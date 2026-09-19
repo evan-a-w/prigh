@@ -4,7 +4,7 @@ quits.
 press Ctrl+C again to quit
 ────────────────────────────────────────────────────────────────────────────────────────────────────
 >
-deepseek/deepseek-flash  thinking:off  ctx:0 (0%)  in:0 out:0  $0.0000  Ctrl+C again quits
+deepseek/deepseek-flash  thinking:off  view:normal  ctx:0 (0%)  in:0 out:0  $0.0000  Ctrl+C again q…
 === quit
 EXITED
 ixon isig icanon iexten echo

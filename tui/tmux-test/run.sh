@@ -170,7 +170,7 @@ scenario_resize() {
 scenario_quit() {
 	wait_for "Ctrl+C twice"
 	keys C-c
-	wait_for "again quits"
+	wait_for "Ctrl+C again"
 	capture quit "after first C-c"
 	keys C-c
 	wait_for "EXITED"

@@ -3,4 +3,4 @@ session <id> in $TMP/cwd. /help for commands, Esc aborts, Ctrl+C twice
 quits.
 ────────────────────────────────────────────────────────────────────────────────────────────────────
 >
-deepseek/deepseek-flash  thinking:off  ctx:0 (0%)  in:0 out:0  $0.0000
+deepseek/deepseek-flash  thinking:off  view:normal  ctx:0 (0%)  in:0 out:0  $0.0000

@@ -15,4 +15,4 @@ quits.
 faux reply
 ────────────────────────────────────────────────────────────────────────────────────────────────────
 >
-deepseek/deepseek-flash  thinking:off  ctx:10 (0%)  in:10 out:5  $0.0000
+deepseek/deepseek-flash  thinking:off  view:normal  ctx:10 (0%)  in:10 out:5  $0.0000
