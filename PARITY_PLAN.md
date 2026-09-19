@@ -62,6 +62,16 @@ answered through `Reply`.
   scenarios `suspend` and `editor` prove it.
 - **M5 TUI done** (`Text_prompt` mode, `/tree` over `get_entries {all}`
   which now returns `{head, entries}`).
+- **M6 TUI done** (`P.Config`, `/scoped-models` multi-select picker,
+  Ctrl+P / Alt+P (Shift+Ctrl+P is not a terminal key), Ctrl+T, status line
+  with priority-based truncation — at 60 cols the old line silently dropped
+  the spinner and `Ctrl+C again quits`; now the mode hint and ctx survive
+  first). `agents:` is part of the status line, no separate strip.
+- **M7 done** (`Markdown.render ?width`, `Style.link`/`strike`, OSC-8 in
+  `View_of_content`, `Screen.to_styled` debug renderer, diff colouring,
+  bash head+tail, bordered dialogs, Ctrl+F search — navigation is
+  Enter/↓/↑ rather than n/N so queries can contain those letters —
+  Ctrl+Up/Down, `/hotkeys`, `/help <cmd>`).
 
 ## M0 — Known bugs (fix first, each with a regression test)
 
