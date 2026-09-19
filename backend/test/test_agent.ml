@@ -338,3 +338,85 @@ let%expect_test "manual compaction" =
     state: running=false messages=5
     |}]
 ;;
+
+let%expect_test "delete_session refuses the active session" =
+  with_agent [ Reply.text "hi" ]
+  @@ fun _t agent _dump ->
+  Or_error.ok_exn (Agent.prompt agent "hello");
+  Agent.wait_idle agent;
+  let first = (Agent.state agent).session_path in
+  Agent.new_session agent;
+  let second = (Agent.state agent).session_path in
+  print_s [%sexp (Agent.delete_session agent ~path:second : unit Or_error.t)];
+  print_s [%sexp (Agent.delete_session agent ~path:first : unit Or_error.t)];
+  print_s
+    [%sexp
+      { first_exists = (Sys_unix.file_exists_exn first : bool)
+      ; second_exists = (Sys_unix.file_exists_exn second : bool)
+      }];
+  [%expect
+    {|
+    (Error "cannot delete the active session")
+    (Ok ())
+    ((first_exists false) (second_exists true))
+    |}]
+;;
+
+let%expect_test "set_cwd changes state, persists, and is refused while running" =
+  with_agent
+    [ Reply.tool_call
+        ~id:"c1"
+        ~name:"bash"
+        ~arguments:{|{"command":"sleep 0.3"}|}
+        ()
+    ; Reply.text "done"
+    ]
+  @@ fun t agent _dump ->
+  let sub = Filename.concat t.dir "sub" in
+  Core_unix.mkdir_p sub;
+  print_s [%sexp (Agent.set_cwd agent ~path:sub : unit Or_error.t)];
+  let state = Agent.state agent in
+  print_s
+    [%sexp
+      (mask t state.cwd : string)
+    , (mask t (Session.cwd (Agent.session agent)) : string)];
+  let reloaded = Or_error.ok_exn (Session.load state.session_path) in
+  print_s [%sexp (mask t (Session.cwd reloaded) : string)];
+  Or_error.ok_exn (Agent.prompt agent "go");
+  print_s [%sexp (Agent.set_cwd agent ~path:t.dir : unit Or_error.t)];
+  Agent.wait_idle agent;
+  [%expect
+    {|
+    (Ok ())
+    ($DIR/sub $DIR/sub)
+    $DIR/sub
+    (Error "cannot change directory while a run is in progress")
+    |}]
+;;
+
+let%expect_test "git_branch is read from .git/HEAD and refreshed" =
+  with_agent [ Reply.text "ok" ]
+  @@ fun t agent _dump ->
+  print_s [%sexp ((Agent.state agent).git_branch : string option)];
+  let repo = Filename.concat t.dir "repo" in
+  let git = Filename.concat repo ".git" in
+  Core_unix.mkdir_p (Filename.concat repo "sub");
+  Core_unix.mkdir_p git;
+  Out_channel.write_all
+    (Filename.concat git "HEAD")
+    ~data:"ref: refs/heads/feature\n";
+  Or_error.ok_exn (Agent.set_cwd agent ~path:(Filename.concat repo "sub"));
+  print_s [%sexp ((Agent.state agent).git_branch : string option)];
+  Out_channel.write_all
+    (Filename.concat git "HEAD")
+    ~data:"0123456789abcdef0123456789abcdef01234567\n";
+  Or_error.ok_exn (Agent.prompt agent "go");
+  Agent.wait_idle agent;
+  print_s [%sexp ((Agent.state agent).git_branch : string option)];
+  [%expect
+    {|
+    ()
+    (feature)
+    (01234567)
+    |}]
+;;

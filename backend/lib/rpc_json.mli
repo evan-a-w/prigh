@@ -9,6 +9,7 @@ val delta : Assistant_event.t -> Json.t
 val state : Agent.State.t -> Json.t
 val model : Model.t -> Json.t
 val session_summary : Session.Summary.t -> Json.t
+val session_stats : Agent.Session_stats.t -> Json.t
 val entry : Session.Entry.t -> Json.t
 val thinking : Thinking.t -> Json.t
 val thinking_of_string : string -> Thinking.t Or_error.t

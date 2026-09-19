@@ -4,6 +4,7 @@
  (preprocess
   (pps ppx_jane ppx_jsonaf_conv))
  (inline_tests)
- (libraries core core_unix core_unix.sys_unix jsonaf jsonaf.kernel re eio
+ (libraries core core_unix core_unix.sys_unix core_unix.filename_unix jsonaf
+  jsonaf.kernel re eio
   eio.unix cohttp-eio tls-eio ca-certs mirage-crypto-rng mirage-crypto-rng.unix
   digestif base64 ohex uri domain-name))

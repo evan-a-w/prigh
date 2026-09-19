@@ -132,7 +132,9 @@ let state (s : Agent.State.t) =
   `Object
     [ "session_id", str s.session_id
     ; "session_path", str s.session_path
+    ; "session_name", Option.value_map s.session_name ~default:`Null ~f:str
     ; "cwd", str s.cwd
+    ; "git_branch", Option.value_map s.git_branch ~default:`Null ~f:str
     ; "model", model s.model
     ; "thinking", thinking s.thinking
     ; "running", bool s.running
@@ -147,10 +149,29 @@ let session_summary (s : Session.Summary.t) =
   `Object
     [ "id", str s.id
     ; "path", str s.path
+    ; "name", Option.value_map s.name ~default:`Null ~f:str
     ; "cwd", str s.cwd
     ; "created_at", str s.created_at
+    ; "updated_at", str s.updated_at
     ; "first_prompt", Option.value_map s.first_prompt ~default:`Null ~f:str
     ; "message_count", int s.message_count
+    ; "parent", Option.value_map s.parent ~default:`Null ~f:str
+    ]
+;;
+
+let session_stats (s : Agent.Session_stats.t) =
+  `Object
+    [ "message_count", int s.message_count
+    ; "turns", int s.turns
+    ; ( "tool_calls"
+      , `Object
+          (List.map s.tool_calls ~f:(fun (name, count) -> name, int count)) )
+    ; "usage", usage s.usage
+    ; "cost_usd", float s.cost_usd
+    ; "context_percent", float s.context_percent
+    ; "model_changes", int s.model_changes
+    ; "compactions", int s.compactions
+    ; "duration_seconds", float s.duration_seconds
     ]
 ;;
 
@@ -165,6 +186,8 @@ let entry (e : Session.Entry.t) =
       ; "summary", str summary
       ; "kept_from", str kept_from
       ]
+    | Name { name } -> [ "kind", str "name"; "name", str name ]
+    | Cwd { cwd } -> [ "kind", str "cwd"; "cwd", str cwd ]
   in
   `Object
     ([ "id", str e.id

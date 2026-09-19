@@ -78,7 +78,7 @@ let split_point ~keep_recent_tokens (entries : Session.Entry.t list) =
              | Assistant _ | Tool_result _ -> candidate
            in
            go rest tokens candidate)
-       | Model _ | Compaction _ -> go rest tokens candidate)
+       | Model _ | Compaction _ | Name _ | Cwd _ -> go rest tokens candidate)
   in
   go (List.rev entries) 0 None
 ;;
@@ -101,7 +101,7 @@ let compact
       |> List.count ~f:(fun e ->
         match e.payload with
         | Message _ -> true
-        | Model _ | Compaction _ -> false)
+        | Model _ | Compaction _ | Name _ | Cwd _ -> false)
     in
     let older =
       List.take messages_before (List.length messages_before - kept_count)

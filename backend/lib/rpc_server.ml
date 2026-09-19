@@ -17,8 +17,15 @@ let methods =
   ; "new_session"
   ; "switch_session"
   ; "list_sessions"
+  ; "set_session_name"
+  ; "delete_session"
+  ; "export"
+  ; "import"
   ; "fork"
+  ; "clone"
   ; "rewind"
+  ; "session_stats"
+  ; "set_cwd"
   ; "auth_status"
   ; "login"
   ; "auth_respond"
@@ -108,6 +115,27 @@ let dispatch agent login ~meth ~params : Json.t Or_error.t =
   | "list_sessions" ->
     let dir = Filename.dirname (Agent.state agent).session_path in
     ok (`Array (List.map (Session.list ~dir) ~f:Rpc_json.session_summary))
+  | "set_session_name" ->
+    Or_error.map (string_param params "name") ~f:(fun name ->
+      Agent.set_session_name agent name;
+      `Object [])
+  | "delete_session" ->
+    Or_error.bind (string_param params "path") ~f:(fun path ->
+      unit_result (Agent.delete_session agent ~path))
+  | "export" ->
+    Or_error.bind (string_param params "format") ~f:(fun format ->
+      Or_error.bind (Session.Export_format.of_string format) ~f:(fun format ->
+        let path =
+          match param params "path" with
+          | Some (`String s) -> Some s
+          | _ -> None
+        in
+        Or_error.map (Agent.export agent ~format ?path ()) ~f:(fun path ->
+          `Object [ "path", `String path ])))
+  | "import" ->
+    Or_error.bind (string_param params "path") ~f:(fun path ->
+      Or_error.map (Agent.import_session agent ~path) ~f:(fun path ->
+        `Object [ "path", `String path ]))
   | "fork" ->
     let at =
       match param params "at" with
@@ -115,9 +143,14 @@ let dispatch agent login ~meth ~params : Json.t Or_error.t =
       | _ -> None
     in
     unit_result (Agent.fork agent ?at ())
+  | "clone" -> unit_result (Agent.fork agent ())
   | "rewind" ->
     Or_error.bind (string_param params "to") ~f:(fun to_ ->
       unit_result (Agent.rewind agent ~to_))
+  | "session_stats" -> ok (Rpc_json.session_stats (Agent.session_stats agent))
+  | "set_cwd" ->
+    Or_error.bind (string_param params "path") ~f:(fun path ->
+      unit_result (Agent.set_cwd agent ~path))
   | "auth_status" ->
     Or_error.map (Login_manager.status login) ~f:(fun statuses ->
       `Array (List.map statuses ~f:Rpc_json.auth_status))

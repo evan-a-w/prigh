@@ -5,7 +5,9 @@ module State = struct
   type t =
     { session_id : string
     ; session_path : string
+    ; session_name : string option
     ; cwd : string
+    ; git_branch : string option
     ; model : Model.t
     ; thinking : Thinking.t
     ; running : bool
@@ -13,6 +15,21 @@ module State = struct
     ; usage : Usage.t
     ; cost_usd : float
     ; context_tokens : int
+    }
+  [@@deriving sexp_of]
+end
+
+module Session_stats = struct
+  type t =
+    { message_count : int
+    ; turns : int
+    ; tool_calls : (string * int) list
+    ; usage : Usage.t
+    ; cost_usd : float
+    ; context_percent : float
+    ; model_changes : int
+    ; compactions : int
+    ; duration_seconds : float
     }
   [@@deriving sexp_of]
 end
@@ -44,8 +61,9 @@ type t =
   ; tools : Tool.t list
   ; sessions_dir : string
   ; home : string
-  ; cwd : string
   ; mutable session : Session.t
+  ; mutable cwd : string
+  ; mutable git_branch : string option
   ; mutable model : Model.t
   ; mutable thinking : Thinking.t
   ; mutable run : Run.t option
@@ -80,8 +98,9 @@ let create
   let session =
     match session with
     | Some s -> s
-    | None -> Session.create ~dir:sessions_dir ~cwd
+    | None -> Session.create ~dir:sessions_dir ~cwd ()
   in
+  let cwd = Session.cwd session in
   let t =
     { env
     ; sw
@@ -89,8 +108,9 @@ let create
     ; tools
     ; sessions_dir
     ; home
-    ; cwd
     ; session
+    ; cwd
+    ; git_branch = Git_branch.find ~cwd
     ; model
     ; thinking
     ; run = None
@@ -129,7 +149,9 @@ let state t =
   in
   { State.session_id = Session.id t.session
   ; session_path = Session.path t.session
+  ; session_name = Session.name t.session
   ; cwd = t.cwd
+  ; git_branch = t.git_branch
   ; model = t.model
   ; thinking = t.thinking
   ; running = is_running t
@@ -169,6 +191,7 @@ let config t =
 ;;
 
 let rec start_run t prompts =
+  t.git_branch <- Git_branch.find ~cwd:t.cwd;
   let cancel = Cancellation.create () in
   let finished, resolve = Promise.create () in
   t.run <- Some { cancel; finished };
@@ -331,6 +354,8 @@ let replace_session t session =
   ignore (abort t);
   wait_idle t;
   t.session <- session;
+  t.cwd <- Session.cwd session;
+  t.git_branch <- Git_branch.find ~cwd:t.cwd;
   t.subagent_usage <- Usage.zero;
   t.subagent_cost_usd <- 0.;
   restore_settings t;
@@ -338,7 +363,7 @@ let replace_session t session =
 ;;
 
 let new_session t =
-  replace_session t (Session.create ~dir:t.sessions_dir ~cwd:t.cwd)
+  replace_session t (Session.create ~dir:t.sessions_dir ~cwd:t.cwd ())
 ;;
 
 let switch_session t ~path =
@@ -356,4 +381,112 @@ let rewind t ~to_ =
   then Or_error.error_string "cannot rewind while a run is in progress"
   else
     Or_error.map (Session.rewind t.session ~to_) ~f:(fun () -> state_changed t)
+;;
+
+let set_session_name t name =
+  ignore (Session.set_name t.session ~name : Session.Entry.t);
+  state_changed t
+;;
+
+let resolve_path t path =
+  let path = Tool.expand_home path in
+  if Filename.is_absolute path then path else Filename.concat t.cwd path
+;;
+
+let set_cwd t ~path =
+  if is_running t
+  then
+    Or_error.error_string "cannot change directory while a run is in progress"
+  else (
+    let path = resolve_path t path in
+    match Sys_unix.is_directory path with
+    | `Yes ->
+      let path = Filename_unix.realpath path in
+      t.cwd <- path;
+      t.git_branch <- Git_branch.find ~cwd:path;
+      ignore (Session.set_cwd t.session ~cwd:path : Session.Entry.t);
+      state_changed t;
+      Ok ()
+    | `No | `Unknown -> Or_error.errorf "not a directory: %s" path)
+;;
+
+let delete_session t ~path =
+  if String.equal path (Session.path t.session)
+  then Or_error.error_string "cannot delete the active session"
+  else Or_error.try_with (fun () -> Core_unix.unlink path)
+;;
+
+let export t ~format ?path () =
+  let path =
+    match path with
+    | Some p -> resolve_path t p
+    | None ->
+      let base = Filename.basename (Session.path t.session) in
+      let stamp = List.hd_exn (String.split base ~on:'_') in
+      Filename.concat
+        (Filename.concat t.sessions_dir "exports")
+        (sprintf
+           "%s_%s.%s"
+           stamp
+           (Session.id t.session)
+           (Session.Export_format.extension format))
+  in
+  Or_error.try_with (fun () ->
+    Core_unix.mkdir_p (Filename.dirname path);
+    (match format with
+     | Session.Export_format.Markdown ->
+       Out_channel.write_all path ~data:(Session.to_markdown t.session)
+     | Jsonl ->
+       Out_channel.write_all
+         path
+         ~data:(In_channel.read_all (Session.path t.session)));
+    path)
+;;
+
+let import_session t ~path =
+  Or_error.map (Session.import ~dir:t.sessions_dir path) ~f:(fun session ->
+    replace_session t session;
+    Session.path session)
+;;
+
+let session_stats t =
+  let path = Session.active_path t.session in
+  let messages = Session.messages t.session in
+  let assistants =
+    List.filter_map messages ~f:(function
+      | Message.Assistant a -> Some a
+      | User _ | Tool_result _ -> None)
+  in
+  let tool_calls = String.Table.create () in
+  List.iter assistants ~f:(fun a ->
+    List.iter (Message.Assistant.tool_calls a) ~f:(fun call ->
+      Hashtbl.update tool_calls call.name ~f:(function
+        | None -> 1
+        | Some n -> n + 1)));
+  let count is_model =
+    List.count path ~f:(fun (e : Session.Entry.t) ->
+      match is_model, e.payload with
+      | true, Model _ -> true
+      | false, Compaction _ -> true
+      | _ -> false)
+  in
+  let state = state t in
+  let context_percent =
+    match state.context_tokens with
+    | 0 -> 0.
+    | tokens ->
+      Float.of_int tokens /. Float.of_int t.model.context_window *. 100.
+  in
+  { Session_stats.message_count = List.length messages
+  ; turns = List.length assistants
+  ; tool_calls =
+      Hashtbl.to_alist tool_calls
+      |> List.sort ~compare:(fun (a, _) (b, _) -> String.compare a b)
+  ; usage = state.usage
+  ; cost_usd = state.cost_usd
+  ; context_percent
+  ; model_changes = count true
+  ; compactions = count false
+  ; duration_seconds = Session.duration_seconds t.session
+  }
 ;;

@@ -36,12 +36,16 @@ let time_re =
   Re.compile (Re.Perl.re {|\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\.\d+Z|})
 ;;
 
-(* Replaces the sandbox dir, session ids, file stamps and timestamps. *)
+let duration_re = Re.compile (Re.Perl.re {|"duration_seconds":-?[0-9.eE+]+|})
+
+(* Replaces the sandbox dir, session ids, file stamps, timestamps and
+   durations. *)
 let mask t s =
   String.substr_replace_all s ~pattern:t.dir ~with_:"$DIR"
+  |> Re.replace_string time_re ~by:"<time>"
+  |> Re.replace_string duration_re ~by:{|"duration_seconds":<t>|}
   |> Re.replace_string id_re ~by:"<id>"
   |> Re.replace_string stamp_re ~by:"<stamp>"
-  |> Re.replace_string time_re ~by:"<time>"
 ;;
 
 let run ?cancel ?on_output t tool args =

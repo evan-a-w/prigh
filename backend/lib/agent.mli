@@ -9,7 +9,9 @@ module State : sig
   type t =
     { session_id : string
     ; session_path : string
+    ; session_name : string option
     ; cwd : string
+    ; git_branch : string option
     ; model : Model.t
     ; thinking : Thinking.t
     ; running : bool
@@ -17,6 +19,21 @@ module State : sig
     ; usage : Usage.t (** summed over assistant messages on the active path *)
     ; cost_usd : float
     ; context_tokens : int (** input tokens of the last request, if any *)
+    }
+  [@@deriving sexp_of]
+end
+
+module Session_stats : sig
+  type t =
+    { message_count : int
+    ; turns : int (** assistant messages *)
+    ; tool_calls : (string * int) list (** by tool name *)
+    ; usage : Usage.t
+    ; cost_usd : float
+    ; context_percent : float
+    ; model_changes : int
+    ; compactions : int
+    ; duration_seconds : float
     }
   [@@deriving sexp_of]
 end
@@ -82,3 +99,26 @@ val new_session : t -> unit
 val switch_session : t -> path:string -> unit Or_error.t
 val fork : t -> ?at:string -> unit -> unit Or_error.t
 val rewind : t -> to_:string -> unit Or_error.t
+val set_session_name : t -> string -> unit
+
+(** Changes the working directory used by tools and the system prompt, and
+    records it in the session. Fails while a run is in progress. *)
+val set_cwd : t -> path:string -> unit Or_error.t
+
+(** Refuses to delete the active session. *)
+val delete_session : t -> path:string -> unit Or_error.t
+
+(** Writes the session to [path] (default: [<sessions_dir>/exports/...]) and
+    returns the path written. *)
+val export
+  :  t
+  -> format:Session.Export_format.t
+  -> ?path:string
+  -> unit
+  -> string Or_error.t
+
+(** Copies a session file into the sessions directory and switches to it;
+    returns the new path. *)
+val import_session : t -> path:string -> string Or_error.t
+
+val session_stats : t -> Session_stats.t
