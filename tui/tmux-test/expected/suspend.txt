@@ -1,0 +1,19 @@
+=== suspend
+[1]+  Stopped                 sh $TMP/run.sh
+bash-5.2$
+=== suspend
+session <id> in $TMP/cwd. /help for commands, Esc aborts, Ctrl+C twice
+quits.
+> before
+faux reply
+────────────────────────────────────────────────────────────────────────────────────────────────────
+>
+deepseek/deepseek-flash  thinking:off  view:normal  ctx:10 (0%)  in:10 out:5  $0.0000
+=== suspend
+session <id> in $TMP/cwd. /help for commands, Esc aborts, Ctrl+C twice
+quits.
+> before
+faux reply
+────────────────────────────────────────────────────────────────────────────────────────────────────
+> still typing
+deepseek/deepseek-flash  thinking:off  view:normal  ctx:10 (0%)  in:10 out:5  $0.0000

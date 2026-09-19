@@ -19,8 +19,7 @@ module Platform = struct
     }
 end
 
-let perform ctx (platform : Platform.t) ~width ~height (command : App.Command.t)
-  =
+let perform ctx (platform : Platform.t) (command : App.Command.t) =
   let inject = Bonsai.Apply_action_context.inject ctx in
   let effect =
     match command with
@@ -36,16 +35,9 @@ let perform ctx (platform : Platform.t) ~width ~height (command : App.Command.t)
       inject (App.Action.Reply (App.Reply_tag.History, result))
     | Append_history text -> platform.append_history text
     | Copy_to_clipboard text -> platform.copy_to_clipboard text
-    | Suspend ->
-      (* The platform releases and re-acquires the terminal; toggling the size
-         forces Bonsai_term to repaint every cell afterwards. *)
-      let%bind.Bonsai.Effect () = platform.suspend in
-      let%bind.Bonsai.Effect () = inject (Resize { width = 1; height = 1 }) in
-      inject (Resize { width; height })
+    | Suspend -> platform.suspend
     | Edit_externally text ->
       let%bind.Bonsai.Effect result = platform.edit_externally text in
-      let%bind.Bonsai.Effect () = inject (Resize { width = 1; height = 1 }) in
-      let%bind.Bonsai.Effect () = inject (Resize { width; height }) in
       inject
         (App.Action.Reply
            ( App.Reply_tag.Editor_text
@@ -64,9 +56,7 @@ let create platform (local_ graph) =
         let model, commands = App.update model action in
         (match input with
          | Bonsai.Computation_status.Active platform ->
-           List.iter
-             commands
-             ~f:(perform ctx platform ~width:model.width ~height:model.height)
+           List.iter commands ~f:(perform ctx platform)
          | Inactive -> ());
         model)
       platform

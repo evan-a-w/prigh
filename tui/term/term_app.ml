@@ -32,20 +32,57 @@ let release_terminal () =
   ignore (Core_unix.system "stty sane </dev/tty" : Core_unix.Exit_or_signal.t)
 ;;
 
+(* Notty diffs each frame against the one it believes is on screen, so after the
+   alt screen is re-entered we must repaint that frame ourselves. Filled in once
+   the driver exists. *)
+let repaint = ref (fun () -> ())
+let last_cursor : (int * int) option ref = ref None
+
 let reacquire_terminal () =
   ignore
-    (Core_unix.system "stty raw -echo -iexten </dev/tty"
+    (Core_unix.system "stty -icanon -echo -isig -ixon -iexten </dev/tty"
      : Core_unix.Exit_or_signal.t);
-  write_tty "\027[?1049h"
+  write_tty "\027[?1049h";
+  !repaint ()
+;;
+
+let install_repaint driver =
+  repaint
+  := fun () ->
+       match Driver.prev_view driver with
+       | None -> ()
+       | Some view ->
+         let { Dimensions.width; height } = Driver.dimensions driver in
+         let buf = Buffer.create 4096 in
+         Buffer.add_string buf "\027[2J\027[H";
+         Notty.Render.to_buffer
+           buf
+           Notty.Cap.ansi
+           (0, 0)
+           (width, height)
+           (View.Private.notty_image view);
+         (match !last_cursor with
+          | Some (row, col) ->
+            Buffer.add_string
+              buf
+              (sprintf "\027[%d;%dH\027[?25h" (row + 1) (col + 1))
+          | None -> ());
+         write_tty (Buffer.contents buf)
 ;;
 
 (* Notty has no api to release and re-acquire the terminal, so we leave the alt
    screen, restore cooked mode and SIGTSTP ourselves; on SIGCONT we put the tty
-   back into raw mode and re-enter the alt screen. The component then injects a
-   1x1 resize followed by the real one to force a full repaint. *)
+   back into raw mode, re-enter the alt screen and repaint. *)
 let suspend () =
   release_terminal ();
-  Signal_unix.send_i Signal.tstp (`Pid (Core_unix.getpid ()));
+  (* Stop the whole foreground process group, like the tty's ^Z would. *)
+  let pid = Core_unix.getpid () in
+  let target =
+    match Core_unix.getpgid pid with
+    | Some group -> `Group group
+    | None -> `Pid pid
+  in
+  Signal_unix.send_i Signal.tstp target;
   reacquire_terminal ()
 ;;
 
@@ -204,6 +241,7 @@ let app
     ~callback:
       (let%arr set_cursor in
        fun cursor ->
+         last_cursor := cursor;
          set_cursor
            (Option.map cursor ~f:(fun (row, col) ->
               { Cursor.position = { x = col; y = row }; kind = Default })))
@@ -275,6 +313,7 @@ let run ~backend ~args =
          else Core_unix.stdout
        in
        let had_iexten = Tty.set_iexten tty false in
+       install_repaint driver;
        don't_wait_for
          (Pipe.iter_without_pushback
             (Client.incoming client)

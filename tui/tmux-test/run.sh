@@ -31,10 +31,21 @@ tmp=""
 start() {
 	mkdir -p "$tmp/home" "$tmp/cwd"
 	session="prigh-test-$$-$RANDOM"
-	tmux new-session -d -s "$session" -x "$W" -y "$H" \
-		"env HOME=$tmp/home TERM=xterm-256color PRIGH_BACKEND=$backend \
-		 $exe -faux -cwd $tmp/cwd -auth-file $tmp/home/auth.json $*; \
-		 echo EXITED; stty -a | tr ' ;' '\n\n' | grep -E '^-?(icanon|echo|iexten|isig|ixon)$' | tr '\n' ' '; echo; sleep 30"
+	{
+		echo "export HOME=$tmp/home TERM=xterm-256color EDITOR=$tmp/editor.sh PRIGH_BACKEND=$backend"
+		echo "$exe -faux -cwd $tmp/cwd -auth-file $tmp/home/auth.json $*"
+		echo "echo EXITED"
+		echo "stty -a | tr ' ;' '\\n\\n' | grep -E '^-?(icanon|echo|iexten|isig|ixon)\$' | tr '\\n' ' '; echo"
+	} >"$tmp/run.sh"
+	if [ "${interactive:-}" = 1 ]; then
+		# Job control (Ctrl+Z / fg) needs an interactive shell.
+		tmux new-session -d -s "$session" -x "$W" -y "$H" "env -i PATH=$PATH TERM=xterm-256color bash --norc --noprofile -i"
+		sleep 0.5
+		tmux send-keys -t "$session" -l "clear; sh $tmp/run.sh"
+		tmux send-keys -t "$session" Enter
+	else
+		tmux new-session -d -s "$session" -x "$W" -y "$H" "sh $tmp/run.sh; sleep 30"
+	fi
 }
 
 stop() {
@@ -107,6 +118,7 @@ run_scenario() {
 	out="$(mktemp)"
 	tmp="$(mktemp -d)"
 	extra_args=""
+	interactive=""
 	if declare -F "setup_$name" >/dev/null; then "setup_$name"; fi
 	start $extra_args
 	if ! "scenario_$name"; then
@@ -221,7 +233,44 @@ scenario_tools() {
 	capture tools "main again"
 }
 
-all="startup prompt ctrl_o resize quit tools"
+setup_suspend() { interactive=1; }
+
+scenario_suspend() {
+	wait_for "Ctrl+C twice"
+	type_text "before"
+	keys Enter
+	wait_for "faux reply"
+	keys C-z
+	wait_for "Stopped"
+	settle
+	capture suspend "suspended (shell visible)"
+	type_text "fg"
+	keys Enter
+	wait_for "faux reply"
+	settle
+	capture suspend "after fg (repainted)"
+	type_text "still typing"
+	settle
+	capture suspend "editor works"
+}
+
+setup_editor() {
+	interactive=1
+	# A fake $EDITOR that appends a line to the prompt file.
+	printf '#!/bin/sh\nprintf "edited by editor\\n" >> "$1"\n' >"$tmp/editor.sh"
+	chmod +x "$tmp/editor.sh"
+}
+
+scenario_editor() {
+	wait_for "Ctrl+C twice"
+	type_text "draft"
+	keys C-g
+	wait_for "edited by editor"
+	settle
+	capture editor "after Ctrl+G round trip"
+}
+
+all="startup prompt ctrl_o resize quit tools suspend editor"
 for name in ${*:-$all}; do
 	run_scenario "$name"
 done
