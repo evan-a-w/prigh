@@ -30,6 +30,29 @@ let make_platform ~replies : Component.Platform.t =
   ; open_browser =
       (fun url ->
         Bonsai.Effect.of_sync_fun (fun () -> printf "open browser %s\n" url) ())
+  ; load_history =
+      (fun () ->
+        Bonsai.Effect.of_sync_fun
+          (fun () ->
+            print_endline "load history";
+            Ok (`Array []))
+          ())
+  ; append_history =
+      (fun text ->
+        Bonsai.Effect.of_sync_fun
+          (fun () -> printf "append history %s\n" text)
+          ())
+  ; copy_to_clipboard =
+      (fun text ->
+        Bonsai.Effect.of_sync_fun (fun () -> printf "copy %s\n" text) ())
+  ; suspend = Bonsai.Effect.of_sync_fun (fun () -> print_endline "suspend") ()
+  ; edit_externally =
+      (fun text ->
+        Bonsai.Effect.of_sync_fun
+          (fun () ->
+            printf "edit %s\n" text;
+            Ok text)
+          ())
   ; quit = Bonsai.Effect.of_sync_fun (fun () -> print_endline "quit") ()
   }
 ;;
@@ -81,6 +104,7 @@ let%expect_test "component: startup requests, key handling, rpc round trip, \
     rpc get_state ()
     rpc get_messages ()
     rpc auth_status ()
+    load history
     spinner=0 running=false
 
 

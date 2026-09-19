@@ -50,6 +50,7 @@ let%expect_test "key_of_event: terminal event -> key" =
     ; "Uchar U+1F600", key_press (Ekey.Uchar (Stdlib.Uchar.of_int 0x1F600)) []
     ; "ASCII 'c' + [Ctrl]", key_press (Ekey.ASCII 'c') [ Mod.Ctrl ]
     ; "ASCII '\\003' (^C raw)", key_press (Ekey.ASCII '\003') []
+    ; "ASCII '\\031' (^_ raw)", key_press (Ekey.ASCII '\031') []
     ; "ASCII 'j' + [Ctrl]", key_press (Ekey.ASCII 'j') [ Mod.Ctrl ]
     ; "Paste Start", Event.Paste `Start
     ; "Paste End", Event.Paste `End
@@ -90,6 +91,7 @@ let%expect_test "key_of_event: terminal event -> key" =
     Uchar U+1F600                (Key_press (key (Uchar U+1F600)))                -> (((code (Char "\240\159\152\128")) (ctrl false) (alt false) (shift false)))
     ASCII 'c' + [Ctrl]           (Key_press (key (ASCII c)) (mods (Ctrl)))        -> (((code (Char c)) (ctrl true) (alt false) (shift false)))
     ASCII '\003' (^C raw)        (Key_press (key (ASCII "\003")))                 -> (((code (Char c)) (ctrl true) (alt false) (shift false)))
+    ASCII '\031' (^_ raw)        (Key_press (key (ASCII "\031")))                 -> (((code (Char _)) (ctrl true) (alt false) (shift false)))
     ASCII 'j' + [Ctrl]           (Key_press (key (ASCII j)) (mods (Ctrl)))        -> (((code (Char j)) (ctrl true) (alt false) (shift false)))
     Paste Start                  (Paste Start)                                    -> ()
     Paste End                    (Paste End)                                      -> ()
@@ -152,12 +154,19 @@ let%expect_test "keymap: every bound key is reachable from a terminal event" =
     Enter            (Key_press (key Enter))          ok
     Alt+Enter        (Key_press (key Enter) (mods (Meta))) ok
     Ctrl+J           (Key_press (key (ASCII j)) (mods (Ctrl))) ok
+    Alt+J            (Key_press (key (ASCII j)) (mods (Meta))) ok
     Esc              (Key_press (key Escape))         ok
     Tab              (Key_press (key Tab))            ok
     Up               (Key_press (key (Arrow Up)))     ok
     Down             (Key_press (key (Arrow Down)))   ok
+    Alt+Up           (Key_press (key (Arrow Up)) (mods (Meta))) ok
     Left             (Key_press (key (Arrow Left)))   ok
     Right            (Key_press (key (Arrow Right)))  ok
+    Alt+B            (Key_press (key (ASCII b)) (mods (Meta))) ok
+    Ctrl+Left        (Key_press (key (Arrow Left)) (mods (Ctrl))) ok
+    Alt+F            (Key_press (key (ASCII f)) (mods (Meta))) ok
+    Ctrl+Right       (Key_press (key (Arrow Right)) (mods (Ctrl))) ok
+    Alt+D            (Key_press (key (ASCII d)) (mods (Meta))) ok
     Home             (Key_press (key Home))           ok
     Ctrl+A           (Key_press (key (ASCII a)) (mods (Ctrl))) ok
     End              (Key_press (key End))            ok
@@ -170,8 +179,16 @@ let%expect_test "keymap: every bound key is reachable from a terminal event" =
     Ctrl+K           (Key_press (key (ASCII k)) (mods (Ctrl))) ok
     Ctrl+U           (Key_press (key (ASCII u)) (mods (Ctrl))) ok
     Ctrl+W           (Key_press (key (ASCII w)) (mods (Ctrl))) ok
-    Ctrl+L           (Key_press (key (ASCII l)) (mods (Ctrl))) ok
+    Alt+Backspace    (Key_press (key Backspace) (mods (Meta))) ok
+    Ctrl+Y           (Key_press (key (ASCII y)) (mods (Ctrl))) ok
+    Alt+Y            (Key_press (key (ASCII y)) (mods (Meta))) ok
+    Ctrl+_           (Key_press (key (ASCII _)) (mods (Ctrl))) ok
     Ctrl+O           (Key_press (key (ASCII o)) (mods (Ctrl))) ok
+    Ctrl+R           (Key_press (key (ASCII r)) (mods (Ctrl))) ok
+    Ctrl+G           (Key_press (key (ASCII g)) (mods (Ctrl))) ok
+    Ctrl+L           (Key_press (key (ASCII l)) (mods (Ctrl))) ok
+    Ctrl+X           (Key_press (key (ASCII x)) (mods (Ctrl))) ok
+    Ctrl+Z           (Key_press (key (ASCII z)) (mods (Ctrl))) ok
     Shift+Tab        (Key_press (key Tab) (mods (Shift))) ok
     Alt+1            (Key_press (key (ASCII 1)) (mods (Meta))) ok
     Ctrl+C           (Key_press (key (ASCII c)) (mods (Ctrl))) ok

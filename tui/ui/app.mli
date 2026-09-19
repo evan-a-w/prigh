@@ -26,6 +26,9 @@ module Reply_tag : sig
     | Compact_done
     | Abort_done
     | Notice_on_success of string
+    | History
+    | Dequeued
+    | Editor_text
   [@@deriving sexp_of, equal]
 end
 
@@ -41,6 +44,11 @@ module Command : sig
         ; tag : Reply_tag.t
         }
     | Open_browser of string
+    | Load_history
+    | Append_history of string
+    | Copy_to_clipboard of string
+    | Suspend
+    | Edit_externally of string
     | Quit
   [@@deriving sexp_of, equal]
 end
@@ -77,6 +85,7 @@ module Model : sig
     ; sessions : P.Session_summary.t list option
     ; known_paths : String.Set.t
     ; queued : Queue_counts.t
+    ; queued_texts : string list
     ; viewport : Viewport.t
     ; pending_quit : bool
     ; spinner : int

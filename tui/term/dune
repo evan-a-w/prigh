@@ -5,5 +5,5 @@
  (foreign_stubs
   (language c)
   (names tty_stubs))
- (libraries core async async_unix core_unix bonsai bonsai_term prigh_protocol
-  prigh_client prigh_ui))
+ (libraries core async async_unix core_unix core_unix.signal_unix bonsai
+  bonsai_term prigh_protocol prigh_client prigh_ui base64))

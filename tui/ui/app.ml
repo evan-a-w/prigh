@@ -22,6 +22,9 @@ module Reply_tag = struct
     | Compact_done
     | Abort_done
     | Notice_on_success of string
+    | History
+    | Dequeued
+    | Editor_text
   [@@deriving sexp_of, equal]
 end
 
@@ -37,6 +40,11 @@ module Command = struct
         ; tag : Reply_tag.t
         }
     | Open_browser of string
+    | Load_history
+    | Append_history of string
+    | Copy_to_clipboard of string
+    | Suspend
+    | Edit_externally of string
     | Quit
   [@@deriving sexp_of, equal]
 end
@@ -73,6 +81,7 @@ module Model = struct
     ; sessions : P.Session_summary.t list option
     ; known_paths : String.Set.t
     ; queued : Queue_counts.t
+    ; queued_texts : string list
     ; viewport : Viewport.t
     ; pending_quit : bool
     ; spinner : int
@@ -192,6 +201,7 @@ let init =
   ; sessions = None
   ; known_paths = String.Set.empty
   ; queued = Queue_counts.zero
+  ; queued_texts = []
   ; viewport = Viewport.Follow
   ; pending_quit = false
   ; spinner = 0
@@ -206,6 +216,7 @@ let start_commands =
   [ rpc "get_state" ~tag:Initial_state
   ; rpc "get_messages" ~tag:Initial_messages
   ; rpc "auth_status" ~tag:Auth_refresh
+  ; Command.Load_history
   ]
 ;;
 
@@ -568,6 +579,27 @@ let user_params m text =
      [ "attachments", `Array (List.map attachments ~f:(fun p -> P.Json.str p)) ])
 ;;
 
+let shell_command m text =
+  if Model.running m
+  then warn m "wait for the current turn", []
+  else (
+    let add_to_context = not (String.is_prefix text ~prefix:"!!") in
+    let command =
+      String.drop_prefix text (if add_to_context then 1 else 2) |> String.strip
+    in
+    if String.is_empty command
+    then error m "usage: !command (!! for without context)", []
+    else
+      ( m
+      , [ rpc
+            "shell"
+            ~params:
+              [ "command", str command
+              ; "add_to_context", P.Json.bool add_to_context
+              ]
+        ] ))
+;;
+
 let submit m =
   let text, editor = Editor.submit m.editor in
   let m = follow { m with editor; autocomplete = None } in
@@ -577,12 +609,58 @@ let submit m =
     match Commands.parse text with
     | Some cmd -> run_command m cmd
     | None ->
-      let params = user_params m text in
-      if Model.running m
-      then
-        ( notice m "queued (delivered after the current turn)"
-        , [ rpc "steer" ~params ] )
-      else { m with agents = []; focus = `Main }, [ rpc "prompt" ~params ])
+      let m, cmds =
+        if String.is_prefix text ~prefix:"!"
+        then shell_command m text
+        else if Model.running m
+        then
+          ( { m with queued_texts = m.queued_texts @ [ text ] }
+          , [ rpc "steer" ~params:(user_params m text) ] )
+        else
+          ( { m with agents = []; focus = `Main }
+          , [ rpc "prompt" ~params:(user_params m text) ] )
+      in
+      m, cmds @ [ Command.Append_history text ])
+;;
+
+let queue_follow_up m =
+  if not (Model.running m)
+  then submit m
+  else (
+    let text, editor = Editor.submit m.editor in
+    if String.is_empty (String.strip text)
+    then m, []
+    else (
+      let m = follow { m with editor; autocomplete = None } in
+      let m = { m with queued_texts = m.queued_texts @ [ text ] } in
+      ( m
+      , [ rpc "follow_up" ~params:(user_params m text)
+        ; Command.Append_history text
+        ] )))
+;;
+
+let last_assistant_text m =
+  let transcript =
+    match m.focus with
+    | `Main -> m.transcript
+    | `Agent id ->
+      (match Agent_view.find m.agents id with
+       | Some a -> a.transcript
+       | None -> m.transcript)
+  in
+  Transcript.items transcript
+  |> List.rev
+  |> List.find_map ~f:(function
+    | Transcript.Item.Assistant { text; _ } -> Some text
+    | _ -> None)
+;;
+
+let copy_last m =
+  match last_assistant_text m with
+  | Some text when not (String.is_empty (String.strip text)) ->
+    ( notice m (sprintf "copied %d chars" (String.length text))
+    , [ Command.Copy_to_clipboard text ] )
+  | _ -> notice m "nothing to copy", []
 ;;
 
 let current_line m =
@@ -636,6 +714,24 @@ let refresh_autocomplete m =
        ( { m with autocomplete = Some ac }
        , [ rpc "list_sessions" ~tag:Sessions_cache ] )
      | _ -> { m with autocomplete = Some ac }, [])
+;;
+
+let path_complete m =
+  let pos = Editor.position m.editor in
+  let line =
+    Option.value (List.nth (Editor.lines m.editor) pos.line) ~default:""
+  in
+  let start = Editor.word_start m.editor in
+  let word =
+    let pieces = List.map (Text_width.uchars line) ~f:fst in
+    String.concat (List.take (List.drop pieces start.col) (pos.col - start.col))
+  in
+  let editor =
+    if String.is_prefix word ~prefix:"@"
+    then m.editor
+    else Editor.insert (Editor.goto m.editor start) "@"
+  in
+  refresh_autocomplete { m with editor }
 ;;
 
 let accept_autocomplete m ~submit_now =
@@ -707,12 +803,19 @@ let editing_intent m (intent : Intent.t) =
   let ed f = { m with editor = f m.editor }, [] in
   match intent with
   | Insert s -> ed (fun e -> Editor.insert e s)
+  | Paste s -> ed (fun e -> Editor.insert_paste e s)
   | Submit -> submit m
   | Newline -> ed Editor.newline
   | Backspace -> ed Editor.backspace
   | Delete -> ed Editor.delete
   | Left -> ed Editor.left
   | Right -> ed Editor.right
+  | Word_left -> ed Editor.word_left
+  | Word_right -> ed Editor.word_right
+  | Delete_word_forward -> ed Editor.delete_word_forward
+  | Yank -> ed Editor.yank
+  | Yank_pop -> ed Editor.yank_pop
+  | Undo -> ed Editor.undo
   | Home ->
     (match m.mode, Editor.is_empty m.editor with
      | Editing, true ->
@@ -743,13 +846,21 @@ let editing_intent m (intent : Intent.t) =
   | Interrupt -> interrupt m
   | Force_quit -> { m with quitting = true }, [ Quit ]
   | Kill_to_end -> ed Editor.kill_to_end
-  | Kill_line -> ed Editor.kill_line
+  | Kill_to_start -> ed Editor.kill_to_start
   | Kill_word -> ed Editor.kill_word
-  | Clear_screen ->
-    follow { m with transcript = Transcript.clear m.transcript }, []
   | Cycle_verbosity -> set_verbosity m (Verbosity.next m.verbosity), []
   | Next_agent -> cycle_focus m, []
   | Focus_agent n -> focus_agent m n, []
+  | Queue_follow_up -> queue_follow_up m
+  | Dequeue -> m, [ rpc "dequeue" ~tag:Dequeued ]
+  | Copy_last -> copy_last m
+  | Suspend -> m, [ Command.Suspend ]
+  | Path_complete -> path_complete m
+  | Edit_externally -> m, [ Command.Edit_externally (Editor.text m.editor) ]
+  | Model_picker ->
+    if List.is_empty m.models
+    then m, [ rpc "list_models" ~tag:(Models_for_picker "") ]
+    else model_picker m ~query:"", []
 ;;
 
 (* Autocomplete is a sub-state of editing: while it is open it owns a few keys,
@@ -780,11 +891,15 @@ let editing m (intent : Intent.t) =
           , [] )
         | Cancel -> { m with autocomplete = None }, []
         | Insert _
+        | Paste _
         | Newline
         | Backspace
         | Delete
         | Left
         | Right
+        | Word_left
+        | Word_right
+        | Delete_word_forward
         | Home
         | End
         | Page_up
@@ -792,12 +907,21 @@ let editing m (intent : Intent.t) =
         | Interrupt
         | Force_quit
         | Kill_to_end
-        | Kill_line
+        | Kill_to_start
         | Kill_word
-        | Clear_screen
+        | Yank
+        | Yank_pop
+        | Undo
         | Cycle_verbosity
         | Next_agent
-        | Focus_agent _ ->
+        | Focus_agent _
+        | Queue_follow_up
+        | Dequeue
+        | Copy_last
+        | Suspend
+        | Path_complete
+        | Edit_externally
+        | Model_picker ->
           let m, cmds = editing_intent m intent in
           let m, more = refresh_autocomplete m in
           m, cmds @ more)
@@ -899,21 +1023,34 @@ let login_prompt m ~id ~(prompt : P.Auth_event.Prompt.t) (intent : Intent.t) =
   | Page_up
   | Page_down
   | Complete
-  | Clear_screen
   | Cycle_verbosity
   | Next_agent
   | Focus_agent _
+  | Queue_follow_up
+  | Dequeue
+  | Copy_last
+  | Suspend
+  | Path_complete
+  | Edit_externally
+  | Model_picker
   | Newline -> m, []
   | Insert _
+  | Paste _
   | Backspace
   | Delete
   | Left
   | Right
+  | Word_left
+  | Word_right
+  | Delete_word_forward
   | Home
   | End
   | Kill_to_end
-  | Kill_line
-  | Kill_word ->
+  | Kill_to_start
+  | Kill_word
+  | Yank
+  | Yank_pop
+  | Undo ->
     let m', cmds = editing m intent in
     { m' with mode = m.mode }, cmds
 ;;
@@ -1041,7 +1178,10 @@ let event m (e : P.Event.t) =
   match e with
   | State state -> { m with state = Some state }, []
   | Queue_update { steer; follow_up } ->
-    { m with queued = { Queue_counts.steer; follow_up } }, []
+    let queued_texts =
+      if steer = 0 && follow_up = 0 then [] else m.queued_texts
+    in
+    { m with queued = { Queue_counts.steer; follow_up }; queued_texts }, []
   | Auth a -> auth_event m a
   | Agent_start
   | Agent_end _
@@ -1163,6 +1303,30 @@ let reply m (tag : Reply_tag.t) (result : (P.Json.t, string) Result.t) =
          ~f:(decode_list ~f:P.Session_summary.of_json)
          (fun sessions ->
             refresh_autocomplete { m with sessions = Some sessions })
+     | History ->
+       decode json ~f:(decode_list ~f:P.Json.to_string_or_error) (fun lines ->
+         { m with editor = Editor.set_history m.editor lines }, [])
+     | Editor_text ->
+       decode json ~f:P.Json.to_string_or_error (fun text ->
+         { m with editor = Editor.set_text m.editor text }, [])
+     | Dequeued ->
+       (match json with
+        | `Null -> notice m "nothing queued", []
+        | _ ->
+          decode
+            json
+            ~f:(fun j -> P.Json.string_field j "text")
+            (fun text ->
+              let editor =
+                if Editor.is_empty m.editor
+                then Editor.set_text m.editor text
+                else
+                  Editor.set_text m.editor (text ^ "\n\n" ^ Editor.text m.editor)
+              in
+              let queued_texts =
+                List.drop_last m.queued_texts |> Option.value ~default:[]
+              in
+              { m with editor; queued_texts }, []))
      | Paths_for_autocomplete prefix ->
        decode json ~f:(decode_list ~f:P.Json.to_string_or_error) (fun paths ->
          let m =

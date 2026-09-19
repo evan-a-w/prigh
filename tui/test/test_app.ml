@@ -139,6 +139,7 @@ let%expect_test "startup: requests state, messages and auth; renders history" =
     (Rpc (method_ get_state) (params ()) (tag Initial_state))
     (Rpc (method_ get_messages) (params ()) (tag Initial_messages))
     (Rpc (method_ auth_status) (params ()) (tag Auth_refresh))
+    Load_history
     |}];
   H.reply h Initial_state (state_json ());
   H.reply
@@ -176,7 +177,10 @@ let%expect_test "prompt, streaming with embedded newlines, tool call, steer \
     |}];
   H.enter h;
   [%expect
-    {| (Rpc (method_ prompt) (params ((text "list the files"))) (tag Show_error)) |}];
+    {|
+    (Rpc (method_ prompt) (params ((text "list the files"))) (tag Show_error))
+    (Append_history "list the files")
+    |}];
   H.event h (State (state ~running:true ()));
   H.event h (Message_start (User "list the files"));
   H.event h (Message_update { partial; delta = Thinking_delta "let me look" });
@@ -225,7 +229,10 @@ let%expect_test "prompt, streaming with embedded newlines, tool call, steer \
   H.keys h "also count them";
   H.enter h;
   [%expect
-    {| (Rpc (method_ steer) (params ((text "also count them"))) (tag Show_error)) |}];
+    {|
+    (Rpc (method_ steer) (params ((text "also count them"))) (tag Show_error))
+    (Append_history "also count them")
+    |}];
   H.event h (Tool_output { call_id = "c1"; chunk = "ial\n" });
   H.event
     h
@@ -243,6 +250,7 @@ let%expect_test "prompt, streaming with embedded newlines, tool call, steer \
   H.show h;
   [%expect
     {|
+    earlier answer
     > list the files
       let me look
     Sure, here they are:
@@ -251,7 +259,6 @@ let%expect_test "prompt, streaming with embedded newlines, tool call, steer \
       a.ml
       b.ml
       partial
-    queued (delivered after the current turn)
     ────────────────────────────────────────────────────────────
     > ▏
     deepseek/deepseek-flash  thinking:off  view:normal  ctx:1.5…
@@ -959,12 +966,16 @@ let%expect_test "submit with @file sends attachments param" =
       (method_ prompt)
       (params ((text "look at @src/app.ml") (attachments (src/app.ml))))
       (tag Show_error))
+    (Append_history "look at @src/app.ml")
     |}];
   (* Unknown @tokens stay plain text and produce no attachments param. *)
   H.step ~quiet:true h (Intent (Insert "check @nope"));
   H.enter h;
   [%expect
-    {| (Rpc (method_ prompt) (params ((text "check @nope"))) (tag Show_error)) |}]
+    {|
+    (Rpc (method_ prompt) (params ((text "check @nope"))) (tag Show_error))
+    (Append_history "check @nope")
+    |}]
 ;;
 
 let%expect_test "/switch fetches sessions then reopens completion" =
@@ -1133,19 +1144,19 @@ let%expect_test "/auth, /help, /state, /clear, unknown method errors" =
   H.show h;
   [%expect
     {|
-    PageDown            scroll the transcript / list down a page
-    Backspace / Ctrl+H  delete the character before the cursor
-    Delete              delete the character under the cursor
-    Ctrl+K              delete to end of line
-    Ctrl+U              delete the whole line
-    Ctrl+W              delete the word before the cursor
-    Ctrl+L              clear the transcript
-    Ctrl+O              cycle transcript verbosity (quiet /
-    normal / verbose)
-    Shift+Tab           cycle focus: main → agent 1 → … → main
-    Alt+1               focus agent N (Alt+1…9)
-    Ctrl+C              clear the editor, then (again) quit
-    Ctrl+D              quit
+    kill
+    Ctrl+_                  undo the last edit
+    Ctrl+O                  cycle transcript verbosity
+    Ctrl+R                  complete a file path at the cursor
+    Ctrl+G                  edit the prompt in $EDITOR
+    Ctrl+L                  pick a model
+    Ctrl+X                  copy the last assistant message
+    Ctrl+Z                  suspend to the shell
+    Shift+Tab               cycle focus: main → agent 1 → … →
+    main
+    Alt+1                   focus agent N (Alt+1…9)
+    Ctrl+C                  clear the editor, then (again) quit
+    Ctrl+D                  quit
     ────────────────────────────────────────────────────────────
     > ▏
     deepseek/deepseek-flash  thinking:off  view:normal  ctx:1.5…
@@ -1157,6 +1168,17 @@ let%expect_test "/auth, /help, /state, /clear, unknown method errors" =
   H.show h;
   [%expect
     {|
+    (Rpc (method_ list_models) (params ()) (tag (Models_for_picker "")))
+    Ctrl+R                  complete a file path at the cursor
+    Ctrl+G                  edit the prompt in $EDITOR
+    Ctrl+L                  pick a model
+    Ctrl+X                  copy the last assistant message
+    Ctrl+Z                  suspend to the shell
+    Shift+Tab               cycle focus: main → agent 1 → … →
+    main
+    Alt+1                   focus agent N (Alt+1…9)
+    Ctrl+C                  clear the editor, then (again) quit
+    Ctrl+D                  quit
     unknown method "bogus"
     protocol error: bad line
     backend: warning from backend
@@ -1188,6 +1210,7 @@ let%expect_test "verbosity cycles Normal / Verbose / Quiet; /verbosity sets it" 
   [%expect
     {|
     (Rpc (method_ prompt) (params ((text "run it"))) (tag Show_error))
+    (Append_history "run it")
     > earlier question
     earlier answer
     > run it
@@ -1437,10 +1460,10 @@ let%expect_test "resize mid-stream re-wraps without losing lines" =
     |}]
 ;;
 
-let%expect_test "multi-line editing: Alt+Enter, cursor movement, history" =
+let%expect_test "multi-line editing: Alt+J, cursor movement, history" =
   let h = connected () in
   H.keys h "first line";
-  H.key h (Key.alt Enter);
+  H.key h (Key.alt (Char "j"));
   H.keys h "second";
   H.key h (Key.plain Up);
   H.key h (Key.plain Home);
@@ -1461,7 +1484,10 @@ let%expect_test "multi-line editing: Alt+Enter, cursor movement, history" =
   H.key h (Key.plain Down);
   H.enter h;
   [%expect
-    {| (Rpc (method_ prompt) (params ((text "first line\nsecond"))) (tag Show_error)) |}];
+    {|
+    (Rpc (method_ prompt) (params ((text "first line\nsecond"))) (tag Show_error))
+    (Append_history "first line\nsecond")
+    |}];
   H.key h (Key.plain Up);
   H.show h;
   [%expect
@@ -1518,11 +1544,18 @@ let%expect_test "abort restores queued messages" =
   H.event h (State (state ~running:true ()));
   H.keys h "first";
   H.enter h;
-  [%expect {| (Rpc (method_ steer) (params ((text first))) (tag Show_error)) |}];
+  [%expect
+    {|
+    (Rpc (method_ steer) (params ((text first))) (tag Show_error))
+    (Append_history first)
+    |}];
   H.keys h "second";
   H.enter h;
   [%expect
-    {| (Rpc (method_ steer) (params ((text second))) (tag Show_error)) |}];
+    {|
+    (Rpc (method_ steer) (params ((text second))) (tag Show_error))
+    (Append_history second)
+    |}];
   H.event h (Queue_update { steer = 2; follow_up = 0 });
   H.show h;
   [%expect
@@ -1530,9 +1563,8 @@ let%expect_test "abort restores queued messages" =
     session abc123 in /work. /help for commands, Esc aborts, Ctrl+C twice quits.
     > earlier question
     earlier answer
-    queued (delivered after the current turn)
-    queued (delivered after the current turn)
     ────────────────────────────────────────────────────────────────────────────────────────────────────
+    queued (2): first ∣ second
     > ▏
     deepseek/deepseek-flash  thinking:off  view:normal  ctx:1.5k (0%)  in:1.2k out:300  $0.0123  queued…
     |}];
@@ -1545,10 +1577,9 @@ let%expect_test "abort restores queued messages" =
     session abc123 in /work. /help for commands, Esc aborts, Ctrl+C twice quits.
     > earlier question
     earlier answer
-    queued (delivered after the current turn)
-    queued (delivered after the current turn)
     restored 2 queued messages to the editor
     ────────────────────────────────────────────────────────────────────────────────────────────────────
+    queued (2): first ∣ second
     > first
 
       second▏
@@ -1561,8 +1592,6 @@ let%expect_test "abort restores queued messages" =
     session abc123 in /work. /help for commands, Esc aborts, Ctrl+C twice quits.
     > earlier question
     earlier answer
-    queued (delivered after the current turn)
-    queued (delivered after the current turn)
     restored 2 queued messages to the editor
     ────────────────────────────────────────────────────────────────────────────────────────────────────
     > first
@@ -1577,7 +1606,10 @@ let%expect_test "scroll stays anchored while streaming" =
   H.keys h "prompt";
   H.enter h;
   [%expect
-    {| (Rpc (method_ prompt) (params ((text prompt))) (tag Show_error)) |}];
+    {|
+    (Rpc (method_ prompt) (params ((text prompt))) (tag Show_error))
+    (Append_history prompt)
+    |}];
   H.event h (Message_start (Assistant partial));
   let stream from count =
     List.iter
@@ -1785,7 +1817,10 @@ let%expect_test "abort restore is singular, prepends, and tolerates no field" =
   H.keys h "queued";
   H.enter h;
   [%expect
-    {| (Rpc (method_ steer) (params ((text queued))) (tag Show_error)) |}];
+    {|
+    (Rpc (method_ steer) (params ((text queued))) (tag Show_error))
+    (Append_history queued)
+    |}];
   H.event h (Queue_update { steer = 1; follow_up = 0 });
   H.keys h "draft";
   H.reply h Abort_done {|{"restored":["queued"]}|};
@@ -1795,9 +1830,9 @@ let%expect_test "abort restore is singular, prepends, and tolerates no field" =
     session abc123 in /work. /help for commands, Esc aborts, Ctrl+C twice quits.
     > earlier question
     earlier answer
-    queued (delivered after the current turn)
     restored 1 queued message to the editor
     ────────────────────────────────────────────────────────────────────────────────────────────────────
+    queued (1): queued
     > queued
 
       draft▏
@@ -1810,9 +1845,9 @@ let%expect_test "abort restore is singular, prepends, and tolerates no field" =
     session abc123 in /work. /help for commands, Esc aborts, Ctrl+C twice quits.
     > earlier question
     earlier answer
-    queued (delivered after the current turn)
     restored 1 queued message to the editor
     ────────────────────────────────────────────────────────────────────────────────────────────────────
+    queued (1): queued
     > queued
 
       draft▏
@@ -1824,7 +1859,11 @@ let%expect_test "two parallel subagents: strip, live tails, focus cycling, Esc" 
   let h = connected ~width:80 ~height:18 () in
   H.keys h "go";
   H.enter h;
-  [%expect {| (Rpc (method_ prompt) (params ((text go))) (tag Show_error)) |}];
+  [%expect
+    {|
+    (Rpc (method_ prompt) (params ((text go))) (tag Show_error))
+    (Append_history go)
+    |}];
   H.event h (State (state ~running:true ()));
   H.event h (Message_start (User "go"));
   let call1 =
@@ -2234,7 +2273,10 @@ let%expect_test "new user prompt clears finished agents" =
   H.keys h "next task";
   H.enter h;
   [%expect
-    {| (Rpc (method_ prompt) (params ((text "next task"))) (tag Show_error)) |}];
+    {|
+    (Rpc (method_ prompt) (params ((text "next task"))) (tag Show_error))
+    (Append_history "next task")
+    |}];
   H.show h;
   [%expect
     {|
@@ -2401,5 +2443,316 @@ let%expect_test "nested subagent events recurse into the parent's children" =
     > ▏
     agents: main [1⠋]  (Shift+Tab)
     deepseek/deepseek-flash  thinking:off  view:normal  ctx:1.5k (0%)  in…
+    |}]
+;;
+
+let%expect_test "Alt+Enter queues a follow-up; queued block and status" =
+  let h = connected ~width:160 () in
+  H.event h (State (state ~running:true ()));
+  H.keys h "after this";
+  H.key h (Key.alt Enter);
+  [%expect
+    {|
+    (Rpc (method_ follow_up) (params ((text "after this"))) (tag Show_error))
+    (Append_history "after this")
+    |}];
+  H.event h (Queue_update { steer = 0; follow_up = 1 });
+  H.show h;
+  [%expect
+    {|
+    session abc123 in /work. /help for commands, Esc aborts, Ctrl+C twice quits.
+    > earlier question
+    earlier answer
+    ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+    queued (1): after this
+    > ▏
+    deepseek/deepseek-flash  thinking:off  view:normal  ctx:1.5k (0%)  in:1.2k out:300  $0.0123  queued:1  ⠋ working (Esc aborts; Enter steers)
+    |}];
+  H.keys h "and more";
+  H.key h (Key.alt Enter);
+  [%expect
+    {|
+    (Rpc (method_ follow_up) (params ((text "and more"))) (tag Show_error))
+    (Append_history "and more")
+    |}];
+  H.event h (Queue_update { steer = 0; follow_up = 2 });
+  H.show h;
+  [%expect
+    {|
+    session abc123 in /work. /help for commands, Esc aborts, Ctrl+C twice quits.
+    > earlier question
+    earlier answer
+    ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+    queued (2): after this ∣ and more
+    > ▏
+    deepseek/deepseek-flash  thinking:off  view:normal  ctx:1.5k (0%)  in:1.2k out:300  $0.0123  queued:2  ⠋ working (Esc aborts; Enter steers)
+    |}]
+;;
+
+let%expect_test "Alt+Up dequeues the last queued message into the editor" =
+  let h = connected ~width:100 () in
+  H.event h (State (state ~running:true ()));
+  H.keys h "queued text";
+  H.key h (Key.alt Enter);
+  [%expect
+    {|
+    (Rpc (method_ follow_up) (params ((text "queued text"))) (tag Show_error))
+    (Append_history "queued text")
+    |}];
+  H.event h (Queue_update { steer = 0; follow_up = 1 });
+  H.keys h "draft";
+  H.key h (Key.alt Key.Code.Up);
+  [%expect {| (Rpc (method_ dequeue) (params ()) (tag Dequeued)) |}];
+  H.reply h Dequeued {|{"text":"queued text","attachments":[]}|};
+  H.show h;
+  [%expect
+    {|
+    session abc123 in /work. /help for commands, Esc aborts, Ctrl+C twice quits.
+    > earlier question
+    earlier answer
+    ────────────────────────────────────────────────────────────────────────────────────────────────────
+    queued (1)
+    > queued text
+
+      draft▏
+    deepseek/deepseek-flash  thinking:off  view:normal  ctx:1.5k (0%)  in:1.2k out:300  $0.0123  queued…
+    |}];
+  H.event h (Queue_update { steer = 0; follow_up = 0 });
+  H.key h (Key.alt Key.Code.Up);
+  [%expect {| (Rpc (method_ dequeue) (params ()) (tag Dequeued)) |}];
+  H.reply h Dequeued {|null|};
+  H.show h;
+  [%expect
+    {|
+    session abc123 in /work. /help for commands, Esc aborts, Ctrl+C twice quits.
+    > earlier question
+    earlier answer
+    nothing queued
+    ────────────────────────────────────────────────────────────────────────────────────────────────────
+    > queued text
+
+      draft▏
+    deepseek/deepseek-flash  thinking:off  view:normal  ctx:1.5k (0%)  in:1.2k out:300  $0.0123  ⠋ work…
+    |}]
+;;
+
+let%expect_test "inline bash: !cmd adds to context, !!cmd does not" =
+  let h = connected ~width:100 () in
+  H.keys h "!ls -la";
+  H.enter h;
+  [%expect
+    {|
+    (Rpc
+      (method_ shell)
+      (params (
+        (command        "ls -la")
+        (add_to_context true)))
+      (tag Show_error))
+    (Append_history "!ls -la")
+    |}];
+  let call = tool_call ~name:"shell" ~arguments:{|{"command":"ls -la"}|} "s1" in
+  H.event h (Tool_start call);
+  H.event
+    h
+    (Tool_end { call; result = tool_result ~name:"shell" ~id:"s1" "a.ml\nb.ml" });
+  H.show h;
+  [%expect
+    {|
+    session abc123 in /work. /help for commands, Esc aborts, Ctrl+C twice quits.
+    > earlier question
+    earlier answer
+    ⚙ shell command=ls -la
+      a.ml
+      b.ml
+    ────────────────────────────────────────────────────────────────────────────────────────────────────
+    > ▏
+    deepseek/deepseek-flash  thinking:off  view:normal  ctx:1.5k (0%)  in:1.2k out:300  $0.0123
+    |}];
+  H.keys h "!!pwd";
+  H.enter h;
+  [%expect
+    {|
+    (Rpc
+      (method_ shell)
+      (params (
+        (command        pwd)
+        (add_to_context false)))
+      (tag Show_error))
+    (Append_history !!pwd)
+    |}];
+  H.event h (State (state ~running:true ()));
+  H.keys h "!echo hi";
+  H.enter h;
+  H.show h;
+  [%expect
+    {|
+    (Append_history "!echo hi")
+
+
+    session abc123 in /work. /help for commands, Esc aborts, Ctrl+C twice quits.
+    > earlier question
+    earlier answer
+    ⚙ shell command=ls -la
+      a.ml
+      b.ml
+    wait for the current turn
+    ────────────────────────────────────────────────────────────────────────────────────────────────────
+    > ▏
+    deepseek/deepseek-flash  thinking:off  view:normal  ctx:1.5k (0%)  in:1.2k out:300  $0.0123  ⠋ work…
+    |}]
+;;
+
+let%expect_test "bracketed paste renders a chip until the cursor enters it" =
+  let h = connected ~width:80 ~height:14 () in
+  H.step h (Intent (Paste "one\ntwo\nthree\nfour"));
+  H.show h;
+  [%expect
+    {|
+    session abc123 in /work. /help for commands, Esc aborts, Ctrl+C twice quits.
+    > earlier question
+    earlier answer
+    ────────────────────────────────────────────────────────────────────────────────
+    > ▏4 lines pasted]
+    deepseek/deepseek-flash  thinking:off  view:normal  ctx:1.5k (0%)  in:1.2k out:…
+    |}];
+  H.key h (Key.plain Up);
+  H.show h;
+  [%expect
+    {|
+    session abc123 in /work. /help for commands, Esc aborts, Ctrl+C twice quits.
+    > earlier question
+    earlier answer
+    ────────────────────────────────────────────────────────────────────────────────
+    > one
+      two
+      thre▏
+      four
+    deepseek/deepseek-flash  thinking:off  view:normal  ctx:1.5k (0%)  in:1.2k out:…
+    |}]
+;;
+
+let%expect_test "history loads at start and is appended on submit" =
+  let h = connected ~width:100 () in
+  H.reply h History {|["old one","old two"]|};
+  H.key h (Key.plain Up);
+  H.show h;
+  [%expect
+    {|
+    session abc123 in /work. /help for commands, Esc aborts, Ctrl+C twice quits.
+    > earlier question
+    earlier answer
+    ────────────────────────────────────────────────────────────────────────────────────────────────────
+    > old two▏
+    deepseek/deepseek-flash  thinking:off  view:normal  ctx:1.5k (0%)  in:1.2k out:300  $0.0123
+    |}];
+  H.key h (Key.ctrl 'c');
+  H.keys h "fresh prompt";
+  H.enter h;
+  [%expect
+    {|
+    (Rpc (method_ prompt) (params ((text "fresh prompt"))) (tag Show_error))
+    (Append_history "fresh prompt")
+    |}]
+;;
+
+let%expect_test "Ctrl+G edits externally and the reply replaces the prompt" =
+  let h = connected () in
+  H.keys h "draft text";
+  H.key h (Key.ctrl 'g');
+  [%expect {| (Edit_externally "draft text") |}];
+  H.reply h Editor_text {|"from the editor"|};
+  H.show h;
+  [%expect
+    {|
+    session abc123 in /work. /help for commands, Esc aborts,
+    Ctrl+C twice quits.
+    > earlier question
+    earlier answer
+    ────────────────────────────────────────────────────────────
+    > from the editor▏
+    deepseek/deepseek-flash  thinking:off  view:normal  ctx:1.5…
+    |}]
+;;
+
+let%expect_test "Ctrl+X copies the last assistant message, or the focused \
+                 report"
+  =
+  let h = connected () in
+  H.key h (Key.ctrl 'x');
+  [%expect {| (Copy_to_clipboard "earlier **answer**") |}];
+  H.event h (State (state ~running:true ()));
+  H.event
+    h
+    (Tool_start (tool_call ~name:"subagent" ~arguments:{|{"task":"t"}|} "c1"));
+  H.event
+    h
+    (Subagent_start
+       { call_id = "c1"; agent_id = "c1"; task = "t"; model = "m"; tools = [] });
+  H.event h (Subagent { call_id = "c1"; agent_id = "c1"; event = Turn_start });
+  H.event
+    h
+    (Subagent
+       { call_id = "c1"
+       ; agent_id = "c1"
+       ; event = Message_update { partial; delta = Text_delta "the report" }
+       });
+  H.event
+    h
+    (Subagent
+       { call_id = "c1"
+       ; agent_id = "c1"
+       ; event = Message_end (assistant "the report")
+       });
+  H.next_agent h;
+  H.key h (Key.ctrl 'x');
+  [%expect {| (Copy_to_clipboard "the report") |}]
+;;
+
+let%expect_test "Ctrl+Z suspends; Ctrl+R completes a path; Ctrl+L picks a model"
+  =
+  let h = connected () in
+  H.key h (Key.ctrl 'z');
+  [%expect {| Suspend |}];
+  H.key h (Key.ctrl 'r');
+  [%expect {| (List_paths (prefix "") (tag (Paths_for_autocomplete ""))) |}];
+  H.keys h "sr";
+  [%expect
+    {|
+    (List_paths (prefix s) (tag (Paths_for_autocomplete s)))
+    (List_paths (prefix sr) (tag (Paths_for_autocomplete sr)))
+    |}];
+  H.reply h (Paths_for_autocomplete "sr") {|["src/","src/app.ml"]|};
+  H.show h;
+  [%expect
+    {|
+    session abc123 in /work. /help for commands, Esc aborts,
+    Ctrl+C twice quits.
+    > earlier question
+    earlier answer
+    ────────────────────────────────────────────────────────────
+    > @sr▏
+    ▸ src/
+      src/app.ml
+    deepseek/deepseek-flash  thinking:off  view:normal  ctx:1.5…
+    |}];
+  H.key h (Key.ctrl 'l');
+  [%expect
+    {| (Rpc (method_ list_models) (params ()) (tag (Models_for_picker ""))) |}];
+  H.reply h (Models_for_picker "") models_json;
+  H.show h;
+  [%expect
+    {|
+    session abc123 in /work. /help for commands, Esc aborts,
+    Ctrl+C twice quits.
+    > earlier question
+    earlier answer
+    Model  (4)
+    / ▏
+      Claude Fable 5       anthropic/claude-fable-5  ctx 1.0M  …
+      Claude Fable 5.1     anthropic/claude-fable-5-1  ctx 1.0M…
+      GPT-5.5              openai/gpt-5.5  ctx 1.0M  $10/$50 pe…
+    * DeepSeek V4.1 Flash  deepseek/deepseek-flash  ctx 1.0M  $…
+    ────────────────────────────────────────────────────────────
+    deepseek/deepseek-flash  thinking:off  view:normal  ctx:1.5…
     |}]
 ;;

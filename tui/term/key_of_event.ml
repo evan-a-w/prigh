@@ -24,6 +24,7 @@ let code (k : Bonsai_term.Event.Key.t) : Key.Code.t option =
      | '\t' -> Some Tab
      | '\127' | '\008' -> Some Backspace
      | '\027' -> Some Escape
+     | '\031' -> Some (Char "_")
      | c when Char.to_int c < 32 ->
        (* Ctrl+letter arrives as a control character on some terminals. *)
        Some (Char (String.of_char (Char.of_int_exn (Char.to_int c + 96))))

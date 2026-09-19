@@ -19,6 +19,121 @@ let open_browser url =
      |> Deferred.map ~f:(fun (_ : string Or_error.t) -> ()))
 ;;
 
+(* Direct tty access for the sequences Notty does not manage (alt screen,
+   suspend) and OSC 52. Writes go to the controlling terminal. *)
+let tty_fd () =
+  if Core_unix.isatty Core_unix.stdin then Core_unix.stdin else Core_unix.stdout
+;;
+
+let write_tty s = ignore (Core_unix.write_substring (tty_fd ()) ~buf:s : int)
+
+let release_terminal () =
+  write_tty "\027[?1049l";
+  ignore (Core_unix.system "stty sane </dev/tty" : Core_unix.Exit_or_signal.t)
+;;
+
+let reacquire_terminal () =
+  ignore
+    (Core_unix.system "stty raw -echo -iexten </dev/tty"
+     : Core_unix.Exit_or_signal.t);
+  write_tty "\027[?1049h"
+;;
+
+(* Notty has no api to release and re-acquire the terminal, so we leave the alt
+   screen, restore cooked mode and SIGTSTP ourselves; on SIGCONT we put the tty
+   back into raw mode and re-enter the alt screen. The component then injects a
+   1x1 resize followed by the real one to force a full repaint. *)
+let suspend () =
+  release_terminal ();
+  Signal_unix.send_i Signal.tstp (`Pid (Core_unix.getpid ()));
+  reacquire_terminal ()
+;;
+
+let history_path () =
+  Filename.concat
+    (Option.value (Sys.getenv "HOME") ~default:".")
+    ".prigh/history"
+;;
+
+let load_history () =
+  match In_channel.read_lines (history_path ()) with
+  | exception _ -> Ok (`Array [])
+  | lines ->
+    let entries =
+      List.filter_map lines ~f:(fun line ->
+        match Prigh_protocol.Json.parse line with
+        | Ok (`String s) -> Some s
+        | _ -> None)
+    in
+    let kept = List.drop entries (Int.max 0 (List.length entries - 500)) in
+    Ok (`Array (List.map kept ~f:(fun s -> `String s)))
+;;
+
+let append_history text =
+  let path = history_path () in
+  (try Core_unix.mkdir_p (Filename.dirname path) with
+   | _ -> ());
+  Out_channel.with_file path ~append:true ~f:(fun oc ->
+    Out_channel.output_string oc (Prigh_protocol.Json.to_string (`String text));
+    Out_channel.newline oc)
+;;
+
+let find_on_path name =
+  match Sys.getenv "PATH" with
+  | None -> None
+  | Some path ->
+    List.find_map (String.split path ~on:':') ~f:(fun dir ->
+      let candidate = Filename.concat dir name in
+      let exists =
+        match Sys_unix.file_exists candidate with
+        | `Yes -> true
+        | `No | `Unknown -> false
+      in
+      Option.some_if exists candidate)
+;;
+
+let copy_to_clipboard text =
+  write_tty (sprintf "\027]52;c;%s\007" (Base64.encode_string text));
+  let attempts =
+    [ "wl-copy", []; "xclip", [ "-selection"; "clipboard" ]; "pbcopy", [] ]
+  in
+  match
+    List.find_map attempts ~f:(fun (prog, args) ->
+      Option.map (find_on_path prog) ~f:(fun _ -> prog, args))
+  with
+  | None -> ()
+  | Some (prog, args) ->
+    don't_wait_for
+      (Process.run ~prog ~args ~stdin:text ()
+       |> Deferred.map ~f:(fun (_ : string Or_error.t) -> ()))
+;;
+
+let edit_externally text =
+  let tmp = Filename_unix.temp_file "prigh-prompt" ".md" in
+  Out_channel.write_all tmp ~data:text;
+  let editor =
+    match Sys.getenv "VISUAL" with
+    | Some v when not (String.is_empty v) -> v
+    | _ ->
+      (match Sys.getenv "EDITOR" with
+       | Some v when not (String.is_empty v) -> v
+       | _ -> "vi")
+  in
+  release_terminal ();
+  let status =
+    Core_unix.system
+      (sprintf "%s %s </dev/tty >/dev/tty 2>&1" editor (Filename.quote tmp))
+  in
+  reacquire_terminal ();
+  let contents = In_channel.read_all tmp in
+  (try Core_unix.unlink tmp with
+   | _ -> ());
+  match status with
+  | Ok () -> Ok contents
+  | Error _ ->
+    Error ("editor failed: " ^ Core_unix.Exit_or_signal.to_string_hum status)
+;;
+
 let platform client ~exit ~quit_requested : Prigh_ui.Component.Platform.t =
   { rpc =
       (fun method_ params ->
@@ -34,6 +149,11 @@ let platform client ~exit ~quit_requested : Prigh_ui.Component.Platform.t =
           (fun () -> Deferred.map (Paths.list ~prefix) ~f:(fun json -> Ok json))
           ())
   ; open_browser = (fun url -> Effect.of_sync_fun open_browser url)
+  ; load_history = (fun () -> Effect.of_sync_fun load_history ())
+  ; append_history = (fun text -> Effect.of_sync_fun append_history text)
+  ; copy_to_clipboard = (fun text -> Effect.of_sync_fun copy_to_clipboard text)
+  ; suspend = Effect.of_sync_fun suspend ()
+  ; edit_externally = (fun text -> Effect.of_sync_fun edit_externally text)
   ; quit =
       (* Bonsai_term's [Driver.finished] never resolves when [exit] is scheduled
          from apply_action (the next frame sees the exit status before any event
@@ -98,7 +218,7 @@ let app
       match event, paste with
       | Paste `Start, _ -> set_paste (Collecting "")
       | Paste `End, Collecting text ->
-        Effect.Many [ set_paste Idle; inject (Intent (Insert text)) ]
+        Effect.Many [ set_paste Idle; inject (Intent (Paste text)) ]
       | Paste `End, Idle -> Effect.Ignore
       | Key_press _, Collecting text ->
         (match Key_of_event.key event with

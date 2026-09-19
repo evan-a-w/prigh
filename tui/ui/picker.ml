@@ -90,7 +90,7 @@ let handle t (intent : Intent.t) ~page : Outcome.t =
       let chars = List.map (Text_width.uchars t.query) ~f:fst in
       Continue
         (refilter { t with query = String.concat (List.drop_last_exn chars) }))
-  | Kill_line | Kill_to_end | Kill_word ->
+  | Kill_to_start | Kill_to_end | Kill_word ->
     Continue (refilter { t with query = "" })
   | Up -> Continue (clamp { t with selected = t.selected - 1 })
   | Down -> Continue (clamp { t with selected = t.selected + 1 })
@@ -99,14 +99,27 @@ let handle t (intent : Intent.t) ~page : Outcome.t =
   | Home -> Continue { t with selected = 0 }
   | End -> Continue (clamp { t with selected = Int.max_value })
   | Newline
+  | Paste _
   | Delete
   | Left
   | Right
+  | Word_left
+  | Word_right
+  | Delete_word_forward
+  | Yank
+  | Yank_pop
+  | Undo
   | Complete
   | Interrupt
   | Force_quit
-  | Clear_screen
   | Cycle_verbosity
   | Next_agent
-  | Focus_agent _ -> Continue t
+  | Focus_agent _
+  | Queue_follow_up
+  | Dequeue
+  | Copy_last
+  | Suspend
+  | Path_complete
+  | Edit_externally
+  | Model_picker -> Continue t
 ;;

@@ -12,7 +12,11 @@ let b keys intent help = { Binding.keys; intent; help }
 
 let bindings =
   [ b [ Key.plain Enter ] Submit "send the prompt / accept the highlighted item"
-  ; b [ Key.alt Enter; Key.ctrl 'j' ] Newline "insert a newline in the editor"
+  ; b
+      [ Key.alt Enter ]
+      Queue_follow_up
+      "queue a follow-up to run after the current turn"
+  ; b [ Key.ctrl 'j'; Key.alt (Char "j") ] Newline "insert a newline"
   ; b [ Key.plain Escape ] Cancel "close the dialog, or abort the running turn"
   ; b
       [ Key.plain Tab ]
@@ -20,8 +24,21 @@ let bindings =
       "complete a slash command / open the command picker"
   ; b [ Key.plain Up ] Up "move up (editor line, history, or list row)"
   ; b [ Key.plain Down ] Down "move down (editor line, history, or list row)"
+  ; b
+      [ Key.alt Up ]
+      Dequeue
+      "pop the last queued steer/follow-up back into the editor"
   ; b [ Key.plain Left ] Left "move the cursor left"
   ; b [ Key.plain Right ] Right "move the cursor right"
+  ; b
+      [ Key.alt (Char "b"); { (Key.plain Left) with ctrl = true } ]
+      Word_left
+      "move the cursor back one word"
+  ; b
+      [ Key.alt (Char "f"); { (Key.plain Right) with ctrl = true } ]
+      Word_right
+      "move the cursor forward one word"
+  ; b [ Key.alt (Char "d") ] Delete_word_forward "delete the next word"
   ; b [ Key.plain Home; Key.ctrl 'a' ] Home "start of line"
   ; b [ Key.plain End; Key.ctrl 'e' ] End "end of line"
   ; b [ Key.plain Page_up ] Page_up "scroll the transcript / list up a page"
@@ -34,14 +51,21 @@ let bindings =
       Backspace
       "delete the character before the cursor"
   ; b [ Key.plain Delete ] Delete "delete the character under the cursor"
-  ; b [ Key.ctrl 'k' ] Kill_to_end "delete to end of line"
-  ; b [ Key.ctrl 'u' ] Kill_line "delete the whole line"
-  ; b [ Key.ctrl 'w' ] Kill_word "delete the word before the cursor"
-  ; b [ Key.ctrl 'l' ] Clear_screen "clear the transcript"
+  ; b [ Key.ctrl 'k' ] Kill_to_end "delete to the end of the line"
+  ; b [ Key.ctrl 'u' ] Kill_to_start "delete to the start of the line"
   ; b
-      [ Key.ctrl 'o' ]
-      Cycle_verbosity
-      "cycle transcript verbosity (quiet / normal / verbose)"
+      [ Key.ctrl 'w'; Key.alt Backspace ]
+      Kill_word
+      "delete the word before the cursor"
+  ; b [ Key.ctrl 'y' ] Yank "paste the most recent kill"
+  ; b [ Key.alt (Char "y") ] Yank_pop "replace the last yank with an older kill"
+  ; b [ Key.ctrl '_' ] Undo "undo the last edit"
+  ; b [ Key.ctrl 'o' ] Cycle_verbosity "cycle transcript verbosity"
+  ; b [ Key.ctrl 'r' ] Path_complete "complete a file path at the cursor"
+  ; b [ Key.ctrl 'g' ] Edit_externally "edit the prompt in $EDITOR"
+  ; b [ Key.ctrl 'l' ] Model_picker "pick a model"
+  ; b [ Key.ctrl 'x' ] Copy_last "copy the last assistant message"
+  ; b [ Key.ctrl 'z' ] Suspend "suspend to the shell"
   ; b
       [ { (Key.plain Tab) with shift = true } ]
       Next_agent

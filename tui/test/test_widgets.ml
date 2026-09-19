@@ -84,7 +84,7 @@ let%expect_test "editor" =
   show e;
   let e = Editor.kill_to_end e in
   show e;
-  let e = Editor.kill_line e in
+  let e = Editor.kill_to_start e in
   show e;
   [%expect
     {|
@@ -121,6 +121,188 @@ let%expect_test "editor" =
     true
     "second" cursor=0:6
     "draft" cursor=0:5
+    |}]
+;;
+
+let%expect_test "editor: word navigation (ascii, unicode, punctuation)" =
+  let walk label e ops =
+    printf "== %s ==\n" label;
+    ignore
+      (List.fold ops ~init:e ~f:(fun e (name, f) ->
+         let e = f e in
+         let p = Editor.position e in
+         printf "%-8s %S cursor=%d:%d\n" name (Editor.text e) p.line p.col;
+         e))
+  in
+  walk
+    "foo.bar(baz)"
+    (Editor.set_text Editor.empty "foo.bar(baz)")
+    [ "left", Editor.word_left
+    ; "left", Editor.word_left
+    ; "left", Editor.word_left
+    ; "left", Editor.word_left
+    ; "left", Editor.word_left
+    ; "left", Editor.word_left
+    ; "right", Editor.word_right
+    ; "right", Editor.word_right
+    ; "right", Editor.word_right
+    ; "right", Editor.word_right
+    ; "right", Editor.word_right
+    ; "right", Editor.word_right
+    ];
+  walk
+    "héllo wörld"
+    (Editor.set_text Editor.empty "héllo wörld")
+    [ "left", Editor.word_left
+    ; "left", Editor.word_left
+    ; "right", Editor.word_right
+    ; "right", Editor.word_right
+    ];
+  walk
+    "delete forward"
+    (Editor.home (Editor.set_text Editor.empty "foo.bar(baz)"))
+    [ "del word", Editor.delete_word_forward
+    ; "del word", Editor.delete_word_forward
+    ];
+  [%expect
+    {|
+    == foo.bar(baz) ==
+    left     "foo.bar(baz)" cursor=0:11
+    left     "foo.bar(baz)" cursor=0:8
+    left     "foo.bar(baz)" cursor=0:7
+    left     "foo.bar(baz)" cursor=0:4
+    left     "foo.bar(baz)" cursor=0:3
+    left     "foo.bar(baz)" cursor=0:0
+    right    "foo.bar(baz)" cursor=0:3
+    right    "foo.bar(baz)" cursor=0:4
+    right    "foo.bar(baz)" cursor=0:7
+    right    "foo.bar(baz)" cursor=0:8
+    right    "foo.bar(baz)" cursor=0:11
+    right    "foo.bar(baz)" cursor=0:12
+    == héllo wörld ==
+    left     "h\195\169llo w\195\182rld" cursor=0:6
+    left     "h\195\169llo w\195\182rld" cursor=0:0
+    right    "h\195\169llo w\195\182rld" cursor=0:5
+    right    "h\195\169llo w\195\182rld" cursor=0:11
+    == delete forward ==
+    del word ".bar(baz)" cursor=0:0
+    del word "bar(baz)" cursor=0:0
+    |}]
+;;
+
+let%expect_test "editor: kill ring, yank and yank-pop" =
+  let show e =
+    let p = Editor.position e in
+    printf
+      "%S cursor=%d:%d ring=[%s]\n"
+      (Editor.text e)
+      p.line
+      p.col
+      (String.concat ~sep:"|" (Editor.kill_ring e))
+  in
+  let e = Editor.set_text Editor.empty "alpha beta gamma" in
+  let e = Editor.kill_word e in
+  show e;
+  let e = Editor.kill_word e in
+  show e;
+  let e = Editor.yank e in
+  show e;
+  let e = Editor.yank_pop e in
+  show e;
+  let e = Editor.yank_pop e in
+  show e;
+  let e = Editor.set_text Editor.empty "keep this" in
+  let e = Editor.goto e { line = 0; col = 5 } in
+  let e = Editor.kill_to_end e in
+  show e;
+  let e = Editor.goto e { line = 0; col = 4 } in
+  let e = Editor.kill_to_start e in
+  show e;
+  [%expect
+    {|
+    "alpha beta " cursor=0:11 ring=[gamma]
+    "alpha " cursor=0:6 ring=[beta |gamma]
+    "alpha beta " cursor=0:11 ring=[beta |gamma]
+    "alpha gamma" cursor=0:11 ring=[beta |gamma]
+    "alpha beta " cursor=0:11 ring=[beta |gamma]
+    "keep " cursor=0:5 ring=[this]
+    " " cursor=0:0 ring=[keep|this]
+    |}]
+;;
+
+let%expect_test "editor: undo grouping" =
+  let show label e =
+    let p = Editor.position e in
+    printf "%-10s %S cursor=%d:%d\n" label (Editor.text e) p.line p.col
+  in
+  let e = Editor.empty in
+  let e = Editor.insert e "a" in
+  let e = Editor.insert e "b" in
+  let e = Editor.insert e "c" in
+  let e = Editor.insert e " " in
+  let e = Editor.insert e "d" in
+  show "typed" e;
+  let e = Editor.undo e in
+  show "undo1" e;
+  let e = Editor.undo e in
+  show "undo2" e;
+  let e = Editor.undo e in
+  show "undo3" e;
+  let e = Editor.insert e "hello world" in
+  let e = Editor.kill_word e in
+  show "kill" e;
+  let e = Editor.undo e in
+  show "undo" e;
+  let e = Editor.insert e "XY" in
+  show "insert" e;
+  let e = Editor.undo e in
+  show "undo" e;
+  [%expect
+    {|
+    typed      "abc d" cursor=0:5
+    undo1      "abc " cursor=0:4
+    undo2      "abc" cursor=0:3
+    undo3      "" cursor=0:0
+    kill       "hello " cursor=0:6
+    undo       "hello world" cursor=0:11
+    insert     "hello worldXY" cursor=0:13
+    undo       "hello world" cursor=0:11
+    |}]
+;;
+
+let%expect_test "editor: paste chips" =
+  let show label e =
+    print_s [%sexp (Editor.chips e : Editor.Chip.t list)];
+    printf
+      "%-8s %S cursor=%d:%d\n"
+      label
+      (Editor.text e)
+      (Editor.position e).line
+      (Editor.position e).col
+  in
+  let e = Editor.insert_paste Editor.empty "l1\nl2\nl3\nl4" in
+  show "4lines" e;
+  let e = Editor.insert_paste Editor.empty "l1\nl2\nl3" in
+  show "3lines" e;
+  let e = Editor.insert_paste Editor.empty "a\nb\nc\nd" in
+  let e = Option.value_exn (Editor.up e) in
+  show "inside" e;
+  let e = Editor.insert e "X" in
+  show "edit" e;
+  [%expect
+    {|
+    ((
+      (start ((line 0) (col 0)))
+      (stop  ((line 3) (col 2)))))
+    4lines   "l1\nl2\nl3\nl4" cursor=3:2
+    ()
+    3lines   "l1\nl2\nl3" cursor=2:2
+    ((
+      (start ((line 0) (col 0)))
+      (stop  ((line 3) (col 1)))))
+    inside   "a\nb\nc\nd" cursor=2:1
+    ()
+    edit     "a\nb\ncX\nd" cursor=2:2
     |}]
 ;;
 
@@ -208,7 +390,7 @@ let%expect_test "picker" =
   let _ = step p Submit in
   let p = step p Backspace in
   let p = step p Backspace in
-  let p = step p Kill_line in
+  let p = step p Kill_to_start in
   let p = step p Page_down in
   let _ = step p Cancel in
   ignore p;
@@ -425,6 +607,8 @@ let%expect_test "model matching" =
 
 let%expect_test "keymap: every binding resolves to its intent and is documented"
   =
+  (* [Paste] is produced by the term layer's bracketed-paste handling and has no
+     key, so there is nothing for the keymap coverage check to assert. *)
   List.iter Keymap.bindings ~f:(fun b ->
     List.iter b.keys ~f:(fun key ->
       let intent = Keymap.lookup key in
@@ -442,14 +626,21 @@ let%expect_test "keymap: every binding resolves to its intent and is documented"
   [%expect
     {|
     Enter            Submit
-    Alt+Enter        Newline
+    Alt+Enter        Queue_follow_up
     Ctrl+J           Newline
+    Alt+J            Newline
     Esc              Cancel
     Tab              Complete
     Up               Up
     Down             Down
+    Alt+Up           Dequeue
     Left             Left
     Right            Right
+    Alt+B            Word_left
+    Ctrl+Left        Word_left
+    Alt+F            Word_right
+    Ctrl+Right       Word_right
+    Alt+D            Delete_word_forward
     Home             Home
     Ctrl+A           Home
     End              End
@@ -460,10 +651,18 @@ let%expect_test "keymap: every binding resolves to its intent and is documented"
     Ctrl+H           Backspace
     Delete           Delete
     Ctrl+K           Kill_to_end
-    Ctrl+U           Kill_line
+    Ctrl+U           Kill_to_start
     Ctrl+W           Kill_word
-    Ctrl+L           Clear_screen
+    Alt+Backspace    Kill_word
+    Ctrl+Y           Yank
+    Alt+Y            Yank_pop
+    Ctrl+_           Undo
     Ctrl+O           Cycle_verbosity
+    Ctrl+R           Path_complete
+    Ctrl+G           Edit_externally
+    Ctrl+L           Model_picker
+    Ctrl+X           Copy_last
+    Ctrl+Z           Suspend
     Shift+Tab        Next_agent
     Alt+1            (Focus_agent 1)
     Ctrl+C           Interrupt
@@ -478,29 +677,41 @@ let%expect_test "keymap: every binding resolves to its intent and is documented"
   print_endline (Content.to_plain Commands.help);
   [%expect
     {|
-    Enter               send the prompt / accept the highlighted item
-    Alt+Enter / Ctrl+J  insert a newline in the editor
-    Esc                 close the dialog, or abort the running turn
-    Tab                 complete a slash command / open the command picker
-    Up                  move up (editor line, history, or list row)
-    Down                move down (editor line, history, or list row)
-    Left                move the cursor left
-    Right               move the cursor right
-    Home / Ctrl+A       start of line
-    End / Ctrl+E        end of line
-    PageUp              scroll the transcript / list up a page
-    PageDown            scroll the transcript / list down a page
-    Backspace / Ctrl+H  delete the character before the cursor
-    Delete              delete the character under the cursor
-    Ctrl+K              delete to end of line
-    Ctrl+U              delete the whole line
-    Ctrl+W              delete the word before the cursor
-    Ctrl+L              clear the transcript
-    Ctrl+O              cycle transcript verbosity (quiet / normal / verbose)
-    Shift+Tab           cycle focus: main → agent 1 → … → main
-    Alt+1               focus agent N (Alt+1…9)
-    Ctrl+C              clear the editor, then (again) quit
-    Ctrl+D              quit
+    Enter                   send the prompt / accept the highlighted item
+    Alt+Enter               queue a follow-up to run after the current turn
+    Ctrl+J / Alt+J          insert a newline
+    Esc                     close the dialog, or abort the running turn
+    Tab                     complete a slash command / open the command picker
+    Up                      move up (editor line, history, or list row)
+    Down                    move down (editor line, history, or list row)
+    Alt+Up                  pop the last queued steer/follow-up back into the editor
+    Left                    move the cursor left
+    Right                   move the cursor right
+    Alt+B / Ctrl+Left       move the cursor back one word
+    Alt+F / Ctrl+Right      move the cursor forward one word
+    Alt+D                   delete the next word
+    Home / Ctrl+A           start of line
+    End / Ctrl+E            end of line
+    PageUp                  scroll the transcript / list up a page
+    PageDown                scroll the transcript / list down a page
+    Backspace / Ctrl+H      delete the character before the cursor
+    Delete                  delete the character under the cursor
+    Ctrl+K                  delete to the end of the line
+    Ctrl+U                  delete to the start of the line
+    Ctrl+W / Alt+Backspace  delete the word before the cursor
+    Ctrl+Y                  paste the most recent kill
+    Alt+Y                   replace the last yank with an older kill
+    Ctrl+_                  undo the last edit
+    Ctrl+O                  cycle transcript verbosity
+    Ctrl+R                  complete a file path at the cursor
+    Ctrl+G                  edit the prompt in $EDITOR
+    Ctrl+L                  pick a model
+    Ctrl+X                  copy the last assistant message
+    Ctrl+Z                  suspend to the shell
+    Shift+Tab               cycle focus: main → agent 1 → … → main
+    Alt+1                   focus agent N (Alt+1…9)
+    Ctrl+C                  clear the editor, then (again) quit
+    Ctrl+D                  quit
     /help                              show commands and keys
     /model [name|id|provider/id]       pick or switch the model
     /login [provider] [api_key|oauth]  log in to a provider

@@ -13,6 +13,11 @@ module Platform : sig
     ; list_paths : prefix:string -> (P.Json.t, string) Result.t Bonsai.Effect.t
     ; open_browser : string -> unit Bonsai.Effect.t
     ; quit : unit Bonsai.Effect.t
+    ; load_history : unit -> (P.Json.t, string) Result.t Bonsai.Effect.t
+    ; append_history : string -> unit Bonsai.Effect.t
+    ; copy_to_clipboard : string -> unit Bonsai.Effect.t
+    ; suspend : unit Bonsai.Effect.t
+    ; edit_externally : string -> (string, string) Result.t Bonsai.Effect.t
     }
 end
 

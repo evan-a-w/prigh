@@ -70,15 +70,22 @@ let status (m : App.Model.t) : Content.Line.t =
 ;;
 
 (* Editor lines hard-wrapped after a two-column marker, returning the rows and
-   the cursor position relative to the first row. *)
+   the cursor position relative to the first row. Collapsed paste chips render
+   as a single dim line while the cursor is elsewhere. *)
 let editor_rows (m : App.Model.t) ~marker ~marker_style ~mask
   : Content.t * (int * int)
   =
   let inner = Int.max 1 (m.width - 2) in
   let pos = Editor.position m.editor in
+  let lines = Editor.lines m.editor in
+  let chips = Editor.chips m.editor in
   let rows = ref [] in
   let cursor = ref (0, 2) in
-  List.iteri (Editor.lines m.editor) ~f:(fun i line ->
+  let emitted = ref 0 in
+  let prefix i j =
+    if i = 0 && j = 0 then span ~style:marker_style marker else span "  "
+  in
+  let render_line i line =
     let line =
       if mask
       then String.make (List.length (Text_width.uchars line)) '*'
@@ -93,12 +100,10 @@ let editor_rows (m : App.Model.t) ~marker ~marker_style ~mask
       in
       go line []
     in
-    let first_row = List.length !rows in
+    let first_row = !emitted in
     List.iteri chunks ~f:(fun j chunk ->
-      let prefix =
-        if i = 0 && j = 0 then span ~style:marker_style marker else span "  "
-      in
-      rows := (prefix :: Content.Line.of_string chunk) :: !rows);
+      rows := (prefix i j :: Content.Line.of_string chunk) :: !rows;
+      incr emitted);
     if i = pos.line
     then (
       let before =
@@ -106,8 +111,60 @@ let editor_rows (m : App.Model.t) ~marker ~marker_style ~mask
           (List.take (List.map (Text_width.uchars line) ~f:fst) pos.col)
       in
       let w = Text_width.string before in
-      cursor := first_row + (w / inner), 2 + (w % inner)));
+      cursor := first_row + (w / inner), 2 + (w % inner))
+  in
+  let rec go i =
+    if i >= List.length lines
+    then ()
+    else (
+      let collapsed =
+        List.find chips ~f:(fun (c : Editor.Chip.t) ->
+          c.start.line = i && not (Editor.Chip.contains c pos))
+      in
+      match collapsed with
+      | Some chip ->
+        let line = List.nth_exn lines i in
+        let before =
+          String.concat
+            (List.take
+               (List.map (Text_width.uchars line) ~f:fst)
+               chip.start.col)
+        in
+        let label = sprintf "[%d lines pasted]" (Editor.Chip.lines chip) in
+        let shortened =
+          if Text_width.string (before ^ label) <= inner
+          then before ^ label
+          else Text_width.truncate (before ^ label) ~width:inner
+        in
+        rows
+        := (prefix i 0 :: Content.Line.of_string ~style:dim shortened) :: !rows;
+        incr emitted;
+        go (chip.stop.line + 1)
+      | None ->
+        render_line i (List.nth_exn lines i);
+        go (i + 1))
+  in
+  go 0;
   List.rev !rows, !cursor
+;;
+
+(** The queued steer/follow-up summary above the editor. *)
+let queued_block (m : App.Model.t) : Content.t =
+  let total = Queue_counts.total m.queued in
+  if total = 0
+  then []
+  else (
+    let texts =
+      List.map m.queued_texts ~f:(fun text ->
+        let one_line = String.concat ~sep:" " (String.split_lines text) in
+        Text_width.truncate one_line ~width:24)
+    in
+    let label =
+      if List.is_empty texts
+      then sprintf "queued (%d)" total
+      else sprintf "queued (%d): %s" total (String.concat ~sep:" ∣ " texts)
+    in
+    [ Content.Line.truncate [ span ~style:dim label ] ~width:m.width ])
 ;;
 
 let picker_block (p : Picker.t) ~width : Content.t * int =
@@ -342,6 +399,7 @@ let screen (m : App.Model.t) : Screen.t =
     let strip = if List.is_empty m.agents then [] else [ agent_strip m ] in
     dialog
     @ [ separator ]
+    @ queued_block m
     @ editor
     @ autocomplete_rows
     @ strip
@@ -391,11 +449,12 @@ let screen (m : App.Model.t) : Screen.t =
   let lines = List.take (transcript @ panel) height in
   let cursor =
     let dialog_rows = List.length dialog in
+    let queued_rows = List.length (queued_block m) in
     let row, col = cursor in
     let base =
       match m.mode with
       | Picker _ -> transcript_area_rows
-      | _ -> transcript_area_rows + dialog_rows + 1
+      | _ -> transcript_area_rows + dialog_rows + 1 + queued_rows
     in
     Some (base + row, Int.min col (width - 1))
   in
