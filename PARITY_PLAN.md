@@ -54,6 +54,14 @@ answered through `Reply`.
   `udiff.ml` unified diffs from `edit`, `wrote N lines` from `write`,
   confirm gate (`tool_confirm` event / `tool_confirm_respond`,
   `Tool_spec.destructive`).
+- **M4 done** (backend `dequeue`/`shell`; TUI word motion, kill ring,
+  undo, `~/.prigh/history`, Alt+Enter/Alt+Up queue, OSC-52 copy, Ctrl+Z,
+  Ctrl+G, `!cmd`, paste chip, Ctrl+L). Suspend/editor needed a manual
+  repaint of Notty's last frame after re-entering the alt screen
+  (`Term_app.install_repaint`) and SIGTSTP to the process group; tmux
+  scenarios `suspend` and `editor` prove it.
+- **M5 TUI done** (`Text_prompt` mode, `/tree` over `get_entries {all}`
+  which now returns `{head, entries}`).
 
 ## M0 — Known bugs (fix first, each with a regression test)
 
