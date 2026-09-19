@@ -66,18 +66,39 @@ let state_json
   ?(model =
     model_json ~provider:"deepseek" "deepseek-flash" "DeepSeek V4.1 Flash")
   ?(running = false)
+  ?session_name
   ()
   =
   sprintf
-    {|{"session_id":"abc123","session_path":"/home/u/.prigh/sessions/1.jsonl","cwd":"/work","model":%s,"thinking":"off","running":%b,"message_count":2,"usage":{"input":1200,"output":300,"cache_read":0},"cost_usd":0.0123,"context_tokens":1500}|}
+    {|{"session_id":"abc123","session_path":"/home/u/.prigh/sessions/1.jsonl","session_name":%s,"cwd":"/work","git_branch":null,"model":%s,"thinking":"off","running":%b,"message_count":2,"usage":{"input":1200,"output":300,"cache_read":0},"cost_usd":0.0123,"context_tokens":1500}|}
+    (match session_name with
+     | Some name -> P.Json.to_string (P.Json.str name)
+     | None -> "null")
     model
     running
 ;;
 
-let state ?model ?running () =
+let state ?model ?running ?session_name () =
   Or_error.ok_exn
     (P.State.of_json
-       (Or_error.ok_exn (P.Json.parse (state_json ?model ?running ()))))
+       (Or_error.ok_exn
+          (P.Json.parse (state_json ?model ?running ?session_name ()))))
+;;
+
+let sessions_json =
+  {|[{"id":"1","path":"/home/u/.prigh/sessions/1.jsonl","name":"build fix","cwd":"/work","created_at":"2025-06-01T10:00:00Z","updated_at":"2025-06-01T10:00:11Z","first_prompt":"fix the build\nplease","message_count":12,"parent":null},{"id":"2","path":"/home/u/.prigh/sessions/2.jsonl","name":null,"cwd":"/other","created_at":"2025-06-02T11:30:00Z","updated_at":"2025-06-02T11:30:22Z","first_prompt":null,"message_count":0,"parent":null}]|}
+;;
+
+let entries_json =
+  {|{"head":"u2","entries":[{"id":"u1","parent":null,"kind":"message","message":{"role":"user","text":"first question"}},{"id":"a1","parent":"u1","kind":"message","message":{"role":"assistant","content":[{"type":"text","text":"answer one"}],"stop_reason":{"type":"end_turn"},"usage":{"input":1,"output":2,"cache_read":0},"model":"m"}},{"id":"u2","parent":"a1","kind":"message","message":{"role":"user","text":"second question\nmore"}}]}|}
+;;
+
+let tree_json =
+  {|{"head":"a2","entries":[{"id":"u1","parent":null,"kind":"message","message":{"role":"user","text":"root question"}},{"id":"a1","parent":"u1","kind":"message","message":{"role":"assistant","content":[{"type":"text","text":"first answer"}],"stop_reason":{"type":"end_turn"},"usage":{"input":1,"output":2,"cache_read":0},"model":"m"}},{"id":"a2","parent":"a1","kind":"message","message":{"role":"assistant","content":[{"type":"text","text":"second answer"}],"stop_reason":{"type":"end_turn"},"usage":{"input":1,"output":2,"cache_read":0},"model":"m"}},{"id":"ab","parent":"u1","kind":"message","message":{"role":"assistant","content":[{"type":"text","text":"branch answer"}],"stop_reason":{"type":"end_turn"},"usage":{"input":1,"output":2,"cache_read":0},"model":"m"}},{"id":"t1","parent":"ab","kind":"message","message":{"role":"tool_result","tool_call_id":"c1","tool_name":"bash","text":"branch tool","is_error":false}}]}|}
+;;
+
+let stats_json =
+  {|{"message_count":4,"turns":2,"tool_calls":{"bash":1,"read":2},"usage":{"input":30,"output":13,"cache_read":5},"cost_usd":0.0001,"context_percent":1.5,"model_changes":1,"compactions":0,"duration_seconds":12.5}|}
 ;;
 
 let auth_json =
@@ -896,6 +917,7 @@ let%expect_test "Esc closes autocomplete without abort while running" =
     ────────────────────────────────────────────────────────────
     > /mo▏
     ▸ /model [name|id|provider/id]  pick or switch the model
+      /import [path]                import a session from a JSO…
     deepseek/deepseek-flash  thinking:off  view:normal  ctx:1.5…
     |}];
   H.esc h;
@@ -1022,7 +1044,12 @@ let%expect_test "/cd completes paths and submits the selected one" =
   H.key h (Key.plain Down);
   H.key h (Key.plain Enter);
   [%expect
-    {| (Rpc (method_ set_cwd) (params ((path src/app.ml))) (tag Show_error)) |}]
+    {|
+    (Rpc
+      (method_ set_cwd)
+      (params ((path src/app.ml)))
+      (tag (Notice_on_success "cwd changed")))
+    |}]
 ;;
 
 let%expect_test "/sessions picker switches and reloads; /logout confirms" =
@@ -1034,7 +1061,7 @@ let%expect_test "/sessions picker switches and reloads; /logout confirms" =
   H.reply
     h
     Sessions_picker
-    {|[{"id":"1","path":"/home/u/.prigh/sessions/1.jsonl","cwd":"/work","created_at":"2025-06-01T10:00:00Z","first_prompt":"fix the build\nplease","message_count":12},{"id":"2","path":"/home/u/.prigh/sessions/2.jsonl","cwd":"/other","created_at":"2025-06-02T11:30:00Z","first_prompt":null,"message_count":0}]|};
+    {|[{"id":"1","path":"/home/u/.prigh/sessions/1.jsonl","name":"build fix","cwd":"/work","created_at":"2025-06-01T10:00:00Z","updated_at":"2025-06-01T10:00:11Z","first_prompt":"fix the build\nplease","message_count":12,"parent":null},{"id":"2","path":"/home/u/.prigh/sessions/2.jsonl","name":null,"cwd":"/other","created_at":"2025-06-02T11:30:00Z","updated_at":"2025-06-02T11:30:22Z","first_prompt":null,"message_count":0,"parent":null}]|};
   H.show h;
   [%expect
     {|
@@ -1044,8 +1071,8 @@ let%expect_test "/sessions picker switches and reloads; /logout confirms" =
     earlier answer
     Sessions  (2)
     / ▏
-    * 2025-06-01T10:00:00  fix the build please  12 msgs  /work
-      2025-06-02T11:30:00  (empty)    0 msgs  /other
+    * build fix ∣ 2025-06-01T10:00 ∣ 12 msgs ∣ fix the build pl…
+      (unnamed) ∣ 2025-06-02T11:30 ∣ 0 msgs ∣ (empty)  /other
     ────────────────────────────────────────────────────────────
     deepseek/deepseek-flash  thinking:off  view:normal  ctx:1.5…
     |}];
@@ -1058,8 +1085,17 @@ let%expect_test "/sessions picker switches and reloads; /logout confirms" =
       (params ((path /home/u/.prigh/sessions/2.jsonl)))
       (tag Reload_messages))
     |}];
-  H.reply h Reload_messages {|[{"role":"user","text":"in the other session"}]|};
-  [%expect {| (Rpc (method_ get_state) (params ()) (tag Initial_state)) |}];
+  H.reply h Reload_messages {|{}|};
+  [%expect
+    {|
+    (Rpc (method_ get_messages) (params ()) (tag Initial_messages))
+    (Rpc (method_ get_state) (params ()) (tag Initial_state))
+    |}];
+  H.reply
+    ~quiet:true
+    h
+    Initial_messages
+    {|[{"role":"user","text":"in the other session"}]|};
   H.show h;
   [%expect
     {|
@@ -1111,6 +1147,412 @@ let%expect_test "/sessions picker switches and reloads; /logout confirms" =
   [%expect {| (Rpc (method_ auth_status) (params ()) (tag Auth_refresh)) |}]
 ;;
 
+let%expect_test "/name sets the name directly or prompts in a text dialog" =
+  let h = connected () in
+  H.keys h "/name my session";
+  H.enter h;
+  [%expect
+    {|
+    (Rpc
+      (method_ set_session_name)
+      (params ((name "my session")))
+      (tag (Notice_on_success "session named")))
+    |}];
+  H.reply h (Notice_on_success "session named") {|{}|};
+  H.event h (State (state ~session_name:"my session" ()));
+  H.show h;
+  [%expect
+    {|
+    session abc123 in /work. /help for commands, Esc aborts,
+    Ctrl+C twice quits.
+    > earlier question
+    earlier answer
+    session named
+    ────────────────────────────────────────────────────────────
+    > ▏
+    deepseek/deepseek-flash  name:my session  thinking:off  vie…
+    |}];
+  H.keys h "/name";
+  H.enter h;
+  H.show h;
+  [%expect
+    {|
+    session abc123 in /work. /help for commands, Esc aborts,
+    Ctrl+C twice quits.
+    > earlier question
+    earlier answer
+    session named
+    Session name
+    ────────────────────────────────────────────────────────────
+    ? ▏
+    deepseek/deepseek-flash  name:my session  thinking:off  vie…
+    |}];
+  H.keys h "renamed";
+  H.enter h;
+  [%expect
+    {|
+    (Rpc
+      (method_ set_session_name)
+      (params ((name renamed)))
+      (tag (Notice_on_success "session named")))
+    |}];
+  H.esc h;
+  H.mode h;
+  [%expect {| editing |}]
+;;
+
+let%expect_test "/session prints the stats table" =
+  let h = connected () in
+  H.keys h "/session";
+  H.enter h;
+  [%expect {| (Rpc (method_ session_stats) (params ()) (tag Session_stats)) |}];
+  H.reply h Session_stats stats_json;
+  H.show h;
+  [%expect
+    {|
+    messages       4
+    turns          2
+    tools          bash 1, read 2
+    usage          in 30 out 13 cache 5
+    cost           $0.0001
+    context        1.5%
+    model changes  1
+    compactions    0
+    duration       12.5s
+    ────────────────────────────────────────────────────────────
+    > ▏
+    deepseek/deepseek-flash  thinking:off  view:normal  ctx:1.5…
+    |}]
+;;
+
+let%expect_test "/sessions Ctrl+N filters named only; Ctrl+D confirms delete" =
+  let h = connected () in
+  H.keys h "/sessions";
+  H.enter h;
+  H.reply h Sessions_picker sessions_json;
+  H.key h (Key.ctrl 'n');
+  H.show h;
+  [%expect
+    {|
+    (Rpc (method_ list_sessions) (params ()) (tag Sessions_picker))
+
+
+
+    session abc123 in /work. /help for commands, Esc aborts,
+    Ctrl+C twice quits.
+    > earlier question
+    earlier answer
+    Sessions (named)  (1)
+    / ▏
+    * build fix ∣ 2025-06-01T10:00 ∣ 12 msgs ∣ fix the build pl…
+    ────────────────────────────────────────────────────────────
+    deepseek/deepseek-flash  thinking:off  view:normal  ctx:1.5…
+    |}];
+  H.key h (Key.ctrl 'n');
+  H.key h (Key.ctrl 'd');
+  H.show h;
+  [%expect
+    {|
+    session abc123 in /work. /help for commands, Esc aborts,
+    Ctrl+C twice quits.
+    > earlier question
+    earlier answer
+    Delete session build fix? (y/n)
+    ────────────────────────────────────────────────────────────
+    ? ▏
+    deepseek/deepseek-flash  thinking:off  view:normal  ctx:1.5…
+    |}];
+  H.keys h "y";
+  [%expect
+    {|
+    (Rpc
+      (method_ delete_session)
+      (params ((path /home/u/.prigh/sessions/1.jsonl)))
+      (tag Deleted_session))
+    |}];
+  H.reply h Deleted_session {|{}|};
+  [%expect
+    {| (Rpc (method_ list_sessions) (params ()) (tag Sessions_picker)) |}];
+  H.reply h Sessions_picker sessions_json;
+  H.mode h;
+  [%expect {| picker |}];
+  H.esc h;
+  H.mode h;
+  [%expect {| editing |}]
+;;
+
+let%expect_test "/fork picks a user message, forks at it and prefills the \
+                 editor"
+  =
+  let h = connected () in
+  H.keys h "/fork";
+  H.enter h;
+  [%expect {| (Rpc (method_ get_entries) (params ()) (tag Entries_for_fork)) |}];
+  H.reply h Entries_for_fork entries_json;
+  H.show h;
+  [%expect
+    {|
+    session abc123 in /work. /help for commands, Esc aborts,
+    Ctrl+C twice quits.
+    > earlier question
+    earlier answer
+    Fork at  (2)
+    / ▏
+      first question   #1
+    * second question  #2
+    ────────────────────────────────────────────────────────────
+    deepseek/deepseek-flash  thinking:off  view:normal  ctx:1.5…
+    |}];
+  H.enter h;
+  [%expect {| (Rpc (method_ fork) (params ((at u2))) (tag Reload_messages)) |}];
+  H.show h;
+  [%expect
+    {|
+    session abc123 in /work. /help for commands, Esc aborts,
+    Ctrl+C twice quits.
+    > earlier question
+    earlier answer
+    ────────────────────────────────────────────────────────────
+    > second question
+      more▏
+    deepseek/deepseek-flash  thinking:off  view:normal  ctx:1.5…
+    |}]
+;;
+
+let%expect_test "/rewind picks a user message, then confirms the rewind" =
+  let h = connected () in
+  H.keys h "/rewind";
+  H.enter h;
+  H.reply h Entries_for_rewind entries_json;
+  H.show h;
+  [%expect
+    {|
+    (Rpc (method_ get_entries) (params ()) (tag Entries_for_rewind))
+
+
+    session abc123 in /work. /help for commands, Esc aborts,
+    Ctrl+C twice quits.
+    > earlier question
+    earlier answer
+    Rewind to  (2)
+    / ▏
+      first question   #1
+    * second question  #2
+    ────────────────────────────────────────────────────────────
+    deepseek/deepseek-flash  thinking:off  view:normal  ctx:1.5…
+    |}];
+  H.enter h;
+  H.show h;
+  [%expect
+    {|
+    session abc123 in /work. /help for commands, Esc aborts,
+    Ctrl+C twice quits.
+    > earlier question
+    earlier answer
+    Rewind to "second question"? Later messages are abandoned (…
+    ────────────────────────────────────────────────────────────
+    ? ▏
+    deepseek/deepseek-flash  thinking:off  view:normal  ctx:1.5…
+    |}];
+  H.keys h "y";
+  [%expect
+    {| (Rpc (method_ rewind) (params ((to u2))) (tag Reload_messages)) |}]
+;;
+
+let%expect_test "/tree renders branches with the active path marked" =
+  let h = connected () in
+  H.keys h "/tree";
+  H.enter h;
+  [%expect
+    {| (Rpc (method_ get_entries) (params ((all true))) (tag Entries_for_tree)) |}];
+  H.reply h Entries_for_tree tree_json;
+  H.show h;
+  [%expect
+    {|
+    Ctrl+C twice quits.
+    > earlier question
+    earlier answer
+    Session tree  (5)
+    / ▏
+    * > root question
+    *   · first answer
+    *     · second answer
+        · branch answer
+          ⚙ branch tool
+    ────────────────────────────────────────────────────────────
+    deepseek/deepseek-flash  thinking:off  view:normal  ctx:1.5…
+    |}];
+  H.key h (Key.plain Down);
+  H.key h (Key.plain Down);
+  H.key h (Key.plain Down);
+  H.enter h;
+  [%expect
+    {| (Rpc (method_ rewind) (params ((to ab))) (tag Reload_messages)) |}]
+;;
+
+let%expect_test "/clone reloads and notices" =
+  let h = connected () in
+  H.keys h "/clone";
+  H.enter h;
+  [%expect
+    {|
+    (Rpc
+      (method_ clone)
+      (params ())
+      (tag (Reload_messages_notice "cloned session")))
+    |}];
+  H.reply h (Reload_messages_notice "cloned session") {|{}|};
+  [%expect
+    {|
+    (Rpc (method_ get_messages) (params ()) (tag Initial_messages))
+    (Rpc (method_ get_state) (params ()) (tag Initial_state))
+    |}];
+  H.reply ~quiet:true h Initial_messages {|[]|};
+  H.show h;
+  [%expect
+    {|
+    cloned session
+    ────────────────────────────────────────────────────────────
+    > ▏
+    deepseek/deepseek-flash  thinking:off  view:normal  ctx:1.5…
+    |}]
+;;
+
+let%expect_test "/export chooses jsonl by extension, or prompts for a path" =
+  let h = connected () in
+  H.step h (Intent (Insert "/export data.jsonl"));
+  H.enter h;
+  [%expect
+    {|
+    (List_paths (prefix data.jsonl) (tag (Paths_for_autocomplete data.jsonl)))
+    (Rpc
+      (method_ export)
+      (params (
+        (format jsonl)
+        (path   data.jsonl)))
+      (tag Export_done))
+    |}];
+  H.step h (Intent (Insert "/export notes.md"));
+  H.enter h;
+  [%expect
+    {|
+    (List_paths (prefix notes.md) (tag (Paths_for_autocomplete notes.md)))
+    (Rpc
+      (method_ export)
+      (params (
+        (format markdown)
+        (path   notes.md)))
+      (tag Export_done))
+    |}];
+  H.reply h Export_done {|{"path":"/tmp/notes.md"}|};
+  H.step h (Intent (Insert "/export "));
+  H.enter h;
+  H.show h;
+  [%expect
+    {|
+    (List_paths (prefix "") (tag (Paths_for_autocomplete "")))
+
+
+
+    session abc123 in /work. /help for commands, Esc aborts,
+    Ctrl+C twice quits.
+    > earlier question
+    earlier answer
+    exported to /tmp/notes.md
+    Export to
+    ────────────────────────────────────────────────────────────
+    ? ▏
+    deepseek/deepseek-flash  thinking:off  view:normal  ctx:1.5…
+    |}];
+  H.step h (Intent (Insert "out.md"));
+  H.enter h;
+  [%expect
+    {|
+    (Rpc
+      (method_ export)
+      (params (
+        (format markdown)
+        (path   out.md)))
+      (tag Export_done))
+    |}]
+;;
+
+let%expect_test "/import imports a path or prompts for one" =
+  let h = connected () in
+  H.step h (Intent (Insert "/import saved.jsonl"));
+  H.enter h;
+  [%expect
+    {|
+    (List_paths (prefix saved.jsonl) (tag (Paths_for_autocomplete saved.jsonl)))
+    (Rpc (method_ import) (params ((path saved.jsonl))) (tag Reload_messages))
+    |}];
+  H.step h (Intent (Insert "/import "));
+  H.enter h;
+  H.show h;
+  [%expect
+    {|
+    (List_paths (prefix "") (tag (Paths_for_autocomplete "")))
+
+
+
+
+    session abc123 in /work. /help for commands, Esc aborts,
+    Ctrl+C twice quits.
+    > earlier question
+    earlier answer
+    Import from
+    ────────────────────────────────────────────────────────────
+    ? ▏
+    deepseek/deepseek-flash  thinking:off  view:normal  ctx:1.5…
+    |}];
+  H.step h (Intent (Insert "other.jsonl"));
+  H.enter h;
+  [%expect
+    {| (Rpc (method_ import) (params ((path other.jsonl))) (tag Reload_messages)) |}]
+;;
+
+let%expect_test "/cd changes the directory or prompts for a path" =
+  let h = connected () in
+  H.step h (Intent (Insert "/cd /var"));
+  H.enter h;
+  [%expect
+    {|
+    (List_paths (prefix /var) (tag (Paths_for_autocomplete /var)))
+    (Rpc
+      (method_ set_cwd)
+      (params ((path /var)))
+      (tag (Notice_on_success "cwd changed")))
+    |}];
+  H.step h (Intent (Insert "/cd "));
+  H.enter h;
+  H.show h;
+  [%expect
+    {|
+    (List_paths (prefix "") (tag (Paths_for_autocomplete "")))
+
+
+
+
+    session abc123 in /work. /help for commands, Esc aborts,
+    Ctrl+C twice quits.
+    > earlier question
+    earlier answer
+    Change directory to
+    ────────────────────────────────────────────────────────────
+    ? ▏
+    deepseek/deepseek-flash  thinking:off  view:normal  ctx:1.5…
+    |}];
+  H.step h (Intent (Insert "/tmp"));
+  H.enter h;
+  [%expect
+    {|
+    (Rpc
+      (method_ set_cwd)
+      (params ((path /tmp)))
+      (tag (Notice_on_success "cwd changed")))
+    |}]
+;;
+
 let%expect_test "/auth, /help, /state, /clear, unknown method errors" =
   let h = connected ~height:16 () in
   H.keys h "/auth";
@@ -1144,12 +1586,12 @@ let%expect_test "/auth, /help, /state, /clear, unknown method errors" =
   H.show h;
   [%expect
     {|
-    kill
-    Ctrl+_                  undo the last edit
     Ctrl+O                  cycle transcript verbosity
     Ctrl+R                  complete a file path at the cursor
     Ctrl+G                  edit the prompt in $EDITOR
     Ctrl+L                  pick a model
+    Ctrl+N                  sessions picker: toggle the
+    named-only filter
     Ctrl+X                  copy the last assistant message
     Ctrl+Z                  suspend to the shell
     Shift+Tab               cycle focus: main → agent 1 → … →
@@ -1169,9 +1611,9 @@ let%expect_test "/auth, /help, /state, /clear, unknown method errors" =
   [%expect
     {|
     (Rpc (method_ list_models) (params ()) (tag (Models_for_picker "")))
-    Ctrl+R                  complete a file path at the cursor
-    Ctrl+G                  edit the prompt in $EDITOR
     Ctrl+L                  pick a model
+    Ctrl+N                  sessions picker: toggle the
+    named-only filter
     Ctrl+X                  copy the last assistant message
     Ctrl+Z                  suspend to the shell
     Shift+Tab               cycle focus: main → agent 1 → … →
@@ -1384,13 +1826,16 @@ let%expect_test "reload pairs tool calls with their results" =
   let h = connected ~height:12 () in
   H.keys h "/verbosity quiet";
   H.enter h;
+  H.reply h Reload_messages {|{}|};
   H.reply
+    ~quiet:true
     h
-    Reload_messages
+    Initial_messages
     {|[{"role":"user","text":"go"},{"role":"assistant","content":[{"type":"tool_call","id":"c1","name":"bash","arguments":"{\"command\":\"ls\"}"}],"stop_reason":{"type":"tool_use"},"usage":{"input":1,"output":2,"cache_read":0},"model":"m"},{"role":"tool_result","tool_call_id":"c1","tool_name":"bash","text":"a.ml\nb.ml","is_error":false}]|};
   H.show h;
   [%expect
     {|
+    (Rpc (method_ get_messages) (params ()) (tag Initial_messages))
     (Rpc (method_ get_state) (params ()) (tag Initial_state))
 
 
@@ -2331,11 +2776,17 @@ let%expect_test "session reload drops subagent transcripts and focus" =
     agents: main [1✓]  (Shift+Tab)
     deepseek/deepseek-flash  thinking:off  view:normal  ctx:1.5k (0%)  in…
     |}];
+  H.reply h Reload_messages {|{}|};
   H.reply
+    ~quiet:true
     h
-    Reload_messages
+    Initial_messages
     {|[{"role":"user","text":"go"},{"role":"assistant","content":[{"type":"tool_call","id":"c1","name":"subagent","arguments":"{\"task\":\"look\"}"}],"stop_reason":{"type":"tool_use"},"usage":{"input":1,"output":2,"cache_read":0},"model":"m"},{"role":"tool_result","tool_call_id":"c1","tool_name":"subagent","text":"report","is_error":false}]|};
-  [%expect {| (Rpc (method_ get_state) (params ()) (tag Initial_state)) |}];
+  [%expect
+    {|
+    (Rpc (method_ get_messages) (params ()) (tag Initial_messages))
+    (Rpc (method_ get_state) (params ()) (tag Initial_state))
+    |}];
   H.show h;
   [%expect
     {|

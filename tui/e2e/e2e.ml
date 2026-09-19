@@ -25,6 +25,21 @@ let tmp_dir = ref ""
 let normalise s =
   let sub re by s = Re.replace_string (Re.compile re) ~by s in
   s
+  |> sub
+       (Re.seq
+          [ Re.str "duration_seconds"
+          ; Re.rep1 Re.space
+          ; Re.rep1
+              (Re.alt
+                 [ Re.digit
+                 ; Re.char 'e'
+                 ; Re.char 'E'
+                 ; Re.char '.'
+                 ; Re.char '+'
+                 ; Re.char '-'
+                 ])
+          ])
+       "duration_seconds <t>"
   |> sub (Re.str !tmp_dir) "$TMP"
   |> sub
        (Re.seq
@@ -202,6 +217,12 @@ let main () =
           (List.hd_exn sessions).message_count
       | Error e -> print_s [%message "list_sessions" (e : Error.t)]
     in
+    let%bind () =
+      call client "set_session_name" [ "name", Json.str "e2e session" ]
+    in
+    let%bind () = call client "get_state" [] in
+    let%bind () = call client "session_stats" [] in
+    let%bind () = call client "get_entries" [] in
     let%bind () = call client "bogus" [] in
     Client.close client;
     let%bind () = Client.closed client in

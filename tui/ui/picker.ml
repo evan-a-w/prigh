@@ -121,5 +121,6 @@ let handle t (intent : Intent.t) ~page : Outcome.t =
   | Suspend
   | Path_complete
   | Edit_externally
-  | Model_picker -> Continue t
+  | Model_picker
+  | Picker_toggle_filter -> Continue t
 ;;

@@ -41,4 +41,5 @@ type t =
   | Path_complete
   | Edit_externally
   | Model_picker
+  | Picker_toggle_filter (** Ctrl+N in the sessions picker *)
 [@@deriving sexp_of, equal, compare]

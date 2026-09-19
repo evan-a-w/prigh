@@ -22,8 +22,13 @@ let status (m : App.Model.t) : Content.Line.t =
     in
     let mode_hint =
       match m.mode with
+      | Picker { kind = Sessions _; _ } ->
+        Some
+          "picker: type to filter, Enter selects, Esc closes · Ctrl+N named \
+           only · Ctrl+D delete"
       | Picker _ -> Some "picker: type to filter, Enter selects, Esc closes"
       | Login_prompt _ -> Some "login: Enter answers, Esc cancels"
+      | Text_prompt _ -> Some "Enter submits, Esc cancels"
       | Confirm _ -> Some "confirm: y / n"
       | Editing ->
         if Option.is_some m.autocomplete
@@ -38,16 +43,19 @@ let status (m : App.Model.t) : Content.Line.t =
         else None
     in
     let parts =
-      [ s.model.key
-      ; "thinking:" ^ s.thinking
-      ; "view:" ^ Verbosity.name m.verbosity
-      ; sprintf "ctx:%s (%d%%)" (format_tokens s.context_tokens) context
-      ; sprintf
-          "in:%s out:%s"
-          (format_tokens s.usage.input)
-          (format_tokens s.usage.output)
-      ; sprintf "$%.4f" s.cost_usd
-      ]
+      [ s.model.key ]
+      @ (match s.session_name with
+         | Some name -> [ "name:" ^ name ]
+         | None -> [])
+      @ [ "thinking:" ^ s.thinking
+        ; "view:" ^ Verbosity.name m.verbosity
+        ; sprintf "ctx:%s (%d%%)" (format_tokens s.context_tokens) context
+        ; sprintf
+            "in:%s out:%s"
+            (format_tokens s.usage.input)
+            (format_tokens s.usage.output)
+        ; sprintf "$%.4f" s.cost_usd
+        ]
     in
     let queued = Queue_counts.total m.queued in
     let parts =
@@ -380,6 +388,15 @@ let screen (m : App.Model.t) : Screen.t =
           ~mask
       in
       [], rows, cursor
+    | Text_prompt { question; _ } ->
+      let rows, cursor =
+        editor_rows
+          m
+          ~marker:"? "
+          ~marker_style:(Style.bold (Style.fg Yellow))
+          ~mask:false
+      in
+      [ [ span ~style:(Style.bold (Style.fg Yellow)) question ] ], rows, cursor
     | Editing ->
       let rows, cursor =
         editor_rows

@@ -38,4 +38,5 @@ type t =
   | Path_complete
   | Edit_externally
   | Model_picker
+  | Picker_toggle_filter
 [@@deriving sexp_of, equal, compare]

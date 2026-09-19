@@ -62,6 +62,39 @@
 <- logout: ()
   event auth (Logged_out deepseek)
 <- list_sessions: 1 session(s), 2 message(s)
+<- set_session_name: ()
+<- get_state: ((session_id <id>)
+ (session_path
+  $TMP/.prigh/sessions/<stamp>_<id>.jsonl)
+ (session_name "e2e session")
+ (cwd $TMP) (git_branch null)
+ (model
+  ((id claude-fable-5-1) (provider anthropic)
+   (key anthropic/claude-fable-5-1) (name "Claude Fable 5.1")
+   (context_window 1000000) (max_output 128000) (supports_thinking true)
+   (cost ((input 10) (output 50) (cache_read 0.25)))))
+ (thinking high) (running false) (message_count 2)
+ (usage ((input 10) (output 5) (cache_read 0))) (cost_usd 0.00035)
+ (context_tokens 10))
+<- session_stats: ((message_count 2) (turns 1) (tool_calls ())
+ (usage ((input 10) (output 5) (cache_read 0))) (cost_usd 0.00035)
+ (context_percent 0.001) (model_changes 2) (compactions 0)
+ (duration_seconds <t>))
+<- get_entries: ((head <id>)
+ (entries
+  (((id <id>) (parent null) (kind message)
+    (message ((role user) (text "hello there"))))
+   ((id <id>) (parent <id>) (kind message)
+    (message
+     ((role assistant) (content (((type text) (text "faux reply"))))
+      (stop_reason ((type end_turn)))
+      (usage ((input 10) (output 5) (cache_read 0))) (model deepseek-flash))))
+   ((id <id>) (parent <id>) (kind model)
+    (model anthropic/claude-fable-5-1) (thinking off))
+   ((id <id>) (parent <id>) (kind model)
+    (model anthropic/claude-fable-5-1) (thinking high))
+   ((id <id>) (parent <id>) (kind name)
+    (name "e2e session")))))
 <- bogus ERROR: "unknown method \"bogus\""
 backend exited
 <- ping: pong

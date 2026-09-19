@@ -344,9 +344,9 @@ let%expect_test "fuzzy ranking: command names" =
       (String.concat ~sep:" " (Fuzzy.rank ~query names ~key:Fn.id)));
   [%expect
     {|
-    "mo" -> model
-    "lo" -> login logout
-    "s"  -> state switch sessions agents verbosity
+    "mo" -> model import
+    "lo" -> login logout clone
+    "s"  -> state switch session sessions agents verbosity
     "sw" -> switch
     "xyz" ->
     |}]
@@ -440,9 +440,13 @@ let%expect_test "commands" =
     (/s (
       "Commands.complete s" (
         Candidates (
+          ((name session)
+           (args "")
+           (help "show session statistics")
+           (argument ()))
           ((name sessions)
            (args "")
-           (help "pick a saved session to switch to")
+           (help "pick a saved session (Ctrl+N named, Ctrl+D delete)")
            (argument ()))
           ((name switch)
            (args [path])
@@ -452,7 +456,7 @@ let%expect_test "commands" =
            (args "")
            (help "show session state")
            (argument ()))))))
-    (/se ("Commands.complete s" (Unique "/sessions ")))
+    (/se ("Commands.complete s" (Common_prefix /session)))
     (/ (
       "Commands.complete s" (
         Candidates (
@@ -492,9 +496,17 @@ let%expect_test "commands" =
            (args "")
            (help "start a new session")
            (argument ()))
+          ((name name)
+           (args [text])
+           (help "set the session name")
+           (argument ()))
+          ((name session)
+           (args "")
+           (help "show session statistics")
+           (argument ()))
           ((name sessions)
            (args "")
-           (help "pick a saved session to switch to")
+           (help "pick a saved session (Ctrl+N named, Ctrl+D delete)")
            (argument ()))
           ((name agents)
            (args "")
@@ -510,8 +522,28 @@ let%expect_test "commands" =
            (argument (Path)))
           ((name fork)
            (args "")
-           (help "fork the current session")
+           (help "fork at a previous user message")
            (argument ()))
+          ((name rewind)
+           (args "")
+           (help "rewind the head to a previous user message")
+           (argument ()))
+          ((name tree)
+           (args "")
+           (help "show the session tree and switch head")
+           (argument ()))
+          ((name clone)
+           (args "")
+           (help "clone the current session")
+           (argument ()))
+          ((name export)
+           (args [path])
+           (help "export the transcript (markdown or .jsonl)")
+           (argument (Path)))
+          ((name import)
+           (args [path])
+           (help "import a session from a JSONL file")
+           (argument (Path)))
           ((name abort)
            (args "")
            (help "abort the current run")
@@ -540,7 +572,7 @@ let%expect_test "commands" =
     {|
     (modle ("Option.map (Commands.closest s) ~f:(fun c -> c.name)" (model)))
     (hlep ("Option.map (Commands.closest s) ~f:(fun c -> c.name)" (help)))
-    (sess ("Option.map (Commands.closest s) ~f:(fun c -> c.name)" (sessions)))
+    (sess ("Option.map (Commands.closest s) ~f:(fun c -> c.name)" (session)))
     (zzzz ("Option.map (Commands.closest s) ~f:(fun c -> c.name)" ()))
     |}]
 ;;
@@ -661,6 +693,7 @@ let%expect_test "keymap: every binding resolves to its intent and is documented"
     Ctrl+R           Path_complete
     Ctrl+G           Edit_externally
     Ctrl+L           Model_picker
+    Ctrl+N           Picker_toggle_filter
     Ctrl+X           Copy_last
     Ctrl+Z           Suspend
     Shift+Tab        Next_agent
@@ -706,6 +739,7 @@ let%expect_test "keymap: every binding resolves to its intent and is documented"
     Ctrl+R                  complete a file path at the cursor
     Ctrl+G                  edit the prompt in $EDITOR
     Ctrl+L                  pick a model
+    Ctrl+N                  sessions picker: toggle the named-only filter
     Ctrl+X                  copy the last assistant message
     Ctrl+Z                  suspend to the shell
     Shift+Tab               cycle focus: main → agent 1 → … → main
@@ -721,11 +755,18 @@ let%expect_test "keymap: every binding resolves to its intent and is documented"
     /auth                              show which providers are configured
     /compact                           summarise older messages to free context
     /new                               start a new session
-    /sessions                          pick a saved session to switch to
+    /name [text]                       set the session name
+    /session                           show session statistics
+    /sessions                          pick a saved session (Ctrl+N named, Ctrl+D delete)
     /agents                            focus a subagent
     /switch [path]                     switch to a saved session
     /cd [path]                         change the working directory
-    /fork                              fork the current session
+    /fork                              fork at a previous user message
+    /rewind                            rewind the head to a previous user message
+    /tree                              show the session tree and switch head
+    /clone                             clone the current session
+    /export [path]                     export the transcript (markdown or .jsonl)
+    /import [path]                     import a session from a JSONL file
     /abort                             abort the current run
     /state                             show session state
     /clear                             clear the transcript

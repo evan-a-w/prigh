@@ -54,11 +54,26 @@ let all =
   ; c "auth" "" "show which providers are configured"
   ; c "compact" "" "summarise older messages to free context"
   ; c "new" "" "start a new session"
-  ; c "sessions" "" "pick a saved session to switch to"
+  ; c "name" "[text]" "set the session name"
+  ; c "session" "" "show session statistics"
+  ; c "sessions" "" "pick a saved session (Ctrl+N named, Ctrl+D delete)"
   ; c "agents" "" "focus a subagent"
   ; c ~argument:Argument.Sessions "switch" "[path]" "switch to a saved session"
   ; c ~argument:Argument.Path "cd" "[path]" "change the working directory"
-  ; c "fork" "" "fork the current session"
+  ; c "fork" "" "fork at a previous user message"
+  ; c "rewind" "" "rewind the head to a previous user message"
+  ; c "tree" "" "show the session tree and switch head"
+  ; c "clone" "" "clone the current session"
+  ; c
+      ~argument:Argument.Path
+      "export"
+      "[path]"
+      "export the transcript (markdown or .jsonl)"
+  ; c
+      ~argument:Argument.Path
+      "import"
+      "[path]"
+      "import a session from a JSONL file"
   ; c "abort" "" "abort the current run"
   ; c "state" "" "show session state"
   ; c "clear" "" "clear the transcript"

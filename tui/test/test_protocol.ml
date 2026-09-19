@@ -22,7 +22,7 @@ let%expect_test "responses" =
 
 let%expect_test "state event and messages" =
   decode
-    {|{"type":"event","event":"state","state":{"session_id":"s1","session_path":"/tmp/s1.jsonl","cwd":"/work","model":{"id":"claude-fable-5-1","provider":"anthropic","key":"anthropic/claude-fable-5-1","name":"Claude Fable 5.1","context_window":1000000,"max_output":128000,"supports_thinking":true,"cost":{"input":10,"output":50,"cache_read":0.25}},"thinking":"low","running":false,"message_count":3,"usage":{"input":120,"output":40,"cache_read":10},"cost_usd":0.0032,"context_tokens":160}}|};
+    {|{"type":"event","event":"state","state":{"session_id":"s1","session_path":"/tmp/s1.jsonl","session_name":"my session","cwd":"/work","git_branch":"main","model":{"id":"claude-fable-5-1","provider":"anthropic","key":"anthropic/claude-fable-5-1","name":"Claude Fable 5.1","context_window":1000000,"max_output":128000,"supports_thinking":true,"cost":{"input":10,"output":50,"cache_read":0.25}},"thinking":"low","running":false,"message_count":3,"usage":{"input":120,"output":40,"cache_read":10},"cost_usd":0.0032,"context_tokens":160}}|};
   decode
     {|{"type":"event","event":"message_start","message":{"role":"user","text":"hi"}}|};
   decode
@@ -44,7 +44,9 @@ let%expect_test "state event and messages" =
       State (
         (session_id   s1)
         (session_path /tmp/s1.jsonl)
-        (cwd          /work)
+        (session_name ("my session"))
+        (cwd /work)
+        (git_branch (main))
         (model (
           (id                claude-fable-5-1)
           (provider          anthropic)
@@ -246,7 +248,7 @@ let%expect_test "auth status, models, sessions" =
   show
     (fun j ->
       Or_error.map (Session_summary.of_json j) ~f:Session_summary.sexp_of_t)
-    {|{"id":"abc","path":"/p","cwd":"/c","created_at":"2025-01-01T00:00:00Z","first_prompt":null,"message_count":0}|};
+    {|{"id":"abc","path":"/p","name":"build fix","cwd":"/c","created_at":"2025-01-01T00:00:00Z","updated_at":"2025-06-01T12:34:56Z","first_prompt":null,"message_count":0,"parent":null}|};
   [%expect
     {|
     ((provider anthropic)
@@ -263,12 +265,90 @@ let%expect_test "auth status, models, sessions" =
      (methods    ())
      (configured ())
      (expires_ms ()))
-    ((id         abc)
-     (path       /p)
+    ((id   abc)
+     (path /p)
+     (name ("build fix"))
      (cwd        /c)
      (created_at 2025-01-01T00:00:00Z)
+     (updated_at (2025-06-01T12:34:56Z))
      (first_prompt ())
-     (message_count 0))
+     (message_count 0)
+     (parent ()))
+    |}]
+;;
+
+let%expect_test "entries and session stats" =
+  let show f json =
+    match Json.parse json with
+    | Error e -> print_s [%message "parse" (e : Error.t)]
+    | Ok j ->
+      (match f j with
+       | Ok s -> print_s s
+       | Error e -> print_s [%message "decode" (e : Error.t)])
+  in
+  (* The optional list-session fields may be absent. *)
+  show
+    (fun j ->
+      Or_error.map (Session_summary.of_json j) ~f:Session_summary.sexp_of_t)
+    {|{"id":"a","path":"/p","cwd":"/c","created_at":"2025-01-01T00:00:00Z","first_prompt":"hi","message_count":3}|};
+  show
+    (fun j -> Or_error.map (Entry.of_json j) ~f:Entry.sexp_of_t)
+    {|{"id":"e1","parent":null,"kind":"message","message":{"role":"user","text":"first\nsecond"}}|};
+  show
+    (fun j -> Or_error.map (Entry.of_json j) ~f:Entry.sexp_of_t)
+    {|{"id":"e2","parent":"e1","kind":"model","model":"deepseek/deepseek-flash","thinking":"high"}|};
+  show
+    (fun j -> Or_error.map (Entry.of_json j) ~f:Entry.sexp_of_t)
+    {|{"id":"e3","parent":"e2","kind":"compaction","summary":"summarised","kept_from":"e1"}|};
+  show
+    (fun j -> Or_error.map (Entry.of_json j) ~f:Entry.sexp_of_t)
+    {|{"id":"e4","parent":"e3","kind":"name","name":"my session"}|};
+  show
+    (fun j -> Or_error.map (Entry.of_json j) ~f:Entry.sexp_of_t)
+    {|{"id":"e5","parent":"e4","kind":"cwd","cwd":"/work"}|};
+  show
+    (fun j -> Or_error.map (Session_stats.of_json j) ~f:Session_stats.sexp_of_t)
+    {|{"message_count":4,"turns":2,"tool_calls":{"bash":1,"read":2},"usage":{"input":30,"output":13,"cache_read":5},"cost_usd":0.0001,"context_percent":1.5,"model_changes":1,"compactions":0,"duration_seconds":12.5}|};
+  [%expect
+    {|
+    ((id   a)
+     (path /p)
+     (name ())
+     (cwd        /c)
+     (created_at 2025-01-01T00:00:00Z)
+     (updated_at ())
+     (first_prompt (hi))
+     (message_count 3)
+     (parent ()))
+    ((id e1) (parent ()) (kind (Message (User "first\nsecond"))))
+    ((id e2)
+     (parent (e1))
+     (kind (
+       Model
+       (model    deepseek/deepseek-flash)
+       (thinking high))))
+    ((id e3)
+     (parent (e2))
+     (kind (
+       Compaction
+       (summary   summarised)
+       (kept_from e1))))
+    ((id e4) (parent (e3)) (kind (Name (name "my session"))))
+    ((id e5) (parent (e4)) (kind (Cwd (cwd /work))))
+    ((message_count 4)
+     (turns         2)
+     (tool_calls (
+       (bash 1)
+       (read 2)))
+     (usage (
+       (input      30)
+       (output     13)
+       (cache_read 5)))
+     (cost_usd         0.0001)
+     (context_percent  1.5)
+     (model_changes    1)
+     (compactions      0)
+     (duration_seconds 12.5))
     |}]
 ;;
 

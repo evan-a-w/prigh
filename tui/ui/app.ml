@@ -17,6 +17,12 @@ module Reply_tag = struct
     | Models_after_login of string
     | Sessions_picker
     | Sessions_cache
+    | Session_stats
+    | Entries_for_fork
+    | Entries_for_rewind
+    | Entries_for_tree
+    | Export_done
+    | Deleted_session
     | Paths_for_autocomplete of string
     | Set_model_done
     | Compact_done
@@ -25,6 +31,7 @@ module Reply_tag = struct
     | History
     | Dequeued
     | Editor_text
+    | Reload_messages_notice of string
   [@@deriving sexp_of, equal]
 end
 
@@ -341,27 +348,219 @@ let logout_picker m (statuses : P.Auth_status.t list) =
   else open_picker m Logout (Picker.create ~title:"Log out of" items)
 ;;
 
-let sessions_picker m (sessions : P.Session_summary.t list) =
+let session_picker_items m (sessions : P.Session_summary.t list) =
   let current = Option.map m.state ~f:(fun s -> s.session_path) in
-  let items =
-    List.map sessions ~f:(fun s ->
-      let first =
-        Option.value_map s.first_prompt ~default:"(empty)" ~f:(fun p ->
-          Text_width.truncate
-            (String.concat ~sep:" " (String.split_lines p))
-            ~width:60)
-      in
-      Picker.Item.create
-        ~id:s.path
-        ~detail:(sprintf "%d msgs  %s" s.message_count s.cwd)
-        ~search:(first ^ " " ^ s.cwd ^ " " ^ s.created_at)
-        ~marked:
-          (Option.value_map current ~default:false ~f:(String.equal s.path))
-        (String.prefix s.created_at 19 ^ "  " ^ first))
+  List.map sessions ~f:(fun s ->
+    let name = Option.value s.name ~default:"(unnamed)" in
+    let date = String.prefix (Option.value s.updated_at ~default:"") 16 in
+    let first =
+      Option.value_map s.first_prompt ~default:"(empty)" ~f:(fun p ->
+        Text_width.truncate
+          (String.concat ~sep:" " (String.split_lines p))
+          ~width:60)
+    in
+    Picker.Item.create
+      ~id:s.path
+      ~detail:s.cwd
+      ~search:(name ^ " " ^ first ^ " " ^ s.cwd ^ " " ^ date)
+      ~marked:(Option.value_map current ~default:false ~f:(String.equal s.path))
+      (sprintf "%s ∣ %s ∣ %d msgs ∣ %s" name date s.message_count first))
+;;
+
+let sessions_picker
+  ?(named_only = false)
+  m
+  (sessions : P.Session_summary.t list)
+  =
+  let shown =
+    if named_only
+    then List.filter sessions ~f:(fun s -> Option.is_some s.name)
+    else sessions
   in
+  let items = session_picker_items m shown in
   if List.is_empty items
   then notice m "no saved sessions"
-  else open_picker m Sessions (Picker.create ~title:"Sessions" items)
+  else (
+    let title = if named_only then "Sessions (named)" else "Sessions" in
+    open_picker
+      m
+      (Sessions { named_only; sessions })
+      (Picker.create ~title items))
+;;
+
+let format_stats (s : P.Session_stats.t) : Content.t =
+  let tools =
+    if List.is_empty s.tool_calls
+    then "none"
+    else
+      String.concat
+        ~sep:", "
+        (List.map s.tool_calls ~f:(fun (name, count) ->
+           sprintf "%s %d" name count))
+  in
+  let rows =
+    [ "messages", Int.to_string s.message_count
+    ; "turns", Int.to_string s.turns
+    ; "tools", tools
+    ; ( "usage"
+      , sprintf
+          "in %s out %s cache %s"
+          (format_tokens s.usage.input)
+          (format_tokens s.usage.output)
+          (format_tokens s.usage.cache_read) )
+    ; "cost", sprintf "$%.4f" s.cost_usd
+    ; "context", sprintf "%.1f%%" s.context_percent
+    ; "model changes", Int.to_string s.model_changes
+    ; "compactions", Int.to_string s.compactions
+    ; "duration", sprintf "%.1fs" s.duration_seconds
+    ]
+  in
+  let width =
+    List.fold rows ~init:0 ~f:(fun acc (label, _) ->
+      Int.max acc (String.length label))
+  in
+  List.map rows ~f:(fun (label, value) ->
+    [ { Content.Span.text = Text_width.pad_right label ~width
+      ; style = Style.bold Style.plain
+      }
+    ; { text = "  " ^ value; style = Style.plain }
+    ])
+;;
+
+let decode_entries json =
+  let open Or_error.Let_syntax in
+  let%bind head = P.Json.string_opt_field json "head" in
+  let%map entries = P.Json.list_field json "entries" ~f:P.Entry.of_json in
+  head, entries
+;;
+
+let first_line text =
+  match String.split_lines text with
+  | line :: _ -> line
+  | [] -> ""
+;;
+
+let message_first_line (m : P.Message.t) =
+  match m with
+  | P.Message.User text -> first_line text
+  | P.Message.Assistant { content; _ } ->
+    (match
+       List.find_map content ~f:(function
+         | P.Content.Text text -> Some text
+         | _ -> None)
+     with
+     | Some text -> first_line text
+     | None -> "(assistant)")
+  | P.Message.Tool_result { tool_name; text; _ } ->
+    let line = first_line text in
+    if String.is_empty line then tool_name else line
+;;
+
+let user_entries entries =
+  List.filter_map entries ~f:(fun (entry : P.Entry.t) ->
+    match entry.kind with
+    | P.Entry.Kind.Message (P.Message.User text) -> Some (entry, text)
+    | _ -> None)
+;;
+
+let entry_picker m kind ~title entries =
+  let users = user_entries entries in
+  let count = List.length users in
+  let items =
+    List.mapi users ~f:(fun i ((entry : P.Entry.t), text) ->
+      Picker.Item.create
+        ~id:entry.id
+        ~detail:(sprintf "#%d" (i + 1))
+        ~marked:(i = count - 1)
+        (first_line text))
+  in
+  if List.is_empty items
+  then notice m "no user messages"
+  else open_picker m (kind entries) (Picker.create ~title items)
+;;
+
+let fork_picker m entries =
+  entry_picker m (fun entries -> Fork entries) ~title:"Fork at" entries
+;;
+
+let rewind_picker m entries =
+  entry_picker m (fun entries -> Rewind entries) ~title:"Rewind to" entries
+;;
+
+let tree_items entries head =
+  let entries =
+    List.filter entries ~f:(fun (e : P.Entry.t) ->
+      match e.kind with
+      | P.Entry.Kind.Message _ -> true
+      | _ -> false)
+  in
+  let ids =
+    String.Set.of_list (List.map entries ~f:(fun (e : P.Entry.t) -> e.id))
+  in
+  let children =
+    String.Map.of_alist_multi
+      (List.filter_map entries ~f:(fun (e : P.Entry.t) ->
+         Option.map e.parent ~f:(fun parent -> parent, e)))
+  in
+  let roots =
+    List.filter entries ~f:(fun (e : P.Entry.t) ->
+      match e.parent with
+      | None -> true
+      | Some parent -> not (Set.mem ids parent))
+  in
+  let active =
+    let rec go id acc =
+      match
+        List.find entries ~f:(fun (e : P.Entry.t) -> String.equal e.id id)
+      with
+      | None -> acc
+      | Some entry ->
+        let acc = Set.add acc id in
+        (match entry.parent with
+         | None -> acc
+         | Some parent -> go parent acc)
+    in
+    match head with
+    | None -> String.Set.empty
+    | Some head -> go head String.Set.empty
+  in
+  let items = ref [] in
+  let rec walk depth (entry : P.Entry.t) =
+    let glyph =
+      match entry.kind with
+      | P.Entry.Kind.Message (P.Message.User _) -> ">"
+      | P.Entry.Kind.Message (P.Message.Assistant _) -> "·"
+      | P.Entry.Kind.Message (P.Message.Tool_result _) -> "⚙"
+      | P.Entry.Kind.Model _
+      | P.Entry.Kind.Compaction _
+      | P.Entry.Kind.Name _
+      | P.Entry.Kind.Cwd _ -> "·"
+    in
+    let label =
+      sprintf
+        "%s%s %s"
+        (String.make (2 * depth) ' ')
+        glyph
+        (match entry.kind with
+         | P.Entry.Kind.Message message -> message_first_line message
+         | _ -> "")
+    in
+    items
+    := Picker.Item.create ~id:entry.id ~marked:(Set.mem active entry.id) label
+       :: !items;
+    List.iter
+      (Option.value (Map.find children entry.id) ~default:[])
+      ~f:(walk (depth + 1))
+  in
+  List.iter roots ~f:(walk 0);
+  List.rev !items
+;;
+
+let tree_picker m entries head =
+  let items = tree_items entries head in
+  if List.is_empty items
+  then notice m "no messages"
+  else open_picker m (Tree entries) (Picker.create ~title:"Session tree" items)
 ;;
 
 let agent_status_text (a : Agent_view.t) =
@@ -443,6 +642,16 @@ let set_model_command key =
   rpc "set_model" ~params:[ "model", str key ] ~tag:Set_model_done
 ;;
 
+let export_command path =
+  let format =
+    if String.is_suffix path ~suffix:".jsonl" then "jsonl" else "markdown"
+  in
+  rpc
+    "export"
+    ~params:[ "format", str format; "path", str path ]
+    ~tag:Export_done
+;;
+
 let switch_model m arg =
   match Model_match.resolve m.models arg with
   | Found model -> m, [ set_model_command model.key ]
@@ -520,6 +729,20 @@ let run_command m (cmd : Commands.Parsed.t) =
     , [] )
   | "compact", _ -> notice m "compacting…", [ rpc "compact" ~tag:Compact_done ]
   | "new", _ -> m, [ rpc "new_session" ~tag:(Notice_on_success "new session") ]
+  | "name", [] ->
+    ( { m with
+        mode = Text_prompt { question = "Session name"; action = Name }
+      ; editor = Editor.clear m.editor
+      }
+    , [] )
+  | "name", _ ->
+    ( m
+    , [ rpc
+          "set_session_name"
+          ~params:[ "name", str cmd.rest ]
+          ~tag:(Notice_on_success "session named")
+      ] )
+  | "session", _ -> m, [ rpc "session_stats" ~tag:Session_stats ]
   | "agents", _ -> agents_picker m
   | "sessions", _ | "switch", [] ->
     m, [ rpc "list_sessions" ~tag:Sessions_picker ]
@@ -530,10 +753,45 @@ let run_command m (cmd : Commands.Parsed.t) =
           ~params:[ "path", str cmd.rest ]
           ~tag:Reload_messages
       ] )
-  | "cd", [] -> error m "usage: /cd <path>", []
+  | "cd", [] ->
+    ( { m with
+        mode = Text_prompt { question = "Change directory to"; action = Cd }
+      ; editor = Editor.clear m.editor
+      }
+    , [] )
   | "cd", _ ->
-    m, [ rpc "set_cwd" ~params:[ "path", str cmd.rest ] ~tag:Show_error ]
-  | "fork", _ -> m, [ rpc "fork" ~tag:(Notice_on_success "forked session") ]
+    ( m
+    , [ rpc
+          "set_cwd"
+          ~params:[ "path", str cmd.rest ]
+          ~tag:(Notice_on_success "cwd changed")
+      ] )
+  | "fork", _ -> m, [ rpc "get_entries" ~tag:Entries_for_fork ]
+  | "rewind", _ -> m, [ rpc "get_entries" ~tag:Entries_for_rewind ]
+  | "tree", _ ->
+    ( m
+    , [ rpc
+          "get_entries"
+          ~params:[ "all", P.Json.bool true ]
+          ~tag:Entries_for_tree
+      ] )
+  | "clone", _ ->
+    m, [ rpc "clone" ~tag:(Reload_messages_notice "cloned session") ]
+  | "export", [] ->
+    ( { m with
+        mode = Text_prompt { question = "Export to"; action = Export_path }
+      ; editor = Editor.clear m.editor
+      }
+    , [] )
+  | "export", _ -> m, [ export_command cmd.rest ]
+  | "import", [] ->
+    ( { m with
+        mode = Text_prompt { question = "Import from"; action = Import_path }
+      ; editor = Editor.clear m.editor
+      }
+    , [] )
+  | "import", _ ->
+    m, [ rpc "import" ~params:[ "path", str cmd.rest ] ~tag:Reload_messages ]
   | "abort", _ -> m, [ rpc "abort" ]
   | "state", _ ->
     let text =
@@ -861,6 +1119,7 @@ let editing_intent m (intent : Intent.t) =
     if List.is_empty m.models
     then m, [ rpc "list_models" ~tag:(Models_for_picker "") ]
     else model_picker m ~query:"", []
+  | Picker_toggle_filter -> m, []
 ;;
 
 (* Autocomplete is a sub-state of editing: while it is open it owns a few keys,
@@ -921,7 +1180,8 @@ let editing m (intent : Intent.t) =
         | Suspend
         | Path_complete
         | Edit_externally
-        | Model_picker ->
+        | Model_picker
+        | Picker_toggle_filter ->
           let m, cmds = editing_intent m intent in
           let m, more = refresh_autocomplete m in
           m, cmds @ more)
@@ -966,21 +1226,98 @@ let picker_selected m (kind : Mode.Picker_kind.t) (item : Picker.Item.t) =
             }
       }
     , [] )
-  | Sessions ->
+  | Sessions _ ->
     ( m
     , [ rpc
           "switch_session"
           ~params:[ "path", str item.id ]
           ~tag:Reload_messages
       ] )
+  | Fork entries ->
+    (match
+       List.find entries ~f:(fun (entry : P.Entry.t) ->
+         String.equal entry.id item.id)
+     with
+     | Some { kind = P.Entry.Kind.Message (P.Message.User text); _ } ->
+       ( { m with editor = Editor.set_text m.editor text }
+       , [ rpc "fork" ~params:[ "at", str item.id ] ~tag:Reload_messages ] )
+     | _ -> m, [])
+  | Rewind entries ->
+    (match
+       List.find entries ~f:(fun (entry : P.Entry.t) ->
+         String.equal entry.id item.id)
+     with
+     | Some { kind = P.Entry.Kind.Message message; _ } ->
+       ( { m with
+           mode =
+             Confirm
+               { question =
+                   sprintf
+                     "Rewind to %S? Later messages are abandoned (y/n)"
+                     (message_first_line message)
+               ; action = Rewind item.id
+               }
+         }
+       , [] )
+     | _ -> m, [])
+  | Tree _ ->
+    m, [ rpc "rewind" ~params:[ "to", str item.id ] ~tag:Reload_messages ]
   | Agents -> set_focus m (`Agent item.id), []
   | Auth_select id ->
     m, [ rpc "auth_respond" ~params:[ "id", str id; "value", str item.id ] ]
 ;;
 
-let picker m kind picker (intent : Intent.t) =
+let picker m (kind : Mode.Picker_kind.t) picker (intent : Intent.t) =
   match intent with
-  | Force_quit -> { m with quitting = true }, [ Command.Quit ]
+  | Picker_toggle_filter ->
+    (match kind with
+     | Sessions { named_only; sessions } ->
+       let named_only = not named_only in
+       let shown =
+         if named_only
+         then List.filter sessions ~f:(fun s -> Option.is_some s.name)
+         else sessions
+       in
+       let items = session_picker_items m shown in
+       let title = if named_only then "Sessions (named)" else "Sessions" in
+       ( { m with
+           mode =
+             Picker
+               { kind = Sessions { named_only; sessions }
+               ; picker =
+                   Picker.create ~query:(Picker.query picker) ~title items
+               }
+         }
+       , [] )
+     | _ -> m, [])
+  | Force_quit ->
+    (match kind with
+     | Sessions { sessions; _ } ->
+       (match Picker.selected_item picker with
+        | None -> m, []
+        | Some item ->
+          (match
+             List.find sessions ~f:(fun s -> String.equal s.path item.id)
+           with
+           | None -> m, []
+           | Some session ->
+             let name =
+               Option.value
+                 session.name
+                 ~default:
+                   (String.prefix
+                      (Option.value session.updated_at ~default:"")
+                      16)
+             in
+             ( { m with
+                 mode =
+                   Confirm
+                     { question = sprintf "Delete session %s? (y/n)" name
+                     ; action = Delete_session session.path
+                     }
+               }
+             , [] )))
+     | _ -> { m with quitting = true }, [ Command.Quit ])
   | _ ->
     (match
        Picker.handle
@@ -1033,6 +1370,7 @@ let login_prompt m ~id ~(prompt : P.Auth_event.Prompt.t) (intent : Intent.t) =
   | Path_complete
   | Edit_externally
   | Model_picker
+  | Picker_toggle_filter
   | Newline -> m, []
   | Insert _
   | Paste _
@@ -1055,6 +1393,87 @@ let login_prompt m ~id ~(prompt : P.Auth_event.Prompt.t) (intent : Intent.t) =
     { m' with mode = m.mode }, cmds
 ;;
 
+let text_prompt m ~(action : Mode.Text_prompt_action.t) (intent : Intent.t) =
+  let submit text =
+    let m = { m with mode = Editing; editor = Editor.clear m.editor } in
+    match action with
+    | Name ->
+      if String.is_empty text
+      then m, []
+      else
+        ( m
+        , [ rpc
+              "set_session_name"
+              ~params:[ "name", str text ]
+              ~tag:(Notice_on_success "session named")
+          ] )
+    | Cd ->
+      if String.is_empty text
+      then m, []
+      else
+        ( m
+        , [ rpc
+              "set_cwd"
+              ~params:[ "path", str text ]
+              ~tag:(Notice_on_success "cwd changed")
+          ] )
+    | Export_path ->
+      let command =
+        if String.is_empty text
+        then rpc "export" ~params:[ "format", str "markdown" ] ~tag:Export_done
+        else export_command text
+      in
+      m, [ command ]
+    | Import_path ->
+      if String.is_empty text
+      then m, []
+      else m, [ rpc "import" ~params:[ "path", str text ] ~tag:Reload_messages ]
+  in
+  match intent with
+  | Submit ->
+    let text, _ = Editor.submit m.editor in
+    submit (String.strip text)
+  | Cancel | Interrupt ->
+    { m with editor = Editor.clear m.editor; mode = Editing }, []
+  | Force_quit -> { m with quitting = true }, [ Quit ]
+  | Newline -> m, []
+  | Insert _
+  | Paste _
+  | Backspace
+  | Delete
+  | Left
+  | Right
+  | Word_left
+  | Word_right
+  | Delete_word_forward
+  | Home
+  | End
+  | Kill_to_end
+  | Kill_to_start
+  | Kill_word
+  | Yank
+  | Yank_pop
+  | Undo ->
+    let m', cmds = editing_intent m intent in
+    { m' with mode = m.mode }, cmds
+  | Up
+  | Down
+  | Page_up
+  | Page_down
+  | Complete
+  | Cycle_verbosity
+  | Next_agent
+  | Focus_agent _
+  | Queue_follow_up
+  | Dequeue
+  | Copy_last
+  | Suspend
+  | Path_complete
+  | Edit_externally
+  | Model_picker
+  | Picker_toggle_filter -> m, []
+;;
+
 (* ---- confirm mode ----------------------------------------------------- *)
 
 let confirm m ~(action : Mode.Confirm_action.t) (intent : Intent.t) =
@@ -1063,6 +1482,12 @@ let confirm m ~(action : Mode.Confirm_action.t) (intent : Intent.t) =
     match action with
     | Logout provider ->
       m, [ rpc "logout" ~params:[ "provider", str provider ] ]
+    | Rewind id ->
+      m, [ rpc "rewind" ~params:[ "to", str id ] ~tag:Reload_messages ]
+    | Delete_session path ->
+      ( m
+      , [ rpc "delete_session" ~params:[ "path", str path ] ~tag:Deleted_session
+        ] )
   in
   match intent with
   | Insert ("y" | "Y") | Submit -> yes ()
@@ -1080,6 +1505,7 @@ let intent m (intent : Intent.t) =
   | Editing -> editing m intent
   | Picker { kind; picker = p } -> picker m kind p intent
   | Login_prompt { id; prompt } -> login_prompt m ~id ~prompt intent
+  | Text_prompt { action; _ } -> text_prompt m ~action intent
   | Confirm { action; _ } -> confirm m ~action intent
 ;;
 
@@ -1251,18 +1677,48 @@ let reply m (tag : Reply_tag.t) (result : (P.Json.t, string) Result.t) =
                 state.cwd)
          in
          m, [])
-     | Initial_messages | Reload_messages ->
+     | Initial_messages ->
        decode json ~f:(decode_list ~f:P.Message.of_json) (fun messages ->
-         let reload = Reply_tag.equal tag Reload_messages in
-         let m = if reload then { m with agents = []; focus = `Main } else m in
          let transcript =
-           if reload then Transcript.clear m.transcript else m.transcript
+           List.fold messages ~init:m.transcript ~f:Transcript.add_message
          in
-         let transcript =
-           List.fold messages ~init:transcript ~f:Transcript.add_message
-         in
-         ( follow { m with transcript }
-         , if reload then [ rpc "get_state" ~tag:Initial_state ] else [] ))
+         follow { m with transcript }, [])
+     | Reload_messages | Reload_messages_notice _ ->
+       let m =
+         { m with
+           agents = []
+         ; focus = `Main
+         ; transcript = Transcript.clear m.transcript
+         }
+       in
+       let m =
+         match tag with
+         | Reload_messages_notice text -> notice m text
+         | _ -> m
+       in
+       ( follow m
+       , [ rpc "get_messages" ~tag:Initial_messages
+         ; rpc "get_state" ~tag:Initial_state
+         ] )
+     | Session_stats ->
+       decode json ~f:P.Session_stats.of_json (fun stats ->
+         block m (format_stats stats), [])
+     | Entries_for_fork ->
+       decode json ~f:decode_entries (fun (_head, entries) ->
+         fork_picker m entries, [])
+     | Entries_for_rewind ->
+       decode json ~f:decode_entries (fun (_head, entries) ->
+         rewind_picker m entries, [])
+     | Entries_for_tree ->
+       decode json ~f:decode_entries (fun (head, entries) ->
+         tree_picker m entries head, [])
+     | Export_done ->
+       decode
+         json
+         ~f:(fun j -> P.Json.string_field j "path")
+         (fun path -> notice m (sprintf "exported to %s" path), [])
+     | Deleted_session ->
+       notice m "session deleted", [ rpc "list_sessions" ~tag:Sessions_picker ]
      | Auth_refresh ->
        decode json ~f:(decode_list ~f:P.Auth_status.of_json) (fun auth ->
          { m with auth }, [])

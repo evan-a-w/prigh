@@ -21,6 +21,12 @@ module Reply_tag : sig
     | Models_after_login of string (** provider *)
     | Sessions_picker
     | Sessions_cache
+    | Session_stats
+    | Entries_for_fork
+    | Entries_for_rewind
+    | Entries_for_tree
+    | Export_done
+    | Deleted_session
     | Paths_for_autocomplete of string
     | Set_model_done
     | Compact_done
@@ -29,6 +35,7 @@ module Reply_tag : sig
     | History
     | Dequeued
     | Editor_text
+    | Reload_messages_notice of string
   [@@deriving sexp_of, equal]
 end
 
