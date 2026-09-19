@@ -270,7 +270,41 @@ scenario_editor() {
 	capture editor "after Ctrl+G round trip"
 }
 
-all="startup prompt ctrl_o resize quit tools suspend editor"
+setup_confirm() {
+	extra_args="-- -faux-script $tmp/script.json"
+	mkdir -p "$tmp/home/.prigh"
+	echo '{"scoped_models": [], "confirm_tools": true}' >"$tmp/home/.prigh/config.json"
+	cat >"$tmp/script.json" <<'JSON'
+[
+  {"text": "running", "tool_calls": [{"id": "c1", "name": "bash", "arguments": {"command": "echo ran-it"}}]},
+  {"text": "first done"},
+  {"text": "again", "tool_calls": [{"id": "c2", "name": "bash", "arguments": {"command": "echo never"}}]},
+  {"text": "second done"}
+]
+JSON
+}
+
+scenario_confirm() {
+	wait_for "Ctrl+C twice"
+	type_text "go"
+	keys Enter
+	wait_for "Run bash"
+	settle
+	capture confirm "dialog"
+	keys y
+	wait_for "first done"
+	settle
+	capture confirm "allowed"
+	type_text "go again"
+	keys Enter
+	wait_for "Run bash"
+	keys n
+	wait_for "second done"
+	settle
+	capture confirm "denied"
+}
+
+all="startup prompt ctrl_o resize quit tools suspend editor confirm"
 for name in ${*:-$all}; do
 	run_scenario "$name"
 done
