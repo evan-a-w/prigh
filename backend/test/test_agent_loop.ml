@@ -36,6 +36,8 @@ let rec show_event (e : Agent_event.t) =
   | Message_end (User _ | Tool_result _) -> "message_end"
   | Tool_start call -> sprintf "tool_start %s %s" call.name call.arguments
   | Tool_output { chunk; _ } -> sprintf "  tool_output %S" chunk
+  | Tool_confirm { call_id; name; summary } ->
+    sprintf "tool_confirm %s %s %S" call_id name summary
   | Tool_end { result; _ } ->
     sprintf
       "tool_end %s%S"
@@ -209,7 +211,7 @@ let%expect_test
     message_start tool_result c1
     message_end
     tool_start write {"path":"out.txt","content":"x"}
-    tool_end "Created $DIR/out.txt (1 bytes)"
+    tool_end "wrote 1 line to $DIR/out.txt"
     message_start tool_result c2
     message_end
     tool_start bash {"command":"cat out.txt"}

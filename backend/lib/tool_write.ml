@@ -4,6 +4,7 @@ open! Import
 let spec =
   { Tool_spec.name = "write"
   ; parallel_safe = false
+  ; destructive = true
   ; description =
       "Write a file, creating it (and parent directories) or overwriting it \
        entirely. Prefer edit for changing parts of an existing file."
@@ -31,12 +32,14 @@ let run (context : Tool.Context.t) args =
   let existed = Sys_unix.file_exists_exn path in
   mkdir_p (Filename.dirname path);
   Out_channel.write_all path ~data:content;
+  let n = Truncate.count_lines content in
   Tool.Result.ok
     (sprintf
-       "%s %s (%d bytes)"
-       (if existed then "Overwrote" else "Created")
-       path
-       (String.length content))
+       "%s %d line%s to %s"
+       (if existed then "overwrote" else "wrote")
+       n
+       (if n = 1 then "" else "s")
+       path)
 ;;
 
 let tool = { Tool.spec; run }

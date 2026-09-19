@@ -36,6 +36,17 @@ let cancelled_result (call : Content.Tool_call.t) =
   }
 ;;
 
+let tool_summary (args : Json.t) =
+  match args with
+  | `Object fields ->
+    let find name = List.Assoc.find fields ~equal:String.equal name in
+    (match find "command", find "path" with
+     | Some (`String s), _ -> s
+     | _, Some (`String s) -> s
+     | _ -> "")
+  | _ -> ""
+;;
+
 let execute_tool
       ~env
       ~(config : Config.t)
@@ -44,6 +55,7 @@ let execute_tool
       ~emit
       ~depth
       ~(agent_id : string option)
+      ?(confirm = fun _ ~summary:_ -> true)
       (call : Content.Tool_call.t)
   =
   let result : Tool.Result.t =
@@ -56,21 +68,29 @@ let execute_tool
        | Error e ->
          Tool.Result.error ("invalid arguments: " ^ Error.to_string_hum e)
        | Ok args ->
-         let context =
-           Tool.Context.create
-             ~cancel
-             ~on_output:(fun chunk ->
-               emit (Agent_event.Tool_output { call_id = call.id; chunk }))
-             ~emit
-             ~depth
-             ?agent_id
-             ~call_id:call.id
-             ~tools:config.tools
-             ~env
-             ~cwd
-             ()
-         in
-         Tool.execute tool context args)
+         if
+           tool.spec.destructive
+           && not (confirm call ~summary:(tool_summary args))
+         then
+           if Cancellation.is_cancelled cancel
+           then Tool.Result.error "[cancelled]"
+           else Tool.Result.error "[denied by user]"
+         else (
+           let context =
+             Tool.Context.create
+               ~cancel
+               ~on_output:(fun chunk ->
+                 emit (Agent_event.Tool_output { call_id = call.id; chunk }))
+               ~emit
+               ~depth
+               ?agent_id
+               ~call_id:call.id
+               ~tools:config.tools
+               ~env
+               ~cwd
+               ()
+           in
+           Tool.execute tool context args))
   in
   { Message.Tool_result.tool_call_id = call.id
   ; tool_name = call.name
@@ -89,6 +109,7 @@ let run
       ?agent_id
       ?(steer = fun () -> [])
       ?(emit = ignore)
+      ?confirm
       ?retry_delay
       ~context
       ~prompts
@@ -160,7 +181,16 @@ let run
       else (
         emit (Tool_start call);
         let result =
-          execute_tool ~env ~config ~cwd ~cancel ~emit ~depth ~agent_id call
+          execute_tool
+            ~env
+            ~config
+            ~cwd
+            ~cancel
+            ~emit
+            ~depth
+            ~agent_id
+            ?confirm
+            call
         in
         emit (Tool_end { call; result });
         result)

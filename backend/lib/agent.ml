@@ -47,6 +47,7 @@ module Event = struct
     | State_changed of State.t
     | Compacted of { summary : string }
     | Notice of string
+    | Config_changed of Config.t
     | Queue_update of
         { steer : int
         ; follow_up : int
@@ -79,6 +80,8 @@ type t =
   ; mutable subscribers : (Event.t -> unit) list
   ; mutable subagent_usage : Usage.t
   ; mutable subagent_cost_usd : float
+  ; mutable config : Config.t
+  ; pending_confirms : bool Promise.u String.Table.t
   }
 
 let restore_settings t =
@@ -126,6 +129,11 @@ let create
     ; subscribers = []
     ; subagent_usage = Usage.zero
     ; subagent_cost_usd = 0.
+    ; config =
+        (match Config.load ~home with
+         | Ok config -> config
+         | Error _ -> Config.default)
+    ; pending_confirms = String.Table.create ()
     }
   in
   restore_settings t;
@@ -180,7 +188,44 @@ let queue_update t =
        })
 ;;
 
-let config t =
+let config t = t.config
+
+let set_config t config =
+  Or_error.map (Config.save ~home:t.home config) ~f:(fun () ->
+    t.config <- config;
+    broadcast t (Config_changed config))
+;;
+
+let respond_confirm t ~call_id ~allow =
+  match Hashtbl.find t.pending_confirms call_id with
+  | None -> Or_error.errorf "no pending confirmation for tool call %S" call_id
+  | Some resolver ->
+    Hashtbl.remove t.pending_confirms call_id;
+    Promise.resolve resolver allow;
+    Ok ()
+;;
+
+let confirm_hook t cancel call ~summary =
+  if not t.config.confirm_tools
+  then true
+  else (
+    let promise, resolver = Promise.create () in
+    Hashtbl.set t.pending_confirms ~key:call.Content.Tool_call.id ~data:resolver;
+    broadcast
+      t
+      (Loop (Tool_confirm { call_id = call.id; name = call.name; summary }));
+    let allow =
+      match
+        Cancellation.protect cancel ~f:(fun () -> Promise.await promise)
+      with
+      | None -> false
+      | Some allow -> allow
+    in
+    Hashtbl.remove t.pending_confirms call.id;
+    allow)
+;;
+
+let loop_config t =
   { Agent_loop.Config.model = t.model
   ; thinking = t.thinking
   ; system =
@@ -237,9 +282,10 @@ let rec start_run t prompts =
        Agent_loop.run
          ~env:t.env
          ~provider:t.provider
-         ~config:(config t)
+         ~config:(loop_config t)
          ~cwd:t.cwd
          ~cancel
+         ~confirm:(confirm_hook t cancel)
          ~steer:(fun () ->
            let l = Queue.to_list t.steer_queue in
            if not (List.is_empty l)

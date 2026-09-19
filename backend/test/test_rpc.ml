@@ -438,3 +438,36 @@ let%expect_test "import, set_session_name, export, clone, set_cwd" =
     {"type":"response","id":"r1","ok":true,"result":{"session_id":"<id>","session_path":"$DIR/sessions/<stamp>_<id>.jsonl","session_name":"imported","cwd":"$DIR/sub","git_branch":null,"model":{"id":"deepseek-flash","provider":"deepseek","key":"deepseek/deepseek-flash","name":"DeepSeek V4.1 Flash","context_window":1000000,"max_output":384000,"supports_thinking":true,"cost":{"input":0.3,"output":1.2,"cache_read":0.006}},"thinking":"off","running":false,"message_count":1,"usage":{"input":0,"output":0,"cache_read":0},"cost_usd":0,"context_tokens":0}}
     |}]
 ;;
+
+let%expect_test "config: get, set, invalid, and the config_changed event" =
+  with_agent []
+  @@ fun t agent login ->
+  Agent.subscribe agent ~f:(fun e ->
+    print_endline (Json.to_string (Rpc_json.event e)));
+  call t agent login "get_config";
+  call
+    t
+    agent
+    login
+    ~params:{|{"config": {"scoped_models": ["a", "b"], "confirm_tools": true}}|}
+    "set_config";
+  call t agent login "get_config";
+  call t agent login ~params:{|{"config": {"scoped_models": "x"}}|} "set_config";
+  call t agent login ~params:{|{}|} "set_config";
+  call
+    t
+    agent
+    login
+    ~params:{|{"call_id": "nope", "allow": true}|}
+    "tool_confirm_respond";
+  [%expect
+    {|
+    {"type":"response","id":"r1","ok":true,"result":{"scoped_models":[],"confirm_tools":false}}
+    {"type":"event","event":"config_changed","config":{"scoped_models":["a","b"],"confirm_tools":true}}
+    {"type":"response","id":"r1","ok":true,"result":{"scoped_models":["a","b"],"confirm_tools":true}}
+    {"type":"response","id":"r1","ok":true,"result":{"scoped_models":["a","b"],"confirm_tools":true}}
+    {"type":"response","id":"r1","ok":false,"error":"config.scoped_models must be an array of strings"}
+    {"type":"response","id":"r1","ok":false,"error":"missing param \"config\""}
+    {"type":"response","id":"r1","ok":false,"error":"no pending confirmation for tool call \"nope\""}
+    |}]
+;;

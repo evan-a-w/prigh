@@ -45,6 +45,7 @@ let%expect_test
   let tools =
     [ { Tool_spec.name = "bash"
       ; parallel_safe = false
+      ; destructive = true
       ; description = "Run a command"
       ; parameters =
           `Object

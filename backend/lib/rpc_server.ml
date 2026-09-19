@@ -26,6 +26,9 @@ let methods =
   ; "rewind"
   ; "session_stats"
   ; "set_cwd"
+  ; "get_config"
+  ; "set_config"
+  ; "tool_confirm_respond"
   ; "auth_status"
   ; "login"
   ; "auth_respond"
@@ -172,6 +175,24 @@ let dispatch agent login ~meth ~params : Json.t Or_error.t =
   | "set_cwd" ->
     Or_error.bind (string_param params "path") ~f:(fun path ->
       unit_result (Agent.set_cwd agent ~path))
+  | "get_config" -> ok (Config.to_json (Agent.config agent))
+  | "set_config" ->
+    (match param params "config" with
+     | None -> Or_error.error_string "missing param \"config\""
+     | Some json ->
+       Or_error.bind (Config.of_json json) ~f:(fun config ->
+         Or_error.map (Agent.set_config agent config) ~f:(fun () ->
+           Config.to_json (Agent.config agent))))
+  | "tool_confirm_respond" ->
+    Or_error.bind (string_param params "call_id") ~f:(fun call_id ->
+      Or_error.bind
+        (match param params "allow" with
+         | Some `True -> Ok true
+         | Some `False -> Ok false
+         | Some _ -> Or_error.error_string "param \"allow\" must be a boolean"
+         | None -> Or_error.error_string "missing param \"allow\"")
+        ~f:(fun allow ->
+          unit_result (Agent.respond_confirm agent ~call_id ~allow)))
   | "auth_status" ->
     Or_error.map (Login_manager.status login) ~f:(fun statuses ->
       `Array (List.map statuses ~f:Rpc_json.auth_status))

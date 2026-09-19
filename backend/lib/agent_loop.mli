@@ -34,6 +34,7 @@ val run
   -> ?agent_id:string
   -> ?steer:(unit -> Message.t list)
   -> ?emit:(Agent_event.t -> unit)
+  -> ?confirm:(Content.Tool_call.t -> summary:string -> bool)
   -> ?retry_delay:(attempt:int -> unit)
   -> context:Message.t list
   -> prompts:Message.t list

@@ -7,6 +7,7 @@ open! Import
 val message : Message.t -> Json.t
 val delta : Assistant_event.t -> Json.t
 val state : Agent.State.t -> Json.t
+val config : Config.t -> Json.t
 val model : Model.t -> Json.t
 val session_summary : Session.Summary.t -> Json.t
 val session_stats : Agent.Session_stats.t -> Json.t

@@ -14,6 +14,7 @@ let instructions =
 let spec =
   { Tool_spec.name = "subagent"
   ; parallel_safe = true
+  ; destructive = false
   ; description =
       "Delegate a self-contained task to a subagent with its own context. The \
        subagent sees only the task (and any context you pass), so include \

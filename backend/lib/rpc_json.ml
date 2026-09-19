@@ -128,6 +128,8 @@ let model (m : Model.t) =
     ]
 ;;
 
+let config (c : Config.t) = Config.to_json c
+
 let state (s : Agent.State.t) =
   `Object
     [ "session_id", str s.session_id
@@ -295,6 +297,12 @@ let rec event (e : Agent.Event.t) =
       [ "event", str "tool_start"; "call", tool_call call ]
     | Loop (Tool_output { call_id; chunk }) ->
       [ "event", str "tool_output"; "call_id", str call_id; "chunk", str chunk ]
+    | Loop (Tool_confirm { call_id; name; summary }) ->
+      [ "event", str "tool_confirm"
+      ; "call_id", str call_id
+      ; "name", str name
+      ; "summary", str summary
+      ]
     | Loop (Tool_end { call; result }) ->
       [ "event", str "tool_end"
       ; "call", tool_call call
@@ -328,6 +336,7 @@ let rec event (e : Agent.Event.t) =
     | State_changed s -> [ "event", str "state"; "state", state s ]
     | Compacted { summary } ->
       [ "event", str "compacted"; "summary", str summary ]
+    | Config_changed c -> [ "event", str "config_changed"; "config", config c ]
     | Notice text -> [ "event", str "notice"; "text", str text ]
     | Queue_update { steer; follow_up } ->
       [ "event", str "queue_update"

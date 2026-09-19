@@ -6,6 +6,7 @@ let default_timeout = Time_ns.Span.of_min 10.
 let spec =
   { Tool_spec.name = "bash"
   ; parallel_safe = false
+  ; destructive = true
   ; description =
       "Run a shell command with bash in the working directory. Returns \
        combined stdout and stderr (interleaved) and the exit code if non-zero. \
@@ -70,9 +71,8 @@ let run (context : Tool.Context.t) args =
     Tool.Result.error
       (with_suffix (sprintf "[killed by %s]" (Signal.to_string s)))
   | Timed_out ->
-    Tool.Result.error
-      (with_suffix
-         (sprintf "[timed out after %s]" (Time_ns.Span.to_string_hum timeout)))
+    let seconds = Time_ns.Span.to_sec timeout |> Float.iround_nearest_exn in
+    Tool.Result.error (with_suffix (sprintf "[timed out after %ds]" seconds))
   | Cancelled -> Tool.Result.error (with_suffix "[cancelled]")
 ;;
 

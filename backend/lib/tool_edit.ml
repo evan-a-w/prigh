@@ -4,6 +4,7 @@ open! Import
 let spec =
   { Tool_spec.name = "edit"
   ; parallel_safe = false
+  ; destructive = true
   ; description =
       "Edit a file by exact text replacement. Each old_text must occur exactly \
        once in the file, and edits must not overlap. Use enough surrounding \
@@ -94,6 +95,15 @@ let apply content located =
   Buffer.contents buf
 ;;
 
+let relative_path ~cwd path =
+  if Filename.is_relative path
+  then path
+  else (
+    match String.chop_prefix path ~prefix:(cwd ^ "/") with
+    | Some rel -> rel
+    | None -> path)
+;;
+
 let run (context : Tool.Context.t) args =
   let path = Tool.resolve_path context (Tool_args.string args "path") in
   let edits =
@@ -111,26 +121,11 @@ let run (context : Tool.Context.t) args =
     | Ok located ->
       let updated = apply content located in
       Out_channel.write_all path ~data:updated;
-      let removed =
-        List.sum
-          (module Int)
-          edits
-          ~f:(fun e -> Truncate.count_lines e.old_text)
-      in
-      let added =
-        List.sum
-          (module Int)
-          edits
-          ~f:(fun e -> Truncate.count_lines e.new_text)
-      in
       Tool.Result.ok
-        (sprintf
-           "Applied %d edit%s to %s (-%d/+%d lines)"
-           (List.length edits)
-           (if List.length edits = 1 then "" else "s")
-           path
-           removed
-           added))
+        (Udiff.hunks
+           ~path:(relative_path ~cwd:context.cwd path)
+           ~before:content
+           ~after:updated))
 ;;
 
 let tool = { Tool.spec; run }

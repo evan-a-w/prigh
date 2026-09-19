@@ -20,6 +20,11 @@ type t =
       { call_id : string
       ; chunk : string
       }
+  | Tool_confirm of
+      { call_id : string
+      ; name : string
+      ; summary : string
+      }
   | Tool_end of
       { call : Content.Tool_call.t
       ; result : Message.Tool_result.t

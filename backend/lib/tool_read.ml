@@ -4,6 +4,7 @@ open! Import
 let spec =
   { Tool_spec.name = "read"
   ; parallel_safe = true
+  ; destructive = false
   ; description =
       "Read a text file. Returns the content; large files are truncated and \
        can be read in pieces with offset and limit."

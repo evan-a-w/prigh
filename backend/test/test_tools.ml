@@ -171,12 +171,20 @@ let%expect_test "read_for_context: shared truncation and errors" =
 let%expect_test "write" =
   with_sandbox
   @@ fun t ->
-  run t Tool_write.tool {|{"path": "new/deep/file.txt", "content": "hello\n"}|};
-  [%expect {| Created $DIR/new/deep/file.txt (6 bytes) |}];
+  run
+    t
+    Tool_write.tool
+    {|{"path": "new/deep/file.txt", "content": "one\ntwo\nthree\n"}|};
+  [%expect {| wrote 3 lines to $DIR/new/deep/file.txt |}];
   print_string (read t "new/deep/file.txt");
-  [%expect {| hello |}];
+  [%expect
+    {|
+    one
+    two
+    three
+    |}];
   run t Tool_write.tool {|{"path": "new/deep/file.txt", "content": "bye"}|};
-  [%expect {| Overwrote $DIR/new/deep/file.txt (3 bytes) |}];
+  [%expect {| overwrote 1 line to $DIR/new/deep/file.txt |}];
   print_string (read t "new/deep/file.txt");
   [%expect {| bye |}]
 ;;
@@ -184,25 +192,49 @@ let%expect_test "write" =
 let%expect_test "edit" =
   with_sandbox
   @@ fun t ->
-  write t "f.ml" "let a = 1\nlet b = 2\nlet c = 3\n";
+  write
+    t
+    "f.ml"
+    (String.concat_lines
+       (List.init 10 ~f:(fun i -> sprintf "line%02d" (i + 1))));
   run
     t
     Tool_edit.tool
-    {|{"path": "f.ml", "edits": [{"old_text": "let a = 1", "new_text": "let a = 10\nlet a2 = 11"}, {"old_text": "let c = 3\n", "new_text": ""}]}|};
-  [%expect {| Applied 2 edits to $DIR/f.ml (-2/+2 lines) |}];
+    {|{"path": "f.ml", "edits": [{"old_text": "line05", "new_text": "line05 changed"}]}|};
+  [%expect
+    {|
+    --- a/f.ml
+    +++ b/f.ml
+    @@ -2,7 +2,7 @@
+     line02
+     line03
+     line04
+    -line05
+    +line05 changed
+     line06
+     line07
+     line08
+    |}];
   print_string (read t "f.ml");
   [%expect
     {|
-    let a = 10
-    let a2 = 11
-    let b = 2
+    line01
+    line02
+    line03
+    line04
+    line05 changed
+    line06
+    line07
+    line08
+    line09
+    line10
     |}];
   run
     t
     Tool_edit.tool
-    {|{"path": "f.ml", "edits": [{"old_text": "let ", "new_text": "x"}]}|};
+    {|{"path": "f.ml", "edits": [{"old_text": "line", "new_text": "x"}]}|};
   [%expect
-    {| ERROR: edit 1: old_text occurs 3 times; add context to make it unique |}];
+    {| ERROR: edit 1: old_text occurs 10 times; add context to make it unique |}];
   run
     t
     Tool_edit.tool
@@ -211,7 +243,7 @@ let%expect_test "edit" =
   run
     t
     Tool_edit.tool
-    {|{"path": "f.ml", "edits": [{"old_text": "let b = 2", "new_text": "X"}, {"old_text": "b = 2\n", "new_text": "Y"}]}|};
+    {|{"path": "f.ml", "edits": [{"old_text": "line05", "new_text": "X"}, {"old_text": "ne05", "new_text": "Y"}]}|};
   [%expect {| ERROR: edits overlap |}];
   run
     t
@@ -230,9 +262,16 @@ let%expect_test "edit" =
   print_string (read t "f.ml");
   [%expect
     {|
-    let a = 10
-    let a2 = 11
-    let b = 2
+    line01
+    line02
+    line03
+    line04
+    line05 changed
+    line06
+    line07
+    line08
+    line09
+    line10
     |}]
 ;;
 

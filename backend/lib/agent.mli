@@ -44,6 +44,7 @@ module Event : sig
     | State_changed of State.t
     | Compacted of { summary : string }
     | Notice of string
+    | Config_changed of Config.t
     | Queue_update of
         { steer : int
         ; follow_up : int
@@ -98,6 +99,18 @@ val wait_idle : t -> unit
 
 val set_model : t -> Model.t -> unit
 val set_thinking : t -> Thinking.t -> unit
+
+(** The agent's persistent configuration (loaded from [~/.prigh/config.json] at
+    creation). *)
+val config : t -> Config.t
+
+(** Writes the configuration and emits [Event.Config_changed]. *)
+val set_config : t -> Config.t -> unit Or_error.t
+
+(** Answers a pending [Tool_confirm] request. Fails if no confirmation is
+    outstanding for [call_id]. *)
+val respond_confirm : t -> call_id:string -> allow:bool -> unit Or_error.t
+
 val compact : t -> string Or_error.t
 val new_session : t -> unit
 val switch_session : t -> path:string -> unit Or_error.t
