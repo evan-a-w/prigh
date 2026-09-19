@@ -100,6 +100,19 @@ round-trips, e2e against `main.exe serve -faux` with an isolated `-auth-file`.
      `frame_outcome.ml`; there is a `demos/` dir — look for
      `bonsai_term_test` or a `For_testing` in `driver.mli`).
 
+## Status (latest)
+
+Steps 1–3 below are done and the frontend is implemented: see
+`FRONTEND_PLAN.md` and `ARCHITECTURE.md` ("Frontend (`tui/`)"). `frontend/`
+(TypeScript) and `spike/` are deleted; `./prigh` builds both switches and
+runs `tui/_build/default/bin/main.exe`; `flake.nix` builds `tui/`
+(`packages.default = prigh_tui`). Test entry points: `cd tui && dune build
+@runtest` (unit + Bonsai handle tests) and `dune build @e2e` (real backend).
+`ocamlformat 0.26.2+ox2` is installed in `prigh-ox` and pinned for Nix.
+Known quirk: the `v0.18~preview` ppx_expect runtime resolves corrected
+files against `-source-tree-root`, so `tui/test/dune` passes
+`(flags (-source-tree-root .))` to override dune's `..`.
+
 ## Remaining work, in order
 
 1. **DONE — `prigh-ox` compiles Bonsai_term.** After the patched compiler

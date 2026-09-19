@@ -31,4 +31,10 @@ val key : t -> string
 (** Accepts a bare id (first provider that has it) or a [key]. *)
 val find : string -> t option
 
+(** What a user typed: [find], then case-insensitive display name, then a
+    unique case-insensitive prefix of the key, id or name. Failures explain
+    themselves ("did you mean: ..." ranked by edit distance, or the
+    ambiguous candidates). *)
+val resolve : string -> t Or_error.t
+
 val cost_usd : t -> Usage.t -> float

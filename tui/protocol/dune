@@ -1,0 +1,5 @@
+(library
+ (name prigh_protocol)
+ (preprocess
+  (pps ppx_jane))
+ (libraries core jsonaf))

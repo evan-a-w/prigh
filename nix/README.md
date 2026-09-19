@@ -55,7 +55,7 @@ recommended fix is to materialize:
 
 ```sh
 nix eval --raw .#lib.x86_64-linux \
-  --apply '(m: m.materializeOpamProject { } ./spike/bonsai_term_hello { /* query */ })'
+  --apply '(m: m.materializeOpamProject { } ./tui { /* query */ })'
 ```
 
 and commit the resulting JSON, then build the scope with

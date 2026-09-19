@@ -1,0 +1,9 @@
+(library
+ (name prigh_tui_test)
+ (preprocess
+  (pps ppx_jane bonsai.ppx_bonsai))
+ (inline_tests
+  (flags (-source-tree-root .)))
+ (libraries core async async_unix expect_test_helpers_core
+  expect_test_helpers_async bonsai bonsai_test prigh_protocol prigh_client
+  prigh_ui prigh_ui_term bonsai_term))

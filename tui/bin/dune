@@ -1,0 +1,6 @@
+(executable
+ (name main)
+ (public_name prigh-tui)
+ (preprocess
+  (pps ppx_jane))
+ (libraries core core_unix.command_unix async prigh_ui_term))

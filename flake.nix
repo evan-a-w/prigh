@@ -59,31 +59,31 @@
         # `depopts = false` mirrors a plain `opam install` and avoids pulling in
         # test-only optional deps (e.g. markup -> bisect_ppx -> cmdliner < 2).
         #
-        # NOTE: this scope is the *Bonsai_term frontend* toolchain. The vanilla
-        # `backend/` does not currently build under OxCaml (digestif does not
-        # compile with modes, and the installed mirage-crypto-rng is 0.11.x
-        # while the backend uses the 2.x `use_default` API), so the backend
-        # stays on the vanilla `prigh` switch for now.
+        # NOTE: this scope is the *Bonsai_term frontend* toolchain (tui/). The
+        # vanilla `backend/` does not currently build under OxCaml (digestif
+        # does not compile with modes, and the installed mirage-crypto-rng is
+        # 0.11.x while the backend uses the 2.x `use_default` API), so the
+        # backend stays on the vanilla `prigh` switch for now.
         scope = (on.buildOpamProject' {
           inherit repos;
           resolveArgs = {
             depopts = false;
             dev = false;
           };
-        } ./spike/bonsai_term_hello query).overrideScope overlay;
+        } ./tui query).overrideScope overlay;
       in
       {
         legacyPackages = scope;
 
-        packages.default = scope.bonsai_term_hello;
+        packages.default = scope.prigh_tui;
 
         devShells.default = pkgs.mkShell {
-          inputsFrom = [ scope.bonsai_term_hello ];
+          inputsFrom = [ scope.prigh_tui ];
           buildInputs = [
             scope.bonsai_test
-            scope.notty_async
             scope.expect_test_helpers_core
-            pkgs.nodejs
+            scope.expect_test_helpers_async
+            scope.ocamlformat
             pkgs.ripgrep
           ];
         };

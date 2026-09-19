@@ -51,6 +51,8 @@
   core_unix = "v0.18~preview.130.106+341";
   cppo = "1.8.0";
   csexp = "1.5.2";
+  either = "1.0.0";
+  dune-build-info = "3.20.2";
   cstruct = "6.2.0";
   domain-local-await = "1.0.1";
   domain-name = "0.5.0";
@@ -72,6 +74,7 @@
   float_array = "v0.18~preview.130.106+341";
   fmt = "0.11.0";
   fpath = "0.7.3";
+  fix = "20250919";
   gen = "1.1";
   gen_js_api = "1.1.2+ox";
   gmap = "0.3.0";
@@ -127,6 +130,12 @@
   optint = "0.3.0";
   oxcaml = "latest";
   parsexp = "v0.18~preview.130.106+341";
+  ocamlformat = "0.26.2+ox2";
+  oxcaml-ocamlformat-patches = "enabled";
+  oxcaml-ocamlformat-lib-patches = "enabled";
+  ocp-indent = "1.9.0";
+  ocaml-version = "4.1.3";
+  ocamlformat-lib = "0.26.2+ox2";
   patdiff = "v0.18~preview.130.106+341";
   patience_diff = "v0.18~preview.130.106+341";
   pbkdf = "1.2.0";
@@ -227,6 +236,7 @@
   uring = "2.7.0";
   uucp = "17.0.0";
   uutf = "1.0.4+ox";
+  uuseg = "17.0.0";
   variantslib = "v0.18~preview.130.106+341";
   virtual_dom = "v0.18~preview.130.106+341";
   x509 = "0.16.5";

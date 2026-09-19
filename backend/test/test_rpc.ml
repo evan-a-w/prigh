@@ -51,6 +51,11 @@ let%expect_test "state, models, thinking, errors" =
   call t agent login ~params:{|{"thinking": "sideways"}|} "set_thinking";
   call t agent login ~params:{|{"model": "deepseek-v4-pro"}|} "set_model";
   call t agent login ~params:{|{"model": "gpt-9"}|} "set_model";
+  call t agent login ~params:{|{"model": "GPT-5.5"}|} "set_model";
+  call t agent login ~params:{|{"model": "deepseek v4 pro"}|} "set_model";
+  call t agent login ~params:{|{"model": "claude fabl"}|} "set_model";
+  call t agent login ~params:{|{"model": "Claude Fable 5.1"}|} "set_model";
+  call t agent login ~params:{|{"model": "deepseek-v4-pro"}|} "set_model";
   call t agent login "get_state";
   call t agent login "nope";
   call t agent login ~params:{|{"text": 5}|} "prompt";
@@ -66,7 +71,12 @@ let%expect_test "state, models, thinking, errors" =
     {"type":"response","id":"r1","ok":true,"result":{}}
     {"type":"response","id":"r1","ok":false,"error":"thinking must be one of: off, on, low, high, max"}
     {"type":"response","id":"r1","ok":true,"result":{}}
-    {"type":"response","id":"r1","ok":false,"error":"unknown model \"gpt-9\""}
+    {"type":"response","id":"r1","ok":false,"error":"unknown model \"gpt-9\"; did you mean: openai/gpt-4 (GPT-4), openai/gpt-5 (GPT-5), openai/gpt-4o (GPT-4o)"}
+    {"type":"response","id":"r1","ok":false,"error":"model \"GPT-5.5\" is ambiguous; one of: openai/gpt-5.5, openai-codex/gpt-5.5"}
+    {"type":"response","id":"r1","ok":true,"result":{}}
+    {"type":"response","id":"r1","ok":false,"error":"model \"claude fabl\" is ambiguous; one of: anthropic/claude-fable-5, anthropic/claude-fable-5-1"}
+    {"type":"response","id":"r1","ok":true,"result":{}}
+    {"type":"response","id":"r1","ok":true,"result":{}}
     {"type":"response","id":"r1","ok":true,"result":{"session_id":"<id>","session_path":"$DIR/sessions/<stamp>_<id>.jsonl","cwd":"$DIR","model":{"id":"deepseek-v4-pro","provider":"deepseek","key":"deepseek/deepseek-v4-pro","name":"DeepSeek V4 Pro","context_window":1000000,"max_output":384000,"supports_thinking":true,"cost":{"input":1.32,"output":3.96,"cache_read":0.044}},"thinking":"high","running":false,"message_count":0,"usage":{"input":0,"output":0,"cache_read":0},"cost_usd":0,"context_tokens":0}}
     {"type":"response","id":"r1","ok":false,"error":"unknown method \"nope\""}
     {"type":"response","id":"r1","ok":false,"error":"param \"text\" must be a string"}

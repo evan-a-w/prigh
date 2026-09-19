@@ -73,13 +73,10 @@ let common_params =
     let cwd = Option.value cwd ~default:(Core_unix.getcwd ()) in
     let model =
       Option.map model ~f:(fun id ->
-        match Model.find id with
-        | Some m -> m
-        | None ->
-          eprintf
-            "unknown model %s; available: %s\n"
-            id
-            (String.concat ~sep:", " (List.map Model.all ~f:Model.key));
+        match Model.resolve id with
+        | Ok m -> m
+        | Error e ->
+          eprintf "%s\n" (Error.to_string_hum e);
           exit 2)
     in
     let thinking =

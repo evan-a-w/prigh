@@ -1,12 +1,12 @@
 # prigh architecture
 
 prigh is an agentic coding harness split into an OCaml backend (`backend/`,
-all the logic) and a TypeScript terminal frontend (`frontend/`, rendering and
-input only). There is no plugin system: tools, subagents, providers and slash
-commands are compiled in.
+all the logic) and an OCaml frontend (`tui/`, Bonsai on OxCaml: rendering,
+input and UI state only). There is no plugin system: tools, subagents,
+providers and slash commands are compiled in.
 
 ```
- terminal ── frontend (node, TUI) ── JSON lines on stdio ── backend `prigh serve` (OCaml, Eio)
+ terminal ── frontend (prigh-tui, Bonsai_term) ── JSON lines on stdio ── backend `prigh serve` (OCaml, Eio)
                                                                │
                                                                ├─ Agent ── Agent_loop ── Provider_router ── Anthropic / Openai_responses / Deepseek ── HTTPS (SSE)
                                                                │                │                 └─ Provider_auth ── Auth_store (~/.config/prigh/auth.json)
@@ -184,7 +184,8 @@ two can share one.
   auth status and events.
 - `Rpc_server` — reads request lines, dispatches to `Agent` and
   `Login_manager`, writes responses and events through a single outbox
-  fiber. Methods: `ping`, `prompt`, `steer`, `follow_up`, `abort`,
+  fiber. `set_model` goes through `Model.resolve` (key, id, display name or
+  unique case-insensitive prefix; otherwise "did you mean" by edit distance). Methods: `ping`, `prompt`, `steer`, `follow_up`, `abort`,
   `get_state`, `get_messages`, `get_entries`, `set_model`, `set_thinking`,
   `list_models`, `compact`, `new_session`, `switch_session`,
   `list_sessions`, `fork`, `rewind`, `auth_status`, `login`,
@@ -199,24 +200,48 @@ two can share one.
 the first logged-in provider's in the order anthropic, openai-codex, openai,
 deepseek.
 
-## Frontend (`frontend/src`)
+## Frontend (`tui/`)
 
-- `protocol.ts` — TypeScript mirrors of `Rpc_json` with hand-written runtime
-  guards for everything that arrives from the backend.
-- `client.ts` — spawns the backend, frames JSON lines, correlates
-  responses by id, and fans out events to subscribers. Typed wrappers for
-  the common methods.
-- `tui/` — a small custom TUI. The transcript lives in terminal scrollback
-  and only receives complete lines; the bottom panel (streaming tail, editor,
-  status line) is erased and redrawn on every change (`app.ts`). `editor.ts`
-  is a multi-line editor with history, `keys.ts` parses keypresses and
-  bracketed paste, `render.ts` renders transcript items, `commands.ts` holds
-  the slash-command table and completion, `markdown.ts` renders markdown to
-  ANSI.
-- Login inside the TUI: `/login <provider> [method]` calls `login`; `auth`
-  events print the URL (and open the browser), switch the editor into a
-  prompt mode (masked input for secrets, numbered options for selects, Esc
-  cancels), and on `done` the model is switched to that provider.
+Built in the `prigh-ox` opam switch (OxCaml 5.2 with the Jane Street
+`v0.18~preview` packages) or under `nix develop`; the backend stays on the
+vanilla `prigh` switch because some of its dependencies do not compile with
+OxCaml modes. The two only meet over the wire, so the frontend owns its own
+copy of the protocol types and the e2e test guards the contract.
+
+- `protocol/` (`prigh_protocol`) — `Jsonaf` decoders for everything
+  `Rpc_json` emits (`Message`, `Delta`, `State`, `Model`, `Session_summary`,
+  `Auth_status`, `Auth_event`, `Event`, `Server_message`) and the `Request`
+  encoder.
+- `client/` (`prigh_client`) — `Transport.t` (line channel: `Stdio_transport`
+  spawns the backend; an in-memory pair for tests; a websocket later) and
+  `Client` (Async; correlates responses by id, fans out events, stderr and
+  close on one `Incoming.t` pipe).
+- `ui/` (`prigh_ui`) — **platform-agnostic**, depends only on `core` and
+  `bonsai`; it is what both the terminal and a future web frontend mount.
+  - `App` is an Elm-style pure state machine: `update : Model.t -> Action.t
+    -> Model.t * Command.t list`. Actions are keys/intents, backend events,
+    RPC replies (tagged with `Reply_tag.t` so they stay sexpable), clock
+    ticks and resizes. Commands (`Rpc`, `Open_browser`, `Quit`) are executed
+    by the platform.
+  - `Component.create ~platform` wraps `App` in `Bonsai.state_machine`,
+    turns commands into effects and feeds replies back; it also runs the
+    spinner clock while a turn is active.
+  - Headless widgets: `Editor` (multi-line, history, kill commands),
+    `Picker` (fuzzy list with `Fuzzy` ranking), `Transcript` (items plus
+    streaming text/thinking/tool tails, rendered lazily from the bottom),
+    `Commands` (slash table, parse, complete, closest), `Model_match`
+    (display-name/prefix/did-you-mean), `Markdown`.
+  - `Key.t` → `Intent.t` through `Keymap` (the one binding table; `/help`
+    prints it). `Mode.t` (`Editing | Picker | Login_prompt | Confirm`) says
+    who owns the keyboard; dialogs never stack, Esc always closes.
+  - `Render.screen : Model.t -> Screen.t` lays out a frame as `Content.t`
+    (styled spans with `Text_width`-aware wrapping) plus the cursor cell.
+- `term/` (`prigh_ui_term`) — `Key_of_event` (Bonsai_term events → `Key.t`,
+  bracketed paste → one `Insert`), `View_of_content` (spans → notty attrs),
+  `Term_app` (spawns the backend, runs `Bonsai_term.start_with_driver`,
+  pushes client `Incoming.t` into the component, sets the cursor).
+- `bin/` — `prigh-tui` (`-faux`, `-session`, `-model`, `-cwd`, `-auth-file`,
+  `-backend`; `PRIGH_BACKEND` overrides the backend path).
 
 ## Data on disk
 
@@ -229,5 +254,14 @@ deepseek.
 Backend tests are ppx_expect tests under `backend/test`, driven by
 `Faux_provider` for the loop/agent/RPC and by `Fake_http_server` (an
 in-process Eio HTTP server) for providers, HTTP, and the OAuth token and
-callback flows; nothing touches the network. Frontend tests use `node:test`
-against the protocol guards, framing, editor, renderer and commands.
+callback flows; nothing touches the network.
+
+Frontend tests (`tui/test`, `dune build @runtest`) are expect tests too:
+protocol decoding, the client over an in-memory transport, the widgets, a
+keymap coverage test, and app scenarios that drive `App.update` and print
+the rendered screen (`Screen.to_plain`) — pickers, login prompts, Esc/Ctrl+C
+semantics, streaming, resize, scrolling. `test_component` runs the Bonsai
+component under `Bonsai_test.Handle` with a scripted platform. `tui/e2e`
+(`dune build @e2e`) drives the real `main.exe serve -faux` with an isolated
+`-auth-file` and `HOME` through the real client and diffs a normalised
+transcript.

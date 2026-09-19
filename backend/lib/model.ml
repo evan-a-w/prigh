@@ -668,6 +668,63 @@ let find s =
   | None -> List.find all ~f:(fun t -> String.equal t.id s)
 ;;
 
+let edit_distance a b =
+  let a = String.lowercase a
+  and b = String.lowercase b in
+  let n = String.length a
+  and m = String.length b in
+  let prev = Array.init (m + 1) ~f:Fn.id in
+  let cur = Array.create ~len:(m + 1) 0 in
+  for i = 1 to n do
+    cur.(0) <- i;
+    for j = 1 to m do
+      let cost = if Char.equal a.[i - 1] b.[j - 1] then 0 else 1 in
+      cur.(j)
+      <- Int.min (Int.min (prev.(j) + 1) (cur.(j - 1) + 1)) (prev.(j - 1) + cost)
+    done;
+    Array.blit ~src:cur ~src_pos:0 ~dst:prev ~dst_pos:0 ~len:(m + 1)
+  done;
+  prev.(m)
+;;
+
+let resolve query =
+  let q = String.lowercase (String.strip query) in
+  let names t = [ key t; t.id; t.name ] in
+  let matches ~f = List.filter all ~f:(fun t -> List.exists (names t) ~f) in
+  let keys ts = String.concat ~sep:", " (List.map ts ~f:key) in
+  match find query with
+  | Some t -> Ok t
+  | None ->
+    (match matches ~f:(fun n -> String.equal (String.lowercase n) q) with
+     | [ t ] -> Ok t
+     | _ :: _ as many ->
+       Or_error.errorf "model %S is ambiguous; one of: %s" query (keys many)
+     | [] ->
+       (match
+          matches ~f:(fun n -> String.is_prefix (String.lowercase n) ~prefix:q)
+        with
+        | [ t ] -> Ok t
+        | _ :: _ as many ->
+          Or_error.errorf "model %S is ambiguous; one of: %s" query (keys many)
+        | [] ->
+          let closest =
+            List.map all ~f:(fun t ->
+              ( List.min_elt
+                  (List.map (names t) ~f:(fun n -> edit_distance n q))
+                  ~compare:Int.compare
+                |> Option.value ~default:Int.max_value
+              , t ))
+            |> List.stable_sort ~compare:(fun (a, _) (b, _) -> Int.compare a b)
+            |> fun l -> List.take l 3 |> List.map ~f:snd
+          in
+          Or_error.errorf
+            "unknown model %S; did you mean: %s"
+            query
+            (String.concat
+               ~sep:", "
+               (List.map closest ~f:(fun t -> sprintf "%s (%s)" (key t) t.name)))))
+;;
+
 let cost_usd t (usage : Usage.t) =
   let per_m tokens price = Float.of_int tokens *. price /. 1e6 in
   per_m (usage.input - usage.cache_read) t.cost.input

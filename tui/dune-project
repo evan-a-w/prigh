@@ -1,0 +1,25 @@
+(lang dune 3.17)
+
+(name prigh_tui)
+
+(generate_opam_files true)
+
+(package
+ (name prigh_tui)
+ (synopsis "Bonsai_term frontend for the prigh agentic coding harness")
+ (allow_empty)
+ (depends
+  ocaml
+  dune
+  core
+  core_unix
+  async
+  ppx_jane
+  jsonaf
+  bonsai
+  bonsai_term
+  bonsai_test
+  expect_test_helpers_core
+  expect_test_helpers_async
+  re
+  uucp))

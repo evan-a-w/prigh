@@ -85,11 +85,9 @@ let dispatch agent login ~meth ~params : Json.t Or_error.t =
              ~f:Rpc_json.entry))
   | "set_model" ->
     Or_error.bind (string_param params "model") ~f:(fun id ->
-      match Model.find id with
-      | None -> Or_error.errorf "unknown model %S" id
-      | Some model ->
+      Or_error.map (Model.resolve id) ~f:(fun model ->
         Agent.set_model agent model;
-        empty)
+        `Object []))
   | "set_thinking" ->
     Or_error.bind (string_param params "thinking") ~f:(fun s ->
       Or_error.map (Rpc_json.thinking_of_string s) ~f:(fun thinking ->

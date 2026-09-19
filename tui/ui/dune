@@ -1,0 +1,7 @@
+; Platform-agnostic UI logic. Must never depend on bonsai_term, notty, async or
+; anything browser-specific: both the terminal and the web frontend mount it.
+(library
+ (name prigh_ui)
+ (preprocess
+  (pps ppx_jane bonsai.ppx_bonsai))
+ (libraries core bonsai uucp prigh_protocol))

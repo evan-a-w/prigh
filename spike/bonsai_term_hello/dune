@@ -1,7 +1,0 @@
-(executable
- (modes byte exe)
- (name main)
- (public_name bonsai_term_hello)
- (libraries async bonsai bonsai_term core core_unix.command_unix)
- (preprocess
-  (pps ppx_jane bonsai.ppx_bonsai)))

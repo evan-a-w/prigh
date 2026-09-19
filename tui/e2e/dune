@@ -1,0 +1,18 @@
+(executable
+ (name e2e)
+ (preprocess
+  (pps ppx_jane))
+ (libraries core core_unix core_unix.command_unix core_unix.filename_unix re
+  async prigh_protocol prigh_client))
+
+; Runs the real backend (`main.exe serve -faux`, built in the vanilla switch)
+; through the real client and compares the normalised transcript.
+(rule
+ (alias e2e)
+ (deps e2e.expected)
+ (action
+  (progn
+   (with-stdout-to
+    e2e.actual
+    (run %{exe:e2e.exe}))
+   (diff e2e.expected e2e.actual))))
