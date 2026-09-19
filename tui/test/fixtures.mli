@@ -13,8 +13,31 @@ val model_json
   -> string
 
 val models_json : string
-val state_json : ?model:string -> ?running:bool -> ?cwd:string -> ?git_branch:string -> ?thinking:string -> ?context_tokens:int -> ?cost_usd:float -> ?session_name:string -> unit -> string
-val state : ?model:string -> ?running:bool -> ?cwd:string -> ?git_branch:string -> ?thinking:string -> ?context_tokens:int -> ?cost_usd:float -> ?session_name:string -> unit -> P.State.t
+
+val state_json
+  :  ?model:string
+  -> ?running:bool
+  -> ?cwd:string
+  -> ?git_branch:string
+  -> ?thinking:string
+  -> ?context_tokens:int
+  -> ?cost_usd:float
+  -> ?session_name:string
+  -> unit
+  -> string
+
+val state
+  :  ?model:string
+  -> ?running:bool
+  -> ?cwd:string
+  -> ?git_branch:string
+  -> ?thinking:string
+  -> ?context_tokens:int
+  -> ?cost_usd:float
+  -> ?session_name:string
+  -> unit
+  -> P.State.t
+
 val sessions_json : string
 val entries_json : string
 val tree_json : string

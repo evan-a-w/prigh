@@ -928,7 +928,8 @@ let%expect_test "bash timeout is merged into the tool line at each verbosity" =
   List.iter [ Verbosity.Quiet; Normal; Verbose ] ~f:(fun verbosity ->
     printf "== %s ==\n" (Verbosity.name verbosity);
     print_endline (Content.to_plain (Transcript.render_item item ~verbosity)));
-  [%expect {|
+  [%expect
+    {|
     == quiet ==
     ⚙ bash sleep 999 ✗ timed out after 120s
       partial output

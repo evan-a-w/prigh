@@ -49,7 +49,6 @@ module H = struct
   ;;
 end
 
-
 let connected ?width ?height ?model () =
   let h = H.create ?width ?height () in
   H.step ~quiet:true h Start;
@@ -4579,7 +4578,8 @@ let%expect_test "editing intents: cursor, word, kill, yank, undo, delete" =
   H.keys h "one two three";
   H.key h (Key.plain Left);
   H.show h;
-  [%expect {|
+  [%expect
+    {|
     session abc123 in /work. /help for commands, Esc aborts,
     Ctrl+C twice quits.
     > earlier question
@@ -4591,7 +4591,8 @@ let%expect_test "editing intents: cursor, word, kill, yank, undo, delete" =
   H.key h (Key.plain Right);
   H.key h (Key.alt (Char "b"));
   H.show h;
-  [%expect {|
+  [%expect
+    {|
     session abc123 in /work. /help for commands, Esc aborts,
     Ctrl+C twice quits.
     > earlier question
@@ -4602,7 +4603,8 @@ let%expect_test "editing intents: cursor, word, kill, yank, undo, delete" =
     |}];
   H.key h (Key.alt (Char "f"));
   H.show h;
-  [%expect {|
+  [%expect
+    {|
     session abc123 in /work. /help for commands, Esc aborts,
     Ctrl+C twice quits.
     > earlier question
@@ -4613,7 +4615,8 @@ let%expect_test "editing intents: cursor, word, kill, yank, undo, delete" =
     |}];
   H.key h (Key.alt (Char "d"));
   H.show h;
-  [%expect {|
+  [%expect
+    {|
     session abc123 in /work. /help for commands, Esc aborts,
     Ctrl+C twice quits.
     > earlier question
@@ -4627,7 +4630,8 @@ let%expect_test "editing intents: cursor, word, kill, yank, undo, delete" =
   H.key h (Key.ctrl 'w');
   H.key h (Key.ctrl 'y');
   H.show h;
-  [%expect {|
+  [%expect
+    {|
     session abc123 in /work. /help for commands, Esc aborts,
     Ctrl+C twice quits.
     > earlier question
@@ -4641,7 +4645,8 @@ let%expect_test "editing intents: cursor, word, kill, yank, undo, delete" =
   H.key h (Key.plain Delete);
   H.key h (Key.plain Backspace);
   H.show h;
-  [%expect {|
+  [%expect
+    {|
     session abc123 in /work. /help for commands, Esc aborts,
     Ctrl+C twice quits.
     > earlier question
@@ -4662,7 +4667,8 @@ let%expect_test "keymap: every binding is covered by a scenario" =
       keys
       (Sexp.to_string (Intent.sexp_of_t b.intent))
       (if Coverage.covered b.intent then "covered" else "MISSING"));
-  [%expect {|
+  [%expect
+    {|
     Enter            Submit                   covered
     Alt+Enter        Queue_follow_up          covered
     Ctrl+J/Alt+J     Newline                  covered

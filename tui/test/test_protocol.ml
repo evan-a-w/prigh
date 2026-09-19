@@ -129,7 +129,8 @@ let%expect_test "tool_confirm event" =
   decode
     {|{"type":"event","event":"tool_confirm","call_id":"c1","name":"bash","summary":"rm -rf build"}|};
   decode {|{"type":"event","event":"tool_confirm","name":"write"}|};
-  [%expect {|
+  [%expect
+    {|
     (Event (
       Tool_confirm
       (call_id c1)

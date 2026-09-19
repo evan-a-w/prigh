@@ -1,4 +1,5 @@
 ; Real-terminal scenarios (tmux). Skipped when tmux is absent.
+
 (rule
  (alias tmux)
  (deps

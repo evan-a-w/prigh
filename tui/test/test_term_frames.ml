@@ -167,7 +167,8 @@ let%expect_test "startup frame matches the pure renderer" =
   H.run ~width:80 ~height:20 (fun h ->
     let%bind () = H.paint h in
     H.show h;
-    [%expect {|
+    [%expect
+      {|
       === Vt.to_plain ===
 
 
@@ -202,7 +203,8 @@ let%expect_test "typing, streamed reply, Ctrl+O and Alt+Enter through the \
     List.iter (String.to_list "hello") ~f:(fun c -> H.ascii h c);
     let%bind () = H.paint h in
     H.show h;
-    [%expect {|
+    [%expect
+      {|
       === Vt.to_plain ===
 
 
@@ -234,7 +236,8 @@ let%expect_test "typing, streamed reply, Ctrl+O and Alt+Enter through the \
             { partial; delta = P.Delta.Text_delta "\nstreamed reply" }));
     let%bind () = H.paint h in
     H.show h;
-    [%expect {|
+    [%expect
+      {|
       === Vt.to_plain ===
 
 
@@ -262,7 +265,8 @@ let%expect_test "typing, streamed reply, Ctrl+O and Alt+Enter through the \
     H.ascii h '\015';
     let%bind () = H.paint h in
     H.show h;
-    [%expect {|
+    [%expect
+      {|
       === Vt.to_plain ===
 
 
@@ -290,7 +294,8 @@ let%expect_test "typing, streamed reply, Ctrl+O and Alt+Enter through the \
     H.alt h Ekey.Enter;
     let%bind () = H.paint h in
     H.show h;
-    [%expect {|
+    [%expect
+      {|
       === Vt.to_plain ===
 
 
@@ -328,7 +333,8 @@ let%expect_test "bracketed paste produces the paste chip" =
     H.paste_end h;
     let%bind () = H.paint h in
     H.show h;
-    [%expect {|
+    [%expect
+      {|
       === Vt.to_plain ===
 
 
@@ -361,7 +367,8 @@ let%expect_test "resize 80 -> 40 keeps the frame matching" =
     H.resize h ~width:40 ~height:20;
     let%bind () = H.paint h in
     H.show h;
-    [%expect {|
+    [%expect
+      {|
       === Vt.to_plain ===
 
 
@@ -424,7 +431,8 @@ let%expect_test "styled frame: markdown link, diff and autocomplete" =
     let%bind () = H.paint h in
     print_endline "=== Vt.to_styled ===";
     print_endline (Vt.to_styled h.vt);
-    [%expect {|
+    [%expect
+      {|
       === Vt.to_styled ===
 
 
