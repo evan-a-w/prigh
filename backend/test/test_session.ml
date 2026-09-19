@@ -137,6 +137,50 @@ let%expect_test "fork copies the active path up to a point" =
   [%expect {| true |}]
 ;;
 
+let%expect_test "session stamps are strictly increasing" =
+  with_dir
+  @@ fun dir ->
+  let sessions =
+    let rec go n acc =
+      if n = 0
+      then List.rev acc
+      else (
+        let s = Session.create ~dir ~cwd:"/x" in
+        go (n - 1) (s :: acc))
+    in
+    go 5 []
+  in
+  let stamps =
+    List.map sessions ~f:(fun s ->
+      let base = Filename.basename (Session.path s) in
+      List.hd_exn (String.split base ~on:'_'))
+  in
+  let sorted = List.sort stamps ~compare:String.compare in
+  let strictly_increasing =
+    List.for_all
+      (List.range 0 (List.length stamps - 1))
+      ~f:(fun i ->
+        String.compare (List.nth_exn stamps i) (List.nth_exn stamps (i + 1)) < 0)
+  in
+  let ranks =
+    List.map stamps ~f:(fun s ->
+      fst
+        (Option.value_exn (List.findi sorted ~f:(fun _ x -> String.equal x s))))
+  in
+  let sorted_equals_created = [%equal: string list] sorted stamps in
+  print_s
+    [%sexp
+      { created_order = (ranks : int list)
+      ; sorted_equals_created : bool
+      ; strictly_increasing : bool
+      }];
+  [%expect
+    {|
+    ((created_order (0 1 2 3 4)) (sorted_equals_created true)
+     (strictly_increasing true))
+    |}]
+;;
+
 let%expect_test "list" =
   with_dir
   @@ fun dir ->
@@ -156,7 +200,7 @@ let%expect_test "list" =
       (List.map (Session.list ~dir) ~f:(fun s ->
          s.cwd, s.first_prompt, s.message_count)
        : (string * string option * int) list)];
-  [%expect {| ((/b () 0) (/a ("first question") 2)) |}]
+  [%expect {| ((/a ("first question") 2) (/b () 0)) |}]
 ;;
 
 let%expect_test "load errors" =

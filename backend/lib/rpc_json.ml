@@ -277,6 +277,11 @@ let event (e : Agent.Event.t) =
     | Compacted { summary } ->
       [ "event", str "compacted"; "summary", str summary ]
     | Notice text -> [ "event", str "notice"; "text", str text ]
+    | Queue_update { steer; follow_up } ->
+      [ "event", str "queue_update"
+      ; "steer", int steer
+      ; "follow_up", int follow_up
+      ]
   in
   `Object (("type", str "event") :: fields)
 ;;

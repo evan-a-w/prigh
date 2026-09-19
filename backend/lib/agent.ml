@@ -23,6 +23,10 @@ module Event = struct
     | State_changed of State.t
     | Compacted of { summary : string }
     | Notice of string
+    | Queue_update of
+        { steer : int
+        ; follow_up : int
+        }
   [@@deriving sexp_of]
 end
 
@@ -133,6 +137,15 @@ let state t =
 
 let state_changed t = broadcast t (State_changed (state t))
 
+let queue_update t =
+  broadcast
+    t
+    (Queue_update
+       { steer = Queue.length t.steer_queue
+       ; follow_up = Queue.length t.follow_up_queue
+       })
+;;
+
 let config t =
   { Agent_loop.Config.model = t.model
   ; thinking = t.thinking
@@ -170,9 +183,11 @@ let rec start_run t prompts =
          ~cwd:t.cwd
          ~cancel
          ~steer:(fun () ->
-           Queue.to_list t.steer_queue
-           |> fun l ->
-           Queue.clear t.steer_queue;
+           let l = Queue.to_list t.steer_queue in
+           if not (List.is_empty l)
+           then (
+             Queue.clear t.steer_queue;
+             queue_update t);
            l)
          ~emit:(fun event ->
            (match event with
@@ -188,17 +203,22 @@ let rec start_run t prompts =
      | exception exn ->
        broadcast t (Notice ("run failed: " ^ Exn.to_string exn)));
     (* Steering messages that arrived after the last turn boundary. *)
-    Queue.iter t.steer_queue ~f:(fun m ->
-      Queue.enqueue
-        t.follow_up_queue
-        (match m with
-         | User u -> u.text
-         | _ -> ""));
-    Queue.clear t.steer_queue;
+    if not (Queue.is_empty t.steer_queue)
+    then (
+      Queue.iter t.steer_queue ~f:(fun m ->
+        Queue.enqueue
+          t.follow_up_queue
+          (match m with
+           | User u -> u.text
+           | _ -> ""));
+      Queue.clear t.steer_queue;
+      queue_update t);
     auto_compact t;
     finish ();
     match Queue.dequeue t.follow_up_queue with
-    | Some text -> start_run t [ Message.user text ]
+    | Some text ->
+      queue_update t;
+      start_run t [ Message.user text ]
     | None -> ())
 
 and auto_compact t =
@@ -228,20 +248,32 @@ let prompt t text =
 
 let steer t text =
   if is_running t
-  then Queue.enqueue t.steer_queue (Message.user text)
+  then (
+    Queue.enqueue t.steer_queue (Message.user text);
+    queue_update t)
   else start_run t [ Message.user text ]
 ;;
 
 let follow_up t text =
   if is_running t
-  then Queue.enqueue t.follow_up_queue text
+  then (
+    Queue.enqueue t.follow_up_queue text;
+    queue_update t)
   else start_run t [ Message.user text ]
 ;;
 
 let abort t =
-  Queue.clear t.follow_up_queue;
+  let restored =
+    List.filter_map (Queue.to_list t.steer_queue) ~f:(function
+      | User u -> Some u.text
+      | Assistant _ | Tool_result _ -> None)
+  in
+  let follow_ups = Queue.to_list t.follow_up_queue in
   Queue.clear t.steer_queue;
-  Option.iter t.run ~f:(fun run -> Cancellation.cancel run.cancel)
+  Queue.clear t.follow_up_queue;
+  queue_update t;
+  Option.iter t.run ~f:(fun run -> Cancellation.cancel run.cancel);
+  restored @ follow_ups
 ;;
 
 let rec wait_idle t =
@@ -286,7 +318,7 @@ let compact t =
 ;;
 
 let replace_session t session =
-  abort t;
+  ignore (abort t);
   wait_idle t;
   t.session <- session;
   restore_settings t;

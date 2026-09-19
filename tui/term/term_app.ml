@@ -129,6 +129,11 @@ let run ~backend ~args =
     (match driver with
      | Error _ as e -> Deferred.return e
      | Ok driver ->
+       (* notty has saved the original termios by now, so it will restore IEXTEN
+          on exit; clear it so ^O reaches us. *)
+       Tty.clear_iexten Core_unix.stdin;
+       if not (Core_unix.isatty Core_unix.stdin)
+       then Tty.clear_iexten Core_unix.stdout;
        don't_wait_for
          (Pipe.iter_without_pushback
             (Client.incoming client)

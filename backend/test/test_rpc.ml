@@ -149,7 +149,7 @@ let%expect_test "sessions: list, new, switch, fork, rewind" =
     {|
     {"type":"response","id":"r1","ok":true,"result":{}}
     {"type":"response","id":"r1","ok":true,"result":{}}
-    {"type":"response","id":"r1","ok":true,"result":[{"id":"<id>","path":"$DIR/sessions/<stamp>_<id>.jsonl","cwd":"$DIR","created_at":"<time>","first_prompt":null,"message_count":0},{"id":"<id>","path":"$DIR/sessions/<stamp>_<id>.jsonl","cwd":"$DIR","created_at":"<time>","first_prompt":"first","message_count":2}]}
+    {"type":"response","id":"r1","ok":true,"result":[{"id":"<id>","path":"$DIR/sessions/<stamp>_<id>.jsonl","cwd":"$DIR","created_at":"<time>","first_prompt":"first","message_count":2},{"id":"<id>","path":"$DIR/sessions/<stamp>_<id>.jsonl","cwd":"$DIR","created_at":"<time>","first_prompt":null,"message_count":0}]}
     {"type":"response","id":"r1","ok":true,"result":{}}
     {"type":"response","id":"r1","ok":false,"error":"(Sys_error \"/nowhere.jsonl: No such file or directory\")"}
     {"type":"response","id":"r1","ok":true,"result":{}}
@@ -237,6 +237,7 @@ let%expect_test
     event "message_update"
     event "message_end"
     event "tool_start"
+    event "queue_update"
     event "tool_end"
     event "message_start"
     event "message_end"
@@ -244,6 +245,45 @@ let%expect_test
     event "agent_end"
     event "state"
     false
+    |}]
+;;
+
+let%expect_test "abort returns restored messages and emits queue_update" =
+  with_agent
+    [ Reply.tool_call
+        ~id:"c1"
+        ~name:"bash"
+        ~arguments:{|{"command":"sleep 5"}|}
+        ()
+    ]
+  @@ fun t agent login ->
+  let events = Queue.create () in
+  Agent.subscribe agent ~f:(fun e -> Queue.enqueue events (Rpc_json.event e));
+  call t agent login ~params:{|{"text": "go"}|} "prompt";
+  call t agent login ~params:{|{"text": "first steer"}|} "steer";
+  call t agent login ~params:{|{"text": "second follow up"}|} "follow_up";
+  call t agent login "abort";
+  Agent.wait_idle agent;
+  Queue.iter events ~f:(fun e -> print_endline (mask t (Json.to_string e)));
+  [%expect
+    {|
+    {"type":"response","id":"r1","ok":true,"result":{}}
+    {"type":"response","id":"r1","ok":true,"result":{}}
+    {"type":"response","id":"r1","ok":true,"result":{}}
+    {"type":"response","id":"r1","ok":true,"result":{"restored":["first steer","second follow up"]}}
+    {"type":"event","event":"state","state":{"session_id":"<id>","session_path":"$DIR/sessions/<stamp>_<id>.jsonl","cwd":"$DIR","model":{"id":"deepseek-flash","provider":"deepseek","key":"deepseek/deepseek-flash","name":"DeepSeek V4.1 Flash","context_window":1000000,"max_output":384000,"supports_thinking":true,"cost":{"input":0.3,"output":1.2,"cache_read":0.006}},"thinking":"off","running":true,"message_count":0,"usage":{"input":0,"output":0,"cache_read":0},"cost_usd":0,"context_tokens":0}}
+    {"type":"event","event":"agent_start"}
+    {"type":"event","event":"message_start","message":{"role":"user","text":"go"}}
+    {"type":"event","event":"message_end","message":{"role":"user","text":"go"}}
+    {"type":"event","event":"turn_start"}
+    {"type":"event","event":"message_start","message":{"role":"assistant","content":[],"stop_reason":{"type":"end_turn"},"usage":{"input":0,"output":0,"cache_read":0},"model":"deepseek-flash"}}
+    {"type":"event","event":"queue_update","steer":1,"follow_up":0}
+    {"type":"event","event":"queue_update","steer":1,"follow_up":1}
+    {"type":"event","event":"queue_update","steer":0,"follow_up":0}
+    {"type":"event","event":"message_end","message":{"role":"assistant","content":[],"stop_reason":{"type":"aborted"},"usage":{"input":20,"output":8,"cache_read":5},"model":"deepseek-flash"}}
+    {"type":"event","event":"turn_end","assistant":{"role":"assistant","content":[],"stop_reason":{"type":"aborted"},"usage":{"input":20,"output":8,"cache_read":5},"model":"deepseek-flash"},"tool_results":[]}
+    {"type":"event","event":"agent_end","messages":[{"role":"user","text":"go"},{"role":"assistant","content":[],"stop_reason":{"type":"aborted"},"usage":{"input":20,"output":8,"cache_read":5},"model":"deepseek-flash"}]}
+    {"type":"event","event":"state","state":{"session_id":"<id>","session_path":"$DIR/sessions/<stamp>_<id>.jsonl","cwd":"$DIR","model":{"id":"deepseek-flash","provider":"deepseek","key":"deepseek/deepseek-flash","name":"DeepSeek V4.1 Flash","context_window":1000000,"max_output":384000,"supports_thinking":true,"cost":{"input":0.3,"output":1.2,"cache_read":0.006}},"thinking":"off","running":false,"message_count":2,"usage":{"input":20,"output":8,"cache_read":5},"cost_usd":1.413e-05,"context_tokens":20}}
     |}]
 ;;
 

@@ -61,23 +61,47 @@ let write_line t (line : Line.t) =
 
 let default_dir ~home = Filename.concat home ".prigh/sessions"
 
+let stamp_of created_at =
+  let date, ofday =
+    Time_float.to_date_ofday created_at ~zone:Time_float.Zone.utc
+  in
+  let parts = Time_float.Ofday.to_parts ofday in
+  sprintf
+    "%s-%02d%02d%02d%03d"
+    (Date.to_string_iso8601_basic date)
+    parts.hr
+    parts.min
+    parts.sec
+    parts.ms
+;;
+
+(* Session file names embed a millisecond stamp, so two sessions created in
+   the same millisecond would collide. Remember the last stamp handed out and
+   push the clock forward until the next one is strictly larger. *)
+let last_created_at = ref None
+
+let next_created_at () =
+  let now = Time_float.now () in
+  match !last_created_at with
+  | None -> now
+  | Some last ->
+    let last_stamp = stamp_of last in
+    if String.compare (stamp_of now) last_stamp > 0
+    then now
+    else (
+      let rec bump t =
+        let t = Time_float.add t (Time_float.Span.of_ms 1.) in
+        if String.compare (stamp_of t) last_stamp > 0 then t else bump t
+      in
+      bump (Time_float.max now last))
+;;
+
 let create ~dir ~cwd =
   Core_unix.mkdir_p dir;
   let id = new_id () in
-  let created_at = Time_float.now () in
-  let stamp =
-    let date, ofday =
-      Time_float.to_date_ofday created_at ~zone:Time_float.Zone.utc
-    in
-    let parts = Time_float.Ofday.to_parts ofday in
-    sprintf
-      "%s-%02d%02d%02d%03d"
-      (Date.to_string_iso8601_basic date)
-      parts.hr
-      parts.min
-      parts.sec
-      parts.ms
-  in
+  let created_at = next_created_at () in
+  last_created_at := Some created_at;
+  let stamp = stamp_of created_at in
   let path = Filename.concat dir (sprintf "%s_%s.jsonl" stamp id) in
   let t =
     { id; path; cwd; entries = []; head = None; by_id = String.Table.create () }

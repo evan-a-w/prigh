@@ -27,6 +27,10 @@ module Event : sig
     | State_changed of State.t
     | Compacted of { summary : string }
     | Notice of string
+    | Queue_update of
+        { steer : int
+        ; follow_up : int
+        }
   [@@deriving sexp_of]
 end
 
@@ -61,7 +65,11 @@ val steer : t -> string -> unit
 (** Queued to run after the current run finishes, or starts a run when idle. *)
 val follow_up : t -> string -> unit
 
-val abort : t -> unit
+(** Cancels the active run (if any) and clears the queues. Returns the texts
+    that were queued and are therefore restored to the caller: steer messages
+    in order, then follow-ups. Emits [Queue_update]. *)
+val abort : t -> string list
+
 val is_running : t -> bool
 
 (** Blocks until no run is active and the queues are empty. *)

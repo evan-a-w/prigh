@@ -36,6 +36,8 @@ let with_agent ?tools ?on_request replies f =
         Some (sprintf "state: running=%b messages=%d" s.running s.message_count)
       | Compacted { summary } -> Some ("compacted: " ^ summary)
       | Notice n -> Some ("notice: " ^ n)
+      | Queue_update { steer; follow_up } ->
+        Some (sprintf "queue: steer=%d follow_up=%d" steer follow_up)
     in
     Option.iter line ~f:(fun l -> Queue.enqueue log (mask t l)));
   let dump () =
@@ -102,10 +104,12 @@ let%expect_test
     {|
     state: running=true messages=0
     user: one
+    queue: steer=0 follow_up=1
     assistant:
     tool_result:
     assistant: first done
     state: running=false messages=4
+    queue: steer=0 follow_up=0
     state: running=true messages=4
     user: two
     assistant: second done
@@ -135,8 +139,10 @@ let%expect_test "steer while running is injected after the tool results" =
     {|
     state: running=true messages=0
     user: one
+    queue: steer=1 follow_up=0
     assistant:
     tool_result: hi
+    queue: steer=0 follow_up=0
     user: also this
     assistant: noted
     state: running=false messages=5
@@ -156,7 +162,7 @@ let%expect_test "abort cancels the tool and drops queued follow-ups" =
   Or_error.ok_exn (Agent.prompt agent "go");
   Agent.follow_up agent "dropped";
   Eio.Time.sleep (Eio.Stdenv.clock t.env) 0.2;
-  Agent.abort agent;
+  ignore (Agent.abort agent);
   Agent.wait_idle agent;
   print_s [%sexp (Agent.is_running agent : bool)];
   dump ();
@@ -165,7 +171,40 @@ let%expect_test "abort cancels the tool and drops queued follow-ups" =
     false
     state: running=true messages=0
     user: go
+    queue: steer=0 follow_up=1
     assistant:
+    queue: steer=0 follow_up=0
+    tool_result: [cancelled]
+    state: running=false messages=3
+    |}]
+;;
+
+let%expect_test "abort restores queued steer and follow-up messages" =
+  with_agent
+    [ Reply.tool_call
+        ~id:"c1"
+        ~name:"bash"
+        ~arguments:{|{"command":"sleep 5"}|}
+        ()
+    ]
+  @@ fun t agent dump ->
+  Or_error.ok_exn (Agent.prompt agent "go");
+  Agent.steer agent "first steer";
+  Agent.follow_up agent "second follow up";
+  Eio.Time.sleep (Eio.Stdenv.clock t.env) 0.2;
+  let restored = Agent.abort agent in
+  print_s [%message (restored : string list)];
+  Agent.wait_idle agent;
+  dump ();
+  [%expect
+    {|
+    (restored ("first steer" "second follow up"))
+    state: running=true messages=0
+    user: go
+    queue: steer=1 follow_up=0
+    queue: steer=1 follow_up=1
+    assistant:
+    queue: steer=0 follow_up=0
     tool_result: [cancelled]
     state: running=false messages=3
     |}]
@@ -233,12 +272,15 @@ let%expect_test "new_session, switch_session, fork, rewind" =
     user: a
     assistant: a1
     state: running=false messages=2
+    queue: steer=0 follow_up=0
     state: running=false messages=0
     state: running=true messages=0
     user: b
     assistant: b1
     state: running=false messages=2
+    queue: steer=0 follow_up=0
     state: running=false messages=2
+    queue: steer=0 follow_up=0
     state: running=false messages=2
     state: running=false messages=1
     state: running=true messages=1

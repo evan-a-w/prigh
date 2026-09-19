@@ -72,8 +72,10 @@ let dispatch agent login ~meth ~params : Json.t Or_error.t =
       Agent.follow_up agent text;
       `Object [])
   | "abort" ->
-    Agent.abort agent;
-    empty
+    let restored = Agent.abort agent in
+    ok
+      (`Object
+          [ "restored", `Array (List.map restored ~f:(fun s -> `String s)) ])
   | "get_state" -> ok (Rpc_json.state (Agent.state agent))
   | "get_messages" ->
     ok (`Array (List.map (Agent.messages agent) ~f:Rpc_json.message))
@@ -208,7 +210,7 @@ let run ~env:_ ~agent ~login ~input ~output =
       loop ()
   in
   loop ();
-  Agent.abort agent;
+  ignore (Agent.abort agent : string list);
   Login_manager.cancel login;
   Agent.wait_idle agent;
   Login_manager.wait login;

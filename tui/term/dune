@@ -2,5 +2,8 @@
  (name prigh_ui_term)
  (preprocess
   (pps ppx_jane bonsai.ppx_bonsai))
- (libraries core async async_unix bonsai bonsai_term prigh_protocol
+ (foreign_stubs
+  (language c)
+  (names tty_stubs))
+ (libraries core async async_unix core_unix bonsai bonsai_term prigh_protocol
   prigh_client prigh_ui))
