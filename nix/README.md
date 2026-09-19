@@ -37,20 +37,17 @@ export PATH=~/.local/bin:$PATH
 opam list --switch=prigh-ox --installed --columns=name,version \
   | awk 'NR>1 && $2 != "guard" && $2 != "enabled" { print "  " $1 " = \"" $2 "\";" }' \
   > /tmp/pins-body
-# then wrap in the file header, drop `oxcaml-*` guards and the menhir
-# runtime libraries (they are resolved consistently with `menhir` itself).
+# then wrap in the file header and drop the `oxcaml-*` guard/static packages.
 ```
 
-The current file was generated this way; `menhir`, `menhirCST`, `menhirLib`
-and `menhirSdk` are intentionally left unpinned so opam picks a matching set,
-and `oxcaml-*` guard/static packages are omitted (their versions are the
-`guard`/`enabled` markers, not real versions).
+The current file was generated this way from the complete switch; it includes
+`bonsai_term`/`bonsai_test`, `menhir 20260209`, `eio 1.3+ox`, etc. `oxcaml-*`
+guard/static packages are omitted because their "versions" are the
+`guard`/`enabled` markers, not real versions.
 
-Once the switch contains `bonsai_term`/`bonsai_test`, replace the `"*"`
-entries in `flake.nix` with their pinned versions (or drop the `// { ... }`
-override entirely).
+`flake.nix` now uses `query = import ./nix/prigh-ox-pins.nix;` directly.
 
-## Materialization (TODO)
+## Materialization (optional)
 
 opam-nix turns every package's opam file into a derivation via an IFD
 `opam.json`, so the first `nix eval` of the scope takes a long time. The
@@ -58,7 +55,7 @@ recommended fix is to materialize:
 
 ```sh
 nix eval --raw .#lib.x86_64-linux \
-  --apply '(m: m.materializeOpamProject { } ./backend { /* query */ })'
+  --apply '(m: m.materializeOpamProject { } ./spike/bonsai_term_hello { /* query */ })'
 ```
 
 and commit the resulting JSON, then build the scope with

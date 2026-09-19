@@ -148,10 +148,17 @@ round-trips, e2e against `main.exe serve -faux` with an isolated `-auth-file`.
      timeout.
    - `packages.default = scope.bonsai_term_hello` (the OxCaml smoke test).
      `devShells.default` inherits that package's inputs plus `bonsai_test`,
-     `notty_async`, `expect_test_helpers_core`, `nodejs`, `ripgrep`. A `nix
-     build .#packages.x86_64-linux.default` was started at 20:52 and is
-     building the compiler + dependency closure; it needs no `prigh`
-     (backend) build, so it does not hit the digestif/mirage-crypto issue.
+     `notty_async`, `expect_test_helpers_core`, `nodejs`, `ripgrep`.
+   - **Verified end to end:** the patched `oxcaml-compiler` built in Nix
+     (`...-oxcaml-compiler-5.2.0minus39`), `menhir 20260209` built (the
+     original failure), `nix build .#packages.x86_64-linux.default` produced
+     `result/bin/bonsai_term_hello` and `--help` runs, and `nix develop`
+     gives `ocamlopt 5.2.0+ox` + `dune 3.22.2` and compiles
+     `let f (r:float array) (i:int) (j:int) = r.(i) +. r.(j)`
+     (`NIX_COMPILER_PATCH_OK`). The full first build took ~1 h on 3 cores
+     (mostly the compiler + ~175 opam packages); it is all in the Nix store
+     now. It needs no `prigh` (backend) build, so it does not hit the
+     digestif/mirage-crypto issue.
    - **Known issue / next:** opam-nix evaluates each `opam.json` with an IFD
      derivation, so the *first* evaluation of this scope took ~15 min (cached
      afterwards); the resolver itself succeeds. The robust fix is opam-nix
@@ -188,8 +195,11 @@ round-trips, e2e against `main.exe serve -faux` with an isolated `-auth-file`.
 - Nix: source `/nix/var/nix/profiles/default/etc/profile.d/nix-daemon.sh`
   (or use `/nix/var/nix/profiles/default/bin/nix`); sudo is available with the
   user-provided password (prefix commands with `printf 'ubu\n' | sudo -S -p ''`).
-  This host is a QEMU CPU **without AVX** (`sse4_2` only) — never enable
-  `-favx`/AVX for things that will run here.
+  Flake entry points: `nix build .#packages.x86_64-linux.default` (the
+  bonsai_term hello smoke test) and `nix develop` (OxCaml toolchain +
+  bonsai_term); `nix eval .#packages.x86_64-linux.default.drvPath` checks
+  evaluation. This host is a QEMU CPU **without AVX** (`sse4_2` only) — never
+  enable `-favx`/AVX for things that will run here.
 - `backend/AGENTS.md` has the coding conventions (mli for every module,
   expect tests, ocamlformat after edits, one dune process at a time).
 - pi source for reference: `~/dev/pi` (TS). Its TUI components
