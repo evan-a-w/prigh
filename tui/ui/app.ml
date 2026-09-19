@@ -16,6 +16,8 @@ module Reply_tag = struct
     | Models_for_switch of string
     | Models_after_login of string
     | Sessions_picker
+    | Sessions_cache
+    | Paths_for_autocomplete of string
     | Set_model_done
     | Compact_done
     | Abort_done
@@ -28,6 +30,10 @@ module Command = struct
     | Rpc of
         { method_ : string
         ; params : (string * P.Json.t) list
+        ; tag : Reply_tag.t
+        }
+    | List_paths of
+        { prefix : string
         ; tag : Reply_tag.t
         }
     | Open_browser of string
@@ -61,6 +67,9 @@ module Model = struct
     ; transcript : Transcript.t
     ; editor : Editor.t
     ; mode : Mode.t
+    ; autocomplete : Autocomplete.t option
+    ; sessions : P.Session_summary.t list option
+    ; known_paths : String.Set.t
     ; queued : Queue_counts.t
     ; viewport : Viewport.t
     ; pending_quit : bool
@@ -153,6 +162,9 @@ let init =
   ; transcript = Transcript.empty
   ; editor = Editor.empty
   ; mode = Editing
+  ; autocomplete = None
+  ; sessions = None
+  ; known_paths = String.Set.empty
   ; queued = Queue_counts.zero
   ; viewport = Viewport.Follow
   ; pending_quit = false
@@ -315,18 +327,6 @@ let sessions_picker m (sessions : P.Session_summary.t list) =
   else open_picker m Sessions (Picker.create ~title:"Sessions" items)
 ;;
 
-let command_picker m ~query =
-  let items =
-    List.map Commands.all ~f:(fun c ->
-      Picker.Item.create
-        ~id:c.name
-        ~detail:c.help
-        ~search:c.name
-        ("/" ^ c.name ^ " " ^ c.args))
-  in
-  open_picker m Commands (Picker.create ~query ~title:"Commands" items)
-;;
-
 (* ---- auth ------------------------------------------------------------- *)
 
 let format_auth (statuses : P.Auth_status.t list) : Content.t =
@@ -382,7 +382,7 @@ let switch_model m arg =
 
 let run_command m (cmd : Commands.Parsed.t) =
   match cmd.name, cmd.args with
-  | "", _ -> command_picker m ~query:"", []
+  | "", _ -> m, []
   | "help", _ ->
     let heading text : Content.Line.t =
       [ { text; style = Style.bold (Style.fg Cyan) } ]
@@ -448,6 +448,9 @@ let run_command m (cmd : Commands.Parsed.t) =
           ~params:[ "path", str cmd.rest ]
           ~tag:Reload_messages
       ] )
+  | "cd", [] -> error m "usage: /cd <path>", []
+  | "cd", _ ->
+    m, [ rpc "set_cwd" ~params:[ "path", str cmd.rest ] ~tag:Show_error ]
   | "fork", _ -> m, [ rpc "fork" ~tag:(Notice_on_success "forked session") ]
   | "abort", _ -> m, [ rpc "abort" ]
   | "state", _ ->
@@ -473,30 +476,120 @@ let run_command m (cmd : Commands.Parsed.t) =
 
 (* ---- editing mode ----------------------------------------------------- *)
 
+let attachments m text =
+  String.split text ~on:'\n'
+  |> List.concat_map ~f:(String.split ~on:' ')
+  |> List.filter_map ~f:(fun token ->
+    match String.chop_prefix token ~prefix:"@" with
+    | Some path when (not (String.is_empty path)) && Set.mem m.known_paths path
+      -> Some path
+    | _ -> None)
+  |> List.dedup_and_sort ~compare:String.compare
+;;
+
+let user_params m text =
+  let attachments = attachments m text in
+  ("text", str text)
+  ::
+  (if List.is_empty attachments
+   then []
+   else
+     [ "attachments", `Array (List.map attachments ~f:(fun p -> P.Json.str p)) ])
+;;
+
 let submit m =
   let text, editor = Editor.submit m.editor in
-  let m = follow { m with editor } in
+  let m = follow { m with editor; autocomplete = None } in
   if String.is_empty (String.strip text)
   then m, []
   else (
     match Commands.parse text with
     | Some cmd -> run_command m cmd
     | None ->
+      let params = user_params m text in
       if Model.running m
       then
         ( notice m "queued (delivered after the current turn)"
-        , [ rpc "steer" ~params:[ "text", str text ] ] )
-      else m, [ rpc "prompt" ~params:[ "text", str text ] ])
+        , [ rpc "steer" ~params ] )
+      else m, [ rpc "prompt" ~params ])
 ;;
 
-let complete m =
-  match Commands.complete (Editor.text m.editor) with
-  | Unique completed | Common_prefix completed ->
-    { m with editor = Editor.set_text m.editor completed }, []
-  | Candidates _ ->
-    let query = String.drop_prefix (Editor.text m.editor) 1 in
-    command_picker { m with editor = Editor.clear m.editor } ~query, []
-  | Nothing -> m, []
+let current_line m =
+  let pos = Editor.position m.editor in
+  let line =
+    Option.value (List.nth (Editor.lines m.editor) pos.line) ~default:""
+  in
+  let before =
+    String.concat (List.take (List.map (Text_width.uchars line) ~f:fst) pos.col)
+  in
+  line, String.length before
+;;
+
+let refresh_autocomplete m =
+  let line, col = current_line m in
+  let line_index = (Editor.position m.editor).line in
+  match
+    Autocomplete.compute
+      ~line
+      ~col
+      ~line_index
+      ~models:m.models
+      ~auth:m.auth
+      ~sessions:m.sessions
+      ~logged_in:(logged_in m)
+  with
+  | None -> { m with autocomplete = None }, []
+  | Some ac ->
+    (match Autocomplete.source ac with
+     | Autocomplete.Source.Path ->
+       let same =
+         match m.autocomplete with
+         | Some prev ->
+           (match Autocomplete.source prev with
+            | Autocomplete.Source.Path ->
+              String.equal (Autocomplete.prefix prev) (Autocomplete.prefix ac)
+            | _ -> false)
+         | None -> false
+       in
+       if same
+       then m, []
+       else (
+         let prefix = Autocomplete.prefix ac in
+         ( { m with autocomplete = Some ac }
+         , [ Command.List_paths { prefix; tag = Paths_for_autocomplete prefix }
+           ] ))
+     | Autocomplete.Source.Argument spec
+       when match spec.argument with
+            | Some Commands.Argument.Sessions -> Option.is_none m.sessions
+            | _ -> false ->
+       ( { m with autocomplete = Some ac }
+       , [ rpc "list_sessions" ~tag:Sessions_cache ] )
+     | _ -> { m with autocomplete = Some ac }, [])
+;;
+
+let accept_autocomplete m ~submit_now =
+  match m.autocomplete with
+  | None -> None
+  | Some ac ->
+    (match Autocomplete.selected_item ac with
+     | None -> None
+     | Some item ->
+       let text = Autocomplete.accept ac ~editor_text:(Editor.text m.editor) in
+       let m =
+         { m with editor = Editor.set_text m.editor text; autocomplete = None }
+       in
+       let m, cmds =
+         match Autocomplete.source ac, submit_now with
+         | Autocomplete.Source.Command, true ->
+           (match Commands.find item.id with
+            | Some spec when Option.is_some spec.argument ->
+              refresh_autocomplete m
+            | _ -> submit m)
+         | Autocomplete.Source.Command, false -> m, []
+         | (Autocomplete.Source.Argument _ | Path), true -> submit m
+         | (Autocomplete.Source.Argument _ | Path), false -> m, []
+       in
+       Some (m, cmds))
 ;;
 
 let interrupt m =
@@ -539,7 +632,7 @@ let scroll_down m =
     else { m with viewport = Viewport.Anchored { top; new_lines } }
 ;;
 
-let editing m (intent : Intent.t) =
+let editing_intent m (intent : Intent.t) =
   let ed f = { m with editor = f m.editor }, [] in
   match intent with
   | Insert s -> ed (fun e -> Editor.insert e s)
@@ -570,7 +663,7 @@ let editing m (intent : Intent.t) =
       | None -> Option.value (Editor.history_next e) ~default:e)
   | Page_up -> scroll_up m, []
   | Page_down -> scroll_down m, []
-  | Complete -> complete m
+  | Complete -> m, []
   | Cancel ->
     if Model.running m then m, [ rpc "abort" ~tag:Abort_done ] else m, []
   | Interrupt -> interrupt m
@@ -581,6 +674,52 @@ let editing m (intent : Intent.t) =
   | Clear_screen ->
     follow { m with transcript = Transcript.clear m.transcript }, []
   | Cycle_verbosity -> set_verbosity m (Verbosity.next m.verbosity), []
+;;
+
+(* Autocomplete is a sub-state of editing: while it is open it owns a few keys,
+   everything else edits the buffer and then recomputes the completion. *)
+let editing m (intent : Intent.t) =
+  match m.autocomplete with
+  | Some _ ->
+    (match intent with
+     | Complete ->
+       Option.value (accept_autocomplete m ~submit_now:false) ~default:(m, [])
+     | Submit ->
+       Option.value (accept_autocomplete m ~submit_now:true) ~default:(submit m)
+     | Up ->
+       ( { m with autocomplete = Option.map m.autocomplete ~f:Autocomplete.up }
+       , [] )
+     | Down ->
+       ( { m with autocomplete = Option.map m.autocomplete ~f:Autocomplete.down }
+       , [] )
+     | Cancel -> { m with autocomplete = None }, []
+     | Insert _
+     | Newline
+     | Backspace
+     | Delete
+     | Left
+     | Right
+     | Home
+     | End
+     | Page_up
+     | Page_down
+     | Interrupt
+     | Force_quit
+     | Kill_to_end
+     | Kill_line
+     | Kill_word
+     | Clear_screen
+     | Cycle_verbosity ->
+       let m, cmds = editing_intent m intent in
+       let m, more = refresh_autocomplete m in
+       m, cmds @ more)
+  | None ->
+    (match intent with
+     | Complete -> refresh_autocomplete m
+     | _ ->
+       let m, cmds = editing_intent m intent in
+       let m, more = refresh_autocomplete m in
+       m, cmds @ more)
 ;;
 
 (* ---- picker mode ------------------------------------------------------ *)
@@ -622,8 +761,6 @@ let picker_selected m (kind : Mode.Picker_kind.t) (item : Picker.Item.t) =
           ~params:[ "path", str item.id ]
           ~tag:Reload_messages
       ] )
-  | Commands ->
-    { m with editor = Editor.set_text m.editor ("/" ^ item.id ^ " ") }, []
   | Auth_select id ->
     m, [ rpc "auth_respond" ~params:[ "id", str id; "value", str item.id ] ]
 ;;
@@ -954,7 +1091,33 @@ let reply m (tag : Reply_tag.t) (result : (P.Json.t, string) Result.t) =
        decode
          json
          ~f:(decode_list ~f:P.Session_summary.of_json)
-         (fun sessions -> sessions_picker m sessions, []))
+         (fun sessions -> sessions_picker m sessions, [])
+     | Sessions_cache ->
+       decode
+         json
+         ~f:(decode_list ~f:P.Session_summary.of_json)
+         (fun sessions ->
+            refresh_autocomplete { m with sessions = Some sessions })
+     | Paths_for_autocomplete prefix ->
+       decode json ~f:(decode_list ~f:P.Json.to_string_or_error) (fun paths ->
+         let m =
+           { m with
+             known_paths =
+               List.fold paths ~init:m.known_paths ~f:(fun acc p ->
+                 Set.add acc p)
+           }
+         in
+         match m.autocomplete with
+         | Some ac
+           when (match Autocomplete.source ac with
+                 | Autocomplete.Source.Path -> true
+                 | _ -> false)
+                && String.equal (Autocomplete.prefix ac) prefix ->
+           let items =
+             List.map paths ~f:(fun p -> Picker.Item.create ~id:p p)
+           in
+           { m with autocomplete = Some (Autocomplete.set_items ac items) }, []
+         | _ -> m, []))
 ;;
 
 let update m (action : Action.t) =

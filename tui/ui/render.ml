@@ -26,7 +26,9 @@ let status (m : App.Model.t) : Content.Line.t =
       | Login_prompt _ -> Some "login: Enter answers, Esc cancels"
       | Confirm _ -> Some "confirm: y / n"
       | Editing ->
-        if m.pending_quit
+        if Option.is_some m.autocomplete
+        then Some "Tab/Enter accept · Esc close"
+        else if m.pending_quit
         then Some "Ctrl+C again quits"
         else if s.running
         then
@@ -156,6 +158,66 @@ let picker_block (p : Picker.t) ~width : Content.t * int =
   title :: filter :: rows, 1
 ;;
 
+let autocomplete_block (ac : Autocomplete.t) ~width : Content.t =
+  let items = Autocomplete.items ac in
+  let selected = Autocomplete.selected ac in
+  let start = Int.max 0 (Int.min (selected - 4) (List.length items - 8)) in
+  let shown = List.take (List.drop items start) 8 in
+  match Autocomplete.source ac with
+  | Autocomplete.Source.Command ->
+    let usage (item : Picker.Item.t) =
+      let args =
+        Option.value_map (Commands.find item.id) ~default:"" ~f:(fun s ->
+          s.args)
+      in
+      "/" ^ item.label ^ if String.is_empty args then "" else " " ^ args
+    in
+    let usage_width =
+      List.fold shown ~init:0 ~f:(fun acc item ->
+        Int.max acc (Text_width.string (usage item)))
+      |> Int.min (width / 2)
+    in
+    List.mapi shown ~f:(fun i (item : Picker.Item.t) ->
+      let is_selected = start + i = selected in
+      let style s = if is_selected then Style.invert s else s in
+      let help =
+        Option.value_map (Commands.find item.id) ~default:"" ~f:(fun s ->
+          s.help)
+      in
+      let name = "/" ^ item.label in
+      let args =
+        Text_width.pad_right
+          (String.drop_prefix (usage item) (String.length name))
+          ~width:(usage_width - Text_width.string name)
+      in
+      Content.Line.truncate
+        [ span ~style:(style Style.plain) (if is_selected then "▸ " else "  ")
+        ; span ~style:(style (Style.bold Style.plain)) name
+        ; span ~style:(style dim) args
+        ; span ~style:(style dim) ("  " ^ help)
+        ]
+        ~width)
+  | Autocomplete.Source.Argument _ | Autocomplete.Source.Path ->
+    let label_width =
+      List.fold shown ~init:0 ~f:(fun acc (item : Picker.Item.t) ->
+        Int.max acc (Text_width.string item.label))
+      |> Int.min (width / 2)
+    in
+    List.mapi shown ~f:(fun i (item : Picker.Item.t) ->
+      let is_selected = start + i = selected in
+      let style s = if is_selected then Style.invert s else s in
+      Content.Line.truncate
+        [ span ~style:(style Style.plain) (if is_selected then "▸ " else "  ")
+        ; span
+            ~style:(style (Style.bold Style.plain))
+            (Text_width.pad_right item.label ~width:label_width)
+        ; span
+            ~style:(style dim)
+            (if String.is_empty item.detail then "" else "  " ^ item.detail)
+        ]
+        ~width)
+;;
+
 let screen (m : App.Model.t) : Screen.t =
   let width = Int.max 1 m.width in
   let height = Int.max 3 m.height in
@@ -202,7 +264,14 @@ let screen (m : App.Model.t) : Screen.t =
       in
       [], rows, cursor
   in
-  let panel = dialog @ [ separator ] @ editor @ [ status_line ] in
+  let autocomplete_rows =
+    match m.mode, m.autocomplete with
+    | Editing, Some ac -> autocomplete_block ac ~width
+    | _ -> []
+  in
+  let panel =
+    dialog @ [ separator ] @ editor @ autocomplete_rows @ [ status_line ]
+  in
   let panel = List.map panel ~f:(Content.Line.truncate ~width) in
   let panel_rows = List.length panel in
   let transcript_rows = Int.max 0 (height - panel_rows) in

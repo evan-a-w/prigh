@@ -153,6 +153,23 @@ let%expect_test "fuzzy ranking" =
     |}]
 ;;
 
+let%expect_test "fuzzy ranking: command names" =
+  let names = List.map Commands.all ~f:(fun (c : Commands.Spec.t) -> c.name) in
+  List.iter [ "mo"; "lo"; "s"; "sw"; "xyz" ] ~f:(fun query ->
+    printf
+      "%-4S -> %s\n"
+      query
+      (String.concat ~sep:" " (Fuzzy.rank ~query names ~key:Fn.id)));
+  [%expect
+    {|
+    "mo" -> model
+    "lo" -> login logout
+    "s"  -> state switch sessions verbosity
+    "sw" -> switch
+    "xyz" ->
+    |}]
+;;
+
 let%expect_test "picker" =
   let items =
     List.map [ "alpha"; "beta"; "gamma"; "delta" ] ~f:(fun l ->
@@ -243,55 +260,88 @@ let%expect_test "commands" =
         Candidates (
           ((name sessions)
            (args "")
-           (help "pick a saved session to switch to"))
+           (help "pick a saved session to switch to")
+           (argument ()))
           ((name switch)
            (args [path])
-           (help "switch to a saved session"))
+           (help "switch to a saved session")
+           (argument (Sessions)))
           ((name state)
            (args "")
-           (help "show session state"))))))
+           (help "show session state")
+           (argument ()))))))
     (/se ("Commands.complete s" (Unique "/sessions ")))
     (/ (
       "Commands.complete s" (
         Candidates (
           ((name help)
            (args "")
-           (help "show commands and keys"))
+           (help "show commands and keys")
+           (argument ()))
           ((name model)
            (args [name|id|provider/id])
-           (help "pick or switch the model"))
-          ((name thinking)
-           (args [off|on|low|high|max])
-           (help "pick or set the thinking level"))
-          ((name verbosity)
-           (args [quiet|normal|verbose])
-           (help "set the transcript verbosity"))
+           (help "pick or switch the model")
+           (argument (Model)))
           ((name login)
            (args "[provider] [api_key|oauth]")
-           (help "log in to a provider"))
+           (help "log in to a provider")
+           (argument (Login)))
           ((name logout)
            (args [provider])
-           (help "remove a provider's stored credential"))
+           (help "remove a provider's stored credential")
+           (argument (Logout)))
+          ((name thinking)
+           (args [off|on|low|high|max])
+           (help "pick or set the thinking level")
+           (argument (Thinking)))
+          ((name verbosity)
+           (args [quiet|normal|verbose])
+           (help "set the transcript verbosity")
+           (argument (Verbosity)))
           ((name auth)
            (args "")
-           (help "show which providers are configured"))
+           (help "show which providers are configured")
+           (argument ()))
           ((name compact)
            (args "")
-           (help "summarise older messages to free context"))
+           (help "summarise older messages to free context")
+           (argument ()))
           ((name new)
            (args "")
-           (help "start a new session"))
+           (help "start a new session")
+           (argument ()))
           ((name sessions)
            (args "")
-           (help "pick a saved session to switch to"))
+           (help "pick a saved session to switch to")
+           (argument ()))
           ((name switch)
            (args [path])
-           (help "switch to a saved session"))
-          ((name fork)  (args "") (help "fork the current session"))
-          ((name abort) (args "") (help "abort the current run"))
-          ((name state) (args "") (help "show session state"))
-          ((name clear) (args "") (help "clear the transcript"))
-          ((name quit)  (args "") (help exit))))))
+           (help "switch to a saved session")
+           (argument (Sessions)))
+          ((name cd)
+           (args [path])
+           (help "change the working directory")
+           (argument (Path)))
+          ((name fork)
+           (args "")
+           (help "fork the current session")
+           (argument ()))
+          ((name abort)
+           (args "")
+           (help "abort the current run")
+           (argument ()))
+          ((name state)
+           (args "")
+           (help "show session state")
+           (argument ()))
+          ((name clear)
+           (args "")
+           (help "clear the transcript")
+           (argument ()))
+          ((name quit)
+           (args "")
+           (help exit)
+           (argument ()))))))
     (/zz ("Commands.complete s" Nothing))
     ("/model x" ("Commands.complete s" Nothing))
     (x ("Commands.complete s" Nothing))
@@ -443,15 +493,16 @@ let%expect_test "keymap: every binding resolves to its intent and is documented"
     Ctrl+D              quit
     /help                              show commands and keys
     /model [name|id|provider/id]       pick or switch the model
-    /thinking [off|on|low|high|max]    pick or set the thinking level
-    /verbosity [quiet|normal|verbose]  set the transcript verbosity
     /login [provider] [api_key|oauth]  log in to a provider
     /logout [provider]                 remove a provider's stored credential
+    /thinking [off|on|low|high|max]    pick or set the thinking level
+    /verbosity [quiet|normal|verbose]  set the transcript verbosity
     /auth                              show which providers are configured
     /compact                           summarise older messages to free context
     /new                               start a new session
     /sessions                          pick a saved session to switch to
     /switch [path]                     switch to a saved session
+    /cd [path]                         change the working directory
     /fork                              fork the current session
     /abort                             abort the current run
     /state                             show session state

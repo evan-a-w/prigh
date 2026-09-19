@@ -8,6 +8,7 @@ module Platform = struct
         string
         -> (string * P.Json.t) list
         -> (P.Json.t, string) Result.t Bonsai.Effect.t
+    ; list_paths : prefix:string -> (P.Json.t, string) Result.t Bonsai.Effect.t
     ; open_browser : string -> unit Bonsai.Effect.t
     ; quit : unit Bonsai.Effect.t
     }
@@ -18,6 +19,9 @@ let perform ctx (platform : Platform.t) (command : App.Command.t) =
     match command with
     | Rpc { method_; params; tag } ->
       let%bind.Bonsai.Effect result = platform.rpc method_ params in
+      Bonsai.Apply_action_context.inject ctx (App.Action.Reply (tag, result))
+    | List_paths { prefix; tag } ->
+      let%bind.Bonsai.Effect result = platform.list_paths ~prefix in
       Bonsai.Apply_action_context.inject ctx (App.Action.Reply (tag, result))
     | Open_browser url -> platform.open_browser url
     | Quit -> platform.quit

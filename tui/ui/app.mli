@@ -20,6 +20,8 @@ module Reply_tag : sig
     | Models_for_switch of string (** the argument to resolve *)
     | Models_after_login of string (** provider *)
     | Sessions_picker
+    | Sessions_cache
+    | Paths_for_autocomplete of string
     | Set_model_done
     | Compact_done
     | Abort_done
@@ -32,6 +34,10 @@ module Command : sig
     | Rpc of
         { method_ : string
         ; params : (string * P.Json.t) list
+        ; tag : Reply_tag.t
+        }
+    | List_paths of
+        { prefix : string
         ; tag : Reply_tag.t
         }
     | Open_browser of string
@@ -65,6 +71,9 @@ module Model : sig
     ; transcript : Transcript.t
     ; editor : Editor.t
     ; mode : Mode.t
+    ; autocomplete : Autocomplete.t option
+    ; sessions : P.Session_summary.t list option
+    ; known_paths : String.Set.t
     ; queued : Queue_counts.t
     ; viewport : Viewport.t
     ; pending_quit : bool

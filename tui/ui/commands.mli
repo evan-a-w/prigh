@@ -2,13 +2,26 @@ open! Core
 
 (** The slash-command table. *)
 
+module Argument : sig
+  type t =
+    | Model
+    | Thinking
+    | Verbosity
+    | Login
+    | Logout
+    | Sessions
+    | Path
+  [@@deriving sexp_of, equal]
+end
+
 module Spec : sig
   type t =
     { name : string
     ; args : string
     ; help : string
+    ; argument : Argument.t option
     }
-  [@@deriving sexp_of]
+  [@@deriving sexp_of, equal]
 end
 
 val all : Spec.t list

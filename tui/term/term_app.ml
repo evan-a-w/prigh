@@ -28,6 +28,11 @@ let platform client ~exit ~quit_requested : Prigh_ui.Component.Platform.t =
               (Client.call client method_ params)
               ~f:(Result.map_error ~f:Error.to_string_hum))
           ())
+  ; list_paths =
+      (fun ~prefix ->
+        Effect.of_deferred_fun
+          (fun () -> Deferred.map (Paths.list ~prefix) ~f:(fun json -> Ok json))
+          ())
   ; open_browser = (fun url -> Effect.of_sync_fun open_browser url)
   ; quit =
       (* Bonsai_term's [Driver.finished] never resolves when [exit] is scheduled

@@ -286,6 +286,8 @@ let%expect_test "/model opens the picker; typing filters; Enter sets the model" 
   let h = connected () in
   H.keys h "/model";
   H.enter h;
+  [%expect {| |}];
+  H.enter h;
   [%expect
     {| (Rpc (method_ list_models) (params ()) (tag (Models_for_picker ""))) |}];
   H.reply h (Models_for_picker "") models_json;
@@ -388,16 +390,21 @@ let%expect_test "/model <display name> switches directly; unknown suggests and \
   H.show h;
   [%expect
     {|
+    (Rpc
+      (method_ set_model)
+      (params ((model anthropic/claude-fable-5)))
+      (tag Set_model_done))
+
+
+
+
+
     session abc123 in /work. /help for commands, Esc aborts,
     Ctrl+C twice quits.
     > earlier question
     earlier answer
-    several models match "claude-fable"
-    Model  (2)
-    / claude-fable▏
-      Claude Fable 5    anthropic/claude-fable-5  ctx 1.0M  $10…
-      Claude Fable 5.1  anthropic/claude-fable-5-1  ctx 1.0M  $…
     ────────────────────────────────────────────────────────────
+    > ▏
     deepseek/deepseek-flash  thinking:off  view:normal  ctx:1.5…
     |}];
   H.esc h;
@@ -410,7 +417,6 @@ let%expect_test "/model <display name> switches directly; unknown suggests and \
     Ctrl+C twice quits.
     > earlier question
     earlier answer
-    several models match "claude-fable"
     unknown model "zzz"; did you mean: GPT-5.5, Claude Fable 5,
     DeepSeek V4.1 Flash
     Model  (0)
@@ -426,7 +432,7 @@ let%expect_test "/model <display name> switches directly; unknown suggests and \
   H.show h;
   [%expect
     {|
-    several models match "claude-fable"
+    earlier answer
     unknown model "zzz"; did you mean: GPT-5.5, Claude Fable 5,
     DeepSeek V4.1 Flash
     unknown model "q"; did you mean: a, b
@@ -441,7 +447,8 @@ let%expect_test "/model <display name> switches directly; unknown suggests and \
     |}]
 ;;
 
-let%expect_test "Esc closes a dialog without aborting; Esc while running aborts"
+let%expect_test "Esc closes autocomplete or dialog without aborting; Esc while \
+                 running aborts"
   =
   let h = connected () in
   H.event h (State (state ~running:true ()));
@@ -450,17 +457,17 @@ let%expect_test "Esc closes a dialog without aborting; Esc while running aborts"
   H.show h;
   [%expect
     {|
+    session abc123 in /work. /help for commands, Esc aborts,
     Ctrl+C twice quits.
     > earlier question
     earlier answer
-    Thinking level  (5)
-    / ▏
-    * off
+    ────────────────────────────────────────────────────────────
+    > /thinking ▏
+    ▸ off
       on
       low
       high
       max
-    ────────────────────────────────────────────────────────────
     deepseek/deepseek-flash  thinking:off  view:normal  ctx:1.5…
     |}];
   H.esc h;
@@ -468,17 +475,29 @@ let%expect_test "Esc closes a dialog without aborting; Esc while running aborts"
   [%expect {| editing |}];
   H.esc h;
   [%expect {| (Rpc (method_ abort) (params ()) (tag Abort_done)) |}];
-  (* Opening a dialog while one is open is refused with a notice. *)
-  H.keys h "/thinking";
+  (* A real dialog is also closed by Esc without aborting; an incoming auth
+     prompt is refused while one is open. *)
+  let h = connected () in
+  H.event h (State (state ~running:true ()));
+  H.keys h "/logout deepseek";
   H.enter h;
+  H.show h;
+  [%expect
+    {|
+    session abc123 in /work. /help for commands, Esc aborts,
+    Ctrl+C twice quits.
+    > earlier question
+    earlier answer
+    Log out of deepseek and delete its credential? (y/n)
+    ────────────────────────────────────────────────────────────
+    ? ▏
+    deepseek/deepseek-flash  thinking:off  view:normal  ctx:1.5…
+    |}];
   H.event
     h
     (Auth (Prompt { id = "p1"; prompt = Secret { message = "API key" } }));
   [%expect {| (Rpc (method_ auth_cancel) (params ()) (tag Show_error)) |}];
-  H.key h (Key.plain Down);
-  H.enter h;
-  [%expect
-    {| (Rpc (method_ set_thinking) (params ((thinking on))) (tag Show_error)) |}];
+  H.keys h "n";
   H.show h;
   [%expect
     {|
@@ -488,10 +507,15 @@ let%expect_test "Esc closes a dialog without aborting; Esc while running aborts"
     earlier answer
     login prompt arrived while a dialog was open; press Esc to
     reach it
+    cancelled
     ────────────────────────────────────────────────────────────
     > ▏
     deepseek/deepseek-flash  thinking:off  view:normal  ctx:1.5…
-    |}]
+    |}];
+  H.mode h;
+  [%expect {| editing |}];
+  H.esc h;
+  [%expect {| (Rpc (method_ abort) (params ()) (tag Abort_done)) |}]
 ;;
 
 let%expect_test "login: url, masked secret prompt, answer, done switches \
@@ -735,12 +759,81 @@ let%expect_test "Ctrl+C clears, then warns, then quits; never quits with a \
   [%expect {| Quit |}]
 ;;
 
-let%expect_test "Tab completes commands or opens the command picker; / alone \
-                 opens it"
+let%expect_test "typing / lists commands, Down twice + Tab fills /login " =
+  let h = connected () in
+  H.keys h "/";
+  H.show h;
+  [%expect
+    {|
+    earlier answer
+    ────────────────────────────────────────────────────────────
+    > /▏
+    ▸ /help                           show commands and keys
+      /model [name|id|provider/id]    pick or switch the model
+      /login [provider] [api_key|oauth]  log in to a provider
+      /logout [provider]              remove a provider's store…
+      /thinking [off|on|low|high|max]  pick or set the thinking…
+      /verbosity [quiet|normal|verbose]  set the transcript ver…
+      /auth                           show which providers are …
+      /compact                        summarise older messages …
+    deepseek/deepseek-flash  thinking:off  view:normal  ctx:1.5…
+    |}];
+  H.key h (Key.plain Down);
+  H.show h;
+  [%expect
+    {|
+    earlier answer
+    ────────────────────────────────────────────────────────────
+    > /▏
+      /help                           show commands and keys
+    ▸ /model [name|id|provider/id]    pick or switch the model
+      /login [provider] [api_key|oauth]  log in to a provider
+      /logout [provider]              remove a provider's store…
+      /thinking [off|on|low|high|max]  pick or set the thinking…
+      /verbosity [quiet|normal|verbose]  set the transcript ver…
+      /auth                           show which providers are …
+      /compact                        summarise older messages …
+    deepseek/deepseek-flash  thinking:off  view:normal  ctx:1.5…
+    |}];
+  H.key h (Key.plain Down);
+  H.show h;
+  [%expect
+    {|
+    earlier answer
+    ────────────────────────────────────────────────────────────
+    > /▏
+      /help                           show commands and keys
+      /model [name|id|provider/id]    pick or switch the model
+    ▸ /login [provider] [api_key|oauth]  log in to a provider
+      /logout [provider]              remove a provider's store…
+      /thinking [off|on|low|high|max]  pick or set the thinking…
+      /verbosity [quiet|normal|verbose]  set the transcript ver…
+      /auth                           show which providers are …
+      /compact                        summarise older messages …
+    deepseek/deepseek-flash  thinking:off  view:normal  ctx:1.5…
+    |}];
+  H.key h (Key.plain Tab);
+  H.show h;
+  [%expect
+    {|
+    session abc123 in /work. /help for commands, Esc aborts,
+    Ctrl+C twice quits.
+    > earlier question
+    earlier answer
+    ────────────────────────────────────────────────────────────
+    > /login ▏
+    deepseek/deepseek-flash  thinking:off  view:normal  ctx:1.5…
+    |}]
+;;
+
+let%expect_test "/mo Enter opens argument completion over models; typing fab \
+                 Enter calls set_model"
   =
   let h = connected () in
+  H.reply ~quiet:true h (Models_for_picker "") models_json;
+  H.esc h;
   H.keys h "/mo";
-  H.key h (Key.plain Tab);
+  H.key h (Key.plain Enter);
   H.show h;
   [%expect
     {|
@@ -750,11 +843,13 @@ let%expect_test "Tab completes commands or opens the command picker; / alone \
     earlier answer
     ────────────────────────────────────────────────────────────
     > /model ▏
+    ▸ Claude Fable 5       anthropic/claude-fable-5
+      Claude Fable 5.1     anthropic/claude-fable-5-1
+      GPT-5.5              openai/gpt-5.5
+      DeepSeek V4.1 Flash  deepseek/deepseek-flash
     deepseek/deepseek-flash  thinking:off  view:normal  ctx:1.5…
     |}];
-  H.key h (Key.ctrl 'u');
-  H.keys h "/s";
-  H.key h (Key.plain Tab);
+  H.keys h "fab";
   H.show h;
   [%expect
     {|
@@ -762,17 +857,122 @@ let%expect_test "Tab completes commands or opens the command picker; / alone \
     Ctrl+C twice quits.
     > earlier question
     earlier answer
-    Commands  (4)
-    / s▏
-      /state                          show session state
-      /switch [path]                  switch to a saved session
-      /sessions                       pick a saved session to s…
-      /verbosity [quiet|normal|verbose]  set the transcript ver…
     ────────────────────────────────────────────────────────────
+    > /model fab▏
+    ▸ Claude Fable 5    anthropic/claude-fable-5
+      Claude Fable 5.1  anthropic/claude-fable-5-1
     deepseek/deepseek-flash  thinking:off  view:normal  ctx:1.5…
     |}];
-  H.keys h "w";
+  H.key h (Key.plain Enter);
+  [%expect
+    {|
+    (Rpc
+      (method_ set_model)
+      (params ((model anthropic/claude-fable-5)))
+      (tag Set_model_done))
+    |}]
+;;
+
+let%expect_test "Esc closes autocomplete without abort while running" =
+  let h = connected () in
+  H.event h (State (state ~running:true ()));
+  H.keys h "/mo";
+  H.show h;
+  [%expect
+    {|
+    session abc123 in /work. /help for commands, Esc aborts,
+    Ctrl+C twice quits.
+    > earlier question
+    earlier answer
+    ────────────────────────────────────────────────────────────
+    > /mo▏
+    ▸ /model [name|id|provider/id]  pick or switch the model
+    deepseek/deepseek-flash  thinking:off  view:normal  ctx:1.5…
+    |}];
+  H.esc h;
+  H.show h;
+  [%expect
+    {|
+    session abc123 in /work. /help for commands, Esc aborts,
+    Ctrl+C twice quits.
+    > earlier question
+    earlier answer
+    ────────────────────────────────────────────────────────────
+    > /mo▏
+    deepseek/deepseek-flash  thinking:off  view:normal  ctx:1.5…
+    |}];
+  H.esc h;
+  [%expect {| (Rpc (method_ abort) (params ()) (tag Abort_done)) |}]
+;;
+
+let%expect_test "@ completion is asynchronous and drops stale replies" =
+  let h = connected () in
+  H.keys h "@sr";
+  [%expect
+    {|
+    (List_paths (prefix "") (tag (Paths_for_autocomplete "")))
+    (List_paths (prefix s) (tag (Paths_for_autocomplete s)))
+    (List_paths (prefix sr) (tag (Paths_for_autocomplete sr)))
+    |}];
+  H.keys h "c";
+  [%expect {| (List_paths (prefix src) (tag (Paths_for_autocomplete src))) |}];
+  H.reply h (Paths_for_autocomplete "sr") {|["stale/only"]|};
+  H.show h;
+  [%expect
+    {|
+    session abc123 in /work. /help for commands, Esc aborts,
+    Ctrl+C twice quits.
+    > earlier question
+    earlier answer
+    ────────────────────────────────────────────────────────────
+    > @src▏
+    deepseek/deepseek-flash  thinking:off  view:normal  ctx:1.5…
+    |}];
+  H.reply h (Paths_for_autocomplete "src") {|["src/","src/app.ml"]|};
+  H.show h;
+  [%expect
+    {|
+    session abc123 in /work. /help for commands, Esc aborts,
+    Ctrl+C twice quits.
+    > earlier question
+    earlier answer
+    ────────────────────────────────────────────────────────────
+    > @src▏
+    ▸ src/
+      src/app.ml
+    deepseek/deepseek-flash  thinking:off  view:normal  ctx:1.5…
+    |}]
+;;
+
+let%expect_test "submit with @file sends attachments param" =
+  let h = connected () in
+  H.step h (Intent (Insert "look at @src/app.ml"));
+  [%expect
+    {| (List_paths (prefix src/app.ml) (tag (Paths_for_autocomplete src/app.ml))) |}];
+  H.reply h (Paths_for_autocomplete "src/app.ml") {|["src/app.ml"]|};
   H.enter h;
+  [%expect
+    {|
+    (Rpc
+      (method_ prompt)
+      (params ((text "look at @src/app.ml") (attachments (src/app.ml))))
+      (tag Show_error))
+    |}];
+  (* Unknown @tokens stay plain text and produce no attachments param. *)
+  H.step ~quiet:true h (Intent (Insert "check @nope"));
+  H.enter h;
+  [%expect
+    {| (Rpc (method_ prompt) (params ((text "check @nope"))) (tag Show_error)) |}]
+;;
+
+let%expect_test "/switch fetches sessions then reopens completion" =
+  let h = connected () in
+  H.step h (Intent (Insert "/switch "));
+  [%expect {| (Rpc (method_ list_sessions) (params ()) (tag Sessions_cache)) |}];
+  H.reply
+    h
+    Sessions_cache
+    {|[{"id":"1","path":"/home/u/.prigh/sessions/1.jsonl","cwd":"/work","created_at":"2025-06-01T10:00:00Z","first_prompt":"fix the build\nplease","message_count":12},{"id":"2","path":"/home/u/.prigh/sessions/2.jsonl","cwd":"/other","created_at":"2025-06-02T11:30:00Z","first_prompt":null,"message_count":0}]|};
   H.show h;
   [%expect
     {|
@@ -782,16 +982,17 @@ let%expect_test "Tab completes commands or opens the command picker; / alone \
     earlier answer
     ────────────────────────────────────────────────────────────
     > /switch ▏
+    ▸ fix the build please  /work
+      (empty)               /other
     deepseek/deepseek-flash  thinking:off  view:normal  ctx:1.5…
-    |}];
-  H.key h (Key.ctrl 'u');
-  H.keys h "/";
-  H.enter h;
-  H.mode h;
-  [%expect {| picker |}];
-  H.esc h;
-  H.keys h "/modle";
-  H.enter h;
+    |}]
+;;
+
+let%expect_test "/cd completes paths and submits the selected one" =
+  let h = connected () in
+  H.step h (Intent (Insert "/cd sr"));
+  [%expect {| (List_paths (prefix sr) (tag (Paths_for_autocomplete sr))) |}];
+  H.reply h (Paths_for_autocomplete "sr") {|["src/","src/app.ml"]|};
   H.show h;
   [%expect
     {|
@@ -799,12 +1000,16 @@ let%expect_test "Tab completes commands or opens the command picker; / alone \
     Ctrl+C twice quits.
     > earlier question
     earlier answer
-    unknown command /modle; did you mean /model? (Tab or / lists
-    commands)
     ────────────────────────────────────────────────────────────
-    > ▏
+    > /cd sr▏
+    ▸ src/
+      src/app.ml
     deepseek/deepseek-flash  thinking:off  view:normal  ctx:1.5…
-    |}]
+    |}];
+  H.key h (Key.plain Down);
+  H.key h (Key.plain Enter);
+  [%expect
+    {| (Rpc (method_ set_cwd) (params ((path src/app.ml))) (tag Show_error)) |}]
 ;;
 
 let%expect_test "/sessions picker switches and reloads; /logout confirms" =
@@ -865,6 +1070,7 @@ let%expect_test "/sessions picker switches and reloads; /logout confirms" =
   H.mode h;
   [%expect {| editing |}];
   H.keys h "/logout";
+  H.esc h;
   H.enter h;
   H.reply h Auth_logout_picker auth_json;
   H.show h;
@@ -1049,7 +1255,7 @@ let%expect_test "verbosity cycles Normal / Verbose / Quiet; /verbosity sets it" 
     |}]
 ;;
 
-let%expect_test "/verbosity with no argument opens a picker" =
+let%expect_test "/verbosity with no argument opens argument completion" =
   let h = connected () in
   H.keys h "/verbosity";
   H.enter h;
@@ -1060,14 +1266,14 @@ let%expect_test "/verbosity with no argument opens a picker" =
     Ctrl+C twice quits.
     > earlier question
     earlier answer
-    Transcript verbosity  (3)
-    / ▏
-      Quiet
-    * Normal
-      Verbose
     ────────────────────────────────────────────────────────────
+    > /verbosity ▏
+    ▸ Quiet
+      Normal
+      Verbose
     deepseek/deepseek-flash  thinking:off  view:normal  ctx:1.5…
     |}];
+  H.key h (Key.plain Down);
   H.key h (Key.plain Down);
   H.enter h;
   H.show h;

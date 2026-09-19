@@ -1,28 +1,62 @@
 open! Core
 
+module Argument = struct
+  type t =
+    | Model
+    | Thinking
+    | Verbosity
+    | Login
+    | Logout
+    | Sessions
+    | Path
+  [@@deriving sexp_of, equal]
+end
+
 module Spec = struct
   type t =
     { name : string
     ; args : string
     ; help : string
+    ; argument : Argument.t option
     }
-  [@@deriving sexp_of]
+  [@@deriving sexp_of, equal]
 end
 
-let c name args help = { Spec.name; args; help }
+let c ?argument name args help = { Spec.name; args; help; argument }
 
 let all =
   [ c "help" "" "show commands and keys"
-  ; c "model" "[name|id|provider/id]" "pick or switch the model"
-  ; c "thinking" "[off|on|low|high|max]" "pick or set the thinking level"
-  ; c "verbosity" "[quiet|normal|verbose]" "set the transcript verbosity"
-  ; c "login" "[provider] [api_key|oauth]" "log in to a provider"
-  ; c "logout" "[provider]" "remove a provider's stored credential"
+  ; c
+      ~argument:Argument.Model
+      "model"
+      "[name|id|provider/id]"
+      "pick or switch the model"
+  ; c
+      ~argument:Argument.Login
+      "login"
+      "[provider] [api_key|oauth]"
+      "log in to a provider"
+  ; c
+      ~argument:Argument.Logout
+      "logout"
+      "[provider]"
+      "remove a provider's stored credential"
+  ; c
+      ~argument:Argument.Thinking
+      "thinking"
+      "[off|on|low|high|max]"
+      "pick or set the thinking level"
+  ; c
+      ~argument:Argument.Verbosity
+      "verbosity"
+      "[quiet|normal|verbose]"
+      "set the transcript verbosity"
   ; c "auth" "" "show which providers are configured"
   ; c "compact" "" "summarise older messages to free context"
   ; c "new" "" "start a new session"
   ; c "sessions" "" "pick a saved session to switch to"
-  ; c "switch" "[path]" "switch to a saved session"
+  ; c ~argument:Argument.Sessions "switch" "[path]" "switch to a saved session"
+  ; c ~argument:Argument.Path "cd" "[path]" "change the working directory"
   ; c "fork" "" "fork the current session"
   ; c "abort" "" "abort the current run"
   ; c "state" "" "show session state"
