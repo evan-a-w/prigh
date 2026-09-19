@@ -29,6 +29,9 @@ type t =
   | Yank_pop
   | Undo
   | Cycle_verbosity
+  | Next_model
+  | Prev_model
+  | Next_thinking
   | Next_agent
   | Focus_agent of int
   | Queue_follow_up

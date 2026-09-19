@@ -25,12 +25,25 @@ end
 
 type t [@@deriving sexp_of]
 
-val create : ?query:string -> title:string -> Item.t list -> t
+val create
+  :  ?query:string
+  -> ?multi:bool
+  -> ?checked:String.Set.t
+  -> title:string
+  -> Item.t list
+  -> t
+
 val title : t -> string
 val query : t -> string
 val visible : t -> Item.t list
 val selected : t -> int
 val selected_item : t -> Item.t option
+
+(** Whether Space/Enter and the [checked] set apply (multi-select mode). *)
+val multi : t -> bool
+
+(** The ids currently checked in a multi-select picker. *)
+val checked : t -> String.Set.t
 
 module Outcome : sig
   type nonrec t =

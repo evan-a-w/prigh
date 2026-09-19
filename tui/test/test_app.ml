@@ -40,14 +40,22 @@ module H = struct
   let mode t = print_endline (Mode.name t.model.mode)
 end
 
-let model_json ?(provider = "anthropic") id name =
+let model_json
+  ?(provider = "anthropic")
+  ?(supports_thinking = true)
+  ?(context_window = 1000000)
+  id
+  name
+  =
   sprintf
-    {|{"id":"%s","provider":"%s","key":"%s/%s","name":"%s","context_window":1000000,"max_output":128000,"supports_thinking":true,"cost":{"input":10,"output":50,"cache_read":1}}|}
+    {|{"id":"%s","provider":"%s","key":"%s/%s","name":"%s","context_window":%d,"max_output":128000,"supports_thinking":%b,"cost":{"input":10,"output":50,"cache_read":1}}|}
     id
     provider
     provider
     id
     name
+    context_window
+    supports_thinking
 ;;
 
 let models_json =
@@ -66,23 +74,55 @@ let state_json
   ?(model =
     model_json ~provider:"deepseek" "deepseek-flash" "DeepSeek V4.1 Flash")
   ?(running = false)
+  ?(cwd = "/work")
+  ?git_branch
+  ?(thinking = "off")
+  ?(context_tokens = 1500)
+  ?(cost_usd = 0.0123)
   ?session_name
   ()
   =
   sprintf
-    {|{"session_id":"abc123","session_path":"/home/u/.prigh/sessions/1.jsonl","session_name":%s,"cwd":"/work","git_branch":null,"model":%s,"thinking":"off","running":%b,"message_count":2,"usage":{"input":1200,"output":300,"cache_read":0},"cost_usd":0.0123,"context_tokens":1500}|}
+    {|{"session_id":"abc123","session_path":"/home/u/.prigh/sessions/1.jsonl","session_name":%s,"cwd":%s,"git_branch":%s,"model":%s,"thinking":%s,"running":%b,"message_count":2,"usage":{"input":1200,"output":300,"cache_read":0},"cost_usd":%g,"context_tokens":%d}|}
     (match session_name with
      | Some name -> P.Json.to_string (P.Json.str name)
      | None -> "null")
+    (P.Json.to_string (P.Json.str cwd))
+    (match git_branch with
+     | Some branch -> P.Json.to_string (P.Json.str branch)
+     | None -> "null")
     model
+    (P.Json.to_string (P.Json.str thinking))
     running
+    cost_usd
+    context_tokens
 ;;
 
-let state ?model ?running ?session_name () =
+let state
+  ?model
+  ?running
+  ?cwd
+  ?git_branch
+  ?thinking
+  ?context_tokens
+  ?cost_usd
+  ?session_name
+  ()
+  =
   Or_error.ok_exn
     (P.State.of_json
        (Or_error.ok_exn
-          (P.Json.parse (state_json ?model ?running ?session_name ()))))
+          (P.Json.parse
+             (state_json
+                ?model
+                ?running
+                ?cwd
+                ?git_branch
+                ?thinking
+                ?context_tokens
+                ?cost_usd
+                ?session_name
+                ()))))
 ;;
 
 let sessions_json =
@@ -122,10 +162,10 @@ let partial =
   | _ -> assert false
 ;;
 
-let connected ?width ?height () =
+let connected ?width ?height ?model () =
   let h = H.create ?width ?height () in
   H.step ~quiet:true h Start;
-  H.reply ~quiet:true h Initial_state (state_json ());
+  H.reply ~quiet:true h Initial_state (state_json ?model ());
   H.reply
     ~quiet:true
     h
@@ -160,6 +200,8 @@ let%expect_test "startup: requests state, messages and auth; renders history" =
     (Rpc (method_ get_state) (params ()) (tag Initial_state))
     (Rpc (method_ get_messages) (params ()) (tag Initial_messages))
     (Rpc (method_ auth_status) (params ()) (tag Auth_refresh))
+    (Rpc (method_ get_config) (params ()) (tag Config))
+    (Rpc (method_ list_models) (params ()) (tag Models_catalog))
     Load_history
     |}];
   H.reply h Initial_state (state_json ());
@@ -176,7 +218,7 @@ let%expect_test "startup: requests state, messages and auth; renders history" =
     earlier answer
     ────────────────────────────────────────────────────────────
     > ▏
-    deepseek/deepseek-flash  thinking:off  view:normal  ctx:1.5…
+    …deepseek-flash  think:off  view:normal  ctx:0% 1.5k  $0.01
     |}]
 ;;
 
@@ -194,7 +236,7 @@ let%expect_test "prompt, streaming with embedded newlines, tool call, steer \
     earlier answer
     ────────────────────────────────────────────────────────────
     > list the files▏
-    deepseek/deepseek-flash  thinking:off  view:normal  ctx:1.5…
+    …deepseek-flash  think:off  view:normal  ctx:0% 1.5k  $0.01
     |}];
   H.enter h;
   [%expect
@@ -222,7 +264,7 @@ let%expect_test "prompt, streaming with embedded newlines, tool call, steer \
     first li
     ────────────────────────────────────────────────────────────
     > ▏
-    deepseek/deepseek-flash  thinking:off  view:normal  ctx:1.5…
+    …deepseek-flash  $0.01  ⠋ working (Esc aborts; Enter steers)
     |}];
   H.event h (Message_update { partial; delta = Text_delta "ne done" });
   H.event
@@ -244,7 +286,7 @@ let%expect_test "prompt, streaming with embedded newlines, tool call, steer \
       part
     ────────────────────────────────────────────────────────────
     > ▏
-    deepseek/deepseek-flash  thinking:off  view:normal  ctx:1.5…
+    …deepseek-flash  $0.01  ⠋ working (Esc aborts; Enter steers)
     |}];
   (* Steering while running is queued, not sent as a prompt. *)
   H.keys h "also count them";
@@ -282,7 +324,7 @@ let%expect_test "prompt, streaming with embedded newlines, tool call, steer \
       partial
     ────────────────────────────────────────────────────────────
     > ▏
-    deepseek/deepseek-flash  thinking:off  view:normal  ctx:1.5…
+    …deepseek-flash  think:off  view:normal  ctx:0% 1.5k  $0.01
     |}]
 ;;
 
@@ -308,7 +350,7 @@ let%expect_test "error and aborted stop reasons are surfaced once" =
     error: HTTP 401: not logged in; use /login anthropic
     ────────────────────────────────────────────────────────────
     > ▏
-    deepseek/deepseek-flash  thinking:off  view:normal  ctx:1.5…
+    …deepseek-flash  think:off  view:normal  ctx:0% 1.5k  $0.01
     |}]
 ;;
 
@@ -333,9 +375,9 @@ let%expect_test "/model opens the picker; typing filters; Enter sets the model" 
       Claude Fable 5       anthropic/claude-fable-5  ctx 1.0M  …
       Claude Fable 5.1     anthropic/claude-fable-5-1  ctx 1.0M…
       GPT-5.5              openai/gpt-5.5  ctx 1.0M  $10/$50 pe…
-    * DeepSeek V4.1 Flash  deepseek/deepseek-flash  ctx 1.0M  $…
+    * DeepSeek V4.1 Flash  deepseek/deepseek-flash ◆  ctx 1.0M …
     ────────────────────────────────────────────────────────────
-    deepseek/deepseek-flash  thinking:off  view:normal  ctx:1.5…
+    …deepseek-flash  think:off  view:normal  ctx:0% 1.5k  $0.01
     |}];
   H.keys h "fable";
   H.show h;
@@ -350,7 +392,7 @@ let%expect_test "/model opens the picker; typing filters; Enter sets the model" 
       Claude Fable 5    anthropic/claude-fable-5  ctx 1.0M  $10…
       Claude Fable 5.1  anthropic/claude-fable-5-1  ctx 1.0M  $…
     ────────────────────────────────────────────────────────────
-    deepseek/deepseek-flash  thinking:off  view:normal  ctx:1.5…
+    …deepseek-flash  think:off  view:normal  ctx:0% 1.5k  $0.01
     |}];
   H.key h (Key.plain Down);
   H.enter h;
@@ -380,7 +422,7 @@ let%expect_test "/model opens the picker; typing filters; Enter sets the model" 
     earlier answer
     ────────────────────────────────────────────────────────────
     > ▏
-    anthropic/claude-fable-5-1  thinking:off  view:normal  ctx:…
+    …claude-fable-5-1  think:off  ctx:0% 1.5k  $0.01
     |}]
 ;;
 
@@ -435,7 +477,7 @@ let%expect_test "/model <display name> switches directly; unknown suggests and \
     earlier answer
     ────────────────────────────────────────────────────────────
     > ▏
-    deepseek/deepseek-flash  thinking:off  view:normal  ctx:1.5…
+    …deepseek-flash  think:off  view:normal  ctx:0% 1.5k  $0.01
     |}];
   H.esc h;
   H.keys h "/model zzz";
@@ -453,7 +495,7 @@ let%expect_test "/model <display name> switches directly; unknown suggests and \
     / zzz▏
       no matches
     ────────────────────────────────────────────────────────────
-    deepseek/deepseek-flash  thinking:off  view:normal  ctx:1.5…
+    …deepseek-flash  think:off  view:normal  ctx:0% 1.5k  $0.01
     |}];
   H.esc h;
   (* A backend rejection (e.g. from another client's catalog) also recovers via
@@ -471,9 +513,9 @@ let%expect_test "/model <display name> switches directly; unknown suggests and \
       Claude Fable 5       anthropic/claude-fable-5  ctx 1.0M  …
       Claude Fable 5.1     anthropic/claude-fable-5-1  ctx 1.0M…
       GPT-5.5              openai/gpt-5.5  ctx 1.0M  $10/$50 pe…
-    * DeepSeek V4.1 Flash  deepseek/deepseek-flash  ctx 1.0M  $…
+    * DeepSeek V4.1 Flash  deepseek/deepseek-flash ◆  ctx 1.0M …
     ────────────────────────────────────────────────────────────
-    deepseek/deepseek-flash  thinking:off  view:normal  ctx:1.5…
+    …deepseek-flash  think:off  view:normal  ctx:0% 1.5k  $0.01
     |}]
 ;;
 
@@ -498,7 +540,7 @@ let%expect_test "Esc closes autocomplete or dialog without aborting; Esc while \
       low
       high
       max
-    deepseek/deepseek-flash  thinking:off  view:normal  ctx:1.5…
+    …deepseek-flash  ctx:0% 1.5k  Tab/Enter accept · Esc close
     |}];
   H.esc h;
   H.mode h;
@@ -521,7 +563,7 @@ let%expect_test "Esc closes autocomplete or dialog without aborting; Esc while \
     Log out of deepseek and delete its credential? (y/n)
     ────────────────────────────────────────────────────────────
     ? ▏
-    deepseek/deepseek-flash  thinking:off  view:normal  ctx:1.5…
+    /work  deepseek-flash  ctx:0% 1.5k  $0.01  confirm: y / n
     |}];
   H.event
     h
@@ -540,7 +582,7 @@ let%expect_test "Esc closes autocomplete or dialog without aborting; Esc while \
     cancelled
     ────────────────────────────────────────────────────────────
     > ▏
-    deepseek/deepseek-flash  thinking:off  view:normal  ctx:1.5…
+    …deepseek-flash  $0.01  ⠋ working (Esc aborts; Enter steers)
     |}];
   H.mode h;
   [%expect {| editing |}];
@@ -592,7 +634,7 @@ let%expect_test "login: url, masked secret prompt, answer, done switches \
     Paste your Anthropic API key
     ────────────────────────────────────────────────────────────
     ? *************▏
-    deepseek/deepseek-flash  thinking:off  view:normal  ctx:1.5…
+    …deepseek-flash  $0.01  login: Enter answers, Esc cancels
     |}];
   H.enter h;
   [%expect
@@ -635,7 +677,7 @@ let%expect_test "login: url, masked secret prompt, answer, done switches \
     model set to anthropic/claude-fable-5; /model to change
     ────────────────────────────────────────────────────────────
     > ▏
-    deepseek/deepseek-flash  thinking:off  view:normal  ctx:1.5…
+    …deepseek-flash  think:off  view:normal  ctx:0% 1.5k  $0.01
     |}]
 ;;
 
@@ -666,7 +708,7 @@ let%expect_test "login: select prompt is a picker; Esc cancels; backend \
       Claude Pro/Max  oauth
       API key         api_key
     ────────────────────────────────────────────────────────────
-    deepseek/deepseek-flash  thinking:off  view:normal  ctx:1.5…
+    …deepseek-flash  think:off  view:normal  ctx:0% 1.5k  $0.01
     |}];
   H.key h (Key.plain Down);
   H.enter h;
@@ -704,7 +746,7 @@ let%expect_test "login: select prompt is a picker; Esc cancels; backend \
     e.g. http://localhost:1455/callback?code=...
     ────────────────────────────────────────────────────────────
     > ▏
-    deepseek/deepseek-flash  thinking:off  view:normal  ctx:1.5…
+    …deepseek-flash  think:off  view:normal  ctx:0% 1.5k  $0.01
     |}];
   H.event h (Auth (Prompt { id = "p4"; prompt = Secret { message = "key" } }));
   H.mode h;
@@ -727,7 +769,7 @@ let%expect_test "login: select prompt is a picker; Esc cancels; backend \
     login to anthropic failed: denied
     ────────────────────────────────────────────────────────────
     > ▏
-    deepseek/deepseek-flash  thinking:off  view:normal  ctx:1.5…
+    …deepseek-flash  think:off  view:normal  ctx:0% 1.5k  $0.01
     |}]
 ;;
 
@@ -746,7 +788,7 @@ let%expect_test "Ctrl+C clears, then warns, then quits; never quits with a \
     earlier answer
     ────────────────────────────────────────────────────────────
     > ▏
-    deepseek/deepseek-flash  thinking:off  view:normal  ctx:1.5…
+    …deepseek-flash  think:off  view:normal  ctx:0% 1.5k  $0.01
     |}];
   H.key h (Key.ctrl 'c');
   H.show h;
@@ -759,7 +801,7 @@ let%expect_test "Ctrl+C clears, then warns, then quits; never quits with a \
     press Ctrl+C again to quit
     ────────────────────────────────────────────────────────────
     > ▏
-    deepseek/deepseek-flash  thinking:off  view:normal  ctx:1.5…
+    …deepseek-flash  ctx:0% 1.5k  $0.01  Ctrl+C again quits
     |}];
   H.keys h "x";
   H.key h (Key.ctrl 'c');
@@ -800,13 +842,13 @@ let%expect_test "typing / lists commands, Down twice + Tab fills /login " =
     > /▏
     ▸ /help                           show commands and keys
       /model [name|id|provider/id]    pick or switch the model
+      /scoped-models                  pick the models Ctrl+P cy…
       /login [provider] [api_key|oauth]  log in to a provider
       /logout [provider]              remove a provider's store…
       /thinking [off|on|low|high|max]  pick or set the thinking…
       /verbosity [quiet|normal|verbose]  set the transcript ver…
       /auth                           show which providers are …
-      /compact                        summarise older messages …
-    deepseek/deepseek-flash  thinking:off  view:normal  ctx:1.5…
+    …deepseek-flash  ctx:0% 1.5k  Tab/Enter accept · Esc close
     |}];
   H.key h (Key.plain Down);
   H.show h;
@@ -817,13 +859,13 @@ let%expect_test "typing / lists commands, Down twice + Tab fills /login " =
     > /▏
       /help                           show commands and keys
     ▸ /model [name|id|provider/id]    pick or switch the model
+      /scoped-models                  pick the models Ctrl+P cy…
       /login [provider] [api_key|oauth]  log in to a provider
       /logout [provider]              remove a provider's store…
       /thinking [off|on|low|high|max]  pick or set the thinking…
       /verbosity [quiet|normal|verbose]  set the transcript ver…
       /auth                           show which providers are …
-      /compact                        summarise older messages …
-    deepseek/deepseek-flash  thinking:off  view:normal  ctx:1.5…
+    …deepseek-flash  ctx:0% 1.5k  Tab/Enter accept · Esc close
     |}];
   H.key h (Key.plain Down);
   H.show h;
@@ -834,13 +876,13 @@ let%expect_test "typing / lists commands, Down twice + Tab fills /login " =
     > /▏
       /help                           show commands and keys
       /model [name|id|provider/id]    pick or switch the model
-    ▸ /login [provider] [api_key|oauth]  log in to a provider
+    ▸ /scoped-models                  pick the models Ctrl+P cy…
+      /login [provider] [api_key|oauth]  log in to a provider
       /logout [provider]              remove a provider's store…
       /thinking [off|on|low|high|max]  pick or set the thinking…
       /verbosity [quiet|normal|verbose]  set the transcript ver…
       /auth                           show which providers are …
-      /compact                        summarise older messages …
-    deepseek/deepseek-flash  thinking:off  view:normal  ctx:1.5…
+    …deepseek-flash  ctx:0% 1.5k  Tab/Enter accept · Esc close
     |}];
   H.key h (Key.plain Tab);
   H.show h;
@@ -851,8 +893,8 @@ let%expect_test "typing / lists commands, Down twice + Tab fills /login " =
     > earlier question
     earlier answer
     ────────────────────────────────────────────────────────────
-    > /login ▏
-    deepseek/deepseek-flash  thinking:off  view:normal  ctx:1.5…
+    > /scoped-models ▏
+    …deepseek-flash  think:off  view:normal  ctx:0% 1.5k  $0.01
     |}]
 ;;
 
@@ -877,7 +919,7 @@ let%expect_test "/mo Enter opens argument completion over models; typing fab \
       Claude Fable 5.1     anthropic/claude-fable-5-1
       GPT-5.5              openai/gpt-5.5
       DeepSeek V4.1 Flash  deepseek/deepseek-flash
-    deepseek/deepseek-flash  thinking:off  view:normal  ctx:1.5…
+    …deepseek-flash  ctx:0% 1.5k  Tab/Enter accept · Esc close
     |}];
   H.keys h "fab";
   H.show h;
@@ -891,7 +933,7 @@ let%expect_test "/mo Enter opens argument completion over models; typing fab \
     > /model fab▏
     ▸ Claude Fable 5    anthropic/claude-fable-5
       Claude Fable 5.1  anthropic/claude-fable-5-1
-    deepseek/deepseek-flash  thinking:off  view:normal  ctx:1.5…
+    …deepseek-flash  ctx:0% 1.5k  Tab/Enter accept · Esc close
     |}];
   H.key h (Key.plain Enter);
   [%expect
@@ -917,8 +959,9 @@ let%expect_test "Esc closes autocomplete without abort while running" =
     ────────────────────────────────────────────────────────────
     > /mo▏
     ▸ /model [name|id|provider/id]  pick or switch the model
+      /scoped-models                pick the models Ctrl+P cycl…
       /import [path]                import a session from a JSO…
-    deepseek/deepseek-flash  thinking:off  view:normal  ctx:1.5…
+    …deepseek-flash  ctx:0% 1.5k  Tab/Enter accept · Esc close
     |}];
   H.esc h;
   H.show h;
@@ -930,7 +973,7 @@ let%expect_test "Esc closes autocomplete without abort while running" =
     earlier answer
     ────────────────────────────────────────────────────────────
     > /mo▏
-    deepseek/deepseek-flash  thinking:off  view:normal  ctx:1.5…
+    …deepseek-flash  $0.01  ⠋ working (Esc aborts; Enter steers)
     |}];
   H.esc h;
   [%expect {| (Rpc (method_ abort) (params ()) (tag Abort_done)) |}]
@@ -957,7 +1000,7 @@ let%expect_test "@ completion is asynchronous and drops stale replies" =
     earlier answer
     ────────────────────────────────────────────────────────────
     > @src▏
-    deepseek/deepseek-flash  thinking:off  view:normal  ctx:1.5…
+    …deepseek-flash  ctx:0% 1.5k  Tab/Enter accept · Esc close
     |}];
   H.reply h (Paths_for_autocomplete "src") {|["src/","src/app.ml"]|};
   H.show h;
@@ -971,7 +1014,7 @@ let%expect_test "@ completion is asynchronous and drops stale replies" =
     > @src▏
     ▸ src/
       src/app.ml
-    deepseek/deepseek-flash  thinking:off  view:normal  ctx:1.5…
+    …deepseek-flash  ctx:0% 1.5k  Tab/Enter accept · Esc close
     |}]
 ;;
 
@@ -1019,7 +1062,7 @@ let%expect_test "/switch fetches sessions then reopens completion" =
     > /switch ▏
     ▸ fix the build please  /work
       (empty)               /other
-    deepseek/deepseek-flash  thinking:off  view:normal  ctx:1.5…
+    …deepseek-flash  ctx:0% 1.5k  Tab/Enter accept · Esc close
     |}]
 ;;
 
@@ -1039,7 +1082,7 @@ let%expect_test "/cd completes paths and submits the selected one" =
     > /cd sr▏
     ▸ src/
       src/app.ml
-    deepseek/deepseek-flash  thinking:off  view:normal  ctx:1.5…
+    …deepseek-flash  ctx:0% 1.5k  Tab/Enter accept · Esc close
     |}];
   H.key h (Key.plain Down);
   H.key h (Key.plain Enter);
@@ -1074,7 +1117,7 @@ let%expect_test "/sessions picker switches and reloads; /logout confirms" =
     * build fix ∣ 2025-06-01T10:00 ∣ 12 msgs ∣ fix the build pl…
       (unnamed) ∣ 2025-06-02T11:30 ∣ 0 msgs ∣ (empty)  /other
     ────────────────────────────────────────────────────────────
-    deepseek/deepseek-flash  thinking:off  view:normal  ctx:1.5…
+    …deepseek-flash  think:off  view:normal  ctx:0% 1.5k  $0.01
     |}];
   H.key h (Key.plain Down);
   H.enter h;
@@ -1102,7 +1145,7 @@ let%expect_test "/sessions picker switches and reloads; /logout confirms" =
     > in the other session
     ────────────────────────────────────────────────────────────
     > ▏
-    deepseek/deepseek-flash  thinking:off  view:normal  ctx:1.5…
+    …deepseek-flash  think:off  view:normal  ctx:0% 1.5k  $0.01
     |}];
   H.keys h "/logout deepseek";
   H.enter h;
@@ -1113,7 +1156,7 @@ let%expect_test "/sessions picker switches and reloads; /logout confirms" =
     Log out of deepseek and delete its credential? (y/n)
     ────────────────────────────────────────────────────────────
     ? ▏
-    deepseek/deepseek-flash  thinking:off  view:normal  ctx:1.5…
+    /work  deepseek-flash  ctx:0% 1.5k  $0.01  confirm: y / n
     |}];
   H.keys h "n";
   H.mode h;
@@ -1137,7 +1180,7 @@ let%expect_test "/sessions picker switches and reloads; /logout confirms" =
     / ▏
       DeepSeek  api_key via auth.json
     ────────────────────────────────────────────────────────────
-    deepseek/deepseek-flash  thinking:off  view:normal  ctx:1.5…
+    …deepseek-flash  think:off  view:normal  ctx:0% 1.5k  $0.01
     |}];
   H.enter h;
   H.keys h "y";
@@ -1170,7 +1213,7 @@ let%expect_test "/name sets the name directly or prompts in a text dialog" =
     session named
     ────────────────────────────────────────────────────────────
     > ▏
-    deepseek/deepseek-flash  name:my session  thinking:off  vie…
+    …deepseek-flash  think:off  view:normal  ctx:0% 1.5k  $0.01
     |}];
   H.keys h "/name";
   H.enter h;
@@ -1185,7 +1228,7 @@ let%expect_test "/name sets the name directly or prompts in a text dialog" =
     Session name
     ────────────────────────────────────────────────────────────
     ? ▏
-    deepseek/deepseek-flash  name:my session  thinking:off  vie…
+    …deepseek-flash  ctx:0% 1.5k  Enter submits, Esc cancels
     |}];
   H.keys h "renamed";
   H.enter h;
@@ -1221,7 +1264,7 @@ let%expect_test "/session prints the stats table" =
     duration       12.5s
     ────────────────────────────────────────────────────────────
     > ▏
-    deepseek/deepseek-flash  thinking:off  view:normal  ctx:1.5…
+    …deepseek-flash  think:off  view:normal  ctx:0% 1.5k  $0.01
     |}]
 ;;
 
@@ -1246,7 +1289,7 @@ let%expect_test "/sessions Ctrl+N filters named only; Ctrl+D confirms delete" =
     / ▏
     * build fix ∣ 2025-06-01T10:00 ∣ 12 msgs ∣ fix the build pl…
     ────────────────────────────────────────────────────────────
-    deepseek/deepseek-flash  thinking:off  view:normal  ctx:1.5…
+    …deepseek-flash  think:off  view:normal  ctx:0% 1.5k  $0.01
     |}];
   H.key h (Key.ctrl 'n');
   H.key h (Key.ctrl 'd');
@@ -1260,7 +1303,7 @@ let%expect_test "/sessions Ctrl+N filters named only; Ctrl+D confirms delete" =
     Delete session build fix? (y/n)
     ────────────────────────────────────────────────────────────
     ? ▏
-    deepseek/deepseek-flash  thinking:off  view:normal  ctx:1.5…
+    /work  deepseek-flash  ctx:0% 1.5k  $0.01  confirm: y / n
     |}];
   H.keys h "y";
   [%expect
@@ -1301,7 +1344,7 @@ let%expect_test "/fork picks a user message, forks at it and prefills the \
       first question   #1
     * second question  #2
     ────────────────────────────────────────────────────────────
-    deepseek/deepseek-flash  thinking:off  view:normal  ctx:1.5…
+    …deepseek-flash  think:off  view:normal  ctx:0% 1.5k  $0.01
     |}];
   H.enter h;
   [%expect {| (Rpc (method_ fork) (params ((at u2))) (tag Reload_messages)) |}];
@@ -1315,7 +1358,7 @@ let%expect_test "/fork picks a user message, forks at it and prefills the \
     ────────────────────────────────────────────────────────────
     > second question
       more▏
-    deepseek/deepseek-flash  thinking:off  view:normal  ctx:1.5…
+    …deepseek-flash  think:off  view:normal  ctx:0% 1.5k  $0.01
     |}]
 ;;
 
@@ -1339,7 +1382,7 @@ let%expect_test "/rewind picks a user message, then confirms the rewind" =
       first question   #1
     * second question  #2
     ────────────────────────────────────────────────────────────
-    deepseek/deepseek-flash  thinking:off  view:normal  ctx:1.5…
+    …deepseek-flash  think:off  view:normal  ctx:0% 1.5k  $0.01
     |}];
   H.enter h;
   H.show h;
@@ -1352,7 +1395,7 @@ let%expect_test "/rewind picks a user message, then confirms the rewind" =
     Rewind to "second question"? Later messages are abandoned (…
     ────────────────────────────────────────────────────────────
     ? ▏
-    deepseek/deepseek-flash  thinking:off  view:normal  ctx:1.5…
+    /work  deepseek-flash  ctx:0% 1.5k  $0.01  confirm: y / n
     |}];
   H.keys h "y";
   [%expect
@@ -1380,7 +1423,7 @@ let%expect_test "/tree renders branches with the active path marked" =
         · branch answer
           ⚙ branch tool
     ────────────────────────────────────────────────────────────
-    deepseek/deepseek-flash  thinking:off  view:normal  ctx:1.5…
+    …deepseek-flash  think:off  view:normal  ctx:0% 1.5k  $0.01
     |}];
   H.key h (Key.plain Down);
   H.key h (Key.plain Down);
@@ -1414,7 +1457,7 @@ let%expect_test "/clone reloads and notices" =
     cloned session
     ────────────────────────────────────────────────────────────
     > ▏
-    deepseek/deepseek-flash  thinking:off  view:normal  ctx:1.5…
+    …deepseek-flash  think:off  view:normal  ctx:0% 1.5k  $0.01
     |}]
 ;;
 
@@ -1462,7 +1505,7 @@ let%expect_test "/export chooses jsonl by extension, or prompts for a path" =
     Export to
     ────────────────────────────────────────────────────────────
     ? ▏
-    deepseek/deepseek-flash  thinking:off  view:normal  ctx:1.5…
+    …deepseek-flash  ctx:0% 1.5k  Enter submits, Esc cancels
     |}];
   H.step h (Intent (Insert "out.md"));
   H.enter h;
@@ -1503,7 +1546,7 @@ let%expect_test "/import imports a path or prompts for one" =
     Import from
     ────────────────────────────────────────────────────────────
     ? ▏
-    deepseek/deepseek-flash  thinking:off  view:normal  ctx:1.5…
+    …deepseek-flash  ctx:0% 1.5k  Enter submits, Esc cancels
     |}];
   H.step h (Intent (Insert "other.jsonl"));
   H.enter h;
@@ -1540,7 +1583,7 @@ let%expect_test "/cd changes the directory or prompts for a path" =
     Change directory to
     ────────────────────────────────────────────────────────────
     ? ▏
-    deepseek/deepseek-flash  thinking:off  view:normal  ctx:1.5…
+    …deepseek-flash  ctx:0% 1.5k  Enter submits, Esc cancels
     |}];
   H.step h (Intent (Insert "/tmp"));
   H.enter h;
@@ -1577,7 +1620,7 @@ let%expect_test "/auth, /help, /state, /clear, unknown method errors" =
     deepseek   logged in via auth.json  [api_key (API key)]
     ────────────────────────────────────────────────────────────
     > ▏
-    deepseek/deepseek-flash  thinking:off  view:normal  ctx:1.5…
+    …deepseek-flash  think:off  view:normal  ctx:0% 1.5k  $0.01
     |}];
   H.keys h "/clear";
   H.enter h;
@@ -1586,12 +1629,12 @@ let%expect_test "/auth, /help, /state, /clear, unknown method errors" =
   H.show h;
   [%expect
     {|
-    Ctrl+O                  cycle transcript verbosity
-    Ctrl+R                  complete a file path at the cursor
-    Ctrl+G                  edit the prompt in $EDITOR
-    Ctrl+L                  pick a model
-    Ctrl+N                  sessions picker: toggle the
-    named-only filter
+    Ctrl+P                  cycle to the next scoped model
+    (Shift+Ctrl+P is unavailable; Alt+P goes back)
+    Alt+P                   cycle to the previous scoped model
+    Ctrl+T                  cycle the thinking level
+    Ctrl+N                  picker: toggle the named-only /
+    logged-in-only filter
     Ctrl+X                  copy the last assistant message
     Ctrl+Z                  suspend to the shell
     Shift+Tab               cycle focus: main → agent 1 → … →
@@ -1601,7 +1644,7 @@ let%expect_test "/auth, /help, /state, /clear, unknown method errors" =
     Ctrl+D                  quit
     ────────────────────────────────────────────────────────────
     > ▏
-    deepseek/deepseek-flash  thinking:off  view:normal  ctx:1.5…
+    …deepseek-flash  think:off  view:normal  ctx:0% 1.5k  $0.01
     |}];
   H.key h (Key.ctrl 'l');
   H.reply_error h Show_error "unknown method \"bogus\"";
@@ -1611,9 +1654,9 @@ let%expect_test "/auth, /help, /state, /clear, unknown method errors" =
   [%expect
     {|
     (Rpc (method_ list_models) (params ()) (tag (Models_for_picker "")))
-    Ctrl+L                  pick a model
-    Ctrl+N                  sessions picker: toggle the
-    named-only filter
+    Ctrl+T                  cycle the thinking level
+    Ctrl+N                  picker: toggle the named-only /
+    logged-in-only filter
     Ctrl+X                  copy the last assistant message
     Ctrl+Z                  suspend to the shell
     Shift+Tab               cycle focus: main → agent 1 → … →
@@ -1626,7 +1669,7 @@ let%expect_test "/auth, /help, /state, /clear, unknown method errors" =
     backend: warning from backend
     ────────────────────────────────────────────────────────────
     > ▏
-    deepseek/deepseek-flash  thinking:off  view:normal  ctx:1.5…
+    …deepseek-flash  think:off  view:normal  ctx:0% 1.5k  $0.01
     |}]
 ;;
 
@@ -1666,7 +1709,7 @@ let%expect_test "verbosity cycles Normal / Verbose / Quiet; /verbosity sets it" 
     all done
     ────────────────────────────────────────────────────────────
     > ▏
-    deepseek/deepseek-flash  thinking:off  view:normal  ctx:1.5…
+    …deepseek-flash  think:off  view:normal  ctx:0% 1.5k  $0.01
     |}];
   H.key h (Key.ctrl 'o');
   H.show h;
@@ -1685,7 +1728,7 @@ let%expect_test "verbosity cycles Normal / Verbose / Quiet; /verbosity sets it" 
     view: verbose — everything is shown
     ────────────────────────────────────────────────────────────
     > ▏
-    deepseek/deepseek-flash  thinking:off  view:verbose  ctx:1.…
+    …deepseek-flash  think:off  view:verbose  ctx:0% 1.5k  $0.01
     |}];
   H.key h (Key.ctrl 'o');
   H.show h;
@@ -1698,7 +1741,7 @@ let%expect_test "verbosity cycles Normal / Verbose / Quiet; /verbosity sets it" 
     all done
     ────────────────────────────────────────────────────────────
     > ▏
-    deepseek/deepseek-flash  thinking:off  view:quiet  ctx:1.5k…
+    …deepseek-flash  think:off  view:quiet  ctx:0% 1.5k  $0.01
     |}];
   H.keys h "/verbosity normal";
   H.enter h;
@@ -1718,7 +1761,7 @@ let%expect_test "verbosity cycles Normal / Verbose / Quiet; /verbosity sets it" 
     view: normal — tool output is summarised
     ────────────────────────────────────────────────────────────
     > ▏
-    deepseek/deepseek-flash  thinking:off  view:normal  ctx:1.5…
+    …deepseek-flash  think:off  view:normal  ctx:0% 1.5k  $0.01
     |}]
 ;;
 
@@ -1738,7 +1781,7 @@ let%expect_test "/verbosity with no argument opens argument completion" =
     ▸ Quiet
       Normal
       Verbose
-    deepseek/deepseek-flash  thinking:off  view:normal  ctx:1.5…
+    …deepseek-flash  ctx:0% 1.5k  Tab/Enter accept · Esc close
     |}];
   H.key h (Key.plain Down);
   H.key h (Key.plain Down);
@@ -1753,7 +1796,7 @@ let%expect_test "/verbosity with no argument opens argument completion" =
     view: verbose — everything is shown
     ────────────────────────────────────────────────────────────
     > ▏
-    deepseek/deepseek-flash  thinking:off  view:verbose  ctx:1.…
+    …deepseek-flash  think:off  view:verbose  ctx:0% 1.5k  $0.01
     |}]
 ;;
 
@@ -1787,7 +1830,7 @@ let%expect_test "quiet hides intermediate text and thinking" =
     all done
     ────────────────────────────────────────────────────────────
     > ▏
-    deepseek/deepseek-flash  thinking:off  view:quiet  ctx:1.5k…
+    …deepseek-flash  think:off  view:quiet  ctx:0% 1.5k  $0.01
     |}]
 ;;
 
@@ -1818,7 +1861,7 @@ let%expect_test "tool error is always visible in Quiet" =
       third line
     ────────────────────────────────────────────────────────────
     > ▏
-    deepseek/deepseek-flash  thinking:off  view:quiet  ctx:1.5k…
+    …deepseek-flash  think:off  view:quiet  ctx:0% 1.5k  $0.01
     |}]
 ;;
 
@@ -1848,7 +1891,7 @@ let%expect_test "reload pairs tool calls with their results" =
     ⚙ bash ls ✓ 2 lines
     ────────────────────────────────────────────────────────────
     > ▏
-    deepseek/deepseek-flash  thinking:off  view:quiet  ctx:1.5k…
+    …deepseek-flash  think:off  view:quiet  ctx:0% 1.5k  $0.01
     |}]
 ;;
 
@@ -1874,7 +1917,7 @@ let%expect_test "resize mid-stream re-wraps without losing lines" =
     second
     ────────────────────────────────────────────────────────────
     > ▏
-    deepseek/deepseek-flash  thinking:off  view:normal  ctx:1.5…
+    …deepseek-flash  $0.01  ⠋ working (Esc aborts; Enter steers)
     |}];
   H.step h (Resize { width = 30; height = 8 });
   H.show h;
@@ -1887,7 +1930,7 @@ let%expect_test "resize mid-stream re-wraps without losing lines" =
     second
     ──────────────────────────────
     > ▏
-    deepseek/deepseek-flash  thin…
+    …deepseek-flash  ctx:0% 1.5k
     |}];
   H.step h (Resize { width = 60; height = 8 });
   H.event h (Message_update { partial; delta = Text_delta " part" });
@@ -1901,7 +1944,7 @@ let%expect_test "resize mid-stream re-wraps without losing lines" =
     second part
     ────────────────────────────────────────────────────────────
     > ▏
-    deepseek/deepseek-flash  thinking:off  view:normal  ctx:1.5…
+    …deepseek-flash  $0.01  ⠋ working (Esc aborts; Enter steers)
     |}]
 ;;
 
@@ -1923,7 +1966,7 @@ let%expect_test "multi-line editing: Alt+J, cursor movement, history" =
     ────────────────────────────────────────────────────────────
     > f▏rst line
       second
-    deepseek/deepseek-flash  thinking:off  view:normal  ctx:1.5…
+    …deepseek-flash  think:off  view:normal  ctx:0% 1.5k  $0.01
     |}];
   H.key h (Key.plain Down);
   H.key h (Key.plain Down);
@@ -1944,7 +1987,7 @@ let%expect_test "multi-line editing: Alt+J, cursor movement, history" =
     ────────────────────────────────────────────────────────────
     > first line
       second▏
-    deepseek/deepseek-flash  thinking:off  view:normal  ctx:1.5…
+    …deepseek-flash  think:off  view:normal  ctx:0% 1.5k  $0.01
     |}];
   H.key h (Key.plain Down);
   H.show h;
@@ -1956,7 +1999,7 @@ let%expect_test "multi-line editing: Alt+J, cursor movement, history" =
     earlier answer
     ────────────────────────────────────────────────────────────
     > ▏
-    deepseek/deepseek-flash  thinking:off  view:normal  ctx:1.5…
+    …deepseek-flash  think:off  view:normal  ctx:0% 1.5k  $0.01
     |}];
   (* Pasted text with newlines goes in as one insert. *)
   H.step h (Intent (Insert "a\nb\nc"));
@@ -1971,7 +2014,7 @@ let%expect_test "multi-line editing: Alt+J, cursor movement, history" =
     > a
       b
       c▏
-    deepseek/deepseek-flash  thinking:off  view:normal  ctx:1.5…
+    …deepseek-flash  think:off  view:normal  ctx:0% 1.5k  $0.01
     |}]
 ;;
 
@@ -2011,7 +2054,7 @@ let%expect_test "abort restores queued messages" =
     ────────────────────────────────────────────────────────────────────────────────────────────────────
     queued (2): first ∣ second
     > ▏
-    deepseek/deepseek-flash  thinking:off  view:normal  ctx:1.5k (0%)  in:1.2k out:300  $0.0123  queued…
+    /work  deepseek-flash  think:off  ctx:0% 1.5k  $0.01  queued:2  ⠋ working (Esc aborts; Enter steers)
     |}];
   H.esc h;
   [%expect {| (Rpc (method_ abort) (params ()) (tag Abort_done)) |}];
@@ -2028,7 +2071,7 @@ let%expect_test "abort restores queued messages" =
     > first
 
       second▏
-    deepseek/deepseek-flash  thinking:off  view:normal  ctx:1.5k (0%)  in:1.2k out:300  $0.0123  queued…
+    /work  deepseek-flash  think:off  ctx:0% 1.5k  $0.01  queued:2  ⠋ working (Esc aborts; Enter steers)
     |}];
   H.event h (Queue_update { steer = 0; follow_up = 0 });
   H.show h;
@@ -2042,7 +2085,7 @@ let%expect_test "abort restores queued messages" =
     > first
 
       second▏
-    deepseek/deepseek-flash  thinking:off  view:normal  ctx:1.5k (0%)  in:1.2k out:300  $0.0123  ⠋ work…
+    …deepseek-flash  think:off  view:normal  ctx:0% 1.5k  $0.01  ⠋ working (Esc aborts; Enter steers)
     |}]
 ;;
 
@@ -2075,7 +2118,7 @@ let%expect_test "scroll stays anchored while streaming" =
     line 11
     ────────────────────────────────────────────────────────────────────────────────────────────────────
     > ▏
-    deepseek/deepseek-flash  thinking:off  view:normal  ctx:1.5k (0%)  in:1.2k out:300  $0.0123
+    /work  deepseek-flash  think:off  view:normal  ctx:0% 1.5k  $0.01
     |}];
   H.key h (Key.plain Page_up);
   H.show h;
@@ -2090,7 +2133,7 @@ let%expect_test "scroll stays anchored while streaming" =
     line 6
     ────────────────────────────────────────────────────────────────────────────────────────────────────
     > ▏
-    deepseek/deepseek-flash  thinking:off  view:normal  ctx:1.5k (0%)  in:1.2k out:300  $0.0123
+    /work  deepseek-flash  think:off  view:normal  ctx:0% 1.5k  $0.01
     |}];
   stream 12 10;
   H.show h;
@@ -2105,7 +2148,7 @@ let%expect_test "scroll stays anchored while streaming" =
     line 6
     ────────────────────────────────────────────────────────────────────────────────────────────────────
     > ▏
-    deepseek/deepseek-flash  thinking:off  view:normal  ctx:1.5k (0%)  in:1.2k out:300  $0.0123  ↓ 10 n…
+    /work  deepseek-flash  think:off  view:normal  ctx:0% 1.5k  $0.01  ↓ 10 new
     |}];
   H.show h;
   [%expect
@@ -2119,7 +2162,7 @@ let%expect_test "scroll stays anchored while streaming" =
     line 6
     ────────────────────────────────────────────────────────────────────────────────────────────────────
     > ▏
-    deepseek/deepseek-flash  thinking:off  view:normal  ctx:1.5k (0%)  in:1.2k out:300  $0.0123  ↓ 10 n…
+    /work  deepseek-flash  think:off  view:normal  ctx:0% 1.5k  $0.01  ↓ 10 new
     |}];
   H.key h (Key.plain End);
   H.show h;
@@ -2134,7 +2177,7 @@ let%expect_test "scroll stays anchored while streaming" =
     line 21
     ────────────────────────────────────────────────────────────────────────────────────────────────────
     > ▏
-    deepseek/deepseek-flash  thinking:off  view:normal  ctx:1.5k (0%)  in:1.2k out:300  $0.0123
+    /work  deepseek-flash  think:off  view:normal  ctx:0% 1.5k  $0.01
     |}]
 ;;
 
@@ -2161,7 +2204,7 @@ let%expect_test "page_down past the bottom returns to follow" =
     line 14
     ────────────────────────────────────────────────────────────────────────────────────────────────────
     > ▏
-    deepseek/deepseek-flash  thinking:off  view:normal  ctx:1.5k (0%)  in:1.2k out:300  $0.0123
+    /work  deepseek-flash  think:off  view:normal  ctx:0% 1.5k  $0.01
     |}];
   H.key h (Key.plain Page_up);
   H.show h;
@@ -2176,7 +2219,7 @@ let%expect_test "page_down past the bottom returns to follow" =
     line 9
     ────────────────────────────────────────────────────────────────────────────────────────────────────
     > ▏
-    deepseek/deepseek-flash  thinking:off  view:normal  ctx:1.5k (0%)  in:1.2k out:300  $0.0123
+    /work  deepseek-flash  think:off  view:normal  ctx:0% 1.5k  $0.01
     |}];
   H.key h (Key.plain Page_down);
   H.show h;
@@ -2191,7 +2234,7 @@ let%expect_test "page_down past the bottom returns to follow" =
     line 14
     ────────────────────────────────────────────────────────────────────────────────────────────────────
     > ▏
-    deepseek/deepseek-flash  thinking:off  view:normal  ctx:1.5k (0%)  in:1.2k out:300  $0.0123
+    /work  deepseek-flash  think:off  view:normal  ctx:0% 1.5k  $0.01
     |}];
   H.key h (Key.plain Page_down);
   H.show h;
@@ -2206,7 +2249,7 @@ let%expect_test "page_down past the bottom returns to follow" =
     line 19
     ────────────────────────────────────────────────────────────────────────────────────────────────────
     > ▏
-    deepseek/deepseek-flash  thinking:off  view:normal  ctx:1.5k (0%)  in:1.2k out:300  $0.0123
+    /work  deepseek-flash  think:off  view:normal  ctx:0% 1.5k  $0.01
     |}]
 ;;
 
@@ -2237,7 +2280,7 @@ let%expect_test "home/end with text in the editor move the cursor, not the \
     line 14
     ────────────────────────────────────────────────────────────────────────────────────────────────────
     > draft▏
-    deepseek/deepseek-flash  thinking:off  view:normal  ctx:1.5k (0%)  in:1.2k out:300  $0.0123
+    /work  deepseek-flash  think:off  view:normal  ctx:0% 1.5k  $0.01
     |}];
   H.key h (Key.plain Home);
   H.show h;
@@ -2252,7 +2295,7 @@ let%expect_test "home/end with text in the editor move the cursor, not the \
     line 14
     ────────────────────────────────────────────────────────────────────────────────────────────────────
     > ▏raft
-    deepseek/deepseek-flash  thinking:off  view:normal  ctx:1.5k (0%)  in:1.2k out:300  $0.0123
+    /work  deepseek-flash  think:off  view:normal  ctx:0% 1.5k  $0.01
     |}]
 ;;
 
@@ -2281,7 +2324,7 @@ let%expect_test "abort restore is singular, prepends, and tolerates no field" =
     > queued
 
       draft▏
-    deepseek/deepseek-flash  thinking:off  view:normal  ctx:1.5k (0%)  in:1.2k out:300  $0.0123  queued…
+    /work  deepseek-flash  think:off  ctx:0% 1.5k  $0.01  queued:1  ⠋ working (Esc aborts; Enter steers)
     |}];
   H.reply h Abort_done {|{}|};
   H.show h;
@@ -2296,7 +2339,7 @@ let%expect_test "abort restore is singular, prepends, and tolerates no field" =
     > queued
 
       draft▏
-    deepseek/deepseek-flash  thinking:off  view:normal  ctx:1.5k (0%)  in:1.2k out:300  $0.0123  queued…
+    /work  deepseek-flash  think:off  ctx:0% 1.5k  $0.01  queued:1  ⠋ working (Esc aborts; Enter steers)
     |}]
 ;;
 
@@ -2417,8 +2460,7 @@ let%expect_test "two parallel subagents: strip, live tails, focus cycling, Esc" 
       all tests pass
     ────────────────────────────────────────────────────────────────────────────────
     > ▏
-    agents: [main] 1⠋ 2✓  (Shift+Tab)
-    deepseek/deepseek-flash  thinking:off  view:normal  ctx:1.5k (0%)  in:1.2k out:…
+    /work  deepseek-flash  ctx:0% 1.5k  $0.01  ⠋ working (Esc aborts; Enter steers)
     |}];
   H.next_agent h;
   H.show h;
@@ -2436,12 +2478,12 @@ let%expect_test "two parallel subagents: strip, live tails, focus cycling, Esc" 
 
 
 
+
     > find all auth code in the repository
     ⚙ bash command=grep -r auth src
     ────────────────────────────────────────────────────────────────────────────────
     > ▏
-    agents: main [1⠋] 2✓  (Shift+Tab)
-    deepseek/deepseek-flash  thinking:off  view:normal  ctx:1.5k (0%)  in:1.2k out:…
+    /work  deepseek-flash  ctx:0% 1.5k  $0.01  ⠋ working (Esc aborts; Enter steers)
     |}];
   H.next_agent h;
   H.show h;
@@ -2459,12 +2501,12 @@ let%expect_test "two parallel subagents: strip, live tails, focus cycling, Esc" 
 
 
 
+
     ⚙ bash command=dune runtest
     all tests pass
     ────────────────────────────────────────────────────────────────────────────────
     > ▏
-    agents: main 1⠋ [2✓]  (Shift+Tab)
-    deepseek/deepseek-flash  thinking:off  view:normal  ctx:1.5k (0%)  in:1.2k out:…
+    /work  deepseek-flash  ctx:0% 1.5k  $0.01  ⠋ working (Esc aborts; Enter steers)
     |}];
   H.next_agent h;
   H.show h;
@@ -2480,8 +2522,7 @@ let%expect_test "two parallel subagents: strip, live tails, focus cycling, Esc" 
       all tests pass
     ────────────────────────────────────────────────────────────────────────────────
     > ▏
-    agents: [main] 1⠋ 2✓  (Shift+Tab)
-    deepseek/deepseek-flash  thinking:off  view:normal  ctx:1.5k (0%)  in:1.2k out:…
+    /work  deepseek-flash  ctx:0% 1.5k  $0.01  ⠋ working (Esc aborts; Enter steers)
     |}];
   H.focus_agent h 2;
   H.show h;
@@ -2499,12 +2540,12 @@ let%expect_test "two parallel subagents: strip, live tails, focus cycling, Esc" 
 
 
 
+
     ⚙ bash command=dune runtest
     all tests pass
     ────────────────────────────────────────────────────────────────────────────────
     > ▏
-    agents: main 1⠋ [2✓]  (Shift+Tab)
-    deepseek/deepseek-flash  thinking:off  view:normal  ctx:1.5k (0%)  in:1.2k out:…
+    /work  deepseek-flash  ctx:0% 1.5k  $0.01  ⠋ working (Esc aborts; Enter steers)
     |}];
   H.esc h;
   H.show h;
@@ -2520,8 +2561,7 @@ let%expect_test "two parallel subagents: strip, live tails, focus cycling, Esc" 
       all tests pass
     ────────────────────────────────────────────────────────────────────────────────
     > ▏
-    agents: [main] 1⠋ 2✓  (Shift+Tab)
-    deepseek/deepseek-flash  thinking:off  view:normal  ctx:1.5k (0%)  in:1.2k out:…
+    /work  deepseek-flash  ctx:0% 1.5k  $0.01  ⠋ working (Esc aborts; Enter steers)
     |}]
 ;;
 
@@ -2574,6 +2614,7 @@ let%expect_test "verbosity applies inside an agent view" =
 
 
 
+
     ⚙ bash command=ls
       line 0
       line 1
@@ -2583,14 +2624,14 @@ let%expect_test "verbosity applies inside an agent view" =
       … (3 more)
     ──────────────────────────────────────────────────────────────────────
     > ▏
-    agents: main [1⠋]  (Shift+Tab)
-    deepseek/deepseek-flash  thinking:off  view:normal  ctx:1.5k (0%)  in…
+    …deepseek-flash  ctx:0% 1.5k  ⠋ working (Esc aborts; Enter steers)
     |}];
   H.key h (Key.ctrl 'o');
   H.show h;
   [%expect
     {|
     ◆ subagent 1/1  claude-haiku  ⠋ running 1 turns  "audit"
+    ⚙ bash
       {
         command: "ls"
       }
@@ -2604,8 +2645,7 @@ let%expect_test "verbosity applies inside an agent view" =
       line 7
     ──────────────────────────────────────────────────────────────────────
     > ▏
-    agents: main [1⠋]  (Shift+Tab)
-    deepseek/deepseek-flash  thinking:off  view:verbose  ctx:1.5k (0%)  i…
+    …deepseek-flash  ctx:0% 1.5k  ⠋ working (Esc aborts; Enter steers)
     |}]
 ;;
 
@@ -2654,8 +2694,7 @@ let%expect_test "/agents picker lists task, status and model; Enter focuses" =
       find auth  running  claude-haiku
       run tests  done 3 turns $0.02  claude-sonnet
     ──────────────────────────────────────────────────────────────────────
-    agents: [main] 1⠋ 2✓  (Shift+Tab)
-    deepseek/deepseek-flash  thinking:off  view:normal  ctx:1.5k (0%)  in…
+    …deepseek-flash  picker: type to filter, Enter selects, Esc closes
     |}];
   H.enter h;
   H.show h;
@@ -2673,10 +2712,10 @@ let%expect_test "/agents picker lists task, status and model; Enter focuses" =
 
 
 
+
     ──────────────────────────────────────────────────────────────────────
     > ▏
-    agents: main [1⠋] 2✓  (Shift+Tab)
-    deepseek/deepseek-flash  thinking:off  view:normal  ctx:1.5k (0%)  in…
+    …deepseek-flash  ctx:0% 1.5k  ⠋ working (Esc aborts; Enter steers)
     |}]
 ;;
 
@@ -2712,8 +2751,7 @@ let%expect_test "new user prompt clears finished agents" =
     earlier answer
     ──────────────────────────────────────────────────────────────────────
     > ▏
-    agents: [main] 1✓  (Shift+Tab)
-    deepseek/deepseek-flash  thinking:off  view:normal  ctx:1.5k (0%)  in…
+    /work  deepseek-flash  think:off  ctx:0% 1.5k  $0.01  agents:[main] 1✓
     |}];
   H.keys h "next task";
   H.enter h;
@@ -2731,7 +2769,7 @@ let%expect_test "new user prompt clears finished agents" =
     earlier answer
     ──────────────────────────────────────────────────────────────────────
     > ▏
-    deepseek/deepseek-flash  thinking:off  view:normal  ctx:1.5k (0%)  in…
+    /work  deepseek-flash  think:off  view:normal  ctx:0% 1.5k  $0.01
     |}]
 ;;
 
@@ -2771,10 +2809,10 @@ let%expect_test "session reload drops subagent transcripts and focus" =
 
 
 
+
     ──────────────────────────────────────────────────────────────────────
     > ▏
-    agents: main [1✓]  (Shift+Tab)
-    deepseek/deepseek-flash  thinking:off  view:normal  ctx:1.5k (0%)  in…
+    …deepseek-flash  ctx:0% 1.5k  ⠋ working (Esc aborts; Enter steers)
     |}];
   H.reply h Reload_messages {|{}|};
   H.reply
@@ -2795,7 +2833,7 @@ let%expect_test "session reload drops subagent transcripts and focus" =
       report
     ──────────────────────────────────────────────────────────────────────
     > ▏
-    deepseek/deepseek-flash  thinking:off  view:normal  ctx:1.5k (0%)  in…
+    …deepseek-flash  ctx:0% 1.5k  ⠋ working (Esc aborts; Enter steers)
     |}]
 ;;
 
@@ -2888,12 +2926,12 @@ let%expect_test "nested subagent events recurse into the parent's children" =
 
 
 
+
     ⚙ subagent "inner task" ✓ 1 turns $0.00
       inner done
     ──────────────────────────────────────────────────────────────────────
     > ▏
-    agents: main [1⠋]  (Shift+Tab)
-    deepseek/deepseek-flash  thinking:off  view:normal  ctx:1.5k (0%)  in…
+    …deepseek-flash  ctx:0% 1.5k  ⠋ working (Esc aborts; Enter steers)
     |}]
 ;;
 
@@ -2917,7 +2955,7 @@ let%expect_test "Alt+Enter queues a follow-up; queued block and status" =
     ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
     queued (1): after this
     > ▏
-    deepseek/deepseek-flash  thinking:off  view:normal  ctx:1.5k (0%)  in:1.2k out:300  $0.0123  queued:1  ⠋ working (Esc aborts; Enter steers)
+    /work  deepseek-flash  think:off  view:normal  ctx:0% 1.5k  $0.01  queued:1  ⠋ working (Esc aborts; Enter steers)
     |}];
   H.keys h "and more";
   H.key h (Key.alt Enter);
@@ -2936,7 +2974,7 @@ let%expect_test "Alt+Enter queues a follow-up; queued block and status" =
     ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
     queued (2): after this ∣ and more
     > ▏
-    deepseek/deepseek-flash  thinking:off  view:normal  ctx:1.5k (0%)  in:1.2k out:300  $0.0123  queued:2  ⠋ working (Esc aborts; Enter steers)
+    /work  deepseek-flash  think:off  view:normal  ctx:0% 1.5k  $0.01  queued:2  ⠋ working (Esc aborts; Enter steers)
     |}]
 ;;
 
@@ -2966,7 +3004,7 @@ let%expect_test "Alt+Up dequeues the last queued message into the editor" =
     > queued text
 
       draft▏
-    deepseek/deepseek-flash  thinking:off  view:normal  ctx:1.5k (0%)  in:1.2k out:300  $0.0123  queued…
+    /work  deepseek-flash  think:off  ctx:0% 1.5k  $0.01  queued:1  ⠋ working (Esc aborts; Enter steers)
     |}];
   H.event h (Queue_update { steer = 0; follow_up = 0 });
   H.key h (Key.alt Key.Code.Up);
@@ -2983,7 +3021,7 @@ let%expect_test "Alt+Up dequeues the last queued message into the editor" =
     > queued text
 
       draft▏
-    deepseek/deepseek-flash  thinking:off  view:normal  ctx:1.5k (0%)  in:1.2k out:300  $0.0123  ⠋ work…
+    …deepseek-flash  think:off  view:normal  ctx:0% 1.5k  $0.01  ⠋ working (Esc aborts; Enter steers)
     |}]
 ;;
 
@@ -3017,7 +3055,7 @@ let%expect_test "inline bash: !cmd adds to context, !!cmd does not" =
       b.ml
     ────────────────────────────────────────────────────────────────────────────────────────────────────
     > ▏
-    deepseek/deepseek-flash  thinking:off  view:normal  ctx:1.5k (0%)  in:1.2k out:300  $0.0123
+    /work  deepseek-flash  think:off  view:normal  ctx:0% 1.5k  $0.01
     |}];
   H.keys h "!!pwd";
   H.enter h;
@@ -3049,7 +3087,7 @@ let%expect_test "inline bash: !cmd adds to context, !!cmd does not" =
     wait for the current turn
     ────────────────────────────────────────────────────────────────────────────────────────────────────
     > ▏
-    deepseek/deepseek-flash  thinking:off  view:normal  ctx:1.5k (0%)  in:1.2k out:300  $0.0123  ⠋ work…
+    …deepseek-flash  think:off  view:normal  ctx:0% 1.5k  $0.01  ⠋ working (Esc aborts; Enter steers)
     |}]
 ;;
 
@@ -3064,7 +3102,7 @@ let%expect_test "bracketed paste renders a chip until the cursor enters it" =
     earlier answer
     ────────────────────────────────────────────────────────────────────────────────
     > ▏4 lines pasted]
-    deepseek/deepseek-flash  thinking:off  view:normal  ctx:1.5k (0%)  in:1.2k out:…
+    /work  deepseek-flash  think:off  view:normal  ctx:0% 1.5k  $0.01
     |}];
   H.key h (Key.plain Up);
   H.show h;
@@ -3078,7 +3116,7 @@ let%expect_test "bracketed paste renders a chip until the cursor enters it" =
       two
       thre▏
       four
-    deepseek/deepseek-flash  thinking:off  view:normal  ctx:1.5k (0%)  in:1.2k out:…
+    /work  deepseek-flash  think:off  view:normal  ctx:0% 1.5k  $0.01
     |}]
 ;;
 
@@ -3094,7 +3132,7 @@ let%expect_test "history loads at start and is appended on submit" =
     earlier answer
     ────────────────────────────────────────────────────────────────────────────────────────────────────
     > old two▏
-    deepseek/deepseek-flash  thinking:off  view:normal  ctx:1.5k (0%)  in:1.2k out:300  $0.0123
+    /work  deepseek-flash  think:off  view:normal  ctx:0% 1.5k  $0.01
     |}];
   H.key h (Key.ctrl 'c');
   H.keys h "fresh prompt";
@@ -3121,7 +3159,7 @@ let%expect_test "Ctrl+G edits externally and the reply replaces the prompt" =
     earlier answer
     ────────────────────────────────────────────────────────────
     > from the editor▏
-    deepseek/deepseek-flash  thinking:off  view:normal  ctx:1.5…
+    …deepseek-flash  think:off  view:normal  ctx:0% 1.5k  $0.01
     |}]
 ;;
 
@@ -3184,7 +3222,7 @@ let%expect_test "Ctrl+Z suspends; Ctrl+R completes a path; Ctrl+L picks a model"
     > @sr▏
     ▸ src/
       src/app.ml
-    deepseek/deepseek-flash  thinking:off  view:normal  ctx:1.5…
+    …deepseek-flash  ctx:0% 1.5k  Tab/Enter accept · Esc close
     |}];
   H.key h (Key.ctrl 'l');
   [%expect
@@ -3202,8 +3240,417 @@ let%expect_test "Ctrl+Z suspends; Ctrl+R completes a path; Ctrl+L picks a model"
       Claude Fable 5       anthropic/claude-fable-5  ctx 1.0M  …
       Claude Fable 5.1     anthropic/claude-fable-5-1  ctx 1.0M…
       GPT-5.5              openai/gpt-5.5  ctx 1.0M  $10/$50 pe…
+    * DeepSeek V4.1 Flash  deepseek/deepseek-flash ◆  ctx 1.0M …
+    ────────────────────────────────────────────────────────────
+    …deepseek-flash  think:off  view:normal  ctx:0% 1.5k  $0.01
+    |}]
+;;
+
+let%expect_test "config: get_config at Start installs the reply; \
+                 config_changed updates"
+  =
+  let h = H.create () in
+  H.step h Start;
+  [%expect
+    {|
+    (Rpc (method_ get_state) (params ()) (tag Initial_state))
+    (Rpc (method_ get_messages) (params ()) (tag Initial_messages))
+    (Rpc (method_ auth_status) (params ()) (tag Auth_refresh))
+    (Rpc (method_ get_config) (params ()) (tag Config))
+    (Rpc (method_ list_models) (params ()) (tag Models_catalog))
+    Load_history
+    |}];
+  H.reply
+    h
+    Config
+    {|{"scoped_models":["anthropic/claude-fable-5-1"],"confirm_tools":true}|};
+  print_s [%sexp (h.model.config : P.Config.t option)];
+  H.event
+    h
+    (P.Event.Config_changed
+       { scoped_models = [ "deepseek/deepseek-flash" ]; confirm_tools = false });
+  print_s [%sexp (h.model.config : P.Config.t option)];
+  [%expect
+    {|
+    (((scoped_models (anthropic/claude-fable-5-1)) (confirm_tools true)))
+    (((scoped_models (deepseek/deepseek-flash)) (confirm_tools false)))
+    |}]
+;;
+
+let%expect_test "/scoped-models: multi-select toggle, Ctrl+A, Ctrl+X, save" =
+  let h = connected () in
+  H.reply ~quiet:true h Models_catalog models_json;
+  H.reply
+    ~quiet:true
+    h
+    Config
+    {|{"scoped_models":["deepseek/deepseek-flash"],"confirm_tools":false}|};
+  H.keys h "/scoped-models";
+  H.enter h;
+  H.show h;
+  [%expect
+    {|
+    session abc123 in /work. /help for commands, Esc aborts,
+    Ctrl+C twice quits.
+    > earlier question
+    earlier answer
+    Scoped models  (4)
+    / ▏
+    [ ] Claude Fable 5       Claude Fable 5
+    [ ] Claude Fable 5.1     Claude Fable 5.1
+    [ ] GPT-5.5              GPT-5.5
+    [x] DeepSeek V4.1 Flash  DeepSeek V4.1 Flash
+    ────────────────────────────────────────────────────────────
+    …deepseek-flash  think:off  view:normal  ctx:0% 1.5k  $0.01
+    |}];
+  H.keys h " ";
+  H.show h;
+  [%expect
+    {|
+    session abc123 in /work. /help for commands, Esc aborts,
+    Ctrl+C twice quits.
+    > earlier question
+    earlier answer
+    Scoped models  (4)
+    / ▏
+    [x] Claude Fable 5       Claude Fable 5
+    [ ] Claude Fable 5.1     Claude Fable 5.1
+    [ ] GPT-5.5              GPT-5.5
+    [x] DeepSeek V4.1 Flash  DeepSeek V4.1 Flash
+    ────────────────────────────────────────────────────────────
+    …deepseek-flash  think:off  view:normal  ctx:0% 1.5k  $0.01
+    |}];
+  H.key h (Key.ctrl 'a');
+  H.show h;
+  [%expect
+    {|
+    session abc123 in /work. /help for commands, Esc aborts,
+    Ctrl+C twice quits.
+    > earlier question
+    earlier answer
+    Scoped models  (4)
+    / ▏
+    [x] Claude Fable 5       Claude Fable 5
+    [x] Claude Fable 5.1     Claude Fable 5.1
+    [x] GPT-5.5              GPT-5.5
+    [x] DeepSeek V4.1 Flash  DeepSeek V4.1 Flash
+    ────────────────────────────────────────────────────────────
+    …deepseek-flash  think:off  view:normal  ctx:0% 1.5k  $0.01
+    |}];
+  H.key h (Key.ctrl 'x');
+  H.show h;
+  [%expect
+    {|
+    session abc123 in /work. /help for commands, Esc aborts,
+    Ctrl+C twice quits.
+    > earlier question
+    earlier answer
+    Scoped models  (4)
+    / ▏
+    [ ] Claude Fable 5       Claude Fable 5
+    [ ] Claude Fable 5.1     Claude Fable 5.1
+    [ ] GPT-5.5              GPT-5.5
+    [ ] DeepSeek V4.1 Flash  DeepSeek V4.1 Flash
+    ────────────────────────────────────────────────────────────
+    …deepseek-flash  think:off  view:normal  ctx:0% 1.5k  $0.01
+    |}];
+  H.key h (Key.ctrl 'a');
+  H.enter h;
+  [%expect
+    {|
+    (Rpc
+      (method_ set_config)
+      (params ((
+        config (
+          (scoped_models (
+            anthropic/claude-fable-5
+            anthropic/claude-fable-5-1
+            openai/gpt-5.5
+            deepseek/deepseek-flash))
+          (confirm_tools false)))))
+      (tag Config_saved))
+    |}];
+  H.reply
+    h
+    Config_saved
+    {|{"scoped_models":["anthropic/claude-fable-5","anthropic/claude-fable-5-1","openai/gpt-5.5","deepseek/deepseek-flash"],"confirm_tools":false}|};
+  H.show h;
+  [%expect
+    {|
+    session abc123 in /work. /help for commands, Esc aborts,
+    Ctrl+C twice quits.
+    > earlier question
+    earlier answer
+    scoped models saved (4)
+    ────────────────────────────────────────────────────────────
+    > ▏
+    …deepseek-flash  think:off  view:normal  ctx:0% 1.5k  $0.01
+    |}]
+;;
+
+let%expect_test "Ctrl+P cycles the scoped models and wraps; Alt+P goes back" =
+  let h = connected ~model:(model_json "claude-fable-5" "Claude Fable 5") () in
+  H.reply ~quiet:true h Models_catalog models_json;
+  H.reply
+    ~quiet:true
+    h
+    Config
+    {|{"scoped_models":["anthropic/claude-fable-5","anthropic/claude-fable-5-1","openai/gpt-5.5"],"confirm_tools":false}|};
+  H.key h (Key.ctrl 'p');
+  H.key h (Key.ctrl 'p');
+  H.key h (Key.ctrl 'p');
+  H.key h (Key.alt (Key.Code.Char "p"));
+  H.show h;
+  [%expect
+    {|
+    (Rpc
+      (method_ set_model)
+      (params ((model anthropic/claude-fable-5-1)))
+      (tag Set_model_done))
+    (Rpc
+      (method_ set_model)
+      (params ((model openai/gpt-5.5)))
+      (tag Set_model_done))
+    (Rpc
+      (method_ set_model)
+      (params ((model anthropic/claude-fable-5)))
+      (tag Set_model_done))
+    (Rpc
+      (method_ set_model)
+      (params ((model openai/gpt-5.5)))
+      (tag Set_model_done))
+
+    session abc123 in /work. /help for commands, Esc aborts,
+    Ctrl+C twice quits.
+    > earlier question
+    earlier answer
+    model: anthropic/claude-fable-5-1
+    model: openai/gpt-5.5
+    model: anthropic/claude-fable-5
+    model: openai/gpt-5.5
+    ────────────────────────────────────────────────────────────
+    > ▏
+    /work  gpt-5.5  think:off  view:normal  ctx:0% 1.5k  $0.01
+    |}]
+;;
+
+let%expect_test "Ctrl+P with one scoped model notices instead of switching" =
+  let h = connected () in
+  H.reply ~quiet:true h Models_catalog models_json;
+  H.reply
+    ~quiet:true
+    h
+    Config
+    {|{"scoped_models":["deepseek/deepseek-flash"],"confirm_tools":false}|};
+  H.key h (Key.ctrl 'p');
+  H.show h;
+  [%expect
+    {|
+    session abc123 in /work. /help for commands, Esc aborts,
+    Ctrl+C twice quits.
+    > earlier question
+    earlier answer
+    only one model in scope
+    ────────────────────────────────────────────────────────────
+    > ▏
+    …deepseek-flash  think:off  view:normal  ctx:0% 1.5k  $0.01
+    |}]
+;;
+
+let%expect_test "Ctrl+T cycles off/low/on/high/max and is n/a when unsupported" =
+  let h =
+    connected ~model:(model_json "claude-fable-5-1" "Claude Fable 5.1") ()
+  in
+  for _ = 1 to 5 do
+    H.key h (Key.ctrl 't')
+  done;
+  H.show h;
+  [%expect
+    {|
+    (Rpc (method_ set_thinking) (params ((thinking low))) (tag Show_error))
+    (Rpc (method_ set_thinking) (params ((thinking on))) (tag Show_error))
+    (Rpc (method_ set_thinking) (params ((thinking high))) (tag Show_error))
+    (Rpc (method_ set_thinking) (params ((thinking max))) (tag Show_error))
+    (Rpc (method_ set_thinking) (params ((thinking off))) (tag Show_error))
+    session abc123 in /work. /help for commands, Esc aborts,
+    Ctrl+C twice quits.
+    > earlier question
+    earlier answer
+    thinking: low
+    thinking: on
+    thinking: high
+    thinking: max
+    thinking: off
+    ────────────────────────────────────────────────────────────
+    > ▏
+    …claude-fable-5-1  think:off  ctx:0% 1.5k  $0.01
+    |}];
+  H.reply
+    ~quiet:true
+    h
+    Initial_state
+    (state_json
+       ~model:(model_json ~supports_thinking:false "gpt-5.5" "GPT-5.5")
+       ());
+  H.key h (Key.ctrl 't');
+  H.show h;
+  [%expect
+    {|
+    earlier answer
+    thinking: low
+    thinking: on
+    thinking: high
+    thinking: max
+    thinking: off
+    session abc123 in /work. /help for commands, Esc aborts,
+    Ctrl+C twice quits.
+    thinking: n/a for this model
+    ────────────────────────────────────────────────────────────
+    > ▏
+    /work  gpt-5.5  think:n/a  view:normal  ctx:0% 1.5k  $0.01
+    |}]
+;;
+
+let%expect_test "status line: width 120 full, width 40 keeps the model and \
+                 drops the cwd"
+  =
+  let model =
+    model_json ~context_window:145000 "claude-fable-5-1" "Claude Fable 5.1"
+  in
+  let h = connected ~width:120 ~height:20 ~model () in
+  H.step ~quiet:true h (Set_home "/home/u");
+  H.reply
+    ~quiet:true
+    h
+    Initial_state
+    (state_json
+       ~model
+       ~cwd:"/home/u/proj"
+       ~git_branch:"main"
+       ~session_name:"my session"
+       ~thinking:"high"
+       ~context_tokens:61000
+       ~cost_usd:0.1234
+       ());
+  H.event h (Queue_update { steer = 1; follow_up = 0 });
+  H.event
+    h
+    (Subagent_start
+       { call_id = "c1"
+       ; agent_id = "c1"
+       ; task = "find auth"
+       ; model = "claude-haiku"
+       ; tools = []
+       });
+  H.event
+    h
+    (Subagent_start
+       { call_id = "c2"
+       ; agent_id = "c2"
+       ; task = "run tests"
+       ; model = "claude-sonnet"
+       ; tools = []
+       });
+  H.event
+    h
+    (Subagent_end
+       { call_id = "c2"
+       ; agent_id = "c2"
+       ; usage = { input = 1; output = 0; cache_read = 0 }
+       ; turns = 1
+       ; cost_usd = 0.02
+       ; result = { text = "ok"; is_error = false }
+       });
+  print_endline (Content.Line.to_plain (Render.status h.model));
+  [%expect
+    {| ~/proj (main) "my session"  claude-fable-5-1  think:high  view:normal  ctx:42% 61k  $0.12  queued:1  agents:[main] 1⠋ 2✓ |}];
+  H.step ~quiet:true h (Resize { width = 40; height = 20 });
+  print_endline (Content.Line.to_plain (Render.status h.model));
+  [%expect {| …claude-fable-5-1  ctx:42% 61k  queued:1 |}]
+;;
+
+let%expect_test "status context percentage is green/yellow/red" =
+  let show tokens =
+    let model = model_json ~context_window:100 "m" "M" in
+    let h = connected ~model () in
+    H.reply
+      ~quiet:true
+      h
+      Initial_state
+      (state_json ~model ~context_tokens:tokens ());
+    let style =
+      Render.status h.model
+      |> List.find_map ~f:(fun (s : Content.Span.t) ->
+        if String.is_prefix s.text ~prefix:"ctx:" then Some s.style else None)
+    in
+    print_s [%sexp (style : Style.t option)]
+  in
+  show 40;
+  show 60;
+  show 85;
+  [%expect
+    {|
+    ((
+      (fg        Green)
+      (bold      false)
+      (dim       false)
+      (italic    false)
+      (underline false)
+      (invert    false)))
+    ((
+      (fg        Yellow)
+      (bold      false)
+      (dim       false)
+      (italic    false)
+      (underline false)
+      (invert    false)))
+    ((
+      (fg        Red)
+      (bold      false)
+      (dim       false)
+      (italic    false)
+      (underline false)
+      (invert    false)))
+    |}]
+;;
+
+let%expect_test "/model Ctrl+N filters to logged-in models; scoped mark" =
+  let h = connected () in
+  H.reply ~quiet:true h Models_catalog models_json;
+  H.reply
+    ~quiet:true
+    h
+    Config
+    {|{"scoped_models":["anthropic/claude-fable-5-1"],"confirm_tools":false}|};
+  H.key h (Key.ctrl 'l');
+  H.show h;
+  [%expect
+    {|
+    session abc123 in /work. /help for commands, Esc aborts,
+    Ctrl+C twice quits.
+    > earlier question
+    earlier answer
+    Model  (4)
+    / ▏
+      Claude Fable 5       anthropic/claude-fable-5  ctx 1.0M  …
+      Claude Fable 5.1     anthropic/claude-fable-5-1 ◆  ctx 1.…
+      GPT-5.5              openai/gpt-5.5  ctx 1.0M  $10/$50 pe…
     * DeepSeek V4.1 Flash  deepseek/deepseek-flash  ctx 1.0M  $…
     ────────────────────────────────────────────────────────────
-    deepseek/deepseek-flash  thinking:off  view:normal  ctx:1.5…
+    …deepseek-flash  think:off  view:normal  ctx:0% 1.5k  $0.01
+    |}];
+  H.key h (Key.ctrl 'n');
+  H.show h;
+  [%expect
+    {|
+    session abc123 in /work. /help for commands, Esc aborts,
+    Ctrl+C twice quits.
+    > earlier question
+    earlier answer
+    Model (logged in)  (1)
+    / ▏
+    * DeepSeek V4.1 Flash  deepseek/deepseek-flash  ctx 1.0M  $…
+    ────────────────────────────────────────────────────────────
+    …deepseek-flash  think:off  view:normal  ctx:0% 1.5k  $0.01
     |}]
 ;;

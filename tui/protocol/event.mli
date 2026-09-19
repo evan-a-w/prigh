@@ -35,6 +35,7 @@ type t =
       }
   | State of State.t
   | Compacted of string
+  | Config_changed of Config.t
   | Notice of string
   | Queue_update of
       { steer : int

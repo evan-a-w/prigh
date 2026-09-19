@@ -218,6 +218,12 @@ let app
   =
   let platform = Bonsai.return (platform client ~exit ~quit_requested) in
   let model, inject = Prigh_ui.Component.create platform graph in
+  let home = Option.value (Sys.getenv "HOME") ~default:"." in
+  Bonsai.Edge.lifecycle
+    ~on_activate:
+      (let%arr inject in
+       inject (App.Action.Set_home home))
+    graph;
   let paste, set_paste =
     Bonsai.state Paste.Idle ~sexp_of_model:Paste.sexp_of_t graph
   in

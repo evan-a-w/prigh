@@ -25,6 +25,10 @@ module Reply_tag = struct
     | Deleted_session
     | Paths_for_autocomplete of string
     | Set_model_done
+    | Config
+    | Config_saved
+    | Models_catalog
+    | Models_for_scoped
     | Compact_done
     | Abort_done
     | Notice_on_success of string
@@ -67,6 +71,7 @@ module Action = struct
     | Backend_closed
     | Reply of Reply_tag.t * (P.Json.t, string) Result.t
     | Tick
+    | Set_home of string
     | Resize of
         { width : int
         ; height : int
@@ -93,6 +98,8 @@ module Model = struct
     ; pending_quit : bool
     ; spinner : int
     ; verbosity : Verbosity.t
+    ; config : P.Config.t option
+    ; home : string option
     ; width : int
     ; height : int
     ; quitting : bool
@@ -213,6 +220,8 @@ let init =
   ; pending_quit = false
   ; spinner = 0
   ; verbosity = Verbosity.Normal
+  ; config = None
+  ; home = None
   ; width = 80
   ; height = 24
   ; quitting = false
@@ -223,6 +232,8 @@ let start_commands =
   [ rpc "get_state" ~tag:Initial_state
   ; rpc "get_messages" ~tag:Initial_messages
   ; rpc "auth_status" ~tag:Auth_refresh
+  ; rpc "get_config" ~tag:Config
+  ; rpc "list_models" ~tag:Models_catalog
   ; Command.Load_history
   ]
 ;;
@@ -247,6 +258,24 @@ let logged_in m provider =
     String.equal a.provider provider && Option.is_some a.configured)
 ;;
 
+(** Models Ctrl+P / Ctrl+T / [/scoped-models] operate on, in catalog order. *)
+let effective_scope m =
+  match m.config with
+  | Some { P.Config.scoped_models = _ :: _ as keys; _ } ->
+    List.filter m.models ~f:(fun (model : P.Model.t) ->
+      List.mem keys model.key ~equal:String.equal)
+  | _ ->
+    let logged =
+      List.filter m.models ~f:(fun model -> logged_in m model.provider)
+    in
+    if List.is_empty logged then m.models else logged
+;;
+
+let scoped_keys m =
+  String.Set.of_list
+    (List.map (effective_scope m) ~f:(fun (model : P.Model.t) -> model.key))
+;;
+
 (* ---- pickers ---------------------------------------------------------- *)
 
 let open_picker m kind picker =
@@ -258,24 +287,35 @@ let open_picker m kind picker =
 let format_price (c : P.Model.Cost.t) = sprintf "$%g/$%g per M" c.input c.output
 
 let format_tokens n =
-  if n >= 1_000_000
-  then sprintf "%.1fM" (Float.of_int n /. 1e6)
-  else if n >= 1000
+  if n < 1000
+  then Int.to_string n
+  else if n < 10000
   then sprintf "%.1fk" (Float.of_int n /. 1e3)
-  else Int.to_string n
+  else if n < 1_000_000
+  then sprintf "%dk" (Int.of_float (Float.round (Float.of_int n /. 1e3)))
+  else if n < 10_000_000
+  then sprintf "%.1fM" (Float.of_int n /. 1e6)
+  else sprintf "%dM" (Int.of_float (Float.round (Float.of_int n /. 1e6)))
 ;;
 
-let model_picker m ~query =
+let model_picker_value m ~logged_in_only ~query =
   let current = Option.map m.state ~f:(fun s -> s.model.key) in
+  let scoped = scoped_keys m in
+  let models =
+    if logged_in_only
+    then List.filter m.models ~f:(fun model -> logged_in m model.provider)
+    else m.models
+  in
   let items =
-    List.map m.models ~f:(fun (model : P.Model.t) ->
+    List.map models ~f:(fun (model : P.Model.t) ->
       let logged = logged_in m model.provider in
+      let scoped_mark = if Set.mem scoped model.key then " ◆" else "" in
       Picker.Item.create
         ~id:model.key
         ~detail:
           (String.concat
              ~sep:"  "
-             ([ model.key
+             ([ model.key ^ scoped_mark
               ; "ctx " ^ format_tokens model.context_window
               ; format_price model.cost
               ]
@@ -286,7 +326,32 @@ let model_picker m ~query =
         ~dimmed:(not logged)
         model.name)
   in
-  open_picker m Models (Picker.create ~query ~title:"Model" items)
+  let title = if logged_in_only then "Model (logged in)" else "Model" in
+  Picker.create ~query ~title items
+;;
+
+let model_picker ?(logged_in_only = false) m ~query =
+  open_picker
+    m
+    (Models { logged_in_only })
+    (model_picker_value m ~logged_in_only ~query)
+;;
+
+let scoped_models_picker m =
+  let checked =
+    match m.config with
+    | Some { P.Config.scoped_models = _ :: _ as keys; _ } ->
+      String.Set.of_list keys
+    | _ -> scoped_keys m
+  in
+  let items =
+    List.map m.models ~f:(fun (model : P.Model.t) ->
+      Picker.Item.create ~id:model.key ~detail:model.name model.name)
+  in
+  open_picker
+    m
+    Scoped_models
+    (Picker.create ~multi:true ~checked ~title:"Scoped models" items)
 ;;
 
 let thinking_levels = [ "off"; "on"; "low"; "high"; "max" ]
@@ -670,6 +735,55 @@ let switch_model m arg =
     model_picker m ~query:arg, []
 ;;
 
+let cycle_model m ~step =
+  let scope = effective_scope m in
+  match scope with
+  | [] -> notice m "no models in scope", []
+  | [ _ ] -> notice m "only one model in scope", []
+  | models ->
+    let n = List.length models in
+    let index =
+      match Option.map m.state ~f:(fun s -> s.model.key) with
+      | None -> 0
+      | Some key ->
+        Option.value_map
+          (List.findi models ~f:(fun _ (model : P.Model.t) ->
+             String.equal model.key key))
+          ~default:0
+          ~f:fst
+    in
+    let next = List.nth_exn models ((index + step + n) mod n) in
+    let m =
+      match m.state with
+      | Some s -> { m with state = Some { s with model = next } }
+      | None -> m
+    in
+    notice m (sprintf "model: %s" next.key), [ set_model_command next.key ]
+;;
+
+let thinking_cycle = [ "off"; "low"; "on"; "high"; "max" ]
+
+let cycle_thinking m =
+  match m.state with
+  | None -> notice m "not connected", []
+  | Some s when not s.model.supports_thinking ->
+    notice m "thinking: n/a for this model", []
+  | Some s ->
+    let index =
+      Option.value_map
+        (List.findi thinking_cycle ~f:(fun _ level ->
+           String.equal level s.thinking))
+        ~default:0
+        ~f:fst
+    in
+    let next =
+      List.nth_exn thinking_cycle ((index + 1) mod List.length thinking_cycle)
+    in
+    let m = { m with state = Some { s with thinking = next } } in
+    ( notice m (sprintf "thinking: %s" next)
+    , [ rpc "set_thinking" ~params:[ "thinking", str next ] ] )
+;;
+
 let run_command m (cmd : Commands.Parsed.t) =
   match cmd.name, cmd.args with
   | "", _ -> m, []
@@ -690,6 +804,10 @@ let run_command m (cmd : Commands.Parsed.t) =
     if List.is_empty m.models
     then m, [ rpc "list_models" ~tag:(Models_for_switch cmd.rest) ]
     else switch_model m cmd.rest
+  | "scoped-models", _ ->
+    if List.is_empty m.models
+    then m, [ rpc "list_models" ~tag:Models_for_scoped ]
+    else scoped_models_picker m, []
   | "thinking", [] -> thinking_picker m, []
   | "thinking", level :: _ ->
     m, [ rpc "set_thinking" ~params:[ "thinking", str level ] ]
@@ -1107,6 +1225,9 @@ let editing_intent m (intent : Intent.t) =
   | Kill_to_start -> ed Editor.kill_to_start
   | Kill_word -> ed Editor.kill_word
   | Cycle_verbosity -> set_verbosity m (Verbosity.next m.verbosity), []
+  | Next_model -> cycle_model m ~step:1
+  | Prev_model -> cycle_model m ~step:(-1)
+  | Next_thinking -> cycle_thinking m
   | Next_agent -> cycle_focus m, []
   | Focus_agent n -> focus_agent m n, []
   | Queue_follow_up -> queue_follow_up m
@@ -1172,6 +1293,9 @@ let editing m (intent : Intent.t) =
         | Yank_pop
         | Undo
         | Cycle_verbosity
+        | Next_model
+        | Prev_model
+        | Next_thinking
         | Next_agent
         | Focus_agent _
         | Queue_follow_up
@@ -1199,7 +1323,8 @@ let editing m (intent : Intent.t) =
 let picker_selected m (kind : Mode.Picker_kind.t) (item : Picker.Item.t) =
   let m = { m with mode = Editing } in
   match kind with
-  | Models -> m, [ set_model_command item.id ]
+  | Models _ -> m, [ set_model_command item.id ]
+  | Scoped_models -> m, []
   | Thinking -> m, [ rpc "set_thinking" ~params:[ "thinking", str item.id ] ]
   | Verbosity ->
     let verbosity =
@@ -1267,6 +1392,25 @@ let picker_selected m (kind : Mode.Picker_kind.t) (item : Picker.Item.t) =
     m, [ rpc "auth_respond" ~params:[ "id", str id; "value", str item.id ] ]
 ;;
 
+let save_scoped_models m picker =
+  let checked = Picker.checked picker in
+  let scoped_models =
+    List.filter_map m.models ~f:(fun (model : P.Model.t) ->
+      Option.some_if (Set.mem checked model.key) model.key)
+  in
+  let config =
+    match m.config with
+    | Some config -> { config with scoped_models }
+    | None -> { P.Config.scoped_models; confirm_tools = false }
+  in
+  ( { m with mode = Editing }
+  , [ rpc
+        "set_config"
+        ~params:[ "config", P.Config.to_json config ]
+        ~tag:Config_saved
+    ] )
+;;
+
 let picker m (kind : Mode.Picker_kind.t) picker (intent : Intent.t) =
   match intent with
   | Picker_toggle_filter ->
@@ -1289,7 +1433,14 @@ let picker m (kind : Mode.Picker_kind.t) picker (intent : Intent.t) =
                }
          }
        , [] )
+     | Models { logged_in_only } ->
+       let logged_in_only = not logged_in_only in
+       let picker =
+         model_picker_value m ~logged_in_only ~query:(Picker.query picker)
+       in
+       { m with mode = Picker { kind = Models { logged_in_only }; picker } }, []
      | _ -> m, [])
+  | Submit when Picker.multi picker -> save_scoped_models m picker
   | Force_quit ->
     (match kind with
      | Sessions { sessions; _ } ->
@@ -1361,6 +1512,9 @@ let login_prompt m ~id ~(prompt : P.Auth_event.Prompt.t) (intent : Intent.t) =
   | Page_down
   | Complete
   | Cycle_verbosity
+  | Next_model
+  | Prev_model
+  | Next_thinking
   | Next_agent
   | Focus_agent _
   | Queue_follow_up
@@ -1462,6 +1616,9 @@ let text_prompt m ~(action : Mode.Text_prompt_action.t) (intent : Intent.t) =
   | Page_down
   | Complete
   | Cycle_verbosity
+  | Next_model
+  | Prev_model
+  | Next_thinking
   | Next_agent
   | Focus_agent _
   | Queue_follow_up
@@ -1608,6 +1765,7 @@ let event m (e : P.Event.t) =
       if steer = 0 && follow_up = 0 then [] else m.queued_texts
     in
     { m with queued = { Queue_counts.steer; follow_up }; queued_texts }, []
+  | Config_changed config -> { m with config = Some config }, []
   | Auth a -> auth_event m a
   | Agent_start
   | Agent_end _
@@ -1731,6 +1889,22 @@ let reply m (tag : Reply_tag.t) (result : (P.Json.t, string) Result.t) =
      | Auth_logout_picker ->
        decode json ~f:(decode_list ~f:P.Auth_status.of_json) (fun auth ->
          logout_picker { m with auth } auth, [])
+     | Config ->
+       decode json ~f:P.Config.of_json (fun config ->
+         { m with config = Some config }, [])
+     | Config_saved ->
+       decode json ~f:P.Config.of_json (fun config ->
+         let count = List.length config.scoped_models in
+         ( notice
+             { m with config = Some config }
+             (sprintf "scoped models saved (%d)" count)
+         , [] ))
+     | Models_catalog ->
+       decode json ~f:(decode_list ~f:P.Model.of_json) (fun models ->
+         { m with models }, [])
+     | Models_for_scoped ->
+       decode json ~f:(decode_list ~f:P.Model.of_json) (fun models ->
+         scoped_models_picker { m with models }, [])
      | Models_for_picker query ->
        decode json ~f:(decode_list ~f:P.Model.of_json) (fun models ->
          model_picker { m with models } ~query, [])
@@ -1823,5 +1997,6 @@ let update m (action : Action.t) =
       error { m with quitting = true } "backend exited", [ Quit ]
     | Reply (tag, result) -> reply m tag result
     | Tick -> { m with spinner = m.spinner + 1 }, []
+    | Set_home home -> { m with home = Some home }, []
     | Resize { width; height } -> { m with width; height }, [])
 ;;

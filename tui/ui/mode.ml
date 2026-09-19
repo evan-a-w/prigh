@@ -3,7 +3,8 @@ open Prigh_protocol
 
 module Picker_kind = struct
   type t =
-    | Models
+    | Models of { logged_in_only : bool }
+    | Scoped_models
     | Thinking
     | Verbosity
     | Login

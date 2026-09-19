@@ -344,9 +344,9 @@ let%expect_test "fuzzy ranking: command names" =
       (String.concat ~sep:" " (Fuzzy.rank ~query names ~key:Fn.id)));
   [%expect
     {|
-    "mo" -> model import
+    "mo" -> model scoped-models import
     "lo" -> login logout clone
-    "s"  -> state switch session sessions agents verbosity
+    "s"  -> state switch session sessions scoped-models agents verbosity
     "sw" -> switch
     "xyz" ->
     |}]
@@ -440,6 +440,10 @@ let%expect_test "commands" =
     (/s (
       "Commands.complete s" (
         Candidates (
+          ((name scoped-models)
+           (args "")
+           (help "pick the models Ctrl+P cycles through")
+           (argument ()))
           ((name session)
            (args "")
            (help "show session statistics")
@@ -468,6 +472,10 @@ let%expect_test "commands" =
            (args [name|id|provider/id])
            (help "pick or switch the model")
            (argument (Model)))
+          ((name scoped-models)
+           (args "")
+           (help "pick the models Ctrl+P cycles through")
+           (argument ()))
           ((name login)
            (args "[provider] [api_key|oauth]")
            (help "log in to a provider")
@@ -693,6 +701,9 @@ let%expect_test "keymap: every binding resolves to its intent and is documented"
     Ctrl+R           Path_complete
     Ctrl+G           Edit_externally
     Ctrl+L           Model_picker
+    Ctrl+P           Next_model
+    Alt+P            Prev_model
+    Ctrl+T           Next_thinking
     Ctrl+N           Picker_toggle_filter
     Ctrl+X           Copy_last
     Ctrl+Z           Suspend
@@ -739,7 +750,10 @@ let%expect_test "keymap: every binding resolves to its intent and is documented"
     Ctrl+R                  complete a file path at the cursor
     Ctrl+G                  edit the prompt in $EDITOR
     Ctrl+L                  pick a model
-    Ctrl+N                  sessions picker: toggle the named-only filter
+    Ctrl+P                  cycle to the next scoped model (Shift+Ctrl+P is unavailable; Alt+P goes back)
+    Alt+P                   cycle to the previous scoped model
+    Ctrl+T                  cycle the thinking level
+    Ctrl+N                  picker: toggle the named-only / logged-in-only filter
     Ctrl+X                  copy the last assistant message
     Ctrl+Z                  suspend to the shell
     Shift+Tab               cycle focus: main → agent 1 → … → main
@@ -748,6 +762,7 @@ let%expect_test "keymap: every binding resolves to its intent and is documented"
     Ctrl+D                  quit
     /help                              show commands and keys
     /model [name|id|provider/id]       pick or switch the model
+    /scoped-models                     pick the models Ctrl+P cycles through
     /login [provider] [api_key|oauth]  log in to a provider
     /logout [provider]                 remove a provider's stored credential
     /thinking [off|on|low|high|max]    pick or set the thinking level

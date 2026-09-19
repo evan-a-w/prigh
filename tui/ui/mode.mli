@@ -5,7 +5,8 @@ open Prigh_protocol
 
 module Picker_kind : sig
   type t =
-    | Models
+    | Models of { logged_in_only : bool }
+    | Scoped_models
     | Thinking
     | Verbosity
     | Login

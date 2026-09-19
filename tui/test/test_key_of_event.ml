@@ -52,6 +52,9 @@ let%expect_test "key_of_event: terminal event -> key" =
     ; "ASCII '\\003' (^C raw)", key_press (Ekey.ASCII '\003') []
     ; "ASCII '\\031' (^_ raw)", key_press (Ekey.ASCII '\031') []
     ; "ASCII 'j' + [Ctrl]", key_press (Ekey.ASCII 'j') [ Mod.Ctrl ]
+    ; "ASCII 'p' + [Ctrl]", key_press (Ekey.ASCII 'p') [ Mod.Ctrl ]
+    ; "ASCII 'p' + [Meta]", key_press (Ekey.ASCII 'p') [ Mod.Meta ]
+    ; "ASCII 't' + [Ctrl]", key_press (Ekey.ASCII 't') [ Mod.Ctrl ]
     ; "Paste Start", Event.Paste `Start
     ; "Paste End", Event.Paste `End
     ; ( "Mouse Left"
@@ -93,6 +96,9 @@ let%expect_test "key_of_event: terminal event -> key" =
     ASCII '\003' (^C raw)        (Key_press (key (ASCII "\003")))                 -> (((code (Char c)) (ctrl true) (alt false) (shift false)))
     ASCII '\031' (^_ raw)        (Key_press (key (ASCII "\031")))                 -> (((code (Char _)) (ctrl true) (alt false) (shift false)))
     ASCII 'j' + [Ctrl]           (Key_press (key (ASCII j)) (mods (Ctrl)))        -> (((code (Char j)) (ctrl true) (alt false) (shift false)))
+    ASCII 'p' + [Ctrl]           (Key_press (key (ASCII p)) (mods (Ctrl)))        -> (((code (Char p)) (ctrl true) (alt false) (shift false)))
+    ASCII 'p' + [Meta]           (Key_press (key (ASCII p)) (mods (Meta)))        -> (((code (Char p)) (ctrl false) (alt true) (shift false)))
+    ASCII 't' + [Ctrl]           (Key_press (key (ASCII t)) (mods (Ctrl)))        -> (((code (Char t)) (ctrl true) (alt false) (shift false)))
     Paste Start                  (Paste Start)                                    -> ()
     Paste End                    (Paste End)                                      -> ()
     Mouse Left                   (Mouse (kind Left) (position ((x 3) (y 4))))     -> ()
@@ -187,6 +193,9 @@ let%expect_test "keymap: every bound key is reachable from a terminal event" =
     Ctrl+R           (Key_press (key (ASCII r)) (mods (Ctrl))) ok
     Ctrl+G           (Key_press (key (ASCII g)) (mods (Ctrl))) ok
     Ctrl+L           (Key_press (key (ASCII l)) (mods (Ctrl))) ok
+    Ctrl+P           (Key_press (key (ASCII p)) (mods (Ctrl))) ok
+    Alt+P            (Key_press (key (ASCII p)) (mods (Meta))) ok
+    Ctrl+T           (Key_press (key (ASCII t)) (mods (Ctrl))) ok
     Ctrl+N           (Key_press (key (ASCII n)) (mods (Ctrl))) ok
     Ctrl+X           (Key_press (key (ASCII x)) (mods (Ctrl))) ok
     Ctrl+Z           (Key_press (key (ASCII z)) (mods (Ctrl))) ok

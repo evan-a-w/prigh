@@ -385,3 +385,33 @@ let%expect_test "request encoding" =
     {"id":8,"method":"ping","params":{}}
     |}]
 ;;
+
+let%expect_test "config round trip and config_changed event" =
+  let show f json =
+    match Json.parse json with
+    | Error e -> print_s [%message "parse" (e : Error.t)]
+    | Ok j ->
+      (match f j with
+       | Ok s -> print_s s
+       | Error e -> print_s [%message "decode" (e : Error.t)])
+  in
+  show
+    (fun j -> Or_error.map (Config.of_json j) ~f:Config.sexp_of_t)
+    {|{"scoped_models":["anthropic/claude-fable-5-1","deepseek/deepseek-flash"],"confirm_tools":true}|};
+  show (fun j -> Or_error.map (Config.of_json j) ~f:Config.sexp_of_t) {|{}|};
+  print_s
+    [%sexp
+      (Config.to_json
+         { Config.scoped_models = [ "a"; "b" ]; confirm_tools = true }
+       : Json.t)];
+  decode
+    {|{"type":"event","event":"config_changed","config":{"scoped_models":["a"],"confirm_tools":false}}|};
+  [%expect
+    {|
+    ((scoped_models (anthropic/claude-fable-5-1 deepseek/deepseek-flash))
+     (confirm_tools true))
+    ((scoped_models ()) (confirm_tools false))
+    ((scoped_models (a b)) (confirm_tools true))
+    (Event (Config_changed ((scoped_models (a)) (confirm_tools false))))
+    |}]
+;;

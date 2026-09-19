@@ -65,9 +65,16 @@ let bindings =
   ; b [ Key.ctrl 'g' ] Edit_externally "edit the prompt in $EDITOR"
   ; b [ Key.ctrl 'l' ] Model_picker "pick a model"
   ; b
+      [ Key.ctrl 'p' ]
+      Next_model
+      "cycle to the next scoped model (Shift+Ctrl+P is unavailable; Alt+P goes \
+       back)"
+  ; b [ Key.alt (Char "p") ] Prev_model "cycle to the previous scoped model"
+  ; b [ Key.ctrl 't' ] Next_thinking "cycle the thinking level"
+  ; b
       [ Key.ctrl 'n' ]
       Picker_toggle_filter
-      "sessions picker: toggle the named-only filter"
+      "picker: toggle the named-only / logged-in-only filter"
   ; b [ Key.ctrl 'x' ] Copy_last "copy the last assistant message"
   ; b [ Key.ctrl 'z' ] Suspend "suspend to the shell"
   ; b

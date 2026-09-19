@@ -32,6 +32,9 @@ type t =
   | Yank_pop
   | Undo
   | Cycle_verbosity
+  | Next_model (** Ctrl+P: cycle forward through the scoped models *)
+  | Prev_model (** Alt+P: cycle backward *)
+  | Next_thinking (** Ctrl+T: cycle the thinking level *)
   | Next_agent
   | Focus_agent of int
   | Queue_follow_up

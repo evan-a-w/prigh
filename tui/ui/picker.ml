@@ -35,6 +35,8 @@ type t =
   ; query : string
   ; visible : Item.t list
   ; selected : int
+  ; multi : bool
+  ; checked : String.Set.t
   }
 [@@deriving sexp_of]
 
@@ -53,8 +55,14 @@ let refilter t =
   { t with visible; selected }
 ;;
 
-let create ?(query = "") ~title items =
-  refilter { title; items; query; visible = []; selected = 0 }
+let create
+  ?(query = "")
+  ?(multi = false)
+  ?(checked = String.Set.empty)
+  ~title
+  items
+  =
+  refilter { title; items; query; visible = []; selected = 0; multi; checked }
 ;;
 
 let title t = t.title
@@ -62,6 +70,8 @@ let query t = t.query
 let visible t = t.visible
 let selected t = t.selected
 let selected_item t = List.nth t.visible t.selected
+let multi t = t.multi
+let checked t = t.checked
 
 module Outcome = struct
   type nonrec t =
@@ -76,13 +86,33 @@ let clamp t =
 ;;
 
 let handle t (intent : Intent.t) ~page : Outcome.t =
+  let toggle id : Outcome.t =
+    let checked =
+      if Set.mem t.checked id
+      then Set.remove t.checked id
+      else Set.add t.checked id
+    in
+    Continue { t with checked }
+  in
   match intent with
   | Cancel -> Cancelled
   | Submit ->
     (match selected_item t with
      | Some item -> Selected item
      | None -> Cancelled)
+  | Insert " " when t.multi ->
+    (match selected_item t with
+     | Some item -> toggle item.id
+     | None -> Continue t)
   | Insert s -> Continue (refilter { t with query = t.query ^ s })
+  | Home when t.multi ->
+    (* Ctrl+A: check everything currently visible. *)
+    let visible = String.Set.of_list (List.map t.visible ~f:(fun i -> i.id)) in
+    Continue { t with checked = Set.union t.checked visible }
+  | Copy_last when t.multi ->
+    (* Ctrl+X: uncheck everything. *)
+    Continue { t with checked = String.Set.empty }
+  | Copy_last -> Continue t
   | Backspace ->
     if String.is_empty t.query
     then Continue t
@@ -113,11 +143,13 @@ let handle t (intent : Intent.t) ~page : Outcome.t =
   | Interrupt
   | Force_quit
   | Cycle_verbosity
+  | Next_model
+  | Prev_model
+  | Next_thinking
   | Next_agent
   | Focus_agent _
   | Queue_follow_up
   | Dequeue
-  | Copy_last
   | Suspend
   | Path_complete
   | Edit_externally

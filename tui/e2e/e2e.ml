@@ -85,6 +85,7 @@ let rec summarise (e : Event.t) : string option =
   | Tool_output _ -> None
   | Tool_end { result; _ } -> Some (sprintf "tool_end %s" result.tool_name)
   | Compacted _ -> Some "compacted"
+  | Config_changed _ -> None
   | Queue_update _ -> None
   | Subagent_start { agent_id; task; model; tools; _ } ->
     Some

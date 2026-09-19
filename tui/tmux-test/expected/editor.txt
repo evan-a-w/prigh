@@ -4,4 +4,4 @@ quits.
 ────────────────────────────────────────────────────────────────────────────────────────────────────
 > draftedited by editor
 
-deepseek/deepseek-flash  thinking:off  view:normal  ctx:0 (0%)  in:0 out:0  $0.0000
+$TMP/cwd  deepseek-flash  think:off  view:normal  ctx:0% 0  $0.00

@@ -87,6 +87,8 @@ let%expect_test "component: startup requests, key handling, rpc round trip, \
     [ "get_state", Ok (state_json false)
     ; "get_messages", Ok "[]"
     ; "auth_status", Ok "[]"
+    ; "get_config", Ok {|{"scoped_models":[],"confirm_tools":false}|}
+    ; "list_models", Ok "[]"
     ; "set_thinking", Error "thinking must be one of: off, on, low, high, max"
     ]
   in
@@ -104,6 +106,8 @@ let%expect_test "component: startup requests, key handling, rpc round trip, \
     rpc get_state ()
     rpc get_messages ()
     rpc auth_status ()
+    rpc get_config ()
+    rpc list_models ()
     load history
     spinner=0 running=false
 
@@ -113,7 +117,7 @@ let%expect_test "component: startup requests, key handling, rpc round trip, \
     Ctrl+C twice quits.
     ──────────────────────────────────────────────────
     > ▏
-    deepseek/m  thinking:off  view:normal  ctx:0 (0%)…
+    /w  m  think:n/a  view:normal  ctx:0% 0  $0.00
     |}];
   Bonsai_test.Handle.do_actions
     handle
@@ -133,7 +137,7 @@ let%expect_test "component: startup requests, key handling, rpc round trip, \
     thinking must be one of: off, on, low, high, max
     ──────────────────────────────────────────────────
     > ▏
-    deepseek/m  thinking:off  view:normal  ctx:0 (0%)…
+    /w  m  think:n/a  view:normal  ctx:0% 0  $0.00
     |}];
   (* The spinner ticks only while running. *)
   Bonsai_test.Handle.do_actions
@@ -158,7 +162,7 @@ let%expect_test "component: startup requests, key handling, rpc round trip, \
     thinking must be one of: off, on, low, high, max
     ──────────────────────────────────────────────────
     > ▏
-    deepseek/m  thinking:off  view:normal  ctx:0 (0%)…
+    …m  ctx:0% 0  ⠹ working (Esc aborts; Enter steers)
     |}];
   Bonsai_test.Handle.do_actions handle [ Key (Key.plain Escape) ];
   Bonsai_test.Handle.recompute_view_until_stable handle;
@@ -177,6 +181,6 @@ let%expect_test "component: startup requests, key handling, rpc round trip, \
     backend exited
     ──────────────────────────────────────────────────
     > ▏
-    deepseek/m  thinking:off  view:normal  ctx:0 (0%)…
+    …m  ctx:0% 0  ⠹ working (Esc aborts; Enter steers)
     |}]
 ;;

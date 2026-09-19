@@ -31,6 +31,7 @@ let all =
       "model"
       "[name|id|provider/id]"
       "pick or switch the model"
+  ; c "scoped-models" "" "pick the models Ctrl+P cycles through"
   ; c
       ~argument:Argument.Login
       "login"

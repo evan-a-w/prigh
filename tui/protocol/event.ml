@@ -40,6 +40,7 @@ type t =
       }
   | State of State.t
   | Compacted of string
+  | Config_changed of Config.t
   | Notice of string
   | Queue_update of
       { steer : int
@@ -110,6 +111,10 @@ let rec of_json j =
   | "state" ->
     Json.object_field j "state" >>= State.of_json >>| fun s -> State s
   | "compacted" -> Json.string_field j "summary" >>| fun s -> Compacted s
+  | "config_changed" ->
+    Json.object_field j "config"
+    >>= Config.of_json
+    >>| fun c -> Config_changed c
   | "notice" -> Json.string_field j "text" >>| fun t -> Notice t
   | "queue_update" ->
     let%bind steer = Json.int_field j "steer" in

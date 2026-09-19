@@ -526,7 +526,8 @@ let apply t (event : P.Event.t) =
   | P.Event.Turn_start
   | P.Event.Turn_end _
   | P.Event.Queue_update _
-  | P.Event.Auth _ -> t
+  | P.Event.Auth _
+  | P.Event.Config_changed _ -> t
 ;;
 
 let render_report ~max_lines text : Content.t =

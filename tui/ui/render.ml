@@ -11,70 +11,242 @@ let spinner_frames = [| "⠋"; "⠙"; "⠹"; "⠸"; "⠼"; "⠴"; "⠦"; "⠧"; 
 let format_tokens = App.format_tokens
 let picker_rows = 10
 
+let agent_symbol (m : App.Model.t) (a : Agent_view.t) =
+  match a.status with
+  | Agent_view.Running ->
+    spinner_frames.(m.spinner % Array.length spinner_frames)
+  | Agent_view.Done _ -> "✓"
+  | Agent_view.Failed _ -> "✗"
+;;
+
+let status_style m =
+  match m.mode with
+  | Editing -> gray
+  | _ -> Style.fg Yellow
+;;
+
+let format_cwd (m : App.Model.t) (s : P.State.t) =
+  let cwd =
+    match m.home with
+    | Some home when String.equal s.cwd home -> "~"
+    | Some home when String.is_prefix s.cwd ~prefix:(home ^ "/") ->
+      "~" ^ String.drop_prefix s.cwd (String.length home)
+    | _ -> s.cwd
+  in
+  let cwd =
+    match s.git_branch with
+    | Some branch -> sprintf "%s (%s)" cwd branch
+    | None -> cwd
+  in
+  match s.session_name with
+  | Some name -> sprintf "%s %S" cwd name
+  | None -> cwd
+;;
+
+let context_style percent =
+  if percent >= 80
+  then Style.fg Red
+  else if percent >= 50
+  then Style.fg Yellow
+  else Style.fg Green
+;;
+
+let agent_marker text ~active =
+  let text = if active then "[" ^ text ^ "]" else text in
+  if active
+  then [ span ~style:(Style.invert (Style.bold Style.plain)) text ]
+  else [ span ~style:gray text ]
+;;
+
+(** The M3 agent strip, folded into the status line as [agents:[main] 1⠋ 2✓]. *)
+let agents_part (m : App.Model.t) : Content.Line.t option =
+  if List.is_empty m.agents
+  then None
+  else (
+    let main =
+      agent_marker
+        "main"
+        ~active:
+          (match m.focus with
+           | `Main -> true
+           | `Agent _ -> false)
+    in
+    let is_focused id =
+      match m.focus with
+      | `Agent fid -> String.equal id fid
+      | `Main -> false
+    in
+    let agents =
+      List.mapi m.agents ~f:(fun i (a : Agent_view.t) ->
+        agent_marker
+          (sprintf "%d%s" (i + 1) (agent_symbol m a))
+          ~active:(is_focused a.id))
+    in
+    Some
+      ([ span ~style:(Style.bold Style.plain) "agents:" ]
+       @ main
+       @ List.concat_map agents ~f:(fun a -> span " " :: a)))
+;;
+
+let mode_hint (m : App.Model.t) : Content.Line.t option =
+  match m.state with
+  | None -> None
+  | Some s ->
+    (match m.mode with
+     | Picker { kind = Scoped_models; _ } ->
+       Some
+         [ span
+             ~style:dim
+             "Space toggle · Ctrl+A all · Ctrl+X none · Enter save"
+         ]
+     | Picker { kind = Models _; _ } ->
+       Some
+         [ span
+             ~style:dim
+             "picker: type to filter, Enter selects, Esc closes · Ctrl+N \
+              logged in only"
+         ]
+     | Picker { kind = Sessions _; _ } ->
+       Some
+         [ span
+             ~style:dim
+             "picker: type to filter, Enter selects, Esc closes · Ctrl+N named \
+              only · Ctrl+D delete"
+         ]
+     | Picker _ ->
+       Some
+         [ span ~style:dim "picker: type to filter, Enter selects, Esc closes" ]
+     | Login_prompt _ ->
+       Some [ span ~style:dim "login: Enter answers, Esc cancels" ]
+     | Text_prompt _ -> Some [ span ~style:dim "Enter submits, Esc cancels" ]
+     | Confirm _ -> Some [ span ~style:dim "confirm: y / n" ]
+     | Editing ->
+       if Option.is_some m.autocomplete
+       then Some [ span ~style:dim "Tab/Enter accept · Esc close" ]
+       else if m.pending_quit
+       then Some [ span ~style:dim "Ctrl+C again quits" ]
+       else if s.running
+       then
+         Some
+           [ span
+               ~style:dim
+               (spinner_frames.(m.spinner % Array.length spinner_frames)
+                ^ " working (Esc aborts; Enter steers)")
+           ]
+       else None)
+;;
+
+let drop_left_text s ~width =
+  let rec go remaining pieces =
+    match pieces with
+    | [] -> []
+    | (p, w) :: rest ->
+      if remaining >= w then go (remaining - w) rest else (p, w) :: rest
+  in
+  String.concat (List.map (go width (Text_width.uchars s)) ~f:fst)
+;;
+
+let rec drop_left_spans spans to_drop acc =
+  match spans with
+  | [] -> List.rev acc
+  | (s : Content.Span.t) :: rest ->
+    let sw = Text_width.string s.text in
+    if sw <= to_drop
+    then drop_left_spans rest (to_drop - sw) acc
+    else (
+      let text = drop_left_text s.text ~width:to_drop in
+      List.rev_append acc ({ s with text } :: rest))
+;;
+
+let truncate_line_left line ~width =
+  let w = Content.Line.width line in
+  if w <= width
+  then line
+  else (
+    let keep = Int.max 0 (width - 1) in
+    span "…" :: drop_left_spans line (w - keep) [])
+;;
+
 let status (m : App.Model.t) : Content.Line.t =
   match m.state with
   | None -> [ span ~style:gray "connecting…" ]
   | Some s ->
+    let max_width = Int.max 1 m.width in
+    let base = status_style m in
     let context =
       if s.model.context_window > 0
       then 100 * s.context_tokens / s.model.context_window
       else 0
     in
-    let mode_hint =
-      match m.mode with
-      | Picker { kind = Sessions _; _ } ->
-        Some
-          "picker: type to filter, Enter selects, Esc closes · Ctrl+N named \
-           only · Ctrl+D delete"
-      | Picker _ -> Some "picker: type to filter, Enter selects, Esc closes"
-      | Login_prompt _ -> Some "login: Enter answers, Esc cancels"
-      | Text_prompt _ -> Some "Enter submits, Esc cancels"
-      | Confirm _ -> Some "confirm: y / n"
-      | Editing ->
-        if Option.is_some m.autocomplete
-        then Some "Tab/Enter accept · Esc close"
-        else if m.pending_quit
-        then Some "Ctrl+C again quits"
-        else if s.running
-        then
-          Some
-            (spinner_frames.(m.spinner % Array.length spinner_frames)
-             ^ " working (Esc aborts; Enter steers)")
-        else None
+    (* Each part after the model carries a priority: at narrow widths the mode
+       hint and context survive before think/view. Display order is fixed. *)
+    let cwd = [ span ~style:base (format_cwd m s) ] in
+    let model = [ span ~style:base s.model.id ] in
+    let after_model =
+      [ ( 5
+        , [ span
+              ~style:base
+              (sprintf
+                 "think:%s"
+                 (if s.model.supports_thinking then s.thinking else "n/a"))
+          ] )
+      ; 6, [ span ~style:base ("view:" ^ Verbosity.name m.verbosity) ]
+      ; ( 2
+        , [ span
+              ~style:(context_style context)
+              (sprintf "ctx:%d%% %s" context (format_tokens s.context_tokens))
+          ] )
+      ; 4, [ span ~style:base (sprintf "$%.2f" s.cost_usd) ]
+      ]
+      @ (let queued = Queue_counts.total m.queued in
+         if queued > 0
+         then [ 3, [ span ~style:base (sprintf "queued:%d" queued) ] ]
+         else [])
+      @ Option.to_list (Option.map (agents_part m) ~f:(fun p -> 3, p))
+      @ (match m.viewport with
+         | Viewport.Anchored { new_lines; _ } when new_lines > 0 ->
+           [ 1, [ span ~style:base (sprintf "↓ %d new" new_lines) ] ]
+         | Viewport.Follow | Viewport.Anchored _ -> [])
+      @ Option.to_list (Option.map (mode_hint m) ~f:(fun p -> 0, p))
     in
-    let parts =
-      [ s.model.key ]
-      @ (match s.session_name with
-         | Some name -> [ "name:" ^ name ]
-         | None -> [])
-      @ [ "thinking:" ^ s.thinking
-        ; "view:" ^ Verbosity.name m.verbosity
-        ; sprintf "ctx:%s (%d%%)" (format_tokens s.context_tokens) context
-        ; sprintf
-            "in:%s out:%s"
-            (format_tokens s.usage.input)
-            (format_tokens s.usage.output)
-        ; sprintf "$%.4f" s.cost_usd
-        ]
+    let cwd_width = Content.Line.width cwd in
+    let model_width = Content.Line.width model in
+    (* Keep parts by priority until the width is exhausted, then restore the
+       display order. *)
+    let fill used0 =
+      let indexed =
+        List.mapi after_model ~f:(fun i (prio, part) -> prio, i, part)
+      in
+      let by_priority =
+        List.sort indexed ~compare:(fun (p1, i1, _) (p2, i2, _) ->
+          match Int.compare p1 p2 with
+          | 0 -> Int.compare i1 i2
+          | c -> c)
+      in
+      let kept, used =
+        List.fold
+          by_priority
+          ~init:([], used0)
+          ~f:(fun (kept, used) (_, i, part) ->
+            let w = Content.Line.width part in
+            if used + 2 + w <= max_width
+            then (i, part) :: kept, used + 2 + w
+            else kept, used)
+      in
+      ( List.map
+          (List.sort kept ~compare:(fun (i1, _) (i2, _) -> Int.compare i1 i2))
+          ~f:snd
+      , used )
     in
-    let queued = Queue_counts.total m.queued in
-    let parts =
-      if queued > 0 then parts @ [ sprintf "queued:%d" queued ] else parts
+    let right, used = fill model_width in
+    let cwd_fits = used + 2 + cwd_width <= max_width in
+    let right = if cwd_fits then right else fst (fill (model_width + 1)) in
+    let line =
+      (if cwd_fits then cwd @ [ span "  " ] else [ span "…" ])
+      @ model
+      @ List.concat_map right ~f:(fun part -> span "  " :: part)
     in
-    let parts =
-      match m.viewport with
-      | Viewport.Anchored { new_lines; _ } when new_lines > 0 ->
-        parts @ [ sprintf "↓ %d new" new_lines ]
-      | Viewport.Follow | Viewport.Anchored _ -> parts
-    in
-    let parts = parts @ Option.to_list mode_hint in
-    let line = String.concat ~sep:"  " parts in
-    let style =
-      match m.mode with
-      | Editing -> gray
-      | _ -> Style.fg Yellow
-    in
-    [ span ~style (Text_width.truncate line ~width:m.width) ]
+    truncate_line_left line ~width:max_width
 ;;
 
 (* Editor lines hard-wrapped after a two-column marker, returning the rows and
@@ -202,7 +374,13 @@ let picker_block (p : Picker.t) ~width : Content.t * int =
   let rows =
     List.mapi shown ~f:(fun i (item : Picker.Item.t) ->
       let is_selected = start + i = selected in
-      let mark = if item.marked then "* " else "  " in
+      let mark =
+        if Picker.multi p
+        then if Set.mem (Picker.checked p) item.id then "[x] " else "[ ] "
+        else if item.marked
+        then "* "
+        else "  "
+      in
       let label = Text_width.pad_right item.label ~width:label_width in
       let label_style =
         let s = if item.dimmed then dim else Style.plain in
@@ -281,43 +459,6 @@ let autocomplete_block (ac : Autocomplete.t) ~width : Content.t =
             (if String.is_empty item.detail then "" else "  " ^ item.detail)
         ]
         ~width)
-;;
-
-let agent_symbol (m : App.Model.t) (a : Agent_view.t) =
-  match a.status with
-  | Agent_view.Running ->
-    spinner_frames.(m.spinner % Array.length spinner_frames)
-  | Agent_view.Done _ -> "✓"
-  | Agent_view.Failed _ -> "✗"
-;;
-
-(** [agents: main 1⠋ [2✓] (Shift+Tab)], with the focused item highlighted. *)
-let agent_strip (m : App.Model.t) : Content.Line.t =
-  let marker text active =
-    let text = if active then "[" ^ text ^ "]" else text in
-    if active
-    then [ span ~style:(Style.invert (Style.bold Style.plain)) text ]
-    else [ span ~style:gray text ]
-  in
-  let main =
-    marker
-      "main"
-      (match m.focus with
-       | `Main -> true
-       | `Agent _ -> false)
-  in
-  let is_focused id =
-    match m.focus with
-    | `Agent fid -> String.equal id fid
-    | `Main -> false
-  in
-  let agents =
-    List.mapi m.agents ~f:(fun i (a : Agent_view.t) ->
-      marker (sprintf "%d%s" (i + 1) (agent_symbol m a)) (is_focused a.id))
-  in
-  ([ span ~style:(Style.bold Style.plain) "agents: " ] @ main)
-  @ List.concat_map agents ~f:(fun a -> span " " :: a)
-  @ [ span ~style:dim "  (Shift+Tab)" ]
 ;;
 
 let subagent_header (m : App.Model.t) (a : Agent_view.t) : Content.Line.t =
@@ -413,13 +554,11 @@ let screen (m : App.Model.t) : Screen.t =
     | _ -> []
   in
   let panel =
-    let strip = if List.is_empty m.agents then [] else [ agent_strip m ] in
     dialog
     @ [ separator ]
     @ queued_block m
     @ editor
     @ autocomplete_rows
-    @ strip
     @ [ status_line ]
   in
   let panel = List.map panel ~f:(Content.Line.truncate ~width) in

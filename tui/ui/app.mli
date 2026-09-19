@@ -29,6 +29,10 @@ module Reply_tag : sig
     | Deleted_session
     | Paths_for_autocomplete of string
     | Set_model_done
+    | Config
+    | Config_saved
+    | Models_catalog
+    | Models_for_scoped
     | Compact_done
     | Abort_done
     | Notice_on_success of string
@@ -71,6 +75,7 @@ module Action : sig
     | Backend_closed
     | Reply of Reply_tag.t * (P.Json.t, string) Result.t
     | Tick
+    | Set_home of string
     | Resize of
         { width : int
         ; height : int
@@ -97,6 +102,8 @@ module Model : sig
     ; pending_quit : bool
     ; spinner : int
     ; verbosity : Verbosity.t
+    ; config : P.Config.t option
+    ; home : string option
     ; width : int
     ; height : int
     ; quitting : bool

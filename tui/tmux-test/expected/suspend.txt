@@ -8,7 +8,7 @@ quits.
 faux reply
 ────────────────────────────────────────────────────────────────────────────────────────────────────
 >
-deepseek/deepseek-flash  thinking:off  view:normal  ctx:10 (0%)  in:10 out:5  $0.0000
+$TMP/cwd  deepseek-flash  think:off  view:normal  ctx:0% 10  $0.00
 === suspend
 session <id> in $TMP/cwd. /help for commands, Esc aborts, Ctrl+C twice
 quits.
@@ -16,4 +16,4 @@ quits.
 faux reply
 ────────────────────────────────────────────────────────────────────────────────────────────────────
 > still typing
-deepseek/deepseek-flash  thinking:off  view:normal  ctx:10 (0%)  in:10 out:5  $0.0000
+$TMP/cwd  deepseek-flash  think:off  view:normal  ctx:0% 10  $0.00
