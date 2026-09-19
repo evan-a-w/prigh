@@ -42,6 +42,8 @@ let execute_tool
       ~cwd
       ~cancel
       ~emit
+      ~depth
+      ~(agent_id : string option)
       (call : Content.Tool_call.t)
   =
   let result : Tool.Result.t =
@@ -59,6 +61,11 @@ let execute_tool
              ~cancel
              ~on_output:(fun chunk ->
                emit (Agent_event.Tool_output { call_id = call.id; chunk }))
+             ~emit
+             ~depth
+             ?agent_id
+             ~call_id:call.id
+             ~tools:config.tools
              ~env
              ~cwd
              ()
@@ -78,6 +85,8 @@ let run
       ~(config : Config.t)
       ~cwd
       ?(cancel = Cancellation.never)
+      ?(depth = 0)
+      ?agent_id
       ?(steer = fun () -> [])
       ?(emit = ignore)
       ?retry_delay
@@ -145,24 +154,47 @@ let run
     added := Assistant assistant :: !added;
     emit (Message_end (Assistant assistant));
     let calls = Message.Assistant.tool_calls assistant in
-    let tool_results =
-      List.map calls ~f:(fun call ->
+    let execute call =
+      if Cancellation.is_cancelled cancel
+      then cancelled_result call
+      else (
+        emit (Tool_start call);
         let result =
-          match assistant.stop_reason with
-          | Aborted | Error _ ->
-            (* Keep the context valid: every tool call needs a result. *)
-            cancelled_result call
-          | End_turn | Tool_use | Length ->
-            if Cancellation.is_cancelled cancel
-            then cancelled_result call
-            else (
-              emit (Tool_start call);
-              let result = execute_tool ~env ~config ~cwd ~cancel ~emit call in
-              emit (Tool_end { call; result });
-              result)
+          execute_tool ~env ~config ~cwd ~cancel ~emit ~depth ~agent_id call
         in
-        append (Tool_result result);
+        emit (Tool_end { call; result });
         result)
+    in
+    let parallel =
+      List.length calls > 1
+      && List.for_all calls ~f:(fun call ->
+        match
+          List.find config.tools ~f:(fun t ->
+            String.equal (Tool.name t) call.name)
+        with
+        | Some tool -> tool.spec.parallel_safe
+        | None -> false)
+    in
+    let tool_results =
+      match assistant.stop_reason with
+      | Aborted | Error _ ->
+        (* Keep the context valid: every tool call needs a result. *)
+        List.map calls ~f:(fun call ->
+          let result = cancelled_result call in
+          append (Tool_result result);
+          result)
+      | End_turn | Tool_use | Length ->
+        if parallel
+        then (
+          let results = Fiber.List.map execute calls in
+          List.map results ~f:(fun result ->
+            append (Tool_result result);
+            result))
+        else
+          List.map calls ~f:(fun call ->
+            let result = execute call in
+            append (Tool_result result);
+            result)
     in
     emit (Turn_end { assistant; tool_results });
     let stopped =

@@ -1,5 +1,6 @@
 open! Core
 
-(** Clears the [IEXTEN] local flag so the line discipline stops eating ^O and
-    ^V. A no-op when [fd] is not a tty. *)
-val clear_iexten : Core_unix.File_descr.t -> unit
+(** Sets or clears the [IEXTEN] local flag (which makes the line discipline
+    eat ^O and ^V) and returns its previous value. A no-op returning [true]
+    when [fd] is not a tty. *)
+val set_iexten : Core_unix.File_descr.t -> bool -> bool

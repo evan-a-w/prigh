@@ -16,3 +16,14 @@ type t =
   | Off
   | On of Level.t option
 [@@deriving sexp, jsonaf, equal]
+
+let of_string s =
+  match String.lowercase (String.strip s) with
+  | "off" -> Ok Off
+  | "on" -> Ok (On None)
+  | s ->
+    (match Level.of_string s with
+     | Some level -> Ok (On (Some level))
+     | None ->
+       Or_error.error_string "thinking must be one of: off, on, low, high, max")
+;;

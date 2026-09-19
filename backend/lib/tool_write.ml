@@ -3,6 +3,7 @@ open! Import
 
 let spec =
   { Tool_spec.name = "write"
+  ; parallel_safe = false
   ; description =
       "Write a file, creating it (and parent directories) or overwriting it \
        entirely. Prefer edit for changing parts of an existing file."

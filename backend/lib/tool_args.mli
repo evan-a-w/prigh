@@ -11,6 +11,7 @@ val string_opt : Json.t -> string -> string option
 val int_opt : Json.t -> string -> int option
 val bool_opt : Json.t -> string -> bool option
 val list_opt : Json.t -> string -> Json.t list option
+val string_list_opt : Json.t -> string -> string list option
 
 (** Builds a JSON schema for an object with the given properties. *)
 val schema

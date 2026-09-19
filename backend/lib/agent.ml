@@ -52,6 +52,8 @@ type t =
   ; steer_queue : Message.t Queue.t
   ; follow_up_queue : string Queue.t
   ; mutable subscribers : (Event.t -> unit) list
+  ; mutable subagent_usage : Usage.t
+  ; mutable subagent_cost_usd : float
   }
 
 let restore_settings t =
@@ -95,6 +97,8 @@ let create
     ; steer_queue = Queue.create ()
     ; follow_up_queue = Queue.create ()
     ; subscribers = []
+    ; subagent_usage = Usage.zero
+    ; subagent_cost_usd = 0.
     }
   in
   restore_settings t;
@@ -114,10 +118,11 @@ let state t =
       | Message.Assistant a -> Some a
       | User _ | Tool_result _ -> None)
   in
-  let usage =
+  let assistant_usage =
     List.fold assistant_messages ~init:Usage.zero ~f:(fun acc a ->
       Usage.add acc a.usage)
   in
+  let usage = Usage.add assistant_usage t.subagent_usage in
   let context_tokens =
     Option.value_map (List.last assistant_messages) ~default:0 ~f:(fun a ->
       a.usage.input)
@@ -130,7 +135,7 @@ let state t =
   ; running = is_running t
   ; message_count = List.length messages
   ; usage
-  ; cost_usd = Model.cost_usd t.model usage
+  ; cost_usd = Model.cost_usd t.model assistant_usage +. t.subagent_cost_usd
   ; context_tokens
   }
 ;;
@@ -190,6 +195,11 @@ let rec start_run t prompts =
              queue_update t);
            l)
          ~emit:(fun event ->
+           (match event with
+            | Subagent_end { usage; cost_usd; _ } ->
+              t.subagent_usage <- Usage.add t.subagent_usage usage;
+              t.subagent_cost_usd <- t.subagent_cost_usd +. cost_usd
+            | _ -> ());
            (match event with
             | Message_end m ->
               ignore (Session.append_message session m : Session.Entry.t)
@@ -321,6 +331,8 @@ let replace_session t session =
   ignore (abort t);
   wait_idle t;
   t.session <- session;
+  t.subagent_usage <- Usage.zero;
+  t.subagent_cost_usd <- 0.;
   restore_settings t;
   state_changed t
 ;;

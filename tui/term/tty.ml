@@ -1,6 +1,7 @@
 open! Core
 
-external clear_iexten
+external set_iexten
   :  Core_unix.File_descr.t
-  -> unit
-  = "prigh_tty_clear_iexten"
+  -> bool
+  -> bool
+  = "prigh_tty_set_iexten"

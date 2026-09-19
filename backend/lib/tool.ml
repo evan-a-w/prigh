@@ -1,34 +1,43 @@
 open! Core
 open! Import
 
-module Context = struct
-  type t =
-    { env : Env.t
-    ; cwd : string
-    ; cancel : Cancellation.t
-    ; on_output : string -> unit
-    }
+type t =
+  { spec : Tool_spec.t
+  ; run : context -> Json.t -> Tool_result.t
+  }
 
-  let create ?(cancel = Cancellation.never) ?(on_output = ignore) ~env ~cwd () =
-    { env; cwd; cancel; on_output }
+and context =
+  { env : Env.t
+  ; cwd : string
+  ; cancel : Cancellation.t
+  ; on_output : string -> unit
+  ; depth : int
+  ; agent_id : string option
+  ; call_id : string
+  ; tools : t list
+  ; emit : Agent_event.t -> unit
+  }
+
+module Context = struct
+  type nonrec t = context
+
+  let create
+        ?(cancel = Cancellation.never)
+        ?(on_output = ignore)
+        ?(depth = 0)
+        ?agent_id
+        ?(call_id = "")
+        ?(tools = [])
+        ?(emit = ignore)
+        ~env
+        ~cwd
+        ()
+    =
+    { env; cwd; cancel; on_output; depth; agent_id; call_id; tools; emit }
   ;;
 end
 
-module Result = struct
-  type t =
-    { text : string
-    ; is_error : bool
-    }
-  [@@deriving sexp_of]
-
-  let ok text = { text; is_error = false }
-  let error text = { text; is_error = true }
-end
-
-type t =
-  { spec : Tool_spec.t
-  ; run : Context.t -> Json.t -> Result.t
-  }
+module Result = Tool_result
 
 let name t = t.spec.name
 

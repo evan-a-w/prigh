@@ -52,6 +52,16 @@ let list_opt json name =
   | Some _ -> invalid "argument %S must be an array" name
 ;;
 
+let string_list_opt json name =
+  match list_opt json name with
+  | None -> None
+  | Some items ->
+    Some
+      (List.map items ~f:(function
+         | `String s -> s
+         | _ -> invalid "argument %S must be an array of strings" name))
+;;
+
 let schema ?(required = []) properties =
   let property (name, kind, description) =
     let typed =

@@ -24,4 +24,24 @@ type t =
       { call : Content.Tool_call.t
       ; result : Message.Tool_result.t
       }
+  | Subagent_start of
+      { call_id : string
+      ; agent_id : string
+      ; task : string
+      ; model : string
+      ; tools : string list
+      }
+  | Subagent of
+      { call_id : string
+      ; agent_id : string
+      ; event : t
+      }
+  | Subagent_end of
+      { call_id : string
+      ; agent_id : string
+      ; usage : Usage.t
+      ; turns : int
+      ; cost_usd : float
+      ; result : Tool_result.t
+      }
 [@@deriving sexp_of]

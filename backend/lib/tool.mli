@@ -1,38 +1,41 @@
 open! Core
 open! Import
 
-module Context : sig
-  type t =
-    { env : Env.t
-    ; cwd : string
-    ; cancel : Cancellation.t
-    ; on_output : string -> unit (** streamed partial output, e.g. from bash *)
-    }
+type t =
+  { spec : Tool_spec.t
+  ; run : context -> Json.t -> Tool_result.t
+  }
 
+and context =
+  { env : Env.t
+  ; cwd : string
+  ; cancel : Cancellation.t
+  ; on_output : string -> unit (** streamed partial output, e.g. from bash *)
+  ; depth : int (** 0 for the main agent *)
+  ; agent_id : string option
+  ; call_id : string
+  ; tools : t list (** tools available to this agent *)
+  ; emit : Agent_event.t -> unit
+  }
+
+module Context : sig
   val create
     :  ?cancel:Cancellation.t
     -> ?on_output:(string -> unit)
+    -> ?depth:int
+    -> ?agent_id:string
+    -> ?call_id:string
+    -> ?tools:t list
+    -> ?emit:(Agent_event.t -> unit)
     -> env:Env.t
     -> cwd:string
     -> unit
-    -> t
+    -> context
+
+  type nonrec t = context
 end
 
-module Result : sig
-  type t =
-    { text : string
-    ; is_error : bool
-    }
-  [@@deriving sexp_of]
-
-  val ok : string -> t
-  val error : string -> t
-end
-
-type t =
-  { spec : Tool_spec.t
-  ; run : Context.t -> Json.t -> Result.t
-  }
+module Result = Tool_result
 
 val name : t -> string
 

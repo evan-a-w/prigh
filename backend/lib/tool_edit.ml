@@ -3,6 +3,7 @@ open! Import
 
 let spec =
   { Tool_spec.name = "edit"
+  ; parallel_safe = false
   ; description =
       "Edit a file by exact text replacement. Each old_text must occur exactly \
        once in the file, and edits must not overlap. Use enough surrounding \

@@ -19,7 +19,7 @@ let open_browser url =
      |> Deferred.map ~f:(fun (_ : string Or_error.t) -> ()))
 ;;
 
-let platform client ~exit : Prigh_ui.Component.Platform.t =
+let platform client ~exit ~quit_requested : Prigh_ui.Component.Platform.t =
   { rpc =
       (fun method_ params ->
         Effect.of_deferred_fun
@@ -29,7 +29,12 @@ let platform client ~exit : Prigh_ui.Component.Platform.t =
               ~f:(Result.map_error ~f:Error.to_string_hum))
           ())
   ; open_browser = (fun url -> Effect.of_sync_fun open_browser url)
-  ; quit = exit ()
+  ; quit =
+      (* Bonsai_term's [Driver.finished] never resolves when [exit] is scheduled
+         from apply_action (the next frame sees the exit status before any event
+         fills the ivar), so we track the request ourselves. *)
+      Effect.Many
+        [ exit (); Effect.of_sync_fun (Ivar.fill_if_empty quit_requested) () ]
   }
 ;;
 
@@ -42,8 +47,14 @@ module Paste = struct
   [@@deriving sexp_of]
 end
 
-let app client ~exit ~(dimensions : Dimensions.t Bonsai.t) (local_ graph) =
-  let platform = Bonsai.return (platform client ~exit) in
+let app
+  client
+  ~exit
+  ~quit_requested
+  ~(dimensions : Dimensions.t Bonsai.t)
+  (local_ graph)
+  =
+  let platform = Bonsai.return (platform client ~exit ~quit_requested) in
   let model, inject = Prigh_ui.Component.create platform graph in
   let paste, set_paste =
     Bonsai.state Paste.Idle ~sexp_of_model:Paste.sexp_of_t graph
@@ -118,31 +129,41 @@ let run ~backend ~args =
   | Error _ as e -> Deferred.return e
   | Ok transport ->
     let client = Client.create transport in
+    let quit_requested = Ivar.create () in
     let%bind.Deferred driver =
       Bonsai_term.start_with_driver
         ~mouse:No_mouse_events
         ~get_view_and_handler:(fun (r : Result_.t) ->
           ~view:r.view, ~handler:r.handler)
         ~handle_incoming:(fun (r : Result_.t) action -> r.inject action)
-        (fun ~exit ~dimensions graph -> app client ~exit ~dimensions graph)
+        (fun ~exit ~dimensions graph ->
+          app client ~exit ~quit_requested ~dimensions graph)
     in
     (match driver with
      | Error _ as e -> Deferred.return e
      | Ok driver ->
-       (* notty has saved the original termios by now, so it will restore IEXTEN
-          on exit; clear it so ^O reaches us. *)
-       Tty.clear_iexten Core_unix.stdin;
-       if not (Core_unix.isatty Core_unix.stdin)
-       then Tty.clear_iexten Core_unix.stdout;
+       (* notty's raw mode leaves IEXTEN set, which makes the tty eat ^O; it
+          cannot restore the flag either, so we do both around the driver. *)
+       let tty =
+         if Core_unix.isatty Core_unix.stdin
+         then Core_unix.stdin
+         else Core_unix.stdout
+       in
+       let had_iexten = Tty.set_iexten tty false in
        don't_wait_for
          (Pipe.iter_without_pushback
             (Client.incoming client)
             ~f:(fun incoming ->
               Driver.send_incoming_event driver (action_of_incoming incoming)));
-       let%bind.Deferred (_ : (unit, [ `Incoming_events_pipe_closed ]) Result.t)
-         =
-         Driver.finished driver
+       let%bind.Deferred () =
+         Deferred.any_unit
+           [ Deferred.ignore_m (Driver.finished driver)
+           ; Ivar.read quit_requested
+           ]
        in
+       (* Give the driver a frame to release the terminal before we exit. *)
+       let%bind.Deferred () = Clock.after (Time_float.Span.of_sec 0.2) in
+       ignore (Tty.set_iexten tty had_iexten : bool);
        Client.close client;
        let%bind.Deferred () =
          Deferred.any_unit

@@ -5,6 +5,7 @@ let default_limit = 200
 
 let spec =
   { Tool_spec.name = "grep"
+  ; parallel_safe = true
   ; description =
       "Search file contents with a regular expression (ripgrep syntax). \
        Returns matching lines as path:line:text. Respects .gitignore."

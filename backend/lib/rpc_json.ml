@@ -50,6 +50,10 @@ let tool_result (r : Message.Tool_result.t) =
     ]
 ;;
 
+let tool_result_value (r : Tool_result.t) =
+  `Object [ "text", str r.text; "is_error", bool r.is_error ]
+;;
+
 let assistant (a : Message.Assistant.t) =
   `Object
     [ "role", str "assistant"
@@ -241,7 +245,7 @@ let login_event (e : Login_manager.Event.t) =
   `Object ([ "type", str "event"; "event", str "auth" ] @ fields)
 ;;
 
-let event (e : Agent.Event.t) =
+let rec event (e : Agent.Event.t) =
   let fields =
     match e with
     | Loop Agent_start -> [ "event", str "agent_start" ]
@@ -272,6 +276,31 @@ let event (e : Agent.Event.t) =
       [ "event", str "tool_end"
       ; "call", tool_call call
       ; "result", tool_result result
+      ]
+    | Loop (Subagent_start { call_id; agent_id; task; model; tools }) ->
+      [ "event", str "subagent_start"
+      ; "call_id", str call_id
+      ; "agent_id", str agent_id
+      ; "task", str task
+      ; "model", str model
+      ; "tools", `Array (List.map tools ~f:str)
+      ]
+    | Loop (Subagent { call_id; agent_id; event = inner }) ->
+      [ "event", str "subagent"
+      ; "call_id", str call_id
+      ; "agent_id", str agent_id
+      ; "inner", event (Loop inner)
+      ]
+    | Loop
+        (Subagent_end { call_id; agent_id; usage = u; turns; cost_usd; result })
+      ->
+      [ "event", str "subagent_end"
+      ; "call_id", str call_id
+      ; "agent_id", str agent_id
+      ; "usage", usage u
+      ; "turns", int turns
+      ; "cost_usd", float cost_usd
+      ; "result", tool_result_value result
       ]
     | State_changed s -> [ "event", str "state"; "state", state s ]
     | Compacted { summary } ->

@@ -15,7 +15,7 @@ let config ?(tools = Tools.all) ?max_turns () =
 ;;
 
 (* Compact rendering of the event stream. *)
-let show_event (e : Agent_event.t) =
+let rec show_event (e : Agent_event.t) =
   match e with
   | Agent_start -> "agent_start"
   | Agent_end added -> sprintf "agent_end (%d new messages)" (List.length added)
@@ -41,15 +41,35 @@ let show_event (e : Agent_event.t) =
       "tool_end %s%S"
       (if result.is_error then "ERROR " else "")
       result.text
+  | Subagent_start { call_id; agent_id; task; model; tools } ->
+    sprintf
+      "subagent_start %s/%s task=%S model=%s tools=[%s]"
+      call_id
+      agent_id
+      task
+      model
+      (String.concat ~sep:"," tools)
+  | Subagent { call_id; agent_id; event } ->
+    sprintf "subagent %s/%s: %s" call_id agent_id (show_event event)
+  | Subagent_end { call_id; agent_id; usage; turns; cost_usd; _ } ->
+    sprintf
+      "subagent_end %s/%s turns=%d in=%d out=%d cache=%d cost=%s"
+      call_id
+      agent_id
+      turns
+      usage.input
+      usage.output
+      usage.cache_read
+      (Float.to_string cost_usd)
 ;;
 
-let run ?cancel ?steer ?max_turns ?(context = []) t provider prompt =
+let run ?cancel ?steer ?max_turns ?tools ?(context = []) t provider prompt =
   let events = ref [] in
   let added =
     Agent_loop.run
       ~env:t.env
       ~provider
-      ~config:(config ?max_turns ())
+      ~config:(config ?max_turns ?tools ())
       ~cwd:t.dir
       ?cancel
       ?steer
@@ -517,4 +537,193 @@ let%expect_test "transient provider errors are retried; permanent ones are not" 
   let (_ : Message.t list) = run t provider "go" in
   turn_ends [%expect.output];
   [%expect {| turn_end stop=(Error"HTTP 401: nope") tool_results=0 |}]
+;;
+
+let subagent ~provider =
+  Tool_subagent.create
+    ~provider
+    ~current_model:(fun () -> Model.default)
+    ~current_thinking:(fun () -> Off)
+    ~home:"/nonexistent"
+;;
+
+let run_silent
+      ?cancel
+      ?steer
+      ?max_turns
+      ?tools
+      ?(context = [])
+      t
+      provider
+      prompt
+  =
+  let events = ref [] in
+  let added =
+    Agent_loop.run
+      ~env:t.env
+      ~provider
+      ~config:(config ?max_turns ?tools ())
+      ~cwd:t.dir
+      ?cancel
+      ?steer
+      ~emit:(fun e -> events := e :: !events)
+      ~context
+      ~prompts:[ Message.user prompt ]
+      ()
+  in
+  added, List.rev !events
+;;
+
+let%expect_test
+    "parallel-safe subagent calls run concurrently; results stay in call order"
+  =
+  with_sandbox
+  @@ fun t ->
+  let in_flight = ref 0 in
+  let max_in_flight = ref 0 in
+  let delay () =
+    incr in_flight;
+    max_in_flight := Int.max !max_in_flight !in_flight;
+    Eio.Fiber.yield ();
+    decr in_flight
+  in
+  let provider =
+    Faux_provider.create
+      ~delay_between_events:delay
+      [ Reply.tool_calls
+          [ "c1", "subagent", {|{"task":"one"}|}
+          ; "c2", "subagent", {|{"task":"two"}|}
+          ; "c3", "subagent", {|{"task":"three"}|}
+          ]
+      ; Reply.text "one"
+      ; Reply.text "two"
+      ; Reply.text "three"
+      ; Reply.text "parent"
+      ]
+  in
+  let subagent = subagent ~provider in
+  let added, events =
+    run_silent ~tools:(Tools.all @ [ subagent ]) t provider "go"
+  in
+  printf "max_in_flight: %d\n" !max_in_flight;
+  print_s
+    [%sexp
+      (List.filter_map added ~f:(function
+         | Message.Tool_result r -> Some r.tool_call_id
+         | _ -> None)
+       : string list)];
+  printf
+    "subagent_ends: %d\n"
+    (List.count events ~f:(function
+       | Agent_event.Subagent_end _ -> true
+       | _ -> false));
+  [%expect
+    {|
+    max_in_flight: 3
+    (c1 c2 c3)
+    subagent_ends: 3
+    |}]
+;;
+
+let%expect_test "mixed turn with a non-parallel-safe tool runs sequentially" =
+  with_sandbox
+  @@ fun t ->
+  write t "notes.txt" "hi\n";
+  let in_flight = ref 0 in
+  let max_in_flight = ref 0 in
+  let wrap ~parallel_safe (base : Tool.t) : Tool.t =
+    { spec = { base.spec with parallel_safe }
+    ; run =
+        (fun context args ->
+          incr in_flight;
+          max_in_flight := Int.max !max_in_flight !in_flight;
+          Eio.Fiber.yield ();
+          let result = base.run context args in
+          decr in_flight;
+          result)
+    }
+  in
+  let read = wrap ~parallel_safe:true Tool_read.tool in
+  let bash = wrap ~parallel_safe:false Tool_bash.tool in
+  let provider =
+    Faux_provider.create
+      [ Reply.tool_calls
+          [ "c1", "read", {|{"path":"notes.txt"}|}
+          ; "c2", "bash", {|{"command":"echo hi"}|}
+          ]
+      ; Reply.text "done"
+      ]
+  in
+  let added, _events = run_silent ~tools:[ read; bash ] t provider "go" in
+  printf "max_in_flight: %d\n" !max_in_flight;
+  print_s
+    [%sexp
+      (List.filter_map added ~f:(function
+         | Message.Tool_result r -> Some (r.tool_call_id, r.text)
+         | _ -> None)
+       : (string * string) list)];
+  [%expect
+    {|
+    max_in_flight: 1
+    ((c1 "hi\n") (c2 "hi\n"))
+    |}]
+;;
+
+let%expect_test "abort mid-subagent cancels the child and returns" =
+  with_sandbox
+  @@ fun t ->
+  let cancel = Cancellation.create () in
+  let count = ref 0 in
+  let provider =
+    Faux_provider.create
+      ~delay_between_events:(fun () ->
+        incr count;
+        if !count = 3 then Cancellation.cancel cancel)
+      [ Reply.tool_call
+          ~id:"p1"
+          ~name:"subagent"
+          ~arguments:{|{"task":"long"}|}
+          ()
+      ; Reply.text "child working"
+      ]
+  in
+  let subagent = subagent ~provider in
+  let added = run t ~cancel ~tools:(Tools.all @ [ subagent ]) provider "go" in
+  print_s
+    [%sexp
+      (List.filter_map added ~f:(function
+         | Message.Tool_result r -> Some (r.text, r.is_error)
+         | _ -> None)
+       : (string * bool) list)];
+  print_endline "returned";
+  [%expect
+    {|
+    agent_start
+    message_start user "go"
+    message_end
+    turn_start
+    message_start assistant
+      update (Tool_call_start(index 0)(id p1)(name subagent))
+      update (Tool_call_delta(index 0)(arguments"{\"task\":\"long\"}"))
+    message_end assistant ""
+    tool_start subagent {"task":"long"}
+    subagent_start p1/p1 task="long" model=deepseek-flash tools=[bash,read,write,edit,ls,grep,find,subagent]
+    subagent p1/p1: agent_start
+    subagent p1/p1: message_start user "long"
+    subagent p1/p1: message_end
+    subagent p1/p1: turn_start
+    subagent p1/p1: message_start assistant
+    subagent p1/p1: message_end assistant ""
+    subagent p1/p1: turn_end stop=Aborted tool_results=0
+    subagent p1/p1: agent_end (2 new messages)
+    subagent_end p1/p1 turns=1 in=10 out=5 cache=0 cost=9e-06
+    tool_end ERROR "[cancelled]\n[subagent: 1 turns, 10 in / 5 out tokens, $0.0000]"
+    message_start tool_result p1
+    message_end
+    turn_end stop=Tool_use tool_results=1
+    agent_end (3 new messages)
+    (( "[cancelled]\
+      \n[subagent: 1 turns, 10 in / 5 out tokens, $0.0000]" true))
+    returned
+    |}]
 ;;

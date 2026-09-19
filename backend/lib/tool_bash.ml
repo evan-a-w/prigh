@@ -5,6 +5,7 @@ let default_timeout = Time_ns.Span.of_min 10.
 
 let spec =
   { Tool_spec.name = "bash"
+  ; parallel_safe = false
   ; description =
       "Run a shell command with bash in the working directory. Returns \
        combined stdout and stderr (interleaved) and the exit code if non-zero. \

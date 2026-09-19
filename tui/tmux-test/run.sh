@@ -35,7 +35,7 @@ start() {
 	tmux new-session -d -s "$session" -x "$W" -y "$H" \
 		"env HOME=$tmp/home TERM=xterm-256color PRIGH_BACKEND=$backend \
 		 $exe -faux -cwd $tmp/cwd -auth-file $tmp/home/auth.json $*; \
-		 echo EXITED; sleep 30"
+		 echo EXITED; stty -a | tr ' ;' '\n\n' | grep -E '^-?(icanon|echo|iexten|isig|ixon)$' | tr '\n' ' '; echo; sleep 30"
 }
 
 stop() {
@@ -120,13 +120,13 @@ run_scenario() {
 # ---- scenarios ------------------------------------------------------------
 
 scenario_startup() {
-	wait_for "Ctrl+C twice quits"
+	wait_for "Ctrl+C twice"
 	settle
 	capture startup "initial screen"
 }
 
 scenario_prompt() {
-	wait_for "Ctrl+C twice quits"
+	wait_for "Ctrl+C twice"
 	type_text "hello there"
 	settle
 	capture prompt "typed"
@@ -139,7 +139,7 @@ scenario_prompt() {
 scenario_ctrl_o() {
 	# ^O is VDISCARD: without IEXTEN cleared the tty swallows it and the
 	# status line never changes. The screen must differ after C-o.
-	wait_for "Ctrl+C twice quits"
+	wait_for "Ctrl+C twice"
 	settle
 	local before after
 	before="$(tmux capture-pane -p -t "$session")"
@@ -155,7 +155,7 @@ scenario_ctrl_o() {
 }
 
 scenario_resize() {
-	wait_for "Ctrl+C twice quits"
+	wait_for "Ctrl+C twice"
 	type_text "first"
 	keys Enter
 	wait_for "faux reply"
@@ -168,14 +168,15 @@ scenario_resize() {
 }
 
 scenario_quit() {
-	wait_for "Ctrl+C twice quits"
+	wait_for "Ctrl+C twice"
 	keys C-c
 	wait_for "again quits"
 	capture quit "after first C-c"
 	keys C-c
 	wait_for "EXITED"
-	# The tty must be sane after exit: check flags through the pane's shell.
-	capture quit "exited"
+	sleep 0.3
+	# The tty must be sane after exit: the shell prints the termios flags.
+	capture quit "exited (tty flags)"
 }
 
 all="startup prompt ctrl_o resize quit"

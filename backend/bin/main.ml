@@ -158,27 +158,55 @@ let run_command =
          ksprintf (fun s -> if not quiet then eprintf "%s\n%!" s) fmt
        in
        let failed = ref None in
-       Agent.subscribe agent ~f:(function
+       let rec handle ~in_subagent (event : Agent.Event.t) =
+         match event with
+         | Loop (Subagent { event = inner; _ }) ->
+           handle ~in_subagent:true (Loop inner)
+         | Loop (Subagent_start { agent_id; task; tools; _ }) ->
+           note
+             "[subagent %s] %s (tools: %s)"
+             agent_id
+             (String.prefix (String.strip task) 100)
+             (String.concat ~sep:", " tools)
+         | Loop
+             (Subagent_end
+                { call_id = _; agent_id; usage; turns; cost_usd; result }) ->
+           note
+             "[subagent %s] %d turns, in=%d out=%d cost=$%.4f%s"
+             agent_id
+             turns
+             usage.input
+             usage.output
+             cost_usd
+             (if result.is_error then " (error)" else "")
          | Loop (Message_update { delta = Text_delta s; _ }) ->
-           Out_channel.output_string stdout s;
-           flush_out ()
+           if in_subagent
+           then eprintf "%s%!" s
+           else (
+             Out_channel.output_string stdout s;
+             flush_out ())
          | Loop (Message_update { delta = Thinking_delta s; _ }) ->
            if show_thinking then eprintf "%s%!" s
          | Loop (Tool_start call) ->
            note "[tool] %s %s" call.name (String.prefix call.arguments 200)
+         | Loop (Tool_output { chunk; _ }) -> eprintf "%s%!" chunk
          | Loop (Tool_end { result; _ }) ->
            note
              "[tool] %s%s"
              (if result.is_error then "error: " else "")
              (String.prefix (String.strip result.text) 200)
          | Loop (Message_end (Assistant a)) ->
-           (match a.stop_reason with
-            | Error e -> failed := Some e
-            | Aborted | End_turn | Tool_use | Length -> ());
-           if not (String.is_empty (Message.Assistant.text a))
-           then print_endline ""
+           if not in_subagent
+           then (
+             (match a.stop_reason with
+              | Error e -> failed := Some e
+              | Aborted | End_turn | Tool_use | Length -> ());
+             if not (String.is_empty (Message.Assistant.text a))
+             then print_endline "")
          | Notice n -> eprintf "%s\n%!" n
-         | _ -> ());
+         | _ -> ()
+       in
+       Agent.subscribe agent ~f:(handle ~in_subagent:false);
        Or_error.ok_exn (Agent.prompt agent prompt);
        Agent.wait_idle agent;
        let state = Agent.state agent in

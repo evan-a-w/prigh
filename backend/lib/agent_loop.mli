@@ -30,6 +30,8 @@ val run
   -> config:Config.t
   -> cwd:string
   -> ?cancel:Cancellation.t
+  -> ?depth:int
+  -> ?agent_id:string
   -> ?steer:(unit -> Message.t list)
   -> ?emit:(Agent_event.t -> unit)
   -> ?retry_delay:(attempt:int -> unit)
