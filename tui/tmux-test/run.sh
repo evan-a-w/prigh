@@ -29,7 +29,6 @@ session=""
 tmp=""
 
 start() {
-	tmp="$(mktemp -d)"
 	mkdir -p "$tmp/home" "$tmp/cwd"
 	session="prigh-test-$$-$RANDOM"
 	tmux new-session -d -s "$session" -x "$W" -y "$H" \
@@ -106,7 +105,10 @@ check() {
 run_scenario() {
 	local name=$1
 	out="$(mktemp)"
-	start
+	tmp="$(mktemp -d)"
+	extra_args=""
+	if declare -F "setup_$name" >/dev/null; then "setup_$name"; fi
+	start $extra_args
 	if ! "scenario_$name"; then
 		echo "FAIL    $name (scenario error)"
 		failures=$((failures + 1))
@@ -179,7 +181,47 @@ scenario_quit() {
 	capture quit "exited (tty flags)"
 }
 
-all="startup prompt ctrl_o resize quit"
+# A scripted provider run: a bash tool call, then two subagents in one turn.
+setup_tools() {
+	extra_args="-- -faux-script $tmp/script.json"
+	cat >"$tmp/script.json" <<'JSON'
+[
+  {"text": "let me look", "tool_calls": [{"id": "c1", "name": "bash", "arguments": {"command": "printf 'one\\ntwo\\nthree\\n'"}}]},
+  {"text": "three lines. now delegating", "tool_calls": [
+     {"id": "s1", "name": "subagent", "arguments": {"task": "count files", "tools": ["ls"]}},
+     {"id": "s2", "name": "subagent", "arguments": {"task": "say hello", "tools": ["ls"]}}]},
+  {"text": "child one reporting: 0 files"},
+  {"text": "child two reporting: hello"},
+  {"text": "all done"}
+]
+JSON
+}
+
+scenario_tools() {
+	wait_for "Ctrl+C twice"
+	type_text "go"
+	keys Enter
+	wait_for "all done"
+	settle
+	capture tools "normal"
+	keys C-o
+	settle
+	capture tools "verbose"
+	keys C-o
+	settle
+	capture tools "quiet"
+	keys BTab
+	settle
+	capture tools "agent 1"
+	keys BTab
+	settle
+	capture tools "agent 2"
+	keys BTab
+	settle
+	capture tools "main again"
+}
+
+all="startup prompt ctrl_o resize quit tools"
 for name in ${*:-$all}; do
 	run_scenario "$name"
 done

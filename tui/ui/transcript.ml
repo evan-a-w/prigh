@@ -589,7 +589,12 @@ let render_item (item : Item.t) ~(verbosity : Verbosity.t) : Content.t =
   | Assistant { text; final } ->
     (match verbosity with
      | Quiet when not final ->
-       Markdown.render (first_line text) @ Content.lines ~style:dim "…"
+       let more =
+         if List.length (String.split_lines (String.strip text)) > 1
+         then Content.lines ~style:dim "…"
+         else []
+       in
+       Markdown.render (first_line text) @ more
      | Quiet | Normal | Verbose -> Markdown.render text)
   | Thinking text ->
     (match verbosity with

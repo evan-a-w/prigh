@@ -1,0 +1,132 @@
+=== tools
+session <id> in $TMP/cwd. /help for commands, Esc aborts, Ctrl+C twice
+quits.
+> go
+let me look
+⚙ bash command=printf 'one\ntwo\nthree\n'
+  one
+  two
+  three
+three lines. now delegating
+⚙ subagent "count files" ✓ 1 turns $0.00
+  child one reporting: 0 files
+  [subagent: 1 turns, 0 in / 0 out tokens, $0.0000]
+⚙ subagent "say hello" ✓ 1 turns $0.00
+  child two reporting: hello
+  [subagent: 1 turns, 0 in / 0 out tokens, $0.0000]
+all done
+────────────────────────────────────────────────────────────────────────────────────────────────────
+>
+agents: [main] 1✓ 2✓  (Shift+Tab)
+deepseek/deepseek-flash  thinking:off  view:normal  ctx:0 (0%)  in:0 out:0  $0.0000
+=== tools
+session <id> in $TMP/cwd. /help for commands, Esc aborts, Ctrl+C twice
+quits.
+> go
+let me look
+⚙ bash
+  {
+    command: "printf 'one\\ntwo\\nthree\\n'"
+  }
+  one
+  two
+  three
+three lines. now delegating
+⚙ subagent "count files" ✓ 1 turns $0.00
+  child one reporting: 0 files
+  [subagent: 1 turns, 0 in / 0 out tokens, $0.0000]
+⚙ subagent "say hello" ✓ 1 turns $0.00
+  child two reporting: hello
+  [subagent: 1 turns, 0 in / 0 out tokens, $0.0000]
+all done
+view: verbose — everything is shown
+────────────────────────────────────────────────────────────────────────────────────────────────────
+>
+agents: [main] 1✓ 2✓  (Shift+Tab)
+deepseek/deepseek-flash  thinking:off  view:verbose  ctx:0 (0%)  in:0 out:0  $0.0000
+=== tools
+> go
+let me look
+⚙ bash printf 'one\ntwo\nthree\n' ✓ 3 lines
+three lines. now delegating
+⚙ subagent "count files" ✓ 1 turns $0.00
+⚙ subagent "say hello" ✓ 1 turns $0.00
+all done
+────────────────────────────────────────────────────────────────────────────────────────────────────
+>
+agents: [main] 1✓ 2✓  (Shift+Tab)
+deepseek/deepseek-flash  thinking:off  view:quiet  ctx:0 (0%)  in:0 out:0  $0.0000
+=== tools
+◆ subagent 1/2  deepseek-flash  ✓ done 1 turns $0.00  "count files"
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+> count files
+child one reporting: 0 files
+────────────────────────────────────────────────────────────────────────────────────────────────────
+>
+agents: main [1✓] 2✓  (Shift+Tab)
+deepseek/deepseek-flash  thinking:off  view:quiet  ctx:0 (0%)  in:0 out:0  $0.0000
+=== tools
+◆ subagent 2/2  deepseek-flash  ✓ done 1 turns $0.00  "say hello"
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+> say hello
+child two reporting: hello
+────────────────────────────────────────────────────────────────────────────────────────────────────
+>
+agents: main 1✓ [2✓]  (Shift+Tab)
+deepseek/deepseek-flash  thinking:off  view:quiet  ctx:0 (0%)  in:0 out:0  $0.0000
+=== tools
+> go
+let me look
+⚙ bash printf 'one\ntwo\nthree\n' ✓ 3 lines
+three lines. now delegating
+⚙ subagent "count files" ✓ 1 turns $0.00
+⚙ subagent "say hello" ✓ 1 turns $0.00
+all done
+────────────────────────────────────────────────────────────────────────────────────────────────────
+>
+agents: [main] 1✓ 2✓  (Shift+Tab)
+deepseek/deepseek-flash  thinking:off  view:quiet  ctx:0 (0%)  in:0 out:0  $0.0000

@@ -1318,7 +1318,6 @@ let%expect_test "quiet hides intermediate text and thinking" =
     earlier answer
     > hi
     let me look at the files
-    …
     ⚙ bash ls ✓ 2 lines
     all done
     ────────────────────────────────────────────────────────────
