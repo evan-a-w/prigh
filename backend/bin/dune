@@ -1,0 +1,7 @@
+(executable
+ (public_name prigh)
+ (name main)
+ (package prigh)
+ (preprocess
+  (pps ppx_jane))
+ (libraries prigh core core_unix core_unix.command_unix eio eio_main))

@@ -1,0 +1,225 @@
+open! Core
+open! Prigh
+open Tool_test_helpers
+module Reply = Faux_provider.Reply
+module Json = Jsonaf
+
+let with_agent replies f =
+  with_sandbox
+  @@ fun t ->
+  Eio.Switch.run
+  @@ fun sw ->
+  let agent =
+    Agent.create
+      ~env:t.env
+      ~sw
+      ~provider:(Faux_provider.create replies)
+      ~tools:Tools.all
+      ~sessions_dir:(Filename.concat t.dir "sessions")
+      ~home:t.dir
+      ~cwd:t.dir
+      ()
+  in
+  f t agent
+;;
+
+let call t agent ?(params = "{}") meth =
+  let request =
+    Json.of_string
+      (sprintf {|{"id": "r1", "method": "%s", "params": %s}|} meth params)
+  in
+  print_endline (mask t (Json.to_string (Rpc_server.handle agent request)))
+;;
+
+let%expect_test "state, models, thinking, errors" =
+  with_agent []
+  @@ fun t agent ->
+  call t agent "ping";
+  call t agent "get_state";
+  call t agent ~params:{|{"thinking": "high"}|} "set_thinking";
+  call t agent ~params:{|{"thinking": "sideways"}|} "set_thinking";
+  call t agent ~params:{|{"model": "deepseek-v4-pro"}|} "set_model";
+  call t agent ~params:{|{"model": "gpt-9"}|} "set_model";
+  call t agent "get_state";
+  call t agent "nope";
+  call t agent ~params:{|{"text": 5}|} "prompt";
+  print_endline
+    (Json.to_string (Rpc_server.handle agent (Json.of_string {|{"id": 7}|})));
+  print_endline
+    (Json.to_string (Rpc_server.handle agent (Json.of_string {|[1]|})));
+  [%expect
+    {|
+    {"type":"response","id":"r1","ok":true,"result":"pong"}
+    {"type":"response","id":"r1","ok":true,"result":{"session_id":"<id>","session_path":"$DIR/sessions/<stamp>_<id>.jsonl","cwd":"$DIR","model":{"id":"deepseek-flash","name":"DeepSeek V4.1 Flash","context_window":1000000,"max_output":384000,"supports_thinking":true,"cost":{"input":0.3,"output":1.2,"cache_read":0.006}},"thinking":"off","running":false,"message_count":0,"usage":{"input":0,"output":0,"cache_read":0},"cost_usd":0,"context_tokens":0}}
+    {"type":"response","id":"r1","ok":true,"result":{}}
+    {"type":"response","id":"r1","ok":false,"error":"thinking must be one of: off, on, low, high, max"}
+    {"type":"response","id":"r1","ok":true,"result":{}}
+    {"type":"response","id":"r1","ok":false,"error":"unknown model \"gpt-9\""}
+    {"type":"response","id":"r1","ok":true,"result":{"session_id":"<id>","session_path":"$DIR/sessions/<stamp>_<id>.jsonl","cwd":"$DIR","model":{"id":"deepseek-v4-pro","name":"DeepSeek V4 Pro","context_window":1000000,"max_output":384000,"supports_thinking":true,"cost":{"input":1.32,"output":3.96,"cache_read":0.044}},"thinking":"high","running":false,"message_count":0,"usage":{"input":0,"output":0,"cache_read":0},"cost_usd":0,"context_tokens":0}}
+    {"type":"response","id":"r1","ok":false,"error":"unknown method \"nope\""}
+    {"type":"response","id":"r1","ok":false,"error":"param \"text\" must be a string"}
+    {"type":"response","id":7,"ok":false,"error":"request must have a string \"method\""}
+    {"type":"response","id":null,"ok":false,"error":"request must have a string \"method\""}
+    |}]
+;;
+
+let%expect_test "prompt emits events, get_messages/get_entries reflect the run" =
+  with_agent
+    [ Reply.tool_call ~text:"Looking." ~id:"c1" ~name:"ls" ~arguments:"{}" ()
+    ; Reply.text "Empty."
+    ]
+  @@ fun t agent ->
+  let events = Queue.create () in
+  Agent.subscribe agent ~f:(fun e -> Queue.enqueue events (Rpc_json.event e));
+  call t agent ~params:{|{"text": "what is here?"}|} "prompt";
+  call t agent ~params:{|{"text": "again"}|} "prompt";
+  Agent.wait_idle agent;
+  Queue.iter events ~f:(fun e -> print_endline (mask t (Json.to_string e)));
+  [%expect
+    {|
+    {"type":"response","id":"r1","ok":true,"result":{}}
+    {"type":"response","id":"r1","ok":false,"error":"a run is already in progress; use steer or follow_up"}
+    {"type":"event","event":"state","state":{"session_id":"<id>","session_path":"$DIR/sessions/<stamp>_<id>.jsonl","cwd":"$DIR","model":{"id":"deepseek-flash","name":"DeepSeek V4.1 Flash","context_window":1000000,"max_output":384000,"supports_thinking":true,"cost":{"input":0.3,"output":1.2,"cache_read":0.006}},"thinking":"off","running":true,"message_count":0,"usage":{"input":0,"output":0,"cache_read":0},"cost_usd":0,"context_tokens":0}}
+    {"type":"event","event":"agent_start"}
+    {"type":"event","event":"message_start","message":{"role":"user","text":"what is here?"}}
+    {"type":"event","event":"message_end","message":{"role":"user","text":"what is here?"}}
+    {"type":"event","event":"turn_start"}
+    {"type":"event","event":"message_start","message":{"role":"assistant","content":[],"stop_reason":{"type":"end_turn"},"usage":{"input":0,"output":0,"cache_read":0},"model":"deepseek-flash"}}
+    {"type":"event","event":"message_update","partial":{"role":"assistant","content":[{"type":"text","text":"Looking."}],"stop_reason":{"type":"end_turn"},"usage":{"input":0,"output":0,"cache_read":0},"model":"deepseek-flash"},"delta":{"type":"text_delta","text":"Looking."}}
+    {"type":"event","event":"message_update","partial":{"role":"assistant","content":[{"type":"text","text":"Looking."},{"type":"tool_call","id":"c1","name":"ls","arguments":""}],"stop_reason":{"type":"end_turn"},"usage":{"input":0,"output":0,"cache_read":0},"model":"deepseek-flash"},"delta":{"type":"tool_call_start","index":0,"id":"c1","name":"ls"}}
+    {"type":"event","event":"message_update","partial":{"role":"assistant","content":[{"type":"text","text":"Looking."},{"type":"tool_call","id":"c1","name":"ls","arguments":"{}"}],"stop_reason":{"type":"end_turn"},"usage":{"input":0,"output":0,"cache_read":0},"model":"deepseek-flash"},"delta":{"type":"tool_call_delta","index":0,"arguments":"{}"}}
+    {"type":"event","event":"message_end","message":{"role":"assistant","content":[{"type":"text","text":"Looking."},{"type":"tool_call","id":"c1","name":"ls","arguments":"{}"}],"stop_reason":{"type":"tool_use"},"usage":{"input":20,"output":8,"cache_read":5},"model":"deepseek-flash"}}
+    {"type":"event","event":"tool_start","call":{"id":"c1","name":"ls","arguments":"{}"}}
+    {"type":"event","event":"tool_end","call":{"id":"c1","name":"ls","arguments":"{}"},"result":{"role":"tool_result","tool_call_id":"c1","tool_name":"ls","text":"sessions/\n","is_error":false}}
+    {"type":"event","event":"message_start","message":{"role":"tool_result","tool_call_id":"c1","tool_name":"ls","text":"sessions/\n","is_error":false}}
+    {"type":"event","event":"message_end","message":{"role":"tool_result","tool_call_id":"c1","tool_name":"ls","text":"sessions/\n","is_error":false}}
+    {"type":"event","event":"turn_end","assistant":{"role":"assistant","content":[{"type":"text","text":"Looking."},{"type":"tool_call","id":"c1","name":"ls","arguments":"{}"}],"stop_reason":{"type":"tool_use"},"usage":{"input":20,"output":8,"cache_read":5},"model":"deepseek-flash"},"tool_results":[{"role":"tool_result","tool_call_id":"c1","tool_name":"ls","text":"sessions/\n","is_error":false}]}
+    {"type":"event","event":"turn_start"}
+    {"type":"event","event":"message_start","message":{"role":"assistant","content":[],"stop_reason":{"type":"end_turn"},"usage":{"input":0,"output":0,"cache_read":0},"model":"deepseek-flash"}}
+    {"type":"event","event":"message_update","partial":{"role":"assistant","content":[{"type":"text","text":"Empty."}],"stop_reason":{"type":"end_turn"},"usage":{"input":0,"output":0,"cache_read":0},"model":"deepseek-flash"},"delta":{"type":"text_delta","text":"Empty."}}
+    {"type":"event","event":"message_end","message":{"role":"assistant","content":[{"type":"text","text":"Empty."}],"stop_reason":{"type":"end_turn"},"usage":{"input":10,"output":5,"cache_read":0},"model":"deepseek-flash"}}
+    {"type":"event","event":"turn_end","assistant":{"role":"assistant","content":[{"type":"text","text":"Empty."}],"stop_reason":{"type":"end_turn"},"usage":{"input":10,"output":5,"cache_read":0},"model":"deepseek-flash"},"tool_results":[]}
+    {"type":"event","event":"agent_end","messages":[{"role":"user","text":"what is here?"},{"role":"assistant","content":[{"type":"text","text":"Looking."},{"type":"tool_call","id":"c1","name":"ls","arguments":"{}"}],"stop_reason":{"type":"tool_use"},"usage":{"input":20,"output":8,"cache_read":5},"model":"deepseek-flash"},{"role":"tool_result","tool_call_id":"c1","tool_name":"ls","text":"sessions/\n","is_error":false},{"role":"assistant","content":[{"type":"text","text":"Empty."}],"stop_reason":{"type":"end_turn"},"usage":{"input":10,"output":5,"cache_read":0},"model":"deepseek-flash"}]}
+    {"type":"event","event":"state","state":{"session_id":"<id>","session_path":"$DIR/sessions/<stamp>_<id>.jsonl","cwd":"$DIR","model":{"id":"deepseek-flash","name":"DeepSeek V4.1 Flash","context_window":1000000,"max_output":384000,"supports_thinking":true,"cost":{"input":0.3,"output":1.2,"cache_read":0.006}},"thinking":"off","running":false,"message_count":4,"usage":{"input":30,"output":13,"cache_read":5},"cost_usd":2.313e-05,"context_tokens":10}}
+    |}];
+  call t agent "get_messages";
+  call t agent "get_entries";
+  [%expect
+    {|
+    {"type":"response","id":"r1","ok":true,"result":[{"role":"user","text":"what is here?"},{"role":"assistant","content":[{"type":"text","text":"Looking."},{"type":"tool_call","id":"c1","name":"ls","arguments":"{}"}],"stop_reason":{"type":"tool_use"},"usage":{"input":20,"output":8,"cache_read":5},"model":"deepseek-flash"},{"role":"tool_result","tool_call_id":"c1","tool_name":"ls","text":"sessions/\n","is_error":false},{"role":"assistant","content":[{"type":"text","text":"Empty."}],"stop_reason":{"type":"end_turn"},"usage":{"input":10,"output":5,"cache_read":0},"model":"deepseek-flash"}]}
+    {"type":"response","id":"r1","ok":true,"result":[{"id":"<id>","parent":null,"kind":"message","message":{"role":"user","text":"what is here?"}},{"id":"<id>","parent":"<id>","kind":"message","message":{"role":"assistant","content":[{"type":"text","text":"Looking."},{"type":"tool_call","id":"c1","name":"ls","arguments":"{}"}],"stop_reason":{"type":"tool_use"},"usage":{"input":20,"output":8,"cache_read":5},"model":"deepseek-flash"}},{"id":"<id>","parent":"<id>","kind":"message","message":{"role":"tool_result","tool_call_id":"c1","tool_name":"ls","text":"sessions/\n","is_error":false}},{"id":"<id>","parent":"<id>","kind":"message","message":{"role":"assistant","content":[{"type":"text","text":"Empty."}],"stop_reason":{"type":"end_turn"},"usage":{"input":10,"output":5,"cache_read":0},"model":"deepseek-flash"}}]}
+    |}]
+;;
+
+let%expect_test "sessions: list, new, switch, fork, rewind" =
+  with_agent [ Reply.text "one"; Reply.text "two" ]
+  @@ fun t agent ->
+  call t agent ~params:{|{"text": "first"}|} "prompt";
+  Agent.wait_idle agent;
+  let first = (Agent.state agent).session_path in
+  call t agent "new_session";
+  call t agent "list_sessions";
+  call t agent ~params:(sprintf {|{"path": "%s"}|} first) "switch_session";
+  call t agent ~params:{|{"path": "/nowhere.jsonl"}|} "switch_session";
+  call t agent "fork";
+  call t agent ~params:{|{"to": "bogus"}|} "rewind";
+  [%expect
+    {|
+    {"type":"response","id":"r1","ok":true,"result":{}}
+    {"type":"response","id":"r1","ok":true,"result":{}}
+    {"type":"response","id":"r1","ok":true,"result":[{"id":"<id>","path":"$DIR/sessions/<stamp>_<id>.jsonl","cwd":"$DIR","created_at":"<time>","first_prompt":null,"message_count":0},{"id":"<id>","path":"$DIR/sessions/<stamp>_<id>.jsonl","cwd":"$DIR","created_at":"<time>","first_prompt":"first","message_count":2}]}
+    {"type":"response","id":"r1","ok":true,"result":{}}
+    {"type":"response","id":"r1","ok":false,"error":"(Sys_error \"/nowhere.jsonl: No such file or directory\")"}
+    {"type":"response","id":"r1","ok":true,"result":{}}
+    {"type":"response","id":"r1","ok":false,"error":"(\"no such entry\" (to_ bogus))"}
+    |}]
+;;
+
+let%expect_test
+    "end to end over pipes: request/response framing, invalid JSON, EOF aborts"
+  =
+  with_sandbox
+  @@ fun t ->
+  Eio.Switch.run
+  @@ fun sw ->
+  let agent =
+    Agent.create
+      ~env:t.env
+      ~sw
+      ~provider:
+        (Faux_provider.create
+           [ Reply.tool_call
+               ~id:"c1"
+               ~name:"bash"
+               ~arguments:{|{"command":"sleep 5"}|}
+               ()
+           ])
+      ~tools:Tools.all
+      ~sessions_dir:(Filename.concat t.dir "sessions")
+      ~home:t.dir
+      ~cwd:t.dir
+      ()
+  in
+  let in_r, in_w = Eio_unix.pipe sw in
+  let out_r, out_w = Eio_unix.pipe sw in
+  let output = Buffer.create 4096 in
+  Eio.Fiber.all
+    [ (fun () ->
+        Rpc_server.run ~env:t.env ~agent ~input:in_r ~output:out_w;
+        Eio.Flow.close out_w)
+    ; (fun () ->
+        Eio.Flow.copy_string
+          "{\"id\":1,\"method\":\"ping\"}\n\
+           not json\n\n\
+           {\"id\":2,\"method\":\"prompt\",\"params\":{\"text\":\"go\"}}\n"
+          in_w;
+        Eio.Time.sleep (Eio.Stdenv.clock t.env) 0.3;
+        Eio.Flow.close in_w)
+    ; (fun () ->
+        let reader = Eio.Buf_read.of_flow out_r ~max_size:(1024 * 1024) in
+        try
+          while true do
+            Buffer.add_string output (Eio.Buf_read.line reader ^ "\n")
+          done
+        with
+        | End_of_file -> ())
+    ];
+  let lines = String.split_lines (Buffer.contents output) in
+  List.iter lines ~f:(fun line ->
+    let json = Json.of_string line in
+    let field name =
+      Option.value_map (Json.member name json) ~default:"" ~f:Json.to_string
+    in
+    match field "type" with
+    | "\"response\"" ->
+      printf
+        "response id=%s ok=%s %s\n"
+        (field "id")
+        (field "ok")
+        (field "error")
+    | _ -> printf "event %s\n" (field "event"));
+  print_s [%sexp (Agent.is_running agent : bool)];
+  [%expect
+    {|
+    response id=1 ok=true
+    response id=null ok=false "invalid JSON: json: unexpected string: 'not'"
+    event "state"
+    event "agent_start"
+    event "message_start"
+    event "message_end"
+    event "turn_start"
+    event "message_start"
+    response id=2 ok=true
+    event "message_update"
+    event "message_update"
+    event "message_end"
+    event "tool_start"
+    event "tool_end"
+    event "message_start"
+    event "message_end"
+    event "turn_end"
+    event "agent_end"
+    event "state"
+    false
+    |}]
+;;

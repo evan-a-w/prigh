@@ -1,0 +1,18 @@
+{
+  "name": "prigh",
+  "version": "0.1.0",
+  "description": "Terminal UI for the prigh coding agent backend",
+  "type": "module",
+  "private": true,
+  "bin": { "prigh": "./dist/src/main.js" },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "check": "tsc -p tsconfig.json --noEmit",
+    "test": "npm run build && node --test \"dist/test/**/*.test.js\"",
+    "start": "node dist/src/main.js"
+  },
+  "devDependencies": {
+    "@types/node": "22.10.2",
+    "typescript": "5.7.2"
+  }
+}

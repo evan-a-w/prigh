@@ -1,0 +1,171 @@
+open! Core
+open! Import
+
+let methods =
+  [ "ping"
+  ; "prompt"
+  ; "steer"
+  ; "follow_up"
+  ; "abort"
+  ; "get_state"
+  ; "get_messages"
+  ; "get_entries"
+  ; "set_model"
+  ; "set_thinking"
+  ; "list_models"
+  ; "compact"
+  ; "new_session"
+  ; "switch_session"
+  ; "list_sessions"
+  ; "fork"
+  ; "rewind"
+  ]
+;;
+
+let param params name =
+  match params with
+  | `Object fields -> List.Assoc.find fields ~equal:String.equal name
+  | _ -> None
+;;
+
+let string_param params name =
+  match param params name with
+  | Some (`String s) -> Ok s
+  | Some _ -> Or_error.errorf "param %S must be a string" name
+  | None -> Or_error.errorf "missing param %S" name
+;;
+
+let ok json = Ok json
+let empty = ok (`Object [])
+let unit_result r = Or_error.map r ~f:(fun () -> `Object [])
+
+let dispatch agent ~meth ~params : Json.t Or_error.t =
+  match meth with
+  | "ping" -> ok (`String "pong")
+  | "prompt" ->
+    Or_error.bind (string_param params "text") ~f:(fun text ->
+      unit_result (Agent.prompt agent text))
+  | "steer" ->
+    Or_error.map (string_param params "text") ~f:(fun text ->
+      Agent.steer agent text;
+      `Object [])
+  | "follow_up" ->
+    Or_error.map (string_param params "text") ~f:(fun text ->
+      Agent.follow_up agent text;
+      `Object [])
+  | "abort" ->
+    Agent.abort agent;
+    empty
+  | "get_state" -> ok (Rpc_json.state (Agent.state agent))
+  | "get_messages" ->
+    ok (`Array (List.map (Agent.messages agent) ~f:Rpc_json.message))
+  | "get_entries" ->
+    ok
+      (`Array
+          (List.map
+             (Session.active_path (Agent.session agent))
+             ~f:Rpc_json.entry))
+  | "set_model" ->
+    Or_error.bind (string_param params "model") ~f:(fun id ->
+      match Model.find id with
+      | None -> Or_error.errorf "unknown model %S" id
+      | Some model ->
+        Agent.set_model agent model;
+        empty)
+  | "set_thinking" ->
+    Or_error.bind (string_param params "thinking") ~f:(fun s ->
+      Or_error.map (Rpc_json.thinking_of_string s) ~f:(fun thinking ->
+        Agent.set_thinking agent thinking;
+        `Object []))
+  | "list_models" -> ok (`Array (List.map Model.all ~f:Rpc_json.model))
+  | "compact" ->
+    Or_error.map (Agent.compact agent) ~f:(fun summary ->
+      `Object [ "summary", `String summary ])
+  | "new_session" ->
+    Agent.new_session agent;
+    empty
+  | "switch_session" ->
+    Or_error.bind (string_param params "path") ~f:(fun path ->
+      unit_result (Agent.switch_session agent ~path))
+  | "list_sessions" ->
+    let dir = Filename.dirname (Agent.state agent).session_path in
+    ok (`Array (List.map (Session.list ~dir) ~f:Rpc_json.session_summary))
+  | "fork" ->
+    let at =
+      match param params "at" with
+      | Some (`String s) -> Some s
+      | _ -> None
+    in
+    unit_result (Agent.fork agent ?at ())
+  | "rewind" ->
+    Or_error.bind (string_param params "to") ~f:(fun to_ ->
+      unit_result (Agent.rewind agent ~to_))
+  | _ -> Or_error.errorf "unknown method %S" meth
+;;
+
+let handle agent (request : Json.t) : Json.t =
+  let id = Option.value (param request "id") ~default:`Null in
+  let response =
+    match param request "method" with
+    | Some (`String meth) ->
+      let params =
+        Option.value (param request "params") ~default:(`Object [])
+      in
+      (match dispatch agent ~meth ~params with
+       | result -> result
+       | exception exn ->
+         Or_error.error_s [%message "internal error" (exn : exn)])
+    | _ -> Or_error.error_string "request must have a string \"method\""
+  in
+  match response with
+  | Ok result ->
+    `Object
+      [ "type", `String "response"; "id", id; "ok", `True; "result", result ]
+  | Error e ->
+    `Object
+      [ "type", `String "response"
+      ; "id", id
+      ; "ok", `False
+      ; "error", `String (Error.to_string_hum e)
+      ]
+;;
+
+let run ~env:_ ~agent ~input ~output =
+  Switch.run
+  @@ fun sw ->
+  let outbox : string option Eio.Stream.t = Eio.Stream.create 1024 in
+  let send json = Eio.Stream.add outbox (Some (Json.to_string json)) in
+  Fiber.fork ~sw (fun () ->
+    let rec loop () =
+      match Eio.Stream.take outbox with
+      | None -> ()
+      | Some line ->
+        Eio.Flow.copy_string (line ^ "\n") output;
+        loop ()
+    in
+    loop ());
+  Agent.subscribe agent ~f:(fun event -> send (Rpc_json.event event));
+  let reader = Eio.Buf_read.of_flow input ~max_size:(64 * 1024 * 1024) in
+  let rec loop () =
+    match Eio.Buf_read.line reader with
+    | exception End_of_file -> ()
+    | line ->
+      if not (String.is_empty (String.strip line))
+      then (
+        match Json.parse line with
+        | Error e ->
+          send
+            (`Object
+                [ "type", `String "response"
+                ; "id", `Null
+                ; "ok", `False
+                ; "error", `String ("invalid JSON: " ^ Error.to_string_hum e)
+                ])
+        | Ok request -> send (handle agent request));
+      loop ()
+  in
+  loop ();
+  Agent.abort agent;
+  Agent.wait_idle agent;
+  Eio.Stream.add outbox None
+;;

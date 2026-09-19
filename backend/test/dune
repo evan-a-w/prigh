@@ -1,0 +1,7 @@
+(library
+ (name prigh_test)
+ (preprocess
+  (pps ppx_jane ppx_jsonaf_conv))
+ (inline_tests)
+ (libraries core core_unix core_unix.filename_unix core_unix.sys_unix jsonaf
+  prigh eio eio.unix eio_main expect_test_helpers_core re))
