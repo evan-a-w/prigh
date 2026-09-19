@@ -102,30 +102,67 @@ round-trips, e2e against `main.exe serve -faux` with an isolated `-auth-file`.
 
 ## Remaining work, in order
 
-1. Wait for the patched `oxcaml-compiler` rebuild, then finish the `prigh-ox`
-   install (`bonsai_term`, `bonsai_test`, `async`, `js_of_ocaml*`); build the
-   bonsai_term hello-world demo from `janestreet/bonsai_term` `demos/`.
-2. Try building `backend/` in `prigh-ox` (`dune build`, `dune build
-   @runtest`). If green: one switch for everything, and `prigh_protocol` is a
-   plain shared library. If not: keep two switches; `prigh_protocol` as a
-   directory vendored into both dune projects.
-3. **Nix environment (user requirement):** nix is now **installed**
-   (multi-user Determinate Nix 3.22.5, daemon active, flakes enabled;
-   `/etc/nix/nix.conf`; profile at
-   `/nix/var/nix/profiles/default/etc/profile.d/nix-daemon.sh`). Remaining:
-   `flake.nix` with opam-nix `buildOpamProject'`/`queryToScope` over both the
-   `ox` and default opam repositories (opam-nix accepts extra repos via
-   `repos = [ ... ]` fetched as flake inputs: `oxcaml/opam-repository` and
-   `ocaml/opam-repository`). **The patched `oxcaml-compiler` must be carried
-   into Nix too** — either vendor the `oxpatched` overlay repo as a flake
-   input / local path and add it to `repos`, or apply the same patch via an
-   opam-nix source/override hook. Pin `ocaml-variants.5.2.0+ox`, `bonsai_term`,
-   `bonsai_test`, `notty_async`, `eio`, `cohttp-eio`, `tls-eio`, `jsonaf`,
-   `ppx_jsonaf_conv`, `expect_test_helpers_core`, `ocamlformat`. Expose a
-   `devShell` (dune, ocamlformat, node for the legacy TS frontend until
-   deleted, `rg` which the tools need) and packages for backend/frontend.
-   Expect the OxCaml compiler build in Nix to be slow. Record the exact
-   opam-nix input revision in `flake.lock`.
+1. **DONE — `prigh-ox` compiles Bonsai_term.** After the patched compiler
+   installed (which triggered a full-switch rebuild — see Environment notes),
+   `opam install bonsai_term.v0.18~preview.130.106+341 bonsai_test notty_async
+   expect_test_helpers_core ppx_jsonaf_conv` succeeded, including `menhir
+   20260209` (the package that originally exposed the bug). A smoke test was
+   added at `spike/bonsai_term_hello/` (the upstream hello-world, with a
+   `bonsai_term_hello.opam`); `dune build` and `main.exe --help` both work.
+2. **DONE — decision: keep two switches.** `backend/` does **not** build under
+   OxCaml, for dependency reasons unrelated to the compiler patch:
+   - All available `digestif` versions (1.1.2, 1.3.0, 1.3.1) fail to compile
+     under OxCaml with modes errors in `src-ocaml/baijiu_*.ml` (e.g.
+     `By.blit` has type `bytes @ local -> int -> bytes @ local -> ...` but
+     `feed` expects a differently-moded `blit`). There is no `oxcaml-digestif`
+     guard in the `ox` repo.
+   - Replacing the one `Digestif.SHA256` use (in `lib/pkce.ml`) with
+     `Mirage_crypto.Hash.SHA256` gets past that, but `mirage-crypto-rng` in
+     `prigh-ox` is `0.11.3`, whose `Mirage_crypto_rng_unix` has no
+     `use_default` (the backend uses the 2.x API; the vanilla switch has
+     `2.4.0`). Upgrading to `mirage-crypto-rng 2.4.0` pulls in `digestif`
+     again via `tls 2.1.2`; the resolver instead picks `tls 0.17.5` +
+     `mirage-crypto 0.11.3`, which is self-consistent but not what the backend
+     is written against.
+   - The temporary backend edits were reverted. Keep `prigh` (vanilla 5.3.0)
+     for `backend/`; `prigh_protocol` needs to be a directory vendored into
+     both dune projects as planned.
+3. **Nix environment (user requirement):** nix is **installed** (multi-user
+   Determinate Nix 3.22.5, daemon active, flakes enabled; `/etc/nix/nix.conf`;
+   profile at `/nix/var/nix/profiles/default/etc/profile.d/nix-daemon.sh`).
+   `flake.nix`, `nix/prigh-ox-pins.nix`, `nix/fix-floatarithmem.patch` and
+   `spike/bonsai_term_hello/` are written and committed. What the flake does:
+   - inputs: `nixpkgs`, `flake-utils`, `opam-nix`,
+     `ocaml/opam-repository`, `oxcaml/opam-repository` (both `flake = false`).
+   - `repos = [ ox-opam-repository opam-repository ]` (ox first for
+     precedence); `on.buildOpamProject' { inherit repos; resolveArgs = {
+     depopts = false; dev = false; }; } ./spike/bonsai_term_hello query`.
+   - the compiler fix is applied as an overlay:
+     `oxcaml-compiler.overrideAttrs (oa: { patches = oa.patches ++ [ ./nix/fix-floatarithmem.patch ]; })`
+     (opam-nix already has an `oxcaml-compiler` override in
+     `src/overlays/ocaml.nix` adding `rsync` + a Makefile patch; ours composes
+     with it).
+   - `query` pins the ~230 exact versions now installed in the `prigh-ox`
+     switch (`nix/prigh-ox-pins.nix`, including `bonsai_term`/`bonsai_test` and
+     `eio 1.3+ox`) so opam's solver finishes inside opam-nix's fixed 60 s IFD
+     timeout.
+   - `packages.default = scope.bonsai_term_hello` (the OxCaml smoke test).
+     `devShells.default` inherits that package's inputs plus `bonsai_test`,
+     `notty_async`, `expect_test_helpers_core`, `nodejs`, `ripgrep`. A `nix
+     build .#packages.x86_64-linux.default` was started at 20:52 and is
+     building the compiler + dependency closure; it needs no `prigh`
+     (backend) build, so it does not hit the digestif/mirage-crypto issue.
+   - **Known issue / next:** opam-nix evaluates each `opam.json` with an IFD
+     derivation, so the *first* evaluation of this scope took ~15 min (cached
+     afterwards); the resolver itself succeeds. The robust fix is opam-nix
+     materialization (`materializeOpamProject'` + `materializedDefsToScope`)
+     with a committed `package-defs.json`, which removes all IFD. Do that once
+     the pins are final. `nix eval
+     .#packages.x86_64-linux.default.drvPath` is the quick check. `flake.lock`
+     is not generated yet (run `nix flake lock`).
+   - A `ocaml-lsp-server`/`ocamlformat` for the OxCaml shell is still to be
+     tested (the `ox` repo ships `oxcaml-ocamlformat` guards; the plain
+     `ocamlformat` may resolve).
 4. Write the frontend plan (`FRONTEND_PLAN.md`) with the user: milestones
    protocol extraction → Async client → Mode/Keymap/Editor/Transcript headless
    + term views (parity with today's TUI) → Picker and `UX_PLAN.md` P0
@@ -143,6 +180,11 @@ round-trips, e2e against `main.exe serve -faux` with an isolated `-auth-file`.
   `fix-floatarithmem.patch` for `oxcaml-compiler`. Keep it in sync with the
   Nix setup. To rebuild the compiler: `opam reinstall --switch=prigh-ox
   oxcaml-compiler` (25 min).
+- Rebuilding the compiler in opam is a **full-switch operation**: `opam
+  reinstall oxcaml-compiler` removes every package that depends on the
+  compiler and reinstalls the whole world (~150 packages recompile). Budget
+  an hour, not 25 min. The patched compiler itself builds fine and now
+  compiles `let f (r:float array) (i:int) (j:int) = r.(i) +. r.(j)`.
 - Nix: source `/nix/var/nix/profiles/default/etc/profile.d/nix-daemon.sh`
   (or use `/nix/var/nix/profiles/default/bin/nix`); sudo is available with the
   user-provided password (prefix commands with `printf 'ubu\n' | sudo -S -p ''`).

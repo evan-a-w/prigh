@@ -39,15 +39,10 @@
           opam-repository
         ];
 
-        # Pinned to the exact versions of the working `prigh-ox` switch plus the
-        # OxCaml preview releases. This both forces the OxCaml compiler and keeps
-        # opam-nix's solver inside its 60 s IFD timeout. See nix/prigh-ox-pins.nix.
-        query = import ./nix/prigh-ox-pins.nix // {
-          # Not installed in the opam switch yet (the install was blocked on the
-          # compiler bug), so resolve them from the ox repository.
-          bonsai_term = "*";
-          bonsai_test = "*";
-        };
+        # Pinned to the exact versions of the working `prigh-ox` switch. This
+        # both forces the OxCaml compiler and keeps opam-nix's solver inside its
+        # 60 s IFD timeout. See nix/prigh-ox-pins.nix.
+        query = import ./nix/prigh-ox-pins.nix;
 
         # OxCaml 5.2.0+ox native codegen drops the second addressing register
         # of `Ifloatarithmem` (any float-array arithmetic at the non-AVX
