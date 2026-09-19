@@ -231,6 +231,43 @@ let%expect_test "abort restores queued steer and follow-up messages" =
     |}]
 ;;
 
+let%expect_test "dequeue pops the most recently queued message" =
+  with_agent
+    [ Reply.tool_call
+        ~id:"c1"
+        ~name:"bash"
+        ~arguments:{|{"command":"sleep 0.2"}|}
+        ()
+    ; Reply.text "done"
+    ]
+  @@ fun _t agent dump ->
+  Or_error.ok_exn (Agent.prompt agent "go");
+  Agent.steer agent "steer one";
+  Agent.follow_up agent "follow up";
+  let pop () = print_s [%sexp (Agent.dequeue agent : Agent.Queued.t option)] in
+  pop ();
+  pop ();
+  pop ();
+  Agent.wait_idle agent;
+  dump ();
+  [%expect
+    {|
+    (((text "follow up") (attachments ())))
+    (((text "steer one") (attachments ())))
+    ()
+    state: running=true messages=0
+    user: go
+    queue: steer=1 follow_up=0
+    queue: steer=1 follow_up=1
+    queue: steer=1 follow_up=0
+    queue: steer=0 follow_up=0
+    assistant:
+    tool_result:
+    assistant: done
+    state: running=false messages=4
+    |}]
+;;
+
 let%expect_test "model and thinking changes persist across session reload" =
   with_agent [ Reply.text "ok" ]
   @@ fun t agent _dump ->

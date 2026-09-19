@@ -471,3 +471,106 @@ let%expect_test "config: get, set, invalid, and the config_changed event" =
     {"type":"response","id":"r1","ok":false,"error":"no pending confirmation for tool call \"nope\""}
     |}]
 ;;
+
+let%expect_test "shell runs a command, streams tool events, and adds to context"
+  =
+  with_agent []
+  @@ fun t agent login ->
+  Agent.subscribe agent ~f:(fun e ->
+    print_endline (mask t (Json.to_string (Rpc_json.event e))));
+  call
+    t
+    agent
+    login
+    ~params:{|{"command": "printf 'a\\nb'", "add_to_context": true}|}
+    "shell";
+  call t agent login "get_messages";
+  [%expect
+    {|
+    {"type":"event","event":"tool_start","call":{"id":"shell-0","name":"shell","arguments":"{\"command\":\"printf 'a\\\\nb'\"}"}}
+    {"type":"event","event":"tool_output","call_id":"shell-0","chunk":"a\nb"}
+    {"type":"event","event":"tool_end","call":{"id":"shell-0","name":"shell","arguments":"{\"command\":\"printf 'a\\\\nb'\"}"},"result":{"role":"tool_result","tool_call_id":"shell-0","tool_name":"shell","text":"a\nb","is_error":false}}
+    {"type":"event","event":"message_start","message":{"role":"user","text":"$ printf 'a\\nb'\na\nb"}}
+    {"type":"event","event":"message_end","message":{"role":"user","text":"$ printf 'a\\nb'\na\nb"}}
+    {"type":"event","event":"state","state":{"session_id":"<id>","session_path":"$DIR/sessions/<stamp>_<id>.jsonl","session_name":null,"cwd":"$DIR","git_branch":null,"model":{"id":"deepseek-flash","provider":"deepseek","key":"deepseek/deepseek-flash","name":"DeepSeek V4.1 Flash","context_window":1000000,"max_output":384000,"supports_thinking":true,"cost":{"input":0.3,"output":1.2,"cache_read":0.006}},"thinking":"off","running":false,"message_count":1,"usage":{"input":0,"output":0,"cache_read":0},"cost_usd":0,"context_tokens":0}}
+    {"type":"response","id":"r1","ok":true,"result":{"text":"a\nb","is_error":false}}
+    {"type":"response","id":"r1","ok":true,"result":[{"role":"user","text":"$ printf 'a\\nb'\na\nb"}]}
+    |}]
+;;
+
+let%expect_test "shell without add_to_context leaves messages unchanged" =
+  with_agent []
+  @@ fun t agent login ->
+  call
+    t
+    agent
+    login
+    ~params:{|{"command": "printf 'a\\nb'", "add_to_context": false}|}
+    "shell";
+  call
+    t
+    agent
+    login
+    ~params:{|{"command": "exit 3", "add_to_context": false}|}
+    "shell";
+  call t agent login "get_messages";
+  [%expect
+    {|
+    {"type":"response","id":"r1","ok":true,"result":{"text":"a\nb","is_error":false}}
+    {"type":"response","id":"r1","ok":true,"result":{"text":"[exit code 3]","is_error":true}}
+    {"type":"response","id":"r1","ok":true,"result":[]}
+    |}]
+;;
+
+let%expect_test "shell refuses while a run is in progress" =
+  with_agent
+    [ Reply.tool_call
+        ~id:"c1"
+        ~name:"bash"
+        ~arguments:{|{"command":"sleep 0.3"}|}
+        ()
+    ; Reply.text "done"
+    ]
+  @@ fun t agent login ->
+  call t agent login ~params:{|{"text": "go"}|} "prompt";
+  call
+    t
+    agent
+    login
+    ~params:{|{"command": "echo hi", "add_to_context": false}|}
+    "shell";
+  Agent.wait_idle agent;
+  [%expect
+    {|
+    {"type":"response","id":"r1","ok":true,"result":{}}
+    {"type":"response","id":"r1","ok":false,"error":"cannot run a shell command while a run is in progress"}
+    |}]
+;;
+
+let%expect_test "dequeue returns queued messages and null when empty" =
+  with_agent
+    [ Reply.tool_call
+        ~id:"c1"
+        ~name:"bash"
+        ~arguments:{|{"command":"sleep 0.2"}|}
+        ()
+    ; Reply.text "done"
+    ]
+  @@ fun t agent login ->
+  call t agent login ~params:{|{"text": "go"}|} "prompt";
+  call t agent login ~params:{|{"text": "steer one"}|} "steer";
+  call t agent login ~params:{|{"text": "follow up"}|} "follow_up";
+  call t agent login "dequeue";
+  call t agent login "dequeue";
+  call t agent login "dequeue";
+  Agent.wait_idle agent;
+  [%expect
+    {|
+    {"type":"response","id":"r1","ok":true,"result":{}}
+    {"type":"response","id":"r1","ok":true,"result":{}}
+    {"type":"response","id":"r1","ok":true,"result":{}}
+    {"type":"response","id":"r1","ok":true,"result":{"text":"follow up","attachments":[]}}
+    {"type":"response","id":"r1","ok":true,"result":{"text":"steer one","attachments":[]}}
+    {"type":"response","id":"r1","ok":true,"result":null}
+    |}]
+;;

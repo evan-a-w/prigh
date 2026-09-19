@@ -6,6 +6,7 @@ module Queued = struct
     { text : string
     ; attachments : string list
     }
+  [@@deriving sexp_of]
 end
 
 module State = struct
@@ -82,6 +83,7 @@ type t =
   ; mutable subagent_cost_usd : float
   ; mutable config : Config.t
   ; pending_confirms : bool Promise.u String.Table.t
+  ; mutable shell_seq : int
   }
 
 let restore_settings t =
@@ -134,6 +136,7 @@ let create
          | Ok config -> config
          | Error _ -> Config.default)
     ; pending_confirms = String.Table.create ()
+    ; shell_seq = 0
     }
   in
   restore_settings t;
@@ -383,6 +386,92 @@ let rec wait_idle t =
     Promise.await run.finished;
     wait_idle t
   | None -> ()
+;;
+
+(* Pops the most recently queued message: follow-ups take priority over steer
+   messages, and within each queue the back (last enqueued) is removed. *)
+let dequeue t =
+  let pop_last queue =
+    match List.rev (Queue.to_list queue) with
+    | [] -> None
+    | last :: rest ->
+      Queue.clear queue;
+      List.iter (List.rev rest) ~f:(fun item -> Queue.enqueue queue item);
+      Some last
+  in
+  let popped =
+    match pop_last t.follow_up_queue with
+    | Some _ as queued -> queued
+    | None -> pop_last t.steer_queue
+  in
+  Option.iter popped ~f:(fun _ -> queue_update t);
+  popped
+;;
+
+let shell t ~command ~add_to_context =
+  if is_running t
+  then
+    Or_error.error_string
+      "cannot run a shell command while a run is in progress"
+  else (
+    let call_id = sprintf "shell-%d" t.shell_seq in
+    t.shell_seq <- t.shell_seq + 1;
+    let call : Content.Tool_call.t =
+      { id = call_id
+      ; name = "shell"
+      ; arguments = Json.to_string (`Object [ "command", `String command ])
+      }
+    in
+    let output = Buffer.create 1024 in
+    let context =
+      Tool.Context.create
+        ~on_output:(fun chunk ->
+          Buffer.add_string output chunk;
+          broadcast t (Loop (Tool_output { call_id; chunk })))
+        ~call_id
+        ~tools:t.tools
+        ~env:t.env
+        ~cwd:t.cwd
+        ()
+    in
+    broadcast t (Loop (Tool_start call));
+    let result =
+      Tool_bash.run
+        context
+        (`Object [ "command", `String command; "timeout", `Number "120" ])
+    in
+    broadcast
+      t
+      (Loop
+         (Tool_end
+            { call
+            ; result =
+                { Message.Tool_result.tool_call_id = call_id
+                ; tool_name = "shell"
+                ; text = result.text
+                ; is_error = result.is_error
+                }
+            }));
+    if add_to_context
+    then (
+      let truncated = Truncate.head (Buffer.contents output) in
+      let output =
+        if truncated.truncated
+        then
+          sprintf
+            "[output truncated: showing the first part of %d lines / %d bytes]\n\
+             %s"
+            truncated.total_lines
+            truncated.total_bytes
+            truncated.text
+        else truncated.text
+      in
+      let message = Message.user (sprintf "$ %s\n%s" command output) in
+      broadcast t (Loop (Message_start message));
+      ignore (Session.append_message t.session message : Session.Entry.t);
+      broadcast t (Loop (Message_end message));
+      state_changed t);
+    Ok result)
 ;;
 
 let set_model t model =

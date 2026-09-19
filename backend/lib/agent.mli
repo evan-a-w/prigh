@@ -52,6 +52,14 @@ module Event : sig
   [@@deriving sexp_of]
 end
 
+module Queued : sig
+  type t =
+    { text : string
+    ; attachments : string list
+    }
+  [@@deriving sexp_of]
+end
+
 type t
 
 val create
@@ -91,6 +99,20 @@ val follow_up : ?attachments:string list -> t -> string -> unit
     that were queued and are therefore restored to the caller: steer messages
     in order, then follow-ups. Emits [Queue_update]. *)
 val abort : t -> string list
+
+(** Pops the most recently queued message: follow-ups take priority over steer
+    messages. Emits [Queue_update] when a message was removed. *)
+val dequeue : t -> Queued.t option
+
+(** Runs [command] through the bash machinery, emitting [Tool_start],
+    [Tool_output] and [Tool_end] events under a synthetic [shell-<n>] call id.
+    When [add_to_context] is set, appends [\$ <command>\n<output>] to the
+    session as a user message. Fails while a run is in progress. *)
+val shell
+  :  t
+  -> command:string
+  -> add_to_context:bool
+  -> Tool_result.t Or_error.t
 
 val is_running : t -> bool
 

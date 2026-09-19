@@ -7,6 +7,8 @@ let methods =
   ; "steer"
   ; "follow_up"
   ; "abort"
+  ; "dequeue"
+  ; "shell"
   ; "get_state"
   ; "get_messages"
   ; "get_entries"
@@ -107,6 +109,33 @@ let dispatch agent login ~meth ~params : Json.t Or_error.t =
     ok
       (`Object
           [ "restored", `Array (List.map restored ~f:(fun s -> `String s)) ])
+  | "dequeue" ->
+    ok
+      (match Agent.dequeue agent with
+       | None -> `Null
+       | Some (queued : Agent.Queued.t) ->
+         `Object
+           [ "text", `String queued.text
+           ; ( "attachments"
+             , `Array (List.map queued.attachments ~f:(fun a -> `String a)) )
+           ])
+  | "shell" ->
+    Or_error.bind (string_param params "command") ~f:(fun command ->
+      Or_error.bind
+        (match param params "add_to_context" with
+         | Some `True -> Ok true
+         | Some `False -> Ok false
+         | Some _ ->
+           Or_error.error_string "param \"add_to_context\" must be a boolean"
+         | None -> Ok false)
+        ~f:(fun add_to_context ->
+          Or_error.map
+            (Agent.shell agent ~command ~add_to_context)
+            ~f:(fun result ->
+              `Object
+                [ "text", `String result.text
+                ; ("is_error", if result.is_error then `True else `False)
+                ])))
   | "get_state" -> ok (Rpc_json.state (Agent.state agent))
   | "get_messages" ->
     ok (`Array (List.map (Agent.messages agent) ~f:Rpc_json.message))
