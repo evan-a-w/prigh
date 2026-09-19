@@ -496,6 +496,10 @@ let%expect_test "commands" =
            (args [quiet|normal|verbose])
            (help "set the transcript verbosity")
            (argument (Verbosity)))
+          ((name confirm)
+           (args [on|off])
+           (help "ask before destructive tools")
+           (argument (Confirm)))
           ((name auth)
            (args "")
            (help "show which providers are configured")
@@ -778,6 +782,7 @@ let%expect_test "keymap: every binding resolves to its intent and is documented"
     /logout [provider]                 remove a provider's stored credential
     /thinking [off|on|low|high|max]    pick or set the thinking level
     /verbosity [quiet|normal|verbose]  set the transcript verbosity
+    /confirm [on|off]                  ask before destructive tools
     /auth                              show which providers are configured
     /compact                           summarise older messages to free context
     /new                               start a new session
@@ -902,6 +907,41 @@ let%expect_test "live tool tail keeps the last five lines at each verbosity" =
       line 4
       line 5
       line 6
+    |}]
+;;
+
+let%expect_test "bash timeout is merged into the tool line at each verbosity" =
+  let call : Prigh_protocol.Tool_call.t =
+    { id = "c1"; name = "bash"; arguments = {|{"command":"sleep 999"}|} }
+  in
+  let result : Prigh_protocol.Message.Tool_result.t =
+    { tool_call_id = "c1"
+    ; tool_name = "bash"
+    ; text = "partial output\n[timed out after 120s]"
+    ; is_error = true
+    }
+  in
+  let item =
+    Transcript.Item.Tool
+      { call; result = Some result; live_tail = None; subagent = None }
+  in
+  List.iter [ Verbosity.Quiet; Normal; Verbose ] ~f:(fun verbosity ->
+    printf "== %s ==\n" (Verbosity.name verbosity);
+    print_endline (Content.to_plain (Transcript.render_item item ~verbosity)));
+  [%expect {|
+    == quiet ==
+    ⚙ bash sleep 999 ✗ timed out after 120s
+      partial output
+      [timed out after 120s]
+    == normal ==
+    ⚙ bash sleep 999 ✗ timed out after 120s
+    == verbose ==
+    ⚙ bash
+      {
+        command: "sleep 999"
+      }
+      partial output
+      [timed out after 120s]
     |}]
 ;;
 
@@ -1148,7 +1188,8 @@ let%expect_test "markdown never raises on malformed input" =
   List.iter inputs ~f:(fun input ->
     printf "== %S ==\n" input;
     print_endline (Content.to_plain (Markdown.render input)));
-  [%expect {|
+  [%expect
+    {|
     == "```" ==
     ──
     == "```ocaml\nlet x = 1" ==

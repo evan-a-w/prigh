@@ -333,6 +333,15 @@ let render_live_tail live_tail ~max_lines : Content.t =
       Content.Line.of_string ~style:gray ("  " ^ line))
 ;;
 
+let timed_out text =
+  List.find_map (String.split_lines text) ~f:(fun line ->
+    match
+      String.chop_prefix (String.strip line) ~prefix:"[timed out after "
+    with
+    | Some rest -> String.chop_suffix rest ~suffix:"]"
+    | None -> None)
+;;
+
 let merged_tool_line
   (call : P.Tool_call.t)
   (result : P.Message.Tool_result.t option)
@@ -347,25 +356,33 @@ let merged_tool_line
           ~width:60
     | _ -> ""
   in
-  let status, style, count =
-    match result with
-    | None -> "…", Style.fg Yellow, ""
-    | Some r ->
-      ( (if r.is_error then "✗" else "✓")
-      , (if r.is_error then red else green)
-      , " " ^ plural_lines (count_lines r.text) )
-  in
-  match result with
-  | Some r when r.is_error ->
-    Content.Line.of_string
-      ~style:red
-      (sprintf "⚙ %s%s %s%s" call.name argument status count)
-  | _ ->
+  match Option.bind result ~f:(fun r -> timed_out r.text) with
+  | Some t ->
     [ { Content.Span.text = "⚙ " ^ call.name; style = magenta }
     ; { text = argument; style = dim }
-    ; { text = " " ^ status; style }
-    ; { text = count; style = dim }
+    ; { text = " ✗"; style = red }
+    ; { text = " timed out after " ^ t; style = red }
     ]
+  | None ->
+    let status, style, count =
+      match result with
+      | None -> "…", Style.fg Yellow, ""
+      | Some r ->
+        ( (if r.is_error then "✗" else "✓")
+        , (if r.is_error then red else green)
+        , " " ^ plural_lines (count_lines r.text) )
+    in
+    (match result with
+     | Some r when r.is_error ->
+       Content.Line.of_string
+         ~style:red
+         (sprintf "⚙ %s%s %s%s" call.name argument status count)
+     | _ ->
+       [ { Content.Span.text = "⚙ " ^ call.name; style = magenta }
+       ; { text = argument; style = dim }
+       ; { text = " " ^ status; style }
+       ; { text = count; style = dim }
+       ])
 ;;
 
 let render_tool
@@ -383,19 +400,23 @@ let render_tool
        merged :: render_result ~show_more:false r ~max_lines:3
      | _ -> [ merged ])
   | Normal ->
-    let output =
-      match result with
-      | None -> render_live_tail live_tail ~max_lines:1
-      | Some r ->
-        if r.is_error
-        then render_result r ~max_lines:8
-        else if is_diff r.text
-        then render_diff r.text ~max_lines:5
-        else if String.equal call.name "bash"
-        then render_bash r
-        else render_result r ~max_lines:5
-    in
-    render_call call @ output
+    (match result with
+     | Some r when Option.is_some (timed_out r.text) ->
+       [ merged_tool_line call result ]
+     | _ ->
+       let output =
+         match result with
+         | None -> render_live_tail live_tail ~max_lines:1
+         | Some r ->
+           if r.is_error
+           then render_result r ~max_lines:8
+           else if is_diff r.text
+           then render_diff r.text ~max_lines:5
+           else if String.equal call.name "bash"
+           then render_bash r
+           else render_result r ~max_lines:5
+       in
+       render_call call @ output)
   | Verbose ->
     let output =
       match result with
@@ -581,6 +602,7 @@ let apply t (event : P.Event.t) =
   | P.Event.Turn_start
   | P.Event.Turn_end _
   | P.Event.Queue_update _
+  | P.Event.Tool_confirm _
   | P.Event.Auth _
   | P.Event.Config_changed _ -> t
 ;;
@@ -668,10 +690,12 @@ let render_item (item : Item.t) ~(verbosity : Verbosity.t) : Content.t =
      | None -> render_tool ~verbosity call result live_tail)
   | Notice (severity, text) ->
     (match verbosity, severity with
-     | Quiet, Info -> []
+     | Quiet, (Info | Debug) -> []
+     | Normal, Debug -> []
      | _ ->
        let style =
          match severity with
+         | Debug -> Style.dim Style.plain
          | Info -> Style.fg Yellow
          | Warn -> Style.bold (Style.fg Yellow)
          | Error -> Style.bold (Style.fg Red)

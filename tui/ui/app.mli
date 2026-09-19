@@ -31,6 +31,7 @@ module Reply_tag : sig
     | Set_model_done
     | Config
     | Config_saved
+    | Config_for_confirm of bool
     | Models_catalog
     | Models_for_scoped
     | Compact_done
@@ -105,6 +106,9 @@ module Model : sig
     ; verbosity : Verbosity.t
     ; config : P.Config.t option
     ; home : string option
+    ; stderr_tail : string list
+    ; pending_confirms : (string * string * string) list
+    ; backend_gone : bool
     ; width : int
     ; height : int
     ; quitting : bool

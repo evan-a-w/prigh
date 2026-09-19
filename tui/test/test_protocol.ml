@@ -125,6 +125,24 @@ let%expect_test "state event and messages" =
     |}]
 ;;
 
+let%expect_test "tool_confirm event" =
+  decode
+    {|{"type":"event","event":"tool_confirm","call_id":"c1","name":"bash","summary":"rm -rf build"}|};
+  decode {|{"type":"event","event":"tool_confirm","name":"write"}|};
+  [%expect {|
+    (Event (
+      Tool_confirm
+      (call_id c1)
+      (name    bash)
+      (summary "rm -rf build")))
+    (error (
+      e (
+        "while decoding"
+        "{\"type\":\"event\",\"event\":\"tool_confirm\",\"name\":\"write\"}"
+        "missing field \"call_id\"")))
+    |}]
+;;
+
 let%expect_test "subagent events are decoded recursively" =
   decode
     {|{"type":"event","event":"subagent","call_id":"p","agent_id":"p","inner":{"type":"event","event":"subagent","call_id":"c1","agent_id":"p/c1","inner":{"type":"event","event":"tool_start","call":{"id":"c1","name":"read","arguments":"{}"}}}}|};

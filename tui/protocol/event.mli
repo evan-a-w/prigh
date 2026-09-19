@@ -33,6 +33,11 @@ type t =
       { call : Tool_call.t
       ; result : Message.Tool_result.t
       }
+  | Tool_confirm of
+      { call_id : string
+      ; name : string
+      ; summary : string
+      }
   | State of State.t
   | Compacted of string
   | Config_changed of Config.t

@@ -7,6 +7,7 @@ module Argument : sig
     | Model
     | Thinking
     | Verbosity
+    | Confirm
     | Login
     | Logout
     | Sessions

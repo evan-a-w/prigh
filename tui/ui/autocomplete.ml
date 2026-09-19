@@ -74,6 +74,11 @@ let verbosity_items () =
     Picker.Item.create ~id:name (String.capitalize name))
 ;;
 
+let confirm_items () =
+  List.map [ "on"; "off" ] ~f:(fun name ->
+    Picker.Item.create ~id:name (String.capitalize name))
+;;
+
 let provider_items (auth : P.Auth_status.t list) =
   List.map auth ~f:(fun (s : P.Auth_status.t) ->
     Picker.Item.create
@@ -113,6 +118,7 @@ let argument_items ~kind ~models ~auth ~sessions ~logged_in =
   | Model -> Some (model_items ~logged_in models)
   | Thinking -> Some (thinking_items ())
   | Verbosity -> Some (verbosity_items ())
+  | Confirm -> Some (confirm_items ())
   | Login | Logout -> Some (provider_items auth)
   | Sessions -> Some (Option.value_map sessions ~default:[] ~f:session_items)
   | Path -> None

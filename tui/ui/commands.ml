@@ -5,6 +5,7 @@ module Argument = struct
     | Model
     | Thinking
     | Verbosity
+    | Confirm
     | Login
     | Logout
     | Sessions
@@ -53,6 +54,11 @@ let all =
       "verbosity"
       "[quiet|normal|verbose]"
       "set the transcript verbosity"
+  ; c
+      ~argument:Argument.Confirm
+      "confirm"
+      "[on|off]"
+      "ask before destructive tools"
   ; c "auth" "" "show which providers are configured"
   ; c "compact" "" "summarise older messages to free context"
   ; c "new" "" "start a new session"

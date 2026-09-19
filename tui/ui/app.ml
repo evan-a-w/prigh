@@ -27,6 +27,7 @@ module Reply_tag = struct
     | Set_model_done
     | Config
     | Config_saved
+    | Config_for_confirm of bool
     | Models_catalog
     | Models_for_scoped
     | Compact_done
@@ -101,6 +102,9 @@ module Model = struct
     ; verbosity : Verbosity.t
     ; config : P.Config.t option
     ; home : string option
+    ; stderr_tail : string list
+    ; pending_confirms : (string * string * string) list
+    ; backend_gone : bool
     ; width : int
     ; height : int
     ; quitting : bool
@@ -186,6 +190,35 @@ let notice ?severity m text =
 let error m text = notice ~severity:Error m text
 let warn m text = notice ~severity:Warn m text
 
+let confirm_question ~name ~summary =
+  match name with
+  | "bash" -> sprintf "Run bash: %s? (y/n)" summary
+  | "write" -> sprintf "Write %s? (y/n)" summary
+  | "edit" -> sprintf "Edit %s? (y/n)" summary
+  | name -> sprintf "Run %s: %s? (y/n)" name summary
+;;
+
+let confirm_tool m ~call_id ~name ~summary =
+  { m with
+    mode =
+      Confirm
+        { question = confirm_question ~name ~summary
+        ; action = Tool_confirm { call_id; name }
+        }
+  ; autocomplete = None
+  }
+;;
+
+let maybe_open_pending m =
+  if m.backend_gone
+  then m
+  else (
+    match m.mode, m.pending_confirms with
+    | Editing, (call_id, name, summary) :: rest ->
+      { (confirm_tool m ~call_id ~name ~summary) with pending_confirms = rest }
+    | _ -> m)
+;;
+
 let verbosity_notice = function
   | Verbosity.Quiet ->
     "view: quiet — intermediate output and thinking are hidden"
@@ -224,6 +257,9 @@ let init =
   ; verbosity = Verbosity.Normal
   ; config = None
   ; home = None
+  ; stderr_tail = []
+  ; pending_confirms = []
+  ; backend_gone = false
   ; width = 80
   ; height = 24
   ; quitting = false
@@ -786,6 +822,30 @@ let cycle_thinking m =
     , [ rpc "set_thinking" ~params:[ "thinking", str next ] ] )
 ;;
 
+let config_with_confirm config enabled =
+  { config with P.Config.confirm_tools = enabled }
+;;
+
+let set_config_command config =
+  let label =
+    sprintf
+      "tool confirmation %s"
+      (if config.P.Config.confirm_tools then "on" else "off")
+  in
+  rpc
+    "set_config"
+    ~params:[ "config", P.Config.to_json config ]
+    ~tag:(Notice_on_success label)
+;;
+
+let set_confirm m enabled =
+  match m.config with
+  | Some config ->
+    let config = config_with_confirm config enabled in
+    { m with config = Some config }, [ set_config_command config ]
+  | None -> m, [ rpc "get_config" ~tag:(Config_for_confirm enabled) ]
+;;
+
 let run_command m (cmd : Commands.Parsed.t) =
   match cmd.name, cmd.args with
   | "", _ -> m, []
@@ -848,6 +908,21 @@ let run_command m (cmd : Commands.Parsed.t) =
            m
            (sprintf "unknown verbosity %S; use quiet, normal or verbose" name)
        , [] ))
+  | "confirm", [] ->
+    (match m.config with
+     | Some config ->
+       ( notice
+           m
+           (sprintf
+              "tool confirmation %s"
+              (if config.P.Config.confirm_tools then "on" else "off"))
+       , [] )
+     | None ->
+       notice m "tool confirmation: unknown", [ rpc "get_config" ~tag:Config ])
+  | "confirm", ("on" | "true") :: _ -> set_confirm m true
+  | "confirm", ("off" | "false") :: _ -> set_confirm m false
+  | "confirm", other :: _ ->
+    error m (sprintf "unknown argument %S; use on or off" other), []
   | "auth", _ -> m, [ rpc "auth_status" ~tag:Auth_show ]
   | "login", [] -> m, [ rpc "auth_status" ~tag:Auth_login_picker ]
   | "login", provider :: rest ->
@@ -1161,7 +1236,9 @@ let accept_autocomplete m ~submit_now =
 ;;
 
 let interrupt m =
-  if not (Editor.is_empty m.editor)
+  if m.backend_gone
+  then { m with quitting = true }, [ Command.Quit ]
+  else if not (Editor.is_empty m.editor)
   then { m with editor = Editor.clear m.editor; pending_quit = false }, []
   else if m.pending_quit
   then { m with quitting = true }, [ Command.Quit ]
@@ -1346,7 +1423,18 @@ let editing_intent m (intent : Intent.t) =
     (match m.focus with
      | `Agent _ -> set_focus m `Main, []
      | `Main ->
-       if Model.running m then m, [ rpc "abort" ~tag:Abort_done ] else m, [])
+       if Model.running m
+       then (
+         let denies =
+           List.map m.pending_confirms ~f:(fun (call_id, _, _) ->
+             rpc
+               "tool_confirm_respond"
+               ~params:[ "call_id", str call_id; "allow", P.Json.bool false ]
+               ~tag:Ignore)
+         in
+         ( { m with pending_confirms = [] }
+         , denies @ [ rpc "abort" ~tag:Abort_done ] ))
+       else m, [])
   | Interrupt -> interrupt m
   | Force_quit -> { m with quitting = true }, [ Quit ]
   | Kill_to_end -> ed Editor.kill_to_end
@@ -1775,8 +1863,7 @@ let text_prompt m ~(action : Mode.Text_prompt_action.t) (intent : Intent.t) =
 (* ---- confirm mode ----------------------------------------------------- *)
 
 let confirm m ~(action : Mode.Confirm_action.t) (intent : Intent.t) =
-  let yes () =
-    let m = { m with mode = Editing } in
+  let yes m =
     match action with
     | Logout provider ->
       m, [ rpc "logout" ~params:[ "provider", str provider ] ]
@@ -1786,11 +1873,28 @@ let confirm m ~(action : Mode.Confirm_action.t) (intent : Intent.t) =
       ( m
       , [ rpc "delete_session" ~params:[ "path", str path ] ~tag:Deleted_session
         ] )
+    | Tool_confirm { call_id; _ } ->
+      ( m
+      , [ rpc
+            "tool_confirm_respond"
+            ~params:[ "call_id", str call_id; "allow", P.Json.bool true ]
+            ~tag:Ignore
+        ] )
+  in
+  let no m =
+    match action with
+    | Tool_confirm { call_id; name } ->
+      ( notice m (sprintf "denied %s" name)
+      , [ rpc
+            "tool_confirm_respond"
+            ~params:[ "call_id", str call_id; "allow", P.Json.bool false ]
+            ~tag:Ignore
+        ] )
+    | Logout _ | Rewind _ | Delete_session _ -> notice m "cancelled", []
   in
   match intent with
-  | Insert ("y" | "Y") | Submit -> yes ()
-  | Insert ("n" | "N") | Cancel | Interrupt ->
-    notice { m with mode = Editing } "cancelled", []
+  | Insert ("y" | "Y") | Submit -> yes { m with mode = Editing }
+  | Insert ("n" | "N") | Cancel | Interrupt -> no { m with mode = Editing }
   | Force_quit -> { m with quitting = true }, [ Quit ]
   | _ -> m, []
 ;;
@@ -1912,6 +2016,11 @@ let event m (e : P.Event.t) =
     { m with queued = { Queue_counts.steer; follow_up }; queued_texts }, []
   | Config_changed config -> { m with config = Some config }, []
   | Auth a -> auth_event m a
+  | Tool_confirm { call_id; name; summary } ->
+    ( { m with
+        pending_confirms = m.pending_confirms @ [ call_id, name, summary ]
+      }
+    , [] )
   | Agent_start
   | Agent_end _
   | Turn_start
@@ -2044,6 +2153,10 @@ let reply m (tag : Reply_tag.t) (result : (P.Json.t, string) Result.t) =
              { m with config = Some config }
              (sprintf "scoped models saved (%d)" count)
          , [] ))
+     | Config_for_confirm enabled ->
+       decode json ~f:P.Config.of_json (fun config ->
+         let config = config_with_confirm config enabled in
+         { m with config = Some config }, [ set_config_command config ])
      | Models_catalog ->
        decode json ~f:(decode_list ~f:P.Model.of_json) (fun models ->
          { m with models }, [])
@@ -2124,24 +2237,59 @@ let reply m (tag : Reply_tag.t) (result : (P.Json.t, string) Result.t) =
          | _ -> m, []))
 ;;
 
+let stderr_tail_limit = 20
+
+let is_backend_command = function
+  | Command.Rpc _ | Command.List_paths _ -> true
+  | _ -> false
+;;
+
+let block_backend_rpc m cmds =
+  if m.backend_gone && List.exists cmds ~f:is_backend_command
+  then
+    error m "backend is gone", List.filter cmds ~f:(Fn.non is_backend_command)
+  else m, cmds
+;;
+
 let update m (action : Action.t) =
   if m.quitting
   then m, []
   else (
-    match action with
-    | Start -> m, start_commands
-    | Key key ->
-      (match Keymap.lookup key with
-       | Some i -> intent m i
-       | None -> m, [])
-    | Intent i -> intent m i
-    | Event e -> event m e
-    | Protocol_error text -> error m ("protocol error: " ^ text), []
-    | Stderr line -> notice ~severity:Warn m ("backend: " ^ line), []
-    | Backend_closed ->
-      error { m with quitting = true } "backend exited", [ Quit ]
-    | Reply (tag, result) -> reply m tag result
-    | Tick -> { m with spinner = m.spinner + 1 }, []
-    | Set_home home -> { m with home = Some home }, []
-    | Resize { width; height } -> { m with width; height }, [])
+    let m, cmds =
+      match action with
+      | Start -> m, start_commands
+      | Key key ->
+        (match Keymap.lookup key with
+         | Some i -> intent m i
+         | None -> m, [])
+      | Intent i -> intent m i
+      | Event e -> event m e
+      | Protocol_error text -> error m ("protocol error: " ^ text), []
+      | Stderr line ->
+        let all = m.stderr_tail @ [ line ] in
+        let stderr_tail =
+          List.drop all (Int.max 0 (List.length all - stderr_tail_limit))
+        in
+        notice ~severity:Debug { m with stderr_tail } ("backend: " ^ line), []
+      | Backend_closed ->
+        let m = { m with backend_gone = true; pending_confirms = [] } in
+        let m = error m "backend exited" in
+        let m =
+          if List.is_empty m.stderr_tail
+          then m
+          else
+            block
+              m
+              (Content.lines
+                 ~style:(Style.dim Style.plain)
+                 (String.concat ~sep:"\n" m.stderr_tail))
+        in
+        m, []
+      | Reply (tag, result) -> reply m tag result
+      | Tick -> { m with spinner = m.spinner + 1 }, []
+      | Set_home home -> { m with home = Some home }, []
+      | Resize { width; height } -> { m with width; height }, []
+    in
+    let m, cmds = block_backend_rpc m cmds in
+    maybe_open_pending m, cmds)
 ;;

@@ -172,7 +172,6 @@ let%expect_test "component: startup requests, key handling, rpc round trip, \
   Bonsai_test.Handle.show handle;
   [%expect
     {|
-    quit
     spinner=2 running=true
 
     session abc in /w. /help for commands, Esc aborts,
@@ -181,6 +180,6 @@ let%expect_test "component: startup requests, key handling, rpc round trip, \
     backend exited
     ──────────────────────────────────────────────────
     > ▏
-    …m  ctx:0% 0  ⠹ working (Esc aborts; Enter steers)
+    …m  backend exited — Ctrl+C or /quit to exit
     |}]
 ;;

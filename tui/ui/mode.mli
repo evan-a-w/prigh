@@ -37,6 +37,10 @@ module Confirm_action : sig
     | Logout of string
     | Rewind of string
     | Delete_session of string
+    | Tool_confirm of
+        { call_id : string
+        ; name : string
+        }
   [@@deriving sexp_of, equal]
 end
 

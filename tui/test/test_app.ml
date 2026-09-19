@@ -38,6 +38,10 @@ module H = struct
 
   let reply_error t tag message = step t (Reply (tag, Error message))
   let mode t = print_endline (Mode.name t.model.mode)
+
+  let set_pending t confirms =
+    t.model <- { t.model with pending_confirms = confirms }
+  ;;
 end
 
 let model_json
@@ -1659,6 +1663,7 @@ let%expect_test "/auth, /help, /state, /clear, unknown method errors" =
   [%expect
     {|
     (Rpc (method_ list_models) (params ()) (tag (Models_for_picker "")))
+    Alt+P                   cycle to the previous scoped model
     Ctrl+T                  cycle the thinking level
     Ctrl+N                  picker: toggle the named-only /
     logged-in-only filter
@@ -1671,7 +1676,6 @@ let%expect_test "/auth, /help, /state, /clear, unknown method errors" =
     Ctrl+D                  quit
     unknown method "bogus"
     protocol error: bad line
-    backend: warning from backend
     ────────────────────────────────────────────────────────────
     > ▏
     …deepseek-flash  think:off  view:normal  ctx:0% 1.5k  $0.01
@@ -2023,13 +2027,65 @@ let%expect_test "multi-line editing: Alt+J, cursor movement, history" =
     |}]
 ;;
 
-let%expect_test "backend exit quits" =
+let%expect_test "backend crash shows the stderr tail; Ctrl+C quits" =
   let h = connected () in
+  H.step h (Stderr "warn one");
+  H.step h (Stderr "warn two");
+  H.step h (Stderr "warn three");
+  H.show h;
+  [%expect
+    {|
+    session abc123 in /work. /help for commands, Esc aborts,
+    Ctrl+C twice quits.
+    > earlier question
+    earlier answer
+    ────────────────────────────────────────────────────────────
+    > ▏
+    …deepseek-flash  think:off  view:normal  ctx:0% 1.5k  $0.01
+    |}];
   H.step h Backend_closed;
+  H.show h;
+  [%expect
+    {|
+    session abc123 in /work. /help for commands, Esc aborts,
+    Ctrl+C twice quits.
+    > earlier question
+    earlier answer
+    backend exited
+    warn one
+    warn two
+    warn three
+    ────────────────────────────────────────────────────────────
+    > ▏
+    …deepseek-flash  backend exited — Ctrl+C or /quit to exit
+    |}];
+  H.step h (Intent Model_picker);
+  H.show h;
+  [%expect
+    {|
+    session abc123 in /work. /help for commands, Esc aborts,
+    Ctrl+C twice quits.
+    > earlier question
+    earlier answer
+    backend exited
+    warn one
+    warn two
+    warn three
+    backend is gone
+    ────────────────────────────────────────────────────────────
+    > ▏
+    …deepseek-flash  backend exited — Ctrl+C or /quit to exit
+    |}];
+  H.key h (Key.ctrl 'c');
   [%expect {| Quit |}];
   H.keys h "x";
   H.enter h;
-  [%expect {| |}]
+  [%expect {| |}];
+  let h = connected () in
+  H.step ~quiet:true h Backend_closed;
+  H.keys h "/quit";
+  H.enter h;
+  [%expect {| Quit |}]
 ;;
 
 let%expect_test "abort restores queued messages" =
@@ -3981,7 +4037,8 @@ let%expect_test "/help with an unknown command suggests the closest name" =
   H.keys h "/help modle";
   H.enter h;
   H.show h;
-  [%expect {|
+  [%expect
+    {|
     session abc123 in /work. /help for commands, Esc aborts,
     Ctrl+C twice quits.
     > earlier question
@@ -3990,5 +4047,644 @@ let%expect_test "/help with an unknown command suggests the closest name" =
     ────────────────────────────────────────────────────────────
     > ▏
     …deepseek-flash  think:off  view:normal  ctx:0% 1.5k  $0.01
+    |}]
+;;
+
+let%expect_test "tool confirm: allow, deny, queue and Esc-abort" =
+  let h = connected () in
+  H.event h (State (state ~running:true ()));
+  H.event
+    h
+    (Tool_confirm { call_id = "c1"; name = "bash"; summary = "rm -rf build" });
+  H.show h;
+  [%expect
+    {|
+    session abc123 in /work. /help for commands, Esc aborts,
+    Ctrl+C twice quits.
+    > earlier question
+    earlier answer
+    ┌─ Confirm ────────────────────────────────────────────────┐
+    │ Run bash: rm -rf build? (y/n)                            │
+    └──────────────────────────────────────────────────────────┘
+    ────────────────────────────────────────────────────────────
+    ? ▏
+    /work  deepseek-flash  ctx:0% 1.5k  $0.01  confirm: y / n
+    |}];
+  H.keys h "y";
+  [%expect
+    {|
+    (Rpc
+      (method_ tool_confirm_respond)
+      (params (
+        (call_id c1)
+        (allow   true)))
+      (tag Ignore))
+    |}];
+  H.mode h;
+  [%expect {| editing |}];
+  let h = connected () in
+  H.event h (State (state ~running:true ()));
+  H.event
+    h
+    (Tool_confirm { call_id = "c1"; name = "bash"; summary = "rm -rf build" });
+  H.keys h "n";
+  H.show h;
+  [%expect
+    {|
+    (Rpc
+      (method_ tool_confirm_respond)
+      (params (
+        (call_id c1)
+        (allow   false)))
+      (tag Ignore))
+
+
+
+
+    session abc123 in /work. /help for commands, Esc aborts,
+    Ctrl+C twice quits.
+    > earlier question
+    earlier answer
+    denied bash
+    ────────────────────────────────────────────────────────────
+    > ▏
+    …deepseek-flash  $0.01  ⠋ working (Esc aborts; Enter steers)
+    |}];
+  let h = connected () in
+  H.event h (State (state ~running:true ()));
+  H.event
+    h
+    (Tool_confirm { call_id = "c1"; name = "bash"; summary = "rm -rf build" });
+  H.event
+    h
+    (Tool_confirm { call_id = "c2"; name = "write"; summary = "/work/a.txt" });
+  H.event
+    h
+    (Tool_confirm { call_id = "c3"; name = "edit"; summary = "/work/b.txt" });
+  H.show h;
+  [%expect
+    {|
+    session abc123 in /work. /help for commands, Esc aborts,
+    Ctrl+C twice quits.
+    > earlier question
+    earlier answer
+    ┌─ Confirm ────────────────────────────────────────────────┐
+    │ Run bash: rm -rf build? (y/n)                            │
+    └──────────────────────────────────────────────────────────┘
+    ────────────────────────────────────────────────────────────
+    ? ▏
+    /work  deepseek-flash  ctx:0% 1.5k  $0.01  confirm: y / n
+    |}];
+  H.keys h "y";
+  H.show h;
+  [%expect
+    {|
+    (Rpc
+      (method_ tool_confirm_respond)
+      (params (
+        (call_id c1)
+        (allow   true)))
+      (tag Ignore))
+
+
+    session abc123 in /work. /help for commands, Esc aborts,
+    Ctrl+C twice quits.
+    > earlier question
+    earlier answer
+    ┌─ Confirm ────────────────────────────────────────────────┐
+    │ Write /work/a.txt? (y/n)                                 │
+    └──────────────────────────────────────────────────────────┘
+    ────────────────────────────────────────────────────────────
+    ? ▏
+    /work  deepseek-flash  ctx:0% 1.5k  $0.01  confirm: y / n
+    |}];
+  H.keys h "y";
+  H.show h;
+  [%expect
+    {|
+    (Rpc
+      (method_ tool_confirm_respond)
+      (params (
+        (call_id c2)
+        (allow   true)))
+      (tag Ignore))
+
+
+    session abc123 in /work. /help for commands, Esc aborts,
+    Ctrl+C twice quits.
+    > earlier question
+    earlier answer
+    ┌─ Confirm ────────────────────────────────────────────────┐
+    │ Edit /work/b.txt? (y/n)                                  │
+    └──────────────────────────────────────────────────────────┘
+    ────────────────────────────────────────────────────────────
+    ? ▏
+    /work  deepseek-flash  ctx:0% 1.5k  $0.01  confirm: y / n
+    |}];
+  H.keys h "n";
+  [%expect
+    {|
+    (Rpc
+      (method_ tool_confirm_respond)
+      (params (
+        (call_id c3)
+        (allow   false)))
+      (tag Ignore))
+    |}];
+  let h = connected () in
+  H.event h (State (state ~running:true ()));
+  H.set_pending h [ "c1", "bash", "rm -rf build"; "c2", "write", "/work/a.txt" ];
+  H.esc h;
+  [%expect
+    {|
+    (Rpc
+      (method_ tool_confirm_respond)
+      (params (
+        (call_id c1)
+        (allow   false)))
+      (tag Ignore))
+    (Rpc
+      (method_ tool_confirm_respond)
+      (params (
+        (call_id c2)
+        (allow   false)))
+      (tag Ignore))
+    (Rpc (method_ abort) (params ()) (tag Abort_done))
+    |}]
+;;
+
+let%expect_test "/confirm on saves confirm_tools through set_config" =
+  let h = connected () in
+  H.reply
+    ~quiet:true
+    h
+    Config
+    {|{"scoped_models":["deepseek/deepseek-flash"],"confirm_tools":false}|};
+  H.keys h "/confirm on";
+  H.enter h;
+  [%expect
+    {|
+    (Rpc
+      (method_ set_config)
+      (params ((
+        config ((scoped_models (deepseek/deepseek-flash)) (confirm_tools true)))))
+      (tag (Notice_on_success "tool confirmation on")))
+    |}];
+  H.reply h (Notice_on_success "tool confirmation on") {|{}|};
+  H.show h;
+  [%expect
+    {|
+    session abc123 in /work. /help for commands, Esc aborts,
+    Ctrl+C twice quits.
+    > earlier question
+    earlier answer
+    tool confirmation on
+    ────────────────────────────────────────────────────────────
+    > ▏
+    …deepseek-flash  think:off  view:normal  ctx:0% 1.5k  $0.01
+    |}];
+  H.keys h "/confirm";
+  H.esc h;
+  H.enter h;
+  H.show h;
+  [%expect
+    {|
+    session abc123 in /work. /help for commands, Esc aborts,
+    Ctrl+C twice quits.
+    > earlier question
+    earlier answer
+    tool confirmation on
+    tool confirmation on
+    ────────────────────────────────────────────────────────────
+    > ▏
+    …deepseek-flash  think:off  view:normal  ctx:0% 1.5k  $0.01
+    |}];
+  (* When config is not loaded yet, /confirm off fetches it first. *)
+  let h = connected () in
+  H.keys h "/confirm off";
+  H.enter h;
+  [%expect
+    {| (Rpc (method_ get_config) (params ()) (tag (Config_for_confirm false))) |}];
+  H.reply
+    h
+    (Config_for_confirm false)
+    {|{"scoped_models":[],"confirm_tools":true}|};
+  [%expect
+    {|
+    (Rpc
+      (method_ set_config)
+      (params ((config ((scoped_models ()) (confirm_tools false)))))
+      (tag (Notice_on_success "tool confirmation off")))
+    |}];
+  H.reply h (Notice_on_success "tool confirmation off") {|{}|};
+  H.show h;
+  [%expect
+    {|
+    session abc123 in /work. /help for commands, Esc aborts,
+    Ctrl+C twice quits.
+    > earlier question
+    earlier answer
+    tool confirmation off
+    ────────────────────────────────────────────────────────────
+    > ▏
+    …deepseek-flash  think:off  view:normal  ctx:0% 1.5k  $0.01
+    |}]
+;;
+
+let%expect_test "bash timeout is merged into the tool line" =
+  let h = connected ~height:12 () in
+  let call : P.Tool_call.t =
+    { id = "c1"; name = "bash"; arguments = {|{"command":"sleep 999"}|} }
+  in
+  H.event h (Tool_start call);
+  H.event
+    h
+    (Tool_end
+       { call
+       ; result =
+           { tool_call_id = "c1"
+           ; tool_name = "bash"
+           ; text = "partial output\n[timed out after 120s]"
+           ; is_error = true
+           }
+       });
+  H.show h;
+  [%expect
+    {|
+    session abc123 in /work. /help for commands, Esc aborts,
+    Ctrl+C twice quits.
+    > earlier question
+    earlier answer
+    ⚙ bash sleep 999 ✗ timed out after 120s
+    ────────────────────────────────────────────────────────────
+    > ▏
+    …deepseek-flash  think:off  view:normal  ctx:0% 1.5k  $0.01
+    |}]
+;;
+
+let%expect_test "resize keeps the confirm dialog and picker within the width" =
+  let h = connected ~width:120 ~height:16 () in
+  H.event h (State (state ~running:true ()));
+  H.event
+    h
+    (Tool_confirm { call_id = "c1"; name = "bash"; summary = "rm -rf build" });
+  H.show h;
+  [%expect
+    {|
+    session abc123 in /work. /help for commands, Esc aborts, Ctrl+C twice quits.
+    > earlier question
+    earlier answer
+    ┌─ Confirm ────────────────────────────────────────────────────────────────────────────────────────────────────────────┐
+    │ Run bash: rm -rf build? (y/n)                                                                                        │
+    └──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┘
+    ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+    ? ▏
+    /work  deepseek-flash  think:off  view:normal  ctx:0% 1.5k  $0.01  confirm: y / n
+    |}];
+  H.step h (Resize { width = 40; height = 16 });
+  H.show h;
+  [%expect
+    {|
+    session abc123 in /work. /help for
+    commands, Esc aborts, Ctrl+C twice
+    quits.
+    > earlier question
+    earlier answer
+    ┌─ Confirm ────────────────────────────┐
+    │ Run bash: rm -rf build? (y/n)        │
+    └──────────────────────────────────────┘
+    ────────────────────────────────────────
+    ? ▏
+    …deepseek-flash  $0.01  confirm: y / n
+    |}];
+  let h = connected ~width:120 ~height:16 () in
+  H.keys h "/sessions";
+  H.enter h;
+  H.reply ~quiet:true h Sessions_picker sessions_json;
+  H.show h;
+  [%expect
+    {|
+    (Rpc (method_ list_sessions) (params ()) (tag Sessions_picker))
+
+
+
+
+
+
+
+    session abc123 in /work. /help for commands, Esc aborts, Ctrl+C twice quits.
+    > earlier question
+    earlier answer
+    Sessions  (2)
+    / ▏
+    * build fix ∣ 2025-06-01T10:00 ∣ 12 msgs ∣ fix the build please  /work
+      (unnamed) ∣ 2025-06-02T11:30 ∣ 0 msgs ∣ (empty)               /other
+    ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+    …deepseek-flash  ctx:0% 1.5k  picker: type to filter, Enter selects, Esc closes · Ctrl+N named only · Ctrl+D delete
+    |}];
+  H.step h (Resize { width = 40; height = 16 });
+  H.show h;
+  [%expect
+    {|
+    session abc123 in /work. /help for
+    commands, Esc aborts, Ctrl+C twice
+    quits.
+    > earlier question
+    earlier answer
+    Sessions  (2)
+    / ▏
+    * build fix ∣ 2025-06-01T10:00 ∣ 12 msg…
+      (unnamed) ∣ 2025-06-02T11:30 ∣ 0 msgs…
+    ────────────────────────────────────────
+    …deepseek-flash  ctx:0% 1.5k  $0.01
+    |}]
+;;
+
+let%expect_test "resize 120->40 mid-stream keeps every line" =
+  let h = connected ~width:120 ~height:12 () in
+  H.event h (State (state ~running:true ()));
+  H.event h (Message_start (Assistant partial));
+  for i = 1 to 6 do
+    H.event
+      h
+      (Message_update
+         { partial
+         ; delta =
+             Text_delta
+               (sprintf
+                  "delta %d with several words that wrap at forty columns\n"
+                  i)
+         })
+  done;
+  H.show h;
+  [%expect
+    {|
+    session abc123 in /work. /help for commands, Esc aborts, Ctrl+C twice quits.
+    > earlier question
+    earlier answer
+    delta 1 with several words that wrap at forty columns
+    delta 2 with several words that wrap at forty columns
+    delta 3 with several words that wrap at forty columns
+    delta 4 with several words that wrap at forty columns
+    delta 5 with several words that wrap at forty columns
+    delta 6 with several words that wrap at forty columns
+    ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+    > ▏
+    /work  deepseek-flash  think:off  view:normal  ctx:0% 1.5k  $0.01  ⠋ working (Esc aborts; Enter steers)
+    |}];
+  H.step h (Resize { width = 40; height = 12 });
+  H.show h;
+  [%expect
+    {|
+    forty columns
+    delta 3 with several words that wrap at
+    forty columns
+    delta 4 with several words that wrap at
+    forty columns
+    delta 5 with several words that wrap at
+    forty columns
+    delta 6 with several words that wrap at
+    forty columns
+    ────────────────────────────────────────
+    > ▏
+    …deepseek-flash  ctx:0% 1.5k  $0.01
+    |}]
+;;
+
+let%expect_test "login end to end includes a prompt_cancelled" =
+  let h = connected () in
+  H.keys h "/login anthropic api_key";
+  H.enter h;
+  [%expect
+    {|
+    (Rpc
+      (method_ login)
+      (params (
+        (provider anthropic)
+        (method   api_key)))
+      (tag Show_error))
+    |}];
+  H.event
+    h
+    (Auth
+       (Auth_url
+          { url = "https://claude.ai/oauth?x=1"
+          ; instructions = "Approve in the browser."
+          }));
+  [%expect {| (Open_browser https://claude.ai/oauth?x=1) |}];
+  H.event
+    h
+    (Auth
+       (Prompt { id = "p1"; prompt = Secret { message = "Paste your API key" } }));
+  H.step h (Intent (Insert "sk-ant-secret"));
+  H.show h;
+  [%expect
+    {|
+    Ctrl+C twice quits.
+    > earlier question
+    earlier answer
+    ┌─ Log in ─────────────────────────────────────────────────┐
+    │ Open this URL to log in:                                 │
+    │   https://claude.ai/oauth?x=1                            │
+    │ Approve in the browser.                                  │
+    │ Paste your API key                                       │
+    └──────────────────────────────────────────────────────────┘
+    ────────────────────────────────────────────────────────────
+    ? *************▏
+    …deepseek-flash  $0.01  login: Enter answers, Esc cancels
+    |}];
+  H.event h (Auth (Prompt_cancelled { id = "p1" }));
+  H.mode h;
+  [%expect {| editing |}];
+  H.show h;
+  [%expect
+    {|
+    session abc123 in /work. /help for commands, Esc aborts,
+    Ctrl+C twice quits.
+    > earlier question
+    earlier answer
+    ────────────────────────────────────────────────────────────
+    > ▏
+    …deepseek-flash  think:off  view:normal  ctx:0% 1.5k  $0.01
+    |}];
+  H.event h (Auth (Progress "exchanging code"));
+  H.event h (Auth (Done { provider = "anthropic"; method_ = "api_key" }));
+  [%expect
+    {|
+    (Rpc (method_ auth_status) (params ()) (tag Auth_refresh))
+    (Rpc (method_ list_models) (params ()) (tag (Models_after_login anthropic)))
+    |}];
+  H.reply h (Models_after_login "anthropic") models_json;
+  H.show h;
+  [%expect
+    {|
+    (Rpc
+      (method_ set_model)
+      (params ((model anthropic/claude-fable-5)))
+      (tag Set_model_done))
+
+
+
+    session abc123 in /work. /help for commands, Esc aborts,
+    Ctrl+C twice quits.
+    > earlier question
+    earlier answer
+    logged in to anthropic (api_key)
+    model set to anthropic/claude-fable-5; /model to change
+    ────────────────────────────────────────────────────────────
+    > ▏
+    …deepseek-flash  think:off  view:normal  ctx:0% 1.5k  $0.01
+    |}]
+;;
+
+let%expect_test "Ctrl+C closes every dialog and search" =
+  let h = connected () in
+  H.keys h "/sessions";
+  H.enter h;
+  H.reply ~quiet:true h Sessions_picker sessions_json;
+  H.key h (Key.ctrl 'c');
+  H.mode h;
+  [%expect
+    {|
+    (Rpc (method_ list_sessions) (params ()) (tag Sessions_picker))
+    editing
+    |}];
+  let h = connected () in
+  H.event h (State (state ~running:true ()));
+  H.event
+    h
+    (Tool_confirm { call_id = "c1"; name = "bash"; summary = "rm -rf build" });
+  H.key h (Key.ctrl 'c');
+  H.mode h;
+  [%expect
+    {|
+    (Rpc
+      (method_ tool_confirm_respond)
+      (params (
+        (call_id c1)
+        (allow   false)))
+      (tag Ignore))
+    editing
+    |}];
+  let h = connected () in
+  H.event h (Auth (Prompt { id = "p1"; prompt = Secret { message = "key" } }));
+  H.key h (Key.ctrl 'c');
+  H.mode h;
+  [%expect
+    {|
+    (Rpc (method_ auth_cancel) (params ()) (tag Show_error))
+    editing
+    |}];
+  let h = connected () in
+  H.keys h "/name";
+  H.enter h;
+  H.key h (Key.ctrl 'c');
+  H.mode h;
+  [%expect {| editing |}];
+  let h = connected () in
+  H.key h (Key.ctrl 'f');
+  H.key h (Key.ctrl 'c');
+  H.mode h;
+  [%expect {| editing |}]
+;;
+
+let%expect_test "stderr lines are dim notices at Verbose only" =
+  let h = connected () in
+  H.step ~quiet:true h (Stderr "warning from backend");
+  H.show h;
+  [%expect
+    {|
+    session abc123 in /work. /help for commands, Esc aborts,
+    Ctrl+C twice quits.
+    > earlier question
+    earlier answer
+    ────────────────────────────────────────────────────────────
+    > ▏
+    …deepseek-flash  think:off  view:normal  ctx:0% 1.5k  $0.01
+    |}];
+  H.keys h "/verbosity verbose";
+  H.enter h;
+  H.show h;
+  [%expect
+    {|
+    session abc123 in /work. /help for commands, Esc aborts,
+    Ctrl+C twice quits.
+    > earlier question
+    earlier answer
+    backend: warning from backend
+    view: verbose — everything is shown
+    ────────────────────────────────────────────────────────────
+    > ▏
+    …deepseek-flash  think:off  view:verbose  ctx:0% 1.5k  $0.01
+    |}]
+;;
+
+let%expect_test "wide characters keep the editor cursor column" =
+  let h = connected ~width:40 () in
+  H.step h (Intent (Insert "日本語"));
+  H.show h;
+  [%expect
+    {|
+    session abc123 in /work. /help for
+    commands, Esc aborts, Ctrl+C twice
+    quits.
+    > earlier question
+    earlier answer
+    ────────────────────────────────────────
+    > 日本語▏
+    …deepseek-flash  ctx:0% 1.5k  $0.01
+    |}];
+  H.key h (Key.plain Home);
+  H.key h (Key.plain Right);
+  H.show h;
+  [%expect
+    {|
+    session abc123 in /work. /help for
+    commands, Esc aborts, Ctrl+C twice
+    quits.
+    > earlier question
+    earlier answer
+    ────────────────────────────────────────
+    > 日▏本語
+    …deepseek-flash  ctx:0% 1.5k  $0.01
+    |}];
+  H.key h (Key.plain End);
+  H.step h (Intent (Insert "🐹!"));
+  H.show h;
+  [%expect
+    {|
+    session abc123 in /work. /help for
+    commands, Esc aborts, Ctrl+C twice
+    quits.
+    > earlier question
+    earlier answer
+    ────────────────────────────────────────
+    > 日本語🐹!▏
+    …deepseek-flash  ctx:0% 1.5k  $0.01
+    |}];
+  H.enter h;
+  H.event h (Message_start (User "日本語🐹 wide"));
+  H.event h (Message_update { partial; delta = Text_delta "emoji 🐹 and 日本語" });
+  H.event h (Message_end (assistant "emoji 🐹 and 日本語"));
+  H.show h;
+  [%expect
+    {|
+    (Rpc
+      (method_ prompt)
+      (params ((text "\230\151\165\230\156\172\232\170\158\240\159\144\185!")))
+      (tag Show_error))
+    (Append_history "\230\151\165\230\156\172\232\170\158\240\159\144\185!")
+
+
+    session abc123 in /work. /help for
+    commands, Esc aborts, Ctrl+C twice
+    quits.
+    > earlier question
+    earlier answer
+    > 日本語🐹 wide
+    emoji 🐹 and 日本語
+    ────────────────────────────────────────
+    > ▏
+    …deepseek-flash  ctx:0% 1.5k  $0.01
     |}]
 ;;

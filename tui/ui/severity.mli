@@ -1,6 +1,7 @@
 open! Core
 
 type t =
+  | Debug
   | Info
   | Warn
   | Error

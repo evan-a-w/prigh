@@ -84,6 +84,7 @@ let rec summarise (e : Event.t) : string option =
   | Tool_start c -> Some (sprintf "tool_start %s" c.name)
   | Tool_output _ -> None
   | Tool_end { result; _ } -> Some (sprintf "tool_end %s" result.tool_name)
+  | Tool_confirm _ -> None
   | Compacted _ -> Some "compacted"
   | Config_changed _ -> None
   | Queue_update _ -> None

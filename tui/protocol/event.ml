@@ -38,6 +38,11 @@ type t =
       { call : Tool_call.t
       ; result : Message.Tool_result.t
       }
+  | Tool_confirm of
+      { call_id : string
+      ; name : string
+      ; summary : string
+      }
   | State of State.t
   | Compacted of string
   | Config_changed of Config.t
@@ -108,6 +113,11 @@ let rec of_json j =
       Json.object_field j "result" >>= Message.Tool_result.of_json
     in
     Tool_end { call; result }
+  | "tool_confirm" ->
+    let%bind call_id = Json.string_field j "call_id" in
+    let%bind name = Json.string_field j "name" in
+    let%map summary = Json.string_field j "summary" in
+    Tool_confirm { call_id; name; summary }
   | "state" ->
     Json.object_field j "state" >>= State.of_json >>| fun s -> State s
   | "compacted" -> Json.string_field j "summary" >>| fun s -> Compacted s

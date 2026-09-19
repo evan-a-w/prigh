@@ -89,63 +89,67 @@ let agents_part (m : App.Model.t) : Content.Line.t option =
 ;;
 
 let mode_hint (m : App.Model.t) : Content.Line.t option =
-  match m.state with
-  | None -> None
-  | Some s ->
-    (match m.mode with
-     | Picker { kind = Scoped_models; _ } ->
-       Some
-         [ span
-             ~style:dim
-             "Space toggle · Ctrl+A all · Ctrl+X none · Enter save"
-         ]
-     | Picker { kind = Models _; _ } ->
-       Some
-         [ span
-             ~style:dim
-             "picker: type to filter, Enter selects, Esc closes · Ctrl+N \
-              logged in only"
-         ]
-     | Picker { kind = Sessions _; _ } ->
-       Some
-         [ span
-             ~style:dim
-             "picker: type to filter, Enter selects, Esc closes · Ctrl+N named \
-              only · Ctrl+D delete"
-         ]
-     | Picker _ ->
-       Some
-         [ span ~style:dim "picker: type to filter, Enter selects, Esc closes" ]
-     | Login_prompt _ ->
-       Some [ span ~style:dim "login: Enter answers, Esc cancels" ]
-     | Text_prompt _ -> Some [ span ~style:dim "Enter submits, Esc cancels" ]
-     | Confirm _ -> Some [ span ~style:dim "confirm: y / n" ]
-     | Search { query = _; matches; current } ->
-       if List.is_empty matches
-       then Some [ span ~style:dim "search: type to find · Esc closes" ]
-       else
+  if m.backend_gone
+  then Some [ span ~style:dim "backend exited — Ctrl+C or /quit to exit" ]
+  else (
+    match m.state with
+    | None -> None
+    | Some s ->
+      (match m.mode with
+       | Picker { kind = Scoped_models; _ } ->
          Some
            [ span
                ~style:dim
-               (sprintf
-                  "search %d/%d · ↓↑ next/prev · Esc closes"
-                  (current + 1)
-                  (List.length matches))
+               "Space toggle · Ctrl+A all · Ctrl+X none · Enter save"
            ]
-     | Editing ->
-       if Option.is_some m.autocomplete
-       then Some [ span ~style:dim "Tab/Enter accept · Esc close" ]
-       else if m.pending_quit
-       then Some [ span ~style:dim "Ctrl+C again quits" ]
-       else if s.running
-       then
+       | Picker { kind = Models _; _ } ->
          Some
            [ span
                ~style:dim
-               (spinner_frames.(m.spinner % Array.length spinner_frames)
-                ^ " working (Esc aborts; Enter steers)")
+               "picker: type to filter, Enter selects, Esc closes · Ctrl+N \
+                logged in only"
            ]
-       else None)
+       | Picker { kind = Sessions _; _ } ->
+         Some
+           [ span
+               ~style:dim
+               "picker: type to filter, Enter selects, Esc closes · Ctrl+N \
+                named only · Ctrl+D delete"
+           ]
+       | Picker _ ->
+         Some
+           [ span ~style:dim "picker: type to filter, Enter selects, Esc closes"
+           ]
+       | Login_prompt _ ->
+         Some [ span ~style:dim "login: Enter answers, Esc cancels" ]
+       | Text_prompt _ -> Some [ span ~style:dim "Enter submits, Esc cancels" ]
+       | Confirm _ -> Some [ span ~style:dim "confirm: y / n" ]
+       | Search { query = _; matches; current } ->
+         if List.is_empty matches
+         then Some [ span ~style:dim "search: type to find · Esc closes" ]
+         else
+           Some
+             [ span
+                 ~style:dim
+                 (sprintf
+                    "search %d/%d · ↓↑ next/prev · Esc closes"
+                    (current + 1)
+                    (List.length matches))
+             ]
+       | Editing ->
+         if Option.is_some m.autocomplete
+         then Some [ span ~style:dim "Tab/Enter accept · Esc close" ]
+         else if m.pending_quit
+         then Some [ span ~style:dim "Ctrl+C again quits" ]
+         else if s.running
+         then
+           Some
+             [ span
+                 ~style:dim
+                 (spinner_frames.(m.spinner % Array.length spinner_frames)
+                  ^ " working (Esc aborts; Enter steers)")
+             ]
+         else None))
 ;;
 
 let drop_left_text s ~width =
