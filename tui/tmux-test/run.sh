@@ -304,7 +304,22 @@ scenario_confirm() {
 	capture confirm "denied"
 }
 
-all="startup prompt ctrl_o resize quit tools suspend editor confirm"
+scenario_paste() {
+	wait_for "Ctrl+C twice"
+	# Bracketed paste: Enter inside the paste must not submit.
+	paste "$(printf 'line one\nline two\nline three\nline four\nline five')"
+	settle
+	capture paste "chip after a 5-line paste"
+	keys Left
+	settle
+	capture paste "cursor inside expands the chip"
+	keys Enter
+	wait_for "faux reply"
+	settle
+	capture paste "submitted as one message"
+}
+
+all="startup prompt ctrl_o resize quit tools suspend editor confirm paste"
 for name in ${*:-$all}; do
 	run_scenario "$name"
 done
