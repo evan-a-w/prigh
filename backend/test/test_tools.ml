@@ -139,6 +139,35 @@ let%expect_test "read" =
     |}]
 ;;
 
+let%expect_test "read_for_context: shared truncation and errors" =
+  with_sandbox
+  @@ fun t ->
+  write t "a.txt" "line1\nline2\n";
+  let show = function
+    | Ok s -> print_endline (mask t ("Ok:\n" ^ s))
+    | Error e -> print_endline (mask t ("Error: " ^ Error.to_string_hum e))
+  in
+  show (Tool_read.read_for_context ~cwd:t.dir "a.txt");
+  show (Tool_read.read_for_context ~cwd:t.dir "missing.txt");
+  show (Tool_read.read_for_context ~cwd:t.dir ".");
+  write t "big.txt" (String.concat_lines (List.init 3000 ~f:Int.to_string));
+  (match Tool_read.read_for_context ~cwd:t.dir "big.txt" with
+   | Error _ -> print_endline "unexpected error"
+   | Ok s ->
+     let lines = String.split_lines s in
+     print_s [%sexp (List.length lines : int), (List.last_exn lines : string)]);
+  [%expect
+    {|
+    Ok:
+    line1
+    line2
+
+    Error: file not found: $DIR/missing.txt
+    Error: $DIR is a directory; use ls
+    (2002 "[showing lines 1-2000 of 3000; use offset=2001 to continue]")
+    |}]
+;;
+
 let%expect_test "write" =
   with_sandbox
   @@ fun t ->

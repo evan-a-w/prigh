@@ -24,20 +24,20 @@ let looks_binary s =
   String.exists sample ~f:(fun c -> Char.equal c '\000')
 ;;
 
-let run (context : Tool.Context.t) args =
-  let path = Tool.resolve_path context (Tool_args.string args "path") in
-  let offset = Option.value (Tool_args.int_opt args "offset") ~default:1 in
-  let limit = Tool_args.int_opt args "limit" in
-  if offset < 1 then raise (Tool_args.Invalid "offset must be >= 1");
+(* Shared by the read tool and prompt attachments: resolves [path] against
+   [cwd], then reads and truncates it. Error strings include the resolved
+   path. *)
+let read_for_context ?(offset = 1) ?limit ~cwd path =
+  let path = Tool.resolve ~cwd path in
   match Sys_unix.is_directory path with
-  | `Yes -> Tool.Result.error (sprintf "%s is a directory; use ls" path)
+  | `Yes -> Or_error.errorf "%s is a directory; use ls" path
   | `Unknown | `No ->
     (match Sys_unix.file_exists_exn path with
-     | false -> Tool.Result.error (sprintf "file not found: %s" path)
+     | false -> Or_error.errorf "file not found: %s" path
      | true ->
        let content = In_channel.read_all path in
        if looks_binary content
-       then Tool.Result.error (sprintf "%s looks like a binary file" path)
+       then Or_error.errorf "%s looks like a binary file" path
        else (
          let lines = String.split_lines content in
          let total = List.length lines in
@@ -61,7 +61,17 @@ let run (context : Tool.Context.t) args =
                (last_shown + 1)
            else ""
          in
-         Tool.Result.ok (truncated.text ^ note)))
+         Ok (truncated.text ^ note)))
+;;
+
+let run (context : Tool.Context.t) args =
+  let path = Tool_args.string args "path" in
+  let offset = Option.value (Tool_args.int_opt args "offset") ~default:1 in
+  let limit = Tool_args.int_opt args "limit" in
+  if offset < 1 then raise (Tool_args.Invalid "offset must be >= 1");
+  match read_for_context ~offset ?limit ~cwd:context.cwd path with
+  | Ok text -> Tool.Result.ok text
+  | Error e -> Tool.Result.error (Error.to_string_hum e)
 ;;
 
 let tool = { Tool.spec; run }

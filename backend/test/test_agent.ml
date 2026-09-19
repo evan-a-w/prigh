@@ -179,6 +179,26 @@ let%expect_test "abort cancels the tool and drops queued follow-ups" =
     |}]
 ;;
 
+let%expect_test
+    "abort restores the raw text of a queued message with attachments"
+  =
+  with_agent
+    [ Reply.tool_call
+        ~id:"c1"
+        ~name:"bash"
+        ~arguments:{|{"command":"sleep 5"}|}
+        ()
+    ]
+  @@ fun t agent _dump ->
+  Or_error.ok_exn (Agent.prompt agent "go");
+  Agent.steer agent ~attachments:[ "notes.txt" ] "look at @notes.txt";
+  Eio.Time.sleep (Eio.Stdenv.clock t.env) 0.1;
+  let restored = Agent.abort agent in
+  print_s [%message (restored : string list)];
+  Agent.wait_idle agent;
+  [%expect {| (restored ("look at @notes.txt")) |}]
+;;
+
 let%expect_test "abort restores queued steer and follow-up messages" =
   with_agent
     [ Reply.tool_call

@@ -1,6 +1,13 @@
 open! Core
 open! Import
 
+module Queued = struct
+  type t =
+    { text : string
+    ; attachments : string list
+    }
+end
+
 module State = struct
   type t =
     { session_id : string
@@ -67,8 +74,8 @@ type t =
   ; mutable model : Model.t
   ; mutable thinking : Thinking.t
   ; mutable run : Run.t option
-  ; steer_queue : Message.t Queue.t
-  ; follow_up_queue : string Queue.t
+  ; steer_queue : Queued.t Queue.t
+  ; follow_up_queue : Queued.t Queue.t
   ; mutable subscribers : (Event.t -> unit) list
   ; mutable subagent_usage : Usage.t
   ; mutable subagent_cost_usd : float
@@ -190,6 +197,29 @@ let config t =
   }
 ;;
 
+let with_attachments t text attachments =
+  match attachments with
+  | [] -> text
+  | _ ->
+    let block path =
+      match Tool_read.read_for_context ~cwd:t.cwd path with
+      | Error e ->
+        sprintf "<file path=%S error=%S/>" path (Error.to_string_hum e)
+      | Ok content ->
+        let content =
+          if String.is_suffix content ~suffix:"\n"
+          then content
+          else content ^ "\n"
+        in
+        sprintf "<file path=%S>\n%s</file>" path content
+    in
+    text ^ "\n\n" ^ String.concat (List.map attachments ~f:block) ~sep:"\n\n"
+;;
+
+let user_message t (q : Queued.t) =
+  Message.user (with_attachments t q.text q.attachments)
+;;
+
 let rec start_run t prompts =
   t.git_branch <- Git_branch.find ~cwd:t.cwd;
   let cancel = Cancellation.create () in
@@ -216,7 +246,7 @@ let rec start_run t prompts =
            then (
              Queue.clear t.steer_queue;
              queue_update t);
-           l)
+           List.map l ~f:(user_message t))
          ~emit:(fun event ->
            (match event with
             | Subagent_end { usage; cost_usd; _ } ->
@@ -238,20 +268,14 @@ let rec start_run t prompts =
     (* Steering messages that arrived after the last turn boundary. *)
     if not (Queue.is_empty t.steer_queue)
     then (
-      Queue.iter t.steer_queue ~f:(fun m ->
-        Queue.enqueue
-          t.follow_up_queue
-          (match m with
-           | User u -> u.text
-           | _ -> ""));
-      Queue.clear t.steer_queue;
+      Queue.blit_transfer ~src:t.steer_queue ~dst:t.follow_up_queue ();
       queue_update t);
     auto_compact t;
     finish ();
     match Queue.dequeue t.follow_up_queue with
-    | Some text ->
+    | Some queued ->
       queue_update t;
-      start_run t [ Message.user text ]
+      start_run t [ user_message t queued ]
     | None -> ())
 
 and auto_compact t =
@@ -270,38 +294,36 @@ and auto_compact t =
       broadcast t (Notice ("auto-compaction failed: " ^ Error.to_string_hum e)))
 ;;
 
-let prompt t text =
+let prompt ?(attachments = []) t text =
   if is_running t
   then
     Or_error.error_string "a run is already in progress; use steer or follow_up"
   else (
-    start_run t [ Message.user text ];
+    start_run t [ user_message t { text; attachments } ];
     Ok ())
 ;;
 
-let steer t text =
+let enqueue t queue ?(attachments = []) text =
+  let queued = { Queued.text; attachments } in
   if is_running t
   then (
-    Queue.enqueue t.steer_queue (Message.user text);
+    Queue.enqueue queue queued;
     queue_update t)
-  else start_run t [ Message.user text ]
+  else start_run t [ user_message t queued ]
 ;;
 
-let follow_up t text =
-  if is_running t
-  then (
-    Queue.enqueue t.follow_up_queue text;
-    queue_update t)
-  else start_run t [ Message.user text ]
+let steer ?attachments t text = enqueue t t.steer_queue ?attachments text
+
+let follow_up ?attachments t text =
+  enqueue t t.follow_up_queue ?attachments text
 ;;
 
+(* Queued text is restored verbatim: attachments are only inlined when the
+   message is actually sent. *)
 let abort t =
-  let restored =
-    List.filter_map (Queue.to_list t.steer_queue) ~f:(function
-      | User u -> Some u.text
-      | Assistant _ | Tool_result _ -> None)
-  in
-  let follow_ups = Queue.to_list t.follow_up_queue in
+  let texts q = List.map (Queue.to_list q) ~f:(fun (q : Queued.t) -> q.text) in
+  let restored = texts t.steer_queue in
+  let follow_ups = texts t.follow_up_queue in
   Queue.clear t.steer_queue;
   Queue.clear t.follow_up_queue;
   queue_update t;

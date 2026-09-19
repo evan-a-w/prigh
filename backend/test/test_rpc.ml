@@ -133,6 +133,53 @@ let%expect_test "prompt emits events, get_messages/get_entries reflect the run" 
     |}]
 ;;
 
+let%expect_test "prompt attachments are inlined into the user message" =
+  with_sandbox
+  @@ fun t ->
+  Eio.Switch.run
+  @@ fun sw ->
+  write t "a.txt" "hello\nworld\n";
+  Core_unix.mkdir_p (Filename.concat t.dir "dir");
+  let login = login_manager t ~sw in
+  let on_request (request : Provider.Request.t) =
+    List.iter request.messages ~f:(function
+      | Message.User u -> print_endline (mask t u.text)
+      | _ -> ())
+  in
+  let agent =
+    Agent.create
+      ~env:t.env
+      ~sw
+      ~provider:(Faux_provider.create ~on_request [ Reply.text "ok" ])
+      ~tools:Tools.all
+      ~sessions_dir:(Filename.concat t.dir "sessions")
+      ~home:t.dir
+      ~cwd:t.dir
+      ()
+  in
+  call
+    t
+    agent
+    login
+    ~params:{|{"text": "look", "attachments": ["a.txt", "missing.txt", "dir"]}|}
+    "prompt";
+  Agent.wait_idle agent;
+  [%expect
+    {|
+    look
+
+    <file path="a.txt">
+    hello
+    world
+    </file>
+
+    <file path="missing.txt" error="file not found: $DIR/missing.txt"/>
+
+    <file path="dir" error="$DIR/dir is a directory; use ls"/>
+    {"type":"response","id":"r1","ok":true,"result":{}}
+    |}]
+;;
+
 let%expect_test "sessions: list, new, switch, fork, rewind" =
   with_agent [ Reply.text "one"; Reply.text "two" ]
   @@ fun t agent login ->

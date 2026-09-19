@@ -72,15 +72,19 @@ val state : t -> State.t
 val session : t -> Session.t
 val messages : t -> Message.t list
 
+(** Attachments are paths (relative to the agent cwd or absolute) whose
+    contents are appended to the user message as [<file>] blocks, read with
+    [Tool_read] limits. *)
+
 (** Starts a run. Fails if one is already running. *)
-val prompt : t -> string -> unit Or_error.t
+val prompt : ?attachments:string list -> t -> string -> unit Or_error.t
 
 (** Queued and injected after the current turn's tool results, or starts a
     run when idle. *)
-val steer : t -> string -> unit
+val steer : ?attachments:string list -> t -> string -> unit
 
 (** Queued to run after the current run finishes, or starts a run when idle. *)
-val follow_up : t -> string -> unit
+val follow_up : ?attachments:string list -> t -> string -> unit
 
 (** Cancels the active run (if any) and clears the queues. Returns the texts
     that were queued and are therefore restored to the caller: steer messages

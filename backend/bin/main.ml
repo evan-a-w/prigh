@@ -68,6 +68,13 @@ let common_params =
       "-faux"
       no_arg
       ~doc:" use a scripted provider that echoes prompts (for testing)"
+  and faux_script =
+    flag
+      "-faux-script"
+      (optional string)
+      ~doc:
+        "PATH JSON array of scripted provider replies (implies -faux; loops \
+         when exhausted)"
   and store = auth_file_flag in
   fun ~env ~sw ->
     let cwd = Option.value cwd ~default:(Core_unix.getcwd ()) in
@@ -88,11 +95,26 @@ let common_params =
           exit 2)
     in
     let provider =
-      if faux
-      then
+      match faux_script with
+      | Some path ->
+        let replies =
+          match Faux_provider.of_script_file path with
+          | Ok replies -> replies
+          | Error e ->
+            eprintf "cannot load faux script: %s\n" (Error.to_string_hum e);
+            exit 2
+        in
         Faux_provider.create
-          (List.init 1000 ~f:(fun _ -> Faux_provider.Reply.text "faux reply"))
-      else Provider_router.create ~env ~store ()
+          ~loop:true
+          ~delay_between_events:(fun () ->
+            Eio.Time.sleep (Eio.Stdenv.clock env) 0.02)
+          replies
+      | None ->
+        if faux
+        then
+          Faux_provider.create
+            (List.init 1000 ~f:(fun _ -> Faux_provider.Reply.text "faux reply"))
+        else Provider_router.create ~env ~store ()
     in
     let model =
       match model, session with

@@ -43,6 +43,9 @@ val name : t -> string
     results. *)
 val execute : t -> Context.t -> Json.t -> Result.t
 
+(** Resolves a user-supplied path against [cwd], expanding [~]. *)
+val resolve : cwd:string -> string -> string
+
 (** Resolves a user-supplied path against the context cwd, expanding [~]. *)
 val resolve_path : Context.t -> string -> string
 

@@ -57,10 +57,10 @@ let expand_home path =
   | None -> if String.equal path "~" then home else path
 ;;
 
-let resolve_path (context : Context.t) path =
+let resolve ~cwd path =
   let path = expand_home path in
   let path =
-    if Filename.is_absolute path then path else Filename.concat context.cwd path
+    if Filename.is_absolute path then path else Filename.concat cwd path
   in
   (* Drop "." segments so that "." resolves to the cwd itself. *)
   let parts =
@@ -71,3 +71,5 @@ let resolve_path (context : Context.t) path =
   | [ "" ] | [] -> "/"
   | _ -> String.concat parts ~sep:"/"
 ;;
+
+let resolve_path (context : Context.t) path = resolve ~cwd:context.cwd path

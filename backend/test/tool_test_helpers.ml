@@ -36,7 +36,7 @@ let time_re =
   Re.compile (Re.Perl.re {|\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\.\d+Z|})
 ;;
 
-let duration_re = Re.compile (Re.Perl.re {|"duration_seconds":-?[0-9.eE+]+|})
+let duration_re = Re.compile (Re.Perl.re {|"duration_seconds":-?[0-9.eE+-]+|})
 
 (* Replaces the sandbox dir, session ids, file stamps, timestamps and
    durations. *)

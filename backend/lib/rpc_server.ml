@@ -47,6 +47,18 @@ let string_param params name =
   | None -> Or_error.errorf "missing param %S" name
 ;;
 
+let string_list_param params name =
+  match param params name with
+  | None -> Ok []
+  | Some (`String s) -> Ok [ s ]
+  | Some (`Array items) ->
+    Or_error.all
+      (List.map items ~f:(function
+         | `String s -> Ok s
+         | _ -> Or_error.errorf "param %S must contain only strings" name))
+  | Some _ -> Or_error.errorf "param %S must be an array of strings" name
+;;
+
 let ok json = Ok json
 let empty = ok (`Object [])
 let unit_result r = Or_error.map r ~f:(fun () -> `Object [])
@@ -69,15 +81,24 @@ let dispatch agent login ~meth ~params : Json.t Or_error.t =
   | "ping" -> ok (`String "pong")
   | "prompt" ->
     Or_error.bind (string_param params "text") ~f:(fun text ->
-      unit_result (Agent.prompt agent text))
+      Or_error.bind
+        (string_list_param params "attachments")
+        ~f:(fun attachments ->
+          unit_result (Agent.prompt ~attachments agent text)))
   | "steer" ->
-    Or_error.map (string_param params "text") ~f:(fun text ->
-      Agent.steer agent text;
-      `Object [])
+    Or_error.bind (string_param params "text") ~f:(fun text ->
+      Or_error.map
+        (string_list_param params "attachments")
+        ~f:(fun attachments ->
+          Agent.steer ~attachments agent text;
+          `Object []))
   | "follow_up" ->
-    Or_error.map (string_param params "text") ~f:(fun text ->
-      Agent.follow_up agent text;
-      `Object [])
+    Or_error.bind (string_param params "text") ~f:(fun text ->
+      Or_error.map
+        (string_list_param params "attachments")
+        ~f:(fun attachments ->
+          Agent.follow_up ~attachments agent text;
+          `Object []))
   | "abort" ->
     let restored = Agent.abort agent in
     ok
