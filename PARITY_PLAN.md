@@ -38,7 +38,22 @@ answered through `Reply`.
   flags after exit). `ctrl_o` passes once M1 puts `view:` in the status.
 - **M3 backend done** (`tool_subagent`, `Tools.for_context`, nested
   `Subagent*` events, `parallel_safe` + `Fiber.List.map`, usage roll-up).
-  TUI half (agent views) pending, after M1.
+- **M1 done** (`ui/verbosity.ml`, paired `Tool` items with live tail,
+  `/verbosity`, `view:` in the status line; tmux `ctrl_o` passes).
+- **M2 done** (`ui/autocomplete.ml`, `List_paths` platform command via
+  `term/paths.ml`, attachments on submit; backend `prompt/steer/follow_up
+  ?attachments` composed at send time so `abort` restores raw text).
+- **M3 done** both halves (`ui/agent_view.ml`, `Transcript.apply`,
+  Shift+Tab / Alt+N / `/agents`, agent strip line above the status). The
+  backend also gained `-faux-script FILE` (JSON list of replies) which the
+  tmux `tools` scenario uses to drive a bash call + two parallel subagents
+  through the real terminal.
+- **M5 backend done** (names, list fields, delete/export/import/clone,
+  stats, set_cwd, git_branch). TUI commands pending (after M4).
+- **M6/M7/M8 backend done**: `config.ml` + `get_config`/`set_config`,
+  `udiff.ml` unified diffs from `edit`, `wrote N lines` from `write`,
+  confirm gate (`tool_confirm` event / `tool_confirm_respond`,
+  `Tool_spec.destructive`).
 
 ## M0 — Known bugs (fix first, each with a regression test)
 
