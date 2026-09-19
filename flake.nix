@@ -91,14 +91,25 @@
             dev = false;
           };
         } ./tui query).overrideScope overlay;
+
+        prighTui = scope.prigh_tui.overrideAttrs (oa: {
+          meta = (oa.meta or { }) // {
+            mainProgram = "prigh-tui";
+          };
+        });
       in
       {
         legacyPackages = scope;
 
-        packages.default = scope.prigh_tui;
+        packages.default = prighTui;
+
+        apps.default = {
+          type = "app";
+          program = "${prighTui}/bin/prigh-tui";
+        };
 
         devShells.default = pkgs.mkShell {
-          inputsFrom = [ scope.prigh_tui ];
+          inputsFrom = [ prighTui ];
           buildInputs = [
             scope.bonsai_test
             scope.expect_test_helpers_core
