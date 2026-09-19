@@ -22,10 +22,46 @@ cd backend && eval $(opam env --switch=prigh) && dune build && dune build @runte
 cd tui && eval $(opam env --switch=prigh-ox) && dune build && dune build @runtest
 dune build @e2e         # against the real backend binary built above
 
-# or with Nix (patched OxCaml compiler, pinned package set)
+# or with Nix (patched OxCaml compiler, pinned package set) — see "Running under Nix"
 nix build               # result/bin/prigh-tui
 nix develop             # toolchain shell for tui/
 ```
+
+## Running under Nix
+
+The flake provides the *frontend* toolchain and binary; the backend is still
+built with the vanilla `prigh` opam switch (see `HANDOFF.md` for why), so the
+TUI needs to be told where that binary is.
+
+```
+source /nix/var/nix/profiles/default/etc/profile.d/nix-daemon.sh   # if nix is not on PATH
+
+# 1. backend (once, or after backend changes)
+(cd backend && eval $(opam env --switch=prigh) && dune build)
+
+# 2a. run the Nix-built frontend against it
+nix build
+PRIGH_BACKEND=$PWD/backend/_build/default/bin/main.exe ./result/bin/prigh-tui
+PRIGH_BACKEND=$PWD/backend/_build/default/bin/main.exe ./result/bin/prigh-tui -faux   # no API calls
+# or, without building first:
+PRIGH_BACKEND=$PWD/backend/_build/default/bin/main.exe nix run . -- -cwd ~/proj
+
+# 2b. or develop: the shell has ocamlopt/dune/bonsai_term/ocamlformat for tui/
+nix develop
+./prigh -faux                       # builds tui/ with the shell's dune, spawns the backend
+cd tui && dune build @runtest        # frontend tests; `dune build @e2e` needs the backend build
+```
+
+`prigh-tui` flags: `-faux`, `-session PATH`, `-model ID`, `-thinking LEVEL`,
+`-cwd DIR`, `-auth-file PATH`, `-backend PATH` (same as `$PRIGH_BACKEND`), and
+`-- <extra backend args>`. Without `-backend`/`PRIGH_BACKEND` it looks for
+`backend/_build/default/bin/main.exe` relative to its own location, which works
+for the dune build in `tui/` but not for the copy in `result/`.
+
+The first `nix build`/`nix develop` evaluation is slow (opam-nix resolves the
+pinned package set through import-from-derivation) and the first build compiles
+the patched OxCaml compiler plus ~200 packages (about an hour on a small
+machine); both are cached afterwards.
 
 ## Use
 
