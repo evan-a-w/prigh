@@ -332,9 +332,13 @@ let editor_rows (m : App.Model.t) ~marker ~marker_style ~mask
           then before ^ label
           else Text_width.truncate (before ^ label) ~width:inner
         in
+        let row = List.length !rows in
         rows
         := (prefix i 0 :: Content.Line.of_string ~style:dim shortened) :: !rows;
         incr emitted;
+        (* The cursor sits after the chip when it is past the pasted block. *)
+        if pos.line = chip.stop.line && pos.col >= chip.stop.col
+        then cursor := row, 2 + Text_width.string shortened;
         go (chip.stop.line + 1)
       | None ->
         render_line i (List.nth_exn lines i);

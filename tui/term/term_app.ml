@@ -7,7 +7,8 @@ module Client = Prigh_client.Client
 
 module Result_ = struct
   type t =
-    { view : View.t
+    { model : App.Model.t
+    ; view : View.t
     ; handler : Event.t -> unit Effect.t
     ; inject : App.Action.t -> unit Effect.t
     }
@@ -201,12 +202,14 @@ let platform client ~exit ~quit_requested : Prigh_ui.Component.Platform.t =
 ;;
 
 (* Bracketed paste arrives as Paste `Start, key presses, Paste `End; the
-   buffered text becomes one [Insert] so Enter inside a paste is a newline. *)
+   buffered text becomes one [Paste] intent so Enter inside a paste is a
+   newline. The buffer is a plain ref: Bonsai_term hands the handler a whole
+   batch of events at once, and [Bonsai.state] would only update after the
+   frame, so every key in the batch would still see [Idle]. *)
 module Paste = struct
   type t =
     | Idle
-    | Collecting of string
-  [@@deriving sexp_of]
+    | Collecting of Buffer.t
 end
 
 let app
@@ -224,9 +227,7 @@ let app
       (let%arr inject in
        inject (App.Action.Set_home home))
     graph;
-  let paste, set_paste =
-    Bonsai.state Paste.Idle ~sexp_of_model:Paste.sexp_of_t graph
-  in
+  let paste = ref Paste.Idle in
   Bonsai.Edge.on_change
     dimensions
     ~equal:Dimensions.equal
@@ -257,20 +258,24 @@ let app
     View_of_content.screen screen
   in
   let handler =
-    let%arr inject and paste and set_paste in
+    let%arr inject in
     fun (event : Event.t) ->
-      match event, paste with
-      | Paste `Start, _ -> set_paste (Collecting "")
-      | Paste `End, Collecting text ->
-        Effect.Many [ set_paste Idle; inject (Intent (Paste text)) ]
+      match event, !paste with
+      | Paste `Start, _ ->
+        paste := Collecting (Buffer.create 256);
+        Effect.Ignore
+      | Paste `End, Collecting buf ->
+        paste := Idle;
+        inject (Intent (Paste (Buffer.contents buf)))
       | Paste `End, Idle -> Effect.Ignore
-      | Key_press _, Collecting text ->
+      | Key_press _, Collecting buf ->
         (match Key_of_event.key event with
          | Some { code = Char c; ctrl = false; alt = false; _ } ->
-           set_paste (Collecting (text ^ c))
-         | Some { code = Enter; _ } -> set_paste (Collecting (text ^ "\n"))
-         | Some { code = Tab; _ } -> set_paste (Collecting (text ^ "\t"))
-         | _ -> Effect.Ignore)
+           Buffer.add_string buf c
+         | Some { code = Enter; _ } -> Buffer.add_char buf '\n'
+         | Some { code = Tab; _ } -> Buffer.add_char buf '\t'
+         | _ -> ());
+        Effect.Ignore
       | Key_press _, Idle ->
         (match Key_of_event.key event with
          | Some key -> inject (Key key)
@@ -279,8 +284,8 @@ let app
       | Mouse { kind = Scroll `Down; _ }, _ -> inject (Intent Page_down)
       | Mouse _, _ -> Effect.Ignore
   in
-  let%arr view and handler and inject in
-  { Result_.view; handler; inject }
+  let%arr model and view and handler and inject in
+  { Result_.model; view; handler; inject }
 ;;
 
 let action_of_incoming (incoming : Client.Incoming.t) : App.Action.t =
@@ -289,6 +294,61 @@ let action_of_incoming (incoming : Client.Incoming.t) : App.Action.t =
   | Protocol_error e -> Protocol_error e
   | Stderr line -> Stderr line
   | Closed -> Backend_closed
+;;
+
+(* The driver only exposes [View.t], so tests read the last [Result_.t] (and
+   hence the model) through this ref. Reset on each [start_for_testing]. *)
+let latest_result : Result_.t option ref = ref None
+
+(* The test owns the frame loop ([Driver.compute_frame]); [start_with_driver]
+   would run its own in the background and the two would fight over events. *)
+module Test_terminal = struct
+  type t =
+    { mutable size : int * int
+    ; mutable winch : unit Ivar.t
+    }
+
+  let create ~width ~height = { size = width, height; winch = Ivar.create () }
+
+  let resize t ~width ~height =
+    t.size <- width, height;
+    let winch = t.winch in
+    t.winch <- Ivar.create ();
+    Ivar.fill_if_empty winch ()
+  ;;
+end
+
+let with_test_driver ~client ~(terminal : Test_terminal.t) ~writer ~reader f =
+  latest_result := None;
+  let quit_requested = Ivar.create () in
+  Bonsai_term.Private.For_testing.with_driver
+    ~dispose:None
+    ~nosig:None
+    ~mouse:(Some No_mouse_events)
+    ~bpaste:None
+    ~reader:(Some reader)
+    ~writer:(Some writer)
+    ~time_source:None
+    ~for_mocking:
+      (Some
+         (Notty_async.For_mocking.create
+            ~capabilities:(fun _ -> Notty.Cap.ansi)
+            ~dimensions:(fun _ -> Some terminal.size)
+            ~wait_for_next_window_change:(fun () -> Ivar.read terminal.winch)
+            ~is_a_tty:(fun _ -> Deferred.return true)))
+    ~optimize:None
+    ~target_frames_per_second:None
+    ~get_view_and_handler:(fun (r : Result_.t) ->
+      latest_result := Some r;
+      ~view:r.view, ~handler:r.handler)
+    ~handle_incoming:(fun (r : Result_.t) action -> r.inject action)
+    (fun ~exit ~dimensions graph ->
+      app client ~exit ~quit_requested ~dimensions graph)
+    (fun driver ->
+      don't_wait_for
+        (Pipe.iter_without_pushback (Client.incoming client) ~f:(fun incoming ->
+           Driver.send_incoming_event driver (action_of_incoming incoming)));
+      f driver)
 ;;
 
 let run ~backend ~args =

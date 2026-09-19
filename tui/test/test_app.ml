@@ -1,6 +1,7 @@
 open! Core
 open! Expect_test_helpers_core
 open Prigh_ui
+open Fixtures
 module P = Prigh_protocol
 
 (* Drives the pure state machine: every command the app emits is printed, and
@@ -14,6 +15,10 @@ module H = struct
   ;;
 
   let step ?(quiet = false) t (action : App.Action.t) =
+    (match action with
+     | Key key -> Coverage.record_key key
+     | Intent intent -> Coverage.record intent
+     | _ -> ());
     let model, commands = App.update t.model action in
     t.model <- model;
     if not quiet
@@ -44,127 +49,6 @@ module H = struct
   ;;
 end
 
-let model_json
-  ?(provider = "anthropic")
-  ?(supports_thinking = true)
-  ?(context_window = 1000000)
-  id
-  name
-  =
-  sprintf
-    {|{"id":"%s","provider":"%s","key":"%s/%s","name":"%s","context_window":%d,"max_output":128000,"supports_thinking":%b,"cost":{"input":10,"output":50,"cache_read":1}}|}
-    id
-    provider
-    provider
-    id
-    name
-    context_window
-    supports_thinking
-;;
-
-let models_json =
-  sprintf
-    "[%s]"
-    (String.concat
-       ~sep:","
-       [ model_json "claude-fable-5" "Claude Fable 5"
-       ; model_json "claude-fable-5-1" "Claude Fable 5.1"
-       ; model_json ~provider:"openai" "gpt-5.5" "GPT-5.5"
-       ; model_json ~provider:"deepseek" "deepseek-flash" "DeepSeek V4.1 Flash"
-       ])
-;;
-
-let state_json
-  ?(model =
-    model_json ~provider:"deepseek" "deepseek-flash" "DeepSeek V4.1 Flash")
-  ?(running = false)
-  ?(cwd = "/work")
-  ?git_branch
-  ?(thinking = "off")
-  ?(context_tokens = 1500)
-  ?(cost_usd = 0.0123)
-  ?session_name
-  ()
-  =
-  sprintf
-    {|{"session_id":"abc123","session_path":"/home/u/.prigh/sessions/1.jsonl","session_name":%s,"cwd":%s,"git_branch":%s,"model":%s,"thinking":%s,"running":%b,"message_count":2,"usage":{"input":1200,"output":300,"cache_read":0},"cost_usd":%g,"context_tokens":%d}|}
-    (match session_name with
-     | Some name -> P.Json.to_string (P.Json.str name)
-     | None -> "null")
-    (P.Json.to_string (P.Json.str cwd))
-    (match git_branch with
-     | Some branch -> P.Json.to_string (P.Json.str branch)
-     | None -> "null")
-    model
-    (P.Json.to_string (P.Json.str thinking))
-    running
-    cost_usd
-    context_tokens
-;;
-
-let state
-  ?model
-  ?running
-  ?cwd
-  ?git_branch
-  ?thinking
-  ?context_tokens
-  ?cost_usd
-  ?session_name
-  ()
-  =
-  Or_error.ok_exn
-    (P.State.of_json
-       (Or_error.ok_exn
-          (P.Json.parse
-             (state_json
-                ?model
-                ?running
-                ?cwd
-                ?git_branch
-                ?thinking
-                ?context_tokens
-                ?cost_usd
-                ?session_name
-                ()))))
-;;
-
-let sessions_json =
-  {|[{"id":"1","path":"/home/u/.prigh/sessions/1.jsonl","name":"build fix","cwd":"/work","created_at":"2025-06-01T10:00:00Z","updated_at":"2025-06-01T10:00:11Z","first_prompt":"fix the build\nplease","message_count":12,"parent":null},{"id":"2","path":"/home/u/.prigh/sessions/2.jsonl","name":null,"cwd":"/other","created_at":"2025-06-02T11:30:00Z","updated_at":"2025-06-02T11:30:22Z","first_prompt":null,"message_count":0,"parent":null}]|}
-;;
-
-let entries_json =
-  {|{"head":"u2","entries":[{"id":"u1","parent":null,"kind":"message","message":{"role":"user","text":"first question"}},{"id":"a1","parent":"u1","kind":"message","message":{"role":"assistant","content":[{"type":"text","text":"answer one"}],"stop_reason":{"type":"end_turn"},"usage":{"input":1,"output":2,"cache_read":0},"model":"m"}},{"id":"u2","parent":"a1","kind":"message","message":{"role":"user","text":"second question\nmore"}}]}|}
-;;
-
-let tree_json =
-  {|{"head":"a2","entries":[{"id":"u1","parent":null,"kind":"message","message":{"role":"user","text":"root question"}},{"id":"a1","parent":"u1","kind":"message","message":{"role":"assistant","content":[{"type":"text","text":"first answer"}],"stop_reason":{"type":"end_turn"},"usage":{"input":1,"output":2,"cache_read":0},"model":"m"}},{"id":"a2","parent":"a1","kind":"message","message":{"role":"assistant","content":[{"type":"text","text":"second answer"}],"stop_reason":{"type":"end_turn"},"usage":{"input":1,"output":2,"cache_read":0},"model":"m"}},{"id":"ab","parent":"u1","kind":"message","message":{"role":"assistant","content":[{"type":"text","text":"branch answer"}],"stop_reason":{"type":"end_turn"},"usage":{"input":1,"output":2,"cache_read":0},"model":"m"}},{"id":"t1","parent":"ab","kind":"message","message":{"role":"tool_result","tool_call_id":"c1","tool_name":"bash","text":"branch tool","is_error":false}}]}|}
-;;
-
-let stats_json =
-  {|{"message_count":4,"turns":2,"tool_calls":{"bash":1,"read":2},"usage":{"input":30,"output":13,"cache_read":5},"cost_usd":0.0001,"context_percent":1.5,"model_changes":1,"compactions":0,"duration_seconds":12.5}|}
-;;
-
-let auth_json =
-  {|[{"provider":"anthropic","name":"Anthropic","methods":[{"method":"oauth","label":"Claude Pro/Max"},{"method":"api_key","label":"API key"}],"configured":null,"expires_ms":null},{"provider":"openai","name":"OpenAI","methods":[{"method":"api_key","label":"API key"}],"configured":null,"expires_ms":null},{"provider":"deepseek","name":"DeepSeek","methods":[{"method":"api_key","label":"API key"}],"configured":{"method":"api_key","source":"auth.json"},"expires_ms":null}]|}
-;;
-
-let assistant ?(stop = "end_turn") text =
-  Or_error.ok_exn
-    (P.Message.of_json
-       (Or_error.ok_exn
-          (P.Json.parse
-             (sprintf
-                {|{"role":"assistant","content":[{"type":"text","text":%s}],"stop_reason":{"type":"%s"},"usage":{"input":1,"output":2,"cache_read":0},"model":"m"}|}
-                (P.Json.to_string (P.Json.str text))
-                stop))))
-;;
-
-let partial =
-  match assistant "" with
-  | Assistant a -> a
-  | _ -> assert false
-;;
 
 let connected ?width ?height ?model () =
   let h = H.create ?width ?height () in
@@ -2585,6 +2469,7 @@ let%expect_test "two parallel subagents: strip, live tails, focus cycling, Esc" 
     > ▏
     /work  deepseek-flash  ctx:0% 1.5k  $0.01  ⠋ working (Esc aborts; Enter steers)
     |}];
+  H.focus_agent h 1;
   H.focus_agent h 2;
   H.show h;
   [%expect
@@ -3162,7 +3047,7 @@ let%expect_test "bracketed paste renders a chip until the cursor enters it" =
     > earlier question
     earlier answer
     ────────────────────────────────────────────────────────────────────────────────
-    > ▏4 lines pasted]
+    > [4 lines pasted]▏
     /work  deepseek-flash  think:off  view:normal  ctx:0% 1.5k  $0.01
     |}];
   H.key h (Key.plain Up);
@@ -4686,5 +4571,139 @@ let%expect_test "wide characters keep the editor cursor column" =
     ────────────────────────────────────────
     > ▏
     …deepseek-flash  ctx:0% 1.5k  $0.01
+    |}]
+;;
+
+let%expect_test "editing intents: cursor, word, kill, yank, undo, delete" =
+  let h = connected () in
+  H.keys h "one two three";
+  H.key h (Key.plain Left);
+  H.show h;
+  [%expect {|
+    session abc123 in /work. /help for commands, Esc aborts,
+    Ctrl+C twice quits.
+    > earlier question
+    earlier answer
+    ────────────────────────────────────────────────────────────
+    > one two thre▏
+    …deepseek-flash  think:off  view:normal  ctx:0% 1.5k  $0.01
+    |}];
+  H.key h (Key.plain Right);
+  H.key h (Key.alt (Char "b"));
+  H.show h;
+  [%expect {|
+    session abc123 in /work. /help for commands, Esc aborts,
+    Ctrl+C twice quits.
+    > earlier question
+    earlier answer
+    ────────────────────────────────────────────────────────────
+    > one two ▏hree
+    …deepseek-flash  think:off  view:normal  ctx:0% 1.5k  $0.01
+    |}];
+  H.key h (Key.alt (Char "f"));
+  H.show h;
+  [%expect {|
+    session abc123 in /work. /help for commands, Esc aborts,
+    Ctrl+C twice quits.
+    > earlier question
+    earlier answer
+    ────────────────────────────────────────────────────────────
+    > one two three▏
+    …deepseek-flash  think:off  view:normal  ctx:0% 1.5k  $0.01
+    |}];
+  H.key h (Key.alt (Char "d"));
+  H.show h;
+  [%expect {|
+    session abc123 in /work. /help for commands, Esc aborts,
+    Ctrl+C twice quits.
+    > earlier question
+    earlier answer
+    ────────────────────────────────────────────────────────────
+    > one two three▏
+    …deepseek-flash  think:off  view:normal  ctx:0% 1.5k  $0.01
+    |}];
+  H.key h (Key.ctrl 'k');
+  H.key h (Key.ctrl 'u');
+  H.key h (Key.ctrl 'w');
+  H.key h (Key.ctrl 'y');
+  H.show h;
+  [%expect {|
+    session abc123 in /work. /help for commands, Esc aborts,
+    Ctrl+C twice quits.
+    > earlier question
+    earlier answer
+    ────────────────────────────────────────────────────────────
+    > one two three▏
+    …deepseek-flash  think:off  view:normal  ctx:0% 1.5k  $0.01
+    |}];
+  H.key h (Key.alt (Char "y"));
+  H.key h (Key.ctrl '_');
+  H.key h (Key.plain Delete);
+  H.key h (Key.plain Backspace);
+  H.show h;
+  [%expect {|
+    session abc123 in /work. /help for commands, Esc aborts,
+    Ctrl+C twice quits.
+    > earlier question
+    earlier answer
+    ────────────────────────────────────────────────────────────
+    > ▏
+    …deepseek-flash  think:off  view:normal  ctx:0% 1.5k  $0.01
+    |}]
+;;
+
+(* Runs last in this file, after every scenario below has populated
+   [Coverage.hit]. Every keymap binding must have been reached by a scenario. *)
+let%expect_test "keymap: every binding is covered by a scenario" =
+  List.iter Keymap.bindings ~f:(fun b ->
+    let keys = List.map b.keys ~f:Key.to_string |> String.concat ~sep:"/" in
+    printf
+      "%-16s %-24s %s\n"
+      keys
+      (Sexp.to_string (Intent.sexp_of_t b.intent))
+      (if Coverage.covered b.intent then "covered" else "MISSING"));
+  [%expect {|
+    Enter            Submit                   covered
+    Alt+Enter        Queue_follow_up          covered
+    Ctrl+J/Alt+J     Newline                  covered
+    Esc              Cancel                   covered
+    Tab              Complete                 covered
+    Up               Up                       covered
+    Down             Down                     covered
+    Alt+Up           Dequeue                  covered
+    Left             Left                     covered
+    Right            Right                    covered
+    Alt+B/Ctrl+Left  Word_left                covered
+    Alt+F/Ctrl+Right Word_right               covered
+    Alt+D            Delete_word_forward      covered
+    Home/Ctrl+A      Home                     covered
+    End/Ctrl+E       End                      covered
+    PageUp           Page_up                  covered
+    PageDown         Page_down                covered
+    Ctrl+Up          Prev_user_message        covered
+    Ctrl+Down        Next_user_message        covered
+    Backspace/Ctrl+H Backspace                covered
+    Delete           Delete                   covered
+    Ctrl+K           Kill_to_end              covered
+    Ctrl+U           Kill_to_start            covered
+    Ctrl+W/Alt+Backspace Kill_word                covered
+    Ctrl+Y           Yank                     covered
+    Alt+Y            Yank_pop                 covered
+    Ctrl+_           Undo                     covered
+    Ctrl+O           Cycle_verbosity          covered
+    Ctrl+R           Path_complete            covered
+    Ctrl+F           Search                   covered
+    Ctrl+G           Edit_externally          covered
+    Ctrl+L           Model_picker             covered
+    Ctrl+P           Next_model               covered
+    Alt+P            Prev_model               covered
+    Ctrl+T           Next_thinking            covered
+    Ctrl+N           Picker_toggle_filter     covered
+    Ctrl+X           Copy_last                covered
+    Ctrl+Z           Suspend                  covered
+    Shift+Tab        Next_agent               covered
+    Alt+1            (Focus_agent 1)          covered
+    Ctrl+C           Interrupt                covered
+    Ctrl+D           Force_quit               covered
     |}]
 ;;
