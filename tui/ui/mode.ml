@@ -5,6 +5,7 @@ module Picker_kind = struct
   type t =
     | Models
     | Thinking
+    | Verbosity
     | Login
     | Logout
     | Sessions

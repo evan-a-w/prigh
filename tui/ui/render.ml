@@ -38,6 +38,7 @@ let status (m : App.Model.t) : Content.Line.t =
     let parts =
       [ s.model.key
       ; "thinking:" ^ s.thinking
+      ; "view:" ^ Verbosity.name m.verbosity
       ; sprintf "ctx:%s (%d%%)" (format_tokens s.context_tokens) context
       ; sprintf
           "in:%s out:%s"
@@ -213,14 +214,14 @@ let screen (m : App.Model.t) : Screen.t =
         ~width
         ~rows:transcript_rows
         ~skip:0
-        ~expand_tools:m.expand_tools
+        ~verbosity:m.verbosity
     | Viewport.Anchored { top; _ } ->
       Transcript.render_window
         m.transcript
         ~width
         ~rows:transcript_rows
         ~top
-        ~expand_tools:m.expand_tools
+        ~verbosity:m.verbosity
   in
   let padding =
     List.init

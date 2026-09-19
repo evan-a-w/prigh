@@ -106,5 +106,5 @@ let handle t (intent : Intent.t) ~page : Outcome.t =
   | Interrupt
   | Force_quit
   | Clear_screen
-  | Toggle_tool_output -> Continue t
+  | Cycle_verbosity -> Continue t
 ;;

@@ -65,7 +65,7 @@ module Model = struct
     ; viewport : Viewport.t
     ; pending_quit : bool
     ; spinner : int
-    ; expand_tools : bool
+    ; verbosity : Verbosity.t
     ; width : int
     ; height : int
     ; quitting : bool
@@ -91,7 +91,7 @@ let transcript_line_count m =
   Transcript.line_count
     m.transcript
     ~width:(transcript_width m)
-    ~expand_tools:m.expand_tools
+    ~verbosity:m.verbosity
 ;;
 
 let editor_row_count m =
@@ -129,11 +129,22 @@ let notice ?severity m text =
 let error m text = notice ~severity:Error m text
 let warn m text = notice ~severity:Warn m text
 
+let verbosity_notice = function
+  | Verbosity.Quiet ->
+    "view: quiet — intermediate output and thinking are hidden"
+  | Normal -> "view: normal — tool output is summarised"
+  | Verbose -> "view: verbose — everything is shown"
+;;
+
 let block m content =
   with_transcript m ~f:(fun t -> Transcript.add t (Block content))
 ;;
 
 let follow m = { m with viewport = Viewport.Follow }
+
+let set_verbosity m verbosity =
+  follow (notice { m with verbosity } (verbosity_notice verbosity))
+;;
 
 let init =
   { state = None
@@ -146,7 +157,7 @@ let init =
   ; viewport = Viewport.Follow
   ; pending_quit = false
   ; spinner = 0
-  ; expand_tools = false
+  ; verbosity = Verbosity.Normal
   ; width = 80
   ; height = 24
   ; quitting = false
@@ -235,6 +246,17 @@ let thinking_picker m =
         level)
   in
   open_picker m Thinking (Picker.create ~title:"Thinking level" items)
+;;
+
+let verbosity_picker m =
+  let items =
+    List.map Verbosity.all ~f:(fun verbosity ->
+      Picker.Item.create
+        ~id:(Verbosity.name verbosity)
+        ~marked:(Verbosity.equal verbosity m.verbosity)
+        (String.capitalize (Verbosity.name verbosity)))
+  in
+  open_picker m Verbosity (Picker.create ~title:"Transcript verbosity" items)
 ;;
 
 let login_picker m (statuses : P.Auth_status.t list) =
@@ -381,6 +403,18 @@ let run_command m (cmd : Commands.Parsed.t) =
   | "thinking", [] -> thinking_picker m, []
   | "thinking", level :: _ ->
     m, [ rpc "set_thinking" ~params:[ "thinking", str level ] ]
+  | "verbosity", [] -> verbosity_picker m, []
+  | "verbosity", name :: _ ->
+    (match
+       List.find Verbosity.all ~f:(fun v ->
+         String.equal (Verbosity.name v) name)
+     with
+     | Some verbosity -> set_verbosity m verbosity, []
+     | None ->
+       ( error
+           m
+           (sprintf "unknown verbosity %S; use quiet, normal or verbose" name)
+       , [] ))
   | "auth", _ -> m, [ rpc "auth_status" ~tag:Auth_show ]
   | "login", [] -> m, [ rpc "auth_status" ~tag:Auth_login_picker ]
   | "login", provider :: rest ->
@@ -546,7 +580,7 @@ let editing m (intent : Intent.t) =
   | Kill_word -> ed Editor.kill_word
   | Clear_screen ->
     follow { m with transcript = Transcript.clear m.transcript }, []
-  | Toggle_tool_output -> { m with expand_tools = not m.expand_tools }, []
+  | Cycle_verbosity -> set_verbosity m (Verbosity.next m.verbosity), []
 ;;
 
 (* ---- picker mode ------------------------------------------------------ *)
@@ -556,6 +590,14 @@ let picker_selected m (kind : Mode.Picker_kind.t) (item : Picker.Item.t) =
   match kind with
   | Models -> m, [ set_model_command item.id ]
   | Thinking -> m, [ rpc "set_thinking" ~params:[ "thinking", str item.id ] ]
+  | Verbosity ->
+    let verbosity =
+      Option.value
+        (List.find Verbosity.all ~f:(fun v ->
+           String.equal (Verbosity.name v) item.id))
+        ~default:Verbosity.Normal
+    in
+    set_verbosity m verbosity, []
   | Login ->
     (match String.split item.id ~on:' ' with
      | [ provider; meth ] ->
@@ -632,7 +674,7 @@ let login_prompt m ~id ~(prompt : P.Auth_event.Prompt.t) (intent : Intent.t) =
   | Page_down
   | Complete
   | Clear_screen
-  | Toggle_tool_output
+  | Cycle_verbosity
   | Newline -> m, []
   | Insert _
   | Backspace
@@ -770,10 +812,9 @@ let event m (e : P.Event.t) =
   match e with
   | State state ->
     let m =
-      with_transcript m ~f:(fun t ->
-        if state.running
-        then t
-        else Transcript.set_tool_tail (Transcript.flush t) None)
+      if state.running
+      then m
+      else with_transcript m ~f:(fun t -> Transcript.flush t)
     in
     { m with state = Some state }, []
   | Message_start (User text) -> tr (fun t -> Transcript.add t (User text))
@@ -786,6 +827,11 @@ let event m (e : P.Event.t) =
   | Message_end (Assistant a) ->
     tr (fun t ->
       let t = Transcript.flush t in
+      let t =
+        match a.stop_reason with
+        | End_turn -> Transcript.mark_final t
+        | _ -> t
+      in
       match a.stop_reason with
       | Error e -> Transcript.notice ~severity:Error t ("error: " ^ e)
       | Aborted -> Transcript.notice ~severity:Warn t "[aborted]"
@@ -796,17 +842,13 @@ let event m (e : P.Event.t) =
           "[output truncated by the model's length limit]"
       | End_turn | Tool_use -> t)
   | Message_end _ -> m, []
-  | Tool_start call ->
-    tr (fun t ->
-      Transcript.add
-        (Transcript.set_tool_tail (Transcript.flush t) None)
-        (Tool_call call))
-  | Tool_output { chunk; _ } ->
-    tr (fun t -> Transcript.append_tool_output t chunk)
-  | Tool_end { result; _ } ->
-    tr (fun t ->
-      Transcript.add (Transcript.set_tool_tail t None) (Tool_result result))
-  | Compacted _ -> notice m "context compacted", []
+  | Tool_start call -> tr (fun t -> Transcript.add_tool t call)
+  | Tool_output { chunk; call_id } ->
+    tr (fun t -> Transcript.append_tool_output t ~call_id chunk)
+  | Tool_end { call; result } ->
+    tr (fun t -> Transcript.end_tool t ~call ~result)
+  | Compacted summary ->
+    with_transcript m ~f:(fun t -> Transcript.add t (Compaction summary)), []
   | Notice text -> notice m text, []
   | Queue_update { steer; follow_up } ->
     { m with queued = { Queue_counts.steer; follow_up } }, []

@@ -7,6 +7,7 @@ module Picker_kind : sig
   type t =
     | Models
     | Thinking
+    | Verbosity
     | Login
     | Logout
     | Sessions

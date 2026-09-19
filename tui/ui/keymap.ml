@@ -38,7 +38,10 @@ let bindings =
   ; b [ Key.ctrl 'u' ] Kill_line "delete the whole line"
   ; b [ Key.ctrl 'w' ] Kill_word "delete the word before the cursor"
   ; b [ Key.ctrl 'l' ] Clear_screen "clear the transcript"
-  ; b [ Key.ctrl 'o' ] Toggle_tool_output "expand / collapse tool output"
+  ; b
+      [ Key.ctrl 'o' ]
+      Cycle_verbosity
+      "cycle transcript verbosity (quiet / normal / verbose)"
   ; b [ Key.ctrl 'c' ] Interrupt "clear the editor, then (again) quit"
   ; b [ Key.ctrl 'd' ] Force_quit "quit"
   ]

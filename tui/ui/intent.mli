@@ -25,5 +25,5 @@ type t =
   | Kill_line
   | Kill_word
   | Clear_screen
-  | Toggle_tool_output
+  | Cycle_verbosity
 [@@deriving sexp_of, equal, compare]

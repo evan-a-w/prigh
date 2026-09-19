@@ -6,12 +6,19 @@ module P = Prigh_protocol
 module Item : sig
   type t =
     | User of string
-    | Assistant of string
+    | Assistant of
+        { text : string
+        ; final : bool
+        }
     | Thinking of string
-    | Tool_call of P.Tool_call.t
-    | Tool_result of P.Message.Tool_result.t
+    | Tool of
+        { call : P.Tool_call.t
+        ; result : P.Message.Tool_result.t option
+        ; live_tail : string option
+        }
     | Notice of Severity.t * string
     | Block of Content.t
+    | Compaction of string
   [@@deriving sexp_of, equal]
 end
 
@@ -36,9 +43,20 @@ val clear : t -> t
 val append : t -> Stream_kind.t -> string -> t
 
 val flush : t -> t
-val set_tool_tail : t -> string option -> t
-val tool_tail : t -> string option
-val append_tool_output : t -> string -> t
+
+(** Re-tags the most recent assistant item as final (end of turn). *)
+val mark_final : t -> t
+
+(** Adds a tool call with no result yet. Flushes any open text stream. *)
+val add_tool : t -> P.Tool_call.t -> t
+
+(** Appends streamed output to the matching open tool, keeping the last five
+    lines. *)
+val append_tool_output : t -> call_id:string -> string -> t
+
+(** Fills in the result of the matching open tool (adding a tool item if the
+    start was missed). *)
+val end_tool : t -> call:P.Tool_call.t -> result:P.Message.Tool_result.t -> t
 
 (** Renders wrapped lines, newest last. Only the last [rows + skip] lines are
     produced; [skip] is how many bottom lines to hide (scrolling). *)
@@ -47,11 +65,11 @@ val render_tail
   -> width:int
   -> rows:int
   -> skip:int
-  -> expand_tools:bool
+  -> verbosity:Verbosity.t
   -> Content.t
 
 (** Total wrapped line count, for scroll clamping. *)
-val line_count : t -> width:int -> expand_tools:bool -> int
+val line_count : t -> width:int -> verbosity:Verbosity.t -> int
 
 (** Renders the wrapped lines in [\[top, top + rows)]. *)
 val render_window
@@ -59,7 +77,7 @@ val render_window
   -> width:int
   -> rows:int
   -> top:int
-  -> expand_tools:bool
+  -> verbosity:Verbosity.t
   -> Content.t
 
-val render_item : Item.t -> expand_tools:bool -> Content.t
+val render_item : Item.t -> verbosity:Verbosity.t -> Content.t

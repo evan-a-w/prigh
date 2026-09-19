@@ -69,7 +69,7 @@ module Model : sig
     ; viewport : Viewport.t
     ; pending_quit : bool
     ; spinner : int
-    ; expand_tools : bool
+    ; verbosity : Verbosity.t
     ; width : int
     ; height : int
     ; quitting : bool

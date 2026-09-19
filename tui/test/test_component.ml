@@ -82,7 +82,7 @@ let%expect_test "component: startup requests, key handling, rpc round trip, \
     Ctrl+C twice quits.
     ──────────────────────────────────────────────────
     > ▏
-    deepseek/m  thinking:off  ctx:0 (0%)  in:0 out:0 …
+    deepseek/m  thinking:off  view:normal  ctx:0 (0%)…
     |}];
   Bonsai_test.Handle.do_actions
     handle
@@ -102,7 +102,7 @@ let%expect_test "component: startup requests, key handling, rpc round trip, \
     thinking must be one of: off, on, low, high, max
     ──────────────────────────────────────────────────
     > ▏
-    deepseek/m  thinking:off  ctx:0 (0%)  in:0 out:0 …
+    deepseek/m  thinking:off  view:normal  ctx:0 (0%)…
     |}];
   (* The spinner ticks only while running. *)
   Bonsai_test.Handle.do_actions
@@ -127,7 +127,7 @@ let%expect_test "component: startup requests, key handling, rpc round trip, \
     thinking must be one of: off, on, low, high, max
     ──────────────────────────────────────────────────
     > ▏
-    deepseek/m  thinking:off  ctx:0 (0%)  in:0 out:0 …
+    deepseek/m  thinking:off  view:normal  ctx:0 (0%)…
     |}];
   Bonsai_test.Handle.do_actions handle [ Key (Key.plain Escape) ];
   Bonsai_test.Handle.recompute_view_until_stable handle;
@@ -146,6 +146,6 @@ let%expect_test "component: startup requests, key handling, rpc round trip, \
     backend exited
     ──────────────────────────────────────────────────
     > ▏
-    deepseek/m  thinking:off  ctx:0 (0%)  in:0 out:0 …
+    deepseek/m  thinking:off  view:normal  ctx:0 (0%)…
     |}]
 ;;

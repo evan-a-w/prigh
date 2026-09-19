@@ -15,6 +15,7 @@ let all =
   [ c "help" "" "show commands and keys"
   ; c "model" "[name|id|provider/id]" "pick or switch the model"
   ; c "thinking" "[off|on|low|high|max]" "pick or set the thinking level"
+  ; c "verbosity" "[quiet|normal|verbose]" "set the transcript verbosity"
   ; c "login" "[provider] [api_key|oauth]" "log in to a provider"
   ; c "logout" "[provider]" "remove a provider's stored credential"
   ; c "auth" "" "show which providers are configured"

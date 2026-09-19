@@ -263,6 +263,9 @@ let%expect_test "commands" =
           ((name thinking)
            (args [off|on|low|high|max])
            (help "pick or set the thinking level"))
+          ((name verbosity)
+           (args [quiet|normal|verbose])
+           (help "set the transcript verbosity"))
           ((name login)
            (args "[provider] [api_key|oauth]")
            (help "log in to a provider"))
@@ -405,7 +408,7 @@ let%expect_test "keymap: every binding resolves to its intent and is documented"
     Ctrl+U           Kill_line
     Ctrl+W           Kill_word
     Ctrl+L           Clear_screen
-    Ctrl+O           Toggle_tool_output
+    Ctrl+O           Cycle_verbosity
     Ctrl+C           Interrupt
     Ctrl+D           Force_quit
     ((Insert x))
@@ -435,12 +438,13 @@ let%expect_test "keymap: every binding resolves to its intent and is documented"
     Ctrl+U              delete the whole line
     Ctrl+W              delete the word before the cursor
     Ctrl+L              clear the transcript
-    Ctrl+O              expand / collapse tool output
+    Ctrl+O              cycle transcript verbosity (quiet / normal / verbose)
     Ctrl+C              clear the editor, then (again) quit
     Ctrl+D              quit
     /help                              show commands and keys
     /model [name|id|provider/id]       pick or switch the model
     /thinking [off|on|low|high|max]    pick or set the thinking level
+    /verbosity [quiet|normal|verbose]  set the transcript verbosity
     /login [provider] [api_key|oauth]  log in to a provider
     /logout [provider]                 remove a provider's stored credential
     /auth                              show which providers are configured
@@ -512,5 +516,44 @@ let%expect_test "markdown" =
          (italic    false)
          (underline false)
          (invert    false))))))
+    |}]
+;;
+
+let%expect_test "live tool tail keeps the last five lines at each verbosity" =
+  let call : Prigh_protocol.Tool_call.t =
+    { id = "c1"; name = "bash"; arguments = {|{"command":"seq 7"}|} }
+  in
+  let t = Transcript.add_tool Transcript.empty call in
+  let t =
+    List.fold
+      (List.init 7 ~f:(fun i -> sprintf "line %d\n" i))
+      ~init:t
+      ~f:(fun t chunk -> Transcript.append_tool_output t ~call_id:"c1" chunk)
+  in
+  let tool =
+    List.find_exn (Transcript.items t) ~f:(function
+      | Transcript.Item.Tool _ -> true
+      | _ -> false)
+  in
+  List.iter [ Verbosity.Quiet; Normal; Verbose ] ~f:(fun verbosity ->
+    printf "== %s ==\n" (Verbosity.name verbosity);
+    print_endline (Content.to_plain (Transcript.render_item tool ~verbosity)));
+  [%expect
+    {|
+    == quiet ==
+    ⚙ bash seq 7 …
+    == normal ==
+    ⚙ bash command=seq 7
+      line 6
+    == verbose ==
+    ⚙ bash
+      {
+        command: "seq 7"
+      }
+      line 2
+      line 3
+      line 4
+      line 5
+      line 6
     |}]
 ;;
