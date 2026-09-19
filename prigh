@@ -1,0 +1,19 @@
+#!/usr/bin/env bash
+# Builds the backend and frontend (no-ops when up to date), then runs the TUI.
+# Usage: ./prigh [frontend options] [-- backend options]
+set -euo pipefail
+root="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+export PATH="$HOME/.local/bin:$PATH"
+if command -v opam >/dev/null; then
+	eval "$(opam env --switch=prigh --set-switch 2>/dev/null || opam env)"
+fi
+
+(cd "$root/backend" && dune build 2>&1)
+
+cd "$root/frontend"
+[ -d node_modules ] || npm install --ignore-scripts
+npm run --silent build
+
+export PRIGH_BACKEND="$root/backend/_build/default/bin/main.exe"
+exec node "$root/frontend/dist/src/main.js" "$@"

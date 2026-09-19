@@ -4,6 +4,13 @@ A coding agent: OCaml backend (Eio, cohttp; Anthropic, OpenAI, OpenAI
 Codex/ChatGPT and DeepSeek providers) and a TypeScript terminal frontend. No
 plugins; tools and subagents are built in.
 
+## Quick start
+
+```
+./prigh                 # builds backend + frontend if needed, then starts the TUI here
+./prigh --cwd ~/proj    # ... in another directory
+```
+
 ## Build
 
 ```
