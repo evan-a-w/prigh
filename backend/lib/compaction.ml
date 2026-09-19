@@ -14,7 +14,8 @@ let estimate_tokens messages =
             (module Int)
             a.content
             ~f:(function
-              | Text s | Thinking s -> String.length s
+              | Text s -> String.length s
+              | Thinking th -> String.length th.text
               | Tool_call c -> String.length c.arguments + String.length c.name))
   in
   chars / 4

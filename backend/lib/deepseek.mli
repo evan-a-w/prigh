@@ -25,5 +25,4 @@ module For_testing : sig
   end
 
   val parse_chunk : Json.t -> Chunk.t Or_error.t
-  val error_message_of_body : status:int -> string -> string
 end

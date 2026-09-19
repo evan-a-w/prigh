@@ -171,18 +171,6 @@ let parse_chunk (json : Json.t) : Chunk.t Or_error.t =
     Ok { Chunk.events; finish_reason; usage }
 ;;
 
-let error_message_of_body ~status body =
-  let detail =
-    match Json.parse body with
-    | Ok json ->
-      (match Json.member "error" json with
-       | Some err -> Option.value (member_string "message" err) ~default:body
-       | None -> body)
-    | Error _ -> body
-  in
-  sprintf "HTTP %d: %s" status (String.strip detail)
-;;
-
 let stop_reason_of_finish = function
   | Some "tool_calls" -> Stop_reason.Tool_use
   | Some "length" -> Length
@@ -199,13 +187,10 @@ let stream
       ~cancel
       ~on_event
   =
-  let builder = Assistant_builder.create ~model:request.model.id in
-  let sse = Sse.create () in
+  let builder = Assistant_builder.create ~model:(Model.key request.model) in
   let finish_reason = ref None in
   let usage = ref Usage.zero in
   let api_error = ref None in
-  let status = ref 0 in
-  let error_body = Buffer.create 256 in
   let handle_event (event : Sse.Event.t) =
     if not (String.equal (String.strip event.data) "[DONE]")
     then (
@@ -223,38 +208,22 @@ let stream
            Option.iter chunk.finish_reason ~f:(fun r -> finish_reason := Some r);
            Option.iter chunk.usage ~f:(fun u -> usage := u)))
   in
-  let on_chunk chunk =
-    if !status / 100 = 2
-    then List.iter (Sse.feed sse chunk) ~f:handle_event
-    else Buffer.add_string error_body chunk
-  in
-  let result =
-    Http_client.post_stream
+  let outcome =
+    Sse_request.run
       ~env
       ?timeout
       ~cancel
       ~url:(base_url ^ "/chat/completions")
-      ~headers:
-        [ "Content-Type", "application/json"
-        ; "Accept", "text/event-stream"
-        ; "Authorization", "Bearer " ^ api_key
-        ]
+      ~headers:[ "Authorization", "Bearer " ^ api_key ]
       ~body:(Json.to_string (request_body request))
-      ~on_response:(fun r -> status := r.status)
-      ~on_chunk
+      ~on_event:handle_event
       ()
   in
-  Option.iter (Sse.finish sse) ~f:handle_event;
   let stop_reason : Stop_reason.t =
-    match result with
-    | Error Cancelled -> Aborted
-    | Error e -> Error (Http_client.Error.to_string e)
-    | Ok response when response.status / 100 <> 2 ->
-      Error
-        (error_message_of_body
-           ~status:response.status
-           (Buffer.contents error_body))
-    | Ok _ ->
+    match outcome with
+    | Aborted -> Aborted
+    | Failed e -> Error e
+    | Completed ->
       (match !api_error with
        | Some e -> Error e
        | None -> stop_reason_of_finish !finish_reason)
@@ -274,5 +243,4 @@ module For_testing = struct
   module Chunk = Chunk
 
   let parse_chunk = parse_chunk
-  let error_message_of_body = error_message_of_body
 end

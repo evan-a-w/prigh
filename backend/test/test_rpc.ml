@@ -4,11 +4,21 @@ open Tool_test_helpers
 module Reply = Faux_provider.Reply
 module Json = Jsonaf
 
+let login_manager t ~sw =
+  Login_manager.create
+    ~env:t.env
+    ~sw
+    ~getenv:(fun _ -> None)
+    ~store:(Auth_store.create ~path:(Filename.concat t.dir "auth.json"))
+    ()
+;;
+
 let with_agent replies f =
   with_sandbox
   @@ fun t ->
   Eio.Switch.run
   @@ fun sw ->
+  let login = login_manager t ~sw in
   let agent =
     Agent.create
       ~env:t.env
@@ -20,42 +30,44 @@ let with_agent replies f =
       ~cwd:t.dir
       ()
   in
-  f t agent
+  f t agent login
 ;;
 
-let call t agent ?(params = "{}") meth =
+let call t agent login ?(params = "{}") meth =
   let request =
     Json.of_string
       (sprintf {|{"id": "r1", "method": "%s", "params": %s}|} meth params)
   in
-  print_endline (mask t (Json.to_string (Rpc_server.handle agent request)))
+  print_endline
+    (mask t (Json.to_string (Rpc_server.handle agent login request)))
 ;;
 
 let%expect_test "state, models, thinking, errors" =
   with_agent []
-  @@ fun t agent ->
-  call t agent "ping";
-  call t agent "get_state";
-  call t agent ~params:{|{"thinking": "high"}|} "set_thinking";
-  call t agent ~params:{|{"thinking": "sideways"}|} "set_thinking";
-  call t agent ~params:{|{"model": "deepseek-v4-pro"}|} "set_model";
-  call t agent ~params:{|{"model": "gpt-9"}|} "set_model";
-  call t agent "get_state";
-  call t agent "nope";
-  call t agent ~params:{|{"text": 5}|} "prompt";
+  @@ fun t agent login ->
+  call t agent login "ping";
+  call t agent login "get_state";
+  call t agent login ~params:{|{"thinking": "high"}|} "set_thinking";
+  call t agent login ~params:{|{"thinking": "sideways"}|} "set_thinking";
+  call t agent login ~params:{|{"model": "deepseek-v4-pro"}|} "set_model";
+  call t agent login ~params:{|{"model": "gpt-9"}|} "set_model";
+  call t agent login "get_state";
+  call t agent login "nope";
+  call t agent login ~params:{|{"text": 5}|} "prompt";
   print_endline
-    (Json.to_string (Rpc_server.handle agent (Json.of_string {|{"id": 7}|})));
+    (Json.to_string
+       (Rpc_server.handle agent login (Json.of_string {|{"id": 7}|})));
   print_endline
-    (Json.to_string (Rpc_server.handle agent (Json.of_string {|[1]|})));
+    (Json.to_string (Rpc_server.handle agent login (Json.of_string {|[1]|})));
   [%expect
     {|
     {"type":"response","id":"r1","ok":true,"result":"pong"}
-    {"type":"response","id":"r1","ok":true,"result":{"session_id":"<id>","session_path":"$DIR/sessions/<stamp>_<id>.jsonl","cwd":"$DIR","model":{"id":"deepseek-flash","name":"DeepSeek V4.1 Flash","context_window":1000000,"max_output":384000,"supports_thinking":true,"cost":{"input":0.3,"output":1.2,"cache_read":0.006}},"thinking":"off","running":false,"message_count":0,"usage":{"input":0,"output":0,"cache_read":0},"cost_usd":0,"context_tokens":0}}
+    {"type":"response","id":"r1","ok":true,"result":{"session_id":"<id>","session_path":"$DIR/sessions/<stamp>_<id>.jsonl","cwd":"$DIR","model":{"id":"deepseek-flash","provider":"deepseek","key":"deepseek/deepseek-flash","name":"DeepSeek V4.1 Flash","context_window":1000000,"max_output":384000,"supports_thinking":true,"cost":{"input":0.3,"output":1.2,"cache_read":0.006}},"thinking":"off","running":false,"message_count":0,"usage":{"input":0,"output":0,"cache_read":0},"cost_usd":0,"context_tokens":0}}
     {"type":"response","id":"r1","ok":true,"result":{}}
     {"type":"response","id":"r1","ok":false,"error":"thinking must be one of: off, on, low, high, max"}
     {"type":"response","id":"r1","ok":true,"result":{}}
     {"type":"response","id":"r1","ok":false,"error":"unknown model \"gpt-9\""}
-    {"type":"response","id":"r1","ok":true,"result":{"session_id":"<id>","session_path":"$DIR/sessions/<stamp>_<id>.jsonl","cwd":"$DIR","model":{"id":"deepseek-v4-pro","name":"DeepSeek V4 Pro","context_window":1000000,"max_output":384000,"supports_thinking":true,"cost":{"input":1.32,"output":3.96,"cache_read":0.044}},"thinking":"high","running":false,"message_count":0,"usage":{"input":0,"output":0,"cache_read":0},"cost_usd":0,"context_tokens":0}}
+    {"type":"response","id":"r1","ok":true,"result":{"session_id":"<id>","session_path":"$DIR/sessions/<stamp>_<id>.jsonl","cwd":"$DIR","model":{"id":"deepseek-v4-pro","provider":"deepseek","key":"deepseek/deepseek-v4-pro","name":"DeepSeek V4 Pro","context_window":1000000,"max_output":384000,"supports_thinking":true,"cost":{"input":1.32,"output":3.96,"cache_read":0.044}},"thinking":"high","running":false,"message_count":0,"usage":{"input":0,"output":0,"cache_read":0},"cost_usd":0,"context_tokens":0}}
     {"type":"response","id":"r1","ok":false,"error":"unknown method \"nope\""}
     {"type":"response","id":"r1","ok":false,"error":"param \"text\" must be a string"}
     {"type":"response","id":7,"ok":false,"error":"request must have a string \"method\""}
@@ -68,18 +80,18 @@ let%expect_test "prompt emits events, get_messages/get_entries reflect the run" 
     [ Reply.tool_call ~text:"Looking." ~id:"c1" ~name:"ls" ~arguments:"{}" ()
     ; Reply.text "Empty."
     ]
-  @@ fun t agent ->
+  @@ fun t agent login ->
   let events = Queue.create () in
   Agent.subscribe agent ~f:(fun e -> Queue.enqueue events (Rpc_json.event e));
-  call t agent ~params:{|{"text": "what is here?"}|} "prompt";
-  call t agent ~params:{|{"text": "again"}|} "prompt";
+  call t agent login ~params:{|{"text": "what is here?"}|} "prompt";
+  call t agent login ~params:{|{"text": "again"}|} "prompt";
   Agent.wait_idle agent;
   Queue.iter events ~f:(fun e -> print_endline (mask t (Json.to_string e)));
   [%expect
     {|
     {"type":"response","id":"r1","ok":true,"result":{}}
     {"type":"response","id":"r1","ok":false,"error":"a run is already in progress; use steer or follow_up"}
-    {"type":"event","event":"state","state":{"session_id":"<id>","session_path":"$DIR/sessions/<stamp>_<id>.jsonl","cwd":"$DIR","model":{"id":"deepseek-flash","name":"DeepSeek V4.1 Flash","context_window":1000000,"max_output":384000,"supports_thinking":true,"cost":{"input":0.3,"output":1.2,"cache_read":0.006}},"thinking":"off","running":true,"message_count":0,"usage":{"input":0,"output":0,"cache_read":0},"cost_usd":0,"context_tokens":0}}
+    {"type":"event","event":"state","state":{"session_id":"<id>","session_path":"$DIR/sessions/<stamp>_<id>.jsonl","cwd":"$DIR","model":{"id":"deepseek-flash","provider":"deepseek","key":"deepseek/deepseek-flash","name":"DeepSeek V4.1 Flash","context_window":1000000,"max_output":384000,"supports_thinking":true,"cost":{"input":0.3,"output":1.2,"cache_read":0.006}},"thinking":"off","running":true,"message_count":0,"usage":{"input":0,"output":0,"cache_read":0},"cost_usd":0,"context_tokens":0}}
     {"type":"event","event":"agent_start"}
     {"type":"event","event":"message_start","message":{"role":"user","text":"what is here?"}}
     {"type":"event","event":"message_end","message":{"role":"user","text":"what is here?"}}
@@ -100,10 +112,10 @@ let%expect_test "prompt emits events, get_messages/get_entries reflect the run" 
     {"type":"event","event":"message_end","message":{"role":"assistant","content":[{"type":"text","text":"Empty."}],"stop_reason":{"type":"end_turn"},"usage":{"input":10,"output":5,"cache_read":0},"model":"deepseek-flash"}}
     {"type":"event","event":"turn_end","assistant":{"role":"assistant","content":[{"type":"text","text":"Empty."}],"stop_reason":{"type":"end_turn"},"usage":{"input":10,"output":5,"cache_read":0},"model":"deepseek-flash"},"tool_results":[]}
     {"type":"event","event":"agent_end","messages":[{"role":"user","text":"what is here?"},{"role":"assistant","content":[{"type":"text","text":"Looking."},{"type":"tool_call","id":"c1","name":"ls","arguments":"{}"}],"stop_reason":{"type":"tool_use"},"usage":{"input":20,"output":8,"cache_read":5},"model":"deepseek-flash"},{"role":"tool_result","tool_call_id":"c1","tool_name":"ls","text":"sessions/\n","is_error":false},{"role":"assistant","content":[{"type":"text","text":"Empty."}],"stop_reason":{"type":"end_turn"},"usage":{"input":10,"output":5,"cache_read":0},"model":"deepseek-flash"}]}
-    {"type":"event","event":"state","state":{"session_id":"<id>","session_path":"$DIR/sessions/<stamp>_<id>.jsonl","cwd":"$DIR","model":{"id":"deepseek-flash","name":"DeepSeek V4.1 Flash","context_window":1000000,"max_output":384000,"supports_thinking":true,"cost":{"input":0.3,"output":1.2,"cache_read":0.006}},"thinking":"off","running":false,"message_count":4,"usage":{"input":30,"output":13,"cache_read":5},"cost_usd":2.313e-05,"context_tokens":10}}
+    {"type":"event","event":"state","state":{"session_id":"<id>","session_path":"$DIR/sessions/<stamp>_<id>.jsonl","cwd":"$DIR","model":{"id":"deepseek-flash","provider":"deepseek","key":"deepseek/deepseek-flash","name":"DeepSeek V4.1 Flash","context_window":1000000,"max_output":384000,"supports_thinking":true,"cost":{"input":0.3,"output":1.2,"cache_read":0.006}},"thinking":"off","running":false,"message_count":4,"usage":{"input":30,"output":13,"cache_read":5},"cost_usd":2.313e-05,"context_tokens":10}}
     |}];
-  call t agent "get_messages";
-  call t agent "get_entries";
+  call t agent login "get_messages";
+  call t agent login "get_entries";
   [%expect
     {|
     {"type":"response","id":"r1","ok":true,"result":[{"role":"user","text":"what is here?"},{"role":"assistant","content":[{"type":"text","text":"Looking."},{"type":"tool_call","id":"c1","name":"ls","arguments":"{}"}],"stop_reason":{"type":"tool_use"},"usage":{"input":20,"output":8,"cache_read":5},"model":"deepseek-flash"},{"role":"tool_result","tool_call_id":"c1","tool_name":"ls","text":"sessions/\n","is_error":false},{"role":"assistant","content":[{"type":"text","text":"Empty."}],"stop_reason":{"type":"end_turn"},"usage":{"input":10,"output":5,"cache_read":0},"model":"deepseek-flash"}]}
@@ -113,16 +125,16 @@ let%expect_test "prompt emits events, get_messages/get_entries reflect the run" 
 
 let%expect_test "sessions: list, new, switch, fork, rewind" =
   with_agent [ Reply.text "one"; Reply.text "two" ]
-  @@ fun t agent ->
-  call t agent ~params:{|{"text": "first"}|} "prompt";
+  @@ fun t agent login ->
+  call t agent login ~params:{|{"text": "first"}|} "prompt";
   Agent.wait_idle agent;
   let first = (Agent.state agent).session_path in
-  call t agent "new_session";
-  call t agent "list_sessions";
-  call t agent ~params:(sprintf {|{"path": "%s"}|} first) "switch_session";
-  call t agent ~params:{|{"path": "/nowhere.jsonl"}|} "switch_session";
-  call t agent "fork";
-  call t agent ~params:{|{"to": "bogus"}|} "rewind";
+  call t agent login "new_session";
+  call t agent login "list_sessions";
+  call t agent login ~params:(sprintf {|{"path": "%s"}|} first) "switch_session";
+  call t agent login ~params:{|{"path": "/nowhere.jsonl"}|} "switch_session";
+  call t agent login "fork";
+  call t agent login ~params:{|{"to": "bogus"}|} "rewind";
   [%expect
     {|
     {"type":"response","id":"r1","ok":true,"result":{}}
@@ -160,12 +172,13 @@ let%expect_test
       ~cwd:t.dir
       ()
   in
+  let login = login_manager t ~sw in
   let in_r, in_w = Eio_unix.pipe sw in
   let out_r, out_w = Eio_unix.pipe sw in
   let output = Buffer.create 4096 in
   Eio.Fiber.all
     [ (fun () ->
-        Rpc_server.run ~env:t.env ~agent ~input:in_r ~output:out_w;
+        Rpc_server.run ~env:t.env ~agent ~login ~input:in_r ~output:out_w;
         Eio.Flow.close out_w)
     ; (fun () ->
         Eio.Flow.copy_string
@@ -221,5 +234,50 @@ let%expect_test
     event "agent_end"
     event "state"
     false
+    |}]
+;;
+
+let%expect_test "auth: status, login via prompt, logout" =
+  with_agent []
+  @@ fun t agent login ->
+  Login_manager.subscribe login ~f:(fun e ->
+    print_endline (Json.to_string (Rpc_json.login_event e)));
+  call t agent login "auth_status";
+  call t agent login ~params:{|{"provider": "groq"}|} "login";
+  call
+    t
+    agent
+    login
+    ~params:{|{"provider": "deepseek", "method": "oauth"}|}
+    "login";
+  call t agent login ~params:{|{"provider": "deepseek"}|} "login";
+  call t agent login ~params:{|{"id": "p1", "value": "sk-rpc"}|} "auth_respond";
+  Login_manager.wait login;
+  call t agent login "auth_status";
+  call
+    t
+    agent
+    login
+    ~params:{|{"provider": "anthropic", "method": "api_key"}|}
+    "login";
+  call t agent login "auth_cancel";
+  Login_manager.wait login;
+  call t agent login ~params:{|{"provider": "deepseek"}|} "logout";
+  [%expect
+    {|
+    {"type":"response","id":"r1","ok":true,"result":[{"provider":"anthropic","name":"Anthropic","methods":[{"method":"oauth","label":"Anthropic (Claude Pro/Max)"},{"method":"api_key","label":"Anthropic API key"}],"configured":null,"expires_ms":null},{"provider":"openai","name":"OpenAI","methods":[{"method":"api_key","label":"OpenAI API key"}],"configured":null,"expires_ms":null},{"provider":"openai-codex","name":"OpenAI Codex (ChatGPT)","methods":[{"method":"oauth","label":"OpenAI (ChatGPT Plus/Pro)"}],"configured":null,"expires_ms":null},{"provider":"deepseek","name":"DeepSeek","methods":[{"method":"api_key","label":"DeepSeek API key"}],"configured":null,"expires_ms":null}]}
+    {"type":"response","id":"r1","ok":false,"error":"unknown provider \"groq\" (one of: anthropic, openai, openai-codex, deepseek)"}
+    {"type":"response","id":"r1","ok":false,"error":"(\"login method not supported by provider\" (provider Deepseek)\n (method_ Oauth))"}
+    {"type":"event","event":"auth","kind":"prompt","id":"p1","prompt":"secret","message":"Enter DeepSeek API key"}
+    {"type":"response","id":"r1","ok":true,"result":{}}
+    {"type":"response","id":"r1","ok":true,"result":{}}
+    {"type":"event","event":"auth","kind":"done","provider":"deepseek","method":"api_key"}
+    {"type":"response","id":"r1","ok":true,"result":[{"provider":"anthropic","name":"Anthropic","methods":[{"method":"oauth","label":"Anthropic (Claude Pro/Max)"},{"method":"api_key","label":"Anthropic API key"}],"configured":null,"expires_ms":null},{"provider":"openai","name":"OpenAI","methods":[{"method":"api_key","label":"OpenAI API key"}],"configured":null,"expires_ms":null},{"provider":"openai-codex","name":"OpenAI Codex (ChatGPT)","methods":[{"method":"oauth","label":"OpenAI (ChatGPT Plus/Pro)"}],"configured":null,"expires_ms":null},{"provider":"deepseek","name":"DeepSeek","methods":[{"method":"api_key","label":"DeepSeek API key"}],"configured":{"method":"api_key","source":"stored api key"},"expires_ms":null}]}
+    {"type":"event","event":"auth","kind":"prompt","id":"p2","prompt":"secret","message":"Enter Anthropic API key"}
+    {"type":"response","id":"r1","ok":true,"result":{}}
+    {"type":"response","id":"r1","ok":true,"result":{}}
+    {"type":"event","event":"auth","kind":"failed","provider":"anthropic","error":"login cancelled"}
+    {"type":"event","event":"auth","kind":"logged_out","provider":"deepseek"}
+    {"type":"response","id":"r1","ok":true,"result":{}}
     |}]
 ;;

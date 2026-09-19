@@ -1,7 +1,8 @@
 # prigh
 
-A coding agent: OCaml backend (Eio, cohttp, DeepSeek) and a TypeScript
-terminal frontend. No plugins; tools and subagents are built in.
+A coding agent: OCaml backend (Eio, cohttp; Anthropic, OpenAI, OpenAI
+Codex/ChatGPT and DeepSeek providers) and a TypeScript terminal frontend. No
+plugins; tools and subagents are built in.
 
 ## Build
 
@@ -15,8 +16,26 @@ cd frontend && npm install --ignore-scripts && npm test
 
 ## Use
 
-Set `DEEPSEEK_API_KEY` (or put `{"deepseek": "<key>"}` in
-`~/.config/prigh/auth.json`), then:
+Log in to at least one provider (credentials go to
+`~/.config/prigh/auth.json`, same shape as pi's `auth.json`):
+
+```
+backend/_build/default/bin/main.exe login anthropic        # Claude Pro/Max (browser OAuth)
+backend/_build/default/bin/main.exe login anthropic -method api_key
+backend/_build/default/bin/main.exe login openai-codex     # ChatGPT Plus/Pro (browser OAuth)
+backend/_build/default/bin/main.exe login openai           # OPENAI_API_KEY
+backend/_build/default/bin/main.exe login deepseek         # DEEPSEEK_API_KEY
+backend/_build/default/bin/main.exe auth                   # status; logout <provider> to remove
+```
+
+The same is available inside the TUI as `/login [provider] [api_key|oauth]`,
+`/logout <provider>` and `/auth`. A stored credential wins; otherwise
+`ANTHROPIC_OAUTH_TOKEN`/`ANTHROPIC_API_KEY`, `OPENAI_API_KEY` and
+`DEEPSEEK_API_KEY` are used. OAuth tokens are refreshed automatically
+(under a cross-process lock) when they are within five minutes of expiry.
+Model ids can be qualified as `provider/id` (e.g. `openai-codex/gpt-5.5`).
+
+Then:
 
 ```
 node frontend/dist/src/main.js                 # interactive TUI in the current directory
@@ -39,10 +58,12 @@ directory, plus `~/.prigh/AGENTS.md`.
 
 - `backend/lib` — `Agent_loop` (stream, run tools, repeat), `Agent`
   (session, queues, abort, compaction), `Tools` (bash, read, write, edit, ls,
-  grep, find) and `Tool_subagent`, `Deepseek` provider, `Session` JSONL log,
-  `Rpc_server`.
+  grep, find) and `Tool_subagent`, providers (`Anthropic`, `Openai_responses`,
+  `Deepseek`, picked per request by `Provider_router`), auth (`Auth_store`,
+  `Provider_auth`, `Oauth_anthropic`, `Oauth_openai_codex`, `Login_manager`),
+  `Session` JSONL log, `Rpc_server`.
 - `backend/test` — expect tests, driven by `Faux_provider` and an in-process
   HTTP server; no network.
 - `frontend/src` — `client.ts` (RPC), `tui/` (editor, keys, render, app).
-- `PLAN.md` — design and milestone status.
+- `ARCHITECTURE.md` — how the pieces fit together; `PLAN.md` — milestone status.
 # prigh

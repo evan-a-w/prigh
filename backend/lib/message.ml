@@ -23,7 +23,7 @@ module Assistant = struct
 
   let thinking t =
     List.filter_map t.content ~f:(function
-      | Content.Thinking s -> Some s
+      | Content.Thinking th -> Some th.text
       | Text _ | Tool_call _ -> None)
     |> String.concat
   ;;

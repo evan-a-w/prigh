@@ -19,6 +19,11 @@ let methods =
   ; "list_sessions"
   ; "fork"
   ; "rewind"
+  ; "auth_status"
+  ; "login"
+  ; "auth_respond"
+  ; "auth_cancel"
+  ; "logout"
   ]
 ;;
 
@@ -39,7 +44,20 @@ let ok json = Ok json
 let empty = ok (`Object [])
 let unit_result r = Or_error.map r ~f:(fun () -> `Object [])
 
-let dispatch agent ~meth ~params : Json.t Or_error.t =
+let provider_param params =
+  Or_error.bind (string_param params "provider") ~f:(fun s ->
+    match Provider_id.of_string s with
+    | Some p -> Ok p
+    | None ->
+      Or_error.errorf
+        "unknown provider %S (one of: %s)"
+        s
+        (String.concat
+           ~sep:", "
+           (List.map Provider_id.all ~f:Provider_id.to_string)))
+;;
+
+let dispatch agent login ~meth ~params : Json.t Or_error.t =
   match meth with
   | "ping" -> ok (`String "pong")
   | "prompt" ->
@@ -100,10 +118,35 @@ let dispatch agent ~meth ~params : Json.t Or_error.t =
   | "rewind" ->
     Or_error.bind (string_param params "to") ~f:(fun to_ ->
       unit_result (Agent.rewind agent ~to_))
+  | "auth_status" ->
+    Or_error.map (Login_manager.status login) ~f:(fun statuses ->
+      `Array (List.map statuses ~f:Rpc_json.auth_status))
+  | "login" ->
+    Or_error.bind (provider_param params) ~f:(fun provider ->
+      let method_ =
+        match param params "method" with
+        | Some (`String s) ->
+          (match Provider_auth.Method.of_string s with
+           | Some m -> Ok m
+           | None -> Or_error.errorf "unknown login method %S" s)
+        | _ -> Ok (List.hd_exn (Provider_auth.methods provider))
+      in
+      Or_error.bind method_ ~f:(fun method_ ->
+        unit_result (Login_manager.start login provider method_)))
+  | "auth_respond" ->
+    Or_error.bind (string_param params "id") ~f:(fun id ->
+      Or_error.bind (string_param params "value") ~f:(fun value ->
+        unit_result (Login_manager.respond login ~id value)))
+  | "auth_cancel" ->
+    Login_manager.cancel login;
+    empty
+  | "logout" ->
+    Or_error.bind (provider_param params) ~f:(fun provider ->
+      unit_result (Login_manager.logout login provider))
   | _ -> Or_error.errorf "unknown method %S" meth
 ;;
 
-let handle agent (request : Json.t) : Json.t =
+let handle agent login (request : Json.t) : Json.t =
   let id = Option.value (param request "id") ~default:`Null in
   let response =
     match param request "method" with
@@ -111,7 +154,7 @@ let handle agent (request : Json.t) : Json.t =
       let params =
         Option.value (param request "params") ~default:(`Object [])
       in
-      (match dispatch agent ~meth ~params with
+      (match dispatch agent login ~meth ~params with
        | result -> result
        | exception exn ->
          Or_error.error_s [%message "internal error" (exn : exn)])
@@ -130,7 +173,7 @@ let handle agent (request : Json.t) : Json.t =
       ]
 ;;
 
-let run ~env:_ ~agent ~input ~output =
+let run ~env:_ ~agent ~login ~input ~output =
   Switch.run
   @@ fun sw ->
   let outbox : string option Eio.Stream.t = Eio.Stream.create 1024 in
@@ -145,6 +188,8 @@ let run ~env:_ ~agent ~input ~output =
     in
     loop ());
   Agent.subscribe agent ~f:(fun event -> send (Rpc_json.event event));
+  Login_manager.subscribe login ~f:(fun event ->
+    send (Rpc_json.login_event event));
   let reader = Eio.Buf_read.of_flow input ~max_size:(64 * 1024 * 1024) in
   let rec loop () =
     match Eio.Buf_read.line reader with
@@ -161,11 +206,13 @@ let run ~env:_ ~agent ~input ~output =
                 ; "ok", `False
                 ; "error", `String ("invalid JSON: " ^ Error.to_string_hum e)
                 ])
-        | Ok request -> send (handle agent request));
+        | Ok request -> send (handle agent login request));
       loop ()
   in
   loop ();
   Agent.abort agent;
+  Login_manager.cancel login;
   Agent.wait_idle agent;
+  Login_manager.wait login;
   Eio.Stream.add outbox None
 ;;

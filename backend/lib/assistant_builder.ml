@@ -4,7 +4,10 @@ open! Import
 module Block = struct
   type t =
     | Text of Buffer.t
-    | Thinking of Buffer.t
+    | Thinking of
+        { text : Buffer.t
+        ; mutable signature : string option
+        }
     | Tool_call of
         { index : int
         ; id : string
@@ -14,7 +17,8 @@ module Block = struct
 
   let to_content = function
     | Text b -> Content.Text (Buffer.contents b)
-    | Thinking b -> Thinking (Buffer.contents b)
+    | Thinking { text; signature } ->
+      Thinking { text = Buffer.contents text; signature }
     | Tool_call { id; name; arguments; index = _ } ->
       Tool_call { id; name; arguments = Buffer.contents arguments }
   ;;
@@ -34,11 +38,15 @@ let apply t (event : Assistant_event.t) =
     let b = Buffer.create 256 in
     Buffer.add_string b s;
     t.blocks <- Text b :: t.blocks
-  | Thinking_delta s, Thinking b :: _ -> Buffer.add_string b s
+  | Thinking_delta s, Thinking b :: _ -> Buffer.add_string b.text s
   | Thinking_delta s, _ ->
     let b = Buffer.create 256 in
     Buffer.add_string b s;
-    t.blocks <- Thinking b :: t.blocks
+    t.blocks <- Thinking { text = b; signature = None } :: t.blocks
+  | Thinking_signature s, Thinking b :: _ -> b.signature <- Some s
+  | Thinking_signature s, _ ->
+    t.blocks
+    <- Thinking { text = Buffer.create 0; signature = Some s } :: t.blocks
   | Tool_call_start { index; id; name }, _ ->
     t.blocks
     <- Tool_call { index; id; name; arguments = Buffer.create 64 } :: t.blocks

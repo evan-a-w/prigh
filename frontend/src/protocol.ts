@@ -48,6 +48,7 @@ export type Message = UserMessage | AssistantMessage | ToolResultMessage;
 export type Delta =
 	| { type: "text_delta"; text: string }
 	| { type: "thinking_delta"; text: string }
+	| { type: "thinking_signature" }
 	| { type: "tool_call_start"; index: number; id: string; name: string }
 	| { type: "tool_call_delta"; index: number; arguments: string };
 
@@ -59,6 +60,8 @@ export interface ToolCall {
 
 export interface Model {
 	id: string;
+	provider: string;
+	key: string;
 	name: string;
 	context_window: number;
 	max_output: number;
@@ -90,6 +93,30 @@ export interface SessionSummary {
 	message_count: number;
 }
 
+export type AuthMethod = "api_key" | "oauth";
+
+export interface AuthStatus {
+	provider: string;
+	name: string;
+	methods: { method: AuthMethod; label: string }[];
+	configured: { method: AuthMethod; source: string } | null;
+	expires_ms: number | null;
+}
+
+export type AuthPrompt =
+	| { prompt: "secret"; message: string }
+	| { prompt: "manual_code"; message: string; placeholder: string }
+	| { prompt: "select"; message: string; options: { id: string; label: string }[] };
+
+export type AuthEvent =
+	| { kind: "auth_url"; url: string; instructions: string }
+	| ({ kind: "prompt"; id: string } & AuthPrompt)
+	| { kind: "prompt_cancelled"; id: string }
+	| { kind: "progress"; message: string }
+	| { kind: "done"; provider: string; method: AuthMethod }
+	| { kind: "failed"; provider: string; error: string }
+	| { kind: "logged_out"; provider: string };
+
 export type Event =
 	| { event: "agent_start" }
 	| { event: "agent_end"; messages: Message[] }
@@ -103,7 +130,8 @@ export type Event =
 	| { event: "tool_end"; call: ToolCall; result: ToolResultMessage }
 	| { event: "state"; state: State }
 	| { event: "compacted"; summary: string }
-	| { event: "notice"; text: string };
+	| { event: "notice"; text: string }
+	| ({ event: "auth" } & AuthEvent);
 
 export type Response =
 	| { type: "response"; id: JsonValue; ok: true; result: JsonValue }
@@ -189,6 +217,8 @@ export function isDelta(v: unknown): v is Delta {
 		case "text_delta":
 		case "thinking_delta":
 			return isString(v.text);
+		case "thinking_signature":
+			return true;
 		case "tool_call_start":
 			return isNumber(v.index) && isString(v.id) && isString(v.name);
 		case "tool_call_delta":
@@ -202,6 +232,8 @@ export function isModel(v: unknown): v is Model {
 	return (
 		isObject(v) &&
 		isString(v.id) &&
+		isString(v.provider) &&
+		isString(v.key) &&
 		isString(v.name) &&
 		isNumber(v.context_window) &&
 		isNumber(v.max_output) &&
@@ -247,6 +279,55 @@ export function isSessionSummary(v: unknown): v is SessionSummary {
 	);
 }
 
+const isAuthMethod = (v: unknown): v is AuthMethod => v === "api_key" || v === "oauth";
+
+export function isAuthStatus(v: unknown): v is AuthStatus {
+	return (
+		isObject(v) &&
+		isString(v.provider) &&
+		isString(v.name) &&
+		Array.isArray(v.methods) &&
+		v.methods.every((m) => isObject(m) && isAuthMethod(m.method) && isString(m.label)) &&
+		(v.configured === null || (isObject(v.configured) && isAuthMethod(v.configured.method) && isString(v.configured.source))) &&
+		(v.expires_ms === null || isNumber(v.expires_ms))
+	);
+}
+
+function isAuthPrompt(v: JsonObject): boolean {
+	switch (v.prompt) {
+		case "secret":
+			return isString(v.message);
+		case "manual_code":
+			return isString(v.message) && isString(v.placeholder);
+		case "select":
+			return isString(v.message) && Array.isArray(v.options) && v.options.every((o) => isObject(o) && isString(o.id) && isString(o.label));
+		default:
+			return false;
+	}
+}
+
+export function isAuthEvent(v: unknown): v is AuthEvent {
+	if (!isObject(v)) return false;
+	switch (v.kind) {
+		case "auth_url":
+			return isString(v.url) && isString(v.instructions);
+		case "prompt":
+			return isString(v.id) && isAuthPrompt(v);
+		case "prompt_cancelled":
+			return isString(v.id);
+		case "progress":
+			return isString(v.message);
+		case "done":
+			return isString(v.provider) && isAuthMethod(v.method);
+		case "failed":
+			return isString(v.provider) && isString(v.error);
+		case "logged_out":
+			return isString(v.provider);
+		default:
+			return false;
+	}
+}
+
 export function isEvent(v: unknown): v is Event {
 	if (!isObject(v) || !isString(v.event)) return false;
 	switch (v.event) {
@@ -274,6 +355,8 @@ export function isEvent(v: unknown): v is Event {
 			return isString(v.summary);
 		case "notice":
 			return isString(v.text);
+		case "auth":
+			return isAuthEvent(v);
 		default:
 			return false;
 	}

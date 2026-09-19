@@ -13,6 +13,7 @@ test("completeCommand", () => {
 	assert.equal(completeCommand("/mo"), "/model ");
 	assert.equal(completeCommand("/s"), null); // sessions, switch, state: no progress possible
 	assert.equal(completeCommand("/se"), "/sessions ");
+	assert.equal(completeCommand("/logi"), "/login ");
 	assert.equal(completeCommand("/zz"), null);
 	assert.equal(completeCommand("hello"), null);
 	assert.equal(completeCommand("/model x"), null);
@@ -20,5 +21,5 @@ test("completeCommand", () => {
 
 test("helpText lists every command", () => {
 	const text = helpText();
-	for (const name of ["help", "model", "thinking", "compact", "quit"]) assert.ok(text.includes(`/${name}`));
+	for (const name of ["help", "model", "thinking", "login", "logout", "auth", "compact", "quit"]) assert.ok(text.includes(`/${name}`));
 });

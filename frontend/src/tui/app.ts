@@ -1,6 +1,7 @@
+import { spawn } from "node:child_process";
 import type { Client } from "../client.js";
 import { ansi } from "../markdown.js";
-import type { Event, SessionSummary, State } from "../protocol.js";
+import type { AuthEvent, AuthStatus, Event, SessionSummary, State } from "../protocol.js";
 import { COMMANDS, completeCommand, helpText, parseCommand } from "./commands.js";
 import { Editor } from "./editor.js";
 import { parseKeys, type Key } from "./keys.js";
@@ -25,6 +26,36 @@ export interface Terminal {
 
 const SPINNER = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
 
+interface PendingAuthPrompt {
+	id: string;
+	kind: "secret" | "manual_code" | "select";
+	options: { id: string; label: string }[];
+}
+
+/** Best-effort, detached; failures are silent because the URL is printed too. */
+export function openBrowser(url: string): void {
+	const [command, args] =
+		process.platform === "darwin" ? ["open", [url]] : process.platform === "win32" ? ["cmd", ["/c", "start", "", url]] : ["xdg-open", [url]];
+	try {
+		const child = spawn(command, args, { stdio: "ignore", detached: true });
+		child.on("error", () => {});
+		child.unref();
+	} catch {
+		// ignore
+	}
+}
+
+export function formatAuthStatus(statuses: AuthStatus[]): string {
+	const width = Math.max(...statuses.map((s) => s.provider.length));
+	return statuses
+		.map((s) => {
+			const methods = s.methods.map((m) => `${m.method} (${m.label})`).join(", ");
+			const state = s.configured ? `${ansi.green}logged in${ansi.reset} via ${s.configured.source}` : `${ansi.gray}not configured${ansi.reset}`;
+			return `${s.provider.padEnd(width)}  ${state}  [${methods}]`;
+		})
+		.join("\n");
+}
+
 /**
  * The transcript lives in the terminal scrollback and only ever receives
  * complete lines. The bottom panel (partial streaming line, editor, status)
@@ -43,6 +74,7 @@ export class App {
 	private spinnerIndex = 0;
 	private spinnerTimer: NodeJS.Timeout | null = null;
 	private sessions: SessionSummary[] = [];
+	private authPrompt: PendingAuthPrompt | null = null;
 	private pendingQuit = false;
 	private ready = false;
 	private inputBuffer: Key[] = [];
@@ -129,11 +161,17 @@ export class App {
 		if (this.toolTail) parts.push(`${ansi.gray}  ${this.toolTail.slice(-(width - 2))}${ansi.reset}`);
 		const separator = `${ansi.gray}${"─".repeat(Math.max(1, width))}${ansi.reset}`;
 		parts.push(separator);
-		const lines = this.editor.getLines();
-		const editorLines = lines.map((line, i) => `${i === 0 ? `${ansi.bold}${ansi.cyan}> ${ansi.reset}` : "  "}${line}`);
+		const secret = this.authPrompt?.kind === "secret";
+		const marker = this.authPrompt ? `${ansi.bold}${ansi.yellow}? ${ansi.reset}` : `${ansi.bold}${ansi.cyan}> ${ansi.reset}`;
+		const lines = this.editor.getLines().map((line) => (secret ? "*".repeat(line.length) : line));
+		const editorLines = lines.map((line, i) => `${i === 0 ? marker : "  "}${line}`);
 		parts.push(...editorLines);
 		const running = this.state?.running ?? false;
-		const extra = running ? `${SPINNER[this.spinnerIndex % SPINNER.length]} working (Esc to abort; Enter steers)` : "";
+		const extra = this.authPrompt
+			? "login: Enter answers, Esc cancels"
+			: running
+				? `${SPINNER[this.spinnerIndex % SPINNER.length]} working (Esc to abort; Enter steers)`
+				: "";
 		parts.push(renderStatus(this.state, extra, style));
 		const panel = parts.join("\n");
 		this.terminal.write(panel);
@@ -240,12 +278,93 @@ export class App {
 			case "notice":
 				this.notice(event.text);
 				break;
+			case "auth":
+				this.handleAuthEvent(event);
+				break;
 			case "agent_start":
 			case "agent_end":
 			case "turn_start":
 			case "turn_end":
 				break;
 		}
+	}
+
+	private handleAuthEvent(event: AuthEvent): void {
+		switch (event.kind) {
+			case "auth_url":
+				this.printBlock(`${ansi.bold}Open this URL to log in:${ansi.reset}\n  ${ansi.cyan}${event.url}${ansi.reset}\n${ansi.gray}${event.instructions}${ansi.reset}`);
+				openBrowser(event.url);
+				break;
+			case "prompt": {
+				const options = event.prompt === "select" ? event.options : [];
+				this.authPrompt = { id: event.id, kind: event.prompt, options };
+				let text = `${ansi.yellow}${event.message}${ansi.reset}`;
+				if (event.prompt === "select") text += `\n${options.map((o, i) => `  ${i + 1}. ${o.label} (${o.id})`).join("\n")}`;
+				if (event.prompt === "manual_code") text += `\n${ansi.gray}e.g. ${event.placeholder}?code=...${ansi.reset}`;
+				this.printBlock(text);
+				break;
+			}
+			case "prompt_cancelled":
+				if (this.authPrompt?.id === event.id) {
+					this.authPrompt = null;
+					this.editor.clear();
+					this.redraw();
+				}
+				break;
+			case "progress":
+				this.notice(event.message);
+				break;
+			case "done":
+				this.authPrompt = null;
+				this.notice(`logged in to ${event.provider} (${event.method})`);
+				void this.switchToProvider(event.provider);
+				break;
+			case "failed":
+				this.authPrompt = null;
+				this.notice(`login to ${event.provider} failed: ${event.error}`);
+				this.redraw();
+				break;
+			case "logged_out":
+				this.notice(`logged out of ${event.provider}`);
+				break;
+		}
+	}
+
+	/** After a login, move to that provider unless it is already in use. */
+	private async switchToProvider(provider: string): Promise<void> {
+		if (this.state?.model.provider === provider) return;
+		try {
+			const models = await this.client.listModels();
+			const model = models.find((m) => m.provider === provider);
+			if (model) {
+				await this.client.call("set_model", { model: model.key });
+				this.notice(`model set to ${model.key}; /model to change`);
+			}
+		} catch (e) {
+			this.notice((e as Error).message);
+		}
+	}
+
+	private async submitAuthAnswer(text: string): Promise<void> {
+		const prompt = this.authPrompt;
+		if (!prompt) return;
+		let value = text.trim();
+		if (prompt.kind === "select") {
+			const index = Number(value);
+			const option = Number.isInteger(index) ? prompt.options[index - 1] : prompt.options.find((o) => o.id === value);
+			if (!option) {
+				this.notice(`choose 1-${prompt.options.length}`);
+				return;
+			}
+			value = option.id;
+		}
+		this.authPrompt = null;
+		try {
+			await this.client.authRespond(prompt.id, value);
+		} catch (e) {
+			this.notice((e as Error).message);
+		}
+		this.redraw();
 	}
 
 	// ---- input --------------------------------------------------------
@@ -295,7 +414,11 @@ export class App {
 				break;
 			}
 			case "escape":
-				if (this.state?.running) void this.client.abort().catch(() => {});
+				if (this.authPrompt) {
+					this.authPrompt = null;
+					this.editor.clear();
+					void this.client.authCancel().catch(() => {});
+				} else if (this.state?.running) void this.client.abort().catch(() => {});
 				break;
 			case "ctrl":
 				this.handleCtrl(key.letter);
@@ -350,8 +473,12 @@ export class App {
 	}
 
 	private async submit(): Promise<void> {
-		const text = this.editor.submit();
+		const text = this.editor.submit(this.authPrompt !== null);
 		this.redraw();
+		if (this.authPrompt) {
+			await this.submitAuthAnswer(text);
+			return;
+		}
 		if (text.trim() === "") return;
 		const command = parseCommand(text);
 		if (command) {
@@ -381,7 +508,7 @@ export class App {
 					} else {
 						this.printBlock(
 							models
-								.map((m) => `${m.id === this.state?.model.id ? "* " : "  "}${m.id.padEnd(18)} ${m.name}  ($${m.cost.input}/$${m.cost.output} per M)`)
+								.map((m) => `${m.key === this.state?.model.key ? "* " : "  "}${m.key.padEnd(34)} ${m.name}  ($${m.cost.input}/$${m.cost.output} per M)`)
 								.join("\n"),
 						);
 					}
@@ -390,6 +517,21 @@ export class App {
 				case "thinking":
 					if (args[0]) await this.client.call("set_thinking", { thinking: args[0] });
 					else this.printBlock(`thinking: ${this.state?.thinking ?? "?"} (levels: off, on, low, high, max)`);
+					break;
+				case "auth":
+					this.printBlock(formatAuthStatus(await this.client.authStatus()));
+					break;
+				case "login": {
+					if (!args[0]) {
+						this.printBlock(`${formatAuthStatus(await this.client.authStatus())}\n\nusage: /login <provider> [api_key|oauth]`);
+						break;
+					}
+					await this.client.login(args[0], args[1]);
+					break;
+				}
+				case "logout":
+					if (!args[0]) throw new Error("usage: /logout <provider>");
+					await this.client.logout(args[0]);
 					break;
 				case "compact": {
 					this.notice("compacting…");

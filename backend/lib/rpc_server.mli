@@ -10,12 +10,13 @@ open! Import
 val methods : string list
 
 (** Dispatches one request; exposed for tests. *)
-val handle : Agent.t -> Json.t -> Json.t
+val handle : Agent.t -> Login_manager.t -> Json.t -> Json.t
 
 (** Serves until [input] reaches end of file. *)
 val run
   :  env:Env.t
   -> agent:Agent.t
+  -> login:Login_manager.t
   -> input:_ Eio.Flow.source
   -> output:_ Eio.Flow.sink
   -> unit

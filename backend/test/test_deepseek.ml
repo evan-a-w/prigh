@@ -25,7 +25,7 @@ let%expect_test
     [ Message.user "list files"
     ; Assistant
         { content =
-            [ Thinking "I should list."
+            [ Content.thinking "I should list."
             ; Text "Listing."
             ; Tool_call
                 { id = "call_1"; name = "bash"; arguments = "{\"cmd\":\"ls\"}" }
@@ -210,11 +210,11 @@ let%expect_test "parse_chunk" =
 
 let%expect_test "error_message_of_body" =
   print_endline
-    (T.error_message_of_body
+    (Sse_request.error_message_of_body
        ~status:401
        {|{"error":{"message":"Authentication Fails","code":"invalid_request_error"}}|});
   print_endline
-    (T.error_message_of_body ~status:502 "<html>bad gateway</html>\n");
+    (Sse_request.error_message_of_body ~status:502 "<html>bad gateway</html>\n");
   [%expect
     {|
     HTTP 401: Authentication Fails
@@ -279,8 +279,9 @@ let%expect_test "stream: text with thinking, usage and stop" =
   [%expect
     {|
     ((Thinking_delta think) (Text_delta Hel) (Text_delta lo))
-    ((content ((Thinking think) (Text Hello))) (stop_reason End_turn)
-     (usage ((input 7) (output 3) (cache_read 0))) (model deepseek-flash))
+    ((content ((Thinking ((text think) (signature ()))) (Text Hello)))
+     (stop_reason End_turn) (usage ((input 7) (output 3) (cache_read 0)))
+     (model deepseek/deepseek-flash))
     |}];
   let request = List.hd_exn (Server.requests server) in
   print_s
@@ -338,7 +339,7 @@ let%expect_test "stream: tool calls split across chunks" =
        (Tool_call ((id c1) (name read) (arguments "{\"path\":\"a.txt\"}")))
        (Tool_call ((id c2) (name ls) (arguments {})))))
      (stop_reason Tool_use) (usage ((input 0) (output 0) (cache_read 0)))
-     (model deepseek-flash))
+     (model deepseek/deepseek-flash))
     |}]
 ;;
 
@@ -361,7 +362,8 @@ let%expect_test "stream: length finish reason and mid-stream API error" =
     {|
     ((Text_delta partial))
     ((content ((Text partial))) (stop_reason Length)
-     (usage ((input 0) (output 0) (cache_read 0))) (model deepseek-flash))
+     (usage ((input 0) (output 0) (cache_read 0)))
+     (model deepseek/deepseek-flash))
     |}];
   let (_ : Server.t) =
     stream_with_server
@@ -377,7 +379,8 @@ let%expect_test "stream: length finish reason and mid-stream API error" =
     {|
     ((Text_delta a))
     ((content ((Text a))) (stop_reason (Error boom))
-     (usage ((input 0) (output 0) (cache_read 0))) (model deepseek-flash))
+     (usage ((input 0) (output 0) (cache_read 0)))
+     (model deepseek/deepseek-flash))
     |}];
   let (_ : Server.t) = stream_with_server ~env ~sw [ "data: {not json\n\n" ] in
   [%expect
@@ -385,7 +388,8 @@ let%expect_test "stream: length finish reason and mid-stream API error" =
     ()
     ((content ())
      (stop_reason (Error "bad JSON in stream: json > object: char '}'"))
-     (usage ((input 0) (output 0) (cache_read 0))) (model deepseek-flash))
+     (usage ((input 0) (output 0) (cache_read 0)))
+     (model deepseek/deepseek-flash))
     |}]
 ;;
 
@@ -449,6 +453,7 @@ let%expect_test "stream: cancellation keeps partial content" =
     {|
     ((Text_delta first))
     ((content ((Text first))) (stop_reason Aborted)
-     (usage ((input 0) (output 0) (cache_read 0))) (model deepseek-flash))
+     (usage ((input 0) (output 0) (cache_read 0)))
+     (model deepseek/deepseek-flash))
     |}]
 ;;

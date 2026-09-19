@@ -255,7 +255,7 @@ let rec wait_idle t =
 let set_model t model =
   t.model <- model;
   ignore
-    (Session.set_model t.session ~model:model.id ~thinking:t.thinking
+    (Session.set_model t.session ~model:(Model.key model) ~thinking:t.thinking
      : Session.Entry.t);
   state_changed t
 ;;
@@ -263,7 +263,8 @@ let set_model t model =
 let set_thinking t thinking =
   t.thinking <- thinking;
   ignore
-    (Session.set_model t.session ~model:t.model.id ~thinking : Session.Entry.t);
+    (Session.set_model t.session ~model:(Model.key t.model) ~thinking
+     : Session.Entry.t);
   state_changed t
 ;;
 

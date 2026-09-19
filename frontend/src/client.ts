@@ -1,11 +1,13 @@
 import { spawn, type ChildProcessByStdio } from "node:child_process";
 import type { Readable, Writable } from "node:stream";
 import {
+	isAuthStatus,
 	isMessage,
 	isModel,
 	isSessionSummary,
 	isState,
 	parseServerMessage,
+	type AuthStatus,
 	type Event,
 	type JsonObject,
 	type JsonValue,
@@ -169,6 +171,28 @@ export class Client {
 			if (!isSessionSummary(s)) throw new RpcError("malformed session");
 			return s;
 		});
+	}
+
+	async authStatus(): Promise<AuthStatus[]> {
+		const result = await this.call("auth_status");
+		if (!Array.isArray(result)) throw new RpcError("malformed auth status");
+		return result.map((s) => {
+			if (!isAuthStatus(s)) throw new RpcError("malformed auth status");
+			return s;
+		});
+	}
+
+	login(provider: string, method?: string): Promise<JsonValue> {
+		return this.call("login", method ? { provider, method } : { provider });
+	}
+	authRespond(id: string, value: string): Promise<JsonValue> {
+		return this.call("auth_respond", { id, value });
+	}
+	authCancel(): Promise<JsonValue> {
+		return this.call("auth_cancel");
+	}
+	logout(provider: string): Promise<JsonValue> {
+		return this.call("logout", { provider });
 	}
 
 	prompt(text: string): Promise<JsonValue> {

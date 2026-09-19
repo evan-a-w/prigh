@@ -30,7 +30,7 @@ let tool_call (c : Content.Tool_call.t) =
 let content (c : Content.t) =
   match c with
   | Text text -> `Object [ "type", str "text"; "text", str text ]
-  | Thinking text -> `Object [ "type", str "thinking"; "text", str text ]
+  | Thinking th -> `Object [ "type", str "thinking"; "text", str th.text ]
   | Tool_call call ->
     `Object
       [ "type", str "tool_call"
@@ -72,6 +72,7 @@ let delta (d : Assistant_event.t) =
   | Text_delta text -> `Object [ "type", str "text_delta"; "text", str text ]
   | Thinking_delta text ->
     `Object [ "type", str "thinking_delta"; "text", str text ]
+  | Thinking_signature _ -> `Object [ "type", str "thinking_signature" ]
   | Tool_call_start { index; id; name } ->
     `Object
       [ "type", str "tool_call_start"
@@ -108,6 +109,8 @@ let thinking_of_string s : Thinking.t Or_error.t =
 let model (m : Model.t) =
   `Object
     [ "id", str m.id
+    ; "provider", str (Provider_id.to_string m.provider)
+    ; "key", str (Model.key m)
     ; "name", str m.name
     ; "context_window", int m.context_window
     ; "max_output", int m.max_output
@@ -164,6 +167,78 @@ let entry (e : Session.Entry.t) =
      ; "parent", Option.value_map e.parent ~default:`Null ~f:str
      ]
      @ payload)
+;;
+
+let auth_status (s : Provider_auth.Status.t) =
+  `Object
+    [ "provider", str (Provider_id.to_string s.provider)
+    ; "name", str (Provider_id.display_name s.provider)
+    ; ( "methods"
+      , `Array
+          (List.map s.methods ~f:(fun m ->
+             `Object
+               [ "method", str (Provider_auth.Method.to_string m)
+               ; "label", str (Provider_auth.Method.label s.provider m)
+               ])) )
+    ; ( "configured"
+      , match s.configured with
+        | None -> `Null
+        | Some (m, source) ->
+          `Object
+            [ "method", str (Provider_auth.Method.to_string m)
+            ; "source", str source
+            ] )
+    ; "expires_ms", Option.value_map s.expires_ms ~default:`Null ~f:int
+    ]
+;;
+
+let auth_prompt (p : Auth_interaction.Prompt.t) =
+  match p with
+  | Secret { message } -> [ "prompt", str "secret"; "message", str message ]
+  | Manual_code { message; placeholder } ->
+    [ "prompt", str "manual_code"
+    ; "message", str message
+    ; "placeholder", str placeholder
+    ]
+  | Select { message; options } ->
+    [ "prompt", str "select"
+    ; "message", str message
+    ; ( "options"
+      , `Array
+          (List.map options ~f:(fun (id, label) ->
+             `Object [ "id", str id; "label", str label ])) )
+    ]
+;;
+
+let login_event (e : Login_manager.Event.t) =
+  let fields =
+    match e with
+    | Auth_url { url; instructions } ->
+      [ "kind", str "auth_url"
+      ; "url", str url
+      ; "instructions", str instructions
+      ]
+    | Prompt { id; prompt } ->
+      [ "kind", str "prompt"; "id", str id ] @ auth_prompt prompt
+    | Prompt_cancelled { id } ->
+      [ "kind", str "prompt_cancelled"; "id", str id ]
+    | Progress message -> [ "kind", str "progress"; "message", str message ]
+    | Done { provider; method_ } ->
+      [ "kind", str "done"
+      ; "provider", str (Provider_id.to_string provider)
+      ; "method", str (Provider_auth.Method.to_string method_)
+      ]
+    | Failed { provider; error } ->
+      [ "kind", str "failed"
+      ; "provider", str (Provider_id.to_string provider)
+      ; "error", str error
+      ]
+    | Logged_out provider ->
+      [ "kind", str "logged_out"
+      ; "provider", str (Provider_id.to_string provider)
+      ]
+  in
+  `Object ([ "type", str "event"; "event", str "auth" ] @ fields)
 ;;
 
 let event (e : Agent.Event.t) =

@@ -3,12 +3,53 @@ open Prigh
 
 let home () = Option.value (Sys.getenv "HOME") ~default:"."
 
+let auth_file_flag =
+  let%map_open.Command auth_file =
+    flag
+      "-auth-file"
+      (optional string)
+      ~doc:"PATH credential file (default: ~/.config/prigh/auth.json)"
+  in
+  Auth_store.create
+    ~path:(Option.value_or_thunk auth_file ~default:Auth_store.default_path)
+;;
+
+let provider_arg =
+  Command.Arg_type.create (fun s ->
+    match Provider_id.of_string s with
+    | Some p -> p
+    | None ->
+      eprintf
+        "unknown provider %s; one of: %s\n"
+        s
+        (String.concat
+           ~sep:", "
+           (List.map Provider_id.all ~f:Provider_id.to_string));
+      exit 2)
+;;
+
+(* With no explicit model, prefer a provider the user is logged in to. *)
+let default_model store =
+  match Provider_auth.status store with
+  | Error _ -> Model.default
+  | Ok statuses ->
+    List.find_map
+      [ Provider_id.Anthropic; Openai_codex; Openai; Deepseek ]
+      ~f:(fun provider ->
+        List.find statuses ~f:(fun s ->
+          Provider_id.equal s.provider provider && Option.is_some s.configured))
+    |> Option.value_map ~default:Model.default ~f:(fun s ->
+      Model.default_for s.provider)
+;;
+
 let common_params =
   let%map_open.Command model =
     flag
       "-model"
       (optional string)
-      ~doc:"ID model id (default: deepseek-flash, or the session's)"
+      ~doc:
+        "ID model id or provider/id (default: the session's, else the first \
+         logged-in provider's)"
   and thinking =
     flag "-thinking" (optional string) ~doc:"LEVEL off|on|low|high|max"
   and session =
@@ -27,7 +68,7 @@ let common_params =
       "-faux"
       no_arg
       ~doc:" use a scripted provider that echoes prompts (for testing)"
-  in
+  and store = auth_file_flag in
   fun ~env ~sw ->
     let cwd = Option.value cwd ~default:(Core_unix.getcwd ()) in
     let model =
@@ -54,12 +95,13 @@ let common_params =
       then
         Faux_provider.create
           (List.init 1000 ~f:(fun _ -> Faux_provider.Reply.text "faux reply"))
-      else (
-        match Auth.deepseek_api_key () with
-        | Ok api_key -> Deepseek.create ~env ~api_key ()
-        | Error e ->
-          eprintf "%s\n" (Error.to_string_hum e);
-          exit 2)
+      else Provider_router.create ~env ~store ()
+    in
+    let model =
+      match model, session with
+      | Some m, _ -> Some m
+      | None, Some _ -> None
+      | None, None -> Some (default_model store)
     in
     let session =
       Option.map session ~f:(fun path ->
@@ -95,7 +137,7 @@ let common_params =
         ()
     in
     agent_ref := Some agent;
-    agent
+    agent, store
 ;;
 
 let run_command =
@@ -113,7 +155,7 @@ let run_command =
        @@ fun env ->
        Eio.Switch.run
        @@ fun sw ->
-       let agent = make_agent ~env ~sw in
+       let agent, _store = make_agent ~env ~sw in
        let flush_out () = Out_channel.flush stdout in
        let note fmt =
          ksprintf (fun s -> if not quiet then eprintf "%s\n%!" s) fmt
@@ -167,12 +209,99 @@ let serve_command =
        @@ fun env ->
        Eio.Switch.run
        @@ fun sw ->
-       let agent = make_agent ~env ~sw in
+       let agent, store = make_agent ~env ~sw in
+       let login = Login_manager.create ~env ~sw ~store () in
        Rpc_server.run
          ~env
          ~agent
+         ~login
          ~input:(Eio.Stdenv.stdin env)
          ~output:(Eio.Stdenv.stdout env))
+;;
+
+let login_command =
+  Command.basic
+    ~summary:"Log in to a provider (anthropic, openai, openai-codex, deepseek)"
+    (let%map_open.Command store = auth_file_flag
+     and provider = anon ("PROVIDER" %: provider_arg)
+     and method_ =
+       flag
+         "-method"
+         (optional string)
+         ~doc:"METHOD api_key or oauth (default: the provider's first method)"
+     and no_browser =
+       flag
+         "-no-browser"
+         no_arg
+         ~doc:" print the login URL instead of opening it"
+     in
+     fun () ->
+       let method_ =
+         match method_ with
+         | None -> List.hd_exn (Provider_auth.methods provider)
+         | Some s ->
+           (match Provider_auth.Method.of_string s with
+            | Some m -> m
+            | None ->
+              eprintf "unknown method %s (api_key or oauth)\n" s;
+              exit 2)
+       in
+       Eio_main.run
+       @@ fun env ->
+       Eio.Switch.run
+       @@ fun sw ->
+       let interaction =
+         Auth_terminal.create ~env ~sw ~open_urls:(not no_browser) ()
+       in
+       match Provider_auth.login ~env store provider method_ interaction with
+       | Ok () ->
+         eprintf
+           "Logged in to %s (%s); saved to %s\n"
+           (Provider_id.display_name provider)
+           (Provider_auth.Method.label provider method_)
+           (Auth_store.path store)
+       | Error e ->
+         eprintf "login failed: %s\n" (Error.to_string_hum e);
+         exit 1)
+;;
+
+let logout_command =
+  Command.basic
+    ~summary:"Remove a provider's stored credential"
+    (let%map_open.Command store = auth_file_flag
+     and provider = anon ("PROVIDER" %: provider_arg) in
+     fun () ->
+       match Provider_auth.logout store provider with
+       | Ok () ->
+         eprintf "Logged out of %s\n" (Provider_id.display_name provider)
+       | Error e ->
+         eprintf "%s\n" (Error.to_string_hum e);
+         exit 1)
+;;
+
+let auth_command =
+  Command.basic
+    ~summary:"Show which providers are configured"
+    (let%map_open.Command store = auth_file_flag in
+     fun () ->
+       match Provider_auth.status store with
+       | Error e ->
+         eprintf "%s\n" (Error.to_string_hum e);
+         exit 1
+       | Ok statuses ->
+         List.iter statuses ~f:(fun s ->
+           printf
+             "%-14s %-24s %s\n"
+             (Provider_id.to_string s.provider)
+             (Provider_id.display_name s.provider)
+             (match s.configured with
+              | None ->
+                sprintf
+                  "not configured (login: %s)"
+                  (String.concat
+                     ~sep:", "
+                     (List.map s.methods ~f:Provider_auth.Method.to_string))
+              | Some (_, source) -> source)))
 ;;
 
 let sessions_command =
@@ -201,5 +330,8 @@ let () =
        [ "run", run_command
        ; "serve", serve_command
        ; "sessions", sessions_command
+       ; "login", login_command
+       ; "logout", logout_command
+       ; "auth", auth_command
        ])
 ;;

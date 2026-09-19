@@ -60,8 +60,19 @@ Model layer:
   Emits `Assistant_event` (Start / Text_delta / Thinking_delta /
   Tool_call_start / Tool_call_delta / Tool_call_end / Done / Error).
   Tested against recorded SSE fixtures, no network.
-- `Auth` — `DEEPSEEK_API_KEY` from env or `{"deepseek": "<key>"}` in
-  `~/.config/prigh/auth.json`. (done)
+- Auth (modelled on pi): `Credential`/`Auth_store` (pi-format
+  `~/.config/prigh/auth.json`, locked read-modify-write), `Provider_auth`
+  (methods per provider, env fallback, OAuth refresh with double-checked
+  locking), `Oauth_anthropic` (Claude Pro/Max PKCE flow: Claude Code client
+  id and scopes, loopback callback on 53692 raced against a pasted code,
+  `state = verifier`), `Oauth_openai_codex` (ChatGPT PKCE flow on 1455,
+  account id from the JWT), `Login_manager` (interactive flows over RPC:
+  `login`/`auth_respond`/`auth_cancel`/`logout`/`auth_status`). (done)
+- Providers: `Anthropic` (Messages API; OAuth tokens get the Claude Code
+  identity system block, betas, user agent and tool-name casing),
+  `Openai_responses` (api.openai.com and the ChatGPT Codex backend, reasoning
+  replayed via encrypted content stored as the thinking signature),
+  `Provider_router` resolving credentials per request. (done)
 
 Tools (`backend/lib/tools/`):
 

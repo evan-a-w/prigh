@@ -88,7 +88,7 @@ export function renderStatus(state: State | null, extra: string, style: Style): 
 	if (!state) return paint(style, ansi.gray, "connecting…");
 	const context = state.model.context_window > 0 ? Math.round((100 * state.context_tokens) / state.model.context_window) : 0;
 	const parts = [
-		state.model.id,
+		state.model.key,
 		`thinking:${state.thinking}`,
 		`ctx:${formatTokens(state.context_tokens)} (${context}%)`,
 		`in:${formatTokens(state.usage.input)} out:${formatTokens(state.usage.output)}`,

@@ -143,10 +143,10 @@ export class Editor {
 		this.cursor.col = i;
 	}
 
-	/** Records submitted text and resets the editor. */
-	submit(): string {
+	/** Records submitted text (unless [secret]) and resets the editor. */
+	submit(secret = false): string {
 		const text = this.text;
-		if (text.trim() !== "" && this.history[this.history.length - 1] !== text) this.history.push(text);
+		if (!secret && text.trim() !== "" && this.history[this.history.length - 1] !== text) this.history.push(text);
 		this.clear();
 		return text;
 	}

@@ -51,7 +51,7 @@ test("status line and helpers", () => {
 			session_id: "s",
 			session_path: "/p",
 			cwd: "/c",
-			model: { id: "deepseek-flash", name: "", context_window: 1000, max_output: 1, supports_thinking: true, cost: { input: 0, output: 0, cache_read: 0 } },
+			model: { id: "deepseek-flash", provider: "deepseek", key: "deepseek/deepseek-flash", name: "", context_window: 1000, max_output: 1, supports_thinking: true, cost: { input: 0, output: 0, cache_read: 0 } },
 			thinking: "high",
 			running: true,
 			message_count: 3,
@@ -62,6 +62,19 @@ test("status line and helpers", () => {
 		"working",
 		{ color: false, width: 200 },
 	);
-	assert.equal(status, "deepseek-flash  thinking:high  ctx:500 (50%)  in:1.5k out:20  $0.0123  working");
+	assert.equal(status, "deepseek/deepseek-flash  thinking:high  ctx:500 (50%)  in:1.5k out:20  $0.0123  working");
 	assert.equal(rowsFor("a\n\x1b[31m" + "b".repeat(45) + "\x1b[0m", 40), 3);
+});
+
+test("formatAuthStatus", async () => {
+	const { formatAuthStatus } = await import("../src/tui/app.js");
+	const text = formatAuthStatus([
+		{ provider: "anthropic", name: "Anthropic", methods: [{ method: "oauth", label: "Anthropic (Claude Pro/Max)" }, { method: "api_key", label: "Anthropic API key" }], configured: { method: "oauth", source: "oauth" }, expires_ms: 1 },
+		{ provider: "deepseek", name: "DeepSeek", methods: [{ method: "api_key", label: "DeepSeek API key" }], configured: null, expires_ms: null },
+	]);
+	const plain = text.replace(/\x1b\[[0-9;]*m/g, "");
+	assert.equal(
+		plain,
+		["anthropic  logged in via oauth  [oauth (Anthropic (Claude Pro/Max)), api_key (Anthropic API key)]", "deepseek   not configured  [api_key (DeepSeek API key)]"].join("\n"),
+	);
 });
