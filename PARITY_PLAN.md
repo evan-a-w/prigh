@@ -20,6 +20,26 @@ answered through `Reply`.
 
 ---
 
+## Status log (updated as work lands)
+
+- **M0 done.** 0.1: root cause was notty's raw mode leaving `IEXTEN` set
+  (OCaml's `terminal_io` cannot express it) → C stub `tui/term/tty_stubs.c`
+  clears/restores it around the driver; `test_key_of_event.ml` maps every
+  binding. 0.2: `Viewport.t = Follow | Anchored {top; new_lines}` in
+  `ui/viewport.ml`, all transcript edits go through `App.with_transcript`;
+  status shows `↓ N new`. 0.3: `abort` RPC returns `{restored}`,
+  `queue_update` event, `queued:N` in the status line, restored text lands
+  in the editor. 0.5: `Session.create` stamps strictly increasing.
+- **Bonus bug found by the tmux harness:** Ctrl+C twice never exited —
+  Bonsai_term's `Driver.finished` ivar is not filled when `exit` is
+  scheduled from `apply_action`; `Term_app` now tracks the quit itself.
+- **M9.3 tmux harness skeleton** at `tui/tmux-test/run.sh` (alias `@tmux`,
+  `UPDATE=1` re-records): startup, prompt, ctrl_o, resize, quit (checks tty
+  flags after exit). `ctrl_o` passes once M1 puts `view:` in the status.
+- **M3 backend done** (`tool_subagent`, `Tools.for_context`, nested
+  `Subagent*` events, `parallel_safe` + `Fiber.List.map`, usage roll-up).
+  TUI half (agent views) pending, after M1.
+
 ## M0 — Known bugs (fix first, each with a regression test)
 
 1. **Ctrl+O does nothing in a real terminal.** `App.editing` handles
