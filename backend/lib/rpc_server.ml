@@ -140,11 +140,23 @@ let dispatch agent login ~meth ~params : Json.t Or_error.t =
   | "get_messages" ->
     ok (`Array (List.map (Agent.messages agent) ~f:Rpc_json.message))
   | "get_entries" ->
+    (* [all] includes abandoned branches (for a tree view); the default is
+       the active path. *)
+    let session = Agent.session agent in
+    let all =
+      match param params "all" with
+      | Some `True -> true
+      | _ -> false
+    in
+    let entries =
+      if all then Session.entries session else Session.active_path session
+    in
+    let head = Session.head session in
     ok
-      (`Array
-          (List.map
-             (Session.active_path (Agent.session agent))
-             ~f:Rpc_json.entry))
+      (`Object
+          [ "head", Option.value_map head ~default:`Null ~f:(fun h -> `String h)
+          ; "entries", `Array (List.map entries ~f:Rpc_json.entry)
+          ])
   | "set_model" ->
     Or_error.bind (string_param params "model") ~f:(fun id ->
       Or_error.map (Model.resolve id) ~f:(fun model ->
