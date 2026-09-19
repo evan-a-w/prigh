@@ -22,6 +22,13 @@ answered through `Reply`.
 
 ## Status log (updated as work lands)
 
+**All milestones M0–M9 are implemented and green** (`dune build @runtest`
+in both projects, `@e2e`, `tui/tmux-test/run.sh` with 10 scenarios, and the
+driver-frame tests). Remaining for a human: the manual pass in a real
+terminal listed under "Test gates" (narrow window, emoji, resize during
+streaming with a live provider). Deviations from the text below are noted
+per milestone here; the text of the milestones is kept as the original spec.
+
 - **M0 done.** 0.1: root cause was notty's raw mode leaving `IEXTEN` set
   (OCaml's `terminal_io` cannot express it) → C stub `tui/term/tty_stubs.c`
   clears/restores it around the driver; `test_key_of_event.ml` maps every
@@ -72,6 +79,19 @@ answered through `Reply`.
   bash head+tail, bordered dialogs, Ctrl+F search — navigation is
   Enter/↓/↑ rather than n/N so queries can contain those letters —
   Ctrl+Up/Down, `/hotkeys`, `/help <cmd>`).
+- **M8 done** (`Tool_confirm` dialog + queueing, `/confirm`, timeout in the
+  tool line, backend crash surface with the stderr tail, resize/Ctrl+C/
+  wide-char scenarios; tmux `confirm` scenario drives the real gate).
+- **M9 done**: 9.1 scenarios in `test_app.ml`; 9.2 `test/vt.ml` +
+  `test/test_term_frames.ml` run the real Bonsai_term driver on an in-memory
+  tty (`Term_app.with_test_driver`, `Test_terminal` for resizes) and print
+  7 frames that are byte-for-byte equal (modulo trailing space) to
+  `Screen.to_plain` — this found that bracketed paste lost keys because
+  the paste buffer was `Bonsai.state` and a whole event batch saw the stale
+  value; 9.3 tmux scenarios: startup, prompt, ctrl_o, resize, quit (tty
+  flags checked), tools (bash + 2 parallel subagents + verbosity +
+  Shift+Tab), suspend, editor, confirm, paste; 9.4 `test/coverage.ml`
+  proves every binding is hit by a scenario.
 
 ## M0 — Known bugs (fix first, each with a regression test)
 

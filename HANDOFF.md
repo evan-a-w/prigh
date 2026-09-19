@@ -1,3 +1,5 @@
+> Superseded: the Bonsai frontend is built; see PARITY_PLAN.md (status log) and ARCHITECTURE.md. Kept for the OxCaml/nix build notes.
+
 # HANDOFF — state of the prigh frontend-on-Bonsai spike
 
 Written mid-task for another agent to pick up. Read `ARCHITECTURE.md` (current
