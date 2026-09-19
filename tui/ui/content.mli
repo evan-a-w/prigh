@@ -23,6 +23,9 @@ module Line : sig
   val wrap : t -> width:int -> t list
 
   val truncate : t -> width:int -> t
+
+  (** Case-insensitive; matching substrings take [Style.invert]. *)
+  val highlight : t -> needle:string -> t
 end
 
 type t = Line.t list [@@deriving sexp_of, equal]
@@ -33,4 +36,8 @@ val text : ?style:Style.t -> string -> t
 val lines : ?style:Style.t -> string -> t
 
 val to_plain : t -> string
+
+(** Debug dump: style runs become [[red]…[/]], [[bold]…[/]], [[link=url]…[/]]. *)
+val to_styled : t -> string
+
 val wrap : t -> width:int -> t

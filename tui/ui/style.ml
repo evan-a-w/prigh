@@ -21,6 +21,8 @@ type t =
   ; italic : bool
   ; underline : bool
   ; invert : bool
+  ; strike : bool
+  ; link : string option
   }
 [@@deriving sexp_of, equal, compare]
 
@@ -31,6 +33,8 @@ let plain =
   ; italic = false
   ; underline = false
   ; invert = false
+  ; strike = false
+  ; link = None
   }
 ;;
 
@@ -40,3 +44,5 @@ let dim t = { t with dim = true }
 let italic t = { t with italic = true }
 let underline t = { t with underline = true }
 let invert t = { t with invert = true }
+let strike t = { t with strike = true }
+let link t url = { t with link = Some url }

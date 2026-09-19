@@ -15,6 +15,16 @@ let color (c : Style.Color.t) =
   | White -> Some Attr.Color.Expert.white
 ;;
 
+(* Hyperlinks need a terminal that understands OSC 8; Notty emits the sequence
+   for [Attr.href]. Terminals without a colour terminal (dumb/linux console) get
+   the URL inline instead. *)
+let hyperlinks_supported =
+  lazy
+    (match Sys.getenv "TERM" with
+     | Some ("dumb" | "linux") | None -> false
+     | Some _ -> true)
+;;
+
 let attr (s : Style.t) =
   let fg =
     if s.dim && Style.Color.equal s.fg Default
@@ -27,7 +37,17 @@ let attr (s : Style.t) =
     ; Option.some_if s.italic Attr.italic
     ; Option.some_if s.underline Attr.underline
     ; Option.some_if s.invert Attr.invert
+    ; (match s.link with
+       | Some url when Lazy.force hyperlinks_supported -> Some (Attr.href url)
+       | _ -> None)
     ]
+;;
+
+let span_text (s : Prigh_ui.Content.Span.t) =
+  match s.style.link with
+  | Some url when not (Lazy.force hyperlinks_supported) ->
+    s.text ^ " (" ^ url ^ ")"
+  | _ -> s.text
 ;;
 
 let line (l : Prigh_ui.Content.Line.t) =
@@ -35,7 +55,8 @@ let line (l : Prigh_ui.Content.Line.t) =
   | [] -> View.text ""
   | spans ->
     View.hcat
-      (List.map spans ~f:(fun s -> View.text ~attrs:(attr s.style) s.text))
+      (List.map spans ~f:(fun s ->
+         View.text ~attrs:(attr s.style) (span_text s)))
 ;;
 
 let screen (s : Prigh_ui.Screen.t) =

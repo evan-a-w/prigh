@@ -154,5 +154,8 @@ let handle t (intent : Intent.t) ~page : Outcome.t =
   | Path_complete
   | Edit_externally
   | Model_picker
-  | Picker_toggle_filter -> Continue t
+  | Picker_toggle_filter
+  | Search
+  | Prev_user_message
+  | Next_user_message -> Continue t
 ;;

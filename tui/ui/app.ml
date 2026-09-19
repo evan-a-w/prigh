@@ -94,6 +94,7 @@ module Model = struct
     ; known_paths : String.Set.t
     ; queued : Queue_counts.t
     ; queued_texts : string list
+    ; login_lines : string list
     ; viewport : Viewport.t
     ; pending_quit : bool
     ; spinner : int
@@ -216,6 +217,7 @@ let init =
   ; known_paths = String.Set.empty
   ; queued = Queue_counts.zero
   ; queued_texts = []
+  ; login_lines = []
   ; viewport = Viewport.Follow
   ; pending_quit = false
   ; spinner = 0
@@ -787,7 +789,7 @@ let cycle_thinking m =
 let run_command m (cmd : Commands.Parsed.t) =
   match cmd.name, cmd.args with
   | "", _ -> m, []
-  | "help", _ ->
+  | "help", [] ->
     let heading text : Content.Line.t =
       [ { text; style = Style.bold (Style.fg Cyan) } ]
     in
@@ -796,6 +798,29 @@ let run_command m (cmd : Commands.Parsed.t) =
         ((heading "Commands" :: Commands.help)
          @ ([] :: heading "Keys" :: Keymap.help))
     , [] )
+  | "help", name :: _ ->
+    (match Commands.find name with
+     | Some spec ->
+       let usage = String.strip ("/" ^ spec.name ^ " " ^ spec.args) in
+       ( block
+           m
+           [ [ { Content.Span.text = usage; style = Style.bold Style.plain }
+             ; { text = "  " ^ spec.help; style = Style.plain }
+             ]
+           ]
+       , [] )
+     | None ->
+       let hint =
+         match Commands.closest name with
+         | Some c -> sprintf "; did you mean /%s?" c.name
+         | None -> ""
+       in
+       error m (sprintf "unknown command /%s%s" name hint), [])
+  | "hotkeys", _ ->
+    let heading text : Content.Line.t =
+      [ { text; style = Style.bold (Style.fg Cyan) } ]
+    in
+    block m (heading "Keys" :: Keymap.help), []
   | "model", [] ->
     if List.is_empty m.models
     then m, [ rpc "list_models" ~tag:(Models_for_picker "") ]
@@ -1175,6 +1200,109 @@ let scroll_down m =
     else { m with viewport = Viewport.Anchored { top; new_lines } }
 ;;
 
+let focused_transcript m =
+  match m.focus with
+  | `Main -> m.transcript
+  | `Agent id ->
+    (match Agent_view.find m.agents id with
+     | Some agent -> agent.transcript
+     | None -> m.transcript)
+;;
+
+let focused_lines m =
+  Transcript.render_all
+    (focused_transcript m)
+    ~width:(transcript_width m)
+    ~verbosity:m.verbosity
+;;
+
+let matches_of (lines : Content.t) query =
+  if String.is_empty query
+  then []
+  else (
+    let needle = String.lowercase query in
+    List.filter_mapi lines ~f:(fun i line ->
+      Option.some_if
+        (String.is_substring
+           ~substring:needle
+           (String.lowercase (Content.Line.to_plain line)))
+        i))
+;;
+
+let search_top_for m line = Int.max 0 (line - (transcript_rows m / 2))
+
+let search_view m matches current =
+  match List.nth matches current with
+  | None -> m
+  | Some line ->
+    { m with
+      viewport =
+        Viewport.Anchored { top = search_top_for m line; new_lines = 0 }
+    }
+;;
+
+let open_search m =
+  { m with
+    mode = Search { query = ""; matches = []; current = 0 }
+  ; autocomplete = None
+  }
+;;
+
+let search m (intent : Intent.t) =
+  match m.mode with
+  | Search { query; matches; current } ->
+    let recompute q =
+      let matches = matches_of (focused_lines m) q in
+      let m = { m with mode = Search { query = q; matches; current = 0 } } in
+      if List.is_empty matches then m else search_view m matches 0
+    in
+    let move step =
+      if List.is_empty matches
+      then m, []
+      else (
+        let count = List.length matches in
+        let current = (((current + step) mod count) + count) mod count in
+        let m = { m with mode = Search { query; matches; current } } in
+        search_view m matches current, [])
+    in
+    (match intent with
+     | Cancel | Interrupt -> { m with mode = Editing }, []
+     | Force_quit -> { m with quitting = true }, [ Command.Quit ]
+     | Down | Submit -> move 1
+     | Up -> move (-1)
+     | Insert s -> recompute (query ^ s), []
+     | Backspace -> recompute (String.drop_suffix query 1), []
+     | _ -> m, [])
+  | _ -> m, []
+;;
+
+let current_top m =
+  match m.viewport with
+  | Viewport.Follow -> Int.max 0 (transcript_line_count m - transcript_rows m)
+  | Viewport.Anchored { top; _ } -> top
+;;
+
+let jump_user_message m ~direction =
+  let lines =
+    Transcript.user_message_lines
+      (focused_transcript m)
+      ~width:(transcript_width m)
+      ~verbosity:m.verbosity
+  in
+  let top = current_top m in
+  match direction with
+  | `Prev ->
+    (match List.last (List.filter lines ~f:(fun line -> line < top)) with
+     | Some line ->
+       { m with viewport = Viewport.Anchored { top = line; new_lines = 0 } }, []
+     | None -> warn m "no earlier message", [])
+  | `Next ->
+    (match List.find lines ~f:(fun line -> line > top) with
+     | Some line ->
+       { m with viewport = Viewport.Anchored { top = line; new_lines = 0 } }, []
+     | None -> follow m, [])
+;;
+
 let editing_intent m (intent : Intent.t) =
   let ed f = { m with editor = f m.editor }, [] in
   match intent with
@@ -1241,6 +1369,9 @@ let editing_intent m (intent : Intent.t) =
     then m, [ rpc "list_models" ~tag:(Models_for_picker "") ]
     else model_picker m ~query:"", []
   | Picker_toggle_filter -> m, []
+  | Search -> open_search m, []
+  | Prev_user_message -> jump_user_message m ~direction:`Prev
+  | Next_user_message -> jump_user_message m ~direction:`Next
 ;;
 
 (* Autocomplete is a sub-state of editing: while it is open it owns a few keys,
@@ -1249,6 +1380,7 @@ let editing m (intent : Intent.t) =
   match intent with
   | Next_agent -> cycle_focus m, []
   | Focus_agent n -> focus_agent m n, []
+  | Search -> open_search m, []
   | _ ->
     (match m.autocomplete with
      | Some _ ->
@@ -1305,7 +1437,10 @@ let editing m (intent : Intent.t) =
         | Path_complete
         | Edit_externally
         | Model_picker
-        | Picker_toggle_filter ->
+        | Picker_toggle_filter
+        | Prev_user_message
+        | Next_user_message
+        | Search ->
           let m, cmds = editing_intent m intent in
           let m, more = refresh_autocomplete m in
           m, cmds @ more)
@@ -1479,7 +1614,7 @@ let picker m (kind : Mode.Picker_kind.t) picker (intent : Intent.t) =
      | Continue picker -> { m with mode = Picker { kind; picker } }, []
      | Selected item -> picker_selected m kind item
      | Cancelled ->
-       let m = { m with mode = Editing } in
+       let m = { m with mode = Editing; login_lines = [] } in
        (match kind with
         | Auth_select _ -> m, [ rpc "auth_cancel" ]
         | _ -> m, []))
@@ -1503,7 +1638,7 @@ let login_prompt m ~id ~(prompt : P.Auth_event.Prompt.t) (intent : Intent.t) =
       ( { m with editor; mode = Editing }
       , [ rpc "auth_respond" ~params:[ "id", str id; "value", str value ] ] )
   | Cancel | Interrupt ->
-    ( { m with editor = Editor.clear m.editor; mode = Editing }
+    ( { m with editor = Editor.clear m.editor; mode = Editing; login_lines = [] }
     , [ rpc "auth_cancel" ] )
   | Force_quit -> { m with quitting = true }, [ Quit ]
   | Up
@@ -1525,6 +1660,9 @@ let login_prompt m ~id ~(prompt : P.Auth_event.Prompt.t) (intent : Intent.t) =
   | Edit_externally
   | Model_picker
   | Picker_toggle_filter
+  | Search
+  | Prev_user_message
+  | Next_user_message
   | Newline -> m, []
   | Insert _
   | Paste _
@@ -1628,7 +1766,10 @@ let text_prompt m ~(action : Mode.Text_prompt_action.t) (intent : Intent.t) =
   | Path_complete
   | Edit_externally
   | Model_picker
-  | Picker_toggle_filter -> m, []
+  | Picker_toggle_filter
+  | Search
+  | Prev_user_message
+  | Next_user_message -> m, []
 ;;
 
 (* ---- confirm mode ----------------------------------------------------- *)
@@ -1664,6 +1805,7 @@ let intent m (intent : Intent.t) =
   | Login_prompt { id; prompt } -> login_prompt m ~id ~prompt intent
   | Text_prompt { action; _ } -> text_prompt m ~action intent
   | Confirm { action; _ } -> confirm m ~action intent
+  | Search _ -> search m intent
 ;;
 
 (* ---- backend events --------------------------------------------------- *)
@@ -1671,14 +1813,8 @@ let intent m (intent : Intent.t) =
 let auth_event m (e : P.Auth_event.t) =
   match e with
   | Auth_url { url; instructions } ->
-    let content : Content.t =
-      [ [ { text = "Open this URL to log in:"; style = Style.bold Style.plain }
-        ]
-      ; [ { text = "  " ^ url; style = Style.underline (Style.fg Cyan) } ]
-      ; [ { text = instructions; style = Style.fg Gray } ]
-      ]
-    in
-    block m content, [ Command.Open_browser url ]
+    let lines = [ "Open this URL to log in:"; "  " ^ url; instructions ] in
+    { m with login_lines = m.login_lines @ lines }, [ Command.Open_browser url ]
   | Prompt { id; prompt } ->
     if Mode.is_dialog m.mode
        && not
@@ -1706,32 +1842,40 @@ let auth_event m (e : P.Auth_event.t) =
           }
         , [] )
       | Secret _ | Manual_code _ ->
-        let m = notice m (P.Auth_event.Prompt.message prompt) in
-        let m =
-          match prompt with
-          | Manual_code { placeholder; _ } ->
-            notice m ("e.g. " ^ placeholder ^ "?code=...")
-          | _ -> m
+        let lines =
+          P.Auth_event.Prompt.message prompt
+          ::
+          (match prompt with
+           | Manual_code { placeholder; _ } ->
+             [ "e.g. " ^ placeholder ^ "?code=..." ]
+           | _ -> [])
         in
         ( { m with
             mode = Login_prompt { id; prompt }
           ; editor = Editor.clear m.editor
+          ; login_lines = m.login_lines @ lines
           }
         , [] ))
   | Prompt_cancelled { id } ->
     (match m.mode with
      | Login_prompt { id = current; _ } when String.equal id current ->
-       { m with mode = Editing; editor = Editor.clear m.editor }, []
+       ( { m with
+           mode = Editing
+         ; editor = Editor.clear m.editor
+         ; login_lines = []
+         }
+       , [] )
      | Picker { kind = Auth_select current; _ } when String.equal id current ->
-       { m with mode = Editing }, []
+       { m with mode = Editing; login_lines = [] }, []
      | _ -> m, [])
-  | Progress message -> notice m message, []
+  | Progress message -> { m with login_lines = m.login_lines @ [ message ] }, []
   | Done { provider; method_ } ->
     let m =
       match m.mode with
       | Login_prompt _ -> { m with mode = Editing }
       | _ -> m
     in
+    let m = { m with login_lines = [] } in
     let m = notice m (sprintf "logged in to %s (%s)" provider method_) in
     let same =
       Option.value_map m.state ~default:false ~f:(fun s ->
@@ -1749,6 +1893,7 @@ let auth_event m (e : P.Auth_event.t) =
       | Login_prompt _ -> { m with mode = Editing }
       | _ -> m
     in
+    let m = { m with login_lines = [] } in
     error m (sprintf "login to %s failed: %s" provider e), []
   | Logged_out provider ->
     ( notice m (sprintf "logged out of %s" provider)

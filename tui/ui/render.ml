@@ -120,6 +120,18 @@ let mode_hint (m : App.Model.t) : Content.Line.t option =
        Some [ span ~style:dim "login: Enter answers, Esc cancels" ]
      | Text_prompt _ -> Some [ span ~style:dim "Enter submits, Esc cancels" ]
      | Confirm _ -> Some [ span ~style:dim "confirm: y / n" ]
+     | Search { query = _; matches; current } ->
+       if List.is_empty matches
+       then Some [ span ~style:dim "search: type to find · Esc closes" ]
+       else
+         Some
+           [ span
+               ~style:dim
+               (sprintf
+                  "search %d/%d · ↓↑ next/prev · Esc closes"
+                  (current + 1)
+                  (List.length matches))
+           ]
      | Editing ->
        if Option.is_some m.autocomplete
        then Some [ span ~style:dim "Tab/Enter accept · Esc close" ]
@@ -493,6 +505,49 @@ let subagent_header (m : App.Model.t) (a : Agent_view.t) : Content.Line.t =
   ]
 ;;
 
+let pad_line_to (line : Content.Line.t) ~width =
+  let w = Content.Line.width line in
+  if w >= width
+  then Content.Line.truncate line ~width
+  else
+    line
+    @ [ { Content.Span.text = String.make (width - w) ' '; style = Style.plain }
+      ]
+;;
+
+let border = Style.fg Gray
+
+let boxed ~title ~(body : Content.t) ~width : Content.t =
+  let inner = Int.max 1 (width - 4) in
+  let title = Text_width.truncate title ~width:(Int.max 1 (width - 6)) in
+  let title_w = Text_width.string title in
+  let fill = Int.max 0 (width - 5 - title_w) in
+  let top : Content.Line.t =
+    [ span ~style:border "┌─ "
+    ; span ~style:(Style.bold Style.plain) title
+    ; span ~style:border " "
+    ; span ~style:border (String.concat (List.init fill ~f:(fun _ -> "─")))
+    ; span ~style:border "┐"
+    ]
+  in
+  let rows =
+    List.map body ~f:(fun line ->
+      let line =
+        pad_line_to (Content.Line.truncate line ~width:inner) ~width:inner
+      in
+      (span ~style:border "│ " :: line) @ [ span ~style:border " │" ])
+  in
+  let bottom : Content.Line.t =
+    [ span ~style:border "└"
+    ; span
+        ~style:border
+        (String.concat (List.init (Int.max 0 (width - 2)) ~f:(fun _ -> "─")))
+    ; span ~style:border "┘"
+    ]
+  in
+  (top :: rows) @ [ bottom ]
+;;
+
 let screen (m : App.Model.t) : Screen.t =
   let width = Int.max 1 m.width in
   let height = Int.max 3 m.height in
@@ -514,7 +569,12 @@ let screen (m : App.Model.t) : Screen.t =
           ~marker_style:(Style.bold (Style.fg Yellow))
           ~mask:false
       in
-      [ [ span ~style:(Style.bold (Style.fg Yellow)) question ] ], rows, cursor
+      ( boxed
+          ~title:"Confirm"
+          ~body:[ [ span ~style:(Style.bold (Style.fg Yellow)) question ] ]
+          ~width
+      , rows
+      , cursor )
     | Login_prompt { prompt; _ } ->
       let mask =
         match prompt with
@@ -528,7 +588,12 @@ let screen (m : App.Model.t) : Screen.t =
           ~marker_style:(Style.bold (Style.fg Yellow))
           ~mask
       in
-      [], rows, cursor
+      ( boxed
+          ~title:"Log in"
+          ~body:(List.map m.login_lines ~f:Content.Line.of_string)
+          ~width
+      , rows
+      , cursor )
     | Text_prompt { question; _ } ->
       let rows, cursor =
         editor_rows
@@ -537,7 +602,12 @@ let screen (m : App.Model.t) : Screen.t =
           ~marker_style:(Style.bold (Style.fg Yellow))
           ~mask:false
       in
-      [ [ span ~style:(Style.bold (Style.fg Yellow)) question ] ], rows, cursor
+      boxed ~title:question ~body:[] ~width, rows, cursor
+    | Search { query; _ } ->
+      let row : Content.Line.t =
+        [ span ~style:(Style.bold (Style.fg Cyan)) "/ "; span query ]
+      in
+      [], [ row ], (0, 2 + Text_width.string query)
     | Editing ->
       let rows, cursor =
         editor_rows
@@ -597,6 +667,12 @@ let screen (m : App.Model.t) : Screen.t =
         ~rows:body_rows
         ~top
         ~verbosity:m.verbosity
+  in
+  let transcript =
+    match m.mode with
+    | Search { query; _ } when not (String.is_empty query) ->
+      List.map transcript ~f:(Content.Line.highlight ~needle:query)
+    | _ -> transcript
   in
   let padding =
     List.init (Int.max 0 (body_rows - List.length transcript)) ~f:(fun _ -> [])

@@ -98,6 +98,7 @@ module Model : sig
     ; known_paths : String.Set.t
     ; queued : Queue_counts.t
     ; queued_texts : string list
+    ; login_lines : string list
     ; viewport : Viewport.t
     ; pending_quit : bool
     ; spinner : int

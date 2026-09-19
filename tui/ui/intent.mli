@@ -45,4 +45,7 @@ type t =
   | Edit_externally
   | Model_picker
   | Picker_toggle_filter (** Ctrl+N in the sessions picker *)
+  | Search (** Ctrl+F: search the transcript *)
+  | Prev_user_message (** Ctrl+Up: jump to the previous user message *)
+  | Next_user_message (** Ctrl+Down: jump to the next user message *)
 [@@deriving sexp_of, equal, compare]

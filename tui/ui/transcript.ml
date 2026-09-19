@@ -278,6 +278,51 @@ let render_result ?(show_more = true) (r : P.Message.Tool_result.t) ~max_lines
     Content.Line.of_string ~style ("  " ^ line))
 ;;
 
+let is_diff text = String.is_prefix text ~prefix:"--- a/"
+
+let diff_style line =
+  if String.is_prefix line ~prefix:"+++" || String.is_prefix line ~prefix:"---"
+  then dim
+  else if String.is_prefix line ~prefix:"@@"
+  then Style.fg Cyan
+  else if String.is_prefix line ~prefix:"+"
+  then green
+  else if String.is_prefix line ~prefix:"-"
+  then red
+  else gray
+;;
+
+let render_diff ?(max_lines = Int.max_value) text : Content.t =
+  let lines = String.split_lines (String.rstrip text) in
+  let shown = List.take lines max_lines in
+  let more =
+    if List.length lines > max_lines
+    then [ sprintf "… (%d more)" (List.length lines - max_lines) ]
+    else []
+  in
+  List.map (shown @ more) ~f:(fun line ->
+    Content.Line.of_string ~style:(diff_style line) ("  " ^ line))
+;;
+
+let render_bash ?(head = 5) ?(tail = 3) (r : P.Message.Tool_result.t)
+  : Content.t
+  =
+  let lines = String.split_lines (String.rstrip r.text) in
+  let count = List.length lines in
+  let selected =
+    if count <= head + tail
+    then lines
+    else
+      List.take lines head
+      @ [ sprintf "… (%d lines hidden)" (count - head - tail) ]
+      @ List.drop lines (count - tail)
+  in
+  let base = if r.is_error then red else gray in
+  List.map selected ~f:(fun line ->
+    let style = if String.is_prefix line ~prefix:"… (" then dim else base in
+    Content.Line.of_string ~style ("  " ^ line))
+;;
+
 let render_live_tail live_tail ~max_lines : Content.t =
   match live_tail with
   | None -> []
@@ -341,14 +386,24 @@ let render_tool
     let output =
       match result with
       | None -> render_live_tail live_tail ~max_lines:1
-      | Some r -> render_result r ~max_lines:(if r.is_error then 8 else 5)
+      | Some r ->
+        if r.is_error
+        then render_result r ~max_lines:8
+        else if is_diff r.text
+        then render_diff r.text ~max_lines:5
+        else if String.equal call.name "bash"
+        then render_bash r
+        else render_result r ~max_lines:5
     in
     render_call call @ output
   | Verbose ->
     let output =
       match result with
       | None -> render_live_tail live_tail ~max_lines:tail_lines
-      | Some r -> render_result r ~max_lines:Int.max_value
+      | Some r ->
+        if is_diff r.text
+        then render_diff r.text
+        else render_result r ~max_lines:Int.max_value
     in
     render_call_full call @ output
 ;;
@@ -662,6 +717,30 @@ let render_tail t ~width ~rows ~skip ~verbosity : Content.t =
 let line_count t ~width ~verbosity =
   List.sum (module Int) (all_items_rev t) ~f:(fun item ->
     List.length (Content.wrap (render_item item ~verbosity) ~width))
+;;
+
+let render_all t ~width ~verbosity : Content.t =
+  List.concat_map
+    (List.rev (all_items_rev t))
+    ~f:(fun item -> Content.wrap (render_item item ~verbosity) ~width)
+;;
+
+let user_message_lines t ~width ~verbosity : int list =
+  let rec go items acc offset =
+    match items with
+    | [] -> List.rev acc
+    | item :: rest ->
+      let acc =
+        match item with
+        | Item.User _ -> offset :: acc
+        | _ -> acc
+      in
+      let count =
+        List.length (Content.wrap (render_item item ~verbosity) ~width)
+      in
+      go rest acc (offset + count)
+  in
+  go (List.rev (all_items_rev t)) [] 0
 ;;
 
 let render_window t ~width ~rows ~top ~verbosity : Content.t =

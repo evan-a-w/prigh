@@ -346,7 +346,7 @@ let%expect_test "fuzzy ranking: command names" =
     {|
     "mo" -> model scoped-models import
     "lo" -> login logout clone
-    "s"  -> state switch session sessions scoped-models agents verbosity
+    "s"  -> state switch session sessions scoped-models agents hotkeys verbosity
     "sw" -> switch
     "xyz" ->
     |}]
@@ -467,6 +467,10 @@ let%expect_test "commands" =
           ((name help)
            (args "")
            (help "show commands and keys")
+           (argument ()))
+          ((name hotkeys)
+           (args "")
+           (help "show keyboard shortcuts")
            (argument ()))
           ((name model)
            (args [name|id|provider/id])
@@ -687,6 +691,8 @@ let%expect_test "keymap: every binding resolves to its intent and is documented"
     Ctrl+E           End
     PageUp           Page_up
     PageDown         Page_down
+    Ctrl+Up          Prev_user_message
+    Ctrl+Down        Next_user_message
     Backspace        Backspace
     Ctrl+H           Backspace
     Delete           Delete
@@ -699,6 +705,7 @@ let%expect_test "keymap: every binding resolves to its intent and is documented"
     Ctrl+_           Undo
     Ctrl+O           Cycle_verbosity
     Ctrl+R           Path_complete
+    Ctrl+F           Search
     Ctrl+G           Edit_externally
     Ctrl+L           Model_picker
     Ctrl+P           Next_model
@@ -738,6 +745,8 @@ let%expect_test "keymap: every binding resolves to its intent and is documented"
     End / Ctrl+E            end of line
     PageUp                  scroll the transcript / list up a page
     PageDown                scroll the transcript / list down a page
+    Ctrl+Up                 jump to the previous user message
+    Ctrl+Down               jump to the next user message
     Backspace / Ctrl+H      delete the character before the cursor
     Delete                  delete the character under the cursor
     Ctrl+K                  delete to the end of the line
@@ -748,6 +757,7 @@ let%expect_test "keymap: every binding resolves to its intent and is documented"
     Ctrl+_                  undo the last edit
     Ctrl+O                  cycle transcript verbosity
     Ctrl+R                  complete a file path at the cursor
+    Ctrl+F                  search the transcript
     Ctrl+G                  edit the prompt in $EDITOR
     Ctrl+L                  pick a model
     Ctrl+P                  cycle to the next scoped model (Shift+Ctrl+P is unavailable; Alt+P goes back)
@@ -761,6 +771,7 @@ let%expect_test "keymap: every binding resolves to its intent and is documented"
     Ctrl+C                  clear the editor, then (again) quit
     Ctrl+D                  quit
     /help                              show commands and keys
+    /hotkeys                           show keyboard shortcuts
     /model [name|id|provider/id]       pick or switch the model
     /scoped-models                     pick the models Ctrl+P cycles through
     /login [provider] [api_key|oauth]  log in to a provider
@@ -808,9 +819,8 @@ let%expect_test "markdown" =
     Some code and bold text.
     • item one
       • nested
-    ``` ocaml
-      let x = 1
-    ```
+    ── ocaml ──
+    let x = 1
     plain
     ((
       ((text "a ")
@@ -820,7 +830,9 @@ let%expect_test "markdown" =
          (dim       false)
          (italic    false)
          (underline false)
-         (invert    false))))
+         (invert    false)
+         (strike    false)
+         (link ()))))
       ((text b)
        (style (
          (fg        Cyan)
@@ -828,7 +840,9 @@ let%expect_test "markdown" =
          (dim       false)
          (italic    false)
          (underline false)
-         (invert    false))))
+         (invert    false)
+         (strike    false)
+         (link ()))))
       ((text " ")
        (style (
          (fg        Default)
@@ -836,7 +850,9 @@ let%expect_test "markdown" =
          (dim       false)
          (italic    false)
          (underline false)
-         (invert    false))))
+         (invert    false)
+         (strike    false)
+         (link ()))))
       ((text c)
        (style (
          (fg        Default)
@@ -844,7 +860,9 @@ let%expect_test "markdown" =
          (dim       false)
          (italic    false)
          (underline false)
-         (invert    false))))))
+         (invert    false)
+         (strike    false)
+         (link ()))))))
     |}]
 ;;
 
@@ -884,5 +902,273 @@ let%expect_test "live tool tail keeps the last five lines at each verbosity" =
       line 4
       line 5
       line 6
+    |}]
+;;
+
+let markdown_fixture =
+  {md|
+# Heading one
+## Heading two
+### Heading three
+
+Some `code`, **bold**, *italic* and ~~struck~~ text.
+A [link](https://example.com) here.
+
+- top one
+  - nested two
+    1. ordered three
+- top two
+
+> quoted line
+
+---
+
+| name  | value | extra                       |
+| ----- | ----- | --------------------------- |
+| alpha | 1     | short                       |
+| beta  | 2     | a much much much longer value |
+
+```ocaml
+let x = 1
+let y = 2
+```
+
+plain tail
+|md}
+;;
+
+let%expect_test "markdown: every construct at width 40 and 80" =
+  List.iter [ 40; 80 ] ~f:(fun width ->
+    printf "== width %d ==\n" width;
+    let content = Markdown.render ~width markdown_fixture in
+    print_endline (Content.to_plain content);
+    print_endline "--- styled";
+    let screen : Screen.t =
+      { lines = content; cursor = None; width; height = List.length content }
+    in
+    print_endline (Screen.to_styled screen));
+  [%expect
+    {|
+    == width 40 ==
+
+    Heading one
+    Heading two
+    Heading three
+
+    Some code, bold, italic and struck text.
+    A link here.
+
+    • top one
+      • nested two
+        1. ordered three
+    • top two
+
+    ▎ quoted line
+
+    ────────────────────────────────────────
+
+    name  │ value │ extra
+    ──────┼───────┼─────────────────────────
+    alpha │ 1     │ short
+    beta  │ 2     │ a much much much longer…
+
+    ── ocaml ──
+    let x = 1
+    let y = 2
+
+    plain tail
+    --- styled
+
+    [cyan][bold]Heading one[/]
+    [bold]Heading two[/]
+    [bold][dim]Heading three[/]
+
+    Some [cyan]code[/], [bold]bold[/], [italic]italic[/] and [dim][strike]struck[/] text.
+    A [link=https://example.com]link[/] here.
+
+    • top one
+      • nested two
+        1. ordered three
+    • top two
+
+    [dim]▎ [/]quoted line
+
+    [dim]────────────────────────────────────────[/]
+
+    [bold]name [/][dim] │ [/][bold]value[/][dim] │ [/][bold]extra                   [/]
+    [dim]─────[/][dim]─┼─[/][dim]─────[/][dim]─┼─[/][dim]────────────────────────[/]
+    alpha[dim] │ [/]1    [dim] │ [/]short
+    beta [dim] │ [/]2    [dim] │ [/]a much much much longer…
+
+    [dim]── ocaml ──[/]
+    [gray]let x = 1[/]
+    [gray]let y = 2[/]
+
+    plain tail
+    == width 80 ==
+
+    Heading one
+    Heading two
+    Heading three
+
+    Some code, bold, italic and struck text.
+    A link here.
+
+    • top one
+      • nested two
+        1. ordered three
+    • top two
+
+    ▎ quoted line
+
+    ────────────────────────────────────────────────────────────────────────────────
+
+    name  │ value │ extra
+    ──────┼───────┼──────────────────────────────
+    alpha │ 1     │ short
+    beta  │ 2     │ a much much much longer value
+
+    ── ocaml ──
+    let x = 1
+    let y = 2
+
+    plain tail
+    --- styled
+
+    [cyan][bold]Heading one[/]
+    [bold]Heading two[/]
+    [bold][dim]Heading three[/]
+
+    Some [cyan]code[/], [bold]bold[/], [italic]italic[/] and [dim][strike]struck[/] text.
+    A [link=https://example.com]link[/] here.
+
+    • top one
+      • nested two
+        1. ordered three
+    • top two
+
+    [dim]▎ [/]quoted line
+
+    [dim]────────────────────────────────────────────────────────────────────────────────[/]
+
+    [bold]name [/][dim] │ [/][bold]value[/][dim] │ [/][bold]extra                        [/]
+    [dim]─────[/][dim]─┼─[/][dim]─────[/][dim]─┼─[/][dim]─────────────────────────────[/]
+    alpha[dim] │ [/]1    [dim] │ [/]short
+    beta [dim] │ [/]2    [dim] │ [/]a much much much longer value
+
+    [dim]── ocaml ──[/]
+    [gray]let x = 1[/]
+    [gray]let y = 2[/]
+
+    plain tail
+    |}]
+;;
+
+let edit_result text : Prigh_protocol.Message.Tool_result.t =
+  { tool_call_id = "c1"; tool_name = "edit"; text; is_error = false }
+;;
+
+let%expect_test "diff colouring at Normal and Verbose through to_styled" =
+  let call : Prigh_protocol.Tool_call.t =
+    { id = "c1"; name = "edit"; arguments = "{}" }
+  in
+  let text =
+    "--- a/f.ml\n\
+     +++ b/f.ml\n\
+     @@ -1,3 +1,3 @@\n\
+     -old line\n\
+     +new line\n\
+    \  context\n\
+    \  more context\n"
+  in
+  let item =
+    Transcript.Item.Tool
+      { call
+      ; result = Some (edit_result text)
+      ; live_tail = None
+      ; subagent = None
+      }
+  in
+  List.iter [ Verbosity.Normal; Verbosity.Verbose ] ~f:(fun verbosity ->
+    printf "== %s ==\n" (Verbosity.name verbosity);
+    print_endline (Content.to_styled (Transcript.render_item item ~verbosity)));
+  [%expect
+    {|
+    == normal ==
+    [magenta]⚙ edit[/][dim] [/]
+    [dim]  --- a/f.ml[/]
+    [dim]  +++ b/f.ml[/]
+    [cyan]  @@ -1,3 +1,3 @@[/]
+    [red]  -old line[/]
+    [green]  +new line[/]
+    [gray]  … (2 more)[/]
+    == verbose ==
+    [magenta]⚙ edit[/]
+    [dim]  {}[/]
+    [dim]  --- a/f.ml[/]
+    [dim]  +++ b/f.ml[/]
+    [cyan]  @@ -1,3 +1,3 @@[/]
+    [red]  -old line[/]
+    [green]  +new line[/]
+    [gray]    context[/]
+    [gray]    more context[/]
+    |}]
+;;
+
+let%expect_test "content: highlight inverts matching spans" =
+  let line = Content.Line.of_string "Earlier question, earlier answer" in
+  List.iter [ "earlier"; "question"; "zzz" ] ~f:(fun needle ->
+    printf "== %s ==\n" needle;
+    print_endline (Content.to_styled [ Content.Line.highlight line ~needle ]));
+  [%expect
+    {|
+    == earlier ==
+    [invert]Earlier[/] question, [invert]earlier[/] answer
+    == question ==
+    Earlier [invert]question[/], earlier answer
+    == zzz ==
+    Earlier question, earlier answer
+    |}]
+;;
+
+let%expect_test "markdown never raises on malformed input" =
+  let inputs =
+    [ "```"
+    ; "```ocaml\nlet x = 1"
+    ; "| a | b |\n| not a separator |"
+    ; "#"
+    ; "- "
+    ; "[text]("
+    ; "**unterminated"
+    ; ">"
+    ; "~~~"
+    ; ""
+    ]
+  in
+  List.iter inputs ~f:(fun input ->
+    printf "== %S ==\n" input;
+    print_endline (Content.to_plain (Markdown.render input)));
+  [%expect {|
+    == "```" ==
+    ──
+    == "```ocaml\nlet x = 1" ==
+    ── ocaml ──
+    let x = 1
+    == "| a | b |\n| not a separator |" ==
+    | a | b |
+    | not a separator |
+    == "#" ==
+
+    == "- " ==
+    •
+    == "[text](" ==
+    [text](
+    == "**unterminated" ==
+    **unterminated
+    == ">" ==
+    ▎
+    == "~~~" ==
+    ~~~
+    == "" ==
     |}]
 ;;

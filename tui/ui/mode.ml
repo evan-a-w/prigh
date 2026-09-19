@@ -56,10 +56,15 @@ type t =
       { question : string
       ; action : Confirm_action.t
       }
+  | Search of
+      { query : string
+      ; matches : int list
+      ; current : int
+      }
 [@@deriving sexp_of]
 
 let is_dialog = function
-  | Editing -> false
+  | Editing | Search _ -> false
   | Picker _ | Login_prompt _ | Text_prompt _ | Confirm _ -> true
 ;;
 
@@ -69,4 +74,5 @@ let name = function
   | Login_prompt _ -> "login"
   | Text_prompt _ -> "text_prompt"
   | Confirm _ -> "confirm"
+  | Search _ -> "search"
 ;;

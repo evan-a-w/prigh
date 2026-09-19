@@ -13,3 +13,6 @@ type t =
 (** Plain text with trailing spaces trimmed and the cursor drawn as [▏] when
     [show_cursor]; for tests. *)
 val to_plain : ?show_cursor:bool -> t -> string
+
+(** Debug dump showing style runs as [[red]…[/]] etc.; for tests. *)
+val to_styled : t -> string

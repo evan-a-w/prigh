@@ -55,6 +55,9 @@ let%expect_test "key_of_event: terminal event -> key" =
     ; "ASCII 'p' + [Ctrl]", key_press (Ekey.ASCII 'p') [ Mod.Ctrl ]
     ; "ASCII 'p' + [Meta]", key_press (Ekey.ASCII 'p') [ Mod.Meta ]
     ; "ASCII 't' + [Ctrl]", key_press (Ekey.ASCII 't') [ Mod.Ctrl ]
+    ; "ASCII 'f' + [Ctrl]", key_press (Ekey.ASCII 'f') [ Mod.Ctrl ]
+    ; "Arrow Up + [Ctrl]", key_press (Ekey.Arrow `Up) [ Mod.Ctrl ]
+    ; "Arrow Down + [Ctrl]", key_press (Ekey.Arrow `Down) [ Mod.Ctrl ]
     ; "Paste Start", Event.Paste `Start
     ; "Paste End", Event.Paste `End
     ; ( "Mouse Left"
@@ -99,6 +102,9 @@ let%expect_test "key_of_event: terminal event -> key" =
     ASCII 'p' + [Ctrl]           (Key_press (key (ASCII p)) (mods (Ctrl)))        -> (((code (Char p)) (ctrl true) (alt false) (shift false)))
     ASCII 'p' + [Meta]           (Key_press (key (ASCII p)) (mods (Meta)))        -> (((code (Char p)) (ctrl false) (alt true) (shift false)))
     ASCII 't' + [Ctrl]           (Key_press (key (ASCII t)) (mods (Ctrl)))        -> (((code (Char t)) (ctrl true) (alt false) (shift false)))
+    ASCII 'f' + [Ctrl]           (Key_press (key (ASCII f)) (mods (Ctrl)))        -> (((code (Char f)) (ctrl true) (alt false) (shift false)))
+    Arrow Up + [Ctrl]            (Key_press (key (Arrow Up)) (mods (Ctrl)))       -> (((code Up) (ctrl true) (alt false) (shift false)))
+    Arrow Down + [Ctrl]          (Key_press (key (Arrow Down)) (mods (Ctrl)))     -> (((code Down) (ctrl true) (alt false) (shift false)))
     Paste Start                  (Paste Start)                                    -> ()
     Paste End                    (Paste End)                                      -> ()
     Mouse Left                   (Mouse (kind Left) (position ((x 3) (y 4))))     -> ()
@@ -179,6 +185,8 @@ let%expect_test "keymap: every bound key is reachable from a terminal event" =
     Ctrl+E           (Key_press (key (ASCII e)) (mods (Ctrl))) ok
     PageUp           (Key_press (key (Page Up)))      ok
     PageDown         (Key_press (key (Page Down)))    ok
+    Ctrl+Up          (Key_press (key (Arrow Up)) (mods (Ctrl))) ok
+    Ctrl+Down        (Key_press (key (Arrow Down)) (mods (Ctrl))) ok
     Backspace        (Key_press (key Backspace))      ok
     Ctrl+H           (Key_press (key (ASCII h)) (mods (Ctrl))) ok
     Delete           (Key_press (key Delete))         ok
@@ -191,6 +199,7 @@ let%expect_test "keymap: every bound key is reachable from a terminal event" =
     Ctrl+_           (Key_press (key (ASCII _)) (mods (Ctrl))) ok
     Ctrl+O           (Key_press (key (ASCII o)) (mods (Ctrl))) ok
     Ctrl+R           (Key_press (key (ASCII r)) (mods (Ctrl))) ok
+    Ctrl+F           (Key_press (key (ASCII f)) (mods (Ctrl))) ok
     Ctrl+G           (Key_press (key (ASCII g)) (mods (Ctrl))) ok
     Ctrl+L           (Key_press (key (ASCII l)) (mods (Ctrl))) ok
     Ctrl+P           (Key_press (key (ASCII p)) (mods (Ctrl))) ok

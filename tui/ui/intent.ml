@@ -42,4 +42,7 @@ type t =
   | Edit_externally
   | Model_picker
   | Picker_toggle_filter
+  | Search
+  | Prev_user_message
+  | Next_user_message
 [@@deriving sexp_of, equal, compare]

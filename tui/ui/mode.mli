@@ -58,6 +58,11 @@ type t =
       { question : string
       ; action : Confirm_action.t
       }
+  | Search of
+      { query : string
+      ; matches : int list (** wrapped transcript line indexes *)
+      ; current : int (** index into [matches] *)
+      }
 [@@deriving sexp_of]
 
 val is_dialog : t -> bool

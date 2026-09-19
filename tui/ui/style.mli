@@ -21,6 +21,8 @@ type t =
   ; italic : bool
   ; underline : bool
   ; invert : bool
+  ; strike : bool
+  ; link : string option
   }
 [@@deriving sexp_of, equal, compare]
 
@@ -31,3 +33,5 @@ val dim : t -> t
 val italic : t -> t
 val underline : t -> t
 val invert : t -> t
+val strike : t -> t
+val link : t -> string -> t

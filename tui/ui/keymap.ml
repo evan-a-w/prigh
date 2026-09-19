@@ -47,6 +47,14 @@ let bindings =
       Page_down
       "scroll the transcript / list down a page"
   ; b
+      [ { (Key.plain Up) with ctrl = true } ]
+      Prev_user_message
+      "jump to the previous user message"
+  ; b
+      [ { (Key.plain Down) with ctrl = true } ]
+      Next_user_message
+      "jump to the next user message"
+  ; b
       [ Key.plain Backspace; Key.ctrl 'h' ]
       Backspace
       "delete the character before the cursor"
@@ -62,6 +70,7 @@ let bindings =
   ; b [ Key.ctrl '_' ] Undo "undo the last edit"
   ; b [ Key.ctrl 'o' ] Cycle_verbosity "cycle transcript verbosity"
   ; b [ Key.ctrl 'r' ] Path_complete "complete a file path at the cursor"
+  ; b [ Key.ctrl 'f' ] Search "search the transcript"
   ; b [ Key.ctrl 'g' ] Edit_externally "edit the prompt in $EDITOR"
   ; b [ Key.ctrl 'l' ] Model_picker "pick a model"
   ; b

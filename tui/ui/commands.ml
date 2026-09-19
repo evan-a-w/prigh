@@ -26,6 +26,7 @@ let c ?argument name args help = { Spec.name; args; help; argument }
 
 let all =
   [ c "help" "" "show commands and keys"
+  ; c "hotkeys" "" "show keyboard shortcuts"
   ; c
       ~argument:Argument.Model
       "model"

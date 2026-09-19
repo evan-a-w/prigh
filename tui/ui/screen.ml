@@ -23,3 +23,5 @@ let to_plain ?(show_cursor = false) t =
     String.rstrip text)
   |> String.concat ~sep:"\n"
 ;;
+
+let to_styled t = Content.to_styled t.lines

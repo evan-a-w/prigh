@@ -121,6 +121,57 @@ module Line = struct
       in
       go t width [])
   ;;
+
+  let find_ci haystack needle start =
+    let hay_len = String.length haystack in
+    let needle_len = String.length needle in
+    let lower = String.lowercase in
+    let rec go i =
+      if i + needle_len > hay_len
+      then None
+      else if String.equal
+                (lower (String.sub haystack ~pos:i ~len:needle_len))
+                (lower needle)
+      then Some i
+      else go (i + 1)
+    in
+    if needle_len = 0 then None else go start
+  ;;
+
+  let highlight (t : t) ~needle : t =
+    if String.is_empty needle
+    then t
+    else (
+      let needle_len = String.length needle in
+      List.concat_map t ~f:(fun (span : Span.t) ->
+        let text = span.text in
+        let n = String.length text in
+        let rec go pos acc =
+          if pos >= n
+          then List.rev acc
+          else (
+            match find_ci text needle pos with
+            | None ->
+              let rest = String.drop_prefix text pos in
+              List.rev
+                (if String.is_empty rest
+                 then acc
+                 else { span with text = rest } :: acc)
+            | Some i ->
+              let before = String.sub text ~pos ~len:(i - pos) in
+              let matched = String.sub text ~pos:i ~len:needle_len in
+              let acc =
+                if String.is_empty before
+                then acc
+                else { span with text = before } :: acc
+              in
+              let acc =
+                { Span.text = matched; style = Style.invert span.style } :: acc
+              in
+              go (i + needle_len) acc)
+        in
+        go 0 []))
+  ;;
 end
 
 type t = Line.t list [@@deriving sexp_of, equal]
@@ -132,3 +183,46 @@ let lines ?style text : t =
 let text ?style s : t = [ Line.of_string ?style s ]
 let to_plain t = String.concat ~sep:"\n" (List.map t ~f:Line.to_plain)
 let wrap t ~width = List.concat_map t ~f:(Line.wrap ~width)
+
+let color_name (c : Style.Color.t) =
+  match c with
+  | Default -> "default"
+  | Red -> "red"
+  | Green -> "green"
+  | Yellow -> "yellow"
+  | Blue -> "blue"
+  | Magenta -> "magenta"
+  | Cyan -> "cyan"
+  | Gray -> "gray"
+  | White -> "white"
+;;
+
+let style_tags (s : Style.t) =
+  List.filter_opt
+    [ (match s.fg with
+       | Default -> None
+       | c -> Some (color_name c))
+    ; Option.some_if s.bold "bold"
+    ; Option.some_if s.dim "dim"
+    ; Option.some_if s.italic "italic"
+    ; Option.some_if s.underline "underline"
+    ; Option.some_if s.invert "invert"
+    ; Option.some_if s.strike "strike"
+    ; Option.map s.link ~f:(fun url -> "link=" ^ url)
+    ]
+;;
+
+let span_to_styled (s : Span.t) =
+  match style_tags s.style with
+  | [] -> s.text
+  | tags ->
+    String.concat (List.map tags ~f:(fun tag -> "[" ^ tag ^ "]"))
+    ^ s.text
+    ^ "[/]"
+;;
+
+let to_styled t =
+  String.concat
+    ~sep:"\n"
+    (List.map t ~f:(fun line -> String.concat (List.map line ~f:span_to_styled)))
+;;

@@ -100,6 +100,12 @@ val render_tail
 (** Total wrapped line count, for scroll clamping. *)
 val line_count : t -> width:int -> verbosity:Verbosity.t -> int
 
+(** Every wrapped line, oldest first. *)
+val render_all : t -> width:int -> verbosity:Verbosity.t -> Content.t
+
+(** Wrapped line index where each [User] item starts, oldest first. *)
+val user_message_lines : t -> width:int -> verbosity:Verbosity.t -> int list
+
 (** Renders the wrapped lines in [\[top, top + rows)]. *)
 val render_window
   :  t
