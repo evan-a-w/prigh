@@ -65,24 +65,36 @@ round-trips, e2e against `main.exe serve -faux` with an isolated `-auth-file`.
 3. Created switch **`prigh-ox`** (`opam switch create prigh-ox --repos
    ox,default --packages ocaml-variants.5.2.0+ox,ocaml-options-vanilla`).
    Compiler build succeeded (~25 min on 3 cores).
-4. Package install into `prigh-ox` is **in progress / partially failed**:
-   - Command: `OPAMSOLVERTIMEOUT=900 opam install --switch=prigh-ox -y
-     bonsai_term.v0.18~preview.130.106+341 bonsai_test notty_async
-     expect_test_helpers_core ppx_jsonaf_conv` (log: `/tmp/prigh-ox-install.log`).
-     The default 60 s solver timeout is too short for this cone; use ≥600.
-   - `menhir.20260209` **fails to compile under OxCaml** (compiler
-     `Invalid_argument "index out of bounds"` in emit for `base/MCOP.ml`).
-     opam kept installing unaffected packages; ~150 installed. `core`, `jsonaf`,
-     `ppx_jsonaf_conv`, `notty-community 0.2.4+ox2`, `expect_test_helpers_core`
-     are in. `bonsai`, `bonsai_term`, `async` were NOT yet installed when I
-     last looked (blocked on menhir → ppx_css/sexp_grammar chain, presumably).
-   - Next step: `opam install --switch=prigh-ox menhir.20240715` (older
-     versions available: 20240715, 20250903, 20250912 — try oldest first; I
-     started this but it was aborted), then re-run the bonsai_term install.
-     If menhir can't build at all, check what actually depends on it
-     (`opam list --switch=prigh-ox --depends-on menhir`) and whether a
-     `+ox`-patched version exists.
-   - Also check: whether `bonsai.ppx_bonsai` + `ppx_jane` coexist in one
+4. **Root cause found for the menhir failure — it is an OxCaml codegen bug,
+   not a menhir problem.** In `backend/amd64/cfg_selection.ml`,
+   `pseudoregs_for_operation` grouped `Ifloatarithmem` with the two-address
+   `Floatop` case and returned `[| res.(0); arg.(1) |]`. When the memory
+   operand uses a two-register addressing mode (`Iindexed2scaled`, which is
+   exactly what a plain `r.(i)` on a `float array` produces), the second
+   addressing register `arg.(2)` is dropped and the emitter raises
+   `Invalid_argument("index out of bounds")`. Minimal repro:
+   `let f (r:float array) (i:int) (j:int) = r.(i) +. r.(j)`.
+   - Only bites on a **non-AVX baseline target**. `-favx` hides it, but this
+     machine is a QEMU CPU with **no AVX** (`sse4_2` only), so AVX binaries
+     would SIGILL. The correct fix is to copy the whole arg array like
+     upstream OCaml (see the local overlay below).
+   - Present in `minus39`, `minus40`, `5.4.0-ox2` and still on `main`, so
+     bumping the compiler does not help. It affects *any* package doing
+     float-array arithmetic at baseline; menhir was just first.
+5. Repaired the compiler with a **local opam overlay repo `oxpatched`**
+   (`~/.opam/repo/ox-patched`, rank 1 for switch `prigh-ox`). It adds
+   `packages/oxcaml-compiler/oxcaml-compiler.5.2.0minus39/files/fix-floatarithmem.patch`
+   and lists it in `patches`, so `opam reinstall oxcaml-compiler` rebuilds the
+   patched compiler. Rebuild is running now (~25 min; log
+   `/tmp/oxcaml-reinstall.log`). After it lands, re-run the package install:
+   `OPAMSOLVERTIMEOUT=900 opam install --switch=prigh-ox -y
+   bonsai_term.v0.18~preview.130.106+341 bonsai_test notty_async
+   expect_test_helpers_core ppx_jsonaf_conv` (`/tmp/prigh-ox-install.log`).
+   Use ≥600 s solver timeout. ~150 packages from the aborted first pass are
+   already installed (`core`, `async`, `jsonaf`, `ppx_jsonaf_conv`,
+   `notty-community 0.2.4+ox2`, `expect_test_helpers_core`); `bonsai`,
+   `bonsai_term`, `js_of_ocaml*` are not yet.
+   - Still to check: whether `bonsai.ppx_bonsai` + `ppx_jane` coexist in one
      stanza (their `src/dune` does this, so yes), and whether the public
      bonsai_term ships a test handle (`src/` has `driver.ml`, `loop.ml`,
      `frame_outcome.ml`; there is a `demos/` dir — look for
@@ -90,27 +102,29 @@ round-trips, e2e against `main.exe serve -faux` with an isolated `-auth-file`.
 
 ## Remaining work, in order
 
-1. Finish the `prigh-ox` install (menhir workaround above); build the
+1. Wait for the patched `oxcaml-compiler` rebuild, then finish the `prigh-ox`
+   install (`bonsai_term`, `bonsai_test`, `async`, `js_of_ocaml*`); build the
    bonsai_term hello-world demo from `janestreet/bonsai_term` `demos/`.
 2. Try building `backend/` in `prigh-ox` (`dune build`, `dune build
    @runtest`). If green: one switch for everything, and `prigh_protocol` is a
    plain shared library. If not: keep two switches; `prigh_protocol` as a
    directory vendored into both dune projects.
-3. **Nix environment (user requirement):** make the whole toolchain
-   reproducible with Nix, using https://github.com/tweag/opam-nix. `nix` is
-   *not* installed on this machine yet (`which nix` → nothing) — install it
-   first (multi-user Determinate/official installer). Plan: `flake.nix` with
-   opam-nix `buildOpamProject'`/`queryToScope` over both the `ox` and default
-   opam repositories (opam-nix accepts extra repos via `repos = [ ... ]`
-   fetched as flake inputs: `https://github.com/oxcaml/opam-repository` and
-   `opam-repository`), pinning `ocaml-variants.5.2.0+ox`, `bonsai_term`,
+3. **Nix environment (user requirement):** nix is now **installed**
+   (multi-user Determinate Nix 3.22.5, daemon active, flakes enabled;
+   `/etc/nix/nix.conf`; profile at
+   `/nix/var/nix/profiles/default/etc/profile.d/nix-daemon.sh`). Remaining:
+   `flake.nix` with opam-nix `buildOpamProject'`/`queryToScope` over both the
+   `ox` and default opam repositories (opam-nix accepts extra repos via
+   `repos = [ ... ]` fetched as flake inputs: `oxcaml/opam-repository` and
+   `ocaml/opam-repository`). **The patched `oxcaml-compiler` must be carried
+   into Nix too** — either vendor the `oxpatched` overlay repo as a flake
+   input / local path and add it to `repos`, or apply the same patch via an
+   opam-nix source/override hook. Pin `ocaml-variants.5.2.0+ox`, `bonsai_term`,
    `bonsai_test`, `notty_async`, `eio`, `cohttp-eio`, `tls-eio`, `jsonaf`,
-   `ppx_jsonaf_conv`, `expect_test_helpers_core`, `ocamlformat`, and
-   `menhir` at a version that compiles (see above). Expose a `devShell`
-   (dune, ocamlformat, node for the legacy TS frontend until deleted, `rg`
-   which the tools need) and packages for the backend and frontend. Expect
-   the OxCaml compiler build in Nix to be slow; the `menhir` and any other
-   `+ox`-patch packages are the likely friction points. Also record the exact
+   `ppx_jsonaf_conv`, `expect_test_helpers_core`, `ocamlformat`. Expose a
+   `devShell` (dune, ocamlformat, node for the legacy TS frontend until
+   deleted, `rg` which the tools need) and packages for backend/frontend.
+   Expect the OxCaml compiler build in Nix to be slow. Record the exact
    opam-nix input revision in `flake.lock`.
 4. Write the frontend plan (`FRONTEND_PLAN.md`) with the user: milestones
    protocol extraction → Async client → Mode/Keymap/Editor/Transcript headless
@@ -125,6 +139,15 @@ round-trips, e2e against `main.exe serve -faux` with an isolated `-auth-file`.
   $(opam env --switch=<name> --set-switch)`.
 - Switches: `prigh` (vanilla 5.3.0, backend builds/tests here), `oxsat`
   (user's OxCaml switch — do not modify), `prigh-ox` (new, for the spike).
+- `prigh-ox` carries the `oxpatched` opam repo (rank 1) with the
+  `fix-floatarithmem.patch` for `oxcaml-compiler`. Keep it in sync with the
+  Nix setup. To rebuild the compiler: `opam reinstall --switch=prigh-ox
+  oxcaml-compiler` (25 min).
+- Nix: source `/nix/var/nix/profiles/default/etc/profile.d/nix-daemon.sh`
+  (or use `/nix/var/nix/profiles/default/bin/nix`); sudo is available with the
+  user-provided password (prefix commands with `printf 'ubu\n' | sudo -S -p ''`).
+  This host is a QEMU CPU **without AVX** (`sse4_2` only) — never enable
+  `-favx`/AVX for things that will run here.
 - `backend/AGENTS.md` has the coding conventions (mli for every module,
   expect tests, ocamlformat after edits, one dune process at a time).
 - pi source for reference: `~/dev/pi` (TS). Its TUI components

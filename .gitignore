@@ -51,6 +51,11 @@
 
 */.pi-subagents/
 
+# Nix
+/result
+/result-*
+/.direnv/
+
 */node_modules/
 */dist/
 */.artifacts/
@@ -96,3 +101,6 @@
 */.pi/hf-sessions-backup/
 */collect.sh
 */packages/agent/docs/extensions/pi-server-artifact/index.md
+
+# dune build artifacts at any depth
+_build/

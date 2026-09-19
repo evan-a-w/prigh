@@ -1,0 +1,17 @@
+opam-version: "2.0"
+synopsis: "Minimal bonsai_term TUI, used to smoke-test the OxCaml toolchain"
+maintainer: "prigh"
+authors: "prigh"
+depends: [
+  "ocaml"
+  "dune" {>= "3.17"}
+  "async"
+  "bonsai"
+  "bonsai_term"
+  "core"
+  "core_unix"
+  "ppx_jane"
+]
+build: [
+  ["dune" "build" "-p" name "-j" jobs]
+]
