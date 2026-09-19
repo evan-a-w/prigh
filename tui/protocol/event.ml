@@ -26,6 +26,10 @@ type t =
   | State of State.t
   | Compacted of string
   | Notice of string
+  | Queue_update of
+      { steer : int
+      ; follow_up : int
+      }
   | Auth of Auth_event.t
 [@@deriving sexp_of, equal]
 
@@ -72,6 +76,10 @@ let of_json j =
     Json.object_field j "state" >>= State.of_json >>| fun s -> State s
   | "compacted" -> Json.string_field j "summary" >>| fun s -> Compacted s
   | "notice" -> Json.string_field j "text" >>| fun t -> Notice t
+  | "queue_update" ->
+    let%bind steer = Json.int_field j "steer" in
+    let%map follow_up = Json.int_field j "follow_up" in
+    Queue_update { steer; follow_up }
   | "auth" -> Auth_event.of_json j >>| fun a -> Auth a
   | other -> Or_error.errorf "unknown event %S" other
 ;;

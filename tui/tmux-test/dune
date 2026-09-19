@@ -1,0 +1,10 @@
+; Real-terminal scenarios (tmux). Skipped when tmux is absent.
+(rule
+ (alias tmux)
+ (deps
+  run.sh
+  (glob_files expected/*.txt)
+  %{exe:../bin/main.exe}
+  (env_var PRIGH_BACKEND))
+ (action
+  (run bash %{dep:run.sh})))

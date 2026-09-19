@@ -1,0 +1,14 @@
+=== prompt
+session <id> in $TMP/cwd. /help for commands, Esc aborts, Ctrl+C twice
+quits.
+────────────────────────────────────────────────────────────────────────────────────────────────────
+> hello there
+deepseek/deepseek-flash  thinking:off  ctx:0 (0%)  in:0 out:0  $0.0000
+=== prompt
+session <id> in $TMP/cwd. /help for commands, Esc aborts, Ctrl+C twice
+quits.
+> hello there
+faux reply
+────────────────────────────────────────────────────────────────────────────────────────────────────
+>
+deepseek/deepseek-flash  thinking:off  ctx:10 (0%)  in:10 out:5  $0.0000

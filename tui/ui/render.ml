@@ -45,8 +45,18 @@ let status (m : App.Model.t) : Content.Line.t =
           (format_tokens s.usage.output)
       ; sprintf "$%.4f" s.cost_usd
       ]
-      @ Option.to_list mode_hint
     in
+    let queued = Queue_counts.total m.queued in
+    let parts =
+      if queued > 0 then parts @ [ sprintf "queued:%d" queued ] else parts
+    in
+    let parts =
+      match m.viewport with
+      | Viewport.Anchored { new_lines; _ } when new_lines > 0 ->
+        parts @ [ sprintf "↓ %d new" new_lines ]
+      | Viewport.Follow | Viewport.Anchored _ -> parts
+    in
+    let parts = parts @ Option.to_list mode_hint in
     let line = String.concat ~sep:"  " parts in
     let style =
       match m.mode with
@@ -196,12 +206,21 @@ let screen (m : App.Model.t) : Screen.t =
   let panel_rows = List.length panel in
   let transcript_rows = Int.max 0 (height - panel_rows) in
   let transcript =
-    Transcript.render_tail
-      m.transcript
-      ~width
-      ~rows:transcript_rows
-      ~skip:m.scroll
-      ~expand_tools:m.expand_tools
+    match m.viewport with
+    | Viewport.Follow ->
+      Transcript.render_tail
+        m.transcript
+        ~width
+        ~rows:transcript_rows
+        ~skip:0
+        ~expand_tools:m.expand_tools
+    | Viewport.Anchored { top; _ } ->
+      Transcript.render_window
+        m.transcript
+        ~width
+        ~rows:transcript_rows
+        ~top
+        ~expand_tools:m.expand_tools
   in
   let padding =
     List.init

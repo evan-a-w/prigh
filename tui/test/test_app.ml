@@ -457,7 +457,7 @@ let%expect_test "Esc closes a dialog without aborting; Esc while running aborts"
   H.mode h;
   [%expect {| editing |}];
   H.esc h;
-  [%expect {| (Rpc (method_ abort) (params ()) (tag Show_error)) |}];
+  [%expect {| (Rpc (method_ abort) (params ()) (tag Abort_done)) |}];
   (* Opening a dialog while one is open is refused with a notice. *)
   H.keys h "/thinking";
   H.enter h;
@@ -1153,4 +1153,311 @@ let%expect_test "backend exit quits" =
   H.keys h "x";
   H.enter h;
   [%expect {| |}]
+;;
+
+let%expect_test "abort restores queued messages" =
+  let h = connected ~width:100 () in
+  H.event h (State (state ~running:true ()));
+  H.keys h "first";
+  H.enter h;
+  [%expect {| (Rpc (method_ steer) (params ((text first))) (tag Show_error)) |}];
+  H.keys h "second";
+  H.enter h;
+  [%expect
+    {| (Rpc (method_ steer) (params ((text second))) (tag Show_error)) |}];
+  H.event h (Queue_update { steer = 2; follow_up = 0 });
+  H.show h;
+  [%expect
+    {|
+    session abc123 in /work. /help for commands, Esc aborts, Ctrl+C twice quits.
+    > earlier question
+    earlier answer
+    queued (delivered after the current turn)
+    queued (delivered after the current turn)
+    ────────────────────────────────────────────────────────────────────────────────────────────────────
+    > ▏
+    deepseek/deepseek-flash  thinking:off  ctx:1.5k (0%)  in:1.2k out:300  $0.0123  queued:2  ⠋ working…
+    |}];
+  H.esc h;
+  [%expect {| (Rpc (method_ abort) (params ()) (tag Abort_done)) |}];
+  H.reply h Abort_done {|{"restored":["first","second"]}|};
+  H.show h;
+  [%expect
+    {|
+    session abc123 in /work. /help for commands, Esc aborts, Ctrl+C twice quits.
+    > earlier question
+    earlier answer
+    queued (delivered after the current turn)
+    queued (delivered after the current turn)
+    restored 2 queued messages to the editor
+    ────────────────────────────────────────────────────────────────────────────────────────────────────
+    > first
+
+      second▏
+    deepseek/deepseek-flash  thinking:off  ctx:1.5k (0%)  in:1.2k out:300  $0.0123  queued:2  ⠋ working…
+    |}];
+  H.event h (Queue_update { steer = 0; follow_up = 0 });
+  H.show h;
+  [%expect
+    {|
+    session abc123 in /work. /help for commands, Esc aborts, Ctrl+C twice quits.
+    > earlier question
+    earlier answer
+    queued (delivered after the current turn)
+    queued (delivered after the current turn)
+    restored 2 queued messages to the editor
+    ────────────────────────────────────────────────────────────────────────────────────────────────────
+    > first
+
+      second▏
+    deepseek/deepseek-flash  thinking:off  ctx:1.5k (0%)  in:1.2k out:300  $0.0123  ⠋ working (Esc abor…
+    |}]
+;;
+
+let%expect_test "scroll stays anchored while streaming" =
+  let h = connected ~width:100 ~height:10 () in
+  H.keys h "prompt";
+  H.enter h;
+  [%expect
+    {| (Rpc (method_ prompt) (params ((text prompt))) (tag Show_error)) |}];
+  H.event h (Message_start (Assistant partial));
+  let stream from count =
+    List.iter
+      (List.init count ~f:(fun i -> sprintf "line %d\n" (from + i)))
+      ~f:(fun text ->
+        H.event h (Message_update { partial; delta = Text_delta text }))
+  in
+  stream 0 12;
+  H.show h;
+  [%expect
+    {|
+    line 5
+    line 6
+    line 7
+    line 8
+    line 9
+    line 10
+    line 11
+    ────────────────────────────────────────────────────────────────────────────────────────────────────
+    > ▏
+    deepseek/deepseek-flash  thinking:off  ctx:1.5k (0%)  in:1.2k out:300  $0.0123
+    |}];
+  H.key h (Key.plain Page_up);
+  H.show h;
+  [%expect
+    {|
+    line 0
+    line 1
+    line 2
+    line 3
+    line 4
+    line 5
+    line 6
+    ────────────────────────────────────────────────────────────────────────────────────────────────────
+    > ▏
+    deepseek/deepseek-flash  thinking:off  ctx:1.5k (0%)  in:1.2k out:300  $0.0123
+    |}];
+  stream 12 10;
+  H.show h;
+  [%expect
+    {|
+    line 0
+    line 1
+    line 2
+    line 3
+    line 4
+    line 5
+    line 6
+    ────────────────────────────────────────────────────────────────────────────────────────────────────
+    > ▏
+    deepseek/deepseek-flash  thinking:off  ctx:1.5k (0%)  in:1.2k out:300  $0.0123  ↓ 10 new
+    |}];
+  H.show h;
+  [%expect
+    {|
+    line 0
+    line 1
+    line 2
+    line 3
+    line 4
+    line 5
+    line 6
+    ────────────────────────────────────────────────────────────────────────────────────────────────────
+    > ▏
+    deepseek/deepseek-flash  thinking:off  ctx:1.5k (0%)  in:1.2k out:300  $0.0123  ↓ 10 new
+    |}];
+  H.key h (Key.plain End);
+  H.show h;
+  [%expect
+    {|
+    line 15
+    line 16
+    line 17
+    line 18
+    line 19
+    line 20
+    line 21
+    ────────────────────────────────────────────────────────────────────────────────────────────────────
+    > ▏
+    deepseek/deepseek-flash  thinking:off  ctx:1.5k (0%)  in:1.2k out:300  $0.0123
+    |}]
+;;
+
+let%expect_test "page_down past the bottom returns to follow" =
+  let h = connected ~width:100 ~height:10 () in
+  H.event h (Message_start (Assistant partial));
+  let stream =
+    List.iter
+      (List.init 20 ~f:(fun i -> sprintf "line %d\n" i))
+      ~f:(fun text ->
+        H.event h (Message_update { partial; delta = Text_delta text }))
+  in
+  stream;
+  H.key h (Key.plain Page_up);
+  H.show h;
+  [%expect
+    {|
+    line 8
+    line 9
+    line 10
+    line 11
+    line 12
+    line 13
+    line 14
+    ────────────────────────────────────────────────────────────────────────────────────────────────────
+    > ▏
+    deepseek/deepseek-flash  thinking:off  ctx:1.5k (0%)  in:1.2k out:300  $0.0123
+    |}];
+  H.key h (Key.plain Page_up);
+  H.show h;
+  [%expect
+    {|
+    line 3
+    line 4
+    line 5
+    line 6
+    line 7
+    line 8
+    line 9
+    ────────────────────────────────────────────────────────────────────────────────────────────────────
+    > ▏
+    deepseek/deepseek-flash  thinking:off  ctx:1.5k (0%)  in:1.2k out:300  $0.0123
+    |}];
+  H.key h (Key.plain Page_down);
+  H.show h;
+  [%expect
+    {|
+    line 8
+    line 9
+    line 10
+    line 11
+    line 12
+    line 13
+    line 14
+    ────────────────────────────────────────────────────────────────────────────────────────────────────
+    > ▏
+    deepseek/deepseek-flash  thinking:off  ctx:1.5k (0%)  in:1.2k out:300  $0.0123
+    |}];
+  H.key h (Key.plain Page_down);
+  H.show h;
+  [%expect
+    {|
+    line 13
+    line 14
+    line 15
+    line 16
+    line 17
+    line 18
+    line 19
+    ────────────────────────────────────────────────────────────────────────────────────────────────────
+    > ▏
+    deepseek/deepseek-flash  thinking:off  ctx:1.5k (0%)  in:1.2k out:300  $0.0123
+    |}]
+;;
+
+let%expect_test "home/end with text in the editor move the cursor, not the \
+                 viewport"
+  =
+  let h = connected ~width:100 ~height:10 () in
+  H.event h (Message_start (Assistant partial));
+  let stream =
+    List.iter
+      (List.init 20 ~f:(fun i -> sprintf "line %d\n" i))
+      ~f:(fun text ->
+        H.event h (Message_update { partial; delta = Text_delta text }))
+  in
+  stream;
+  H.key h (Key.plain Page_up);
+  H.keys h "draft";
+  H.key h (Key.plain End);
+  H.show h;
+  [%expect
+    {|
+    line 8
+    line 9
+    line 10
+    line 11
+    line 12
+    line 13
+    line 14
+    ────────────────────────────────────────────────────────────────────────────────────────────────────
+    > draft▏
+    deepseek/deepseek-flash  thinking:off  ctx:1.5k (0%)  in:1.2k out:300  $0.0123
+    |}];
+  H.key h (Key.plain Home);
+  H.show h;
+  [%expect
+    {|
+    line 8
+    line 9
+    line 10
+    line 11
+    line 12
+    line 13
+    line 14
+    ────────────────────────────────────────────────────────────────────────────────────────────────────
+    > ▏raft
+    deepseek/deepseek-flash  thinking:off  ctx:1.5k (0%)  in:1.2k out:300  $0.0123
+    |}]
+;;
+
+let%expect_test "abort restore is singular, prepends, and tolerates no field" =
+  let h = connected ~width:100 () in
+  H.event h (State (state ~running:true ()));
+  H.keys h "queued";
+  H.enter h;
+  [%expect
+    {| (Rpc (method_ steer) (params ((text queued))) (tag Show_error)) |}];
+  H.event h (Queue_update { steer = 1; follow_up = 0 });
+  H.keys h "draft";
+  H.reply h Abort_done {|{"restored":["queued"]}|};
+  H.show h;
+  [%expect
+    {|
+    session abc123 in /work. /help for commands, Esc aborts, Ctrl+C twice quits.
+    > earlier question
+    earlier answer
+    queued (delivered after the current turn)
+    restored 1 queued message to the editor
+    ────────────────────────────────────────────────────────────────────────────────────────────────────
+    > queued
+
+      draft▏
+    deepseek/deepseek-flash  thinking:off  ctx:1.5k (0%)  in:1.2k out:300  $0.0123  queued:1  ⠋ working…
+    |}];
+  H.reply h Abort_done {|{}|};
+  H.show h;
+  [%expect
+    {|
+    session abc123 in /work. /help for commands, Esc aborts, Ctrl+C twice quits.
+    > earlier question
+    earlier answer
+    queued (delivered after the current turn)
+    restored 1 queued message to the editor
+    ────────────────────────────────────────────────────────────────────────────────────────────────────
+    > queued
+
+      draft▏
+    deepseek/deepseek-flash  thinking:off  ctx:1.5k (0%)  in:1.2k out:300  $0.0123  queued:1  ⠋ working…
+    |}]
 ;;

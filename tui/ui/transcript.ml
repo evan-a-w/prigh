@@ -198,3 +198,9 @@ let line_count t ~width ~expand_tools =
   List.sum (module Int) (all_items_rev t) ~f:(fun item ->
     List.length (Content.wrap (render_item item ~expand_tools) ~width))
 ;;
+
+let render_window t ~width ~rows ~top ~expand_tools : Content.t =
+  let total = line_count t ~width ~expand_tools in
+  let skip = Int.max 0 (total - top - rows) in
+  render_tail t ~width ~rows ~skip ~expand_tools
+;;

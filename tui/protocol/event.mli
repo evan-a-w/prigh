@@ -26,6 +26,10 @@ type t =
   | State of State.t
   | Compacted of string
   | Notice of string
+  | Queue_update of
+      { steer : int
+      ; follow_up : int
+      }
   | Auth of Auth_event.t
 [@@deriving sexp_of, equal]
 

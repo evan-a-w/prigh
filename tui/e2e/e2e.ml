@@ -75,6 +75,7 @@ let rec drain client ~stop =
       | Tool_output _ -> None
       | Tool_end { result; _ } -> Some (sprintf "tool_end %s" result.tool_name)
       | Compacted _ -> Some "compacted"
+      | Queue_update _ -> None
     in
     Option.iter summary ~f:(fun s -> printf "  event %s\n" (normalise s));
     if stop e then return () else drain client ~stop

@@ -18,6 +18,7 @@ module Reply_tag = struct
     | Sessions_picker
     | Set_model_done
     | Compact_done
+    | Abort_done
     | Notice_on_success of string
   [@@deriving sexp_of, equal]
 end
@@ -60,7 +61,8 @@ module Model = struct
     ; transcript : Transcript.t
     ; editor : Editor.t
     ; mode : Mode.t
-    ; scroll : int
+    ; queued : Queue_counts.t
+    ; viewport : Viewport.t
     ; pending_quit : bool
     ; spinner : int
     ; expand_tools : bool
@@ -82,19 +84,56 @@ let rpc ?(params = []) ?(tag = Reply_tag.Show_error) method_ =
 ;;
 
 let str = P.Json.str
+let transcript_width m = Int.max 1 m.width
+let transcript_height m = Int.max 3 m.height
+
+let transcript_line_count m =
+  Transcript.line_count
+    m.transcript
+    ~width:(transcript_width m)
+    ~expand_tools:m.expand_tools
+;;
+
+let editor_row_count m =
+  let inner = Int.max 1 (m.width - 2) in
+  List.sum (module Int) (Editor.lines m.editor) ~f:(fun line ->
+    let rec count text acc =
+      let _, rest = Text_width.take text ~width:inner in
+      if String.is_empty rest then acc + 1 else count rest (acc + 1)
+    in
+    count line 0)
+;;
+
+let transcript_rows m =
+  Int.max 0 (transcript_height m - (editor_row_count m + 2))
+;;
+
+(* The single place transcript edits go through so the anchored viewport can
+   count lines appended beneath it. *)
+let with_transcript m ~f =
+  let before = transcript_line_count m in
+  let m = { m with transcript = f m.transcript } in
+  match m.viewport with
+  | Viewport.Follow -> m
+  | Viewport.Anchored { top; new_lines } ->
+    let added = Int.max 0 (transcript_line_count m - before) in
+    { m with
+      viewport = Viewport.Anchored { top; new_lines = new_lines + added }
+    }
+;;
 
 let notice ?severity m text =
-  { m with transcript = Transcript.notice ?severity m.transcript text }
+  with_transcript m ~f:(fun t -> Transcript.notice ?severity t text)
 ;;
 
 let error m text = notice ~severity:Error m text
 let warn m text = notice ~severity:Warn m text
 
 let block m content =
-  { m with transcript = Transcript.add m.transcript (Block content) }
+  with_transcript m ~f:(fun t -> Transcript.add t (Block content))
 ;;
 
-let follow m = { m with scroll = 0 }
+let follow m = { m with viewport = Viewport.Follow }
 
 let init =
   { state = None
@@ -103,7 +142,8 @@ let init =
   ; transcript = Transcript.empty
   ; editor = Editor.empty
   ; mode = Editing
-  ; scroll = 0
+  ; queued = Queue_counts.zero
+  ; viewport = Viewport.Follow
   ; pending_quit = false
   ; spinner = 0
   ; expand_tools = false
@@ -124,6 +164,15 @@ let decode_list json ~f =
   match json with
   | `Array items -> Or_error.all (List.map items ~f)
   | other -> Or_error.errorf "expected array, got %s" (P.Json.to_string other)
+;;
+
+let decode_restored json =
+  match P.Json.field json "restored" with
+  | None -> Ok []
+  | Some (`Array items) ->
+    Or_error.all (List.map items ~f:P.Json.to_string_or_error)
+  | Some other ->
+    Or_error.errorf "restored: expected array, got %s" (P.Json.to_string other)
 ;;
 
 let logged_in m provider =
@@ -374,7 +423,7 @@ let run_command m (cmd : Commands.Parsed.t) =
     in
     block m (Content.lines ~style:(Style.fg Gray) text), []
   | "clear", _ ->
-    { m with transcript = Transcript.clear m.transcript; scroll = 0 }, []
+    follow { m with transcript = Transcript.clear m.transcript }, []
   | "quit", _ | "exit", _ -> { m with quitting = true }, [ Quit ]
   | name, _ ->
     let hint =
@@ -424,18 +473,36 @@ let interrupt m =
   else warn { m with pending_quit = true } "press Ctrl+C again to quit", []
 ;;
 
-let scroll_by m delta =
-  let page = Int.max 1 (m.height / 2) in
-  let total =
-    Transcript.line_count
-      m.transcript
-      ~width:m.width
-      ~expand_tools:m.expand_tools
-  in
-  let scroll =
-    Int.max 0 (Int.min (m.scroll + (delta * page)) (Int.max 0 (total - page)))
-  in
-  { m with scroll }
+let page_size m = Int.max 1 (m.height / 2)
+
+let scroll_up m =
+  match m.viewport with
+  | Viewport.Follow ->
+    { m with
+      viewport =
+        Viewport.Anchored
+          { top =
+              Int.max
+                0
+                (transcript_line_count m - transcript_rows m - page_size m)
+          ; new_lines = 0
+          }
+    }
+  | Viewport.Anchored { top; new_lines } ->
+    { m with
+      viewport =
+        Viewport.Anchored { top = Int.max 0 (top - page_size m); new_lines }
+    }
+;;
+
+let scroll_down m =
+  match m.viewport with
+  | Viewport.Follow -> m
+  | Viewport.Anchored { top; new_lines } ->
+    let top = top + page_size m in
+    if top + transcript_rows m >= transcript_line_count m
+    then follow m
+    else { m with viewport = Viewport.Anchored { top; new_lines } }
 ;;
 
 let editing m (intent : Intent.t) =
@@ -448,8 +515,15 @@ let editing m (intent : Intent.t) =
   | Delete -> ed Editor.delete
   | Left -> ed Editor.left
   | Right -> ed Editor.right
-  | Home -> ed Editor.home
-  | End -> ed Editor.end_
+  | Home ->
+    (match m.mode, Editor.is_empty m.editor with
+     | Editing, true ->
+       { m with viewport = Viewport.Anchored { top = 0; new_lines = 0 } }, []
+     | _ -> ed Editor.home)
+  | End ->
+    (match m.mode, Editor.is_empty m.editor with
+     | Editing, true -> follow m, []
+     | _ -> ed Editor.end_)
   | Up ->
     ed (fun e ->
       match Editor.up e with
@@ -460,17 +534,18 @@ let editing m (intent : Intent.t) =
       match Editor.down e with
       | Some e -> e
       | None -> Option.value (Editor.history_next e) ~default:e)
-  | Page_up -> scroll_by m 1, []
-  | Page_down -> scroll_by m (-1), []
+  | Page_up -> scroll_up m, []
+  | Page_down -> scroll_down m, []
   | Complete -> complete m
-  | Cancel -> if Model.running m then m, [ rpc "abort" ] else m, []
+  | Cancel ->
+    if Model.running m then m, [ rpc "abort" ~tag:Abort_done ] else m, []
   | Interrupt -> interrupt m
   | Force_quit -> { m with quitting = true }, [ Quit ]
   | Kill_to_end -> ed Editor.kill_to_end
   | Kill_line -> ed Editor.kill_line
   | Kill_word -> ed Editor.kill_word
   | Clear_screen ->
-    { m with transcript = Transcript.clear m.transcript; scroll = 0 }, []
+    follow { m with transcript = Transcript.clear m.transcript }, []
   | Toggle_tool_output -> { m with expand_tools = not m.expand_tools }, []
 ;;
 
@@ -691,15 +766,16 @@ let auth_event m (e : P.Auth_event.t) =
 ;;
 
 let event m (e : P.Event.t) =
-  let tr f = { m with transcript = f m.transcript }, [] in
+  let tr f = with_transcript m ~f, [] in
   match e with
   | State state ->
-    let transcript =
-      if state.running
-      then m.transcript
-      else Transcript.set_tool_tail (Transcript.flush m.transcript) None
+    let m =
+      with_transcript m ~f:(fun t ->
+        if state.running
+        then t
+        else Transcript.set_tool_tail (Transcript.flush t) None)
     in
-    { m with state = Some state; transcript }, []
+    { m with state = Some state }, []
   | Message_start (User text) -> tr (fun t -> Transcript.add t (User text))
   | Message_start _ -> m, []
   | Message_update { delta = Text_delta text; _ } ->
@@ -732,6 +808,8 @@ let event m (e : P.Event.t) =
       Transcript.add (Transcript.set_tool_tail t None) (Tool_result result))
   | Compacted _ -> notice m "context compacted", []
   | Notice text -> notice m text, []
+  | Queue_update { steer; follow_up } ->
+    { m with queued = { Queue_counts.steer; follow_up } }, []
   | Auth a -> auth_event m a
   | Agent_start | Agent_end _ | Turn_start | Turn_end _ -> m, []
 ;;
@@ -758,6 +836,22 @@ let reply m (tag : Reply_tag.t) (result : (P.Json.t, string) Result.t) =
      | Notice_on_success text -> notice m text, []
      | Set_model_done -> m, []
      | Compact_done -> notice m "context compacted", []
+     | Abort_done ->
+       decode json ~f:decode_restored (fun restored ->
+         match restored with
+         | [] -> m, []
+         | restored ->
+           let joined = String.concat ~sep:"\n\n" restored in
+           let text =
+             if Editor.is_empty m.editor
+             then joined
+             else joined ^ "\n\n" ^ Editor.text m.editor
+           in
+           let count = List.length restored in
+           let noun = if count = 1 then "message" else "messages" in
+           let m = { m with editor = Editor.set_text m.editor text } in
+           ( notice m (sprintf "restored %d queued %s to the editor" count noun)
+           , [] ))
      | Initial_state ->
        decode json ~f:P.State.of_json (fun state ->
          let m = { m with state = Some state } in

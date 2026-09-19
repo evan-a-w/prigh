@@ -22,6 +22,7 @@ module Reply_tag : sig
     | Sessions_picker
     | Set_model_done
     | Compact_done
+    | Abort_done
     | Notice_on_success of string
   [@@deriving sexp_of, equal]
 end
@@ -64,7 +65,8 @@ module Model : sig
     ; transcript : Transcript.t
     ; editor : Editor.t
     ; mode : Mode.t
-    ; scroll : int (** wrapped transcript lines hidden below the viewport *)
+    ; queued : Queue_counts.t
+    ; viewport : Viewport.t
     ; pending_quit : bool
     ; spinner : int
     ; expand_tools : bool
@@ -76,6 +78,10 @@ module Model : sig
 
   val running : t -> bool
 end
+
+(** Wrapped transcript lines currently visible, mirroring [Render.screen] for
+    [Editing] mode; approximate for dialog modes. *)
+val transcript_rows : Model.t -> int
 
 val init : Model.t
 val format_tokens : int -> string

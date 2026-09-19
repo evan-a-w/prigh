@@ -53,4 +53,13 @@ val render_tail
 (** Total wrapped line count, for scroll clamping. *)
 val line_count : t -> width:int -> expand_tools:bool -> int
 
+(** Renders the wrapped lines in [\[top, top + rows)]. *)
+val render_window
+  :  t
+  -> width:int
+  -> rows:int
+  -> top:int
+  -> expand_tools:bool
+  -> Content.t
+
 val render_item : Item.t -> expand_tools:bool -> Content.t

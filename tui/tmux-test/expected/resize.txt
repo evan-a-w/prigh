@@ -1,0 +1,18 @@
+=== resize
+session <id> in
+$TMP/cwd. /help for
+commands, Esc aborts, Ctrl+C twice
+quits.
+> first
+faux reply
+────────────────────────────────────────
+>
+deepseek/deepseek-flash  thinking:off  …
+=== resize
+session <id> in $TMP/cwd. /help for commands, Esc aborts, Ctrl+C twice
+quits.
+> first
+faux reply
+────────────────────────────────────────────────────────────────────────────────────────────────────
+>
+deepseek/deepseek-flash  thinking:off  ctx:10 (0%)  in:10 out:5  $0.0000
