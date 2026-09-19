@@ -16,6 +16,11 @@ depends: [
   "tls-eio"
   "ca-certs"
   "mirage-crypto-rng"
+  "digestif"
+  "base64"
+  "ohex"
+  "uri"
+  "domain-name"
   "odoc" {with-doc}
 ]
 build: [

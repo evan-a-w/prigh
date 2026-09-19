@@ -34,10 +34,12 @@
         pkgs = nixpkgs.legacyPackages.${system};
         on = opam-nix.lib.${system};
 
-        repos = [
+        oxRepos = [
           ox-opam-repository
           opam-repository
         ];
+
+        upstreamRepos = [ opam-repository ];
 
         # Pinned to the exact versions of the working `prigh-ox` switch. This
         # both forces the OxCaml compiler and keeps opam-nix's solver inside its
@@ -78,43 +80,68 @@
 
         # `depopts = false` mirrors a plain `opam install` and avoids pulling in
         # test-only optional deps (e.g. markup -> bisect_ppx -> cmdliner < 2).
-        #
-        # NOTE: this scope is the *Bonsai_term frontend* toolchain (tui/). The
-        # vanilla `backend/` does not currently build under OxCaml (digestif
-        # does not compile with modes, and the installed mirage-crypto-rng is
-        # 0.11.x while the backend uses the 2.x `use_default` API), so the
-        # backend stays on the vanilla `prigh` switch for now.
-        scope = (on.buildOpamProject' {
-          inherit repos;
+        frontendScope = (on.buildOpamProject' {
+          repos = oxRepos;
           resolveArgs = {
             depopts = false;
             dev = false;
           };
         } ./tui query).overrideScope overlay;
 
-        prighTui = scope.prigh_tui.overrideAttrs (oa: {
+        backendScope = on.buildOpamProject' {
+          repos = upstreamRepos;
+          resolveArgs = {
+            depopts = false;
+            dev = false;
+          };
+        } ./backend {
+          ocaml-base-compiler = "5.3.0";
+        };
+
+        prighTui = frontendScope.prigh_tui.overrideAttrs (oa: {
           meta = (oa.meta or { }) // {
             mainProgram = "prigh-tui";
           };
         });
+
+        prighBackend = backendScope.prigh.overrideAttrs (oa: {
+          meta = (oa.meta or { }) // {
+            mainProgram = "prigh";
+          };
+        });
+
+        prigh = pkgs.writeShellApplication {
+          name = "prigh";
+          text = ''
+            export PRIGH_BACKEND="''${PRIGH_BACKEND:-${prighBackend}/bin/prigh}"
+            exec ${prighTui}/bin/prigh-tui "$@"
+          '';
+        };
       in
       {
-        legacyPackages = scope;
+        legacyPackages = frontendScope;
 
-        packages.default = prighTui;
+        packages = {
+          default = prigh;
+          tui = prighTui;
+          backend = prighBackend;
+        };
 
         apps.default = {
           type = "app";
-          program = "${prighTui}/bin/prigh-tui";
+          program = "${prigh}/bin/prigh";
         };
 
         devShells.default = pkgs.mkShell {
-          inputsFrom = [ prighTui ];
+          inputsFrom = [
+            prighTui
+            prighBackend
+          ];
           buildInputs = [
-            scope.bonsai_test
-            scope.expect_test_helpers_core
-            scope.expect_test_helpers_async
-            scope.ocamlformat
+            frontendScope.bonsai_test
+            frontendScope.expect_test_helpers_core
+            frontendScope.expect_test_helpers_async
+            frontendScope.ocamlformat
             pkgs.ripgrep
           ];
         };

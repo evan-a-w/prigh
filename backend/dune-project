@@ -8,4 +8,5 @@
  (name prigh)
  (synopsis "Agentic coding harness backend")
  (depends ocaml dune core core_unix ppx_jane re jsonaf ppx_jsonaf_conv eio
-  eio_main cohttp-eio tls-eio ca-certs mirage-crypto-rng))
+  eio_main cohttp-eio tls-eio ca-certs mirage-crypto-rng digestif base64 ohex
+  uri domain-name))
