@@ -79,7 +79,7 @@ let common_params =
           eprintf
             "unknown model %s; available: %s\n"
             id
-            (String.concat ~sep:", " (List.map Model.all ~f:(fun m -> m.id)));
+            (String.concat ~sep:", " (List.map Model.all ~f:Model.key));
           exit 2)
     in
     let thinking =
