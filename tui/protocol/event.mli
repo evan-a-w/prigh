@@ -1,5 +1,15 @@
 open! Core
 
+module Subagent_result : sig
+  type t =
+    { text : string
+    ; is_error : bool
+    }
+  [@@deriving sexp_of, equal]
+
+  val of_json : Json.t -> t Or_error.t
+end
+
 type t =
   | Agent_start
   | Agent_end of Message.t list
@@ -29,6 +39,26 @@ type t =
   | Queue_update of
       { steer : int
       ; follow_up : int
+      }
+  | Subagent_start of
+      { call_id : string
+      ; agent_id : string
+      ; task : string
+      ; model : string
+      ; tools : string list
+      }
+  | Subagent of
+      { call_id : string
+      ; agent_id : string
+      ; event : t
+      }
+  | Subagent_end of
+      { call_id : string
+      ; agent_id : string
+      ; usage : Usage.t
+      ; turns : int
+      ; cost_usd : float
+      ; result : Subagent_result.t
       }
   | Auth of Auth_event.t
 [@@deriving sexp_of, equal]

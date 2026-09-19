@@ -48,36 +48,56 @@ let call client method_ params =
 ;;
 
 (* Reads events until [stop] accepts one. *)
+let rec summarise (e : Event.t) : string option =
+  match e with
+  | Message_update { delta = Text_delta t; _ } ->
+    Some (sprintf "text_delta %S" t)
+  | Message_update _ | Agent_start | Agent_end _ | Turn_start | Turn_end _ ->
+    None
+  | Message_start (User t) -> Some (sprintf "user %S" t)
+  | Message_start _ -> Some "message_start"
+  | Message_end (Assistant a) ->
+    Some
+      (sprintf
+         "assistant_end %s"
+         (Sexp.to_string [%sexp (a.stop_reason : Stop_reason.t)]))
+  | Message_end _ -> Some "message_end"
+  | State s -> Some (sprintf "state running=%b model=%s" s.running s.model.key)
+  | Notice t -> Some (sprintf "notice %S" t)
+  | Auth a ->
+    Some (sprintf "auth %s" (Sexp.to_string [%sexp (a : Auth_event.t)]))
+  | Tool_start c -> Some (sprintf "tool_start %s" c.name)
+  | Tool_output _ -> None
+  | Tool_end { result; _ } -> Some (sprintf "tool_end %s" result.tool_name)
+  | Compacted _ -> Some "compacted"
+  | Queue_update _ -> None
+  | Subagent_start { agent_id; task; model; tools; _ } ->
+    Some
+      (sprintf
+         "subagent_start %s model=%s task=%S tools=[%s]"
+         agent_id
+         model
+         task
+         (String.concat ~sep:"," tools))
+  | Subagent { agent_id; event; _ } ->
+    Option.map (summarise event) ~f:(fun s ->
+      sprintf "subagent %s: %s" agent_id s)
+  | Subagent_end { agent_id; turns; cost_usd; result; _ } ->
+    Some
+      (sprintf
+         "subagent_end %s turns=%d cost=%.4f is_error=%b text=%S"
+         agent_id
+         turns
+         cost_usd
+         result.is_error
+         result.text)
+;;
+
 let rec drain client ~stop =
   match%bind Pipe.read (Client.incoming client) with
   | `Eof -> return ()
   | `Ok (Event e) ->
-    let summary =
-      match e with
-      | Message_update { delta = Text_delta t; _ } ->
-        Some (sprintf "text_delta %S" t)
-      | Message_update _ | Agent_start | Agent_end _ | Turn_start | Turn_end _
-        -> None
-      | Message_start (User t) -> Some (sprintf "user %S" t)
-      | Message_start _ -> Some "message_start"
-      | Message_end (Assistant a) ->
-        Some
-          (sprintf
-             "assistant_end %s"
-             (Sexp.to_string [%sexp (a.stop_reason : Stop_reason.t)]))
-      | Message_end _ -> Some "message_end"
-      | State s ->
-        Some (sprintf "state running=%b model=%s" s.running s.model.key)
-      | Notice t -> Some (sprintf "notice %S" t)
-      | Auth a ->
-        Some (sprintf "auth %s" (Sexp.to_string [%sexp (a : Auth_event.t)]))
-      | Tool_start c -> Some (sprintf "tool_start %s" c.name)
-      | Tool_output _ -> None
-      | Tool_end { result; _ } -> Some (sprintf "tool_end %s" result.tool_name)
-      | Compacted _ -> Some "compacted"
-      | Queue_update _ -> None
-    in
-    Option.iter summary ~f:(fun s -> printf "  event %s\n" (normalise s));
+    Option.iter (summarise e) ~f:(fun s -> printf "  event %s\n" (normalise s));
     if stop e then return () else drain client ~stop
   | `Ok other ->
     print_s [%sexp (other : Client.Incoming.t)];
@@ -186,6 +206,55 @@ let main () =
     Client.close client;
     let%bind () = Client.closed client in
     print_endline "backend exited";
+    let script = Filename.concat tmp "subagent.json" in
+    let script_json =
+      {|[
+  {"text":"delegating","tool_calls":[{"id":"s1","name":"subagent","arguments":{"task":"say hi","tools":["read"]}}]},
+  {"text":"child says hi"},
+  {"text":"parent done"}
+]|}
+    in
+    Out_channel.write_all script ~data:script_json;
+    let subagent_args =
+      [ "serve"
+      ; "-faux"
+      ; "-faux-script"
+      ; script
+      ; "-auth-file"
+      ; Filename.concat tmp "auth2.json"
+      ; "-cwd"
+      ; tmp
+      ; "-model"
+      ; "deepseek/deepseek-flash"
+      ]
+    in
+    let%bind () =
+      match%bind
+        Prigh_client.Stdio_transport.spawn
+          ~env:(`Extend [ "HOME", tmp ])
+          ~prog:(backend ())
+          ~args:subagent_args
+          ()
+      with
+      | Error e ->
+        print_s [%message "cannot start subagent backend" (e : Error.t)];
+        return ()
+      | Ok transport ->
+        let client = Client.create transport in
+        let%bind () = call client "ping" [] in
+        let%bind () =
+          call client "prompt" [ "text", Json.str "delegate something" ]
+        in
+        let%bind () =
+          drain client ~stop:(function
+            | State { running = false; _ } -> true
+            | _ -> false)
+        in
+        Client.close client;
+        let%bind () = Client.closed client in
+        print_endline "subagent backend exited";
+        return ()
+    in
     return ()
 ;;
 

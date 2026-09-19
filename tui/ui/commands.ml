@@ -55,6 +55,7 @@ let all =
   ; c "compact" "" "summarise older messages to free context"
   ; c "new" "" "start a new session"
   ; c "sessions" "" "pick a saved session to switch to"
+  ; c "agents" "" "focus a subagent"
   ; c ~argument:Argument.Sessions "switch" "[path]" "switch to a saved session"
   ; c ~argument:Argument.Path "cd" "[path]" "change the working directory"
   ; c "fork" "" "fork the current session"

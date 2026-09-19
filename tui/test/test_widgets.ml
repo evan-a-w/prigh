@@ -164,7 +164,7 @@ let%expect_test "fuzzy ranking: command names" =
     {|
     "mo" -> model
     "lo" -> login logout
-    "s"  -> state switch sessions verbosity
+    "s"  -> state switch sessions agents verbosity
     "sw" -> switch
     "xyz" ->
     |}]
@@ -314,6 +314,10 @@ let%expect_test "commands" =
            (args "")
            (help "pick a saved session to switch to")
            (argument ()))
+          ((name agents)
+           (args "")
+           (help "focus a subagent")
+           (argument ()))
           ((name switch)
            (args [path])
            (help "switch to a saved session")
@@ -431,6 +435,7 @@ let%expect_test "keymap: every binding resolves to its intent and is documented"
         (Key.to_string key)
         (Sexp.to_string (Intent.sexp_of_t b.intent))));
   print_s [%sexp (Keymap.lookup (Key.char 'x') : Intent.t option)];
+  print_s [%sexp (Keymap.lookup (Key.alt (Char "5")) : Intent.t option)];
   print_s [%sexp (Keymap.lookup (Key.plain (Char "é")) : Intent.t option)];
   print_s [%sexp (Keymap.lookup (Key.plain (Function 5)) : Intent.t option)];
   print_s [%sexp (Keymap.lookup (Key.ctrl 'q') : Intent.t option)];
@@ -459,9 +464,12 @@ let%expect_test "keymap: every binding resolves to its intent and is documented"
     Ctrl+W           Kill_word
     Ctrl+L           Clear_screen
     Ctrl+O           Cycle_verbosity
+    Shift+Tab        Next_agent
+    Alt+1            (Focus_agent 1)
     Ctrl+C           Interrupt
     Ctrl+D           Force_quit
     ((Insert x))
+    ((Focus_agent 5))
     ((Insert "\195\169"))
     ()
     ()
@@ -489,6 +497,8 @@ let%expect_test "keymap: every binding resolves to its intent and is documented"
     Ctrl+W              delete the word before the cursor
     Ctrl+L              clear the transcript
     Ctrl+O              cycle transcript verbosity (quiet / normal / verbose)
+    Shift+Tab           cycle focus: main → agent 1 → … → main
+    Alt+1               focus agent N (Alt+1…9)
     Ctrl+C              clear the editor, then (again) quit
     Ctrl+D              quit
     /help                              show commands and keys
@@ -501,6 +511,7 @@ let%expect_test "keymap: every binding resolves to its intent and is documented"
     /compact                           summarise older messages to free context
     /new                               start a new session
     /sessions                          pick a saved session to switch to
+    /agents                            focus a subagent
     /switch [path]                     switch to a saved session
     /cd [path]                         change the working directory
     /fork                              fork the current session

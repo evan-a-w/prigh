@@ -29,6 +29,8 @@ let%expect_test "key_of_event: terminal event -> key" =
     ; "Enter + [Meta]", key_press Ekey.Enter [ Mod.Meta ]
     ; "ASCII '\\t'", key_press (Ekey.ASCII '\t') []
     ; "Tab", key_press Ekey.Tab []
+    ; "Tab + [Shift]", key_press Ekey.Tab [ Mod.Shift ]
+    ; "ASCII '\\t' + [Shift]", key_press (Ekey.ASCII '\t') [ Mod.Shift ]
     ; "ASCII '\\127'", key_press (Ekey.ASCII '\127') []
     ; "ASCII '\\008'", key_press (Ekey.ASCII '\008') []
     ; "Backspace", key_press Ekey.Backspace []
@@ -67,6 +69,8 @@ let%expect_test "key_of_event: terminal event -> key" =
     Enter + [Meta]               (Key_press (key Enter) (mods (Meta)))            -> (((code Enter) (ctrl false) (alt true) (shift false)))
     ASCII '\t'                   (Key_press (key (ASCII "\t")))                   -> (((code Tab) (ctrl false) (alt false) (shift false)))
     Tab                          (Key_press (key Tab))                            -> (((code Tab) (ctrl false) (alt false) (shift false)))
+    Tab + [Shift]                (Key_press (key Tab) (mods (Shift)))             -> (((code Tab) (ctrl false) (alt false) (shift true)))
+    ASCII '\t' + [Shift]         (Key_press (key (ASCII "\t")) (mods (Shift)))    -> (((code Tab) (ctrl false) (alt false) (shift true)))
     ASCII '\127'                 (Key_press (key (ASCII "\127")))                 -> (((code Backspace) (ctrl false) (alt false) (shift false)))
     ASCII '\008'                 (Key_press (key (ASCII "\b")))                   -> (((code Backspace) (ctrl false) (alt false) (shift false)))
     Backspace                    (Key_press (key Backspace))                      -> (((code Backspace) (ctrl false) (alt false) (shift false)))
@@ -168,6 +172,8 @@ let%expect_test "keymap: every bound key is reachable from a terminal event" =
     Ctrl+W           (Key_press (key (ASCII w)) (mods (Ctrl))) ok
     Ctrl+L           (Key_press (key (ASCII l)) (mods (Ctrl))) ok
     Ctrl+O           (Key_press (key (ASCII o)) (mods (Ctrl))) ok
+    Shift+Tab        (Key_press (key Tab) (mods (Shift))) ok
+    Alt+1            (Key_press (key (ASCII 1)) (mods (Meta))) ok
     Ctrl+C           (Key_press (key (ASCII c)) (mods (Ctrl))) ok
     Ctrl+D           (Key_press (key (ASCII d)) (mods (Ctrl))) ok
     |}]

@@ -106,5 +106,7 @@ let handle t (intent : Intent.t) ~page : Outcome.t =
   | Interrupt
   | Force_quit
   | Clear_screen
-  | Cycle_verbosity -> Continue t
+  | Cycle_verbosity
+  | Next_agent
+  | Focus_agent _ -> Continue t
 ;;

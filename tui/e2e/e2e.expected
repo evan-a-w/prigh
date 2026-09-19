@@ -2,7 +2,8 @@
 <- get_state: ((session_id <id>)
  (session_path
   $TMP/.prigh/sessions/<stamp>_<id>.jsonl)
- (cwd $TMP)
+ (session_name null) (cwd $TMP)
+ (git_branch null)
  (model
   ((id deepseek-flash) (provider deepseek) (key deepseek/deepseek-flash)
    (name "DeepSeek V4.1 Flash") (context_window 1000000) (max_output 384000)
@@ -63,3 +64,27 @@
 <- list_sessions: 1 session(s), 2 message(s)
 <- bogus ERROR: "unknown method \"bogus\""
 backend exited
+<- ping: pong
+<- prompt: ()
+  event state running=true model=deepseek/deepseek-flash
+  event user "delegate something"
+  event message_end
+  event message_start
+  event text_delta "delegating"
+  event assistant_end Tool_use
+  event tool_start subagent
+  event subagent_start s1 model=deepseek-flash task="say hi" tools=[read]
+  event subagent s1: user "say hi"
+  event subagent s1: message_end
+  event subagent s1: message_start
+  event subagent s1: text_delta "child says hi"
+  event subagent s1: assistant_end End_turn
+  event subagent_end s1 turns=1 cost=0.0000 is_error=false text="child says hi\n[subagent: 1 turns, 0 in / 0 out tokens, $0.0000]"
+  event tool_end subagent
+  event message_start
+  event message_end
+  event message_start
+  event text_delta "parent done"
+  event assistant_end End_turn
+  event state running=false model=deepseek/deepseek-flash
+subagent backend exited

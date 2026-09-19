@@ -11,6 +11,7 @@ module Picker_kind : sig
     | Login
     | Logout
     | Sessions
+    | Agents
     | Auth_select of string (** login prompt id *)
   [@@deriving sexp_of, equal]
 end

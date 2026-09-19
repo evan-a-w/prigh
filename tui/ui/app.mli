@@ -69,6 +69,8 @@ module Model : sig
     ; models : P.Model.t list
     ; auth : P.Auth_status.t list
     ; transcript : Transcript.t
+    ; agents : Agent_view.t list
+    ; focus : [ `Main | `Agent of string ]
     ; editor : Editor.t
     ; mode : Mode.t
     ; autocomplete : Autocomplete.t option

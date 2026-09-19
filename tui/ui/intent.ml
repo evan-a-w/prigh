@@ -23,4 +23,6 @@ type t =
   | Kill_word
   | Clear_screen
   | Cycle_verbosity
+  | Next_agent
+  | Focus_agent of int
 [@@deriving sexp_of, equal, compare]

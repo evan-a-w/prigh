@@ -65,6 +65,8 @@ module Model = struct
     ; models : P.Model.t list
     ; auth : P.Auth_status.t list
     ; transcript : Transcript.t
+    ; agents : Agent_view.t list
+    ; focus : [ `Main | `Agent of string ]
     ; editor : Editor.t
     ; mode : Mode.t
     ; autocomplete : Autocomplete.t option
@@ -97,8 +99,16 @@ let transcript_width m = Int.max 1 m.width
 let transcript_height m = Int.max 3 m.height
 
 let transcript_line_count m =
+  let transcript =
+    match m.focus with
+    | `Main -> m.transcript
+    | `Agent id ->
+      (match Agent_view.find m.agents id with
+       | Some agent -> agent.transcript
+       | None -> m.transcript)
+  in
   Transcript.line_count
-    m.transcript
+    transcript
     ~width:(transcript_width m)
     ~verbosity:m.verbosity
 ;;
@@ -122,6 +132,20 @@ let transcript_rows m =
 let with_transcript m ~f =
   let before = transcript_line_count m in
   let m = { m with transcript = f m.transcript } in
+  match m.viewport with
+  | Viewport.Follow -> m
+  | Viewport.Anchored { top; new_lines } ->
+    let added = Int.max 0 (transcript_line_count m - before) in
+    { m with
+      viewport = Viewport.Anchored { top; new_lines = new_lines + added }
+    }
+;;
+
+(* Same as [with_transcript] but for the agent list, so streaming inside a
+   focused subagent still bumps the anchored viewport. *)
+let update_agents m ~f =
+  let before = transcript_line_count m in
+  let m = { m with agents = f m.agents } in
   match m.viewport with
   | Viewport.Follow -> m
   | Viewport.Anchored { top; new_lines } ->
@@ -160,6 +184,8 @@ let init =
   ; models = []
   ; auth = []
   ; transcript = Transcript.empty
+  ; agents = []
+  ; focus = `Main
   ; editor = Editor.empty
   ; mode = Editing
   ; autocomplete = None
@@ -327,6 +353,50 @@ let sessions_picker m (sessions : P.Session_summary.t list) =
   else open_picker m Sessions (Picker.create ~title:"Sessions" items)
 ;;
 
+let agent_status_text (a : Agent_view.t) =
+  match a.status with
+  | Running -> "running"
+  | Done { turns; cost_usd } -> sprintf "done %d turns $%.2f" turns cost_usd
+  | Failed _ -> "failed"
+;;
+
+let agents_picker m =
+  if List.is_empty m.agents
+  then notice m "no subagents", []
+  else (
+    let items =
+      List.map m.agents ~f:(fun (a : Agent_view.t) ->
+        Picker.Item.create
+          ~id:a.id
+          ~detail:(sprintf "%s  %s" (agent_status_text a) a.model)
+          ~marked:
+            (match m.focus with
+             | `Agent id -> String.equal id a.id
+             | `Main -> false)
+          a.task)
+    in
+    open_picker m Agents (Picker.create ~title:"Subagents" items), [])
+;;
+
+let set_focus m focus = follow { m with focus }
+
+let cycle_focus m =
+  let n = List.length m.agents in
+  match m.focus with
+  | `Main -> if n = 0 then m else set_focus m (`Agent (List.hd_exn m.agents).id)
+  | `Agent id ->
+    (match List.findi m.agents ~f:(fun _ a -> String.equal a.id id) with
+     | Some (i, _) when i + 1 < n ->
+       set_focus m (`Agent (List.nth_exn m.agents (i + 1)).id)
+     | _ -> set_focus m `Main)
+;;
+
+let focus_agent m n =
+  match List.nth m.agents (n - 1) with
+  | Some a -> set_focus m (`Agent a.id)
+  | None -> m
+;;
+
 (* ---- auth ------------------------------------------------------------- *)
 
 let format_auth (statuses : P.Auth_status.t list) : Content.t =
@@ -439,6 +509,7 @@ let run_command m (cmd : Commands.Parsed.t) =
     , [] )
   | "compact", _ -> notice m "compacting…", [ rpc "compact" ~tag:Compact_done ]
   | "new", _ -> m, [ rpc "new_session" ~tag:(Notice_on_success "new session") ]
+  | "agents", _ -> agents_picker m
   | "sessions", _ | "switch", [] ->
     m, [ rpc "list_sessions" ~tag:Sessions_picker ]
   | "switch", _ ->
@@ -511,7 +582,7 @@ let submit m =
       then
         ( notice m "queued (delivered after the current turn)"
         , [ rpc "steer" ~params ] )
-      else m, [ rpc "prompt" ~params ])
+      else { m with agents = []; focus = `Main }, [ rpc "prompt" ~params ])
 ;;
 
 let current_line m =
@@ -665,7 +736,10 @@ let editing_intent m (intent : Intent.t) =
   | Page_down -> scroll_down m, []
   | Complete -> m, []
   | Cancel ->
-    if Model.running m then m, [ rpc "abort" ~tag:Abort_done ] else m, []
+    (match m.focus with
+     | `Agent _ -> set_focus m `Main, []
+     | `Main ->
+       if Model.running m then m, [ rpc "abort" ~tag:Abort_done ] else m, [])
   | Interrupt -> interrupt m
   | Force_quit -> { m with quitting = true }, [ Quit ]
   | Kill_to_end -> ed Editor.kill_to_end
@@ -674,52 +748,66 @@ let editing_intent m (intent : Intent.t) =
   | Clear_screen ->
     follow { m with transcript = Transcript.clear m.transcript }, []
   | Cycle_verbosity -> set_verbosity m (Verbosity.next m.verbosity), []
+  | Next_agent -> cycle_focus m, []
+  | Focus_agent n -> focus_agent m n, []
 ;;
 
 (* Autocomplete is a sub-state of editing: while it is open it owns a few keys,
    everything else edits the buffer and then recomputes the completion. *)
 let editing m (intent : Intent.t) =
-  match m.autocomplete with
-  | Some _ ->
-    (match intent with
-     | Complete ->
-       Option.value (accept_autocomplete m ~submit_now:false) ~default:(m, [])
-     | Submit ->
-       Option.value (accept_autocomplete m ~submit_now:true) ~default:(submit m)
-     | Up ->
-       ( { m with autocomplete = Option.map m.autocomplete ~f:Autocomplete.up }
-       , [] )
-     | Down ->
-       ( { m with autocomplete = Option.map m.autocomplete ~f:Autocomplete.down }
-       , [] )
-     | Cancel -> { m with autocomplete = None }, []
-     | Insert _
-     | Newline
-     | Backspace
-     | Delete
-     | Left
-     | Right
-     | Home
-     | End
-     | Page_up
-     | Page_down
-     | Interrupt
-     | Force_quit
-     | Kill_to_end
-     | Kill_line
-     | Kill_word
-     | Clear_screen
-     | Cycle_verbosity ->
-       let m, cmds = editing_intent m intent in
-       let m, more = refresh_autocomplete m in
-       m, cmds @ more)
-  | None ->
-    (match intent with
-     | Complete -> refresh_autocomplete m
-     | _ ->
-       let m, cmds = editing_intent m intent in
-       let m, more = refresh_autocomplete m in
-       m, cmds @ more)
+  match intent with
+  | Next_agent -> cycle_focus m, []
+  | Focus_agent n -> focus_agent m n, []
+  | _ ->
+    (match m.autocomplete with
+     | Some _ ->
+       (match intent with
+        | Complete ->
+          Option.value (accept_autocomplete m ~submit_now:false) ~default:(m, [])
+        | Submit ->
+          Option.value
+            (accept_autocomplete m ~submit_now:true)
+            ~default:(submit m)
+        | Up ->
+          ( { m with
+              autocomplete = Option.map m.autocomplete ~f:Autocomplete.up
+            }
+          , [] )
+        | Down ->
+          ( { m with
+              autocomplete = Option.map m.autocomplete ~f:Autocomplete.down
+            }
+          , [] )
+        | Cancel -> { m with autocomplete = None }, []
+        | Insert _
+        | Newline
+        | Backspace
+        | Delete
+        | Left
+        | Right
+        | Home
+        | End
+        | Page_up
+        | Page_down
+        | Interrupt
+        | Force_quit
+        | Kill_to_end
+        | Kill_line
+        | Kill_word
+        | Clear_screen
+        | Cycle_verbosity
+        | Next_agent
+        | Focus_agent _ ->
+          let m, cmds = editing_intent m intent in
+          let m, more = refresh_autocomplete m in
+          m, cmds @ more)
+     | None ->
+       (match intent with
+        | Complete -> refresh_autocomplete m
+        | _ ->
+          let m, cmds = editing_intent m intent in
+          let m, more = refresh_autocomplete m in
+          m, cmds @ more))
 ;;
 
 (* ---- picker mode ------------------------------------------------------ *)
@@ -761,6 +849,7 @@ let picker_selected m (kind : Mode.Picker_kind.t) (item : Picker.Item.t) =
           ~params:[ "path", str item.id ]
           ~tag:Reload_messages
       ] )
+  | Agents -> set_focus m (`Agent item.id), []
   | Auth_select id ->
     m, [ rpc "auth_respond" ~params:[ "id", str id; "value", str item.id ] ]
 ;;
@@ -812,6 +901,8 @@ let login_prompt m ~id ~(prompt : P.Auth_event.Prompt.t) (intent : Intent.t) =
   | Complete
   | Clear_screen
   | Cycle_verbosity
+  | Next_agent
+  | Focus_agent _
   | Newline -> m, []
   | Insert _
   | Backspace
@@ -945,52 +1036,28 @@ let auth_event m (e : P.Auth_event.t) =
 ;;
 
 let event m (e : P.Event.t) =
-  let tr f = with_transcript m ~f, [] in
+  let m = with_transcript m ~f:(fun t -> Transcript.apply t e) in
+  let m = update_agents m ~f:(fun agents -> Agent_view.apply_all agents e) in
   match e with
-  | State state ->
-    let m =
-      if state.running
-      then m
-      else with_transcript m ~f:(fun t -> Transcript.flush t)
-    in
-    { m with state = Some state }, []
-  | Message_start (User text) -> tr (fun t -> Transcript.add t (User text))
-  | Message_start _ -> m, []
-  | Message_update { delta = Text_delta text; _ } ->
-    tr (fun t -> Transcript.append t Text text)
-  | Message_update { delta = Thinking_delta text; _ } ->
-    tr (fun t -> Transcript.append t Thinking text)
-  | Message_update _ -> m, []
-  | Message_end (Assistant a) ->
-    tr (fun t ->
-      let t = Transcript.flush t in
-      let t =
-        match a.stop_reason with
-        | End_turn -> Transcript.mark_final t
-        | _ -> t
-      in
-      match a.stop_reason with
-      | Error e -> Transcript.notice ~severity:Error t ("error: " ^ e)
-      | Aborted -> Transcript.notice ~severity:Warn t "[aborted]"
-      | Length ->
-        Transcript.notice
-          ~severity:Warn
-          t
-          "[output truncated by the model's length limit]"
-      | End_turn | Tool_use -> t)
-  | Message_end _ -> m, []
-  | Tool_start call -> tr (fun t -> Transcript.add_tool t call)
-  | Tool_output { chunk; call_id } ->
-    tr (fun t -> Transcript.append_tool_output t ~call_id chunk)
-  | Tool_end { call; result } ->
-    tr (fun t -> Transcript.end_tool t ~call ~result)
-  | Compacted summary ->
-    with_transcript m ~f:(fun t -> Transcript.add t (Compaction summary)), []
-  | Notice text -> notice m text, []
+  | State state -> { m with state = Some state }, []
   | Queue_update { steer; follow_up } ->
     { m with queued = { Queue_counts.steer; follow_up } }, []
   | Auth a -> auth_event m a
-  | Agent_start | Agent_end _ | Turn_start | Turn_end _ -> m, []
+  | Agent_start
+  | Agent_end _
+  | Turn_start
+  | Turn_end _
+  | Message_start _
+  | Message_update _
+  | Message_end _
+  | Tool_start _
+  | Tool_output _
+  | Tool_end _
+  | Compacted _
+  | Notice _
+  | Subagent_start _
+  | Subagent _
+  | Subagent_end _ -> m, []
 ;;
 
 (* ---- rpc replies ------------------------------------------------------ *)
@@ -1046,18 +1113,16 @@ let reply m (tag : Reply_tag.t) (result : (P.Json.t, string) Result.t) =
          m, [])
      | Initial_messages | Reload_messages ->
        decode json ~f:(decode_list ~f:P.Message.of_json) (fun messages ->
+         let reload = Reply_tag.equal tag Reload_messages in
+         let m = if reload then { m with agents = []; focus = `Main } else m in
          let transcript =
-           if Reply_tag.equal tag Reload_messages
-           then Transcript.clear m.transcript
-           else m.transcript
+           if reload then Transcript.clear m.transcript else m.transcript
          in
          let transcript =
            List.fold messages ~init:transcript ~f:Transcript.add_message
          in
          ( follow { m with transcript }
-         , if Reply_tag.equal tag Reload_messages
-           then [ rpc "get_state" ~tag:Initial_state ]
-           else [] ))
+         , if reload then [ rpc "get_state" ~tag:Initial_state ] else [] ))
      | Auth_refresh ->
        decode json ~f:(decode_list ~f:P.Auth_status.of_json) (fun auth ->
          { m with auth }, [])

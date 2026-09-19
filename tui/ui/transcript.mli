@@ -3,6 +3,29 @@ module P = Prigh_protocol
 
 (** Conversation history plus the live streaming tails. Pure. *)
 
+module Subagent : sig
+  type status =
+    | Running
+    | Done of
+        { turns : int
+        ; cost_usd : float
+        }
+    | Failed of string
+  [@@deriving sexp_of, equal]
+
+  type t =
+    { agent_id : string
+    ; task : string
+    ; model : string
+    ; status : status
+    ; turns : int
+    ; report : string option
+    ; last_tool : string option
+    ; nested : string list
+    }
+  [@@deriving sexp_of, equal]
+end
+
 module Item : sig
   type t =
     | User of string
@@ -15,6 +38,7 @@ module Item : sig
         { call : P.Tool_call.t
         ; result : P.Message.Tool_result.t option
         ; live_tail : string option
+        ; subagent : Subagent.t option
         }
     | Notice of Severity.t * string
     | Block of Content.t
@@ -35,6 +59,11 @@ val empty : t
 val items : t -> Item.t list
 val add : t -> Item.t -> t
 val add_message : t -> P.Message.t -> t
+
+(** The single event-to-transcript function used for the main transcript and for
+    every subagent's transcript. *)
+val apply : t -> P.Event.t -> t
+
 val notice : ?severity:Severity.t -> t -> string -> t
 val clear : t -> t
 

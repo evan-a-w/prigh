@@ -1,5 +1,20 @@
 open! Core
 
+module Subagent_result = struct
+  type t =
+    { text : string
+    ; is_error : bool
+    }
+  [@@deriving sexp_of, equal]
+
+  let of_json j =
+    let open Or_error.Let_syntax in
+    let%bind text = Json.string_field j "text" in
+    let%map is_error = Json.bool_field j "is_error" in
+    { text; is_error }
+  ;;
+end
+
 type t =
   | Agent_start
   | Agent_end of Message.t list
@@ -30,10 +45,30 @@ type t =
       { steer : int
       ; follow_up : int
       }
+  | Subagent_start of
+      { call_id : string
+      ; agent_id : string
+      ; task : string
+      ; model : string
+      ; tools : string list
+      }
+  | Subagent of
+      { call_id : string
+      ; agent_id : string
+      ; event : t
+      }
+  | Subagent_end of
+      { call_id : string
+      ; agent_id : string
+      ; usage : Usage.t
+      ; turns : int
+      ; cost_usd : float
+      ; result : Subagent_result.t
+      }
   | Auth of Auth_event.t
 [@@deriving sexp_of, equal]
 
-let of_json j =
+let rec of_json j =
   let open Or_error.Let_syntax in
   match%bind Json.string_field j "event" with
   | "agent_start" -> Ok Agent_start
@@ -80,6 +115,27 @@ let of_json j =
     let%bind steer = Json.int_field j "steer" in
     let%map follow_up = Json.int_field j "follow_up" in
     Queue_update { steer; follow_up }
+  | "subagent_start" ->
+    let%bind call_id = Json.string_field j "call_id" in
+    let%bind agent_id = Json.string_field j "agent_id" in
+    let%bind task = Json.string_field j "task" in
+    let%bind model = Json.string_field j "model" in
+    let%map tools = Json.list_field j "tools" ~f:Json.to_string_or_error in
+    Subagent_start { call_id; agent_id; task; model; tools }
+  | "subagent" ->
+    let%bind call_id = Json.string_field j "call_id" in
+    let%bind agent_id = Json.string_field j "agent_id" in
+    let%bind inner = Json.object_field j "inner" in
+    let%map event = of_json inner in
+    Subagent { call_id; agent_id; event }
+  | "subagent_end" ->
+    let%bind call_id = Json.string_field j "call_id" in
+    let%bind agent_id = Json.string_field j "agent_id" in
+    let%bind usage = Json.object_field j "usage" >>= Usage.of_json in
+    let%bind turns = Json.int_field j "turns" in
+    let%bind cost_usd = Json.float_field j "cost_usd" in
+    let%map result = Json.object_field j "result" >>= Subagent_result.of_json in
+    Subagent_end { call_id; agent_id; usage; turns; cost_usd; result }
   | "auth" -> Auth_event.of_json j >>| fun a -> Auth a
   | other -> Or_error.errorf "unknown event %S" other
 ;;

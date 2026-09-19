@@ -28,6 +28,8 @@ module H = struct
   let keys t s = String.iter s ~f:(fun c -> key t (Key.char c))
   let enter t = key t (Key.plain Enter)
   let esc t = key t (Key.plain Escape)
+  let next_agent t = key t { (Key.plain Tab) with shift = true }
+  let focus_agent t n = key t (Key.alt (Key.Code.Char (Int.to_string n)))
   let event t e = step t (Event e)
 
   let reply ?quiet t tag json =
@@ -1131,8 +1133,6 @@ let%expect_test "/auth, /help, /state, /clear, unknown method errors" =
   H.show h;
   [%expect
     {|
-    End / Ctrl+E        end of line
-    PageUp              scroll the transcript / list up a page
     PageDown            scroll the transcript / list down a page
     Backspace / Ctrl+H  delete the character before the cursor
     Delete              delete the character under the cursor
@@ -1142,6 +1142,8 @@ let%expect_test "/auth, /help, /state, /clear, unknown method errors" =
     Ctrl+L              clear the transcript
     Ctrl+O              cycle transcript verbosity (quiet /
     normal / verbose)
+    Shift+Tab           cycle focus: main → agent 1 → … → main
+    Alt+1               focus agent N (Alt+1…9)
     Ctrl+C              clear the editor, then (again) quit
     Ctrl+D              quit
     ────────────────────────────────────────────────────────────
@@ -1816,5 +1818,589 @@ let%expect_test "abort restore is singular, prepends, and tolerates no field" =
 
       draft▏
     deepseek/deepseek-flash  thinking:off  view:normal  ctx:1.5k (0%)  in:1.2k out:300  $0.0123  queued…
+    |}]
+;;
+
+let%expect_test "two parallel subagents: strip, live tails, focus cycling, Esc" =
+  let h = connected ~width:80 ~height:18 () in
+  H.keys h "go";
+  H.enter h;
+  [%expect {| (Rpc (method_ prompt) (params ((text go))) (tag Show_error)) |}];
+  H.event h (State (state ~running:true ()));
+  H.event h (Message_start (User "go"));
+  let call1 =
+    tool_call
+      ~name:"subagent"
+      ~arguments:{|{"task":"find all auth code in the repository"}|}
+      "c1"
+  in
+  let call2 =
+    tool_call ~name:"subagent" ~arguments:{|{"task":"run the test suite"}|} "c2"
+  in
+  H.event h (Tool_start call1);
+  H.event
+    h
+    (Subagent_start
+       { call_id = "c1"
+       ; agent_id = "c1"
+       ; task = "find all auth code in the repository"
+       ; model = "claude-haiku"
+       ; tools = [ "read"; "grep" ]
+       });
+  H.event h (Tool_start call2);
+  H.event
+    h
+    (Subagent_start
+       { call_id = "c2"
+       ; agent_id = "c2"
+       ; task = "run the test suite"
+       ; model = "claude-sonnet"
+       ; tools = [ "bash" ]
+       });
+  H.event h (Subagent { call_id = "c1"; agent_id = "c1"; event = Turn_start });
+  H.event
+    h
+    (Subagent
+       { call_id = "c1"
+       ; agent_id = "c1"
+       ; event = Message_start (User "find all auth code in the repository")
+       });
+  H.event
+    h
+    (Subagent
+       { call_id = "c1"
+       ; agent_id = "c1"
+       ; event =
+           Tool_start
+             (tool_call
+                ~name:"bash"
+                ~arguments:{|{"command":"grep -r auth src"}|}
+                "t1")
+       });
+  H.event h (Subagent { call_id = "c2"; agent_id = "c2"; event = Turn_start });
+  H.event
+    h
+    (Subagent
+       { call_id = "c2"
+       ; agent_id = "c2"
+       ; event =
+           Tool_start
+             (tool_call
+                ~name:"bash"
+                ~arguments:{|{"command":"dune runtest"}|}
+                "t2")
+       });
+  H.event
+    h
+    (Subagent
+       { call_id = "c2"
+       ; agent_id = "c2"
+       ; event = Message_update { partial; delta = Text_delta "all tests pass" }
+       });
+  H.event
+    h
+    (Subagent
+       { call_id = "c2"
+       ; agent_id = "c2"
+       ; event = Message_end (assistant "all tests pass")
+       });
+  H.event
+    h
+    (Subagent_end
+       { call_id = "c2"
+       ; agent_id = "c2"
+       ; usage = { input = 10; output = 5; cache_read = 0 }
+       ; turns = 1
+       ; cost_usd = 0.02
+       ; result = { text = "all tests pass"; is_error = false }
+       });
+  (* The matching [Tool_end] arrives too and must not duplicate the item. *)
+  H.event
+    h
+    (Tool_end
+       { call = call2
+       ; result = tool_result ~name:"subagent" ~id:"c2" "all tests pass"
+       });
+  H.show h;
+  [%expect
+    {|
+    session abc123 in /work. /help for commands, Esc aborts, Ctrl+C twice quits.
+    > earlier question
+    earlier answer
+    > go
+    ⚙ subagent "find all auth code in the repository" … 1 turns
+      ⚙ bash grep -r auth src
+    ⚙ subagent "run the test suite" ✓ 1 turns $0.02
+      all tests pass
+    ────────────────────────────────────────────────────────────────────────────────
+    > ▏
+    agents: [main] 1⠋ 2✓  (Shift+Tab)
+    deepseek/deepseek-flash  thinking:off  view:normal  ctx:1.5k (0%)  in:1.2k out:…
+    |}];
+  H.next_agent h;
+  H.show h;
+  [%expect
+    {|
+    ◆ subagent 1/2  claude-haiku  ⠋ running 1 turns  "find all auth code in the rep…
+
+
+
+
+
+
+
+
+
+
+
+    > find all auth code in the repository
+    ⚙ bash command=grep -r auth src
+    ────────────────────────────────────────────────────────────────────────────────
+    > ▏
+    agents: main [1⠋] 2✓  (Shift+Tab)
+    deepseek/deepseek-flash  thinking:off  view:normal  ctx:1.5k (0%)  in:1.2k out:…
+    |}];
+  H.next_agent h;
+  H.show h;
+  [%expect
+    {|
+    ◆ subagent 2/2  claude-sonnet  ✓ done 1 turns $0.02  "run the test suite"
+
+
+
+
+
+
+
+
+
+
+
+    ⚙ bash command=dune runtest
+    all tests pass
+    ────────────────────────────────────────────────────────────────────────────────
+    > ▏
+    agents: main 1⠋ [2✓]  (Shift+Tab)
+    deepseek/deepseek-flash  thinking:off  view:normal  ctx:1.5k (0%)  in:1.2k out:…
+    |}];
+  H.next_agent h;
+  H.show h;
+  [%expect
+    {|
+    session abc123 in /work. /help for commands, Esc aborts, Ctrl+C twice quits.
+    > earlier question
+    earlier answer
+    > go
+    ⚙ subagent "find all auth code in the repository" … 1 turns
+      ⚙ bash grep -r auth src
+    ⚙ subagent "run the test suite" ✓ 1 turns $0.02
+      all tests pass
+    ────────────────────────────────────────────────────────────────────────────────
+    > ▏
+    agents: [main] 1⠋ 2✓  (Shift+Tab)
+    deepseek/deepseek-flash  thinking:off  view:normal  ctx:1.5k (0%)  in:1.2k out:…
+    |}];
+  H.focus_agent h 2;
+  H.show h;
+  [%expect
+    {|
+    ◆ subagent 2/2  claude-sonnet  ✓ done 1 turns $0.02  "run the test suite"
+
+
+
+
+
+
+
+
+
+
+
+    ⚙ bash command=dune runtest
+    all tests pass
+    ────────────────────────────────────────────────────────────────────────────────
+    > ▏
+    agents: main 1⠋ [2✓]  (Shift+Tab)
+    deepseek/deepseek-flash  thinking:off  view:normal  ctx:1.5k (0%)  in:1.2k out:…
+    |}];
+  H.esc h;
+  H.show h;
+  [%expect
+    {|
+    session abc123 in /work. /help for commands, Esc aborts, Ctrl+C twice quits.
+    > earlier question
+    earlier answer
+    > go
+    ⚙ subagent "find all auth code in the repository" … 1 turns
+      ⚙ bash grep -r auth src
+    ⚙ subagent "run the test suite" ✓ 1 turns $0.02
+      all tests pass
+    ────────────────────────────────────────────────────────────────────────────────
+    > ▏
+    agents: [main] 1⠋ 2✓  (Shift+Tab)
+    deepseek/deepseek-flash  thinking:off  view:normal  ctx:1.5k (0%)  in:1.2k out:…
+    |}]
+;;
+
+let%expect_test "verbosity applies inside an agent view" =
+  let h = connected ~width:70 ~height:16 () in
+  H.keys h "/verbosity normal";
+  H.enter h;
+  H.event h (State (state ~running:true ()));
+  H.event
+    h
+    (Tool_start
+       (tool_call ~name:"subagent" ~arguments:{|{"task":"audit"}|} "c1"));
+  H.event
+    h
+    (Subagent_start
+       { call_id = "c1"
+       ; agent_id = "c1"
+       ; task = "audit"
+       ; model = "claude-haiku"
+       ; tools = [ "bash" ]
+       });
+  H.event h (Subagent { call_id = "c1"; agent_id = "c1"; event = Turn_start });
+  let call = tool_call ~name:"bash" ~arguments:{|{"command":"ls"}|} "t1" in
+  H.event
+    h
+    (Subagent { call_id = "c1"; agent_id = "c1"; event = Tool_start call });
+  let lines =
+    String.concat ~sep:"\n" (List.init 8 ~f:(fun i -> sprintf "line %d" i))
+  in
+  H.event
+    h
+    (Subagent
+       { call_id = "c1"
+       ; agent_id = "c1"
+       ; event = Tool_end { call; result = tool_result ~id:"t1" lines }
+       });
+  H.event
+    h
+    (Subagent
+       { call_id = "c1"
+       ; agent_id = "c1"
+       ; event = Message_end (assistant "the report")
+       });
+  H.next_agent h;
+  H.show h;
+  [%expect
+    {|
+    ◆ subagent 1/1  claude-haiku  ⠋ running 1 turns  "audit"
+
+
+
+
+    ⚙ bash command=ls
+      line 0
+      line 1
+      line 2
+      line 3
+      line 4
+      … (3 more)
+    ──────────────────────────────────────────────────────────────────────
+    > ▏
+    agents: main [1⠋]  (Shift+Tab)
+    deepseek/deepseek-flash  thinking:off  view:normal  ctx:1.5k (0%)  in…
+    |}];
+  H.key h (Key.ctrl 'o');
+  H.show h;
+  [%expect
+    {|
+    ◆ subagent 1/1  claude-haiku  ⠋ running 1 turns  "audit"
+      {
+        command: "ls"
+      }
+      line 0
+      line 1
+      line 2
+      line 3
+      line 4
+      line 5
+      line 6
+      line 7
+    ──────────────────────────────────────────────────────────────────────
+    > ▏
+    agents: main [1⠋]  (Shift+Tab)
+    deepseek/deepseek-flash  thinking:off  view:verbose  ctx:1.5k (0%)  i…
+    |}]
+;;
+
+let%expect_test "/agents picker lists task, status and model; Enter focuses" =
+  let h = connected ~width:70 ~height:16 () in
+  H.event h (State (state ~running:true ()));
+  H.event
+    h
+    (Subagent_start
+       { call_id = "c1"
+       ; agent_id = "c1"
+       ; task = "find auth"
+       ; model = "claude-haiku"
+       ; tools = [ "read" ]
+       });
+  H.event
+    h
+    (Subagent_start
+       { call_id = "c2"
+       ; agent_id = "c2"
+       ; task = "run tests"
+       ; model = "claude-sonnet"
+       ; tools = [ "bash" ]
+       });
+  H.event
+    h
+    (Subagent_end
+       { call_id = "c2"
+       ; agent_id = "c2"
+       ; usage = { input = 1; output = 2; cache_read = 0 }
+       ; turns = 3
+       ; cost_usd = 0.02
+       ; result = { text = "green"; is_error = false }
+       });
+  H.keys h "/agents";
+  H.enter h;
+  H.show h;
+  [%expect
+    {|
+    session abc123 in /work. /help for commands, Esc aborts, Ctrl+C twice
+    quits.
+    > earlier question
+    earlier answer
+    Subagents  (2)
+    / ▏
+      find auth  running  claude-haiku
+      run tests  done 3 turns $0.02  claude-sonnet
+    ──────────────────────────────────────────────────────────────────────
+    agents: [main] 1⠋ 2✓  (Shift+Tab)
+    deepseek/deepseek-flash  thinking:off  view:normal  ctx:1.5k (0%)  in…
+    |}];
+  H.enter h;
+  H.show h;
+  [%expect
+    {|
+    ◆ subagent 1/2  claude-haiku  ⠋ running 0 turns  "find auth"
+
+
+
+
+
+
+
+
+
+
+
+    ──────────────────────────────────────────────────────────────────────
+    > ▏
+    agents: main [1⠋] 2✓  (Shift+Tab)
+    deepseek/deepseek-flash  thinking:off  view:normal  ctx:1.5k (0%)  in…
+    |}]
+;;
+
+let%expect_test "new user prompt clears finished agents" =
+  let h = connected ~width:70 ~height:14 () in
+  H.event h (State (state ~running:true ()));
+  H.event
+    h
+    (Subagent_start
+       { call_id = "c1"
+       ; agent_id = "c1"
+       ; task = "look around"
+       ; model = "claude-haiku"
+       ; tools = [ "read" ]
+       });
+  H.event
+    h
+    (Subagent_end
+       { call_id = "c1"
+       ; agent_id = "c1"
+       ; usage = { input = 1; output = 2; cache_read = 0 }
+       ; turns = 1
+       ; cost_usd = 0.01
+       ; result = { text = "done"; is_error = false }
+       });
+  H.event h (State (state ()));
+  H.show h;
+  [%expect
+    {|
+    session abc123 in /work. /help for commands, Esc aborts, Ctrl+C twice
+    quits.
+    > earlier question
+    earlier answer
+    ──────────────────────────────────────────────────────────────────────
+    > ▏
+    agents: [main] 1✓  (Shift+Tab)
+    deepseek/deepseek-flash  thinking:off  view:normal  ctx:1.5k (0%)  in…
+    |}];
+  H.keys h "next task";
+  H.enter h;
+  [%expect
+    {| (Rpc (method_ prompt) (params ((text "next task"))) (tag Show_error)) |}];
+  H.show h;
+  [%expect
+    {|
+    session abc123 in /work. /help for commands, Esc aborts, Ctrl+C twice
+    quits.
+    > earlier question
+    earlier answer
+    ──────────────────────────────────────────────────────────────────────
+    > ▏
+    deepseek/deepseek-flash  thinking:off  view:normal  ctx:1.5k (0%)  in…
+    |}]
+;;
+
+let%expect_test "session reload drops subagent transcripts and focus" =
+  let h = connected ~width:70 ~height:14 () in
+  H.event h (State (state ~running:true ()));
+  H.event
+    h
+    (Subagent_start
+       { call_id = "c1"
+       ; agent_id = "c1"
+       ; task = "look"
+       ; model = "m"
+       ; tools = []
+       });
+  H.event
+    h
+    (Subagent_end
+       { call_id = "c1"
+       ; agent_id = "c1"
+       ; usage = { input = 1; output = 1; cache_read = 0 }
+       ; turns = 1
+       ; cost_usd = 0.0
+       ; result = { text = "report"; is_error = false }
+       });
+  H.next_agent h;
+  H.show h;
+  [%expect
+    {|
+    ◆ subagent 1/1  m  ✓ done 1 turns $0.00  "look"
+
+
+
+
+
+
+
+
+
+    ──────────────────────────────────────────────────────────────────────
+    > ▏
+    agents: main [1✓]  (Shift+Tab)
+    deepseek/deepseek-flash  thinking:off  view:normal  ctx:1.5k (0%)  in…
+    |}];
+  H.reply
+    h
+    Reload_messages
+    {|[{"role":"user","text":"go"},{"role":"assistant","content":[{"type":"tool_call","id":"c1","name":"subagent","arguments":"{\"task\":\"look\"}"}],"stop_reason":{"type":"tool_use"},"usage":{"input":1,"output":2,"cache_read":0},"model":"m"},{"role":"tool_result","tool_call_id":"c1","tool_name":"subagent","text":"report","is_error":false}]|};
+  [%expect {| (Rpc (method_ get_state) (params ()) (tag Initial_state)) |}];
+  H.show h;
+  [%expect
+    {|
+    > go
+    ⚙ subagent task=look
+      report
+    ──────────────────────────────────────────────────────────────────────
+    > ▏
+    deepseek/deepseek-flash  thinking:off  view:normal  ctx:1.5k (0%)  in…
+    |}]
+;;
+
+let%expect_test "nested subagent events recurse into the parent's children" =
+  let h = connected ~width:70 ~height:16 () in
+  H.event h (State (state ~running:true ()));
+  H.event
+    h
+    (Subagent_start
+       { call_id = "p"
+       ; agent_id = "p"
+       ; task = "outer task"
+       ; model = "m1"
+       ; tools = [ "subagent" ]
+       });
+  H.event
+    h
+    (Subagent
+       { call_id = "p"
+       ; agent_id = "p"
+       ; event =
+           Tool_start
+             (tool_call
+                ~name:"subagent"
+                ~arguments:{|{"task":"inner task"}|}
+                "c1")
+       });
+  H.event
+    h
+    (Subagent
+       { call_id = "p"
+       ; agent_id = "p"
+       ; event =
+           Subagent_start
+             { call_id = "c1"
+             ; agent_id = "p/c1"
+             ; task = "inner task"
+             ; model = "m2"
+             ; tools = [ "read" ]
+             }
+       });
+  H.event
+    h
+    (Subagent
+       { call_id = "p"
+       ; agent_id = "p"
+       ; event =
+           Subagent { call_id = "c1"; agent_id = "p/c1"; event = Turn_start }
+       });
+  H.event
+    h
+    (Subagent
+       { call_id = "p"
+       ; agent_id = "p"
+       ; event =
+           Subagent
+             { call_id = "c1"
+             ; agent_id = "p/c1"
+             ; event =
+                 Tool_start
+                   (tool_call ~name:"read" ~arguments:{|{"path":"a.ml"}|} "t1")
+             }
+       });
+  H.event
+    h
+    (Subagent
+       { call_id = "p"
+       ; agent_id = "p"
+       ; event =
+           Subagent_end
+             { call_id = "c1"
+             ; agent_id = "p/c1"
+             ; usage = { input = 1; output = 1; cache_read = 0 }
+             ; turns = 1
+             ; cost_usd = 0.0
+             ; result = { text = "inner done"; is_error = false }
+             }
+       });
+  H.next_agent h;
+  H.show h;
+  [%expect
+    {|
+    ◆ subagent 1/1  m1  ⠋ running 0 turns  "outer task"
+
+
+
+
+
+
+
+
+
+    ⚙ subagent "inner task" ✓ 1 turns $0.00
+      inner done
+    ──────────────────────────────────────────────────────────────────────
+    > ▏
+    agents: main [1⠋]  (Shift+Tab)
+    deepseek/deepseek-flash  thinking:off  view:normal  ctx:1.5k (0%)  in…
     |}]
 ;;

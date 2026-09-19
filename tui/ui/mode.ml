@@ -9,6 +9,7 @@ module Picker_kind = struct
     | Login
     | Logout
     | Sessions
+    | Agents
     | Auth_select of string
   [@@deriving sexp_of, equal]
 end

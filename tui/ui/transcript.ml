@@ -1,6 +1,29 @@
 open! Core
 module P = Prigh_protocol
 
+module Subagent = struct
+  type status =
+    | Running
+    | Done of
+        { turns : int
+        ; cost_usd : float
+        }
+    | Failed of string
+  [@@deriving sexp_of, equal]
+
+  type t =
+    { agent_id : string
+    ; task : string
+    ; model : string
+    ; status : status
+    ; turns : int
+    ; report : string option
+    ; last_tool : string option
+    ; nested : string list
+    }
+  [@@deriving sexp_of, equal]
+end
+
 module Item = struct
   type t =
     | User of string
@@ -13,6 +36,7 @@ module Item = struct
         { call : P.Tool_call.t
         ; result : P.Message.Tool_result.t option
         ; live_tail : string option
+        ; subagent : Subagent.t option
         }
     | Notice of Severity.t * string
     | Block of Content.t
@@ -81,7 +105,9 @@ let update_tail previous chunk =
 ;;
 
 let add_tool t (call : P.Tool_call.t) =
-  add (flush t) (Tool { call; result = None; live_tail = None })
+  add
+    (flush t)
+    (Tool { call; result = None; live_tail = None; subagent = None })
 ;;
 
 let append_tool_output t ~call_id chunk =
@@ -100,8 +126,7 @@ let end_tool t ~(call : P.Tool_call.t) ~(result : P.Message.Tool_result.t) =
   let t = flush t in
   let rec go acc found = function
     | [] -> found, List.rev acc
-    | Item.Tool tool :: rest
-      when String.equal tool.call.id call.id && Option.is_none tool.result ->
+    | Item.Tool tool :: rest when String.equal tool.call.id call.id ->
       go (Item.Tool { tool with result = Some result } :: acc) true rest
     | item :: rest -> go (item :: acc) found rest
   in
@@ -109,7 +134,10 @@ let end_tool t ~(call : P.Tool_call.t) ~(result : P.Message.Tool_result.t) =
   let t = { t with items_rev } in
   if found
   then t
-  else add t (Tool { call; result = Some result; live_tail = None })
+  else
+    add
+      t
+      (Tool { call; result = Some result; live_tail = None; subagent = None })
 ;;
 
 let pair_result t (r : P.Message.Tool_result.t) =
@@ -140,7 +168,9 @@ let add_message t (m : P.Message.t) =
           add t (Thinking text)
         | Thinking _ -> t
         | Tool_call call ->
-          add t (Tool { call; result = None; live_tail = None }))
+          add
+            t
+            (Tool { call; result = None; live_tail = None; subagent = None }))
     in
     (match a.stop_reason with
      | Error e -> add t (Notice (Error, "error: " ^ e))
@@ -323,6 +353,232 @@ let render_tool
     render_call_full call @ output
 ;;
 
+let subagent_task_quoted task =
+  let one_line = String.concat ~sep:" " (String.split_lines task) in
+  "\"" ^ Text_width.truncate one_line ~width:50 ^ "\""
+;;
+
+let assistant_text (a : P.Message.Assistant.t) =
+  String.concat
+    ~sep:"\n"
+    (List.filter_map a.content ~f:(function
+      | P.Content.Text text -> Some text
+      | P.Content.Thinking _ | P.Content.Tool_call _ -> None))
+;;
+
+let tool_line (call : P.Tool_call.t) =
+  let short text =
+    Text_width.truncate
+      (String.concat ~sep:" " (String.split_lines text))
+      ~width:60
+  in
+  match first_string_argument call with
+  | Some s when not (String.is_empty (String.strip s)) ->
+    sprintf "⚙ %s %s" call.name (short s)
+  | _ -> "⚙ " ^ call.name
+;;
+
+let update_tool_subagent t ~call_id ~f =
+  let rec go acc = function
+    | [] -> List.rev acc
+    | Item.Tool tool :: rest when String.equal tool.call.id call_id ->
+      List.rev_append
+        acc
+        (Item.Tool { tool with subagent = f tool.subagent } :: rest)
+    | item :: rest -> go (item :: acc) rest
+  in
+  { t with items_rev = go [] t.items_rev }
+;;
+
+let rec update_subagent (s : Subagent.t) (event : P.Event.t) =
+  match event with
+  | P.Event.Tool_start call ->
+    let line = tool_line call in
+    { s with last_tool = Some line; nested = s.nested @ [ line ] }
+  | P.Event.Turn_start -> { s with turns = s.turns + 1 }
+  | P.Event.Message_end (P.Message.Assistant a) ->
+    let text = assistant_text a in
+    if String.is_empty (String.strip text)
+    then s
+    else { s with report = Some text }
+  | P.Event.Subagent_start { task; _ } ->
+    let line = sprintf "⚙ subagent %s" (subagent_task_quoted task) in
+    { s with last_tool = Some line; nested = s.nested @ [ line ] }
+  | P.Event.Subagent { event; _ } -> update_subagent s event
+  | _ -> s
+;;
+
+let mark_subagent t ~call_id ~agent_id ~task ~model =
+  let rec go acc = function
+    | [] -> List.rev acc
+    | Item.Tool tool :: rest when String.equal tool.call.id call_id ->
+      List.rev_append
+        acc
+        (Item.Tool
+           { tool with
+             subagent =
+               Some
+                 { Subagent.agent_id
+                 ; task
+                 ; model
+                 ; status = Running
+                 ; turns = 0
+                 ; report = None
+                 ; last_tool = None
+                 ; nested = []
+                 }
+           }
+         :: rest)
+    | item :: rest -> go (item :: acc) rest
+  in
+  { t with items_rev = go [] t.items_rev }
+;;
+
+let finish_subagent
+  t
+  ~call_id
+  ~agent_id
+  ~turns
+  ~cost_usd
+  (result : P.Event.Subagent_result.t)
+  =
+  let status =
+    if result.is_error
+    then Subagent.Failed result.text
+    else Subagent.Done { turns; cost_usd }
+  in
+  let synth =
+    { P.Message.Tool_result.tool_call_id = call_id
+    ; tool_name = "subagent"
+    ; text = result.text
+    ; is_error = result.is_error
+    }
+  in
+  let rec go acc = function
+    | [] -> List.rev acc
+    | Item.Tool tool :: rest when String.equal tool.call.id call_id ->
+      let subagent =
+        match tool.subagent with
+        | Some s -> Some { s with status; turns; report = Some result.text }
+        | None ->
+          Some
+            { Subagent.agent_id
+            ; task = ""
+            ; model = ""
+            ; status
+            ; turns
+            ; report = Some result.text
+            ; last_tool = None
+            ; nested = []
+            }
+      in
+      List.rev_append
+        acc
+        (Item.Tool { tool with subagent; result = Some synth } :: rest)
+    | item :: rest -> go (item :: acc) rest
+  in
+  { t with items_rev = go [] t.items_rev }
+;;
+
+(** The single event-to-transcript function shared by the main transcript and
+    every subagent view. *)
+let apply t (event : P.Event.t) =
+  match event with
+  | P.Event.State state -> if state.running then t else flush t
+  | P.Event.Message_start (P.Message.User text) -> add t (User text)
+  | P.Event.Message_start _ -> t
+  | P.Event.Message_update { delta = P.Delta.Text_delta text; _ } ->
+    append t Text text
+  | P.Event.Message_update { delta = P.Delta.Thinking_delta text; _ } ->
+    append t Thinking text
+  | P.Event.Message_update _ -> t
+  | P.Event.Message_end (P.Message.Assistant a) ->
+    let t = flush t in
+    let t =
+      match a.stop_reason with
+      | P.Stop_reason.End_turn -> mark_final t
+      | _ -> t
+    in
+    (match a.stop_reason with
+     | P.Stop_reason.Error e -> notice ~severity:Error t ("error: " ^ e)
+     | P.Stop_reason.Aborted -> notice ~severity:Warn t "[aborted]"
+     | P.Stop_reason.Length ->
+       notice ~severity:Warn t "[output truncated by the model's length limit]"
+     | P.Stop_reason.End_turn | P.Stop_reason.Tool_use -> t)
+  | P.Event.Message_end _ -> t
+  | P.Event.Tool_start call -> add_tool t call
+  | P.Event.Tool_output { chunk; call_id } ->
+    append_tool_output t ~call_id chunk
+  | P.Event.Tool_end { call; result } -> end_tool t ~call ~result
+  | P.Event.Compacted summary -> add t (Compaction summary)
+  | P.Event.Notice text -> notice t text
+  | P.Event.Subagent_start { call_id; agent_id; task; model; _ } ->
+    mark_subagent t ~call_id ~agent_id ~task ~model
+  | P.Event.Subagent { call_id; event = inner; _ } ->
+    update_tool_subagent t ~call_id ~f:(fun current ->
+      match current with
+      | None -> current
+      | Some s -> Some (update_subagent s inner))
+  | P.Event.Subagent_end { call_id; agent_id; turns; cost_usd; result; _ } ->
+    finish_subagent t ~call_id ~agent_id ~turns ~cost_usd result
+  | P.Event.Agent_start
+  | P.Event.Agent_end _
+  | P.Event.Turn_start
+  | P.Event.Turn_end _
+  | P.Event.Queue_update _
+  | P.Event.Auth _ -> t
+;;
+
+let render_report ~max_lines text : Content.t =
+  let lines = String.split_lines (String.rstrip text) in
+  let shown = List.take lines max_lines in
+  let more =
+    if List.length lines > max_lines
+    then [ sprintf "… (%d more)" (List.length lines - max_lines) ]
+    else []
+  in
+  List.map (shown @ more) ~f:(fun line ->
+    Content.Line.of_string ~style:gray ("  " ^ line))
+;;
+
+let render_subagent ~(verbosity : Verbosity.t) (s : Subagent.t) : Content.t =
+  let status_text, status_style =
+    match s.status with
+    | Subagent.Running -> sprintf "… %d turns" s.turns, Style.fg Yellow
+    | Subagent.Done { turns; cost_usd } ->
+      sprintf "✓ %d turns $%.2f" turns cost_usd, green
+    | Subagent.Failed _ -> "✗ failed", red
+  in
+  let header : Content.Line.t =
+    [ { Content.Span.text = "⚙ subagent"; style = magenta }
+    ; { text = " " ^ subagent_task_quoted s.task; style = dim }
+    ; { text = " " ^ status_text; style = status_style }
+    ]
+  in
+  match s.status with
+  | Subagent.Running ->
+    header
+    :: List.map (Option.to_list s.last_tool) ~f:(fun line ->
+      Content.Line.of_string ~style:gray ("  " ^ line))
+  | Subagent.Failed message ->
+    (match verbosity with
+     | Quiet -> [ header ]
+     | Normal -> header :: render_report ~max_lines:5 message
+     | Verbose -> header :: render_report ~max_lines:Int.max_value message)
+  | Subagent.Done _ ->
+    (match verbosity with
+     | Quiet -> [ header ]
+     | Normal ->
+       header :: render_report ~max_lines:5 (Option.value s.report ~default:"")
+     | Verbose ->
+       header
+       :: (List.map s.nested ~f:(fun line ->
+             Content.Line.of_string ~style:gray ("  " ^ line))
+           @ render_report
+               ~max_lines:Int.max_value
+               (Option.value s.report ~default:"")))
+;;
+
 let render_item (item : Item.t) ~(verbosity : Verbosity.t) : Content.t =
   match item with
   | User text ->
@@ -345,8 +601,10 @@ let render_item (item : Item.t) ~(verbosity : Verbosity.t) : Content.t =
      | Verbose ->
        List.map (String.split_lines text) ~f:(fun line ->
          Content.Line.of_string ~style:dim ("  " ^ line)))
-  | Tool { call; result; live_tail } ->
-    render_tool ~verbosity call result live_tail
+  | Tool { call; result; live_tail; subagent } ->
+    (match subagent with
+     | Some s -> render_subagent ~verbosity s
+     | None -> render_tool ~verbosity call result live_tail)
   | Notice (severity, text) ->
     (match verbosity, severity with
      | Quiet, Info -> []

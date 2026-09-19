@@ -42,6 +42,11 @@ let bindings =
       [ Key.ctrl 'o' ]
       Cycle_verbosity
       "cycle transcript verbosity (quiet / normal / verbose)"
+  ; b
+      [ { (Key.plain Tab) with shift = true } ]
+      Next_agent
+      "cycle focus: main → agent 1 → … → main"
+  ; b [ Key.alt (Char "1") ] (Focus_agent 1) "focus agent N (Alt+1…9)"
   ; b [ Key.ctrl 'c' ] Interrupt "clear the editor, then (again) quit"
   ; b [ Key.ctrl 'd' ] Force_quit "quit"
   ]
@@ -58,6 +63,10 @@ let lookup (key : Key.t) =
   | None ->
     (match key.code with
      | Char c when (not key.ctrl) && not key.alt -> Some (Intent.Insert c)
+     | Char c when key.alt && not key.ctrl ->
+       (match Int.of_string_opt c with
+        | Some n when n >= 1 && n <= 9 -> Some (Intent.Focus_agent n)
+        | _ -> None)
      | _ -> None)
 ;;
 

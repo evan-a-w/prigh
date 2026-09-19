@@ -123,6 +123,51 @@ let%expect_test "state event and messages" =
     |}]
 ;;
 
+let%expect_test "subagent events are decoded recursively" =
+  decode
+    {|{"type":"event","event":"subagent","call_id":"p","agent_id":"p","inner":{"type":"event","event":"subagent","call_id":"c1","agent_id":"p/c1","inner":{"type":"event","event":"tool_start","call":{"id":"c1","name":"read","arguments":"{}"}}}}|};
+  decode
+    {|{"type":"event","event":"subagent_start","call_id":"p","agent_id":"p","task":"go","model":"m","tools":["read","ls"]}|};
+  decode
+    {|{"type":"event","event":"subagent_end","call_id":"p","agent_id":"p","usage":{"input":3,"output":4,"cache_read":1},"turns":2,"cost_usd":0.001,"result":{"text":"done","is_error":false}}|};
+  [%expect
+    {|
+    (Event (
+      Subagent
+      (call_id  p)
+      (agent_id p)
+      (event (
+        Subagent
+        (call_id  c1)
+        (agent_id p/c1)
+        (event (
+          Tool_start (
+            (id        c1)
+            (name      read)
+            (arguments {}))))))))
+    (Event (
+      Subagent_start
+      (call_id  p)
+      (agent_id p)
+      (task     go)
+      (model    m)
+      (tools (read ls))))
+    (Event (
+      Subagent_end
+      (call_id  p)
+      (agent_id p)
+      (usage (
+        (input      3)
+        (output     4)
+        (cache_read 1)))
+      (turns    2)
+      (cost_usd 0.001)
+      (result (
+        (text     done)
+        (is_error false)))))
+    |}]
+;;
+
 let%expect_test "auth events" =
   decode
     {|{"type":"event","event":"auth","kind":"auth_url","url":"https://x","instructions":"paste the code"}|};
