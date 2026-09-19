@@ -42,7 +42,21 @@
         # Pinned to the exact versions of the working `prigh-ox` switch. This
         # both forces the OxCaml compiler and keeps opam-nix's solver inside its
         # 60 s IFD timeout. See nix/prigh-ox-pins.nix.
-        query = import ./nix/prigh-ox-pins.nix;
+        #
+        # The pins were generated from a Linux opam switch, so it includes a few
+        # Linux-only packages. Requesting those packages on Darwin makes the
+        # opam-nix solver fail before it can build the project.
+        query =
+          let
+            pins = import ./nix/prigh-ox-pins.nix;
+          in
+          if pkgs.stdenv.hostPlatform.isLinux then
+            pins
+          else
+            builtins.removeAttrs pins [
+              "eio_linux"
+              "uring"
+            ];
 
         # OxCaml 5.2.0+ox native codegen drops the second addressing register
         # of `Ifloatarithmem` (any float-array arithmetic at the non-AVX
@@ -53,6 +67,12 @@
           {
             oxcaml-compiler = prev.oxcaml-compiler.overrideAttrs (oa: {
               patches = (oa.patches or [ ]) ++ [ ./nix/fix-floatarithmem.patch ];
+              nativeBuildInputs =
+                (oa.nativeBuildInputs or [ ])
+                ++ pkgs.lib.optionals pkgs.stdenv.hostPlatform.isDarwin [
+                  # OxCaml's archive merge helper invokes Apple's `libtool`.
+                  pkgs.darwin.cctools
+                ];
             });
           };
 
