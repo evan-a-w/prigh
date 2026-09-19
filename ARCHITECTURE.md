@@ -140,15 +140,25 @@ two can share one.
 - `Tool` — `{spec; run : Context.t -> Json.t -> Result.t}`; `Tool.execute`
   turns invalid arguments and exceptions into error results. `Tool_args`
   gives typed accessors and builds the JSON schema; `Truncate` bounds output
-  by lines and bytes.
+  by lines and bytes. `Tool_spec` carries the flags the harness reasons
+  about: `parallel_safe` (safe to run concurrently with other tools) and
+  `destructive` (held for confirmation when `confirm_tools` is on).
 - `Tool_bash` (streamed output, timeout, cancellation), `Tool_read`,
-  `Tool_write`, `Tool_edit` (multi-edit, unique non-overlapping matches,
-  atomic), `Tool_ls`, `Tool_grep`/`Tool_find` (via `rg`). `Tools.all` is the
-  fixed set.
-- `Tool_subagent` — a tool that runs a nested `Agent_loop` in-process with a
-  role-restricted tool set (`explore` read-only, `worker` full) and a turn
-  budget, streaming its progress as tool output and returning its final
-  reply. It shares the parent's provider and current model/thinking.
+  `Tool_write` (`wrote N lines`), `Tool_edit` (multi-edit, unique
+  non-overlapping matches, atomic; returns a unified diff from `Udiff`),
+  `Tool_ls`, `Tool_grep`/`Tool_find` (via `rg`).
+- `Tool_subagent` — one tool, no roles: the model passes `task` (required)
+  plus optional `tools` (a subset of the parent's, default all), `model`
+  (`Model.resolve`; default the parent's), `cwd`, `max_turns` (default 50)
+  and `context` (extra system text). It runs a nested `Agent_loop`
+  in-process sharing the parent's provider and cancellation, and returns the
+  child's final text plus a `[subagent: N turns, in/out tokens, $cost]`
+  trailer. Progress comes back as nested `Subagent*` events (below), not
+  text chunks.
+- `Tools.all` is the fixed built-in set; `Tools.for_context` builds the
+  per-agent tool list (`parent`, `depth`, optional `only`), so the
+  subagent's tool set can be restricted and the `subagent` tool is dropped at
+  depth 2; unknown names are an argument error.
 
 ### Harness
 
@@ -157,23 +167,48 @@ two can share one.
   `~/.prigh/AGENTS.md`.
 - `Agent_loop` — the core loop. Per turn: build the request from the context,
   stream the assistant message (emitting `Message_start/update/end`), retry
-  with exponential backoff on retryable errors, execute each tool call
-  sequentially (`Tool_start/output/end`), append results, then poll `steer`
-  for user messages to inject before the next turn. Stops on `End_turn`
-  without tool calls, `Length`, `Error`, `Aborted`, `max_turns` or
-  cancellation. Every tool call always gets a result (a `[cancelled]` one if
-  needed) so the context stays valid.
-- `Agent` — one conversation: owns the session, model and thinking level,
-  the run lifecycle (`prompt`, `steer` = after the current turn,
-  `follow_up` = after the loop ends, `abort`), automatic compaction at 80% of
-  the context window, and a subscriber list receiving `Agent.Event.t`
-  (`Loop of Agent_event.t | State_changed | Compacted | Notice`).
+  with exponential backoff on retryable errors, execute the tool calls
+  (`Tool_start/output/end`), append results, then poll `steer` for user
+  messages to inject before the next turn. A turn whose calls are all
+  `parallel_safe` runs them through `Eio.Fiber.List.map`; a mixed turn stays
+  sequential, and results are appended in call order regardless of completion
+  order so the context stays deterministic. Destructive tools block on a
+  `Tool_confirm` event until `respond_confirm` when `confirm_tools` is set; a
+  deny becomes an error result. Stops on `End_turn` without tool calls,
+  `Length`, `Error`, `Aborted`, `max_turns` or cancellation. Every tool call
+  always gets a result (a `[cancelled]` one if needed) so the context stays
+  valid.
+- `Agent_event` — the loop's event vocabulary (`Agent_start/end`, `Turn_*`,
+  `Message_*`, `Tool_start/output/end`, `Tool_confirm`, and the recursive
+  `Subagent` / `Subagent_start` / `Subagent_end`, whose inner events carry
+  `call_id`/`agent_id`), so the UI can build a transcript per agent.
+- `Agent` — one conversation: owns the session, model, thinking level and
+  `Config`, the run lifecycle (`prompt`, `steer` = after the current turn,
+  `follow_up` = after the loop ends, `abort` = cancels and returns the queued
+  texts to restore, `dequeue` = pops the last queued message, `shell` = runs
+  a `!cmd` through the bash machinery), automatic compaction at 80% of the
+  context window, and a subscriber list receiving `Agent.Event.t` (`Loop of
+  Agent_event.t | State_changed | Compacted | Notice | Config_changed |
+  Queue_update`). `prompt`/`steer`/`follow_up` accept optional `attachments`
+  (paths whose contents are appended to the user message as `<file>` blocks).
+  Subagent usage is rolled up into `State.usage`/`cost_usd`
+  (never `context_tokens`), and `State` also carries the session name, cwd
+  and `git_branch`. `respond_confirm` answers a pending `Tool_confirm`.
+- `Config` — `~/.prigh/config.json` (`scoped_models : string list`,
+  `confirm_tools : bool`), loaded at agent creation, read/written through
+  `get_config`/`set_config`; unknown fields are ignored.
 - `Session` — an append-only JSONL log forming a tree: every entry has a
   `parent`, the active conversation is the path from the root to `head`.
   Rewinding moves `head`; forking copies the active path to a new file.
-  Entries are messages, model/thinking changes and compaction summaries;
-  `Session.messages` is the message list for the next request with the
-  compaction summary replacing everything before `kept_from`.
+  Entries are messages, model/thinking changes, compaction summaries, names
+  and cwds (so a reload restores both); `Session.messages` is the message
+  list for the next request with the compaction summary replacing everything
+  before `kept_from`. `list` returns name, cwd, timestamps, message count,
+  first prompt and parent; `export` writes markdown or copies the JSONL,
+  `import` copies a file in, and `session_stats` counts turns, tool calls by
+  name, tokens, cost, model changes and compactions. Under the RPC,
+  `get_entries` returns `{head, entries}` (`all: true` includes abandoned
+  branches for the tree view).
 - `Compaction` — summarises older messages via the model and keeps a tail;
   manual (`/compact`) or automatic.
 
@@ -185,10 +220,13 @@ two can share one.
 - `Rpc_server` — reads request lines, dispatches to `Agent` and
   `Login_manager`, writes responses and events through a single outbox
   fiber. `set_model` goes through `Model.resolve` (key, id, display name or
-  unique case-insensitive prefix; otherwise "did you mean" by edit distance). Methods: `ping`, `prompt`, `steer`, `follow_up`, `abort`,
-  `get_state`, `get_messages`, `get_entries`, `set_model`, `set_thinking`,
-  `list_models`, `compact`, `new_session`, `switch_session`,
-  `list_sessions`, `fork`, `rewind`, `auth_status`, `login`,
+  unique case-insensitive prefix; otherwise "did you mean" by edit
+  distance). Methods: `ping`, `prompt`, `steer`, `follow_up`, `abort`,
+  `dequeue`, `shell`, `get_state`, `get_messages`, `get_entries`, `set_model`,
+  `set_thinking`, `list_models`, `compact`, `new_session`,
+  `switch_session`, `list_sessions`, `set_session_name`, `delete_session`,
+  `export`, `import`, `fork`, `clone`, `rewind`, `session_stats`, `set_cwd`,
+  `get_config`, `set_config`, `tool_confirm_respond`, `auth_status`, `login`,
   `auth_respond`, `auth_cancel`, `logout`.
 
 ### CLI (`backend/bin/main.ml`)
@@ -196,9 +234,10 @@ two can share one.
 `serve` (RPC), `run <prompt>` (headless, streams to stdout), `sessions`,
 `login <provider> [-method]`, `logout <provider>`, `auth`. All commands share
 `-auth-file`; `run`/`serve` share `-model`, `-thinking`, `-session`, `-cwd`,
-`-no-tools`, `-faux`. With no explicit model or session, the default model is
-the first logged-in provider's in the order anthropic, openai-codex, openai,
-deepseek.
+`-no-tools`, `-faux` (and `-faux-script FILE`, a JSON array of scripted
+replies that implies `-faux`). With no explicit model or session, the default
+model is the first logged-in provider's in the order anthropic, openai-codex,
+openai, deepseek.
 
 ## Frontend (`tui/`)
 
@@ -221,25 +260,49 @@ copy of the protocol types and the e2e test guards the contract.
   - `App` is an Elm-style pure state machine: `update : Model.t -> Action.t
     -> Model.t * Command.t list`. Actions are keys/intents, backend events,
     RPC replies (tagged with `Reply_tag.t` so they stay sexpable), clock
-    ticks and resizes. Commands (`Rpc`, `Open_browser`, `Quit`) are executed
-    by the platform.
+    ticks and resizes. Commands (`Rpc`, `List_paths`, `Load_history`,
+    `Append_history`, `Copy_to_clipboard`, `Suspend`, `Edit_externally`,
+    `Open_browser`, `Quit`) are executed by the platform and answered through
+    `Action.Reply`.
   - `Component.create ~platform` wraps `App` in `Bonsai.state_machine`,
     turns commands into effects and feeds replies back; it also runs the
     spinner clock while a turn is active.
-  - Headless widgets: `Editor` (multi-line, history, kill commands),
-    `Picker` (fuzzy list with `Fuzzy` ranking), `Transcript` (items plus
-    streaming text/thinking/tool tails, rendered lazily from the bottom),
-    `Commands` (slash table, parse, complete, closest), `Model_match`
-    (display-name/prefix/did-you-mean), `Markdown`.
+  - Headless widgets: `Editor` (multi-line, kill ring, undo, chips for long
+    pastes, persistent history), `Picker` (fuzzy list with `Fuzzy` ranking),
+    `Transcript` (items plus streaming tails; `Transcript.apply` is the one
+    event→transcript function, used for the main transcript and each
+    subagent), `Viewport` (`Follow | Anchored`, so new output never pushes an
+    anchored view), `Verbosity` (quiet/normal/verbose), `Autocomplete`
+    (inline command/argument/path completion), `Agent_view` (per-subagent
+    transcript and status), `Commands` (slash table, parse, complete,
+    closest), `Model_match` (display-name/prefix/did-you-mean), `Markdown`.
   - `Key.t` → `Intent.t` through `Keymap` (the one binding table; `/help`
-    prints it). `Mode.t` (`Editing | Picker | Login_prompt | Confirm`) says
-    who owns the keyboard; dialogs never stack, Esc always closes.
+    prints it). `Mode.t` (`Editing | Picker | Login_prompt | Text_prompt |
+    Confirm | Search`) says who owns the keyboard; dialogs never stack, Esc
+    always closes.
   - `Render.screen : Model.t -> Screen.t` lays out a frame as `Content.t`
-    (styled spans with `Text_width`-aware wrapping) plus the cursor cell.
+    (styled spans with `Text_width`-aware wrapping) plus the cursor cell. The
+    status line keeps the cwd and model, then fills remaining width by
+    priority (context, cost/queued/agents, thinking, verbosity, new-line
+    count, mode hint) and left-truncates, so the model key stays visible at
+    narrow widths.
 - `term/` (`prigh_ui_term`) — `Key_of_event` (Bonsai_term events → `Key.t`,
-  bracketed paste → one `Insert`), `View_of_content` (spans → notty attrs),
-  `Term_app` (spawns the backend, runs `Bonsai_term.start_with_driver`,
-  pushes client `Incoming.t` into the component, sets the cursor).
+  bracketed paste → one `Insert`), `View_of_content` (spans → notty attrs,
+  including OSC-8 links), `Paths` (path completion via `fd`/`readdir`),
+  `Tty`/`tty_stubs.c` (clears `IEXTEN`), and `Term_app` (spawns the backend,
+  runs `Bonsai_term.start_with_driver`, pushes client `Incoming.t` into the
+  component, executes the platform commands, sets the cursor). Three
+  terminal-only details live here. Notty's raw mode leaves `IEXTEN` set, so
+  the line discipline eats `^O` before the program sees it; the stub clears
+  the flag around the driver (OCaml's `terminal_io` cannot express it, so
+  notty cannot restore it either). Bonsai_term's `Driver.finished` ivar is
+  not filled when `exit` is scheduled from `apply_action`, so `Term_app`
+  tracks the quit itself. Suspend (`Ctrl+Z`) and the external editor leave
+  and re-enter the alt screen; notty still believes its last frame is on
+  screen, so `install_repaint` re-emits it. Bracketed paste is buffered in a
+  plain `ref`, not Bonsai state, because the handler receives a whole batch
+  of events at once and state would only update after the frame, so every key
+  in the batch would still see `Idle`.
 - `bin/` — `prigh-tui` (`-faux`, `-session`, `-model`, `-cwd`, `-auth-file`,
   `-backend`; `PRIGH_BACKEND` overrides the backend path).
 
@@ -247,21 +310,41 @@ copy of the protocol types and the e2e test guards the contract.
 
 - `~/.config/prigh/auth.json` — credentials (pi-compatible).
 - `~/.prigh/sessions/<stamp>_<id>.jsonl` — session logs.
+- `~/.prigh/sessions/exports/` — default `/export` output.
+- `~/.prigh/history` — prompt history (one JSON string per line, last 500).
+- `~/.prigh/config.json` — `scoped_models`, `confirm_tools`.
 - `~/.prigh/AGENTS.md` — global instructions.
 
 ## Testing
 
-Backend tests are ppx_expect tests under `backend/test`, driven by
-`Faux_provider` for the loop/agent/RPC and by `Fake_http_server` (an
-in-process Eio HTTP server) for providers, HTTP, and the OAuth token and
-callback flows; nothing touches the network.
+Four layers, cheapest first.
 
-Frontend tests (`tui/test`, `dune build @runtest`) are expect tests too:
-protocol decoding, the client over an in-memory transport, the widgets, a
-keymap coverage test, and app scenarios that drive `App.update` and print
-the rendered screen (`Screen.to_plain`) — pickers, login prompts, Esc/Ctrl+C
-semantics, streaming, resize, scrolling. `test_component` runs the Bonsai
-component under `Bonsai_test.Handle` with a scripted platform. `tui/e2e`
-(`dune build @e2e`) drives the real `main.exe serve -faux` with an isolated
-`-auth-file` and `HOME` through the real client and diffs a normalised
-transcript.
+1. **Pure expect tests.** Backend (`cd backend && dune build @runtest`)
+   drives the loop/agent/RPC with `Faux_provider` and
+   providers/HTTP/OAuth with `Fake_http_server` (an in-process Eio HTTP
+   server); nothing touches the network. Frontend (`cd tui && dune build
+   @runtest`) covers protocol decoding, the client over an in-memory
+   transport, the widgets and the keymap, and `App.update` scenarios that
+   print the screen (`Screen.to_plain`) — pickers, login prompts, Esc/Ctrl+C,
+   streaming, resize, scrolling, subagents. `test_component` runs the Bonsai
+   component under `Bonsai_test.Handle` with a scripted platform.
+2. **Rendered-frame snapshots.** `tui/test/test_term_frames.ml` (same
+   `@runtest`) drives the real Bonsai_term driver over an in-memory tty,
+   decodes Notty's output with the VT emulator in `tui/test/vt.ml`, and
+   compares the grid and cursor with `Screen.to_plain`, so
+   `View_of_content`/`Key_of_event` cannot diverge from the pure renderer.
+3. **Protocol e2e.** `cd tui && dune build @e2e` runs the real
+   `main.exe serve -faux` with an isolated `-auth-file` and `HOME` through
+   the real client and diffs a normalised transcript.
+4. **Real terminal.** `tui/tmux-test/run.sh` (alias `cd tui && dune build
+   @tmux`; skipped when `tmux` is absent) starts the built TUI inside tmux,
+   sends keys with `tmux send-keys`, and diffs captured panes against
+   `expected/*.txt` (normalised for spinners and paths; `UPDATE=1`
+   re-records). Scenarios: startup, prompt, ctrl_o, resize, quit, tools,
+   suspend, editor, confirm, paste.
+
+The last two layers are the only ones that exercise the real terminal, and
+they paid for themselves immediately: the tmux layer caught `Ctrl+O` being
+eaten by the tty's line discipline (fixed by clearing `IEXTEN`) and the quit
+hang (`Driver.finished` never resolving), and the paste scenario caught the
+batched-event buffering bug.

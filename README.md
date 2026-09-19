@@ -89,16 +89,130 @@ backend/_build/default/bin/main.exe sessions   # list saved sessions
 backend/_build/default/bin/main.exe serve      # JSON-lines RPC on stdio
 ```
 
-TUI: Enter sends (or steers while a run is active), Alt+Enter/Ctrl+J inserts a
-newline, Esc closes a dialog or aborts, Tab completes `/commands` (or opens the
-command picker), Up/Down browse history, PageUp/PageDown scroll, Ctrl+O
-expands tool output, Ctrl+C twice quits. `/model`, `/thinking`, `/sessions`,
-`/login` and `/logout` open fuzzy pickers; `/model` also accepts a display
-name, id, `provider/id` or unique prefix. `/help` lists commands and keys.
+### Keys
+
+| Key | Action |
+|---|---|
+| Enter | send the prompt; accept the highlighted item |
+| Alt+Enter | queue a follow-up to run after the current turn |
+| Ctrl+J / Alt+J | insert a newline |
+| Esc | close the dialog, or abort the running turn |
+| Tab | complete a slash command / open the command picker |
+| Up / Down | move up/down (editor line, history, or list row) |
+| Alt+Up | pop the last queued steer/follow-up back into the editor |
+| Left / Right | move the cursor |
+| Alt+B / Ctrl+Left | move back one word |
+| Alt+F / Ctrl+Right | move forward one word |
+| Alt+D | delete the next word |
+| Home / Ctrl+A | start of line |
+| End / Ctrl+E | end of line |
+| PageUp / PageDown | scroll the transcript / list a page |
+| Ctrl+Up / Ctrl+Down | jump to the previous/next user message |
+| Backspace / Ctrl+H | delete the character before the cursor |
+| Delete | delete the character under the cursor |
+| Ctrl+K / Ctrl+U | delete to the end / start of the line |
+| Ctrl+W / Alt+Backspace | delete the word before the cursor |
+| Ctrl+Y / Alt+Y | paste the most recent kill / replace it with an older kill |
+| Ctrl+_ | undo |
+| Ctrl+O | cycle transcript verbosity |
+| Ctrl+R | complete a file path at the cursor |
+| Ctrl+F | search the transcript |
+| Ctrl+G | edit the prompt in `$VISUAL`/`$EDITOR` |
+| Ctrl+L | pick a model |
+| Ctrl+P / Alt+P | cycle to the next / previous scoped model |
+| Ctrl+T | cycle the thinking level |
+| Ctrl+N | picker: toggle the named-only / logged-in-only filter |
+| Ctrl+X | copy the last assistant message |
+| Ctrl+Z | suspend to the shell |
+| Shift+Tab | cycle subagent focus: main → agent 1 → … → main |
+| Alt+1…9 | focus agent N |
+| Ctrl+C | clear the editor, then quit |
+| Ctrl+D | quit |
+
+Ctrl+O cycles the transcript verbosity:
+
+| Level | Shows |
+|---|---|
+| quiet | user and final assistant text only; tool calls and subagents collapse to one line |
+| normal | thinking (first 3 lines), tool calls with a short result tail, subagent live tails |
+| verbose | full thinking, tool arguments and results, every nested subagent event |
+
+`/verbosity [quiet|normal|verbose]` sets it directly; the status line shows
+`view:`.
+
+A `subagent` tool call gets its own transcript. Shift+Tab cycles focus main →
+agent 1 → …, Alt+1…9 jumps, and `/agents` opens a picker; Esc returns to main.
+Finished agents stay cyclable until the next prompt. The status line shows an
+`agents:` strip.
+
+Typing `/` opens inline autocomplete (commands, then per-command arguments
+such as models, sessions and directories). Typing `@` completes file paths
+under the cwd; on submit the referenced files are sent as attachments and the
+backend appends them to the user message as `<file>` blocks. `!cmd` runs a
+shell command through the backend (streamed output shown as a tool item) and
+adds it and its output to the context; `!!cmd` runs it without adding to the
+context.
+
+Submitted prompts are kept in `~/.prigh/history` (one JSON string per line,
+last 500) and loaded on start; secrets from login prompts are never recorded.
+`~/.prigh/config.json` holds `scoped_models` (the models Ctrl+P cycles
+through; `/scoped-models` edits it) and `confirm_tools` (ask before
+destructive `bash`/`write`/`edit`; `/confirm on|off`).
+
+### Slash commands
+
+| Command | Action |
+|---|---|
+| `/help`, `/hotkeys` | commands and keys / keys only |
+| `/model [name\|id\|provider/id]` | pick or switch the model |
+| `/scoped-models` | pick the models Ctrl+P cycles through |
+| `/login [provider] [api_key\|oauth]`, `/logout [provider]`, `/auth` | credentials |
+| `/thinking [off\|on\|low\|high\|max]` | set the thinking level |
+| `/verbosity [quiet\|normal\|verbose]` | set the transcript verbosity |
+| `/confirm [on\|off]` | ask before destructive tools |
+| `/compact` | summarise older messages to free context |
+| `/new`, `/clear`, `/quit` | new session / clear transcript / exit |
+| `/name [text]` | set the session name |
+| `/session` | show session statistics |
+| `/sessions` | pick a saved session (Ctrl+N named-only, Ctrl+D delete) |
+| `/switch [path]` | switch to a saved session |
+| `/cd [path]` | change the working directory |
+| `/fork`, `/rewind`, `/tree`, `/clone` | branch the session tree |
+| `/export [path]`, `/import [path]` | markdown or `.jsonl` |
+| `/agents` | focus a subagent |
+| `/abort` | abort the current run |
+| `/state` | show session state |
+
+`/model` also accepts a display name, id, `provider/id` or unique prefix, and
+`/login`/`/logout`/`/thinking`/`/sessions` open fuzzy pickers.
+
+`-faux-script FILE` (a backend flag, passed through the TUI after `--`) plays
+a JSON array of scripted provider replies, so demos and tests run without API
+calls; it implies `-faux`.
 
 Sessions are JSONL trees under `~/.prigh/sessions/`. Project instructions are
 read from `AGENTS.md`/`CLAUDE.md` files between `/` and the working
 directory, plus `~/.prigh/AGENTS.md`.
+
+### Testing
+
+Four layers, cheapest first:
+
+1. **Pure expect tests** — `cd backend && dune build @runtest` drives the
+   agent loop, tools and RPC with `Faux_provider` and the providers/HTTP/OAuth
+   flows with an in-process EIO HTTP server; `cd tui && dune build @runtest`
+   covers protocol/client decoding, the widgets, the keymap, and `App.update`
+   scenarios that print the rendered screen (`Screen.to_plain`).
+2. **Driver-frame snapshots** — `tui/test/test_term_frames.ml`, run by the
+   same `cd tui && dune build @runtest`: drives the real Bonsai_term driver
+   over an in-memory tty, decodes Notty's output with `tui/test/vt.ml`, and
+   compares it with `Screen.to_plain`.
+3. **Protocol e2e** — `cd tui && dune build @e2e` runs the real
+   `backend/_build/default/bin/main.exe serve -faux` through the real client
+   with an isolated `HOME`/`-auth-file` and diffs a normalised transcript.
+4. **Real terminal** — `tui/tmux-test/run.sh` (or `cd tui && dune build
+   @tmux`; skipped without `tmux`) drives the built TUI inside tmux and diffs
+   captured panes; `UPDATE=1 tmux-test/run.sh` re-records them.
 
 ## Layout
 
