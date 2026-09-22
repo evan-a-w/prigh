@@ -78,6 +78,11 @@ val create
 
 val subscribe : t -> f:(Event.t -> unit) -> unit
 val state : t -> State.t
+
+(** The home directory the agent was created with (config, history). *)
+val home : t -> string
+
+val env : t -> Env.t
 val session : t -> Session.t
 val messages : t -> Message.t list
 

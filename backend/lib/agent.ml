@@ -149,6 +149,9 @@ let session t = t.session
 let messages t = Session.messages t.session
 let is_running t = Option.is_some t.run
 
+let home t = t.home
+let env t = t.env
+
 let state t =
   let messages = messages t in
   let assistant_messages =
