@@ -19,6 +19,7 @@ module Picker_kind : sig
     | Rewind of Entry.t list
     | Tree of Entry.t list
     | Agents
+    | Hosts
     | Auth_select of string (** login prompt id *)
   [@@deriving sexp_of, equal]
 end

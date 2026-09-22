@@ -39,6 +39,8 @@ let with_agent ?tools ?on_request replies f =
       | Notice n -> Some ("notice: " ^ n)
       | Queue_update { steer; follow_up } ->
         Some (sprintf "queue: steer=%d follow_up=%d" steer follow_up)
+      | Tool_exec { name; _ } -> Some ("tool_exec: " ^ name)
+      | Tool_exec_cancel _ -> Some "tool_exec_cancel"
     in
     Option.iter line ~f:(fun l -> Queue.enqueue log (mask t l)));
   let dump () =

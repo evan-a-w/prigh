@@ -604,6 +604,8 @@ let apply t (event : P.Event.t) =
   | P.Event.Queue_update _
   | P.Event.Tool_confirm _
   | P.Event.Auth _
+  | P.Event.Tool_exec _
+  | P.Event.Tool_exec_cancel _
   | P.Event.Config_changed _ -> t
 ;;
 

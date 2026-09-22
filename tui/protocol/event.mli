@@ -67,6 +67,14 @@ type t =
       ; result : Subagent_result.t
       }
   | Auth of Auth_event.t
+  | Tool_exec of
+      { exec_id : string
+      ; call_id : string
+      ; name : string
+      ; arguments : Json.t
+      ; cwd : string
+      } (** run this tool on our machine (we are the active host) *)
+  | Tool_exec_cancel of string
 [@@deriving sexp_of, equal]
 
 val of_json : Json.t -> t Or_error.t

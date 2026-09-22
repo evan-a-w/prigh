@@ -4,6 +4,7 @@ open! Import
 let spec =
   { Tool_spec.name = "edit"
   ; parallel_safe = false
+  ; on_host = true
   ; destructive = true
   ; description =
       "Edit a file by exact text replacement. Each old_text must occur exactly \

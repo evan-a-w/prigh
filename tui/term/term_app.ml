@@ -351,13 +351,25 @@ let with_test_driver ~client ~(terminal : Test_terminal.t) ~writer ~reader f =
       f driver)
 ;;
 
-let run ~backend ~args =
-  match%bind.Deferred
-    Prigh_client.Stdio_transport.spawn ~prog:backend ~args ()
-  with
-  | Error _ as e -> Deferred.return e
-  | Ok transport ->
-    let client = Client.create transport in
+let run ~transport ~hello ~local_tools =
+  let client = Client.create transport in
+  let hello =
+    hello @ [ ("tools", if Option.is_some local_tools then `True else `False) ]
+  in
+  match%bind.Deferred Client.call client "hello" hello with
+  | Error _ as e ->
+    Client.close client;
+    Deferred.return e
+  | Ok reply ->
+    let client_id =
+      match Jsonaf.member "client_id" reply with
+      | Some (`String id) -> Some id
+      | _ -> None
+    in
+    let tool_host =
+      Option.map local_tools ~f:(fun backend ->
+        Prigh_client.Tool_host.create ~client ~backend)
+    in
     let quit_requested = Ivar.create () in
     let%bind.Deferred driver =
       Bonsai_term.start_with_driver
@@ -380,10 +392,15 @@ let run ~backend ~args =
        in
        let had_iexten = Tty.set_iexten tty false in
        install_repaint driver;
+       Option.iter client_id ~f:(fun id ->
+         Driver.send_incoming_event driver (App.Action.Set_client_id id));
        don't_wait_for
          (Pipe.iter_without_pushback
             (Client.incoming client)
             ~f:(fun incoming ->
+              (match incoming, tool_host with
+               | Event e, Some host -> Prigh_client.Tool_host.handle host e
+               | _ -> ());
               Driver.send_incoming_event driver (action_of_incoming incoming)));
        let%bind.Deferred () =
          Deferred.any_unit
@@ -394,6 +411,7 @@ let run ~backend ~args =
        (* Give the driver a frame to release the terminal before we exit. *)
        let%bind.Deferred () = Clock.after (Time_float.Span.of_sec 0.2) in
        ignore (Tty.set_iexten tty had_iexten : bool);
+       Option.iter tool_host ~f:Prigh_client.Tool_host.close;
        Client.close client;
        let%bind.Deferred () =
          Deferred.any_unit

@@ -6,6 +6,7 @@ let default_timeout = Time_ns.Span.of_min 10.
 let spec =
   { Tool_spec.name = "bash"
   ; parallel_safe = false
+  ; on_host = true
   ; destructive = true
   ; description =
       "Run a shell command with bash in the working directory. Returns \

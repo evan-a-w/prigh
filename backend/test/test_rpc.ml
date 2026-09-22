@@ -13,61 +13,93 @@ let login_manager t ~sw =
     ()
 ;;
 
+(* A server with one connected client; [h.sent] collects what the server
+   pushes to that client. *)
+type h =
+  { server : Rpc_server.t
+  ; client : Rpc_server.Client.t
+  ; login : Login_manager.t
+  ; sent : Json.t Queue.t
+  }
+
+let make_server t ~sw ~provider =
+  let login = login_manager t ~sw in
+  let sessions_dir = Filename.concat t.dir "sessions" in
+  let new_agent ?session ~cwd () =
+    Agent.create
+      ~env:t.env
+      ~sw
+      ~provider
+      ~tools:Tools.all
+      ~sessions_dir
+      ~home:t.dir
+      ?session
+      ~cwd
+      ()
+  in
+  let agent = new_agent ~cwd:t.dir () in
+  let server =
+    Rpc_server.create
+      ~env:t.env
+      ~sw
+      ~login
+      ~sessions_dir
+      ~new_agent
+      ~default_agent:agent
+      ()
+  in
+  let sent = Queue.create () in
+  let client = Rpc_server.connect server ~send:(Queue.enqueue sent) in
+  agent, { server; client; login; sent }
+;;
+
 let with_agent replies f =
   with_sandbox
   @@ fun t ->
   Eio.Switch.run
   @@ fun sw ->
-  let login = login_manager t ~sw in
-  let agent =
-    Agent.create
-      ~env:t.env
-      ~sw
-      ~provider:(Faux_provider.create replies)
-      ~tools:Tools.all
-      ~sessions_dir:(Filename.concat t.dir "sessions")
-      ~home:t.dir
-      ~cwd:t.dir
-      ()
-  in
-  f t agent login
+  let agent, h = make_server t ~sw ~provider:(Faux_provider.create replies) in
+  f t agent h
 ;;
 
-let call t agent login ?(params = "{}") meth =
+let call t h ?(params = "{}") meth =
   let request =
     Json.of_string
       (sprintf {|{"id": "r1", "method": "%s", "params": %s}|} meth params)
   in
   print_endline
-    (mask t (Json.to_string (Rpc_server.handle agent login request)))
+    (mask t (Json.to_string (Rpc_server.handle h.server h.client request)))
 ;;
+
+let current h = Rpc_server.agent_of_client h.server h.client
 
 let%expect_test "state, models, thinking, errors" =
   with_agent []
-  @@ fun t agent login ->
-  call t agent login "ping";
-  call t agent login "get_state";
-  call t agent login ~params:{|{"thinking": "high"}|} "set_thinking";
-  call t agent login ~params:{|{"thinking": "sideways"}|} "set_thinking";
-  call t agent login ~params:{|{"model": "deepseek-v4-pro"}|} "set_model";
-  call t agent login ~params:{|{"model": "gpt-9"}|} "set_model";
-  call t agent login ~params:{|{"model": "GPT-5.5"}|} "set_model";
-  call t agent login ~params:{|{"model": "deepseek v4 pro"}|} "set_model";
-  call t agent login ~params:{|{"model": "claude fabl"}|} "set_model";
-  call t agent login ~params:{|{"model": "Claude Fable 5.1"}|} "set_model";
-  call t agent login ~params:{|{"model": "deepseek-v4-pro"}|} "set_model";
-  call t agent login "get_state";
-  call t agent login "nope";
-  call t agent login ~params:{|{"text": 5}|} "prompt";
+  @@ fun t _agent h ->
+  call t h "ping";
+  call t h "get_state";
+  call t h ~params:{|{"thinking": "high"}|} "set_thinking";
+  call t h ~params:{|{"thinking": "sideways"}|} "set_thinking";
+  call t h ~params:{|{"model": "deepseek-v4-pro"}|} "set_model";
+  call t h ~params:{|{"model": "gpt-9"}|} "set_model";
+  call t h ~params:{|{"model": "GPT-5.5"}|} "set_model";
+  call t h ~params:{|{"model": "deepseek v4 pro"}|} "set_model";
+  call t h ~params:{|{"model": "claude fabl"}|} "set_model";
+  call t h ~params:{|{"model": "Claude Fable 5.1"}|} "set_model";
+  call t h ~params:{|{"model": "deepseek-v4-pro"}|} "set_model";
+  call t h "get_state";
+  call t h "nope";
+  call t h ~params:{|{"text": 5}|} "prompt";
   print_endline
     (Json.to_string
-       (Rpc_server.handle agent login (Json.of_string {|{"id": 7}|})));
+       (Rpc_server.handle h.server h.client (Json.of_string {|{"id": 7}|})));
   print_endline
-    (Json.to_string (Rpc_server.handle agent login (Json.of_string {|[1]|})));
+    (Json.to_string
+       (Rpc_server.handle h.server h.client (Json.of_string {|[1]|})));
   [%expect
     {|
     {"type":"response","id":"r1","ok":true,"result":"pong"}
-    {"type":"response","id":"r1","ok":true,"result":{"session_id":"<id>","session_path":"$DIR/sessions/<stamp>_<id>.jsonl","session_name":null,"cwd":"$DIR","git_branch":null,"model":{"id":"deepseek-flash","provider":"deepseek","key":"deepseek/deepseek-flash","name":"DeepSeek V4.1 Flash","context_window":1000000,"max_output":384000,"supports_thinking":true,"cost":{"input":0.3,"output":1.2,"cache_read":0.006}},"thinking":"off","running":false,"message_count":0,"usage":{"input":0,"output":0,"cache_read":0},"cost_usd":0,"context_tokens":0}}
+    {"type":"response","id":"r1","ok":true,"result":{"session_id":"<id>","session_path":"$DIR/sessions/<stamp>_<id>.jsonl","session_name":null,"cwd":"$DIR","git_branch":null,"model":{"id":"deepseek-flash","provider":"deepseek","key":"deepseek/deepseek-flash","name":"DeepSeek V4.1 Flash","context_window":1000000,"max_output":384000,"supports_thinking":true,"cost":{"input":0.3,"output":1.2,"cache_read":0.006}},"thinking":"off","running":false,"message_count":0,"usage":{"input":0,"output":0,"cache_read":0},"cost_usd":0,"context_tokens":0,"active_host":"backend","hosts":[{"id":"backend","name":"<host>","cwd":"$DIR"}]}}
     {"type":"response","id":"r1","ok":true,"result":{}}
     {"type":"response","id":"r1","ok":false,"error":"thinking must be one of: off, on, low, high, max"}
     {"type":"response","id":"r1","ok":true,"result":{}}
@@ -77,7 +109,7 @@ let%expect_test "state, models, thinking, errors" =
     {"type":"response","id":"r1","ok":false,"error":"model \"claude fabl\" is ambiguous; one of: anthropic/claude-fable-5, anthropic/claude-fable-5-1"}
     {"type":"response","id":"r1","ok":true,"result":{}}
     {"type":"response","id":"r1","ok":true,"result":{}}
-    {"type":"response","id":"r1","ok":true,"result":{"session_id":"<id>","session_path":"$DIR/sessions/<stamp>_<id>.jsonl","session_name":null,"cwd":"$DIR","git_branch":null,"model":{"id":"deepseek-v4-pro","provider":"deepseek","key":"deepseek/deepseek-v4-pro","name":"DeepSeek V4 Pro","context_window":1000000,"max_output":384000,"supports_thinking":true,"cost":{"input":1.32,"output":3.96,"cache_read":0.044}},"thinking":"high","running":false,"message_count":0,"usage":{"input":0,"output":0,"cache_read":0},"cost_usd":0,"context_tokens":0}}
+    {"type":"response","id":"r1","ok":true,"result":{"session_id":"<id>","session_path":"$DIR/sessions/<stamp>_<id>.jsonl","session_name":null,"cwd":"$DIR","git_branch":null,"model":{"id":"deepseek-v4-pro","provider":"deepseek","key":"deepseek/deepseek-v4-pro","name":"DeepSeek V4 Pro","context_window":1000000,"max_output":384000,"supports_thinking":true,"cost":{"input":1.32,"output":3.96,"cache_read":0.044}},"thinking":"high","running":false,"message_count":0,"usage":{"input":0,"output":0,"cache_read":0},"cost_usd":0,"context_tokens":0,"active_host":"backend","hosts":[{"id":"backend","name":"<host>","cwd":"$DIR"}]}}
     {"type":"response","id":"r1","ok":false,"error":"unknown method \"nope\""}
     {"type":"response","id":"r1","ok":false,"error":"param \"text\" must be a string"}
     {"type":"response","id":7,"ok":false,"error":"request must have a string \"method\""}
@@ -90,18 +122,18 @@ let%expect_test "prompt emits events, get_messages/get_entries reflect the run" 
     [ Reply.tool_call ~text:"Looking." ~id:"c1" ~name:"ls" ~arguments:"{}" ()
     ; Reply.text "Empty."
     ]
-  @@ fun t agent login ->
+  @@ fun t agent h ->
   let events = Queue.create () in
   Agent.subscribe agent ~f:(fun e -> Queue.enqueue events (Rpc_json.event e));
-  call t agent login ~params:{|{"text": "what is here?"}|} "prompt";
-  call t agent login ~params:{|{"text": "again"}|} "prompt";
+  call t h ~params:{|{"text": "what is here?"}|} "prompt";
+  call t h ~params:{|{"text": "again"}|} "prompt";
   Agent.wait_idle agent;
   Queue.iter events ~f:(fun e -> print_endline (mask t (Json.to_string e)));
   [%expect
     {|
     {"type":"response","id":"r1","ok":true,"result":{}}
     {"type":"response","id":"r1","ok":false,"error":"a run is already in progress; use steer or follow_up"}
-    {"type":"event","event":"state","state":{"session_id":"<id>","session_path":"$DIR/sessions/<stamp>_<id>.jsonl","session_name":null,"cwd":"$DIR","git_branch":null,"model":{"id":"deepseek-flash","provider":"deepseek","key":"deepseek/deepseek-flash","name":"DeepSeek V4.1 Flash","context_window":1000000,"max_output":384000,"supports_thinking":true,"cost":{"input":0.3,"output":1.2,"cache_read":0.006}},"thinking":"off","running":true,"message_count":0,"usage":{"input":0,"output":0,"cache_read":0},"cost_usd":0,"context_tokens":0}}
+    {"type":"event","event":"state","state":{"session_id":"<id>","session_path":"$DIR/sessions/<stamp>_<id>.jsonl","session_name":null,"cwd":"$DIR","git_branch":null,"model":{"id":"deepseek-flash","provider":"deepseek","key":"deepseek/deepseek-flash","name":"DeepSeek V4.1 Flash","context_window":1000000,"max_output":384000,"supports_thinking":true,"cost":{"input":0.3,"output":1.2,"cache_read":0.006}},"thinking":"off","running":true,"message_count":0,"usage":{"input":0,"output":0,"cache_read":0},"cost_usd":0,"context_tokens":0,"active_host":"backend","hosts":[{"id":"backend","name":"<host>","cwd":"$DIR"}]}}
     {"type":"event","event":"agent_start"}
     {"type":"event","event":"message_start","message":{"role":"user","text":"what is here?"}}
     {"type":"event","event":"message_end","message":{"role":"user","text":"what is here?"}}
@@ -122,10 +154,10 @@ let%expect_test "prompt emits events, get_messages/get_entries reflect the run" 
     {"type":"event","event":"message_end","message":{"role":"assistant","content":[{"type":"text","text":"Empty."}],"stop_reason":{"type":"end_turn"},"usage":{"input":10,"output":5,"cache_read":0},"model":"deepseek-flash"}}
     {"type":"event","event":"turn_end","assistant":{"role":"assistant","content":[{"type":"text","text":"Empty."}],"stop_reason":{"type":"end_turn"},"usage":{"input":10,"output":5,"cache_read":0},"model":"deepseek-flash"},"tool_results":[]}
     {"type":"event","event":"agent_end","messages":[{"role":"user","text":"what is here?"},{"role":"assistant","content":[{"type":"text","text":"Looking."},{"type":"tool_call","id":"c1","name":"ls","arguments":"{}"}],"stop_reason":{"type":"tool_use"},"usage":{"input":20,"output":8,"cache_read":5},"model":"deepseek-flash"},{"role":"tool_result","tool_call_id":"c1","tool_name":"ls","text":"sessions/\n","is_error":false},{"role":"assistant","content":[{"type":"text","text":"Empty."}],"stop_reason":{"type":"end_turn"},"usage":{"input":10,"output":5,"cache_read":0},"model":"deepseek-flash"}]}
-    {"type":"event","event":"state","state":{"session_id":"<id>","session_path":"$DIR/sessions/<stamp>_<id>.jsonl","session_name":null,"cwd":"$DIR","git_branch":null,"model":{"id":"deepseek-flash","provider":"deepseek","key":"deepseek/deepseek-flash","name":"DeepSeek V4.1 Flash","context_window":1000000,"max_output":384000,"supports_thinking":true,"cost":{"input":0.3,"output":1.2,"cache_read":0.006}},"thinking":"off","running":false,"message_count":4,"usage":{"input":30,"output":13,"cache_read":5},"cost_usd":2.313e-05,"context_tokens":10}}
+    {"type":"event","event":"state","state":{"session_id":"<id>","session_path":"$DIR/sessions/<stamp>_<id>.jsonl","session_name":null,"cwd":"$DIR","git_branch":null,"model":{"id":"deepseek-flash","provider":"deepseek","key":"deepseek/deepseek-flash","name":"DeepSeek V4.1 Flash","context_window":1000000,"max_output":384000,"supports_thinking":true,"cost":{"input":0.3,"output":1.2,"cache_read":0.006}},"thinking":"off","running":false,"message_count":4,"usage":{"input":30,"output":13,"cache_read":5},"cost_usd":2.313e-05,"context_tokens":10,"active_host":"backend","hosts":[{"id":"backend","name":"<host>","cwd":"$DIR"}]}}
     |}];
-  call t agent login "get_messages";
-  call t agent login "get_entries";
+  call t h "get_messages";
+  call t h "get_entries";
   [%expect
     {|
     {"type":"response","id":"r1","ok":true,"result":[{"role":"user","text":"what is here?"},{"role":"assistant","content":[{"type":"text","text":"Looking."},{"type":"tool_call","id":"c1","name":"ls","arguments":"{}"}],"stop_reason":{"type":"tool_use"},"usage":{"input":20,"output":8,"cache_read":5},"model":"deepseek-flash"},{"role":"tool_result","tool_call_id":"c1","tool_name":"ls","text":"sessions/\n","is_error":false},{"role":"assistant","content":[{"type":"text","text":"Empty."}],"stop_reason":{"type":"end_turn"},"usage":{"input":10,"output":5,"cache_read":0},"model":"deepseek-flash"}]}
@@ -140,27 +172,20 @@ let%expect_test "prompt attachments are inlined into the user message" =
   @@ fun sw ->
   write t "a.txt" "hello\nworld\n";
   Core_unix.mkdir_p (Filename.concat t.dir "dir");
-  let login = login_manager t ~sw in
   let on_request (request : Provider.Request.t) =
     List.iter request.messages ~f:(function
       | Message.User u -> print_endline (mask t u.text)
       | _ -> ())
   in
-  let agent =
-    Agent.create
-      ~env:t.env
+  let agent, h =
+    make_server
+      t
       ~sw
       ~provider:(Faux_provider.create ~on_request [ Reply.text "ok" ])
-      ~tools:Tools.all
-      ~sessions_dir:(Filename.concat t.dir "sessions")
-      ~home:t.dir
-      ~cwd:t.dir
-      ()
   in
   call
     t
-    agent
-    login
+    h
     ~params:{|{"text": "look", "attachments": ["a.txt", "missing.txt", "dir"]}|}
     "prompt";
   Agent.wait_idle agent;
@@ -182,23 +207,23 @@ let%expect_test "prompt attachments are inlined into the user message" =
 
 let%expect_test "sessions: list, new, switch, fork, rewind" =
   with_agent [ Reply.text "one"; Reply.text "two" ]
-  @@ fun t agent login ->
-  call t agent login ~params:{|{"text": "first"}|} "prompt";
+  @@ fun t agent h ->
+  call t h ~params:{|{"text": "first"}|} "prompt";
   Agent.wait_idle agent;
   let first = (Agent.state agent).session_path in
-  call t agent login "new_session";
-  call t agent login "list_sessions";
-  call t agent login ~params:(sprintf {|{"path": "%s"}|} first) "switch_session";
-  call t agent login ~params:{|{"path": "/nowhere.jsonl"}|} "switch_session";
-  call t agent login "fork";
-  call t agent login ~params:{|{"to": "bogus"}|} "rewind";
+  call t h "new_session";
+  call t h "list_sessions";
+  call t h ~params:(sprintf {|{"path": "%s"}|} first) "switch_session";
+  call t h ~params:{|{"path": "/nowhere.jsonl"}|} "switch_session";
+  call t h "fork";
+  call t h ~params:{|{"to": "bogus"}|} "rewind";
   [%expect
     {|
     {"type":"response","id":"r1","ok":true,"result":{}}
     {"type":"response","id":"r1","ok":true,"result":{}}
-    {"type":"response","id":"r1","ok":true,"result":[{"id":"<id>","path":"$DIR/sessions/<stamp>_<id>.jsonl","name":null,"cwd":"$DIR","created_at":"<time>","updated_at":"<time>","first_prompt":"first","message_count":2,"parent":null},{"id":"<id>","path":"$DIR/sessions/<stamp>_<id>.jsonl","name":null,"cwd":"$DIR","created_at":"<time>","updated_at":"<time>","first_prompt":null,"message_count":0,"parent":null}]}
+    {"type":"response","id":"r1","ok":true,"result":[{"id":"<id>","path":"$DIR/sessions/<stamp>_<id>.jsonl","name":null,"cwd":"$DIR","created_at":"<time>","updated_at":"<time>","first_prompt":"first","message_count":2,"parent":null,"live":true,"running":false,"clients":0},{"id":"<id>","path":"$DIR/sessions/<stamp>_<id>.jsonl","name":null,"cwd":"$DIR","created_at":"<time>","updated_at":"<time>","first_prompt":null,"message_count":0,"parent":null,"live":true,"running":false,"clients":1}]}
     {"type":"response","id":"r1","ok":true,"result":{}}
-    {"type":"response","id":"r1","ok":false,"error":"(Sys_error \"/nowhere.jsonl: No such file or directory\")"}
+    {"type":"response","id":"r1","ok":false,"error":"no session \"/nowhere.jsonl\""}
     {"type":"response","id":"r1","ok":true,"result":{}}
     {"type":"response","id":"r1","ok":false,"error":"(\"no such entry\" (to_ bogus))"}
     |}]
@@ -211,9 +236,9 @@ let%expect_test
   @@ fun t ->
   Eio.Switch.run
   @@ fun sw ->
-  let agent =
-    Agent.create
-      ~env:t.env
+  let agent, h =
+    make_server
+      t
       ~sw
       ~provider:
         (Faux_provider.create
@@ -223,19 +248,14 @@ let%expect_test
                ~arguments:{|{"command":"sleep 5"}|}
                ()
            ])
-      ~tools:Tools.all
-      ~sessions_dir:(Filename.concat t.dir "sessions")
-      ~home:t.dir
-      ~cwd:t.dir
-      ()
   in
-  let login = login_manager t ~sw in
   let in_r, in_w = Eio_unix.pipe sw in
   let out_r, out_w = Eio_unix.pipe sw in
   let output = Buffer.create 4096 in
   Eio.Fiber.all
     [ (fun () ->
-        Rpc_server.run ~env:t.env ~agent ~login ~input:in_r ~output:out_w;
+        Rpc_server.serve_connection h.server ~input:in_r ~output:out_w;
+        Rpc_server.shutdown h.server;
         Eio.Flow.close out_w)
     ; (fun () ->
         Eio.Flow.copy_string
@@ -284,13 +304,6 @@ let%expect_test
     event "message_update"
     event "message_end"
     event "tool_start"
-    event "queue_update"
-    event "tool_end"
-    event "message_start"
-    event "message_end"
-    event "turn_end"
-    event "agent_end"
-    event "state"
     false
     |}]
 ;;
@@ -303,13 +316,13 @@ let%expect_test "abort returns restored messages and emits queue_update" =
         ~arguments:{|{"command":"sleep 5"}|}
         ()
     ]
-  @@ fun t agent login ->
+  @@ fun t agent h ->
   let events = Queue.create () in
   Agent.subscribe agent ~f:(fun e -> Queue.enqueue events (Rpc_json.event e));
-  call t agent login ~params:{|{"text": "go"}|} "prompt";
-  call t agent login ~params:{|{"text": "first steer"}|} "steer";
-  call t agent login ~params:{|{"text": "second follow up"}|} "follow_up";
-  call t agent login "abort";
+  call t h ~params:{|{"text": "go"}|} "prompt";
+  call t h ~params:{|{"text": "first steer"}|} "steer";
+  call t h ~params:{|{"text": "second follow up"}|} "follow_up";
+  call t h "abort";
   Agent.wait_idle agent;
   Queue.iter events ~f:(fun e -> print_endline (mask t (Json.to_string e)));
   [%expect
@@ -318,7 +331,7 @@ let%expect_test "abort returns restored messages and emits queue_update" =
     {"type":"response","id":"r1","ok":true,"result":{}}
     {"type":"response","id":"r1","ok":true,"result":{}}
     {"type":"response","id":"r1","ok":true,"result":{"restored":["first steer","second follow up"]}}
-    {"type":"event","event":"state","state":{"session_id":"<id>","session_path":"$DIR/sessions/<stamp>_<id>.jsonl","session_name":null,"cwd":"$DIR","git_branch":null,"model":{"id":"deepseek-flash","provider":"deepseek","key":"deepseek/deepseek-flash","name":"DeepSeek V4.1 Flash","context_window":1000000,"max_output":384000,"supports_thinking":true,"cost":{"input":0.3,"output":1.2,"cache_read":0.006}},"thinking":"off","running":true,"message_count":0,"usage":{"input":0,"output":0,"cache_read":0},"cost_usd":0,"context_tokens":0}}
+    {"type":"event","event":"state","state":{"session_id":"<id>","session_path":"$DIR/sessions/<stamp>_<id>.jsonl","session_name":null,"cwd":"$DIR","git_branch":null,"model":{"id":"deepseek-flash","provider":"deepseek","key":"deepseek/deepseek-flash","name":"DeepSeek V4.1 Flash","context_window":1000000,"max_output":384000,"supports_thinking":true,"cost":{"input":0.3,"output":1.2,"cache_read":0.006}},"thinking":"off","running":true,"message_count":0,"usage":{"input":0,"output":0,"cache_read":0},"cost_usd":0,"context_tokens":0,"active_host":"backend","hosts":[{"id":"backend","name":"<host>","cwd":"$DIR"}]}}
     {"type":"event","event":"agent_start"}
     {"type":"event","event":"message_start","message":{"role":"user","text":"go"}}
     {"type":"event","event":"message_end","message":{"role":"user","text":"go"}}
@@ -330,36 +343,26 @@ let%expect_test "abort returns restored messages and emits queue_update" =
     {"type":"event","event":"message_end","message":{"role":"assistant","content":[],"stop_reason":{"type":"aborted"},"usage":{"input":20,"output":8,"cache_read":5},"model":"deepseek-flash"}}
     {"type":"event","event":"turn_end","assistant":{"role":"assistant","content":[],"stop_reason":{"type":"aborted"},"usage":{"input":20,"output":8,"cache_read":5},"model":"deepseek-flash"},"tool_results":[]}
     {"type":"event","event":"agent_end","messages":[{"role":"user","text":"go"},{"role":"assistant","content":[],"stop_reason":{"type":"aborted"},"usage":{"input":20,"output":8,"cache_read":5},"model":"deepseek-flash"}]}
-    {"type":"event","event":"state","state":{"session_id":"<id>","session_path":"$DIR/sessions/<stamp>_<id>.jsonl","session_name":null,"cwd":"$DIR","git_branch":null,"model":{"id":"deepseek-flash","provider":"deepseek","key":"deepseek/deepseek-flash","name":"DeepSeek V4.1 Flash","context_window":1000000,"max_output":384000,"supports_thinking":true,"cost":{"input":0.3,"output":1.2,"cache_read":0.006}},"thinking":"off","running":false,"message_count":2,"usage":{"input":20,"output":8,"cache_read":5},"cost_usd":1.413e-05,"context_tokens":20}}
+    {"type":"event","event":"state","state":{"session_id":"<id>","session_path":"$DIR/sessions/<stamp>_<id>.jsonl","session_name":null,"cwd":"$DIR","git_branch":null,"model":{"id":"deepseek-flash","provider":"deepseek","key":"deepseek/deepseek-flash","name":"DeepSeek V4.1 Flash","context_window":1000000,"max_output":384000,"supports_thinking":true,"cost":{"input":0.3,"output":1.2,"cache_read":0.006}},"thinking":"off","running":false,"message_count":2,"usage":{"input":20,"output":8,"cache_read":5},"cost_usd":1.413e-05,"context_tokens":20,"active_host":"backend","hosts":[{"id":"backend","name":"<host>","cwd":"$DIR"}]}}
     |}]
 ;;
 
 let%expect_test "auth: status, login via prompt, logout" =
   with_agent []
-  @@ fun t agent login ->
-  Login_manager.subscribe login ~f:(fun e ->
+  @@ fun t _agent h ->
+  Login_manager.subscribe h.login ~f:(fun e ->
     print_endline (Json.to_string (Rpc_json.login_event e)));
-  call t agent login "auth_status";
-  call t agent login ~params:{|{"provider": "groq"}|} "login";
-  call
-    t
-    agent
-    login
-    ~params:{|{"provider": "deepseek", "method": "oauth"}|}
-    "login";
-  call t agent login ~params:{|{"provider": "deepseek"}|} "login";
-  call t agent login ~params:{|{"id": "p1", "value": "sk-rpc"}|} "auth_respond";
-  Login_manager.wait login;
-  call t agent login "auth_status";
-  call
-    t
-    agent
-    login
-    ~params:{|{"provider": "anthropic", "method": "api_key"}|}
-    "login";
-  call t agent login "auth_cancel";
-  Login_manager.wait login;
-  call t agent login ~params:{|{"provider": "deepseek"}|} "logout";
+  call t h "auth_status";
+  call t h ~params:{|{"provider": "groq"}|} "login";
+  call t h ~params:{|{"provider": "deepseek", "method": "oauth"}|} "login";
+  call t h ~params:{|{"provider": "deepseek"}|} "login";
+  call t h ~params:{|{"id": "p1", "value": "sk-rpc"}|} "auth_respond";
+  Login_manager.wait h.login;
+  call t h "auth_status";
+  call t h ~params:{|{"provider": "anthropic", "method": "api_key"}|} "login";
+  call t h "auth_cancel";
+  Login_manager.wait h.login;
+  call t h ~params:{|{"provider": "deepseek"}|} "logout";
   [%expect
     {|
     {"type":"response","id":"r1","ok":true,"result":[{"provider":"anthropic","name":"Anthropic","methods":[{"method":"oauth","label":"Anthropic (Claude Pro/Max)"},{"method":"api_key","label":"Anthropic API key"}],"configured":null,"expires_ms":null},{"provider":"openai","name":"OpenAI","methods":[{"method":"api_key","label":"OpenAI API key"}],"configured":null,"expires_ms":null},{"provider":"openai-codex","name":"OpenAI Codex (ChatGPT)","methods":[{"method":"oauth","label":"OpenAI (ChatGPT Plus/Pro)"}],"configured":null,"expires_ms":null},{"provider":"deepseek","name":"DeepSeek","methods":[{"method":"api_key","label":"DeepSeek API key"}],"configured":null,"expires_ms":null}]}
@@ -384,11 +387,11 @@ let%expect_test "session stats" =
     [ Reply.tool_call ~text:"Looking." ~id:"c1" ~name:"ls" ~arguments:"{}" ()
     ; Reply.text "Empty."
     ]
-  @@ fun t agent login ->
-  call t agent login ~params:{|{"model": "deepseek-v4-pro"}|} "set_model";
-  call t agent login ~params:{|{"text": "what is here?"}|} "prompt";
+  @@ fun t agent h ->
+  call t h ~params:{|{"model": "deepseek-v4-pro"}|} "set_model";
+  call t h ~params:{|{"text": "what is here?"}|} "prompt";
   Agent.wait_idle agent;
-  call t agent login "session_stats";
+  call t h "session_stats";
   [%expect
     {|
     {"type":"response","id":"r1","ok":true,"result":{}}
@@ -399,67 +402,56 @@ let%expect_test "session stats" =
 
 let%expect_test "import, set_session_name, export, clone, set_cwd" =
   with_agent [ Reply.text "unused" ]
-  @@ fun t agent login ->
+  @@ fun t _agent h ->
   let external_dir = Filename.concat t.dir "external" in
   let src = Session.create ~dir:external_dir ~cwd:t.dir () in
   let (_ : Session.Entry.t) =
     Session.append_message src (Message.user "imported question")
   in
-  call
-    t
-    agent
-    login
-    ~params:(sprintf {|{"path": "%s"}|} (Session.path src))
-    "import";
-  call t agent login "get_state";
-  call t agent login ~params:{|{"name": "imported"}|} "set_session_name";
-  call t agent login "get_state";
-  call t agent login ~params:{|{"format": "markdown"}|} "export";
-  call t agent login ~params:{|{"format": "jsonl"}|} "export";
-  call t agent login ~params:{|{"format": "html"}|} "export";
-  call t agent login ~params:{|{"path": "/nowhere.jsonl"}|} "import";
-  call t agent login "clone";
+  call t h ~params:(sprintf {|{"path": "%s"}|} (Session.path src)) "import";
+  call t h "get_state";
+  call t h ~params:{|{"name": "imported"}|} "set_session_name";
+  call t h "get_state";
+  call t h ~params:{|{"format": "markdown"}|} "export";
+  call t h ~params:{|{"format": "jsonl"}|} "export";
+  call t h ~params:{|{"format": "html"}|} "export";
+  call t h ~params:{|{"path": "/nowhere.jsonl"}|} "import";
+  call t h "clone";
   let sub = Filename.concat t.dir "sub" in
   Core_unix.mkdir_p sub;
-  call t agent login ~params:(sprintf {|{"path": "%s"}|} sub) "set_cwd";
-  call t agent login "get_state";
+  call t h ~params:(sprintf {|{"path": "%s"}|} sub) "set_cwd";
+  call t h "get_state";
   [%expect
     {|
     {"type":"response","id":"r1","ok":true,"result":{"path":"$DIR/sessions/<stamp>_<id>.jsonl"}}
-    {"type":"response","id":"r1","ok":true,"result":{"session_id":"<id>","session_path":"$DIR/sessions/<stamp>_<id>.jsonl","session_name":null,"cwd":"$DIR","git_branch":null,"model":{"id":"deepseek-flash","provider":"deepseek","key":"deepseek/deepseek-flash","name":"DeepSeek V4.1 Flash","context_window":1000000,"max_output":384000,"supports_thinking":true,"cost":{"input":0.3,"output":1.2,"cache_read":0.006}},"thinking":"off","running":false,"message_count":1,"usage":{"input":0,"output":0,"cache_read":0},"cost_usd":0,"context_tokens":0}}
+    {"type":"response","id":"r1","ok":true,"result":{"session_id":"<id>","session_path":"$DIR/sessions/<stamp>_<id>.jsonl","session_name":null,"cwd":"$DIR","git_branch":null,"model":{"id":"deepseek-flash","provider":"deepseek","key":"deepseek/deepseek-flash","name":"DeepSeek V4.1 Flash","context_window":1000000,"max_output":384000,"supports_thinking":true,"cost":{"input":0.3,"output":1.2,"cache_read":0.006}},"thinking":"off","running":false,"message_count":1,"usage":{"input":0,"output":0,"cache_read":0},"cost_usd":0,"context_tokens":0,"active_host":"backend","hosts":[{"id":"backend","name":"<host>","cwd":"$DIR"}]}}
     {"type":"response","id":"r1","ok":true,"result":{}}
-    {"type":"response","id":"r1","ok":true,"result":{"session_id":"<id>","session_path":"$DIR/sessions/<stamp>_<id>.jsonl","session_name":"imported","cwd":"$DIR","git_branch":null,"model":{"id":"deepseek-flash","provider":"deepseek","key":"deepseek/deepseek-flash","name":"DeepSeek V4.1 Flash","context_window":1000000,"max_output":384000,"supports_thinking":true,"cost":{"input":0.3,"output":1.2,"cache_read":0.006}},"thinking":"off","running":false,"message_count":1,"usage":{"input":0,"output":0,"cache_read":0},"cost_usd":0,"context_tokens":0}}
+    {"type":"response","id":"r1","ok":true,"result":{"session_id":"<id>","session_path":"$DIR/sessions/<stamp>_<id>.jsonl","session_name":"imported","cwd":"$DIR","git_branch":null,"model":{"id":"deepseek-flash","provider":"deepseek","key":"deepseek/deepseek-flash","name":"DeepSeek V4.1 Flash","context_window":1000000,"max_output":384000,"supports_thinking":true,"cost":{"input":0.3,"output":1.2,"cache_read":0.006}},"thinking":"off","running":false,"message_count":1,"usage":{"input":0,"output":0,"cache_read":0},"cost_usd":0,"context_tokens":0,"active_host":"backend","hosts":[{"id":"backend","name":"<host>","cwd":"$DIR"}]}}
     {"type":"response","id":"r1","ok":true,"result":{"path":"$DIR/sessions/exports/<stamp>_<id>.md"}}
     {"type":"response","id":"r1","ok":true,"result":{"path":"$DIR/sessions/exports/<stamp>_<id>.jsonl"}}
     {"type":"response","id":"r1","ok":false,"error":"unknown export format \"html\" (expected markdown or jsonl)"}
     {"type":"response","id":"r1","ok":false,"error":"(Sys_error \"/nowhere.jsonl: No such file or directory\")"}
     {"type":"response","id":"r1","ok":true,"result":{}}
     {"type":"response","id":"r1","ok":true,"result":{}}
-    {"type":"response","id":"r1","ok":true,"result":{"session_id":"<id>","session_path":"$DIR/sessions/<stamp>_<id>.jsonl","session_name":"imported","cwd":"$DIR/sub","git_branch":null,"model":{"id":"deepseek-flash","provider":"deepseek","key":"deepseek/deepseek-flash","name":"DeepSeek V4.1 Flash","context_window":1000000,"max_output":384000,"supports_thinking":true,"cost":{"input":0.3,"output":1.2,"cache_read":0.006}},"thinking":"off","running":false,"message_count":1,"usage":{"input":0,"output":0,"cache_read":0},"cost_usd":0,"context_tokens":0}}
+    {"type":"response","id":"r1","ok":true,"result":{"session_id":"<id>","session_path":"$DIR/sessions/<stamp>_<id>.jsonl","session_name":"imported","cwd":"$DIR/sub","git_branch":null,"model":{"id":"deepseek-flash","provider":"deepseek","key":"deepseek/deepseek-flash","name":"DeepSeek V4.1 Flash","context_window":1000000,"max_output":384000,"supports_thinking":true,"cost":{"input":0.3,"output":1.2,"cache_read":0.006}},"thinking":"off","running":false,"message_count":1,"usage":{"input":0,"output":0,"cache_read":0},"cost_usd":0,"context_tokens":0,"active_host":"backend","hosts":[{"id":"backend","name":"<host>","cwd":"$DIR/sub"}]}}
     |}]
 ;;
 
 let%expect_test "config: get, set, invalid, and the config_changed event" =
   with_agent []
-  @@ fun t agent login ->
+  @@ fun t agent h ->
   Agent.subscribe agent ~f:(fun e ->
     print_endline (Json.to_string (Rpc_json.event e)));
-  call t agent login "get_config";
+  call t h "get_config";
   call
     t
-    agent
-    login
+    h
     ~params:{|{"config": {"scoped_models": ["a", "b"], "confirm_tools": true}}|}
     "set_config";
-  call t agent login "get_config";
-  call t agent login ~params:{|{"config": {"scoped_models": "x"}}|} "set_config";
-  call t agent login ~params:{|{}|} "set_config";
-  call
-    t
-    agent
-    login
-    ~params:{|{"call_id": "nope", "allow": true}|}
-    "tool_confirm_respond";
+  call t h "get_config";
+  call t h ~params:{|{"config": {"scoped_models": "x"}}|} "set_config";
+  call t h ~params:{|{}|} "set_config";
+  call t h ~params:{|{"call_id": "nope", "allow": true}|} "tool_confirm_respond";
   [%expect
     {|
     {"type":"response","id":"r1","ok":true,"result":{"scoped_models":[],"confirm_tools":false}}
@@ -475,16 +467,15 @@ let%expect_test "config: get, set, invalid, and the config_changed event" =
 let%expect_test "shell runs a command, streams tool events, and adds to context"
   =
   with_agent []
-  @@ fun t agent login ->
+  @@ fun t agent h ->
   Agent.subscribe agent ~f:(fun e ->
     print_endline (mask t (Json.to_string (Rpc_json.event e))));
   call
     t
-    agent
-    login
+    h
     ~params:{|{"command": "printf 'a\\nb'", "add_to_context": true}|}
     "shell";
-  call t agent login "get_messages";
+  call t h "get_messages";
   [%expect
     {|
     {"type":"event","event":"tool_start","call":{"id":"shell-0","name":"shell","arguments":"{\"command\":\"printf 'a\\\\nb'\"}"}}
@@ -492,7 +483,7 @@ let%expect_test "shell runs a command, streams tool events, and adds to context"
     {"type":"event","event":"tool_end","call":{"id":"shell-0","name":"shell","arguments":"{\"command\":\"printf 'a\\\\nb'\"}"},"result":{"role":"tool_result","tool_call_id":"shell-0","tool_name":"shell","text":"a\nb","is_error":false}}
     {"type":"event","event":"message_start","message":{"role":"user","text":"$ printf 'a\\nb'\na\nb"}}
     {"type":"event","event":"message_end","message":{"role":"user","text":"$ printf 'a\\nb'\na\nb"}}
-    {"type":"event","event":"state","state":{"session_id":"<id>","session_path":"$DIR/sessions/<stamp>_<id>.jsonl","session_name":null,"cwd":"$DIR","git_branch":null,"model":{"id":"deepseek-flash","provider":"deepseek","key":"deepseek/deepseek-flash","name":"DeepSeek V4.1 Flash","context_window":1000000,"max_output":384000,"supports_thinking":true,"cost":{"input":0.3,"output":1.2,"cache_read":0.006}},"thinking":"off","running":false,"message_count":1,"usage":{"input":0,"output":0,"cache_read":0},"cost_usd":0,"context_tokens":0}}
+    {"type":"event","event":"state","state":{"session_id":"<id>","session_path":"$DIR/sessions/<stamp>_<id>.jsonl","session_name":null,"cwd":"$DIR","git_branch":null,"model":{"id":"deepseek-flash","provider":"deepseek","key":"deepseek/deepseek-flash","name":"DeepSeek V4.1 Flash","context_window":1000000,"max_output":384000,"supports_thinking":true,"cost":{"input":0.3,"output":1.2,"cache_read":0.006}},"thinking":"off","running":false,"message_count":1,"usage":{"input":0,"output":0,"cache_read":0},"cost_usd":0,"context_tokens":0,"active_host":"backend","hosts":[{"id":"backend","name":"<host>","cwd":"$DIR"}]}}
     {"type":"response","id":"r1","ok":true,"result":{"text":"a\nb","is_error":false}}
     {"type":"response","id":"r1","ok":true,"result":[{"role":"user","text":"$ printf 'a\\nb'\na\nb"}]}
     |}]
@@ -500,20 +491,14 @@ let%expect_test "shell runs a command, streams tool events, and adds to context"
 
 let%expect_test "shell without add_to_context leaves messages unchanged" =
   with_agent []
-  @@ fun t agent login ->
+  @@ fun t _agent h ->
   call
     t
-    agent
-    login
+    h
     ~params:{|{"command": "printf 'a\\nb'", "add_to_context": false}|}
     "shell";
-  call
-    t
-    agent
-    login
-    ~params:{|{"command": "exit 3", "add_to_context": false}|}
-    "shell";
-  call t agent login "get_messages";
+  call t h ~params:{|{"command": "exit 3", "add_to_context": false}|} "shell";
+  call t h "get_messages";
   [%expect
     {|
     {"type":"response","id":"r1","ok":true,"result":{"text":"a\nb","is_error":false}}
@@ -531,14 +516,9 @@ let%expect_test "shell refuses while a run is in progress" =
         ()
     ; Reply.text "done"
     ]
-  @@ fun t agent login ->
-  call t agent login ~params:{|{"text": "go"}|} "prompt";
-  call
-    t
-    agent
-    login
-    ~params:{|{"command": "echo hi", "add_to_context": false}|}
-    "shell";
+  @@ fun t agent h ->
+  call t h ~params:{|{"text": "go"}|} "prompt";
+  call t h ~params:{|{"command": "echo hi", "add_to_context": false}|} "shell";
   Agent.wait_idle agent;
   [%expect
     {|
@@ -556,13 +536,13 @@ let%expect_test "dequeue returns queued messages and null when empty" =
         ()
     ; Reply.text "done"
     ]
-  @@ fun t agent login ->
-  call t agent login ~params:{|{"text": "go"}|} "prompt";
-  call t agent login ~params:{|{"text": "steer one"}|} "steer";
-  call t agent login ~params:{|{"text": "follow up"}|} "follow_up";
-  call t agent login "dequeue";
-  call t agent login "dequeue";
-  call t agent login "dequeue";
+  @@ fun t agent h ->
+  call t h ~params:{|{"text": "go"}|} "prompt";
+  call t h ~params:{|{"text": "steer one"}|} "steer";
+  call t h ~params:{|{"text": "follow up"}|} "follow_up";
+  call t h "dequeue";
+  call t h "dequeue";
+  call t h "dequeue";
   Agent.wait_idle agent;
   [%expect
     {|
@@ -572,5 +552,158 @@ let%expect_test "dequeue returns queued messages and null when empty" =
     {"type":"response","id":"r1","ok":true,"result":{"text":"follow up","attachments":[]}}
     {"type":"response","id":"r1","ok":true,"result":{"text":"steer one","attachments":[]}}
     {"type":"response","id":"r1","ok":true,"result":null}
+    |}]
+;;
+
+let is_exec json =
+  match Json.member "event" json with
+  | Some (`String "tool_exec") -> true
+  | _ -> false
+;;
+
+(* Yields until the server pushes a [tool_exec] to [sent]. *)
+let wait_for_exec sent =
+  let rec go n =
+    match Queue.find sent ~f:is_exec with
+    | Some json -> json
+    | None ->
+      if n = 0 then failwith "no tool_exec";
+      Eio.Fiber.yield ();
+      go (n - 1)
+  in
+  go 1000
+;;
+
+(* A second client that advertises tools becomes the session's active host
+   (tools default to the frontend); its [tool_exec] events are answered
+   through [tool_exec_output]/[tool_exec_result]. *)
+let%expect_test "remote tool host: exec round trip, switch, disconnect" =
+  with_agent
+    [ Reply.tool_call ~id:"c1" ~name:"bash" ~arguments:{|{"command":"x"}|} ()
+    ; Reply.text "done"
+    ; Reply.tool_call ~id:"c2" ~name:"ls" ~arguments:"{}" ()
+    ; Reply.text "done again"
+    ]
+  @@ fun t agent h ->
+  let sent = Queue.create () in
+  let laptop = Rpc_server.connect h.server ~send:(Queue.enqueue sent) in
+  let call_as client ?(params = "{}") meth =
+    let request =
+      Json.of_string
+        (sprintf {|{"id": "r2", "method": "%s", "params": %s}|} meth params)
+    in
+    print_endline
+      (mask t (Json.to_string (Rpc_server.handle h.server client request)))
+  in
+  call_as
+    laptop
+    ~params:{|{"name": "laptop", "tools": true, "cwd": "/home/me/proj"}|}
+    "hello";
+  let state = Agent.state agent in
+  print_endline (mask t (sprintf "%s %s" state.active_host state.cwd));
+  (* The exec goes only to the host client. *)
+  Queue.clear sent;
+  Queue.clear h.sent;
+  call t h ~params:{|{"text": "run it"}|} "prompt";
+  let exec = wait_for_exec sent in
+  let exec_id =
+    match Json.member "exec_id" exec with
+    | Some (`String id) -> id
+    | _ -> ""
+  in
+  print_endline (mask t (Json.to_string exec));
+  printf "default client saw tool_exec: %b\n" (Queue.exists h.sent ~f:is_exec);
+  call_as
+    laptop
+    ~params:(sprintf {|{"exec_id": "%s", "chunk": "partial\n"}|} exec_id)
+    "tool_exec_output";
+  call_as
+    laptop
+    ~params:
+      (sprintf
+         {|{"exec_id": "%s", "text": "partial\nall\n", "is_error": false}|}
+         exec_id)
+    "tool_exec_result";
+  call_as laptop ~params:{|{"exec_id": "nope", "text": ""}|} "tool_exec_result";
+  Agent.wait_idle agent;
+  List.iter (Agent.messages agent) ~f:(function
+    | Message.Tool_result r -> printf "tool_result: %S\n" r.text
+    | _ -> ());
+  [%expect
+    {|
+    {"type":"response","id":"r2","ok":true,"result":{"client_id":"client-2","state":{"session_id":"<id>","session_path":"$DIR/sessions/<stamp>_<id>.jsonl","session_name":null,"cwd":"/home/me/proj","git_branch":null,"model":{"id":"deepseek-flash","provider":"deepseek","key":"deepseek/deepseek-flash","name":"DeepSeek V4.1 Flash","context_window":1000000,"max_output":384000,"supports_thinking":true,"cost":{"input":0.3,"output":1.2,"cache_read":0.006}},"thinking":"off","running":false,"message_count":0,"usage":{"input":0,"output":0,"cache_read":0},"cost_usd":0,"context_tokens":0,"active_host":"client-2","hosts":[{"id":"backend","name":"<host>","cwd":"$DIR"},{"id":"client-2","name":"laptop","cwd":"/home/me/proj"}]}}}
+    client-2 /home/me/proj
+    {"type":"response","id":"r1","ok":true,"result":{}}
+    {"type":"event","event":"tool_exec","host":"client-2","exec_id":"c1-0","call_id":"c1","name":"bash","arguments":{"command":"x"},"cwd":"/home/me/proj"}
+    default client saw tool_exec: false
+    {"type":"response","id":"r2","ok":true,"result":{}}
+    {"type":"response","id":"r2","ok":true,"result":{}}
+    {"type":"response","id":"r2","ok":false,"error":"no tool execution \"nope\""}
+    tool_result: "partial\nall\n"
+    |}];
+  (* Switch back to the backend, then drop the laptop: an unknown host is
+     refused, the backend runs the next call itself. *)
+  call t h ~params:{|{"host": "nobody"}|} "set_active_host";
+  call t h ~params:{|{"host": "backend"}|} "set_active_host";
+  Rpc_server.disconnect h.server laptop;
+  print_endline
+    (mask t (Sexp.to_string [%sexp (Agent.hosts agent : Agent.Host.t list)]));
+  call t h ~params:{|{"text": "again"}|} "prompt";
+  Agent.wait_idle agent;
+  List.iter
+    (List.drop (Agent.messages agent) 4)
+    ~f:(function
+      | Message.Tool_result r -> printf "tool_result: %S\n" r.text
+      | _ -> ());
+  [%expect
+    {|
+    {"type":"response","id":"r1","ok":false,"error":"unknown tool host \"nobody\""}
+    {"type":"response","id":"r1","ok":true,"result":{}}
+    (((id backend)(name <host>)(cwd $DIR)))
+    {"type":"response","id":"r1","ok":true,"result":{}}
+    tool_result: "sessions/\n"
+    |}]
+;;
+
+let%expect_test "remote tool host: disconnect mid-call fails the call" =
+  with_agent
+    [ Reply.tool_call ~id:"c1" ~name:"bash" ~arguments:{|{"command":"x"}|} ()
+    ; Reply.text "done"
+    ; Reply.tool_call ~id:"c2" ~name:"bash" ~arguments:{|{"command":"y"}|} ()
+    ; Reply.text "done"
+    ]
+  @@ fun t agent h ->
+  let sent = Queue.create () in
+  let laptop = Rpc_server.connect h.server ~send:(Queue.enqueue sent) in
+  ignore
+    (Rpc_server.handle
+       h.server
+       laptop
+       (Json.of_string
+          {|{"id": 1, "method": "hello", "params": {"name": "laptop", "tools": true}}|})
+     : Json.t);
+  call t h ~params:{|{"text": "run it"}|} "prompt";
+  ignore (wait_for_exec sent : Json.t);
+  Rpc_server.disconnect h.server laptop;
+  Agent.wait_idle agent;
+  print_s [%sexp ((Agent.state agent).active_host : string)];
+  List.iter (Agent.messages agent) ~f:(function
+    | Message.Tool_result r -> printf "tool_result: %S\n" r.text
+    | _ -> ());
+  (* With the host gone, the next call fails immediately. *)
+  call t h ~params:{|{"text": "and again"}|} "prompt";
+  Agent.wait_idle agent;
+  List.iter
+    (List.drop (Agent.messages agent) 4)
+    ~f:(function
+      | Message.Tool_result r -> printf "tool_result: %S\n" r.text
+      | _ -> ());
+  [%expect
+    {|
+    {"type":"response","id":"r1","ok":true,"result":{}}
+    client-2
+    tool_result: "[tool host disconnected]"
+    {"type":"response","id":"r1","ok":true,"result":{}}
+    tool_result: "tool host \"client-2\" is not connected; use set_active_host to pick another"
     |}]
 ;;

@@ -5,6 +5,19 @@ open! Import
     settings, the running loop (at most one at a time), the steer/follow-up
     queues, and broadcasts events to subscribers. *)
 
+module Host : sig
+  (** Where a session's [on_host] tools run: the backend itself (id
+      [backend_id]) or a connected client that advertised tool support. *)
+  type t =
+    { id : string
+    ; name : string
+    ; cwd : string
+    }
+  [@@deriving sexp_of]
+
+  val backend_id : string
+end
+
 module State : sig
   type t =
     { session_id : string
@@ -19,6 +32,8 @@ module State : sig
     ; usage : Usage.t (** summed over assistant messages on the active path *)
     ; cost_usd : float
     ; context_tokens : int (** input tokens of the last request, if any *)
+    ; active_host : string (** [Host.id]; may be absent from [hosts] *)
+    ; hosts : Host.t list (** the backend first, then connected clients *)
     }
   [@@deriving sexp_of]
 end
@@ -48,6 +63,18 @@ module Event : sig
     | Queue_update of
         { steer : int
         ; follow_up : int
+        }
+    | Tool_exec of
+        { host : string (** only delivered to this host *)
+        ; exec_id : string
+        ; call_id : string
+        ; name : string
+        ; arguments : Json.t
+        ; cwd : string
+        }
+    | Tool_exec_cancel of
+        { host : string
+        ; exec_id : string
         }
   [@@deriving sexp_of]
 end
@@ -134,7 +161,12 @@ val set_config : t -> Config.t -> unit Or_error.t
 val respond_confirm : t -> call_id:string -> allow:bool -> unit Or_error.t
 
 val compact : t -> string Or_error.t
+
+(** In-place session replacement for a single-agent embedding (the CLI and
+    tests). [Rpc_server] instead keeps one agent per session and moves
+    clients between them. *)
 val new_session : t -> unit
+
 val switch_session : t -> path:string -> unit Or_error.t
 val fork : t -> ?at:string -> unit -> unit Or_error.t
 val rewind : t -> to_:string -> unit Or_error.t
@@ -161,3 +193,31 @@ val export
 val import_session : t -> path:string -> string Or_error.t
 
 val session_stats : t -> Session_stats.t
+
+(** {2 Tool hosts} *)
+
+(** Registers a client as a possible tool host. If the current active host is
+    not connected, the new host becomes active (and the session cwd becomes
+    its cwd). *)
+val add_host : t -> Host.t -> unit
+
+(** Forgets a host; its in-flight tool executions fail. *)
+val remove_host : t -> string -> unit
+
+val hosts : t -> Host.t list
+val active_host : t -> string
+
+(** Switches where tools run from the next call on; the session cwd becomes
+    the host's. Fails for an unknown host. *)
+val set_active_host : t -> string -> unit Or_error.t
+
+(** Streamed output of a remote execution, relayed by the host. *)
+val tool_exec_output : t -> exec_id:string -> chunk:string -> unit Or_error.t
+
+(** Completes a remote execution. *)
+val tool_exec_result
+  :  t
+  -> exec_id:string
+  -> text:string
+  -> is_error:bool
+  -> unit Or_error.t

@@ -6,6 +6,7 @@ let default_limit = 500
 let spec =
   { Tool_spec.name = "find"
   ; parallel_safe = true
+  ; on_host = true
   ; destructive = false
   ; description =
       "Find files by glob pattern (e.g. *.ml, src/**/*.ts). Respects \

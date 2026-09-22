@@ -3,6 +3,10 @@ open! Import
 
 let methods =
   [ "ping"
+  ; "hello"
+  ; "set_active_host"
+  ; "tool_exec_output"
+  ; "tool_exec_result"
   ; "prompt"
   ; "steer"
   ; "follow_up"
@@ -79,6 +83,292 @@ let provider_param params =
         (String.concat
            ~sep:", "
            (List.map Provider_id.all ~f:Provider_id.to_string)))
+;;
+
+module Client = struct
+  type t =
+    { id : string
+    ; mutable name : string
+    ; mutable tools : bool
+    ; mutable cwd : string option
+    ; mutable agent : Agent.t
+    ; mutable authed : bool
+    ; send : Json.t -> unit
+    }
+
+  let id t = t.id
+end
+
+type t =
+  { login : Login_manager.t
+  ; token : string option (** required in [hello] before anything else *)
+  ; sessions_dir : string
+  ; new_agent : ?session:Session.t -> cwd:string -> unit -> Agent.t
+  ; default_agent : Agent.t
+  ; agents : Agent.t String.Table.t (** live sessions by session id *)
+  ; clients : Client.t String.Table.t
+  ; mutable client_seq : int
+  }
+
+let agent_of_client _t (client : Client.t) = client.agent
+let session_id agent = Session.id (Agent.session agent)
+
+let clients_of t agent =
+  Hashtbl.data t.clients
+  |> List.filter ~f:(fun (c : Client.t) -> phys_equal c.agent agent)
+;;
+
+let maybe_evict t agent =
+  if
+    (not (phys_equal agent t.default_agent))
+    && (not (Agent.is_running agent))
+    && List.is_empty (clients_of t agent)
+  then Hashtbl.remove t.agents (session_id agent)
+;;
+
+let route t agent (event : Agent.Event.t) =
+  let json = Rpc_json.event event in
+  (match event with
+   | Tool_exec { host; _ } | Tool_exec_cancel { host; _ } ->
+     Option.iter (Hashtbl.find t.clients host) ~f:(fun c -> c.send json)
+   | _ -> List.iter (clients_of t agent) ~f:(fun c -> c.send json));
+  match event with
+  | State_changed { running = false; _ } -> maybe_evict t agent
+  | _ -> ()
+;;
+
+let register t agent =
+  Hashtbl.set t.agents ~key:(session_id agent) ~data:agent;
+  Agent.subscribe agent ~f:(route t agent);
+  agent
+;;
+
+let create ~env:_ ~sw:_ ?token ~login ~sessions_dir ~new_agent ~default_agent ()
+  =
+  let t =
+    { login
+    ; token
+    ; sessions_dir
+    ; new_agent
+    ; default_agent
+    ; agents = String.Table.create ()
+    ; clients = String.Table.create ()
+    ; client_seq = 0
+    }
+  in
+  ignore (register t default_agent : Agent.t);
+  Login_manager.subscribe login ~f:(fun event ->
+    let json = Rpc_json.login_event event in
+    Hashtbl.iter t.clients ~f:(fun c -> c.send json));
+  t
+;;
+
+let host_of (client : Client.t) =
+  { Agent.Host.id = client.id
+  ; name = client.name
+  ; cwd = Option.value client.cwd ~default:(Agent.state client.agent).cwd
+  }
+;;
+
+let attach t (client : Client.t) agent =
+  let previous = client.agent in
+  if not (phys_equal previous agent)
+  then (
+    if client.tools then Agent.remove_host previous client.id;
+    client.agent <- agent;
+    maybe_evict t previous);
+  if client.tools then Agent.add_host agent (host_of client)
+;;
+
+let connect t ~send =
+  t.client_seq <- t.client_seq + 1;
+  let client =
+    { Client.id = sprintf "client-%d" t.client_seq
+    ; name = sprintf "client-%d" t.client_seq
+    ; tools = false
+    ; cwd = None
+    ; agent = t.default_agent
+    ; authed = Option.is_none t.token
+    ; send
+    }
+  in
+  Hashtbl.set t.clients ~key:client.id ~data:client;
+  client
+;;
+
+let disconnect t (client : Client.t) =
+  Hashtbl.remove t.clients client.id;
+  if client.tools then Agent.remove_host client.agent client.id;
+  maybe_evict t client.agent
+;;
+
+let shutdown t =
+  Hashtbl.iter t.agents ~f:(fun agent ->
+    ignore (Agent.abort agent : string list));
+  Login_manager.cancel t.login;
+  Hashtbl.iter t.agents ~f:Agent.wait_idle;
+  Login_manager.wait t.login
+;;
+
+(* Finds a live session by id or path, or loads it from disk. *)
+let find_agent t key =
+  let live =
+    match Hashtbl.find t.agents key with
+    | Some agent -> Some agent
+    | None ->
+      Hashtbl.data t.agents
+      |> List.find ~f:(fun agent ->
+        String.equal (Session.path (Agent.session agent)) key)
+  in
+  match live with
+  | Some agent -> Ok agent
+  | None ->
+    let path =
+      if Sys_unix.file_exists_exn key
+      then Ok key
+      else (
+        match
+          List.find (Session.list ~dir:t.sessions_dir) ~f:(fun s ->
+            String.equal s.id key)
+        with
+        | Some summary -> Ok summary.path
+        | None -> Or_error.errorf "no session %S" key)
+    in
+    Or_error.bind path ~f:(fun path ->
+      Or_error.map (Session.load path) ~f:(fun session ->
+        register t (t.new_agent ~session ~cwd:(Session.cwd session) ())))
+;;
+
+let new_agent_for t (client : Client.t) session =
+  register t (t.new_agent ~session ~cwd:(Session.cwd session) ())
+  |> attach t client
+;;
+
+let bool_param params name ~default =
+  match param params name with
+  | Some `True -> Ok true
+  | Some `False -> Ok false
+  | None -> Ok default
+  | Some _ -> Or_error.errorf "param %S must be a boolean" name
+;;
+
+let hello t (client : Client.t) params =
+  let authorised =
+    match t.token with
+    | None -> Ok ()
+    | Some token ->
+      (match param params "token" with
+       | Some (`String given) when String.equal given token ->
+         client.authed <- true;
+         Ok ()
+       | _ -> Or_error.error_string "unauthorised: bad or missing token")
+  in
+  Or_error.bind authorised ~f:(fun () ->
+    Option.iter (param params "name") ~f:(function
+      | `String name -> client.name <- name
+      | _ -> ());
+    Option.iter (param params "cwd") ~f:(function
+      | `String cwd -> client.cwd <- Some cwd
+      | _ -> ());
+    Or_error.bind (bool_param params "tools" ~default:false) ~f:(fun tools ->
+      (* Re-registration as a host is handled by [attach]. *)
+      if client.tools && not tools then Agent.remove_host client.agent client.id;
+      client.tools <- tools;
+      let agent =
+        match param params "session" with
+        | Some (`String key) -> find_agent t key
+        | _ -> Ok client.agent
+      in
+      Or_error.map agent ~f:(fun agent ->
+        attach t client agent;
+        `Object
+          [ "client_id", `String client.id
+          ; "state", Rpc_json.state (Agent.state agent)
+          ])))
+;;
+
+let list_sessions t =
+  `Array
+    (List.map (Session.list ~dir:t.sessions_dir) ~f:(fun summary ->
+       let base = Rpc_json.session_summary summary in
+       match Hashtbl.find t.agents summary.id, base with
+       | Some agent, `Object fields ->
+         `Object
+           (fields
+            @ [ "live", `True
+              ; ("running", if Agent.is_running agent then `True else `False)
+              ; ( "clients"
+                , `Number (Int.to_string (List.length (clients_of t agent))) )
+              ])
+       | _, `Object fields -> `Object (fields @ [ "live", `False ])
+       | _, other -> other))
+;;
+
+let dispatch_server t (client : Client.t) ~meth ~params
+  : Json.t Or_error.t option
+  =
+  let agent = client.agent in
+  match meth with
+  | "hello" -> Some (hello t client params)
+  | "set_active_host" ->
+    Some
+      (Or_error.bind (string_param params "host") ~f:(fun host ->
+         unit_result (Agent.set_active_host agent host)))
+  | "tool_exec_output" ->
+    Some
+      (Or_error.bind (string_param params "exec_id") ~f:(fun exec_id ->
+         Or_error.bind (string_param params "chunk") ~f:(fun chunk ->
+           unit_result (Agent.tool_exec_output agent ~exec_id ~chunk))))
+  | "tool_exec_result" ->
+    Some
+      (Or_error.bind (string_param params "exec_id") ~f:(fun exec_id ->
+         Or_error.bind (string_param params "text") ~f:(fun text ->
+           Or_error.bind
+             (bool_param params "is_error" ~default:false)
+             ~f:(fun is_error ->
+               unit_result
+                 (Agent.tool_exec_result agent ~exec_id ~text ~is_error)))))
+  | "new_session" ->
+    let cwd = (Agent.state agent).cwd in
+    new_agent_for t client (Session.create ~dir:t.sessions_dir ~cwd ());
+    Some empty
+  | "switch_session" ->
+    Some
+      (Or_error.bind (string_param params "path") ~f:(fun key ->
+         Or_error.map (find_agent t key) ~f:(fun target ->
+           attach t client target;
+           `Object [])))
+  | "list_sessions" -> Some (ok (list_sessions t))
+  | "delete_session" ->
+    Some
+      (Or_error.bind (string_param params "path") ~f:(fun path ->
+         if
+           Hashtbl.data t.agents
+           |> List.exists ~f:(fun a ->
+             String.equal (Session.path (Agent.session a)) path)
+         then Or_error.error_string "cannot delete a live session"
+         else Or_error.try_with (fun () -> Core_unix.unlink path) |> unit_result))
+  | "import" ->
+    Some
+      (Or_error.bind (string_param params "path") ~f:(fun path ->
+         Or_error.map
+           (Session.import ~dir:t.sessions_dir path)
+           ~f:(fun session ->
+             new_agent_for t client session;
+             `Object [ "path", `String (Session.path session) ])))
+  | "fork" | "clone" ->
+    let at =
+      match meth, param params "at" with
+      | "fork", Some (`String s) -> Some s
+      | _ -> None
+    in
+    Some
+      (Or_error.map
+         (Session.fork ?at (Agent.session agent) ~dir:t.sessions_dir)
+         ~f:(fun session ->
+           new_agent_for t client session;
+           `Object []))
+  | _ -> None
 ;;
 
 let dispatch agent login ~meth ~params : Json.t Or_error.t =
@@ -171,22 +461,10 @@ let dispatch agent login ~meth ~params : Json.t Or_error.t =
   | "compact" ->
     Or_error.map (Agent.compact agent) ~f:(fun summary ->
       `Object [ "summary", `String summary ])
-  | "new_session" ->
-    Agent.new_session agent;
-    empty
-  | "switch_session" ->
-    Or_error.bind (string_param params "path") ~f:(fun path ->
-      unit_result (Agent.switch_session agent ~path))
-  | "list_sessions" ->
-    let dir = Filename.dirname (Agent.state agent).session_path in
-    ok (`Array (List.map (Session.list ~dir) ~f:Rpc_json.session_summary))
   | "set_session_name" ->
     Or_error.map (string_param params "name") ~f:(fun name ->
       Agent.set_session_name agent name;
       `Object [])
-  | "delete_session" ->
-    Or_error.bind (string_param params "path") ~f:(fun path ->
-      unit_result (Agent.delete_session agent ~path))
   | "export" ->
     Or_error.bind (string_param params "format") ~f:(fun format ->
       Or_error.bind (Session.Export_format.of_string format) ~f:(fun format ->
@@ -197,18 +475,6 @@ let dispatch agent login ~meth ~params : Json.t Or_error.t =
         in
         Or_error.map (Agent.export agent ~format ?path ()) ~f:(fun path ->
           `Object [ "path", `String path ])))
-  | "import" ->
-    Or_error.bind (string_param params "path") ~f:(fun path ->
-      Or_error.map (Agent.import_session agent ~path) ~f:(fun path ->
-        `Object [ "path", `String path ]))
-  | "fork" ->
-    let at =
-      match param params "at" with
-      | Some (`String s) -> Some s
-      | _ -> None
-    in
-    unit_result (Agent.fork agent ?at ())
-  | "clone" -> unit_result (Agent.fork agent ())
   | "rewind" ->
     Or_error.bind (string_param params "to") ~f:(fun to_ ->
       unit_result (Agent.rewind agent ~to_))
@@ -262,7 +528,7 @@ let dispatch agent login ~meth ~params : Json.t Or_error.t =
   | _ -> Or_error.errorf "unknown method %S" meth
 ;;
 
-let handle agent login (request : Json.t) : Json.t =
+let handle t client (request : Json.t) : Json.t =
   let id = Option.value (param request "id") ~default:`Null in
   let response =
     match param request "method" with
@@ -270,7 +536,15 @@ let handle agent login (request : Json.t) : Json.t =
       let params =
         Option.value (param request "params") ~default:(`Object [])
       in
-      (match dispatch agent login ~meth ~params with
+      (match
+         if (not client.Client.authed) && not (String.equal meth "hello")
+         then
+           Or_error.error_string "unauthorised: send hello with the token first"
+         else (
+           match dispatch_server t client ~meth ~params with
+           | Some result -> result
+           | None -> dispatch (agent_of_client t client) t.login ~meth ~params)
+       with
        | result -> result
        | exception exn ->
          Or_error.error_s [%message "internal error" (exn : exn)])
@@ -289,7 +563,7 @@ let handle agent login (request : Json.t) : Json.t =
       ]
 ;;
 
-let run ~env:_ ~agent ~login ~input ~output =
+let serve_connection t ~input ~output =
   Switch.run
   @@ fun sw ->
   let outbox : string option Eio.Stream.t = Eio.Stream.create 1024 in
@@ -299,17 +573,16 @@ let run ~env:_ ~agent ~login ~input ~output =
       match Eio.Stream.take outbox with
       | None -> ()
       | Some line ->
-        Eio.Flow.copy_string (line ^ "\n") output;
-        loop ()
+        (match Eio.Flow.copy_string (line ^ "\n") output with
+         | () -> loop ()
+         | exception _ -> ())
     in
     loop ());
-  Agent.subscribe agent ~f:(fun event -> send (Rpc_json.event event));
-  Login_manager.subscribe login ~f:(fun event ->
-    send (Rpc_json.login_event event));
+  let client = connect t ~send in
   let reader = Eio.Buf_read.of_flow input ~max_size:(64 * 1024 * 1024) in
   let rec loop () =
     match Eio.Buf_read.line reader with
-    | exception End_of_file -> ()
+    | exception (End_of_file | Eio.Io _) -> ()
     | line ->
       if not (String.is_empty (String.strip line))
       then (
@@ -322,13 +595,13 @@ let run ~env:_ ~agent ~login ~input ~output =
                 ; "ok", `False
                 ; "error", `String ("invalid JSON: " ^ Error.to_string_hum e)
                 ])
-        | Ok request -> send (handle agent login request));
+        | Ok request ->
+          (* Each request in its own fiber: a blocking method (shell, compact,
+             a remote tool round trip) must not stall the reader. *)
+          Fiber.fork ~sw (fun () -> send (handle t client request)));
       loop ()
   in
   loop ();
-  ignore (Agent.abort agent : string list);
-  Login_manager.cancel login;
-  Agent.wait_idle agent;
-  Login_manager.wait login;
+  disconnect t client;
   Eio.Stream.add outbox None
 ;;

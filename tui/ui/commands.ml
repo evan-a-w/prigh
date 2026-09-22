@@ -66,6 +66,10 @@ let all =
   ; c "session" "" "show session statistics"
   ; c "sessions" "" "pick a saved session (Ctrl+N named, Ctrl+D delete)"
   ; c "agents" "" "focus a subagent"
+  ; c
+      "host"
+      "[name|backend]"
+      "pick where tools run: this frontend, another one, or the backend"
   ; c ~argument:Argument.Sessions "switch" "[path]" "switch to a saved session"
   ; c ~argument:Argument.Path "cd" "[path]" "change the working directory"
   ; c "fork" "" "fork at a previous user message"

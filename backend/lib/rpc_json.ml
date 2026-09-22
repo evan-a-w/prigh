@@ -144,6 +144,12 @@ let state (s : Agent.State.t) =
     ; "usage", usage s.usage
     ; "cost_usd", float s.cost_usd
     ; "context_tokens", int s.context_tokens
+    ; "active_host", str s.active_host
+    ; ( "hosts"
+      , `Array
+          (List.map s.hosts ~f:(fun (h : Agent.Host.t) ->
+             `Object [ "id", str h.id; "name", str h.name; "cwd", str h.cwd ]))
+      )
     ]
 ;;
 
@@ -342,6 +348,20 @@ let rec event (e : Agent.Event.t) =
       [ "event", str "queue_update"
       ; "steer", int steer
       ; "follow_up", int follow_up
+      ]
+    | Tool_exec { host; exec_id; call_id; name; arguments; cwd } ->
+      [ "event", str "tool_exec"
+      ; "host", str host
+      ; "exec_id", str exec_id
+      ; "call_id", str call_id
+      ; "name", str name
+      ; "arguments", arguments
+      ; "cwd", str cwd
+      ]
+    | Tool_exec_cancel { host; exec_id } ->
+      [ "event", str "tool_exec_cancel"
+      ; "host", str host
+      ; "exec_id", str exec_id
       ]
   in
   `Object (("type", str "event") :: fields)

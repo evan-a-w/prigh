@@ -2,4 +2,4 @@
  (name prigh_client)
  (preprocess
   (pps ppx_jane))
- (libraries core async async_unix core_unix prigh_protocol))
+ (libraries core async async_unix core_unix jsonaf prigh_protocol))

@@ -42,6 +42,15 @@ let default_model store =
       Model.default_for s.provider)
 ;;
 
+module Setup = struct
+  type t =
+    { agent : Agent.t (** the default session *)
+    ; new_agent : ?session:Session.t -> cwd:string -> unit -> Agent.t
+    ; sessions_dir : string
+    ; store : Auth_store.t
+    }
+end
+
 let common_params =
   let%map_open.Command model =
     flag
@@ -130,33 +139,40 @@ let common_params =
           eprintf "cannot load session: %s\n" (Error.to_string_hum e);
           exit 2)
     in
-    let agent_ref = ref None in
-    let current f default () =
-      Option.value_map !agent_ref ~default ~f:(fun a -> f (Agent.state a))
+    let sessions_dir = Session.default_dir ~home:(home ()) in
+    (* One agent per session; the subagent tool follows its own agent's
+       model and thinking level. *)
+    let new_agent ?session ~cwd () =
+      let agent_ref = ref None in
+      let current f default () =
+        Option.value_map !agent_ref ~default ~f:(fun a -> f (Agent.state a))
+      in
+      let subagent =
+        Tool_subagent.create
+          ~provider
+          ~current_model:(current (fun s -> s.model) Model.default)
+          ~current_thinking:(current (fun s -> s.thinking) Thinking.Off)
+          ~home:(home ())
+      in
+      let agent =
+        Agent.create
+          ~env
+          ~sw
+          ~provider
+          ~tools:(if no_tools then [] else Tools.all @ [ subagent ])
+          ~sessions_dir
+          ~home:(home ())
+          ?session
+          ?model
+          ?thinking
+          ~cwd
+          ()
+      in
+      agent_ref := Some agent;
+      agent
     in
-    let subagent =
-      Tool_subagent.create
-        ~provider
-        ~current_model:(current (fun s -> s.model) Model.default)
-        ~current_thinking:(current (fun s -> s.thinking) Thinking.Off)
-        ~home:(home ())
-    in
-    let agent =
-      Agent.create
-        ~env
-        ~sw
-        ~provider
-        ~tools:(if no_tools then [] else Tools.all @ [ subagent ])
-        ~sessions_dir:(Session.default_dir ~home:(home ()))
-        ~home:(home ())
-        ?session
-        ?model
-        ?thinking
-        ~cwd
-        ()
-    in
-    agent_ref := Some agent;
-    agent, store
+    let agent = new_agent ?session ~cwd () in
+    { Setup.agent; new_agent; sessions_dir; store }
 ;;
 
 let run_command =
@@ -174,7 +190,7 @@ let run_command =
        @@ fun env ->
        Eio.Switch.run
        @@ fun sw ->
-       let agent, _store = make_agent ~env ~sw in
+       let { Setup.agent; _ } = make_agent ~env ~sw in
        let flush_out () = Out_channel.flush stdout in
        let note fmt =
          ksprintf (fun s -> if not quiet then eprintf "%s\n%!" s) fmt
@@ -247,23 +263,123 @@ let run_command =
        | None -> ())
 ;;
 
+let parse_listen_addr spec =
+  match String.rsplit2 spec ~on:':' with
+  | None -> Or_error.errorf "listen address must be HOST:PORT, got %S" spec
+  | Some (host, port) ->
+    (match Int.of_string_opt port with
+     | None -> Or_error.errorf "bad port %S" port
+     | Some port ->
+       let host = if String.is_empty host then "0.0.0.0" else host in
+       (match Core_unix.Inet_addr.of_string_or_getbyname host with
+        | addr -> Ok (Eio_unix.Net.Ipaddr.of_unix addr, port)
+        | exception _ -> Or_error.errorf "cannot resolve host %S" host))
+;;
+
 let serve_command =
   Command.basic
-    ~summary:"Serve the JSON-lines RPC protocol on stdin/stdout"
-    (let%map_open.Command make_agent = common_params in
+    ~summary:
+      "Serve the JSON-lines RPC protocol on stdin/stdout and/or a TCP port"
+    (let%map_open.Command make_agent = common_params
+     and listen =
+       flag
+         "-listen"
+         (optional string)
+         ~doc:
+           "HOST:PORT accept TCP clients (multiple frontends, other machines)"
+     and stdio =
+       flag
+         "-stdio"
+         no_arg
+         ~doc:
+           " also serve stdin/stdout when -listen is given (the default \
+            without it)"
+     and token =
+       flag
+         "-token"
+         (optional string)
+         ~doc:"SECRET clients must present it in hello (default: $PRIGH_TOKEN)"
+     in
      fun () ->
+       let token =
+         match token with
+         | Some t -> Some t
+         | None -> Sys.getenv "PRIGH_TOKEN"
+       in
+       let listen =
+         Option.map listen ~f:(fun spec ->
+           match parse_listen_addr spec with
+           | Ok addr -> addr
+           | Error e ->
+             eprintf "%s\n" (Error.to_string_hum e);
+             exit 2)
+       in
+       let stdio = stdio || Option.is_none listen in
        Eio_main.run
        @@ fun env ->
        Eio.Switch.run
        @@ fun sw ->
-       let agent, store = make_agent ~env ~sw in
+       let { Setup.agent; new_agent; sessions_dir; store } =
+         make_agent ~env ~sw
+       in
        let login = Login_manager.create ~env ~sw ~store () in
-       Rpc_server.run
+       let server =
+         Rpc_server.create
+           ~env
+           ~sw
+           ?token
+           ~login
+           ~sessions_dir
+           ~new_agent
+           ~default_agent:agent
+           ()
+       in
+       Option.iter listen ~f:(fun (addr, port) ->
+         let socket =
+           Eio.Net.listen
+             ~sw
+             ~backlog:16
+             ~reuse_addr:true
+             (Eio.Stdenv.net env)
+             (`Tcp (addr, port))
+         in
+         eprintf
+           "prigh: listening on %s\n%!"
+           (Eio.Net.Sockaddr.pp Format.str_formatter (`Tcp (addr, port));
+            Format.flush_str_formatter ());
+         Eio.Fiber.fork ~sw (fun () ->
+           while true do
+             Eio.Net.accept_fork
+               ~sw
+               socket
+               ~on_error:(fun exn ->
+                 eprintf "prigh: connection failed: %s\n%!" (Exn.to_string exn))
+               (fun flow _addr ->
+                  Rpc_server.serve_connection server ~input:flow ~output:flow)
+           done));
+       if stdio
+       then (
+         Rpc_server.serve_connection
+           server
+           ~input:(Eio.Stdenv.stdin env)
+           ~output:(Eio.Stdenv.stdout env);
+         (* The spawning frontend went away: stop everything. *)
+         Rpc_server.shutdown server;
+         exit 0))
+;;
+
+let tool_host_command =
+  Command.basic
+    ~summary:
+      "Run tools on this machine for a frontend connected to a remote backend \
+       (JSON lines on stdin/stdout)"
+    (Command.Param.return (fun () ->
+       Eio_main.run
+       @@ fun env ->
+       Tool_host.run
          ~env
-         ~agent
-         ~login
          ~input:(Eio.Stdenv.stdin env)
-         ~output:(Eio.Stdenv.stdout env))
+         ~output:(Eio.Stdenv.stdout env)))
 ;;
 
 let login_command =
@@ -376,6 +492,7 @@ let () =
        ~summary:"prigh backend"
        [ "run", run_command
        ; "serve", serve_command
+       ; "tool-host", tool_host_command
        ; "sessions", sessions_command
        ; "login", login_command
        ; "logout", logout_command

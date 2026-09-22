@@ -4,6 +4,7 @@ open! Import
 let spec =
   { Tool_spec.name = "ls"
   ; parallel_safe = true
+  ; on_host = true
   ; destructive = false
   ; description =
       "List a directory. Directories are shown with a trailing slash."

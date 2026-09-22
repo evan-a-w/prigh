@@ -56,6 +56,7 @@ let execute_tool
       ~depth
       ~(agent_id : string option)
       ?(confirm = fun _ ~summary:_ -> true)
+      ?execute
       (call : Content.Tool_call.t)
   =
   let result : Tool.Result.t =
@@ -79,6 +80,7 @@ let execute_tool
            let context =
              Tool.Context.create
                ~cancel
+               ?execute
                ~on_output:(fun chunk ->
                  emit (Agent_event.Tool_output { call_id = call.id; chunk }))
                ~emit
@@ -90,7 +92,7 @@ let execute_tool
                ~cwd
                ()
            in
-           Tool.execute tool context args))
+           Tool.execute_via context tool args))
   in
   { Message.Tool_result.tool_call_id = call.id
   ; tool_name = call.name
@@ -110,6 +112,7 @@ let run
       ?(steer = fun () -> [])
       ?(emit = ignore)
       ?confirm
+      ?execute
       ?retry_delay
       ~context
       ~prompts
@@ -190,6 +193,7 @@ let run
             ~depth
             ~agent_id
             ?confirm
+            ?execute
             call
         in
         emit (Tool_end { call; result });

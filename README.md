@@ -49,8 +49,9 @@ cd tui && dune build @runtest
 ```
 
 `prigh-tui` flags: `-faux`, `-session PATH`, `-model ID`, `-thinking LEVEL`,
-`-cwd DIR`, `-auth-file PATH`, `-backend PATH` (same as `$PRIGH_BACKEND`), and
-`-- <extra backend args>`. The Nix wrapper sets `PRIGH_BACKEND` to the
+`-cwd DIR`, `-auth-file PATH`, `-backend PATH` (same as `$PRIGH_BACKEND`),
+`-connect HOST:PORT`, `-token SECRET`, `-tools local|remote`, `-name NAME`,
+and `-- <extra backend args>`. The Nix wrapper sets `PRIGH_BACKEND` to the
 Nix-built backend by default; set `PRIGH_BACKEND` or pass `-backend` to override
 it.
 
@@ -58,6 +59,33 @@ The first `nix build`/`nix develop` evaluation is slow (opam-nix resolves the
 pinned package set through import-from-derivation) and the first build compiles
 both OCaml toolchains plus their package sets (about an hour on a small
 machine); both are cached afterwards.
+
+## Remote backend, several frontends
+
+The backend can run on another machine and serve many sessions and
+frontends at once:
+
+```
+# on the server (keep it in tmux; sessions live in ~/.prigh/sessions there)
+prigh serve -listen 0.0.0.0:7777 -token sekrit
+
+# on each laptop
+prigh-tui -connect server:7777 -token sekrit -cwd ~/proj
+prigh-tui -connect server:7777 -token sekrit -session <id>   # join a session
+```
+
+By default a connected frontend runs the session's tools (bash, file
+edits, ...) on *its own* machine, in the `-cwd` it was started with, by
+spawning `prigh tool-host` locally (so the prigh binary must be installed
+there too; `-tools remote` runs them on the backend instead). Every session
+has one *active tool host*; `/host` lists the backend and the connected
+frontends and switches between them, and the status line shows
+`tools:<name>` when tools run elsewhere or `tools:offline` when the active
+host has disconnected (tool calls then fail until you pick another host).
+Several frontends can attach to one session (`/sessions` marks live ones)
+and all see the same stream; a session keeps running when its frontends
+disconnect. Plain TCP with a shared token: bind to localhost and use an SSH
+tunnel on untrusted networks.
 
 ## Use
 

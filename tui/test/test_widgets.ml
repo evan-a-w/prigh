@@ -346,7 +346,7 @@ let%expect_test "fuzzy ranking: command names" =
     {|
     "mo" -> model scoped-models import
     "lo" -> login logout clone
-    "s"  -> state switch session sessions scoped-models agents hotkeys verbosity
+    "s"  -> state switch session sessions scoped-models host agents hotkeys verbosity
     "sw" -> switch
     "xyz" ->
     |}]
@@ -527,6 +527,11 @@ let%expect_test "commands" =
           ((name agents)
            (args "")
            (help "focus a subagent")
+           (argument ()))
+          ((name host)
+           (args [name|backend])
+           (help
+            "pick where tools run: this frontend, another one, or the backend")
            (argument ()))
           ((name switch)
            (args [path])
@@ -790,6 +795,7 @@ let%expect_test "keymap: every binding resolves to its intent and is documented"
     /session                           show session statistics
     /sessions                          pick a saved session (Ctrl+N named, Ctrl+D delete)
     /agents                            focus a subagent
+    /host [name|backend]               pick where tools run: this frontend, another one, or the backend
     /switch [path]                     switch to a saved session
     /cd [path]                         change the working directory
     /fork                              fork at a previous user message

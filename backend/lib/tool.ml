@@ -16,26 +16,10 @@ and context =
   ; call_id : string
   ; tools : t list
   ; emit : Agent_event.t -> unit
+  ; execute : executor
   }
 
-module Context = struct
-  type nonrec t = context
-
-  let create
-        ?(cancel = Cancellation.never)
-        ?(on_output = ignore)
-        ?(depth = 0)
-        ?agent_id
-        ?(call_id = "")
-        ?(tools = [])
-        ?(emit = ignore)
-        ~env
-        ~cwd
-        ()
-    =
-    { env; cwd; cancel; on_output; depth; agent_id; call_id; tools; emit }
-  ;;
-end
+and executor = context -> t -> Json.t -> Tool_result.t
 
 module Result = Tool_result
 
@@ -49,6 +33,39 @@ let execute t context args =
   | exception exn ->
     Result.error (sprintf "%s failed: %s" t.spec.name (Exn.to_string exn))
 ;;
+
+let local_executor context t args = execute t context args
+let execute_via context t args = context.execute context t args
+
+module Context = struct
+  type nonrec t = context
+
+  let create
+        ?(cancel = Cancellation.never)
+        ?(execute = local_executor)
+        ?(on_output = ignore)
+        ?(depth = 0)
+        ?agent_id
+        ?(call_id = "")
+        ?(tools = [])
+        ?(emit = ignore)
+        ~env
+        ~cwd
+        ()
+    =
+    { env
+    ; cwd
+    ; cancel
+    ; on_output
+    ; depth
+    ; agent_id
+    ; call_id
+    ; tools
+    ; emit
+    ; execute
+    }
+  ;;
+end
 
 let expand_home path =
   let home = Option.value (Sys.getenv "HOME") ~default:"/" in

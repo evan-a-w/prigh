@@ -16,11 +16,19 @@ and context =
   ; call_id : string
   ; tools : t list (** tools available to this agent *)
   ; emit : Agent_event.t -> unit
+  ; execute : executor
+    (** how tool calls of this agent (and of its subagents) are run; the
+        default runs them in this process *)
   }
+
+(** Runs a tool call. [Agent] installs one that forwards [on_host] tools to
+    the session's active tool host. *)
+and executor = context -> t -> Json.t -> Tool_result.t
 
 module Context : sig
   val create
     :  ?cancel:Cancellation.t
+    -> ?execute:executor
     -> ?on_output:(string -> unit)
     -> ?depth:int
     -> ?agent_id:string
@@ -39,9 +47,12 @@ module Result = Tool_result
 
 val name : t -> string
 
-(** Runs the tool, turning [Tool_args.Invalid] and other exceptions into error
-    results. *)
+(** Runs the tool in this process, turning [Tool_args.Invalid] and other
+    exceptions into error results. *)
 val execute : t -> Context.t -> Json.t -> Result.t
+
+(** [execute] through the context's executor. *)
+val execute_via : Context.t -> t -> Json.t -> Result.t
 
 (** Resolves a user-supplied path against [cwd], expanding [~]. *)
 val resolve : cwd:string -> string -> string

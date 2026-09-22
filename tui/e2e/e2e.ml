@@ -42,6 +42,9 @@ let normalise s =
        "duration_seconds <t>"
   |> sub (Re.str !tmp_dir) "$TMP"
   |> sub
+       (Re.str (sprintf "(name %s)" (Core_unix.gethostname ())))
+       "(name <host>)"
+  |> sub
        (Re.seq
           [ Re.repn Re.digit 8 (Some 8)
           ; Re.char '-'
@@ -108,6 +111,8 @@ let rec summarise (e : Event.t) : string option =
          cost_usd
          result.is_error
          result.text)
+  | Tool_exec { name; _ } -> Some (sprintf "tool_exec %s" name)
+  | Tool_exec_cancel id -> Some (sprintf "tool_exec_cancel %s" id)
 ;;
 
 let rec drain client ~stop =

@@ -10,6 +10,9 @@ type t =
   ; first_prompt : string option
   ; message_count : int
   ; parent : string option
+  ; live : bool (** loaded in the backend *)
+  ; running : bool
+  ; clients : int (** frontends attached to it *)
   }
 [@@deriving sexp_of, equal]
 

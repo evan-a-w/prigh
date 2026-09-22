@@ -6,6 +6,7 @@ let default_limit = 200
 let spec =
   { Tool_spec.name = "grep"
   ; parallel_safe = true
+  ; on_host = true
   ; destructive = false
   ; description =
       "Search file contents with a regular expression (ripgrep syntax). \

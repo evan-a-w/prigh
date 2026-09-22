@@ -13,6 +13,9 @@ type t =
   ; usage : Usage.t
   ; cost_usd : float
   ; context_tokens : int
+  ; active_host : string (** [Host.id]; "backend" or a client id *)
+  ; hosts : Host.t list
+  (** backend first, then connected tool-capable clients *)
   }
 [@@deriving sexp_of, equal]
 

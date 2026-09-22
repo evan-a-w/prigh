@@ -46,6 +46,12 @@ let mask t s =
   |> Re.replace_string duration_re ~by:{|"duration_seconds":<t>|}
   |> Re.replace_string id_re ~by:"<id>"
   |> Re.replace_string stamp_re ~by:"<stamp>"
+  |> String.substr_replace_all
+       ~pattern:(sprintf {|"name":"%s"|} (Core_unix.gethostname ()))
+       ~with_:{|"name":"<host>"|}
+  |> String.substr_replace_all
+       ~pattern:(sprintf "(name %s)" (Core_unix.gethostname ()))
+       ~with_:"(name <host>)"
 ;;
 
 let run ?cancel ?on_output t tool args =

@@ -3,4 +3,10 @@
  (public_name prigh-tui)
  (preprocess
   (pps ppx_jane))
- (libraries core core_unix.command_unix async prigh_ui_term))
+ (libraries
+  core
+  core_unix
+  core_unix.command_unix
+  async
+  prigh_client
+  prigh_ui_term))

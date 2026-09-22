@@ -6,24 +6,60 @@ input and UI state only). There is no plugin system: tools, subagents,
 providers and slash commands are compiled in.
 
 ```
- terminal ── frontend (prigh-tui, Bonsai_term) ── JSON lines on stdio ── backend `prigh serve` (OCaml, Eio)
-                                                               │
-                                                               ├─ Agent ── Agent_loop ── Provider_router ── Anthropic / Openai_responses / Deepseek ── HTTPS (SSE)
-                                                               │                │                 └─ Provider_auth ── Auth_store (~/.config/prigh/auth.json)
-                                                               │                └─ Tools (bash, read, write, edit, ls, grep, find, subagent)
-                                                               ├─ Session (JSONL tree under ~/.prigh/sessions/)
-                                                               └─ Login_manager ── Oauth_anthropic / Oauth_openai_codex ── loopback callback server + browser
+ terminal ── frontend (prigh-tui, Bonsai_term) ── JSON lines on stdio or TCP ── backend `prigh serve` (OCaml, Eio)
+                │                                                      │
+                └─ `prigh tool-host` (local tools)                     ├─ Rpc_server: clients ↔ sessions, tool hosts
+                                                                       ├─ Agent (one per session) ── Agent_loop ── Provider_router ── Anthropic / Openai_responses / Deepseek ── HTTPS (SSE)
+                                                                       │                │                 └─ Provider_auth ── Auth_store (~/.config/prigh/auth.json)
+                                                                       │                └─ Tools (bash, read, write, edit, ls, grep, find, subagent) ── on the backend or a tool host
+                                                                       ├─ Session (JSONL tree under ~/.prigh/sessions/)
+                                                                       └─ Login_manager ── Oauth_anthropic / Oauth_openai_codex ── loopback callback server + browser
 ```
 
 ## Process model and concurrency
 
-The frontend spawns `prigh serve` and exchanges one JSON object per line over
-stdin/stdout. Requests carry `{id, method, params}`; the backend answers with
-`{type:"response", id, ok, result|error}` and pushes `{type:"event", event,
-...}` for everything that happens asynchronously (streaming deltas, tool
-output, state changes, login prompts). The same binary also has headless
+The frontend either spawns `prigh serve` and talks to it over stdin/stdout,
+or connects over TCP to a backend started with `prigh serve -listen
+HOST:PORT` (possibly on another machine). Either way it exchanges one JSON
+object per line. Requests carry `{id, method, params}`; the backend answers
+with `{type:"response", id, ok, result|error}` and pushes `{type:"event",
+event, ...}` for everything that happens asynchronously (streaming deltas,
+tool output, state changes, login prompts). The same binary also has headless
 subcommands (`run`, `sessions`, `login`, `logout`, `auth`) that use the same
-library modules without the RPC layer.
+library modules without the RPC layer, and `tool-host`, the worker a
+frontend spawns on its own machine to run tools there.
+
+One backend serves many sessions and many clients. Every session is an
+`Agent` (loaded on demand, dropped from memory when idle with no clients;
+the JSONL file is the durable state) and every client is attached to exactly
+one session at a time: its requests act on that session and it receives that
+session's events. Several frontends can attach to the same session and each
+sees the same stream. A session keeps running when its clients go away, and
+a client sends `hello` first (name, cwd, whether it can run tools, an
+optional session id or path, the `-token` if the backend requires one).
+
+### Tool hosts
+
+Each session has an *active tool host*: where its `on_host` tools (bash,
+read, write, edit, ls, grep, find) and `!cmd` shells run. It is either the
+backend itself or a connected client that advertised `tools: true` in
+`hello`; the subagent tool always runs in the backend but its tool calls
+follow the same active host. Tools default to the frontend: a tool-capable
+client takes over when it attaches unless the user pinned a host with
+`set_active_host` (`/host` in the TUI). The session cwd is a property of the
+host, so switching hosts switches the cwd (and `/cd` validates the directory
+on the host). When the active host is a client, `Agent.host_exec` emits a
+`tool_exec` event to that client only and waits on a promise; the client
+answers with `tool_exec_output` (streamed chunks, fanned out to everyone as
+`tool_output`) and `tool_exec_result`; an abort sends `tool_exec_cancel`.
+Disconnecting the active host fails its in-flight calls with `[tool host
+disconnected]` and later calls with "not connected", so the run continues
+and the model sees the error; the TUI shows `tools:offline` until another
+host is chosen. The frontend does not implement any tools: it proxies
+`tool_exec` to a local `prigh tool-host` process (`Tool_host` in the backend
+runs `Host_ops.execute`, the same code path the backend uses for itself,
+plus two pseudo-tools, `$resolve_dir` and `$read_file`, for `/cd` and
+prompt attachments).
 
 The backend is direct-style Eio code. Every I/O function takes `~env`
 (`Eio_unix.Stdenv.base`), and long-running work runs in fibers forked into a
@@ -138,11 +174,20 @@ two can share one.
 ### Tools
 
 - `Tool` — `{spec; run : Context.t -> Json.t -> Result.t}`; `Tool.execute`
-  turns invalid arguments and exceptions into error results. `Tool_args`
-  gives typed accessors and builds the JSON schema; `Truncate` bounds output
-  by lines and bytes. `Tool_spec` carries the flags the harness reasons
-  about: `parallel_safe` (safe to run concurrently with other tools) and
-  `destructive` (held for confirmation when `confirm_tools` is on).
+  turns invalid arguments and exceptions into error results. The context
+  carries an `execute : executor` hook (`Tool.execute_via`) through which
+  the loop runs every call; the default runs in-process and `Agent`
+  installs one that forwards `on_host` tools to the session's active host.
+  `Tool_args` gives typed accessors and builds the JSON schema; `Truncate`
+  bounds output by lines and bytes. `Tool_spec` carries the flags the
+  harness reasons about: `parallel_safe` (safe to run concurrently with
+  other tools), `destructive` (held for confirmation when `confirm_tools`
+  is on) and `on_host` (runs on the active tool host rather than always in
+  the backend).
+- `Host_ops` — what a tool host does for a session: the `on_host` tools by
+  name plus `$resolve_dir`/`$read_file`. `Tool_host` is the `prigh tool-host`
+  worker loop around it (`exec`/`cancel` in, `output`/`result` out, one fiber
+  per exec).
 - `Tool_bash` (streamed output, timeout, cancellation), `Tool_read`,
   `Tool_write` (`wrote N lines`), `Tool_edit` (multi-edit, unique
   non-overlapping matches, atomic; returns a unified diff from `Udiff`),
@@ -183,7 +228,8 @@ two can share one.
   `Subagent` / `Subagent_start` / `Subagent_end`, whose inner events carry
   `call_id`/`agent_id`), so the UI can build a transcript per agent.
 - `Agent` — one conversation: owns the session, model, thinking level and
-  `Config`, the run lifecycle (`prompt`, `steer` = after the current turn,
+  `Config`, the tool hosts (`add_host`/`remove_host`/`set_active_host`,
+  `host_exec` and the pending remote executions), the run lifecycle (`prompt`, `steer` = after the current turn,
   `follow_up` = after the loop ends, `abort` = cancels and returns the queued
   texts to restore, `dequeue` = pops the last queued message, `shell` = runs
   a `!cmd` through the bash machinery), automatic compaction at 80% of the
@@ -217,25 +263,41 @@ two can share one.
 - `Rpc_json` — the wire encoding (plain tagged objects, not the derived
   `["Ctor", ...]` form) for messages, deltas, state, models, sessions,
   auth status and events.
-- `Rpc_server` — reads request lines, dispatches to `Agent` and
-  `Login_manager`, writes responses and events through a single outbox
-  fiber. `set_model` goes through `Model.resolve` (key, id, display name or
-  unique case-insensitive prefix; otherwise "did you mean" by edit
-  distance). Methods: `ping`, `prompt`, `steer`, `follow_up`, `abort`,
-  `dequeue`, `shell`, `get_state`, `get_messages`, `get_entries`, `set_model`,
-  `set_thinking`, `list_models`, `compact`, `new_session`,
-  `switch_session`, `list_sessions`, `set_session_name`, `delete_session`,
-  `export`, `import`, `fork`, `clone`, `rewind`, `session_stats`, `set_cwd`,
-  `get_config`, `set_config`, `tool_confirm_respond`, `auth_status`, `login`,
-  `auth_respond`, `auth_cancel`, `logout`.
+- `Rpc_server` — the connection and session manager: a table of live
+  agents by session id, a table of clients, and per-connection
+  `serve_connection` (reader loop, one outbox fiber, and one fiber per
+  request so a blocking method such as `shell` or a remote tool round trip
+  never stalls the reader that must deliver the client's own
+  `tool_exec_result`). Agent events are routed to the clients attached to
+  that agent, except `tool_exec`/`tool_exec_cancel`, which go to the named
+  host only; login events go to everyone. The session methods
+  (`new_session`, `switch_session` by id or path, `fork`, `clone`, `import`)
+  create or load an agent and move only the calling client; `list_sessions`
+  marks live sessions with `live`, `running` and `clients`; `delete_session`
+  refuses live ones. `set_model` goes through `Model.resolve` (key, id,
+  display name or unique case-insensitive prefix; otherwise "did you mean"
+  by edit distance). Methods: `hello`, `ping`, `prompt`, `steer`,
+  `follow_up`, `abort`, `dequeue`, `shell`, `get_state`, `get_messages`,
+  `get_entries`, `set_model`, `set_thinking`, `list_models`, `compact`,
+  `new_session`, `switch_session`, `list_sessions`, `set_session_name`,
+  `delete_session`, `export`, `import`, `fork`, `clone`, `rewind`,
+  `session_stats`, `set_cwd`, `get_config`, `set_config`,
+  `tool_confirm_respond`, `set_active_host`, `tool_exec_output`,
+  `tool_exec_result`, `auth_status`, `login`, `auth_respond`, `auth_cancel`,
+  `logout`. `State` carries `active_host` and `hosts` (the backend first).
 
 ### CLI (`backend/bin/main.ml`)
 
-`serve` (RPC), `run <prompt>` (headless, streams to stdout), `sessions`,
-`login <provider> [-method]`, `logout <provider>`, `auth`. All commands share
-`-auth-file`; `run`/`serve` share `-model`, `-thinking`, `-session`, `-cwd`,
-`-no-tools`, `-faux` (and `-faux-script FILE`, a JSON array of scripted
-replies that implies `-faux`). With no explicit model or session, the default
+`serve` (RPC on stdio; `-listen HOST:PORT` accepts TCP clients instead,
+`-stdio` as well, `-token SECRET`/`$PRIGH_TOKEN` gates them; with stdio the
+backend exits when the spawning frontend closes it, with `-listen` only it
+runs until killed), `tool-host` (the local tool worker), `run <prompt>`
+(headless, streams to stdout), `sessions`, `login <provider> [-method]`,
+`logout <provider>`, `auth`. All commands share `-auth-file`; `run`/`serve`
+share `-model`, `-thinking`, `-session`, `-cwd`, `-no-tools`, `-faux` (and
+`-faux-script FILE`, a JSON array of scripted replies that implies `-faux`);
+for `serve` these describe the default session, the one a client lands on
+when its `hello` names none. With no explicit model or session, the default
 model is the first logged-in provider's in the order anthropic, openai-codex,
 openai, deepseek.
 
@@ -252,9 +314,11 @@ copy of the protocol types and the e2e test guards the contract.
   `Auth_status`, `Auth_event`, `Event`, `Server_message`) and the `Request`
   encoder.
 - `client/` (`prigh_client`) — `Transport.t` (line channel: `Stdio_transport`
-  spawns the backend; an in-memory pair for tests; a websocket later) and
-  `Client` (Async; correlates responses by id, fans out events, stderr and
-  close on one `Incoming.t` pipe).
+  spawns the backend, `Tcp_transport` connects to `-listen`; an in-memory
+  pair for tests), `Client` (Async; correlates responses by id, fans out
+  events, stderr and close on one `Incoming.t` pipe) and `Tool_host` (spawns
+  `prigh tool-host` lazily and proxies `Tool_exec`/`Tool_exec_cancel` events
+  to it and its `output`/`result` lines back as `tool_exec_*` requests).
 - `ui/` (`prigh_ui`) — **platform-agnostic**, depends only on `core` and
   `bonsai`; it is what both the terminal and a future web frontend mount.
   - `App` is an Elm-style pure state machine: `update : Model.t -> Action.t
@@ -303,8 +367,17 @@ copy of the protocol types and the e2e test guards the contract.
   plain `ref`, not Bonsai state, because the handler receives a whole batch
   of events at once and state would only update after the frame, so every key
   in the batch would still see `Idle`.
+  `Term_app.run` sends `hello` before mounting the app and feeds the client
+  id back as `Set_client_id`, so `/host` can mark this frontend as "(here)"
+  and the status line can show `tools:<host>` when tools run elsewhere or
+  `tools:offline` when the active host is gone.
 - `bin/` — `prigh-tui` (`-faux`, `-session`, `-model`, `-cwd`, `-auth-file`,
-  `-backend`; `PRIGH_BACKEND` overrides the backend path).
+  `-backend`; `PRIGH_BACKEND` overrides the backend path). `-connect
+  HOST:PORT` (`$PRIGH_CONNECT`) joins a running backend instead of spawning
+  one, with `-token` (`$PRIGH_TOKEN`) and `-name`; `-tools local|remote`
+  says where this session's tools run (local = this machine through
+  `tool-host`, the default with `-connect`; remote = the backend, the default
+  when spawning, where the two coincide).
 
 ## Data on disk
 

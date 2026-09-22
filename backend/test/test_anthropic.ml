@@ -10,6 +10,7 @@ let model = Model.default_for Anthropic
 let tools =
   [ { Tool_spec.name = "bash"
     ; parallel_safe = false
+    ; on_host = true
     ; destructive = true
     ; description = "Run a command"
     ; parameters =
@@ -21,6 +22,7 @@ let tools =
     }
   ; { Tool_spec.name = "subagent"
     ; parallel_safe = true
+    ; on_host = true
     ; destructive = false
     ; description = "Delegate"
     ; parameters = `Object [ "type", `String "object" ]

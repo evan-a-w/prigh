@@ -44,7 +44,7 @@ let state_json
   ()
   =
   sprintf
-    {|{"session_id":"abc123","session_path":"/home/u/.prigh/sessions/1.jsonl","session_name":%s,"cwd":%s,"git_branch":%s,"model":%s,"thinking":%s,"running":%b,"message_count":2,"usage":{"input":1200,"output":300,"cache_read":0},"cost_usd":%g,"context_tokens":%d}|}
+    {|{"session_id":"abc123","session_path":"/home/u/.prigh/sessions/1.jsonl","session_name":%s,"cwd":%s,"git_branch":%s,"model":%s,"thinking":%s,"running":%b,"message_count":2,"usage":{"input":1200,"output":300,"cache_read":0},"cost_usd":%g,"context_tokens":%d,"active_host":"backend","hosts":[{"id":"backend","name":"srv","cwd":%s}]}|}
     (match session_name with
      | Some name -> P.Json.to_string (P.Json.str name)
      | None -> "null")
@@ -57,6 +57,7 @@ let state_json
     running
     cost_usd
     context_tokens
+    (P.Json.to_string (P.Json.str cwd))
 ;;
 
 let state

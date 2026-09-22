@@ -4,6 +4,7 @@ open! Import
 let spec =
   { Tool_spec.name = "write"
   ; parallel_safe = false
+  ; on_host = true
   ; destructive = true
   ; description =
       "Write a file, creating it (and parent directories) or overwriting it \

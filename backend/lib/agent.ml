@@ -9,6 +9,17 @@ module Queued = struct
   [@@deriving sexp_of]
 end
 
+module Host = struct
+  type t =
+    { id : string
+    ; name : string
+    ; cwd : string
+    }
+  [@@deriving sexp_of]
+
+  let backend_id = "backend"
+end
+
 module State = struct
   type t =
     { session_id : string
@@ -23,6 +34,8 @@ module State = struct
     ; usage : Usage.t
     ; cost_usd : float
     ; context_tokens : int
+    ; active_host : string
+    ; hosts : Host.t list
     }
   [@@deriving sexp_of]
 end
@@ -53,7 +66,27 @@ module Event = struct
         { steer : int
         ; follow_up : int
         }
+    | Tool_exec of
+        { host : string
+        ; exec_id : string
+        ; call_id : string
+        ; name : string
+        ; arguments : Json.t
+        ; cwd : string
+        }
+    | Tool_exec_cancel of
+        { host : string
+        ; exec_id : string
+        }
   [@@deriving sexp_of]
+end
+
+module Pending_exec = struct
+  type t =
+    { host : string
+    ; on_output : string -> unit
+    ; resolver : Tool_result.t Promise.u
+    }
 end
 
 module Run = struct
@@ -84,6 +117,12 @@ type t =
   ; mutable config : Config.t
   ; pending_confirms : bool Promise.u String.Table.t
   ; mutable shell_seq : int
+  ; mutable hosts : Host.t list (** connected clients able to run tools *)
+  ; mutable backend_cwd : string (** the backend host's own cwd *)
+  ; mutable active_host : string
+  ; mutable host_pinned : bool (** chosen explicitly via [set_active_host] *)
+  ; pending_execs : Pending_exec.t String.Table.t
+  ; mutable exec_seq : int
   }
 
 let restore_settings t =
@@ -137,12 +176,27 @@ let create
          | Error _ -> Config.default)
     ; pending_confirms = String.Table.create ()
     ; shell_seq = 0
+    ; hosts = []
+    ; backend_cwd = cwd
+    ; active_host = Host.backend_id
+    ; host_pinned = false
+    ; pending_execs = String.Table.create ()
+    ; exec_seq = 0
     }
   in
   restore_settings t;
   t
 ;;
 
+let backend_host t =
+  { Host.id = Host.backend_id
+  ; name = Core_unix.gethostname ()
+  ; cwd = t.backend_cwd
+  }
+;;
+
+let hosts t = backend_host t :: List.rev t.hosts
+let active_host t = t.active_host
 let subscribe t ~f = t.subscribers <- f :: t.subscribers
 let broadcast t event = List.iter (List.rev t.subscribers) ~f:(fun f -> f event)
 let session t = t.session
@@ -177,6 +231,8 @@ let state t =
   ; usage
   ; cost_usd = Model.cost_usd t.model assistant_usage +. t.subagent_cost_usd
   ; context_tokens
+  ; active_host = t.active_host
+  ; hosts = hosts t
   }
 ;;
 
@@ -228,6 +284,128 @@ let confirm_hook t cancel call ~summary =
     allow)
 ;;
 
+(* ---- tool hosts ------------------------------------------------------- *)
+
+let find_host t id = List.find (hosts t) ~f:(fun h -> String.equal h.id id)
+let active_host_connected t = Option.is_some (find_host t t.active_host)
+
+let fail_execs t ~host ~text =
+  let failed =
+    Hashtbl.filter t.pending_execs ~f:(fun (e : Pending_exec.t) ->
+      String.equal e.host host)
+  in
+  Hashtbl.iteri failed ~f:(fun ~key ~data:(e : Pending_exec.t) ->
+    Hashtbl.remove t.pending_execs key;
+    Promise.resolve e.resolver (Tool.Result.error text))
+;;
+
+let set_active_host_exn t id =
+  match find_host t id with
+  | None -> Or_error.errorf "unknown tool host %S" id
+  | Some host ->
+    t.active_host <- id;
+    if not (String.equal t.cwd host.cwd)
+    then (
+      t.cwd <- host.cwd;
+      t.git_branch <- Git_branch.find ~cwd:t.cwd;
+      ignore (Session.set_cwd t.session ~cwd:t.cwd : Session.Entry.t));
+    broadcast t (Notice (sprintf "tools now run on %s" host.name));
+    state_changed t;
+    Ok ()
+;;
+
+let set_active_host t id =
+  Or_error.map (set_active_host_exn t id) ~f:(fun () -> t.host_pinned <- true)
+;;
+
+(* Tools default to the frontend: a new host takes over unless the user
+   pinned a host that is still connected. *)
+let add_host t (host : Host.t) =
+  t.hosts
+  <- host :: List.filter t.hosts ~f:(fun h -> not (String.equal h.id host.id));
+  let take_over =
+    (not (active_host_connected t))
+    || ((not t.host_pinned) && String.equal t.active_host Host.backend_id)
+  in
+  if take_over
+  then ignore (set_active_host_exn t host.id : unit Or_error.t)
+  else state_changed t
+;;
+
+let remove_host t id =
+  t.hosts <- List.filter t.hosts ~f:(fun h -> not (String.equal h.id id));
+  fail_execs t ~host:id ~text:"[tool host disconnected]";
+  state_changed t
+;;
+
+let tool_exec_output t ~exec_id ~chunk =
+  match Hashtbl.find t.pending_execs exec_id with
+  | None -> Or_error.errorf "no tool execution %S" exec_id
+  | Some e ->
+    e.on_output chunk;
+    Ok ()
+;;
+
+let tool_exec_result t ~exec_id ~text ~is_error =
+  match Hashtbl.find t.pending_execs exec_id with
+  | None -> Or_error.errorf "no tool execution %S" exec_id
+  | Some e ->
+    Hashtbl.remove t.pending_execs exec_id;
+    Promise.resolve e.resolver { Tool_result.text; is_error };
+    Ok ()
+;;
+
+(* Runs [name] on the active host: in-process when that is the backend,
+   otherwise through a [Tool_exec] round trip with the client. *)
+let host_exec t ~cancel ~on_output ~call_id ~cwd ~name ~arguments =
+  if String.equal t.active_host Host.backend_id
+  then Host_ops.execute ~env:t.env ~cancel ~on_output ~cwd ~name ~arguments
+  else (
+    match find_host t t.active_host with
+    | None ->
+      Tool.Result.error
+        (sprintf
+           "tool host %S is not connected; use set_active_host to pick another"
+           t.active_host)
+    | Some host ->
+      let exec_id = sprintf "%s-%d" call_id t.exec_seq in
+      t.exec_seq <- t.exec_seq + 1;
+      let promise, resolver = Promise.create () in
+      Hashtbl.set
+        t.pending_execs
+        ~key:exec_id
+        ~data:{ Pending_exec.host = host.id; on_output; resolver };
+      broadcast
+        t
+        (Tool_exec { host = host.id; exec_id; call_id; name; arguments; cwd });
+      let result =
+        match
+          Cancellation.protect cancel ~f:(fun () -> Promise.await promise)
+        with
+        | Some result -> result
+        | None ->
+          Hashtbl.remove t.pending_execs exec_id;
+          broadcast t (Tool_exec_cancel { host = host.id; exec_id });
+          Tool.Result.error "[cancelled]"
+      in
+      result)
+;;
+
+let executor t : Tool.executor =
+  fun context tool arguments ->
+  if (not tool.spec.on_host) || String.equal t.active_host Host.backend_id
+  then Tool.execute tool context arguments
+  else
+    host_exec
+      t
+      ~cancel:context.cancel
+      ~on_output:context.on_output
+      ~call_id:context.call_id
+      ~cwd:context.cwd
+      ~name:(Tool.name tool)
+      ~arguments
+;;
+
 let loop_config t =
   { Agent_loop.Config.model = t.model
   ; thinking = t.thinking
@@ -250,10 +428,20 @@ let with_attachments t text attachments =
   | [] -> text
   | _ ->
     let block path =
-      match Tool_read.read_for_context ~cwd:t.cwd path with
-      | Error e ->
-        sprintf "<file path=%S error=%S/>" path (Error.to_string_hum e)
-      | Ok content ->
+      let result =
+        host_exec
+          t
+          ~cancel:Cancellation.never
+          ~on_output:ignore
+          ~call_id:"attachment"
+          ~cwd:t.cwd
+          ~name:Host_ops.read_file_op
+          ~arguments:(`Object [ "path", `String path ])
+      in
+      match result with
+      | { is_error = true; text } ->
+        sprintf "<file path=%S error=%S/>" path text
+      | { is_error = false; text = content } ->
         let content =
           if String.is_suffix content ~suffix:"\n"
           then content
@@ -289,6 +477,7 @@ let rec start_run t prompts =
          ~cwd:t.cwd
          ~cancel
          ~confirm:(confirm_hook t cancel)
+         ~execute:(executor t)
          ~steer:(fun () ->
            let l = Queue.to_list t.steer_queue in
            if not (List.is_empty l)
@@ -423,22 +612,19 @@ let shell t ~command ~add_to_context =
       }
     in
     let output = Buffer.create 1024 in
-    let context =
-      Tool.Context.create
+    broadcast t (Loop (Tool_start call));
+    let result =
+      host_exec
+        t
+        ~cancel:Cancellation.never
         ~on_output:(fun chunk ->
           Buffer.add_string output chunk;
           broadcast t (Loop (Tool_output { call_id; chunk })))
         ~call_id
-        ~tools:t.tools
-        ~env:t.env
         ~cwd:t.cwd
-        ()
-    in
-    broadcast t (Loop (Tool_start call));
-    let result =
-      Tool_bash.run
-        context
-        (`Object [ "command", `String command; "timeout", `Number "120" ])
+        ~name:"bash"
+        ~arguments:
+          (`Object [ "command", `String command; "timeout", `Number "120" ])
     in
     broadcast
       t
@@ -556,15 +742,27 @@ let set_cwd t ~path =
     Or_error.error_string "cannot change directory while a run is in progress"
   else (
     let path = resolve_path t path in
-    match Sys_unix.is_directory path with
-    | `Yes ->
-      let path = Filename_unix.realpath path in
+    match
+      host_exec
+        t
+        ~cancel:Cancellation.never
+        ~on_output:ignore
+        ~call_id:"cd"
+        ~cwd:t.cwd
+        ~name:Host_ops.resolve_dir_op
+        ~arguments:(`Object [ "path", `String path ])
+    with
+    | { is_error = true; text } -> Or_error.error_string text
+    | { is_error = false; text = path } ->
       t.cwd <- path;
+      if String.equal t.active_host Host.backend_id then t.backend_cwd <- path;
+      t.hosts
+      <- List.map t.hosts ~f:(fun h ->
+           if String.equal h.id t.active_host then { h with cwd = path } else h);
       t.git_branch <- Git_branch.find ~cwd:path;
       ignore (Session.set_cwd t.session ~cwd:path : Session.Entry.t);
       state_changed t;
-      Ok ()
-    | `No | `Unknown -> Or_error.errorf "not a directory: %s" path)
+      Ok ())
 ;;
 
 let delete_session t ~path =

@@ -67,7 +67,9 @@ let%expect_test "state event and messages" =
           (output     40)
           (cache_read 10)))
         (cost_usd       0.0032)
-        (context_tokens 160))))
+        (context_tokens 160)
+        (active_host    backend)
+        (hosts ()))))
     (Event (Message_start (User hi)))
     (Event (
       Message_end (
@@ -141,6 +143,60 @@ let%expect_test "tool_confirm event" =
         "while decoding"
         "{\"type\":\"event\",\"event\":\"tool_confirm\",\"name\":\"write\"}"
         "missing field \"call_id\"")))
+    |}]
+;;
+
+let%expect_test "tool host events and state hosts" =
+  decode
+    {|{"type":"event","event":"tool_exec","host":"client-2","exec_id":"c1-0","call_id":"c1","name":"bash","arguments":{"command":"ls"},"cwd":"/work"}|};
+  decode
+    {|{"type":"event","event":"tool_exec_cancel","host":"client-2","exec_id":"c1-0"}|};
+  decode
+    (Fixtures.state_json ()
+     |> fun s -> sprintf {|{"type":"event","event":"state","state":%s}|} s);
+  [%expect
+    {|
+    (Event (
+      Tool_exec
+      (exec_id c1-0)
+      (call_id c1)
+      (name    bash)
+      (arguments ((command ls)))
+      (cwd /work)))
+    (Event (Tool_exec_cancel c1-0))
+    (Event (
+      State (
+        (session_id   abc123)
+        (session_path /home/u/.prigh/sessions/1.jsonl)
+        (session_name ())
+        (cwd /work)
+        (git_branch ())
+        (model (
+          (id                deepseek-flash)
+          (provider          deepseek)
+          (key               deepseek/deepseek-flash)
+          (name              "DeepSeek V4.1 Flash")
+          (context_window    1000000)
+          (max_output        128000)
+          (supports_thinking true)
+          (cost (
+            (input      10)
+            (output     50)
+            (cache_read 1)))))
+        (thinking      off)
+        (running       false)
+        (message_count 2)
+        (usage (
+          (input      1200)
+          (output     300)
+          (cache_read 0)))
+        (cost_usd       0.0123)
+        (context_tokens 1500)
+        (active_host    backend)
+        (hosts ((
+          (id   backend)
+          (name srv)
+          (cwd  /work)))))))
     |}]
 ;;
 
@@ -292,7 +348,10 @@ let%expect_test "auth status, models, sessions" =
      (updated_at (2025-06-01T12:34:56Z))
      (first_prompt ())
      (message_count 0)
-     (parent ()))
+     (parent ())
+     (live    false)
+     (running false)
+     (clients 0))
     |}]
 ;;
 
@@ -338,7 +397,10 @@ let%expect_test "entries and session stats" =
      (updated_at ())
      (first_prompt (hi))
      (message_count 3)
-     (parent ()))
+     (parent ())
+     (live    false)
+     (running false)
+     (clients 0))
     ((id e1) (parent ()) (kind (Message (User "first\nsecond"))))
     ((id e2)
      (parent (e1))

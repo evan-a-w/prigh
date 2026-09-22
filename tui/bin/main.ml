@@ -19,13 +19,39 @@ let find_backend () =
 
 let command =
   Command.async_or_error
-    ~summary:"prigh terminal UI (spawns the backend with `serve`)"
+    ~summary:
+      "prigh terminal UI (spawns the backend with `serve`, or connects to one)"
     (let%map_open.Command backend =
        flag
          "-backend"
          (optional string)
          ~doc:
            "PATH backend executable (default: $PRIGH_BACKEND or the dune build)"
+     and connect =
+       flag
+         "-connect"
+         (optional string)
+         ~doc:
+           "HOST:PORT connect to a running `prigh serve -listen` instead of \
+            spawning one (default: $PRIGH_CONNECT)"
+     and token =
+       flag
+         "-token"
+         (optional string)
+         ~doc:"SECRET the backend's -token (default: $PRIGH_TOKEN)"
+     and tools =
+       flag
+         "-tools"
+         (optional string)
+         ~doc:
+           "local|remote where this session's tools run: on this machine \
+            (local, the default with -connect) or on the backend (remote, the \
+            default when spawning)"
+     and name =
+       flag
+         "-name"
+         (optional string)
+         ~doc:"NAME how this frontend appears in /host (default: hostname)"
      and faux = flag "-faux" no_arg ~doc:" scripted provider, no API calls"
      and session =
        flag "-session" (optional string) ~doc:"PATH resume a session file"
@@ -40,18 +66,80 @@ let command =
        let opt name v =
          Option.value_map v ~default:[] ~f:(fun v -> [ name; v ])
        in
-       let args =
-         [ "serve" ]
-         @ (if faux then [ "-faux" ] else [])
-         @ opt "-session" session
-         @ opt "-model" model
-         @ opt "-thinking" thinking
-         @ opt "-cwd" cwd
-         @ opt "-auth-file" auth_file
-         @ Option.value rest ~default:[]
-       in
        let backend = Option.value backend ~default:(find_backend ()) in
-       Prigh_ui_term.Term_app.run ~backend ~args)
+       let connect =
+         match connect with
+         | Some c -> Some c
+         | None -> Sys.getenv "PRIGH_CONNECT"
+       in
+       let token =
+         match token with
+         | Some t -> Some t
+         | None -> Sys.getenv "PRIGH_TOKEN"
+       in
+       let local_tools =
+         match tools, connect with
+         | Some "local", _ | None, Some _ -> Some backend
+         | Some "remote", _ | None, None -> None
+         | Some other, _ ->
+           eprintf "-tools must be local or remote, got %s\n" other;
+           Core.exit 2
+       in
+       let cwd =
+         Option.map cwd ~f:(fun d ->
+           if Filename.is_absolute d
+           then d
+           else Filename.concat (Core_unix.getcwd ()) d)
+       in
+       (* The hello cwd is where our tools run; for a spawned backend the serve
+          arguments already carry it. *)
+       let hello_cwd = Option.value cwd ~default:(Core_unix.getcwd ()) in
+       let hello =
+         [ ( "name"
+           , `String (Option.value name ~default:(Core_unix.gethostname ())) )
+         ]
+         @ [ "cwd", `String hello_cwd ]
+         @ Option.value_map token ~default:[] ~f:(fun t ->
+           [ "token", `String t ])
+         @ Option.value_map session ~default:[] ~f:(fun s ->
+           [ "session", `String s ])
+       in
+       match connect with
+       | Some addr ->
+         let host, port =
+           match String.rsplit2 addr ~on:':' with
+           | Some (host, port) ->
+             (match Int.of_string_opt port with
+              | Some port ->
+                (if String.is_empty host then "127.0.0.1" else host), port
+              | None ->
+                eprintf "-connect must be HOST:PORT, got %s\n" addr;
+                Core.exit 2)
+           | None ->
+             eprintf "-connect must be HOST:PORT, got %s\n" addr;
+             Core.exit 2
+         in
+         (match%bind Prigh_client.Tcp_transport.connect ~host ~port with
+          | Error _ as e -> return e
+          | Ok transport ->
+            Prigh_ui_term.Term_app.run ~transport ~hello ~local_tools)
+       | None ->
+         let args =
+           [ "serve" ]
+           @ (if faux then [ "-faux" ] else [])
+           @ opt "-session" session
+           @ opt "-model" model
+           @ opt "-thinking" thinking
+           @ opt "-cwd" cwd
+           @ opt "-auth-file" auth_file
+           @ Option.value rest ~default:[]
+         in
+         (match%bind
+            Prigh_client.Stdio_transport.spawn ~prog:backend ~args ()
+          with
+          | Error _ as e -> return e
+          | Ok transport ->
+            Prigh_ui_term.Term_app.run ~transport ~hello ~local_tools))
 ;;
 
 let () = Command_unix.run command

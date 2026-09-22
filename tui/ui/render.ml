@@ -183,6 +183,20 @@ let truncate_line_left line ~width =
     span "…" :: drop_left_spans line (w - keep) [])
 ;;
 
+(* [tools:laptop] when tools run on another host, [tools:offline] (error style)
+   when the active host is gone. Nothing when they run on the backend or here,
+   the two ordinary cases. *)
+let tools_part (m : App.Model.t) (s : P.State.t) =
+  let is_me id =
+    Option.value_map m.client_id ~default:false ~f:(String.equal id)
+  in
+  match List.find s.hosts ~f:(fun h -> String.equal h.id s.active_host) with
+  | None when List.is_empty s.hosts -> []
+  | None -> [ 2, [ span ~style:(Style.fg Red) "tools:offline" ] ]
+  | Some h when String.equal h.id P.Host.backend_id || is_me h.id -> []
+  | Some h -> [ 4, [ span ~style:(status_style m) ("tools:" ^ h.name) ] ]
+;;
+
 let status (m : App.Model.t) : Content.Line.t =
   match m.state with
   | None -> [ span ~style:gray "connecting…" ]
@@ -214,6 +228,7 @@ let status (m : App.Model.t) : Content.Line.t =
           ] )
       ; 4, [ span ~style:base (sprintf "$%.2f" s.cost_usd) ]
       ]
+      @ tools_part m s
       @ (let queued = Queue_counts.total m.queued in
          if queued > 0
          then [ 3, [ span ~style:base (sprintf "queued:%d" queued) ] ]

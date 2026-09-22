@@ -73,6 +73,7 @@ module Action = struct
     | Reply of Reply_tag.t * (P.Json.t, string) Result.t
     | Tick
     | Set_home of string
+    | Set_client_id of string
     | Resize of
         { width : int
         ; height : int
@@ -102,6 +103,7 @@ module Model = struct
     ; verbosity : Verbosity.t
     ; config : P.Config.t option
     ; home : string option
+    ; client_id : string option (** ours, from [hello] *)
     ; stderr_tail : string list
     ; pending_confirms : (string * string * string) list
     ; backend_gone : bool
@@ -257,6 +259,7 @@ let init =
   ; verbosity = Verbosity.Normal
   ; config = None
   ; home = None
+  ; client_id = None
   ; stderr_tail = []
   ; pending_confirms = []
   ; backend_gone = false
@@ -467,7 +470,13 @@ let session_picker_items m (sessions : P.Session_summary.t list) =
       ~detail:s.cwd
       ~search:(name ^ " " ^ first ^ " " ^ s.cwd ^ " " ^ date)
       ~marked:(Option.value_map current ~default:false ~f:(String.equal s.path))
-      (sprintf "%s ∣ %s ∣ %d msgs ∣ %s" name date s.message_count first))
+      (sprintf
+         "%s%s ∣ %s ∣ %d msgs ∣ %s"
+         (if s.running then "▶ " else if s.live then "● " else "")
+         name
+         date
+         s.message_count
+         first))
 ;;
 
 let sessions_picker
@@ -689,6 +698,59 @@ let agents_picker m =
           a.task)
     in
     open_picker m Agents (Picker.create ~title:"Subagents" items), [])
+;;
+
+(* A host's display name: "(here)" marks this frontend. *)
+let host_label m (h : P.Host.t) =
+  if Option.value_map m.client_id ~default:false ~f:(String.equal h.id)
+  then h.name ^ " (here)"
+  else h.name
+;;
+
+let hosts_picker m =
+  match m.state with
+  | None -> notice m "not connected", []
+  | Some s ->
+    let items =
+      List.map s.hosts ~f:(fun h ->
+        Picker.Item.create
+          ~id:h.id
+          ~detail:h.cwd
+          ~search:(h.name ^ " " ^ h.id ^ " " ^ h.cwd)
+          ~marked:(String.equal h.id s.active_host)
+          (host_label m h))
+    in
+    open_picker m Hosts (Picker.create ~title:"Tool host" items), []
+;;
+
+let set_host_command id = rpc "set_active_host" ~params:[ "host", str id ]
+
+let switch_host m arg =
+  match m.state with
+  | None -> notice m "not connected", []
+  | Some s ->
+    let arg = String.strip arg in
+    let matches =
+      List.filter s.hosts ~f:(fun h ->
+        String.equal h.id arg
+        || String.equal h.name arg
+        || (String.equal arg "here"
+            && Option.value_map
+                 m.client_id
+                 ~default:false
+                 ~f:(String.equal h.id)))
+    in
+    (match matches with
+     | [ h ] -> m, [ set_host_command h.id ]
+     | [] ->
+       ( error
+           m
+           (sprintf
+              "unknown host %S; one of: %s"
+              arg
+              (String.concat ~sep:", " (List.map s.hosts ~f:(host_label m))))
+       , [] )
+     | _ -> hosts_picker m)
 ;;
 
 let set_focus m focus = follow { m with focus }
@@ -962,6 +1024,8 @@ let run_command m (cmd : Commands.Parsed.t) =
       ] )
   | "session", _ -> m, [ rpc "session_stats" ~tag:Session_stats ]
   | "agents", _ -> agents_picker m
+  | "host", [] -> hosts_picker m
+  | "host", _ -> switch_host m cmd.rest
   | "sessions", _ | "switch", [] ->
     m, [ rpc "list_sessions" ~tag:Sessions_picker ]
   | "switch", _ ->
@@ -1611,6 +1675,7 @@ let picker_selected m (kind : Mode.Picker_kind.t) (item : Picker.Item.t) =
   | Tree _ ->
     m, [ rpc "rewind" ~params:[ "to", str item.id ] ~tag:Reload_messages ]
   | Agents -> set_focus m (`Agent item.id), []
+  | Hosts -> m, [ set_host_command item.id ]
   | Auth_select id ->
     m, [ rpc "auth_respond" ~params:[ "id", str id; "value", str item.id ] ]
 ;;
@@ -2035,7 +2100,9 @@ let event m (e : P.Event.t) =
   | Notice _
   | Subagent_start _
   | Subagent _
-  | Subagent_end _ -> m, []
+  | Subagent_end _
+  | Tool_exec _
+  | Tool_exec_cancel _ -> m, []
 ;;
 
 (* ---- rpc replies ------------------------------------------------------ *)
@@ -2288,6 +2355,7 @@ let update m (action : Action.t) =
       | Reply (tag, result) -> reply m tag result
       | Tick -> { m with spinner = m.spinner + 1 }, []
       | Set_home home -> { m with home = Some home }, []
+      | Set_client_id id -> { m with client_id = Some id }, []
       | Resize { width; height } -> { m with width; height }, []
     in
     let m, cmds = block_backend_rpc m cmds in

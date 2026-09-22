@@ -77,6 +77,7 @@ module Action : sig
     | Reply of Reply_tag.t * (P.Json.t, string) Result.t
     | Tick
     | Set_home of string
+    | Set_client_id of string (** ours, from the [hello] reply *)
     | Resize of
         { width : int
         ; height : int
@@ -106,6 +107,7 @@ module Model : sig
     ; verbosity : Verbosity.t
     ; config : P.Config.t option
     ; home : string option
+    ; client_id : string option
     ; stderr_tail : string list
     ; pending_confirms : (string * string * string) list
     ; backend_gone : bool

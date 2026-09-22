@@ -50,5 +50,12 @@ val with_test_driver
       -> 'a Async.Deferred.Or_error.t)
   -> 'a Async.Deferred.Or_error.t
 
-(** Runs the TUI against a spawned backend until the user quits. *)
-val run : backend:string -> args:string list -> unit Deferred.Or_error.t
+(** Runs the TUI over [transport] until the user quits. [hello] is sent first
+    (name, cwd, session, token, ...); with [local_tools] (the path of the prigh
+    binary) the session's tools run on this machine through [prigh tool-host]
+    and [hello] advertises [tools: true]. *)
+val run
+  :  transport:Prigh_client.Transport.t
+  -> hello:(string * Prigh_protocol.Json.t) list
+  -> local_tools:string option
+  -> unit Deferred.Or_error.t

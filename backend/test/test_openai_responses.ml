@@ -11,6 +11,7 @@ let openai_model = Model.default_for Openai
 let tools =
   [ { Tool_spec.name = "bash"
     ; parallel_safe = false
+    ; on_host = true
     ; destructive = true
     ; description = "Run a command"
     ; parameters =

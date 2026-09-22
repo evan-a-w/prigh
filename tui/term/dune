@@ -15,5 +15,6 @@
   bonsai_term
   prigh_protocol
   prigh_client
+  jsonaf
   prigh_ui
   base64))

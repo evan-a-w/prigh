@@ -17,6 +17,7 @@ module Picker_kind = struct
     | Rewind of Entry.t list
     | Tree of Entry.t list
     | Agents
+    | Hosts
     | Auth_select of string
   [@@deriving sexp_of, equal]
 end

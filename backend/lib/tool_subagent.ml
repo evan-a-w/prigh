@@ -14,6 +14,7 @@ let instructions =
 let spec =
   { Tool_spec.name = "subagent"
   ; parallel_safe = true
+  ; on_host = false
   ; destructive = false
   ; description =
       "Delegate a self-contained task to a subagent with its own context. The \
@@ -138,6 +139,7 @@ let create ~provider ~current_model ~current_thinking ~home =
         ~config
         ~cwd
         ~cancel:context.cancel
+        ~execute:context.execute
         ~depth
         ~agent_id
         ~emit
