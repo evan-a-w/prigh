@@ -16,7 +16,7 @@
 ; through the real client and compares the normalised transcript.
 
 (rule
- (alias e2e)
+ (aliases e2e runtest)
  (deps e2e.expected)
  (action
   (progn

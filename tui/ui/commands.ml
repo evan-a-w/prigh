@@ -69,7 +69,8 @@ let all =
   ; c
       "host"
       "[name|backend]"
-      "pick where tools run: this frontend, another one, or the backend"
+      "pick where tools run (this frontend, another one, or the backend) and \
+       the directory there"
   ; c ~argument:Argument.Sessions "switch" "[path]" "switch to a saved session"
   ; c ~argument:Argument.Path "cd" "[path]" "change the working directory"
   ; c "fork" "" "fork at a previous user message"
@@ -87,6 +88,10 @@ let all =
       "[path]"
       "import a session from a JSONL file"
   ; c "abort" "" "abort the current run"
+  ; c
+      "retry-backend-connection"
+      ""
+      "reconnect to the backend now instead of waiting for the next retry"
   ; c "state" "" "show session state"
   ; c "clear" "" "clear the transcript"
   ; c "quit" "" "exit"

@@ -172,7 +172,33 @@ let edit_externally text =
     Error ("editor failed: " ^ Core_unix.Exit_or_signal.to_string_hum status)
 ;;
 
-let platform client ~exit ~quit_requested : Prigh_ui.Component.Platform.t =
+let hello_params hello ~session =
+  match session with
+  | None -> hello
+  | Some path ->
+    List.Assoc.remove hello ~equal:String.equal "session"
+    @ [ "session", `String path ]
+;;
+
+let hello_error = Result.map_error ~f:Error.to_string_hum
+
+let send_hello client hello ~session =
+  Deferred.map
+    (Client.call client "hello" (hello_params hello ~session))
+    ~f:hello_error
+;;
+
+let reconnect client ~hello ~delay_ms ~session =
+  let%bind.Deferred () =
+    Clock.after (Time_float.Span.of_ms (Float.of_int delay_ms))
+  in
+  match%bind.Deferred Client.connect client with
+  | Error e -> Deferred.return (Error (Error.to_string_hum e))
+  | Ok () -> send_hello client hello ~session
+;;
+
+let platform client ~hello ~exit ~quit_requested : Prigh_ui.Component.Platform.t
+  =
   { rpc =
       (fun method_ params ->
         Effect.of_deferred_fun
@@ -192,6 +218,11 @@ let platform client ~exit ~quit_requested : Prigh_ui.Component.Platform.t =
   ; copy_to_clipboard = (fun text -> Effect.of_sync_fun copy_to_clipboard text)
   ; suspend = Effect.of_sync_fun suspend ()
   ; edit_externally = (fun text -> Effect.of_sync_fun edit_externally text)
+  ; reconnect =
+      (fun ~delay_ms ~session ->
+        Effect.of_deferred_fun
+          (fun () -> reconnect client ~hello ~delay_ms ~session)
+          ())
   ; quit =
       (* Bonsai_term's [Driver.finished] never resolves when [exit] is scheduled
          from apply_action (the next frame sees the exit status before any event
@@ -214,12 +245,13 @@ end
 
 let app
   client
+  ~hello
   ~exit
   ~quit_requested
   ~(dimensions : Dimensions.t Bonsai.t)
   (local_ graph)
   =
-  let platform = Bonsai.return (platform client ~exit ~quit_requested) in
+  let platform = Bonsai.return (platform client ~hello ~exit ~quit_requested) in
   let model, inject = Prigh_ui.Component.create platform graph in
   let home = Option.value (Sys.getenv "HOME") ~default:"." in
   Bonsai.Edge.lifecycle
@@ -280,8 +312,8 @@ let app
         (match Key_of_event.key event with
          | Some key -> inject (Key key)
          | None -> Effect.Ignore)
-      | Mouse { kind = Scroll `Up; _ }, _ -> inject (Intent Page_up)
-      | Mouse { kind = Scroll `Down; _ }, _ -> inject (Intent Page_down)
+      | Mouse { kind = Scroll `Up; _ }, _ -> inject (Intent Scroll_up)
+      | Mouse { kind = Scroll `Down; _ }, _ -> inject (Intent Scroll_down)
       | Mouse _, _ -> Effect.Ignore
   in
   let%arr model and view and handler and inject in
@@ -343,7 +375,7 @@ let with_test_driver ~client ~(terminal : Test_terminal.t) ~writer ~reader f =
       ~view:r.view, ~handler:r.handler)
     ~handle_incoming:(fun (r : Result_.t) action -> r.inject action)
     (fun ~exit ~dimensions graph ->
-      app client ~exit ~quit_requested ~dimensions graph)
+      app client ~hello:[] ~exit ~quit_requested ~dimensions graph)
     (fun driver ->
       don't_wait_for
         (Pipe.iter_without_pushback (Client.incoming client) ~f:(fun incoming ->
@@ -351,14 +383,21 @@ let with_test_driver ~client ~(terminal : Test_terminal.t) ~writer ~reader f =
       f driver)
 ;;
 
-let run ~transport ~hello ~local_tools =
-  let client = Client.create transport in
+let run ~connect ~hello ~local_tools =
+  let client = Client.create ~connect in
   let hello =
     hello @ [ ("tools", if Option.is_some local_tools then `True else `False) ]
   in
-  match%bind.Deferred Client.call client "hello" hello with
+  match%bind.Deferred
+    match%bind.Deferred Client.connect client with
+    | Error _ as e -> Deferred.return e
+    | Ok () ->
+      Deferred.map
+        (send_hello client hello ~session:None)
+        ~f:(Result.map_error ~f:Error.of_string)
+  with
   | Error _ as e ->
-    Client.close client;
+    let%bind.Deferred () = Client.close client in
     Deferred.return e
   | Ok reply ->
     let client_id =
@@ -372,13 +411,16 @@ let run ~transport ~hello ~local_tools =
     in
     let quit_requested = Ivar.create () in
     let%bind.Deferred driver =
+      (* Mouse reporting so the wheel scrolls the transcript (the terminal would
+         otherwise turn it into arrow keys, i.e. prompt history); selecting text
+         needs Shift. *)
       Bonsai_term.start_with_driver
-        ~mouse:No_mouse_events
+        ~mouse:All_mouse_events_except_hover
         ~get_view_and_handler:(fun (r : Result_.t) ->
           ~view:r.view, ~handler:r.handler)
         ~handle_incoming:(fun (r : Result_.t) action -> r.inject action)
         (fun ~exit ~dimensions graph ->
-          app client ~exit ~quit_requested ~dimensions graph)
+          app client ~hello ~exit ~quit_requested ~dimensions graph)
     in
     (match driver with
      | Error _ as e -> Deferred.return e
@@ -412,10 +454,9 @@ let run ~transport ~hello ~local_tools =
        let%bind.Deferred () = Clock.after (Time_float.Span.of_sec 0.2) in
        ignore (Tty.set_iexten tty had_iexten : bool);
        Option.iter tool_host ~f:Prigh_client.Tool_host.close;
-       Client.close client;
        let%bind.Deferred () =
          Deferred.any_unit
-           [ Client.closed client; Clock.after (Time_float.Span.of_sec 3.) ]
+           [ Client.close client; Clock.after (Time_float.Span.of_sec 3.) ]
        in
        Deferred.return (Ok ()))
 ;;

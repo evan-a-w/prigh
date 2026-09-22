@@ -1,5 +1,5 @@
 open! Core
-module P = Prigh_protocol
+open! Import
 
 module Source = struct
   type t =

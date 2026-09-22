@@ -17,6 +17,7 @@ end
     backend; tests mount it against an in-memory transport. *)
 val app
   :  Prigh_client.Client.t
+  -> hello:(string * Prigh_protocol.Json.t) list
   -> exit:(unit -> unit Bonsai.Effect.t)
   -> quit_requested:unit Ivar.t
   -> dimensions:Dimensions.t Bonsai.t
@@ -50,12 +51,14 @@ val with_test_driver
       -> 'a Async.Deferred.Or_error.t)
   -> 'a Async.Deferred.Or_error.t
 
-(** Runs the TUI over [transport] until the user quits. [hello] is sent first
-    (name, cwd, session, token, ...); with [local_tools] (the path of the prigh
-    binary) the session's tools run on this machine through [prigh tool-host]
-    and [hello] advertises [tools: true]. *)
+(** Runs the TUI until the user quits. [connect] opens the transport (and is
+    called again to reconnect after the backend goes away); [hello] is sent on
+    every connection (name, cwd, session, token, ...), with [session] replaced
+    by the current one when reconnecting. With [local_tools] (the path of the
+    prigh binary) the session's tools run on this machine through
+    [prigh tool-host] and [hello] advertises [tools: true]. *)
 val run
-  :  transport:Prigh_client.Transport.t
+  :  connect:(unit -> Prigh_client.Transport.t Deferred.Or_error.t)
   -> hello:(string * Prigh_protocol.Json.t) list
   -> local_tools:string option
   -> unit Deferred.Or_error.t

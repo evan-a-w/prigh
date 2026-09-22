@@ -123,6 +123,8 @@ type t =
   ; mutable host_pinned : bool (** chosen explicitly via [set_active_host] *)
   ; pending_execs : Pending_exec.t String.Table.t
   ; mutable exec_seq : int
+  ; mutable environment_notes : string list
+    (** cwd/host changes not yet told to the model, oldest first *)
   }
 
 let restore_settings t =
@@ -182,6 +184,7 @@ let create
     ; host_pinned = false
     ; pending_execs = String.Table.create ()
     ; exec_seq = 0
+    ; environment_notes = []
     }
   in
   restore_settings t;
@@ -299,23 +302,33 @@ let fail_execs t ~host ~text =
     Promise.resolve e.resolver (Tool.Result.error text))
 ;;
 
-let set_active_host_exn t id =
-  match find_host t id with
-  | None -> Or_error.errorf "unknown tool host %S" id
-  | Some host ->
-    t.active_host <- id;
-    if not (String.equal t.cwd host.cwd)
-    then (
-      t.cwd <- host.cwd;
-      t.git_branch <- Git_branch.find ~cwd:t.cwd;
-      ignore (Session.set_cwd t.session ~cwd:t.cwd : Session.Entry.t));
-    broadcast t (Notice (sprintf "tools now run on %s" host.name));
-    state_changed t;
-    Ok ()
+(* Before the first run the system prompt is still to be built from the
+   current environment, so there is nothing to report. *)
+let add_environment_note t note =
+  if Option.is_some (Session.system_prompt t.session)
+  then t.environment_notes <- t.environment_notes @ [ note ]
 ;;
 
-let set_active_host t id =
-  Or_error.map (set_active_host_exn t id) ~f:(fun () -> t.host_pinned <- true)
+let set_host_cwd t (host : Host.t) ~cwd =
+  if not (String.equal t.cwd cwd)
+  then (
+    t.cwd <- cwd;
+    t.git_branch <- Git_branch.find ~cwd;
+    ignore (Session.set_cwd t.session ~cwd : Session.Entry.t);
+    add_environment_note t (System_prompt.cwd_changed_note ~cwd));
+  if String.equal host.id Host.backend_id then t.backend_cwd <- cwd;
+  t.hosts
+  <- List.map t.hosts ~f:(fun h ->
+       if String.equal h.id host.id then { h with cwd } else h)
+;;
+
+let activate_host t (host : Host.t) ~cwd =
+  if not (String.equal t.active_host host.id)
+  then add_environment_note t (System_prompt.host_changed_note ~host:host.name);
+  t.active_host <- host.id;
+  set_host_cwd t host ~cwd;
+  broadcast t (Notice (sprintf "tools now run on %s in %s" host.name cwd));
+  state_changed t
 ;;
 
 (* Tools default to the frontend: a new host takes over unless the user
@@ -327,9 +340,7 @@ let add_host t (host : Host.t) =
     (not (active_host_connected t))
     || ((not t.host_pinned) && String.equal t.active_host Host.backend_id)
   in
-  if take_over
-  then ignore (set_active_host_exn t host.id : unit Or_error.t)
-  else state_changed t
+  if take_over then activate_host t host ~cwd:host.cwd else state_changed t
 ;;
 
 let remove_host t id =
@@ -355,40 +366,80 @@ let tool_exec_result t ~exec_id ~text ~is_error =
     Ok ()
 ;;
 
-(* Runs [name] on the active host: in-process when that is the backend,
-   otherwise through a [Tool_exec] round trip with the client. *)
-let host_exec t ~cancel ~on_output ~call_id ~cwd ~name ~arguments =
-  if String.equal t.active_host Host.backend_id
+(* Runs [name] on [host]: in-process when that is the backend, otherwise
+   through a [Tool_exec] round trip with the client. *)
+let host_exec_on
+      t
+      (host : Host.t)
+      ~cancel
+      ~on_output
+      ~call_id
+      ~cwd
+      ~name
+      ~arguments
+  =
+  if String.equal host.id Host.backend_id
   then Host_ops.execute ~env:t.env ~cancel ~on_output ~cwd ~name ~arguments
   else (
-    match find_host t t.active_host with
+    let exec_id = sprintf "%s-%d" call_id t.exec_seq in
+    t.exec_seq <- t.exec_seq + 1;
+    let promise, resolver = Promise.create () in
+    Hashtbl.set
+      t.pending_execs
+      ~key:exec_id
+      ~data:{ Pending_exec.host = host.id; on_output; resolver };
+    broadcast
+      t
+      (Tool_exec { host = host.id; exec_id; call_id; name; arguments; cwd });
+    match Cancellation.protect cancel ~f:(fun () -> Promise.await promise) with
+    | Some result -> result
     | None ->
-      Tool.Result.error
-        (sprintf
-           "tool host %S is not connected; use set_active_host to pick another"
-           t.active_host)
-    | Some host ->
-      let exec_id = sprintf "%s-%d" call_id t.exec_seq in
-      t.exec_seq <- t.exec_seq + 1;
-      let promise, resolver = Promise.create () in
-      Hashtbl.set
-        t.pending_execs
-        ~key:exec_id
-        ~data:{ Pending_exec.host = host.id; on_output; resolver };
-      broadcast
-        t
-        (Tool_exec { host = host.id; exec_id; call_id; name; arguments; cwd });
-      let result =
-        match
-          Cancellation.protect cancel ~f:(fun () -> Promise.await promise)
-        with
-        | Some result -> result
-        | None ->
-          Hashtbl.remove t.pending_execs exec_id;
-          broadcast t (Tool_exec_cancel { host = host.id; exec_id });
-          Tool.Result.error "[cancelled]"
-      in
-      result)
+      Hashtbl.remove t.pending_execs exec_id;
+      broadcast t (Tool_exec_cancel { host = host.id; exec_id });
+      Tool.Result.error "[cancelled]")
+;;
+
+let host_exec t ~cancel ~on_output ~call_id ~cwd ~name ~arguments =
+  match find_host t t.active_host with
+  | None ->
+    Tool.Result.error
+      (sprintf
+         "tool host %S is not connected; use set_active_host to pick another"
+         t.active_host)
+  | Some host ->
+    host_exec_on t host ~cancel ~on_output ~call_id ~cwd ~name ~arguments
+;;
+
+let resolve_dir_on t (host : Host.t) path =
+  match
+    host_exec_on
+      t
+      host
+      ~cancel:Cancellation.never
+      ~on_output:ignore
+      ~call_id:"cd"
+      ~cwd:host.cwd
+      ~name:Host_ops.resolve_dir_op
+      ~arguments:(`Object [ "path", `String path ])
+  with
+  | { is_error = true; text } -> Or_error.errorf "%s: %s" host.name text
+  | { is_error = false; text } -> Ok text
+;;
+
+(* The session cwd is a property of the host, so switching hosts means
+   choosing a directory there; without [cwd] the host's own is used. *)
+let set_active_host t id ~cwd =
+  match find_host t id with
+  | None -> Or_error.errorf "unknown tool host %S" id
+  | Some host ->
+    let cwd =
+      match cwd with
+      | None -> Ok host.cwd
+      | Some path -> resolve_dir_on t host (Tool.expand_home path)
+    in
+    Or_error.map cwd ~f:(fun cwd ->
+      activate_host t host ~cwd;
+      t.host_pinned <- true)
 ;;
 
 let executor t : Tool.executor =
@@ -419,17 +470,29 @@ let instructions t ~cwd =
        ~arguments:(`Object [ "home", `String t.home ]))
 ;;
 
+(* Built once per conversation and recorded in the session, so the prompt
+   prefix stays cacheable; later cwd/host changes reach the model as notes on
+   the next user message instead. *)
+let system_prompt t =
+  match Session.system_prompt t.session with
+  | Some text -> text
+  | None ->
+    let text =
+      System_prompt.build
+        ~instructions:(instructions t ~cwd:t.cwd)
+        ~cwd:t.cwd
+        ~home:t.home
+        ~tools:(Tools.specs t.tools)
+        ()
+    in
+    ignore (Session.set_system_prompt t.session ~text : Session.Entry.t);
+    text
+;;
+
 let loop_config t =
   { Agent_loop.Config.model = t.model
   ; thinking = t.thinking
-  ; system =
-      Some
-        (System_prompt.build
-           ~instructions:(instructions t ~cwd:t.cwd)
-           ~cwd:t.cwd
-           ~home:t.home
-           ~tools:(Tools.specs t.tools)
-           ())
+  ; system = Some (system_prompt t)
   ; tools = t.tools
   ; max_turns = None
   ; max_tokens = None
@@ -467,7 +530,15 @@ let with_attachments t text attachments =
 ;;
 
 let user_message t (q : Queued.t) =
-  Message.user (with_attachments t q.text q.attachments)
+  let text = with_attachments t q.text q.attachments in
+  let text =
+    match t.environment_notes with
+    | [] -> text
+    | notes ->
+      t.environment_notes <- [];
+      String.concat ~sep:"\n" notes ^ "\n\n" ^ text
+  in
+  Message.user text
 ;;
 
 let rec start_run t prompts =
@@ -713,6 +784,7 @@ let replace_session t session =
   t.session <- session;
   t.cwd <- Session.cwd session;
   t.git_branch <- Git_branch.find ~cwd:t.cwd;
+  t.environment_notes <- [];
   t.subagent_usage <- Usage.zero;
   t.subagent_cost_usd <- 0.;
   restore_settings t;
@@ -755,28 +827,17 @@ let set_cwd t ~path =
   then
     Or_error.error_string "cannot change directory while a run is in progress"
   else (
-    let path = resolve_path t path in
-    match
-      host_exec
-        t
-        ~cancel:Cancellation.never
-        ~on_output:ignore
-        ~call_id:"cd"
-        ~cwd:t.cwd
-        ~name:Host_ops.resolve_dir_op
-        ~arguments:(`Object [ "path", `String path ])
-    with
-    | { is_error = true; text } -> Or_error.error_string text
-    | { is_error = false; text = path } ->
-      t.cwd <- path;
-      if String.equal t.active_host Host.backend_id then t.backend_cwd <- path;
-      t.hosts
-      <- List.map t.hosts ~f:(fun h ->
-           if String.equal h.id t.active_host then { h with cwd = path } else h);
-      t.git_branch <- Git_branch.find ~cwd:path;
-      ignore (Session.set_cwd t.session ~cwd:path : Session.Entry.t);
-      state_changed t;
-      Ok ())
+    match find_host t t.active_host with
+    | None ->
+      Or_error.errorf
+        "tool host %S is not connected; use set_active_host to pick another"
+        t.active_host
+    | Some host ->
+      Or_error.map
+        (resolve_dir_on t host (resolve_path t path))
+        ~f:(fun cwd ->
+          set_host_cwd t host ~cwd;
+          state_changed t))
 ;;
 
 let delete_session t ~path =

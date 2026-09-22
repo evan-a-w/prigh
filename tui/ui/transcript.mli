@@ -1,23 +1,25 @@
 open! Core
-module P = Prigh_protocol
+open! Import
 
 (** Conversation history plus the live streaming tails. Pure. *)
 
 module Subagent : sig
-  type status =
-    | Running
-    | Done of
-        { turns : int
-        ; cost_usd : float
-        }
-    | Failed of string
-  [@@deriving sexp_of, equal]
+  module Status : sig
+    type t =
+      | Running
+      | Done of
+          { turns : int
+          ; cost_usd : float
+          }
+      | Failed of string
+    [@@deriving sexp_of, equal]
+  end
 
   type t =
     { agent_id : string
     ; task : string
     ; model : string
-    ; status : status
+    ; status : Status.t
     ; turns : int
     ; report : string option
     ; last_tool : string option

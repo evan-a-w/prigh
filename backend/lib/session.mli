@@ -6,25 +6,28 @@ open! Import
     to an earlier entry so new messages branch from there. *)
 
 module Entry : sig
-  type payload =
-    | Message of Message.t
-    | Model of
-        { model : string
-        ; thinking : Thinking.t
-        }
-    | Compaction of
-        { summary : string
-        ; kept_from : string
-          (** id of the first entry retained after the summary *)
-        }
-    | Name of { name : string }
-    | Cwd of { cwd : string }
-  [@@deriving sexp, jsonaf]
+  module Payload : sig
+    type t =
+      | Message of Message.t
+      | Model of
+          { model : string
+          ; thinking : Thinking.t
+          }
+      | Compaction of
+          { summary : string
+          ; kept_from : string
+            (** id of the first entry retained after the summary *)
+          }
+      | Name of { name : string }
+      | Cwd of { cwd : string }
+      | System_prompt of { text : string }
+    [@@deriving sexp, jsonaf]
+  end
 
   type t =
     { id : string
     ; parent : string option
-    ; payload : payload
+    ; payload : Payload.t
     }
   [@@deriving sexp, jsonaf]
 end
@@ -57,6 +60,12 @@ val active_path : t -> Entry.t list
 val messages : t -> Message.t list
 
 val model : t -> (string * Thinking.t) option
+
+(** The system prompt fixed for this conversation, if one was recorded on the
+    active path. *)
+val system_prompt : t -> string option
+
+val set_system_prompt : t -> text:string -> Entry.t
 val append_message : t -> Message.t -> Entry.t
 val set_model : t -> model:string -> thinking:Thinking.t -> Entry.t
 val set_name : t -> name:string -> Entry.t

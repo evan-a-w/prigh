@@ -119,10 +119,10 @@ let command =
              eprintf "-connect must be HOST:PORT, got %s\n" addr;
              Core.exit 2
          in
-         (match%bind Prigh_client.Tcp_transport.connect ~host ~port with
-          | Error _ as e -> return e
-          | Ok transport ->
-            Prigh_ui_term.Term_app.run ~transport ~hello ~local_tools)
+         Prigh_ui_term.Term_app.run
+           ~connect:(fun () -> Prigh_client.Tcp_transport.connect ~host ~port)
+           ~hello
+           ~local_tools
        | None ->
          let args =
            [ "serve" ]
@@ -134,12 +134,11 @@ let command =
            @ opt "-auth-file" auth_file
            @ Option.value rest ~default:[]
          in
-         (match%bind
-            Prigh_client.Stdio_transport.spawn ~prog:backend ~args ()
-          with
-          | Error _ as e -> return e
-          | Ok transport ->
-            Prigh_ui_term.Term_app.run ~transport ~hello ~local_tools))
+         Prigh_ui_term.Term_app.run
+           ~connect:(fun () ->
+             Prigh_client.Stdio_transport.spawn ~prog:backend ~args ())
+           ~hello
+           ~local_tools)
 ;;
 
 let () = Command_unix.run command

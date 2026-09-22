@@ -1,5 +1,5 @@
 open! Core
-module P = Prigh_protocol
+open! Import
 
 (** The Bonsai component both platforms mount. The platform supplies the effects
     that commands need; everything else is shared. *)
@@ -18,6 +18,11 @@ module Platform : sig
     ; copy_to_clipboard : string -> unit Bonsai.Effect.t
     ; suspend : unit Bonsai.Effect.t
     ; edit_externally : string -> (string, string) Result.t Bonsai.Effect.t
+    ; reconnect :
+        delay_ms:int
+        -> session:string option
+        -> (P.Json.t, string) Result.t Bonsai.Effect.t
+    (** Waits, connects again and sends [hello]; the result is the hello reply. *)
     }
 end
 

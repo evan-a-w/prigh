@@ -1,16 +1,20 @@
 open! Core
 open! Import
 
-type op =
-  | Keep of string
-  | Del of string
-  | Add of string
+module Op = struct
+  type t =
+    | Keep of string
+    | Del of string
+    | Add of string
+end
 
-type positioned =
-  { op : op
-  ; old_before : int
-  ; new_before : int
-  }
+module Positioned = struct
+  type t =
+    { op : Op.t
+    ; old_before : int
+    ; new_before : int
+    }
+end
 
 let context = 3
 
@@ -18,7 +22,7 @@ let lines s =
   if String.is_empty s then [||] else Array.of_list (String.split_lines s)
 ;;
 
-let ops a b =
+let ops a b : Op.t list =
   let n = Array.length a in
   let m = Array.length b in
   let dp = Array.make_matrix ~dimx:(n + 1) ~dimy:(m + 1) 0 in
@@ -30,7 +34,7 @@ let ops a b =
           else Int.max dp.(i + 1).(j) dp.(i).(j + 1))
     done
   done;
-  let rec walk i j acc =
+  let rec walk i j (acc : Op.t list) =
     if i = n && j = m
     then List.rev acc
     else if i < n && j < m && String.equal a.(i) b.(j)
@@ -46,7 +50,7 @@ let position ops =
   let old = ref 1 in
   let new_ = ref 1 in
   List.map ops ~f:(fun op ->
-    let p = { op; old_before = !old; new_before = !new_ } in
+    let p = { Positioned.op; old_before = !old; new_before = !new_ } in
     (match op with
      | Keep _ ->
        incr old;
@@ -57,7 +61,7 @@ let position ops =
   |> Array.of_list
 ;;
 
-let is_change (p : positioned) =
+let is_change (p : Positioned.t) =
   match p.op with
   | Keep _ -> false
   | Del _ | Add _ -> true
@@ -84,7 +88,7 @@ let clusters ops =
   | first :: rest -> go [] [ first ] rest
 ;;
 
-let render_hunk ops ~start ~stop =
+let render_hunk (ops : Positioned.t array) ~start ~stop =
   let old_count = ref 0 in
   let new_count = ref 0 in
   for i = start to stop - 1 do

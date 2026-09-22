@@ -56,7 +56,13 @@ module H = struct
   (* [with_test_driver] owns the driver for the duration of [f]. *)
   let run ~width ~height f =
     let transport, backend = Transport.In_memory.create () in
-    let client = Prigh_client.Client.create transport in
+    let client =
+      Prigh_client.Client.create ~connect:(fun () ->
+        Deferred.Or_error.return transport)
+    in
+    let%bind () =
+      Deferred.Or_error.ok_exn (Prigh_client.Client.connect client)
+    in
     serve backend;
     let%bind `Reader in_r, `Writer _in_w =
       Async_unix.Unix.pipe (Info.of_string "prigh-test-in")
@@ -161,6 +167,19 @@ module H = struct
 
   let paste_start t = send t (Bonsai_term.Event.Paste `Start)
   let paste_end t = send t (Bonsai_term.Event.Paste `End)
+
+  let wheel t dir =
+    send
+      t
+      (Bonsai_term.Event.Mouse
+         { kind = Scroll dir; position = { x = 10; y = 5 }; mods = [] })
+  ;;
+
+  let viewport () =
+    match !Term_app.latest_result with
+    | Some r -> Sexp.to_string [%sexp (r.model.viewport : Prigh_ui.Viewport.t)]
+    | None -> "?"
+  ;;
 end
 
 let%expect_test "startup frame matches the pure renderer" =
@@ -464,6 +483,56 @@ let%expect_test "styled frame: markdown link, diff and autocomplete" =
         [bold]/thinking[/][gray] [off|on|low|high|max]    pick or set the thinking level[/]
         [bold]/verbosity[/][gray] [quiet|normal|verbose]  set the transcript verbosity[/]
       …[gray]deepseek-flash[/]  [gray]think:off[/]  [green]ctx:0% 1.5k[/]  [gray]$0.01[/]  [gray]Tab/Enter accept · Esc close[/]
+      |}];
+    return ())
+;;
+
+let%expect_test "mouse wheel scrolls the transcript; Up walks history" =
+  H.run ~width:80 ~height:8 (fun h ->
+    let%bind () = H.paint h in
+    List.iter (List.range 0 6) ~f:(fun i ->
+      H.incoming
+        h
+        (Prigh_ui.App.Action.Event
+           (P.Event.Message_start (P.Message.User (sprintf "line %d" i)))));
+    let%bind () = H.paint h in
+    H.wheel h `Up;
+    let%bind () = H.paint h in
+    printf "after wheel up: %s\n" (H.viewport ());
+    H.show h;
+    [%expect
+      {|
+      after wheel up: (Anchored(top 1)(new_lines 0))
+      === Vt.to_plain ===
+      > earlier question
+      earlier answer
+      > line 0
+      > line 1
+      > line 2
+      ────────────────────────────────────────────────────────────────────────────────
+      > ▏
+      /work  deepseek-flash  think:off  view:normal  ctx:0% 1.5k  $0.01
+      same: true
+      |}];
+    H.wheel h `Down;
+    let%bind () = H.paint h in
+    printf "after wheel down: %s\n" (H.viewport ());
+    H.key h (Ekey.Arrow `Up);
+    let%bind () = H.paint h in
+    H.show h;
+    [%expect
+      {|
+      after wheel down: Follow
+      === Vt.to_plain ===
+      > line 1
+      > line 2
+      > line 3
+      > line 4
+      > line 5
+      ────────────────────────────────────────────────────────────────────────────────
+      > hello▏
+      /work  deepseek-flash  think:off  view:normal  ctx:0% 1.5k  $0.01
+      same: true
       |}];
     return ())
 ;;

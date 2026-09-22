@@ -1,21 +1,23 @@
 open! Core
-module P = Prigh_protocol
+open! Import
 
-type status =
-  | Running
-  | Done of
-      { turns : int
-      ; cost_usd : float
-      }
-  | Failed of string
-[@@deriving sexp_of, equal]
+module Status = struct
+  type t =
+    | Running
+    | Done of
+        { turns : int
+        ; cost_usd : float
+        }
+    | Failed of string
+  [@@deriving sexp_of, equal]
+end
 
 type t =
   { id : string
   ; call_id : string
   ; task : string
   ; model : string
-  ; status : status
+  ; status : Status.t
   ; turns : int
   ; transcript : Transcript.t
   ; children : t list
@@ -44,7 +46,9 @@ let start agents ~call_id ~agent_id ~task ~model =
   agents @ [ create ~call_id ~agent_id ~task ~model ]
 ;;
 
-let status_of_result ~turns ~cost_usd (result : P.Event.Subagent_result.t) =
+let status_of_result ~turns ~cost_usd (result : P.Event.Subagent_result.t)
+  : Status.t
+  =
   if result.is_error then Failed result.text else Done { turns; cost_usd }
 ;;
 

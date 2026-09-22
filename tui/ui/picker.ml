@@ -122,8 +122,8 @@ let handle t (intent : Intent.t) ~page : Outcome.t =
         (refilter { t with query = String.concat (List.drop_last_exn chars) }))
   | Kill_to_start | Kill_to_end | Kill_word ->
     Continue (refilter { t with query = "" })
-  | Up -> Continue (clamp { t with selected = t.selected - 1 })
-  | Down -> Continue (clamp { t with selected = t.selected + 1 })
+  | Up | Scroll_up -> Continue (clamp { t with selected = t.selected - 1 })
+  | Down | Scroll_down -> Continue (clamp { t with selected = t.selected + 1 })
   | Page_up -> Continue (clamp { t with selected = t.selected - page })
   | Page_down -> Continue (clamp { t with selected = t.selected + page })
   | Home -> Continue { t with selected = 0 }

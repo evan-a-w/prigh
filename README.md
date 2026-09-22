@@ -20,7 +20,7 @@ cd backend && eval $(opam env --switch=prigh) && dune build && dune build @runte
 
 # frontend (opam switch "prigh-ox": OxCaml 5.2 + bonsai_term; or `nix develop`)
 cd tui && eval $(opam env --switch=prigh-ox) && dune build && dune build @runtest
-dune build @e2e         # against the real backend binary built above
+# @runtest includes the e2e and tmux tests against the backend binary built above
 
 # or with Nix (backend + patched OxCaml frontend) — see "Running under Nix"
 nix build               # result/bin/prigh wrapper (includes backend + TUI)
@@ -79,13 +79,20 @@ edits, ...) on *its own* machine, in the `-cwd` it was started with, by
 spawning `prigh tool-host` locally (so the prigh binary must be installed
 there too; `-tools remote` runs them on the backend instead). Every session
 has one *active tool host*; `/host` lists the backend and the connected
-frontends and switches between them, and the status line shows
-`tools:<name>` when tools run elsewhere or `tools:offline` when the active
-host has disconnected (tool calls then fail until you pick another host).
-Several frontends can attach to one session (`/sessions` marks live ones)
-and all see the same stream; a session keeps running when its frontends
-disconnect. Plain TCP with a shared token: bind to localhost and use an SSH
-tunnel on untrusted networks.
+frontends and switches between them (asking for the working directory to
+use on the new host, prefilled with the current one and checked there
+before switching), and the status line shows `tools:<name>` when tools run
+elsewhere or `tools:offline` when the active host has disconnected (tool
+calls then fail until you pick another host). Several frontends can attach
+to one session (`/sessions` marks live ones) and all see the same stream; a
+session keeps running when its frontends disconnect. Plain TCP with a shared
+token: bind to localhost and use an SSH tunnel on untrusted networks.
+
+If the backend goes away (the spawned process dies, or the TCP connection
+drops) the TUI reconnects on its own — immediately, then with exponential
+backoff capped at 10s — rejoining the same session and respawning the
+backend when it was spawned; `/retry-backend-connection` retries at once and
+Ctrl+C quits meanwhile.
 
 ## Use
 
@@ -135,6 +142,7 @@ backend/_build/default/bin/main.exe serve      # JSON-lines RPC on stdio
 | Home / Ctrl+A | start of line |
 | End / Ctrl+E | end of line |
 | PageUp / PageDown | scroll the transcript / list a page |
+| mouse wheel | scroll the transcript (selecting text needs Shift) |
 | Ctrl+Up / Ctrl+Down | jump to the previous/next user message |
 | Backspace / Ctrl+H | delete the character before the cursor |
 | Delete | delete the character under the cursor |
@@ -208,7 +216,9 @@ destructive `bash`/`write`/`edit`; `/confirm on|off`).
 | `/fork`, `/rewind`, `/tree`, `/clone` | branch the session tree |
 | `/export [path]`, `/import [path]` | markdown or `.jsonl` |
 | `/agents` | focus a subagent |
+| `/host [name\|backend]` | pick where tools run, and the directory there |
 | `/abort` | abort the current run |
+| `/retry-backend-connection` | reconnect to the backend now |
 | `/state` | show session state |
 
 `/model` also accepts a display name, id, `provider/id` or unique prefix, and
@@ -220,11 +230,17 @@ calls; it implies `-faux`.
 
 Sessions are JSONL trees under `~/.prigh/sessions/`. Project instructions are
 read from `AGENTS.md`/`CLAUDE.md` files between `/` and the working
-directory, plus `~/.prigh/AGENTS.md`.
+directory, plus `~/.prigh/AGENTS.md`. The system prompt is built once, at a
+session's first run, and recorded in the session so the cached prompt prefix
+survives `/cd`, `/host` and backend restarts; later directory or host changes
+reach the model as a short note on the next message, leaving it to re-read
+the instructions if that seems worthwhile.
 
 ### Testing
 
-Four layers, cheapest first:
+Four layers, cheapest first; `dune build @runtest` in each project runs all
+of them (the last two need the backend binary built first), and `dune
+promote` accepts new output everywhere:
 
 1. **Pure expect tests** — `cd backend && dune build @runtest` drives the
    agent loop, tools and RPC with `Faux_provider` and the providers/HTTP/OAuth
@@ -235,12 +251,13 @@ Four layers, cheapest first:
    same `cd tui && dune build @runtest`: drives the real Bonsai_term driver
    over an in-memory tty, decodes Notty's output with `tui/test/vt.ml`, and
    compares it with `Screen.to_plain`.
-3. **Protocol e2e** — `cd tui && dune build @e2e` runs the real
+3. **Protocol e2e** — `tui/e2e` (also `dune build @e2e`) runs the real
    `backend/_build/default/bin/main.exe serve -faux` through the real client
    with an isolated `HOME`/`-auth-file` and diffs a normalised transcript.
-4. **Real terminal** — `tui/tmux-test/run.sh` (or `cd tui && dune build
-   @tmux`; skipped without `tmux`) drives the built TUI inside tmux and diffs
-   captured panes; `UPDATE=1 tmux-test/run.sh` re-records them.
+4. **Real terminal** — the cram test `tui/tmux-test/run.t` (skipped without
+   `tmux`) runs each scenario of `run.t/harness.sh` with the built TUI inside
+   tmux and compares the captured panes, including a backend kill and
+   reconnect.
 
 ## Layout
 

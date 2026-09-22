@@ -1,6 +1,0 @@
-=== startup
-session <id> in $TMP/cwd. /help for commands, Esc aborts, Ctrl+C twice
-quits.
-────────────────────────────────────────────────────────────────────────────────────────────────────
->
-$TMP/cwd  deepseek-flash  think:off  view:normal  ctx:0% 0  $0.00

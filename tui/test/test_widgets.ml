@@ -531,7 +531,7 @@ let%expect_test "commands" =
           ((name host)
            (args [name|backend])
            (help
-            "pick where tools run: this frontend, another one, or the backend")
+            "pick where tools run (this frontend, another one, or the backend) and the directory there")
            (argument ()))
           ((name switch)
            (args [path])
@@ -568,6 +568,11 @@ let%expect_test "commands" =
           ((name abort)
            (args "")
            (help "abort the current run")
+           (argument ()))
+          ((name retry-backend-connection)
+           (args "")
+           (help
+            "reconnect to the backend now instead of waiting for the next retry")
            (argument ()))
           ((name state)
            (args "")
@@ -795,7 +800,7 @@ let%expect_test "keymap: every binding resolves to its intent and is documented"
     /session                           show session statistics
     /sessions                          pick a saved session (Ctrl+N named, Ctrl+D delete)
     /agents                            focus a subagent
-    /host [name|backend]               pick where tools run: this frontend, another one, or the backend
+    /host [name|backend]               pick where tools run (this frontend, another one, or the backend) and the directory there
     /switch [path]                     switch to a saved session
     /cd [path]                         change the working directory
     /fork                              fork at a previous user message
@@ -805,6 +810,7 @@ let%expect_test "keymap: every binding resolves to its intent and is documented"
     /export [path]                     export the transcript (markdown or .jsonl)
     /import [path]                     import a session from a JSONL file
     /abort                             abort the current run
+    /retry-backend-connection          reconnect to the backend now instead of waiting for the next retry
     /state                             show session state
     /clear                             clear the transcript
     /quit                              exit

@@ -1,5 +1,5 @@
 open! Core
-module P = Prigh_protocol
+open! Import
 
 module Reply_tag = struct
   type t =
@@ -37,6 +37,7 @@ module Reply_tag = struct
     | Dequeued
     | Editor_text
     | Reload_messages_notice of string
+    | Reconnect of int (** generation; stale replies are ignored *)
   [@@deriving sexp_of, equal]
 end
 
@@ -57,8 +58,31 @@ module Command = struct
     | Copy_to_clipboard of string
     | Suspend
     | Edit_externally of string
+    | Reconnect of
+        { generation : int
+        ; delay_ms : int
+        ; session : string option
+        }
     | Quit
   [@@deriving sexp_of, equal]
+end
+
+module Connection = struct
+  type t =
+    | Connected
+    | Reconnecting of
+        { attempt : int
+        ; generation : int
+        ; delay_ms : int
+        }
+  [@@deriving sexp_of, equal]
+
+  let max_delay_ms = 10_000
+
+  (* 250ms, 500ms, 1s, ... capped at 10s. *)
+  let delay_ms ~attempt =
+    Int.min max_delay_ms (250 * Int.pow 2 (Int.max 0 (attempt - 1)))
+  ;;
 end
 
 module Action = struct
@@ -106,7 +130,8 @@ module Model = struct
     ; client_id : string option (** ours, from [hello] *)
     ; stderr_tail : string list
     ; pending_confirms : (string * string * string) list
-    ; backend_gone : bool
+    ; connection : Connection.t
+    ; reconnect_generation : int
     ; width : int
     ; height : int
     ; quitting : bool
@@ -115,6 +140,12 @@ module Model = struct
 
   let running t =
     Option.value_map t.state ~default:false ~f:(fun s -> s.running)
+  ;;
+
+  let backend_gone t =
+    match t.connection with
+    | Connected -> false
+    | Reconnecting _ -> true
   ;;
 end
 
@@ -212,7 +243,7 @@ let confirm_tool m ~call_id ~name ~summary =
 ;;
 
 let maybe_open_pending m =
-  if m.backend_gone
+  if Model.backend_gone m
   then m
   else (
     match m.mode, m.pending_confirms with
@@ -262,7 +293,8 @@ let init =
   ; client_id = None
   ; stderr_tail = []
   ; pending_confirms = []
-  ; backend_gone = false
+  ; connection = Connected
+  ; reconnect_generation = 0
   ; width = 80
   ; height = 24
   ; quitting = false
@@ -646,7 +678,8 @@ let tree_items entries head =
       | P.Entry.Kind.Model _
       | P.Entry.Kind.Compaction _
       | P.Entry.Kind.Name _
-      | P.Entry.Kind.Cwd _ -> "·"
+      | P.Entry.Kind.Cwd _
+      | P.Entry.Kind.System_prompt -> "·"
     in
     let label =
       sprintf
@@ -723,7 +756,29 @@ let hosts_picker m =
     open_picker m Hosts (Picker.create ~title:"Tool host" items), []
 ;;
 
-let set_host_command id = rpc "set_active_host" ~params:[ "host", str id ]
+(* The session cwd belongs to the host, so switching asks for the directory to
+   use there, prefilled with the current one. *)
+let host_cwd_prompt m (host : P.Host.t) =
+  let current =
+    Option.value_map m.state ~default:host.cwd ~f:(fun s -> s.cwd)
+  in
+  { m with
+    mode =
+      Text_prompt
+        { question = sprintf "Working directory on %s" (host_label m host)
+        ; action = Host_cwd host.id
+        }
+  ; editor = Editor.set_text (Editor.clear m.editor) current
+  ; autocomplete = None
+  }
+;;
+
+let set_host_command ~host ~cwd =
+  rpc
+    "set_active_host"
+    ~params:[ "host", str host; "cwd", str cwd ]
+    ~tag:(Notice_on_success "tool host switched")
+;;
 
 let switch_host m arg =
   match m.state with
@@ -741,7 +796,7 @@ let switch_host m arg =
                  ~f:(String.equal h.id)))
     in
     (match matches with
-     | [ h ] -> m, [ set_host_command h.id ]
+     | [ h ] -> host_cwd_prompt m h, []
      | [] ->
        ( error
            m
@@ -799,6 +854,98 @@ let format_auth (statuses : P.Auth_status.t list) : Content.t =
     ]
     @ state
     @ [ { text = "  [" ^ methods ^ "]"; style = Style.dim Style.plain } ])
+;;
+
+(* ---- reconnection ----------------------------------------------------- *)
+
+let schedule_reconnect m ~attempt ~delay_ms =
+  let generation = m.reconnect_generation + 1 in
+  ( { m with
+      connection = Reconnecting { attempt; generation; delay_ms }
+    ; reconnect_generation = generation
+    }
+  , [ Command.Reconnect
+        { generation
+        ; delay_ms
+        ; session = Option.map m.state ~f:(fun s -> s.session_path)
+        }
+    ] )
+;;
+
+let backend_closed m =
+  let m =
+    { m with
+      pending_confirms = []
+    ; state = Option.map m.state ~f:(fun s -> { s with running = false })
+    }
+  in
+  let m =
+    error
+      m
+      "backend connection lost; reconnecting (/retry-backend-connection to \
+       retry now, Ctrl+C quits)"
+  in
+  let m =
+    if List.is_empty m.stderr_tail
+    then m
+    else
+      block
+        m
+        (Content.lines
+           ~style:(Style.dim Style.plain)
+           (String.concat ~sep:"\n" m.stderr_tail))
+  in
+  schedule_reconnect { m with stderr_tail = [] } ~attempt:1 ~delay_ms:0
+;;
+
+let retry_backend_connection m =
+  match m.connection with
+  | Connected -> notice m "backend is connected", []
+  | Reconnecting { attempt; _ } ->
+    schedule_reconnect (notice m "reconnecting…") ~attempt ~delay_ms:0
+;;
+
+let reconnect_reply m ~generation result =
+  match m.connection with
+  | Reconnecting { generation = current; attempt; _ } when generation = current
+    ->
+    (match result with
+     | Error e ->
+       let attempt = attempt + 1 in
+       let delay_ms = Connection.delay_ms ~attempt in
+       schedule_reconnect
+         (warn
+            m
+            (sprintf
+               "reconnect failed: %s; retrying in %gs (attempt %d)"
+               e
+               (Float.of_int delay_ms /. 1000.)
+               attempt))
+         ~attempt
+         ~delay_ms
+     | Ok json ->
+       let client_id =
+         match P.Json.field json "client_id" with
+         | Some (`String id) -> Some id
+         | _ -> m.client_id
+       in
+       let m =
+         { m with
+           connection = Connected
+         ; client_id
+         ; agents = []
+         ; focus = `Main
+         ; transcript = Transcript.clear m.transcript
+         }
+       in
+       ( follow (notice m "reconnected to the backend")
+       , [ rpc "get_state" ~tag:Initial_state
+         ; rpc "get_messages" ~tag:Initial_messages
+         ; rpc "auth_status" ~tag:Auth_refresh
+         ; rpc "get_config" ~tag:Config
+         ; rpc "list_models" ~tag:Models_catalog
+         ] ))
+  | Connected | Reconnecting _ -> m, []
 ;;
 
 (* ---- slash commands --------------------------------------------------- *)
@@ -1075,6 +1222,7 @@ let run_command m (cmd : Commands.Parsed.t) =
   | "import", _ ->
     m, [ rpc "import" ~params:[ "path", str cmd.rest ] ~tag:Reload_messages ]
   | "abort", _ -> m, [ rpc "abort" ]
+  | "retry-backend-connection", _ -> retry_backend_connection m
   | "state", _ ->
     let text =
       Option.value_map m.state ~default:"not connected" ~f:(fun s ->
@@ -1300,7 +1448,7 @@ let accept_autocomplete m ~submit_now =
 ;;
 
 let interrupt m =
-  if m.backend_gone
+  if Model.backend_gone m
   then { m with quitting = true }, [ Command.Quit ]
   else if not (Editor.is_empty m.editor)
   then { m with editor = Editor.clear m.editor; pending_quit = false }, []
@@ -1310,32 +1458,29 @@ let interrupt m =
 ;;
 
 let page_size m = Int.max 1 (m.height / 2)
+let wheel_lines = 3
 
-let scroll_up m =
+let scroll_up m ~lines =
   match m.viewport with
   | Viewport.Follow ->
     { m with
       viewport =
         Viewport.Anchored
-          { top =
-              Int.max
-                0
-                (transcript_line_count m - transcript_rows m - page_size m)
+          { top = Int.max 0 (transcript_line_count m - transcript_rows m - lines)
           ; new_lines = 0
           }
     }
   | Viewport.Anchored { top; new_lines } ->
     { m with
-      viewport =
-        Viewport.Anchored { top = Int.max 0 (top - page_size m); new_lines }
+      viewport = Viewport.Anchored { top = Int.max 0 (top - lines); new_lines }
     }
 ;;
 
-let scroll_down m =
+let scroll_down m ~lines =
   match m.viewport with
   | Viewport.Follow -> m
   | Viewport.Anchored { top; new_lines } ->
-    let top = top + page_size m in
+    let top = top + lines in
     if top + transcript_rows m >= transcript_line_count m
     then follow m
     else { m with viewport = Viewport.Anchored { top; new_lines } }
@@ -1480,8 +1625,10 @@ let editing_intent m (intent : Intent.t) =
       match Editor.down e with
       | Some e -> e
       | None -> Option.value (Editor.history_next e) ~default:e)
-  | Page_up -> scroll_up m, []
-  | Page_down -> scroll_down m, []
+  | Page_up -> scroll_up m ~lines:(page_size m), []
+  | Page_down -> scroll_down m ~lines:(page_size m), []
+  | Scroll_up -> scroll_up m ~lines:wheel_lines, []
+  | Scroll_down -> scroll_down m ~lines:wheel_lines, []
   | Complete -> m, []
   | Cancel ->
     (match m.focus with
@@ -1568,6 +1715,8 @@ let editing m (intent : Intent.t) =
         | End
         | Page_up
         | Page_down
+        | Scroll_up
+        | Scroll_down
         | Interrupt
         | Force_quit
         | Kill_to_end
@@ -1675,7 +1824,13 @@ let picker_selected m (kind : Mode.Picker_kind.t) (item : Picker.Item.t) =
   | Tree _ ->
     m, [ rpc "rewind" ~params:[ "to", str item.id ] ~tag:Reload_messages ]
   | Agents -> set_focus m (`Agent item.id), []
-  | Hosts -> m, [ set_host_command item.id ]
+  | Hosts ->
+    (match
+       Option.bind m.state ~f:(fun s ->
+         List.find s.hosts ~f:(fun h -> String.equal h.id item.id))
+     with
+     | Some host -> host_cwd_prompt m host, []
+     | None -> error m (sprintf "unknown host %S" item.id), [])
   | Auth_select id ->
     m, [ rpc "auth_respond" ~params:[ "id", str id; "value", str item.id ] ]
 ;;
@@ -1798,6 +1953,8 @@ let login_prompt m ~id ~(prompt : P.Auth_event.Prompt.t) (intent : Intent.t) =
   | Down
   | Page_up
   | Page_down
+  | Scroll_up
+  | Scroll_down
   | Complete
   | Cycle_verbosity
   | Next_model
@@ -1873,6 +2030,10 @@ let text_prompt m ~(action : Mode.Text_prompt_action.t) (intent : Intent.t) =
       if String.is_empty text
       then m, []
       else m, [ rpc "import" ~params:[ "path", str text ] ~tag:Reload_messages ]
+    | Host_cwd host ->
+      if String.is_empty text
+      then m, []
+      else m, [ set_host_command ~host ~cwd:text ]
   in
   match intent with
   | Submit ->
@@ -1905,6 +2066,8 @@ let text_prompt m ~(action : Mode.Text_prompt_action.t) (intent : Intent.t) =
   | Down
   | Page_up
   | Page_down
+  | Scroll_up
+  | Scroll_down
   | Complete
   | Cycle_verbosity
   | Next_model
@@ -2123,7 +2286,7 @@ let reply m (tag : Reply_tag.t) (result : (P.Json.t, string) Result.t) =
      | _ -> error m e, [])
   | Ok json ->
     (match tag with
-     | Ignore | Show_error -> m, []
+     | Ignore | Show_error | Reconnect _ -> m, []
      | Notice_on_success text -> notice m text, []
      | Set_model_done -> m, []
      | Compact_done -> notice m "context compacted", []
@@ -2312,7 +2475,7 @@ let is_backend_command = function
 ;;
 
 let block_backend_rpc m cmds =
-  if m.backend_gone && List.exists cmds ~f:is_backend_command
+  if Model.backend_gone m && List.exists cmds ~f:is_backend_command
   then
     error m "backend is gone", List.filter cmds ~f:(Fn.non is_backend_command)
   else m, cmds
@@ -2339,19 +2502,18 @@ let update m (action : Action.t) =
         in
         notice ~severity:Debug { m with stderr_tail } ("backend: " ^ line), []
       | Backend_closed ->
-        let m = { m with backend_gone = true; pending_confirms = [] } in
-        let m = error m "backend exited" in
-        let m =
-          if List.is_empty m.stderr_tail
-          then m
-          else
-            block
-              m
-              (Content.lines
-                 ~style:(Style.dim Style.plain)
-                 (String.concat ~sep:"\n" m.stderr_tail))
-        in
-        m, []
+        (match m.connection with
+         | Connected -> backend_closed m
+         | Reconnecting { attempt; _ } ->
+           (* An attempt got as far as connecting and then lost the transport
+              again; its reply (if any) is now stale. *)
+           let attempt = attempt + 1 in
+           schedule_reconnect
+             m
+             ~attempt
+             ~delay_ms:(Connection.delay_ms ~attempt))
+      | Reply (Reconnect generation, result) ->
+        reconnect_reply m ~generation result
       | Reply (tag, result) -> reply m tag result
       | Tick -> { m with spinner = m.spinner + 1 }, []
       | Set_home home -> { m with home = Some home }, []

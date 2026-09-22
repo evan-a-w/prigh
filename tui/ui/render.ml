@@ -1,5 +1,5 @@
 open! Core
-module P = Prigh_protocol
+open! Import
 open App.Model
 
 let gray = Style.fg Gray
@@ -13,10 +13,10 @@ let picker_rows = 10
 
 let agent_symbol (m : App.Model.t) (a : Agent_view.t) =
   match a.status with
-  | Agent_view.Running ->
+  | Agent_view.Status.Running ->
     spinner_frames.(m.spinner % Array.length spinner_frames)
-  | Agent_view.Done _ -> "✓"
-  | Agent_view.Failed _ -> "✗"
+  | Agent_view.Status.Done _ -> "✓"
+  | Agent_view.Status.Failed _ -> "✗"
 ;;
 
 let status_style m =
@@ -89,67 +89,77 @@ let agents_part (m : App.Model.t) : Content.Line.t option =
 ;;
 
 let mode_hint (m : App.Model.t) : Content.Line.t option =
-  if m.backend_gone
-  then Some [ span ~style:dim "backend exited — Ctrl+C or /quit to exit" ]
-  else (
-    match m.state with
-    | None -> None
-    | Some s ->
-      (match m.mode with
-       | Picker { kind = Scoped_models; _ } ->
-         Some
-           [ span
-               ~style:dim
-               "Space toggle · Ctrl+A all · Ctrl+X none · Enter save"
-           ]
-       | Picker { kind = Models _; _ } ->
-         Some
-           [ span
-               ~style:dim
-               "picker: type to filter, Enter selects, Esc closes · Ctrl+N \
-                logged in only"
-           ]
-       | Picker { kind = Sessions _; _ } ->
-         Some
-           [ span
-               ~style:dim
-               "picker: type to filter, Enter selects, Esc closes · Ctrl+N \
-                named only · Ctrl+D delete"
-           ]
-       | Picker _ ->
-         Some
-           [ span ~style:dim "picker: type to filter, Enter selects, Esc closes"
-           ]
-       | Login_prompt _ ->
-         Some [ span ~style:dim "login: Enter answers, Esc cancels" ]
-       | Text_prompt _ -> Some [ span ~style:dim "Enter submits, Esc cancels" ]
-       | Confirm _ -> Some [ span ~style:dim "confirm: y / n" ]
-       | Search { query = _; matches; current } ->
-         if List.is_empty matches
-         then Some [ span ~style:dim "search: type to find · Esc closes" ]
-         else
-           Some
-             [ span
-                 ~style:dim
-                 (sprintf
-                    "search %d/%d · ↓↑ next/prev · Esc closes"
-                    (current + 1)
-                    (List.length matches))
-             ]
-       | Editing ->
-         if Option.is_some m.autocomplete
-         then Some [ span ~style:dim "Tab/Enter accept · Esc close" ]
-         else if m.pending_quit
-         then Some [ span ~style:dim "Ctrl+C again quits" ]
-         else if s.running
-         then
-           Some
-             [ span
-                 ~style:dim
-                 (spinner_frames.(m.spinner % Array.length spinner_frames)
-                  ^ " working (Esc aborts; Enter steers)")
-             ]
-         else None))
+  match m.connection with
+  | Reconnecting { attempt; delay_ms; _ } ->
+    Some
+      [ span
+          ~style:dim
+          (sprintf
+             "backend gone · retry %d in %gs"
+             attempt
+             (Float.of_int delay_ms /. 1000.))
+      ]
+  | Connected ->
+    (match m.state with
+     | None -> None
+     | Some s ->
+       (match m.mode with
+        | Picker { kind = Scoped_models; _ } ->
+          Some
+            [ span
+                ~style:dim
+                "Space toggle · Ctrl+A all · Ctrl+X none · Enter save"
+            ]
+        | Picker { kind = Models _; _ } ->
+          Some
+            [ span
+                ~style:dim
+                "picker: type to filter, Enter selects, Esc closes · Ctrl+N \
+                 logged in only"
+            ]
+        | Picker { kind = Sessions _; _ } ->
+          Some
+            [ span
+                ~style:dim
+                "picker: type to filter, Enter selects, Esc closes · Ctrl+N \
+                 named only · Ctrl+D delete"
+            ]
+        | Picker _ ->
+          Some
+            [ span
+                ~style:dim
+                "picker: type to filter, Enter selects, Esc closes"
+            ]
+        | Login_prompt _ ->
+          Some [ span ~style:dim "login: Enter answers, Esc cancels" ]
+        | Text_prompt _ -> Some [ span ~style:dim "Enter submits, Esc cancels" ]
+        | Confirm _ -> Some [ span ~style:dim "confirm: y / n" ]
+        | Search { query = _; matches; current } ->
+          if List.is_empty matches
+          then Some [ span ~style:dim "search: type to find · Esc closes" ]
+          else
+            Some
+              [ span
+                  ~style:dim
+                  (sprintf
+                     "search %d/%d · ↓↑ next/prev · Esc closes"
+                     (current + 1)
+                     (List.length matches))
+              ]
+        | Editing ->
+          if Option.is_some m.autocomplete
+          then Some [ span ~style:dim "Tab/Enter accept · Esc close" ]
+          else if m.pending_quit
+          then Some [ span ~style:dim "Ctrl+C again quits" ]
+          else if s.running
+          then
+            Some
+              [ span
+                  ~style:dim
+                  (spinner_frames.(m.spinner % Array.length spinner_frames)
+                   ^ " working (Esc aborts; Enter steers)")
+              ]
+          else None))
 ;;
 
 let drop_left_text s ~width =
@@ -505,14 +515,14 @@ let subagent_header (m : App.Model.t) (a : Agent_view.t) : Content.Line.t =
   in
   let status =
     match a.status with
-    | Agent_view.Running ->
+    | Agent_view.Status.Running ->
       sprintf
         "%s running %d turns"
         spinner_frames.(m.spinner % Array.length spinner_frames)
         a.turns
-    | Agent_view.Done { turns; cost_usd } ->
+    | Agent_view.Status.Done { turns; cost_usd } ->
       sprintf "✓ done %d turns $%.2f" turns cost_usd
-    | Agent_view.Failed _ -> "✗ failed"
+    | Agent_view.Status.Failed _ -> "✗ failed"
   in
   let task =
     Text_width.truncate

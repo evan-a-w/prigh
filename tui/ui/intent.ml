@@ -18,6 +18,8 @@ type t =
   | Delete_word_forward
   | Page_up
   | Page_down
+  | Scroll_up
+  | Scroll_down
   | Complete
   | Cancel
   | Interrupt

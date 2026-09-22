@@ -2,24 +2,27 @@ open! Core
 open! Import
 
 module Entry = struct
-  type payload =
-    | Message of Message.t
-    | Model of
-        { model : string
-        ; thinking : Thinking.t
-        }
-    | Compaction of
-        { summary : string
-        ; kept_from : string
-        }
-    | Name of { name : string }
-    | Cwd of { cwd : string }
-  [@@deriving sexp, jsonaf]
+  module Payload = struct
+    type t =
+      | Message of Message.t
+      | Model of
+          { model : string
+          ; thinking : Thinking.t
+          }
+      | Compaction of
+          { summary : string
+          ; kept_from : string
+          }
+      | Name of { name : string }
+      | Cwd of { cwd : string }
+      | System_prompt of { text : string }
+    [@@deriving sexp, jsonaf]
+  end
 
   type t =
     { id : string
     ; parent : string option
-    ; payload : payload
+    ; payload : Payload.t
     }
   [@@deriving sexp, jsonaf]
 end
@@ -149,7 +152,7 @@ let add_entry t (entry : Entry.t) =
   t.head <- Some entry.id;
   match entry.payload with
   | Cwd { cwd } -> t.cwd <- cwd
-  | Message _ | Model _ | Compaction _ | Name _ -> ()
+  | Message _ | Model _ | Compaction _ | Name _ | System_prompt _ -> ()
 ;;
 
 let load path =
@@ -198,12 +201,13 @@ let append_message t message = append t (Message message)
 let set_model t ~model ~thinking = append t (Model { model; thinking })
 let set_name t ~name = append t (Name { name })
 let set_cwd t ~cwd = append t (Cwd { cwd })
+let set_system_prompt t ~text = append t (System_prompt { text })
 
 let name t =
   List.find_map t.entries ~f:(fun (e : Entry.t) ->
     match e.payload with
     | Name { name } -> Some name
-    | Message _ | Model _ | Compaction _ | Cwd _ -> None)
+    | Message _ | Model _ | Compaction _ | Cwd _ | System_prompt _ -> None)
 ;;
 
 let append_compaction t ~summary ~kept_from =
@@ -225,7 +229,7 @@ let messages t =
     List.fold path ~init:None ~f:(fun acc (e : Entry.t) ->
       match e.payload with
       | Compaction { summary; kept_from } -> Some (summary, kept_from)
-      | Message _ | Model _ | Name _ | Cwd _ -> acc)
+      | Message _ | Model _ | Name _ | Cwd _ | System_prompt _ -> acc)
   in
   let path =
     match compaction with
@@ -237,7 +241,7 @@ let messages t =
       let kept =
         List.filter kept ~f:(fun e ->
           match e.payload with
-          | Compaction _ | Name _ | Cwd _ -> false
+          | Compaction _ | Name _ | Cwd _ | System_prompt _ -> false
           | Message _ | Model _ -> true)
       in
       { Entry.id = "summary"
@@ -251,14 +255,21 @@ let messages t =
   List.filter_map path ~f:(fun e ->
     match e.payload with
     | Message m -> Some m
-    | Model _ | Compaction _ | Name _ | Cwd _ -> None)
+    | Model _ | Compaction _ | Name _ | Cwd _ | System_prompt _ -> None)
+;;
+
+let system_prompt t =
+  List.fold (active_path t) ~init:None ~f:(fun acc (e : Entry.t) ->
+    match e.payload with
+    | System_prompt { text } -> Some text
+    | Message _ | Model _ | Compaction _ | Name _ | Cwd _ -> acc)
 ;;
 
 let model t =
   List.fold (active_path t) ~init:None ~f:(fun acc (e : Entry.t) ->
     match e.payload with
     | Model { model; thinking } -> Some (model, thinking)
-    | Message _ | Compaction _ | Name _ | Cwd _ -> acc)
+    | Message _ | Compaction _ | Name _ | Cwd _ | System_prompt _ -> acc)
 ;;
 
 let rewind t ~to_ =
@@ -441,7 +452,7 @@ let to_markdown t =
            "### Tool: %s\n\n```\n%s\n```"
            r.tool_name
            (String.strip r.text))
-    | Model _ | Compaction _ | Name _ | Cwd _ -> None
+    | Model _ | Compaction _ | Name _ | Cwd _ | System_prompt _ -> None
   in
   let blocks = List.filter_map (active_path t) ~f:block in
   String.concat (("# Session " ^ t.id) :: blocks) ~sep:"\n\n" ^ "\n"

@@ -53,6 +53,16 @@ let make_platform ~replies : Component.Platform.t =
             printf "edit %s\n" text;
             Ok text)
           ())
+  ; reconnect =
+      (fun ~delay_ms ~session ->
+        Bonsai.Effect.of_sync_fun
+          (fun () ->
+            printf
+              "reconnect after %dms session=%s\n"
+              delay_ms
+              (Option.value session ~default:"-");
+            Ok (`Object [ "client_id", `String "client-2" ]))
+          ())
   ; quit = Bonsai.Effect.of_sync_fun (fun () -> print_endline "quit") ()
   }
 ;;
@@ -172,14 +182,20 @@ let%expect_test "component: startup requests, key handling, rpc round trip, \
   Bonsai_test.Handle.show handle;
   [%expect
     {|
-    spinner=2 running=true
+    reconnect after 0ms session=/s
+    rpc get_state ()
+    rpc get_messages ()
+    rpc auth_status ()
+    rpc get_config ()
+    rpc list_models ()
+    spinner=2 running=false
 
+
+    reconnected to the backend
     session abc in /w. /help for commands, Esc aborts,
     Ctrl+C twice quits.
-    thinking must be one of: off, on, low, high, max
-    backend exited
     ──────────────────────────────────────────────────
     > ▏
-    …m  backend exited — Ctrl+C or /quit to exit
+    /w  m  think:n/a  view:normal  ctx:0% 0  $0.00
     |}]
 ;;

@@ -1930,34 +1930,39 @@ let%expect_test "backend crash shows the stderr tail; Ctrl+C quits" =
   H.show h;
   [%expect
     {|
+    (Reconnect
+      (generation 1)
+      (delay_ms   0)
+      (session (/home/u/.prigh/sessions/1.jsonl)))
     session abc123 in /work. /help for commands, Esc aborts,
     Ctrl+C twice quits.
     > earlier question
     earlier answer
-    backend exited
+    backend connection lost; reconnecting
+    (/retry-backend-connection to retry now, Ctrl+C quits)
     warn one
     warn two
     warn three
     ────────────────────────────────────────────────────────────
     > ▏
-    …deepseek-flash  backend exited — Ctrl+C or /quit to exit
+    …deepseek-flash  ctx:0% 1.5k  backend gone · retry 1 in 0s
     |}];
   H.step h (Intent Model_picker);
   H.show h;
   [%expect
     {|
-    session abc123 in /work. /help for commands, Esc aborts,
     Ctrl+C twice quits.
     > earlier question
     earlier answer
-    backend exited
+    backend connection lost; reconnecting
+    (/retry-backend-connection to retry now, Ctrl+C quits)
     warn one
     warn two
     warn three
     backend is gone
     ────────────────────────────────────────────────────────────
     > ▏
-    …deepseek-flash  backend exited — Ctrl+C or /quit to exit
+    …deepseek-flash  ctx:0% 1.5k  backend gone · retry 1 in 0s
     |}];
   H.key h (Key.ctrl 'c');
   [%expect {| Quit |}];
@@ -4711,5 +4716,315 @@ let%expect_test "keymap: every binding is covered by a scenario" =
     Alt+1            (Focus_agent 1)          covered
     Ctrl+C           Interrupt                covered
     Ctrl+D           Force_quit               covered
+    |}]
+;;
+
+let%expect_test "reconnect: backoff doubles to the 10s cap, stale replies are \
+                 ignored, /retry-backend-connection retries now, success \
+                 resyncs"
+  =
+  let h = connected ~width:70 () in
+  H.step h Backend_closed;
+  [%expect
+    {|
+    (Reconnect
+      (generation 1)
+      (delay_ms   0)
+      (session (/home/u/.prigh/sessions/1.jsonl)))
+    |}];
+  (* Losing the transport again mid-reconnect counts as a failed attempt. *)
+  H.step h Backend_closed;
+  [%expect
+    {|
+    (Reconnect
+      (generation 2)
+      (delay_ms   500)
+      (session (/home/u/.prigh/sessions/1.jsonl)))
+    |}];
+  let fail generation =
+    H.reply_error h (Reconnect generation) "connection refused"
+  in
+  fail 1;
+  [%expect {| |}];
+  List.iter [ 2; 3; 4; 5; 6; 7; 8 ] ~f:fail;
+  [%expect
+    {|
+    (Reconnect
+      (generation 3)
+      (delay_ms   1000)
+      (session (/home/u/.prigh/sessions/1.jsonl)))
+    (Reconnect
+      (generation 4)
+      (delay_ms   2000)
+      (session (/home/u/.prigh/sessions/1.jsonl)))
+    (Reconnect
+      (generation 5)
+      (delay_ms   4000)
+      (session (/home/u/.prigh/sessions/1.jsonl)))
+    (Reconnect
+      (generation 6)
+      (delay_ms   8000)
+      (session (/home/u/.prigh/sessions/1.jsonl)))
+    (Reconnect
+      (generation 7)
+      (delay_ms   10000)
+      (session (/home/u/.prigh/sessions/1.jsonl)))
+    (Reconnect
+      (generation 8)
+      (delay_ms   10000)
+      (session (/home/u/.prigh/sessions/1.jsonl)))
+    (Reconnect
+      (generation 9)
+      (delay_ms   10000)
+      (session (/home/u/.prigh/sessions/1.jsonl)))
+    |}];
+  print_s [%sexp (h.model.connection : App.Connection.t)];
+  [%expect
+    {|
+    (Reconnecting
+      (attempt    9)
+      (generation 9)
+      (delay_ms   10000))
+    |}];
+  (* A late reply from an earlier attempt is ignored. *)
+  fail 3;
+  H.reply h (Reconnect 3) {|{"client_id":"client-9"}|};
+  print_s [%sexp (h.model.connection : App.Connection.t)];
+  [%expect
+    {|
+    (Reconnecting
+      (attempt    9)
+      (generation 9)
+      (delay_ms   10000))
+    |}];
+  H.show h;
+  [%expect
+    {|
+    backend connection lost; reconnecting (/retry-backend-connection to
+    retry now, Ctrl+C quits)
+    reconnect failed: connection refused; retrying in 1s (attempt 3)
+    reconnect failed: connection refused; retrying in 2s (attempt 4)
+    reconnect failed: connection refused; retrying in 4s (attempt 5)
+    reconnect failed: connection refused; retrying in 8s (attempt 6)
+    reconnect failed: connection refused; retrying in 10s (attempt 7)
+    reconnect failed: connection refused; retrying in 10s (attempt 8)
+    reconnect failed: connection refused; retrying in 10s (attempt 9)
+    ──────────────────────────────────────────────────────────────────────
+    > ▏
+    …deepseek-flash  ctx:0% 1.5k  $0.01  backend gone · retry 9 in 10s
+    |}];
+  (* The user cuts the wait short; the pending attempt 9 becomes stale. *)
+  H.keys h "/retry-backend-connection";
+  H.enter h;
+  [%expect
+    {|
+    (Reconnect
+      (generation 10)
+      (delay_ms   0)
+      (session (/home/u/.prigh/sessions/1.jsonl)))
+    |}];
+  fail 9;
+  [%expect {| |}];
+  H.reply h (Reconnect 10) {|{"client_id":"client-7"}|};
+  [%expect
+    {|
+    (Rpc (method_ get_state) (params ()) (tag Initial_state))
+    (Rpc (method_ get_messages) (params ()) (tag Initial_messages))
+    (Rpc (method_ auth_status) (params ()) (tag Auth_refresh))
+    (Rpc (method_ get_config) (params ()) (tag Config))
+    (Rpc (method_ list_models) (params ()) (tag Models_catalog))
+    |}];
+  print_s
+    [%sexp
+      (h.model.connection : App.Connection.t)
+      , (h.model.client_id : string option)];
+  [%expect {| (Connected (client-7)) |}];
+  H.reply h Initial_state (state_json ());
+  H.reply h Initial_messages {|[{"role":"user","text":"earlier question"}]|};
+  H.show h;
+  [%expect
+    {|
+    reconnected to the backend
+    session abc123 in /work. /help for commands, Esc aborts, Ctrl+C twice
+    quits.
+    > earlier question
+    ──────────────────────────────────────────────────────────────────────
+    > ▏
+    /work  deepseek-flash  think:off  view:normal  ctx:0% 1.5k  $0.01
+    |}];
+  H.keys h "/retry-backend-connection";
+  H.enter h;
+  H.show h;
+  [%expect
+    {|
+    reconnected to the backend
+    session abc123 in /work. /help for commands, Esc aborts, Ctrl+C twice
+    quits.
+    > earlier question
+    backend is connected
+    ──────────────────────────────────────────────────────────────────────
+    > ▏
+    /work  deepseek-flash  think:off  view:normal  ctx:0% 1.5k  $0.01
+    |}];
+  (* A later disconnection starts a fresh backoff. *)
+  H.step h Backend_closed;
+  [%expect
+    {|
+    (Reconnect
+      (generation 11)
+      (delay_ms   0)
+      (session (/home/u/.prigh/sessions/1.jsonl)))
+    |}]
+;;
+
+let%expect_test "wheel scrolling moves the transcript a few lines; arrows \
+                 still walk the prompt history"
+  =
+  let h = connected ~height:10 () in
+  H.reply ~quiet:true h History {|["older prompt","newer prompt"]|};
+  List.iter (List.range 0 8) ~f:(fun i ->
+    H.event h (Message_start (User (sprintf "message %d" i))));
+  H.show h;
+  [%expect
+    {|
+    > message 1
+    > message 2
+    > message 3
+    > message 4
+    > message 5
+    > message 6
+    > message 7
+    ────────────────────────────────────────────────────────────
+    > ▏
+    …deepseek-flash  think:off  view:normal  ctx:0% 1.5k  $0.01
+    |}];
+  H.step h (Intent Scroll_up);
+  H.show h;
+  [%expect
+    {|
+    > earlier question
+    earlier answer
+    > message 0
+    > message 1
+    > message 2
+    > message 3
+    > message 4
+    ────────────────────────────────────────────────────────────
+    > ▏
+    …deepseek-flash  think:off  view:normal  ctx:0% 1.5k  $0.01
+    |}];
+  H.step h (Intent Scroll_up);
+  print_s [%sexp (h.model.viewport : Viewport.t)];
+  H.step h (Intent Scroll_down);
+  H.step h (Intent Scroll_down);
+  print_s [%sexp (h.model.viewport : Viewport.t)];
+  [%expect
+    {|
+    (Anchored
+      (top       0)
+      (new_lines 0))
+    Follow
+    |}];
+  H.key h (Key.plain Up);
+  H.show h;
+  [%expect
+    {|
+    > message 1
+    > message 2
+    > message 3
+    > message 4
+    > message 5
+    > message 6
+    > message 7
+    ────────────────────────────────────────────────────────────
+    > newer prompt▏
+    …deepseek-flash  think:off  view:normal  ctx:0% 1.5k  $0.01
+    |}]
+;;
+
+let%expect_test "switching tool host asks for the directory there, prefilled \
+                 with the current cwd"
+  =
+  let h = connected ~width:70 () in
+  let state =
+    Or_error.ok_exn
+      (P.State.of_json
+         (Or_error.ok_exn
+            (P.Json.parse
+               {|{"session_id":"abc123","session_path":"/s","session_name":null,"cwd":"/work","git_branch":null,"model":{"id":"m","provider":"deepseek","key":"deepseek/m","name":"M","context_window":1000,"max_output":10,"supports_thinking":false,"cost":{"input":1,"output":1,"cache_read":1}},"thinking":"off","running":false,"message_count":0,"usage":{"input":0,"output":0,"cache_read":0},"cost_usd":0,"context_tokens":0,"active_host":"backend","hosts":[{"id":"backend","name":"srv","cwd":"/work"},{"id":"client-1","name":"laptop","cwd":"/home/me"}]}|})))
+  in
+  H.event h (State state);
+  H.step h (Set_client_id "client-1");
+  H.keys h "/host laptop";
+  H.enter h;
+  H.show h;
+  [%expect
+    {|
+    session abc123 in /work. /help for commands, Esc aborts, Ctrl+C twice
+    quits.
+    > earlier question
+    earlier answer
+    ┌─ Working directory on laptop (here) ───────────────────────────────┐
+    └────────────────────────────────────────────────────────────────────┘
+    ──────────────────────────────────────────────────────────────────────
+    ? /work▏
+    …m  think:n/a  ctx:0% 0  $0.00  Enter submits, Esc cancels
+    |}];
+  H.keys h "/src";
+  H.enter h;
+  [%expect
+    {|
+    (Rpc
+      (method_ set_active_host)
+      (params (
+        (host client-1)
+        (cwd  /work/src)))
+      (tag (Notice_on_success "tool host switched")))
+    |}];
+  H.mode h;
+  [%expect {| editing |}];
+  (* The picker route ends in the same prompt; Esc abandons it. *)
+  H.keys h "/host";
+  H.enter h;
+  H.mode h;
+  H.key h (Key.plain Down);
+  H.enter h;
+  H.show h;
+  [%expect
+    {|
+    picker
+
+
+
+    session abc123 in /work. /help for commands, Esc aborts, Ctrl+C twice
+    quits.
+    > earlier question
+    earlier answer
+    ┌─ Working directory on laptop (here) ───────────────────────────────┐
+    └────────────────────────────────────────────────────────────────────┘
+    ──────────────────────────────────────────────────────────────────────
+    ? /work▏
+    …m  think:n/a  ctx:0% 0  $0.00  Enter submits, Esc cancels
+    |}];
+  H.esc h;
+  H.mode h;
+  H.keys h "/host nope";
+  H.enter h;
+  H.show h;
+  [%expect
+    {|
+    editing
+
+
+
+
+    session abc123 in /work. /help for commands, Esc aborts, Ctrl+C twice
+    quits.
+    > earlier question
+    earlier answer
+    unknown host "nope"; one of: srv, laptop (here)
+    ──────────────────────────────────────────────────────────────────────
+    > ▏
+    /work  m  think:n/a  view:normal  ctx:0% 0  $0.00
     |}]
 ;;

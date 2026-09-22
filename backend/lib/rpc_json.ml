@@ -196,6 +196,7 @@ let entry (e : Session.Entry.t) =
       ]
     | Name { name } -> [ "kind", str "name"; "name", str name ]
     | Cwd { cwd } -> [ "kind", str "cwd"; "cwd", str cwd ]
+    | System_prompt _ -> [ "kind", str "system_prompt" ]
   in
   `Object
     ([ "id", str e.id

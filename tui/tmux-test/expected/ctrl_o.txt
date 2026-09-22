@@ -1,7 +1,0 @@
-=== ctrl_o
-session <id> in $TMP/cwd. /help for commands, Esc aborts, Ctrl+C twice
-quits.
-view: verbose — everything is shown
-────────────────────────────────────────────────────────────────────────────────────────────────────
->
-$TMP/cwd  deepseek-flash  think:off  view:verbose  ctx:0% 0  $0.00

@@ -15,12 +15,14 @@ let login_manager t ~sw =
 
 (* A server with one connected client; [h.sent] collects what the server
    pushes to that client. *)
-type h =
-  { server : Rpc_server.t
-  ; client : Rpc_server.Client.t
-  ; login : Login_manager.t
-  ; sent : Json.t Queue.t
-  }
+module H = struct
+  type t =
+    { server : Rpc_server.t
+    ; client : Rpc_server.Client.t
+    ; login : Login_manager.t
+    ; sent : Json.t Queue.t
+    }
+end
 
 let make_server t ~sw ~provider =
   let login = login_manager t ~sw in
@@ -50,7 +52,7 @@ let make_server t ~sw ~provider =
   in
   let sent = Queue.create () in
   let client = Rpc_server.connect server ~send:(Queue.enqueue sent) in
-  agent, { server; client; login; sent }
+  agent, { H.server; client; login; sent }
 ;;
 
 let with_agent replies f =
@@ -62,7 +64,7 @@ let with_agent replies f =
   f t agent h
 ;;
 
-let call t h ?(params = "{}") meth =
+let call t (h : H.t) ?(params = "{}") meth =
   let request =
     Json.of_string
       (sprintf {|{"id": "r1", "method": "%s", "params": %s}|} meth params)
@@ -71,7 +73,7 @@ let call t h ?(params = "{}") meth =
     (mask t (Json.to_string (Rpc_server.handle h.server h.client request)))
 ;;
 
-let current h = Rpc_server.agent_of_client h.server h.client
+let current (h : H.t) = Rpc_server.agent_of_client h.server h.client
 
 let%expect_test "state, models, thinking, errors" =
   with_agent []
@@ -161,7 +163,7 @@ let%expect_test "prompt emits events, get_messages/get_entries reflect the run" 
   [%expect
     {|
     {"type":"response","id":"r1","ok":true,"result":[{"role":"user","text":"what is here?"},{"role":"assistant","content":[{"type":"text","text":"Looking."},{"type":"tool_call","id":"c1","name":"ls","arguments":"{}"}],"stop_reason":{"type":"tool_use"},"usage":{"input":20,"output":8,"cache_read":5},"model":"deepseek-flash"},{"role":"tool_result","tool_call_id":"c1","tool_name":"ls","text":"sessions/\n","is_error":false},{"role":"assistant","content":[{"type":"text","text":"Empty."}],"stop_reason":{"type":"end_turn"},"usage":{"input":10,"output":5,"cache_read":0},"model":"deepseek-flash"}]}
-    {"type":"response","id":"r1","ok":true,"result":{"head":"<id>","entries":[{"id":"<id>","parent":null,"kind":"message","message":{"role":"user","text":"what is here?"}},{"id":"<id>","parent":"<id>","kind":"message","message":{"role":"assistant","content":[{"type":"text","text":"Looking."},{"type":"tool_call","id":"c1","name":"ls","arguments":"{}"}],"stop_reason":{"type":"tool_use"},"usage":{"input":20,"output":8,"cache_read":5},"model":"deepseek-flash"}},{"id":"<id>","parent":"<id>","kind":"message","message":{"role":"tool_result","tool_call_id":"c1","tool_name":"ls","text":"sessions/\n","is_error":false}},{"id":"<id>","parent":"<id>","kind":"message","message":{"role":"assistant","content":[{"type":"text","text":"Empty."}],"stop_reason":{"type":"end_turn"},"usage":{"input":10,"output":5,"cache_read":0},"model":"deepseek-flash"}}]}}
+    {"type":"response","id":"r1","ok":true,"result":{"head":"<id>","entries":[{"id":"<id>","parent":null,"kind":"system_prompt"},{"id":"<id>","parent":"<id>","kind":"message","message":{"role":"user","text":"what is here?"}},{"id":"<id>","parent":"<id>","kind":"message","message":{"role":"assistant","content":[{"type":"text","text":"Looking."},{"type":"tool_call","id":"c1","name":"ls","arguments":"{}"}],"stop_reason":{"type":"tool_use"},"usage":{"input":20,"output":8,"cache_read":5},"model":"deepseek-flash"}},{"id":"<id>","parent":"<id>","kind":"message","message":{"role":"tool_result","tool_call_id":"c1","tool_name":"ls","text":"sessions/\n","is_error":false}},{"id":"<id>","parent":"<id>","kind":"message","message":{"role":"assistant","content":[{"type":"text","text":"Empty."}],"stop_reason":{"type":"end_turn"},"usage":{"input":10,"output":5,"cache_read":0},"model":"deepseek-flash"}}]}}
     |}]
 ;;
 
@@ -570,7 +572,7 @@ let exec_name json =
 (* Yields until the server pushes a [tool_exec] for a real tool to [sent].
    The [$instructions] lookup that every run starts with is answered on the
    host's behalf (no instruction files), printing that it happened. *)
-let wait_for_exec h client sent =
+let wait_for_exec (h : H.t) client sent =
   let rec go n =
     match Queue.find sent ~f:is_exec with
     | Some json when String.equal (exec_name json) Host_ops.instructions_op ->

@@ -11,13 +11,15 @@ module Cell = struct
     }
 end
 
-type csi_state =
-  | Ground
-  | Escape
-  | Csi
-  | Osc
-  | Osc_esc
-  | Skip_one
+module Parser_state = struct
+  type t =
+    | Ground
+    | Escape
+    | Csi
+    | Osc
+    | Osc_esc
+    | Skip_one
+end
 
 type t =
   { mutable width : int
@@ -29,7 +31,7 @@ type t =
   ; mutable saved : (int * int) option
   ; mutable style : Style.t
   ; mutable link : string option
-  ; mutable state : csi_state
+  ; mutable state : Parser_state.t
   ; csi : Buffer.t
   ; osc : Buffer.t
   ; utf8 : Buffer.t

@@ -143,3 +143,27 @@ let%expect_test "missing program" =
   print_s [%sexp (Or_error.is_error result : bool)];
   [%expect {| true |}]
 ;;
+
+let%expect_test "cancellation kills the whole process group" =
+  Eio_main.run
+  @@ fun env ->
+  let cancel = Cancellation.create () in
+  let out = ref None in
+  let started = Time_ns.now () in
+  Eio.Fiber.both
+    (fun () ->
+       (* [sh -c "a; b"] forks [sleep], which would otherwise outlive the shell
+          and hold the output pipe open. *)
+       out := Some (sh ~env ~cancel "echo started; sleep 30; echo never"))
+    (fun () ->
+       Eio.Time.sleep (Eio.Stdenv.clock env) 0.1;
+       Cancellation.cancel cancel);
+  let elapsed = Time_ns.diff (Time_ns.now ()) started in
+  print_s [%sexp (!out : Process.Output.t option)];
+  printf "returned within a second: %b\n" Time_ns.Span.(elapsed < of_int_sec 1);
+  [%expect
+    {|
+    (((exit Cancelled) (stdout "started\n") (stderr "")))
+    returned within a second: true
+    |}]
+;;

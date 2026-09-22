@@ -1,5 +1,5 @@
 open! Core
-module P = Prigh_protocol
+open! Import
 
 (** The whole frontend as a pure state machine. [update] never performs I/O; it
     returns [Command.t]s for the platform to execute, and their results come
@@ -41,6 +41,7 @@ module Reply_tag : sig
     | Dequeued
     | Editor_text
     | Reload_messages_notice of string
+    | Reconnect of int (** generation; stale replies are ignored *)
   [@@deriving sexp_of, equal]
 end
 
@@ -61,8 +62,31 @@ module Command : sig
     | Copy_to_clipboard of string
     | Suspend
     | Edit_externally of string
+    | Reconnect of
+        { generation : int
+        ; delay_ms : int
+        ; session : string option
+        }
+    (** After [delay_ms], connect again, send [hello] (rejoining [session]) and
+        answer [Reply (Reconnect generation, hello reply)]. *)
     | Quit
   [@@deriving sexp_of, equal]
+end
+
+(** Reconnection is driven from here so the backoff is testable: every
+    [Backend_closed] starts a retry loop (250ms doubling, capped at 10s) that
+    [/retry-backend-connection] can short-circuit. *)
+module Connection : sig
+  type t =
+    | Connected
+    | Reconnecting of
+        { attempt : int
+        ; generation : int
+        ; delay_ms : int
+        }
+  [@@deriving sexp_of, equal]
+
+  val delay_ms : attempt:int -> int
 end
 
 module Action : sig
@@ -110,7 +134,8 @@ module Model : sig
     ; client_id : string option
     ; stderr_tail : string list
     ; pending_confirms : (string * string * string) list
-    ; backend_gone : bool
+    ; connection : Connection.t
+    ; reconnect_generation : int
     ; width : int
     ; height : int
     ; quitting : bool
@@ -118,6 +143,7 @@ module Model : sig
   [@@deriving sexp_of]
 
   val running : t -> bool
+  val backend_gone : t -> bool
 end
 
 (** Wrapped transcript lines currently visible, mirroring [Render.screen] for

@@ -21,6 +21,8 @@ type t =
   | Delete_word_forward
   | Page_up
   | Page_down
+  | Scroll_up (** a few transcript lines: the mouse wheel *)
+  | Scroll_down
   | Complete
   | Cancel
   | Interrupt

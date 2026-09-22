@@ -81,3 +81,24 @@ let build ?date ?instructions ~cwd ~home ~tools () =
   in
   String.concat ~sep:"\n\n" ([ base ~tools; environment ] @ instructions)
 ;;
+
+let discretion =
+  "Re-reading AGENTS.md/CLAUDE.md there is at your discretion: they are often \
+   unchanged, and missing an update is not serious."
+;;
+
+let host_changed_note ~host =
+  sprintf
+    "[Environment: the tool host is now %s, so tools run there and its \
+     filesystem may differ from the one described above. %s]"
+    host
+    discretion
+;;
+
+let cwd_changed_note ~cwd =
+  sprintf
+    "[Environment: the working directory is now %s. Project instructions for \
+     it may differ from the ones above. %s]"
+    cwd
+    discretion
+;;

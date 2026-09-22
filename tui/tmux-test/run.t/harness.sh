@@ -1,22 +1,25 @@
 #!/usr/bin/env bash
-# Real-terminal harness: runs the built TUI (`main.exe -faux`) inside a
-# detached tmux session, sends keys, captures panes and diffs them against
-# expected/*.txt (normalised). Usage:
-#   tmux-test/run.sh            run every scenario
-#   tmux-test/run.sh NAME...    run some
-#   UPDATE=1 tmux-test/run.sh   rewrite the expected files
-# Skips (exit 0) when tmux is not installed.
+# Real-terminal harness behind the cram test in run.t: runs the built TUI
+# (`prigh-tui -faux`) inside a detached tmux session, sends keys, and prints
+# the captured panes (normalised) for the cram expectation. Usage:
+#   harness.sh NAME     run one scenario (see the bottom of this file)
+# Outside dune, PRIGH_TUI and PRIGH_BACKEND locate the executables.
 set -euo pipefail
+# Under dune the locale is C; the spinner and rules are multi-byte.
+export LC_ALL=C.UTF-8
 here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-tui="$(dirname "$here")"
+if [ -n "${DUNE_SOURCEROOT:-}" ]; then
+	tui="$DUNE_SOURCEROOT"
+else
+	tui="$(dirname "$(dirname "$here")")"
+fi
 root="$(dirname "$tui")"
-exe="${PRIGH_TUI:-$tui/_build/default/bin/main.exe}"
+exe="${PRIGH_TUI:-$(command -v prigh-tui || echo "$tui/_build/default/bin/main.exe")}"
 backend="${PRIGH_BACKEND:-$root/backend/_build/default/bin/main.exe}"
-expected="$here/expected"
 
 if ! command -v tmux >/dev/null; then
-	echo "tmux-test: tmux not installed, skipping"
-	exit 0
+	echo "tmux-test: tmux not installed"
+	exit 1
 fi
 for f in "$exe" "$backend"; do
 	[ -x "$f" ] || { echo "tmux-test: missing $f (build both projects first)"; exit 1; }
@@ -24,7 +27,6 @@ done
 
 W=100
 H=30
-failures=0
 session=""
 tmp=""
 
@@ -91,44 +93,22 @@ normalise() {
 		-e 's/[[:space:]]+$//'
 }
 
-# capture NAME STEP: appends the normalised pane to the scenario transcript.
+# capture NAME STEP: prints the normalised pane.
 capture() {
-	{
-		echo "=== $1"
-		tmux capture-pane -p -t "$session" | normalise | sed '/./,$!d' | sed -e :a -e '/^\n*$/{$d;N;ba' -e '}'
-	} >>"$out"
-}
-
-check() {
-	local name=$1
-	if [ "${UPDATE:-}" = 1 ]; then
-		cp "$out" "$expected/$name.txt"
-		echo "updated $name"
-	elif diff -u "$expected/$name.txt" "$out" >"$out.diff"; then
-		echo "ok      $name"
-	else
-		echo "FAIL    $name"
-		cat "$out.diff"
-		failures=$((failures + 1))
-	fi
+	echo "=== $2"
+	tmux capture-pane -p -t "$session" | normalise | sed '/./,$!d' | sed -e :a -e '/^\n*$/{$d;N;ba' -e '}'
 }
 
 run_scenario() {
-	local name=$1
-	out="$(mktemp)"
+	local name=$1 status=0
 	tmp="$(mktemp -d)"
 	extra_args=""
 	interactive=""
 	if declare -F "setup_$name" >/dev/null; then "setup_$name"; fi
 	start $extra_args
-	if ! "scenario_$name"; then
-		echo "FAIL    $name (scenario error)"
-		failures=$((failures + 1))
-	else
-		check "$name"
-	fi
+	"scenario_$name" || status=$?
 	stop
-	rm -f "$out" "$out.diff"
+	return $status
 }
 
 # ---- scenarios ------------------------------------------------------------
@@ -319,8 +299,22 @@ scenario_paste() {
 	capture paste "submitted as one message"
 }
 
-all="startup prompt ctrl_o resize quit tools suspend editor confirm paste"
-for name in ${*:-$all}; do
-	run_scenario "$name"
-done
-[ "$failures" = 0 ]
+# The spawned backend dies; the TUI reconnects (respawning it) and rejoins
+# the same session.
+scenario_reconnect() {
+	wait_for "Ctrl+C twice"
+	type_text "before"
+	keys Enter
+	wait_for "faux reply"
+	pkill -f "serve -faux -cwd $tmp/cwd"
+	wait_for "reconnected to the backend"
+	settle
+	capture reconnect "after the backend was killed"
+	type_text "after"
+	keys Enter
+	wait_for "> after"
+	settle
+	capture reconnect "prompt works again"
+}
+
+run_scenario "$1"

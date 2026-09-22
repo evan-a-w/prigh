@@ -13,6 +13,7 @@ module Kind : sig
         }
     | Name of { name : string }
     | Cwd of { cwd : string }
+    | System_prompt
   [@@deriving sexp_of, equal]
 end
 

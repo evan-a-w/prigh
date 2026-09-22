@@ -1,21 +1,23 @@
 open! Core
-module P = Prigh_protocol
+open! Import
 
 module Subagent = struct
-  type status =
-    | Running
-    | Done of
-        { turns : int
-        ; cost_usd : float
-        }
-    | Failed of string
-  [@@deriving sexp_of, equal]
+  module Status = struct
+    type t =
+      | Running
+      | Done of
+          { turns : int
+          ; cost_usd : float
+          }
+      | Failed of string
+    [@@deriving sexp_of, equal]
+  end
 
   type t =
     { agent_id : string
     ; task : string
     ; model : string
-    ; status : status
+    ; status : Status.t
     ; turns : int
     ; report : string option
     ; last_tool : string option
@@ -520,8 +522,8 @@ let finish_subagent
   =
   let status =
     if result.is_error
-    then Subagent.Failed result.text
-    else Subagent.Done { turns; cost_usd }
+    then Subagent.Status.Failed result.text
+    else Subagent.Status.Done { turns; cost_usd }
   in
   let synth =
     { P.Message.Tool_result.tool_call_id = call_id
@@ -624,10 +626,10 @@ let render_report ~max_lines text : Content.t =
 let render_subagent ~(verbosity : Verbosity.t) (s : Subagent.t) : Content.t =
   let status_text, status_style =
     match s.status with
-    | Subagent.Running -> sprintf "… %d turns" s.turns, Style.fg Yellow
-    | Subagent.Done { turns; cost_usd } ->
+    | Subagent.Status.Running -> sprintf "… %d turns" s.turns, Style.fg Yellow
+    | Subagent.Status.Done { turns; cost_usd } ->
       sprintf "✓ %d turns $%.2f" turns cost_usd, green
-    | Subagent.Failed _ -> "✗ failed", red
+    | Subagent.Status.Failed _ -> "✗ failed", red
   in
   let header : Content.Line.t =
     [ { Content.Span.text = "⚙ subagent"; style = magenta }
@@ -636,16 +638,16 @@ let render_subagent ~(verbosity : Verbosity.t) (s : Subagent.t) : Content.t =
     ]
   in
   match s.status with
-  | Subagent.Running ->
+  | Subagent.Status.Running ->
     header
     :: List.map (Option.to_list s.last_tool) ~f:(fun line ->
       Content.Line.of_string ~style:gray ("  " ^ line))
-  | Subagent.Failed message ->
+  | Subagent.Status.Failed message ->
     (match verbosity with
      | Quiet -> [ header ]
      | Normal -> header :: render_report ~max_lines:5 message
      | Verbose -> header :: render_report ~max_lines:Int.max_value message)
-  | Subagent.Done _ ->
+  | Subagent.Status.Done _ ->
     (match verbosity with
      | Quiet -> [ header ]
      | Normal ->

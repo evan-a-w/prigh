@@ -327,7 +327,7 @@ let%expect_test "new_session, switch_session, fork, rewind" =
   dump ();
   [%expect
     {|
-    ((forked_is_new true) (messages (a "a again" a2)) (bad_switch true))
+    ((forked_is_new true) (messages ("a again" a2)) (bad_switch true))
     state: running=true messages=0
     user: a
     assistant: a1
@@ -342,11 +342,11 @@ let%expect_test "new_session, switch_session, fork, rewind" =
     state: running=false messages=2
     queue: steer=0 follow_up=0
     state: running=false messages=2
-    state: running=false messages=1
-    state: running=true messages=1
+    state: running=false messages=0
+    state: running=true messages=0
     user: a again
     assistant: a2
-    state: running=false messages=3
+    state: running=false messages=2
     |}]
 ;;
 
@@ -689,4 +689,188 @@ let%expect_test "confirm_tools: responding to an unknown call id is an error" =
       (Agent.respond_confirm agent ~call_id:"nope" ~allow:true
        : unit Or_error.t)];
   [%expect {| (Error "no pending confirmation for tool call \"nope\"") |}]
+;;
+
+let%expect_test "abort kills a tool's whole process group promptly" =
+  with_agent
+    [ Reply.tool_call
+        ~id:"c1"
+        ~name:"bash"
+        ~arguments:{|{"command":"echo started; sleep 30; echo never"}|}
+        ()
+    ; Reply.text "never"
+    ]
+  @@ fun t agent dump ->
+  Or_error.ok_exn (Agent.prompt agent "go");
+  Eio.Time.sleep (Eio.Stdenv.clock t.env) 0.3;
+  let started = Time_ns.now () in
+  ignore (Agent.abort agent);
+  Agent.wait_idle agent;
+  let elapsed = Time_ns.diff (Time_ns.now ()) started in
+  printf "idle within a second: %b\n" Time_ns.Span.(elapsed < of_int_sec 1);
+  dump ();
+  [%expect
+    {|
+    idle within a second: true
+    state: running=true messages=0
+    user: go
+    assistant:
+    queue: steer=0 follow_up=0
+    tool_result: started
+    [cancelled]
+    state: running=false messages=3
+    |}]
+;;
+
+let%expect_test
+    "the system prompt is fixed at the first run and reused after cwd changes, \
+     which reach the model as notes on the next message"
+  =
+  let systems = Queue.create () in
+  let users = Queue.create () in
+  with_agent
+    ~on_request:(fun request ->
+      Queue.enqueue systems (Option.value request.system ~default:"");
+      List.iter request.messages ~f:(function
+        | Message.User u -> Queue.enqueue users u.text
+        | _ -> ()))
+    [ Reply.text "one"; Reply.text "two"; Reply.text "three" ]
+  @@ fun t agent _dump ->
+  let sub = Filename.concat t.dir "sub" in
+  Core_unix.mkdir_p sub;
+  Out_channel.write_all (Filename.concat sub "AGENTS.md") ~data:"sub rules";
+  Or_error.ok_exn (Agent.prompt agent "first");
+  Agent.wait_idle agent;
+  Or_error.ok_exn (Agent.set_cwd agent ~path:sub);
+  Or_error.ok_exn (Agent.prompt agent "second");
+  Agent.wait_idle agent;
+  let systems = Queue.to_list systems in
+  printf
+    "requests: %d, identical system prompts: %b\n"
+    (List.length systems)
+    (List.all_equal systems ~equal:String.equal |> Option.is_some);
+  let mentions s sub = String.is_substring s ~substring:sub in
+  printf
+    "system prompt mentions sub rules: %b\n"
+    (mentions (List.hd_exn systems) "sub rules");
+  Queue.to_list users
+  |> List.dedup_and_sort ~compare:String.compare
+  |> List.iter ~f:(fun u -> printf "user: %s\n" (mask t u));
+  print_s
+    [%sexp
+      (Option.is_some (Session.system_prompt (Agent.session agent)) : bool)];
+  let reloaded =
+    Or_error.ok_exn (Session.load (Agent.state agent).session_path)
+  in
+  printf
+    "reloaded prompt identical: %b\n"
+    (Option.equal
+       String.equal
+       (Session.system_prompt reloaded)
+       (Some (List.hd_exn systems)));
+  Or_error.ok_exn (Agent.prompt agent "third");
+  Agent.wait_idle agent;
+  printf
+    "third message carries no note: %b\n"
+    (not (mentions (Queue.last_exn users) "Environment"));
+  [%expect
+    {|
+    requests: 2, identical system prompts: true
+    system prompt mentions sub rules: false
+    user: [Environment: the working directory is now $DIR/sub. Project instructions for it may differ from the ones above. Re-reading AGENTS.md/CLAUDE.md there is at your discretion: they are often unchanged, and missing an update is not serious.]
+
+    second
+    user: first
+    true
+    reloaded prompt identical: true
+    third message carries no note: true
+    |}]
+;;
+
+let%expect_test "set_active_host with a cwd validates it on the new host" =
+  with_agent [ Reply.text "ok" ]
+  @@ fun t agent dump ->
+  let sub = Filename.concat t.dir "sub" in
+  Core_unix.mkdir_p sub;
+  Or_error.ok_exn (Agent.prompt agent "first");
+  Agent.wait_idle agent;
+  dump ();
+  let switch cwd =
+    print_endline
+      (mask
+         t
+         (Sexp.to_string_hum
+            [%sexp
+              (Agent.set_active_host agent "backend" ~cwd : unit Or_error.t)]));
+    printf
+      "cwd=%s hosts=%s\n"
+      (mask t (Agent.state agent).cwd)
+      (String.concat
+         ~sep:","
+         (List.map (Agent.hosts agent) ~f:(fun h -> mask t h.cwd)))
+  in
+  switch (Some "/no/such/dir");
+  switch (Some sub);
+  switch None;
+  dump ();
+  [%expect
+    {|
+    state: running=true messages=0
+    user: first
+    assistant: ok
+    state: running=false messages=2
+    (Error "<host>: not a directory: /no/such/dir")
+    cwd=$DIR hosts=$DIR
+    (Ok ())
+    cwd=$DIR/sub hosts=$DIR/sub
+    (Ok ())
+    cwd=$DIR/sub hosts=$DIR/sub
+    notice: tools now run on <host> in $DIR/sub
+    state: running=false messages=2
+    notice: tools now run on <host> in $DIR/sub
+    state: running=false messages=2
+    |}]
+;;
+
+let%expect_test
+    "a message sent right after abort runs as soon as the cancelled tool is \
+     gone"
+  =
+  with_agent
+    [ Reply.tool_call
+        ~id:"c1"
+        ~name:"bash"
+        ~arguments:{|{"command":"echo started; sleep 30; echo never"}|}
+        ()
+    ; Reply.text "second run"
+    ]
+  @@ fun t agent dump ->
+  Or_error.ok_exn (Agent.prompt agent "go");
+  Agent.steer agent "queued";
+  Eio.Time.sleep (Eio.Stdenv.clock t.env) 0.3;
+  let restored = Agent.abort agent in
+  print_s [%message (restored : string list)];
+  (* The run is still winding down, so this queues; it starts by itself. *)
+  Agent.steer agent "queued again";
+  Agent.wait_idle agent;
+  dump ();
+  [%expect
+    {|
+    (restored (queued))
+    state: running=true messages=0
+    user: go
+    queue: steer=1 follow_up=0
+    assistant:
+    queue: steer=0 follow_up=0
+    queue: steer=1 follow_up=0
+    tool_result: started
+    [cancelled]
+    queue: steer=0 follow_up=1
+    state: running=false messages=3
+    queue: steer=0 follow_up=0
+    state: running=true messages=3
+    user: queued again
+    assistant: second run
+    state: running=false messages=5
+    |}]
 ;;

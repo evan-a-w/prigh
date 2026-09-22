@@ -56,6 +56,12 @@ let string_param params name =
   | None -> Or_error.errorf "missing param %S" name
 ;;
 
+let string_param_opt params name =
+  match param params name with
+  | None | Some `Null -> Ok None
+  | Some _ -> Or_error.map (string_param params name) ~f:Option.some
+;;
+
 let string_list_param params name =
   match param params name with
   | None -> Ok []
@@ -313,7 +319,8 @@ let dispatch_server t (client : Client.t) ~meth ~params
   | "set_active_host" ->
     Some
       (Or_error.bind (string_param params "host") ~f:(fun host ->
-         unit_result (Agent.set_active_host agent host)))
+         Or_error.bind (string_param_opt params "cwd") ~f:(fun cwd ->
+           unit_result (Agent.set_active_host agent host ~cwd))))
   | "tool_exec_output" ->
     Some
       (Or_error.bind (string_param params "exec_id") ~f:(fun exec_id ->

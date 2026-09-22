@@ -42,9 +42,9 @@ let run
   Switch.run
   @@ fun sw ->
   let mgr = Eio.Stdenv.process_mgr env in
-  let stdin_r, stdin_w = Eio.Process.pipe ~sw mgr in
-  let stdout_r, stdout_w = Eio.Process.pipe ~sw mgr in
-  let stderr_r, stderr_w = Eio.Process.pipe ~sw mgr in
+  let stdin_r, stdin_w = Eio_unix.pipe sw in
+  let stdout_r, stdout_w = Eio_unix.pipe sw in
+  let stderr_r, stderr_w = Eio_unix.pipe sw in
   let process_env =
     if List.is_empty extra_env
     then None
@@ -54,14 +54,20 @@ let run
            (Core_unix.environment ())
            (Array.of_list (List.map extra_env ~f:(fun (k, v) -> k ^ "=" ^ v))))
   in
+  (* The child leads its own process group so that on cancel or timeout its
+     descendants die with it; otherwise they keep the pipes open and draining
+     them would block until they exit on their own. *)
   let child =
-    Eio.Process.spawn
+    Eio_unix.Process.spawn_unix
       ~sw
       mgr
       ?cwd:(Option.map cwd ~f:(fun d -> Eio.Path.(Eio.Stdenv.fs env / d)))
-      ~stdin:stdin_r
-      ~stdout:stdout_w
-      ~stderr:stderr_w
+      ~pgid:0
+      ~fds:
+        [ 0, Eio_unix.Resource.fd stdin_r, `Blocking
+        ; 1, Eio_unix.Resource.fd stdout_w, `Blocking
+        ; 2, Eio_unix.Resource.fd stderr_w, `Blocking
+        ]
       ?env:process_env
       (prog :: args)
   in
@@ -98,7 +104,7 @@ let run
     | Some (Ok status) -> `Done status
   in
   let kill_and_reap () =
-    Eio.Process.signal child Stdlib.Sys.sigkill;
+    Signal_unix.send_i Signal.kill (`Group (Pid.of_int (Eio.Process.pid child)));
     drain ();
     ignore (Eio.Process.await child : Eio.Process.exit_status)
   in

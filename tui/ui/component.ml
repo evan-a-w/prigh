@@ -1,6 +1,6 @@
 open! Core
 open Bonsai.Let_syntax
-module P = Prigh_protocol
+open! Import
 
 module Platform = struct
   type t =
@@ -16,6 +16,10 @@ module Platform = struct
     ; copy_to_clipboard : string -> unit Bonsai.Effect.t
     ; suspend : unit Bonsai.Effect.t
     ; edit_externally : string -> (string, string) Result.t Bonsai.Effect.t
+    ; reconnect :
+        delay_ms:int
+        -> session:string option
+        -> (P.Json.t, string) Result.t Bonsai.Effect.t
     }
 end
 
@@ -42,6 +46,9 @@ let perform ctx (platform : Platform.t) (command : App.Command.t) =
         (App.Action.Reply
            ( App.Reply_tag.Editor_text
            , Result.map result ~f:(fun contents -> `String contents) ))
+    | Reconnect { generation; delay_ms; session } ->
+      let%bind.Bonsai.Effect result = platform.reconnect ~delay_ms ~session in
+      inject (App.Action.Reply (App.Reply_tag.Reconnect generation, result))
     | Quit -> platform.quit
   in
   Bonsai.Apply_action_context.schedule_event ctx effect

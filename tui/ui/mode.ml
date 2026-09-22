@@ -28,6 +28,7 @@ module Text_prompt_action = struct
     | Cd
     | Export_path
     | Import_path
+    | Host_cwd of string (** host id; the text is the directory there *)
   [@@deriving sexp_of, equal]
 end
 

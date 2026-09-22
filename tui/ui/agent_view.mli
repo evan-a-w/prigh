@@ -1,23 +1,25 @@
 open! Core
-module P = Prigh_protocol
+open! Import
 
 (** One subagent's transcript and status, plus any subagents it started. *)
 
-type status =
-  | Running
-  | Done of
-      { turns : int
-      ; cost_usd : float
-      }
-  | Failed of string
-[@@deriving sexp_of, equal]
+module Status : sig
+  type t =
+    | Running
+    | Done of
+        { turns : int
+        ; cost_usd : float
+        }
+    | Failed of string
+  [@@deriving sexp_of, equal]
+end
 
 type t =
   { id : string
   ; call_id : string
   ; task : string
   ; model : string
-  ; status : status
+  ; status : Status.t
   ; turns : int
   ; transcript : Transcript.t
   ; children : t list

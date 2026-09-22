@@ -141,18 +141,19 @@ let main () =
     ; "deepseek/deepseek-flash"
     ]
   in
-  match%bind
+  let spawn args () =
     Prigh_client.Stdio_transport.spawn
       ~env:(`Extend [ "HOME", tmp ])
       ~prog:(backend ())
       ~args
       ()
-  with
+  in
+  let client = Client.create ~connect:(spawn args) in
+  match%bind Client.connect client with
   | Error e ->
     print_s [%message "cannot start backend" (e : Error.t)];
     return ()
-  | Ok transport ->
-    let client = Client.create transport in
+  | Ok () ->
     let%bind () = call client "ping" [] in
     let%bind () = call client "get_state" [] in
     let%bind () = call client "prompt" [ "text", Json.str "hello there" ] in
@@ -231,8 +232,7 @@ let main () =
     let%bind () = call client "session_stats" [] in
     let%bind () = call client "get_entries" [] in
     let%bind () = call client "bogus" [] in
-    Client.close client;
-    let%bind () = Client.closed client in
+    let%bind () = Client.close client in
     print_endline "backend exited";
     let script = Filename.concat tmp "subagent.json" in
     let script_json =
@@ -257,18 +257,12 @@ let main () =
       ]
     in
     let%bind () =
-      match%bind
-        Prigh_client.Stdio_transport.spawn
-          ~env:(`Extend [ "HOME", tmp ])
-          ~prog:(backend ())
-          ~args:subagent_args
-          ()
-      with
+      let client = Client.create ~connect:(spawn subagent_args) in
+      match%bind Client.connect client with
       | Error e ->
         print_s [%message "cannot start subagent backend" (e : Error.t)];
         return ()
-      | Ok transport ->
-        let client = Client.create transport in
+      | Ok () ->
         let%bind () = call client "ping" [] in
         let%bind () =
           call client "prompt" [ "text", Json.str "delegate something" ]
@@ -278,8 +272,7 @@ let main () =
             | State { running = false; _ } -> true
             | _ -> false)
         in
-        Client.close client;
-        let%bind () = Client.closed client in
+        let%bind () = Client.close client in
         print_endline "subagent backend exited";
         return ()
     in

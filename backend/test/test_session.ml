@@ -243,7 +243,7 @@ let%expect_test "name entry round trips through save/load" =
   print_endline
     (mask_ids (List.last_exn (In_channel.read_lines (Session.path t))));
   let last_entry = List.last_exn (Session.entries t) in
-  print_s [%sexp (last_entry.payload : Session.Entry.payload)];
+  print_s [%sexp (last_entry.payload : Session.Entry.Payload.t)];
   let loaded = Or_error.ok_exn (Session.load (Session.path t)) in
   print_s [%sexp (Session.name loaded : string option)];
   let (_ : Session.Entry.t) = Session.set_name t ~name:"renamed" in

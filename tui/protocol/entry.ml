@@ -13,6 +13,7 @@ module Kind = struct
         }
     | Name of { name : string }
     | Cwd of { cwd : string }
+    | System_prompt
   [@@deriving sexp_of, equal]
 end
 
@@ -43,6 +44,7 @@ let kind_of_json j =
       Kind.Name { name })
   | "cwd" ->
     Or_error.map (Json.string_field j "cwd") ~f:(fun cwd -> Kind.Cwd { cwd })
+  | "system_prompt" -> Ok Kind.System_prompt
   | other -> Or_error.errorf "unknown entry kind %S" other
 ;;
 

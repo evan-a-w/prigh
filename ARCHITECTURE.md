@@ -58,10 +58,10 @@ and the model sees the error; the TUI shows `tools:offline` until another
 host is chosen. The frontend does not implement any tools: it proxies
 `tool_exec` to a local `prigh tool-host` process (`Tool_host` in the backend
 runs `Host_ops.execute`, the same code path the backend uses for itself,
-plus three pseudo-tools: `$resolve_dir` for `/cd`, `$read_file` for prompt
-attachments, and `$instructions`, which every run and subagent calls first
-so that `AGENTS.md`/`CLAUDE.md` come from the host's cwd ancestors and the
-host's own `~/.prigh/`).
+plus three pseudo-tools: `$resolve_dir` for `/cd` and `/host`, `$read_file`
+for prompt attachments, and `$instructions`, called when a session's system
+prompt is first built and by every subagent, so that `AGENTS.md`/`CLAUDE.md`
+come from the host's cwd ancestors and the host's own `~/.prigh/`).
 
 The backend is direct-style Eio code. Every I/O function takes `~env`
 (`Eio_unix.Stdenv.base`), and long-running work runs in fibers forked into a
@@ -78,7 +78,9 @@ while it is waiting on the browser.
 ### Foundations
 
 - `Import` — `Json = Jsonaf`, Eio aliases, `Env.t`.
-- `Cancellation`, `Process` (streamed subprocess with timeout/kill),
+- `Cancellation`, `Process` (streamed subprocess with timeout/kill; the
+  child leads its own process group and the whole group is killed, so a
+  cancelled `bash` cannot leave grandchildren holding the output pipes),
   `Http_client` (cohttp-eio + ocaml-tls; `post` and streaming
   `post_stream`), `Sse` (incremental `text/event-stream` parser),
   `Sse_request` (streaming POST whose non-2xx bodies become
@@ -213,6 +215,13 @@ two can share one.
   `AGENTS.md`/`CLAUDE.md` files from `/` down to the cwd and
   `~/.prigh/AGENTS.md`; `read_instructions` scans the local filesystem and
   `build ?instructions` accepts files fetched elsewhere (the tool host).
+  `Agent` builds it once, at the session's first run, and records it as a
+  `System_prompt` session entry so every later request (and every reload)
+  sends the same prefix, which is what provider prompt caches key on. When
+  the cwd or the active host changes afterwards, `host_changed_note` /
+  `cwd_changed_note` are queued and prepended to the next user message: they
+  say what changed and leave re-reading the instructions to the model's
+  discretion, since they are often unchanged.
 - `Agent_loop` — the core loop. Per turn: build the request from the context,
   stream the assistant message (emitting `Message_start/update/end`), retry
   with exponential backoff on retryable errors, execute the tool calls
@@ -249,8 +258,8 @@ two can share one.
 - `Session` — an append-only JSONL log forming a tree: every entry has a
   `parent`, the active conversation is the path from the root to `head`.
   Rewinding moves `head`; forking copies the active path to a new file.
-  Entries are messages, model/thinking changes, compaction summaries, names
-  and cwds (so a reload restores both); `Session.messages` is the message
+  Entries are messages, model/thinking changes, compaction summaries, names,
+  cwds (so a reload restores both) and the system prompt; `Session.messages` is the message
   list for the next request with the compaction summary replacing everything
   before `kept_from`. `list` returns name, cwd, timestamps, message count,
   first prompt and parent; `export` writes markdown or copies the JSONL,
@@ -318,8 +327,10 @@ copy of the protocol types and the e2e test guards the contract.
   encoder.
 - `client/` (`prigh_client`) — `Transport.t` (line channel: `Stdio_transport`
   spawns the backend, `Tcp_transport` connects to `-listen`; an in-memory
-  pair for tests), `Client` (Async; correlates responses by id, fans out
-  events, stderr and close on one `Incoming.t` pipe) and `Tool_host` (spawns
+  pair for tests), `Client` (Async; created with a `connect` thunk and
+  reconnectable: correlates responses by id, fans out events, stderr and
+  `Closed` on one `Incoming.t` pipe that outlives the transport, fails calls
+  with "not connected" in between) and `Tool_host` (spawns
   `prigh tool-host` lazily and proxies `Tool_exec`/`Tool_exec_cancel` events
   to it and its `output`/`result` lines back as `tool_exec_*` requests).
 - `ui/` (`prigh_ui`) — **platform-agnostic**, depends only on `core` and
@@ -334,6 +345,13 @@ copy of the protocol types and the e2e test guards the contract.
   - `Component.create ~platform` wraps `App` in `Bonsai.state_machine`,
     turns commands into effects and feeds replies back; it also runs the
     spinner clock while a turn is active.
+  - Reconnection is App state (`Connection.t`), so the policy is an expect
+    test: `Backend_closed` emits `Command.Reconnect {generation; delay_ms;
+    session}` (immediately, then 250ms doubling to a 10s cap), the platform
+    sleeps, connects and re-sends `hello` for the current session, and the
+    reply comes back tagged with its generation so late attempts are ignored;
+    `/retry-backend-connection` issues a new generation with no delay.
+    Success clears the transcript and re-runs the startup requests.
   - Headless widgets: `Editor` (multi-line, kill ring, undo, chips for long
     pastes, persistent history), `Picker` (fuzzy list with `Fuzzy` ranking),
     `Transcript` (items plus streaming tails; `Transcript.apply` is the one
@@ -373,7 +391,10 @@ copy of the protocol types and the e2e test guards the contract.
   `Term_app.run` sends `hello` before mounting the app and feeds the client
   id back as `Set_client_id`, so `/host` can mark this frontend as "(here)"
   and the status line can show `tools:<host>` when tools run elsewhere or
-  `tools:offline` when the active host is gone.
+  `tools:offline` when the active host is gone. Mouse reporting is on so the
+  wheel scrolls the transcript (`Scroll_up`/`Scroll_down`, three lines);
+  without it the terminal turns the wheel into arrow keys, which walk the
+  prompt history. Text selection therefore needs Shift.
 - `bin/` — `prigh-tui` (`-faux`, `-session`, `-model`, `-cwd`, `-auth-file`,
   `-backend`; `PRIGH_BACKEND` overrides the backend path). `-connect
   HOST:PORT` (`$PRIGH_CONNECT`) joins a running backend instead of spawning
@@ -409,15 +430,16 @@ Four layers, cheapest first.
    decodes Notty's output with the VT emulator in `tui/test/vt.ml`, and
    compares the grid and cursor with `Screen.to_plain`, so
    `View_of_content`/`Key_of_event` cannot diverge from the pure renderer.
-3. **Protocol e2e.** `cd tui && dune build @e2e` runs the real
+3. **Protocol e2e.** `tui/e2e` (in `@runtest`, also `@e2e`) runs the real
    `main.exe serve -faux` with an isolated `-auth-file` and `HOME` through
    the real client and diffs a normalised transcript.
-4. **Real terminal.** `tui/tmux-test/run.sh` (alias `cd tui && dune build
-   @tmux`; skipped when `tmux` is absent) starts the built TUI inside tmux,
-   sends keys with `tmux send-keys`, and diffs captured panes against
-   `expected/*.txt` (normalised for spinners and paths; `UPDATE=1`
-   re-records). Scenarios: startup, prompt, ctrl_o, resize, quit, tools,
-   suspend, editor, confirm, paste.
+4. **Real terminal.** The cram test `tui/tmux-test/run.t` (in `@runtest`;
+   skipped when `tmux` is absent) runs each scenario of `run.t/harness.sh`:
+   the built TUI inside a detached tmux session, keys sent with `tmux
+   send-keys`, panes captured and normalised (spinners, paths) into the
+   cram output, so `dune promote` re-records. Scenarios: startup, prompt,
+   ctrl_o, resize, quit, tools, suspend, editor, confirm, paste, reconnect
+   (the backend is killed; the TUI respawns it and rejoins the session).
 
 The last two layers are the only ones that exercise the real terminal, and
 they paid for themselves immediately: the tmux layer caught `Ctrl+O` being

@@ -207,9 +207,11 @@ val remove_host : t -> string -> unit
 val hosts : t -> Host.t list
 val active_host : t -> string
 
-(** Switches where tools run from the next call on; the session cwd becomes
-    the host's. Fails for an unknown host. *)
-val set_active_host : t -> string -> unit Or_error.t
+(** Switches where tools run from the next call on. The session cwd becomes
+    [cwd], which must be a directory on that host (resolved there; [~/] is
+    expanded), or the host's own cwd when omitted. Fails for an unknown host or
+    a missing directory without switching. *)
+val set_active_host : t -> string -> cwd:string option -> unit Or_error.t
 
 (** Streamed output of a remote execution, relayed by the host. *)
 val tool_exec_output : t -> exec_id:string -> chunk:string -> unit Or_error.t

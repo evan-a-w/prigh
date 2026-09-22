@@ -50,6 +50,12 @@ let mask t s =
        ~pattern:(sprintf {|"name":"%s"|} (Core_unix.gethostname ()))
        ~with_:{|"name":"<host>"|}
   |> String.substr_replace_all
+       ~pattern:(sprintf "tools now run on %s" (Core_unix.gethostname ()))
+       ~with_:"tools now run on <host>"
+  |> String.substr_replace_all
+       ~pattern:(sprintf "\"%s: not a directory" (Core_unix.gethostname ()))
+       ~with_:"\"<host>: not a directory"
+  |> String.substr_replace_all
        ~pattern:(sprintf "(name %s)" (Core_unix.gethostname ()))
        ~with_:"(name <host>)"
 ;;

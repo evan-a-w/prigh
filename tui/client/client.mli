@@ -15,17 +15,28 @@ end
 
 type t
 
-val create : Transport.t -> t
+(** Not yet connected: call [connect]. [connect] is called again for every
+    reconnection. *)
+val create : connect:(unit -> Transport.t Deferred.Or_error.t) -> t
+
+(** Opens the transport. A no-op when connected; concurrent calls share one
+    attempt. When the transport later closes, pending calls fail, [Closed] is
+    delivered on [incoming] and the client is disconnected again. *)
+val connect : t -> unit Deferred.Or_error.t
+
+val is_connected : t -> bool
+
+(** Fails immediately with "not connected" while disconnected. *)
 val call : t -> string -> (string * Json.t) list -> Json.t Deferred.Or_error.t
+
+(** Stays open across reconnections; ends with [close]. *)
 val incoming : t -> Incoming.t Pipe.Reader.t
-val close : t -> unit
-val closed : t -> unit Deferred.t
 
-(** Typed wrappers used by tests and tools; the UI decodes replies itself. *)
-val get_state : t -> State.t Deferred.Or_error.t
+(** Closes the transport (if any) and [incoming]; determined once the transport
+    has shut down. *)
+val close : t -> unit Deferred.t
 
-val get_messages : t -> Message.t list Deferred.Or_error.t
+(** Typed wrappers used by the e2e test; the UI decodes replies itself. *)
 val list_models : t -> Model.t list Deferred.Or_error.t
+
 val list_sessions : t -> Session_summary.t list Deferred.Or_error.t
-val auth_status : t -> Auth_status.t list Deferred.Or_error.t
-val prompt : t -> string -> unit Deferred.Or_error.t

@@ -19,3 +19,9 @@ val build
   -> tools:Tool_spec.t list
   -> unit
   -> string
+
+(** Notes prepended to the next user message when the environment changes
+    after the system prompt was fixed, so the prompt prefix stays cacheable. *)
+val host_changed_note : host:string -> string
+
+val cwd_changed_note : cwd:string -> string
