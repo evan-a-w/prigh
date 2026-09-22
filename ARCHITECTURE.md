@@ -58,8 +58,10 @@ and the model sees the error; the TUI shows `tools:offline` until another
 host is chosen. The frontend does not implement any tools: it proxies
 `tool_exec` to a local `prigh tool-host` process (`Tool_host` in the backend
 runs `Host_ops.execute`, the same code path the backend uses for itself,
-plus two pseudo-tools, `$resolve_dir` and `$read_file`, for `/cd` and
-prompt attachments).
+plus three pseudo-tools: `$resolve_dir` for `/cd`, `$read_file` for prompt
+attachments, and `$instructions`, which every run and subagent calls first
+so that `AGENTS.md`/`CLAUDE.md` come from the host's cwd ancestors and the
+host's own `~/.prigh/`).
 
 The backend is direct-style Eio code. Every I/O function takes `~env`
 (`Eio_unix.Stdenv.base`), and long-running work runs in fibers forked into a
@@ -185,7 +187,7 @@ two can share one.
   is on) and `on_host` (runs on the active tool host rather than always in
   the backend).
 - `Host_ops` — what a tool host does for a session: the `on_host` tools by
-  name plus `$resolve_dir`/`$read_file`. `Tool_host` is the `prigh tool-host`
+  name plus `$resolve_dir`/`$read_file`/`$instructions`. `Tool_host` is the `prigh tool-host`
   worker loop around it (`exec`/`cancel` in, `output`/`result` out, one fiber
   per exec).
 - `Tool_bash` (streamed output, timeout, cancellation), `Tool_read`,
@@ -209,7 +211,8 @@ two can share one.
 
 - `System_prompt` — built-in guidance plus environment facts plus
   `AGENTS.md`/`CLAUDE.md` files from `/` down to the cwd and
-  `~/.prigh/AGENTS.md`.
+  `~/.prigh/AGENTS.md`; `read_instructions` scans the local filesystem and
+  `build ?instructions` accepts files fetched elsewhere (the tool host).
 - `Agent_loop` — the core loop. Per turn: build the request from the context,
   stream the assistant message (emitting `Message_start/update/end`), retry
   with exponential backoff on retryable errors, execute the tool calls

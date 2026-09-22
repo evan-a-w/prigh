@@ -21,7 +21,54 @@ let read_file ~cwd path =
   | Error e -> Tool.Result.error (Error.to_string_hum e)
 ;;
 
-let host_tools () = List.filter Tools.all ~f:(fun t -> t.spec.on_host)
+let instructions_op = "$instructions"
+
+(* AGENTS.md/CLAUDE.md from the host's filesystem: the ancestors of [cwd]
+   and the host's own ~/.prigh. A pseudo-tool so that it goes through the
+   same executor (and hence the same host) as the real tools. [home] is only
+   honoured when given (the backend's, for tests); the tool-host worker
+   strips it so a remote host uses its own. *)
+let instructions_tool =
+  { Tool.spec =
+      { Tool_spec.name = instructions_op
+      ; description = "project instruction files"
+      ; parameters = `Object []
+      ; parallel_safe = true
+      ; destructive = false
+      ; on_host = true
+      }
+  ; run =
+      (fun context args ->
+        let home =
+          match Tool_args.string_opt args "home" with
+          | Some home -> home
+          | None -> Option.value (Sys.getenv "HOME") ~default:"/"
+        in
+        let files = System_prompt.read_instructions ~cwd:context.cwd ~home in
+        Tool.Result.ok
+          (Json.to_string
+             (`Array
+                 (List.map files ~f:(fun (path, text) ->
+                    `Object [ "path", `String path; "text", `String text ])))))
+  }
+;;
+
+let instructions_of_result (result : Tool.Result.t) =
+  if result.is_error
+  then []
+  else (
+    match Json.parse result.text with
+    | Ok (`Array items) ->
+      List.filter_map items ~f:(fun item ->
+        match Json.member "path" item, Json.member "text" item with
+        | Some (`String path), Some (`String text) -> Some (path, text)
+        | _ -> None)
+    | _ -> [])
+;;
+
+let host_tools () =
+  instructions_tool :: List.filter Tools.all ~f:(fun t -> t.spec.on_host)
+;;
 
 let execute ~env ~cancel ~on_output ~cwd ~name ~(arguments : Json.t) =
   let string_arg key =

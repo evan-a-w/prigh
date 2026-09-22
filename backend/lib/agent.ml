@@ -406,12 +406,26 @@ let executor t : Tool.executor =
       ~arguments
 ;;
 
+(* AGENTS.md/CLAUDE.md come from the active host's filesystem. *)
+let instructions t ~cwd =
+  Host_ops.instructions_of_result
+    (host_exec
+       t
+       ~cancel:Cancellation.never
+       ~on_output:ignore
+       ~call_id:"instructions"
+       ~cwd
+       ~name:Host_ops.instructions_op
+       ~arguments:(`Object [ "home", `String t.home ]))
+;;
+
 let loop_config t =
   { Agent_loop.Config.model = t.model
   ; thinking = t.thinking
   ; system =
       Some
         (System_prompt.build
+           ~instructions:(instructions t ~cwd:t.cwd)
            ~cwd:t.cwd
            ~home:t.home
            ~tools:(Tools.specs t.tools)

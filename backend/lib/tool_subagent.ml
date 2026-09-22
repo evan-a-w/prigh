@@ -97,10 +97,22 @@ let create ~provider ~current_model ~current_thinking ~home =
         | Some extra -> extra ^ "\n\n" ^ instructions
         | None -> instructions
       in
+      let instructions =
+        Host_ops.instructions_of_result
+          (Tool.execute_via
+             { context with cwd; on_output = ignore }
+             Host_ops.instructions_tool
+             (`Object [ "home", `String home ]))
+      in
       Some
         (base
          ^ "\n\n"
-         ^ System_prompt.build ~cwd ~home ~tools:(Tools.specs tools) ())
+         ^ System_prompt.build
+             ~instructions
+             ~cwd
+             ~home
+             ~tools:(Tools.specs tools)
+             ())
     in
     let config =
       { Agent_loop.Config.model

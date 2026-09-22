@@ -561,10 +561,36 @@ let is_exec json =
   | _ -> false
 ;;
 
-(* Yields until the server pushes a [tool_exec] to [sent]. *)
-let wait_for_exec sent =
+let exec_name json =
+  match Json.member "name" json with
+  | Some (`String name) -> name
+  | _ -> ""
+;;
+
+(* Yields until the server pushes a [tool_exec] for a real tool to [sent].
+   The [$instructions] lookup that every run starts with is answered on the
+   host's behalf (no instruction files), printing that it happened. *)
+let wait_for_exec h client sent =
   let rec go n =
     match Queue.find sent ~f:is_exec with
+    | Some json when String.equal (exec_name json) Host_ops.instructions_op ->
+      Queue.filter_inplace sent ~f:(fun j -> not (phys_equal j json));
+      let exec_id =
+        match Json.member "exec_id" json with
+        | Some (`String id) -> id
+        | _ -> ""
+      in
+      printf "(host answered %s)\n" Host_ops.instructions_op;
+      ignore
+        (Rpc_server.handle
+           h.server
+           client
+           (Json.of_string
+              (sprintf
+                 {|{"id": 0, "method": "tool_exec_result", "params": {"exec_id": "%s", "text": "[]"}}|}
+                 exec_id))
+         : Json.t);
+      go n
     | Some json -> json
     | None ->
       if n = 0 then failwith "no tool_exec";
@@ -605,7 +631,7 @@ let%expect_test "remote tool host: exec round trip, switch, disconnect" =
   Queue.clear sent;
   Queue.clear h.sent;
   call t h ~params:{|{"text": "run it"}|} "prompt";
-  let exec = wait_for_exec sent in
+  let exec = wait_for_exec h laptop sent in
   let exec_id =
     match Json.member "exec_id" exec with
     | Some (`String id) -> id
@@ -634,7 +660,8 @@ let%expect_test "remote tool host: exec round trip, switch, disconnect" =
     {"type":"response","id":"r2","ok":true,"result":{"client_id":"client-2","state":{"session_id":"<id>","session_path":"$DIR/sessions/<stamp>_<id>.jsonl","session_name":null,"cwd":"/home/me/proj","git_branch":null,"model":{"id":"deepseek-flash","provider":"deepseek","key":"deepseek/deepseek-flash","name":"DeepSeek V4.1 Flash","context_window":1000000,"max_output":384000,"supports_thinking":true,"cost":{"input":0.3,"output":1.2,"cache_read":0.006}},"thinking":"off","running":false,"message_count":0,"usage":{"input":0,"output":0,"cache_read":0},"cost_usd":0,"context_tokens":0,"active_host":"client-2","hosts":[{"id":"backend","name":"<host>","cwd":"$DIR"},{"id":"client-2","name":"laptop","cwd":"/home/me/proj"}]}}}
     client-2 /home/me/proj
     {"type":"response","id":"r1","ok":true,"result":{}}
-    {"type":"event","event":"tool_exec","host":"client-2","exec_id":"c1-0","call_id":"c1","name":"bash","arguments":{"command":"x"},"cwd":"/home/me/proj"}
+    (host answered $instructions)
+    {"type":"event","event":"tool_exec","host":"client-2","exec_id":"c1-1","call_id":"c1","name":"bash","arguments":{"command":"x"},"cwd":"/home/me/proj"}
     default client saw tool_exec: false
     {"type":"response","id":"r2","ok":true,"result":{}}
     {"type":"response","id":"r2","ok":true,"result":{}}
@@ -683,7 +710,7 @@ let%expect_test "remote tool host: disconnect mid-call fails the call" =
           {|{"id": 1, "method": "hello", "params": {"name": "laptop", "tools": true}}|})
      : Json.t);
   call t h ~params:{|{"text": "run it"}|} "prompt";
-  ignore (wait_for_exec sent : Json.t);
+  ignore (wait_for_exec h laptop sent : Json.t);
   Rpc_server.disconnect h.server laptop;
   Agent.wait_idle agent;
   print_s [%sexp ((Agent.state agent).active_host : string)];
@@ -701,6 +728,7 @@ let%expect_test "remote tool host: disconnect mid-call fails the call" =
   [%expect
     {|
     {"type":"response","id":"r1","ok":true,"result":{}}
+    (host answered $instructions)
     client-2
     tool_result: "[tool host disconnected]"
     {"type":"response","id":"r1","ok":true,"result":{}}

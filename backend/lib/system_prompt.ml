@@ -52,7 +52,12 @@ let base ~tools =
     ]
 ;;
 
-let build ?date ~cwd ~home ~tools () =
+let read_instructions ~cwd ~home =
+  List.map (instruction_files ~cwd ~home) ~f:(fun path ->
+    path, String.strip (In_channel.read_all path))
+;;
+
+let build ?date ?instructions ~cwd ~home ~tools () =
   let date =
     match date with
     | Some d -> d
@@ -66,11 +71,13 @@ let build ?date ~cwd ~home ~tools () =
       (Core_unix.Utsname.sysname (Core_unix.uname ()))
   in
   let instructions =
-    List.map (instruction_files ~cwd ~home) ~f:(fun path ->
-      sprintf
-        "Instructions from %s:\n%s"
-        path
-        (String.strip (In_channel.read_all path)))
+    match instructions with
+    | Some files -> files
+    | None -> read_instructions ~cwd ~home
+  in
+  let instructions =
+    List.map instructions ~f:(fun (path, text) ->
+      sprintf "Instructions from %s:\n%s" path text)
   in
   String.concat ~sep:"\n\n" ([ base ~tools; environment ] @ instructions)
 ;;
