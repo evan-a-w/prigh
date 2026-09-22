@@ -91,7 +91,10 @@ let bindings =
       Next_agent
       "cycle focus: main → agent 1 → … → main"
   ; b [ Key.alt (Char "1") ] (Focus_agent 1) "focus agent N (Alt+1…9)"
-  ; b [ Key.ctrl 'c' ] Interrupt "clear the editor, then (again) quit"
+  ; b
+      [ Key.ctrl 'c' ]
+      Interrupt
+      "clear the editor or abort the turn, then (again) quit"
   ; b [ Key.ctrl 'd' ] Force_quit "quit"
   ]
 ;;

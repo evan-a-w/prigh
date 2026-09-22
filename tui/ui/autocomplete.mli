@@ -15,7 +15,19 @@ val source : t -> Source.t
 val prefix : t -> string
 val items : t -> Picker.Item.t list
 val selected : t -> int
+
+(** Whether Up/Down have been used; see [accepts_on_enter]. *)
+val navigated : t -> bool
+
+(** Enter accepts the highlighted item for commands, and for arguments and paths
+    once the user has typed a filter or moved the highlight; before that Enter
+    runs the command as typed (so [/model] Enter Enter opens the picker rather
+    than silently picking the first model). *)
+val accepts_on_enter : t -> bool
+
+(** Keeps only directories for [/cd]. *)
 val set_items : t -> Picker.Item.t list -> t
+
 val up : t -> t
 val down : t -> t
 val selected_item : t -> Picker.Item.t option

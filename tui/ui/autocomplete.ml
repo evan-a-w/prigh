@@ -16,6 +16,8 @@ type t =
   ; start : int (* byte offset of [prefix] within [line] *)
   ; items : Picker.Item.t list
   ; selected : int
+  ; navigated : bool
+  ; dirs_only : bool
   }
 [@@deriving sexp_of]
 
@@ -23,15 +25,32 @@ let source t = t.source
 let prefix t = t.prefix
 let items t = t.items
 let selected t = t.selected
-let set_items t items = { t with items; selected = 0 }
+let navigated t = t.navigated
+
+let set_items t items =
+  let items =
+    if t.dirs_only
+    then
+      List.filter items ~f:(fun (i : Picker.Item.t) ->
+        String.is_suffix i.id ~suffix:"/")
+    else items
+  in
+  { t with items; selected = 0 }
+;;
+
+let accepts_on_enter t =
+  match t.source with
+  | Source.Command -> true
+  | Argument _ | Path -> t.navigated || not (String.is_empty t.prefix)
+;;
 
 let clamp t =
   let n = List.length t.items in
   { t with selected = Int.max 0 (Int.min t.selected (n - 1)) }
 ;;
 
-let up t = clamp { t with selected = t.selected - 1 }
-let down t = clamp { t with selected = t.selected + 1 }
+let up t = clamp { t with selected = t.selected - 1; navigated = true }
+let down t = clamp { t with selected = t.selected + 1; navigated = true }
 let selected_item t = List.nth t.items t.selected
 
 let rank ~prefix items =
@@ -60,12 +79,14 @@ let compute_command ~line ~line_index =
       ; start = 1
       ; items
       ; selected = 0
+      ; navigated = false
+      ; dirs_only = false
       }
   | _ -> None
 ;;
 
 let thinking_items () =
-  List.map [ "off"; "on"; "low"; "high"; "max" ] ~f:(fun level ->
+  List.map Commands.thinking_levels ~f:(fun level ->
     Picker.Item.create ~id:level level)
 ;;
 
@@ -159,6 +180,8 @@ let compute_argument ~line ~line_index ~models ~auth ~sessions ~logged_in =
                   ; start
                   ; items = []
                   ; selected = 0
+                  ; navigated = false
+                  ; dirs_only = String.equal spec.name "cd"
                   }
               | Sessions when Option.is_none sessions ->
                 (* Loading; the app fetches the session list. *)
@@ -169,6 +192,8 @@ let compute_argument ~line ~line_index ~models ~auth ~sessions ~logged_in =
                   ; start
                   ; items = []
                   ; selected = 0
+                  ; navigated = false
+                  ; dirs_only = false
                   }
               | _ ->
                 let items =
@@ -185,6 +210,8 @@ let compute_argument ~line ~line_index ~models ~auth ~sessions ~logged_in =
                   ; start
                   ; items
                   ; selected = 0
+                  ; navigated = false
+                  ; dirs_only = false
                   }))))
 ;;
 
@@ -208,6 +235,8 @@ let compute_at ~line ~col ~line_index =
       ; start = !start + 1
       ; items = []
       ; selected = 0
+      ; navigated = false
+      ; dirs_only = false
       }
   | None -> None
 ;;

@@ -21,10 +21,13 @@ let make_platform ~replies : Component.Platform.t =
             | None -> Ok (`Object []))
           ())
   ; list_paths =
-      (fun ~prefix ->
+      (fun ~cwd ~prefix ->
         Bonsai.Effect.of_sync_fun
           (fun () ->
-            printf "list_paths %s\n" prefix;
+            printf
+              "list_paths %s in %s\n"
+              prefix
+              (Option.value cwd ~default:"(no cwd)");
             Ok (`Array []))
           ())
   ; open_browser =

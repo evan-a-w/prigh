@@ -259,10 +259,10 @@ let%expect_test "/model opens the picker; typing filters; Enter sets the model" 
     earlier answer
     Model  (4)
     / ▏
-      Claude Fable 5       anthropic/claude-fable-5  ctx 1.0M  …
-      Claude Fable 5.1     anthropic/claude-fable-5-1  ctx 1.0M…
-      GPT-5.5              openai/gpt-5.5  ctx 1.0M  $10/$50 pe…
-    * DeepSeek V4.1 Flash  deepseek/deepseek-flash ◆  ctx 1.0M …
+       Claude Fable 5       anthropic/claude-fable-5  ctx 1.0M …
+       Claude Fable 5.1     anthropic/claude-fable-5-1  ctx 1.0…
+       GPT-5.5              openai/gpt-5.5  ctx 1.0M  $10/$50 p…
+    ▸* DeepSeek V4.1 Flash  deepseek/deepseek-flash ◆  ctx 1.0M…
     ────────────────────────────────────────────────────────────
     …deepseek-flash  think:off  view:normal  ctx:0% 1.5k  $0.01
     |}];
@@ -276,8 +276,8 @@ let%expect_test "/model opens the picker; typing filters; Enter sets the model" 
     earlier answer
     Model  (2)
     / fable▏
-      Claude Fable 5    anthropic/claude-fable-5  ctx 1.0M  $10…
-      Claude Fable 5.1  anthropic/claude-fable-5-1  ctx 1.0M  $…
+    ▸  Claude Fable 5    anthropic/claude-fable-5  ctx 1.0M  $1…
+       Claude Fable 5.1  anthropic/claude-fable-5-1  ctx 1.0M  …
     ────────────────────────────────────────────────────────────
     …deepseek-flash  think:off  view:normal  ctx:0% 1.5k  $0.01
     |}];
@@ -288,7 +288,7 @@ let%expect_test "/model opens the picker; typing filters; Enter sets the model" 
     (Rpc
       (method_ set_model)
       (params ((model anthropic/claude-fable-5-1)))
-      (tag Set_model_done))
+      (tag (Set_model_done anthropic/claude-fable-5-1)))
     |}];
   H.mode h;
   H.event
@@ -332,7 +332,7 @@ let%expect_test "/model <display name> switches directly; unknown suggests and \
     (Rpc
       (method_ set_model)
       (params ((model anthropic/claude-fable-5-1)))
-      (tag Set_model_done))
+      (tag (Set_model_done anthropic/claude-fable-5-1)))
     |}];
   (* Models are cached now. *)
   H.keys h "/model GPT-5.5";
@@ -342,7 +342,7 @@ let%expect_test "/model <display name> switches directly; unknown suggests and \
     (Rpc
       (method_ set_model)
       (params ((model openai/gpt-5.5)))
-      (tag Set_model_done))
+      (tag (Set_model_done openai/gpt-5.5)))
     |}];
   H.keys h "/model claude-fable";
   H.enter h;
@@ -352,7 +352,7 @@ let%expect_test "/model <display name> switches directly; unknown suggests and \
     (Rpc
       (method_ set_model)
       (params ((model anthropic/claude-fable-5)))
-      (tag Set_model_done))
+      (tag (Set_model_done anthropic/claude-fable-5)))
 
 
 
@@ -387,7 +387,7 @@ let%expect_test "/model <display name> switches directly; unknown suggests and \
   H.esc h;
   (* A backend rejection (e.g. from another client's catalog) also recovers via
      the picker. *)
-  H.reply_error h Set_model_done {|unknown model "q"; did you mean: a, b|};
+  H.reply_error h (Set_model_done "q") {|unknown model "q"; did you mean: a, b|};
   H.show h;
   [%expect
     {|
@@ -397,10 +397,10 @@ let%expect_test "/model <display name> switches directly; unknown suggests and \
     unknown model "q"; did you mean: a, b
     Model  (4)
     / ▏
-      Claude Fable 5       anthropic/claude-fable-5  ctx 1.0M  …
-      Claude Fable 5.1     anthropic/claude-fable-5-1  ctx 1.0M…
-      GPT-5.5              openai/gpt-5.5  ctx 1.0M  $10/$50 pe…
-    * DeepSeek V4.1 Flash  deepseek/deepseek-flash ◆  ctx 1.0M …
+       Claude Fable 5       anthropic/claude-fable-5  ctx 1.0M …
+       Claude Fable 5.1     anthropic/claude-fable-5-1  ctx 1.0…
+       GPT-5.5              openai/gpt-5.5  ctx 1.0M  $10/$50 p…
+    ▸* DeepSeek V4.1 Flash  deepseek/deepseek-flash ◆  ctx 1.0M…
     ────────────────────────────────────────────────────────────
     …deepseek-flash  think:off  view:normal  ctx:0% 1.5k  $0.01
     |}]
@@ -423,11 +423,11 @@ let%expect_test "Esc closes autocomplete or dialog without aborting; Esc while \
     ────────────────────────────────────────────────────────────
     > /thinking ▏
     ▸ off
-      on
       low
+      on
       high
       max
-    …deepseek-flash  ctx:0% 1.5k  Tab/Enter accept · Esc close
+    …deepseek-flash  Tab accepts · Enter runs as typed · Esc
     |}];
   H.esc h;
   H.mode h;
@@ -551,7 +551,7 @@ let%expect_test "login: url, masked secret prompt, answer, done switches \
     (Rpc
       (method_ set_model)
       (params ((model anthropic/claude-fable-5)))
-      (tag Set_model_done))
+      (tag (Set_model_done anthropic/claude-fable-5)))
     |}];
   H.show h;
   [%expect
@@ -592,10 +592,10 @@ let%expect_test "login: select prompt is a picker; Esc cancels; backend \
     earlier answer
     Choose a login method  (2)
     / ▏
-      Claude Pro/Max  oauth
-      API key         api_key
+    ▸  Claude Pro/Max  oauth
+       API key         api_key
     ────────────────────────────────────────────────────────────
-    …deepseek-flash  think:off  view:normal  ctx:0% 1.5k  $0.01
+    …deepseek-flash  ctx:0% 1.5k  Enter selects · Esc closes
     |}];
   H.key h (Key.plain Down);
   H.enter h;
@@ -722,7 +722,6 @@ let%expect_test "typing / lists commands, Down twice + Tab fills /login " =
   H.show h;
   [%expect
     {|
-    earlier answer
     ────────────────────────────────────────────────────────────
     > /▏
     ▸ /help                           show commands and keys
@@ -731,15 +730,15 @@ let%expect_test "typing / lists commands, Down twice + Tab fills /login " =
       /scoped-models                  pick the models Ctrl+P cy…
       /login [provider] [api_key|oauth]  log in to a provider
       /logout [provider]              remove a provider's store…
-      /thinking [off|on|low|high|max]  pick or set the thinking…
+      /thinking [off|low|on|high|max]  pick or set the thinking…
       /verbosity [quiet|normal|verbose]  set the transcript ver…
+      ↕ 1–8 of 30
     …deepseek-flash  ctx:0% 1.5k  Tab/Enter accept · Esc close
     |}];
   H.key h (Key.plain Down);
   H.show h;
   [%expect
     {|
-    earlier answer
     ────────────────────────────────────────────────────────────
     > /▏
       /help                           show commands and keys
@@ -748,15 +747,15 @@ let%expect_test "typing / lists commands, Down twice + Tab fills /login " =
       /scoped-models                  pick the models Ctrl+P cy…
       /login [provider] [api_key|oauth]  log in to a provider
       /logout [provider]              remove a provider's store…
-      /thinking [off|on|low|high|max]  pick or set the thinking…
+      /thinking [off|low|on|high|max]  pick or set the thinking…
       /verbosity [quiet|normal|verbose]  set the transcript ver…
+      ↕ 1–8 of 30
     …deepseek-flash  ctx:0% 1.5k  Tab/Enter accept · Esc close
     |}];
   H.key h (Key.plain Down);
   H.show h;
   [%expect
     {|
-    earlier answer
     ────────────────────────────────────────────────────────────
     > /▏
       /help                           show commands and keys
@@ -765,8 +764,9 @@ let%expect_test "typing / lists commands, Down twice + Tab fills /login " =
       /scoped-models                  pick the models Ctrl+P cy…
       /login [provider] [api_key|oauth]  log in to a provider
       /logout [provider]              remove a provider's store…
-      /thinking [off|on|low|high|max]  pick or set the thinking…
+      /thinking [off|low|on|high|max]  pick or set the thinking…
       /verbosity [quiet|normal|verbose]  set the transcript ver…
+      ↕ 1–8 of 30
     …deepseek-flash  ctx:0% 1.5k  Tab/Enter accept · Esc close
     |}];
   H.key h (Key.plain Tab);
@@ -804,7 +804,7 @@ let%expect_test "/mo Enter opens argument completion over models; typing fab \
       Claude Fable 5.1     anthropic/claude-fable-5-1
       GPT-5.5              openai/gpt-5.5
       DeepSeek V4.1 Flash  deepseek/deepseek-flash
-    …deepseek-flash  ctx:0% 1.5k  Tab/Enter accept · Esc close
+    …deepseek-flash  Tab accepts · Enter runs as typed · Esc
     |}];
   H.keys h "fab";
   H.show h;
@@ -826,7 +826,7 @@ let%expect_test "/mo Enter opens argument completion over models; typing fab \
     (Rpc
       (method_ set_model)
       (params ((model anthropic/claude-fable-5)))
-      (tag Set_model_done))
+      (tag (Set_model_done anthropic/claude-fable-5)))
     |}]
 ;;
 
@@ -869,12 +869,13 @@ let%expect_test "@ completion is asynchronous and drops stale replies" =
   H.keys h "@sr";
   [%expect
     {|
-    (List_paths (prefix "") (tag (Paths_for_autocomplete "")))
-    (List_paths (prefix s) (tag (Paths_for_autocomplete s)))
-    (List_paths (prefix sr) (tag (Paths_for_autocomplete sr)))
+    (List_paths (prefix "") (cwd (/work)) (tag (Paths_for_autocomplete "")))
+    (List_paths (prefix s) (cwd (/work)) (tag (Paths_for_autocomplete s)))
+    (List_paths (prefix sr) (cwd (/work)) (tag (Paths_for_autocomplete sr)))
     |}];
   H.keys h "c";
-  [%expect {| (List_paths (prefix src) (tag (Paths_for_autocomplete src))) |}];
+  [%expect
+    {| (List_paths (prefix src) (cwd (/work)) (tag (Paths_for_autocomplete src))) |}];
   H.reply h (Paths_for_autocomplete "sr") {|["stale/only"]|};
   H.show h;
   [%expect
@@ -907,7 +908,12 @@ let%expect_test "submit with @file sends attachments param" =
   let h = connected () in
   H.step h (Intent (Insert "look at @src/app.ml"));
   [%expect
-    {| (List_paths (prefix src/app.ml) (tag (Paths_for_autocomplete src/app.ml))) |}];
+    {|
+    (List_paths
+      (prefix src/app.ml)
+      (cwd (/work))
+      (tag (Paths_for_autocomplete src/app.ml)))
+    |}];
   H.reply h (Paths_for_autocomplete "src/app.ml") {|["src/app.ml"]|};
   H.enter h;
   [%expect
@@ -947,14 +953,15 @@ let%expect_test "/switch fetches sessions then reopens completion" =
     > /switch ▏
     ▸ fix the build please  /work
       (empty)               /other
-    …deepseek-flash  ctx:0% 1.5k  Tab/Enter accept · Esc close
+    …deepseek-flash  Tab accepts · Enter runs as typed · Esc
     |}]
 ;;
 
 let%expect_test "/cd completes paths and submits the selected one" =
   let h = connected () in
   H.step h (Intent (Insert "/cd sr"));
-  [%expect {| (List_paths (prefix sr) (tag (Paths_for_autocomplete sr))) |}];
+  [%expect
+    {| (List_paths (prefix sr) (cwd (/work)) (tag (Paths_for_autocomplete sr))) |}];
   H.reply h (Paths_for_autocomplete "sr") {|["src/","src/app.ml"]|};
   H.show h;
   [%expect
@@ -966,7 +973,6 @@ let%expect_test "/cd completes paths and submits the selected one" =
     ────────────────────────────────────────────────────────────
     > /cd sr▏
     ▸ src/
-      src/app.ml
     …deepseek-flash  ctx:0% 1.5k  Tab/Enter accept · Esc close
     |}];
   H.key h (Key.plain Down);
@@ -975,7 +981,7 @@ let%expect_test "/cd completes paths and submits the selected one" =
     {|
     (Rpc
       (method_ set_cwd)
-      (params ((path src/app.ml)))
+      (params ((path src/)))
       (tag (Notice_on_success "cwd changed")))
     |}]
 ;;
@@ -999,8 +1005,8 @@ let%expect_test "/sessions picker switches and reloads; /logout confirms" =
     earlier answer
     Sessions  (2)
     / ▏
-    * build fix ∣ 2025-06-01T10:00 ∣ 12 msgs ∣ fix the build pl…
-      (unnamed) ∣ 2025-06-02T11:30 ∣ 0 msgs ∣ (empty)  /other
+    ▸* build fix ∣ 2025-06-01T10:00 ∣ 12 msgs ∣ fix the build p…
+       (unnamed) ∣ 2025-06-02T11:30 ∣ 0 msgs ∣ (empty)  /other
     ────────────────────────────────────────────────────────────
     …deepseek-flash  think:off  view:normal  ctx:0% 1.5k  $0.01
     |}];
@@ -1065,9 +1071,9 @@ let%expect_test "/sessions picker switches and reloads; /logout confirms" =
     cancelled
     Log out of  (1)
     / ▏
-      DeepSeek  api_key via auth.json
+    ▸  DeepSeek  api_key via auth.json
     ────────────────────────────────────────────────────────────
-    …deepseek-flash  think:off  view:normal  ctx:0% 1.5k  $0.01
+    …deepseek-flash  ctx:0% 1.5k  Enter selects · Esc closes
     |}];
   H.enter h;
   H.keys h "y";
@@ -1175,7 +1181,7 @@ let%expect_test "/sessions Ctrl+N filters named only; Ctrl+D confirms delete" =
     earlier answer
     Sessions (named)  (1)
     / ▏
-    * build fix ∣ 2025-06-01T10:00 ∣ 12 msgs ∣ fix the build pl…
+    ▸* build fix ∣ 2025-06-01T10:00 ∣ 12 msgs ∣ fix the build p…
     ────────────────────────────────────────────────────────────
     …deepseek-flash  think:off  view:normal  ctx:0% 1.5k  $0.01
     |}];
@@ -1231,10 +1237,10 @@ let%expect_test "/fork picks a user message, forks at it and prefills the \
     earlier answer
     Fork at  (2)
     / ▏
-      first question   #1
-    * second question  #2
+       first question   #1
+    ▸* second question  #2
     ────────────────────────────────────────────────────────────
-    …deepseek-flash  think:off  view:normal  ctx:0% 1.5k  $0.01
+    …deepseek-flash  ctx:0% 1.5k  Enter selects · Esc closes
     |}];
   H.enter h;
   [%expect {| (Rpc (method_ fork) (params ((at u2))) (tag Reload_messages)) |}];
@@ -1269,10 +1275,10 @@ let%expect_test "/rewind picks a user message, then confirms the rewind" =
     earlier answer
     Rewind to  (2)
     / ▏
-      first question   #1
-    * second question  #2
+       first question   #1
+    ▸* second question  #2
     ────────────────────────────────────────────────────────────
-    …deepseek-flash  think:off  view:normal  ctx:0% 1.5k  $0.01
+    …deepseek-flash  ctx:0% 1.5k  Enter selects · Esc closes
     |}];
   H.enter h;
   H.show h;
@@ -1309,13 +1315,13 @@ let%expect_test "/tree renders branches with the active path marked" =
     earlier answer
     Session tree  (5)
     / ▏
-    * > root question
-    *   · first answer
-    *     · second answer
-        · branch answer
-          ⚙ branch tool
+    ▸* > root question
+     *   · first answer
+     *     · second answer
+         · branch answer
+           ⚙ branch tool
     ────────────────────────────────────────────────────────────
-    …deepseek-flash  think:off  view:normal  ctx:0% 1.5k  $0.01
+    …deepseek-flash  ctx:0% 1.5k  Enter selects · Esc closes
     |}];
   H.key h (Key.plain Down);
   H.key h (Key.plain Down);
@@ -1359,7 +1365,10 @@ let%expect_test "/export chooses jsonl by extension, or prompts for a path" =
   H.enter h;
   [%expect
     {|
-    (List_paths (prefix data.jsonl) (tag (Paths_for_autocomplete data.jsonl)))
+    (List_paths
+      (prefix data.jsonl)
+      (cwd (/work))
+      (tag (Paths_for_autocomplete data.jsonl)))
     (Rpc
       (method_ export)
       (params (
@@ -1371,7 +1380,10 @@ let%expect_test "/export chooses jsonl by extension, or prompts for a path" =
   H.enter h;
   [%expect
     {|
-    (List_paths (prefix notes.md) (tag (Paths_for_autocomplete notes.md)))
+    (List_paths
+      (prefix notes.md)
+      (cwd (/work))
+      (tag (Paths_for_autocomplete notes.md)))
     (Rpc
       (method_ export)
       (params (
@@ -1385,7 +1397,7 @@ let%expect_test "/export chooses jsonl by extension, or prompts for a path" =
   H.show h;
   [%expect
     {|
-    (List_paths (prefix "") (tag (Paths_for_autocomplete "")))
+    (List_paths (prefix "") (cwd (/work)) (tag (Paths_for_autocomplete "")))
 
 
     session abc123 in /work. /help for commands, Esc aborts,
@@ -1418,7 +1430,10 @@ let%expect_test "/import imports a path or prompts for one" =
   H.enter h;
   [%expect
     {|
-    (List_paths (prefix saved.jsonl) (tag (Paths_for_autocomplete saved.jsonl)))
+    (List_paths
+      (prefix saved.jsonl)
+      (cwd (/work))
+      (tag (Paths_for_autocomplete saved.jsonl)))
     (Rpc (method_ import) (params ((path saved.jsonl))) (tag Reload_messages))
     |}];
   H.step h (Intent (Insert "/import "));
@@ -1426,7 +1441,7 @@ let%expect_test "/import imports a path or prompts for one" =
   H.show h;
   [%expect
     {|
-    (List_paths (prefix "") (tag (Paths_for_autocomplete "")))
+    (List_paths (prefix "") (cwd (/work)) (tag (Paths_for_autocomplete "")))
 
 
 
@@ -1452,7 +1467,7 @@ let%expect_test "/cd changes the directory or prompts for a path" =
   H.enter h;
   [%expect
     {|
-    (List_paths (prefix /var) (tag (Paths_for_autocomplete /var)))
+    (List_paths (prefix /var) (cwd (/work)) (tag (Paths_for_autocomplete /var)))
     (Rpc
       (method_ set_cwd)
       (params ((path /var)))
@@ -1463,7 +1478,7 @@ let%expect_test "/cd changes the directory or prompts for a path" =
   H.show h;
   [%expect
     {|
-    (List_paths (prefix "") (tag (Paths_for_autocomplete "")))
+    (List_paths (prefix "") (cwd (/work)) (tag (Paths_for_autocomplete "")))
 
 
 
@@ -1521,7 +1536,6 @@ let%expect_test "/auth, /help, /state, /clear, unknown method errors" =
   H.show h;
   [%expect
     {|
-    Ctrl+P                  cycle to the next scoped model
     (Shift+Ctrl+P is unavailable; Alt+P goes back)
     Alt+P                   cycle to the previous scoped model
     Ctrl+T                  cycle the thinking level
@@ -1532,7 +1546,8 @@ let%expect_test "/auth, /help, /state, /clear, unknown method errors" =
     Shift+Tab               cycle focus: main → agent 1 → … →
     main
     Alt+1                   focus agent N (Alt+1…9)
-    Ctrl+C                  clear the editor, then (again) quit
+    Ctrl+C                  clear the editor or abort the turn,
+    then (again) quit
     Ctrl+D                  quit
     ────────────────────────────────────────────────────────────
     > ▏
@@ -1546,7 +1561,6 @@ let%expect_test "/auth, /help, /state, /clear, unknown method errors" =
   [%expect
     {|
     (Rpc (method_ list_models) (params ()) (tag (Models_for_picker "")))
-    Alt+P                   cycle to the previous scoped model
     Ctrl+T                  cycle the thinking level
     Ctrl+N                  picker: toggle the named-only /
     logged-in-only filter
@@ -1555,7 +1569,8 @@ let%expect_test "/auth, /help, /state, /clear, unknown method errors" =
     Shift+Tab               cycle focus: main → agent 1 → … →
     main
     Alt+1                   focus agent N (Alt+1…9)
-    Ctrl+C                  clear the editor, then (again) quit
+    Ctrl+C                  clear the editor or abort the turn,
+    then (again) quit
     Ctrl+D                  quit
     unknown method "bogus"
     protocol error: bad line
@@ -1673,7 +1688,7 @@ let%expect_test "/verbosity with no argument opens argument completion" =
     ▸ Quiet
       Normal
       Verbose
-    …deepseek-flash  ctx:0% 1.5k  Tab/Enter accept · Esc close
+    …deepseek-flash  Tab accepts · Enter runs as typed · Esc
     |}];
   H.key h (Key.plain Down);
   H.key h (Key.plain Down);
@@ -2082,7 +2097,7 @@ let%expect_test "scroll stays anchored while streaming" =
     line 6
     ────────────────────────────────────────────────────────────────────────────────────────────────────
     > ▏
-    /work  deepseek-flash  think:off  view:normal  ctx:0% 1.5k  $0.01
+    /work  deepseek-flash  think:off  view:normal  ctx:0% 1.5k  $0.01  ↑ scrolled
     |}];
   stream 12 10;
   H.show h;
@@ -2153,7 +2168,7 @@ let%expect_test "page_down past the bottom returns to follow" =
     line 14
     ────────────────────────────────────────────────────────────────────────────────────────────────────
     > ▏
-    /work  deepseek-flash  think:off  view:normal  ctx:0% 1.5k  $0.01
+    /work  deepseek-flash  think:off  view:normal  ctx:0% 1.5k  $0.01  ↑ scrolled
     |}];
   H.key h (Key.plain Page_up);
   H.show h;
@@ -2168,7 +2183,7 @@ let%expect_test "page_down past the bottom returns to follow" =
     line 9
     ────────────────────────────────────────────────────────────────────────────────────────────────────
     > ▏
-    /work  deepseek-flash  think:off  view:normal  ctx:0% 1.5k  $0.01
+    /work  deepseek-flash  think:off  view:normal  ctx:0% 1.5k  $0.01  ↑ scrolled
     |}];
   H.key h (Key.plain Page_down);
   H.show h;
@@ -2183,7 +2198,7 @@ let%expect_test "page_down past the bottom returns to follow" =
     line 14
     ────────────────────────────────────────────────────────────────────────────────────────────────────
     > ▏
-    /work  deepseek-flash  think:off  view:normal  ctx:0% 1.5k  $0.01
+    /work  deepseek-flash  think:off  view:normal  ctx:0% 1.5k  $0.01  ↑ scrolled
     |}];
   H.key h (Key.plain Page_down);
   H.show h;
@@ -2229,7 +2244,7 @@ let%expect_test "home/end with text in the editor move the cursor, not the \
     line 14
     ────────────────────────────────────────────────────────────────────────────────────────────────────
     > draft▏
-    /work  deepseek-flash  think:off  view:normal  ctx:0% 1.5k  $0.01
+    /work  deepseek-flash  think:off  view:normal  ctx:0% 1.5k  $0.01  ↑ scrolled
     |}];
   H.key h (Key.plain Home);
   H.show h;
@@ -2244,7 +2259,7 @@ let%expect_test "home/end with text in the editor move the cursor, not the \
     line 14
     ────────────────────────────────────────────────────────────────────────────────────────────────────
     > ▏raft
-    /work  deepseek-flash  think:off  view:normal  ctx:0% 1.5k  $0.01
+    /work  deepseek-flash  think:off  view:normal  ctx:0% 1.5k  $0.01  ↑ scrolled
     |}]
 ;;
 
@@ -2641,10 +2656,10 @@ let%expect_test "/agents picker lists task, status and model; Enter focuses" =
     earlier answer
     Subagents  (2)
     / ▏
-      find auth  running  claude-haiku
-      run tests  done 3 turns $0.02  claude-sonnet
+    ▸  find auth  running  claude-haiku
+       run tests  done 3 turns $0.02  claude-sonnet
     ──────────────────────────────────────────────────────────────────────
-    …deepseek-flash  picker: type to filter, Enter selects, Esc closes
+    /work  deepseek-flash  ctx:0% 1.5k  $0.01  Enter selects · Esc closes
     |}];
   H.enter h;
   H.show h;
@@ -3153,12 +3168,13 @@ let%expect_test "Ctrl+Z suspends; Ctrl+R completes a path; Ctrl+L picks a model"
   H.key h (Key.ctrl 'z');
   [%expect {| Suspend |}];
   H.key h (Key.ctrl 'r');
-  [%expect {| (List_paths (prefix "") (tag (Paths_for_autocomplete ""))) |}];
+  [%expect
+    {| (List_paths (prefix "") (cwd (/work)) (tag (Paths_for_autocomplete ""))) |}];
   H.keys h "sr";
   [%expect
     {|
-    (List_paths (prefix s) (tag (Paths_for_autocomplete s)))
-    (List_paths (prefix sr) (tag (Paths_for_autocomplete sr)))
+    (List_paths (prefix s) (cwd (/work)) (tag (Paths_for_autocomplete s)))
+    (List_paths (prefix sr) (cwd (/work)) (tag (Paths_for_autocomplete sr)))
     |}];
   H.reply h (Paths_for_autocomplete "sr") {|["src/","src/app.ml"]|};
   H.show h;
@@ -3187,10 +3203,10 @@ let%expect_test "Ctrl+Z suspends; Ctrl+R completes a path; Ctrl+L picks a model"
     earlier answer
     Model  (4)
     / ▏
-      Claude Fable 5       anthropic/claude-fable-5  ctx 1.0M  …
-      Claude Fable 5.1     anthropic/claude-fable-5-1  ctx 1.0M…
-      GPT-5.5              openai/gpt-5.5  ctx 1.0M  $10/$50 pe…
-    * DeepSeek V4.1 Flash  deepseek/deepseek-flash ◆  ctx 1.0M …
+       Claude Fable 5       anthropic/claude-fable-5  ctx 1.0M …
+       Claude Fable 5.1     anthropic/claude-fable-5-1  ctx 1.0…
+       GPT-5.5              openai/gpt-5.5  ctx 1.0M  $10/$50 p…
+    ▸* DeepSeek V4.1 Flash  deepseek/deepseek-flash ◆  ctx 1.0M…
     ────────────────────────────────────────────────────────────
     …deepseek-flash  think:off  view:normal  ctx:0% 1.5k  $0.01
     |}]
@@ -3246,10 +3262,10 @@ let%expect_test "/scoped-models: multi-select toggle, Ctrl+A, Ctrl+X, save" =
     earlier answer
     Scoped models  (4)
     / ▏
-    [ ] Claude Fable 5       Claude Fable 5
-    [ ] Claude Fable 5.1     Claude Fable 5.1
-    [ ] GPT-5.5              GPT-5.5
-    [x] DeepSeek V4.1 Flash  DeepSeek V4.1 Flash
+    ▸[ ] Claude Fable 5       Claude Fable 5
+     [ ] Claude Fable 5.1     Claude Fable 5.1
+     [ ] GPT-5.5              GPT-5.5
+     [x] DeepSeek V4.1 Flash  DeepSeek V4.1 Flash
     ────────────────────────────────────────────────────────────
     …deepseek-flash  think:off  view:normal  ctx:0% 1.5k  $0.01
     |}];
@@ -3263,10 +3279,10 @@ let%expect_test "/scoped-models: multi-select toggle, Ctrl+A, Ctrl+X, save" =
     earlier answer
     Scoped models  (4)
     / ▏
-    [x] Claude Fable 5       Claude Fable 5
-    [ ] Claude Fable 5.1     Claude Fable 5.1
-    [ ] GPT-5.5              GPT-5.5
-    [x] DeepSeek V4.1 Flash  DeepSeek V4.1 Flash
+    ▸[x] Claude Fable 5       Claude Fable 5
+     [ ] Claude Fable 5.1     Claude Fable 5.1
+     [ ] GPT-5.5              GPT-5.5
+     [x] DeepSeek V4.1 Flash  DeepSeek V4.1 Flash
     ────────────────────────────────────────────────────────────
     …deepseek-flash  think:off  view:normal  ctx:0% 1.5k  $0.01
     |}];
@@ -3280,10 +3296,10 @@ let%expect_test "/scoped-models: multi-select toggle, Ctrl+A, Ctrl+X, save" =
     earlier answer
     Scoped models  (4)
     / ▏
-    [x] Claude Fable 5       Claude Fable 5
-    [x] Claude Fable 5.1     Claude Fable 5.1
-    [x] GPT-5.5              GPT-5.5
-    [x] DeepSeek V4.1 Flash  DeepSeek V4.1 Flash
+    ▸[x] Claude Fable 5       Claude Fable 5
+     [x] Claude Fable 5.1     Claude Fable 5.1
+     [x] GPT-5.5              GPT-5.5
+     [x] DeepSeek V4.1 Flash  DeepSeek V4.1 Flash
     ────────────────────────────────────────────────────────────
     …deepseek-flash  think:off  view:normal  ctx:0% 1.5k  $0.01
     |}];
@@ -3297,10 +3313,10 @@ let%expect_test "/scoped-models: multi-select toggle, Ctrl+A, Ctrl+X, save" =
     earlier answer
     Scoped models  (4)
     / ▏
-    [ ] Claude Fable 5       Claude Fable 5
-    [ ] Claude Fable 5.1     Claude Fable 5.1
-    [ ] GPT-5.5              GPT-5.5
-    [ ] DeepSeek V4.1 Flash  DeepSeek V4.1 Flash
+    ▸[ ] Claude Fable 5       Claude Fable 5
+     [ ] Claude Fable 5.1     Claude Fable 5.1
+     [ ] GPT-5.5              GPT-5.5
+     [ ] DeepSeek V4.1 Flash  DeepSeek V4.1 Flash
     ────────────────────────────────────────────────────────────
     …deepseek-flash  think:off  view:normal  ctx:0% 1.5k  $0.01
     |}];
@@ -3346,38 +3362,44 @@ let%expect_test "Ctrl+P cycles the scoped models and wraps; Alt+P goes back" =
     h
     Config
     {|{"scoped_models":["anthropic/claude-fable-5","anthropic/claude-fable-5-1","openai/gpt-5.5"],"confirm_tools":false}|};
+  (* The status line switches at once; the transcript notice waits for the
+     backend to confirm. *)
   H.key h (Key.ctrl 'p');
+  H.reply h (Set_model_done "anthropic/claude-fable-5-1") "{}";
   H.key h (Key.ctrl 'p');
+  H.reply h (Set_model_done "openai/gpt-5.5") "{}";
   H.key h (Key.ctrl 'p');
+  H.reply h (Set_model_done "anthropic/claude-fable-5") "{}";
   H.key h (Key.alt (Key.Code.Char "p"));
+  H.reply h (Set_model_done "openai/gpt-5.5") "{}";
   H.show h;
   [%expect
     {|
     (Rpc
       (method_ set_model)
       (params ((model anthropic/claude-fable-5-1)))
-      (tag Set_model_done))
+      (tag (Set_model_done anthropic/claude-fable-5-1)))
     (Rpc
       (method_ set_model)
       (params ((model openai/gpt-5.5)))
-      (tag Set_model_done))
+      (tag (Set_model_done openai/gpt-5.5)))
     (Rpc
       (method_ set_model)
       (params ((model anthropic/claude-fable-5)))
-      (tag Set_model_done))
+      (tag (Set_model_done anthropic/claude-fable-5)))
     (Rpc
       (method_ set_model)
       (params ((model openai/gpt-5.5)))
-      (tag Set_model_done))
-
-    session abc123 in /work. /help for commands, Esc aborts,
+      (tag (Set_model_done openai/gpt-5.5)))
     Ctrl+C twice quits.
     > earlier question
     earlier answer
-    model: anthropic/claude-fable-5-1
-    model: openai/gpt-5.5
-    model: anthropic/claude-fable-5
-    model: openai/gpt-5.5
+    model: anthropic/claude-fable-5-1 (not logged in; /login
+    anthropic)
+    model: openai/gpt-5.5 (not logged in; /login openai)
+    model: anthropic/claude-fable-5 (not logged in; /login
+    anthropic)
+    model: openai/gpt-5.5 (not logged in; /login openai)
     ────────────────────────────────────────────────────────────
     > ▏
     /work  gpt-5.5  think:off  view:normal  ctx:0% 1.5k  $0.01
@@ -3588,10 +3610,10 @@ let%expect_test "/model Ctrl+N filters to logged-in models; scoped mark" =
     earlier answer
     Model  (4)
     / ▏
-      Claude Fable 5       anthropic/claude-fable-5  ctx 1.0M  …
-      Claude Fable 5.1     anthropic/claude-fable-5-1 ◆  ctx 1.…
-      GPT-5.5              openai/gpt-5.5  ctx 1.0M  $10/$50 pe…
-    * DeepSeek V4.1 Flash  deepseek/deepseek-flash  ctx 1.0M  $…
+       Claude Fable 5       anthropic/claude-fable-5  ctx 1.0M …
+       Claude Fable 5.1     anthropic/claude-fable-5-1 ◆  ctx 1…
+       GPT-5.5              openai/gpt-5.5  ctx 1.0M  $10/$50 p…
+    ▸* DeepSeek V4.1 Flash  deepseek/deepseek-flash  ctx 1.0M  …
     ────────────────────────────────────────────────────────────
     …deepseek-flash  think:off  view:normal  ctx:0% 1.5k  $0.01
     |}];
@@ -3605,7 +3627,7 @@ let%expect_test "/model Ctrl+N filters to logged-in models; scoped mark" =
     earlier answer
     Model (logged in)  (1)
     / ▏
-    * DeepSeek V4.1 Flash  deepseek/deepseek-flash  ctx 1.0M  $…
+    ▸* DeepSeek V4.1 Flash  deepseek/deepseek-flash  ctx 1.0M  …
     ────────────────────────────────────────────────────────────
     …deepseek-flash  think:off  view:normal  ctx:0% 1.5k  $0.01
     |}]
@@ -3733,7 +3755,7 @@ let%expect_test "search: Ctrl+F, type, n, N, Esc" =
     earlier answer
     ────────────────────────────────────────────────────────────
     > ▏
-    …deepseek-flash  think:off  view:normal  ctx:0% 1.5k  $0.01
+    …deepseek-flash  think:off  ctx:0% 1.5k  $0.01  ↑ scrolled
     |}]
 ;;
 
@@ -3771,7 +3793,7 @@ let%expect_test "Ctrl+Up / Ctrl+Down jump between user messages at height 8" =
     > third question
     ────────────────────────────────────────────────────────────
     > ▏
-    …deepseek-flash  think:off  view:normal  ctx:0% 1.5k  $0.01
+    …deepseek-flash  think:off  ctx:0% 1.5k  $0.01  ↑ scrolled
     |}];
   H.key h ctrl_up;
   H.show h;
@@ -3797,7 +3819,7 @@ let%expect_test "Ctrl+Up / Ctrl+Down jump between user messages at height 8" =
     no earlier message
     ────────────────────────────────────────────────────────────
     > ▏
-    …deepseek-flash  think:off  view:normal  ctx:0% 1.5k  $0.01
+    …deepseek-flash  think:off  ctx:0% 1.5k  $0.01  ↑ scrolled
     |}];
   H.key h ctrl_down;
   H.show h;
@@ -3810,7 +3832,7 @@ let%expect_test "Ctrl+Up / Ctrl+Down jump between user messages at height 8" =
     no earlier message
     ────────────────────────────────────────────────────────────
     > ▏
-    …deepseek-flash  think:off  view:normal  ctx:0% 1.5k  $0.01
+    …deepseek-flash  think:off  ctx:0% 1.5k  $0.01  ↑ scrolled
     |}];
   H.key h ctrl_down;
   H.show h;
@@ -3888,14 +3910,14 @@ let%expect_test "/hotkeys prints the keys half of /help" =
   H.show h;
   [%expect
     {|
-    Ctrl+N                  picker: toggle the named-only /
     logged-in-only filter
     Ctrl+X                  copy the last assistant message
     Ctrl+Z                  suspend to the shell
     Shift+Tab               cycle focus: main → agent 1 → … →
     main
     Alt+1                   focus agent N (Alt+1…9)
-    Ctrl+C                  clear the editor, then (again) quit
+    Ctrl+C                  clear the editor or abort the turn,
+    then (again) quit
     Ctrl+D                  quit
     ────────────────────────────────────────────────────────────
     > ▏
@@ -4266,10 +4288,10 @@ let%expect_test "resize keeps the confirm dialog and picker within the width" =
     earlier answer
     Sessions  (2)
     / ▏
-    * build fix ∣ 2025-06-01T10:00 ∣ 12 msgs ∣ fix the build please  /work
-      (unnamed) ∣ 2025-06-02T11:30 ∣ 0 msgs ∣ (empty)               /other
+    ▸* build fix ∣ 2025-06-01T10:00 ∣ 12 msgs ∣ fix the build please  /work
+       (unnamed) ∣ 2025-06-02T11:30 ∣ 0 msgs ∣ (empty)               /other
     ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
-    …deepseek-flash  ctx:0% 1.5k  picker: type to filter, Enter selects, Esc closes · Ctrl+N named only · Ctrl+D delete
+    …deepseek-flash  think:off  view:normal  ctx:0% 1.5k  $0.01  Enter selects · Esc closes · Ctrl+N named · Ctrl+D delete
     |}];
   H.step h (Resize { width = 40; height = 16 });
   H.show h;
@@ -4282,8 +4304,8 @@ let%expect_test "resize keeps the confirm dialog and picker within the width" =
     earlier answer
     Sessions  (2)
     / ▏
-    * build fix ∣ 2025-06-01T10:00 ∣ 12 msg…
-      (unnamed) ∣ 2025-06-02T11:30 ∣ 0 msgs…
+    ▸* build fix ∣ 2025-06-01T10:00 ∣ 12 ms…
+       (unnamed) ∣ 2025-06-02T11:30 ∣ 0 msg…
     ────────────────────────────────────────
     …deepseek-flash  ctx:0% 1.5k  $0.01
     |}]
@@ -4410,7 +4432,7 @@ let%expect_test "login end to end includes a prompt_cancelled" =
     (Rpc
       (method_ set_model)
       (params ((model anthropic/claude-fable-5)))
-      (tag Set_model_done))
+      (tag (Set_model_done anthropic/claude-fable-5)))
 
 
 
@@ -4911,7 +4933,7 @@ let%expect_test "wheel scrolling moves the transcript a few lines; arrows \
     > message 4
     ────────────────────────────────────────────────────────────
     > ▏
-    …deepseek-flash  think:off  view:normal  ctx:0% 1.5k  $0.01
+    …deepseek-flash  think:off  ctx:0% 1.5k  $0.01  ↑ scrolled
     |}];
   H.step h (Intent Scroll_up);
   print_s [%sexp (h.model.viewport : Viewport.t)];
@@ -5026,5 +5048,445 @@ let%expect_test "switching tool host asks for the directory there, prefilled \
     ──────────────────────────────────────────────────────────────────────
     > ▏
     /work  m  think:n/a  view:normal  ctx:0% 0  $0.00
+    |}]
+;;
+
+(* ---- UX guarantees ---------------------------------------------------- *)
+
+let%expect_test "/model Enter Enter opens the picker instead of silently \
+                 picking the first model; a filter or Down makes Enter accept"
+  =
+  let h = connected () in
+  H.reply ~quiet:true h Models_catalog models_json;
+  H.keys h "/model";
+  H.enter h;
+  H.show h;
+  [%expect
+    {|
+    session abc123 in /work. /help for commands, Esc aborts,
+    Ctrl+C twice quits.
+    > earlier question
+    earlier answer
+    ────────────────────────────────────────────────────────────
+    > /model ▏
+    ▸ Claude Fable 5       anthropic/claude-fable-5
+      Claude Fable 5.1     anthropic/claude-fable-5-1
+      GPT-5.5              openai/gpt-5.5
+      DeepSeek V4.1 Flash  deepseek/deepseek-flash
+    …deepseek-flash  Tab accepts · Enter runs as typed · Esc
+    |}];
+  (* Nothing typed, nothing chosen: Enter runs /model, which is the picker. *)
+  H.enter h;
+  H.mode h;
+  H.show h;
+  [%expect
+    {|
+    picker
+    session abc123 in /work. /help for commands, Esc aborts,
+    Ctrl+C twice quits.
+    > earlier question
+    earlier answer
+    Model  (4)
+    / ▏
+       Claude Fable 5       anthropic/claude-fable-5  ctx 1.0M …
+       Claude Fable 5.1     anthropic/claude-fable-5-1  ctx 1.0…
+       GPT-5.5              openai/gpt-5.5  ctx 1.0M  $10/$50 p…
+    ▸* DeepSeek V4.1 Flash  deepseek/deepseek-flash ◆  ctx 1.0M…
+    ────────────────────────────────────────────────────────────
+    …deepseek-flash  think:off  view:normal  ctx:0% 1.5k  $0.01
+    |}];
+  H.esc h;
+  (* Down means the highlight was chosen on purpose. *)
+  H.keys h "/model ";
+  H.key h (Key.plain Down);
+  H.show h;
+  [%expect
+    {|
+    session abc123 in /work. /help for commands, Esc aborts,
+    Ctrl+C twice quits.
+    > earlier question
+    earlier answer
+    ────────────────────────────────────────────────────────────
+    > /model ▏
+      Claude Fable 5       anthropic/claude-fable-5
+    ▸ Claude Fable 5.1     anthropic/claude-fable-5-1
+      GPT-5.5              openai/gpt-5.5
+      DeepSeek V4.1 Flash  deepseek/deepseek-flash
+    …deepseek-flash  ctx:0% 1.5k  Tab/Enter accept · Esc close
+    |}];
+  H.enter h;
+  [%expect
+    {|
+    (Rpc
+      (method_ set_model)
+      (params ((model anthropic/claude-fable-5-1)))
+      (tag (Set_model_done anthropic/claude-fable-5-1)))
+    |}];
+  (* So does typing a filter. *)
+  H.keys h "/model gpt";
+  H.enter h;
+  [%expect
+    {|
+    (Rpc
+      (method_ set_model)
+      (params ((model openai/gpt-5.5)))
+      (tag (Set_model_done openai/gpt-5.5)))
+    |}];
+  (* Tab always accepts the highlight. *)
+  H.keys h "/model ";
+  H.key h (Key.plain Tab);
+  H.show h;
+  [%expect
+    {|
+    session abc123 in /work. /help for commands, Esc aborts,
+    Ctrl+C twice quits.
+    > earlier question
+    earlier answer
+    ────────────────────────────────────────────────────────────
+    > /model anthropic/claude-fable-5▏
+    …deepseek-flash  think:off  view:normal  ctx:0% 1.5k  $0.01
+    |}];
+  (* The same rule sends /cd to its prompt rather than into the first directory. *)
+  H.key h (Key.ctrl 'u');
+  H.keys h "/cd ";
+  H.reply ~quiet:true h (Paths_for_autocomplete "") {|["src/","src/app.ml"]|};
+  H.show h;
+  [%expect
+    {|
+    (List_paths (prefix "") (cwd (/work)) (tag (Paths_for_autocomplete "")))
+
+
+
+
+    session abc123 in /work. /help for commands, Esc aborts,
+    Ctrl+C twice quits.
+    > earlier question
+    earlier answer
+    ────────────────────────────────────────────────────────────
+    > /cd ▏
+    ▸ src/
+    …deepseek-flash  Tab accepts · Enter runs as typed · Esc
+    |}];
+  H.enter h;
+  H.mode h;
+  [%expect {| text_prompt |}]
+;;
+
+let%expect_test "picking a model reports it, and flags a provider that is not \
+                 logged in"
+  =
+  let h = connected () in
+  H.reply ~quiet:true h Models_catalog models_json;
+  H.keys h "/model gpt";
+  H.enter h;
+  H.reply h (Set_model_done "openai/gpt-5.5") "{}";
+  H.keys h "/model flash";
+  H.enter h;
+  H.reply h (Set_model_done "deepseek/deepseek-flash") "{}";
+  H.show h;
+  [%expect
+    {|
+    (Rpc
+      (method_ set_model)
+      (params ((model openai/gpt-5.5)))
+      (tag (Set_model_done openai/gpt-5.5)))
+    (Rpc
+      (method_ set_model)
+      (params ((model deepseek/deepseek-flash)))
+      (tag (Set_model_done deepseek/deepseek-flash)))
+
+
+
+    session abc123 in /work. /help for commands, Esc aborts,
+    Ctrl+C twice quits.
+    > earlier question
+    earlier answer
+    model: openai/gpt-5.5 (not logged in; /login openai)
+    model: deepseek/deepseek-flash
+    ────────────────────────────────────────────────────────────
+    > ▏
+    …deepseek-flash  think:off  view:normal  ctx:0% 1.5k  $0.01
+    |}]
+;;
+
+let%expect_test "the scoped mark only appears when the scope is a real subset" =
+  let h = connected () in
+  H.reply ~quiet:true h Models_catalog models_json;
+  (* No config scope and only deepseek logged in: the scope is the logged-in
+     models, a subset, so it is marked. *)
+  H.key h (Key.ctrl 'l');
+  H.show h;
+  [%expect
+    {|
+    session abc123 in /work. /help for commands, Esc aborts,
+    Ctrl+C twice quits.
+    > earlier question
+    earlier answer
+    Model  (4)
+    / ▏
+       Claude Fable 5       anthropic/claude-fable-5  ctx 1.0M …
+       Claude Fable 5.1     anthropic/claude-fable-5-1  ctx 1.0…
+       GPT-5.5              openai/gpt-5.5  ctx 1.0M  $10/$50 p…
+    ▸* DeepSeek V4.1 Flash  deepseek/deepseek-flash ◆  ctx 1.0M…
+    ────────────────────────────────────────────────────────────
+    …deepseek-flash  think:off  view:normal  ctx:0% 1.5k  $0.01
+    |}];
+  H.esc h;
+  (* Nobody logged in: every model is in scope, so no row is marked. *)
+  H.reply ~quiet:true h Auth_refresh "[]";
+  H.key h (Key.ctrl 'l');
+  H.show h;
+  [%expect
+    {|
+    session abc123 in /work. /help for commands, Esc aborts,
+    Ctrl+C twice quits.
+    > earlier question
+    earlier answer
+    Model  (4)
+    / ▏
+       Claude Fable 5       anthropic/claude-fable-5  ctx 1.0M …
+       Claude Fable 5.1     anthropic/claude-fable-5-1  ctx 1.0…
+       GPT-5.5              openai/gpt-5.5  ctx 1.0M  $10/$50 p…
+    ▸* DeepSeek V4.1 Flash  deepseek/deepseek-flash  ctx 1.0M  …
+    ────────────────────────────────────────────────────────────
+    …deepseek-flash  think:off  view:normal  ctx:0% 1.5k  $0.01
+    |}]
+;;
+
+let%expect_test "picker: Enter with no match keeps it open; the title shows \
+                 the window for long lists"
+  =
+  let h = connected ~width:70 () in
+  let many =
+    sprintf
+      "[%s]"
+      (String.concat
+         ~sep:","
+         (List.init 25 ~f:(fun i ->
+            model_json (sprintf "m-%02d" i) (sprintf "Model %02d" i))))
+  in
+  H.reply ~quiet:true h Models_catalog many;
+  H.key h (Key.ctrl 'l');
+  H.keys h "zzz";
+  H.enter h;
+  H.mode h;
+  H.show h;
+  [%expect
+    {|
+    picker
+
+
+
+    session abc123 in /work. /help for commands, Esc aborts, Ctrl+C twice
+    quits.
+    > earlier question
+    earlier answer
+    Model  (0)
+    / zzz▏
+      no matches
+    ──────────────────────────────────────────────────────────────────────
+    …deepseek-flash  Enter selects · Esc closes · Ctrl+N logged-in only
+    |}];
+  H.key h (Key.ctrl 'u');
+  H.show h;
+  [%expect
+    {|
+    earlier answer
+    Model  (1–7 of 25)
+    / ▏
+    ▸  Model 00  anthropic/m-00  ctx 1.0M  $10/$50 per M  not logged in
+       Model 01  anthropic/m-01  ctx 1.0M  $10/$50 per M  not logged in
+       Model 02  anthropic/m-02  ctx 1.0M  $10/$50 per M  not logged in
+       Model 03  anthropic/m-03  ctx 1.0M  $10/$50 per M  not logged in
+       Model 04  anthropic/m-04  ctx 1.0M  $10/$50 per M  not logged in
+       Model 05  anthropic/m-05  ctx 1.0M  $10/$50 per M  not logged in
+       Model 06  anthropic/m-06  ctx 1.0M  $10/$50 per M  not logged in
+    ──────────────────────────────────────────────────────────────────────
+    …deepseek-flash  Enter selects · Esc closes · Ctrl+N logged-in only
+    |}];
+  H.key h (Key.plain Page_down);
+  H.key h (Key.plain Page_down);
+  H.show h;
+  [%expect
+    {|
+    earlier answer
+    Model  (12–18 of 25)
+    / ▏
+       Model 11  anthropic/m-11  ctx 1.0M  $10/$50 per M  not logged in
+       Model 12  anthropic/m-12  ctx 1.0M  $10/$50 per M  not logged in
+       Model 13  anthropic/m-13  ctx 1.0M  $10/$50 per M  not logged in
+    ▸  Model 14  anthropic/m-14  ctx 1.0M  $10/$50 per M  not logged in
+       Model 15  anthropic/m-15  ctx 1.0M  $10/$50 per M  not logged in
+       Model 16  anthropic/m-16  ctx 1.0M  $10/$50 per M  not logged in
+       Model 17  anthropic/m-17  ctx 1.0M  $10/$50 per M  not logged in
+    ──────────────────────────────────────────────────────────────────────
+    …deepseek-flash  Enter selects · Esc closes · Ctrl+N logged-in only
+    |}]
+;;
+
+let%expect_test "Tab on an empty editor opens the command list; the list shows \
+                 its window"
+  =
+  let h = connected () in
+  H.key h (Key.plain Tab);
+  H.show h;
+  [%expect
+    {|
+    ────────────────────────────────────────────────────────────
+    > /▏
+    ▸ /help                           show commands and keys
+      /hotkeys                        show keyboard shortcuts
+      /model [name|id|provider/id]    pick or switch the model
+      /scoped-models                  pick the models Ctrl+P cy…
+      /login [provider] [api_key|oauth]  log in to a provider
+      /logout [provider]              remove a provider's store…
+      /thinking [off|low|on|high|max]  pick or set the thinking…
+      /verbosity [quiet|normal|verbose]  set the transcript ver…
+      ↕ 1–8 of 30
+    …deepseek-flash  ctx:0% 1.5k  Tab/Enter accept · Esc close
+    |}];
+  H.key h (Key.plain End);
+  H.show h;
+  [%expect
+    {|
+    ────────────────────────────────────────────────────────────
+    > /▏
+    ▸ /help                           show commands and keys
+      /hotkeys                        show keyboard shortcuts
+      /model [name|id|provider/id]    pick or switch the model
+      /scoped-models                  pick the models Ctrl+P cy…
+      /login [provider] [api_key|oauth]  log in to a provider
+      /logout [provider]              remove a provider's store…
+      /thinking [off|low|on|high|max]  pick or set the thinking…
+      /verbosity [quiet|normal|verbose]  set the transcript ver…
+      ↕ 1–8 of 30
+    …deepseek-flash  ctx:0% 1.5k  Tab/Enter accept · Esc close
+    |}];
+  H.keys h "qu";
+  H.enter h;
+  [%expect {| Quit |}]
+;;
+
+let%expect_test "Ctrl+C while a turn runs aborts it first; the next press quits"
+  =
+  let h = connected () in
+  H.keys h "do it";
+  H.enter h;
+  H.event h (State (state ~running:true ()));
+  H.set_pending h [ "c9", "bash", "rm -rf /" ];
+  (* A pending confirmation is denied as part of the abort. *)
+  H.key h (Key.ctrl 'c');
+  H.show h;
+  [%expect
+    {|
+    (Rpc (method_ prompt) (params ((text "do it"))) (tag Show_error))
+    (Append_history "do it")
+    (Rpc
+      (method_ tool_confirm_respond)
+      (params (
+        (call_id c9)
+        (allow   false)))
+      (tag Ignore))
+    (Rpc (method_ abort) (params ()) (tag Abort_done))
+
+
+
+
+    session abc123 in /work. /help for commands, Esc aborts,
+    Ctrl+C twice quits.
+    > earlier question
+    earlier answer
+    aborting; Ctrl+C again quits
+    ────────────────────────────────────────────────────────────
+    > ▏
+    …deepseek-flash  ctx:0% 1.5k  $0.01  Ctrl+C again quits
+    |}];
+  (* Any other key forgets the pending quit. *)
+  H.keys h "x";
+  H.key h (Key.ctrl 'c');
+  H.show h;
+  [%expect
+    {|
+    session abc123 in /work. /help for commands, Esc aborts,
+    Ctrl+C twice quits.
+    > earlier question
+    earlier answer
+    aborting; Ctrl+C again quits
+    ────────────────────────────────────────────────────────────
+    > ▏
+    …deepseek-flash  $0.01  ⠋ working (Esc aborts; Enter steers)
+    |}];
+  H.key h (Key.ctrl 'c');
+  [%expect {| (Rpc (method_ abort) (params ()) (tag Abort_done)) |}];
+  H.key h (Key.ctrl 'c');
+  [%expect {| Quit |}]
+;;
+
+let%expect_test "scrolled up: the status says so, and Esc returns to the \
+                 bottom when idle (aborts when running)"
+  =
+  let h = connected ~height:8 () in
+  List.iter (List.range 0 6) ~f:(fun i ->
+    H.event h (Message_start (User (sprintf "line %d" i))));
+  H.key h (Key.plain Page_up);
+  H.show h;
+  [%expect
+    {|
+    Ctrl+C twice quits.
+    > earlier question
+    earlier answer
+    > line 0
+    > line 1
+    ────────────────────────────────────────────────────────────
+    > ▏
+    …deepseek-flash  think:off  ctx:0% 1.5k  $0.01  ↑ scrolled
+    |}];
+  H.esc h;
+  H.show h;
+  [%expect
+    {|
+    > line 1
+    > line 2
+    > line 3
+    > line 4
+    > line 5
+    ────────────────────────────────────────────────────────────
+    > ▏
+    …deepseek-flash  think:off  view:normal  ctx:0% 1.5k  $0.01
+    |}];
+  H.event h (State (state ~running:true ()));
+  H.key h (Key.plain Page_up);
+  H.esc h;
+  [%expect {| (Rpc (method_ abort) (params ()) (tag Abort_done)) |}];
+  print_s [%sexp (h.model.viewport : Viewport.t)];
+  [%expect {|
+    (Anchored
+      (top       1)
+      (new_lines 0))
+    |}]
+;;
+
+let%expect_test "/thinking lists levels in cycling order with the default \
+                 marked"
+  =
+  let h = connected () in
+  H.keys h "/thinking";
+  H.enter h;
+  H.enter h;
+  H.show h;
+  [%expect
+    {|
+    Ctrl+C twice quits.
+    > earlier question
+    earlier answer
+    Thinking level  (5)
+    / ▏
+    ▸* off
+       low
+       on    provider default
+       high
+       max
+    ────────────────────────────────────────────────────────────
+    …deepseek-flash  ctx:0% 1.5k  Enter selects · Esc closes
     |}]
 ;;

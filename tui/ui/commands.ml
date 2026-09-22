@@ -25,6 +25,9 @@ end
 
 let c ?argument name args help = { Spec.name; args; help; argument }
 
+(* In cycling order: "on" is the provider's default budget. *)
+let thinking_levels = [ "off"; "low"; "on"; "high"; "max" ]
+
 let all =
   [ c "help" "" "show commands and keys"
   ; c "hotkeys" "" "show keyboard shortcuts"
@@ -47,7 +50,7 @@ let all =
   ; c
       ~argument:Argument.Thinking
       "thinking"
-      "[off|on|low|high|max]"
+      "[off|low|on|high|max]"
       "pick or set the thinking level"
   ; c
       ~argument:Argument.Verbosity
@@ -121,38 +124,6 @@ let parse input =
      | name :: args ->
        let rest = String.strip (String.drop_prefix body (String.length name)) in
        Some { name; args; rest })
-;;
-
-module Completion = struct
-  type t =
-    | Unique of string
-    | Common_prefix of string
-    | Candidates of Spec.t list
-    | Nothing
-  [@@deriving sexp_of]
-end
-
-let common_prefix a b =
-  let n = Int.min (String.length a) (String.length b) in
-  let rec go i = if i < n && Char.equal a.[i] b.[i] then go (i + 1) else i in
-  String.prefix a (go 0)
-;;
-
-let complete input : Completion.t =
-  match String.chop_prefix input ~prefix:"/" with
-  | Some prefix when not (String.contains prefix ' ') ->
-    (match List.filter all ~f:(fun s -> String.is_prefix s.name ~prefix) with
-     | [] -> Nothing
-     | [ one ] -> Unique ("/" ^ one.name ^ " ")
-     | many ->
-       let common =
-         List.fold many ~init:(List.hd_exn many).name ~f:(fun acc s ->
-           common_prefix acc s.name)
-       in
-       if String.length common > String.length prefix
-       then Common_prefix ("/" ^ common)
-       else Candidates many)
-  | _ -> Nothing
 ;;
 
 let closest name =

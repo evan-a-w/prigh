@@ -28,7 +28,7 @@ module Reply_tag : sig
     | Export_done
     | Deleted_session
     | Paths_for_autocomplete of string
-    | Set_model_done
+    | Set_model_done of string
     | Config
     | Config_saved
     | Config_for_confirm of bool
@@ -54,6 +54,7 @@ module Command : sig
         }
     | List_paths of
         { prefix : string
+        ; cwd : string option
         ; tag : Reply_tag.t
         }
     | Open_browser of string
@@ -152,4 +153,8 @@ val transcript_rows : Model.t -> int
 
 val init : Model.t
 val format_tokens : int -> string
+
+(** Rows a picker lists at once (its page size), capped by the screen. *)
+val picker_rows : height:int -> int
+
 val update : Model.t -> Action.t -> Model.t * Command.t list

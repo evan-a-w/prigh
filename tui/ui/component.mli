@@ -10,7 +10,10 @@ module Platform : sig
         string
         -> (string * P.Json.t) list
         -> (P.Json.t, string) Result.t Bonsai.Effect.t
-    ; list_paths : prefix:string -> (P.Json.t, string) Result.t Bonsai.Effect.t
+    ; list_paths :
+        cwd:string option
+        -> prefix:string
+        -> (P.Json.t, string) Result.t Bonsai.Effect.t
     ; open_browser : string -> unit Bonsai.Effect.t
     ; quit : unit Bonsai.Effect.t
     ; load_history : unit -> (P.Json.t, string) Result.t Bonsai.Effect.t

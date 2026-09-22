@@ -52,4 +52,5 @@ module Outcome : sig
     | Cancelled
 end
 
+(** Enter with no match keeps the picker open; only Esc cancels. *)
 val handle : t -> Intent.t -> page:int -> Outcome.t

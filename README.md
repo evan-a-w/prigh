@@ -128,11 +128,11 @@ backend/_build/default/bin/main.exe serve      # JSON-lines RPC on stdio
 
 | Key | Action |
 |---|---|
-| Enter | send the prompt; accept the highlighted item |
+| Enter | send the prompt; accept the highlighted item (for command arguments only once you have typed a filter or moved the highlight — `/model` Enter Enter opens the picker) |
 | Alt+Enter | queue a follow-up to run after the current turn |
 | Ctrl+J / Alt+J | insert a newline |
-| Esc | close the dialog, or abort the running turn |
-| Tab | complete a slash command / open the command picker |
+| Esc | close the dialog, abort the running turn, or scroll back to the bottom |
+| Tab | accept the highlighted completion; on an empty prompt, list the commands |
 | Up / Down | move up/down (editor line, history, or list row) |
 | Alt+Up | pop the last queued steer/follow-up back into the editor |
 | Left / Right | move the cursor |
@@ -162,7 +162,7 @@ backend/_build/default/bin/main.exe serve      # JSON-lines RPC on stdio
 | Ctrl+Z | suspend to the shell |
 | Shift+Tab | cycle subagent focus: main → agent 1 → … → main |
 | Alt+1…9 | focus agent N |
-| Ctrl+C | clear the editor, then quit |
+| Ctrl+C | clear the editor, or abort the running turn; again to quit |
 | Ctrl+D | quit |
 
 Ctrl+O cycles the transcript verbosity:
@@ -183,7 +183,7 @@ Finished agents stay cyclable until the next prompt. The status line shows an
 
 Typing `/` opens inline autocomplete (commands, then per-command arguments
 such as models, sessions and directories). Typing `@` completes file paths
-under the cwd; on submit the referenced files are sent as attachments and the
+under the session's working directory; on submit the referenced files are sent as attachments and the
 backend appends them to the user message as `<file>` blocks. `!cmd` runs a
 shell command through the backend (streamed output shown as a tool item) and
 adds it and its output to the context; `!!cmd` runs it without adding to the

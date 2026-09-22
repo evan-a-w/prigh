@@ -208,9 +208,10 @@ let platform client ~hello ~exit ~quit_requested : Prigh_ui.Component.Platform.t
               ~f:(Result.map_error ~f:Error.to_string_hum))
           ())
   ; list_paths =
-      (fun ~prefix ->
+      (fun ~cwd ~prefix ->
         Effect.of_deferred_fun
-          (fun () -> Deferred.map (Paths.list ~prefix) ~f:(fun json -> Ok json))
+          (fun () ->
+            Deferred.map (Paths.list ~cwd ~prefix) ~f:(fun json -> Ok json))
           ())
   ; open_browser = (fun url -> Effect.of_sync_fun open_browser url)
   ; load_history = (fun () -> Effect.of_sync_fun load_history ())

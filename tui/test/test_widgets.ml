@@ -404,7 +404,7 @@ let%expect_test "picker" =
     query="a" selected=1 visible=[alpha beta gamma delta]
     selected beta
     query="azz" selected=0 visible=[]
-    cancelled
+    query="azz" selected=0 visible=[]
     query="az" selected=0 visible=[]
     query="a" selected=0 visible=[alpha beta gamma delta]
     query="" selected=2 visible=[alpha beta gamma delta]
@@ -431,164 +431,6 @@ let%expect_test "commands" =
     (((name switch) (args (/tmp/a b.jsonl)) (rest "/tmp/a b.jsonl")))
     ()
     (((name x) (args ()) (rest "")))
-    |}];
-  List.iter [ "/mo"; "/s"; "/se"; "/"; "/zz"; "/model x"; "x" ] ~f:(fun s ->
-    print_s [%message s (Commands.complete s : Commands.Completion.t)]);
-  [%expect
-    {|
-    (/mo ("Commands.complete s" (Unique "/model ")))
-    (/s (
-      "Commands.complete s" (
-        Candidates (
-          ((name scoped-models)
-           (args "")
-           (help "pick the models Ctrl+P cycles through")
-           (argument ()))
-          ((name session)
-           (args "")
-           (help "show session statistics")
-           (argument ()))
-          ((name sessions)
-           (args "")
-           (help "pick a saved session (Ctrl+N named, Ctrl+D delete)")
-           (argument ()))
-          ((name switch)
-           (args [path])
-           (help "switch to a saved session")
-           (argument (Sessions)))
-          ((name state)
-           (args "")
-           (help "show session state")
-           (argument ()))))))
-    (/se ("Commands.complete s" (Common_prefix /session)))
-    (/ (
-      "Commands.complete s" (
-        Candidates (
-          ((name help)
-           (args "")
-           (help "show commands and keys")
-           (argument ()))
-          ((name hotkeys)
-           (args "")
-           (help "show keyboard shortcuts")
-           (argument ()))
-          ((name model)
-           (args [name|id|provider/id])
-           (help "pick or switch the model")
-           (argument (Model)))
-          ((name scoped-models)
-           (args "")
-           (help "pick the models Ctrl+P cycles through")
-           (argument ()))
-          ((name login)
-           (args "[provider] [api_key|oauth]")
-           (help "log in to a provider")
-           (argument (Login)))
-          ((name logout)
-           (args [provider])
-           (help "remove a provider's stored credential")
-           (argument (Logout)))
-          ((name thinking)
-           (args [off|on|low|high|max])
-           (help "pick or set the thinking level")
-           (argument (Thinking)))
-          ((name verbosity)
-           (args [quiet|normal|verbose])
-           (help "set the transcript verbosity")
-           (argument (Verbosity)))
-          ((name confirm)
-           (args [on|off])
-           (help "ask before destructive tools")
-           (argument (Confirm)))
-          ((name auth)
-           (args "")
-           (help "show which providers are configured")
-           (argument ()))
-          ((name compact)
-           (args "")
-           (help "summarise older messages to free context")
-           (argument ()))
-          ((name new)
-           (args "")
-           (help "start a new session")
-           (argument ()))
-          ((name name)
-           (args [text])
-           (help "set the session name")
-           (argument ()))
-          ((name session)
-           (args "")
-           (help "show session statistics")
-           (argument ()))
-          ((name sessions)
-           (args "")
-           (help "pick a saved session (Ctrl+N named, Ctrl+D delete)")
-           (argument ()))
-          ((name agents)
-           (args "")
-           (help "focus a subagent")
-           (argument ()))
-          ((name host)
-           (args [name|backend])
-           (help
-            "pick where tools run (this frontend, another one, or the backend) and the directory there")
-           (argument ()))
-          ((name switch)
-           (args [path])
-           (help "switch to a saved session")
-           (argument (Sessions)))
-          ((name cd)
-           (args [path])
-           (help "change the working directory")
-           (argument (Path)))
-          ((name fork)
-           (args "")
-           (help "fork at a previous user message")
-           (argument ()))
-          ((name rewind)
-           (args "")
-           (help "rewind the head to a previous user message")
-           (argument ()))
-          ((name tree)
-           (args "")
-           (help "show the session tree and switch head")
-           (argument ()))
-          ((name clone)
-           (args "")
-           (help "clone the current session")
-           (argument ()))
-          ((name export)
-           (args [path])
-           (help "export the transcript (markdown or .jsonl)")
-           (argument (Path)))
-          ((name import)
-           (args [path])
-           (help "import a session from a JSONL file")
-           (argument (Path)))
-          ((name abort)
-           (args "")
-           (help "abort the current run")
-           (argument ()))
-          ((name retry-backend-connection)
-           (args "")
-           (help
-            "reconnect to the backend now instead of waiting for the next retry")
-           (argument ()))
-          ((name state)
-           (args "")
-           (help "show session state")
-           (argument ()))
-          ((name clear)
-           (args "")
-           (help "clear the transcript")
-           (argument ()))
-          ((name quit)
-           (args "")
-           (help exit)
-           (argument ()))))))
-    (/zz ("Commands.complete s" Nothing))
-    ("/model x" ("Commands.complete s" Nothing))
-    (x ("Commands.complete s" Nothing))
     |}];
   List.iter [ "modle"; "hlep"; "sess"; "zzzz" ] ~f:(fun s ->
     print_s
@@ -782,7 +624,7 @@ let%expect_test "keymap: every binding resolves to its intent and is documented"
     Ctrl+Z                  suspend to the shell
     Shift+Tab               cycle focus: main → agent 1 → … → main
     Alt+1                   focus agent N (Alt+1…9)
-    Ctrl+C                  clear the editor, then (again) quit
+    Ctrl+C                  clear the editor or abort the turn, then (again) quit
     Ctrl+D                  quit
     /help                              show commands and keys
     /hotkeys                           show keyboard shortcuts
@@ -790,7 +632,7 @@ let%expect_test "keymap: every binding resolves to its intent and is documented"
     /scoped-models                     pick the models Ctrl+P cycles through
     /login [provider] [api_key|oauth]  log in to a provider
     /logout [provider]                 remove a provider's stored credential
-    /thinking [off|on|low|high|max]    pick or set the thinking level
+    /thinking [off|low|on|high|max]    pick or set the thinking level
     /verbosity [quiet|normal|verbose]  set the transcript verbosity
     /confirm [on|off]                  ask before destructive tools
     /auth                              show which providers are configured
@@ -1224,5 +1066,74 @@ let%expect_test "markdown never raises on malformed input" =
     == "~~~" ==
     ~~~
     == "" ==
+    |}]
+;;
+
+let%expect_test "autocomplete: Enter accepts arguments only after a filter or \
+                 navigation; /cd keeps directories only"
+  =
+  let models =
+    Or_error.ok_exn
+      (Prigh_protocol.Json.parse Fixtures.models_json
+       |> Or_error.bind ~f:(function
+         | `Array items ->
+           Or_error.all (List.map items ~f:Prigh_protocol.Model.of_json)
+         | _ -> Or_error.error_string "array"))
+  in
+  let compute line =
+    Autocomplete.compute
+      ~line
+      ~col:(String.length line)
+      ~line_index:0
+      ~models
+      ~auth:[]
+      ~sessions:None
+      ~logged_in:(fun _ -> true)
+  in
+  let show name ac =
+    printf
+      "%-12s %-10s prefix=%S navigated=%b enter_accepts=%b items=%d\n"
+      name
+      (match Autocomplete.source ac with
+       | Command -> "command"
+       | Argument spec -> "arg:" ^ spec.name
+       | Path -> "path")
+      (Autocomplete.prefix ac)
+      (Autocomplete.navigated ac)
+      (Autocomplete.accepts_on_enter ac)
+      (List.length (Autocomplete.items ac))
+  in
+  let ac line = Option.value_exn (compute line) in
+  show "/mo" (ac "/mo");
+  show "/model " (ac "/model ");
+  show "/model down" (Autocomplete.down (ac "/model "));
+  show "/model gp" (ac "/model gp");
+  show "@" (ac "@");
+  show "@ down" (Autocomplete.down (ac "@"));
+  [%expect
+    {|
+    /mo          command    prefix="mo" navigated=false enter_accepts=true items=3
+    /model       arg:model  prefix="" navigated=false enter_accepts=false items=4
+    /model down  arg:model  prefix="" navigated=true enter_accepts=true items=4
+    /model gp    arg:model  prefix="gp" navigated=false enter_accepts=true items=1
+    @            path       prefix="" navigated=false enter_accepts=false items=0
+    @ down       path       prefix="" navigated=true enter_accepts=true items=0
+    |}];
+  let paths =
+    List.map [ "src/"; "src/app.ml"; "docs/" ] ~f:(fun p ->
+      Picker.Item.create ~id:p p)
+  in
+  let ids ac =
+    List.map (Autocomplete.items ac) ~f:(fun i -> i.Picker.Item.id)
+  in
+  print_s [%sexp (ids (Autocomplete.set_items (ac "/cd ") paths) : string list)];
+  print_s
+    [%sexp (ids (Autocomplete.set_items (ac "/export ") paths) : string list)];
+  print_s [%sexp (ids (Autocomplete.set_items (ac "@") paths) : string list)];
+  [%expect
+    {|
+    (src/ docs/)
+    (src/ src/app.ml docs/)
+    (src/ src/app.ml docs/)
     |}]
 ;;

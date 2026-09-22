@@ -373,7 +373,7 @@ copy of the protocol types and the e2e test guards the contract.
     narrow widths.
 - `term/` (`prigh_ui_term`) — `Key_of_event` (Bonsai_term events → `Key.t`,
   bracketed paste → one `Insert`), `View_of_content` (spans → notty attrs,
-  including OSC-8 links), `Paths` (path completion via `fd`/`readdir`),
+  including OSC-8 links), `Paths` (path completion under the session cwd via `fd`/`readdir`),
   `Tty`/`tty_stubs.c` (clears `IEXTEN`), and `Term_app` (spawns the backend,
   runs `Bonsai_term.start_with_driver`, pushes client `Incoming.t` into the
   component, executes the platform commands, sets the cursor). Three

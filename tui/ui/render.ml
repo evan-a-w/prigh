@@ -9,7 +9,6 @@ let span ?(style = Style.plain) text = { Content.Span.text; style }
 let spinner_frames = [| "⠋"; "⠙"; "⠹"; "⠸"; "⠼"; "⠴"; "⠦"; "⠧"; "⠇"; "⠏" |]
 
 let format_tokens = App.format_tokens
-let picker_rows = 10
 
 let agent_symbol (m : App.Model.t) (a : Agent_view.t) =
   match a.status with
@@ -114,22 +113,15 @@ let mode_hint (m : App.Model.t) : Content.Line.t option =
           Some
             [ span
                 ~style:dim
-                "picker: type to filter, Enter selects, Esc closes · Ctrl+N \
-                 logged in only"
+                "Enter selects · Esc closes · Ctrl+N logged-in only"
             ]
         | Picker { kind = Sessions _; _ } ->
           Some
             [ span
                 ~style:dim
-                "picker: type to filter, Enter selects, Esc closes · Ctrl+N \
-                 named only · Ctrl+D delete"
+                "Enter selects · Esc closes · Ctrl+N named · Ctrl+D delete"
             ]
-        | Picker _ ->
-          Some
-            [ span
-                ~style:dim
-                "picker: type to filter, Enter selects, Esc closes"
-            ]
+        | Picker _ -> Some [ span ~style:dim "Enter selects · Esc closes" ]
         | Login_prompt _ ->
           Some [ span ~style:dim "login: Enter answers, Esc cancels" ]
         | Text_prompt _ -> Some [ span ~style:dim "Enter submits, Esc cancels" ]
@@ -147,19 +139,23 @@ let mode_hint (m : App.Model.t) : Content.Line.t option =
                      (List.length matches))
               ]
         | Editing ->
-          if Option.is_some m.autocomplete
-          then Some [ span ~style:dim "Tab/Enter accept · Esc close" ]
-          else if m.pending_quit
-          then Some [ span ~style:dim "Ctrl+C again quits" ]
-          else if s.running
-          then
-            Some
-              [ span
-                  ~style:dim
-                  (spinner_frames.(m.spinner % Array.length spinner_frames)
-                   ^ " working (Esc aborts; Enter steers)")
-              ]
-          else None))
+          (match m.autocomplete with
+           | Some ac when Autocomplete.accepts_on_enter ac ->
+             Some [ span ~style:dim "Tab/Enter accept · Esc close" ]
+           | Some _ ->
+             Some [ span ~style:dim "Tab accepts · Enter runs as typed · Esc" ]
+           | None ->
+             if m.pending_quit
+             then Some [ span ~style:dim "Ctrl+C again quits" ]
+             else if s.running
+             then
+               Some
+                 [ span
+                     ~style:dim
+                     (spinner_frames.(m.spinner % Array.length spinner_frames)
+                      ^ " working (Esc aborts; Enter steers)")
+                 ]
+             else None)))
 ;;
 
 let drop_left_text s ~width =
@@ -247,7 +243,8 @@ let status (m : App.Model.t) : Content.Line.t =
       @ (match m.viewport with
          | Viewport.Anchored { new_lines; _ } when new_lines > 0 ->
            [ 1, [ span ~style:base (sprintf "↓ %d new" new_lines) ] ]
-         | Viewport.Follow | Viewport.Anchored _ -> [])
+         | Viewport.Anchored _ -> [ 1, [ span ~style:base "↑ scrolled" ] ]
+         | Viewport.Follow -> [])
       @ Option.to_list (Option.map (mode_hint m) ~f:(fun p -> 0, p))
     in
     let cwd_width = Content.Line.width cwd in
@@ -392,7 +389,8 @@ let queued_block (m : App.Model.t) : Content.t =
     [ Content.Line.truncate [ span ~style:dim label ] ~width:m.width ])
 ;;
 
-let picker_block (p : Picker.t) ~width : Content.t * int =
+let picker_block (p : Picker.t) ~width ~height : Content.t * int =
+  let picker_rows = App.picker_rows ~height in
   let visible = Picker.visible p in
   let selected = Picker.selected p in
   let start =
@@ -403,9 +401,19 @@ let picker_block (p : Picker.t) ~width : Content.t * int =
          (List.length visible - picker_rows))
   in
   let shown = List.take (List.drop visible start) picker_rows in
+  let total = List.length visible in
   let title =
     [ span ~style:(Style.bold (Style.fg Cyan)) (Picker.title p)
-    ; span ~style:dim (sprintf "  (%d)" (List.length visible))
+    ; span
+        ~style:dim
+        (if total <= picker_rows
+         then sprintf "  (%d)" total
+         else
+           sprintf
+             "  (%d–%d of %d)"
+             (start + 1)
+             (start + List.length shown)
+             total)
     ]
   in
   let filter =
@@ -420,6 +428,8 @@ let picker_block (p : Picker.t) ~width : Content.t * int =
     List.mapi shown ~f:(fun i (item : Picker.Item.t) ->
       let is_selected = start + i = selected in
       let mark =
+        (if is_selected then "▸" else " ")
+        ^
         if Picker.multi p
         then if Set.mem (Picker.checked p) item.id then "[x] " else "[ ] "
         else if item.marked
@@ -446,64 +456,82 @@ let picker_block (p : Picker.t) ~width : Content.t * int =
   title :: filter :: rows, 1
 ;;
 
+let autocomplete_rows = 8
+
 let autocomplete_block (ac : Autocomplete.t) ~width : Content.t =
   let items = Autocomplete.items ac in
   let selected = Autocomplete.selected ac in
-  let start = Int.max 0 (Int.min (selected - 4) (List.length items - 8)) in
-  let shown = List.take (List.drop items start) 8 in
-  match Autocomplete.source ac with
-  | Autocomplete.Source.Command ->
-    let usage (item : Picker.Item.t) =
-      let args =
-        Option.value_map (Commands.find item.id) ~default:"" ~f:(fun s ->
-          s.args)
-      in
-      "/" ^ item.label ^ if String.is_empty args then "" else " " ^ args
-    in
-    let usage_width =
-      List.fold shown ~init:0 ~f:(fun acc item ->
-        Int.max acc (Text_width.string (usage item)))
-      |> Int.min (width / 2)
-    in
-    List.mapi shown ~f:(fun i (item : Picker.Item.t) ->
-      let is_selected = start + i = selected in
-      let style s = if is_selected then Style.invert s else s in
-      let help =
-        Option.value_map (Commands.find item.id) ~default:"" ~f:(fun s ->
-          s.help)
-      in
-      let name = "/" ^ item.label in
-      let args =
-        Text_width.pad_right
-          (String.drop_prefix (usage item) (String.length name))
-          ~width:(usage_width - Text_width.string name)
-      in
-      Content.Line.truncate
-        [ span ~style:(style Style.plain) (if is_selected then "▸ " else "  ")
-        ; span ~style:(style (Style.bold Style.plain)) name
-        ; span ~style:(style dim) args
-        ; span ~style:(style dim) ("  " ^ help)
+  let total = List.length items in
+  let start = Int.max 0 (Int.min (selected - 4) (total - autocomplete_rows)) in
+  let shown = List.take (List.drop items start) autocomplete_rows in
+  let overflow =
+    if total <= autocomplete_rows
+    then []
+    else
+      [ [ span
+            ~style:dim
+            (sprintf
+               "  ↕ %d–%d of %d"
+               (start + 1)
+               (start + List.length shown)
+               total)
         ]
-        ~width)
-  | Autocomplete.Source.Argument _ | Autocomplete.Source.Path ->
-    let label_width =
-      List.fold shown ~init:0 ~f:(fun acc (item : Picker.Item.t) ->
-        Int.max acc (Text_width.string item.label))
-      |> Int.min (width / 2)
-    in
-    List.mapi shown ~f:(fun i (item : Picker.Item.t) ->
-      let is_selected = start + i = selected in
-      let style s = if is_selected then Style.invert s else s in
-      Content.Line.truncate
-        [ span ~style:(style Style.plain) (if is_selected then "▸ " else "  ")
-        ; span
-            ~style:(style (Style.bold Style.plain))
-            (Text_width.pad_right item.label ~width:label_width)
-        ; span
-            ~style:(style dim)
-            (if String.is_empty item.detail then "" else "  " ^ item.detail)
-        ]
-        ~width)
+      ]
+  in
+  (match Autocomplete.source ac with
+   | Autocomplete.Source.Command ->
+     let usage (item : Picker.Item.t) =
+       let args =
+         Option.value_map (Commands.find item.id) ~default:"" ~f:(fun s ->
+           s.args)
+       in
+       "/" ^ item.label ^ if String.is_empty args then "" else " " ^ args
+     in
+     let usage_width =
+       List.fold shown ~init:0 ~f:(fun acc item ->
+         Int.max acc (Text_width.string (usage item)))
+       |> Int.min (width / 2)
+     in
+     List.mapi shown ~f:(fun i (item : Picker.Item.t) ->
+       let is_selected = start + i = selected in
+       let style s = if is_selected then Style.invert s else s in
+       let help =
+         Option.value_map (Commands.find item.id) ~default:"" ~f:(fun s ->
+           s.help)
+       in
+       let name = "/" ^ item.label in
+       let args =
+         Text_width.pad_right
+           (String.drop_prefix (usage item) (String.length name))
+           ~width:(usage_width - Text_width.string name)
+       in
+       Content.Line.truncate
+         [ span ~style:(style Style.plain) (if is_selected then "▸ " else "  ")
+         ; span ~style:(style (Style.bold Style.plain)) name
+         ; span ~style:(style dim) args
+         ; span ~style:(style dim) ("  " ^ help)
+         ]
+         ~width)
+   | Autocomplete.Source.Argument _ | Autocomplete.Source.Path ->
+     let label_width =
+       List.fold shown ~init:0 ~f:(fun acc (item : Picker.Item.t) ->
+         Int.max acc (Text_width.string item.label))
+       |> Int.min (width / 2)
+     in
+     List.mapi shown ~f:(fun i (item : Picker.Item.t) ->
+       let is_selected = start + i = selected in
+       let style s = if is_selected then Style.invert s else s in
+       Content.Line.truncate
+         [ span ~style:(style Style.plain) (if is_selected then "▸ " else "  ")
+         ; span
+             ~style:(style (Style.bold Style.plain))
+             (Text_width.pad_right item.label ~width:label_width)
+         ; span
+             ~style:(style dim)
+             (if String.is_empty item.detail then "" else "  " ^ item.detail)
+         ]
+         ~width))
+  @ overflow
 ;;
 
 let subagent_header (m : App.Model.t) (a : Agent_view.t) : Content.Line.t =
@@ -591,7 +619,7 @@ let screen (m : App.Model.t) : Screen.t =
   let dialog, editor, cursor =
     match m.mode with
     | Picker { picker; _ } ->
-      let block, cursor_row = picker_block picker ~width in
+      let block, cursor_row = picker_block picker ~width ~height in
       let query_width = Text_width.string (Picker.query picker) in
       block, [], (cursor_row, 2 + query_width)
     | Confirm { question; _ } ->

@@ -460,7 +460,6 @@ let%expect_test "styled frame: markdown link, diff and autocomplete" =
 
 
 
-
       [yellow]session abc123 in /work. /help for commands, Esc aborts, Ctrl+C twice quits.[/]
       [green][bold]> [/][bold]earlier question[/]
       earlier [bold]answer[/]
@@ -480,8 +479,9 @@ let%expect_test "styled frame: markdown link, diff and autocomplete" =
         [bold]/scoped-models[/][gray]                     pick the models Ctrl+P cycles through[/]
         [bold]/login[/][gray] [provider] [api_key|oauth]  log in to a provider[/]
         [bold]/logout[/][gray] [provider]                 remove a provider's stored credential[/]
-        [bold]/thinking[/][gray] [off|on|low|high|max]    pick or set the thinking level[/]
+        [bold]/thinking[/][gray] [off|low|on|high|max]    pick or set the thinking level[/]
         [bold]/verbosity[/][gray] [quiet|normal|verbose]  set the transcript verbosity[/]
+      [gray]  ↕ 1–8 of 30[/]
       …[gray]deepseek-flash[/]  [gray]think:off[/]  [green]ctx:0% 1.5k[/]  [gray]$0.01[/]  [gray]Tab/Enter accept · Esc close[/]
       |}];
     return ())
@@ -511,7 +511,7 @@ let%expect_test "mouse wheel scrolls the transcript; Up walks history" =
       > line 2
       ────────────────────────────────────────────────────────────────────────────────
       > ▏
-      /work  deepseek-flash  think:off  view:normal  ctx:0% 1.5k  $0.01
+      /work  deepseek-flash  think:off  view:normal  ctx:0% 1.5k  $0.01  ↑ scrolled
       same: true
       |}];
     H.wheel h `Down;

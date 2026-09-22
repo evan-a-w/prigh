@@ -99,7 +99,7 @@ let handle t (intent : Intent.t) ~page : Outcome.t =
   | Submit ->
     (match selected_item t with
      | Some item -> Selected item
-     | None -> Cancelled)
+     | None -> Continue t)
   | Insert " " when t.multi ->
     (match selected_item t with
      | Some item -> toggle item.id

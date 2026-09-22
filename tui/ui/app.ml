@@ -24,7 +24,7 @@ module Reply_tag = struct
     | Export_done
     | Deleted_session
     | Paths_for_autocomplete of string
-    | Set_model_done
+    | Set_model_done of string (** the key requested *)
     | Config
     | Config_saved
     | Config_for_confirm of bool
@@ -50,6 +50,7 @@ module Command = struct
         }
     | List_paths of
         { prefix : string
+        ; cwd : string option
         ; tag : Reply_tag.t
         }
     | Open_browser of string
@@ -344,9 +345,14 @@ let effective_scope m =
     if List.is_empty logged then m.models else logged
 ;;
 
+(* Empty when every model is in scope: a mark on every row says nothing. *)
 let scoped_keys m =
-  String.Set.of_list
-    (List.map (effective_scope m) ~f:(fun (model : P.Model.t) -> model.key))
+  let scope = effective_scope m in
+  if List.length scope >= List.length m.models
+  then String.Set.empty
+  else
+    String.Set.of_list
+      (List.map scope ~f:(fun (model : P.Model.t) -> model.key))
 ;;
 
 (* ---- pickers ---------------------------------------------------------- *)
@@ -427,14 +433,13 @@ let scoped_models_picker m =
     (Picker.create ~multi:true ~checked ~title:"Scoped models" items)
 ;;
 
-let thinking_levels = [ "off"; "on"; "low"; "high"; "max" ]
-
 let thinking_picker m =
   let current = Option.map m.state ~f:(fun s -> s.thinking) in
   let items =
-    List.map thinking_levels ~f:(fun level ->
+    List.map Commands.thinking_levels ~f:(fun level ->
       Picker.Item.create
         ~id:level
+        ~detail:(if String.equal level "on" then "provider default" else "")
         ~marked:
           (Option.value_map current ~default:false ~f:(String.equal level))
         level)
@@ -951,7 +956,7 @@ let reconnect_reply m ~generation result =
 (* ---- slash commands --------------------------------------------------- *)
 
 let set_model_command key =
-  rpc "set_model" ~params:[ "model", str key ] ~tag:Set_model_done
+  rpc "set_model" ~params:[ "model", str key ] ~tag:(Set_model_done key)
 ;;
 
 let export_command path =
@@ -1005,10 +1010,10 @@ let cycle_model m ~step =
       | Some s -> { m with state = Some { s with model = next } }
       | None -> m
     in
-    notice m (sprintf "model: %s" next.key), [ set_model_command next.key ]
+    m, [ set_model_command next.key ]
 ;;
 
-let thinking_cycle = [ "off"; "low"; "on"; "high"; "max" ]
+let thinking_cycle = Commands.thinking_levels
 
 let cycle_thinking m =
   match m.state with
@@ -1393,7 +1398,11 @@ let refresh_autocomplete m =
        else (
          let prefix = Autocomplete.prefix ac in
          ( { m with autocomplete = Some ac }
-         , [ Command.List_paths { prefix; tag = Paths_for_autocomplete prefix }
+         , [ Command.List_paths
+               { prefix
+               ; cwd = Option.map m.state ~f:(fun s -> s.cwd)
+               ; tag = Paths_for_autocomplete prefix
+               }
            ] ))
      | Autocomplete.Source.Argument spec
        when match spec.argument with
@@ -1447,17 +1456,36 @@ let accept_autocomplete m ~submit_now =
        Some (m, cmds))
 ;;
 
+(* Denies pending tool confirmations and aborts the running turn. *)
+let abort m =
+  let denies =
+    List.map m.pending_confirms ~f:(fun (call_id, _, _) ->
+      rpc
+        "tool_confirm_respond"
+        ~params:[ "call_id", str call_id; "allow", P.Json.bool false ]
+        ~tag:Ignore)
+  in
+  { m with pending_confirms = [] }, denies @ [ rpc "abort" ~tag:Abort_done ]
+;;
+
+(* Ctrl+C: clear the editor; else abort the running turn; else quit on the
+   second press. *)
 let interrupt m =
-  if Model.backend_gone m
+  if Model.backend_gone m || m.pending_quit
   then { m with quitting = true }, [ Command.Quit ]
   else if not (Editor.is_empty m.editor)
   then { m with editor = Editor.clear m.editor; pending_quit = false }, []
-  else if m.pending_quit
-  then { m with quitting = true }, [ Command.Quit ]
+  else if Model.running m
+  then (
+    let m, cmds = abort { m with pending_quit = true } in
+    warn m "aborting; Ctrl+C again quits", cmds)
   else warn { m with pending_quit = true } "press Ctrl+C again to quit", []
 ;;
 
 let page_size m = Int.max 1 (m.height / 2)
+
+(* Ten rows, fewer on short screens so the separator and status line stay. *)
+let picker_rows ~height = Int.max 3 (Int.min 10 (height - 5))
 let wheel_lines = 3
 
 let scroll_up m ~lines =
@@ -1635,17 +1663,11 @@ let editing_intent m (intent : Intent.t) =
      | `Agent _ -> set_focus m `Main, []
      | `Main ->
        if Model.running m
-       then (
-         let denies =
-           List.map m.pending_confirms ~f:(fun (call_id, _, _) ->
-             rpc
-               "tool_confirm_respond"
-               ~params:[ "call_id", str call_id; "allow", P.Json.bool false ]
-               ~tag:Ignore)
-         in
-         ( { m with pending_confirms = [] }
-         , denies @ [ rpc "abort" ~tag:Abort_done ] ))
-       else m, [])
+       then abort m
+       else (
+         match m.viewport with
+         | Viewport.Anchored _ -> follow m, []
+         | Viewport.Follow -> m, []))
   | Interrupt -> interrupt m
   | Force_quit -> { m with quitting = true }, [ Quit ]
   | Kill_to_end -> ed Editor.kill_to_end
@@ -1687,9 +1709,13 @@ let editing m (intent : Intent.t) =
         | Complete ->
           Option.value (accept_autocomplete m ~submit_now:false) ~default:(m, [])
         | Submit ->
-          Option.value
-            (accept_autocomplete m ~submit_now:true)
-            ~default:(submit m)
+          (match m.autocomplete with
+           | Some ac when not (Autocomplete.accepts_on_enter ac) ->
+             submit { m with autocomplete = None }
+           | _ ->
+             Option.value
+               (accept_autocomplete m ~submit_now:true)
+               ~default:(submit m))
         | Up ->
           ( { m with
               autocomplete = Option.map m.autocomplete ~f:Autocomplete.up
@@ -1747,6 +1773,8 @@ let editing m (intent : Intent.t) =
           m, cmds @ more)
      | None ->
        (match intent with
+        | Complete when Editor.is_empty m.editor ->
+          refresh_autocomplete { m with editor = Editor.insert m.editor "/" }
         | Complete -> refresh_autocomplete m
         | _ ->
           let m, cmds = editing_intent m intent in
@@ -1917,7 +1945,7 @@ let picker m (kind : Mode.Picker_kind.t) picker (intent : Intent.t) =
        Picker.handle
          picker
          (if Intent.equal intent Interrupt then Cancel else intent)
-         ~page:10
+         ~page:(picker_rows ~height:m.height)
      with
      | Continue picker -> { m with mode = Picker { kind; picker } }, []
      | Selected item -> picker_selected m kind item
@@ -2280,7 +2308,7 @@ let reply m (tag : Reply_tag.t) (result : (P.Json.t, string) Result.t) =
   | Error e ->
     (match tag with
      | Ignore -> m, []
-     | Set_model_done ->
+     | Set_model_done _ ->
        (* The backend formats "did you mean"; the picker helps recover. *)
        model_picker (error m e) ~query:"", []
      | _ -> error m e, [])
@@ -2288,7 +2316,19 @@ let reply m (tag : Reply_tag.t) (result : (P.Json.t, string) Result.t) =
     (match tag with
      | Ignore | Show_error | Reconnect _ -> m, []
      | Notice_on_success text -> notice m text, []
-     | Set_model_done -> m, []
+     | Set_model_done key ->
+       (match
+          List.find m.models ~f:(fun model -> String.equal model.key key)
+        with
+        | Some model when not (logged_in m model.provider) ->
+          ( warn
+              m
+              (sprintf
+                 "model: %s (not logged in; /login %s)"
+                 key
+                 model.provider)
+          , [] )
+        | _ -> notice m (sprintf "model: %s" key), [])
      | Compact_done -> notice m "context compacted", []
      | Abort_done ->
        decode json ~f:decode_restored (fun restored ->
