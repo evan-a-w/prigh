@@ -1,0 +1,11 @@
+; The browser frontend: main.bc.js plus the page, assembled under site/ (what
+; `prigh serve -web` serves).
+
+(executable
+ (name main)
+ (modes js)
+ (preprocess
+  (pps ppx_jane js_of_ocaml-ppx))
+ (js_of_ocaml
+  (flags (:standard --opt 3)))
+ (libraries prigh_ui_web_app))

@@ -178,6 +178,10 @@ val set_session_name : t -> string -> unit
     records it in the session. Fails while a run is in progress. *)
 val set_cwd : t -> path:string -> unit Or_error.t
 
+(** Paths under the session cwd matching [prefix], listed on the active tool
+    host (for [@] completion). *)
+val list_paths : t -> prefix:string -> Json.t Or_error.t
+
 (** Refuses to delete the active session. *)
 val delete_session : t -> path:string -> unit Or_error.t
 

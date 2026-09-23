@@ -1,8 +1,10 @@
 # prigh
 
 A coding agent: OCaml backend (Eio, cohttp; Anthropic, OpenAI, OpenAI
-Codex/ChatGPT and DeepSeek providers) and an OCaml terminal frontend on
-Bonsai_term (OxCaml). No plugins; tools and subagents are built in.
+Codex/ChatGPT and DeepSeek providers) and an OCaml frontend — the same
+Bonsai logic mounted either in the terminal (Bonsai_term, OxCaml) or in a
+browser (Bonsai_web, js_of_ocaml). No plugins; tools and subagents are built
+in.
 
 ## Quick start
 
@@ -10,6 +12,7 @@ Bonsai_term (OxCaml). No plugins; tools and subagents are built in.
 ./prigh                 # builds backend + frontend if needed, then starts the TUI here
 ./prigh -cwd ~/proj     # ... in another directory
 ./prigh -faux           # scripted provider, no API calls
+./prigh -web            # the same UI in a browser (serves it on 127.0.0.1:7788 and opens it)
 ```
 
 ## Build
@@ -20,7 +23,8 @@ cd backend && eval $(opam env --switch=prigh) && dune build && dune build @runte
 
 # frontend (opam switch "prigh-ox": OxCaml 5.2 + bonsai_term; or `nix develop`)
 cd tui && eval $(opam env --switch=prigh-ox) && dune build && dune build @runtest
-# @runtest includes the e2e and tmux tests against the backend binary built above
+# @runtest includes the e2e and tmux tests against the backend binary built above,
+# and the web-layer tests when `node` is on PATH (they run under js_of_ocaml)
 
 # or with Nix (backend + patched OxCaml frontend) — see "Running under Nix"
 nix build               # result/bin/prigh wrapper (includes backend + TUI)
@@ -47,6 +51,10 @@ nix build .#tui                      # TUI only: result/bin/prigh-tui
 nix develop
 cd tui && dune build @runtest
 ```
+
+`prigh -web [serve options]` runs the backend with the browser frontend
+(`prigh serve -web 127.0.0.1:7788 -open`); `PRIGH_WEB_ROOT` points at the
+built assets (the Nix wrapper sets it).
 
 `prigh-tui` flags: `-faux`, `-session PATH`, `-model ID`, `-thinking LEVEL`,
 `-cwd DIR`, `-auth-file PATH`, `-backend PATH` (same as `$PRIGH_BACKEND`),
@@ -87,6 +95,31 @@ calls then fail until you pick another host). Several frontends can attach
 to one session (`/sessions` marks live ones) and all see the same stream; a
 session keeps running when its frontends disconnect. Plain TCP with a shared
 token: bind to localhost and use an SSH tunnel on untrusted networks.
+
+## In a browser
+
+The frontend also runs as a web page, with the same keys, commands, pickers
+and transcript as the terminal (it renders the same cell grid). The backend
+serves it and speaks the RPC protocol over a WebSocket at `/ws`:
+
+```
+./prigh -web                      # local: serves http://127.0.0.1:7788/ and opens it
+./prigh -web -faux -cwd ~/proj    # ... any `prigh serve` options after -web
+
+# remote: on the server, next to (or instead of) -listen
+prigh serve -listen 0.0.0.0:7777 -web 0.0.0.0:7788 -token sekrit
+# then open http://server:7788/?token=sekrit (or type the token into the
+# connect form, which remembers it in localStorage)
+```
+
+The page connects to its own origin by default; `?backend=ws://host:port/ws`
+points a page served from one place at a backend elsewhere, `?session=ID`
+joins a session and `?name=` names the frontend in `/host`. Tools run on the
+backend (a browser cannot host them; `/host` still switches to any connected
+tool host). Prompt history lives in `localStorage`; Ctrl+Z and Ctrl+G have no
+browser equivalent and say so. Plain `ws://` with a shared token: bind to
+localhost and use an SSH tunnel or a TLS-terminating proxy on untrusted
+networks.
 
 If the backend goes away (the spawned process dies, or the TCP connection
 drops) the TUI reconnects on its own — immediately, then with exponential
@@ -151,7 +184,7 @@ backend/_build/default/bin/main.exe serve      # JSON-lines RPC on stdio
 | Ctrl+Y / Alt+Y | paste the most recent kill / replace it with an older kill |
 | Ctrl+_ | undo |
 | Ctrl+O | cycle transcript verbosity |
-| Ctrl+R | complete a file path at the cursor |
+| Ctrl+R | complete a file path at the cursor (paths are listed on the active tool host, under the session cwd) |
 | Ctrl+F | search the transcript |
 | Ctrl+G | edit the prompt in `$VISUAL`/`$EDITOR` |
 | Ctrl+L | pick a model |
@@ -269,9 +302,12 @@ promote` accepts new output everywhere:
   `Session` JSONL log, `Rpc_server`.
 - `backend/test` — expect tests, driven by `Faux_provider` and an in-process
   HTTP server; no network.
-- `tui/` — the frontend: `protocol/` (wire types), `client/` (Async RPC over
-  a `Transport`), `ui/` (platform-agnostic Bonsai logic: `App` state machine,
+- `tui/` — the frontend: `protocol/` (wire types), `client/` (Async_kernel RPC
+  over a `Transport`; `client_unix/` has the stdio/TCP transports and the
+  tool host), `ui/` (platform-agnostic Bonsai logic: `App` state machine,
   `Editor`, `Picker`, `Transcript`, `Render` to styled `Content`), `term/`
-  (Bonsai_term views + backend process), `test/`, `e2e/`.
+  (Bonsai_term views + backend process), `web/` + `web-app/` + `web-bin/`
+  (DOM rendering, key mapping, WebSocket transport, the js_of_ocaml page),
+  `test/`, `test-web/`, `e2e/`.
 - `ARCHITECTURE.md` — how the pieces fit together; `PLAN.md` — milestone status.
 # prigh

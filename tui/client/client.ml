@@ -1,5 +1,5 @@
 open! Core
-open! Async
+open! Async_kernel
 open Prigh_protocol
 
 module Incoming = struct

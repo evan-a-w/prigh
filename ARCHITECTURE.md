@@ -2,11 +2,12 @@
 
 prigh is an agentic coding harness split into an OCaml backend (`backend/`,
 all the logic) and an OCaml frontend (`tui/`, Bonsai on OxCaml: rendering,
-input and UI state only). There is no plugin system: tools, subagents,
-providers and slash commands are compiled in.
+input and UI state only) that runs in a terminal or a browser. There is no
+plugin system: tools, subagents, providers and slash commands are compiled in.
 
 ```
  terminal ── frontend (prigh-tui, Bonsai_term) ── JSON lines on stdio or TCP ── backend `prigh serve` (OCaml, Eio)
+ browser ─── frontend (main.bc.js, Bonsai_web) ── JSON lines on a WebSocket ──┘  (`-web`: Web_server serves the page and /ws)
                 │                                                      │
                 └─ `prigh tool-host` (local tools)                     ├─ Rpc_server: clients ↔ sessions, tool hosts
                                                                        ├─ Agent (one per session) ── Agent_loop ── Provider_router ── Anthropic / Openai_responses / Deepseek ── HTTPS (SSE)
@@ -58,8 +59,10 @@ and the model sees the error; the TUI shows `tools:offline` until another
 host is chosen. The frontend does not implement any tools: it proxies
 `tool_exec` to a local `prigh tool-host` process (`Tool_host` in the backend
 runs `Host_ops.execute`, the same code path the backend uses for itself,
-plus three pseudo-tools: `$resolve_dir` for `/cd` and `/host`, `$read_file`
-for prompt attachments, and `$instructions`, called when a session's system
+plus four pseudo-tools: `$resolve_dir` for `/cd` and `/host`, `$read_file`
+for prompt attachments, `$list_paths` for `@` completion (`Path_listing`:
+`fd` or a bounded `readdir` under the session cwd, so completion always
+reflects the machine the tools run on), and `$instructions`, called when a session's system
 prompt is first built and by every subagent, so that `AGENTS.md`/`CLAUDE.md`
 come from the host's cwd ancestors and the host's own `~/.prigh/`).
 
@@ -189,7 +192,7 @@ two can share one.
   is on) and `on_host` (runs on the active tool host rather than always in
   the backend).
 - `Host_ops` — what a tool host does for a session: the `on_host` tools by
-  name plus `$resolve_dir`/`$read_file`/`$instructions`. `Tool_host` is the `prigh tool-host`
+  name plus `$resolve_dir`/`$read_file`/`$list_paths`/`$instructions`. `Tool_host` is the `prigh tool-host`
   worker loop around it (`exec`/`cancel` in, `output`/`result` out, one fiber
   per exec).
 - `Tool_bash` (streamed output, timeout, cancellation), `Tool_read`,
@@ -277,7 +280,8 @@ two can share one.
   auth status and events.
 - `Rpc_server` — the connection and session manager: a table of live
   agents by session id, a table of clients, and per-connection
-  `serve_connection` (reader loop, one outbox fiber, and one fiber per
+  `serve_lines` (`serve_connection` over newline-delimited flows, or one
+  WebSocket text message per line: reader loop, one outbox fiber, and one fiber per
   request so a blocking method such as `shell` or a remote tool round trip
   never stalls the reader that must deliver the client's own
   `tool_exec_result`). Agent events are routed to the clients attached to
@@ -293,17 +297,27 @@ two can share one.
   `get_entries`, `set_model`, `set_thinking`, `list_models`, `compact`,
   `new_session`, `switch_session`, `list_sessions`, `set_session_name`,
   `delete_session`, `export`, `import`, `fork`, `clone`, `rewind`,
-  `session_stats`, `set_cwd`, `get_config`, `set_config`,
+  `session_stats`, `set_cwd`, `list_paths`, `get_config`, `set_config`,
   `tool_confirm_respond`, `set_active_host`, `tool_exec_output`,
   `tool_exec_result`, `auth_status`, `login`, `auth_respond`, `auth_cancel`,
   `logout`. `State` carries `active_host` and `hosts` (the backend first).
+- `Websocket` — a minimal RFC 6455 server side (handshake key, frame
+  encode/decode with client masking, fragment reassembly, ping/pong and
+  close) and `Web_server` — the `-web` listener: one HTTP/1.1 request per
+  connection, `GET /ws` upgraded and handed to `Rpc_server.serve_lines`,
+  anything else served from the web root (the built `tui/web-bin/site`,
+  found via `-web-root`, `$PRIGH_WEB_ROOT` or next to the executable;
+  no `..`, no dot files). The token check is the same `hello` check as
+  for TCP; the static files are public.
 
 ### CLI (`backend/bin/main.ml`)
 
 `serve` (RPC on stdio; `-listen HOST:PORT` accepts TCP clients instead,
-`-stdio` as well, `-token SECRET`/`$PRIGH_TOKEN` gates them; with stdio the
-backend exits when the spawning frontend closes it, with `-listen` only it
-runs until killed), `tool-host` (the local tool worker), `run <prompt>`
+`-web HOST:PORT` serves the browser frontend and WebSocket clients (`-open`
+launches a browser, `-web-root DIR` overrides the assets), `-stdio` as well,
+`-token SECRET`/`$PRIGH_TOKEN` gates them; with stdio the backend exits when
+the spawning frontend closes it, with `-listen`/`-web` only it runs until
+killed), `tool-host` (the local tool worker), `run <prompt>`
 (headless, streams to stdout), `sessions`, `login <provider> [-method]`,
 `logout <provider>`, `auth`. All commands share `-auth-file`; `run`/`serve`
 share `-model`, `-thinking`, `-session`, `-cwd`, `-no-tools`, `-faux` (and
@@ -325,14 +339,17 @@ copy of the protocol types and the e2e test guards the contract.
   `Rpc_json` emits (`Message`, `Delta`, `State`, `Model`, `Session_summary`,
   `Auth_status`, `Auth_event`, `Event`, `Server_message`) and the `Request`
   encoder.
-- `client/` (`prigh_client`) — `Transport.t` (line channel: `Stdio_transport`
-  spawns the backend, `Tcp_transport` connects to `-listen`; an in-memory
-  pair for tests), `Client` (Async; created with a `connect` thunk and
+- `client/` (`prigh_client`, `Async_kernel` only so it links under
+  js_of_ocaml) — `Transport.t` (a line channel; an in-memory pair for
+  tests) and `Client` (created with a `connect` thunk and
   reconnectable: correlates responses by id, fans out events, stderr and
   `Closed` on one `Incoming.t` pipe that outlives the transport, fails calls
-  with "not connected" in between) and `Tool_host` (spawns
-  `prigh tool-host` lazily and proxies `Tool_exec`/`Tool_exec_cancel` events
-  to it and its `output`/`result` lines back as `tool_exec_*` requests).
+  with "not connected" in between). `client_unix/` (`prigh_client_unix`)
+  has the transports that need a process or a socket — `Stdio_transport`
+  spawns the backend, `Tcp_transport` connects to `-listen` — and
+  `Tool_host` (spawns `prigh tool-host` lazily and proxies
+  `Tool_exec`/`Tool_exec_cancel` events to it and its `output`/`result`
+  lines back as `tool_exec_*` requests).
 - `ui/` (`prigh_ui`) — **platform-agnostic**, depends only on `core` and
   `bonsai`; it is what both the terminal and a future web frontend mount.
   - `App` is an Elm-style pure state machine: `update : Model.t -> Action.t
@@ -344,7 +361,9 @@ copy of the protocol types and the e2e test guards the contract.
     `Action.Reply`.
   - `Component.create ~platform` wraps `App` in `Bonsai.state_machine`,
     turns commands into effects and feeds replies back; it also runs the
-    spinner clock while a turn is active.
+    spinner clock while a turn is active. `@` path completion is an RPC
+    (`list_paths`), answered by the active tool host, so both platforms
+    complete the same paths.
   - Reconnection is App state (`Connection.t`), so the policy is an expect
     test: `Backend_closed` emits `Command.Reconnect {generation; delay_ms;
     session}` (immediately, then 250ms doubling to a 10s cap), the platform
@@ -373,7 +392,7 @@ copy of the protocol types and the e2e test guards the contract.
     narrow widths.
 - `term/` (`prigh_ui_term`) — `Key_of_event` (Bonsai_term events → `Key.t`,
   bracketed paste → one `Insert`), `View_of_content` (spans → notty attrs,
-  including OSC-8 links), `Paths` (path completion under the session cwd via `fd`/`readdir`),
+  including OSC-8 links),
   `Tty`/`tty_stubs.c` (clears `IEXTEN`), and `Term_app` (spawns the backend,
   runs `Bonsai_term.start_with_driver`, pushes client `Incoming.t` into the
   component, executes the platform commands, sets the cursor). Three
@@ -395,6 +414,29 @@ copy of the protocol types and the e2e test guards the contract.
   wheel scrolls the transcript (`Scroll_up`/`Scroll_down`, three lines);
   without it the terminal turns the wheel into arrow keys, which walk the
   prompt history. Text selection therefore needs Shift.
+- `web/` (`prigh_ui_web`, pure: `core` + `virtual_dom`) — `Dom_of_screen`
+  renders a `Screen.t` as a monospace cell grid (`pre.screen` > `div.line` >
+  spans with style classes, links as anchors, the cursor cell in
+  `span.cursor`; `style.css` colours it) and `Key_of_dom` maps a browser
+  `keydown` (`key`, `code`, modifiers) to `Key.t`, using the physical `code`
+  for Alt/Ctrl combinations (Option on a Mac produces symbols) and leaving
+  paste and Meta shortcuts to the browser. A test checks every keymap
+  binding is producible from a browser event.
+- `web-app/` (`prigh_ui_web_app`) — the page: `Ws_transport` (a browser
+  WebSocket as a `Transport.t`), `Browser` (localStorage, query string,
+  clipboard, the cell measurement that turns the window into columns and
+  rows) and `Web_app`, the counterpart of `Term_app`: reads
+  `?backend=`/`?token=`/`?session=`/`?name=` (falling back to what the
+  connect form saved, then the page's origin `/ws`), sends `hello` with
+  `tools: false`, mounts the shared component with
+  `Bonsai_web.Start.start_and_get_handle` (incoming actions through the
+  handle), installs document-level `keydown`/`paste`/`wheel`/`resize`
+  listeners, and implements the platform: history in `localStorage`,
+  `navigator.clipboard`, `window.open`; suspend and the external editor
+  report themselves unavailable. A failed first `hello` shows a connect
+  form instead (backend URL + token, saved and reloaded). `web-bin/` is
+  the js_of_ocaml executable plus `index.html`/`style.css`, assembled
+  under `web-bin/site/` and installed to `share/prigh_tui/web`.
 - `bin/` — `prigh-tui` (`-faux`, `-session`, `-model`, `-cwd`, `-auth-file`,
   `-backend`; `PRIGH_BACKEND` overrides the backend path). `-connect
   HOST:PORT` (`$PRIGH_CONNECT`) joins a running backend instead of spawning
@@ -446,3 +488,14 @@ they paid for themselves immediately: the tmux layer caught `Ctrl+O` being
 eaten by the tty's line discipline (fixed by clearing `IEXTEN`) and the quit
 hang (`Driver.finished` never resolving), and the paste scenario caught the
 batched-event buffering bug.
+
+The web layer adds two: `backend/test/test_web.ml` (frames, fragmentation,
+the RFC handshake vector, static serving and traversal, and a masked
+WebSocket RPC conversation over a real loopback socket) and
+`tui/test-web/` (`Key_of_dom` and `Dom_of_screen`, run under `node` with
+js_of_ocaml because `virtual_dom`'s initialisers need a JavaScript runtime;
+skipped without `node`). The page itself was exercised with a headless
+Chromium against `serve -faux -web` (prompt, `/help`, pickers, `@`
+completion, `!` shell, paste, resize, the connect form, `?backend=` to a
+second backend, quit and reconnect after a backend restart); that is not
+automated.

@@ -865,6 +865,21 @@ let set_cwd t ~path =
           state_changed t))
 ;;
 
+let list_paths t ~prefix =
+  match
+    host_exec
+      t
+      ~cancel:Cancellation.never
+      ~on_output:ignore
+      ~call_id:"list_paths"
+      ~cwd:t.cwd
+      ~name:Host_ops.list_paths_op
+      ~arguments:(`Object [ "prefix", `String prefix ])
+  with
+  | { is_error = true; text } -> Or_error.error_string text
+  | { is_error = false; text } -> Json.parse text
+;;
+
 let delete_session t ~path =
   if String.equal path (Session.path t.session)
   then Or_error.error_string "cannot delete the active session"

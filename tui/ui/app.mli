@@ -52,11 +52,6 @@ module Command : sig
         ; params : (string * P.Json.t) list
         ; tag : Reply_tag.t
         }
-    | List_paths of
-        { prefix : string
-        ; cwd : string option
-        ; tag : Reply_tag.t
-        }
     | Open_browser of string
     | Load_history
     | Append_history of string

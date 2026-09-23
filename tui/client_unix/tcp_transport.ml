@@ -1,5 +1,6 @@
 open! Core
 open! Async
+open Prigh_client
 
 let connect ~host ~port =
   match%map

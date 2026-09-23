@@ -276,10 +276,47 @@ let parse_listen_addr spec =
         | exception _ -> Or_error.errorf "cannot resolve host %S" host))
 ;;
 
+(* The web frontend's built assets: $PRIGH_WEB_ROOT, or the dune build next to
+   this executable. *)
+let find_web_root () =
+  match Sys.getenv "PRIGH_WEB_ROOT" with
+  | Some dir -> Some dir
+  | None ->
+    let exe = Core_unix.readlink "/proc/self/exe" in
+    List.find
+      [ "../../../../tui/_build/default/web-bin/site"
+      ; "../../tui/_build/default/web-bin/site"
+      ; "../share/prigh/web"
+      ]
+      ~f:(fun rel ->
+        match
+          Sys_unix.is_directory (Filename.concat (Filename.dirname exe) rel)
+        with
+        | `Yes -> true
+        | `No | `Unknown -> false)
+    |> Option.map ~f:(fun rel ->
+      Filename_unix.realpath (Filename.concat (Filename.dirname exe) rel))
+;;
+
+let open_in_browser url =
+  let prog =
+    if Sys_unix.file_exists_exn "/usr/bin/open" then "open" else "xdg-open"
+  in
+  match Core_unix.fork () with
+  | `In_the_child ->
+    (try
+       Core_unix.exec ~prog ~argv:[ prog; url ] ~use_path:true ()
+       |> never_returns
+     with
+     | _ -> exit 1)
+  | `In_the_parent _ -> ()
+;;
+
 let serve_command =
   Command.basic
     ~summary:
-      "Serve the JSON-lines RPC protocol on stdin/stdout and/or a TCP port"
+      "Serve the JSON-lines RPC protocol on stdin/stdout, a TCP port and/or a \
+       web port (the browser frontend)"
     (let%map_open.Command make_agent = common_params
      and listen =
        flag
@@ -299,6 +336,22 @@ let serve_command =
          "-token"
          (optional string)
          ~doc:"SECRET clients must present it in hello (default: $PRIGH_TOKEN)"
+     and web =
+       flag
+         "-web"
+         (optional string)
+         ~doc:
+           "HOST:PORT serve the browser frontend and accept WebSocket clients \
+            (port 0 picks a free one)"
+     and web_root =
+       flag
+         "-web-root"
+         (optional string)
+         ~doc:
+           "DIR the built web frontend (default: $PRIGH_WEB_ROOT or the dune \
+            build)"
+     and open_browser =
+       flag "-open" no_arg ~doc:" open the web frontend in a browser"
      in
      fun () ->
        let token =
@@ -314,7 +367,19 @@ let serve_command =
              eprintf "%s\n" (Error.to_string_hum e);
              exit 2)
        in
-       let stdio = stdio || Option.is_none listen in
+       let web =
+         Option.map web ~f:(fun spec ->
+           match parse_listen_addr spec with
+           | Ok addr -> addr
+           | Error e ->
+             eprintf "%s\n" (Error.to_string_hum e);
+             exit 2)
+       in
+       if open_browser && Option.is_none web
+       then (
+         eprintf "-open needs -web\n";
+         exit 2);
+       let stdio = stdio || (Option.is_none listen && Option.is_none web) in
        Eio_main.run
        @@ fun env ->
        Eio.Switch.run
@@ -357,6 +422,35 @@ let serve_command =
                (fun flow _addr ->
                   Rpc_server.serve_connection server ~input:flow ~output:flow)
            done));
+       Option.iter web ~f:(fun (addr, port) ->
+         let root =
+           match web_root with
+           | Some dir -> Some dir
+           | None -> find_web_root ()
+         in
+         let port =
+           Web_server.listen
+             ~env
+             ~sw
+             ~addr
+             ~port
+             ~root
+             ~on_websocket:(Web_server.serve_rpc server)
+         in
+         let host =
+           Format.asprintf "%a" Eio.Net.Ipaddr.pp addr
+           |> fun h -> if String.equal h "0.0.0.0" then "127.0.0.1" else h
+         in
+         let url = sprintf "http://%s:%d/" host port in
+         eprintf "prigh: web ui on %s\n%!" url;
+         (match root with
+          | Some root -> eprintf "prigh: serving web assets from %s\n%!" root
+          | None ->
+            eprintf
+              "prigh: no web assets found (-web-root or $PRIGH_WEB_ROOT); only \
+               /ws is served\n\
+               %!");
+         if open_browser then open_in_browser url);
        if stdio
        then (
          Rpc_server.serve_connection

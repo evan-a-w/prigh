@@ -32,6 +32,7 @@ let methods =
   ; "rewind"
   ; "session_stats"
   ; "set_cwd"
+  ; "list_paths"
   ; "get_config"
   ; "set_config"
   ; "tool_confirm_respond"
@@ -532,6 +533,13 @@ let dispatch agent login ~meth ~params : Json.t Or_error.t =
   | "set_cwd" ->
     Or_error.bind (string_param params "path") ~f:(fun path ->
       unit_result (Agent.set_cwd agent ~path))
+  | "list_paths" ->
+    let prefix =
+      match param params "prefix" with
+      | Some (`String s) -> s
+      | _ -> ""
+    in
+    Agent.list_paths agent ~prefix
   | "get_config" -> ok (Config.to_json (Agent.config agent))
   | "set_config" ->
     (match param params "config" with
@@ -613,7 +621,7 @@ let handle t client (request : Json.t) : Json.t =
       ]
 ;;
 
-let serve_connection t ~input ~output =
+let serve_lines t ~read_line ~write_line =
   Switch.run
   @@ fun sw ->
   let outbox : string option Eio.Stream.t = Eio.Stream.create 1024 in
@@ -623,17 +631,16 @@ let serve_connection t ~input ~output =
       match Eio.Stream.take outbox with
       | None -> ()
       | Some line ->
-        (match Eio.Flow.copy_string (line ^ "\n") output with
+        (match write_line line with
          | () -> loop ()
          | exception _ -> ())
     in
     loop ());
   let client = connect t ~send in
-  let reader = Eio.Buf_read.of_flow input ~max_size:(64 * 1024 * 1024) in
   let rec loop () =
-    match Eio.Buf_read.line reader with
-    | exception (End_of_file | Eio.Io _) -> ()
-    | line ->
+    match read_line () with
+    | None -> ()
+    | Some line ->
       if not (String.is_empty (String.strip line))
       then (
         match Json.parse line with
@@ -654,4 +661,15 @@ let serve_connection t ~input ~output =
   loop ();
   disconnect t client;
   Eio.Stream.add outbox None
+;;
+
+let serve_connection t ~input ~output =
+  let reader = Eio.Buf_read.of_flow input ~max_size:(64 * 1024 * 1024) in
+  serve_lines
+    t
+    ~read_line:(fun () ->
+      match Eio.Buf_read.line reader with
+      | exception (End_of_file | Eio.Io _) -> None
+      | line -> Some line)
+    ~write_line:(fun line -> Eio.Flow.copy_string (line ^ "\n") output)
 ;;

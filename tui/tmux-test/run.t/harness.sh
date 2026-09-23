@@ -168,8 +168,9 @@ scenario_quit() {
 	capture quit "after first C-c"
 	keys C-c
 	wait_for "EXITED"
-	sleep 0.3
-	# The tty must be sane after exit: the shell prints the termios flags.
+	# The tty must be sane after exit: the shell prints the termios flags
+	# (wait for them rather than for a fixed time; stty can lag on a slow box).
+	wait_for "ixon"
 	capture quit "exited (tty flags)"
 }
 

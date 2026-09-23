@@ -20,16 +20,6 @@ let make_platform ~replies : Component.Platform.t =
             | Some (Error e) -> Error e
             | None -> Ok (`Object []))
           ())
-  ; list_paths =
-      (fun ~cwd ~prefix ->
-        Bonsai.Effect.of_sync_fun
-          (fun () ->
-            printf
-              "list_paths %s in %s\n"
-              prefix
-              (Option.value cwd ~default:"(no cwd)");
-            Ok (`Array []))
-          ())
   ; open_browser =
       (fun url ->
         Bonsai.Effect.of_sync_fun (fun () -> printf "open browser %s\n" url) ())

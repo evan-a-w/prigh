@@ -207,12 +207,6 @@ let platform client ~hello ~exit ~quit_requested : Prigh_ui.Component.Platform.t
               (Client.call client method_ params)
               ~f:(Result.map_error ~f:Error.to_string_hum))
           ())
-  ; list_paths =
-      (fun ~cwd ~prefix ->
-        Effect.of_deferred_fun
-          (fun () ->
-            Deferred.map (Paths.list ~cwd ~prefix) ~f:(fun json -> Ok json))
-          ())
   ; open_browser = (fun url -> Effect.of_sync_fun open_browser url)
   ; load_history = (fun () -> Effect.of_sync_fun load_history ())
   ; append_history = (fun text -> Effect.of_sync_fun append_history text)
@@ -408,7 +402,7 @@ let run ~connect ~hello ~local_tools =
     in
     let tool_host =
       Option.map local_tools ~f:(fun backend ->
-        Prigh_client.Tool_host.create ~client ~backend)
+        Prigh_client_unix.Tool_host.create ~client ~backend)
     in
     let quit_requested = Ivar.create () in
     let%bind.Deferred driver =
@@ -442,7 +436,7 @@ let run ~connect ~hello ~local_tools =
             (Client.incoming client)
             ~f:(fun incoming ->
               (match incoming, tool_host with
-               | Event e, Some host -> Prigh_client.Tool_host.handle host e
+               | Event e, Some host -> Prigh_client_unix.Tool_host.handle host e
                | _ -> ());
               Driver.send_incoming_event driver (action_of_incoming incoming)));
        let%bind.Deferred () =
@@ -454,7 +448,7 @@ let run ~connect ~hello ~local_tools =
        (* Give the driver a frame to release the terminal before we exit. *)
        let%bind.Deferred () = Clock.after (Time_float.Span.of_sec 0.2) in
        ignore (Tty.set_iexten tty had_iexten : bool);
-       Option.iter tool_host ~f:Prigh_client.Tool_host.close;
+       Option.iter tool_host ~f:Prigh_client_unix.Tool_host.close;
        let%bind.Deferred () =
          Deferred.any_unit
            [ Client.close client; Clock.after (Time_float.Span.of_sec 3.) ]

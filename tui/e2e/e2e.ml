@@ -142,7 +142,7 @@ let main () =
     ]
   in
   let spawn args () =
-    Prigh_client.Stdio_transport.spawn
+    Prigh_client_unix.Stdio_transport.spawn
       ~env:(`Extend [ "HOME", tmp ])
       ~prog:(backend ())
       ~args

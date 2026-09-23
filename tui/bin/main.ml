@@ -120,7 +120,8 @@ let command =
              Core.exit 2
          in
          Prigh_ui_term.Term_app.run
-           ~connect:(fun () -> Prigh_client.Tcp_transport.connect ~host ~port)
+           ~connect:(fun () ->
+             Prigh_client_unix.Tcp_transport.connect ~host ~port)
            ~hello
            ~local_tools
        | None ->
@@ -136,7 +137,7 @@ let command =
          in
          Prigh_ui_term.Term_app.run
            ~connect:(fun () ->
-             Prigh_client.Stdio_transport.spawn ~prog:backend ~args ())
+             Prigh_client_unix.Stdio_transport.spawn ~prog:backend ~args ())
            ~hello
            ~local_tools)
 ;;

@@ -243,4 +243,26 @@
   yojson = "2.2.2+ox";
   zarith = "1.12+ox3";
   zarith_stubs_js = "v0.18~preview.130.106+341";
+  # The web frontend (bonsai_web + js_of_ocaml).
+  am_running_how_js = "v0.18~preview.130.106+341";
+  async_durable = "v0.18~preview.130.106+341";
+  babel = "v0.18~preview.130.106+341";
+  bonsai_web = "v0.18~preview.130.106+341";
+  bonsai_web_test = "v0.18~preview.130.106+341";
+  browser = "v0.18~preview.130.106+341";
+  fastdom = "v0.18~preview.130.106+341";
+  file_path = "v0.18~preview.130.106+341";
+  filesystem = "v0.18~preview.130.106+341";
+  incr_dom = "v0.18~preview.130.106+341";
+  ocamlgraph = "2.0.0";
+  pending_or_error = "v0.18~preview.130.106+341";
+  polling_state_rpc = "v0.18~preview.130.106+341";
+  ppx_css = "v0.18~preview.130.106+341";
+  ppx_html = "v0.18~preview.130.106+341";
+  promise_jsoo = "0.4.3";
+  result = "1.5";
+  testable_timeout = "v0.18~preview.130.106+341";
+  tilde_f = "v0.18~preview.130.106+341";
+  toplayer = "v0.18~preview.130.106+341";
+  versioned_polling_state_rpc = "v0.18~preview.130.106+341";
 }

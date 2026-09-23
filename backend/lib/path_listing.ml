@@ -1,6 +1,5 @@
 open! Core
-open! Async
-module P = Prigh_protocol
+open! Import
 
 let max_results = 200
 let max_depth = 4
@@ -25,14 +24,11 @@ let normalize ~root path =
 ;;
 
 let finish ~root ~prefix paths =
-  let paths =
-    paths
-    |> List.map ~f:(normalize ~root)
-    |> List.filter ~f:(matches ~prefix)
-    |> List.dedup_and_sort ~compare:String.compare
-    |> fun paths -> List.take paths max_results
-  in
-  `Array (List.map paths ~f:(fun p -> `String p))
+  paths
+  |> List.map ~f:(normalize ~root)
+  |> List.filter ~f:(matches ~prefix)
+  |> List.dedup_and_sort ~compare:String.compare
+  |> fun paths -> List.take paths max_results
 ;;
 
 let rec walk ~root ~dir ~depth acc =
@@ -61,26 +57,39 @@ let readdir ~root ~prefix =
   finish ~root ~prefix (walk ~root ~dir:"" ~depth:1 [])
 ;;
 
-let fd ~root ~prefix =
-  let%bind.Deferred result =
-    Process.run
-      ~working_dir:root
+let fd ~env ~root ~prefix =
+  match
+    Process.run_collect
+      ~env
+      ~cwd:root
+      ~timeout:(Time_ns.Span.of_sec 5.)
       ~prog:"fd"
       ~args:
-        ([ "--type"; "f"; "--type"; "d"; "--max-depth"; "4"; "--hidden" ]
+        ([ "--type"
+         ; "f"
+         ; "--type"
+         ; "d"
+         ; "--max-depth"
+         ; Int.to_string max_depth
+         ; "--hidden"
+         ]
          @ List.concat_map skips ~f:(fun name -> [ "--exclude"; name ]))
       ()
-  in
-  match result with
-  | Error _ -> Deferred.return (readdir ~root ~prefix)
-  | Ok output ->
-    let paths =
-      List.filter (String.split_lines output) ~f:(Fn.non String.is_empty)
-    in
-    Deferred.return (finish ~root ~prefix paths)
+  with
+  | exception _ -> None
+  | { exit; stdout; _ } ->
+    if Process.Exit.is_success exit
+    then
+      Some
+        (finish
+           ~root
+           ~prefix
+           (List.filter (String.split_lines stdout) ~f:(Fn.non String.is_empty)))
+    else None
 ;;
 
-let list ~cwd ~prefix =
-  let root = Option.value cwd ~default:(Core_unix.getcwd ()) in
-  fd ~root ~prefix
+let list ~env ~root ~prefix =
+  match fd ~env ~root ~prefix with
+  | Some paths -> paths
+  | None -> readdir ~root ~prefix
 ;;

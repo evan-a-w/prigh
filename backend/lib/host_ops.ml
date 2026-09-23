@@ -15,6 +15,16 @@ let resolve_dir ~cwd path =
   | `No | `Unknown -> Tool.Result.error (sprintf "not a directory: %s" path)
 ;;
 
+let list_paths_op = "$list_paths"
+
+let list_paths ~env ~cwd prefix =
+  Tool.Result.ok
+    (Json.to_string
+       (`Array
+           (List.map (Path_listing.list ~env ~root:cwd ~prefix) ~f:(fun p ->
+              `String p))))
+;;
+
 let read_file ~cwd path =
   match Tool_read.read_for_context ~cwd path with
   | Ok content -> Tool.Result.ok content
@@ -88,6 +98,11 @@ let execute ~env ~cancel ~on_output ~cwd ~name ~(arguments : Json.t) =
   then (
     match string_arg "path" with
     | Ok path -> read_file ~cwd path
+    | Error e -> Tool.Result.error (Error.to_string_hum e))
+  else if String.equal name list_paths_op
+  then (
+    match string_arg "prefix" with
+    | Ok prefix -> list_paths ~env ~cwd prefix
     | Error e -> Tool.Result.error (Error.to_string_hum e))
   else (
     match

@@ -3,6 +3,7 @@
 # (OxCaml `prigh-ox` switch, or the current environment under `nix develop`),
 # then runs the TUI.
 # Usage: ./prigh [frontend options] [-- backend options]   (see prigh-tui -help)
+#        ./prigh -web [serve options]                      (browser frontend; see prigh serve -help)
 set -euo pipefail
 root="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 export PATH="$HOME/.local/bin:$PATH"
@@ -19,4 +20,13 @@ fi
 (cd "$root/tui" && dune build ./bin/main.exe 2>&1)
 
 export PRIGH_BACKEND="${PRIGH_BACKEND:-$root/backend/_build/default/bin/main.exe}"
+
+# ./prigh -web [serve options]: the browser frontend instead of the TUI.
+if [ "${1:-}" = "-web" ]; then
+	shift
+	(cd "$root/tui" && dune build ./web-bin/site 2>&1 | { grep -v missing-effects-backend || true; })
+	export PRIGH_WEB_ROOT="${PRIGH_WEB_ROOT:-$root/tui/_build/default/web-bin/site}"
+	exec "$PRIGH_BACKEND" serve -web "${PRIGH_WEB_LISTEN:-127.0.0.1:7788}" -open "$@"
+fi
+
 exec "$root/tui/_build/default/bin/main.exe" "$@"

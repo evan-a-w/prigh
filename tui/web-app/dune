@@ -1,0 +1,20 @@
+; The browser entry point: WebSocket transport, Platform effects, Bonsai_web
+; mount. Only runs in a page.
+
+(library
+ (name prigh_ui_web_app)
+ (preprocess
+  (pps ppx_jane js_of_ocaml-ppx bonsai.ppx_bonsai))
+ (libraries
+  core
+  async_kernel
+  async_js
+  bonsai
+  bonsai_web
+  virtual_dom
+  js_of_ocaml
+  jsonaf
+  prigh_protocol
+  prigh_client
+  prigh_ui
+  prigh_ui_web))

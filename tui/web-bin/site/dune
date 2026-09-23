@@ -1,0 +1,25 @@
+(rule
+ (target main.bc.js)
+ (deps ../main.bc.js)
+ (action
+  (copy ../main.bc.js main.bc.js)))
+
+(rule
+ (target index.html)
+ (deps ../index.html)
+ (action
+  (copy ../index.html index.html)))
+
+(rule
+ (target style.css)
+ (deps ../style.css)
+ (action
+  (copy ../style.css style.css)))
+
+(install
+ (section share)
+ (package prigh_tui)
+ (files
+  (index.html as web/index.html)
+  (main.bc.js as web/main.bc.js)
+  (style.css as web/style.css)))

@@ -1,0 +1,9 @@
+; The pure part of the browser platform: Screen.t -> DOM and keyboard events
+; -> Key.t. No bonsai_web here so the tests can link it (in bytecode: the
+; OxCaml build of ojs, which virtual_dom pulls in, has no native archive).
+
+(library
+ (name prigh_ui_web)
+ (preprocess
+  (pps ppx_jane))
+ (libraries core virtual_dom prigh_ui))

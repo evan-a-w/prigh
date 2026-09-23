@@ -48,11 +48,6 @@ module Command = struct
         ; params : (string * P.Json.t) list
         ; tag : Reply_tag.t
         }
-    | List_paths of
-        { prefix : string
-        ; cwd : string option
-        ; tag : Reply_tag.t
-        }
     | Open_browser of string
     | Load_history
     | Append_history of string
@@ -1404,11 +1399,10 @@ let refresh_autocomplete m =
        else (
          let prefix = Autocomplete.prefix ac in
          ( { m with autocomplete = Some ac }
-         , [ Command.List_paths
-               { prefix
-               ; cwd = Option.map m.state ~f:(fun s -> s.cwd)
-               ; tag = Paths_for_autocomplete prefix
-               }
+         , [ rpc
+               "list_paths"
+               ~params:[ "prefix", `String prefix ]
+               ~tag:(Paths_for_autocomplete prefix)
            ] ))
      | Autocomplete.Source.Argument spec
        when match spec.argument with
@@ -2516,7 +2510,7 @@ let reply m (tag : Reply_tag.t) (result : (P.Json.t, string) Result.t) =
 let stderr_tail_limit = 20
 
 let is_backend_command = function
-  | Command.Rpc _ | Command.List_paths _ -> true
+  | Command.Rpc _ -> true
   | _ -> false
 ;;
 

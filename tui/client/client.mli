@@ -1,5 +1,5 @@
 open! Core
-open! Async
+open! Async_kernel
 open Prigh_protocol
 
 (** JSON-lines RPC client: correlates responses by id and fans out events. *)

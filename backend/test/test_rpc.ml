@@ -844,3 +844,77 @@ let%expect_test "remote tool host: attached to another session" =
     side: active=client-2 hosts=(((id backend)(name <host>)(cwd /home/me/proj)(session_id())(session_name())))
     |}]
 ;;
+
+(* [@] completion lists paths on the active tool host, under the session cwd:
+   the backend's own filesystem by default, a connected frontend's after
+   [set_active_host]. *)
+let%expect_test "list_paths: on the backend, then routed to a remote host" =
+  with_agent []
+  @@ fun t _agent h ->
+  List.iter [ "src/sub"; "docs"; ".git/objects"; "_build/default" ] ~f:(fun d ->
+    Core_unix.mkdir_p (Filename.concat t.dir d));
+  List.iter
+    [ "src/app.ml"
+    ; "src/sub/deep.ml"
+    ; "docs/README.md"
+    ; ".git/HEAD"
+    ; "_build/x"
+    ]
+    ~f:(fun f -> Out_channel.write_all (Filename.concat t.dir f) ~data:"");
+  call t h "list_paths";
+  call t h ~params:{|{"prefix": "APP"}|} "list_paths";
+  call t h ~params:{|{"prefix": "zzz"}|} "list_paths";
+  [%expect
+    {|
+    {"type":"response","id":"r1","ok":true,"result":["docs/","docs/README.md","sessions/","sessions/<stamp>_<id>.jsonl","src/","src/app.ml","src/sub/","src/sub/deep.ml"]}
+    {"type":"response","id":"r1","ok":true,"result":["src/app.ml"]}
+    {"type":"response","id":"r1","ok":true,"result":[]}
+    |}];
+  let sent = Queue.create () in
+  let laptop = Rpc_server.connect h.server ~send:(Queue.enqueue sent) in
+  let call_as client ?(params = "{}") meth =
+    Rpc_server.handle
+      h.server
+      client
+      (Json.of_string
+         (sprintf {|{"id": "r2", "method": "%s", "params": %s}|} meth params))
+  in
+  ignore
+    (call_as
+       laptop
+       ~params:{|{"name": "laptop", "tools": true, "cwd": "/home/me/proj"}|}
+       "hello"
+     : Json.t);
+  (* The request blocks until the host answers, so answer from another fiber. *)
+  Eio.Fiber.both
+    (fun () -> call t h ~params:{|{"prefix": "ma"}|} "list_paths")
+    (fun () ->
+       let rec wait () =
+         match Queue.find sent ~f:is_exec with
+         | Some json -> json
+         | None ->
+           Eio.Fiber.yield ();
+           wait ()
+       in
+       let exec = wait () in
+       print_endline (mask t (Json.to_string exec));
+       let exec_id =
+         match Json.member "exec_id" exec with
+         | Some (`String id) -> id
+         | _ -> ""
+       in
+       ignore
+         (call_as
+            laptop
+            ~params:
+              (sprintf
+                 {|{"exec_id": "%s", "text": "[\"main.ml\",\"src/main.ml\"]", "is_error": false}|}
+                 exec_id)
+            "tool_exec_result"
+          : Json.t));
+  [%expect
+    {|
+    {"type":"event","event":"tool_exec","host":"client-2","exec_id":"<id>/list_paths-0","call_id":"list_paths","name":"$list_paths","arguments":{"prefix":"ma"},"cwd":"/home/me/proj"}
+    {"type":"response","id":"r1","ok":true,"result":["main.ml","src/main.ml"]}
+    |}]
+;;

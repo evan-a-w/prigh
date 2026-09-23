@@ -1,0 +1,74 @@
+:root {
+  --bg: #1e1e1e;
+  --fg: #d4d4d4;
+  --red: #f14c4c;
+  --green: #23d18b;
+  --yellow: #f5f543;
+  --blue: #3b8eea;
+  --magenta: #d670d6;
+  --cyan: #29b8db;
+  --gray: #8a8a8a;
+  --white: #ffffff;
+}
+
+html, body {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  background: var(--bg);
+  color: var(--fg);
+  overflow: hidden;
+}
+
+#app { height: 100%; }
+
+pre.screen {
+  margin: 0;
+  padding: 0;
+  font-family: "JetBrains Mono", "Fira Code", Menlo, Consolas, "DejaVu Sans Mono", monospace;
+  font-size: 14px;
+  line-height: 1.25;
+  white-space: pre;
+  tab-size: 8;
+}
+
+pre.screen .line { height: 1.25em; overflow: hidden; }
+
+pre.screen.probe { position: absolute; visibility: hidden; top: 0; left: 0; }
+
+pre.screen a { color: inherit; text-decoration: underline; }
+
+.fg-red { color: var(--red); }
+.fg-green { color: var(--green); }
+.fg-yellow { color: var(--yellow); }
+.fg-blue { color: var(--blue); }
+.fg-magenta { color: var(--magenta); }
+.fg-cyan { color: var(--cyan); }
+.fg-gray { color: var(--gray); }
+.fg-white { color: var(--white); }
+.bold { font-weight: bold; }
+.dim { opacity: 0.6; }
+.italic { font-style: italic; }
+.underline { text-decoration: underline; }
+.strike { text-decoration: line-through; }
+.invert { background: var(--fg); color: var(--bg); }
+.cursor { background: var(--fg); color: var(--bg); }
+
+.connect {
+  max-width: 28em;
+  margin: 4em auto;
+  font-family: system-ui, sans-serif;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75em;
+}
+.connect label { display: flex; flex-direction: column; gap: 0.25em; }
+.connect input {
+  font: inherit;
+  padding: 0.4em;
+  background: #2b2b2b;
+  color: var(--fg);
+  border: 1px solid #444;
+}
+.connect button { font: inherit; padding: 0.5em; cursor: pointer; }
+.connect .error { color: var(--red); white-space: pre-wrap; }

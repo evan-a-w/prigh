@@ -869,13 +869,27 @@ let%expect_test "@ completion is asynchronous and drops stale replies" =
   H.keys h "@sr";
   [%expect
     {|
-    (List_paths (prefix "") (cwd (/work)) (tag (Paths_for_autocomplete "")))
-    (List_paths (prefix s) (cwd (/work)) (tag (Paths_for_autocomplete s)))
-    (List_paths (prefix sr) (cwd (/work)) (tag (Paths_for_autocomplete sr)))
+    (Rpc
+      (method_ list_paths)
+      (params ((prefix "")))
+      (tag (Paths_for_autocomplete "")))
+    (Rpc
+      (method_ list_paths)
+      (params ((prefix s)))
+      (tag (Paths_for_autocomplete s)))
+    (Rpc
+      (method_ list_paths)
+      (params ((prefix sr)))
+      (tag (Paths_for_autocomplete sr)))
     |}];
   H.keys h "c";
   [%expect
-    {| (List_paths (prefix src) (cwd (/work)) (tag (Paths_for_autocomplete src))) |}];
+    {|
+    (Rpc
+      (method_ list_paths)
+      (params ((prefix src)))
+      (tag (Paths_for_autocomplete src)))
+    |}];
   H.reply h (Paths_for_autocomplete "sr") {|["stale/only"]|};
   H.show h;
   [%expect
@@ -909,9 +923,9 @@ let%expect_test "submit with @file sends attachments param" =
   H.step h (Intent (Insert "look at @src/app.ml"));
   [%expect
     {|
-    (List_paths
-      (prefix src/app.ml)
-      (cwd (/work))
+    (Rpc
+      (method_ list_paths)
+      (params ((prefix src/app.ml)))
       (tag (Paths_for_autocomplete src/app.ml)))
     |}];
   H.reply h (Paths_for_autocomplete "src/app.ml") {|["src/app.ml"]|};
@@ -961,7 +975,12 @@ let%expect_test "/cd completes paths and submits the selected one" =
   let h = connected () in
   H.step h (Intent (Insert "/cd sr"));
   [%expect
-    {| (List_paths (prefix sr) (cwd (/work)) (tag (Paths_for_autocomplete sr))) |}];
+    {|
+    (Rpc
+      (method_ list_paths)
+      (params ((prefix sr)))
+      (tag (Paths_for_autocomplete sr)))
+    |}];
   H.reply h (Paths_for_autocomplete "sr") {|["src/","src/app.ml"]|};
   H.show h;
   [%expect
@@ -1365,9 +1384,9 @@ let%expect_test "/export chooses jsonl by extension, or prompts for a path" =
   H.enter h;
   [%expect
     {|
-    (List_paths
-      (prefix data.jsonl)
-      (cwd (/work))
+    (Rpc
+      (method_ list_paths)
+      (params ((prefix data.jsonl)))
       (tag (Paths_for_autocomplete data.jsonl)))
     (Rpc
       (method_ export)
@@ -1380,9 +1399,9 @@ let%expect_test "/export chooses jsonl by extension, or prompts for a path" =
   H.enter h;
   [%expect
     {|
-    (List_paths
-      (prefix notes.md)
-      (cwd (/work))
+    (Rpc
+      (method_ list_paths)
+      (params ((prefix notes.md)))
       (tag (Paths_for_autocomplete notes.md)))
     (Rpc
       (method_ export)
@@ -1397,7 +1416,10 @@ let%expect_test "/export chooses jsonl by extension, or prompts for a path" =
   H.show h;
   [%expect
     {|
-    (List_paths (prefix "") (cwd (/work)) (tag (Paths_for_autocomplete "")))
+    (Rpc
+      (method_ list_paths)
+      (params ((prefix "")))
+      (tag (Paths_for_autocomplete "")))
 
 
     session abc123 in /work. /help for commands, Esc aborts,
@@ -1430,9 +1452,9 @@ let%expect_test "/import imports a path or prompts for one" =
   H.enter h;
   [%expect
     {|
-    (List_paths
-      (prefix saved.jsonl)
-      (cwd (/work))
+    (Rpc
+      (method_ list_paths)
+      (params ((prefix saved.jsonl)))
       (tag (Paths_for_autocomplete saved.jsonl)))
     (Rpc (method_ import) (params ((path saved.jsonl))) (tag Reload_messages))
     |}];
@@ -1441,7 +1463,10 @@ let%expect_test "/import imports a path or prompts for one" =
   H.show h;
   [%expect
     {|
-    (List_paths (prefix "") (cwd (/work)) (tag (Paths_for_autocomplete "")))
+    (Rpc
+      (method_ list_paths)
+      (params ((prefix "")))
+      (tag (Paths_for_autocomplete "")))
 
 
 
@@ -1467,7 +1492,10 @@ let%expect_test "/cd changes the directory or prompts for a path" =
   H.enter h;
   [%expect
     {|
-    (List_paths (prefix /var) (cwd (/work)) (tag (Paths_for_autocomplete /var)))
+    (Rpc
+      (method_ list_paths)
+      (params ((prefix /var)))
+      (tag (Paths_for_autocomplete /var)))
     (Rpc
       (method_ set_cwd)
       (params ((path /var)))
@@ -1478,7 +1506,10 @@ let%expect_test "/cd changes the directory or prompts for a path" =
   H.show h;
   [%expect
     {|
-    (List_paths (prefix "") (cwd (/work)) (tag (Paths_for_autocomplete "")))
+    (Rpc
+      (method_ list_paths)
+      (params ((prefix "")))
+      (tag (Paths_for_autocomplete "")))
 
 
 
@@ -3169,12 +3200,23 @@ let%expect_test "Ctrl+Z suspends; Ctrl+R completes a path; Ctrl+L picks a model"
   [%expect {| Suspend |}];
   H.key h (Key.ctrl 'r');
   [%expect
-    {| (List_paths (prefix "") (cwd (/work)) (tag (Paths_for_autocomplete ""))) |}];
+    {|
+    (Rpc
+      (method_ list_paths)
+      (params ((prefix "")))
+      (tag (Paths_for_autocomplete "")))
+    |}];
   H.keys h "sr";
   [%expect
     {|
-    (List_paths (prefix s) (cwd (/work)) (tag (Paths_for_autocomplete s)))
-    (List_paths (prefix sr) (cwd (/work)) (tag (Paths_for_autocomplete sr)))
+    (Rpc
+      (method_ list_paths)
+      (params ((prefix s)))
+      (tag (Paths_for_autocomplete s)))
+    (Rpc
+      (method_ list_paths)
+      (params ((prefix sr)))
+      (tag (Paths_for_autocomplete sr)))
     |}];
   H.reply h (Paths_for_autocomplete "sr") {|["src/","src/app.ml"]|};
   H.show h;
@@ -5200,7 +5242,10 @@ let%expect_test "/model Enter Enter opens the picker instead of silently \
   H.show h;
   [%expect
     {|
-    (List_paths (prefix "") (cwd (/work)) (tag (Paths_for_autocomplete "")))
+    (Rpc
+      (method_ list_paths)
+      (params ((prefix "")))
+      (tag (Paths_for_autocomplete "")))
 
 
 

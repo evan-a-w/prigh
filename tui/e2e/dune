@@ -10,7 +10,8 @@
   re
   async
   prigh_protocol
-  prigh_client))
+  prigh_client
+  prigh_client_unix))
 
 ; Runs the real backend (`main.exe serve -faux`, built in the vanilla switch)
 ; through the real client and compares the normalised transcript.

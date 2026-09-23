@@ -1,5 +1,6 @@
 open! Core
 open! Async
+open Prigh_client
 
 (** Runs the session's tools on this machine: spawns [prigh tool-host] lazily
     and proxies between it and the backend. Feed it the [Tool_exec] and

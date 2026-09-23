@@ -1,0 +1,12 @@
+(library
+ (name prigh_client_unix)
+ (preprocess
+  (pps ppx_jane))
+ (libraries
+  core
+  async
+  async_unix
+  core_unix
+  jsonaf
+  prigh_protocol
+  prigh_client))

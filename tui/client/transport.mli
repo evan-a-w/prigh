@@ -1,5 +1,5 @@
 open! Core
-open! Async
+open! Async_kernel
 
 (** A bidirectional line channel to the backend. Stdio to a spawned process
     today; a websocket later. *)

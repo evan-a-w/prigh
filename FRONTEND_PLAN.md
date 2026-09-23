@@ -64,6 +64,9 @@ client) rather than by sharing source between two incompatible switches.
    opam switch or `nix develop`. ✔
 8. Delete `frontend/` (TypeScript); update `ARCHITECTURE.md`. ✔
 
+9. `prigh_ui_web` on bonsai_web over a WebSocket (`prigh serve -web`), same
+   `Screen.t` rendered as a DOM cell grid; `@` completion moved to the
+   backend (`list_paths`, on the active tool host). ✔
+
 Later (P1/P2 in `UX_PLAN.md`): login dialog block, confirmations, collapsible
-tool output, markdown tables, `prigh_ui_web` on bonsai_web over a websocket
-transport.
+tool output, markdown tables.

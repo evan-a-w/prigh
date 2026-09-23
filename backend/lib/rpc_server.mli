@@ -50,8 +50,15 @@ val handle : t -> Client.t -> Json.t -> Json.t
 (** Forgets a client (its sessions keep running). *)
 val disconnect : t -> Client.t -> unit
 
-(** Serves one connection until [input] reaches end of file; each request is
+(** Serves one connection until [read_line] returns [None]; each request is
     handled in its own fiber. *)
+val serve_lines
+  :  t
+  -> read_line:(unit -> string option)
+  -> write_line:(string -> unit)
+  -> unit
+
+(** [serve_lines] over newline-delimited flows. *)
 val serve_connection
   :  t
   -> input:_ Eio.Flow.source

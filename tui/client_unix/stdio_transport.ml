@@ -1,5 +1,6 @@
 open! Core
 open! Async
+open Prigh_client
 
 let spawn ?env ~prog ~args () =
   match%map Process.create ?env ~prog ~args () with

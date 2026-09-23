@@ -1,5 +1,8 @@
+; Platform-agnostic: linkable under js_of_ocaml (the web frontend), so only
+; Async_kernel. The unix transports live in prigh_client_unix.
+
 (library
  (name prigh_client)
  (preprocess
   (pps ppx_jane))
- (libraries core async async_unix core_unix jsonaf prigh_protocol))
+ (libraries core async_kernel jsonaf prigh_protocol))

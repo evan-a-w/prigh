@@ -386,3 +386,30 @@ let%expect_test "resolve_path" =
     $HOME
     |}]
 ;;
+
+let%expect_test "path listing: fd and the readdir fallback agree" =
+  with_sandbox
+  @@ fun t ->
+  List.iter [ "src/sub"; "docs"; ".git/objects"; "_build/default" ] ~f:(fun d ->
+    Core_unix.mkdir_p (Filename.concat t.dir d));
+  List.iter
+    [ "src/app.ml"
+    ; "src/sub/deep.ml"
+    ; "docs/README.md"
+    ; ".git/HEAD"
+    ; "_build/x"
+    ]
+    ~f:(fun f -> write t f "");
+  let show paths = print_s [%sexp (paths : string list)] in
+  show (Path_listing.list ~env:t.env ~root:t.dir ~prefix:"");
+  show (Path_listing.readdir ~root:t.dir ~prefix:"");
+  show (Path_listing.readdir ~root:t.dir ~prefix:"APP");
+  show (Path_listing.readdir ~root:(Filename.concat t.dir "docs") ~prefix:"");
+  [%expect
+    {|
+    (docs/ docs/README.md src/ src/app.ml src/sub/ src/sub/deep.ml)
+    (docs/ docs/README.md src/ src/app.ml src/sub/ src/sub/deep.ml)
+    (src/app.ml)
+    (README.md)
+    |}]
+;;

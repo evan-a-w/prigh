@@ -1,5 +1,6 @@
 open! Core
 open! Async
+open Prigh_client
 open Prigh_protocol
 
 type t =

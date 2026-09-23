@@ -1,0 +1,20 @@
+; Runs under node: virtual_dom's initialisers call JavaScript primitives, so
+; like Bonsai's own web tests these cannot link natively.
+
+(library
+ (name prigh_tui_test_web)
+ (enabled_if %{bin-available:node})
+ (preprocess
+  (pps ppx_jane js_of_ocaml-ppx))
+ (inline_tests
+  (modes js)
+  (flags
+   (-source-tree-root .)))
+ (libraries
+  core
+  expect_test_helpers_core
+  prigh_protocol
+  prigh_ui
+  prigh_ui_web
+  virtual_dom
+  virtual_dom.vdom_test_helpers))

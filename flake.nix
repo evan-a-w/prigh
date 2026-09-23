@@ -1,5 +1,5 @@
 {
-  description = "prigh — OCaml backend and Bonsai_term frontend on OxCaml";
+  description = "prigh — OCaml backend, Bonsai_term and Bonsai_web frontends on OxCaml";
 
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
@@ -117,10 +117,18 @@
           };
         });
 
+        # `prigh` runs the TUI; `prigh -web [serve options]` runs the backend
+        # with the browser frontend instead (`prigh serve -web 127.0.0.1:7788
+        # -open ...`).
         prigh = pkgs.writeShellApplication {
           name = "prigh";
           text = ''
             export PRIGH_BACKEND="''${PRIGH_BACKEND:-${prighBackend}/bin/prigh}"
+            export PRIGH_WEB_ROOT="''${PRIGH_WEB_ROOT:-${prighTui}/share/prigh_tui/web}"
+            if [ "''${1:-}" = "-web" ]; then
+              shift
+              exec "$PRIGH_BACKEND" serve -web "''${PRIGH_WEB_LISTEN:-127.0.0.1:7788}" -open "$@"
+            fi
             exec ${prighTui}/bin/prigh-tui "$@"
           '';
         };
@@ -150,6 +158,8 @@
             frontendScope.expect_test_helpers_async
             frontendScope.ocamlformat
             pkgs.ripgrep
+            # the web-layer tests run under node (js_of_ocaml)
+            pkgs.nodejs
           ];
         };
       }

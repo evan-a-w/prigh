@@ -1,5 +1,5 @@
 open! Core
-open! Async
+open! Async_kernel
 
 type t =
   { send_line : string -> unit
