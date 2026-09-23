@@ -738,11 +738,17 @@ let agents_picker m =
     open_picker m Agents (Picker.create ~title:"Subagents" items), [])
 ;;
 
-(* A host's display name: "(here)" marks this frontend. *)
+(* A host's display name: "(here)" marks this frontend, "(in ...)" a client
+   attached to another session. *)
 let host_label m (h : P.Host.t) =
   if Option.value_map m.client_id ~default:false ~f:(String.equal h.id)
   then h.name ^ " (here)"
-  else h.name
+  else (
+    let ours = Option.map m.state ~f:(fun (s : P.State.t) -> s.session_id) in
+    match h.session_id with
+    | Some id when not (Option.equal String.equal ours (Some id)) ->
+      sprintf "%s (in %s)" h.name (Option.value h.session_name ~default:id)
+    | _ -> h.name)
 ;;
 
 let hosts_picker m =

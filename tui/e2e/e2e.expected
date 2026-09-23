@@ -14,7 +14,8 @@
  (context_tokens 0) (active_host backend)
  (hosts
   (((id backend) (name <host>)
-    (cwd $TMP)))))
+    (cwd $TMP) (session_id null)
+    (session_name null)))))
 <- prompt: ()
   event state running=true model=deepseek/deepseek-flash
   event user "hello there"
@@ -81,7 +82,8 @@
  (context_tokens 10) (active_host backend)
  (hosts
   (((id backend) (name <host>)
-    (cwd $TMP)))))
+    (cwd $TMP) (session_id null)
+    (session_name null)))))
 <- session_stats: ((message_count 2) (turns 1) (tool_calls ())
  (usage ((input 10) (output 5) (cache_read 0))) (cost_usd 0.00035)
  (context_percent 0.001) (model_changes 2) (compactions 0)

@@ -5051,6 +5051,53 @@ let%expect_test "switching tool host asks for the directory there, prefilled \
     |}]
 ;;
 
+let%expect_test "the host picker shows which session other frontends are in" =
+  let h = connected ~width:70 () in
+  let state =
+    Or_error.ok_exn
+      (P.State.of_json
+         (Or_error.ok_exn
+            (P.Json.parse
+               {|{"session_id":"abc123","session_path":"/s","session_name":null,"cwd":"/work","git_branch":null,"model":{"id":"m","provider":"deepseek","key":"deepseek/m","name":"M","context_window":1000,"max_output":10,"supports_thinking":false,"cost":{"input":1,"output":1,"cache_read":1}},"thinking":"off","running":false,"message_count":0,"usage":{"input":0,"output":0,"cache_read":0},"cost_usd":0,"context_tokens":0,"active_host":"client-3","hosts":[{"id":"backend","name":"srv","cwd":"/work","session_id":null,"session_name":null},{"id":"client-1","name":"laptop","cwd":"/home/me","session_id":"abc123","session_name":null},{"id":"client-2","name":"desktop","cwd":"/home/me/other","session_id":"def456","session_name":"refactor"},{"id":"client-3","name":"pi","cwd":"/pi","session_id":"9876","session_name":null}]}|})))
+  in
+  H.event h (State state);
+  H.step h (Set_client_id "client-1");
+  H.keys h "/host";
+  H.enter h;
+  H.show h;
+  [%expect
+    {|
+    session abc123 in /work. /help for commands, Esc aborts, Ctrl+C twice
+    quits.
+    > earlier question
+    earlier answer
+    Tool host  (4)
+    / ▏
+       srv                    /work
+       laptop (here)          /home/me
+       desktop (in refactor)  /home/me/other
+    ▸* pi (in 9876)           /pi
+    ──────────────────────────────────────────────────────────────────────
+    …m  think:n/a  ctx:0% 0  $0.00  tools:pi  Enter selects · Esc closes
+    |}];
+  H.esc h;
+  H.keys h "/host desktop";
+  H.enter h;
+  H.show h;
+  [%expect
+    {|
+    session abc123 in /work. /help for commands, Esc aborts, Ctrl+C twice
+    quits.
+    > earlier question
+    earlier answer
+    ┌─ Working directory on desktop (in refactor) ───────────────────────┐
+    └────────────────────────────────────────────────────────────────────┘
+    ──────────────────────────────────────────────────────────────────────
+    ? /work▏
+    …m  think:n/a  ctx:0% 0  $0.00  tools:pi  Enter submits, Esc cancels
+    |}]
+;;
+
 (* ---- UX guarantees ---------------------------------------------------- *)
 
 let%expect_test "/model Enter Enter opens the picker instead of silently \

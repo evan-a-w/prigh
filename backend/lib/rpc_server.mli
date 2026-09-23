@@ -10,9 +10,11 @@ open! Import
     and many clients. Every client is attached to exactly one session at a
     time; its requests act on that session and it receives that session's
     events. [hello] attaches a client (to a named session or the default
-    one) and registers it as a tool host when it advertises [tools]. The
-    session methods ([new_session], [switch_session], [fork], [clone],
-    [import]) move only the calling client. A session keeps running when its
+    one) and registers it as a tool host when it advertises [tools]; hosts
+    are visible to every session, so a session can run its tools on a client
+    attached elsewhere (replies are routed by exec id). The session methods
+    ([new_session], [switch_session], [fork], [clone], [import]) move only
+    the calling client. A session keeps running when its
     clients disconnect; an idle session with no clients is dropped from
     memory (it stays on disk). *)
 

@@ -94,6 +94,7 @@ let provider_param params =
 module Client = struct
   type t =
     { id : string
+    ; seq : int
     ; mutable name : string
     ; mutable tools : bool
     ; mutable cwd : string option
@@ -114,6 +115,8 @@ type t =
   ; agents : Agent.t String.Table.t (** live sessions by session id *)
   ; clients : Client.t String.Table.t
   ; mutable client_seq : int
+  ; execs : (string * Agent.t) String.Table.t
+    (** in-flight remote executions by exec id: host client id and session *)
   }
 
 let agent_of_client _t (client : Client.t) = client.agent
@@ -132,18 +135,55 @@ let maybe_evict t agent =
   then Hashtbl.remove t.agents (session_id agent)
 ;;
 
+let host_of (client : Client.t) =
+  { Agent.Host.id = client.id
+  ; name = client.name
+  ; cwd = Option.value client.cwd ~default:(Agent.state client.agent).cwd
+  ; session_id = Some (session_id client.agent)
+  ; session_name = Session.name (Agent.session client.agent)
+  }
+;;
+
+let hosts t =
+  Hashtbl.data t.clients
+  |> List.filter ~f:(fun (c : Client.t) -> c.tools)
+  |> List.sort ~compare:(fun (a : Client.t) b -> Int.compare a.seq b.seq)
+  |> List.map ~f:host_of
+;;
+
+(* Snapshots the agents: setting hosts emits state changes, which may evict. *)
+let publish_hosts t =
+  let hosts = hosts t in
+  List.iter (Hashtbl.data t.agents) ~f:(fun agent ->
+    Agent.set_hosts agent hosts)
+;;
+
+(* Hosts are global: every client that advertised tools, whichever session
+   it is attached to. Execs are keyed by id (not by the answering client's
+   session) so a host can run tools for other sessions. *)
 let route t agent (event : Agent.Event.t) =
   let json = Rpc_json.event event in
   (match event with
-   | Tool_exec { host; _ } | Tool_exec_cancel { host; _ } ->
+   | Tool_exec { host; exec_id; _ } ->
+     Hashtbl.set t.execs ~key:exec_id ~data:(host, agent);
+     Option.iter (Hashtbl.find t.clients host) ~f:(fun c -> c.send json)
+   | Tool_exec_cancel { host; exec_id } ->
+     Hashtbl.remove t.execs exec_id;
      Option.iter (Hashtbl.find t.clients host) ~f:(fun c -> c.send json)
    | _ -> List.iter (clients_of t agent) ~f:(fun c -> c.send json));
   match event with
-  | State_changed { running = false; _ } -> maybe_evict t agent
+  | State_changed { running; _ } ->
+    if not running then maybe_evict t agent;
+    (* A host's session name may have changed; [set_hosts] is a no-op when
+       nothing did, so this does not loop. *)
+    publish_hosts t
   | _ -> ()
 ;;
 
+(* Hosts are set before subscribing: the state change would otherwise evict
+   the agent, which has no client until [attach]. *)
 let register t agent =
+  Agent.set_hosts agent (hosts t);
   Hashtbl.set t.agents ~key:(session_id agent) ~data:agent;
   Agent.subscribe agent ~f:(route t agent);
   agent
@@ -160,6 +200,7 @@ let create ~env:_ ~sw:_ ?token ~login ~sessions_dir ~new_agent ~default_agent ()
     ; agents = String.Table.create ()
     ; clients = String.Table.create ()
     ; client_seq = 0
+    ; execs = String.Table.create ()
     }
   in
   ignore (register t default_agent : Agent.t);
@@ -169,27 +210,21 @@ let create ~env:_ ~sw:_ ?token ~login ~sessions_dir ~new_agent ~default_agent ()
   t
 ;;
 
-let host_of (client : Client.t) =
-  { Agent.Host.id = client.id
-  ; name = client.name
-  ; cwd = Option.value client.cwd ~default:(Agent.state client.agent).cwd
-  }
-;;
-
 let attach t (client : Client.t) agent =
   let previous = client.agent in
   if not (phys_equal previous agent)
   then (
-    if client.tools then Agent.remove_host previous client.id;
     client.agent <- agent;
     maybe_evict t previous);
-  if client.tools then Agent.add_host agent (host_of client)
+  publish_hosts t;
+  if client.tools then Agent.prefer_host agent client.id
 ;;
 
 let connect t ~send =
   t.client_seq <- t.client_seq + 1;
   let client =
     { Client.id = sprintf "client-%d" t.client_seq
+    ; seq = t.client_seq
     ; name = sprintf "client-%d" t.client_seq
     ; tools = false
     ; cwd = None
@@ -204,7 +239,9 @@ let connect t ~send =
 
 let disconnect t (client : Client.t) =
   Hashtbl.remove t.clients client.id;
-  if client.tools then Agent.remove_host client.agent client.id;
+  Hashtbl.filter_inplace t.execs ~f:(fun (host, _) ->
+    not (String.equal host client.id));
+  if client.tools then publish_hosts t;
   maybe_evict t client.agent
 ;;
 
@@ -277,8 +314,6 @@ let hello t (client : Client.t) params =
       | `String cwd -> client.cwd <- Some cwd
       | _ -> ());
     Or_error.bind (bool_param params "tools" ~default:false) ~f:(fun tools ->
-      (* Re-registration as a host is handled by [attach]. *)
-      if client.tools && not tools then Agent.remove_host client.agent client.id;
       client.tools <- tools;
       let agent =
         match param params "session" with
@@ -310,6 +345,13 @@ let list_sessions t =
        | _, other -> other))
 ;;
 
+let exec_param t params =
+  Or_error.bind (string_param params "exec_id") ~f:(fun exec_id ->
+    match Hashtbl.find t.execs exec_id with
+    | Some (_, agent) -> Ok (exec_id, agent)
+    | None -> Or_error.errorf "no tool execution %S" exec_id)
+;;
+
 let dispatch_server t (client : Client.t) ~meth ~params
   : Json.t Or_error.t option
   =
@@ -323,16 +365,17 @@ let dispatch_server t (client : Client.t) ~meth ~params
            unit_result (Agent.set_active_host agent host ~cwd))))
   | "tool_exec_output" ->
     Some
-      (Or_error.bind (string_param params "exec_id") ~f:(fun exec_id ->
+      (Or_error.bind (exec_param t params) ~f:(fun (exec_id, agent) ->
          Or_error.bind (string_param params "chunk") ~f:(fun chunk ->
            unit_result (Agent.tool_exec_output agent ~exec_id ~chunk))))
   | "tool_exec_result" ->
     Some
-      (Or_error.bind (string_param params "exec_id") ~f:(fun exec_id ->
+      (Or_error.bind (exec_param t params) ~f:(fun (exec_id, agent) ->
          Or_error.bind (string_param params "text") ~f:(fun text ->
            Or_error.bind
              (bool_param params "is_error" ~default:false)
              ~f:(fun is_error ->
+               Hashtbl.remove t.execs exec_id;
                unit_result
                  (Agent.tool_exec_result agent ~exec_id ~text ~is_error)))))
   | "new_session" ->

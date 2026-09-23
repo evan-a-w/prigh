@@ -148,8 +148,14 @@ let state (s : Agent.State.t) =
     ; ( "hosts"
       , `Array
           (List.map s.hosts ~f:(fun (h : Agent.Host.t) ->
-             `Object [ "id", str h.id; "name", str h.name; "cwd", str h.cwd ]))
-      )
+             let opt = Option.value_map ~default:`Null ~f:str in
+             `Object
+               [ "id", str h.id
+               ; "name", str h.name
+               ; "cwd", str h.cwd
+               ; "session_id", opt h.session_id
+               ; "session_name", opt h.session_name
+               ])) )
     ]
 ;;
 

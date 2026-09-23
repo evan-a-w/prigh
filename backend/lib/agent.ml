@@ -14,8 +14,10 @@ module Host = struct
     { id : string
     ; name : string
     ; cwd : string
+    ; session_id : string option
+    ; session_name : string option
     }
-  [@@deriving sexp_of]
+  [@@deriving sexp_of, equal]
 
   let backend_id = "backend"
 end
@@ -117,7 +119,10 @@ type t =
   ; mutable config : Config.t
   ; pending_confirms : bool Promise.u String.Table.t
   ; mutable shell_seq : int
-  ; mutable hosts : Host.t list (** connected clients able to run tools *)
+  ; mutable hosts : Host.t list
+    (** every connected client able to run tools, set by the server *)
+  ; host_cwds : string String.Table.t
+    (** where this session last was on each host, overriding [Host.cwd] *)
   ; mutable backend_cwd : string (** the backend host's own cwd *)
   ; mutable active_host : string
   ; mutable host_pinned : bool (** chosen explicitly via [set_active_host] *)
@@ -179,6 +184,7 @@ let create
     ; pending_confirms = String.Table.create ()
     ; shell_seq = 0
     ; hosts = []
+    ; host_cwds = String.Table.create ()
     ; backend_cwd = cwd
     ; active_host = Host.backend_id
     ; host_pinned = false
@@ -195,10 +201,19 @@ let backend_host t =
   { Host.id = Host.backend_id
   ; name = Core_unix.gethostname ()
   ; cwd = t.backend_cwd
+  ; session_id = None
+  ; session_name = None
   }
 ;;
 
-let hosts t = backend_host t :: List.rev t.hosts
+let hosts t =
+  backend_host t
+  :: List.map t.hosts ~f:(fun h ->
+    match Hashtbl.find t.host_cwds h.id with
+    | Some cwd -> { h with cwd }
+    | None -> h)
+;;
+
 let active_host t = t.active_host
 let subscribe t ~f = t.subscribers <- f :: t.subscribers
 let broadcast t event = List.iter (List.rev t.subscribers) ~f:(fun f -> f event)
@@ -316,10 +331,9 @@ let set_host_cwd t (host : Host.t) ~cwd =
     t.git_branch <- Git_branch.find ~cwd;
     ignore (Session.set_cwd t.session ~cwd : Session.Entry.t);
     add_environment_note t (System_prompt.cwd_changed_note ~cwd));
-  if String.equal host.id Host.backend_id then t.backend_cwd <- cwd;
-  t.hosts
-  <- List.map t.hosts ~f:(fun h ->
-       if String.equal h.id host.id then { h with cwd } else h)
+  if String.equal host.id Host.backend_id
+  then t.backend_cwd <- cwd
+  else Hashtbl.set t.host_cwds ~key:host.id ~data:cwd
 ;;
 
 let activate_host t (host : Host.t) ~cwd =
@@ -331,22 +345,31 @@ let activate_host t (host : Host.t) ~cwd =
   state_changed t
 ;;
 
-(* Tools default to the frontend: a new host takes over unless the user
-   pinned a host that is still connected. *)
-let add_host t (host : Host.t) =
-  t.hosts
-  <- host :: List.filter t.hosts ~f:(fun h -> not (String.equal h.id host.id));
-  let take_over =
-    (not (active_host_connected t))
-    || ((not t.host_pinned) && String.equal t.active_host Host.backend_id)
-  in
-  if take_over then activate_host t host ~cwd:host.cwd else state_changed t
+let set_hosts t hosts =
+  if not (List.equal Host.equal t.hosts hosts)
+  then (
+    let gone =
+      List.filter t.hosts ~f:(fun h ->
+        not (List.exists hosts ~f:(fun h' -> String.equal h.id h'.id)))
+    in
+    t.hosts <- hosts;
+    List.iter gone ~f:(fun h ->
+      Hashtbl.remove t.host_cwds h.id;
+      fail_execs t ~host:h.id ~text:"[tool host disconnected]");
+    state_changed t)
 ;;
 
-let remove_host t id =
-  t.hosts <- List.filter t.hosts ~f:(fun h -> not (String.equal h.id id));
-  fail_execs t ~host:id ~text:"[tool host disconnected]";
-  state_changed t
+(* Tools default to the frontend: a host attaching takes over unless the user
+   pinned a host that is still connected. *)
+let prefer_host t id =
+  match find_host t id with
+  | None -> ()
+  | Some host ->
+    let take_over =
+      (not (active_host_connected t))
+      || ((not t.host_pinned) && String.equal t.active_host Host.backend_id)
+    in
+    if take_over then activate_host t host ~cwd:host.cwd
 ;;
 
 let tool_exec_output t ~exec_id ~chunk =
@@ -381,7 +404,9 @@ let host_exec_on
   if String.equal host.id Host.backend_id
   then Host_ops.execute ~env:t.env ~cancel ~on_output ~cwd ~name ~arguments
   else (
-    let exec_id = sprintf "%s-%d" call_id t.exec_seq in
+    let exec_id =
+      sprintf "%s/%s-%d" (Session.id t.session) call_id t.exec_seq
+    in
     t.exec_seq <- t.exec_seq + 1;
     let promise, resolver = Promise.create () in
     Hashtbl.set

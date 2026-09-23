@@ -12,8 +12,10 @@ module Host : sig
     { id : string
     ; name : string
     ; cwd : string
+    ; session_id : string option (** the session the client is attached to *)
+    ; session_name : string option
     }
-  [@@deriving sexp_of]
+  [@@deriving sexp_of, equal]
 
   val backend_id : string
 end
@@ -196,15 +198,18 @@ val session_stats : t -> Session_stats.t
 
 (** {2 Tool hosts} *)
 
-(** Registers a client as a possible tool host. If the current active host is
-    not connected, the new host becomes active (and the session cwd becomes
-    its cwd). *)
-val add_host : t -> Host.t -> unit
+(** Replaces the client hosts (every connected client able to run tools,
+    whichever session it is attached to). In-flight executions on hosts that
+    are gone fail. Hosts keep the cwd this session last used on them. *)
+val set_hosts : t -> Host.t list -> unit
 
-(** Forgets a host; its in-flight tool executions fail. *)
-val remove_host : t -> string -> unit
+(** Makes [id] the active host (with its own cwd) unless the user pinned a
+    host that is still connected; called when a client attaches. *)
+val prefer_host : t -> string -> unit
 
+(** The backend first, then the client hosts. *)
 val hosts : t -> Host.t list
+
 val active_host : t -> string
 
 (** Switches where tools run from the next call on. The session cwd becomes

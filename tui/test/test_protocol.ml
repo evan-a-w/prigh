@@ -196,7 +196,9 @@ let%expect_test "tool host events and state hosts" =
         (hosts ((
           (id   backend)
           (name srv)
-          (cwd  /work)))))))
+          (cwd  /work)
+          (session_id   ())
+          (session_name ())))))))
     |}]
 ;;
 
