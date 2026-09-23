@@ -68,13 +68,20 @@
           final: prev:
           {
             oxcaml-compiler = prev.oxcaml-compiler.overrideAttrs (oa: {
-              patches = (oa.patches or [ ]) ++ [ ./nix/fix-floatarithmem.patch ];
+              patches = (oa.patches or [ ]) ++ [
+                ./nix/fix-floatarithmem.patch
+                ./nix/limit-dune-jobs.patch
+              ];
               nativeBuildInputs =
                 (oa.nativeBuildInputs or [ ])
                 ++ pkgs.lib.optionals pkgs.stdenv.hostPlatform.isDarwin [
                   # OxCaml's archive merge helper invokes Apple's `libtool`.
                   pkgs.darwin.cctools
                 ];
+              # dune ignores `make -j` and uses one job per CPU; a single
+              # ocamlopt.opt peaks around 2 GB, so 12-way parallelism OOM-kills
+              # a 6 GB machine. See nix/limit-dune-jobs.patch.
+              env = (oa.env or { }) // { JOBS = "2"; };
             });
           };
 

@@ -1,0 +1,39 @@
+--- a/Makefile.common-ox	2026-09-23 19:11:18.448949760 +0800
++++ b/Makefile.common-ox	2026-09-23 19:11:18.450335447 +0800
+@@ -6,6 +6,11 @@
+ ws_runstd = --root=. --workspace=duneconf/runtime_stdlib.ws
+ ws_main   = --root=. --workspace=duneconf/main.ws
+ 
++# dune auto-detects parallelism from the CPU count and ignores `make -j`, so
++# building the compiler can spawn one ~2 GB ocamlopt per core and get OOM-killed
++# on machines with little RAM. Cap it with an overridable variable.
++JOBS ?= $(shell nproc 2>/dev/null || echo 1)
++
+ ifeq ($(coverage),yes)
+   coverage_dune_flags=--instrument-with bisect_ppx
+   ocaml_subdirs_to_ignore=otherlibs
+@@ -81,13 +86,13 @@
+   ocamltest/ocamltest.native
+ 
+ boot-compiler: _build/_bootinstall
+-	RUNTIME_DIR=$(RUNTIME_DIR) $(dune) build $(ws_boot) $(coverage_dune_flags) $(boot_targets)
++	RUNTIME_DIR=$(RUNTIME_DIR) $(dune) build -j $(JOBS) $(ws_boot) $(coverage_dune_flags) $(boot_targets)
+ 
+ boot-runtest: boot-compiler
+ 	RUNTIME_DIR=$(RUNTIME_DIR) $(dune) runtest $(ws_boot) $(coverage_dune_flags) --force
+ 
+ runtime-stdlib: boot-compiler
+-	RUNTIME_DIR=$(RUNTIME_DIR) $(dune) build $(ws_runstd) --only-package=ocaml_runtime_stdlib @install
++	RUNTIME_DIR=$(RUNTIME_DIR) $(dune) build -j $(JOBS) $(ws_runstd) --only-package=ocaml_runtime_stdlib @install
+ 	rm -rf _build/runtime_stdlib_install
+ # Dune 3.11+ clears `_build/install` before building, move the runtime stdlib
+ # to a separate directory.
+@@ -106,7 +111,7 @@
+ compiler: runtime-stdlib
+ 	RUNTIME_DIR=$(RUNTIME_DIR) SYSTEM=$(SYSTEM) MODEL=$(MODEL) \
+           ASPP="$(ASPP)" ASPPFLAGS="$(ASPPFLAGS)" \
+-          $(dune) build $(ws_main) \
++          $(dune) build -j $(JOBS) $(ws_main) \
+           --only-package=ocaml @install \
+           tools/regalloc/regalloc.exe \
+           oxcaml/testsuite/tools/expect.exe \
