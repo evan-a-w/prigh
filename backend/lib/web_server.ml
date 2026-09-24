@@ -143,41 +143,41 @@ let handle ~root ~on_websocket ~on_lines flow =
   let reader = Eio.Buf_read.of_flow flow ~max_size:(64 * 1024 * 1024) in
   if is_json_lines reader
   then serve_json_lines ~on_lines ~reader flow
-  else
-  match Request.parse reader with
-  | None -> ()
-  | Some request when wants_upgrade request ->
-    (match Request.header request "Sec-WebSocket-Key" with
-     | None ->
-       Eio.Flow.copy_string
-         (response
-            ~status:400
-            ~reason:"Bad Request"
-            "missing Sec-WebSocket-Key\n")
-         flow
-     | Some key ->
-       Eio.Flow.copy_string
-         (sprintf
-            "HTTP/1.1 101 Switching Protocols\r\n\
-             Upgrade: websocket\r\n\
-             Connection: Upgrade\r\n\
-             Sec-WebSocket-Accept: %s\r\n\
-             \r\n"
-            (Websocket.accept_key (String.strip key)))
-         flow;
-       let ws = Websocket.create ~reader ~flow () in
-       on_websocket ws;
-       Websocket.close ws)
-  | Some request ->
-    (match root with
-     | None ->
-       Eio.Flow.copy_string
-         (response
-            ~status:404
-            ~reason:"Not Found"
-            "no web root configured; only /ws is served\n")
-         flow
-     | Some root -> Eio.Flow.copy_string (static ~root request) flow)
+  else (
+    match Request.parse reader with
+    | None -> ()
+    | Some request when wants_upgrade request ->
+      (match Request.header request "Sec-WebSocket-Key" with
+       | None ->
+         Eio.Flow.copy_string
+           (response
+              ~status:400
+              ~reason:"Bad Request"
+              "missing Sec-WebSocket-Key\n")
+           flow
+       | Some key ->
+         Eio.Flow.copy_string
+           (sprintf
+              "HTTP/1.1 101 Switching Protocols\r\n\
+               Upgrade: websocket\r\n\
+               Connection: Upgrade\r\n\
+               Sec-WebSocket-Accept: %s\r\n\
+               \r\n"
+              (Websocket.accept_key (String.strip key)))
+           flow;
+         let ws = Websocket.create ~reader ~flow () in
+         on_websocket ws;
+         Websocket.close ws)
+    | Some request ->
+      (match root with
+       | None ->
+         Eio.Flow.copy_string
+           (response
+              ~status:404
+              ~reason:"Not Found"
+              "no web root configured; only /ws is served\n")
+           flow
+       | Some root -> Eio.Flow.copy_string (static ~root request) flow))
 ;;
 
 let serve_rpc server ws =

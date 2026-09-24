@@ -1,13 +1,16 @@
 --- a/Makefile.common-ox	2026-09-23 19:11:18.448949760 +0800
 +++ b/Makefile.common-ox	2026-09-23 19:11:18.450335447 +0800
-@@ -6,6 +6,11 @@
+@@ -6,6 +6,14 @@
  ws_runstd = --root=. --workspace=duneconf/runtime_stdlib.ws
  ws_main   = --root=. --workspace=duneconf/main.ws
  
 +# dune auto-detects parallelism from the CPU count and ignores `make -j`, so
 +# building the compiler can spawn one ~2 GB ocamlopt per core and get OOM-killed
-+# on machines with little RAM. Cap it with an overridable variable.
-+JOBS ?= $(shell nproc 2>/dev/null || echo 1)
++# on machines with little RAM. Default to min(cores, RAM / 2 GB); overridable.
++JOBS ?= $(shell n=$$(nproc 2>/dev/null || sysctl -n hw.ncpu 2>/dev/null || echo 1); \
++  m=$$(awk '/MemTotal/ { print int($$2 / 2097152) }' /proc/meminfo 2>/dev/null); \
++  if [ -n "$$m" ] && [ "$$m" -lt "$$n" ]; then n=$$m; fi; \
++  if [ "$$n" -lt 1 ]; then n=1; fi; echo $$n)
 +
  ifeq ($(coverage),yes)
    coverage_dune_flags=--instrument-with bisect_ppx

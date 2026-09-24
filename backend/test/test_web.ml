@@ -58,8 +58,8 @@ let%expect_test "websocket: frames round-trip at every length encoding" =
   [%expect {| ((fin true) (opcode Text) (payload Hello)) |}]
 ;;
 
-let%expect_test
-    "websocket: fragmented messages, interleaved control frames, errors"
+let%expect_test "websocket: fragmented messages, interleaved control frames, \
+                 errors"
   =
   let show s =
     let reader = Websocket.Message_reader.create (reader_of_string s) in
@@ -331,8 +331,7 @@ let%expect_test "web server: static files, 404s and the RPC over a WebSocket" =
   print_s [%sexp (Websocket.Message_reader.next messages : Websocket.Message.t)];
   Websocket.close ws;
   print_s [%sexp (Websocket.Message_reader.next messages : Websocket.Message.t)];
-  [%expect
-    {|
+  [%expect {|
     (Pong hb)
     (Close (1000))
     |}]
@@ -390,15 +389,16 @@ let%expect_test "web port: a JSON-lines terminal and a WebSocket browser share \
       ~on_websocket:(Web_server.serve_rpc server)
       ~on_lines:(Rpc_server.serve_lines server)
   in
+  let terminal_flow = Loopback.connect ~env:t.env ~sw ~port in
   let terminal =
-    let flow = Loopback.connect ~env:t.env ~sw ~port in
-    let reader = Eio.Buf_read.of_flow flow ~max_size:(1024 * 1024) in
-    ( (fun line -> Eio.Flow.copy_string (line ^ "\n") flow)
+    let reader = Eio.Buf_read.of_flow terminal_flow ~max_size:(1024 * 1024) in
+    ( (fun line -> Eio.Flow.copy_string (line ^ "\n") terminal_flow)
     , fun () ->
         match Eio.Buf_read.line reader with
         | exception (End_of_file | Eio.Io _) -> None
         | line -> Some line )
   in
+  let browser_ws = ref None in
   let browser =
     let flow = Loopback.connect ~env:t.env ~sw ~port in
     Eio.Flow.copy_string
@@ -418,6 +418,7 @@ let%expect_test "web port: a JSON-lines terminal and a WebSocket browser share \
     in
     skip_headers ();
     let ws = Websocket.create ~role:`Client ~reader ~flow () in
+    browser_ws := Some ws;
     Websocket.send_text ws, fun () -> Websocket.read_text ws
   in
   let summarise line =
@@ -434,6 +435,8 @@ let%expect_test "web port: a JSON-lines terminal and a WebSocket browser share \
         | Some (`Array hosts) ->
           List.map hosts ~f:(fun h ->
             match Jsonaf.member "name" h with
+            | Some (`String n) when String.equal n (Core_unix.gethostname ()) ->
+              "<host>"
             | Some (`String n) -> n
             | _ -> "?")
           |> String.concat ~sep:","
@@ -442,7 +445,9 @@ let%expect_test "web port: a JSON-lines terminal and a WebSocket browser share \
       (match field "type" with
        | "response" ->
          let result =
-           Option.value (List.Assoc.find fields ~equal:String.equal "result") ~default:`Null
+           Option.value
+             (List.Assoc.find fields ~equal:String.equal "result")
+             ~default:`Null
          in
          let client_id =
            match Jsonaf.member "client_id" result with
@@ -460,11 +465,20 @@ let%expect_test "web port: a JSON-lines terminal and a WebSocket browser share \
                (hosts state)
            | None -> ""
          in
-         sprintf "response %s ok=%s%s%s" (field "id") (field "ok") client_id state
+         sprintf
+           "response %s ok=%s%s%s"
+           (field "id")
+           (field "ok")
+           client_id
+           state
        | "event" ->
          (match field "event" with
           | "state" ->
-            let state = Option.value (Jsonaf.member "state" (`Object fields)) ~default:`Null in
+            let state =
+              Option.value
+                (Jsonaf.member "state" (`Object fields))
+                ~default:`Null
+            in
             sprintf
               "event state active_host=%s hosts=%s"
               (match Jsonaf.member "active_host" state with
@@ -483,7 +497,8 @@ let%expect_test "web port: a JSON-lines terminal and a WebSocket browser share \
     | Some line ->
       last_line := line;
       printf "%s: %s\n" name (summarise line);
-      if not (String.is_substring line ~substring) then drain_until name c ~substring
+      if not (String.is_substring line ~substring)
+      then drain_until name c ~substring
   in
   let response id = sprintf "\"id\":%S" id in
   let client_id () =
@@ -502,9 +517,21 @@ let%expect_test "web port: a JSON-lines terminal and a WebSocket browser share \
     {|{"id": "t1", "method": "hello", "params": {"name": "laptop", "cwd": "/tmp", "tools": true}}|};
   drain_until "terminal" terminal ~substring:(response "t1");
   let terminal_id = client_id () in
-  send browser {|{"id": "b1", "method": "hello", "params": {"name": "browser"}}|};
+  send
+    browser
+    {|{"id": "b1", "method": "hello", "params": {"name": "browser"}}|};
   drain_until "browser" browser ~substring:(response "b1");
-  [%expect {| |}];
+  [%expect
+    {|
+    terminal: event state active_host=backend hosts=<host>,laptop
+    terminal: event notice
+    terminal: event state active_host=client-2 hosts=<host>,laptop
+    terminal: response t1 ok=true client_id=client-2 active_host=client-2 hosts=<host>,laptop
+    browser: event state active_host=backend hosts=<host>,laptop
+    browser: event notice
+    browser: event state active_host=client-2 hosts=<host>,laptop
+    browser: response b1 ok=true client_id=client-1 active_host=client-2 hosts=<host>,laptop
+    |}];
   send browser {|{"id": "b2", "method": "prompt", "params": {"text": "hello"}}|};
   (* The run's first host call is the $instructions lookup on the terminal,
      which answers as the real tool host would. *)
@@ -519,7 +546,32 @@ let%expect_test "web port: a JSON-lines terminal and a WebSocket browser share \
    | _ -> print_endline "no exec_id");
   drain_until "browser" browser ~substring:(event "agent_end");
   drain_until "terminal" terminal ~substring:(event "agent_end");
-  [%expect {| |}];
+  [%expect
+    {|
+    terminal: event state active_host=client-2 hosts=<host>,laptop
+    terminal: event tool_exec
+    browser: event state active_host=client-2 hosts=<host>,laptop
+    browser: response b2 ok=true
+    browser: event agent_start
+    browser: event message_start
+    browser: event message_end
+    browser: event turn_start
+    browser: event message_start
+    browser: event message_update
+    browser: event message_end
+    browser: event turn_end
+    browser: event agent_end
+    terminal: response t-exec ok=true
+    terminal: event agent_start
+    terminal: event message_start
+    terminal: event message_end
+    terminal: event turn_start
+    terminal: event message_start
+    terminal: event message_update
+    terminal: event message_end
+    terminal: event turn_end
+    terminal: event agent_end
+    |}];
   (* /host from the browser moves tools back to the backend and then to the
      terminal again; both clients see each switch. *)
   send
@@ -534,5 +586,21 @@ let%expect_test "web port: a JSON-lines terminal and a WebSocket browser share \
        terminal_id);
   drain_until "terminal" terminal ~substring:(response "t2");
   drain_until "browser" browser ~substring:(event "state");
-  [%expect {| |}]
+  [%expect
+    {|
+    browser: event state active_host=client-2 hosts=<host>,laptop
+    browser: event notice
+    browser: event state active_host=backend hosts=<host>,laptop
+    browser: response b3 ok=true
+    terminal: event state active_host=client-2 hosts=<host>,laptop
+    terminal: event notice
+    terminal: event state active_host=backend hosts=<host>,laptop
+    terminal: event notice
+    terminal: event state active_host=client-2 hosts=<host>,laptop
+    terminal: response t2 ok=true
+    browser: event notice
+    browser: event state active_host=client-2 hosts=<host>,laptop
+    |}];
+  Option.iter !browser_ws ~f:Websocket.close;
+  Eio.Flow.shutdown terminal_flow `Send
 ;;

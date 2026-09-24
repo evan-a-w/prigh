@@ -303,8 +303,11 @@ two can share one.
   `logout`. `State` carries `active_host` and `hosts` (the backend first).
 - `Websocket` — a minimal RFC 6455 server side (handshake key, frame
   encode/decode with client masking, fragment reassembly, ping/pong and
-  close) and `Web_server` — the `-web` listener: one HTTP/1.1 request per
-  connection, `GET /ws` upgraded and handed to `Rpc_server.serve_lines`,
+  close) and `Web_server` — the `-web` listener: a connection whose first
+  byte is `{` is a plain JSON-lines client (the TUI's `-connect`) and goes
+  straight to `Rpc_server.serve_lines`, so one port serves terminals and
+  browsers alike; otherwise one HTTP/1.1 request per connection, `GET /ws`
+  upgraded and handed to `Rpc_server.serve_lines`,
   anything else served from the web root (the built `tui/web-bin/site`,
   found via `-web-root`, `$PRIGH_WEB_ROOT` or next to the executable;
   no `..`, no dot files). The token check is the same `hello` check as
@@ -313,8 +316,9 @@ two can share one.
 ### CLI (`backend/bin/main.ml`)
 
 `serve` (RPC on stdio; `-listen HOST:PORT` accepts TCP clients instead,
-`-web HOST:PORT` serves the browser frontend and WebSocket clients (`-open`
-launches a browser, `-web-root DIR` overrides the assets), `-stdio` as well,
+`-web HOST:PORT` serves the browser frontend, WebSocket clients and TCP
+`-connect` clients on one port (`-open` launches a browser, `-web-root DIR`
+overrides the assets), `-stdio` as well,
 `-token SECRET`/`$PRIGH_TOKEN` gates them; with stdio the backend exits when
 the spawning frontend closes it, with `-listen`/`-web` only it runs until
 killed), `tool-host` (the local tool worker), `run <prompt>`

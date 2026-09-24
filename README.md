@@ -106,11 +106,16 @@ serves it and speaks the RPC protocol over a WebSocket at `/ws`:
 ./prigh -web                      # local: serves http://127.0.0.1:7788/ and opens it
 ./prigh -web -faux -cwd ~/proj    # ... any `prigh serve` options after -web
 
-# remote: on the server, next to (or instead of) -listen
-prigh serve -listen 0.0.0.0:7777 -web 0.0.0.0:7788 -token sekrit
+# remote: on the server (or PRIGH_WEB_LISTEN=0.0.0.0:7788 ./prigh -web -token sekrit)
+prigh serve -web 0.0.0.0:7788 -token sekrit
 # then open http://server:7788/?token=sekrit (or type the token into the
 # connect form, which remembers it in localStorage)
+prigh-tui -connect server:7788 -token sekrit -cwd ~/proj   # terminals use the same port
 ```
+
+The `-web` port also accepts the terminal frontend's plain JSON-lines
+connections, so one port serves browsers and terminals on the same sessions
+(`-listen` is only needed for a TCP-only port).
 
 The page connects to its own origin by default; `?backend=ws://host:port/ws`
 points a page served from one place at a backend elsewhere, `?session=ID`

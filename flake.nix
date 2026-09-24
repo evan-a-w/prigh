@@ -78,10 +78,8 @@
                   # OxCaml's archive merge helper invokes Apple's `libtool`.
                   pkgs.darwin.cctools
                 ];
-              # dune ignores `make -j` and uses one job per CPU; a single
-              # ocamlopt.opt peaks around 2 GB, so 12-way parallelism OOM-kills
-              # a 6 GB machine. See nix/limit-dune-jobs.patch.
-              env = (oa.env or { }) // { JOBS = "2"; };
+              # dune ignores `make -j`; nix/limit-dune-jobs.patch sizes the
+              # compiler build to min(cores, RAM / 2 GB). Set JOBS to override.
             });
           };
 
