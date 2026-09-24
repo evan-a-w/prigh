@@ -436,6 +436,7 @@ let serve_command =
              ~port
              ~root
              ~on_websocket:(Web_server.serve_rpc server)
+             ~on_lines:(Rpc_server.serve_lines server)
          in
          let host =
            Format.asprintf "%a" Eio.Net.Ipaddr.pp addr

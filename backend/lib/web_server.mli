@@ -3,13 +3,19 @@ open! Import
 
 (** The browser frontend's listener: serves the static frontend from [root]
     (when given) and upgrades [GET /ws] to a WebSocket that carries the same
-    JSON-lines RPC as stdio and TCP, one message per line. *)
+    JSON-lines RPC as stdio and TCP, one message per line. A connection whose
+    first byte is [{] is a plain JSON-lines client (the terminal frontend's
+    [-connect]) and is handed to [on_lines], so one port serves both. *)
 
-(** Handles one HTTP/1.1 connection: one request, then close (or the
-    WebSocket until it ends). *)
+type on_lines =
+  read_line:(unit -> string option) -> write_line:(string -> unit) -> unit
+
+(** Handles one connection: JSON lines until EOF, or one HTTP/1.1 request,
+    then close (or the WebSocket until it ends). *)
 val handle
   :  root:string option
   -> on_websocket:(Websocket.t -> unit)
+  -> on_lines:on_lines
   -> _ Eio.Flow.two_way
   -> unit
 
@@ -25,6 +31,7 @@ val listen
   -> port:int
   -> root:string option
   -> on_websocket:(Websocket.t -> unit)
+  -> on_lines:on_lines
   -> int
 
 module For_testing : sig

@@ -118,8 +118,32 @@ let wants_upgrade (request : Request.t) =
        ~f:(fun v -> String.Caseless.equal (String.strip v) "websocket")
 ;;
 
-let handle ~root ~on_websocket flow =
-  let reader = Eio.Buf_read.of_flow flow ~max_size:(1024 * 1024) in
+type on_lines =
+  read_line:(unit -> string option) -> write_line:(string -> unit) -> unit
+
+let serve_json_lines ~(on_lines : on_lines) ~reader flow =
+  on_lines
+    ~read_line:(fun () ->
+      match Eio.Buf_read.line reader with
+      | exception (End_of_file | Eio.Io _) -> None
+      | line -> Some line)
+    ~write_line:(fun line -> Eio.Flow.copy_string (line ^ "\n") flow)
+;;
+
+(* A terminal frontend (`-connect`) starts with a JSON request; a browser
+   starts with an HTTP request line. *)
+let is_json_lines reader =
+  match Eio.Buf_read.peek_char reader with
+  | Some '{' -> true
+  | Some _ | None -> false
+  | exception (End_of_file | Eio.Io _) -> false
+;;
+
+let handle ~root ~on_websocket ~on_lines flow =
+  let reader = Eio.Buf_read.of_flow flow ~max_size:(64 * 1024 * 1024) in
+  if is_json_lines reader
+  then serve_json_lines ~on_lines ~reader flow
+  else
   match Request.parse reader with
   | None -> ()
   | Some request when wants_upgrade request ->
@@ -163,7 +187,7 @@ let serve_rpc server ws =
     ~write_line:(Websocket.send_text ws)
 ;;
 
-let listen ~env ~sw ~addr ~port ~root ~on_websocket =
+let listen ~env ~sw ~addr ~port ~root ~on_websocket ~on_lines =
   let socket =
     Eio.Net.listen
       ~sw
@@ -184,7 +208,7 @@ let listen ~env ~sw ~addr ~port ~root ~on_websocket =
         socket
         ~on_error:(fun exn ->
           eprintf "prigh: web connection failed: %s\n%!" (Exn.to_string exn))
-        (fun flow _addr -> handle ~root ~on_websocket flow)
+        (fun flow _addr -> handle ~root ~on_websocket ~on_lines flow)
     done);
   port
 ;;
