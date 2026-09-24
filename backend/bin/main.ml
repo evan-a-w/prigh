@@ -459,7 +459,10 @@ let serve_command =
            ~output:(Eio.Stdenv.stdout env);
          (* The spawning frontend went away: stop everything. *)
          Rpc_server.shutdown server;
-         exit 0))
+         exit 0)
+       else
+         (* The web listener is a daemon fiber; keep the switch alive. *)
+         Eio.Fiber.await_cancel ())
 ;;
 
 let tool_host_command =
