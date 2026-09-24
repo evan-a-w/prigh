@@ -79,7 +79,12 @@
                   pkgs.darwin.cctools
                 ];
               # dune ignores `make -j`; nix/limit-dune-jobs.patch sizes the
-              # compiler build to min(cores, RAM / 2 GB). Set JOBS to override.
+              # compiler build to min(cores, RAM / 2 GB, 4). The bootstrap
+              # has only been seen to succeed on macOS at 2 jobs, so pin it
+              # there.
+              env =
+                (oa.env or { })
+                // pkgs.lib.optionalAttrs pkgs.stdenv.hostPlatform.isDarwin { JOBS = "2"; };
             });
           };
 
