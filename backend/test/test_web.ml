@@ -463,7 +463,6 @@ let%expect_test "web port: a JSON-lines terminal and a WebSocket browser share \
          sprintf "response %s ok=%s%s%s" (field "id") (field "ok") client_id state
        | "event" ->
          (match field "event" with
-          | "text_delta" -> sprintf "event text_delta %S" (field "text")
           | "state" ->
             let state = Option.value (Jsonaf.member "state" (`Object fields)) ~default:`Null in
             sprintf
@@ -477,14 +476,24 @@ let%expect_test "web port: a JSON-lines terminal and a WebSocket browser share \
     | _ -> line
   in
   let send (write, _) line = write line in
+  let last_line = ref "" in
   let rec drain_until name ((_, read) as c) ~substring =
     match read () with
     | None -> printf "%s: (closed)\n" name
     | Some line ->
+      last_line := line;
       printf "%s: %s\n" name (summarise line);
       if not (String.is_substring line ~substring) then drain_until name c ~substring
   in
   let response id = sprintf "\"id\":%S" id in
+  let client_id () =
+    match Json.of_string !last_line |> Jsonaf.member "result" with
+    | Some result ->
+      (match Jsonaf.member "client_id" result with
+       | Some (`String id) -> id
+       | _ -> "?")
+    | None -> "?"
+  in
   let event name = sprintf "\"event\":%S" name in
   (* The terminal can run tools, so it takes over as the session's host as
      it attaches (the state event precedes the hello response). *)
@@ -492,12 +501,24 @@ let%expect_test "web port: a JSON-lines terminal and a WebSocket browser share \
     terminal
     {|{"id": "t1", "method": "hello", "params": {"name": "laptop", "cwd": "/tmp", "tools": true}}|};
   drain_until "terminal" terminal ~substring:(response "t1");
+  let terminal_id = client_id () in
   send browser {|{"id": "b1", "method": "hello", "params": {"name": "browser"}}|};
   drain_until "browser" browser ~substring:(response "b1");
   [%expect {| |}];
   send browser {|{"id": "b2", "method": "prompt", "params": {"text": "hello"}}|};
-  drain_until "browser" browser ~substring:(event "run_finished");
-  drain_until "terminal" terminal ~substring:(event "run_finished");
+  (* The run's first host call is the $instructions lookup on the terminal,
+     which answers as the real tool host would. *)
+  drain_until "terminal" terminal ~substring:(event "tool_exec");
+  (match !last_line |> Json.of_string |> Jsonaf.member "exec_id" with
+   | Some (`String exec_id) ->
+     send
+       terminal
+       (sprintf
+          {|{"id": "t-exec", "method": "tool_exec_result", "params": {"exec_id": "%s", "text": "[]"}}|}
+          exec_id)
+   | _ -> print_endline "no exec_id");
+  drain_until "browser" browser ~substring:(event "agent_end");
+  drain_until "terminal" terminal ~substring:(event "agent_end");
   [%expect {| |}];
   (* /host from the browser moves tools back to the backend and then to the
      terminal again; both clients see each switch. *)
@@ -508,7 +529,9 @@ let%expect_test "web port: a JSON-lines terminal and a WebSocket browser share \
   drain_until "terminal" terminal ~substring:(event "state");
   send
     terminal
-    {|{"id": "t2", "method": "set_active_host", "params": {"host": "client-1"}}|};
+    (sprintf
+       {|{"id": "t2", "method": "set_active_host", "params": {"host": "%s"}}|}
+       terminal_id);
   drain_until "terminal" terminal ~substring:(response "t2");
   drain_until "browser" browser ~substring:(event "state");
   [%expect {| |}]
