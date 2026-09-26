@@ -89,6 +89,15 @@ let href_with_backend ~pathname ~search ~backend =
   let search =
     String.chop_prefix search ~prefix:"?" |> Option.value ~default:search
   in
+  let search =
+    String.split search ~on:'&'
+    |> List.filter ~f:(fun pair ->
+      let key =
+        String.lsplit2 pair ~on:'=' |> Option.value_map ~default:pair ~f:fst
+      in
+      not (String.equal key "backend" || String.equal key "token"))
+    |> String.concat ~sep:"&"
+  in
   let suffix = if String.is_empty search then "" else "&" ^ search in
   pathname
   ^ "?backend="

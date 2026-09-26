@@ -108,8 +108,8 @@ serves it and speaks the RPC protocol over a WebSocket at `/ws`:
 
 # remote: on the server (or PRIGH_WEB_LISTEN=0.0.0.0:7788 ./prigh -web -token sekrit)
 prigh serve -web 0.0.0.0:7788 -token sekrit
-# then open http://server:7788/?token=sekrit (or type the token into the
-# connect form, which remembers it in localStorage)
+# then open http://server:7788/ and type the token into the connect form
+# (the browser remembers it in localStorage)
 prigh-tui -connect server:7788 -token sekrit -cwd ~/proj   # terminals use the same port
 ```
 

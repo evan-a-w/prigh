@@ -106,20 +106,13 @@ let%expect_test
   [%expect {| eof |}]
 ;;
 
-let%expect_test "web server: browser URLs carry tokens without logging them" =
-  List.iter
-    [ None; Some ""; Some "sekrit"; Some "spaces, symbols?&=#/% and ünicode" ]
-    ~f:(fun token ->
-      print_endline (Web_server.browser_url ~host:"127.0.0.1" ~port:7777 ~token));
-  print_endline
-    (Web_server.browser_url ~host:"::1" ~port:7777 ~token:(Some "sekrit"));
+let%expect_test "web server: browser URLs" =
+  print_endline (Web_server.browser_url ~host:"127.0.0.1" ~port:7777);
+  print_endline (Web_server.browser_url ~host:"::1" ~port:7777);
   [%expect
     {|
     http://127.0.0.1:7777/
-    http://127.0.0.1:7777/
-    http://127.0.0.1:7777/?token=sekrit
-    http://127.0.0.1:7777/?token=spaces%2C%20symbols%3F%26%3D%23%2F%25%20and%20%C3%BCnicode
-    http://[::1]:7777/?token=sekrit
+    http://[::1]:7777/
     |}]
 ;;
 

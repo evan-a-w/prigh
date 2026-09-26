@@ -25,18 +25,13 @@ module Settings = struct
   ;;
 
   let load () =
-    let first_some options = List.find_map options ~f:Fn.id in
     let non_empty s = Option.filter s ~f:(Fn.non String.is_empty) in
     Browser.remove_item backend_key;
     { backend =
         choose_backend
           ~query:(Browser.query_param "backend")
           ~same_origin:(Browser.same_origin_ws_url ())
-    ; token =
-        first_some
-          [ non_empty (Browser.query_param "token")
-          ; non_empty (Browser.get_item token_key)
-          ]
+    ; token = non_empty (Browser.get_item token_key)
     ; session = non_empty (Browser.query_param "session")
     ; name =
         Option.value (non_empty (Browser.query_param "name")) ~default:"browser"

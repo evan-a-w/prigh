@@ -444,9 +444,8 @@ let serve_command =
            | "::" -> "::1"
            | host -> host
          in
-         let log_url = Web_server.browser_url ~host ~port ~token:None in
-         let open_url = Web_server.browser_url ~host ~port ~token in
-         eprintf "prigh: web ui on %s\n%!" log_url;
+         let url = Web_server.browser_url ~host ~port in
+         eprintf "prigh: web ui on %s\n%!" url;
          (match root with
           | Some root -> eprintf "prigh: serving web assets from %s\n%!" root
           | None ->
@@ -454,7 +453,7 @@ let serve_command =
               "prigh: no web assets found (-web-root or $PRIGH_WEB_ROOT); only \
                /ws is served\n\
                %!");
-         if open_browser then open_in_browser open_url);
+         if open_browser then open_in_browser url);
        if stdio
        then (
          Rpc_server.serve_connection

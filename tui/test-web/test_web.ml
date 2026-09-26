@@ -25,14 +25,15 @@ let%expect_test "web connection: same-origin is stable unless explicitly \
     |> print_endline
   in
   href "";
-  href "?token=sekrit%26x%3Dy&session=abc&name=laptop";
+  href
+    "?token=sekrit%26x%3Dy&session=abc&backend=ws%3A%2F%2Fold%2Fws&name=laptop";
   [%expect
     {|
     ws://127.0.0.1:7777/ws
     ws://127.0.0.1:7777/ws
     ws://server.example:9000/ws
     /ui/?backend=ws%3A%2F%2Fserver.example%3A9000%2Fws%3Fx%3D1%26y%3D2
-    /ui/?backend=ws%3A%2F%2Fserver.example%3A9000%2Fws%3Fx%3D1%26y%3D2&token=sekrit%26x%3Dy&session=abc&name=laptop
+    /ui/?backend=ws%3A%2F%2Fserver.example%3A9000%2Fws%3Fx%3D1%26y%3D2&session=abc&name=laptop
     |}]
 ;;
 
