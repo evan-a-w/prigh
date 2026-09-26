@@ -8,7 +8,10 @@ if (!url || !token || !engine) {
 
 const browser = await engine.launch({
   headless: true,
-  args: engineName === "chromium" ? ["--no-sandbox"] : [],
+  args:
+    engineName === "chromium"
+      ? ["--no-sandbox", "--disable-dev-shm-usage", "--disable-gpu"]
+      : [],
 });
 const page = await browser.newPage({ viewport: { width: 960, height: 560 } });
 const errors = [];
@@ -26,8 +29,10 @@ const clean = text => text
   .replace(/─+/g, "<RULE>")
   .replace(/ctx:\d+% [0-9.km]+/g, "ctx:<USAGE>")
   .replace(/\$\d+\.\d+/g, "$<COST>")
-  .replace(/^[ \t]+|[ \t]+$/gm, "")
-  .replace(/^\s*$/gm, "")
+  .split("\n")
+  .map(line => line.trim())
+  .filter(line => line !== "")
+  .join("\n")
   .trim();
 
 const screen = async label => {
@@ -39,15 +44,32 @@ const screen = async label => {
 
 try {
   await page.goto(url);
+  await page.bringToFront();
   await page.locator("#connect-form").waitFor();
   console.log(`=== ${engineName}: authentication ===`);
   console.log(clean(await page.locator("#connect-form").textContent()));
   console.log(clean(`backend=${await page.locator("#backend").inputValue()}`));
   console.log(`token-in-url=${new URL(page.url()).searchParams.has("token")}`);
 
-  await page.locator("#token").fill(token);
+  // Native text insertion is what the connect form depends on; fail loudly if
+  // this environment's browser cannot deliver it.
+  await page.evaluate(() => {
+    const input = document.createElement("input");
+    input.id = "scratch";
+    document.body.appendChild(input);
+  });
+  await page.locator("#scratch").click();
+  await page.keyboard.type("ab");
+  const scratch = await page.locator("#scratch").inputValue();
+  if (scratch !== "ab") {
+    throw new Error(`keyboard typing does not work here: ${JSON.stringify(scratch)}`);
+  }
+  await page.locator("#scratch").evaluate(input => input.remove());
+
+  await page.locator("#token").click();
+  await page.keyboard.type(token, { delay: 20 });
   if (await page.locator("#token").inputValue() !== token) {
-    throw new Error("connect form did not retain the token input");
+    throw new Error(`connect form lost the typed token: ${JSON.stringify(await page.locator("#token").inputValue())}`);
   }
   await page.locator("#connect-form button").click();
   await page.waitForURL(/\?backend=/);

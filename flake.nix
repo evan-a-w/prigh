@@ -181,147 +181,6 @@
           touch "$out"
         '';
 
-        checks.web-browser =
-          if pkgs.stdenv.hostPlatform.isLinux then
-            pkgs.runCommand "prigh-web-browser-test" {
-              nativeBuildInputs = [ pkgs.chromium pkgs.curl pkgs.jq pkgs.nodejs ];
-            } ''
-              mkdir -p fake-bin home cwd
-              for opener in open xdg-open; do
-                cat > "fake-bin/$opener" <<'EOF'
-              #!${pkgs.runtimeShell}
-              printf '%s\n' "$1" > "$OPEN_LOG"
-              EOF
-                chmod +x "fake-bin/$opener"
-              done
-              export OPEN_LOG="$PWD/opened-url"
-              export HOME="$PWD/home"
-              export PATH="$PWD/fake-bin:$PATH"
-              PRIGH_WEB_LISTEN=127.0.0.1:0 \
-                ${prigh}/bin/prigh -web -faux -token 'sekrit&x=y' -cwd "$PWD/cwd" \
-                >server.out 2>server.err &
-              server_pid=$!
-              cleanup() {
-                status=$?
-                kill "''${chrome_pid:-}" "$server_pid" 2>/dev/null || true
-                if test "$status" -ne 0; then
-                  cat server.err chrome.err 2>/dev/null || true
-                  cat targets.json body.txt 2>/dev/null || true
-                fi
-                exit "$status"
-              }
-              trap cleanup EXIT
-              for attempt in $(seq 1 200); do
-                test -s "$OPEN_LOG" && break
-                sleep 0.05
-              done
-              test -s "$OPEN_LOG"
-              opened_url="$(cat "$OPEN_LOG")"
-              grep -Fx "prigh: web ui on $opened_url" server.err
-              ! grep -q 'sekrit' server.err
-              case "$opened_url" in *token*) exit 1;; esac
-              curl --fail --silent "''${opened_url}main.bc.js" >/dev/null
-              chromium \
-                --headless --no-sandbox --disable-gpu \
-                --user-data-dir="$PWD/chrome" --remote-debugging-port=9222 \
-                "$opened_url" >chrome.out 2>chrome.err &
-              chrome_pid=$!
-              for attempt in $(seq 1 200); do
-                curl --fail --silent http://127.0.0.1:9222/json >targets.json \
-                  && test "$(jq length targets.json)" -gt 0 \
-                  && break
-                sleep 0.05
-              done
-              test -s targets.json
-              debugger_url="$(jq -er '[.[] | select(.type == "page")][0].webSocketDebuggerUrl' targets.json)"
-              cat > drive-browser.mjs <<'EOF'
-              const ws = new WebSocket(process.argv[2]);
-              await new Promise((resolve, reject) => {
-                ws.onopen = resolve;
-                ws.onerror = reject;
-              });
-              let nextId = 1;
-              const pending = new Map();
-              ws.onmessage = event => {
-                const message = JSON.parse(event.data);
-                if (message.id && pending.has(message.id)) {
-                  pending.get(message.id)(message);
-                  pending.delete(message.id);
-                }
-              };
-              const call = (method, params = {}) => new Promise(resolve => {
-                const id = nextId++;
-                pending.set(id, resolve);
-                ws.send(JSON.stringify({ id, method, params }));
-              });
-              const evaluate = async expression => {
-                const reply = await call("Runtime.evaluate", { expression, returnByValue: true });
-                return reply.result.result.value;
-              };
-              for (let attempt = 0; attempt < 200; attempt++) {
-                if (await evaluate("Boolean(document.querySelector('form.connect'))")) break;
-                await new Promise(resolve => setTimeout(resolve, 50));
-              }
-              if (!(await evaluate("Boolean(document.querySelector('form.connect'))"))) {
-                throw new Error("tokenless page did not show the connect form");
-              }
-              await evaluate(`
-                document.querySelector("#token").value = "sekrit&x=y";
-                document.querySelector("#connect-form").requestSubmit();
-              `);
-              let body = "";
-              for (let attempt = 0; attempt < 400; attempt++) {
-                body = await evaluate(`document.body?.textContent ?? ""`);
-                if (body.includes("deepseek-flash") && !body.includes("connecting…")) break;
-                await new Promise(resolve => setTimeout(resolve, 50));
-              }
-              if (!body.includes("deepseek-flash") || body.includes("connecting…")) {
-                throw new Error("authenticated page did not start: " + JSON.stringify(body));
-              }
-              await call("Page.bringToFront");
-              if (!(await evaluate("document.hasFocus()"))) {
-                throw new Error("browser page is not focused");
-              }
-              const press = async (key, code, text = "") => {
-                await call("Input.dispatchKeyEvent", { type: "keyDown", key, code, text });
-                await call("Input.dispatchKeyEvent", { type: "keyUp", key, code });
-              };
-              let typed = "";
-              for (const key of "hello") {
-                typed += key;
-                await press(key, "Key" + key.toUpperCase(), key);
-                for (let attempt = 0; attempt < 100; attempt++) {
-                  body = await evaluate(`document.body?.textContent ?? ""`);
-                  if (body.includes("> " + typed)) break;
-                  await new Promise(resolve => setTimeout(resolve, 10));
-                }
-                if (!body.includes("> " + typed)) {
-                  throw new Error("real browser input did not reach the editor: " + JSON.stringify(body));
-                }
-              }
-              await press("Enter", "Enter", "\r");
-              for (let attempt = 0; attempt < 400; attempt++) {
-                body = await evaluate(`document.body?.textContent ?? ""`);
-                if (body.includes("faux reply")) break;
-                await new Promise(resolve => setTimeout(resolve, 50));
-              }
-              if (!body.includes("faux reply")) {
-                throw new Error("browser prompt did not round-trip: " + JSON.stringify(body));
-              }
-              console.log(body);
-              ws.close();
-              EOF
-              node drive-browser.mjs "$debugger_url" >body.txt
-              grep -q 'deepseek-flash' body.txt
-              ! grep -q 'connecting…' body.txt
-              ! grep -q 'connect-form' body.txt
-              touch "$out"
-            ''
-          else
-            pkgs.runCommand "prigh-web-browser-test-skipped" { } ''
-              touch "$out"
-            '';
-
         checks.web-workflows =
           if pkgs.stdenv.hostPlatform.isLinux then
             pkgs.runCommand "prigh-web-workflows-test" {
@@ -331,8 +190,18 @@
                   pkgs.nodejs
                   pkgs.playwright-test
                   pkgs.playwright-driver.browsers
+                  pkgs.dejavu_fonts
                 ];
             } ''
+              cat > fonts.conf <<EOF
+              <?xml version="1.0"?>
+              <!DOCTYPE fontconfig SYSTEM "fonts.dtd">
+              <fontconfig>
+                <dir>${pkgs.dejavu_fonts}/share/fonts</dir>
+                <cachedir>$PWD/font-cache</cachedir>
+              </fontconfig>
+              EOF
+              export FONTCONFIG_FILE="$PWD/fonts.conf"
               mkdir -p fake-bin
               for opener in open xdg-open; do
                 cat > "fake-bin/$opener" <<'EOF'
@@ -369,6 +238,8 @@
                 test -s "$OPEN_LOG"
                 opened_url="$(cat "$OPEN_LOG")"
                 case "$opened_url" in *token*) exit 1;; esac
+                ! grep -q 'sekrit' server.err
+                curl --fail --silent "''${opened_url}main.bc.js" >/dev/null
                 TEST_CWD="$PWD/cwd-$engine" \
                   node ${./tui/e2e-web/web_workflows.mjs} \
                     "$opened_url" 'sekrit&x=y' "$engine" >>actual

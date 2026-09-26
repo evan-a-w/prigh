@@ -500,11 +500,15 @@ RPC conversation over a real loopback socket)
 and `tui/test-web/` (connection selection, `Key_of_dom` and `Dom_of_screen`,
 run under `node` with js_of_ocaml because `virtual_dom`'s initialisers need a
 JavaScript runtime; skipped without `node`). On Linux, the flake's
-`web-browser` check starts the packaged wrapper and `serve -faux -web`, captures
-the URL sent to the browser, checks that the opened URL does not contain the
-token, fetches the installed bundle, submits the real connect form, loads the
-WebSocket session until the screen replaces `connecting…`, and sends a prompt
-through Chromium's input pipeline to the faux provider. Additional interactions
-(`/help`, pickers, `@` completion, `!` shell, paste, resize, the connect form,
-`?backend=` to a second backend, quit and reconnect after a backend restart)
-have been exercised manually.
+`web-workflows` check starts the packaged wrapper and `serve -faux -web`, checks
+that the opened URL does not carry the token and that the secret never reaches
+the log, fetches the installed bundle, and then drives real browsers with
+Playwright (Chromium and Firefox): it submits the connect form by typing the
+token, verifies the token is remembered and the page reloads to an
+authenticated WebSocket session, then types into the hidden keyboard input,
+edits with arrow/backspace, submits a prompt to the faux provider and reloads
+to prove the session survives. Every step saves a normalised ASCII snapshot of
+the screen and the expected output lives in `tui/e2e-web/web_workflows.expected`.
+Additional interactions (`/help`, pickers, `@` completion, `!` shell, paste,
+resize, `?backend=` to a second backend, quit and reconnect after a backend
+restart) have been exercised manually.

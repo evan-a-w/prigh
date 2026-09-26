@@ -193,6 +193,18 @@ let focus_keyboard_input () =
     input##focus)
 ;;
 
+let event_target (ev : #Dom_html.event Js.t) = Dom_html.eventTarget ev
+
+(* The connect form's own fields must keep their focus and receive keystrokes,
+   so those events are left to the browser. The hidden keyboard input is the
+   only textarea, so a textarea target is ours. *)
+let form_control (ev : #Dom_html.event Js.t) =
+  let target = event_target ev in
+  Js.Opt.test (Dom_html.CoerceTo.input target)
+  || Js.Opt.test (Dom_html.CoerceTo.button target)
+  || Js.Opt.test (Dom_html.CoerceTo.select target)
+;;
+
 let install_listeners ~schedule =
   let document = Dom_html.document in
   ignore
@@ -200,12 +212,15 @@ let install_listeners ~schedule =
        document
        Dom_html.Event.keydown
        (Dom.handler (fun ev ->
-          match Prigh_ui_web.Key_of_dom.key (key_event ev) with
-          | Some key ->
-            schedule (App.Action.Key key);
-            Dom.preventDefault ev;
-            Js._false
-          | None -> Js._true))
+          if form_control ev
+          then Js._true
+          else (
+            match Prigh_ui_web.Key_of_dom.key (key_event ev) with
+            | Some key ->
+              schedule (App.Action.Key key);
+              Dom.preventDefault ev;
+              Js._false
+            | None -> Js._true)))
        Js._false
      : Dom_html.event_listener_id);
   ignore
@@ -213,14 +228,17 @@ let install_listeners ~schedule =
        document
        Dom_html.Event.paste
        (Dom.handler (fun ev ->
-          (match Js.Opt.to_option ev##.clipboardData with
-           | Some data ->
-             let text = Js.to_string (data##getData (Js.string "text")) in
-             if not (String.is_empty text)
-             then schedule (App.Action.Intent (Paste text))
-           | None -> ());
-          Dom.preventDefault ev;
-          Js._false))
+          if form_control ev
+          then Js._true
+          else (
+            (match Js.Opt.to_option ev##.clipboardData with
+             | Some data ->
+               let text = Js.to_string (data##getData (Js.string "text")) in
+               if not (String.is_empty text)
+               then schedule (App.Action.Intent (Paste text))
+             | None -> ());
+            Dom.preventDefault ev;
+            Js._false)))
        Js._false
      : Dom_html.event_listener_id);
   ignore
@@ -263,8 +281,8 @@ let install_listeners ~schedule =
       (Dom_html.addEventListener
          app
          Dom_html.Event.mousedown
-         (Dom.handler (fun _ ->
-            focus_keyboard_input ();
+         (Dom.handler (fun ev ->
+            if not (form_control ev) then focus_keyboard_input ();
             Js._true))
          Js._false
        : Dom_html.event_listener_id));

@@ -1,8 +1,6 @@
 === chromium: authentication ===
 prigh
-
 unauthorised: bad or missing token
-
 backend
 token
 connect
@@ -39,9 +37,7 @@ faux reply
 <CWD>  deepseek-flash  think:off  view:normal  ctx:<USAGE>  $<COST>
 === firefox: authentication ===
 prigh
-
 unauthorised: bad or missing token
-
 backend
 token
 connect
