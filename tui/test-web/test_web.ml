@@ -5,6 +5,36 @@ module Key_of_dom = Prigh_ui_web.Key_of_dom
 module Dom_of_screen = Prigh_ui_web.Dom_of_screen
 module Node_helpers = Virtual_dom_test_helpers.Node_helpers
 
+(* The web frontend runs under js_of_ocaml with 32-bit OCaml ints, so
+   epoch-millisecond fields must not be decoded as [int]. [expires_ms] arrives
+   from a real [auth.json] and used to throw, leaving the app stuck at
+   "connecting…". *)
+let%expect_test "protocol: epoch-millisecond fields decode on the 32-bit \
+                 runtime"
+  =
+  let auth =
+    Or_error.ok_exn
+      (Prigh_protocol.Auth_status.of_json
+         (Or_error.ok_exn
+            (Prigh_protocol.Json.parse
+               {|{"provider":"anthropic","name":"Anthropic","methods":[],"configured":{"method":"oauth","source":"auth.json"},"expires_ms":1789820702579}|})))
+  in
+  print_s [%sexp (auth.expires_ms : Int64.t option)];
+  (* [int_field] stays total: an out-of-range value is an error, not a raise. *)
+  (match
+     Prigh_protocol.Json.int_field
+       (Or_error.ok_exn (Prigh_protocol.Json.parse {|{"n":1789820702579}|}))
+       "n"
+   with
+   | Ok n -> printf "unexpected int: %d\n" n
+   | Error e -> printf "out of range: %s\n" (Error.to_string_hum e));
+  [%expect
+    {|
+    (1789820702579)
+    out of range: field "n": integer "1789820702579" out of range
+    |}]
+;;
+
 let%expect_test "web connection: same-origin is stable unless explicitly \
                  overridden"
   =

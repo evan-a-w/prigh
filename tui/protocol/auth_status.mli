@@ -21,7 +21,7 @@ type t =
   ; name : string
   ; methods : Method.t list
   ; configured : Configured.t option
-  ; expires_ms : int option
+  ; expires_ms : Int64.t option
   }
 [@@deriving sexp_of, equal]
 

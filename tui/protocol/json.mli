@@ -19,6 +19,7 @@ val field : t -> string -> t option
 val string_field : t -> string -> string Or_error.t
 val string_opt_field : t -> string -> string option Or_error.t
 val int_field : t -> string -> int Or_error.t
+val int64_field : t -> string -> Int64.t Or_error.t
 val float_field : t -> string -> float Or_error.t
 val bool_field : t -> string -> bool Or_error.t
 val list_field : t -> string -> f:(t -> 'a Or_error.t) -> 'a list Or_error.t

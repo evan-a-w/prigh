@@ -68,8 +68,19 @@ let int_field t name =
     | i -> Ok i
     | exception _ ->
       (match Float.of_string n with
-       | f -> Ok (Float.to_int f)
-       | exception _ -> Or_error.errorf "field %S: bad integer %S" name n))
+       | exception _ -> Or_error.errorf "field %S: bad integer %S" name n
+       | f ->
+         (match Float.to_int f with
+          | i -> Ok i
+          | exception _ ->
+            Or_error.errorf "field %S: integer %S out of range" name n)))
+;;
+
+let int64_field t name =
+  Or_error.bind (number_field t name) ~f:(fun n ->
+    match Int64.of_string n with
+    | i -> Ok i
+    | exception _ -> Or_error.errorf "field %S: bad integer %S" name n)
 ;;
 
 let float_field t name =

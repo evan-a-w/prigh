@@ -35,7 +35,7 @@ type t =
   ; name : string
   ; methods : Method.t list
   ; configured : Configured.t option
-  ; expires_ms : int option
+  ; expires_ms : Int64.t option
   }
 [@@deriving sexp_of, equal]
 
@@ -52,7 +52,7 @@ let of_json j =
   let%map expires_ms =
     match Json.field j "expires_ms" with
     | None -> Ok None
-    | Some _ -> Json.int_field j "expires_ms" >>| Option.some
+    | Some _ -> Json.int64_field j "expires_ms" >>| Option.some
   in
   { provider; name; methods; configured; expires_ms }
 ;;
