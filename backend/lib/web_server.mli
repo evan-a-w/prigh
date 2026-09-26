@@ -19,6 +19,10 @@ val handle
   -> _ Eio.Flow.two_way
   -> unit
 
+(** URL opened for the local browser. The token is percent-encoded when one is
+    required by the server. *)
+val browser_url : host:string -> port:int -> token:string option -> string
+
 (** [Rpc_server.serve_lines] over a WebSocket. *)
 val serve_rpc : Rpc_server.t -> Websocket.t -> unit
 

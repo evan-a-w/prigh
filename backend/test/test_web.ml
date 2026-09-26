@@ -58,8 +58,8 @@ let%expect_test "websocket: frames round-trip at every length encoding" =
   [%expect {| ((fin true) (opcode Text) (payload Hello)) |}]
 ;;
 
-let%expect_test "websocket: fragmented messages, interleaved control frames, \
-                 errors"
+let%expect_test
+    "websocket: fragmented messages, interleaved control frames, errors"
   =
   let show s =
     let reader = Websocket.Message_reader.create (reader_of_string s) in
@@ -104,6 +104,23 @@ let%expect_test "websocket: fragmented messages, interleaved control frames, \
   [%expect {| protocol error: frame too large |}];
   show "\x81\x05Hel";
   [%expect {| eof |}]
+;;
+
+let%expect_test "web server: browser URLs carry tokens without logging them" =
+  List.iter
+    [ None; Some ""; Some "sekrit"; Some "spaces, symbols?&=#/% and ünicode" ]
+    ~f:(fun token ->
+      print_endline (Web_server.browser_url ~host:"127.0.0.1" ~port:7777 ~token));
+  print_endline
+    (Web_server.browser_url ~host:"::1" ~port:7777 ~token:(Some "sekrit"));
+  [%expect
+    {|
+    http://127.0.0.1:7777/
+    http://127.0.0.1:7777/
+    http://127.0.0.1:7777/?token=sekrit
+    http://127.0.0.1:7777/?token=spaces%2C%20symbols%3F%26%3D%23%2F%25%20and%20%C3%BCnicode
+    http://[::1]:7777/?token=sekrit
+    |}]
 ;;
 
 let%expect_test "web server: path safety and content types" =
@@ -331,7 +348,8 @@ let%expect_test "web server: static files, 404s and the RPC over a WebSocket" =
   print_s [%sexp (Websocket.Message_reader.next messages : Websocket.Message.t)];
   Websocket.close ws;
   print_s [%sexp (Websocket.Message_reader.next messages : Websocket.Message.t)];
-  [%expect {|
+  [%expect
+    {|
     (Pong hb)
     (Close (1000))
     |}]
@@ -341,8 +359,8 @@ let%expect_test "web server: static files, 404s and the RPC over a WebSocket" =
    TUI's -connect) and a browser (WebSocket). They attach to the same session,
    a prompt from one streams to both, and the terminal, which can run tools,
    shows up in [hosts] for either of them to pick with /host. *)
-let%expect_test "web port: a JSON-lines terminal and a WebSocket browser share \
-                 a session"
+let%expect_test
+    "web port: a JSON-lines terminal and a WebSocket browser share a session"
   =
   with_sandbox
   @@ fun t ->

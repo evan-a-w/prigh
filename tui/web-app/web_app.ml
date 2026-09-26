@@ -6,8 +6,8 @@ open Bonsai.Let_syntax
 module App = Prigh_ui.App
 module Client = Prigh_client.Client
 
-(* Where to connect: the URL query, then what the connect form saved, then the
-   page's own origin. *)
+(* Connect to the page's origin unless an explicit URL query selects another
+   backend. *)
 module Settings = struct
   type t =
     { backend : string
@@ -19,15 +19,19 @@ module Settings = struct
   let backend_key = "prigh.backend"
   let token_key = "prigh.token"
 
+  let choose_backend ~query ~same_origin =
+    Option.filter query ~f:(Fn.non String.is_empty)
+    |> Option.value ~default:same_origin
+  ;;
+
   let load () =
     let first_some options = List.find_map options ~f:Fn.id in
     let non_empty s = Option.filter s ~f:(Fn.non String.is_empty) in
+    Browser.remove_item backend_key;
     { backend =
-        first_some
-          [ non_empty (Browser.query_param "backend")
-          ; non_empty (Browser.get_item backend_key)
-          ]
-        |> Option.value_map ~default:(Browser.same_origin_ws_url ()) ~f:Fn.id
+        choose_backend
+          ~query:(Browser.query_param "backend")
+          ~same_origin:(Browser.same_origin_ws_url ())
     ; token =
         first_some
           [ non_empty (Browser.query_param "token")
@@ -39,10 +43,8 @@ module Settings = struct
     }
   ;;
 
-  let save ~backend ~token =
-    if String.is_empty backend
-    then Browser.remove_item backend_key
-    else Browser.set_item backend_key backend;
+  let save ~token =
+    Browser.remove_item backend_key;
     if String.is_empty token
     then Browser.remove_item token_key
     else Browser.set_item token_key token
@@ -137,6 +139,11 @@ let platform client ~hello ~schedule ~quit : Prigh_ui.Component.Platform.t =
   ; quit = Effect.of_sync_fun quit ()
   }
 ;;
+
+module For_testing = struct
+  let choose_backend = Settings.choose_backend
+  let href_with_backend = Browser.href_with_backend
+end
 
 module Result_ = struct
   type t =
@@ -270,10 +277,9 @@ let connect_form ~backend ~token ~error =
          Dom_html.Event.submit
          (Dom.handler (fun ev ->
             Dom.preventDefault ev;
-            Settings.save
-              ~backend:(String.strip (Browser.input_value "backend"))
-              ~token:(String.strip (Browser.input_value "token"));
-            Browser.reload ();
+            let backend = String.strip (Browser.input_value "backend") in
+            Settings.save ~token:(String.strip (Browser.input_value "token"));
+            Browser.reload_with_backend backend;
             Js._false))
          Js._false
        : Dom_html.event_listener_id)

@@ -85,7 +85,26 @@ let grid_size () =
   , Int.max 5 (Float.to_int (height /. cell_h)) )
 ;;
 
-let reload () = Dom_html.window##.location##reload
+let href_with_backend ~pathname ~search ~backend =
+  let search =
+    String.chop_prefix search ~prefix:"?" |> Option.value ~default:search
+  in
+  let suffix = if String.is_empty search then "" else "&" ^ search in
+  pathname
+  ^ "?backend="
+  ^ Js.to_string (Js.encodeURIComponent (Js.string backend))
+  ^ suffix
+;;
+
+let reload_with_backend backend =
+  let location = Dom_html.window##.location in
+  location##.href
+  := Js.string
+       (href_with_backend
+          ~pathname:(Js.to_string location##.pathname)
+          ~search:(Js.to_string location##.search)
+          ~backend)
+;;
 
 let set_app_html html =
   match Dom_html.getElementById_opt "app" with

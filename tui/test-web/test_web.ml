@@ -5,6 +5,37 @@ module Key_of_dom = Prigh_ui_web.Key_of_dom
 module Dom_of_screen = Prigh_ui_web.Dom_of_screen
 module Node_helpers = Virtual_dom_test_helpers.Node_helpers
 
+let%expect_test "web connection: same-origin is stable unless explicitly \
+                 overridden"
+  =
+  let choose ?query () =
+    Prigh_ui_web_app.Web_app.For_testing.choose_backend
+      ~query
+      ~same_origin:"ws://127.0.0.1:7777/ws"
+    |> print_endline
+  in
+  choose ();
+  choose ~query:"" ();
+  choose ~query:"ws://server.example:9000/ws" ();
+  let href search =
+    Prigh_ui_web_app.Web_app.For_testing.href_with_backend
+      ~pathname:"/ui/"
+      ~search
+      ~backend:"ws://server.example:9000/ws?x=1&y=2"
+    |> print_endline
+  in
+  href "";
+  href "?token=sekrit%26x%3Dy&session=abc&name=laptop";
+  [%expect
+    {|
+    ws://127.0.0.1:7777/ws
+    ws://127.0.0.1:7777/ws
+    ws://server.example:9000/ws
+    /ui/?backend=ws%3A%2F%2Fserver.example%3A9000%2Fws%3Fx%3D1%26y%3D2
+    /ui/?backend=ws%3A%2F%2Fserver.example%3A9000%2Fws%3Fx%3D1%26y%3D2&token=sekrit%26x%3Dy&session=abc&name=laptop
+    |}]
+;;
+
 let event
   ?(code = "")
   ?(ctrl = false)

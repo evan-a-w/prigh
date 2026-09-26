@@ -150,6 +150,82 @@
           program = "${prigh}/bin/prigh";
         };
 
+        checks.web-wrapper = pkgs.runCommand "prigh-web-wrapper-test" { } ''
+          cat > fake-backend <<'EOF'
+          #!${pkgs.runtimeShell}
+          printf '%s\n' "$@" > "$ARGS_OUT"
+          printf '%s\n' "$PRIGH_WEB_ROOT" > "$ROOT_OUT"
+          EOF
+          chmod +x fake-backend
+          ARGS_OUT="$PWD/args" ROOT_OUT="$PWD/root" \
+            PRIGH_BACKEND="$PWD/fake-backend" PRIGH_WEB_LISTEN=0.0.0.0:7777 \
+            ${prigh}/bin/prigh -web -token sekrit -cwd /work
+          diff -u ${pkgs.writeText "expected-web-args" ''
+            serve
+            -web
+            0.0.0.0:7777
+            -open
+            -token
+            sekrit
+            -cwd
+            /work
+          ''} args
+          test "$(cat root)" = "${prighTui}/share/prigh_tui/web"
+          test -f ${prighTui}/share/prigh_tui/web/index.html
+          test -f ${prighTui}/share/prigh_tui/web/main.bc.js
+          test -f ${prighTui}/share/prigh_tui/web/style.css
+          ARGS_OUT="$PWD/override-args" ROOT_OUT="$PWD/override-root" \
+            PRIGH_BACKEND="$PWD/fake-backend" PRIGH_WEB_ROOT=/custom \
+            ${prigh}/bin/prigh -web
+          test "$(cat override-root)" = /custom
+          touch "$out"
+        '';
+
+        checks.web-browser =
+          if pkgs.stdenv.hostPlatform.isLinux then
+            pkgs.runCommand "prigh-web-browser-test" {
+              nativeBuildInputs = [ pkgs.chromium pkgs.curl ];
+            } ''
+              mkdir -p fake-bin home cwd
+              cat > fake-bin/xdg-open <<'EOF'
+              #!${pkgs.runtimeShell}
+              printf '%s\n' "$1" > "$OPEN_LOG"
+              EOF
+              chmod +x fake-bin/xdg-open
+              export OPEN_LOG="$PWD/opened-url"
+              export HOME="$PWD/home"
+              export PATH="$PWD/fake-bin:$PATH"
+              PRIGH_WEB_LISTEN=127.0.0.1:0 \
+                ${prigh}/bin/prigh -web -faux -token 'sekrit&x=y' -cwd "$PWD/cwd" \
+                >server.out 2>server.err &
+              server_pid=$!
+              trap 'kill "$server_pid" 2>/dev/null || true' EXIT
+              for attempt in $(seq 1 200); do
+                test -s "$OPEN_LOG" && break
+                sleep 0.05
+              done
+              test -s "$OPEN_LOG"
+              opened_url="$(cat "$OPEN_LOG")"
+              base_url="''${opened_url%%\?*}"
+              grep -Fx "prigh: web ui on $base_url" server.err
+              ! grep -q 'sekrit' server.err
+              test "$opened_url" = "''${base_url}?token=sekrit%26x%3Dy"
+              curl --fail --silent "''${base_url}main.bc.js" >/dev/null
+              chromium \
+                --headless --no-sandbox --disable-gpu \
+                --user-data-dir="$PWD/chrome" --virtual-time-budget=10000 \
+                --dump-dom "$opened_url" >dom.html
+              grep -q '<pre class="screen">' dom.html
+              grep -q 'deepseek-flash' dom.html
+              ! grep -q 'connect-form' dom.html
+              ! grep -q 'connecting…' dom.html
+              touch "$out"
+            ''
+          else
+            pkgs.runCommand "prigh-web-browser-test-skipped" { } ''
+              touch "$out"
+            '';
+
         devShells.default = pkgs.mkShell {
           inputsFrom = [
             prighTui

@@ -16,5 +16,6 @@
   prigh_protocol
   prigh_ui
   prigh_ui_web
+  prigh_ui_web_app
   virtual_dom
   virtual_dom.vdom_test_helpers))

@@ -430,15 +430,16 @@ copy of the protocol types and the e2e test guards the contract.
   WebSocket as a `Transport.t`), `Browser` (localStorage, query string,
   clipboard, the cell measurement that turns the window into columns and
   rows) and `Web_app`, the counterpart of `Term_app`: reads
-  `?backend=`/`?token=`/`?session=`/`?name=` (falling back to what the
-  connect form saved, then the page's origin `/ws`), sends `hello` with
+  `?backend=`/`?token=`/`?session=`/`?name=` (using the page's origin `/ws`
+  when no backend is explicit), sends `hello` with
   `tools: false`, mounts the shared component with
   `Bonsai_web.Start.start_and_get_handle` (incoming actions through the
   handle), installs document-level `keydown`/`paste`/`wheel`/`resize`
   listeners, and implements the platform: history in `localStorage`,
   `navigator.clipboard`, `window.open`; suspend and the external editor
   report themselves unavailable. A failed first `hello` shows a connect
-  form instead (backend URL + token, saved and reloaded). `web-bin/` is
+  form instead (the token is saved and the selected backend is put in the
+  reloaded page's query string). `web-bin/` is
   the js_of_ocaml executable plus `index.html`/`style.css`, assembled
   under `web-bin/site/` and installed to `share/prigh_tui/web`.
 - `bin/` — `prigh-tui` (`-faux`, `-session`, `-model`, `-cwd`, `-auth-file`,
@@ -494,12 +495,15 @@ hang (`Driver.finished` never resolving), and the paste scenario caught the
 batched-event buffering bug.
 
 The web layer adds two: `backend/test/test_web.ml` (frames, fragmentation,
-the RFC handshake vector, static serving and traversal, and a masked
-WebSocket RPC conversation over a real loopback socket) and
-`tui/test-web/` (`Key_of_dom` and `Dom_of_screen`, run under `node` with
+the RFC handshake vector, static serving and traversal, browser URL/token
+encoding, and a masked WebSocket RPC conversation over a real loopback socket)
+and `tui/test-web/` (connection selection, `Key_of_dom` and `Dom_of_screen`, run under `node` with
 js_of_ocaml because `virtual_dom`'s initialisers need a JavaScript runtime;
-skipped without `node`). The page itself was exercised with a headless
-Chromium against `serve -faux -web` (prompt, `/help`, pickers, `@`
-completion, `!` shell, paste, resize, the connect form, `?backend=` to a
-second backend, quit and reconnect after a backend restart); that is not
-automated.
+skipped without `node`). On Linux, the flake's `web-browser` check starts the
+packaged wrapper and `serve -faux -web`, captures the URL sent to the browser,
+checks that its token is encoded but not logged, fetches the installed bundle,
+and loads it in headless Chromium through the real WebSocket until the session
+screen replaces `connecting…`. Additional interactions (prompt, `/help`,
+pickers, `@` completion, `!` shell, paste, resize, the connect form,
+`?backend=` to a second backend, quit and reconnect after a backend restart)
+have been exercised manually.

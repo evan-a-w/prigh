@@ -16,6 +16,12 @@ val copy_to_clipboard : string -> unit
 (** Columns and rows of the monospace grid that fit the window. *)
 val grid_size : unit -> int * int
 
-val reload : unit -> unit
+val href_with_backend
+  :  pathname:string
+  -> search:string
+  -> backend:string
+  -> string
+
+val reload_with_backend : string -> unit
 val set_app_html : string -> unit
 val input_value : string -> string

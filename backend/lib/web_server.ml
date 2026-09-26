@@ -110,6 +110,29 @@ let static ~root (request : Request.t) =
 
 let ws_path = "/ws"
 
+let percent_encode s =
+  let unreserved = function
+    | 'A' .. 'Z' | 'a' .. 'z' | '0' .. '9' | '-' | '.' | '_' | '~' -> true
+    | _ -> false
+  in
+  String.concat_map s ~f:(fun c ->
+    if unreserved c then String.of_char c else sprintf "%%%02X" (Char.to_int c))
+;;
+
+let browser_url ~host ~port ~token =
+  let host =
+    if
+      String.is_substring host ~substring:":"
+      && not (String.is_prefix host ~prefix:"[")
+    then "[" ^ host ^ "]"
+    else host
+  in
+  let base = sprintf "http://%s:%d/" host port in
+  Option.filter token ~f:(Fn.non String.is_empty)
+  |> Option.value_map ~default:base ~f:(fun token ->
+    base ^ "?token=" ^ percent_encode token)
+;;
+
 let wants_upgrade (request : Request.t) =
   String.equal request.path ws_path
   && Option.value_map

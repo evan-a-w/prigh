@@ -439,11 +439,14 @@ let serve_command =
              ~on_lines:(Rpc_server.serve_lines server)
          in
          let host =
-           Format.asprintf "%a" Eio.Net.Ipaddr.pp addr
-           |> fun h -> if String.equal h "0.0.0.0" then "127.0.0.1" else h
+           match Format.asprintf "%a" Eio.Net.Ipaddr.pp addr with
+           | "0.0.0.0" -> "127.0.0.1"
+           | "::" -> "::1"
+           | host -> host
          in
-         let url = sprintf "http://%s:%d/" host port in
-         eprintf "prigh: web ui on %s\n%!" url;
+         let log_url = Web_server.browser_url ~host ~port ~token:None in
+         let open_url = Web_server.browser_url ~host ~port ~token in
+         eprintf "prigh: web ui on %s\n%!" log_url;
          (match root with
           | Some root -> eprintf "prigh: serving web assets from %s\n%!" root
           | None ->
@@ -451,7 +454,7 @@ let serve_command =
               "prigh: no web assets found (-web-root or $PRIGH_WEB_ROOT); only \
                /ws is served\n\
                %!");
-         if open_browser then open_in_browser url);
+         if open_browser then open_in_browser open_url);
        if stdio
        then (
          Rpc_server.serve_connection
