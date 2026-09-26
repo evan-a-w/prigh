@@ -10,6 +10,7 @@ module Argument = struct
     | Logout
     | Sessions
     | Path
+    | Directory
   [@@deriving sexp_of, equal]
 end
 
@@ -75,7 +76,7 @@ let all =
       "pick where tools run (this frontend, another one, or the backend) and \
        the directory there"
   ; c ~argument:Argument.Sessions "switch" "[path]" "switch to a saved session"
-  ; c ~argument:Argument.Path "cd" "[path]" "change the working directory"
+  ; c ~argument:Argument.Directory "cd" "[path]" "change the working directory"
   ; c "fork" "" "fork at a previous user message"
   ; c "rewind" "" "rewind the head to a previous user message"
   ; c "tree" "" "show the session tree and switch head"

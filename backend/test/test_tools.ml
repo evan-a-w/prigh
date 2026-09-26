@@ -413,3 +413,50 @@ let%expect_test "path listing: fd and the readdir fallback agree" =
     (README.md)
     |}]
 ;;
+
+let%expect_test "directory completion keeps the typed notation" =
+  with_sandbox
+  @@ fun t ->
+  List.iter
+    [ "src/sub"; "src/Support"; "docs"; ".hidden"; "other/proj/deep" ]
+    ~f:(fun d -> Core_unix.mkdir_p (Filename.concat t.dir d));
+  write t "src/app.ml" "";
+  write t "notes.txt" "";
+  let show ?(cwd = t.dir) prefix =
+    let result =
+      Host_ops.execute
+        ~env:t.env
+        ~cancel:Cancellation.never
+        ~on_output:ignore
+        ~cwd
+        ~name:Host_ops.list_dirs_op
+        ~arguments:(`Object [ "prefix", `String prefix ])
+    in
+    printf "%S -> %s\n" (mask t prefix) (mask t result.text)
+  in
+  show "";
+  show ".";
+  show "s";
+  show "src/";
+  show "src/SU";
+  show "src/sub/";
+  show ~cwd:(Filename.concat t.dir "src") "../ot";
+  show (t.dir ^ "/oth");
+  show (t.dir ^ "/other/proj/");
+  show "nowhere/";
+  show "notes.txt/";
+  [%expect
+    {|
+    "" -> ["docs/","other/","src/"]
+    "." -> [".hidden/"]
+    "s" -> ["src/"]
+    "src/" -> ["src/Support/","src/sub/"]
+    "src/SU" -> ["src/Support/","src/sub/"]
+    "src/sub/" -> []
+    "../ot" -> ["../other/"]
+    "$DIR/oth" -> ["$DIR/other/"]
+    "$DIR/other/proj/" -> ["$DIR/other/proj/deep/"]
+    "nowhere/" -> []
+    "notes.txt/" -> []
+    |}]
+;;

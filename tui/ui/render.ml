@@ -124,7 +124,11 @@ let mode_hint (m : App.Model.t) : Content.Line.t option =
         | Picker _ -> Some [ span ~style:dim "Enter selects · Esc closes" ]
         | Login_prompt _ ->
           Some [ span ~style:dim "login: Enter answers, Esc cancels" ]
-        | Text_prompt _ -> Some [ span ~style:dim "Enter submits, Esc cancels" ]
+        | Text_prompt _ ->
+          (match m.autocomplete with
+           | Some _ ->
+             Some [ span ~style:dim "Tab completes · Enter submits · Esc" ]
+           | None -> Some [ span ~style:dim "Enter submits, Esc cancels" ])
         | Confirm _ -> Some [ span ~style:dim "confirm: y / n" ]
         | Search { query = _; matches; current } ->
           if List.is_empty matches
@@ -512,7 +516,7 @@ let autocomplete_block (ac : Autocomplete.t) ~width : Content.t =
          ; span ~style:(style dim) ("  " ^ help)
          ]
          ~width)
-   | Autocomplete.Source.Argument _ | Autocomplete.Source.Path ->
+   | Autocomplete.Source.Argument _ | Path | Directory _ ->
      let label_width =
        List.fold shown ~init:0 ~f:(fun acc (item : Picker.Item.t) ->
          Int.max acc (Text_width.string item.label))
@@ -681,7 +685,7 @@ let screen (m : App.Model.t) : Screen.t =
   in
   let autocomplete_rows =
     match m.mode, m.autocomplete with
-    | Editing, Some ac -> autocomplete_block ac ~width
+    | (Editing | Text_prompt _), Some ac -> autocomplete_block ac ~width
     | _ -> []
   in
   let panel =

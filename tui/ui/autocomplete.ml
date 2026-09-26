@@ -6,6 +6,7 @@ module Source = struct
     | Command
     | Argument of Commands.Spec.t
     | Path
+    | Directory of { host : string option }
   [@@deriving sexp_of, equal]
 end
 
@@ -17,7 +18,6 @@ type t =
   ; items : Picker.Item.t list
   ; selected : int
   ; navigated : bool
-  ; dirs_only : bool
   }
 [@@deriving sexp_of]
 
@@ -26,22 +26,13 @@ let prefix t = t.prefix
 let items t = t.items
 let selected t = t.selected
 let navigated t = t.navigated
-
-let set_items t items =
-  let items =
-    if t.dirs_only
-    then
-      List.filter items ~f:(fun (i : Picker.Item.t) ->
-        String.is_suffix i.id ~suffix:"/")
-    else items
-  in
-  { t with items; selected = 0 }
-;;
+let set_items t items = { t with items; selected = 0 }
 
 let accepts_on_enter t =
   match t.source with
   | Source.Command -> true
-  | Argument _ | Path -> t.navigated || not (String.is_empty t.prefix)
+  | Argument _ | Path | Directory _ ->
+    t.navigated || not (String.is_empty t.prefix)
 ;;
 
 let clamp t =
@@ -80,7 +71,6 @@ let compute_command ~line ~line_index =
       ; items
       ; selected = 0
       ; navigated = false
-      ; dirs_only = false
       }
   | _ -> None
 ;;
@@ -121,12 +111,7 @@ let model_items ~logged_in (models : P.Model.t list) =
 
 let session_items (sessions : P.Session_summary.t list) =
   List.map sessions ~f:(fun (s : P.Session_summary.t) ->
-    let first =
-      Option.value_map s.first_prompt ~default:"(empty)" ~f:(fun p ->
-        Text_width.truncate
-          (String.concat ~sep:" " (String.split_lines p))
-          ~width:60)
-    in
+    let first = Text_width.truncate (P.Session_summary.blurb s) ~width:60 in
     Picker.Item.create
       ~id:s.path
       ~detail:s.cwd
@@ -142,7 +127,7 @@ let argument_items ~kind ~models ~auth ~sessions ~logged_in =
   | Confirm -> Some (confirm_items ())
   | Login | Logout -> Some (provider_items auth)
   | Sessions -> Some (Option.value_map sessions ~default:[] ~f:session_items)
-  | Path -> None
+  | Path | Directory -> None
 ;;
 
 let argument_start ~line ~name =
@@ -171,17 +156,19 @@ let compute_argument ~line ~line_index ~models ~auth ~sessions ~logged_in =
              let prefix = String.strip rest in
              let start = argument_start ~line ~name in
              (match kind with
-              | Commands.Argument.Path ->
+              | Commands.Argument.Path | Directory ->
                 (* Filled in asynchronously by the platform. *)
                 Some
-                  { source = Source.Path
+                  { source =
+                      (match kind with
+                       | Directory -> Source.Directory { host = None }
+                       | _ -> Source.Path)
                   ; prefix
                   ; line = line_index
                   ; start
                   ; items = []
                   ; selected = 0
                   ; navigated = false
-                  ; dirs_only = String.equal spec.name "cd"
                   }
               | Sessions when Option.is_none sessions ->
                 (* Loading; the app fetches the session list. *)
@@ -193,7 +180,6 @@ let compute_argument ~line ~line_index ~models ~auth ~sessions ~logged_in =
                   ; items = []
                   ; selected = 0
                   ; navigated = false
-                  ; dirs_only = false
                   }
               | _ ->
                 let items =
@@ -211,7 +197,6 @@ let compute_argument ~line ~line_index ~models ~auth ~sessions ~logged_in =
                   ; items
                   ; selected = 0
                   ; navigated = false
-                  ; dirs_only = false
                   }))))
 ;;
 
@@ -236,9 +221,19 @@ let compute_at ~line ~col ~line_index =
       ; items = []
       ; selected = 0
       ; navigated = false
-      ; dirs_only = false
       }
   | None -> None
+;;
+
+let directory ~host ~text =
+  { source = Source.Directory { host = Some host }
+  ; prefix = text
+  ; line = 0
+  ; start = 0
+  ; items = []
+  ; selected = 0
+  ; navigated = false
+  }
 ;;
 
 let compute ~line ~col ~line_index ~models ~auth ~sessions ~logged_in =
@@ -261,7 +256,7 @@ let accept t ~editor_text =
     | Some item ->
       (match t.source with
        | Source.Command -> item.id ^ " "
-       | Argument _ | Path -> item.id)
+       | Argument _ | Path | Directory _ -> item.id)
   in
   let before = String.prefix line t.start in
   let after = String.drop_prefix line (t.start + String.length t.prefix) in

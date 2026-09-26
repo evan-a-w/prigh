@@ -1097,7 +1097,9 @@ let%expect_test "autocomplete: Enter accepts arguments only after a filter or \
       (match Autocomplete.source ac with
        | Command -> "command"
        | Argument spec -> "arg:" ^ spec.name
-       | Path -> "path")
+       | Path -> "path"
+       | Directory { host } ->
+         "dir" ^ Option.value_map host ~default:"" ~f:(fun h -> "@" ^ h))
       (Autocomplete.prefix ac)
       (Autocomplete.navigated ac)
       (Autocomplete.accepts_on_enter ac)
@@ -1110,6 +1112,9 @@ let%expect_test "autocomplete: Enter accepts arguments only after a filter or \
   show "/model gp" (ac "/model gp");
   show "@" (ac "@");
   show "@ down" (Autocomplete.down (ac "@"));
+  show "/cd sr" (ac "/cd sr");
+  show "/export s" (ac "/export s");
+  show "host prompt" (Autocomplete.directory ~host:"client-1" ~text:"~/de");
   [%expect
     {|
     /mo          command    prefix="mo" navigated=false enter_accepts=true items=3
@@ -1118,22 +1123,15 @@ let%expect_test "autocomplete: Enter accepts arguments only after a filter or \
     /model gp    arg:model  prefix="gp" navigated=false enter_accepts=true items=1
     @            path       prefix="" navigated=false enter_accepts=false items=0
     @ down       path       prefix="" navigated=true enter_accepts=true items=0
+    /cd sr       dir        prefix="sr" navigated=false enter_accepts=true items=0
+    /export s    path       prefix="s" navigated=false enter_accepts=true items=0
+    host prompt  dir@client-1 prefix="~/de" navigated=false enter_accepts=true items=0
     |}];
-  let paths =
-    List.map [ "src/"; "src/app.ml"; "docs/" ] ~f:(fun p ->
-      Picker.Item.create ~id:p p)
+  (* Accepting a directory in the host prompt replaces the whole line. *)
+  let dirs = Autocomplete.directory ~host:"client-1" ~text:"~/de" in
+  let dirs =
+    Autocomplete.set_items dirs [ Picker.Item.create ~id:"~/dev/" "~/dev/" ]
   in
-  let ids ac =
-    List.map (Autocomplete.items ac) ~f:(fun i -> i.Picker.Item.id)
-  in
-  print_s [%sexp (ids (Autocomplete.set_items (ac "/cd ") paths) : string list)];
-  print_s
-    [%sexp (ids (Autocomplete.set_items (ac "/export ") paths) : string list)];
-  print_s [%sexp (ids (Autocomplete.set_items (ac "@") paths) : string list)];
-  [%expect
-    {|
-    (src/ docs/)
-    (src/ src/app.ml docs/)
-    (src/ src/app.ml docs/)
-    |}]
+  print_endline (Autocomplete.accept dirs ~editor_text:"~/de");
+  [%expect {| ~/dev/ |}]
 ;;

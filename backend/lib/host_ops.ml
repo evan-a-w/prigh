@@ -25,6 +25,42 @@ let list_paths ~env ~cwd prefix =
               `String p))))
 ;;
 
+let list_dirs_op = "$list_dirs"
+
+(* Completions for a directory being typed: [prefix] is what the user has
+   so far (absolute, [~/...] or relative to [cwd]); the results keep that
+   notation, so accepting one just extends the text. *)
+let list_dirs ~cwd prefix =
+  let dir_part, base =
+    match String.rsplit2 prefix ~on:'/' with
+    | Some (dir, base) -> dir ^ "/", base
+    | None -> "", prefix
+  in
+  let dir =
+    match String.rstrip dir_part ~drop:(Char.equal '/') with
+    | "" -> if String.is_empty dir_part then cwd else "/"
+    | dir -> Tool.resolve ~cwd dir
+  in
+  let names =
+    match Sys_unix.ls_dir dir with
+    | names -> names
+    | exception _ -> []
+  in
+  let show_hidden = String.is_prefix base ~prefix:"." in
+  names
+  |> List.filter ~f:(fun name ->
+    (show_hidden || not (String.is_prefix name ~prefix:"."))
+    && String.Caseless.is_prefix name ~prefix:base
+    &&
+    match Sys_unix.is_directory (Filename.concat dir name) with
+    | `Yes -> true
+    | `No | `Unknown -> false)
+  |> List.sort ~compare:String.compare
+  |> Fn.flip List.take 200
+  |> List.map ~f:(fun name -> `String (dir_part ^ name ^ "/"))
+  |> fun items -> Tool.Result.ok (Json.to_string (`Array items))
+;;
+
 let read_file ~cwd path =
   match Tool_read.read_for_context ~cwd path with
   | Ok content -> Tool.Result.ok content
@@ -103,6 +139,11 @@ let execute ~env ~cancel ~on_output ~cwd ~name ~(arguments : Json.t) =
   then (
     match string_arg "prefix" with
     | Ok prefix -> list_paths ~env ~cwd prefix
+    | Error e -> Tool.Result.error (Error.to_string_hum e))
+  else if String.equal name list_dirs_op
+  then (
+    match string_arg "prefix" with
+    | Ok prefix -> list_dirs ~cwd prefix
     | Error e -> Tool.Result.error (Error.to_string_hum e))
   else (
     match

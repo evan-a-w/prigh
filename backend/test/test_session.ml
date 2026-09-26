@@ -200,7 +200,116 @@ let%expect_test "list" =
       (List.map (Session.list ~dir) ~f:(fun s ->
          s.cwd, s.first_prompt, s.message_count)
        : (string * string option * int) list)];
-  [%expect {| ((/a ("first question") 2) (/b () 0)) |}]
+  [%expect {| ((/a ("first question") 2)) |}]
+;;
+
+let%expect_test "nothing is written until a message or a name" =
+  with_dir
+  @@ fun dir ->
+  let t = Session.create ~dir ~cwd:"/a" () in
+  let exists () = Sys_unix.file_exists_exn (Session.path t) in
+  let (_ : Session.Entry.t) = Session.set_model t ~model:"m" ~thinking:Off in
+  let (_ : Session.Entry.t) = Session.set_cwd t ~cwd:"/b" in
+  let (_ : Session.Entry.t) = Session.set_system_prompt t ~text:"sys" in
+  print_s
+    [%sexp
+      { persisted = (Session.persisted t : bool)
+      ; file = (exists () : bool)
+      ; dir = (Sys_unix.file_exists_exn dir : bool)
+      ; updated_at_is_created_at =
+          (String.equal (Session.updated_at t) (Session.created_at t) : bool)
+      }];
+  [%expect
+    {| ((persisted false) (file false) (dir true) (updated_at_is_created_at true)) |}];
+  let (_ : Session.Entry.t) = Session.append_message t (Message.user "hi") in
+  print_s
+    [%sexp
+      { persisted = (Session.persisted t : bool); file = (exists () : bool) }];
+  [%expect {| ((persisted true) (file true)) |}];
+  (* Everything recorded before the first message is in the file. *)
+  let loaded = Or_error.ok_exn (Session.load (Session.path t)) in
+  print_s
+    [%sexp
+      { cwd = (Session.cwd loaded : string)
+      ; model = (Session.model loaded : (string * Thinking.t) option)
+      ; system_prompt = (Session.system_prompt loaded : string option)
+      ; messages = (kinds loaded : string list)
+      ; entries = (List.length (Session.entries loaded) : int)
+      }];
+  [%expect
+    {|
+    ((cwd /b) (model ((m Off))) (system_prompt (sys)) (messages (user:hi))
+     (entries 4))
+    |}];
+  (* A name alone is also worth keeping. *)
+  let named = Session.create ~dir ~cwd:"/a" () in
+  let (_ : Session.Entry.t) = Session.set_name named ~name:"keep" in
+  print_s
+    [%sexp
+      (Session.name (Or_error.ok_exn (Session.load (Session.path named)))
+       : string option)];
+  [%expect {| (keep) |}]
+;;
+
+let%expect_test "a rewind before the first message is reflected when written" =
+  with_dir
+  @@ fun dir ->
+  let t = Session.create ~dir ~cwd:"/a" () in
+  let m1 = Session.set_model t ~model:"one" ~thinking:Off in
+  let (_ : Session.Entry.t) = Session.set_model t ~model:"two" ~thinking:Off in
+  Or_error.ok_exn (Session.rewind t ~to_:m1.id);
+  let (_ : Session.Entry.t) = Session.append_message t (Message.user "hi") in
+  let loaded = Or_error.ok_exn (Session.load (Session.path t)) in
+  print_s
+    [%sexp
+      (Session.model loaded : (string * Thinking.t) option)
+    , ([%equal: string option] (Session.head loaded) (Session.head t) : bool)];
+  [%expect {| (((one Off)) true) |}]
+;;
+
+let%expect_test "description entry, exported as a list field" =
+  with_dir
+  @@ fun dir ->
+  let t = Session.create ~dir ~cwd:"/a" () in
+  let (_ : Session.Entry.t) = Session.append_message t (Message.user "hi") in
+  print_s [%sexp (Session.description t : string option)];
+  let (_ : Session.Entry.t) = Session.set_description t ~text:"Greeting" in
+  let (_ : Session.Entry.t) = Session.set_description t ~text:"Greeting, v2" in
+  let loaded = Or_error.ok_exn (Session.load (Session.path t)) in
+  print_s
+    [%sexp
+      (Session.description loaded : string option)
+    , (List.map (Session.list ~dir) ~f:(fun s -> s.description)
+       : string option list)
+    , (kinds loaded : string list)];
+  [%expect
+    {|
+    ()
+    (("Greeting, v2") (("Greeting, v2")) (user:hi))
+    |}]
+;;
+
+let%expect_test "list orders by last modification, newest first" =
+  with_dir
+  @@ fun dir ->
+  let make name =
+    let t = Session.create ~dir ~cwd:"/a" () in
+    let (_ : Session.Entry.t) = Session.set_name t ~name in
+    t
+  in
+  let touch t seconds =
+    Core_unix.utimes (Session.path t) ~access:seconds ~modif:seconds
+  in
+  let old = make "old" in
+  let newest = make "newest" in
+  let middle = make "middle" in
+  touch old 1000.;
+  touch middle 2000.;
+  touch newest 3000.;
+  print_s
+    [%sexp
+      (List.map (Session.list ~dir) ~f:(fun s -> s.name) : string option list)];
+  [%expect {| ((newest) (middle) (old)) |}]
 ;;
 
 let%expect_test "load errors" =

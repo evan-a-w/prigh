@@ -25,6 +25,7 @@ module State : sig
     { session_id : string
     ; session_path : string
     ; session_name : string option
+    ; session_description : string option
     ; cwd : string
     ; git_branch : string option
     ; model : Model.t
@@ -101,6 +102,9 @@ val create
   -> ?session:Session.t
   -> ?model:Model.t
   -> ?thinking:Thinking.t
+  -> ?auto_describe:bool
+       (** write a [Session_description] after a turn once the conversation
+           is long enough (default: false) *)
   -> cwd:string
   -> unit
   -> t
@@ -181,6 +185,11 @@ val set_cwd : t -> path:string -> unit Or_error.t
 (** Paths under the session cwd matching [prefix], listed on the active tool
     host (for [@] completion). *)
 val list_paths : t -> prefix:string -> Json.t Or_error.t
+
+(** Directory completions for [prefix] (absolute, [~/] or relative to the
+    session cwd on that host), listed on [host] (default: the active one),
+    in the notation the prefix used. *)
+val list_dirs : ?host:string -> t -> prefix:string -> Json.t Or_error.t
 
 (** Refuses to delete the active session. *)
 val delete_session : t -> path:string -> unit Or_error.t

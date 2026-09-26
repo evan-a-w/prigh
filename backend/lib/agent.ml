@@ -27,6 +27,7 @@ module State = struct
     { session_id : string
     ; session_path : string
     ; session_name : string option
+    ; session_description : string option
     ; cwd : string
     ; git_branch : string option
     ; model : Model.t
@@ -111,6 +112,8 @@ type t =
   ; mutable model : Model.t
   ; mutable thinking : Thinking.t
   ; mutable run : Run.t option
+  ; mutable describing : unit Promise.t option
+  ; auto_describe : bool
   ; steer_queue : Queued.t Queue.t
   ; follow_up_queue : Queued.t Queue.t
   ; mutable subscribers : (Event.t -> unit) list
@@ -150,6 +153,7 @@ let create
       ?session
       ?(model = Model.default)
       ?(thinking = Thinking.Off)
+      ?(auto_describe = false)
       ~cwd
       ()
   =
@@ -172,6 +176,8 @@ let create
     ; model
     ; thinking
     ; run = None
+    ; describing = None
+    ; auto_describe
     ; steer_queue = Queue.create ()
     ; follow_up_queue = Queue.create ()
     ; subscribers = []
@@ -240,6 +246,7 @@ let state t =
   { State.session_id = Session.id t.session
   ; session_path = Session.path t.session
   ; session_name = Session.name t.session
+  ; session_description = Session.description t.session
   ; cwd = t.cwd
   ; git_branch = t.git_branch
   ; model = t.model
@@ -620,11 +627,38 @@ let rec start_run t prompts =
       queue_update t);
     auto_compact t;
     finish ();
+    auto_describe t;
     match Queue.dequeue t.follow_up_queue with
     | Some queued ->
       queue_update t;
       start_run t [ user_message t queued ]
     | None -> ())
+
+(* Runs after the turn is over so the user is not kept waiting; [wait_idle]
+   still covers it. *)
+and auto_describe t =
+  let session = t.session in
+  if
+    t.auto_describe
+    && Option.is_none t.describing
+    && Session_description.wanted session
+  then (
+    let finished, resolve = Promise.create () in
+    t.describing <- Some finished;
+    Fiber.fork ~sw:t.sw (fun () ->
+      (match
+         Session_description.describe
+           ~provider:t.provider
+           ~model:t.model
+           session
+       with
+       | Ok _ -> if phys_equal session t.session then state_changed t
+       | Error e ->
+         broadcast
+           t
+           (Notice ("session description failed: " ^ Error.to_string_hum e)));
+      t.describing <- None;
+      Promise.resolve resolve ()))
 
 and auto_compact t =
   let state = state t in
@@ -680,11 +714,14 @@ let abort t =
 ;;
 
 let rec wait_idle t =
-  match t.run with
-  | Some run ->
+  match t.run, t.describing with
+  | Some run, _ ->
     Promise.await run.finished;
     wait_idle t
-  | None -> ()
+  | None, Some describing ->
+    Promise.await describing;
+    wait_idle t
+  | None, None -> ()
 ;;
 
 (* Pops the most recently queued message: follow-ups take priority over steer
@@ -878,6 +915,36 @@ let list_paths t ~prefix =
   with
   | { is_error = true; text } -> Or_error.error_string text
   | { is_error = false; text } -> Json.parse text
+;;
+
+let list_dirs ?host t ~prefix =
+  let host =
+    match host with
+    | None -> Ok (find_host t t.active_host)
+    | Some id ->
+      (match find_host t id with
+       | Some host -> Ok (Some host)
+       | None -> Or_error.errorf "unknown tool host %S" id)
+  in
+  Or_error.bind host ~f:(function
+    | None -> Or_error.error_string "tool host is not connected"
+    | Some host ->
+      let cwd =
+        if String.equal host.id t.active_host then t.cwd else host.cwd
+      in
+      (match
+         host_exec_on
+           t
+           host
+           ~cancel:Cancellation.never
+           ~on_output:ignore
+           ~call_id:"list_dirs"
+           ~cwd
+           ~name:Host_ops.list_dirs_op
+           ~arguments:(`Object [ "prefix", `String prefix ])
+       with
+       | { is_error = true; text } -> Or_error.error_string text
+       | { is_error = false; text } -> Json.parse text))
 ;;
 
 let delete_session t ~path =

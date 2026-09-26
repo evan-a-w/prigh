@@ -12,6 +12,7 @@ module Argument : sig
     | Logout
     | Sessions
     | Path
+    | Directory
   [@@deriving sexp_of, equal]
 end
 

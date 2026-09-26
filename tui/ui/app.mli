@@ -28,6 +28,7 @@ module Reply_tag : sig
     | Export_done
     | Deleted_session
     | Paths_for_autocomplete of string
+    | Dirs_for_autocomplete of string
     | Set_model_done of string
     | Config
     | Config_saved

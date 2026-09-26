@@ -977,11 +977,11 @@ let%expect_test "/cd completes paths and submits the selected one" =
   [%expect
     {|
     (Rpc
-      (method_ list_paths)
+      (method_ list_dirs)
       (params ((prefix sr)))
-      (tag (Paths_for_autocomplete sr)))
+      (tag (Dirs_for_autocomplete sr)))
     |}];
-  H.reply h (Paths_for_autocomplete "sr") {|["src/","src/app.ml"]|};
+  H.reply h (Dirs_for_autocomplete "sr") {|["src/"]|};
   H.show h;
   [%expect
     {|
@@ -1493,9 +1493,9 @@ let%expect_test "/cd changes the directory or prompts for a path" =
   [%expect
     {|
     (Rpc
-      (method_ list_paths)
+      (method_ list_dirs)
       (params ((prefix /var)))
-      (tag (Paths_for_autocomplete /var)))
+      (tag (Dirs_for_autocomplete /var)))
     (Rpc
       (method_ set_cwd)
       (params ((path /var)))
@@ -1507,9 +1507,9 @@ let%expect_test "/cd changes the directory or prompts for a path" =
   [%expect
     {|
     (Rpc
-      (method_ list_paths)
+      (method_ list_dirs)
       (params ((prefix "")))
-      (tag (Paths_for_autocomplete "")))
+      (tag (Dirs_for_autocomplete "")))
 
 
 
@@ -1527,6 +1527,12 @@ let%expect_test "/cd changes the directory or prompts for a path" =
   H.enter h;
   [%expect
     {|
+    (Rpc
+      (method_ list_dirs)
+      (params (
+        (prefix /tmp)
+        (host   backend)))
+      (tag (Dirs_for_autocomplete /tmp)))
     (Rpc
       (method_ set_cwd)
       (params ((path /tmp)))
@@ -5053,7 +5059,60 @@ let%expect_test "switching tool host asks for the directory there, prefilled \
     ? /work▏
     …m  think:n/a  ctx:0% 0  $0.00  Enter submits, Esc cancels
     |}];
-  H.keys h "/src";
+  (* Directories complete on the host being switched to: Tab asks, Tab again
+     accepts and drills down, Enter submits the text. *)
+  H.key h (Key.plain Tab);
+  [%expect
+    {|
+    (Rpc
+      (method_ list_dirs)
+      (params (
+        (prefix /work)
+        (host   client-1)))
+      (tag (Dirs_for_autocomplete /work)))
+    |}];
+  H.reply h (Dirs_for_autocomplete "/work") {|["/work/"]|};
+  H.show h;
+  [%expect
+    {|
+    session abc123 in /work. /help for commands, Esc aborts, Ctrl+C twice
+    quits.
+    > earlier question
+    earlier answer
+    ┌─ Working directory on laptop (here) ───────────────────────────────┐
+    └────────────────────────────────────────────────────────────────────┘
+    ──────────────────────────────────────────────────────────────────────
+    ? /work▏
+    ▸ /work/
+    …m  think:n/a  ctx:0% 0  $0.00  Tab completes · Enter submits · Esc
+    |}];
+  H.key h (Key.plain Tab);
+  [%expect
+    {|
+    (Rpc
+      (method_ list_dirs)
+      (params (
+        (prefix /work/)
+        (host   client-1)))
+      (tag (Dirs_for_autocomplete /work/)))
+    |}];
+  H.reply h (Dirs_for_autocomplete "/work/") {|["/work/src/","/work/test/"]|};
+  H.step ~quiet:true h (Key (Key.char 's'));
+  H.reply ~quiet:true h (Dirs_for_autocomplete "/work/s") {|["/work/src/"]|};
+  H.show h;
+  [%expect
+    {|
+    session abc123 in /work. /help for commands, Esc aborts, Ctrl+C twice
+    quits.
+    > earlier question
+    earlier answer
+    ┌─ Working directory on laptop (here) ───────────────────────────────┐
+    └────────────────────────────────────────────────────────────────────┘
+    ──────────────────────────────────────────────────────────────────────
+    ? /work/s▏
+    ▸ /work/src/
+    …m  think:n/a  ctx:0% 0  $0.00  Tab completes · Enter submits · Esc
+    |}];
   H.enter h;
   [%expect
     {|
@@ -5061,7 +5120,7 @@ let%expect_test "switching tool host asks for the directory there, prefilled \
       (method_ set_active_host)
       (params (
         (host client-1)
-        (cwd  /work/src)))
+        (cwd  /work/src/)))
       (tag (Notice_on_success "tool host switched")))
     |}];
   H.mode h;
@@ -5257,14 +5316,14 @@ let%expect_test "/model Enter Enter opens the picker instead of silently \
   (* The same rule sends /cd to its prompt rather than into the first directory. *)
   H.key h (Key.ctrl 'u');
   H.keys h "/cd ";
-  H.reply ~quiet:true h (Paths_for_autocomplete "") {|["src/","src/app.ml"]|};
+  H.reply ~quiet:true h (Dirs_for_autocomplete "") {|["src/"]|};
   H.show h;
   [%expect
     {|
     (Rpc
-      (method_ list_paths)
+      (method_ list_dirs)
       (params ((prefix "")))
-      (tag (Paths_for_autocomplete "")))
+      (tag (Dirs_for_autocomplete "")))
 
 
 
@@ -5599,5 +5658,51 @@ let%expect_test "/thinking lists levels in cycling order with the default \
        max
     ────────────────────────────────────────────────────────────
     …deepseek-flash  ctx:0% 1.5k  Enter selects · Esc closes
+    |}]
+;;
+
+let%expect_test "/new and /switch leave the previous session's subagents behind"
+  =
+  let h = connected () in
+  H.event h Agent_start;
+  H.event
+    h
+    (Subagent_start
+       { call_id = "c1"
+       ; agent_id = "c1"
+       ; task = "old work"
+       ; model = "m"
+       ; tools = []
+       });
+  H.event h (Agent_end []);
+  H.next_agent h;
+  H.mode h;
+  print_s
+    [%sexp
+      (List.length h.model.agents : int)
+      , (h.model.focus : [ `Main | `Agent of string ])];
+  [%expect {|
+    editing
+    (1 (Agent c1))
+    |}];
+  H.keys h "/new";
+  H.enter h;
+  H.reply h (Reload_messages_notice "new session") "{}";
+  print_s
+    [%sexp
+      (List.length h.model.agents : int)
+      , (h.model.focus : [ `Main | `Agent of string ])];
+  H.next_agent h;
+  print_s [%sexp (h.model.focus : [ `Main | `Agent of string ])];
+  [%expect
+    {|
+    (Rpc
+      (method_ new_session)
+      (params ())
+      (tag (Reload_messages_notice "new session")))
+    (Rpc (method_ get_messages) (params ()) (tag Initial_messages))
+    (Rpc (method_ get_state) (params ()) (tag Initial_state))
+    (0 Main)
+    Main
     |}]
 ;;

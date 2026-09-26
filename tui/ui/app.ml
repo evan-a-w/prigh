@@ -24,6 +24,7 @@ module Reply_tag = struct
     | Export_done
     | Deleted_session
     | Paths_for_autocomplete of string
+    | Dirs_for_autocomplete of string
     | Set_model_done of string (** the key requested *)
     | Config
     | Config_saved
@@ -76,15 +77,15 @@ module Connection = struct
   let max_delay_ms = 60_000
   let max_attempt = 9
 
-  (* 250ms, 500ms, 1s, ... capped at 60s.  Check the cap before
-     calculating the exponential backoff so that a large attempt cannot
-     overflow the integer arithmetic. *)
+  (* 250ms, 500ms, 1s, ... capped at 60s. Check the cap before calculating the
+     exponential backoff so that a large attempt cannot overflow the integer
+     arithmetic. *)
   let delay_ms ~attempt =
     if attempt >= max_attempt
     then max_delay_ms
-    else
+    else (
       let exponent = if attempt <= 1 then 0 else attempt - 1 in
-      250 * Int.pow 2 exponent
+      250 * Int.pow 2 exponent)
   ;;
 
   let next_attempt attempt =
@@ -502,12 +503,7 @@ let session_picker_items m (sessions : P.Session_summary.t list) =
   List.map sessions ~f:(fun s ->
     let name = Option.value s.name ~default:"(unnamed)" in
     let date = String.prefix (Option.value s.updated_at ~default:"") 16 in
-    let first =
-      Option.value_map s.first_prompt ~default:"(empty)" ~f:(fun p ->
-        Text_width.truncate
-          (String.concat ~sep:" " (String.split_lines p))
-          ~width:60)
-    in
+    let first = Text_width.truncate (P.Session_summary.blurb s) ~width:60 in
     Picker.Item.create
       ~id:s.path
       ~detail:s.cwd
@@ -689,6 +685,7 @@ let tree_items entries head =
       | P.Entry.Kind.Model _
       | P.Entry.Kind.Compaction _
       | P.Entry.Kind.Name _
+      | P.Entry.Kind.Description _
       | P.Entry.Kind.Cwd _
       | P.Entry.Kind.System_prompt -> "·"
     in
@@ -1172,7 +1169,8 @@ let run_command m (cmd : Commands.Parsed.t) =
       }
     , [] )
   | "compact", _ -> notice m "compacting…", [ rpc "compact" ~tag:Compact_done ]
-  | "new", _ -> m, [ rpc "new_session" ~tag:(Notice_on_success "new session") ]
+  | "new", _ ->
+    m, [ rpc "new_session" ~tag:(Reload_messages_notice "new session") ]
   | "name", [] ->
     ( { m with
         mode = Text_prompt { question = "Session name"; action = Name }
@@ -1379,6 +1377,49 @@ let current_line m =
   line, String.length before
 ;;
 
+(* Path and directory completions come from the backend (from the tool host, so
+   they reflect the machine tools run on); the same prefix is not asked for
+   twice. *)
+let fetch_autocomplete m ac =
+  match Autocomplete.source ac with
+  | (Autocomplete.Source.Path | Directory _) as source ->
+    let same =
+      match m.autocomplete with
+      | Some prev ->
+        Autocomplete.Source.equal (Autocomplete.source prev) source
+        && String.equal (Autocomplete.prefix prev) (Autocomplete.prefix ac)
+      | None -> false
+    in
+    if same
+    then m, []
+    else (
+      let prefix = Autocomplete.prefix ac in
+      let request =
+        match source with
+        | Directory { host } ->
+          rpc
+            "list_dirs"
+            ~params:
+              (("prefix", `String prefix)
+               :: Option.value_map host ~default:[] ~f:(fun h ->
+                 [ "host", `String h ]))
+            ~tag:(Dirs_for_autocomplete prefix)
+        | _ ->
+          rpc
+            "list_paths"
+            ~params:[ "prefix", `String prefix ]
+            ~tag:(Paths_for_autocomplete prefix)
+      in
+      { m with autocomplete = Some ac }, [ request ])
+  | Autocomplete.Source.Argument spec
+    when match spec.argument with
+         | Some Commands.Argument.Sessions -> Option.is_none m.sessions
+         | _ -> false ->
+    ( { m with autocomplete = Some ac }
+    , [ rpc "list_sessions" ~tag:Sessions_cache ] )
+  | _ -> { m with autocomplete = Some ac }, []
+;;
+
 let refresh_autocomplete m =
   let line, col = current_line m in
   let line_index = (Editor.position m.editor).line in
@@ -1393,35 +1434,15 @@ let refresh_autocomplete m =
       ~logged_in:(logged_in m)
   with
   | None -> { m with autocomplete = None }, []
-  | Some ac ->
-    (match Autocomplete.source ac with
-     | Autocomplete.Source.Path ->
-       let same =
-         match m.autocomplete with
-         | Some prev ->
-           (match Autocomplete.source prev with
-            | Autocomplete.Source.Path ->
-              String.equal (Autocomplete.prefix prev) (Autocomplete.prefix ac)
-            | _ -> false)
-         | None -> false
-       in
-       if same
-       then m, []
-       else (
-         let prefix = Autocomplete.prefix ac in
-         ( { m with autocomplete = Some ac }
-         , [ rpc
-               "list_paths"
-               ~params:[ "prefix", `String prefix ]
-               ~tag:(Paths_for_autocomplete prefix)
-           ] ))
-     | Autocomplete.Source.Argument spec
-       when match spec.argument with
-            | Some Commands.Argument.Sessions -> Option.is_none m.sessions
-            | _ -> false ->
-       ( { m with autocomplete = Some ac }
-       , [ rpc "list_sessions" ~tag:Sessions_cache ] )
-     | _ -> { m with autocomplete = Some ac }, [])
+  | Some ac -> fetch_autocomplete m ac
+;;
+
+(* The directory prompts complete on the host the answer is for. *)
+let refresh_directory_autocomplete m ~host =
+  let text = Editor.text m.editor in
+  match host with
+  | None -> { m with autocomplete = None }, []
+  | Some host -> fetch_autocomplete m (Autocomplete.directory ~host ~text)
 ;;
 
 let path_complete m =
@@ -1461,8 +1482,9 @@ let accept_autocomplete m ~submit_now =
               refresh_autocomplete m
             | _ -> submit m)
          | Autocomplete.Source.Command, false -> m, []
-         | (Autocomplete.Source.Argument _ | Path), true -> submit m
-         | (Autocomplete.Source.Argument _ | Path), false -> m, []
+         | (Autocomplete.Source.Argument _ | Path | Directory _), true ->
+           submit m
+         | (Autocomplete.Source.Argument _ | Path | Directory _), false -> m, []
        in
        Some (m, cmds))
 ;;
@@ -2036,7 +2058,13 @@ let login_prompt m ~id ~(prompt : P.Auth_event.Prompt.t) (intent : Intent.t) =
 
 let text_prompt m ~(action : Mode.Text_prompt_action.t) (intent : Intent.t) =
   let submit text =
-    let m = { m with mode = Editing; editor = Editor.clear m.editor } in
+    let m =
+      { m with
+        mode = Editing
+      ; editor = Editor.clear m.editor
+      ; autocomplete = None
+      }
+    in
     match action with
     | Name ->
       if String.is_empty text
@@ -2074,12 +2102,62 @@ let text_prompt m ~(action : Mode.Text_prompt_action.t) (intent : Intent.t) =
       then m, []
       else m, [ set_host_command ~host ~cwd:text ]
   in
-  match intent with
-  | Submit ->
+  let submit_text m =
     let text, _ = Editor.submit m.editor in
     submit (String.strip text)
+  in
+  (* Directory answers complete on the host they are for. *)
+  let directory_host =
+    match action with
+    | Cd ->
+      Some
+        (Option.value_map m.state ~default:"backend" ~f:(fun s -> s.active_host))
+    | Host_cwd host -> Some host
+    | Name | Export_path | Import_path -> None
+  in
+  let edit m =
+    let m', cmds = editing_intent m intent in
+    let m' = { m' with mode = m.mode } in
+    match directory_host with
+    | None -> m', cmds
+    | Some _ ->
+      let m', more = refresh_directory_autocomplete m' ~host:directory_host in
+      m', cmds @ more
+  in
+  let accept ~submit_now =
+    match m.autocomplete with
+    | None -> None
+    | Some ac ->
+      Option.map (Autocomplete.selected_item ac) ~f:(fun _ ->
+        let text = Autocomplete.accept ac ~editor_text:(Editor.text m.editor) in
+        let m = { m with editor = Editor.set_text m.editor text } in
+        if submit_now
+        then submit_text m
+        else refresh_directory_autocomplete m ~host:directory_host)
+  in
+  match intent with
+  | Submit ->
+    (match m.autocomplete with
+     | Some ac when Autocomplete.accepts_on_enter ac ->
+       Option.value (accept ~submit_now:true) ~default:(submit_text m)
+     | _ -> submit_text m)
+  | Complete ->
+    (match m.autocomplete with
+     | Some _ -> Option.value (accept ~submit_now:false) ~default:(m, [])
+     | None -> refresh_directory_autocomplete m ~host:directory_host)
+  | Up when Option.is_some m.autocomplete ->
+    { m with autocomplete = Option.map m.autocomplete ~f:Autocomplete.up }, []
+  | Down when Option.is_some m.autocomplete ->
+    { m with autocomplete = Option.map m.autocomplete ~f:Autocomplete.down }, []
+  | Cancel when Option.is_some m.autocomplete ->
+    { m with autocomplete = None }, []
   | Cancel | Interrupt ->
-    { m with editor = Editor.clear m.editor; mode = Editing }, []
+    ( { m with
+        editor = Editor.clear m.editor
+      ; mode = Editing
+      ; autocomplete = None
+      }
+    , [] )
   | Force_quit -> { m with quitting = true }, [ Quit ]
   | Newline -> m, []
   | Insert _
@@ -2098,16 +2176,13 @@ let text_prompt m ~(action : Mode.Text_prompt_action.t) (intent : Intent.t) =
   | Kill_word
   | Yank
   | Yank_pop
-  | Undo ->
-    let m', cmds = editing_intent m intent in
-    { m' with mode = m.mode }, cmds
+  | Undo -> edit m
   | Up
   | Down
   | Page_up
   | Page_down
   | Scroll_up
   | Scroll_down
-  | Complete
   | Cycle_verbosity
   | Next_model
   | Prev_model
@@ -2514,6 +2589,17 @@ let reply m (tag : Reply_tag.t) (result : (P.Json.t, string) Result.t) =
            let items =
              List.map paths ~f:(fun p -> Picker.Item.create ~id:p p)
            in
+           { m with autocomplete = Some (Autocomplete.set_items ac items) }, []
+         | _ -> m, [])
+     | Dirs_for_autocomplete prefix ->
+       decode json ~f:(decode_list ~f:P.Json.to_string_or_error) (fun dirs ->
+         match m.autocomplete with
+         | Some ac
+           when (match Autocomplete.source ac with
+                 | Autocomplete.Source.Directory _ -> true
+                 | _ -> false)
+                && String.equal (Autocomplete.prefix ac) prefix ->
+           let items = List.map dirs ~f:(fun d -> Picker.Item.create ~id:d d) in
            { m with autocomplete = Some (Autocomplete.set_items ac items) }, []
          | _ -> m, []))
 ;;

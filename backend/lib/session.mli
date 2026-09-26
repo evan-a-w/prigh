@@ -19,6 +19,8 @@ module Entry : sig
             (** id of the first entry retained after the summary *)
           }
       | Name of { name : string }
+      | Description of { text : string }
+      (** model-written one-line summary, see [Session_description] *)
       | Cwd of { cwd : string }
       | System_prompt of { text : string }
     [@@deriving sexp, jsonaf]
@@ -34,8 +36,15 @@ end
 
 type t
 
+(** Nothing is written until the session has a message or a name; an
+    abandoned empty session leaves no file. *)
 val create : dir:string -> cwd:string -> ?parent:string -> unit -> t
+
 val load : string -> t Or_error.t
+
+(** Whether the file at [path] exists yet. *)
+val persisted : t -> bool
+
 val id : t -> string
 val path : t -> string
 val cwd : t -> string
@@ -51,6 +60,9 @@ val duration_seconds : t -> float
 
 (** Last [name] entry written to the file. *)
 val name : t -> string option
+
+(** Last [description] entry written to the file. *)
+val description : t -> string option
 
 (** Entries on the active path, root first. *)
 val active_path : t -> Entry.t list
@@ -69,6 +81,7 @@ val set_system_prompt : t -> text:string -> Entry.t
 val append_message : t -> Message.t -> Entry.t
 val set_model : t -> model:string -> thinking:Thinking.t -> Entry.t
 val set_name : t -> name:string -> Entry.t
+val set_description : t -> text:string -> Entry.t
 
 (** Records a [cwd] entry; a subsequent [load] restores it. *)
 val set_cwd : t -> cwd:string -> Entry.t
@@ -102,6 +115,7 @@ module Summary : sig
     { id : string
     ; path : string
     ; name : string option
+    ; description : string option
     ; cwd : string
     ; created_at : string
     ; updated_at : string
@@ -112,5 +126,7 @@ module Summary : sig
   [@@deriving sexp_of]
 end
 
+(** Most recently updated first. *)
 val list : dir:string -> Summary.t list
+
 val default_dir : home:string -> string

@@ -216,8 +216,8 @@ let%expect_test "web server: static files, 404s and the RPC over a WebSocket" =
       ~token:"sekrit"
       ~login
       ~sessions_dir
+      ~cwd:t.dir
       ~new_agent
-      ~default_agent:(new_agent ~cwd:t.dir ())
       ()
   in
   let port =
@@ -327,7 +327,7 @@ let%expect_test "web server: static files, 404s and the RPC over a WebSocket" =
     {|
     {"type":"response","id":1,"ok":false,"error":"unauthorised: send hello with the token first"}
     {"type":"response","id":2,"ok":false,"error":"unauthorised: bad or missing token"}
-    {"type":"response","id":3,"ok":true,"result":{"client_id":"client-1","state":{"session_id":"<id>","session_path":"$DIR/sessions/<stamp>_<id>.jsonl","session_name":null,"cwd":"$DIR","git_branch":null,"model":{"id":"deepseek-flash","provider":"deepseek","key":"deepseek/deepseek-flash","name":"DeepSeek V4.1 Flash","context_window":1000000,"max_output":384000,"supports_thinking":true,"cost":{"input":0.3,"output":1.2,"cache_read":0.006}},"thinking":"off","running":false,"message_count":0,"usage":{"input":0,"output":0,"cache_read":0},"cost_usd":0,"context_tokens":0,"active_host":"backend","hosts":[{"id":"backend","name":"<host>","cwd":"$DIR","session_id":null,"session_name":null}]}}}
+    {"type":"response","id":3,"ok":true,"result":{"client_id":"client-1","state":{"session_id":"<id>","session_path":"$DIR/sessions/<stamp>_<id>.jsonl","session_name":null,"session_description":null,"cwd":"$DIR","git_branch":null,"model":{"id":"deepseek-flash","provider":"deepseek","key":"deepseek/deepseek-flash","name":"DeepSeek V4.1 Flash","context_window":1000000,"max_output":384000,"supports_thinking":true,"cost":{"input":0.3,"output":1.2,"cache_read":0.006}},"thinking":"off","running":false,"message_count":0,"usage":{"input":0,"output":0,"cache_read":0},"cost_usd":0,"context_tokens":0,"active_host":"backend","hosts":[{"id":"backend","name":"<host>","cwd":"$DIR","session_id":null,"session_name":null}]}}}
     {"type":"response","id":4,"ok":true,"result":["site/","site/.secret","site/index.html","site/main.bc.js"]}
     {"type":"response","id":null,"ok":false,"error":"invalid JSON: json: unexpected string: 'not'"}
     |}];
@@ -386,8 +386,8 @@ let%expect_test
       ~sw
       ~login
       ~sessions_dir
+      ~cwd:t.dir
       ~new_agent
-      ~default_agent:(new_agent ~cwd:t.dir ())
       ()
   in
   let port =
@@ -528,9 +528,22 @@ let%expect_test
     {|{"id": "t1", "method": "hello", "params": {"name": "laptop", "cwd": "/tmp", "tools": true}}|};
   drain_until "terminal" terminal ~substring:(response "t1");
   let terminal_id = client_id () in
+  let session_id =
+    match
+      Json.of_string !last_line
+      |> Jsonaf.member "result"
+      |> Option.bind ~f:(Jsonaf.member "state")
+      |> Option.bind ~f:(Jsonaf.member "session_id")
+    with
+    | Some (`String id) -> id
+    | _ -> "?"
+  in
+  (* A client starts in its own session; the browser joins the terminal's. *)
   send
     browser
-    {|{"id": "b1", "method": "hello", "params": {"name": "browser"}}|};
+    (sprintf
+       {|{"id": "b1", "method": "hello", "params": {"name": "browser", "session": "%s"}}|}
+       session_id);
   drain_until "browser" browser ~substring:(response "b1");
   [%expect
     {|
@@ -539,8 +552,6 @@ let%expect_test
     terminal: event state active_host=client-2 hosts=<host>,laptop
     terminal: response t1 ok=true client_id=client-2 active_host=client-2 hosts=<host>,laptop
     browser: event state active_host=backend hosts=<host>,laptop
-    browser: event notice
-    browser: event state active_host=client-2 hosts=<host>,laptop
     browser: response b1 ok=true client_id=client-1 active_host=client-2 hosts=<host>,laptop
     |}];
   send browser {|{"id": "b2", "method": "prompt", "params": {"text": "hello"}}|};

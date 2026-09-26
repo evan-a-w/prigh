@@ -4,6 +4,7 @@ type t =
   { id : string
   ; path : string
   ; name : string option
+  ; description : string option
   ; cwd : string
   ; created_at : string
   ; updated_at : string option
@@ -21,6 +22,7 @@ let of_json j =
   let%bind id = Json.string_field j "id" in
   let%bind path = Json.string_field j "path" in
   let%bind name = Json.string_opt_field j "name" in
+  let%bind description = Json.string_opt_field j "description" in
   let%bind cwd = Json.string_field j "cwd" in
   let%bind created_at = Json.string_field j "created_at" in
   let%bind updated_at = Json.string_opt_field j "updated_at" in
@@ -38,6 +40,7 @@ let of_json j =
   { id
   ; path
   ; name
+  ; description
   ; cwd
   ; created_at
   ; updated_at
@@ -48,4 +51,11 @@ let of_json j =
   ; running = opt_bool "running"
   ; clients
   }
+;;
+
+let blurb t =
+  match t.description, t.first_prompt with
+  | Some text, _ | None, Some text ->
+    String.concat ~sep:" " (String.split_lines text)
+  | None, None -> "(empty)"
 ;;

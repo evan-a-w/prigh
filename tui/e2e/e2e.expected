@@ -2,8 +2,8 @@
 <- get_state: ((session_id <id>)
  (session_path
   $TMP/.prigh/sessions/<stamp>_<id>.jsonl)
- (session_name null) (cwd $TMP)
- (git_branch null)
+ (session_name null) (session_description null)
+ (cwd $TMP) (git_branch null)
  (model
   ((id deepseek-flash) (provider deepseek) (key deepseek/deepseek-flash)
    (name "DeepSeek V4.1 Flash") (context_window 1000000) (max_output 384000)
@@ -70,7 +70,7 @@
 <- get_state: ((session_id <id>)
  (session_path
   $TMP/.prigh/sessions/<stamp>_<id>.jsonl)
- (session_name "e2e session")
+ (session_name "e2e session") (session_description null)
  (cwd $TMP) (git_branch null)
  (model
   ((id claude-fable-5-1) (provider anthropic)

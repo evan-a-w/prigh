@@ -135,6 +135,8 @@ let state (s : Agent.State.t) =
     [ "session_id", str s.session_id
     ; "session_path", str s.session_path
     ; "session_name", Option.value_map s.session_name ~default:`Null ~f:str
+    ; ( "session_description"
+      , Option.value_map s.session_description ~default:`Null ~f:str )
     ; "cwd", str s.cwd
     ; "git_branch", Option.value_map s.git_branch ~default:`Null ~f:str
     ; "model", model s.model
@@ -164,6 +166,7 @@ let session_summary (s : Session.Summary.t) =
     [ "id", str s.id
     ; "path", str s.path
     ; "name", Option.value_map s.name ~default:`Null ~f:str
+    ; "description", Option.value_map s.description ~default:`Null ~f:str
     ; "cwd", str s.cwd
     ; "created_at", str s.created_at
     ; "updated_at", str s.updated_at
@@ -201,6 +204,7 @@ let entry (e : Session.Entry.t) =
       ; "kept_from", str kept_from
       ]
     | Name { name } -> [ "kind", str "name"; "name", str name ]
+    | Description { text } -> [ "kind", str "description"; "text", str text ]
     | Cwd { cwd } -> [ "kind", str "cwd"; "cwd", str cwd ]
     | System_prompt _ -> [ "kind", str "system_prompt" ]
   in

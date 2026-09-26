@@ -45,6 +45,7 @@ let%expect_test "state event and messages" =
         (session_id   s1)
         (session_path /tmp/s1.jsonl)
         (session_name ("my session"))
+        (session_description ())
         (cwd /work)
         (git_branch (main))
         (model (
@@ -168,7 +169,8 @@ let%expect_test "tool host events and state hosts" =
       State (
         (session_id   abc123)
         (session_path /home/u/.prigh/sessions/1.jsonl)
-        (session_name ())
+        (session_name        ())
+        (session_description ())
         (cwd /work)
         (git_branch ())
         (model (
@@ -345,6 +347,7 @@ let%expect_test "auth status, models, sessions" =
     ((id   abc)
      (path /p)
      (name ("build fix"))
+     (description ())
      (cwd        /c)
      (created_at 2025-01-01T00:00:00Z)
      (updated_at (2025-06-01T12:34:56Z))
@@ -393,7 +396,8 @@ let%expect_test "entries and session stats" =
     {|
     ((id   a)
      (path /p)
-     (name ())
+     (name        ())
+     (description ())
      (cwd        /c)
      (created_at 2025-01-01T00:00:00Z)
      (updated_at ())

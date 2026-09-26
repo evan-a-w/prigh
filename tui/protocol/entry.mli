@@ -12,6 +12,7 @@ module Kind : sig
         ; kept_from : string
         }
     | Name of { name : string }
+    | Description of { text : string }
     | Cwd of { cwd : string }
     | System_prompt
   [@@deriving sexp_of, equal]

@@ -3,7 +3,7 @@ open! Prigh
 open Tool_test_helpers
 module Reply = Faux_provider.Reply
 
-let with_agent ?tools ?on_request replies f =
+let with_agent ?tools ?on_request ?auto_describe replies f =
   with_sandbox
   @@ fun t ->
   Eio.Switch.run
@@ -17,6 +17,7 @@ let with_agent ?tools ?on_request replies f =
       ~tools:(Option.value tools ~default:Tools.all)
       ~sessions_dir:(Filename.concat t.dir "sessions")
       ~home:t.dir
+      ?auto_describe
       ~cwd:t.dir
       ()
   in
@@ -276,6 +277,11 @@ let%expect_test "model and thinking changes persist across session reload" =
   Agent.set_model agent (Option.value_exn (Model.find "deepseek-v4-pro"));
   Agent.set_thinking agent (On (Some Max));
   let path = (Agent.state agent).session_path in
+  (* Settings alone do not create the file; the first message does. *)
+  print_s [%sexp (Sys_unix.file_exists_exn path : bool)];
+  Or_error.ok_exn (Agent.prompt agent "hello");
+  Agent.wait_idle agent;
+  print_s [%sexp (Sys_unix.file_exists_exn path : bool)];
   Eio.Switch.run
   @@ fun sw ->
   let agent2 =
@@ -292,7 +298,12 @@ let%expect_test "model and thinking changes persist across session reload" =
   in
   let s = Agent.state agent2 in
   print_s [%sexp (s.model.id : string), (s.thinking : Thinking.t)];
-  [%expect {| (deepseek-v4-pro (On (Max))) |}]
+  [%expect
+    {|
+    false
+    true
+    (deepseek-v4-pro (On (Max)))
+    |}]
 ;;
 
 let%expect_test "new_session, switch_session, fork, rewind" =
@@ -418,7 +429,7 @@ let%expect_test "delete_session refuses the active session" =
     {|
     (Error "cannot delete the active session")
     (Ok ())
-    ((first_exists false) (second_exists true))
+    ((first_exists false) (second_exists false))
     |}]
 ;;
 
@@ -440,17 +451,17 @@ let%expect_test "set_cwd changes state, persists, and is refused while running" 
     [%sexp
       (mask t state.cwd : string)
     , (mask t (Session.cwd (Agent.session agent)) : string)];
-  let reloaded = Or_error.ok_exn (Session.load state.session_path) in
-  print_s [%sexp (mask t (Session.cwd reloaded) : string)];
   Or_error.ok_exn (Agent.prompt agent "go");
   print_s [%sexp (Agent.set_cwd agent ~path:t.dir : unit Or_error.t)];
   Agent.wait_idle agent;
+  let reloaded = Or_error.ok_exn (Session.load state.session_path) in
+  print_s [%sexp (mask t (Session.cwd reloaded) : string)];
   [%expect
     {|
     (Ok ())
     ($DIR/sub $DIR/sub)
-    $DIR/sub
     (Error "cannot change directory while a run is in progress")
+    $DIR/sub
     |}]
 ;;
 
@@ -872,5 +883,129 @@ let%expect_test
     user: queued again
     assistant: second run
     state: running=false messages=5
+    |}]
+;;
+
+let%expect_test
+    "auto-describe: after the second user turn, once, off the turn's critical \
+     path"
+  =
+  let requests = Queue.create () in
+  with_agent
+    ~auto_describe:true
+    ~on_request:(fun (r : Provider.Request.t) ->
+      Queue.enqueue
+        requests
+        (sprintf
+           "%s: %s"
+           (Option.value_map r.system ~default:"-" ~f:(fun s ->
+              String.prefix s 24))
+           (match List.last r.messages with
+            | Some (User u) ->
+              String.prefix u.text 30
+              |> String.split_lines
+              |> String.concat ~sep:"|"
+            | _ -> "?")))
+    [ Reply.text "one"
+    ; Reply.text "two"
+    ; Reply.text "  \"Investigating flaky tests.\"\nignored second line"
+    ; Reply.text "three"
+    ]
+  @@ fun _t agent dump ->
+  let show_description () =
+    print_s
+      [%sexp
+        (Session.description (Agent.session agent) : string option)
+      , ((Agent.state agent).session_description : string option)]
+  in
+  Or_error.ok_exn (Agent.prompt agent "first question");
+  Agent.wait_idle agent;
+  show_description ();
+  Or_error.ok_exn (Agent.prompt agent "second question");
+  Agent.wait_idle agent;
+  show_description ();
+  Or_error.ok_exn (Agent.prompt agent "third question");
+  Agent.wait_idle agent;
+  show_description ();
+  dump ();
+  Queue.iter requests ~f:print_endline;
+  [%expect
+    {|
+    (() ())
+    (("Investigating flaky tests") ("Investigating flaky tests"))
+    (("Investigating flaky tests") ("Investigating flaky tests"))
+    state: running=true messages=0
+    user: first question
+    assistant: one
+    state: running=false messages=2
+    state: running=true messages=2
+    user: second question
+    assistant: two
+    state: running=false messages=4
+    state: running=false messages=4
+    state: running=true messages=4
+    user: third question
+    assistant: three
+    state: running=false messages=6
+    You are prigh, a coding : first question
+    You are prigh, a coding : second question
+    Describe the conversatio: USER:|first question||ASSISTAN
+    You are prigh, a coding : third question
+    |}]
+;;
+
+let%expect_test
+    "auto-describe: a failed description is a notice and is retried later"
+  =
+  with_agent
+    ~auto_describe:true
+    [ Reply.text "one"
+    ; Reply.text "two"
+    ; Reply.text ""
+    ; Reply.text "three"
+    ; Reply.text "Adding OAuth login"
+    ]
+  @@ fun _t agent dump ->
+  List.iter [ "a"; "b"; "c" ] ~f:(fun p ->
+    Or_error.ok_exn (Agent.prompt agent p);
+    Agent.wait_idle agent);
+  print_s [%sexp (Session.description (Agent.session agent) : string option)];
+  dump ();
+  [%expect
+    {|
+    ("Adding OAuth login")
+    state: running=true messages=0
+    user: a
+    assistant: one
+    state: running=false messages=2
+    state: running=true messages=2
+    user: b
+    assistant: two
+    state: running=false messages=4
+    notice: session description failed: description failed: empty reply
+    state: running=true messages=4
+    user: c
+    assistant: three
+    state: running=false messages=6
+    state: running=false messages=6
+    |}]
+;;
+
+let%expect_test "session_description: cleaning replies" =
+  List.iter
+    [ "Fixing the build"
+    ; "\"Fixing the build.\""
+    ; "\n\n  Title: yes  \nmore"
+    ; ""
+    ; String.make 120 'x'
+    ]
+    ~f:(fun s -> printf "%S\n" (Session_description.clean s));
+  [%expect
+    {|
+    "Fixing the build"
+    "Fixing the build"
+    "Title: yes"
+    ""
+    "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\226\128\166"
     |}]
 ;;

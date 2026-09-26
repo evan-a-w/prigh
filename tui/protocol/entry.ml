@@ -12,6 +12,7 @@ module Kind = struct
         ; kept_from : string
         }
     | Name of { name : string }
+    | Description of { text : string }
     | Cwd of { cwd : string }
     | System_prompt
   [@@deriving sexp_of, equal]
@@ -42,6 +43,9 @@ let kind_of_json j =
   | "name" ->
     Or_error.map (Json.string_field j "name") ~f:(fun name ->
       Kind.Name { name })
+  | "description" ->
+    Or_error.map (Json.string_field j "text") ~f:(fun text ->
+      Kind.Description { text })
   | "cwd" ->
     Or_error.map (Json.string_field j "cwd") ~f:(fun cwd -> Kind.Cwd { cwd })
   | "system_prompt" -> Ok Kind.System_prompt

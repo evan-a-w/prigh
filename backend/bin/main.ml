@@ -44,7 +44,8 @@ let default_model store =
 
 module Setup = struct
   type t =
-    { agent : Agent.t (** the default session *)
+    { session : Session.t option (** [-session], if given *)
+    ; cwd : string
     ; new_agent : ?session:Session.t -> cwd:string -> unit -> Agent.t
     ; sessions_dir : string
     ; store : Auth_store.t
@@ -165,14 +166,14 @@ let common_params =
           ?session
           ?model
           ?thinking
+          ~auto_describe:(Option.is_none faux_script && not faux)
           ~cwd
           ()
       in
       agent_ref := Some agent;
       agent
     in
-    let agent = new_agent ?session ~cwd () in
-    { Setup.agent; new_agent; sessions_dir; store }
+    { Setup.session; cwd; new_agent; sessions_dir; store }
 ;;
 
 let run_command =
@@ -190,7 +191,8 @@ let run_command =
        @@ fun env ->
        Eio.Switch.run
        @@ fun sw ->
-       let { Setup.agent; _ } = make_agent ~env ~sw in
+       let { Setup.session; cwd; new_agent; _ } = make_agent ~env ~sw in
+       let agent = new_agent ?session ~cwd () in
        let flush_out () = Out_channel.flush stdout in
        let note fmt =
          ksprintf (fun s -> if not quiet then eprintf "%s\n%!" s) fmt
@@ -384,10 +386,14 @@ let serve_command =
        @@ fun env ->
        Eio.Switch.run
        @@ fun sw ->
-       let { Setup.agent; new_agent; sessions_dir; store } =
+       let { Setup.session; cwd; new_agent; sessions_dir; store } =
          make_agent ~env ~sw
        in
        let login = Login_manager.create ~env ~sw ~store () in
+       let default_agent =
+         Option.map session ~f:(fun session ->
+           new_agent ~session ~cwd:(Session.cwd session) ())
+       in
        let server =
          Rpc_server.create
            ~env
@@ -395,8 +401,9 @@ let serve_command =
            ?token
            ~login
            ~sessions_dir
+           ~cwd
            ~new_agent
-           ~default_agent:agent
+           ?default_agent
            ()
        in
        Option.iter listen ~f:(fun (addr, port) ->

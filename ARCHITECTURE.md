@@ -59,10 +59,13 @@ and the model sees the error; the TUI shows `tools:offline` until another
 host is chosen. The frontend does not implement any tools: it proxies
 `tool_exec` to a local `prigh tool-host` process (`Tool_host` in the backend
 runs `Host_ops.execute`, the same code path the backend uses for itself,
-plus four pseudo-tools: `$resolve_dir` for `/cd` and `/host`, `$read_file`
+plus five pseudo-tools: `$resolve_dir` for `/cd` and `/host`, `$read_file`
 for prompt attachments, `$list_paths` for `@` completion (`Path_listing`:
 `fd` or a bounded `readdir` under the session cwd, so completion always
-reflects the machine the tools run on), and `$instructions`, called when a session's system
+reflects the machine the tools run on), `$list_dirs` for the directory
+completion in `/cd` and the `/host` prompt (one level, in the notation
+typed: absolute, `~/` or relative; `list_dirs` takes a `host` so the `/host`
+prompt completes on the host being switched to), and `$instructions`, called when a session's system
 prompt is first built and by every subagent, so that `AGENTS.md`/`CLAUDE.md`
 come from the host's cwd ancestors and the host's own `~/.prigh/`).
 
@@ -262,16 +265,24 @@ two can share one.
   `parent`, the active conversation is the path from the root to `head`.
   Rewinding moves `head`; forking copies the active path to a new file.
   Entries are messages, model/thinking changes, compaction summaries, names,
-  cwds (so a reload restores both) and the system prompt; `Session.messages` is the message
-  list for the next request with the compaction summary replacing everything
-  before `kept_from`. `list` returns name, cwd, timestamps, message count,
-  first prompt and parent; `export` writes markdown or copies the JSONL,
+  descriptions, cwds (so a reload restores both) and the system prompt;
+  `Session.messages` is the message list for the next request with the
+  compaction summary replacing everything before `kept_from`. Nothing is
+  written to disk until the first message (or name): an abandoned empty
+  session leaves no file. `list` returns name, description, cwd,
+  timestamps, message count, first prompt and parent, most recently
+  modified first; `export` writes markdown or copies the JSONL,
   `import` copies a file in, and `session_stats` counts turns, tool calls by
   name, tokens, cost, model changes and compactions. Under the RPC,
   `get_entries` returns `{head, entries}` (`all: true` includes abandoned
   branches for the tree view).
 - `Compaction` — summarises older messages via the model and keeps a tail;
   manual (`/compact`) or automatic.
+- `Session_description` — after a turn, once the conversation has a second
+  user message (or a long first one), asks the model for a one-line
+  description and records it (`Agent ~auto_describe`, off under `-faux` and
+  in tests); it runs after the turn has finished so it never delays the
+  user, and shows up in the session list and in `State`.
 
 ### RPC
 
@@ -297,7 +308,7 @@ two can share one.
   `get_entries`, `set_model`, `set_thinking`, `list_models`, `compact`,
   `new_session`, `switch_session`, `list_sessions`, `set_session_name`,
   `delete_session`, `export`, `import`, `fork`, `clone`, `rewind`,
-  `session_stats`, `set_cwd`, `list_paths`, `get_config`, `set_config`,
+  `session_stats`, `set_cwd`, `list_paths`, `list_dirs`, `get_config`, `set_config`,
   `tool_confirm_respond`, `set_active_host`, `tool_exec_output`,
   `tool_exec_result`, `auth_status`, `login`, `auth_respond`, `auth_cancel`,
   `logout`. `State` carries `active_host` and `hosts` (the backend first).
@@ -326,8 +337,10 @@ killed), `tool-host` (the local tool worker), `run <prompt>`
 `logout <provider>`, `auth`. All commands share `-auth-file`; `run`/`serve`
 share `-model`, `-thinking`, `-session`, `-cwd`, `-no-tools`, `-faux` (and
 `-faux-script FILE`, a JSON array of scripted replies that implies `-faux`);
-for `serve` these describe the default session, the one a client lands on
-when its `hello` names none. With no explicit model or session, the default
+for `serve`, `-session` is the default session, the one a client lands on
+when its `hello` names none; without it every new client starts in a fresh
+session of its own (sharing one is explicit: `hello` with the session id or
+path, which is also how a frontend reattaches after a reconnect). With no explicit model or session, the default
 model is the first logged-in provider's in the order anthropic, openai-codex,
 openai, deepseek.
 

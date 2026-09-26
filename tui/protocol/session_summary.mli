@@ -4,6 +4,7 @@ type t =
   { id : string
   ; path : string
   ; name : string option
+  ; description : string option
   ; cwd : string
   ; created_at : string
   ; updated_at : string option
@@ -17,3 +18,7 @@ type t =
 [@@deriving sexp_of, equal]
 
 val of_json : Json.t -> t Or_error.t
+
+(** One line for lists: the description if there is one, else the first prompt,
+    else ["(empty)"]. *)
+val blurb : t -> string

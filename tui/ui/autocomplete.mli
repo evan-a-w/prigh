@@ -6,6 +6,9 @@ module Source : sig
     | Command
     | Argument of Commands.Spec.t
     | Path
+    | Directory of { host : string option }
+    (** [/cd] and the [/host] directory prompt: listed by the backend on [host]
+        (the active one when [None]) *)
   [@@deriving sexp_of, equal]
 end
 
@@ -25,9 +28,7 @@ val navigated : t -> bool
     than silently picking the first model). *)
 val accepts_on_enter : t -> bool
 
-(** Keeps only directories for [/cd]. *)
 val set_items : t -> Picker.Item.t list -> t
-
 val up : t -> t
 val down : t -> t
 val selected_item : t -> Picker.Item.t option
@@ -43,6 +44,10 @@ val compute
   -> sessions:P.Session_summary.t list option
   -> logged_in:(string -> bool)
   -> t option
+
+(** Directory completion for a whole prompt line (the [/host] directory
+    question): the prefix is the entire text. *)
+val directory : host:string -> text:string -> t
 
 (** Replaces [prefix] (at its original offset in [editor_text]) with the
     selected item, or leaves the text unchanged when nothing is selected. *)

@@ -14,6 +14,7 @@ module Entry = struct
           ; kept_from : string
           }
       | Name of { name : string }
+      | Description of { text : string }
       | Cwd of { cwd : string }
       | System_prompt of { text : string }
     [@@deriving sexp, jsonaf]
@@ -49,6 +50,9 @@ type t =
   ; mutable entries : Entry.t list (* reversed *)
   ; mutable head : string option
   ; by_id : Entry.t String.Table.t
+  ; mutable persisted : bool
+    (** whether the file exists: it is only written once the session has
+        something worth keeping (a message or a name) *)
   }
 
 let id t = t.id
@@ -60,8 +64,11 @@ let entries t = List.rev t.entries
 let created_at t = Time_float.to_string_utc t.created_at
 
 let mtime t =
-  Time_float.of_span_since_epoch
-    (Time_float.Span.of_sec (Core_unix.stat t.path).st_mtime)
+  if t.persisted
+  then
+    Time_float.of_span_since_epoch
+      (Time_float.Span.of_sec (Core_unix.stat t.path).st_mtime)
+  else t.created_at
 ;;
 
 let updated_at t = Time_float.to_string_utc (mtime t)
@@ -78,10 +85,51 @@ let new_id () =
   String.concat (List.init 8 ~f:(fun _ -> sprintf "%02x" (Random.int 256)))
 ;;
 
+let output_line oc (line : Line.t) =
+  Out_channel.output_string oc (Json.to_string (Line.jsonaf_of_t line));
+  Out_channel.newline oc
+;;
+
+let header t =
+  Line.Header
+    { id = t.id
+    ; cwd = t.cwd
+    ; created_at = Time_float.to_string_utc t.created_at
+    ; parent = t.parent
+    }
+;;
+
+let worth_saving (line : Line.t) =
+  match line with
+  | Entry { payload = Message _ | Name _; _ } -> true
+  | Entry
+      { payload =
+          Model _ | Compaction _ | Description _ | Cwd _ | System_prompt _
+      ; _
+      }
+  | Header _ | Head _ -> false
+;;
+
+let persisted t = t.persisted
+
+(* The file is created on the first line worth saving, with everything
+   recorded in memory so far; before that nothing touches the disk. *)
 let write_line t (line : Line.t) =
-  Out_channel.with_file t.path ~append:true ~f:(fun oc ->
-    Out_channel.output_string oc (Json.to_string (Line.jsonaf_of_t line));
-    Out_channel.newline oc)
+  if t.persisted
+  then
+    Out_channel.with_file t.path ~append:true ~f:(fun oc -> output_line oc line)
+  else if worth_saving line
+  then (
+    Core_unix.mkdir_p (Filename.dirname t.path);
+    Out_channel.with_file t.path ~f:(fun oc ->
+      output_line oc (header t);
+      let entries = List.rev t.entries in
+      List.iter entries ~f:(fun e -> output_line oc (Entry e));
+      match t.head, List.last entries with
+      | Some head, Some last when not (String.equal head last.id) ->
+        output_line oc (Head head)
+      | _ -> ());
+    t.persisted <- true)
 ;;
 
 let default_dir ~home = Filename.concat home ".prigh/sessions"
@@ -122,7 +170,6 @@ let next_created_at () =
 ;;
 
 let create ~dir ~cwd ?parent () =
-  Core_unix.mkdir_p dir;
   let id = new_id () in
   let created_at = next_created_at () in
   last_created_at := Some created_at;
@@ -137,12 +184,9 @@ let create ~dir ~cwd ?parent () =
     ; entries = []
     ; head = None
     ; by_id = String.Table.create ()
+    ; persisted = false
     }
   in
-  write_line
-    t
-    (Header
-       { id; cwd; created_at = Time_float.to_string_utc created_at; parent });
   t
 ;;
 
@@ -152,7 +196,12 @@ let add_entry t (entry : Entry.t) =
   t.head <- Some entry.id;
   match entry.payload with
   | Cwd { cwd } -> t.cwd <- cwd
-  | Message _ | Model _ | Compaction _ | Name _ | System_prompt _ -> ()
+  | Message _
+  | Model _
+  | Compaction _
+  | Name _
+  | Description _
+  | System_prompt _ -> ()
 ;;
 
 let load path =
@@ -180,6 +229,7 @@ let load path =
         ; entries = []
         ; head = None
         ; by_id = String.Table.create ()
+        ; persisted = true
         }
       in
       List.iter rest ~f:(function
@@ -200,6 +250,7 @@ let append t payload =
 let append_message t message = append t (Message message)
 let set_model t ~model ~thinking = append t (Model { model; thinking })
 let set_name t ~name = append t (Name { name })
+let set_description t ~text = append t (Description { text })
 let set_cwd t ~cwd = append t (Cwd { cwd })
 let set_system_prompt t ~text = append t (System_prompt { text })
 
@@ -207,7 +258,20 @@ let name t =
   List.find_map t.entries ~f:(fun (e : Entry.t) ->
     match e.payload with
     | Name { name } -> Some name
-    | Message _ | Model _ | Compaction _ | Cwd _ | System_prompt _ -> None)
+    | Message _
+    | Model _
+    | Compaction _
+    | Description _
+    | Cwd _
+    | System_prompt _ -> None)
+;;
+
+let description t =
+  List.find_map t.entries ~f:(fun (e : Entry.t) ->
+    match e.payload with
+    | Description { text } -> Some text
+    | Message _ | Model _ | Compaction _ | Name _ | Cwd _ | System_prompt _ ->
+      None)
 ;;
 
 let append_compaction t ~summary ~kept_from =
@@ -229,7 +293,8 @@ let messages t =
     List.fold path ~init:None ~f:(fun acc (e : Entry.t) ->
       match e.payload with
       | Compaction { summary; kept_from } -> Some (summary, kept_from)
-      | Message _ | Model _ | Name _ | Cwd _ | System_prompt _ -> acc)
+      | Message _ | Model _ | Name _ | Description _ | Cwd _ | System_prompt _
+        -> acc)
   in
   let path =
     match compaction with
@@ -241,7 +306,8 @@ let messages t =
       let kept =
         List.filter kept ~f:(fun e ->
           match e.payload with
-          | Compaction _ | Name _ | Cwd _ | System_prompt _ -> false
+          | Compaction _ | Name _ | Description _ | Cwd _ | System_prompt _ ->
+            false
           | Message _ | Model _ -> true)
       in
       { Entry.id = "summary"
@@ -255,21 +321,27 @@ let messages t =
   List.filter_map path ~f:(fun e ->
     match e.payload with
     | Message m -> Some m
-    | Model _ | Compaction _ | Name _ | Cwd _ | System_prompt _ -> None)
+    | Model _ | Compaction _ | Name _ | Description _ | Cwd _ | System_prompt _
+      -> None)
 ;;
 
 let system_prompt t =
   List.fold (active_path t) ~init:None ~f:(fun acc (e : Entry.t) ->
     match e.payload with
     | System_prompt { text } -> Some text
-    | Message _ | Model _ | Compaction _ | Name _ | Cwd _ -> acc)
+    | Message _ | Model _ | Compaction _ | Name _ | Description _ | Cwd _ -> acc)
 ;;
 
 let model t =
   List.fold (active_path t) ~init:None ~f:(fun acc (e : Entry.t) ->
     match e.payload with
     | Model { model; thinking } -> Some (model, thinking)
-    | Message _ | Compaction _ | Name _ | Cwd _ | System_prompt _ -> acc)
+    | Message _
+    | Compaction _
+    | Name _
+    | Description _
+    | Cwd _
+    | System_prompt _ -> acc)
 ;;
 
 let rewind t ~to_ =
@@ -307,6 +379,7 @@ module Summary = struct
     { id : string
     ; path : string
     ; name : string option
+    ; description : string option
     ; cwd : string
     ; created_at : string
     ; updated_at : string
@@ -331,19 +404,23 @@ let list ~dir =
       | Ok t ->
         let messages = messages t in
         Some
-          { Summary.id = t.id
-          ; path
-          ; name = name t
-          ; cwd = t.cwd
-          ; created_at = created_at t
-          ; updated_at = updated_at t
-          ; first_prompt =
-              List.find_map messages ~f:(function
-                | Message.User u -> Some u.text
-                | _ -> None)
-          ; message_count = List.length messages
-          ; parent = t.parent
-          })
+          ( mtime t
+          , { Summary.id = t.id
+            ; path
+            ; name = name t
+            ; description = description t
+            ; cwd = t.cwd
+            ; created_at = created_at t
+            ; updated_at = updated_at t
+            ; first_prompt =
+                List.find_map messages ~f:(function
+                  | Message.User u -> Some u.text
+                  | _ -> None)
+            ; message_count = List.length messages
+            ; parent = t.parent
+            } ))
+    |> List.stable_sort ~compare:(fun (a, _) (b, _) -> Time_float.compare b a)
+    |> List.map ~f:snd
 ;;
 
 let has_id ~dir id =
@@ -452,7 +529,8 @@ let to_markdown t =
            "### Tool: %s\n\n```\n%s\n```"
            r.tool_name
            (String.strip r.text))
-    | Model _ | Compaction _ | Name _ | Cwd _ | System_prompt _ -> None
+    | Model _ | Compaction _ | Name _ | Description _ | Cwd _ | System_prompt _
+      -> None
   in
   let blocks = List.filter_map (active_path t) ~f:block in
   String.concat (("# Session " ^ t.id) :: blocks) ~sep:"\n\n" ^ "\n"

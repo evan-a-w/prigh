@@ -4,6 +4,7 @@ type t =
   { session_id : string
   ; session_path : string
   ; session_name : string option
+  ; session_description : string option
   ; cwd : string
   ; git_branch : string option
   ; model : Model.t
@@ -24,6 +25,9 @@ let of_json j =
   let%bind session_id = Json.string_field j "session_id" in
   let%bind session_path = Json.string_field j "session_path" in
   let%bind session_name = Json.string_opt_field j "session_name" in
+  let%bind session_description =
+    Json.string_opt_field j "session_description"
+  in
   let%bind cwd = Json.string_field j "cwd" in
   let%bind git_branch = Json.string_opt_field j "git_branch" in
   let%bind model = Json.object_field j "model" >>= Model.of_json in
@@ -46,6 +50,7 @@ let of_json j =
   { session_id
   ; session_path
   ; session_name
+  ; session_description
   ; cwd
   ; git_branch
   ; model

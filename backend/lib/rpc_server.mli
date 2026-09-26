@@ -9,8 +9,9 @@ open! Import
     One server holds many sessions (an [Agent.t] each, keyed by session id)
     and many clients. Every client is attached to exactly one session at a
     time; its requests act on that session and it receives that session's
-    events. [hello] attaches a client (to a named session or the default
-    one) and registers it as a tool host when it advertises [tools]; hosts
+    events. A new client starts in a fresh session (or the [default_agent]
+    when one is given); [hello] can attach it to an existing session by id
+    or path and registers it as a tool host when it advertises [tools]; hosts
     are visible to every session, so a session can run its tools on a client
     attached elsewhere (replies are routed by exec id). The session methods
     ([new_session], [switch_session], [fork], [clone], [import]) move only
@@ -34,13 +35,14 @@ val create
   -> ?token:string
   -> login:Login_manager.t
   -> sessions_dir:string
+  -> cwd:string
   -> new_agent:(?session:Session.t -> cwd:string -> unit -> Agent.t)
-  -> default_agent:Agent.t
+  -> ?default_agent:Agent.t
   -> unit
   -> t
 
 (** Registers a client whose outgoing lines go through [send]; it starts
-    attached to the default session. *)
+    in a new session in [cwd] (or the default one). *)
 val connect : t -> send:(Json.t -> unit) -> Client.t
 
 (** Dispatches one request from [client] and returns the response. Blocking

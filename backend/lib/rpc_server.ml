@@ -33,6 +33,7 @@ let methods =
   ; "session_stats"
   ; "set_cwd"
   ; "list_paths"
+  ; "list_dirs"
   ; "get_config"
   ; "set_config"
   ; "tool_confirm_respond"
@@ -111,8 +112,9 @@ type t =
   { login : Login_manager.t
   ; token : string option (** required in [hello] before anything else *)
   ; sessions_dir : string
+  ; cwd : string
   ; new_agent : ?session:Session.t -> cwd:string -> unit -> Agent.t
-  ; default_agent : Agent.t
+  ; default_agent : Agent.t option
   ; agents : Agent.t String.Table.t (** live sessions by session id *)
   ; clients : Client.t String.Table.t
   ; mutable client_seq : int
@@ -130,7 +132,7 @@ let clients_of t agent =
 
 let maybe_evict t agent =
   if
-    (not (phys_equal agent t.default_agent))
+    (not (Option.exists t.default_agent ~f:(phys_equal agent)))
     && (not (Agent.is_running agent))
     && List.is_empty (clients_of t agent)
   then Hashtbl.remove t.agents (session_id agent)
@@ -190,12 +192,22 @@ let register t agent =
   agent
 ;;
 
-let create ~env:_ ~sw:_ ?token ~login ~sessions_dir ~new_agent ~default_agent ()
+let create
+      ~env:_
+      ~sw:_
+      ?token
+      ~login
+      ~sessions_dir
+      ~cwd
+      ~new_agent
+      ?default_agent
+      ()
   =
   let t =
     { login
     ; token
     ; sessions_dir
+    ; cwd
     ; new_agent
     ; default_agent
     ; agents = String.Table.create ()
@@ -204,7 +216,8 @@ let create ~env:_ ~sw:_ ?token ~login ~sessions_dir ~new_agent ~default_agent ()
     ; execs = String.Table.create ()
     }
   in
-  ignore (register t default_agent : Agent.t);
+  Option.iter default_agent ~f:(fun agent ->
+    ignore (register t agent : Agent.t));
   Login_manager.subscribe login ~f:(fun event ->
     let json = Rpc_json.login_event event in
     Hashtbl.iter t.clients ~f:(fun c -> c.send json));
@@ -221,15 +234,22 @@ let attach t (client : Client.t) agent =
   if client.tools then Agent.prefer_host agent client.id
 ;;
 
+let fresh_agent t = register t (t.new_agent ~cwd:t.cwd ())
+
 let connect t ~send =
   t.client_seq <- t.client_seq + 1;
+  let agent =
+    match t.default_agent with
+    | Some agent -> agent
+    | None -> fresh_agent t
+  in
   let client =
     { Client.id = sprintf "client-%d" t.client_seq
     ; seq = t.client_seq
     ; name = sprintf "client-%d" t.client_seq
     ; tools = false
     ; cwd = None
-    ; agent = t.default_agent
+    ; agent
     ; authed = Option.is_none t.token
     ; send
     }
@@ -246,11 +266,12 @@ let disconnect t (client : Client.t) =
   maybe_evict t client.agent
 ;;
 
+(* Finishing runs evict idle sessions, so iterate over a snapshot. *)
 let shutdown t =
-  Hashtbl.iter t.agents ~f:(fun agent ->
-    ignore (Agent.abort agent : string list));
+  let agents = Hashtbl.data t.agents in
+  List.iter agents ~f:(fun agent -> ignore (Agent.abort agent : string list));
   Login_manager.cancel t.login;
-  Hashtbl.iter t.agents ~f:Agent.wait_idle;
+  List.iter agents ~f:Agent.wait_idle;
   Login_manager.wait t.login
 ;;
 
@@ -540,6 +561,14 @@ let dispatch agent login ~meth ~params : Json.t Or_error.t =
       | _ -> ""
     in
     Agent.list_paths agent ~prefix
+  | "list_dirs" ->
+    let prefix =
+      match param params "prefix" with
+      | Some (`String s) -> s
+      | _ -> ""
+    in
+    Or_error.bind (string_param_opt params "host") ~f:(fun host ->
+      Agent.list_dirs ?host agent ~prefix)
   | "get_config" -> ok (Config.to_json (Agent.config agent))
   | "set_config" ->
     (match param params "config" with
