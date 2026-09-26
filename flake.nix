@@ -322,6 +322,69 @@
               touch "$out"
             '';
 
+        checks.web-workflows =
+          if pkgs.stdenv.hostPlatform.isLinux then
+            pkgs.runCommand "prigh-web-workflows-test" {
+              nativeBuildInputs =
+                [
+                  pkgs.curl
+                  pkgs.nodejs
+                  pkgs.playwright-test
+                  pkgs.playwright-driver.browsers
+                ];
+            } ''
+              mkdir -p fake-bin
+              for opener in open xdg-open; do
+                cat > "fake-bin/$opener" <<'EOF'
+              #!${pkgs.runtimeShell}
+              printf '%s\n' "$1" > "$OPEN_LOG"
+              EOF
+                chmod +x "fake-bin/$opener"
+              done
+              export PATH="$PWD/fake-bin:$PATH"
+              export PLAYWRIGHT_BROWSERS_PATH=${pkgs.playwright-driver.browsers}
+              export PLAYWRIGHT_MODULE=${pkgs.playwright-test}/lib/node_modules/playwright/index.mjs
+              : >actual
+              cleanup() {
+                status=$?
+                kill "''${server_pid:-}" 2>/dev/null || true
+                if test "$status" -ne 0; then
+                  cat server.err actual 2>/dev/null || true
+                fi
+                exit "$status"
+              }
+              trap cleanup EXIT
+              for engine in chromium firefox; do
+                mkdir -p "home-$engine" "cwd-$engine"
+                export OPEN_LOG="$PWD/opened-$engine"
+                export HOME="$PWD/home-$engine"
+                PRIGH_WEB_LISTEN=127.0.0.1:0 \
+                  ${prigh}/bin/prigh -web -faux -token 'sekrit&x=y' \
+                    -cwd "$PWD/cwd-$engine" >server.out 2>server.err &
+                server_pid=$!
+                for attempt in $(seq 1 200); do
+                  test -s "$OPEN_LOG" && break
+                  sleep 0.05
+                done
+                test -s "$OPEN_LOG"
+                opened_url="$(cat "$OPEN_LOG")"
+                case "$opened_url" in *token*) exit 1;; esac
+                TEST_CWD="$PWD/cwd-$engine" \
+                  node ${./tui/e2e-web/web_workflows.mjs} \
+                    "$opened_url" 'sekrit&x=y' "$engine" >>actual
+                kill "$server_pid"
+                wait "$server_pid" 2>/dev/null || true
+                server_pid=
+              done
+              diff -u ${./tui/e2e-web/web_workflows.expected} actual
+              mkdir "$out"
+              cp actual "$out/screens.txt"
+            ''
+          else
+            pkgs.runCommand "prigh-web-workflows-test-skipped" { } ''
+              touch "$out"
+            '';
+
         devShells.default = pkgs.mkShell {
           inputsFrom = [
             prighTui

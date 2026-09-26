@@ -1,0 +1,78 @@
+=== chromium: authentication ===
+prigh
+
+unauthorised: bad or missing token
+
+backend
+token
+connect
+backend=<BACKEND>
+token-in-url=false
+=== chromium: ready ===
+session <ID> in <CWD>. /help for commands, Esc aborts, Ctrl+C twice quits.
+<RULE>
+>
+<CWD>  deepseek-flash  think:off  view:normal  ctx:<USAGE>  $<COST>
+=== chromium: typed ===
+session <ID> in <CWD>. /help for commands, Esc aborts, Ctrl+C twice quits.
+<RULE>
+> hello web
+<CWD>  deepseek-flash  think:off  view:normal  ctx:<USAGE>  $<COST>
+=== chromium: edited ===
+session <ID> in <CWD>. /help for commands, Esc aborts, Ctrl+C twice quits.
+<RULE>
+> hello wXb
+<CWD>  deepseek-flash  think:off  view:normal  ctx:<USAGE>  $<COST>
+=== chromium: replied ===
+session <ID> in <CWD>. /help for commands, Esc aborts, Ctrl+C twice quits.
+> hello wXb
+faux reply
+<RULE>
+>
+<CWD>  deepseek-flash  think:off  view:normal  ctx:<USAGE>  $<COST>
+=== chromium: reloaded ===
+session <ID> in <CWD>. /help for commands, Esc aborts, Ctrl+C twice quits.
+> hello wXb
+faux reply
+<RULE>
+>
+<CWD>  deepseek-flash  think:off  view:normal  ctx:<USAGE>  $<COST>
+=== firefox: authentication ===
+prigh
+
+unauthorised: bad or missing token
+
+backend
+token
+connect
+backend=<BACKEND>
+token-in-url=false
+=== firefox: ready ===
+session <ID> in <CWD>. /help for commands, Esc aborts, Ctrl+C twice quits.
+<RULE>
+>
+<CWD>  deepseek-flash  think:off  view:normal  ctx:<USAGE>  $<COST>
+=== firefox: typed ===
+session <ID> in <CWD>. /help for commands, Esc aborts, Ctrl+C twice quits.
+<RULE>
+> hello web
+<CWD>  deepseek-flash  think:off  view:normal  ctx:<USAGE>  $<COST>
+=== firefox: edited ===
+session <ID> in <CWD>. /help for commands, Esc aborts, Ctrl+C twice quits.
+<RULE>
+> hello wXb
+<CWD>  deepseek-flash  think:off  view:normal  ctx:<USAGE>  $<COST>
+=== firefox: replied ===
+session <ID> in <CWD>. /help for commands, Esc aborts, Ctrl+C twice quits.
+> hello wXb
+faux reply
+<RULE>
+>
+<CWD>  deepseek-flash  think:off  view:normal  ctx:<USAGE>  $<COST>
+=== firefox: reloaded ===
+session <ID> in <CWD>. /help for commands, Esc aborts, Ctrl+C twice quits.
+> hello wXb
+faux reply
+<RULE>
+>
+<CWD>  deepseek-flash  think:off  view:normal  ctx:<USAGE>  $<COST>

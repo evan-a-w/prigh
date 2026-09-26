@@ -183,6 +183,16 @@ let key_event (ev : Dom_html.keyboardEvent Js.t)
   }
 ;;
 
+let keyboard_input () =
+  Dom_html.getElementById_coerce "keyboard-input" Dom_html.CoerceTo.textarea
+;;
+
+let focus_keyboard_input () =
+  Option.iter (keyboard_input ()) ~f:(fun input ->
+    input##.value := Js.string "";
+    input##focus)
+;;
+
 let install_listeners ~schedule =
   let document = Dom_html.document in
   ignore
@@ -239,7 +249,27 @@ let install_listeners ~schedule =
           Js._true))
        Js._false
      : Dom_html.event_listener_id);
-  resize ()
+  ignore
+    (Dom_html.addEventListener
+       Dom_html.window
+       Dom_html.Event.focus
+       (Dom.handler (fun _ ->
+          focus_keyboard_input ();
+          Js._true))
+       Js._false
+     : Dom_html.event_listener_id);
+  Option.iter (Dom_html.getElementById_opt "app") ~f:(fun app ->
+    ignore
+      (Dom_html.addEventListener
+         app
+         Dom_html.Event.mousedown
+         (Dom.handler (fun _ ->
+            focus_keyboard_input ();
+            Js._true))
+         Js._false
+       : Dom_html.event_listener_id));
+  resize ();
+  focus_keyboard_input ()
 ;;
 
 let connect_form ~backend ~token ~error =
@@ -258,7 +288,7 @@ let connect_form ~backend ~token ~error =
   <p class="error">%s</p>
   <label>backend <input id="backend" value="%s" placeholder="ws://host:port/ws"></label>
   <label>token <input id="token" type="password" value="%s"></label>
-  <button type="submit">connect</button>
+  <button id="connect-submit" type="submit" disabled>connect</button>
 </form>|}
        (escape error)
        (escape backend)
@@ -279,7 +309,10 @@ let connect_form ~backend ~token ~error =
             Browser.reload_with_backend backend;
             Js._false))
          Js._false
-       : Dom_html.event_listener_id)
+       : Dom_html.event_listener_id);
+    Option.iter
+      (Dom_html.getElementById_coerce "connect-submit" Dom_html.CoerceTo.button)
+      ~f:(fun button -> button##.disabled := Js._false)
 ;;
 
 let run () =
