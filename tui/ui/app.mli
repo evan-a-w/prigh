@@ -70,7 +70,7 @@ module Command : sig
 end
 
 (** Reconnection is driven from here so the backoff is testable: every
-    [Backend_closed] starts a retry loop (250ms doubling, capped at 10s) that
+    [Backend_closed] starts a retry loop (250ms doubling, capped at 60s) that
     [/retry-backend-connection] can short-circuit. *)
 module Connection : sig
   type t =

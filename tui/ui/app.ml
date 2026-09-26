@@ -73,11 +73,22 @@ module Connection = struct
         }
   [@@deriving sexp_of, equal]
 
-  let max_delay_ms = 10_000
+  let max_delay_ms = 60_000
+  let max_attempt = 9
 
-  (* 250ms, 500ms, 1s, ... capped at 10s. *)
+  (* 250ms, 500ms, 1s, ... capped at 60s.  Check the cap before
+     calculating the exponential backoff so that a large attempt cannot
+     overflow the integer arithmetic. *)
   let delay_ms ~attempt =
-    Int.min max_delay_ms (250 * Int.pow 2 (Int.max 0 (attempt - 1)))
+    if attempt >= max_attempt
+    then max_delay_ms
+    else
+      let exponent = if attempt <= 1 then 0 else attempt - 1 in
+      250 * Int.pow 2 exponent
+  ;;
+
+  let next_attempt attempt =
+    if attempt >= max_attempt then max_attempt else attempt + 1
   ;;
 end
 
@@ -917,7 +928,7 @@ let reconnect_reply m ~generation result =
     ->
     (match result with
      | Error e ->
-       let attempt = attempt + 1 in
+       let attempt = Connection.next_attempt attempt in
        let delay_ms = Connection.delay_ms ~attempt in
        schedule_reconnect
          (warn
@@ -2547,7 +2558,7 @@ let update m (action : Action.t) =
          | Reconnecting { attempt; _ } ->
            (* An attempt got as far as connecting and then lost the transport
               again; its reply (if any) is now stale. *)
-           let attempt = attempt + 1 in
+           let attempt = Connection.next_attempt attempt in
            schedule_reconnect
              m
              ~attempt

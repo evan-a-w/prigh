@@ -4783,7 +4783,26 @@ let%expect_test "keymap: every binding is covered by a scenario" =
     |}]
 ;;
 
-let%expect_test "reconnect: backoff doubles to the 10s cap, stale replies are \
+let%expect_test "reconnect: backoff caps before integer overflow" =
+  List.iter [ 1; 2; 3; 4; 5; 6; 7; 8; 9; 10; 1_000_000 ] ~f:(fun attempt ->
+    printf "%dms\n" (App.Connection.delay_ms ~attempt));
+  [%expect
+    {|
+    250ms
+    500ms
+    1000ms
+    2000ms
+    4000ms
+    8000ms
+    16000ms
+    32000ms
+    60000ms
+    60000ms
+    60000ms
+    |}]
+;;
+
+let%expect_test "reconnect: backoff doubles to the 60s cap, stale replies are \
                  ignored, /retry-backend-connection retries now, success \
                  resyncs"
   =
@@ -4831,15 +4850,15 @@ let%expect_test "reconnect: backoff doubles to the 10s cap, stale replies are \
       (session (/home/u/.prigh/sessions/1.jsonl)))
     (Reconnect
       (generation 7)
-      (delay_ms   10000)
+      (delay_ms   16000)
       (session (/home/u/.prigh/sessions/1.jsonl)))
     (Reconnect
       (generation 8)
-      (delay_ms   10000)
+      (delay_ms   32000)
       (session (/home/u/.prigh/sessions/1.jsonl)))
     (Reconnect
       (generation 9)
-      (delay_ms   10000)
+      (delay_ms   60000)
       (session (/home/u/.prigh/sessions/1.jsonl)))
     |}];
   print_s [%sexp (h.model.connection : App.Connection.t)];
@@ -4848,7 +4867,7 @@ let%expect_test "reconnect: backoff doubles to the 10s cap, stale replies are \
     (Reconnecting
       (attempt    9)
       (generation 9)
-      (delay_ms   10000))
+      (delay_ms   60000))
     |}];
   (* A late reply from an earlier attempt is ignored. *)
   fail 3;
@@ -4859,7 +4878,7 @@ let%expect_test "reconnect: backoff doubles to the 10s cap, stale replies are \
     (Reconnecting
       (attempt    9)
       (generation 9)
-      (delay_ms   10000))
+      (delay_ms   60000))
     |}];
   H.show h;
   [%expect
@@ -4870,12 +4889,12 @@ let%expect_test "reconnect: backoff doubles to the 10s cap, stale replies are \
     reconnect failed: connection refused; retrying in 2s (attempt 4)
     reconnect failed: connection refused; retrying in 4s (attempt 5)
     reconnect failed: connection refused; retrying in 8s (attempt 6)
-    reconnect failed: connection refused; retrying in 10s (attempt 7)
-    reconnect failed: connection refused; retrying in 10s (attempt 8)
-    reconnect failed: connection refused; retrying in 10s (attempt 9)
+    reconnect failed: connection refused; retrying in 16s (attempt 7)
+    reconnect failed: connection refused; retrying in 32s (attempt 8)
+    reconnect failed: connection refused; retrying in 60s (attempt 9)
     ──────────────────────────────────────────────────────────────────────
     > ▏
-    …deepseek-flash  ctx:0% 1.5k  $0.01  backend gone · retry 9 in 10s
+    …deepseek-flash  ctx:0% 1.5k  $0.01  backend gone · retry 9 in 60s
     |}];
   (* The user cuts the wait short; the pending attempt 9 becomes stale. *)
   H.keys h "/retry-backend-connection";
