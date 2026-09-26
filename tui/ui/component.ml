@@ -50,7 +50,7 @@ let perform ctx (platform : Platform.t) (command : App.Command.t) =
   Bonsai.Apply_action_context.schedule_event ctx effect
 ;;
 
-let create platform (local_ graph) =
+let create ?(start_on_activate = true) platform (local_ graph) =
   let model, inject =
     Bonsai.state_machine_with_input
       ~sexp_of_action:App.Action.sexp_of_t
@@ -65,11 +65,13 @@ let create platform (local_ graph) =
       platform
       graph
   in
-  Bonsai.Edge.lifecycle
-    ~on_activate:
-      (let%arr inject in
-       inject App.Action.Start)
-    graph;
+  if start_on_activate
+  then
+    Bonsai.Edge.lifecycle
+      ~on_activate:
+        (let%arr inject in
+         inject App.Action.Start)
+      graph;
   let running =
     let%arr model in
     App.Model.running model && not (Mode.is_dialog model.mode)

@@ -265,24 +265,43 @@
               if (!(await evaluate("Boolean(document.querySelector('form.connect'))"))) {
                 throw new Error("tokenless page did not show the connect form");
               }
-              await evaluate("localStorage.setItem('prigh.token', 'sekrit&x=y'); location.reload()");
+              await evaluate(`
+                document.querySelector("#token").value = "sekrit&x=y";
+                document.querySelector("#connect-form").requestSubmit();
+              `);
               let body = "";
               for (let attempt = 0; attempt < 400; attempt++) {
-                body = await evaluate("document.body.textContent");
+                body = await evaluate(`document.body?.textContent ?? ""`);
                 if (body.includes("deepseek-flash") && !body.includes("connecting…")) break;
                 await new Promise(resolve => setTimeout(resolve, 50));
               }
               if (!body.includes("deepseek-flash") || body.includes("connecting…")) {
                 throw new Error("authenticated page did not start: " + JSON.stringify(body));
               }
-              await evaluate(`
-                for (const key of "hello") {
-                  document.dispatchEvent(new KeyboardEvent("keydown", { key, bubbles: true }));
+              await call("Page.bringToFront");
+              if (!(await evaluate("document.hasFocus()"))) {
+                throw new Error("browser page is not focused");
+              }
+              const press = async (key, code, text = "") => {
+                await call("Input.dispatchKeyEvent", { type: "keyDown", key, code, text });
+                await call("Input.dispatchKeyEvent", { type: "keyUp", key, code });
+              };
+              let typed = "";
+              for (const key of "hello") {
+                typed += key;
+                await press(key, "Key" + key.toUpperCase(), key);
+                for (let attempt = 0; attempt < 100; attempt++) {
+                  body = await evaluate(`document.body?.textContent ?? ""`);
+                  if (body.includes("> " + typed)) break;
+                  await new Promise(resolve => setTimeout(resolve, 10));
                 }
-                document.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
-              `);
+                if (!body.includes("> " + typed)) {
+                  throw new Error("real browser input did not reach the editor: " + JSON.stringify(body));
+                }
+              }
+              await press("Enter", "Enter", "\r");
               for (let attempt = 0; attempt < 400; attempt++) {
-                body = await evaluate("document.body.textContent");
+                body = await evaluate(`document.body?.textContent ?? ""`);
                 if (body.includes("faux reply")) break;
                 await new Promise(resolve => setTimeout(resolve, 50));
               }

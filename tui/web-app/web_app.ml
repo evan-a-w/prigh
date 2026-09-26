@@ -155,7 +155,9 @@ module Result_ = struct
 end
 
 let app platform (local_ graph) =
-  let model, inject = Prigh_ui.Component.create platform graph in
+  let model, inject =
+    Prigh_ui.Component.create ~start_on_activate:false platform graph
+  in
   let view =
     let%arr model in
     (* Bonsai replaces the element it binds to, so keep an [#app] wrapper for
@@ -325,7 +327,9 @@ let run () =
            (fun graph -> app platform graph)
        in
        handle_ref := Some handle;
-       let%map.Deferred () = Start.Handle.started handle in
+       (* [schedule] queues before the first frame, so startup and input must
+          not wait on [Handle.started]'s Async continuation. *)
+       schedule App.Action.Start;
        Option.iter client_id ~f:(fun id ->
          schedule (App.Action.Set_client_id id));
        install_listeners ~schedule;
@@ -338,5 +342,6 @@ let run () =
                  | Event e -> Event e
                  | Protocol_error e -> Protocol_error e
                  | Stderr line -> Stderr line
-                 | Closed -> Backend_closed))))
+                 | Closed -> Backend_closed)));
+       Deferred.unit)
 ;;

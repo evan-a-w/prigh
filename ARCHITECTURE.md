@@ -499,12 +499,12 @@ the RFC handshake vector, static serving and traversal, and a masked WebSocket
 RPC conversation over a real loopback socket)
 and `tui/test-web/` (connection selection, `Key_of_dom` and `Dom_of_screen`,
 run under `node` with js_of_ocaml because `virtual_dom`'s initialisers need a
-JavaScript runtime; skipped without `node`). On Linux, the flake's `web-browser` check starts the
-packaged wrapper and `serve -faux -web`, captures the URL sent to the browser,
-checks that the opened URL does not contain the token, fetches the installed
-bundle, enters the token through browser storage, loads the real WebSocket
-session until the screen replaces `connecting…`, and sends a prompt through the
-faux provider. Additional interactions (`/help`, pickers, `@` completion, `!`
-shell, paste, resize, the connect form,
+JavaScript runtime; skipped without `node`). On Linux, the flake's
+`web-browser` check starts the packaged wrapper and `serve -faux -web`, captures
+the URL sent to the browser, checks that the opened URL does not contain the
+token, fetches the installed bundle, submits the real connect form, loads the
+WebSocket session until the screen replaces `connecting…`, and sends a prompt
+through Chromium's input pipeline to the faux provider. Additional interactions
+(`/help`, pickers, `@` completion, `!` shell, paste, resize, the connect form,
 `?backend=` to a second backend, quit and reconnect after a backend restart)
 have been exercised manually.

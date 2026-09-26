@@ -25,7 +25,11 @@ module Platform : sig
     }
 end
 
+(** [start_on_activate] defaults to true. A driver that must wire input before
+    its first browser frame can disable it and schedule [App.Action.Start]
+    itself. *)
 val create
-  :  Platform.t Bonsai.t
+  :  ?start_on_activate:bool
+  -> Platform.t Bonsai.t
   -> local_ Bonsai.graph
   -> App.Model.t Bonsai.t * (App.Action.t -> unit Bonsai.Effect.t) Bonsai.t

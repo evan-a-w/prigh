@@ -83,6 +83,40 @@ module Result_spec = struct
   let incoming (_, inject) action = inject action
 end
 
+let%expect_test "component: a driver can schedule startup explicitly" =
+  let replies =
+    [ "get_state", Ok (state_json false)
+    ; "get_messages", Ok "[]"
+    ; "auth_status", Ok "[]"
+    ; "get_config", Ok {|{"scoped_models":[],"confirm_tools":false}|}
+    ; "list_models", Ok "[]"
+    ]
+  in
+  let handle =
+    Bonsai_test.Handle.create (module Result_spec) (fun graph ->
+      let model, inject =
+        Component.create
+          ~start_on_activate:false
+          (Bonsai.return (make_platform ~replies))
+          graph
+      in
+      Bonsai.both model inject)
+  in
+  Bonsai_test.Handle.recompute_view_until_stable handle;
+  [%expect {| |}];
+  Bonsai_test.Handle.do_actions handle [ App.Action.Start ];
+  Bonsai_test.Handle.recompute_view_until_stable handle;
+  [%expect
+    {|
+    rpc get_state ()
+    rpc get_messages ()
+    rpc auth_status ()
+    rpc get_config ()
+    rpc list_models ()
+    load history
+    |}]
+;;
+
 let%expect_test "component: startup requests, key handling, rpc round trip, \
                  quit"
   =
