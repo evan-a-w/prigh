@@ -48,7 +48,7 @@ module Result = Tool_result
 val name : t -> string
 
 (** Runs the tool in this process, turning [Tool_args.Invalid] and other
-    exceptions into error results. *)
+    exceptions into error results. Output is repaired to valid UTF-8. *)
 val execute : t -> Context.t -> Json.t -> Result.t
 
 (** [execute] through the context's executor. *)

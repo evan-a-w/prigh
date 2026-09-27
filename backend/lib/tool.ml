@@ -27,7 +27,7 @@ let name t = t.spec.name
 
 let execute t context args =
   match t.run context args with
-  | result -> result
+  | result -> { result with text = Utf8.sanitize result.text }
   | exception Tool_args.Invalid msg -> Result.error ("invalid arguments: " ^ msg)
   | exception (Eio.Cancel.Cancelled _ as exn) -> raise exn
   | exception exn ->

@@ -204,12 +204,15 @@ let add_entry t (entry : Entry.t) =
   | System_prompt _ -> ()
 ;;
 
+let read_lines path =
+  In_channel.read_lines path
+  |> List.filter ~f:(fun l -> not (String.is_empty (String.strip l)))
+  |> List.map ~f:Utf8.sanitize
+;;
+
 let load path =
   Or_error.try_with (fun () ->
-    let lines =
-      In_channel.read_lines path
-      |> List.filter ~f:(fun l -> not (String.is_empty (String.strip l)))
-    in
+    let lines = read_lines path in
     let parsed =
       List.map lines ~f:(fun l -> Line.t_of_jsonaf (Json.of_string l))
     in
@@ -460,11 +463,7 @@ let import ~dir src_path =
                 ; parent = src.parent
                 }))
       in
-      let lines =
-        In_channel.read_lines src_path
-        |> List.filter ~f:(fun l -> not (String.is_empty (String.strip l)))
-      in
-      let rest = List.drop lines 1 in
+      let rest = List.drop (read_lines src_path) 1 in
       Out_channel.write_all
         path
         ~data:(String.concat (header :: rest) ~sep:"\n" ^ "\n");

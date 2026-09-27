@@ -110,6 +110,40 @@ let%expect_test "compaction replaces the prefix with a summary" =
   [%expect {| (4 6) |}]
 ;;
 
+let%expect_test "loading a file with invalid utf-8 repairs it" =
+  with_dir
+  @@ fun dir ->
+  let t = Session.create ~dir ~cwd:"/proj" () in
+  let (_ : Session.Entry.t) =
+    Session.append_message
+      t
+      (Tool_result
+         { tool_call_id = "c1"
+         ; tool_name = "bash"
+         ; text = "(\xE2\x88\xA8 ((\xC2\n3:"
+         ; is_error = false
+         })
+  in
+  let show_text t =
+    List.iter (Session.messages t) ~f:(function
+      | Tool_result r -> print_s [%sexp (r.text : string)]
+      | User _ | Assistant _ -> ())
+  in
+  show_text t;
+  [%expect
+    {|
+     "(\226\136\168 ((\194\
+    \n3:"
+    |}];
+  let loaded = Or_error.ok_exn (Session.load (Session.path t)) in
+  show_text loaded;
+  [%expect
+    {|
+     "(\226\136\168 ((\239\191\189\
+    \n3:"
+    |}]
+;;
+
 let%expect_test "fork copies the active path up to a point" =
   with_dir
   @@ fun dir ->

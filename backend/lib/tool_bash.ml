@@ -33,9 +33,13 @@ let run (context : Tool.Context.t) args =
     | None -> default_timeout
   in
   let output = Buffer.create 1024 in
+  let pending = ref "" in
   let on_data s =
     Buffer.add_string output s;
-    context.on_output s
+    let complete, rest = Utf8.split_incomplete_suffix (!pending ^ s) in
+    pending := rest;
+    if not (String.is_empty complete)
+    then context.on_output (Utf8.sanitize complete)
   in
   let exit =
     Process.run
@@ -49,6 +53,8 @@ let run (context : Tool.Context.t) args =
       ~args:[ "-c"; command ]
       ()
   in
+  if not (String.is_empty !pending)
+  then context.on_output (Utf8.sanitize !pending);
   let truncated = Truncate.tail (Buffer.contents output) in
   let text =
     if truncated.truncated

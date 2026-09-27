@@ -51,6 +51,26 @@ let%expect_test "bash: output, exit codes, cwd, streaming" =
   [%expect {| ERROR: invalid arguments: missing required argument "command" |}]
 ;;
 
+let%expect_test
+    "bash: invalid utf-8 is repaired, multibyte chars split across chunks \
+     survive"
+  =
+  with_sandbox
+  @@ fun t ->
+  let chunks = ref [] in
+  run
+    t
+    ~on_output:(fun s -> chunks := s :: !chunks)
+    Tool_bash.tool
+    {|{"command": "printf 'a\\xe2\\x88'; sleep 0.05; printf '\\xa8b'; sleep 0.05; printf 'x\\xc2\\n'"}|};
+  print_s [%sexp (List.rev !chunks : string list)];
+  [%expect
+    {|
+    a∨bx�
+    (a "\226\136\168b" "x\239\191\189\n")
+    |}]
+;;
+
 let%expect_test "bash: timeout, cancellation, truncation" =
   with_sandbox
   @@ fun t ->
