@@ -195,6 +195,12 @@ let focus_keyboard_input () =
 
 let event_target (ev : #Dom_html.event Js.t) = Dom_html.eventTarget ev
 
+let within_link (ev : #Dom_html.event Js.t) =
+  Js.Opt.test
+    ((Js.Unsafe.coerce (event_target ev))##closest (Js.string "a")
+     : Dom_html.element Js.t Js.opt)
+;;
+
 (* The connect form's own fields must keep their focus and receive keystrokes,
    so those events are left to the browser. The hidden keyboard input is the
    only textarea, so a textarea target is ours. *)
@@ -255,18 +261,27 @@ let install_listeners ~schedule =
        Js._false
      : Dom_html.event_listener_id);
   let resize () =
+    Browser.fit_root ();
     let width, height = Browser.grid_size () in
     schedule (App.Action.Resize { width; height })
   in
-  ignore
-    (Dom_html.addEventListener
-       Dom_html.window
-       Dom_html.Event.resize
-       (Dom.handler (fun _ ->
-          resize ();
-          Js._true))
-       Js._false
-     : Dom_html.event_listener_id);
+  Browser.on_viewport_change resize;
+  Option.iter (keyboard_input ()) ~f:(fun input ->
+    (* Keys the [keydown] handler recognised were prevented from reaching the
+       textarea, so any text that does arrive came from a virtual keyboard whose
+       [keydown] was unidentified. *)
+    ignore
+      (Dom_html.addEventListener
+         input
+         Dom_html.Event.input
+         (Dom.handler (fun _ ->
+            let text = Js.to_string input##.value in
+            input##.value := Js.string "";
+            List.iter (Prigh_ui_web.Key_of_dom.keys_of_text text) ~f:(fun key ->
+              schedule (App.Action.Key key));
+            Js._true))
+         Js._false
+       : Dom_html.event_listener_id));
   ignore
     (Dom_html.addEventListener
        Dom_html.window
@@ -276,30 +291,69 @@ let install_listeners ~schedule =
           Js._true))
        Js._false
      : Dom_html.event_listener_id);
-  Option.iter (Dom_html.getElementById_opt "app") ~f:(fun app ->
-    (* Focus the hidden keyboard input on tap/click. [touchend] is a direct user
-       gesture on iOS and Android, whereas the synthesized [mousedown] iOS sends
-       for non-clickable elements is not. The input must also be visible (in
-       view, non-zero size, non-zero opacity) for iOS to open the keyboard; see
-       style.css. *)
-    let focus_on_tap (ev : #Dom_html.event Js.t) =
-      if not (form_control ev) then focus_keyboard_input ();
-      Js._true
-    in
+  Option.iter (Dom_html.getElementById_opt "root") ~f:(fun root ->
     ignore
       (Dom_html.addEventListener
-         app
+         root
          Dom_html.Event.mousedown
-         (Dom.handler focus_on_tap)
+         (Dom.handler (fun ev ->
+            if not (form_control ev) then focus_keyboard_input ();
+            Js._true))
          Js._false
        : Dom_html.event_listener_id);
-    ignore
-      (Dom_html.addEventListener
-         app
-         Dom_html.Event.touchend
-         (Dom.handler focus_on_tap)
-         Js._false
-       : Dom_html.event_listener_id));
+    (* A tap focuses the hidden input from [touchend], a direct user gesture
+       that mobile browsers accept for opening the keyboard (the input must also
+       be visible enough; see style.css). The tap's default action would then
+       synthesize mouse events and a click on non-editable content, which blurs
+       the input again and closes the keyboard, so it is cancelled. Swipes
+       scroll instead. *)
+    let gesture = ref None in
+    let touch_point (ev : Dom_html.touchEvent Js.t) =
+      Js.Optdef.to_option (ev##.changedTouches##item 0)
+      |> Option.map ~f:(fun t ->
+        Js.to_float t##.clientX, Js.to_float t##.clientY)
+    in
+    let touch event handler =
+      ignore
+        (Dom_html.addEventListener root event (Dom.handler handler) Js._false
+         : Dom_html.event_listener_id)
+    in
+    touch Dom_html.Event.touchstart (fun ev ->
+      gesture
+      := if form_control ev || within_link ev
+         then None
+         else
+           Option.map (touch_point ev) ~f:(fun (x, y) ->
+             let step =
+               Browser.cell_height () *. Float.of_int App.wheel_lines
+             in
+             Touch.start ~x ~y, step);
+      Js._true);
+    touch Dom_html.Event.touchmove (fun ev ->
+      (match !gesture, touch_point ev with
+       | Some (g, step), Some (x, y) ->
+         let g, steps = Touch.move g ~x ~y ~step in
+         gesture := Some (g, step);
+         for _ = 1 to abs steps do
+           schedule
+             (App.Action.Intent (if steps > 0 then Scroll_down else Scroll_up))
+         done;
+         Dom.preventDefault ev
+       | _ -> ());
+      Js._true);
+    touch Dom_html.Event.touchend (fun ev ->
+      (match !gesture with
+       | None -> ()
+       | Some (g, _) ->
+         gesture := None;
+         Dom.preventDefault ev;
+         (match Touch.finish g with
+          | `Tap -> focus_keyboard_input ()
+          | `Swipe -> ()));
+      Js._true);
+    touch Dom_html.Event.touchcancel (fun _ ->
+      gesture := None;
+      Js._true));
   resize ();
   focus_keyboard_input ()
 ;;

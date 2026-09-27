@@ -148,6 +148,10 @@ end
 val transcript_rows : Model.t -> int
 
 val init : Model.t
+
+(** Lines one [Scroll_up]/[Scroll_down] intent moves. *)
+val wheel_lines : int
+
 val format_tokens : int -> string
 
 (** Rows a picker lists at once (its page size), capped by the screen. *)

@@ -13,8 +13,18 @@ val same_origin_ws_url : unit -> string
 val open_url : string -> unit
 val copy_to_clipboard : string -> unit
 
-(** Columns and rows of the monospace grid that fit the window. *)
+(** Columns and rows of the monospace grid that fit the visible viewport (which
+    excludes the on-screen keyboard). *)
 val grid_size : unit -> int * int
+
+(** Pixel height of one grid row. *)
+val cell_height : unit -> float
+
+(** Sizes and positions [#root] to cover exactly the visible viewport. *)
+val fit_root : unit -> unit
+
+(** Runs [f] whenever the window or visible viewport resizes or moves. *)
+val on_viewport_change : (unit -> unit) -> unit
 
 val href_with_backend
   :  pathname:string

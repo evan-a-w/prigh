@@ -77,13 +77,87 @@ let cell_size () =
   Float.max 1. width, Float.max 1. height
 ;;
 
+let cell_height () = snd (cell_size ())
+
+(* The visual viewport is what the user actually sees: unlike the layout
+   viewport (window.innerHeight) it shrinks when the on-screen keyboard opens
+   and moves when the browser scrolls a focused field into view. *)
+module Viewport = struct
+  type t =
+    { width : float
+    ; height : float
+    ; offset_left : float
+    ; offset_top : float
+    }
+
+  let visual () =
+    let vv = Js.Unsafe.get Dom_html.window (Js.string "visualViewport") in
+    if Js.Optdef.test vv && Js.Opt.test vv then Some vv else None
+  ;;
+
+  let number obj name : float =
+    Js.to_float (Js.Unsafe.get obj (Js.string name) : Js.number_t)
+  ;;
+
+  let current () =
+    match visual () with
+    | Some vv ->
+      { width = number vv "width"
+      ; height = number vv "height"
+      ; offset_left = number vv "offsetLeft"
+      ; offset_top = number vv "offsetTop"
+      }
+    | None ->
+      { width = Float.of_int Dom_html.window##.innerWidth
+      ; height = Float.of_int Dom_html.window##.innerHeight
+      ; offset_left = 0.
+      ; offset_top = 0.
+      }
+  ;;
+
+  let listen target event f =
+    ignore
+      (Dom_html.addEventListener
+         target
+         (Dom_html.Event.make event)
+         (Dom.handler (fun _ ->
+            f ();
+            Js._true))
+         Js._false
+       : Dom_html.event_listener_id)
+  ;;
+
+  let on_change f =
+    listen Dom_html.window "resize" f;
+    Option.iter (visual ()) ~f:(fun vv ->
+      let vv : Dom_html.eventTarget Js.t = Js.Unsafe.coerce vv in
+      listen vv "resize" f;
+      listen vv "scroll" f)
+  ;;
+end
+
+(* Pins [#root] to the visible area so the bottom of the screen (the input) is
+   never behind the keyboard, and undoes any scroll the browser applied to bring
+   the hidden textarea into view. *)
+let fit_root () =
+  let v = Viewport.current () in
+  Option.iter (Dom_html.getElementById_opt "root") ~f:(fun root ->
+    root##.style##.height := Js.string (sprintf "%.0fpx" v.height);
+    root##.style##.width := Js.string (sprintf "%.0fpx" v.width);
+    (Js.Unsafe.coerce root##.style)##.transform
+    := Js.string
+         (sprintf "translate(%.0fpx, %.0fpx)" v.offset_left v.offset_top));
+  Dom_html.window##scroll (Js.float 0.) (Js.float 0.)
+;;
+
 let grid_size () =
   let cell_w, cell_h = cell_size () in
-  let width = Float.of_int Dom_html.window##.innerWidth in
-  let height = Float.of_int Dom_html.window##.innerHeight in
-  ( Int.max 20 (Float.to_int (width /. cell_w))
-  , Int.max 5 (Float.to_int (height /. cell_h)) )
+  let v = Viewport.current () in
+  ( Int.max 20 (Float.to_int (v.width /. cell_w))
+  , Int.max 5 (Float.to_int (v.height /. cell_h)) )
 ;;
+
+let on_viewport_change = Viewport.on_change
 
 let href_with_backend ~pathname ~search ~backend =
   let search =

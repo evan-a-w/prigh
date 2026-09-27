@@ -1,4 +1,4 @@
-const { chromium, firefox, webkit } = await import(process.env.PLAYWRIGHT_MODULE);
+const { chromium, firefox, webkit, devices } = await import(process.env.PLAYWRIGHT_MODULE);
 
 const [url, token, engineName] = process.argv.slice(2);
 const engine = { chromium, firefox, webkit }[engineName];
@@ -42,6 +42,76 @@ const screen = async label => {
   console.log(text);
 };
 
+// A phone: taps must open the keyboard and keep it open, the grid must
+// shrink to the visible viewport when the keyboard takes part of the screen,
+// text committed by an IME must arrive, and swipes must scroll.
+const mobile = async () => {
+  const ctx = await browser.newContext({ ...devices["Pixel 7"] });
+  const phone = await ctx.newPage();
+  phone.on("pageerror", error => errors.push(`phone: ${error.message}`));
+  await phone.goto(url);
+  await phone.locator("#token").click();
+  await phone.keyboard.type(token);
+  await phone.locator("#connect-form button").click();
+  await phone.waitForFunction(() =>
+    document.body.textContent.includes("/help for commands")
+    && !document.body.textContent.includes("connecting…"));
+  const active = () => phone.evaluate(() => document.activeElement?.id);
+  const rows = () => phone.evaluate(() => document.querySelectorAll("pre.screen .line").length);
+  const firstLine = () => phone.evaluate(() =>
+    [...document.querySelectorAll("pre.screen .line")].map(l => l.textContent.trim()).find(Boolean));
+  const expect = (label, ok) => { if (!ok) throw new Error(`phone: ${label}`); };
+
+  await phone.evaluate(() => document.activeElement.blur());
+  await phone.touchscreen.tap(200, 300);
+  expect(`tap focuses the keyboard input (active=${await active()})`, await active() === "keyboard-input");
+  let blurs = 0;
+  await phone.exposeFunction("onBlur", () => blurs++);
+  await phone.evaluate(() => document.getElementById("keyboard-input").addEventListener("blur", () => window.onBlur()));
+  await phone.touchscreen.tap(150, 250);
+  await phone.waitForTimeout(100);
+  expect(`tapping again keeps the keyboard (blurs=${blurs})`, blurs === 0 && await active() === "keyboard-input");
+
+  const tallRows = await rows();
+  await phone.setViewportSize({ width: 412, height: 400 });
+  await phone.waitForFunction(rows => document.querySelectorAll("pre.screen .line").length < rows, tallRows);
+  const prompt = await phone.evaluate(() =>
+    [...document.querySelectorAll("pre.screen .line")].map(l => l.textContent.trim()).filter(Boolean).at(-2));
+  expect(`the prompt stays visible above the keyboard (${prompt})`, prompt.startsWith(">"));
+
+  await phone.locator("#keyboard-input").evaluate(input => {
+    input.value = "ime";
+    input.dispatchEvent(new Event("input", { bubbles: true }));
+  });
+  await phone.waitForFunction(() => document.body.textContent.includes("> ime"));
+  for (let i = 1; i <= 4; i++) {
+    await phone.keyboard.press("Enter");
+    await phone.waitForFunction(i => document.body.textContent.split("faux reply").length > i, i);
+    await phone.keyboard.type(`more ${i}`);
+  }
+
+  await phone.setViewportSize({ width: 412, height: 180 });
+  await phone.waitForTimeout(200);
+  const top = await firstLine();
+  const cdp = await ctx.newCDPSession(phone);
+  const swipe = async (from, to) => {
+    await cdp.send("Input.dispatchTouchEvent", { type: "touchStart", touchPoints: [{ x: 200, y: from }] });
+    const step = from < to ? 20 : -20;
+    for (let y = from + step; step > 0 ? y <= to : y >= to; y += step) {
+      await cdp.send("Input.dispatchTouchEvent", { type: "touchMove", touchPoints: [{ x: 200, y }] });
+    }
+    await cdp.send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] });
+  };
+  await swipe(30, 170);
+  await phone.waitForTimeout(200);
+  expect(`dragging down scrolls up (${top} -> ${await firstLine()})`, await firstLine() !== top);
+  expect(`swiping does not close the keyboard (blurs=${blurs})`, blurs === 0);
+  await swipe(170, 30);
+  await phone.waitForTimeout(200);
+  expect(`dragging back returns (${await firstLine()})`, await firstLine() === top);
+  await ctx.close();
+};
+
 try {
   await page.goto(url);
   await page.bringToFront();
@@ -56,7 +126,7 @@ try {
   await page.evaluate(() => {
     const input = document.createElement("input");
     input.id = "scratch";
-    document.body.appendChild(input);
+    document.getElementById("root").appendChild(input);
   });
   await page.locator("#scratch").click();
   await page.keyboard.type("ab");
@@ -109,6 +179,8 @@ try {
     throw new Error(`keyboard input lost focus after reload; active=${await page.evaluate(() => document.activeElement?.id)}`);
   }
   await screen("reloaded");
+
+  if (engineName === "chromium") await mobile();
 
   if (errors.length > 0) throw new Error(errors.join("\n"));
 } catch (error) {

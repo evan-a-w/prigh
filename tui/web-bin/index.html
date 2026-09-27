@@ -2,13 +2,15 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="viewport" content="width=device-width, initial-scale=1, interactive-widget=resizes-content">
   <title>prigh</title>
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
-  <div id="app"></div>
-  <textarea id="keyboard-input" aria-label="Terminal keyboard input" autofocus></textarea>
+  <div id="root">
+    <div id="app"></div>
+    <textarea id="keyboard-input" aria-label="Terminal keyboard input" autofocus autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"></textarea>
+  </div>
   <script src="main.bc.js"></script>
 </body>
 </html>

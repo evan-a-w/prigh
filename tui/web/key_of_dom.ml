@@ -82,3 +82,10 @@ let key (e : Event.t) : Key.t option =
     Option.map code ~f:(fun code ->
       { Key.code; ctrl = e.ctrl; alt = e.alt; shift = e.shift }))
 ;;
+
+let keys_of_text text : Key.t list =
+  List.map (Prigh_ui.Text_width.uchars text) ~f:(fun (s, _) ->
+    match s with
+    | "\n" | "\r" -> Key.plain Enter
+    | s -> Key.plain (Char s))
+;;

@@ -396,3 +396,63 @@ let%expect_test "dom_of_screen: a rendered app screen round-trips to plain text"
     DOM text matches the plain screen
     |}]
 ;;
+
+module Touch = Prigh_ui_web_app.Touch
+
+let%expect_test "touch: taps focus, swipes scroll by whole steps and carry the \
+                 remainder"
+  =
+  let step = 30. in
+  let run label points =
+    let g = Touch.start ~x:100. ~y:300. in
+    let g, steps =
+      List.fold points ~init:(g, []) ~f:(fun (g, acc) (x, y) ->
+        let g, n = Touch.move g ~x ~y ~step in
+        g, n :: acc)
+    in
+    printf
+      "%-24s steps=%s -> %s\n"
+      label
+      (Sexp.to_string [%sexp (List.rev steps : int list)])
+      (match Touch.finish g with
+       | `Tap -> "tap"
+       | `Swipe -> "swipe")
+  in
+  run "no movement" [];
+  run "jitter under slop" [ 104., 296.; 99., 302. ];
+  run "one row up" [ 100., 270. ];
+  run
+    "up in small increments"
+    [ 100., 290.; 100., 280.; 100., 268.; 100., 240. ];
+  run "down then up" [ 100., 360.; 100., 300. ];
+  run "horizontal only" [ 150., 300. ];
+  run "fast fling" [ 100., 100. ];
+  [%expect
+    {|
+    no movement              steps=() -> tap
+    jitter under slop        steps=(0 0) -> tap
+    one row up               steps=(1) -> swipe
+    up in small increments   steps=(0 0 1 1) -> swipe
+    down then up             steps=(-2 2) -> swipe
+    horizontal only          steps=(0) -> swipe
+    fast fling               steps=(6) -> swipe
+    |}]
+;;
+
+let%expect_test "key_of_dom: text committed by a virtual keyboard becomes keys" =
+  List.iter [ "a"; "héllo"; "ok\n"; "🙂"; "" ] ~f:(fun text ->
+    printf
+      "%S -> %s\n"
+      text
+      (String.concat
+         ~sep:" "
+         (List.map (Key_of_dom.keys_of_text text) ~f:Key.to_string)));
+  [%expect
+    {|
+    "a" -> A
+    "h\195\169llo" -> H é L L O
+    "ok\n" -> O K Enter
+    "\240\159\153\130" -> 🙂
+    "" ->
+    |}]
+;;
