@@ -4873,7 +4873,8 @@ let%expect_test "reconnect: backoff doubles to the 60s cap, stale replies are \
     (Reconnecting
       (attempt    9)
       (generation 9)
-      (delay_ms   60000))
+      (delay_ms   60000)
+      (session (/home/u/.prigh/sessions/1.jsonl)))
     |}];
   (* A late reply from an earlier attempt is ignored. *)
   fail 3;
@@ -4884,7 +4885,8 @@ let%expect_test "reconnect: backoff doubles to the 60s cap, stale replies are \
     (Reconnecting
       (attempt    9)
       (generation 9)
-      (delay_ms   60000))
+      (delay_ms   60000)
+      (session (/home/u/.prigh/sessions/1.jsonl)))
     |}];
   H.show h;
   [%expect
@@ -4963,6 +4965,90 @@ let%expect_test "reconnect: backoff doubles to the 60s cap, stale replies are \
       (generation 11)
       (delay_ms   0)
       (session (/home/u/.prigh/sessions/1.jsonl)))
+    |}]
+;;
+
+let%expect_test "reconnect: a session the backend no longer knows (never \
+                 saved, or deleted) is dropped instead of retried forever"
+  =
+  let h = connected ~width:70 () in
+  H.step h Backend_closed;
+  [%expect
+    {|
+    (Reconnect
+      (generation 1)
+      (delay_ms   0)
+      (session (/home/u/.prigh/sessions/1.jsonl)))
+    |}];
+  (* A fresh backend has no record of an empty session: it was never written to
+     disk. The retry is immediate, without the session, and keeps the attempt
+     count. *)
+  H.reply_error h (Reconnect 1) "no session \"/home/u/.prigh/sessions/1.jsonl\"";
+  [%expect
+    {|
+    (Reconnect
+      (generation 2)
+      (delay_ms   0)
+      (session ()))
+    |}];
+  print_s [%sexp (h.model.connection : App.Connection.t)];
+  [%expect
+    {|
+    (Reconnecting
+      (attempt    1)
+      (generation 2)
+      (delay_ms   0)
+      (session ()))
+    |}];
+  (* Other failures keep backing off, still without the session; and losing the
+     transport again does not bring it back. *)
+  H.reply_error h (Reconnect 2) "connection refused";
+  H.step h Backend_closed;
+  [%expect
+    {|
+    (Reconnect
+      (generation 3)
+      (delay_ms   500)
+      (session ()))
+    (Reconnect
+      (generation 4)
+      (delay_ms   1000)
+      (session ()))
+    |}];
+  H.reply h (Reconnect 4) {|{"client_id":"client-2"}|};
+  [%expect
+    {|
+    (Rpc (method_ get_state) (params ()) (tag Initial_state))
+    (Rpc (method_ get_messages) (params ()) (tag Initial_messages))
+    (Rpc (method_ auth_status) (params ()) (tag Auth_refresh))
+    (Rpc (method_ get_config) (params ()) (tag Config))
+    (Rpc (method_ list_models) (params ()) (tag Models_catalog))
+    |}];
+  H.reply
+    h
+    Initial_state
+    (state_json ~session:("fresh1", "/home/u/.prigh/sessions/2.jsonl") ());
+  H.reply h Initial_messages {|[]|};
+  H.show h;
+  [%expect
+    {|
+    reconnected to the backend
+    session /home/u/.prigh/sessions/1.jsonl no longer exists (it was never
+    saved, or was deleted); starting a new one
+    session fresh1 in /work. /help for commands, Esc aborts, Ctrl+C twice
+    quits.
+    ──────────────────────────────────────────────────────────────────────
+    > ▏
+    /work  deepseek-flash  think:off  view:normal  ctx:0% 1.5k  $0.01
+    |}];
+  (* The next disconnection resumes the new session as usual. *)
+  H.step h Backend_closed;
+  [%expect
+    {|
+    (Reconnect
+      (generation 5)
+      (delay_ms   0)
+      (session (/home/u/.prigh/sessions/2.jsonl)))
     |}]
 ;;
 

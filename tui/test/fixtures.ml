@@ -41,10 +41,14 @@ let state_json
   ?(context_tokens = 1500)
   ?(cost_usd = 0.0123)
   ?session_name
+  ?(session = "abc123", "/home/u/.prigh/sessions/1.jsonl")
   ()
   =
+  let session_id, session_path = session in
   sprintf
-    {|{"session_id":"abc123","session_path":"/home/u/.prigh/sessions/1.jsonl","session_name":%s,"cwd":%s,"git_branch":%s,"model":%s,"thinking":%s,"running":%b,"message_count":2,"usage":{"input":1200,"output":300,"cache_read":0},"cost_usd":%g,"context_tokens":%d,"active_host":"backend","hosts":[{"id":"backend","name":"srv","cwd":%s}]}|}
+    {|{"session_id":%s,"session_path":%s,"session_name":%s,"cwd":%s,"git_branch":%s,"model":%s,"thinking":%s,"running":%b,"message_count":2,"usage":{"input":1200,"output":300,"cache_read":0},"cost_usd":%g,"context_tokens":%d,"active_host":"backend","hosts":[{"id":"backend","name":"srv","cwd":%s}]}|}
+    (P.Json.to_string (P.Json.str session_id))
+    (P.Json.to_string (P.Json.str session_path))
     (match session_name with
      | Some name -> P.Json.to_string (P.Json.str name)
      | None -> "null")

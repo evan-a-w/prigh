@@ -80,6 +80,7 @@ module Connection : sig
         { attempt : int
         ; generation : int
         ; delay_ms : int
+        ; session : string option
         }
   [@@deriving sexp_of, equal]
 

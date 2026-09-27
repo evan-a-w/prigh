@@ -23,6 +23,7 @@ val state_json
   -> ?context_tokens:int
   -> ?cost_usd:float
   -> ?session_name:string
+  -> ?session:string * string (** id, path *)
   -> unit
   -> string
 

@@ -71,9 +71,13 @@ module Connection = struct
         { attempt : int
         ; generation : int
         ; delay_ms : int
+        ; session : string option
+        (** the session to resume; dropped once the backend says it no longer
+            exists (a never-persisted session has no file) *)
         }
   [@@deriving sexp_of, equal]
 
+  let session_missing error = String.is_prefix error ~prefix:"no session "
   let max_delay_ms = 60_000
   let max_attempt = 9
 
@@ -872,18 +876,13 @@ let format_auth (statuses : P.Auth_status.t list) : Content.t =
 
 (* ---- reconnection ----------------------------------------------------- *)
 
-let schedule_reconnect m ~attempt ~delay_ms =
+let schedule_reconnect m ~attempt ~delay_ms ~session =
   let generation = m.reconnect_generation + 1 in
   ( { m with
-      connection = Reconnecting { attempt; generation; delay_ms }
+      connection = Reconnecting { attempt; generation; delay_ms; session }
     ; reconnect_generation = generation
     }
-  , [ Command.Reconnect
-        { generation
-        ; delay_ms
-        ; session = Option.map m.state ~f:(fun s -> s.session_path)
-        }
-    ] )
+  , [ Command.Reconnect { generation; delay_ms; session } ] )
 ;;
 
 let backend_closed m =
@@ -909,21 +908,36 @@ let backend_closed m =
            ~style:(Style.dim Style.plain)
            (String.concat ~sep:"\n" m.stderr_tail))
   in
-  schedule_reconnect { m with stderr_tail = [] } ~attempt:1 ~delay_ms:0
+  schedule_reconnect
+    { m with stderr_tail = [] }
+    ~attempt:1
+    ~delay_ms:0
+    ~session:(Option.map m.state ~f:(fun s -> s.session_path))
 ;;
 
 let retry_backend_connection m =
   match m.connection with
   | Connected -> notice m "backend is connected", []
-  | Reconnecting { attempt; _ } ->
-    schedule_reconnect (notice m "reconnecting…") ~attempt ~delay_ms:0
+  | Reconnecting { attempt; session; _ } ->
+    schedule_reconnect (notice m "reconnecting…") ~attempt ~delay_ms:0 ~session
 ;;
 
 let reconnect_reply m ~generation result =
   match m.connection with
-  | Reconnecting { generation = current; attempt; _ } when generation = current
-    ->
+  | Reconnecting { generation = current; attempt; session; _ }
+    when generation = current ->
     (match result with
+     | Error e when Option.is_some session && Connection.session_missing e ->
+       schedule_reconnect
+         (warn
+            m
+            (sprintf
+               "%s; the session was never saved or has been deleted, starting \
+                a new one"
+               e))
+         ~attempt
+         ~delay_ms:0
+         ~session:None
      | Error e ->
        let attempt = Connection.next_attempt attempt in
        let delay_ms = Connection.delay_ms ~attempt in
@@ -937,6 +951,7 @@ let reconnect_reply m ~generation result =
                attempt))
          ~attempt
          ~delay_ms
+         ~session
      | Ok json ->
        let client_id =
          match P.Json.field json "client_id" with
@@ -952,7 +967,18 @@ let reconnect_reply m ~generation result =
          ; transcript = Transcript.clear m.transcript
          }
        in
-       ( follow (notice m "reconnected to the backend")
+       let m =
+         match session, m.state with
+         | None, Some { session_path; _ } ->
+           warn
+             (notice m "reconnected to the backend")
+             (sprintf
+                "session %s no longer exists (it was never saved, or was \
+                 deleted); starting a new one"
+                session_path)
+         | _ -> notice m "reconnected to the backend"
+       in
+       ( follow m
        , [ rpc "get_state" ~tag:Initial_state
          ; rpc "get_messages" ~tag:Initial_messages
          ; rpc "auth_status" ~tag:Auth_refresh
@@ -2641,14 +2667,15 @@ let update m (action : Action.t) =
       | Backend_closed ->
         (match m.connection with
          | Connected -> backend_closed m
-         | Reconnecting { attempt; _ } ->
+         | Reconnecting { attempt; session; _ } ->
            (* An attempt got as far as connecting and then lost the transport
               again; its reply (if any) is now stale. *)
            let attempt = Connection.next_attempt attempt in
            schedule_reconnect
              m
              ~attempt
-             ~delay_ms:(Connection.delay_ms ~attempt))
+             ~delay_ms:(Connection.delay_ms ~attempt)
+             ~session)
       | Reply (Reconnect generation, result) ->
         reconnect_reply m ~generation result
       | Reply (tag, result) -> reply m tag result
