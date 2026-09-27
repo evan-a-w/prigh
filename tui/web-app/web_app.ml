@@ -277,13 +277,27 @@ let install_listeners ~schedule =
        Js._false
      : Dom_html.event_listener_id);
   Option.iter (Dom_html.getElementById_opt "app") ~f:(fun app ->
+    (* Focus the hidden keyboard input on tap/click. [touchend] is a direct user
+       gesture on iOS and Android, whereas the synthesized [mousedown] iOS sends
+       for non-clickable elements is not. The input must also be visible (in
+       view, non-zero size, non-zero opacity) for iOS to open the keyboard; see
+       style.css. *)
+    let focus_on_tap (ev : #Dom_html.event Js.t) =
+      if not (form_control ev) then focus_keyboard_input ();
+      Js._true
+    in
     ignore
       (Dom_html.addEventListener
          app
          Dom_html.Event.mousedown
-         (Dom.handler (fun ev ->
-            if not (form_control ev) then focus_keyboard_input ();
-            Js._true))
+         (Dom.handler focus_on_tap)
+         Js._false
+       : Dom_html.event_listener_id);
+    ignore
+      (Dom_html.addEventListener
+         app
+         Dom_html.Event.touchend
+         (Dom.handler focus_on_tap)
          Js._false
        : Dom_html.event_listener_id));
   resize ();
