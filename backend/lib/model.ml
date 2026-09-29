@@ -138,6 +138,16 @@ let all =
       ~cache_read:0.5
   ; m
       Anthropic
+      "claude-opus-5-5"
+      "Claude Opus 5.5"
+      ~ctx:1000000
+      ~max:128000
+      ~thinking:true
+      ~input:4.
+      ~output:20.
+      ~cache_read:0.2
+  ; m
+      Anthropic
       "claude-sonnet-4-5"
       "Claude Sonnet 4.5 (latest)"
       ~ctx:1000000
@@ -170,6 +180,16 @@ let all =
       Anthropic
       "claude-sonnet-5"
       "Claude Sonnet 5"
+      ~ctx:1000000
+      ~max:128000
+      ~thinking:true
+      ~input:2.
+      ~output:10.
+      ~cache_read:0.2
+  ; m
+      Anthropic
+      "claude-sonnet-5-5"
+      "Claude Sonnet 5.5"
       ~ctx:1000000
       ~max:128000
       ~thinking:true
@@ -626,6 +646,26 @@ let all =
       ~input:10.
       ~output:50.
       ~cache_read:1.
+  ; m
+      Openai_codex
+      "gpt-6-luna"
+      "GPT-6 Luna"
+      ~ctx:272000
+      ~max:128000
+      ~thinking:true
+      ~input:0.1
+      ~output:0.5
+      ~cache_read:0.01
+  ; m
+      Openai_codex
+      "gpt-6-sol"
+      "GPT-6 Sol"
+      ~ctx:272000
+      ~max:128000
+      ~thinking:true
+      ~input:2.
+      ~output:10.
+      ~cache_read:0.2
   ; m
       Deepseek
       "deepseek-flash"
