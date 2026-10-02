@@ -170,6 +170,13 @@ nix run .#backend -- login deepseek         # DEEPSEEK_API_KEY
 nix run .#backend -- auth                   # status; logout <provider> to remove
 ```
 
+To share pi's logins instead, symlink the file: `ln -s ~/.pi/agent/auth.json
+~/.config/prigh/auth.json`. Don't copy it: Anthropic rotates the refresh
+token on every refresh, so a copy dies as soon as the other side refreshes.
+Through the symlink both use one grant; expired tokens are refreshed under
+the same lock pi uses (`auth.json.lock` directory, `proper-lockfile`
+protocol) and written back for the other side.
+
 The same is available inside the TUI as `/login [provider] [api_key|oauth]`,
 `/logout <provider>` and `/auth`. A stored credential wins; otherwise
 `ANTHROPIC_OAUTH_TOKEN`/`ANTHROPIC_API_KEY`, `OPENAI_API_KEY` and

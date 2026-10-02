@@ -16,7 +16,18 @@ let default_path () =
   Filename.concat config_home "prigh/auth.json"
 ;;
 
-let create ~path = { path; mutex = Eio.Mutex.create () }
+(* A symlink (e.g. to pi's ~/.pi/agent/auth.json) is followed so that the
+   lock sits next to the real file and [save]'s rename replaces the file
+   rather than the link. *)
+let create ~path =
+  let path =
+    match Filename_unix.realpath path with
+    | real -> real
+    | exception Core_unix.Unix_error (ENOENT, _, _) -> path
+  in
+  { path; mutex = Eio.Mutex.create () }
+;;
+
 let path t = t.path
 
 let load t : (string * Json.t) list Or_error.t =
@@ -53,23 +64,13 @@ let save t fields =
   Core_unix.rename ~src:tmp ~dst:t.path
 ;;
 
-(* [lockf] locks are per process, so fibers of one process are serialised
-   with the mutex and processes with the lock file. *)
+(* Fibers of one process are serialised with the mutex, processes with the
+   lock directory. *)
 let with_lock t ~f =
   Eio.Mutex.use_rw ~protect:false t.mutex
   @@ fun () ->
   Core_unix.mkdir_p ~perm:0o700 (Filename.dirname t.path);
-  let fd =
-    Core_unix.openfile (t.path ^ ".lock") ~mode:[ O_RDWR; O_CREAT ] ~perm:0o600
-  in
-  Exn.protect
-    ~f:(fun () ->
-      Core_unix.lockf fd ~mode:F_LOCK ~len:0L;
-      f ())
-    ~finally:(fun () ->
-      (try Core_unix.lockf fd ~mode:F_ULOCK ~len:0L with
-       | _ -> ());
-      Core_unix.close fd)
+  Lock_dir.with_lock ~file:t.path ~f ()
 ;;
 
 let parse_entry ~file (provider, json) =

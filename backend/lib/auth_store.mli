@@ -2,8 +2,11 @@ open! Core
 
 (** Credential file ([~/.config/prigh/auth.json] by default), one entry per
     provider. Every read goes to disk so changes made by other processes are
-    seen; [modify] is the only write path and holds a cross-process lock so
-    that two processes cannot both rotate the same OAuth refresh token. *)
+    seen; [modify] is the only write path and holds a cross-process lock
+    ([Lock_dir], compatible with pi's) so that two processes cannot both
+    rotate the same OAuth refresh token. The file may be a symlink to pi's
+    [~/.pi/agent/auth.json]: both then share one OAuth grant, and whichever
+    refreshes writes the rotated token back for the other. *)
 
 type t
 

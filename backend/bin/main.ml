@@ -618,6 +618,8 @@ let logout_command =
     (let%map_open.Command store = auth_file_flag
      and provider = anon ("PROVIDER" %: provider_arg) in
      fun () ->
+       Eio_main.run
+       @@ fun _env ->
        match Provider_auth.logout store provider with
        | Ok () ->
          eprintf "Logged out of %s\n" (Provider_id.display_name provider)

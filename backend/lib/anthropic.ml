@@ -3,7 +3,7 @@ open! Import
 
 let default_base_url = "https://api.anthropic.com"
 let api_version = "2023-06-01"
-let claude_code_version = "2.1.251"
+let claude_code_version = "2.1.280"
 
 let claude_code_identity =
   "You are Claude Code, Anthropic's official CLI for Claude."

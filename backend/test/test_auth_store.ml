@@ -175,3 +175,53 @@ let%expect_test "store: set/read/list/remove, unknown providers preserved" =
       (provider Openai) (e "credential: missing string \"access\"")))
     |}]
 ;;
+
+let%expect_test "store through a symlink (sharing pi's auth.json)" =
+  with_sandbox
+  @@ fun t ->
+  let real = Filename.concat t.dir "pi/auth.json" in
+  Core_unix.mkdir_p (Filename.dirname real);
+  Out_channel.write_all
+    real
+    ~data:{|{"anthropic": {"type":"api_key","key":"pi"}}|};
+  let link = Filename.concat t.dir "prigh/auth.json" in
+  Core_unix.mkdir_p (Filename.dirname link);
+  Core_unix.symlink ~target:real ~link_name:link;
+  let store = Auth_store.create ~path:link in
+  print_endline (mask t (Auth_store.path store));
+  [%expect {| $DIR/pi/auth.json |}];
+  let lock = Lock_dir.lock_path ~file:real in
+  Or_error.ok_exn
+    (Auth_store.modify store Anthropic ~f:(fun current ->
+       print_s [%sexp (current : Credential.t option)];
+       printf
+         "lock next to the real file: %b\n"
+         (Sys_unix.is_directory_exn lock);
+       Ok (Some (Api_key "rotated")))
+     |> Or_error.ignore_m);
+  [%expect
+    {|
+    ((Api_key pi))
+    lock next to the real file: true
+    |}];
+  printf
+    "still a symlink: %b\n"
+    (match (Core_unix.lstat link).st_kind with
+     | S_LNK -> true
+     | _ -> false);
+  print_string (In_channel.read_all real);
+  [%expect
+    {|
+    still a symlink: true
+    {
+      "anthropic": {
+        "type": "api_key",
+        "key": "rotated"
+      }
+    }
+    |}];
+  (* A path that does not exist yet is used as given. *)
+  let fresh = Filename.concat t.dir "new/auth.json" in
+  print_endline (mask t (Auth_store.path (Auth_store.create ~path:fresh)));
+  [%expect {| $DIR/new/auth.json |}]
+;;

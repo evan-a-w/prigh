@@ -300,7 +300,7 @@ let%expect_test "headers: api key vs oauth token, betas" =
     --
     anthropic-version: 2023-06-01
     Authorization: Bearer sk-ant-oat01-x
-    user-agent: claude-cli/2.1.251
+    user-agent: claude-cli/2.1.280
     x-app: cli
     anthropic-beta: claude-code-20250219,oauth-2025-04-20,interleaved-thinking-2025-05-14
     --
@@ -439,7 +439,7 @@ let%expect_test "stream end to end: request shape, headers, assembled message" =
     authorization: Bearer sk-ant-oat01-t
     anthropic-beta: claude-code-20250219,oauth-2025-04-20,interleaved-thinking-2025-05-14
     x-app: cli
-    user-agent: claude-cli/2.1.251
+    user-agent: claude-cli/2.1.280
     accept: text/event-stream
     [{"type":"text","text":"You are Claude Code, Anthropic's official CLI for Claude.","cache_control":{"type":"ephemeral"}}]
     {"type":"enabled","budget_tokens":8192}
