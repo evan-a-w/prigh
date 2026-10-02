@@ -30,6 +30,7 @@ val create
 module For_testing : sig
   val request_body : oauth:bool -> Provider.Request.t -> Json.t
   val headers : auth:Auth.t -> thinking_on:bool -> (string * string) list
+  val thinking_on : Model.t -> Thinking.t -> bool
 
   val parse_events
     :  tools:Tool_spec.t list

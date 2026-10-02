@@ -180,6 +180,53 @@ let thinking_budget ~max_tokens (thinking : Thinking.t) =
   Option.map budget ~f:(fun b -> Int.max 1_024 (Int.min b (max_tokens - 1_024)))
 ;;
 
+let effort_of_thinking : Thinking.t -> string option = function
+  | Off -> None
+  | On None -> Some "medium"
+  | On (Some Low) -> Some "low"
+  | On (Some High) -> Some "high"
+  | On (Some Max) -> Some "max"
+;;
+
+(* The thinking-related fields of the request. Budget models get
+   [thinking.enabled] with a token budget (pi's older Claude path); adaptive
+   models get [thinking.adaptive] and the effort in [output_config], or
+   [thinking.disabled] when off (omitted for models that are always on). *)
+let thinking_fields ~max_tokens (model : Model.t) (thinking : Thinking.t) =
+  if not model.supports_thinking
+  then []
+  else (
+    match model.thinking_style with
+    | Budget ->
+      (match thinking_budget ~max_tokens thinking with
+       | None -> []
+       | Some budget_tokens ->
+         [ ( "thinking"
+           , `Object
+               [ "type", `String "enabled"
+               ; "budget_tokens", `Number (Int.to_string budget_tokens)
+               ] )
+         ])
+    | Adaptive { can_disable } ->
+      (match effort_of_thinking thinking with
+       | None ->
+         if can_disable
+         then [ "thinking", `Object [ "type", `String "disabled" ] ]
+         else []
+       | Some effort ->
+         [ "thinking", `Object [ "type", `String "adaptive" ]
+         ; "output_config", `Object [ "effort", `String effort ]
+         ]))
+;;
+
+(* Only budget models need the beta; adaptive thinking is interleaved
+   already. *)
+let thinking_on (model : Model.t) (thinking : Thinking.t) =
+  match model.thinking_style with
+  | Budget -> model.supports_thinking && not (Thinking.equal thinking Off)
+  | Adaptive _ -> false
+;;
+
 let request_body ~oauth (r : Provider.Request.t) : Json.t =
   let max_tokens = Option.value r.max_tokens ~default:r.model.max_output in
   let system =
@@ -189,20 +236,7 @@ let request_body ~oauth (r : Provider.Request.t) : Json.t =
           [ text_block ~cached:true s ])
       ]
   in
-  let thinking =
-    if not r.model.supports_thinking
-    then []
-    else (
-      match thinking_budget ~max_tokens r.thinking with
-      | None -> []
-      | Some budget_tokens ->
-        [ ( "thinking"
-          , `Object
-              [ "type", `String "enabled"
-              ; "budget_tokens", `Number (Int.to_string budget_tokens)
-              ] )
-        ])
-  in
+  let thinking = thinking_fields ~max_tokens r.model r.thinking in
   `Object
     (List.concat
        [ [ "model", `String r.model.id
@@ -396,16 +430,7 @@ let stream
   in
   let builder = Assistant_builder.create ~model:(Model.key request.model) in
   let state = Stream_state.create () in
-  let thinking_on =
-    request.model.supports_thinking
-    && Option.is_some
-         (thinking_budget
-            ~max_tokens:
-              (Option.value
-                 request.max_tokens
-                 ~default:request.model.max_output)
-            request.thinking)
-  in
+  let thinking_on = thinking_on request.model request.thinking in
   let outcome =
     Sse_request.run
       ~env
@@ -450,6 +475,7 @@ let create ~env ?(base_url = default_base_url) ?timeout ~auth () =
 ;;
 
 module For_testing = struct
+  let thinking_on = thinking_on
   let request_body = request_body
   let headers = headers
 

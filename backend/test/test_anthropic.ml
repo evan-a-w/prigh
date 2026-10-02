@@ -208,8 +208,10 @@ let%expect_test
         }
       ],
       "thinking": {
-        "type": "enabled",
-        "budget_tokens": 16384
+        "type": "adaptive"
+      },
+      "output_config": {
+        "effort": "high"
       }
     }
     |}]
@@ -219,14 +221,18 @@ let%expect_test
     "request body with OAuth: Claude Code identity first, Claude Code tool \
      names"
   =
+  (* A budget model: the budget is clamped to fit under max_tokens. *)
   let body =
     T.request_body
       ~oauth:true
-      (request
-         ~system:"Be brief."
-         ~max_tokens:2000
-         ~thinking:(On (Some Max))
-         conversation)
+      { (request
+           ~system:"Be brief."
+           ~max_tokens:2000
+           ~thinking:(On (Some Max))
+           conversation)
+        with
+        model = Option.value_exn (Model.find "claude-sonnet-4-5")
+      }
   in
   let field name = Option.value_exn (Json.member name body) in
   print_endline (Json.to_string_hum (field "system"));
@@ -437,12 +443,12 @@ let%expect_test "stream end to end: request shape, headers, assembled message" =
     {|
     POST /v1/messages HTTP/1.1
     authorization: Bearer sk-ant-oat01-t
-    anthropic-beta: claude-code-20250219,oauth-2025-04-20,interleaved-thinking-2025-05-14
+    anthropic-beta: claude-code-20250219,oauth-2025-04-20
     x-app: cli
     user-agent: claude-cli/2.1.280
     accept: text/event-stream
     [{"type":"text","text":"You are Claude Code, Anthropic's official CLI for Claude.","cache_control":{"type":"ephemeral"}}]
-    {"type":"enabled","budget_tokens":8192}
+    {"type":"adaptive"}
     |}];
   let (_ : Server.t) =
     stream_with_server
@@ -472,5 +478,59 @@ let%expect_test "stream end to end: request shape, headers, assembled message" =
     ((content ((Text partial))) (stop_reason Length)
      (usage ((input 3) (output 9) (cache_read 0)))
      (model anthropic/claude-opus-4-6))
+    |}]
+;;
+
+let%expect_test "thinking: budget models vs adaptive models (effort)" =
+  let show id =
+    let model = Option.value_exn (Model.find id) in
+    printf
+      "%s: %s\n"
+      id
+      (Sexp.to_string [%sexp (model.thinking_style : Model.Thinking_style.t)]);
+    List.iter
+      [ Thinking.Off; On None; On (Some Low); On (Some High); On (Some Max) ]
+      ~f:(fun thinking ->
+        let body =
+          T.request_body
+            ~oauth:false
+            { (request [ Message.user "hi" ]) with model; thinking }
+        in
+        let field name =
+          Option.value_map
+            (Json.member name body)
+            ~default:"-"
+            ~f:Json.to_string
+        in
+        printf
+          "  %-12s thinking=%s output_config=%s interleaved-beta=%b\n"
+          (Sexp.to_string [%sexp (thinking : Thinking.t)])
+          (field "thinking")
+          (field "output_config")
+          (T.thinking_on model thinking))
+  in
+  show "claude-sonnet-4-5";
+  show "claude-opus-5-5";
+  show "claude-opus-5";
+  [%expect
+    {|
+    claude-sonnet-4-5: Budget
+      Off          thinking=- output_config=- interleaved-beta=false
+      (On())       thinking={"type":"enabled","budget_tokens":8192} output_config=- interleaved-beta=true
+      (On(Low))    thinking={"type":"enabled","budget_tokens":2048} output_config=- interleaved-beta=true
+      (On(High))   thinking={"type":"enabled","budget_tokens":16384} output_config=- interleaved-beta=true
+      (On(Max))    thinking={"type":"enabled","budget_tokens":32000} output_config=- interleaved-beta=true
+    claude-opus-5-5: (Adaptive(can_disable false))
+      Off          thinking=- output_config=- interleaved-beta=false
+      (On())       thinking={"type":"adaptive"} output_config={"effort":"medium"} interleaved-beta=false
+      (On(Low))    thinking={"type":"adaptive"} output_config={"effort":"low"} interleaved-beta=false
+      (On(High))   thinking={"type":"adaptive"} output_config={"effort":"high"} interleaved-beta=false
+      (On(Max))    thinking={"type":"adaptive"} output_config={"effort":"max"} interleaved-beta=false
+    claude-opus-5: (Adaptive(can_disable false))
+      Off          thinking=- output_config=- interleaved-beta=false
+      (On())       thinking={"type":"adaptive"} output_config={"effort":"medium"} interleaved-beta=false
+      (On(Low))    thinking={"type":"adaptive"} output_config={"effort":"low"} interleaved-beta=false
+      (On(High))   thinking={"type":"adaptive"} output_config={"effort":"high"} interleaved-beta=false
+      (On(Max))    thinking={"type":"adaptive"} output_config={"effort":"max"} interleaved-beta=false
     |}]
 ;;

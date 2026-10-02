@@ -10,6 +10,13 @@ module Cost = struct
   [@@deriving sexp_of]
 end
 
+module Thinking_style = struct
+  type t =
+    | Budget
+    | Adaptive of { can_disable : bool }
+  [@@deriving sexp_of, equal]
+end
+
 type t =
   { id : string
   ; provider : Provider_id.t
@@ -17,26 +24,46 @@ type t =
   ; context_window : int
   ; max_output : int
   ; supports_thinking : bool
+  ; thinking_style : Thinking_style.t
   ; cost : Cost.t
   }
 [@@deriving sexp_of]
 
 let key t = Provider_id.to_string t.provider ^ "/" ^ t.id
 
-let m provider id name ~ctx ~max ~thinking ~input ~output ~cache_read =
+let m
+      ?(style = Thinking_style.Budget)
+      provider
+      id
+      name
+      ~ctx
+      ~max
+      ~thinking
+      ~input
+      ~output
+      ~cache_read
+  =
   { id
   ; provider
   ; name
   ; context_window = ctx
   ; max_output = max
   ; supports_thinking = thinking
+  ; thinking_style = style
   ; cost = { input; output; cache_read }
   }
 ;;
 
+(* pi's [forceAdaptiveThinking]; [can_disable] is false where its
+   [thinkingLevelMap] has [off: null], and for Opus 5.5, which rejects
+   [thinking.type = disabled]. *)
+let adaptive = Thinking_style.Adaptive { can_disable = true }
+let adaptive_always_on = Thinking_style.Adaptive { can_disable = false }
+
 (* Mirrors pi's model catalog for these providers. *)
 let all =
   [ m
+      ~style:adaptive_always_on
       Anthropic
       "claude-fable-5"
       "Claude Fable 5"
@@ -47,6 +74,7 @@ let all =
       ~output:50.
       ~cache_read:1.
   ; m
+      ~style:adaptive_always_on
       Anthropic
       "claude-fable-5-1"
       "Claude Fable 5.1"
@@ -97,6 +125,7 @@ let all =
       ~output:25.
       ~cache_read:0.5
   ; m
+      ~style:adaptive
       Anthropic
       "claude-opus-4-6"
       "Claude Opus 4.6"
@@ -107,6 +136,7 @@ let all =
       ~output:25.
       ~cache_read:0.5
   ; m
+      ~style:adaptive
       Anthropic
       "claude-opus-4-7"
       "Claude Opus 4.7"
@@ -117,6 +147,7 @@ let all =
       ~output:25.
       ~cache_read:0.5
   ; m
+      ~style:adaptive
       Anthropic
       "claude-opus-4-8"
       "Claude Opus 4.8"
@@ -127,6 +158,7 @@ let all =
       ~output:25.
       ~cache_read:0.5
   ; m
+      ~style:adaptive_always_on
       Anthropic
       "claude-opus-5"
       "Claude Opus 5"
@@ -137,6 +169,7 @@ let all =
       ~output:25.
       ~cache_read:0.5
   ; m
+      ~style:adaptive_always_on
       Anthropic
       "claude-opus-5-5"
       "Claude Opus 5.5"
@@ -167,6 +200,7 @@ let all =
       ~output:15.
       ~cache_read:0.3
   ; m
+      ~style:adaptive
       Anthropic
       "claude-sonnet-4-6"
       "Claude Sonnet 4.6"
@@ -177,6 +211,7 @@ let all =
       ~output:15.
       ~cache_read:0.3
   ; m
+      ~style:adaptive
       Anthropic
       "claude-sonnet-5"
       "Claude Sonnet 5"

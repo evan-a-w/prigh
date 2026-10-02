@@ -10,6 +10,16 @@ module Cost : sig
   [@@deriving sexp_of]
 end
 
+(** How a model takes a thinking setting (Anthropic): a token budget, or
+    adaptive thinking with an effort level. [can_disable] is false for models
+    that cannot turn thinking off. *)
+module Thinking_style : sig
+  type t =
+    | Budget
+    | Adaptive of { can_disable : bool }
+  [@@deriving sexp_of, equal]
+end
+
 type t =
   { id : string
   ; provider : Provider_id.t
@@ -17,6 +27,7 @@ type t =
   ; context_window : int
   ; max_output : int
   ; supports_thinking : bool
+  ; thinking_style : Thinking_style.t
   ; cost : Cost.t
   }
 [@@deriving sexp_of]
