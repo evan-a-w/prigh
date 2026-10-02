@@ -26,7 +26,17 @@ nix flake check ./pi-web                   # type-check, unit tests, wrapper tes
 
 `PRIGH_PI_WEB_LISTEN` (default `127.0.0.1:7789`) and `PRIGH_PI_WEB_ROOT`
 override the listen address and the assets; `prigh serve -pi-web HOST:PORT
-[-pi-web-root DIR]` is the underlying command. The page connects to its own
+[-pi-web-root DIR]` is the underlying command. The wrapper also sets
+`PRIGH_WEB_ROOT`, so adding `-web HOST:PORT` makes the same backend serve the
+Bonsai web UI on a second port, with both UIs sharing its sessions:
+
+```
+PRIGH_PI_WEB_LISTEN=0.0.0.0:7789 nix run ./pi-web -- -web 0.0.0.0:7777 -token sekrit -cwd ~/dev/prigh
+```
+
+The two UIs cannot share a port: pi-web's `/ws` speaks pi's protocol, the
+Bonsai UI's `/ws` speaks prigh's, so pointing pi-web at a `-web` listener via
+`?backend=` does not work. The page connects to its own
 origin's `/ws`; `?backend=ws://host:port/ws` points it elsewhere,
 `?session=ID` joins a session (the app keeps the current session id in the
 address bar so a reload rejoins it), `?token=` is remembered in

@@ -138,6 +138,16 @@ nix run ./pi-web -- -faux -cwd ~/proj     # serves it on 127.0.0.1:7789 and open
 prigh serve -pi-web 0.0.0.0:7789 -token sekrit   # remote; the page asks for the token
 ```
 
+One backend can serve both web UIs (on different ports, since their `/ws`
+speak different protocols) with shared sessions; the pi-web wrapper also
+knows where the Bonsai site is, so this is the one-liner to run at boot
+(e.g. a `@reboot` crontab entry):
+
+```
+cd ~/dev/prigh && PRIGH_PI_WEB_LISTEN=0.0.0.0:7789 nix run ./pi-web -- -web 0.0.0.0:7777 -token sekrit -cwd ~/dev/prigh > ~/prigh.stdout 2> ~/prigh.stderr
+# Bonsai UI on :7777, pi-web on :7789
+```
+
 See `pi-web/README.md` for what was kept, dropped and mapped.
 
 If the backend goes away (the spawned process dies, or the TCP connection

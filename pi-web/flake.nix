@@ -21,6 +21,7 @@
       let
         pkgs = nixpkgs.legacyPackages.${system};
         backend = prigh.packages.${system}.backend;
+        tui = prigh.packages.${system}.tui;
 
         # The built site (vite): dist/ with index.html, assets/, theme/, icons/.
         site = pkgs.buildNpmPackage {
@@ -51,11 +52,14 @@
 
         # `prigh-pi-web [serve options]`: the backend serving the pi web UI on
         # $PRIGH_PI_WEB_LISTEN (default 127.0.0.1:7789), opening a browser.
+        # PRIGH_WEB_ROOT is set too so that `-web HOST:PORT` among the serve
+        # options makes the same backend serve the Bonsai web UI as well.
         prigh-pi-web = pkgs.writeShellApplication {
           name = "prigh-pi-web";
           text = ''
             export PRIGH_BACKEND="''${PRIGH_BACKEND:-${backend}/bin/prigh}"
             export PRIGH_PI_WEB_ROOT="''${PRIGH_PI_WEB_ROOT:-${site}}"
+            export PRIGH_WEB_ROOT="''${PRIGH_WEB_ROOT:-${tui}/share/prigh_tui/web}"
             exec "$PRIGH_BACKEND" serve -pi-web "''${PRIGH_PI_WEB_LISTEN:-127.0.0.1:7789}" -open "$@"
           '';
         };
@@ -76,11 +80,12 @@
           #!${pkgs.runtimeShell}
           printf '%s\n' "$@" > "$ARGS_OUT"
           printf '%s\n' "$PRIGH_PI_WEB_ROOT" > "$ROOT_OUT"
+          printf '%s\n' "$PRIGH_WEB_ROOT" > "$WEB_ROOT_OUT"
           EOF
           chmod +x fake-backend
-          ARGS_OUT="$PWD/args" ROOT_OUT="$PWD/root" \
+          ARGS_OUT="$PWD/args" ROOT_OUT="$PWD/root" WEB_ROOT_OUT="$PWD/web-root" \
             PRIGH_BACKEND="$PWD/fake-backend" PRIGH_PI_WEB_LISTEN=0.0.0.0:7777 \
-            ${prigh-pi-web}/bin/prigh-pi-web -token sekrit -cwd /work
+            ${prigh-pi-web}/bin/prigh-pi-web -token sekrit -cwd /work -web 0.0.0.0:7788
           diff -u ${pkgs.writeText "expected-args" ''
             serve
             -pi-web
@@ -90,8 +95,12 @@
             sekrit
             -cwd
             /work
+            -web
+            0.0.0.0:7788
           ''} args
           test "$(cat root)" = "${site}"
+          test "$(cat web-root)" = "${tui}/share/prigh_tui/web"
+          test -f ${tui}/share/prigh_tui/web/index.html
           test -f ${site}/index.html
           test -f ${site}/theme/dark.json
           test -f ${site}/theme/light.json
