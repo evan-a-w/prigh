@@ -534,3 +534,27 @@ let to_markdown t =
   let blocks = List.filter_map (active_path t) ~f:block in
   String.concat (("# Session " ^ t.id) :: blocks) ~sep:"\n\n" ^ "\n"
 ;;
+
+module Filter = struct
+  type t =
+    { max_messages : int option
+    ; cwd : string option
+    ; older_than_days : float option
+    ; prompt : string option
+    }
+  [@@deriving sexp_of]
+
+  let matches t ~now (s : Summary.t) =
+    Option.value_map t.max_messages ~default:true ~f:(fun n ->
+      s.message_count <= n)
+    && Option.value_map t.cwd ~default:true ~f:(String.equal s.cwd)
+    && Option.value_map t.older_than_days ~default:true ~f:(fun days ->
+      let updated = Time_float.of_string_with_utc_offset s.updated_at in
+      Float.( >= ) (Time_float.Span.to_day (Time_float.diff now updated)) days)
+    && Option.value_map t.prompt ~default:true ~f:(fun text ->
+      Option.value_map s.first_prompt ~default:false ~f:(fun p ->
+        String.is_substring p ~substring:text))
+  ;;
+end
+
+let delete (s : Summary.t) = Core_unix.unlink s.path

@@ -189,7 +189,10 @@ Then:
 ```
 tui/_build/default/bin/main.exe                # interactive TUI (PRIGH_BACKEND or the dune build)
 backend/_build/default/bin/main.exe run "explain this repo"    # headless
-backend/_build/default/bin/main.exe sessions   # list saved sessions
+backend/_build/default/bin/main.exe sessions list          # saved sessions
+backend/_build/default/bin/main.exe sessions delete ID...  # ids may be prefixes
+backend/_build/default/bin/main.exe sessions prune -dry-run                        # empty sessions
+backend/_build/default/bin/main.exe sessions prune -max-messages 2 -cwd /tmp       # filters: -older-than DAYS, -prompt TEXT
 backend/_build/default/bin/main.exe serve      # JSON-lines RPC on stdio
 ```
 

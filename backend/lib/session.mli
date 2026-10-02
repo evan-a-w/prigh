@@ -129,4 +129,21 @@ end
 (** Most recently updated first. *)
 val list : dir:string -> Summary.t list
 
+(** Which saved sessions [prune] should delete; every given field must
+    match. [cwd] is compared verbatim, so resolve it first. *)
+module Filter : sig
+  type t =
+    { max_messages : int option
+    ; cwd : string option
+    ; older_than_days : float option
+    ; prompt : string option (** substring of the first prompt *)
+    }
+  [@@deriving sexp_of]
+
+  val matches : t -> now:Time_float.t -> Summary.t -> bool
+end
+
+(** Removes the session file. *)
+val delete : Summary.t -> unit
+
 val default_dir : home:string -> string

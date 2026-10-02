@@ -653,21 +653,114 @@ let auth_command =
               | Some (_, source) -> source)))
 ;;
 
-let sessions_command =
+let sessions_dir () = Session.default_dir ~home:(home ())
+
+let print_summary (s : Session.Summary.t) =
+  printf
+    "%s  %s  %3d msgs  %s  %s\n"
+    s.created_at
+    s.id
+    s.message_count
+    s.cwd
+    (Option.value_map s.first_prompt ~default:"" ~f:(fun p ->
+       String.prefix (String.strip p) 60))
+;;
+
+let sessions_list_command =
   Command.basic
     ~summary:"List saved sessions"
     (Command.Param.return (fun () ->
-       List.iter
-         (Session.list ~dir:(Session.default_dir ~home:(home ())))
-         ~f:(fun s ->
-           printf
-             "%s  %s  %3d msgs  %s  %s\n"
-             s.created_at
-             s.id
-             s.message_count
-             s.cwd
-             (Option.value_map s.first_prompt ~default:"" ~f:(fun p ->
-                String.prefix (String.strip p) 60)))))
+       List.iter (Session.list ~dir:(sessions_dir ())) ~f:print_summary))
+;;
+
+let delete_sessions summaries =
+  List.iter summaries ~f:(fun s ->
+    Session.delete s;
+    print_summary s);
+  eprintf "Deleted %d session(s)\n" (List.length summaries)
+;;
+
+let sessions_delete_command =
+  Command.basic
+    ~summary:"Delete sessions by id"
+    (let%map_open.Command ids = anon (sequence ("ID" %: string)) in
+     fun () ->
+       let all = Session.list ~dir:(sessions_dir ()) in
+       let found, missing =
+         List.partition_map ids ~f:(fun id ->
+           match
+             List.find all ~f:(fun s ->
+               String.equal s.id id || String.is_prefix s.id ~prefix:id)
+           with
+           | Some s -> First s
+           | None -> Second id)
+       in
+       List.iter missing ~f:(eprintf "no session %s\n");
+       delete_sessions found;
+       if not (List.is_empty missing) then exit 1)
+;;
+
+let sessions_prune_command =
+  Command.basic
+    ~summary:
+      "Delete sessions matching all given filters (no filter: empty sessions). \
+       Don't prune a session a running server is using."
+    (let%map_open.Command max_messages =
+       flag
+         "-max-messages"
+         (optional int)
+         ~doc:
+           "N sessions with at most N messages (default 0 when no other filter)"
+     and cwd =
+       flag
+         "-cwd"
+         (optional string)
+         ~doc:"DIR sessions started in this directory"
+     and older_than_days =
+       flag
+         "-older-than"
+         (optional float)
+         ~doc:"DAYS sessions not updated for this many days"
+     and prompt =
+       flag
+         "-prompt"
+         (optional string)
+         ~doc:"TEXT sessions whose first prompt contains TEXT"
+     and dry_run =
+       flag "-dry-run" no_arg ~doc:" only list what would be deleted"
+     in
+     fun () ->
+       let max_messages =
+         match max_messages, cwd, older_than_days, prompt with
+         | None, None, None, None -> Some 0
+         | _ -> max_messages
+       in
+       let filter =
+         { Session.Filter.max_messages
+         ; cwd = Option.map cwd ~f:Filename_unix.realpath
+         ; older_than_days
+         ; prompt
+         }
+       in
+       let victims =
+         List.filter
+           (Session.list ~dir:(sessions_dir ()))
+           ~f:(Session.Filter.matches filter ~now:(Time_float.now ()))
+       in
+       if dry_run
+       then (
+         List.iter victims ~f:print_summary;
+         eprintf "Would delete %d session(s)\n" (List.length victims))
+       else delete_sessions victims)
+;;
+
+let sessions_command =
+  Command.group
+    ~summary:"Saved sessions"
+    [ "list", sessions_list_command
+    ; "delete", sessions_delete_command
+    ; "prune", sessions_prune_command
+    ]
 ;;
 
 let () =

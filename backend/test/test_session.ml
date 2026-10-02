@@ -585,3 +585,86 @@ let%expect_test "fork ~at and rewind ~to address entries by id" =
     ((head_is_e3 true) (messages (user:q1 assistant:a1 user:q2)))
     |}]
 ;;
+
+let%expect_test "Filter.matches and delete (sessions prune)" =
+  with_dir
+  @@ fun dir ->
+  let make ~cwd prompts =
+    let t = Session.create ~dir ~cwd () in
+    List.iter prompts ~f:(fun p ->
+      ignore (Session.append_message t (Message.user p) : Session.Entry.t);
+      ignore (Session.append_message t (assistant "ok") : Session.Entry.t));
+    t
+  in
+  let empty = make ~cwd:"/proj" [] in
+  (* A name is enough to get the file written. *)
+  ignore (Session.set_name empty ~name:"scratch" : Session.Entry.t);
+  let short = make ~cwd:"/proj" [ "fix the bug" ] in
+  let long = make ~cwd:"/other" [ "hello"; "fix it"; "thanks" ] in
+  (* Pretend [long] was last touched ten days ago. *)
+  let ten_days_ago = Core_unix.gettimeofday () -. (10. *. 86400.) in
+  Core_unix.utimes (Session.path long) ~access:ten_days_ago ~modif:ten_days_ago;
+  let now = Time_float.now () in
+  let summaries = Session.list ~dir in
+  let name (s : Session.Summary.t) =
+    if String.equal s.id (Session.id empty)
+    then "empty"
+    else if String.equal s.id (Session.id short)
+    then "short"
+    else "long"
+  in
+  let show filter =
+    print_s [%sexp (filter : Session.Filter.t)];
+    List.filter summaries ~f:(Session.Filter.matches filter ~now)
+    |> List.map ~f:name
+    |> List.sort ~compare:String.compare
+    |> List.iter ~f:(printf "  %s\n")
+  in
+  let none =
+    { Session.Filter.max_messages = None
+    ; cwd = None
+    ; older_than_days = None
+    ; prompt = None
+    }
+  in
+  show none;
+  show { none with max_messages = Some 0 };
+  show { none with max_messages = Some 2 };
+  show { none with cwd = Some "/proj" };
+  show { none with older_than_days = Some 5. };
+  show { none with older_than_days = Some 30. };
+  show { none with prompt = Some "fix" };
+  show { none with prompt = Some "fix"; cwd = Some "/proj" };
+  [%expect
+    {|
+    ((max_messages ()) (cwd ()) (older_than_days ()) (prompt ()))
+      empty
+      long
+      short
+    ((max_messages (0)) (cwd ()) (older_than_days ()) (prompt ()))
+      empty
+    ((max_messages (2)) (cwd ()) (older_than_days ()) (prompt ()))
+      empty
+      short
+    ((max_messages ()) (cwd (/proj)) (older_than_days ()) (prompt ()))
+      empty
+      short
+    ((max_messages ()) (cwd ()) (older_than_days (5)) (prompt ()))
+      long
+    ((max_messages ()) (cwd ()) (older_than_days (30)) (prompt ()))
+    ((max_messages ()) (cwd ()) (older_than_days ()) (prompt (fix)))
+      short
+    ((max_messages ()) (cwd (/proj)) (older_than_days ()) (prompt (fix)))
+      short
+    |}];
+  Session.delete
+    (List.find_exn summaries ~f:(fun s -> String.equal (name s) "empty"));
+  List.map (Session.list ~dir) ~f:name
+  |> List.sort ~compare:String.compare
+  |> List.iter ~f:(printf "%s\n");
+  [%expect
+    {|
+    long
+    short
+    |}]
+;;
