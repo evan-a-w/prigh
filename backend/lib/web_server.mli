@@ -10,11 +10,14 @@ open! Import
 type on_lines =
   read_line:(unit -> string option) -> write_line:(string -> unit) -> unit
 
+type on_websocket = query:(string * string) list -> Websocket.t -> unit
+
 (** Handles one connection: JSON lines until EOF, or one HTTP/1.1 request,
-    then close (or the WebSocket until it ends). *)
+    then close (or the WebSocket until it ends). [on_websocket] gets the
+    decoded query string of the upgrade request. *)
 val handle
   :  root:string option
-  -> on_websocket:(Websocket.t -> unit)
+  -> on_websocket:on_websocket
   -> on_lines:on_lines
   -> _ Eio.Flow.two_way
   -> unit
@@ -22,7 +25,7 @@ val handle
 val browser_url : host:string -> port:int -> string
 
 (** [Rpc_server.serve_lines] over a WebSocket. *)
-val serve_rpc : Rpc_server.t -> Websocket.t -> unit
+val serve_rpc : Rpc_server.t -> on_websocket
 
 (** Accepts connections until [sw] ends; returns the bound port (useful with
     port 0). *)
@@ -32,11 +35,12 @@ val listen
   -> addr:Eio.Net.Ipaddr.v4v6
   -> port:int
   -> root:string option
-  -> on_websocket:(Websocket.t -> unit)
+  -> on_websocket:on_websocket
   -> on_lines:on_lines
   -> int
 
 module For_testing : sig
   val safe_relative : string -> string option
   val content_type : string -> string
+  val parse_query : string -> (string * string) list
 end

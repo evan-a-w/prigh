@@ -1,0 +1,212 @@
+=== chromium: connect form ===
+Connect to prigh
+unauthorised: bad or missing token
+Connect
+=== chromium: connected ===
+prigh
+New
+<CWD>
+=== chromium: status strip ===
+DeepSeek V4.1 Flash
+off
+Compact
+$<COST>
+0
+=== chromium: transcript ===
+go
+deepseek-flash
+let me look
+bash
+printf 'one\ntwo\nthree\n'
+one
+two
+three
+deepseek-flash
+three lines. writing a note
+write
+note.txt
++ hello
++ world
+wrote 2 lines to <CWD>/note.txt
+deepseek-flash
+now delegating
+subagent
+count files
+child reporting: 1 file
+[subagent: 1 turns, 0 in / 0 out tokens, $<COST>]
+deepseek-flash
+all done
+=== chromium: agents rail ===
+Agents
+updated <WHEN>
+×
+count files
+subagent
+complete
+0s
+1 turn · 0 tools
+=== chromium: sidebar after the run ===
+prigh
+New
+<CWD>
+SESSIONS
+go
+<WHEN> · 8 msgs
+=== chromium: help ===
+HELP
+/compact [instructions] — Compact the context
+/new — Start a new session
+/name <name> — Name the session
+/model [name] — Pick a model
+/thinking [level] — Set or cycle the thinking level
+/session — Show session info
+/export [path] — Export the session as markdown (on the backend)
+/copy — Copy the last assistant message
+/fork — Fork the session from an earlier message
+/clone — Clone the session
+/cd [dir] — Change the working directory
+/login [provider] [oauth|api_key] — Log in to a provider
+/logout <provider> — Log out of a provider
+/auth — Show provider credentials
+/sessions — Pick a saved session to switch to
+/switch <id|path> — Switch to a session by id or path
+/host — Pick where tools run
+/help — List the commands
+=== chromium: sessions dialog ===
+Switch to session
+go · 8 msgs · live · <ID>
+Cancel
+=== chromium: status strip after /model ===
+GPT-4o mini
+off
+Compact
+$<COST>
+0
+=== chromium: last chat entry after ! ===
+$ printf 'shell says hi\n'
+shell says hi
+=== chromium: sidebar after /name ===
+prigh
+New
+<CWD>
+SESSIONS
+My e2e session
+<WHEN> · 9 msgs
+=== chromium: sidebar after reload ===
+prigh
+New
+<CWD>
+SESSIONS
+My e2e session
+<WHEN> · 9 msgs
+url keeps session: true
+=== chromium: new session ===
+No messages yet. Say something.
+=== chromium: switched back ===
+go
+=== firefox: connect form ===
+Connect to prigh
+unauthorised: bad or missing token
+Connect
+=== firefox: connected ===
+prigh
+New
+<CWD>
+=== firefox: status strip ===
+DeepSeek V4.1 Flash
+off
+Compact
+$<COST>
+0
+=== firefox: transcript ===
+go
+deepseek-flash
+let me look
+bash
+printf 'one\ntwo\nthree\n'
+one
+two
+three
+deepseek-flash
+three lines. writing a note
+write
+note.txt
++ hello
++ world
+wrote 2 lines to <CWD>/note.txt
+deepseek-flash
+now delegating
+subagent
+count files
+child reporting: 1 file
+[subagent: 1 turns, 0 in / 0 out tokens, $<COST>]
+deepseek-flash
+all done
+=== firefox: agents rail ===
+Agents
+updated <WHEN>
+×
+count files
+subagent
+complete
+0s
+1 turn · 0 tools
+=== firefox: sidebar after the run ===
+prigh
+New
+<CWD>
+SESSIONS
+go
+<WHEN> · 8 msgs
+=== firefox: help ===
+HELP
+/compact [instructions] — Compact the context
+/new — Start a new session
+/name <name> — Name the session
+/model [name] — Pick a model
+/thinking [level] — Set or cycle the thinking level
+/session — Show session info
+/export [path] — Export the session as markdown (on the backend)
+/copy — Copy the last assistant message
+/fork — Fork the session from an earlier message
+/clone — Clone the session
+/cd [dir] — Change the working directory
+/login [provider] [oauth|api_key] — Log in to a provider
+/logout <provider> — Log out of a provider
+/auth — Show provider credentials
+/sessions — Pick a saved session to switch to
+/switch <id|path> — Switch to a session by id or path
+/host — Pick where tools run
+/help — List the commands
+=== firefox: sessions dialog ===
+Switch to session
+go · 8 msgs · live · <ID>
+Cancel
+=== firefox: status strip after /model ===
+GPT-4o mini
+off
+Compact
+$<COST>
+0
+=== firefox: last chat entry after ! ===
+$ printf 'shell says hi\n'
+shell says hi
+=== firefox: sidebar after /name ===
+prigh
+New
+<CWD>
+SESSIONS
+My e2e session
+<WHEN> · 9 msgs
+=== firefox: sidebar after reload ===
+prigh
+New
+<CWD>
+SESSIONS
+My e2e session
+<WHEN> · 9 msgs
+url keeps session: true
+=== firefox: new session ===
+No messages yet. Say something.
+=== firefox: switched back ===
+go

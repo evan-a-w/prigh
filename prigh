@@ -4,6 +4,7 @@
 # then runs the TUI.
 # Usage: ./prigh [frontend options] [-- backend options]   (see prigh-tui -help)
 #        ./prigh -web [serve options]                      (browser frontend; see prigh serve -help)
+#        ./prigh -pi-web [serve options]                   (pi's web UI from pi-web/; needs npm)
 set -euo pipefail
 root="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 export PATH="$HOME/.local/bin:$PATH"
@@ -17,9 +18,19 @@ else
 	(cd "$root/backend" && dune build 2>&1)
 fi
 
-(cd "$root/tui" && dune build ./bin/main.exe 2>&1)
-
 export PRIGH_BACKEND="${PRIGH_BACKEND:-$root/backend/_build/default/bin/main.exe}"
+
+# ./prigh -pi-web [serve options]: pi's web UI (pi-web/, built with npm) on the backend.
+if [ "${1:-}" = "-pi-web" ]; then
+	shift
+	if [ -z "${PRIGH_PI_WEB_ROOT:-}" ]; then
+		(cd "$root/pi-web" && { [ -d node_modules ] || npm install --no-audit --no-fund; } && npm run build >/dev/null)
+		export PRIGH_PI_WEB_ROOT="$root/pi-web/dist"
+	fi
+	exec "$PRIGH_BACKEND" serve -pi-web "${PRIGH_PI_WEB_LISTEN:-127.0.0.1:7789}" -open "$@"
+fi
+
+(cd "$root/tui" && dune build ./bin/main.exe 2>&1)
 
 # ./prigh -web [serve options]: the browser frontend instead of the TUI.
 if [ "${1:-}" = "-web" ]; then

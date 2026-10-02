@@ -626,3 +626,129 @@ let%expect_test
   Option.iter !browser_ws ~f:Websocket.close;
   Eio.Flow.shutdown terminal_flow `Send
 ;;
+
+let%expect_test "web server: query strings are decoded" =
+  List.iter
+    [ ""; "token=a%26b%3Dc&session=s1&flag"; "a=1&&b=%20x" ]
+    ~f:(fun q ->
+      print_s
+        [%sexp (Web_server.For_testing.parse_query q : (string * string) list)]);
+  [%expect
+    {|
+    ()
+    ((token a&b=c) (session s1) (flag ""))
+    ((a 1) (b " x"))
+    |}]
+;;
+
+let%expect_test
+    "pi web port: token and session come from the query; pi RPC over a \
+     WebSocket"
+  =
+  with_sandbox
+  @@ fun t ->
+  Eio.Switch.run
+  @@ fun sw ->
+  let login =
+    Login_manager.create
+      ~env:t.env
+      ~sw
+      ~getenv:(fun _ -> None)
+      ~store:(Auth_store.create ~path:(Filename.concat t.dir "auth.json"))
+      ()
+  in
+  let sessions_dir = Filename.concat t.dir "sessions" in
+  let new_agent ?session ~cwd () =
+    Agent.create
+      ~env:t.env
+      ~sw
+      ~provider:(Faux_provider.create [ Faux_provider.Reply.text "hi pi" ])
+      ~tools:Tools.all
+      ~sessions_dir
+      ~home:t.dir
+      ?session
+      ~cwd
+      ()
+  in
+  let server =
+    Rpc_server.create
+      ~env:t.env
+      ~sw
+      ~token:"sek&ret"
+      ~login
+      ~sessions_dir
+      ~cwd:t.dir
+      ~new_agent
+      ()
+  in
+  let port =
+    Web_server.listen
+      ~env:t.env
+      ~sw
+      ~addr:Eio.Net.Ipaddr.V4.loopback
+      ~port:0
+      ~root:None
+      ~on_websocket:(Pi_rpc.serve_websocket server)
+      ~on_lines:(Rpc_server.serve_lines server)
+  in
+  let browser target =
+    let flow = Loopback.connect ~env:t.env ~sw ~port in
+    Eio.Flow.copy_string
+      (sprintf
+         "GET %s HTTP/1.1\r\n\
+          Host: x\r\n\
+          Connection: Upgrade\r\n\
+          Upgrade: websocket\r\n\
+          Sec-WebSocket-Version: 13\r\n\
+          Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==\r\n\
+          \r\n"
+         target)
+      flow;
+    let reader = Eio.Buf_read.of_flow flow ~max_size:(1024 * 1024) in
+    let rec skip_headers () =
+      match Eio.Buf_read.line reader with
+      | "" -> ()
+      | _ -> skip_headers ()
+    in
+    skip_headers ();
+    Websocket.create ~role:`Client ~reader ~flow ()
+  in
+  let show line = print_endline (mask t line) in
+  let ws = browser "/ws" in
+  Option.iter (Websocket.read_text ws) ~f:show;
+  let ws = browser "/ws?token=sek%26ret&name=tab" in
+  (* Status entries from hello. *)
+  Option.iter (Websocket.read_text ws) ~f:show;
+  Option.iter (Websocket.read_text ws) ~f:show;
+  Websocket.send_text ws {|{"id":"1","type":"prompt","message":"hello"}|};
+  let rec until_settled () =
+    match Websocket.read_text ws with
+    | None -> ()
+    | Some line ->
+      show line;
+      if not (String.is_substring line ~substring:"agent_settled")
+      then until_settled ()
+  in
+  until_settled ();
+  Websocket.send_text ws {|{"id":"2","type":"get_state"}|};
+  Option.iter (Websocket.read_text ws) ~f:show;
+  Websocket.close ws;
+  [%expect
+    {|
+    {"type":"prigh_hello_failed","error":"unauthorised: bad or missing token"}
+    {"type":"extension_ui_request","id":"status-host","method":"setStatus","statusKey":"host","statusText":null}
+    {"type":"extension_ui_request","id":"status-branch","method":"setStatus","statusKey":"branch","statusText":null}
+    {"type":"agent_start"}
+    {"type":"message_start","message":{"role":"user","content":"hello","timestamp":0}}
+    {"type":"message_end","message":{"role":"user","content":"hello","timestamp":0}}
+    {"type":"turn_start"}
+    {"type":"message_start","message":{"role":"assistant","content":[],"provider":"prigh","model":"deepseek-flash","stopReason":"stop","timestamp":1}}
+    {"id":"1","type":"response","command":"prompt","success":true,"data":{}}
+    {"type":"message_update","message":{"role":"assistant","content":[{"type":"text","text":"hi pi"}],"provider":"prigh","model":"deepseek-flash","stopReason":"stop","timestamp":1},"assistantMessageEvent":{"type":"text_delta"}}
+    {"type":"message_end","message":{"role":"assistant","content":[{"type":"text","text":"hi pi"}],"provider":"prigh","model":"deepseek-flash","stopReason":"stop","timestamp":1}}
+    {"type":"turn_end","message":{"role":"assistant","content":[{"type":"text","text":"hi pi"}],"provider":"prigh","model":"deepseek-flash","stopReason":"stop","timestamp":1},"toolResults":[]}
+    {"type":"agent_end","messages":[{"role":"user","content":"hello","timestamp":0},{"role":"assistant","content":[{"type":"text","text":"hi pi"}],"provider":"prigh","model":"deepseek-flash","stopReason":"stop","timestamp":1}],"willRetry":false}
+    {"type":"agent_settled"}
+    {"id":"2","type":"response","command":"get_state","success":true,"data":{"model":{"id":"deepseek-flash","name":"DeepSeek V4.1 Flash","provider":"deepseek","reasoning":true,"contextWindow":1000000},"cwd":"$DIR","thinkingLevel":"off","isStreaming":false,"isCompacting":false,"steeringMode":"all","followUpMode":"all","sessionFile":"$DIR/sessions/<stamp>_<id>.jsonl","sessionId":"<id>","autoCompactionEnabled":true,"messageCount":2,"pendingMessageCount":0}}
+    |}]
+;;

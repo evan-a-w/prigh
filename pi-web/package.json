@@ -1,0 +1,30 @@
+{
+	"name": "prigh-pi-web",
+	"version": "0.1.0",
+	"private": true,
+	"description": "pi's web UI on the prigh backend. Static assets served by `prigh serve -pi-web`; speaks pi's RPC protocol over a WebSocket, translated by the backend's Pi_rpc adapter.",
+	"type": "module",
+	"scripts": {
+		"dev": "vite",
+		"build": "vite build",
+		"check": "tsc --noEmit -p tsconfig.json",
+		"test": "vitest run"
+	},
+	"dependencies": {
+		"@preact/signals": "2.10.0",
+		"diff": "8.0.4",
+		"dompurify": "3.4.12",
+		"highlight.js": "10.7.3",
+		"marked": "18.0.5",
+		"preact": "10.29.7"
+	},
+	"devDependencies": {
+		"@preact/preset-vite": "2.10.6",
+		"@types/diff": "7.0.2",
+		"typescript": "5.9.3",
+		"vite": "8.1.5",
+		"vitest": "3.2.4",
+		"ws": "8.21.1",
+		"@types/ws": "8.18.1"
+	}
+}

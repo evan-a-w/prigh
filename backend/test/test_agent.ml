@@ -39,7 +39,11 @@ let with_agent ?tools ?on_request ?auto_describe replies f =
       | Config_changed _ -> None
       | Notice n -> Some ("notice: " ^ n)
       | Queue_update { steer; follow_up } ->
-        Some (sprintf "queue: steer=%d follow_up=%d" steer follow_up)
+        Some
+          (sprintf
+             "queue: steer=%d follow_up=%d"
+             (List.length steer)
+             (List.length follow_up))
       | Tool_exec { name; _ } -> Some ("tool_exec: " ^ name)
       | Tool_exec_cancel _ -> Some "tool_exec_cancel"
     in

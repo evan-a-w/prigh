@@ -278,26 +278,42 @@ let parse_listen_addr spec =
         | exception _ -> Or_error.errorf "cannot resolve host %S" host))
 ;;
 
-(* The web frontend's built assets: $PRIGH_WEB_ROOT, or the dune build next to
-   this executable. *)
-let find_web_root () =
-  match Sys.getenv "PRIGH_WEB_ROOT" with
+(* A frontend's built assets: the environment variable, or a directory
+   relative to this executable. *)
+let find_root ~env_var ~candidates () =
+  match Sys.getenv env_var with
   | Some dir -> Some dir
   | None ->
     let exe = Core_unix.readlink "/proc/self/exe" in
-    List.find
+    List.find candidates ~f:(fun rel ->
+      match
+        Sys_unix.is_directory (Filename.concat (Filename.dirname exe) rel)
+      with
+      | `Yes -> true
+      | `No | `Unknown -> false)
+    |> Option.map ~f:(fun rel ->
+      Filename_unix.realpath (Filename.concat (Filename.dirname exe) rel))
+;;
+
+let find_web_root =
+  find_root
+    ~env_var:"PRIGH_WEB_ROOT"
+    ~candidates:
       [ "../../../../tui/_build/default/web-bin/site"
       ; "../../tui/_build/default/web-bin/site"
       ; "../share/prigh/web"
       ]
-      ~f:(fun rel ->
-        match
-          Sys_unix.is_directory (Filename.concat (Filename.dirname exe) rel)
-        with
-        | `Yes -> true
-        | `No | `Unknown -> false)
-    |> Option.map ~f:(fun rel ->
-      Filename_unix.realpath (Filename.concat (Filename.dirname exe) rel))
+;;
+
+(* The pi web frontend (pi-web/, built with vite). *)
+let find_pi_web_root =
+  find_root
+    ~env_var:"PRIGH_PI_WEB_ROOT"
+    ~candidates:
+      [ "../../../../pi-web/dist"
+      ; "../../pi-web/dist"
+      ; "../share/prigh/pi-web"
+      ]
 ;;
 
 let open_in_browser url =
@@ -352,6 +368,20 @@ let serve_command =
          ~doc:
            "DIR the built web frontend (default: $PRIGH_WEB_ROOT or the dune \
             build)"
+     and pi_web =
+       flag
+         "-pi-web"
+         (optional string)
+         ~doc:
+           "HOST:PORT serve the pi web frontend (pi-web/) and accept its \
+            WebSocket clients, speaking pi's RPC protocol"
+     and pi_web_root =
+       flag
+         "-pi-web-root"
+         (optional string)
+         ~doc:
+           "DIR the built pi web frontend (default: $PRIGH_PI_WEB_ROOT or \
+            pi-web/dist)"
      and open_browser =
        flag "-open" no_arg ~doc:" open the web frontend in a browser"
      in
@@ -377,11 +407,24 @@ let serve_command =
              eprintf "%s\n" (Error.to_string_hum e);
              exit 2)
        in
-       if open_browser && Option.is_none web
+       let pi_web =
+         Option.map pi_web ~f:(fun spec ->
+           match parse_listen_addr spec with
+           | Ok addr -> addr
+           | Error e ->
+             eprintf "%s\n" (Error.to_string_hum e);
+             exit 2)
+       in
+       if open_browser && Option.is_none web && Option.is_none pi_web
        then (
-         eprintf "-open needs -web\n";
+         eprintf "-open needs -web or -pi-web\n";
          exit 2);
-       let stdio = stdio || (Option.is_none listen && Option.is_none web) in
+       let stdio =
+         stdio
+         || (Option.is_none listen
+             && Option.is_none web
+             && Option.is_none pi_web)
+       in
        Eio_main.run
        @@ fun env ->
        Eio.Switch.run
@@ -429,12 +472,8 @@ let serve_command =
                (fun flow _addr ->
                   Rpc_server.serve_connection server ~input:flow ~output:flow)
            done));
-       Option.iter web ~f:(fun (addr, port) ->
-         let root =
-           match web_root with
-           | Some dir -> Some dir
-           | None -> find_web_root ()
-         in
+       let serve_web ~label ~root ~root_flag ~env_var ~on_websocket (addr, port)
+         =
          let port =
            Web_server.listen
              ~env
@@ -442,7 +481,7 @@ let serve_command =
              ~addr
              ~port
              ~root
-             ~on_websocket:(Web_server.serve_rpc server)
+             ~on_websocket
              ~on_lines:(Rpc_server.serve_lines server)
          in
          let host =
@@ -452,15 +491,53 @@ let serve_command =
            | host -> host
          in
          let url = Web_server.browser_url ~host ~port in
-         eprintf "prigh: web ui on %s\n%!" url;
+         eprintf "prigh: %s on %s\n%!" label url;
          (match root with
-          | Some root -> eprintf "prigh: serving web assets from %s\n%!" root
+          | Some root ->
+            eprintf "prigh: serving %s assets from %s\n%!" label root
           | None ->
             eprintf
-              "prigh: no web assets found (-web-root or $PRIGH_WEB_ROOT); only \
-               /ws is served\n\
-               %!");
-         if open_browser then open_in_browser url);
+              "prigh: no %s assets found (%s or $%s); only /ws is served\n%!"
+              label
+              root_flag
+              env_var);
+         url
+       in
+       let opened = ref false in
+       let maybe_open url =
+         if open_browser && not !opened
+         then (
+           opened := true;
+           open_in_browser url)
+       in
+       Option.iter web ~f:(fun addr ->
+         let root =
+           match web_root with
+           | Some dir -> Some dir
+           | None -> find_web_root ()
+         in
+         serve_web
+           ~label:"web ui"
+           ~root
+           ~root_flag:"-web-root"
+           ~env_var:"PRIGH_WEB_ROOT"
+           ~on_websocket:(Web_server.serve_rpc server)
+           addr
+         |> maybe_open);
+       Option.iter pi_web ~f:(fun addr ->
+         let root =
+           match pi_web_root with
+           | Some dir -> Some dir
+           | None -> find_pi_web_root ()
+         in
+         serve_web
+           ~label:"pi-web"
+           ~root
+           ~root_flag:"-pi-web-root"
+           ~env_var:"PRIGH_PI_WEB_ROOT"
+           ~on_websocket:(Pi_rpc.serve_websocket server)
+           addr
+         |> maybe_open);
        if stdio
        then (
          Rpc_server.serve_connection

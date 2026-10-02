@@ -357,8 +357,10 @@ let rec event (e : Agent.Event.t) =
     | Notice text -> [ "event", str "notice"; "text", str text ]
     | Queue_update { steer; follow_up } ->
       [ "event", str "queue_update"
-      ; "steer", int steer
-      ; "follow_up", int follow_up
+      ; "steer", int (List.length steer)
+      ; "follow_up", int (List.length follow_up)
+      ; "steer_texts", `Array (List.map steer ~f:str)
+      ; "follow_up_texts", `Array (List.map follow_up ~f:str)
       ]
     | Tool_exec { host; exec_id; call_id; name; arguments; cwd } ->
       [ "event", str "tool_exec"

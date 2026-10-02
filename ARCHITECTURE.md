@@ -324,6 +324,28 @@ two can share one.
   no `..`, no dot files). The token check is the same `hello` check as
   for TCP; the static files are public.
 
+- `Pi_protocol` / `Pi_rpc` — pi's RPC protocol (what pi's web UI in
+  `pi-web/` speaks) on top of `Rpc_server`: one WebSocket connection is one
+  prigh client (`connect`/`handle`/`disconnect`); pi commands become prigh
+  requests (`prompt` with `streamingBehavior` → `steer`/`follow_up`,
+  `set_model {provider, modelId}` → `provider/id`, pi's seven thinking
+  levels ↔ prigh's five, `fork {entryId}` → fork at the entry's parent,
+  `bash` → `shell`) and prigh events become pi's (`message_update` carrying
+  the accumulated message with synthetic index timestamps, which pi keys
+  messages by; `tool_execution_*` with accumulated output; `tool_confirm`
+  and login prompts as `extension_ui_request` dialogs answered through
+  `tool_confirm_respond`/`auth_respond`; notices as toasts; subagents as the
+  agents-rail widget snapshot; `session_reloaded`/`session_info_changed`/
+  `thinking_level_changed`/`agent_settled` derived by diffing `state`
+  events, suppressed while running a command the frontend re-syncs after).
+  The prigh-only slash commands (`/login`, `/logout`, `/auth`, `/sessions`,
+  `/switch`, `/host`, `/help`) arrive as prompts and run in the adapter;
+  `list_sessions`/`switch_session` are pi-protocol additions for the
+  sidebar. `serve -pi-web HOST:PORT` is a second `Web_server` listener whose
+  `/ws?token=&session=&name=` goes to `Pi_rpc.serve_websocket` (the query
+  string becomes the `hello`; a refused hello is reported as
+  `prigh_hello_failed` and the socket closed).
+
 ### CLI (`backend/bin/main.ml`)
 
 `serve` (RPC on stdio; `-listen HOST:PORT` accepts TCP clients instead,
@@ -506,6 +528,14 @@ they paid for themselves immediately: the tmux layer caught `Ctrl+O` being
 eaten by the tty's line discipline (fixed by clearing `IEXTEN`) and the quit
 hang (`Driver.finished` never resolving), and the paste scenario caught the
 batched-event buffering bug.
+
+`backend/test/test_pi_rpc.ml` drives `Pi_rpc` over in-memory lines
+(pi commands in, pi events out) for prompts, steering, confirmations,
+thinking levels, forks, sessions, login dialogs, subagents and compaction;
+`pi-web/` has vitest unit tests for its pure modules and a Playwright e2e
+(`pi-web/e2e`, the `e2e` check of `pi-web/flake.nix`) that drives Chromium
+and Firefox through the connect form, a scripted run with tools and a
+subagent, slash commands, the model picker, a reload and a session switch.
 
 The web layer adds two: `backend/test/test_web.ml` (frames, fragmentation,
 the RFC handshake vector, static serving and traversal, and a masked WebSocket

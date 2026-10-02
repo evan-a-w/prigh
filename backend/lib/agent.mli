@@ -64,8 +64,8 @@ module Event : sig
     | Notice of string
     | Config_changed of Config.t
     | Queue_update of
-        { steer : int
-        ; follow_up : int
+        { steer : string list (** the queued texts, in order *)
+        ; follow_up : string list
         }
     | Tool_exec of
         { host : string (** only delivered to this host *)

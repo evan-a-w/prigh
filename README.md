@@ -126,6 +126,20 @@ browser equivalent and say so. Plain `ws://` with a shared token: bind to
 localhost and use an SSH tunnel or a TLS-terminating proxy on untrusted
 networks.
 
+### pi's web UI
+
+A second, separate browser frontend lives in `pi-web/`: pi's own web UI
+(Preact/TypeScript) on the prigh backend, which speaks pi's RPC protocol for
+it (`Pi_rpc`). It has its own flake:
+
+```
+nix run ./pi-web -- -faux -cwd ~/proj     # serves it on 127.0.0.1:7789 and opens it
+./prigh -pi-web -faux                      # development (npm build + dune-built backend)
+prigh serve -pi-web 0.0.0.0:7789 -token sekrit   # remote; the page asks for the token
+```
+
+See `pi-web/README.md` for what was kept, dropped and mapped.
+
 If the backend goes away (the spawned process dies, or the TCP connection
 drops) the TUI reconnects on its own — immediately, then with exponential
 backoff capped at 10s — rejoining the same session and respawning the

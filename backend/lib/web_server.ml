@@ -5,9 +5,22 @@ module Request = struct
   type t =
     { meth : string
     ; path : string
+    ; query : (string * string) list
     ; headers : (string * string) list
     }
   [@@deriving sexp_of]
+
+  let parse_query query =
+    String.split query ~on:'&'
+    |> List.filter ~f:(Fn.non String.is_empty)
+    |> List.map ~f:(fun pair ->
+      let key, value =
+        match String.lsplit2 pair ~on:'=' with
+        | Some (k, v) -> k, v
+        | None -> pair, ""
+      in
+      Uri.pct_decode key, Uri.pct_decode value)
+  ;;
 
   let header t name =
     List.Assoc.find t.headers ~equal:String.Caseless.equal name
@@ -19,10 +32,10 @@ module Request = struct
     | request_line ->
       (match String.split request_line ~on:' ' with
        | [ meth; target; _version ] ->
-         let path =
+         let path, query =
            match String.lsplit2 target ~on:'?' with
-           | Some (path, _query) -> path
-           | None -> target
+           | Some (path, query) -> path, parse_query query
+           | None -> target, []
          in
          let rec headers acc =
            match Eio.Buf_read.line reader with
@@ -34,7 +47,7 @@ module Request = struct
                 headers ((String.strip name, String.strip value) :: acc)
               | None -> headers acc)
          in
-         Some { meth; path; headers = headers [] }
+         Some { meth; path; query; headers = headers [] }
        | _ -> None)
   ;;
 end
@@ -132,6 +145,8 @@ let wants_upgrade (request : Request.t) =
 type on_lines =
   read_line:(unit -> string option) -> write_line:(string -> unit) -> unit
 
+type on_websocket = query:(string * string) list -> Websocket.t -> unit
+
 let serve_json_lines ~(on_lines : on_lines) ~reader flow =
   on_lines
     ~read_line:(fun () ->
@@ -177,7 +192,7 @@ let handle ~root ~on_websocket ~on_lines flow =
               (Websocket.accept_key (String.strip key)))
            flow;
          let ws = Websocket.create ~reader ~flow () in
-         on_websocket ws;
+         on_websocket ~query:request.query ws;
          Websocket.close ws)
     | Some request ->
       (match root with
@@ -191,7 +206,7 @@ let handle ~root ~on_websocket ~on_lines flow =
        | Some root -> Eio.Flow.copy_string (static ~root request) flow))
 ;;
 
-let serve_rpc server ws =
+let serve_rpc server ~query:_ ws =
   Rpc_server.serve_lines
     server
     ~read_line:(fun () -> Websocket.read_text ws)
@@ -227,4 +242,5 @@ let listen ~env ~sw ~addr ~port ~root ~on_websocket ~on_lines =
 module For_testing = struct
   let safe_relative = safe_relative
   let content_type = content_type
+  let parse_query = Request.parse_query
 end

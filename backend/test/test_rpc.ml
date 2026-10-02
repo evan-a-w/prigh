@@ -343,9 +343,9 @@ let%expect_test "abort returns restored messages and emits queue_update" =
     {"type":"event","event":"message_end","message":{"role":"user","text":"go"}}
     {"type":"event","event":"turn_start"}
     {"type":"event","event":"message_start","message":{"role":"assistant","content":[],"stop_reason":{"type":"end_turn"},"usage":{"input":0,"output":0,"cache_read":0},"model":"deepseek-flash"}}
-    {"type":"event","event":"queue_update","steer":1,"follow_up":0}
-    {"type":"event","event":"queue_update","steer":1,"follow_up":1}
-    {"type":"event","event":"queue_update","steer":0,"follow_up":0}
+    {"type":"event","event":"queue_update","steer":1,"follow_up":0,"steer_texts":["first steer"],"follow_up_texts":[]}
+    {"type":"event","event":"queue_update","steer":1,"follow_up":1,"steer_texts":["first steer"],"follow_up_texts":["second follow up"]}
+    {"type":"event","event":"queue_update","steer":0,"follow_up":0,"steer_texts":[],"follow_up_texts":[]}
     {"type":"event","event":"message_end","message":{"role":"assistant","content":[],"stop_reason":{"type":"aborted"},"usage":{"input":20,"output":8,"cache_read":5},"model":"deepseek-flash"}}
     {"type":"event","event":"turn_end","assistant":{"role":"assistant","content":[],"stop_reason":{"type":"aborted"},"usage":{"input":20,"output":8,"cache_read":5},"model":"deepseek-flash"},"tool_results":[]}
     {"type":"event","event":"agent_end","messages":[{"role":"user","text":"go"},{"role":"assistant","content":[],"stop_reason":{"type":"aborted"},"usage":{"input":20,"output":8,"cache_read":5},"model":"deepseek-flash"}]}

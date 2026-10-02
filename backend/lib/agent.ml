@@ -66,8 +66,8 @@ module Event = struct
     | Notice of string
     | Config_changed of Config.t
     | Queue_update of
-        { steer : int
-        ; follow_up : int
+        { steer : string list
+        ; follow_up : string list
         }
     | Tool_exec of
         { host : string
@@ -267,8 +267,12 @@ let queue_update t =
   broadcast
     t
     (Queue_update
-       { steer = Queue.length t.steer_queue
-       ; follow_up = Queue.length t.follow_up_queue
+       { steer =
+           List.map (Queue.to_list t.steer_queue) ~f:(fun (q : Queued.t) ->
+             q.text)
+       ; follow_up =
+           List.map (Queue.to_list t.follow_up_queue) ~f:(fun (q : Queued.t) ->
+             q.text)
        })
 ;;
 
