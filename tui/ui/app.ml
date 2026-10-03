@@ -28,6 +28,7 @@ module Reply_tag = struct
     | Set_model_done of string (** the key requested *)
     | Config
     | Config_saved
+    | Default_saved
     | Config_for_confirm of bool
     | Models_catalog
     | Models_for_scoped
@@ -1172,6 +1173,7 @@ let run_command m (cmd : Commands.Parsed.t) =
   | "confirm", ("off" | "false") :: _ -> set_confirm m false
   | "confirm", other :: _ ->
     error m (sprintf "unknown argument %S; use on or off" other), []
+  | "change_default", _ -> m, [ rpc "change_default" ~tag:Default_saved ]
   | "auth", _ -> m, [ rpc "auth_status" ~tag:Auth_show ]
   | "login", [] -> m, [ rpc "auth_status" ~tag:Auth_login_picker ]
   | "login", provider :: rest ->
@@ -1931,7 +1933,7 @@ let save_scoped_models m picker =
   let config =
     match m.config with
     | Some config -> { config with scoped_models }
-    | None -> { P.Config.scoped_models; confirm_tools = false }
+    | None -> { P.Config.default with scoped_models }
   in
   ( { m with mode = Editing }
   , [ rpc
@@ -2534,6 +2536,16 @@ let reply m (tag : Reply_tag.t) (result : (P.Json.t, string) Result.t) =
          ( notice
              { m with config = Some config }
              (sprintf "scoped models saved (%d)" count)
+         , [] ))
+     | Default_saved ->
+       decode json ~f:P.Config.of_json (fun config ->
+         let show = Option.value ~default:"?" in
+         ( notice
+             { m with config = Some config }
+             (sprintf
+                "default: %s, thinking %s"
+                (show config.default_model)
+                (show config.default_thinking))
          , [] ))
      | Config_for_confirm enabled ->
        decode json ~f:P.Config.of_json (fun config ->

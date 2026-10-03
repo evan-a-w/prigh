@@ -71,3 +71,9 @@ val serve_connection
 val shutdown : t -> unit
 
 val agent_of_client : t -> Client.t -> Agent.t
+
+(** Whether [token] is the one [hello] requires (always, without one). *)
+val token_ok : t -> string option -> bool
+
+(** The backend host's directory for a live session, else the server's. *)
+val backend_cwd : t -> session:string option -> string

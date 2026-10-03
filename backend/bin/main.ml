@@ -28,7 +28,8 @@ let provider_arg =
       exit 2)
 ;;
 
-(* With no explicit model, prefer a provider the user is logged in to. *)
+(* With no explicit or configured default model, prefer a provider the user is
+   logged in to. *)
 let default_model store =
   match Provider_auth.status store with
   | Error _ -> Model.default
@@ -58,8 +59,8 @@ let common_params =
       "-model"
       (optional string)
       ~doc:
-        "ID model id or provider/id (default: the session's, else the first \
-         logged-in provider's)"
+        "ID model id or provider/id (default: the session's, else the one \
+         saved by /change_default, else the first logged-in provider's)"
   and thinking =
     flag "-thinking" (optional string) ~doc:"LEVEL off|on|low|high|max"
   and session =
@@ -126,12 +127,6 @@ let common_params =
             (List.init 1000 ~f:(fun _ -> Faux_provider.Reply.text "faux reply"))
         else Provider_router.create ~env ~store ()
     in
-    let model =
-      match model, session with
-      | Some m, _ -> Some m
-      | None, Some _ -> None
-      | None, None -> Some (default_model store)
-    in
     let session =
       Option.map session ~f:(fun path ->
         match Session.load path with
@@ -166,6 +161,7 @@ let common_params =
           ?session
           ?model
           ?thinking
+          ~fallback_model:(default_model store)
           ~auto_describe:(Option.is_none faux_script && not faux)
           ~cwd
           ()
@@ -472,8 +468,7 @@ let serve_command =
                (fun flow _addr ->
                   Rpc_server.serve_connection server ~input:flow ~output:flow)
            done));
-       let serve_web ~label ~root ~root_flag ~env_var ~on_websocket (addr, port)
-         =
+       let serve_web ~label ~root ~root_flag ~env_var ~websockets (addr, port) =
          let port =
            Web_server.listen
              ~env
@@ -481,7 +476,7 @@ let serve_command =
              ~addr
              ~port
              ~root
-             ~on_websocket
+             ~websockets
              ~on_lines:(Rpc_server.serve_lines server)
          in
          let host =
@@ -497,7 +492,8 @@ let serve_command =
             eprintf "prigh: serving %s assets from %s\n%!" label root
           | None ->
             eprintf
-              "prigh: no %s assets found (%s or $%s); only /ws is served\n%!"
+              "prigh: no %s assets found (%s or $%s); only WebSockets are served\n\
+               %!"
               label
               root_flag
               env_var);
@@ -521,7 +517,12 @@ let serve_command =
            ~root
            ~root_flag:"-web-root"
            ~env_var:"PRIGH_WEB_ROOT"
-           ~on_websocket:(Web_server.serve_rpc server)
+           ~websockets:
+             [ "/ws", Web_server.serve_rpc server
+             ; ( "/terminal"
+               , Web_server.serve_terminal server (Terminals.create ~env ~sw ())
+               )
+             ]
            addr
          |> maybe_open);
        Option.iter pi_web ~f:(fun addr ->
@@ -535,7 +536,7 @@ let serve_command =
            ~root
            ~root_flag:"-pi-web-root"
            ~env_var:"PRIGH_PI_WEB_ROOT"
-           ~on_websocket:(Pi_rpc.serve_websocket server)
+           ~websockets:[ "/ws", Pi_rpc.serve_websocket server ]
            addr
          |> maybe_open);
        if stdio

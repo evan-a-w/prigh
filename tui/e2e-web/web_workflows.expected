@@ -35,6 +35,22 @@ faux reply
 <RULE>
 >
 <CWD>  deepseek-flash  think:off  view:normal  ctx:<USAGE>  $<COST>
+=== chromium: terminal ===
+opening shrinks the app
+the terminal has the keyboard
+it runs in the session directory
+closing restores the app and its keyboard
+the app takes keys again
+reopening shows the same shell
+exiting the shell says so
+a key starts a new shell
+=== chromium: after terminal ===
+session <ID> in <CWD>. /help for commands, Esc aborts, Ctrl+C twice quits.
+> hello wXb
+faux reply
+<RULE>
+>
+<CWD>  deepseek-flash  think:off  view:normal  ctx:<USAGE>  $<COST>
 === firefox: authentication ===
 prigh
 unauthorised: bad or missing token
@@ -66,6 +82,22 @@ faux reply
 >
 <CWD>  deepseek-flash  think:off  view:normal  ctx:<USAGE>  $<COST>
 === firefox: reloaded ===
+session <ID> in <CWD>. /help for commands, Esc aborts, Ctrl+C twice quits.
+> hello wXb
+faux reply
+<RULE>
+>
+<CWD>  deepseek-flash  think:off  view:normal  ctx:<USAGE>  $<COST>
+=== firefox: terminal ===
+opening shrinks the app
+the terminal has the keyboard
+it runs in the session directory
+closing restores the app and its keyboard
+the app takes keys again
+reopening shows the same shell
+exiting the shell says so
+a key starts a new shell
+=== firefox: after terminal ===
 session <ID> in <CWD>. /help for commands, Esc aborts, Ctrl+C twice quits.
 > hello wXb
 faux reply

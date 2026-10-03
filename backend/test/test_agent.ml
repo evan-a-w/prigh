@@ -310,6 +310,88 @@ let%expect_test "model and thinking changes persist across session reload" =
     |}]
 ;;
 
+let%expect_test "save_as_default applies to new agents, not saved sessions" =
+  with_agent [ Reply.text "ok" ]
+  @@ fun t agent _dump ->
+  Eio.Switch.run
+  @@ fun sw ->
+  let new_agent ?session ?model ?thinking () =
+    Agent.create
+      ~env:t.env
+      ~sw
+      ~provider:(Faux_provider.create [])
+      ~tools:[]
+      ~sessions_dir:(Filename.concat t.dir "sessions")
+      ~home:t.dir
+      ?session
+      ?model
+      ?thinking
+      ~fallback_model:(Option.value_exn (Model.find "deepseek-v4-pro"))
+      ~cwd:t.dir
+      ()
+  in
+  let show label a =
+    let s = Agent.state a in
+    print_s
+      [%sexp
+        (label : string)
+      , (Model.key s.model : string)
+      , (s.thinking : Thinking.t)]
+  in
+  show "no default: fallback" (new_agent ());
+  Agent.set_model agent (Option.value_exn (Model.find "deepseek-flash"));
+  Agent.set_thinking agent (On (Some High));
+  Or_error.ok_exn (Agent.prompt agent "hello");
+  Agent.wait_idle agent;
+  let saved_path = (Agent.state agent).session_path in
+  (* Another session's change since this agent loaded its config survives. *)
+  Or_error.ok_exn
+    (Config.save
+       ~home:t.dir
+       { (Agent.config agent) with scoped_models = [ "a" ] });
+  Or_error.ok_exn (Agent.save_as_default agent);
+  print_s [%sexp (Agent.config agent : Config.t)];
+  print_endline
+    (In_channel.read_all (Filename.concat t.dir ".prigh/config.json"));
+  show "default" (new_agent ());
+  show
+    "explicit"
+    (new_agent
+       ~model:(Option.value_exn (Model.find "deepseek-v4-pro"))
+       ~thinking:Off
+       ());
+  Agent.set_model agent (Option.value_exn (Model.find "deepseek-v4-pro"));
+  Agent.set_thinking agent (On (Some Low));
+  Or_error.ok_exn (Agent.prompt agent "again");
+  Agent.wait_idle agent;
+  show
+    "saved session keeps its own"
+    (new_agent ~session:(Or_error.ok_exn (Session.load saved_path)) ());
+  Or_error.ok_exn
+    (Config.save
+       ~home:t.dir
+       { Config.default with default_model = Some "nonexistent/model" });
+  show "unknown default model: fallback" (new_agent ());
+  [%expect
+    {|
+    ("no default: fallback" deepseek/deepseek-v4-pro Off)
+    ((scoped_models (a)) (confirm_tools false)
+     (default_model (deepseek/deepseek-flash)) (default_thinking ((On (High)))))
+    {
+      "scoped_models": [
+        "a"
+      ],
+      "confirm_tools": false,
+      "default_model": "deepseek/deepseek-flash",
+      "default_thinking": "high"
+    }
+    (default deepseek/deepseek-flash (On (High)))
+    (explicit deepseek/deepseek-v4-pro Off)
+    ("saved session keeps its own" deepseek/deepseek-v4-pro (On (Low)))
+    ("unknown default model: fallback" deepseek/deepseek-v4-pro Off)
+    |}]
+;;
+
 let%expect_test "new_session, switch_session, fork, rewind" =
   with_agent [ Reply.text "a1"; Reply.text "b1"; Reply.text "a2" ]
   @@ fun _t agent dump ->

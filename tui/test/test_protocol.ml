@@ -486,19 +486,47 @@ let%expect_test "config round trip and config_changed event" =
     (fun j -> Or_error.map (Config.of_json j) ~f:Config.sexp_of_t)
     {|{"scoped_models":["anthropic/claude-fable-5-1","deepseek/deepseek-flash"],"confirm_tools":true}|};
   show (fun j -> Or_error.map (Config.of_json j) ~f:Config.sexp_of_t) {|{}|};
+  show
+    (fun j -> Or_error.map (Config.of_json j) ~f:Config.sexp_of_t)
+    {|{"default_model":null,"default_thinking":"low"}|};
+  show
+    (fun j -> Or_error.map (Config.of_json j) ~f:Config.sexp_of_t)
+    {|{"default_model":3}|};
   print_s
     [%sexp
       (Config.to_json
-         { Config.scoped_models = [ "a"; "b" ]; confirm_tools = true }
+         { Config.scoped_models = [ "a"; "b" ]
+         ; confirm_tools = true
+         ; default_model = Some "deepseek/deepseek-flash"
+         ; default_thinking = Some "max"
+         }
        : Json.t)];
   decode
     {|{"type":"event","event":"config_changed","config":{"scoped_models":["a"],"confirm_tools":false}}|};
   [%expect
     {|
     ((scoped_models (anthropic/claude-fable-5-1 deepseek/deepseek-flash))
-     (confirm_tools true))
-    ((scoped_models ()) (confirm_tools false))
-    ((scoped_models (a b)) (confirm_tools true))
-    (Event (Config_changed ((scoped_models (a)) (confirm_tools false))))
+     (confirm_tools true)
+     (default_model    ())
+     (default_thinking ()))
+    ((scoped_models ())
+     (confirm_tools false)
+     (default_model    ())
+     (default_thinking ()))
+    ((scoped_models ())
+     (confirm_tools false)
+     (default_model ())
+     (default_thinking (low)))
+    (decode (e "default_model must be a string"))
+    ((scoped_models (a b))
+     (confirm_tools    true)
+     (default_model    deepseek/deepseek-flash)
+     (default_thinking max))
+    (Event (
+      Config_changed (
+        (scoped_models (a))
+        (confirm_tools false)
+        (default_model    ())
+        (default_thinking ()))))
     |}]
 ;;

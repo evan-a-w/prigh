@@ -30,7 +30,18 @@ html, body {
   touch-action: none;
 }
 
-#app { height: 100%; }
+#app {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+#screen-area {
+  position: relative;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: hidden;
+}
 
 #keyboard-input {
   position: absolute;
@@ -95,3 +106,61 @@ pre.screen a { color: inherit; text-decoration: underline; }
 }
 .connect button { font: inherit; padding: 0.5em; cursor: pointer; }
 .connect .error { color: var(--red); white-space: pre-wrap; }
+
+.terminal-open {
+  position: absolute;
+  top: 0.25em;
+  right: 0.25em;
+  font: 13px/1 "JetBrains Mono", Menlo, Consolas, monospace;
+  padding: 0.3em 0.5em;
+  color: var(--fg);
+  background: #2b2b2b;
+  border: 1px solid #444;
+  border-radius: 3px;
+  opacity: 0.6;
+  cursor: pointer;
+}
+.terminal-open:hover { opacity: 1; }
+
+.terminal-panel {
+  flex: 0 0 45%;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  border-top: 1px solid #444;
+}
+.terminal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0 0.5em;
+  font: 12px system-ui, sans-serif;
+  color: var(--gray);
+  background: #252526;
+}
+.terminal-close {
+  font: inherit;
+  font-size: 16px;
+  color: var(--gray);
+  background: none;
+  border: 0;
+  cursor: pointer;
+}
+.terminal-close:hover { color: var(--fg); }
+.terminal-host {
+  position: relative;
+  flex: 1 1 auto;
+  min-height: 0;
+  padding-left: 4px;
+  touch-action: auto;
+}
+.terminal-status {
+  position: absolute;
+  top: 0.5em;
+  right: 1em;
+  z-index: 10;
+  padding: 0.2em 0.6em;
+  font: 12px system-ui, sans-serif;
+  color: var(--bg);
+  background: var(--yellow);
+}

@@ -112,6 +112,63 @@ const mobile = async () => {
   await ctx.close();
 };
 
+// The terminal panel: a shell on the backend that keeps running while the
+// panel is hidden, gives the keyboard back to the app when closed, and starts
+// a fresh shell after the old one exits.
+const terminal = async () => {
+  const expect = (label, ok) => {
+    if (!ok) throw new Error(`terminal: ${label}`);
+    console.log(label);
+  };
+  const xterm = () => page.evaluate(() =>
+    document.querySelector(".xterm-rows")?.textContent ?? "");
+  const appRows = () => page.locator("pre.screen .line").count();
+  console.log(`=== ${engineName}: terminal ===`);
+  const fullRows = await appRows();
+  await page.locator(".terminal-open").click();
+  await page.locator(".xterm-rows").waitFor();
+  await page.waitForFunction(rows =>
+    document.querySelectorAll("pre.screen .line").length < rows, fullRows);
+  expect("opening shrinks the app", true);
+  await page.waitForFunction(() =>
+    document.activeElement?.classList.contains("xterm-helper-textarea"));
+  expect("the terminal has the keyboard", true);
+  await page.keyboard.type("cd .. && cd - >/dev/null && pwd && echo sum=$((6*7))\n");
+  await page.waitForFunction(() =>
+    document.querySelector(".xterm-rows").textContent.includes("sum=42"));
+  expect("it runs in the session directory", (await xterm()).includes(process.env.TEST_CWD));
+  await page.locator(".terminal-close").click();
+  await page.waitForFunction(rows =>
+    document.querySelectorAll("pre.screen .line").length === rows, fullRows);
+  await page.waitForFunction(() => document.activeElement?.id === "keyboard-input");
+  expect("closing restores the app and its keyboard", true);
+  await page.keyboard.type("app again", { delay: 20 });
+  await page.waitForFunction(() => document.body.textContent.includes("> app again"));
+  expect("the app takes keys again", true);
+  await page.locator(".terminal-open").click();
+  await page.waitForFunction(() =>
+    document.querySelector(".xterm-rows")?.textContent.includes("sum=42"));
+  expect("reopening shows the same shell", true);
+  await page.keyboard.type("exit\n");
+  await page.locator(".terminal-status", { hasText: "shell exited" }).waitFor();
+  expect("exiting the shell says so", true);
+  await page.keyboard.type("x");
+  await page.waitForFunction(() =>
+    !document.querySelector(".xterm-rows").textContent.includes("sum=42"));
+  await page.keyboard.type("echo fresh\n");
+  await page.waitForFunction(() =>
+    document.querySelector(".xterm-rows").textContent.includes("fresh"));
+  expect("a key starts a new shell", true);
+  await page.locator(".terminal-close").click();
+  await page.waitForFunction(rows =>
+    document.activeElement?.id === "keyboard-input"
+    && document.querySelectorAll("pre.screen .line").length === rows, fullRows);
+  for (let i = 0; i < "app again".length; i++) await page.keyboard.press("Backspace");
+  await page.waitForFunction(() =>
+    !document.body.textContent.includes("app again")
+    && document.body.textContent.includes("deepseek-flash"));
+};
+
 try {
   await page.goto(url);
   await page.bringToFront();
@@ -179,6 +236,9 @@ try {
     throw new Error(`keyboard input lost focus after reload; active=${await page.evaluate(() => document.activeElement?.id)}`);
   }
   await screen("reloaded");
+
+  await terminal();
+  await screen("after terminal");
 
   if (engineName === "chromium") await mobile();
 

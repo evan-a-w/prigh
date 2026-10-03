@@ -233,6 +233,9 @@ let extension_commands =
   ; "sessions", "Pick a saved session to switch to", None
   ; "switch", "Switch to a session by id or path", Some "<id|path>"
   ; "host", "Pick where tools run", None
+  ; ( "change_default"
+    , "Save the current model and thinking level as the default"
+    , None )
   ; "help", "List the commands", None
   ]
 ;;

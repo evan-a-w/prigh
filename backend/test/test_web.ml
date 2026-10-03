@@ -227,7 +227,7 @@ let%expect_test "web server: static files, 404s and the RPC over a WebSocket" =
       ~addr:Eio.Net.Ipaddr.V4.loopback
       ~port:0
       ~root:(Some root)
-      ~on_websocket:(Web_server.serve_rpc server)
+      ~websockets:[ "/ws", Web_server.serve_rpc server ]
       ~on_lines:(Rpc_server.serve_lines server)
   in
   let http = Loopback.http ~env:t.env ~sw ~port in
@@ -397,7 +397,7 @@ let%expect_test
       ~addr:Eio.Net.Ipaddr.V4.loopback
       ~port:0
       ~root:None
-      ~on_websocket:(Web_server.serve_rpc server)
+      ~websockets:[ "/ws", Web_server.serve_rpc server ]
       ~on_lines:(Rpc_server.serve_lines server)
   in
   let terminal_flow = Loopback.connect ~env:t.env ~sw ~port in
@@ -688,7 +688,7 @@ let%expect_test
       ~addr:Eio.Net.Ipaddr.V4.loopback
       ~port:0
       ~root:None
-      ~on_websocket:(Pi_rpc.serve_websocket server)
+      ~websockets:[ "/ws", Pi_rpc.serve_websocket server ]
       ~on_lines:(Rpc_server.serve_lines server)
   in
   let browser target =

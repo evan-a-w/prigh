@@ -4,6 +4,9 @@ open! Import
 type t =
   { scoped_models : string list
   ; confirm_tools : bool
+  ; default_model : string option
+    (** model key for new sessions, set by [/change_default] *)
+  ; default_thinking : Thinking.t option
   }
 [@@deriving sexp_of]
 

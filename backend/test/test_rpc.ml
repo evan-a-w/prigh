@@ -460,10 +460,10 @@ let%expect_test "config: get, set, invalid, and the config_changed event" =
   call t h ~params:{|{"call_id": "nope", "allow": true}|} "tool_confirm_respond";
   [%expect
     {|
-    {"type":"response","id":"r1","ok":true,"result":{"scoped_models":[],"confirm_tools":false}}
-    {"type":"event","event":"config_changed","config":{"scoped_models":["a","b"],"confirm_tools":true}}
-    {"type":"response","id":"r1","ok":true,"result":{"scoped_models":["a","b"],"confirm_tools":true}}
-    {"type":"response","id":"r1","ok":true,"result":{"scoped_models":["a","b"],"confirm_tools":true}}
+    {"type":"response","id":"r1","ok":true,"result":{"scoped_models":[],"confirm_tools":false,"default_model":null,"default_thinking":null}}
+    {"type":"event","event":"config_changed","config":{"scoped_models":["a","b"],"confirm_tools":true,"default_model":null,"default_thinking":null}}
+    {"type":"response","id":"r1","ok":true,"result":{"scoped_models":["a","b"],"confirm_tools":true,"default_model":null,"default_thinking":null}}
+    {"type":"response","id":"r1","ok":true,"result":{"scoped_models":["a","b"],"confirm_tools":true,"default_model":null,"default_thinking":null}}
     {"type":"response","id":"r1","ok":false,"error":"config.scoped_models must be an array of strings"}
     {"type":"response","id":"r1","ok":false,"error":"missing param \"config\""}
     {"type":"response","id":"r1","ok":false,"error":"no pending confirmation for tool call \"nope\""}
@@ -474,8 +474,17 @@ let%expect_test "shell runs a command, streams tool events, and adds to context"
   =
   with_agent []
   @@ fun t agent h ->
+  (* How the pipe splits the output varies, so chunks are joined. *)
+  let output = Buffer.create 16 in
   Agent.subscribe agent ~f:(fun e ->
-    print_endline (mask t (Json.to_string (Rpc_json.event e))));
+    match e with
+    | Loop (Tool_output { chunk; _ }) -> Buffer.add_string output chunk
+    | _ ->
+      if Buffer.length output > 0
+      then (
+        printf "tool_output (joined): %S\n" (Buffer.contents output);
+        Buffer.clear output);
+      print_endline (mask t (Json.to_string (Rpc_json.event e))));
   call
     t
     h
@@ -485,7 +494,7 @@ let%expect_test "shell runs a command, streams tool events, and adds to context"
   [%expect
     {|
     {"type":"event","event":"tool_start","call":{"id":"shell-0","name":"shell","arguments":"{\"command\":\"printf 'a\\\\nb'\"}"}}
-    {"type":"event","event":"tool_output","call_id":"shell-0","chunk":"a\nb"}
+    tool_output (joined): "a\nb"
     {"type":"event","event":"tool_end","call":{"id":"shell-0","name":"shell","arguments":"{\"command\":\"printf 'a\\\\nb'\"}"},"result":{"role":"tool_result","tool_call_id":"shell-0","tool_name":"shell","text":"a\nb","is_error":false}}
     {"type":"event","event":"message_start","message":{"role":"user","text":"$ printf 'a\\nb'\na\nb"}}
     {"type":"event","event":"message_end","message":{"role":"user","text":"$ printf 'a\\nb'\na\nb"}}
@@ -1053,5 +1062,73 @@ let%expect_test "list_dirs: on the active host, or a named one" =
     {"type":"response","id":"r1","ok":true,"result":["beta/"]}
     {"type":"event","event":"tool_exec","host":"client-2","exec_id":"<id>/list_dirs-0","call_id":"list_dirs","name":"$list_dirs","arguments":{"prefix":"~/de"},"cwd":"/home/me/proj"}
     {"type":"response","id":"r1","ok":true,"result":["~/dev/"]}
+    |}]
+;;
+
+let%expect_test "change_default saves the current model and thinking level" =
+  with_agent []
+  @@ fun t agent h ->
+  Agent.subscribe agent ~f:(function
+    | Config_changed _ as e -> print_endline (Json.to_string (Rpc_json.event e))
+    | _ -> ());
+  call t h ~params:{|{"model": "deepseek-v4-pro"}|} "set_model";
+  call t h ~params:{|{"thinking": "max"}|} "set_thinking";
+  call t h "change_default";
+  call t h "get_config";
+  call t h "new_session";
+  let s = Agent.state (current h) in
+  print_s [%sexp (Model.key s.model : string), (s.thinking : Thinking.t)];
+  [%expect
+    {|
+    {"type":"response","id":"r1","ok":true,"result":{}}
+    {"type":"response","id":"r1","ok":true,"result":{}}
+    {"type":"event","event":"config_changed","config":{"scoped_models":[],"confirm_tools":false,"default_model":"deepseek/deepseek-v4-pro","default_thinking":"max"}}
+    {"type":"response","id":"r1","ok":true,"result":{"scoped_models":[],"confirm_tools":false,"default_model":"deepseek/deepseek-v4-pro","default_thinking":"max"}}
+    {"type":"response","id":"r1","ok":true,"result":{"scoped_models":[],"confirm_tools":false,"default_model":"deepseek/deepseek-v4-pro","default_thinking":"max"}}
+    {"type":"response","id":"r1","ok":true,"result":{}}
+    (deepseek/deepseek-v4-pro (On (Max)))
+    |}]
+;;
+
+let%expect_test
+    "a login's URL and prompts go only to the client that started it"
+  =
+  with_agent []
+  @@ fun t _agent h ->
+  let other_sent = Queue.create () in
+  let other = Rpc_server.connect h.server ~send:(Queue.enqueue other_sent) in
+  let dump () =
+    let show who q =
+      Queue.iter q ~f:(fun json ->
+        let line = Json.to_string json in
+        if String.is_substring line ~substring:{|"event":"auth"|}
+        then printf "%s: %s\n" who line);
+      Queue.clear q
+    in
+    show "starter" h.sent;
+    show "other" other_sent
+  in
+  Queue.clear h.sent;
+  call t h ~params:{|{"provider": "deepseek"}|} "login";
+  dump ();
+  (* A second login while one runs fails and leaves the flow with its owner. *)
+  print_endline
+    (Json.to_string
+       (Rpc_server.handle
+          h.server
+          other
+          (Json.of_string
+             {|{"id": "o1", "method": "login", "params": {"provider": "anthropic", "method": "api_key"}}|})));
+  call t h ~params:{|{"id": "p1", "value": "sk-test"}|} "auth_respond";
+  Login_manager.wait h.login;
+  dump ();
+  [%expect
+    {|
+    {"type":"response","id":"r1","ok":true,"result":{}}
+    starter: {"type":"event","event":"auth","kind":"prompt","id":"p1","prompt":"secret","message":"Enter DeepSeek API key"}
+    {"type":"response","id":"o1","ok":false,"error":"a login is already in progress"}
+    {"type":"response","id":"r1","ok":true,"result":{}}
+    starter: {"type":"event","event":"auth","kind":"done","provider":"deepseek","method":"api_key"}
+    other: {"type":"event","event":"auth","kind":"done","provider":"deepseek","method":"api_key"}
     |}]
 ;;

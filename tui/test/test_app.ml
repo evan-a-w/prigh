@@ -728,11 +728,11 @@ let%expect_test "typing / lists commands, Down twice + Tab fills /login " =
       /hotkeys                        show keyboard shortcuts
       /model [name|id|provider/id]    pick or switch the model
       /scoped-models                  pick the models Ctrl+P cy…
+      /change_default                 save the current model an…
       /login [provider] [api_key|oauth]  log in to a provider
       /logout [provider]              remove a provider's store…
       /thinking [off|low|on|high|max]  pick or set the thinking…
-      /verbosity [quiet|normal|verbose]  set the transcript ver…
-      ↕ 1–8 of 30
+      ↕ 1–8 of 31
     …deepseek-flash  ctx:0% 1.5k  Tab/Enter accept · Esc close
     |}];
   H.key h (Key.plain Down);
@@ -745,11 +745,11 @@ let%expect_test "typing / lists commands, Down twice + Tab fills /login " =
     ▸ /hotkeys                        show keyboard shortcuts
       /model [name|id|provider/id]    pick or switch the model
       /scoped-models                  pick the models Ctrl+P cy…
+      /change_default                 save the current model an…
       /login [provider] [api_key|oauth]  log in to a provider
       /logout [provider]              remove a provider's store…
       /thinking [off|low|on|high|max]  pick or set the thinking…
-      /verbosity [quiet|normal|verbose]  set the transcript ver…
-      ↕ 1–8 of 30
+      ↕ 1–8 of 31
     …deepseek-flash  ctx:0% 1.5k  Tab/Enter accept · Esc close
     |}];
   H.key h (Key.plain Down);
@@ -762,11 +762,11 @@ let%expect_test "typing / lists commands, Down twice + Tab fills /login " =
       /hotkeys                        show keyboard shortcuts
     ▸ /model [name|id|provider/id]    pick or switch the model
       /scoped-models                  pick the models Ctrl+P cy…
+      /change_default                 save the current model an…
       /login [provider] [api_key|oauth]  log in to a provider
       /logout [provider]              remove a provider's store…
       /thinking [off|low|on|high|max]  pick or set the thinking…
-      /verbosity [quiet|normal|verbose]  set the transcript ver…
-      ↕ 1–8 of 30
+      ↕ 1–8 of 31
     …deepseek-flash  ctx:0% 1.5k  Tab/Enter accept · Esc close
     |}];
   H.key h (Key.plain Tab);
@@ -3282,12 +3282,20 @@ let%expect_test "config: get_config at Start installs the reply; \
   H.event
     h
     (P.Event.Config_changed
-       { scoped_models = [ "deepseek/deepseek-flash" ]; confirm_tools = false });
+       { P.Config.default with scoped_models = [ "deepseek/deepseek-flash" ] });
   print_s [%sexp (h.model.config : P.Config.t option)];
   [%expect
     {|
-    (((scoped_models (anthropic/claude-fable-5-1)) (confirm_tools true)))
-    (((scoped_models (deepseek/deepseek-flash)) (confirm_tools false)))
+    ((
+      (scoped_models (anthropic/claude-fable-5-1))
+      (confirm_tools true)
+      (default_model    ())
+      (default_thinking ())))
+    ((
+      (scoped_models (deepseek/deepseek-flash))
+      (confirm_tools false)
+      (default_model    ())
+      (default_thinking ())))
     |}]
 ;;
 
@@ -3381,7 +3389,9 @@ let%expect_test "/scoped-models: multi-select toggle, Ctrl+A, Ctrl+X, save" =
             anthropic/claude-fable-5-1
             openai/gpt-5.5
             deepseek/deepseek-flash))
-          (confirm_tools false)))))
+          (confirm_tools    false)
+          (default_model    null)
+          (default_thinking null)))))
       (tag Config_saved))
     |}];
   H.reply
@@ -4172,6 +4182,56 @@ let%expect_test "tool confirm: allow, deny, queue and Esc-abort" =
     |}]
 ;;
 
+let%expect_test "/change_default saves the model and thinking level" =
+  let h = connected () in
+  H.reply
+    ~quiet:true
+    h
+    Config
+    {|{"scoped_models":["deepseek/deepseek-flash"],"confirm_tools":true}|};
+  H.keys h "/change_default";
+  H.enter h;
+  H.reply
+    h
+    Default_saved
+    {|{"scoped_models":["deepseek/deepseek-flash"],"confirm_tools":true,"default_model":"deepseek/deepseek-flash","default_thinking":"high"}|};
+  print_s [%sexp (h.model.config : P.Config.t option)];
+  H.show h;
+  (* A later set_config keeps the saved defaults. *)
+  H.keys h "/confirm off";
+  H.enter h;
+  [%expect
+    {|
+    (Rpc (method_ change_default) (params ()) (tag Default_saved))
+    ((
+      (scoped_models (deepseek/deepseek-flash))
+      (confirm_tools true)
+      (default_model    (deepseek/deepseek-flash))
+      (default_thinking (high))))
+
+
+
+
+    session abc123 in /work. /help for commands, Esc aborts,
+    Ctrl+C twice quits.
+    > earlier question
+    earlier answer
+    default: deepseek/deepseek-flash, thinking high
+    ────────────────────────────────────────────────────────────
+    > ▏
+    …deepseek-flash  think:off  view:normal  ctx:0% 1.5k  $0.01
+    (Rpc
+      (method_ set_config)
+      (params ((
+        config (
+          (scoped_models (deepseek/deepseek-flash))
+          (confirm_tools    false)
+          (default_model    deepseek/deepseek-flash)
+          (default_thinking high)))))
+      (tag (Notice_on_success "tool confirmation off")))
+    |}]
+;;
+
 let%expect_test "/confirm on saves confirm_tools through set_config" =
   let h = connected () in
   H.reply
@@ -4186,7 +4246,11 @@ let%expect_test "/confirm on saves confirm_tools through set_config" =
     (Rpc
       (method_ set_config)
       (params ((
-        config ((scoped_models (deepseek/deepseek-flash)) (confirm_tools true)))))
+        config (
+          (scoped_models (deepseek/deepseek-flash))
+          (confirm_tools    true)
+          (default_model    null)
+          (default_thinking null)))))
       (tag (Notice_on_success "tool confirmation on")))
     |}];
   H.reply h (Notice_on_success "tool confirmation on") {|{}|};
@@ -4232,7 +4296,12 @@ let%expect_test "/confirm on saves confirm_tools through set_config" =
     {|
     (Rpc
       (method_ set_config)
-      (params ((config ((scoped_models ()) (confirm_tools false)))))
+      (params ((
+        config (
+          (scoped_models ())
+          (confirm_tools    false)
+          (default_model    null)
+          (default_thinking null)))))
       (tag (Notice_on_success "tool confirmation off")))
     |}];
   H.reply h (Notice_on_success "tool confirmation off") {|{}|};
@@ -5594,11 +5663,11 @@ let%expect_test "Tab on an empty editor opens the command list; the list shows \
       /hotkeys                        show keyboard shortcuts
       /model [name|id|provider/id]    pick or switch the model
       /scoped-models                  pick the models Ctrl+P cy…
+      /change_default                 save the current model an…
       /login [provider] [api_key|oauth]  log in to a provider
       /logout [provider]              remove a provider's store…
       /thinking [off|low|on|high|max]  pick or set the thinking…
-      /verbosity [quiet|normal|verbose]  set the transcript ver…
-      ↕ 1–8 of 30
+      ↕ 1–8 of 31
     …deepseek-flash  ctx:0% 1.5k  Tab/Enter accept · Esc close
     |}];
   H.key h (Key.plain End);
@@ -5611,11 +5680,11 @@ let%expect_test "Tab on an empty editor opens the command list; the list shows \
       /hotkeys                        show keyboard shortcuts
       /model [name|id|provider/id]    pick or switch the model
       /scoped-models                  pick the models Ctrl+P cy…
+      /change_default                 save the current model an…
       /login [provider] [api_key|oauth]  log in to a provider
       /logout [provider]              remove a provider's store…
       /thinking [off|low|on|high|max]  pick or set the thinking…
-      /verbosity [quiet|normal|verbose]  set the transcript ver…
-      ↕ 1–8 of 30
+      ↕ 1–8 of 31
     …deepseek-flash  ctx:0% 1.5k  Tab/Enter accept · Esc close
     |}];
   H.keys h "qu";

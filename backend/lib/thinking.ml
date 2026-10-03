@@ -17,6 +17,12 @@ type t =
   | On of Level.t option
 [@@deriving sexp, jsonaf, equal]
 
+let to_string = function
+  | Off -> "off"
+  | On None -> "on"
+  | On (Some level) -> Level.to_string level
+;;
+
 let of_string s =
   match String.lowercase (String.strip s) with
   | "off" -> Ok Off

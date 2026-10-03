@@ -259,8 +259,12 @@ two can share one.
   (never `context_tokens`), and `State` also carries the session name, cwd
   and `git_branch`. `respond_confirm` answers a pending `Tool_confirm`.
 - `Config` — `~/.prigh/config.json` (`scoped_models : string list`,
-  `confirm_tools : bool`), loaded at agent creation, read/written through
-  `get_config`/`set_config`; unknown fields are ignored.
+  `confirm_tools : bool`, `default_model`/`default_thinking`), loaded at
+  agent creation, read/written through `get_config`/`set_config`; unknown
+  fields are ignored. `Agent.save_as_default` (`change_default`,
+  `/change_default`) rereads the file and records the agent's current model
+  and thinking level there; agents created without an explicit `-model`/
+  `-thinking` start from them (a loaded session's own settings still win).
 - `Session` — an append-only JSONL log forming a tree: every entry has a
   `parent`, the active conversation is the path from the root to `head`.
   Rewinding moves `head`; forking copies the active path to a new file.
@@ -297,7 +301,10 @@ two can share one.
   never stalls the reader that must deliver the client's own
   `tool_exec_result`). Agent events are routed to the clients attached to
   that agent, except `tool_exec`/`tool_exec_cancel`, which go to the named
-  host only; login events go to everyone. The session methods
+  host only. A login's URL, prompts and progress go only to the client that
+  started it (another frontend, perhaps on another machine, must not open a
+  browser or a dialog for it); its outcome (`done`, `failed`, `logged_out`)
+  goes to everyone. The session methods
   (`new_session`, `switch_session` by id or path, `fork`, `clone`, `import`)
   create or load an agent and move only the calling client; `list_sessions`
   marks live sessions with `live`, `running` and `clients`; `delete_session`
@@ -309,6 +316,7 @@ two can share one.
   `new_session`, `switch_session`, `list_sessions`, `set_session_name`,
   `delete_session`, `export`, `import`, `fork`, `clone`, `rewind`,
   `session_stats`, `set_cwd`, `list_paths`, `list_dirs`, `get_config`, `set_config`,
+  `change_default`,
   `tool_confirm_respond`, `set_active_host`, `tool_exec_output`,
   `tool_exec_result`, `auth_status`, `login`, `auth_respond`, `auth_cancel`,
   `logout`. `State` carries `active_host` and `hosts` (the backend first).
@@ -318,11 +326,31 @@ two can share one.
   byte is `{` is a plain JSON-lines client (the TUI's `-connect`) and goes
   straight to `Rpc_server.serve_lines`, so one port serves terminals and
   browsers alike; otherwise one HTTP/1.1 request per connection, `GET /ws`
-  upgraded and handed to `Rpc_server.serve_lines`,
+  upgraded and handed to `Rpc_server.serve_lines`, `GET /terminal` upgraded
+  and handed to `Terminals` (below),
   anything else served from the web root (the built `tui/web-bin/site`,
   found via `-web-root`, `$PRIGH_WEB_ROOT` or next to the executable;
   no `..`, no dot files). The token check is the same `hello` check as
   for TCP; the static files are public.
+- `Terminal` / `Terminals` / `Tmux_control` — the browser's shell panel.
+  A `Terminal` is a tmux session on the server `-L prigh` (session names
+  carry the backend's pid; `$PRIGH_TMUX` picks the binary) driven by one
+  control-mode client (`tmux -C`) over pipes, so no pty is needed:
+  `Tmux_control` parses its output into pane bytes (`%output`, unescaped),
+  replies to our commands (`%begin`…`%end`/`%error`, matched in order) and
+  `%exit`. Input is `send-keys -H`, resizing `refresh-client -C`. A new
+  viewer's replay (`display-message` for the cursor and modes, then
+  `capture-pane` of the screen and scrollback, and of the normal screen when
+  an application has the alternate one) goes through the same client, so it
+  lines up exactly with the live output after it. `Terminals` keys
+  terminals by session id (cwd: that session's directory on the backend)
+  and serves the `/terminal` WebSocket: binary frames carry bytes both
+  ways, text frames carry `resize`, `ping`/`pong`, `exit` and `error`.
+  Leaks are prevented at three levels: a socket silent for 30 s is closed
+  (the page pings every 10 s), a terminal with no sockets for 10 minutes is
+  killed, and every session has `destroy-unattached` with our control
+  client as its only client, so when the backend dies (even by SIGKILL) the
+  client sees EOF, exits, and tmux destroys the shell.
 
 - `Pi_protocol` / `Pi_rpc` — pi's RPC protocol (what pi's web UI in
   `pi-web/` speaks) on top of `Rpc_server`: one WebSocket connection is one
@@ -339,7 +367,7 @@ two can share one.
   `thinking_level_changed`/`agent_settled` derived by diffing `state`
   events, suppressed while running a command the frontend re-syncs after).
   The prigh-only slash commands (`/login`, `/logout`, `/auth`, `/sessions`,
-  `/switch`, `/host`, `/help`) arrive as prompts and run in the adapter;
+  `/switch`, `/host`, `/change_default`, `/help`) arrive as prompts and run in the adapter;
   `list_sessions`/`switch_session` are pi-protocol additions for the
   sidebar. `serve -pi-web HOST:PORT` is a second `Web_server` listener whose
   `/ws?token=&session=&name=` goes to `Pi_rpc.serve_websocket` (the query
@@ -362,9 +390,9 @@ share `-model`, `-thinking`, `-session`, `-cwd`, `-no-tools`, `-faux` (and
 for `serve`, `-session` is the default session, the one a client lands on
 when its `hello` names none; without it every new client starts in a fresh
 session of its own (sharing one is explicit: `hello` with the session id or
-path, which is also how a frontend reattaches after a reconnect). With no explicit model or session, the default
-model is the first logged-in provider's in the order anthropic, openai-codex,
-openai, deepseek.
+path, which is also how a frontend reattaches after a reconnect). With no explicit model, a new
+session uses the config's `default_model`, else the first logged-in
+provider's in the order anthropic, openai-codex, openai, deepseek.
 
 ## Frontend (`tui/`)
 
@@ -474,9 +502,18 @@ copy of the protocol types and the e2e test guards the contract.
   `navigator.clipboard`, `window.open`; suspend and the external editor
   report themselves unavailable. A failed first `hello` shows a connect
   form instead (the token is saved and the selected backend is put in the
-  reloaded page's query string). `web-bin/` is
-  the js_of_ocaml executable plus `index.html`/`style.css`, assembled
-  under `web-bin/site/` and installed to `share/prigh_tui/web`.
+  reloaded page's query string). The page's `?session=` follows the current
+  session (`history.replaceState`), so a reload rejoins it. The app sits in
+  `#screen-area` (whose height `Browser.grid_size` measures) next to an
+  optional `Terminal_panel`: a `>_` button opens it, and it is a
+  `Vdom.Node.widget` around `web-bin/terminal.js` (xterm.js and its fit
+  addon, vendored in `web-bin/vendor/`): connect with the size, reset on
+  open (the first message is the replay), reconnect with backoff, ping, and
+  a key after the shell exits starts a new one. Keys, pastes, wheel and
+  touches inside the panel are left to xterm.js. `web-bin/` is
+  the js_of_ocaml executable plus `index.html`/`style.css`/`terminal.js`
+  and the vendored xterm.js, assembled under `web-bin/site/` and installed
+  to `share/prigh_tui/web`.
 - `bin/` — `prigh-tui` (`-faux`, `-session`, `-model`, `-cwd`, `-auth-file`,
   `-backend`; `PRIGH_BACKEND` overrides the backend path). `-connect
   HOST:PORT` (`$PRIGH_CONNECT`) joins a running backend instead of spawning

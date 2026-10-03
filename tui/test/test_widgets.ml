@@ -630,6 +630,7 @@ let%expect_test "keymap: every binding resolves to its intent and is documented"
     /hotkeys                           show keyboard shortcuts
     /model [name|id|provider/id]       pick or switch the model
     /scoped-models                     pick the models Ctrl+P cycles through
+    /change_default                    save the current model and thinking level as the default for new sessions
     /login [provider] [api_key|oauth]  log in to a provider
     /logout [provider]                 remove a provider's stored credential
     /thinking [off|low|on|high|max]    pick or set the thinking level

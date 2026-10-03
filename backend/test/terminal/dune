@@ -1,0 +1,9 @@
+; Runs a real tmux; skipped where there is none.
+
+(library
+ (name prigh_terminal_test)
+ (enabled_if %{bin-available:tmux})
+ (preprocess
+  (pps ppx_jane))
+ (inline_tests)
+ (libraries core core_unix prigh prigh_test eio eio.unix eio_main))

@@ -92,23 +92,8 @@ let delta (d : Assistant_event.t) =
       ]
 ;;
 
-let thinking (t : Thinking.t) =
-  match t with
-  | Off -> str "off"
-  | On None -> str "on"
-  | On (Some level) -> str (Thinking.Level.to_string level)
-;;
-
-let thinking_of_string s : Thinking.t Or_error.t =
-  match String.lowercase s with
-  | "off" -> Ok Off
-  | "on" -> Ok (On None)
-  | s ->
-    (match Thinking.Level.of_string s with
-     | Some level -> Ok (On (Some level))
-     | None ->
-       Or_error.error_string "thinking must be one of: off, on, low, high, max")
-;;
+let thinking t = str (Thinking.to_string t)
+let thinking_of_string = Thinking.of_string
 
 let model (m : Model.t) =
   `Object

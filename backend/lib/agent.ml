@@ -151,12 +151,29 @@ let create
       ~sessions_dir
       ~home
       ?session
-      ?(model = Model.default)
-      ?(thinking = Thinking.Off)
+      ?model
+      ?thinking
+      ?(fallback_model = Model.default)
       ?(auto_describe = false)
       ~cwd
       ()
   =
+  let config =
+    match Config.load ~home with
+    | Ok config -> config
+    | Error _ -> Config.default
+  in
+  let model =
+    match model with
+    | Some model -> model
+    | None ->
+      Option.bind config.default_model ~f:Model.find
+      |> Option.value ~default:fallback_model
+  in
+  let thinking =
+    Option.first_some thinking config.default_thinking
+    |> Option.value ~default:Thinking.Off
+  in
   let session =
     match session with
     | Some s -> s
@@ -183,10 +200,7 @@ let create
     ; subscribers = []
     ; subagent_usage = Usage.zero
     ; subagent_cost_usd = 0.
-    ; config =
-        (match Config.load ~home with
-         | Ok config -> config
-         | Error _ -> Config.default)
+    ; config
     ; pending_confirms = String.Table.create ()
     ; shell_seq = 0
     ; hosts = []
@@ -282,6 +296,16 @@ let set_config t config =
   Or_error.map (Config.save ~home:t.home config) ~f:(fun () ->
     t.config <- config;
     broadcast t (Config_changed config))
+;;
+
+let save_as_default t =
+  Or_error.bind (Config.load ~home:t.home) ~f:(fun config ->
+    set_config
+      t
+      { config with
+        default_model = Some (Model.key t.model)
+      ; default_thinking = Some t.thinking
+      })
 ;;
 
 let respond_confirm t ~call_id ~allow =

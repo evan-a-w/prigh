@@ -32,6 +32,7 @@ module Reply_tag : sig
     | Set_model_done of string
     | Config
     | Config_saved
+    | Default_saved
     | Config_for_confirm of bool
     | Models_catalog
     | Models_for_scoped

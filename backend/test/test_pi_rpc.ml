@@ -161,7 +161,7 @@ let%expect_test "hello sets status entries; state, commands, models, stats" =
     {"type":"extension_ui_request","id":"status-host","method":"setStatus","statusKey":"host","statusText":null}
     {"type":"extension_ui_request","id":"status-branch","method":"setStatus","statusKey":"branch","statusText":null}
     {"id":"q","type":"response","command":"get_state","success":true,"data":{"model":{"id":"deepseek-flash","name":"DeepSeek V4.1 Flash","provider":"deepseek","reasoning":true,"contextWindow":1000000},"cwd":"$DIR","thinkingLevel":"off","isStreaming":false,"isCompacting":false,"steeringMode":"all","followUpMode":"all","sessionFile":"$DIR/sessions/<stamp>_<id>.jsonl","sessionId":"<id>","autoCompactionEnabled":true,"messageCount":0,"pendingMessageCount":0}}
-    {"id":"q","type":"response","command":"get_commands","success":true,"data":{"commands":[{"name":"compact","description":"Compact the context","source":"builtin","argumentHint":"[instructions]"},{"name":"new","description":"Start a new session","source":"builtin"},{"name":"name","description":"Name the session","source":"builtin","argumentHint":"<name>"},{"name":"model","description":"Pick a model","source":"builtin","argumentHint":"[name]"},{"name":"thinking","description":"Set or cycle the thinking level","source":"builtin","argumentHint":"[level]"},{"name":"session","description":"Show session info","source":"builtin"},{"name":"export","description":"Export the session as markdown (on the backend)","source":"builtin","argumentHint":"[path]"},{"name":"copy","description":"Copy the last assistant message","source":"builtin"},{"name":"fork","description":"Fork the session from an earlier message","source":"builtin"},{"name":"clone","description":"Clone the session","source":"builtin"},{"name":"cd","description":"Change the working directory","source":"builtin","argumentHint":"[dir]"},{"name":"login","description":"Log in to a provider","source":"extension","argumentHint":"[provider] [oauth|api_key]"},{"name":"logout","description":"Log out of a provider","source":"extension","argumentHint":"<provider>"},{"name":"auth","description":"Show provider credentials","source":"extension"},{"name":"sessions","description":"Pick a saved session to switch to","source":"extension"},{"name":"switch","description":"Switch to a session by id or path","source":"extension","argumentHint":"<id|path>"},{"name":"host","description":"Pick where tools run","source":"extension"},{"name":"help","description":"List the commands","source":"extension"}]}}
+    {"id":"q","type":"response","command":"get_commands","success":true,"data":{"commands":[{"name":"compact","description":"Compact the context","source":"builtin","argumentHint":"[instructions]"},{"name":"new","description":"Start a new session","source":"builtin"},{"name":"name","description":"Name the session","source":"builtin","argumentHint":"<name>"},{"name":"model","description":"Pick a model","source":"builtin","argumentHint":"[name]"},{"name":"thinking","description":"Set or cycle the thinking level","source":"builtin","argumentHint":"[level]"},{"name":"session","description":"Show session info","source":"builtin"},{"name":"export","description":"Export the session as markdown (on the backend)","source":"builtin","argumentHint":"[path]"},{"name":"copy","description":"Copy the last assistant message","source":"builtin"},{"name":"fork","description":"Fork the session from an earlier message","source":"builtin"},{"name":"clone","description":"Clone the session","source":"builtin"},{"name":"cd","description":"Change the working directory","source":"builtin","argumentHint":"[dir]"},{"name":"login","description":"Log in to a provider","source":"extension","argumentHint":"[provider] [oauth|api_key]"},{"name":"logout","description":"Log out of a provider","source":"extension","argumentHint":"<provider>"},{"name":"auth","description":"Show provider credentials","source":"extension"},{"name":"sessions","description":"Pick a saved session to switch to","source":"extension"},{"name":"switch","description":"Switch to a session by id or path","source":"extension","argumentHint":"<id|path>"},{"name":"host","description":"Pick where tools run","source":"extension"},{"name":"change_default","description":"Save the current model and thinking level as the default","source":"extension"},{"name":"help","description":"List the commands","source":"extension"}]}}
     {"id":"q","type":"response","command":"get_session_stats","success":true,"data":{"sessionFile":"$DIR/sessions/<stamp>_<id>.jsonl","sessionId":"<id>","userMessages":0,"assistantMessages":0,"toolCalls":0,"toolResults":0,"totalMessages":0,"tokens":{"input":0,"output":0,"cacheRead":0,"cacheWrite":0,"total":0},"cost":0,"contextUsage":{"tokens":0,"contextWindow":1000000,"percent":0}}}
     {"id":"q","type":"response","command":"get_messages","success":true,"data":{"messages":[]}}
     {"id":"q","type":"response","command":"nope","success":false,"error":"command \"nope\" is not supported by prigh"}
@@ -551,7 +551,7 @@ let%expect_test "/help, /auth and /login dialogs; a secret prompt is an input" =
   H.dump h;
   [%expect
     {|
-    {"type":"message_end","message":{"role":"custom","customType":"help","content":"- `/compact [instructions]` — Compact the context\n- `/new` — Start a new session\n- `/name <name>` — Name the session\n- `/model [name]` — Pick a model\n- `/thinking [level]` — Set or cycle the thinking level\n- `/session` — Show session info\n- `/export [path]` — Export the session as markdown (on the backend)\n- `/copy` — Copy the last assistant message\n- `/fork` — Fork the session from an earlier message\n- `/clone` — Clone the session\n- `/cd [dir]` — Change the working directory\n- `/login [provider] [oauth|api_key]` — Log in to a provider\n- `/logout <provider>` — Log out of a provider\n- `/auth` — Show provider credentials\n- `/sessions` — Pick a saved session to switch to\n- `/switch <id|path>` — Switch to a session by id or path\n- `/host` — Pick where tools run\n- `/help` — List the commands","display":true,"timestamp":0}}
+    {"type":"message_end","message":{"role":"custom","customType":"help","content":"- `/compact [instructions]` — Compact the context\n- `/new` — Start a new session\n- `/name <name>` — Name the session\n- `/model [name]` — Pick a model\n- `/thinking [level]` — Set or cycle the thinking level\n- `/session` — Show session info\n- `/export [path]` — Export the session as markdown (on the backend)\n- `/copy` — Copy the last assistant message\n- `/fork` — Fork the session from an earlier message\n- `/clone` — Clone the session\n- `/cd [dir]` — Change the working directory\n- `/login [provider] [oauth|api_key]` — Log in to a provider\n- `/logout <provider>` — Log out of a provider\n- `/auth` — Show provider credentials\n- `/sessions` — Pick a saved session to switch to\n- `/switch <id|path>` — Switch to a session by id or path\n- `/host` — Pick where tools run\n- `/change_default` — Save the current model and thinking level as the default\n- `/help` — List the commands","display":true,"timestamp":0}}
     {"id":"q","type":"response","command":"prompt","success":true,"data":{}}
     {"type":"message_end","message":{"role":"custom","customType":"auth","content":"Providers:\n- **Anthropic** `anthropic`: not logged in\n- **OpenAI** `openai`: not logged in\n- **OpenAI Codex (ChatGPT)** `openai-codex`: not logged in\n- **DeepSeek** `deepseek`: not logged in","display":true,"timestamp":1}}
     {"id":"q","type":"response","command":"prompt","success":true,"data":{}}
@@ -653,5 +653,30 @@ let%expect_test "compaction, export, /host" =
     {"type":"extension_ui_request","id":"dialog-8","method":"select","title":"Run tools on","options":["<host> ($DIR) · active"]}
     {"id":"q","type":"response","command":"prompt","success":true,"data":{}}
     {"type":"extension_ui_request","id":"notify-5","method":"notify","message":"unknown choice nowhere","notifyType":"error"}
+    |}]
+;;
+
+let%expect_test "/change_default saves the model and thinking level" =
+  with_server []
+  @@ fun h ->
+  cmd
+    h
+    ~fields:{|, "provider": "deepseek", "modelId": "deepseek-v4-pro"|}
+    "set_model";
+  cmd h ~fields:{|, "level": "high"|} "set_thinking_level";
+  Queue.clear h.output;
+  cmd h ~fields:{|, "message": "/change_default"|} "prompt";
+  H.dump h;
+  print_endline (read h.sandbox ".prigh/config.json");
+  [%expect
+    {|
+    {"type":"extension_ui_request","id":"notify-6","method":"notify","message":"default: deepseek/deepseek-v4-pro, thinking high","notifyType":"info"}
+    {"id":"q","type":"response","command":"prompt","success":true,"data":{}}
+    {
+      "scoped_models": [],
+      "confirm_tools": false,
+      "default_model": "deepseek/deepseek-v4-pro",
+      "default_thinking": "high"
+    }
     |}]
 ;;

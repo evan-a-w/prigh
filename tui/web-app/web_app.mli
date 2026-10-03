@@ -4,7 +4,8 @@ open! Core
     [?backend=] query parameter or this page's origin ([/ws]), sends [hello]
     (with the saved token and [?session=]/[?name=]) and runs the shared Bonsai
     component in [#app]. Shows a connect form instead when the backend cannot be
-    reached. *)
+    reached. The page's [?session=] follows the session, so a reload rejoins it.
+    A button opens a terminal on the backend ({!Terminal_panel}). *)
 val run : unit -> unit
 
 module For_testing : sig
@@ -15,4 +16,12 @@ module For_testing : sig
     -> search:string
     -> backend:string
     -> string
+
+  val terminal_url
+    :  backend:string
+    -> token:string option
+    -> session:string option
+    -> string
+
+  val with_query_param : search:string -> string -> string -> string
 end

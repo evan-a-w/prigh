@@ -101,7 +101,10 @@ val create
   -> home:string
   -> ?session:Session.t
   -> ?model:Model.t
+       (** default: the config's [default_model], else [fallback_model] *)
   -> ?thinking:Thinking.t
+       (** default: the config's [default_thinking], else [Off] *)
+  -> ?fallback_model:Model.t (** default: [Model.default] *)
   -> ?auto_describe:bool
        (** write a [Session_description] after a turn once the conversation
            is long enough (default: false) *)
@@ -161,6 +164,11 @@ val config : t -> Config.t
 
 (** Writes the configuration and emits [Event.Config_changed]. *)
 val set_config : t -> Config.t -> unit Or_error.t
+
+(** Saves the current model and thinking level as the defaults for new
+    sessions. Rereads the config file first, so settings changed by other
+    sessions are kept. *)
+val save_as_default : t -> unit Or_error.t
 
 (** Answers a pending [Tool_confirm] request. Fails if no confirmation is
     outstanding for [call_id]. *)

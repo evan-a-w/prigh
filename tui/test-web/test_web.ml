@@ -67,6 +67,35 @@ let%expect_test "web connection: same-origin is stable unless explicitly \
     |}]
 ;;
 
+let%expect_test "web connection: the terminal URL and the session in the page \
+                 URL"
+  =
+  let terminal backend ?token ?session () =
+    Prigh_ui_web_app.Web_app.For_testing.terminal_url ~backend ~token ~session
+    |> print_endline
+  in
+  terminal "ws://127.0.0.1:7777/ws" ();
+  terminal "wss://host.example/ws?x=1" ~token:"sekrit&x=y" ~session:"abc" ();
+  terminal "ws://host:9000/" ~session:"s" ();
+  let with_session search =
+    Prigh_ui_web_app.Web_app.For_testing.with_query_param
+      ~search
+      "session"
+      "a b&c"
+    |> print_endline
+  in
+  with_session "";
+  with_session "?backend=ws%3A%2F%2Fx&session=old&name=laptop";
+  [%expect
+    {|
+    ws://127.0.0.1:7777/terminal
+    wss://host.example/terminal?token=sekrit%26x%3Dy&session=abc
+    ws://host:9000/terminal?session=s
+    ?session=a%20b%26c
+    ?backend=ws%3A%2F%2Fx&name=laptop&session=a%20b%26c
+    |}]
+;;
+
 let event
   ?(code = "")
   ?(ctrl = false)

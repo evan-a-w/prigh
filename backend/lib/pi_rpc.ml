@@ -715,6 +715,16 @@ let pick_host t =
          |> Or_error.ignore_m)))
 ;;
 
+let change_default t =
+  Or_error.map (call t "change_default" []) ~f:(fun config ->
+    notify
+      t
+      (sprintf
+         "default: %s, thinking %s"
+         (string_field "default_model" config)
+         (string_field "default_thinking" config)))
+;;
+
 let help t =
   let lines =
     List.map (list_field "commands" P.commands) ~f:(fun c ->
@@ -748,6 +758,7 @@ let slash_command t text =
      | "switch", key :: _ -> switch_session t key
      | "switch", [] -> Or_error.error_string "usage: /switch <id|path>"
      | "host", _ -> pick_host t
+     | "change_default", _ -> change_default t
      | "help", _ -> Ok (help t)
      | name, _ -> Or_error.errorf "unknown command /%s" name)
 ;;

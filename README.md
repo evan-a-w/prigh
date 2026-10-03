@@ -119,10 +119,16 @@ connections, so one port serves browsers and terminals on the same sessions
 
 The page connects to its own origin by default; `?backend=ws://host:port/ws`
 points a page served from one place at a backend elsewhere, `?session=ID`
-joins a session and `?name=` names the frontend in `/host`. Tools run on the
+joins a session (the page keeps it up to date, so a reload stays in the
+session) and `?name=` names the frontend in `/host`. Tools run on the
 backend (a browser cannot host them; `/host` still switches to any connected
 tool host). Prompt history lives in `localStorage`; Ctrl+Z and Ctrl+G have no
-browser equivalent and say so. Plain `ws://` with a shared token: bind to
+browser equivalent and say so. The `>_` button (top right) opens a shell on
+the backend machine in the session's directory, in a panel under the app
+(it needs `tmux` on the backend; the nix package brings its own). Closing
+the panel keeps the shell, so reopening it or reloading the page finds it
+again; it is killed after 10 minutes with no page attached, when it exits,
+or when the backend stops. Plain `ws://` with a shared token: bind to
 localhost and use an SSH tunnel or a TLS-terminating proxy on untrusted
 networks.
 
@@ -264,8 +270,10 @@ context.
 Submitted prompts are kept in `~/.prigh/history` (one JSON string per line,
 last 500) and loaded on start; secrets from login prompts are never recorded.
 `~/.prigh/config.json` holds `scoped_models` (the models Ctrl+P cycles
-through; `/scoped-models` edits it) and `confirm_tools` (ask before
-destructive `bash`/`write`/`edit`; `/confirm on|off`).
+through; `/scoped-models` edits it), `confirm_tools` (ask before
+destructive `bash`/`write`/`edit`; `/confirm on|off`) and
+`default_model`/`default_thinking` (what new sessions start with unless
+`-model`/`-thinking` is given; `/change_default` saves the current ones).
 
 ### Slash commands
 
@@ -274,6 +282,7 @@ destructive `bash`/`write`/`edit`; `/confirm on|off`).
 | `/help`, `/hotkeys` | commands and keys / keys only |
 | `/model [name\|id\|provider/id]` | pick or switch the model |
 | `/scoped-models` | pick the models Ctrl+P cycles through |
+| `/change_default` | save the current model and thinking level as the default for new sessions |
 | `/login [provider] [api_key\|oauth]`, `/logout [provider]`, `/auth` | credentials |
 | `/thinking [off\|on\|low\|high\|max]` | set the thinking level |
 | `/verbosity [quiet\|normal\|verbose]` | set the transcript verbosity |

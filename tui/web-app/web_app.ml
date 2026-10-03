@@ -138,6 +138,8 @@ let platform client ~hello ~schedule ~quit : Prigh_ui.Component.Platform.t =
 module For_testing = struct
   let choose_backend = Settings.choose_backend
   let href_with_backend = Browser.href_with_backend
+  let terminal_url = Terminal_panel.url
+  let with_query_param = Browser.with_query_param
 end
 
 module Result_ = struct
@@ -154,17 +156,70 @@ module Result_ = struct
   let incoming t action = t.inject action
 end
 
-let app platform (local_ graph) =
+let keyboard_input () =
+  Dom_html.getElementById_coerce "keyboard-input" Dom_html.CoerceTo.textarea
+;;
+
+let focus_keyboard_input () =
+  Option.iter (keyboard_input ()) ~f:(fun input ->
+    input##.value := Js.string "";
+    input##focus)
+;;
+
+(* Set by [install_listeners]: refits the app's grid to [#screen-area]. *)
+let relayout = ref Fn.id
+
+let app platform ~terminal_url (local_ graph) =
   let model, inject =
     Prigh_ui.Component.create ~start_on_activate:false platform graph
   in
-  let view =
+  let session =
     let%arr model in
+    Option.map model.Prigh_ui.App.Model.state ~f:(fun s ->
+      s.Prigh_protocol.State.session_id)
+  in
+  (* The page's URL names its session, so a reload rejoins it. *)
+  Bonsai.Edge.on_change
+    ~equal:[%equal: string option]
+    session
+    ~callback:
+      (Bonsai.return (fun session ->
+         Effect.of_sync_fun
+           (Option.iter ~f:(Browser.replace_query_param "session"))
+           session))
+    graph;
+  let terminal_open, set_terminal_open = Bonsai.state false graph in
+  let view =
+    let%arr model and session and terminal_open and set_terminal_open in
+    let set_open value =
+      Effect.Many
+        [ set_terminal_open value
+        ; Effect.of_sync_fun
+            (fun () ->
+              Browser.after_render (fun () ->
+                !relayout ();
+                if not value then focus_keyboard_input ()))
+            ()
+        ]
+    in
     (* Bonsai replaces the element it binds to, so keep an [#app] wrapper for
        the messages shown after the app stops. *)
     Vdom.Node.div
       ~attrs:[ Vdom.Attr.id "app" ]
-      [ Prigh_ui_web.Dom_of_screen.screen (Prigh_ui.Render.screen model) ]
+      [ Vdom.Node.div
+          ~attrs:[ Vdom.Attr.id "screen-area" ]
+          [ Prigh_ui_web.Dom_of_screen.screen (Prigh_ui.Render.screen model)
+          ; (if terminal_open
+             then Vdom.Node.none
+             else Terminal_panel.open_button ~on_click:(set_open true))
+          ]
+      ; (if terminal_open
+         then
+           Terminal_panel.view
+             ~url:(terminal_url ~session)
+             ~on_close:(set_open false)
+         else Vdom.Node.none)
+      ]
   in
   let%arr view and inject in
   { Result_.view; inject }
@@ -181,16 +236,6 @@ let key_event (ev : Dom_html.keyboardEvent Js.t)
   ; shift = Js.to_bool ev##.shiftKey
   ; meta = Js.to_bool ev##.metaKey
   }
-;;
-
-let keyboard_input () =
-  Dom_html.getElementById_coerce "keyboard-input" Dom_html.CoerceTo.textarea
-;;
-
-let focus_keyboard_input () =
-  Option.iter (keyboard_input ()) ~f:(fun input ->
-    input##.value := Js.string "";
-    input##focus)
 ;;
 
 let event_target (ev : #Dom_html.event Js.t) = Dom_html.eventTarget ev
@@ -211,6 +256,10 @@ let form_control (ev : #Dom_html.event Js.t) =
   || Js.Opt.test (Dom_html.CoerceTo.select target)
 ;;
 
+let in_terminal (ev : #Dom_html.event Js.t) =
+  Terminal_panel.contains (event_target ev)
+;;
+
 let install_listeners ~schedule =
   let document = Dom_html.document in
   ignore
@@ -218,7 +267,7 @@ let install_listeners ~schedule =
        document
        Dom_html.Event.keydown
        (Dom.handler (fun ev ->
-          if form_control ev
+          if form_control ev || in_terminal ev
           then Js._true
           else (
             match Prigh_ui_web.Key_of_dom.key (key_event ev) with
@@ -234,7 +283,7 @@ let install_listeners ~schedule =
        document
        Dom_html.Event.paste
        (Dom.handler (fun ev ->
-          if form_control ev
+          if form_control ev || in_terminal ev
           then Js._true
           else (
             (match Js.Opt.to_option ev##.clipboardData with
@@ -253,7 +302,9 @@ let install_listeners ~schedule =
        Dom_html.Event.wheel
        (Dom.handler (fun ev ->
           let dy = Js.to_float ev##.deltaY in
-          if Float.(dy < 0.)
+          if in_terminal ev
+          then ()
+          else if Float.(dy < 0.)
           then schedule (App.Action.Intent Scroll_up)
           else if Float.(dy > 0.)
           then schedule (App.Action.Intent Scroll_down);
@@ -265,6 +316,7 @@ let install_listeners ~schedule =
     let width, height = Browser.grid_size () in
     schedule (App.Action.Resize { width; height })
   in
+  relayout := resize;
   Browser.on_viewport_change resize;
   Option.iter (keyboard_input ()) ~f:(fun input ->
     (* Keys the [keydown] handler recognised were prevented from reaching the
@@ -282,12 +334,24 @@ let install_listeners ~schedule =
             Js._true))
          Js._false
        : Dom_html.event_listener_id));
+  (* Coming back to the page returns focus to wherever it was: the terminal or
+     the app. *)
+  let terminal_focused = ref false in
+  ignore
+    (Dom_html.addEventListener
+       document
+       (Dom_html.Event.make "focusin")
+       (Dom.handler (fun ev ->
+          terminal_focused := in_terminal ev;
+          Js._true))
+       Js._false
+     : Dom_html.event_listener_id);
   ignore
     (Dom_html.addEventListener
        Dom_html.window
        Dom_html.Event.focus
        (Dom.handler (fun _ ->
-          focus_keyboard_input ();
+          if not !terminal_focused then focus_keyboard_input ();
           Js._true))
        Js._false
      : Dom_html.event_listener_id);
@@ -297,7 +361,8 @@ let install_listeners ~schedule =
          root
          Dom_html.Event.mousedown
          (Dom.handler (fun ev ->
-            if not (form_control ev) then focus_keyboard_input ();
+            if not (form_control ev || in_terminal ev)
+            then focus_keyboard_input ();
             Js._true))
          Js._false
        : Dom_html.event_listener_id);
@@ -320,7 +385,7 @@ let install_listeners ~schedule =
     in
     touch Dom_html.Event.touchstart (fun ev ->
       gesture
-      := if form_control ev || within_link ev
+      := if form_control ev || within_link ev || in_terminal ev
          then None
          else
            Option.map (touch_point ev) ~f:(fun (x, y) ->
@@ -439,11 +504,17 @@ let run () =
            {|<div class="connect"><h1>prigh</h1><p>disconnected — reload to start again</p></div>|}
        in
        let platform = Bonsai.return (platform client ~hello ~schedule ~quit) in
+       let terminal_url ~session =
+         Terminal_panel.url
+           ~backend:settings.backend
+           ~token:settings.token
+           ~session
+       in
        let handle =
          Start.start_and_get_handle
            (module Result_)
            ~bind_to_element_with_id:"app"
-           (fun graph -> app platform graph)
+           (fun graph -> app platform ~terminal_url graph)
        in
        handle_ref := Some handle;
        (* [schedule] queues before the first frame, so startup and input must

@@ -16,10 +16,38 @@
  (action
   (copy ../style.css style.css)))
 
+(rule
+ (target terminal.js)
+ (deps ../terminal.js)
+ (action
+  (copy ../terminal.js terminal.js)))
+
+(rule
+ (target xterm.js)
+ (deps ../vendor/xterm.js)
+ (action
+  (copy ../vendor/xterm.js xterm.js)))
+
+(rule
+ (target xterm.css)
+ (deps ../vendor/xterm.css)
+ (action
+  (copy ../vendor/xterm.css xterm.css)))
+
+(rule
+ (target addon-fit.js)
+ (deps ../vendor/addon-fit.js)
+ (action
+  (copy ../vendor/addon-fit.js addon-fit.js)))
+
 (install
  (section share)
  (package prigh_tui)
  (files
   (index.html as web/index.html)
   (main.bc.js as web/main.bc.js)
-  (style.css as web/style.css)))
+  (style.css as web/style.css)
+  (terminal.js as web/terminal.js)
+  (xterm.js as web/xterm.js)
+  (xterm.css as web/xterm.css)
+  (addon-fit.js as web/addon-fit.js)))

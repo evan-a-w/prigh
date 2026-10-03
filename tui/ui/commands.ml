@@ -39,6 +39,11 @@ let all =
       "pick or switch the model"
   ; c "scoped-models" "" "pick the models Ctrl+P cycles through"
   ; c
+      "change_default"
+      ""
+      "save the current model and thinking level as the default for new \
+       sessions"
+  ; c
       ~argument:Argument.Login
       "login"
       "[provider] [api_key|oauth]"

@@ -2,7 +2,8 @@ open! Core
 open! Import
 
 (** A minimal RFC 6455 implementation: enough for the browser frontend to
-    exchange the JSON-lines protocol as text messages. *)
+    exchange the JSON-lines protocol as text messages and terminal bytes as
+    binary ones. *)
 
 (** [Sec-WebSocket-Accept] for a [Sec-WebSocket-Key]. *)
 val accept_key : string -> string
@@ -66,11 +67,14 @@ val create
   -> unit
   -> t
 
-(** The next text message; answers pings and skips binary messages. [None]
-    once the peer closed, the connection dropped or a protocol error was
-    answered with a close frame. *)
+(** The next data message; answers pings. [None] once the peer closed, the
+    connection dropped or a protocol error was answered with a close frame. *)
+val read : t -> [ `Text of string | `Binary of string ] option
+
+(** [read], skipping binary messages. *)
 val read_text : t -> string option
 
 val send_text : t -> string -> unit
+val send_binary : t -> string -> unit
 val close : ?code:int -> t -> unit
 val is_closed : t -> bool

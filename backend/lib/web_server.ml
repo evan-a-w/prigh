@@ -121,8 +121,6 @@ let static ~root (request : Request.t) =
          response ~status:404 ~reason:"Not Found" "not found\n"))
 ;;
 
-let ws_path = "/ws"
-
 let browser_url ~host ~port =
   let host =
     if
@@ -134,18 +132,20 @@ let browser_url ~host ~port =
   sprintf "http://%s:%d/" host port
 ;;
 
-let wants_upgrade (request : Request.t) =
-  String.equal request.path ws_path
-  && Option.value_map
-       (Request.header request "Upgrade")
-       ~default:false
-       ~f:(fun v -> String.Caseless.equal (String.strip v) "websocket")
-;;
-
 type on_lines =
   read_line:(unit -> string option) -> write_line:(string -> unit) -> unit
 
 type on_websocket = query:(string * string) list -> Websocket.t -> unit
+
+let upgrade_handler ~websockets (request : Request.t) =
+  if
+    Option.value_map
+      (Request.header request "Upgrade")
+      ~default:false
+      ~f:(fun v -> String.Caseless.equal (String.strip v) "websocket")
+  then List.Assoc.find websockets ~equal:String.equal request.path
+  else None
+;;
 
 let serve_json_lines ~(on_lines : on_lines) ~reader flow =
   on_lines
@@ -165,14 +165,17 @@ let is_json_lines reader =
   | exception (End_of_file | Eio.Io _) -> false
 ;;
 
-let handle ~root ~on_websocket ~on_lines flow =
+let handle ~root ~websockets ~on_lines flow =
   let reader = Eio.Buf_read.of_flow flow ~max_size:(64 * 1024 * 1024) in
   if is_json_lines reader
   then serve_json_lines ~on_lines ~reader flow
   else (
     match Request.parse reader with
     | None -> ()
-    | Some request when wants_upgrade request ->
+    | Some request when Option.is_some (upgrade_handler ~websockets request) ->
+      let on_websocket =
+        Option.value_exn (upgrade_handler ~websockets request)
+      in
       (match Request.header request "Sec-WebSocket-Key" with
        | None ->
          Eio.Flow.copy_string
@@ -201,7 +204,7 @@ let handle ~root ~on_websocket ~on_lines flow =
            (response
               ~status:404
               ~reason:"Not Found"
-              "no web root configured; only /ws is served\n")
+              "no web root configured; only WebSockets are served\n")
            flow
        | Some root -> Eio.Flow.copy_string (static ~root request) flow))
 ;;
@@ -213,7 +216,28 @@ let serve_rpc server ~query:_ ws =
     ~write_line:(Websocket.send_text ws)
 ;;
 
-let listen ~env ~sw ~addr ~port ~root ~on_websocket ~on_lines =
+let serve_terminal server terminals ~query ws =
+  let param name = List.Assoc.find query ~equal:String.equal name in
+  let size name ~default =
+    Option.bind (param name) ~f:Int.of_string_opt |> Option.value ~default
+  in
+  if not (Rpc_server.token_ok server (param "token"))
+  then
+    Websocket.send_text
+      ws
+      {|{"type":"error","message":"unauthorised: bad or missing token"}|}
+  else (
+    let session = Option.filter (param "session") ~f:(Fn.non String.is_empty) in
+    Terminals.serve
+      terminals
+      ~key:(Option.value session ~default:"default")
+      ~cwd:(Rpc_server.backend_cwd server ~session)
+      ~cols:(size "cols" ~default:80)
+      ~rows:(size "rows" ~default:24)
+      ws)
+;;
+
+let listen ~env ~sw ~addr ~port ~root ~websockets ~on_lines =
   let socket =
     Eio.Net.listen
       ~sw
@@ -234,7 +258,7 @@ let listen ~env ~sw ~addr ~port ~root ~on_websocket ~on_lines =
         socket
         ~on_error:(fun exn ->
           eprintf "prigh: web connection failed: %s\n%!" (Exn.to_string exn))
-        (fun flow _addr -> handle ~root ~on_websocket ~on_lines flow)
+        (fun flow _addr -> handle ~root ~websockets ~on_lines flow)
     done);
   port
 ;;

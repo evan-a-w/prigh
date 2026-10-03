@@ -153,8 +153,25 @@ let fit_root () =
 let grid_size () =
   let cell_w, cell_h = cell_size () in
   let v = Viewport.current () in
+  let height =
+    match Dom_html.getElementById_opt "screen-area" with
+    | Some area when area##.clientHeight > 0 -> Float.of_int area##.clientHeight
+    | Some _ | None -> v.height
+  in
   ( Int.max 20 (Float.to_int (v.width /. cell_w))
-  , Int.max 5 (Float.to_int (v.height /. cell_h)) )
+  , Int.max 5 (Float.to_int (height /. cell_h)) )
+;;
+
+let after_render f =
+  let request_frame g =
+    ignore
+      (Dom_html.window##requestAnimationFrame
+         (Js.wrap_callback (fun (_ : Js.number_t) -> g ()))
+       : Dom_html.animation_frame_request_id)
+  in
+  (* Bonsai patches the DOM in its own animation frame callback, which may run
+     after one requested now; the next frame is surely after it. *)
+  request_frame (fun () -> request_frame f)
 ;;
 
 let on_viewport_change = Viewport.on_change
@@ -177,6 +194,41 @@ let href_with_backend ~pathname ~search ~backend =
   ^ "?backend="
   ^ Js.to_string (Js.encodeURIComponent (Js.string backend))
   ^ suffix
+;;
+
+let with_query_param ~search name value =
+  let search =
+    String.chop_prefix search ~prefix:"?" |> Option.value ~default:search
+  in
+  let pairs =
+    String.split search ~on:'&'
+    |> List.filter ~f:(fun pair ->
+      (not (String.is_empty pair))
+      && not
+           (String.equal
+              (String.lsplit2 pair ~on:'='
+               |> Option.value_map ~default:pair ~f:fst)
+              name))
+  in
+  "?"
+  ^ String.concat
+      ~sep:"&"
+      (pairs
+       @ [ name ^ "=" ^ Js.to_string (Js.encodeURIComponent (Js.string value)) ]
+      )
+;;
+
+let replace_query_param name value =
+  let location = Dom_html.window##.location in
+  let search =
+    with_query_param ~search:(Js.to_string location##.search) name value
+  in
+  if not (String.equal search (Js.to_string location##.search))
+  then
+    Dom_html.window##.history##replaceState
+      Js.null
+      (Js.string "")
+      (Js.some (Js.string (Js.to_string location##.pathname ^ search)))
 ;;
 
 let reload_with_backend backend =

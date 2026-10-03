@@ -2,10 +2,11 @@ open! Core
 open! Import
 
 (** The browser frontend's listener: serves the static frontend from [root]
-    (when given) and upgrades [GET /ws] to a WebSocket that carries the same
-    JSON-lines RPC as stdio and TCP, one message per line. A connection whose
-    first byte is [{] is a plain JSON-lines client (the terminal frontend's
-    [-connect]) and is handed to [on_lines], so one port serves both. *)
+    (when given) and upgrades WebSocket requests for the paths in
+    [websockets] ([/ws] carries the same JSON-lines RPC as stdio and TCP, one
+    message per line; [/terminal] a shell). A connection whose first byte is
+    [{] is a plain JSON-lines client (the terminal frontend's [-connect]) and
+    is handed to [on_lines], so one port serves both. *)
 
 type on_lines =
   read_line:(unit -> string option) -> write_line:(string -> unit) -> unit
@@ -13,11 +14,11 @@ type on_lines =
 type on_websocket = query:(string * string) list -> Websocket.t -> unit
 
 (** Handles one connection: JSON lines until EOF, or one HTTP/1.1 request,
-    then close (or the WebSocket until it ends). [on_websocket] gets the
-    decoded query string of the upgrade request. *)
+    then close (or the WebSocket until it ends). The [websockets] handler for
+    the request's path gets the decoded query string of the upgrade request. *)
 val handle
   :  root:string option
-  -> on_websocket:on_websocket
+  -> websockets:(string * on_websocket) list
   -> on_lines:on_lines
   -> _ Eio.Flow.two_way
   -> unit
@@ -27,6 +28,11 @@ val browser_url : host:string -> port:int -> string
 (** [Rpc_server.serve_lines] over a WebSocket. *)
 val serve_rpc : Rpc_server.t -> on_websocket
 
+(** A {!Terminals} socket. The query carries [token] (checked like [hello]'s),
+    [session] (the terminal's key; it starts in that session's directory on
+    the backend) and the initial [cols] and [rows]. *)
+val serve_terminal : Rpc_server.t -> Terminals.t -> on_websocket
+
 (** Accepts connections until [sw] ends; returns the bound port (useful with
     port 0). *)
 val listen
@@ -35,7 +41,7 @@ val listen
   -> addr:Eio.Net.Ipaddr.v4v6
   -> port:int
   -> root:string option
-  -> on_websocket:on_websocket
+  -> websockets:(string * on_websocket) list
   -> on_lines:on_lines
   -> int
 

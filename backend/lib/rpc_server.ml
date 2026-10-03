@@ -36,6 +36,7 @@ let methods =
   ; "list_dirs"
   ; "get_config"
   ; "set_config"
+  ; "change_default"
   ; "tool_confirm_respond"
   ; "auth_status"
   ; "login"
@@ -120,6 +121,8 @@ type t =
   ; mutable client_seq : int
   ; execs : (string * Agent.t) String.Table.t
     (** in-flight remote executions by exec id: host client id and session *)
+  ; mutable login_owner : string option
+    (** the client running the current login flow *)
   }
 
 let agent_of_client _t (client : Client.t) = client.agent
@@ -214,13 +217,23 @@ let create
     ; clients = String.Table.create ()
     ; client_seq = 0
     ; execs = String.Table.create ()
+    ; login_owner = None
     }
   in
   Option.iter default_agent ~f:(fun agent ->
     ignore (register t agent : Agent.t));
+  (* The flow itself (URL, prompts) belongs to the client that started it:
+     other frontends, possibly on other machines, must not open a browser or
+     pop up a dialog. Everyone hears the outcome, to refresh their status. *)
   Login_manager.subscribe login ~f:(fun event ->
     let json = Rpc_json.login_event event in
-    Hashtbl.iter t.clients ~f:(fun c -> c.send json));
+    match event with
+    | Auth_url _ | Prompt _ | Prompt_cancelled _ | Progress _ ->
+      Option.iter
+        (Option.bind t.login_owner ~f:(Hashtbl.find t.clients))
+        ~f:(fun c -> c.send json)
+    | Done _ | Failed _ | Logged_out _ ->
+      Hashtbl.iter t.clients ~f:(fun c -> c.send json));
   t
 ;;
 
@@ -315,6 +328,21 @@ let bool_param params name ~default =
   | Some `False -> Ok false
   | None -> Ok default
   | Some _ -> Or_error.errorf "param %S must be a boolean" name
+;;
+
+let token_ok t given =
+  match t.token with
+  | None -> true
+  | Some token -> Option.exists given ~f:(String.equal token)
+;;
+
+let backend_cwd t ~session =
+  match Option.bind session ~f:(Hashtbl.find t.agents) with
+  | None -> t.cwd
+  | Some agent ->
+    (match Agent.hosts agent with
+     | backend :: _ -> backend.cwd
+     | [] -> t.cwd)
 ;;
 
 let hello t (client : Client.t) params =
@@ -440,6 +468,24 @@ let dispatch_server t (client : Client.t) ~meth ~params
          ~f:(fun session ->
            new_agent_for t client session;
            `Object []))
+  | "login" ->
+    Option.some
+    @@ Or_error.bind (provider_param params) ~f:(fun provider ->
+      let method_ =
+        match param params "method" with
+        | Some (`String s) ->
+          (match Provider_auth.Method.of_string s with
+           | Some m -> Ok m
+           | None -> Or_error.errorf "unknown login method %S" s)
+        | _ -> Ok (List.hd_exn (Provider_auth.methods provider))
+      in
+      Or_error.bind method_ ~f:(fun method_ ->
+        (* The flow may emit its first event before [start] returns. *)
+        let previous = t.login_owner in
+        t.login_owner <- Some client.id;
+        let started = Login_manager.start t.login provider method_ in
+        if Result.is_error started then t.login_owner <- previous;
+        unit_result started))
   | _ -> None
 ;;
 
@@ -577,6 +623,9 @@ let dispatch agent login ~meth ~params : Json.t Or_error.t =
        Or_error.bind (Config.of_json json) ~f:(fun config ->
          Or_error.map (Agent.set_config agent config) ~f:(fun () ->
            Config.to_json (Agent.config agent))))
+  | "change_default" ->
+    Or_error.map (Agent.save_as_default agent) ~f:(fun () ->
+      Config.to_json (Agent.config agent))
   | "tool_confirm_respond" ->
     Or_error.bind (string_param params "call_id") ~f:(fun call_id ->
       Or_error.bind
@@ -590,18 +639,6 @@ let dispatch agent login ~meth ~params : Json.t Or_error.t =
   | "auth_status" ->
     Or_error.map (Login_manager.status login) ~f:(fun statuses ->
       `Array (List.map statuses ~f:Rpc_json.auth_status))
-  | "login" ->
-    Or_error.bind (provider_param params) ~f:(fun provider ->
-      let method_ =
-        match param params "method" with
-        | Some (`String s) ->
-          (match Provider_auth.Method.of_string s with
-           | Some m -> Ok m
-           | None -> Or_error.errorf "unknown login method %S" s)
-        | _ -> Ok (List.hd_exn (Provider_auth.methods provider))
-      in
-      Or_error.bind method_ ~f:(fun method_ ->
-        unit_result (Login_manager.start login provider method_)))
   | "auth_respond" ->
     Or_error.bind (string_param params "id") ~f:(fun id ->
       Or_error.bind (string_param params "value") ~f:(fun value ->

@@ -224,6 +224,7 @@ let create ?(role = `Server) ~reader ~flow () =
 ;;
 
 let send_text t text = write t { fin = true; opcode = Text; payload = text }
+let send_binary t data = write t { fin = true; opcode = Binary; payload = data }
 
 let close ?(code = 1000) t =
   if not t.closed
@@ -232,7 +233,7 @@ let close ?(code = 1000) t =
     t.closed <- true)
 ;;
 
-let rec read_text t =
+let rec read t =
   if t.closed
   then None
   else (
@@ -243,15 +244,22 @@ let rec read_text t =
     | exception Protocol_error _ ->
       close ~code:1002 t;
       None
-    | Text text -> Some text
-    | Binary _ -> read_text t
+    | Text text -> Some (`Text text)
+    | Binary data -> Some (`Binary data)
     | Ping payload ->
       write t { fin = true; opcode = Pong; payload };
-      read_text t
-    | Pong _ -> read_text t
+      read t
+    | Pong _ -> read t
     | Close code ->
       close ?code t;
       None)
+;;
+
+let rec read_text t =
+  match read t with
+  | None -> None
+  | Some (`Text text) -> Some text
+  | Some (`Binary _) -> read_text t
 ;;
 
 let is_closed t = t.closed

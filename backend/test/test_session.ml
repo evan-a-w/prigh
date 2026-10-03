@@ -420,6 +420,9 @@ let%expect_test "list reports name, parent, message count and updated_at" =
          , Option.equal String.equal s.parent (Some (Session.id a))
          , s.message_count
          , mask_times s.updated_at ))
+       (* Both files are written within one mtime tick, so order is not
+          tested here. *)
+       |> List.sort ~compare:[%compare: string option * bool * int * string]
        : (string option * bool * int * string) list)];
   [%expect {| (((alpha) false 1 <t>) ((beta) true 1 <t>)) |}]
 ;;

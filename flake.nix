@@ -128,6 +128,7 @@
           text = ''
             export PRIGH_BACKEND="''${PRIGH_BACKEND:-${prighBackend}/bin/prigh}"
             export PRIGH_WEB_ROOT="''${PRIGH_WEB_ROOT:-${prighTui}/share/prigh_tui/web}"
+            export PRIGH_TMUX="''${PRIGH_TMUX:-${pkgs.tmux}/bin/tmux}"
             if [ "''${1:-}" = "-web" ]; then
               shift
               exec "$PRIGH_BACKEND" serve -web "''${PRIGH_WEB_LISTEN:-127.0.0.1:7788}" -open "$@"
@@ -174,6 +175,10 @@
           test -f ${prighTui}/share/prigh_tui/web/index.html
           test -f ${prighTui}/share/prigh_tui/web/main.bc.js
           test -f ${prighTui}/share/prigh_tui/web/style.css
+          test -f ${prighTui}/share/prigh_tui/web/terminal.js
+          test -f ${prighTui}/share/prigh_tui/web/xterm.js
+          test -f ${prighTui}/share/prigh_tui/web/xterm.css
+          test -f ${prighTui}/share/prigh_tui/web/addon-fit.js
           ARGS_OUT="$PWD/override-args" ROOT_OUT="$PWD/override-root" \
             PRIGH_BACKEND="$PWD/fake-backend" PRIGH_WEB_ROOT=/custom \
             ${prigh}/bin/prigh -web
@@ -267,6 +272,8 @@
             frontendScope.expect_test_helpers_async
             frontendScope.ocamlformat
             pkgs.ripgrep
+            # the backend's terminal tests and the TUI's tmux-test
+            pkgs.tmux
             # the web-layer tests run under node (js_of_ocaml)
             pkgs.nodejs
           ];

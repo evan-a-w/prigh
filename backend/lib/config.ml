@@ -4,24 +4,38 @@ open! Import
 type t =
   { scoped_models : string list
   ; confirm_tools : bool
+  ; default_model : string option
+  ; default_thinking : Thinking.t option
   }
 [@@deriving sexp_of]
 
-let default = { scoped_models = []; confirm_tools = false }
+let default =
+  { scoped_models = []
+  ; confirm_tools = false
+  ; default_model = None
+  ; default_thinking = None
+  }
+;;
+
 let path ~home = Filename.concat home ".prigh/config.json"
 
 let to_json t =
+  let option f = Option.value_map ~default:`Null ~f in
   `Object
     [ "scoped_models", `Array (List.map t.scoped_models ~f:(fun s -> `String s))
     ; ("confirm_tools", if t.confirm_tools then `True else `False)
+    ; "default_model", option (fun s -> `String s) t.default_model
+    ; ( "default_thinking"
+      , option (fun th -> `String (Thinking.to_string th)) t.default_thinking )
     ]
 ;;
 
 let of_json json =
   match json with
   | `Object fields ->
+    let open Or_error.Let_syntax in
     let find name = List.Assoc.find fields ~equal:String.equal name in
-    let scoped_models =
+    let%bind scoped_models =
       match find "scoped_models" with
       | None -> Ok []
       | Some (`Array items) ->
@@ -34,17 +48,29 @@ let of_json json =
       | Some _ ->
         Or_error.error_string "config.scoped_models must be an array of strings"
     in
-    let confirm_tools =
+    let%bind confirm_tools =
       match find "confirm_tools" with
       | None -> Ok false
       | Some `True -> Ok true
       | Some `False -> Ok false
       | Some _ -> Or_error.error_string "config.confirm_tools must be a boolean"
     in
-    Or_error.map
-      (Or_error.both scoped_models confirm_tools)
-      ~f:(fun (scoped_models, confirm_tools) ->
-        { scoped_models; confirm_tools })
+    let%bind default_model =
+      match find "default_model" with
+      | None | Some `Null -> Ok None
+      | Some (`String s) -> Ok (Some s)
+      | Some _ -> Or_error.error_string "config.default_model must be a string"
+    in
+    let%map default_thinking =
+      match find "default_thinking" with
+      | None | Some `Null -> Ok None
+      | Some (`String s) ->
+        Or_error.map (Thinking.of_string s) ~f:Option.some
+        |> Or_error.tag ~tag:"config.default_thinking"
+      | Some _ ->
+        Or_error.error_string "config.default_thinking must be a string"
+    in
+    { scoped_models; confirm_tools; default_model; default_thinking }
   | _ -> Or_error.error_string "config must be a JSON object"
 ;;
 

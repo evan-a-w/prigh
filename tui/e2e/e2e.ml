@@ -180,10 +180,7 @@ let main () =
     let%bind () =
       match%map Client.list_models client with
       | Ok models ->
-        printf
-          "<- list_models: %d models, first %s\n"
-          (List.length models)
-          (List.hd_exn models).key
+        printf "<- list_models: first %s\n" (List.hd_exn models).key
       | Error e -> print_s [%message "list_models" (e : Error.t)]
     in
     let%bind () = call client "auth_status" [] in
