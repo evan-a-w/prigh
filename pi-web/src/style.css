@@ -2076,6 +2076,23 @@ body.terminal-resizing {
 	padding: 4px 6px;
 }
 
+/* Drawn by terminal.js inside the host (reconnecting, shell exited, ...). */
+.terminal-host {
+	background: #1e1e1e;
+	position: relative;
+}
+
+.terminal-status {
+	background: var(--pi-warning, #e5c07b);
+	color: #1e1e1e;
+	font-size: 12px;
+	padding: 2px 8px;
+	position: absolute;
+	right: 12px;
+	top: 8px;
+	z-index: 10;
+}
+
 .terminal-status-overlay {
 	align-items: center;
 	background: color-mix(in srgb, var(--pi-cardBg) 85%, transparent);

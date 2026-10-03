@@ -71,6 +71,7 @@ HELP
 /sessions — Pick a saved session to switch to
 /switch <id|path> — Switch to a session by id or path
 /host — Pick where tools run
+/change_default — Save the current model and thinking level as the default
 /help — List the commands
 === chromium: sessions dialog ===
 Switch to session
@@ -104,6 +105,15 @@ url keeps session: true
 No messages yet. Say something.
 === chromium: switched back ===
 go
+=== chromium: terminal ===
+opening shrinks the chat: true
+the terminal has the keyboard
+it runs in the session directory: true
+closing restores the chat: true
+reopening shows the same shell
+exiting the shell says so
+a key starts a new shell
+the topbar button hides it again
 === firefox: connect form ===
 Connect to prigh
 unauthorised: bad or missing token
@@ -177,6 +187,7 @@ HELP
 /sessions — Pick a saved session to switch to
 /switch <id|path> — Switch to a session by id or path
 /host — Pick where tools run
+/change_default — Save the current model and thinking level as the default
 /help — List the commands
 === firefox: sessions dialog ===
 Switch to session
@@ -210,3 +221,12 @@ url keeps session: true
 No messages yet. Say something.
 === firefox: switched back ===
 go
+=== firefox: terminal ===
+opening shrinks the chat: true
+the terminal has the keyboard
+it runs in the session directory: true
+closing restores the chat: true
+reopening shows the same shell
+exiting the shell says so
+a key starts a new shell
+the topbar button hides it again

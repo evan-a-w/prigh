@@ -131,6 +131,42 @@ await page.locator(".session-item", { hasText: "My e2e session" }).click();
 await waitForText("all done");
 await show("switched back", ".chat .msg-user >> nth=0");
 
+// 7. The terminal panel: a shell in the session's directory that survives
+//    hiding the panel and is replaced by a fresh one after it exits.
+{
+  console.log(`=== ${engineName}: terminal ===`);
+  const xterm = () => page.evaluate(() => document.querySelector(".xterm-rows")?.textContent ?? "");
+  const xtermHas = text => page.waitForFunction(
+    needle => document.querySelector(".xterm-rows")?.textContent.includes(needle), text);
+  const chatHeight = () => page.evaluate(() => document.querySelector(".chat").getBoundingClientRect().height);
+  const fullHeight = await chatHeight();
+  await page.locator(".topbar .terminal-open").click();
+  await page.locator(".xterm-rows").waitFor();
+  console.log(`opening shrinks the chat: ${(await chatHeight()) < fullHeight}`);
+  await page.waitForFunction(() => document.activeElement?.classList.contains("xterm-helper-textarea"));
+  console.log("the terminal has the keyboard");
+  await page.keyboard.type("pwd && echo sum=$((6*7))\n");
+  await xtermHas("sum=42");
+  console.log(`it runs in the session directory: ${(await xterm()).includes(process.env.TEST_CWD)}`);
+  await page.locator(".terminal-close").click();
+  await page.locator(".terminal-panel").waitFor({ state: "detached" });
+  console.log(`closing restores the chat: ${(await chatHeight()) === fullHeight}`);
+  await page.locator(".topbar .terminal-open").click();
+  await xtermHas("sum=42");
+  console.log("reopening shows the same shell");
+  await page.keyboard.type("exit\n");
+  await page.locator(".terminal-status", { hasText: "shell exited" }).waitFor();
+  console.log("exiting the shell says so");
+  await page.keyboard.type("x");
+  await page.waitForFunction(() => !document.querySelector(".xterm-rows").textContent.includes("sum=42"));
+  await page.keyboard.type("echo fresh\n");
+  await xtermHas("fresh");
+  console.log("a key starts a new shell");
+  await page.locator(".topbar .terminal-open").click();
+  await page.locator(".terminal-panel").waitFor({ state: "detached" });
+  console.log("the topbar button hides it again");
+}
+
 await browser.close();
 if (errors.length > 0) {
   console.log("=== errors ===");

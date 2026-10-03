@@ -38,6 +38,8 @@
           };
           npmDepsHash = "sha256-JlRK5p9GUNW+NM4FbNWpbQN97lFVg3m2z2O5QfiICwU=";
           npmBuildScript = "build";
+          # The terminal panel's script and xterm.js (see vite.config.ts).
+          PRIGH_TERMINAL_ASSETS = "${prigh}/tui/web-bin";
           # Type-check and unit-test before bundling.
           preBuild = ''
             npm run check
@@ -60,6 +62,7 @@
             export PRIGH_BACKEND="''${PRIGH_BACKEND:-${backend}/bin/prigh}"
             export PRIGH_PI_WEB_ROOT="''${PRIGH_PI_WEB_ROOT:-${site}}"
             export PRIGH_WEB_ROOT="''${PRIGH_WEB_ROOT:-${tui}/share/prigh_tui/web}"
+            export PRIGH_TMUX="''${PRIGH_TMUX:-${pkgs.tmux}/bin/tmux}"
             exec "$PRIGH_BACKEND" serve -pi-web "''${PRIGH_PI_WEB_LISTEN:-127.0.0.1:7789}" -open "$@"
           '';
         };
@@ -105,6 +108,10 @@
           test -f ${site}/theme/dark.json
           test -f ${site}/theme/light.json
           ls ${site}/assets/*.js >/dev/null
+          test -f ${site}/xterm/terminal.js
+          test -f ${site}/xterm/xterm.js
+          test -f ${site}/xterm/xterm.css
+          test -f ${site}/xterm/addon-fit.js
           touch "$out"
         '';
 
@@ -120,6 +127,7 @@
                   pkgs.playwright-test
                   pkgs.playwright-driver.browsers
                   pkgs.dejavu_fonts
+                  pkgs.tmux
                 ];
               }
               ''
@@ -138,6 +146,10 @@
                 export PRIGH_PI_WEB_ROOT=${site}
                 export HOME="$PWD/home"
                 mkdir -p "$HOME"
+                # the terminal panel's shell (tmux under the backend)
+                export SHELL=${pkgs.bashInteractive}/bin/bash
+                export TMUX_TMPDIR="$PWD/tmux"
+                mkdir -p "$TMUX_TMPDIR"
                 cp -r ${./e2e} e2e
                 chmod -R u+w e2e
                 ${pkgs.runtimeShell} e2e/pi_web.sh

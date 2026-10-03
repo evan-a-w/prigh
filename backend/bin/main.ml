@@ -499,6 +499,10 @@ let serve_command =
               env_var);
          url
        in
+       (* Shared, so both UIs on one session see the same shell. *)
+       let terminal =
+         Web_server.serve_terminal server (Terminals.create ~env ~sw ())
+       in
        let opened = ref false in
        let maybe_open url =
          if open_browser && not !opened
@@ -518,11 +522,7 @@ let serve_command =
            ~root_flag:"-web-root"
            ~env_var:"PRIGH_WEB_ROOT"
            ~websockets:
-             [ "/ws", Web_server.serve_rpc server
-             ; ( "/terminal"
-               , Web_server.serve_terminal server (Terminals.create ~env ~sw ())
-               )
-             ]
+             [ "/ws", Web_server.serve_rpc server; "/terminal", terminal ]
            addr
          |> maybe_open);
        Option.iter pi_web ~f:(fun addr ->
@@ -536,7 +536,8 @@ let serve_command =
            ~root
            ~root_flag:"-pi-web-root"
            ~env_var:"PRIGH_PI_WEB_ROOT"
-           ~websockets:[ "/ws", Pi_rpc.serve_websocket server ]
+           ~websockets:
+             [ "/ws", Pi_rpc.serve_websocket server; "/terminal", terminal ]
            addr
          |> maybe_open);
        if stdio

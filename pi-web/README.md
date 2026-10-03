@@ -65,8 +65,8 @@ markdown rendering, the editor with slash-command autocomplete, the model and
 fork pickers, dialogs and toasts, the status strip, the agents rail, theme
 loading (pi's `dark.json`/`light.json` are shipped in `public/theme/`).
 
-Removed, because they need pi-server or a pi-only feature: the xterm
-terminal and TUI views, the file explorer, the subagents run-history panel,
+Removed, because they need pi-server or a pi-only feature: the TUI view,
+the file explorer, the subagents run-history panel,
 the dashboard session list, snippets, the service worker.
 
 Changed:
@@ -86,6 +86,11 @@ Changed:
   new_text}]`) and `write` (`content`) arguments (`tool-args.ts`).
 - `sidebar.tsx` — prigh sessions (name / description / first prompt, age,
   message count), click to switch, "New".
+- `terminal-panel.tsx` — the topbar's Terminal button opens the Bonsai web
+  UI's terminal (`tui/web-bin/terminal.js` and its vendored xterm.js, copied
+  into `dist/xterm/` by `vite.config.ts`; `$PRIGH_TERMINAL_ASSETS` overrides
+  the directory) on the backend's `/terminal` WebSocket, keyed by the
+  current session, so both UIs share one shell per session.
 
 ## Backend mapping (summary)
 
@@ -98,7 +103,8 @@ Changed:
 | `bash` | `shell` (recorded in the session, so the transcript shows it) |
 | `get_fork_messages`, `fork {entryId}` | `get_entries`, `fork {at: parent}` |
 | `export_html` | `export {format: markdown}` |
-| `terminal_*`, `tui_*` | not supported |
+| `terminal_*` | not used: the panel talks to `/terminal` (`Terminals`) directly |
+| `tui_*` | not supported |
 | `message_update {message}` | `message_update {partial}` |
 | `tool_execution_start/update/end` | `tool_start/output/end` (output accumulated) |
 | `extension_ui_request confirm` | `tool_confirm` ↔ `tool_confirm_respond` |

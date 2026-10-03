@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { connectionFor, saveToken, type Storage, TOKEN_STORAGE_KEY } from "../src/connection.ts";
+import { connectionFor, saveToken, type Storage, TOKEN_STORAGE_KEY, terminalUrl } from "../src/connection.ts";
 
 function memoryStorage(initial: Record<string, string> = {}): Storage & { data: Record<string, string> } {
 	const data = { ...initial };
@@ -66,5 +66,18 @@ describe("saveToken", () => {
 		expect(storage.data[TOKEN_STORAGE_KEY]).toBe("abc");
 		saveToken(storage, "");
 		expect(storage.data[TOKEN_STORAGE_KEY]).toBeUndefined();
+	});
+});
+
+describe("terminalUrl", () => {
+	it("is /terminal next to /ws, keeping only the token, keyed by the session", () => {
+		expect(terminalUrl("ws://127.0.0.1:7789/ws?token=sek%26ret&session=old&name=laptop", "s2")).toBe(
+			"ws://127.0.0.1:7789/terminal?token=sek%26ret&session=s2",
+		);
+	});
+
+	it("keeps the scheme and base path, and works without token or session", () => {
+		expect(terminalUrl("wss://host/pi/ws", undefined)).toBe("wss://host/pi/terminal");
+		expect(terminalUrl("ws://other:1/", "x")).toBe("ws://other:1/terminal?session=x");
 	});
 });

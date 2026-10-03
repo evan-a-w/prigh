@@ -58,6 +58,21 @@ export function connectionFor(location: PageLocation, storage: Storage): Connect
 	return { url: url.toString(), session, cleanedSearch };
 }
 
+/**
+ * The backend's shell WebSocket next to the RPC one at `wsUrl` (same token),
+ * keyed by `session` so it starts in that session's directory.
+ */
+export function terminalUrl(wsUrl: string, session: string | undefined): string {
+	const rpc = new URL(wsUrl);
+	const url = new URL(wsUrl);
+	url.search = "";
+	url.pathname = url.pathname.replace(/\/ws\/?$/, "").replace(/\/$/, "") + "/terminal";
+	const token = rpc.searchParams.get("token");
+	if (token) url.searchParams.set("token", token);
+	if (session) url.searchParams.set("session", session);
+	return url.toString();
+}
+
 export function saveToken(storage: Storage, token: string): void {
 	if (token) storage.setItem(TOKEN_STORAGE_KEY, token);
 	else storage.removeItem(TOKEN_STORAGE_KEY);

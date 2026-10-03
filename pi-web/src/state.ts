@@ -1,6 +1,6 @@
 import { effect, signal } from "@preact/signals";
 import { RpcClient } from "./client.ts";
-import { connectionFor } from "./connection.ts";
+import { connectionFor, terminalUrl } from "./connection.ts";
 import type {
 	AgentMessage,
 	AgentSessionEvent,
@@ -567,6 +567,13 @@ const storedAgentsRailOpen = loadStoredAgentsRailOpen();
 export const agentsRailOpen = signal(storedAgentsRailOpen ?? false);
 // Skip auto-open once the user has an explicit stored preference either way.
 let agentsRailAutoOpened = storedAgentsRailOpen !== undefined;
+
+export const terminalOpen = signal(false);
+
+/** Where the terminal panel connects: the current session's shell on this backend. */
+export function currentTerminalUrl(): string {
+	return terminalUrl(connectionFor(location, localStorage).url, sessionState.value?.sessionId);
+}
 
 export function toggleAgentsRail(): void {
 	agentsRailOpen.value = !agentsRailOpen.value;

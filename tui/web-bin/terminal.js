@@ -1,7 +1,8 @@
 // The browser end of a prigh terminal: xterm.js on a WebSocket to the
 // backend's /terminal, whose protocol is described in
 // backend/lib/terminals.mli. The Bonsai app mounts it through
-// [window.prighTerminal.mount] (see tui/web-app/terminal_panel.ml).
+// [window.prighTerminal.mount] (see tui/web-app/terminal_panel.ml), and so
+// does pi-web (pi-web/src/components/terminal-panel.tsx).
 "use strict";
 
 (() => {

@@ -372,7 +372,8 @@ two can share one.
   sidebar. `serve -pi-web HOST:PORT` is a second `Web_server` listener whose
   `/ws?token=&session=&name=` goes to `Pi_rpc.serve_websocket` (the query
   string becomes the `hello`; a refused hello is reported as
-  `prigh_hello_failed` and the socket closed).
+  `prigh_hello_failed` and the socket closed) and whose `/terminal` is the
+  same `Terminals` as the `-web` listener's.
 
 ### CLI (`backend/bin/main.ml`)
 
@@ -572,7 +573,8 @@ thinking levels, forks, sessions, login dialogs, subagents and compaction;
 `pi-web/` has vitest unit tests for its pure modules and a Playwright e2e
 (`pi-web/e2e`, the `e2e` check of `pi-web/flake.nix`) that drives Chromium
 and Firefox through the connect form, a scripted run with tools and a
-subagent, slash commands, the model picker, a reload and a session switch.
+subagent, slash commands, the model picker, a reload, a session switch and
+the terminal panel.
 
 The web layer adds two: `backend/test/test_web.ml` (frames, fragmentation,
 the RFC handshake vector, static serving and traversal, and a masked WebSocket

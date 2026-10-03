@@ -7,6 +7,7 @@ import { StatusStrip } from "./components/footer.tsx";
 import { MarkdownView } from "./components/markdown-view.tsx";
 import { ForkPicker, ModelPicker } from "./components/pickers.tsx";
 import { Sidebar } from "./components/sidebar.tsx";
+import { TerminalPanel } from "./components/terminal-panel.tsx";
 import { saveToken } from "./connection.ts";
 import {
 	agentsRailOpen,
@@ -16,6 +17,7 @@ import {
 	sidebarOpen,
 	stats,
 	subagentSnapshot,
+	terminalOpen,
 	toggleAgentsRail,
 	widgets,
 } from "./state.ts";
@@ -145,6 +147,27 @@ function TopBar() {
 						<span class="topbar-btn-count">{countRunningNodes(subagentSnapshot.value)}</span>
 					) : null}
 				</button>
+				<button
+					type="button"
+					class={`topbar-btn terminal-open ${terminalOpen.value ? "active" : ""}`}
+					title={terminalOpen.value ? "Hide the terminal" : "Open a terminal"}
+					onClick={() => {
+						terminalOpen.value = !terminalOpen.value;
+					}}
+				>
+					<svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+						<title>Terminal</title>
+						<rect x="1.5" y="2.5" width="13" height="11" rx="1.5" stroke="currentColor" stroke-width="1.2" />
+						<path
+							d="M4.5 6l2 2-2 2M8.5 10.5h3"
+							stroke="currentColor"
+							stroke-width="1.2"
+							stroke-linecap="round"
+							stroke-linejoin="round"
+						/>
+					</svg>
+					<span class="topbar-btn-label">Terminal</span>
+				</button>
 			</div>
 			<div class="topbar-right">
 				<UsageStats />
@@ -248,6 +271,7 @@ export function App() {
 					</div>
 					<AgentsRail />
 				</div>
+				<TerminalPanel />
 				<StatusStrip />
 				<DialogHost />
 				<ToastHost />
