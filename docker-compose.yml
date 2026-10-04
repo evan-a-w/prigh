@@ -11,6 +11,8 @@ services:
         EXTRA_APT_PACKAGES: ${PRIGH_EXTRA_APT_PACKAGES:-}
         PRIGH_UID: ${PRIGH_UID:-1000}
         PRIGH_GID: ${PRIGH_GID:-1000}
+        NIX_SUBSTITUTER: ${PRIGH_NIX_SUBSTITUTER-https://prigh.cachix.org}
+        NIX_SUBSTITUTER_KEY: ${PRIGH_NIX_SUBSTITUTER_KEY:-prigh.cachix.org-1:1kHKoGOetNmpzJg8lJ1nvQzwzTL0XiOs5GInELMgSoI=}
     image: prigh:local
     restart: unless-stopped
     environment:

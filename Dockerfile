@@ -5,24 +5,34 @@
 # UI with npm. The runtime image is Debian with just the two binaries, the
 # few Nix store paths they link against, and the static web assets.
 
-ARG NIX_IMAGE=nixos/nix:latest
+ARG NIX_IMAGE=nixos/nix:2.35.2
 ARG NODE_IMAGE=node:22-bookworm-slim
 ARG RUNTIME_IMAGE=debian:bookworm-slim
 
 FROM ${NIX_IMAGE} AS nix-build
+# A binary cache holding the OxCaml toolchain and packages, so they are
+# downloaded instead of compiled (see DOCKER.md). Empty NIX_SUBSTITUTER to
+# build everything from source.
+ARG NIX_SUBSTITUTER=https://prigh.cachix.org
+ARG NIX_SUBSTITUTER_KEY=prigh.cachix.org-1:1kHKoGOetNmpzJg8lJ1nvQzwzTL0XiOs5GInELMgSoI=
 # Builds must keep running as the image's nixbld users: as root, an impure
 # build can create /homeless-shelter, which fails every later build.
 RUN printf '%s\n' 'experimental-features = nix-command flakes' 'sandbox = false' \
-      'filter-syscalls = false' 'max-jobs = auto' >> /etc/nix/nix.conf
+      'filter-syscalls = false' 'max-jobs = auto' >> /etc/nix/nix.conf \
+ && if [ -n "$NIX_SUBSTITUTER" ]; then \
+      printf '%s\n' "extra-substituters = $NIX_SUBSTITUTER" \
+        "extra-trusted-public-keys = $NIX_SUBSTITUTER_KEY" >> /etc/nix/nix.conf; \
+    fi
 
 # Dependencies first, from only the files that determine them, so that source
-# changes reuse this (very slow: it compiles OxCaml) layer.
+# changes reuse these layers. The frontend's (OxCaml, very slow) come first so
+# that backend dependency changes don't rebuild them.
 COPY flake.nix flake.lock /deps/
 COPY nix /deps/nix
-COPY backend/dune-project backend/prigh.opam /deps/backend/
 COPY tui/dune-project tui/prigh_tui.opam /deps/tui/
-RUN nix build --no-link path:/deps#backend.inputDerivation
 RUN nix build --no-link path:/deps#tui.inputDerivation
+COPY backend/dune-project backend/prigh.opam /deps/backend/
+RUN nix build --no-link path:/deps#backend.inputDerivation
 
 COPY . /src
 RUN nix build --out-link /out/backend path:/src#backend \

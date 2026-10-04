@@ -19,9 +19,11 @@ user's home, plus a scratch `/tmp`.
 4. Open `http://<docker-host>:7788/`, enter the token in the connect form,
    and `/login` to a provider (see [Logging in](#logging-in)).
 
-**The first build is slow.** It compiles the OxCaml toolchain through Nix,
-which takes about an hour or more and needs roughly 8 GB of RAM and 20 GB
-of disk. Later builds reuse the cached dependency layer whenever
+**The first build downloads a few GB.** The OxCaml toolchain and packages
+come from the binary cache `prigh.cachix.org` instead of being compiled.
+Without the cache, compiling them takes an hour or more and over 8 GB of
+RAM. The cache must be re-pushed when the dependencies change (see
+[Binary cache](#binary-cache)). Later builds reuse the cached dependency layer whenever
 `flake.nix`, `flake.lock`, `nix/` and the `*.opam`/`dune-project` files
 are unchanged. In that case only prigh itself is rebuilt, which takes a
 few minutes. Redeploying with "Re-pull image and redeploy" (or the
@@ -86,6 +88,7 @@ them in the container's `/workspace` instead.
 | `GH_TOKEN` | – | GitHub token for `git` over HTTPS (see [Git and SSH](#git-and-ssh)) |
 | `PRIGH_GIT_NAME`, `PRIGH_GIT_EMAIL` | – | written to the git config in the home volume at start, for the agent's commits |
 | `PRIGH_UID`, `PRIGH_GID` | 1000 | (build) uid/gid of the `prigh` user. Match the owner of a bound `PRIGH_WORKSPACE`. Docker sets a named volume's ownership only when it is first created, so after changing these, `chown` the existing `prigh-home` volume or recreate it |
+| `PRIGH_NIX_SUBSTITUTER`, `PRIGH_NIX_SUBSTITUTER_KEY` | `https://prigh.cachix.org` and its key | (build) the Nix binary cache. Set the substituter to an empty value to compile everything |
 | `PRIGH_EXTRA_APT_PACKAGES` | – | (build) extra Debian packages for the agent to use, e.g. `python3 build-essential` |
 
 The image ships `bash git ripgrep tmux curl jq less openssh-client
@@ -192,6 +195,20 @@ docker compose run --rm prigh prigh sessions list
 docker compose run --rm prigh bash
 docker compose exec prigh prigh auth
 ```
+
+## Binary cache
+
+When `flake.lock`, `nix/` or the `*.opam`/`dune-project` files change, the
+dependencies get new hashes. Rebuild and push them from a machine that has
+Nix (and enough RAM):
+
+```
+nix build --no-link --print-out-paths path:.#tui.inputDerivation path:.#backend.inputDerivation \
+  | nix run nixpkgs#cachix -- push prigh
+```
+
+Anything missing from the cache is compiled, so a stale cache makes the
+build slower but does not break it.
 
 ## How the image is built
 
