@@ -1,20 +1,22 @@
-import { useState } from "preact/hooks";
 import { AgentsRail } from "./components/agents-rail.tsx";
 import { ChatList } from "./components/chat-list.tsx";
 import { DialogHost, ToastHost } from "./components/dialogs.tsx";
 import { Editor } from "./components/editor.tsx";
 import { StatusStrip } from "./components/footer.tsx";
+import { LoginView } from "./components/login-view.tsx";
 import { MarkdownView } from "./components/markdown-view.tsx";
 import { ForkPicker, ModelPicker } from "./components/pickers.tsx";
 import { Sidebar } from "./components/sidebar.tsx";
 import { TerminalPanel } from "./components/terminal-panel.tsx";
-import { saveToken } from "./connection.ts";
 import {
 	agentsRailOpen,
 	commandResult,
 	connected,
+	currentUser,
 	helloError,
 	sidebarOpen,
+	signedIn,
+	signOut,
 	stats,
 	subagentSnapshot,
 	terminalOpen,
@@ -175,8 +177,35 @@ function TopBar() {
 					class={`connection-dot ${isConnected ? "online" : "offline"}`}
 					title={isConnected ? "Connected" : "Disconnected"}
 				/>
+				<SignOutButton />
 			</div>
 		</header>
+	);
+}
+
+function SignOutButton() {
+	if (!signedIn.value) return null;
+	const user = currentUser.value;
+	return (
+		<button
+			type="button"
+			class="topbar-btn sign-out"
+			title={user ? `Signed in as ${user}. Sign out or switch user` : "Sign out (forget the password)"}
+			onClick={signOut}
+		>
+			{user ? <span class="topbar-user">{user}</span> : null}
+			<svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+				<title>Sign out</title>
+				<path
+					d="M6 2.5H3.5a1 1 0 00-1 1v9a1 1 0 001 1H6M10.5 11l3-3-3-3M13.5 8H6"
+					stroke="currentColor"
+					stroke-width="1.2"
+					stroke-linecap="round"
+					stroke-linejoin="round"
+				/>
+			</svg>
+			<span class="topbar-btn-label">Sign out</span>
+		</button>
 	);
 }
 
@@ -217,44 +246,19 @@ function CommandResultCard() {
 	);
 }
 
-/**
- * Shown when the backend refused the connection: the token is saved and the
- * page reloads (the session id, if any, stays in the query string).
- */
-function ConnectView({ error }: { error: string }) {
-	const [token, setToken] = useState("");
-	return (
-		<div class="unreachable-view">
-			<div class="unreachable-card">
-				<h1>Connect to prigh</h1>
-				<p class="connect-error">{error}</p>
-				<form
-					class="connect-form"
-					onSubmit={(event) => {
-						event.preventDefault();
-						saveToken(localStorage, token.trim());
-						location.reload();
-					}}
-				>
-					<input
-						type="password"
-						placeholder="Token (prigh serve -token …)"
-						value={token}
-						autocomplete="off"
-						onInput={(event) => setToken((event.target as HTMLInputElement).value)}
-					/>
-					<button type="submit" class="unreachable-home">
-						Connect
-					</button>
-				</form>
-			</div>
-		</div>
-	);
-}
-
 export function App() {
 	if (helloError.value !== undefined) {
-		return <ConnectView error={helloError.value} />;
+		return (
+			<LoginView
+				error={helloError.value}
+				storage={localStorage}
+				search={location.search}
+				onLogin={(search) => {
+					if (search === location.search) location.reload();
+					else location.replace(`${location.pathname}${search}${location.hash}`);
+				}}
+			/>
+		);
 	}
 	return (
 		<div class="app-shell">

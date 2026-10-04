@@ -39,9 +39,37 @@ Bonsai UI's `/ws` speaks prigh's, so pointing pi-web at a `-web` listener via
 `?backend=` does not work. The page connects to its own
 origin's `/ws`; `?backend=ws://host:port/ws` points it elsewhere,
 `?session=ID` joins a session (the app keeps the current session id in the
-address bar so a reload rejoins it), `?token=` is remembered in
-`localStorage` and stripped from the URL, and a refused connection shows a
-connect form asking for the token.
+address bar so a reload rejoins it), and `?user=` / `?token=` are remembered
+in `localStorage` and stripped from the URL.
+
+## Signing in
+
+A refused connection shows a sign-in form with a **User name** and a
+**Password**. The password is the server's token (`prigh serve -token`); the
+user name picks the token namespace on servers that have them and is left
+empty otherwise. Both are remembered in `localStorage`
+(`prigh-pi-web:user`, `prigh-pi-web:token`) and sent as `user` and `token` in
+the query string of the `/ws` and `/terminal` WebSocket URLs. Signing in as
+a different user drops the previous user's `?session=` from the address bar.
+While the password field has focus, a "Caps Lock is on" warning appears when
+Caps Lock is active.
+
+**Sign out** (top right, next to the signed-in user name; or `/signout`)
+forgets the stored user name and password, closes the connection, drops
+`?session=` and shows the sign-in form again. The other things pi-web keeps
+in `localStorage` (theme, whether the agents panel is open) are browser
+preferences, shared by all users.
+
+## Provider (OAuth) login
+
+`/login anthropic` (or `openai-codex`) opens one dialog with the
+authorization link (opens in a new tab), a **Copy link** button and a field
+for the code or the full redirect URL. The backend's separate pieces (the
+`login` chat message carrying the link, the `auth-*` input prompt, the
+progress/failure/success notifications) are folded into that dialog
+(`provider-login.ts`): the link is not added to the chat, progress and
+errors show in the dialog, it closes on success, and the prompt disappears
+if the browser redirect delivers the code first.
 
 ## Development
 
@@ -49,7 +77,8 @@ connect form asking for the token.
 cd pi-web
 npm install
 npm run check                 # tsc
-npm test                      # vitest: connection.ts, sessions.ts, tool-args.ts, chat-items.ts
+npm test                      # vitest: connection.ts, sessions.ts, tool-args.ts, chat-items.ts,
+                              #   the sign-in form and the provider login dialog (happy-dom)
 npm run build                 # dist/
 npm run dev                   # vite dev server on :5173, proxies /ws to a backend on :7789:
                               #   ../backend/_build/default/bin/main.exe serve -pi-web 127.0.0.1:7789 -faux
@@ -71,14 +100,14 @@ the dashboard session list, snippets, the service worker.
 
 Changed:
 
-- `client.ts` — the token, session and frontend name travel in the WebSocket
-  URL's query string (`connection.ts`); `prigh_hello_failed` stops
-  reconnecting and shows the connect form.
+- `client.ts` — the user name, token, session and frontend name travel in
+  the WebSocket URL's query string (`connection.ts`); `prigh_hello_failed`
+  stops reconnecting and shows the sign-in form (`login-view.tsx`).
 - `state.ts` — trimmed to the events the backend sends; sessions come from
   the backend's `list_sessions` / `switch_session` (prigh additions to the
   protocol) and fill the sidebar; `/new`, `/fork`, `/clone`, `/cd`,
   `/model`, `/thinking`, `/name`, `/session`, `/export`, `/copy`, `/compact`
-  are handled client-side as in pi; `/login`, `/logout`, `/auth`,
+  are handled client-side as in pi (plus `/signout`); `/login`, `/logout`, `/auth`,
   `/sessions`, `/switch`, `/host`, `/help` are sent as prompts and run by the
   backend, which answers with custom chat messages and `select`/`input`
   dialogs.
