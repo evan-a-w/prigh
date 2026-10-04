@@ -15,6 +15,9 @@ let methods =
   ; "abort"
   ; "dequeue"
   ; "cancel_subagent"
+  ; "list_subagents"
+  ; "get_subagent"
+  ; "get_pending"
   ; "shell"
   ; "get_state"
   ; "get_messages"
@@ -675,6 +678,20 @@ let dispatch agent login ~meth ~params : Json.t Or_error.t =
                 ; ("is_error", if result.is_error then `True else `False)
                 ])))
   | "get_state" -> ok (Rpc_json.state (Agent.state agent))
+  | "get_pending" ->
+    let steer, follow_up = Agent.queued_texts agent in
+    ok
+      (Rpc_json.pending
+         ~steer
+         ~follow_up
+         ~confirms:(Agent.pending_confirms agent))
+  | "list_subagents" ->
+    ok (`Array (List.map (Agent.subagents agent) ~f:Rpc_json.subagent_summary))
+  | "get_subagent" ->
+    Or_error.bind (string_param params "id") ~f:(fun id ->
+      match Agent.subagent agent id with
+      | Some found -> ok (Rpc_json.subagent found)
+      | None -> Or_error.errorf "unknown subagent %S" id)
   | "get_messages" ->
     ok (`Array (List.map (Agent.messages agent) ~f:Rpc_json.message))
   | "get_entries" ->

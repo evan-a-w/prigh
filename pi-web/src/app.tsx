@@ -7,9 +7,11 @@ import { LoginView } from "./components/login-view.tsx";
 import { MarkdownView } from "./components/markdown-view.tsx";
 import { ForkPicker, ModelPicker } from "./components/pickers.tsx";
 import { Sidebar } from "./components/sidebar.tsx";
+import { SubagentPanel } from "./components/subagent-panel.tsx";
 import { TerminalPanel } from "./components/terminal-panel.tsx";
 import {
 	agentsRailOpen,
+	asUser,
 	commandResult,
 	connected,
 	currentUser,
@@ -19,6 +21,7 @@ import {
 	signOut,
 	stats,
 	subagentSnapshot,
+	subagentView,
 	terminalOpen,
 	toggleAgentsRail,
 	widgets,
@@ -183,17 +186,26 @@ function TopBar() {
 	);
 }
 
-function SignOutButton() {
+export function SignOutButton() {
 	if (!signedIn.value) return null;
 	const user = currentUser.value;
+	const actingAs = asUser.value;
+	const label = actingAs ? `${user ? `${user} ` : ""}as ${actingAs}` : user;
+	const signedInAs = user ? `Signed in as ${user}` : "Signed in";
 	return (
 		<button
 			type="button"
 			class="topbar-btn sign-out"
-			title={user ? `Signed in as ${user}. Sign out or switch user` : "Sign out (forget the password)"}
+			title={
+				actingAs
+					? `${signedInAs}, acting as ${actingAs} (/setusr ${user || "NAME"} to stop). Sign out`
+					: user
+						? `${signedInAs}. Sign out or switch user`
+						: "Sign out (forget the password)"
+			}
 			onClick={signOut}
 		>
-			{user ? <span class="topbar-user">{user}</span> : null}
+			{label ? <span class="topbar-user">{label}</span> : null}
 			<svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true">
 				<title>Sign out</title>
 				<path
@@ -267,11 +279,17 @@ export function App() {
 				<TopBar />
 				<div class="main-content-row">
 					<div class="main-content">
-						<ChatList />
-						<CommandResultCard />
-						<WidgetArea placement="aboveEditor" />
-						<Editor />
-						<WidgetArea placement="belowEditor" />
+						{subagentView.value ? (
+							<SubagentPanel />
+						) : (
+							<>
+								<ChatList />
+								<CommandResultCard />
+								<WidgetArea placement="aboveEditor" />
+								<Editor />
+								<WidgetArea placement="belowEditor" />
+							</>
+						)}
 					</div>
 					<AgentsRail />
 				</div>

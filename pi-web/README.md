@@ -60,6 +60,33 @@ forgets the stored user name and password, closes the connection, drops
 in `localStorage` (theme, whether the agents panel is open) are browser
 preferences, shared by all users.
 
+## Acting as another user
+
+`/setusr NAME` (run by the backend) lets a superuser act as NAME: on success
+the backend sends `{"type":"prigh_set_user","user":"NAME"}`, pi-web
+remembers NAME (`prigh-pi-web:as-user`), drops `?session=` and reconnects
+with `as_user=NAME` on every `/ws` and `/terminal` URL. The top bar shows
+"evan as alice". `/setusr` with your own name, signing out or signing in
+again stops it; a refused connection while acting as someone drops it and
+reconnects once as yourself (with a toast saying why).
+
+## Sessions and subagents
+
+Everything the backend pushes for the current session only (queued
+messages, status entries, the agents rail, pending confirmations) is
+cleared when pi-web re-syncs (after connecting, reconnecting or switching
+sessions); the backend's `get_state` sends it again for the session it
+answers for.
+
+Clicking a subagent in the agents rail, or **Open subagent →** under a
+`subagent` tool call, replaces the chat with that subagent's conversation
+(`subagent-panel.tsx`): status, model, duration, turns and tools, and its
+messages and tool calls, live while it runs (`watch_subagent` and
+`prigh_subagent_event`s). The list on the left switches between the rail's
+subagents; **← Back to chat** closes it, as does switching sessions; a
+reconnect re-watches it. The backend keeps transcripts in memory while the
+session is loaded.
+
 ## Provider (OAuth) login
 
 `/login anthropic` (or `openai-codex`) opens one dialog with the
@@ -78,7 +105,9 @@ cd pi-web
 npm install
 npm run check                 # tsc
 npm test                      # vitest: connection.ts, sessions.ts, tool-args.ts, chat-items.ts,
-                              #   the sign-in form and the provider login dialog (happy-dom)
+                              #   subagent-view.ts, transcript.ts, the sign-in form, the provider
+                              #   login dialog, and state.ts / the subagent view against a fake
+                              #   backend (test/fake-backend.ts; happy-dom)
 npm run build                 # dist/
 npm run dev                   # vite dev server on :5173, proxies /ws to a backend on :7789:
                               #   ../backend/_build/default/bin/main.exe serve -pi-web 127.0.0.1:7789 -faux
@@ -95,8 +124,9 @@ fork pickers, dialogs and toasts, the status strip, the agents rail, theme
 loading (pi's `dark.json`/`light.json` are shipped in `public/theme/`).
 
 Removed, because they need pi-server or a pi-only feature: the TUI view,
-the file explorer, the subagents run-history panel,
-the dashboard session list, snippets, the service worker.
+the file explorer, the dashboard session list, snippets, the service worker.
+The subagents run-history panel became the subagent view (live from the
+backend's events instead of transcript files).
 
 Changed:
 

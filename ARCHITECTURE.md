@@ -278,7 +278,11 @@ two can share one.
   results stay paired), or the run's tail starts a new run unless it was
   aborted (then the report waits for the next prompt, which it precedes).
   `wait_idle` also waits for running subagents and their deliveries;
-  `State.subagents` lists the running and undelivered ones; the in-place
+  `State.subagents` lists the running and undelivered ones; `Subagent_log`
+  records every subagent's status, activity and transcript (nested ones as
+  `<parent>/<call id>`) from the agent's own events, for `subagents`/
+  `subagent` (`list_subagents`, `get_subagent {id}` by agent or tool call
+  id); `queued_texts` and `pending_confirms` back `get_pending`; the in-place
   `new_session`/`switch_session` cancel them and drop their reports.
   `prompt`/`steer`/`follow_up` accept optional `attachments`
   (paths whose contents are appended to the user message as `<file>` blocks).
@@ -340,7 +344,8 @@ two can share one.
   client attached); `shutdown` cancels them. `set_model` goes through `Model.resolve` (key, id,
   display name or unique case-insensitive prefix; otherwise "did you mean"
   by edit distance). Methods: `hello`, `ping`, `prompt`, `steer`,
-  `follow_up`, `abort`, `dequeue`, `cancel_subagent`, `shell`, `get_state`, `get_messages`,
+  `follow_up`, `abort`, `dequeue`, `cancel_subagent`, `list_subagents`,
+  `get_subagent`, `get_pending`, `shell`, `get_state`, `get_messages`,
   `get_entries`, `set_model`, `set_thinking`, `list_models`, `compact`,
   `new_session`, `switch_session`, `list_sessions`, `set_session_name`,
   `delete_session`, `export`, `import`, `fork`, `clone`, `rewind`,
@@ -423,13 +428,21 @@ two can share one.
   messages by; `tool_execution_*` with accumulated output; `tool_confirm`
   and login prompts as `extension_ui_request` dialogs answered through
   `tool_confirm_respond`/`auth_respond`; notices as toasts; subagents as the
-  agents-rail widget snapshot; `session_reloaded`/`session_info_changed`/
+  agents-rail widget snapshot, re-read from `list_subagents` on every
+  subagent lifecycle event; `session_reloaded`/`session_info_changed`/
   `thinking_level_changed`/`agent_settled` derived by diffing `state`
   events, suppressed while running a command the frontend re-syncs after).
   The prigh-only slash commands (`/login`, `/logout`, `/auth`, `/sessions`,
   `/switch`, `/host`, `/change_default`, `/help`) arrive as prompts and run in the adapter;
   `list_sessions`/`switch_session` are pi-protocol additions for the
-  sidebar. `serve -pi-web HOST:PORT` is a second `Web_server` listener whose
+  sidebar. `get_state` also re-sends the session's non-empty live state
+  (status entries, queue, pending confirmations, agents rail) since the
+  frontend clears it when it re-syncs after connecting or switching; a
+  session change cancels the old session's confirmation dialogs.
+  `watch_subagent {agentId | toolCallId}` answers with a subagent's
+  transcript (`get_subagent`) and forwards its own message and tool events
+  as `prigh_subagent_event`s until unwatched or the session changes (the
+  pi-web subagent view). `serve -pi-web HOST:PORT` is a second `Web_server` listener whose
   `/ws?token=&user=&session=&name=` goes to `Pi_rpc.serve_websocket` (the query
   string becomes the `hello`; a refused hello is reported as
   `prigh_hello_failed` and the socket closed) and whose `/terminal` is the

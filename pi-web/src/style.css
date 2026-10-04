@@ -2959,3 +2959,27 @@ body.terminal-resizing {
 		z-index: 200;
 	}
 }
+
+/* Subagent view (subagent-panel.tsx): the conversation scrolls, not the pane. */
+.subagent-view .subagents-detail {
+	overflow: hidden;
+}
+
+.agents-rail-node.selected {
+	border-color: var(--accent);
+}
+
+.tool-open-subagent {
+	background: none;
+	border: 0;
+	color: var(--accent);
+	cursor: pointer;
+	font: inherit;
+	font-size: var(--font-sm);
+	padding: 0 var(--sp-2) var(--sp-1);
+	text-align: left;
+}
+
+.tool-open-subagent:hover {
+	text-decoration: underline;
+}

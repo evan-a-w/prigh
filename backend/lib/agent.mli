@@ -96,6 +96,16 @@ module Queued : sig
   [@@deriving sexp_of]
 end
 
+(** A tool call waiting for [respond_confirm]. *)
+module Pending_confirm : sig
+  type t =
+    { call_id : string
+    ; name : string
+    ; summary : string
+    }
+  [@@deriving sexp_of]
+end
+
 type t
 
 val create
@@ -151,6 +161,13 @@ val abort : t -> string list
     messages. Emits [Queue_update] when a message was removed. *)
 val dequeue : t -> Queued.t option
 
+(** The texts of the queued steer and follow-up messages, in order (what the
+    last [Queue_update] said). *)
+val queued_texts : t -> string list * string list
+
+(** Confirmations still unanswered, by call id. *)
+val pending_confirms : t -> Pending_confirm.t list
+
 (** Runs [command] through the bash machinery, emitting [Tool_start],
     [Tool_output] and [Tool_end] events under a synthetic [shell-<n>] call id.
     When [add_to_context] is set, appends [\$ <command>\n<output>] to the
@@ -177,6 +194,14 @@ val wait_idle : t -> unit
     running; after an abort, reports that are ready wait for the next run. *)
 
 val has_running_subagents : t -> bool
+
+(** Every subagent run since the agent was created (or its session was
+    replaced), with status and activity, oldest first. *)
+val subagents : t -> Subagent_log.Summary.t list
+
+(** One of [subagents] by agent id or starting tool call id, with its
+    transcript. *)
+val subagent : t -> string -> (Subagent_log.Summary.t * Message.t list) option
 
 (** Cancels one; its partial report is still delivered. *)
 val cancel_subagent : t -> agent_id:string -> unit Or_error.t

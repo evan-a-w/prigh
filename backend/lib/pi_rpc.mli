@@ -11,7 +11,21 @@ open! Import
 
     Beyond pi's commands it answers [list_sessions] and [switch_session], and
     the prigh-only slash commands ([/login], [/logout], [/auth], [/sessions],
-    [/switch], [/host], [/help]) arrive as [prompt]s and run here. *)
+    [/switch], [/host], [/help]) arrive as [prompt]s and run here.
+
+    [get_state] also re-sends the session's live state that is not empty:
+    status entries, queued messages ([queue_update]), unanswered tool
+    confirmations and the agents rail widget. A frontend re-syncing (after
+    connecting or switching sessions) clears these before asking. Switching
+    sessions cancels the old session's confirmation dialogs.
+
+    [watch_subagent {agentId | toolCallId}] answers with a subagent's info
+    and transcript ([{subagent, messages}]) and from then on forwards its
+    events as [{"type": "prigh_subagent_event", "agentId", "event"}], where
+    [event] is a [message_start/update/end] or [tool_execution_*] event of
+    its own conversation (timestamps continue the transcript's indices) or
+    [{"type": "subagent_info", "subagent"}]. [watch_subagent {}] or a
+    session change stops it. *)
 
 (** Sends [hello] (with [token], [user], [session] and [name]) and then serves until
     [read_line] returns [None]. A failed [hello] writes

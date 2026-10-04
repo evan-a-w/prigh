@@ -1,6 +1,15 @@
 import { effect, signal } from "@preact/signals";
 import { RpcClient } from "./client.ts";
-import { connectionFor, forgetCredentials, loadCredentials, searchWithoutSession, terminalUrl } from "./connection.ts";
+import {
+	connectionFor,
+	forgetAsUser,
+	forgetCredentials,
+	loadAsUser,
+	loadCredentials,
+	saveAsUser,
+	searchWithoutSession,
+	terminalUrl,
+} from "./connection.ts";
 import type {
 	AgentMessage,
 	AgentSessionEvent,
@@ -13,9 +22,8 @@ import type {
 	RpcSessionState,
 	RpcSlashCommand,
 	SessionStats,
+	SubagentTranscript,
 	ThinkingLevel,
-	ToolResultLike,
-	ToolResultMessage,
 } from "./protocol.ts";
 import { type ProviderLogin, type ProviderLoginInput, reduce as reduceProviderLogin } from "./provider-login.ts";
 import {
@@ -24,15 +32,11 @@ import {
 	countRunningNodes,
 	parseAsyncStatusSnapshotWidgetLine,
 } from "./subagent-status.ts";
+import * as SubagentViews from "./subagent-view.ts";
+import type { SubagentTarget, SubagentView } from "./subagent-view.ts";
+import { applyToolEvent, rebuildToolStates, type ToolStates, upsertMessage } from "./transcript.ts";
 
-export interface ToolDisplayState {
-	name: string;
-	args: Record<string, unknown>;
-	status: "running" | "done";
-	partial?: string;
-	output?: string;
-	isError?: boolean;
-}
+export type { ToolDisplayState } from "./transcript.ts";
 
 export interface Toast {
 	id: number;
@@ -53,7 +57,7 @@ export const connected = signal(false);
 export const helloError = signal<string | undefined>(undefined);
 export const sessionState = signal<RpcSessionState | undefined>(undefined);
 export const messages = signal<AgentMessage[]>([]);
-export const toolStates = signal<Record<string, ToolDisplayState>>({});
+export const toolStates = signal<ToolStates>({});
 export const stats = signal<SessionStats | undefined>(undefined);
 export const slashCommands = signal<RpcSlashCommand[]>([]);
 export const queue = signal<{ steering: readonly string[]; followUp: readonly string[] }>({
@@ -99,6 +103,8 @@ if (initialConnection.cleanedSearch !== undefined) {
 export const currentUser = signal(loadCredentials(localStorage).user);
 /** Whether there is anything to sign out of: a stored user name or password. */
 export const signedIn = signal(Object.values(loadCredentials(localStorage)).some((value) => value !== ""));
+/** The user this page acts as after `/setusr` ("" for the signed-in user). */
+export const asUser = signal(loadAsUser(localStorage));
 
 export const client = new RpcClient(() => connectionFor(location, localStorage).url, {
 	onEvent: handleEvent,
@@ -108,10 +114,14 @@ export const client = new RpcClient(() => connectionFor(location, localStorage).
 		dialogQueue.value = dialogQueue.value.filter((queued) => queued.id !== id);
 	},
 	onConnectionChange: handleConnectionChange,
-	onHelloFailed: (error) => {
-		helloError.value = error;
-	},
+	onHelloFailed: handleHelloFailed,
+	onSetUser: handleSetUser,
 });
+
+/** Sessions belong to a user: drops `?session=` from the address bar. */
+function forgetSessionInUrl(): void {
+	history.replaceState(null, "", `${location.pathname}${searchWithoutSession(location.search)}${location.hash}`);
+}
 
 /** Forgets the stored user name and password, disconnects and shows the login form. */
 export function signOut(): void {
@@ -119,11 +129,41 @@ export function signOut(): void {
 	client.stop();
 	currentUser.value = "";
 	signedIn.value = false;
+	asUser.value = "";
 	providerLogin.value = undefined;
 	dialogQueue.value = [];
 	terminalOpen.value = false;
-	history.replaceState(null, "", `${location.pathname}${searchWithoutSession(location.search)}${location.hash}`);
+	forgetSessionInUrl();
 	helloError.value = "";
+}
+
+/** `/setusr NAME` succeeded: reconnect acting as NAME (or as ourselves again). */
+function handleSetUser(user: string): void {
+	if (user === "" || user === currentUser.value) forgetAsUser(localStorage);
+	else saveAsUser(localStorage, user);
+	asUser.value = loadAsUser(localStorage);
+	forgetSessionInUrl();
+	pushToast(asUser.value ? `Acting as ${asUser.value}` : `Acting as ${currentUser.value || "yourself"} again`, "info");
+	// The /setusr prompt's response follows on this connection.
+	void client.whenIdle(2_000).then(() => client.reconnect());
+}
+
+/**
+ * The backend refused the connection. Acting as another user, that is
+ * probably no longer allowed: retry once as ourselves before asking to
+ * sign in.
+ */
+function handleHelloFailed(error: string): void {
+	const actingAs = asUser.value;
+	if (actingAs) {
+		forgetAsUser(localStorage);
+		asUser.value = "";
+		forgetSessionInUrl();
+		pushToast(`Could not act as ${actingAs} (${error}); back to ${currentUser.value || "your own user"}`, "warning");
+		client.reconnect();
+		return;
+	}
+	helloError.value = error;
 }
 
 let syncing = false;
@@ -134,6 +174,10 @@ function handleConnectionChange(isConnected: boolean): void {
 	if (isConnected) {
 		helloError.value = undefined;
 		void sync();
+	} else {
+		// Dialogs are answered on the connection that asked; the next one
+		// asks again for whatever is still pending.
+		dialogQueue.value = [];
 	}
 }
 
@@ -141,8 +185,23 @@ export function dataAs<T>(response: RpcResponse, command: string): T | undefined
 	return response.success && response.command === command ? (response.data as T) : undefined;
 }
 
+/**
+ * State the backend pushes for the current session only: get_state sends
+ * it again (when not empty) for the session it answers for, so a re-sync
+ * starts from nothing rather than from another session's.
+ */
+function resetSessionPushedState(): void {
+	queue.value = { steering: [], followUp: [] };
+	statusEntries.value = {};
+	widgets.value = {};
+	subagentSnapshot.value = undefined;
+	subagentSnapshotWidgetKey = undefined;
+}
+
 export async function sync(): Promise<void> {
 	syncing = true;
+	const previousSessionId = sessionState.value?.sessionId;
+	resetSessionPushedState();
 	try {
 		const [stateRes, messagesRes, commandsRes, statsRes] = await Promise.all([
 			client.command({ type: "get_state" }),
@@ -155,11 +214,12 @@ export async function sync(): Promise<void> {
 			sessionState.value = state;
 			updateTitle(state.sessionName);
 			rememberSession(state.sessionId);
+			if (state.sessionId !== previousSessionId) sessionChanged();
 		}
 		const history = dataAs<{ messages: AgentMessage[] }>(messagesRes, "get_messages");
 		if (history) {
 			messages.value = history.messages;
-			rebuildToolStates(history.messages);
+			toolStates.value = rebuildToolStates(history.messages);
 		}
 		const commandList = dataAs<{ commands: RpcSlashCommand[] }>(commandsRes, "get_commands");
 		if (commandList) {
@@ -174,8 +234,14 @@ export async function sync(): Promise<void> {
 		}
 		workingMessage.value = sessionState.value?.isStreaming ? "Working" : undefined;
 		void refreshSessions();
+		// Same session (a reconnect, a model change): the backend may have
+		// forgotten what we watch.
+		const view = subagentView.value;
+		if (view && state && state.sessionId === previousSessionId) void watchSubagent(view.target);
 	} catch (error) {
-		pushToast(`Failed to sync session state: ${error instanceof Error ? error.message : String(error)}`, "error");
+		// Lost the connection: the next one syncs again.
+		if (client.connected)
+			pushToast(`Failed to sync session state: ${error instanceof Error ? error.message : String(error)}`, "error");
 	} finally {
 		syncing = false;
 		const buffered = eventBuffer.splice(0);
@@ -183,6 +249,12 @@ export async function sync(): Promise<void> {
 			applyEvent(event);
 		}
 	}
+}
+
+/** What only made sense in the previous session. */
+function sessionChanged(): void {
+	subagentView.value = undefined;
+	commandResult.value = undefined;
 }
 
 function handleEvent(event: AgentSessionEvent): void {
@@ -206,75 +278,6 @@ function rememberSession(sessionId: string): void {
 }
 
 // ============================================================================
-// Message handling
-// ============================================================================
-
-function upsertMessage(message: AgentMessage): void {
-	const list = messages.value;
-	for (let i = list.length - 1; i >= 0; i--) {
-		const existing = list[i];
-		if (existing.role === message.role && existing.timestamp === message.timestamp) {
-			const next = [...list];
-			next[i] = message;
-			messages.value = next;
-			return;
-		}
-	}
-	messages.value = [...list, message];
-}
-
-function setToolState(toolCallId: string, updates: Partial<ToolDisplayState>): void {
-	const existing = toolStates.value[toolCallId];
-	toolStates.value = {
-		...toolStates.value,
-		[toolCallId]: {
-			name: updates.name ?? existing?.name ?? "tool",
-			args: updates.args ?? existing?.args ?? {},
-			status: updates.status ?? existing?.status ?? "running",
-			...updates,
-		},
-	};
-}
-
-function extractResultText(result: ToolResultLike | undefined): string | undefined {
-	if (!result || !Array.isArray(result.content)) {
-		return undefined;
-	}
-	const texts: string[] = [];
-	for (const block of result.content) {
-		if (block && typeof block === "object" && "text" in block && typeof block.text === "string") {
-			texts.push(block.text);
-		}
-	}
-	return texts.length > 0 ? texts.join("\n") : undefined;
-}
-
-function rebuildToolStates(history: AgentMessage[]): void {
-	const resultsByToolCallId = new Map<string, ToolResultMessage>();
-	for (const message of history) {
-		if (message.role === "toolResult") {
-			resultsByToolCallId.set(message.toolCallId, message);
-		}
-	}
-	const states: Record<string, ToolDisplayState> = {};
-	for (const message of history) {
-		if (message.role !== "assistant") continue;
-		for (const toolCall of message.content) {
-			if (toolCall.type !== "toolCall") continue;
-			const result = resultsByToolCallId.get(toolCall.id);
-			states[toolCall.id] = {
-				name: toolCall.name,
-				args: toolCall.arguments,
-				status: result ? "done" : "running",
-				output: result ? extractResultText(result) : undefined,
-				isError: result?.isError,
-			};
-		}
-	}
-	toolStates.value = states;
-}
-
-// ============================================================================
 // Event reduction
 // ============================================================================
 
@@ -295,32 +298,21 @@ function applyEvent(event: AgentSessionEvent): void {
 		case "message_start":
 		case "message_end":
 		case "message_update":
-			if (!feedProviderLogin({ kind: "message", message: event.message })) upsertMessage(event.message);
+			if (!feedProviderLogin({ kind: "message", message: event.message })) {
+				messages.value = upsertMessage(messages.value, event.message);
+			}
 			break;
 
 		case "tool_execution_start":
-			setToolState(event.toolCallId, {
-				name: event.toolName,
-				args: event.args ?? {},
-				status: "running",
-				partial: undefined,
-				output: undefined,
-				isError: undefined,
-			});
-			break;
-
 		case "tool_execution_update":
-			setToolState(event.toolCallId, {
-				partial: extractResultText(event.partialResult),
-			});
+		case "tool_execution_end":
+			toolStates.value = applyToolEvent(toolStates.value, event);
 			break;
 
-		case "tool_execution_end":
-			setToolState(event.toolCallId, {
-				status: "done",
-				output: extractResultText(event.result),
-				isError: event.isError,
-			});
+		case "prigh_subagent_event":
+			if (subagentView.value) {
+				subagentView.value = SubagentViews.receive(subagentView.value, event.agentId, event.event);
+			}
 			break;
 
 		case "agent_start":
@@ -445,7 +437,10 @@ function handleUiRequest(request: RpcExtensionUIRequest): void {
 		case "confirm":
 		case "input":
 		case "editor":
-			dialogQueue.value = [...dialogQueue.value, request];
+			// The backend asks again for a confirmation still pending when we re-sync.
+			dialogQueue.value = dialogQueue.value.some((queued) => queued.id === request.id)
+				? dialogQueue.value.map((queued) => (queued.id === request.id ? request : queued))
+				: [...dialogQueue.value, request];
 			break;
 		case "notify":
 			pushToast(request.message, request.notifyType ?? "info");
@@ -618,6 +613,41 @@ export const agentsRailOpen = signal(storedAgentsRailOpen ?? false);
 let agentsRailAutoOpened = storedAgentsRailOpen !== undefined;
 
 export const terminalOpen = signal(false);
+
+// ============================================================================
+// Subagent view (a subagent's conversation in place of the chat, see subagent-panel.tsx)
+// ============================================================================
+
+export const subagentView = signal<SubagentView | undefined>(undefined);
+
+async function watchSubagent(target: SubagentTarget): Promise<void> {
+	let response: RpcResponse;
+	try {
+		response = await client.command({ type: "watch_subagent", ...target });
+	} catch (error) {
+		response = { type: "response", command: "watch_subagent", success: false, error: String(error) };
+	}
+	const view = subagentView.value;
+	if (!view || view.target !== target) return;
+	const transcript = dataAs<SubagentTranscript>(response, "watch_subagent");
+	subagentView.value = transcript
+		? SubagentViews.loaded(view, transcript)
+		: SubagentViews.failed(view, response.success ? "no transcript" : response.error);
+}
+
+/** Shows a subagent's conversation (live while it runs) instead of the chat. */
+export async function openSubagent(target: SubagentTarget): Promise<void> {
+	if (SubagentViews.sameTarget(subagentView.value, target)) return;
+	subagentView.value = SubagentViews.openView(target);
+	if (window.matchMedia?.("(max-width: 900px)").matches) agentsRailOpen.value = false;
+	await watchSubagent(target);
+}
+
+export function closeSubagent(): void {
+	if (!subagentView.value) return;
+	subagentView.value = undefined;
+	if (client.connected) void client.command({ type: "watch_subagent" }).catch(() => {});
+}
 
 /** Where the terminal panel connects: the current session's shell on this backend. */
 export function currentTerminalUrl(): string {

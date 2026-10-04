@@ -24,48 +24,18 @@ module Tool_state = struct
     }
 end
 
-module Subagent = struct
+module Watch = struct
+  (** The subagent whose transcript the frontend shows: its events are
+      forwarded as [prigh_subagent_event]s, with message timestamps
+      continuing the transcript's indices. *)
   type t =
-    { id : string
-    ; parent : string option
-    ; label : string
-    ; started_at : int
-    ; mutable state : string
-    ; mutable ended_at : int option
-    ; mutable updated_at : int
-    ; mutable current_tool : string option
-    ; mutable tool_started_at : int option
-    ; mutable turns : int
-    ; mutable tools : int
+    { agent_id : string
+    ; session_id : string
+    ; mutable next_ts : int
+    ; mutable current_ts : int
+    ; tools : Tool_state.t String.Table.t
+    ; mutable info : Json.t
     }
-
-  let rec node ~all t =
-    let opt name = Option.value_map ~default:[] ~f:(fun v -> [ name, int v ]) in
-    let children =
-      List.filter all ~f:(fun (c : t) ->
-        Option.equal String.equal c.parent (Some t.id))
-    in
-    `Object
-      ([ "id", str t.id
-       ; "kind", str "subagent"
-       ; "label", str t.label
-       ; "state", str t.state
-       ; "startedAt", int t.started_at
-       ; "updatedAt", int t.updated_at
-       ]
-       @ opt "endedAt" t.ended_at
-       @ [ ( "activity"
-           , `Object
-               ([ "turnCount", int t.turns; "toolCount", int t.tools ]
-                @ Option.value_map t.current_tool ~default:[] ~f:(fun tool ->
-                  [ "currentTool", str tool ])
-                @ opt "currentToolStartedAt" t.tool_started_at) )
-         ]
-       @
-       if List.is_empty children
-       then []
-       else [ "children", `Array (List.map children ~f:(node ~all)) ])
-  ;;
 end
 
 type t =
@@ -74,12 +44,17 @@ type t =
   ; write : Json.t -> unit
   ; now : unit -> int
   ; mutable seq : int
+  ; mutable dialog_seq : int
   ; mutable next_ts : int
   ; mutable current_ts : int
   ; mutable last_assistant_ts : int
   ; result_ts : int String.Table.t
   ; tools : Tool_state.t String.Table.t
-  ; mutable subagents : Subagent.t list (** oldest first *)
+  ; mutable widget_runs : Json.t option
+    (** the agents rail's runs as last sent, [None] when empty *)
+  ; mutable watch : Watch.t option
+  ; mutable messages_session : string option
+    (** the session the last [get_messages] answered for *)
   ; mutable last_state : Json.t option
   ; mutable quiet_state_changes : int
     (** > 0 while running a command after which the frontend re-syncs itself *)
@@ -131,8 +106,8 @@ let set_status t key text =
 ;;
 
 let dialog t ~meth fields ~on_response =
-  t.seq <- t.seq + 1;
-  let id = sprintf "dialog-%d" t.seq in
+  t.dialog_seq <- t.dialog_seq + 1;
+  let id = sprintf "dialog-%d" t.dialog_seq in
   Hashtbl.set t.dialogs ~key:id ~data:on_response;
   t.write (P.ui_request ~id ~meth fields)
 ;;
@@ -159,6 +134,215 @@ let report t result =
   match result with
   | Ok () -> ()
   | Error e -> notify t ~kind:"error" (Error.to_string_hum e)
+;;
+
+(* ---------------------------------------------------------------------- *)
+(* Subagents                                                               *)
+
+let first_line s =
+  let line = Option.value (List.hd (String.split_lines s)) ~default:s in
+  if String.length line > 60 then String.prefix line 57 ^ "..." else line
+;;
+
+let current_session t =
+  Option.value_map t.last_state ~default:"" ~f:(string_field "session_id")
+;;
+
+(* A [Subagent_log] summary as a node of pi-subagents' status snapshot. *)
+let subagent_node_fields s =
+  let opt_ms key name =
+    Option.value_map
+      (Json.int (field name s))
+      ~default:[]
+      ~f:(fun v -> [ key, int v ])
+  in
+  [ "id", str (string_field "id" s)
+  ; "kind", str "subagent"
+  ; "label", str (first_line (string_field "task" s))
+  ; "state", str (string_field "state" s)
+  ]
+  @ opt_ms "startedAt" "started_at_ms"
+  @ opt_ms "updatedAt" "updated_at_ms"
+  @ opt_ms "endedAt" "ended_at_ms"
+  @ [ ( "activity"
+      , `Object
+          ([ "turnCount", field "turns" s; "toolCount", field "tool_calls" s ]
+           @ Option.value_map
+               (opt_string_field "current_tool" s)
+               ~default:[]
+               ~f:(fun tool -> [ "currentTool", str tool ])
+           @ opt_ms "currentToolStartedAt" "current_tool_started_at_ms") )
+    ]
+;;
+
+let rec subagent_node ~all s =
+  let id = string_field "id" s in
+  let children =
+    List.filter all ~f:(fun c ->
+      Option.equal String.equal (opt_string_field "parent" c) (Some id))
+  in
+  `Object
+    (subagent_node_fields s
+     @
+     if List.is_empty children
+     then []
+     else [ "children", `Array (List.map children ~f:(subagent_node ~all)) ])
+;;
+
+(* What the subagent view shows about the subagent besides its transcript. *)
+let subagent_info s =
+  let result =
+    match field "result" s with
+    | `Object _ as r ->
+      `Object
+        [ "text", field "text" r
+        ; ( "isError"
+          , if Json.exactly_equal (field "is_error" r) `True
+            then `True
+            else `False )
+        ]
+    | _ -> `Null
+  in
+  `Object
+    (subagent_node_fields s
+     @ [ "task", field "task" s
+       ; "model", field "model" s
+       ; "callId", field "call_id" s
+       ; "parentId", field "parent" s
+       ; "result", result
+       ])
+;;
+
+let watched t =
+  Option.filter t.watch ~f:(fun (w : Watch.t) ->
+    String.equal w.session_id (current_session t))
+;;
+
+let subagent_event t (w : Watch.t) name fields =
+  t.write
+    (P.event
+       "prigh_subagent_event"
+       [ "agentId", str w.agent_id; "event", P.event name fields ])
+;;
+
+(* Re-reads the subagents: the agents rail widget is sent when its runs
+   changed (or, on [resync], whenever there are any: the frontend cleared
+   it), and the watched subagent's info when that changed. *)
+let refresh_subagents ?(resync = false) t =
+  let all =
+    match call t "list_subagents" [] with
+    | Ok summaries -> Option.value (Json.list summaries) ~default:[]
+    | Error _ -> []
+  in
+  let visible =
+    List.filter all ~f:(fun s ->
+      not (Json.exactly_equal (field "stale" s) `True))
+  in
+  let runs =
+    List.filter_map visible ~f:(fun s ->
+      if Option.is_none (opt_string_field "parent" s)
+      then Some (subagent_node ~all:visible s)
+      else None)
+  in
+  let runs = if List.is_empty runs then None else Some (`Array runs) in
+  let send =
+    if resync
+    then Option.is_some runs
+    else not (Option.equal Json.exactly_equal runs t.widget_runs)
+  in
+  t.widget_runs <- runs;
+  if send
+  then (
+    let lines =
+      Option.value_map runs ~default:`Null ~f:(fun runs ->
+        let snapshot =
+          `Object
+            [ "generatedAt", int (t.now ())
+            ; ( "omitted"
+              , `Object
+                  [ "runs", int 0
+                  ; "children", int 0
+                  ; "byteLimitExceeded", `False
+                  ] )
+            ; "runs", runs
+            ]
+        in
+        `Array [ str ("PI_SUBAGENT_ASYNC_JSON:" ^ Json.to_string snapshot) ])
+    in
+    t.write
+      (P.ui_request
+         ~id:"widget-subagents"
+         ~meth:"setWidget"
+         [ "widgetKey", str "subagents"; "widgetLines", lines ]));
+  Option.iter (watched t) ~f:(fun w ->
+    Option.iter
+      (List.find all ~f:(fun s -> String.equal (string_field "id" s) w.agent_id))
+      ~f:(fun s ->
+        let info = subagent_info s in
+        if not (Json.exactly_equal info w.info)
+        then (
+          w.info <- info;
+          subagent_event t w "subagent_info" [ "subagent", info ])))
+;;
+
+let watch_subagent t key =
+  Or_error.map
+    (call t "get_subagent" [ "id", str key ])
+    ~f:(fun result ->
+      let s = field "subagent" result in
+      let messages = list_field "messages" result in
+      let n = List.length messages in
+      let info = subagent_info s in
+      t.watch
+      <- Some
+           { agent_id = string_field "id" s
+           ; session_id = current_session t
+           ; next_ts = n
+           ; current_ts = n
+           ; tools = String.Table.create ()
+           ; info
+           };
+      `Object
+        [ "subagent", info
+        ; ( "messages"
+          , `Array (List.mapi messages ~f:(fun i m -> P.message ~timestamp:i m))
+          )
+        ])
+;;
+
+(* ---------------------------------------------------------------------- *)
+(* Dialogs                                                                 *)
+
+let confirm_dialog t json =
+  let call_id = string_field "call_id" json in
+  let dialog_id = "confirm-" ^ call_id in
+  Hashtbl.set t.dialogs ~key:dialog_id ~data:(fun response ->
+    let allow = Json.exactly_equal (field "confirmed" response) `True in
+    report
+      t
+      (call
+         t
+         "tool_confirm_respond"
+         [ "call_id", str call_id; ("allow", if allow then `True else `False) ]
+       |> Or_error.ignore_m));
+  t.write
+    (P.ui_request
+       ~id:dialog_id
+       ~meth:"confirm"
+       [ "title", str (sprintf "Run %s?" (string_field "name" json))
+       ; "message", str (string_field "summary" json)
+       ])
+;;
+
+(* Tool confirmations belong to the session that asked: answering one after
+   switching would go to the new session. *)
+let cancel_confirm_dialogs t =
+  Hashtbl.keys t.dialogs
+  |> List.filter ~f:(String.is_prefix ~prefix:"confirm-")
+  |> List.sort ~compare:String.compare
+  |> List.iter ~f:(fun id ->
+    Hashtbl.remove t.dialogs id;
+    event t "extension_ui_cancel" [ "id", str id ])
 ;;
 
 (* ---------------------------------------------------------------------- *)
@@ -202,6 +386,11 @@ let apply_state t state =
   match previous with
   | None -> ()
   | Some p ->
+    if changed "session_id"
+    then (
+      t.watch <- None;
+      cancel_confirm_dialogs t;
+      refresh_subagents t);
     if changed "session_name"
     then
       event
@@ -235,12 +424,6 @@ let apply_state t state =
     then event t "session_reloaded" []
 ;;
 
-let refresh_state t =
-  match call t "get_state" [] with
-  | Ok state -> t.last_state <- Some state
-  | Error _ -> ()
-;;
-
 (* Runs [f] with state diffs not turning into [session_reloaded]: the
    frontend re-syncs after these commands on its own. *)
 let quietly t f =
@@ -249,110 +432,140 @@ let quietly t f =
     t.quiet_state_changes <- t.quiet_state_changes - 1)
 ;;
 
+let refresh_state t =
+  match call t "get_state" [] with
+  | Ok state -> quietly t (fun () -> apply_state t state)
+  | Error _ -> ()
+;;
+
+(* The session's live state a re-syncing frontend has just cleared: status
+   entries, queued messages, unanswered confirmations, the agents rail. *)
+let resync t state =
+  List.iter (status_texts state) ~f:(fun (key, text) ->
+    if Option.is_some text then set_status t key text);
+  (match call t "get_pending" [] with
+   | Ok pending ->
+     let steer = list_field "steer_texts" pending in
+     let follow_up = list_field "follow_up_texts" pending in
+     if not (List.is_empty steer && List.is_empty follow_up)
+     then
+       event
+         t
+         "queue_update"
+         [ "steering", `Array steer; "followUp", `Array follow_up ];
+     List.iter (list_field "confirms" pending) ~f:(confirm_dialog t)
+   | Error _ -> ());
+  refresh_subagents ~resync:true t
+;;
+
 (* ---------------------------------------------------------------------- *)
 (* Events                                                                  *)
 
-let subagent_widget t =
-  let snapshot =
-    `Object
-      [ "generatedAt", int (t.now ())
-      ; ( "omitted"
-        , `Object
-            [ "runs", int 0; "children", int 0; "byteLimitExceeded", `False ] )
-      ; ( "runs"
-        , `Array
-            (List.filter_map t.subagents ~f:(fun s ->
-               if Option.is_none s.parent
-               then Some (Subagent.node ~all:t.subagents s)
-               else None)) )
-      ]
-  in
-  t.write
-    (P.ui_request
-       ~id:"widget-subagents"
-       ~meth:"setWidget"
-       [ "widgetKey", str "subagents"
-       ; ( "widgetLines"
-         , if List.is_empty t.subagents
-           then `Null
-           else
-             `Array
-               [ str ("PI_SUBAGENT_ASYNC_JSON:" ^ Json.to_string snapshot) ] )
-       ])
-;;
-
-let find_subagent t id =
-  List.find t.subagents ~f:(fun s -> String.equal s.id id)
-;;
-
-let first_line s =
-  let line = Option.value (List.hd (String.split_lines s)) ~default:s in
-  if String.length line > 60 then String.prefix line 57 ^ "..." else line
-;;
-
-let rec subagent_event t ~parent json =
-  let now = t.now () in
-  let touch id f =
-    Option.iter (find_subagent t id) ~f:(fun s ->
-      s.updated_at <- now;
-      f s);
-    subagent_widget t
-  in
-  match string_field "event" json with
-  | "subagent_start" ->
-    let id = string_field "agent_id" json in
-    t.subagents
-    <- t.subagents
-       @ [ { Subagent.id
-           ; parent
-           ; label = first_line (string_field "task" json)
-           ; started_at = now
-           ; state = "running"
-           ; ended_at = None
-           ; updated_at = now
-           ; current_tool = None
-           ; tool_started_at = None
-           ; turns = 0
-           ; tools = 0
-           }
-         ];
-    subagent_widget t
-  | "subagent_end" ->
-    touch (string_field "agent_id" json) (fun s ->
-      s.state
-      <- (if Json.exactly_equal (field "is_error" (field "result" json)) `True
-          then "failed"
-          else "complete");
-      s.ended_at <- Some now;
-      s.current_tool <- None)
-  | "subagent" ->
-    let id = string_field "agent_id" json in
-    let inner = field "inner" json in
-    (match string_field "event" inner with
-     | "subagent_start" | "subagent_end" | "subagent" ->
-       subagent_event t ~parent:(Some id) inner
-     | "turn_start" -> touch id (fun s -> s.turns <- s.turns + 1)
-     | "tool_start" ->
-       touch id (fun s ->
-         s.tools <- s.tools + 1;
-         s.current_tool <- Some (string_field "name" (field "call" inner));
-         s.tool_started_at <- Some now)
-     | "tool_end" ->
-       touch id (fun s ->
-         s.current_tool <- None;
-         s.tool_started_at <- None)
-     | _ -> ())
-  | _ -> ()
-;;
-
 let is_shell_call id = String.is_prefix id ~prefix:"shell-"
 
-let tool_fields t call_id =
-  match Hashtbl.find t.tools call_id with
+let tool_fields tools call_id =
+  match Hashtbl.find tools call_id with
   | Some (tool : Tool_state.t) ->
     [ "toolCallId", str call_id; "toolName", str tool.name; "args", tool.args ]
   | None ->
     [ "toolCallId", str call_id; "toolName", str "tool"; "args", `Object [] ]
+;;
+
+let tool_start tools call =
+  let id = string_field "id" call in
+  Hashtbl.set
+    tools
+    ~key:id
+    ~data:
+      { Tool_state.name = string_field "name" call
+      ; args = P.arguments_object (string_field "arguments" call)
+      ; output = Buffer.create 256
+      };
+  tool_fields tools id
+;;
+
+let tool_output tools json =
+  let id = string_field "call_id" json in
+  Option.map (Hashtbl.find tools id) ~f:(fun (tool : Tool_state.t) ->
+    Buffer.add_string tool.output (string_field "chunk" json);
+    tool_fields tools id
+    @ [ ( "partialResult"
+        , `Object
+            [ "content", P.tool_result_content (Buffer.contents tool.output) ] )
+      ])
+;;
+
+let tool_end tools json =
+  let id = string_field "id" (field "call" json) in
+  let result = field "result" json in
+  let fields =
+    tool_fields tools id
+    @ [ ( "result"
+        , `Object
+            [ "content", P.tool_result_content (string_field "text" result) ] )
+      ; "isError", field "is_error" result
+      ]
+  in
+  Hashtbl.remove tools id;
+  fields
+;;
+
+(* A nested [subagent] event's innermost agent and its own event. *)
+let rec innermost json =
+  let inner = field "inner" json in
+  if String.equal (string_field "event" inner) "subagent"
+  then innermost inner
+  else string_field "agent_id" json, inner
+;;
+
+let forward_to_watch t (w : Watch.t) inner =
+  let message ts =
+    [ ( "message"
+      , P.message
+          ~timestamp:ts
+          (field
+             (if String.equal (string_field "event" inner) "message_update"
+              then "partial"
+              else "message")
+             inner) )
+    ]
+  in
+  match string_field "event" inner with
+  | "message_start" ->
+    w.current_ts <- w.next_ts;
+    subagent_event t w "message_start" (message w.current_ts)
+  | "message_update" ->
+    subagent_event t w "message_update" (message w.current_ts)
+  | "message_end" ->
+    subagent_event t w "message_end" (message w.current_ts);
+    w.next_ts <- w.current_ts + 1
+  | "tool_start" ->
+    subagent_event
+      t
+      w
+      "tool_execution_start"
+      (tool_start w.tools (field "call" inner))
+  | "tool_output" ->
+    Option.iter
+      (tool_output w.tools inner)
+      ~f:(subagent_event t w "tool_execution_update")
+  | "tool_end" ->
+    subagent_event t w "tool_execution_end" (tool_end w.tools inner)
+  | _ -> ()
+;;
+
+let on_subagent_event t json =
+  let agent_id, inner =
+    match string_field "event" json with
+    | "subagent" -> innermost json
+    | _ -> "", json
+  in
+  Option.iter (watched t) ~f:(fun w ->
+    if String.equal w.agent_id agent_id then forward_to_watch t w inner);
+  match string_field "event" inner with
+  | "subagent_start" | "subagent_end" | "turn_start" | "tool_start" | "tool_end"
+    -> refresh_subagents t
+  | _ -> ()
 ;;
 
 let auth_event t json =
@@ -433,13 +646,7 @@ let on_event t json =
   | "state" -> apply_state t (field "state" json)
   | "agent_start" ->
     (* Finished subagents stay on the rail until the next run. *)
-    let live =
-      List.filter t.subagents ~f:(fun s -> String.equal s.state "running")
-    in
-    if List.length live <> List.length t.subagents
-    then (
-      t.subagents <- live;
-      subagent_widget t);
+    refresh_subagents t;
     event t "agent_start" []
   | "agent_end" ->
     let messages = list_field "messages" json in
@@ -501,71 +708,15 @@ let on_event t json =
       [ "message", P.message ~timestamp:t.current_ts message ]
   | "tool_start" ->
     let call = field "call" json in
-    let id = string_field "id" call in
-    if not (is_shell_call id)
-    then (
-      Hashtbl.set
-        t.tools
-        ~key:id
-        ~data:
-          { name = string_field "name" call
-          ; args = P.arguments_object (string_field "arguments" call)
-          ; output = Buffer.create 256
-          };
-      event t "tool_execution_start" (tool_fields t id))
+    if not (is_shell_call (string_field "id" call))
+    then event t "tool_execution_start" (tool_start t.tools call)
   | "tool_output" ->
-    let id = string_field "call_id" json in
-    Option.iter (Hashtbl.find t.tools id) ~f:(fun tool ->
-      Buffer.add_string tool.output (string_field "chunk" json);
-      event
-        t
-        "tool_execution_update"
-        (tool_fields t id
-         @ [ ( "partialResult"
-             , `Object
-                 [ ( "content"
-                   , P.tool_result_content (Buffer.contents tool.output) )
-                 ] )
-           ]))
+    Option.iter (tool_output t.tools json) ~f:(event t "tool_execution_update")
   | "tool_end" ->
-    let id = string_field "id" (field "call" json) in
-    if not (is_shell_call id)
-    then (
-      let result = field "result" json in
-      event
-        t
-        "tool_execution_end"
-        (tool_fields t id
-         @ [ ( "result"
-             , `Object
-                 [ "content", P.tool_result_content (string_field "text" result)
-                 ] )
-           ; "isError", field "is_error" result
-           ]);
-      Hashtbl.remove t.tools id)
-  | "tool_confirm" ->
-    let call_id = string_field "call_id" json in
-    let dialog_id = "confirm-" ^ call_id in
-    Hashtbl.set t.dialogs ~key:dialog_id ~data:(fun response ->
-      let allow = Json.exactly_equal (field "confirmed" response) `True in
-      report
-        t
-        (call
-           t
-           "tool_confirm_respond"
-           [ "call_id", str call_id
-           ; ("allow", if allow then `True else `False)
-           ]
-         |> Or_error.ignore_m));
-    t.write
-      (P.ui_request
-         ~id:dialog_id
-         ~meth:"confirm"
-         [ "title", str (sprintf "Run %s?" (string_field "name" json))
-         ; "message", str (string_field "summary" json)
-         ])
-  | "subagent_start" | "subagent" | "subagent_end" ->
-    subagent_event t ~parent:None json
+    if not (is_shell_call (string_field "id" (field "call" json)))
+    then event t "tool_execution_end" (tool_end t.tools json)
+  | "tool_confirm" -> confirm_dialog t json
+  | "subagent_start" | "subagent" | "subagent_end" -> on_subagent_event t json
   | "compacted" ->
     let tokens_before =
       Option.value_map t.last_state ~default:0 ~f:(fun s ->
@@ -865,11 +1016,22 @@ let run_command t json =
   | "abort" -> unit_ok (call t "abort" [])
   | "get_state" ->
     Or_error.map (call t "get_state" []) ~f:(fun state ->
-      t.last_state <- Some state;
+      quietly t (fun () -> apply_state t state);
+      resync t state;
       P.session_state state)
   | "get_messages" ->
     Or_error.map (messages t) ~f:(fun messages ->
       t.next_ts <- Int.max t.next_ts (List.length messages);
+      let session = current_session t in
+      if not (Option.equal String.equal t.messages_session (Some session))
+      then (
+        t.messages_session <- Some session;
+        (* A message streaming in this session started before the client
+           joined: give it a slot after the history. *)
+        if
+          Option.exists t.last_state ~f:(fun s ->
+            Json.exactly_equal (field "running" s) `True)
+        then t.current_ts <- take_ts t);
       `Object
         [ ( "messages"
           , `Array (List.mapi messages ~f:(fun i m -> P.message ~timestamp:i m))
@@ -976,6 +1138,14 @@ let run_command t json =
       in
       `Object [ "sessions", sessions; "current", current ])
   | "switch_session" -> unit_ok (switch_session t (arg "path"))
+  | "watch_subagent" ->
+    (match
+       opt_string_field "agentId" json, opt_string_field "toolCallId" json
+     with
+     | Some key, _ | None, Some key -> watch_subagent t key
+     | None, None ->
+       t.watch <- None;
+       Ok (`Object []))
   | "" -> Or_error.error_string "command must have a string \"type\""
   | command -> Or_error.errorf "command %S is not supported by prigh" command
 ;;
@@ -1038,12 +1208,15 @@ let serve_lines
     ; write
     ; now
     ; seq = 0
+    ; dialog_seq = 0
     ; next_ts = 0
     ; current_ts = 0
     ; last_assistant_ts = 0
     ; result_ts = String.Table.create ()
     ; tools = String.Table.create ()
-    ; subagents = []
+    ; widget_runs = None
+    ; watch = None
+    ; messages_session = None
     ; last_state = None
     ; quiet_state_changes = 0
     ; dialogs = String.Table.create ()
