@@ -202,6 +202,13 @@ let drain_background client =
     printf "  event %s\n" (normalise line))
 ;;
 
+(* A missing delivery shows up as a diff rather than a hung test. *)
+let with_deadline what d =
+  match%map Clock.with_timeout (Time_float.Span.of_sec 60.) d with
+  | `Result () -> ()
+  | `Timeout -> printf "%s: timed out\n" what
+;;
+
 let main () =
   let tmp = Filename_unix.temp_dir "prigh-e2e" "" in
   tmp_dir := tmp;
@@ -341,7 +348,7 @@ let main () =
         let%bind () =
           call client "prompt" [ "text", Json.str "delegate something" ]
         in
-        let%bind () = drain_background client in
+        let%bind () = with_deadline "subagents" (drain_background client) in
         let%bind () = Client.close client in
         print_endline "subagent backend exited";
         return ()
@@ -377,7 +384,7 @@ let main () =
         return ()
       | Ok () ->
         let%bind () = call client "prompt" [ "text", Json.str "build it" ] in
-        let%bind () = drain_jobs client in
+        let%bind () = with_deadline "jobs" (drain_jobs client) in
         let%bind () =
           match%map
             Client.call
