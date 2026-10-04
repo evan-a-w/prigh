@@ -59,9 +59,23 @@ ARG PRIGH_UID=1000
 ARG PRIGH_GID=1000
 RUN apt-get update \
  && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
-      bash ca-certificates curl git jq less netbase openssh-client procps \
-      ripgrep tini tmux ${EXTRA_APT_PACKAGES} \
+      bash ca-certificates curl git jq less libnss-extrausers netbase \
+      openssh-client procps ripgrep tini tmux util-linux ${EXTRA_APT_PACKAGES} \
  && rm -rf /var/lib/apt/lists/*
+
+# The entrypoint creates a Linux user per namespace at runtime, on a read-only
+# root: NSS also reads users from /var/lib/extrausers, which points into the
+# /run tmpfs. Checked here, since a broken lookup would only show at runtime.
+RUN sed -i -E '/extrausers/! s/^(passwd|group|shadow):(.*)$/\1:\2 extrausers/' /etc/nsswitch.conf \
+ && [ "$(grep -cE '^(passwd|group|shadow):.* extrausers' /etc/nsswitch.conf)" = 3 ] \
+ && rm -rf /var/lib/extrausers \
+ && ln -s /run/prigh/extrausers /var/lib/extrausers \
+ && mkdir -p /run/prigh/extrausers \
+ && echo 'nsstest:x:54321:54321::/nonexistent:/bin/false' > /run/prigh/extrausers/passwd \
+ && printf 'nsstest:x:54321:\nnsstest2:x:54322:nsstest\n' > /run/prigh/extrausers/group \
+ && echo 'nsstest:*:::::::' > /run/prigh/extrausers/shadow \
+ && [ "$(setpriv --reuid=54321 --regid=54321 --init-groups id -un):$(setpriv --reuid=54321 --regid=54321 --init-groups id -G)" = "nsstest:54321 54322" ] \
+ && rm -rf /run/prigh
 
 COPY --from=nix-build /closure /nix/store
 COPY --from=nix-build /opt/prigh /opt/prigh
@@ -74,19 +88,21 @@ RUN ln -s /opt/prigh/bin/prigh /opt/prigh/bin/prigh-tui /usr/local/bin/ \
  && groupadd -o -g "${PRIGH_GID}" prigh \
  && useradd -o -m -u "${PRIGH_UID}" -g prigh -s /bin/bash prigh \
  && mkdir -p /workspace /home/prigh/.prigh /home/prigh/.config/prigh \
- && chown -R prigh:prigh /workspace /home/prigh
+ && chown -R prigh:prigh /home/prigh \
+ && chmod 700 /home/prigh
 
 ENV LANG=C.UTF-8 \
     PRIGH_BACKEND=/opt/prigh/bin/prigh \
     PRIGH_WEB_ROOT=/opt/prigh/share/web \
     PRIGH_PI_WEB_ROOT=/opt/prigh/share/pi-web \
     PRIGH_MODE=web \
-    PRIGH_CWD=/workspace \
     GIT_TERMINAL_PROMPT=0
 
-USER prigh
+# Starts as root: the entrypoint creates the users, then drops privileges.
+# Each user's own directory is /workspace/<name>.
 WORKDIR /workspace
-VOLUME ["/home/prigh", "/workspace"]
+VOLUME ["/home", "/workspace"]
 EXPOSE 7777 7788 7789
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s CMD ["prigh-docker", "healthcheck"]
-ENTRYPOINT ["tini", "--", "prigh-docker"]
+# -g: stop signals go to the whole process group (backend and tool hosts).
+ENTRYPOINT ["tini", "-g", "--", "prigh-docker"]

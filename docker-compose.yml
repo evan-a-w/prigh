@@ -19,11 +19,14 @@ services:
       PRIGH_MODE: ${PRIGH_MODE:-web}
       PRIGH_TOKEN: ${PRIGH_TOKEN:-}
       PRIGH_TOKENS: ${PRIGH_TOKENS:-}
+      PRIGH_SUPERUSERS: ${PRIGH_SUPERUSERS:-}
       PRIGH_NO_BACKEND_HOST: ${PRIGH_NO_BACKEND_HOST:-}
       PRIGH_ALLOW_NO_TOKEN: ${PRIGH_ALLOW_NO_TOKEN:-}
       PRIGH_ARGS: ${PRIGH_ARGS:-}
       PRIGH_TUI_ARGS: ${PRIGH_TUI_ARGS:-}
+      PRIGH_CWD: ${PRIGH_CWD:-}
       GH_TOKEN: ${GH_TOKEN:-}
+      PRIGH_GH_TOKENS: ${PRIGH_GH_TOKENS:-}
       PRIGH_GIT_NAME: ${PRIGH_GIT_NAME:-}
       PRIGH_GIT_EMAIL: ${PRIGH_GIT_EMAIL:-}
     ports:
@@ -31,18 +34,30 @@ services:
       - "${PRIGH_BIND:-0.0.0.0}:${PRIGH_PI_WEB_PORT:-7789}:7789"
       - "${PRIGH_BIND:-0.0.0.0}:${PRIGH_SERVER_PORT:-7777}:7777"
     volumes:
-      # Sessions, credentials, config and history.
-      - prigh-home:/home/prigh
-      # What the agent works on. Set PRIGH_WORKSPACE to a host path to bind
-      # it instead (it must be writable by PRIGH_UID).
+      # Every user's home: /home/<name> (~/.ssh, ~/.gitconfig), and /home/prigh,
+      # the backend's sessions, logins and config.
+      - prigh-home:/home
+      # What the agents work on, /workspace/<name> per user. Set
+      # PRIGH_WORKSPACE to a host path to bind it instead (it must be
+      # world-searchable, e.g. mode 755).
       - ${PRIGH_WORKSPACE:-prigh-workspace}:/workspace
-    # Only the two volumes above and a scratch /tmp are writable; the agent
-    # sees nothing else of the host.
+    # Only the two volumes above, a scratch /tmp and /run (the per-user
+    # accounts) are writable; the agents see nothing else of the host.
     read_only: true
     tmpfs:
       - /tmp:exec,mode=1777
+      - /run:mode=0755
+    # The entrypoint runs as root to create the users; everything it starts
+    # runs as an unprivileged user with no capabilities (see DOCKER.md).
     cap_drop:
       - ALL
+    cap_add:
+      - CHOWN
+      - DAC_OVERRIDE
+      - FOWNER
+      - SETUID
+      - SETGID
+      - KILL
     security_opt:
       - no-new-privileges:true
     # For PRIGH_MODE=tui (attach to the container); harmless otherwise.
