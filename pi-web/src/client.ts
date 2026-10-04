@@ -18,6 +18,8 @@ export interface RpcClientCallbacks {
 	 * client stops reconnecting: the user has to fix the token or session.
 	 */
 	onHelloFailed(error: string): void;
+	/** `/setusr` succeeded: the page should reconnect acting as `user`. */
+	onSetUser(user: string): void;
 }
 
 const RESPONSE_TIMEOUT_MS = 60_000;
@@ -39,8 +41,9 @@ export class RpcClient {
 	private helloFailed = false;
 	private readonly pending = new Map<
 		string,
-		{ resolve: (response: RpcResponse) => void; timer: ReturnType<typeof setTimeout> }
+		{ resolve: (response: RpcResponse) => void; reject: (error: Error) => void; timer: ReturnType<typeof setTimeout> }
 	>();
+	private idleWaiters: Array<() => void> = [];
 
 	/** Re-read on every (re)connect, so the session in the address bar is the one rejoined. */
 	private readonly url: () => string;
@@ -60,6 +63,47 @@ export class RpcClient {
 		this.ws?.close();
 	}
 
+	/** Drops the current connection (even a refused one) and connects again with a fresh URL. */
+	reconnect(): void {
+		const previous = this.ws;
+		this.generation++;
+		this.stopped = false;
+		if (previous) {
+			previous.close();
+			this.dropPending();
+			this.callbacks.onConnectionChange(false);
+		}
+		this.reconnectDelayMs = INITIAL_RECONNECT_DELAY_MS;
+		this.connect();
+	}
+
+	/** Resolves once no command awaits its response, or after `timeoutMs`. */
+	whenIdle(timeoutMs: number): Promise<void> {
+		if (this.pending.size === 0) return Promise.resolve();
+		return new Promise((resolve) => {
+			const done = () => {
+				clearTimeout(timer);
+				this.idleWaiters = this.idleWaiters.filter((waiter) => waiter !== done);
+				resolve();
+			};
+			const timer = setTimeout(done, timeoutMs);
+			this.idleWaiters.push(done);
+		});
+	}
+
+	private notifyIfIdle(): void {
+		if (this.pending.size === 0) for (const waiter of [...this.idleWaiters]) waiter();
+	}
+
+	private dropPending(): void {
+		for (const [id, entry] of this.pending) {
+			clearTimeout(entry.timer);
+			this.pending.delete(id);
+			entry.reject(new Error("Connection closed"));
+		}
+		this.notifyIfIdle();
+	}
+
 	get connected(): boolean {
 		return this.ws?.readyState === WebSocket.OPEN;
 	}
@@ -73,9 +117,10 @@ export class RpcClient {
 		return new Promise<RpcResponse>((resolve, reject) => {
 			const timer = setTimeout(() => {
 				this.pending.delete(id);
+				this.notifyIfIdle();
 				reject(new Error(`Command "${command.type}" timed out`));
 			}, RESPONSE_TIMEOUT_MS);
-			this.pending.set(id, { resolve, timer });
+			this.pending.set(id, { resolve, reject, timer });
 			ws.send(JSON.stringify({ ...command, id }));
 		});
 	}
@@ -105,10 +150,7 @@ export class RpcClient {
 		ws.onclose = () => {
 			if (generation !== this.generation) return;
 			this.callbacks.onConnectionChange(false);
-			for (const [id, entry] of this.pending) {
-				clearTimeout(entry.timer);
-				this.pending.delete(id);
-			}
+			this.dropPending();
 			if (!this.stopped && !this.helloFailed) {
 				setTimeout(() => this.connect(), this.reconnectDelayMs);
 				this.reconnectDelayMs = Math.min(this.reconnectDelayMs * 2, MAX_RECONNECT_DELAY_MS);
@@ -131,6 +173,7 @@ export class RpcClient {
 					this.pending.delete(response.id);
 					clearTimeout(entry.timer);
 					entry.resolve(response);
+					this.notifyIfIdle();
 				}
 			}
 			return;
@@ -146,6 +189,11 @@ export class RpcClient {
 		if (message.type === "prigh_hello_failed") {
 			this.helloFailed = true;
 			this.callbacks.onHelloFailed((message as { error?: string }).error ?? "connection refused");
+			return;
+		}
+		if (message.type === "prigh_set_user") {
+			const user = (message as { user?: unknown }).user;
+			if (typeof user === "string") this.callbacks.onSetUser(user);
 			return;
 		}
 		this.callbacks.onEvent(message as unknown as AgentSessionEvent);

@@ -9,6 +9,15 @@ module Queued = struct
   [@@deriving sexp_of]
 end
 
+module Pending_confirm = struct
+  type t =
+    { call_id : string
+    ; name : string
+    ; summary : string
+    }
+  [@@deriving sexp_of]
+end
+
 module Host = struct
   type t =
     { id : string
@@ -122,7 +131,7 @@ type t =
   ; mutable extra_usage : Usage.t (** subagents and [btw] calls *)
   ; mutable extra_cost_usd : float
   ; mutable config : Config.t
-  ; pending_confirms : bool Promise.u String.Table.t
+  ; pending_confirms : (Pending_confirm.t * bool Promise.u) String.Table.t
   ; mutable shell_seq : int
   ; mutable hosts : Host.t list
     (** every connected client able to run tools, set by the server *)
@@ -136,6 +145,7 @@ type t =
   ; mutable environment_notes : string list
     (** cwd/host changes not yet told to the model, oldest first *)
   ; jobs : Subagent_jobs.t
+  ; subagent_log : Subagent_log.t
   }
 
 let restore_settings t =
@@ -171,7 +181,18 @@ let find_branch t ~cwd =
 
 let active_host t = t.active_host
 let subscribe t ~f = t.subscribers <- f :: t.subscribers
-let broadcast t event = List.iter (List.rev t.subscribers) ~f:(fun f -> f event)
+
+let broadcast t (event : Event.t) =
+  (match event with
+   | Loop e ->
+     Subagent_log.record
+       t.subagent_log
+       ~now:(Eio.Time.now (Eio.Stdenv.clock t.env))
+       e
+   | _ -> ());
+  List.iter (List.rev t.subscribers) ~f:(fun f -> f event)
+;;
+
 let session t = t.session
 let messages t = Session.messages t.session
 let is_running t = Option.is_some t.run
@@ -213,17 +234,16 @@ let state t =
 
 let state_changed t = broadcast t (State_changed (state t))
 
+let queued_texts t =
+  let texts queue =
+    List.map (Queue.to_list queue) ~f:(fun (q : Queued.t) -> q.text)
+  in
+  texts t.steer_queue, texts t.follow_up_queue
+;;
+
 let queue_update t =
-  broadcast
-    t
-    (Queue_update
-       { steer =
-           List.map (Queue.to_list t.steer_queue) ~f:(fun (q : Queued.t) ->
-             q.text)
-       ; follow_up =
-           List.map (Queue.to_list t.follow_up_queue) ~f:(fun (q : Queued.t) ->
-             q.text)
-       })
+  let steer, follow_up = queued_texts t in
+  broadcast t (Queue_update { steer; follow_up })
 ;;
 
 let config t = t.config
@@ -247,7 +267,7 @@ let save_as_default t =
 let respond_confirm t ~call_id ~allow =
   match Hashtbl.find t.pending_confirms call_id with
   | None -> Or_error.errorf "no pending confirmation for tool call %S" call_id
-  | Some resolver ->
+  | Some (_, resolver) ->
     Hashtbl.remove t.pending_confirms call_id;
     Promise.resolve resolver allow;
     Ok ()
@@ -258,7 +278,12 @@ let confirm_hook t cancel call ~summary =
   then true
   else (
     let promise, resolver = Promise.create () in
-    Hashtbl.set t.pending_confirms ~key:call.Content.Tool_call.id ~data:resolver;
+    Hashtbl.set
+      t.pending_confirms
+      ~key:call.Content.Tool_call.id
+      ~data:
+        ( { Pending_confirm.call_id = call.id; name = call.name; summary }
+        , resolver );
     broadcast
       t
       (Loop (Tool_confirm { call_id = call.id; name = call.name; summary }));
@@ -778,6 +803,7 @@ let create
           ~sw
           ~first_id:(subagent_calls (Session.messages session) + 1)
           ()
+    ; subagent_log = Subagent_log.create ()
     }
   in
   restore_settings t;
@@ -843,6 +869,16 @@ let rec wait_idle t =
 ;;
 
 let has_running_subagents t = Subagent_jobs.has_running t.jobs
+let subagents t = Subagent_log.summaries t.subagent_log
+let subagent t key = Subagent_log.find t.subagent_log key
+
+let pending_confirms t =
+  Hashtbl.data t.pending_confirms
+  |> List.map ~f:fst
+  |> List.sort ~compare:(fun (a : Pending_confirm.t) b ->
+    String.compare a.call_id b.call_id)
+;;
+
 let cancel_subagent t ~agent_id = Subagent_jobs.cancel t.jobs agent_id
 let cancel_subagents ?discard t = Subagent_jobs.cancel_all ?discard t.jobs
 
@@ -997,6 +1033,7 @@ let replace_session t session =
   ignore (abort t);
   Subagent_jobs.cancel_all ~discard:true t.jobs;
   wait_idle t;
+  Subagent_log.clear t.subagent_log;
   t.session <- session;
   t.cwd <- Session.cwd session;
   t.git_branch <- find_branch t ~cwd:t.cwd;

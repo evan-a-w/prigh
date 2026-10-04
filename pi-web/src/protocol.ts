@@ -210,7 +210,41 @@ export type RpcCommand =
 	// prigh additions: the backend's saved sessions, and switching this
 	// connection to one of them (the client re-syncs afterwards).
 	| { id?: string; type: "list_sessions" }
-	| { id?: string; type: "switch_session"; path: string };
+	| { id?: string; type: "switch_session"; path: string }
+	// prigh addition: a subagent's conversation (by agent id or by the id of
+	// the tool call that started it); its events then arrive as
+	// prigh_subagent_event until the next watch_subagent (without ids: stop)
+	// or a session change.
+	| { id?: string; type: "watch_subagent"; agentId?: string; toolCallId?: string };
+
+/** One node of the agents rail plus what the subagent view shows (watch_subagent). */
+export interface SubagentInfo {
+	id: string;
+	label: string;
+	state: "running" | "complete" | "failed";
+	startedAt?: number;
+	updatedAt?: number;
+	endedAt?: number;
+	activity?: { turnCount?: number; toolCount?: number; currentTool?: string; currentToolStartedAt?: number };
+	task: string;
+	model: string;
+	callId: string;
+	parentId: string | null;
+	result: { text: string; isError: boolean } | null;
+}
+
+export interface SubagentTranscript {
+	subagent: SubagentInfo;
+	messages: AgentMessage[];
+}
+
+/** The watched subagent's own conversation events, or a change of its info. */
+export type SubagentEvent =
+	| { type: "message_start" | "message_update" | "message_end"; message: AgentMessage }
+	| { type: "tool_execution_start"; toolCallId: string; toolName: string; args: Record<string, unknown> }
+	| { type: "tool_execution_update"; toolCallId: string; toolName: string; partialResult: ToolResultLike }
+	| { type: "tool_execution_end"; toolCallId: string; toolName: string; result: ToolResultLike; isError: boolean }
+	| { type: "subagent_info"; subagent: SubagentInfo };
 
 /** A saved prigh session (the backend's list_sessions entry). */
 export interface PrighSession {
@@ -297,7 +331,10 @@ export type AgentSessionEvent =
 	| { type: "extension_event"; channel: string; data: unknown }
 	// prigh addition: the backend refused this connection's hello (bad token,
 	// unknown session); the socket is closed right after.
-	| { type: "prigh_hello_failed"; error: string };
+	| { type: "prigh_hello_failed"; error: string }
+	| { type: "prigh_subagent_event"; agentId: string; event: SubagentEvent }
+	// prigh addition: /setusr succeeded; reconnect acting as this user.
+	| { type: "prigh_set_user"; user: string };
 
 // ============================================================================
 // Extension UI sub-protocol

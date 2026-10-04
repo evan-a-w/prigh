@@ -34,6 +34,7 @@ deepseek-flash
 now delegating
 subagent
 count files
+Open subagent →
 child reporting: 1 file
 [subagent: 1 turns, 0 in / 0 out tokens, $<COST>]
 deepseek-flash
@@ -176,6 +177,7 @@ deepseek-flash
 now delegating
 subagent
 count files
+Open subagent →
 child reporting: 1 file
 [subagent: 1 turns, 0 in / 0 out tokens, $<COST>]
 deepseek-flash

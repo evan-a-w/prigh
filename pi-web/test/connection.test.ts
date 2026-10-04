@@ -1,8 +1,12 @@
 import { describe, expect, it } from "vitest";
 import {
+	AS_USER_STORAGE_KEY,
 	connectionFor,
+	forgetAsUser,
 	forgetCredentials,
+	loadAsUser,
 	loadCredentials,
+	saveAsUser,
 	saveCredentials,
 	searchAfterLogin,
 	searchWithoutSession,
@@ -111,5 +115,39 @@ describe("terminalUrl", () => {
 	it("keeps the scheme and base path, and works without token or session", () => {
 		expect(terminalUrl("wss://host/pi/ws", undefined)).toBe("wss://host/pi/terminal");
 		expect(terminalUrl("ws://other:1/", "x")).toBe("ws://other:1/terminal?session=x");
+	});
+});
+
+describe("acting as another user", () => {
+	it("as_user goes in the /ws URL and on to /terminal", () => {
+		const storage = memoryStorage({ [USER_STORAGE_KEY]: "evan", [TOKEN_STORAGE_KEY]: "pw" });
+		saveAsUser(storage, "alice");
+		expect(storage.data[AS_USER_STORAGE_KEY]).toBe("alice");
+		expect(loadAsUser(storage)).toBe("alice");
+		const url = connectionFor(page("?session=s1"), storage).url;
+		expect(url).toBe("ws://127.0.0.1:7789/ws?user=evan&token=pw&as_user=alice&session=s1");
+		expect(terminalUrl(url, "s2")).toBe("ws://127.0.0.1:7789/terminal?user=evan&token=pw&as_user=alice&session=s2");
+	});
+
+	it("is not sent when unset", () => {
+		const storage = memoryStorage({ [USER_STORAGE_KEY]: "evan" });
+		saveAsUser(storage, "");
+		expect(storage.data).toEqual({ [USER_STORAGE_KEY]: "evan" });
+		expect(connectionFor(page(""), storage).url).toBe("ws://127.0.0.1:7789/ws?user=evan");
+	});
+
+	it("signing in or out (as anyone) forgets it", () => {
+		const storage = memoryStorage({ [USER_STORAGE_KEY]: "evan", [AS_USER_STORAGE_KEY]: "alice" });
+		saveCredentials(storage, { user: "evan", password: "pw" });
+		expect(loadAsUser(storage)).toBe("");
+		saveAsUser(storage, "alice");
+		forgetCredentials(storage);
+		expect(storage.data).toEqual({});
+		saveAsUser(storage, "alice");
+		connectionFor(page("?user=bob&token=x"), storage);
+		expect(storage.data).toEqual({ [USER_STORAGE_KEY]: "bob", [TOKEN_STORAGE_KEY]: "x" });
+		saveAsUser(storage, "alice");
+		forgetAsUser(storage);
+		expect(loadAsUser(storage)).toBe("");
 	});
 });

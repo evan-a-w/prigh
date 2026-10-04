@@ -370,3 +370,49 @@ let rec event (e : Agent.Event.t) =
   in
   `Object (("type", str "event") :: fields)
 ;;
+
+let ms seconds = int (Float.iround_nearest_exn (seconds *. 1000.))
+let opt f = Option.value_map ~default:`Null ~f
+
+let subagent_summary (s : Subagent_log.Summary.t) =
+  `Object
+    [ "id", str s.id
+    ; "call_id", str s.call_id
+    ; "parent", opt str s.parent
+    ; "task", str s.task
+    ; "model", str s.model
+    ; "state", str (Subagent_log.State.to_string s.state)
+    ; "started_at_ms", ms s.started_at
+    ; "updated_at_ms", ms s.updated_at
+    ; "ended_at_ms", opt ms s.ended_at
+    ; "turns", int s.turns
+    ; "tool_calls", int s.tool_calls
+    ; "current_tool", opt (fun (name, _) -> str name) s.current_tool
+    ; "current_tool_started_at_ms", opt (fun (_, at) -> ms at) s.current_tool
+    ; "message_count", int s.message_count
+    ; "stale", bool s.stale
+    ; "result", opt tool_result_value s.result
+    ]
+;;
+
+let subagent ((s : Subagent_log.Summary.t), messages) =
+  `Object
+    [ "subagent", subagent_summary s
+    ; "messages", `Array (List.map messages ~f:message)
+    ]
+;;
+
+let pending ~steer ~follow_up ~confirms =
+  `Object
+    [ "steer_texts", `Array (List.map steer ~f:str)
+    ; "follow_up_texts", `Array (List.map follow_up ~f:str)
+    ; ( "confirms"
+      , `Array
+          (List.map confirms ~f:(fun (c : Agent.Pending_confirm.t) ->
+             `Object
+               [ "call_id", str c.call_id
+               ; "name", str c.name
+               ; "summary", str c.summary
+               ])) )
+    ]
+;;

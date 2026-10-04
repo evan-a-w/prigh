@@ -13,7 +13,21 @@ open! Import
     the prigh-only slash commands ([/login], [/logout], [/auth], [/sessions],
     [/switch], [/host], [/setusr], [/help]) arrive as [prompt]s and run here.
     A successful [/setusr NAME] sends [{"type": "prigh_set_user", "user":
-    NAME}]: the frontend reconnects with the [as_user] query parameter. *)
+    NAME}]: the frontend reconnects with the [as_user] query parameter.
+
+    [get_state] also re-sends the session's live state that is not empty:
+    status entries, queued messages ([queue_update]), unanswered tool
+    confirmations and the agents rail widget. A frontend re-syncing (after
+    connecting or switching sessions) clears these before asking. Switching
+    sessions cancels the old session's confirmation dialogs.
+
+    [watch_subagent {agentId | toolCallId}] answers with a subagent's info
+    and transcript ([{subagent, messages}]) and from then on forwards its
+    events as [{"type": "prigh_subagent_event", "agentId", "event"}], where
+    [event] is a [message_start/update/end] or [tool_execution_*] event of
+    its own conversation (timestamps continue the transcript's indices) or
+    [{"type": "subagent_info", "subagent"}]. [watch_subagent {}] or a
+    session change stops it. *)
 
 (** Sends [hello] (with [token], [user], [session] and [name]; as [signed_in]
     when given, see [Rpc_server.connect]) and then serves until
