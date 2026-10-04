@@ -163,7 +163,10 @@ let common_params =
           ~env
           ~sw
           ~provider
-          ~tools:(if no_tools then [] else Tools.all @ [ subagent ])
+          ~tools:
+            (if no_tools
+             then []
+             else Tools.all @ (subagent :: Tool_subagent.control_tools))
           ~sessions_dir
           ~home
           ?session

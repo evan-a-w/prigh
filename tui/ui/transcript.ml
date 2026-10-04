@@ -43,8 +43,63 @@ module Item = struct
     | Notice of Severity.t * string
     | Block of Content.t
     | Compaction of string
+    | Delivery of string
   [@@deriving sexp_of, equal]
 end
+
+(* The backend hands finished background subagents to the main agent as a user
+   message of reports, each starting [[subagent <id> finished] <task>] (or
+   [failed]). *)
+module Delivery = struct
+  type section =
+    { id : string
+    ; ok : bool
+    ; task : string
+    ; body : string list
+    }
+
+  let header line =
+    let open Option.Let_syntax in
+    let%bind rest = String.chop_prefix line ~prefix:"[subagent " in
+    let%bind id, rest = String.lsplit2 rest ~on:' ' in
+    let%bind ok, task =
+      match String.chop_prefix rest ~prefix:"finished]" with
+      | Some task -> Some (true, task)
+      | None ->
+        String.chop_prefix rest ~prefix:"failed]"
+        |> Option.map ~f:(fun task -> false, task)
+    in
+    Some (id, ok, String.strip task)
+  ;;
+
+  let parse text =
+    match String.split_lines text with
+    | first :: _ as lines when Option.is_some (header first) ->
+      let sections =
+        List.fold lines ~init:[] ~f:(fun acc line ->
+          match header line, acc with
+          | Some (id, ok, task), _ -> { id; ok; task; body = [] } :: acc
+          | None, current :: rest ->
+            { current with body = line :: current.body } :: rest
+          | None, [] -> acc)
+      in
+      Some
+        (List.rev_map sections ~f:(fun s ->
+           { s with
+             body =
+               List.rev s.body
+               |> List.drop_while ~f:String.is_empty
+               |> List.rev
+               |> List.drop_while ~f:String.is_empty
+               |> List.rev
+           }))
+    | _ -> None
+  ;;
+end
+
+let user_item text : Item.t =
+  if Option.is_some (Delivery.parse text) then Delivery text else User text
+;;
 
 module Stream_kind = struct
   type t =
@@ -156,7 +211,7 @@ let pair_result t (r : P.Message.Tool_result.t) =
 
 let add_message t (m : P.Message.t) =
   match m with
-  | User text -> add t (User text)
+  | User text -> add t (user_item text)
   | Tool_result r -> pair_result t r
   | Assistant a ->
     let final = P.Stop_reason.equal P.Stop_reason.End_turn a.stop_reason in
@@ -563,7 +618,7 @@ let finish_subagent
 let apply t (event : P.Event.t) =
   match event with
   | P.Event.State state -> if state.running then t else flush t
-  | P.Event.Message_start (P.Message.User text) -> add t (User text)
+  | P.Event.Message_start (P.Message.User text) -> add t (user_item text)
   | P.Event.Message_start _ -> t
   | P.Event.Message_update { delta = P.Delta.Text_delta text; _ } ->
     append t Text text
@@ -710,6 +765,23 @@ let render_item (item : Item.t) ~(verbosity : Verbosity.t) : Content.t =
        in
        Content.lines ~style text)
   | Block content -> content
+  | Delivery text ->
+    List.concat_map
+      (Option.value (Delivery.parse text) ~default:[])
+      ~f:(fun (section : Delivery.section) ->
+        let header : Content.Line.t =
+          [ { Content.Span.text = "↩ subagent " ^ section.id; style = magenta }
+          ; (if section.ok
+             then { text = " finished"; style = green }
+             else { text = " failed"; style = red })
+          ; { text = " " ^ subagent_task_quoted section.task; style = dim }
+          ]
+        in
+        let body = String.concat ~sep:"\n" section.body in
+        match verbosity with
+        | Quiet -> [ header ]
+        | Normal -> header :: render_report ~max_lines:5 body
+        | Verbose -> header :: render_report ~max_lines:Int.max_value body)
   | Compaction summary ->
     let heading = Content.lines ~style:(Style.fg Cyan) "context compacted" in
     (match verbosity with

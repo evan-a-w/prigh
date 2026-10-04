@@ -41,6 +41,8 @@ module State : sig
               host is disabled and no client host was ever adopted *)
     ; hosts : Host.t list
       (** the backend first (unless disabled), then connected clients *)
+    ; subagents : Subagent_jobs.Summary.t list
+      (** background subagents still running or not yet delivered *)
     }
   [@@deriving sexp_of]
 end
@@ -159,10 +161,28 @@ val shell
   -> add_to_context:bool
   -> Tool_result.t Or_error.t
 
+(** Whether the main loop is running (background subagents do not count). *)
 val is_running : t -> bool
 
-(** Blocks until no run is active and the queues are empty. *)
+(** Blocks until no run is active, the queues are empty and no background
+    subagent is running (their deliveries included). *)
 val wait_idle : t -> unit
+
+(** {2 Background subagents}
+
+    The [subagent] tool starts them and returns at once. A finished one's
+    report becomes a user message: an idle agent starts a turn for it, a
+    running one injects it at the next turn boundary (with steering), unless
+    [subagent_wait]/[subagent_cancel] already returned it. [abort] leaves them
+    running; after an abort, reports that are ready wait for the next run. *)
+
+val has_running_subagents : t -> bool
+
+(** Cancels one; its partial report is still delivered. *)
+val cancel_subagent : t -> agent_id:string -> unit Or_error.t
+
+(** Cancels every running one; with [discard] their reports are dropped. *)
+val cancel_subagents : ?discard:bool -> t -> unit
 
 val set_model : t -> Model.t -> unit
 val set_thinking : t -> Thinking.t -> unit
@@ -197,8 +217,9 @@ val btw
   -> (Message.Assistant.t * float) Or_error.t
 
 (** In-place session replacement for a single-agent embedding (the CLI and
-    tests). [Rpc_server] instead keeps one agent per session and moves
-    clients between them. *)
+    tests); background subagents are cancelled and their reports dropped.
+    [Rpc_server] instead keeps one agent per session and moves clients
+    between them, so they keep running and deliver to their own session. *)
 val new_session : t -> unit
 
 val switch_session : t -> path:string -> unit Or_error.t

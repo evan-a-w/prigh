@@ -209,10 +209,21 @@ two can share one.
   plus optional `tools` (a subset of the parent's, default all), `model`
   (`Model.resolve`; default the parent's), `cwd`, `max_turns` (default 50)
   and `context` (extra system text). It runs a nested `Agent_loop`
-  in-process sharing the parent's provider and cancellation, and returns the
-  child's final text plus a `[subagent: N turns, in/out tokens, $cost]`
-  trailer. Progress comes back as nested `Subagent*` events (below), not
-  text chunks.
+  in-process sharing the parent's provider, whose report is the child's final
+  text plus a `[subagent: N turns, in/out tokens, $cost]` trailer. Progress
+  comes back as nested `Subagent*` events (below), not text chunks. At depth 0
+  the context carries the agent's `Subagent_jobs` and the call only spawns
+  the loop there, with its own cancellation, and returns `started agent
+  a<n> (...)`; deeper calls (no jobs) block and return the report.
+  `subagent_wait`/`subagent_status`/`subagent_cancel` act on the jobs and are
+  dropped below depth 0.
+- `Subagent_jobs` — one agent's background subagents: ids `a<n>` (seeded past
+  the subagent calls already in the session), task, start time, last
+  activity (from their events), result and a `delivered` flag. Each finished
+  job's report is delivered exactly once, by `take_undelivered` (the agent
+  turns a batch into one user message of `[subagent <id> finished|failed]
+  <task>` sections) or by `wait`/`cancel_and_wait` (tool results). Events
+  and changes go to the hooks `Agent` installs with `connect`.
 - `Tools.all` is the fixed built-in set; `Tools.for_context` builds the
   per-agent tool list (`parent`, `depth`, optional `only`), so the
   subagent's tool set can be restricted and the `subagent` tool is dropped at
@@ -247,7 +258,9 @@ two can share one.
 - `Agent_event` — the loop's event vocabulary (`Agent_start/end`, `Turn_*`,
   `Message_*`, `Tool_start/output/end`, `Tool_confirm`, and the recursive
   `Subagent` / `Subagent_start` / `Subagent_end`, whose inner events carry
-  `call_id`/`agent_id`), so the UI can build a transcript per agent.
+  `call_id`/`agent_id`), so the UI can build a transcript per agent. A
+  background subagent's events keep arriving after its `subagent` call's
+  `Tool_end`, possibly during later turns or while the agent is idle.
 - `Agent` — one conversation: owns the session, model, thinking level and
   `Config`, the tool hosts (`add_host`/`remove_host`/`set_active_host`,
   `host_exec` and the pending remote executions), the run lifecycle (`prompt`, `steer` = after the current turn,
@@ -256,7 +269,17 @@ two can share one.
   a `!cmd` through the bash machinery), automatic compaction at 80% of the
   context window, and a subscriber list receiving `Agent.Event.t` (`Loop of
   Agent_event.t | State_changed | Compacted | Notice | Config_changed |
-  Queue_update`). `prompt`/`steer`/`follow_up` accept optional `attachments`
+  Queue_update`). Background subagents (`Subagent_jobs`) run in the agent's
+  switch, not the run's: `abort` leaves them running, `cancel_subagent`
+  cancels one. When one finishes, an idle agent starts a run whose prompts
+  begin with the delivery message; a running loop gets it from `steer` at
+  the next turn boundary (after the turn's tool results, so tool calls and
+  results stay paired), or the run's tail starts a new run unless it was
+  aborted (then the report waits for the next prompt, which it precedes).
+  `wait_idle` also waits for running subagents and their deliveries;
+  `State.subagents` lists the running and undelivered ones; the in-place
+  `new_session`/`switch_session` cancel them and drop their reports.
+  `prompt`/`steer`/`follow_up` accept optional `attachments`
   (paths whose contents are appended to the user message as `<file>` blocks).
   Subagent and `btw` usage is rolled up into `State.usage`/`cost_usd`
   (never `context_tokens`), and `State` also carries the session name, cwd
@@ -311,10 +334,12 @@ two can share one.
   (`new_session`, `switch_session` by id or path, `fork`, `clone`, `import`)
   create or load an agent and move only the calling client; `list_sessions`
   marks live sessions with `live`, `running` and `clients`; `delete_session`
-  refuses live ones. `set_model` goes through `Model.resolve` (key, id,
+  refuses live ones. A session with running background subagents is not
+  evicted (it delivers their reports into its own session even with no
+  client attached); `shutdown` cancels them. `set_model` goes through `Model.resolve` (key, id,
   display name or unique case-insensitive prefix; otherwise "did you mean"
   by edit distance). Methods: `hello`, `ping`, `prompt`, `steer`,
-  `follow_up`, `abort`, `dequeue`, `shell`, `get_state`, `get_messages`,
+  `follow_up`, `abort`, `dequeue`, `cancel_subagent`, `shell`, `get_state`, `get_messages`,
   `get_entries`, `set_model`, `set_thinking`, `list_models`, `compact`,
   `new_session`, `switch_session`, `list_sessions`, `set_session_name`,
   `delete_session`, `export`, `import`, `fork`, `clone`, `rewind`,
@@ -474,7 +499,10 @@ copy of the protocol types and the e2e test guards the contract.
     subagent), `Viewport` (`Follow | Anchored`, so new output never pushes an
     anchored view), `Verbosity` (quiet/normal/verbose), `Autocomplete`
     (inline command/argument/path completion), `Agent_view` (per-subagent
-    transcript and status), `Commands` (slash table, parse, complete,
+    transcript and status; the app keeps an agent while it runs or while
+    `State.subagents` lists it as undelivered, then until the next prompt;
+    a delivered report renders as a compact `Transcript` `Delivery` item),
+    `Commands` (slash table, parse, complete,
     closest), `Model_match` (display-name/prefix/did-you-mean), `Markdown`,
     `Btw_box` (the `/btw` panel above the editor: a newer question cancels
     and replaces it; Esc dismisses it before Esc's other meanings, so it

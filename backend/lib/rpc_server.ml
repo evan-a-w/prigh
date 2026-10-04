@@ -14,6 +14,7 @@ let methods =
   ; "follow_up"
   ; "abort"
   ; "dequeue"
+  ; "cancel_subagent"
   ; "shell"
   ; "get_state"
   ; "get_messages"
@@ -146,6 +147,7 @@ let maybe_evict t agent =
   if
     (not (Option.exists t.default_agent ~f:(phys_equal agent)))
     && (not (Agent.is_running agent))
+    && (not (Agent.has_running_subagents agent))
     && List.is_empty (clients_of t agent)
   then Hashtbl.remove t.agents (session_id agent)
 ;;
@@ -300,7 +302,9 @@ let disconnect t (client : Client.t) =
 (* Finishing runs evict idle sessions, so iterate over a snapshot. *)
 let shutdown t =
   let agents = Hashtbl.data t.agents in
-  List.iter agents ~f:(fun agent -> ignore (Agent.abort agent : string list));
+  List.iter agents ~f:(fun agent ->
+    Agent.cancel_subagents ~discard:true agent;
+    ignore (Agent.abort agent : string list));
   Login_manager.cancel t.login;
   List.iter agents ~f:Agent.wait_idle;
   Login_manager.wait t.login
@@ -628,6 +632,9 @@ let dispatch agent login ~meth ~params : Json.t Or_error.t =
     ok
       (`Object
           [ "restored", `Array (List.map restored ~f:(fun s -> `String s)) ])
+  | "cancel_subagent" ->
+    Or_error.bind (string_param params "agent_id") ~f:(fun agent_id ->
+      unit_result (Agent.cancel_subagent agent ~agent_id))
   | "dequeue" ->
     ok
       (match Agent.dequeue agent with

@@ -42,11 +42,12 @@ let state_json
   ?(cost_usd = 0.0123)
   ?session_name
   ?(session = "abc123", "/home/u/.prigh/sessions/1.jsonl")
+  ?(subagents = [])
   ()
   =
   let session_id, session_path = session in
   sprintf
-    {|{"session_id":%s,"session_path":%s,"session_name":%s,"cwd":%s,"git_branch":%s,"model":%s,"thinking":%s,"running":%b,"message_count":2,"usage":{"input":1200,"output":300,"cache_read":0},"cost_usd":%g,"context_tokens":%d,"active_host":"backend","hosts":[{"id":"backend","name":"srv","cwd":%s}]}|}
+    {|{"session_id":%s,"session_path":%s,"session_name":%s,"cwd":%s,"git_branch":%s,"model":%s,"thinking":%s,"running":%b,"message_count":2,"usage":{"input":1200,"output":300,"cache_read":0},"cost_usd":%g,"context_tokens":%d,"active_host":"backend","hosts":[{"id":"backend","name":"srv","cwd":%s}],"subagents":[%s]}|}
     (P.Json.to_string (P.Json.str session_id))
     (P.Json.to_string (P.Json.str session_path))
     (match session_name with
@@ -62,6 +63,14 @@ let state_json
     cost_usd
     context_tokens
     (P.Json.to_string (P.Json.str cwd))
+    (String.concat
+       ~sep:","
+       (List.map subagents ~f:(fun (id, task, running) ->
+          sprintf
+            {|{"id":%s,"task":%s,"running":%b}|}
+            (P.Json.to_string (P.Json.str id))
+            (P.Json.to_string (P.Json.str task))
+            running)))
 ;;
 
 let state
@@ -73,6 +82,7 @@ let state
   ?context_tokens
   ?cost_usd
   ?session_name
+  ?subagents
   ()
   =
   Or_error.ok_exn
@@ -88,6 +98,7 @@ let state
                 ?context_tokens
                 ?cost_usd
                 ?session_name
+                ?subagents
                 ()))))
 ;;
 

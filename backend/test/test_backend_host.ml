@@ -4,8 +4,8 @@ open Tool_test_helpers
 module Reply = Faux_provider.Reply
 module Json = Jsonaf
 
-let make_server t ~sw ~backend_host replies =
-  let provider = Faux_provider.create replies in
+let make_server t ~sw ~backend_host ?before ?(children = []) replies =
+  let provider = Routed_provider.create ?before ~main:replies children in
   let sessions_dir = t.dir ^/ "sessions" in
   let new_agent ?session ~cwd () =
     let agent_ref = ref None in
@@ -22,7 +22,7 @@ let make_server t ~sw ~backend_host replies =
         ~env:t.env
         ~sw
         ~provider
-        ~tools:(Tools.all @ [ subagent ])
+        ~tools:(Tools.all @ (subagent :: Tool_subagent.control_tools))
         ~sessions_dir
         ~home:t.dir
         ?session
@@ -126,7 +126,7 @@ let act_as_host t server host sent agent ~reply =
       go ()
     | Some _ -> go ()
     | None ->
-      if Agent.is_running agent
+      if Agent.is_running agent || Agent.has_running_subagents agent
       then (
         Eio.Fiber.yield ();
         go ())
@@ -164,9 +164,8 @@ let%expect_test "backend host disabled" =
           ~name:"subagent"
           ~arguments:{|{"task":"look around"}|}
           ()
-      ; Reply.tool_call ~id:"s1" ~name:"ls" ~arguments:"{}" ()
-      ; Reply.text "sub done"
       ; Reply.text "delegated"
+      ; Reply.text "noted the report"
       ; Reply.tool_call
           ~id:"c4"
           ~name:"bash"
@@ -174,6 +173,12 @@ let%expect_test "backend host disabled" =
           ()
       ; Reply.text "host gone"
       ]
+      ~children:
+        [ ( "look around"
+          , [ Reply.tool_call ~id:"s1" ~name:"ls" ~arguments:"{}" ()
+            ; Reply.text "sub done"
+            ] )
+        ]
   in
   let client = Rpc_server.connect server ~send:ignore in
   let agent = Rpc_server.agent_of_client server client in
@@ -227,7 +232,7 @@ let%expect_test "backend host disabled" =
   new_tool_results agent ~seen;
   [%expect
     {|
-    {"type":"response","id":"r","ok":true,"result":{"client_id":"client-2","state":{"session_id":"<id>","session_path":"$DIR/sessions/<stamp>_<id>.jsonl","session_name":null,"session_description":null,"cwd":"/home/me/proj","git_branch":null,"model":{"id":"deepseek-flash","provider":"deepseek","key":"deepseek/deepseek-flash","name":"DeepSeek V4.1 Flash","context_window":1000000,"max_output":384000,"supports_thinking":true,"cost":{"input":0.3,"output":1.2,"cache_read":0.006}},"thinking":"off","running":false,"message_count":0,"usage":{"input":0,"output":0,"cache_read":0},"cost_usd":0,"context_tokens":0,"active_host":"client-2","hosts":[{"id":"client-2","name":"laptop","cwd":"/home/me/proj","session_id":"<id>","session_name":null}]}}}
+    {"type":"response","id":"r","ok":true,"result":{"client_id":"client-2","state":{"session_id":"<id>","session_path":"$DIR/sessions/<stamp>_<id>.jsonl","session_name":null,"session_description":null,"cwd":"/home/me/proj","git_branch":null,"model":{"id":"deepseek-flash","provider":"deepseek","key":"deepseek/deepseek-flash","name":"DeepSeek V4.1 Flash","context_window":1000000,"max_output":384000,"supports_thinking":true,"cost":{"input":0.3,"output":1.2,"cache_read":0.006}},"thinking":"off","running":false,"message_count":0,"usage":{"input":0,"output":0,"cache_read":0},"cost_usd":0,"context_tokens":0,"active_host":"client-2","hosts":[{"id":"client-2","name":"laptop","cwd":"/home/me/proj","session_id":"<id>","session_name":null}],"subagents":[]}}}
     ((active_host client-2) (cwd /home/me/proj) (git_branch ())
      (hosts (client-2)))
     (Host client-2 /home/me/proj)
@@ -235,17 +240,23 @@ let%expect_test "backend host disabled" =
     exec: {"type":"event","event":"tool_exec","host":"client-2","exec_id":"<id>/c2-0","call_id":"c2","name":"bash","arguments":{"command":"pwd"},"cwd":"/home/me/proj"}
     tool_result bash: "bash ran on laptop"
     |}];
-  (* The subagent's tools (and its instructions lookup) also go to the host. *)
+  (* The subagent's tools (and its instructions lookup) also go to the host,
+     even after the turn that started it has ended. *)
   call t server client ~params:{|{"text": "delegate"}|} "prompt";
   act_as_host t server laptop sent agent ~reply:(fun name ->
     name ^ " ran on laptop");
   new_tool_results agent ~seen;
+  List.iter (Agent.messages agent) ~f:(function
+    | User { text } when String.is_prefix text ~prefix:"[subagent" ->
+      printf "delivered: %S\n" text
+    | _ -> ());
   [%expect
     {|
     {"type":"response","id":"r","ok":true,"result":{}}
     exec: {"type":"event","event":"tool_exec","host":"client-2","exec_id":"<id>/c3-1","call_id":"c3","name":"$instructions","arguments":{"home":"$DIR"},"cwd":"/home/me/proj"}
     exec: {"type":"event","event":"tool_exec","host":"client-2","exec_id":"<id>/s1-2","call_id":"s1","name":"ls","arguments":{},"cwd":"/home/me/proj"}
-    tool_result subagent: "sub done\n[subagent: 2 turns, 30 in / 13 out tokens, $0.0000]"
+    tool_result subagent: "started agent a1 (look around); its result will be delivered to you when it finishes; use subagent_wait to block on it"
+    delivered: "[subagent a1 finished] look around\nsub done\n[subagent: 2 turns, 30 in / 13 out tokens, $0.0000]"
     |}];
   (* With the host gone there is nothing to run on. *)
   Rpc_server.disconnect server laptop;
@@ -298,5 +309,105 @@ let%expect_test "backend host enabled: git branch and terminal targets" =
     (Host client-2 /home/me)
     {"type":"response","id":"r","ok":true,"result":{}}
     (Backend $DIR)
+    |}]
+;;
+
+let delivered agent =
+  List.iter (Agent.messages agent) ~f:(function
+    | User { text } when String.is_prefix text ~prefix:"[subagent" ->
+      printf "delivered: %S\n" text
+    | _ -> ())
+;;
+
+let live_sessions server client =
+  let request =
+    Json.of_string {|{"id": "r", "method": "list_sessions", "params": {}}|}
+  in
+  match Json.member "result" (Rpc_server.handle server client request) with
+  | Some (`Array sessions) ->
+    List.iter sessions ~f:(fun s ->
+      printf
+        "session %S live=%s\n"
+        (member_string s "first_prompt")
+        (match Json.member "live" s with
+         | Some `True -> "true"
+         | _ -> "false"))
+  | _ -> print_endline "no sessions"
+;;
+
+let rec wait_turn agent =
+  if Agent.is_running agent
+  then (
+    Eio.Fiber.yield ();
+    wait_turn agent)
+;;
+
+let%expect_test "subagents outlive their turn and a session switch; cancel RPC" =
+  with_sandbox
+  @@ fun t ->
+  Eio.Switch.run
+  @@ fun sw ->
+  let gates = Routed_provider.Gates.create () in
+  Routed_provider.Gates.hold gates "stuck";
+  Routed_provider.Gates.hold gates "slow";
+  let server =
+    make_server
+      t
+      ~sw
+      ~backend_host:true
+      ~before:(Routed_provider.Gates.before gates)
+      [ Reply.tool_call
+          ~id:"c1"
+          ~name:"subagent"
+          ~arguments:{|{"task":"stuck"}|}
+          ()
+      ; Reply.text "waiting"
+      ; Reply.text "noted the cancel"
+      ; Reply.tool_call
+          ~id:"c2"
+          ~name:"subagent"
+          ~arguments:{|{"task":"slow"}|}
+          ()
+      ; Reply.text "spawned slow"
+      ; Reply.text "slow arrived"
+      ]
+      ~children:
+        [ "stuck", [ Reply.text "never" ]
+        ; "slow", [ Reply.text "slow report" ]
+        ]
+  in
+  let client = Rpc_server.connect server ~send:ignore in
+  let agent = Rpc_server.agent_of_client server client in
+  call t server client ~params:{|{"text": "go"}|} "prompt";
+  wait_turn agent;
+  call t server client ~params:{|{"agent_id": "a9"}|} "cancel_subagent";
+  call t server client ~params:{|{"agent_id": "a1"}|} "cancel_subagent";
+  Agent.wait_idle agent;
+  delivered agent;
+  [%expect
+    {|
+    {"type":"response","id":"r","ok":true,"result":{}}
+    {"type":"response","id":"r","ok":false,"error":"unknown subagent \"a9\"; known: a1"}
+    {"type":"response","id":"r","ok":true,"result":{}}
+    delivered: "[subagent a1 failed] stuck\n[cancelled]\n[subagent: 1 turns, 10 in / 5 out tokens, $0.0000]"
+    |}];
+  (* The client moves to a new session; the old one keeps its agent running
+     (live, with no client) and receives the report. *)
+  call t server client ~params:{|{"text": "again"}|} "prompt";
+  wait_turn agent;
+  call t server client "new_session";
+  live_sessions server client;
+  Routed_provider.Gates.release gates "slow";
+  Agent.wait_idle agent;
+  delivered agent;
+  live_sessions server client;
+  [%expect
+    {|
+    {"type":"response","id":"r","ok":true,"result":{}}
+    {"type":"response","id":"r","ok":true,"result":{}}
+    session "go" live=true
+    delivered: "[subagent a1 failed] stuck\n[cancelled]\n[subagent: 1 turns, 10 in / 5 out tokens, $0.0000]"
+    delivered: "[subagent a2 finished] slow\nslow report\n[subagent: 1 turns, 10 in / 5 out tokens, $0.0000]"
+    session "go" live=false
     |}]
 ;;

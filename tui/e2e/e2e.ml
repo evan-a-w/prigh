@@ -130,6 +130,43 @@ let rec drain client ~stop =
     drain client ~stop
 ;;
 
+(* Background subagents run concurrently with the main agent, so the two event
+   streams are printed separately (each is deterministic on its own), and state
+   events, whose position depends on timing, are left out. Stops once a
+   delivered report has been answered and nothing is left. *)
+let drain_background client =
+  let subagent_lines = Queue.create () in
+  let delivered = ref false in
+  let rec go () =
+    match%bind Pipe.read (Client.incoming client) with
+    | `Eof -> return ()
+    | `Ok (Event (State s)) ->
+      if !delivered && (not s.running) && List.is_empty s.subagents
+      then (
+        printf "  event state running=false subagents=[]\n";
+        return ())
+      else go ()
+    | `Ok (Event e) ->
+      (match e with
+       | Message_start (User t) when String.is_prefix t ~prefix:"[subagent " ->
+         delivered := true
+       | _ -> ());
+      (match e, summarise e with
+       | (Subagent_start _ | Subagent _ | Subagent_end _), Some line ->
+         Queue.enqueue subagent_lines line
+       | _, Some line -> printf "  event %s\n" (normalise line)
+       | _, None -> ());
+      go ()
+    | `Ok other ->
+      print_s [%sexp (other : Client.Incoming.t)];
+      go ()
+  in
+  let%map () = go () in
+  print_endline "  subagent events:";
+  Queue.iter subagent_lines ~f:(fun line ->
+    printf "  event %s\n" (normalise line))
+;;
+
 let main () =
   let tmp = Filename_unix.temp_dir "prigh-e2e" "" in
   tmp_dir := tmp;
@@ -240,7 +277,8 @@ let main () =
       {|[
   {"text":"delegating","tool_calls":[{"id":"s1","name":"subagent","arguments":{"task":"say hi","tools":["read"]}}]},
   {"text":"child says hi"},
-  {"text":"parent done"}
+  {"text":"parent done"},
+  {"text":"got the report"}
 ]|}
     in
     Out_channel.write_all script ~data:script_json;
@@ -268,11 +306,7 @@ let main () =
         let%bind () =
           call client "prompt" [ "text", Json.str "delegate something" ]
         in
-        let%bind () =
-          drain client ~stop:(function
-            | State { running = false; _ } -> true
-            | _ -> false)
-        in
+        let%bind () = drain_background client in
         let%bind () = Client.close client in
         print_endline "subagent backend exited";
         return ()

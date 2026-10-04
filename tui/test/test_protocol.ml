@@ -70,7 +70,8 @@ let%expect_test "state event and messages" =
         (cost_usd       0.0032)
         (context_tokens 160)
         (active_host    backend)
-        (hosts ()))))
+        (hosts     ())
+        (subagents ()))))
     (Event (Message_start (User hi)))
     (Event (
       Message_end (
@@ -239,7 +240,28 @@ let%expect_test "tool host events and state hosts" =
           (name srv)
           (cwd  /work)
           (session_id   ())
-          (session_name ())))))))
+          (session_name ()))))
+        (subagents ()))))
+    |}]
+;;
+
+let%expect_test "state lists background subagents (absent means none)" =
+  let subagents json =
+    match Json.parse json |> Or_error.bind ~f:State.of_json with
+    | Ok state -> print_s [%sexp (state.subagents : State.Subagent.t list)]
+    | Error e -> print_s [%message "error" (e : Error.t)]
+  in
+  subagents
+    (Fixtures.state_json
+       ~subagents:[ "a1", "look around", true; "a2", "run tests", false ]
+       ());
+  subagents
+    {|{"session_id":"s1","session_path":"/tmp/s1.jsonl","cwd":"/work","model":{"id":"m","provider":"p","key":"p/m","name":"M","context_window":1,"max_output":1,"supports_thinking":false,"cost":{"input":0,"output":0,"cache_read":0}},"thinking":"off","running":false,"message_count":0,"usage":{"input":0,"output":0,"cache_read":0},"cost_usd":0,"context_tokens":0}|};
+  [%expect
+    {|
+    (((id a1) (task "look around") (running true))
+     ((id a2) (task "run tests")   (running false)))
+    ()
     |}]
 ;;
 
