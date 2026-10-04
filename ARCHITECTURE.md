@@ -389,6 +389,20 @@ two can share one.
   selects the namespace), every failure is `unauthorised: bad user name or
   password`, and the `hello` result carries `namespace` (null outside this
   mode). Single-token servers ignore `user`.
+- `User_access` — who may act as which namespace: login tokens,
+  `-host-tokens` (sign in as their namespace, never as a superuser) and
+  `-superusers`. The router authenticates the first `hello`, including its
+  optional `as_user` (superusers only), and connects the client to that
+  namespace's server pre-authenticated (`Rpc_server.connect ~signed_in`),
+  so its `hello` result also carries the signed-in `user` and `superuser`.
+  `list_users` and `set_user` answer from the client's credentials; an
+  allowed `set_user` ends `Rpc_server.serve_lines` and the router serves
+  the rest of the connection from the new namespace's server, answering
+  `set_user` with a `hello` of the first one's client details. pi-web
+  instead reconnects with `as_user` (Pi_rpc's `/setusr` sends
+  `prigh_set_user`), as do `/terminal` URLs. Without the backend host,
+  `Rpc_server.session_file` keeps session paths inside the sessions
+  directory and `Agent.export` writes through the tool host.
 - `Terminal_channel` / `Terminal_relay` — terminals run on the session's
   active host (`Rpc_server.terminal_target`). `Terminals.serve` speaks to an
   abstract frame channel (a WebSocket, or frames fed by a relay). For a

@@ -133,6 +133,18 @@ tool host: nothing runs on the server, every session's tools and terminal
 run only on hosts its namespace has connected (`prigh tool-host -connect`
 or a TUI), so namespaces cannot reach each other's files through the
 server.
+Then the server also refuses clients' paths outside their sessions
+directory (`/switch`, `/import`, deleting sessions), and `/export` writes
+on the tool host.
+
+`-superusers NAME,...` (`$PRIGH_SUPERUSERS`) lets those users act as any
+other: `/setusr NAME` (in the TUI, the web UI and pi-web) switches the
+connection to NAME's sessions, logins and tool hosts (the status line shows
+`user:<me> as <them>`), `/setusr` alone lists the users and `/setusr <me>`
+switches back. Everyone else gets an error. `-host-tokens NAME=TOKEN,...`
+(`$PRIGH_HOST_TOKENS`) adds tokens that sign in as NAME but never as a
+superuser, for tool hosts that should not hold the user's own token (the
+Docker image starts one per user with one).
 
 ## In a browser
 

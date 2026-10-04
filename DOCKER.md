@@ -113,10 +113,12 @@ name in the container. At startup, the entrypoint (as root):
 `prigh-docker users` lists the users, their uids and directories.
 
 **Superusers.** `PRIGH_SUPERUSERS=alice` makes alice a superuser. `/setusr
-NAME` in either UI switches her connection to user NAME (its sessions,
-logins and tool host, so its tools run as NAME); other users get an error.
+NAME` in any of the UIs switches her connection to user NAME (its sessions,
+logins and tool host, so its tools run as NAME), `/setusr` lists the users
+and `/setusr alice` switches back; other users get an error.
 Superusers are also in every user's group, so from their own shell they can
-read and write the other users' `/workspace/<name>`, but not their homes.
+read the other users' `/workspace/<name>` (and write where files are
+group-writable), but not their homes.
 The container tool hosts sign in with separate per-user tokens that never
 have superuser rights, so a superuser's agent cannot use `/setusr`.
 
