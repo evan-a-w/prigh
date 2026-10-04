@@ -73,19 +73,24 @@ prints the captured panes.
     three
   three lines. now delegating
   ⚙ subagent "count files" ✓ 1 turns $0.00
-    child one reporting: 0 files
+    child reporting: done
     [subagent: 1 turns, 0 in / 0 out tokens, $0.0000]
   ⚙ subagent "say hello" ✓ 1 turns $0.00
-    child two reporting: hello
+    child reporting: done
     [subagent: 1 turns, 0 in / 0 out tokens, $0.0000]
+  waiting for both
+  ⚙ subagent_wait
+    [subagent a1 finished] count files
+    child reporting: done
+    [subagent: 1 turns, 0 in / 0 out tokens, $0.0000]
+  
+    [subagent a2 finished] say hello
+    … (2 more)
   all done
   ────────────────────────────────────────────────────────────────────────────────────────────────────
   >
   …deepseek-flash  think:off  view:normal  ctx:0% 0  $0.00  agents:[main] 1✓ 2✓
   === verbose
-  session <id> in $TMP/cwd. /help for commands, Esc
-  aborts, Ctrl+C twice quits.
-  > go
   let me look
   ⚙ bash
     {
@@ -96,10 +101,20 @@ prints the captured panes.
     three
   three lines. now delegating
   ⚙ subagent "count files" ✓ 1 turns $0.00
-    child one reporting: 0 files
+    child reporting: done
     [subagent: 1 turns, 0 in / 0 out tokens, $0.0000]
   ⚙ subagent "say hello" ✓ 1 turns $0.00
-    child two reporting: hello
+    child reporting: done
+    [subagent: 1 turns, 0 in / 0 out tokens, $0.0000]
+  waiting for both
+  ⚙ subagent_wait
+    {}
+    [subagent a1 finished] count files
+    child reporting: done
+    [subagent: 1 turns, 0 in / 0 out tokens, $0.0000]
+  
+    [subagent a2 finished] say hello
+    child reporting: done
     [subagent: 1 turns, 0 in / 0 out tokens, $0.0000]
   all done
   view: verbose — everything is shown
@@ -113,6 +128,8 @@ prints the captured panes.
   three lines. now delegating
   ⚙ subagent "count files" ✓ 1 turns $0.00
   ⚙ subagent "say hello" ✓ 1 turns $0.00
+  waiting for both
+  ⚙ subagent_wait ✓ 7 lines
   all done
   ────────────────────────────────────────────────────────────────────────────────────────────────────
   >
@@ -144,7 +161,7 @@ prints the captured panes.
   
   
   > count files
-  child one reporting: 0 files
+  child reporting: done
   ────────────────────────────────────────────────────────────────────────────────────────────────────
   >
   …deepseek-flash  think:off  view:quiet  ctx:0% 0  $0.00  agents:main [1✓] 2✓
@@ -175,7 +192,7 @@ prints the captured panes.
   
   
   > say hello
-  child two reporting: hello
+  child reporting: done
   ────────────────────────────────────────────────────────────────────────────────────────────────────
   >
   …deepseek-flash  think:off  view:quiet  ctx:0% 0  $0.00  agents:main 1✓ [2✓]
@@ -186,6 +203,8 @@ prints the captured panes.
   three lines. now delegating
   ⚙ subagent "count files" ✓ 1 turns $0.00
   ⚙ subagent "say hello" ✓ 1 turns $0.00
+  waiting for both
+  ⚙ subagent_wait ✓ 7 lines
   all done
   ────────────────────────────────────────────────────────────────────────────────────────────────────
   >

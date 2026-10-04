@@ -59,8 +59,21 @@ let agent_marker text ~active =
 
 (** The M3 agent strip, folded into the status line as [agents:[main] 1⠋ 2✓]. *)
 let agents_part (m : App.Model.t) : Content.Line.t option =
+  let background = (not (App.Model.running m)) && App.Model.agents_running m in
   if List.is_empty m.agents
-  then None
+  then (
+    (* Running agents whose events this client missed (e.g. it reconnected). *)
+    let running =
+      Option.value_map m.state ~default:0 ~f:(fun s ->
+        List.count s.subagents ~f:(fun a -> a.running))
+    in
+    if running = 0
+    then None
+    else
+      Some
+        [ span ~style:(Style.bold Style.plain) "agents:"
+        ; span (sprintf "%d running" running)
+        ])
   else (
     let main =
       agent_marker
@@ -84,7 +97,8 @@ let agents_part (m : App.Model.t) : Content.Line.t option =
     Some
       ([ span ~style:(Style.bold Style.plain) "agents:" ]
        @ main
-       @ List.concat_map agents ~f:(fun a -> span " " :: a)))
+       @ List.concat_map agents ~f:(fun a -> span " " :: a)
+       @ if background then [ span ~style:(Style.fg Yellow) " bg" ] else []))
 ;;
 
 let mode_hint (m : App.Model.t) : Content.Line.t option =
@@ -121,6 +135,8 @@ let mode_hint (m : App.Model.t) : Content.Line.t option =
                 ~style:dim
                 "Enter selects · Esc closes · Ctrl+N named · Ctrl+D delete"
             ]
+        | Picker { kind = Agents; _ } ->
+          Some [ span ~style:dim "Enter focuses · Esc closes · Ctrl+D cancels" ]
         | Picker _ -> Some [ span ~style:dim "Enter selects · Esc closes" ]
         | Login_prompt _ ->
           Some [ span ~style:dim "login: Enter answers, Esc cancels" ]

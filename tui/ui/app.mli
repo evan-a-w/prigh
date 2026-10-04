@@ -142,6 +142,11 @@ module Model : sig
   [@@deriving sexp_of]
 
   val running : t -> bool
+
+  (** Whether any subagent is running, including background ones the main agent
+      is no longer waiting for. *)
+  val agents_running : t -> bool
+
   val backend_gone : t -> bool
 end
 

@@ -279,10 +279,32 @@ Ctrl+O cycles the transcript verbosity:
 `/verbosity [quiet|normal|verbose]` sets it directly; the status line shows
 `view:`.
 
-A `subagent` tool call gets its own transcript. Shift+Tab cycles focus main →
-agent 1 → …, Alt+1…9 jumps, and `/agents` opens a picker; Esc returns to main.
-Finished agents stay cyclable until the next prompt. The status line shows an
-`agents:` strip.
+Subagents run in the background. A `subagent` tool call returns at once
+(`started agent a1 (...)`) and the main agent's turn carries on or ends, so
+you can keep talking to it. When a subagent finishes (or fails, or is
+cancelled) its report is handed to the main agent as a message starting
+`[subagent a1 finished]`: an idle agent starts a turn for it, a running one
+gets it after its current tool calls (several finishing together arrive as one
+message). The model also has `subagent_wait` (block on some or all of them,
+optionally with a timeout; what it returns is not delivered again),
+`subagent_status` and `subagent_cancel`. Subagents started by a subagent stay
+synchronous (and cannot delegate further).
+
+Each subagent gets its own transcript. Shift+Tab cycles focus main → agent 1 →
+…, Alt+1…9 jumps, and `/agents` opens a picker (Enter focuses, Ctrl+D cancels
+the highlighted one); `/agents cancel <n|id>` cancels by number or id; Esc
+returns to main. Agents stay cyclable while they run and until their report
+has been delivered, then until the next prompt. The status line shows an
+`agents:` strip, with `bg` while agents run and the main agent is idle; a
+delivered report shows as `↩ subagent a1 finished "task"` and the report's
+first lines.
+
+Esc/abort stops the main turn only; background subagents keep running (reports
+that are ready when you abort wait for your next message). Subagents belong to
+their session: `/new` or switching sessions leaves them running in the old
+session (which stays live until they finish and deliver there). Stopping the
+backend loses running subagents; nothing is resumed, and the session simply
+has no report for them.
 
 Typing `/` opens inline autocomplete (commands, then per-command arguments
 such as models, sessions and directories). Typing `@` completes file paths
@@ -321,7 +343,7 @@ destructive `bash`/`write`/`edit`; `/confirm on|off`) and
 | `/cd [path]` | change the working directory |
 | `/fork`, `/rewind`, `/tree`, `/clone` | branch the session tree |
 | `/export [path]`, `/import [path]` | markdown or `.jsonl` |
-| `/agents` | focus a subagent |
+| `/agents [cancel <n>]` | focus a subagent (Ctrl+D in the picker cancels one), or cancel subagent n |
 | `/host [name\|backend]` | pick where tools run, and the directory there |
 | `/abort` | abort the current run |
 | `/retry-backend-connection` | reconnect to the backend now |

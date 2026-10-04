@@ -642,7 +642,7 @@ let%expect_test "keymap: every binding resolves to its intent and is documented"
     /name [text]                       set the session name
     /session                           show session statistics
     /sessions                          pick a saved session (Ctrl+N named, Ctrl+D delete)
-    /agents                            focus a subagent
+    /agents [cancel <n>]               focus a subagent (Ctrl+D cancels one), or cancel subagent n
     /host [name|backend]               pick where tools run (this frontend, another one, or the backend) and the directory there
     /switch [path]                     switch to a saved session
     /cd [path]                         change the working directory

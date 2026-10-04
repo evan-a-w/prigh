@@ -36,6 +36,7 @@ val run
   -> ?emit:(Agent_event.t -> unit)
   -> ?confirm:(Content.Tool_call.t -> summary:string -> bool)
   -> ?execute:Tool.executor
+  -> ?jobs:Subagent_jobs.t
   -> ?retry_delay:(attempt:int -> unit)
   -> context:Message.t list
   -> prompts:Message.t list

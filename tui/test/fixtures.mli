@@ -24,6 +24,7 @@ val state_json
   -> ?cost_usd:float
   -> ?session_name:string
   -> ?session:string * string (** id, path *)
+  -> ?subagents:(string * string * bool) list (** id, task, running *)
   -> unit
   -> string
 
@@ -36,6 +37,7 @@ val state
   -> ?context_tokens:int
   -> ?cost_usd:float
   -> ?session_name:string
+  -> ?subagents:(string * string * bool) list
   -> unit
   -> P.State.t
 

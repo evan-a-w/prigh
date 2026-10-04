@@ -116,8 +116,8 @@ let%expect_test
     assistant:
     tool_result:
     assistant: first done
-    state: running=false messages=4
     queue: steer=0 follow_up=0
+    state: running=false messages=4
     state: running=true messages=4
     user: two
     assistant: second done
@@ -963,8 +963,8 @@ let%expect_test
     tool_result: started
     [cancelled]
     queue: steer=0 follow_up=1
-    state: running=false messages=3
     queue: steer=0 follow_up=0
+    state: running=false messages=3
     state: running=true messages=3
     user: queued again
     assistant: second run

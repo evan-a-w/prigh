@@ -155,6 +155,13 @@ module Model = struct
     Option.value_map t.state ~default:false ~f:(fun s -> s.running)
   ;;
 
+  let agents_running t =
+    List.exists t.agents ~f:(fun (a : Agent_view.t) ->
+      Agent_view.Status.equal a.status Running)
+    || Option.exists t.state ~f:(fun s ->
+      List.exists s.subagents ~f:(fun a -> a.running))
+  ;;
+
   let backend_gone t =
     match t.connection with
     | Connected -> false
@@ -736,7 +743,7 @@ let agents_picker m =
       List.map m.agents ~f:(fun (a : Agent_view.t) ->
         Picker.Item.create
           ~id:a.id
-          ~detail:(sprintf "%s  %s" (agent_status_text a) a.model)
+          ~detail:(sprintf "%s  %s  %s" a.id (agent_status_text a) a.model)
           ~marked:
             (match m.focus with
              | `Agent id -> String.equal id a.id
@@ -828,6 +835,46 @@ let switch_host m arg =
 ;;
 
 let set_focus m focus = follow { m with focus }
+
+(* Agents stay listed while they run and until the backend has handed their
+   report to the main agent; after that, until the next prompt. *)
+let prune_agents m =
+  let undelivered id =
+    Option.exists m.state ~f:(fun (s : P.State.t) ->
+      List.exists s.subagents ~f:(fun a -> String.equal a.id id))
+  in
+  let agents =
+    List.filter m.agents ~f:(fun (a : Agent_view.t) ->
+      Agent_view.Status.equal a.status Running || undelivered a.id)
+  in
+  let focus =
+    match m.focus with
+    | `Agent id when not (List.exists agents ~f:(fun a -> String.equal a.id id))
+      -> `Main
+    | focus -> focus
+  in
+  { m with agents; focus }
+;;
+
+(* [arg] is the agent's number in the strip or its id. *)
+let cancel_agent m arg =
+  let agent =
+    match Int.of_string_opt arg with
+    | Some n -> List.nth m.agents (n - 1)
+    | None -> Agent_view.find m.agents arg
+  in
+  match agent with
+  | None -> error m (sprintf "no subagent %s" arg), []
+  | Some a when not (Agent_view.Status.equal a.status Running) ->
+    notice m (sprintf "subagent %s is not running" a.id), []
+  | Some a ->
+    ( m
+    , [ rpc
+          "cancel_subagent"
+          ~params:[ "agent_id", str a.id ]
+          ~tag:(Notice_on_success (sprintf "cancelling subagent %s" a.id))
+      ] )
+;;
 
 let cycle_focus m =
   let n = List.length m.agents in
@@ -1213,6 +1260,8 @@ let run_command m (cmd : Commands.Parsed.t) =
           ~tag:(Notice_on_success "session named")
       ] )
   | "session", _ -> m, [ rpc "session_stats" ~tag:Session_stats ]
+  | "agents", [ "cancel"; arg ] -> cancel_agent m arg
+  | "agents", "cancel" :: _ -> error m "usage: /agents cancel <n|id>", []
   | "agents", _ -> agents_picker m
   | "host", [] -> hosts_picker m
   | "host", _ -> switch_host m cmd.rest
@@ -1347,9 +1396,7 @@ let submit m =
         then
           ( { m with queued_texts = m.queued_texts @ [ text ] }
           , [ rpc "steer" ~params:(user_params m text) ] )
-        else
-          ( { m with agents = []; focus = `Main }
-          , [ rpc "prompt" ~params:(user_params m text) ] )
+        else prune_agents m, [ rpc "prompt" ~params:(user_params m text) ]
       in
       m, cmds @ [ Command.Append_history text ])
 ;;
@@ -1975,6 +2022,10 @@ let picker m (kind : Mode.Picker_kind.t) picker (intent : Intent.t) =
   | Submit when Picker.multi picker -> save_scoped_models m picker
   | Force_quit ->
     (match kind with
+     | Agents ->
+       (match Picker.selected_item picker with
+        | None -> m, []
+        | Some item -> cancel_agent { m with mode = Editing } item.id)
      | Sessions { sessions; _ } ->
        (match Picker.selected_item picker with
         | None -> m, []

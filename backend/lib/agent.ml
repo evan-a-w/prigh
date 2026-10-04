@@ -39,6 +39,7 @@ module State = struct
     ; context_tokens : int
     ; active_host : string
     ; hosts : Host.t list
+    ; subagents : Subagent_jobs.Summary.t list
     }
   [@@deriving sexp_of]
 end
@@ -134,6 +135,7 @@ type t =
   ; mutable exec_seq : int
   ; mutable environment_notes : string list
     (** cwd/host changes not yet told to the model, oldest first *)
+  ; jobs : Subagent_jobs.t
   }
 
 let restore_settings t =
@@ -142,82 +144,6 @@ let restore_settings t =
     Option.iter (Model.find model_id) ~f:(fun m -> t.model <- m);
     t.thinking <- thinking
   | None -> ()
-;;
-
-let create
-      ~env
-      ~sw
-      ~provider
-      ~tools
-      ~sessions_dir
-      ~home
-      ?session
-      ?model
-      ?thinking
-      ?(fallback_model = Model.default)
-      ?(auto_describe = false)
-      ?(backend_host = true)
-      ~cwd
-      ()
-  =
-  let config =
-    match Config.load ~home with
-    | Ok config -> config
-    | Error _ -> Config.default
-  in
-  let model =
-    match model with
-    | Some model -> model
-    | None ->
-      Option.bind config.default_model ~f:Model.find
-      |> Option.value ~default:fallback_model
-  in
-  let thinking =
-    Option.first_some thinking config.default_thinking
-    |> Option.value ~default:Thinking.Off
-  in
-  let session =
-    match session with
-    | Some s -> s
-    | None -> Session.create ~dir:sessions_dir ~cwd ()
-  in
-  let cwd = Session.cwd session in
-  let t =
-    { env
-    ; sw
-    ; provider
-    ; tools
-    ; sessions_dir
-    ; home
-    ; backend_host_enabled = backend_host
-    ; session
-    ; cwd
-    ; git_branch = (if backend_host then Git_branch.find ~cwd else None)
-    ; model
-    ; thinking
-    ; run = None
-    ; describing = None
-    ; auto_describe
-    ; steer_queue = Queue.create ()
-    ; follow_up_queue = Queue.create ()
-    ; subscribers = []
-    ; subagent_usage = Usage.zero
-    ; subagent_cost_usd = 0.
-    ; config
-    ; pending_confirms = String.Table.create ()
-    ; shell_seq = 0
-    ; hosts = []
-    ; host_cwds = String.Table.create ()
-    ; backend_cwd = cwd
-    ; active_host = (if backend_host then Host.backend_id else "")
-    ; host_pinned = false
-    ; pending_execs = String.Table.create ()
-    ; exec_seq = 0
-    ; environment_notes = []
-    }
-  in
-  restore_settings t;
-  t
 ;;
 
 let backend_host t =
@@ -281,6 +207,7 @@ let state t =
   ; context_tokens
   ; active_host = t.active_host
   ; hosts = hosts t
+  ; subagents = Subagent_jobs.summaries t.jobs
   }
 ;;
 
@@ -626,11 +553,27 @@ let user_message t (q : Queued.t) =
   Message.user text
 ;;
 
+let account_subagent t (event : Agent_event.t) =
+  match event with
+  | Subagent_end { usage; cost_usd; _ } ->
+    t.subagent_usage <- Usage.add t.subagent_usage usage;
+    t.subagent_cost_usd <- t.subagent_cost_usd +. cost_usd
+  | _ -> ()
+;;
+
+let deliveries t =
+  match Subagent_jobs.take_undelivered t.jobs with
+  | [] -> []
+  | jobs -> [ Subagent_jobs.delivery_message jobs ]
+;;
+
+(* Finished background agents not delivered yet go first. *)
 let rec start_run t prompts =
   t.git_branch <- find_branch t ~cwd:t.cwd;
   let cancel = Cancellation.create () in
   let finished, resolve = Promise.create () in
   t.run <- Some { cancel; finished };
+  let prompts = deliveries t @ prompts in
   state_changed t;
   Fiber.fork ~sw:t.sw (fun () ->
     let session = t.session in
@@ -648,19 +591,16 @@ let rec start_run t prompts =
          ~cancel
          ~confirm:(confirm_hook t cancel)
          ~execute:(executor t)
+         ~jobs:t.jobs
          ~steer:(fun () ->
            let l = Queue.to_list t.steer_queue in
            if not (List.is_empty l)
            then (
              Queue.clear t.steer_queue;
              queue_update t);
-           List.map l ~f:(user_message t))
+           deliveries t @ List.map l ~f:(user_message t))
          ~emit:(fun event ->
-           (match event with
-            | Subagent_end { usage; cost_usd; _ } ->
-              t.subagent_usage <- Usage.add t.subagent_usage usage;
-              t.subagent_cost_usd <- t.subagent_cost_usd +. cost_usd
-            | _ -> ());
+           account_subagent t event;
            (match event with
             | Message_end m ->
               ignore (Session.append_message session m : Session.Entry.t)
@@ -679,13 +619,23 @@ let rec start_run t prompts =
       Queue.blit_transfer ~src:t.steer_queue ~dst:t.follow_up_queue ();
       queue_update t);
     auto_compact t;
+    (* After an abort, finished agents wait for the next prompt (or the next
+       one to finish) rather than restarting the run at once. *)
+    let next =
+      match Queue.dequeue t.follow_up_queue with
+      | Some queued ->
+        queue_update t;
+        Some [ user_message t queued ]
+      | None ->
+        if
+          Subagent_jobs.has_undelivered t.jobs
+          && not (Cancellation.is_cancelled cancel)
+        then Some []
+        else None
+    in
     finish ();
-    auto_describe t;
-    match Queue.dequeue t.follow_up_queue with
-    | Some queued ->
-      queue_update t;
-      start_run t [ user_message t queued ]
-    | None -> ())
+    Option.iter next ~f:(start_run t);
+    auto_describe t)
 
 (* Runs after the turn is over so the user is not kept waiting; [wait_idle]
    still covers it. *)
@@ -727,6 +677,115 @@ and auto_compact t =
     | Ok summary -> broadcast t (Compacted { summary })
     | Error e ->
       broadcast t (Notice ("auto-compaction failed: " ^ Error.to_string_hum e)))
+;;
+
+(* A background agent finished (or was delivered): an idle agent starts a
+   turn to receive it; a running one picks it up at its next turn boundary. *)
+let subagents_changed t =
+  if (not (is_running t)) && Subagent_jobs.has_undelivered t.jobs
+  then start_run t [];
+  state_changed t
+;;
+
+(* Seeds background agent ids so they do not repeat ids the model has
+   already seen in this conversation. *)
+let subagent_calls messages =
+  List.sum
+    (module Int)
+    messages
+    ~f:(function
+      | Message.Assistant a ->
+        List.count (Message.Assistant.tool_calls a) ~f:(fun call ->
+          String.equal call.name "subagent")
+      | User _ | Tool_result _ -> 0)
+;;
+
+let create
+      ~env
+      ~sw
+      ~provider
+      ~tools
+      ~sessions_dir
+      ~home
+      ?session
+      ?model
+      ?thinking
+      ?(fallback_model = Model.default)
+      ?(auto_describe = false)
+      ?(backend_host = true)
+      ~cwd
+      ()
+  =
+  let config =
+    match Config.load ~home with
+    | Ok config -> config
+    | Error _ -> Config.default
+  in
+  let model =
+    match model with
+    | Some model -> model
+    | None ->
+      Option.bind config.default_model ~f:Model.find
+      |> Option.value ~default:fallback_model
+  in
+  let thinking =
+    Option.first_some thinking config.default_thinking
+    |> Option.value ~default:Thinking.Off
+  in
+  let session =
+    match session with
+    | Some s -> s
+    | None -> Session.create ~dir:sessions_dir ~cwd ()
+  in
+  let cwd = Session.cwd session in
+  let t =
+    { env
+    ; sw
+    ; provider
+    ; tools
+    ; sessions_dir
+    ; home
+    ; backend_host_enabled = backend_host
+    ; session
+    ; cwd
+    ; git_branch = (if backend_host then Git_branch.find ~cwd else None)
+    ; model
+    ; thinking
+    ; run = None
+    ; describing = None
+    ; auto_describe
+    ; steer_queue = Queue.create ()
+    ; follow_up_queue = Queue.create ()
+    ; subscribers = []
+    ; subagent_usage = Usage.zero
+    ; subagent_cost_usd = 0.
+    ; config
+    ; pending_confirms = String.Table.create ()
+    ; shell_seq = 0
+    ; hosts = []
+    ; host_cwds = String.Table.create ()
+    ; backend_cwd = cwd
+    ; active_host = (if backend_host then Host.backend_id else "")
+    ; host_pinned = false
+    ; pending_execs = String.Table.create ()
+    ; exec_seq = 0
+    ; environment_notes = []
+    ; jobs =
+        Subagent_jobs.create
+          ~env
+          ~sw
+          ~first_id:(subagent_calls (Session.messages session) + 1)
+          ()
+    }
+  in
+  restore_settings t;
+  Subagent_jobs.connect
+    t.jobs
+    ~emit:(fun event ->
+      account_subagent t event;
+      broadcast t (Loop event))
+    ~on_change:(fun () -> subagents_changed t);
+  t
 ;;
 
 let prompt ?(attachments = []) t text =
@@ -774,8 +833,16 @@ let rec wait_idle t =
   | None, Some describing ->
     Promise.await describing;
     wait_idle t
-  | None, None -> ()
+  | None, None ->
+    if Subagent_jobs.has_running t.jobs
+    then (
+      Subagent_jobs.wait_all t.jobs;
+      wait_idle t)
 ;;
+
+let has_running_subagents t = Subagent_jobs.has_running t.jobs
+let cancel_subagent t ~agent_id = Subagent_jobs.cancel t.jobs agent_id
+let cancel_subagents ?discard t = Subagent_jobs.cancel_all ?discard t.jobs
 
 (* Pops the most recently queued message: follow-ups take priority over steer
    messages, and within each queue the back (last enqueued) is removed. *)
@@ -895,6 +962,7 @@ let compact t =
 
 let replace_session t session =
   ignore (abort t);
+  Subagent_jobs.cancel_all ~discard:true t.jobs;
   wait_idle t;
   t.session <- session;
   t.cwd <- Session.cwd session;

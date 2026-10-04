@@ -143,6 +143,12 @@ let state (s : Agent.State.t) =
                ; "session_id", opt h.session_id
                ; "session_name", opt h.session_name
                ])) )
+    ; ( "subagents"
+      , `Array
+          (List.map s.subagents ~f:(fun (a : Subagent_jobs.Summary.t) ->
+             `Object
+               [ "id", str a.id; "task", str a.task; "running", bool a.running ]))
+      )
     ]
 ;;
 

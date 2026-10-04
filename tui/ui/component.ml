@@ -74,7 +74,8 @@ let create ?(start_on_activate = true) platform (local_ graph) =
       graph;
   let running =
     let%arr model in
-    App.Model.running model && not (Mode.is_dialog model.mode)
+    (App.Model.running model || App.Model.agents_running model)
+    && not (Mode.is_dialog model.mode)
   in
   let (_ : unit Bonsai.t) =
     match%sub running with

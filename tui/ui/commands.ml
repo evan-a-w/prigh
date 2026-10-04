@@ -74,7 +74,10 @@ let all =
   ; c "name" "[text]" "set the session name"
   ; c "session" "" "show session statistics"
   ; c "sessions" "" "pick a saved session (Ctrl+N named, Ctrl+D delete)"
-  ; c "agents" "" "focus a subagent"
+  ; c
+      "agents"
+      "[cancel <n>]"
+      "focus a subagent (Ctrl+D cancels one), or cancel subagent n"
   ; c
       "host"
       "[name|backend]"
