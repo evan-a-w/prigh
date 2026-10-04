@@ -10,9 +10,10 @@ ARG NODE_IMAGE=node:22-bookworm-slim
 ARG RUNTIME_IMAGE=debian:bookworm-slim
 
 FROM ${NIX_IMAGE} AS nix-build
+# Builds must keep running as the image's nixbld users: as root, an impure
+# build can create /homeless-shelter, which fails every later build.
 RUN printf '%s\n' 'experimental-features = nix-command flakes' 'sandbox = false' \
-      'filter-syscalls = false' 'build-users-group =' 'max-jobs = auto' \
-      >> /etc/nix/nix.conf
+      'filter-syscalls = false' 'max-jobs = auto' >> /etc/nix/nix.conf
 
 # Dependencies first, from only the files that determine them, so that source
 # changes reuse this (very slow: it compiles OxCaml) layer.
@@ -20,7 +21,8 @@ COPY flake.nix flake.lock /deps/
 COPY nix /deps/nix
 COPY backend/dune-project backend/prigh.opam /deps/backend/
 COPY tui/dune-project tui/prigh_tui.opam /deps/tui/
-RUN nix build --no-link path:/deps#backend.inputDerivation path:/deps#tui.inputDerivation
+RUN nix build --no-link path:/deps#backend.inputDerivation
+RUN nix build --no-link path:/deps#tui.inputDerivation
 
 COPY . /src
 RUN nix build --out-link /out/backend path:/src#backend \
