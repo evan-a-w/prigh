@@ -29,8 +29,9 @@ val browser_url : host:string -> port:int -> string
 val serve_rpc : Rpc_server.t -> on_websocket
 
 (** A {!Terminals} socket. The query carries [token] (checked like [hello]'s),
-    [session] (the terminal's key; it starts in that session's directory on
-    the backend) and the initial [cols] and [rows]. *)
+    [session] (the terminal's key; it runs on that session's active host, in
+    its directory there, relayed when that is a client) and the initial
+    [cols] and [rows]. *)
 val serve_terminal : Rpc_server.t -> Terminals.t -> on_websocket
 
 (** Accepts connections until [sw] ends; returns the bound port (useful with

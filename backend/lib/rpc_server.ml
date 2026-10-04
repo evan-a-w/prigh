@@ -7,6 +7,8 @@ let methods =
   ; "set_active_host"
   ; "tool_exec_output"
   ; "tool_exec_result"
+  ; "terminal_frame"
+  ; "terminal_closed"
   ; "prompt"
   ; "steer"
   ; "follow_up"
@@ -123,6 +125,7 @@ type t =
     (** in-flight remote executions by exec id: host client id and session *)
   ; mutable login_owner : string option
     (** the client running the current login flow *)
+  ; terminals : Terminal_relay.t
   }
 
 let agent_of_client _t (client : Client.t) = client.agent
@@ -218,6 +221,7 @@ let create
     ; client_seq = 0
     ; execs = String.Table.create ()
     ; login_owner = None
+    ; terminals = Terminal_relay.create ()
     }
   in
   Option.iter default_agent ~f:(fun agent ->
@@ -276,6 +280,7 @@ let disconnect t (client : Client.t) =
   Hashtbl.filter_inplace t.execs ~f:(fun (host, _) ->
     not (String.equal host client.id));
   if client.tools then publish_hosts t;
+  Terminal_relay.host_gone t.terminals ~host:client.id;
   maybe_evict t client.agent
 ;;
 
@@ -336,13 +341,45 @@ let token_ok t given =
   | Some token -> Option.exists given ~f:(String.equal token)
 ;;
 
-let backend_cwd t ~session =
+let terminal_target t ~session =
   match Option.bind session ~f:(Hashtbl.find t.agents) with
-  | None -> t.cwd
+  | None -> `Backend t.cwd
   | Some agent ->
-    (match Agent.hosts agent with
-     | backend :: _ -> backend.cwd
-     | [] -> t.cwd)
+    let active = Agent.active_host agent in
+    let host =
+      List.find (Agent.hosts agent) ~f:(fun h -> String.equal h.id active)
+    in
+    if String.equal active Agent.Host.backend_id
+    then `Backend (Option.value_map host ~default:t.cwd ~f:(fun h -> h.cwd))
+    else (
+      match host, Hashtbl.find t.clients active with
+      | Some host, Some client when client.tools -> `Host (active, host.cwd)
+      | _ -> `Unavailable (sprintf "the tool host %S is not connected" active))
+;;
+
+let relay_terminal t ~host ~key ~cwd ~cols ~rows channel =
+  let send_event json =
+    Option.iter (Hashtbl.find t.clients host) ~f:(fun c -> c.send json)
+  in
+  if Hashtbl.mem t.clients host
+  then
+    Terminal_relay.serve
+      t.terminals
+      ~host
+      ~send_event
+      ~key
+      ~cwd
+      ~cols
+      ~rows
+      channel
+  else
+    Terminal_channel.send_text
+      channel
+      (Json.to_string
+         (`Object
+             [ "type", `String "error"
+             ; "message", `String "the tool host disconnected"
+             ]))
 ;;
 
 let hello t (client : Client.t) params =
@@ -428,6 +465,12 @@ let dispatch_server t (client : Client.t) ~meth ~params
                Hashtbl.remove t.execs exec_id;
                unit_result
                  (Agent.tool_exec_result agent ~exec_id ~text ~is_error)))))
+  | "terminal_frame" ->
+    Some
+      (unit_result (Terminal_relay.frame t.terminals ~client:client.id params))
+  | "terminal_closed" ->
+    Some
+      (unit_result (Terminal_relay.closed t.terminals ~client:client.id params))
   | "new_session" ->
     let cwd = (Agent.state agent).cwd in
     new_agent_for t client (Session.create ~dir:t.sessions_dir ~cwd ());

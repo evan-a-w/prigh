@@ -557,15 +557,68 @@ let serve_command =
 let tool_host_command =
   Command.basic
     ~summary:
-      "Run tools on this machine for a frontend connected to a remote backend \
-       (JSON lines on stdin/stdout)"
-    (Command.Param.return (fun () ->
-       Eio_main.run
-       @@ fun env ->
-       Tool_host.run
-         ~env
-         ~input:(Eio.Stdenv.stdin env)
-         ~output:(Eio.Stdenv.stdout env)))
+      "Run tools and terminals on this machine for a backend: as a frontend's \
+       worker (JSON lines on stdin/stdout), or with -connect as a tool host \
+       connected to the backend over TCP"
+    (let%map_open.Command connect =
+       flag
+         "-connect"
+         (optional string)
+         ~doc:
+           "HOST:PORT connect to a backend's JSON-lines port (-listen or -web) \
+            and serve it, reconnecting when the connection drops"
+     and token =
+       flag
+         "-token"
+         (optional string)
+         ~doc:"SECRET the backend's token (default: $PRIGH_TOKEN)"
+     and name =
+       flag
+         "-name"
+         (optional string)
+         ~doc:"NAME how the host is shown (default: the hostname)"
+     and cwd =
+       flag
+         "-cwd"
+         (optional string)
+         ~doc:"DIR the host's directory (default: the current one)"
+     in
+     fun () ->
+       match connect with
+       | None ->
+         Eio_main.run
+         @@ fun env ->
+         Tool_host.run
+           ~env
+           ~input:(Eio.Stdenv.stdin env)
+           ~output:(Eio.Stdenv.stdout env)
+           ()
+       | Some spec ->
+         let host, port =
+           match String.rsplit2 spec ~on:':' with
+           | Some (host, port)
+             when (not (String.is_empty host))
+                  && Option.is_some (Int.of_string_opt port) ->
+             host, Int.of_string port
+           | _ ->
+             eprintf "-connect must be HOST:PORT, got %S\n" spec;
+             exit 2
+         in
+         let cwd =
+           match cwd with
+           | Some dir -> Filename_unix.realpath dir
+           | None -> Core_unix.getcwd ()
+         in
+         Eio_main.run
+         @@ fun env ->
+         Tool_host.connect
+           ~env
+           ~host
+           ~port
+           ~token:(Option.first_some token (Sys.getenv "PRIGH_TOKEN"))
+           ~name:(Option.value name ~default:(Core_unix.gethostname ()))
+           ~cwd
+           ())
 ;;
 
 let login_command =

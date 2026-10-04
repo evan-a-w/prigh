@@ -75,5 +75,21 @@ val agent_of_client : t -> Client.t -> Agent.t
 (** Whether [token] is the one [hello] requires (always, without one). *)
 val token_ok : t -> string option -> bool
 
-(** The backend host's directory for a live session, else the server's. *)
-val backend_cwd : t -> session:string option -> string
+(** Where a terminal for [session] runs: on the backend (in that directory),
+    on a connected tool-host client, or nowhere (with the reason). *)
+val terminal_target
+  :  t
+  -> session:string option
+  -> [ `Backend of string | `Host of string * string | `Unavailable of string ]
+
+(** Relays a terminal channel to the tool-host client [host] (see
+    {!Terminal_relay}) until either side closes. *)
+val relay_terminal
+  :  t
+  -> host:string
+  -> key:string
+  -> cwd:string
+  -> cols:int
+  -> rows:int
+  -> Terminal_channel.t
+  -> unit

@@ -127,12 +127,13 @@ end
    fresh replay instead of an ever-growing backlog. *)
 let queue_capacity = 1024
 
-let control_message terminal ws text =
+let control_message terminal channel text =
   match Json.parse text with
   | Ok json ->
     let field name = Json.member name json in
     (match field "type" with
-     | Some (`String "ping") -> Websocket.send_text ws {|{"type":"pong"}|}
+     | Some (`String "ping") ->
+       Terminal_channel.send_text channel {|{"type":"pong"}|}
      | Some (`String "resize") ->
        (match field "cols", field "rows" with
         | Some (`Number cols), Some (`Number rows) ->
@@ -144,7 +145,7 @@ let control_message terminal ws text =
   | Error _ -> ()
 ;;
 
-let serve_terminal t (entry : Entry.t) ~cols ~rows ws =
+let serve_terminal t (entry : Entry.t) ~cols ~rows channel =
   let terminal = entry.terminal in
   Switch.run
   @@ fun sw ->
@@ -172,22 +173,22 @@ let serve_terminal t (entry : Entry.t) ~cols ~rows ws =
   let rec write () =
     match (Eio.Stream.take outgoing : Outgoing.t) with
     | Data data ->
-      Websocket.send_binary ws data;
-      if not (Websocket.is_closed ws) then write ()
+      Terminal_channel.send channel (`Binary data);
+      if not (Terminal_channel.is_closed channel) then write ()
     | Overflow -> ()
-    | Exited -> Websocket.send_text ws {|{"type":"exit"}|}
+    | Exited -> Terminal_channel.send_text channel {|{"type":"exit"}|}
   in
   let rec read () =
     match
       Eio.Time.with_timeout (clock t) t.heartbeat_timeout (fun () ->
-        Ok (Websocket.read ws))
+        Ok (Terminal_channel.read channel))
     with
     | Error `Timeout | Ok None -> ()
     | Ok (Some (`Binary data)) ->
       Terminal.input terminal data;
       read ()
     | Ok (Some (`Text text)) ->
-      control_message terminal ws text;
+      control_message terminal channel text;
       read ()
   in
   Exn.protect
@@ -197,12 +198,12 @@ let serve_terminal t (entry : Entry.t) ~cols ~rows ws =
       start_idle_timer t entry)
 ;;
 
-let serve t ~key ~cwd ~cols ~rows ws =
+let serve t ~key ~cwd ~cols ~rows channel =
   match get_or_create t ~key ~cwd ~cols ~rows with
-  | Ok entry -> serve_terminal t entry ~cols ~rows ws
+  | Ok entry -> serve_terminal t entry ~cols ~rows channel
   | Error e ->
-    Websocket.send_text
-      ws
+    Terminal_channel.send_text
+      channel
       (Json.to_string
          (`Object
              [ "type", `String "error"
