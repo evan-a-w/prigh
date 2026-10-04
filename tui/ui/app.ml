@@ -62,6 +62,7 @@ module Command = struct
         ; delay_ms : int
         ; session : string option
         }
+    | Sign_out
     | Quit
   [@@deriving sexp_of, equal]
 end
@@ -111,7 +112,7 @@ module Action = struct
     | Reply of Reply_tag.t * (P.Json.t, string) Result.t
     | Tick
     | Set_home of string
-    | Set_client_id of string
+    | Hello of P.Hello_reply.t
     | Resize of
         { width : int
         ; height : int
@@ -142,6 +143,7 @@ module Model = struct
     ; config : P.Config.t option
     ; home : string option
     ; client_id : string option (** ours, from [hello] *)
+    ; namespace : string option
     ; stderr_tail : string list
     ; pending_confirms : (string * string * string) list
     ; connection : Connection.t
@@ -325,6 +327,7 @@ let init =
   ; config = None
   ; home = None
   ; client_id = None
+  ; namespace = None
   ; stderr_tail = []
   ; pending_confirms = []
   ; connection = Connected
@@ -1017,15 +1020,16 @@ let reconnect_reply m ~generation result =
          ~delay_ms
          ~session
      | Ok json ->
-       let client_id =
-         match P.Json.field json "client_id" with
-         | Some (`String id) -> Some id
-         | _ -> m.client_id
+       let client_id, namespace =
+         match P.Hello_reply.of_json json with
+         | Ok { client_id; namespace } -> Some client_id, namespace
+         | Error _ -> m.client_id, m.namespace
        in
        let m =
          { m with
            connection = Connected
          ; client_id
+         ; namespace
          ; agents = []
          ; focus = `Main
          ; transcript = Transcript.clear m.transcript
@@ -1368,6 +1372,7 @@ let run_command m (cmd : Commands.Parsed.t) =
     block m (Content.lines ~style:(Style.fg Gray) text), []
   | "clear", _ ->
     follow { m with transcript = Transcript.clear m.transcript }, []
+  | "signout", _ -> m, [ Sign_out ]
   | "quit", _ | "exit", _ -> { m with quitting = true }, [ Quit ]
   | name, _ ->
     let hint =
@@ -2801,7 +2806,8 @@ let update m (action : Action.t) =
       | Reply (tag, result) -> reply m tag result
       | Tick -> { m with spinner = m.spinner + 1 }, []
       | Set_home home -> { m with home = Some home }, []
-      | Set_client_id id -> { m with client_id = Some id }, []
+      | Hello { client_id; namespace } ->
+        { m with client_id = Some client_id; namespace }, []
       | Resize { width; height } -> { m with width; height }, []
     in
     let m, cmds = block_backend_rpc m cmds in

@@ -68,8 +68,13 @@ val shutdown : t -> unit
 
 val agent_of_client : t -> Client.t -> Agent.t
 
-(** Whether [token] is the one [hello] requires (always, without one). *)
-val token_ok : t -> string option -> bool
+(** The error for any failed authentication. *)
+val unauthorised : string
+
+(** Whether [hello] would accept this token (always, without one) and [user]:
+    with a namespace, a given [user] must be its name; otherwise [user] is
+    ignored. *)
+val credentials_ok : t -> ?user:string -> string option -> bool
 
 val namespace : t -> string option
 

@@ -111,6 +111,7 @@ let all =
       "reconnect to the backend now instead of waiting for the next retry"
   ; c "state" "" "show session state"
   ; c "clear" "" "clear the transcript"
+  ; c "signout" "" "sign out to log in as another user (browser only)"
   ; c "quit" "" "exit"
   ]
 ;;

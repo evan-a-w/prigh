@@ -18,15 +18,23 @@ val namespaced
   -> create_server:(Namespace.t -> Namespace.World.t -> Rpc_server.t)
   -> t
 
-(** The server a client presenting [token] belongs to: in single mode the
-    server if the token is accepted, else the namespace with that token. *)
-val lookup : t -> token:string option -> Rpc_server.t option
+(** The server a client presenting [token] (and optionally [user]) belongs
+    to: in single mode the server if the token is accepted ([user] is
+    ignored), else the namespace with that token, whose name must be [user]
+    when given. *)
+val lookup
+  :  t
+  -> ?user:string
+  -> token:string option
+  -> unit
+  -> Rpc_server.t option
 
 (** By namespace name (the empty name in single mode). *)
 val servers : t -> (string * Rpc_server.t) list
 
 (** Like [Rpc_server.serve_lines]. With namespaces the first request must be
-    a [hello] carrying a known token, or it is answered with an error and the
+    a [hello] carrying a known token (and, if any, its namespace's name as
+    [user]), or it is answered with an error and the
     connection closed. *)
 val serve_lines
   :  t

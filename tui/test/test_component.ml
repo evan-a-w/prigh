@@ -56,6 +56,12 @@ let make_platform ~replies : Component.Platform.t =
               (Option.value session ~default:"-");
             Ok (`Object [ "client_id", `String "client-2" ]))
           ())
+  ; sign_out =
+      Bonsai.Effect.of_sync_fun
+        (fun () ->
+          print_endline "sign out";
+          Error "not here")
+        ()
   ; quit = Bonsai.Effect.of_sync_fun (fun () -> print_endline "quit") ()
   }
 ;;
@@ -221,6 +227,53 @@ let%expect_test "component: startup requests, key handling, rpc round trip, \
     reconnected to the backend
     session abc in /w. /help for commands, Esc aborts,
     Ctrl+C twice quits.
+    ──────────────────────────────────────────────────
+    > ▏
+    /w  m  think:n/a  view:normal  ctx:0% 0  $0.00
+    |}]
+;;
+
+let%expect_test "component: /signout runs the platform's sign-out and shows \
+                 its error"
+  =
+  let replies =
+    [ "get_state", Ok (state_json false)
+    ; "get_messages", Ok "[]"
+    ; "auth_status", Ok "[]"
+    ; "get_config", Ok {|{"scoped_models":[],"confirm_tools":false}|}
+    ; "list_models", Ok "[]"
+    ]
+  in
+  let handle =
+    Bonsai_test.Handle.create (module Result_spec) (fun graph ->
+      let model, inject =
+        Component.create (Bonsai.return (make_platform ~replies)) graph
+      in
+      Bonsai.both model inject)
+  in
+  Bonsai_test.Handle.recompute_view_until_stable handle;
+  Bonsai_test.Handle.do_actions
+    handle
+    (List.map (String.to_list "/signout") ~f:(fun c ->
+       App.Action.Key (Key.char c))
+     @ [ Key (Key.plain Enter) ]);
+  Bonsai_test.Handle.recompute_view_until_stable handle;
+  Bonsai_test.Handle.show handle;
+  [%expect
+    {|
+    rpc get_state ()
+    rpc get_messages ()
+    rpc auth_status ()
+    rpc get_config ()
+    rpc list_models ()
+    load history
+    sign out
+    spinner=0 running=false
+
+
+    session abc in /w. /help for commands, Esc aborts,
+    Ctrl+C twice quits.
+    not here
     ──────────────────────────────────────────────────
     > ▏
     /w  m  think:n/a  view:normal  ctx:0% 0  $0.00

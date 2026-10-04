@@ -10,6 +10,7 @@ module Platform = struct
         -> (P.Json.t, string) Result.t Bonsai.Effect.t
     ; open_browser : string -> unit Bonsai.Effect.t
     ; quit : unit Bonsai.Effect.t
+    ; sign_out : (unit, string) Result.t Bonsai.Effect.t
     ; load_history : unit -> (P.Json.t, string) Result.t Bonsai.Effect.t
     ; append_history : string -> unit Bonsai.Effect.t
     ; copy_to_clipboard : string -> unit Bonsai.Effect.t
@@ -45,6 +46,11 @@ let perform ctx (platform : Platform.t) (command : App.Command.t) =
     | Reconnect { generation; delay_ms; session } ->
       let%bind.Bonsai.Effect result = platform.reconnect ~delay_ms ~session in
       inject (App.Action.Reply (App.Reply_tag.Reconnect generation, result))
+    | Sign_out ->
+      let%bind.Bonsai.Effect result = platform.sign_out in
+      inject
+        (App.Action.Reply
+           (App.Reply_tag.Show_error, Result.map result ~f:(fun () -> `Null)))
     | Quit -> platform.quit
   in
   Bonsai.Apply_action_context.schedule_event ctx effect

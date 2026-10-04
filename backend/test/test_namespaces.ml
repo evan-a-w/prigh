@@ -154,11 +154,32 @@ let%expect_test "namespaces: worlds, sessions, logins, tool hosts, config" =
   (* A namespace's token is not valid in another. *)
   let intruder = Rpc_server.connect b ~send:ignore in
   show t (call b intruder ~params:{|{"token": "tok-a"}|} "hello");
+  show t (call b intruder ~params:{|{"user": "a", "token": "tok-a"}|} "hello");
+  show t (call b intruder ~params:{|{"user": "a", "token": "tok-b"}|} "hello");
   show t (call b intruder "list_sessions");
+  (* The user name is the namespace's, and the hello result says which. *)
+  let namespace_of response =
+    Option.bind (Json.member "result" response) ~f:(Json.member "namespace")
+    |> Option.value_map ~default:"-" ~f:Json.to_string
+  in
+  print_endline
+    (namespace_of
+       (call b intruder ~params:{|{"user": "b", "token": "tok-b"}|} "hello"));
+  print_endline
+    (namespace_of
+       (call
+          b
+          (Rpc_server.connect b ~send:ignore)
+          ~params:{|{"token": "tok-b"}|}
+          "hello"));
   [%expect
     {|
-    {"type":"response","id":"r","ok":false,"error":"unauthorised: bad or missing token"}
+    {"type":"response","id":"r","ok":false,"error":"unauthorised: bad user name or password"}
+    {"type":"response","id":"r","ok":false,"error":"unauthorised: bad user name or password"}
+    {"type":"response","id":"r","ok":false,"error":"unauthorised: bad user name or password"}
     {"type":"response","id":"r","ok":false,"error":"unauthorised: send hello with the token first"}
+    "b"
+    "b"
     |}];
   (* Sessions. *)
   ignore (call a ca ~params:{|{"name": "in a"}|} "set_session_name" : Json.t);
@@ -270,22 +291,38 @@ let%expect_test "routing connections by the hello token" =
     ; {|{"id": 5, "method": "hello", "params": {"token": "tok-b"}}|}
     ; {|{"id": 6, "method": "get_state"}|}
     ];
+  serve
+    [ {|{"id": 7, "method": "hello", "params": {"user": "a", "token": "tok-b"}}|}
+    ; {|{"id": 8, "method": "get_state"}|}
+    ];
+  serve [ {|{"id": 9, "method": "hello", "params": {"user": "b"}}|} ];
+  serve
+    [ {|{"id": 10, "method": "hello", "params": {"user": "b", "token": "tok-b"}}|}
+    ; {|{"id": 11, "method": "get_state"}|}
+    ];
   [%expect
     {|
-    {"type":"response","id":1,"ok":false,"error":"unauthorised: bad or missing token"}
+    {"type":"response","id":1,"ok":false,"error":"unauthorised: bad user name or password"}
     --
-    {"type":"response","id":null,"ok":false,"error":"unauthorised: bad or missing token"}
+    {"type":"response","id":null,"ok":false,"error":"unauthorised: bad user name or password"}
     --
-    {"type":"response","id":3,"ok":false,"error":"unauthorised: bad or missing token"}
+    {"type":"response","id":3,"ok":false,"error":"unauthorised: bad user name or password"}
     --
-    {"type":"response","id":4,"ok":false,"error":"unauthorised: bad or missing token"}
+    {"type":"response","id":4,"ok":false,"error":"unauthorised: bad user name or password"}
     --
-    {"type":"response","id":5,"ok":true,"result":{"client_id":"client-1","state":{"session_id":"<id>","session_path":"$DIR/home/.prigh/namespaces/b/.prigh/sessions/<stamp>_<id>.jsonl","session_name":null,"session_description":null,"cwd":"$DIR","git_branch":null,"model":{"id":"deepseek-flash","provider":"deepseek","key":"deepseek/deepseek-flash","name":"DeepSeek V4.1 Flash","context_window":1000000,"max_output":384000,"supports_thinking":true,"cost":{"input":0.3,"output":1.2,"cache_read":0.006}},"thinking":"off","running":false,"message_count":0,"usage":{"input":0,"output":0,"cache_read":0},"cost_usd":0,"context_tokens":0,"active_host":"backend","hosts":[{"id":"backend","name":"<host>","cwd":"$DIR","session_id":null,"session_name":null}],"subagents":[]}}}
+    {"type":"response","id":5,"ok":true,"result":{"client_id":"client-1","namespace":"b","state":{"session_id":"<id>","session_path":"$DIR/home/.prigh/namespaces/b/.prigh/sessions/<stamp>_<id>.jsonl","session_name":null,"session_description":null,"cwd":"$DIR","git_branch":null,"model":{"id":"deepseek-flash","provider":"deepseek","key":"deepseek/deepseek-flash","name":"DeepSeek V4.1 Flash","context_window":1000000,"max_output":384000,"supports_thinking":true,"cost":{"input":0.3,"output":1.2,"cache_read":0.006}},"thinking":"off","running":false,"message_count":0,"usage":{"input":0,"output":0,"cache_read":0},"cost_usd":0,"context_tokens":0,"active_host":"backend","hosts":[{"id":"backend","name":"<host>","cwd":"$DIR","session_id":null,"session_name":null}],"subagents":[]}}}
+    {"session_path":"$DIR/home/.prigh/namespaces/b/.prigh/sessions/<stamp>_<id>.jsonl"}
+    --
+    {"type":"response","id":7,"ok":false,"error":"unauthorised: bad user name or password"}
+    --
+    {"type":"response","id":9,"ok":false,"error":"unauthorised: bad user name or password"}
+    --
+    {"type":"response","id":10,"ok":true,"result":{"client_id":"client-2","namespace":"b","state":{"session_id":"<id>","session_path":"$DIR/home/.prigh/namespaces/b/.prigh/sessions/<stamp>_<id>.jsonl","session_name":null,"session_description":null,"cwd":"$DIR","git_branch":null,"model":{"id":"deepseek-flash","provider":"deepseek","key":"deepseek/deepseek-flash","name":"DeepSeek V4.1 Flash","context_window":1000000,"max_output":384000,"supports_thinking":true,"cost":{"input":0.3,"output":1.2,"cache_read":0.006}},"thinking":"off","running":false,"message_count":0,"usage":{"input":0,"output":0,"cache_read":0},"cost_usd":0,"context_tokens":0,"active_host":"backend","hosts":[{"id":"backend","name":"<host>","cwd":"$DIR","session_id":null,"session_name":null}],"subagents":[]}}}
     {"session_path":"$DIR/home/.prigh/namespaces/b/.prigh/sessions/<stamp>_<id>.jsonl"}
     --
     |}];
-  let which token =
-    match Rpc_router.lookup router ~token with
+  let which ?user token =
+    match Rpc_router.lookup router ?user ~token () with
     | None -> "none"
     | Some s ->
       List.find_map_exn (Rpc_router.servers router) ~f:(fun (name, s') ->
@@ -296,11 +333,18 @@ let%expect_test "routing connections by the hello token" =
       (which (Some "tok-a") : string)
         (which (Some "tok-b") : string)
         (which (Some "tok-c") : string)
-        (which None : string)];
+        (which None : string)
+        (which ~user:"a" (Some "tok-a") : string)
+        (which ~user:"b" (Some "tok-a") : string)
+        (which ~user:"a" None : string)
+        (which ~user:"c" (Some "tok-c") : string)];
   [%expect
     {|
     (("which (Some \"tok-a\")" a) ("which (Some \"tok-b\")" b)
-     ("which (Some \"tok-c\")" none) ("which None" none))
+     ("which (Some \"tok-c\")" none) ("which None" none)
+     ("which ~user:\"a\" (Some \"tok-a\")" a)
+     ("which ~user:\"b\" (Some \"tok-a\")" none) ("which ~user:\"a\" None" none)
+     ("which ~user:\"c\" (Some \"tok-c\")" none))
     |}];
   Rpc_router.shutdown router
 ;;
@@ -329,19 +373,27 @@ let%expect_test "single mode: lookup follows the server's token" =
   in
   let open_ = server () in
   let locked = server ~token:"s" () in
-  let found router token = Option.is_some (Rpc_router.lookup router ~token) in
+  let found ?user router token =
+    Option.is_some (Rpc_router.lookup router ?user ~token ())
+  in
   print_s
     [%message
       (found open_ None : bool)
         (found open_ (Some "x") : bool)
         (found locked None : bool)
         (found locked (Some "x") : bool)
-        (found locked (Some "s") : bool)];
+        (found locked (Some "s") : bool)
+        (found ~user:"anyone" open_ None : bool)
+        (found ~user:"anyone" locked (Some "s") : bool)
+        (found ~user:"anyone" locked (Some "x") : bool)];
   [%expect
     {|
     (("found open_ None" true) ("found open_ (Some \"x\")" true)
      ("found locked None" false) ("found locked (Some \"x\")" false)
-     ("found locked (Some \"s\")" true))
+     ("found locked (Some \"s\")" true)
+     ("found ~user:\"anyone\" open_ None" true)
+     ("found ~user:\"anyone\" locked (Some \"s\")" true)
+     ("found ~user:\"anyone\" locked (Some \"x\")" false))
     |}]
 ;;
 
@@ -458,6 +510,8 @@ let%expect_test "pi-web and /terminal look the namespace up by token" =
   in
   Websocket.close (first "/ws?token=nope");
   Websocket.close (first "/ws");
+  Websocket.close (first "/ws?token=tok-b&user=a");
+  Websocket.close (first "/ws?token=tok-b&user=b");
   let ws = first "/ws?token=tok-b" in
   Websocket.send_text ws {|{"id":"1","type":"get_state"}|};
   let rec until_response () =
@@ -481,14 +535,20 @@ let%expect_test "pi-web and /terminal look the namespace up by token" =
   Websocket.close ws;
   [%expect
     {|
-    {"type":"prigh_hello_failed","error":"unauthorised: bad or missing token"}
-    {"type":"prigh_hello_failed","error":"unauthorised: bad or missing token"}
+    {"type":"prigh_hello_failed","error":"unauthorised: bad user name or password"}
+    {"type":"prigh_hello_failed","error":"unauthorised: bad user name or password"}
+    {"type":"prigh_hello_failed","error":"unauthorised: bad user name or password"}
+    {"type":"extension_ui_request","id":"status-host","method":"setStatus","statusKey":"host","statusText":null}
     {"type":"extension_ui_request","id":"status-host","method":"setStatus","statusKey":"host","statusText":null}
     "$DIR/home/.prigh/namespaces/b/.prigh/sessions/<stamp>_<id>.jsonl"
     |}];
   Websocket.close (first "/terminal?token=nope");
+  Websocket.close (first "/terminal?token=tok-b&user=a");
   [%expect
-    {| {"type":"error","message":"unauthorised: bad or missing token"} |}];
+    {|
+    {"type":"error","message":"unauthorised: bad user name or password"}
+    {"type":"error","message":"unauthorised: bad user name or password"}
+    |}];
   (* A session whose tools run on a client host: relayed to that host, within
      the namespace. *)
   let client, _, _ = connect b ~token:"tok-b" () in
@@ -504,7 +564,9 @@ let%expect_test "pi-web and /terminal look the namespace up by token" =
            session_id)
       ()
   in
-  let ws = browser (sprintf "/terminal?token=tok-b&session=%s" session_id) in
+  let ws =
+    browser (sprintf "/terminal?user=b&token=tok-b&session=%s" session_id)
+  in
   let is_open json =
     Option.equal
       Json.exactly_equal
@@ -552,7 +614,7 @@ let%expect_test "pi-web and /terminal look the namespace up by token" =
   drain ();
   [%expect
     {|
-    {"type":"event","event":"terminal_open","host":"client-3","term_id":"term-1","key":"b:<id>","cwd":"/home/me","cols":80,"rows":24}
+    {"type":"event","event":"terminal_open","host":"client-4","term_id":"term-1","key":"b:<id>","cwd":"/home/me","cols":80,"rows":24}
     {"type":"response","id":"r","ok":true,"result":{}}
     {"type":"response","id":"r","ok":true,"result":{}}
     {"type":"exit"}

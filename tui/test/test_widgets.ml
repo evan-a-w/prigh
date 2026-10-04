@@ -346,7 +346,7 @@ let%expect_test "fuzzy ranking: command names" =
     {|
     "mo" -> model scoped-models import
     "lo" -> login logout clone
-    "s"  -> state switch session sessions scoped-models host agents hotkeys verbosity
+    "s"  -> state switch session signout sessions scoped-models host agents hotkeys verbosity
     "sw" -> switch
     "xyz" ->
     |}]
@@ -657,6 +657,7 @@ let%expect_test "keymap: every binding resolves to its intent and is documented"
     /retry-backend-connection          reconnect to the backend now instead of waiting for the next retry
     /state                             show session state
     /clear                             clear the transcript
+    /signout                           sign out to log in as another user (browser only)
     /quit                              exit
     |}]
 ;;

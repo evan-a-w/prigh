@@ -609,3 +609,26 @@ let%expect_test "btw_delta" =
         "missing field \"delta\"")))
     |}]
 ;;
+
+let%expect_test "hello reply: client id and namespace" =
+  List.iter
+    [ {|{"client_id":"client-1","namespace":"lloyd","state":{}}|}
+    ; {|{"client_id":"client-1","namespace":null}|}
+    ; {|{"client_id":"client-1"}|}
+    ; {|{"namespace":"lloyd"}|}
+    ; {|{"client_id":"client-1","namespace":3}|}
+    ]
+    ~f:(fun json ->
+      print_s
+        [%sexp
+          (Hello_reply.of_json (Or_error.ok_exn (Json.parse json))
+           : Hello_reply.t Or_error.t)]);
+  [%expect
+    {|
+    (Ok ((client_id client-1) (namespace (lloyd))))
+    (Ok ((client_id client-1) (namespace ())))
+    (Ok ((client_id client-1) (namespace ())))
+    (Error "missing field \"client_id\"")
+    (Error "field \"namespace\": expected string, got 3")
+    |}]
+;;

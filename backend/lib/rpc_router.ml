@@ -16,13 +16,13 @@ let namespaced namespaces ~home ~legacy_auth_file ~create_server =
            (Namespace.world namespace ~home ~legacy_auth_file) )))
 ;;
 
-let lookup t ~token =
+let lookup t ?user ~token () =
   match t with
-  | Single server -> Option.some_if (Rpc_server.token_ok server token) server
+  | Single server ->
+    Option.some_if (Rpc_server.credentials_ok server ?user token) server
   | Namespaced namespaces ->
-    Option.bind token ~f:(fun token ->
-      List.find_map namespaces ~f:(fun ((namespace : Namespace.t), server) ->
-        Option.some_if (String.equal namespace.token token) server))
+    List.find_map namespaces ~f:(fun (_, server) ->
+      Option.some_if (Rpc_server.credentials_ok server ?user token) server)
 ;;
 
 let servers = function
@@ -38,19 +38,23 @@ let member json name =
   | _ -> None
 ;;
 
-(* The token of a [hello] request, and the request id to answer with. *)
-let hello_token line =
+(* The server a [hello] request's credentials select, and the request id to
+   answer with. *)
+let hello_server t line =
   match Json.parse line with
   | Error _ -> `Null, None
   | Ok request ->
     let id = Option.value (member request "id") ~default:`Null in
     (match member request "method" with
      | Some (`String "hello") ->
-       (match
-          Option.bind (member request "params") ~f:(fun p -> member p "token")
-        with
-        | Some (`String token) -> id, Some token
-        | _ -> id, None)
+       let param name =
+         match
+           Option.bind (member request "params") ~f:(fun p -> member p name)
+         with
+         | Some (`String s) -> Some s
+         | _ -> None
+       in
+       id, lookup t ?user:(param "user") ~token:(param "token") ()
      | _ -> id, None)
 ;;
 
@@ -66,20 +70,17 @@ let serve_lines t ~read_line ~write_line =
   | Single server -> Rpc_server.serve_lines server ~read_line ~write_line
   | Namespaced _ ->
     Option.iter (first_line read_line) ~f:(fun line ->
-      let id, token = hello_token line in
-      match
-        Option.bind token ~f:(fun token -> lookup t ~token:(Some token))
-      with
-      | None ->
+      match hello_server t line with
+      | id, None ->
         write_line
           (Json.to_string
              (`Object
                  [ "type", `String "response"
                  ; "id", id
                  ; "ok", `False
-                 ; "error", `String "unauthorised: bad or missing token"
+                 ; "error", `String Rpc_server.unauthorised
                  ]))
-      | Some server ->
+      | _, Some server ->
         let pending = ref (Some line) in
         Rpc_server.serve_lines
           server

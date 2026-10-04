@@ -37,7 +37,8 @@ one session at a time: its requests act on that session and it receives that
 session's events. Several frontends can attach to the same session and each
 sees the same stream. A session keeps running when its clients go away, and
 a client sends `hello` first (name, cwd, whether it can run tools, an
-optional session id or path, the `-token` if the backend requires one).
+optional session id or path, the `-token` if the backend requires one, and
+with `-tokens` optionally the user, i.e. the namespace name).
 
 ### Tool hosts
 
@@ -376,7 +377,13 @@ two can share one.
   from the environment. Every listener goes through the router, which reads
   a connection's first line (a `hello` with a known token) and hands the
   connection to that namespace's server; `/terminal` and pi-web look the
-  server up by the query token. Without `-tokens` it wraps one server.
+  server up by the query `token` (and `user`). Without `-tokens` it wraps
+  one server. Logins are user name + password: `hello`'s optional `user`
+  must then be the token's namespace name (`Rpc_server.credentials_ok`,
+  shared by the router and `hello`; without it the token alone still
+  selects the namespace), every failure is `unauthorised: bad user name or
+  password`, and the `hello` result carries `namespace` (null outside this
+  mode). Single-token servers ignore `user`.
 - `Terminal_channel` / `Terminal_relay` — terminals run on the session's
   active host (`Rpc_server.terminal_target`). `Terminals.serve` speaks to an
   abstract frame channel (a WebSocket, or frames fed by a relay). For a
@@ -423,7 +430,7 @@ two can share one.
   `/switch`, `/host`, `/change_default`, `/help`) arrive as prompts and run in the adapter;
   `list_sessions`/`switch_session` are pi-protocol additions for the
   sidebar. `serve -pi-web HOST:PORT` is a second `Web_server` listener whose
-  `/ws?token=&session=&name=` goes to `Pi_rpc.serve_websocket` (the query
+  `/ws?token=&user=&session=&name=` goes to `Pi_rpc.serve_websocket` (the query
   string becomes the `hello`; a refused hello is reported as
   `prigh_hello_failed` and the socket closed) and whose `/terminal` is the
   same `Terminals` as the `-web` listener's.
@@ -553,7 +560,8 @@ copy of the protocol types and the e2e test guards the contract.
   WebSocket as a `Transport.t`), `Browser` (localStorage, query string,
   clipboard, the cell measurement that turns the window into columns and
   rows) and `Web_app`, the counterpart of `Term_app`: reads
-  `?backend=`/`?session=`/`?name=` plus the token saved by the connect form
+  `?backend=`/`?session=`/`?name=` plus the user name and password (the
+  token) saved by the connect form (`Login`: `prigh.user`, `prigh.token`)
   (using the page's origin `/ws` when no backend is explicit), sends `hello` with
   `tools: false`, mounts the shared component with
   `Bonsai_web.Start.start_and_get_handle` (incoming actions through the
@@ -561,8 +569,12 @@ copy of the protocol types and the e2e test guards the contract.
   listeners, and implements the platform: history in `localStorage`,
   `navigator.clipboard`, `window.open`; suspend and the external editor
   report themselves unavailable. A failed first `hello` shows a connect
-  form instead (the token is saved and the selected backend is put in the
-  reloaded page's query string). The page's `?session=` follows the current
+  form instead (user name, password with a Caps Lock warning; both are
+  saved and the selected backend is put in the reloaded page's query
+  string). `/signout` (the `Sign_out` command; the terminal's platform
+  answers that it is browser-only) and the `sign out` button next to `>_`
+  forget the login, note it, and reload without `?session=`, so every socket
+  is dropped and the next load shows the form instead of connecting. The page's `?session=` follows the current
   session (`history.replaceState`), so a reload rejoins it. The app sits in
   `#screen-area` (whose height `Browser.grid_size` measures) next to an
   optional `Terminal_panel`: a `>_` button opens it, and it is a
@@ -577,7 +589,7 @@ copy of the protocol types and the e2e test guards the contract.
 - `bin/` — `prigh-tui` (`-faux`, `-session`, `-model`, `-cwd`, `-auth-file`,
   `-backend`; `PRIGH_BACKEND` overrides the backend path). `-connect
   HOST:PORT` (`$PRIGH_CONNECT`) joins a running backend instead of spawning
-  one, with `-token` (`$PRIGH_TOKEN`) and `-name`; `-tools local|remote`
+  one, with `-token` (`$PRIGH_TOKEN`), `-user` (`$PRIGH_USER`) and `-name`; `-tools local|remote`
   says where this session's tools run (local = this machine through
   `tool-host`, the default with `-connect`; remote = the backend, the default
   when spawning, where the two coincide).
@@ -645,7 +657,7 @@ JavaScript runtime; skipped without `node`). On Linux, the flake's
 that the opened URL does not carry the token and that the secret never reaches
 the log, fetches the installed bundle, and then drives real browsers with
 Playwright (Chromium and Firefox): it submits the connect form by typing the
-token, verifies the token is remembered and the page reloads to an
+token into the Password field, verifies the token is remembered and the page reloads to an
 authenticated WebSocket session, then types into the hidden keyboard input,
 edits with arrow/backspace, submits a prompt to the faux provider and reloads
 to prove the session survives. Every step saves a normalised ASCII snapshot of

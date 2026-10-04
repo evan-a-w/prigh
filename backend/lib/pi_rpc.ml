@@ -1006,6 +1006,7 @@ let serve_lines
       server
       ?(now = default_now)
       ?token
+      ?user
       ?session
       ?(name = "pi-web")
       ~read_line
@@ -1054,6 +1055,7 @@ let serve_lines
       "hello"
       ([ "name", str name; "tools", `False ]
        @ Option.value_map token ~default:[] ~f:(fun v -> [ "token", str v ])
+       @ Option.value_map user ~default:[] ~f:(fun v -> [ "user", str v ])
        @ Option.value_map session ~default:[] ~f:(fun v -> [ "session", str v ])
       )
   in
@@ -1088,18 +1090,20 @@ let serve_lines
 let serve_websocket router ~query ws =
   let param name = List.Assoc.find query ~equal:String.equal name in
   let token = param "token" in
-  match Rpc_router.lookup router ~token with
+  let user = param "user" in
+  match Rpc_router.lookup router ?user ~token () with
   | None ->
     Websocket.send_text
       ws
       (Json.to_string
          (P.event
             "prigh_hello_failed"
-            [ "error", `String "unauthorised: bad or missing token" ]))
+            [ "error", `String Rpc_server.unauthorised ]))
   | Some server ->
     serve_lines
       server
       ?token
+      ?user
       ?session:(param "session")
       ?name:(param "name")
       ~read_line:(fun () -> Websocket.read_text ws)

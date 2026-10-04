@@ -732,7 +732,7 @@ let%expect_test "typing / lists commands, Down twice + Tab fills /login " =
       /login [provider] [api_key|oauth]  log in to a provider
       /logout [provider]              remove a provider's store…
       /thinking [off|low|on|high|max]  pick or set the thinking…
-      ↕ 1–8 of 32
+      ↕ 1–8 of 33
     …deepseek-flash  ctx:0% 1.5k  Tab/Enter accept · Esc close
     |}];
   H.key h (Key.plain Down);
@@ -749,7 +749,7 @@ let%expect_test "typing / lists commands, Down twice + Tab fills /login " =
       /login [provider] [api_key|oauth]  log in to a provider
       /logout [provider]              remove a provider's store…
       /thinking [off|low|on|high|max]  pick or set the thinking…
-      ↕ 1–8 of 32
+      ↕ 1–8 of 33
     …deepseek-flash  ctx:0% 1.5k  Tab/Enter accept · Esc close
     |}];
   H.key h (Key.plain Down);
@@ -766,7 +766,7 @@ let%expect_test "typing / lists commands, Down twice + Tab fills /login " =
       /login [provider] [api_key|oauth]  log in to a provider
       /logout [provider]              remove a provider's store…
       /thinking [off|low|on|high|max]  pick or set the thinking…
-      ↕ 1–8 of 32
+      ↕ 1–8 of 33
     …deepseek-flash  ctx:0% 1.5k  Tab/Enter accept · Esc close
     |}];
   H.key h (Key.plain Tab);
@@ -5434,7 +5434,7 @@ let%expect_test "switching tool host asks for the directory there, prefilled \
                {|{"session_id":"abc123","session_path":"/s","session_name":null,"cwd":"/work","git_branch":null,"model":{"id":"m","provider":"deepseek","key":"deepseek/m","name":"M","context_window":1000,"max_output":10,"supports_thinking":false,"cost":{"input":1,"output":1,"cache_read":1}},"thinking":"off","running":false,"message_count":0,"usage":{"input":0,"output":0,"cache_read":0},"cost_usd":0,"context_tokens":0,"active_host":"backend","hosts":[{"id":"backend","name":"srv","cwd":"/work"},{"id":"client-1","name":"laptop","cwd":"/home/me"}]}|})))
   in
   H.event h (State state);
-  H.step h (Set_client_id "client-1");
+  H.step h (Hello { client_id = "client-1"; namespace = None });
   H.keys h "/host laptop";
   H.enter h;
   H.show h;
@@ -5572,7 +5572,7 @@ let%expect_test "the host picker shows which session other frontends are in" =
                {|{"session_id":"abc123","session_path":"/s","session_name":null,"cwd":"/work","git_branch":null,"model":{"id":"m","provider":"deepseek","key":"deepseek/m","name":"M","context_window":1000,"max_output":10,"supports_thinking":false,"cost":{"input":1,"output":1,"cache_read":1}},"thinking":"off","running":false,"message_count":0,"usage":{"input":0,"output":0,"cache_read":0},"cost_usd":0,"context_tokens":0,"active_host":"client-3","hosts":[{"id":"backend","name":"srv","cwd":"/work","session_id":null,"session_name":null},{"id":"client-1","name":"laptop","cwd":"/home/me","session_id":"abc123","session_name":null},{"id":"client-2","name":"desktop","cwd":"/home/me/other","session_id":"def456","session_name":"refactor"},{"id":"client-3","name":"pi","cwd":"/pi","session_id":"9876","session_name":null}]}|})))
   in
   H.event h (State state);
-  H.step h (Set_client_id "client-1");
+  H.step h (Hello { client_id = "client-1"; namespace = None });
   H.keys h "/host";
   H.enter h;
   H.show h;
@@ -5903,7 +5903,7 @@ let%expect_test "Tab on an empty editor opens the command list; the list shows \
       /login [provider] [api_key|oauth]  log in to a provider
       /logout [provider]              remove a provider's store…
       /thinking [off|low|on|high|max]  pick or set the thinking…
-      ↕ 1–8 of 32
+      ↕ 1–8 of 33
     …deepseek-flash  ctx:0% 1.5k  Tab/Enter accept · Esc close
     |}];
   H.key h (Key.plain End);
@@ -5920,7 +5920,7 @@ let%expect_test "Tab on an empty editor opens the command list; the list shows \
       /login [provider] [api_key|oauth]  log in to a provider
       /logout [provider]              remove a provider's store…
       /thinking [off|low|on|high|max]  pick or set the thinking…
-      ↕ 1–8 of 32
+      ↕ 1–8 of 33
     …deepseek-flash  ctx:0% 1.5k  Tab/Enter accept · Esc close
     |}];
   H.keys h "qu";
@@ -6096,4 +6096,79 @@ let%expect_test "/new and /switch leave the previous session's subagents behind"
     (0 Main)
     Main
     |}]
+;;
+
+let%expect_test "logged-in user: shown in the status line, kept across \
+                 reconnects; /signout asks the platform"
+  =
+  let h = connected ~width:80 () in
+  H.step h (Hello { client_id = "client-1"; namespace = Some "lloyd" });
+  H.show h;
+  [%expect
+    {|
+    session abc123 in /work. /help for commands, Esc aborts, Ctrl+C twice quits.
+    > earlier question
+    earlier answer
+    ────────────────────────────────────────────────────────────────────────────────
+    > ▏
+    /work  deepseek-flash  think:off  view:normal  ctx:0% 1.5k  $0.01  user:lloyd
+    |}];
+  (* Narrow screens drop it before the more useful parts. *)
+  H.step h (Resize { width = 50; height = 12 });
+  H.show h;
+  [%expect
+    {|
+    session abc123 in /work. /help for commands, Esc
+    aborts, Ctrl+C twice quits.
+    > earlier question
+    earlier answer
+    ──────────────────────────────────────────────────
+    > ▏
+    …deepseek-flash  think:off  ctx:0% 1.5k  $0.01
+    |}];
+  H.step h (Resize { width = 80; height = 12 });
+  H.step ~quiet:true h Backend_closed;
+  H.reply
+    ~quiet:true
+    h
+    (Reconnect 1)
+    {|{"client_id":"client-2","namespace":"alice"}|};
+  print_s
+    [%sexp
+      (h.model.client_id : string option), (h.model.namespace : string option)];
+  [%expect {|
+    ((client-2)
+     (alice))
+    |}];
+  (* Outside namespace mode the reply's namespace is null: nothing is shown. *)
+  H.step ~quiet:true h Backend_closed;
+  H.reply
+    ~quiet:true
+    h
+    (Reconnect 2)
+    {|{"client_id":"client-3","namespace":null}|};
+  print_s
+    [%sexp
+      (h.model.client_id : string option), (h.model.namespace : string option)];
+  H.reply ~quiet:true h Initial_state (state_json ());
+  H.show h;
+  [%expect
+    {|
+    ((client-3) ())
+
+
+
+
+
+
+
+    reconnected to the backend
+    session abc123 in /work. /help for commands, Esc aborts, Ctrl+C twice quits.
+    ────────────────────────────────────────────────────────────────────────────────
+    > ▏
+    /work  deepseek-flash  think:off  view:normal  ctx:0% 1.5k  $0.01
+    |}];
+  H.keys h "/signout";
+  H.enter h;
+  [%expect {| Sign_out |}]
 ;;

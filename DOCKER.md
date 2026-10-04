@@ -103,7 +103,11 @@ on a read-only root filesystem.
 Set `PRIGH_TOKENS=me=<token1>,alice=<token2>` instead of `PRIGH_TOKEN`. Each
 token is its own world: provider logins, sessions, config, connected tool
 hosts and terminals live under `/home/prigh/.prigh/namespaces/<name>/`, and
-clients with one token never see another's. A namespace called `default`
+clients with one token never see another's. The namespace name is the user
+name and its token the password: the web UI's connect form asks for both
+(the status line then shows `user:<name>`), and `/signout` or the `sign out`
+button next to `>_` forgets them and returns to the form so another user can
+log in. A namespace called `default`
 uses the paths a single `PRIGH_TOKEN` used, so switching keeps your
 existing logins and sessions (e.g. `PRIGH_TOKENS=default=<old token>,alice=...`).
 
@@ -115,9 +119,9 @@ from their own machine, which runs that namespace's tools and `>_`
 terminal:
 
 ```
-prigh tool-host -connect <docker-host>:7788 -token <their token> -cwd ~/proj
+prigh tool-host -connect <docker-host>:7788 -user <name> -token <their token> -cwd ~/proj
 # or, with the tools themselves in a throwaway container on that machine:
-docker run --rm -it -v "$PWD:/work" -w /work <image> prigh tool-host -connect <docker-host>:7788 -token <their token> -cwd /work
+docker run --rm -it -v "$PWD:/work" -w /work <image> prigh tool-host -connect <docker-host>:7788 -user <name> -token <their token> -cwd /work
 ```
 
 Then `/host` in the web UI (or TUI) picks it. A TUI started with

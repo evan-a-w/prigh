@@ -368,9 +368,10 @@ let serve_command =
          (optional string)
          ~doc:
            "NAME=TOKEN,... separate namespaces (sessions, logins, config, tool \
-            hosts) under ~/.prigh/namespaces/NAME, chosen by the hello token; \
-            [default] uses the usual paths. Provider keys are not read from \
-            the environment (default: $PRIGH_TOKENS)"
+            hosts) under ~/.prigh/namespaces/NAME, chosen by the hello token \
+            (users log in with NAME and TOKEN as the password); [default] uses \
+            the usual paths. Provider keys are not read from the environment \
+            (default: $PRIGH_TOKENS)"
      and no_backend_host =
        flag
          "-no-backend-host"
@@ -655,6 +656,13 @@ let tool_host_command =
          "-token"
          (optional string)
          ~doc:"SECRET the backend's token (default: $PRIGH_TOKEN)"
+     and user =
+       flag
+         "-user"
+         (optional string)
+         ~doc:
+           "NAME the user (namespace) name to log in as, with -token as its \
+            password (default: $PRIGH_USER)"
      and name =
        flag
          "-name"
@@ -699,6 +707,7 @@ let tool_host_command =
            ~host
            ~port
            ~token:(Option.first_some token (Sys.getenv "PRIGH_TOKEN"))
+           ?user:(Option.first_some user (Sys.getenv "PRIGH_USER"))
            ~name:(Option.value name ~default:(Core_unix.gethostname ()))
            ~cwd
            ())

@@ -68,6 +68,8 @@ module Command : sig
         }
     (** After [delay_ms], connect again, send [hello] (rejoining [session]) and
         answer [Reply (Reconnect generation, hello reply)]. *)
+    | Sign_out
+    (** Forget the stored credentials and offer to log in again (browser only). *)
     | Quit
   [@@deriving sexp_of, equal]
 end
@@ -101,7 +103,7 @@ module Action : sig
     | Reply of Reply_tag.t * (P.Json.t, string) Result.t
     | Tick
     | Set_home of string
-    | Set_client_id of string (** ours, from the [hello] reply *)
+    | Hello of P.Hello_reply.t (** the [hello] reply *)
     | Resize of
         { width : int
         ; height : int
@@ -132,6 +134,7 @@ module Model : sig
     ; config : P.Config.t option
     ; home : string option
     ; client_id : string option
+    ; namespace : string option (** the user we logged in as, from [hello] *)
     ; stderr_tail : string list
     ; pending_confirms : (string * string * string) list
     ; connection : Connection.t

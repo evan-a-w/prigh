@@ -196,26 +196,40 @@ let href_with_backend ~pathname ~search ~backend =
   ^ suffix
 ;;
 
-let with_query_param ~search name value =
+let pairs_without ~search name =
   let search =
     String.chop_prefix search ~prefix:"?" |> Option.value ~default:search
   in
-  let pairs =
-    String.split search ~on:'&'
-    |> List.filter ~f:(fun pair ->
-      (not (String.is_empty pair))
-      && not
-           (String.equal
-              (String.lsplit2 pair ~on:'='
-               |> Option.value_map ~default:pair ~f:fst)
-              name))
-  in
+  String.split search ~on:'&'
+  |> List.filter ~f:(fun pair ->
+    (not (String.is_empty pair))
+    && not
+         (String.equal
+            (String.lsplit2 pair ~on:'='
+             |> Option.value_map ~default:pair ~f:fst)
+            name))
+;;
+
+let with_query_param ~search name value =
   "?"
   ^ String.concat
       ~sep:"&"
-      (pairs
+      (pairs_without ~search name
        @ [ name ^ "=" ^ Js.to_string (Js.encodeURIComponent (Js.string value)) ]
       )
+;;
+
+let without_query_param ~search name =
+  let pairs = pairs_without ~search name in
+  if List.is_empty pairs then "" else "?" ^ String.concat ~sep:"&" pairs
+;;
+
+let reload_without_query_param name =
+  let location = Dom_html.window##.location in
+  location##.href
+  := Js.string
+       (Js.to_string location##.pathname
+        ^ without_query_param ~search:(Js.to_string location##.search) name)
 ;;
 
 let replace_query_param name value =

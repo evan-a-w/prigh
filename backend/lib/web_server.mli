@@ -28,8 +28,8 @@ val browser_url : host:string -> port:int -> string
 (** [Rpc_router.serve_lines] over a WebSocket. *)
 val serve_rpc : Rpc_router.t -> on_websocket
 
-(** A {!Terminals} socket. The query carries [token] (selecting the server,
-    like [hello]'s), [session] (the terminal's key, within the namespace) and
+(** A {!Terminals} socket. The query carries [token] and optionally [user]
+    (selecting the server, like [hello]'s), [session] (the terminal's key, within the namespace) and
     the initial [cols] and [rows]. The terminal runs on the session's active
     tool host, in its directory there, relayed when that is a client (see
     [Rpc_server.terminal_target]). *)

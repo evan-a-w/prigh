@@ -275,7 +275,7 @@ let worker_kind = function
 ;;
 
 (* One connection: [`Served] once [hello] succeeded, else why it did not. *)
-let serve_connection ~env ~terminals ~log ~address ~token ~name ~cwd flow =
+let serve_connection ~env ~terminals ~log ~address ~token ~user ~name ~cwd flow =
   Switch.run
   @@ fun sw ->
   let outbox =
@@ -303,6 +303,7 @@ let serve_connection ~env ~terminals ~log ~address ~token ~name ~cwd flow =
           , `Object
               (List.filter_opt
                  [ Option.map token ~f:(fun token -> "token", `String token)
+                 ; Option.map user ~f:(fun user -> "user", `String user)
                  ; Some ("name", `String name)
                  ; Some ("cwd", `String cwd)
                  ; Some ("tools", `True)
@@ -383,6 +384,7 @@ let connect
       ~host
       ~port
       ~token
+      ?user
       ~name
       ~cwd
       ()
@@ -400,7 +402,16 @@ let connect
     | addr :: _ ->
       Switch.run (fun sw ->
         let flow = Eio.Net.connect ~sw net addr in
-        serve_connection ~env ~terminals ~log ~address ~token ~name ~cwd flow)
+        serve_connection
+          ~env
+          ~terminals
+          ~log
+          ~address
+          ~token
+          ~user
+          ~name
+          ~cwd
+          flow)
   in
   let rec loop backoff =
     let backoff =

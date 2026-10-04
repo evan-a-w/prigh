@@ -12,6 +12,8 @@ module Platform : sig
         -> (P.Json.t, string) Result.t Bonsai.Effect.t
     ; open_browser : string -> unit Bonsai.Effect.t
     ; quit : unit Bonsai.Effect.t
+    ; sign_out : (unit, string) Result.t Bonsai.Effect.t
+    (** Fails where signing out is not supported; the error is shown. *)
     ; load_history : unit -> (P.Json.t, string) Result.t Bonsai.Effect.t
     ; append_history : string -> unit Bonsai.Effect.t
     ; copy_to_clipboard : string -> unit Bonsai.Effect.t

@@ -265,6 +265,8 @@ let status (m : App.Model.t) : Content.Line.t =
           ] )
       ; 4, [ span ~style:base (sprintf "$%.2f" s.cost_usd) ]
       ]
+      @ Option.value_map m.namespace ~default:[] ~f:(fun user ->
+        [ 6, [ span ~style:base ("user:" ^ user) ] ])
       @ tools_part m s
       @ (let queued = Queue_counts.total m.queued in
          if queued > 0

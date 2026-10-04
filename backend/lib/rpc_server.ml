@@ -352,10 +352,17 @@ let bool_param params name ~default =
   | Some _ -> Or_error.errorf "param %S must be a boolean" name
 ;;
 
-let token_ok t given =
+let unauthorised = "unauthorised: bad user name or password"
+
+let credentials_ok t ?user given =
   match t.token with
   | None -> true
-  | Some token -> Option.exists given ~f:(String.equal token)
+  | Some token ->
+    Option.exists given ~f:(String.equal token)
+    &&
+      (match user, t.namespace with
+      | Some user, Some namespace -> String.equal user namespace
+      | _ -> true)
 ;;
 
 let namespace t = t.namespace
@@ -407,15 +414,17 @@ let relay_terminal t ~host ~key ~cwd ~cols ~rows channel =
 ;;
 
 let hello t (client : Client.t) params =
+  let string name =
+    match param params name with
+    | Some (`String s) -> Some s
+    | _ -> None
+  in
   let authorised =
-    match t.token with
-    | None -> Ok ()
-    | Some token ->
-      (match param params "token" with
-       | Some (`String given) when String.equal given token ->
-         client.authed <- true;
-         Ok ()
-       | _ -> Or_error.error_string "unauthorised: bad or missing token")
+    if credentials_ok t ?user:(string "user") (string "token")
+    then (
+      client.authed <- true;
+      Ok ())
+    else Or_error.error_string unauthorised
   in
   Or_error.bind authorised ~f:(fun () ->
     Option.iter (param params "name") ~f:(function
@@ -435,6 +444,9 @@ let hello t (client : Client.t) params =
         attach t client agent;
         `Object
           [ "client_id", `String client.id
+          ; ( "namespace"
+            , Option.value_map t.namespace ~default:`Null ~f:(fun n ->
+                `String n) )
           ; "state", Rpc_json.state (Agent.state agent)
           ])))
 ;;

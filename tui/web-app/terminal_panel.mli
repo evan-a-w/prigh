@@ -9,6 +9,7 @@ open Bonsai_web
 (** The [/terminal] URL on the same server as the RPC WebSocket [backend]. *)
 val url
   :  backend:string
+  -> user:string option
   -> token:string option
   -> session:string option
   -> string

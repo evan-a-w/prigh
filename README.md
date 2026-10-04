@@ -58,7 +58,8 @@ built assets (the Nix wrapper sets it).
 
 `prigh-tui` flags: `-faux`, `-session PATH`, `-model ID`, `-thinking LEVEL`,
 `-cwd DIR`, `-auth-file PATH`, `-backend PATH` (same as `$PRIGH_BACKEND`),
-`-connect HOST:PORT`, `-token SECRET`, `-tools local|remote`, `-name NAME`,
+`-connect HOST:PORT`, `-token SECRET`, `-user NAME` (with `-tokens`),
+`-tools local|remote`, `-name NAME`,
 and `-- <extra backend args>`. The Nix wrapper sets `PRIGH_BACKEND` to the
 Nix-built backend by default; set `PRIGH_BACKEND` or pass `-backend` to override
 it.
@@ -102,13 +103,25 @@ connection drops) and hosts the session's tools *and* its `>_` terminal, so
 a browser-only user can pick it with `/host`. The web UI's terminal always
 runs on the session's active host, relayed through the backend.
 
-### Several tokens (namespaces)
+### Several users (namespaces)
 
 ```
 prigh serve -web 0.0.0.0:7788 -tokens 'me=sekrit,alice=0ther'   # or $PRIGH_TOKENS
 ```
 
-Each token opens its own namespace: its own provider logins, sessions,
+Each `name=token` entry is a user: log in with the name as the user name
+and the token as the password. The web UI's connect form asks for both
+(and remembers them in the browser); `/signout` or the page's `sign out`
+button forgets them and shows the form again, so someone else can log in.
+The TUI and tool hosts take `-user NAME -token TOKEN` (`$PRIGH_USER`,
+`$PRIGH_TOKEN`); the token alone is still accepted, so scripts need not send
+a user name, but a user name that doesn't match the token is refused like a
+wrong password. Both UIs show the logged-in user as `user:<name>` in the
+status line. Outside this mode the user name is ignored (leave it empty) and
+`/signout` only forgets the saved token; in the terminal TUI `/signout`
+just explains that it is browser-only (restart with other credentials).
+
+Each user has its own namespace: its own provider logins, sessions,
 config (`default_model`, scoped models, ...), global `AGENTS.md`, connected
 tool hosts and terminals, under `~/.prigh/namespaces/<name>/` (the name
 `default` keeps the usual `~/.prigh` and `~/.config/prigh` paths). Clients
@@ -133,8 +146,8 @@ serves it and speaks the RPC protocol over a WebSocket at `/ws`:
 
 # remote: on the server (or PRIGH_WEB_LISTEN=0.0.0.0:7788 ./prigh -web -token sekrit)
 prigh serve -web 0.0.0.0:7788 -token sekrit
-# then open http://server:7788/ and type the token into the connect form
-# (the browser remembers it in localStorage)
+# then open http://server:7788/ and type the token into the connect form's
+# Password field (the browser remembers it in localStorage; /signout forgets it)
 prigh-tui -connect server:7788 -token sekrit -cwd ~/proj   # terminals use the same port
 ```
 

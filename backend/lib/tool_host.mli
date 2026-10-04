@@ -47,6 +47,7 @@ val connect
   -> host:string
   -> port:int
   -> token:string option
+  -> ?user:string (** the namespace's name, sent in [hello] *)
   -> name:string
   -> cwd:string
   -> unit

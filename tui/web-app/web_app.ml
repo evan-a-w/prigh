@@ -11,13 +11,12 @@ module Client = Prigh_client.Client
 module Settings = struct
   type t =
     { backend : string
-    ; token : string option
+    ; login : Login.t
     ; session : string option
     ; name : string
     }
 
   let backend_key = "prigh.backend"
-  let token_key = "prigh.token"
 
   let choose_backend ~query ~same_origin =
     Option.filter query ~f:(Fn.non String.is_empty)
@@ -31,24 +30,21 @@ module Settings = struct
         choose_backend
           ~query:(Browser.query_param "backend")
           ~same_origin:(Browser.same_origin_ws_url ())
-    ; token = non_empty (Browser.get_item token_key)
+    ; login = Login.load Login.Storage.browser
     ; session = non_empty (Browser.query_param "session")
     ; name =
         Option.value (non_empty (Browser.query_param "name")) ~default:"browser"
     }
   ;;
 
-  let save ~token =
+  let save ~user ~password =
     Browser.remove_item backend_key;
-    if String.is_empty token
-    then Browser.remove_item token_key
-    else Browser.set_item token_key token
+    Login.save Login.Storage.browser ~user ~password
   ;;
 
   let hello t =
     [ "name", `String t.name; "tools", `False ]
-    @ Option.value_map t.token ~default:[] ~f:(fun token ->
-      [ "token", `String token ])
+    @ Login.hello_fields t.login
     @ Option.value_map t.session ~default:[] ~f:(fun s ->
       [ "session", `String s ])
   ;;
@@ -114,7 +110,7 @@ let reconnect client ~hello ~delay_ms ~session =
   | Ok () -> send_hello client hello ~session
 ;;
 
-let platform client ~hello ~history_key ~schedule ~quit
+let platform client ~hello ~history_key ~schedule ~quit ~sign_out
   : Prigh_ui.Component.Platform.t
   =
   let unavailable what =
@@ -149,6 +145,7 @@ let platform client ~hello ~history_key ~schedule ~quit
         Effect.of_deferred_fun
           (fun () -> reconnect client ~hello ~delay_ms ~session)
           ())
+  ; sign_out = Effect.of_sync_fun (fun () -> Ok (sign_out ())) ()
   ; quit = Effect.of_sync_fun quit ()
   }
 ;;
@@ -157,6 +154,7 @@ module For_testing = struct
   let choose_backend = Settings.choose_backend
   let href_with_backend = Browser.href_with_backend
   let terminal_url = Terminal_panel.url
+  let without_query_param = Browser.without_query_param
   let with_query_param = Browser.with_query_param
   let history_key = History.key
 end
@@ -188,7 +186,20 @@ let focus_keyboard_input () =
 (* Set by [install_listeners]: refits the app's grid to [#screen-area]. *)
 let relayout = ref Fn.id
 
-let app platform ~terminal_url (local_ graph) =
+let sign_out_button ~namespace ~on_click =
+  Vdom.Node.button
+    ~attrs:
+      [ Vdom.Attr.class_ "sign-out"
+      ; Vdom.Attr.title
+          (match namespace with
+           | Some user -> sprintf "sign out (%s)" user
+           | None -> "sign out")
+      ; Vdom.Attr.on_click (fun _ -> on_click)
+      ]
+    [ Vdom.Node.text "sign out" ]
+;;
+
+let app platform ~terminal_url ~signed_in ~sign_out (local_ graph) =
   let model, inject =
     Prigh_ui.Component.create ~start_on_activate:false platform graph
   in
@@ -228,9 +239,18 @@ let app platform ~terminal_url (local_ graph) =
       [ Vdom.Node.div
           ~attrs:[ Vdom.Attr.id "screen-area" ]
           [ Prigh_ui_web.Dom_of_screen.screen (Prigh_ui.Render.screen model)
-          ; (if terminal_open
-             then Vdom.Node.none
-             else Terminal_panel.open_button ~on_click:(set_open true))
+          ; Vdom.Node.div
+              ~attrs:[ Vdom.Attr.class_ "page-buttons" ]
+              [ (if signed_in || Option.is_some model.namespace
+                 then
+                   sign_out_button
+                     ~namespace:model.namespace
+                     ~on_click:(Effect.of_sync_fun sign_out ())
+                 else Vdom.Node.none)
+              ; (if terminal_open
+                 then Vdom.Node.none
+                 else Terminal_panel.open_button ~on_click:(set_open true))
+              ]
           ]
       ; (if terminal_open
          then
@@ -442,7 +462,7 @@ let install_listeners ~schedule =
   focus_keyboard_input ()
 ;;
 
-let connect_form ~backend ~token ~error =
+let connect_form ~backend ~(login : Login.t) ~error =
   let escape s =
     String.concat_map s ~f:(function
       | '<' -> "&lt;"
@@ -451,18 +471,56 @@ let connect_form ~backend ~token ~error =
       | '"' -> "&quot;"
       | c -> String.of_char c)
   in
+  let value = Option.value_map ~default:"" ~f:escape in
   Browser.set_app_html
     (sprintf
        {|<form class="connect" id="connect-form">
   <h1>prigh</h1>
   <p class="error">%s</p>
   <label>backend <input id="backend" value="%s" placeholder="ws://host:port/ws"></label>
-  <label>token <input id="token" type="password" value="%s"></label>
+  <label>User name <input id="user" value="%s" autocomplete="username" autocapitalize="off" spellcheck="false"></label>
+  <label>Password <input id="password" type="password" value="%s" autocomplete="current-password"></label>
+  <p class="caps-lock" id="caps-lock" style="display: none">Caps Lock is on</p>
   <button id="connect-submit" type="submit" disabled>connect</button>
 </form>|}
        (escape error)
        (escape backend)
-       (escape token));
+       (value login.user)
+       (value login.password));
+  Option.iter
+    (Dom_html.getElementById_coerce "password" Dom_html.CoerceTo.input)
+    ~f:(fun password ->
+      let show_caps_lock on =
+        Option.iter (Dom_html.getElementById_opt "caps-lock") ~f:(fun warning ->
+          warning##.style##.display := Js.string (if on then "" else "none"))
+      in
+      let on_key event =
+        ignore
+          (Dom_html.addEventListener
+             password
+             event
+             (Dom.handler (fun (ev : Dom_html.keyboardEvent Js.t) ->
+                show_caps_lock
+                  (Js.to_bool
+                     (Js.Unsafe.meth_call
+                        ev
+                        "getModifierState"
+                        [| Js.Unsafe.inject (Js.string "CapsLock") |]));
+                Js._true))
+             Js._false
+           : Dom_html.event_listener_id)
+      in
+      on_key Dom_html.Event.keydown;
+      on_key Dom_html.Event.keyup;
+      ignore
+        (Dom_html.addEventListener
+           password
+           Dom_html.Event.blur
+           (Dom.handler (fun _ ->
+              show_caps_lock false;
+              Js._true))
+           Js._false
+         : Dom_html.event_listener_id));
   match
     Dom_html.getElementById_coerce "connect-form" Dom_html.CoerceTo.form
   with
@@ -475,7 +533,9 @@ let connect_form ~backend ~token ~error =
          (Dom.handler (fun ev ->
             Dom.preventDefault ev;
             let backend = String.strip (Browser.input_value "backend") in
-            Settings.save ~token:(String.strip (Browser.input_value "token"));
+            Settings.save
+              ~user:(Browser.input_value "user")
+              ~password:(Browser.input_value "password");
             Browser.reload_with_backend backend;
             Js._false))
          Js._false
@@ -485,9 +545,14 @@ let connect_form ~backend ~token ~error =
       ~f:(fun button -> button##.disabled := Js._false)
 ;;
 
-let run () =
-  Async_js.init ();
-  let settings = Settings.load () in
+(* Reloading drops every socket (the app's and any terminal's) and listener; the
+   next page load sees the note and shows the connect form. *)
+let sign_out () =
+  Login.forget Login.Storage.browser;
+  Browser.reload_without_query_param "session"
+;;
+
+let run_app (settings : Settings.t) =
   let hello = Settings.hello settings in
   let client =
     Client.create ~connect:(fun () ->
@@ -501,15 +566,10 @@ let run () =
      with
      | Error error ->
        let%map.Deferred () = Client.close client in
-       connect_form
-         ~backend:settings.backend
-         ~token:(Option.value settings.token ~default:"")
-         ~error
+       connect_form ~backend:settings.backend ~login:settings.login ~error
      | Ok reply ->
-       let client_id =
-         match Jsonaf.member "client_id" reply with
-         | Some (`String id) -> Some id
-         | _ -> None
+       let hello_reply =
+         Prigh_protocol.Hello_reply.of_json reply |> Or_error.ok
        in
        let handle_ref = ref None in
        let schedule action =
@@ -527,28 +587,36 @@ let run () =
            (platform
               client
               ~hello
-              ~history_key:(History.key ~token:settings.token)
+              ~history_key:(History.key ~token:settings.login.password)
               ~schedule
-              ~quit)
+              ~quit
+              ~sign_out)
        in
        let terminal_url ~session =
          Terminal_panel.url
            ~backend:settings.backend
-           ~token:settings.token
+           ~user:settings.login.user
+           ~token:settings.login.password
            ~session
        in
        let handle =
          Start.start_and_get_handle
            (module Result_)
            ~bind_to_element_with_id:"app"
-           (fun graph -> app platform ~terminal_url graph)
+           (fun graph ->
+              app
+                platform
+                ~terminal_url
+                ~signed_in:(Option.is_some settings.login.password)
+                ~sign_out
+                graph)
        in
        handle_ref := Some handle;
        (* [schedule] queues before the first frame, so startup and input must
           not wait on [Handle.started]'s Async continuation. *)
        schedule App.Action.Start;
-       Option.iter client_id ~f:(fun id ->
-         schedule (App.Action.Set_client_id id));
+       Option.iter hello_reply ~f:(fun reply ->
+         schedule (App.Action.Hello reply));
        install_listeners ~schedule;
        don't_wait_for
          (Pipe.iter_without_pushback
@@ -561,4 +629,12 @@ let run () =
                  | Stderr line -> Stderr line
                  | Closed -> Backend_closed)));
        Deferred.unit)
+;;
+
+let run () =
+  Async_js.init ();
+  let settings = Settings.load () in
+  if Login.take_signed_out Login.Storage.browser
+  then connect_form ~backend:settings.backend ~login:settings.login ~error:""
+  else run_app settings
 ;;

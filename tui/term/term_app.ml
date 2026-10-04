@@ -218,6 +218,11 @@ let platform client ~hello ~exit ~quit_requested : Prigh_ui.Component.Platform.t
         Effect.of_deferred_fun
           (fun () -> reconnect client ~hello ~delay_ms ~session)
           ())
+  ; sign_out =
+      Effect.return
+        (Error
+           "/signout is only available in the browser; to log in as another \
+            user, restart prigh-tui with -user and -token")
   ; quit =
       (* Bonsai_term's [Driver.finished] never resolves when [exit] is scheduled
          from apply_action (the next frame sees the exit status before any event
@@ -395,11 +400,7 @@ let run ~connect ~hello ~local_tools =
     let%bind.Deferred () = Client.close client in
     Deferred.return e
   | Ok reply ->
-    let client_id =
-      match Jsonaf.member "client_id" reply with
-      | Some (`String id) -> Some id
-      | _ -> None
-    in
+    let hello_reply = Prigh_protocol.Hello_reply.of_json reply |> Or_error.ok in
     let tool_host =
       Option.map local_tools ~f:(fun backend ->
         Prigh_client_unix.Tool_host.create
@@ -431,8 +432,8 @@ let run ~connect ~hello ~local_tools =
        in
        let had_iexten = Tty.set_iexten tty false in
        install_repaint driver;
-       Option.iter client_id ~f:(fun id ->
-         Driver.send_incoming_event driver (App.Action.Set_client_id id));
+       Option.iter hello_reply ~f:(fun reply ->
+         Driver.send_incoming_event driver (App.Action.Hello reply));
        don't_wait_for
          (Pipe.iter_without_pushback
             (Client.incoming client)

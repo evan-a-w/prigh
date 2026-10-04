@@ -397,7 +397,7 @@ let%expect_test "bad token, unknown session and start failures" =
   Fixture.print_live f;
   [%expect
     {|
-    ("{\"type\":\"error\",\"message\":\"unauthorised: bad or missing token\"}")
+    ("{\"type\":\"error\",\"message\":\"unauthorised: bad user name or password\"}")
     true
     ((default t1-default 1))
     |}];

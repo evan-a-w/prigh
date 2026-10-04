@@ -228,8 +228,10 @@ let serve_terminal router terminals ~query ws =
       (Json.to_string
          (`Object [ "type", `String "error"; "message", `String message ]))
   in
-  match Rpc_router.lookup router ~token:(param "token") with
-  | None -> error "unauthorised: bad or missing token"
+  match
+    Rpc_router.lookup router ?user:(param "user") ~token:(param "token") ()
+  with
+  | None -> error Rpc_server.unauthorised
   | Some server ->
     let session = Option.filter (param "session") ~f:(Fn.non String.is_empty) in
     let key =

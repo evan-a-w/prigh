@@ -72,7 +72,7 @@ module Host = struct
 
   (* Runs [Tool_host.connect] until [sw] ends; logs are kept, with the port
      masked. *)
-  let start ?terminals t ~sw ~port ~token ~cwd =
+  let start ?terminals ?user t ~sw ~port ~token ~cwd =
     let logs = Queue.create () in
     Eio.Fiber.fork_daemon ~sw (fun () ->
       Tool_host.connect
@@ -90,6 +90,7 @@ module Host = struct
         ~host:"127.0.0.1"
         ~port
         ~token
+        ?user
         ~name:"box"
         ~cwd
         ());
@@ -134,6 +135,60 @@ let tool_results t agent =
     | _ -> ())
 ;;
 
+let%expect_test "network tool host: the user name must be the namespace's" =
+  with_sandbox
+  @@ fun t ->
+  Eio.Switch.run
+  @@ fun sw ->
+  let agent, h =
+    Test_rpc.make_server
+      ~token:"sekrit"
+      ~namespace:"me"
+      t
+      ~sw
+      ~provider:(Faux_provider.create [])
+  in
+  let listener = Listener.start t ~sw h.server in
+  Eio.Switch.run (fun sw ->
+    let bad =
+      Host.start
+        t
+        ~sw
+        ~port:listener.port
+        ~user:"alice"
+        ~token:(Some "sekrit")
+        ~cwd:t.dir
+    in
+    Host.wait_logs t bad 2);
+  [%expect
+    {|
+    hello failed: unauthorised: bad user name or password
+    retrying in 50ms
+    |}];
+  let host =
+    Host.start
+      t
+      ~sw
+      ~port:listener.port
+      ~user:"me"
+      ~token:(Some "sekrit")
+      ~cwd:t.dir
+  in
+  Host.wait_logs t host 1;
+  print_s
+    [%sexp
+      (List.filter_map (Agent.hosts agent) ~f:(fun h ->
+         Option.some_if
+           (not (String.equal h.id Agent.Host.backend_id))
+           (h.id, h.name))
+       : (string * string) list)];
+  [%expect
+    {|
+    connected to 127.0.0.1:PORT as client-3
+    ((client-3 box))
+    |}]
+;;
+
 let%expect_test "network tool host: hello, run tools, reconnect, bad token" =
   with_sandbox
   @@ fun t ->
@@ -165,7 +220,7 @@ let%expect_test "network tool host: hello, run tools, reconnect, bad token" =
   show_hosts t agent;
   [%expect
     {|
-    {"type":"response","id":"r","ok":true,"result":{"client_id":"client-1","state":{"session_id":"<id>","session_path":"$DIR/sessions/<stamp>_<id>.jsonl","session_name":null,"session_description":null,"cwd":"$DIR","git_branch":null,"model":{"id":"deepseek-flash","provider":"deepseek","key":"deepseek/deepseek-flash","name":"DeepSeek V4.1 Flash","context_window":1000000,"max_output":384000,"supports_thinking":true,"cost":{"input":0.3,"output":1.2,"cache_read":0.006}},"thinking":"off","running":false,"message_count":0,"usage":{"input":0,"output":0,"cache_read":0},"cost_usd":0,"context_tokens":0,"active_host":"backend","hosts":[{"id":"backend","name":"<host>","cwd":"$DIR","session_id":null,"session_name":null}],"subagents":[]}}}
+    {"type":"response","id":"r","ok":true,"result":{"client_id":"client-1","namespace":null,"state":{"session_id":"<id>","session_path":"$DIR/sessions/<stamp>_<id>.jsonl","session_name":null,"session_description":null,"cwd":"$DIR","git_branch":null,"model":{"id":"deepseek-flash","provider":"deepseek","key":"deepseek/deepseek-flash","name":"DeepSeek V4.1 Flash","context_window":1000000,"max_output":384000,"supports_thinking":true,"cost":{"input":0.3,"output":1.2,"cache_read":0.006}},"thinking":"off","running":false,"message_count":0,"usage":{"input":0,"output":0,"cache_read":0},"cost_usd":0,"context_tokens":0,"active_host":"backend","hosts":[{"id":"backend","name":"<host>","cwd":"$DIR","session_id":null,"session_name":null}],"subagents":[]}}}
     connected to 127.0.0.1:PORT as client-2
     active=backend hosts=(((id backend)(name <host>)(cwd $DIR)(session_id())(session_name()))((id client-2)(name box)(cwd $DIR/host)(session_id(<id>))(session_name())))
     |}];
@@ -207,13 +262,13 @@ let%expect_test "network tool host: hello, run tools, reconnect, bad token" =
     Host.wait_logs t bad 8);
   [%expect
     {|
-    hello failed: unauthorised: bad or missing token
+    hello failed: unauthorised: bad user name or password
     retrying in 50ms
-    hello failed: unauthorised: bad or missing token
+    hello failed: unauthorised: bad user name or password
     retrying in 100ms
-    hello failed: unauthorised: bad or missing token
+    hello failed: unauthorised: bad user name or password
     retrying in 200ms
-    hello failed: unauthorised: bad or missing token
+    hello failed: unauthorised: bad user name or password
     retrying in 200ms
     |}];
   (* Nothing listening. *)

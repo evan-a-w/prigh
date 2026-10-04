@@ -577,7 +577,7 @@ let%expect_test "a bad token fails hello" =
   cmd h "get_state";
   H.dump h;
   [%expect
-    {| {"type":"prigh_hello_failed","error":"unauthorised: bad or missing token"} |}]
+    {| {"type":"prigh_hello_failed","error":"unauthorised: bad user name or password"} |}]
 ;;
 
 let%expect_test "the token and session from the query string are used" =
