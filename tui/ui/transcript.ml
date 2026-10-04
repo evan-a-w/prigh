@@ -608,6 +608,9 @@ let apply t (event : P.Event.t) =
   | P.Event.Auth _
   | P.Event.Tool_exec _
   | P.Event.Tool_exec_cancel _
+  | P.Event.Terminal_open _
+  | P.Event.Terminal_frame _
+  | P.Event.Terminal_close _
   | P.Event.Config_changed _ -> t
 ;;
 

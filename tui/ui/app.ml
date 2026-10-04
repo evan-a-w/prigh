@@ -2407,7 +2407,10 @@ let event m (e : P.Event.t) =
   | Subagent _
   | Subagent_end _
   | Tool_exec _
-  | Tool_exec_cancel _ -> m, []
+  | Tool_exec_cancel _
+  | Terminal_open _
+  | Terminal_frame _
+  | Terminal_close _ -> m, []
 ;;
 
 (* ---- rpc replies ------------------------------------------------------ *)

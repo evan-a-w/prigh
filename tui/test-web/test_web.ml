@@ -67,6 +67,30 @@ let%expect_test "web connection: same-origin is stable unless explicitly \
     |}]
 ;;
 
+let%expect_test "prompt history is stored per token, without the token" =
+  (* FNV-1a reference values: "" 811c9dc5, "a" e40c292c, "foobar" bf9cf968. *)
+  List.iter
+    [ None
+    ; Some ""
+    ; Some "a"
+    ; Some "foobar"
+    ; Some "sekrit-token-1"
+    ; Some "sekrit-token-2"
+    ]
+    ~f:(fun token ->
+      let key = Prigh_ui_web_app.Web_app.For_testing.history_key ~token in
+      print_s [%message (token : string option) key]);
+  [%expect
+    {|
+    ((token ()) prigh.history)
+    ((token ("")) prigh.history.811c9dc5)
+    ((token (a)) prigh.history.e40c292c)
+    ((token (foobar)) prigh.history.bf9cf968)
+    ((token (sekrit-token-1)) prigh.history.8fcc21e3)
+    ((token (sekrit-token-2)) prigh.history.90cc2376)
+    |}]
+;;
+
 let%expect_test "web connection: the terminal URL and the session in the page \
                  URL"
   =

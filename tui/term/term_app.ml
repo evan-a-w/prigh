@@ -402,7 +402,9 @@ let run ~connect ~hello ~local_tools =
     in
     let tool_host =
       Option.map local_tools ~f:(fun backend ->
-        Prigh_client_unix.Tool_host.create ~client ~backend)
+        Prigh_client_unix.Tool_host.create
+          ~client
+          ~spawn:(Prigh_client_unix.Tool_host.spawn_worker ~backend))
     in
     let quit_requested = Ivar.create () in
     let%bind.Deferred driver =

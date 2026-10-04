@@ -24,4 +24,8 @@ module For_testing : sig
     -> string
 
   val with_query_param : search:string -> string -> string -> string
+
+  (** The localStorage key of the prompt history: per token, as each token is a
+      separate namespace. *)
+  val history_key : token:string option -> string
 end
