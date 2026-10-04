@@ -44,6 +44,7 @@ module Reply_tag : sig
     | Editor_text
     | Reload_messages_notice of string
     | Reconnect of int (** generation; stale replies are ignored *)
+    | Btw of string (** btw id *)
   [@@deriving sexp_of, equal]
 end
 
@@ -135,6 +136,8 @@ module Model : sig
     ; pending_confirms : (string * string * string) list
     ; connection : Connection.t
     ; reconnect_generation : int
+    ; btw : Btw_box.t option
+    ; btw_seq : int
     ; width : int
     ; height : int
     ; quitting : bool

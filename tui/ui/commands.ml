@@ -98,6 +98,11 @@ let all =
       "import a session from a JSONL file"
   ; c "abort" "" "abort the current run"
   ; c
+      "btw"
+      "<question>"
+      "ask a side question without interrupting the turn (not added to the \
+       conversation)"
+  ; c
       "retry-backend-connection"
       ""
       "reconnect to the backend now instead of waiting for the next retry"

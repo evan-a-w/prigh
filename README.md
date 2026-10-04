@@ -324,11 +324,17 @@ destructive `bash`/`write`/`edit`; `/confirm on|off`) and
 | `/agents` | focus a subagent |
 | `/host [name\|backend]` | pick where tools run, and the directory there |
 | `/abort` | abort the current run |
+| `/btw <question>` | ask a side question without interrupting the run |
 | `/retry-backend-connection` | reconnect to the backend now |
 | `/state` | show session state |
 
 `/model` also accepts a display name, id, `provider/id` or unique prefix, and
 `/login`/`/logout`/`/thinking`/`/sessions` open fuzzy pickers.
+
+`/btw` works while a turn is running: one extra model call (no tools) answers
+from the session's current context, streaming into a box above the editor
+that Esc dismisses (without aborting the run). The question and answer are
+never added to the conversation; their cost counts towards the session's.
 
 `-faux-script FILE` (a backend flag, passed through the TUI after `--`) plays
 a JSON array of scripted provider replies, so demos and tests run without API

@@ -130,3 +130,25 @@ backend exited
   event assistant_end End_turn
   event state running=false model=deepseek/deepseek-flash
 subagent backend exited
+<- prompt: ()
+  event state running=true model=deepseek/deepseek-flash
+  event user "sleep a bit"
+  event message_end
+  event message_start
+  event text_delta "sleeping"
+  event assistant_end Tool_use
+  event tool_start bash
+<- btw: ((btw_id e2e-1) (text "You asked me to sleep.")
+ (usage ((input 0) (output 0) (cache_read 0))) (cost_usd 0))
+  event btw_delta e2e-1 "You asked m"
+  event btw_delta e2e-1 "e to sleep."
+  event state running=true model=deepseek/deepseek-flash
+  event tool_end bash
+  event message_start
+  event message_end
+  event message_start
+  event text_delta "slept"
+  event assistant_end End_turn
+  event state running=false model=deepseek/deepseek-flash
+<- get_messages: 4 message(s)
+btw backend exited

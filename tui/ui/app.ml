@@ -40,6 +40,7 @@ module Reply_tag = struct
     | Editor_text
     | Reload_messages_notice of string
     | Reconnect of int (** generation; stale replies are ignored *)
+    | Btw of string (** btw id *)
   [@@deriving sexp_of, equal]
 end
 
@@ -145,6 +146,8 @@ module Model = struct
     ; pending_confirms : (string * string * string) list
     ; connection : Connection.t
     ; reconnect_generation : int
+    ; btw : Btw_box.t option
+    ; btw_seq : int
     ; width : int
     ; height : int
     ; quitting : bool
@@ -197,8 +200,19 @@ let editor_row_count m =
     count line 0)
 ;;
 
+let btw_rows m =
+  match m.btw, m.mode with
+  | Some box, Editing ->
+    List.length
+      (Btw_box.render
+         box
+         ~width:(transcript_width m)
+         ~max_rows:(Btw_box.max_rows ~height:(transcript_height m)))
+  | _ -> 0
+;;
+
 let transcript_rows m =
-  Int.max 0 (transcript_height m - (editor_row_count m + 2))
+  Int.max 0 (transcript_height m - (editor_row_count m + 2 + btw_rows m))
 ;;
 
 (* The single place transcript edits go through so the anchored viewport can
@@ -308,6 +322,8 @@ let init =
   ; pending_confirms = []
   ; connection = Connected
   ; reconnect_generation = 0
+  ; btw = None
+  ; btw_seq = 0
   ; width = 80
   ; height = 24
   ; quitting = false
@@ -1096,6 +1112,33 @@ let set_confirm m enabled =
   | None -> m, [ rpc "get_config" ~tag:(Config_for_confirm enabled) ]
 ;;
 
+let cancel_btw m =
+  match m.btw with
+  | Some box when Btw_box.is_streaming box ->
+    [ rpc "btw_cancel" ~params:[ "btw_id", str box.id ] ~tag:Ignore ]
+  | _ -> []
+;;
+
+(* A newer question replaces (and cancels) the previous one. *)
+let start_btw m question =
+  let id = sprintf "btw-%d" (m.btw_seq + 1) in
+  ( { m with btw = Some (Btw_box.create ~id ~question); btw_seq = m.btw_seq + 1 }
+  , cancel_btw m
+    @ [ rpc
+          "btw"
+          ~params:[ "question", str question; "btw_id", str id ]
+          ~tag:(Btw id)
+      ] )
+;;
+
+let dismiss_btw m = { m with btw = None }, cancel_btw m
+
+let update_btw m id ~f =
+  match m.btw with
+  | Some box when String.equal box.id id -> { m with btw = Some (f box) }
+  | _ -> m
+;;
+
 let run_command m (cmd : Commands.Parsed.t) =
   match cmd.name, cmd.args with
   | "", _ -> m, []
@@ -1265,6 +1308,8 @@ let run_command m (cmd : Commands.Parsed.t) =
   | "import", _ ->
     m, [ rpc "import" ~params:[ "path", str cmd.rest ] ~tag:Reload_messages ]
   | "abort", _ -> m, [ rpc "abort" ]
+  | "btw", [] -> error m "usage: /btw <question>", []
+  | "btw", _ -> start_btw m cmd.rest
   | "retry-backend-connection", _ -> retry_backend_connection m
   | "state", _ ->
     let text =
@@ -1760,6 +1805,7 @@ let editing_intent m (intent : Intent.t) =
    everything else edits the buffer and then recomputes the completion. *)
 let editing m (intent : Intent.t) =
   match intent with
+  | Cancel when Option.is_some m.btw -> dismiss_btw m
   | Next_agent -> cycle_focus m, []
   | Focus_agent n -> focus_agent m n, []
   | Search -> open_search m, []
@@ -2391,6 +2437,8 @@ let event m (e : P.Event.t) =
         pending_confirms = m.pending_confirms @ [ call_id, name, summary ]
       }
     , [] )
+  | Btw_delta { btw_id; delta } ->
+    update_btw m btw_id ~f:(fun box -> Btw_box.add_delta box delta), []
   | Agent_start
   | Agent_end _
   | Turn_start
@@ -2425,6 +2473,7 @@ let reply m (tag : Reply_tag.t) (result : (P.Json.t, string) Result.t) =
   | Error e ->
     (match tag with
      | Ignore -> m, []
+     | Btw id -> update_btw m id ~f:(fun box -> Btw_box.fail box e), []
      | Set_model_done _ ->
        (* The backend formats "did you mean"; the picker helps recover. *)
        model_picker (error m e) ~query:"", []
@@ -2432,6 +2481,11 @@ let reply m (tag : Reply_tag.t) (result : (P.Json.t, string) Result.t) =
   | Ok json ->
     (match tag with
      | Ignore | Show_error | Reconnect _ -> m, []
+     | Btw id ->
+       decode
+         json
+         ~f:(fun json -> P.Json.string_field json "text")
+         (fun text -> update_btw m id ~f:(Btw_box.finish ~text), [])
      | Notice_on_success text -> notice m text, []
      | Set_model_done key ->
        (match

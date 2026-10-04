@@ -98,6 +98,10 @@ type t =
       ; data : string
       }
   | Terminal_close of string
+  | Btw_delta of
+      { btw_id : string
+      ; delta : string
+      } (** streamed answer to our own [btw] request *)
 [@@deriving sexp_of, equal]
 
 val of_json : Json.t -> t Or_error.t

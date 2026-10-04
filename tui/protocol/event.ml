@@ -111,6 +111,10 @@ type t =
       ; data : string
       }
   | Terminal_close of string
+  | Btw_delta of
+      { btw_id : string
+      ; delta : string
+      } (** streamed answer to our own [btw] request *)
 [@@deriving sexp_of, equal]
 
 let rec of_json j =
@@ -214,5 +218,9 @@ let rec of_json j =
     Terminal_frame { term_id; kind; data }
   | "terminal_close" ->
     Json.string_field j "term_id" >>| fun id -> Terminal_close id
+  | "btw_delta" ->
+    let%bind btw_id = Json.string_field j "btw_id" in
+    let%map delta = Json.string_field j "delta" in
+    Btw_delta { btw_id; delta }
   | other -> Or_error.errorf "unknown event %S" other
 ;;

@@ -40,6 +40,8 @@ let methods =
   ; "set_config"
   ; "change_default"
   ; "tool_confirm_respond"
+  ; "btw"
+  ; "btw_cancel"
   ; "auth_status"
   ; "login"
   ; "auth_respond"
@@ -106,6 +108,7 @@ module Client = struct
     ; mutable agent : Agent.t
     ; mutable authed : bool
     ; send : Json.t -> unit
+    ; btws : Cancellation.t String.Table.t (** in-flight [btw] calls by id *)
     }
 
   let id t = t.id
@@ -123,6 +126,7 @@ type t =
   ; agents : Agent.t String.Table.t (** live sessions by session id *)
   ; clients : Client.t String.Table.t
   ; mutable client_seq : int
+  ; mutable btw_seq : int
   ; execs : (string * Agent.t) String.Table.t
     (** in-flight remote executions by exec id: host client id and session *)
   ; mutable login_owner : string option
@@ -225,6 +229,7 @@ let create
     ; agents = String.Table.create ()
     ; clients = String.Table.create ()
     ; client_seq = 0
+    ; btw_seq = 0
     ; execs = String.Table.create ()
     ; login_owner = None
     ; terminals = Terminal_relay.create ()
@@ -275,6 +280,7 @@ let connect t ~send =
     ; agent
     ; authed = Option.is_none t.token
     ; send
+    ; btws = String.Table.create ()
     }
   in
   Hashtbl.set t.clients ~key:client.id ~data:client;
@@ -283,6 +289,7 @@ let connect t ~send =
 
 let disconnect t (client : Client.t) =
   Hashtbl.remove t.clients client.id;
+  Hashtbl.iter client.btws ~f:Cancellation.cancel;
   Hashtbl.filter_inplace t.execs ~f:(fun (host, _) ->
     not (String.equal host client.id));
   if client.tools then publish_hosts t;
@@ -452,6 +459,46 @@ let exec_param t params =
     | None -> Or_error.errorf "no tool execution %S" exec_id)
 ;;
 
+(* The answer streams to the asking client only and never enters the session. *)
+let btw t (client : Client.t) params =
+  Or_error.bind (string_param params "question") ~f:(fun question ->
+    Or_error.bind (string_param_opt params "btw_id") ~f:(fun btw_id ->
+      let btw_id =
+        match btw_id with
+        | Some id -> id
+        | None ->
+          t.btw_seq <- t.btw_seq + 1;
+          sprintf "btw-%d" t.btw_seq
+      in
+      if String.is_empty (String.strip question)
+      then Or_error.error_string "missing question"
+      else if Hashtbl.mem client.btws btw_id
+      then Or_error.errorf "btw %S is already running" btw_id
+      else (
+        let cancel = Cancellation.create () in
+        Hashtbl.set client.btws ~key:btw_id ~data:cancel;
+        let result =
+          Exn.protect
+            ~finally:(fun () -> Hashtbl.remove client.btws btw_id)
+            ~f:(fun () ->
+              Agent.btw client.agent ~question ~cancel ~on_delta:(fun delta ->
+                client.send
+                  (`Object
+                      [ "type", `String "event"
+                      ; "event", `String "btw_delta"
+                      ; "btw_id", `String btw_id
+                      ; "delta", `String delta
+                      ])))
+        in
+        Or_error.map result ~f:(fun (reply, cost_usd) ->
+          `Object
+            [ "btw_id", `String btw_id
+            ; "text", `String (Message.Assistant.text reply)
+            ; "usage", Usage.jsonaf_of_t reply.usage
+            ; "cost_usd", `Number (sprintf "%.15g" cost_usd)
+            ]))))
+;;
+
 let dispatch_server t (client : Client.t) ~meth ~params
   : Json.t Or_error.t option
   =
@@ -478,6 +525,14 @@ let dispatch_server t (client : Client.t) ~meth ~params
                Hashtbl.remove t.execs exec_id;
                unit_result
                  (Agent.tool_exec_result agent ~exec_id ~text ~is_error)))))
+  | "btw" -> Some (btw t client params)
+  | "btw_cancel" ->
+    Some
+      (Or_error.map (string_param params "btw_id") ~f:(fun btw_id ->
+         let found = Hashtbl.find client.btws btw_id in
+         Option.iter found ~f:Cancellation.cancel;
+         `Object
+           [ ("cancelled", if Option.is_some found then `True else `False) ]))
   | "terminal_frame" ->
     Some
       (unit_result (Terminal_relay.frame t.terminals ~client:client.id params))

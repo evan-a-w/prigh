@@ -116,6 +116,7 @@ let rec summarise (e : Event.t) : string option =
   | Terminal_open { term_id; _ } -> Some (sprintf "terminal_open %s" term_id)
   | Terminal_frame _ -> None
   | Terminal_close id -> Some (sprintf "terminal_close %s" id)
+  | Btw_delta { btw_id; delta } -> Some (sprintf "btw_delta %s %S" btw_id delta)
 ;;
 
 let rec drain client ~stop =
@@ -276,7 +277,61 @@ let main () =
         print_endline "subagent backend exited";
         return ()
     in
-    return ()
+    let btw_script = Filename.concat tmp "btw.json" in
+    Out_channel.write_all
+      btw_script
+      ~data:
+        {|[
+  {"text":"sleeping","tool_calls":[{"id":"b1","name":"bash","arguments":{"command":"sleep 1"}}]},
+  {"text":"You asked me to sleep.","chunks":2},
+  {"text":"slept"}
+]|};
+    let btw_args =
+      [ "serve"
+      ; "-faux-script"
+      ; btw_script
+      ; "-auth-file"
+      ; Filename.concat tmp "auth3.json"
+      ; "-cwd"
+      ; tmp
+      ; "-model"
+      ; "deepseek/deepseek-flash"
+      ]
+    in
+    let client = Client.create ~connect:(spawn btw_args) in
+    (match%bind Client.connect client with
+     | Error e ->
+       print_s [%message "cannot start btw backend" (e : Error.t)];
+       return ()
+     | Ok () ->
+       let%bind () = call client "prompt" [ "text", Json.str "sleep a bit" ] in
+       let%bind () =
+         drain client ~stop:(function
+           | Tool_start _ -> true
+           | _ -> false)
+       in
+       let%bind () =
+         call
+           client
+           "btw"
+           [ "question", Json.str "what did I ask?"
+           ; "btw_id", Json.str "e2e-1"
+           ]
+       in
+       let%bind () =
+         drain client ~stop:(function
+           | State { running = false; _ } -> true
+           | _ -> false)
+       in
+       let%bind () =
+         match%map Client.call client "get_messages" [] with
+         | Ok (`Array messages) ->
+           printf "<- get_messages: %d message(s)\n" (List.length messages)
+         | Ok _ | Error _ -> print_endline "<- get_messages: unexpected"
+       in
+       let%bind () = Client.close client in
+       print_endline "btw backend exited";
+       return ())
 ;;
 
 let () =

@@ -611,6 +611,7 @@ let apply t (event : P.Event.t) =
   | P.Event.Terminal_open _
   | P.Event.Terminal_frame _
   | P.Event.Terminal_close _
+  | P.Event.Btw_delta _
   | P.Event.Config_changed _ -> t
 ;;
 

@@ -258,7 +258,7 @@ two can share one.
   Agent_event.t | State_changed | Compacted | Notice | Config_changed |
   Queue_update`). `prompt`/`steer`/`follow_up` accept optional `attachments`
   (paths whose contents are appended to the user message as `<file>` blocks).
-  Subagent usage is rolled up into `State.usage`/`cost_usd`
+  Subagent and `btw` usage is rolled up into `State.usage`/`cost_usd`
   (never `context_tokens`), and `State` also carries the session name, cwd
   and `git_branch`. `respond_confirm` answers a pending `Tool_confirm`.
 - `Config` — `~/.prigh/config.json` (`scoped_models : string list`,
@@ -319,10 +319,20 @@ two can share one.
   `new_session`, `switch_session`, `list_sessions`, `set_session_name`,
   `delete_session`, `export`, `import`, `fork`, `clone`, `rewind`,
   `session_stats`, `set_cwd`, `list_paths`, `list_dirs`, `get_config`, `set_config`,
-  `change_default`,
+  `change_default`, `btw`, `btw_cancel`,
   `tool_confirm_respond`, `set_active_host`, `tool_exec_output`,
   `tool_exec_result`, `auth_status`, `login`, `auth_respond`, `auth_cancel`,
   `logout`. `State` carries `active_host` and `hosts` (the backend first).
+  `btw {question, btw_id?}` (`/btw`) answers a side question with one
+  tool-less model call (`Btw`, `Agent.btw`) over the session's recorded
+  system prompt and a snapshot of its messages, sanitised because it may be
+  taken mid-turn (a tool call without its result yet gets a "still running"
+  placeholder), plus the question. It runs in the request's fiber, takes
+  no run lock and never writes to the session; the answer streams to the
+  calling client only as `btw_delta {btw_id, delta}` events and the
+  response is `{btw_id, text, usage, cost_usd}`. `btw_cancel {btw_id}`
+  (or the client disconnecting) cancels it. Its usage is added to the
+  in-memory `State.usage`/`cost_usd` like subagents'.
 - `Websocket` — a minimal RFC 6455 server side (handshake key, frame
   encode/decode with client masking, fragment reassembly, ping/pong and
   close) and `Web_server` — the `-web` listener: a connection whose first
@@ -465,7 +475,10 @@ copy of the protocol types and the e2e test guards the contract.
     anchored view), `Verbosity` (quiet/normal/verbose), `Autocomplete`
     (inline command/argument/path completion), `Agent_view` (per-subagent
     transcript and status), `Commands` (slash table, parse, complete,
-    closest), `Model_match` (display-name/prefix/did-you-mean), `Markdown`.
+    closest), `Model_match` (display-name/prefix/did-you-mean), `Markdown`,
+    `Btw_box` (the `/btw` panel above the editor: a newer question cancels
+    and replaces it; Esc dismisses it before Esc's other meanings, so it
+    never aborts the run), `Boxed` (the framed dialogs).
   - `Key.t` → `Intent.t` through `Keymap` (the one binding table; `/help`
     prints it). `Mode.t` (`Editing | Picker | Login_prompt | Text_prompt |
     Confirm | Search`) says who owns the keyboard; dialogs never stack, Esc

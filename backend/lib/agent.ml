@@ -118,8 +118,8 @@ type t =
   ; steer_queue : Queued.t Queue.t
   ; follow_up_queue : Queued.t Queue.t
   ; mutable subscribers : (Event.t -> unit) list
-  ; mutable subagent_usage : Usage.t
-  ; mutable subagent_cost_usd : float
+  ; mutable extra_usage : Usage.t (** subagents and [btw] calls *)
+  ; mutable extra_cost_usd : float
   ; mutable config : Config.t
   ; pending_confirms : bool Promise.u String.Table.t
   ; mutable shell_seq : int
@@ -201,8 +201,8 @@ let create
     ; steer_queue = Queue.create ()
     ; follow_up_queue = Queue.create ()
     ; subscribers = []
-    ; subagent_usage = Usage.zero
-    ; subagent_cost_usd = 0.
+    ; extra_usage = Usage.zero
+    ; extra_cost_usd = 0.
     ; config
     ; pending_confirms = String.Table.create ()
     ; shell_seq = 0
@@ -261,7 +261,7 @@ let state t =
     List.fold assistant_messages ~init:Usage.zero ~f:(fun acc a ->
       Usage.add acc a.usage)
   in
-  let usage = Usage.add assistant_usage t.subagent_usage in
+  let usage = Usage.add assistant_usage t.extra_usage in
   let context_tokens =
     Option.value_map (List.last assistant_messages) ~default:0 ~f:(fun a ->
       a.usage.input)
@@ -277,7 +277,7 @@ let state t =
   ; running = is_running t
   ; message_count = List.length messages
   ; usage
-  ; cost_usd = Model.cost_usd t.model assistant_usage +. t.subagent_cost_usd
+  ; cost_usd = Model.cost_usd t.model assistant_usage +. t.extra_cost_usd
   ; context_tokens
   ; active_host = t.active_host
   ; hosts = hosts t
@@ -558,18 +558,20 @@ let instructions t ~cwd =
 (* Built once per conversation and recorded in the session, so the prompt
    prefix stays cacheable; later cwd/host changes reach the model as notes on
    the next user message instead. *)
+let build_system_prompt t =
+  System_prompt.build
+    ~instructions:(instructions t ~cwd:t.cwd)
+    ~cwd:t.cwd
+    ~home:t.home
+    ~tools:(Tools.specs t.tools)
+    ()
+;;
+
 let system_prompt t =
   match Session.system_prompt t.session with
   | Some text -> text
   | None ->
-    let text =
-      System_prompt.build
-        ~instructions:(instructions t ~cwd:t.cwd)
-        ~cwd:t.cwd
-        ~home:t.home
-        ~tools:(Tools.specs t.tools)
-        ()
-    in
+    let text = build_system_prompt t in
     ignore (Session.set_system_prompt t.session ~text : Session.Entry.t);
     text
 ;;
@@ -658,8 +660,8 @@ let rec start_run t prompts =
          ~emit:(fun event ->
            (match event with
             | Subagent_end { usage; cost_usd; _ } ->
-              t.subagent_usage <- Usage.add t.subagent_usage usage;
-              t.subagent_cost_usd <- t.subagent_cost_usd +. cost_usd
+              t.extra_usage <- Usage.add t.extra_usage usage;
+              t.extra_cost_usd <- t.extra_cost_usd +. cost_usd
             | _ -> ());
            (match event with
             | Message_end m ->
@@ -893,6 +895,37 @@ let compact t =
     result)
 ;;
 
+let btw t ~question ~cancel ~on_delta =
+  let session = t.session in
+  let model = t.model in
+  let system =
+    match Session.system_prompt session with
+    | Some text -> text
+    | None -> build_system_prompt t
+  in
+  let request =
+    Btw.request ~model ~system ~messages:(Session.messages session) ~question
+  in
+  let reply =
+    t.provider.stream request ~cancel ~on_event:(function
+      | Text_delta text -> on_delta text
+      | Thinking_delta _
+      | Thinking_signature _
+      | Tool_call_start _
+      | Tool_call_delta _ -> ())
+  in
+  let cost_usd = Model.cost_usd model reply.usage in
+  if phys_equal session t.session
+  then (
+    t.extra_usage <- Usage.add t.extra_usage reply.usage;
+    t.extra_cost_usd <- t.extra_cost_usd +. cost_usd;
+    state_changed t);
+  match reply.stop_reason with
+  | Error e -> Or_error.error_string e
+  | Aborted -> Or_error.error_string "cancelled"
+  | End_turn | Tool_use | Length -> Ok (reply, cost_usd)
+;;
+
 let replace_session t session =
   ignore (abort t);
   wait_idle t;
@@ -900,8 +933,8 @@ let replace_session t session =
   t.cwd <- Session.cwd session;
   t.git_branch <- find_branch t ~cwd:t.cwd;
   t.environment_notes <- [];
-  t.subagent_usage <- Usage.zero;
-  t.subagent_cost_usd <- 0.;
+  t.extra_usage <- Usage.zero;
+  t.extra_cost_usd <- 0.;
   restore_settings t;
   state_changed t
 ;;

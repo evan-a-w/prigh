@@ -569,3 +569,21 @@ let%expect_test "config round trip and config_changed event" =
         (default_thinking ()))))
     |}]
 ;;
+
+let%expect_test "btw_delta" =
+  decode
+    {|{"type":"event","event":"btw_delta","btw_id":"btw-1","delta":"It is "}|};
+  decode {|{"type":"event","event":"btw_delta","btw_id":"btw-1"}|};
+  [%expect
+    {|
+    (Event (
+      Btw_delta
+      (btw_id btw-1)
+      (delta  "It is ")))
+    (error (
+      e (
+        "while decoding"
+        "{\"type\":\"event\",\"event\":\"btw_delta\",\"btw_id\":\"btw-1\"}"
+        "missing field \"delta\"")))
+    |}]
+;;

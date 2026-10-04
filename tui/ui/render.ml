@@ -151,6 +151,17 @@ let mode_hint (m : App.Model.t) : Content.Line.t option =
            | None ->
              if m.pending_quit
              then Some [ span ~style:dim "Ctrl+C again quits" ]
+             else if Option.is_some m.btw
+             then
+               Some
+                 [ span
+                     ~style:dim
+                     (if s.running
+                      then
+                        spinner_frames.(m.spinner % Array.length spinner_frames)
+                        ^ " working (Esc dismisses btw; Enter steers)"
+                      else "Esc dismisses btw")
+                 ]
              else if s.running
              then
                Some
@@ -570,49 +581,6 @@ let subagent_header (m : App.Model.t) (a : Agent_view.t) : Content.Line.t =
   ]
 ;;
 
-let pad_line_to (line : Content.Line.t) ~width =
-  let w = Content.Line.width line in
-  if w >= width
-  then Content.Line.truncate line ~width
-  else
-    line
-    @ [ { Content.Span.text = String.make (width - w) ' '; style = Style.plain }
-      ]
-;;
-
-let border = Style.fg Gray
-
-let boxed ~title ~(body : Content.t) ~width : Content.t =
-  let inner = Int.max 1 (width - 4) in
-  let title = Text_width.truncate title ~width:(Int.max 1 (width - 6)) in
-  let title_w = Text_width.string title in
-  let fill = Int.max 0 (width - 5 - title_w) in
-  let top : Content.Line.t =
-    [ span ~style:border "┌─ "
-    ; span ~style:(Style.bold Style.plain) title
-    ; span ~style:border " "
-    ; span ~style:border (String.concat (List.init fill ~f:(fun _ -> "─")))
-    ; span ~style:border "┐"
-    ]
-  in
-  let rows =
-    List.map body ~f:(fun line ->
-      let line =
-        pad_line_to (Content.Line.truncate line ~width:inner) ~width:inner
-      in
-      (span ~style:border "│ " :: line) @ [ span ~style:border " │" ])
-  in
-  let bottom : Content.Line.t =
-    [ span ~style:border "└"
-    ; span
-        ~style:border
-        (String.concat (List.init (Int.max 0 (width - 2)) ~f:(fun _ -> "─")))
-    ; span ~style:border "┘"
-    ]
-  in
-  (top :: rows) @ [ bottom ]
-;;
-
 let screen (m : App.Model.t) : Screen.t =
   let width = Int.max 1 m.width in
   let height = Int.max 3 m.height in
@@ -634,10 +602,10 @@ let screen (m : App.Model.t) : Screen.t =
           ~marker_style:(Style.bold (Style.fg Yellow))
           ~mask:false
       in
-      ( boxed
+      ( Boxed.render
           ~title:"Confirm"
-          ~body:[ [ span ~style:(Style.bold (Style.fg Yellow)) question ] ]
           ~width
+          [ [ span ~style:(Style.bold (Style.fg Yellow)) question ] ]
       , rows
       , cursor )
     | Login_prompt { prompt; _ } ->
@@ -653,10 +621,10 @@ let screen (m : App.Model.t) : Screen.t =
           ~marker_style:(Style.bold (Style.fg Yellow))
           ~mask
       in
-      ( boxed
+      ( Boxed.render
           ~title:"Log in"
-          ~body:(List.map m.login_lines ~f:Content.Line.of_string)
           ~width
+          (List.map m.login_lines ~f:Content.Line.of_string)
       , rows
       , cursor )
     | Text_prompt { question; _ } ->
@@ -667,7 +635,7 @@ let screen (m : App.Model.t) : Screen.t =
           ~marker_style:(Style.bold (Style.fg Yellow))
           ~mask:false
       in
-      boxed ~title:question ~body:[] ~width, rows, cursor
+      Boxed.render ~title:question ~width [], rows, cursor
     | Search { query; _ } ->
       let row : Content.Line.t =
         [ span ~style:(Style.bold (Style.fg Cyan)) "/ "; span query ]
@@ -681,7 +649,13 @@ let screen (m : App.Model.t) : Screen.t =
           ~marker_style:(Style.bold (Style.fg Cyan))
           ~mask:false
       in
-      [], rows, cursor
+      let btw =
+        match m.btw with
+        | Some box ->
+          Btw_box.render box ~width ~max_rows:(Btw_box.max_rows ~height)
+        | None -> []
+      in
+      btw, rows, cursor
   in
   let autocomplete_rows =
     match m.mode, m.autocomplete with

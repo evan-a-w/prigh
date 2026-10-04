@@ -653,6 +653,7 @@ let%expect_test "keymap: every binding resolves to its intent and is documented"
     /export [path]                     export the transcript (markdown or .jsonl)
     /import [path]                     import a session from a JSONL file
     /abort                             abort the current run
+    /btw <question>                    ask a side question without interrupting the turn (not added to the conversation)
     /retry-backend-connection          reconnect to the backend now instead of waiting for the next retry
     /state                             show session state
     /clear                             clear the transcript

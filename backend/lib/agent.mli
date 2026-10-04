@@ -32,7 +32,8 @@ module State : sig
     ; thinking : Thinking.t
     ; running : bool
     ; message_count : int
-    ; usage : Usage.t (** summed over assistant messages on the active path *)
+    ; usage : Usage.t
+      (** assistant messages on the active path, plus subagents and [btw] calls since the agent loaded the session *)
     ; cost_usd : float
     ; context_tokens : int (** input tokens of the last request, if any *)
     ; active_host : string
@@ -183,6 +184,17 @@ val save_as_default : t -> unit Or_error.t
 val respond_confirm : t -> call_id:string -> allow:bool -> unit Or_error.t
 
 val compact : t -> string Or_error.t
+
+(** Answers a side question with one tool-less model call over a snapshot of
+    the conversation (see {!Btw}), concurrently with any run and without
+    touching the session; [on_delta] receives the streamed text. The usage
+    counts towards [State.usage]/[cost_usd]. Returns the reply and its cost. *)
+val btw
+  :  t
+  -> question:string
+  -> cancel:Cancellation.t
+  -> on_delta:(string -> unit)
+  -> (Message.Assistant.t * float) Or_error.t
 
 (** In-place session replacement for a single-agent embedding (the CLI and
     tests). [Rpc_server] instead keeps one agent per session and moves
