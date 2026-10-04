@@ -147,6 +147,45 @@ let%expect_test "tool_confirm event" =
     |}]
 ;;
 
+let%expect_test "terminal relay events" =
+  decode
+    {|{"type":"event","event":"terminal_open","host":"client-2","term_id":"t1","key":"sess-1","cwd":"/work","cols":120,"rows":40}|};
+  decode
+    {|{"type":"event","event":"terminal_frame","host":"client-2","term_id":"t1","kind":"binary","data":"bHMK"}|};
+  decode
+    {|{"type":"event","event":"terminal_frame","host":"client-2","term_id":"t1","kind":"text","data":"{\"type\":\"ping\"}"}|};
+  decode
+    {|{"type":"event","event":"terminal_frame","host":"client-2","term_id":"t1","kind":"video","data":""}|};
+  decode
+    {|{"type":"event","event":"terminal_close","host":"client-2","term_id":"t1"}|};
+  [%expect
+    {|
+    (Event (
+      Terminal_open
+      (term_id t1)
+      (key     sess-1)
+      (cwd     /work)
+      (cols    120)
+      (rows    40)))
+    (Event (
+      Terminal_frame
+      (term_id t1)
+      (kind    Binary)
+      (data    bHMK)))
+    (Event (
+      Terminal_frame
+      (term_id t1)
+      (kind    Text)
+      (data    "{\"type\":\"ping\"}")))
+    (error (
+      e (
+        "while decoding"
+        "{\"type\":\"event\",\"event\":\"terminal_frame\",\"host\":\"client-2\",\"term_id\":\"t1\",\"kind\":\"video\",\"data\":\"\"}"
+        "unknown frame kind \"video\"")))
+    (Event (Terminal_close t1))
+    |}]
+;;
+
 let%expect_test "tool host events and state hosts" =
   decode
     {|{"type":"event","event":"tool_exec","host":"client-2","exec_id":"c1-0","call_id":"c1","name":"bash","arguments":{"command":"ls"},"cwd":"/work"}|};

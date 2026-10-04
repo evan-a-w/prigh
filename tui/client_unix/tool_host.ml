@@ -5,22 +5,28 @@ open Prigh_protocol
 
 type t =
   { client : Client.t
-  ; backend : string
+  ; spawn : unit -> Transport.t Deferred.Or_error.t
   ; mutable worker : Transport.t Deferred.Or_error.t option
+  ; sends : unit Sequencer.t
   }
 
-let create ~client ~backend = { client; backend; worker = None }
+let spawn_worker ~backend () =
+  Stdio_transport.spawn ~prog:backend ~args:[ "tool-host" ] ()
+;;
+
+let create ~client ~spawn =
+  { client; spawn; worker = None; sends = Sequencer.create () }
+;;
+
+let call t method_ params =
+  don't_wait_for (Deferred.ignore_m (Client.call t.client method_ params))
+;;
 
 let fail t ~exec_id text =
-  don't_wait_for
-    (Deferred.ignore_m
-       (Client.call
-          t.client
-          "tool_exec_result"
-          [ "exec_id", `String exec_id
-          ; "text", `String text
-          ; "is_error", `True
-          ]))
+  call
+    t
+    "tool_exec_result"
+    [ "exec_id", `String exec_id; "text", `String text; "is_error", `True ]
 ;;
 
 let relay t line =
@@ -28,39 +34,40 @@ let relay t line =
   | Error _ -> ()
   | Ok json ->
     let field name = Jsonaf.member name json in
-    (match field "type", field "exec_id" with
-     | Some (`String "output"), Some (`String exec_id) ->
-       let chunk =
-         match field "chunk" with
-         | Some (`String s) -> s
-         | _ -> ""
-       in
-       don't_wait_for
-         (Deferred.ignore_m
-            (Client.call
-               t.client
-               "tool_exec_output"
-               [ "exec_id", `String exec_id; "chunk", `String chunk ]))
-     | Some (`String "result"), Some (`String exec_id) ->
-       let text =
-         match field "text" with
-         | Some (`String s) -> s
-         | _ -> ""
-       in
+    let string_field name =
+      match field name with
+      | Some (`String s) -> s
+      | _ -> ""
+    in
+    (match field "type", field "exec_id", field "term_id" with
+     | Some (`String "output"), Some (`String exec_id), _ ->
+       call
+         t
+         "tool_exec_output"
+         [ "exec_id", `String exec_id; "chunk", `String (string_field "chunk") ]
+     | Some (`String "result"), Some (`String exec_id), _ ->
        let is_error =
          match field "is_error" with
          | Some `True -> true
          | _ -> false
        in
-       don't_wait_for
-         (Deferred.ignore_m
-            (Client.call
-               t.client
-               "tool_exec_result"
-               [ "exec_id", `String exec_id
-               ; "text", `String text
-               ; ("is_error", if is_error then `True else `False)
-               ]))
+       call
+         t
+         "tool_exec_result"
+         [ "exec_id", `String exec_id
+         ; "text", `String (string_field "text")
+         ; ("is_error", if is_error then `True else `False)
+         ]
+     | Some (`String "terminal_frame"), _, Some (`String term_id) ->
+       call
+         t
+         "terminal_frame"
+         [ "term_id", `String term_id
+         ; "kind", `String (string_field "kind")
+         ; "data", `String (string_field "data")
+         ]
+     | Some (`String "terminal_closed"), _, Some (`String term_id) ->
+       call t "terminal_closed" [ "term_id", `String term_id ]
      | _ -> ())
 ;;
 
@@ -69,9 +76,7 @@ let worker t =
   | Some w -> w
   | None ->
     let w =
-      match%map
-        Stdio_transport.spawn ~prog:t.backend ~args:[ "tool-host" ] ()
-      with
+      match%map t.spawn () with
       | Error _ as e ->
         t.worker <- None;
         e
@@ -87,13 +92,18 @@ let worker t =
 
 let send t json =
   don't_wait_for
-    (match%map worker t with
-     | Ok transport -> transport.send_line (Jsonaf.to_string json)
-     | Error e ->
-       (match Jsonaf.member "exec_id" json with
-        | Some (`String exec_id) ->
-          fail t ~exec_id ("cannot start tool host: " ^ Error.to_string_hum e)
-        | _ -> ()))
+  @@ Throttle.enqueue t.sends (fun () ->
+    match%map worker t with
+    | Ok transport -> transport.send_line (Jsonaf.to_string json)
+    | Error e ->
+      (match Jsonaf.member "exec_id" json, Jsonaf.member "type" json with
+       | Some (`String exec_id), _ ->
+         fail t ~exec_id ("cannot start tool host: " ^ Error.to_string_hum e)
+       | _, Some (`String "terminal_open") ->
+         (match Jsonaf.member "term_id" json with
+          | Some term_id -> call t "terminal_closed" [ "term_id", term_id ]
+          | None -> ())
+       | _ -> ()))
 ;;
 
 let handle t (event : Event.t) =
@@ -110,6 +120,30 @@ let handle t (event : Event.t) =
         ])
   | Tool_exec_cancel exec_id ->
     send t (`Object [ "type", `String "cancel"; "exec_id", `String exec_id ])
+  | Terminal_open { term_id; key; cwd; cols; rows } ->
+    send
+      t
+      (`Object
+        [ "type", `String "terminal_open"
+        ; "term_id", `String term_id
+        ; "key", `String key
+        ; "cwd", `String cwd
+        ; "cols", `Number (Int.to_string cols)
+        ; "rows", `Number (Int.to_string rows)
+        ])
+  | Terminal_frame { term_id; kind; data } ->
+    send
+      t
+      (`Object
+        [ "type", `String "terminal_frame"
+        ; "term_id", `String term_id
+        ; "kind", `String (Event.Frame_kind.to_string kind)
+        ; "data", `String data
+        ])
+  | Terminal_close term_id ->
+    send
+      t
+      (`Object [ "type", `String "terminal_close"; "term_id", `String term_id ])
   | _ -> ()
 ;;
 

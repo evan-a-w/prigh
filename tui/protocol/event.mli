@@ -10,6 +10,16 @@ module Subagent_result : sig
   val of_json : Json.t -> t Or_error.t
 end
 
+module Frame_kind : sig
+  type t =
+    | Binary (** [data] is base64 *)
+    | Text
+  [@@deriving sexp_of, equal]
+
+  val of_string : string -> t Or_error.t
+  val to_string : t -> string
+end
+
 type t =
   | Agent_start
   | Agent_end of Message.t list
@@ -75,6 +85,19 @@ type t =
       ; cwd : string
       } (** run this tool on our machine (we are the active host) *)
   | Tool_exec_cancel of string
+  | Terminal_open of
+      { term_id : string
+      ; key : string
+      ; cwd : string
+      ; cols : int
+      ; rows : int
+      } (** relayed to our tool host worker (we are the active host) *)
+  | Terminal_frame of
+      { term_id : string
+      ; kind : Frame_kind.t
+      ; data : string
+      }
+  | Terminal_close of string
 [@@deriving sexp_of, equal]
 
 val of_json : Json.t -> t Or_error.t

@@ -55,10 +55,24 @@ module Settings = struct
 end
 
 module History = struct
-  let key = "prigh.history"
+  (* FNV-1a, so the key is stable across builds and does not reveal the token. *)
+  let token_hash token =
+    String.fold token ~init:0x811c9dc5l ~f:(fun h c ->
+      Int32.( * )
+        (Int32.bit_xor h (Int32.of_int_exn (Char.to_int c)))
+        0x01000193l)
+    |> sprintf "%08lx"
+  ;;
+
+  let key ~token =
+    match token with
+    | None -> "prigh.history"
+    | Some token -> "prigh.history." ^ token_hash token
+  ;;
+
   let limit = 500
 
-  let load () =
+  let load ~key =
     match Browser.get_item key with
     | None -> `Array []
     | Some text ->
@@ -67,9 +81,9 @@ module History = struct
        | _ -> `Array [])
   ;;
 
-  let append text =
+  let append ~key text =
     let items =
-      match load () with
+      match load ~key with
       | `Array items -> items
       | _ -> []
     in
@@ -100,7 +114,9 @@ let reconnect client ~hello ~delay_ms ~session =
   | Ok () -> send_hello client hello ~session
 ;;
 
-let platform client ~hello ~schedule ~quit : Prigh_ui.Component.Platform.t =
+let platform client ~hello ~history_key ~schedule ~quit
+  : Prigh_ui.Component.Platform.t
+  =
   let unavailable what =
     schedule
       (App.Action.Stderr (sprintf "%s is not available in the browser" what))
@@ -115,8 +131,10 @@ let platform client ~hello ~schedule ~quit : Prigh_ui.Component.Platform.t =
           ())
   ; open_browser = (fun url -> Effect.of_sync_fun Browser.open_url url)
   ; load_history =
-      (fun () -> Effect.of_sync_fun (fun () -> Ok (History.load ())) ())
-  ; append_history = (fun text -> Effect.of_sync_fun History.append text)
+      (fun () ->
+        Effect.of_sync_fun (fun () -> Ok (History.load ~key:history_key)) ())
+  ; append_history =
+      (fun text -> Effect.of_sync_fun (History.append ~key:history_key) text)
   ; copy_to_clipboard =
       (fun text -> Effect.of_sync_fun Browser.copy_to_clipboard text)
   ; suspend = Effect.of_sync_fun (fun () -> unavailable "suspend (Ctrl+Z)") ()
@@ -140,6 +158,7 @@ module For_testing = struct
   let href_with_backend = Browser.href_with_backend
   let terminal_url = Terminal_panel.url
   let with_query_param = Browser.with_query_param
+  let history_key = History.key
 end
 
 module Result_ = struct
@@ -503,7 +522,15 @@ let run () =
          Browser.set_app_html
            {|<div class="connect"><h1>prigh</h1><p>disconnected — reload to start again</p></div>|}
        in
-       let platform = Bonsai.return (platform client ~hello ~schedule ~quit) in
+       let platform =
+         Bonsai.return
+           (platform
+              client
+              ~hello
+              ~history_key:(History.key ~token:settings.token)
+              ~schedule
+              ~quit)
+       in
        let terminal_url ~session =
          Terminal_panel.url
            ~backend:settings.backend

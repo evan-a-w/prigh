@@ -15,6 +15,24 @@ module Subagent_result = struct
   ;;
 end
 
+module Frame_kind = struct
+  type t =
+    | Binary
+    | Text
+  [@@deriving sexp_of, equal]
+
+  let of_string = function
+    | "binary" -> Ok Binary
+    | "text" -> Ok Text
+    | other -> Or_error.errorf "unknown frame kind %S" other
+  ;;
+
+  let to_string = function
+    | Binary -> "binary"
+    | Text -> "text"
+  ;;
+end
+
 type t =
   | Agent_start
   | Agent_end of Message.t list
@@ -80,6 +98,19 @@ type t =
       ; cwd : string
       } (** run this tool on our machine (we are the active host) *)
   | Tool_exec_cancel of string
+  | Terminal_open of
+      { term_id : string
+      ; key : string
+      ; cwd : string
+      ; cols : int
+      ; rows : int
+      } (** relayed to our tool host worker (we are the active host) *)
+  | Terminal_frame of
+      { term_id : string
+      ; kind : Frame_kind.t
+      ; data : string
+      }
+  | Terminal_close of string
 [@@deriving sexp_of, equal]
 
 let rec of_json j =
@@ -169,5 +200,19 @@ let rec of_json j =
     Tool_exec { exec_id; call_id; name; arguments; cwd }
   | "tool_exec_cancel" ->
     Json.string_field j "exec_id" >>| fun id -> Tool_exec_cancel id
+  | "terminal_open" ->
+    let%bind term_id = Json.string_field j "term_id" in
+    let%bind key = Json.string_field j "key" in
+    let%bind cwd = Json.string_field j "cwd" in
+    let%bind cols = Json.int_field j "cols" in
+    let%map rows = Json.int_field j "rows" in
+    Terminal_open { term_id; key; cwd; cols; rows }
+  | "terminal_frame" ->
+    let%bind term_id = Json.string_field j "term_id" in
+    let%bind kind = Json.string_field j "kind" >>= Frame_kind.of_string in
+    let%map data = Json.string_field j "data" in
+    Terminal_frame { term_id; kind; data }
+  | "terminal_close" ->
+    Json.string_field j "term_id" >>| fun id -> Terminal_close id
   | other -> Or_error.errorf "unknown event %S" other
 ;;
