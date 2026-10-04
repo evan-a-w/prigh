@@ -59,8 +59,8 @@ ARG PRIGH_UID=1000
 ARG PRIGH_GID=1000
 RUN apt-get update \
  && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
-      bash ca-certificates curl git jq less openssh-client procps ripgrep \
-      tini tmux ${EXTRA_APT_PACKAGES} \
+      bash ca-certificates curl git jq less netbase openssh-client procps \
+      ripgrep tini tmux ${EXTRA_APT_PACKAGES} \
  && rm -rf /var/lib/apt/lists/*
 
 COPY --from=nix-build /closure /nix/store
