@@ -346,7 +346,7 @@ let%expect_test "fuzzy ranking: command names" =
     {|
     "mo" -> model scoped-models import
     "lo" -> login logout clone
-    "s"  -> state switch session signout sessions scoped-models host agents hotkeys verbosity
+    "s"  -> state switch setusr session signout sessions scoped-models host agents hotkeys verbosity
     "sw" -> switch
     "xyz" ->
     |}]
@@ -658,6 +658,7 @@ let%expect_test "keymap: every binding resolves to its intent and is documented"
     /state                             show session state
     /clear                             clear the transcript
     /signout                           sign out to log in as another user (browser only)
+    /setusr [user]                     act as another user (superusers only); without a user, list them
     /quit                              exit
     |}]
 ;;

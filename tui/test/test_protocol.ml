@@ -625,9 +625,15 @@ let%expect_test "hello reply: client id and namespace" =
            : Hello_reply.t Or_error.t)]);
   [%expect
     {|
-    (Ok ((client_id client-1) (namespace (lloyd))))
-    (Ok ((client_id client-1) (namespace ())))
-    (Ok ((client_id client-1) (namespace ())))
+    (Ok ((client_id client-1) (namespace (lloyd)) (user ())))
+    (Ok (
+      (client_id client-1)
+      (namespace ())
+      (user      ())))
+    (Ok (
+      (client_id client-1)
+      (namespace ())
+      (user      ())))
     (Error "missing field \"client_id\"")
     (Error "field \"namespace\": expected string, got 3")
     |}]
