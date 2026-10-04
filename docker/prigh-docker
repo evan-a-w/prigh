@@ -1,0 +1,119 @@
+#!/usr/bin/env bash
+# The container's entrypoint (see DOCKER.md).
+#
+#   prigh-docker                 start what $PRIGH_MODE says
+#   prigh-docker tui [ARGS]      a TUI on the running server (for `docker exec -it`)
+#   prigh-docker ssh-key         create ~/.ssh/id_ed25519 if missing; print the public key
+#   prigh-docker healthcheck     exit 0 when every enabled port accepts connections
+#   prigh-docker CMD [ARGS]      run CMD (e.g. `prigh login anthropic`, `bash`)
+set -euo pipefail
+
+mode="${PRIGH_MODE:-web}"
+cwd="${PRIGH_CWD:-/workspace}"
+web_port=7788
+pi_web_port=7789
+server_port=7777
+[ -n "${PRIGH_TOKEN:-}" ] || unset PRIGH_TOKEN
+
+die() {
+	echo "prigh-docker: $*" >&2
+	exit 2
+}
+
+# What $PRIGH_MODE serves: parallel arrays of serve flags and ports.
+flags=()
+ports=()
+tui_mode=false
+IFS=',' read -ra entries <<<"${mode//[[:space:]]/}"
+for m in "${entries[@]}"; do
+	case "$m" in
+	web) flags+=(-web) ports+=("$web_port") ;;
+	pi-web) flags+=(-pi-web) ports+=("$pi_web_port") ;;
+	server) flags+=(-listen) ports+=("$server_port") ;;
+	tui) tui_mode=true ;;
+	"") ;;
+	*) die "unknown PRIGH_MODE entry '$m' (expected web, pi-web, server or tui)" ;;
+	esac
+done
+if $tui_mode && [ ${#flags[@]} -gt 0 ]; then
+	die "PRIGH_MODE=tui cannot be combined with other modes"
+fi
+
+port_open() {
+	(exec 3<>"/dev/tcp/127.0.0.1/$1") 2>/dev/null
+}
+
+extra_args=()
+if [ -n "${PRIGH_ARGS:-}" ]; then
+	read -ra extra_args <<<"$PRIGH_ARGS"
+fi
+
+git_identity() {
+	if [ -n "${PRIGH_GIT_NAME:-}" ]; then git config --global user.name "$PRIGH_GIT_NAME"; fi
+	if [ -n "${PRIGH_GIT_EMAIL:-}" ]; then git config --global user.email "$PRIGH_GIT_EMAIL"; fi
+}
+
+ssh_key() {
+	local key="$HOME/.ssh/id_ed25519"
+	if [ ! -f "$key" ]; then
+		mkdir -p -m 700 "$HOME/.ssh"
+		ssh-keygen -q -t ed25519 -N "" -C "prigh@${HOSTNAME:-docker}" -f "$key"
+	fi
+	cat "$key.pub"
+}
+
+start() {
+	mkdir -p "$cwd"
+	git_identity
+	if $tui_mode; then
+		[ -t 0 ] || die "PRIGH_MODE=tui needs a terminal: run with -it (compose: stdin_open + tty) and attach"
+		tui_args=()
+		if [ -n "${PRIGH_TUI_ARGS:-}" ]; then
+			read -ra tui_args <<<"$PRIGH_TUI_ARGS"
+		fi
+		exec prigh-tui -cwd "$cwd" "${tui_args[@]}" -- "${extra_args[@]}"
+	fi
+	local serve_args=() i
+	for i in "${!flags[@]}"; do
+		serve_args+=("${flags[$i]}" "0.0.0.0:${ports[$i]}")
+	done
+	[ ${#serve_args[@]} -gt 0 ] || die "PRIGH_MODE='$mode' enables nothing"
+	if [ -z "${PRIGH_TOKEN:-}" ] && [ "${PRIGH_ALLOW_NO_TOKEN:-}" != 1 ]; then
+		die "set PRIGH_TOKEN (anyone who can reach the port can run commands in the container); PRIGH_ALLOW_NO_TOKEN=1 to skip"
+	fi
+	echo "prigh-docker: mode=$mode cwd=$cwd" >&2
+	exec prigh serve -cwd "$cwd" "${serve_args[@]}" "${extra_args[@]}"
+}
+
+tui() {
+	local i
+	for i in "${!flags[@]}"; do
+		case "${flags[$i]}" in
+		-web | -listen)
+			exec prigh-tui -connect "127.0.0.1:${ports[$i]}" -tools remote -cwd "$cwd" "$@"
+			;;
+		esac
+	done
+	exec prigh-tui -cwd "$cwd" "$@" -- "${extra_args[@]}"
+}
+
+healthcheck() {
+	local i
+	for i in "${!flags[@]}"; do
+		port_open "${ports[$i]}" || {
+			echo "port ${ports[$i]} (${flags[$i]}) is not accepting connections" >&2
+			exit 1
+		}
+	done
+}
+
+case "${1:-}" in
+"" | start) start ;;
+tui)
+	shift
+	tui "$@"
+	;;
+healthcheck) healthcheck ;;
+ssh-key) ssh_key ;;
+*) exec "$@" ;;
+esac

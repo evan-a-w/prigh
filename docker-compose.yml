@@ -1,0 +1,50 @@
+# prigh as a Docker Compose / Portainer stack. Configuration is through
+# environment variables (Portainer: "Environment variables" on the stack);
+# see DOCKER.md for all of them.
+name: prigh
+
+services:
+  prigh:
+    build:
+      context: .
+      args:
+        EXTRA_APT_PACKAGES: ${PRIGH_EXTRA_APT_PACKAGES:-}
+        PRIGH_UID: ${PRIGH_UID:-1000}
+        PRIGH_GID: ${PRIGH_GID:-1000}
+    image: prigh:local
+    restart: unless-stopped
+    environment:
+      PRIGH_MODE: ${PRIGH_MODE:-web}
+      PRIGH_TOKEN: ${PRIGH_TOKEN:-}
+      PRIGH_ALLOW_NO_TOKEN: ${PRIGH_ALLOW_NO_TOKEN:-}
+      PRIGH_ARGS: ${PRIGH_ARGS:-}
+      PRIGH_TUI_ARGS: ${PRIGH_TUI_ARGS:-}
+      GH_TOKEN: ${GH_TOKEN:-}
+      PRIGH_GIT_NAME: ${PRIGH_GIT_NAME:-}
+      PRIGH_GIT_EMAIL: ${PRIGH_GIT_EMAIL:-}
+    ports:
+      - "${PRIGH_BIND:-0.0.0.0}:${PRIGH_WEB_PORT:-7788}:7788"
+      - "${PRIGH_BIND:-0.0.0.0}:${PRIGH_PI_WEB_PORT:-7789}:7789"
+      - "${PRIGH_BIND:-0.0.0.0}:${PRIGH_SERVER_PORT:-7777}:7777"
+    volumes:
+      # Sessions, credentials, config and history.
+      - prigh-home:/home/prigh
+      # What the agent works on. Set PRIGH_WORKSPACE to a host path to bind
+      # it instead (it must be writable by PRIGH_UID).
+      - ${PRIGH_WORKSPACE:-prigh-workspace}:/workspace
+    # Only the two volumes above and a scratch /tmp are writable; the agent
+    # sees nothing else of the host.
+    read_only: true
+    tmpfs:
+      - /tmp:exec,mode=1777
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    # For PRIGH_MODE=tui (attach to the container); harmless otherwise.
+    stdin_open: true
+    tty: true
+
+volumes:
+  prigh-home:
+  prigh-workspace:
