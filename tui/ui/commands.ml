@@ -79,6 +79,11 @@ let all =
       "[cancel <n>]"
       "focus a subagent (Ctrl+D cancels one), or cancel subagent n"
   ; c
+      "jobs"
+      "[id|kill <id>]"
+      "list background jobs (Enter shows output, Ctrl+D kills), or show/kill \
+       one"
+  ; c
       "host"
       "[name|backend]"
       "pick where tools run (this frontend, another one, or the backend) and \

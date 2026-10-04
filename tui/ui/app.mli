@@ -45,6 +45,9 @@ module Reply_tag : sig
     | Reload_messages_notice of string
     | Reconnect of int (** generation; stale replies are ignored *)
     | Btw of string (** btw id *)
+    | Jobs_picker
+    | Job_output
+    | Job_started
   [@@deriving sexp_of, equal]
 end
 
@@ -152,6 +155,9 @@ module Model : sig
   (** Whether any subagent is running, including background ones the main agent
       is no longer waiting for. *)
   val agents_running : t -> bool
+
+  (** Background shell jobs of this session still running. *)
+  val jobs_running : t -> bool
 
   val backend_gone : t -> bool
 end

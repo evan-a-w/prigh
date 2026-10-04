@@ -16,7 +16,7 @@ and context =
   ; call_id : string
   ; tools : t list
   ; emit : Agent_event.t -> unit
-  ; jobs : Subagent_jobs.t option
+  ; background : Background_tasks.t option
   ; execute : executor
   }
 
@@ -50,7 +50,7 @@ module Context = struct
         ?(call_id = "")
         ?(tools = [])
         ?(emit = ignore)
-        ?jobs
+        ?background
         ~env
         ~cwd
         ()
@@ -64,7 +64,7 @@ module Context = struct
     ; call_id
     ; tools
     ; emit
-    ; jobs
+    ; background
     ; execute
     }
   ;;

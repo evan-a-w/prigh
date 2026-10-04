@@ -732,7 +732,7 @@ let%expect_test "typing / lists commands, Down twice + Tab fills /login " =
       /login [provider] [api_key|oauth]  log in to a provider
       /logout [provider]              remove a provider's store…
       /thinking [off|low|on|high|max]  pick or set the thinking…
-      ↕ 1–8 of 33
+      ↕ 1–8 of 34
     …deepseek-flash  ctx:0% 1.5k  Tab/Enter accept · Esc close
     |}];
   H.key h (Key.plain Down);
@@ -749,7 +749,7 @@ let%expect_test "typing / lists commands, Down twice + Tab fills /login " =
       /login [provider] [api_key|oauth]  log in to a provider
       /logout [provider]              remove a provider's store…
       /thinking [off|low|on|high|max]  pick or set the thinking…
-      ↕ 1–8 of 33
+      ↕ 1–8 of 34
     …deepseek-flash  ctx:0% 1.5k  Tab/Enter accept · Esc close
     |}];
   H.key h (Key.plain Down);
@@ -766,7 +766,7 @@ let%expect_test "typing / lists commands, Down twice + Tab fills /login " =
       /login [provider] [api_key|oauth]  log in to a provider
       /logout [provider]              remove a provider's store…
       /thinking [off|low|on|high|max]  pick or set the thinking…
-      ↕ 1–8 of 33
+      ↕ 1–8 of 34
     …deepseek-flash  ctx:0% 1.5k  Tab/Enter accept · Esc close
     |}];
   H.key h (Key.plain Tab);
@@ -5903,7 +5903,7 @@ let%expect_test "Tab on an empty editor opens the command list; the list shows \
       /login [provider] [api_key|oauth]  log in to a provider
       /logout [provider]              remove a provider's store…
       /thinking [off|low|on|high|max]  pick or set the thinking…
-      ↕ 1–8 of 33
+      ↕ 1–8 of 34
     …deepseek-flash  ctx:0% 1.5k  Tab/Enter accept · Esc close
     |}];
   H.key h (Key.plain End);
@@ -5920,7 +5920,7 @@ let%expect_test "Tab on an empty editor opens the command list; the list shows \
       /login [provider] [api_key|oauth]  log in to a provider
       /logout [provider]              remove a provider's store…
       /thinking [off|low|on|high|max]  pick or set the thinking…
-      ↕ 1–8 of 33
+      ↕ 1–8 of 34
     …deepseek-flash  ctx:0% 1.5k  Tab/Enter accept · Esc close
     |}];
   H.keys h "qu";
@@ -6171,4 +6171,188 @@ let%expect_test "logged-in user: shown in the status line, kept across \
   H.keys h "/signout";
   H.enter h;
   [%expect {| Sign_out |}]
+;;
+
+let jobs_json =
+  {|[{"id":"j1","command":"make test","running":true,"exit":null,"delivered":false,"elapsed":75.4,"bytes":2048,"last_line":"PASS parser"},{"id":"j2","command":"docker build .","running":false,"exit":"exited 0","delivered":true,"elapsed":3.2,"bytes":10,"last_line":null}]|}
+;;
+
+let%expect_test "background jobs: !&, status line while idle, /jobs picker, \
+                 output, kill, delivery"
+  =
+  let h = connected ~width:100 ~height:16 () in
+  H.keys h "!&make test";
+  H.enter h;
+  H.reply h Job_started {|{"job_id":"j1"}|};
+  H.event h (State (state ~jobs:[ "j1", "make test", None ] ()));
+  H.show h;
+  print_s [%sexp (App.Model.jobs_running h.model : bool)];
+  [%expect
+    {|
+    (Rpc
+      (method_ shell)
+      (params (
+        (command    "make test")
+        (background true)))
+      (tag Job_started))
+    (Append_history "!&make test")
+
+
+
+
+
+
+
+
+
+    session abc123 in /work. /help for commands, Esc aborts, Ctrl+C twice quits.
+    > earlier question
+    earlier answer
+    started job j1; /jobs shows it, and its exit is reported to the agent
+    ────────────────────────────────────────────────────────────────────────────────────────────────────
+    > ▏
+    /work  deepseek-flash  think:off  view:normal  ctx:0% 1.5k  $0.01  jobs:1 ⠋
+    true
+    |}];
+  (* The picker lists id, state, elapsed time and the last line; Ctrl+D kills
+     the highlighted job. *)
+  H.keys h "/jobs";
+  H.enter h;
+  H.reply h Jobs_picker jobs_json;
+  H.show h;
+  H.key h (Key.ctrl 'd');
+  H.mode h;
+  [%expect
+    {|
+    (Rpc (method_ list_jobs) (params ()) (tag Jobs_picker))
+
+
+
+
+
+
+    session abc123 in /work. /help for commands, Esc aborts, Ctrl+C twice quits.
+    > earlier question
+    earlier answer
+    started job j1; /jobs shows it, and its exit is reported to the agent
+    Jobs  (2)
+    / ▏
+    ▸  make test       j1  running  1m15s  PASS parser
+       docker build .  j2  exited 0  3s
+    ────────────────────────────────────────────────────────────────────────────────────────────────────
+    /work  deepseek-flash  ctx:0% 1.5k  $0.01  jobs:1 ⠋  Enter shows output · Esc closes · Ctrl+D kills
+    (Rpc
+      (method_ kill_job)
+      (params ((job_id j1)))
+      (tag (Notice_on_success "killing job j1")))
+    editing
+    |}];
+  (* Enter shows the recent output in the transcript. *)
+  H.keys h "/jobs";
+  H.enter h;
+  H.reply ~quiet:true h Jobs_picker jobs_json;
+  H.key h (Key.plain Down);
+  H.enter h;
+  H.reply
+    h
+    Job_output
+    {|{"text":"[job j2 exited 0 after 3s, 10 bytes; lines 1-2 of 2] docker build .\nStep 1/2\nStep 2/2"}|};
+  H.keys h "/jobs kill j1";
+  H.enter h;
+  H.keys h "/jobs j1";
+  H.enter h;
+  H.show h;
+  [%expect
+    {|
+    (Rpc (method_ list_jobs) (params ()) (tag Jobs_picker))
+    (Rpc
+      (method_ job_output)
+      (params (
+        (job_id j2)
+        (lines  200)))
+      (tag Job_output))
+    (Rpc
+      (method_ kill_job)
+      (params ((job_id j1)))
+      (tag (Notice_on_success "killing job j1")))
+    (Rpc
+      (method_ job_output)
+      (params (
+        (job_id j1)
+        (lines  200)))
+      (tag Job_output))
+
+
+
+
+
+
+    session abc123 in /work. /help for commands, Esc aborts, Ctrl+C twice quits.
+    > earlier question
+    earlier answer
+    started job j1; /jobs shows it, and its exit is reported to the agent
+    [job j2 exited 0 after 3s, 10 bytes; lines 1-2 of 2] docker build .
+    Step 1/2
+    Step 2/2
+    ────────────────────────────────────────────────────────────────────────────────────────────────────
+    > ▏
+    /work  deepseek-flash  think:off  view:normal  ctx:0% 1.5k  $0.01  jobs:1 ⠋
+    |}];
+  (* The exit report reaches the idle agent and renders compactly. *)
+  H.event h (State (state ~running:true ()));
+  H.event
+    h
+    (Message_start
+       (User
+          "[job j1 killed] make test\n\
+           ok parser\n\
+           PASS parser\n\n\
+           [job j3 exited 2] make lint\n\
+           lint.ml:3: error"));
+  say h "the tests were killed";
+  H.event h (State (state ()));
+  H.show h;
+  [%expect
+    {|
+    session abc123 in /work. /help for commands, Esc aborts, Ctrl+C twice quits.
+    > earlier question
+    earlier answer
+    started job j1; /jobs shows it, and its exit is reported to the agent
+    [job j2 exited 0 after 3s, 10 bytes; lines 1-2 of 2] docker build .
+    Step 1/2
+    Step 2/2
+    ↩ job j1 killed "make test"
+      ok parser
+      PASS parser
+    ↩ job j3 exited 2 "make lint"
+      lint.ml:3: error
+    the tests were killed
+    ────────────────────────────────────────────────────────────────────────────────────────────────────
+    > ▏
+    /work  deepseek-flash  think:off  view:normal  ctx:0% 1.5k  $0.01
+    |}]
+;;
+
+let%expect_test "job reports reload compactly; look-alike text stays a user \
+                 message"
+  =
+  let h = connected ~width:80 ~height:12 () in
+  H.reply
+    ~quiet:true
+    h
+    Initial_messages
+    {|[{"role":"user","text":"[job j4 failed: tool host disconnected] npm run dev\nlistening on :3000"},{"role":"user","text":"[job board] what is on it?"}]|};
+  H.show h;
+  [%expect
+    {|
+    session abc123 in /work. /help for commands, Esc aborts, Ctrl+C twice quits.
+    > earlier question
+    earlier answer
+    ↩ job j4 failed: tool host disconnected "npm run dev"
+      listening on :3000
+    > [job board] what is on it?
+    ────────────────────────────────────────────────────────────────────────────────
+    > ▏
+    /work  deepseek-flash  think:off  view:normal  ctx:0% 1.5k  $0.01
+    |}]
 ;;

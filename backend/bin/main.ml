@@ -166,7 +166,10 @@ let common_params =
           ~tools:
             (if no_tools
              then []
-             else Tools.all @ (subagent :: Tool_subagent.control_tools))
+             else
+               Tools.all
+               @ (subagent :: Tool_subagent.control_tools)
+               @ Tool_jobs.tools)
           ~sessions_dir
           ~home
           ?session

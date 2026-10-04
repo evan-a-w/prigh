@@ -11,6 +11,18 @@ module Subagent : sig
   [@@deriving sexp_of, equal]
 end
 
+module Job : sig
+  (** A background shell job that is running or whose report has not been
+      delivered to the main agent yet. *)
+  type t =
+    { id : string
+    ; command : string
+    ; running : bool
+    ; exit : string option (** e.g. [exited 0], [killed], once finished *)
+    }
+  [@@deriving sexp_of, equal]
+end
+
 type t =
   { session_id : string
   ; session_path : string
@@ -29,6 +41,7 @@ type t =
   ; hosts : Host.t list
   (** backend first, then connected tool-capable clients *)
   ; subagents : Subagent.t list
+  ; jobs : Job.t list
   }
 [@@deriving sexp_of, equal]
 

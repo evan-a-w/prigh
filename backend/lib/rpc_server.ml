@@ -15,6 +15,9 @@ let methods =
   ; "abort"
   ; "dequeue"
   ; "cancel_subagent"
+  ; "kill_job"
+  ; "job_output"
+  ; "list_jobs"
   ; "shell"
   ; "get_state"
   ; "get_messages"
@@ -147,7 +150,7 @@ let maybe_evict t agent =
   if
     (not (Option.exists t.default_agent ~f:(phys_equal agent)))
     && (not (Agent.is_running agent))
-    && (not (Agent.has_running_subagents agent))
+    && (not (Agent.has_running_background agent))
     && List.is_empty (clients_of t agent)
   then Hashtbl.remove t.agents (session_id agent)
 ;;
@@ -303,7 +306,7 @@ let disconnect t (client : Client.t) =
 let shutdown t =
   let agents = Hashtbl.data t.agents in
   List.iter agents ~f:(fun agent ->
-    Agent.cancel_subagents ~discard:true agent;
+    Agent.cancel_background ~discard:true agent;
     ignore (Agent.abort agent : string list));
   Login_manager.cancel t.login;
   List.iter agents ~f:Agent.wait_idle;
@@ -647,6 +650,21 @@ let dispatch agent login ~meth ~params : Json.t Or_error.t =
   | "cancel_subagent" ->
     Or_error.bind (string_param params "agent_id") ~f:(fun agent_id ->
       unit_result (Agent.cancel_subagent agent ~agent_id))
+  | "kill_job" ->
+    Or_error.bind (string_param params "job_id") ~f:(fun job_id ->
+      unit_result (Agent.kill_job agent ~job_id))
+  | "job_output" ->
+    Or_error.bind (string_param params "job_id") ~f:(fun job_id ->
+      let lines =
+        match param params "lines" with
+        | Some (`Number n) -> Option.value (Int.of_string_opt n) ~default:200
+        | _ -> 200
+      in
+      Or_error.map (Agent.job_output agent ~job_id ~lines) ~f:(fun text ->
+        `Object [ "text", `String text ]))
+  | "list_jobs" ->
+    let now = Core_unix.gettimeofday () in
+    ok (`Array (List.map (Agent.jobs agent) ~f:(Rpc_json.job ~now)))
   | "dequeue" ->
     ok
       (match Agent.dequeue agent with
@@ -667,13 +685,18 @@ let dispatch agent login ~meth ~params : Json.t Or_error.t =
            Or_error.error_string "param \"add_to_context\" must be a boolean"
          | None -> Ok false)
         ~f:(fun add_to_context ->
-          Or_error.map
-            (Agent.shell agent ~command ~add_to_context)
-            ~f:(fun result ->
-              `Object
-                [ "text", `String result.text
-                ; ("is_error", if result.is_error then `True else `False)
-                ])))
+          match bool_param params "background" ~default:false with
+          | Error _ as e -> e
+          | Ok true ->
+            ok (`Object [ "job_id", `String (Agent.start_job agent ~command) ])
+          | Ok false ->
+            Or_error.map
+              (Agent.shell agent ~command ~add_to_context)
+              ~f:(fun result ->
+                `Object
+                  [ "text", `String result.text
+                  ; ("is_error", if result.is_error then `True else `False)
+                  ])))
   | "get_state" -> ok (Rpc_json.state (Agent.state agent))
   | "get_messages" ->
     ok (`Array (List.map (Agent.messages agent) ~f:Rpc_json.message))

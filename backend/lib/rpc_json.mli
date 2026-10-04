@@ -9,6 +9,11 @@ val delta : Assistant_event.t -> Json.t
 val state : Agent.State.t -> Json.t
 val config : Config.t -> Json.t
 val model : Model.t -> Json.t
+
+(** A job for [list_jobs]: id, command, running, exit, delivered, elapsed
+    seconds, bytes and last output line. *)
+val job : now:float -> Background_tasks.Task.t -> Json.t
+
 val session_summary : Session.Summary.t -> Json.t
 val session_stats : Agent.Session_stats.t -> Json.t
 val entry : Session.Entry.t -> Json.t

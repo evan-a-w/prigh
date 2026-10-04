@@ -134,6 +134,41 @@ let rec drain client ~stop =
    streams are printed separately (each is deterministic on its own), and state
    events, whose position depends on timing, are left out. Stops once a
    delivered report has been answered and nothing is left. *)
+(* Until the job's report has been delivered and the agent is idle again. *)
+let drain_jobs client =
+  let delivered = ref false in
+  let last_state = ref "" in
+  let rec go () =
+    match%bind Pipe.read (Client.incoming client) with
+    | `Eof -> return ()
+    | `Ok (Event (State s)) ->
+      let jobs =
+        String.concat
+          ~sep:" "
+          (List.map s.jobs ~f:(fun (j : State.Job.t) ->
+             sprintf "%s:%s" j.id (Option.value j.exit ~default:"running")))
+      in
+      let line = sprintf "  event state running=%b jobs=[%s]" s.running jobs in
+      if not (String.equal line !last_state) then print_endline line;
+      last_state := line;
+      if !delivered && (not s.running) && List.is_empty s.jobs
+      then return ()
+      else go ()
+    | `Ok (Event e) ->
+      (match e with
+       | Message_start (User t) when String.is_prefix t ~prefix:"[job " ->
+         delivered := true
+       | _ -> ());
+      Option.iter (summarise e) ~f:(fun line ->
+        printf "  event %s\n" (normalise line));
+      go ()
+    | `Ok other ->
+      print_s [%sexp (other : Client.Incoming.t)];
+      go ()
+  in
+  go ()
+;;
+
 let drain_background client =
   let subagent_lines = Queue.create () in
   let delivered = ref false in
@@ -309,6 +344,58 @@ let main () =
         let%bind () = drain_background client in
         let%bind () = Client.close client in
         print_endline "subagent backend exited";
+        return ()
+    in
+    let jobs_script = Filename.concat tmp "jobs.json" in
+    Out_channel.write_all
+      jobs_script
+      ~data:
+        {|[
+  {"text":"building","tool_calls":[{"id":"j1","name":"bash","arguments":{"command":"sleep 0.5; echo built","background":true}}]},
+  {"text":"started the build"},
+  {"text":"the build passed"}
+]|};
+    let%bind () =
+      let client =
+        Client.create
+          ~connect:
+            (spawn
+               [ "serve"
+               ; "-faux-script"
+               ; jobs_script
+               ; "-auth-file"
+               ; Filename.concat tmp "auth4.json"
+               ; "-cwd"
+               ; tmp
+               ; "-model"
+               ; "deepseek/deepseek-flash"
+               ])
+      in
+      match%bind Client.connect client with
+      | Error e ->
+        print_s [%message "cannot start jobs backend" (e : Error.t)];
+        return ()
+      | Ok () ->
+        let%bind () = call client "prompt" [ "text", Json.str "build it" ] in
+        let%bind () = drain_jobs client in
+        let%bind () =
+          match%map
+            Client.call
+              client
+              "job_output"
+              [ "job_id", Json.str "j1"; "lines", Json.int 5 ]
+          with
+          | Ok json ->
+            printf
+              "<- job_output: %s\n"
+              (Re.replace_string
+                 (Re.Perl.compile_pat {|after \d+s|})
+                 ~by:"after Ns"
+                 (Json.to_string json))
+          | Error e -> print_s [%message "job_output" (e : Error.t)]
+        in
+        let%bind () = Client.close client in
+        print_endline "jobs backend exited";
         return ()
     in
     let btw_script = Filename.concat tmp "btw.json" in

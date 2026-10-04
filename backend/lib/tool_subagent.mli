@@ -2,7 +2,7 @@ open! Core
 open! Import
 
 (** A tool that delegates a task to a nested agent loop with its own context,
-    tool set, model and turn budget. At depth 0 with [Tool.context.jobs] set it
+    tool set, model and turn budget. At depth 0 with [Tool.context.background] set it
     starts the agent in the background and returns its id; otherwise it blocks
     and returns the final reply. *)
 
@@ -16,5 +16,5 @@ val create
   -> Tool.t
 
 (** [subagent_wait], [subagent_status] and [subagent_cancel], which act on
-    the context's background jobs. *)
+    the context's background subagents. *)
 val control_tools : Tool.t list

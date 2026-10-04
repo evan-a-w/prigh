@@ -16,17 +16,27 @@ let find name = List.find all ~f:(fun t -> String.equal (Tool.name t) name)
 let specs tools = List.map tools ~f:(fun (t : Tool.t) -> t.spec)
 
 let background_control =
-  [ "subagent_wait"; "subagent_status"; "subagent_cancel" ]
+  [ "subagent_wait"
+  ; "subagent_status"
+  ; "subagent_cancel"
+  ; "job_status"
+  ; "job_output"
+  ; "job_wait"
+  ; "job_kill"
+  ]
 ;;
 
 let for_context ~parent ~depth ?only () =
   let available =
-    List.filter parent ~f:(fun t ->
+    List.filter_map parent ~f:(fun t ->
       let name = Tool.name t in
-      not
-        ((depth >= 2 && String.equal name "subagent")
-         || (depth >= 1 && List.mem background_control name ~equal:String.equal)
-        ))
+      if
+        (depth >= 2 && String.equal name "subagent")
+        || (depth >= 1 && List.mem background_control name ~equal:String.equal)
+      then None
+      else if depth >= 1 && String.equal name "bash"
+      then Some Tool_bash.foreground_tool
+      else Some t)
   in
   match only with
   | None -> Ok available

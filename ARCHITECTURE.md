@@ -202,7 +202,8 @@ two can share one.
   name plus `$resolve_dir`/`$read_file`/`$list_paths`/`$instructions`. `Tool_host` is the `prigh tool-host`
   worker loop around it (`exec`/`cancel` in, `output`/`result` out, one fiber
   per exec).
-- `Tool_bash` (streamed output, timeout, cancellation), `Tool_read`,
+- `Tool_bash` (streamed output, timeout, cancellation; with `background`
+  at depth 0 it starts a job instead, see below), `Tool_read`,
   `Tool_write` (`wrote N lines`), `Tool_edit` (multi-edit, unique
   non-overlapping matches, atomic; returns a unified diff from `Udiff`),
   `Tool_ls`, `Tool_grep`/`Tool_find` (via `rg`).
@@ -213,18 +214,39 @@ two can share one.
   in-process sharing the parent's provider, whose report is the child's final
   text plus a `[subagent: N turns, in/out tokens, $cost]` trailer. Progress
   comes back as nested `Subagent*` events (below), not text chunks. At depth 0
-  the context carries the agent's `Subagent_jobs` and the call only spawns
+  the context carries the agent's `Background_tasks` and the call only spawns
   the loop there, with its own cancellation, and returns `started agent
   a<n> (...)`; deeper calls (no jobs) block and return the report.
   `subagent_wait`/`subagent_status`/`subagent_cancel` act on the jobs and are
   dropped below depth 0.
-- `Subagent_jobs` — one agent's background subagents: ids `a<n>` (seeded past
-  the subagent calls already in the session), task, start time, last
-  activity (from their events), result and a `delivered` flag. Each finished
-  job's report is delivered exactly once, by `take_undelivered` (the agent
-  turns a batch into one user message of `[subagent <id> finished|failed]
-  <task>` sections) or by `wait`/`cancel_and_wait` (tool results). Events
-  and changes go to the hooks `Agent` installs with `connect`.
+- `Background_tasks` — one agent's background work, of two kinds:
+  subagents (ids `a<n>`, seeded past the subagent calls already in the
+  session) and shell jobs (ids `j<n>`, seeded past the `started job j<n>`
+  results and `[job j<n> ...]` reports already in it). Each task has its
+  label (task or command), start time, its own cancellation, last activity
+  (subagents, from their events), an `Output_tail` (jobs: the last 1 MB of
+  output and the total byte count), an outcome (`status` such as `finished`,
+  `exited 2`, `killed`, `failed: ...`, a body and `is_error`) and a
+  `delivered` flag. Each finished task's report (`[<kind> <id> <status>]
+  <label>` and the body) is delivered exactly once, by `take_undelivered`
+  (the agent turns a batch, subagents and jobs together, into one user
+  message) or by `wait`/`cancel_and_wait` (tool results). Events and changes
+  go to the hooks `Agent` installs with `connect`.
+- Background jobs — `bash` with `background: true` at depth 0 spawns a job
+  whose fiber runs the same call in the foreground (`background` dropped,
+  no timeout unless one was given) through the context's executor, so it
+  runs on the session's active host exactly like a normal call: in-process,
+  or as a `Tool_exec` round trip that the backend keeps pending in the job's
+  fiber while the turn goes on, its streamed `tool_exec_output` chunks
+  feeding the job's buffer (`Agent.executor` runs the spawning call itself in
+  the backend, never on the host). Killing a job cancels that call, which
+  kills the process group (locally, or on the host via `tool_exec_cancel`); a
+  host disconnecting fails it. The outcome's status is read from the
+  foreground result's trailer (`[exit code N]`, `[cancelled]`, `[killed by
+  ...]`, `[timed out ...]`), its body is the last 40 lines of output.
+  `Tool_jobs` has `job_status`, `job_output` (`lines`, `offset` from the
+  end), `job_wait` and `job_kill`; like the subagent controls they and
+  `background` itself are dropped below depth 0.
 - `Tools.all` is the fixed built-in set; `Tools.for_context` builds the
   per-agent tool list (`parent`, `depth`, optional `only`), so the
   subagent's tool set can be restricted and the `subagent` tool is dropped at
@@ -270,15 +292,17 @@ two can share one.
   a `!cmd` through the bash machinery), automatic compaction at 80% of the
   context window, and a subscriber list receiving `Agent.Event.t` (`Loop of
   Agent_event.t | State_changed | Compacted | Notice | Config_changed |
-  Queue_update`). Background subagents (`Subagent_jobs`) run in the agent's
-  switch, not the run's: `abort` leaves them running, `cancel_subagent`
-  cancels one. When one finishes, an idle agent starts a run whose prompts
+  Queue_update`). Background subagents and jobs (`Background_tasks`) run in
+  the agent's switch, not the run's: `abort` leaves them running,
+  `cancel_subagent`/`kill_job` stop one, `start_job` starts a job for a
+  user's `!&cmd`. When one finishes, an idle agent starts a run whose prompts
   begin with the delivery message; a running loop gets it from `steer` at
   the next turn boundary (after the turn's tool results, so tool calls and
   results stay paired), or the run's tail starts a new run unless it was
   aborted (then the report waits for the next prompt, which it precedes).
-  `wait_idle` also waits for running subagents and their deliveries;
-  `State.subagents` lists the running and undelivered ones; the in-place
+  `wait_idle` also waits for running subagents and jobs and their
+  deliveries (so headless `run` does too); `State.subagents` and
+  `State.jobs` list the running and undelivered ones; the in-place
   `new_session`/`switch_session` cancel them and drop their reports.
   `prompt`/`steer`/`follow_up` accept optional `attachments`
   (paths whose contents are appended to the user message as `<file>` blocks).
@@ -335,12 +359,18 @@ two can share one.
   (`new_session`, `switch_session` by id or path, `fork`, `clone`, `import`)
   create or load an agent and move only the calling client; `list_sessions`
   marks live sessions with `live`, `running` and `clients`; `delete_session`
-  refuses live ones. A session with running background subagents is not
-  evicted (it delivers their reports into its own session even with no
-  client attached); `shutdown` cancels them. `set_model` goes through `Model.resolve` (key, id,
+  refuses live ones. A session with running background subagents or jobs
+  is not evicted (it delivers their reports into its own session even with
+  no client attached); `shutdown` cancels them (killing the jobs).
+  `kill_job {job_id}`, `job_output {job_id, lines}` (`{text}`: a header line
+  and the last lines) and `list_jobs` (every job of the session: id,
+  command, running, exit, delivered, elapsed, bytes, last_line) serve the
+  `/jobs` picker, and `shell {command, background: true}` (`!&cmd`) returns
+  `{job_id}`. `set_model` goes through `Model.resolve` (key, id,
   display name or unique case-insensitive prefix; otherwise "did you mean"
   by edit distance). Methods: `hello`, `ping`, `prompt`, `steer`,
-  `follow_up`, `abort`, `dequeue`, `cancel_subagent`, `shell`, `get_state`, `get_messages`,
+  `follow_up`, `abort`, `dequeue`, `cancel_subagent`, `kill_job`,
+  `job_output`, `list_jobs`, `shell`, `get_state`, `get_messages`,
   `get_entries`, `set_model`, `set_thinking`, `list_models`, `compact`,
   `new_session`, `switch_session`, `list_sessions`, `set_session_name`,
   `delete_session`, `export`, `import`, `fork`, `clone`, `rewind`,
@@ -508,7 +538,9 @@ copy of the protocol types and the e2e test guards the contract.
     (inline command/argument/path completion), `Agent_view` (per-subagent
     transcript and status; the app keeps an agent while it runs or while
     `State.subagents` lists it as undelivered, then until the next prompt;
-    a delivered report renders as a compact `Transcript` `Delivery` item),
+    a delivered report, a subagent's or a job's, renders as a compact
+    `Transcript` `Delivery` item; `/jobs` lists `list_jobs` in a picker,
+    Enter adds `job_output` to the transcript as a block, Ctrl+D kills),
     `Commands` (slash table, parse, complete,
     closest), `Model_match` (display-name/prefix/did-you-mean), `Markdown`,
     `Btw_box` (the `/btw` panel above the editor: a newer question cancels
@@ -521,7 +553,7 @@ copy of the protocol types and the e2e test guards the contract.
   - `Render.screen : Model.t -> Screen.t` lays out a frame as `Content.t`
     (styled spans with `Text_width`-aware wrapping) plus the cursor cell. The
     status line keeps the cwd and model, then fills remaining width by
-    priority (context, cost/queued/agents, thinking, verbosity, new-line
+    priority (context, cost/queued/agents/jobs, thinking, verbosity, new-line
     count, mode hint) and left-truncates, so the model key stays visible at
     narrow widths.
 - `term/` (`prigh_ui_term`) — `Key_of_event` (Bonsai_term events → `Key.t`,
@@ -637,6 +669,13 @@ they paid for themselves immediately: the tmux layer caught `Ctrl+O` being
 eaten by the tty's line discipline (fixed by clearing `IEXTEN`) and the quit
 hang (`Driver.finished` never resolving), and the paste scenario caught the
 batched-event buffering bug.
+
+`backend/test/test_background_jobs.ml` covers background jobs: delivery
+while idle and at a turn boundary (batched with a subagent's report), the
+job tools, abort, kills that really end the process, id continuity across a
+reload, and jobs on a real `prigh tool-host` connected over TCP (output
+streamed into the job, `kill_job` cancelling the exec on the host, a dropped
+connection failing the job).
 
 `backend/test/test_pi_rpc.ml` drives `Pi_rpc` over in-memory lines
 (pi commands in, pi events out) for prompts, steering, confirmations,

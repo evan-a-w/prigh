@@ -258,26 +258,34 @@ let execute
 let create ~provider ~current_model ~current_thinking ~home =
   let run (context : Tool.Context.t) args =
     let prepared = prepare ~current_model ~current_thinking context args in
-    match context.jobs with
-    | Some jobs when context.depth = 0 ->
+    match context.background with
+    | Some background when context.depth = 0 ->
       let id =
-        Subagent_jobs.spawn
-          jobs
-          ~task:prepared.task
-          ~run:(fun ~id ~cancel ~emit ->
-            execute
-              ~provider
-              ~home
-              { context with cancel; emit; on_output = ignore }
-              prepared
-              ~agent_id:id)
+        Background_tasks.spawn
+          background
+          ~kind:Subagent
+          ~label:prepared.task
+          ~run:(fun ~id ~cancel ~emit ~on_output:_ ->
+            let result =
+              execute
+                ~provider
+                ~home
+                { context with cancel; emit; on_output = ignore }
+                prepared
+                ~agent_id:id
+            in
+            { Background_tasks.Outcome.status =
+                (if result.is_error then "failed" else "finished")
+            ; body = result.text
+            ; is_error = result.is_error
+            })
       in
       Tool.Result.ok
         (sprintf
            "started agent %s (%s); its result will be delivered to you when it \
             finishes; use subagent_wait to block on it"
            id
-           (Subagent_jobs.short_task prepared.task))
+           (Background_tasks.short_task prepared.task))
     | _ ->
       let agent_id =
         match context.agent_id with
@@ -289,9 +297,9 @@ let create ~provider ~current_model ~current_thinking ~home =
   { Tool.spec; run }
 ;;
 
-let jobs_of (context : Tool.Context.t) =
-  match context.jobs with
-  | Some jobs -> jobs
+let background_of (context : Tool.Context.t) =
+  match context.background with
+  | Some background -> background
   | None ->
     raise (Tool_args.Invalid "background subagents are not available here")
 ;;
@@ -331,17 +339,23 @@ let wait_tool =
          ])
   in
   let run (context : Tool.Context.t) args =
-    let jobs = jobs_of context in
+    let background = background_of context in
     let ids = Tool_args.string_list_opt args "ids" in
     let all = Option.value (Tool_args.bool_opt args "all") ~default:true in
     let timeout =
       Option.map (Tool_args.int_opt args "timeout") ~f:Float.of_int
     in
-    let { Subagent_jobs.Wait_result.finished; running; timed_out } =
+    let { Background_tasks.Wait_result.finished; running; timed_out } =
       ok_or_invalid
-        (Subagent_jobs.wait jobs ~ids ~all ~timeout ~cancel:context.cancel)
+        (Background_tasks.wait
+           background
+           ~kind:Subagent
+           ~ids
+           ~all
+           ~timeout
+           ~cancel:context.cancel)
     in
-    let reports = List.map finished ~f:Subagent_jobs.Job.report in
+    let reports = List.map finished ~f:Background_tasks.Task.report in
     let still =
       match running with
       | [] -> []
@@ -354,8 +368,9 @@ let wait_tool =
                (List.map running ~f:(fun job ->
                   sprintf
                     "%s (%s)"
-                    (Subagent_jobs.Job.id job)
-                    (Subagent_jobs.short_task (Subagent_jobs.Job.task job)))))
+                    (Background_tasks.Task.id job)
+                    (Background_tasks.short_task
+                       (Background_tasks.Task.label job)))))
         ]
     in
     match reports @ still with
@@ -375,7 +390,8 @@ let status_tool =
       (Tool_args.schema [])
   in
   let run context _args =
-    Tool.Result.ok (Subagent_jobs.status_text (jobs_of context))
+    Tool.Result.ok
+      (Background_tasks.status_text (background_of context) ~kind:Subagent)
   in
   { Tool.spec; run }
 ;;
@@ -389,13 +405,16 @@ let cancel_tool =
       (Tool_args.schema ~required:[ "id" ] [ "id", `String, "Agent id" ])
   in
   let run (context : Tool.Context.t) args =
-    let jobs = jobs_of context in
     let id = Tool_args.string args "id" in
-    let job =
+    let task =
       ok_or_invalid
-        (Subagent_jobs.cancel_and_wait jobs id ~cancel:context.cancel)
+        (Background_tasks.cancel_and_wait
+           (background_of context)
+           ~kind:Subagent
+           id
+           ~cancel:context.cancel)
     in
-    Tool.Result.ok (Subagent_jobs.Job.report job)
+    Tool.Result.ok (Background_tasks.Task.report task)
   in
   { Tool.spec; run }
 ;;
