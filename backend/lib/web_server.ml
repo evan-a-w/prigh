@@ -216,40 +216,35 @@ let serve_rpc router ~query:_ ws =
     ~write_line:(Websocket.send_text ws)
 ;;
 
-let send_error ws message =
-  Websocket.send_text
-    ws
-    (Json.to_string
-       (`Object [ "type", `String "error"; "message", `String message ]))
-;;
-
 let serve_terminal router terminals ~query ws =
   let param name = List.Assoc.find query ~equal:String.equal name in
   let size name ~default =
     Option.bind (param name) ~f:Int.of_string_opt |> Option.value ~default
   in
+  let channel = Terminal_channel.of_websocket ws in
+  let error message =
+    Terminal_channel.send_text
+      channel
+      (Json.to_string
+         (`Object [ "type", `String "error"; "message", `String message ]))
+  in
   match Rpc_router.lookup router ~token:(param "token") with
-  | None -> send_error ws "unauthorised: bad or missing token"
+  | None -> error "unauthorised: bad or missing token"
   | Some server ->
     let session = Option.filter (param "session") ~f:(Fn.non String.is_empty) in
+    let key =
+      let key = Option.value session ~default:"default" in
+      match Rpc_server.namespace server with
+      | None -> key
+      | Some namespace -> namespace ^ ":" ^ key
+    in
+    let cols = size "cols" ~default:80 in
+    let rows = size "rows" ~default:24 in
     (match Rpc_server.terminal_target server ~session with
-     | `Unavailable reason -> send_error ws ("no terminal: " ^ reason)
-     | `Host (host, _) ->
-       send_error
-         ws
-         (sprintf "terminals on tool host %S are not supported yet" host)
-     | `Backend cwd ->
-       let key = Option.value session ~default:"default" in
-       Terminals.serve
-         terminals
-         ~key:
-           (match Rpc_server.namespace server with
-            | None -> key
-            | Some namespace -> namespace ^ ":" ^ key)
-         ~cwd
-         ~cols:(size "cols" ~default:80)
-         ~rows:(size "rows" ~default:24)
-         ws)
+     | `Backend cwd -> Terminals.serve terminals ~key ~cwd ~cols ~rows channel
+     | `Host (host, cwd) ->
+       Rpc_server.relay_terminal server ~host ~key ~cwd ~cols ~rows channel
+     | `Unavailable reason -> error ("no terminal: " ^ reason))
 ;;
 
 let listen ~env ~sw ~addr ~port ~root ~websockets ~on_lines =

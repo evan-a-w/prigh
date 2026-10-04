@@ -73,9 +73,9 @@ val token_ok : t -> string option -> bool
 
 val namespace : t -> string option
 
-(** Where [session]'s terminal should run: on its active tool host, in the
-    session's cwd. Without a live session, the backend in the server's cwd
-    (if it is a host). *)
+(** Where [session]'s terminal should run: on its active tool host, in that
+    host's cwd for the session. Without a live session, the backend in the
+    server's cwd (if it is a host). *)
 val terminal_target
   :  t
   -> session:string option
@@ -83,3 +83,15 @@ val terminal_target
      | `Host of string * string (** client id, cwd on that host *)
      | `Unavailable of string (** reason *)
      ]
+
+(** Relays a terminal channel to the tool-host client [host] (see
+    {!Terminal_relay}) until either side closes. *)
+val relay_terminal
+  :  t
+  -> host:string
+  -> key:string
+  -> cwd:string
+  -> cols:int
+  -> rows:int
+  -> Terminal_channel.t
+  -> unit

@@ -487,28 +487,76 @@ let%expect_test "pi-web and /terminal look the namespace up by token" =
     "$DIR/home/.prigh/namespaces/b/.prigh/sessions/<stamp>_<id>.jsonl"
     |}];
   Websocket.close (first "/terminal?token=nope");
-  (* A session whose tools run on a client host: not served here (yet). *)
+  [%expect
+    {| {"type":"error","message":"unauthorised: bad or missing token"} |}];
+  (* A session whose tools run on a client host: relayed to that host, within
+     the namespace. *)
   let client, _, _ = connect b ~token:"tok-b" () in
   let agent = Rpc_server.agent_of_client b client in
-  let _laptop, _, _ =
+  let session_id = Session.id (Agent.session agent) in
+  let laptop, laptop_sent, _ =
     connect
       b
       ~token:"tok-b"
       ~fields:
         (sprintf
            {|, "tools": true, "cwd": "/home/me", "session": "%s"|}
-           (Session.id (Agent.session agent)))
+           session_id)
       ()
   in
-  Websocket.close
-    (first
-       (sprintf
-          "/terminal?token=tok-b&session=%s"
-          (Session.id (Agent.session agent))));
+  let ws = browser (sprintf "/terminal?token=tok-b&session=%s" session_id) in
+  let is_open json =
+    Option.equal
+      Json.exactly_equal
+      (Json.member "event" json)
+      (Some (`String "terminal_open"))
+  in
+  let rec await_open () =
+    match Queue.find laptop_sent ~f:is_open with
+    | Some event -> event
+    | None ->
+      Eio.Time.sleep (Eio.Stdenv.clock t.env) 0.01;
+      await_open ()
+  in
+  let opened = await_open () in
+  show t opened;
+  let term_id =
+    match Json.member "term_id" opened with
+    | Some (`String id) -> id
+    | _ -> assert false
+  in
+  show
+    t
+    (call
+       b
+       laptop
+       ~params:
+         (sprintf
+            {|{"term_id": "%s", "kind": "text", "data": "{\"type\":\"exit\"}"}|}
+            term_id)
+       "terminal_frame");
+  show
+    t
+    (call
+       b
+       laptop
+       ~params:(sprintf {|{"term_id": "%s"}|} term_id)
+       "terminal_closed");
+  let rec drain () =
+    match Websocket.read_text ws with
+    | None -> print_endline "browser socket closed"
+    | Some line ->
+      print_endline line;
+      drain ()
+  in
+  drain ();
   [%expect
     {|
-    {"type":"error","message":"unauthorised: bad or missing token"}
-    {"type":"error","message":"terminals on tool host \"client-3\" are not supported yet"}
+    {"type":"event","event":"terminal_open","host":"client-3","term_id":"term-1","key":"b:<id>","cwd":"/home/me","cols":80,"rows":24}
+    {"type":"response","id":"r","ok":true,"result":{}}
+    {"type":"response","id":"r","ok":true,"result":{}}
+    {"type":"exit"}
+    browser socket closed
     |}];
   Rpc_router.shutdown router
 ;;

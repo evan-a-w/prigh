@@ -44,8 +44,11 @@ optional session id or path, the `-token` if the backend requires one).
 Each session has an *active tool host*: where its `on_host` tools (bash,
 read, write, edit, ls, grep, find) and `!cmd` shells run. It is either the
 backend itself or a connected client that advertised `tools: true` in
-`hello`; the subagent tool always runs in the backend but its tool calls
-follow the same active host. Tools default to the frontend: a tool-capable
+`hello` (a TUI, or a standalone `prigh tool-host -connect`); the subagent
+tool always runs in the backend but its tool calls follow the same active
+host. With `-no-backend-host` the backend is not a host at all (not listed,
+no in-process tools, instructions, path listings or git branch), and a
+session without a host adopts the first one that connects. Tools default to the frontend: a tool-capable
 client takes over when it attaches unless the user pinned a host with
 `set_active_host` (`/host` in the TUI). The session cwd is a property of the
 host, so switching hosts switches the cwd (and `/cd` validates the directory
@@ -332,6 +335,21 @@ two can share one.
   found via `-web-root`, `$PRIGH_WEB_ROOT` or next to the executable;
   no `..`, no dot files). The token check is the same `hello` check as
   for TCP; the static files are public.
+- `Rpc_router` / `Namespace` — `-tokens name=token,...`: one `Rpc_server`
+  per namespace, each with its own home (sessions, config, `auth.json`,
+  global `AGENTS.md`) under `~/.prigh/namespaces/<name>` and no provider keys
+  from the environment. Every listener goes through the router, which reads
+  a connection's first line (a `hello` with a known token) and hands the
+  connection to that namespace's server; `/terminal` and pi-web look the
+  server up by the query token. Without `-tokens` it wraps one server.
+- `Terminal_channel` / `Terminal_relay` — terminals run on the session's
+  active host (`Rpc_server.terminal_target`). `Terminals.serve` speaks to an
+  abstract frame channel (a WebSocket, or frames fed by a relay). For a
+  client host the backend relays the browser socket as `terminal_open` /
+  `terminal_frame` / `terminal_close` events to that host and its
+  `terminal_frame` / `terminal_closed` requests back; the host runs the same
+  `Terminals` code (`Tool_host`, also behind the TUI's stdio worker, which
+  forwards the same messages as lines).
 - `Terminal` / `Terminals` / `Tmux_control` — the browser's shell panel.
   A `Terminal` is a tmux session on the server `-L prigh` (session names
   carry the backend's pid; `$PRIGH_TMUX` picks the binary) driven by one

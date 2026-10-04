@@ -96,6 +96,31 @@ to one session (`/sessions` marks live ones) and all see the same stream; a
 session keeps running when its frontends disconnect. Plain TCP with a shared
 token: bind to localhost and use an SSH tunnel on untrusted networks.
 
+A tool host doesn't need a TUI: `prigh tool-host -connect server:7777 -token
+sekrit -cwd ~/proj [-name NAME]` connects on its own (reconnecting when the
+connection drops) and hosts the session's tools *and* its `>_` terminal, so
+a browser-only user can pick it with `/host`. The web UI's terminal always
+runs on the session's active host, relayed through the backend.
+
+### Several tokens (namespaces)
+
+```
+prigh serve -web 0.0.0.0:7788 -tokens 'me=sekrit,alice=0ther'   # or $PRIGH_TOKENS
+```
+
+Each token opens its own namespace: its own provider logins, sessions,
+config (`default_model`, scoped models, ...), global `AGENTS.md`, connected
+tool hosts and terminals, under `~/.prigh/namespaces/<name>/` (the name
+`default` keeps the usual `~/.prigh` and `~/.config/prigh` paths). Clients
+in one namespace never see another's. In this mode provider keys are never
+read from the environment; log in per namespace with `/login`.
+
+`-no-backend-host` (or `PRIGH_NO_BACKEND_HOST=1`) removes the backend's own
+tool host: nothing runs on the server, every session's tools and terminal
+run only on hosts its namespace has connected (`prigh tool-host -connect`
+or a TUI), so namespaces cannot reach each other's files through the
+server.
+
 ## In a browser
 
 The frontend also runs as a web page, with the same keys, commands, pickers

@@ -24,7 +24,7 @@ module H = struct
     }
 end
 
-let make_server t ~sw ~provider =
+let make_server ?token t ~sw ~provider =
   let login = login_manager t ~sw in
   let sessions_dir = Filename.concat t.dir "sessions" in
   let new_agent ?session ~cwd () =
@@ -43,6 +43,7 @@ let make_server t ~sw ~provider =
     Rpc_server.create
       ~env:t.env
       ~sw
+      ?token
       ~login
       ~sessions_dir
       ~cwd:t.dir

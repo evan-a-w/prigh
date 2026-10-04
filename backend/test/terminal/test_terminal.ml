@@ -417,3 +417,281 @@ let%expect_test "bad token, unknown session and start failures" =
   [%expect
     {| (Error "/nonexistent/tmux not found: install tmux or set PRIGH_TMUX") |}]
 ;;
+
+module Worker = Prigh_test.Test_tool_host.Worker
+
+(* Reads what a stdio worker writes until [pred]: binary frames go to
+   [screen], other lines are printed and kept in [lines]. *)
+let read_worker_until w ~screen ~lines pred =
+  let rec go () =
+    if not (pred ())
+    then (
+      match Worker.read_line w with
+      | None -> print_endline "(eof)"
+      | Some line ->
+        let json = Jsonaf.of_string line in
+        (match Jsonaf.member "kind" json, Jsonaf.member "data" json with
+         | Some (`String "binary"), Some (`String data) ->
+           Buffer.add_string screen (Base64.decode_exn data)
+         | _ ->
+           print_endline line;
+           lines := line :: !lines);
+        go ())
+  in
+  go ()
+;;
+
+let%expect_test "stdio worker: terminals over JSON lines" =
+  with_fixture
+  @@ fun f ->
+  let w = Worker.start f.sandbox ~sw:f.sw ~terminals:(lazy f.terminals) in
+  let screen = Buffer.create 1024 in
+  let lines = ref [] in
+  let read_until pred = read_worker_until w ~screen ~lines pred in
+  let saw text () =
+    String.is_substring (Buffer.contents screen) ~substring:text
+  in
+  let said text () =
+    List.exists !lines ~f:(String.is_substring ~substring:text)
+  in
+  let frame term_id kind data =
+    Worker.send
+      w
+      (Jsonaf.to_string
+         (`Object
+             [ "type", `String "terminal_frame"
+             ; "term_id", `String term_id
+             ; "kind", `String kind
+             ; ( "data"
+               , `String
+                   (if String.equal kind "binary"
+                    then Base64.encode_string data
+                    else data) )
+             ]))
+  in
+  Worker.send
+    w
+    (sprintf
+       {|{"type":"terminal_open","term_id":"v1","key":"k1","cwd":"%s","cols":40,"rows":8}|}
+       f.sandbox.dir);
+  read_until (saw "$");
+  frame "v1" "binary" "echo hel''lo\r";
+  read_until (saw "hello\r\n");
+  frame "v1" "text" {|{"type":"ping"}|};
+  read_until (said "pong");
+  Fixture.print_live f;
+  [%expect
+    {|
+    {"type":"terminal_frame","term_id":"v1","kind":"text","data":"{\"type\":\"pong\"}"}
+    ((k1 t1-k1 1))
+    |}];
+  (* The frontend closing a viewer gets no reply; the terminal lives on. *)
+  Worker.send w {|{"type":"terminal_close","term_id":"v1"}|};
+  print_s
+    [%sexp
+      (Fixture.eventually f (fun () ->
+         List.equal
+           [%equal: string * string * int]
+           (Terminals.live f.terminals)
+           [ "k1", "t1-k1", 0 ])
+       : bool)];
+  [%expect {| true |}];
+  (* The shell ending is reported, then the viewer is closed. *)
+  Worker.send
+    w
+    (sprintf
+       {|{"type":"terminal_open","term_id":"v2","key":"k1","cwd":"%s"}|}
+       f.sandbox.dir);
+  Buffer.clear screen;
+  read_until (saw "$");
+  frame "v2" "binary" "exit\r";
+  read_until (said "terminal_closed");
+  Worker.close w;
+  read_until (fun () -> false);
+  [%expect
+    {|
+    {"type":"terminal_frame","term_id":"v2","kind":"text","data":"{\"type\":\"exit\"}"}
+    {"type":"terminal_closed","term_id":"v2"}
+    (worker finished)
+    (eof)
+    |}]
+;;
+
+(* The browser's terminal for a session whose tools run on a network tool
+   host: the backend relays it, the host runs the shell. *)
+let%expect_test "a terminal on a network tool host, relayed end to end" =
+  with_sandbox
+  @@ fun sandbox ->
+  Eio.Switch.run
+  @@ fun sw ->
+  let terminals ~socket =
+    Terminals.create
+      ~env:sandbox.env
+      ~sw
+      ~tmux:"tmux"
+      ~socket:(Path (Filename.concat sandbox.dir socket))
+      ~idle_timeout:(Time_ns.Span.of_sec 60.)
+      ~command:[ "env"; "PS1=$ "; "/bin/sh" ]
+      ()
+  in
+  let backend_terminals = terminals ~socket:"backend.sock" in
+  let host_terminals = terminals ~socket:"host.sock" in
+  let host_dir = Filename.concat sandbox.dir "host" in
+  Core_unix.mkdir_p host_dir;
+  let agent, h =
+    Prigh_test.Test_rpc.make_server
+      ~token:"sekrit"
+      sandbox
+      ~sw
+      ~provider:(Faux_provider.create [])
+  in
+  let port =
+    Web_server.listen
+      ~env:sandbox.env
+      ~sw
+      ~addr:Eio.Net.Ipaddr.V4.loopback
+      ~port:0
+      ~root:None
+      ~websockets:
+        [ ( "/terminal"
+          , Web_server.serve_terminal
+              (Rpc_router.single h.server)
+              backend_terminals )
+        ]
+      ~on_lines:(Rpc_server.serve_lines h.server)
+  in
+  let f =
+    { Fixture.sandbox
+    ; sw
+    ; socket = Filename.concat sandbox.dir "host.sock"
+    ; port
+    ; terminals = host_terminals
+    }
+  in
+  let call meth params =
+    ignore
+      (Rpc_server.handle
+         h.server
+         h.client
+         (Jsonaf.of_string
+            (sprintf {|{"id": 1, "method": "%s", "params": %s}|} meth params))
+       : Jsonaf.t)
+  in
+  let session = Session.id (Agent.session agent) in
+  let query = sprintf "token=sekrit&session=%s&cols=40&rows=8" session in
+  let print_live () =
+    print_endline
+      (mask
+         sandbox
+         (Sexp.to_string
+            [%sexp
+              { host =
+                  (Terminals.live host_terminals : (string * string * int) list)
+              ; backend =
+                  (Terminals.live backend_terminals
+                   : (string * string * int) list)
+              }]))
+  in
+  Exn.protect
+    ~finally:(fun () ->
+      Terminals.close_all host_terminals;
+      Terminals.close_all backend_terminals;
+      ignore (Fixture.tmux f [ "kill-server" ] : Process.Output.t))
+    ~f:(fun () ->
+      (* The host runs in [host_sw]; ending it drops the connection. *)
+      let c =
+        Eio.Switch.run (fun host_sw ->
+          let host =
+            Prigh_test.Test_tool_host.Host.start
+              sandbox
+              ~sw:host_sw
+              ~terminals:(lazy host_terminals)
+              ~port
+              ~token:(Some "sekrit")
+              ~cwd:host_dir
+          in
+          Prigh_test.Test_tool_host.Host.wait_logs sandbox host 1;
+          call "hello" {|{"token": "sekrit"}|};
+          call "set_active_host" {|{"host": "client-2"}|};
+          let a = Peer.connect f query in
+          ignore (Peer.read_until f a (Peer.saw "$") : bool);
+          Peer.type_ a "pwd\r";
+          print_s [%sexp (Peer.read_until f a (Peer.saw host_dir) : bool)];
+          print_live ();
+          [%expect
+            {|
+            connected to 127.0.0.1:PORT as client-2
+            true
+            ((host((<id> t1-<id> 1)))(backend()))
+            |}];
+          Websocket.send_text a.ws {|{"type":"resize","cols":50,"rows":12}|};
+          Websocket.send_text a.ws {|{"type":"ping"}|};
+          print_s
+            [%sexp
+              (Peer.read_until f a (fun p ->
+                 List.mem p.texts {|{"type":"pong"}|} ~equal:String.equal)
+               : bool)];
+          let name = sprintf "t1-%s" session in
+          print_s
+            [%sexp
+              (Fixture.eventually f (fun () ->
+                 String.equal
+                   (String.strip
+                      (Fixture.tmux
+                         f
+                         [ "display-message"
+                         ; "-p"
+                         ; "-t"
+                         ; name
+                         ; "#{window_width}x#{window_height}"
+                         ])
+                        .stdout)
+                   "50x12")
+               : bool)];
+          [%expect
+            {|
+            true
+            true
+            |}];
+          (* Closing the browser detaches it on the host. *)
+          Peer.close a;
+          print_s
+            [%sexp
+              (Fixture.eventually f (fun () ->
+                 List.equal
+                   [%equal: string * string * int]
+                   (Terminals.live host_terminals)
+                   [ session, name, 0 ])
+               : bool)];
+          (* The shell exiting on the host closes the browser's socket. *)
+          let b = Peer.connect f query in
+          ignore (Peer.read_until f b (Peer.saw "$") : bool);
+          Peer.type_ b "exit\r";
+          print_s [%sexp (Peer.read_until f b (fun p -> p.closed) : bool)];
+          print_s [%sexp (b.texts : string list)];
+          [%expect
+            {|
+            true
+            true
+            ("{\"type\":\"exit\"}")
+            |}];
+          let c = Peer.connect f query in
+          ignore (Peer.read_until f c (Peer.saw "$") : bool);
+          print_live ();
+          [%expect {| ((host((<id> t2-<id> 1)))(backend())) |}];
+          c)
+      in
+      (* The host is gone: its browser sockets close with an error, and new
+         ones are refused. *)
+      print_s [%sexp (Peer.read_until f c (fun p -> p.closed) : bool)];
+      print_s [%sexp (c.texts : string list)];
+      let d = Peer.connect f query in
+      ignore (Peer.read_until f d (fun p -> p.closed) : bool);
+      print_s [%sexp (d.texts : string list)];
+      [%expect
+        {|
+        true
+        ("{\"type\":\"error\",\"message\":\"the tool host disconnected\"}")
+        ("{\"type\":\"error\",\"message\":\"no terminal: the tool host \\\"client-2\\\" is not connected\"}")
+        |}])
+;;

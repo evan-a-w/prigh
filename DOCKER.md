@@ -78,7 +78,9 @@ them in the container's `/workspace` instead.
 | Variable | Default | Meaning |
 |---|---|---|
 | `PRIGH_MODE` | `web` | see above |
-| `PRIGH_TOKEN` | – | shared secret that clients must present. **Required** for network modes |
+| `PRIGH_TOKEN` | – | shared secret that clients must present. **Required** for network modes (or `PRIGH_TOKENS`) |
+| `PRIGH_TOKENS` | – | several tokens, `name=token,name2=token2`: each is its own namespace (see [Namespaces](#namespaces)); replaces `PRIGH_TOKEN` |
+| `PRIGH_NO_BACKEND_HOST` | – | `1`: nothing runs in the container; tools and terminals run only on hosts the user connects (see [Namespaces](#namespaces)) |
 | `PRIGH_ALLOW_NO_TOKEN` | – | set to `1` to start without a token (only behind something else that authenticates) |
 | `PRIGH_BIND` | `0.0.0.0` | host address the ports are published on (`127.0.0.1` keeps them local, e.g. behind a reverse proxy) |
 | `PRIGH_WEB_PORT`, `PRIGH_PI_WEB_PORT`, `PRIGH_SERVER_PORT` | 7788, 7789, 7777 | host ports |
@@ -95,6 +97,34 @@ The image ships `bash git ripgrep tmux curl jq less openssh-client
 procps`. Anything else the agent needs at runtime must be added with
 `PRIGH_EXTRA_APT_PACKAGES`, because the container runs as a non-root user
 on a read-only root filesystem.
+
+## Namespaces
+
+Set `PRIGH_TOKENS=me=<token1>,alice=<token2>` instead of `PRIGH_TOKEN`. Each
+token is its own world: provider logins, sessions, config, connected tool
+hosts and terminals live under `/home/prigh/.prigh/namespaces/<name>/`, and
+clients with one token never see another's. A namespace called `default`
+uses the paths a single `PRIGH_TOKEN` used, so switching keeps your
+existing logins and sessions (e.g. `PRIGH_TOKENS=default=<old token>,alice=...`).
+
+All namespaces share the container, so by default their agents can read
+each other's files there (the backend's own tool host runs as one user).
+For real separation set `PRIGH_NO_BACKEND_HOST=1`. Then nothing
+model-controlled runs in the container. Each user connects a tool host
+from their own machine, which runs that namespace's tools and `>_`
+terminal:
+
+```
+prigh tool-host -connect <docker-host>:7788 -token <their token> -cwd ~/proj
+# or, with the tools themselves in a throwaway container on that machine:
+docker run --rm -it -v "$PWD:/work" -w /work <image> prigh tool-host -connect <docker-host>:7788 -token <their token> -cwd /work
+```
+
+Then `/host` in the web UI (or TUI) picks it. A TUI started with
+`prigh-tui -connect` is a tool host too, while it is open.
+`docker compose exec prigh prigh-docker tui -token <token>` still works as
+an admin console; without the backend host it hosts its own tools in the
+container while it is open.
 
 ## Logging in
 

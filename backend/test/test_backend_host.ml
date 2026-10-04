@@ -259,7 +259,7 @@ let%expect_test "backend host disabled" =
     ((active_host client-2) (cwd /home/me/proj) (git_branch ()) (hosts ()))
     {"type":"response","id":"r","ok":true,"result":{}}
     tool_result bash: "no tool host connected: connect one with `prigh tool-host -connect ...` or a TUI, then pick it with /host"
-    (Unavailable "tool host \"client-2\" is not connected")
+    (Unavailable "the tool host \"client-2\" is not connected")
     |}]
 ;;
 
