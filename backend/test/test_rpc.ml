@@ -260,7 +260,10 @@ let%expect_test
   let output = Buffer.create 4096 in
   Eio.Fiber.all
     [ (fun () ->
-        Rpc_server.serve_connection h.server ~input:in_r ~output:out_w;
+        Rpc_router.serve_connection
+          (Rpc_router.single h.server)
+          ~input:in_r
+          ~output:out_w;
         Rpc_server.shutdown h.server;
         Eio.Flow.close out_w)
     ; (fun () ->

@@ -35,8 +35,11 @@ module State : sig
     ; usage : Usage.t (** summed over assistant messages on the active path *)
     ; cost_usd : float
     ; context_tokens : int (** input tokens of the last request, if any *)
-    ; active_host : string (** [Host.id]; may be absent from [hosts] *)
-    ; hosts : Host.t list (** the backend first, then connected clients *)
+    ; active_host : string
+      (** [Host.id]; may be absent from [hosts], or [""] when the backend
+              host is disabled and no client host was ever adopted *)
+    ; hosts : Host.t list
+      (** the backend first (unless disabled), then connected clients *)
     }
   [@@deriving sexp_of]
 end
@@ -108,6 +111,11 @@ val create
   -> ?auto_describe:bool
        (** write a [Session_description] after a turn once the conversation
            is long enough (default: false) *)
+  -> ?backend_host:bool
+       (** whether the backend itself is a tool host (default: true). Without
+           it, [on_host] tools, instructions, path listings and the git branch
+           never touch the backend's filesystem, and a session adopts the
+           first connected client host when its own is missing. *)
   -> cwd:string
   -> unit
   -> t
@@ -228,7 +236,7 @@ val set_hosts : t -> Host.t list -> unit
     host that is still connected; called when a client attaches. *)
 val prefer_host : t -> string -> unit
 
-(** The backend first, then the client hosts. *)
+(** The backend first (unless disabled), then the client hosts. *)
 val hosts : t -> Host.t list
 
 val active_host : t -> string

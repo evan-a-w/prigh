@@ -1085,14 +1085,24 @@ let serve_lines
   Eio.Stream.add outbox None
 ;;
 
-let serve_websocket server ~query ws =
+let serve_websocket router ~query ws =
   let param name = List.Assoc.find query ~equal:String.equal name in
-  serve_lines
-    server
-    ?token:(param "token")
-    ?session:(param "session")
-    ?name:(param "name")
-    ~read_line:(fun () -> Websocket.read_text ws)
-    ~write_line:(Websocket.send_text ws)
-    ()
+  let token = param "token" in
+  match Rpc_router.lookup router ~token with
+  | None ->
+    Websocket.send_text
+      ws
+      (Json.to_string
+         (P.event
+            "prigh_hello_failed"
+            [ "error", `String "unauthorised: bad or missing token" ]))
+  | Some server ->
+    serve_lines
+      server
+      ?token
+      ?session:(param "session")
+      ?name:(param "name")
+      ~read_line:(fun () -> Websocket.read_text ws)
+      ~write_line:(Websocket.send_text ws)
+      ()
 ;;

@@ -28,6 +28,6 @@ val serve_lines
   -> unit
   -> unit
 
-(** [serve_lines] over a WebSocket, taking [token] and [session] from the
-    upgrade request's query string. *)
-val serve_websocket : Rpc_server.t -> Web_server.on_websocket
+(** [serve_lines] over a WebSocket on the server [token] selects, taking
+    [token] and [session] from the upgrade request's query string. *)
+val serve_websocket : Rpc_router.t -> Web_server.on_websocket

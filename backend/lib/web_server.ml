@@ -209,32 +209,47 @@ let handle ~root ~websockets ~on_lines flow =
        | Some root -> Eio.Flow.copy_string (static ~root request) flow))
 ;;
 
-let serve_rpc server ~query:_ ws =
-  Rpc_server.serve_lines
-    server
+let serve_rpc router ~query:_ ws =
+  Rpc_router.serve_lines
+    router
     ~read_line:(fun () -> Websocket.read_text ws)
     ~write_line:(Websocket.send_text ws)
 ;;
 
-let serve_terminal server terminals ~query ws =
+let send_error ws message =
+  Websocket.send_text
+    ws
+    (Json.to_string
+       (`Object [ "type", `String "error"; "message", `String message ]))
+;;
+
+let serve_terminal router terminals ~query ws =
   let param name = List.Assoc.find query ~equal:String.equal name in
   let size name ~default =
     Option.bind (param name) ~f:Int.of_string_opt |> Option.value ~default
   in
-  if not (Rpc_server.token_ok server (param "token"))
-  then
-    Websocket.send_text
-      ws
-      {|{"type":"error","message":"unauthorised: bad or missing token"}|}
-  else (
+  match Rpc_router.lookup router ~token:(param "token") with
+  | None -> send_error ws "unauthorised: bad or missing token"
+  | Some server ->
     let session = Option.filter (param "session") ~f:(Fn.non String.is_empty) in
-    Terminals.serve
-      terminals
-      ~key:(Option.value session ~default:"default")
-      ~cwd:(Rpc_server.backend_cwd server ~session)
-      ~cols:(size "cols" ~default:80)
-      ~rows:(size "rows" ~default:24)
-      ws)
+    (match Rpc_server.terminal_target server ~session with
+     | `Unavailable reason -> send_error ws ("no terminal: " ^ reason)
+     | `Host (host, _) ->
+       send_error
+         ws
+         (sprintf "terminals on tool host %S are not supported yet" host)
+     | `Backend cwd ->
+       let key = Option.value session ~default:"default" in
+       Terminals.serve
+         terminals
+         ~key:
+           (match Rpc_server.namespace server with
+            | None -> key
+            | Some namespace -> namespace ^ ":" ^ key)
+         ~cwd
+         ~cols:(size "cols" ~default:80)
+         ~rows:(size "rows" ~default:24)
+         ws)
 ;;
 
 let listen ~env ~sw ~addr ~port ~root ~websockets ~on_lines =

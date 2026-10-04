@@ -33,6 +33,9 @@ val create
   :  env:Env.t
   -> sw:Switch.t
   -> ?token:string
+  -> ?namespace:string
+  -> ?backend_host:bool
+       (** whether [new_agent] makes the backend a tool host (default: true) *)
   -> login:Login_manager.t
   -> sessions_dir:string
   -> cwd:string
@@ -60,13 +63,6 @@ val serve_lines
   -> write_line:(string -> unit)
   -> unit
 
-(** [serve_lines] over newline-delimited flows. *)
-val serve_connection
-  :  t
-  -> input:_ Eio.Flow.source
-  -> output:_ Eio.Flow.sink
-  -> unit
-
 (** Aborts every session and waits for them to finish. *)
 val shutdown : t -> unit
 
@@ -75,5 +71,15 @@ val agent_of_client : t -> Client.t -> Agent.t
 (** Whether [token] is the one [hello] requires (always, without one). *)
 val token_ok : t -> string option -> bool
 
-(** The backend host's directory for a live session, else the server's. *)
-val backend_cwd : t -> session:string option -> string
+val namespace : t -> string option
+
+(** Where [session]'s terminal should run: on its active tool host, in the
+    session's cwd. Without a live session, the backend in the server's cwd
+    (if it is a host). *)
+val terminal_target
+  :  t
+  -> session:string option
+  -> [ `Backend of string (** cwd *)
+     | `Host of string * string (** client id, cwd on that host *)
+     | `Unavailable of string (** reason *)
+     ]

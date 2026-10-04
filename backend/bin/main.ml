@@ -3,15 +3,19 @@ open Prigh
 
 let home () = Option.value (Sys.getenv "HOME") ~default:"."
 
-let auth_file_flag =
+let auth_file_path_flag =
   let%map_open.Command auth_file =
     flag
       "-auth-file"
       (optional string)
       ~doc:"PATH credential file (default: ~/.config/prigh/auth.json)"
   in
-  Auth_store.create
-    ~path:(Option.value_or_thunk auth_file ~default:Auth_store.default_path)
+  Option.value_or_thunk auth_file ~default:Auth_store.default_path
+;;
+
+let auth_file_flag =
+  let%map.Command path = auth_file_path_flag in
+  Auth_store.create ~path
 ;;
 
 let provider_arg =
@@ -30,8 +34,8 @@ let provider_arg =
 
 (* With no explicit or configured default model, prefer a provider the user is
    logged in to. *)
-let default_model store =
-  match Provider_auth.status store with
+let default_model ~getenv store =
+  match Provider_auth.status ~getenv store with
   | Error _ -> Model.default
   | Ok statuses ->
     List.find_map
@@ -48,8 +52,7 @@ module Setup = struct
     { session : Session.t option (** [-session], if given *)
     ; cwd : string
     ; new_agent : ?session:Session.t -> cwd:string -> unit -> Agent.t
-    ; sessions_dir : string
-    ; store : Auth_store.t
+    ; world : Namespace.World.t
     }
 end
 
@@ -86,8 +89,14 @@ let common_params =
       ~doc:
         "PATH JSON array of scripted provider replies (implies -faux; loops \
          when exhausted)"
-  and store = auth_file_flag in
-  fun ~env ~sw ->
+  and auth_file = auth_file_path_flag in
+  fun ~env ~sw ?(backend_host = true) ?world () ->
+    let world =
+      match world with
+      | Some world -> world
+      | None -> Namespace.World.legacy ~home:(home ()) ~auth_file
+    in
+    let { Namespace.World.home; sessions_dir; store; getenv } = world in
     let cwd = Option.value cwd ~default:(Core_unix.getcwd ()) in
     let model =
       Option.map model ~f:(fun id ->
@@ -125,7 +134,7 @@ let common_params =
         then
           Faux_provider.create
             (List.init 1000 ~f:(fun _ -> Faux_provider.Reply.text "faux reply"))
-        else Provider_router.create ~env ~store ()
+        else Provider_router.create ~env ~getenv ~store ()
     in
     let session =
       Option.map session ~f:(fun path ->
@@ -135,7 +144,6 @@ let common_params =
           eprintf "cannot load session: %s\n" (Error.to_string_hum e);
           exit 2)
     in
-    let sessions_dir = Session.default_dir ~home:(home ()) in
     (* One agent per session; the subagent tool follows its own agent's
        model and thinking level. *)
     let new_agent ?session ~cwd () =
@@ -148,7 +156,7 @@ let common_params =
           ~provider
           ~current_model:(current (fun s -> s.model) Model.default)
           ~current_thinking:(current (fun s -> s.thinking) Thinking.Off)
-          ~home:(home ())
+          ~home
       in
       let agent =
         Agent.create
@@ -157,19 +165,20 @@ let common_params =
           ~provider
           ~tools:(if no_tools then [] else Tools.all @ [ subagent ])
           ~sessions_dir
-          ~home:(home ())
+          ~home
           ?session
           ?model
           ?thinking
-          ~fallback_model:(default_model store)
+          ~fallback_model:(default_model ~getenv store)
           ~auto_describe:(Option.is_none faux_script && not faux)
+          ~backend_host
           ~cwd
           ()
       in
       agent_ref := Some agent;
       agent
     in
-    { Setup.session; cwd; new_agent; sessions_dir; store }
+    { Setup.session; cwd; new_agent; world }
 ;;
 
 let run_command =
@@ -187,7 +196,7 @@ let run_command =
        @@ fun env ->
        Eio.Switch.run
        @@ fun sw ->
-       let { Setup.session; cwd; new_agent; _ } = make_agent ~env ~sw in
+       let { Setup.session; cwd; new_agent; _ } = make_agent ~env ~sw () in
        let agent = new_agent ?session ~cwd () in
        let flush_out () = Out_channel.flush stdout in
        let note fmt =
@@ -350,6 +359,22 @@ let serve_command =
          "-token"
          (optional string)
          ~doc:"SECRET clients must present it in hello (default: $PRIGH_TOKEN)"
+     and tokens =
+       flag
+         "-tokens"
+         (optional string)
+         ~doc:
+           "NAME=TOKEN,... separate namespaces (sessions, logins, config, tool \
+            hosts) under ~/.prigh/namespaces/NAME, chosen by the hello token; \
+            [default] uses the usual paths. Provider keys are not read from \
+            the environment (default: $PRIGH_TOKENS)"
+     and no_backend_host =
+       flag
+         "-no-backend-host"
+         no_arg
+         ~doc:
+           " never run tools on the backend machine, only on connected tool \
+            hosts (also: $PRIGH_NO_BACKEND_HOST=1)"
      and web =
        flag
          "-web"
@@ -382,10 +407,37 @@ let serve_command =
        flag "-open" no_arg ~doc:" open the web frontend in a browser"
      in
      fun () ->
+       if Option.is_some tokens && Option.is_some token
+       then (
+         eprintf "-tokens and -token are mutually exclusive\n";
+         exit 2);
+       let namespaces =
+         match tokens with
+         | Some spec -> Some spec
+         | None ->
+           Option.filter (Sys.getenv "PRIGH_TOKENS") ~f:(Fn.non String.is_empty)
+       in
+       let namespaces =
+         Option.map namespaces ~f:(fun spec ->
+           match Namespace.parse_spec spec with
+           | Ok namespaces -> namespaces
+           | Error e ->
+             eprintf "%s\n" (Error.to_string_hum e);
+             exit 2)
+       in
        let token =
-         match token with
-         | Some t -> Some t
-         | None -> Sys.getenv "PRIGH_TOKEN"
+         match token, namespaces with
+         | Some t, _ -> Some t
+         | None, None -> Sys.getenv "PRIGH_TOKEN"
+         | None, Some _ -> None
+       in
+       let backend_host =
+         not
+           (no_backend_host
+            || Option.equal
+                 String.equal
+                 (Sys.getenv "PRIGH_NO_BACKEND_HOST")
+                 (Some "1"))
        in
        let listen =
          Option.map listen ~f:(fun spec ->
@@ -425,25 +477,53 @@ let serve_command =
        @@ fun env ->
        Eio.Switch.run
        @@ fun sw ->
-       let { Setup.session; cwd; new_agent; sessions_dir; store } =
-         make_agent ~env ~sw
-       in
-       let login = Login_manager.create ~env ~sw ~store () in
-       let default_agent =
-         Option.map session ~f:(fun session ->
-           new_agent ~session ~cwd:(Session.cwd session) ())
-       in
-       let server =
+       let create_server ?token ?namespace ?world () =
+         let { Setup.session; cwd; new_agent; world } =
+           make_agent ~env ~sw ~backend_host ?world ()
+         in
+         let login =
+           Login_manager.create
+             ~env
+             ~sw
+             ~getenv:world.getenv
+             ~store:world.store
+             ()
+         in
+         let default_agent =
+           Option.map session ~f:(fun session ->
+             if Option.is_some namespace
+             then (
+               eprintf "-session cannot be combined with -tokens\n";
+               exit 2);
+             new_agent ~session ~cwd:(Session.cwd session) ())
+         in
          Rpc_server.create
            ~env
            ~sw
            ?token
+           ?namespace
+           ~backend_host
            ~login
-           ~sessions_dir
+           ~sessions_dir:world.sessions_dir
            ~cwd
            ~new_agent
            ?default_agent
            ()
+       in
+       let router =
+         match namespaces with
+         | None -> Rpc_router.single (create_server ?token ())
+         | Some namespaces ->
+           Rpc_router.namespaced
+             namespaces
+             ~home:(home ())
+             ~legacy_auth_file:(Auth_store.default_path ())
+             ~create_server:(fun namespace world ->
+               create_server
+                 ~token:namespace.token
+                 ~namespace:namespace.name
+                 ~world
+                 ())
        in
        Option.iter listen ~f:(fun (addr, port) ->
          let socket =
@@ -466,7 +546,7 @@ let serve_command =
                ~on_error:(fun exn ->
                  eprintf "prigh: connection failed: %s\n%!" (Exn.to_string exn))
                (fun flow _addr ->
-                  Rpc_server.serve_connection server ~input:flow ~output:flow)
+                  Rpc_router.serve_connection router ~input:flow ~output:flow)
            done));
        let serve_web ~label ~root ~root_flag ~env_var ~websockets (addr, port) =
          let port =
@@ -477,7 +557,7 @@ let serve_command =
              ~port
              ~root
              ~websockets
-             ~on_lines:(Rpc_server.serve_lines server)
+             ~on_lines:(Rpc_router.serve_lines router)
          in
          let host =
            match Format.asprintf "%a" Eio.Net.Ipaddr.pp addr with
@@ -501,7 +581,7 @@ let serve_command =
        in
        (* Shared, so both UIs on one session see the same shell. *)
        let terminal =
-         Web_server.serve_terminal server (Terminals.create ~env ~sw ())
+         Web_server.serve_terminal router (Terminals.create ~env ~sw ())
        in
        let opened = ref false in
        let maybe_open url =
@@ -522,7 +602,7 @@ let serve_command =
            ~root_flag:"-web-root"
            ~env_var:"PRIGH_WEB_ROOT"
            ~websockets:
-             [ "/ws", Web_server.serve_rpc server; "/terminal", terminal ]
+             [ "/ws", Web_server.serve_rpc router; "/terminal", terminal ]
            addr
          |> maybe_open);
        Option.iter pi_web ~f:(fun addr ->
@@ -537,17 +617,17 @@ let serve_command =
            ~root_flag:"-pi-web-root"
            ~env_var:"PRIGH_PI_WEB_ROOT"
            ~websockets:
-             [ "/ws", Pi_rpc.serve_websocket server; "/terminal", terminal ]
+             [ "/ws", Pi_rpc.serve_websocket router; "/terminal", terminal ]
            addr
          |> maybe_open);
        if stdio
        then (
-         Rpc_server.serve_connection
-           server
+         Rpc_router.serve_connection
+           router
            ~input:(Eio.Stdenv.stdin env)
            ~output:(Eio.Stdenv.stdout env);
          (* The spawning frontend went away: stop everything. *)
-         Rpc_server.shutdown server;
+         Rpc_router.shutdown router;
          exit 0)
        else
          (* The web listener is a daemon fiber; keep the switch alive. *)

@@ -176,7 +176,10 @@ let with_fixture ?(idle_timeout = 0.3) ?(heartbeat_timeout = 3.) f =
       ~addr:Eio.Net.Ipaddr.V4.loopback
       ~port:0
       ~root:None
-      ~websockets:[ "/terminal", Web_server.serve_terminal server terminals ]
+      ~websockets:
+        [ ( "/terminal"
+          , Web_server.serve_terminal (Rpc_router.single server) terminals )
+        ]
       ~on_lines:(fun ~read_line:_ ~write_line:_ -> ())
   in
   let fixture = { Fixture.sandbox; sw; socket; port; terminals } in

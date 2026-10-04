@@ -112,6 +112,8 @@ end
 type t =
   { login : Login_manager.t
   ; token : string option (** required in [hello] before anything else *)
+  ; namespace : string option
+  ; backend_host : bool
   ; sessions_dir : string
   ; cwd : string
   ; new_agent : ?session:Session.t -> cwd:string -> unit -> Agent.t
@@ -199,6 +201,8 @@ let create
       ~env:_
       ~sw:_
       ?token
+      ?namespace
+      ?(backend_host = true)
       ~login
       ~sessions_dir
       ~cwd
@@ -209,6 +213,8 @@ let create
   let t =
     { login
     ; token
+    ; namespace
+    ; backend_host
     ; sessions_dir
     ; cwd
     ; new_agent
@@ -336,13 +342,26 @@ let token_ok t given =
   | Some token -> Option.exists given ~f:(String.equal token)
 ;;
 
-let backend_cwd t ~session =
+let namespace t = t.namespace
+
+let terminal_target t ~session =
   match Option.bind session ~f:(Hashtbl.find t.agents) with
-  | None -> t.cwd
+  | None ->
+    if t.backend_host
+    then `Backend t.cwd
+    else `Unavailable "no live session and the backend tool host is disabled"
   | Some agent ->
-    (match Agent.hosts agent with
-     | backend :: _ -> backend.cwd
-     | [] -> t.cwd)
+    let state = Agent.state agent in
+    (match
+       List.find state.hosts ~f:(fun h -> String.equal h.id state.active_host)
+     with
+     | Some host when String.equal host.id Agent.Host.backend_id ->
+       `Backend state.cwd
+     | Some host -> `Host (host.id, state.cwd)
+     | None when String.is_empty state.active_host ->
+       `Unavailable "no tool host connected"
+     | None ->
+       `Unavailable (sprintf "tool host %S is not connected" state.active_host))
 ;;
 
 let hello t (client : Client.t) params =
@@ -727,15 +746,4 @@ let serve_lines t ~read_line ~write_line =
   loop ();
   disconnect t client;
   Eio.Stream.add outbox None
-;;
-
-let serve_connection t ~input ~output =
-  let reader = Eio.Buf_read.of_flow input ~max_size:(64 * 1024 * 1024) in
-  serve_lines
-    t
-    ~read_line:(fun () ->
-      match Eio.Buf_read.line reader with
-      | exception (End_of_file | Eio.Io _) -> None
-      | line -> Some line)
-    ~write_line:(fun line -> Eio.Flow.copy_string (line ^ "\n") output)
 ;;

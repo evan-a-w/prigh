@@ -106,6 +106,7 @@ type t =
   ; tools : Tool.t list
   ; sessions_dir : string
   ; home : string
+  ; backend_host_enabled : bool
   ; mutable session : Session.t
   ; mutable cwd : string
   ; mutable git_branch : string option
@@ -155,6 +156,7 @@ let create
       ?thinking
       ?(fallback_model = Model.default)
       ?(auto_describe = false)
+      ?(backend_host = true)
       ~cwd
       ()
   =
@@ -187,9 +189,10 @@ let create
     ; tools
     ; sessions_dir
     ; home
+    ; backend_host_enabled = backend_host
     ; session
     ; cwd
-    ; git_branch = Git_branch.find ~cwd
+    ; git_branch = (if backend_host then Git_branch.find ~cwd else None)
     ; model
     ; thinking
     ; run = None
@@ -206,7 +209,7 @@ let create
     ; hosts = []
     ; host_cwds = String.Table.create ()
     ; backend_cwd = cwd
-    ; active_host = Host.backend_id
+    ; active_host = (if backend_host then Host.backend_id else "")
     ; host_pinned = false
     ; pending_execs = String.Table.create ()
     ; exec_seq = 0
@@ -227,11 +230,17 @@ let backend_host t =
 ;;
 
 let hosts t =
-  backend_host t
-  :: List.map t.hosts ~f:(fun h ->
-    match Hashtbl.find t.host_cwds h.id with
-    | Some cwd -> { h with cwd }
-    | None -> h)
+  let clients =
+    List.map t.hosts ~f:(fun h ->
+      match Hashtbl.find t.host_cwds h.id with
+      | Some cwd -> { h with cwd }
+      | None -> h)
+  in
+  if t.backend_host_enabled then backend_host t :: clients else clients
+;;
+
+let find_branch t ~cwd =
+  if t.backend_host_enabled then Git_branch.find ~cwd else None
 ;;
 
 let active_host t = t.active_host
@@ -363,7 +372,7 @@ let set_host_cwd t (host : Host.t) ~cwd =
   if not (String.equal t.cwd cwd)
   then (
     t.cwd <- cwd;
-    t.git_branch <- Git_branch.find ~cwd;
+    t.git_branch <- find_branch t ~cwd;
     ignore (Session.set_cwd t.session ~cwd : Session.Entry.t);
     add_environment_note t (System_prompt.cwd_changed_note ~cwd));
   if String.equal host.id Host.backend_id
@@ -380,18 +389,24 @@ let activate_host t (host : Host.t) ~cwd =
   state_changed t
 ;;
 
-let set_hosts t hosts =
-  if not (List.equal Host.equal t.hosts hosts)
+(* Without the backend there is nothing to fall back on, so a session whose
+   host is gone adopts the first connected one. *)
+let set_hosts t clients =
+  if not (List.equal Host.equal t.hosts clients)
   then (
     let gone =
       List.filter t.hosts ~f:(fun h ->
-        not (List.exists hosts ~f:(fun h' -> String.equal h.id h'.id)))
+        not (List.exists clients ~f:(fun h' -> String.equal h.id h'.id)))
     in
-    t.hosts <- hosts;
+    t.hosts <- clients;
     List.iter gone ~f:(fun h ->
       Hashtbl.remove t.host_cwds h.id;
       fail_execs t ~host:h.id ~text:"[tool host disconnected]");
-    state_changed t)
+    match List.hd (hosts t) with
+    | Some host
+      when (not t.backend_host_enabled) && not (active_host_connected t) ->
+      activate_host t host ~cwd:host.cwd
+    | _ -> state_changed t)
 ;;
 
 (* Tools default to the frontend: a host attaching takes over unless the user
@@ -436,7 +451,7 @@ let host_exec_on
       ~name
       ~arguments
   =
-  if String.equal host.id Host.backend_id
+  if String.equal host.id Host.backend_id && t.backend_host_enabled
   then Host_ops.execute ~env:t.env ~cancel ~on_output ~cwd ~name ~arguments
   else (
     let exec_id =
@@ -459,8 +474,14 @@ let host_exec_on
       Tool.Result.error "[cancelled]")
 ;;
 
+let no_host_message =
+  "no tool host connected: connect one with `prigh tool-host -connect ...` or \
+   a TUI, then pick it with /host"
+;;
+
 let host_exec t ~cancel ~on_output ~call_id ~cwd ~name ~arguments =
   match find_host t t.active_host with
+  | None when List.is_empty (hosts t) -> Tool.Result.error no_host_message
   | None ->
     Tool.Result.error
       (sprintf
@@ -490,6 +511,8 @@ let resolve_dir_on t (host : Host.t) path =
    choosing a directory there; without [cwd] the host's own is used. *)
 let set_active_host t id ~cwd =
   match find_host t id with
+  | None when String.equal id Host.backend_id && not t.backend_host_enabled ->
+    Or_error.error_string "the backend tool host is disabled"
   | None -> Or_error.errorf "unknown tool host %S" id
   | Some host ->
     let cwd =
@@ -504,7 +527,9 @@ let set_active_host t id ~cwd =
 
 let executor t : Tool.executor =
   fun context tool arguments ->
-  if (not tool.spec.on_host) || String.equal t.active_host Host.backend_id
+  if
+    (not tool.spec.on_host)
+    || (String.equal t.active_host Host.backend_id && t.backend_host_enabled)
   then Tool.execute tool context arguments
   else
     host_exec
@@ -602,7 +627,7 @@ let user_message t (q : Queued.t) =
 ;;
 
 let rec start_run t prompts =
-  t.git_branch <- Git_branch.find ~cwd:t.cwd;
+  t.git_branch <- find_branch t ~cwd:t.cwd;
   let cancel = Cancellation.create () in
   let finished, resolve = Promise.create () in
   t.run <- Some { cancel; finished };
@@ -873,7 +898,7 @@ let replace_session t session =
   wait_idle t;
   t.session <- session;
   t.cwd <- Session.cwd session;
-  t.git_branch <- Git_branch.find ~cwd:t.cwd;
+  t.git_branch <- find_branch t ~cwd:t.cwd;
   t.environment_notes <- [];
   t.subagent_usage <- Usage.zero;
   t.subagent_cost_usd <- 0.;
@@ -918,6 +943,7 @@ let set_cwd t ~path =
     Or_error.error_string "cannot change directory while a run is in progress"
   else (
     match find_host t t.active_host with
+    | None when List.is_empty (hosts t) -> Or_error.error_string no_host_message
     | None ->
       Or_error.errorf
         "tool host %S is not connected; use set_active_host to pick another"
