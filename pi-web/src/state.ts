@@ -1,6 +1,6 @@
 import { effect, signal } from "@preact/signals";
 import { RpcClient } from "./client.ts";
-import { connectionFor, terminalUrl } from "./connection.ts";
+import { connectionFor, forgetCredentials, loadCredentials, searchWithoutSession, terminalUrl } from "./connection.ts";
 import type {
 	AgentMessage,
 	AgentSessionEvent,
@@ -17,6 +17,7 @@ import type {
 	ToolResultLike,
 	ToolResultMessage,
 } from "./protocol.ts";
+import { type ProviderLogin, type ProviderLoginInput, reduce as reduceProviderLogin } from "./provider-login.ts";
 import {
 	ASYNC_STATUS_SNAPSHOT_WIDGET_PREFIX,
 	type AsyncStatusSnapshot,
@@ -45,7 +46,10 @@ export interface Widget {
 }
 
 export const connected = signal(false);
-/** Set when the backend refused the connection (see client.ts onHelloFailed): the app shows the connect form. */
+/**
+ * Set when the app shows the login form: the backend refused the connection
+ * (see client.ts onHelloFailed), or "" after signing out.
+ */
 export const helloError = signal<string | undefined>(undefined);
 export const sessionState = signal<RpcSessionState | undefined>(undefined);
 export const messages = signal<AgentMessage[]>([]);
@@ -91,10 +95,16 @@ if (initialConnection.cleanedSearch !== undefined) {
 	history.replaceState(null, "", `${location.pathname}${initialConnection.cleanedSearch}${location.hash}`);
 }
 
+/** The user name this page signed in with ("" on servers without namespaces). */
+export const currentUser = signal(loadCredentials(localStorage).user);
+/** Whether there is anything to sign out of: a stored user name or password. */
+export const signedIn = signal(Object.values(loadCredentials(localStorage)).some((value) => value !== ""));
+
 export const client = new RpcClient(() => connectionFor(location, localStorage).url, {
 	onEvent: handleEvent,
 	onUiRequest: handleUiRequest,
 	onUiCancel: (id) => {
+		feedProviderLogin({ kind: "ui_cancel", id });
 		dialogQueue.value = dialogQueue.value.filter((queued) => queued.id !== id);
 	},
 	onConnectionChange: handleConnectionChange,
@@ -102,6 +112,19 @@ export const client = new RpcClient(() => connectionFor(location, localStorage).
 		helloError.value = error;
 	},
 });
+
+/** Forgets the stored user name and password, disconnects and shows the login form. */
+export function signOut(): void {
+	forgetCredentials(localStorage);
+	client.stop();
+	currentUser.value = "";
+	signedIn.value = false;
+	providerLogin.value = undefined;
+	dialogQueue.value = [];
+	terminalOpen.value = false;
+	history.replaceState(null, "", `${location.pathname}${searchWithoutSession(location.search)}${location.hash}`);
+	helloError.value = "";
+}
 
 let syncing = false;
 const eventBuffer: AgentSessionEvent[] = [];
@@ -140,7 +163,10 @@ export async function sync(): Promise<void> {
 		}
 		const commandList = dataAs<{ commands: RpcSlashCommand[] }>(commandsRes, "get_commands");
 		if (commandList) {
-			slashCommands.value = commandList.commands;
+			slashCommands.value = [
+				...commandList.commands,
+				{ name: "signout", description: "Sign out of this prigh server", source: "builtin" },
+			];
 		}
 		const sessionStats = dataAs<SessionStats>(statsRes, "get_session_stats");
 		if (sessionStats) {
@@ -269,7 +295,7 @@ function applyEvent(event: AgentSessionEvent): void {
 		case "message_start":
 		case "message_end":
 		case "message_update":
-			upsertMessage(event.message);
+			if (!feedProviderLogin({ kind: "message", message: event.message })) upsertMessage(event.message);
 			break;
 
 		case "tool_execution_start":
@@ -390,7 +416,30 @@ function applyEvent(event: AgentSessionEvent): void {
 // Extension UI requests
 // ============================================================================
 
+/** The provider login (OAuth) dialog, see provider-login.ts. */
+export const providerLogin = signal<ProviderLogin | undefined>(undefined);
+
+function feedProviderLogin(input: ProviderLoginInput): boolean {
+	const { login, consumed } = reduceProviderLogin(providerLogin.value, input);
+	providerLogin.value = login;
+	return consumed;
+}
+
+export function submitProviderLoginCode(code: string): void {
+	const request = providerLogin.value?.request;
+	if (!request) return;
+	client.sendUiResponse({ type: "extension_ui_response", id: request.id, value: code });
+	feedProviderLogin({ kind: "responded" });
+}
+
+export function closeProviderLogin(): void {
+	const request = providerLogin.value?.request;
+	if (request) client.sendUiResponse({ type: "extension_ui_response", id: request.id, cancelled: true });
+	feedProviderLogin({ kind: "dismiss" });
+}
+
 function handleUiRequest(request: RpcExtensionUIRequest): void {
+	if (feedProviderLogin({ kind: "ui_request", request })) return;
 	switch (request.method) {
 		case "select":
 		case "confirm":
@@ -822,6 +871,10 @@ export async function executeBuiltinCommand(text: string): Promise<boolean> {
 			}
 			pushToast("Cloned session", "info");
 			await sync();
+			return true;
+		}
+		case "signout": {
+			signOut();
 			return true;
 		}
 		case "cd": {

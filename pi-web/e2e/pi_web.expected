@@ -1,7 +1,9 @@
-=== chromium: connect form ===
-Connect to prigh
-unauthorised: bad or missing token
-Connect
+=== chromium: login form ===
+Sign in to prigh
+unauthorised: <ERROR>
+User name
+Password
+Sign in
 === chromium: connected ===
 prigh
 New
@@ -114,10 +116,36 @@ reopening shows the same shell
 exiting the shell says so
 a key starts a new shell
 the topbar button hides it again
-=== firefox: connect form ===
-Connect to prigh
-unauthorised: bad or missing token
-Connect
+=== chromium: provider login dialog ===
+Log in to a provider
+Complete login in your browser. If the browser is on another machine, paste the final redirect URL here.
+Open the link and sign in.
+Paste the code or the full redirect URL below.
+https://claude.ai/oauth/authorize?<QUERY>
+Copy link
+Submit
+Cancel
+link: target=_blank rel=noopener noreferrer
+the link is clickable: true
+the chat shows the link: false
+a bad redirect URL: login to anthropic failed: OAuth state mismatch
+Close dismisses it
+Cancel: login to anthropic failed: login cancelled
+=== chromium: after signing out ===
+Sign in to prigh
+User name
+Password
+Sign in
+stored credentials: []
+url keeps session: false
+signed in again
+/signout shows the login form
+=== firefox: login form ===
+Sign in to prigh
+unauthorised: <ERROR>
+User name
+Password
+Sign in
 === firefox: connected ===
 prigh
 New
@@ -230,3 +258,27 @@ reopening shows the same shell
 exiting the shell says so
 a key starts a new shell
 the topbar button hides it again
+=== firefox: provider login dialog ===
+Log in to a provider
+Complete login in your browser. If the browser is on another machine, paste the final redirect URL here.
+Open the link and sign in.
+Paste the code or the full redirect URL below.
+https://claude.ai/oauth/authorize?<QUERY>
+Copy link
+Submit
+Cancel
+link: target=_blank rel=noopener noreferrer
+the link is clickable: true
+the chat shows the link: false
+a bad redirect URL: login to anthropic failed: OAuth state mismatch
+Close dismisses it
+Cancel: login to anthropic failed: login cancelled
+=== firefox: after signing out ===
+Sign in to prigh
+User name
+Password
+Sign in
+stored credentials: []
+url keeps session: false
+signed in again
+/signout shows the login form
