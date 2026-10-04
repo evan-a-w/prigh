@@ -22,6 +22,7 @@ module For_testing : sig
   val terminal_url
     :  backend:string
     -> user:string option
+    -> as_user:string option
     -> token:string option
     -> session:string option
     -> string

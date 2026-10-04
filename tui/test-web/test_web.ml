@@ -134,6 +134,7 @@ let%expect_test "web connection: the terminal URL and the session in the page \
     wss://host.example/terminal?token=sekrit%26x%3Dy&session=abc
     ws://host:9000/terminal?session=s
     ws://host:9000/terminal?user=lloyd%20o'k&token=pw&session=s
+    ws://host:9000/terminal?user=s&as_user=lloyd&token=pw
     ?session=a%20b%26c
     ?backend=ws%3A%2F%2Fx&name=laptop&session=a%20b%26c
     ""
