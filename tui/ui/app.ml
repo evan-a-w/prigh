@@ -41,6 +41,8 @@ module Reply_tag = struct
     | Reload_messages_notice of string
     | Reconnect of int (** generation; stale replies are ignored *)
     | Btw of string (** btw id *)
+    | Users_list
+    | User_switched
   [@@deriving sexp_of, equal]
 end
 
@@ -61,6 +63,7 @@ module Command = struct
         { generation : int
         ; delay_ms : int
         ; session : string option
+        ; as_user : string option
         }
     | Sign_out
     | Quit
@@ -144,6 +147,7 @@ module Model = struct
     ; home : string option
     ; client_id : string option (** ours, from [hello] *)
     ; namespace : string option
+    ; user : string option
     ; stderr_tail : string list
     ; pending_confirms : (string * string * string) list
     ; connection : Connection.t
@@ -171,6 +175,11 @@ module Model = struct
     match t.connection with
     | Connected -> false
     | Reconnecting _ -> true
+  ;;
+
+  let acting_as t =
+    P.Hello_reply.acting_as
+      { client_id = ""; namespace = t.namespace; user = t.user }
   ;;
 end
 
@@ -328,6 +337,7 @@ let init =
   ; home = None
   ; client_id = None
   ; namespace = None
+  ; user = None
   ; stderr_tail = []
   ; pending_confirms = []
   ; connection = Connected
@@ -949,7 +959,9 @@ let schedule_reconnect m ~attempt ~delay_ms ~session =
       connection = Reconnecting { attempt; generation; delay_ms; session }
     ; reconnect_generation = generation
     }
-  , [ Command.Reconnect { generation; delay_ms; session } ] )
+  , [ Command.Reconnect
+        { generation; delay_ms; session; as_user = Model.acting_as m }
+    ] )
 ;;
 
 let backend_closed m =
@@ -1020,16 +1032,17 @@ let reconnect_reply m ~generation result =
          ~delay_ms
          ~session
      | Ok json ->
-       let client_id, namespace =
+       let client_id, namespace, user =
          match P.Hello_reply.of_json json with
-         | Ok { client_id; namespace } -> Some client_id, namespace
-         | Error _ -> m.client_id, m.namespace
+         | Ok { client_id; namespace; user } -> Some client_id, namespace, user
+         | Error _ -> m.client_id, m.namespace, m.user
        in
        let m =
          { m with
            connection = Connected
          ; client_id
          ; namespace
+         ; user
          ; agents = []
          ; focus = `Main
          ; transcript = Transcript.clear m.transcript
@@ -1373,6 +1386,10 @@ let run_command m (cmd : Commands.Parsed.t) =
   | "clear", _ ->
     follow { m with transcript = Transcript.clear m.transcript }, []
   | "signout", _ -> m, [ Sign_out ]
+  | "setusr", [] -> m, [ rpc "list_users" ~tag:Users_list ]
+  | "setusr", [ user ] ->
+    m, [ rpc "set_user" ~params:[ "user", str user ] ~tag:User_switched ]
+  | "setusr", _ -> error m "usage: /setusr [user]", []
   | "quit", _ | "exit", _ -> { m with quitting = true }, [ Quit ]
   | name, _ ->
     let hint =
@@ -2609,6 +2626,54 @@ let reply m (tag : Reply_tag.t) (result : (P.Json.t, string) Result.t) =
        , [ rpc "get_messages" ~tag:Initial_messages
          ; rpc "get_state" ~tag:Initial_state
          ] )
+     | Users_list ->
+       decode
+         json
+         ~f:
+           (decode_list ~f:(fun j ->
+              match j with
+              | `String s -> Ok s
+              | _ -> Or_error.error_string "expected a user name"))
+         (fun users ->
+            ( block
+                m
+                (Content.lines
+                   (String.concat
+                      ~sep:"\n"
+                      ("users (/setusr NAME to act as one):"
+                       :: List.map users ~f:(fun u -> "  " ^ u))))
+            , [] ))
+     | User_switched ->
+       decode
+         json
+         ~f:P.Hello_reply.of_json
+         (fun { client_id; namespace; user } ->
+            let m =
+              { m with
+                client_id = Some client_id
+              ; namespace
+              ; user
+              ; agents = []
+              ; focus = `Main
+              ; queued = Queue_counts.zero
+              ; queued_texts = []
+              ; transcript = Transcript.clear m.transcript
+              }
+            in
+            let m =
+              notice
+                m
+                (match Model.acting_as m, namespace with
+                 | Some other, _ -> sprintf "acting as %s" other
+                 | None, Some own -> sprintf "back to %s" own
+                 | None, None -> "switched user")
+            in
+            ( follow m
+            , [ rpc "get_state" ~tag:Initial_state
+              ; rpc "get_messages" ~tag:Initial_messages
+              ; rpc "auth_status" ~tag:Auth_refresh
+              ; rpc "get_config" ~tag:Config
+              ] ))
      | Session_stats ->
        decode json ~f:P.Session_stats.of_json (fun stats ->
          block m (format_stats stats), [])
@@ -2806,8 +2871,8 @@ let update m (action : Action.t) =
       | Reply (tag, result) -> reply m tag result
       | Tick -> { m with spinner = m.spinner + 1 }, []
       | Set_home home -> { m with home = Some home }, []
-      | Hello { client_id; namespace } ->
-        { m with client_id = Some client_id; namespace }, []
+      | Hello { client_id; namespace; user } ->
+        { m with client_id = Some client_id; namespace; user }, []
       | Resize { width; height } -> { m with width; height }, []
     in
     let m, cmds = block_backend_rpc m cmds in

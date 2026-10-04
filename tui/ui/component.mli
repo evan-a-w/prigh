@@ -22,8 +22,10 @@ module Platform : sig
     ; reconnect :
         delay_ms:int
         -> session:string option
+        -> as_user:string option
         -> (P.Json.t, string) Result.t Bonsai.Effect.t
-    (** Waits, connects again and sends [hello]; the result is the hello reply. *)
+    (** Waits, connects again and sends [hello] (with [session] and [as_user]
+        when given); the result is the hello reply. *)
     }
 end
 

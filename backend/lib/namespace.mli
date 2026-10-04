@@ -12,8 +12,8 @@ type t =
 [@@deriving sexp_of]
 
 (** Comma-separated [name=token] entries; names are [[A-Za-z0-9_-]+] and
-    names and tokens are unique. *)
-val parse_spec : string -> t list Or_error.t
+    names and tokens are unique. Errors name [flag] (default [-tokens]). *)
+val parse_spec : ?flag:string -> string -> t list Or_error.t
 
 module World : sig
   (** Everything a server derives from the user's home. *)

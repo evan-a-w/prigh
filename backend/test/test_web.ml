@@ -228,7 +228,7 @@ let%expect_test "web server: static files, 404s and the RPC over a WebSocket" =
       ~port:0
       ~root:(Some root)
       ~websockets:[ "/ws", Web_server.serve_rpc (Rpc_router.single server) ]
-      ~on_lines:(Rpc_server.serve_lines server)
+      ~on_lines:(Rpc_router.serve_lines (Rpc_router.single server))
   in
   let http = Loopback.http ~env:t.env ~sw ~port in
   http "GET / HTTP/1.1\r\nHost: x\r\n\r\n";
@@ -327,7 +327,7 @@ let%expect_test "web server: static files, 404s and the RPC over a WebSocket" =
     {|
     {"type":"response","id":1,"ok":false,"error":"unauthorised: send hello with the token first"}
     {"type":"response","id":2,"ok":false,"error":"unauthorised: bad user name or password"}
-    {"type":"response","id":3,"ok":true,"result":{"client_id":"client-1","namespace":null,"state":{"session_id":"<id>","session_path":"$DIR/sessions/<stamp>_<id>.jsonl","session_name":null,"session_description":null,"cwd":"$DIR","git_branch":null,"model":{"id":"deepseek-flash","provider":"deepseek","key":"deepseek/deepseek-flash","name":"DeepSeek V4.1 Flash","context_window":1000000,"max_output":384000,"supports_thinking":true,"cost":{"input":0.3,"output":1.2,"cache_read":0.006}},"thinking":"off","running":false,"message_count":0,"usage":{"input":0,"output":0,"cache_read":0},"cost_usd":0,"context_tokens":0,"active_host":"backend","hosts":[{"id":"backend","name":"<host>","cwd":"$DIR","session_id":null,"session_name":null}],"subagents":[]}}}
+    {"type":"response","id":3,"ok":true,"result":{"client_id":"client-1","namespace":null,"user":null,"superuser":false,"state":{"session_id":"<id>","session_path":"$DIR/sessions/<stamp>_<id>.jsonl","session_name":null,"session_description":null,"cwd":"$DIR","git_branch":null,"model":{"id":"deepseek-flash","provider":"deepseek","key":"deepseek/deepseek-flash","name":"DeepSeek V4.1 Flash","context_window":1000000,"max_output":384000,"supports_thinking":true,"cost":{"input":0.3,"output":1.2,"cache_read":0.006}},"thinking":"off","running":false,"message_count":0,"usage":{"input":0,"output":0,"cache_read":0},"cost_usd":0,"context_tokens":0,"active_host":"backend","hosts":[{"id":"backend","name":"<host>","cwd":"$DIR","session_id":null,"session_name":null}],"subagents":[]}}}
     {"type":"response","id":4,"ok":true,"result":["site/","site/.secret","site/index.html","site/main.bc.js"]}
     {"type":"response","id":null,"ok":false,"error":"invalid JSON: json: unexpected string: 'not'"}
     |}];
@@ -398,7 +398,7 @@ let%expect_test
       ~port:0
       ~root:None
       ~websockets:[ "/ws", Web_server.serve_rpc (Rpc_router.single server) ]
-      ~on_lines:(Rpc_server.serve_lines server)
+      ~on_lines:(Rpc_router.serve_lines (Rpc_router.single server))
   in
   let terminal_flow = Loopback.connect ~env:t.env ~sw ~port in
   let terminal =
@@ -689,7 +689,7 @@ let%expect_test
       ~port:0
       ~root:None
       ~websockets:[ "/ws", Pi_rpc.serve_websocket (Rpc_router.single server) ]
-      ~on_lines:(Rpc_server.serve_lines server)
+      ~on_lines:(Rpc_router.serve_lines (Rpc_router.single server))
   in
   let browser target =
     let flow = Loopback.connect ~env:t.env ~sw ~port in

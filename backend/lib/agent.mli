@@ -244,7 +244,9 @@ val list_dirs : ?host:string -> t -> prefix:string -> Json.t Or_error.t
 val delete_session : t -> path:string -> unit Or_error.t
 
 (** Writes the session to [path] (default: [<sessions_dir>/exports/...]) and
-    returns the path written. *)
+    returns the path written. Without the backend host it is written on the
+    active tool host instead (default: a file named like the session in the
+    cwd). *)
 val export
   :  t
   -> format:Session.Export_format.t

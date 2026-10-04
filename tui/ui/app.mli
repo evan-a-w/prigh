@@ -45,6 +45,8 @@ module Reply_tag : sig
     | Reload_messages_notice of string
     | Reconnect of int (** generation; stale replies are ignored *)
     | Btw of string (** btw id *)
+    | Users_list
+    | User_switched
   [@@deriving sexp_of, equal]
 end
 
@@ -65,9 +67,10 @@ module Command : sig
         { generation : int
         ; delay_ms : int
         ; session : string option
+        ; as_user : string option
         }
-    (** After [delay_ms], connect again, send [hello] (rejoining [session]) and
-        answer [Reply (Reconnect generation, hello reply)]. *)
+    (** After [delay_ms], connect again, send [hello] (rejoining [session], as
+        [as_user]) and answer [Reply (Reconnect generation, hello reply)]. *)
     | Sign_out
     (** Forget the stored credentials and offer to log in again (browser only). *)
     | Quit
@@ -134,7 +137,8 @@ module Model : sig
     ; config : P.Config.t option
     ; home : string option
     ; client_id : string option
-    ; namespace : string option (** the user we logged in as, from [hello] *)
+    ; namespace : string option (** the user whose sessions we see *)
+    ; user : string option (** the user we signed in as *)
     ; stderr_tail : string list
     ; pending_confirms : (string * string * string) list
     ; connection : Connection.t
@@ -154,6 +158,9 @@ module Model : sig
   val agents_running : t -> bool
 
   val backend_gone : t -> bool
+
+  (** [namespace] when a superuser acts as another user ([/setusr]). *)
+  val acting_as : t -> string option
 end
 
 (** Wrapped transcript lines currently visible, mirroring [Render.screen] for

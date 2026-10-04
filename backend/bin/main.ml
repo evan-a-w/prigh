@@ -372,6 +372,21 @@ let serve_command =
             (users log in with NAME and TOKEN as the password); [default] uses \
             the usual paths. Provider keys are not read from the environment \
             (default: $PRIGH_TOKENS)"
+     and superusers =
+       flag
+         "-superusers"
+         (optional string)
+         ~doc:
+           "NAME,... -tokens users who may act as any user (as_user in hello, \
+            set_user; /setusr in the UIs) (default: $PRIGH_SUPERUSERS)"
+     and host_tokens =
+       flag
+         "-host-tokens"
+         (optional string)
+         ~doc:
+           "NAME=TOKEN,... further tokens signing in as -tokens users, never \
+            as superusers: for tool hosts, which then need not hold the user's \
+            own token (default: $PRIGH_HOST_TOKENS)"
      and no_backend_host =
        flag
          "-no-backend-host"
@@ -415,19 +430,51 @@ let serve_command =
        then (
          eprintf "-tokens and -token are mutually exclusive\n";
          exit 2);
-       let namespaces =
-         match tokens with
-         | Some spec -> Some spec
-         | None ->
-           Option.filter (Sys.getenv "PRIGH_TOKENS") ~f:(Fn.non String.is_empty)
+       let from_env value var =
+         match value with
+         | Some v -> Some v
+         | None -> Option.filter (Sys.getenv var) ~f:(Fn.non String.is_empty)
        in
        let namespaces =
-         Option.map namespaces ~f:(fun spec ->
+         Option.map (from_env tokens "PRIGH_TOKENS") ~f:(fun spec ->
            match Namespace.parse_spec spec with
            | Ok namespaces -> namespaces
            | Error e ->
              eprintf "%s\n" (Error.to_string_hum e);
              exit 2)
+       in
+       let superusers =
+         Option.map
+           (from_env superusers "PRIGH_SUPERUSERS")
+           ~f:User_access.parse_names
+       in
+       let host_tokens =
+         Option.map (from_env host_tokens "PRIGH_HOST_TOKENS") ~f:(fun spec ->
+           match Namespace.parse_spec ~flag:"-host-tokens" spec with
+           | Ok host_tokens -> host_tokens
+           | Error e ->
+             eprintf "%s\n" (Error.to_string_hum e);
+             exit 2)
+       in
+       let access =
+         match namespaces with
+         | None ->
+           if Option.is_some superusers || Option.is_some host_tokens
+           then (
+             eprintf "-superusers and -host-tokens need -tokens\n";
+             exit 2);
+           None
+         | Some namespaces ->
+           (match
+              User_access.create
+                namespaces
+                ~host_tokens:(Option.value host_tokens ~default:[])
+                ~superusers:(Option.value superusers ~default:[])
+            with
+            | Ok access -> Some access
+            | Error e ->
+              eprintf "%s\n" (Error.to_string_hum e);
+              exit 2)
        in
        let token =
          match token, namespaces with
@@ -435,6 +482,10 @@ let serve_command =
          | None, None -> Sys.getenv "PRIGH_TOKEN"
          | None, Some _ -> None
        in
+       (* Tools the backend runs inherit its environment. *)
+       List.iter
+         [ "PRIGH_TOKEN"; "PRIGH_TOKENS"; "PRIGH_HOST_TOKENS" ]
+         ~f:Core_unix.unsetenv;
        let backend_host =
          not
            (no_backend_host
@@ -515,11 +566,11 @@ let serve_command =
            ()
        in
        let router =
-         match namespaces with
+         match access with
          | None -> Rpc_router.single (create_server ?token ())
-         | Some namespaces ->
+         | Some access ->
            Rpc_router.namespaced
-             namespaces
+             access
              ~home:(home ())
              ~legacy_auth_file:(Auth_store.default_path ())
              ~create_server:(fun namespace world ->
@@ -700,14 +751,18 @@ let tool_host_command =
            | Some dir -> Filename_unix.realpath dir
            | None -> Core_unix.getcwd ()
          in
+         let token = Option.first_some token (Sys.getenv "PRIGH_TOKEN") in
+         let user = Option.first_some user (Sys.getenv "PRIGH_USER") in
+         (* Not for the tools it runs. *)
+         List.iter [ "PRIGH_TOKEN"; "PRIGH_USER" ] ~f:Core_unix.unsetenv;
          Eio_main.run
          @@ fun env ->
          Tool_host.connect
            ~env
            ~host
            ~port
-           ~token:(Option.first_some token (Sys.getenv "PRIGH_TOKEN"))
-           ?user:(Option.first_some user (Sys.getenv "PRIGH_USER"))
+           ~token
+           ?user
            ~name:(Option.value name ~default:(Core_unix.gethostname ()))
            ~cwd
            ())

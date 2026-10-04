@@ -50,5 +50,8 @@ val reload_without_query_param : string -> unit
     history entry. *)
 val replace_query_param : string -> string -> unit
 
+(** Removes a query parameter like [replace_query_param] sets one. *)
+val remove_query_param : string -> unit
+
 val set_app_html : string -> unit
 val input_value : string -> string

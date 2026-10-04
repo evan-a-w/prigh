@@ -4,6 +4,8 @@ open! Import
 let methods =
   [ "ping"
   ; "hello"
+  ; "list_users"
+  ; "set_user"
   ; "set_active_host"
   ; "tool_exec_output"
   ; "tool_exec_result"
@@ -108,6 +110,8 @@ module Client = struct
     ; mutable cwd : string option
     ; mutable agent : Agent.t
     ; mutable authed : bool
+    ; signed_in : User_access.Signed_in.t option
+      (** set when the router checked the credentials *)
     ; send : Json.t -> unit
     ; btws : Cancellation.t String.Table.t (** in-flight [btw] calls by id *)
     }
@@ -266,7 +270,7 @@ let attach t (client : Client.t) agent =
 
 let fresh_agent t = register t (t.new_agent ~cwd:t.cwd ())
 
-let connect t ~send =
+let connect ?signed_in t ~send =
   t.client_seq <- t.client_seq + 1;
   let agent =
     match t.default_agent with
@@ -280,7 +284,8 @@ let connect t ~send =
     ; tools = false
     ; cwd = None
     ; agent
-    ; authed = Option.is_none t.token
+    ; authed = Option.is_none t.token || Option.is_some signed_in
+    ; signed_in
     ; send
     ; btws = String.Table.create ()
     }
@@ -310,6 +315,21 @@ let shutdown t =
   Login_manager.wait t.login
 ;;
 
+(* Without the backend host, clients have no business with the backend's
+   files: only session files in the sessions directory. *)
+let session_file t path =
+  if t.backend_host
+  then Ok path
+  else (
+    let real path =
+      try Filename_unix.realpath path with
+      | _ -> path
+    in
+    if String.is_prefix (real path) ~prefix:(real t.sessions_dir ^ "/")
+    then Ok path
+    else Or_error.errorf "%S is not in the sessions directory" path)
+;;
+
 (* Finds a live session by id or path, or loads it from disk. *)
 let find_agent t key =
   let live =
@@ -325,7 +345,7 @@ let find_agent t key =
   | None ->
     let path =
       if Sys_unix.file_exists_exn key
-      then Ok key
+      then session_file t key
       else (
         match
           List.find (Session.list ~dir:t.sessions_dir) ~f:(fun s ->
@@ -352,7 +372,7 @@ let bool_param params name ~default =
   | Some _ -> Or_error.errorf "param %S must be a boolean" name
 ;;
 
-let unauthorised = "unauthorised: bad user name or password"
+let unauthorised = User_access.unauthorised
 
 let credentials_ok t ?user given =
   match t.token with
@@ -420,11 +440,19 @@ let hello t (client : Client.t) params =
     | _ -> None
   in
   let authorised =
-    if credentials_ok t ?user:(string "user") (string "token")
-    then (
-      client.authed <- true;
-      Ok ())
-    else Or_error.error_string unauthorised
+    match client.signed_in with
+    | Some _ -> Ok ()
+    | None ->
+      if not (credentials_ok t ?user:(string "user") (string "token"))
+      then Or_error.error_string unauthorised
+      else if
+        Option.exists (string "as_user") ~f:(fun as_user ->
+          (not (String.is_empty as_user))
+          && not (Option.equal String.equal (Some as_user) t.namespace))
+      then Or_error.error_string User_access.no_users
+      else (
+        client.authed <- true;
+        Ok ())
   in
   Or_error.bind authorised ~f:(fun () ->
     Option.iter (param params "name") ~f:(function
@@ -447,6 +475,13 @@ let hello t (client : Client.t) params =
           ; ( "namespace"
             , Option.value_map t.namespace ~default:`Null ~f:(fun n ->
                 `String n) )
+          ; ( "user"
+            , Option.value_map client.signed_in ~default:`Null ~f:(fun s ->
+                `String s.user) )
+          ; ( "superuser"
+            , if Option.exists client.signed_in ~f:(fun s -> s.superuser)
+              then `True
+              else `False )
           ; "state", Rpc_json.state (Agent.state agent)
           ])))
 ;;
@@ -515,12 +550,35 @@ let btw t (client : Client.t) params =
             ]))))
 ;;
 
+let switch_user (client : Client.t) params =
+  match client.signed_in with
+  | None -> Or_error.error_string User_access.no_users
+  | Some signed_in ->
+    Or_error.bind (string_param params "user") ~f:(fun user ->
+      User_access.Signed_in.switch signed_in user)
+;;
+
+let request_params request =
+  Option.value (param request "params") ~default:(`Object [])
+;;
+
 let dispatch_server t (client : Client.t) ~meth ~params
   : Json.t Or_error.t option
   =
   let agent = client.agent in
   match meth with
   | "hello" -> Some (hello t client params)
+  | "list_users" ->
+    Some
+      (match client.signed_in with
+       | None -> Or_error.error_string User_access.no_users
+       | Some signed_in ->
+         Or_error.map (User_access.Signed_in.users signed_in) ~f:(fun users ->
+           `Array (List.map users ~f:(fun u -> `String u))))
+  | "set_user" ->
+    Some
+      (Or_error.map (switch_user client params) ~f:(fun user ->
+         `Object [ "user", `String user ]))
   | "set_active_host" ->
     Some
       (Or_error.bind (string_param params "host") ~f:(fun host ->
@@ -569,20 +627,23 @@ let dispatch_server t (client : Client.t) ~meth ~params
   | "delete_session" ->
     Some
       (Or_error.bind (string_param params "path") ~f:(fun path ->
-         if
-           Hashtbl.data t.agents
-           |> List.exists ~f:(fun a ->
-             String.equal (Session.path (Agent.session a)) path)
-         then Or_error.error_string "cannot delete a live session"
-         else Or_error.try_with (fun () -> Core_unix.unlink path) |> unit_result))
+         Or_error.bind (session_file t path) ~f:(fun path ->
+           if
+             Hashtbl.data t.agents
+             |> List.exists ~f:(fun a ->
+               String.equal (Session.path (Agent.session a)) path)
+           then Or_error.error_string "cannot delete a live session"
+           else
+             Or_error.try_with (fun () -> Core_unix.unlink path) |> unit_result)))
   | "import" ->
     Some
       (Or_error.bind (string_param params "path") ~f:(fun path ->
-         Or_error.map
-           (Session.import ~dir:t.sessions_dir path)
-           ~f:(fun session ->
-             new_agent_for t client session;
-             `Object [ "path", `String (Session.path session) ])))
+         Or_error.bind (session_file t path) ~f:(fun path ->
+           Or_error.map
+             (Session.import ~dir:t.sessions_dir path)
+             ~f:(fun session ->
+               new_agent_for t client session;
+               `Object [ "path", `String (Session.path session) ]))))
   | "fork" | "clone" ->
     let at =
       match meth, param params "at" with
@@ -787,9 +848,7 @@ let handle t client (request : Json.t) : Json.t =
   let response =
     match param request "method" with
     | Some (`String meth) ->
-      let params =
-        Option.value (param request "params") ~default:(`Object [])
-      in
+      let params = request_params request in
       (match
          if (not client.Client.authed) && not (String.equal meth "hello")
          then
@@ -817,7 +876,7 @@ let handle t client (request : Json.t) : Json.t =
       ]
 ;;
 
-let serve_lines t ~read_line ~write_line =
+let serve_lines ?signed_in t ~read_line ~write_line =
   Switch.run
   @@ fun sw ->
   let outbox : string option Eio.Stream.t = Eio.Stream.create 1024 in
@@ -832,13 +891,14 @@ let serve_lines t ~read_line ~write_line =
          | exception _ -> ())
     in
     loop ());
-  let client = connect t ~send in
+  let client = connect ?signed_in t ~send in
   let rec loop () =
     match read_line () with
-    | None -> ()
+    | None -> None
     | Some line ->
-      if not (String.is_empty (String.strip line))
-      then (
+      if String.is_empty (String.strip line)
+      then loop ()
+      else (
         match Json.parse line with
         | Error e ->
           send
@@ -847,14 +907,29 @@ let serve_lines t ~read_line ~write_line =
                 ; "id", `Null
                 ; "ok", `False
                 ; "error", `String ("invalid JSON: " ^ Error.to_string_hum e)
-                ])
+                ]);
+          loop ()
         | Ok request ->
-          (* Each request in its own fiber: a blocking method (shell, compact,
-             a remote tool round trip) must not stall the reader. *)
-          Fiber.fork ~sw (fun () -> send (handle t client request)));
-      loop ()
+          let switch =
+            match param request "method" with
+            | Some (`String "set_user") ->
+              Result.ok (switch_user client (request_params request))
+            | _ -> None
+          in
+          (match switch with
+           | Some user ->
+             (* Read no further: the router serves the rest of the
+                connection as [user]. *)
+             Some (Option.value (param request "id") ~default:`Null, user)
+           | None ->
+             (* Each request in its own fiber: a blocking method (shell,
+                compact, a remote tool round trip) must not stall the
+                reader. *)
+             Fiber.fork ~sw (fun () -> send (handle t client request));
+             loop ()))
   in
-  loop ();
+  let switch_to = loop () in
   disconnect t client;
-  Eio.Stream.add outbox None
+  Eio.Stream.add outbox None;
+  switch_to
 ;;

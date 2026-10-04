@@ -19,6 +19,7 @@ module Platform = struct
     ; reconnect :
         delay_ms:int
         -> session:string option
+        -> as_user:string option
         -> (P.Json.t, string) Result.t Bonsai.Effect.t
     }
 end
@@ -43,8 +44,10 @@ let perform ctx (platform : Platform.t) (command : App.Command.t) =
         (App.Action.Reply
            ( App.Reply_tag.Editor_text
            , Result.map result ~f:(fun contents -> `String contents) ))
-    | Reconnect { generation; delay_ms; session } ->
-      let%bind.Bonsai.Effect result = platform.reconnect ~delay_ms ~session in
+    | Reconnect { generation; delay_ms; session; as_user } ->
+      let%bind.Bonsai.Effect result =
+        platform.reconnect ~delay_ms ~session ~as_user
+      in
       inject (App.Action.Reply (App.Reply_tag.Reconnect generation, result))
     | Sign_out ->
       let%bind.Bonsai.Effect result = platform.sign_out in

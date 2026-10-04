@@ -13,6 +13,7 @@ module Settings = struct
     { backend : string
     ; login : Login.t
     ; session : string option
+    ; as_user : string option
     ; name : string
     }
 
@@ -32,6 +33,7 @@ module Settings = struct
           ~same_origin:(Browser.same_origin_ws_url ())
     ; login = Login.load Login.Storage.browser
     ; session = non_empty (Browser.query_param "session")
+    ; as_user = non_empty (Browser.query_param "as_user")
     ; name =
         Option.value (non_empty (Browser.query_param "name")) ~default:"browser"
     }
@@ -89,25 +91,30 @@ module History = struct
   ;;
 end
 
-let hello_params hello ~session =
-  match session with
-  | None -> hello
-  | Some path ->
-    List.Assoc.remove hello ~equal:String.equal "session"
-    @ [ "session", `String path ]
+let hello_params hello ~session ~as_user =
+  let set name value params =
+    match value with
+    | None -> params
+    | Some v ->
+      List.Assoc.remove params ~equal:String.equal name @ [ name, `String v ]
+  in
+  hello
+  |> List.filter ~f:(fun (name, _) -> not (String.equal name "as_user"))
+  |> set "session" session
+  |> set "as_user" as_user
 ;;
 
-let send_hello client hello ~session =
+let send_hello client hello ~session ~as_user =
   Deferred.map
-    (Client.call client "hello" (hello_params hello ~session))
+    (Client.call client "hello" (hello_params hello ~session ~as_user))
     ~f:(Result.map_error ~f:Error.to_string_hum)
 ;;
 
-let reconnect client ~hello ~delay_ms ~session =
+let reconnect client ~hello ~delay_ms ~session ~as_user =
   let%bind.Deferred () = Clock_ns.after (Time_ns.Span.of_int_ms delay_ms) in
   match%bind.Deferred Client.connect client with
   | Error e -> Deferred.return (Error (Error.to_string_hum e))
-  | Ok () -> send_hello client hello ~session
+  | Ok () -> send_hello client hello ~session ~as_user
 ;;
 
 let platform client ~hello ~history_key ~schedule ~quit ~sign_out
@@ -141,9 +148,9 @@ let platform client ~hello ~history_key ~schedule ~quit ~sign_out
             Error "the external editor (Ctrl+G) is not available in the browser")
           ())
   ; reconnect =
-      (fun ~delay_ms ~session ->
+      (fun ~delay_ms ~session ~as_user ->
         Effect.of_deferred_fun
-          (fun () -> reconnect client ~hello ~delay_ms ~session)
+          (fun () -> reconnect client ~hello ~delay_ms ~session ~as_user)
           ())
   ; sign_out = Effect.of_sync_fun (fun () -> Ok (sign_out ())) ()
   ; quit = Effect.of_sync_fun quit ()
@@ -218,9 +225,29 @@ let app platform ~terminal_url ~signed_in ~sign_out (local_ graph) =
            (Option.iter ~f:(Browser.replace_query_param "session"))
            session))
     graph;
+  let as_user =
+    let%arr model in
+    Prigh_ui.App.Model.acting_as model
+  in
+  (* Likewise for the user a superuser acts as. *)
+  Bonsai.Edge.on_change
+    ~equal:[%equal: string option]
+    as_user
+    ~callback:
+      (Bonsai.return (fun as_user ->
+         Effect.of_sync_fun
+           (function
+             | Some user -> Browser.replace_query_param "as_user" user
+             | None -> Browser.remove_query_param "as_user")
+           as_user))
+    graph;
   let terminal_open, set_terminal_open = Bonsai.state false graph in
   let view =
-    let%arr model and session and terminal_open and set_terminal_open in
+    let%arr model
+    and session
+    and as_user
+    and terminal_open
+    and set_terminal_open in
     let set_open value =
       Effect.Many
         [ set_terminal_open value
@@ -255,7 +282,7 @@ let app platform ~terminal_url ~signed_in ~sign_out (local_ graph) =
       ; (if terminal_open
          then
            Terminal_panel.view
-             ~url:(terminal_url ~session)
+             ~url:(terminal_url ~session ~as_user)
              ~on_close:(set_open false)
          else Vdom.Node.none)
       ]
@@ -549,6 +576,7 @@ let connect_form ~backend ~(login : Login.t) ~error =
    next page load sees the note and shows the connect form. *)
 let sign_out () =
   Login.forget Login.Storage.browser;
+  Browser.remove_query_param "as_user";
   Browser.reload_without_query_param "session"
 ;;
 
@@ -562,7 +590,15 @@ let run_app (settings : Settings.t) =
     (match%bind.Deferred
        match%bind.Deferred Client.connect client with
        | Error e -> Deferred.return (Error (Error.to_string_hum e))
-       | Ok () -> send_hello client hello ~session:None
+       | Ok () ->
+         (match%bind.Deferred
+            send_hello client hello ~session:None ~as_user:settings.as_user
+          with
+          | Error _ when Option.is_some settings.as_user ->
+            (* No longer allowed to act as that user: be ourselves. *)
+            Browser.remove_query_param "as_user";
+            send_hello client hello ~session:None ~as_user:None
+          | result -> Deferred.return result)
      with
      | Error error ->
        let%map.Deferred () = Client.close client in
@@ -592,10 +628,11 @@ let run_app (settings : Settings.t) =
               ~quit
               ~sign_out)
        in
-       let terminal_url ~session =
+       let terminal_url ~session ~as_user =
          Terminal_panel.url
            ~backend:settings.backend
            ~user:settings.login.user
+           ~as_user
            ~token:settings.login.password
            ~session
        in

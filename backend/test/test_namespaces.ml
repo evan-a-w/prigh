@@ -48,11 +48,29 @@ let home t = Filename.concat t.dir "home"
 
 (* A server per namespace, set up like [prigh serve -tokens]: each from its
    own world. *)
-let make_router ?(backend_host = true) ?(replies = []) t ~sw spec =
+let make_router
+      ?(backend_host = true)
+      ?(replies = [])
+      ?(superusers = [])
+      ?(host_tokens = "")
+      t
+      ~sw
+      spec
+  =
   let worlds = ref [] in
+  let access =
+    User_access.create
+      (Or_error.ok_exn (Namespace.parse_spec spec))
+      ~superusers
+      ~host_tokens:
+        (if String.is_empty host_tokens
+         then []
+         else Or_error.ok_exn (Namespace.parse_spec host_tokens))
+    |> Or_error.ok_exn
+  in
   let router =
     Rpc_router.namespaced
-      (Or_error.ok_exn (Namespace.parse_spec spec))
+      access
       ~home:(home t)
       ~legacy_auth_file:(Filename.concat t.dir "legacy-auth.json")
       ~create_server:(fun namespace world ->
@@ -139,7 +157,11 @@ let%expect_test "namespaces: worlds, sessions, logins, tool hosts, config" =
             world.sessions_dir
             (Auth_store.path world.store))));
   print_s
-    [%sexp (Sys_unix.ls_dir (home t ^/ ".prigh/namespaces") : string list)];
+    [%sexp
+      (List.sort
+         ~compare:String.compare
+         (Sys_unix.ls_dir (home t ^/ ".prigh/namespaces"))
+       : string list)];
   [%expect
     {|
     a: home=$DIR/home/.prigh/namespaces/a sessions=$DIR/home/.prigh/namespaces/a/.prigh/sessions auth=$DIR/home/.prigh/namespaces/a/.config/prigh/auth.json
@@ -310,14 +332,14 @@ let%expect_test "routing connections by the hello token" =
     --
     {"type":"response","id":4,"ok":false,"error":"unauthorised: bad user name or password"}
     --
-    {"type":"response","id":5,"ok":true,"result":{"client_id":"client-1","namespace":"b","state":{"session_id":"<id>","session_path":"$DIR/home/.prigh/namespaces/b/.prigh/sessions/<stamp>_<id>.jsonl","session_name":null,"session_description":null,"cwd":"$DIR","git_branch":null,"model":{"id":"deepseek-flash","provider":"deepseek","key":"deepseek/deepseek-flash","name":"DeepSeek V4.1 Flash","context_window":1000000,"max_output":384000,"supports_thinking":true,"cost":{"input":0.3,"output":1.2,"cache_read":0.006}},"thinking":"off","running":false,"message_count":0,"usage":{"input":0,"output":0,"cache_read":0},"cost_usd":0,"context_tokens":0,"active_host":"backend","hosts":[{"id":"backend","name":"<host>","cwd":"$DIR","session_id":null,"session_name":null}],"subagents":[]}}}
+    {"type":"response","id":5,"ok":true,"result":{"client_id":"client-1","namespace":"b","user":"b","superuser":false,"state":{"session_id":"<id>","session_path":"$DIR/home/.prigh/namespaces/b/.prigh/sessions/<stamp>_<id>.jsonl","session_name":null,"session_description":null,"cwd":"$DIR","git_branch":null,"model":{"id":"deepseek-flash","provider":"deepseek","key":"deepseek/deepseek-flash","name":"DeepSeek V4.1 Flash","context_window":1000000,"max_output":384000,"supports_thinking":true,"cost":{"input":0.3,"output":1.2,"cache_read":0.006}},"thinking":"off","running":false,"message_count":0,"usage":{"input":0,"output":0,"cache_read":0},"cost_usd":0,"context_tokens":0,"active_host":"backend","hosts":[{"id":"backend","name":"<host>","cwd":"$DIR","session_id":null,"session_name":null}],"subagents":[]}}}
     {"session_path":"$DIR/home/.prigh/namespaces/b/.prigh/sessions/<stamp>_<id>.jsonl"}
     --
     {"type":"response","id":7,"ok":false,"error":"unauthorised: bad user name or password"}
     --
     {"type":"response","id":9,"ok":false,"error":"unauthorised: bad user name or password"}
     --
-    {"type":"response","id":10,"ok":true,"result":{"client_id":"client-2","namespace":"b","state":{"session_id":"<id>","session_path":"$DIR/home/.prigh/namespaces/b/.prigh/sessions/<stamp>_<id>.jsonl","session_name":null,"session_description":null,"cwd":"$DIR","git_branch":null,"model":{"id":"deepseek-flash","provider":"deepseek","key":"deepseek/deepseek-flash","name":"DeepSeek V4.1 Flash","context_window":1000000,"max_output":384000,"supports_thinking":true,"cost":{"input":0.3,"output":1.2,"cache_read":0.006}},"thinking":"off","running":false,"message_count":0,"usage":{"input":0,"output":0,"cache_read":0},"cost_usd":0,"context_tokens":0,"active_host":"backend","hosts":[{"id":"backend","name":"<host>","cwd":"$DIR","session_id":null,"session_name":null}],"subagents":[]}}}
+    {"type":"response","id":10,"ok":true,"result":{"client_id":"client-2","namespace":"b","user":"b","superuser":false,"state":{"session_id":"<id>","session_path":"$DIR/home/.prigh/namespaces/b/.prigh/sessions/<stamp>_<id>.jsonl","session_name":null,"session_description":null,"cwd":"$DIR","git_branch":null,"model":{"id":"deepseek-flash","provider":"deepseek","key":"deepseek/deepseek-flash","name":"DeepSeek V4.1 Flash","context_window":1000000,"max_output":384000,"supports_thinking":true,"cost":{"input":0.3,"output":1.2,"cache_read":0.006}},"thinking":"off","running":false,"message_count":0,"usage":{"input":0,"output":0,"cache_read":0},"cost_usd":0,"context_tokens":0,"active_host":"backend","hosts":[{"id":"backend","name":"<host>","cwd":"$DIR","session_id":null,"session_name":null}],"subagents":[]}}}
     {"session_path":"$DIR/home/.prigh/namespaces/b/.prigh/sessions/<stamp>_<id>.jsonl"}
     --
     |}];
@@ -452,6 +474,34 @@ let%expect_test "provider keys from the environment: ignored in namespaces" =
     |}]
 ;;
 
+let open_websocket t ~sw ~port target =
+  let flow =
+    Eio.Net.connect
+      ~sw
+      (Eio.Stdenv.net t.env)
+      (`Tcp (Eio.Net.Ipaddr.V4.loopback, port))
+  in
+  Eio.Flow.copy_string
+    (sprintf
+       "GET %s HTTP/1.1\r\n\
+        Host: x\r\n\
+        Connection: Upgrade\r\n\
+        Upgrade: websocket\r\n\
+        Sec-WebSocket-Version: 13\r\n\
+        Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==\r\n\
+        \r\n"
+       target)
+    flow;
+  let reader = Eio.Buf_read.of_flow flow ~max_size:(1024 * 1024) in
+  let rec skip_headers () =
+    match Eio.Buf_read.line reader with
+    | "" -> ()
+    | _ -> skip_headers ()
+  in
+  skip_headers ();
+  Websocket.create ~role:`Client ~reader ~flow ()
+;;
+
 (* Over a real listener: the pi web frontend and the terminal pick their
    namespace by the [token] in the query. *)
 let%expect_test "pi-web and /terminal look the namespace up by token" =
@@ -475,33 +525,7 @@ let%expect_test "pi-web and /terminal look the namespace up by token" =
         ]
       ~on_lines:(Rpc_router.serve_lines router)
   in
-  let browser target =
-    let flow =
-      Eio.Net.connect
-        ~sw
-        (Eio.Stdenv.net t.env)
-        (`Tcp (Eio.Net.Ipaddr.V4.loopback, port))
-    in
-    Eio.Flow.copy_string
-      (sprintf
-         "GET %s HTTP/1.1\r\n\
-          Host: x\r\n\
-          Connection: Upgrade\r\n\
-          Upgrade: websocket\r\n\
-          Sec-WebSocket-Version: 13\r\n\
-          Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==\r\n\
-          \r\n"
-         target)
-      flow;
-    let reader = Eio.Buf_read.of_flow flow ~max_size:(1024 * 1024) in
-    let rec skip_headers () =
-      match Eio.Buf_read.line reader with
-      | "" -> ()
-      | _ -> skip_headers ()
-    in
-    skip_headers ();
-    Websocket.create ~role:`Client ~reader ~flow ()
-  in
+  let browser = open_websocket t ~sw ~port in
   let first target =
     let ws = browser target in
     Option.iter (Websocket.read_text ws) ~f:(fun line ->
@@ -619,6 +643,395 @@ let%expect_test "pi-web and /terminal look the namespace up by token" =
     {"type":"response","id":"r","ok":true,"result":{}}
     {"type":"exit"}
     browser socket closed
+    |}];
+  Rpc_router.shutdown router
+;;
+
+let%expect_test "user access: sign-in, host tokens, superusers, as_user" =
+  let namespaces =
+    Or_error.ok_exn (Namespace.parse_spec "a=tok-a,b=tok-b,s=tok-s")
+  in
+  let create ?(host_tokens = []) ?(superusers = []) () =
+    User_access.create namespaces ~host_tokens ~superusers
+  in
+  let host spec =
+    Or_error.ok_exn (Namespace.parse_spec ~flag:"-host-tokens" spec)
+  in
+  List.iter
+    [ "unknown superuser", create ~superusers:[ "x" ] ()
+    ; "unknown host user", create ~host_tokens:(host "x=h") ()
+    ; "host token reuses a login token", create ~host_tokens:(host "a=tok-b") ()
+    ]
+    ~f:(fun (name, access) ->
+      print_s
+        [%message name ~_:(Or_error.map access ~f:ignore : unit Or_error.t)]);
+  [%expect
+    {|
+    ("unknown superuser" (Error "-superusers: no user \"x\""))
+    ("unknown host user" (Error "-host-tokens: no user \"x\""))
+    ("host token reuses a login token"
+     (Error "-host-tokens: a host token is not unique"))
+    |}];
+  print_s [%sexp (User_access.parse_names " s, ,a,," : string list)];
+  [%expect {| (s a) |}];
+  let access =
+    create ~host_tokens:(host "a=host-a,s=host-s") ~superusers:[ "s" ] ()
+    |> Or_error.ok_exn
+  in
+  let try_ ?user ?as_user token =
+    match User_access.authenticate access ?user ?as_user token with
+    | Error e -> Error.to_string_hum e
+    | Ok (signed_in, acting) ->
+      sprintf
+        "%s%s acting as %s"
+        signed_in.user
+        (if signed_in.superuser then " (superuser)" else "")
+        acting
+  in
+  List.iter
+    [ "a's token", try_ (Some "tok-a")
+    ; "a's token, user a", try_ ~user:"a" (Some "tok-a")
+    ; "a's token, user b", try_ ~user:"b" (Some "tok-a")
+    ; "no token", try_ None
+    ; "a's host token", try_ (Some "host-a")
+    ; "a as b", try_ ~as_user:"b" (Some "tok-a")
+    ; "a as a", try_ ~as_user:"a" (Some "tok-a")
+    ; "a with an empty as_user", try_ ~as_user:"" (Some "tok-a")
+    ; "s as b", try_ ~user:"s" ~as_user:"b" (Some "tok-s")
+    ; "s as nobody", try_ ~as_user:"nobody" (Some "tok-s")
+    ; "s's host token as b", try_ ~as_user:"b" (Some "host-s")
+    ; "bad token as b", try_ ~as_user:"b" (Some "nope")
+    ]
+    ~f:(fun (name, result) -> printf "%-26s %s\n" name result);
+  [%expect
+    {|
+    a's token                  a acting as a
+    a's token, user a          a acting as a
+    a's token, user b          unauthorised: bad user name or password
+    no token                   unauthorised: bad user name or password
+    a's host token             a acting as a
+    a as b                     unauthorised: a is not a superuser
+    a as a                     a acting as a
+    a with an empty as_user    a acting as a
+    s as b                     s (superuser) acting as b
+    s as nobody                no user "nobody"
+    s's host token as b        unauthorised: s is not a superuser
+    bad token as b             unauthorised: bad user name or password
+    |}];
+  let users token =
+    match User_access.authenticate access (Some token) with
+    | Error e -> Error.to_string_hum e
+    | Ok (signed_in, _) ->
+      (match User_access.Signed_in.users signed_in with
+       | Ok users -> String.concat ~sep:" " users
+       | Error e -> Error.to_string_hum e)
+  in
+  print_endline (users "tok-s");
+  print_endline (users "tok-a");
+  [%expect
+    {|
+    a b s
+    unauthorised: a is not a superuser
+    |}]
+;;
+
+(* Prints the responses (with the namespace, user and session dir of hellos)
+   and named events of one connection through the router. *)
+let serve_through router t lines =
+  let lines = ref lines in
+  Rpc_router.serve_lines
+    router
+    ~read_line:(fun () ->
+      match !lines with
+      | [] -> None
+      | line :: rest ->
+        lines := rest;
+        Some line)
+    ~write_line:(fun line ->
+      let json = Json.of_string line in
+      match Json.member "type" json, Json.member "result" json with
+      | Some (`String "response"), Some (`Object fields as result)
+        when List.Assoc.mem fields ~equal:String.equal "client_id" ->
+        let field name =
+          Option.value_map
+            (Json.member name result)
+            ~default:"-"
+            ~f:Json.to_string
+        in
+        let sessions =
+          Option.bind
+            (Json.member "state" result)
+            ~f:(Json.member "session_path")
+          |> Option.bind ~f:Json.string
+          |> Option.value_map ~default:"-" ~f:Filename.dirname
+        in
+        print_endline
+          (mask
+             t
+             (sprintf
+                "id %s: namespace=%s user=%s superuser=%s sessions=%s"
+                (Option.value_map
+                   (Json.member "id" json)
+                   ~default:"-"
+                   ~f:Json.to_string)
+                (field "namespace")
+                (field "user")
+                (field "superuser")
+                sessions))
+      | Some (`String "response"), _ -> print_endline (mask t line)
+      | _ -> ());
+  print_endline "--"
+;;
+
+let%expect_test "superusers: as_user in hello, set_user and list_users" =
+  with_sandbox
+  @@ fun t ->
+  Eio.Switch.run
+  @@ fun sw ->
+  let router, _ =
+    make_router
+      t
+      ~sw
+      ~superusers:[ "s" ]
+      ~host_tokens:"s=host-s"
+      "a=tok-a,b=tok-b,s=tok-s"
+  in
+  let hello ?(extra = "") ?(id = 1) token =
+    sprintf
+      {|{"id": %d, "method": "hello", "params": {"token": "%s", "name": "web"%s}}|}
+      id
+      token
+      extra
+  in
+  let request ?(params = "{}") id meth =
+    sprintf {|{"id": %d, "method": "%s", "params": %s}|} id meth params
+  in
+  (* A plain user: as_user and switching are refused, the connection stays. *)
+  serve_through router t [ hello "tok-a" ~extra:{|, "as_user": "b"|} ];
+  serve_through
+    router
+    t
+    [ hello "tok-a"
+    ; request 2 "list_users"
+    ; request 3 "set_user" ~params:{|{"user": "b"}|}
+    ; request 4 "set_user" ~params:{|{"user": "a"}|}
+    ; request 5 "ping"
+    ];
+  [%expect
+    {|
+    {"type":"response","id":1,"ok":false,"error":"unauthorised: a is not a superuser"}
+    --
+    id 1: namespace="a" user="a" superuser=false sessions=$DIR/home/.prigh/namespaces/a/.prigh/sessions
+    {"type":"response","id":2,"ok":false,"error":"unauthorised: a is not a superuser"}
+    {"type":"response","id":3,"ok":false,"error":"unauthorised: a is not a superuser"}
+    id 4: namespace="a" user="a" superuser=false sessions=$DIR/home/.prigh/namespaces/a/.prigh/sessions
+    {"type":"response","id":5,"ok":true,"result":"pong"}
+    --
+    |}];
+  (* A superuser acts as anyone, from hello or mid-connection, and back. *)
+  serve_through
+    router
+    t
+    [ hello "tok-s" ~extra:{|, "as_user": "b"|}
+    ; request 2 "list_users"
+    ; request 3 "set_user" ~params:{|{"user": "nobody"}|}
+    ; request 4 "set_user" ~params:{|{"user": "a"}|}
+    ; request 5 "set_session_name" ~params:{|{"name": "made by s"}|}
+    ; request 6 "set_user" ~params:{|{"user": "s"}|}
+    ; request 7 "set_user"
+    ; request 8 "ping"
+    ];
+  [%expect
+    {|
+    id 1: namespace="b" user="s" superuser=true sessions=$DIR/home/.prigh/namespaces/b/.prigh/sessions
+    {"type":"response","id":2,"ok":true,"result":["a","b","s"]}
+    {"type":"response","id":3,"ok":false,"error":"no user \"nobody\""}
+    id 4: namespace="a" user="s" superuser=true sessions=$DIR/home/.prigh/namespaces/a/.prigh/sessions
+    {"type":"response","id":5,"ok":true,"result":{}}
+    id 6: namespace="s" user="s" superuser=true sessions=$DIR/home/.prigh/namespaces/s/.prigh/sessions
+    {"type":"response","id":7,"ok":false,"error":"missing param \"user\""}
+    {"type":"response","id":8,"ok":true,"result":"pong"}
+    --
+    |}];
+  (* The session named while acting as a belongs to a. *)
+  let a = server router "a" in
+  let ca, _, _ = connect a ~token:"tok-a" () in
+  print_endline
+    (Json.to_string
+       (match result (call a ca "list_sessions") with
+        | `Array sessions ->
+          `Array (List.filter_map sessions ~f:(Json.member "name"))
+        | other -> other));
+  [%expect {| ["made by s"] |}];
+  (* The superuser's host token signs in as s, without superuser rights. *)
+  serve_through
+    router
+    t
+    [ hello "host-s"; request 2 "set_user" ~params:{|{"user": "a"}|} ];
+  [%expect
+    {|
+    id 1: namespace="s" user="s" superuser=false sessions=$DIR/home/.prigh/namespaces/s/.prigh/sessions
+    {"type":"response","id":2,"ok":false,"error":"unauthorised: s is not a superuser"}
+    --
+    |}];
+  Rpc_router.shutdown router
+;;
+
+let%expect_test "single mode: no users to switch to" =
+  with_sandbox
+  @@ fun t ->
+  Eio.Switch.run
+  @@ fun sw ->
+  let router =
+    Rpc_router.single
+      (Rpc_server.create
+         ~env:t.env
+         ~sw
+         ~token:"s"
+         ~login:
+           (Login_manager.create
+              ~env:t.env
+              ~sw
+              ~store:(Auth_store.create ~path:(t.dir ^/ "auth.json"))
+              ())
+         ~sessions_dir:(t.dir ^/ "sessions")
+         ~cwd:t.dir
+         ~new_agent:(fun ?session ~cwd () ->
+           Agent.create
+             ~env:t.env
+             ~sw
+             ~provider:(Faux_provider.create [])
+             ~tools:[]
+             ~sessions_dir:(t.dir ^/ "sessions")
+             ~home:t.dir
+             ?session
+             ~cwd
+             ())
+         ())
+  in
+  serve_through
+    router
+    t
+    [ {|{"id": 1, "method": "hello", "params": {"token": "s", "as_user": "x"}}|}
+    ; {|{"id": 2, "method": "hello", "params": {"token": "s", "as_user": ""}}|}
+    ; {|{"id": 3, "method": "list_users"}|}
+    ; {|{"id": 4, "method": "set_user", "params": {"user": "x"}}|}
+    ; {|{"id": 5, "method": "ping"}|}
+    ];
+  print_s
+    [%sexp
+      (Rpc_router.authenticate router ~as_user:"x" ~token:(Some "s") ()
+       |> Or_error.map ~f:ignore
+       : unit Or_error.t)];
+  [%expect
+    {|
+    {"type":"response","id":1,"ok":false,"error":"user switching needs users (prigh serve -tokens)"}
+    id 2: namespace=null user=null superuser=false sessions=$DIR/sessions
+    {"type":"response","id":3,"ok":false,"error":"user switching needs users (prigh serve -tokens)"}
+    {"type":"response","id":4,"ok":false,"error":"user switching needs users (prigh serve -tokens)"}
+    {"type":"response","id":5,"ok":true,"result":"pong"}
+    --
+    (Error "user switching needs users (prigh serve -tokens)")
+    |}];
+  Rpc_router.shutdown router
+;;
+
+let%expect_test "pi-web and /terminal: as_user and /setusr" =
+  with_sandbox
+  @@ fun t ->
+  Eio.Switch.run
+  @@ fun sw ->
+  let router, _ = make_router t ~sw ~superusers:[ "s" ] "a=tok-a,s=tok-s" in
+  let terminals = Terminals.create ~env:t.env ~sw () in
+  let port =
+    Web_server.listen
+      ~env:t.env
+      ~sw
+      ~addr:Eio.Net.Ipaddr.V4.loopback
+      ~port:0
+      ~root:None
+      ~websockets:
+        [ "/ws", Pi_rpc.serve_websocket router
+        ; "/terminal", Web_server.serve_terminal router terminals
+        ]
+      ~on_lines:(Rpc_router.serve_lines router)
+  in
+  let first target =
+    let ws = open_websocket t ~sw ~port target in
+    Option.iter (Websocket.read_text ws) ~f:(fun line ->
+      print_endline (mask t line));
+    ws
+  in
+  Websocket.close (first "/ws?token=tok-a&as_user=s");
+  Websocket.close (first "/terminal?token=tok-a&as_user=s");
+  Websocket.close (first "/ws?token=tok-s&as_user=nobody");
+  [%expect
+    {|
+    {"type":"prigh_hello_failed","error":"unauthorised: a is not a superuser"}
+    {"type":"error","message":"unauthorised: bad user name or password"}
+    {"type":"prigh_hello_failed","error":"no user \"nobody\""}
+    |}];
+  (* The session file says whose namespace the connection is in. *)
+  let session_file ws =
+    Websocket.send_text ws {|{"id":"1","type":"get_state"}|};
+    let rec until_response () =
+      match Websocket.read_text ws with
+      | None -> ()
+      | Some line ->
+        if String.is_substring line ~substring:{|"type":"response"|}
+        then
+          print_endline
+            (mask
+               t
+               (Json.to_string
+                  (Option.value_exn
+                     (Option.bind
+                        (Json.member "data" (Json.of_string line))
+                        ~f:(Json.member "sessionFile")))))
+        else until_response ()
+    in
+    until_response ()
+  in
+  let ws = open_websocket t ~sw ~port "/ws?token=tok-s&user=s&as_user=a" in
+  session_file ws;
+  (* /setusr answers with the users, or tells the page to reconnect. *)
+  let prompt text =
+    Websocket.send_text
+      ws
+      (sprintf {|{"id":"p","type":"prompt","message":"%s"}|} text);
+    let rec until_response () =
+      match Websocket.read_text ws with
+      | None -> ()
+      | Some line ->
+        let json = Json.of_string line in
+        (match Json.member "type" json with
+         | Some (`String "prigh_set_user") -> print_endline line
+         | Some (`String "message_end") ->
+           Option.iter
+             (Option.bind
+                (Json.member "message" json)
+                ~f:(Json.member "content"))
+             ~f:(fun content -> print_endline (Json.to_string content))
+         | Some (`String "response") -> print_endline line
+         | _ -> ());
+        if String.is_substring line ~substring:{|"type":"response"|}
+        then ()
+        else until_response ()
+    in
+    until_response ()
+  in
+  prompt "/setusr";
+  prompt "/setusr nobody";
+  prompt "/setusr s";
+  Websocket.close ws;
+  [%expect
+    {|
+    "$DIR/home/.prigh/namespaces/a/.prigh/sessions/<stamp>_<id>.jsonl"
+    "Users (`/setusr NAME` to act as one):\n- a\n- s"
+    {"id":"p","type":"response","command":"prompt","success":true,"data":{}}
+    {"id":"p","type":"response","command":"prompt","success":false,"error":"no user \"nobody\""}
+    {"type":"prigh_set_user","user":"s"}
+    {"id":"p","type":"response","command":"prompt","success":true,"data":{}}
     |}];
   Rpc_router.shutdown router
 ;;

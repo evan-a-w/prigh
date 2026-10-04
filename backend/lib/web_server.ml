@@ -229,7 +229,12 @@ let serve_terminal router terminals ~query ws =
          (`Object [ "type", `String "error"; "message", `String message ]))
   in
   match
-    Rpc_router.lookup router ?user:(param "user") ~token:(param "token") ()
+    Rpc_router.lookup
+      router
+      ?user:(param "user")
+      ?as_user:(param "as_user")
+      ~token:(param "token")
+      ()
   with
   | None -> error Rpc_server.unauthorised
   | Some server ->

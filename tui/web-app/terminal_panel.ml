@@ -4,7 +4,7 @@ open Bonsai_web
 
 let panel_class = "terminal-panel"
 
-let url ~backend ~user ~token ~session =
+let url ~backend ~user ~as_user ~token ~session =
   let base =
     match String.lsplit2 backend ~on:'?' with
     | Some (base, _) -> base
@@ -19,6 +19,7 @@ let url ~backend ~user ~token ~session =
   let query =
     List.filter_opt
       [ Option.map user ~f:(fun u -> "user", u)
+      ; Option.map as_user ~f:(fun u -> "as_user", u)
       ; Option.map token ~f:(fun t -> "token", t)
       ; Option.map session ~f:(fun s -> "session", s)
       ]

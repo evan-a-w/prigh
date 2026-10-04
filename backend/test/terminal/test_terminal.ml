@@ -558,7 +558,7 @@ let%expect_test "a terminal on a network tool host, relayed end to end" =
               (Rpc_router.single h.server)
               backend_terminals )
         ]
-      ~on_lines:(Rpc_server.serve_lines h.server)
+      ~on_lines:(Rpc_router.serve_lines (Rpc_router.single h.server))
   in
   let f =
     { Fixture.sandbox

@@ -232,17 +232,23 @@ let reload_without_query_param name =
         ^ without_query_param ~search:(Js.to_string location##.search) name)
 ;;
 
-let replace_query_param name value =
+let replace_search f =
   let location = Dom_html.window##.location in
-  let search =
-    with_query_param ~search:(Js.to_string location##.search) name value
-  in
+  let search = f ~search:(Js.to_string location##.search) in
   if not (String.equal search (Js.to_string location##.search))
   then
     Dom_html.window##.history##replaceState
       Js.null
       (Js.string "")
       (Js.some (Js.string (Js.to_string location##.pathname ^ search)))
+;;
+
+let replace_query_param name value =
+  replace_search (fun ~search -> with_query_param ~search name value)
+;;
+
+let remove_query_param name =
+  replace_search (fun ~search -> without_query_param ~search name)
 ;;
 
 let reload_with_backend backend =

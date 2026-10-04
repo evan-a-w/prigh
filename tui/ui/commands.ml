@@ -112,6 +112,10 @@ let all =
   ; c "state" "" "show session state"
   ; c "clear" "" "clear the transcript"
   ; c "signout" "" "sign out to log in as another user (browser only)"
+  ; c
+      "setusr"
+      "[user]"
+      "act as another user (superusers only); without a user, list them"
   ; c "quit" "" "exit"
   ]
 ;;

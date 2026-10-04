@@ -232,7 +232,7 @@ let%expect_test "backend host disabled" =
   new_tool_results agent ~seen;
   [%expect
     {|
-    {"type":"response","id":"r","ok":true,"result":{"client_id":"client-2","namespace":null,"state":{"session_id":"<id>","session_path":"$DIR/sessions/<stamp>_<id>.jsonl","session_name":null,"session_description":null,"cwd":"/home/me/proj","git_branch":null,"model":{"id":"deepseek-flash","provider":"deepseek","key":"deepseek/deepseek-flash","name":"DeepSeek V4.1 Flash","context_window":1000000,"max_output":384000,"supports_thinking":true,"cost":{"input":0.3,"output":1.2,"cache_read":0.006}},"thinking":"off","running":false,"message_count":0,"usage":{"input":0,"output":0,"cache_read":0},"cost_usd":0,"context_tokens":0,"active_host":"client-2","hosts":[{"id":"client-2","name":"laptop","cwd":"/home/me/proj","session_id":"<id>","session_name":null}],"subagents":[]}}}
+    {"type":"response","id":"r","ok":true,"result":{"client_id":"client-2","namespace":null,"user":null,"superuser":false,"state":{"session_id":"<id>","session_path":"$DIR/sessions/<stamp>_<id>.jsonl","session_name":null,"session_description":null,"cwd":"/home/me/proj","git_branch":null,"model":{"id":"deepseek-flash","provider":"deepseek","key":"deepseek/deepseek-flash","name":"DeepSeek V4.1 Flash","context_window":1000000,"max_output":384000,"supports_thinking":true,"cost":{"input":0.3,"output":1.2,"cache_read":0.006}},"thinking":"off","running":false,"message_count":0,"usage":{"input":0,"output":0,"cache_read":0},"cost_usd":0,"context_tokens":0,"active_host":"client-2","hosts":[{"id":"client-2","name":"laptop","cwd":"/home/me/proj","session_id":"<id>","session_name":null}],"subagents":[]}}}
     ((active_host client-2) (cwd /home/me/proj) (git_branch ())
      (hosts (client-2)))
     (Host client-2 /home/me/proj)
@@ -409,5 +409,107 @@ let%expect_test "subagents outlive their turn and a session switch; cancel RPC" 
     delivered: "[subagent a1 failed] stuck\n[cancelled]\n[subagent: 1 turns, 10 in / 5 out tokens, $0.0000]"
     delivered: "[subagent a2 finished] slow\nslow report\n[subagent: 1 turns, 10 in / 5 out tokens, $0.0000]"
     session "go" live=false
+    |}]
+;;
+
+let%expect_test "backend host disabled: no access to the backend's other files" =
+  with_sandbox
+  @@ fun t ->
+  Eio.Switch.run
+  @@ fun sw ->
+  let server = make_server t ~sw ~backend_host:false [] in
+  let client = Rpc_server.connect server ~send:ignore in
+  (* A saved session of this server, and a file it must not touch. *)
+  let saved = Session.create ~dir:(t.dir ^/ "sessions") ~cwd:t.dir () in
+  ignore (Session.set_name saved ~name:"saved" : Session.Entry.t);
+  let elsewhere = Session.create ~dir:(t.dir ^/ "elsewhere") ~cwd:t.dir () in
+  ignore (Session.set_name elsewhere ~name:"elsewhere" : Session.Entry.t);
+  let secret = t.dir ^/ "secret.json" in
+  Out_channel.write_all secret ~data:"{}";
+  let path_param path = sprintf {|{"path": "%s"}|} path in
+  call t server client ~params:(path_param (Session.path elsewhere)) "import";
+  call
+    t
+    server
+    client
+    ~params:(path_param (Session.path elsewhere))
+    "switch_session";
+  call t server client ~params:(path_param secret) "delete_session";
+  call
+    t
+    server
+    client
+    ~params:(path_param (t.dir ^/ "sessions/../secret.json"))
+    "delete_session";
+  print_s [%sexp (Sys_unix.file_exists_exn secret : bool)];
+  call
+    t
+    server
+    client
+    ~params:(path_param (Session.path saved))
+    "delete_session";
+  print_s [%sexp (Sys_unix.file_exists_exn (Session.path saved) : bool)];
+  [%expect
+    {|
+    {"type":"response","id":"r","ok":false,"error":"\"$DIR/elsewhere/<stamp>_<id>.jsonl\" is not in the sessions directory"}
+    {"type":"response","id":"r","ok":false,"error":"\"$DIR/elsewhere/<stamp>_<id>.jsonl\" is not in the sessions directory"}
+    {"type":"response","id":"r","ok":false,"error":"\"$DIR/secret.json\" is not in the sessions directory"}
+    {"type":"response","id":"r","ok":false,"error":"\"$DIR/sessions/../secret.json\" is not in the sessions directory"}
+    true
+    {"type":"response","id":"r","ok":true,"result":{}}
+    false
+    |}];
+  (* Exports are written by the tool host, as its user. *)
+  let sent = Queue.create () in
+  let laptop = Rpc_server.connect server ~send:(Queue.enqueue sent) in
+  call
+    t
+    server
+    laptop
+    ~params:{|{"name": "laptop", "tools": true, "cwd": "/home/me/proj"}|}
+    "hello";
+  Eio.Fiber.both
+    (fun () ->
+       call
+         t
+         server
+         client
+         ~params:{|{"format": "markdown", "path": "out.md"}|}
+         "export")
+    (fun () ->
+       let rec answer () =
+         match Queue.dequeue sent with
+         | Some json when String.equal (member_string json "event") "tool_exec"
+           ->
+           print_endline
+             (mask
+                t
+                (sprintf
+                   "exec %s %s"
+                   (member_string json "name")
+                   (Option.value_map
+                      (Json.member "arguments" json)
+                      ~default:""
+                      ~f:(fun args -> member_string args "path"))));
+           ignore
+             (Rpc_server.handle
+                server
+                laptop
+                (Json.of_string
+                   (sprintf
+                      {|{"id": 0, "method": "tool_exec_result", "params": {"exec_id": "%s", "text": "wrote"}}|}
+                      (member_string json "exec_id")))
+              : Json.t)
+         | Some _ -> answer ()
+         | None ->
+           Eio.Fiber.yield ();
+           answer ()
+       in
+       answer ());
+  [%expect
+    {|
+    {"type":"response","id":"r","ok":true,"result":{"client_id":"client-2","namespace":null,"user":null,"superuser":false,"state":{"session_id":"<id>","session_path":"$DIR/sessions/<stamp>_<id>.jsonl","session_name":null,"session_description":null,"cwd":"/home/me/proj","git_branch":null,"model":{"id":"deepseek-flash","provider":"deepseek","key":"deepseek/deepseek-flash","name":"DeepSeek V4.1 Flash","context_window":1000000,"max_output":384000,"supports_thinking":true,"cost":{"input":0.3,"output":1.2,"cache_read":0.006}},"thinking":"off","running":false,"message_count":0,"usage":{"input":0,"output":0,"cache_read":0},"cost_usd":0,"context_tokens":0,"active_host":"client-2","hosts":[{"id":"client-2","name":"laptop","cwd":"/home/me/proj","session_id":"<id>","session_name":null}],"subagents":[]}}}
+    exec write out.md
+    {"type":"response","id":"r","ok":true,"result":{"path":"/home/me/proj/out.md"}}
     |}]
 ;;

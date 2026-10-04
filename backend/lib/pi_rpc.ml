@@ -740,6 +740,30 @@ let help t =
   show t ~kind:"help" (String.concat ~sep:"\n" lines)
 ;;
 
+(* pi-web reconnects as [user] (the [as_user] query parameter). *)
+let set_user t = function
+  | None ->
+    Or_error.map (call t "list_users" []) ~f:(fun users ->
+      show
+        t
+        ~kind:"users"
+        (String.concat
+           ~sep:"\n"
+           ("Users (`/setusr NAME` to act as one):"
+            :: List.map
+                 (Option.value (Json.list users) ~default:[])
+                 ~f:(fun u ->
+                   sprintf
+                     "- %s"
+                     (markdown_escape
+                        (Option.value (Json.string u) ~default:""))))))
+  | Some user ->
+    Or_error.map
+      (call t "set_user" [ "user", str user ])
+      ~f:(fun result ->
+        event t "prigh_set_user" [ "user", field "user" result ])
+;;
+
 let slash_command t text =
   let words =
     String.split (String.strip text) ~on:' '
@@ -759,6 +783,9 @@ let slash_command t text =
      | "switch", [] -> Or_error.error_string "usage: /switch <id|path>"
      | "host", _ -> pick_host t
      | "change_default", _ -> change_default t
+     | "setusr", [] -> set_user t None
+     | "setusr", [ user ] -> set_user t (Some user)
+     | "setusr", _ -> Or_error.error_string "usage: /setusr [user]"
      | "help", _ -> Ok (help t)
      | name, _ -> Or_error.errorf "unknown command /%s" name)
 ;;
@@ -1007,6 +1034,7 @@ let serve_lines
       ?(now = default_now)
       ?token
       ?user
+      ?signed_in
       ?session
       ?(name = "pi-web")
       ~read_line
@@ -1029,7 +1057,7 @@ let serve_lines
     loop ());
   let t_ref = ref None in
   let client =
-    Rpc_server.connect server ~send:(fun json ->
+    Rpc_server.connect ?signed_in server ~send:(fun json ->
       Option.iter !t_ref ~f:(fun t -> on_event t json))
   in
   let t =
@@ -1091,19 +1119,20 @@ let serve_websocket router ~query ws =
   let param name = List.Assoc.find query ~equal:String.equal name in
   let token = param "token" in
   let user = param "user" in
-  match Rpc_router.lookup router ?user ~token () with
-  | None ->
+  match
+    Rpc_router.authenticate router ?user ?as_user:(param "as_user") ~token ()
+  with
+  | Error e ->
     Websocket.send_text
       ws
       (Json.to_string
-         (P.event
-            "prigh_hello_failed"
-            [ "error", `String Rpc_server.unauthorised ]))
-  | Some server ->
+         (P.event "prigh_hello_failed" [ "error", str (Error.to_string_hum e) ]))
+  | Ok (server, signed_in) ->
     serve_lines
       server
       ?token
       ?user
+      ?signed_in
       ?session:(param "session")
       ?name:(param "name")
       ~read_line:(fun () -> Websocket.read_text ws)

@@ -47,13 +47,15 @@ let make_platform ~replies : Component.Platform.t =
             Ok text)
           ())
   ; reconnect =
-      (fun ~delay_ms ~session ->
+      (fun ~delay_ms ~session ~as_user ->
         Bonsai.Effect.of_sync_fun
           (fun () ->
             printf
-              "reconnect after %dms session=%s\n"
+              "reconnect after %dms session=%s%s\n"
               delay_ms
-              (Option.value session ~default:"-");
+              (Option.value session ~default:"-")
+              (Option.value_map as_user ~default:"" ~f:(fun u ->
+                 " as_user=" ^ u));
             Ok (`Object [ "client_id", `String "client-2" ]))
           ())
   ; sign_out =

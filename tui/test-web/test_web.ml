@@ -94,10 +94,11 @@ let%expect_test "prompt history is stored per token, without the token" =
 let%expect_test "web connection: the terminal URL and the session in the page \
                  URL"
   =
-  let terminal backend ?user ?token ?session () =
+  let terminal backend ?user ?as_user ?token ?session () =
     Prigh_ui_web_app.Web_app.For_testing.terminal_url
       ~backend
       ~user
+      ~as_user
       ~token
       ~session
     |> print_endline
@@ -106,6 +107,7 @@ let%expect_test "web connection: the terminal URL and the session in the page \
   terminal "wss://host.example/ws?x=1" ~token:"sekrit&x=y" ~session:"abc" ();
   terminal "ws://host:9000/" ~session:"s" ();
   terminal "ws://host:9000/ws" ~user:"lloyd o'k" ~token:"pw" ~session:"s" ();
+  terminal "ws://host:9000/ws" ~user:"s" ~as_user:"lloyd" ~token:"pw" ();
   let with_session search =
     Prigh_ui_web_app.Web_app.For_testing.with_query_param
       ~search

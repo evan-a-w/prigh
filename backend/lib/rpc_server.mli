@@ -45,8 +45,14 @@ val create
   -> t
 
 (** Registers a client whose outgoing lines go through [send]; it starts
-    in a new session in [cwd] (or the default one). *)
-val connect : t -> send:(Json.t -> unit) -> Client.t
+    in a new session in [cwd] (or the default one). With [signed_in] (the
+    router checked its credentials) it needs no token in [hello], and can
+    [list_users] and [set_user] as [signed_in] allows. *)
+val connect
+  :  ?signed_in:User_access.Signed_in.t
+  -> t
+  -> send:(Json.t -> unit)
+  -> Client.t
 
 (** Dispatches one request from [client] and returns the response. Blocking
     methods block the caller. *)
@@ -56,12 +62,15 @@ val handle : t -> Client.t -> Json.t -> Json.t
 val disconnect : t -> Client.t -> unit
 
 (** Serves one connection until [read_line] returns [None]; each request is
-    handled in its own fiber. *)
+    handled in its own fiber. An allowed [set_user] request ends it too,
+    unanswered: the result is its id and the user to serve the rest of the
+    connection as. *)
 val serve_lines
-  :  t
+  :  ?signed_in:User_access.Signed_in.t
+  -> t
   -> read_line:(unit -> string option)
   -> write_line:(string -> unit)
-  -> unit
+  -> (Json.t * string) option
 
 (** Aborts every session and waits for them to finish. *)
 val shutdown : t -> unit

@@ -1109,30 +1109,49 @@ let delete_session t ~path =
 ;;
 
 let export t ~format ?path () =
-  let path =
-    match path with
-    | Some p -> resolve_path t p
-    | None ->
-      let base = Filename.basename (Session.path t.session) in
-      let stamp = List.hd_exn (String.split base ~on:'_') in
-      Filename.concat
-        (Filename.concat t.sessions_dir "exports")
-        (sprintf
-           "%s_%s.%s"
-           stamp
-           (Session.id t.session)
-           (Session.Export_format.extension format))
+  let name =
+    let base = Filename.basename (Session.path t.session) in
+    let stamp = List.hd_exn (String.split base ~on:'_') in
+    sprintf
+      "%s_%s.%s"
+      stamp
+      (Session.id t.session)
+      (Session.Export_format.extension format)
   in
-  Or_error.try_with (fun () ->
-    Core_unix.mkdir_p (Filename.dirname path);
-    (match format with
-     | Session.Export_format.Markdown ->
-       Out_channel.write_all path ~data:(Session.to_markdown t.session)
-     | Jsonl ->
-       Out_channel.write_all
-         path
-         ~data:(In_channel.read_all (Session.path t.session)));
-    path)
+  let data () =
+    match format with
+    | Session.Export_format.Markdown -> Session.to_markdown t.session
+    | Jsonl -> In_channel.read_all (Session.path t.session)
+  in
+  if t.backend_host_enabled
+  then (
+    let path =
+      match path with
+      | Some p -> resolve_path t p
+      | None -> Filename.concat (Filename.concat t.sessions_dir "exports") name
+    in
+    Or_error.try_with (fun () ->
+      Core_unix.mkdir_p (Filename.dirname path);
+      Out_channel.write_all path ~data:(data ());
+      path))
+  else (
+    (* The backend's files are not the user's: write on the tool host. *)
+    let path = Option.value path ~default:name in
+    match
+      host_exec
+        t
+        ~cancel:Cancellation.never
+        ~on_output:ignore
+        ~call_id:"export"
+        ~cwd:t.cwd
+        ~name:"write"
+        ~arguments:
+          (`Object [ "path", `String path; "content", `String (data ()) ])
+    with
+    | { is_error = true; text } -> Or_error.error_string text
+    | { is_error = false; _ } ->
+      Ok
+        (if Filename.is_absolute path then path else Filename.concat t.cwd path))
 ;;
 
 let import_session t ~path =

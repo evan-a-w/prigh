@@ -172,29 +172,34 @@ let edit_externally text =
     Error ("editor failed: " ^ Core_unix.Exit_or_signal.to_string_hum status)
 ;;
 
-let hello_params hello ~session =
-  match session with
-  | None -> hello
-  | Some path ->
-    List.Assoc.remove hello ~equal:String.equal "session"
-    @ [ "session", `String path ]
+let hello_params hello ~session ~as_user =
+  let set name value params =
+    match value with
+    | None -> params
+    | Some v ->
+      List.Assoc.remove params ~equal:String.equal name @ [ name, `String v ]
+  in
+  hello
+  |> List.filter ~f:(fun (name, _) -> not (String.equal name "as_user"))
+  |> set "session" session
+  |> set "as_user" as_user
 ;;
 
 let hello_error = Result.map_error ~f:Error.to_string_hum
 
-let send_hello client hello ~session =
+let send_hello client hello ~session ~as_user =
   Deferred.map
-    (Client.call client "hello" (hello_params hello ~session))
+    (Client.call client "hello" (hello_params hello ~session ~as_user))
     ~f:hello_error
 ;;
 
-let reconnect client ~hello ~delay_ms ~session =
+let reconnect client ~hello ~delay_ms ~session ~as_user =
   let%bind.Deferred () =
     Clock.after (Time_float.Span.of_ms (Float.of_int delay_ms))
   in
   match%bind.Deferred Client.connect client with
   | Error e -> Deferred.return (Error (Error.to_string_hum e))
-  | Ok () -> send_hello client hello ~session
+  | Ok () -> send_hello client hello ~session ~as_user
 ;;
 
 let platform client ~hello ~exit ~quit_requested : Prigh_ui.Component.Platform.t
@@ -214,9 +219,9 @@ let platform client ~hello ~exit ~quit_requested : Prigh_ui.Component.Platform.t
   ; suspend = Effect.of_sync_fun suspend ()
   ; edit_externally = (fun text -> Effect.of_sync_fun edit_externally text)
   ; reconnect =
-      (fun ~delay_ms ~session ->
+      (fun ~delay_ms ~session ~as_user ->
         Effect.of_deferred_fun
-          (fun () -> reconnect client ~hello ~delay_ms ~session)
+          (fun () -> reconnect client ~hello ~delay_ms ~session ~as_user)
           ())
   ; sign_out =
       Effect.return
@@ -393,7 +398,7 @@ let run ~connect ~hello ~local_tools =
     | Error _ as e -> Deferred.return e
     | Ok () ->
       Deferred.map
-        (send_hello client hello ~session:None)
+        (send_hello client hello ~session:None ~as_user:None)
         ~f:(Result.map_error ~f:Error.of_string)
   with
   | Error _ as e ->

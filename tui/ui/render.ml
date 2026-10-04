@@ -265,8 +265,13 @@ let status (m : App.Model.t) : Content.Line.t =
           ] )
       ; 4, [ span ~style:base (sprintf "$%.2f" s.cost_usd) ]
       ]
-      @ Option.value_map m.namespace ~default:[] ~f:(fun user ->
-        [ 6, [ span ~style:base ("user:" ^ user) ] ])
+      @ Option.value_map m.namespace ~default:[] ~f:(fun namespace ->
+        let text =
+          match App.Model.acting_as m, m.user with
+          | Some _, Some user -> sprintf "user:%s as %s" user namespace
+          | _ -> "user:" ^ namespace
+        in
+        [ 6, [ span ~style:base text ] ])
       @ tools_part m s
       @ (let queued = Queue_counts.total m.queued in
          if queued > 0

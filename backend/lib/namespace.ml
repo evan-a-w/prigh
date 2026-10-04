@@ -13,19 +13,20 @@ let valid_name name =
     Char.is_alphanum c || Char.equal c '_' || Char.equal c '-')
 ;;
 
-let parse_entry entry =
+let parse_entry ~flag entry =
   match String.lsplit2 entry ~on:'=' with
-  | None -> Or_error.errorf "-tokens entry %S must be NAME=TOKEN" entry
+  | None -> Or_error.errorf "%s entry %S must be NAME=TOKEN" flag entry
   | Some (name, token) ->
     let name = String.strip name in
     let token = String.strip token in
     if not (valid_name name)
     then
       Or_error.errorf
-        "-tokens: bad namespace name %S (use letters, digits, _ and -)"
+        "%s: bad namespace name %S (use letters, digits, _ and -)"
+        flag
         name
     else if String.is_empty token
-    then Or_error.errorf "-tokens: empty token for namespace %S" name
+    then Or_error.errorf "%s: empty token for namespace %S" flag name
     else Ok { name; token }
 ;;
 
@@ -33,26 +34,27 @@ let first_duplicate l ~f =
   List.find_a_dup l ~compare:(fun a b -> String.compare (f a) (f b))
 ;;
 
-let parse_spec spec =
+let parse_spec ?(flag = "-tokens") spec =
   let entries =
     String.split spec ~on:','
     |> List.map ~f:String.strip
     |> List.filter ~f:(Fn.non String.is_empty)
   in
   Or_error.bind
-    (Or_error.all (List.map entries ~f:parse_entry))
+    (Or_error.all (List.map entries ~f:(parse_entry ~flag)))
     ~f:(fun ts ->
       if List.is_empty ts
-      then Or_error.error_string "-tokens: no NAME=TOKEN entries"
+      then Or_error.errorf "%s: no NAME=TOKEN entries" flag
       else (
         match
           ( first_duplicate ts ~f:(fun t -> t.name)
           , first_duplicate ts ~f:(fun t -> t.token) )
         with
-        | Some t, _ -> Or_error.errorf "-tokens: duplicate namespace %S" t.name
+        | Some t, _ -> Or_error.errorf "%s: duplicate namespace %S" flag t.name
         | None, Some t ->
           Or_error.errorf
-            "-tokens: namespace %S reuses another namespace's token"
+            "%s: namespace %S reuses another namespace's token"
+            flag
             t.name
         | None, None -> Ok ts))
 ;;
