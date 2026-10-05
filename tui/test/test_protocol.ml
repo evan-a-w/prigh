@@ -177,7 +177,7 @@ let%expect_test "image sizes come from the base64 length, padded or not" =
     ~f:(fun data ->
       print_s [%message data ~bytes:(Image.decoded_size data : int)]);
   List.iter [ 0; 1023; 1024; 35021; 1_572_864 ] ~f:(fun bytes ->
-    print_endline (Image.to_string_hum { mime_type = "image/jpeg"; bytes }));
+    print_endline (Image.to_string_hum { mime_type = "image/jpeg"; bytes; data = "" }));
   [%expect
     {|
     ("" (bytes 0))
