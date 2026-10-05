@@ -401,7 +401,8 @@ two can share one.
   `get_entries` returns `{head, entries}` (`all: true` includes abandoned
   branches for the tree view).
 - `Compaction` — summarises older messages via the model and keeps a tail;
-  manual (`/compact`) or automatic.
+  manual (`/compact [instructions]`: the RPC's `instructions`, pi's
+  `customInstructions`, are appended to the summariser's) or automatic.
 - `Session_description` — after a turn, once the conversation has a second
   user message (or a long first one), asks the model for a one-line
   description and records it (`Agent ~auto_describe`, off under `-faux` and
