@@ -374,7 +374,12 @@ let id_re =
   Re.compile (Re.repn (Re.alt [ Re.digit; Re.rg 'a' 'f' ]) 16 (Some 16))
 ;;
 
-let mask_ids s = Re.replace_string id_re ~by:"<id>" s
+let at_re = Re.compile (Re.Perl.re {|"at":[0-9.eE+-]+|})
+
+let mask_ids s =
+  Re.replace_string id_re ~by:"<id>" s
+  |> Re.replace_string at_re ~by:{|"at":<at>|}
+;;
 
 let%expect_test "name entry round trips through save/load" =
   with_dir
@@ -399,7 +404,7 @@ let%expect_test "name entry round trips through save/load" =
     {|
     ()
     ("first name")
-    ["Entry",{"id":"<id>","parent":"<id>","payload":["Name",{"name":"first name"}]}]
+    ["Entry",{"id":"<id>","parent":"<id>","at":<at>,"payload":["Name",{"name":"first name"}]}]
     (Name (name "first name"))
     ("first name")
     (renamed)
@@ -432,10 +437,15 @@ let%expect_test "markdown export renders user, assistant, tool and result" =
   with_dir
   @@ fun dir ->
   let t = Session.create ~dir ~cwd:"/proj" () in
-  let (_ : Session.Entry.t) = Session.append_message t (Message.user "hello") in
+  (* 2026-10-05 14:32:10 UTC *)
+  let at = 1791210730. in
+  let (_ : Session.Entry.t) =
+    Session.append_message t ~at (Message.user "hello")
+  in
   let (_ : Session.Entry.t) =
     Session.append_message
       t
+      ~at:(at +. 30.)
       (Message.Assistant
          { content =
              [ Content.Thinking { text = "let me think"; signature = None }
@@ -462,7 +472,9 @@ let%expect_test "markdown export renders user, assistant, tool and result" =
          ; images = []
          })
   in
-  let (_ : Session.Entry.t) = Session.append_message t (assistant "done") in
+  let (_ : Session.Entry.t) =
+    Session.append_message t ~at:(at +. 86400.) (assistant "done")
+  in
   print_string
     (String.substr_replace_all
        (Session.to_markdown t)
@@ -472,11 +484,11 @@ let%expect_test "markdown export renders user, assistant, tool and result" =
     {|
     # Session <id>
 
-    ## User
+    ## User · 2026-10-05 14:32 UTC
 
     hello
 
-    ## Assistant
+    ## Assistant · 2026-10-05 14:32 UTC
 
     > let me think
 
@@ -497,7 +509,7 @@ let%expect_test "markdown export renders user, assistant, tool and result" =
     file2
     ```
 
-    ## Assistant
+    ## Assistant · 2026-10-06 14:32 UTC
 
     done
     |}]
@@ -562,6 +574,110 @@ let%expect_test "headers written before parent existed still load" =
     , (Session.cwd t : string)
     , (kinds t : string list)];
   [%expect {| (() /old (user:old)) |}]
+;;
+
+let%expect_test
+    "entries written before times load without one; new ones get a time, kept \
+     by reloads and forks"
+  =
+  with_dir
+  @@ fun dir ->
+  let path = Filename.concat dir "old.jsonl" in
+  Out_channel.write_all
+    path
+    ~data:
+      {|["Header",{"id":"abc","cwd":"/old","created_at":"2026-01-01 00:00:00.000000Z"}]
+["Entry",{"id":"e1","parent":null,"payload":["Message",["User",{"text":"old"}]]}]
+["Entry",{"id":"e2","parent":"e1","payload":["Message",["Assistant",{"content":[["Text","reply"]],"stop_reason":["End_turn"],"usage":{"input":0,"output":0,"cache_read":0},"model":"m"}]]}]
+|};
+  let t = Or_error.ok_exn (Session.load path) in
+  let show t =
+    List.iter (Session.entries t) ~f:(fun (e : Session.Entry.t) ->
+      print_s [%sexp (e.id : string), (e.at : float option)]);
+    List.iter (Session.timed_messages t) ~f:(fun m ->
+      print_s [%sexp (m : Timed_message.t)])
+  in
+  show t;
+  [%expect
+    {|
+    (e1 ())
+    (e2 ())
+    ((message (User ((text old)))) (at ()))
+    ((message
+      (Assistant
+       ((content ((Text reply))) (stop_reason End_turn)
+        (usage ((input 0) (output 0) (cache_read 0))) (model m))))
+     (at ()))
+    |}];
+  let e3 = Session.append_message t ~at:1791210730.5 (Message.user "new") in
+  print_endline (mask_ids (List.last_exn (In_channel.read_lines path)));
+  [%expect
+    {| ["Entry",{"id":"<id>","parent":"e2","at":<at>,"payload":["Message",["User",{"text":"new"}]]}] |}];
+  let reloaded = Or_error.ok_exn (Session.load path) in
+  print_s
+    [%sexp
+      (List.map (Session.entries reloaded) ~f:(fun e -> e.at)
+       : float option list)];
+  [%expect {| (() () (1791210730.5)) |}];
+  let forked = Or_error.ok_exn (Session.fork reloaded ~at:e3.id ~dir) in
+  print_s
+    [%sexp
+      (List.map (Session.entries forked) ~f:(fun e -> e.at) : float option list)];
+  [%expect {| (() () (1791210730.5)) |}];
+  print_string
+    (String.substr_replace_all
+       (Session.to_markdown forked)
+       ~pattern:(Session.id forked)
+       ~with_:"<id>");
+  [%expect
+    {|
+    # Session <id>
+
+    ## User
+
+    old
+
+    ## Assistant
+
+    reply
+
+    ## User · 2026-10-05 14:32 UTC
+
+    new
+    |}]
+;;
+
+let%expect_test "the compaction summary has no time; kept messages keep theirs" =
+  with_dir
+  @@ fun dir ->
+  let t = Session.create ~dir ~cwd:"/proj" () in
+  let (_ : Session.Entry.t) =
+    Session.append_message t ~at:1. (Message.user "q1")
+  in
+  let kept = Session.append_message t ~at:2. (assistant "a1") in
+  let (_ : Session.Entry.t) =
+    Session.append_compaction t ~summary:"earlier" ~kept_from:kept.id
+  in
+  let (_ : Session.Entry.t) =
+    Session.append_message t ~at:3. (Message.user "q2")
+  in
+  List.iter (Session.timed_messages t) ~f:(fun { message; at } ->
+    let text =
+      match message with
+      | User u -> u.text
+      | Assistant a -> Message.Assistant.text a
+      | Tool_result r -> r.text
+    in
+    print_s
+      [%sexp
+        (String.tr text ~target:'\n' ~replacement:' ' : string)
+      , (at : float option)]);
+  [%expect
+    {|
+    ("Summary of the conversation so far: earlier" ())
+    (a1 (2))
+    (q2 (3))
+    |}]
 ;;
 
 let%expect_test "fork ~at and rewind ~to address entries by id" =

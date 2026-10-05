@@ -23,6 +23,7 @@ module Entry = struct
   type t =
     { id : string
     ; parent : string option
+    ; at : float option [@jsonaf.option] [@sexp.option]
     ; payload : Payload.t
     }
   [@@deriving sexp, jsonaf]
@@ -243,14 +244,18 @@ let load path =
     | _ -> failwith "session file does not start with a header")
 ;;
 
-let append t payload =
-  let entry = { Entry.id = new_id (); parent = t.head; payload } in
+let append_at t ~at payload =
+  let entry = { Entry.id = new_id (); parent = t.head; at; payload } in
   add_entry t entry;
   write_line t (Entry entry);
   entry
 ;;
 
-let append_message t message = append t (Message message)
+let append ?(at = Core_unix.gettimeofday ()) t payload =
+  append_at t ~at:(Some at) payload
+;;
+
+let append_message t ?at message = append ?at t (Message message)
 let set_model t ~model ~thinking = append t (Model { model; thinking })
 let set_name t ~name = append t (Name { name })
 let set_description t ~text = append t (Description { text })
@@ -290,7 +295,7 @@ let active_path t =
   go t.head []
 ;;
 
-let messages t =
+let timed_messages t =
   let path = active_path t in
   let compaction =
     List.fold path ~init:None ~f:(fun acc (e : Entry.t) ->
@@ -315,6 +320,7 @@ let messages t =
       in
       { Entry.id = "summary"
       ; parent = None
+      ; at = None
       ; payload =
           Message
             (Message.user ("Summary of the conversation so far:\n" ^ summary))
@@ -323,9 +329,13 @@ let messages t =
   in
   List.filter_map path ~f:(fun e ->
     match e.payload with
-    | Message m -> Some m
+    | Message message -> Some { Timed_message.message; at = e.at }
     | Model _ | Compaction _ | Name _ | Description _ | Cwd _ | System_prompt _
       -> None)
+;;
+
+let messages t =
+  List.map (timed_messages t) ~f:(fun (m : Timed_message.t) -> m.message)
 ;;
 
 let system_prompt t =
@@ -370,7 +380,7 @@ let fork ?at t ~dir =
       let rec copy = function
         | [] -> ()
         | (e : Entry.t) :: rest ->
-          ignore (append forked e.payload : Entry.t);
+          ignore (append_at forked ~at:e.at e.payload : Entry.t);
           if not (String.equal e.id at) then copy rest
       in
       copy path;
@@ -504,6 +514,21 @@ let tool_call_block (call : Content.Tool_call.t) =
   sprintf "### Tool: %s\n\n```json\n%s\n```" call.name (String.strip arguments)
 ;;
 
+let heading title (at : float option) =
+  match at with
+  | None -> "## " ^ title
+  | Some at ->
+    let time = Time_float.of_span_since_epoch (Time_float.Span.of_sec at) in
+    let date, ofday = Time_float.to_date_ofday time ~zone:Time_float.Zone.utc in
+    let parts = Time_float.Ofday.to_parts ofday in
+    sprintf
+      "## %s · %s %02d:%02d UTC"
+      title
+      (Date.to_string date)
+      parts.hr
+      parts.min
+;;
+
 let to_markdown t =
   let images (images : Image.t list) =
     List.map images ~f:(fun i -> sprintf "\n\n*[image: %s]*" i.mime_type)
@@ -512,7 +537,12 @@ let to_markdown t =
   let block (e : Entry.t) =
     match e.payload with
     | Message (User u) ->
-      Some (sprintf "## User\n\n%s%s" (String.strip u.text) (images u.images))
+      Some
+        (sprintf
+           "%s\n\n%s%s"
+           (heading "User" e.at)
+           (String.strip u.text)
+           (images u.images))
     | Message (Assistant a) ->
       let segments =
         List.filter_map a.content ~f:(function
@@ -526,7 +556,8 @@ let to_markdown t =
       in
       if List.is_empty segments
       then None
-      else Some (String.concat ("## Assistant" :: segments) ~sep:"\n\n")
+      else
+        Some (String.concat (heading "Assistant" e.at :: segments) ~sep:"\n\n")
     | Message (Tool_result r) ->
       Some
         (sprintf

@@ -289,3 +289,36 @@ let%expect_test "Rpc_json encodes nested subagent events" =
     {"type":"event","event":"subagent_end","call_id":"p","agent_id":"p","usage":{"input":3,"output":4,"cache_read":1},"turns":2,"cost_usd":0.001,"result":{"text":"done","is_error":false}}
     |}]
 ;;
+
+let%expect_test
+    "Rpc_json: nested messages carry the event's time, as do get_subagent's"
+  =
+  let message_end =
+    Agent_event.Subagent
+      { call_id = "p"; agent_id = "p"; event = Message_end (Message.user "go") }
+  in
+  print_endline
+    (Json.to_string
+       (Rpc_json.event ~now:1791210730.25 (Agent.Event.Loop message_end)));
+  let log = Subagent_log.create () in
+  Subagent_log.record
+    log
+    ~now:1791210700.
+    (Subagent_start
+       { call_id = "p"; agent_id = "p"; task = "go"; model = "m"; tools = [] });
+  Subagent_log.record log ~now:1791210730.25 message_end;
+  print_endline
+    (Json.to_string
+       (match Subagent_log.find log "p" with
+        | Some (summary, messages) ->
+          (match Rpc_json.subagent (summary, messages) with
+           | `Object fields ->
+             List.Assoc.find_exn fields "messages" ~equal:String.equal
+           | json -> json)
+        | None -> `Null));
+  [%expect
+    {|
+    {"type":"event","event":"subagent","call_id":"p","agent_id":"p","inner":{"type":"event","event":"message_end","message":{"role":"user","text":"go","at":1791210730250}}}
+    [{"role":"user","text":"go","at":1791210730250}]
+    |}]
+;;

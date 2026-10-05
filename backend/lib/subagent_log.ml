@@ -50,7 +50,7 @@ module Entry = struct
     ; mutable turns : int
     ; mutable tool_calls : int
     ; mutable current_tool : (string * float) option
-    ; messages : Message.t Queue.t
+    ; messages : Timed_message.t Queue.t
     }
 end
 
@@ -112,7 +112,8 @@ let rec record_in t ~now ~parent (event : Agent_event.t) =
          e.current_tool <- Some (call.name, now))
      | Tool_end _ -> touch agent_id (fun e -> e.current_tool <- None)
      | Message_end message ->
-       touch agent_id (fun e -> Queue.enqueue e.messages message)
+       touch agent_id (fun e ->
+         Queue.enqueue e.messages { Timed_message.message; at = Some now })
      | _ -> touch agent_id ignore)
   | _ -> ()
 ;;

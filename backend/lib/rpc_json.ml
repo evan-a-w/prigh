@@ -79,6 +79,16 @@ let message (m : Message.t) =
   | Tool_result r -> tool_result r
 ;;
 
+let ms seconds = int (Float.iround_nearest_exn (seconds *. 1000.))
+
+let message_at m ~(at : float option) =
+  match message m, at with
+  | `Object fields, Some at -> `Object (fields @ [ "at", ms at ])
+  | json, _ -> json
+;;
+
+let timed_message ({ message; at } : Timed_message.t) = message_at message ~at
+
 let delta (d : Assistant_event.t) =
   match d with
   | Text_delta text -> `Object [ "type", str "text_delta"; "text", str text ]
@@ -243,6 +253,7 @@ let entry (e : Session.Entry.t) =
     ([ "id", str e.id
      ; "parent", Option.value_map e.parent ~default:`Null ~f:str
      ]
+     @ Option.value_map e.at ~default:[] ~f:(fun at -> [ "at", ms at ])
      @ payload)
 ;;
 
@@ -334,7 +345,7 @@ let login_event (e : Login_manager.Event.t) =
   `Object ([ "type", str "event"; "event", str "auth" ] @ fields)
 ;;
 
-let rec event (e : Agent.Event.t) =
+let rec event ?now (e : Agent.Event.t) =
   let fields =
     match e with
     | Loop Agent_start -> [ "event", str "agent_start" ]
@@ -349,14 +360,14 @@ let rec event (e : Agent.Event.t) =
       ; "tool_results", `Array (List.map tool_results ~f:tool_result)
       ]
     | Loop (Message_start m) ->
-      [ "event", str "message_start"; "message", message m ]
+      [ "event", str "message_start"; "message", message_at m ~at:now ]
     | Loop (Message_update { partial; delta = d }) ->
       [ "event", str "message_update"
       ; "partial", assistant partial
       ; "delta", delta d
       ]
     | Loop (Message_end m) ->
-      [ "event", str "message_end"; "message", message m ]
+      [ "event", str "message_end"; "message", message_at m ~at:now ]
     | Loop (Tool_start call) ->
       [ "event", str "tool_start"; "call", tool_call call ]
     | Loop (Tool_output { call_id; chunk }) ->
@@ -384,7 +395,7 @@ let rec event (e : Agent.Event.t) =
       [ "event", str "subagent"
       ; "call_id", str call_id
       ; "agent_id", str agent_id
-      ; "inner", event (Loop inner)
+      ; "inner", event ?now (Loop inner)
       ]
     | Loop
         (Subagent_end { call_id; agent_id; usage = u; turns; cost_usd; result })
@@ -427,7 +438,6 @@ let rec event (e : Agent.Event.t) =
   `Object (("type", str "event") :: fields)
 ;;
 
-let ms seconds = int (Float.iround_nearest_exn (seconds *. 1000.))
 let opt f = Option.value_map ~default:`Null ~f
 
 let subagent_summary (s : Subagent_log.Summary.t) =
@@ -454,7 +464,7 @@ let subagent_summary (s : Subagent_log.Summary.t) =
 let subagent ((s : Subagent_log.Summary.t), messages) =
   `Object
     [ "subagent", subagent_summary s
-    ; "messages", `Array (List.map messages ~f:message)
+    ; "messages", `Array (List.map messages ~f:timed_message)
     ]
 ;;
 

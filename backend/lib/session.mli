@@ -29,6 +29,9 @@ module Entry : sig
   type t =
     { id : string
     ; parent : string option
+    ; at : float option
+      (** when it was appended (seconds since the epoch); absent in files
+          written before entries recorded it *)
     ; payload : Payload.t
     }
   [@@deriving sexp, jsonaf]
@@ -71,6 +74,9 @@ val active_path : t -> Entry.t list
     compaction summary (if any) replacing everything before [kept_from]. *)
 val messages : t -> Message.t list
 
+(** [messages] with the times they were appended (none for the summary). *)
+val timed_messages : t -> Timed_message.t list
+
 val model : t -> (string * Thinking.t) option
 
 (** The system prompt fixed for this conversation, if one was recorded on the
@@ -78,7 +84,9 @@ val model : t -> (string * Thinking.t) option
 val system_prompt : t -> string option
 
 val set_system_prompt : t -> text:string -> Entry.t
-val append_message : t -> Message.t -> Entry.t
+(** [at] defaults to now. *)
+val append_message : t -> ?at:float -> Message.t -> Entry.t
+
 val set_model : t -> model:string -> thinking:Thinking.t -> Entry.t
 val set_name : t -> name:string -> Entry.t
 val set_description : t -> text:string -> Entry.t
@@ -107,7 +115,8 @@ module Export_format : sig
   val extension : t -> string
 end
 
-(** Markdown transcript of the active path. *)
+(** Markdown transcript of the active path; message headings carry their
+    time (UTC) when known. *)
 val to_markdown : t -> string
 
 module Summary : sig
