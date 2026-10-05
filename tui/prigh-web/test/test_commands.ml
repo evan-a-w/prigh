@@ -692,6 +692,28 @@ let%expect_test "/tree shows branches and moves the head" =
     |}]
 ;;
 
+let%expect_test "/tree of a very long conversation" =
+  let n = 50_000 in
+  let json =
+    entries
+      ~head:(sprintf "e%d" n)
+      (List.init n ~f:(fun i ->
+         entry
+           ?parent:(if i = 0 then None else Some (sprintf "e%d" i))
+           (sprintf "e%d" (i + 1))
+           (if i % 2 = 0 then user "question" else assistant "answer")))
+  in
+  let head, list =
+    Prigh_web.Session_tree.of_json (Jsonaf.of_string json) |> Or_error.ok_exn
+  in
+  let items = Prigh_web.Session_tree.tree_items list ~head in
+  print_s
+    [%sexp
+      (List.length items : int)
+    , (List.last_exn items |> Prigh_web.Picker.Item.label : string)];
+  [%expect {| |}]
+;;
+
 let%expect_test "/cd: a prompt with directory completion, failures stay in it" =
   let h = H.create () in
   run h "/cd";
