@@ -326,6 +326,9 @@ let%expect_test "slash commands: the popup, arguments, running, unknown ones" =
     /host [name|backend] pick where tools run, and the directory there
     /export [path] export the transcript on the backend (markdown, or .jsonl)
     /import [path] import a session from a JSONL file on the backend
+    /skills pick a skill to invoke (/skill:name)
+    /skill:<name> [args] send a skill's instructions to the agent, with your arguments
+    /mcp [reconnect] MCP servers: their tools, approve a project's, or restart failed ones
     /copy copy the last reply to the clipboard
     /btw <question> ask a side question without interrupting the run (not added to the conversation)
     /abort stop the current run

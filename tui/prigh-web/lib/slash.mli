@@ -16,6 +16,7 @@ module Argument : sig
     | Path (** [list_paths] *)
     | Host
     | User (** the users a superuser can act as *)
+    | Skill (** right after [/skill:], from [list_skills] *)
   [@@deriving sexp_of, equal]
 end
 
@@ -27,6 +28,10 @@ module Spec : sig
     ; argument : Argument.t option
     }
   [@@deriving sexp_of, equal]
+
+  (** [/name args]; names ending in [:] (like [skill:]) take their argument
+      without a space. *)
+  val usage : t -> string
 end
 
 val all : Spec.t list

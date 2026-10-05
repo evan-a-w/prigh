@@ -18,6 +18,8 @@ module Picker_kind : sig
     | Hosts (** item ids are host ids *)
     | Users (** act as one ([/setusr]) *)
     | Accounts (** the account menu: see [App] for the item ids *)
+    | Skills (** item ids are skill names *)
+    | Mcp of Mcp_list.t (** item ids are [Mcp_servers.id]s *)
   [@@deriving sexp_of, equal]
 end
 
@@ -49,6 +51,7 @@ type t =
       { title : string
       ; text : string
       }
+  | Mcp_tools of Mcp_server.t (** a ready server's tools *)
 [@@deriving sexp_of, equal]
 
 (** Belongs to the session (closed when switching). *)

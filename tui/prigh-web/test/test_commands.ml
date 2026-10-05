@@ -71,6 +71,9 @@ let%expect_test "every command does something (none is unknown)" =
     /host                      picker: Where tools run
     /export                    path prompt
     /import                    path prompt
+    /skills                    rpc list_skills
+    /skill:                    rpc list_skills
+    /mcp                       rpc list_mcp
     /copy                      toast: Nothing to copy yet: no reply in this session.
     /btw                       toast: Usage: /btw <question> (asked aside; the run goes on)
     /abort                     rpc abort
