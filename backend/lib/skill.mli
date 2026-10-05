@@ -36,6 +36,10 @@ val invocation : string -> (string * string) option
 (** The user message for invoking [t] with [args]. *)
 val expand : t -> body:string -> args:string -> string
 
+(** An {!expand}ed message as it was typed ([/skill:NAME ARGS]); other
+    texts unchanged. *)
+val as_typed : string -> string
+
 (** The system prompt's skills section, if any skill is [model_invocable]. *)
 val prompt_section : t list -> string option
 

@@ -427,7 +427,7 @@ let list ~dir =
             ; updated_at = updated_at t
             ; first_prompt =
                 List.find_map messages ~f:(function
-                  | Message.User u -> Some u.text
+                  | Message.User u -> Some (Skill.as_typed u.text)
                   | _ -> None)
             ; message_count = List.length messages
             ; parent = t.parent

@@ -140,6 +140,16 @@ let expand t ~body ~args =
   if String.is_empty args then block else block ^ "\n\n" ^ args
 ;;
 
+let as_typed text =
+  let re = Re.Perl.compile_pat ~opts:[ `Dotall ] {|^<skill name="([^"]*)" location="[^"]*">\n.*?\n</skill>(\n\n(.*))?$|} in
+  match Re.exec_opt re text with
+  | None -> text
+  | Some g ->
+    (match Re.Group.get_opt g 3 with
+     | Some args -> sprintf "/skill:%s %s" (Re.Group.get g 1) args
+     | None -> "/skill:" ^ Re.Group.get g 1)
+;;
+
 let prompt_section skills =
   match List.filter skills ~f:(fun t -> t.model_invocable) with
   | [] -> None

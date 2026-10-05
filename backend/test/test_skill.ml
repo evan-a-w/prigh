@@ -206,6 +206,19 @@ let%expect_test "invocation and expansion" =
     Do the thing.
     </skill>
     |}];
+  List.iter
+    [ Skill.expand skill ~body:"Do the thing." ~args:"src/a.ml\nand more"
+    ; Skill.expand skill ~body:"Do\n</skill>\n" ~args:""
+    ; "plain text"
+    ]
+    ~f:(fun text -> print_endline (Skill.as_typed text));
+  [%expect
+    {|
+    /skill:review src/a.ml
+    and more
+    /skill:review
+    plain text
+    |}];
   print_endline (Error.to_string_hum (Skill.unknown [ skill ] "reveiw"));
   print_endline (Error.to_string_hum (Skill.unknown [] "reveiw"));
   [%expect
