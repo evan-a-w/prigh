@@ -249,7 +249,8 @@ let%expect_test "aborting brings the queued prompts back into the editor" =
   let h = H.create () in
   H.event h (sprintf {|{"event":"state","state":%s}|} busy_state);
   H.text h ~selector:".composer-buttons";
-  [%expect {|
+  [%expect
+    {|
     (Rpc (method_ list_subagents) (params ()) (tag Subagents))
     (Rpc (method_ list_jobs) (params ()) (tag Jobs))
     (Stop (Esc)) (Steer (Enter))

@@ -15,7 +15,8 @@ let closest (el : Dom_html.element Js.t) selector : Dom_html.element Js.t option
 let target (ev : #Dom_html.event Js.t) = Js.Opt.to_option ev##.target
 
 let attribute (el : Dom_html.element Js.t) name =
-  Js.Opt.to_option (el##getAttribute (Js.string name)) |> Option.map ~f:Js.to_string
+  Js.Opt.to_option (el##getAttribute (Js.string name))
+  |> Option.map ~f:Js.to_string
 ;;
 
 let listen ?(capture = false) event handler =
@@ -57,7 +58,9 @@ let install_resize () =
     ~f:(fun px -> set_width (clamp px));
   let dragging = ref None in
   listen Dom_html.Event.pointerdown (fun (ev : Dom_html.pointerEvent Js.t) ->
-    match Option.bind (target ev) ~f:(fun el -> closest el ".agents-resize") with
+    match
+      Option.bind (target ev) ~f:(fun el -> closest el ".agents-resize")
+    with
     | None -> ()
     | Some _ ->
       Dom.preventDefault ev;
@@ -89,7 +92,9 @@ let body () = Dom_html.getElementById_opt "agents-body"
 
 let at_bottom (el : Dom_html.element Js.t) =
   Float.(
-    of_int el##.scrollHeight -. Js.to_float el##.scrollTop -. of_int el##.clientHeight
+    of_int el##.scrollHeight
+    -. Js.to_float el##.scrollTop
+    -. of_int el##.clientHeight
     < 60.)
 ;;
 
@@ -100,7 +105,8 @@ let install_follow () =
   let shown = ref None in
   listen ~capture:true (Dom_html.Event.make "scroll") (fun ev ->
     match target ev, body () with
-    | Some el, Some body when phys_equal (el :> Dom.node Js.t) (body :> Dom.node Js.t) ->
+    | Some el, Some body
+      when phys_equal (el :> Dom.node Js.t) (body :> Dom.node Js.t) ->
       stick := at_bottom body
     | _ -> ());
   let observer =
@@ -130,7 +136,9 @@ let install ~schedule =
   listen Dom_html.Event.click (fun (ev : Dom_html.mouseEvent Js.t) ->
     match Option.bind (target ev) ~f:(fun el -> closest el "[data-agent]") with
     | None -> ()
-    | Some el -> Option.iter (attribute el "data-agent") ~f:(fun id -> schedule (Action.Open_subagents (Some id))));
+    | Some el ->
+      Option.iter (attribute el "data-agent") ~f:(fun id ->
+        schedule (Action.Open_subagents (Some id))));
   install_resize ();
   install_follow ()
 ;;
