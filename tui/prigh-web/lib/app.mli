@@ -80,6 +80,8 @@ module Reply_tag : sig
     | Reconnect of int (** generation; stale replies are ignored *)
     | Config (** [get_config] *)
     | Config_saved of string (** the new config; the notice is shown *)
+    | Fallback_saved (** the new config; its chain is shown *)
+    | Default_dir_saved
     | Default_saved
     | Session_stats
     | Entries of Entries_purpose.t
