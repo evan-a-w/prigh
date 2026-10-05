@@ -136,6 +136,9 @@ val create
            never touch the backend's filesystem, and a session adopts the
            first connected client host when its own is missing. *)
   -> ?mcp:Mcp_hub.t
+  -> ?use_default_cwd:bool
+       (** start a new session in the config's [default_cwd] rather than
+           [cwd] (default: true; false when [cwd] was given explicitly) *)
        (** the backend's MCP servers, when it is the tool host; without it
            sessions use no MCP servers on any host *)
   -> cwd:string
