@@ -98,7 +98,10 @@ let%expect_test "discovery: roots, nesting, precedence, invalid files" =
   Core_unix.mkdir_p home;
   let roots = Skill.roots ~cwd ~home in
   print_s [%sexp (List.map (List.take roots 6) ~f:(mask t) : string list)];
-  print_s [%sexp (List.map (List.drop roots (List.length roots - 3)) ~f:(mask t) : string list)];
+  print_s
+    [%sexp
+      (List.map (List.drop roots (List.length roots - 3)) ~f:(mask t)
+       : string list)];
   [%expect
     {|
     ($DIR/proj/sub/.prigh/skills $DIR/proj/sub/.claude/skills
@@ -107,7 +110,10 @@ let%expect_test "discovery: roots, nesting, precedence, invalid files" =
     ($DIR/home/.prigh/skills $DIR/home/.claude/skills $DIR/home/.agents/skills)
     |}];
   write t "home/.prigh/skills/review/SKILL.md" (skill_md "user review");
-  write t "home/.claude/skills/synced/abc/pdf/SKILL.md" (skill_md "pdf handling");
+  write
+    t
+    "home/.claude/skills/synced/abc/pdf/SKILL.md"
+    (skill_md "pdf handling");
   write t "proj/.claude/skills/review/SKILL.md" (skill_md "project review");
   write
     t
@@ -117,11 +123,15 @@ let%expect_test "discovery: roots, nesting, precedence, invalid files" =
     t
     "proj/.prigh/skills/manual/SKILL.md"
     (skill_md ~extra:"disable-model-invocation: true\n" "only by hand");
-  write t "proj/.prigh/skills/broken/SKILL.md" "---\nname: broken\n---\nno description\n";
+  write
+    t
+    "proj/.prigh/skills/broken/SKILL.md"
+    "---\nname: broken\n---\nno description\n";
   write t "proj/.prigh/skills/.hidden/SKILL.md" (skill_md "hidden");
   write t "proj/.prigh/skills/too/deep/to/find/SKILL.md" (skill_md "deep");
   let skills = Skill.discover ~cwd ~home in
-  List.iter skills ~f:(fun s -> print_endline (mask_sexp t [%sexp (s : Skill.t)]));
+  List.iter skills ~f:(fun s ->
+    print_endline (mask_sexp t [%sexp (s : Skill.t)]));
   [%expect
     {|
     ((name manual) (description "only by hand")
@@ -148,7 +158,9 @@ let%expect_test "discovery: roots, nesting, precedence, invalid files" =
 ;;
 
 let%expect_test "invocation and expansion" =
-  let show text = print_s [%sexp (Skill.invocation text : (string * string) option)] in
+  let show text =
+    print_s [%sexp (Skill.invocation text : (string * string) option)]
+  in
   show "/skill:review the diff please";
   show "/skill:review";
   show "/skill:review\nmulti\nline";
@@ -244,7 +256,9 @@ let%expect_test "the system prompt lists skills only with the read tool" =
     - Date: 2026-01-02
     - OS: Linux
     |}];
-  print_s [%sexp (String.is_substring (build [ Tool_ls.tool ]) ~substring:"review" : bool)];
+  print_s
+    [%sexp
+      (String.is_substring (build [ Tool_ls.tool ]) ~substring:"review" : bool)];
   [%expect {| false |}]
 ;;
 
@@ -283,7 +297,8 @@ let%expect_test "agent: /skill:NAME expands on the host; unknown names fail" =
   @@ fun t agent requests ->
   write t ".prigh/skills/review/SKILL.md" (skill_md "careful review");
   write t "home/.prigh/skills/notes/SKILL.md" (skill_md "note taking");
-  print_endline (mask_sexp t [%sexp (Agent.skills agent : Skill.t list Or_error.t)]);
+  print_endline
+    (mask_sexp t [%sexp (Agent.skills agent : Skill.t list Or_error.t)]);
   [%expect
     {|
     (Ok
@@ -292,7 +307,8 @@ let%expect_test "agent: /skill:NAME expands on the host; unknown names fail" =
       ((name review) (description "careful review")
        (path $DIR/.prigh/skills/review/SKILL.md) (model_invocable true))))
     |}];
-  print_s [%sexp (Agent.prompt agent "/skill:reveiw the diff" : unit Or_error.t)];
+  print_s
+    [%sexp (Agent.prompt agent "/skill:reveiw the diff" : unit Or_error.t)];
   [%expect
     {|
     (Error

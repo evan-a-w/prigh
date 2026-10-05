@@ -1310,3 +1310,47 @@ let%expect_test
     other: {"type":"event","event":"auth","kind":"done","provider":"deepseek","method":"api_key"}
     |}]
 ;;
+
+let%expect_test "skills: list_skills, /skill: prompts, unknown names refused" =
+  with_agent [ Reply.text "done" ]
+  @@ fun t agent h ->
+  call t h "list_skills";
+  [%expect {| {"type":"response","id":"r1","ok":true,"result":{"skills":[]}} |}];
+  write
+    t
+    ".claude/skills/frontend-design/SKILL.md"
+    "---\nname: frontend-design\ndescription: distinctive UI\n---\nBe bold.\n";
+  call t h "list_skills";
+  [%expect
+    {| {"type":"response","id":"r1","ok":true,"result":{"skills":[{"name":"frontend-design","description":"distinctive UI","path":"$DIR/.claude/skills/frontend-design/SKILL.md","model_invocable":true}]}} |}];
+  call t h "prompt" ~params:{|{"text": "/skill:frontend a landing page"}|};
+  call t h "steer" ~params:{|{"text": "/skill:frontend"}|};
+  [%expect
+    {|
+    {"type":"response","id":"r1","ok":false,"error":"unknown skill \"frontend\"; did you mean: frontend-design (/skills lists them all)"}
+    {"type":"response","id":"r1","ok":false,"error":"unknown skill \"frontend\"; did you mean: frontend-design (/skills lists them all)"}
+    |}];
+  call
+    t
+    h
+    "prompt"
+    ~params:{|{"text": "/skill:frontend-design a landing page"}|};
+  Agent.wait_idle agent;
+  [%expect {| {"type":"response","id":"r1","ok":true,"result":{}} |}];
+  List.iter (Agent.messages agent) ~f:(function
+    | User u -> print_endline (mask t u.text)
+    | Assistant _ | Tool_result _ -> ());
+  [%expect
+    {|
+    <skill name="frontend-design" location="$DIR/.claude/skills/frontend-design/SKILL.md">
+    References are relative to $DIR/.claude/skills/frontend-design.
+
+    Be bold.
+    </skill>
+
+    a landing page
+    |}];
+  call t h "list_mcp";
+  [%expect
+    {| {"type":"response","id":"r1","ok":false,"error":"MCP is off in this backend (it was started with -no-tools)"} |}]
+;;

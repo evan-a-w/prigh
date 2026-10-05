@@ -29,7 +29,10 @@ module Server = struct
   let key t =
     Md5.to_hex
       (Md5.digest_string
-         (Sexp.to_string [%sexp (t.name, t.source, t.dir, t.transport : string * string * string * Transport.t)]))
+         (Sexp.to_string
+            [%sexp
+              ((t.name, t.source, t.dir, t.transport)
+               : string * string * string * Transport.t)]))
   ;;
 end
 
@@ -57,7 +60,9 @@ let ancestors dir =
 (* [${VAR}] and [${VAR:-default}]; an unset variable without a default is
    an error naming it. *)
 let expand ~getenv s =
-  let re = Re.compile (Re.Perl.re {|\$\{([A-Za-z_][A-Za-z0-9_]*)(:-([^}]*))?\}|}) in
+  let re =
+    Re.compile (Re.Perl.re {|\$\{([A-Za-z_][A-Za-z0-9_]*)(:-([^}]*))?\}|})
+  in
   let missing = ref [] in
   let expanded =
     Re.replace re s ~f:(fun g ->
@@ -133,7 +138,8 @@ let transport ~getenv json =
     Or_error.error_string
       "the legacy SSE transport is not supported; use the server's streamable \
        HTTP endpoint (\"type\": \"http\")"
-  | Some other, _, _ -> Or_error.errorf "unknown type %S; use stdio or http" other
+  | Some other, _, _ ->
+    Or_error.errorf "unknown type %S; use stdio or http" other
   | None, _, _ ->
     Or_error.error_string "give a \"command\" (stdio) or a \"url\" (http)"
 ;;
@@ -149,7 +155,8 @@ let servers_in ~getenv ~source ~project ~dir =
   | None -> [], []
   | Some text ->
     (match Json.parse text with
-     | Error e -> [], [ sprintf "%s: invalid JSON: %s" source (Error.to_string_hum e) ]
+     | Error e ->
+       [], [ sprintf "%s: invalid JSON: %s" source (Error.to_string_hum e) ]
      | Ok json ->
        (match field json "mcpServers" with
         | None -> [], []
@@ -165,7 +172,8 @@ let servers_in ~getenv ~source ~project ~dir =
                 ; transport
                 ; approval =
                     Md5.to_hex
-                      (Md5.digest_string (source ^ "\000" ^ name ^ "\000" ^ Json.to_string spec))
+                      (Md5.digest_string
+                         (source ^ "\000" ^ name ^ "\000" ^ Json.to_string spec))
                 }
             | Error e ->
               Second
@@ -180,13 +188,20 @@ let servers_in ~getenv ~source ~project ~dir =
 let discover ?(getenv = Sys.getenv) ~cwd ~home () =
   let project =
     List.map (ancestors cwd) ~f:(fun dir ->
-      servers_in ~getenv ~source:(Filename.concat dir ".mcp.json") ~project:true ~dir)
+      servers_in
+        ~getenv
+        ~source:(Filename.concat dir ".mcp.json")
+        ~project:true
+        ~dir)
   in
-  let user = servers_in ~getenv ~source:(user_file ~home) ~project:false ~dir:home in
+  let user =
+    servers_in ~getenv ~source:(user_file ~home) ~project:false ~dir:home
+  in
   let found = project @ [ user ] in
   { Discovered.servers =
       List.concat_map found ~f:fst
-      |> List.stable_dedup ~compare:(fun (a : Server.t) b -> String.compare a.name b.name)
+      |> List.stable_dedup ~compare:(fun (a : Server.t) b ->
+        String.compare a.name b.name)
   ; problems = List.concat_map found ~f:snd
   }
 ;;
@@ -203,7 +218,8 @@ let find ?(getenv = Sys.getenv) ~home ~source name =
          String.is_substring p ~substring:(sprintf "server %S:" name))
      with
      | Some problem -> Error (Error.of_string problem)
-     | None -> Or_error.errorf "%s no longer defines the MCP server %S" source name)
+     | None ->
+       Or_error.errorf "%s no longer defines the MCP server %S" source name)
 ;;
 
 let approvals ~home =
@@ -232,6 +248,7 @@ let approve ~home (server : Server.t) =
       Out_channel.write_all
         tmp
         ~data:
-          (Json.to_string (`Array (List.map items ~f:(fun s -> `String s))) ^ "\n");
+          (Json.to_string (`Array (List.map items ~f:(fun s -> `String s)))
+           ^ "\n");
       Core_unix.rename ~src:tmp ~dst:path))
 ;;

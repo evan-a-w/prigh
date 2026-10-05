@@ -579,19 +579,13 @@ let expand_skill t text =
          ~cwd:t.cwd
          ~name:Host_ops.skill_op
          ~arguments:(Host_ops.skill_args ~home:t.home name))
-    |> Or_error.map ~f:(fun (skill, body) -> Some (Skill.expand skill ~body ~args))
+    |> Or_error.map ~f:(fun (skill, body) ->
+      Some (Skill.expand skill ~body ~args))
 ;;
 
 let mcp_exec t ?(cancel = Cancellation.never) ~call_id name arguments =
   Host_ops.listing_of_result
-    (host_exec
-       t
-       ~cancel
-       ~on_output:ignore
-       ~call_id
-       ~cwd:t.cwd
-       ~name
-       ~arguments)
+    (host_exec t ~cancel ~on_output:ignore ~call_id ~cwd:t.cwd ~name ~arguments)
 ;;
 
 let mcp_call t (context : Tool.Context.t) ~source ~server ~tool arguments =
@@ -602,7 +596,8 @@ let mcp_call t (context : Tool.Context.t) ~source ~server ~tool arguments =
     ~call_id:context.call_id
     ~cwd:context.cwd
     ~name:Host_ops.mcp_call_op
-    ~arguments:(Host_ops.mcp_call_args ~home:t.home ~source ~server ~tool arguments)
+    ~arguments:
+      (Host_ops.mcp_call_args ~home:t.home ~source ~server ~tool arguments)
 ;;
 
 let use_listing t (listing : Mcp_tools.Listing.t) =
@@ -1004,7 +999,8 @@ let prompt ?(attachments = []) ?(images = []) t text =
     Or_error.bind (expand_skill t text) ~f:(fun skill ->
       if is_running t
       then running ()
-      else Ok (start_run t [ user_message t { text; skill; attachments; images } ]))
+      else
+        Ok (start_run t [ user_message t { text; skill; attachments; images } ]))
 ;;
 
 let enqueue t queue ?(attachments = []) ?(images = []) text =

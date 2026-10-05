@@ -21,5 +21,9 @@ type t = unit
 
 let create ~env:_ ~sw:_ () = ()
 let servers () ?reconnect:_ ~cwd:_ ~home:_ () = [], []
-let call () ~cancel:_ ~source:_ ~server:_ ~home:_ ~tool:_ ~arguments:_ = Tool_result.error "stub"
+
+let call () ~cancel:_ ~source:_ ~server:_ ~home:_ ~tool:_ ~arguments:_ =
+  Tool_result.error "stub"
+;;
+
 let close () = ()

@@ -295,7 +295,18 @@ let worker_kind = function
 ;;
 
 (* One connection: [`Served] once [hello] succeeded, else why it did not. *)
-let serve_connection ~env ~terminals ~mcp ~log ~address ~token ~user ~name ~cwd flow =
+let serve_connection
+      ~env
+      ~terminals
+      ~mcp
+      ~log
+      ~address
+      ~token
+      ~user
+      ~name
+      ~cwd
+      flow
+  =
   Switch.run
   @@ fun sw ->
   let outbox =

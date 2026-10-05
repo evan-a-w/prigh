@@ -236,7 +236,8 @@ let%expect_test
     ]
   @@ fun t agent _dump ->
   Or_error.ok_exn (Agent.prompt agent "go");
-  Or_error.ok_exn (Agent.steer agent ~attachments:[ "notes.txt" ] "look at @notes.txt");
+  Or_error.ok_exn
+    (Agent.steer agent ~attachments:[ "notes.txt" ] "look at @notes.txt");
   Eio.Time.sleep (Eio.Stdenv.clock t.env) 0.1;
   let restored = Agent.abort agent in
   print_s [%message (restored : string list)];

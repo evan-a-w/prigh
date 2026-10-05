@@ -190,10 +190,13 @@ let skill ~cwd ~home name =
      | Ok (skill, body) ->
        Tool.Result.ok
          (Json.to_string
-            (`Object [ "skill", [%jsonaf_of: Skill.t] skill; "body", `String body ])))
+            (`Object
+                [ "skill", [%jsonaf_of: Skill.t] skill; "body", `String body ])))
 ;;
 
-let skill_args ~home name = `Object [ "home", `String home; "name", `String name ]
+let skill_args ~home name =
+  `Object [ "home", `String home; "name", `String name ]
+;;
 
 let skill_of_result (result : Tool.Result.t) =
   if result.is_error
@@ -210,10 +213,17 @@ let skill_of_result (result : Tool.Result.t) =
 let mcp_servers_op = "$mcp_servers"
 let mcp_call_op = "$mcp_call"
 let mcp_approve_op = "$mcp_approve"
-let is_mcp_op name = List.mem [ mcp_servers_op; mcp_call_op; mcp_approve_op ] name ~equal:String.equal
+
+let is_mcp_op name =
+  List.mem
+    [ mcp_servers_op; mcp_call_op; mcp_approve_op ]
+    name
+    ~equal:String.equal
+;;
 
 let mcp_servers_args ~home ~reconnect =
-  `Object [ "home", `String home; ("reconnect", if reconnect then `True else `False) ]
+  `Object
+    [ "home", `String home; ("reconnect", if reconnect then `True else `False) ]
 ;;
 
 let mcp_call_args ~home ~source ~server ~tool arguments =
@@ -227,7 +237,8 @@ let mcp_call_args ~home ~source ~server ~tool arguments =
 ;;
 
 let mcp_approve_args ~home ~source ~server =
-  `Object [ "home", `String home; "source", `String source; "server", `String server ]
+  `Object
+    [ "home", `String home; "source", `String source; "server", `String server ]
 ;;
 
 let listing_of_result (result : Tool.Result.t) =
@@ -242,13 +253,15 @@ let mcp ~mcp ~cancel ~cwd ~name ~(arguments : Json.t) =
     Tool.Result.ok
       (Json.to_string
          (Mcp_tools.Listing.to_json
-            (Mcp_tools.Listing.of_hub (Mcp_hub.servers mcp ~reconnect ~cwd ~home ()))))
+            (Mcp_tools.Listing.of_hub
+               (Mcp_hub.servers mcp ~reconnect ~cwd ~home ()))))
   in
   let string key = Tool_args.string arguments key in
   if String.equal name mcp_servers_op
   then
     listing
-      ~reconnect:(Option.value (Tool_args.bool_opt arguments "reconnect") ~default:false)
+      ~reconnect:
+        (Option.value (Tool_args.bool_opt arguments "reconnect") ~default:false)
   else if String.equal name mcp_call_op
   then
     Mcp_hub.call

@@ -439,19 +439,37 @@ let%expect_test "stdio worker: instructions come from the host's own home" =
   @@ fun sw ->
   write t "backend-home/.prigh/AGENTS.md" "the backend's";
   write t "host-home/.prigh/AGENTS.md" "the host's";
+  write
+    t
+    "backend-home/.prigh/skills/b/SKILL.md"
+    "---\ndescription: backend's\n---\nb";
+  write
+    t
+    "host-home/.prigh/skills/h/SKILL.md"
+    "---\ndescription: host's\n---\nh";
   Core_unix.mkdir_p (Filename.concat t.dir "proj");
   let old_home = Sys.getenv "HOME" in
   Core_unix.putenv ~key:"HOME" ~data:(Filename.concat t.dir "host-home");
   let w = Worker.start t ~sw in
-  Worker.send
-    w
-    (sprintf
-       {|{"type":"exec","exec_id":"i1","name":"$instructions","arguments":{"home":"%s/backend-home","with_nix":true},"cwd":"%s/proj"}|}
-       t.dir
-       t.dir);
-  let reply = Worker.read_line w in
+  let exec id name arguments =
+    Worker.send
+      w
+      (sprintf
+         {|{"type":"exec","exec_id":"%s","name":"%s","arguments":%s,"cwd":"%s/proj"}|}
+         id
+         name
+         (sprintf arguments t.dir)
+         t.dir);
+    Worker.read_line w
+  in
+  let replies =
+    [ exec "i1" "$instructions" {|{"home":"%s/backend-home","with_nix":true}|}
+    ; exec "s1" "$skill" {|{"home":"%s/backend-home","name":"b"}|}
+    ; exec "s2" "$skill" {|{"home":"%s/backend-home","name":"h"}|}
+    ]
+  in
   Option.iter old_home ~f:(fun data -> Core_unix.putenv ~key:"HOME" ~data);
-  Option.iter reply ~f:(fun line ->
+  List.iter (List.filter_opt replies) ~f:(fun line ->
     print_endline
       (mask
          t
@@ -463,7 +481,9 @@ let%expect_test "stdio worker: instructions come from the host's own home" =
   ignore (Worker.read_line w : string option);
   [%expect
     {|
-    {"type":"result","exec_id":"i1","text":"{\"files\":[{\"path\":\"$DIR/host-home/.prigh/AGENTS.md\",\"text\":\"the host's\"}],\"nix\":<bool>,\"skills\":[]}","is_error":false}
+    {"type":"result","exec_id":"i1","text":"{\"files\":[{\"path\":\"$DIR/host-home/.prigh/AGENTS.md\",\"text\":\"the host's\"}],\"nix\":<bool>,\"skills\":[{\"name\":\"h\",\"description\":\"host's\",\"path\":\"$DIR/host-home/.prigh/skills/h/SKILL.md\",\"model_invocable\":true}]}","is_error":false}
+    {"type":"result","exec_id":"s1","text":"unknown skill \"b\"; did you mean: h (/skills lists them all)","is_error":true}
+    {"type":"result","exec_id":"s2","text":"{\"skill\":{\"name\":\"h\",\"description\":\"host's\",\"path\":\"$DIR/host-home/.prigh/skills/h/SKILL.md\",\"model_invocable\":true},\"body\":\"h\"}","is_error":false}
     (worker finished)
     |}]
 ;;

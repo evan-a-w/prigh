@@ -10,12 +10,13 @@ let strip_cr line =
 
 let is_fence line = String.equal (String.rstrip line) "---"
 let is_end line = is_fence line || String.equal (String.rstrip line) "..."
-let indented line = String.is_prefix line ~prefix:" " || String.is_prefix line ~prefix:"\t"
-let is_blank line = String.is_empty (String.strip line)
 
-let unquote_single s =
-  String.substr_replace_all s ~pattern:"''" ~with_:"'"
+let indented line =
+  String.is_prefix line ~prefix:" " || String.is_prefix line ~prefix:"\t"
 ;;
+
+let is_blank line = String.is_empty (String.strip line)
+let unquote_single s = String.substr_replace_all s ~pattern:"''" ~with_:"'"
 
 let unquote_double s =
   let b = Buffer.create (String.length s) in
@@ -65,14 +66,18 @@ let block_scalar ~literal lines =
 let scalar first continuation =
   let first = String.strip first in
   let rest = List.map continuation ~f:String.strip in
-  let joined = String.concat ~sep:" " (List.filter (first :: rest) ~f:(Fn.non String.is_empty)) in
+  let joined =
+    String.concat
+      ~sep:" "
+      (List.filter (first :: rest) ~f:(Fn.non String.is_empty))
+  in
   match String.prefix first 1 with
   | "|" -> block_scalar ~literal:true continuation
   | ">" -> block_scalar ~literal:false continuation
   | "'" when String.length joined >= 2 && String.is_suffix joined ~suffix:"'" ->
     unquote_single (String.sub joined ~pos:1 ~len:(String.length joined - 2))
-  | "\"" when String.length joined >= 2 && String.is_suffix joined ~suffix:"\"" ->
-    unquote_double (String.sub joined ~pos:1 ~len:(String.length joined - 2))
+  | "\"" when String.length joined >= 2 && String.is_suffix joined ~suffix:"\""
+    -> unquote_double (String.sub joined ~pos:1 ~len:(String.length joined - 2))
   | _ ->
     if List.is_empty rest
     then first
@@ -85,7 +90,8 @@ let scalar first continuation =
 let rec fields lines =
   match lines with
   | [] -> []
-  | line :: rest when is_blank line || String.is_prefix (String.lstrip line) ~prefix:"#" ->
+  | line :: rest
+    when is_blank line || String.is_prefix (String.lstrip line) ~prefix:"#" ->
     fields rest
   | line :: rest ->
     let continuation, rest =

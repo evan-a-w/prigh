@@ -99,7 +99,8 @@ let read_instructions ~cwd ~home =
     path, String.strip (In_channel.read_all path))
 ;;
 
-let build ?date ?instructions ?(nix = false) ?(skills = []) ~cwd ~home ~tools () =
+let build ?date ?instructions ?(nix = false) ?(skills = []) ~cwd ~home ~tools ()
+  =
   let date =
     match date with
     | Some d -> d
@@ -122,7 +123,8 @@ let build ?date ?instructions ?(nix = false) ?(skills = []) ~cwd ~home ~tools ()
       sprintf "Instructions from %s:\n%s" path text)
   in
   let skills =
-    if List.exists tools ~f:(fun (t : Tool_spec.t) -> String.equal t.name "read")
+    if
+      List.exists tools ~f:(fun (t : Tool_spec.t) -> String.equal t.name "read")
     then Option.to_list (Skill.prompt_section skills)
     else []
   in

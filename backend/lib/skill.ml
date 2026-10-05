@@ -16,14 +16,17 @@ let subdirs = [ ".prigh/skills"; ".claude/skills"; ".agents/skills" ]
 let ancestors dir =
   let rec go dir acc =
     let parent = Filename.dirname dir in
-    if String.equal parent dir then List.rev (dir :: acc) else go parent (dir :: acc)
+    if String.equal parent dir
+    then List.rev (dir :: acc)
+    else go parent (dir :: acc)
   in
   go dir []
 ;;
 
 let roots ~cwd ~home =
-  List.concat_map (ancestors cwd @ [ home ]) ~f:(fun dir ->
-    List.map subdirs ~f:(Filename.concat dir))
+  List.concat_map
+    (ancestors cwd @ [ home ])
+    ~f:(fun dir -> List.map subdirs ~f:(Filename.concat dir))
   |> List.stable_dedup ~compare:String.compare
 ;;
 
@@ -92,7 +95,8 @@ let rec find_in dir ~depth =
     | names ->
       List.sort names ~compare:String.compare
       |> List.filter ~f:(fun name ->
-        not (String.is_prefix name ~prefix:"." || String.equal name "node_modules"))
+        not
+          (String.is_prefix name ~prefix:"." || String.equal name "node_modules"))
       |> List.concat_map ~f:(fun name ->
         let path = Filename.concat dir name in
         if is_directory path then find_in path ~depth:(depth - 1) else []))
@@ -144,8 +148,8 @@ let prompt_section skills =
       (String.concat
          ~sep:"\n"
          ("Skills hold instructions for particular tasks. When a task matches \
-           a skill's description, read its file with read before starting, \
-           and follow it; paths in it are relative to its directory."
+           a skill's description, read its file with read before starting, and \
+           follow it; paths in it are relative to its directory."
           :: List.map skills ~f:(fun t ->
             sprintf "- %s (%s): %s" t.name t.path t.description)))
 ;;
