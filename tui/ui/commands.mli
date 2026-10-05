@@ -13,6 +13,8 @@ module Argument : sig
     | Sessions
     | Path
     | Directory
+    | Skill (** [/skill:NAME]: the name is part of the command *)
+    | Mcp
   [@@deriving sexp_of, equal]
 end
 
@@ -28,6 +30,9 @@ end
 
 val all : Spec.t list
 val find : string -> Spec.t option
+
+(** [/name args], as [/help] shows it. *)
+val usage : Spec.t -> string
 
 (** [/thinking] levels in Ctrl+T cycling order. *)
 val thinking_levels : string list

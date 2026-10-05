@@ -346,7 +346,7 @@ let%expect_test "fuzzy ranking: command names" =
     {|
     "mo" -> model scoped-models import
     "lo" -> login logout clone
-    "s"  -> state switch setusr session signout sessions scoped-models jobs host agents hotkeys verbosity
+    "s"  -> state switch skills skill: setusr session signout sessions scoped-models jobs host agents hotkeys verbosity
     "sw" -> switch
     "xyz" ->
     |}]
@@ -655,6 +655,9 @@ let%expect_test "keymap: every binding resolves to its intent and is documented"
     /import [path]                     import a session from a JSONL file
     /abort                             abort the current run
     /btw <question>                    ask a side question without interrupting the turn (not added to the conversation)
+    /skills                            pick a skill to run (Enter puts /skill:NAME in the editor)
+    /skill:NAME [args]                 run a skill, with what follows as its arguments
+    /mcp [reconnect]                   list MCP servers (Enter approves one or lists its tools); reconnect restarts failed ones
     /retry-backend-connection          reconnect to the backend now instead of waiting for the next retry
     /state                             show session state
     /clear                             clear the transcript
@@ -1093,7 +1096,7 @@ let%expect_test "autocomplete: Enter accepts arguments only after a filter or \
            Or_error.all (List.map items ~f:Prigh_protocol.Model.of_json)
          | _ -> Or_error.error_string "array"))
   in
-  let compute line =
+  let compute ?skills line =
     Autocomplete.compute
       ~line
       ~col:(String.length line)
@@ -1101,6 +1104,7 @@ let%expect_test "autocomplete: Enter accepts arguments only after a filter or \
       ~models
       ~auth:[]
       ~sessions:None
+      ~skills
       ~logged_in:(fun _ -> true)
   in
   let show name ac =
@@ -1112,13 +1116,14 @@ let%expect_test "autocomplete: Enter accepts arguments only after a filter or \
        | Argument spec -> "arg:" ^ spec.name
        | Path -> "path"
        | Directory { host } ->
-         "dir" ^ Option.value_map host ~default:"" ~f:(fun h -> "@" ^ h))
+         "dir" ^ Option.value_map host ~default:"" ~f:(fun h -> "@" ^ h)
+       | Skill -> "skill")
       (Autocomplete.prefix ac)
       (Autocomplete.navigated ac)
       (Autocomplete.accepts_on_enter ac)
       (List.length (Autocomplete.items ac))
   in
-  let ac line = Option.value_exn (compute line) in
+  let ac ?skills line = Option.value_exn (compute ?skills line) in
   show "/mo" (ac "/mo");
   show "/model " (ac "/model ");
   show "/model down" (Autocomplete.down (ac "/model "));
@@ -1147,4 +1152,124 @@ let%expect_test "autocomplete: Enter accepts arguments only after a filter or \
   in
   print_endline (Autocomplete.accept dirs ~editor_text:"~/de");
   [%expect {| ~/dev/ |}]
+;;
+
+let%expect_test "autocomplete: /skill: completes skill names" =
+  let skill name description : Prigh_protocol.Skill.t =
+    { name
+    ; description
+    ; path = sprintf "/p/.claude/skills/%s/SKILL.md" name
+    ; model_invocable = true
+    }
+  in
+  let skills =
+    [ skill "frontend-design" "Build distinctive UIs"
+    ; skill "release" "Cut a release"
+    ; skill "review" "Review a diff"
+    ]
+  in
+  let compute ?skills line =
+    Autocomplete.compute
+      ~line
+      ~col:(String.length line)
+      ~line_index:0
+      ~models:[]
+      ~auth:[]
+      ~sessions:None
+      ~skills
+      ~logged_in:(fun _ -> true)
+  in
+  let show line ?skills () =
+    match compute ?skills line with
+    | None -> printf "%-14s none\n" line
+    | Some ac ->
+      printf
+        "%-14s %s prefix=%S enter_accepts=%b items=[%s] accept=%S\n"
+        line
+        (match Autocomplete.source ac with
+         | Argument spec -> "arg:" ^ spec.name
+         | source -> Sexp.to_string [%sexp (source : Autocomplete.Source.t)])
+        (Autocomplete.prefix ac)
+        (Autocomplete.accepts_on_enter ac)
+        (String.concat
+           ~sep:" "
+           (List.map (Autocomplete.items ac) ~f:(fun i -> i.Picker.Item.id)))
+        (Autocomplete.accept ac ~editor_text:line)
+  in
+  show "/sk" ();
+  show "/skill:" ();
+  show "/skill:" ~skills ();
+  show "/skill:re" ~skills ();
+  show "/skill:fd" ~skills ();
+  show "/skill:zzz" ~skills ();
+  show "/skill:review x" ~skills ();
+  show "/skill:" ~skills:[] ();
+  show "/mcp " ();
+  [%expect
+    {|
+    /sk            Command prefix="sk" enter_accepts=true items=[skills skill:] accept="/skills "
+    /skill:        Skill prefix="" enter_accepts=false items=[] accept="/skill:"
+    /skill:        Skill prefix="" enter_accepts=false items=[frontend-design release review] accept="/skill:frontend-design "
+    /skill:re      Skill prefix="re" enter_accepts=true items=[review release frontend-design] accept="/skill:review "
+    /skill:fd      Skill prefix="fd" enter_accepts=true items=[frontend-design] accept="/skill:frontend-design "
+    /skill:zzz     none
+    /skill:review x none
+    /skill:        Skill prefix="" enter_accepts=false items=[] accept="/skill:"
+    /mcp           arg:mcp prefix="" enter_accepts=false items=[reconnect] accept="/mcp reconnect"
+    |}]
+;;
+
+let%expect_test "skill messages: parsed back into name, location, body and \
+                 arguments"
+  =
+  let head =
+    "<skill name=\"review\" location=\"/p/.prigh/skills/review/SKILL.md\">\n"
+  in
+  List.iter
+    [ head ^ "References are relative to /p.\n\nRead the diff.\n</skill>"
+    ; head ^ "Read the diff.\n</skill>\n\nfocus on app.ml\n\nand tests"
+    ; head ^ "Quote:\n</skill>\nnot the end\n</skill>\n\nargs"
+    ; head ^ "</skill>"
+    ; head ^ "no closing tag"
+    ; "<skill name=\"x\">\nbody\n</skill>"
+    ; "/skill:review focus"
+    ]
+    ~f:(fun text ->
+      match Skill_message.parse text with
+      | None -> print_endline "none"
+      | Some t ->
+        print_s
+          [%message
+            (t : Skill_message.t)
+              ~invocation:(Skill_message.invocation t : string)]);
+  [%expect
+    {|
+    ((t (
+       (name     review)
+       (location /p/.prigh/skills/review/SKILL.md)
+       (body "References are relative to /p.\n\nRead the diff.")
+       (args "")))
+     (invocation /skill:review))
+    ((t (
+       (name     review)
+       (location /p/.prigh/skills/review/SKILL.md)
+       (body     "Read the diff.")
+       (args     "focus on app.ml\n\nand tests")))
+     (invocation "/skill:review focus on app.ml\n\nand tests"))
+    ((t (
+       (name     review)
+       (location /p/.prigh/skills/review/SKILL.md)
+       (body     "Quote:\n</skill>\nnot the end")
+       (args     args)))
+     (invocation "/skill:review args"))
+    ((t (
+       (name     review)
+       (location /p/.prigh/skills/review/SKILL.md)
+       (body     "")
+       (args     "")))
+     (invocation /skill:review))
+    none
+    none
+    none
+    |}]
 ;;

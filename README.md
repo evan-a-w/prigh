@@ -600,12 +600,23 @@ destructive `bash`/`write`/`edit`; `/confirm on|off`) and
 | `/host [name\|backend]` | pick where tools run, and the directory there |
 | `/abort` | abort the current run |
 | `/btw <question>` | ask a side question without interrupting the run |
+| `/skills`, `/skill:NAME [args]` | pick a skill (Enter puts `/skill:NAME ` in the editor for its arguments) / run one |
+| `/mcp [reconnect]` | MCP servers and their state: Enter approves a project's server or lists a ready one's tools; `reconnect` restarts failed ones |
 | `/retry-backend-connection` | reconnect to the backend now |
 | `/state` | show session state |
 | `/copy` | (prigh-web) copy the last reply to the clipboard |
 
 `/model` also accepts a display name, id, `provider/id` or unique prefix, and
 `/login`/`/logout`/`/thinking`/`/sessions` open fuzzy pickers.
+
+`/skill:` completes the names of the skills found where the session's tools
+run (fetched once per session, directory and tool host), and is sent like a
+prompt (a steer or follow-up while a turn runs). The transcript shows an
+invoked skill as `skill NAME` followed by its arguments; verbose (Ctrl+O)
+adds the skill's file. A name the backend does not know comes back as an
+error listing the closest ones, with the text back in the editor. `/mcp`
+also shows configuration problems, and says where to configure servers when
+there are none.
 
 `/btw` works while a turn is running: one extra model call (no tools) answers
 from the session's current context, streaming into a box above the editor
