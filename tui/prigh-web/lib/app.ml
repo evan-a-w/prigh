@@ -321,7 +321,7 @@ let set_state (m : Model.t) (state : State.t) =
   let background_changed =
     match m.state with
     | Some old ->
-      [ ( (not ([%equal: State.Subagent.t list] old.subagents state.subagents))
+      [ ( not ([%equal: State.Subagent.t list] old.subagents state.subagents)
         , list_subagents )
       ; not ([%equal: State.Job.t list] old.jobs state.jobs), list_jobs
       ]
@@ -621,10 +621,12 @@ let open_agents (m : Model.t) arg =
        error
          m
          (match Agents.listed m.agents with
-          | [] -> sprintf "No subagent or job %s: none has run in this session." arg
+          | [] ->
+            sprintf "No subagent or job %s: none has run in this session." arg
           | listed ->
             sprintf
-              "No subagent or job %s: give its number (1-%d) or id; /agents                lists them."
+              "No subagent or job %s: give its number (1-%d) or id; /agents \
+               lists them."
               arg
               (List.length listed)))
 ;;
@@ -818,13 +820,9 @@ let reply (m : Model.t) (tag : Reply_tag.t) result =
     in
     m, cmds @ startup
   (* Subagents from before the backend restarted are gone: the report stays. *)
-  | ( ( Ignore
-      | Paths _
+  | ( ( Ignore | Paths _
       | Auth_status Refresh
-      | Subagent _
-      | Subagents
-      | Jobs
-      | Job_output _ )
+      | Subagent _ | Subagents | Jobs | Job_output _ )
     , Error _ ) -> m, []
   | Deleted title, Error e ->
     error

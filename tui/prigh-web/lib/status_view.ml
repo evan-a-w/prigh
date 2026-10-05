@@ -13,7 +13,6 @@ let tokens n =
   else Int.to_string n
 ;;
 
-
 let item ?(cls = "") ?title children =
   Node.span
     ~attrs:
@@ -67,9 +66,7 @@ let background (m : App.Model.t) ~inject =
   | Some (text, running) ->
     Node.button
       ~attrs:
-        [ classes
-            [ "status-item"; "link"; "background" ]
-            [ "active", running ]
+        [ classes [ "status-item"; "link"; "background" ] [ "active", running ]
         ; Attr.type_ "button"
         ; Attr.title "Subagents and jobs (/agents)"
         ; Attr.on_click (fun _ -> inject (Action.Open_subagents None))

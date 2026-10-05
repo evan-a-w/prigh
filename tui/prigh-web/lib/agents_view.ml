@@ -65,7 +65,17 @@ let number_badge n =
   else Node.span ~attrs:[ Attr.class_ "row-num none" ] []
 ;;
 
-let row ~inject ~item ~status ~selected ~depth ~number ~title ~elapsed ~meta ~line
+let row
+      ~inject
+      ~item
+      ~status
+      ~selected
+      ~depth
+      ~number
+      ~title
+      ~elapsed
+      ~meta
+      ~line
   =
   Node.button
     ~attrs:
@@ -80,7 +90,9 @@ let row ~inject ~item ~status ~selected ~depth ~number ~title ~elapsed ~meta ~li
     ; status_icon status
     ; div
         ~cls:"row-main"
-        [ div ~cls:"row-top" [ span ~cls:"row-title" title; span ~cls:"row-elapsed" elapsed ]
+        [ div
+            ~cls:"row-top"
+            [ span ~cls:"row-title" title; span ~cls:"row-elapsed" elapsed ]
         ; span ~cls:"row-meta" (String.concat ~sep:" · " meta)
         ; (if String.is_empty line then Node.none else span ~cls:"row-line" line)
         ]
@@ -165,8 +177,7 @@ let item_row (m : App.Model.t) ~inject ~number (item, depth) =
          ~elapsed:(Agents.format_span (Agents.job_elapsed job ~now:(now m)))
          ~meta:(job_meta job)
          ~line:(Option.value job.info.last_line ~default:"")
-       |> fun node ->
-       Node.div ~attrs:[ Attr.class_ "job" ] [ node ])
+       |> fun node -> Node.div ~attrs:[ Attr.class_ "job" ] [ node ])
 ;;
 
 let is_agent ((item : Item.t), _) =
@@ -208,7 +219,8 @@ let list_view (m : App.Model.t) ~inject =
   then
     div
       ~cls:"agents-empty"
-      [ Node.p [ Node.text "No subagents or background jobs in this session yet." ]
+      [ Node.p
+          [ Node.text "No subagents or background jobs in this session yet." ]
       ; Node.p
           ~attrs:[ Attr.class_ "hint" ]
           [ Node.text
@@ -223,18 +235,25 @@ let list_view (m : App.Model.t) ~inject =
           ~title:"Subagents"
           ~count:
             (counts
-               ~running:(List.count listed ~f:(fun (item, _) -> is_agent (item, 0) && Agents.running a item))
+               ~running:
+                 (List.count listed ~f:(fun (item, _) ->
+                    is_agent (item, 0) && Agents.running a item))
                ~total:(List.length agents))
           agents
       ; section
           ~title:"Jobs"
           ~count:
             (counts
-               ~running:(List.count listed ~f:(fun (item, _) -> (not (is_agent (item, 0))) && Agents.running a item))
+               ~running:
+                 (List.count listed ~f:(fun (item, _) ->
+                    (not (is_agent (item, 0))) && Agents.running a item))
                ~total:(List.length jobs))
           jobs
       ; (if List.is_empty listed
-         then div ~cls:"agents-empty" [ Node.p [ Node.text "Nothing since your last prompt." ] ]
+         then
+           div
+             ~cls:"agents-empty"
+             [ Node.p [ Node.text "Nothing since your last prompt." ] ]
          else Node.none)
       ; (match earlier with
          | [] -> Node.none
@@ -248,8 +267,18 @@ let list_view (m : App.Model.t) ~inject =
 
 let stop_button (m : App.Model.t) ~inject item ~label ~action ~title =
   if Set.mem m.agents.stopping item
-  then button ~cls:"stop small" ~disabled:true ~on_click:Effect.Ignore [ Node.text "Stopping…" ]
-  else button ~cls:"stop small" ~title ~on_click:(inject action) [ icon Stop; Node.text label ]
+  then
+    button
+      ~cls:"stop small"
+      ~disabled:true
+      ~on_click:Effect.Ignore
+      [ Node.text "Stopping…" ]
+  else
+    button
+      ~cls:"stop small"
+      ~title
+      ~on_click:(inject action)
+      [ icon Stop; Node.text label ]
 ;;
 
 let crumbs (m : App.Model.t) ~inject (a : Agent.t) =
@@ -267,7 +296,8 @@ let crumbs (m : App.Model.t) ~inject (a : Agent.t) =
                  [ Attr.class_ "crumb"
                  ; Attr.type_ "button"
                  ; Attr.title b.id
-                 ; Attr.on_click (fun _ -> inject (Action.Select_item (Agent b.id)))
+                 ; Attr.on_click (fun _ ->
+                     inject (Action.Select_item (Agent b.id)))
                  ]
                [ Node.text (first_line b.task) ]
            ; span ~cls:"crumb-sep" "›"
@@ -278,11 +308,13 @@ let agent_detail (m : App.Model.t) ~inject (a : Agent.t) =
   let sub = Chat.find_subagent m.chat a.id in
   let children =
     Agents.children m.agents (Some a.id)
-    |> List.map ~f:(fun (c : Agent.t) -> item_row m ~inject ~number:0 (Item.Agent c.id, 0))
+    |> List.map ~f:(fun (c : Agent.t) ->
+      item_row m ~inject ~number:0 (Item.Agent c.id, 0))
   in
   let transcript =
     match sub with
-    | Some s when not (List.is_empty (Chat.entries s.chat)) -> Chat_view.view s.chat
+    | Some s when not (List.is_empty (Chat.entries s.chat)) ->
+      Chat_view.view s.chat
     | Some _ -> div ~cls:"agents-note" [ Node.text "Starting…" ]
     | None ->
       div
@@ -303,10 +335,18 @@ let agent_detail (m : App.Model.t) ~inject (a : Agent.t) =
         ; Markdown_view.render (report_text r)
         ]
     | Some ({ is_error = true; _ } as r) ->
+      let text = String.strip (report_text r) in
+      let head, text =
+        match String.chop_prefix text ~prefix:"[cancelled]" with
+        | Some rest -> "Cancelled", String.strip rest
+        | None -> "Failed", text
+      in
       div
         ~cls:"agents-result failed"
-        [ div ~cls:"agents-result-head" [ Node.text "Failed" ]
-        ; Node.pre [ Node.text (String.strip (report_text r)) ]
+        [ div ~cls:"agents-result-head" [ Node.text head ]
+        ; (if String.is_empty text
+           then Node.none
+           else Node.pre [ Node.text text ])
         ]
   in
   div
@@ -315,11 +355,17 @@ let agent_detail (m : App.Model.t) ~inject (a : Agent.t) =
     [ crumbs m ~inject a
     ; div
         ~cls:"detail-head"
-        [ div ~cls:"detail-title" [ status_icon a.status; span ~cls:"detail-task" (first_line a.task) ]
+        [ div
+            ~cls:"detail-title"
+            [ status_icon a.status
+            ; span ~cls:"detail-task" (first_line a.task)
+            ]
         ; div
             ~cls:"detail-meta"
             ([ pill a.status (Agents.Status.to_string a.status)
-             ; span ~cls:"detail-elapsed" (Agents.format_span (Agents.agent_elapsed a ~now:(now m)))
+             ; span
+                 ~cls:"detail-elapsed"
+                 (Agents.format_span (Agents.agent_elapsed a ~now:(now m)))
              ]
              @ List.map (a.id :: agent_meta m a) ~f:(span ~cls:"detail-chip"))
         ; div
@@ -344,7 +390,10 @@ let agent_detail (m : App.Model.t) ~inject (a : Agent.t) =
     ; (match children with
        | [] -> Node.none
        | rows ->
-         section ~title:"Its subagents" ~count:(Int.to_string (List.length rows)) rows)
+         section
+           ~title:"Its subagents"
+           ~count:(Int.to_string (List.length rows))
+           rows)
     ; div ~cls:"agents-transcript" [ transcript ]
     ; result
     ]
@@ -367,8 +416,14 @@ let job_detail (m : App.Model.t) ~inject (j : Agents.Job.t) =
             [ status_icon status; span ~cls:"detail-command" j.info.command ]
         ; div
             ~cls:"detail-meta"
-            ([ pill status (if j.info.running then "running" else Option.value j.info.exit ~default:"finished")
-             ; span ~cls:"detail-elapsed" (Agents.format_span (Agents.job_elapsed j ~now:(now m)))
+            ([ pill
+                 status
+                 (if j.info.running
+                  then "running"
+                  else Option.value j.info.exit ~default:"finished")
+             ; span
+                 ~cls:"detail-elapsed"
+                 (Agents.format_span (Agents.job_elapsed j ~now:(now m)))
              ]
              @ List.map (job_meta ~exit:false j) ~f:(span ~cls:"detail-chip"))
         ; (if j.info.running
@@ -389,18 +444,24 @@ let job_detail (m : App.Model.t) ~inject (j : Agents.Job.t) =
        | None ->
          div
            ~cls:"agents-note"
-           [ Node.span ~attrs:[ Attr.class_ "spinner" ] []; Node.text "Loading the output…" ]
+           [ Node.span ~attrs:[ Attr.class_ "spinner" ] []
+           ; Node.text "Loading the output…"
+           ]
        | Some (_, text) when String.is_empty (String.strip text) ->
          div ~cls:"agents-note" [ Node.text "No output yet." ]
        | Some (lines, text) ->
          Node.fragment
            [ (match lines with
-              | Some lines -> div ~cls:"agents-note small" [ Node.text ("Output, " ^ lines) ]
+              | Some lines ->
+                div ~cls:"agents-note small" [ Node.text ("Output, " ^ lines) ]
               | None -> Node.none)
            ; Node.pre ~attrs:[ Attr.class_ "job-output" ] [ Node.text text ]
            ])
     ; (if j.info.running
-       then div ~cls:"agents-note small" [ Node.text "Its output refreshes while it runs." ]
+       then
+         div
+           ~cls:"agents-note small"
+           [ Node.text "Its output refreshes while it runs." ]
        else Node.none)
     ]
 ;;
@@ -490,10 +551,15 @@ let toggle (m : App.Model.t) ~inject =
   else (
     let running = Agents.running_agents a + Agents.running_jobs a in
     button
-      ~cls:(if a.open_ then "icon ghost agents-toggle open" else "icon ghost agents-toggle")
+      ~cls:
+        (if a.open_
+         then "icon ghost agents-toggle open"
+         else "icon ghost agents-toggle")
       ~title:"Subagents and jobs (/agents)"
       ~on_click:(inject Action.Toggle_subagents)
       [ icon Bot
-      ; (if running > 0 then span ~cls:"badge" (Int.to_string running) else Node.none)
+      ; (if running > 0
+         then span ~cls:"badge" (Int.to_string running)
+         else Node.none)
       ])
 ;;

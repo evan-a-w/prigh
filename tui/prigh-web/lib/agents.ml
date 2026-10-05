@@ -192,14 +192,16 @@ let rec record_in t ~now ~parent (event : Event.t) =
     (match inner with
      | Subagent_start _ | Subagent_end _ | Subagent _ ->
        record_in t ~now ~parent:(Some agent_id) inner
-     | Turn_start -> update_agent t agent_id ~f:(fun a -> { a with turns = a.turns + 1 })
+     | Turn_start ->
+       update_agent t agent_id ~f:(fun a -> { a with turns = a.turns + 1 })
      | Tool_start call ->
        update_agent t agent_id ~f:(fun a ->
          { a with
            tool_calls = a.tool_calls + 1
          ; current_tool = Some (call.name, now)
          })
-     | Tool_end _ -> update_agent t agent_id ~f:(fun a -> { a with current_tool = None })
+     | Tool_end _ ->
+       update_agent t agent_id ~f:(fun a -> { a with current_tool = None })
      | _ -> t)
   | _ -> t
 ;;
@@ -271,7 +273,9 @@ let tree t roots =
   in
   let rec walk depth (a : Agent.t) =
     (Item.Agent a.id, depth)
-    :: List.concat_map (by_running (children t (Some a.id))) ~f:(walk (depth + 1))
+    :: List.concat_map
+         (by_running (children t (Some a.id)))
+         ~f:(walk (depth + 1))
   in
   List.concat_map (by_running roots) ~f:(walk 0)
 ;;
