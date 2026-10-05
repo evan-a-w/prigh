@@ -52,7 +52,7 @@ function ConfirmDialog({ request }: { request: RpcExtensionUIRequest & { method:
 }
 
 function InputDialog({ request }: { request: RpcExtensionUIRequest & { method: "input" } }) {
-	const [value, setValue] = useState("");
+	const [value, setValue] = useState(request.prefill ?? "");
 	const inputRef = useRef<HTMLInputElement>(null);
 	useEffect(() => inputRef.current?.focus(), []);
 	return (

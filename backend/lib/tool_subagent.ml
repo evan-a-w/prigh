@@ -78,14 +78,20 @@ module Prepared = struct
     }
 end
 
-let prepare ~current_model ~current_thinking (context : Tool.Context.t) args =
+let prepare
+      ~models
+      ~current_model
+      ~current_thinking
+      (context : Tool.Context.t)
+      args
+  =
   let task = Tool_args.string args "task" in
   let only = Tool_args.string_list_opt args "tools" in
   let model =
     match Tool_args.string_opt args "model" with
     | None -> current_model ()
     | Some name ->
-      (match Model.resolve name with
+      (match Model_registry.resolve models name with
        | Ok model -> model
        | Error e -> raise (Tool_args.Invalid (Error.to_string_hum e)))
   in
@@ -256,9 +262,18 @@ let execute
   result
 ;;
 
-let create ~provider ~current_model ~current_thinking ~home =
+let create
+      ?(models = Model_registry.builtin ())
+      ~provider
+      ~current_model
+      ~current_thinking
+      ~home
+      ()
+  =
   let run (context : Tool.Context.t) args =
-    let prepared = prepare ~current_model ~current_thinking context args in
+    let prepared =
+      prepare ~models ~current_model ~current_thinking context args
+    in
     match context.background with
     | Some background when context.depth = 0 ->
       let id =

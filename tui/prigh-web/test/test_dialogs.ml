@@ -83,7 +83,7 @@ let%expect_test "help lists every key and command" =
     /cd <path> change the working directory
     /abort stop the current run
     /agents show background subagents and jobs
-    /login [provider] log in to a model provider
+    /login [provider] log in to a model provider (or /login custom)
     /logout [provider] remove a provider's login
     /auth show which providers are logged in
     /signout sign out of this backend
@@ -111,6 +111,7 @@ let%expect_test "logging in: pick a provider, open the URL, answer the prompts" 
     Anthropic API key
     OpenAI API key
     DeepSeek API key
+    Custom provider add an OpenAI-compatible endpoint (aiproxy, LiteLLM, OpenRouter, vLLM, Ollama…)
     |}];
   H.act h (Picker_query "open");
   H.key h "Enter" ~target:Field;
@@ -142,6 +143,7 @@ let%expect_test "logging in: pick a provider, open the URL, answer the prompts" 
   H.text h ~selector:".modal";
   [%expect
     {|
+    (Focus dialog-input)
     Log in to OpenAI
     (Close (Esc))
     Sign in, then paste the code.
@@ -268,6 +270,7 @@ let%expect_test "/auth shows the providers; /logout picks a logged-in one" =
     {|
     (Expire_toast (id 0) (after_ms 4000))
     (Rpc (method_ auth_status) (params ()) (tag (Auth_status Refresh)))
+    (Rpc (method_ list_models) (params ()) (tag Models))
     |}];
   H.reply h "auth_status" H.auth_json;
   H.act h Close_dialog;

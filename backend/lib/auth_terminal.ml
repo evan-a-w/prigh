@@ -50,11 +50,18 @@ let create ~env ~sw ?(open_urls = true) () : Auth_interaction.t =
   let prompt (p : Auth_interaction.Prompt.t) =
     let answer =
       match p with
-      | Secret { message } ->
+      | Secret { message; allow_empty = _ } ->
         eprintf "%s: %!" message;
         let line = with_echo_off ~f:read_line in
         eprintf "\n%!";
         line
+      | Text { message; placeholder; default } ->
+        say "%s" message;
+        (match default, placeholder with
+         | "", "" -> eprintf "> %!"
+         | "", example -> eprintf "(e.g. %s) > %!" example
+         | default, _ -> eprintf "[%s] > %!" default);
+        read_line ()
       | Manual_code { message; placeholder } ->
         say "%s" message;
         eprintf "(%s) > %!" placeholder;
@@ -62,12 +69,13 @@ let create ~env ~sw ?(open_urls = true) () : Auth_interaction.t =
       | Select { message; options } ->
         say "%s" message;
         List.iteri options ~f:(fun i (_, label) -> say "  %d. %s" (i + 1) label);
-        eprintf "> %!";
+        eprintf "[1] > %!";
         Option.bind (read_line ()) ~f:(fun line ->
           let line = String.strip line in
-          match Int.of_string_opt line with
-          | Some n when n >= 1 && n <= List.length options ->
+          match Int.of_string_opt line, List.hd options with
+          | Some n, _ when n >= 1 && n <= List.length options ->
             Some (fst (List.nth_exn options (n - 1)))
+          | None, Some (first, _) when String.is_empty line -> Some first
           | _ -> Some line)
     in
     match answer with

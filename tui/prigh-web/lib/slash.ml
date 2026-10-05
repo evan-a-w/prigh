@@ -38,7 +38,11 @@ let all =
   ; c ~argument:Directory ~args:"<path>" "cd" "change the working directory"
   ; c "abort" "stop the current run"
   ; c "agents" "show background subagents and jobs"
-  ; c ~argument:Login ~args:"[provider]" "login" "log in to a model provider"
+  ; c
+      ~argument:Login
+      ~args:"[provider]"
+      "login"
+      "log in to a model provider (or /login custom)"
   ; c ~argument:Logout ~args:"[provider]" "logout" "remove a provider's login"
   ; c "auth" "show which providers are logged in"
   ; c "signout" "sign out of this backend"

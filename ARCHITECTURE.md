@@ -120,9 +120,26 @@ while it is waiting on the browser.
   `Tool_call_delta`) and the accumulator that turns deltas into a message.
   Every provider emits these, so the loop, the session and the UI never see
   provider wire formats.
+- `Provider_id` — `Anthropic | Openai | Openai_codex | Deepseek | Custom of
+  string`: a custom provider is named by the user, so `of_builtin_string`
+  only knows the built-in names and custom ones are looked up in the
+  `Model_registry`.
 - `Model` — the static model table (id, provider, context window, max output,
   thinking support, prices). Ids may repeat across providers, so `Model.key`
   is `provider/id` and `Model.find` accepts either form.
+- `Custom_provider` — a user-defined endpoint from `config.json`'s
+  `providers` (`base_url`, `api`: `chat`/`responses`/`anthropic`, extra
+  `headers`, per-model overrides of context, output, thinking, images and
+  cost); loading reports each problem with what to fix, saving rewrites only
+  its entry; name and base URL validation; `<NAME>_API_KEY`.
+- `Model_registry` — the models a namespace can use: `Model.all` plus each
+  custom provider's `GET {base_url}/models` (fetched in the background at
+  start, when the config changes and after `/login`; cached in memory)
+  merged with its overrides. `reload` rereads the config (`list_models`
+  calls it, so hand edits show); `resolve` accepts an unlisted
+  `<custom>/<id>` only while that provider's list is unknown. Problems (bad
+  entries, failed fetches) go to subscribers, which the RPC server turns
+  into one notice per client.
 - `Provider` — the provider interface: `stream : Request.t -> cancel ->
   on_event -> Message.Assistant.t`. Providers never raise for network or API
   failures; those come back as an `Error`/`Aborted` stop reason.
@@ -136,9 +153,18 @@ maps events back to `Assistant_event.t`. Images follow the text: Anthropic
 list), OpenAI `input_image` data URLs (a `function_call_output`'s `output`
 becomes a list):
 
-- `Deepseek` — OpenAI-compatible chat completions (`reasoning_content`,
-  index-based tool-call argument accumulation). Its models take no images:
-  each becomes a line saying it was omitted.
+- `Openai_chat` — OpenAI-compatible chat completions, for DeepSeek and for
+  custom providers with `api: chat`. Tool calls are accumulated by `index`,
+  tolerating servers that repeat the id and name in every delta or omit the
+  index or id; thinking arrives as `reasoning_content` or `reasoning`.
+  Images are `image_url` data-URL parts; a tool message is text only, so a
+  tool result's images follow the run of tool messages in a user message.
+  Per-server differences are `Quirks`: how the thinking level is sent
+  (DeepSeek's `thinking: {type}` plus `reasoning_effort`, or OpenAI's
+  `reasoning_effort`) and whether earlier thinking is replayed as
+  `reasoning_content` (DeepSeek needs it on tool-call turns).
+- `Deepseek` — `Openai_chat` with DeepSeek's URL and quirks. Its models take
+  no images: each becomes a line saying it was omitted.
 - `Anthropic` — Messages API. Consecutive same-role turns are merged, the
   last block and the system blocks carry cache breakpoints, thinking blocks
   are replayed only with a signature. With an OAuth token (Claude Pro/Max) the
@@ -156,7 +182,11 @@ becomes a list):
   `Provider_auth` (refreshing OAuth tokens if needed) and delegates to the
   right backend, so logging in, out or switching models takes effect on the
   next request. Missing credentials become an `Error` stop reason naming the
-  `/login` command.
+  `/login` command. A custom provider is built per request from its
+  `Model_registry` entry: `Openai_chat` (generic quirks), `Openai_responses`
+  or `Anthropic` at its base URL with its headers and optional key (Bearer;
+  `x-api-key` too for Anthropic); a `401`/`403` from it names `/login
+  <name>` (and the environment variable when no key was sent).
 - `Faux_provider` — a scripted provider for tests and `--faux` runs.
 
 ### Authentication
@@ -181,7 +211,10 @@ two can share one.
   re-checked under the lock, and the rotated credential is persisted before
   release.
 - `Auth_interaction` — how a flow talks to the user: `prompt` (secret,
-  manual code, select) and `notify` (auth URL, progress), plus a cancel token.
+  possibly allowed to be empty; text with a placeholder and a prefilled
+  default, where an empty answer means the default for frontends that cannot
+  prefill; manual code; select) and `notify` (auth URL, progress), plus a
+  cancel token.
   Implemented by `Auth_terminal` for the CLI and by `Login_manager` for the
   RPC client.
 - `Pkce`, `Oauth_callback_server`, `Oauth_common` — S256 PKCE, a one-shot
@@ -198,7 +231,19 @@ two can share one.
   turns its prompts and notices into `auth` events; the client answers
   prompts by id (`auth_respond`) or cancels (`auth_cancel`). A prompt that the
   flow no longer needs (the browser callback won) is withdrawn with
-  `prompt_cancelled`.
+  `prompt_cancelled`. `start_custom` runs `Custom_login.login`; logging out
+  of a configured custom provider is a flow too (one select), ending in
+  `logged_out`, or in nothing when the user keeps everything.
+- `Custom_login` — `/login custom` through `Auth_interaction` prompts, so
+  every frontend runs it: name (text; an existing custom name edits it),
+  base URL (text, prefilled when editing), API style (select), key (secret
+  that may be empty; with a stored key, a keep/new/remove select). An
+  invalid answer is asked again with the error first and the answer
+  prefilled. It lists `GET /models` and reports the count, or offers save
+  anyway / change the settings / cancel; only then does it write the
+  definition (`config.json`) and the key (`auth.json`) and tell the
+  registry. `logout` asks whether to remove the key only or the provider
+  too.
 
 ### Tools
 
@@ -379,7 +424,11 @@ two can share one.
   host only. A login's URL, prompts and progress go only to the client that
   started it (another frontend, perhaps on another machine, must not open a
   browser or a dialog for it); its outcome (`done`, `failed`, `logged_out`)
-  goes to everyone. The session methods
+  goes to everyone. `login {provider: "custom"}` starts `/login custom`
+  (`failed` then names `custom` until the flow has a name); a custom
+  provider's `logout` is a flow owned by its caller like a login;
+  `list_models` rereads the registry; `auth_status` entries of custom
+  providers carry `custom: {base_url, api, api_label}`. The session methods
   (`new_session`, `switch_session` by id or path, `fork`, `clone`, `import`)
   create or load an agent and move only the calling client; `list_sessions`
   marks live sessions with `live`, `running` and `clients`; `delete_session`
@@ -492,7 +541,8 @@ two can share one.
   `bash` → `shell`) and prigh events become pi's (`message_update` carrying
   the accumulated message with synthetic index timestamps, which pi keys
   messages by; `tool_execution_*` with accumulated output; `tool_confirm`
-  and login prompts as `extension_ui_request` dialogs answered through
+  and login prompts as `extension_ui_request` dialogs (text prompts as
+  `input` with the default as `prefill`) answered through
   `tool_confirm_respond`/`auth_respond`; notices as toasts; subagents as the
   agents-rail widget snapshot, re-read from `list_subagents` on every
   subagent lifecycle event; `session_reloaded`/`session_info_changed`/
@@ -701,7 +751,8 @@ copy of the protocol types and the e2e test guards the contract.
       (slash commands from `Slash`, their arguments, `@` paths via
       `list_paths`) and `History`, `Dialog`/`Dialog_view`/`Modal`
       (pickers built on `Picker`, help, rename, delete, the login flow
-      `Login_flow`, tool confirmations), `Status_view`, and `Keys` (which
+      `Login_flow` — also a custom provider's logout question — tool
+      confirmations), `Status_view`, and `Keys` (which
       of the dialog, the popup or the editor owns a key).
   - `app/` (`prigh_web_app`) — `Web_main.run`: connects a `Ws_transport`
     to `?backend=` or the page's `/ws`, sends `hello` with the login saved
@@ -738,7 +789,8 @@ copy of the protocol types and the e2e test guards the contract.
 - `~/.prigh/sessions/<stamp>_<id>.jsonl` — session logs.
 - `~/.prigh/sessions/exports/` — default `/export` output.
 - `~/.prigh/history` — prompt history (one JSON string per line, last 500).
-- `~/.prigh/config.json` — `scoped_models`, `confirm_tools`.
+- `~/.prigh/config.json` — `scoped_models`, `confirm_tools`, `providers`
+  (custom endpoints; their keys are in `auth.json` under their names).
 - `~/.prigh/AGENTS.md` — global instructions.
 
 ## Testing

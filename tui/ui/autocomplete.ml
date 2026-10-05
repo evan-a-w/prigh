@@ -125,7 +125,15 @@ let argument_items ~kind ~models ~auth ~sessions ~logged_in =
   | Thinking -> Some (thinking_items ())
   | Verbosity -> Some (verbosity_items ())
   | Confirm -> Some (confirm_items ())
-  | Login | Logout -> Some (provider_items auth)
+  | Login ->
+    Some
+      (provider_items auth
+       @ [ Picker.Item.create
+             ~id:"custom"
+             ~detail:"add an OpenAI-compatible endpoint"
+             "custom"
+         ])
+  | Logout -> Some (provider_items auth)
   | Sessions -> Some (Option.value_map sessions ~default:[] ~f:session_items)
   | Path | Directory -> None
 ;;

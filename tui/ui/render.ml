@@ -674,7 +674,9 @@ let screen (m : App.Model.t) : Screen.t =
       ( Boxed.render
           ~title:"Log in"
           ~width
-          (List.map m.login_lines ~f:Content.Line.of_string)
+          (Content.wrap
+             (List.map m.login_lines ~f:Content.Line.of_string)
+             ~width:(Boxed.inner_width ~width))
       , rows
       , cursor )
     | Text_prompt { question; _ } ->

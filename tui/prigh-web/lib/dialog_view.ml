@@ -146,11 +146,17 @@ let delete ~title ~inject =
 let login (m : App.Model.t) (flow : Login_flow.t) ~inject =
   let title =
     match
-      List.find m.auth ~f:(fun s -> String.equal s.provider flow.provider)
+      ( flow.purpose
+      , List.find m.auth ~f:(fun s -> String.equal s.provider flow.provider) )
     with
-    | Some s -> "Log in to " ^ s.name
-    | None when String.is_empty flow.provider -> "Log in"
-    | None -> "Log in to " ^ flow.provider
+    | Logout, Some s -> "Log out of " ^ s.name
+    | Logout, None -> "Log out of " ^ flow.provider
+    | Login, Some { custom = Some _; name; _ } -> "Edit " ^ name
+    | Login, Some s -> "Log in to " ^ s.name
+    | Login, None when String.is_empty flow.provider -> "Log in"
+    | Login, None when String.equal flow.provider "custom" ->
+      "Add a custom provider"
+    | Login, None -> "Log in to " ^ flow.provider
   in
   let url =
     match flow.url with
@@ -186,11 +192,15 @@ let login (m : App.Model.t) (flow : Login_flow.t) ~inject =
     | Some (_, prompt) ->
       div
         ~cls:"login-prompt"
-        [ Node.label [ Node.text (Auth_event.Prompt.message prompt) ]
+        [ div
+            ~cls:"login-message"
+            (List.map
+               (String.split_lines (Auth_event.Prompt.message prompt))
+               ~f:(fun line -> Node.p [ Node.text line ]))
         ; (match prompt with
            | Secret _ ->
              text_input ~kind:"password" ~value:flow.input ~inject ()
-           | Manual_code { placeholder; _ } ->
+           | Manual_code { placeholder; _ } | Text { placeholder; _ } ->
              text_input ~placeholder ~value:flow.input ~inject ()
            | Select { options; _ } ->
              div
@@ -213,7 +223,11 @@ let login (m : App.Model.t) (flow : Login_flow.t) ~inject =
     | Some error, _ ->
       ( div
           ~cls:"login-failed"
-          [ Node.textf "Login failed: %s. /login tries again." error ]
+          [ (match flow.purpose with
+             | Login -> Node.textf "Login failed: %s. /login tries again." error
+             | Logout ->
+               Node.textf "Logout failed: %s. /logout tries again." error)
+          ]
       , [ button
             ~cls:"primary"
             ~on_click:(inject Action.Dialog_accept)
@@ -245,6 +259,9 @@ let auth (statuses : Auth_status.t list) ~inject =
     ~footer:
       [ keys_hint "/login and /logout pick a provider"
       ; button
+          ~on_click:(inject (Action.Start_login "custom"))
+          [ Node.text "Add a custom provider" ]
+      ; button
           ~cls:"primary"
           ~on_click:(inject Action.Close_dialog)
           [ Node.text "Done" ]
@@ -263,18 +280,38 @@ let auth (statuses : Auth_status.t list) ~inject =
                     [ span ~cls:"picker-label" s.name
                     ; span
                         ~cls:"picker-detail"
-                        (match s.configured with
-                         | Some c ->
+                        (match s.custom, s.configured with
+                         | Some c, configured ->
+                           sprintf
+                             "custom · %s · %s · %s"
+                             c.base_url
+                             c.api_label
+                             (match configured with
+                              | Some { source = "no key"; _ } | None -> "no key"
+                              | Some k -> "key: " ^ k.source)
+                         | None, Some c ->
                            sprintf "logged in with %s (%s)" c.method_ c.source
-                         | None -> "not logged in")
+                         | None, None -> "not logged in")
                     ]
-                ; (match s.configured with
-                   | Some _ ->
+                ; (match s.custom, s.configured with
+                   | Some _, _ ->
+                     div
+                       ~cls:"auth-buttons"
+                       [ button
+                           ~cls:"small"
+                           ~on_click:(inject (Action.Start_login s.provider))
+                           [ Node.text "Edit" ]
+                       ; button
+                           ~cls:"small"
+                           ~on_click:(inject (Action.Logout s.provider))
+                           [ Node.text "Remove" ]
+                       ]
+                   | None, Some _ ->
                      button
                        ~cls:"small"
                        ~on_click:(inject (Action.Logout s.provider))
                        [ Node.text "Log out" ]
-                   | None ->
+                   | None, None ->
                      button
                        ~cls:"small primary"
                        ~on_click:(inject (Action.Start_login s.provider))

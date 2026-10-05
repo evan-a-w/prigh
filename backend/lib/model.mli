@@ -29,23 +29,44 @@ type t =
   ; supports_thinking : bool
   ; thinking_style : Thinking_style.t
   ; cost : Cost.t
+  ; supports_images : bool
+    (** otherwise each image is replaced by a note saying it was left out *)
   }
 [@@deriving sexp_of]
 
+(** The built-in models. Custom providers' models come from
+    {!Model_registry}. *)
 val all : t list
+
 val default : t
-val default_for : Provider_id.t -> t
+
+(** [None] for custom providers. *)
+val default_for : Provider_id.t -> t option
 
 (** ["provider/id"]; the same id can exist under several providers. *)
 val key : t -> string
 
-(** Accepts a bare id (first provider that has it) or a [key]. *)
+(** The provider name of a [key] (everything before the first ['/']). *)
+val key_provider : string -> string option
+
+(** Accepts a [key] or a bare id (the first model that has it). Ids may
+    contain ['/']: the part before the first ['/'] is only taken as a
+    provider name when a model of that provider has the rest as its id. *)
+val find_in : t list -> string -> t option
+
 val find : string -> t option
 
 (** What a user typed: [find], then case-insensitive display name, then a
     unique case-insensitive prefix of the key, id or name. Failures explain
     themselves ("did you mean: ..." ranked by edit distance, or the
     ambiguous candidates). *)
+val resolve_in : t list -> string -> t Or_error.t
+
 val resolve : string -> t Or_error.t
+
+(** Whether an assistant message's [model] (a key, or a bare id in old
+    sessions) is the provider's, so that its opaque thinking signatures can
+    be replayed to it. *)
+val written_by : string -> Provider_id.t -> bool
 
 val cost_usd : t -> Usage.t -> float

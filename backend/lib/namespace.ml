@@ -77,11 +77,14 @@ module World = struct
 end
 
 let provider_key_vars =
-  List.concat_map Provider_id.all ~f:Provider_auth.env_vars
+  List.concat_map Provider_id.builtins ~f:Provider_auth.env_vars
 ;;
 
+(* [*_API_KEY] covers custom providers' variables, whatever they are named. *)
 let without_provider_keys getenv name =
-  if List.mem provider_key_vars name ~equal:String.equal
+  if
+    List.mem provider_key_vars name ~equal:String.equal
+    || String.is_suffix name ~suffix:"_API_KEY"
   then None
   else getenv name
 ;;

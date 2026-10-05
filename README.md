@@ -263,6 +263,7 @@ nix run .#backend -- login anthropic -method api_key
 nix run .#backend -- login openai-codex     # ChatGPT Plus/Pro (browser OAuth)
 nix run .#backend -- login openai           # OPENAI_API_KEY
 nix run .#backend -- login deepseek         # DEEPSEEK_API_KEY
+nix run .#backend -- login custom           # an OpenAI-compatible endpoint (below)
 nix run .#backend -- auth                   # status; logout <provider> to remove
 ```
 
@@ -279,6 +280,79 @@ The same is available inside the TUI as `/login [provider] [api_key|oauth]`,
 `DEEPSEEK_API_KEY` are used. OAuth tokens are refreshed automatically
 (under a cross-process lock) when they are within five minutes of expiry.
 Model ids can be qualified as `provider/id` (e.g. `openai-codex/gpt-5.5`).
+
+### Custom OpenAI-compatible providers
+
+Any server that speaks OpenAI's chat completions (or the Responses API, or
+Anthropic's messages API) can be added as a provider: gateways such as
+[aiproxy](https://github.com/labring/aiproxy), LiteLLM and OpenRouter, or
+local servers such as vLLM and Ollama. `/login custom` (in every frontend;
+`prigh login custom` on the CLI) asks for
+
+1. a name: lowercase letters, digits, `-` and `_`, not a built-in provider
+   (an existing custom provider's name edits it, with every answer
+   prefilled);
+2. the base URL: the part before `/chat/completions`, usually ending in
+   `/v1` (a pasted endpoint path is removed);
+3. the API style: OpenAI chat completions (most servers), OpenAI Responses or
+   Anthropic messages;
+4. the API key, which may be empty for servers that need none.
+
+It then lists `GET {base_url}/models` and reports what it found ("Found 2
+models: ..."); if that fails it shows the error (connection refused, HTTP
+401, ...) and offers to save anyway, change the settings or cancel. Nothing
+is written until the end: the definition goes to `~/.prigh/config.json`
+under `providers`, the key to `auth.json` under the provider's name. The
+models then appear in `/model` as `<name>/<model id>` (e.g.
+`aiproxy/gpt-4o`) and in `prigh models`; `prigh run -model
+aiproxy/gpt-4o ...` works too. `/auth` lists custom providers with their URL
+and key source (prigh-web's list has Edit and Remove buttons), and
+`/logout <name>` asks whether to remove only the key or the provider too.
+
+Without a stored key, `<NAME>_API_KEY` is used (the name upper-cased, `-` as
+`_`: `my-proxy` reads `MY_PROXY_API_KEY`), except with `-tokens`, where keys
+are never read from the environment. A `401`/`403` reply says how to fix the
+key.
+
+The config can also be written by hand; changes are picked up on the next
+`/model` (or `list_models`). Per-model entries override what the server's
+list says (or add models it does not list); unlisted fields default to a
+128k context, 16k output, no thinking, images accepted and an unknown price
+(shown as such):
+
+```json
+{
+  "providers": {
+    "aiproxy": {
+      "base_url": "https://aiproxy.example.com/v1",
+      "api": "chat",
+      "headers": { "X-Team": "infra" },
+      "models": [
+        { "id": "gpt-4o", "context_window": 128000, "max_output": 16384,
+          "images": true, "cost": { "input": 2.5, "output": 10, "cache_read": 1.25 } },
+        { "id": "deepseek-r1", "name": "DeepSeek R1 (aiproxy)", "thinking": true,
+          "images": false }
+      ]
+    },
+    "ollama": { "base_url": "http://localhost:11434/v1" }
+  }
+}
+```
+
+- `aiproxy`: `/login custom`, name `aiproxy`, base URL
+  `https://<your aiproxy>/v1`, chat completions, and an aiproxy token as the
+  key (or `export AIPROXY_API_KEY=...` and leave it empty). Its models are
+  then `aiproxy/<model>`.
+- Ollama: `ollama serve`, then `/login custom` with name `ollama`, base URL
+  `http://localhost:11434/v1`, chat completions and no key;
+  `/model ollama/llama3.2`.
+
+`api` is `chat` (default), `responses` or `anthropic`; `headers` are sent
+with every request; `cost` is in dollars per million tokens. A context
+window the server reports (`context_length`, `context_window` or
+`max_model_len`) is used when the config gives none. Problems in the config
+(a missing `base_url`, an unknown field, a model list that failed) are
+shown as notices saying what to fix.
 
 Then:
 
@@ -436,7 +510,7 @@ destructive `bash`/`write`/`edit`; `/confirm on|off`) and
 | `/model [name\|id\|provider/id]` | pick or switch the model |
 | `/scoped-models` | pick the models Ctrl+P cycles through |
 | `/change_default` | save the current model and thinking level as the default for new sessions |
-| `/login [provider] [api_key\|oauth]`, `/logout [provider]`, `/auth` | credentials |
+| `/login [provider\|custom] [api_key\|oauth]`, `/logout [provider]`, `/auth` | credentials; `/login custom` adds an OpenAI-compatible endpoint |
 | `/thinking [off\|on\|low\|high\|max]` | set the thinking level |
 | `/verbosity [quiet\|normal\|verbose]` | set the transcript verbosity |
 | `/confirm [on\|off]` | ask before destructive tools |

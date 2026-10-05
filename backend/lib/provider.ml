@@ -11,6 +11,12 @@ module Request = struct
     ; max_tokens : int option
     }
   [@@deriving sexp_of]
+
+  let omit_unsupported_images t =
+    if t.model.supports_images
+    then t
+    else { t with messages = List.map t.messages ~f:Message.omit_images }
+  ;;
 end
 
 (** [stream] never raises for network/API failures; those are reported through

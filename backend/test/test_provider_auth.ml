@@ -19,7 +19,7 @@ let show_resolved r =
 ;;
 
 let%expect_test "methods, env vars and labels per provider" =
-  List.iter Provider_id.all ~f:(fun p ->
+  List.iter Provider_id.builtins ~f:(fun p ->
     printf
       "%-13s methods=%s env=%s\n"
       (Provider_id.to_string p)
@@ -285,10 +285,10 @@ let%expect_test "provider router: unauthenticated request fails with a hint" =
   let provider =
     Provider_router.create ~env:t.env ~getenv:no_env ~store:(store t) ()
   in
-  List.iter Provider_id.all ~f:(fun p ->
+  List.iter Provider_id.builtins ~f:(fun p ->
     let message =
       provider.stream
-        { model = Model.default_for p
+        { model = Option.value_exn (Model.default_for p)
         ; system = None
         ; messages = [ Message.user "hi" ]
         ; tools = []

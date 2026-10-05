@@ -447,7 +447,11 @@ let%expect_test "Esc closes autocomplete or dialog without aborting; Esc while \
     |}];
   H.event
     h
-    (Auth (Prompt { id = "p1"; prompt = Secret { message = "API key" } }));
+    (Auth
+       (Prompt
+          { id = "p1"
+          ; prompt = Secret { message = "API key"; allow_empty = false }
+          }));
   [%expect {| (Rpc (method_ auth_cancel) (params ()) (tag Show_error)) |}];
   H.keys h "n";
   H.show h;
@@ -498,7 +502,11 @@ let%expect_test "login: url, masked secret prompt, answer, done switches \
     (Auth
        (Prompt
           { id = "p1"
-          ; prompt = Secret { message = "Paste your Anthropic API key" }
+          ; prompt =
+              Secret
+                { message = "Paste your Anthropic API key"
+                ; allow_empty = false
+                }
           }));
   H.keys h "sk-ant-secret";
   H.show h;
@@ -624,7 +632,13 @@ let%expect_test "login: select prompt is a picker; Esc cancels; backend \
     > ▏
     …deepseek-flash  think:off  view:normal  ctx:0% 1.5k  $0.01
     |}];
-  H.event h (Auth (Prompt { id = "p4"; prompt = Secret { message = "key" } }));
+  H.event
+    h
+    (Auth
+       (Prompt
+          { id = "p4"
+          ; prompt = Secret { message = "key"; allow_empty = false }
+          }));
   H.mode h;
   H.event h (Auth (Prompt_cancelled { id = "p4" }));
   H.mode h;
@@ -697,7 +711,13 @@ let%expect_test "Ctrl+C clears, then warns, then quits; never quits with a \
   H.key h (Key.ctrl 'c');
   [%expect {| Quit |}];
   let h = connected () in
-  H.event h (Auth (Prompt { id = "p1"; prompt = Secret { message = "key" } }));
+  H.event
+    h
+    (Auth
+       (Prompt
+          { id = "p1"
+          ; prompt = Secret { message = "key"; allow_empty = false }
+          }));
   H.key h (Key.ctrl 'c');
   [%expect {| (Rpc (method_ auth_cancel) (params ()) (tag Show_error)) |}];
   H.mode h;
@@ -1544,7 +1564,6 @@ let%expect_test "/auth, /help, /state, /clear, unknown method errors" =
 
 
 
-
     session abc123 in /work. /help for commands, Esc aborts,
     Ctrl+C twice quits.
     > earlier question
@@ -1553,6 +1572,7 @@ let%expect_test "/auth, /help, /state, /clear, unknown method errors" =
     (API key)]
     openai     not configured  [api_key (API key)]
     deepseek   logged in via auth.json  [api_key (API key)]
+    /login custom adds an OpenAI-compatible endpoint
     ────────────────────────────────────────────────────────────
     > ▏
     …deepseek-flash  think:off  view:normal  ctx:0% 1.5k  $0.01
@@ -4079,7 +4099,11 @@ let%expect_test "login dialog is a bordered block with url, progress and prompt"
   H.event
     h
     (Auth
-       (Prompt { id = "p1"; prompt = Secret { message = "Paste your API key" } }));
+       (Prompt
+          { id = "p1"
+          ; prompt =
+              Secret { message = "Paste your API key"; allow_empty = false }
+          }));
   H.keys h "sk-secret";
   H.show h;
   [%expect
@@ -4879,7 +4903,11 @@ let%expect_test "login end to end includes a prompt_cancelled" =
   H.event
     h
     (Auth
-       (Prompt { id = "p1"; prompt = Secret { message = "Paste your API key" } }));
+       (Prompt
+          { id = "p1"
+          ; prompt =
+              Secret { message = "Paste your API key"; allow_empty = false }
+          }));
   H.step h (Intent (Insert "sk-ant-secret"));
   H.show h;
   [%expect
@@ -4971,7 +4999,13 @@ let%expect_test "Ctrl+C closes every dialog and search" =
     editing
     |}];
   let h = connected () in
-  H.event h (Auth (Prompt { id = "p1"; prompt = Secret { message = "key" } }));
+  H.event
+    h
+    (Auth
+       (Prompt
+          { id = "p1"
+          ; prompt = Secret { message = "key"; allow_empty = false }
+          }));
   H.key h (Key.ctrl 'c');
   H.mode h;
   [%expect
@@ -6607,5 +6641,282 @@ let%expect_test "/setusr: lists users, acts as one, reconnects as them" =
     ────────────────────────────────────────────────────────────────────────────────
     > ▏
     /work  deepseek-flash  think:off  view:normal  ctx:0% 1.5k  $0.01  user:s
+    |}]
+;;
+
+let custom_auth_json =
+  {|[{"provider":"deepseek","name":"DeepSeek","methods":[{"method":"api_key","label":"API key"}],"configured":{"method":"api_key","source":"auth.json"},"expires_ms":null},{"provider":"ollama","name":"ollama","methods":[{"method":"api_key","label":"ollama API key"}],"configured":{"method":"api_key","source":"no key"},"expires_ms":null,"custom":{"base_url":"http://localhost:11434/v1","api":"chat","api_label":"OpenAI chat completions (/chat/completions)"}}]|}
+;;
+
+let%expect_test
+    "custom provider: /login picker, prefilled text prompts, empty key, the \
+     new models"
+  =
+  let h = connected ~height:14 () in
+  H.reply ~quiet:true h Auth_refresh custom_auth_json;
+  H.keys h "/login";
+  H.esc h;
+  H.enter h;
+  H.reply h Auth_login_picker custom_auth_json;
+  H.show h;
+  [%expect
+    {|
+    (Rpc (method_ auth_status) (params ()) (tag Auth_login_picker))
+
+
+
+    session abc123 in /work. /help for commands, Esc aborts,
+    Ctrl+C twice quits.
+    > earlier question
+    earlier answer
+    Log in to  (3)
+    / ▏
+    ▸* DeepSeek (api_key)              API key  logged in via a…
+       ollama (edit)                   custom: http://localhost…
+       custom (add an OpenAI-compatible endpoint)  aiproxy, Lit…
+    ────────────────────────────────────────────────────────────
+    …deepseek-flash  ctx:0% 1.5k  Enter selects · Esc closes
+    |}];
+  H.keys h "custom";
+  H.enter h;
+  [%expect
+    {|
+    (Rpc
+      (method_ login)
+      (params (
+        (provider custom)
+        (method   api_key)))
+      (tag Show_error))
+    |}];
+  H.event
+    h
+    (Auth
+       (Prompt
+          { id = "p1"
+          ; prompt =
+              Text
+                { message =
+                    "\"AI Proxy\" is not a valid name: use lowercase letters\n\
+                     Name of the provider"
+                ; placeholder = "aiproxy"
+                ; default = "AI Proxy"
+                }
+          }));
+  H.show h;
+  [%expect
+    {|
+    session abc123 in /work. /help for commands, Esc aborts,
+    Ctrl+C twice quits.
+    > earlier question
+    earlier answer
+    ┌─ Log in ─────────────────────────────────────────────────┐
+    │ "AI Proxy" is not a valid name: use lowercase letters    │
+    │ Name of the provider                                     │
+    │ e.g. aiproxy                                             │
+    └──────────────────────────────────────────────────────────┘
+    ────────────────────────────────────────────────────────────
+    ? AI Proxy▏
+    …deepseek-flash  $0.01  login: Enter answers, Esc cancels
+    |}];
+  (* The prefilled answer is edited, not retyped. *)
+  H.key h (Key.ctrl 'a');
+  H.key h (Key.ctrl 'k');
+  H.keys h "aiproxy";
+  H.enter h;
+  [%expect
+    {|
+    (Rpc
+      (method_ auth_respond)
+      (params (
+        (id    p1)
+        (value aiproxy)))
+      (tag Show_error))
+    |}];
+  H.event
+    h
+    (Auth
+       (Prompt
+          { id = "p2"
+          ; prompt =
+              Text
+                { message = "Base URL of aiproxy's API"
+                ; placeholder = "http://localhost:3000/v1"
+                ; default = "http://gpu:3000/v1"
+                }
+          }));
+  H.show h;
+  H.enter h;
+  [%expect
+    {|
+    session abc123 in /work. /help for commands, Esc aborts,
+    Ctrl+C twice quits.
+    > earlier question
+    earlier answer
+    ┌─ Log in ─────────────────────────────────────────────────┐
+    │ Base URL of aiproxy's API                                │
+    │ e.g. http://localhost:3000/v1                            │
+    └──────────────────────────────────────────────────────────┘
+    ────────────────────────────────────────────────────────────
+    ? http://gpu:3000/v1▏
+    …deepseek-flash  $0.01  login: Enter answers, Esc cancels
+    (Rpc
+      (method_ auth_respond)
+      (params (
+        (id    p2)
+        (value http://gpu:3000/v1)))
+      (tag Show_error))
+    |}];
+  H.event
+    h
+    (Auth
+       (Prompt
+          { id = "p3"
+          ; prompt =
+              Secret
+                { message =
+                    "API key for aiproxy (leave empty if the server needs none)"
+                ; allow_empty = true
+                }
+          }));
+  H.show h;
+  H.enter h;
+  [%expect
+    {|
+    session abc123 in /work. /help for commands, Esc aborts,
+    Ctrl+C twice quits.
+    > earlier question
+    earlier answer
+    ┌─ Log in ─────────────────────────────────────────────────┐
+    │ API key for aiproxy (leave empty if the server needs     │
+    │ none)                                                    │
+    │ (Enter with nothing typed for none)                      │
+    └──────────────────────────────────────────────────────────┘
+    ────────────────────────────────────────────────────────────
+    ? ▏
+    …deepseek-flash  $0.01  login: Enter answers, Esc cancels
+    (Rpc
+      (method_ auth_respond)
+      (params (
+        (id    p3)
+        (value "")))
+      (tag Show_error))
+    |}];
+  H.event h (Auth (Progress "Found 1 models: gpt-4o"));
+  H.event h (Auth (Done { provider = "aiproxy"; method_ = "api_key" }));
+  H.reply
+    ~quiet:true
+    h
+    Auth_refresh
+    (String.substr_replace_all
+       custom_auth_json
+       ~pattern:"ollama"
+       ~with_:"aiproxy");
+  H.reply
+    h
+    (Models_after_login "aiproxy")
+    {|[{"id":"gpt-4o","provider":"aiproxy","key":"aiproxy/gpt-4o","name":"gpt-4o","context_window":128000,"max_output":16384,"supports_thinking":false,"cost":{"input":0,"output":0,"cache_read":0}}]|};
+  H.show h;
+  [%expect
+    {|
+    (Rpc (method_ auth_status) (params ()) (tag Auth_refresh))
+    (Rpc (method_ list_models) (params ()) (tag (Models_after_login aiproxy)))
+    (Rpc
+      (method_ set_model)
+      (params ((model aiproxy/gpt-4o)))
+      (tag (Set_model_done aiproxy/gpt-4o)))
+
+
+
+
+
+    session abc123 in /work. /help for commands, Esc aborts,
+    Ctrl+C twice quits.
+    > earlier question
+    earlier answer
+    logged in to aiproxy (api_key)
+    model set to aiproxy/gpt-4o; /model to change
+    ────────────────────────────────────────────────────────────
+    > ▏
+    …deepseek-flash  think:off  view:normal  ctx:0% 1.5k  $0.01
+    |}];
+  H.keys h "/model";
+  H.esc h;
+  H.enter h;
+  H.show h;
+  [%expect
+    {|
+    session abc123 in /work. /help for commands, Esc aborts,
+    Ctrl+C twice quits.
+    > earlier question
+    earlier answer
+    logged in to aiproxy (api_key)
+    model set to aiproxy/gpt-4o; /model to change
+    Model  (1)
+    / ▏
+    ▸  gpt-4o  aiproxy/gpt-4o  ctx 128k  price unknown
+    ────────────────────────────────────────────────────────────
+    …deepseek-flash  think:off  view:normal  ctx:0% 1.5k  $0.01
+    |}]
+;;
+
+let%expect_test
+    "custom provider: /logout asks the backend, not y/n; /auth shows the \
+     endpoint"
+  =
+  let h = connected ~width:90 () in
+  H.reply ~quiet:true h Auth_refresh custom_auth_json;
+  H.keys h "/logout ollama";
+  H.enter h;
+  H.mode h;
+  [%expect
+    {|
+    (Rpc (method_ logout) (params ((provider ollama))) (tag Show_error))
+    editing
+    |}];
+  H.event
+    h
+    (Auth
+       (Prompt
+          { id = "p1"
+          ; prompt =
+              Select
+                { message = "Log out of ollama (http://localhost:11434/v1)"
+                ; options =
+                    [ "all", "Remove the provider from config.json"
+                    ; "keep", "Keep it"
+                    ]
+                }
+          }));
+  H.enter h;
+  H.event h (Auth (Logged_out "ollama"));
+  [%expect
+    {|
+    (Rpc
+      (method_ auth_respond)
+      (params (
+        (id    p1)
+        (value all)))
+      (tag Show_error))
+    (Rpc (method_ auth_status) (params ()) (tag Auth_refresh))
+    |}];
+  H.keys h "/auth";
+  H.enter h;
+  H.reply h Auth_show custom_auth_json;
+  H.show h;
+  [%expect
+    {|
+    (Rpc (method_ auth_status) (params ()) (tag Auth_show))
+
+
+    session abc123 in /work. /help for commands, Esc aborts, Ctrl+C twice quits.
+    > earlier question
+    earlier answer
+    logged out of ollama
+    deepseek  logged in via auth.json  [api_key (API key)]
+    ollama    custom http://localhost:11434/v1 (chat)  no key
+    /login custom adds an OpenAI-compatible endpoint
+    ──────────────────────────────────────────────────────────────────────────────────────────
+    > ▏
+    /work  deepseek-flash  think:off  view:normal  ctx:0% 1.5k  $0.01
     |}]
 ;;

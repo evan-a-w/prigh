@@ -424,6 +424,10 @@ let%expect_test "auth events" =
     {|{"type":"event","event":"auth","kind":"prompt","id":"p2","prompt":"select","message":"Pick","options":[{"id":"a","label":"A"},{"id":"b","label":"B"}]}|};
   decode
     {|{"type":"event","event":"auth","kind":"prompt","id":"p3","prompt":"manual_code","message":"Paste","placeholder":"http://localhost:1455/callback"}|};
+  decode
+    {|{"type":"event","event":"auth","kind":"prompt","id":"p4","prompt":"secret","message":"Key","allow_empty":true}|};
+  decode
+    {|{"type":"event","event":"auth","kind":"prompt","id":"p5","prompt":"text","message":"Base URL","placeholder":"http://localhost:3000/v1","default":"http://gpu/v1"}|};
   decode {|{"type":"event","event":"auth","kind":"prompt_cancelled","id":"p1"}|};
   decode
     {|{"type":"event","event":"auth","kind":"progress","message":"waiting"}|};
@@ -440,7 +444,14 @@ let%expect_test "auth events" =
         Auth_url
         (url          https://x)
         (instructions "paste the code"))))
-    (Event (Auth (Prompt (id p1) (prompt (Secret (message "API key"))))))
+    (Event (
+      Auth (
+        Prompt
+        (id p1)
+        (prompt (
+          Secret
+          (message     "API key")
+          (allow_empty false))))))
     (Event (
       Auth (
         Prompt
@@ -459,6 +470,23 @@ let%expect_test "auth events" =
           Manual_code
           (message     Paste)
           (placeholder http://localhost:1455/callback))))))
+    (Event (
+      Auth (
+        Prompt
+        (id p4)
+        (prompt (
+          Secret
+          (message     Key)
+          (allow_empty true))))))
+    (Event (
+      Auth (
+        Prompt
+        (id p5)
+        (prompt (
+          Text
+          (message     "Base URL")
+          (placeholder http://localhost:3000/v1)
+          (default     http://gpu/v1))))))
     (Event (Auth (Prompt_cancelled (id p1))))
     (Event (Auth (Progress waiting)))
     (Event (
@@ -491,8 +519,11 @@ let%expect_test "auth status, models, sessions" =
     (fun j -> Or_error.map (Auth_status.of_json j) ~f:Auth_status.sexp_of_t)
     {|{"provider":"openai","name":"OpenAI","methods":[],"configured":null,"expires_ms":null}|};
   show
+    (fun j -> Or_error.map (Auth_status.of_json j) ~f:Auth_status.sexp_of_t)
+    {|{"provider":"aiproxy","name":"aiproxy","methods":[{"method":"api_key","label":"aiproxy API key"}],"configured":{"method":"api_key","source":"no key"},"expires_ms":null,"custom":{"base_url":"http://localhost:3000/v1","api":"chat","api_label":"OpenAI chat completions (/chat/completions)"}}|};
+  show
     (fun j ->
-      Or_error.map (Session_summary.of_json j) ~f:Session_summary.sexp_of_t)
+       Or_error.map (Session_summary.of_json j) ~f:Session_summary.sexp_of_t)
     {|{"id":"abc","path":"/p","name":"build fix","cwd":"/c","created_at":"2025-01-01T00:00:00Z","updated_at":"2025-06-01T12:34:56Z","first_prompt":null,"message_count":0,"parent":null}|};
   [%expect
     {|
@@ -504,12 +535,27 @@ let%expect_test "auth status, models, sessions" =
      (configured ((
        (method_ oauth)
        (source  auth.json))))
-     (expires_ms (1700000000000)))
+     (expires_ms (1700000000000))
+     (custom ()))
     ((provider openai)
      (name     OpenAI)
      (methods    ())
      (configured ())
-     (expires_ms ()))
+     (expires_ms ())
+     (custom     ()))
+    ((provider aiproxy)
+     (name     aiproxy)
+     (methods ((
+       (method_ api_key)
+       (label   "aiproxy API key"))))
+     (configured ((
+       (method_ api_key)
+       (source  "no key"))))
+     (expires_ms ())
+     (custom ((
+       (base_url http://localhost:3000/v1)
+       (api      chat)
+       (api_label "OpenAI chat completions (/chat/completions)")))))
     ((id   abc)
      (path /p)
      (name ("build fix"))
