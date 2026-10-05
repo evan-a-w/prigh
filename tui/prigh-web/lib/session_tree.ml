@@ -22,8 +22,16 @@ let typed text =
     ~f:Skill_message.invocation
 ;;
 
+(* A hand-over as the transcript shows it. *)
+let label text =
+  Option.value_map
+    (Handover_message.parse text)
+    ~default:(typed text)
+    ~f:Handover_message.summary
+;;
+
 let user_line ({ text; images; at = _ } : Message.User.t) =
-  match line (typed text), images with
+  match line (label text), images with
   | "", image :: _ -> Image.to_string_hum image
   | line, _ -> line
 ;;

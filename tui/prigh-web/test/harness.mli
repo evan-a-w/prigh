@@ -68,6 +68,15 @@ val session_json
   -> string
   -> string
 
+(** A model as [list_models] and states give it, keyed [provider/id]. *)
+val model_json
+  :  ?thinking:bool
+  -> provider:string
+  -> id:string
+  -> name:string
+  -> unit
+  -> string
+
 (** GPT-6 (openai), Claude Opus 5.5 and Claude Sonnet 5 (anthropic), and
     DeepSeek Chat (deepseek, no thinking). *)
 val models_json : string
