@@ -242,7 +242,7 @@ let%expect_test "/default-dir shows, sets and clears where new sessions start" =
     {|
     (Save_history (/default-dir))
     (Expire_toast (id 0) (after_ms 4000))
-    No default directory: new sessions start where the backend was started; /default-dir PATH sets one
+    No default directory: new sessions start in the backend's working directory; /default-dir PATH sets one
     |}];
   run h "/default-dir ~/proj";
   H.reply h "set_config" (config ~default_cwd:"~/proj" ());
@@ -280,7 +280,7 @@ let%expect_test "/default-dir shows, sets and clears where new sessions start" =
     (Rpc (method_ set_config) (params ((config ((default_cwd null)))))
      (tag Default_dir_saved))
     (Expire_toast (id 3) (after_ms 4000))
-    Default directory cleared: new sessions start where the backend was started
+    Default directory cleared: new sessions start in the backend's working directory
     |}];
   run h "/default-dir /etc/passwd";
   H.fail h "set_config" "config.default_cwd must be a directory";
