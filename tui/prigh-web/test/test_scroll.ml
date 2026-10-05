@@ -1,10 +1,8 @@
 open! Core
 
 (* The page tells the app when the user scrolls the chat away from its end;
-   the app shows a button back, marked when output arrived meanwhile. *)
-let%expect_test
-    "scrolled up: a jump button, new output marked, sending follows again"
-  =
+   the app shows a button back. *)
+let%expect_test "scrolled up: a jump button; it, or sending, follows again" =
   let h = Harness.create () in
   let button () = Harness.show h ~selector:".jump-to-bottom" in
   button ();
@@ -15,7 +13,6 @@ let%expect_test
     {|
     <button title="Jump to the latest" class="jump-to-bottom" @on_click>
       <icon class="arrow_down"> </icon>
-      <Vdom.Node.none-widget> </Vdom.Node.none-widget>
     </button>
     |}];
   Harness.event
@@ -24,9 +21,8 @@ let%expect_test
   button ();
   [%expect
     {|
-    <button title="Jump to the latest" class="jump-to-bottom unseen" @on_click>
+    <button title="Jump to the latest" class="jump-to-bottom" @on_click>
       <icon class="arrow_down"> </icon>
-      <span> New output </span>
     </button>
     |}];
   Harness.act h Jump_to_bottom;

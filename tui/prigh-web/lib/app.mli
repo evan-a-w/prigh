@@ -270,7 +270,6 @@ module Model : sig
     ; next_toast : int
     ; sidebar_open : bool
     ; scrolled_up : bool (** the chat is not following new output *)
-    ; unseen : bool (** output arrived while [scrolled_up] *)
     ; session_query : string
     ; agents : Agents.t (** the agents panel, per session *)
     ; verbosity : Prigh_ui.Verbosity.t

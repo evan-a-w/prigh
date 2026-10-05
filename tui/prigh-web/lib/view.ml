@@ -15,16 +15,11 @@ let jump_to_bottom (m : Model.t) ~inject =
       ~attrs:[ Attr.class_ "jump-anchor" ]
       [ Node.button
           ~attrs:
-            [ Attr.classes
-                ([ "jump-to-bottom" ] @ if m.unseen then [ "unseen" ] else [])
+            [ Attr.class_ "jump-to-bottom"
             ; Attr.title "Jump to the latest"
             ; Attr.on_click (fun _ -> inject Action.Jump_to_bottom)
             ]
-          [ icon Arrow_down
-          ; (if m.unseen
-             then Node.span [ Node.text "New output" ]
-             else Node.none)
-          ]
+          [ icon Arrow_down ]
       ]
 ;;
 

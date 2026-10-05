@@ -254,7 +254,6 @@ module Model = struct
     ; next_toast : int
     ; sidebar_open : bool
     ; scrolled_up : bool
-    ; unseen : bool
     ; session_query : string
     ; agents : Agents.t
     ; verbosity : Prigh_ui.Verbosity.t
@@ -311,7 +310,6 @@ let init =
   ; next_toast = 0
   ; sidebar_open = true
   ; scrolled_up = false
-  ; unseen = false
   ; session_query = ""
   ; agents = Agents.empty
   ; verbosity = Normal
@@ -412,7 +410,6 @@ let set_state (m : Model.t) (state : State.t) =
       ; agents = { Agents.empty with open_ = m.agents.open_ && not m.narrow }
       ; btw = None
       ; scrolled_up = false
-      ; unseen = false
       }
     , [ Command.Set_url_session state.session_id
       ; Command.Scroll_to_bottom
@@ -2146,7 +2143,7 @@ let dialog_accept (m : Model.t) =
 
 (* Following new output again: the jump button, or sending something. *)
 let to_bottom (m : Model.t) =
-  { m with scrolled_up = false; unseen = false }, [ Command.Scroll_to_bottom ]
+  { m with scrolled_up = false }, [ Command.Scroll_to_bottom ]
 ;;
 
 let sent_to_bottom (m : Model.t) (m', cmds) =
@@ -2175,10 +2172,7 @@ let update (m : Model.t) (action : Action.t) =
     m, (if m.narrow then [] else [ focus_editor ]) @ startup @ probe
   | Hello hello -> { m with hello = Some hello }, []
   | Saved_login -> { m with saved_login = true }, []
-  | Event e ->
-    let m', cmds = event m e in
-    let grew = m.scrolled_up && not (phys_equal m'.chat m.chat) in
-    { m' with unseen = m'.unseen || grew }, cmds
+  | Event e -> event m e
   | Protocol_error e -> error m ("Protocol error: " ^ e)
   | Backend_closed ->
     (match m.connection with
@@ -2363,9 +2357,7 @@ let update (m : Model.t) (action : Action.t) =
       prompt_input m (Prompt.complete prompt))
   | Retry_connection -> retry_connection m
   | Scroll_chat pages -> m, [ Command.Scroll_chat pages ]
-  | Chat_scrolled { at_bottom } ->
-    ( { m with scrolled_up = not at_bottom; unseen = m.unseen && not at_bottom }
-    , [] )
+  | Chat_scrolled { at_bottom } -> { m with scrolled_up = not at_bottom }, []
   | Jump_to_bottom -> to_bottom m
   | Jump_to_user_message dir -> m, [ Command.Jump_to_user_message dir ]
   | Run command ->

@@ -790,21 +790,18 @@ kbd {
   z-index: 5;
   display: flex;
   align-items: center;
-  gap: 6px;
   height: 34px;
-  min-width: 34px;
+  width: 34px;
   justify-content: center;
-  padding: 0 9px;
+  padding: 0;
   border-radius: 999px;
   border: 1px solid var(--border);
   background: var(--panel-2);
   color: var(--fg);
   box-shadow: 0 6px 20px #0008;
   cursor: pointer;
-  font-size: 13px;
   animation: jump-in 0.15s ease-out;
 }
 .jump-to-bottom:hover, .jump-to-bottom:focus-visible { border-color: var(--accent-2); outline: none; }
 .jump-to-bottom .icon { width: 16px; height: 16px; }
-.jump-to-bottom.unseen { background: var(--accent-2); border-color: var(--accent-2); color: #fff; padding: 0 12px 0 10px; }
 @keyframes jump-in { from { opacity: 0; transform: translate(-50%, 6px); } }
