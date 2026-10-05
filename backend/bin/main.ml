@@ -109,6 +109,7 @@ let common_params =
       | None -> Namespace.World.legacy ~home:(home ()) ~auth_file
     in
     let { Namespace.World.home; sessions_dir; store; getenv } = world in
+    let cwd_given = Option.is_some cwd in
     let cwd = Option.value cwd ~default:(Core_unix.getcwd ()) in
     let models = Model_registry.create ~env ~sw ~home ~store ~getenv () in
     let model =
@@ -196,6 +197,7 @@ let common_params =
           ~auto_describe:(Option.is_none faux_script && not faux)
           ~backend_host
           ?mcp
+          ~use_default_cwd:(not cwd_given)
           ~cwd
           ()
       in

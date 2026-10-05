@@ -277,6 +277,19 @@ let set_config t (config : Config.t) =
         List.stable_dedup fallback_models ~compare:String.compare
     }
   in
+  let%bind () =
+    match config.default_cwd with
+    | Some dir when not (Filename.is_absolute (Tool.expand_home dir)) ->
+      Or_error.errorf "default_cwd: %s must be absolute (or start with ~/)" dir
+    | Some dir
+      when t.backend_host_enabled
+           && not (Sys_unix.is_directory_exn (Tool.expand_home dir)) ->
+      Or_error.errorf
+        "default_cwd: %s is not a directory on the backend (%s)"
+        dir
+        (Core_unix.gethostname ())
+    | Some _ | None -> Ok ()
+  in
   let%map () = Config.save ~home:t.home config in
   t.config <- config;
   broadcast t (Config_changed config)
@@ -812,10 +825,10 @@ let rec start_run ?(tried = String.Set.empty) t prompts =
   state_changed t;
   Fiber.fork ~sw:t.sw (fun () ->
     let session = t.session in
-    let finish () =
+    let finish ~idle =
       t.run <- None;
       Promise.resolve resolve ();
-      state_changed t
+      if idle then state_changed t
     in
     refresh_mcp t ~cancel;
     let added =
@@ -908,7 +921,13 @@ let rec start_run ?(tried = String.Set.empty) t prompts =
            then Some (`Prompts [])
            else None)
     in
-    finish ();
+    (* A hand-over carries on the same task: the run's next state says
+       [running] again, with no idle moment in between. *)
+    finish
+      ~idle:
+        (match next with
+         | Some (`Handover _) -> false
+         | Some (`Prompts _) | None -> true);
     Option.iter next ~f:(function
       | `Handover prompts -> start_run ~tried t prompts
       | `Prompts prompts -> start_run t prompts);
@@ -1013,6 +1032,7 @@ let create
       ?(auto_describe = false)
       ?(backend_host = true)
       ?mcp
+      ?(use_default_cwd = true)
       ~cwd
       ()
   =
@@ -1038,8 +1058,9 @@ let create
     | None ->
       let cwd =
         match Option.map config.default_cwd ~f:Tool.expand_home with
-        | Some dir when (not backend_host) || Sys_unix.is_directory_exn dir ->
-          dir
+        | Some dir
+          when use_default_cwd
+               && ((not backend_host) || Sys_unix.is_directory_exn dir) -> dir
         | Some _ | None -> cwd
       in
       Session.create ~dir:sessions_dir ~cwd ()

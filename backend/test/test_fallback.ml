@@ -133,6 +133,29 @@ let%expect_test "a run hands over down the chain and carries on" =
   [%expect {| deepseek/deepseek-flash |}]
 ;;
 
+let%expect_test "a hand-over never shows the agent idle in between" =
+  with_agent ~config:chain [ exhausted; Reply.text "done" ]
+  @@ fun _t agent ->
+  Agent.subscribe agent ~f:(function
+    | State_changed s ->
+      printf "state: running=%b model=%s\n" s.running (Model.key s.model)
+    | _ -> ());
+  Or_error.ok_exn (Agent.prompt agent "go");
+  Agent.wait_idle agent;
+  [%expect
+    {|
+    state: running=true model=openai-codex/gpt-6-sol
+    request to openai-codex/gpt-6-sol, last user: go
+    assistant (gpt-6-sol):  (Error"HTTP 429: The usage limit has been reached (usage limit reached)")
+    notice: openai-codex/gpt-6-sol: HTTP 429: The usage limit has been reached (usage limit reached); handing over to anthropic/claude-opus-5-5
+    state: running=true model=anthropic/claude-opus-5-5
+    state: running=true model=anthropic/claude-opus-5-5
+    request to anthropic/claude-opus-5-5, last user: [prigh: openai-codex/gpt-6-sol cannot continue (HTTP 429: The usage limit has been reached (usage limit reached)), so anthropic/claude-opus-5-5 takes over this conversation from here. Carry on with the task where it left off.]
+    assistant (claude-opus-5-5): done End_turn
+    state: running=false model=anthropic/claude-opus-5-5
+    |}]
+;;
+
 let%expect_test "the end of the chain stops; other errors never hand over" =
   with_agent
     ~config:chain
@@ -248,5 +271,45 @@ let%expect_test "default_cwd: where new sessions start" =
     {|
     $DIR/work
     /
+    |}];
+  (* An explicit -cwd wins; set_config refuses a directory that is not
+     there. *)
+  write t ".prigh/config.json" (sprintf {|{"default_cwd": "%s/work"}|} t.dir);
+  let agent =
+    Agent.create
+      ~env:t.env
+      ~sw
+      ~provider:(Faux_provider.create [])
+      ~tools:[]
+      ~sessions_dir:(Filename.concat t.dir "sessions")
+      ~home:t.dir
+      ~use_default_cwd:false
+      ~cwd:"/"
+      ()
+  in
+  print_endline (Agent.state agent).cwd;
+  let set dir =
+    match
+      Agent.set_config
+        agent
+        { (Agent.config agent) with default_cwd = Some dir }
+    with
+    | Ok () -> print_endline "ok"
+    | Error e ->
+      print_endline
+        (String.substr_replace_all
+           (Error.to_string_hum e)
+           ~pattern:(Core_unix.gethostname ())
+           ~with_:"HOST")
+  in
+  set "/no/such/dir";
+  set "work";
+  set "~";
+  [%expect
+    {|
+    /
+    default_cwd: /no/such/dir is not a directory on the backend (HOST)
+    default_cwd: work must be absolute (or start with ~/)
+    ok
     |}]
 ;;
