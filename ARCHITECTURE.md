@@ -412,9 +412,27 @@ two can share one.
   (never `context_tokens`), and `State` also carries the session name, cwd
   and `git_branch`. `respond_confirm` answers a pending `Tool_confirm`.
 - `Config` — `~/.prigh/config.json` (`scoped_models : string list`,
-  `confirm_tools : bool`, `default_model`/`default_thinking`), loaded at
-  agent creation, read/written through `get_config`/`set_config`; unknown
-  fields are ignored. `Agent.save_as_default` (`change_default`,
+  `confirm_tools : bool`, `default_model`/`default_thinking`,
+  `fallback_models` (model keys) and `default_cwd`), loaded at agent
+  creation, read/written through `get_config`/`set_config`; unknown fields
+  are ignored. Each namespace has its own file, so each has its own
+  defaults. `set_config` merges the given fields over the current ones and
+  resolves `fallback_models` like `set_model` (stored as keys). A new
+  session starts in `default_cwd` (on the backend host) and on
+  `default_model`, else the first of `fallback_models`.
+- Model hand-over — `Usage_limit.unavailable` recognises errors meaning a
+  model cannot be used for now: an exhausted allowance or balance (`HTTP
+  402`, quota codes such as `usage_limit_reached`/`insufficient_quota`,
+  which `Sse_request` marks with `(usage limit reached)`, as it does an
+  Anthropic subscription's `anthropic-ratelimit-unified-status: rejected`)
+  or missing credentials. `Agent_loop` does not retry them. When a run ends
+  on one, `Agent` switches the session to the next model in
+  `fallback_models` after the current one (the first when the current one
+  is not listed) that this hand-over sequence has not tried, says so in a
+  `Notice`, and starts a new run whose first message tells the new model it
+  is taking over; the queue and follow-ups wait behind it. A user's prompt
+  starts a fresh sequence; an abort, a session switch or the end of the
+  chain stops it. `Agent.save_as_default` (`change_default`,
   `/change_default`) rereads the file and records the agent's current model
   and thinking level there; agents created without an explicit `-model`/
   `-thinking` start from them (a loaded session's own settings still win).
