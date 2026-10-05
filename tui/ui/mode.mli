@@ -21,6 +21,8 @@ module Picker_kind : sig
     | Agents
     | Jobs
     | Hosts
+    | Skills
+    | Mcp of Mcp_list.t
     | Auth_select of string (** login prompt id *)
   [@@deriving sexp_of, equal]
 end

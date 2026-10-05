@@ -103,9 +103,9 @@ let%expect_test
     ]
   @@ fun _t agent dump ->
   Or_error.ok_exn (Agent.prompt agent "one");
-  Agent.follow_up agent "two";
+  Or_error.ok_exn (Agent.follow_up agent "two");
   Agent.wait_idle agent;
-  Agent.steer agent "three";
+  Or_error.ok_exn (Agent.steer agent "three");
   Agent.wait_idle agent;
   dump ();
   [%expect
@@ -140,8 +140,8 @@ let%expect_test
     ]
   @@ fun _t agent dump ->
   Or_error.ok_exn (Agent.prompt agent "one");
-  Agent.steer agent "be brief";
-  Agent.follow_up agent "then summarise";
+  Or_error.ok_exn (Agent.steer agent "be brief");
+  Or_error.ok_exn (Agent.follow_up agent "then summarise");
   Agent.wait_idle agent;
   dump ();
   [%expect
@@ -177,7 +177,7 @@ let%expect_test "steer while running is injected after the tool results" =
     ]
   @@ fun _t agent dump ->
   Or_error.ok_exn (Agent.prompt agent "one");
-  Agent.steer agent "also this";
+  Or_error.ok_exn (Agent.steer agent "also this");
   Agent.wait_idle agent;
   dump ();
   [%expect
@@ -205,7 +205,7 @@ let%expect_test "abort cancels the tool and drops queued follow-ups" =
     ]
   @@ fun t agent dump ->
   Or_error.ok_exn (Agent.prompt agent "go");
-  Agent.follow_up agent "dropped";
+  Or_error.ok_exn (Agent.follow_up agent "dropped");
   Eio.Time.sleep (Eio.Stdenv.clock t.env) 0.2;
   ignore (Agent.abort agent);
   Agent.wait_idle agent;
@@ -236,7 +236,8 @@ let%expect_test
     ]
   @@ fun t agent _dump ->
   Or_error.ok_exn (Agent.prompt agent "go");
-  Agent.steer agent ~attachments:[ "notes.txt" ] "look at @notes.txt";
+  Or_error.ok_exn
+    (Agent.steer agent ~attachments:[ "notes.txt" ] "look at @notes.txt");
   Eio.Time.sleep (Eio.Stdenv.clock t.env) 0.1;
   let restored = Agent.abort agent in
   print_s [%message (restored : string list)];
@@ -254,8 +255,8 @@ let%expect_test "abort restores queued steer and follow-up messages" =
     ]
   @@ fun t agent dump ->
   Or_error.ok_exn (Agent.prompt agent "go");
-  Agent.steer agent "first steer";
-  Agent.follow_up agent "second follow up";
+  Or_error.ok_exn (Agent.steer agent "first steer");
+  Or_error.ok_exn (Agent.follow_up agent "second follow up");
   Eio.Time.sleep (Eio.Stdenv.clock t.env) 0.2;
   let restored = Agent.abort agent in
   print_s [%message (restored : string list)];
@@ -286,8 +287,8 @@ let%expect_test "dequeue pops the most recently queued message" =
     ]
   @@ fun _t agent dump ->
   Or_error.ok_exn (Agent.prompt agent "go");
-  Agent.steer agent "steer one";
-  Agent.follow_up agent "follow up";
+  Or_error.ok_exn (Agent.steer agent "steer one");
+  Or_error.ok_exn (Agent.follow_up agent "follow up");
   let pop () = print_s [%sexp (Agent.dequeue agent : Agent.Queued.t option)] in
   pop ();
   pop ();
@@ -296,8 +297,8 @@ let%expect_test "dequeue pops the most recently queued message" =
   dump ();
   [%expect
     {|
-    (((text "follow up") (attachments ()) (images ())))
-    (((text "steer one") (attachments ()) (images ())))
+    (((text "follow up") (skill ()) (attachments ()) (images ())))
+    (((text "steer one") (skill ()) (attachments ()) (images ())))
     ()
     state: running=true messages=0
     user: go
@@ -413,14 +414,17 @@ let%expect_test "save_as_default applies to new agents, not saved sessions" =
     {|
     ("no default: fallback" deepseek/deepseek-v4-pro Off)
     ((scoped_models (a)) (confirm_tools false)
-     (default_model (deepseek/deepseek-flash)) (default_thinking ((On (High)))))
+     (default_model (deepseek/deepseek-flash)) (default_thinking ((On (High))))
+     (fallback_models ()) (default_cwd ()))
     {
       "scoped_models": [
         "a"
       ],
       "confirm_tools": false,
       "default_model": "deepseek/deepseek-flash",
-      "default_thinking": "high"
+      "default_thinking": "high",
+      "fallback_models": [],
+      "default_cwd": null
     }
     (default deepseek/deepseek-flash (On (High)))
     (explicit deepseek/deepseek-v4-pro Off)
@@ -1006,12 +1010,12 @@ let%expect_test
     ]
   @@ fun t agent dump ->
   Or_error.ok_exn (Agent.prompt agent "go");
-  Agent.steer agent "queued";
+  Or_error.ok_exn (Agent.steer agent "queued");
   Eio.Time.sleep (Eio.Stdenv.clock t.env) 0.3;
   let restored = Agent.abort agent in
   print_s [%message (restored : string list)];
   (* The run is still winding down, so this queues; it starts by itself. *)
-  Agent.steer agent "queued again";
+  Or_error.ok_exn (Agent.steer agent "queued again");
   Agent.wait_idle agent;
   dump ();
   [%expect

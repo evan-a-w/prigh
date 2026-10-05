@@ -328,3 +328,26 @@ prints the captured panes.
   ────────────────────────────────────────────────────────────────────────────────────────────────────
   >
   $TMP/cwd  deepseek-flash  think:off  view:normal  ctx:0% 10  $0.00
+  $ bash ./harness.sh fallback
+  === chain and default directory set
+  session <id> in $TMP/cwd. /help for commands, Esc aborts, Ctrl+C twice
+  quits.
+  fallback: deepseek/deepseek-flash → anthropic/claude-fable-5-1 (now on deepseek/deepseek-flash)
+  default directory: $TMP/cwd (new sessions start there; /default-dir off clears it)
+  ────────────────────────────────────────────────────────────────────────────────────────────────────
+  >
+  $TMP/cwd  deepseek-flash  think:off  view:normal  ctx:0% 0  $0.00
+  === handed over
+  session <id> in $TMP/cwd. /help for commands, Esc aborts, Ctrl+C twice
+  quits.
+  fallback: deepseek/deepseek-flash → anthropic/claude-fable-5-1 (now on deepseek/deepseek-flash)
+  default directory: $TMP/cwd (new sessions start there; /default-dir off clears it)
+  > go
+  error: HTTP 429: The usage limit has been reached (usage limit reached)
+  deepseek/deepseek-flash: HTTP 429: The usage limit has been reached (usage limit reached); handing
+  over to anthropic/claude-fable-5-1
+  ↪ handed over from deepseek/deepseek-flash to anthropic/claude-fable-5-1
+  carried on
+  ────────────────────────────────────────────────────────────────────────────────────────────────────
+  >
+  $TMP/cwd  claude-fable-5-1  think:off  view:normal  ctx:0% 0  $0.00

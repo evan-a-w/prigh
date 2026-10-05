@@ -472,6 +472,7 @@ let%expect_test "directory completion keeps the typed notation" =
   let show ?(cwd = t.dir) prefix =
     let result =
       Host_ops.execute
+        ~mcp:None
         ~env:t.env
         ~cancel:Cancellation.never
         ~on_output:ignore

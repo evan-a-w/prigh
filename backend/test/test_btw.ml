@@ -267,7 +267,7 @@ let%expect_test
   print_messages (Agent.messages agent);
   [%expect
     {|
-    {"type":"response","id":"r1","ok":true,"result":{"scoped_models":[],"confirm_tools":true,"default_model":null,"default_thinking":null}}
+    {"type":"response","id":"r1","ok":true,"result":{"scoped_models":[],"confirm_tools":true,"default_model":null,"default_thinking":null,"fallback_models":[],"default_cwd":null}}
     {"type":"response","id":"r1","ok":true,"result":{}}
     running: true
     {"type":"response","id":"r1","ok":true,"result":{"btw_id":"btw-1","text":"I am listing files and about to echo.","usage":{"input":10,"output":5,"cache_read":0},"cost_usd":9e-06}}

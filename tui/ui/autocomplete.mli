@@ -9,6 +9,7 @@ module Source : sig
     | Directory of { host : string option }
     (** [/cd] and the [/host] directory prompt: listed by the backend on [host]
         (the active one when [None]) *)
+    | Skill (** the name after [/skill:] *)
   [@@deriving sexp_of, equal]
 end
 
@@ -42,7 +43,10 @@ val compute
   -> models:P.Model.t list
   -> auth:P.Auth_status.t list
   -> sessions:P.Session_summary.t list option
+  -> skills:P.Skill.t list option (** [None]: not fetched yet *)
   -> logged_in:(string -> bool)
+  -> default_dir_host:string option
+       (** where [/default-dir] lists directories ([None]: the active host) *)
   -> t option
 
 (** Directory completion for a whole prompt line (the [/host] directory

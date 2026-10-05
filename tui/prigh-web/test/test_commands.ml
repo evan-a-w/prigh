@@ -54,6 +54,7 @@ let%expect_test "every command does something (none is unknown)" =
     /new                       rpc new_session
     /model                     picker: Switch model
     /scoped-models             scoped models dialog
+    /fallback                  toast: No fallback models: /fallback MODEL [MODEL...] sets the chain that takes over when a model's usage runs out
     /thinking                  picker: Thinking level
     /change_default            rpc change_default
     /verbosity                 picker: Transcript verbosity
@@ -68,9 +69,13 @@ let%expect_test "every command does something (none is unknown)" =
     /rewind                    rpc get_entries
     /tree                      rpc get_entries
     /cd                        path prompt
+    /default-dir               toast: No default directory: new sessions start in the backend's working directory; /default-dir PATH sets one
     /host                      picker: Where tools run
     /export                    path prompt
     /import                    path prompt
+    /skills                    rpc list_skills
+    /skill:                    rpc list_skills
+    /mcp                       rpc list_mcp
     /copy                      toast: Nothing to copy yet: no reply in this session.
     /btw                       toast: Usage: /btw <question> (asked aside; the run goes on)
     /abort                     rpc abort
@@ -212,8 +217,7 @@ let%expect_test "/scoped-models, Ctrl+P and Alt+P" =
       ((config
         ((scoped_models
           (anthropic/claude-opus-5-5 anthropic/claude-sonnet-5
-           deepseek/deepseek-chat))
-         (confirm_tools false) (default_model null) (default_thinking null)))))
+           deepseek/deepseek-chat))))))
      (tag (Config_saved "3 scoped models: Ctrl+P and Alt+P cycle through them")))
     (Expire_toast (id 2) (after_ms 4000))
     Model: Claude Opus 5.5
@@ -251,7 +255,8 @@ let%expect_test "/scoped-models, Ctrl+P and Alt+P" =
     (((scoped_models
        (anthropic/claude-opus-5-5 anthropic/claude-sonnet-5
         deepseek/deepseek-chat))
-      (confirm_tools false) (default_model ()) (default_thinking ())))
+      (confirm_tools false) (default_model ()) (default_thinking ())
+      (fallback_models ()) (default_cwd ())))
     |}]
 ;;
 
@@ -398,20 +403,12 @@ let%expect_test "/confirm" =
   [%expect
     {|
     (Focus editor)
-    (Rpc (method_ set_config)
-     (params
-      ((config
-        ((scoped_models ()) (confirm_tools true) (default_model null)
-         (default_thinking null)))))
+    (Rpc (method_ set_config) (params ((config ((confirm_tools true)))))
      (tag (Config_saved "Tool confirmation on: bash, write and edit ask first")))
     (Expire_toast (id 0) (after_ms 4000))
     Ready 0% ↑0 ↓0 $0.0000 (confirm)
     (Save_history ("/confirm off" /confirm))
-    (Rpc (method_ set_config)
-     (params
-      ((config
-        ((scoped_models ()) (confirm_tools false) (default_model null)
-         (default_thinking null)))))
+    (Rpc (method_ set_config) (params ((config ((confirm_tools false)))))
      (tag (Config_saved "Tool confirmation off: tools run without asking")))
     (Save_history ("/confirm maybe" "/confirm off" /confirm))
     Tool confirmation on: bash, write and edit ask first

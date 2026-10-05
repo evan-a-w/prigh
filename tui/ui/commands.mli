@@ -5,6 +5,7 @@ open! Core
 module Argument : sig
   type t =
     | Model
+    | Models (** several, completed word by word ([off] first) *)
     | Thinking
     | Verbosity
     | Confirm
@@ -13,6 +14,11 @@ module Argument : sig
     | Sessions
     | Path
     | Directory
+    | Default_directory
+    (** a directory on the backend's host when it runs tools, else on the
+        active tool host *)
+    | Skill (** [/skill:NAME]: the name is part of the command *)
+    | Mcp
   [@@deriving sexp_of, equal]
 end
 
@@ -28,6 +34,9 @@ end
 
 val all : Spec.t list
 val find : string -> Spec.t option
+
+(** [/name args], as [/help] shows it. *)
+val usage : Spec.t -> string
 
 (** [/thinking] levels in Ctrl+T cycling order. *)
 val thinking_levels : string list

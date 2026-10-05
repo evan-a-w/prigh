@@ -6,16 +6,19 @@ module Argument : sig
   (** What the completion popup offers after the command name. *)
   type t =
     | Model
+    | Models (** model keys, one per word, then [off] *)
     | Thinking
     | Login
     | Logout
     | Directory
+    | Backend_directory (** directories on the backend's host *)
     | Verbosity
     | Confirm
     | Session (** saved sessions' paths *)
     | Path (** [list_paths] *)
     | Host
     | User (** the users a superuser can act as *)
+    | Skill (** right after [/skill:], from [list_skills] *)
   [@@deriving sexp_of, equal]
 end
 
@@ -27,6 +30,10 @@ module Spec : sig
     ; argument : Argument.t option
     }
   [@@deriving sexp_of, equal]
+
+  (** [/name args]; names ending in [:] (like [skill:]) take their argument
+      without a space. *)
+  val usage : t -> string
 end
 
 val all : Spec.t list

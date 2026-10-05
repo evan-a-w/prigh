@@ -732,6 +732,21 @@ kbd {
 .tree-dialog .picker-item.marked { box-shadow: inset 2px 0 0 var(--green); }
 .tree-dialog .picker-item.marked.selected { box-shadow: inset 2px 0 0 var(--accent); }
 
+/* /mcp: servers, their problems and a ready one's tools */
+.mcp-dialog { width: min(720px, 100%); }
+.mcp-dialog .picker-label { font: 12.5px var(--mono); }
+.mcp-problems { margin-top: 10px; color: #ffc2c2; background: var(--red-bg); border: 1px solid var(--red-border); border-radius: 8px; padding: 7px 11px; font-size: 13px; }
+.mcp-problems h3 { margin: 0 0 4px; font-size: 12px; font-weight: 600; color: var(--red); }
+.mcp-problems ul { margin: 0; padding-left: 18px; }
+.mcp-problems li { overflow-wrap: anywhere; }
+.mcp-tools-dialog { width: min(720px, 100%); }
+.mcp-tools-dialog .dialog-note { font: 11.5px var(--mono); overflow-wrap: anywhere; }
+.mcp-tools { display: flex; flex-direction: column; }
+.mcp-tool { display: flex; flex-direction: column; gap: 2px; padding: 7px 0; }
+.mcp-tool + .mcp-tool { border-top: 1px solid var(--border); }
+.mcp-tool-name { font: 12.5px var(--mono); overflow-wrap: anywhere; }
+.mcp-tool-description { color: var(--muted); font-size: 12.5px; }
+
 .rewind-quote { margin: 0 0 10px; padding: 8px 12px; border-left: 3px solid var(--accent); background: var(--panel-2); border-radius: 0 8px 8px 0; white-space: pre-wrap; }
 
 .session-dialog { width: min(600px, 100%); }

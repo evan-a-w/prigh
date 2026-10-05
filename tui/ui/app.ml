@@ -29,7 +29,10 @@ module Reply_tag = struct
     | Config
     | Config_saved
     | Default_saved
-    | Config_for_confirm of bool
+    | Fallback_shown
+    | Fallback_saved of string
+    | Default_dir_shown
+    | Default_dir_saved of string
     | Models_catalog
     | Models_for_scoped
     | Compact_done
@@ -46,6 +49,12 @@ module Reply_tag = struct
     | Jobs_picker
     | Job_output
     | Job_started
+    | Skills_picker
+    | Skills_for_autocomplete of string (** the [Skill_cache] key *)
+    | Skill_prompt of string (** the [/skill:] text sent *)
+    | Mcp_picker
+    | Mcp_reconnected
+    | Mcp_approved of string (** server *)
   [@@deriving sexp_of, equal]
 end
 
@@ -138,6 +147,7 @@ module Model = struct
     ; mode : Mode.t
     ; autocomplete : Autocomplete.t option
     ; sessions : P.Session_summary.t list option
+    ; skills : Skill_cache.t
     ; known_paths : String.Set.t
     ; queued : Queue_counts.t
     ; queued_texts : string list
@@ -148,7 +158,7 @@ module Model = struct
     ; verbosity : Verbosity.t
     ; config : P.Config.t option
     ; home : string option
-    ; client_id : string option (** ours, from [hello] *)
+    ; client_id : string option (** our host id, from [hello] *)
     ; namespace : string option
     ; user : string option
     ; stderr_tail : string list
@@ -195,6 +205,14 @@ open Model
 
 let rpc ?(params = []) ?(tag = Reply_tag.Show_error) method_ =
   Command.Rpc { method_; params; tag }
+;;
+
+let call ?(tag = Reply_tag.Show_error) (method_ : P.Request.Method.t) =
+  Command.Rpc
+    { method_ = P.Request.Method.name method_
+    ; params = P.Request.Method.params method_
+    ; tag
+    }
 ;;
 
 let str = P.Json.str
@@ -333,6 +351,7 @@ let init =
   ; mode = Editing
   ; autocomplete = None
   ; sessions = None
+  ; skills = Skill_cache.empty
   ; known_paths = String.Set.empty
   ; queued = Queue_counts.zero
   ; queued_texts = []
@@ -682,7 +701,19 @@ let first_line text =
   | [] -> ""
 ;;
 
+(* What the user typed: a skill's expansion stands for [/skill:NAME ARGS]. *)
+let user_text text =
+  match Skill_message.parse text with
+  | Some skill -> Skill_message.invocation skill
+  | None -> text
+;;
+
 let user_first_line ({ text; images; at = _ } : P.Message.User.t) =
+  let text =
+    match Handover_message.parse text with
+    | Some handover -> Handover_message.summary handover
+    | None -> user_text text
+  in
   match first_line text, images with
   | "", image :: _ -> P.Image.to_string_hum image
   | line, _ -> line
@@ -890,6 +921,148 @@ let job_output m id =
         ~params:[ "job_id", str id; "lines", P.Json.int 200 ]
         ~tag:Job_output
     ] )
+;;
+
+(* ---- skills and MCP servers ------------------------------------------ *)
+
+let skills_hint =
+  "add one as .prigh/skills/<name>/SKILL.md (or .claude/skills/<name>/) in \
+   the project, or under ~/.prigh/skills/"
+;;
+
+(* [/abs/proj/.claude/skills/x/SKILL.md] as [~/proj/.claude/skills/x]. *)
+let skill_location m (skill : P.Skill.t) =
+  let dir =
+    Option.value
+      (String.chop_suffix skill.path ~suffix:"/SKILL.md")
+      ~default:skill.path
+  in
+  match m.home with
+  | Some home when String.is_prefix dir ~prefix:(home ^ "/") ->
+    "~" ^ String.drop_prefix dir (String.length home)
+  | _ -> dir
+;;
+
+let skills_picker m (skills : P.Skill.t list) =
+  if List.is_empty skills
+  then notice m ("no skills here; " ^ skills_hint)
+  else (
+    let items =
+      List.map skills ~f:(fun (s : P.Skill.t) ->
+        let location = skill_location m s in
+        Picker.Item.create
+          ~id:s.name
+          ~detail:
+            (String.concat
+               ~sep:"  "
+               ([ s.description; location ]
+                @ if s.model_invocable then [] else [ "(only you invoke it)" ]))
+          ~search:(s.name ^ " " ^ s.description ^ " " ^ location)
+          s.name)
+    in
+    open_picker m Skills (Picker.create ~title:"Skills" items))
+;;
+
+let open_skills m = m, [ call List_skills ~tag:Skills_picker ]
+
+let mcp_config_hint =
+  "configure servers under \"mcpServers\" in ~/.prigh/mcp.json or a \
+   project's .mcp.json"
+;;
+
+let plural n word = sprintf "%d %s%s" n word (if n = 1 then "" else "s")
+
+let mcp_status (s : P.Mcp_server.t) =
+  match s.status with
+  | Ready -> "ready, " ^ plural (List.length s.tools) "tool"
+  | Failed -> "failed: " ^ Option.value s.error ~default:"unknown error"
+  | Needs_approval -> "needs approval"
+;;
+
+let mcp_problems m (list : P.Mcp_list.t) =
+  List.fold list.problems ~init:m ~f:(fun m problem ->
+    warn m ("MCP config: " ^ problem))
+;;
+
+let mcp_picker ?(problems = true) m (list : P.Mcp_list.t) =
+  let m = if problems then mcp_problems m list else m in
+  if List.is_empty list.servers
+  then notice m ("no MCP servers; " ^ mcp_config_hint)
+  else (
+    let items =
+      List.mapi list.servers ~f:(fun i (s : P.Mcp_server.t) ->
+        Picker.Item.create
+          ~id:(Int.to_string i)
+          ~detail:(mcp_status s ^ "  " ^ s.source)
+          ~search:(s.name ^ " " ^ s.source)
+          ~dimmed:(P.Mcp_server.Status.equal s.status Failed)
+          s.name)
+    in
+    open_picker m (Mcp list) (Picker.create ~title:"MCP servers" items))
+;;
+
+let mcp_tools (s : P.Mcp_server.t) : Content.t =
+  let header : Content.Line.t =
+    [ { Content.Span.text = s.name; style = Style.bold (Style.fg Cyan) }
+    ; { text = "  " ^ plural (List.length s.tools) "tool"; style = Style.plain }
+    ; { text = "  " ^ s.source; style = Style.dim Style.plain }
+    ]
+  in
+  let width =
+    List.fold s.tools ~init:0 ~f:(fun acc (t : P.Mcp_server.Tool.t) ->
+      Int.max acc (Text_width.string t.name))
+  in
+  header
+  :: List.map s.tools ~f:(fun (t : P.Mcp_server.Tool.t) ->
+    [ { Content.Span.text = "  " ^ Text_width.pad_right t.name ~width
+      ; style = Style.bold Style.plain
+      }
+    ; { text = "  " ^ first_line t.description; style = Style.plain }
+    ])
+;;
+
+let mcp_selected m (list : P.Mcp_list.t) id =
+  match Option.bind (Int.of_string_opt id) ~f:(List.nth list.servers) with
+  | None -> m, []
+  | Some s ->
+    (match s.status with
+     | Ready -> block m (mcp_tools s), []
+     | Failed ->
+       ( error
+           m
+           (sprintf
+              "%s %s; check its entry in %s, then /mcp reconnect"
+              s.name
+              (mcp_status s)
+              s.source)
+       , [] )
+     | Needs_approval ->
+       ( notice m (sprintf "approving %s from %s…" s.name s.source)
+       , [ call
+             (Mcp_approve { source = s.source; server = s.name })
+             ~tag:(Mcp_approved s.name)
+         ] ))
+;;
+
+(* One line per server, for [/mcp reconnect]. *)
+let mcp_summary (list : P.Mcp_list.t) : Content.t =
+  let width =
+    List.fold list.servers ~init:0 ~f:(fun acc (s : P.Mcp_server.t) ->
+      Int.max acc (Text_width.string s.name))
+  in
+  List.map list.servers ~f:(fun (s : P.Mcp_server.t) ->
+    let style =
+      match s.status with
+      | Ready -> Style.fg Green
+      | Failed -> Style.fg Red
+      | Needs_approval -> Style.fg Yellow
+    in
+    [ { Content.Span.text = Text_width.pad_right s.name ~width
+      ; style = Style.bold Style.plain
+      }
+    ; { text = "  " ^ mcp_status s; style }
+    ; { text = "  " ^ s.source; style = Style.dim Style.plain }
+    ])
 ;;
 
 (* A host's display name: "(here)" marks this frontend, "(in ...)" a client
@@ -1173,6 +1346,7 @@ let reconnect_reply m ~generation result =
          ; client_id
          ; namespace
          ; user
+         ; skills = Skill_cache.empty
          ; agents = []
          ; focus = `Main
          ; transcript = Transcript.clear m.transcript
@@ -1282,28 +1456,81 @@ let cycle_thinking m =
     , [ rpc "set_thinking" ~params:[ "thinking", str next ] ] )
 ;;
 
-let config_with_confirm config enabled =
-  { config with P.Config.confirm_tools = enabled }
-;;
-
-let set_config_command config =
-  let label =
-    sprintf
-      "tool confirmation %s"
-      (if config.P.Config.confirm_tools then "on" else "off")
-  in
-  rpc
-    "set_config"
-    ~params:[ "config", P.Config.to_json config ]
-    ~tag:(Notice_on_success label)
+(* The backend keeps the fields left out, so each command sends only its own:
+   a stale or missing [m.config] cannot undo another change. *)
+let set_config ~tag fields =
+  rpc "set_config" ~params:[ "config", `Object fields ] ~tag
 ;;
 
 let set_confirm m enabled =
+  let label =
+    sprintf "tool confirmation %s" (if enabled then "on" else "off")
+  in
+  ( { m with
+      config =
+        Option.map m.config ~f:(fun config ->
+          { config with P.Config.confirm_tools = enabled })
+    }
+  , [ set_config
+        ~tag:(Notice_on_success label)
+        [ "confirm_tools", P.Json.bool enabled ]
+    ] )
+;;
+
+let fallback_summary m (config : P.Config.t) =
+  match config.fallback_models with
+  | [] ->
+    "no fallback models: /fallback MODEL [MODEL...] sets the chain that takes \
+     over when a model's usage runs out"
+  | chain ->
+    let now =
+      Option.value_map m.state ~default:"" ~f:(fun s ->
+        sprintf " (now on %s)" s.model.key)
+    in
+    sprintf "fallback: %s%s" (String.concat ~sep:" → " chain) now
+;;
+
+let default_dir_summary (config : P.Config.t) =
+  match config.default_cwd with
+  | Some dir ->
+    sprintf
+      "default directory: %s (new sessions start there; /default-dir off \
+       clears it)"
+      dir
+  | None ->
+    "no default directory: /default-dir PATH makes new sessions start there"
+;;
+
+let show_config m ~tag ~summary =
   match m.config with
-  | Some config ->
-    let config = config_with_confirm config enabled in
-    { m with config = Some config }, [ set_config_command config ]
-  | None -> m, [ rpc "get_config" ~tag:(Config_for_confirm enabled) ]
+  | Some config -> notice m (summary config), []
+  | None -> m, [ rpc "get_config" ~tag ]
+;;
+
+let set_fallback m (cmd : Commands.Parsed.t) =
+  let models =
+    match cmd.args with
+    | [ "off" ] -> []
+    | models -> models
+  in
+  ( m
+  , [ set_config
+        ~tag:(Fallback_saved ("/fallback " ^ cmd.rest))
+        [ "fallback_models", `Array (List.map models ~f:str) ]
+    ] )
+;;
+
+let set_default_dir m (cmd : Commands.Parsed.t) =
+  let dir =
+    match cmd.args with
+    | [ "off" ] -> `Null
+    | _ -> str cmd.rest
+  in
+  ( m
+  , [ set_config
+        ~tag:(Default_dir_saved ("/default-dir " ^ cmd.rest))
+        [ "default_cwd", dir ]
+    ] )
 ;;
 
 let cancel_btw m =
@@ -1348,7 +1575,7 @@ let run_command m (cmd : Commands.Parsed.t) =
   | "help", name :: _ ->
     (match Commands.find name with
      | Some spec ->
-       let usage = String.strip ("/" ^ spec.name ^ " " ^ spec.args) in
+       let usage = Commands.usage spec in
        ( block
            m
            [ [ { Content.Span.text = usage; style = Style.bold Style.plain }
@@ -1411,6 +1638,12 @@ let run_command m (cmd : Commands.Parsed.t) =
   | "confirm", other :: _ ->
     error m (sprintf "unknown argument %S; use on or off" other), []
   | "change_default", _ -> m, [ rpc "change_default" ~tag:Default_saved ]
+  | "fallback", [] ->
+    show_config m ~tag:Fallback_shown ~summary:(fallback_summary m)
+  | "fallback", _ -> set_fallback m cmd
+  | "default-dir", [] ->
+    show_config m ~tag:Default_dir_shown ~summary:default_dir_summary
+  | "default-dir", _ -> set_default_dir m cmd
   | "auth", _ -> m, [ rpc "auth_status" ~tag:Auth_show ]
   | "login", [] -> m, [ rpc "auth_status" ~tag:Auth_login_picker ]
   | "login", provider :: rest ->
@@ -1506,6 +1739,12 @@ let run_command m (cmd : Commands.Parsed.t) =
   | "import", _ ->
     m, [ rpc "import" ~params:[ "path", str cmd.rest ] ~tag:Reload_messages ]
   | "abort", _ -> m, [ rpc "abort" ]
+  | "skills", _ -> open_skills m
+  | "mcp", [] -> m, [ call (List_mcp { reconnect = false }) ~tag:Mcp_picker ]
+  | "mcp", [ "reconnect" ] ->
+    ( notice m "reconnecting MCP servers…"
+    , [ call (List_mcp { reconnect = true }) ~tag:Mcp_reconnected ] )
+  | "mcp", _ -> error m "usage: /mcp [reconnect]", []
   | "btw", [] -> error m "usage: /btw <question>", []
   | "btw", _ -> start_btw m cmd.rest
   | "retry-backend-connection", _ -> retry_backend_connection m
@@ -1591,6 +1830,33 @@ let shell_command m text =
         ] ))
 ;;
 
+(* [/skill:NAME ARGS] is a prompt that the backend expands; a failure (an
+   unknown name) puts the text back. *)
+let skill_invocation text =
+  match Commands.parse text with
+  | Some { name; _ } -> String.is_prefix name ~prefix:"skill:"
+  | None -> false
+;;
+
+let prompt_tag text : Reply_tag.t =
+  if skill_invocation text then Skill_prompt text else Show_error
+;;
+
+let send_prompt m text =
+  let m, cmds =
+    if String.is_prefix text ~prefix:"!"
+    then shell_command m text
+    else if Model.running m
+    then
+      ( { m with queued_texts = m.queued_texts @ [ text ] }
+      , [ rpc "steer" ~params:(user_params m text) ~tag:(prompt_tag text) ] )
+    else
+      ( prune_agents m
+      , [ rpc "prompt" ~params:(user_params m text) ~tag:(prompt_tag text) ] )
+  in
+  m, cmds @ [ Command.Append_history text ]
+;;
+
 let submit m =
   let text, editor = Editor.submit m.editor in
   let m = follow { m with editor; autocomplete = None } in
@@ -1598,18 +1864,11 @@ let submit m =
   then m, []
   else (
     match Commands.parse text with
+    | Some { name = "skill:"; _ } -> open_skills m
+    | Some { name; _ } when String.is_prefix name ~prefix:"skill:" ->
+      send_prompt m (String.strip text)
     | Some cmd -> run_command m cmd
-    | None ->
-      let m, cmds =
-        if String.is_prefix text ~prefix:"!"
-        then shell_command m text
-        else if Model.running m
-        then
-          ( { m with queued_texts = m.queued_texts @ [ text ] }
-          , [ rpc "steer" ~params:(user_params m text) ] )
-        else prune_agents m, [ rpc "prompt" ~params:(user_params m text) ]
-      in
-      m, cmds @ [ Command.Append_history text ])
+    | None -> send_prompt m text)
 ;;
 
 let queue_follow_up m =
@@ -1623,7 +1882,7 @@ let queue_follow_up m =
       let m = follow { m with editor; autocomplete = None } in
       let m = { m with queued_texts = m.queued_texts @ [ text ] } in
       ( m
-      , [ rpc "follow_up" ~params:(user_params m text)
+      , [ rpc "follow_up" ~params:(user_params m text) ~tag:(prompt_tag text)
         ; Command.Append_history text
         ] )))
 ;;
@@ -1697,6 +1956,13 @@ let fetch_autocomplete m ac =
             ~tag:(Paths_for_autocomplete prefix)
       in
       { m with autocomplete = Some ac }, [ request ])
+  | Autocomplete.Source.Skill ->
+    let key = Skill_cache.key m.state in
+    (match Skill_cache.request m.skills ~key with
+     | None -> { m with autocomplete = Some ac }, []
+     | Some skills ->
+       ( { m with autocomplete = Some ac; skills }
+       , [ call List_skills ~tag:(Skills_for_autocomplete key) ] ))
   | Autocomplete.Source.Argument spec
     when match spec.argument with
          | Some Commands.Argument.Sessions -> Option.is_none m.sessions
@@ -1704,6 +1970,15 @@ let fetch_autocomplete m ac =
     ( { m with autocomplete = Some ac }
     , [ rpc "list_sessions" ~tag:Sessions_cache ] )
   | _ -> { m with autocomplete = Some ac }, []
+;;
+
+(* [default_cwd] is a directory on the backend's host, unless the backend runs
+   no tools ([-no-backend-host]): then it is used on whichever host runs them. *)
+let default_dir_host m =
+  Option.bind m.state ~f:(fun (s : P.State.t) ->
+    Option.some_if
+      (List.exists s.hosts ~f:(fun h -> String.equal h.id P.Host.backend_id))
+      P.Host.backend_id)
 ;;
 
 let refresh_autocomplete m =
@@ -1717,7 +1992,9 @@ let refresh_autocomplete m =
       ~models:m.models
       ~auth:m.auth
       ~sessions:m.sessions
+      ~skills:(Skill_cache.find m.skills ~key:(Skill_cache.key m.state))
       ~logged_in:(logged_in m)
+      ~default_dir_host:(default_dir_host m)
   with
   | None -> { m with autocomplete = None }, []
   | Some ac -> fetch_autocomplete m ac
@@ -1767,10 +2044,13 @@ let accept_autocomplete m ~submit_now =
             | Some spec when Option.is_some spec.argument ->
               refresh_autocomplete m
             | _ -> submit m)
+         | Autocomplete.Source.Command, false
+           when String.is_suffix item.id ~suffix:":" -> refresh_autocomplete m
          | Autocomplete.Source.Command, false -> m, []
-         | (Autocomplete.Source.Argument _ | Path | Directory _), true ->
-           submit m
-         | (Autocomplete.Source.Argument _ | Path | Directory _), false -> m, []
+         | (Autocomplete.Source.Argument _ | Path | Directory _ | Skill), true
+           -> submit m
+         | (Autocomplete.Source.Argument _ | Path | Directory _ | Skill), false
+           -> m, []
        in
        Some (m, cmds))
 ;;
@@ -2139,7 +2419,7 @@ let picker_selected m (kind : Mode.Picker_kind.t) (item : Picker.Item.t) =
          String.equal entry.id item.id)
      with
      | Some { kind = P.Entry.Kind.Message (P.Message.User { text; _ }); _ } ->
-       ( { m with editor = Editor.set_text m.editor text }
+       ( { m with editor = Editor.set_text m.editor (user_text text) }
        , [ rpc "fork" ~params:[ "at", str item.id ] ~tag:Reload_messages ] )
      | _ -> m, [])
   | Rewind entries ->
@@ -2171,6 +2451,10 @@ let picker_selected m (kind : Mode.Picker_kind.t) (item : Picker.Item.t) =
      with
      | Some host -> host_cwd_prompt m host, []
      | None -> error m (sprintf "unknown host %S" item.id), [])
+  | Skills ->
+    ( { m with editor = Editor.set_text m.editor ("/skill:" ^ item.id ^ " ") }
+    , [] )
+  | Mcp list -> mcp_selected m list item.id
   | Auth_select id ->
     m, [ rpc "auth_respond" ~params:[ "id", str id; "value", str item.id ] ]
 ;;
@@ -2181,16 +2465,10 @@ let save_scoped_models m picker =
     List.filter_map m.models ~f:(fun (model : P.Model.t) ->
       Option.some_if (Set.mem checked model.key) model.key)
   in
-  let config =
-    match m.config with
-    | Some config -> { config with scoped_models }
-    | None -> { P.Config.default with scoped_models }
-  in
   ( { m with mode = Editing }
-  , [ rpc
-        "set_config"
-        ~params:[ "config", P.Config.to_json config ]
+  , [ set_config
         ~tag:Config_saved
+        [ "scoped_models", `Array (List.map scoped_models ~f:str) ]
     ] )
 ;;
 
@@ -2695,6 +2973,53 @@ let event m (e : P.Event.t) =
 
 (* ---- rpc replies ------------------------------------------------------ *)
 
+let decode_skills json = P.Json.list_field json "skills" ~f:P.Skill.of_json
+
+(* Back in the editor (unless something else is there now) so the name can be
+   fixed, and no longer queued. *)
+let skill_prompt_failed m text e =
+  let queued_texts =
+    match List.findi m.queued_texts ~f:(fun _ q -> String.equal q text) with
+    | Some (i, _) -> List.filteri m.queued_texts ~f:(fun j _ -> j <> i)
+    | None -> m.queued_texts
+  in
+  let editor =
+    if Editor.is_empty m.editor then Editor.set_text m.editor text else m.editor
+  in
+  error { m with queued_texts; editor } e
+;;
+
+let skills_for_autocomplete m =
+  match m.mode, m.autocomplete with
+  | Editing, Some ac
+    when Autocomplete.Source.equal (Autocomplete.source ac) Skill ->
+    refresh_autocomplete m
+  | _ -> m, []
+;;
+
+let mcp_approved m server (list : P.Mcp_list.t) =
+  let m =
+    match
+      List.find list.servers ~f:(fun (s : P.Mcp_server.t) ->
+        String.equal s.name server)
+    with
+    | Some ({ status = Failed; _ } as s) ->
+      error
+        m
+        (sprintf
+           "approved %s, but it %s; check its entry in %s, then /mcp reconnect"
+           server
+           (mcp_status s)
+           s.source)
+    | Some s -> notice m (sprintf "approved %s: %s" server (mcp_status s))
+    | None -> notice m (sprintf "approved %s" server)
+  in
+  (* Back to the refreshed list, unless the user has moved on meanwhile. *)
+  if Mode.is_dialog m.mode || not (Editor.is_empty m.editor)
+  then m, []
+  else mcp_picker ~problems:false m list, []
+;;
+
 let reply m (tag : Reply_tag.t) (result : (P.Json.t, string) Result.t) =
   let decode json ~f k =
     match f json with
@@ -2709,10 +3034,41 @@ let reply m (tag : Reply_tag.t) (result : (P.Json.t, string) Result.t) =
      | Set_model_done _ ->
        (* The backend formats "did you mean"; the picker helps recover. *)
        model_picker (error m e) ~query:"", []
+     | Skill_prompt text -> skill_prompt_failed m text e, []
+     | Fallback_saved text | Default_dir_saved text ->
+       (* Back in the editor, to correct rather than retype. *)
+       let editor =
+         if Editor.is_empty m.editor
+         then Editor.set_text m.editor text
+         else m.editor
+       in
+       error { m with editor } e, []
+     | Skills_for_autocomplete key ->
+       skills_for_autocomplete
+         { m with skills = Skill_cache.set m.skills ~key [] }
+     | Mcp_approved server ->
+       error m (sprintf "approving MCP server %s failed: %s" server e), []
      | _ -> error m e, [])
   | Ok json ->
     (match tag with
      | Ignore | Show_error | Reconnect _ -> m, []
+     | Skill_prompt _ -> m, []
+     | Skills_picker ->
+       decode json ~f:decode_skills (fun skills -> skills_picker m skills, [])
+     | Skills_for_autocomplete key ->
+       decode json ~f:decode_skills (fun skills ->
+         skills_for_autocomplete
+           { m with skills = Skill_cache.set m.skills ~key skills })
+     | Mcp_picker ->
+       decode json ~f:P.Mcp_list.of_json (fun list -> mcp_picker m list, [])
+     | Mcp_reconnected ->
+       decode json ~f:P.Mcp_list.of_json (fun list ->
+         let m = mcp_problems m list in
+         if List.is_empty list.servers
+         then notice m ("no MCP servers; " ^ mcp_config_hint), []
+         else block m (mcp_summary list), [])
+     | Mcp_approved server ->
+       decode json ~f:P.Mcp_list.of_json (mcp_approved m server)
      | Btw id ->
        decode
          json
@@ -2771,7 +3127,8 @@ let reply m (tag : Reply_tag.t) (result : (P.Json.t, string) Result.t) =
      | Reload_messages | Reload_messages_notice _ ->
        let m =
          { m with
-           agents = []
+           skills = Skill_cache.empty
+         ; agents = []
          ; focus = `Main
          ; transcript = Transcript.clear m.transcript
          }
@@ -2812,6 +3169,7 @@ let reply m (tag : Reply_tag.t) (result : (P.Json.t, string) Result.t) =
                 client_id = Some client_id
               ; namespace
               ; user
+              ; skills = Skill_cache.empty
               ; agents = []
               ; focus = `Main
               ; queued = Queue_counts.zero
@@ -2884,10 +3242,13 @@ let reply m (tag : Reply_tag.t) (result : (P.Json.t, string) Result.t) =
                 (show config.default_model)
                 (show config.default_thinking))
          , [] ))
-     | Config_for_confirm enabled ->
+     | Fallback_shown | Fallback_saved _ ->
        decode json ~f:P.Config.of_json (fun config ->
-         let config = config_with_confirm config enabled in
-         { m with config = Some config }, [ set_config_command config ])
+         let m = { m with config = Some config } in
+         notice m (fallback_summary m config), [])
+     | Default_dir_shown | Default_dir_saved _ ->
+       decode json ~f:P.Config.of_json (fun config ->
+         notice { m with config = Some config } (default_dir_summary config), [])
      | Models_catalog ->
        decode json ~f:(decode_list ~f:P.Model.of_json) (fun models ->
          { m with models }, [])

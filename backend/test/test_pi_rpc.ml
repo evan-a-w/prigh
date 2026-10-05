@@ -687,7 +687,9 @@ let%expect_test "/change_default saves the model and thinking level" =
       "scoped_models": [],
       "confirm_tools": false,
       "default_model": "deepseek/deepseek-v4-pro",
-      "default_thinking": "high"
+      "default_thinking": "high",
+      "fallback_models": [],
+      "default_cwd": null
     }
     |}]
 ;;

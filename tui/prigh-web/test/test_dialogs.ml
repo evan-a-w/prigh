@@ -111,6 +111,7 @@ let%expect_test "help lists every key and command" =
     /new start a new session
     /model [name] pick or switch the model
     /scoped-models pick the models Ctrl+P and Alt+P cycle through
+    /fallback [model...|off] show or set the models that take over, in order, when one's usage runs out
     /thinking [off|low|on|high|max] pick or set the thinking level
     /change_default save the model and thinking level as the default for new sessions
     /verbosity [quiet|normal|verbose] how much of tool calls and thinking the transcript shows
@@ -125,9 +126,13 @@ let%expect_test "help lists every key and command" =
     /rewind go back to an earlier message in this session
     /tree show the session tree and move to any message in it
     /cd [path] change the working directory
+    /default-dir [path|off] show or set the directory new sessions start in
     /host [name|backend] pick where tools run, and the directory there
     /export [path] export the transcript on the backend (markdown, or .jsonl)
     /import [path] import a session from a JSONL file on the backend
+    /skills pick a skill to invoke (/skill:name)
+    /skill:<name> [args] send a skill's instructions to the agent, with your arguments
+    /mcp [reconnect] MCP servers: their tools, approve a project's, or restart failed ones
     /copy copy the last reply to the clipboard
     /btw <question> ask a side question without interrupting the run (not added to the conversation)
     /abort stop the current run

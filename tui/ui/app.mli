@@ -33,7 +33,11 @@ module Reply_tag : sig
     | Config
     | Config_saved
     | Default_saved
-    | Config_for_confirm of bool
+    | Fallback_shown (** [get_config] for [/fallback] *)
+    | Fallback_saved of string
+    (** [set_config] of [/fallback]'s text, back in the editor if refused *)
+    | Default_dir_shown (** [get_config] for [/default-dir] *)
+    | Default_dir_saved of string (** like [Fallback_saved] *)
     | Models_catalog
     | Models_for_scoped
     | Compact_done
@@ -50,6 +54,13 @@ module Reply_tag : sig
     | Jobs_picker
     | Job_output
     | Job_started
+    | Skills_picker
+    | Skills_for_autocomplete of string (** the [Skill_cache] key *)
+    | Skill_prompt of string
+    (** a [/skill:] prompt, steer or follow-up; failing puts it back *)
+    | Mcp_picker
+    | Mcp_reconnected
+    | Mcp_approved of string (** server *)
   [@@deriving sexp_of, equal]
 end
 
@@ -129,6 +140,7 @@ module Model : sig
     ; mode : Mode.t
     ; autocomplete : Autocomplete.t option
     ; sessions : P.Session_summary.t list option
+    ; skills : Skill_cache.t
     ; known_paths : String.Set.t
     ; queued : Queue_counts.t
     ; queued_texts : string list

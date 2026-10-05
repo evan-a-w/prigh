@@ -721,11 +721,12 @@ let%expect_test "jobs on a client tool host: output, list, kill, disconnect" =
       t
       ~sw
       ~port:listener.port
+      ~host_id:"host-box"
       ~token:(Some "sekrit")
       ~cwd:host_dir
   in
   Test_tool_host.Host.wait_logs t host 1;
-  rpc t h "set_active_host" {|{"host": "client-2"}|};
+  rpc t h "set_active_host" {|{"host": "host-box"}|};
   rpc t h "prompt" {|{"text": "build"}|};
   Test_background_subagents.wait_turn agent;
   ignore
@@ -745,7 +746,7 @@ let%expect_test "jobs on a client tool host: output, list, kill, disconnect" =
   print_tail t agent 2;
   [%expect
     {|
-    {"type":"response","id":"r","ok":true,"result":{"client_id":"client-1","namespace":null,"user":null,"superuser":false,"state":{"session_id":"<id>","session_path":"$DIR/sessions/<stamp>_<id>.jsonl","session_name":null,"session_description":null,"cwd":"$DIR","git_branch":null,"model":{"id":"deepseek-flash","provider":"deepseek","key":"deepseek/deepseek-flash","name":"DeepSeek V4.1 Flash","context_window":1000000,"max_output":384000,"supports_thinking":true,"cost":{"input":0.3,"output":1.2,"cache_read":0.006}},"thinking":"off","running":false,"message_count":0,"usage":{"input":0,"output":0,"cache_read":0},"cost_usd":0,"context_tokens":0,"active_host":"backend","hosts":[{"id":"backend","name":"<host>","cwd":"$DIR","session_id":null,"session_name":null}],"subagents":[],"jobs":[]}}}
+    {"type":"response","id":"r","ok":true,"result":{"client_id":"client-1","host_id":"client-1","namespace":null,"user":null,"superuser":false,"state":{"session_id":"<id>","session_path":"$DIR/sessions/<stamp>_<id>.jsonl","session_name":null,"session_description":null,"cwd":"$DIR","git_branch":null,"model":{"id":"deepseek-flash","provider":"deepseek","key":"deepseek/deepseek-flash","name":"DeepSeek V4.1 Flash","context_window":1000000,"max_output":384000,"supports_thinking":true,"cost":{"input":0.3,"output":1.2,"cache_read":0.006}},"thinking":"off","running":false,"message_count":0,"usage":{"input":0,"output":0,"cache_read":0},"cost_usd":0,"context_tokens":0,"active_host":"backend","hosts":[{"id":"backend","name":"<host>","cwd":"$DIR","session_id":null,"session_name":null}],"subagents":[],"jobs":[]}}}
     connected to 127.0.0.1:PORT as client-2
     {"type":"response","id":"r","ok":true,"result":{}}
     {"type":"response","id":"r","ok":true,"result":{}}

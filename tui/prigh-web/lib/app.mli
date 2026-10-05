@@ -31,6 +31,24 @@ module Users_purpose : sig
   [@@deriving sexp_of, equal]
 end
 
+module Skills_purpose : sig
+  (** Why we asked for [list_skills]. *)
+  type t =
+    | Complete (** [/skill:] in the editor *)
+    | Picker of string (** [/skills], filtered by this *)
+  [@@deriving sexp_of, equal]
+end
+
+module Mcp_purpose : sig
+  (** Why we asked for [list_mcp] or [mcp_approve]. *)
+  type t =
+    | Picker (** [/mcp] *)
+    | Reconnect (** [/mcp reconnect]: report it *)
+    | Refreshed of string
+    (** a server ([Mcp_servers.id]) approved or restarted from the picker *)
+  [@@deriving sexp_of, equal]
+end
+
 module Reply_tag : sig
   type t =
     | Ignore
@@ -62,6 +80,8 @@ module Reply_tag : sig
     | Reconnect of int (** generation; stale replies are ignored *)
     | Config (** [get_config] *)
     | Config_saved of string (** the new config; the notice is shown *)
+    | Fallback_saved (** the new config; its chain is shown *)
+    | Default_dir_saved
     | Default_saved
     | Session_stats
     | Entries of Entries_purpose.t
@@ -74,6 +94,11 @@ module Reply_tag : sig
     | Btw of string (** the side question's id *)
     | Users of Users_purpose.t
     | User_switched (** [set_user]'s reply, like [hello]'s *)
+    | Skills of
+        { place : string (** [Skills.place]: stale replies are ignored *)
+        ; purpose : Skills_purpose.t
+        }
+    | Mcp of Mcp_purpose.t
   [@@deriving sexp_of, equal]
 end
 
@@ -307,6 +332,7 @@ module Model : sig
     ; users : string list option
       (** the users we may act as: [Some] for superusers *)
     ; terminal : Terminal.t
+    ; skills : Skills.t (** for [/skill:]'s completion *)
     }
   [@@deriving sexp_of]
 

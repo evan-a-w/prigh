@@ -51,12 +51,31 @@ val with_test_driver
       -> 'a Async.Deferred.Or_error.t)
   -> 'a Async.Deferred.Or_error.t
 
+(** The [hello] sent on every connection: [hello] plus [tools] and, with
+    [local_tools], a fresh [host_id], so that the backend knows our tool host
+    again when we reconnect (and resumes its sessions on it). *)
+val connection_hello
+  :  (string * Prigh_protocol.Json.t) list
+  -> local_tools:string option
+  -> (string * Prigh_protocol.Json.t) list
+
+(** Connects [client] again after [delay_ms] and sends [hello], with
+    [session] and [as_user] replacing those fields; the [hello] reply. *)
+val reconnect
+  :  Prigh_client.Client.t
+  -> hello:(string * Prigh_protocol.Json.t) list
+  -> delay_ms:int
+  -> session:string option
+  -> as_user:string option
+  -> (Prigh_protocol.Json.t, string) Result.t Deferred.t
+
 (** Runs the TUI until the user quits. [connect] opens the transport (and is
     called again to reconnect after the backend goes away); [hello] is sent on
     every connection (name, cwd, session, token, ...), with [session] replaced
     by the current one when reconnecting. With [local_tools] (the path of the
     prigh binary) the session's tools run on this machine through
-    [prigh tool-host] and [hello] advertises [tools: true]. *)
+    [prigh tool-host] and [hello] advertises [tools: true] and a [host_id]
+    ({!connection_hello}). *)
 val run
   :  connect:(unit -> Prigh_client.Transport.t Deferred.Or_error.t)
   -> hello:(string * Prigh_protocol.Json.t) list

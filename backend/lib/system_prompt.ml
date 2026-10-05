@@ -55,9 +55,12 @@ let base ~nix ~tools =
           [ "Subagents run in the background: subagent returns at once, and \
              each one's final report arrives later as a message starting with \
              \"[subagent <id> finished]\" (or failed), sent automatically, not \
-             typed by the user. While they run, keep working or end your turn; \
-             call subagent_wait only when you cannot continue without a \
-             result."
+             typed by the user. While they run, keep working on whatever does \
+             not depend on them, or end your turn: you are woken by each \
+             report, so never call subagent_wait (or job_wait) just to pass \
+             the time or to collect results you could take as they arrive. \
+             Wait only when you cannot do anything useful without a result, \
+             and then wait for that one (ids, all=false), not all of them."
           ; ""
           ]
         else [])
@@ -99,7 +102,8 @@ let read_instructions ~cwd ~home =
     path, String.strip (In_channel.read_all path))
 ;;
 
-let build ?date ?instructions ?(nix = false) ~cwd ~home ~tools () =
+let build ?date ?instructions ?(nix = false) ?(skills = []) ~cwd ~home ~tools ()
+  =
   let date =
     match date with
     | Some d -> d
@@ -121,7 +125,15 @@ let build ?date ?instructions ?(nix = false) ~cwd ~home ~tools () =
     List.map instructions ~f:(fun (path, text) ->
       sprintf "Instructions from %s:\n%s" path text)
   in
-  String.concat ~sep:"\n\n" ([ base ~nix ~tools; environment ] @ instructions)
+  let skills =
+    if
+      List.exists tools ~f:(fun (t : Tool_spec.t) -> String.equal t.name "read")
+    then Option.to_list (Skill.prompt_section skills)
+    else []
+  in
+  String.concat
+    ~sep:"\n\n"
+    ([ base ~nix ~tools ] @ skills @ [ environment ] @ instructions)
 ;;
 
 let discretion =

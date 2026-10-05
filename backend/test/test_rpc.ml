@@ -638,10 +638,10 @@ let%expect_test "config: get, set, invalid, and the config_changed event" =
   call t h ~params:{|{"call_id": "nope", "allow": true}|} "tool_confirm_respond";
   [%expect
     {|
-    {"type":"response","id":"r1","ok":true,"result":{"scoped_models":[],"confirm_tools":false,"default_model":null,"default_thinking":null}}
-    {"type":"event","event":"config_changed","config":{"scoped_models":["a","b"],"confirm_tools":true,"default_model":null,"default_thinking":null}}
-    {"type":"response","id":"r1","ok":true,"result":{"scoped_models":["a","b"],"confirm_tools":true,"default_model":null,"default_thinking":null}}
-    {"type":"response","id":"r1","ok":true,"result":{"scoped_models":["a","b"],"confirm_tools":true,"default_model":null,"default_thinking":null}}
+    {"type":"response","id":"r1","ok":true,"result":{"scoped_models":[],"confirm_tools":false,"default_model":null,"default_thinking":null,"fallback_models":[],"default_cwd":null}}
+    {"type":"event","event":"config_changed","config":{"scoped_models":["a","b"],"confirm_tools":true,"default_model":null,"default_thinking":null,"fallback_models":[],"default_cwd":null}}
+    {"type":"response","id":"r1","ok":true,"result":{"scoped_models":["a","b"],"confirm_tools":true,"default_model":null,"default_thinking":null,"fallback_models":[],"default_cwd":null}}
+    {"type":"response","id":"r1","ok":true,"result":{"scoped_models":["a","b"],"confirm_tools":true,"default_model":null,"default_thinking":null,"fallback_models":[],"default_cwd":null}}
     {"type":"response","id":"r1","ok":false,"error":"config.scoped_models must be an array of strings"}
     {"type":"response","id":"r1","ok":false,"error":"missing param \"config\""}
     {"type":"response","id":"r1","ok":false,"error":"no pending confirmation for tool call \"nope\""}
@@ -853,7 +853,7 @@ let%expect_test "remote tool host: exec round trip, switch, disconnect" =
     | _ -> ());
   [%expect
     {|
-    {"type":"response","id":"r2","ok":true,"result":{"client_id":"client-2","namespace":null,"user":null,"superuser":false,"state":{"session_id":"<id>","session_path":"$DIR/sessions/<stamp>_<id>.jsonl","session_name":null,"session_description":null,"cwd":"/home/me/proj","git_branch":null,"model":{"id":"deepseek-flash","provider":"deepseek","key":"deepseek/deepseek-flash","name":"DeepSeek V4.1 Flash","context_window":1000000,"max_output":384000,"supports_thinking":true,"cost":{"input":0.3,"output":1.2,"cache_read":0.006}},"thinking":"off","running":false,"message_count":0,"usage":{"input":0,"output":0,"cache_read":0},"cost_usd":0,"context_tokens":0,"active_host":"client-2","hosts":[{"id":"backend","name":"<host>","cwd":"$DIR","session_id":null,"session_name":null},{"id":"client-2","name":"laptop","cwd":"/home/me/proj","session_id":"<id>","session_name":null}],"subagents":[],"jobs":[]}}}
+    {"type":"response","id":"r2","ok":true,"result":{"client_id":"client-2","host_id":"client-2","namespace":null,"user":null,"superuser":false,"state":{"session_id":"<id>","session_path":"$DIR/sessions/<stamp>_<id>.jsonl","session_name":null,"session_description":null,"cwd":"/home/me/proj","git_branch":null,"model":{"id":"deepseek-flash","provider":"deepseek","key":"deepseek/deepseek-flash","name":"DeepSeek V4.1 Flash","context_window":1000000,"max_output":384000,"supports_thinking":true,"cost":{"input":0.3,"output":1.2,"cache_read":0.006}},"thinking":"off","running":false,"message_count":0,"usage":{"input":0,"output":0,"cache_read":0},"cost_usd":0,"context_tokens":0,"active_host":"client-2","hosts":[{"id":"backend","name":"<host>","cwd":"$DIR","session_id":null,"session_name":null},{"id":"client-2","name":"laptop","cwd":"/home/me/proj","session_id":"<id>","session_name":null}],"subagents":[],"jobs":[]}}}
     client-2 /home/me/proj
     {"type":"response","id":"r1","ok":true,"result":{}}
     (host answered $instructions)
@@ -930,7 +930,7 @@ let%expect_test "remote tool host: disconnect mid-call fails the call" =
     client-2
     tool_result: "[tool host disconnected]"
     {"type":"response","id":"r1","ok":true,"result":{}}
-    tool_result: "tool host \"client-2\" is not connected; use set_active_host to pick another"
+    tool_result: "waiting for tool host \"laptop\" to reconnect; /host picks another"
     |}]
 ;;
 
@@ -1260,9 +1260,9 @@ let%expect_test "change_default saves the current model and thinking level" =
     {|
     {"type":"response","id":"r1","ok":true,"result":{}}
     {"type":"response","id":"r1","ok":true,"result":{}}
-    {"type":"event","event":"config_changed","config":{"scoped_models":[],"confirm_tools":false,"default_model":"deepseek/deepseek-v4-pro","default_thinking":"max"}}
-    {"type":"response","id":"r1","ok":true,"result":{"scoped_models":[],"confirm_tools":false,"default_model":"deepseek/deepseek-v4-pro","default_thinking":"max"}}
-    {"type":"response","id":"r1","ok":true,"result":{"scoped_models":[],"confirm_tools":false,"default_model":"deepseek/deepseek-v4-pro","default_thinking":"max"}}
+    {"type":"event","event":"config_changed","config":{"scoped_models":[],"confirm_tools":false,"default_model":"deepseek/deepseek-v4-pro","default_thinking":"max","fallback_models":[],"default_cwd":null}}
+    {"type":"response","id":"r1","ok":true,"result":{"scoped_models":[],"confirm_tools":false,"default_model":"deepseek/deepseek-v4-pro","default_thinking":"max","fallback_models":[],"default_cwd":null}}
+    {"type":"response","id":"r1","ok":true,"result":{"scoped_models":[],"confirm_tools":false,"default_model":"deepseek/deepseek-v4-pro","default_thinking":"max","fallback_models":[],"default_cwd":null}}
     {"type":"response","id":"r1","ok":true,"result":{}}
     (deepseek/deepseek-v4-pro (On (Max)))
     |}]
@@ -1308,5 +1308,69 @@ let%expect_test
     {"type":"response","id":"r1","ok":true,"result":{}}
     starter: {"type":"event","event":"auth","kind":"done","provider":"deepseek","method":"api_key"}
     other: {"type":"event","event":"auth","kind":"done","provider":"deepseek","method":"api_key"}
+    |}]
+;;
+
+let%expect_test "skills: list_skills, /skill: prompts, unknown names refused" =
+  with_agent [ Reply.text "done" ]
+  @@ fun t agent h ->
+  call t h "list_skills";
+  [%expect {| {"type":"response","id":"r1","ok":true,"result":{"skills":[]}} |}];
+  write
+    t
+    ".claude/skills/frontend-design/SKILL.md"
+    "---\nname: frontend-design\ndescription: distinctive UI\n---\nBe bold.\n";
+  call t h "list_skills";
+  [%expect
+    {| {"type":"response","id":"r1","ok":true,"result":{"skills":[{"name":"frontend-design","description":"distinctive UI","path":"$DIR/.claude/skills/frontend-design/SKILL.md","model_invocable":true}]}} |}];
+  call t h "prompt" ~params:{|{"text": "/skill:frontend a landing page"}|};
+  call t h "steer" ~params:{|{"text": "/skill:frontend"}|};
+  [%expect
+    {|
+    {"type":"response","id":"r1","ok":false,"error":"unknown skill \"frontend\"; did you mean: frontend-design (/skills lists them all)"}
+    {"type":"response","id":"r1","ok":false,"error":"unknown skill \"frontend\"; did you mean: frontend-design (/skills lists them all)"}
+    |}];
+  call
+    t
+    h
+    "prompt"
+    ~params:{|{"text": "/skill:frontend-design a landing page"}|};
+  Agent.wait_idle agent;
+  [%expect {| {"type":"response","id":"r1","ok":true,"result":{}} |}];
+  List.iter (Agent.messages agent) ~f:(function
+    | User u -> print_endline (mask t u.text)
+    | Assistant _ | Tool_result _ -> ());
+  [%expect
+    {|
+    <skill name="frontend-design" location="$DIR/.claude/skills/frontend-design/SKILL.md">
+    References are relative to $DIR/.claude/skills/frontend-design.
+
+    Be bold.
+    </skill>
+
+    a landing page
+    |}];
+  call t h "list_mcp";
+  [%expect
+    {| {"type":"response","id":"r1","ok":false,"error":"MCP is off in this backend (it was started with -no-tools)"} |}]
+;;
+
+let%expect_test "set_config: omitted fields keep their values" =
+  with_agent []
+  @@ fun t _agent h ->
+  call
+    t
+    h
+    "set_config"
+    ~params:
+      {|{"config": {"fallback_models": ["gpt-6-sol", "deepseek-flash"], "default_cwd": "/srv"}}|};
+  call t h "set_config" ~params:{|{"config": {"confirm_tools": true}}|};
+  call t h "set_config" ~params:{|{"config": {"fallback_models": ["nope"]}}|};
+  Queue.clear h.sent;
+  [%expect
+    {|
+    {"type":"response","id":"r1","ok":true,"result":{"scoped_models":[],"confirm_tools":false,"default_model":null,"default_thinking":null,"fallback_models":["openai-codex/gpt-6-sol","deepseek/deepseek-flash"],"default_cwd":"/srv"}}
+    {"type":"response","id":"r1","ok":true,"result":{"scoped_models":[],"confirm_tools":true,"default_model":null,"default_thinking":null,"fallback_models":["openai-codex/gpt-6-sol","deepseek/deepseek-flash"],"default_cwd":"/srv"}}
+    {"type":"response","id":"r1","ok":false,"error":"fallback_models: unknown model \"nope\"; did you mean: openai/o1 (o1), openai/o3 (o3), openai/gpt-4 (GPT-4)"}
     |}]
 ;;

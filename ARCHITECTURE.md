@@ -3,7 +3,9 @@
 prigh is an agentic coding harness split into an OCaml backend (`backend/`,
 all the logic) and an OCaml frontend (`tui/`, Bonsai on OxCaml: rendering,
 input and UI state only) that runs in a terminal or a browser. There is no
-plugin system: tools, subagents, providers and slash commands are compiled in.
+plugin system: tools, subagents, providers and slash commands are compiled in;
+what comes from outside is skills (instructions in `SKILL.md` files) and the
+tools of MCP servers.
 
 ```
  terminal ── frontend (prigh-tui, Bonsai_term) ── JSON lines on stdio or TCP ── backend `prigh serve` (OCaml, Eio)
@@ -36,8 +38,8 @@ the JSONL file is the durable state) and every client is attached to exactly
 one session at a time: its requests act on that session and it receives that
 session's events. Several frontends can attach to the same session and each
 sees the same stream. A session keeps running when its clients go away, and
-a client sends `hello` first (name, cwd, whether it can run tools, an
-optional session id or path, the `-token` if the backend requires one, and
+a client sends `hello` first (name, cwd, whether it can run tools and its
+host id, an optional session id or path, the `-token` if the backend requires one, and
 with `-tokens` optionally the user, i.e. the namespace name).
 
 ### Tool hosts
@@ -47,20 +49,36 @@ read, write, edit, ls, grep, find) and `!cmd` shells run. It is either the
 backend itself or a connected client that advertised `tools: true` in
 `hello` (a TUI, or a standalone `prigh tool-host -connect`); the subagent
 tool always runs in the backend but its tool calls follow the same active
-host. With `-no-backend-host` the backend is not a host at all (not listed,
-no in-process tools, instructions, path listings or git branch), and a
-session without a host adopts the first one that connects. Tools default to the frontend: a tool-capable
-client takes over when it attaches unless the user pinned a host with
-`set_active_host` (`/host` in the TUI). The session cwd is a property of the
-host, so switching hosts switches the cwd (and `/cd` validates the directory
-on the host). When the active host is a client, `Agent.host_exec` emits a
+host. A client host is known by its *host id*: the `host_id` it sends in
+`hello` (`prigh tool-host -connect` and the TUI pick a random one per
+process and send it on every reconnect), or its client id without one, so a
+host that reconnects is the same host. A newer connection claiming a held id
+takes it over: the older one is a connection the host gave up on (the
+backend may notice a dropped connection late), so it falls back to its
+client id and its in-flight calls and relayed terminals fail. `hello`
+answers with both `client_id` and `host_id`. With `-no-backend-host` the
+backend is not a host at all (not listed, no in-process tools,
+instructions, path listings or git branch), and a session that never had a
+host adopts the first one that connects. Tools default to the frontend: a
+tool-capable client takes over a session that runs on the backend by
+default or has no host when it attaches, never one the user pinned with
+`set_active_host` (`/host` in the TUI) or whose host is only disconnected.
+The session cwd is a property of the host, so switching hosts switches the
+cwd (and `/cd` validates the directory on the host); a session remembers
+its cwd on each host, also while the host is away (`Rpc_server` keeps them
+for evicted sessions, so a TUI that was its session's only client resumes
+it in place). When the active host is a client, `Agent.host_exec` emits a
 `tool_exec` event to that client only and waits on a promise; the client
 answers with `tool_exec_output` (streamed chunks, fanned out to everyone as
 `tool_output`) and `tool_exec_result`; an abort sends `tool_exec_cancel`.
 Disconnecting the active host fails its in-flight calls with `[tool host
-disconnected]` and later calls with "not connected", so the run continues
-and the model sees the error; the TUI shows `tools:offline` until another
-host is chosen. The frontend does not implement any tools: it proxies
+disconnected]`, but the session stays on that host: later calls fail with
+"waiting for tool host NAME to reconnect; /host picks another" (the run
+continues and the model sees the error) and the TUI shows `tools:offline`.
+When the same host id connects again the session resumes on it in the cwd
+it had there (a `Notice` "tools run on NAME again in CWD", a state change,
+and no environment note for the model). Only `set_active_host` moves a
+session off a disconnected host. The frontend does not implement any tools: it proxies
 `tool_exec` to a local `prigh tool-host` process (`Tool_host` in the backend
 runs `Host_ops.execute`, the same code path the backend uses for itself,
 plus five pseudo-tools: `$resolve_dir` for `/cd` and `/host`, `$read_file`
@@ -259,9 +277,38 @@ two can share one.
   is on) and `on_host` (runs on the active tool host rather than always in
   the backend).
 - `Host_ops` — what a tool host does for a session: the `on_host` tools by
-  name plus `$resolve_dir`/`$read_file`/`$list_paths`/`$instructions`. `Tool_host` is the `prigh tool-host`
-  worker loop around it (`exec`/`cancel` in, `output`/`result` out, one fiber
-  per exec).
+  name plus `$resolve_dir`/`$read_file`/`$list_paths`/`$instructions` (whose
+  reply also lists the host's skills), `$skill` (one skill's file, for
+  `/skill:`) and `$mcp_servers`/`$mcp_call`/`$mcp_approve` (the host's
+  `Mcp_hub`). Every `$` op honours a `home` argument only in the backend:
+  `Tool_host`, the `prigh tool-host` worker loop around it (`exec`/`cancel`
+  in, `output`/`result` out, one fiber per exec), strips it so a remote host
+  uses its own home. A tool host predating an op answers "unknown host tool",
+  which the backend treats as having nothing (no skills, no MCP servers).
+- `Frontmatter`, `Skill` — a `SKILL.md`'s YAML frontmatter (the scalar forms
+  skill files use), discovery (`.prigh/skills`, `.claude/skills`,
+  `.agents/skills` in the cwd, its ancestors, then the home directory;
+  closest wins; nested a few levels), the system prompt's section, and
+  `/skill:NAME ARGS` expansion into a `<skill name location>` block followed
+  by ARGS.
+- MCP — `Mcp_config` reads `mcpServers` from the host's `~/.prigh/mcp.json`
+  and `.mcp.json` in the cwd and its ancestors (closest wins; `${VAR}` and
+  `${VAR:-default}`), and keeps approvals of project servers (by a digest of
+  the definition as written) in `~/.prigh/mcp-approvals.json`. `Mcp_client`
+  is one connection (stdio child in its own process group, or streamable
+  HTTP; `initialize`, `tools/list`, `tools/call`, cancellation, ping).
+  `Mcp_hub` holds a host's running servers, shared by all its sessions: one
+  per tool-host process, and one per namespace in the backend (none with
+  `-no-tools`, which turns MCP off for every host). A server starts the first
+  time a session needs it, keyed by its definition (so an edit starts a new
+  one); a failed start is remembered until `reconnect`. `Mcp_tools` is the
+  `$mcp_servers` wire format and turns a listing into prigh tools named
+  `mcp__<server>__<tool>` (`parallel_safe` when `readOnlyHint`, otherwise
+  `destructive`), whose `run` sends `$mcp_call {source, server, tool}` to the
+  session's active host. `Agent` asks the host for the listing at the start
+  of every run (so tools follow host and cwd changes), adds the tools to the
+  run's and its subagents' tool lists, and reports each problem once as a
+  `Notice`.
 - `Tool_bash` (streamed output, timeout, cancellation; with `background`
   at depth 0 it starts a job instead, see below), `Tool_read` (images
   through `Image.load`, as an image result),
@@ -318,9 +365,9 @@ two can share one.
 - `System_prompt` — built-in guidance plus environment facts plus
   `AGENTS.md`/`CLAUDE.md` files from `/` down to the cwd and
   `~/.prigh/AGENTS.md`; `read_instructions` scans the local filesystem and
-  `build ?instructions ?nix` accepts files fetched elsewhere (the tool host)
-  and whether that host has Nix, which adds how to get missing tools from
-  nixpkgs.
+  `build ?instructions ?nix ?skills` accepts files fetched elsewhere (the
+  tool host), whether that host has Nix, which adds how to get missing tools
+  from nixpkgs, and the host's skills, listed when the model has `read`.
   `Agent` builds it once, at the session's first run, and records it as a
   `System_prompt` session entry so every later request (and every reload)
   sends the same prefix, which is what provider prompt caches key on. When
@@ -350,7 +397,9 @@ two can share one.
 - `Agent` — one conversation: owns the session, model, thinking level and
   `Config`, the tool hosts (`add_host`/`remove_host`/`set_active_host`,
   `host_exec` and the pending remote executions), the run lifecycle (`prompt`, `steer` = after the current turn,
-  `follow_up` = after the loop ends, `abort` = cancels and returns the queued
+  `follow_up` = after the loop ends; `/skill:NAME ARGS` texts are expanded
+  through the host's `$skill` when queued, so an unknown skill fails the
+  request, and the queue keeps the typed text, `abort` = cancels and returns the queued
   texts to restore, `dequeue` = pops the last queued message, `shell` = runs
   a `!cmd` through the bash machinery), automatic compaction at 80% of the
   context window, and a subscriber list receiving `Agent.Event.t` (`Loop of
@@ -379,9 +428,27 @@ two can share one.
   (never `context_tokens`), and `State` also carries the session name, cwd
   and `git_branch`. `respond_confirm` answers a pending `Tool_confirm`.
 - `Config` — `~/.prigh/config.json` (`scoped_models : string list`,
-  `confirm_tools : bool`, `default_model`/`default_thinking`), loaded at
-  agent creation, read/written through `get_config`/`set_config`; unknown
-  fields are ignored. `Agent.save_as_default` (`change_default`,
+  `confirm_tools : bool`, `default_model`/`default_thinking`,
+  `fallback_models` (model keys) and `default_cwd`), loaded at agent
+  creation, read/written through `get_config`/`set_config`; unknown fields
+  are ignored. Each namespace has its own file, so each has its own
+  defaults. `set_config` merges the given fields over the current ones and
+  resolves `fallback_models` like `set_model` (stored as keys). A new
+  session starts in `default_cwd` (on the backend host) and on
+  `default_model`, else the first of `fallback_models`.
+- Model hand-over — `Usage_limit.unavailable` recognises errors meaning a
+  model cannot be used for now: an exhausted allowance or balance (`HTTP
+  402`, quota codes such as `usage_limit_reached`/`insufficient_quota`,
+  which `Sse_request` marks with `(usage limit reached)`, as it does an
+  Anthropic subscription's `anthropic-ratelimit-unified-status: rejected`)
+  or missing credentials. `Agent_loop` does not retry them. When a run ends
+  on one, `Agent` switches the session to the next model in
+  `fallback_models` after the current one (the first when the current one
+  is not listed) that this hand-over sequence has not tried, says so in a
+  `Notice`, and starts a new run whose first message tells the new model it
+  is taking over; the queue and follow-ups wait behind it. A user's prompt
+  starts a fresh sequence; an abort, a session switch or the end of the
+  chain stops it. `Agent.save_as_default` (`change_default`,
   `/change_default`) rereads the file and records the agent's current model
   and thinking level there; agents created without an explicit `-model`/
   `-thinking` start from them (a loaded session's own settings still win).
@@ -466,6 +533,11 @@ two can share one.
   `session_stats`, `set_cwd`, `list_paths`, `list_dirs`, `get_config`, `set_config`,
   `change_default`, `btw`, `btw_cancel`,
   `tool_confirm_respond`, `set_active_host`, `tool_exec_output`,
+  `list_skills` (`{skills: [{name, description, path, model_invocable}]}`),
+  `list_mcp {reconnect?}` and `mcp_approve {source, server}` (both
+  `{servers: [{name, source, project, status: ready|failed|needs_approval,
+  error?, tools: [{name, description}]}], problems}`, tools under their
+  prigh names),
   `tool_exec_result`, `auth_status`, `login`, `auth_respond`, `auth_cancel`,
   `logout`. `State` carries `active_host` and `hosts` (the backend first).
   `btw {question, btw_id?}` (`/btw`) answers a side question with one
@@ -613,8 +685,9 @@ copy of the protocol types and the e2e test guards the contract.
 
 - `protocol/` (`prigh_protocol`) — `Jsonaf` decoders for everything
   `Rpc_json` emits (`Message`, `Delta`, `State`, `Model`, `Session_summary`,
-  `Auth_status`, `Auth_event`, `Event`, `Server_message`) and the `Request`
-  encoder.
+  `Auth_status`, `Auth_event`, `Event`, `Server_message`, `Skill`,
+  `Mcp_server`, `Mcp_list`) and the `Request` encoder (`Request.Method` has
+  typed constructors for `list_skills`, `list_mcp` and `mcp_approve`).
 - `client/` (`prigh_client`, `Async_kernel` only so it links under
   js_of_ocaml) — `Transport.t` (a line channel; an in-memory pair for
   tests) and `Client` (created with a `connect` thunk and
@@ -664,6 +737,34 @@ copy of the protocol types and the e2e test guards the contract.
     `Btw_box` (the `/btw` panel above the editor: a newer question cancels
     and replaces it; Esc dismisses it before Esc's other meanings, so it
     never aborts the run), `Boxed` (the framed dialogs).
+  - Skills and MCP: `/skills` and `/mcp` are pickers over `list_skills` and
+    `list_mcp` (Enter on a server needing approval sends `mcp_approve`,
+    whose reply is the new list). `/skill:NAME ARGS` is sent as a prompt
+    tagged `Skill_prompt`, so a failure (an unknown name) puts the text back
+    in the editor and takes it off the queue. `Autocomplete`'s `Skill`
+    source completes names from `Skill_cache`, which is keyed by session,
+    tool host and directory (a stale key or reply fetches again or is
+    dropped) and emptied on reloads, `/setusr` and reconnects.
+    `Skill_message` parses the backend's expansion (`<skill name=…
+    location=…>`) back into name, file, body and arguments (prigh-web uses
+    it too): `Transcript`
+    renders it as a `Skill` item (`skill NAME` and the arguments; the body
+    only in verbose), and `/fork` lists and restores it as
+    `/skill:NAME ARGS`.
+  - Model hand-over and default directory: `/fallback` and `/default-dir`
+    show `Config`'s `fallback_models`/`default_cwd`, or send `set_config`
+    with only that field. The backend keeps the fields a `set_config`
+    leaves out, so every one the app sends (`/confirm`, `/scoped-models`
+    too) carries only its own field and a stale or missing `Config` cannot
+    undo another change. A refusal (an unknown model, with the backend's
+    suggestions) puts the command back in the editor. `Autocomplete`
+    completes `/fallback` word by word (the models not listed yet, `off`
+    first) and `/default-dir` with `list_dirs` on the backend's host when
+    it runs tools. `Handover_message` (prigh-web uses it too) parses the
+    user message the backend starts a hand-over run with (`[prigh: A cannot continue (ERROR), so B
+    takes over …]`): `Transcript` renders it as a `Handover` item (`↪
+    handed over from A to B`; the error only in verbose, since the failed
+    reply above it shows it) and `/fork` lists it by that line.
   - `Key.t` → `Intent.t` through `Keymap` (the one binding table; `/help`
     prints it). `Mode.t` (`Editing | Picker | Login_prompt | Text_prompt |
     Confirm | Search`) says who owns the keyboard; dialogs never stack, Esc
@@ -691,8 +792,11 @@ copy of the protocol types and the e2e test guards the contract.
   plain `ref`, not Bonsai state, because the handler receives a whole batch
   of events at once and state would only update after the frame, so every key
   in the batch would still see `Idle`.
-  `Term_app.run` sends `hello` before mounting the app and feeds the client
-  id back as `Set_client_id`, so `/host` can mark this frontend as "(here)"
+  `Term_app.run` sends `hello` (`connection_hello`: with local tools, a
+  `host_id` for the life of the process, also sent on reconnects) before
+  mounting the app and feeds the reply back as `Hello`, whose `client_id`
+  is our host id (`Hello_reply` prefers the reply's `host_id`), so `/host`
+  can mark this frontend as "(here)"
   and the status line can show `tools:<host>` when tools run elsewhere or
   `tools:offline` when the active host is gone. Mouse reporting is on so the
   wheel scrolls the transcript (`Scroll_up`/`Scroll_down`, three lines);
@@ -831,6 +935,29 @@ copy of the protocol types and the e2e test guards the contract.
       `Status_view`, and `Keys` (which of the dialog, the popup or the
       editor owns a key; `help`, and `browser`: the TUI's keys that the
       browser keeps).
+    - Skills and MCP: `Skills` caches `list_skills` for `/skill:`'s
+      completion, keyed by the session, its directory and tool host (a
+      reply for another place is ignored; switching user empties it), and
+      builds `/skills`' picker; `Completion` offers the names right after
+      `/skill:`, and `send` sends `/skill:NAME args` as a prompt (or steer
+      or follow-up) for the backend to expand. `Prigh_ui.Skill_message` (shared with
+      the TUI) parses the expanded user message (`<skill name
+      location>…</skill>` then the arguments), which `Chat_view` renders as a folded card above the
+      arguments and `Session_tree` labels as typed. `Mcp_servers` turns
+      `list_mcp`/`mcp_approve` replies (`Mcp_list`) into `/mcp`'s picker
+      (servers to act on first; the problems under it, in `Dialog_view`),
+      `/mcp reconnect`'s report and what became of an approved or restarted
+      server; a ready one's tools are the `Mcp_tools` dialog.
+    - Model hand-over: `/fallback` and `/default-dir` send `set_config`
+      with only the field they change (as `/confirm` and `/scoped-models`
+      do), and show the config the backend replies with (`/fallback`'s
+      names resolved to keys). `Completion`'s `Models` argument completes
+      the word under the cursor, leaving out the models already listed;
+      `Backend_directory` is `list_dirs` with `host: backend`.
+      `Prigh_ui.Handover_message` (shared with the TUI) parses the user
+      message the backend starts the next model's run with, which
+      `Chat_view` renders as a hand-over line with the error and
+      `Session_tree` labels the same way.
   - `app/` (`prigh_web_app`) — `Web_main.run`: connects a `Ws_transport`
     to `?backend=` or the page's `/ws`, sends `hello` with the active
     account (`prigh.user`/`prigh.token`, `web-app/`'s `Login`) and
@@ -937,6 +1064,15 @@ job tools, abort, kills that really end the process, id continuity across a
 reload, and jobs on a real `prigh tool-host` connected over TCP (output
 streamed into the job, `kill_job` cancelling the exec on the host, a dropped
 connection failing the job).
+
+`backend/test/test_host_reconnect.ml` covers tool hosts going away: a
+session stays on its disconnected host (also when another host attaches),
+tool calls say it waits for the host, the host reconnecting with the same
+`host_id` resumes it in the same cwd without an environment note, only
+`set_active_host` moves it, an evicted session resumes on its returning
+host, and a newer connection taking over a held host id. The real
+`prigh tool-host` reconnecting with its id is in `test_tool_host.ml`,
+terminals routed by host id in `test_terminal_relay.ml`.
 
 `backend/test/test_pi_rpc.ml` drives `Pi_rpc` over in-memory lines
 (pi commands in, pi events out) for prompts, steering, confirmations,

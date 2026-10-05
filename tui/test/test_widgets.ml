@@ -346,7 +346,7 @@ let%expect_test "fuzzy ranking: command names" =
     {|
     "mo" -> model scoped-models import
     "lo" -> login logout clone
-    "s"  -> state switch setusr session signout sessions scoped-models jobs host agents hotkeys verbosity
+    "s"  -> state switch skills skill: setusr session signout sessions scoped-models jobs host agents hotkeys verbosity
     "sw" -> switch
     "xyz" ->
     |}]
@@ -631,6 +631,8 @@ let%expect_test "keymap: every binding resolves to its intent and is documented"
     /model [name|id|provider/id]       pick or switch the model
     /scoped-models                     pick the models Ctrl+P cycles through
     /change_default                    save the current model and thinking level as the default for new sessions
+    /fallback [off|model...]           show or set the models that take over, in order, when a model's usage runs out
+    /default-dir [off|path]            show or set the directory new sessions start in
     /login [provider] [api_key|oauth]  log in to a provider
     /logout [provider]                 remove a provider's stored credential
     /thinking [off|low|on|high|max]    pick or set the thinking level
@@ -655,6 +657,9 @@ let%expect_test "keymap: every binding resolves to its intent and is documented"
     /import [path]                     import a session from a JSONL file
     /abort                             abort the current run
     /btw <question>                    ask a side question without interrupting the turn (not added to the conversation)
+    /skills                            pick a skill to run (Enter puts /skill:NAME in the editor)
+    /skill:NAME [args]                 run a skill, with what follows as its arguments
+    /mcp [reconnect]                   list MCP servers (Enter approves one or lists its tools); reconnect restarts failed ones
     /retry-backend-connection          reconnect to the backend now instead of waiting for the next retry
     /state                             show session state
     /clear                             clear the transcript
@@ -1093,7 +1098,7 @@ let%expect_test "autocomplete: Enter accepts arguments only after a filter or \
            Or_error.all (List.map items ~f:Prigh_protocol.Model.of_json)
          | _ -> Or_error.error_string "array"))
   in
-  let compute line =
+  let compute ?skills line =
     Autocomplete.compute
       ~line
       ~col:(String.length line)
@@ -1101,7 +1106,9 @@ let%expect_test "autocomplete: Enter accepts arguments only after a filter or \
       ~models
       ~auth:[]
       ~sessions:None
+      ~skills
       ~logged_in:(fun _ -> true)
+      ~default_dir_host:None
   in
   let show name ac =
     printf
@@ -1112,13 +1119,14 @@ let%expect_test "autocomplete: Enter accepts arguments only after a filter or \
        | Argument spec -> "arg:" ^ spec.name
        | Path -> "path"
        | Directory { host } ->
-         "dir" ^ Option.value_map host ~default:"" ~f:(fun h -> "@" ^ h))
+         "dir" ^ Option.value_map host ~default:"" ~f:(fun h -> "@" ^ h)
+       | Skill -> "skill")
       (Autocomplete.prefix ac)
       (Autocomplete.navigated ac)
       (Autocomplete.accepts_on_enter ac)
       (List.length (Autocomplete.items ac))
   in
-  let ac line = Option.value_exn (compute line) in
+  let ac ?skills line = Option.value_exn (compute ?skills line) in
   show "/mo" (ac "/mo");
   show "/model " (ac "/model ");
   show "/model down" (Autocomplete.down (ac "/model "));
@@ -1147,4 +1155,292 @@ let%expect_test "autocomplete: Enter accepts arguments only after a filter or \
   in
   print_endline (Autocomplete.accept dirs ~editor_text:"~/de");
   [%expect {| ~/dev/ |}]
+;;
+
+let%expect_test "autocomplete: /skill: completes skill names" =
+  let skill name description : Prigh_protocol.Skill.t =
+    { name
+    ; description
+    ; path = sprintf "/p/.claude/skills/%s/SKILL.md" name
+    ; model_invocable = true
+    }
+  in
+  let skills =
+    [ skill "frontend-design" "Build distinctive UIs"
+    ; skill "release" "Cut a release"
+    ; skill "review" "Review a diff"
+    ]
+  in
+  let compute ?skills line =
+    Autocomplete.compute
+      ~line
+      ~col:(String.length line)
+      ~line_index:0
+      ~models:[]
+      ~auth:[]
+      ~sessions:None
+      ~skills
+      ~logged_in:(fun _ -> true)
+      ~default_dir_host:None
+  in
+  let show line ?skills () =
+    match compute ?skills line with
+    | None -> printf "%-14s none\n" line
+    | Some ac ->
+      printf
+        "%-14s %s prefix=%S enter_accepts=%b items=[%s] accept=%S\n"
+        line
+        (match Autocomplete.source ac with
+         | Argument spec -> "arg:" ^ spec.name
+         | source -> Sexp.to_string [%sexp (source : Autocomplete.Source.t)])
+        (Autocomplete.prefix ac)
+        (Autocomplete.accepts_on_enter ac)
+        (String.concat
+           ~sep:" "
+           (List.map (Autocomplete.items ac) ~f:(fun i -> i.Picker.Item.id)))
+        (Autocomplete.accept ac ~editor_text:line)
+  in
+  show "/sk" ();
+  show "/skill:" ();
+  show "/skill:" ~skills ();
+  show "/skill:re" ~skills ();
+  show "/skill:fd" ~skills ();
+  show "/skill:zzz" ~skills ();
+  show "/skill:review x" ~skills ();
+  show "/skill:" ~skills:[] ();
+  show "/mcp " ();
+  [%expect
+    {|
+    /sk            Command prefix="sk" enter_accepts=true items=[skills skill:] accept="/skills "
+    /skill:        Skill prefix="" enter_accepts=false items=[] accept="/skill:"
+    /skill:        Skill prefix="" enter_accepts=false items=[frontend-design release review] accept="/skill:frontend-design "
+    /skill:re      Skill prefix="re" enter_accepts=true items=[review release frontend-design] accept="/skill:review "
+    /skill:fd      Skill prefix="fd" enter_accepts=true items=[frontend-design] accept="/skill:frontend-design "
+    /skill:zzz     none
+    /skill:review x none
+    /skill:        Skill prefix="" enter_accepts=false items=[] accept="/skill:"
+    /mcp           arg:mcp prefix="" enter_accepts=false items=[reconnect] accept="/mcp reconnect"
+    |}]
+;;
+
+let%expect_test "skill messages: parsed back into name, location, body and \
+                 arguments"
+  =
+  let head =
+    "<skill name=\"review\" location=\"/p/.prigh/skills/review/SKILL.md\">\n"
+  in
+  List.iter
+    [ head ^ "References are relative to /p.\n\nRead the diff.\n</skill>"
+    ; head ^ "Read the diff.\n</skill>\n\nfocus on app.ml\n\nand tests"
+    ; head ^ "Quote:\n</skill>\nnot the end\n</skill>\n\nargs"
+    ; head
+      ^ "Write </skill> in HTML.\n</skill>\n\nwhy does\n</skill>\nclose it?"
+    ; head ^ "</skill>"
+    ; head ^ "  Read the diff.\n\n</skill>\n\n  focus \n"
+    ; "<skill name=\"x\" location=\"/p/\"q\">/SKILL.md\">\nbody\n</skill>"
+    ; head ^ "no closing tag"
+    ; "<skill name=\"x\">\nbody\n</skill>"
+    ; "look at " ^ head ^ "body\n</skill>"
+    ; "<skill name=\"x"
+    ; "/skill:review focus"
+    ]
+    ~f:(fun text ->
+      match Skill_message.parse text with
+      | None -> print_endline "none"
+      | Some t ->
+        print_s
+          [%message
+            (t : Skill_message.t)
+              ~invocation:(Skill_message.invocation t : string)]);
+  [%expect
+    {|
+    ((t (
+       (name     review)
+       (location /p/.prigh/skills/review/SKILL.md)
+       (body "References are relative to /p.\n\nRead the diff.")
+       (args "")))
+     (invocation /skill:review))
+    ((t (
+       (name     review)
+       (location /p/.prigh/skills/review/SKILL.md)
+       (body     "Read the diff.")
+       (args     "focus on app.ml\n\nand tests")))
+     (invocation "/skill:review focus on app.ml\n\nand tests"))
+    ((t (
+       (name     review)
+       (location /p/.prigh/skills/review/SKILL.md)
+       (body     "Quote:\n</skill>\nnot the end")
+       (args     args)))
+     (invocation "/skill:review args"))
+    ((t (
+       (name     review)
+       (location /p/.prigh/skills/review/SKILL.md)
+       (body     "Write </skill> in HTML.")
+       (args     "why does\n</skill>\nclose it?")))
+     (invocation "/skill:review why does\n</skill>\nclose it?"))
+    ((t (
+       (name     review)
+       (location /p/.prigh/skills/review/SKILL.md)
+       (body     "")
+       (args     "")))
+     (invocation /skill:review))
+    ((t (
+       (name     review)
+       (location /p/.prigh/skills/review/SKILL.md)
+       (body     "Read the diff.")
+       (args     focus)))
+     (invocation "/skill:review focus"))
+    ((t (
+       (name     x)
+       (location "/p/\"q\">/SKILL.md")
+       (body     body)
+       (args     "")))
+     (invocation /skill:x))
+    none
+    none
+    none
+    none
+    none
+    |}]
+;;
+
+let%expect_test "autocomplete: /fallback completes each word with a model not \
+                 listed yet; /default-dir lists directories on its host"
+  =
+  let models =
+    Or_error.ok_exn
+      (Prigh_protocol.Json.parse Fixtures.models_json
+       |> Or_error.bind ~f:(function
+         | `Array items ->
+           Or_error.all (List.map items ~f:Prigh_protocol.Model.of_json)
+         | _ -> Or_error.error_string "array"))
+  in
+  let show ?col ?default_dir_host line =
+    match
+      Autocomplete.compute
+        ~line
+        ~col:(Option.value col ~default:(String.length line))
+        ~line_index:0
+        ~models
+        ~auth:[]
+        ~sessions:None
+        ~skills:None
+        ~logged_in:(fun _ -> true)
+        ~default_dir_host
+    with
+    | None -> printf "%S none\n" line
+    | Some ac ->
+      printf
+        "%S %s prefix=%S enter_accepts=%b\n  items=[%s]\n  accept=%S\n"
+        line
+        (match Autocomplete.source ac with
+         | Argument spec -> "arg:" ^ spec.name
+         | source -> Sexp.to_string [%sexp (source : Autocomplete.Source.t)])
+        (Autocomplete.prefix ac)
+        (Autocomplete.accepts_on_enter ac)
+        (String.concat
+           ~sep:" "
+           (List.map (Autocomplete.items ac) ~f:(fun i -> i.Picker.Item.id)))
+        (Autocomplete.accept ac ~editor_text:line)
+  in
+  show "/fallback ";
+  show "/fallback fab";
+  show "/fallback anthropic/claude-fable-5 gp";
+  show "/fallback anthropic/claude-fable-5 openai/gpt-5.5 ";
+  (* The cursor in the first word of three: the word is replaced, the rest
+     kept. *)
+  show
+    ~col:(String.length "/fallback dee")
+    "/fallback deep openai/gpt-5.5 anthropic/claude-fable-5";
+  show "/fallback off";
+  show "/fallback zzzz";
+  show "/default-dir ~/pro";
+  show ~default_dir_host:"backend" "/default-dir ~/pro";
+  [%expect
+    {|
+    "/fallback " arg:fallback prefix="" enter_accepts=false
+      items=[off anthropic/claude-fable-5 anthropic/claude-fable-5-1 openai/gpt-5.5 deepseek/deepseek-flash]
+      accept="/fallback off"
+    "/fallback fab" arg:fallback prefix="fab" enter_accepts=true
+      items=[anthropic/claude-fable-5 anthropic/claude-fable-5-1]
+      accept="/fallback anthropic/claude-fable-5"
+    "/fallback anthropic/claude-fable-5 gp" arg:fallback prefix="gp" enter_accepts=true
+      items=[openai/gpt-5.5]
+      accept="/fallback anthropic/claude-fable-5 openai/gpt-5.5"
+    "/fallback anthropic/claude-fable-5 openai/gpt-5.5 " arg:fallback prefix="" enter_accepts=false
+      items=[anthropic/claude-fable-5-1 deepseek/deepseek-flash]
+      accept="/fallback anthropic/claude-fable-5 openai/gpt-5.5 anthropic/claude-fable-5-1"
+    "/fallback deep openai/gpt-5.5 anthropic/claude-fable-5" arg:fallback prefix="deep" enter_accepts=true
+      items=[deepseek/deepseek-flash anthropic/claude-fable-5-1]
+      accept="/fallback deepseek/deepseek-flash openai/gpt-5.5 anthropic/claude-fable-5"
+    "/fallback off" arg:fallback prefix="off" enter_accepts=true
+      items=[off]
+      accept="/fallback off"
+    "/fallback zzzz" none
+    "/default-dir ~/pro" (Directory(host())) prefix="~/pro" enter_accepts=true
+      items=[]
+      accept="/default-dir ~/pro"
+    "/default-dir ~/pro" (Directory(host(backend))) prefix="~/pro" enter_accepts=true
+      items=[]
+      accept="/default-dir ~/pro"
+    |}]
+;;
+
+let%expect_test "hand-over messages: parsed back into from, to and the error" =
+  List.iter
+    [ "[prigh: openai-codex/gpt-6-sol cannot continue (HTTP 429: The usage \
+       limit has been reached (usage limit reached)), so \
+       anthropic/claude-opus-5-5 takes over this conversation from here. Carry \
+       on with the task where it left off.]"
+    ; "[prigh: a/b cannot continue (no, so what), so c/d takes over this \
+       conversation from here. Carry on with the task where it left off.]"
+    ; "[prigh: a/x cannot continue (HTTP 429: {\"error\": \"usage limit \
+       reached (plan: pro), try later\"}), so b/y takes over this conversation \
+       from here. Carry on with the task where it left off.]"
+    ; "[prigh: a/x cannot continue (quota (daily), so wait; b/y takes over \
+       this conversation), so b/y takes over this conversation from here. \
+       Carry on with the task where it left off.]"
+    ; "[prigh: something else]"
+    ; "[prigh: a/b cannot continue (x), so c/d takes over this conversation \
+       from here."
+    ; "[prigh: a/b cannot continue (x) and c/d takes over this conversation.]"
+    ; "please: [prigh: a/b cannot continue (x), so c/d takes over this \
+       conversation.]"
+    ; "[prigh: a/b cannot continue (x), so c d takes over this conversation.]"
+    ; "[prigh: a b cannot continue (x), so c/d takes over this conversation.]"
+    ; "[prigh:  cannot continue (x), so c/d takes over this conversation.]"
+    ]
+    ~f:(fun text ->
+      match Handover_message.parse text with
+      | None -> print_endline "none"
+      | Some t ->
+        print_s [%sexp (t : Handover_message.t)];
+        print_endline (Handover_message.summary t));
+  [%expect
+    {|
+    ((from openai-codex/gpt-6-sol)
+     (to_  anthropic/claude-opus-5-5)
+     (error "HTTP 429: The usage limit has been reached (usage limit reached)"))
+    ↪ handed over from openai-codex/gpt-6-sol to anthropic/claude-opus-5-5
+    ((from  a/b)
+     (to_   c/d)
+     (error "no, so what"))
+    ↪ handed over from a/b to c/d
+    ((from a/x)
+     (to_  b/y)
+     (error
+      "HTTP 429: {\"error\": \"usage limit reached (plan: pro), try later\"}"))
+    ↪ handed over from a/x to b/y
+    ((from a/x)
+     (to_  b/y)
+     (error "quota (daily), so wait; b/y takes over this conversation"))
+    ↪ handed over from a/x to b/y
+    none
+    none
+    none
+    none
+    none
+    none
+    none
+    |}]
 ;;

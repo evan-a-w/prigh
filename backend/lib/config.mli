@@ -7,10 +7,19 @@ type t =
   ; default_model : string option
     (** model key for new sessions, set by [/change_default] *)
   ; default_thinking : Thinking.t option
+  ; fallback_models : string list
+    (** model keys, in order: when a model's usage runs out (or it has no
+        credentials), a run hands over to the next one after it *)
+  ; default_cwd : string option
+    (** where new sessions start on the backend host *)
   }
 [@@deriving sexp_of]
 
 val default : t
+
+(** The model for new sessions: [default_model], else the first of
+    [fallback_models]. *)
+val start_model : t -> string option
 
 (** Reads [~/.prigh/config.json] under [home]. A missing file yields
     {!default}; unknown fields are ignored. *)

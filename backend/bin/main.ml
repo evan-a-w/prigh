@@ -109,6 +109,7 @@ let common_params =
       | None -> Namespace.World.legacy ~home:(home ()) ~auth_file
     in
     let { Namespace.World.home; sessions_dir; store; getenv } = world in
+    let cwd_given = Option.is_some cwd in
     let cwd = Option.value cwd ~default:(Core_unix.getcwd ()) in
     let models = Model_registry.create ~env ~sw ~home ~store ~getenv () in
     let model =
@@ -157,6 +158,7 @@ let common_params =
           eprintf "cannot load session: %s\n" (Error.to_string_hum e);
           exit 2)
     in
+    let mcp = if no_tools then None else Some (Mcp_hub.create ~env ~sw ()) in
     (* One agent per session; the subagent tool follows its own agent's
        model and thinking level. *)
     let new_agent ?session ~cwd () =
@@ -194,6 +196,8 @@ let common_params =
           ~models
           ~auto_describe:(Option.is_none faux_script && not faux)
           ~backend_host
+          ?mcp
+          ~use_default_cwd:(not cwd_given)
           ~cwd
           ()
       in
@@ -789,6 +793,14 @@ let tool_host_command =
          "-name"
          (optional string)
          ~doc:"NAME how the host is shown (default: the hostname)"
+     and host_id =
+       flag
+         "-host-id"
+         (optional string)
+         ~doc:
+           "ID what sessions know this host by, so they resume on it when it \
+            reconnects; give a fixed one to keep it across restarts (default: \
+            random, one per process)"
      and cwd =
        flag
          "-cwd"
@@ -833,6 +845,7 @@ let tool_host_command =
            ~port
            ~token
            ?user
+           ?host_id
            ~name:(Option.value name ~default:(Core_unix.gethostname ()))
            ~cwd
            ())

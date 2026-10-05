@@ -26,6 +26,7 @@ val compute
   :  ?sessions:Session_summary.t list
   -> ?hosts:Host.t list
   -> ?users:string list
+  -> ?skills:Skill.t list
   -> text:string
   -> cursor:int
   -> models:Llm.t list
@@ -39,8 +40,8 @@ val compute
 val same : t -> t -> bool
 
 (** The RPC that lists the items ([list_paths] or [list_dirs]) and its
-    [prefix]. *)
-val request : t -> (string * string) option
+    params. *)
+val request : t -> (string * (string * Json.t) list) option
 
 (** The backend's listing for [prefix]; stale ones are ignored. *)
 val set_results : t -> prefix:string -> string list -> t
@@ -48,6 +49,6 @@ val set_results : t -> prefix:string -> string list -> t
 val move : t -> int -> t
 
 (** The text with the highlighted item in place of [prefix], and the caret
-    after it. Commands get a trailing space and files a space (directories
-    keep completing). *)
+    after it. Commands get a trailing space (but [skill:], whose skill name
+    follows), and files and skills a space (directories keep completing). *)
 val accept : t -> text:string -> string * int

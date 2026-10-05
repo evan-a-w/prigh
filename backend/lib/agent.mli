@@ -10,6 +10,8 @@ module Host : sig
       [backend_id]) or a connected client that advertised tool support. *)
   type t =
     { id : string
+      (** a client's host id, the same across its reconnects (see
+          [Rpc_server]) *)
     ; name : string
     ; cwd : string
     ; session_id : string option (** the session the client is attached to *)
@@ -37,8 +39,9 @@ module State : sig
     ; cost_usd : float
     ; context_tokens : int (** input tokens of the last request, if any *)
     ; active_host : string
-      (** [Host.id]; may be absent from [hosts], or [""] when the backend
-              host is disabled and no client host was ever adopted *)
+      (** [Host.id]; absent from [hosts] while that host is disconnected, or
+              [""] when the backend host is disabled and no client host was
+              ever adopted *)
     ; hosts : Host.t list
       (** the backend first (unless disabled), then connected clients *)
     ; subagents : Background_tasks.Summary.t list
@@ -92,7 +95,8 @@ end
 
 module Queued : sig
   type t =
-    { text : string
+    { text : string (** as typed, e.g. [/skill:NAME ARGS] *)
+    ; skill : string option (** the expanded skill invocation *)
     ; attachments : string list
     ; images : Image.t list
     }
@@ -134,6 +138,12 @@ val create
            it, [on_host] tools, instructions, path listings and the git branch
            never touch the backend's filesystem, and a session adopts the
            first connected client host when its own is missing. *)
+  -> ?mcp:Mcp_hub.t
+  -> ?use_default_cwd:bool
+       (** start a new session in the config's [default_cwd] rather than
+           [cwd] (default: true; false when [cwd] was given explicitly) *)
+       (** the backend's MCP servers, when it is the tool host; without it
+           sessions use no MCP servers on any host *)
   -> cwd:string
   -> unit
   -> t
@@ -146,7 +156,10 @@ val messages : t -> Message.t list
 
 (** Attachments are paths (relative to the agent cwd or absolute) whose
     contents are appended to the user message as [<file>] blocks, read with
-    [Tool_read] limits (image files are attached as images, like [images]). *)
+    [Tool_read] limits (image files are attached as images, like [images]).
+
+    A text [/skill:NAME ARGS] invokes the skill [NAME] from the tool host
+    ({!Skill.expand}); an unknown name is an error. *)
 
 (** Starts a run. Fails if one is already running. *)
 val prompt
@@ -163,7 +176,7 @@ val steer
   -> ?images:Image.t list
   -> t
   -> string
-  -> unit
+  -> unit Or_error.t
 
 (** Queued to run after the current run finishes, or starts a run when idle. *)
 val follow_up
@@ -171,7 +184,23 @@ val follow_up
   -> ?images:Image.t list
   -> t
   -> string
-  -> unit
+  -> unit Or_error.t
+
+(** The skills on the active tool host. *)
+val skills : t -> Skill.t list Or_error.t
+
+(** The MCP servers for the session on the active tool host, starting those
+    not running yet; [reconnect] restarts failed ones. Their tools are
+    offered to the model from the next run on (each run starts by asking the
+    host again), and problems are reported once each as [Notice]s. *)
+val mcp_servers : ?reconnect:bool -> t -> Mcp_tools.Listing.t Or_error.t
+
+(** Approves a project's MCP server on the host and starts it. *)
+val approve_mcp
+  :  t
+  -> source:string
+  -> server:string
+  -> Mcp_tools.Listing.t Or_error.t
 
 (** Cancels the active run (if any) and clears the queues. Returns the texts
     that were queued and are therefore restored to the caller: steer messages
@@ -332,12 +361,28 @@ val session_stats : t -> Session_stats.t
 
 (** Replaces the client hosts (every connected client able to run tools,
     whichever session it is attached to). In-flight executions on hosts that
-    are gone fail. Hosts keep the cwd this session last used on them. *)
+    are gone fail. Hosts keep the cwd this session last used on them, also
+    while disconnected. The active host stays active when it goes away (tool
+    calls fail until it comes back, see {!host_unavailable_message}); when it
+    is listed again the session resumes on it in the same cwd. Without the
+    backend host, a session that never had a host adopts the first one. *)
 val set_hosts : t -> Host.t list -> unit
 
-(** Makes [id] the active host (with its own cwd) unless the user pinned a
-    host that is still connected; called when a client attaches. *)
+(** Makes [id] the active host (with its own cwd) when the session runs on
+    the backend by default (not pinned with {!set_active_host}) or has no
+    host; called when a client attaches. *)
 val prefer_host : t -> string -> unit
+
+(** Why tools cannot run while the active host is not connected: no host
+    yet, or waiting for it to reconnect. *)
+val host_unavailable_message : t -> string
+
+(** Where this session last was on each client host, for a reloaded agent of
+    the same session ({!restore_host_cwds}). *)
+val host_cwds : t -> string String.Map.t
+
+(** Adds [host_cwds] it does not know yet. *)
+val restore_host_cwds : t -> string String.Map.t -> unit
 
 (** The backend first (unless disabled), then the client hosts. *)
 val hosts : t -> Host.t list
