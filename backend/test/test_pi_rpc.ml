@@ -94,7 +94,7 @@ let with_server
                ~provider
                ~current_model:(fun () -> Model.default)
                ~current_thinking:(fun () -> Off)
-               ~home:"/nonexistent"
+               ~home:"/nonexistent" ()
            ])
   in
   let new_agent ?session ~cwd () =

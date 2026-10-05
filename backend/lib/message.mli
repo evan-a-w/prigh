@@ -40,3 +40,7 @@ type t =
 [@@deriving sexp, jsonaf, equal]
 
 val user : ?images:Image.t list -> string -> t
+
+(** Each image becomes a line of text saying it was left out, for models that
+    cannot see images. *)
+val omit_images : t -> t

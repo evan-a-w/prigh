@@ -74,7 +74,7 @@ let with_lock t ~f =
 ;;
 
 let parse_entry ~file (provider, json) =
-  match Provider_id.of_string provider with
+  match Provider_id.of_builtin_string provider with
   | None -> None
   | Some provider ->
     (match Credential.of_json json with
@@ -96,9 +96,27 @@ let list t =
     |> Or_error.map ~f:(List.sort ~compare:[%compare: Provider_id.t * _]))
 ;;
 
+(* Only the provider's own entry is parsed: other tools (pi) may keep
+   entries prigh cannot read under other names. *)
 let read t provider =
-  Or_error.map (list t) ~f:(fun entries ->
-    List.Assoc.find entries ~equal:Provider_id.equal provider)
+  Or_error.bind (load t) ~f:(fun fields ->
+    match List.Assoc.find fields ~equal:String.equal (Provider_id.to_string provider) with
+    | None -> Ok None
+    | Some json ->
+      (match Credential.of_json json with
+       | Ok c -> Ok (Some c)
+       | Error e ->
+         Or_error.error_s
+           [%message
+             "auth file: bad credential"
+               ~file:(t.path : string)
+               (provider : Provider_id.t)
+               (e : Error.t)]))
+;;
+
+let mem t name =
+  Or_error.map (load t) ~f:(fun fields ->
+    List.Assoc.mem fields ~equal:String.equal name)
 ;;
 
 let modify t provider ~f =

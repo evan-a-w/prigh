@@ -6,7 +6,16 @@ open! Core
 
 module Prompt : sig
   type t =
-    | Secret of { message : string }
+    | Secret of
+        { message : string
+        ; allow_empty : bool
+        }
+    | Text of
+        { message : string
+        ; placeholder : string
+        ; default : string
+        (** prefilled; frontends that cannot prefill send [""] for it *)
+        }
     | Manual_code of
         { message : string
         ; placeholder : string
@@ -35,6 +44,9 @@ type t =
   }
 
 val cancelled : unit -> _ Or_error.t
+
+(** Whether the error is [cancelled]'s. *)
+val is_cancelled : Error.t -> bool
 
 (** Answers prompts from a fixed list; cancels once it runs out. *)
 val scripted

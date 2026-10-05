@@ -24,6 +24,8 @@ module Method = struct
     | Openai_codex, Api_key -> "OpenAI Codex API key"
     | Deepseek, Api_key -> "DeepSeek API key"
     | Deepseek, Oauth -> "DeepSeek OAuth"
+    | Custom name, Api_key -> name ^ " API key"
+    | Custom name, Oauth -> name ^ " OAuth"
   ;;
 end
 
@@ -31,7 +33,7 @@ let methods : Provider_id.t -> Method.t list = function
   | Anthropic -> [ Oauth; Api_key ]
   | Openai -> [ Api_key ]
   | Openai_codex -> [ Oauth ]
-  | Deepseek -> [ Api_key ]
+  | Deepseek | Custom _ -> [ Api_key ]
 ;;
 
 let env_vars : Provider_id.t -> string list = function
@@ -39,6 +41,7 @@ let env_vars : Provider_id.t -> string list = function
   | Openai -> [ "OPENAI_API_KEY" ]
   | Openai_codex -> []
   | Deepseek -> [ "DEEPSEEK_API_KEY" ]
+  | Custom name -> [ Custom_provider.env_var name ]
 ;;
 
 module Resolved = struct
@@ -57,6 +60,7 @@ module Status = struct
     ; methods : Method.t list
     ; configured : (Method.t * string) option
     ; expires_ms : int option
+    ; custom : Custom_provider.t option
     }
   [@@deriving sexp_of]
 end
@@ -72,7 +76,7 @@ let refresh_oauth ~env ~cancel provider ~refresh_token =
   match (provider : Provider_id.t) with
   | Anthropic -> Oauth_anthropic.refresh ~env ~cancel ~refresh_token ()
   | Openai_codex -> Oauth_openai_codex.refresh ~env ~cancel ~refresh_token ()
-  | Openai | Deepseek ->
+  | Openai | Deepseek | Custom _ ->
     Or_error.error_s
       [%message "provider has no OAuth support" (provider : Provider_id.t)]
 ;;
@@ -118,6 +122,13 @@ let resolve
          ; account_id = None
          ; source = "stored api key"
          })
+  | Some (Oauth _) when Provider_id.is_custom provider ->
+    Or_error.errorf
+      "auth.json's %S entry is an OAuth login, not an API key (another tool may \
+       use that name): /logout %s, then /login %s"
+      (Provider_id.to_string provider)
+      (Provider_id.to_string provider)
+      (Provider_id.to_string provider)
   | Some (Oauth stored) ->
     let%map c = fresh_oauth ~refresh store provider stored in
     Some
@@ -132,19 +143,54 @@ let resolve
          { Resolved.token; method_ = Api_key; account_id = None; source = name }))
 ;;
 
-let status ?(getenv = Sys.getenv) store =
-  Or_error.map (Auth_store.list store) ~f:(fun stored ->
-    List.map Provider_id.all ~f:(fun provider ->
+let status ?(getenv = Sys.getenv) ?(custom = []) store =
+  let open Or_error.Let_syntax in
+  let%bind stored = Auth_store.list store in
+  let from_env provider =
+    Option.map (env_value ~getenv provider) ~f:(fun (name, _) ->
+      Method.Api_key, name)
+  in
+  let builtins =
+    List.map Provider_id.builtins ~f:(fun provider ->
       let configured, expires_ms =
         match List.Assoc.find stored ~equal:Provider_id.equal provider with
         | Some (Oauth o) -> Some (Method.Oauth, "oauth"), Some o.expires_ms
         | Some (Api_key _) -> Some (Method.Api_key, "stored api key"), None
-        | None ->
-          ( Option.map (env_value ~getenv provider) ~f:(fun (name, _) ->
-              Method.Api_key, name)
-          , None )
+        | None -> from_env provider, None
       in
-      { Status.provider; methods = methods provider; configured; expires_ms }))
+      { Status.provider
+      ; methods = methods provider
+      ; configured
+      ; expires_ms
+      ; custom = None
+      })
+  in
+  let%map customs =
+    Or_error.all
+      (List.map custom ~f:(fun (c : Custom_provider.t) ->
+         let provider = Custom_provider.provider_id c in
+         let%map stored =
+           (* A bad entry must not hide the provider from [/auth]. *)
+           match Auth_store.read store provider with
+           | Ok stored -> Ok stored
+           | Error _ -> Ok None
+         in
+         let configured =
+           match stored with
+           | Some (Api_key _) -> Some (Method.Api_key, "stored api key")
+           | Some (Oauth _) -> Some (Method.Oauth, "oauth (not usable)")
+           | None ->
+             Some
+               (Option.value (from_env provider) ~default:(Method.Api_key, "no key"))
+         in
+         { Status.provider
+         ; methods = methods provider
+         ; configured
+         ; expires_ms = None
+         ; custom = Some c
+         }))
+  in
+  builtins @ customs
 ;;
 
 let login_api_key provider (interaction : Auth_interaction.t) =
@@ -152,7 +198,9 @@ let login_api_key provider (interaction : Auth_interaction.t) =
     Or_error.bind
       (interaction.prompt
          (Secret
-            { message = sprintf "Enter %s" (Method.label provider Api_key) }))
+            { message = sprintf "Enter %s" (Method.label provider Api_key)
+            ; allow_empty = false
+            }))
       ~f:(fun key ->
         let key = String.strip key in
         if String.is_empty key
@@ -175,7 +223,7 @@ let login ~env store provider (method_ : Method.t) interaction =
       | Api_key, _ -> login_api_key provider interaction
       | Oauth, Anthropic -> Oauth_anthropic.login ~env interaction
       | Oauth, Openai_codex -> Oauth_openai_codex.login ~env interaction
-      | Oauth, (Openai | Deepseek) -> assert false)
+      | Oauth, (Openai | Deepseek | Custom _) -> assert false)
   in
   Auth_store.set store provider credential
 ;;

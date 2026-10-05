@@ -8,15 +8,21 @@ module Endpoint = struct
         { access_token : string
         ; account_id : string
         }
+    | Custom of
+        { provider : Provider_id.t
+        ; api_key : string option
+        ; headers : (string * string) list
+        }
 
   let default_base_url = function
     | Openai _ -> "https://api.openai.com/v1"
     | Codex _ -> "https://chatgpt.com/backend-api"
+    | Custom _ -> "http://localhost/v1"
   ;;
 
   let url t ~base_url =
     match t with
-    | Openai _ -> base_url ^ "/responses"
+    | Openai _ | Custom _ -> base_url ^ "/responses"
     | Codex _ -> base_url ^ "/codex/responses"
   ;;
 
@@ -30,11 +36,16 @@ module Endpoint = struct
       ; "OpenAI-Beta", "responses=experimental"
       ; "User-Agent", "prigh/" ^ Version.to_string
       ]
+    | Custom { api_key; headers; provider = _ } ->
+      Option.value_map api_key ~default:[] ~f:(fun key ->
+        [ "Authorization", "Bearer " ^ key ])
+      @ headers
   ;;
 
   let provider_id : t -> Provider_id.t = function
     | Openai _ -> Openai
     | Codex _ -> Openai_codex
+    | Custom { provider; _ } -> provider
   ;;
 end
 
@@ -47,9 +58,7 @@ let effort_of_thinking : Thinking.t -> string option = function
 ;;
 
 let same_provider ~provider (a : Message.Assistant.t) =
-  match Model.find a.model with
-  | Some m -> Provider_id.equal m.provider provider
-  | None -> false
+  Model.written_by a.model provider
 ;;
 
 let input_text text =
@@ -142,6 +151,7 @@ let wire_tool (t : Tool_spec.t) =
 ;;
 
 let request_body ~(endpoint : Endpoint.t) (r : Provider.Request.t) : Json.t =
+  let r = Provider.Request.omit_unsupported_images r in
   let provider = Endpoint.provider_id endpoint in
   let reasoning =
     if not r.model.supports_thinking
@@ -174,7 +184,7 @@ let request_body ~(endpoint : Endpoint.t) (r : Provider.Request.t) : Json.t =
        ; reasoning
        ; (match endpoint with
           | Codex _ -> [ "text", `Object [ "verbosity", `String "low" ] ]
-          | Openai _ ->
+          | Openai _ | Custom _ ->
             Option.value_map r.max_tokens ~default:[] ~f:(fun n ->
               [ "max_output_tokens", `Number (Int.to_string n) ]))
        ])
