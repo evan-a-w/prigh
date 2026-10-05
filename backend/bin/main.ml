@@ -799,8 +799,8 @@ let tool_host_command =
          (optional string)
          ~doc:
            "ID what sessions know this host by, so they resume on it when it \
-            reconnects; give a fixed one to keep it across restarts (default: \
-            random, one per process)"
+            reconnects or restarts (default: the machine's, kept in \
+            ~/.prigh/host-id and shared with the TUI)"
      and cwd =
        flag
          "-cwd"
@@ -835,6 +835,13 @@ let tool_host_command =
          in
          let token = Option.first_some token (Sys.getenv "PRIGH_TOKEN") in
          let user = Option.first_some user (Sys.getenv "PRIGH_USER") in
+         let host_id =
+           Host_id.choose
+             ?given:host_id
+             ~home:(home ())
+             ~warn:(eprintf "%s\n%!")
+             ()
+         in
          (* Not for the tools it runs. *)
          List.iter [ "PRIGH_TOKEN"; "PRIGH_USER" ] ~f:Core_unix.unsetenv;
          Eio_main.run
@@ -845,7 +852,7 @@ let tool_host_command =
            ~port
            ~token
            ?user
-           ?host_id
+           ~host_id
            ~name:(Option.value name ~default:(Core_unix.gethostname ()))
            ~cwd
            ())

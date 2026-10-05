@@ -363,23 +363,66 @@ let add_environment_note t note =
   then t.environment_notes <- t.environment_notes @ [ note ]
 ;;
 
+(* The host is recorded with the cwd, so that the session resumes there when
+   it is loaded again (evicted, or after a backend restart): see
+   [restore_host]. *)
+let record_location t =
+  let host =
+    if String.is_empty t.active_host
+    then None
+    else
+      Some
+        { Session.Host.id = t.active_host
+        ; name = t.active_host_name
+        ; pinned = t.host_pinned
+        }
+  in
+  if
+    not
+      (String.equal (Session.cwd t.session) t.cwd
+       && Option.equal Session.Host.equal (Session.host t.session) host)
+  then ignore (Session.set_cwd t.session ?host ~cwd:t.cwd () : Session.Entry.t)
+;;
+
+(* A session that recorded no host (or the backend's, when it is disabled)
+   is where a new one would be. *)
+let restore_host t =
+  Hashtbl.clear t.host_cwds;
+  Map.iteri (Session.host_cwds t.session) ~f:(fun ~key ~data ->
+    if String.equal key Host.backend_id
+    then t.backend_cwd <- data
+    else Hashtbl.set t.host_cwds ~key ~data);
+  match Session.host t.session with
+  | Some host
+    when t.backend_host_enabled || not (String.equal host.id Host.backend_id) ->
+    t.active_host <- host.id;
+    t.active_host_name <- host.name;
+    t.host_pinned <- host.pinned
+  | Some _ | None ->
+    t.active_host <- (if t.backend_host_enabled then Host.backend_id else "");
+    t.active_host_name <- "";
+    t.host_pinned <- false;
+    if t.backend_host_enabled then t.backend_cwd <- t.cwd
+;;
+
 let set_host_cwd t (host : Host.t) ~cwd =
   if not (String.equal t.cwd cwd)
   then (
     t.cwd <- cwd;
     t.git_branch <- find_branch t ~cwd;
-    ignore (Session.set_cwd t.session ~cwd : Session.Entry.t);
     add_environment_note t (System_prompt.cwd_changed_note ~cwd));
+  record_location t;
   if String.equal host.id Host.backend_id
   then t.backend_cwd <- cwd
   else Hashtbl.set t.host_cwds ~key:host.id ~data:cwd
 ;;
 
-let activate_host t (host : Host.t) ~cwd =
+let activate_host t (host : Host.t) ~cwd ~pinned =
   if not (String.equal t.active_host host.id)
   then add_environment_note t (System_prompt.host_changed_note ~host:host.name);
   t.active_host <- host.id;
   t.active_host_name <- host.name;
+  t.host_pinned <- pinned;
   set_host_cwd t host ~cwd;
   broadcast t (Notice (sprintf "tools now run on %s in %s" host.name cwd));
   state_changed t
@@ -416,7 +459,7 @@ let set_hosts t clients =
       fail_execs t ~host:h.id ~text:"[tool host disconnected]");
     match find_host t t.active_host, List.hd (hosts t) with
     | None, Some host when String.is_empty t.active_host ->
-      activate_host t host ~cwd:host.cwd
+      activate_host t host ~cwd:host.cwd ~pinned:false
     | Some host, _ when not was_connected ->
       t.active_host_name <- host.name;
       set_host_cwd t host ~cwd:host.cwd;
@@ -443,14 +486,7 @@ let prefer_host t id =
       String.is_empty t.active_host
       || ((not t.host_pinned) && String.equal t.active_host Host.backend_id)
     in
-    if take_over then activate_host t host ~cwd:host.cwd
-;;
-
-let host_cwds t = String.Map.of_hashtbl_exn t.host_cwds
-
-let restore_host_cwds t cwds =
-  Map.iteri cwds ~f:(fun ~key ~data ->
-    if not (Hashtbl.mem t.host_cwds key) then Hashtbl.set t.host_cwds ~key ~data)
+    if take_over then activate_host t host ~cwd:host.cwd ~pinned:false
 ;;
 
 let tool_exec_output t ~exec_id ~chunk =
@@ -553,9 +589,7 @@ let set_active_host t id ~cwd =
       | None -> Ok host.cwd
       | Some path -> resolve_dir_on t host (Tool.expand_home path)
     in
-    Or_error.map cwd ~f:(fun cwd ->
-      activate_host t host ~cwd;
-      t.host_pinned <- true)
+    Or_error.map cwd ~f:(fun cwd -> activate_host t host ~cwd ~pinned:true)
 ;;
 
 let executor t : Tool.executor =
@@ -1144,6 +1178,7 @@ let create
     }
   in
   restore_settings t;
+  restore_host t;
   Background_tasks.connect
     t.background
     ~emit:(fun event ->
@@ -1406,14 +1441,21 @@ let btw t ~question ~cancel ~on_delta =
   | End_turn | Tool_use | Length -> Ok (reply, cost_usd)
 ;;
 
-let replace_session t session =
+(* With [keep_host] (a new session or a fork) the session carries on where
+   this one is; otherwise it goes where it last ran. *)
+let replace_session t session ~keep_host =
   ignore (abort t);
   Background_tasks.cancel_all ~discard:true t.background;
   wait_idle t;
   Subagent_log.clear t.subagent_log;
   t.session <- session;
-  t.cwd <- Session.cwd session;
+  if keep_host then record_location t else t.cwd <- Session.cwd session;
   t.git_branch <- find_branch t ~cwd:t.cwd;
+  restore_host t;
+  (match List.hd (hosts t) with
+   | Some host when String.is_empty t.active_host ->
+     activate_host t host ~cwd:host.cwd ~pinned:false
+   | Some _ | None -> ());
   t.environment_notes <- [];
   t.extra_usage <- Usage.zero;
   t.extra_cost_usd <- 0.;
@@ -1422,17 +1464,21 @@ let replace_session t session =
 ;;
 
 let new_session t =
-  replace_session t (Session.create ~dir:t.sessions_dir ~cwd:t.cwd ())
+  replace_session
+    t
+    (Session.create ~dir:t.sessions_dir ~cwd:t.cwd ())
+    ~keep_host:true
 ;;
 
 let switch_session t ~path =
-  Or_error.map (Session.load path) ~f:(fun session -> replace_session t session)
+  Or_error.map (Session.load path) ~f:(fun session ->
+    replace_session t session ~keep_host:false)
 ;;
 
 let fork t ?at () =
   Or_error.map
     (Session.fork ?at t.session ~dir:t.sessions_dir)
-    ~f:(fun session -> replace_session t session)
+    ~f:(fun session -> replace_session t session ~keep_host:true)
 ;;
 
 let rewind t ~to_ =
@@ -1566,7 +1612,7 @@ let export t ~format ?path () =
 
 let import_session t ~path =
   Or_error.map (Session.import ~dir:t.sessions_dir path) ~f:(fun session ->
-    replace_session t session;
+    replace_session t session ~keep_host:false;
     Session.path session)
 ;;
 
