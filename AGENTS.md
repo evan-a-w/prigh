@@ -7,6 +7,7 @@ prigh is a coding agent. Read `README.md` for what it does and
 |---|---|---|---|
 | `backend/` | the agent, providers, RPC/web servers (`prigh`) | OCaml 5.3, Eio | `nix develop .#backend`, then `cd backend && dune build @runtest` |
 | `tui/` | terminal and Bonsai web frontends (`prigh-tui`) | OxCaml 5.2, Bonsai | `nix develop`, then `cd tui && dune build @runtest` |
+| `tui/prigh-web/` | prigh-web, the DOM browser frontend (part of `tui/`) | OxCaml 5.2, Bonsai_web | `cd tui && dune build @prigh-web/test/runtest ./prigh-web/bin/site`; e2e: `bash tui/prigh-web/e2e/prigh_web.sh` (backend built, `PLAYWRIGHT_MODULE`/`PLAYWRIGHT_BROWSERS_PATH` set) |
 | `pi-web/` | pi's web UI (Preact/TypeScript) on the backend | node 22 | `npm ci && npm run check && npm test && npm run build` |
 | `docker/` | the image's entrypoint (`prigh-docker`) | bash | `bash docker/test-prigh-docker.sh` (`-promote` re-records) |
 | `nix/` | pins and patches for the flake | | see `nix/README.md` |
@@ -18,6 +19,12 @@ prigh is a coding agent. Read `README.md` for what it does and
   a terminal multiplexer (`tmux`) and can be slow; `dune build @test/runtest`
   runs only the unit tests. `$PRIGH_BACKEND` overrides that path: unset it
   (e.g. when working inside prigh, which sets it) to test your build.
+- The browser e2es (`tui/e2e-web`, `tui/prigh-web/e2e`, `pi-web/e2e`) are
+  Playwright scripts run with `node`, not dune; the flakes' Linux checks run
+  them (`nix build .#checks.x86_64-linux.prigh-web-e2e`). Locally, point
+  `PLAYWRIGHT_MODULE` at the playwright package's `index.mjs` and
+  `PLAYWRIGHT_BROWSERS_PATH` at its browsers (both in the Nix store), and
+  look at the screenshots (`SHOTS=dir`) as well as the text diff.
 - The flakes use the binary cache `prigh.cachix.org`; pass
   `--accept-flake-config` to Nix in non-interactive use.
 - Only have one dune process running at a time, otherwise it hangs. E.g. if
