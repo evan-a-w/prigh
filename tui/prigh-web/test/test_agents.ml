@@ -431,6 +431,7 @@ let%expect_test "jobs: listed, their output polled, killed" =
     (sprintf
        "[%s]"
        (job "j1" "make test" ~running:false ~exit:"killed" ~elapsed:6.));
+  (* Its last lines are fetched once more now that it has exited. *)
   H.text h ~selector:".detail-head";
   H.act h (Clock (at 9.));
   print_s [%sexp (App.Model.ticking (H.model h) : bool)];
@@ -439,6 +440,7 @@ let%expect_test "jobs: listed, their output polled, killed" =
     (Rpc (method_ kill_job) (params ((job_id j1))) (tag Show_error))
     (Stopping…)
     (Rpc (method_ list_jobs) (params ()) (tag Jobs))
+    (Rpc (method_ job_output) (params ((job_id j1))) (tag (Job_output j1)))
     ✕ make test
     killed 6s j1
     false
