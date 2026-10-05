@@ -178,6 +178,7 @@ module Model = struct
     ; queue : int * int
     ; confirms : Confirm.t list
     ; dialog : Dialog.t option
+    ; cancelled_login : string option
     ; toasts : Toast.t list
     ; next_toast : int
     ; sidebar_open : bool
@@ -219,6 +220,7 @@ let init =
   ; queue = 0, 0
   ; confirms = []
   ; dialog = None
+  ; cancelled_login = None
   ; toasts = []
   ; next_toast = 0
   ; sidebar_open = true
@@ -688,6 +690,9 @@ let auth_event (m : Model.t) (e : Auth_event.t) =
     m, cmds @ [ rpc "auth_status" [] ~tag:(Auth_status Refresh) ]
   | _, Some (Login flow) ->
     { m with dialog = Some (Login (Login_flow.apply flow e)) }, []
+  | Failed { provider; _ }, _
+    when Option.equal String.equal m.cancelled_login (Some provider) ->
+    { m with cancelled_login = None }, []
   | Failed { provider; error = e }, _ ->
     error m (sprintf "Login to %s failed: %s. /login tries again." provider e)
   | (Auth_url _ | Prompt _), _ ->
@@ -950,8 +955,8 @@ let update (m : Model.t) (action : Action.t) =
   | Dialog_accept -> dialog_accept m
   | Close_dialog ->
     (match m.dialog with
-     | Some (Login { failed = None; _ }) ->
-       let m, cmds = close_dialog m in
+     | Some (Login { failed = None; provider; _ }) ->
+       let m, cmds = close_dialog { m with cancelled_login = Some provider } in
        m, cmds @ [ rpc "auth_cancel" [] ]
      | Some _ -> close_dialog m
      | None -> m, [])

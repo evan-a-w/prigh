@@ -185,6 +185,8 @@ module Model : sig
     ; queue : int * int (** steer, follow-up *)
     ; confirms : Confirm.t list
     ; dialog : Dialog.t option
+    ; cancelled_login : string option
+    (** the provider whose login we cancelled: its failure is expected *)
     ; toasts : Toast.t list
     ; next_toast : int
     ; sidebar_open : bool
