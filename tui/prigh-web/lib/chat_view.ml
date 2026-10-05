@@ -12,7 +12,7 @@ let tokens n =
   else sprintf "%dk" (n / 1000)
 ;;
 
-let user ({ text; images } : Message.User.t) =
+let user ({ text; images; at = _ } : Message.User.t) =
   div
     "msg user"
     [ Image_view.thumbs images

@@ -4,6 +4,7 @@ module User : sig
   type t =
     { text : string
     ; images : Image.t list [@sexp.list]
+    ; at : Time_ns.t option [@sexp.option]
     }
   [@@deriving sexp_of, equal]
 
@@ -16,6 +17,7 @@ module Assistant : sig
     ; stop_reason : Stop_reason.t
     ; usage : Usage.t
     ; model : string
+    ; at : Time_ns.t option [@sexp.option]
     }
   [@@deriving sexp_of, equal]
 
@@ -29,12 +31,15 @@ module Tool_result : sig
     ; text : string
     ; is_error : bool
     ; images : Image.t list [@sexp.list]
+    ; at : Time_ns.t option [@sexp.option]
     }
   [@@deriving sexp_of, equal]
 
   val of_json : Json.t -> t Or_error.t
 end
 
+(** [at]: when the backend recorded the message (absent for older sessions'
+    messages, the compaction summary, and streaming partials). *)
 type t =
   | User of User.t
   | Assistant of Assistant.t

@@ -4,14 +4,16 @@ module User = struct
   type t =
     { text : string
     ; images : Image.t list [@sexp.list]
+    ; at : Time_ns.t option [@sexp.option]
     }
   [@@deriving sexp_of, equal]
 
   let of_json j =
     let open Or_error.Let_syntax in
     let%bind text = Json.string_field j "text" in
-    let%map images = Json.optional_list_field j "images" ~f:Image.of_json in
-    { text; images }
+    let%bind images = Json.optional_list_field j "images" ~f:Image.of_json in
+    let%map at = Json.time_ms_opt_field j "at" in
+    { text; images; at }
   ;;
 end
 
@@ -21,6 +23,7 @@ module Assistant = struct
     ; stop_reason : Stop_reason.t
     ; usage : Usage.t
     ; model : string
+    ; at : Time_ns.t option [@sexp.option]
     }
   [@@deriving sexp_of, equal]
 
@@ -31,8 +34,9 @@ module Assistant = struct
       Json.object_field j "stop_reason" >>= Stop_reason.of_json
     in
     let%bind usage = Json.object_field j "usage" >>= Usage.of_json in
-    let%map model = Json.string_field j "model" in
-    { content; stop_reason; usage; model }
+    let%bind model = Json.string_field j "model" in
+    let%map at = Json.time_ms_opt_field j "at" in
+    { content; stop_reason; usage; model; at }
   ;;
 end
 
@@ -43,6 +47,7 @@ module Tool_result = struct
     ; text : string
     ; is_error : bool
     ; images : Image.t list [@sexp.list]
+    ; at : Time_ns.t option [@sexp.option]
     }
   [@@deriving sexp_of, equal]
 
@@ -52,8 +57,9 @@ module Tool_result = struct
     let%bind tool_name = Json.string_field j "tool_name" in
     let%bind text = Json.string_field j "text" in
     let%bind is_error = Json.bool_field j "is_error" in
-    let%map images = Json.optional_list_field j "images" ~f:Image.of_json in
-    { tool_call_id; tool_name; text; is_error; images }
+    let%bind images = Json.optional_list_field j "images" ~f:Image.of_json in
+    let%map at = Json.time_ms_opt_field j "at" in
+    { tool_call_id; tool_name; text; is_error; images; at }
   ;;
 end
 

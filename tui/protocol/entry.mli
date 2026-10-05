@@ -21,6 +21,7 @@ end
 type t =
   { id : string
   ; parent : string option
+  ; at : Time_ns.t option [@sexp.option]
   ; kind : Kind.t
   }
 [@@deriving sexp_of, equal]
