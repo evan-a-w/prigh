@@ -111,9 +111,12 @@ name in the container. At startup, the entrypoint (as root):
 - starts one tool host per user, running as that user in
   `/workspace/<name>`, and restarts it if it exits (with a fixed
   `-host-id container-<name>`, so its sessions resume on it after a
-  restart). The backend runs no tools itself (`-no-backend-host`). A new
-  session adopts its user's first connected tool host, normally this one;
-  `/host` picks another;
+  restart, and it is not confused with a TUI run as that user in the
+  container, which would use `/home/<name>/.prigh/host-id`). The backend
+  runs no tools itself (`-no-backend-host`). A new session adopts its
+  user's first connected tool host, normally this one; `/host` picks
+  another, and a session stays on the host it has (waiting while that host
+  is away, also across the backend's restarts) until `/host` moves it;
 - runs the backend as `prigh`.
 
 `prigh-docker users` lists the users, their uids and directories.
@@ -140,7 +143,10 @@ docker run --rm -it -v "$PWD:/work" -w /work <image> prigh tool-host -connect <d
 ```
 
 Then `/host` in the web UI (or TUI) picks it. A TUI started with
-`prigh-tui -connect` is a tool host too, while it is open.
+`prigh-tui -connect` is a tool host too, while it is open; both are known
+by the machine's `~/.prigh/host-id`, so sessions on them wait for them and
+resume when they come back. A throwaway container gets a new id each run:
+pass `-host-id` (or mount a home) to keep its sessions.
 
 **Without a token** (`PRIGH_ALLOW_NO_TOKEN=1`) there is no sign-in and one
 user, `default`.

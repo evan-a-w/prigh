@@ -109,17 +109,22 @@ before switching), and the status line shows `tools:<name>` when tools run
 elsewhere or `tools:offline` when the active host has disconnected. A
 session never leaves its host on its own: while the host is away tool calls
 fail with a message saying it waits for the host to reconnect, and when the
-host comes back (a frontend or `prigh tool-host` reconnecting, which keeps
-its identity for the life of the process) the session carries on there, in
-the same directory; `/host` picks another host meanwhile. Several frontends can attach
+host comes back (a frontend or `prigh tool-host` reconnecting or restarted
+on the same machine, which is the same host) the session carries on there,
+in the same directory; `/host` picks another host meanwhile. This holds
+across the session leaving memory and backend restarts too: a session
+records its host with its directory. A machine's identity is the id in
+`~/.prigh/host-id` (created on first use; edit it to choose one), shared by
+its TUIs and `prigh tool-host`: with two TUIs open, the newer one runs the
+machine's tools and the older one takes over again if the newer one quits. Several frontends can attach
 to one session (`/sessions` marks live ones) and all see the same stream; a
 session keeps running when its frontends disconnect. Plain TCP with a shared
 token: bind to localhost and use an SSH tunnel on untrusted networks.
 
 A tool host doesn't need a TUI: `prigh tool-host -connect server:7777 -token
 sekrit -cwd ~/proj [-name NAME] [-host-id ID]` connects on its own
-(reconnecting when the connection drops; a fixed `-host-id` also keeps its
-sessions across restarts of the tool host) and hosts the session's tools *and* its `>_` terminal, so
+(reconnecting when the connection drops; it is the machine's host, by
+`~/.prigh/host-id`, unless `-host-id` names another) and hosts the session's tools *and* its `>_` terminal, so
 a browser-only user can pick it with `/host`. The web UI's terminal always
 runs on the session's active host, relayed through the backend.
 
