@@ -30,7 +30,9 @@ let sessions =
        ])
 ;;
 
-let%expect_test "the sidebar: titles, ages, cwd, sizes, live and running, current" =
+let%expect_test
+    "the sidebar: titles, ages, cwd, sizes, live and running, current"
+  =
   let h = H.create ~sessions () in
   H.text h ~selector:".sessions";
   [%expect
@@ -64,7 +66,8 @@ let%expect_test "the sidebar: titles, ages, cwd, sizes, live and running, curren
   [%expect {| <span title="running" class="dot running">  </span> |}];
   (* The topbar names the session after its first prompt until it has a name. *)
   H.text h ~selector:".topbar .title";
-  [%expect {|
+  [%expect
+    {|
     (fix the parser bug)
     /work main
     |}];
@@ -83,7 +86,8 @@ let%expect_test "the sidebar: titles, ages, cwd, sizes, live and running, curren
 let%expect_test "fuzzy search over titles, prompts and directories" =
   let h = H.create ~sessions () in
   H.key h "k" ~ctrl:true;
-  [%expect {|
+  [%expect
+    {|
     Open_sessions
     (Focus session-search)
     |}];
@@ -116,9 +120,13 @@ let%expect_test "switching resets what belonged to the old session" =
   let h = H.create ~sessions () in
   H.act h (Switch_session "/sessions/s1.jsonl");
   [%expect {| |}];
-  H.event h {|{"event":"message_start","message":{"role":"user","text":"hello"}}|};
+  H.event
+    h
+    {|{"event":"message_start","message":{"role":"user","text":"hello"}}|};
   H.event h {|{"event":"queue_update","steer":1,"follow_up":1}|};
-  H.event h {|{"event":"tool_confirm","call_id":"c1","name":"bash","summary":"rm -rf build"}|};
+  H.event
+    h
+    {|{"event":"tool_confirm","call_id":"c1","name":"bash","summary":"rm -rf build"}|};
   [%expect {| (Focus confirm) |}];
   H.act h (Switch_session "/sessions/s2.jsonl");
   [%expect
@@ -149,7 +157,8 @@ let%expect_test "switching resets what belonged to the old session" =
       (Prigh_web.Chat.entries m.chat |> List.length : int)
         (m.queue : int * int)
         (List.length m.confirms : int)];
-  [%expect {|
+  [%expect
+    {|
     (("(Prigh_web.Chat.entries m.chat) |> List.length" 0) (m.queue (0 0))
      ("List.length m.confirms" 0))
     |}];
@@ -172,7 +181,9 @@ let%expect_test "new session" =
     |}]
 ;;
 
-let%expect_test "deleting asks first; Esc keeps the session; backend errors say what to do" =
+let%expect_test
+    "deleting asks first; Esc keeps the session; backend errors say what to do"
+  =
   let h = H.create ~sessions () in
   H.act h (Ask_delete "/sessions/s3.jsonl");
   H.text h ~selector:".modal";
@@ -185,7 +196,8 @@ let%expect_test "deleting asks first; Esc keeps the session; backend errors say 
     (Cancel) (Delete)
     |}];
   H.key h "Escape" ~target:Page;
-  [%expect {|
+  [%expect
+    {|
     Close_dialog
     (Focus editor)
     |}];
@@ -267,13 +279,16 @@ let%expect_test "renaming the current session" =
     |}]
 ;;
 
-let%expect_test "the sidebar collapses; on phones it is a drawer, closed at first" =
+let%expect_test
+    "the sidebar collapses; on phones it is a drawer, closed at first"
+  =
   let h = H.create ~sessions () in
   let classes () = H.show h ~selector:".app > .scrim" in
   print_s [%sexp ((H.model h).sidebar_open : bool)];
   H.key h "b" ~ctrl:true;
   print_s [%sexp ((H.model h).sidebar_open : bool)];
-  [%expect {|
+  [%expect
+    {|
     true
     Toggle_sidebar
     false

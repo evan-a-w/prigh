@@ -78,7 +78,6 @@ let state_json ?(fields = []) () =
   Jsonaf.to_string (`Object fields)
 ;;
 
-
 let model_json ?(thinking = true) ~provider ~id ~name () =
   sprintf
     {|{"id":"%s","provider":"%s","key":"%s/%s","name":"%s","context_window":200000,"max_output":64000,"supports_thinking":%b,"cost":{"input":3,"output":15,"cache_read":0.3}}|}
@@ -96,8 +95,16 @@ let models_json =
     (String.concat
        ~sep:","
        [ model_json ~provider:"openai" ~id:"gpt-6" ~name:"GPT-6" ()
-       ; model_json ~provider:"anthropic" ~id:"claude-opus-5-5" ~name:"Claude Opus 5.5" ()
-       ; model_json ~provider:"anthropic" ~id:"claude-sonnet-5" ~name:"Claude Sonnet 5" ()
+       ; model_json
+           ~provider:"anthropic"
+           ~id:"claude-opus-5-5"
+           ~name:"Claude Opus 5.5"
+           ()
+       ; model_json
+           ~provider:"anthropic"
+           ~id:"claude-sonnet-5"
+           ~name:"Claude Sonnet 5"
+           ()
        ; model_json
            ~thinking:false
            ~provider:"deepseek"
@@ -114,15 +121,15 @@ let auth_json =
 ;;
 
 let session_json
-  ?name
-  ?description
-  ?first_prompt
-  ?(cwd = "/work")
-  ?(updated_at = "2026-10-05 09:58:00Z")
-  ?(messages = 4)
-  ?(live = false)
-  ?(running = false)
-  id
+      ?name
+      ?description
+      ?first_prompt
+      ?(cwd = "/work")
+      ?(updated_at = "2026-10-05 09:58:00Z")
+      ?(messages = 4)
+      ?(live = false)
+      ?(running = false)
+      id
   =
   let opt = Option.value_map ~default:"null" ~f:(sprintf "%S") in
   sprintf
@@ -141,7 +148,15 @@ let session_json
 
 let now = Time_ns.of_string_with_utc_offset "2026-10-05 10:00:00Z"
 
-let key ?(shift = false) ?(alt = false) ?(ctrl = false) ?(meta = false) ?target t key =
+let key
+      ?(shift = false)
+      ?(alt = false)
+      ?(ctrl = false)
+      ?(meta = false)
+      ?target
+      t
+      key
+  =
   let target : Keys.Target.t =
     match target with
     | Some target -> target
@@ -185,8 +200,24 @@ let show ?selector t =
 ;;
 
 let block_tags =
-  [ "div"; "p"; "li"; "tr"; "h1"; "h2"; "h3"; "header"; "footer"; "aside"; "main"
-  ; "pre"; "ul"; "table"; "label"; "section"; "details"; "summary"
+  [ "div"
+  ; "p"
+  ; "li"
+  ; "tr"
+  ; "h1"
+  ; "h2"
+  ; "h3"
+  ; "header"
+  ; "footer"
+  ; "aside"
+  ; "main"
+  ; "pre"
+  ; "ul"
+  ; "table"
+  ; "label"
+  ; "section"
+  ; "details"
+  ; "summary"
   ]
 ;;
 
@@ -226,7 +257,9 @@ let render node =
     | Element ({ tag_name = "button" | "a"; _ } as e) ->
       let label =
         match
-          List.filter (List.concat_map e.children ~f:inline) ~f:(Fn.non String.is_empty)
+          List.filter
+            (List.concat_map e.children ~f:inline)
+            ~f:(Fn.non String.is_empty)
         with
         | [] ->
           List.Assoc.find e.attributes ~equal:String.equal "title"

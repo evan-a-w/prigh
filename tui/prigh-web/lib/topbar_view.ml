@@ -8,9 +8,11 @@ let session_title (m : App.Model.t) (state : State.t) =
   | Some name, _ when not (String.is_empty (String.strip name)) -> name
   | _, Some description -> description
   | _ ->
-    (match List.find m.sessions ~f:(fun s -> String.equal s.id state.session_id) with
-     | Some s when Option.is_some s.description || Option.is_some s.first_prompt ->
-       Session_list.title s
+    (match
+       List.find m.sessions ~f:(fun s -> String.equal s.id state.session_id)
+     with
+     | Some s when Option.is_some s.description || Option.is_some s.first_prompt
+       -> Session_list.title s
      | _ -> "New session")
 ;;
 

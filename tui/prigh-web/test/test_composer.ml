@@ -3,10 +3,13 @@ module H = Harness
 
 let running_state = H.state_json ~fields:[ "running", `True ] ()
 
-let%expect_test "Enter sends, Shift+Enter is a newline, Alt+Enter queues a follow-up" =
+let%expect_test
+    "Enter sends, Shift+Enter is a newline, Alt+Enter queues a follow-up"
+  =
   let h = H.create () in
   H.text h ~selector:".composer-row";
-  [%expect {|
+  [%expect
+    {|
     []
     (Send (Enter))
     |}];
@@ -74,7 +77,8 @@ let%expect_test "Enter sends, Shift+Enter is a newline, Alt+Enter queues a follo
     |}];
   (* Esc stops the run; when idle it does nothing. *)
   H.key h "Escape";
-  [%expect {|
+  [%expect
+    {|
     Abort
     (Rpc (method_ abort) (params ()) (tag Restored))
     |}];
@@ -166,7 +170,8 @@ let%expect_test "prompt history: Up and Down at the first and last line" =
     |}];
   H.key h "ArrowUp" ~target:(Editor { cursor = 0 });
   print_s [%sexp ((H.model h).draft : string)];
-  [%expect {|
+  [%expect
+    {|
     History_older
      "older\
     \ntwo lines"
@@ -174,14 +179,16 @@ let%expect_test "prompt history: Up and Down at the first and last line" =
   (* Inside a multi-line entry the arrows move the caret. *)
   H.key h "ArrowDown" ~target:(Editor { cursor = 2 });
   H.key h "ArrowUp" ~target:(Editor { cursor = 8 });
-  [%expect {|
+  [%expect
+    {|
     (browser default)
     (browser default)
     |}];
   H.key h "ArrowUp" ~target:(Editor { cursor = 0 });
   H.key h "ArrowUp" ~target:(Editor { cursor = 0 });
   print_s [%sexp ((H.model h).draft : string)];
-  [%expect {|
+  [%expect
+    {|
     History_older
     (browser default)
     oldest
@@ -217,7 +224,8 @@ let%expect_test "prompt history: Up and Down at the first and last line" =
 let%expect_test "@ completes paths from the backend" =
   let h = H.create () in
   H.type_ h "look at @src/ma";
-  [%expect {| (Rpc (method_ list_paths) (params ((prefix src/ma))) (tag (Paths src/ma))) |}];
+  [%expect
+    {| (Rpc (method_ list_paths) (params ((prefix src/ma))) (tag (Paths src/ma))) |}];
   (* Nothing to show until the backend answers. *)
   H.text h ~selector:".popup";
   [%expect {| |}];
@@ -274,7 +282,8 @@ let%expect_test "@ completes paths from the backend" =
   H.type_ h "see @zz";
   H.fail h "list_paths" "no such directory";
   H.text h ~selector:".toasts";
-  [%expect {| (Rpc (method_ list_paths) (params ((prefix zz))) (tag (Paths zz))) |}]
+  [%expect
+    {| (Rpc (method_ list_paths) (params ((prefix zz))) (tag (Paths zz))) |}]
 ;;
 
 let%expect_test "slash commands: the popup, arguments, running, unknown ones" =
@@ -385,7 +394,8 @@ let%expect_test "slash commands: the popup, arguments, running, unknown ones" =
 let%expect_test "/cd completes directories" =
   let h = H.create () in
   H.type_ h "/cd ";
-  [%expect {| (Rpc (method_ list_dirs) (params ((prefix ""))) (tag (Paths ""))) |}];
+  [%expect
+    {| (Rpc (method_ list_dirs) (params ((prefix ""))) (tag (Paths ""))) |}];
   H.reply h "list_dirs" {|["src/","test/"]|};
   H.key h "Enter";
   print_s [%sexp ((H.model h).draft : string)];

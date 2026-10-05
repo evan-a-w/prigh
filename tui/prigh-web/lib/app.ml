@@ -93,6 +93,7 @@ module Action = struct
   type t =
     | Start
     | Hello of Hello_reply.t
+    | Saved_login
     | Event of Event.t
     | Protocol_error of string
     | Backend_closed
@@ -161,6 +162,7 @@ module Model = struct
     { connection : Connection.t
     ; generation : int
     ; hello : Hello_reply.t option
+    ; saved_login : bool
     ; state : State.t option
     ; chat : Chat.t
     ; sessions : Session_summary.t list
@@ -201,6 +203,7 @@ let init =
   { Model.connection = Connected
   ; generation = 0
   ; hello = None
+  ; saved_login = false
   ; state = None
   ; chat = Chat.empty
   ; sessions = []
@@ -834,6 +837,7 @@ let update (m : Model.t) (action : Action.t) =
   match action with
   | Start -> m, (if m.narrow then [] else [ focus_editor ]) @ startup
   | Hello hello -> { m with hello = Some hello }, []
+  | Saved_login -> { m with saved_login = true }, []
   | Event e -> event m e
   | Protocol_error e -> error m ("Protocol error: " ^ e)
   | Backend_closed ->
