@@ -44,7 +44,8 @@ let set_suggestions t ~prefix suggestions =
   then
     { t with
       suggestions =
-        List.filter suggestions ~f:(Fn.non (String.equal t.input))
+        List.filter suggestions ~f:(fun s ->
+          not (String.equal s t.input || String.equal s (t.input ^ "/")))
     ; selected = None
     }
   else t

@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
-# Runs the browser e2e (prigh_web.mjs, which starts and restarts the backend)
-# in each browser and diffs the output with prigh_web.expected. Needs node,
+# Runs the browser e2e (prigh_web.mjs, which starts and restarts the backend,
+# then accounts.mjs, the account switcher on a backend with users) in each
+# browser and diffs the output with prigh_web.expected. Needs node,
 # PLAYWRIGHT_MODULE (the playwright package's index.mjs) and
 # PLAYWRIGHT_BROWSERS_PATH, plus:
 #   PRIGH_BACKEND        the backend binary (default: the dune build)
@@ -29,6 +30,7 @@ if [ -n "${SHOTS:-}" ]; then mkdir -p "$SHOTS"; fi
 
 for engine in ${ENGINES:-chromium firefox}; do
 	TEST_DIR="$tmp/$engine" node "$here/prigh_web.mjs" "$engine" >>"$actual"
+	TEST_DIR="$tmp/$engine" node "$here/accounts.mjs" "$engine" >>"$actual"
 done
 
 if [ "${UPDATE:-}" = 1 ]; then

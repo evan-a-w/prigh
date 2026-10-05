@@ -118,7 +118,7 @@ let user (m : App.Model.t) ~inject =
   | Some text ->
     Node.button
       ~attrs:
-        [ Attr.class_ "status-item link user"
+        [ Attr.class_ "status-item link account"
         ; Attr.type_ "button"
         ; Attr.title "Signed in: switch account"
         ; Attr.on_click (fun _ -> inject Action.Open_accounts)

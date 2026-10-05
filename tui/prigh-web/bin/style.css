@@ -681,11 +681,12 @@ kbd {
 .menu-label { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .menu-detail { color: var(--muted); font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .menu-keys { color: var(--faint); font-size: 11.5px; padding: 6px 10px 4px; border-top: 1px solid var(--border); }
-.status-item.user { color: var(--muted); }
+.status-item.account { color: var(--muted); }
+.status-item.account:hover { color: var(--fg); }
 
 .btw-panel {
   margin: 0 auto 8px;
-  width: min(880px, calc(100% - 32px));
+  width: min(860px, calc(100% - 32px));
   background: var(--panel);
   border: 1px solid var(--border-2);
   border-left: 3px solid var(--yellow);
@@ -764,6 +765,7 @@ kbd {
 .chat.verbosity-quiet .thinking { display: none; }
 .chat.verbosity-verbose details:not(.image)::details-content { content-visibility: visible; display: block; }
 .chat.verbosity-verbose details:not(.image) > summary > .preview { visibility: hidden; }
+.chat.verbosity-verbose details:not(.image) > summary > .label::before { transform: rotate(90deg); }
 
 .saved-accounts { display: flex; flex-direction: column; gap: 6px; }
 .saved-title { margin: 0; color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: 0.06em; }
@@ -779,11 +781,13 @@ kbd {
 .saved-host { color: var(--muted); font: 11.5px var(--mono); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .saved-badge { font-size: 11px; color: var(--muted); }
 .saved-forget { font-size: 18px; }
+.saved-or { margin: 2px 0 -6px; color: var(--faint); font-size: 12px; text-align: center; }
 .signin #signin-back { justify-content: center; }
 
 @media (max-width: 760px) {
+  .menu-backdrop { background: #0008; }
+  .help-table kbd { white-space: normal; }
   .account-menu { left: 8px; right: 8px; bottom: 8px; width: auto; }
-  .status .user { display: inline-flex; }
   .stats-grid { grid-template-columns: repeat(2, 1fr); }
   .btw-panel { width: calc(100% - 16px); }
   .job-item { flex-wrap: wrap; }

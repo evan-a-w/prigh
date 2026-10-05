@@ -1104,7 +1104,7 @@ let%expect_test "/setusr: a superuser acts as another user, and back" =
     |}];
   H.reply h "get_state" (H.state_json ~fields:[ "session_id", `String "b1" ] ());
   H.text h ~selector:".sidebar-footer";
-  H.text h ~selector:".status-item.user";
+  H.text h ~selector:".status-item.account";
   [%expect {|
     (Set_url_session b1)
     (Rpc (method_ get_messages) (params ()) (tag Messages))
