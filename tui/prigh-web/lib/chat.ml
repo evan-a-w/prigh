@@ -14,6 +14,7 @@ and entry =
       ; streaming : bool
       }
   | Notice of string
+  | Shell of Tool_call.t
   | Compaction of string
 
 and tool =
@@ -65,6 +66,7 @@ module Entry = struct
         ; streaming : bool
         }
     | Notice of string
+    | Shell of Tool_call.t
     | Compaction of string
   [@@deriving sexp_of]
 end
@@ -118,6 +120,15 @@ let add_message t (message : Message.t) =
   | Tool_result r -> set_result t r
 ;;
 
+let shell_command (call : Tool_call.t) =
+  match Json.parse call.arguments with
+  | Ok json ->
+    (match Json.field json "command" with
+     | Some (`String command) -> command
+     | _ -> "")
+  | Error _ -> ""
+;;
+
 let of_messages messages = List.fold messages ~init:empty ~f:add_message
 
 let subagents_to_load t =
@@ -148,14 +159,23 @@ let rec apply t (event : Event.t) =
     | _ -> t
   in
   match event with
-  | Message_start (User u) -> add t (User u)
+  | Message_start (User u) ->
+    (* [!command]'s output, added to the context, is already on show. *)
+    (match t.rev_entries with
+     | Shell call :: _
+       when String.is_prefix
+              u.text
+              ~prefix:(sprintf "$ %s\n" (shell_command call)) -> t
+     | _ -> add t (User u))
   | Message_start (Assistant a) -> set_assistant t a ~streaming:true
   | Message_update { partial; delta = _ } ->
     set_assistant t partial ~streaming:true
   | Message_end (Assistant a) -> set_assistant t a ~streaming:false
   | Message_end (Tool_result r) -> set_result t r
   | Message_start (Tool_result _) | Message_end (User _) -> t
-  | Tool_start call -> add_call t call
+  | Tool_start call ->
+    let t = add_call t call in
+    if String.equal call.name "shell" then add t (Shell call) else t
   | Tool_output { call_id; chunk } ->
     update_tool t call_id ~f:(fun tool ->
       { tool with output = tool.output ^ chunk })

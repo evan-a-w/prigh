@@ -675,29 +675,46 @@ copy of the protocol types and the e2e test guards the contract.
   not mount `ui/`'s cell-grid `App`: it has its own Elm-style state
   machine over the same `prigh_protocol` types and `prigh_client`, and
   renders HTML.
-  - `lib/` (`prigh_web`, pure: `core` + `virtual_dom`) — `Chat` (one
-    agent's transcript: `get_messages` then events, each tool call's
-    streamed output and result, subagents' nested chats), `App`
-    (`update : Model.t -> Action.t -> Model.t * Command.t list`; commands
-    are `Rpc` tagged with a `Reply_tag.t`, `Reconnect` and
-    `Set_url_session`), `View`/`Chat_view`/`Markdown_view` (the page as
-    `Vdom`), `Keys` (composer keys to actions). Startup asks for
-    `get_state` and `list_models`; a state with a new session id resets the
-    chat and fetches its messages and the session list, and `new_session`/
-    `switch_session` are answered with `Reload_state`, so every way of
-    changing session goes through that one path. Reconnection mirrors
-    `ui/`: `Backend_closed` → `Reconnect {generation; delay_ms; session}`
-    with backoff behind a banner, and success starts over.
+  - `lib/` (`prigh_web`, pure: `core` + `virtual_dom`):
+    - `App` — `update : Model.t -> Action.t -> Model.t * Command.t list`;
+      commands are `Rpc` tagged with a `Reply_tag.t`, `Reconnect`,
+      `Set_url_session`, history saves, focus and toast expiry. Startup asks
+      for `get_state` and `list_models`; a state with a new session id
+      resets everything that belongs to the session and fetches its
+      messages and the session list, and `new_session`/`switch_session`/
+      `clone` are answered with `Reload_state`, so every way of changing
+      session goes through that one path. Reconnection mirrors `ui/`
+      (`Backend_closed` → `Reconnect` with backoff behind a banner; success
+      starts over). `!cmd`/`!!cmd`/`!&cmd` go to `shell` like the TUI's.
+    - The transcript: `Chat` (one agent: `get_messages` then events; each
+      tool call's streamed output and result; subagents' nested chats,
+      fetched with `get_subagent` after a reload since `get_messages` only
+      has their reports; `!cmd` runs as `Shell` entries), `Chat_view`,
+      `Tool_view` (a card per tool: bash, read with images, write, edit
+      with `Line_diff`/`Diff_view`, ls/grep/find, subagents, jobs),
+      `Delivery_view` (reports of finished background work, parsed by
+      `ui/`'s `Delivery`), `Markdown` (a total parser that also renders
+      streaming prefixes) and `Markdown_view`, `Image_view`,
+      `Output_view`.
+    - Around it: `Sidebar_view`/`Session_list` (fuzzy search, ages from
+      `Rel_time`), `Topbar_view`, `Composer_view` with `Completion`
+      (slash commands from `Slash`, their arguments, `@` paths via
+      `list_paths`) and `History`, `Dialog`/`Dialog_view`/`Modal`
+      (pickers built on `Picker`, help, rename, delete, the login flow
+      `Login_flow`, tool confirmations), `Status_view`, and `Keys` (which
+      of the dialog, the popup or the editor owns a key).
   - `app/` (`prigh_web_app`) — `Web_main.run`: connects a `Ws_transport`
     to `?backend=` or the page's `/ws`, sends `hello` with the login saved
     by the sign-in form (`web-app/`'s `Login`) and `?session=`; on failure
     it shows the sign-in form, otherwise it runs `App.update` in a
     `Bonsai.state_machine`, executes the commands (RPCs through the
     `Client`, replies back as `Action.Reply`; `history.replaceState` for
-    `?session=`), and installs document listeners: pasted and dropped image
-    files become attachments (PNG, JPEG, GIF, WebP, sent with the prompt as
-    base64; others get a toast), and the chat follows new output unless
-    scrolled up.
+    `?session=`), and installs document listeners: keys (through `Keys`),
+    pasted and dropped image files become attachments (PNG, JPEG, GIF,
+    WebP, sent with the prompt as base64; others get a toast), the narrow
+    (phone) layout, a clock for ages and toasts, and the chat following new
+    output unless scrolled up. `Chat_listeners` copies code blocks and
+    closes an open image with Esc.
   - `bin/` — `main.bc.js` plus `index.html`/`style.css`, assembled under
     `bin/site/` and installed to `share/prigh_tui/prigh-web` (the Nix
     wrapper exports it as `$PRIGH_PRIGH_WEB_ROOT`). The dev profile links

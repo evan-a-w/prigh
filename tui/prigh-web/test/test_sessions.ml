@@ -343,6 +343,7 @@ let%expect_test "new session and switching session reload the state" =
     /work
     / commands
     @ mention a file
+    ! run a command
     Ctrl+L switch model
     Ctrl+K find a session
     |}];

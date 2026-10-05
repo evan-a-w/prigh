@@ -25,6 +25,9 @@ let help =
   ; "Esc", "stop the run; close a dialog or popup"
   ; "↑ ↓", "earlier prompts (in an empty editor or its first line)"
   ; "Tab", "complete a /command or @path"
+  ; ( "!cmd"
+    , "run a shell command (!!cmd: not added to the context; !&cmd: as a \
+       background job)" )
   ; "Ctrl+L", "switch model"
   ; "Ctrl+K", "search sessions"
   ; "Ctrl+B", "show or hide the sidebar"

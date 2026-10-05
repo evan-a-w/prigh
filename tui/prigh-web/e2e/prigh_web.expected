@@ -18,6 +18,7 @@ What are we building?
 <CWD>
 / commands
 @ mention a file
+! run a command
 Ctrl+L switch model
 Ctrl+K find a session
 === chromium: signed in: top bar ===
@@ -77,6 +78,7 @@ What are we building?
 <CWD>
 / commands
 @ mention a file
+! run a command
 Ctrl+L switch model
 Ctrl+K find a session
 new session in the url: true
@@ -124,6 +126,7 @@ What are we building?
 <CWD>
 / commands
 @ mention a file
+! run a command
 Ctrl+L switch model
 Ctrl+K find a session
 === firefox: signed in: top bar ===
@@ -183,6 +186,7 @@ What are we building?
 <CWD>
 / commands
 @ mention a file
+! run a command
 Ctrl+L switch model
 Ctrl+K find a session
 new session in the url: true

@@ -96,7 +96,7 @@ let last_activity chat =
         | Thinking t when not (String.is_empty (String.strip t)) ->
           Some "thinking…"
         | Text _ | Thinking _ -> None)
-    | User _ | Notice _ | Compaction _ -> None)
+    | User _ | Notice _ | Compaction _ | Shell _ -> None)
 ;;
 
 let report text =
