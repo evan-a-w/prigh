@@ -11,7 +11,8 @@ type t =
 let close = "\n</skill>"
 
 (* The end of the body is the first [</skill>] line that ends the text or is
-   followed by the arguments' blank line. *)
+   followed by the arguments' blank line: the body or the arguments may
+   mention the tag. *)
 let split_body rest =
   let rest = "\n" ^ rest in
   let rec find pos =
@@ -43,7 +44,7 @@ let parse text =
     String.drop_prefix attributes (i + String.length "\" location=\"")
   in
   let%map body, args = split_body rest in
-  { name; location; body; args }
+  { name; location; body = String.strip body; args = String.strip args }
 ;;
 
 let invocation t =

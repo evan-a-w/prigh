@@ -22,12 +22,12 @@ let typed text =
     ~f:Skill_message.invocation
 ;;
 
-(* A hand-over as the transcript shows it. *)
+(* A hand-over as the transcript shows it, with the error. *)
 let label text =
   Option.value_map
     (Handover_message.parse text)
     ~default:(typed text)
-    ~f:Handover_message.summary
+    ~f:(fun h -> sprintf "%s (%s)" (Handover_message.summary h) h.error)
 ;;
 
 let user_line ({ text; images; at = _ } : Message.User.t) =
