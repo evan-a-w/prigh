@@ -71,7 +71,10 @@ completion in `/cd` and the `/host` prompt (one level, in the notation
 typed: absolute, `~/` or relative; `list_dirs` takes a `host` so the `/host`
 prompt completes on the host being switched to), and `$instructions`, called when a session's system
 prompt is first built and by every subagent, so that `AGENTS.md`/`CLAUDE.md`
-come from the host's cwd ancestors and the host's own `~/.prigh/`).
+come from the host's cwd ancestors and the host's own `~/.prigh/`; asked
+`with_nix`, it also says whether `nix` is on the host's PATH, and
+`instructions_of_result` still accepts the bare array of files that older
+hosts reply with).
 
 The backend is direct-style Eio code. Every I/O function takes `~env`
 (`Eio_unix.Stdenv.base`), and long-running work runs in fibers forked into a
@@ -270,7 +273,9 @@ two can share one.
 - `System_prompt` — built-in guidance plus environment facts plus
   `AGENTS.md`/`CLAUDE.md` files from `/` down to the cwd and
   `~/.prigh/AGENTS.md`; `read_instructions` scans the local filesystem and
-  `build ?instructions` accepts files fetched elsewhere (the tool host).
+  `build ?instructions ?nix` accepts files fetched elsewhere (the tool host)
+  and whether that host has Nix, which adds how to get missing tools from
+  nixpkgs.
   `Agent` builds it once, at the session's first run, and records it as a
   `System_prompt` session entry so every later request (and every reload)
   sends the same prefix, which is what provider prompt caches key on. When
