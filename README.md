@@ -574,6 +574,23 @@ destructive `bash`/`write`/`edit`; `/confirm on|off`) and
 `default_model`/`default_thinking` (what new sessions start with unless
 `-model`/`-thinking` is given; `/change_default` saves the current ones).
 
+`fallback_models` is a chain of models that take over from each other
+(`/fallback MODEL...` sets it; names, ids and prefixes work as for
+`/model`, and are saved as `provider/id` keys). When a provider says the
+current model's usage allowance or balance is exhausted, or it has no
+credentials, the run does not stop: the session switches to the next model
+of the chain after the current one (the first if the current one is not in
+it), the transcript shows `↪ handed over from A to B`, and B carries on with
+the task. At the end of the chain the run stops with a note saying so
+(`/model` picks another). Without a `default_model`, new sessions start on
+the chain's first model. `/fallback` shows the chain and `/fallback off`
+clears it. `default_cwd` (`/default-dir PATH`, `/default-dir off`) is the
+directory, on the backend's host (`~` allowed), that a session starts in
+when the backend starts one for a frontend, instead of the backend's
+working directory; it is ignored if it is not a directory there. Like the
+rest of `config.json`, both are per namespace
+(`~/.prigh/namespaces/<name>/config.json` under `-tokens`).
+
 ### Slash commands
 
 | Command | Action |
@@ -582,6 +599,8 @@ destructive `bash`/`write`/`edit`; `/confirm on|off`) and
 | `/model [name\|id\|provider/id]` | pick or switch the model |
 | `/scoped-models` | pick the models Ctrl+P cycles through |
 | `/change_default` | save the current model and thinking level as the default for new sessions |
+| `/fallback [off\|model...]` | show or set the models that take over, in order, when a model's usage runs out (each word completes a model) |
+| `/default-dir [off\|path]` | show or set the directory new sessions start in |
 | `/login [provider\|custom] [api_key\|oauth]`, `/logout [provider]`, `/auth` | credentials; `/login custom` adds an OpenAI-compatible endpoint |
 | `/thinking [off\|on\|low\|high\|max]` | set the thinking level |
 | `/verbosity [quiet\|normal\|verbose]` | set the transcript verbosity |

@@ -741,10 +741,10 @@ let%expect_test "typing / lists commands, Down twice + Tab fills /login " =
       /model [name|id|provider/id]    pick or switch the model
       /scoped-models                  pick the models Ctrl+P cy…
       /change_default                 save the current model an…
+      /fallback [off|model...]        show or set the models th…
+      /default-dir [off|path]         show or set the directory…
       /login [provider] [api_key|oauth]  log in to a provider
-      /logout [provider]              remove a provider's store…
-      /thinking [off|low|on|high|max]  pick or set the thinking…
-      ↕ 1–8 of 38
+      ↕ 1–8 of 40
     …deepseek-flash  ctx:0% 1.5k  Tab/Enter accept · Esc close
     |}];
   H.key h (Key.plain Down);
@@ -758,10 +758,10 @@ let%expect_test "typing / lists commands, Down twice + Tab fills /login " =
       /model [name|id|provider/id]    pick or switch the model
       /scoped-models                  pick the models Ctrl+P cy…
       /change_default                 save the current model an…
+      /fallback [off|model...]        show or set the models th…
+      /default-dir [off|path]         show or set the directory…
       /login [provider] [api_key|oauth]  log in to a provider
-      /logout [provider]              remove a provider's store…
-      /thinking [off|low|on|high|max]  pick or set the thinking…
-      ↕ 1–8 of 38
+      ↕ 1–8 of 40
     …deepseek-flash  ctx:0% 1.5k  Tab/Enter accept · Esc close
     |}];
   H.key h (Key.plain Down);
@@ -775,10 +775,10 @@ let%expect_test "typing / lists commands, Down twice + Tab fills /login " =
     ▸ /model [name|id|provider/id]    pick or switch the model
       /scoped-models                  pick the models Ctrl+P cy…
       /change_default                 save the current model an…
+      /fallback [off|model...]        show or set the models th…
+      /default-dir [off|path]         show or set the directory…
       /login [provider] [api_key|oauth]  log in to a provider
-      /logout [provider]              remove a provider's store…
-      /thinking [off|low|on|high|max]  pick or set the thinking…
-      ↕ 1–8 of 38
+      ↕ 1–8 of 40
     …deepseek-flash  ctx:0% 1.5k  Tab/Enter accept · Esc close
     |}];
   H.key h (Key.plain Tab);
@@ -3700,12 +3700,16 @@ let%expect_test "config: get_config at Start installs the reply; \
       (scoped_models (anthropic/claude-fable-5-1))
       (confirm_tools true)
       (default_model    ())
-      (default_thinking ())))
+      (default_thinking ())
+      (fallback_models  ())
+      (default_cwd      ())))
     ((
       (scoped_models (deepseek/deepseek-flash))
       (confirm_tools false)
       (default_model    ())
-      (default_thinking ())))
+      (default_thinking ())
+      (fallback_models  ())
+      (default_cwd      ())))
     |}]
 ;;
 
@@ -3793,15 +3797,12 @@ let%expect_test "/scoped-models: multi-select toggle, Ctrl+A, Ctrl+X, save" =
     (Rpc
       (method_ set_config)
       (params ((
-        config (
-          (scoped_models (
+        config ((
+          scoped_models (
             anthropic/claude-fable-5
             anthropic/claude-fable-5-1
             openai/gpt-5.5
-            deepseek/deepseek-flash))
-          (confirm_tools    false)
-          (default_model    null)
-          (default_thinking null)))))
+            deepseek/deepseek-flash))))))
       (tag Config_saved))
     |}];
   H.reply
@@ -4623,7 +4624,9 @@ let%expect_test "/change_default saves the model and thinking level" =
       (scoped_models (deepseek/deepseek-flash))
       (confirm_tools true)
       (default_model    (deepseek/deepseek-flash))
-      (default_thinking (high))))
+      (default_thinking (high))
+      (fallback_models ())
+      (default_cwd     ())))
 
 
 
@@ -4638,12 +4641,7 @@ let%expect_test "/change_default saves the model and thinking level" =
     …deepseek-flash  think:off  view:normal  ctx:0% 1.5k  $0.01
     (Rpc
       (method_ set_config)
-      (params ((
-        config (
-          (scoped_models (deepseek/deepseek-flash))
-          (confirm_tools    false)
-          (default_model    deepseek/deepseek-flash)
-          (default_thinking high)))))
+      (params ((config ((confirm_tools false)))))
       (tag (Notice_on_success "tool confirmation off")))
     |}]
 ;;
@@ -4661,12 +4659,7 @@ let%expect_test "/confirm on saves confirm_tools through set_config" =
     {|
     (Rpc
       (method_ set_config)
-      (params ((
-        config (
-          (scoped_models (deepseek/deepseek-flash))
-          (confirm_tools    true)
-          (default_model    null)
-          (default_thinking null)))))
+      (params ((config ((confirm_tools true)))))
       (tag (Notice_on_success "tool confirmation on")))
     |}];
   H.reply h (Notice_on_success "tool confirmation on") {|{}|};
@@ -4698,26 +4691,16 @@ let%expect_test "/confirm on saves confirm_tools through set_config" =
     > ▏
     …deepseek-flash  think:off  view:normal  ctx:0% 1.5k  $0.01
     |}];
-  (* When config is not loaded yet, /confirm off fetches it first. *)
+  (* Without the config loaded, only confirm_tools is sent: the backend keeps
+     the rest. *)
   let h = connected () in
   H.keys h "/confirm off";
   H.enter h;
   [%expect
-    {| (Rpc (method_ get_config) (params ()) (tag (Config_for_confirm false))) |}];
-  H.reply
-    h
-    (Config_for_confirm false)
-    {|{"scoped_models":[],"confirm_tools":true}|};
-  [%expect
     {|
     (Rpc
       (method_ set_config)
-      (params ((
-        config (
-          (scoped_models ())
-          (confirm_tools    false)
-          (default_model    null)
-          (default_thinking null)))))
+      (params ((config ((confirm_tools false)))))
       (tag (Notice_on_success "tool confirmation off")))
     |}];
   H.reply h (Notice_on_success "tool confirmation off") {|{}|};
@@ -6108,10 +6091,10 @@ let%expect_test "Tab on an empty editor opens the command list; the list shows \
       /model [name|id|provider/id]    pick or switch the model
       /scoped-models                  pick the models Ctrl+P cy…
       /change_default                 save the current model an…
+      /fallback [off|model...]        show or set the models th…
+      /default-dir [off|path]         show or set the directory…
       /login [provider] [api_key|oauth]  log in to a provider
-      /logout [provider]              remove a provider's store…
-      /thinking [off|low|on|high|max]  pick or set the thinking…
-      ↕ 1–8 of 38
+      ↕ 1–8 of 40
     …deepseek-flash  ctx:0% 1.5k  Tab/Enter accept · Esc close
     |}];
   H.key h (Key.plain End);
@@ -6125,10 +6108,10 @@ let%expect_test "Tab on an empty editor opens the command list; the list shows \
       /model [name|id|provider/id]    pick or switch the model
       /scoped-models                  pick the models Ctrl+P cy…
       /change_default                 save the current model an…
+      /fallback [off|model...]        show or set the models th…
+      /default-dir [off|path]         show or set the directory…
       /login [provider] [api_key|oauth]  log in to a provider
-      /logout [provider]              remove a provider's store…
-      /thinking [off|low|on|high|max]  pick or set the thinking…
-      ↕ 1–8 of 38
+      ↕ 1–8 of 40
     …deepseek-flash  ctx:0% 1.5k  Tab/Enter accept · Esc close
     |}];
   H.keys h "qu";
