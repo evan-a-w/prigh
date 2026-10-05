@@ -363,20 +363,23 @@ let add_environment_note t note =
   then t.environment_notes <- t.environment_notes @ [ note ]
 ;;
 
+let location t =
+  if String.is_empty t.active_host
+  then None
+  else
+    Some
+      ( { Session.Host.id = t.active_host
+        ; name = t.active_host_name
+        ; pinned = t.host_pinned
+        }
+      , t.cwd )
+;;
+
 (* The host is recorded with the cwd, so that the session resumes there when
    it is loaded again (evicted, or after a backend restart): see
    [restore_host]. *)
 let record_location t =
-  let host =
-    if String.is_empty t.active_host
-    then None
-    else
-      Some
-        { Session.Host.id = t.active_host
-        ; name = t.active_host_name
-        ; pinned = t.host_pinned
-        }
-  in
+  let host = Option.map (location t) ~f:fst in
   if
     not
       (String.equal (Session.cwd t.session) t.cwd
