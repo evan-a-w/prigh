@@ -129,6 +129,43 @@ let%expect_test
     |}]
 ;;
 
+let%expect_test
+    "a steer the run ended before taking goes before the follow-ups queued \
+     after it"
+  =
+  with_agent
+    [ Reply.text "first done"
+    ; Reply.text "second done"
+    ; Reply.text "third done"
+    ]
+  @@ fun _t agent dump ->
+  Or_error.ok_exn (Agent.prompt agent "one");
+  Agent.steer agent "be brief";
+  Agent.follow_up agent "then summarise";
+  Agent.wait_idle agent;
+  dump ();
+  [%expect
+    {|
+    state: running=true messages=0
+    user: one
+    queue: steer=1 follow_up=0
+    queue: steer=1 follow_up=1
+    assistant: first done
+    queue: steer=0 follow_up=2
+    queue: steer=0 follow_up=1
+    state: running=false messages=2
+    state: running=true messages=2
+    user: be brief
+    assistant: second done
+    queue: steer=0 follow_up=0
+    state: running=false messages=4
+    state: running=true messages=4
+    user: then summarise
+    assistant: third done
+    state: running=false messages=6
+    |}]
+;;
+
 let%expect_test "steer while running is injected after the tool results" =
   with_agent
     [ Reply.tool_call
