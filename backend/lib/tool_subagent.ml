@@ -145,7 +145,7 @@ let execute
       | Some extra -> extra ^ "\n\n" ^ instructions
       | None -> instructions
     in
-    let { Host_ops.Instructions.files; nix } =
+    let { Host_ops.Instructions.files; nix; skills } =
       Host_ops.instructions_of_result
         (Tool.execute_via
            { context with cwd = p.cwd; on_output = ignore }
@@ -158,6 +158,7 @@ let execute
        ^ System_prompt.build
            ~instructions:files
            ~nix
+           ~skills
            ~cwd:p.cwd
            ~home
            ~tools:(Tools.specs p.tools)

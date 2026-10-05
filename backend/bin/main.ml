@@ -157,6 +157,7 @@ let common_params =
           eprintf "cannot load session: %s\n" (Error.to_string_hum e);
           exit 2)
     in
+    let mcp = if no_tools then None else Some (Mcp_hub.create ~env ~sw ()) in
     (* One agent per session; the subagent tool follows its own agent's
        model and thinking level. *)
     let new_agent ?session ~cwd () =
@@ -194,6 +195,7 @@ let common_params =
           ~models
           ~auto_describe:(Option.is_none faux_script && not faux)
           ~backend_host
+          ?mcp
           ~cwd
           ()
       in

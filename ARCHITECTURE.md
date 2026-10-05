@@ -3,7 +3,9 @@
 prigh is an agentic coding harness split into an OCaml backend (`backend/`,
 all the logic) and an OCaml frontend (`tui/`, Bonsai on OxCaml: rendering,
 input and UI state only) that runs in a terminal or a browser. There is no
-plugin system: tools, subagents, providers and slash commands are compiled in.
+plugin system: tools, subagents, providers and slash commands are compiled in;
+what comes from outside is skills (instructions in `SKILL.md` files) and the
+tools of MCP servers.
 
 ```
  terminal ── frontend (prigh-tui, Bonsai_term) ── JSON lines on stdio or TCP ── backend `prigh serve` (OCaml, Eio)
@@ -259,9 +261,38 @@ two can share one.
   is on) and `on_host` (runs on the active tool host rather than always in
   the backend).
 - `Host_ops` — what a tool host does for a session: the `on_host` tools by
-  name plus `$resolve_dir`/`$read_file`/`$list_paths`/`$instructions`. `Tool_host` is the `prigh tool-host`
-  worker loop around it (`exec`/`cancel` in, `output`/`result` out, one fiber
-  per exec).
+  name plus `$resolve_dir`/`$read_file`/`$list_paths`/`$instructions` (whose
+  reply also lists the host's skills), `$skill` (one skill's file, for
+  `/skill:`) and `$mcp_servers`/`$mcp_call`/`$mcp_approve` (the host's
+  `Mcp_hub`). Every `$` op honours a `home` argument only in the backend:
+  `Tool_host`, the `prigh tool-host` worker loop around it (`exec`/`cancel`
+  in, `output`/`result` out, one fiber per exec), strips it so a remote host
+  uses its own home. A tool host predating an op answers "unknown host tool",
+  which the backend treats as having nothing (no skills, no MCP servers).
+- `Frontmatter`, `Skill` — a `SKILL.md`'s YAML frontmatter (the scalar forms
+  skill files use), discovery (`.prigh/skills`, `.claude/skills`,
+  `.agents/skills` in the cwd, its ancestors, then the home directory;
+  closest wins; nested a few levels), the system prompt's section, and
+  `/skill:NAME ARGS` expansion into a `<skill name location>` block followed
+  by ARGS.
+- MCP — `Mcp_config` reads `mcpServers` from the host's `~/.prigh/mcp.json`
+  and `.mcp.json` in the cwd and its ancestors (closest wins; `${VAR}` and
+  `${VAR:-default}`), and keeps approvals of project servers (by a digest of
+  the definition as written) in `~/.prigh/mcp-approvals.json`. `Mcp_client`
+  is one connection (stdio child in its own process group, or streamable
+  HTTP; `initialize`, `tools/list`, `tools/call`, cancellation, ping).
+  `Mcp_hub` holds a host's running servers, shared by all its sessions: one
+  per tool-host process, and one per namespace in the backend (none with
+  `-no-tools`, which turns MCP off for every host). A server starts the first
+  time a session needs it, keyed by its definition (so an edit starts a new
+  one); a failed start is remembered until `reconnect`. `Mcp_tools` is the
+  `$mcp_servers` wire format and turns a listing into prigh tools named
+  `mcp__<server>__<tool>` (`parallel_safe` when `readOnlyHint`, otherwise
+  `destructive`), whose `run` sends `$mcp_call {source, server, tool}` to the
+  session's active host. `Agent` asks the host for the listing at the start
+  of every run (so tools follow host and cwd changes), adds the tools to the
+  run's and its subagents' tool lists, and reports each problem once as a
+  `Notice`.
 - `Tool_bash` (streamed output, timeout, cancellation; with `background`
   at depth 0 it starts a job instead, see below), `Tool_read` (images
   through `Image.load`, as an image result),
@@ -318,9 +349,9 @@ two can share one.
 - `System_prompt` — built-in guidance plus environment facts plus
   `AGENTS.md`/`CLAUDE.md` files from `/` down to the cwd and
   `~/.prigh/AGENTS.md`; `read_instructions` scans the local filesystem and
-  `build ?instructions ?nix` accepts files fetched elsewhere (the tool host)
-  and whether that host has Nix, which adds how to get missing tools from
-  nixpkgs.
+  `build ?instructions ?nix ?skills` accepts files fetched elsewhere (the
+  tool host), whether that host has Nix, which adds how to get missing tools
+  from nixpkgs, and the host's skills, listed when the model has `read`.
   `Agent` builds it once, at the session's first run, and records it as a
   `System_prompt` session entry so every later request (and every reload)
   sends the same prefix, which is what provider prompt caches key on. When
@@ -350,7 +381,9 @@ two can share one.
 - `Agent` — one conversation: owns the session, model, thinking level and
   `Config`, the tool hosts (`add_host`/`remove_host`/`set_active_host`,
   `host_exec` and the pending remote executions), the run lifecycle (`prompt`, `steer` = after the current turn,
-  `follow_up` = after the loop ends, `abort` = cancels and returns the queued
+  `follow_up` = after the loop ends; `/skill:NAME ARGS` texts are expanded
+  through the host's `$skill` when queued, so an unknown skill fails the
+  request, and the queue keeps the typed text, `abort` = cancels and returns the queued
   texts to restore, `dequeue` = pops the last queued message, `shell` = runs
   a `!cmd` through the bash machinery), automatic compaction at 80% of the
   context window, and a subscriber list receiving `Agent.Event.t` (`Loop of
@@ -466,6 +499,11 @@ two can share one.
   `session_stats`, `set_cwd`, `list_paths`, `list_dirs`, `get_config`, `set_config`,
   `change_default`, `btw`, `btw_cancel`,
   `tool_confirm_respond`, `set_active_host`, `tool_exec_output`,
+  `list_skills` (`{skills: [{name, description, path, model_invocable}]}`),
+  `list_mcp {reconnect?}` and `mcp_approve {source, server}` (both
+  `{servers: [{name, source, project, status: ready|failed|needs_approval,
+  error?, tools: [{name, description}]}], problems}`, tools under their
+  prigh names),
   `tool_exec_result`, `auth_status`, `login`, `auth_respond`, `auth_cancel`,
   `logout`. `State` carries `active_host` and `hosts` (the backend first).
   `btw {question, btw_id?}` (`/btw`) answers a side question with one

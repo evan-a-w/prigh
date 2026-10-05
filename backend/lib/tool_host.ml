@@ -73,16 +73,18 @@ module Worker = struct
     { env : Env.t
     ; sw : Switch.t
     ; terminals : Terminals.t Lazy.t
+    ; mcp : Mcp_hub.t
     ; default_cwd : string
     ; send : Reply.t -> unit
     ; running : Cancellation.t String.Table.t
     ; viewers : Terminal_channel.Fed.t String.Table.t
     }
 
-  let create ~env ~sw ~terminals ~default_cwd ~send =
+  let create ~env ~sw ~terminals ~mcp ~default_cwd ~send =
     { env
     ; sw
     ; terminals
+    ; mcp
     ; default_cwd
     ; send
     ; running = String.Table.create ()
@@ -96,11 +98,11 @@ module Worker = struct
       let arguments =
         Option.value (field json "arguments") ~default:(`Object [])
       in
-      (* The backend's home is not ours: instructions come from this machine's
-         ~/.prigh. *)
+      (* The backend's home is not ours: instructions, skills and MCP
+         servers come from this machine's. *)
       let arguments =
         match arguments with
-        | `Object fields when String.equal name Host_ops.instructions_op ->
+        | `Object fields when String.is_prefix name ~prefix:"$" ->
           `Object
             (List.filter fields ~f:(fun (key, _) ->
                not (String.equal key "home")))
@@ -113,6 +115,7 @@ module Worker = struct
         let result =
           match
             Host_ops.execute
+              ~mcp:(Some t.mcp)
               ~env:t.env
               ~cancel
               ~on_output:(fun chunk -> t.send (Output { exec_id; chunk }))
@@ -257,6 +260,7 @@ let run ~env ?terminals ~input ~output () =
   let terminals =
     Option.value terminals ~default:(lazy (Terminals.create ~env ~sw ()))
   in
+  let mcp = Mcp_hub.create ~env ~sw () in
   let outbox =
     Outbox.create ~sw ~write:(fun s -> Eio.Flow.copy_string s output)
   in
@@ -265,6 +269,7 @@ let run ~env ?terminals ~input ~output () =
       ~env
       ~sw
       ~terminals
+      ~mcp
       ~default_cwd:(Core_unix.getcwd ())
       ~send:(fun reply ->
         Outbox.send
@@ -278,6 +283,7 @@ let run ~env ?terminals ~input ~output () =
   Worker.stop worker;
   if owned && Lazy.is_val terminals
   then Terminals.close_all (Lazy.force terminals);
+  Mcp_hub.close mcp;
   Outbox.close outbox
 ;;
 
@@ -289,7 +295,7 @@ let worker_kind = function
 ;;
 
 (* One connection: [`Served] once [hello] succeeded, else why it did not. *)
-let serve_connection ~env ~terminals ~log ~address ~token ~user ~name ~cwd flow =
+let serve_connection ~env ~terminals ~mcp ~log ~address ~token ~user ~name ~cwd flow =
   Switch.run
   @@ fun sw ->
   let outbox =
@@ -324,7 +330,7 @@ let serve_connection ~env ~terminals ~log ~address ~token ~user ~name ~cwd flow 
                  ]) )
         ]);
   let worker =
-    Worker.create ~env ~sw ~terminals ~default_cwd:cwd ~send:(fun reply ->
+    Worker.create ~env ~sw ~terminals ~mcp ~default_cwd:cwd ~send:(fun reply ->
       request (Reply.method_ reply) (`Object (Reply.fields reply)))
   in
   let outcome = ref (`Failed (sprintf "disconnected from %s" address)) in
@@ -408,6 +414,7 @@ let connect
   let terminals =
     Option.value terminals ~default:(lazy (Terminals.create ~env ~sw ()))
   in
+  let mcp = Mcp_hub.create ~env ~sw () in
   let address = sprintf "%s:%d" host port in
   let net = Eio.Stdenv.net env in
   let attempt () =
@@ -419,6 +426,7 @@ let connect
         serve_connection
           ~env
           ~terminals
+          ~mcp
           ~log
           ~address
           ~token

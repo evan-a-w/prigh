@@ -463,7 +463,7 @@ let%expect_test "stdio worker: instructions come from the host's own home" =
   ignore (Worker.read_line w : string option);
   [%expect
     {|
-    {"type":"result","exec_id":"i1","text":"{\"files\":[{\"path\":\"$DIR/host-home/.prigh/AGENTS.md\",\"text\":\"the host's\"}],\"nix\":<bool>}","is_error":false}
+    {"type":"result","exec_id":"i1","text":"{\"files\":[{\"path\":\"$DIR/host-home/.prigh/AGENTS.md\",\"text\":\"the host's\"}],\"nix\":<bool>,\"skills\":[]}","is_error":false}
     (worker finished)
     |}]
 ;;

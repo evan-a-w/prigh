@@ -78,7 +78,7 @@ let scalar first continuation =
     then first
     else if String.is_empty first
     then (* a nested mapping or list: keep its text *)
-      String.concat ~sep:"\n" (List.map continuation ~f:String.rstrip)
+      block_scalar ~literal:true continuation
     else joined
 ;;
 

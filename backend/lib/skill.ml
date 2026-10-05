@@ -102,6 +102,7 @@ let discover ~cwd ~home =
   List.concat_map (roots ~cwd ~home) ~f:(fun root ->
     if is_directory root then find_in root ~depth:3 else [])
   |> List.stable_dedup ~compare:(fun a b -> String.compare a.name b.name)
+  |> List.sort ~compare:(fun a b -> String.compare a.name b.name)
 ;;
 
 let invocation text =

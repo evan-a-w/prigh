@@ -92,7 +92,8 @@ end
 
 module Queued : sig
   type t =
-    { text : string
+    { text : string (** as typed, e.g. [/skill:NAME ARGS] *)
+    ; skill : string option (** the expanded skill invocation *)
     ; attachments : string list
     ; images : Image.t list
     }
@@ -134,6 +135,9 @@ val create
            it, [on_host] tools, instructions, path listings and the git branch
            never touch the backend's filesystem, and a session adopts the
            first connected client host when its own is missing. *)
+  -> ?mcp:Mcp_hub.t
+       (** the backend's MCP servers, when it is the tool host; without it
+           sessions use no MCP servers on any host *)
   -> cwd:string
   -> unit
   -> t
@@ -146,7 +150,10 @@ val messages : t -> Message.t list
 
 (** Attachments are paths (relative to the agent cwd or absolute) whose
     contents are appended to the user message as [<file>] blocks, read with
-    [Tool_read] limits (image files are attached as images, like [images]). *)
+    [Tool_read] limits (image files are attached as images, like [images]).
+
+    A text [/skill:NAME ARGS] invokes the skill [NAME] from the tool host
+    ({!Skill.expand}); an unknown name is an error. *)
 
 (** Starts a run. Fails if one is already running. *)
 val prompt
@@ -163,7 +170,7 @@ val steer
   -> ?images:Image.t list
   -> t
   -> string
-  -> unit
+  -> unit Or_error.t
 
 (** Queued to run after the current run finishes, or starts a run when idle. *)
 val follow_up
@@ -171,7 +178,23 @@ val follow_up
   -> ?images:Image.t list
   -> t
   -> string
-  -> unit
+  -> unit Or_error.t
+
+(** The skills on the active tool host. *)
+val skills : t -> Skill.t list Or_error.t
+
+(** The MCP servers for the session on the active tool host, starting those
+    not running yet; [reconnect] restarts failed ones. Their tools are
+    offered to the model from the next run on (each run starts by asking the
+    host again), and problems are reported once each as [Notice]s. *)
+val mcp_servers : ?reconnect:bool -> t -> Mcp_tools.Listing.t Or_error.t
+
+(** Approves a project's MCP server on the host and starts it. *)
+val approve_mcp
+  :  t
+  -> source:string
+  -> server:string
+  -> Mcp_tools.Listing.t Or_error.t
 
 (** Cancels the active run (if any) and clears the queues. Returns the texts
     that were queued and are therefore restored to the caller: steer messages
