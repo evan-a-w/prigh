@@ -51,6 +51,7 @@ module Auth = struct
   type t =
     | Api_key of string
     | Oauth of string
+    | Gateway of string option
 end
 
 let cache_control = "cache_control", `Object [ "type", `String "ephemeral" ]
@@ -139,22 +140,20 @@ let tool_result_block (r : Message.Tool_result.t) =
     ]
 ;;
 
-let same_provider (a : Message.Assistant.t) =
-  match Model.find a.model with
-  | Some m -> Provider_id.equal m.provider Anthropic
-  | None -> false
+let same_provider ~provider (a : Message.Assistant.t) =
+  Model.written_by a.model provider
 ;;
 
 (* Consecutive same-role turns are merged; the last block of the last message
    carries the cache breakpoint. *)
-let wire_messages ~oauth (messages : Message.t list) =
+let wire_messages ~oauth ~provider (messages : Message.t list) =
   let turns =
     List.filter_map messages ~f:(fun m ->
       match m with
       | User u -> Some ("user", user_blocks u)
       | Tool_result r -> Some ("user", [ tool_result_block r ])
       | Assistant a ->
-        (match assistant_blocks ~oauth ~replay_thinking:(same_provider a) a with
+        (match assistant_blocks ~oauth ~replay_thinking:(same_provider ~provider a) a with
          | [] -> None
          | blocks -> Some ("assistant", blocks)))
   in
@@ -252,6 +251,7 @@ let thinking_on (model : Model.t) (thinking : Thinking.t) =
 ;;
 
 let request_body ~oauth (r : Provider.Request.t) : Json.t =
+  let r = Provider.Request.omit_unsupported_images r in
   let max_tokens = Option.value r.max_tokens ~default:r.model.max_output in
   let system =
     List.concat
@@ -268,7 +268,7 @@ let request_body ~oauth (r : Provider.Request.t) : Json.t =
          ; "stream", `True
          ]
        ; (if List.is_empty system then [] else [ "system", `Array system ])
-       ; [ "messages", `Array (wire_messages ~oauth r.messages) ]
+       ; [ "messages", `Array (wire_messages ~oauth ~provider:r.model.provider r.messages) ]
        ; (if List.is_empty r.tools
           then []
           else [ "tools", `Array (List.map r.tools ~f:(wire_tool ~oauth)) ])
@@ -280,13 +280,16 @@ let headers ~(auth : Auth.t) ~thinking_on =
   let betas =
     (match auth with
      | Oauth _ -> oauth_betas
-     | Api_key _ -> [])
+     | Api_key _ | Gateway _ -> [])
     @ if thinking_on then [ interleaved_thinking_beta ] else []
   in
   List.concat
     [ [ "anthropic-version", api_version ]
     ; (match auth with
        | Api_key key -> [ "x-api-key", key ]
+       | Gateway None -> []
+       | Gateway (Some key) ->
+         [ "x-api-key", key; "Authorization", "Bearer " ^ key ]
        | Oauth token ->
          [ "Authorization", "Bearer " ^ token
          ; "user-agent", "claude-cli/" ^ claude_code_version
@@ -440,7 +443,8 @@ let stop_reason_of_string = function
 
 let stream
       ~env
-      ~base_url
+      ~url
+      ~extra_headers
       ~timeout
       ~(auth : Auth.t)
       (request : Provider.Request.t)
@@ -450,7 +454,7 @@ let stream
   let oauth =
     match auth with
     | Oauth _ -> true
-    | Api_key _ -> false
+    | Api_key _ | Gateway _ -> false
   in
   let builder = Assistant_builder.create ~model:(Model.key request.model) in
   let state = Stream_state.create () in
@@ -460,8 +464,8 @@ let stream
       ~env
       ?timeout
       ~cancel
-      ~url:(base_url ^ "/v1/messages")
-      ~headers:(headers ~auth ~thinking_on)
+      ~url
+      ~headers:(headers ~auth ~thinking_on @ extra_headers)
       ~body:(Json.to_string (request_body ~oauth request))
       ~on_event:(fun event ->
         List.iter (parse_event ~tools:request.tools state event) ~f:(fun e ->
@@ -494,8 +498,18 @@ let auth_of_token ~(method_ : Provider_auth.Method.t) token : Auth.t =
   | Api_key -> if is_oauth_token token then Oauth token else Api_key token
 ;;
 
-let create ~env ?(base_url = default_base_url) ?timeout ~auth () =
-  { Provider.name = "anthropic"; stream = stream ~env ~base_url ~timeout ~auth }
+let create
+      ~env
+      ?(base_url = default_base_url)
+      ?(path = "/v1/messages")
+      ?(extra_headers = [])
+      ?timeout
+      ~auth
+      ()
+  =
+  { Provider.name = "anthropic"
+  ; stream = stream ~env ~url:(base_url ^ path) ~extra_headers ~timeout ~auth
+  }
 ;;
 
 module For_testing = struct

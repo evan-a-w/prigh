@@ -59,3 +59,19 @@ type t =
 [@@deriving sexp, jsonaf, equal]
 
 let user ?(images = []) text = User { text; images }
+
+let with_image_notes text (images : Image.t list) =
+  String.concat
+    ~sep:"\n"
+    ((if String.is_empty text then [] else [ text ])
+     @ List.map images ~f:(fun image ->
+       sprintf "[%s image omitted: this model cannot see images]" image.mime_type))
+;;
+
+let omit_images = function
+  | User { text; images = _ :: _ as images } ->
+    User { text = with_image_notes text images; images = [] }
+  | Tool_result ({ text; images = _ :: _ as images; _ } as r) ->
+    Tool_result { r with text = with_image_notes text images; images = [] }
+  | (User _ | Tool_result _ | Assistant _) as m -> m
+;;

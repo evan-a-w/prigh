@@ -5,7 +5,7 @@ module Server = Fake_http_server
 module T = Anthropic.For_testing
 module Json = Jsonaf
 
-let model = Model.default_for Anthropic
+let model = Option.value_exn (Model.default_for Anthropic)
 
 let tools =
   [ { Tool_spec.name = "bash"
@@ -293,13 +293,16 @@ let%expect_test "headers: api key vs oauth token, betas" =
             Anthropic.auth_of_token ~method_:Api_key "sk-ant-oat01-from-env"
           with
           | Oauth _ -> "oauth"
-          | Api_key _ -> "api_key")
+          | Api_key _ -> "api_key"
+          | Gateway _ -> "gateway")
        , (match Anthropic.auth_of_token ~method_:Api_key "sk-ant-api03-x" with
           | Oauth _ -> "oauth"
-          | Api_key _ -> "api_key")
+          | Api_key _ -> "api_key"
+          | Gateway _ -> "gateway")
        , match Anthropic.auth_of_token ~method_:Oauth "whatever" with
          | Oauth _ -> "oauth"
-         | Api_key _ -> "api_key" )
+         | Api_key _ -> "api_key"
+         | Gateway _ -> "gateway" )
        : string * string * string)];
   [%expect
     {|

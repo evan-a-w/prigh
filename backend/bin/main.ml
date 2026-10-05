@@ -18,23 +18,32 @@ let auth_file_flag =
   Auth_store.create ~path
 ;;
 
-let provider_arg =
-  Command.Arg_type.create (fun s ->
-    match Provider_id.of_string s with
-    | Some p -> p
-    | None ->
-      eprintf
-        "unknown provider %s; one of: %s\n"
-        s
-        (String.concat
-           ~sep:", "
-           (List.map Provider_id.all ~f:Provider_id.to_string));
-      exit 2)
+(* A built-in provider or a custom one from config.json. *)
+let provider_of_arg models s =
+  match Provider_id.of_builtin_string s with
+  | Some p -> p
+  | None ->
+    (match Model_registry.find_provider models s with
+     | Some p -> Custom_provider.provider_id p
+     | None ->
+       eprintf
+         "unknown provider %s; one of: %s (or custom, to add an OpenAI-compatible \
+          endpoint)\n"
+         s
+         (String.concat
+            ~sep:", "
+            (List.map Provider_id.builtins ~f:Provider_id.to_string
+             @ List.map (Model_registry.providers models) ~f:(fun p -> p.name)));
+       exit 2)
 ;;
 
 (* With no explicit or configured default model, prefer a provider the user is
-   logged in to. *)
-let default_model ~getenv store =
+   logged in to, then the first custom provider's first known model. *)
+let default_model ~getenv ~models store =
+  let custom () =
+    List.find (Model_registry.models models) ~f:(fun m ->
+      Provider_id.is_custom m.provider)
+  in
   match Provider_auth.status ~getenv store with
   | Error _ -> Model.default
   | Ok statuses ->
@@ -43,8 +52,10 @@ let default_model ~getenv store =
       ~f:(fun provider ->
         List.find statuses ~f:(fun s ->
           Provider_id.equal s.provider provider && Option.is_some s.configured))
-    |> Option.value_map ~default:Model.default ~f:(fun s ->
-      Model.default_for s.provider)
+    |> Option.bind ~f:(fun s -> Model.default_for s.provider)
+    |> (function
+     | Some m -> m
+     | None -> Option.value (custom ()) ~default:Model.default)
 ;;
 
 module Setup = struct
@@ -53,6 +64,7 @@ module Setup = struct
     ; cwd : string
     ; new_agent : ?session:Session.t -> cwd:string -> unit -> Agent.t
     ; world : Namespace.World.t
+    ; models : Model_registry.t
     }
 end
 
@@ -98,9 +110,10 @@ let common_params =
     in
     let { Namespace.World.home; sessions_dir; store; getenv } = world in
     let cwd = Option.value cwd ~default:(Core_unix.getcwd ()) in
+    let models = Model_registry.create ~env ~sw ~home ~store ~getenv () in
     let model =
       Option.map model ~f:(fun id ->
-        match Model.resolve id with
+        match Model_registry.resolve models id with
         | Ok m -> m
         | Error e ->
           eprintf "%s\n" (Error.to_string_hum e);
@@ -134,7 +147,7 @@ let common_params =
         then
           Faux_provider.create
             (List.init 1000 ~f:(fun _ -> Faux_provider.Reply.text "faux reply"))
-        else Provider_router.create ~env ~getenv ~store ()
+        else Provider_router.create ~env ~getenv ~models ~store ()
     in
     let session =
       Option.map session ~f:(fun path ->
@@ -153,10 +166,12 @@ let common_params =
       in
       let subagent =
         Tool_subagent.create
+          ~models
           ~provider
           ~current_model:(current (fun s -> s.model) Model.default)
           ~current_thinking:(current (fun s -> s.thinking) Thinking.Off)
           ~home
+          ()
       in
       let agent =
         Agent.create
@@ -175,7 +190,8 @@ let common_params =
           ?session
           ?model
           ?thinking
-          ~fallback_model:(default_model ~getenv store)
+          ~fallback_model:(default_model ~getenv ~models store)
+          ~models
           ~auto_describe:(Option.is_none faux_script && not faux)
           ~backend_host
           ~cwd
@@ -184,7 +200,7 @@ let common_params =
       agent_ref := Some agent;
       agent
     in
-    { Setup.session; cwd; new_agent; world }
+    { Setup.session; cwd; new_agent; world; models }
 ;;
 
 let run_command =
@@ -202,7 +218,9 @@ let run_command =
        @@ fun env ->
        Eio.Switch.run
        @@ fun sw ->
-       let { Setup.session; cwd; new_agent; _ } = make_agent ~env ~sw () in
+       let { Setup.session; cwd; new_agent; models; _ } = make_agent ~env ~sw () in
+       Model_registry.subscribe models ~f:(eprintf "%s\n%!");
+       List.iter (Model_registry.problems models) ~f:(eprintf "%s\n%!");
        let agent = new_agent ?session ~cwd () in
        let flush_out () = Out_channel.flush stdout in
        let note fmt =
@@ -536,7 +554,7 @@ let serve_command =
        Eio.Switch.run
        @@ fun sw ->
        let create_server ?token ?namespace ?world () =
-         let { Setup.session; cwd; new_agent; world } =
+         let { Setup.session; cwd; new_agent; world; models } =
            make_agent ~env ~sw ~backend_host ?world ()
          in
          let login =
@@ -544,6 +562,7 @@ let serve_command =
              ~env
              ~sw
              ~getenv:world.getenv
+             ~models
              ~store:world.store
              ()
          in
@@ -771,11 +790,33 @@ let tool_host_command =
            ())
 ;;
 
+(* The CLI's view of the legacy (non-namespace) world. *)
+let with_registry ~store f =
+  Eio_main.run
+  @@ fun env ->
+  Eio.Switch.run
+  @@ fun sw ->
+  let models =
+    Model_registry.create
+      ~env
+      ~sw
+      ~auto_fetch:false
+      ~home:(home ())
+      ~store
+      ~getenv:Sys.getenv
+      ()
+  in
+  List.iter (Model_registry.problems models) ~f:(eprintf "%s\n%!");
+  f ~env ~sw models
+;;
+
 let login_command =
   Command.basic
-    ~summary:"Log in to a provider (anthropic, openai, openai-codex, deepseek)"
+    ~summary:
+      "Log in to a provider (anthropic, openai, openai-codex, deepseek, a custom \
+       one), or add a custom OpenAI-compatible provider (custom)"
     (let%map_open.Command store = auth_file_flag
-     and provider = anon ("PROVIDER" %: provider_arg)
+     and provider = anon ("PROVIDER" %: string)
      and method_ =
        flag
          "-method"
@@ -788,46 +829,84 @@ let login_command =
          ~doc:" print the login URL instead of opening it"
      in
      fun () ->
-       let method_ =
-         match method_ with
-         | None -> List.hd_exn (Provider_auth.methods provider)
-         | Some s ->
-           (match Provider_auth.Method.of_string s with
-            | Some m -> m
-            | None ->
-              eprintf "unknown method %s (api_key or oauth)\n" s;
-              exit 2)
-       in
-       Eio_main.run
-       @@ fun env ->
-       Eio.Switch.run
-       @@ fun sw ->
+       with_registry ~store
+       @@ fun ~env ~sw models ->
        let interaction =
          Auth_terminal.create ~env ~sw ~open_urls:(not no_browser) ()
        in
-       match Provider_auth.login ~env store provider method_ interaction with
-       | Ok () ->
-         eprintf
-           "Logged in to %s (%s); saved to %s\n"
-           (Provider_id.display_name provider)
-           (Provider_auth.Method.label provider method_)
-           (Auth_store.path store)
-       | Error e ->
-         eprintf "login failed: %s\n" (Error.to_string_hum e);
-         exit 1)
+       let custom ?name () =
+         match
+           Custom_login.login ~env ~models ~store ~getenv:Sys.getenv ?name interaction
+         with
+         | Ok p ->
+           eprintf
+             "Saved %s (%s, %s) to %s; its models are %s/<model id> (prigh models \
+              lists them)\n"
+             p.name
+             p.base_url
+             (Custom_provider.Api.to_string p.api)
+             (Config.path ~home:(home ()))
+             p.name
+         | Error e ->
+           eprintf "login failed: %s\n" (Error.to_string_hum e);
+           exit 1
+       in
+       match provider with
+       | "custom" -> custom ()
+       | provider ->
+         (match provider_of_arg models provider with
+          | Custom name -> custom ~name ()
+          | provider ->
+            let method_ =
+              match method_ with
+              | None -> List.hd_exn (Provider_auth.methods provider)
+              | Some s ->
+                (match Provider_auth.Method.of_string s with
+                 | Some m -> m
+                 | None ->
+                   eprintf "unknown method %s (api_key or oauth)\n" s;
+                   exit 2)
+            in
+            (match Provider_auth.login ~env store provider method_ interaction with
+             | Ok () ->
+               eprintf
+                 "Logged in to %s (%s); saved to %s\n"
+                 (Provider_id.display_name provider)
+                 (Provider_auth.Method.label provider method_)
+                 (Auth_store.path store)
+             | Error e ->
+               eprintf "login failed: %s\n" (Error.to_string_hum e);
+               exit 1)))
 ;;
 
 let logout_command =
   Command.basic
-    ~summary:"Remove a provider's stored credential"
+    ~summary:"Remove a provider's stored credential (and, for a custom one, maybe the provider)"
     (let%map_open.Command store = auth_file_flag
-     and provider = anon ("PROVIDER" %: provider_arg) in
+     and provider = anon ("PROVIDER" %: string) in
      fun () ->
-       Eio_main.run
-       @@ fun _env ->
-       match Provider_auth.logout store provider with
-       | Ok () ->
-         eprintf "Logged out of %s\n" (Provider_id.display_name provider)
+       with_registry ~store
+       @@ fun ~env ~sw models ->
+       let provider = provider_of_arg models provider in
+       let result =
+         match provider with
+         | Custom name ->
+           Or_error.map
+             (Custom_login.logout
+                ~models
+                ~store
+                name
+                (Auth_terminal.create ~env ~sw ()))
+             ~f:(function
+               | Key_removed -> sprintf "Removed %s's API key" name
+               | Provider_removed -> sprintf "Removed %s" name
+               | Kept -> sprintf "Kept %s" name)
+         | provider ->
+           Or_error.map (Provider_auth.logout store provider) ~f:(fun () ->
+             sprintf "Logged out of %s" (Provider_id.display_name provider))
+       in
+       match result with
+       | Ok message -> eprintf "%s\n" message
        | Error e ->
          eprintf "%s\n" (Error.to_string_hum e);
          exit 1)
@@ -838,7 +917,11 @@ let auth_command =
     ~summary:"Show which providers are configured"
     (let%map_open.Command store = auth_file_flag in
      fun () ->
-       match Provider_auth.status store with
+       with_registry ~store
+       @@ fun ~env:_ ~sw:_ models ->
+       match
+         Provider_auth.status ~custom:(Model_registry.providers models) store
+       with
        | Error e ->
          eprintf "%s\n" (Error.to_string_hum e);
          exit 1
@@ -847,7 +930,10 @@ let auth_command =
            printf
              "%-14s %-24s %s\n"
              (Provider_id.to_string s.provider)
-             (Provider_id.display_name s.provider)
+             (match s.custom with
+              | None -> Provider_id.display_name s.provider
+              | Some c ->
+                sprintf "%s (%s)" c.base_url (Custom_provider.Api.to_string c.api))
              (match s.configured with
               | None ->
                 sprintf
@@ -856,6 +942,25 @@ let auth_command =
                      ~sep:", "
                      (List.map s.methods ~f:Provider_auth.Method.to_string))
               | Some (_, source) -> source)))
+;;
+
+let models_command =
+  Command.basic
+    ~summary:"List the models (custom providers' lists are fetched first)"
+    (let%map_open.Command store = auth_file_flag
+     and provider =
+       flag "-provider" (optional string) ~doc:"NAME only this provider's models"
+     in
+     fun () ->
+       with_registry ~store
+       @@ fun ~env:_ ~sw:_ models ->
+       let before = Model_registry.problems models in
+       Model_registry.refresh models ();
+       List.iter (Model_registry.problems models) ~f:(fun p ->
+         if not (List.mem before p ~equal:String.equal) then eprintf "%s\n%!" p);
+       List.iter (Model_registry.models models) ~f:(fun (m : Model.t) ->
+         if Option.for_all provider ~f:(String.equal (Provider_id.to_string m.provider))
+         then printf "%-50s %s\n" (Model.key m) m.name))
 ;;
 
 let sessions_dir () = Session.default_dir ~home:(home ())
@@ -981,5 +1086,6 @@ let () =
        ; "login", login_command
        ; "logout", logout_command
        ; "auth", auth_command
+       ; "models", models_command
        ])
 ;;

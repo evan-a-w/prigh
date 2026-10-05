@@ -15,7 +15,7 @@ let make_server t ~sw ~backend_host ?before ?(children = []) replies =
         ~current_model:(fun () ->
           (Agent.state (Option.value_exn !agent_ref)).model)
         ~current_thinking:(fun () -> Thinking.Off)
-        ~home:t.dir
+        ~home:t.dir ()
     in
     let agent =
       Agent.create

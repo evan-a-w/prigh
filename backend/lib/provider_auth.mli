@@ -33,6 +33,7 @@ module Status : sig
     ; methods : Method.t list
     ; configured : (Method.t * string) option
     ; expires_ms : int option
+    ; custom : Custom_provider.t option
     }
   [@@deriving sexp_of]
 end
@@ -52,9 +53,12 @@ val resolve
   -> Provider_id.t
   -> Resolved.t option Or_error.t
 
-(** Side-effect free (no refresh). *)
+(** Side-effect free (no refresh). The built-in providers, then [custom].
+    A custom provider is always usable: its [configured] source is
+    ["stored api key"], the environment variable, or ["no key"]. *)
 val status
   :  ?getenv:(string -> string option)
+  -> ?custom:Custom_provider.t list
   -> Auth_store.t
   -> Status.t list Or_error.t
 

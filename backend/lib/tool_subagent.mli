@@ -9,10 +9,12 @@ open! Import
 val max_turns : int
 
 val create
-  :  provider:Provider.t
+  :  ?models:Model_registry.t (** what the [model] argument resolves against *)
+  -> provider:Provider.t
   -> current_model:(unit -> Model.t)
   -> current_thinking:(unit -> Thinking.t)
   -> home:string
+  -> unit
   -> Tool.t
 
 (** [subagent_wait], [subagent_status] and [subagent_cancel], which act on

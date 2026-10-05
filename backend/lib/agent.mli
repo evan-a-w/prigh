@@ -124,6 +124,8 @@ val create
   -> ?thinking:Thinking.t
        (** default: the config's [default_thinking], else [Off] *)
   -> ?fallback_model:Model.t (** default: [Model.default] *)
+  -> ?models:Model_registry.t
+       (** resolves the session's and the config's model keys *)
   -> ?auto_describe:bool
        (** write a [Session_description] after a turn once the conversation
            is long enough (default: false) *)

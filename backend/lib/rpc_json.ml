@@ -248,7 +248,7 @@ let entry (e : Session.Entry.t) =
 
 let auth_status (s : Provider_auth.Status.t) =
   `Object
-    [ "provider", str (Provider_id.to_string s.provider)
+    ([ "provider", str (Provider_id.to_string s.provider)
     ; "name", str (Provider_id.display_name s.provider)
     ; ( "methods"
       , `Array
@@ -267,11 +267,30 @@ let auth_status (s : Provider_auth.Status.t) =
             ] )
     ; "expires_ms", Option.value_map s.expires_ms ~default:`Null ~f:int
     ]
+    @
+    match s.custom with
+    | None -> []
+    | Some c ->
+      [ ( "custom"
+        , `Object
+            [ "base_url", str c.base_url
+            ; "api", str (Custom_provider.Api.to_string c.api)
+            ; "api_label", str (Custom_provider.Api.label c.api)
+            ] )
+      ])
 ;;
 
 let auth_prompt (p : Auth_interaction.Prompt.t) =
   match p with
-  | Secret { message } -> [ "prompt", str "secret"; "message", str message ]
+  | Secret { message; allow_empty } ->
+    [ "prompt", str "secret"; "message", str message ]
+    @ if allow_empty then [ "allow_empty", bool true ] else []
+  | Text { message; placeholder; default } ->
+    [ "prompt", str "text"
+    ; "message", str message
+    ; "placeholder", str placeholder
+    ; "default", str default
+    ]
   | Manual_code { message; placeholder } ->
     [ "prompt", str "manual_code"
     ; "message", str message
@@ -307,7 +326,7 @@ let login_event (e : Login_manager.Event.t) =
       ]
     | Failed { provider; error } ->
       [ "kind", str "failed"
-      ; "provider", str (Provider_id.to_string provider)
+      ; "provider", str provider
       ; "error", str error
       ]
     | Logged_out provider ->

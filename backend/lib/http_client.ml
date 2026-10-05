@@ -70,7 +70,7 @@ let with_default_port uri =
   | None, _ -> uri
 ;;
 
-let post_stream
+let stream
       ~(env : Env.t)
       ?(cancel = Cancellation.never)
       ?timeout
@@ -87,13 +87,18 @@ let post_stream
     let client =
       Cohttp_eio.Client.make ~https:(Some https) (Eio.Stdenv.net env)
     in
+    let headers = Http.Header.of_list headers in
+    let uri = with_default_port (Uri.of_string url) in
     match
-      Cohttp_eio.Client.post
-        client
-        ~sw
-        ~headers:(Http.Header.of_list headers)
-        ~body:(Cohttp_eio.Body.of_string body)
-        (with_default_port (Uri.of_string url))
+      match body with
+      | None -> Cohttp_eio.Client.get client ~sw ~headers uri
+      | Some body ->
+        Cohttp_eio.Client.post
+          client
+          ~sw
+          ~headers
+          ~body:(Cohttp_eio.Body.of_string body)
+          uri
     with
     | exception
         (( Eio.Io _
@@ -130,10 +135,14 @@ let post_stream
   | Some result -> result
 ;;
 
-let post ~env ?cancel ?timeout ~url ~headers ~body () =
+let post_stream ~env ?cancel ?timeout ?on_response ~url ~headers ~body =
+  stream ~env ?cancel ?timeout ?on_response ~url ~headers ~body:(Some body)
+;;
+
+let collect ~env ?cancel ?timeout ~url ~headers ~body () =
   let buf = Buffer.create 1024 in
   Result.map
-    (post_stream
+    (stream
        ~env
        ?cancel
        ?timeout
@@ -143,4 +152,12 @@ let post ~env ?cancel ?timeout ~url ~headers ~body () =
        ~on_chunk:(Buffer.add_string buf)
        ())
     ~f:(fun response -> response, Buffer.contents buf)
+;;
+
+let post ~env ?cancel ?timeout ~url ~headers ~body () =
+  collect ~env ?cancel ?timeout ~url ~headers ~body:(Some body) ()
+;;
+
+let get ~env ?cancel ?timeout ~url ~headers () =
+  collect ~env ?cancel ?timeout ~url ~headers ~body:None ()
 ;;

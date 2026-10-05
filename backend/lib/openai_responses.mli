@@ -13,6 +13,11 @@ module Endpoint : sig
         { access_token : string
         ; account_id : string
         }
+    | Custom of
+        { provider : Provider_id.t
+        ; api_key : string option (** sent as a Bearer token *)
+        ; headers : (string * string) list
+        } (** an OpenAI-compatible server's [{base_url}/responses] *)
 
   val default_base_url : t -> string
 end

@@ -26,6 +26,7 @@ type t =
   ; supports_thinking : bool
   ; thinking_style : Thinking_style.t
   ; cost : Cost.t
+  ; supports_images : bool
   }
 [@@deriving sexp_of]
 
@@ -33,6 +34,7 @@ let key t = Provider_id.to_string t.provider ^ "/" ^ t.id
 
 let m
       ?(style = Thinking_style.Budget)
+      ?(images = true)
       provider
       id
       name
@@ -51,6 +53,7 @@ let m
   ; supports_thinking = thinking
   ; thinking_style = style
   ; cost = { input; output; cache_read }
+  ; supports_images = images
   }
 ;;
 
@@ -702,6 +705,7 @@ let all =
       ~output:10.
       ~cache_read:0.2
   ; m
+      ~images:false
       Deepseek
       "deepseek-flash"
       "DeepSeek V4.1 Flash"
@@ -712,6 +716,7 @@ let all =
       ~output:1.2
       ~cache_read:0.006
   ; m
+      ~images:false
       Deepseek
       "deepseek-v4-pro"
       "DeepSeek V4 Pro"
@@ -727,21 +732,33 @@ let all =
 let find_exn k = List.find_exn all ~f:(fun t -> String.equal (key t) k)
 let default = find_exn "deepseek/deepseek-flash"
 
-let default_for : Provider_id.t -> t = function
-  | Anthropic -> find_exn "anthropic/claude-opus-4-6"
-  | Openai -> find_exn "openai/gpt-5.5"
-  | Openai_codex -> find_exn "openai-codex/gpt-5.5"
-  | Deepseek -> default
+let default_for : Provider_id.t -> t option = function
+  | Anthropic -> Some (find_exn "anthropic/claude-opus-4-6")
+  | Openai -> Some (find_exn "openai/gpt-5.5")
+  | Openai_codex -> Some (find_exn "openai-codex/gpt-5.5")
+  | Deepseek -> Some default
+  | Custom _ -> None
 ;;
 
-let find s =
+let key_provider key = Option.map (String.lsplit2 key ~on:'/') ~f:fst
+
+(* Ids may contain '/' (OpenRouter's [vendor/model]): only a known provider
+   name before the first '/' makes it a key. *)
+let find_in models s =
+  let by_id id = List.find models ~f:(fun t -> String.equal t.id id) in
   match String.lsplit2 s ~on:'/' with
   | Some (provider, id) ->
-    Option.bind (Provider_id.of_string provider) ~f:(fun provider ->
-      List.find all ~f:(fun t ->
-        Provider_id.equal t.provider provider && String.equal t.id id))
-  | None -> List.find all ~f:(fun t -> String.equal t.id s)
+    (match
+       List.find models ~f:(fun t ->
+         String.equal (Provider_id.to_string t.provider) provider
+         && String.equal t.id id)
+     with
+     | Some t -> Some t
+     | None -> by_id s)
+  | None -> by_id s
 ;;
+
+let find = find_in all
 
 let edit_distance a b =
   let a = String.lowercase a
@@ -762,12 +779,12 @@ let edit_distance a b =
   prev.(m)
 ;;
 
-let resolve query =
+let resolve_in models query =
   let q = String.lowercase (String.strip query) in
   let names t = [ key t; t.id; t.name ] in
-  let matches ~f = List.filter all ~f:(fun t -> List.exists (names t) ~f) in
+  let matches ~f = List.filter models ~f:(fun t -> List.exists (names t) ~f) in
   let keys ts = String.concat ~sep:", " (List.map ts ~f:key) in
-  match find query with
+  match find_in models query with
   | Some t -> Ok t
   | None ->
     (match matches ~f:(fun n -> String.equal (String.lowercase n) q) with
@@ -783,7 +800,7 @@ let resolve query =
           Or_error.errorf "model %S is ambiguous; one of: %s" query (keys many)
         | [] ->
           let closest =
-            List.map all ~f:(fun t ->
+            List.map models ~f:(fun t ->
               ( List.min_elt
                   (List.map (names t) ~f:(fun n -> edit_distance n q))
                   ~compare:Int.compare
@@ -798,6 +815,18 @@ let resolve query =
             (String.concat
                ~sep:", "
                (List.map closest ~f:(fun t -> sprintf "%s (%s)" (key t) t.name)))))
+;;
+
+let resolve = resolve_in all
+
+let written_by model_key provider =
+  match find model_key with
+  | Some m -> Provider_id.equal m.provider provider
+  | None ->
+    Option.equal
+      String.equal
+      (key_provider model_key)
+      (Some (Provider_id.to_string provider))
 ;;
 
 let cost_usd t (usage : Usage.t) =

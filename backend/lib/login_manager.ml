@@ -18,7 +18,7 @@ module Event = struct
         ; method_ : Provider_auth.Method.t
         }
     | Failed of
-        { provider : Provider_id.t
+        { provider : string
         ; error : string
         }
     | Logged_out of Provider_id.t
@@ -45,20 +45,29 @@ type t =
   ; sw : Switch.t
   ; store : Auth_store.t
   ; getenv : string -> string option
+  ; models : Model_registry.t
   ; mutable flow : Flow.t option
   ; mutable subscribers : (Event.t -> unit) list
   ; mutable next_id : int
   }
 
-let create ~env ~sw ?(getenv = Sys.getenv) ~store () =
-  { env; sw; store; getenv; flow = None; subscribers = []; next_id = 1 }
+let create ~env ~sw ?(getenv = Sys.getenv) ?(models = Model_registry.builtin ()) ~store () =
+  { env; sw; store; getenv; models; flow = None; subscribers = []; next_id = 1 }
 ;;
 
 let store t = t.store
 let subscribe t ~f = t.subscribers <- f :: t.subscribers
 let emit t event = List.iter (List.rev t.subscribers) ~f:(fun f -> f event)
 let in_progress t = Option.is_some t.flow
-let status t = Provider_auth.status ~getenv:t.getenv t.store
+let models t = t.models
+
+let status t =
+  Model_registry.reload t.models;
+  Provider_auth.status
+    ~getenv:t.getenv
+    ~custom:(Model_registry.providers t.models)
+    t.store
+;;
 
 let interaction t (flow : Flow.t) : Auth_interaction.t =
   let prompt prompt =
@@ -88,15 +97,48 @@ let interaction t (flow : Flow.t) : Auth_interaction.t =
   { prompt; notify; cancel = flow.cancel }
 ;;
 
-let start t provider method_ =
+(* [run] gets the interaction; [finish] turns its outcome into events. *)
+let run_flow t ~run ~finish =
   if in_progress t
   then Or_error.error_string "a login is already in progress"
-  else if
-    not
-      (List.mem
-         (Provider_auth.methods provider)
-         method_
-         ~equal:Provider_auth.Method.equal)
+  else (
+    let finished, resolve = Promise.create () in
+    let flow = { Flow.cancel = Cancellation.create (); pending = None; finished } in
+    t.flow <- Some flow;
+    Fiber.fork ~sw:t.sw (fun () ->
+      let result =
+        try run (interaction t flow) with
+        | exn -> Or_error.error_s [%message "login failed" (exn : exn)]
+      in
+      t.flow <- None;
+      finish result;
+      Promise.resolve resolve ());
+    Ok ())
+;;
+
+let start_custom t ?name () =
+  let provider_name = Option.value name ~default:"custom" in
+  run_flow
+    t
+    ~run:
+      (Custom_login.login
+         ~env:t.env
+         ~models:t.models
+         ~store:t.store
+         ~getenv:t.getenv
+         ?name)
+    ~finish:(function
+      | Ok p ->
+        emit t (Done { provider = Custom_provider.provider_id p; method_ = Api_key })
+      | Error e -> emit t (Failed { provider = provider_name; error = Error.to_string_hum e }))
+;;
+
+let start t (provider : Provider_id.t) method_ =
+  if not
+       (List.mem
+          (Provider_auth.methods provider)
+          method_
+          ~equal:Provider_auth.Method.equal)
   then
     Or_error.error_s
       [%message
@@ -104,29 +146,21 @@ let start t provider method_ =
           (provider : Provider_id.t)
           (method_ : Provider_auth.Method.t)]
   else (
-    let finished, resolve = Promise.create () in
-    let flow =
-      { Flow.cancel = Cancellation.create (); pending = None; finished }
-    in
-    t.flow <- Some flow;
-    Fiber.fork ~sw:t.sw (fun () ->
-      let result =
-        try
-          Provider_auth.login
-            ~env:t.env
-            t.store
-            provider
-            method_
-            (interaction t flow)
-        with
-        | exn -> Or_error.error_s [%message "login failed" (exn : exn)]
-      in
-      t.flow <- None;
-      (match result with
-       | Ok () -> emit t (Done { provider; method_ })
-       | Error e -> emit t (Failed { provider; error = Error.to_string_hum e }));
-      Promise.resolve resolve ());
-    Ok ())
+    match provider with
+    | Custom name -> start_custom t ~name ()
+    | Anthropic | Openai | Openai_codex | Deepseek ->
+      run_flow
+        t
+        ~run:(Provider_auth.login ~env:t.env t.store provider method_)
+        ~finish:(function
+          | Ok () -> emit t (Done { provider; method_ })
+          | Error e ->
+            emit
+              t
+              (Failed
+                 { provider = Provider_id.to_string provider
+                 ; error = Error.to_string_hum e
+                 })))
 ;;
 
 let respond t ~id value =
@@ -151,7 +185,23 @@ let cancel t =
 
 let wait t = Option.iter t.flow ~f:(fun flow -> Promise.await flow.finished)
 
-let logout t provider =
-  Or_error.map (Provider_auth.logout t.store provider) ~f:(fun () ->
-    emit t (Logged_out provider))
+let logout t (provider : Provider_id.t) =
+  match provider with
+  | Custom name when Option.is_some (Model_registry.find_provider t.models name) ->
+    run_flow
+      t
+      ~run:(Custom_login.logout ~models:t.models ~store:t.store name)
+      ~finish:(function
+        | Ok (Key_removed | Provider_removed) -> emit t (Logged_out provider)
+        | Ok Kept -> ()
+        | Error e ->
+          (* Cancelled: nothing happened, and the dialog is gone already. *)
+          if not (Auth_interaction.is_cancelled e)
+          then
+            emit
+              t
+              (Failed { provider = name; error = "logout: " ^ Error.to_string_hum e }))
+  | Anthropic | Openai | Openai_codex | Deepseek | Custom _ ->
+    Or_error.map (Provider_auth.logout t.store provider) ~f:(fun () ->
+      emit t (Logged_out provider))
 ;;

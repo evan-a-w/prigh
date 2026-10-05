@@ -3,7 +3,15 @@ open! Import
 
 module Prompt = struct
   type t =
-    | Secret of { message : string }
+    | Secret of
+        { message : string
+        ; allow_empty : bool
+        }
+    | Text of
+        { message : string
+        ; placeholder : string
+        ; default : string
+        }
     | Manual_code of
         { message : string
         ; placeholder : string
@@ -31,7 +39,9 @@ type t =
   ; cancel : Cancellation.t
   }
 
-let cancelled () = Or_error.error_string "login cancelled"
+let cancelled_message = "login cancelled"
+let cancelled () = Or_error.error_string cancelled_message
+let is_cancelled e = String.equal (Error.to_string_hum e) cancelled_message
 
 let scripted ?(notify = ignore) ?(cancel = Cancellation.create ()) answers =
   let remaining = ref answers in
