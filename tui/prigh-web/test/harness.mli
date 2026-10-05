@@ -16,6 +16,9 @@ val model : t -> App.Model.t
 (** Applies an action and prints the commands it issued. *)
 val act : t -> App.Action.t -> unit
 
+(** Runs [f] without printing the commands issued. *)
+val quiet : t -> (unit -> unit) -> unit
+
 (** A key press as the page sees it (in the editor with the caret at the end,
     unless [target]): prints the action [Keys.handle] chose, and applies it. *)
 val key

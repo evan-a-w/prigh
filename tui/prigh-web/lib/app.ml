@@ -25,6 +25,21 @@ module Users_purpose = struct
   [@@deriving sexp_of, equal]
 end
 
+module Skills_purpose = struct
+  type t =
+    | Complete
+    | Picker of string
+  [@@deriving sexp_of, equal]
+end
+
+module Mcp_purpose = struct
+  type t =
+    | Picker
+    | Reconnect
+    | Refreshed of string
+  [@@deriving sexp_of, equal]
+end
+
 module Reply_tag = struct
   type t =
     | Ignore
@@ -66,6 +81,11 @@ module Reply_tag = struct
     | Btw of string
     | Users of Users_purpose.t
     | User_switched
+    | Skills of
+        { place : string
+        ; purpose : Skills_purpose.t
+        }
+    | Mcp of Mcp_purpose.t
   [@@deriving sexp_of, equal]
 end
 
@@ -288,6 +308,7 @@ module Model = struct
     ; account : Accounts.Account.t option
     ; users : string list option
     ; terminal : Terminal.t
+    ; skills : Skills.t
     }
   [@@deriving sexp_of]
 
@@ -352,11 +373,16 @@ let init =
   ; account = None
   ; users = None
   ; terminal = Terminal.closed
+  ; skills = Skills.empty
   }
 ;;
 
 let rpc ?(tag = Reply_tag.Show_error) method_ params =
   Command.Rpc { method_; params; tag }
+;;
+
+let call ?tag (method_ : Request.Method.t) =
+  rpc ?tag (Request.Method.name method_) (Request.Method.params method_)
 ;;
 
 let str s = `String s
@@ -463,6 +489,7 @@ let set_state (m : Model.t) (state : State.t) =
       ; btw = None
       ; completion = None
       ; scrolled_up = false
+      ; skills = Skills.empty
       }
     , cancel_btw m
       @ [ Command.Set_url_session state.session_id
@@ -669,9 +696,10 @@ let set_draft (m : Model.t) ?cursor draft =
   { m with draft; cursor = Option.value cursor ~default:(String.length draft) }
 ;;
 
-let refresh_completion (m : Model.t) =
+let complete_draft (m : Model.t) ~skills =
   match
     Completion.compute
+      ~skills
       ~sessions:m.sessions
       ~hosts:(Option.value_map m.state ~default:[] ~f:(fun s -> s.hosts))
       ~users:(Option.value m.users ~default:[])
@@ -692,6 +720,28 @@ let refresh_completion (m : Model.t) =
           | None -> []
           | Some (method_, prefix) ->
             [ rpc method_ [ "prefix", str prefix ] ~tag:(Paths prefix) ]) ))
+;;
+
+(* [/skill:] completes the skills listed where the tools run, fetched the
+   first time it is typed there. *)
+let fetch_skills (m : Model.t) =
+  match Skills.place m.state with
+  | Some place
+    when String.is_prefix m.draft ~prefix:"/skill:"
+         && Skills.unknown m.skills ~place ->
+    ( { m with skills = Skills.requested ~place }
+    , [ call List_skills ~tag:(Skills { place; purpose = Complete }) ] )
+  | _ -> m, []
+;;
+
+let refresh_completion (m : Model.t) =
+  let m, fetch = fetch_skills m in
+  let skills =
+    Option.bind (Skills.place m.state) ~f:(fun place ->
+      Skills.find m.skills ~place)
+  in
+  let m, cmds = complete_draft m ~skills:(Option.value skills ~default:[]) in
+  m, fetch @ cmds
 ;;
 
 let edit m ?cursor text = refresh_completion (set_draft m ?cursor text)
@@ -1317,13 +1367,7 @@ let prompt_succeeded (m : Model.t) =
 let help_command (m : Model.t) name =
   let name = String.chop_prefix_if_exists name ~prefix:"/" in
   match Slash.find name with
-  | Some spec ->
-    toast
-      m
-      (sprintf
-         "%s — %s"
-         (String.strip ("/" ^ spec.name ^ " " ^ spec.args))
-         spec.help)
+  | Some spec -> toast m (sprintf "%s — %s" (Slash.Spec.usage spec) spec.help)
   | None ->
     error
       m
@@ -1449,6 +1493,7 @@ let user_switched (m : Model.t) (hello : Hello_reply.t) =
     ; completion = None
     ; btw = None
     ; images = []
+    ; skills = Skills.empty
     }
   in
   let m, cmds =
@@ -1512,6 +1557,55 @@ let entries_picker (m : Model.t) (purpose : Entries_purpose.t) json =
                { kind = Tree
                ; picker = Picker.create ?highlight ~title:"Session tree" items
                })))
+;;
+
+let open_skills (m : Model.t) ~query =
+  current_state m ~f:(fun state ->
+    match Skills.place (Some state) with
+    | None -> m, []
+    | Some place ->
+      m, [ call List_skills ~tag:(Skills { place; purpose = Picker query }) ])
+;;
+
+let mcp_chosen (m : Model.t) (l : Mcp_list.t) id =
+  match Mcp_servers.find l ~id with
+  | None -> m, []
+  | Some server ->
+    (match server.status with
+     | Ready -> open_dialog m (Mcp_tools server)
+     | Needs_approval ->
+       let m, cmds =
+         toast m (sprintf "Approved %s: starting it…" server.name)
+       in
+       ( m
+       , cmds
+         @ [ call
+               (Mcp_approve { source = server.source; server = server.name })
+               ~tag:(Mcp (Refreshed id))
+           ] )
+     | Failed ->
+       let m, cmds = toast m "Restarting the failed MCP servers…" in
+       ( m
+       , cmds
+         @ [ call (List_mcp { reconnect = true }) ~tag:(Mcp (Refreshed id)) ] ))
+;;
+
+let mcp_listed (m : Model.t) (purpose : Mcp_purpose.t) (l : Mcp_list.t) =
+  let say (text, `Error error) = toast m ~error text in
+  match purpose with
+  | Picker ->
+    if List.is_empty l.servers && List.is_empty l.problems
+    then toast m Mcp_servers.none
+    else open_picker m (Mcp_servers.picker l)
+  | Reconnect -> say (Mcp_servers.summary l)
+  | Refreshed id ->
+    let m, toast_cmds = say (Mcp_servers.outcome l ~id) in
+    (* Back to the list, unless something else has been opened since. *)
+    if Option.is_some m.dialog
+    then m, toast_cmds
+    else (
+      let m, cmds = open_picker m (Mcp_servers.picker ~highlight:id l) in
+      m, toast_cmds @ cmds)
 ;;
 
 let run_command (m : Model.t) ({ name; rest } : Slash.Parsed.t) =
@@ -1617,6 +1711,18 @@ let run_command (m : Model.t) ({ name; rest } : Slash.Parsed.t) =
   | "export", path -> export m path
   | "import", "" -> open_prompt m (Prompt.create Import)
   | "import", path -> m, [ rpc "import" [ "path", str path ] ~tag:Imported ]
+  | ("skills" | "skill:"), query -> open_skills m ~query
+  | "mcp", "" -> m, [ call (List_mcp { reconnect = false }) ~tag:(Mcp Picker) ]
+  | "mcp", "reconnect" ->
+    let m, cmds = toast m "Restarting the failed MCP servers…" in
+    m, cmds @ [ call (List_mcp { reconnect = true }) ~tag:(Mcp Reconnect) ]
+  | "mcp", other ->
+    error
+      m
+      (sprintf
+         "Unknown /mcp argument %S: /mcp lists the servers, /mcp reconnect \
+          restarts the failed ones."
+         other)
   | "copy", _ -> copy_last m
   | "btw", "" -> error m "Usage: /btw <question> (asked aside; the run goes on)"
   | "btw", question -> start_btw m question
@@ -1769,6 +1875,19 @@ let reply (m : Model.t) (tag : Reply_tag.t) result =
       | Users Probe )
     , Error _ ) -> m, []
   | Btw id, Error e -> update_btw m id ~f:(fun b -> Btw.fail b e), []
+  | Skills { place; purpose = Complete }, Error _ ->
+    (* Complete nothing rather than ask again at every key. *)
+    if Option.equal String.equal (Skills.place m.state) (Some place)
+    then { m with skills = Skills.loaded ~place [] }, []
+    else m, []
+  | Skills { purpose = Picker _; _ }, Error e ->
+    error m (sprintf "Couldn't list the skills: %s" e)
+  | Mcp (Refreshed _), Error e ->
+    error
+      m
+      (sprintf "Couldn't start the MCP server: %s. /mcp reconnect retries." e)
+  | Mcp (Picker | Reconnect), Error e ->
+    error m (sprintf "Couldn't list the MCP servers: %s" e)
   | (Prompt_done _ | Exported | Imported), Error e -> prompt_failed m e
   | Deleted title, Error e ->
     error
@@ -1980,6 +2099,23 @@ let reply (m : Model.t) (tag : Reply_tag.t) result =
     decode m json strings ~f:(fun users -> users_picker m users)
   | User_switched, Ok json ->
     decode m json Hello_reply.of_json ~f:(user_switched m)
+  (* Listed for another session, directory or host. *)
+  | Skills { place; _ }, Ok _
+    when not (Option.equal String.equal (Skills.place m.state) (Some place)) ->
+    m, []
+  | Skills { place; purpose }, Ok json ->
+    decode
+      m
+      json
+      (fun json -> Json.list_field json "skills" ~f:Skill.of_json)
+      ~f:(fun skills ->
+        let m = { m with skills = Skills.loaded ~place skills } in
+        match purpose, skills with
+        | Complete, _ -> refresh_completion { m with completion = None }
+        | Picker _, [] -> toast m Skills.none
+        | Picker query, skills -> open_picker m (Skills.picker ~query skills))
+  | Mcp purpose, Ok json ->
+    decode m json Mcp_list.of_json ~f:(mcp_listed m purpose)
 ;;
 
 let auth_event (m : Model.t) (e : Auth_event.t) =
@@ -2120,6 +2256,13 @@ let shell (m : Model.t) text =
         ] ))
 ;;
 
+(* [/skill:NAME args] is a prompt: the backend expands it. *)
+let invokes_skill ({ name; _ } : Slash.Parsed.t) =
+  match String.chop_prefix name ~prefix:"skill:" with
+  | Some skill -> not (String.is_empty skill)
+  | None -> false
+;;
+
 let send (m : Model.t) ~follow_up =
   let text = String.strip m.draft in
   let sent (m : Model.t) =
@@ -2132,7 +2275,7 @@ let send (m : Model.t) ~follow_up =
     let m, save = sent m in
     let m, cmds = shell m text in
     m, save @ (Command.Scroll_to_bottom :: cmds)
-  | Some parsed when List.is_empty m.images ->
+  | Some parsed when List.is_empty m.images && not (invokes_skill parsed) ->
     let m, save = sent m in
     let m, cmds = run_command m parsed in
     m, save @ cmds
@@ -2193,7 +2336,7 @@ let accept_completion (m : Model.t) ~run =
          | Some { args; argument = None; _ } ->
            String.is_empty args || String.is_prefix args ~prefix:"["
          | Some { argument = Some _; _ } | None -> false)
-      | Argument (Directory | Path), _ -> false
+      | Argument (Directory | Path | Skill), _ -> false
       | Argument _, _ -> true
       | (Command | Path), _ -> false
     in
@@ -2253,6 +2396,8 @@ let picker_accept (m : Model.t) ~kind (item : Picker.Item.t) =
          error m (sprintf "Tool host %s has gone: /host lists them." item.id))
     | Users -> act_as m item.id
     | Accounts -> account_chosen m item.id
+    | Skills -> edit m ("/skill:" ^ item.id ^ " ")
+    | Mcp l -> mcp_chosen m l item.id
   in
   m, (if Option.is_none m.dialog then [ focus_editor ] else []) @ cmds
 ;;
@@ -2319,7 +2464,8 @@ let dialog_accept (m : Model.t) =
      | None, Some _ -> respond_login m flow
      | Some _, _ -> close_dialog m
      | None, None -> m, [])
-  | Some (Help | Hotkeys | Auth _ | Session _ | Text _) -> close_dialog m
+  | Some (Help | Hotkeys | Auth _ | Session _ | Text _ | Mcp_tools _) ->
+    close_dialog m
   | Some (Scoped_models { checked; _ }) ->
     let m, cmds = save_scoped m checked in
     m, focus_editor :: cmds

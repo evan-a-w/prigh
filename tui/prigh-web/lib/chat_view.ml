@@ -29,10 +29,28 @@ let time times at =
     [ Node.text (Message_time.short times at) ]
 ;;
 
-let user times ({ text; images; at } : Message.User.t) =
+(* A skill's instructions, folded under its name, above the user's text. *)
+let skill_card (skill : Skill_message.t) =
+  folded
+    ~cls:"skill-card"
+    ~label:("skill " ^ skill.name)
+    ~preview:skill.location
+    (div
+       "skill-body"
+       [ div "skill-location" [ Node.text skill.location ]
+       ; Markdown_view.render skill.body
+       ])
+;;
+
+let user ?skill times ({ text; images; at } : Message.User.t) =
+  let text =
+    Option.value_map skill ~default:text ~f:(fun (s : Skill_message.t) ->
+      s.args)
+  in
   div
-    "msg user"
-    [ Image_view.thumbs images
+    (if Option.is_some skill then "msg user skill" else "msg user")
+    [ Option.value_map skill ~default:Node.none ~f:skill_card
+    ; Image_view.thumbs images
     ; (if String.is_empty (String.strip text)
        then Node.none
        else div "bubble" [ Node.text text ])
@@ -165,7 +183,7 @@ and render_entry times chat (entry : Chat.Entry.t) =
   | User u ->
     (match Prigh_ui.Delivery.parse u.text with
      | Some sections -> div "msg" [ Delivery_view.view sections ]
-     | None -> user times u)
+     | None -> user ?skill:(Skill_message.parse u.text) times u)
   | Notice text -> div "msg notice" [ Node.text text ]
   | Shell call ->
     let tool = Chat.tool chat call.id in
