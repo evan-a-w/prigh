@@ -123,7 +123,7 @@ let%expect_test "logging in: pick a provider, open the URL, answer the prompts" 
   H.text h ~selector:".modal";
   [%expect
     {|
-    Log in to openai
+    Log in to OpenAI
     (Close (Esc))
     Waiting for the provider…
     (Cancel)
@@ -141,7 +141,7 @@ let%expect_test "logging in: pick a provider, open the URL, answer the prompts" 
   H.text h ~selector:".modal";
   [%expect
     {|
-    Log in to openai
+    Log in to OpenAI
     (Close (Esc))
     Sign in, then paste the code.
     (Open the login page)

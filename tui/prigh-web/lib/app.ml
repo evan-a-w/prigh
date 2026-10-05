@@ -386,12 +386,15 @@ let login_picker (statuses : Auth_status.t list) =
         Picker.Item.create
           ~id:(s.provider ^ " " ^ meth.method_)
           ~detail:(meth.label ^ configured)
-          ~search:(s.name ^ " " ^ s.provider ^ " " ^ meth.method_)
+          ~search:
+            (String.concat
+               ~sep:" "
+               [ s.name; s.provider; meth.method_; meth.label ])
           ~marked:(not (String.is_empty configured))
           s.name))
   in
   Dialog.Picker
-    { kind = Login; picker = Picker.create ~title:"Log in to" items }
+    { kind = Login; picker = Picker.create ~title:"Log in to a provider" items }
 ;;
 
 let logout_picker (statuses : Auth_status.t list) =
@@ -407,7 +410,9 @@ let logout_picker (statuses : Auth_status.t list) =
   | items ->
     Some
       (Dialog.Picker
-         { kind = Logout; picker = Picker.create ~title:"Log out of" items })
+         { kind = Logout
+         ; picker = Picker.create ~title:"Log out of a provider" items
+         })
 ;;
 
 let open_dialog (m : Model.t) ?(focus = "dialog") dialog =

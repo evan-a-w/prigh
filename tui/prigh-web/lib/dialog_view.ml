@@ -143,11 +143,14 @@ let delete ~title ~inject =
     ]
 ;;
 
-let login (flow : Login_flow.t) ~inject =
+let login (m : App.Model.t) (flow : Login_flow.t) ~inject =
   let title =
-    if String.is_empty flow.provider
-    then "Log in"
-    else "Log in to " ^ flow.provider
+    match
+      List.find m.auth ~f:(fun s -> String.equal s.provider flow.provider)
+    with
+    | Some s -> "Log in to " ^ s.name
+    | None when String.is_empty flow.provider -> "Log in"
+    | None -> "Log in to " ^ flow.provider
   in
   let url =
     match flow.url with
@@ -345,7 +348,7 @@ let dialog (m : App.Model.t) ~inject =
   | Some Help -> help ~inject
   | Some (Rename name) -> rename name ~inject
   | Some (Delete { title; _ }) -> delete ~title ~inject
-  | Some (Login flow) -> login flow ~inject
+  | Some (Login flow) -> login m flow ~inject
   | Some (Auth statuses) -> auth statuses ~inject
   | Some Agents -> agents m ~inject
 ;;
