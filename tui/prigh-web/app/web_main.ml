@@ -343,12 +343,22 @@ let key_target (ev : Dom_html.keyboardEvent Js.t) : Prigh_web.Keys.Target.t =
                (Js.to_string t##.value)
                ~utf16:t##.selectionStart
          }
+     | Input i when String.equal (Js.to_string i##.id) "session-search" ->
+       Session_search
      | Textarea _ | Input _ | Select _ -> Field
      | Button _ | A _ -> Control
      | _ ->
-       if String.equal (String.lowercase (Js.to_string el##.tagName)) "summary"
-       then Control
-       else Page)
+       (match
+          Js.Opt.to_option (el##getAttribute (Js.string "data-session"))
+        with
+        | Some id -> Session (Js.to_string id)
+        | None ->
+          if
+            String.equal
+              (String.lowercase (Js.to_string el##.tagName))
+              "summary"
+          then Control
+          else Page))
 ;;
 
 (* Selected text in a field or the page (so Ctrl+X cuts or does nothing). *)

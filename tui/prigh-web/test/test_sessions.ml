@@ -47,7 +47,13 @@ let%expect_test
   H.show h ~selector:".session.selected";
   [%expect
     {|
-    <div title="/sessions/s1.jsonl" class="selected session" @on_click>
+    <div id="session-s1"
+         tabindex="0"
+         role="button"
+         data-session="s1"
+         title="/sessions/s1.jsonl"
+         class="selected session"
+         @on_click>
       <div class="session-top">
         <span title="open in the backend" class="dot live">  </span>
         <span class="session-title"> fix the parser bug </span>
@@ -119,7 +125,7 @@ let%expect_test "no sessions yet" =
 let%expect_test "switching resets what belonged to the old session" =
   let h = H.create ~sessions () in
   H.act h (Switch_session "/sessions/s1.jsonl");
-  [%expect {| |}];
+  [%expect {| (Focus editor) |}];
   H.event
     h
     {|{"event":"message_start","message":{"role":"user","text":"hello"}}|};
@@ -140,6 +146,7 @@ let%expect_test "switching resets what belonged to the old session" =
     {|
     (Rpc (method_ switch_session) (params ((path /sessions/s2.jsonl)))
      (tag Reload_state))
+    (Focus editor)
     |}];
   H.event
     h
@@ -389,6 +396,7 @@ let%expect_test
     (Focus session-search)
     (Rpc (method_ switch_session) (params ((path /sessions/s3.jsonl)))
      (tag Reload_state))
+    (Focus editor)
     false
     |}];
   H.act h (Set_narrow false);
@@ -409,7 +417,12 @@ let%expect_test "new session and switching session reload the state" =
   Harness.reply
     h
     "get_state"
-    (Harness.state_json ~fields:[ "session_id", `String "s2" ] ());
+    (Harness.state_json
+       ~fields:
+         [ "session_id", `String "s2"
+         ; "session_path", `String "/sessions/s2.jsonl"
+         ]
+       ());
   Harness.text h ~selector:".chat";
   [%expect
     {|
@@ -434,6 +447,83 @@ let%expect_test "new session and switching session reload the state" =
   Harness.reply h "get_state" (Harness.state_json ());
   Harness.reply h "get_messages" {|[{"role":"user","text":"hello"}]|};
   Harness.text h ~selector:".chat";
-  [%expect.unreachable]
-[@@expect.uncaught_exn {| ("no pending request" switch_session) |}]
+  [%expect
+    {|
+    (Rpc (method_ switch_session) (params ((path /sessions/s1.jsonl)))
+     (tag Reload_state))
+    (Focus editor)
+    (Rpc (method_ get_state) (params ()) (tag State))
+    (Set_url_session s1)
+    (Rpc (method_ get_messages) (params ()) (tag (Messages s1)))
+    (Rpc (method_ get_pending) (params ()) (tag Pending))
+    (Rpc (method_ list_sessions) (params ()) (tag Sessions))
+    (Rpc (method_ list_subagents) (params ()) (tag Subagents))
+    (Rpc (method_ list_jobs) (params ()) (tag Jobs))
+    What are we building?
+    /work
+    / commands
+    @ mention a file
+    ! run a command
+    Ctrl+L switch model
+    Ctrl+K find a session
+    |}]
+;;
+
+let%expect_test
+    "the sidebar from the keyboard: ↓ ↑ through the sessions, Enter opens, Esc \
+     goes back to the editor"
+  =
+  let h = H.create ~sessions () in
+  H.key h "k" ~ctrl:true;
+  H.type_ h "";
+  H.act h (Set_session_query "re");
+  H.text h ~selector:".session-title";
+  H.key h "ArrowDown" ~target:Session_search;
+  H.key h "ArrowDown" ~target:(Session "s2");
+  H.key h "ArrowDown" ~target:(Session "s3");
+  H.key h "ArrowUp" ~target:(Session "s2");
+  H.key h "ArrowUp" ~target:(Session "s2");
+  [%expect
+    {|
+    Open_sessions
+    (Focus session-search)
+    Release notes
+    Refactor the lexer
+    fix the parser bug
+    (Session_nav (from ()) (by 1))
+    (Focus session-s2)
+    (Session_nav (from (s2)) (by 1))
+    (Focus session-s3)
+    (Session_nav (from (s3)) (by 1))
+    (Focus session-s1)
+    (Session_nav (from (s2)) (by -1))
+    (Focus session-search)
+    (Session_nav (from (s2)) (by -1))
+    (Focus session-search)
+    |}];
+  H.key h "Enter" ~target:(Session "s3");
+  H.key h "Delete" ~target:(Session "s3");
+  H.key h "Escape" ~target:Page;
+  H.key h "Escape" ~target:(Session "s3");
+  [%expect
+    {|
+    (Switch_session /sessions/s3.jsonl)
+    (Rpc (method_ switch_session) (params ((path /sessions/s3.jsonl)))
+     (tag Reload_state))
+    (Focus editor)
+    (Ask_delete /sessions/s3.jsonl)
+    (Focus dialog)
+    Close_dialog
+    (Focus editor)
+    Leave_sidebar
+    (Focus editor)
+    |}];
+  H.key h "Enter" ~target:Session_search;
+  [%expect
+    {|
+    Open_first_session
+    (Rpc (method_ switch_session) (params ((path /sessions/s2.jsonl)))
+     (tag Reload_state))
+    (Focus editor)
+    |}]
 ;;
