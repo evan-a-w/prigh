@@ -67,11 +67,36 @@ let read_file ~env ~cancel ~cwd path =
 
 let instructions_op = "$instructions"
 
+module Instructions = struct
+  type t =
+    { files : (string * string) list
+    ; nix : bool
+    }
+  [@@deriving sexp_of]
+end
+
+let on_path name =
+  match Sys.getenv "PATH" with
+  | None -> false
+  | Some path ->
+    List.exists (String.split path ~on:':') ~f:(fun dir ->
+      (not (String.is_empty dir))
+      &&
+      let file = Filename.concat dir name in
+      Result.is_ok (Core_unix.access file [ `Exec ])
+      &&
+      match Sys_unix.is_file file with
+      | `Yes -> true
+      | `No | `Unknown -> false)
+;;
+
 (* AGENTS.md/CLAUDE.md from the host's filesystem: the ancestors of [cwd]
    and the host's own ~/.prigh. A pseudo-tool so that it goes through the
    same executor (and hence the same host) as the real tools. [home] is only
    honoured when given (the backend's, for tests); the tool-host worker
-   strips it so a remote host uses its own. *)
+   strips it so a remote host uses its own. With [with_nix], the reply is an
+   object that also says whether [nix] is on the host's PATH; without it,
+   the bare array that backends predating it expect. *)
 let instructions_tool =
   { Tool.spec =
       { Tool_spec.name = instructions_op
@@ -88,26 +113,53 @@ let instructions_tool =
           | Some home -> home
           | None -> Option.value (Sys.getenv "HOME") ~default:"/"
         in
-        let files = System_prompt.read_instructions ~cwd:context.cwd ~home in
+        let files =
+          `Array
+            (List.map
+               (System_prompt.read_instructions ~cwd:context.cwd ~home)
+               ~f:(fun (path, text) ->
+                 `Object [ "path", `String path; "text", `String text ]))
+        in
         Tool.Result.ok
           (Json.to_string
-             (`Array
-                 (List.map files ~f:(fun (path, text) ->
-                    `Object [ "path", `String path; "text", `String text ])))))
+             (match Tool_args.bool_opt args "with_nix" with
+              | Some true ->
+                `Object
+                  [ "files", files
+                  ; ("nix", if on_path "nix" then `True else `False)
+                  ]
+              | Some false | None -> files)))
   }
 ;;
 
-let instructions_of_result (result : Tool.Result.t) =
-  if result.is_error
-  then []
-  else (
-    match Json.parse result.text with
-    | Ok (`Array items) ->
+let instructions_args ~home =
+  `Object [ "home", `String home; "with_nix", `True ]
+;;
+
+(* Tool hosts predating [with_nix] answer with just the array of files. *)
+let instructions_of_result (result : Tool.Result.t) : Instructions.t =
+  let files = function
+    | `Array items ->
       List.filter_map items ~f:(fun item ->
         match Json.member "path" item, Json.member "text" item with
         | Some (`String path), Some (`String text) -> Some (path, text)
         | _ -> None)
-    | _ -> [])
+    | _ -> []
+  in
+  let none = { Instructions.files = []; nix = false } in
+  if result.is_error
+  then none
+  else (
+    match Json.parse result.text with
+    | Ok (`Array _ as items) -> { none with files = files items }
+    | Ok (`Object _ as json) ->
+      { files = Option.value_map (Json.member "files" json) ~default:[] ~f:files
+      ; nix =
+          (match Json.member "nix" json with
+           | Some `True -> true
+           | _ -> false)
+      }
+    | _ -> none)
 ;;
 
 let host_tools () =
