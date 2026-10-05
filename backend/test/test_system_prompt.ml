@@ -91,7 +91,8 @@ let%expect_test "background guidance follows the tools" =
       ~provider:(Faux_provider.create [])
       ~current_model:(fun () -> Model.default)
       ~current_thinking:(fun () -> Off)
-      ~home:"/home" ()
+      ~home:"/home"
+      ()
   in
   print_endline
     (base

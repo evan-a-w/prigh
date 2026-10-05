@@ -45,10 +45,13 @@ let announce t message = List.iter t.subscribers ~f:(fun f -> f message)
 let providers t = t.providers
 
 let find_provider t name =
-  List.find t.providers ~f:(fun (p : Custom_provider.t) -> String.equal p.name name)
+  List.find t.providers ~f:(fun (p : Custom_provider.t) ->
+    String.equal p.name name)
 ;;
 
-let listing t name = Option.value (Hashtbl.find t.listings name) ~default:Listing.Unknown
+let listing t name =
+  Option.value (Hashtbl.find t.listings name) ~default:Listing.Unknown
+;;
 
 let listed t name =
   match listing t name with
@@ -84,7 +87,11 @@ let resolve t query =
      | Some (p, id) when not (String.is_empty id) ->
        (match listing t p.name with
         | Unknown | Failed _ -> Ok (Custom_provider.model p id)
-        | Listed _ -> error)
+        | Listed listed ->
+          (* Suggest that provider's models only. *)
+          (match Model.resolve_in (Custom_provider.models p ~listed) query with
+           | Ok _ -> error
+           | Error _ as narrower -> narrower))
      | _ -> error)
 ;;
 
@@ -98,12 +105,19 @@ let problems t =
 
 let describe_http_error ~url (e : Http_client.Error.t) =
   match e with
-  | Connection_failed message -> sprintf "could not connect to %s (%s)" url message
+  | Connection_failed message ->
+    sprintf "could not connect to %s (%s)" url message
   | Timed_out -> sprintf "no answer from %s in time" url
   | Cancelled -> "cancelled"
 ;;
 
-let fetch_models ~env ?cancel ?(timeout = default_timeout) (p : Custom_provider.t) ~key =
+let fetch_models
+      ~env
+      ?cancel
+      ?(timeout = default_timeout)
+      (p : Custom_provider.t)
+      ~key
+  =
   let url = p.base_url ^ "/models" in
   let auth =
     match key with
@@ -111,9 +125,9 @@ let fetch_models ~env ?cancel ?(timeout = default_timeout) (p : Custom_provider.
     | Some key ->
       [ "Authorization", "Bearer " ^ key ]
       @
-      (match p.api with
-       | Anthropic -> [ "x-api-key", key ]
-       | Chat | Responses -> [])
+        (match p.api with
+        | Anthropic -> [ "x-api-key", key ]
+        | Chat | Responses -> [])
   in
   let version =
     match p.api with
@@ -131,7 +145,9 @@ let fetch_models ~env ?cancel ?(timeout = default_timeout) (p : Custom_provider.
   with
   | Error e -> Or_error.error_string (describe_http_error ~url e)
   | Ok (response, body) when response.status / 100 <> 2 ->
-    let message = Sse_request.error_message_of_body ~status:response.status body in
+    let message =
+      Sse_request.error_message_of_body ~status:response.status body
+    in
     let hint =
       match response.status with
       | 401 | 403 ->
@@ -146,8 +162,8 @@ let fetch_models ~env ?cancel ?(timeout = default_timeout) (p : Custom_provider.
     (match Json.parse body with
      | Error _ ->
        Or_error.errorf
-         "GET %s did not return JSON (is the base URL the API's, usually ending in \
-          /v1?)"
+         "GET %s did not return JSON (is the base URL the API's, usually \
+          ending in /v1?)"
          url
      | Ok json ->
        Or_error.tag
@@ -174,7 +190,9 @@ let fetch t ?cancel p =
       fetch_models ~env:source.env ?cancel ~timeout:source.timeout p ~key)
 ;;
 
-let set_listed t name models = Hashtbl.set t.listings ~key:name ~data:(Listed models)
+let set_listed t name models =
+  Hashtbl.set t.listings ~key:name ~data:(Listed models)
+;;
 
 let refresh_one t (p : Custom_provider.t) =
   match fetch t p with
@@ -192,13 +210,16 @@ let refresh_one t (p : Custom_provider.t) =
       then
         announce
           t
-          (sprintf "%s: the model list loaded again (%d models)" p.name (List.length models)))
+          (sprintf
+             "%s: the model list loaded again (%d models)"
+             p.name
+             (List.length models)))
   | Error e ->
     let message =
       sprintf
-        "%s: no model list: %s. Check that the server is running and the base URL and \
-         key are right (/login %s to change them); models named in config.json still \
-         work."
+        "%s: no model list: %s. Check that the server is running and the base \
+         URL and key are right (/login %s to change them); models named in \
+         config.json still work."
         p.name
         (Error.to_string_hum e)
         p.name
@@ -214,7 +235,8 @@ let refresh t ?only () =
     match only with
     | None -> t.providers
     | Some names ->
-      List.filter t.providers ~f:(fun p -> List.mem names p.name ~equal:String.equal)
+      List.filter t.providers ~f:(fun p ->
+        List.mem names p.name ~equal:String.equal)
   in
   Fiber.List.iter (refresh_one t) selected
 ;;

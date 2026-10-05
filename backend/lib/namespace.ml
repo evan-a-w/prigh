@@ -82,8 +82,9 @@ let provider_key_vars =
 
 (* [*_API_KEY] covers custom providers' variables, whatever they are named. *)
 let without_provider_keys getenv name =
-  if List.mem provider_key_vars name ~equal:String.equal
-     || String.is_suffix name ~suffix:"_API_KEY"
+  if
+    List.mem provider_key_vars name ~equal:String.equal
+    || String.is_suffix name ~suffix:"_API_KEY"
   then None
   else getenv name
 ;;

@@ -154,7 +154,8 @@ type t =
 let restore_settings t =
   match Session.model t.session with
   | Some (model_id, thinking) ->
-    Option.iter (Model_registry.find t.models model_id) ~f:(fun m -> t.model <- m);
+    Option.iter (Model_registry.find t.models model_id) ~f:(fun m ->
+      t.model <- m);
     t.thinking <- thinking
   | None -> ()
 ;;

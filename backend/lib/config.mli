@@ -28,6 +28,5 @@ val read_fields : home:string -> (string * Json.t) list Or_error.t
 val write_fields : home:string -> (string * Json.t) list -> unit Or_error.t
 
 val path : home:string -> string
-
 val to_json : t -> Json.t
 val of_json : Json.t -> t Or_error.t

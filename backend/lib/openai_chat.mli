@@ -16,7 +16,8 @@ open! Import
 (** How a server takes the thinking level. *)
 module Thinking_param : sig
   type t =
-    | Deepseek (** [thinking: {type: enabled|disabled}] plus [reasoning_effort] *)
+    | Deepseek
+    (** [thinking: {type: enabled|disabled}] plus [reasoning_effort] *)
     | Reasoning_effort (** OpenAI's [reasoning_effort] (low/medium/high) *)
   [@@deriving sexp_of]
 end

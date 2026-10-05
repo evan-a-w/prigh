@@ -66,7 +66,8 @@ module Listed_model = struct
     | Some (`Array items), _ | None, Some (`Array items) ->
       Ok
         (List.filter_map items ~f:of_json
-         |> List.stable_dedup ~compare:(fun (a : t) b -> String.compare a.id b.id))
+         |> List.stable_dedup ~compare:(fun (a : t) b ->
+           String.compare a.id b.id))
     | _ ->
       Or_error.error_string
         "the response has no \"data\" array of models; is this an \
@@ -83,15 +84,21 @@ type t =
   }
 [@@deriving sexp_of]
 
-let reserved = "custom" :: List.map Provider_id.builtins ~f:Provider_id.to_string
+let reserved =
+  "custom" :: List.map Provider_id.builtins ~f:Provider_id.to_string
+;;
 
 let validate_name raw =
   let name = String.strip raw in
   let valid_char c =
-    Char.is_lowercase c || Char.is_digit c || Char.equal c '-' || Char.equal c '_'
+    Char.is_lowercase c
+    || Char.is_digit c
+    || Char.equal c '-'
+    || Char.equal c '_'
   in
   if String.is_empty name
-  then Or_error.error_string "the name is empty: type a short name such as aiproxy"
+  then
+    Or_error.error_string "the name is empty: type a short name such as aiproxy"
   else if List.mem reserved name ~equal:String.equal
   then
     Or_error.errorf
@@ -101,8 +108,8 @@ let validate_name raw =
   else if not (Char.is_lowercase name.[0] && String.for_all name ~f:valid_char)
   then
     Or_error.errorf
-      "%S is not a valid name: use lowercase letters, digits, - and _, starting \
-       with a letter (e.g. %s)"
+      "%S is not a valid name: use lowercase letters, digits, - and _, \
+       starting with a letter (e.g. %s)"
       name
       (let s =
          String.lowercase name
@@ -128,7 +135,9 @@ let validate_base_url raw =
   let uri = Uri.of_string url in
   match Uri.scheme uri, Uri.host uri with
   | Some ("http" | "https"), Some host when not (String.is_empty host) ->
-    if Option.is_some (Uri.verbatim_query uri) || Option.is_some (Uri.fragment uri)
+    if
+      Option.is_some (Uri.verbatim_query uri)
+      || Option.is_some (Uri.fragment uri)
     then
       Or_error.errorf
         "%S has a query or fragment: give only the base URL, e.g. \
@@ -143,7 +152,8 @@ let validate_base_url raw =
 ;;
 
 let env_var name =
-  String.uppercase (String.map name ~f:(fun c -> if Char.equal c '-' then '_' else c))
+  String.uppercase
+    (String.map name ~f:(fun c -> if Char.equal c '-' then '_' else c))
   ^ "_API_KEY"
 ;;
 
@@ -230,8 +240,12 @@ let cost_of_json ~what json =
       (match Json.float json with
        | Some f when Float.(f >= 0.) -> Ok f
        | _ ->
-         Or_error.errorf "%s.%s must be a non-negative number (USD per million tokens)" what name)
-    | None -> Or_error.errorf "%s.%s is missing (USD per million tokens)" what name
+         Or_error.errorf
+           "%s.%s must be a non-negative number (USD per million tokens)"
+           what
+           name)
+    | None ->
+      Or_error.errorf "%s.%s is missing (USD per million tokens)" what name
   in
   let%bind input = price "input" ~required:true in
   let%bind output = price "output" ~required:true in
@@ -258,7 +272,8 @@ let override_of_json ~what json =
   let%bind id =
     match find "id" with
     | Some (`String id) when not (String.is_empty id) -> Ok id
-    | _ -> Or_error.errorf "%s needs an \"id\" (the model id the server uses)" what
+    | _ ->
+      Or_error.errorf "%s needs an \"id\" (the model id the server uses)" what
   in
   let%bind name = opt "name" ~f:Json.string ~expected:"a string" in
   let%bind context_window =
@@ -272,9 +287,17 @@ let override_of_json ~what json =
   let%map cost =
     match find "cost" with
     | None | Some `Null -> Ok None
-    | Some json -> Or_error.map (cost_of_json ~what:(what ^ ".cost") json) ~f:Option.some
+    | Some json ->
+      Or_error.map (cost_of_json ~what:(what ^ ".cost") json) ~f:Option.some
   in
-  ( { Model_override.id; name; context_window; max_output; thinking; images; cost }
+  ( { Model_override.id
+    ; name
+    ; context_window
+    ; max_output
+    ; thinking
+    ; images
+    ; cost
+    }
   , unknown_fields ~what ~known:override_known fields )
 ;;
 
@@ -283,15 +306,18 @@ let provider_known = [ "base_url"; "api"; "headers"; "models" ]
 let of_json ~name json =
   let what = "providers." ^ name in
   let open Or_error.Let_syntax in
-  let%bind name =
-    Or_error.tag (validate_name name) ~tag:(what ^ ": bad provider name")
+  let prefixed r =
+    Result.map_error r ~f:(fun e ->
+      Error.of_string (sprintf "%s: %s" what (Error.to_string_hum e)))
   in
+  let%bind name = prefixed (validate_name name) in
   let%bind fields = fields_of ~what json in
   let find field = List.Assoc.find fields ~equal:String.equal field in
   let%bind base_url =
     match find "base_url" with
     | Some (`String url) ->
-      Or_error.tag (validate_base_url url) ~tag:(what ^ ".base_url")
+      Result.map_error (validate_base_url url) ~f:(fun e ->
+        Error.of_string (sprintf "%s.base_url: %s" what (Error.to_string_hum e)))
     | _ ->
       Or_error.errorf
         "%s needs a \"base_url\" such as \"http://localhost:3000/v1\""
@@ -318,7 +344,9 @@ let of_json ~name json =
            | `String v -> Ok (header, v)
            | _ -> Or_error.errorf "%s.headers.%s must be a string" what header))
     | Some _ ->
-      Or_error.errorf "%s.headers must be an object of header names to strings" what
+      Or_error.errorf
+        "%s.headers must be an object of header names to strings"
+        what
   in
   let%map models, warnings =
     match find "models" with
@@ -332,15 +360,19 @@ let of_json ~name json =
         ( List.filter_map results ~f:(fun r -> Option.map (Result.ok r) ~f:fst)
         , List.concat_map results ~f:(function
             | Ok (_, warnings) -> warnings
-            | Error e -> [ Error.to_string_hum e ^ "; that entry is ignored" ]) )
-    | Some _ -> Or_error.errorf "%s.models must be an array of model objects" what
+            | Error e -> [ Error.to_string_hum e ^ "; that entry is ignored" ])
+        )
+    | Some _ ->
+      Or_error.errorf "%s.models must be an array of model objects" what
   in
   ( { name; base_url; api; headers; models }
   , unknown_fields ~what ~known:provider_known fields @ warnings )
 ;;
 
 let override_to_json (o : Model_override.t) =
-  let opt name f v = Option.value_map v ~default:[] ~f:(fun v -> [ name, f v ]) in
+  let opt name f v =
+    Option.value_map v ~default:[] ~f:(fun v -> [ name, f v ])
+  in
   let int n = `Number (Int.to_string n) in
   let float f = `Number (Float.to_string_hum ~strip_zero:true f) in
   let bool b = if b then `True else `False in
@@ -355,11 +387,11 @@ let override_to_json (o : Model_override.t) =
        ; opt
            "cost"
            (fun (c : Model.Cost.t) ->
-             `Object
-               [ "input", float c.input
-               ; "output", float c.output
-               ; "cache_read", float c.cache_read
-               ])
+              `Object
+                [ "input", float c.input
+                ; "output", float c.output
+                ; "cache_read", float c.cache_read
+                ])
            o.cost
        ])
 ;;
@@ -367,11 +399,14 @@ let override_to_json (o : Model_override.t) =
 let to_json t =
   `Object
     (List.concat
-       [ [ "base_url", `String t.base_url; "api", `String (Api.to_string t.api) ]
+       [ [ "base_url", `String t.base_url
+         ; "api", `String (Api.to_string t.api)
+         ]
        ; (if List.is_empty t.headers
           then []
           else
-            [ "headers", `Object (List.map t.headers ~f:(fun (k, v) -> k, `String v))
+            [ ( "headers"
+              , `Object (List.map t.headers ~f:(fun (k, v) -> k, `String v)) )
             ])
        ; (if List.is_empty t.models
           then []
@@ -385,12 +420,15 @@ let hint ~home = sprintf " (in %s)" (Config.path ~home)
 
 let load ~home =
   match Config.read_fields ~home with
-  | Error e -> [], [ Error.to_string_hum e ^ "; custom providers are not loaded" ]
+  | Error e ->
+    [], [ Error.to_string_hum e ^ "; custom providers are not loaded" ]
   | Ok fields ->
     (match List.Assoc.find fields ~equal:String.equal "providers" with
      | None | Some `Null -> [], []
      | Some (`Object entries) ->
-       let results = List.map entries ~f:(fun (name, json) -> of_json ~name json) in
+       let results =
+         List.map entries ~f:(fun (name, json) -> of_json ~name json)
+       in
        let providers =
          List.filter_map results ~f:(fun r -> Option.map (Result.ok r) ~f:fst)
        in
@@ -398,7 +436,8 @@ let load ~home =
          List.concat_map results ~f:(function
            | Ok (_, warnings) -> List.map warnings ~f:(fun w -> w ^ hint ~home)
            | Error e ->
-             [ Error.to_string_hum e ^ hint ~home ^ "; that provider is skipped" ])
+             [ Error.to_string_hum e ^ hint ~home ^ "; that provider is skipped"
+             ])
        in
        providers, problems
      | Some _ ->
@@ -420,7 +459,9 @@ let update ~home ~f =
       if List.Assoc.mem fields ~equal:String.equal "providers"
       then
         List.map fields ~f:(fun (name, value) ->
-          if String.equal name "providers" then name, `Object providers else name, value)
+          if String.equal name "providers"
+          then name, `Object providers
+          else name, value)
       else fields @ [ "providers", `Object providers ]
     in
     Config.write_fields ~home fields)
@@ -436,5 +477,6 @@ let save ~home t =
 ;;
 
 let remove ~home name =
-  update ~home ~f:(fun entries -> List.Assoc.remove entries ~equal:String.equal name)
+  update ~home ~f:(fun entries ->
+    List.Assoc.remove entries ~equal:String.equal name)
 ;;

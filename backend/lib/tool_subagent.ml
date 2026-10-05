@@ -78,7 +78,13 @@ module Prepared = struct
     }
 end
 
-let prepare ~models ~current_model ~current_thinking (context : Tool.Context.t) args =
+let prepare
+      ~models
+      ~current_model
+      ~current_thinking
+      (context : Tool.Context.t)
+      args
+  =
   let task = Tool_args.string args "task" in
   let only = Tool_args.string_list_opt args "tools" in
   let model =
@@ -264,7 +270,9 @@ let create
       ()
   =
   let run (context : Tool.Context.t) args =
-    let prepared = prepare ~models ~current_model ~current_thinking context args in
+    let prepared =
+      prepare ~models ~current_model ~current_thinking context args
+    in
     match context.background with
     | Some background when context.depth = 0 ->
       let id =

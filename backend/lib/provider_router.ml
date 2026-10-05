@@ -16,7 +16,8 @@ let not_configured_message provider =
 
 let custom_provider ~env ?timeout (p : Custom_provider.t) ~key : Provider.t =
   let bearer =
-    Option.value_map key ~default:[] ~f:(fun key -> [ "Authorization", "Bearer " ^ key ])
+    Option.value_map key ~default:[] ~f:(fun key ->
+      [ "Authorization", "Bearer " ^ key ])
   in
   match p.api with
   | Chat ->
@@ -35,7 +36,10 @@ let custom_provider ~env ?timeout (p : Custom_provider.t) ~key : Provider.t =
       ?timeout
       ~endpoint:
         (Custom
-           { provider = Custom_provider.provider_id p; api_key = key; headers = p.headers })
+           { provider = Custom_provider.provider_id p
+           ; api_key = key
+           ; headers = p.headers
+           })
       ()
   | Anthropic ->
     Anthropic.create
@@ -86,7 +90,8 @@ let builtin_provider
   | Custom _ -> assert false
 ;;
 
-let create ~env ?timeout ?getenv ?(models = Model_registry.builtin ()) ~store () =
+let create ~env ?timeout ?getenv ?(models = Model_registry.builtin ()) ~store ()
+  =
   let stream (request : Provider.Request.t) ~cancel ~on_event =
     let fail message =
       Assistant_builder.finish
@@ -95,23 +100,30 @@ let create ~env ?timeout ?getenv ?(models = Model_registry.builtin ()) ~store ()
         ~usage:Usage.zero
     in
     let provider = request.model.provider in
-    let resolve () = Provider_auth.resolve ~env ~cancel ?getenv store provider in
+    let resolve () =
+      Provider_auth.resolve ~env ~cancel ?getenv store provider
+    in
     match provider with
     | Custom name ->
       (match Model_registry.find_provider models name with
        | None ->
          fail
            (sprintf
-              "custom provider %s is not configured: add it with /login custom (or \
-               check providers.%s in config.json)"
+              "custom provider %s is not configured: add it with /login custom \
+               (or check providers.%s in config.json)"
               name
               name)
        | Some p ->
          (match resolve () with
           | Error e -> fail ("auth: " ^ Error.to_string_hum e)
           | Ok auth ->
-            let key = Option.map auth ~f:(fun (r : Provider_auth.Resolved.t) -> r.token) in
-            (custom_provider ~env ?timeout p ~key).stream request ~cancel ~on_event))
+            let key =
+              Option.map auth ~f:(fun (r : Provider_auth.Resolved.t) -> r.token)
+            in
+            (custom_provider ~env ?timeout p ~key).stream
+              request
+              ~cancel
+              ~on_event))
     | Anthropic | Openai | Openai_codex | Deepseek ->
       (match resolve () with
        | Error e -> fail ("auth: " ^ Error.to_string_hum e)

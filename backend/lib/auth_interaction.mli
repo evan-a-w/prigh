@@ -14,7 +14,7 @@ module Prompt : sig
         { message : string
         ; placeholder : string
         ; default : string
-        (** prefilled; frontends that cannot prefill send [""] for it *)
+          (** prefilled; frontends that cannot prefill send [""] for it *)
         }
     | Manual_code of
         { message : string
