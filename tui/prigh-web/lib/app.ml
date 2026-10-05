@@ -190,13 +190,14 @@ let set_state (m : Model.t) (state : State.t) =
 let reply (m : Model.t) (tag : Reply_tag.t) result =
   match tag, result with
   | Reconnect generation, _ when generation <> m.generation -> m, []
-  | Reconnect _, Error error ->
+  (* The banner says that we are reconnecting: a toast per attempt would
+     pile up over the page. *)
+  | Reconnect _, Error _ ->
     (match m.connection with
      | Connected -> m, []
      | Reconnecting { attempt; generation } ->
        let attempt = attempt + 1 in
-       let m = { m with connection = Reconnecting { attempt; generation } } in
-       ( toast m ~error:true (sprintf "reconnecting: %s" error)
+       ( { m with connection = Reconnecting { attempt; generation } }
        , [ Command.Reconnect
              { generation
              ; delay_ms = Connection.delay_ms ~attempt
