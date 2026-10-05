@@ -3,11 +3,14 @@ open! Import
 open Html
 module Action = App.Action
 
-let session_title (state : State.t) =
+let session_title (m : App.Model.t) (state : State.t) =
   match state.session_name, state.session_description with
   | Some name, _ when not (String.is_empty (String.strip name)) -> name
   | _, Some description -> description
-  | _ -> "New session"
+  | _ ->
+    (match List.find m.sessions ~f:(fun s -> String.equal s.id state.session_id) with
+     | Some ({ first_prompt = Some _; _ } as s) -> Session_list.title s
+     | _ -> "New session")
 ;;
 
 let view (m : App.Model.t) ~inject =
@@ -38,7 +41,7 @@ let view (m : App.Model.t) ~inject =
                 ; Attr.title "Rename (/name)"
                 ; Attr.on_click (fun _ -> inject Action.Open_rename)
                 ]
-              [ Node.span [ Node.text (session_title state) ]
+              [ Node.span [ Node.text (session_title m state) ]
               ; icon ~cls:"edit-hint" Pencil
               ]
           ; div
