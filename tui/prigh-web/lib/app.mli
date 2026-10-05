@@ -99,6 +99,7 @@ module Action : sig
   type t =
     | Start (** the initial requests, after [hello] *)
     | Hello of Hello_reply.t
+    | Saved_login (** we signed in with a saved user name or token *)
     | Event of Event.t
     | Protocol_error of string
     | Backend_closed
@@ -168,6 +169,7 @@ module Model : sig
     { connection : Connection.t
     ; generation : int
     ; hello : Hello_reply.t option
+    ; saved_login : bool (** so signing out means something *)
     ; state : State.t option
     ; chat : Chat.t
     ; sessions : Session_summary.t list

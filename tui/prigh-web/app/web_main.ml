@@ -29,7 +29,8 @@ module Settings = struct
   let hello t ~session =
     [ "name", `String "prigh-web"; "tools", `False ]
     @ Login.hello_fields t.login
-    @ Option.value_map session ~default:[] ~f:(fun s -> [ "session", `String s ])
+    @ Option.value_map session ~default:[] ~f:(fun s ->
+      [ "session", `String s ])
   ;;
 end
 
@@ -86,9 +87,9 @@ let perform client settings ctx (command : App.Command.t) =
       let%bind.Effect result =
         Effect.of_deferred_fun
           (fun () ->
-            Deferred.map
-              (Client.call client method_ params)
-              ~f:(Result.map_error ~f:Error.to_string_hum))
+             Deferred.map
+               (Client.call client method_ params)
+               ~f:(Result.map_error ~f:Error.to_string_hum))
           ()
       in
       inject (App.Action.Reply (tag, result))
@@ -96,10 +97,12 @@ let perform client settings ctx (command : App.Command.t) =
       let%bind.Effect result =
         Effect.of_deferred_fun
           (fun () ->
-            let%bind.Deferred () = Clock_ns.after (Time_ns.Span.of_int_ms delay_ms) in
-            match%bind.Deferred Client.connect client with
-            | Error e -> Deferred.return (Error (Error.to_string_hum e))
-            | Ok () -> send_hello client settings ~session)
+             let%bind.Deferred () =
+               Clock_ns.after (Time_ns.Span.of_int_ms delay_ms)
+             in
+             match%bind.Deferred Client.connect client with
+             | Error e -> Deferred.return (Error (Error.to_string_hum e))
+             | Ok () -> send_hello client settings ~session)
           ()
       in
       inject (App.Action.Reply (Reconnect generation, result))
@@ -151,17 +154,19 @@ let component client settings ~current (local_ graph) =
       ~apply_action:(fun ctx model action ->
         let model', commands = App.update model action in
         current := model';
-        if not
-             (String.equal model.draft model'.draft
-              && Bool.equal (App.Model.running model) (App.Model.running model')
-              && Bool.equal model.narrow model'.narrow)
+        if
+          not
+            (String.equal model.draft model'.draft
+             && Bool.equal (App.Model.running model) (App.Model.running model')
+             && Bool.equal model.narrow model'.narrow)
         then autosize ();
         List.iter commands ~f:(perform client settings ctx);
         model')
       graph
   in
   let open Bonsai.Let_syntax in
-  let%arr model and inject in
+  let%arr model
+  and inject in
   { Result_.view = Prigh_web.View.view model ~inject; inject }
 ;;
 
@@ -171,39 +176,43 @@ let supported_images = [ "image/png"; "image/jpeg"; "image/gif"; "image/webp" ]
    downscales them. *)
 let read_images ~schedule (files : File.fileList Js.t) =
   for i = 0 to files##.length - 1 do
-    Js.Opt.iter (files##item i) (fun file ->
-      let mime_type = Js.to_string file##._type in
-      if not (String.is_prefix mime_type ~prefix:"image/")
-      then ()
-      else if not (List.mem supported_images mime_type ~equal:String.equal)
-      then
-        schedule
-          (App.Action.Show_toast
-             { text =
-                 sprintf
-                   "%s is not supported: use PNG, JPEG, GIF or WebP"
-                   mime_type
-             ; error = true
-             })
-      else (
-        let reader = new%js File.fileReader in
-        reader##.onload
-        := Dom.handler (fun _ ->
-             (match Js.Opt.to_option (File.CoerceTo.string reader##.result) with
-              | Some url ->
-                let url = Js.to_string url in
-                (match String.lsplit2 url ~on:',' with
-                 | Some (_, data) ->
-                   schedule
-                     (App.Action.Add_image
-                        { mime_type
-                        ; data
-                        ; bytes = Prigh_protocol.Image.decoded_size data
-                        })
-                 | None -> ())
-              | None -> ());
-             Js._true);
-        reader##readAsDataURL file))
+    Js.Opt.iter
+      (files##item i)
+      (fun file ->
+         let mime_type = Js.to_string file##._type in
+         if not (String.is_prefix mime_type ~prefix:"image/")
+         then ()
+         else if not (List.mem supported_images mime_type ~equal:String.equal)
+         then
+           schedule
+             (App.Action.Show_toast
+                { text =
+                    sprintf
+                      "%s is not supported: use PNG, JPEG, GIF or WebP"
+                      mime_type
+                ; error = true
+                })
+         else (
+           let reader = new%js File.fileReader in
+           reader##.onload
+           := Dom.handler (fun _ ->
+                (match
+                   Js.Opt.to_option (File.CoerceTo.string reader##.result)
+                 with
+                 | Some url ->
+                   let url = Js.to_string url in
+                   (match String.lsplit2 url ~on:',' with
+                    | Some (_, data) ->
+                      schedule
+                        (App.Action.Add_image
+                           { mime_type
+                           ; data
+                           ; bytes = Prigh_protocol.Image.decoded_size data
+                           })
+                    | None -> ())
+                 | None -> ());
+                Js._true);
+           reader##readAsDataURL file))
   done
 ;;
 
@@ -231,12 +240,15 @@ let key (ev : Dom_html.keyboardEvent Js.t) : Prigh_web.Keys.t =
 (* Keeps the highlighted item of a picker or the completion popup in view. *)
 let reveal_selected () =
   Browser.after_render (fun () ->
-    List.iter [ ".picker-item.selected"; ".popup-item.selected" ] ~f:(fun selector ->
-      Js.Opt.iter
-        (Dom_html.document##querySelector (Js.string selector))
-        (fun el ->
-          (Js.Unsafe.coerce el)##scrollIntoView
-            (Js.Unsafe.obj [| "block", Js.Unsafe.inject (Js.string "nearest") |]))))
+    List.iter
+      [ ".picker-item.selected"; ".popup-item.selected" ]
+      ~f:(fun selector ->
+        Js.Opt.iter
+          (Dom_html.document##querySelector (Js.string selector))
+          (fun el ->
+             (Js.Unsafe.coerce el)##scrollIntoView
+               (Js.Unsafe.obj
+                  [| "block", Js.Unsafe.inject (Js.string "nearest") |]))))
 ;;
 
 let narrow () = Dom_html.window##.innerWidth < 760
@@ -263,7 +275,8 @@ let install_listeners ~schedule ~current =
         schedule action;
         reveal_selected ();
         Js._false));
-  Browser.on_viewport_change (fun () -> schedule (App.Action.Set_narrow (narrow ())));
+  Browser.on_viewport_change (fun () ->
+    schedule (App.Action.Set_narrow (narrow ())));
   listen Dom_html.Event.paste (fun (ev : Dom_html.clipboardEvent Js.t) ->
     Js.Opt.iter ev##.clipboardData (fun data ->
       if data##.files##.length > 0
@@ -276,21 +289,22 @@ let install_listeners ~schedule ~current =
     Js._true);
   listen Dom_html.Event.drop (fun (ev : Dom_html.dragEvent Js.t) ->
     Dom.preventDefault ev;
-    Js.Opt.iter ev##.dataTransfer (fun data -> read_images ~schedule data##.files);
+    Js.Opt.iter ev##.dataTransfer (fun data ->
+      read_images ~schedule data##.files);
     Js._true);
   (* The chat follows new output unless the user has scrolled up. *)
   let stick = ref true in
   let chat () = Dom_html.getElementById_opt "chat" in
   let at_bottom (el : Dom_html.element Js.t) =
     Float.(
-      of_int el##.scrollHeight -. Js.to_float el##.scrollTop -. of_int el##.clientHeight
+      of_int el##.scrollHeight
+      -. Js.to_float el##.scrollTop
+      -. of_int el##.clientHeight
       < 60.)
   in
-  listen
-    (Dom_html.Event.make "scroll")
-    (fun _ ->
-       Option.iter (chat ()) ~f:(fun el -> stick := at_bottom el);
-       Js._true);
+  listen (Dom_html.Event.make "scroll") (fun _ ->
+    Option.iter (chat ()) ~f:(fun el -> stick := at_bottom el);
+    Js._true);
   let observer =
     new%js MutationObserver.mutationObserver
       (Js.wrap_callback (fun _ _ ->
@@ -348,7 +362,8 @@ let sign_in_form ?(notice = false) (settings : Settings.t) ~error =
                 Login.Storage.browser
                 ~user:(Browser.input_value "user")
                 ~password:(Browser.input_value "password");
-              Browser.reload_with_backend (String.strip (Browser.input_value "backend"));
+              Browser.reload_with_backend
+                (String.strip (Browser.input_value "backend"));
               Js._false))
            Js._false
          : Dom_html.event_listener_id))
@@ -356,7 +371,8 @@ let sign_in_form ?(notice = false) (settings : Settings.t) ~error =
 
 let run_app (settings : Settings.t) =
   let client =
-    Client.create ~connect:(fun () -> Ws_transport.connect ~url:settings.backend)
+    Client.create ~connect:(fun () ->
+      Ws_transport.connect ~url:settings.backend)
   in
   don't_wait_for
     (match%bind.Deferred
@@ -371,7 +387,8 @@ let run_app (settings : Settings.t) =
        let handle_ref = ref None in
        let current = ref App.init in
        let schedule action =
-         Option.iter !handle_ref ~f:(fun handle -> Start.Handle.schedule handle action)
+         Option.iter !handle_ref ~f:(fun handle ->
+           Start.Handle.schedule handle action)
        in
        let handle =
          Start.start_and_get_handle
@@ -380,8 +397,13 @@ let run_app (settings : Settings.t) =
            (component client settings ~current)
        in
        handle_ref := Some handle;
-       Option.iter (Prigh_protocol.Hello_reply.of_json reply |> Or_error.ok) ~f:(fun hello ->
-         schedule (App.Action.Hello hello));
+       Option.iter
+         (Prigh_protocol.Hello_reply.of_json reply |> Or_error.ok)
+         ~f:(fun hello -> schedule (App.Action.Hello hello));
+       if
+         Option.is_some settings.login.password
+         || Option.is_some settings.login.user
+       then schedule App.Action.Saved_login;
        schedule (App.Action.Set_narrow (narrow ()));
        schedule (App.Action.Load_history (load_history ()));
        schedule App.Action.Start;
@@ -390,13 +412,15 @@ let run_app (settings : Settings.t) =
        Clock_ns.every (Time_ns.Span.of_sec 30.) tick;
        install_listeners ~schedule ~current;
        don't_wait_for
-         (Pipe.iter_without_pushback (Client.incoming client) ~f:(fun incoming ->
-            schedule
-              (match incoming with
-               | Event e -> Event e
-               | Protocol_error e -> Protocol_error e
-               | Stderr text -> Show_toast { text; error = true }
-               | Closed -> Backend_closed)));
+         (Pipe.iter_without_pushback
+            (Client.incoming client)
+            ~f:(fun incoming ->
+              schedule
+                (match incoming with
+                 | Event e -> Event e
+                 | Protocol_error e -> Protocol_error e
+                 | Stderr text -> Show_toast { text; error = true }
+                 | Closed -> Backend_closed)));
        Deferred.unit)
 ;;
 

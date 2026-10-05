@@ -53,8 +53,11 @@ let argument_items
   =
   match kind with
   | Model ->
-    let usable (model : Llm.t) = List.is_empty auth || logged_in auth model.provider in
-    List.stable_sort models ~compare:(fun a b -> Bool.compare (usable b) (usable a))
+    let usable (model : Llm.t) =
+      List.is_empty auth || logged_in auth model.provider
+    in
+    List.stable_sort models ~compare:(fun a b ->
+      Bool.compare (usable b) (usable a))
     |> List.map ~f:(fun model ->
       Picker.Item.create
         ~id:model.key

@@ -51,7 +51,6 @@ let%expect_test "tool confirmations own the keyboard: Enter allows, Esc denies" 
     {|{"event":"tool_end","call":{"id":"c3","name":"bash","arguments":"{\"command\":\"ls\"}"},"result":{"tool_call_id":"c3","tool_name":"bash","text":"cancelled","is_error":true}}|};
   H.text h ~selector:".modal";
   [%expect {| (Focus confirm) |}]
-
 ;;
 
 let%expect_test "help lists every key and command" =
@@ -89,7 +88,8 @@ let%expect_test "help lists every key and command" =
     /signout sign out of this backend
     |}];
   H.key h "Enter" ~target:Page;
-  [%expect {|
+  [%expect
+    {|
     Dialog_accept
     (Focus editor)
     |}]
@@ -132,7 +132,9 @@ let%expect_test "logging in: pick a provider, open the URL, answer the prompts" 
   H.event
     h
     {|{"event":"auth","kind":"auth_url","url":"https://example.com/auth?x=1","instructions":"Sign in, then paste the code."}|};
-  H.event h {|{"event":"auth","kind":"progress","message":"Waiting for the browser"}|};
+  H.event
+    h
+    {|{"event":"auth","kind":"progress","message":"Waiting for the browser"}|};
   H.event
     h
     {|{"event":"auth","kind":"prompt","id":"p1","prompt":"manual_code","message":"Paste the code","placeholder":"code#state"}|};
@@ -189,7 +191,9 @@ let%expect_test "logging in: pick a provider, open the URL, answer the prompts" 
     Dialog_accept
     (Rpc (method_ auth_respond) (params ((id p2) (value o2))) (tag Show_error))
     |}];
-  H.event h {|{"event":"auth","kind":"done","provider":"openai","method":"api_key"}|};
+  H.event
+    h
+    {|{"event":"auth","kind":"done","provider":"openai","method":"api_key"}|};
   H.text h ~selector:".modal";
   H.text h ~selector:".toast";
   [%expect
@@ -213,7 +217,8 @@ let%expect_test "a login that fails says so; Esc cancels one in progress" =
     Login failed: already logging in to openai. /login tries again.
     |}];
   H.key h "Escape" ~target:Page;
-  [%expect {|
+  [%expect
+    {|
     Close_dialog
     (Focus editor)
     |}];
@@ -229,7 +234,9 @@ let%expect_test "a login that fails says so; Esc cancels one in progress" =
     (Rpc (method_ auth_cancel) (params ()) (tag Show_error))
     |}];
   (* A failure after the dialog was closed is a toast. *)
-  H.event h {|{"event":"auth","kind":"failed","provider":"anthropic","error":"timed out"}|};
+  H.event
+    h
+    {|{"event":"auth","kind":"failed","provider":"anthropic","error":"timed out"}|};
   H.text h ~selector:".toast";
   [%expect {| Login to anthropic failed: timed out. /login tries again. |}]
 ;;
@@ -295,7 +302,9 @@ let%expect_test "/auth shows the providers; /logout picks a logged-in one" =
     |}]
 ;;
 
-let%expect_test "toasts: notices expire, errors stay until dismissed, at most four" =
+let%expect_test
+    "toasts: notices expire, errors stay until dismissed, at most four"
+  =
   let h = H.create () in
   H.event h {|{"event":"notice","text":"Compacted"}|};
   H.act h (Show_toast { text = "Upload failed"; error = true });
@@ -321,9 +330,13 @@ let%expect_test "toasts: notices expire, errors stay until dismissed, at most fo
     |}]
 ;;
 
-let%expect_test "losing the connection: a banner with the attempt, then a fresh start" =
+let%expect_test
+    "losing the connection: a banner with the attempt, then a fresh start"
+  =
   let h = H.create () in
-  H.event h {|{"event":"message_start","message":{"role":"user","text":"hello"}}|};
+  H.event
+    h
+    {|{"event":"message_start","message":{"role":"user","text":"hello"}}|};
   H.act h Backend_closed;
   H.text h ~selector:".banner";
   [%expect
@@ -388,18 +401,24 @@ let%expect_test "signing out" =
   let h = H.create () in
   H.text h ~selector:".sidebar-footer";
   [%expect {| (Commands & keys) |}];
-  H.act h (Hello { client_id = "c1"; namespace = Some "ann"; user = Some "ann" });
+  H.act h Saved_login;
+  H.text h ~selector:".sidebar-footer";
+  [%expect {| (Commands & keys) (Sign out) |}];
+  H.act
+    h
+    (Hello { client_id = "c1"; namespace = Some "bob"; user = Some "ann" });
   H.text h ~selector:".sidebar-footer";
   [%expect
     {|
     A
-    ann
-    (Sign out)
+    ann acting as bob
+    (Commands and keys (/help)) (Sign out)
     |}];
   H.act h Sign_out;
   H.type_ h "/signout";
   H.act h Send;
-  [%expect {|
+  [%expect
+    {|
     Sign_out
     (Save_history (/signout))
     Sign_out

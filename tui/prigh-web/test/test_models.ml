@@ -1,7 +1,9 @@
 open! Core
 module H = Harness
 
-let%expect_test "the model picker: logged-in providers first, fuzzy filter, Enter switches" =
+let%expect_test
+    "the model picker: logged-in providers first, fuzzy filter, Enter switches"
+  =
   let h = H.create () in
   H.text h ~selector:".controls";
   [%expect {| (Claude Opus 5.5) (on) |}];
@@ -48,7 +50,8 @@ let%expect_test "the model picker: logged-in providers first, fuzzy filter, Ente
   (* Esc closes without switching. *)
   H.act h Open_model_picker;
   H.key h "Escape" ~target:Field;
-  [%expect {|
+  [%expect
+    {|
     (Focus picker-input)
     Close_dialog
     (Focus editor)
@@ -147,7 +150,9 @@ let%expect_test "thinking: a picker and /thinking, when the model supports it" =
     h
     (sprintf
        {|{"event":"state","state":%s}|}
-       (H.state_json ~fields:[ "model", deepseek; "thinking", `String "off" ] ()));
+       (H.state_json
+          ~fields:[ "model", deepseek; "thinking", `String "off" ]
+          ()));
   H.text h ~selector:".controls";
   [%expect {| (DeepSeek Chat) |}];
   H.type_ h "/thinking high";
@@ -167,14 +172,17 @@ let busy_state =
       [ "running", `True
       ; "context_tokens", `Number "150000"
       ; "cost_usd", `Number "1.2345"
-      ; "usage", Jsonaf.of_string {|{"input":123456,"output":7890,"cache_read":100000}|}
+      ; ( "usage"
+        , Jsonaf.of_string
+            {|{"input":123456,"output":7890,"cache_read":100000}|} )
       ; "active_host", `String "c7"
       ; ( "hosts"
         , Jsonaf.of_string
             {|[{"id":"backend","name":"backend","cwd":"/work"},{"id":"c7","name":"laptop","cwd":"/home/ann/work","session_id":"s1","session_name":null}]|}
         )
       ; ( "subagents"
-        , Jsonaf.of_string {|[{"id":"a1","task":"read the tests","running":true}]|} )
+        , Jsonaf.of_string
+            {|[{"id":"a1","task":"read the tests","running":true}]|} )
       ; ( "jobs"
         , Jsonaf.of_string
             {|[{"id":"j1","command":"make test","running":true,"exit":null},{"id":"j2","command":"sleep 1","running":false,"exit":"exited 0"}]|}
@@ -183,11 +191,16 @@ let busy_state =
     ()
 ;;
 
-let%expect_test "the status line: running, context, tokens, cost, queue, background, host, user" =
+let%expect_test
+    "the status line: running, context, tokens, cost, queue, background, host, \
+     user"
+  =
   let h = H.create () in
   H.text h ~selector:".status";
   [%expect {| Ready 0% ↑0 ↓0 $0.0000 |}];
-  H.act h (Hello { client_id = "c1"; namespace = Some "bob"; user = Some "ann" });
+  H.act
+    h
+    (Hello { client_id = "c1"; namespace = Some "bob"; user = Some "ann" });
   H.event h (sprintf {|{"event":"state","state":%s}|} busy_state);
   H.event h {|{"event":"queue_update","steer":1,"follow_up":2}|};
   H.text h ~selector:".status";
@@ -256,7 +269,8 @@ let%expect_test "aborting brings the queued prompts back into the editor" =
   [%expect {| (Stop (Esc)) (Steer (Enter)) |}];
   H.type_ h "half-written";
   H.key h "Escape";
-  [%expect {|
+  [%expect
+    {|
     Abort
     (Rpc (method_ abort) (params ()) (tag Restored))
     |}];

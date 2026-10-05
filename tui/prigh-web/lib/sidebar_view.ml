@@ -64,6 +64,20 @@ let session (m : App.Model.t) ~inject ~current (s : Session_summary.t) =
 ;;
 
 let user_footer (m : App.Model.t) ~inject =
+  let help =
+    button
+      ~cls:"icon ghost"
+      ~title:"Commands and keys (/help)"
+      ~on_click:(inject Action.Open_help)
+      [ icon Help ]
+  in
+  let sign_out =
+    button
+      ~cls:"icon ghost"
+      ~title:"Sign out"
+      ~on_click:(inject Action.Sign_out)
+      [ icon Logout ]
+  in
   match m.hello with
   | Some ({ user = Some user; _ } as hello) ->
     div
@@ -76,20 +90,18 @@ let user_footer (m : App.Model.t) ~inject =
              | Some ns -> span ~cls:"user-acting" ("acting as " ^ ns)
              | None -> Node.none)
           ]
-      ; button
-          ~cls:"icon ghost"
-          ~title:"Sign out"
-          ~on_click:(inject Action.Sign_out)
-          [ icon Logout ]
+      ; help
+      ; sign_out
       ]
   | _ ->
     div
       ~cls:"sidebar-footer"
       [ button
           ~cls:"ghost help-button"
-          ~title:"Commands and keys"
+          ~title:"Commands and keys (/help)"
           ~on_click:(inject Action.Open_help)
           [ icon Help; Node.text "Commands & keys" ]
+      ; (if m.saved_login then sign_out else Node.none)
       ]
 ;;
 

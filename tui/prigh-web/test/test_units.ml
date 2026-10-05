@@ -42,7 +42,9 @@ let%expect_test "what counts as a slash command" =
     ; "not /a command"
     ; "/"
     ]
-    ~f:(fun text -> print_s [%sexp (text : string), (Slash.parse text : Slash.Parsed.t option)]);
+    ~f:(fun text ->
+      print_s
+        [%sexp (text : string), (Slash.parse text : Slash.Parsed.t option)]);
   [%expect
     {|
     ("/model sonnet" (((name model) (rest sonnet))))
@@ -58,7 +60,8 @@ let%expect_test "what counts as a slash command" =
     printf
       "%S -> %s\n"
       name
-      (Option.value_map (Slash.closest name) ~default:"none" ~f:(fun s -> s.name)));
+      (Option.value_map (Slash.closest name) ~default:"none" ~f:(fun s ->
+         s.name)));
   [%expect
     {|
     "hlep" -> help
@@ -71,10 +74,14 @@ let%expect_test "what counts as a slash command" =
 
 let%expect_test "history keeps 100 entries, no consecutive duplicates" =
   let h =
-    List.fold (List.init 105 ~f:Int.to_string) ~init:History.empty ~f:History.add
+    List.fold
+      (List.init 105 ~f:Int.to_string)
+      ~init:History.empty
+      ~f:History.add
   in
   let h = History.add h "104" in
   let entries = History.to_list h in
-  print_s [%sexp (List.length entries : int), (List.take entries 3 : string list)];
+  print_s
+    [%sexp (List.length entries : int), (List.take entries 3 : string list)];
   [%expect {| (100 (104 103 102)) |}]
 ;;
