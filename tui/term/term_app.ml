@@ -172,29 +172,34 @@ let edit_externally text =
     Error ("editor failed: " ^ Core_unix.Exit_or_signal.to_string_hum status)
 ;;
 
-let hello_params hello ~session =
-  match session with
-  | None -> hello
-  | Some path ->
-    List.Assoc.remove hello ~equal:String.equal "session"
-    @ [ "session", `String path ]
+let hello_params hello ~session ~as_user =
+  let set name value params =
+    match value with
+    | None -> params
+    | Some v ->
+      List.Assoc.remove params ~equal:String.equal name @ [ name, `String v ]
+  in
+  hello
+  |> List.filter ~f:(fun (name, _) -> not (String.equal name "as_user"))
+  |> set "session" session
+  |> set "as_user" as_user
 ;;
 
 let hello_error = Result.map_error ~f:Error.to_string_hum
 
-let send_hello client hello ~session =
+let send_hello client hello ~session ~as_user =
   Deferred.map
-    (Client.call client "hello" (hello_params hello ~session))
+    (Client.call client "hello" (hello_params hello ~session ~as_user))
     ~f:hello_error
 ;;
 
-let reconnect client ~hello ~delay_ms ~session =
+let reconnect client ~hello ~delay_ms ~session ~as_user =
   let%bind.Deferred () =
     Clock.after (Time_float.Span.of_ms (Float.of_int delay_ms))
   in
   match%bind.Deferred Client.connect client with
   | Error e -> Deferred.return (Error (Error.to_string_hum e))
-  | Ok () -> send_hello client hello ~session
+  | Ok () -> send_hello client hello ~session ~as_user
 ;;
 
 let platform client ~hello ~exit ~quit_requested : Prigh_ui.Component.Platform.t
@@ -214,10 +219,15 @@ let platform client ~hello ~exit ~quit_requested : Prigh_ui.Component.Platform.t
   ; suspend = Effect.of_sync_fun suspend ()
   ; edit_externally = (fun text -> Effect.of_sync_fun edit_externally text)
   ; reconnect =
-      (fun ~delay_ms ~session ->
+      (fun ~delay_ms ~session ~as_user ->
         Effect.of_deferred_fun
-          (fun () -> reconnect client ~hello ~delay_ms ~session)
+          (fun () -> reconnect client ~hello ~delay_ms ~session ~as_user)
           ())
+  ; sign_out =
+      Effect.return
+        (Error
+           "/signout is only available in the browser; to log in as another \
+            user, restart prigh-tui with -user and -token")
   ; quit =
       (* Bonsai_term's [Driver.finished] never resolves when [exit] is scheduled
          from apply_action (the next frame sees the exit status before any event
@@ -388,21 +398,19 @@ let run ~connect ~hello ~local_tools =
     | Error _ as e -> Deferred.return e
     | Ok () ->
       Deferred.map
-        (send_hello client hello ~session:None)
+        (send_hello client hello ~session:None ~as_user:None)
         ~f:(Result.map_error ~f:Error.of_string)
   with
   | Error _ as e ->
     let%bind.Deferred () = Client.close client in
     Deferred.return e
   | Ok reply ->
-    let client_id =
-      match Jsonaf.member "client_id" reply with
-      | Some (`String id) -> Some id
-      | _ -> None
-    in
+    let hello_reply = Prigh_protocol.Hello_reply.of_json reply |> Or_error.ok in
     let tool_host =
       Option.map local_tools ~f:(fun backend ->
-        Prigh_client_unix.Tool_host.create ~client ~backend)
+        Prigh_client_unix.Tool_host.create
+          ~client
+          ~spawn:(Prigh_client_unix.Tool_host.spawn_worker ~backend))
     in
     let quit_requested = Ivar.create () in
     let%bind.Deferred driver =
@@ -429,8 +437,8 @@ let run ~connect ~hello ~local_tools =
        in
        let had_iexten = Tty.set_iexten tty false in
        install_repaint driver;
-       Option.iter client_id ~f:(fun id ->
-         Driver.send_incoming_event driver (App.Action.Set_client_id id));
+       Option.iter hello_reply ~f:(fun reply ->
+         Driver.send_incoming_event driver (App.Action.Hello reply));
        don't_wait_for
          (Pipe.iter_without_pushback
             (Client.incoming client)

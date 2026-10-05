@@ -1,0 +1,12 @@
+.git
+**/_build
+**/node_modules
+**/dist
+result
+result-*
+.direnv
+**/*.log
+**/.env
+Dockerfile
+docker-compose.yml
+docker/test-*

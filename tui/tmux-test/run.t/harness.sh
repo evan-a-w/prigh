@@ -174,7 +174,11 @@ scenario_quit() {
 	capture quit "exited (tty flags)"
 }
 
-# A scripted provider run: a bash tool call, then two subagents in one turn.
+# A scripted provider run: a bash tool call, then two background subagents in
+# one turn and a subagent_wait for both. The replies are one shared script:
+# each subagent takes its first reply as it starts, before the main agent asks
+# for its next one, and both get the same reply so their order does not
+# matter.
 setup_tools() {
 	extra_args="-- -faux-script $tmp/script.json"
 	cat >"$tmp/script.json" <<'JSON'
@@ -183,8 +187,9 @@ setup_tools() {
   {"text": "three lines. now delegating", "tool_calls": [
      {"id": "s1", "name": "subagent", "arguments": {"task": "count files", "tools": ["ls"]}},
      {"id": "s2", "name": "subagent", "arguments": {"task": "say hello", "tools": ["ls"]}}]},
-  {"text": "child one reporting: 0 files"},
-  {"text": "child two reporting: hello"},
+  {"text": "child reporting: done"},
+  {"text": "child reporting: done"},
+  {"text": "waiting for both", "tool_calls": [{"id": "w1", "name": "subagent_wait", "arguments": {}}]},
   {"text": "all done"}
 ]
 JSON

@@ -39,9 +39,64 @@ Bonsai UI's `/ws` speaks prigh's, so pointing pi-web at a `-web` listener via
 `?backend=` does not work. The page connects to its own
 origin's `/ws`; `?backend=ws://host:port/ws` points it elsewhere,
 `?session=ID` joins a session (the app keeps the current session id in the
-address bar so a reload rejoins it), `?token=` is remembered in
-`localStorage` and stripped from the URL, and a refused connection shows a
-connect form asking for the token.
+address bar so a reload rejoins it), and `?user=` / `?token=` are remembered
+in `localStorage` and stripped from the URL.
+
+## Signing in
+
+A refused connection shows a sign-in form with a **User name** and a
+**Password**. The password is the server's token (`prigh serve -token`); the
+user name picks the token namespace on servers that have them and is left
+empty otherwise. Both are remembered in `localStorage`
+(`prigh-pi-web:user`, `prigh-pi-web:token`) and sent as `user` and `token` in
+the query string of the `/ws` and `/terminal` WebSocket URLs. Signing in as
+a different user drops the previous user's `?session=` from the address bar.
+While the password field has focus, a "Caps Lock is on" warning appears when
+Caps Lock is active.
+
+**Sign out** (top right, next to the signed-in user name; or `/signout`)
+forgets the stored user name and password, closes the connection, drops
+`?session=` and shows the sign-in form again. The other things pi-web keeps
+in `localStorage` (theme, whether the agents panel is open) are browser
+preferences, shared by all users.
+
+## Acting as another user
+
+`/setusr NAME` (run by the backend) lets a superuser act as NAME: on success
+the backend sends `{"type":"prigh_set_user","user":"NAME"}`, pi-web
+remembers NAME (`prigh-pi-web:as-user`), drops `?session=` and reconnects
+with `as_user=NAME` on every `/ws` and `/terminal` URL. The top bar shows
+"evan as alice". `/setusr` with your own name, signing out or signing in
+again stops it; a refused connection while acting as someone drops it and
+reconnects once as yourself (with a toast saying why).
+
+## Sessions and subagents
+
+Everything the backend pushes for the current session only (queued
+messages, status entries, the agents rail, pending confirmations) is
+cleared when pi-web re-syncs (after connecting, reconnecting or switching
+sessions); the backend's `get_state` sends it again for the session it
+answers for.
+
+Clicking a subagent in the agents rail, or **Open subagent →** under a
+`subagent` tool call, replaces the chat with that subagent's conversation
+(`subagent-panel.tsx`): status, model, duration, turns and tools, and its
+messages and tool calls, live while it runs (`watch_subagent` and
+`prigh_subagent_event`s). The list on the left switches between the rail's
+subagents; **← Back to chat** closes it, as does switching sessions; a
+reconnect re-watches it. The backend keeps transcripts in memory while the
+session is loaded.
+
+## Provider (OAuth) login
+
+`/login anthropic` (or `openai-codex`) opens one dialog with the
+authorization link (opens in a new tab), a **Copy link** button and a field
+for the code or the full redirect URL. The backend's separate pieces (the
+`login` chat message carrying the link, the `auth-*` input prompt, the
+progress/failure/success notifications) are folded into that dialog
+(`provider-login.ts`): the link is not added to the chat, progress and
+errors show in the dialog, it closes on success, and the prompt disappears
+if the browser redirect delivers the code first.
 
 ## Development
 
@@ -49,7 +104,10 @@ connect form asking for the token.
 cd pi-web
 npm install
 npm run check                 # tsc
-npm test                      # vitest: connection.ts, sessions.ts, tool-args.ts, chat-items.ts
+npm test                      # vitest: connection.ts, sessions.ts, tool-args.ts, chat-items.ts,
+                              #   subagent-view.ts, transcript.ts, the sign-in form, the provider
+                              #   login dialog, and state.ts / the subagent view against a fake
+                              #   backend (test/fake-backend.ts; happy-dom)
 npm run build                 # dist/
 npm run dev                   # vite dev server on :5173, proxies /ws to a backend on :7789:
                               #   ../backend/_build/default/bin/main.exe serve -pi-web 127.0.0.1:7789 -faux
@@ -66,19 +124,20 @@ fork pickers, dialogs and toasts, the status strip, the agents rail, theme
 loading (pi's `dark.json`/`light.json` are shipped in `public/theme/`).
 
 Removed, because they need pi-server or a pi-only feature: the TUI view,
-the file explorer, the subagents run-history panel,
-the dashboard session list, snippets, the service worker.
+the file explorer, the dashboard session list, snippets, the service worker.
+The subagents run-history panel became the subagent view (live from the
+backend's events instead of transcript files).
 
 Changed:
 
-- `client.ts` — the token, session and frontend name travel in the WebSocket
-  URL's query string (`connection.ts`); `prigh_hello_failed` stops
-  reconnecting and shows the connect form.
+- `client.ts` — the user name, token, session and frontend name travel in
+  the WebSocket URL's query string (`connection.ts`); `prigh_hello_failed`
+  stops reconnecting and shows the sign-in form (`login-view.tsx`).
 - `state.ts` — trimmed to the events the backend sends; sessions come from
   the backend's `list_sessions` / `switch_session` (prigh additions to the
   protocol) and fill the sidebar; `/new`, `/fork`, `/clone`, `/cd`,
   `/model`, `/thinking`, `/name`, `/session`, `/export`, `/copy`, `/compact`
-  are handled client-side as in pi; `/login`, `/logout`, `/auth`,
+  are handled client-side as in pi (plus `/signout`); `/login`, `/logout`, `/auth`,
   `/sessions`, `/switch`, `/host`, `/help` are sent as prompts and run by the
   backend, which answers with custom chat messages and `select`/`input`
   dialogs.

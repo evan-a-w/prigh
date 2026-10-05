@@ -35,6 +35,7 @@ if (process.env.DEBUG_WS) {
 }
 
 const clean = text => text
+  .replace(/unauthorised: .*/g, "unauthorised: <ERROR>")
   .replaceAll(process.env.TEST_CWD, "<CWD>")
   .replace(/[0-9a-f]{16}/g, "<ID>")
   .replace(/\$\d+\.\d+/g, "$<COST>")
@@ -68,12 +69,13 @@ const type = async text => {
   await page.locator(".editor-button.send").click();
 };
 
-// 1. No token: the backend refuses hello, the connect form appears; the
-//    token is remembered and the page reloads into a session.
+// 1. No token: the backend refuses hello, the login form appears; the
+//    password (token) is remembered and the page reloads into a session.
+//    This server has no namespaces, so the user name stays empty.
 await page.goto(url);
-await waitForText("Connect to prigh");
-await show("connect form");
-await page.locator(".connect-form input").fill(token);
+await waitForText("Sign in to prigh");
+await show("login form");
+await page.locator(".connect-form input[name=password]").fill(token);
 await page.locator(".connect-form button").click();
 await waitForText("No messages yet");
 await page.waitForSelector(".sidebar-project");
@@ -165,6 +167,58 @@ await show("switched back", ".chat .msg-user >> nth=0");
   await page.locator(".topbar .terminal-open").click();
   await page.locator(".terminal-panel").waitFor({ state: "detached" });
   console.log("the topbar button hides it again");
+}
+
+// 8. An OAuth provider login: the authorization link is in the dialog,
+//    clickable (nothing covers it), and not dumped into the chat.
+{
+  await type("/login anthropic oauth");
+  await page.waitForSelector(".provider-login .dialog-input");
+  console.log(`=== ${engineName}: provider login dialog ===`);
+  console.log(clean(await page.locator(".provider-login").innerText())
+    .replace(/https:\/\/\S+/g, url => url.split("?")[0] + "?<QUERY>"));
+  const link = page.locator(".provider-login a");
+  console.log(`link: target=${await link.getAttribute("target")} rel=${await link.getAttribute("rel")}`);
+  const onTop = await link.evaluate(a => {
+    const box = a.getBoundingClientRect();
+    const hit = document.elementFromPoint(box.left + box.width / 2, box.top + box.height / 2);
+    return a === hit || a.contains(hit);
+  });
+  console.log(`the link is clickable: ${onTop}`);
+  console.log(`the chat shows the link: ${await page.locator(".chat a[href*='oauth']").count() > 0}`);
+  // A redirect URL for another login fails before any network request.
+  await page.locator(".provider-login .dialog-input").fill("http://localhost/callback?code=c&state=other");
+  await page.locator(".provider-login button[type=submit]").click();
+  await page.waitForSelector(".provider-login-error");
+  console.log(`a bad redirect URL: ${clean(await page.locator(".provider-login-error").innerText())}`);
+  await page.locator(".provider-login .dialog-actions button").click();
+  await page.waitForSelector(".provider-login", { state: "detached" });
+  console.log("Close dismisses it");
+  await type("/login anthropic oauth");
+  await page.waitForSelector(".provider-login .dialog-input");
+  await page.locator(".provider-login button", { hasText: "Cancel" }).click();
+  await page.waitForSelector(".provider-login", { state: "detached" });
+  await waitForText("login cancelled");
+  console.log(`Cancel: ${clean(await page.locator(".toast").last().innerText())}`);
+}
+
+// 9. Signing out forgets the password and drops the session from the
+//    address bar; signing in again works.
+{
+  await page.locator(".topbar .sign-out").click();
+  await waitForText("Sign in to prigh");
+  await show("after signing out");
+  const stored = await page.evaluate(() => Object.keys(localStorage).filter(key => /user|token/.test(key)));
+  console.log(`stored credentials: ${JSON.stringify(stored)}`);
+  console.log(`url keeps session: ${/[?&]session=/.test(page.url())}`);
+  await page.locator(".connect-form input[name=password]").fill(token);
+  await page.locator(".connect-form button").click();
+  await page.waitForFunction(() => document.querySelector(".connection-dot.online"));
+  await page.waitForSelector(".sidebar-project");
+  console.log("signed in again");
+  await type("/signout");
+  await waitForText("Sign in to prigh");
+  console.log("/signout shows the login form");
 }
 
 await browser.close();

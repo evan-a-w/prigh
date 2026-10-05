@@ -193,3 +193,22 @@ let%expect_test "error messages" =
     timed out
     |}]
 ;;
+
+let%expect_test "default ports make the address lookup numeric" =
+  List.iter
+    [ "https://platform.claude.com/v1/oauth/token"
+    ; "http://127.0.0.1/x"
+    ; "https://example.com:8443/y"
+    ; "ftp://example.com/z"
+    ]
+    ~f:(fun url ->
+      print_endline
+        (Uri.to_string (Http_client.with_default_port (Uri.of_string url))));
+  [%expect
+    {|
+    https://platform.claude.com:443/v1/oauth/token
+    http://127.0.0.1:80/x
+    https://example.com:8443/y
+    ftp://example.com/z
+    |}]
+;;

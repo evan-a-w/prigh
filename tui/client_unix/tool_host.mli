@@ -2,13 +2,21 @@ open! Core
 open! Async
 open Prigh_client
 
-(** Runs the session's tools on this machine: spawns [prigh tool-host] lazily
-    and proxies between it and the backend. Feed it the [Tool_exec] and
-    [Tool_exec_cancel] events; it answers with [tool_exec_output] and
-    [tool_exec_result] requests on the client. *)
+(** Runs the session's tools and terminals on this machine: spawns
+    [prigh tool-host] lazily and proxies between it and the backend. Feed it the
+    [Tool_exec], [Tool_exec_cancel] and [Terminal_*] events; it answers with
+    [tool_exec_output], [tool_exec_result], [terminal_frame] and
+    [terminal_closed] requests on the client. *)
 type t
 
-val create : client:Client.t -> backend:string -> t
+(** Spawns [backend tool-host]. *)
+val spawn_worker : backend:string -> unit -> Transport.t Deferred.Or_error.t
+
+(** [spawn] starts the worker, on first use and again after it exits. *)
+val create
+  :  client:Client.t
+  -> spawn:(unit -> Transport.t Deferred.Or_error.t)
+  -> t
 
 (** Handles an event; other events are ignored. *)
 val handle : t -> Prigh_protocol.Event.t -> unit

@@ -44,6 +44,12 @@ module Reply_tag : sig
     | Editor_text
     | Reload_messages_notice of string
     | Reconnect of int (** generation; stale replies are ignored *)
+    | Btw of string (** btw id *)
+    | Users_list
+    | User_switched
+    | Jobs_picker
+    | Job_output
+    | Job_started
   [@@deriving sexp_of, equal]
 end
 
@@ -64,9 +70,12 @@ module Command : sig
         { generation : int
         ; delay_ms : int
         ; session : string option
+        ; as_user : string option
         }
-    (** After [delay_ms], connect again, send [hello] (rejoining [session]) and
-        answer [Reply (Reconnect generation, hello reply)]. *)
+    (** After [delay_ms], connect again, send [hello] (rejoining [session], as
+        [as_user]) and answer [Reply (Reconnect generation, hello reply)]. *)
+    | Sign_out
+    (** Forget the stored credentials and offer to log in again (browser only). *)
     | Quit
   [@@deriving sexp_of, equal]
 end
@@ -100,7 +109,7 @@ module Action : sig
     | Reply of Reply_tag.t * (P.Json.t, string) Result.t
     | Tick
     | Set_home of string
-    | Set_client_id of string (** ours, from the [hello] reply *)
+    | Hello of P.Hello_reply.t (** the [hello] reply *)
     | Resize of
         { width : int
         ; height : int
@@ -131,10 +140,14 @@ module Model : sig
     ; config : P.Config.t option
     ; home : string option
     ; client_id : string option
+    ; namespace : string option (** the user whose sessions we see *)
+    ; user : string option (** the user we signed in as *)
     ; stderr_tail : string list
     ; pending_confirms : (string * string * string) list
     ; connection : Connection.t
     ; reconnect_generation : int
+    ; btw : Btw_box.t option
+    ; btw_seq : int
     ; width : int
     ; height : int
     ; quitting : bool
@@ -142,7 +155,18 @@ module Model : sig
   [@@deriving sexp_of]
 
   val running : t -> bool
+
+  (** Whether any subagent is running, including background ones the main agent
+      is no longer waiting for. *)
+  val agents_running : t -> bool
+
+  (** Background shell jobs of this session still running. *)
+  val jobs_running : t -> bool
+
   val backend_gone : t -> bool
+
+  (** [namespace] when a superuser acts as another user ([/setusr]). *)
+  val acting_as : t -> string option
 end
 
 (** Wrapped transcript lines currently visible, mirroring [Render.screen] for

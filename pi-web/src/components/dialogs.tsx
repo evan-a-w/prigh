@@ -1,6 +1,15 @@
 import { useEffect, useRef, useState } from "preact/hooks";
+import { copyText } from "../copy.ts";
 import type { RpcExtensionUIRequest } from "../protocol.ts";
-import { dialogQueue, respondToDialog, toasts } from "../state.ts";
+import {
+	closeProviderLogin,
+	dialogQueue,
+	providerLogin,
+	respondToDialog,
+	submitProviderLoginCode,
+	toasts,
+} from "../state.ts";
+import { ProviderLoginDialog } from "./provider-login-dialog.tsx";
 
 function SelectDialog({ request }: { request: RpcExtensionUIRequest & { method: "select" } }) {
 	return (
@@ -104,6 +113,19 @@ function EditorDialog({ request }: { request: RpcExtensionUIRequest & { method: 
 }
 
 export function DialogHost() {
+	const login = providerLogin.value;
+	if (login) {
+		return (
+			<div class="dialog-overlay">
+				<ProviderLoginDialog
+					login={login}
+					onSubmit={submitProviderLoginCode}
+					onClose={closeProviderLogin}
+					copy={copyText}
+				/>
+			</div>
+		);
+	}
 	const current = dialogQueue.value[0];
 	if (!current) return null;
 	return (

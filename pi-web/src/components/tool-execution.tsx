@@ -1,6 +1,8 @@
 import { diffLines } from "diff";
-import { useState } from "preact/hooks";
-import { toolStates } from "../state.ts";
+import { createContext } from "preact";
+import { useContext, useState } from "preact/hooks";
+import { openSubagent, toolStates } from "../state.ts";
+import type { ToolStates } from "../transcript.ts";
 import { diffLineCount, editsOf, summarizeArgs } from "../tool-args.ts";
 
 const COLLAPSE_LINE_THRESHOLD = 15;
@@ -8,6 +10,9 @@ const COLLAPSE_CHAR_THRESHOLD = 2000;
 
 // Remember expand/collapse per tool call across re-renders
 const expandedToolCalls = new Map<string, boolean>();
+
+/** Where tool calls find their live state: the session's, or a subagent's in its view. */
+export const ToolStatesContext = createContext<() => ToolStates>(() => toolStates.value);
 
 /** Line-based diff for the edit tool (oldText -> newText). */
 function EditDiff({ oldText, newText }: { oldText: string; newText: string }) {
@@ -67,7 +72,7 @@ export function ToolExecution({
 	name: string;
 	args: Record<string, unknown>;
 }) {
-	const live = toolStates.value[toolCallId];
+	const live = useContext(ToolStatesContext)()[toolCallId];
 	const status = live?.status ?? "running";
 	const isError = live?.isError ?? false;
 	const output = live?.output ?? live?.partial ?? "";
@@ -93,6 +98,16 @@ export function ToolExecution({
 				{status === "running" && <span class="tool-running-indicator">…</span>}
 				{isLong && <span class="tool-chevron">{expanded ? "▴" : "▾"}</span>}
 			</button>
+			{name === "subagent" && (
+				<button
+					type="button"
+					class="tool-open-subagent"
+					title="Show this subagent's conversation"
+					onClick={() => void openSubagent({ toolCallId })}
+				>
+					Open subagent →
+				</button>
+			)}
 			{(hasDiff || output) && (
 				<div class={`tool-body ${isLong && !expanded ? "collapsed" : ""}`}>
 					{hasDiff && <ArgsDiff name={name} args={args} />}

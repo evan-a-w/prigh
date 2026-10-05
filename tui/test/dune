@@ -15,6 +15,7 @@
   bonsai_test
   prigh_protocol
   prigh_client
+  prigh_client_unix
   prigh_ui
   prigh_ui_term
   bonsai_term))

@@ -155,15 +155,17 @@ let%expect_test "Agent.state rolls up subagent usage and cost" =
   Eio.Switch.run
   @@ fun sw ->
   let provider =
-    Faux_provider.create
-      [ Reply.tool_call
-          ~id:"p1"
-          ~name:"subagent"
-          ~arguments:{|{"task":"look around"}|}
-          ()
-      ; Reply.text "child report"
-      ; Reply.text "main report"
-      ]
+    Routed_provider.create
+      ~main:
+        [ Reply.tool_call
+            ~id:"p1"
+            ~name:"subagent"
+            ~arguments:{|{"task":"look around"}|}
+            ()
+        ; Reply.text "main report"
+        ; Reply.text "got the report"
+        ]
+      [ "look around", [ Reply.text "child report" ] ]
   in
   let subagent = subagent ~provider in
   let agent =
@@ -171,7 +173,7 @@ let%expect_test "Agent.state rolls up subagent usage and cost" =
       ~env:t.env
       ~sw
       ~provider
-      ~tools:(Tools.all @ [ subagent ])
+      ~tools:(Tools.all @ (subagent :: Tool_subagent.control_tools))
       ~sessions_dir:(Filename.concat t.dir "sessions")
       ~home:t.dir
       ~cwd:t.dir
@@ -200,10 +202,10 @@ let%expect_test "Agent.state rolls up subagent usage and cost" =
   print_s [%sexp (state.usage : Usage.t), (state.cost_usd : float)];
   [%expect
     {|
-    (p1 "look around" deepseek-flash
+    (a1 "look around" deepseek-flash
      (bash read write edit ls grep find subagent))
-    (p1 ((input 10) (output 5) (cache_read 0)) 1 9E-06)
-    (((input 40) (output 18) (cache_read 5)) 3.213E-05)
+    (a1 ((input 10) (output 5) (cache_read 0)) 1 9E-06)
+    (((input 50) (output 23) (cache_read 5)) 4.1129999999999994E-05)
     |}]
 ;;
 

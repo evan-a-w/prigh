@@ -1,0 +1,6 @@
+# A bind-mounted workspace may be owned by another uid.
+[safe]
+	directory = *
+# HTTPS to GitHub authenticates with $GH_TOKEN when it is set.
+[credential "https://github.com"]
+	helper = "!f() { test \"$1\" = get && test -n \"$GH_TOKEN\" && printf 'username=x-access-token\\npassword=%s\\n' \"$GH_TOKEN\"; }; f"

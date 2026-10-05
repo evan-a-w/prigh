@@ -67,16 +67,47 @@ let%expect_test "web connection: same-origin is stable unless explicitly \
     |}]
 ;;
 
+let%expect_test "prompt history is stored per token, without the token" =
+  (* FNV-1a reference values: "" 811c9dc5, "a" e40c292c, "foobar" bf9cf968. *)
+  List.iter
+    [ None
+    ; Some ""
+    ; Some "a"
+    ; Some "foobar"
+    ; Some "sekrit-token-1"
+    ; Some "sekrit-token-2"
+    ]
+    ~f:(fun token ->
+      let key = Prigh_ui_web_app.Web_app.For_testing.history_key ~token in
+      print_s [%message (token : string option) key]);
+  [%expect
+    {|
+    ((token ()) prigh.history)
+    ((token ("")) prigh.history.811c9dc5)
+    ((token (a)) prigh.history.e40c292c)
+    ((token (foobar)) prigh.history.bf9cf968)
+    ((token (sekrit-token-1)) prigh.history.8fcc21e3)
+    ((token (sekrit-token-2)) prigh.history.90cc2376)
+    |}]
+;;
+
 let%expect_test "web connection: the terminal URL and the session in the page \
                  URL"
   =
-  let terminal backend ?token ?session () =
-    Prigh_ui_web_app.Web_app.For_testing.terminal_url ~backend ~token ~session
+  let terminal backend ?user ?as_user ?token ?session () =
+    Prigh_ui_web_app.Web_app.For_testing.terminal_url
+      ~backend
+      ~user
+      ~as_user
+      ~token
+      ~session
     |> print_endline
   in
   terminal "ws://127.0.0.1:7777/ws" ();
   terminal "wss://host.example/ws?x=1" ~token:"sekrit&x=y" ~session:"abc" ();
   terminal "ws://host:9000/" ~session:"s" ();
+  terminal "ws://host:9000/ws" ~user:"lloyd o'k" ~token:"pw" ~session:"s" ();
+  terminal "ws://host:9000/ws" ~user:"s" ~as_user:"lloyd" ~token:"pw" ();
   let with_session search =
     Prigh_ui_web_app.Web_app.For_testing.with_query_param
       ~search
@@ -86,13 +117,108 @@ let%expect_test "web connection: the terminal URL and the session in the page \
   in
   with_session "";
   with_session "?backend=ws%3A%2F%2Fx&session=old&name=laptop";
+  let without_session search =
+    print_s
+      [%sexp
+        (Prigh_ui_web_app.Web_app.For_testing.without_query_param
+           ~search
+           "session"
+         : string)]
+  in
+  without_session "";
+  without_session "?session=abc";
+  without_session "?backend=ws%3A%2F%2Fx&session=old&name=laptop";
   [%expect
     {|
     ws://127.0.0.1:7777/terminal
     wss://host.example/terminal?token=sekrit%26x%3Dy&session=abc
     ws://host:9000/terminal?session=s
+    ws://host:9000/terminal?user=lloyd%20o'k&token=pw&session=s
+    ws://host:9000/terminal?user=s&as_user=lloyd&token=pw
     ?session=a%20b%26c
     ?backend=ws%3A%2F%2Fx&name=laptop&session=a%20b%26c
+    ""
+    ""
+    ?backend=ws%3A%2F%2Fx&name=laptop
+    |}]
+;;
+
+let%expect_test "login: user name and password in localStorage, signing out" =
+  let module Login = Prigh_ui_web_app.Login in
+  let items = String.Table.create () in
+  let storage : Login.Storage.t =
+    { get = Hashtbl.find items
+    ; set = (fun key data -> Hashtbl.set items ~key ~data)
+    ; remove = Hashtbl.remove items
+    }
+  in
+  let show () =
+    let login = Login.load storage in
+    print_s
+      [%message
+        ""
+          ~stored:
+            (Hashtbl.to_alist items
+             |> List.sort ~compare:[%compare: string * string]
+             : (string * string) list)
+          (login : Login.t)
+          ~hello:
+            (List.map (Login.hello_fields login) ~f:(fun (k, v) ->
+               k, Prigh_protocol.Json.to_string v)
+             : (string * string) list)]
+  in
+  show ();
+  (* A token saved before user names existed is still the password. *)
+  Hashtbl.set items ~key:"prigh.token" ~data:"old-token";
+  show ();
+  Login.save storage ~user:" lloyd " ~password:" sekrit\t";
+  show ();
+  (* No user name: fine outside namespace mode. *)
+  Login.save storage ~user:"" ~password:"sekrit";
+  show ();
+  Login.save storage ~user:"lloyd" ~password:"sekrit";
+  Hashtbl.set items ~key:"prigh.history.abc" ~data:"[]";
+  Login.forget storage;
+  show ();
+  print_s [%sexp (Login.take_signed_out storage : bool)];
+  print_s [%sexp (Login.take_signed_out storage : bool)];
+  show ();
+  [%expect
+    {|
+    ((stored ())
+     (login (
+       (user     ())
+       (password ())))
+     (hello ()))
+    ((stored ((prigh.token old-token)))
+     (login ((user ()) (password (old-token))))
+     (hello ((token "\"old-token\""))))
+    ((stored (
+       (prigh.token sekrit)
+       (prigh.user  lloyd)))
+     (login (
+       (user     (lloyd))
+       (password (sekrit))))
+     (hello (
+       (user  "\"lloyd\"")
+       (token "\"sekrit\""))))
+    ((stored ((prigh.token sekrit)))
+     (login ((user ()) (password (sekrit))))
+     (hello ((token "\"sekrit\""))))
+    ((stored (
+       (prigh.history.abc [])
+       (prigh.signed_out  1)))
+     (login (
+       (user     ())
+       (password ())))
+     (hello ()))
+    true
+    false
+    ((stored ((prigh.history.abc [])))
+     (login (
+       (user     ())
+       (password ())))
+     (hello ()))
     |}]
 ;;
 

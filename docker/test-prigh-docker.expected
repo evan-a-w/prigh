@@ -1,0 +1,320 @@
+
+=== fresh volumes: two users, alice a superuser, per-user and shared GitHub tokens
+$ PRIGH_TOKENS= alice=tok-a , bob=tok-b PRIGH_SUPERUSERS=alice PRIGH_GH_TOKENS=bob=gh-b GH_TOKEN=gh-shared PRIGH_GIT_NAME=Ada L PRIGH_GIT_EMAIL=ada@example.com PRIGH_ARGS=-model m prigh-docker 
++ chmod 700 /home/prigh
++ chown -R 10000:10000 /home/alice
++ chmod 700 /home/alice
++ chown -R 10000:10000 /workspace/alice
++ setpriv --reuid=10000 --regid=10000 --clear-groups chmod 2770 /workspace/alice
++ chown -R 10001:10001 /home/bob
++ chmod 700 /home/bob
++ chown -R 10001:10001 /workspace/bob
++ setpriv --reuid=10001 --regid=10001 --clear-groups chmod 2770 /workspace/bob
++ setpriv --reuid=10000 --regid=10000 --init-groups env -i HOME=/home/alice USER=alice LOGNAME=alice SHELL=/bin/bash PATH=$PATH LANG=C.UTF-8 GIT_TERMINAL_PROMPT=0 GH_TOKEN=gh-shared sh -c $'for kv in "user.name=$1" "user.email=$2"; do\n  [ -z "${kv#*=}" ] || git config --global --get "${kv%%=*}" >/dev/null || git config --global "${kv%%=*}" "${kv#*=}"\ndone' sh Ada\ L ada@example.com
++ setpriv --reuid=10001 --regid=10001 --init-groups env -i HOME=/home/bob USER=bob LOGNAME=bob SHELL=/bin/bash PATH=$PATH LANG=C.UTF-8 GIT_TERMINAL_PROMPT=0 GH_TOKEN=gh-b sh -c $'for kv in "user.name=$1" "user.email=$2"; do\n  [ -z "${kv#*=}" ] || git config --global --get "${kv%%=*}" >/dev/null || git config --global "${kv%%=*}" "${kv#*=}"\ndone' sh Ada\ L ada@example.com
+supervise in /workspace/alice: setpriv --reuid=10000 --regid=10000 --init-groups env -i HOME=/home/alice USER=alice LOGNAME=alice SHELL=/bin/bash PATH=$PATH LANG=C.UTF-8 GIT_TERMINAL_PROMPT=0 GH_TOKEN=gh-shared PRIGH_TOKEN=host-token-alice PRIGH_USER=alice prigh tool-host -connect 127.0.0.1:7788 -name container -cwd /workspace/alice
+supervise in /workspace/bob: setpriv --reuid=10001 --regid=10001 --init-groups env -i HOME=/home/bob USER=bob LOGNAME=bob SHELL=/bin/bash PATH=$PATH LANG=C.UTF-8 GIT_TERMINAL_PROMPT=0 GH_TOKEN=gh-b PRIGH_TOKEN=host-token-bob PRIGH_USER=bob prigh tool-host -connect 127.0.0.1:7788 -name container -cwd /workspace/bob
+prigh-docker: mode=web users: alice(10000,superuser) bob(10001); tool hosts: one per user, as that user
+exec setpriv --reuid=1000 --regid=1000 --init-groups env -u PRIGH_TOKEN -u PRIGH_GH_TOKENS -u PRIGH_HOST_TOKENS -u GH_TOKEN -u PRIGH_TOKENS -u PRIGH_SUPERUSERS HOME=/home/prigh USER=prigh LOGNAME=prigh SHELL=/bin/bash PRIGH_TOKENS=alice=tok-a\,bob=tok-b PRIGH_HOST_TOKENS=alice=host-token-alice\,bob=host-token-bob PRIGH_SUPERUSERS=alice prigh serve -cwd /workspace -no-backend-host -web 0.0.0.0:7788 -model m
+--- /run/prigh/extrausers/passwd
+alice:x:10000:10000:prigh user alice:/home/alice:/bin/bash
+bob:x:10001:10001:prigh user bob:/home/bob:/bin/bash
+--- /run/prigh/extrausers/group
+alice:x:10000:
+bob:x:10001:alice
+--- /run/prigh/extrausers/shadow
+alice:*:::::::
+bob:*:::::::
+--- dirs (mode owner path)
+755 0 /home
+700 10000 /home/alice
+700 10001 /home/bob
+700 1000 /home/prigh
+755 0 /workspace
+2770 10000 /workspace/alice
+2770 10001 /workspace/bob
+
+=== commands in the running container (docker compose exec)
+$ prigh-docker users
+NAME             UID    HOME                   WORKSPACE                    SUPERUSER
+alice            10000  /home/alice            /workspace/alice             yes
+bob              10001  /home/bob              /workspace/bob               no
+$ prigh-docker as alice env
+exec setpriv --reuid=10000 --regid=10000 --init-groups env -i HOME=/home/alice USER=alice LOGNAME=alice SHELL=/bin/bash PATH=$PATH LANG=C.UTF-8 GIT_TERMINAL_PROMPT=0 env
+$ TERM=xterm prigh-docker as alice env
+exec setpriv --reuid=10000 --regid=10000 --init-groups env -i HOME=/home/alice USER=alice LOGNAME=alice SHELL=/bin/bash PATH=$PATH LANG=C.UTF-8 GIT_TERMINAL_PROMPT=0 TERM=xterm env
+$ GH_TOKEN=gh-shared PRIGH_GH_TOKENS=bob=gh-b prigh-docker as bob git push
+exec setpriv --reuid=10001 --regid=10001 --init-groups env -i HOME=/home/bob USER=bob LOGNAME=bob SHELL=/bin/bash PATH=$PATH LANG=C.UTF-8 GIT_TERMINAL_PROMPT=0 GH_TOKEN=gh-b git push
+$ prigh-docker as prigh bash
+exec setpriv --reuid=1000 --regid=1000 --init-groups env -i HOME=/home/prigh USER=prigh LOGNAME=prigh SHELL=/bin/bash PATH=$PATH LANG=C.UTF-8 GIT_TERMINAL_PROMPT=0 bash
+$ prigh-docker as root bash
+prigh-docker: no user 'root' (see prigh-docker users)
+[exit 2]
+$ prigh-docker as mallory bash
+prigh-docker: no user 'mallory' (see prigh-docker users)
+[exit 2]
+$ prigh-docker as alice
+prigh-docker: usage: prigh-docker as NAME CMD [ARGS]
+[exit 2]
+$ PRIGH_DOCKER_UID=10001 prigh-docker as bob id
+exec env -i HOME=/home/bob USER=bob LOGNAME=bob SHELL=/bin/bash PATH=$PATH LANG=C.UTF-8 GIT_TERMINAL_PROMPT=0 id
+$ PRIGH_DOCKER_UID=10001 prigh-docker as alice id
+prigh-docker: must run as root (or as alice) to run commands as alice
+[exit 2]
+$ prigh-docker ssh-key
+prigh-docker: several users (alice bob): prigh-docker ssh-key NAME
+[exit 2]
+$ prigh-docker ssh-key bob
+exec setpriv --reuid=10001 --regid=10001 --init-groups env -i HOME=/home/bob USER=bob LOGNAME=bob SHELL=/bin/bash PATH=$PATH LANG=C.UTF-8 GIT_TERMINAL_PROMPT=0 sh -c $'key="$HOME/.ssh/id_ed25519"\nif [ ! -f "$key" ]; then\n  mkdir -p "$HOME/.ssh" && chmod 700 "$HOME/.ssh" && ssh-keygen -q -t ed25519 -N "" -C "$1" -f "$key"\nfi\ncat "$key.pub"' sh bob@prigh
+$ prigh-docker login alice anthropic -method api_key
++ setpriv --reuid=1000 --regid=1000 --init-groups env -i HOME=/home/prigh USER=prigh LOGNAME=prigh SHELL=/bin/bash PATH=$PATH LANG=C.UTF-8 GIT_TERMINAL_PROMPT=0 mkdir -p /home/prigh/.prigh/namespaces/alice/.config/prigh
+exec setpriv --reuid=1000 --regid=1000 --init-groups env -i HOME=/home/prigh USER=prigh LOGNAME=prigh SHELL=/bin/bash PATH=$PATH LANG=C.UTF-8 GIT_TERMINAL_PROMPT=0 prigh login -auth-file /home/prigh/.prigh/namespaces/alice/.config/prigh/auth.json anthropic -method api_key
+$ prigh-docker login default openai
+prigh-docker: no user 'default' (see prigh-docker users)
+[exit 2]
+$ prigh-docker login alice
+prigh-docker: usage: prigh-docker login NAME PROVIDER [ARGS]
+[exit 2]
+$ PRIGH_TOKENS=alice=tok-a prigh-docker tui
+exec setpriv --reuid=1000 --regid=1000 --init-groups env -i HOME=/home/prigh USER=prigh LOGNAME=prigh SHELL=/bin/bash PATH=$PATH LANG=C.UTF-8 GIT_TERMINAL_PROMPT=0 prigh-tui -connect 127.0.0.1:7788 -tools remote
+$ PRIGH_MODE=web,server prigh-docker tui -session s1
+exec setpriv --reuid=1000 --regid=1000 --init-groups env -i HOME=/home/prigh USER=prigh LOGNAME=prigh SHELL=/bin/bash PATH=$PATH LANG=C.UTF-8 GIT_TERMINAL_PROMPT=0 prigh-tui -connect 127.0.0.1:7777 -tools remote -session s1
+$ PRIGH_MODE=pi-web prigh-docker tui
+exec setpriv --reuid=1000 --regid=1000 --init-groups env -i HOME=/home/prigh USER=prigh LOGNAME=prigh SHELL=/bin/bash PATH=$PATH LANG=C.UTF-8 GIT_TERMINAL_PROMPT=0 prigh-tui -connect 127.0.0.1:7777 -tools remote
+$ prigh-docker tui -tools remote
+exec setpriv --reuid=1000 --regid=1000 --init-groups env -i HOME=/home/prigh USER=prigh LOGNAME=prigh SHELL=/bin/bash PATH=$PATH LANG=C.UTF-8 GIT_TERMINAL_PROMPT=0 prigh-tui -connect 127.0.0.1:7788 -tools remote
+$ prigh-docker tui -tools local
+prigh-docker: -tools local would run the agent's tools as the prigh service user, which can read every namespace's logins; use the container's tool hosts (the default), or run a TUI as a user: prigh-docker as NAME prigh-tui -connect 127.0.0.1:7788 -user NAME -token TOKEN -tools local
+[exit 2]
+$ PRIGH_TOKEN=tok prigh-docker tui
+exec setpriv --reuid=1000 --regid=1000 --init-groups env -i HOME=/home/prigh USER=prigh LOGNAME=prigh SHELL=/bin/bash PATH=$PATH LANG=C.UTF-8 GIT_TERMINAL_PROMPT=0 PRIGH_TOKEN=tok prigh-tui -connect 127.0.0.1:7788 -tools remote
+$ prigh-docker prigh sessions list
+exec setpriv --reuid=1000 --regid=1000 --init-groups env -i HOME=/home/prigh USER=prigh LOGNAME=prigh SHELL=/bin/bash PATH=$PATH LANG=C.UTF-8 GIT_TERMINAL_PROMPT=0 prigh sessions list
+$ PRIGH_DOCKER_UID=1000 prigh-docker prigh sessions list
+exec prigh sessions list
+
+=== restart: tokens reordered, a new user, a removed user's home still there
+$ PRIGH_TOKENS=carol=tok-c,bob=tok-b,alice=tok-a PRIGH_SUPERUSERS=alice, bob PRIGH_MODE=server,web prigh-docker 
++ chown -R 10003:10003 /home/carol
++ chmod 700 /home/carol
++ chown -R 10003:10003 /workspace/carol
++ setpriv --reuid=10003 --regid=10003 --clear-groups chmod 2770 /workspace/carol
+supervise in /workspace/carol: setpriv --reuid=10003 --regid=10003 --init-groups env -i HOME=/home/carol USER=carol LOGNAME=carol SHELL=/bin/bash PATH=$PATH LANG=C.UTF-8 GIT_TERMINAL_PROMPT=0 PRIGH_TOKEN=host-token-carol PRIGH_USER=carol prigh tool-host -connect 127.0.0.1:7777 -name container -cwd /workspace/carol
+supervise in /workspace/bob: setpriv --reuid=10001 --regid=10001 --init-groups env -i HOME=/home/bob USER=bob LOGNAME=bob SHELL=/bin/bash PATH=$PATH LANG=C.UTF-8 GIT_TERMINAL_PROMPT=0 PRIGH_TOKEN=host-token-bob PRIGH_USER=bob prigh tool-host -connect 127.0.0.1:7777 -name container -cwd /workspace/bob
+supervise in /workspace/alice: setpriv --reuid=10000 --regid=10000 --init-groups env -i HOME=/home/alice USER=alice LOGNAME=alice SHELL=/bin/bash PATH=$PATH LANG=C.UTF-8 GIT_TERMINAL_PROMPT=0 PRIGH_TOKEN=host-token-alice PRIGH_USER=alice prigh tool-host -connect 127.0.0.1:7777 -name container -cwd /workspace/alice
+prigh-docker: mode=server,web users: carol(10003) bob(10001,superuser) alice(10000,superuser); tool hosts: one per user, as that user
+exec setpriv --reuid=1000 --regid=1000 --init-groups env -u PRIGH_TOKEN -u PRIGH_GH_TOKENS -u PRIGH_HOST_TOKENS -u GH_TOKEN -u PRIGH_TOKENS -u PRIGH_SUPERUSERS HOME=/home/prigh USER=prigh LOGNAME=prigh SHELL=/bin/bash PRIGH_TOKENS=carol=tok-c\,bob=tok-b\,alice=tok-a PRIGH_HOST_TOKENS=carol=host-token-carol\,bob=host-token-bob\,alice=host-token-alice PRIGH_SUPERUSERS=alice\,bob prigh serve -cwd /workspace -no-backend-host -listen 0.0.0.0:7777 -web 0.0.0.0:7788
+--- /run/prigh/extrausers/group
+carol:x:10003:alice,bob
+bob:x:10001:alice
+alice:x:10000:bob
+$ prigh-docker users
+NAME             UID    HOME                   WORKSPACE                    SUPERUSER
+carol            10003  /home/carol            /workspace/carol             no
+bob              10001  /home/bob              /workspace/bob               yes
+alice            10000  /home/alice            /workspace/alice             yes
+
+=== uids from existing directories
+$ PRIGH_TOKENS=alice=a,bob=b,carol=c,dave=d,erin=e PRIGH_NO_BACKEND_HOST=1 prigh-docker 
++ chmod 700 /home/prigh
+prigh-docker: /home/alice is owned by uid 1000, not 10001: chowning it recursively
++ chown -R 10001:10001 /home/alice
++ chmod 700 /home/alice
++ chown -R 10001:10001 /workspace/alice
++ setpriv --reuid=10001 --regid=10001 --clear-groups chmod 2770 /workspace/alice
++ chown -R 10007:10007 /home/bob
++ chmod 700 /home/bob
++ setpriv --reuid=10007 --regid=10007 --clear-groups chmod 2770 /workspace/bob
+prigh-docker: /home/carol is owned by uid 65534, not 10002: chowning it recursively
++ chown -R 10002:10002 /home/carol
++ chmod 700 /home/carol
++ chown -R 10002:10002 /workspace/carol
++ setpriv --reuid=10002 --regid=10002 --clear-groups chmod 2770 /workspace/carol
++ chmod 700 /home/dave
++ setpriv --reuid=10003 --regid=10003 --clear-groups chmod 2770 /workspace/dave
+prigh-docker: /home/erin is owned by uid 10003, not 10004: chowning it recursively
++ chown -R 10004:10004 /home/erin
++ chmod 700 /home/erin
++ chown -R 10004:10004 /workspace/erin
++ setpriv --reuid=10004 --regid=10004 --clear-groups chmod 2770 /workspace/erin
+prigh-docker: mode=web users: alice(10001) bob(10007) carol(10002) dave(10003) erin(10004); tool hosts: none in the container (PRIGH_NO_BACKEND_HOST=1)
+exec setpriv --reuid=1000 --regid=1000 --init-groups env -u PRIGH_TOKEN -u PRIGH_GH_TOKENS -u PRIGH_HOST_TOKENS -u GH_TOKEN -u PRIGH_TOKENS -u PRIGH_SUPERUSERS HOME=/home/prigh USER=prigh LOGNAME=prigh SHELL=/bin/bash PRIGH_TOKENS=alice=a\,bob=b\,carol=c\,dave=d\,erin=e prigh serve -cwd /workspace -no-backend-host -web 0.0.0.0:7788
+--- /run/prigh/users
+alice	10001	
+bob	10007	
+carol	10002	
+dave	10003	
+erin	10004	
+--- dirs (mode owner path)
+755 0 /home
+700 10001 /home/alice
+700 10007 /home/bob
+700 10002 /home/carol
+700 10003 /home/dave
+700 10004 /home/erin
+700 1000 /home/prigh
+755 0 /workspace
+2770 10001 /workspace/alice
+2770 10007 /workspace/bob
+2770 10002 /workspace/carol
+2770 10003 /workspace/dave
+2770 10004 /workspace/erin
+
+=== old layout: the volume was prigh's home; single PRIGH_TOKEN; pi-web only
+$ PRIGH_TOKEN=tok PRIGH_MODE=pi-web prigh-docker 
+prigh-docker: moving the old home volume's contents (prigh's home) into /home/prigh
++ chown 0:0 /home
+prigh-docker: /home/prigh is owned by uid 0, not 1000: chowning it recursively
++ chown -R 1000:1000 /home/prigh
++ chmod 700 /home/prigh
++ chown -R 10000:10000 /home/default
++ chmod 700 /home/default
+prigh-docker: /workspace/default is owned by uid 1000, not 10000: chowning it recursively
++ chown -R 10000:10000 /workspace/default
++ setpriv --reuid=10000 --regid=10000 --clear-groups chmod 2770 /workspace/default
+supervise in /workspace/default: setpriv --reuid=10000 --regid=10000 --init-groups env -i HOME=/home/default USER=default LOGNAME=default SHELL=/bin/bash PATH=$PATH LANG=C.UTF-8 GIT_TERMINAL_PROMPT=0 PRIGH_TOKEN=host-token-default PRIGH_USER=default prigh tool-host -connect 127.0.0.1:7777 -name container -cwd /workspace/default
+prigh-docker: mode=pi-web users: default(10000); tool hosts: one per user, as that user
+exec setpriv --reuid=1000 --regid=1000 --init-groups env -u PRIGH_TOKEN -u PRIGH_GH_TOKENS -u PRIGH_HOST_TOKENS -u GH_TOKEN -u PRIGH_TOKENS -u PRIGH_SUPERUSERS HOME=/home/prigh USER=prigh LOGNAME=prigh SHELL=/bin/bash PRIGH_TOKENS=default=tok PRIGH_HOST_TOKENS=default=host-token-default prigh serve -cwd /workspace -no-backend-host -pi-web 0.0.0.0:7789 -listen 127.0.0.1:7777
+.
+./default
+./default/.bashrc
+./prigh
+./prigh/.bashrc
+./prigh/.config
+./prigh/.config/prigh
+./prigh/.config/prigh/auth.json
+./prigh/.prigh
+./prigh/.prigh/sessions
+./prigh/.ssh
+./prigh/.ssh/id_ed25519
+--- dirs (mode owner path)
+755 0 /home
+700 10000 /home/default
+700 1000 /home/prigh
+755 0 /workspace
+2770 10000 /workspace/default
+755 1000 /workspace/proj
+
+=== old layout and /home/prigh both present
+$ PRIGH_TOKEN=tok prigh-docker 
+prigh-docker: /home has both an old-layout home (.prigh or .config) and /home/prigh; move the old files into /home/prigh by hand
+[exit 2]
+
+=== no token: no auth, one tool host as default without a token
+$ PRIGH_ALLOW_NO_TOKEN=1 PRIGH_MODE=server PRIGH_SUPERUSERS= prigh-docker 
++ chmod 700 /home/prigh
++ chown -R 10000:10000 /home/default
++ chmod 700 /home/default
++ chown -R 10000:10000 /workspace/default
++ setpriv --reuid=10000 --regid=10000 --clear-groups chmod 2770 /workspace/default
+supervise in /workspace/default: setpriv --reuid=10000 --regid=10000 --init-groups env -i HOME=/home/default USER=default LOGNAME=default SHELL=/bin/bash PATH=$PATH LANG=C.UTF-8 GIT_TERMINAL_PROMPT=0 prigh tool-host -connect 127.0.0.1:7777 -name container -cwd /workspace/default
+prigh-docker: mode=server users: default(10000); tool hosts: one per user, as that user
+exec setpriv --reuid=1000 --regid=1000 --init-groups env -u PRIGH_TOKEN -u PRIGH_GH_TOKENS -u PRIGH_HOST_TOKENS -u GH_TOKEN -u PRIGH_TOKENS -u PRIGH_SUPERUSERS HOME=/home/prigh USER=prigh LOGNAME=prigh SHELL=/bin/bash prigh serve -cwd /workspace -no-backend-host -listen 0.0.0.0:7777
+--- /run/prigh/extrausers/passwd
+default:x:10000:10000:prigh user default:/home/default:/bin/bash
+
+=== PRIGH_MODE=tui: single user, as prigh
+$ PRIGH_MODE=tui PRIGH_TUI_ARGS=-model m PRIGH_GIT_EMAIL=me@example.com GH_TOKEN=gh prigh-docker 
++ chmod 700 /home/prigh
++ chown 1000:1000 /workspace/prigh
++ setpriv --reuid=1000 --regid=1000 --init-groups env -i HOME=/home/prigh USER=prigh LOGNAME=prigh SHELL=/bin/bash PATH=$PATH LANG=C.UTF-8 GIT_TERMINAL_PROMPT=0 sh -c $'for kv in "user.name=$1" "user.email=$2"; do\n  [ -z "${kv#*=}" ] || git config --global --get "${kv%%=*}" >/dev/null || git config --global "${kv%%=*}" "${kv#*=}"\ndone' sh '' me@example.com
+prigh-docker: mode=tui cwd=/workspace/prigh (single user: tools run as prigh)
+exec setpriv --reuid=1000 --regid=1000 --init-groups env -u PRIGH_TOKEN -u PRIGH_GH_TOKENS -u PRIGH_HOST_TOKENS HOME=/home/prigh USER=prigh LOGNAME=prigh SHELL=/bin/bash prigh-tui -cwd /workspace/prigh -model m --
+$ PRIGH_MODE=tui PRIGH_CWD=/workspace/proj prigh-docker 
++ chown 1000:1000 /workspace/proj
+prigh-docker: mode=tui cwd=/workspace/proj (single user: tools run as prigh)
+exec setpriv --reuid=1000 --regid=1000 --init-groups env -u PRIGH_TOKEN -u PRIGH_GH_TOKENS -u PRIGH_HOST_TOKENS HOME=/home/prigh USER=prigh LOGNAME=prigh SHELL=/bin/bash prigh-tui -cwd /workspace/proj --
+$ PRIGH_MODE=tui prigh-docker tui
+exec setpriv --reuid=1000 --regid=1000 --init-groups env -u PRIGH_TOKEN -u PRIGH_GH_TOKENS -u PRIGH_HOST_TOKENS HOME=/home/prigh USER=prigh LOGNAME=prigh SHELL=/bin/bash prigh-tui -cwd /workspace/prigh --
+$ PRIGH_MODE=tui prigh-docker ssh-key
+exec setpriv --reuid=1000 --regid=1000 --init-groups env -i HOME=/home/prigh USER=prigh LOGNAME=prigh SHELL=/bin/bash PATH=$PATH LANG=C.UTF-8 GIT_TERMINAL_PROMPT=0 sh -c $'key="$HOME/.ssh/id_ed25519"\nif [ ! -f "$key" ]; then\n  mkdir -p "$HOME/.ssh" && chmod 700 "$HOME/.ssh" && ssh-keygen -q -t ed25519 -N "" -C "$1" -f "$key"\nfi\ncat "$key.pub"' sh prigh@prigh
+$ PRIGH_MODE=tui prigh-docker login default anthropic
++ setpriv --reuid=1000 --regid=1000 --init-groups env -i HOME=/home/prigh USER=prigh LOGNAME=prigh SHELL=/bin/bash PATH=$PATH LANG=C.UTF-8 GIT_TERMINAL_PROMPT=0 mkdir -p /home/prigh/.config/prigh
+exec setpriv --reuid=1000 --regid=1000 --init-groups env -i HOME=/home/prigh USER=prigh LOGNAME=prigh SHELL=/bin/bash PATH=$PATH LANG=C.UTF-8 GIT_TERMINAL_PROMPT=0 prigh login -auth-file /home/prigh/.config/prigh/auth.json anthropic
+$ PRIGH_MODE=tui prigh-docker login alice anthropic
+prigh-docker: PRIGH_MODE=tui has only the namespace default
+[exit 2]
+--- dirs (mode owner path)
+755 0 /home
+700 1000 /home/prigh
+755 0 /workspace
+755 1000 /workspace/prigh
+755 1000 /workspace/proj
+
+=== errors
+$ prigh-docker users
+prigh-docker: no users are set up (/run/prigh/users is missing): is the container running (through its entrypoint, in a network mode)?
+[exit 2]
+$ prigh-docker as alice id
+prigh-docker: no users are set up (/run/prigh/users is missing): is the container running (through its entrypoint, in a network mode)?
+[exit 2]
+$ prigh-docker ssh-key
+prigh-docker: no users are set up (/run/prigh/users is missing): is the container running (through its entrypoint, in a network mode)?
+[exit 2]
+$ PRIGH_DOCKER_UID=1000 PRIGH_TOKEN=tok prigh-docker 
+prigh-docker: the container must start as root (uid 1000 now): it creates a Linux user per namespace and then drops privileges itself; remove `user:`/--user
+[exit 2]
+$ prigh-docker 
+prigh-docker: set PRIGH_TOKEN or PRIGH_TOKENS (anyone who can reach the port can use prigh); PRIGH_ALLOW_NO_TOKEN=1 to skip
+[exit 2]
+$ PRIGH_TOKENS=root=a prigh-docker 
+prigh-docker: user name 'root' is taken by a system user or group of the image; choose another namespace name
+[exit 2]
+$ PRIGH_TOKENS=prigh=a prigh-docker 
+prigh-docker: user name 'prigh' is taken by a system user or group of the image; choose another namespace name
+[exit 2]
+$ PRIGH_TOKENS=nogroup=a prigh-docker 
+prigh-docker: user name 'nogroup' is taken by a system user or group of the image; choose another namespace name
+[exit 2]
+$ PRIGH_TOKENS=1abc=a prigh-docker 
+prigh-docker: '1abc' cannot be a user name: use letters, digits, _ and -, not starting with a digit or -
+[exit 2]
+$ PRIGH_TOKENS=-x=a prigh-docker 
+prigh-docker: '-x' cannot be a user name: use letters, digits, _ and -, not starting with a digit or -
+[exit 2]
+$ PRIGH_TOKENS=a.b=a prigh-docker 
+prigh-docker: 'a.b' cannot be a user name: use letters, digits, _ and -, not starting with a digit or -
+[exit 2]
+$ PRIGH_TOKENS=abcdefghijabcdefghijabcdefghijabc=a prigh-docker 
+prigh-docker: user name 'abcdefghijabcdefghijabcdefghijabc' is longer than 32 characters
+[exit 2]
+$ PRIGH_TOKENS=alice=a,alice=b prigh-docker 
+prigh-docker: PRIGH_TOKENS: duplicate user 'alice'
+[exit 2]
+$ PRIGH_TOKENS=alice=a,secret-without-name prigh-docker 
+prigh-docker: PRIGH_TOKENS: entry 2 must be NAME=VALUE
+[exit 2]
+$ PRIGH_TOKENS=alice= prigh-docker 
+prigh-docker: PRIGH_TOKENS: empty value for 'alice'
+[exit 2]
+$ PRIGH_TOKENS=, prigh-docker 
+prigh-docker: PRIGH_TOKENS has no NAME=TOKEN entries
+[exit 2]
+$ PRIGH_TOKENS=alice=a PRIGH_SUPERUSERS=bob prigh-docker 
+prigh-docker: PRIGH_SUPERUSERS: 'bob' is not a user from PRIGH_TOKENS
+[exit 2]
+$ PRIGH_ALLOW_NO_TOKEN=1 PRIGH_SUPERUSERS=default prigh-docker 
+prigh-docker: PRIGH_SUPERUSERS needs PRIGH_TOKEN or PRIGH_TOKENS
+[exit 2]
+$ PRIGH_TOKENS=alice=a PRIGH_GH_TOKENS=bob=gh prigh-docker 
+prigh-docker: PRIGH_GH_TOKENS: 'bob' is not a user
+[exit 2]
+$ PRIGH_TOKEN=tok PRIGH_MODE=tui,web prigh-docker 
+prigh-docker: PRIGH_MODE=tui cannot be combined with other modes
+[exit 2]
+$ PRIGH_TOKEN=tok PRIGH_MODE=bogus prigh-docker 
+prigh-docker: unknown PRIGH_MODE entry 'bogus' (expected web, pi-web, server or tui)
+[exit 2]
+$ PRIGH_TOKEN=tok PRIGH_MODE=, prigh-docker 
+prigh-docker: PRIGH_MODE=',' enables nothing
+[exit 2]
+$ PRIGH_TOKEN=tok prigh-docker 
++ chown -R 1000:1000 /home/prigh
++ chmod 700 /home/prigh
++ chown -R 10000:10000 /home/default
++ chmod 700 /home/default
+prigh-docker: /workspace/default is a symlink
+[exit 2]
+$ PRIGH_TOKEN=tok prigh-docker 
+prigh-docker: /workspace has mode 750, so users cannot reach /workspace/<name>: make it world-searchable (chmod o+x, on the host for a bind mount)
+[exit 2]

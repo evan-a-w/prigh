@@ -227,8 +227,8 @@ let%expect_test "web server: static files, 404s and the RPC over a WebSocket" =
       ~addr:Eio.Net.Ipaddr.V4.loopback
       ~port:0
       ~root:(Some root)
-      ~websockets:[ "/ws", Web_server.serve_rpc server ]
-      ~on_lines:(Rpc_server.serve_lines server)
+      ~websockets:[ "/ws", Web_server.serve_rpc (Rpc_router.single server) ]
+      ~on_lines:(Rpc_router.serve_lines (Rpc_router.single server))
   in
   let http = Loopback.http ~env:t.env ~sw ~port in
   http "GET / HTTP/1.1\r\nHost: x\r\n\r\n";
@@ -326,8 +326,8 @@ let%expect_test "web server: static files, 404s and the RPC over a WebSocket" =
   [%expect
     {|
     {"type":"response","id":1,"ok":false,"error":"unauthorised: send hello with the token first"}
-    {"type":"response","id":2,"ok":false,"error":"unauthorised: bad or missing token"}
-    {"type":"response","id":3,"ok":true,"result":{"client_id":"client-1","state":{"session_id":"<id>","session_path":"$DIR/sessions/<stamp>_<id>.jsonl","session_name":null,"session_description":null,"cwd":"$DIR","git_branch":null,"model":{"id":"deepseek-flash","provider":"deepseek","key":"deepseek/deepseek-flash","name":"DeepSeek V4.1 Flash","context_window":1000000,"max_output":384000,"supports_thinking":true,"cost":{"input":0.3,"output":1.2,"cache_read":0.006}},"thinking":"off","running":false,"message_count":0,"usage":{"input":0,"output":0,"cache_read":0},"cost_usd":0,"context_tokens":0,"active_host":"backend","hosts":[{"id":"backend","name":"<host>","cwd":"$DIR","session_id":null,"session_name":null}]}}}
+    {"type":"response","id":2,"ok":false,"error":"unauthorised: bad user name or password"}
+    {"type":"response","id":3,"ok":true,"result":{"client_id":"client-1","namespace":null,"user":null,"superuser":false,"state":{"session_id":"<id>","session_path":"$DIR/sessions/<stamp>_<id>.jsonl","session_name":null,"session_description":null,"cwd":"$DIR","git_branch":null,"model":{"id":"deepseek-flash","provider":"deepseek","key":"deepseek/deepseek-flash","name":"DeepSeek V4.1 Flash","context_window":1000000,"max_output":384000,"supports_thinking":true,"cost":{"input":0.3,"output":1.2,"cache_read":0.006}},"thinking":"off","running":false,"message_count":0,"usage":{"input":0,"output":0,"cache_read":0},"cost_usd":0,"context_tokens":0,"active_host":"backend","hosts":[{"id":"backend","name":"<host>","cwd":"$DIR","session_id":null,"session_name":null}],"subagents":[],"jobs":[]}}}
     {"type":"response","id":4,"ok":true,"result":["site/","site/.secret","site/index.html","site/main.bc.js"]}
     {"type":"response","id":null,"ok":false,"error":"invalid JSON: json: unexpected string: 'not'"}
     |}];
@@ -397,8 +397,8 @@ let%expect_test
       ~addr:Eio.Net.Ipaddr.V4.loopback
       ~port:0
       ~root:None
-      ~websockets:[ "/ws", Web_server.serve_rpc server ]
-      ~on_lines:(Rpc_server.serve_lines server)
+      ~websockets:[ "/ws", Web_server.serve_rpc (Rpc_router.single server) ]
+      ~on_lines:(Rpc_router.serve_lines (Rpc_router.single server))
   in
   let terminal_flow = Loopback.connect ~env:t.env ~sw ~port in
   let terminal =
@@ -688,8 +688,8 @@ let%expect_test
       ~addr:Eio.Net.Ipaddr.V4.loopback
       ~port:0
       ~root:None
-      ~websockets:[ "/ws", Pi_rpc.serve_websocket server ]
-      ~on_lines:(Rpc_server.serve_lines server)
+      ~websockets:[ "/ws", Pi_rpc.serve_websocket (Rpc_router.single server) ]
+      ~on_lines:(Rpc_router.serve_lines (Rpc_router.single server))
   in
   let browser target =
     let flow = Loopback.connect ~env:t.env ~sw ~port in
@@ -735,7 +735,7 @@ let%expect_test
   Websocket.close ws;
   [%expect
     {|
-    {"type":"prigh_hello_failed","error":"unauthorised: bad or missing token"}
+    {"type":"prigh_hello_failed","error":"unauthorised: bad user name or password"}
     {"type":"extension_ui_request","id":"status-host","method":"setStatus","statusKey":"host","statusText":null}
     {"type":"extension_ui_request","id":"status-branch","method":"setStatus","statusKey":"branch","statusText":null}
     {"type":"agent_start"}

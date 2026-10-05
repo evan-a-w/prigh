@@ -1,7 +1,6 @@
-import { computed } from "@preact/signals";
-import { useEffect, useRef } from "preact/hooks";
+import { useEffect, useMemo, useRef } from "preact/hooks";
 import { buildChatEntries, type ChatEntry } from "../chat-items.ts";
-import type { AssistantMessage, UserMessage } from "../protocol.ts";
+import type { AgentMessage, AssistantMessage, UserMessage } from "../protocol.ts";
 import { messages } from "../state.ts";
 import {
 	AssistantMessageView,
@@ -11,8 +10,6 @@ import {
 	CustomMessageView,
 	UserMessageView,
 } from "./messages.tsx";
-
-const entries = computed(() => buildChatEntries(messages.value));
 
 function Entry({ entry }: { entry: ChatEntry }) {
 	switch (entry.kind) {
@@ -35,9 +32,11 @@ function Entry({ entry }: { entry: ChatEntry }) {
 
 const NEAR_BOTTOM_PX = 120;
 
-export function ChatList() {
+/** A scrolling message list that follows new output while scrolled to the bottom. */
+export function Conversation({ history, emptyText }: { history: AgentMessage[]; emptyText: string }) {
 	const containerRef = useRef<HTMLDivElement>(null);
 	const stickToBottom = useRef(true);
+	const entries = useMemo(() => buildChatEntries(history), [history]);
 
 	const handleScroll = () => {
 		const el = containerRef.current;
@@ -62,10 +61,14 @@ export function ChatList() {
 
 	return (
 		<div class="chat" ref={containerRef} onScroll={handleScroll}>
-			{entries.value.length === 0 && <div class="chat-empty">No messages yet. Say something.</div>}
-			{entries.value.map((entry) => (
+			{entries.length === 0 && <div class="chat-empty">{emptyText}</div>}
+			{entries.map((entry) => (
 				<Entry key={entry.key} entry={entry} />
 			))}
 		</div>
 	);
+}
+
+export function ChatList() {
+	return <Conversation history={messages.value} emptyText="No messages yet. Say something." />;
 }

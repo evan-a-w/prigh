@@ -38,7 +38,16 @@ let command =
        flag
          "-token"
          (optional string)
-         ~doc:"SECRET the backend's -token (default: $PRIGH_TOKEN)"
+         ~doc:
+           "SECRET the backend's -token, or with -tokens the user's password \
+            (default: $PRIGH_TOKEN)"
+     and user =
+       flag
+         "-user"
+         (optional string)
+         ~doc:
+           "NAME the user (namespace) name of a backend with -tokens (default: \
+            $PRIGH_USER)"
      and tools =
        flag
          "-tools"
@@ -77,6 +86,7 @@ let command =
          | Some t -> Some t
          | None -> Sys.getenv "PRIGH_TOKEN"
        in
+       let user = Option.first_some user (Sys.getenv "PRIGH_USER") in
        let local_tools =
          match tools, connect with
          | Some "local", _ | None, Some _ -> Some backend
@@ -101,6 +111,7 @@ let command =
          @ [ "cwd", `String hello_cwd ]
          @ Option.value_map token ~default:[] ~f:(fun t ->
            [ "token", `String t ])
+         @ Option.value_map user ~default:[] ~f:(fun u -> [ "user", `String u ])
          @ Option.value_map session ~default:[] ~f:(fun s ->
            [ "session", `String s ])
        in

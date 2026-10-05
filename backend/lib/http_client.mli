@@ -23,6 +23,10 @@ module Error : sig
   val to_string : t -> string
 end
 
+(** Adds the scheme's port when the URI has none, so that connecting never
+    needs a service-name lookup. *)
+val with_default_port : Uri.t -> Uri.t
+
 (** [on_response] is called once headers arrive, before any [on_chunk]. *)
 val post_stream
   :  env:Env.t

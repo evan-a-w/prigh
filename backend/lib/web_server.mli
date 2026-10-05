@@ -25,13 +25,16 @@ val handle
 
 val browser_url : host:string -> port:int -> string
 
-(** [Rpc_server.serve_lines] over a WebSocket. *)
-val serve_rpc : Rpc_server.t -> on_websocket
+(** [Rpc_router.serve_lines] over a WebSocket. *)
+val serve_rpc : Rpc_router.t -> on_websocket
 
-(** A {!Terminals} socket. The query carries [token] (checked like [hello]'s),
-    [session] (the terminal's key; it starts in that session's directory on
-    the backend) and the initial [cols] and [rows]. *)
-val serve_terminal : Rpc_server.t -> Terminals.t -> on_websocket
+(** A {!Terminals} socket. The query carries [token] and optionally [user]
+    and [as_user]
+    (selecting the server, like [hello]'s), [session] (the terminal's key, within the namespace) and
+    the initial [cols] and [rows]. The terminal runs on the session's active
+    tool host, in its directory there, relayed when that is a client (see
+    [Rpc_server.terminal_target]). *)
+val serve_terminal : Rpc_router.t -> Terminals.t -> on_websocket
 
 (** Accepts connections until [sw] ends; returns the bound port (useful with
     port 0). *)

@@ -12,6 +12,8 @@ module Platform : sig
         -> (P.Json.t, string) Result.t Bonsai.Effect.t
     ; open_browser : string -> unit Bonsai.Effect.t
     ; quit : unit Bonsai.Effect.t
+    ; sign_out : (unit, string) Result.t Bonsai.Effect.t
+    (** Fails where signing out is not supported; the error is shown. *)
     ; load_history : unit -> (P.Json.t, string) Result.t Bonsai.Effect.t
     ; append_history : string -> unit Bonsai.Effect.t
     ; copy_to_clipboard : string -> unit Bonsai.Effect.t
@@ -20,8 +22,10 @@ module Platform : sig
     ; reconnect :
         delay_ms:int
         -> session:string option
+        -> as_user:string option
         -> (P.Json.t, string) Result.t Bonsai.Effect.t
-    (** Waits, connects again and sends [hello]; the result is the hello reply. *)
+    (** Waits, connects again and sends [hello] (with [session] and [as_user]
+        when given); the result is the hello reply. *)
     }
 end
 

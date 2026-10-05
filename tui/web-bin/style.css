@@ -106,11 +106,16 @@ pre.screen a { color: inherit; text-decoration: underline; }
 }
 .connect button { font: inherit; padding: 0.5em; cursor: pointer; }
 .connect .error { color: var(--red); white-space: pre-wrap; }
+.connect .caps-lock { color: var(--yellow); margin: 0; font-size: 0.9em; }
 
-.terminal-open {
+.page-buttons {
   position: absolute;
   top: 0.25em;
   right: 0.25em;
+  display: flex;
+  gap: 0.25em;
+}
+.terminal-open, .sign-out {
   font: 13px/1 "JetBrains Mono", Menlo, Consolas, monospace;
   padding: 0.3em 0.5em;
   color: var(--fg);
@@ -120,7 +125,7 @@ pre.screen a { color: inherit; text-decoration: underline; }
   opacity: 0.6;
   cursor: pointer;
 }
-.terminal-open:hover { opacity: 1; }
+.terminal-open:hover, .sign-out:hover { opacity: 1; }
 
 .terminal-panel {
   flex: 0 0 45%;

@@ -57,6 +57,7 @@ let execute_tool
       ~(agent_id : string option)
       ?(confirm = fun _ ~summary:_ -> true)
       ?execute
+      ?background
       (call : Content.Tool_call.t)
   =
   let result : Tool.Result.t =
@@ -88,6 +89,7 @@ let execute_tool
                ?agent_id
                ~call_id:call.id
                ~tools:config.tools
+               ?background
                ~env
                ~cwd
                ()
@@ -113,6 +115,7 @@ let run
       ?(emit = ignore)
       ?confirm
       ?execute
+      ?background
       ?retry_delay
       ~context
       ~prompts
@@ -194,6 +197,7 @@ let run
             ~agent_id
             ?confirm
             ?execute
+            ?background
             call
         in
         emit (Tool_end { call; result });

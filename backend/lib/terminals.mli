@@ -2,9 +2,10 @@ open! Core
 open! Import
 
 (** The browser's terminals: one {!Terminal} per key (a session id), shared
-    by every WebSocket that asks for that key and reattached on reconnect.
+    by every channel (a browser's WebSocket, possibly relayed through a tool
+    host) that asks for that key and reattached on reconnect.
 
-    The protocol on a terminal WebSocket:
+    The protocol on a terminal channel:
     - server → client binary: terminal output; the first message is the
       replay (the client resets its emulator when the socket opens);
     - client → server binary: input bytes;
@@ -35,7 +36,7 @@ val create
   -> unit
   -> t
 
-(** Serves one terminal WebSocket until it closes, creating the terminal for
+(** Serves one terminal channel until it closes, creating the terminal for
     [key] in [cwd] (at [cols]x[rows]) unless it is already running. *)
 val serve
   :  t
@@ -43,7 +44,7 @@ val serve
   -> cwd:string
   -> cols:int
   -> rows:int
-  -> Websocket.t
+  -> Terminal_channel.t
   -> unit
 
 (** Running terminals: key, tmux session name and attached sockets. *)

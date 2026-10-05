@@ -45,6 +45,8 @@ module Item : sig
     | Notice of Severity.t * string
     | Block of Content.t
     | Compaction of string
+    | Delivery of string
+    (** finished background subagents' reports handed to the main agent *)
   [@@deriving sexp_of, equal]
 end
 

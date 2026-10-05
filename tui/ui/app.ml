@@ -40,6 +40,12 @@ module Reply_tag = struct
     | Editor_text
     | Reload_messages_notice of string
     | Reconnect of int (** generation; stale replies are ignored *)
+    | Btw of string (** btw id *)
+    | Users_list
+    | User_switched
+    | Jobs_picker
+    | Job_output
+    | Job_started
   [@@deriving sexp_of, equal]
 end
 
@@ -60,7 +66,9 @@ module Command = struct
         { generation : int
         ; delay_ms : int
         ; session : string option
+        ; as_user : string option
         }
+    | Sign_out
     | Quit
   [@@deriving sexp_of, equal]
 end
@@ -110,7 +118,7 @@ module Action = struct
     | Reply of Reply_tag.t * (P.Json.t, string) Result.t
     | Tick
     | Set_home of string
-    | Set_client_id of string
+    | Hello of P.Hello_reply.t
     | Resize of
         { width : int
         ; height : int
@@ -141,10 +149,14 @@ module Model = struct
     ; config : P.Config.t option
     ; home : string option
     ; client_id : string option (** ours, from [hello] *)
+    ; namespace : string option
+    ; user : string option
     ; stderr_tail : string list
     ; pending_confirms : (string * string * string) list
     ; connection : Connection.t
     ; reconnect_generation : int
+    ; btw : Btw_box.t option
+    ; btw_seq : int
     ; width : int
     ; height : int
     ; quitting : bool
@@ -155,10 +167,27 @@ module Model = struct
     Option.value_map t.state ~default:false ~f:(fun s -> s.running)
   ;;
 
+  let agents_running t =
+    List.exists t.agents ~f:(fun (a : Agent_view.t) ->
+      Agent_view.Status.equal a.status Running)
+    || Option.exists t.state ~f:(fun s ->
+      List.exists s.subagents ~f:(fun a -> a.running))
+  ;;
+
+  let jobs_running t =
+    Option.exists t.state ~f:(fun s ->
+      List.exists s.jobs ~f:(fun (j : P.State.Job.t) -> j.running))
+  ;;
+
   let backend_gone t =
     match t.connection with
     | Connected -> false
     | Reconnecting _ -> true
+  ;;
+
+  let acting_as t =
+    P.Hello_reply.acting_as
+      { client_id = ""; namespace = t.namespace; user = t.user }
   ;;
 end
 
@@ -197,8 +226,19 @@ let editor_row_count m =
     count line 0)
 ;;
 
+let btw_rows m =
+  match m.btw, m.mode with
+  | Some box, Editing ->
+    List.length
+      (Btw_box.render
+         box
+         ~width:(transcript_width m)
+         ~max_rows:(Btw_box.max_rows ~height:(transcript_height m)))
+  | _ -> 0
+;;
+
 let transcript_rows m =
-  Int.max 0 (transcript_height m - (editor_row_count m + 2))
+  Int.max 0 (transcript_height m - (editor_row_count m + 2 + btw_rows m))
 ;;
 
 (* The single place transcript edits go through so the anchored viewport can
@@ -304,10 +344,14 @@ let init =
   ; config = None
   ; home = None
   ; client_id = None
+  ; namespace = None
+  ; user = None
   ; stderr_tail = []
   ; pending_confirms = []
   ; connection = Connected
   ; reconnect_generation = 0
+  ; btw = None
+  ; btw_seq = 0
   ; width = 80
   ; height = 24
   ; quitting = false
@@ -736,7 +780,7 @@ let agents_picker m =
       List.map m.agents ~f:(fun (a : Agent_view.t) ->
         Picker.Item.create
           ~id:a.id
-          ~detail:(sprintf "%s  %s" (agent_status_text a) a.model)
+          ~detail:(sprintf "%s  %s  %s" a.id (agent_status_text a) a.model)
           ~marked:
             (match m.focus with
              | `Agent id -> String.equal id a.id
@@ -744,6 +788,60 @@ let agents_picker m =
           a.task)
     in
     open_picker m Agents (Picker.create ~title:"Subagents" items), [])
+;;
+
+let format_elapsed seconds =
+  let s = Float.iround_down_exn seconds in
+  if s < 60
+  then sprintf "%ds" s
+  else if s < 3600
+  then sprintf "%dm%02ds" (s / 60) (s % 60)
+  else sprintf "%dh%02dm" (s / 3600) (s % 3600 / 60)
+;;
+
+let jobs_picker m (jobs : P.Job_info.t list) =
+  if List.is_empty jobs
+  then notice m "no jobs", []
+  else (
+    let items =
+      List.map jobs ~f:(fun (j : P.Job_info.t) ->
+        let state =
+          match j.exit with
+          | None -> "running"
+          | Some status -> status
+        in
+        Picker.Item.create
+          ~id:j.id
+          ~detail:
+            (sprintf
+               "%s  %s  %s%s"
+               j.id
+               state
+               (format_elapsed j.elapsed)
+               (Option.value_map j.last_line ~default:"" ~f:(fun l ->
+                  "  " ^ String.prefix l 80)))
+          ~search:(j.id ^ " " ^ j.command)
+          j.command)
+    in
+    open_picker m Jobs (Picker.create ~title:"Jobs" items), [])
+;;
+
+let kill_job m id =
+  ( m
+  , [ rpc
+        "kill_job"
+        ~params:[ "job_id", str id ]
+        ~tag:(Notice_on_success (sprintf "killing job %s" id))
+    ] )
+;;
+
+let job_output m id =
+  ( { m with mode = Editing }
+  , [ rpc
+        "job_output"
+        ~params:[ "job_id", str id; "lines", P.Json.int 200 ]
+        ~tag:Job_output
+    ] )
 ;;
 
 (* A host's display name: "(here)" marks this frontend, "(in ...)" a client
@@ -829,6 +927,46 @@ let switch_host m arg =
 
 let set_focus m focus = follow { m with focus }
 
+(* Agents stay listed while they run and until the backend has handed their
+   report to the main agent; after that, until the next prompt. *)
+let prune_agents m =
+  let undelivered id =
+    Option.exists m.state ~f:(fun (s : P.State.t) ->
+      List.exists s.subagents ~f:(fun a -> String.equal a.id id))
+  in
+  let agents =
+    List.filter m.agents ~f:(fun (a : Agent_view.t) ->
+      Agent_view.Status.equal a.status Running || undelivered a.id)
+  in
+  let focus =
+    match m.focus with
+    | `Agent id when not (List.exists agents ~f:(fun a -> String.equal a.id id))
+      -> `Main
+    | focus -> focus
+  in
+  { m with agents; focus }
+;;
+
+(* [arg] is the agent's number in the strip or its id. *)
+let cancel_agent m arg =
+  let agent =
+    match Int.of_string_opt arg with
+    | Some n -> List.nth m.agents (n - 1)
+    | None -> Agent_view.find m.agents arg
+  in
+  match agent with
+  | None -> error m (sprintf "no subagent %s" arg), []
+  | Some a when not (Agent_view.Status.equal a.status Running) ->
+    notice m (sprintf "subagent %s is not running" a.id), []
+  | Some a ->
+    ( m
+    , [ rpc
+          "cancel_subagent"
+          ~params:[ "agent_id", str a.id ]
+          ~tag:(Notice_on_success (sprintf "cancelling subagent %s" a.id))
+      ] )
+;;
+
 let cycle_focus m =
   let n = List.length m.agents in
   match m.focus with
@@ -883,7 +1021,9 @@ let schedule_reconnect m ~attempt ~delay_ms ~session =
       connection = Reconnecting { attempt; generation; delay_ms; session }
     ; reconnect_generation = generation
     }
-  , [ Command.Reconnect { generation; delay_ms; session } ] )
+  , [ Command.Reconnect
+        { generation; delay_ms; session; as_user = Model.acting_as m }
+    ] )
 ;;
 
 let backend_closed m =
@@ -954,15 +1094,17 @@ let reconnect_reply m ~generation result =
          ~delay_ms
          ~session
      | Ok json ->
-       let client_id =
-         match P.Json.field json "client_id" with
-         | Some (`String id) -> Some id
-         | _ -> m.client_id
+       let client_id, namespace, user =
+         match P.Hello_reply.of_json json with
+         | Ok { client_id; namespace; user } -> Some client_id, namespace, user
+         | Error _ -> m.client_id, m.namespace, m.user
        in
        let m =
          { m with
            connection = Connected
          ; client_id
+         ; namespace
+         ; user
          ; agents = []
          ; focus = `Main
          ; transcript = Transcript.clear m.transcript
@@ -1096,6 +1238,33 @@ let set_confirm m enabled =
   | None -> m, [ rpc "get_config" ~tag:(Config_for_confirm enabled) ]
 ;;
 
+let cancel_btw m =
+  match m.btw with
+  | Some box when Btw_box.is_streaming box ->
+    [ rpc "btw_cancel" ~params:[ "btw_id", str box.id ] ~tag:Ignore ]
+  | _ -> []
+;;
+
+(* A newer question replaces (and cancels) the previous one. *)
+let start_btw m question =
+  let id = sprintf "btw-%d" (m.btw_seq + 1) in
+  ( { m with btw = Some (Btw_box.create ~id ~question); btw_seq = m.btw_seq + 1 }
+  , cancel_btw m
+    @ [ rpc
+          "btw"
+          ~params:[ "question", str question; "btw_id", str id ]
+          ~tag:(Btw id)
+      ] )
+;;
+
+let dismiss_btw m = { m with btw = None }, cancel_btw m
+
+let update_btw m id ~f =
+  match m.btw with
+  | Some box when String.equal box.id id -> { m with btw = Some (f box) }
+  | _ -> m
+;;
+
 let run_command m (cmd : Commands.Parsed.t) =
   match cmd.name, cmd.args with
   | "", _ -> m, []
@@ -1213,7 +1382,13 @@ let run_command m (cmd : Commands.Parsed.t) =
           ~tag:(Notice_on_success "session named")
       ] )
   | "session", _ -> m, [ rpc "session_stats" ~tag:Session_stats ]
+  | "agents", [ "cancel"; arg ] -> cancel_agent m arg
+  | "agents", "cancel" :: _ -> error m "usage: /agents cancel <n|id>", []
   | "agents", _ -> agents_picker m
+  | "jobs", [ "kill"; id ] -> kill_job m id
+  | "jobs", "kill" :: _ -> error m "usage: /jobs kill <id>", []
+  | "jobs", [] -> m, [ rpc "list_jobs" ~tag:Jobs_picker ]
+  | "jobs", [ id ] -> job_output m id
   | "host", [] -> hosts_picker m
   | "host", _ -> switch_host m cmd.rest
   | "sessions", _ | "switch", [] ->
@@ -1265,6 +1440,8 @@ let run_command m (cmd : Commands.Parsed.t) =
   | "import", _ ->
     m, [ rpc "import" ~params:[ "path", str cmd.rest ] ~tag:Reload_messages ]
   | "abort", _ -> m, [ rpc "abort" ]
+  | "btw", [] -> error m "usage: /btw <question>", []
+  | "btw", _ -> start_btw m cmd.rest
   | "retry-backend-connection", _ -> retry_backend_connection m
   | "state", _ ->
     let text =
@@ -1274,6 +1451,11 @@ let run_command m (cmd : Commands.Parsed.t) =
     block m (Content.lines ~style:(Style.fg Gray) text), []
   | "clear", _ ->
     follow { m with transcript = Transcript.clear m.transcript }, []
+  | "signout", _ -> m, [ Sign_out ]
+  | "setusr", [] -> m, [ rpc "list_users" ~tag:Users_list ]
+  | "setusr", [ user ] ->
+    m, [ rpc "set_user" ~params:[ "user", str user ] ~tag:User_switched ]
+  | "setusr", _ -> error m "usage: /setusr [user]", []
   | "quit", _ | "exit", _ -> { m with quitting = true }, [ Quit ]
   | name, _ ->
     let hint =
@@ -1311,7 +1493,19 @@ let user_params m text =
 ;;
 
 let shell_command m text =
-  if Model.running m
+  if String.is_prefix text ~prefix:"!&"
+  then (
+    let command = String.drop_prefix text 2 |> String.strip in
+    if String.is_empty command
+    then error m "usage: !&command (runs it as a background job)", []
+    else
+      ( m
+      , [ rpc
+            "shell"
+            ~params:[ "command", str command; "background", P.Json.bool true ]
+            ~tag:Job_started
+        ] ))
+  else if Model.running m
   then warn m "wait for the current turn", []
   else (
     let add_to_context = not (String.is_prefix text ~prefix:"!!") in
@@ -1347,9 +1541,7 @@ let submit m =
         then
           ( { m with queued_texts = m.queued_texts @ [ text ] }
           , [ rpc "steer" ~params:(user_params m text) ] )
-        else
-          ( { m with agents = []; focus = `Main }
-          , [ rpc "prompt" ~params:(user_params m text) ] )
+        else prune_agents m, [ rpc "prompt" ~params:(user_params m text) ]
       in
       m, cmds @ [ Command.Append_history text ])
 ;;
@@ -1760,6 +1952,7 @@ let editing_intent m (intent : Intent.t) =
    everything else edits the buffer and then recomputes the completion. *)
 let editing m (intent : Intent.t) =
   match intent with
+  | Cancel when Option.is_some m.btw -> dismiss_btw m
   | Next_agent -> cycle_focus m, []
   | Focus_agent n -> focus_agent m n, []
   | Search -> open_search m, []
@@ -1913,6 +2106,7 @@ let picker_selected m (kind : Mode.Picker_kind.t) (item : Picker.Item.t) =
   | Tree _ ->
     m, [ rpc "rewind" ~params:[ "to", str item.id ] ~tag:Reload_messages ]
   | Agents -> set_focus m (`Agent item.id), []
+  | Jobs -> job_output m item.id
   | Hosts ->
     (match
        Option.bind m.state ~f:(fun s ->
@@ -1975,6 +2169,14 @@ let picker m (kind : Mode.Picker_kind.t) picker (intent : Intent.t) =
   | Submit when Picker.multi picker -> save_scoped_models m picker
   | Force_quit ->
     (match kind with
+     | Agents ->
+       (match Picker.selected_item picker with
+        | None -> m, []
+        | Some item -> cancel_agent { m with mode = Editing } item.id)
+     | Jobs ->
+       (match Picker.selected_item picker with
+        | None -> m, []
+        | Some item -> kill_job { m with mode = Editing } item.id)
      | Sessions { sessions; _ } ->
        (match Picker.selected_item picker with
         | None -> m, []
@@ -2391,6 +2593,8 @@ let event m (e : P.Event.t) =
         pending_confirms = m.pending_confirms @ [ call_id, name, summary ]
       }
     , [] )
+  | Btw_delta { btw_id; delta } ->
+    update_btw m btw_id ~f:(fun box -> Btw_box.add_delta box delta), []
   | Agent_start
   | Agent_end _
   | Turn_start
@@ -2407,7 +2611,10 @@ let event m (e : P.Event.t) =
   | Subagent _
   | Subagent_end _
   | Tool_exec _
-  | Tool_exec_cancel _ -> m, []
+  | Tool_exec_cancel _
+  | Terminal_open _
+  | Terminal_frame _
+  | Terminal_close _ -> m, []
 ;;
 
 (* ---- rpc replies ------------------------------------------------------ *)
@@ -2422,6 +2629,7 @@ let reply m (tag : Reply_tag.t) (result : (P.Json.t, string) Result.t) =
   | Error e ->
     (match tag with
      | Ignore -> m, []
+     | Btw id -> update_btw m id ~f:(fun box -> Btw_box.fail box e), []
      | Set_model_done _ ->
        (* The backend formats "did you mean"; the picker helps recover. *)
        model_picker (error m e) ~query:"", []
@@ -2429,6 +2637,11 @@ let reply m (tag : Reply_tag.t) (result : (P.Json.t, string) Result.t) =
   | Ok json ->
     (match tag with
      | Ignore | Show_error | Reconnect _ -> m, []
+     | Btw id ->
+       decode
+         json
+         ~f:(fun json -> P.Json.string_field json "text")
+         (fun text -> update_btw m id ~f:(Btw_box.finish ~text), [])
      | Notice_on_success text -> notice m text, []
      | Set_model_done key ->
        (match
@@ -2496,6 +2709,54 @@ let reply m (tag : Reply_tag.t) (result : (P.Json.t, string) Result.t) =
        , [ rpc "get_messages" ~tag:Initial_messages
          ; rpc "get_state" ~tag:Initial_state
          ] )
+     | Users_list ->
+       decode
+         json
+         ~f:
+           (decode_list ~f:(fun j ->
+              match j with
+              | `String s -> Ok s
+              | _ -> Or_error.error_string "expected a user name"))
+         (fun users ->
+            ( block
+                m
+                (Content.lines
+                   (String.concat
+                      ~sep:"\n"
+                      ("users (/setusr NAME to act as one):"
+                       :: List.map users ~f:(fun u -> "  " ^ u))))
+            , [] ))
+     | User_switched ->
+       decode
+         json
+         ~f:P.Hello_reply.of_json
+         (fun { client_id; namespace; user } ->
+            let m =
+              { m with
+                client_id = Some client_id
+              ; namespace
+              ; user
+              ; agents = []
+              ; focus = `Main
+              ; queued = Queue_counts.zero
+              ; queued_texts = []
+              ; transcript = Transcript.clear m.transcript
+              }
+            in
+            let m =
+              notice
+                m
+                (match Model.acting_as m, namespace with
+                 | Some other, _ -> sprintf "acting as %s" other
+                 | None, Some own -> sprintf "back to %s" own
+                 | None, None -> "switched user")
+            in
+            ( follow m
+            , [ rpc "get_state" ~tag:Initial_state
+              ; rpc "get_messages" ~tag:Initial_messages
+              ; rpc "auth_status" ~tag:Auth_refresh
+              ; rpc "get_config" ~tag:Config
+              ] ))
      | Session_stats ->
        decode json ~f:P.Session_stats.of_json (fun stats ->
          block m (format_stats stats), [])
@@ -2574,6 +2835,25 @@ let reply m (tag : Reply_tag.t) (result : (P.Json.t, string) Result.t) =
            ( notice m (sprintf "model set to %s; /model to change" model.key)
            , [ set_model_command model.key ] )
          | None -> m, [])
+     | Jobs_picker ->
+       decode json ~f:(decode_list ~f:P.Job_info.of_json) (jobs_picker m)
+     | Job_output ->
+       decode
+         json
+         ~f:(fun json -> P.Json.string_field json "text")
+         (fun text -> block m (Content.lines text), [])
+     | Job_started ->
+       decode
+         json
+         ~f:(fun json -> P.Json.string_field json "job_id")
+         (fun id ->
+           ( notice
+               m
+               (sprintf
+                  "started job %s; /jobs shows it, and its exit is reported to \
+                   the agent"
+                  id)
+           , [] ))
      | Sessions_picker ->
        decode
          json
@@ -2693,7 +2973,8 @@ let update m (action : Action.t) =
       | Reply (tag, result) -> reply m tag result
       | Tick -> { m with spinner = m.spinner + 1 }, []
       | Set_home home -> { m with home = Some home }, []
-      | Set_client_id id -> { m with client_id = Some id }, []
+      | Hello { client_id; namespace; user } ->
+        { m with client_id = Some client_id; namespace; user }, []
       | Resize { width; height } -> { m with width; height }, []
     in
     let m, cmds = block_backend_rpc m cmds in
