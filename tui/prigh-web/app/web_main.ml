@@ -246,6 +246,9 @@ let install_listeners ~schedule ~current =
       | None -> Js._true
       | Some action ->
         Dom.preventDefault ev;
+        (* Bonsai applies it on the next frame: a key pressed before then must
+           see its effect (e.g. Esc closing a dialog, then Ctrl+K). *)
+        current := fst (App.update !current action);
         schedule action;
         reveal_selected ();
         Js._false));
