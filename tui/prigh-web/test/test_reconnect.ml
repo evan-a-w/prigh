@@ -8,20 +8,13 @@ let%expect_test "reconnecting after the backend goes away" =
   Harness.event
     h
     {|{"event":"message_start","message":{"role":"user","text":"hello"}}|};
-  [%expect
-    {|
-    (Rpc (method_ get_state) (params ()) (tag State))
-    (Rpc (method_ list_models) (params ()) (tag Models))
-    (Set_url_session s1)
-    (Rpc (method_ get_messages) (params ()) (tag Messages))
-    (Rpc (method_ list_sessions) (params ()) (tag Sessions))
-    |}];
+  [%expect {| |}];
   Harness.act h Backend_closed;
   Harness.text h ~selector:".banner";
   [%expect
     {|
     (Reconnect (generation 1) (delay_ms 0) (session (s1)))
-    Connection lost — reconnecting…
+    Connection lost: reconnecting…
     |}];
   Harness.act h Backend_closed;
   for _ = 1 to 3 do
@@ -47,12 +40,14 @@ let%expect_test "reconnecting after the backend goes away" =
         ~toasts:(List.length m.toasts : int)];
   [%expect
     {|
+    (Expire_toast (id 0) (after_ms 4000))
     (Rpc (method_ get_state) (params ()) (tag State))
     (Rpc (method_ list_models) (params ()) (tag Models))
+    (Rpc (method_ auth_status) (params ()) (tag (Auth_status Refresh)))
     (Set_url_session s1)
     (Rpc (method_ get_messages) (params ()) (tag Messages))
     (Rpc (method_ list_sessions) (params ()) (tag Sessions))
     hello
-    ((connection Connected) (toasts 0))
+    ((connection Connected) (toasts 1))
     |}]
 ;;
