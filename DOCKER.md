@@ -109,9 +109,11 @@ name in the container. At startup, the entrypoint (as root):
 - creates `/home/<name>` (mode 700) and `/workspace/<name>` (mode 2770, the
   user's group) for each user;
 - starts one tool host per user, running as that user in
-  `/workspace/<name>`, and restarts it if it exits. The backend runs no
-  tools itself (`-no-backend-host`). A new session adopts its user's first
-  connected tool host, normally this one; `/host` picks another;
+  `/workspace/<name>`, and restarts it if it exits (with a fixed
+  `-host-id container-<name>`, so its sessions resume on it after a
+  restart). The backend runs no tools itself (`-no-backend-host`). A new
+  session adopts its user's first connected tool host, normally this one;
+  `/host` picks another;
 - runs the backend as `prigh`.
 
 `prigh-docker users` lists the users, their uids and directories.

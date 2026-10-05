@@ -203,11 +203,12 @@ let%expect_test "backend host disabled" =
     {"type":"response","id":"r","ok":false,"error":"the backend tool host is disabled"}
     {"type":"response","id":"r","ok":false,"error":"unknown tool host \"nobody\""}
     {"type":"response","id":"r","ok":false,"error":"no tool host connected: connect one with `prigh tool-host -connect ...` or a TUI, then pick it with /host"}
-    {"type":"response","id":"r","ok":false,"error":"tool host is not connected"}
+    {"type":"response","id":"r","ok":false,"error":"no tool host connected: connect one with `prigh tool-host -connect ...` or a TUI, then pick it with /host"}
     {"type":"response","id":"r","ok":false,"error":"no tool host connected: connect one with `prigh tool-host -connect ...` or a TUI, then pick it with /host"}
     {"type":"response","id":"r","ok":true,"result":{"text":"no tool host connected: connect one with `prigh tool-host -connect ...` or a TUI, then pick it with /host","is_error":true}}
     (Unavailable "no live session and the backend tool host is disabled")
-    (Unavailable "no tool host connected")
+    (Unavailable
+     "no tool host connected: connect one with `prigh tool-host -connect ...` or a TUI, then pick it with /host")
     {"type":"response","id":"r","ok":true,"result":{}}
     tool_result bash: "no tool host connected: connect one with `prigh tool-host -connect ...` or a TUI, then pick it with /host"
     true
@@ -230,7 +231,7 @@ let%expect_test "backend host disabled" =
   new_tool_results agent ~seen;
   [%expect
     {|
-    {"type":"response","id":"r","ok":true,"result":{"client_id":"client-2","namespace":null,"user":null,"superuser":false,"state":{"session_id":"<id>","session_path":"$DIR/sessions/<stamp>_<id>.jsonl","session_name":null,"session_description":null,"cwd":"/home/me/proj","git_branch":null,"model":{"id":"deepseek-flash","provider":"deepseek","key":"deepseek/deepseek-flash","name":"DeepSeek V4.1 Flash","context_window":1000000,"max_output":384000,"supports_thinking":true,"cost":{"input":0.3,"output":1.2,"cache_read":0.006}},"thinking":"off","running":false,"message_count":0,"usage":{"input":0,"output":0,"cache_read":0},"cost_usd":0,"context_tokens":0,"active_host":"client-2","hosts":[{"id":"client-2","name":"laptop","cwd":"/home/me/proj","session_id":"<id>","session_name":null}],"subagents":[],"jobs":[]}}}
+    {"type":"response","id":"r","ok":true,"result":{"client_id":"client-2","host_id":"client-2","namespace":null,"user":null,"superuser":false,"state":{"session_id":"<id>","session_path":"$DIR/sessions/<stamp>_<id>.jsonl","session_name":null,"session_description":null,"cwd":"/home/me/proj","git_branch":null,"model":{"id":"deepseek-flash","provider":"deepseek","key":"deepseek/deepseek-flash","name":"DeepSeek V4.1 Flash","context_window":1000000,"max_output":384000,"supports_thinking":true,"cost":{"input":0.3,"output":1.2,"cache_read":0.006}},"thinking":"off","running":false,"message_count":0,"usage":{"input":0,"output":0,"cache_read":0},"cost_usd":0,"context_tokens":0,"active_host":"client-2","hosts":[{"id":"client-2","name":"laptop","cwd":"/home/me/proj","session_id":"<id>","session_name":null}],"subagents":[],"jobs":[]}}}
     ((active_host client-2) (cwd /home/me/proj) (git_branch ())
      (hosts (client-2)))
     (Host client-2 /home/me/proj)
@@ -256,8 +257,18 @@ let%expect_test "backend host disabled" =
     tool_result subagent: "started agent a1 (look around); its result will be delivered to you when it finishes; use subagent_wait to block on it"
     delivered: "[subagent a1 finished] look around\nsub done\n[subagent: 2 turns, 30 in / 13 out tokens, $0.0000]"
     |}];
-  (* With the host gone there is nothing to run on. *)
+  (* With the host gone the session waits for it: another host connecting
+     is not adopted (only a session that never had a host adopts one). *)
   Rpc_server.disconnect server laptop;
+  show_state t agent;
+  let desk = Rpc_server.connect server ~send:ignore in
+  ignore
+    (Rpc_server.handle
+       server
+       desk
+       (Json.of_string
+          {|{"id": 1, "method": "hello", "params": {"name": "desk", "tools": true, "host_id": "host-desk"}}|})
+     : Json.t);
   show_state t agent;
   call t server client ~params:{|{"text": "and again"}|} "prompt";
   Agent.wait_idle agent;
@@ -266,9 +277,12 @@ let%expect_test "backend host disabled" =
   [%expect
     {|
     ((active_host client-2) (cwd /home/me/proj) (git_branch ()) (hosts ()))
+    ((active_host client-2) (cwd /home/me/proj) (git_branch ())
+     (hosts (host-desk)))
     {"type":"response","id":"r","ok":true,"result":{}}
-    tool_result bash: "no tool host connected: connect one with `prigh tool-host -connect ...` or a TUI, then pick it with /host"
-    (Unavailable "the tool host \"client-2\" is not connected")
+    tool_result bash: "waiting for tool host \"laptop\" to reconnect; /host picks another"
+    (Unavailable
+     "waiting for tool host \"laptop\" to reconnect; /host picks another")
     |}]
 ;;
 
@@ -505,7 +519,7 @@ let%expect_test "backend host disabled: no access to the backend's other files" 
        answer ());
   [%expect
     {|
-    {"type":"response","id":"r","ok":true,"result":{"client_id":"client-2","namespace":null,"user":null,"superuser":false,"state":{"session_id":"<id>","session_path":"$DIR/sessions/<stamp>_<id>.jsonl","session_name":null,"session_description":null,"cwd":"/home/me/proj","git_branch":null,"model":{"id":"deepseek-flash","provider":"deepseek","key":"deepseek/deepseek-flash","name":"DeepSeek V4.1 Flash","context_window":1000000,"max_output":384000,"supports_thinking":true,"cost":{"input":0.3,"output":1.2,"cache_read":0.006}},"thinking":"off","running":false,"message_count":0,"usage":{"input":0,"output":0,"cache_read":0},"cost_usd":0,"context_tokens":0,"active_host":"client-2","hosts":[{"id":"client-2","name":"laptop","cwd":"/home/me/proj","session_id":"<id>","session_name":null}],"subagents":[],"jobs":[]}}}
+    {"type":"response","id":"r","ok":true,"result":{"client_id":"client-2","host_id":"client-2","namespace":null,"user":null,"superuser":false,"state":{"session_id":"<id>","session_path":"$DIR/sessions/<stamp>_<id>.jsonl","session_name":null,"session_description":null,"cwd":"/home/me/proj","git_branch":null,"model":{"id":"deepseek-flash","provider":"deepseek","key":"deepseek/deepseek-flash","name":"DeepSeek V4.1 Flash","context_window":1000000,"max_output":384000,"supports_thinking":true,"cost":{"input":0.3,"output":1.2,"cache_read":0.006}},"thinking":"off","running":false,"message_count":0,"usage":{"input":0,"output":0,"cache_read":0},"cost_usd":0,"context_tokens":0,"active_host":"client-2","hosts":[{"id":"client-2","name":"laptop","cwd":"/home/me/proj","session_id":"<id>","session_name":null}],"subagents":[],"jobs":[]}}}
     exec write out.md
     {"type":"response","id":"r","ok":true,"result":{"path":"/home/me/proj/out.md"}}
     |}]

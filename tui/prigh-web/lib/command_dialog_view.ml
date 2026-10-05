@@ -310,6 +310,34 @@ let text ~title ~text ~inject =
     [ Node.pre ~attrs:[ Attr.class_ "text-block" ] [ Node.text text ] ]
 ;;
 
+let mcp_tools (server : Mcp_server.t) ~inject =
+  Modal.view
+    ~cls:"mcp-tools-dialog"
+    ~title:
+      (sprintf
+         "%s: %s"
+         server.name
+         (Chat_html.plural (List.length server.tools) "tool"))
+    ~on_close:(inject Action.Close_dialog)
+    ~footer:[ keys_hint "/mcp lists the servers"; done_button ~inject ]
+    [ Node.p ~attrs:[ Attr.class_ "dialog-note" ] [ Node.text server.source ]
+    ; (match server.tools with
+       | [] ->
+         div ~cls:"picker-empty" [ Node.text "This server offers no tools." ]
+       | tools ->
+         div
+           ~cls:"mcp-tools"
+           (List.map tools ~f:(fun (tool : Mcp_server.Tool.t) ->
+              div
+                ~cls:"mcp-tool"
+                [ span ~cls:"mcp-tool-name" tool.name
+                ; (if String.is_empty tool.description
+                   then Node.none
+                   else span ~cls:"mcp-tool-description" tool.description)
+                ])))
+    ]
+;;
+
 let view (m : App.Model.t) (dialog : Dialog.t) ~inject =
   match dialog with
   | Hotkeys -> Some (hotkeys ~inject)
@@ -319,5 +347,6 @@ let view (m : App.Model.t) (dialog : Dialog.t) ~inject =
   | Rewind_confirm { text = t; _ } -> Some (rewind_confirm ~text:t ~inject)
   | Session stats -> Some (session m stats ~inject)
   | Text { title; text = t } -> Some (text ~title ~text:t ~inject)
+  | Mcp_tools server -> Some (mcp_tools server ~inject)
   | Picker _ | Help | Rename _ | Delete _ | Login _ | Auth _ -> None
 ;;

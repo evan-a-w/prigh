@@ -19,6 +19,8 @@ module Picker_kind = struct
     | Agents
     | Jobs
     | Hosts
+    | Skills
+    | Mcp of Mcp_list.t
     | Auth_select of string
   [@@deriving sexp_of, equal]
 end

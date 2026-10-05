@@ -11,15 +11,18 @@ let popup (m : App.Model.t) ~inject =
       match Completion.source c with
       | Command -> "Commands"
       | Argument Model -> "Models"
+      | Argument Models -> "Fallback models, in order"
       | Argument Thinking -> "Thinking"
       | Argument (Login | Logout) -> "Providers"
       | Argument Directory -> "Directories"
+      | Argument Backend_directory -> "Directories on the backend"
       | Argument Path | Path -> "Files"
       | Argument Verbosity -> "Verbosity"
       | Argument Confirm -> "Tool confirmation"
       | Argument Session -> "Sessions"
       | Argument Host -> "Hosts"
       | Argument User -> "Users"
+      | Argument Skill -> "Skills"
     in
     div
       ~cls:"popup"

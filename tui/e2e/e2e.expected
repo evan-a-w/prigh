@@ -176,6 +176,34 @@ jobs backend exited
   event state running=false model=deepseek/deepseek-flash
 <- get_messages: 4 message(s)
 btw backend exited
+<- set_config: (Ok
+ ((scoped_models ()) (confirm_tools false) (default_model ())
+  (default_thinking ())
+  (fallback_models (deepseek/deepseek-flash anthropic/claude-fable-5-1))
+  (default_cwd ($TMP))))
+<- set_config ERROR: "fallback_models: unknown model \"gpt-9\"; did you mean: openai/gpt-4 (GPT-4), openai/gpt-5 (GPT-5), openai/gpt-4o (GPT-4o)"
+<- set_config: (Ok
+ ((scoped_models ()) (confirm_tools false) (default_model ())
+  (default_thinking ())
+  (fallback_models (deepseek/deepseek-flash anthropic/claude-fable-5-1))
+  (default_cwd ())))
+<- prompt: ()
+  event state running=true model=deepseek/deepseek-flash
+  event user "fix the bug"
+  event message_end
+  event message_start
+  event text_delta ""
+  event assistant_end (Error"HTTP 429: The usage limit has been reached (usage limit reached)")
+  event notice "deepseek/deepseek-flash: HTTP 429: The usage limit has been reached (usage limit reached); handing over to anthropic/claude-fable-5-1"
+  event state running=true model=anthropic/claude-fable-5-1
+  event state running=true model=anthropic/claude-fable-5-1
+  event user "[prigh: deepseek/deepseek-flash cannot continue (HTTP 429: The usage limit has been reached (usage limit reached)), so anthropic/claude-fable-5-1 takes over this conversation from here. Carry on with the task where it left off.]"
+  event message_end
+  event message_start
+  event text_delta "carried on"
+  event assistant_end End_turn
+  event state running=false model=anthropic/claude-fable-5-1
+fallback backend exited
 <- prompt: ()
   event state running=true model=deepseek/deepseek-flash
   event user "what is in @shot.png?\n\n<file path=\"shot.png\">\nRead image file [image/png, 3x2]\n</file>"

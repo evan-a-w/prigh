@@ -760,25 +760,6 @@ let find_in models s =
 
 let find = find_in all
 
-let edit_distance a b =
-  let a = String.lowercase a
-  and b = String.lowercase b in
-  let n = String.length a
-  and m = String.length b in
-  let prev = Array.init (m + 1) ~f:Fn.id in
-  let cur = Array.create ~len:(m + 1) 0 in
-  for i = 1 to n do
-    cur.(0) <- i;
-    for j = 1 to m do
-      let cost = if Char.equal a.[i - 1] b.[j - 1] then 0 else 1 in
-      cur.(j)
-      <- Int.min (Int.min (prev.(j) + 1) (cur.(j - 1) + 1)) (prev.(j - 1) + cost)
-    done;
-    Array.blit ~src:cur ~src_pos:0 ~dst:prev ~dst_pos:0 ~len:(m + 1)
-  done;
-  prev.(m)
-;;
-
 let resolve_in models query =
   let q = String.lowercase (String.strip query) in
   let names t = [ key t; t.id; t.name ] in
@@ -802,7 +783,7 @@ let resolve_in models query =
           let closest =
             List.map models ~f:(fun t ->
               ( List.min_elt
-                  (List.map (names t) ~f:(fun n -> edit_distance n q))
+                  (List.map (names t) ~f:(fun n -> Edit_distance.caseless n q))
                   ~compare:Int.compare
                 |> Option.value ~default:Int.max_value
               , t ))

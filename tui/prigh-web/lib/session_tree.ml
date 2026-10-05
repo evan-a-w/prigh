@@ -14,8 +14,24 @@ let line text =
   |> Option.value_map ~default:"" ~f:String.strip
 ;;
 
+(* A skill's invocation as it was typed, not its instructions. *)
+let typed text =
+  Option.value_map
+    (Skill_message.parse text)
+    ~default:text
+    ~f:Skill_message.invocation
+;;
+
+(* A hand-over as the transcript shows it, with the error. *)
+let label text =
+  Option.value_map
+    (Handover_message.parse text)
+    ~default:(typed text)
+    ~f:(fun h -> sprintf "%s (%s)" (Handover_message.summary h) h.error)
+;;
+
 let user_line ({ text; images; at = _ } : Message.User.t) =
-  match line text, images with
+  match line (label text), images with
   | "", image :: _ -> Image.to_string_hum image
   | line, _ -> line
 ;;
@@ -57,7 +73,7 @@ let user_items entries =
 
 let user_text entries id =
   List.find_map (users entries) ~f:(fun ((entry : Entry.t), user) ->
-    Option.some_if (String.equal entry.id id) user.text)
+    Option.some_if (String.equal entry.id id) (typed user.text))
 ;;
 
 let tree_items entries ~head =

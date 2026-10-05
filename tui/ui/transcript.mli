@@ -47,6 +47,14 @@ module Item : sig
     | Compaction of string
     | Delivery of string
     (** finished background subagents' reports handed to the main agent *)
+    | Skill of
+        { skill : Skill_message.t
+        ; images : P.Image.t list
+        }
+    (** a user message invoking a skill ([/skill:NAME ARGS], expanded) *)
+    | Handover of Handover_message.t
+    (** the backend's message handing the conversation to the next fallback
+        model *)
   [@@deriving sexp_of, equal]
 end
 

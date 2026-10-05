@@ -3,7 +3,8 @@ open! Import
 
 (** The dialogs that commands open beyond the pickers: [/hotkeys],
     [/scoped-models], a path prompt ([/cd], [/host], [/export], [/import]),
-    [/rewind]'s confirmation, [/session] and text ([/state]). [None] for the
+    [/rewind]'s confirmation, [/session], text ([/state]) and an MCP
+    server's tools. [None] for the
     other dialogs. *)
 val view
   :  App.Model.t

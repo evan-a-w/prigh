@@ -388,11 +388,19 @@ let with_test_driver ~client ~(terminal : Test_terminal.t) ~writer ~reader f =
       f driver)
 ;;
 
+let connection_hello hello ~local_tools =
+  match local_tools with
+  | None -> hello @ [ "tools", `False ]
+  | Some _ ->
+    hello
+    @ [ "tools", `True
+      ; "host_id", `String (Prigh_client_unix.Tool_host.new_host_id ())
+      ]
+;;
+
 let run ~connect ~hello ~local_tools =
   let client = Client.create ~connect in
-  let hello =
-    hello @ [ ("tools", if Option.is_some local_tools then `True else `False) ]
-  in
+  let hello = connection_hello hello ~local_tools in
   match%bind.Deferred
     match%bind.Deferred Client.connect client with
     | Error _ as e -> Deferred.return e

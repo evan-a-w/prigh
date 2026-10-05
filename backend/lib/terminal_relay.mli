@@ -18,8 +18,8 @@ type t
 
 val create : unit -> t
 
-(** Relays [channel] to the host until either side closes. [send_event]
-    reaches the host client while it is connected. *)
+(** Relays [channel] to the tool host [host] (its host id) until either side
+    closes. [send_event] reaches the host client while it is connected. *)
 val serve
   :  t
   -> host:string
@@ -31,11 +31,12 @@ val serve
   -> Terminal_channel.t
   -> unit
 
-(** A [terminal_frame] request from [client], which must own the terminal. *)
-val frame : t -> client:string -> Json.t -> unit Or_error.t
+(** A [terminal_frame] request from the client that is tool host [host],
+    which must own the terminal. *)
+val frame : t -> host:string -> Json.t -> unit Or_error.t
 
-(** A [terminal_closed] request from [client]. *)
-val closed : t -> client:string -> Json.t -> unit Or_error.t
+(** A [terminal_closed] request from tool host [host]. *)
+val closed : t -> host:string -> Json.t -> unit Or_error.t
 
 (** Closes the browser side of every terminal relayed to [host]. *)
 val host_gone : t -> host:string -> unit

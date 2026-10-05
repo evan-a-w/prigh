@@ -759,6 +759,15 @@ let%expect_test "config round trip and config_changed event" =
   show
     (fun j -> Or_error.map (Config.of_json j) ~f:Config.sexp_of_t)
     {|{"default_model":3}|};
+  show
+    (fun j -> Or_error.map (Config.of_json j) ~f:Config.sexp_of_t)
+    {|{"scoped_models":[],"confirm_tools":false,"default_model":null,"default_thinking":null,"fallback_models":["openai-codex/gpt-6-sol","anthropic/claude-opus-5-5"],"default_cwd":"/srv/work"}|};
+  show
+    (fun j -> Or_error.map (Config.of_json j) ~f:Config.sexp_of_t)
+    {|{"fallback_models":"gpt-6-sol"}|};
+  show
+    (fun j -> Or_error.map (Config.of_json j) ~f:Config.sexp_of_t)
+    {|{"default_cwd":["/srv"]}|};
   print_s
     [%sexp
       (Config.to_json
@@ -766,6 +775,9 @@ let%expect_test "config round trip and config_changed event" =
          ; confirm_tools = true
          ; default_model = Some "deepseek/deepseek-flash"
          ; default_thinking = Some "max"
+         ; fallback_models =
+             [ "openai-codex/gpt-6-sol"; "deepseek/deepseek-flash" ]
+         ; default_cwd = Some "~/proj"
          }
        : Json.t)];
   decode
@@ -775,26 +787,44 @@ let%expect_test "config round trip and config_changed event" =
     ((scoped_models (anthropic/claude-fable-5-1 deepseek/deepseek-flash))
      (confirm_tools true)
      (default_model    ())
-     (default_thinking ()))
+     (default_thinking ())
+     (fallback_models  ())
+     (default_cwd      ()))
     ((scoped_models ())
      (confirm_tools false)
      (default_model    ())
-     (default_thinking ()))
+     (default_thinking ())
+     (fallback_models  ())
+     (default_cwd      ()))
     ((scoped_models ())
      (confirm_tools false)
      (default_model ())
-     (default_thinking (low)))
+     (default_thinking (low))
+     (fallback_models ())
+     (default_cwd     ()))
     (decode (e "default_model must be a string"))
+    ((scoped_models ())
+     (confirm_tools false)
+     (default_model    ())
+     (default_thinking ())
+     (fallback_models (openai-codex/gpt-6-sol anthropic/claude-opus-5-5))
+     (default_cwd (/srv/work)))
+    (decode (e "fallback_models must be an array of strings"))
+    (decode (e "default_cwd must be a string"))
     ((scoped_models (a b))
      (confirm_tools    true)
      (default_model    deepseek/deepseek-flash)
-     (default_thinking max))
+     (default_thinking max)
+     (fallback_models (openai-codex/gpt-6-sol deepseek/deepseek-flash))
+     (default_cwd ~/proj))
     (Event (
       Config_changed (
         (scoped_models (a))
         (confirm_tools false)
         (default_model    ())
-        (default_thinking ()))))
+        (default_thinking ())
+        (fallback_models  ())
+        (default_cwd      ()))))
     |}]
 ;;
 
@@ -816,11 +846,14 @@ let%expect_test "btw_delta" =
     |}]
 ;;
 
+(* With a [host_id] (the backend lists our tool host under it), that is our
+   id. *)
 let%expect_test "hello reply: client id and namespace" =
   List.iter
     [ {|{"client_id":"client-1","namespace":"lloyd","state":{}}|}
     ; {|{"client_id":"client-1","namespace":null}|}
     ; {|{"client_id":"client-1"}|}
+    ; {|{"client_id":"client-1","host_id":"host-abc"}|}
     ; {|{"namespace":"lloyd"}|}
     ; {|{"client_id":"client-1","namespace":3}|}
     ]
@@ -838,6 +871,10 @@ let%expect_test "hello reply: client id and namespace" =
       (user      ())))
     (Ok (
       (client_id client-1)
+      (namespace ())
+      (user      ())))
+    (Ok (
+      (client_id host-abc)
       (namespace ())
       (user      ())))
     (Error "missing field \"client_id\"")
@@ -881,5 +918,83 @@ let%expect_test "Json.parse agrees with Jsonaf, and says where it fails" =
     "[1] x": invalid JSON at byte 4: trailing characters
     "01": invalid JSON at byte 0: leading zero
     "\"\\q\"": invalid JSON at byte 2: bad escape
+    |}]
+;;
+
+let%expect_test "skills and MCP requests" =
+  List.iter
+    [ Request.Method.List_skills
+    ; List_mcp { reconnect = false }
+    ; List_mcp { reconnect = true }
+    ; Mcp_approve { source = "/p/.mcp.json"; server = "fs" }
+    ]
+    ~f:(fun m -> print_endline (Request.to_line (Request.create ~id:1 m)));
+  [%expect
+    {|
+    {"id":1,"method":"list_skills","params":{}}
+    {"id":1,"method":"list_mcp","params":{}}
+    {"id":1,"method":"list_mcp","params":{"reconnect":true}}
+    {"id":1,"method":"mcp_approve","params":{"source":"/p/.mcp.json","server":"fs"}}
+    |}]
+;;
+
+let%expect_test "list_skills and list_mcp results" =
+  let show of_json sexp_of json =
+    match Or_error.bind (Json.parse json) ~f:of_json with
+    | Ok v -> print_s (sexp_of v)
+    | Error e -> print_s [%message "error" (e : Error.t)]
+  in
+  show
+    (fun j -> Json.list_field j "skills" ~f:Skill.of_json)
+    [%sexp_of: Skill.t list]
+    {|{"skills":[{"name":"frontend-design","description":"Build UIs","path":"/p/.claude/skills/frontend-design/SKILL.md","model_invocable":true},{"name":"release","description":"Cut a release","path":"/h/.prigh/skills/release/SKILL.md","model_invocable":false}]}|};
+  show
+    Mcp_list.of_json
+    Mcp_list.sexp_of_t
+    {|{"servers":[{"name":"fs","source":"/p/.mcp.json","project":true,"status":"ready","tools":[{"name":"mcp__fs__read_file","description":"Read a file"}]},{"name":"gh","source":"/h/.prigh/mcp.json","project":false,"status":"failed","error":"exited 1","tools":[]},{"name":"db","source":"/p/.mcp.json","project":true,"status":"needs_approval"}],"problems":["/p/.mcp.json: server \"x\": give a \"command\" (stdio) or a \"url\" (http)"]}|};
+  show Mcp_list.of_json Mcp_list.sexp_of_t {|{"servers":[]}|};
+  show
+    Mcp_list.of_json
+    Mcp_list.sexp_of_t
+    {|{"servers":[{"name":"fs","source":"/p/.mcp.json","project":true,"status":"sleeping"}],"problems":[]}|};
+  [%expect
+    {|
+    (((name        frontend-design)
+      (description "Build UIs")
+      (path /p/.claude/skills/frontend-design/SKILL.md)
+      (model_invocable true))
+     ((name            release)
+      (description     "Cut a release")
+      (path            /h/.prigh/skills/release/SKILL.md)
+      (model_invocable false)))
+    ((servers (
+       ((name    fs)
+        (source  /p/.mcp.json)
+        (project true)
+        (status  Ready)
+        (error ())
+        (tools ((
+          (name        mcp__fs__read_file)
+          (description "Read a file")))))
+       ((name    gh)
+        (source  /h/.prigh/mcp.json)
+        (project false)
+        (status  Failed)
+        (error ("exited 1"))
+        (tools ()))
+       ((name    db)
+        (source  /p/.mcp.json)
+        (project true)
+        (status  Needs_approval)
+        (error ())
+        (tools ()))))
+     (problems (
+       "/p/.mcp.json: server \"x\": give a \"command\" (stdio) or a \"url\" (http)")))
+    ((servers  ())
+     (problems ()))
+    (error (
+      e (
+        in servers[0] (
+          "field \"status\"" "unknown MCP server status \"sleeping\""))))
     |}]
 ;;

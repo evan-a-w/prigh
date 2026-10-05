@@ -23,6 +23,9 @@ let methods =
   ; "kill_job"
   ; "job_output"
   ; "list_jobs"
+  ; "list_skills"
+  ; "list_mcp"
+  ; "mcp_approve"
   ; "shell"
   ; "get_state"
   ; "get_messages"
@@ -145,6 +148,8 @@ module Client = struct
   type t =
     { id : string
     ; seq : int
+    ; mutable host_id : string
+      (** what sessions know it by as a tool host: [hello]'s [host_id] or [id] *)
     ; mutable name : string
     ; mutable tools : bool
     ; mutable cwd : string option
@@ -174,7 +179,10 @@ type t =
   ; mutable client_seq : int
   ; mutable btw_seq : int
   ; execs : (string * Agent.t) String.Table.t
-    (** in-flight remote executions by exec id: host client id and session *)
+    (** in-flight remote executions by exec id: host id and session *)
+  ; parked_host_cwds : string String.Map.t String.Table.t
+    (** [Agent.host_cwds] of evicted sessions, by session id, for when they
+        are loaded again *)
   ; mutable login_owner : string option
     (** the client running the current login flow *)
   ; terminals : Terminal_relay.t
@@ -204,11 +212,21 @@ let maybe_evict t agent =
     && (not (Agent.is_running agent))
     && (not (Agent.has_running_background agent))
     && List.is_empty (clients_of t agent)
-  then Hashtbl.remove t.agents (session_id agent)
+  then (
+    Hashtbl.remove t.agents (session_id agent);
+    let cwds = Agent.host_cwds agent in
+    if not (Map.is_empty cwds)
+    then Hashtbl.set t.parked_host_cwds ~key:(session_id agent) ~data:cwds)
+;;
+
+(* The tool host clients are few: a scan is fine. *)
+let host_client t host_id =
+  List.find (Hashtbl.data t.clients) ~f:(fun (c : Client.t) ->
+    c.tools && String.equal c.host_id host_id)
 ;;
 
 let host_of (client : Client.t) =
-  { Agent.Host.id = client.id
+  { Agent.Host.id = client.host_id
   ; name = client.name
   ; cwd = Option.value client.cwd ~default:(Agent.state client.agent).cwd
   ; session_id = Some (session_id client.agent)
@@ -242,10 +260,10 @@ let route t agent (event : Agent.Event.t) =
   (match event with
    | Tool_exec { host; exec_id; _ } ->
      Hashtbl.set t.execs ~key:exec_id ~data:(host, agent);
-     Option.iter (Hashtbl.find t.clients host) ~f:(fun c -> c.send json)
+     Option.iter (host_client t host) ~f:(fun c -> c.send json)
    | Tool_exec_cancel { host; exec_id } ->
      Hashtbl.remove t.execs exec_id;
-     Option.iter (Hashtbl.find t.clients host) ~f:(fun c -> c.send json)
+     Option.iter (host_client t host) ~f:(fun c -> c.send json)
    | _ -> List.iter (clients_of t agent) ~f:(fun c -> c.send json));
   match event with
   | State_changed { running; _ } ->
@@ -259,6 +277,9 @@ let route t agent (event : Agent.Event.t) =
 (* Hosts are set before subscribing: the state change would otherwise evict
    the agent, which has no client until [attach]. *)
 let register t agent =
+  Option.iter
+    (Hashtbl.find_and_remove t.parked_host_cwds (session_id agent))
+    ~f:(Agent.restore_host_cwds agent);
   Agent.set_hosts agent (hosts t);
   Hashtbl.set t.agents ~key:(session_id agent) ~data:agent;
   Agent.subscribe agent ~f:(route t agent);
@@ -292,6 +313,7 @@ let create
     ; client_seq = 0
     ; btw_seq = 0
     ; execs = String.Table.create ()
+    ; parked_host_cwds = String.Table.create ()
     ; login_owner = None
     ; terminals = Terminal_relay.create ()
     }
@@ -322,7 +344,7 @@ let attach t (client : Client.t) agent =
     client.agent <- agent;
     maybe_evict t previous);
   publish_hosts t;
-  if client.tools then Agent.prefer_host agent client.id
+  if client.tools then Agent.prefer_host agent client.host_id
 ;;
 
 let fresh_agent t = register t (t.new_agent ~cwd:t.cwd ())
@@ -337,6 +359,7 @@ let connect ?signed_in t ~send =
   let client =
     { Client.id = sprintf "client-%d" t.client_seq
     ; seq = t.client_seq
+    ; host_id = sprintf "client-%d" t.client_seq
     ; name = sprintf "client-%d" t.client_seq
     ; tools = false
     ; cwd = None
@@ -356,9 +379,9 @@ let disconnect t (client : Client.t) =
   Hashtbl.remove t.clients client.id;
   Hashtbl.iter client.btws ~f:Cancellation.cancel;
   Hashtbl.filter_inplace t.execs ~f:(fun (host, _) ->
-    not (String.equal host client.id));
+    not (String.equal host client.host_id));
   if client.tools then publish_hosts t;
-  Terminal_relay.host_gone t.terminals ~host:client.id;
+  Terminal_relay.host_gone t.terminals ~host:client.host_id;
   maybe_evict t client.agent
 ;;
 
@@ -459,18 +482,17 @@ let terminal_target t ~session =
      | Some host when String.equal host.id Agent.Host.backend_id ->
        `Backend host.cwd
      | Some host ->
-       (match Hashtbl.find t.clients active with
-        | Some client when client.tools -> `Host (active, host.cwd)
-        | _ -> `Unavailable (sprintf "the tool host %S is not connected" active))
-     | None when String.is_empty active -> `Unavailable "no tool host connected"
-     | None -> `Unavailable (sprintf "the tool host %S is not connected" active))
+       (match host_client t active with
+        | Some _ -> `Host (active, host.cwd)
+        | None -> `Unavailable (Agent.host_unavailable_message agent))
+     | None -> `Unavailable (Agent.host_unavailable_message agent))
 ;;
 
 let relay_terminal t ~host ~key ~cwd ~cols ~rows channel =
   let send_event json =
-    Option.iter (Hashtbl.find t.clients host) ~f:(fun c -> c.send json)
+    Option.iter (host_client t host) ~f:(fun c -> c.send json)
   in
-  if Hashtbl.mem t.clients host
+  if Option.is_some (host_client t host)
   then
     Terminal_relay.serve
       t.terminals
@@ -489,6 +511,47 @@ let relay_terminal t ~host ~key ~cwd ~cols ~rows channel =
              [ "type", `String "error"
              ; "message", `String "the tool host disconnected"
              ]))
+;;
+
+(* Fails what is in flight on [client] as the host it is now. *)
+let release_host_id t (client : Client.t) =
+  let execs =
+    Hashtbl.filter t.execs ~f:(fun (host, _) ->
+      String.equal host client.host_id)
+  in
+  Hashtbl.iteri execs ~f:(fun ~key:exec_id ~data:(_, agent) ->
+    Hashtbl.remove t.execs exec_id;
+    ignore
+      (Agent.tool_exec_result
+         agent
+         ~exec_id
+         (Tool.Result.error "[tool host reconnected]")
+       : unit Or_error.t));
+  Terminal_relay.host_gone t.terminals ~host:client.host_id
+;;
+
+(* A tool host names itself with [host_id], the same on every connection of
+   its process, so that sessions on it resume when it reconnects. The newest
+   connection owns the id: an older one still holding it is one the host
+   gave up on (the backend may notice a dropped connection late), so it is
+   demoted to its client id, failing what was in flight on it. *)
+let claim_host_id t (client : Client.t) host_id =
+  if String.equal host_id client.host_id
+  then Ok ()
+  else if
+    String.is_empty host_id
+    || String.equal host_id Agent.Host.backend_id
+    || String.is_prefix host_id ~prefix:"client-"
+  then Or_error.errorf "param \"host_id\": %S is reserved" host_id
+  else (
+    release_host_id t client;
+    Hashtbl.iter t.clients ~f:(fun (other : Client.t) ->
+      if String.equal other.host_id host_id
+      then (
+        release_host_id t other;
+        other.host_id <- other.id));
+    client.host_id <- host_id;
+    Ok ())
 ;;
 
 let hello t (client : Client.t) params =
@@ -520,28 +583,35 @@ let hello t (client : Client.t) params =
       | `String cwd -> client.cwd <- Some cwd
       | _ -> ());
     Or_error.bind (bool_param params "tools" ~default:false) ~f:(fun tools ->
-      client.tools <- tools;
-      let agent =
-        match param params "session" with
-        | Some (`String key) -> find_agent t key
-        | _ -> Ok client.agent
+      let claimed =
+        match string "host_id" with
+        | Some host_id when tools -> claim_host_id t client host_id
+        | _ -> Ok ()
       in
-      Or_error.map agent ~f:(fun agent ->
-        attach t client agent;
-        `Object
-          [ "client_id", `String client.id
-          ; ( "namespace"
-            , Option.value_map t.namespace ~default:`Null ~f:(fun n ->
-                `String n) )
-          ; ( "user"
-            , Option.value_map client.signed_in ~default:`Null ~f:(fun s ->
-                `String s.user) )
-          ; ( "superuser"
-            , if Option.exists client.signed_in ~f:(fun s -> s.superuser)
-              then `True
-              else `False )
-          ; "state", Rpc_json.state (Agent.state agent)
-          ])))
+      Or_error.bind claimed ~f:(fun () ->
+        client.tools <- tools;
+        let agent =
+          match param params "session" with
+          | Some (`String key) -> find_agent t key
+          | _ -> Ok client.agent
+        in
+        Or_error.map agent ~f:(fun agent ->
+          attach t client agent;
+          `Object
+            [ "client_id", `String client.id
+            ; "host_id", `String client.host_id
+            ; ( "namespace"
+              , Option.value_map t.namespace ~default:`Null ~f:(fun n ->
+                  `String n) )
+            ; ( "user"
+              , Option.value_map client.signed_in ~default:`Null ~f:(fun s ->
+                  `String s.user) )
+            ; ( "superuser"
+              , if Option.exists client.signed_in ~f:(fun s -> s.superuser)
+                then `True
+                else `False )
+            ; "state", Rpc_json.state (Agent.state agent)
+            ]))))
 ;;
 
 let list_sessions t =
@@ -670,10 +740,12 @@ let dispatch_server t (client : Client.t) ~meth ~params
            [ ("cancelled", if Option.is_some found then `True else `False) ]))
   | "terminal_frame" ->
     Some
-      (unit_result (Terminal_relay.frame t.terminals ~client:client.id params))
+      (unit_result
+         (Terminal_relay.frame t.terminals ~host:client.host_id params))
   | "terminal_closed" ->
     Some
-      (unit_result (Terminal_relay.closed t.terminals ~client:client.id params))
+      (unit_result
+         (Terminal_relay.closed t.terminals ~host:client.host_id params))
   | "new_session" ->
     let cwd = (Agent.state agent).cwd in
     new_agent_for t client (Session.create ~dir:t.sessions_dir ~cwd ());
@@ -771,12 +843,25 @@ let dispatch agent login ~meth ~params : Json.t Or_error.t =
     let%bind images = images_param ~env:(Agent.env agent) params in
     (match meth with
      | "prompt" -> unit_result (Agent.prompt ~attachments ~images agent text)
-     | "steer" ->
-       Agent.steer ~attachments ~images agent text;
-       empty
-     | _ ->
-       Agent.follow_up ~attachments ~images agent text;
-       empty)
+     | "steer" -> unit_result (Agent.steer ~attachments ~images agent text)
+     | _ -> unit_result (Agent.follow_up ~attachments ~images agent text))
+  | "list_skills" ->
+    Or_error.map (Agent.skills agent) ~f:(fun skills ->
+      `Object [ "skills", `Array (List.map skills ~f:[%jsonaf_of: Skill.t]) ])
+  | "list_mcp" ->
+    Or_error.bind
+      (bool_param params "reconnect" ~default:false)
+      ~f:(fun reconnect ->
+        Or_error.map
+          (Agent.mcp_servers ~reconnect agent)
+          ~f:Mcp_tools.Listing.to_rpc_json)
+  | "mcp_approve" ->
+    let open Or_error.Let_syntax in
+    let%bind source = string_param params "source" in
+    let%bind server = string_param params "server" in
+    Or_error.map
+      (Agent.approve_mcp agent ~source ~server)
+      ~f:Mcp_tools.Listing.to_rpc_json
   | "abort" ->
     let restored = Agent.abort agent in
     ok
@@ -934,6 +1019,17 @@ let dispatch agent login ~meth ~params : Json.t Or_error.t =
     (match param params "config" with
      | None -> Or_error.error_string "missing param \"config\""
      | Some json ->
+       (* Fields left out keep their values, so a frontend that does not know
+          a field cannot reset it. *)
+       let json =
+         match Config.to_json (Agent.config agent), json with
+         | `Object current, `Object given ->
+           `Object
+             (List.filter current ~f:(fun (k, _) ->
+                not (List.Assoc.mem given ~equal:String.equal k))
+              @ given)
+         | _, json -> json
+       in
        Or_error.bind (Config.of_json json) ~f:(fun config ->
          Or_error.map (Agent.set_config agent config) ~f:(fun () ->
            Config.to_json (Agent.config agent))))

@@ -44,13 +44,24 @@ module Item = struct
     | Block of Content.t
     | Compaction of string
     | Delivery of string
+    | Skill of
+        { skill : Skill_message.t
+        ; images : P.Image.t list
+        }
+    | Handover of Handover_message.t
   [@@deriving sexp_of, equal]
 end
 
 let user_item (user : P.Message.User.t) : Item.t =
   if Option.is_some (Delivery.parse user.text)
   then Delivery user.text
-  else User user
+  else (
+    match Skill_message.parse user.text with
+    | Some skill -> Skill { skill; images = user.images }
+    | None ->
+      (match Handover_message.parse user.text with
+       | Some handover -> Handover handover
+       | None -> User user))
 ;;
 
 module Stream_kind = struct
@@ -689,17 +700,55 @@ let render_subagent ~(verbosity : Verbosity.t) (s : Subagent.t) : Content.t =
                (Option.value s.report ~default:"")))
 ;;
 
+let user_prompt = "> "
+let user_prompt_style = Style.bold (Style.fg Green)
+
+let render_user text images : Content.t =
+  let line text style : Content.Line.t =
+    [ { Content.Span.text = user_prompt; style = user_prompt_style }
+    ; { text; style }
+    ]
+  in
+  List.map (String.split_lines text) ~f:(fun l ->
+    line l (Style.bold Style.plain))
+  @ List.map images ~f:(fun image -> line (P.Image.to_string_hum image) cyan)
+;;
+
+(* The skill's file is long and the user did not type it: a header stands for
+   it, and only verbose mode shows it. *)
+let render_skill (skill : Skill_message.t) images ~(verbosity : Verbosity.t)
+  : Content.t
+  =
+  let header : Content.Line.t =
+    [ { Content.Span.text = user_prompt; style = user_prompt_style }
+    ; { text = "skill "; style = magenta }
+    ; { text = skill.name; style = Style.bold magenta }
+    ]
+  in
+  let header, body =
+    match verbosity with
+    | Quiet | Normal -> header, []
+    | Verbose ->
+      ( header @ [ { text = "  " ^ skill.location; style = dim } ]
+      , List.map (String.split_lines skill.body) ~f:(fun line ->
+          Content.Line.of_string ~style:dim ("  " ^ line)) )
+  in
+  (header :: body) @ render_user skill.args images
+;;
+
 let render_item (item : Item.t) ~(verbosity : Verbosity.t) : Content.t =
   match item with
-  | User { text; images; at = _ } ->
-    let line text style : Content.Line.t =
-      [ { Content.Span.text = "> "; style = Style.bold (Style.fg Green) }
-      ; { text; style }
-      ]
+  | User { text; images; at = _ } -> render_user text images
+  | Skill { skill; images } -> render_skill skill images ~verbosity
+  | Handover handover ->
+    let header : Content.Span.t =
+      { text = Handover_message.summary handover; style = magenta }
     in
-    List.map (String.split_lines text) ~f:(fun l ->
-      line l (Style.bold Style.plain))
-    @ List.map images ~f:(fun image -> line (P.Image.to_string_hum image) cyan)
+    (* The failed reply above it already shows the error. *)
+    (match verbosity with
+     | Quiet | Normal -> [ [ header ] ]
+     | Verbose ->
+       [ [ header; { text = sprintf " (%s)" handover.error; style = dim } ] ])
   | Assistant { text; final } ->
     (match verbosity with
      | Quiet when not final ->
@@ -811,7 +860,7 @@ let user_message_lines t ~width ~verbosity : int list =
     | item :: rest ->
       let acc =
         match item with
-        | Item.User _ -> offset :: acc
+        | Item.User _ | Item.Skill _ -> offset :: acc
         | _ -> acc
       in
       let count =

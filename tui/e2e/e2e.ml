@@ -474,6 +474,74 @@ let main () =
         print_endline "btw backend exited";
        return ()
     in
+    (* Fallback chain and default directory through set_config, then a run
+       whose model's usage runs out hands over to the next one. *)
+    let handover_script = Filename.concat tmp "handover.json" in
+    Out_channel.write_all
+      handover_script
+      ~data:
+        {|[
+  {"text":"","stop_reason":"error","error":"HTTP 429: The usage limit has been reached (usage limit reached)"},
+  {"text":"carried on"}
+]|};
+    let%bind () =
+      let client =
+        Client.create
+          ~connect:
+            (spawn
+               [ "serve"
+               ; "-faux-script"
+               ; handover_script
+               ; "-auth-file"
+               ; Filename.concat tmp "auth6.json"
+               ; "-cwd"
+               ; tmp
+               ; "-model"
+               ; "deepseek/deepseek-flash"
+               ])
+      in
+      match%bind Client.connect client with
+      | Error e ->
+        print_s [%message "cannot start fallback backend" (e : Error.t)];
+        return ()
+      | Ok () ->
+        let set_config fields =
+          match%map
+            Client.call client "set_config" [ "config", `Object fields ]
+          with
+          | Ok json ->
+            show
+              "<- set_config"
+              [%sexp (Config.of_json json : Config.t Or_error.t)]
+          | Error e ->
+            show "<- set_config ERROR" [%sexp (Error.to_string_hum e : string)]
+        in
+        let%bind () =
+          set_config
+            [ ( "fallback_models"
+              , `Array
+                  [ Json.str "deepseek-flash"; Json.str "Claude Fable 5.1" ] )
+            ; "default_cwd", Json.str tmp
+            ]
+        in
+        let%bind () =
+          set_config [ "fallback_models", `Array [ Json.str "gpt-9" ] ]
+        in
+        let%bind () = set_config [ "default_cwd", `Null ] in
+        let%bind () = call client "prompt" [ "text", Json.str "fix the bug" ] in
+        (* A hand-over goes straight into the next run: the first idle
+           state is the end. *)
+        let%bind () =
+          with_deadline
+            "fallback"
+            (drain client ~stop:(function
+               | State { running = false; _ } -> true
+               | _ -> false))
+        in
+        let%bind () = Client.close client in
+        print_endline "fallback backend exited";
+        return ()
+    in
     (* Images: a prompt's own, an attached image file, and [read] on one;
        the model sees them and the messages carry them back. *)
     Out_channel.write_all

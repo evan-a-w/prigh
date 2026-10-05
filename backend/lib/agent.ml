@@ -4,6 +4,7 @@ open! Import
 module Queued = struct
   type t =
     { text : string
+    ; skill : string option
     ; attachments : string list
     ; images : Image.t list
     }
@@ -139,9 +140,11 @@ type t =
   ; mutable hosts : Host.t list
     (** every connected client able to run tools, set by the server *)
   ; host_cwds : string String.Table.t
-    (** where this session last was on each host, overriding [Host.cwd] *)
+    (** where this session last was on each client host, connected or not,
+        overriding [Host.cwd] *)
   ; mutable backend_cwd : string (** the backend host's own cwd *)
   ; mutable active_host : string
+  ; mutable active_host_name : string (** as last seen, for when it is gone *)
   ; mutable host_pinned : bool (** chosen explicitly via [set_active_host] *)
   ; pending_execs : Pending_exec.t String.Table.t
   ; mutable exec_seq : int
@@ -149,6 +152,11 @@ type t =
     (** cwd/host changes not yet told to the model, oldest first *)
   ; background : Background_tasks.t
   ; subagent_log : Subagent_log.t
+  ; mcp : Mcp_hub.t option
+    (** the backend's own servers; [None] turns MCP off on every host *)
+  ; mutable mcp_tools : Tool.t list (** as of the latest run's start *)
+  ; mutable mcp_noticed : String.Set.t
+    (** MCP problems already reported, so each is told once *)
   }
 
 let restore_settings t =
@@ -253,10 +261,40 @@ let queue_update t =
 
 let config t = t.config
 
-let set_config t config =
-  Or_error.map (Config.save ~home:t.home config) ~f:(fun () ->
-    t.config <- config;
-    broadcast t (Config_changed config))
+(* Fallback models are stored as keys, so a name or prefix that resolves
+   now keeps meaning the same model. *)
+let set_config t (config : Config.t) =
+  let open Or_error.Let_syntax in
+  let%bind fallback_models =
+    List.map config.fallback_models ~f:(fun name ->
+      Model_registry.resolve t.models name
+      |> Or_error.map ~f:Model.key
+      |> Result.map_error ~f:(fun e ->
+        Error.createf "fallback_models: %s" (Error.to_string_hum e)))
+    |> Or_error.all
+  in
+  let config =
+    { config with
+      fallback_models =
+        List.stable_dedup fallback_models ~compare:String.compare
+    }
+  in
+  let%bind () =
+    match config.default_cwd with
+    | Some dir when not (Filename.is_absolute (Tool.expand_home dir)) ->
+      Or_error.errorf "default_cwd: %s must be absolute (or start with ~/)" dir
+    | Some dir
+      when t.backend_host_enabled
+           && not (Sys_unix.is_directory_exn (Tool.expand_home dir)) ->
+      Or_error.errorf
+        "default_cwd: %s is not a directory on the backend (%s)"
+        dir
+        (Core_unix.gethostname ())
+    | Some _ | None -> Ok ()
+  in
+  let%map () = Config.save ~home:t.home config in
+  t.config <- config;
+  broadcast t (Config_changed config)
 ;;
 
 let save_as_default t =
@@ -341,42 +379,78 @@ let activate_host t (host : Host.t) ~cwd =
   if not (String.equal t.active_host host.id)
   then add_environment_note t (System_prompt.host_changed_note ~host:host.name);
   t.active_host <- host.id;
+  t.active_host_name <- host.name;
   set_host_cwd t host ~cwd;
   broadcast t (Notice (sprintf "tools now run on %s in %s" host.name cwd));
   state_changed t
 ;;
 
-(* Without the backend there is nothing to fall back on, so a session whose
-   host is gone adopts the first connected one. *)
+let no_host_message =
+  "no tool host connected: connect one with `prigh tool-host -connect ...` or \
+   a TUI, then pick it with /host"
+;;
+
+let host_unavailable_message t =
+  if String.is_empty t.active_host
+  then no_host_message
+  else
+    sprintf
+      "waiting for tool host %S to reconnect; /host picks another"
+      t.active_host_name
+;;
+
+(* A session stays on its host when the host goes away, and resumes there,
+   in the same cwd, when it comes back: only [set_active_host] moves it.
+   Without the backend host, a session that never had a host adopts the
+   first one that connects. *)
 let set_hosts t clients =
   if not (List.equal Host.equal t.hosts clients)
   then (
+    let was_connected = active_host_connected t in
     let gone =
       List.filter t.hosts ~f:(fun h ->
         not (List.exists clients ~f:(fun h' -> String.equal h.id h'.id)))
     in
     t.hosts <- clients;
     List.iter gone ~f:(fun h ->
-      Hashtbl.remove t.host_cwds h.id;
       fail_execs t ~host:h.id ~text:"[tool host disconnected]");
-    match List.hd (hosts t) with
-    | Some host
-      when (not t.backend_host_enabled) && not (active_host_connected t) ->
+    match find_host t t.active_host, List.hd (hosts t) with
+    | None, Some host when String.is_empty t.active_host ->
       activate_host t host ~cwd:host.cwd
-    | _ -> state_changed t)
+    | Some host, _ when not was_connected ->
+      t.active_host_name <- host.name;
+      set_host_cwd t host ~cwd:host.cwd;
+      broadcast
+        t
+        (Notice (sprintf "tools run on %s again in %s" host.name t.cwd));
+      state_changed t
+    | Some host, _ ->
+      t.active_host_name <- host.name;
+      state_changed t
+    | None, _ ->
+      if was_connected then broadcast t (Notice (host_unavailable_message t));
+      state_changed t)
 ;;
 
-(* Tools default to the frontend: a host attaching takes over unless the user
-   pinned a host that is still connected. *)
+(* Tools default to the frontend: a host attaching takes over a session that
+   runs on the backend by default or has no host yet, never one whose host is
+   only disconnected. *)
 let prefer_host t id =
   match find_host t id with
   | None -> ()
   | Some host ->
     let take_over =
-      (not (active_host_connected t))
+      String.is_empty t.active_host
       || ((not t.host_pinned) && String.equal t.active_host Host.backend_id)
     in
     if take_over then activate_host t host ~cwd:host.cwd
+;;
+
+let host_cwds t = String.Map.of_hashtbl_exn t.host_cwds
+
+let restore_host_cwds t cwds =
+  Map.iteri cwds ~f:(fun ~key ~data ->
+    if not (Hashtbl.mem t.host_cwds key) then Hashtbl.set t.host_cwds ~key ~data)
 ;;
 
 let tool_exec_output t ~exec_id ~chunk =
@@ -411,7 +485,15 @@ let host_exec_on
       ~arguments
   =
   if String.equal host.id Host.backend_id && t.backend_host_enabled
-  then Host_ops.execute ~env:t.env ~cancel ~on_output ~cwd ~name ~arguments
+  then
+    Host_ops.execute
+      ~mcp:t.mcp
+      ~env:t.env
+      ~cancel
+      ~on_output
+      ~cwd
+      ~name
+      ~arguments
   else (
     let exec_id =
       sprintf "%s/%s-%d" (Session.id t.session) call_id t.exec_seq
@@ -433,19 +515,9 @@ let host_exec_on
       Tool.Result.error "[cancelled]")
 ;;
 
-let no_host_message =
-  "no tool host connected: connect one with `prigh tool-host -connect ...` or \
-   a TUI, then pick it with /host"
-;;
-
 let host_exec t ~cancel ~on_output ~call_id ~cwd ~name ~arguments =
   match find_host t t.active_host with
-  | None when List.is_empty (hosts t) -> Tool.Result.error no_host_message
-  | None ->
-    Tool.Result.error
-      (sprintf
-         "tool host %S is not connected; use set_active_host to pick another"
-         t.active_host)
+  | None -> Tool.Result.error (host_unavailable_message t)
   | Some host ->
     host_exec_on t host ~cancel ~on_output ~call_id ~cwd ~name ~arguments
 ;;
@@ -472,6 +544,8 @@ let set_active_host t id ~cwd =
   match find_host t id with
   | None when String.equal id Host.backend_id && not t.backend_host_enabled ->
     Or_error.error_string "the backend tool host is disabled"
+  | None when String.equal id t.active_host ->
+    Or_error.error_string (host_unavailable_message t)
   | None -> Or_error.errorf "unknown tool host %S" id
   | Some host ->
     let cwd =
@@ -518,15 +592,130 @@ let instructions t ~cwd =
 (* Built once per conversation and recorded in the session, so the prompt
    prefix stays cacheable; later cwd/host changes reach the model as notes on
    the next user message instead. *)
+let tools t = t.tools @ t.mcp_tools
+
 let build_system_prompt t =
-  let { Host_ops.Instructions.files; nix } = instructions t ~cwd:t.cwd in
+  let { Host_ops.Instructions.files; nix; skills } =
+    instructions t ~cwd:t.cwd
+  in
   System_prompt.build
     ~instructions:files
     ~nix
+    ~skills
     ~cwd:t.cwd
     ~home:t.home
-    ~tools:(Tools.specs t.tools)
+    ~tools:(Tools.specs (tools t))
     ()
+;;
+
+let skills t =
+  let result =
+    host_exec
+      t
+      ~cancel:Cancellation.never
+      ~on_output:ignore
+      ~call_id:"skills"
+      ~cwd:t.cwd
+      ~name:Host_ops.instructions_op
+      ~arguments:(Host_ops.instructions_args ~home:t.home)
+  in
+  if result.is_error
+  then Error (Error.of_string result.text)
+  else Ok (Host_ops.instructions_of_result result).skills
+;;
+
+(* [/skill:NAME ARGS] becomes the skill's file plus ARGS; other texts are
+   sent as they are. *)
+let expand_skill t text =
+  match Skill.invocation text with
+  | None -> Ok None
+  | Some (name, args) ->
+    Host_ops.skill_of_result
+      (host_exec
+         t
+         ~cancel:Cancellation.never
+         ~on_output:ignore
+         ~call_id:"skill"
+         ~cwd:t.cwd
+         ~name:Host_ops.skill_op
+         ~arguments:(Host_ops.skill_args ~home:t.home name))
+    |> Or_error.map ~f:(fun (skill, body) ->
+      Some (Skill.expand skill ~body ~args))
+;;
+
+let mcp_exec t ?(cancel = Cancellation.never) ~call_id name arguments =
+  Host_ops.listing_of_result
+    (host_exec t ~cancel ~on_output:ignore ~call_id ~cwd:t.cwd ~name ~arguments)
+;;
+
+let mcp_call t (context : Tool.Context.t) ~source ~server ~tool arguments =
+  host_exec
+    t
+    ~cancel:context.cancel
+    ~on_output:context.on_output
+    ~call_id:context.call_id
+    ~cwd:context.cwd
+    ~name:Host_ops.mcp_call_op
+    ~arguments:
+      (Host_ops.mcp_call_args ~home:t.home ~source ~server ~tool arguments)
+;;
+
+let use_listing t (listing : Mcp_tools.Listing.t) =
+  t.mcp_tools <- Mcp_tools.tools listing ~call:(mcp_call t);
+  List.iter (Mcp_tools.Listing.notices listing) ~f:(fun notice ->
+    if not (Set.mem t.mcp_noticed notice)
+    then (
+      t.mcp_noticed <- Set.add t.mcp_noticed notice;
+      broadcast t (Notice notice)))
+;;
+
+(* The host's MCP servers as of now. A host that cannot tell (an older
+   tool host, none connected) has none. *)
+let refresh_mcp t ~cancel =
+  if Option.is_some t.mcp
+  then (
+    match
+      mcp_exec
+        t
+        ~cancel
+        ~call_id:"mcp"
+        Host_ops.mcp_servers_op
+        (Host_ops.mcp_servers_args ~home:t.home ~reconnect:false)
+    with
+    | Ok listing -> use_listing t listing
+    | Error _ -> t.mcp_tools <- [])
+;;
+
+let mcp_disabled = "MCP is off in this backend (it was started with -no-tools)"
+
+let mcp_servers ?(reconnect = false) t =
+  if Option.is_none t.mcp
+  then Or_error.error_string mcp_disabled
+  else
+    Or_error.map
+      (mcp_exec
+         t
+         ~call_id:"mcp"
+         Host_ops.mcp_servers_op
+         (Host_ops.mcp_servers_args ~home:t.home ~reconnect))
+      ~f:(fun listing ->
+        use_listing t listing;
+        listing)
+;;
+
+let approve_mcp t ~source ~server =
+  if Option.is_none t.mcp
+  then Or_error.error_string mcp_disabled
+  else
+    Or_error.map
+      (mcp_exec
+         t
+         ~call_id:"mcp"
+         Host_ops.mcp_approve_op
+         (Host_ops.mcp_approve_args ~home:t.home ~source ~server))
+      ~f:(fun listing ->
+        use_listing t listing;
+        listing)
 ;;
 
 let system_prompt t =
@@ -542,7 +731,7 @@ let loop_config t =
   { Agent_loop.Config.model = t.model
   ; thinking = t.thinking
   ; system = Some (system_prompt t)
-  ; tools = t.tools
+  ; tools = tools t
   ; max_turns = None
   ; max_tokens = None
   ; retries = Agent_loop.Config.default_retries
@@ -581,7 +770,8 @@ let with_attachments t text attachments =
 ;;
 
 let user_message t (q : Queued.t) =
-  let text, attached = with_attachments t q.text q.attachments in
+  let text = Option.value q.skill ~default:q.text in
+  let text, attached = with_attachments t text q.attachments in
   let text =
     match t.environment_notes with
     | [] -> text
@@ -606,8 +796,57 @@ let deliveries t =
   | tasks -> [ Background_tasks.delivery_message tasks ]
 ;;
 
-(* Finished background tasks not delivered yet go first. *)
-let rec start_run t prompts =
+let set_model t model =
+  t.model <- model;
+  ignore
+    (Session.set_model t.session ~model:(Model.key model) ~thinking:t.thinking
+     : Session.Entry.t);
+  state_changed t
+;;
+
+(* The model to continue with when [model] cannot be used: the next one in
+   [fallback_models] after it (or the first, if it is not listed) that this
+   hand-over chain has not tried yet. *)
+let next_model t ~tried =
+  let chain = t.config.fallback_models in
+  let after =
+    match
+      List.findi chain ~f:(fun _ key ->
+        match Model_registry.find t.models key with
+        | Some m -> String.equal (Model.key m) (Model.key t.model)
+        | None -> false)
+    with
+    | Some (i, _) -> List.drop chain (i + 1)
+    | None -> chain
+  in
+  List.find_map after ~f:(fun key ->
+    match Model_registry.find t.models key with
+    | Some m when not (Set.mem tried (Model.key m)) -> Some m
+    | Some _ | None -> None)
+;;
+
+let unavailable_error added =
+  List.find_map (List.rev added) ~f:(function
+    | Message.Assistant { stop_reason = Error message; _ }
+      when Usage_limit.unavailable message -> Some message
+    | Message.Assistant _ -> Some ""
+    | User _ | Tool_result _ -> None)
+  |> Option.filter ~f:(Fn.non String.is_empty)
+;;
+
+let handover_message ~from ~(to_ : Model.t) ~error =
+  Message.user
+    (sprintf
+       "[prigh: %s cannot continue (%s), so %s takes over this conversation \
+        from here. Carry on with the task where it left off.]"
+       from
+       error
+       (Model.key to_))
+;;
+
+(* Finished background tasks not delivered yet go first. [tried] are the
+   models a hand-over chain has used so far (empty for a user's prompt). *)
+let rec start_run ?(tried = String.Set.empty) t prompts =
   t.git_branch <- find_branch t ~cwd:t.cwd;
   let cancel = Cancellation.create () in
   let finished, resolve = Promise.create () in
@@ -616,42 +855,77 @@ let rec start_run t prompts =
   state_changed t;
   Fiber.fork ~sw:t.sw (fun () ->
     let session = t.session in
-    let finish () =
+    let finish ~idle =
       t.run <- None;
       Promise.resolve resolve ();
-      state_changed t
+      if idle then state_changed t
     in
-    (match
-       Agent_loop.run
-         ~env:t.env
-         ~provider:t.provider
-         ~config:(loop_config t)
-         ~cwd:t.cwd
-         ~cancel
-         ~confirm:(confirm_hook t cancel)
-         ~execute:(executor t)
-         ~background:t.background
-         ~steer:(fun () ->
-           let l = Queue.to_list t.steer_queue in
-           if not (List.is_empty l)
-           then (
-             Queue.clear t.steer_queue;
-             queue_update t);
-           deliveries t @ List.map l ~f:(user_message t))
-         ~emit:(fun event ->
-           account_subagent t event;
-           (match event with
-            | Message_end m ->
-              ignore (Session.append_message session m : Session.Entry.t)
-            | _ -> ());
-           broadcast t (Loop event))
-         ~context:(Session.messages session)
-         ~prompts
-         ()
-     with
-     | (_ : Message.t list) -> ()
-     | exception exn ->
-       broadcast t (Notice ("run failed: " ^ Exn.to_string exn)));
+    refresh_mcp t ~cancel;
+    let added =
+      match
+        Agent_loop.run
+          ~env:t.env
+          ~provider:t.provider
+          ~config:(loop_config t)
+          ~cwd:t.cwd
+          ~cancel
+          ~confirm:(confirm_hook t cancel)
+          ~execute:(executor t)
+          ~background:t.background
+          ~steer:(fun () ->
+            let l = Queue.to_list t.steer_queue in
+            if not (List.is_empty l)
+            then (
+              Queue.clear t.steer_queue;
+              queue_update t);
+            deliveries t @ List.map l ~f:(user_message t))
+          ~emit:(fun event ->
+            account_subagent t event;
+            (match event with
+             | Message_end m ->
+               ignore (Session.append_message session m : Session.Entry.t)
+             | _ -> ());
+            broadcast t (Loop event))
+          ~context:(Session.messages session)
+          ~prompts
+          ()
+      with
+      | added -> added
+      | exception exn ->
+        broadcast t (Notice ("run failed: " ^ Exn.to_string exn));
+        []
+    in
+    let tried = Set.add tried (Model.key t.model) in
+    let handover =
+      if Cancellation.is_cancelled cancel || not (phys_equal session t.session)
+      then None
+      else
+        Option.bind (unavailable_error added) ~f:(fun error ->
+          match next_model t ~tried with
+          | None ->
+            if not (List.is_empty t.config.fallback_models)
+            then
+              broadcast
+                t
+                (Notice
+                   (sprintf
+                      "%s cannot continue and no model in fallback_models is \
+                       left to hand over to; /model picks another"
+                      (Model.key t.model)));
+            None
+          | Some next ->
+            let from = Model.key t.model in
+            broadcast
+              t
+              (Notice
+                 (sprintf
+                    "%s: %s; handing over to %s"
+                    from
+                    error
+                    (Model.key next)));
+            set_model t next;
+            Some [ handover_message ~from ~to_:next ~error ])
+    in
     (* Steering messages that arrived after the last turn boundary go
        first: they were sent before any follow-up still queued. *)
     if not (Queue.is_empty t.steer_queue)
@@ -663,19 +937,30 @@ let rec start_run t prompts =
     (* After an abort, finished tasks wait for the next prompt (or the next
        one to finish) rather than restarting the run at once. *)
     let next =
-      match Queue.dequeue t.follow_up_queue with
-      | Some queued ->
-        queue_update t;
-        Some [ user_message t queued ]
+      match handover with
+      | Some prompts -> Some (`Handover prompts)
       | None ->
-        if
-          Background_tasks.has_undelivered t.background
-          && not (Cancellation.is_cancelled cancel)
-        then Some []
-        else None
+        (match Queue.dequeue t.follow_up_queue with
+         | Some queued ->
+           queue_update t;
+           Some (`Prompts [ user_message t queued ])
+         | None ->
+           if
+             Background_tasks.has_undelivered t.background
+             && not (Cancellation.is_cancelled cancel)
+           then Some (`Prompts [])
+           else None)
     in
-    finish ();
-    Option.iter next ~f:(start_run t);
+    (* A hand-over carries on the same task: the run's next state says
+       [running] again, with no idle moment in between. *)
+    finish
+      ~idle:
+        (match next with
+         | Some (`Handover _) -> false
+         | Some (`Prompts _) | None -> true);
+    Option.iter next ~f:(function
+      | `Handover prompts -> start_run ~tried t prompts
+      | `Prompts prompts -> start_run t prompts);
     auto_describe t)
 
 (* Runs after the turn is over so the user is not kept waiting; [wait_idle]
@@ -776,6 +1061,8 @@ let create
       ?(models = Model_registry.builtin ())
       ?(auto_describe = false)
       ?(backend_host = true)
+      ?mcp
+      ?(use_default_cwd = true)
       ~cwd
       ()
   =
@@ -788,7 +1075,7 @@ let create
     match model with
     | Some model -> model
     | None ->
-      Option.bind config.default_model ~f:(Model_registry.find models)
+      Option.bind (Config.start_model config) ~f:(Model_registry.find models)
       |> Option.value ~default:fallback_model
   in
   let thinking =
@@ -798,7 +1085,15 @@ let create
   let session =
     match session with
     | Some s -> s
-    | None -> Session.create ~dir:sessions_dir ~cwd ()
+    | None ->
+      let cwd =
+        match Option.map config.default_cwd ~f:Tool.expand_home with
+        | Some dir
+          when use_default_cwd
+               && ((not backend_host) || Sys_unix.is_directory_exn dir) -> dir
+        | Some _ | None -> cwd
+      in
+      Session.create ~dir:sessions_dir ~cwd ()
   in
   let cwd = Session.cwd session in
   let t =
@@ -830,6 +1125,7 @@ let create
     ; host_cwds = String.Table.create ()
     ; backend_cwd = cwd
     ; active_host = (if backend_host then Host.backend_id else "")
+    ; active_host_name = ""
     ; host_pinned = false
     ; pending_execs = String.Table.create ()
     ; exec_seq = 0
@@ -842,6 +1138,9 @@ let create
           ~first_job_id:(last_job_number (Session.messages session) + 1)
           ()
     ; subagent_log = Subagent_log.create ()
+    ; mcp
+    ; mcp_tools = []
+    ; mcp_noticed = String.Set.empty
     }
   in
   restore_settings t;
@@ -855,21 +1154,27 @@ let create
 ;;
 
 let prompt ?(attachments = []) ?(images = []) t text =
-  if is_running t
-  then
+  let running () =
     Or_error.error_string "a run is already in progress; use steer or follow_up"
-  else (
-    start_run t [ user_message t { text; attachments; images } ];
-    Ok ())
+  in
+  if is_running t
+  then running ()
+  else
+    Or_error.bind (expand_skill t text) ~f:(fun skill ->
+      if is_running t
+      then running ()
+      else
+        Ok (start_run t [ user_message t { text; skill; attachments; images } ]))
 ;;
 
 let enqueue t queue ?(attachments = []) ?(images = []) text =
-  let queued = { Queued.text; attachments; images } in
-  if is_running t
-  then (
-    Queue.enqueue queue queued;
-    queue_update t)
-  else start_run t [ user_message t queued ]
+  Or_error.map (expand_skill t text) ~f:(fun skill ->
+    let queued = { Queued.text; skill; attachments; images } in
+    if is_running t
+    then (
+      Queue.enqueue queue queued;
+      queue_update t)
+    else start_run t [ user_message t queued ])
 ;;
 
 let steer ?attachments ?images t text =
@@ -1044,14 +1349,6 @@ let shell t ~command ~add_to_context =
     Ok result)
 ;;
 
-let set_model t model =
-  t.model <- model;
-  ignore
-    (Session.set_model t.session ~model:(Model.key model) ~thinking:t.thinking
-     : Session.Entry.t);
-  state_changed t
-;;
-
 let set_thinking t thinking =
   t.thinking <- thinking;
   ignore
@@ -1161,11 +1458,7 @@ let set_cwd t ~path =
     Or_error.error_string "cannot change directory while a run is in progress"
   else (
     match find_host t t.active_host with
-    | None when List.is_empty (hosts t) -> Or_error.error_string no_host_message
-    | None ->
-      Or_error.errorf
-        "tool host %S is not connected; use set_active_host to pick another"
-        t.active_host
+    | None -> Or_error.error_string (host_unavailable_message t)
     | Some host ->
       Or_error.map
         (resolve_dir_on t host (resolve_path t path))
@@ -1199,7 +1492,7 @@ let list_dirs ?host t ~prefix =
        | None -> Or_error.errorf "unknown tool host %S" id)
   in
   Or_error.bind host ~f:(function
-    | None -> Or_error.error_string "tool host is not connected"
+    | None -> Or_error.error_string (host_unavailable_message t)
     | Some host ->
       let cwd =
         if String.equal host.id t.active_host then t.cwd else host.cwd

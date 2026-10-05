@@ -15,16 +15,35 @@ let member_string name json =
   | _ -> None
 ;;
 
-let error_message_of_body ~status body =
-  let detail =
+let quota_codes =
+  [ "usage_limit_reached"; "insufficient_quota"; "billing_hard_limit_reached" ]
+;;
+
+(* The message, plus [Usage_limit.marker] when the error's type or code (or,
+   for Anthropic's subscriptions, [limit_rejected]) says the allowance is used
+   up rather than briefly rate limited. *)
+let error_message_of_body ?(limit_rejected = false) ~status body =
+  let detail, code =
     match Json.parse body with
     | Ok json ->
       (match Json.member "error" json with
-       | Some err -> Option.value (member_string "message" err) ~default:body
-       | None -> body)
-    | Error _ -> body
+       | Some err ->
+         ( Option.value (member_string "message" err) ~default:body
+         , List.find_map [ "type"; "code" ] ~f:(fun key ->
+             member_string key err) )
+       | None -> body, None)
+    | Error _ -> body, None
   in
-  sprintf "HTTP %d: %s" status (String.strip detail)
+  let exhausted =
+    limit_rejected
+    || Option.value_map code ~default:false ~f:(fun code ->
+      List.mem quota_codes code ~equal:String.equal)
+  in
+  sprintf
+    "HTTP %d: %s%s"
+    status
+    (String.strip detail)
+    (if exhausted then " " ^ Usage_limit.marker else "")
 ;;
 
 let run ~env ?timeout ~cancel ~url ~headers ~body ~on_event () =
@@ -57,6 +76,13 @@ let run ~env ?timeout ~cancel ~url ~headers ~body ~on_event () =
   | Ok response when response.status / 100 <> 2 ->
     Failed
       (error_message_of_body
+         ~limit_rejected:
+           (Option.equal
+              String.equal
+              (Http_client.Response.header
+                 response
+                 "anthropic-ratelimit-unified-status")
+              (Some "rejected"))
          ~status:response.status
          (Buffer.contents error_body))
   | Ok _ -> Completed

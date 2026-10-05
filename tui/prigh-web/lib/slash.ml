@@ -3,16 +3,19 @@ open! Core
 module Argument = struct
   type t =
     | Model
+    | Models
     | Thinking
     | Login
     | Logout
     | Directory
+    | Backend_directory
     | Verbosity
     | Confirm
     | Session
     | Path
     | Host
     | User
+    | Skill
   [@@deriving sexp_of, equal]
 end
 
@@ -24,6 +27,12 @@ module Spec = struct
     ; argument : Argument.t option
     }
   [@@deriving sexp_of, equal]
+
+  let usage t =
+    if String.is_suffix t.name ~suffix:":"
+    then "/" ^ t.name ^ t.args
+    else String.strip ("/" ^ t.name ^ " " ^ t.args)
+  ;;
 end
 
 let c ?argument ?(args = "") name help = { Spec.name; args; help; argument }
@@ -34,6 +43,12 @@ let all =
   ; c "new" "start a new session"
   ; c ~argument:Model ~args:"[name]" "model" "pick or switch the model"
   ; c "scoped-models" "pick the models Ctrl+P and Alt+P cycle through"
+  ; c
+      ~argument:Models
+      ~args:"[model...|off]"
+      "fallback"
+      "show or set the models that take over, in order, when one's usage runs \
+       out"
   ; c
       ~argument:Thinking
       ~args:"[off|low|on|high|max]"
@@ -66,6 +81,11 @@ let all =
   ; c "tree" "show the session tree and move to any message in it"
   ; c ~argument:Directory ~args:"[path]" "cd" "change the working directory"
   ; c
+      ~argument:Backend_directory
+      ~args:"[path|off]"
+      "default-dir"
+      "show or set the directory new sessions start in"
+  ; c
       ~argument:Host
       ~args:"[name|backend]"
       "host"
@@ -80,6 +100,16 @@ let all =
       ~args:"[path]"
       "import"
       "import a session from a JSONL file on the backend"
+  ; c "skills" "pick a skill to invoke (/skill:name)"
+  ; c
+      ~argument:Skill
+      ~args:"<name> [args]"
+      "skill:"
+      "send a skill's instructions to the agent, with your arguments"
+  ; c
+      ~args:"[reconnect]"
+      "mcp"
+      "MCP servers: their tools, approve a project's, or restart failed ones"
   ; c "copy" "copy the last reply to the clipboard"
   ; c
       ~args:"<question>"

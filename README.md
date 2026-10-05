@@ -106,15 +106,20 @@ has one *active tool host*; `/host` lists the backend and the connected
 frontends and switches between them (asking for the working directory to
 use on the new host, prefilled with the current one and checked there
 before switching), and the status line shows `tools:<name>` when tools run
-elsewhere or `tools:offline` when the active host has disconnected (tool
-calls then fail until you pick another host). Several frontends can attach
+elsewhere or `tools:offline` when the active host has disconnected. A
+session never leaves its host on its own: while the host is away tool calls
+fail with a message saying it waits for the host to reconnect, and when the
+host comes back (a frontend or `prigh tool-host` reconnecting, which keeps
+its identity for the life of the process) the session carries on there, in
+the same directory; `/host` picks another host meanwhile. Several frontends can attach
 to one session (`/sessions` marks live ones) and all see the same stream; a
 session keeps running when its frontends disconnect. Plain TCP with a shared
 token: bind to localhost and use an SSH tunnel on untrusted networks.
 
 A tool host doesn't need a TUI: `prigh tool-host -connect server:7777 -token
-sekrit -cwd ~/proj [-name NAME]` connects on its own (reconnecting when the
-connection drops) and hosts the session's tools *and* its `>_` terminal, so
+sekrit -cwd ~/proj [-name NAME] [-host-id ID]` connects on its own
+(reconnecting when the connection drops; a fixed `-host-id` also keeps its
+sessions across restarts of the tool host) and hosts the session's tools *and* its `>_` terminal, so
 a browser-only user can pick it with `/host`. The web UI's terminal always
 runs on the session's active host, relayed through the backend.
 
@@ -293,10 +298,27 @@ when the backend refuses it; `/agents` and `/jobs` open the agents panel
 (above); `/btw` answers in a panel above the composer (Esc closes it);
 `/verbosity` (Ctrl+O cycles) hides tool output and thinking (quiet) or
 unfolds everything (verbose); `/copy` (Ctrl+X with nothing selected) copies
-the last reply. Ctrl+P/Alt+P cycle the scoped models, Alt+T the thinking
-level (Ctrl+T is the browser's), Alt+↑ takes back a queued message, Ctrl+↑/↓
-jump between your messages; `/help` and `/hotkeys` also list the TUI's keys
-that the browser keeps (Ctrl+C, Ctrl+Z, Ctrl+F, Ctrl+R, $EDITOR's Ctrl+G)
+the last reply. `/skills` is a picker of the skills where the tools run
+(name, description, directory) whose Enter puts `/skill:name ` in the
+editor for you to add the arguments; typing `/skill:` completes their
+names (listed once per session, directory and tool host). A message that
+invoked a skill shows as a folded `skill name` card (its location and
+instructions; verbose unfolds it) above the arguments you typed, and
+`/fork` and `/tree` show it as typed. `/mcp` lists the MCP servers with
+their status, tool count or error and config file, the configuration's
+problems under them: Enter approves (and starts) a project's server,
+restarts a failed one, or lists a ready one's tools; `/mcp reconnect`
+restarts the failed ones and reports. `/fallback` completes a model for
+each word, in order (or `off`), and shows the backend's error, with the
+closest models, for one it doesn't know; `/default-dir` completes
+directories on the backend's host, where new sessions start, and takes a
+relative path from the backend's directory. When a model's usage runs out
+and the next fallback model takes over, the transcript shows a `↪ handed
+over from A to B (error)` line rather than the message as a prompt, and
+`/fork` and `/tree` label it the same way. Ctrl+P/Alt+P cycle the scoped
+models, Alt+T the thinking level (Ctrl+T is the browser's), Alt+↑ takes
+back a queued message, Ctrl+↑/↓ jump between your messages; `/help` and
+`/hotkeys` also list the TUI's keys that the browser keeps (Ctrl+C, Ctrl+Z, Ctrl+F, Ctrl+R, $EDITOR's Ctrl+G)
 and what to use instead, and `/quit` says to close the tab.
 
 The account at the bottom of the sidebar (also in the status line) opens the
@@ -564,6 +586,23 @@ destructive `bash`/`write`/`edit`; `/confirm on|off`) and
 `default_model`/`default_thinking` (what new sessions start with unless
 `-model`/`-thinking` is given; `/change_default` saves the current ones).
 
+`fallback_models` is a chain of models that take over from each other
+(`/fallback MODEL...` sets it; names, ids and prefixes work as for
+`/model`, and are saved as `provider/id` keys). When a provider says the
+current model's usage allowance or balance is exhausted, or it has no
+credentials, the run does not stop: the session switches to the next model
+of the chain after the current one (the first if the current one is not in
+it), the transcript shows `↪ handed over from A to B`, and B carries on with
+the task. At the end of the chain the run stops with a note saying so
+(`/model` picks another). Without a `default_model`, new sessions start on
+the chain's first model. `/fallback` shows the chain and `/fallback off`
+clears it. `default_cwd` (`/default-dir PATH`, `/default-dir off`) is the
+directory, on the backend's host (`~` allowed), that a session starts in
+when the backend starts one for a frontend, instead of the backend's
+working directory; it is ignored if it is not a directory there. Like the
+rest of `config.json`, both are per namespace
+(`~/.prigh/namespaces/<name>/config.json` under `-tokens`).
+
 ### Slash commands
 
 | Command | Action |
@@ -572,6 +611,8 @@ destructive `bash`/`write`/`edit`; `/confirm on|off`) and
 | `/model [name\|id\|provider/id]` | pick or switch the model |
 | `/scoped-models` | pick the models Ctrl+P cycles through |
 | `/change_default` | save the current model and thinking level as the default for new sessions |
+| `/fallback [off\|model...]` | show or set the models that take over, in order, when a model's usage runs out (each word completes a model) |
+| `/default-dir [off\|path]` | show or set the directory new sessions start in |
 | `/login [provider\|custom] [api_key\|oauth]`, `/logout [provider]`, `/auth` | credentials; `/login custom` adds an OpenAI-compatible endpoint |
 | `/thinking [off\|on\|low\|high\|max]` | set the thinking level |
 | `/verbosity [quiet\|normal\|verbose]` | set the transcript verbosity |
@@ -590,12 +631,23 @@ destructive `bash`/`write`/`edit`; `/confirm on|off`) and
 | `/host [name\|backend]` | pick where tools run, and the directory there |
 | `/abort` | abort the current run |
 | `/btw <question>` | ask a side question without interrupting the run |
+| `/skills`, `/skill:NAME [args]` | pick a skill (Enter puts `/skill:NAME ` in the editor for its arguments) / run one |
+| `/mcp [reconnect]` | MCP servers and their state: Enter approves a project's server or lists a ready one's tools; `reconnect` restarts failed ones |
 | `/retry-backend-connection` | reconnect to the backend now |
 | `/state` | show session state |
 | `/copy` | (prigh-web) copy the last reply to the clipboard |
 
 `/model` also accepts a display name, id, `provider/id` or unique prefix, and
 `/login`/`/logout`/`/thinking`/`/sessions` open fuzzy pickers.
+
+`/skill:` completes the names of the skills found where the session's tools
+run (fetched once per session, directory and tool host), and is sent like a
+prompt (a steer or follow-up while a turn runs). The transcript shows an
+invoked skill as `skill NAME` followed by its arguments; verbose (Ctrl+O)
+adds the skill's file. A name the backend does not know comes back as an
+error listing the closest ones, with the text back in the editor. `/mcp`
+also shows configuration problems, and says where to configure servers when
+there are none.
 
 `/btw` works while a turn is running: one extra model call (no tools) answers
 from the session's current context, streaming into a box above the editor
@@ -619,6 +671,52 @@ first run, and recorded in the session so the cached prompt prefix survives
 `/cd`, `/host` and backend restarts; later directory or host changes reach
 the model as a short note on the next message, leaving it to re-read the
 instructions if that seems worthwhile.
+
+### Skills
+
+A skill is a directory with a `SKILL.md` whose YAML frontmatter has a
+`name` (default: the directory's) and a `description` saying when to use
+it ([Agent Skills](https://agentskills.io), as in Claude Code and pi).
+They are found on the tool host in `.prigh/skills/`, `.claude/skills/` and
+`.agents/skills/` of the working directory and each of its ancestors, then
+the same under the home directory (the closest wins a name; skill
+directories may be nested a few levels, as in `~/.claude/skills/synced/`).
+The system prompt lists them with their paths, and the model reads a
+skill's file when a task matches it; `disable-model-invocation: true` keeps
+a skill out of that list. `/skill:NAME ARGS` invokes one yourself: the
+message sent is the skill's file followed by ARGS, and an unknown name is
+refused with the closest ones. `/skills` lists them.
+
+### MCP servers
+
+MCP servers are configured in Claude Code's `mcpServers` format, in the
+tool host's `~/.prigh/mcp.json` and in a project's `.mcp.json` (in the
+working directory or an ancestor; the closest definition of a name wins):
+
+```json
+{
+  "mcpServers": {
+    "fs": { "command": "npx", "args": ["-y", "@modelcontextprotocol/server-filesystem", "."],
+            "env": { "DEBUG": "${DEBUG:-0}" } },
+    "docs": { "type": "http", "url": "https://example.com/mcp",
+              "headers": { "Authorization": "Bearer ${DOCS_TOKEN}" } }
+  }
+}
+```
+
+Stdio servers run on the session's tool host (a project's in the project's
+directory, the user's in the home directory); HTTP ones use the streamable
+HTTP transport. Strings may use `${VAR}` and `${VAR:-default}`. Servers
+start when a run first needs them and keep running for every session on
+that host; their tools are offered to the model as
+`mcp__<server>__<tool>` (read-only ones may run in parallel; the others
+count as destructive for `/confirm`). A project's servers run commands that
+came with the project, so they only start once you approve them in `/mcp`
+(the approval lasts until their definition changes; it is kept in
+`~/.prigh/mcp-approvals.json`). Problems, failed starts and servers awaiting
+approval are reported once each; `/mcp` shows every server with its status
+and tools, and `/mcp reconnect` restarts failed ones. `-no-tools` turns MCP
+off.
 
 ### Testing
 
