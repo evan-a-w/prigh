@@ -69,6 +69,15 @@ pinned package set through import-from-derivation) and the first build compiles
 both OCaml toolchains plus their package sets (about an hour on a small
 machine); both are cached afterwards.
 
+The flakes name the binary cache `prigh.cachix.org`, which has the OxCaml
+toolchain and packages prebuilt, so that most of that is downloaded instead.
+Nix asks before using a flake's settings: answer `y` (and save it), or pass
+`--accept-flake-config`. With a multi-user Nix install it is only used if you
+are in `trusted-users`, or if `https://prigh.cachix.org` and its key are in
+the system's `trusted-substituters`/`trusted-public-keys`; otherwise add them
+to `/etc/nix/nix.conf` (NixOS: `nix.settings`) as `extra-substituters` and
+`extra-trusted-public-keys`. The key is in `flake.nix`.
+
 ## Remote backend, several frontends
 
 The backend can run on another machine and serve many sessions and
