@@ -60,6 +60,7 @@ let show label sexp =
   let rec go : Sexp.t -> Sexp.t = function
     | List [ Atom "duration_seconds"; Atom _ ] ->
       List [ Atom "duration_seconds"; Atom "<t>" ]
+    | List [ Atom "at"; Atom _ ] -> List [ Atom "at"; Atom "<at>" ]
     | List [ Atom "name"; Atom host ]
       when String.equal host (Core_unix.gethostname ()) ->
       List [ Atom "name"; Atom "<host>" ]
