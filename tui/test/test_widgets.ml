@@ -779,6 +779,7 @@ let%expect_test "bash timeout is merged into the tool line at each verbosity" =
     ; text = "partial output\n[timed out after 120s]"
     ; is_error = true
     ; images = []
+    ; at = None
     }
   in
   let item =
@@ -971,6 +972,7 @@ let edit_result text : Prigh_protocol.Message.Tool_result.t =
   ; text
   ; is_error = false
   ; images = []
+  ; at = None
   }
 ;;
 

@@ -184,6 +184,7 @@ let%expect_test "prompt, streaming with embedded newlines, tool call, steer \
            ; text = "a.ml\nb.ml\npartial\n"
            ; is_error = false
            ; images = []
+           ; at = None
            }
        });
   H.event h (Message_end (assistant "Sure, here they are:\nfirst line done"));
@@ -4355,6 +4356,7 @@ let%expect_test "bash result at Normal shows the head and tail" =
                ^ "\n"
            ; is_error = false
            ; images = []
+           ; at = None
            }
        });
   H.show h;
@@ -4749,6 +4751,7 @@ let%expect_test "bash timeout is merged into the tool line" =
            ; text = "partial output\n[timed out after 120s]"
            ; is_error = true
            ; images = []
+           ; at = None
            }
        });
   H.show h;

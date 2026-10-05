@@ -553,6 +553,7 @@ let finish_subagent
     ; text = result.text
     ; is_error = result.is_error
     ; images = []
+    ; at = None
     }
   in
   let rec go acc = function
@@ -690,7 +691,7 @@ let render_subagent ~(verbosity : Verbosity.t) (s : Subagent.t) : Content.t =
 
 let render_item (item : Item.t) ~(verbosity : Verbosity.t) : Content.t =
   match item with
-  | User { text; images } ->
+  | User { text; images; at = _ } ->
     let line text style : Content.Line.t =
       [ { Content.Span.text = "> "; style = Style.bold (Style.fg Green) }
       ; { text; style }

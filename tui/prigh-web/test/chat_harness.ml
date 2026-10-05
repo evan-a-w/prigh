@@ -20,6 +20,7 @@ let with_card chat (event : Event.t) =
             ; stop_reason = Tool_use
             ; usage = Usage.zero
             ; model = "m"
+            ; at = None
             }))
   | _ -> chat
 ;;
