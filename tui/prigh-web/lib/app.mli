@@ -5,6 +5,16 @@ open! Import
     [Command.t]s for the page to execute, whose results come back as
     [Action.Reply]. *)
 
+module Auth_purpose : sig
+  (** Why we asked for [auth_status]. *)
+  type t =
+    | Refresh
+    | Login_picker
+    | Logout_picker
+    | Show
+  [@@deriving sexp_of, equal]
+end
+
 module Reply_tag : sig
   type t =
     | Ignore
@@ -13,6 +23,14 @@ module Reply_tag : sig
     | Messages
     | Sessions
     | Models
+    | Auth_status of Auth_purpose.t
+    | Paths of string (** the completion prefix listed *)
+    | Restored (** [abort]: queued prompts back to the editor *)
+    | Dequeued
+    | Deleted of string (** the session's title *)
+    | Refresh_sessions (** on success, list the sessions again *)
+    | Login_started
+    | Notice of string (** shown on success *)
     | Reconnect of int (** generation; stale replies are ignored *)
   [@@deriving sexp_of, equal]
 end
@@ -33,6 +51,13 @@ module Command : sig
         answered by [Reply (Reconnect generation, hello reply)]. *)
     | Set_url_session of string
     (** the page's [?session=], so a reload rejoins *)
+    | Expire_toast of
+        { id : int
+        ; after_ms : int
+        } (** [Dismiss_toast id] after [after_ms] *)
+    | Focus of string (** the element with this id, once rendered *)
+    | Save_history of string list (** newest first *)
+    | Sign_out (** forget the saved login and reload *)
   [@@deriving sexp_of, equal]
 end
 
@@ -56,6 +81,9 @@ module Toast : sig
     ; error : bool
     }
   [@@deriving sexp_of, equal]
+
+  (** How long non-error toasts stay. *)
+  val lifetime_ms : int
 end
 
 module Confirm : sig
@@ -75,14 +103,49 @@ module Action : sig
     | Protocol_error of string
     | Backend_closed
     | Reply of Reply_tag.t * (Json.t, string) Result.t
-    | Set_draft of string
-    | Send (** prompt, or steer while running *)
+    | Tick of Time_ns.t (** the clock, for ages; also refreshes the sessions *)
+    | Set_narrow of bool (** a phone-sized window: the sidebar is a drawer *)
+    | Load_history of string list
+    | Set_draft of string (** the caret at the end *)
+    | Edit of
+        { text : string
+        ; cursor : int
+        }
+    | Send (** prompt, or steer while running; slash commands run *)
     | Send_follow_up (** after the run, or now when idle *)
     | Abort
+    | History_older
+    | History_newer
+    | Complete_move of int
+    | Complete_accept of { run : bool }
+    (** [run]: a command without arguments, or an argument, runs at once *)
+    | Complete_choose of int (** clicked *)
+    | Complete_close
     | New_session
     | Switch_session of string (** path *)
+    | Ask_delete of string (** path *)
+    | Set_session_query of string
+    | Open_sessions (** the sidebar, with its search focused *)
     | Set_model of string (** [provider/id] *)
     | Set_thinking of string
+    | Open_model_picker
+    | Open_thinking_picker
+    | Open_help
+    | Open_rename
+    | Open_agents
+    | Picker_query of string
+    | Picker_move of int
+    | Picker_accept
+    | Picker_choose of string (** an item's id, clicked *)
+    | Dialog_input of string (** rename, login answers *)
+    | Dialog_move of int (** login select options *)
+    | Dialog_accept
+    | Close_dialog (** no side effects, except cancelling a login *)
+    | Login_choose of int (** a login select option, clicked *)
+    | Start_login of string (** provider, with its default method *)
+    | Cancel_subagent of string
+    | Kill_job of string
+    | Dequeue (** the last queued message back into the editor *)
     | Toggle_sidebar
     | Respond_confirm of
         { call_id : string
@@ -95,6 +158,7 @@ module Action : sig
         ; error : bool
         }
     | Dismiss_toast of int
+    | Sign_out
   [@@deriving sexp_of]
 end
 
@@ -107,17 +171,28 @@ module Model : sig
     ; chat : Chat.t
     ; sessions : Session_summary.t list
     ; models : Llm.t list
+    ; auth : Auth_status.t list
+    ; now : Time_ns.t option
+    ; narrow : bool
     ; draft : string
+    ; cursor : int (** the caret's byte offset in [draft] *)
+    ; completion : Completion.t option
+    ; history : History.t
     ; images : Image.t list (** attached to the next prompt *)
     ; queue : int * int (** steer, follow-up *)
     ; confirms : Confirm.t list
+    ; dialog : Dialog.t option
     ; toasts : Toast.t list
     ; next_toast : int
     ; sidebar_open : bool
+    ; session_query : string
     }
   [@@deriving sexp_of]
 
   val running : t -> bool
+
+  (** The completion popup when it has something to show. *)
+  val popup : t -> Completion.t option
 end
 
 val thinking_levels : string list
