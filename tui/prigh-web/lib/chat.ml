@@ -4,6 +4,7 @@ open! Import
 type t =
   { rev_entries : entry list
   ; tools : tool String.Map.t
+  ; running : bool
   }
 
 and entry =
@@ -68,7 +69,8 @@ module Entry = struct
   [@@deriving sexp_of]
 end
 
-let empty = { rev_entries = []; tools = String.Map.empty }
+let empty = { rev_entries = []; tools = String.Map.empty; running = false }
+let running t = t.running
 let entries t = List.rev t.rev_entries
 let tool t id = Map.find t.tools id
 let add t entry = { t with rev_entries = entry :: t.rev_entries }
@@ -119,6 +121,14 @@ let add_message t (message : Message.t) =
 let of_messages messages = List.fold messages ~init:empty ~f:add_message
 
 let rec apply t (event : Event.t) =
+  let t =
+    match event with
+    | Agent_start | Turn_start | Message_start _ | Message_update _ | Tool_start _
+    | Tool_output _ ->
+      { t with running = true }
+    | Agent_end _ -> { t with running = false }
+    | _ -> t
+  in
   match event with
   | Message_start (User u) -> add t (User u)
   | Message_start (Assistant a) -> set_assistant t a ~streaming:true

@@ -160,7 +160,7 @@ module Inline = struct
     raw
   ;;
 
-  let rec parse_range s lo hi =
+  let rec parse_range ?(partial = false) s lo hi =
     let out = ref [] in
     let buf = Buffer.create 16 in
     let flush () =
@@ -204,6 +204,10 @@ module Inline = struct
            | Some (code, after) ->
              emit (Code code);
              go after
+           | None when partial ->
+             let n = run s i ~hi '`' in
+             if i + n < hi
+             then emit (Code (String.sub s ~pos:(i + n) ~len:(hi - i - n)))
            | None ->
              let n = run s i ~hi '`' in
              text i (i + n);
@@ -231,16 +235,20 @@ module Inline = struct
             | _ -> r <= 3)
         && not (Char.equal c '_' && i > lo && Char.is_alphanum s.[i - 1])
       in
+      let span inner =
+        match c, r with
+        | '~', _ -> Strike inner
+        | _, 1 -> Emph inner
+        | _, 2 -> Strong inner
+        | _ -> Strong [ Emph inner ]
+      in
       match if can_open then find_closer s after ~hi c ~len:r else None with
       | Some close ->
-        let inner = parse_range s after close in
-        emit
-          (match c, r with
-           | '~', _ -> Strike inner
-           | _, 1 -> Emph inner
-           | _, 2 -> Strong inner
-           | _ -> Strong [ Emph inner ]);
+        emit (span (parse_range s after close));
         go (close + r)
+      | None when partial && can_open ->
+        emit (span (parse_range ~partial s after hi))
+      | None when partial && after >= hi -> ()
       | None ->
         text i after;
         go after
@@ -268,9 +276,12 @@ module Inline = struct
            then emit (Link { href; children })
            else emit_all children;
            go (paren + 1)
+         | None when partial ->
+           emit_all (parse_range s (open_ + 1) close)
          | None ->
            text i (open_ + 1);
            go (open_ + 1))
+      | None when partial -> emit_all (parse_range ~partial s (open_ + 1) hi)
       | _ ->
         text i (open_ + 1);
         go (open_ + 1)
@@ -297,7 +308,15 @@ module Inline = struct
     List.rev !out
   ;;
 
-  let parse s = parse_range s 0 (String.length s)
+  let parse ?partial s = parse_range ?partial s 0 (String.length s)
+
+  let rec to_plain l =
+    List.map l ~f:(function
+      | Text s | Code s -> s
+      | Strong l | Emph l | Strike l | Link { children = l; _ } -> to_plain l
+      | Break -> " ")
+    |> String.concat
+  ;;
 end
 
 module Align = struct
@@ -567,7 +586,7 @@ let task_prefix text =
         checked, rest))
 ;;
 
-let rec parse_lines lines =
+let rec parse_lines ?(partial = false) lines =
   let n = Array.length lines in
   let blocks = ref [] in
   let add b = blocks := b :: !blocks in
@@ -584,7 +603,8 @@ let rec parse_lines lines =
         | None ->
           (match heading line with
            | Some (level, text) ->
-             add (Block.Heading (level, Inline.parse text));
+             add
+               (Block.Heading (level, Inline.parse ~partial:(partial && i + 1 = n) text));
              go (i + 1)
            | None ->
              if is_rule line
@@ -632,7 +652,9 @@ let rec parse_lines lines =
           else j, acc)
     in
     let stop, rev = collect i [] ~lazy_ok:false in
-    add (Quote (parse_lines (Array.of_list (List.rev rev))));
+    add
+      (Quote
+         (parse_lines ~partial:(partial && stop = n) (Array.of_list (List.rev rev))));
     stop
   and table i aligns =
     let width = List.length aligns in
@@ -669,7 +691,8 @@ let rec parse_lines lines =
       |> List.map ~f:String.lstrip
       |> String.concat ~sep:"\n"
     in
-    add (Paragraph (Inline.parse (String.rstrip text)));
+    add
+      (Paragraph (Inline.parse ~partial:(partial && stop = n) (String.rstrip text)));
     stop
   and list i (first : Marker.t) =
     let item i (marker : Marker.t) =
@@ -721,7 +744,12 @@ let rec parse_lines lines =
            | None -> None, content)
         | [] -> None, content
       in
-      { Block.checked; blocks = parse_lines (Array.of_list content) }, stop, gap
+      ( { Block.checked
+        ; blocks =
+            parse_lines ~partial:(partial && stop = n) (Array.of_list content)
+        }
+      , stop
+      , gap )
     in
     let rec items i acc ~tight =
       let it, stop, gap =
@@ -745,9 +773,30 @@ let rec parse_lines lines =
   List.rev !blocks
 ;;
 
-let parse text =
+let parse ?partial text =
   String.split_lines text
   |> List.map ~f:(String.substr_replace_all ~pattern:"\t" ~with_:"    ")
   |> Array.of_list
-  |> parse_lines
+  |> parse_lines ?partial
+;;
+
+let rec first_inlines (blocks : Block.t list) =
+  match blocks with
+  | [] -> None
+  | (Paragraph l | Heading (_, l)) :: _ -> Some l
+  | Quote blocks :: rest -> Option.first_some (first_inlines blocks) (first_inlines rest)
+  | List { items; _ } :: rest ->
+    Option.first_some
+      (List.find_map items ~f:(fun item -> first_inlines item.blocks))
+      (first_inlines rest)
+  | Table { header; _ } :: _ -> Some (List.concat header)
+  | Code { text; _ } :: _ -> Some [ Text text ]
+  | Rule :: rest -> first_inlines rest
+;;
+
+let preview text =
+  String.split_lines text
+  |> List.find ~f:(Fn.non is_blank)
+  |> Option.bind ~f:(fun line -> first_inlines (parse line))
+  |> Option.value_map ~default:"" ~f:(fun l -> String.strip (Inline.to_plain l))
 ;;

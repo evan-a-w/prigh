@@ -120,6 +120,8 @@ let rec block ?(tight = false) (b : Block.t) =
       ]
 ;;
 
-let render text =
-  Node.div ~attrs:(cls "markdown") (List.map (Markdown.parse text) ~f:block)
+let render ?(streaming = false) text =
+  Node.div
+    ~attrs:(cls "markdown")
+    (List.map (Markdown.parse ~partial:streaming text) ~f:block)
 ;;

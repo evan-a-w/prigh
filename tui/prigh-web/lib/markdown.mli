@@ -2,8 +2,11 @@ open! Core
 
 (** Markdown as a tree: the subset language models write (CommonMark-ish
     blocks, GitHub tables, task lists and strikethrough). Total: any input
-    parses, so partial text streamed so far renders sensibly. Single newlines
-    inside a paragraph are line breaks. *)
+    parses. Single newlines inside a paragraph are line breaks.
+
+    [partial]: the text is a prefix still being streamed, so spans left open
+    at its end (emphasis, code, links) are shown as if closed and a lone
+    marker at the very end is hidden. *)
 
 module Inline : sig
   type t =
@@ -19,7 +22,8 @@ module Inline : sig
     | Break
   [@@deriving sexp_of, equal]
 
-  val parse : string -> t list
+  val parse : ?partial:bool -> string -> t list
+  val to_plain : t list -> string
 end
 
 module Align : sig
@@ -60,7 +64,11 @@ module Block : sig
   [@@deriving sexp_of, equal]
 end
 
-val parse : string -> Block.t list
+val parse : ?partial:bool -> string -> Block.t list
+
+(** The first non-blank line as plain text, without markup: for one-line
+    previews. *)
+val preview : string -> string
 
 (** Whether [href] is safe to link to: http, https or mailto. *)
 val safe_href : string -> bool
