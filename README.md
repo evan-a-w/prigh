@@ -18,18 +18,20 @@ in.
 ## Build
 
 ```
-# backend (opam switch "prigh": OCaml 5.3, core, eio, cohttp-eio, jsonaf)
-cd backend && eval $(opam env --switch=prigh) && dune build && dune build @runtest
+# backend: vanilla OCaml 5.3, core, eio, cohttp-eio, jsonaf
+nix develop .#backend -c sh -c 'cd backend && dune build @runtest'
 
-# frontend (opam switch "prigh-ox": OxCaml 5.2 + bonsai_term; or `nix develop`)
-cd tui && eval $(opam env --switch=prigh-ox) && dune build && dune build @runtest
+# frontend: OxCaml 5.2 + bonsai_term (the default dev shell)
+nix develop -c sh -c 'cd tui && dune build @runtest'
 # @runtest includes the e2e and tmux tests against the backend binary built above,
-# and the web-layer tests when `node` is on PATH (they run under js_of_ocaml)
+# and the web-layer tests (they run under node, via js_of_ocaml)
 
-# or with Nix (backend + patched OxCaml frontend) — see "Running under Nix"
 nix build               # result/bin/prigh wrapper (includes backend + TUI)
-nix develop             # toolchain shell
 ```
+
+The two need different compilers, so build each in its own shell. Without
+Nix, opam switches with the same packages work too (`backend/prigh.opam`,
+`tui/prigh_tui.opam`; the OxCaml one needs `nix/fix-floatarithmem.patch`).
 
 ## Running under Nix
 
@@ -48,8 +50,8 @@ nix build                            # result/bin/prigh
 nix build .#backend                  # backend only: result/bin/prigh
 nix build .#tui                      # TUI only: result/bin/prigh-tui
 
-nix develop
-cd tui && dune build @runtest
+nix develop                          # TUI toolchain (OxCaml)
+nix develop .#backend                # backend toolchain (OCaml 5.3)
 ```
 
 `prigh -web [serve options]` runs the backend with the browser frontend
@@ -471,5 +473,5 @@ promote` accepts new output everywhere:
   (Bonsai_term views + backend process), `web/` + `web-app/` + `web-bin/`
   (DOM rendering, key mapping, WebSocket transport, the js_of_ocaml page),
   `test/`, `test-web/`, `e2e/`.
-- `ARCHITECTURE.md` — how the pieces fit together; `PLAN.md` — milestone status.
-# prigh
+- `ARCHITECTURE.md` — how the pieces fit together; `DOCKER.md` — the
+  container; `AGENTS.md` — conventions for working on the code.

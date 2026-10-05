@@ -269,16 +269,28 @@
               touch "$out"
             '';
 
-        devShells.default = pkgs.mkShell {
-          inputsFrom = [
-            prighTui
-            prighBackend
+        # The backend is vanilla OCaml 5.3 and the TUI OxCaml: dune can only
+        # use one of them, so each has its own shell.
+        devShells.backend = pkgs.mkShell {
+          inputsFrom = [ prighBackend ];
+          buildInputs = [
+            backendScope.expect_test_helpers_core
+            pkgs.ocamlformat
+            pkgs.ripgrep
+            pkgs.tmux
           ];
+        };
+
+        devShells.default = pkgs.mkShell {
+          inputsFrom = [ prighTui ];
           buildInputs = [
             frontendScope.bonsai_test
             frontendScope.expect_test_helpers_core
             frontendScope.expect_test_helpers_async
-            frontendScope.ocamlformat
+            # The OxCaml ocamlformat (frontendScope.ocamlformat) has an unhashed git
+            # source that does not evaluate; upstream formats the backend, and
+            # whatever does not use OxCaml syntax in tui/.
+            pkgs.ocamlformat
             pkgs.ripgrep
             # the backend's terminal tests and the TUI's tmux-test
             pkgs.tmux
