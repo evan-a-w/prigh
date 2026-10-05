@@ -47,6 +47,8 @@ module Icon : sig
     | User_plus
     | Copy
     | Check
+    | Terminal
+    | Restart
 
   (** An inline SVG; tests show [<icon name>]. *)
   val view : ?cls:string -> t -> Node.t

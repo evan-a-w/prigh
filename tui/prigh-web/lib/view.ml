@@ -84,7 +84,7 @@ let empty (m : Model.t) =
     ]
 ;;
 
-let view (m : Model.t) ~inject =
+let view (m : Model.t) ~inject ~terminal =
   let chat =
     match Chat.entries m.chat with
     | [] -> empty m
@@ -97,6 +97,7 @@ let view (m : Model.t) ~inject =
           [ "sidebar-open", m.sidebar_open
           ; "narrow", m.narrow
           ; "agents-open", m.agents.open_
+          ; "terminal-open", m.terminal.open_
           ]
       ]
     [ Sidebar_view.view m ~inject
@@ -122,6 +123,7 @@ let view (m : Model.t) ~inject =
             [ chat; jump_to_bottom m ~inject ]
         ; Btw_view.view m ~inject
         ; Composer_view.view m ~inject
+        ; Terminal_view.view m ~inject ~widget:terminal
         ]
     ; Agents_view.view m ~inject
     ; Dialog_view.view m ~inject

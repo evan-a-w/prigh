@@ -71,6 +71,8 @@ module Icon = struct
     | User_plus
     | Copy
     | Check
+    | Terminal
+    | Restart
   [@@deriving sexp_of]
 
   (* Paths in the style of Lucide (24x24, stroked). *)
@@ -121,6 +123,8 @@ module Icon = struct
     | Copy ->
       {|<rect x="8" y="8" width="13" height="13" rx="2"/><path d="M16 8V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h3"/>|}
     | Check -> {|<path d="m5 12 5 5L20 7"/>|}
+    | Terminal -> {|<path d="m4 17 6-6-6-6M12 19h8"/>|}
+    | Restart -> {|<path d="M3 12a9 9 0 1 0 2.6-6.4L3 8"/><path d="M3 3v5h5"/>|}
   ;;
 
   let name t = String.lowercase (Sexp.to_string (sexp_of_t t))

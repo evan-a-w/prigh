@@ -11,6 +11,7 @@ module Target : sig
     | Control (** a button, link or fold: Enter and Space are its own *)
     | Session_search (** the sidebar's search *)
     | Session of string (** a session's row in the sidebar, by id *)
+    | Terminal (** the terminal panel: its keys are the shell's but Ctrl+` *)
     | Page
   [@@deriving sexp_of]
 end
