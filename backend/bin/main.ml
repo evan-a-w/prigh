@@ -793,6 +793,14 @@ let tool_host_command =
          "-name"
          (optional string)
          ~doc:"NAME how the host is shown (default: the hostname)"
+     and host_id =
+       flag
+         "-host-id"
+         (optional string)
+         ~doc:
+           "ID what sessions know this host by, so they resume on it when it \
+            reconnects; give a fixed one to keep it across restarts (default: \
+            random, one per process)"
      and cwd =
        flag
          "-cwd"
@@ -837,6 +845,7 @@ let tool_host_command =
            ~port
            ~token
            ?user
+           ?host_id
            ~name:(Option.value name ~default:(Core_unix.gethostname ()))
            ~cwd
            ())

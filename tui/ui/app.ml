@@ -158,7 +158,7 @@ module Model = struct
     ; verbosity : Verbosity.t
     ; config : P.Config.t option
     ; home : string option
-    ; client_id : string option (** ours, from [hello] *)
+    ; client_id : string option (** our host id, from [hello] *)
     ; namespace : string option
     ; user : string option
     ; stderr_tail : string list

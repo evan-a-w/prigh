@@ -846,11 +846,14 @@ let%expect_test "btw_delta" =
     |}]
 ;;
 
+(* With a [host_id] (the backend lists our tool host under it), that is our
+   id. *)
 let%expect_test "hello reply: client id and namespace" =
   List.iter
     [ {|{"client_id":"client-1","namespace":"lloyd","state":{}}|}
     ; {|{"client_id":"client-1","namespace":null}|}
     ; {|{"client_id":"client-1"}|}
+    ; {|{"client_id":"client-1","host_id":"host-abc"}|}
     ; {|{"namespace":"lloyd"}|}
     ; {|{"client_id":"client-1","namespace":3}|}
     ]
@@ -868,6 +871,10 @@ let%expect_test "hello reply: client id and namespace" =
       (user      ())))
     (Ok (
       (client_id client-1)
+      (namespace ())
+      (user      ())))
+    (Ok (
+      (client_id host-abc)
       (namespace ())
       (user      ())))
     (Error "missing field \"client_id\"")

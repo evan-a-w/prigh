@@ -10,6 +10,8 @@ module Host : sig
       [backend_id]) or a connected client that advertised tool support. *)
   type t =
     { id : string
+      (** a client's host id, the same across its reconnects (see
+          [Rpc_server]) *)
     ; name : string
     ; cwd : string
     ; session_id : string option (** the session the client is attached to *)
@@ -37,8 +39,9 @@ module State : sig
     ; cost_usd : float
     ; context_tokens : int (** input tokens of the last request, if any *)
     ; active_host : string
-      (** [Host.id]; may be absent from [hosts], or [""] when the backend
-              host is disabled and no client host was ever adopted *)
+      (** [Host.id]; absent from [hosts] while that host is disconnected, or
+              [""] when the backend host is disabled and no client host was
+              ever adopted *)
     ; hosts : Host.t list
       (** the backend first (unless disabled), then connected clients *)
     ; subagents : Background_tasks.Summary.t list
@@ -358,12 +361,28 @@ val session_stats : t -> Session_stats.t
 
 (** Replaces the client hosts (every connected client able to run tools,
     whichever session it is attached to). In-flight executions on hosts that
-    are gone fail. Hosts keep the cwd this session last used on them. *)
+    are gone fail. Hosts keep the cwd this session last used on them, also
+    while disconnected. The active host stays active when it goes away (tool
+    calls fail until it comes back, see {!host_unavailable_message}); when it
+    is listed again the session resumes on it in the same cwd. Without the
+    backend host, a session that never had a host adopts the first one. *)
 val set_hosts : t -> Host.t list -> unit
 
-(** Makes [id] the active host (with its own cwd) unless the user pinned a
-    host that is still connected; called when a client attaches. *)
+(** Makes [id] the active host (with its own cwd) when the session runs on
+    the backend by default (not pinned with {!set_active_host}) or has no
+    host; called when a client attaches. *)
 val prefer_host : t -> string -> unit
+
+(** Why tools cannot run while the active host is not connected: no host
+    yet, or waiting for it to reconnect. *)
+val host_unavailable_message : t -> string
+
+(** Where this session last was on each client host, for a reloaded agent of
+    the same session ({!restore_host_cwds}). *)
+val host_cwds : t -> string String.Map.t
+
+(** Adds [host_cwds] it does not know yet. *)
+val restore_host_cwds : t -> string String.Map.t -> unit
 
 (** The backend first (unless disabled), then the client hosts. *)
 val hosts : t -> Host.t list

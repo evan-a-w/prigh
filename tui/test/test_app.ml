@@ -5753,6 +5753,82 @@ let%expect_test "switching tool host asks for the directory there, prefilled \
     |}]
 ;;
 
+(* A tool-capable TUI sends a [host_id] in every hello; the backend lists its
+   host under that id, the same across reconnects, so it stays "(here)". *)
+let%expect_test "the hello's host id marks this frontend, also after a \
+                 reconnect"
+  =
+  let h = connected ~width:70 () in
+  let state =
+    {|{"session_id":"abc123","session_path":"/s","session_name":null,"cwd":"/home/me","git_branch":null,"model":{"id":"m","provider":"deepseek","key":"deepseek/m","name":"M","context_window":1000,"max_output":10,"supports_thinking":false,"cost":{"input":1,"output":1,"cache_read":1}},"thinking":"off","running":false,"message_count":0,"usage":{"input":0,"output":0,"cache_read":0},"cost_usd":0,"context_tokens":0,"active_host":"host-abc","hosts":[{"id":"backend","name":"srv","cwd":"/work"},{"id":"client-1","name":"desk","cwd":"/d"},{"id":"host-abc","name":"laptop","cwd":"/home/me"}]}|}
+  in
+  let picker () =
+    H.keys h "/host";
+    H.enter h;
+    H.show h;
+    H.esc h
+  in
+  H.event
+    h
+    (State
+       (Or_error.ok_exn
+          (P.State.of_json (Or_error.ok_exn (P.Json.parse state)))));
+  H.step
+    h
+    (Hello
+       (Or_error.ok_exn
+          (P.Hello_reply.of_json
+             (Or_error.ok_exn
+                (P.Json.parse {|{"client_id":"client-1","host_id":"host-abc"}|})))));
+  picker ();
+  [%expect
+    {|
+    session abc123 in /work. /help for commands, Esc aborts, Ctrl+C twice
+    quits.
+    > earlier question
+    earlier answer
+    Tool host  (3)
+    / ▏
+       srv            /work
+       desk           /d
+    ▸* laptop (here)  /home/me
+    ──────────────────────────────────────────────────────────────────────
+    …m  think:n/a  ctx:0% 0  $0.00  Enter selects · Esc closes
+    |}];
+  H.step h Backend_closed;
+  H.reply h (Reconnect 1) {|{"client_id":"client-2","host_id":"host-abc"}|};
+  print_s [%sexp (h.model.client_id : string option)];
+  H.reply h Initial_state state;
+  H.reply h Initial_messages {|[]|};
+  picker ();
+  [%expect
+    {|
+    (Reconnect
+      (generation 1)
+      (delay_ms   0)
+      (session (/s))
+      (as_user ()))
+    (Rpc (method_ get_state) (params ()) (tag Initial_state))
+    (Rpc (method_ get_messages) (params ()) (tag Initial_messages))
+    (Rpc (method_ auth_status) (params ()) (tag Auth_refresh))
+    (Rpc (method_ get_config) (params ()) (tag Config))
+    (Rpc (method_ list_models) (params ()) (tag Models_catalog))
+    (host-abc)
+
+
+    reconnected to the backend
+    session abc123 in /home/me. /help for commands, Esc aborts, Ctrl+C
+    twice quits.
+    Tool host  (3)
+    / ▏
+       srv            /work
+       desk           /d
+    ▸* laptop (here)  /home/me
+    ──────────────────────────────────────────────────────────────────────
+    …m  think:n/a  ctx:0% 0  $0.00  Enter selects · Esc closes
+    |}]
+;;
+
 let%expect_test "the host picker shows which session other frontends are in" =
   let h = connected ~width:70 () in
   let state =

@@ -140,9 +140,11 @@ type t =
   ; mutable hosts : Host.t list
     (** every connected client able to run tools, set by the server *)
   ; host_cwds : string String.Table.t
-    (** where this session last was on each host, overriding [Host.cwd] *)
+    (** where this session last was on each client host, connected or not,
+        overriding [Host.cwd] *)
   ; mutable backend_cwd : string (** the backend host's own cwd *)
   ; mutable active_host : string
+  ; mutable active_host_name : string (** as last seen, for when it is gone *)
   ; mutable host_pinned : bool (** chosen explicitly via [set_active_host] *)
   ; pending_execs : Pending_exec.t String.Table.t
   ; mutable exec_seq : int
@@ -377,42 +379,78 @@ let activate_host t (host : Host.t) ~cwd =
   if not (String.equal t.active_host host.id)
   then add_environment_note t (System_prompt.host_changed_note ~host:host.name);
   t.active_host <- host.id;
+  t.active_host_name <- host.name;
   set_host_cwd t host ~cwd;
   broadcast t (Notice (sprintf "tools now run on %s in %s" host.name cwd));
   state_changed t
 ;;
 
-(* Without the backend there is nothing to fall back on, so a session whose
-   host is gone adopts the first connected one. *)
+let no_host_message =
+  "no tool host connected: connect one with `prigh tool-host -connect ...` or \
+   a TUI, then pick it with /host"
+;;
+
+let host_unavailable_message t =
+  if String.is_empty t.active_host
+  then no_host_message
+  else
+    sprintf
+      "waiting for tool host %S to reconnect; /host picks another"
+      t.active_host_name
+;;
+
+(* A session stays on its host when the host goes away, and resumes there,
+   in the same cwd, when it comes back: only [set_active_host] moves it.
+   Without the backend host, a session that never had a host adopts the
+   first one that connects. *)
 let set_hosts t clients =
   if not (List.equal Host.equal t.hosts clients)
   then (
+    let was_connected = active_host_connected t in
     let gone =
       List.filter t.hosts ~f:(fun h ->
         not (List.exists clients ~f:(fun h' -> String.equal h.id h'.id)))
     in
     t.hosts <- clients;
     List.iter gone ~f:(fun h ->
-      Hashtbl.remove t.host_cwds h.id;
       fail_execs t ~host:h.id ~text:"[tool host disconnected]");
-    match List.hd (hosts t) with
-    | Some host
-      when (not t.backend_host_enabled) && not (active_host_connected t) ->
+    match find_host t t.active_host, List.hd (hosts t) with
+    | None, Some host when String.is_empty t.active_host ->
       activate_host t host ~cwd:host.cwd
-    | _ -> state_changed t)
+    | Some host, _ when not was_connected ->
+      t.active_host_name <- host.name;
+      set_host_cwd t host ~cwd:host.cwd;
+      broadcast
+        t
+        (Notice (sprintf "tools run on %s again in %s" host.name t.cwd));
+      state_changed t
+    | Some host, _ ->
+      t.active_host_name <- host.name;
+      state_changed t
+    | None, _ ->
+      if was_connected then broadcast t (Notice (host_unavailable_message t));
+      state_changed t)
 ;;
 
-(* Tools default to the frontend: a host attaching takes over unless the user
-   pinned a host that is still connected. *)
+(* Tools default to the frontend: a host attaching takes over a session that
+   runs on the backend by default or has no host yet, never one whose host is
+   only disconnected. *)
 let prefer_host t id =
   match find_host t id with
   | None -> ()
   | Some host ->
     let take_over =
-      (not (active_host_connected t))
+      String.is_empty t.active_host
       || ((not t.host_pinned) && String.equal t.active_host Host.backend_id)
     in
     if take_over then activate_host t host ~cwd:host.cwd
+;;
+
+let host_cwds t = String.Map.of_hashtbl_exn t.host_cwds
+
+let restore_host_cwds t cwds =
+  Map.iteri cwds ~f:(fun ~key ~data ->
+    if not (Hashtbl.mem t.host_cwds key) then Hashtbl.set t.host_cwds ~key ~data)
 ;;
 
 let tool_exec_output t ~exec_id ~chunk =
@@ -477,19 +515,9 @@ let host_exec_on
       Tool.Result.error "[cancelled]")
 ;;
 
-let no_host_message =
-  "no tool host connected: connect one with `prigh tool-host -connect ...` or \
-   a TUI, then pick it with /host"
-;;
-
 let host_exec t ~cancel ~on_output ~call_id ~cwd ~name ~arguments =
   match find_host t t.active_host with
-  | None when List.is_empty (hosts t) -> Tool.Result.error no_host_message
-  | None ->
-    Tool.Result.error
-      (sprintf
-         "tool host %S is not connected; use set_active_host to pick another"
-         t.active_host)
+  | None -> Tool.Result.error (host_unavailable_message t)
   | Some host ->
     host_exec_on t host ~cancel ~on_output ~call_id ~cwd ~name ~arguments
 ;;
@@ -516,6 +544,8 @@ let set_active_host t id ~cwd =
   match find_host t id with
   | None when String.equal id Host.backend_id && not t.backend_host_enabled ->
     Or_error.error_string "the backend tool host is disabled"
+  | None when String.equal id t.active_host ->
+    Or_error.error_string (host_unavailable_message t)
   | None -> Or_error.errorf "unknown tool host %S" id
   | Some host ->
     let cwd =
@@ -1095,6 +1125,7 @@ let create
     ; host_cwds = String.Table.create ()
     ; backend_cwd = cwd
     ; active_host = (if backend_host then Host.backend_id else "")
+    ; active_host_name = ""
     ; host_pinned = false
     ; pending_execs = String.Table.create ()
     ; exec_seq = 0
@@ -1427,11 +1458,7 @@ let set_cwd t ~path =
     Or_error.error_string "cannot change directory while a run is in progress"
   else (
     match find_host t t.active_host with
-    | None when List.is_empty (hosts t) -> Or_error.error_string no_host_message
-    | None ->
-      Or_error.errorf
-        "tool host %S is not connected; use set_active_host to pick another"
-        t.active_host
+    | None -> Or_error.error_string (host_unavailable_message t)
     | Some host ->
       Or_error.map
         (resolve_dir_on t host (resolve_path t path))
@@ -1465,7 +1492,7 @@ let list_dirs ?host t ~prefix =
        | None -> Or_error.errorf "unknown tool host %S" id)
   in
   Or_error.bind host ~f:(function
-    | None -> Or_error.error_string "tool host is not connected"
+    | None -> Or_error.error_string (host_unavailable_message t)
     | Some host ->
       let cwd =
         if String.equal host.id t.active_host then t.cwd else host.cwd
