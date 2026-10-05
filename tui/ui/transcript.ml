@@ -48,6 +48,7 @@ module Item = struct
         { skill : Skill_message.t
         ; images : P.Image.t list
         }
+    | Handover of Handover_message.t
   [@@deriving sexp_of, equal]
 end
 
@@ -57,7 +58,10 @@ let user_item (user : P.Message.User.t) : Item.t =
   else (
     match Skill_message.parse user.text with
     | Some skill -> Skill { skill; images = user.images }
-    | None -> User user)
+    | None ->
+      (match Handover_message.parse user.text with
+       | Some handover -> Handover handover
+       | None -> User user))
 ;;
 
 module Stream_kind = struct
@@ -736,6 +740,15 @@ let render_item (item : Item.t) ~(verbosity : Verbosity.t) : Content.t =
   match item with
   | User { text; images; at = _ } -> render_user text images
   | Skill { skill; images } -> render_skill skill images ~verbosity
+  | Handover handover ->
+    let header : Content.Span.t =
+      { text = Handover_message.summary handover; style = magenta }
+    in
+    (* The failed reply above it already shows the error. *)
+    (match verbosity with
+     | Quiet | Normal -> [ [ header ] ]
+     | Verbose ->
+       [ [ header; { text = sprintf " (%s)" handover.error; style = dim } ] ])
   | Assistant { text; final } ->
     (match verbosity with
      | Quiet when not final ->

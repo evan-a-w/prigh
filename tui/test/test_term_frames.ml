@@ -478,10 +478,10 @@ let%expect_test "styled frame: markdown link, diff and autocomplete" =
         [bold]/model[/][gray] [name|id|provider/id]       pick or switch the model[/]
         [bold]/scoped-models[/][gray]                     pick the models Ctrl+P cycles through[/]
         [bold]/change_default[/][gray]                    save the current model and thinking level …[/]
+        [bold]/fallback[/][gray] [off|model...]           show or set the models that take over, in …[/]
+        [bold]/default-dir[/][gray] [off|path]            show or set the directory new sessions sta…[/]
         [bold]/login[/][gray] [provider] [api_key|oauth]  log in to a provider[/]
-        [bold]/logout[/][gray] [provider]                 remove a provider's stored credential[/]
-        [bold]/thinking[/][gray] [off|low|on|high|max]    pick or set the thinking level[/]
-      [gray]  ↕ 1–8 of 38[/]
+      [gray]  ↕ 1–8 of 40[/]
       …[gray]deepseek-flash[/]  [gray]think:off[/]  [green]ctx:0% 1.5k[/]  [gray]$0.01[/]  [gray]Tab/Enter accept · Esc close[/]
       |}];
     return ())

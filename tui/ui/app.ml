@@ -29,7 +29,10 @@ module Reply_tag = struct
     | Config
     | Config_saved
     | Default_saved
-    | Config_for_confirm of bool
+    | Fallback_shown
+    | Fallback_saved of string
+    | Default_dir_shown
+    | Default_dir_saved of string
     | Models_catalog
     | Models_for_scoped
     | Compact_done
@@ -706,7 +709,12 @@ let user_text text =
 ;;
 
 let user_first_line ({ text; images; at = _ } : P.Message.User.t) =
-  match first_line (user_text text), images with
+  let text =
+    match Handover_message.parse text with
+    | Some handover -> Handover_message.summary handover
+    | None -> user_text text
+  in
+  match first_line text, images with
   | "", image :: _ -> P.Image.to_string_hum image
   | line, _ -> line
 ;;
@@ -1448,28 +1456,81 @@ let cycle_thinking m =
     , [ rpc "set_thinking" ~params:[ "thinking", str next ] ] )
 ;;
 
-let config_with_confirm config enabled =
-  { config with P.Config.confirm_tools = enabled }
-;;
-
-let set_config_command config =
-  let label =
-    sprintf
-      "tool confirmation %s"
-      (if config.P.Config.confirm_tools then "on" else "off")
-  in
-  rpc
-    "set_config"
-    ~params:[ "config", P.Config.to_json config ]
-    ~tag:(Notice_on_success label)
+(* The backend keeps the fields left out, so each command sends only its own:
+   a stale or missing [m.config] cannot undo another change. *)
+let set_config ~tag fields =
+  rpc "set_config" ~params:[ "config", `Object fields ] ~tag
 ;;
 
 let set_confirm m enabled =
+  let label =
+    sprintf "tool confirmation %s" (if enabled then "on" else "off")
+  in
+  ( { m with
+      config =
+        Option.map m.config ~f:(fun config ->
+          { config with P.Config.confirm_tools = enabled })
+    }
+  , [ set_config
+        ~tag:(Notice_on_success label)
+        [ "confirm_tools", P.Json.bool enabled ]
+    ] )
+;;
+
+let fallback_summary m (config : P.Config.t) =
+  match config.fallback_models with
+  | [] ->
+    "no fallback models: /fallback MODEL [MODEL...] sets the chain that takes \
+     over when a model's usage runs out"
+  | chain ->
+    let now =
+      Option.value_map m.state ~default:"" ~f:(fun s ->
+        sprintf " (now on %s)" s.model.key)
+    in
+    sprintf "fallback: %s%s" (String.concat ~sep:" → " chain) now
+;;
+
+let default_dir_summary (config : P.Config.t) =
+  match config.default_cwd with
+  | Some dir ->
+    sprintf
+      "default directory: %s (new sessions start there; /default-dir off \
+       clears it)"
+      dir
+  | None ->
+    "no default directory: /default-dir PATH makes new sessions start there"
+;;
+
+let show_config m ~tag ~summary =
   match m.config with
-  | Some config ->
-    let config = config_with_confirm config enabled in
-    { m with config = Some config }, [ set_config_command config ]
-  | None -> m, [ rpc "get_config" ~tag:(Config_for_confirm enabled) ]
+  | Some config -> notice m (summary config), []
+  | None -> m, [ rpc "get_config" ~tag ]
+;;
+
+let set_fallback m (cmd : Commands.Parsed.t) =
+  let models =
+    match cmd.args with
+    | [ "off" ] -> []
+    | models -> models
+  in
+  ( m
+  , [ set_config
+        ~tag:(Fallback_saved ("/fallback " ^ cmd.rest))
+        [ "fallback_models", `Array (List.map models ~f:str) ]
+    ] )
+;;
+
+let set_default_dir m (cmd : Commands.Parsed.t) =
+  let dir =
+    match cmd.args with
+    | [ "off" ] -> `Null
+    | _ -> str cmd.rest
+  in
+  ( m
+  , [ set_config
+        ~tag:(Default_dir_saved ("/default-dir " ^ cmd.rest))
+        [ "default_cwd", dir ]
+    ] )
 ;;
 
 let cancel_btw m =
@@ -1577,6 +1638,12 @@ let run_command m (cmd : Commands.Parsed.t) =
   | "confirm", other :: _ ->
     error m (sprintf "unknown argument %S; use on or off" other), []
   | "change_default", _ -> m, [ rpc "change_default" ~tag:Default_saved ]
+  | "fallback", [] ->
+    show_config m ~tag:Fallback_shown ~summary:(fallback_summary m)
+  | "fallback", _ -> set_fallback m cmd
+  | "default-dir", [] ->
+    show_config m ~tag:Default_dir_shown ~summary:default_dir_summary
+  | "default-dir", _ -> set_default_dir m cmd
   | "auth", _ -> m, [ rpc "auth_status" ~tag:Auth_show ]
   | "login", [] -> m, [ rpc "auth_status" ~tag:Auth_login_picker ]
   | "login", provider :: rest ->
@@ -1905,6 +1972,15 @@ let fetch_autocomplete m ac =
   | _ -> { m with autocomplete = Some ac }, []
 ;;
 
+(* [default_cwd] is a directory on the backend's host, unless the backend runs
+   no tools ([-no-backend-host]): then it is used on whichever host runs them. *)
+let default_dir_host m =
+  Option.bind m.state ~f:(fun (s : P.State.t) ->
+    Option.some_if
+      (List.exists s.hosts ~f:(fun h -> String.equal h.id P.Host.backend_id))
+      P.Host.backend_id)
+;;
+
 let refresh_autocomplete m =
   let line, col = current_line m in
   let line_index = (Editor.position m.editor).line in
@@ -1918,6 +1994,7 @@ let refresh_autocomplete m =
       ~sessions:m.sessions
       ~skills:(Skill_cache.find m.skills ~key:(Skill_cache.key m.state))
       ~logged_in:(logged_in m)
+      ~default_dir_host:(default_dir_host m)
   with
   | None -> { m with autocomplete = None }, []
   | Some ac -> fetch_autocomplete m ac
@@ -2388,16 +2465,10 @@ let save_scoped_models m picker =
     List.filter_map m.models ~f:(fun (model : P.Model.t) ->
       Option.some_if (Set.mem checked model.key) model.key)
   in
-  let config =
-    match m.config with
-    | Some config -> { config with scoped_models }
-    | None -> { P.Config.default with scoped_models }
-  in
   ( { m with mode = Editing }
-  , [ rpc
-        "set_config"
-        ~params:[ "config", P.Config.to_json config ]
+  , [ set_config
         ~tag:Config_saved
+        [ "scoped_models", `Array (List.map scoped_models ~f:str) ]
     ] )
 ;;
 
@@ -2964,6 +3035,14 @@ let reply m (tag : Reply_tag.t) (result : (P.Json.t, string) Result.t) =
        (* The backend formats "did you mean"; the picker helps recover. *)
        model_picker (error m e) ~query:"", []
      | Skill_prompt text -> skill_prompt_failed m text e, []
+     | Fallback_saved text | Default_dir_saved text ->
+       (* Back in the editor, to correct rather than retype. *)
+       let editor =
+         if Editor.is_empty m.editor
+         then Editor.set_text m.editor text
+         else m.editor
+       in
+       error { m with editor } e, []
      | Skills_for_autocomplete key ->
        skills_for_autocomplete
          { m with skills = Skill_cache.set m.skills ~key [] }
@@ -3163,10 +3242,13 @@ let reply m (tag : Reply_tag.t) (result : (P.Json.t, string) Result.t) =
                 (show config.default_model)
                 (show config.default_thinking))
          , [] ))
-     | Config_for_confirm enabled ->
+     | Fallback_shown | Fallback_saved _ ->
        decode json ~f:P.Config.of_json (fun config ->
-         let config = config_with_confirm config enabled in
-         { m with config = Some config }, [ set_config_command config ])
+         let m = { m with config = Some config } in
+         notice m (fallback_summary m config), [])
+     | Default_dir_shown | Default_dir_saved _ ->
+       decode json ~f:P.Config.of_json (fun config ->
+         notice { m with config = Some config } (default_dir_summary config), [])
      | Models_catalog ->
        decode json ~f:(decode_list ~f:P.Model.of_json) (fun models ->
          { m with models }, [])
