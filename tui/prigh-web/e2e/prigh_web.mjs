@@ -8,6 +8,7 @@
 // SHOTS (a directory for screenshots of each step).
 import { spawn } from "node:child_process";
 import { mkdirSync, writeFileSync } from "node:fs";
+import { hostname } from "node:os";
 import { join } from "node:path";
 import { png, pngSize } from "./png.mjs";
 
@@ -69,7 +70,10 @@ const startServer = (listen, scriptFile) =>
       backend,
       ["serve", "-prigh-web", listen, "-prigh-web-root", site, "-faux-script", scriptFile,
         "-token", token, "-cwd", cwd],
-      { env: { ...process.env, HOME: home }, stdio: ["ignore", "ignore", "pipe"] },
+      // The terminal's tmux server is ours (not a shared -L prigh), so its
+      // shell is $SHELL.
+      { env: { ...process.env, HOME: home, TMUX_TMPDIR: dir, SHELL: "/bin/sh" },
+        stdio: ["ignore", "ignore", "pipe"] },
     );
     let err = "";
     server.stderr.on("data", data => {
@@ -118,6 +122,7 @@ const clean = text => text
   .replace(/\d+% ctx/g, "<CTX>% ctx")
   // Messages' times, and the day separator a run past midnight would add.
   .replace(/(Yesterday )?\b\d\d:\d\d\b/g, "<TIME>")
+  .replaceAll(hostname(), "<HOSTNAME>")
   .split("\n")
   .map(line => line.trim())
   .filter(line => line !== "" && line !== "Today")
@@ -195,6 +200,24 @@ const send = async text => {
 };
 
 const sessionId = () => new URL(page.url()).searchParams.get("session");
+
+// The terminal panel's screen (xterm.js draws a div per row).
+const terminalRows = () => page.evaluate(() =>
+  [...document.querySelectorAll(".terminal-panel .xterm-rows > div")].map(row => row.textContent.trimEnd()));
+const terminalHas = text => page.waitForFunction(
+  t => document.querySelector(".terminal-panel .xterm-rows")?.textContent.includes(t), text);
+const showTerminal = async label => {
+  section(label);
+  console.log(clean(await page.locator(".terminal-head").innerText()));
+  console.log(clean((await terminalRows()).join("\n")));
+  await screenshot(label);
+};
+// Runs [command] in the terminal and waits for the output line [expect].
+const shell = async (command, expect) => {
+  await page.keyboard.type(command);
+  await page.keyboard.press("Enter");
+  if (expect) await terminalHas(expect);
+};
 
 // A second client asks the backend what the session's messages are.
 const backendMessages = session =>
@@ -361,6 +384,86 @@ try {
   await page.waitForSelector(".agents-detail .agents-transcript .entries");
   await showPanel("a card opens its agent");
   await page.locator(".agents-close").click();
+
+  // 9. The terminal: a shell on the backend, in the session's directory.
+  //    Its keys are the shell's (Esc too); closing and reopening it, or
+  //    reloading the page, finds the same shell; another session has its own.
+  const clearScreen = String.raw`printf '\033[H\033[2J\033[3J'`;
+  const cleared = () => page.waitForFunction(() =>
+    document.querySelector(".terminal-panel .xterm-rows").textContent.trim() === "$");
+  await page.locator(".terminal-toggle").click();
+  await page.waitForFunction(() =>
+    document.activeElement?.closest(".terminal-panel")
+    && document.querySelector(".terminal-panel .xterm-rows")?.textContent.trim());
+  // A known prompt, and nothing from before it.
+  await shell(`PS1='$ '; ${clearScreen}`);
+  await cleared();
+  await shell("echo hello-from-prigh-web", "hello-from-prigh-web");
+  await shell("pwd", cwd);
+  await shell("cat -v");
+  await page.keyboard.press("Escape");
+  await page.keyboard.press("Enter");
+  await terminalHas("^[");
+  await page.keyboard.press("Control+D");
+  await page.waitForFunction(() =>
+    [...document.querySelectorAll(".terminal-panel .xterm-rows > div")]
+      .map(row => row.textContent.trim()).filter(row => row !== "").at(-1) === "$");
+  await showTerminal("a shell in the terminal panel");
+  // The shell's size is the panel's; dragging its edge makes both taller.
+  const shellRows = async () => {
+    const sizes = async () => (await terminalRows()).filter(row => /^\d+ \d+$/.test(row));
+    const seen = (await sizes()).length;
+    await shell("stty size");
+    await page.waitForFunction(n =>
+      [...document.querySelectorAll(".terminal-panel .xterm-rows > div")]
+        .filter(row => /^\d+ \d+$/.test(row.textContent.trim())).length > n, seen);
+    return Number((await sizes()).at(-1).split(" ")[0]);
+  };
+  const before = await shellRows();
+  console.log(`the shell has the panel's rows: ${before === (await terminalRows()).length}`);
+  const edge = await page.locator(".terminal-resize").boundingBox();
+  await page.mouse.move(edge.x + 300, edge.y + edge.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(edge.x + 300, edge.y - 160, { steps: 8 });
+  await page.mouse.up();
+  await page.locator(".terminal-panel .xterm").click();
+  await page.waitForFunction(n => document.querySelectorAll(".terminal-panel .xterm-rows > div").length > n, before);
+  const after = await shellRows();
+  console.log(`taller after dragging: ${after > before}; the panel's rows: ${after === (await terminalRows()).length}`);
+  await shell(clearScreen);
+  await cleared();
+  await shell("echo still-here", "still-here");
+  await page.keyboard.press("Control+Backquote");
+  await page.waitForSelector(".terminal-panel", { state: "detached" });
+  await page.waitForFunction(() => document.activeElement?.id === "editor");
+  console.log("closed: the editor has the keyboard");
+  await page.keyboard.press("Control+Backquote");
+  await terminalHas("still-here");
+  await showTerminal("reopened: the same shell");
+  await page.reload();
+  await composer().waitFor();
+  await terminalHas("still-here");
+  console.log(`reloaded: the same height: ${await page.evaluate(() =>
+    getComputedStyle(document.querySelector(".terminal-panel")).getPropertyValue("--terminal-height") !== "")}`);
+  await showTerminal("reloaded: the panel and the shell are back");
+  await page.locator(".sidebar .session", { hasText: "hello again" }).click();
+  await bodyHas("second session reply");
+  await page.waitForFunction(() => {
+    const rows = document.querySelector(".terminal-panel .xterm-rows")?.textContent ?? "";
+    return rows.trim() !== "" && !rows.includes("still-here");
+  });
+  console.log("another session: another shell");
+  await page.locator(".sidebar .session", { hasText: "count some lines" }).click();
+  await terminalHas("still-here");
+  console.log("back: the first one again");
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.waitForFunction(() => document.querySelector(".app.narrow:not(.sidebar-open)"));
+  await page.waitForTimeout(400); // the sheet's slide
+  await showTerminal("the terminal on a phone");
+  await page.locator(".terminal-close").click();
+  await page.waitForSelector(".terminal-panel", { state: "detached" });
+  await page.setViewportSize({ width: 1280, height: 800 });
+  await page.waitForFunction(() => document.querySelector(".app:not(.narrow)"));
 
   // The layout at phone size.
   await page.setViewportSize({ width: 390, height: 844 });
