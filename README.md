@@ -106,15 +106,20 @@ has one *active tool host*; `/host` lists the backend and the connected
 frontends and switches between them (asking for the working directory to
 use on the new host, prefilled with the current one and checked there
 before switching), and the status line shows `tools:<name>` when tools run
-elsewhere or `tools:offline` when the active host has disconnected (tool
-calls then fail until you pick another host). Several frontends can attach
+elsewhere or `tools:offline` when the active host has disconnected. A
+session never leaves its host on its own: while the host is away tool calls
+fail with a message saying it waits for the host to reconnect, and when the
+host comes back (a frontend or `prigh tool-host` reconnecting, which keeps
+its identity for the life of the process) the session carries on there, in
+the same directory; `/host` picks another host meanwhile. Several frontends can attach
 to one session (`/sessions` marks live ones) and all see the same stream; a
 session keeps running when its frontends disconnect. Plain TCP with a shared
 token: bind to localhost and use an SSH tunnel on untrusted networks.
 
 A tool host doesn't need a TUI: `prigh tool-host -connect server:7777 -token
-sekrit -cwd ~/proj [-name NAME]` connects on its own (reconnecting when the
-connection drops) and hosts the session's tools *and* its `>_` terminal, so
+sekrit -cwd ~/proj [-name NAME] [-host-id ID]` connects on its own
+(reconnecting when the connection drops; a fixed `-host-id` also keeps its
+sessions across restarts of the tool host) and hosts the session's tools *and* its `>_` terminal, so
 a browser-only user can pick it with `/host`. The web UI's terminal always
 runs on the session's active host, relayed through the backend.
 
