@@ -23,6 +23,9 @@ let methods =
   ; "kill_job"
   ; "job_output"
   ; "list_jobs"
+  ; "list_skills"
+  ; "list_mcp"
+  ; "mcp_approve"
   ; "shell"
   ; "get_state"
   ; "get_messages"
@@ -771,12 +774,19 @@ let dispatch agent login ~meth ~params : Json.t Or_error.t =
     let%bind images = images_param ~env:(Agent.env agent) params in
     (match meth with
      | "prompt" -> unit_result (Agent.prompt ~attachments ~images agent text)
-     | "steer" ->
-       Agent.steer ~attachments ~images agent text;
-       empty
-     | _ ->
-       Agent.follow_up ~attachments ~images agent text;
-       empty)
+     | "steer" -> unit_result (Agent.steer ~attachments ~images agent text)
+     | _ -> unit_result (Agent.follow_up ~attachments ~images agent text))
+  | "list_skills" ->
+    Or_error.map (Agent.skills agent) ~f:(fun skills ->
+      `Object [ "skills", `Array (List.map skills ~f:[%jsonaf_of: Skill.t]) ])
+  | "list_mcp" ->
+    Or_error.bind (bool_param params "reconnect" ~default:false) ~f:(fun reconnect ->
+      Or_error.map (Agent.mcp_servers ~reconnect agent) ~f:Mcp_tools.Listing.to_rpc_json)
+  | "mcp_approve" ->
+    let open Or_error.Let_syntax in
+    let%bind source = string_param params "source" in
+    let%bind server = string_param params "server" in
+    Or_error.map (Agent.approve_mcp agent ~source ~server) ~f:Mcp_tools.Listing.to_rpc_json
   | "abort" ->
     let restored = Agent.abort agent in
     ok

@@ -4,6 +4,7 @@ open Tool_test_helpers
 
 let instructions t arguments =
   Host_ops.execute
+    ~mcp:None
     ~env:t.env
     ~cancel:Cancellation.never
     ~on_output:ignore
@@ -29,14 +30,14 @@ let%expect_test
   with_nix_on_path t ~nix:true (fun () -> show t (instructions t args));
   [%expect
     {|
-    reply: {"files":[{"path":"$DIR/AGENTS.md","text":"rules"}],"nix":true}
-    ((files (($DIR/AGENTS.md rules))) (nix true))
+    reply: {"files":[{"path":"$DIR/AGENTS.md","text":"rules"}],"nix":true,"skills":[]}
+    ((files (($DIR/AGENTS.md rules))) (nix true) (skills ()))
     |}];
   with_nix_on_path t ~nix:false (fun () -> show t (instructions t args));
   [%expect
     {|
-    reply: {"files":[{"path":"$DIR/AGENTS.md","text":"rules"}],"nix":false}
-    ((files (($DIR/AGENTS.md rules))) (nix false))
+    reply: {"files":[{"path":"$DIR/AGENTS.md","text":"rules"}],"nix":false,"skills":[]}
+    ((files (($DIR/AGENTS.md rules))) (nix false) (skills ()))
     |}];
   (* Backends that predate [with_nix] get the bare array they expect. *)
   with_nix_on_path t ~nix:true (fun () ->
@@ -44,7 +45,7 @@ let%expect_test
   [%expect
     {|
     reply: [{"path":"$DIR/AGENTS.md","text":"rules"}]
-    ((files (($DIR/AGENTS.md rules))) (nix false))
+    ((files (($DIR/AGENTS.md rules))) (nix false) (skills ()))
     |}]
 ;;
 
@@ -86,18 +87,18 @@ let%expect_test "instructions_of_result: old and new hosts, errors" =
   [%expect
     {|
     reply: [{"path":"/p/AGENTS.md","text":"old host"}]
-    ((files ((/p/AGENTS.md "old host"))) (nix false))
+    ((files ((/p/AGENTS.md "old host"))) (nix false) (skills ()))
     reply: {"files":[{"path":"/p/AGENTS.md","text":"new host"}],"nix":true}
-    ((files ((/p/AGENTS.md "new host"))) (nix true))
+    ((files ((/p/AGENTS.md "new host"))) (nix true) (skills ()))
     reply: {"files":[],"nix":false}
-    ((files ()) (nix false))
+    ((files ()) (nix false) (skills ()))
     reply: {"nix":true}
-    ((files ()) (nix true))
+    ((files ()) (nix true) (skills ()))
     reply: [{"path":"/p/AGENTS.md"},{"path":"/q/AGENTS.md","text":"kept"}]
-    ((files ((/q/AGENTS.md kept))) (nix false))
+    ((files ((/q/AGENTS.md kept))) (nix false) (skills ()))
     reply: unknown host tool
-    ((files ()) (nix false))
+    ((files ()) (nix false) (skills ()))
     reply: not json
-    ((files ()) (nix false))
+    ((files ()) (nix false) (skills ()))
     |}]
 ;;

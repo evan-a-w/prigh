@@ -71,6 +71,7 @@ module Instructions = struct
   type t =
     { files : (string * string) list
     ; nix : bool
+    ; skills : Skill.t list
     }
   [@@deriving sexp_of]
 end
@@ -97,6 +98,12 @@ let on_path name =
    strips it so a remote host uses its own. With [with_nix], the reply is an
    object that also says whether [nix] is on the host's PATH; without it,
    the bare array that backends predating it expect. *)
+let home_arg args =
+  match Tool_args.string_opt args "home" with
+  | Some home -> home
+  | None -> Option.value (Sys.getenv "HOME") ~default:"/"
+;;
+
 let instructions_tool =
   { Tool.spec =
       { Tool_spec.name = instructions_op
@@ -108,11 +115,7 @@ let instructions_tool =
       }
   ; run =
       (fun context args ->
-        let home =
-          match Tool_args.string_opt args "home" with
-          | Some home -> home
-          | None -> Option.value (Sys.getenv "HOME") ~default:"/"
-        in
+        let home = home_arg args in
         let files =
           `Array
             (List.map
@@ -127,6 +130,11 @@ let instructions_tool =
                 `Object
                   [ "files", files
                   ; ("nix", if on_path "nix" then `True else `False)
+                  ; ( "skills"
+                    , `Array
+                        (List.map
+                           (Skill.discover ~cwd:context.cwd ~home)
+                           ~f:[%jsonaf_of: Skill.t]) )
                   ]
               | Some false | None -> files)))
   }
@@ -146,7 +154,7 @@ let instructions_of_result (result : Tool.Result.t) : Instructions.t =
         | _ -> None)
     | _ -> []
   in
-  let none = { Instructions.files = []; nix = false } in
+  let none = { Instructions.files = []; nix = false; skills = [] } in
   if result.is_error
   then none
   else (
@@ -158,15 +166,115 @@ let instructions_of_result (result : Tool.Result.t) : Instructions.t =
           (match Json.member "nix" json with
            | Some `True -> true
            | _ -> false)
+      ; skills =
+          (match Json.member "skills" json with
+           | Some (`Array items) ->
+             List.filter_map items ~f:(fun item ->
+               Option.try_with (fun () -> [%of_jsonaf: Skill.t] item))
+           | _ -> [])
       }
     | _ -> none)
+;;
+
+let skill_op = "$skill"
+
+(* The skill [name] as the host sees it now, with its body. *)
+let skill ~cwd ~home name =
+  let skills = Skill.discover ~cwd ~home in
+  match List.find skills ~f:(fun s -> String.equal s.name name) with
+  | None -> Tool.Result.error (Error.to_string_hum (Skill.unknown skills name))
+  | Some skill ->
+    (match Skill.parse ~path:skill.path (In_channel.read_all skill.path) with
+     | exception exn -> Tool.Result.error (Exn.to_string exn)
+     | Error e -> Tool.Result.error (Error.to_string_hum e)
+     | Ok (skill, body) ->
+       Tool.Result.ok
+         (Json.to_string
+            (`Object [ "skill", [%jsonaf_of: Skill.t] skill; "body", `String body ])))
+;;
+
+let skill_args ~home name = `Object [ "home", `String home; "name", `String name ]
+
+let skill_of_result (result : Tool.Result.t) =
+  if result.is_error
+  then Error (Error.of_string result.text)
+  else
+    Or_error.try_with (fun () ->
+      let json = Json.parse result.text |> Or_error.ok_exn in
+      ( [%of_jsonaf: Skill.t] (Option.value_exn (Json.member "skill" json))
+      , match Json.member "body" json with
+        | Some (`String body) -> body
+        | _ -> "" ))
+;;
+
+let mcp_servers_op = "$mcp_servers"
+let mcp_call_op = "$mcp_call"
+let mcp_approve_op = "$mcp_approve"
+let is_mcp_op name = List.mem [ mcp_servers_op; mcp_call_op; mcp_approve_op ] name ~equal:String.equal
+
+let mcp_servers_args ~home ~reconnect =
+  `Object [ "home", `String home; ("reconnect", if reconnect then `True else `False) ]
+;;
+
+let mcp_call_args ~home ~source ~server ~tool arguments =
+  `Object
+    [ "home", `String home
+    ; "source", `String source
+    ; "server", `String server
+    ; "tool", `String tool
+    ; "arguments", arguments
+    ]
+;;
+
+let mcp_approve_args ~home ~source ~server =
+  `Object [ "home", `String home; "source", `String source; "server", `String server ]
+;;
+
+let listing_of_result (result : Tool.Result.t) =
+  if result.is_error
+  then Error (Error.of_string result.text)
+  else Or_error.bind (Json.parse result.text) ~f:Mcp_tools.Listing.of_json
+;;
+
+let mcp ~mcp ~cancel ~cwd ~name ~(arguments : Json.t) =
+  let home = home_arg arguments in
+  let listing ~reconnect =
+    Tool.Result.ok
+      (Json.to_string
+         (Mcp_tools.Listing.to_json
+            (Mcp_tools.Listing.of_hub (Mcp_hub.servers mcp ~reconnect ~cwd ~home ()))))
+  in
+  let string key = Tool_args.string arguments key in
+  if String.equal name mcp_servers_op
+  then
+    listing
+      ~reconnect:(Option.value (Tool_args.bool_opt arguments "reconnect") ~default:false)
+  else if String.equal name mcp_call_op
+  then
+    Mcp_hub.call
+      mcp
+      ~cancel
+      ~source:(string "source")
+      ~server:(string "server")
+      ~home
+      ~tool:(string "tool")
+      ~arguments:
+        (Option.value (Json.member "arguments" arguments) ~default:(`Object []))
+  else (
+    match
+      Or_error.bind
+        (Mcp_config.find ~home ~source:(string "source") (string "server"))
+        ~f:(Mcp_config.approve ~home)
+    with
+    | Error e -> Tool.Result.error (Error.to_string_hum e)
+    | Ok () -> listing ~reconnect:true)
 ;;
 
 let host_tools () =
   instructions_tool :: List.filter Tools.all ~f:(fun t -> t.spec.on_host)
 ;;
 
-let execute ~env ~cancel ~on_output ~cwd ~name ~(arguments : Json.t) =
+let execute ~mcp:hub ~env ~cancel ~on_output ~cwd ~name ~(arguments : Json.t) =
   let string_arg key =
     match arguments with
     | `Object fields ->
@@ -190,6 +298,18 @@ let execute ~env ~cancel ~on_output ~cwd ~name ~(arguments : Json.t) =
     match string_arg "prefix" with
     | Ok prefix -> list_paths ~env ~cwd prefix
     | Error e -> Tool.Result.error (Error.to_string_hum e))
+  else if String.equal name skill_op
+  then (
+    match string_arg "name" with
+    | Ok skill_name -> skill ~cwd ~home:(home_arg arguments) skill_name
+    | Error e -> Tool.Result.error (Error.to_string_hum e))
+  else if is_mcp_op name
+  then (
+    match hub with
+    | None -> Tool.Result.error "MCP is not available on this tool host"
+    | Some hub ->
+      (try mcp ~mcp:hub ~cancel ~cwd ~name ~arguments with
+       | Tool_args.Invalid message -> Tool.Result.error message))
   else if String.equal name list_dirs_op
   then (
     match string_arg "prefix" with

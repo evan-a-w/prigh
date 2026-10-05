@@ -4,6 +4,7 @@ open! Import
 module Queued = struct
   type t =
     { text : string
+    ; skill : string option
     ; attachments : string list
     ; images : Image.t list
     }
@@ -149,6 +150,11 @@ type t =
     (** cwd/host changes not yet told to the model, oldest first *)
   ; background : Background_tasks.t
   ; subagent_log : Subagent_log.t
+  ; mcp : Mcp_hub.t option
+    (** the backend's own servers; [None] turns MCP off on every host *)
+  ; mutable mcp_tools : Tool.t list (** as of the latest run's start *)
+  ; mutable mcp_noticed : String.Set.t
+    (** MCP problems already reported, so each is told once *)
   }
 
 let restore_settings t =
@@ -411,7 +417,15 @@ let host_exec_on
       ~arguments
   =
   if String.equal host.id Host.backend_id && t.backend_host_enabled
-  then Host_ops.execute ~env:t.env ~cancel ~on_output ~cwd ~name ~arguments
+  then
+    Host_ops.execute
+      ~mcp:t.mcp
+      ~env:t.env
+      ~cancel
+      ~on_output
+      ~cwd
+      ~name
+      ~arguments
   else (
     let exec_id =
       sprintf "%s/%s-%d" (Session.id t.session) call_id t.exec_seq
@@ -518,15 +532,135 @@ let instructions t ~cwd =
 (* Built once per conversation and recorded in the session, so the prompt
    prefix stays cacheable; later cwd/host changes reach the model as notes on
    the next user message instead. *)
+let tools t = t.tools @ t.mcp_tools
+
 let build_system_prompt t =
-  let { Host_ops.Instructions.files; nix } = instructions t ~cwd:t.cwd in
+  let { Host_ops.Instructions.files; nix; skills } =
+    instructions t ~cwd:t.cwd
+  in
   System_prompt.build
     ~instructions:files
     ~nix
+    ~skills
     ~cwd:t.cwd
     ~home:t.home
-    ~tools:(Tools.specs t.tools)
+    ~tools:(Tools.specs (tools t))
     ()
+;;
+
+let skills t =
+  let result =
+    host_exec
+      t
+      ~cancel:Cancellation.never
+      ~on_output:ignore
+      ~call_id:"skills"
+      ~cwd:t.cwd
+      ~name:Host_ops.instructions_op
+      ~arguments:(Host_ops.instructions_args ~home:t.home)
+  in
+  if result.is_error
+  then Error (Error.of_string result.text)
+  else Ok (Host_ops.instructions_of_result result).skills
+;;
+
+(* [/skill:NAME ARGS] becomes the skill's file plus ARGS; other texts are
+   sent as they are. *)
+let expand_skill t text =
+  match Skill.invocation text with
+  | None -> Ok None
+  | Some (name, args) ->
+    Host_ops.skill_of_result
+      (host_exec
+         t
+         ~cancel:Cancellation.never
+         ~on_output:ignore
+         ~call_id:"skill"
+         ~cwd:t.cwd
+         ~name:Host_ops.skill_op
+         ~arguments:(Host_ops.skill_args ~home:t.home name))
+    |> Or_error.map ~f:(fun (skill, body) -> Some (Skill.expand skill ~body ~args))
+;;
+
+let mcp_exec t ?(cancel = Cancellation.never) ~call_id name arguments =
+  Host_ops.listing_of_result
+    (host_exec
+       t
+       ~cancel
+       ~on_output:ignore
+       ~call_id
+       ~cwd:t.cwd
+       ~name
+       ~arguments)
+;;
+
+let mcp_call t (context : Tool.Context.t) ~source ~server ~tool arguments =
+  host_exec
+    t
+    ~cancel:context.cancel
+    ~on_output:context.on_output
+    ~call_id:context.call_id
+    ~cwd:context.cwd
+    ~name:Host_ops.mcp_call_op
+    ~arguments:(Host_ops.mcp_call_args ~home:t.home ~source ~server ~tool arguments)
+;;
+
+let use_listing t (listing : Mcp_tools.Listing.t) =
+  t.mcp_tools <- Mcp_tools.tools listing ~call:(mcp_call t);
+  List.iter (Mcp_tools.Listing.notices listing) ~f:(fun notice ->
+    if not (Set.mem t.mcp_noticed notice)
+    then (
+      t.mcp_noticed <- Set.add t.mcp_noticed notice;
+      broadcast t (Notice notice)))
+;;
+
+(* The host's MCP servers as of now. A host that cannot tell (an older
+   tool host, none connected) has none. *)
+let refresh_mcp t ~cancel =
+  if Option.is_some t.mcp
+  then (
+    match
+      mcp_exec
+        t
+        ~cancel
+        ~call_id:"mcp"
+        Host_ops.mcp_servers_op
+        (Host_ops.mcp_servers_args ~home:t.home ~reconnect:false)
+    with
+    | Ok listing -> use_listing t listing
+    | Error _ -> t.mcp_tools <- [])
+;;
+
+let mcp_disabled = "MCP is off in this backend (it was started with -no-tools)"
+
+let mcp_servers ?(reconnect = false) t =
+  if Option.is_none t.mcp
+  then Or_error.error_string mcp_disabled
+  else
+    Or_error.map
+      (mcp_exec
+         t
+         ~call_id:"mcp"
+         Host_ops.mcp_servers_op
+         (Host_ops.mcp_servers_args ~home:t.home ~reconnect))
+      ~f:(fun listing ->
+        use_listing t listing;
+        listing)
+;;
+
+let approve_mcp t ~source ~server =
+  if Option.is_none t.mcp
+  then Or_error.error_string mcp_disabled
+  else
+    Or_error.map
+      (mcp_exec
+         t
+         ~call_id:"mcp"
+         Host_ops.mcp_approve_op
+         (Host_ops.mcp_approve_args ~home:t.home ~source ~server))
+      ~f:(fun listing ->
+        use_listing t listing;
+        listing)
 ;;
 
 let system_prompt t =
@@ -542,7 +676,7 @@ let loop_config t =
   { Agent_loop.Config.model = t.model
   ; thinking = t.thinking
   ; system = Some (system_prompt t)
-  ; tools = t.tools
+  ; tools = tools t
   ; max_turns = None
   ; max_tokens = None
   ; retries = Agent_loop.Config.default_retries
@@ -581,7 +715,8 @@ let with_attachments t text attachments =
 ;;
 
 let user_message t (q : Queued.t) =
-  let text, attached = with_attachments t q.text q.attachments in
+  let text = Option.value q.skill ~default:q.text in
+  let text, attached = with_attachments t text q.attachments in
   let text =
     match t.environment_notes with
     | [] -> text
@@ -621,6 +756,7 @@ let rec start_run t prompts =
       Promise.resolve resolve ();
       state_changed t
     in
+    refresh_mcp t ~cancel;
     (match
        Agent_loop.run
          ~env:t.env
@@ -776,6 +912,7 @@ let create
       ?(models = Model_registry.builtin ())
       ?(auto_describe = false)
       ?(backend_host = true)
+      ?mcp
       ~cwd
       ()
   =
@@ -842,6 +979,9 @@ let create
           ~first_job_id:(last_job_number (Session.messages session) + 1)
           ()
     ; subagent_log = Subagent_log.create ()
+    ; mcp
+    ; mcp_tools = []
+    ; mcp_noticed = String.Set.empty
     }
   in
   restore_settings t;
@@ -855,21 +995,26 @@ let create
 ;;
 
 let prompt ?(attachments = []) ?(images = []) t text =
-  if is_running t
-  then
+  let running () =
     Or_error.error_string "a run is already in progress; use steer or follow_up"
-  else (
-    start_run t [ user_message t { text; attachments; images } ];
-    Ok ())
+  in
+  if is_running t
+  then running ()
+  else
+    Or_error.bind (expand_skill t text) ~f:(fun skill ->
+      if is_running t
+      then running ()
+      else Ok (start_run t [ user_message t { text; skill; attachments; images } ]))
 ;;
 
 let enqueue t queue ?(attachments = []) ?(images = []) text =
-  let queued = { Queued.text; attachments; images } in
-  if is_running t
-  then (
-    Queue.enqueue queue queued;
-    queue_update t)
-  else start_run t [ user_message t queued ]
+  Or_error.map (expand_skill t text) ~f:(fun skill ->
+    let queued = { Queued.text; skill; attachments; images } in
+    if is_running t
+    then (
+      Queue.enqueue queue queued;
+      queue_update t)
+    else start_run t [ user_message t queued ])
 ;;
 
 let steer ?attachments ?images t text =

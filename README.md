@@ -620,6 +620,52 @@ first run, and recorded in the session so the cached prompt prefix survives
 the model as a short note on the next message, leaving it to re-read the
 instructions if that seems worthwhile.
 
+### Skills
+
+A skill is a directory with a `SKILL.md` whose YAML frontmatter has a
+`name` (default: the directory's) and a `description` saying when to use
+it ([Agent Skills](https://agentskills.io), as in Claude Code and pi).
+They are found on the tool host in `.prigh/skills/`, `.claude/skills/` and
+`.agents/skills/` of the working directory and each of its ancestors, then
+the same under the home directory (the closest wins a name; skill
+directories may be nested a few levels, as in `~/.claude/skills/synced/`).
+The system prompt lists them with their paths, and the model reads a
+skill's file when a task matches it; `disable-model-invocation: true` keeps
+a skill out of that list. `/skill:NAME ARGS` invokes one yourself: the
+message sent is the skill's file followed by ARGS, and an unknown name is
+refused with the closest ones. `/skills` lists them.
+
+### MCP servers
+
+MCP servers are configured in Claude Code's `mcpServers` format, in the
+tool host's `~/.prigh/mcp.json` and in a project's `.mcp.json` (in the
+working directory or an ancestor; the closest definition of a name wins):
+
+```json
+{
+  "mcpServers": {
+    "fs": { "command": "npx", "args": ["-y", "@modelcontextprotocol/server-filesystem", "."],
+            "env": { "DEBUG": "${DEBUG:-0}" } },
+    "docs": { "type": "http", "url": "https://example.com/mcp",
+              "headers": { "Authorization": "Bearer ${DOCS_TOKEN}" } }
+  }
+}
+```
+
+Stdio servers run on the session's tool host (a project's in the project's
+directory, the user's in the home directory); HTTP ones use the streamable
+HTTP transport. Strings may use `${VAR}` and `${VAR:-default}`. Servers
+start when a run first needs them and keep running for every session on
+that host; their tools are offered to the model as
+`mcp__<server>__<tool>` (read-only ones may run in parallel; the others
+count as destructive for `/confirm`). A project's servers run commands that
+came with the project, so they only start once you approve them in `/mcp`
+(the approval lasts until their definition changes; it is kept in
+`~/.prigh/mcp-approvals.json`). Problems, failed starts and servers awaiting
+approval are reported once each; `/mcp` shows every server with its status
+and tools, and `/mcp reconnect` restarts failed ones. `-no-tools` turns MCP
+off.
+
 ### Testing
 
 Four layers, cheapest first; `dune build @runtest` in each project runs all
