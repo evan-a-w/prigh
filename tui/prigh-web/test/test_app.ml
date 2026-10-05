@@ -4,6 +4,7 @@ let%expect_test "startup, a prompt and its streamed reply" =
   let h = Harness.create ~verbose:true () in
   [%expect
     {|
+    (Focus editor)
     (Rpc (method_ get_state) (params ()) (tag State))
     (Rpc (method_ list_models) (params ()) (tag Models))
     (Rpc (method_ auth_status) (params ()) (tag (Auth_status Refresh)))

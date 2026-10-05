@@ -249,7 +249,6 @@ let install_listeners ~schedule ~current =
         schedule action;
         reveal_selected ();
         Js._false));
-  schedule (App.Action.Set_narrow (narrow ()));
   Browser.on_viewport_change (fun () -> schedule (App.Action.Set_narrow (narrow ())));
   listen Dom_html.Event.paste (fun (ev : Dom_html.clipboardEvent Js.t) ->
     Js.Opt.iter ev##.clipboardData (fun data ->
@@ -369,6 +368,7 @@ let run_app (settings : Settings.t) =
        handle_ref := Some handle;
        Option.iter (Prigh_protocol.Hello_reply.of_json reply |> Or_error.ok) ~f:(fun hello ->
          schedule (App.Action.Hello hello));
+       schedule (App.Action.Set_narrow (narrow ()));
        schedule (App.Action.Load_history (load_history ()));
        schedule App.Action.Start;
        let tick () = schedule (App.Action.Tick (Time_ns.now ())) in
