@@ -84,7 +84,14 @@ let view (m : Model.t) ~inject =
         ~attrs:[ Attr.class_ "main" ]
         [ Topbar_view.view m ~inject
         ; banner m
-        ; Node.div ~attrs:[ Attr.class_ "chat"; Attr.id "chat" ] [ chat ]
+        ; Node.div
+            ~attrs:
+              [ Attr.classes
+                  [ "chat"; "verbosity-" ^ Prigh_ui.Verbosity.name m.verbosity ]
+              ; Attr.id "chat"
+              ]
+            [ chat ]
+        ; Btw_view.view m ~inject
         ; Composer_view.view m ~inject
         ]
     ; Dialog_view.view m ~inject

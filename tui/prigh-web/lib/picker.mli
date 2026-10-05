@@ -26,8 +26,13 @@ end
 
 type t [@@deriving sexp_of, equal]
 
-(** The highlight starts on the marked item. *)
-val create : ?query:string -> title:string -> Item.t list -> t
+(** The highlight starts on the item [highlight], else the marked one. *)
+val create
+  :  ?query:string
+  -> ?highlight:string
+  -> title:string
+  -> Item.t list
+  -> t
 
 val title : t -> string
 val query : t -> string

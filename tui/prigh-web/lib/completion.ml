@@ -50,7 +50,13 @@ let argument_items
       ~(models : Llm.t list)
       ~(auth : Auth_status.t list)
       ~current_model
+      ~(sessions : Session_summary.t list)
+      ~(hosts : Host.t list)
+      ~users
   =
+  let simple items =
+    List.map items ~f:(fun (id, detail) -> Picker.Item.create ~id ~detail id)
+  in
   match kind with
   | Model ->
     let usable (model : Llm.t) =
@@ -96,7 +102,31 @@ let argument_items
              | None -> sprintf "%s via %s" c.method_ c.source)
           ~search:(s.name ^ " " ^ s.provider)
           s.name))
-  | Directory -> []
+  | Verbosity ->
+    simple
+      [ "quiet", "hide tool output and thinking"
+      ; "normal", "tool output folded"
+      ; "verbose", "everything unfolded"
+      ]
+  | Confirm ->
+    simple
+      [ "on", "ask before bash, write and edit"; "off", "run tools without asking" ]
+  | Session ->
+    List.map sessions ~f:(fun s ->
+      Picker.Item.create
+        ~id:s.path
+        ~detail:s.cwd
+        ~search:(Session_list.title s ^ " " ^ s.path)
+        (Session_list.title s))
+  | Host ->
+    List.map hosts ~f:(fun h ->
+      Picker.Item.create
+        ~id:h.name
+        ~detail:h.cwd
+        ~search:(h.name ^ " " ^ h.id)
+        h.name)
+  | User -> List.map users ~f:(fun u -> Picker.Item.create ~id:u u)
+  | Directory | Path -> []
 ;;
 
 let word_at text ~cursor =
@@ -123,7 +153,17 @@ let make source ~prefix ~start items =
   { source; prefix; start; items; selected = 0 }
 ;;
 
-let compute ~text ~cursor ~models ~auth ~current_model =
+let compute
+      ?(sessions = [])
+      ?(hosts = [])
+      ?(users = [])
+      ~text
+      ~cursor
+      ~models
+      ~auth
+      ~current_model
+      ()
+  =
   let in_first_line = not (String.mem (String.prefix text cursor) '\n') in
   let slash =
     match String.chop_prefix text ~prefix:"/" with
@@ -141,12 +181,20 @@ let compute ~text ~cursor ~models ~auth ~current_model =
               String.length text - String.length (String.lstrip rest)
             in
             (match kind with
-             | Directory -> Some (make (Argument kind) ~prefix ~start [])
+             | Directory | Path ->
+               Some (make (Argument kind) ~prefix ~start [])
              | _ ->
                (match
                   rank
                     ~prefix
-                    (argument_items kind ~models ~auth ~current_model)
+                    (argument_items
+                       kind
+                       ~models
+                       ~auth
+                       ~current_model
+                       ~sessions
+                       ~hosts
+                       ~users)
                 with
                 | [] -> None
                 | items -> Some (make (Argument kind) ~prefix ~start items)))
@@ -169,6 +217,7 @@ let request t =
   match t.source with
   | Path -> Some ("list_paths", t.prefix)
   | Argument Directory -> Some ("list_dirs", t.prefix)
+  | Argument Path -> Some ("list_paths", t.prefix)
   | Command | Argument _ -> None
 ;;
 

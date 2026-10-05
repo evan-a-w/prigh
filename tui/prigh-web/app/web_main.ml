@@ -7,6 +7,14 @@ module Client = Prigh_client.Client
 module Browser = Prigh_ui_web_app.Browser
 module Login = Prigh_ui_web_app.Login
 module Ws_transport = Prigh_ui_web_app.Ws_transport
+module Accounts = Prigh_web.Accounts
+
+let storage =
+  { Accounts.Storage.get = Browser.get_item
+  ; set = Browser.set_item
+  ; remove = Browser.remove_item
+  }
+;;
 
 module Settings = struct
   type t =
@@ -72,14 +80,77 @@ let focus id =
     Option.iter (Dom_html.getElementById_opt id) ~f:(fun el -> el##focus))
 ;;
 
+(* Loads the page for [backend] (and rejoins [session]). *)
+let navigate ~backend ~session =
+  let location = Dom_html.window##.location in
+  let search =
+    Option.value_map session ~default:"" ~f:(fun s ->
+      Browser.with_query_param ~search:"" "session" s)
+  in
+  location##.href
+  := Js.string
+       (Browser.href_with_backend
+          ~pathname:(Js.to_string location##.pathname)
+          ~search
+          ~backend)
+;;
+
 (* Reloading drops the socket; the next page load sees the note and shows the
-   sign-in form. *)
-let sign_out () =
+   sign-in form, with the other saved accounts. *)
+let sign_out (settings : Settings.t) =
+  Option.iter (Accounts.current storage ~backend:settings.backend) ~f:(fun account ->
+    Accounts.remove storage account);
   Login.forget Login.Storage.browser;
   Browser.reload_without_query_param "session"
 ;;
 
-let perform client settings ctx (command : App.Command.t) =
+let switch_account (account : Accounts.Account.t) =
+  Accounts.activate storage account;
+  navigate ~backend:account.backend ~session:account.session
+;;
+
+(* The next page load shows the sign-in form instead of connecting. *)
+let adding_key = "prigh-web.adding"
+
+let add_account () =
+  Browser.set_item adding_key "1";
+  Browser.reload_without_query_param "session"
+;;
+
+let take_adding () =
+  let adding = Option.is_some (Browser.get_item adding_key) in
+  Browser.remove_item adding_key;
+  adding
+;;
+
+let chat_element () = Dom_html.getElementById_opt "chat"
+
+let scroll_chat pages =
+  Option.iter (chat_element ()) ~f:(fun chat ->
+    let by = Float.of_int (pages * chat##.clientHeight) *. 0.85 in
+    chat##.scrollTop := Js.float (Js.to_float chat##.scrollTop +. by))
+;;
+
+(* The previous (or next) of the user's messages above (or below) the top of
+   the transcript's view. *)
+let jump_to_user_message direction =
+  Option.iter (chat_element ()) ~f:(fun chat ->
+    let top = Js.to_float chat##getBoundingClientRect##.top in
+    let offsets =
+      Dom.list_of_nodeList (chat##querySelectorAll (Js.string ".msg.user"))
+      |> List.map ~f:(fun (el : Dom_html.element Js.t) ->
+        Js.to_float el##getBoundingClientRect##.top -. top)
+    in
+    let target =
+      if direction < 0
+      then List.filter offsets ~f:(fun o -> Float.(o < -8.)) |> List.max_elt ~compare:Float.compare
+      else List.filter offsets ~f:(fun o -> Float.(o > 8.)) |> List.min_elt ~compare:Float.compare
+    in
+    Option.iter target ~f:(fun offset ->
+      chat##.scrollTop := Js.float (Js.to_float chat##.scrollTop +. offset -. 8.)))
+;;
+
+let perform client settings ctx (model : App.Model.t) (command : App.Command.t) =
   let inject = Bonsai.Apply_action_context.inject ctx in
   let eff =
     match command with
@@ -107,7 +178,14 @@ let perform client settings ctx (command : App.Command.t) =
       in
       inject (App.Action.Reply (Reconnect generation, result))
     | Set_url_session session ->
-      Effect.of_sync_fun (Browser.replace_query_param "session") session
+      Effect.of_sync_fun
+        (fun () ->
+           Browser.replace_query_param "session" session;
+           (* Acting as another user, the session is not this account's. *)
+           match model.account, Option.bind model.hello ~f:Prigh_protocol.Hello_reply.acting_as with
+           | Some account, None -> Accounts.set_session storage account session
+           | _ -> ())
+        ()
     | Expire_toast { id; after_ms } ->
       let%bind.Effect () =
         Effect.of_deferred_fun
@@ -117,7 +195,13 @@ let perform client settings ctx (command : App.Command.t) =
       inject (App.Action.Dismiss_toast id)
     | Focus id -> Effect.of_sync_fun focus id
     | Save_history entries -> Effect.of_sync_fun save_history entries
-    | Sign_out -> Effect.of_sync_fun sign_out ()
+    | Sign_out -> Effect.of_sync_fun sign_out settings
+    | Copy text -> Effect.of_sync_fun Browser.copy_to_clipboard text
+    | Switch_account account -> Effect.of_sync_fun switch_account account
+    | Add_account -> Effect.of_sync_fun add_account ()
+    | Scroll_chat pages -> Effect.of_sync_fun scroll_chat pages
+    | Jump_to_user_message direction ->
+      Effect.of_sync_fun jump_to_user_message direction
   in
   Bonsai.Apply_action_context.schedule_event ctx eff
 ;;
@@ -160,7 +244,7 @@ let component client settings ~current (local_ graph) =
              && Bool.equal (App.Model.running model) (App.Model.running model')
              && Bool.equal model.narrow model'.narrow)
         then autosize ();
-        List.iter commands ~f:(perform client settings ctx);
+        List.iter commands ~f:(perform client settings ctx model');
         model')
       graph
   in
@@ -227,8 +311,31 @@ let key_target (ev : Dom_html.keyboardEvent Js.t) : Prigh_web.Keys.Target.t =
      | _ -> Page)
 ;;
 
+(* Selected text in a field or the page (so Ctrl+X cuts or does nothing). *)
+let has_selection (ev : Dom_html.keyboardEvent Js.t) =
+  let in_field =
+    match Js.Opt.to_option ev##.target with
+    | None -> false
+    | Some el ->
+      (match Dom_html.tagged el with
+       | Textarea t -> t##.selectionStart <> t##.selectionEnd
+       | Input i -> i##.selectionStart <> i##.selectionEnd
+       | _ -> false)
+  in
+  in_field
+  || not
+       (String.is_empty
+          (Js.to_string
+             (Js.Unsafe.meth_call
+                (Js.Unsafe.meth_call Dom_html.window "getSelection" [||])
+                "toString"
+                [||])))
+;;
+
 let key (ev : Dom_html.keyboardEvent Js.t) : Prigh_web.Keys.t =
   { key = Js.Optdef.case ev##.key (fun () -> "") Js.to_string
+  ; code = Js.Optdef.case ev##.code (fun () -> "") Js.to_string
+  ; selection = has_selection ev
   ; shift = Js.to_bool ev##.shiftKey
   ; alt = Js.to_bool ev##.altKey
   ; ctrl = Js.to_bool ev##.ctrlKey
@@ -330,26 +437,83 @@ let escape s =
     | c -> String.of_char c)
 ;;
 
-let sign_in_form ?(notice = false) (settings : Settings.t) ~error =
+let on_click id f =
+  Option.iter (Dom_html.getElementById_opt id) ~f:(fun el ->
+    el##.onclick
+    := Dom_html.handler (fun ev ->
+         Dom.preventDefault ev;
+         f ();
+         Js._false))
+;;
+
+(* [adding]: another account, keeping the one we are signed in as. *)
+let rec sign_in_form ?(notice = false) ?(adding = false) (settings : Settings.t) ~error =
   let value = Option.value_map ~default:"" ~f:escape in
+  let accounts = Accounts.load storage in
+  let current = Accounts.current storage ~backend:settings.backend in
+  let is_current account = Option.exists current ~f:(Accounts.Account.same account) in
+  let saved =
+    match accounts with
+    | [] -> ""
+    | accounts ->
+      sprintf
+        {|<div class="saved-accounts"><p class="saved-title">%s</p>%s</div>|}
+        (if adding then "Saved accounts" else "Continue as")
+        (String.concat
+           (List.mapi accounts ~f:(fun i account ->
+              sprintf
+                {|<div class="saved-account%s"><button class="saved-switch" type="button" id="account-%d"><span class="avatar">%s</span><span class="saved-who"><span class="saved-name">%s</span><span class="saved-host">%s</span></span>%s</button><button class="btn icon ghost saved-forget" type="button" id="forget-%d" title="Forget %s" aria-label="Forget %s">×</button></div>|}
+                (if is_current account then " current" else "")
+                i
+                (escape (String.prefix (String.uppercase (Accounts.Account.name account)) 1))
+                (escape (Accounts.Account.name account))
+                (escape (Accounts.Account.host account))
+                (if is_current account && not adding then {|<span class="saved-badge">last used</span>|} else "")
+                i
+                (escape (Accounts.Account.name account))
+                (escape (Accounts.Account.name account)))))
+  in
+  let back =
+    match adding, current with
+    | true, Some account ->
+      sprintf
+        {|<button class="btn ghost" type="button" id="signin-back">Back to %s</button>|}
+        (escape (Accounts.Account.name account))
+    | _ -> ""
+  in
+  let login : Login.t =
+    if adding then { user = None; password = None } else settings.login
+  in
   Browser.set_app_html
     (sprintf
        {|<div class="signin-page"><form class="signin" id="signin-form">
   <div class="brand"><span class="logo">prigh</span><span class="brand-sub">web</span></div>
-  <h1>Sign in</h1>
+  <h1>%s</h1>
   <p class="signin-sub">to the prigh backend at %s</p>
   <p class="signin-error%s">%s</p>
+  %s
   <label>User name <input id="user" name="user" value="%s" autofocus autocomplete="username" autocapitalize="off" spellcheck="false"></label>
   <label>Password <input id="password" name="password" type="password" value="%s" autocomplete="current-password"></label>
   <details><summary>Backend</summary><input id="backend" name="backend" value="%s"></details>
   <button class="btn primary" type="submit">Sign in</button>
+  %s
 </form></div>|}
+       (if adding then "Add an account" else "Sign in")
        (escape settings.backend)
        (if notice then " notice" else "")
        (escape error)
-       (value settings.login.user)
-       (value settings.login.password)
-       (escape settings.backend));
+       saved
+       (value login.user)
+       (value login.password)
+       (escape settings.backend)
+       back);
+  List.iteri accounts ~f:(fun i account ->
+    on_click (sprintf "account-%d" i) (fun () -> switch_account account);
+    on_click (sprintf "forget-%d" i) (fun () ->
+      Accounts.remove storage account;
+      sign_in_form ~notice ~adding settings ~error));
+  Option.iter current ~f:(fun account ->
+    on_click "signin-back" (fun () -> switch_account account));
   Option.iter
     (Dom_html.getElementById_coerce "signin-form" Dom_html.CoerceTo.form)
     ~f:(fun form ->
@@ -359,12 +523,29 @@ let sign_in_form ?(notice = false) (settings : Settings.t) ~error =
            Dom_html.Event.submit
            (Dom.handler (fun ev ->
               Dom.preventDefault ev;
-              Login.save
-                Login.Storage.browser
-                ~user:(Browser.input_value "user")
-                ~password:(Browser.input_value "password");
-              Browser.reload_with_backend
-                (String.strip (Browser.input_value "backend"));
+              let field id =
+                Option.filter
+                  (Some (String.strip (Browser.input_value id)))
+                  ~f:(Fn.non String.is_empty)
+              in
+              let backend =
+                Option.value (field "backend") ~default:settings.backend
+              in
+              let account =
+                { Accounts.Account.backend
+                ; user = field "user"
+                ; token = field "password"
+                ; session = None
+                }
+              in
+              (* Saved as an account once the backend accepts it. *)
+              Accounts.activate storage account;
+              navigate
+                ~backend
+                ~session:
+                  (if adding || not (String.equal backend settings.backend)
+                   then None
+                   else settings.session);
               Js._false))
            Js._false
          : Dom_html.event_listener_id))
@@ -411,6 +592,11 @@ let run_app (settings : Settings.t) =
          Option.is_some settings.login.password
          || Option.is_some settings.login.user
        then schedule App.Action.Saved_login;
+       schedule
+         (App.Action.Set_accounts
+            { accounts = Accounts.remember storage ~backend:settings.backend
+            ; current = Accounts.current storage ~backend:settings.backend
+            });
        schedule (App.Action.Set_narrow (narrow ()));
        schedule (App.Action.Load_history (load_history ()));
        schedule App.Action.Start;
@@ -436,5 +622,7 @@ let run () =
   let settings = Settings.load () in
   if Login.take_signed_out Login.Storage.browser
   then sign_in_form settings ~notice:true ~error:"Signed out."
+  else if take_adding ()
+  then sign_in_form settings ~adding:true ~error:""
   else run_app settings
 ;;

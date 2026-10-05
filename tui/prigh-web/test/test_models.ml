@@ -207,7 +207,7 @@ let%expect_test
   [%expect
     {|
     Working 75% ↑123k ↓7.9k $1.2345 (3 queued) (1 subagent · 2 jobs) laptop
-    ann as bob
+    (ann as bob)
     |}];
   H.show h ~selector:".context";
   [%expect
@@ -258,7 +258,7 @@ let%expect_test
   [%expect
     {|
     (Rpc (method_ cancel_subagent) (params ((agent_id a1))) (tag Show_error))
-    (Rpc (method_ kill_job) (params ((job_id j1))) (tag Show_error))
+    (Rpc (method_ kill_job) (params ((job_id j1))) (tag (Job_killed j1)))
     |}]
 ;;
 
