@@ -121,7 +121,7 @@ let signed_in_as ?(users = false) user =
 let%expect_test "the account menu: who we are, the other accounts, actions" =
   let h = signed_in_as "alice" in
   H.text h ~selector:".sidebar-footer";
-  H.text h ~selector:".status-item.user";
+  H.text h ~selector:".status-item.account";
   [%expect {|
     (A alice) (Commands and keys (/help))
     (alice)

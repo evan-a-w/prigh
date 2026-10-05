@@ -457,7 +457,7 @@ let rec sign_in_form ?(notice = false) ?(adding = false) (settings : Settings.t)
     | [] -> ""
     | accounts ->
       sprintf
-        {|<div class="saved-accounts"><p class="saved-title">%s</p>%s</div>|}
+        {|<div class="saved-accounts"><p class="saved-title">%s</p>%s</div><p class="saved-or">or sign in</p>|}
         (if adding then "Saved accounts" else "Continue as")
         (String.concat
            (List.mapi accounts ~f:(fun i account ->
