@@ -178,6 +178,7 @@ const showImages = async (label, locator) => {
 const showPanel = async label => {
   section(label);
   console.log(clean(await page.locator(".agents-panel").innerText()).replace(/\b\d+(m \d\d)?s\b/g, "<T>"));
+  await page.waitForTimeout(200); // its slide in
   await screenshot(label);
 };
 
