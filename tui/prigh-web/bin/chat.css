@@ -72,7 +72,7 @@ summary:hover > .label { color: var(--fg); }
 
 /* Background work handed back to the agent */
 
-.msg.delivery { display: flex; flex-direction: column; gap: 6px; }
+.delivery { display: flex; flex-direction: column; gap: 6px; }
 .delivery-section {
   border: 1px dashed var(--border);
   border-radius: 10px;
@@ -93,7 +93,9 @@ summary:hover > .label { color: var(--fg); }
   overflow: hidden;
   text-overflow: ellipsis;
 }
+.delivery-head .stats { color: var(--faint); font-size: 11.5px; flex-shrink: 0; white-space: nowrap; }
 .delivery-body .markdown, .delivery-body .output { margin-top: 6px; }
+.tool-body .delivery-section { border-style: solid; background: var(--code-bg); }
 
 /* Assistant messages */
 
@@ -343,6 +345,7 @@ summary:hover > .label { color: var(--fg); }
 .tool-head .icon { width: 14px; text-align: center; flex-shrink: 0; font-size: 12px; }
 .tool.ok .tool-head .icon { color: var(--green); }
 .tool.error .tool-head .icon { color: var(--red); }
+.tool.interrupted .tool-head .icon { color: var(--faint); }
 .tool .chip {
   font-size: 11px;
   padding: 0 7px;
@@ -448,6 +451,7 @@ summary:hover > .label { color: var(--fg); }
 }
 .output pre + pre, .output pre + details, .output details + pre { padding-top: 0; }
 .output .more > pre { padding-top: 0; }
+.output pre:has(+ .more) { padding-bottom: 0; }
 .output.error { background: var(--err-bg); border-color: var(--err-border); }
 .output.error pre { color: var(--del-fg); }
 .more > summary {
@@ -537,6 +541,7 @@ details.image[open] .lightbox {
   .markdown { font-size: 14.5px; }
   .tool-head { padding: 7px 10px; gap: 7px; }
   .tool-body { padding: 8px 10px 10px; }
-  .tool .chip:not(.bad):not(.add):not(.del) { display: none; }
+  .tool .chip:not(.bad):not(.add):not(.del):not(.job) { display: none; }
+  .delivery-head .stats { display: none; }
   .code pre { padding: 10px 12px; }
 }

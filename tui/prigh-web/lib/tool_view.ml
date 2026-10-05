@@ -27,11 +27,13 @@ module Status = struct
     | Running
     | Done
     | Failed
+    | Interrupted
 
   let cls = function
     | Preparing | Running -> "running"
     | Done -> "ok"
     | Failed -> "error"
+    | Interrupted -> "interrupted"
   ;;
 
   let icon t =
@@ -39,6 +41,7 @@ module Status = struct
     | Preparing | Running -> Node.span ~attrs:[ Attr.class_ "spinner" ] []
     | Done -> span "icon" "✓"
     | Failed -> span "icon" "✕"
+    | Interrupted -> span "icon" "■"
   ;;
 end
 
@@ -50,11 +53,7 @@ let bash_outcome text =
     when String.is_prefix last ~prefix:"["
          && String.is_suffix last ~suffix:"]"
          && List.exists
-              [ "[exit code "
-              ; "[timed out after "
-              ; "[killed by "
-              ; "[cancelled"
-              ]
+              [ "[exit code "; "[timed out after "; "[killed by "; "[cancelled" ]
               ~f:(fun prefix -> String.is_prefix last ~prefix) ->
     ( Some (String.sub last ~pos:1 ~len:(String.length last - 2))
     , String.concat ~sep:"\n" (List.drop_last_exn lines) )
@@ -96,43 +95,47 @@ let last_activity chat =
     | User _ | Notice _ | Compaction _ -> None)
 ;;
 
-let subagent_body ~nested (s : Chat.Subagent.t) ~running =
+let report text =
+  if String.is_empty (String.strip text)
+  then Node.none
+  else
+    folded
+      ~cls:"report"
+      ~label:"Report"
+      ~preview:(Markdown.preview text)
+      (Markdown_view.render text)
+;;
+
+let subagent_body ~nested (s : Chat.Subagent.t) =
   let transcript =
     match Chat.entries s.chat with
     | [] -> Node.none
     | entries ->
-      Node.details
-        ~attrs:[ Attr.class_ "transcript" ]
-        [ Node.summary
-            [ Node.text
-                (sprintf
-                   "Transcript · %s"
-                   (plural (List.length entries) "message"))
-            ]
-        ; nested s.chat
-        ]
+      folded
+        ~cls:"transcript"
+        ~label:"Transcript"
+        ~preview:(plural (List.length entries) "message")
+        (nested s.chat)
   in
   let activity =
-    if running
-    then (
-      match last_activity s.chat with
-      | Some a -> div "activity" [ span "arrow" "↳"; span "text" a ]
-      | None -> div "activity" [ span "arrow" "↳"; span "text" "starting…" ])
-    else Node.none
-  in
-  let report =
     match s.result with
-    | Some { text; is_error = false }
-      when not (String.is_empty (String.strip text)) ->
-      folded
-        ~cls:"report"
-        ~label:"Report"
-        ~preview:(first_line text)
-        (Markdown_view.render text)
-    | Some { text; is_error = true } -> output ~error:true ~head:12 text
-    | Some _ | None -> Node.none
+    | Some _ -> Node.none
+    | None ->
+      div
+        "activity"
+        [ span "arrow" "↳"
+        ; span "text" (Option.value (last_activity s.chat) ~default:"starting…")
+        ]
   in
-  [ activity; report; transcript ]
+  let result =
+    match s.result with
+    | Some { text; is_error = false } ->
+      report (Subagent_report.of_string text).text
+    | Some { text; is_error = true } ->
+      output ~error:true ~head:12 (Subagent_report.of_string text).text
+    | None -> Node.none
+  in
+  [ activity; result; transcript ]
 ;;
 
 let task_details task =
@@ -146,47 +149,56 @@ let task_details task =
   else Node.none
 ;;
 
-let view ~nested ~streaming (call : Tool_call.t) (tool : Chat.Tool.t option) =
+(* Reports of finished jobs or subagents ([job_wait], [job_kill],
+   [subagent_wait]), then perhaps a note of what is still running. *)
+let reports text =
+  let text, note =
+    match String.substr_index_all text ~may_overlap:false ~pattern:"\n\n" |> List.last with
+    | Some i
+      when List.exists [ "still running: "; "timed out; still running: " ] ~f:(fun prefix ->
+             String.is_substring_at text ~pos:(i + 2) ~substring:prefix) ->
+      String.prefix text i, String.drop_prefix text (i + 2)
+    | _ -> text, ""
+  in
+  match Prigh_ui.Delivery.parse text with
+  | Some sections -> [ Delivery_view.view sections; output ~head:8 note ]
+  | None -> [ output ~head:8 (String.concat ~sep:"\n\n" (List.filter [ text; note ] ~f:(Fn.non String.is_empty))) ]
+;;
+
+type presentation =
+  { arg : Node.t option
+  ; chips : Node.t list
+  ; body : Node.t list
+  }
+
+let present ~nested ~streaming ~live (call : Tool_call.t) ~result ~subagent =
   let args = Tool_args.of_call call in
   let str key = Option.value (Tool_args.string args key) ~default:"" in
-  let result = Option.bind tool ~f:(fun t -> t.result) in
-  let live = Option.value_map tool ~default:"" ~f:(fun t -> t.output) in
-  let subagent = Option.bind tool ~f:(fun t -> t.subagent) in
-  let status : Status.t =
-    match result, subagent with
-    | _, Some { result = None; _ } -> Running
-    | _, Some { result = Some { is_error = true; _ }; _ } -> Failed
-    | Some { is_error = true; _ }, _ -> Failed
-    | Some _, _ -> Done
-    | None, _ -> if streaming then Preparing else Running
+  let error_body =
+    match result with
+    | Some ({ is_error = true; _ } as r : Message.Tool_result.t) -> error_output r
+    | _ -> Node.none
   in
-  let failed = function
-    | Some ({ is_error = true; _ } : Message.Tool_result.t) -> true
-    | _ -> false
-  in
-  let arg, chips, body =
-    match call.name with
-    | "bash" ->
-      let command = str "command" in
-      let background =
-        Option.value (Tool_args.bool args "background") ~default:false
-      in
-      let outcome, text =
-        match result with
-        | Some r -> bash_outcome r.text
-        | None -> None, live
-      in
-      let job = Option.bind result ~f:(fun r -> job_started r.text) in
-      let chips =
+  match call.name with
+  | "bash" ->
+    let command = str "command" in
+    let background =
+      Option.value (Tool_args.bool args "background") ~default:false
+    in
+    let outcome, text =
+      match result with
+      | Some r -> bash_outcome r.text
+      | None -> None, live
+    in
+    let job = Option.bind result ~f:(fun r -> job_started r.text) in
+    { arg = Some (span "arg command" (first_line command))
+    ; chips =
         List.filter_opt
-          [ Option.some_if
-              (background && Option.is_none job)
-              (chip "background")
+          [ Option.some_if (background && Option.is_none job) (chip "background")
           ; Option.map job ~f:(fun id -> chip ~cls:"job" ("job " ^ id))
           ; Option.map outcome ~f:(chip ~cls:"bad")
           ]
-      in
-      let body =
+    ; body =
         [ (if String.mem (String.strip command) '\n'
            then Node.pre ~attrs:[ Attr.class_ "command" ] [ Node.text command ]
            else Node.none)
@@ -197,157 +209,187 @@ let view ~nested ~streaming (call : Tool_call.t) (tool : Chat.Tool.t option) =
              | None -> output ~head:0 ~tail:8 text
              | Some r -> output ~error:r.is_error ~head:4 ~tail:8 text))
         ]
-      in
-      Some (span "arg command" (first_line command)), chips, body
-    | "read" ->
-      let range =
-        match Tool_args.int args "offset", Tool_args.int args "limit" with
-        | None, None -> []
-        | Some o, None -> [ chip (sprintf "from line %d" o) ]
-        | None, Some l -> [ chip (plural l "line") ]
-        | Some o, Some l -> [ chip (sprintf "lines %d–%d" o (o + l - 1)) ]
-      in
-      let body =
-        match result with
-        | None -> []
-        | Some ({ is_error = true; _ } as r) -> [ error_output r ]
-        | Some { images = _ :: _ as images; text; _ } ->
-          [ Image_view.thumbs images; span "caption" text ]
-        | Some { text; _ } ->
-          [ Node.details
-              ~attrs:[ Attr.class_ "file" ]
-              [ Node.summary
-                  [ Node.text (plural (Output_view.line_count text) "line") ]
-              ; Node.pre [ Node.text text ]
-              ]
+    }
+  | "read" ->
+    let range =
+      match Tool_args.int args "offset", Tool_args.int args "limit" with
+      | None, None -> []
+      | Some o, None -> [ chip (sprintf "from line %d" o) ]
+      | None, Some l -> [ chip (plural l "line") ]
+      | Some o, Some l -> [ chip (sprintf "lines %d–%d" o (o + l - 1)) ]
+    in
+    let body =
+      match result with
+      | None -> []
+      | Some { is_error = true; _ } -> [ error_body ]
+      | Some { images = _ :: _ as images; text; _ } ->
+        [ Image_view.thumbs images; span "caption" text ]
+      | Some { text; _ } ->
+        [ Node.details
+            ~attrs:[ Attr.class_ "file" ]
+            [ Node.summary
+                [ Node.text (plural (Output_view.line_count text) "line") ]
+            ; Node.pre [ Node.text text ]
+            ]
+        ]
+    in
+    { arg = Some (span "arg path" (str "path")); chips = range; body }
+  | "write" ->
+    let content = str "content" in
+    let overwrote =
+      match result with
+      | Some { is_error = false; text; _ } ->
+        String.is_prefix text ~prefix:"overwrote "
+      | _ -> false
+    in
+    { arg = Some (span "arg path" (str "path"))
+    ; chips =
+        List.filter_opt
+          [ Some (chip (plural (Output_view.line_count content) "line"))
+          ; Option.some_if overwrote (chip "overwrote")
           ]
-      in
-      Some (span "arg path" (str "path")), range, body
-    | "write" ->
-      let content = str "content" in
-      let lines = Output_view.line_count content in
-      ( Some (span "arg path" (str "path"))
-      , [ chip (plural lines "line") ]
-      , [ (match result with
-           | Some ({ is_error = true; _ } as r) -> error_output r
-           | _ -> Node.none)
+    ; body =
+        [ error_body
         ; (if String.is_empty content
            then Node.none
-           else
-             Output_view.view
-               ~head:(if streaming then 0 else 8)
-               ~tail:(if streaming then 8 else 0)
-               content)
-        ] )
-    | "edit" ->
-      let edits = Tool_args.edits args in
-      let diff =
-        match result with
-        | Some { is_error = false; text; _ } when Diff_view.is_unified text ->
-          `Unified text
-        | _ -> `Edits edits
-      in
-      let added, removed =
-        match diff with
-        | `Unified text -> Diff_view.unified_counts text
-        | `Edits edits -> Diff_view.edits_counts edits
-      in
-      ( Some (span "arg path" (str "path"))
-      , (if added + removed = 0
+           else if streaming
+           then Output_view.view ~head:0 ~tail:8 content
+           else Output_view.view ~head:8 ~tail:0 content)
+        ]
+    }
+  | "edit" ->
+    let diff =
+      match result with
+      | Some { is_error = false; text; _ } when Diff_view.is_unified text ->
+        `Unified text
+      | _ -> `Edits (Tool_args.edits args)
+    in
+    let added, removed =
+      match diff with
+      | `Unified text -> Diff_view.unified_counts text
+      | `Edits edits -> Diff_view.edits_counts edits
+    in
+    { arg = Some (span "arg path" (str "path"))
+    ; chips =
+        (if added + removed = 0
          then []
          else
-           [ span "chip add" (sprintf "+%d" added)
-           ; span "chip del" (sprintf "−%d" removed)
+           [ chip ~cls:"add" (sprintf "+%d" added)
+           ; chip ~cls:"del" (sprintf "−%d" removed)
            ])
-      , [ (match result with
-           | Some ({ is_error = true; _ } as r) -> error_output r
-           | _ -> Node.none)
+    ; body =
+        [ error_body
         ; (match diff with
            | `Unified text -> Diff_view.unified text
            | `Edits [] -> Node.none
            | `Edits edits -> Diff_view.edits edits)
-        ] )
-    | ("ls" | "grep" | "find") as name ->
-      let arg =
-        match name with
-        | "ls" -> Option.value (Tool_args.string args "path") ~default:"."
-        | _ -> str "pattern"
-      in
-      let chips =
+        ]
+    }
+  | ("ls" | "grep" | "find") as name ->
+    let ls = String.equal name "ls" in
+    let arg =
+      if ls
+      then Option.value (Tool_args.string args "path") ~default:"."
+      else str "pattern"
+    in
+    { arg = Some (span (if ls then "arg path" else "arg pattern") arg)
+    ; chips =
         List.filter_opt
-          [ (match name with
-             | "ls" -> None
-             | _ ->
+          [ (if ls
+             then None
+             else
                Option.map (Tool_args.string args "path") ~f:(fun p ->
                  chip ("in " ^ p)))
           ; Option.map (Tool_args.string args "glob") ~f:chip
           ; Option.bind (Tool_args.bool args "ignore_case") ~f:(fun b ->
               Option.some_if b (chip "ignore case"))
           ]
-      in
-      let body =
-        match result with
-        | None -> []
-        | Some r -> [ output ~error:r.is_error ~head:8 r.text ]
-      in
-      ( Some
-          (span
-             ("arg " ^ if String.equal name "ls" then "path" else "pattern")
-             arg)
-      , chips
-      , body )
-    | "subagent" ->
-      let task = str "task" in
-      let model =
-        match subagent with
-        | Some s -> Some s.model
-        | None -> Tool_args.string args "model"
-      in
-      let chips =
+    ; body =
+        (match result with
+         | None -> []
+         | Some r -> [ output ~error:r.is_error ~head:8 r.text ])
+    }
+  | "subagent" ->
+    let task = str "task" in
+    let model =
+      match subagent with
+      | Some (s : Chat.Subagent.t) -> Some s.model
+      | None -> Tool_args.string args "model"
+    in
+    let started =
+      match result with
+      | Some { is_error = false; text; _ } -> Subagent_report.started text
+      | _ -> None
+    in
+    { arg = Some (span "arg task" (first_line task))
+    ; chips =
         List.filter_opt
-          [ Option.map model ~f:(chip ~cls:"model")
+          [ Option.map started ~f:(fun id -> chip ~cls:"job" ("agent " ^ id))
+          ; Option.map model ~f:(chip ~cls:"model")
           ; Option.bind subagent ~f:(fun s ->
               Option.some_if (s.turns > 0) (chip (plural s.turns "turn")))
           ; Option.bind subagent ~f:(fun s ->
               Option.map s.cost_usd ~f:(fun c -> chip (sprintf "$%.2f" c)))
           ]
-      in
-      let body =
+    ; body =
         task_details task
         ::
-        (match subagent with
-         | Some s -> subagent_body ~nested s ~running:(Option.is_none s.result)
-         | None ->
-           (match result with
-            | Some ({ is_error = true; _ } as r) -> [ error_output r ]
-            | Some _ | None -> []))
-      in
-      Some (span "arg task" (first_line task)), chips, body
-    | _ ->
-      let arg = first_line (summary call) in
-      let body =
-        match result with
-        | None -> [ output ~head:0 ~tail:6 live ]
-        | Some r ->
-          [ output ~error:r.is_error ~head:8 r.text
-          ; Image_view.thumbs r.images
-          ]
-      in
-      Option.some_if (not (String.is_empty arg)) (span "arg" arg), [], body
+        (match subagent, result with
+         | Some s, _ -> subagent_body ~nested s
+         | None, Some { is_error = true; _ } -> [ error_body ]
+         | None, Some { text; _ } when Option.is_none started ->
+           [ report (Subagent_report.of_string text).text ]
+         | None, _ -> [])
+    }
+  | "job_wait" | "job_kill" | "subagent_wait" | "subagent_cancel" ->
+    let ids = Tool_args.strings args "ids" @ Tool_args.strings args "id" in
+    { arg = Some (span "arg" (String.concat ~sep:" " ids))
+    ; chips = []
+    ; body =
+        (match result with
+         | None -> []
+         | Some { is_error = true; _ } -> [ error_body ]
+         | Some { text; _ } -> reports text)
+    }
+  | _ ->
+    let arg = first_line (summary call) in
+    { arg = Option.some_if (not (String.is_empty arg)) (span "arg" arg)
+    ; chips = []
+    ; body =
+        (match result with
+         | None -> [ output ~head:0 ~tail:6 live ]
+         | Some r ->
+           [ output ~error:r.is_error ~head:8 r.text; Image_view.thumbs r.images ])
+    }
+;;
+
+let view ~nested ~streaming ~running (call : Tool_call.t) (tool : Chat.Tool.t option) =
+  let result = Option.bind tool ~f:(fun t -> t.result) in
+  let live = Option.value_map tool ~default:"" ~f:(fun t -> t.output) in
+  let subagent = Option.bind tool ~f:(fun t -> t.subagent) in
+  let status : Status.t =
+    match result, subagent with
+    | Some { is_error = true; _ }, _
+    | _, Some { result = Some { is_error = true; _ }; _ } -> Failed
+    | _, Some { result = None; _ } -> Running
+    | Some _, _ -> Done
+    | None, _ ->
+      if streaming then Preparing else if running then Running else Interrupted
   in
-  let status =
-    if failed result && Poly.equal status Status.Done
-    then Status.Failed
-    else status
+  let { arg; chips; body } =
+    present ~nested ~streaming ~live call ~result ~subagent
   in
-  let body = present body in
+  let chips =
+    match status with
+    | Interrupted -> chips @ [ chip "no result" ]
+    | Preparing | Running | Done | Failed -> chips
+  in
+  let body = Chat_html.present body in
   div
     (String.concat ~sep:" " [ "tool"; "tool-" ^ call.name; Status.cls status ])
     [ div
         "tool-head"
-        ([ Status.icon status; span "name" call.name ]
-         @ Option.to_list arg
-         @ chips)
+        ([ Status.icon status; span "name" call.name ] @ Option.to_list arg @ chips)
     ; (match body with
        | [] -> Node.none
        | body -> div "tool-body" body)

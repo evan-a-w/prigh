@@ -22,39 +22,6 @@ let user ({ text; images } : Message.User.t) =
     ]
 ;;
 
-let delivery (sections : Prigh_ui.Delivery.Section.t list) =
-  div
-    "msg delivery"
-    (List.map sections ~f:(fun section ->
-       let body = String.concat ~sep:"\n" section.body in
-       let head =
-         div
-           "delivery-head"
-           [ span "icon" "↩"
-           ; span "kind" (sprintf "%s %s" section.kind section.id)
-           ; span (if section.ok then "chip ok" else "chip bad") section.status
-           ; span "task" section.task
-           ]
-       in
-       div
-         (if section.ok then "delivery-section ok" else "delivery-section bad")
-         [ head
-         ; (if String.is_empty (String.strip body)
-            then Node.none
-            else
-              folded
-                ~cls:"delivery-body"
-                ~label:
-                  (if String.equal section.kind "job"
-                   then "Output"
-                   else "Report")
-                ~preview:(first_line body)
-                (if String.equal section.kind "job"
-                 then Output_view.view ~head:0 ~tail:20 body
-                 else Markdown_view.render body))
-         ]))
-;;
-
 let thinking ~live text =
   if live
   then
@@ -71,7 +38,7 @@ let thinking ~live text =
     folded
       ~cls:"thinking"
       ~label:"Thought"
-      ~preview:(first_line text)
+      ~preview:(Markdown.preview text)
       (div "thinking-text" [ Markdown_view.render text ])
 ;;
 
@@ -117,13 +84,14 @@ let rec assistant chat (message : Message.Assistant.t) ~streaming =
       let last = i = count - 1 in
       match (content : Content.t) with
       | Text text when String.is_empty (String.strip text) -> Node.none
-      | Text text -> Markdown_view.render text
+      | Text text -> Markdown_view.render ~streaming:(streaming && last) text
       | Thinking text when String.is_empty (String.strip text) -> Node.none
       | Thinking text -> thinking ~live:(streaming && last) text
       | Tool_call call ->
         Tool_view.view
           ~nested:view
           ~streaming:(streaming && last)
+          ~running:(Chat.running chat)
           call
           (Chat.tool chat call.id))
   in
@@ -142,14 +110,14 @@ and entry chat (entry : Chat.Entry.t) =
   match entry with
   | User u ->
     (match Prigh_ui.Delivery.parse u.text with
-     | Some sections -> delivery sections
+     | Some sections -> div "msg" [ Delivery_view.view sections ]
      | None -> user u)
   | Notice text -> div "msg notice" [ Node.text text ]
   | Compaction summary ->
     folded
       ~cls:"msg compaction"
       ~label:"Context compacted"
-      ~preview:(first_line summary)
+      ~preview:(Markdown.preview summary)
       (Markdown_view.render summary)
   | Assistant { message; streaming } -> assistant chat message ~streaming
 
