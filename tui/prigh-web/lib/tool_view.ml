@@ -15,7 +15,7 @@ let first_line s =
 let summary (call : Tool_call.t) =
   let args = Tool_args.of_call call in
   List.find_map
-    [ "command"; "path"; "pattern"; "task"; "id"; "prefix" ]
+    [ "command"; "path"; "pattern"; "task"; "id"; "url"; "query" ]
     ~f:(Tool_args.string args)
   |> Option.value
        ~default:(String.concat ~sep:" " (Tool_args.strings args "ids"))
@@ -53,7 +53,11 @@ let bash_outcome text =
     when String.is_prefix last ~prefix:"["
          && String.is_suffix last ~suffix:"]"
          && List.exists
-              [ "[exit code "; "[timed out after "; "[killed by "; "[cancelled" ]
+              [ "[exit code "
+              ; "[timed out after "
+              ; "[killed by "
+              ; "[cancelled"
+              ]
               ~f:(fun prefix -> String.is_prefix last ~prefix) ->
     ( Some (String.sub last ~pos:1 ~len:(String.length last - 2))
     , String.concat ~sep:"\n" (List.drop_last_exn lines) )
@@ -153,16 +157,27 @@ let task_details task =
    [subagent_wait]), then perhaps a note of what is still running. *)
 let reports text =
   let text, note =
-    match String.substr_index_all text ~may_overlap:false ~pattern:"\n\n" |> List.last with
+    match
+      String.substr_index_all text ~may_overlap:false ~pattern:"\n\n"
+      |> List.last
+    with
     | Some i
-      when List.exists [ "still running: "; "timed out; still running: " ] ~f:(fun prefix ->
-             String.is_substring_at text ~pos:(i + 2) ~substring:prefix) ->
+      when List.exists
+             [ "still running: "; "timed out; still running: " ]
+             ~f:(fun prefix ->
+               String.is_substring_at text ~pos:(i + 2) ~substring:prefix) ->
       String.prefix text i, String.drop_prefix text (i + 2)
     | _ -> text, ""
   in
   match Prigh_ui.Delivery.parse text with
   | Some sections -> [ Delivery_view.view sections; output ~head:8 note ]
-  | None -> [ output ~head:8 (String.concat ~sep:"\n\n" (List.filter [ text; note ] ~f:(Fn.non String.is_empty))) ]
+  | None ->
+    [ output
+        ~head:8
+        (String.concat
+           ~sep:"\n\n"
+           (List.filter [ text; note ] ~f:(Fn.non String.is_empty)))
+    ]
 ;;
 
 type presentation =
@@ -176,7 +191,8 @@ let present ~nested ~streaming ~live (call : Tool_call.t) ~result ~subagent =
   let str key = Option.value (Tool_args.string args key) ~default:"" in
   let error_body =
     match result with
-    | Some ({ is_error = true; _ } as r : Message.Tool_result.t) -> error_output r
+    | Some ({ is_error = true; _ } as r : Message.Tool_result.t) ->
+      error_output r
     | _ -> Node.none
   in
   match call.name with
@@ -194,7 +210,9 @@ let present ~nested ~streaming ~live (call : Tool_call.t) ~result ~subagent =
     { arg = Some (span "arg command" (first_line command))
     ; chips =
         List.filter_opt
-          [ Option.some_if (background && Option.is_none job) (chip "background")
+          [ Option.some_if
+              (background && Option.is_none job)
+              (chip "background")
           ; Option.map job ~f:(fun id -> chip ~cls:"job" ("job " ^ id))
           ; Option.map outcome ~f:(chip ~cls:"bad")
           ]
@@ -343,7 +361,10 @@ let present ~nested ~streaming ~live (call : Tool_call.t) ~result ~subagent =
     }
   | "job_wait" | "job_kill" | "subagent_wait" | "subagent_cancel" ->
     let ids = Tool_args.strings args "ids" @ Tool_args.strings args "id" in
-    { arg = Some (span "arg" (String.concat ~sep:" " ids))
+    { arg =
+        Option.some_if
+          (not (List.is_empty ids))
+          (span "arg" (String.concat ~sep:" " ids))
     ; chips = []
     ; body =
         (match result with
@@ -359,11 +380,19 @@ let present ~nested ~streaming ~live (call : Tool_call.t) ~result ~subagent =
         (match result with
          | None -> [ output ~head:0 ~tail:6 live ]
          | Some r ->
-           [ output ~error:r.is_error ~head:8 r.text; Image_view.thumbs r.images ])
+           [ output ~error:r.is_error ~head:8 r.text
+           ; Image_view.thumbs r.images
+           ])
     }
 ;;
 
-let view ~nested ~streaming ~running (call : Tool_call.t) (tool : Chat.Tool.t option) =
+let view
+      ~nested
+      ~streaming
+      ~running
+      (call : Tool_call.t)
+      (tool : Chat.Tool.t option)
+  =
   let result = Option.bind tool ~f:(fun t -> t.result) in
   let live = Option.value_map tool ~default:"" ~f:(fun t -> t.output) in
   let subagent = Option.bind tool ~f:(fun t -> t.subagent) in
@@ -372,6 +401,7 @@ let view ~nested ~streaming ~running (call : Tool_call.t) (tool : Chat.Tool.t op
     | Some { is_error = true; _ }, _
     | _, Some { result = Some { is_error = true; _ }; _ } -> Failed
     | _, Some { result = None; _ } -> Running
+    | _, Some { result = Some _; _ } -> Done
     | Some _, _ -> Done
     | None, _ ->
       if streaming then Preparing else if running then Running else Interrupted
@@ -389,7 +419,9 @@ let view ~nested ~streaming ~running (call : Tool_call.t) (tool : Chat.Tool.t op
     (String.concat ~sep:" " [ "tool"; "tool-" ^ call.name; Status.cls status ])
     [ div
         "tool-head"
-        ([ Status.icon status; span "name" call.name ] @ Option.to_list arg @ chips)
+        ([ Status.icon status; span "name" call.name ]
+         @ Option.to_list arg
+         @ chips)
     ; (match body with
        | [] -> Node.none
        | body -> div "tool-body" body)

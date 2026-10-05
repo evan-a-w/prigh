@@ -55,5 +55,6 @@ val tool : t -> string -> Tool.t option
 (** Whether the agent is working: between its start and end events. A tool
     call without a result while it is not will never get one. *)
 val running : t -> bool
+
 val apply : t -> Event.t -> t
 val add_notice : t -> string -> t

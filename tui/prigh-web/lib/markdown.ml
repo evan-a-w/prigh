@@ -276,8 +276,7 @@ module Inline = struct
            then emit (Link { href; children })
            else emit_all children;
            go (paren + 1)
-         | None when partial ->
-           emit_all (parse_range s (open_ + 1) close)
+         | None when partial -> emit_all (parse_range s (open_ + 1) close)
          | None ->
            text i (open_ + 1);
            go (open_ + 1))
@@ -604,7 +603,8 @@ let rec parse_lines ?(partial = false) lines =
           (match heading line with
            | Some (level, text) ->
              add
-               (Block.Heading (level, Inline.parse ~partial:(partial && i + 1 = n) text));
+               (Block.Heading
+                  (level, Inline.parse ~partial:(partial && i + 1 = n) text));
              go (i + 1)
            | None ->
              if is_rule line
@@ -654,7 +654,9 @@ let rec parse_lines ?(partial = false) lines =
     let stop, rev = collect i [] ~lazy_ok:false in
     add
       (Quote
-         (parse_lines ~partial:(partial && stop = n) (Array.of_list (List.rev rev))));
+         (parse_lines
+            ~partial:(partial && stop = n)
+            (Array.of_list (List.rev rev))));
     stop
   and table i aligns =
     let width = List.length aligns in
@@ -692,7 +694,8 @@ let rec parse_lines ?(partial = false) lines =
       |> String.concat ~sep:"\n"
     in
     add
-      (Paragraph (Inline.parse ~partial:(partial && stop = n) (String.rstrip text)));
+      (Paragraph
+         (Inline.parse ~partial:(partial && stop = n) (String.rstrip text)));
     stop
   and list i (first : Marker.t) =
     let item i (marker : Marker.t) =
@@ -784,19 +787,24 @@ let rec first_inlines (blocks : Block.t list) =
   match blocks with
   | [] -> None
   | (Paragraph l | Heading (_, l)) :: _ -> Some l
-  | Quote blocks :: rest -> Option.first_some (first_inlines blocks) (first_inlines rest)
+  | Quote blocks :: rest ->
+    Option.first_some (first_inlines blocks) (first_inlines rest)
   | List { items; _ } :: rest ->
     Option.first_some
       (List.find_map items ~f:(fun item -> first_inlines item.blocks))
       (first_inlines rest)
-  | Table { header; _ } :: _ -> Some (List.concat header)
-  | Code { text; _ } :: _ -> Some [ Text text ]
+  | Table { header; _ } :: _ ->
+    Some (List.concat (List.intersperse header ~sep:[ Inline.Text " | " ]))
+  | Code { text; _ } :: rest ->
+    (match List.find (String.split_lines text) ~f:(Fn.non is_blank) with
+     | Some line -> Some [ Text line ]
+     | None -> first_inlines rest)
   | Rule :: rest -> first_inlines rest
 ;;
 
 let preview text =
-  String.split_lines text
-  |> List.find ~f:(Fn.non is_blank)
-  |> Option.bind ~f:(fun line -> first_inlines (parse line))
-  |> Option.value_map ~default:"" ~f:(fun l -> String.strip (Inline.to_plain l))
+  first_inlines (parse text)
+  |> Option.value_map ~default:"" ~f:(fun l ->
+    match List.split_while l ~f:(fun i -> not (Inline.equal i Break)) with
+    | line, _ -> String.strip (Inline.to_plain line))
 ;;

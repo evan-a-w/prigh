@@ -11,11 +11,13 @@ let of_string text =
   match List.last lines with
   | Some last ->
     (match
-       Option.bind (String.chop_prefix last ~prefix:"[subagent: ") ~f:(fun rest ->
-         String.chop_suffix rest ~suffix:"]")
+       Option.bind
+         (String.chop_prefix last ~prefix:"[subagent: ")
+         ~f:(fun rest -> String.chop_suffix rest ~suffix:"]")
      with
      | Some stats ->
-       { text = String.rstrip (String.concat ~sep:"\n" (List.drop_last_exn lines))
+       { text =
+           String.rstrip (String.concat ~sep:"\n" (List.drop_last_exn lines))
        ; stats = Some stats
        }
      | None -> { text; stats = None })

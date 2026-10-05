@@ -101,10 +101,14 @@ let rec assistant chat (message : Message.Assistant.t) ~streaming =
     then div "pending" (List.init 3 ~f:(fun _ -> Node.span []))
     else Node.none
   in
-  div
-    (if streaming then "msg assistant streaming" else "msg assistant")
-    ((pending :: blocks)
-     @ [ stopped message; (if streaming then Node.none else footer message) ])
+  let stopped = stopped message in
+  if List.is_empty blocks && (not streaming) && phys_equal stopped Node.none
+  then Node.none
+  else
+    div
+      (if streaming then "msg assistant streaming" else "msg assistant")
+      ((pending :: blocks)
+       @ [ stopped; (if streaming then Node.none else footer message) ])
 
 and entry chat (entry : Chat.Entry.t) =
   match entry with
