@@ -50,13 +50,24 @@ backend itself or a connected client that advertised `tools: true` in
 `hello` (a TUI, or a standalone `prigh tool-host -connect`); the subagent
 tool always runs in the backend but its tool calls follow the same active
 host. A client host is known by its *host id*: the `host_id` it sends in
-`hello` (`prigh tool-host -connect` and the TUI pick a random one per
-process and send it on every reconnect), or its client id without one, so a
-host that reconnects is the same host. A newer connection claiming a held id
-takes it over: the older one is a connection the host gave up on (the
-backend may notice a dropped connection late), so it falls back to its
-client id and its in-flight calls and relayed terminals fail. `hello`
-answers with both `client_id` and `host_id`. With `-no-backend-host` the
+`hello`, or its client id without one, so a host that reconnects or
+restarts is the same host. `prigh tool-host -connect` and the TUI send the
+machine's: `Host_id` (`backend/lib`, and `client_unix/` in the TUI) reads
+`~/.prigh/host-id` from the home the tools see (the TUI's, which its
+`prigh tool-host` worker shares), creating it with a random `host-…` id the
+first time (written to a temporary file and linked into place, so
+processes starting together agree); `-host-id` overrides it (the Docker
+image's per-user `container-<name>`), and when the file cannot be kept a
+random per-process id is used, with a warning. A newer connection claiming
+a held id takes it over: the older one is a connection the host gave up on
+(the backend may notice a dropped connection late) or another frontend on
+the same machine (two TUIs share the id), so it falls back to its client id
+(and is told with a notice), and its in-flight calls and relayed terminals
+fail. When the connection holding the id disconnects, the newest other
+connection that asked for it takes it back (`hand_over_host_id`), so a
+machine's sessions keep running while any of its frontends is open. The
+TUI's `(here)` is by host id, i.e. this machine. `hello` answers with both
+`client_id` and `host_id`. With `-no-backend-host` the
 backend is not a host at all (not listed, no in-process tools,
 instructions, path listings or git branch), and a session that never had a
 host adopts the first one that connects. Tools default to the frontend: a
@@ -65,9 +76,16 @@ default or has no host when it attaches, never one the user pinned with
 `set_active_host` (`/host` in the TUI) or whose host is only disconnected.
 The session cwd is a property of the host, so switching hosts switches the
 cwd (and `/cd` validates the directory on the host); a session remembers
-its cwd on each host, also while the host is away (`Rpc_server` keeps them
-for evicted sessions, so a TUI that was its session's only client resumes
-it in place). When the active host is a client, `Agent.host_exec` emits a
+its cwd on each host, also while the host is away. The session file records
+where it runs: every change of cwd, host or pinning appends a `cwd` entry
+carrying the host (id, name, whether pinned), so a session loaded again
+(evicted from memory when it had no clients, or after a backend restart) is
+on the host it had, in the cwd it had there, exactly like a live one: on it
+if connected, otherwise waiting for it (never adopting another; first-time
+adoption is only for sessions that never had a host, or whose recorded host
+is the disabled backend). A fork or a single-agent `new_session` carries on
+on the current host; files without recorded hosts load as before. When the
+active host is a client, `Agent.host_exec` emits a
 `tool_exec` event to that client only and waits on a promise; the client
 answers with `tool_exec_output` (streamed chunks, fanned out to everyone as
 `tool_output`) and `tool_exec_result`; an abort sends `tool_exec_cancel`.
@@ -458,7 +476,8 @@ two can share one.
   times), and the active conversation is the path from the root to `head`.
   Rewinding moves `head`; forking copies the active path to a new file.
   Entries are messages, model/thinking changes, compaction summaries, names,
-  descriptions, cwds (so a reload restores both) and the system prompt;
+  descriptions, cwds with the tool host they are on (so a reload restores
+  where the session runs) and the system prompt;
   `Session.messages` is the message list for the next request with the
   compaction summary replacing everything before `kept_from`
   (`timed_messages`: each with its entry's time, as a `Timed_message.t`;
@@ -698,7 +717,9 @@ copy of the protocol types and the e2e test guards the contract.
   spawns the backend, `Tcp_transport` connects to `-listen` — and
   `Tool_host` (spawns `prigh tool-host` lazily and proxies
   `Tool_exec`/`Tool_exec_cancel` events to it and its `output`/`result`
-  lines back as `tool_exec_*` requests, a result's `images` verbatim).
+  lines back as `tool_exec_*` requests, a result's `images` verbatim) and
+  `Host_id` (the machine's tool host id in `~/.prigh/host-id`, sent in
+  every `hello` with local tools).
 - `ui/` (`prigh_ui`) — **platform-agnostic**, depends only on `core` and
   `bonsai`; it is what both the terminal and a future web frontend mount.
   - `App` is an Elm-style pure state machine: `update : Model.t -> Action.t
