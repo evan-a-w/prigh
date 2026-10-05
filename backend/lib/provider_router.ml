@@ -120,10 +120,31 @@ let create ~env ?timeout ?getenv ?(models = Model_registry.builtin ()) ~store ()
             let key =
               Option.map auth ~f:(fun (r : Provider_auth.Resolved.t) -> r.token)
             in
-            (custom_provider ~env ?timeout p ~key).stream
-              request
-              ~cancel
-              ~on_event))
+            let message =
+              (custom_provider ~env ?timeout p ~key).stream
+                request
+                ~cancel
+                ~on_event
+            in
+            (match message.stop_reason with
+             | Error e
+               when List.exists [ "HTTP 401"; "HTTP 403" ] ~f:(fun prefix ->
+                      String.is_prefix e ~prefix) ->
+               let hint =
+                 match key with
+                 | Some _ ->
+                   sprintf
+                     "the server refused the API key: /login %s changes it"
+                     name
+                 | None ->
+                   sprintf
+                     "the server wants an API key: /login %s adds one, or set \
+                      %s"
+                     name
+                     (Custom_provider.env_var name)
+               in
+               { message with stop_reason = Error (sprintf "%s (%s)" e hint) }
+             | _ -> message)))
     | Anthropic | Openai | Openai_codex | Deepseek ->
       (match resolve () with
        | Error e -> fail ("auth: " ^ Error.to_string_hum e)

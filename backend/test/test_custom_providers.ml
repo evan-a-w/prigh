@@ -1336,18 +1336,24 @@ let%expect_test "router: keyless servers, other API styles, unknown providers" =
   Eio.Switch.run
   @@ fun sw ->
   let server =
-    Server.start ~sw ~env:t.env ~handler:(fun _ ->
-      Server.Reply.simple 418 {|{"error":{"message":"just checking"}}|})
+    Server.start ~sw ~env:t.env ~handler:(fun (r : Server.Request.t) ->
+      if String.is_substring r.request_line ~substring:"/responses"
+      then Server.Reply.simple 401 {|{"error":{"message":"bad key"}}|}
+      else if String.is_substring r.request_line ~substring:"/v2/"
+      then Server.Reply.simple 403 {|{"error":{"message":"key required"}}|}
+      else Server.Reply.simple 418 {|{"error":{"message":"just checking"}}|})
   in
   let url = Server.url server "/v1" in
   write_config
     t
     (sprintf
        {|{"providers": {
+  "keyless": {"base_url": "%s"},
   "local": {"base_url": "%s"},
   "gw": {"base_url": "%s", "api": "anthropic"},
   "resp": {"base_url": "%s", "api": "responses"}
 }}|}
+       (Server.url server "/v2")
        url
        url
        url);
@@ -1357,21 +1363,23 @@ let%expect_test "router: keyless servers, other API styles, unknown providers" =
   let provider =
     Provider_router.create ~env:t.env ~getenv:no_env ~models ~store:(store t) ()
   in
-  List.iter [ "local/llama3"; "gw/claude-x"; "resp/gpt-x" ] ~f:(fun key ->
-    let model = Option.value_exn (Model_registry.find models key) in
-    let message =
-      provider.stream
-        { model
-        ; system = None
-        ; messages = [ Message.user "hi" ]
-        ; tools = []
-        ; thinking = Off
-        ; max_tokens = None
-        }
-        ~cancel:Cancellation.never
-        ~on_event:ignore
-    in
-    print_s [%sexp (key : string), (message.stop_reason : Stop_reason.t)]);
+  List.iter
+    [ "local/llama3"; "gw/claude-x"; "resp/gpt-x"; "keyless/llama3" ]
+    ~f:(fun key ->
+      let model = Option.value_exn (Model_registry.find models key) in
+      let message =
+        provider.stream
+          { model
+          ; system = None
+          ; messages = [ Message.user "hi" ]
+          ; tools = []
+          ; thinking = Off
+          ; max_tokens = None
+          }
+          ~cancel:Cancellation.never
+          ~on_event:ignore
+      in
+      print_s [%sexp (key : string), (message.stop_reason : Stop_reason.t)]);
   List.iter (Server.requests server) ~f:(fun r ->
     printf
       "%s authorization=%s x-api-key=%s\n"
@@ -1401,10 +1409,16 @@ let%expect_test "router: keyless servers, other API styles, unknown providers" =
     {|
     (local/llama3 (Error "HTTP 418: just checking"))
     (gw/claude-x (Error "HTTP 418: just checking"))
-    (resp/gpt-x (Error "HTTP 418: just checking"))
+    (resp/gpt-x
+     (Error
+      "HTTP 401: bad key (the server refused the API key: /login resp changes it)"))
+    (keyless/llama3
+     (Error
+      "HTTP 403: key required (the server wants an API key: /login keyless adds one, or set KEYLESS_API_KEY)"))
     POST /v1/chat/completions HTTP/1.1 authorization=- x-api-key=-
     POST /v1/messages HTTP/1.1 authorization=Bearer sk-gw x-api-key=sk-gw
     POST /v1/responses HTTP/1.1 authorization=Bearer sk-resp x-api-key=-
+    POST /v2/chat/completions HTTP/1.1 authorization=- x-api-key=-
     (Error
      "custom provider ghost is not configured: add it with /login custom (or check providers.ghost in config.json)")
     |}]

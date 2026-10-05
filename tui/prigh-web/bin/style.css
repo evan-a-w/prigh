@@ -521,7 +521,7 @@ kbd {
 .auth-row, .bg-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 8px 0; }
 .auth-row + .auth-row, .bg-row + .bg-row { border-top: 1px solid var(--border); }
 .auth-name, .bg-text { display: flex; flex-direction: column; min-width: 0; }
-.auth-name .picker-detail { margin: 0; overflow-wrap: anywhere; }
+.auth-name .picker-detail { margin: 0; white-space: normal; overflow-wrap: anywhere; }
 .auth-buttons { display: flex; gap: 6px; flex-shrink: 0; }
 .bg-title { font-family: var(--mono); font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .bg-status { font-size: 12px; color: var(--muted); }
