@@ -2,7 +2,7 @@
 prigh
 web
 Sign in
-unauthorised: bad user name or password
+to the prigh backend at ws://127.0.0.1:<PORT>/ws
 User name
 Password
 Backend
@@ -10,42 +10,42 @@ Sign in
 === chromium: signed in: sidebar ===
 prigh
 web
-+ New session
+New session
+No saved sessions yet.
+Commands & keys
 === chromium: signed in: chat ===
 What are we building?
-Ask a question, paste a screenshot, or point prigh at a file with @path.
+<CWD>
+/ commands
+@ mention a file
+Ctrl+L switch model
+Ctrl+K find a session
 === chromium: signed in: top bar ===
-☰
 New session
 <CWD>
-[DeepSeek V4.1 Flash · deepseek]
-[thinking: off]
-<CTX>% ctx
-$<COST>
+DeepSeek V4.1 Flash
+off
 === chromium: bash run ===
 count some lines
 let me look
+✓
 bash
 printf 'one\ntwo\nthree\n'
-done
 one
 two
 three
 three lines
 === chromium: top bar after a run ===
-☰
-New session
+count some lines
 <CWD>
-[DeepSeek V4.1 Flash · deepseek]
-[thinking: off]
-<CTX>% ctx
-$<COST>
+DeepSeek V4.1 Flash
+off
 === chromium: read an image ===
 what does flag.png look like?
 opening it
+✓
 read
 flag.png
-done
 Read image file [image/png, 24x16]
 a red flag with a blue stripe
 === chromium: the read tool's image ===
@@ -66,28 +66,38 @@ same session after reload: true
 === chromium: sidebar after reload ===
 prigh
 web
-+ New session
+New session
 count some lines
-●
-10 messages
+<AGE>
+<CWD>
+10 msgs
+Commands & keys
 === chromium: new session ===
 What are we building?
-Ask a question, paste a screenshot, or point prigh at a file with @path.
+<CWD>
+/ commands
+@ mention a file
+Ctrl+L switch model
+Ctrl+K find a session
 new session in the url: true
 === chromium: two sessions ===
 prigh
 web
-+ New session
+New session
 hello again
-●
-2 messages
+<AGE>
+<CWD>
+2 msgs
 count some lines
-10 messages
+<AGE>
+<CWD>
+10 msgs
+Commands & keys
 switched back: true
 === chromium: switched back ===
 count some lines
 === chromium: backend gone ===
-Connection lost — reconnecting…
+Connection lost: reconnecting…
 same session after reconnecting: true
 === chromium: after reconnecting ===
 still there?
@@ -98,7 +108,7 @@ none
 prigh
 web
 Sign in
-unauthorised: bad user name or password
+to the prigh backend at ws://127.0.0.1:<PORT>/ws
 User name
 Password
 Backend
@@ -106,42 +116,42 @@ Sign in
 === firefox: signed in: sidebar ===
 prigh
 web
-+ New session
+New session
+No saved sessions yet.
+Commands & keys
 === firefox: signed in: chat ===
 What are we building?
-Ask a question, paste a screenshot, or point prigh at a file with @path.
+<CWD>
+/ commands
+@ mention a file
+Ctrl+L switch model
+Ctrl+K find a session
 === firefox: signed in: top bar ===
-☰
 New session
 <CWD>
-[DeepSeek V4.1 Flash · deepseek]
-[thinking: off]
-<CTX>% ctx
-$<COST>
+DeepSeek V4.1 Flash
+off
 === firefox: bash run ===
 count some lines
 let me look
+✓
 bash
 printf 'one\ntwo\nthree\n'
-done
 one
 two
 three
 three lines
 === firefox: top bar after a run ===
-☰
-New session
+count some lines
 <CWD>
-[DeepSeek V4.1 Flash · deepseek]
-[thinking: off]
-<CTX>% ctx
-$<COST>
+DeepSeek V4.1 Flash
+off
 === firefox: read an image ===
 what does flag.png look like?
 opening it
+✓
 read
 flag.png
-done
 Read image file [image/png, 24x16]
 a red flag with a blue stripe
 === firefox: the read tool's image ===
@@ -162,28 +172,38 @@ same session after reload: true
 === firefox: sidebar after reload ===
 prigh
 web
-+ New session
+New session
 count some lines
-●
-10 messages
+<AGE>
+<CWD>
+10 msgs
+Commands & keys
 === firefox: new session ===
 What are we building?
-Ask a question, paste a screenshot, or point prigh at a file with @path.
+<CWD>
+/ commands
+@ mention a file
+Ctrl+L switch model
+Ctrl+K find a session
 new session in the url: true
 === firefox: two sessions ===
 prigh
 web
-+ New session
+New session
 hello again
-●
-2 messages
+<AGE>
+<CWD>
+2 msgs
 count some lines
-10 messages
+<AGE>
+<CWD>
+10 msgs
+Commands & keys
 switched back: true
 === firefox: switched back ===
 count some lines
 === firefox: backend gone ===
-Connection lost — reconnecting…
+Connection lost: reconnecting…
 same session after reconnecting: true
 === firefox: after reconnecting ===
 still there?
