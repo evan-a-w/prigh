@@ -3,8 +3,7 @@ open! Core
 let safe_href href =
   let lower = String.lowercase (String.strip href) in
   List.exists [ "http://"; "https://"; "mailto:" ] ~f:(fun prefix ->
-    String.is_prefix lower ~prefix
-    && String.length lower > String.length prefix)
+    String.is_prefix lower ~prefix && String.length lower > String.length prefix)
 ;;
 
 let is_punct c =
@@ -47,10 +46,11 @@ module Inline = struct
       let text = String.sub s ~pos:(i + n) ~len:(k - i - n) in
       let text = String.tr text ~target:'\n' ~replacement:' ' in
       let text =
-        if String.length text >= 2
-           && Char.equal text.[0] ' '
-           && Char.equal text.[String.length text - 1] ' '
-           && not (String.for_all text ~f:(Char.equal ' '))
+        if
+          String.length text >= 2
+          && Char.equal text.[0] ' '
+          && Char.equal text.[String.length text - 1] ' '
+          && not (String.for_all text ~f:(Char.equal ' '))
         then String.sub text ~pos:1 ~len:(String.length text - 2)
         else text
       in
@@ -96,11 +96,11 @@ module Inline = struct
       then (
         let r = run s j ~hi c in
         let after = j + r in
-        if r = len
-           && j > i
-           && (not (Char.is_whitespace s.[j - 1]))
-           && not
-                (Char.equal c '_' && after < hi && Char.is_alphanum s.[after])
+        if
+          r = len
+          && j > i
+          && (not (Char.is_whitespace s.[j - 1]))
+          && not (Char.equal c '_' && after < hi && Char.is_alphanum s.[after])
         then Some j
         else go after)
       else go (j + 1)
@@ -110,7 +110,8 @@ module Inline = struct
 
   let url_end s i ~hi =
     let rec go j =
-      if j < hi && (not (Char.is_whitespace s.[j])) && not (Char.equal s.[j] '<')
+      if
+        j < hi && (not (Char.is_whitespace s.[j])) && not (Char.equal s.[j] '<')
       then go (j + 1)
       else j
     in
@@ -124,8 +125,9 @@ module Inline = struct
           trim (j - 1)
         | ')' ->
           let url = String.sub s ~pos:i ~len:(j - i) in
-          if String.count url ~f:(Char.equal ')')
-             > String.count url ~f:(Char.equal '(')
+          if
+            String.count url ~f:(Char.equal ')')
+            > String.count url ~f:(Char.equal '(')
           then trim (j - 1)
           else j
         | _ -> j)
@@ -229,9 +231,7 @@ module Inline = struct
             | _ -> r <= 3)
         && not (Char.equal c '_' && i > lo && Char.is_alphanum s.[i - 1])
       in
-      match
-        if can_open then find_closer s after ~hi c ~len:r else None
-      with
+      match if can_open then find_closer s after ~hi c ~len:r else None with
       | Some close ->
         let inner = parse_range s after close in
         emit
@@ -258,7 +258,9 @@ module Inline = struct
            let children =
              if image
              then (
-               let alt = String.sub s ~pos:(open_ + 1) ~len:(close - open_ - 1) in
+               let alt =
+                 String.sub s ~pos:(open_ + 1) ~len:(close - open_ - 1)
+               in
                [ Text (if String.is_empty alt then "image" else alt) ])
              else parse_range s (open_ + 1) close
            in
@@ -344,9 +346,7 @@ let indent line =
   | None -> String.length line
 ;;
 
-let drop_indent line n =
-  String.drop_prefix line (Int.min n (indent line))
-;;
+let drop_indent line n = String.drop_prefix line (Int.min n (indent line))
 
 module Fence = struct
   type t =
@@ -392,9 +392,10 @@ let heading line =
   else (
     let rest = String.drop_prefix line ind in
     let level = Inline.run rest 0 ~hi:(String.length rest) '#' in
-    if level < 1
-       || level > 6
-       || (level < String.length rest && not (Char.equal rest.[level] ' '))
+    if
+      level < 1
+      || level > 6
+      || (level < String.length rest && not (Char.equal rest.[level] ' '))
     then None
     else (
       let text = String.strip (String.drop_prefix rest level) in
@@ -450,19 +451,22 @@ module Marker = struct
             String.lfindi ~pos:ind line ~f:(fun _ c -> not (Char.is_digit c))
             |> Option.value ~default:len
           in
-          if digits - ind <= 9
-             && digits < len
-             && (Char.equal line.[digits] '.' || Char.equal line.[digits] ')')
+          if
+            digits - ind <= 9
+            && digits < len
+            && (Char.equal line.[digits] '.' || Char.equal line.[digits] ')')
           then
             Some
-              ( Some (Int.of_string (String.sub line ~pos:ind ~len:(digits - ind)))
+              ( Some
+                  (Int.of_string (String.sub line ~pos:ind ~len:(digits - ind)))
               , digits + 1 )
           else None
         | _ -> None
       in
       match marker_end with
       | None -> None
-      | Some (start, e) when e = len -> Some { start; indent = ind; offset = e + 1 }
+      | Some (start, e) when e = len ->
+        Some { start; indent = ind; offset = e + 1 }
       | Some (start, e) when Char.equal line.[e] ' ' ->
         let spaces = indent (String.drop_prefix line e) in
         let offset = if spaces > 4 then e + 1 else e + spaces in
@@ -470,15 +474,18 @@ module Marker = struct
       | Some _ -> None)
   ;;
 
-  let same_kind a b = Bool.equal (Option.is_some a.start) (Option.is_some b.start)
+  let same_kind a b =
+    Bool.equal (Option.is_some a.start) (Option.is_some b.start)
+  ;;
 end
 
 let split_row line =
   let line = String.strip line in
   let line = Option.value (String.chop_prefix line ~prefix:"|") ~default:line in
   let line =
-    if String.is_suffix line ~suffix:"|"
-       && not (String.is_suffix line ~suffix:"\\|")
+    if
+      String.is_suffix line ~suffix:"|"
+      && not (String.is_suffix line ~suffix:"\\|")
     then String.drop_suffix line 1
     else line
   in
@@ -515,7 +522,9 @@ let delimiter_row line =
       let left = String.is_prefix cell ~prefix:":" in
       let right = String.is_suffix cell ~suffix:":" in
       let dashes = String.strip cell ~drop:(Char.equal ':') in
-      if String.is_empty dashes || not (String.for_all dashes ~f:(Char.equal '-'))
+      if
+        String.is_empty dashes
+        || not (String.for_all dashes ~f:(Char.equal '-'))
       then None
       else
         Some
@@ -554,7 +563,8 @@ let task_prefix text =
   List.find_map
     [ "[ ] ", false; "[x] ", true; "[X] ", true ]
     ~f:(fun (prefix, checked) ->
-      Option.map (String.chop_prefix text ~prefix) ~f:(fun rest -> checked, rest))
+      Option.map (String.chop_prefix text ~prefix) ~f:(fun rest ->
+        checked, rest))
 ;;
 
 let rec parse_lines lines =
@@ -589,10 +599,11 @@ let rec parse_lines lines =
                | None ->
                  (match table_start lines i with
                   | Some aligns -> go (table i aligns)
-                  | None -> go (paragraph i)))))
-    )
+                  | None -> go (paragraph i))))))
   and code (fence : Fence.t) i =
-    let rec find j = if j >= n || Fence.closes fence lines.(j) then j else find (j + 1) in
+    let rec find j =
+      if j >= n || Fence.closes fence lines.(j) then j else find (j + 1)
+    in
     let stop = find i in
     let text =
       Array.sub lines ~pos:i ~len:(stop - i)
@@ -613,7 +624,8 @@ let rec parse_lines lines =
       then j, acc
       else (
         match quote_content lines.(j) with
-        | Some content -> collect (j + 1) (content :: acc) ~lazy_ok:(not (is_blank content))
+        | Some content ->
+          collect (j + 1) (content :: acc) ~lazy_ok:(not (is_blank content))
         | None ->
           if lazy_ok && (not (is_blank lines.(j))) && not (starts_block lines j)
           then collect (j + 1) (lines.(j) :: acc) ~lazy_ok
@@ -627,14 +639,17 @@ let rec parse_lines lines =
     let cells line =
       let cells = split_row line in
       let cells = List.take cells width in
-      let cells = cells @ List.init (width - List.length cells) ~f:(fun _ -> "") in
+      let cells =
+        cells @ List.init (width - List.length cells) ~f:(fun _ -> "")
+      in
       List.map cells ~f:Inline.parse
     in
     let rec rows j acc =
-      if j < n
-         && (not (is_blank lines.(j)))
-         && String.mem lines.(j) '|'
-         && not (Option.is_some (Fence.opening lines.(j)))
+      if
+        j < n
+        && (not (is_blank lines.(j)))
+        && String.mem lines.(j) '|'
+        && not (Option.is_some (Fence.opening lines.(j)))
       then rows (j + 1) (cells lines.(j) :: acc)
       else j, List.rev acc
     in
@@ -659,7 +674,11 @@ let rec parse_lines lines =
   and list i (first : Marker.t) =
     let item i (marker : Marker.t) =
       let threshold = Int.min marker.offset (marker.indent + 2) in
-      let first = String.drop_prefix lines.(i) (Int.min marker.offset (String.length lines.(i))) in
+      let first =
+        String.drop_prefix
+          lines.(i)
+          (Int.min marker.offset (String.length lines.(i)))
+      in
       let rec collect j acc ~gap ~lazy_ok =
         if j >= n
         then j, acc, gap
@@ -667,7 +686,9 @@ let rec parse_lines lines =
           let line = lines.(j) in
           if is_blank line
           then (
-            let rec next k = if k < n && is_blank lines.(k) then next (k + 1) else k in
+            let rec next k =
+              if k < n && is_blank lines.(k) then next (k + 1) else k
+            in
             let k = next j in
             if k < n && indent lines.(k) >= threshold
             then
@@ -703,9 +724,13 @@ let rec parse_lines lines =
       { Block.checked; blocks = parse_lines (Array.of_list content) }, stop, gap
     in
     let rec items i acc ~tight =
-      let it, stop, gap = item i (Marker.of_line lines.(i) |> Option.value_exn) in
+      let it, stop, gap =
+        item i (Marker.of_line lines.(i) |> Option.value_exn)
+      in
       let tight = tight && not gap in
-      let rec next k = if k < n && is_blank lines.(k) then next (k + 1) else k in
+      let rec next k =
+        if k < n && is_blank lines.(k) then next (k + 1) else k
+      in
       let k = next stop in
       match if k < n then Marker.of_line lines.(k) else None with
       | Some m when Marker.same_kind m first && m.indent <= first.indent + 1 ->

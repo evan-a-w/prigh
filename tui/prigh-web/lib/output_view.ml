@@ -21,11 +21,11 @@ let view ?(error = false) ~head ~tail text =
       [ pre (List.take lines head)
       ; Node.details
           ~attrs:[ Attr.class_ "more" ]
-          [ Node.summary [ Node.text (Html.plural hidden "more line") ]
+          [ Node.summary [ Node.text (Chat_html.plural hidden "more line") ]
           ; pre (List.sub lines ~pos:head ~len:hidden)
           ]
       ; pre (List.drop lines (head + hidden))
       ])
   in
-  Html.div (if error then "output error" else "output") body
+  Chat_html.div (if error then "output error" else "output") body
 ;;

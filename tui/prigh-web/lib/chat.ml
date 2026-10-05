@@ -64,7 +64,7 @@ module Entry = struct
         ; streaming : bool
         }
     | Notice of string
-  | Compaction of string
+    | Compaction of string
   [@@deriving sexp_of]
 end
 

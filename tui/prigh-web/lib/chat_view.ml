@@ -1,7 +1,6 @@
 open! Core
 open! Import
-
-open Html
+open Chat_html
 
 let image_src = Image_view.src
 
@@ -45,7 +44,10 @@ let delivery (sections : Prigh_ui.Delivery.Section.t list) =
             else
               folded
                 ~cls:"delivery-body"
-                ~label:(if String.equal section.kind "job" then "Output" else "Report")
+                ~label:
+                  (if String.equal section.kind "job"
+                   then "Output"
+                   else "Report")
                 ~preview:(first_line body)
                 (if String.equal section.kind "job"
                  then Output_view.view ~head:0 ~tail:20 body
@@ -60,7 +62,9 @@ let thinking ~live text =
       "thinking live"
       [ div
           "thinking-head"
-          [ Node.span ~attrs:[ Attr.class_ "spinner" ] []; span "label" "Thinking…" ]
+          [ Node.span ~attrs:[ Attr.class_ "spinner" ] []
+          ; span "label" "Thinking…"
+          ]
       ; div "thinking-text" [ Node.text (String.strip text) ]
       ]
   else

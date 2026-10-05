@@ -88,7 +88,8 @@ let bool t key =
 
 let int t key =
   match field t key with
-  | Some (`Number n) -> Option.try_with (fun () -> Float.to_int (Float.of_string n))
+  | Some (`Number n) ->
+    Option.try_with (fun () -> Float.to_int (Float.of_string n))
   | _ -> None
 ;;
 

@@ -25,13 +25,14 @@ let%expect_test "startup, a prompt and its streamed reply" =
     <div class="entries">
       <div class="msg user">
         <div class="bubble"> hello </div>
-        <Vdom.Node.none-widget> </Vdom.Node.none-widget>
       </div>
       <div class="assistant msg streaming">
         <div class="markdown">
-          <p> Hi **there** </p>
+          <p>
+            Hi
+            <strong> there </strong>
+          </p>
         </div>
-        <Vdom.Node.none-widget> </Vdom.Node.none-widget>
       </div>
     </div>
     |}]
