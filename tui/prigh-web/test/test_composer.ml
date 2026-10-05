@@ -304,7 +304,7 @@ let%expect_test "slash commands: the popup, arguments, running, unknown ones" =
     /cd <path> change the working directory
     /abort stop the current run
     /agents show background subagents and jobs
-    /login [provider] log in to a model provider
+    /login [provider] log in to a model provider (or /login custom)
     /logout [provider] remove a provider's login
     /auth show which providers are logged in
     /signout sign out of this backend

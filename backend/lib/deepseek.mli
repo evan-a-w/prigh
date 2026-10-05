@@ -1,6 +1,9 @@
 open! Core
 open! Import
 
+(** DeepSeek: {!Openai_chat} with DeepSeek's quirks (its [thinking]
+    parameter, [reasoning_content] replayed, no images). *)
+
 val default_base_url : string
 
 val create
@@ -15,14 +18,7 @@ val create
 module For_testing : sig
   val request_body : Provider.Request.t -> Json.t
 
-  module Chunk : sig
-    type t =
-      { events : Assistant_event.t list
-      ; finish_reason : string option
-      ; usage : Usage.t option
-      }
-    [@@deriving sexp_of]
-  end
+  module Chunk = Openai_chat.For_testing.Chunk
 
   val parse_chunk : Json.t -> Chunk.t Or_error.t
 end

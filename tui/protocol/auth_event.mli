@@ -2,7 +2,15 @@ open! Core
 
 module Prompt : sig
   type t =
-    | Secret of { message : string }
+    | Secret of
+        { message : string
+        ; allow_empty : bool
+        }
+    | Text of
+        { message : string
+        ; placeholder : string
+        ; default : string (** prefilled *)
+        }
     | Manual_code of
         { message : string
         ; placeholder : string

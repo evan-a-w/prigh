@@ -5,8 +5,8 @@ module Server = Fake_http_server
 module T = Openai_responses.For_testing
 module Json = Jsonaf
 
-let codex_model = Model.default_for Openai_codex
-let openai_model = Model.default_for Openai
+let codex_model = Option.value_exn (Model.default_for Openai_codex)
+let openai_model = Option.value_exn (Model.default_for Openai)
 
 let tools =
   [ { Tool_spec.name = "bash"

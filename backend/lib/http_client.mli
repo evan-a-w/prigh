@@ -1,7 +1,7 @@
 open! Core
 open! Import
 
-(** Streaming HTTP POST over cohttp-eio, with TLS via ocaml-tls. *)
+(** HTTP over cohttp-eio, with TLS via ocaml-tls. *)
 
 module Response : sig
   type t =
@@ -47,5 +47,14 @@ val post
   -> url:string
   -> headers:(string * string) list
   -> body:string
+  -> unit
+  -> (Response.t * string, Error.t) Result.t
+
+val get
+  :  env:Env.t
+  -> ?cancel:Cancellation.t
+  -> ?timeout:Time_ns.Span.t
+  -> url:string
+  -> headers:(string * string) list
   -> unit
   -> (Response.t * string, Error.t) Result.t

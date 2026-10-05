@@ -11,6 +11,9 @@ module Auth : sig
   type t =
     | Api_key of string
     | Oauth of string
+    | Gateway of string option
+    (** an Anthropic-compatible gateway (aiproxy, LiteLLM): the key, if any,
+        goes both as [x-api-key] and as a Bearer token *)
 end
 
 val default_base_url : string
@@ -22,6 +25,8 @@ val auth_of_token : method_:Provider_auth.Method.t -> string -> Auth.t
 val create
   :  env:Env.t
   -> ?base_url:string
+  -> ?path:string (** default ["/v1/messages"] *)
+  -> ?extra_headers:(string * string) list
   -> ?timeout:Time_ns.Span.t
   -> auth:Auth.t
   -> unit

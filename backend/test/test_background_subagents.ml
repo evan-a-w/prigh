@@ -31,6 +31,7 @@ let subagent_tools ~provider =
     ~current_model:(fun () -> Model.default)
     ~current_thinking:(fun () -> Off)
     ~home:"/nonexistent"
+    ()
   :: Tool_subagent.control_tools
 ;;
 

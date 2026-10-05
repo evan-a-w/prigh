@@ -419,7 +419,11 @@ let open_picker m kind picker =
   else { m with mode = Picker { kind; picker }; pending_quit = false }
 ;;
 
-let format_price (c : P.Model.Cost.t) = sprintf "$%g/$%g per M" c.input c.output
+let format_price (c : P.Model.Cost.t) =
+  if Float.(c.input = 0. && c.output = 0.)
+  then "price unknown"
+  else sprintf "$%g/$%g per M" c.input c.output
+;;
 
 let format_tokens n =
   if n < 1000
@@ -524,13 +528,47 @@ let login_picker m (statuses : P.Auth_status.t list) =
             sprintf "logged in via %s" c.source
           | _ -> ""
         in
-        Picker.Item.create
-          ~id:(s.provider ^ " " ^ meth.method_)
-          ~detail:(String.strip (meth.label ^ "  " ^ configured))
-          ~marked:(not (String.is_empty configured))
-          (s.name ^ " (" ^ meth.method_ ^ ")")))
+        match s.custom with
+        | Some c ->
+          Picker.Item.create
+            ~id:(s.provider ^ " " ^ meth.method_)
+            ~detail:(sprintf "custom: %s (%s)" c.base_url c.api)
+            ~search:(s.provider ^ " custom " ^ c.base_url)
+            (s.name ^ " (edit)")
+        | None ->
+          Picker.Item.create
+            ~id:(s.provider ^ " " ^ meth.method_)
+            ~detail:(String.strip (meth.label ^ "  " ^ configured))
+            ~marked:(not (String.is_empty configured))
+            (s.name ^ " (" ^ meth.method_ ^ ")")))
+    @ [ Picker.Item.create
+          ~id:"custom api_key"
+          ~detail:"aiproxy, LiteLLM, OpenRouter, vLLM, Ollama, ..."
+          "custom (add an OpenAI-compatible endpoint)"
+      ]
   in
   open_picker m Login (Picker.create ~title:"Log in to" items)
+;;
+
+(* A custom provider's logout asks itself what to remove (a backend login
+   prompt), so it needs no confirmation here. *)
+let logout m provider =
+  if
+    List.exists m.auth ~f:(fun s ->
+      String.equal s.provider provider && Option.is_some s.custom)
+  then m, [ rpc "logout" ~params:[ "provider", str provider ] ]
+  else
+    ( { m with
+        mode =
+          Confirm
+            { question =
+                sprintf
+                  "Log out of %s and delete its credential? (y/n)"
+                  provider
+            ; action = Logout provider
+            }
+      }
+    , [] )
 ;;
 
 let logout_picker m (statuses : P.Auth_status.t list) =
@@ -539,7 +577,11 @@ let logout_picker m (statuses : P.Auth_status.t list) =
       Option.map s.configured ~f:(fun c ->
         Picker.Item.create
           ~id:s.provider
-          ~detail:(sprintf "%s via %s" c.method_ c.source)
+          ~detail:
+            (match s.custom with
+             | Some custom ->
+               sprintf "custom: %s, key: %s" custom.base_url c.source
+             | None -> sprintf "%s via %s" c.method_ c.source)
           s.name))
   in
   if List.is_empty items
@@ -997,26 +1039,46 @@ let format_auth (statuses : P.Auth_status.t list) : Content.t =
     List.fold statuses ~init:0 ~f:(fun acc s ->
       Int.max acc (String.length s.provider))
   in
-  List.map statuses ~f:(fun s ->
+  List.map statuses ~f:(fun (s : P.Auth_status.t) ->
     let methods =
       String.concat
         ~sep:", "
         (List.map s.methods ~f:(fun m -> m.method_ ^ " (" ^ m.label ^ ")"))
     in
     let state : Content.Line.t =
-      match s.configured with
-      | Some c ->
+      match s.configured, s.custom with
+      | configured, Some custom ->
+        [ { text = "custom"; style = Style.fg Cyan }
+        ; { text = sprintf " %s (%s)" custom.base_url custom.api
+          ; style = Style.plain
+          }
+        ; { text =
+              (match configured with
+               | Some { source = "no key"; _ } | None -> "  no key"
+               | Some c -> "  key: " ^ c.source)
+          ; style = Style.dim Style.plain
+          }
+        ]
+      | Some c, None ->
         [ { text = "logged in"; style = Style.fg Green }
         ; { text = " via " ^ c.source; style = Style.plain }
         ]
-      | None -> [ { text = "not configured"; style = Style.fg Gray } ]
+      | None, None -> [ { text = "not configured"; style = Style.fg Gray } ]
     in
     [ { Content.Span.text = Text_width.pad_right s.provider ~width ^ "  "
       ; style = Style.bold Style.plain
       }
     ]
     @ state
-    @ [ { text = "  [" ^ methods ^ "]"; style = Style.dim Style.plain } ])
+    @
+    if Option.is_some s.custom
+    then []
+    else [ { text = "  [" ^ methods ^ "]"; style = Style.dim Style.plain } ])
+  @ [ [ { Content.Span.text = "/login custom adds an OpenAI-compatible endpoint"
+        ; style = Style.dim Style.plain
+        }
+      ]
+    ]
 ;;
 
 (* ---- reconnection ----------------------------------------------------- *)
@@ -1359,18 +1421,7 @@ let run_command m (cmd : Commands.Parsed.t) =
     in
     m, [ rpc "login" ~params ]
   | "logout", [] -> m, [ rpc "auth_status" ~tag:Auth_logout_picker ]
-  | "logout", provider :: _ ->
-    ( { m with
-        mode =
-          Confirm
-            { question =
-                sprintf
-                  "Log out of %s and delete its credential? (y/n)"
-                  provider
-            ; action = Logout provider
-            }
-      }
-    , [] )
+  | "logout", provider :: _ -> logout m provider
   | "compact", _ -> notice m "compacting…", [ rpc "compact" ~tag:Compact_done ]
   | "new", _ ->
     m, [ rpc "new_session" ~tag:(Reload_messages_notice "new session") ]
@@ -2065,16 +2116,7 @@ let picker_selected m (kind : Mode.Picker_kind.t) (item : Picker.Item.t) =
        , [ rpc "login" ~params:[ "provider", str provider; "method", str meth ]
          ] )
      | _ -> error m "bad login selection", [])
-  | Logout ->
-    ( { m with
-        mode =
-          Confirm
-            { question =
-                sprintf "Log out of %s and delete its credential? (y/n)" item.id
-            ; action = Logout item.id
-            }
-      }
-    , [] )
+  | Logout -> logout m item.id
   | Sessions _ ->
     ( m
     , [ rpc
@@ -2228,19 +2270,26 @@ let picker m (kind : Mode.Picker_kind.t) picker (intent : Intent.t) =
 (* ---- login prompt mode ------------------------------------------------ *)
 
 let login_prompt m ~id ~(prompt : P.Auth_event.Prompt.t) (intent : Intent.t) =
-  let secret =
+  let allow_empty, keep_lines =
     match prompt with
-    | Secret _ -> true
-    | Manual_code _ | Select _ -> false
+    | Secret { allow_empty; _ } -> allow_empty, false
+    | Text _ -> true, false
+    | Manual_code _ -> false, true
+    | Select _ -> false, false
   in
   match intent with
   | Submit ->
-    let value, editor = Editor.submit ~secret m.editor in
+    (* Answers are never prompt history. *)
+    let value, editor = Editor.submit ~secret:true m.editor in
     let value = String.strip value in
-    if String.is_empty value
+    if String.is_empty value && not allow_empty
     then m, []
     else
-      ( { m with editor; mode = Editing }
+      ( { m with
+          editor
+        ; mode = Editing
+        ; login_lines = (if keep_lines then m.login_lines else [])
+        }
       , [ rpc "auth_respond" ~params:[ "id", str id; "value", str value ] ] )
   | Cancel | Interrupt ->
     ( { m with editor = Editor.clear m.editor; mode = Editing; login_lines = [] }
@@ -2523,18 +2572,30 @@ let auth_event m (e : P.Auth_event.t) =
                 }
           }
         , [] )
-      | Secret _ | Manual_code _ ->
+      | Secret _ | Manual_code _ | Text _ ->
         let lines =
-          P.Auth_event.Prompt.message prompt
-          ::
-          (match prompt with
-           | Manual_code { placeholder; _ } ->
-             [ "e.g. " ^ placeholder ^ "?code=..." ]
-           | _ -> [])
+          String.split_lines (P.Auth_event.Prompt.message prompt)
+          @
+          match prompt with
+          | Manual_code { placeholder; _ } ->
+            [ "e.g. " ^ placeholder ^ "?code=..." ]
+          | Text { placeholder; default; _ }
+            when (not (String.is_empty placeholder))
+                 && not (String.equal placeholder default) ->
+            [ "e.g. " ^ placeholder ]
+          | Secret { allow_empty = true; _ } ->
+            [ "(Enter with nothing typed for none)" ]
+          | Secret _ | Text _ | Select _ -> []
+        in
+        let editor =
+          match prompt with
+          | Text { default; _ } ->
+            Editor.set_text (Editor.clear m.editor) default
+          | Secret _ | Manual_code _ | Select _ -> Editor.clear m.editor
         in
         ( { m with
             mode = Login_prompt { id; prompt }
-          ; editor = Editor.clear m.editor
+          ; editor
           ; login_lines = m.login_lines @ lines
           }
         , [] ))

@@ -74,19 +74,55 @@ let of_json json =
   | _ -> Or_error.error_string "config must be a JSON object"
 ;;
 
-let load ~home =
+let read_fields ~home =
   let path = path ~home in
   if not (Sys_unix.file_exists_exn path)
-  then Ok default
+  then Ok []
   else
     Or_error.bind
       (Or_error.try_with (fun () -> In_channel.read_all path))
-      ~f:(fun data -> Or_error.bind (Json.parse data) ~f:of_json)
+      ~f:(fun data ->
+        if String.is_empty (String.strip data)
+        then Ok []
+        else (
+          match Json.parse data with
+          | Ok (`Object fields) -> Ok fields
+          | Ok _ -> Or_error.errorf "%s must be a JSON object" path
+          | Error e -> Error e))
 ;;
 
-let save ~home t =
+let write_fields ~home fields =
   let path = path ~home in
   Or_error.try_with (fun () ->
     Core_unix.mkdir_p (Filename.dirname path);
-    Out_channel.write_all path ~data:(Json.to_string_hum (to_json t)))
+    let tmp = path ^ ".tmp" in
+    Out_channel.write_all tmp ~data:(Json.to_string_hum (`Object fields));
+    Core_unix.rename ~src:tmp ~dst:path)
+;;
+
+let load ~home =
+  Or_error.bind (read_fields ~home) ~f:(fun f -> of_json (`Object f))
+;;
+
+(* Fields this module does not own ([providers], anything hand-added) are
+   kept, in place. *)
+let save ~home t =
+  Or_error.bind (read_fields ~home) ~f:(fun existing ->
+    let ours =
+      match to_json t with
+      | `Object fields -> fields
+      | _ -> assert false
+    in
+    let replaced =
+      List.map existing ~f:(fun (name, value) ->
+        ( name
+        , Option.value
+            (List.Assoc.find ours ~equal:String.equal name)
+            ~default:value ))
+    in
+    let added =
+      List.filter ours ~f:(fun (name, _) ->
+        not (List.Assoc.mem existing ~equal:String.equal name))
+    in
+    write_fields ~home (replaced @ added))
 ;;

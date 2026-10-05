@@ -14,7 +14,12 @@ val default_path : unit -> string
 val create : path:string -> t
 val path : t -> string
 val read : t -> Provider_id.t -> Credential.t option Or_error.t
+
+(** The built-in providers' entries. *)
 val list : t -> (Provider_id.t * Credential.t) list Or_error.t
+
+(** Whether the file has an entry of that name, whoever wrote it. *)
+val mem : t -> string -> bool Or_error.t
 
 (** [f] sees the on-disk credential under the lock; the file is rewritten
     only if it returns something different. Entries for unknown providers

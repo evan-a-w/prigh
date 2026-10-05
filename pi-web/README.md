@@ -157,7 +157,8 @@ Changed:
   are handled client-side as in pi (plus `/signout`); `/login`, `/logout`, `/auth`,
   `/sessions`, `/switch`, `/host`, `/help` are sent as prompts and run by the
   backend, which answers with custom chat messages and `select`/`input`
-  dialogs.
+  dialogs (an `input` may carry `prefill`, a prigh addition: `/login custom`
+  prefills the current settings when editing a custom provider).
 - `editor.tsx` — pasted and dropped images are downscaled or converted to
   what the backend accepts (`image-fit.ts`, `image-file.ts`).
 - `tool-execution.tsx` — diffs for prigh's `edit` (`edits: [{old_text,

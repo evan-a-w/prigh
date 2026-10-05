@@ -118,6 +118,7 @@ type t =
   ; tools : Tool.t list
   ; sessions_dir : string
   ; home : string
+  ; models : Model_registry.t
   ; backend_host_enabled : bool
   ; mutable session : Session.t
   ; mutable cwd : string
@@ -153,7 +154,8 @@ type t =
 let restore_settings t =
   match Session.model t.session with
   | Some (model_id, thinking) ->
-    Option.iter (Model.find model_id) ~f:(fun m -> t.model <- m);
+    Option.iter (Model_registry.find t.models model_id) ~f:(fun m ->
+      t.model <- m);
     t.thinking <- thinking
   | None -> ()
 ;;
@@ -769,6 +771,7 @@ let create
       ?model
       ?thinking
       ?(fallback_model = Model.default)
+      ?(models = Model_registry.builtin ())
       ?(auto_describe = false)
       ?(backend_host = true)
       ~cwd
@@ -783,7 +786,7 @@ let create
     match model with
     | Some model -> model
     | None ->
-      Option.bind config.default_model ~f:Model.find
+      Option.bind config.default_model ~f:(Model_registry.find models)
       |> Option.value ~default:fallback_model
   in
   let thinking =
@@ -803,6 +806,7 @@ let create
     ; tools
     ; sessions_dir
     ; home
+    ; models
     ; backend_host_enabled = backend_host
     ; session
     ; cwd

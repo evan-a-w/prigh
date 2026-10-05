@@ -73,15 +73,27 @@ let argument_items
     List.map auth ~f:(fun s ->
       Picker.Item.create
         ~id:s.provider
-        ~detail:(if Option.is_some s.configured then "logged in" else "")
+        ~detail:
+          (match s.custom, s.configured with
+           | Some c, _ -> "custom · " ^ c.base_url
+           | None, Some _ -> "logged in"
+           | None, None -> "")
         ~search:(s.name ^ " " ^ s.provider)
         s.name)
+    @ [ Picker.Item.create
+          ~id:"custom"
+          ~detail:"add an OpenAI-compatible endpoint"
+          "custom"
+      ]
   | Logout ->
     List.filter_map auth ~f:(fun s ->
       Option.map s.configured ~f:(fun c ->
         Picker.Item.create
           ~id:s.provider
-          ~detail:(sprintf "%s via %s" c.method_ c.source)
+          ~detail:
+            (match s.custom with
+             | Some custom -> "custom · " ^ custom.base_url
+             | None -> sprintf "%s via %s" c.method_ c.source)
           ~search:(s.name ^ " " ^ s.provider)
           s.name))
   | Directory -> []

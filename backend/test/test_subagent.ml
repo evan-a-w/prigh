@@ -10,6 +10,7 @@ let subagent ~provider =
     ~current_model:(fun () -> Model.default)
     ~current_thinking:(fun () -> Off)
     ~home:"/nonexistent"
+    ()
 ;;
 
 let run_tool t ~tools ~emit tool args =

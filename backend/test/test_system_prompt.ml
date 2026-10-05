@@ -92,6 +92,7 @@ let%expect_test "background guidance follows the tools" =
       ~current_model:(fun () -> Model.default)
       ~current_thinking:(fun () -> Off)
       ~home:"/home"
+      ()
   in
   print_endline
     (base
