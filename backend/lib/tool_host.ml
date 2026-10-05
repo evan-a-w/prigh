@@ -303,6 +303,7 @@ let serve_connection
       ~address
       ~token
       ~user
+      ~host_id
       ~name
       ~cwd
       flow
@@ -338,6 +339,7 @@ let serve_connection
                  ; Some ("name", `String name)
                  ; Some ("cwd", `String cwd)
                  ; Some ("tools", `True)
+                 ; Some ("host_id", `String host_id)
                  ]) )
         ]);
   let worker =
@@ -406,6 +408,12 @@ let serve_connection
   !outcome
 ;;
 
+let new_host_id () =
+  let state = Random.State.make_self_init ~allow_in_tests:true () in
+  "host-"
+  ^ String.init 16 ~f:(fun _ -> "0123456789abcdef".[Random.State.int state 16])
+;;
+
 let connect
       ~env
       ?terminals
@@ -416,6 +424,7 @@ let connect
       ~port
       ~token
       ?user
+      ?(host_id = new_host_id ())
       ~name
       ~cwd
       ()
@@ -442,6 +451,7 @@ let connect
           ~address
           ~token
           ~user
+          ~host_id
           ~name
           ~cwd
           flow)

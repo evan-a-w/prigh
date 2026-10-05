@@ -104,23 +104,23 @@ let serve t ~host ~send_event ~key ~cwd ~cols ~rows channel =
     ~finally:(fun () -> Hashtbl.remove t.relays term_id)
 ;;
 
-let find t ~client params =
+let find t ~host params =
   match Json.member "term_id" params with
   | Some (`String term_id) ->
     (match Hashtbl.find t.relays term_id with
-     | Some relay when String.equal relay.host client -> Ok relay
+     | Some relay when String.equal relay.host host -> Ok relay
      | Some _ | None -> Or_error.errorf "no terminal %S" term_id)
   | _ -> Or_error.error_string "missing string param \"term_id\""
 ;;
 
-let frame t ~client params =
-  Or_error.bind (find t ~client params) ~f:(fun relay ->
+let frame t ~host params =
+  Or_error.bind (find t ~host params) ~f:(fun relay ->
     Or_error.map (Terminal_channel.Frame.of_json params) ~f:(fun frame ->
       push relay (Frame frame)))
 ;;
 
-let closed t ~client params =
-  Or_error.map (find t ~client params) ~f:(fun relay -> push relay Closed)
+let closed t ~host params =
+  Or_error.map (find t ~host params) ~f:(fun relay -> push relay Closed)
 ;;
 
 let host_gone t ~host =
