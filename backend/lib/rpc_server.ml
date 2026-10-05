@@ -156,6 +156,9 @@ module Client = struct
     ; mutable tools : bool
     ; mutable cwd : string option
     ; mutable agent : Agent.t
+    ; mutable placeholder : Agent.t option
+      (** the fresh session [connect] gave it, until [hello] (see
+          [first_session]) *)
     ; mutable authed : bool
     ; signed_in : User_access.Signed_in.t option
       (** set when the router checked the credentials *)
@@ -338,14 +341,79 @@ let attach t (client : Client.t) agent =
   if client.tools then Agent.prefer_host agent client.host_id
 ;;
 
+(* A brand-new session made or opened for [client] starts on a host chosen
+   from the client's context rather than the first host to connect: on the
+   client itself when it is a tool host (in [cwd]), else where the client's
+   session is (connected or not), in its cwd there. [None] (a client without
+   tools on a session without a host): where any new session would be.
+   Unpinned: the host was chosen by default. *)
+let start_location (client : Client.t) ~cwd =
+  if client.tools
+  then
+    Some
+      ( { Session.Host.id = client.host_id; name = client.name; pinned = false }
+      , cwd )
+  else
+    Option.map (Agent.location client.agent) ~f:(fun (host, cwd) ->
+      { host with pinned = false }, cwd)
+;;
+
+(* The cwd [client]'s session last had on the client's own host. *)
+let own_cwd (client : Client.t) =
+  match
+    List.find (Agent.hosts client.agent) ~f:(fun h ->
+      String.equal h.id client.host_id)
+  with
+  | Some host -> host.cwd
+  | None -> (host_of client).cwd
+;;
+
+(* A session that already ran on the chosen host goes back to its cwd there. *)
+let with_recorded_cwd session start =
+  Option.map start ~f:(fun ((host : Session.Host.t), cwd) ->
+    ( host
+    , Option.value (Map.find (Session.host_cwds session) host.id) ~default:cwd ))
+;;
+
+(* The start is recorded in the session before its agent exists, so the
+   agent never has a moment without a host in which it would adopt the first
+   one (see [Agent.set_hosts]). *)
+let start_agent t session start =
+  Option.iter start ~f:(fun ((host : Session.Host.t), cwd) ->
+    if
+      not
+        (Option.equal Session.Host.equal (Session.host session) (Some host)
+         && String.equal (Session.cwd session) cwd)
+    then ignore (Session.set_cwd session ~host ~cwd () : Session.Entry.t));
+  register t (t.new_agent ~session ~cwd:(Session.cwd session) ())
+;;
+
+(* A session loaded from disk keeps the host it recorded (waiting for it if
+   need be); one without (or on the disabled backend) would adopt the first
+   host to connect, so it starts like a new session for [client] instead. *)
+let loaded_start t (client : Client.t) session =
+  let has_host =
+    match Session.host session with
+    | None -> false
+    | Some host ->
+      t.backend_host || not (String.equal host.id Agent.Host.backend_id)
+  in
+  if t.backend_host || has_host
+  then None
+  else
+    with_recorded_cwd session (start_location client ~cwd:(host_of client).cwd)
+;;
+
 let fresh_agent t = register t (t.new_agent ~cwd:t.cwd ())
 
 let connect ?signed_in t ~send =
   t.client_seq <- t.client_seq + 1;
-  let agent =
+  let agent, placeholder =
     match t.default_agent with
-    | Some agent -> agent
-    | None -> fresh_agent t
+    | Some agent -> agent, None
+    | None ->
+      let agent = fresh_agent t in
+      agent, Some agent
   in
   let client =
     { Client.id = sprintf "client-%d" t.client_seq
@@ -356,6 +424,7 @@ let connect ?signed_in t ~send =
     ; tools = false
     ; cwd = None
     ; agent
+    ; placeholder
     ; authed = Option.is_none t.token || Option.is_some signed_in
     ; signed_in
     ; send
@@ -434,8 +503,8 @@ let session_file t path =
     else Or_error.errorf "%S is not in the sessions directory" path)
 ;;
 
-(* Finds a live session by id or path, or loads it from disk. *)
-let find_agent t key =
+(* Finds a live session by id or path, or loads it from disk for [client]. *)
+let find_agent t (client : Client.t) key =
   let live =
     match Hashtbl.find t.agents key with
     | Some agent -> Some agent
@@ -460,12 +529,29 @@ let find_agent t key =
     in
     Or_error.bind path ~f:(fun path ->
       Or_error.map (Session.load path) ~f:(fun session ->
-        register t (t.new_agent ~session ~cwd:(Session.cwd session) ())))
+        start_agent t session (loaded_start t client session)))
 ;;
 
-let new_agent_for t (client : Client.t) session =
-  register t (t.new_agent ~session ~cwd:(Session.cwd session) ())
-  |> attach t client
+(* Without the backend host, the session [connect] gave a tool host may have
+   adopted another host while the client was not yet known as one: it is
+   replaced, before anyone used it, by one on the client in its cwd. (On the
+   backend it is taken over instead, see [attach].) *)
+let first_session t (client : Client.t) =
+  match client.placeholder with
+  | Some agent
+    when client.tools
+         && (not t.backend_host)
+         && phys_equal agent client.agent
+         && (not (Agent.is_running agent))
+         && (not (Session.persisted (Agent.session agent)))
+         && List.is_empty (Session.messages (Agent.session agent))
+         && List.for_all (clients_of t agent) ~f:(phys_equal client) ->
+    let cwd = (host_of client).cwd in
+    start_agent
+      t
+      (Session.create ~dir:t.sessions_dir ~cwd ())
+      (start_location client ~cwd)
+  | Some _ | None -> client.agent
 ;;
 
 let bool_param params name ~default =
@@ -609,9 +695,10 @@ let hello t (client : Client.t) params =
         client.tools <- tools;
         let agent =
           match param params "session" with
-          | Some (`String key) -> find_agent t key
-          | _ -> Ok client.agent
+          | Some (`String key) -> find_agent t client key
+          | _ -> Ok (first_session t client)
         in
+        client.placeholder <- None;
         Or_error.map agent ~f:(fun agent ->
           attach t client agent;
           `Object
@@ -764,13 +851,19 @@ let dispatch_server t (client : Client.t) ~meth ~params
       (unit_result
          (Terminal_relay.closed t.terminals ~host:client.host_id params))
   | "new_session" ->
-    let cwd = (Agent.state agent).cwd in
-    new_agent_for t client (Session.create ~dir:t.sessions_dir ~cwd ());
+    let start = start_location client ~cwd:(own_cwd client) in
+    let cwd =
+      match start with
+      | Some (_, cwd) -> cwd
+      | None -> (Agent.state agent).cwd
+    in
+    start_agent t (Session.create ~dir:t.sessions_dir ~cwd ()) start
+    |> attach t client;
     Some empty
   | "switch_session" ->
     Some
       (Or_error.bind (string_param params "path") ~f:(fun key ->
-         Or_error.map (find_agent t key) ~f:(fun target ->
+         Or_error.map (find_agent t client key) ~f:(fun target ->
            attach t client target;
            `Object [])))
   | "list_sessions" -> Some (ok (list_sessions t))
@@ -792,7 +885,15 @@ let dispatch_server t (client : Client.t) ~meth ~params
            Or_error.map
              (Session.import ~dir:t.sessions_dir path)
              ~f:(fun session ->
-               new_agent_for t client session;
+               let start =
+                 if client.tools
+                 then
+                   with_recorded_cwd
+                     session
+                     (start_location client ~cwd:(host_of client).cwd)
+                 else loaded_start t client session
+               in
+               start_agent t session start |> attach t client;
                `Object [ "path", `String (Session.path session) ]))))
   | "fork" | "clone" ->
     let at =
@@ -804,7 +905,13 @@ let dispatch_server t (client : Client.t) ~meth ~params
       (Or_error.map
          (Session.fork ?at (Agent.session agent) ~dir:t.sessions_dir)
          ~f:(fun session ->
-           new_agent_for t client session;
+           (* A copy of the conversation stays where the user pinned it. *)
+           let start =
+             match Agent.location agent with
+             | Some ((host, _) as location) when host.pinned -> Some location
+             | Some _ | None -> start_location client ~cwd:(own_cwd client)
+           in
+           start_agent t session start |> attach t client;
            `Object []))
   | "login" ->
     (* The flow may emit its first event before it is started. *)

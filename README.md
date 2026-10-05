@@ -113,7 +113,12 @@ host comes back (a frontend or `prigh tool-host` reconnecting or restarted
 on the same machine, which is the same host) the session carries on there,
 in the same directory; `/host` picks another host meanwhile. This holds
 across the session leaving memory and backend restarts too: a session
-records its host with its directory. A machine's identity is the id in
+records its host with its directory. A new session (`/new`, `/fork`,
+`/clone`, an import, or the one a frontend starts in) starts on the
+frontend's own machine, in the directory you were in there (its `-cwd` for
+the first); from the web UI,
+where the session you were on runs. A fork or clone of a session you moved
+with `/host` stays where you put it. A machine's identity is the id in
 `~/.prigh/host-id` (created on first use; edit it to choose one), shared by
 its TUIs and `prigh tool-host`: with two TUIs open, the newer one runs the
 machine's tools and the older one takes over again if the newer one quits. Several frontends can attach
