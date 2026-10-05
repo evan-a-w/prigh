@@ -1,0 +1,5 @@
+; A scripted MCP server on stdio for the Mcp_client and Mcp_hub tests.
+
+(executable
+ (name fake_mcp_server)
+ (libraries core jsonaf))

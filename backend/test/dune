@@ -2,7 +2,8 @@
  (name prigh_test)
  (preprocess
   (pps ppx_jane ppx_jsonaf_conv))
- (inline_tests)
+ (inline_tests
+  (deps fake_mcp_server/fake_mcp_server.exe))
  (libraries
   core
   core_unix
