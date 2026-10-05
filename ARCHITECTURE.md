@@ -651,8 +651,9 @@ copy of the protocol types and the e2e test guards the contract.
 
 - `protocol/` (`prigh_protocol`) — `Jsonaf` decoders for everything
   `Rpc_json` emits (`Message`, `Delta`, `State`, `Model`, `Session_summary`,
-  `Auth_status`, `Auth_event`, `Event`, `Server_message`) and the `Request`
-  encoder.
+  `Auth_status`, `Auth_event`, `Event`, `Server_message`, `Skill`,
+  `Mcp_server`, `Mcp_list`) and the `Request` encoder (`Request.Method` has
+  typed constructors for `list_skills`, `list_mcp` and `mcp_approve`).
 - `client/` (`prigh_client`, `Async_kernel` only so it links under
   js_of_ocaml) — `Transport.t` (a line channel; an in-memory pair for
   tests) and `Client` (created with a `connect` thunk and
@@ -702,6 +703,19 @@ copy of the protocol types and the e2e test guards the contract.
     `Btw_box` (the `/btw` panel above the editor: a newer question cancels
     and replaces it; Esc dismisses it before Esc's other meanings, so it
     never aborts the run), `Boxed` (the framed dialogs).
+  - Skills and MCP: `/skills` and `/mcp` are pickers over `list_skills` and
+    `list_mcp` (Enter on a server needing approval sends `mcp_approve`,
+    whose reply is the new list). `/skill:NAME ARGS` is sent as a prompt
+    tagged `Skill_prompt`, so a failure (an unknown name) puts the text back
+    in the editor and takes it off the queue. `Autocomplete`'s `Skill`
+    source completes names from `Skill_cache`, which is keyed by session,
+    tool host and directory (a stale key or reply fetches again or is
+    dropped) and emptied on reloads, `/setusr` and reconnects.
+    `Skill_message` parses the backend's expansion (`<skill name=…
+    location=…>`) back into name, file, body and arguments: `Transcript`
+    renders it as a `Skill` item (`skill NAME` and the arguments; the body
+    only in verbose), and `/fork` lists and restores it as
+    `/skill:NAME ARGS`.
   - `Key.t` → `Intent.t` through `Keymap` (the one binding table; `/help`
     prints it). `Mode.t` (`Editing | Picker | Login_prompt | Text_prompt |
     Confirm | Search`) says who owns the keyboard; dialogs never stack, Esc
