@@ -51,7 +51,8 @@ let closest name =
   List.filter_map all ~f:(fun s ->
     let d = Prigh_ui.Edit_distance.distance s.name name in
     Option.some_if
-      (d <= 2 || (String.is_prefix s.name ~prefix:name && String.length name > 0))
+      (d <= 2 || (String.is_prefix s.name ~prefix:name && String.length name > 0)
+      )
       (d, s))
   |> List.min_elt ~compare:(fun (a, _) (b, _) -> Int.compare a b)
   |> Option.map ~f:snd

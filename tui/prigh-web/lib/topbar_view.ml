@@ -22,7 +22,9 @@ let view (m : App.Model.t) ~inject =
   | None ->
     Node.header
       ~attrs:[ Attr.class_ "topbar" ]
-      [ toggle; div ~cls:"title" [ span ~cls:"session-name muted" "Connecting…" ] ]
+      [ toggle
+      ; div ~cls:"title" [ span ~cls:"session-name muted" "Connecting…" ]
+      ]
   | Some state ->
     Node.header
       ~attrs:[ Attr.class_ "topbar" ]
@@ -36,12 +38,20 @@ let view (m : App.Model.t) ~inject =
                 ; Attr.title "Rename (/name)"
                 ; Attr.on_click (fun _ -> inject Action.Open_rename)
                 ]
-              [ Node.span [ Node.text (session_title state) ]; icon ~cls:"edit-hint" Pencil ]
+              [ Node.span [ Node.text (session_title state) ]
+              ; icon ~cls:"edit-hint" Pencil
+              ]
           ; div
               ~cls:"session-where"
-              [ span ~cls:"where" ~attrs:[ Attr.title state.cwd ] (Sidebar_view.home_relative state.cwd)
+              [ span
+                  ~cls:"where"
+                  ~attrs:[ Attr.title state.cwd ]
+                  (Sidebar_view.home_relative state.cwd)
               ; (match state.git_branch with
-                 | Some branch -> Node.span ~attrs:[ Attr.class_ "branch" ] [ icon Branch; Node.text branch ]
+                 | Some branch ->
+                   Node.span
+                     ~attrs:[ Attr.class_ "branch" ]
+                     [ icon Branch; Node.text branch ]
                  | None -> Node.none)
               ]
           ]

@@ -13,16 +13,16 @@ let home_relative cwd =
 ;;
 
 let age (m : App.Model.t) (s : Session_summary.t) =
-  match m.now, Rel_time.parse (Option.value s.updated_at ~default:s.created_at) with
+  match
+    m.now, Rel_time.parse (Option.value s.updated_at ~default:s.created_at)
+  with
   | Some now, Some time -> Rel_time.ago ~now time
   | _ -> ""
 ;;
 
 let session (m : App.Model.t) ~inject ~current (s : Session_summary.t) =
   let selected = Option.equal String.equal current (Some s.id) in
-  let running =
-    if selected then App.Model.running m else s.running
-  in
+  let running = if selected then App.Model.running m else s.running in
   Node.div
     ~attrs:
       [ classes [ "session" ] [ "selected", selected; "running", running ]
@@ -34,7 +34,8 @@ let session (m : App.Model.t) ~inject ~current (s : Session_summary.t) =
         [ (if running
            then span ~cls:"dot running" ~attrs:[ Attr.title "running" ] ""
            else if s.live
-           then span ~cls:"dot live" ~attrs:[ Attr.title "open in the backend" ] ""
+           then
+             span ~cls:"dot live" ~attrs:[ Attr.title "open in the backend" ] ""
            else Node.none)
         ; span ~cls:"session-title" (Session_list.title s)
         ; span ~cls:"session-age" (age m s)
@@ -44,7 +45,10 @@ let session (m : App.Model.t) ~inject ~current (s : Session_summary.t) =
         [ span ~cls:"session-cwd" (home_relative s.cwd)
         ; span
             ~cls:"session-count"
-            (sprintf "%d msg%s" s.message_count (if s.message_count = 1 then "" else "s"))
+            (sprintf
+               "%d msg%s"
+               s.message_count
+               (if s.message_count = 1 then "" else "s"))
         ; Node.button
             ~attrs:
               [ Attr.class_ "btn icon ghost delete"
@@ -96,7 +100,9 @@ let view (m : App.Model.t) ~inject =
     ~attrs:[ Attr.class_ "sidebar"; Attr.id "sidebar" ]
     [ div
         ~cls:"sidebar-head"
-        [ div ~cls:"brand" [ span ~cls:"logo" "prigh"; span ~cls:"brand-sub" "web" ]
+        [ div
+            ~cls:"brand"
+            [ span ~cls:"logo" "prigh"; span ~cls:"brand-sub" "web" ]
         ; button
             ~cls:"icon ghost"
             ~title:"Hide sidebar (Ctrl+B)"
@@ -118,14 +124,16 @@ let view (m : App.Model.t) ~inject =
               ; Attr.placeholder "Search sessions  (Ctrl+K)"
               ; Attr.value m.session_query
               ; Attr.create "autocomplete" "off"
-              ; Attr.on_input (fun _ text -> inject (Action.Set_session_query text))
+              ; Attr.on_input (fun _ text ->
+                  inject (Action.Set_session_query text))
               ]
             ()
         ]
     ; div
         ~cls:"sessions"
         (match sessions, m.sessions with
-         | [], [] -> [ div ~cls:"sessions-empty" [ Node.text "No saved sessions yet." ] ]
+         | [], [] ->
+           [ div ~cls:"sessions-empty" [ Node.text "No saved sessions yet." ] ]
          | [], _ ->
            [ div
                ~cls:"sessions-empty"

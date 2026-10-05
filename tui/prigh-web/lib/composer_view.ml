@@ -19,23 +19,32 @@ let popup (m : App.Model.t) ~inject =
     div
       ~cls:"popup"
       ~attrs:[ Attr.role "listbox" ]
-      [ div ~cls:"popup-title" [ Node.text title; span ~cls:"popup-keys" "↑↓ Tab Enter Esc" ]
+      [ div
+          ~cls:"popup-title"
+          [ Node.text title; span ~cls:"popup-keys" "↑↓ Tab Enter Esc" ]
       ; div
           ~cls:"popup-items"
-          (List.mapi (List.take (Completion.items c) 50) ~f:(fun i (item : Picker.Item.t) ->
-             Node.div
-               ~attrs:
-                 [ classes
-                     [ "popup-item" ]
-                     [ "selected", i = Completion.selected c; "dimmed", item.dimmed; "marked", item.marked ]
-                 ; Attr.role "option"
-                 ; Attr.on_mousedown (fun ev ->
-                     Js_of_ocaml.Dom.preventDefault ev;
-                     inject (Action.Complete_choose i))
-                 ]
-               [ span ~cls:"popup-label" item.label
-               ; (if String.is_empty item.detail then Node.none else span ~cls:"popup-detail" item.detail)
-               ]))
+          (List.mapi
+             (List.take (Completion.items c) 50)
+             ~f:(fun i (item : Picker.Item.t) ->
+               Node.div
+                 ~attrs:
+                   [ classes
+                       [ "popup-item" ]
+                       [ "selected", i = Completion.selected c
+                       ; "dimmed", item.dimmed
+                       ; "marked", item.marked
+                       ]
+                   ; Attr.role "option"
+                   ; Attr.on_mousedown (fun ev ->
+                       Js_of_ocaml.Dom.preventDefault ev;
+                       inject (Action.Complete_choose i))
+                   ]
+                 [ span ~cls:"popup-label" item.label
+                 ; (if String.is_empty item.detail
+                    then Node.none
+                    else span ~cls:"popup-detail" item.detail)
+                 ]))
       ]
 ;;
 
@@ -73,7 +82,9 @@ let placeholder (m : App.Model.t) =
 
 let view (m : App.Model.t) ~inject =
   let running = App.Model.running m in
-  let has_input = not (String.is_empty (String.strip m.draft) && List.is_empty m.images) in
+  let has_input =
+    not (String.is_empty (String.strip m.draft) && List.is_empty m.images)
+  in
   Node.footer
     ~attrs:[ Attr.class_ "composer" ]
     [ popup m ~inject
@@ -90,9 +101,13 @@ let view (m : App.Model.t) ~inject =
                   ; Attr.value m.draft
                   ; Attr.rows 1
                   ; Attr.create "autocomplete" "off"
-                  ; Attr.create "enterkeyhint" (if running then "send" else "send")
+                  ; Attr.create
+                      "enterkeyhint"
+                      (if running then "send" else "send")
                   ; Attr.on_input (fun ev text ->
-                      let cursor = Option.value (caret ev) ~default:(String.length text) in
+                      let cursor =
+                        Option.value (caret ev) ~default:(String.length text)
+                      in
                       inject (Action.Edit { text; cursor }))
                   ]
                 []
