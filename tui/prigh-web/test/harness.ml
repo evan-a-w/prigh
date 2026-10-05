@@ -22,7 +22,12 @@ let act t action =
      | Focus _
      | Save_history _
      | Sign_out
-     | Reveal _ -> ());
+     | Reveal _
+     | Copy _
+     | Switch_account _
+     | Add_account
+     | Scroll_chat _
+     | Jump_to_user_message _ -> ());
     if not t.quiet then print_s [%sexp (command : App.Command.t)])
 ;;
 
@@ -147,6 +152,10 @@ let session_json
     running
 ;;
 
+let config_json =
+  {|{"scoped_models":[],"confirm_tools":false,"default_model":null,"default_thinking":null}|}
+;;
+
 let now = Time_ns.of_string_with_utc_offset "2026-10-05 10:00:00Z"
 
 let key
@@ -154,6 +163,8 @@ let key
       ?(alt = false)
       ?(ctrl = false)
       ?(meta = false)
+      ?(selection = false)
+      ?code
       ?target
       t
       key
@@ -163,7 +174,16 @@ let key
     | Some target -> target
     | None -> Editor { cursor = String.length t.model.draft }
   in
-  match Keys.handle t.model { key; shift; alt; ctrl; meta; target } with
+  let code =
+    match code with
+    | Some code -> code
+    | None when String.length key = 1 && Char.is_alpha key.[0] ->
+      "Key" ^ String.uppercase key
+    | None -> key
+  in
+  match
+    Keys.handle t.model { key; code; shift; alt; ctrl; meta; selection; target }
+  with
   | None -> print_endline "(browser default)"
   | Some action ->
     print_s [%sexp (action : App.Action.t)];
@@ -178,6 +198,7 @@ let create ?(verbose = false) ?(sessions = "[]") ?(state = state_json ()) () =
   reply t "get_state" state;
   reply t "list_models" models_json;
   reply t "auth_status" auth_json;
+  reply t "get_config" config_json;
   reply t "get_messages" "[]";
   reply t "list_sessions" sessions;
   act t (Tick now);

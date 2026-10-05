@@ -7,6 +7,14 @@ module Picker_kind = struct
     | Thinking
     | Login
     | Logout
+    | Verbosity
+    | Confirm_tools
+    | Fork of Entry.t list
+    | Rewind of Entry.t list
+    | Tree
+    | Hosts
+    | Users
+    | Accounts
   [@@deriving sexp_of, equal]
 end
 
@@ -23,9 +31,37 @@ type t =
       }
   | Login of Login_flow.t
   | Auth of Auth_status.t list
+  | Hotkeys
+  | Scoped_models of
+      { picker : Picker.t
+      ; checked : String.Set.t
+      }
+  | Prompt of Prompt.t
+  | Rewind_confirm of
+      { id : string
+      ; text : string
+      }
+  | Session of Session_stats.t
+  | Text of
+      { title : string
+      ; text : string
+      }
 [@@deriving sexp_of, equal]
 
 let per_session = function
-  | Rename _ -> true
-  | Picker _ | Help | Delete _ | Login _ | Auth _ -> false
+  | Rename _ | Prompt _ | Rewind_confirm _ | Session _ | Text _
+  | Picker { kind = Fork _ | Rewind _ | Tree | Hosts; _ } -> true
+  | Picker
+      { kind =
+          ( Models
+          | Thinking
+          | Login
+          | Logout
+          | Verbosity
+          | Confirm_tools
+          | Users
+          | Accounts )
+      ; _
+      }
+  | Help | Hotkeys | Scoped_models _ | Delete _ | Login _ | Auth _ -> false
 ;;

@@ -293,21 +293,42 @@ let%expect_test "slash commands: the popup, arguments, running, unknown ones" =
   [%expect
     {|
     Commands ↑↓ Tab Enter Esc
-    /help show commands and keys
+    /help [command] show commands and keys, or a command's usage
+    /hotkeys show the keyboard shortcuts
     /new start a new session
     /model [name] pick or switch the model
+    /scoped-models pick the models Ctrl+P and Alt+P cycle through
     /thinking [off|low|on|high|max] pick or set the thinking level
-    /compact summarise older messages to free context
+    /change_default save the model and thinking level as the default for new sessions
+    /verbosity [quiet|normal|verbose] how much of tool calls and thinking the transcript shows
+    /confirm [on|off] ask before bash, write and edit run
+    /compact [instructions] summarise older messages to free context
     /name [name] rename the session
+    /session show the session's details and statistics
     /sessions search the saved sessions
+    /switch [path] switch to a saved session
     /clone copy this session into a new one
-    /cd <path> change the working directory
+    /fork start a new session from an earlier message
+    /rewind go back to an earlier message in this session
+    /tree show the session tree and move to any message in it
+    /cd [path] change the working directory
+    /host [name|backend] pick where tools run, and the directory there
+    /export [path] export the transcript on the backend (markdown, or .jsonl)
+    /import [path] import a session from a JSONL file on the backend
+    /copy copy the last reply to the clipboard
+    /btw <question> ask a side question without interrupting the run (not added to the conversation)
     /abort stop the current run
-    /agents [n|id] follow subagents and background jobs
+    /agents [n|id|cancel <n|id>] follow subagents and background jobs in the agents panel, or cancel one
+    /jobs [id|kill <id>] background jobs in the agents panel: list them, show or kill one
     /login [provider] log in to a model provider (or /login custom)
     /logout [provider] remove a provider's login
     /auth show which providers are logged in
-    /signout sign out of this backend
+    /setusr [user] act as another user (superusers); without a user, pick one
+    /signout sign out of this account
+    /retry-backend-connection reconnect to the backend now
+    /state show the session state as the backend reports it
+    /clear clear the transcript view (the conversation is kept)
+    /quit how to leave (close the tab; /signout signs out)
     |}];
   H.type_ h "/mod";
   H.key h "Tab";
@@ -420,6 +441,8 @@ let%expect_test "/cd completes directories" =
   [%expect
     {|
     (Save_history (/cd "/cd src/"))
-    Usage: /cd <path> (Tab completes directories)
+    (Focus dialog-input)
+    (Rpc (method_ list_dirs) (params ((prefix /work) (host backend)))
+     (tag (Prompt_paths /work)))
     |}]
 ;;

@@ -4,7 +4,7 @@ open Html
 module Model = App.Model
 module Action = App.Action
 
-let banner (m : Model.t) =
+let banner (m : Model.t) ~inject =
   match m.connection with
   | Connected -> Node.none
   | Reconnecting { attempt; _ } ->
@@ -20,6 +20,11 @@ let banner (m : Model.t) =
                "Connection lost: reconnecting (attempt %d, next in %.1fs)…"
                (attempt + 1)
                (Float.of_int (App.Connection.delay_ms ~attempt) /. 1000.))
+      ; button
+          ~cls:"small"
+          ~title:"/retry-backend-connection"
+          ~on_click:(inject Action.Retry_connection)
+          [ Node.text "Retry now" ]
       ]
 ;;
 
@@ -88,8 +93,15 @@ let view (m : Model.t) ~inject =
     ; Node.main
         ~attrs:[ Attr.class_ "main" ]
         [ Topbar_view.view m ~inject
-        ; banner m
-        ; Node.div ~attrs:[ Attr.class_ "chat"; Attr.id "chat" ] [ chat ]
+        ; banner m ~inject
+        ; Node.div
+            ~attrs:
+              [ Attr.classes
+                  [ "chat"; "verbosity-" ^ Prigh_ui.Verbosity.name m.verbosity ]
+              ; Attr.id "chat"
+              ]
+            [ chat ]
+        ; Btw_view.view m ~inject
         ; Composer_view.view m ~inject
         ]
     ; Agents_view.view m ~inject

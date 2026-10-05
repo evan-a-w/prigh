@@ -12,7 +12,8 @@ prigh
 web
 New session
 No saved sessions yet.
-Commands & keys
+T
+token
 === chromium: signed in: chat ===
 What are we building?
 <CWD>
@@ -72,7 +73,8 @@ count some lines
 <AGE>
 <CWD>
 10 msgs
-Commands & keys
+T
+token
 === chromium: new session ===
 What are we building?
 <CWD>
@@ -94,7 +96,8 @@ count some lines
 <AGE>
 <CWD>
 10 msgs
-Commands & keys
+T
+token
 switched back: true
 === chromium: switched back ===
 count some lines
@@ -190,6 +193,90 @@ Transcript
 The survey: 3 files.
 === chromium: errors ===
 none
+=== chromium: accounts: sessions ===
+I am alice
+=== chromium: accounts: alice's menu ===
+A
+alice
+127.0.0.1:<PORT>
+signed in
+Act as…
+see and work in another user's sessions
+Add account…
+sign in as another user, or to another backend
+Sign out
+forget this account in this browser
+↑↓ move · Enter choose · Esc close
+=== chromium: accounts: add an account ===
+prigh
+web
+Add an account
+to the prigh backend at ws://127.0.0.1:<PORT>/ws
+SAVED ACCOUNTS
+A
+alice
+127.0.0.1:<PORT>
+×
+or sign in
+User name
+Password
+Backend
+Sign in
+Back to alice
+=== chromium: accounts: sessions ===
+I am bob
+=== chromium: accounts: bob's menu ===
+B
+bob
+127.0.0.1:<PORT>
+signed in
+SWITCH TO
+A
+alice
+127.0.0.1:<PORT>
+Add account…
+sign in as another user, or to another backend
+Sign out
+forget this account in this browser
+↑↓ move · Enter choose · Esc close
+=== chromium: accounts: sessions ===
+I am alice
+=== chromium: accounts: act as ===
+alice
+you
+✓
+bob
+=== chromium: accounts: sessions ===
+I am bob
+=== chromium: accounts: acting as bob ===
+A
+alice
+acting as bob
+=== chromium: accounts: sessions ===
+I am alice
+=== chromium: accounts: signed out ===
+prigh
+web
+Sign in
+to the prigh backend at ws://127.0.0.1:<PORT>/ws
+Signed out.
+CONTINUE AS
+A
+alice
+127.0.0.1:<PORT>
+×
+or sign in
+User name
+Password
+Backend
+Sign in
+=== chromium: accounts: alice again ===
+A
+alice
+=== chromium: accounts: saved accounts ===
+alice
+=== chromium: accounts: errors ===
+none
 === firefox: sign-in page ===
 prigh
 web
@@ -204,7 +291,8 @@ prigh
 web
 New session
 No saved sessions yet.
-Commands & keys
+T
+token
 === firefox: signed in: chat ===
 What are we building?
 <CWD>
@@ -264,7 +352,8 @@ count some lines
 <AGE>
 <CWD>
 10 msgs
-Commands & keys
+T
+token
 === firefox: new session ===
 What are we building?
 <CWD>
@@ -286,7 +375,8 @@ count some lines
 <AGE>
 <CWD>
 10 msgs
-Commands & keys
+T
+token
 switched back: true
 === firefox: switched back ===
 count some lines
@@ -381,4 +471,88 @@ Transcript
 2 messages
 The survey: 3 files.
 === firefox: errors ===
+none
+=== firefox: accounts: sessions ===
+I am alice
+=== firefox: accounts: alice's menu ===
+A
+alice
+127.0.0.1:<PORT>
+signed in
+Act as…
+see and work in another user's sessions
+Add account…
+sign in as another user, or to another backend
+Sign out
+forget this account in this browser
+↑↓ move · Enter choose · Esc close
+=== firefox: accounts: add an account ===
+prigh
+web
+Add an account
+to the prigh backend at ws://127.0.0.1:<PORT>/ws
+SAVED ACCOUNTS
+A
+alice
+127.0.0.1:<PORT>
+×
+or sign in
+User name
+Password
+Backend
+Sign in
+Back to alice
+=== firefox: accounts: sessions ===
+I am bob
+=== firefox: accounts: bob's menu ===
+B
+bob
+127.0.0.1:<PORT>
+signed in
+SWITCH TO
+A
+alice
+127.0.0.1:<PORT>
+Add account…
+sign in as another user, or to another backend
+Sign out
+forget this account in this browser
+↑↓ move · Enter choose · Esc close
+=== firefox: accounts: sessions ===
+I am alice
+=== firefox: accounts: act as ===
+alice
+you
+✓
+bob
+=== firefox: accounts: sessions ===
+I am bob
+=== firefox: accounts: acting as bob ===
+A
+alice
+acting as bob
+=== firefox: accounts: sessions ===
+I am alice
+=== firefox: accounts: signed out ===
+prigh
+web
+Sign in
+to the prigh backend at ws://127.0.0.1:<PORT>/ws
+Signed out.
+CONTINUE AS
+A
+alice
+127.0.0.1:<PORT>
+×
+or sign in
+User name
+Password
+Backend
+Sign in
+=== firefox: accounts: alice again ===
+A
+alice
+=== firefox: accounts: saved accounts ===
+alice
+=== firefox: accounts: errors ===
 none

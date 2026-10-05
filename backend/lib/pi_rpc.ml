@@ -1140,7 +1140,14 @@ let run_command t json =
               (List.map (P.Thinking_level.available ~supports_thinking) ~f:str)
           )
         ])
-  | "compact" -> Or_error.map (call t "compact" []) ~f:Fn.id
+  | "compact" ->
+    call
+      t
+      "compact"
+      (Option.value_map
+         (opt_string_field "customInstructions" json)
+         ~default:[]
+         ~f:(fun i -> [ "instructions", str i ]))
   | "set_session_name" ->
     unit_ok (call t "set_session_name" [ "name", str (arg "name") ])
   | "new_session" ->

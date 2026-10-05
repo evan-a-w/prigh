@@ -23,11 +23,15 @@ val selected_item : t -> Picker.Item.t option
 (** What the editor's [text] with the caret at byte [cursor] completes, if
     anything. Paths and directories start without items: see [request]. *)
 val compute
-  :  text:string
+  :  ?sessions:Session_summary.t list
+  -> ?hosts:Host.t list
+  -> ?users:string list
+  -> text:string
   -> cursor:int
   -> models:Llm.t list
   -> auth:Auth_status.t list
   -> current_model:string option
+  -> unit
   -> t option
 
 (** Whether two completions are for the same thing, so the newer can keep the

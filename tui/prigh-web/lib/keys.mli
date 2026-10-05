@@ -14,10 +14,12 @@ end
 
 type t =
   { key : string (** [KeyboardEvent.key] *)
+  ; code : string (** [KeyboardEvent.code], e.g. [KeyP] *)
   ; shift : bool
   ; alt : bool
   ; ctrl : bool
   ; meta : bool
+  ; selection : bool (** text is selected (so Ctrl+X cuts it) *)
   ; target : Target.t
   }
 [@@deriving sexp_of]
@@ -27,3 +29,6 @@ val handle : App.Model.t -> t -> App.Action.t option
 
 (** The bindings, for [/help]. *)
 val help : (string * string) list
+
+(** The TUI's keys that the browser keeps, and what to use instead. *)
+val browser : (string * string) list

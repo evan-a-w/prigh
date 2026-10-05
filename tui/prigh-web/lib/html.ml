@@ -65,6 +65,11 @@ module Icon = struct
     | Bot
     | Back
     | Locate
+    | User
+    | Users
+    | User_plus
+    | Copy
+    | Check
   [@@deriving sexp_of]
 
   (* Paths in the style of Lucide (24x24, stroked). *)
@@ -106,6 +111,14 @@ module Icon = struct
     | Back -> {|<path d="M19 12H5M12 19l-7-7 7-7"/>|}
     | Locate ->
       {|<circle cx="12" cy="12" r="7"/><circle cx="12" cy="12" r="2"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/>|}
+    | User -> {|<circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/>|}
+    | Users ->
+      {|<circle cx="9" cy="8" r="4"/><path d="M2 21a7 7 0 0 1 14 0M16 3.5a4 4 0 0 1 0 9M22 21a7 7 0 0 0-4-6.3"/>|}
+    | User_plus ->
+      {|<circle cx="9" cy="8" r="4"/><path d="M2 21a7 7 0 0 1 14 0M19 8v6M16 11h6"/>|}
+    | Copy ->
+      {|<rect x="8" y="8" width="13" height="13" rx="2"/><path d="M16 8V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h3"/>|}
+    | Check -> {|<path d="m5 12 5 5L20 7"/>|}
   ;;
 
   let name t = String.lowercase (Sexp.to_string (sexp_of_t t))
