@@ -202,6 +202,41 @@ Transcript
 2 messages
 The survey: 3 files.
 <TIME>
+=== chromium: a shell in the terminal panel ===
+<HOSTNAME>
+<CWD>
+$ echo hello-from-prigh-web
+hello-from-prigh-web
+$ pwd
+<CWD>
+$ cat -v
+^[
+^[
+$
+the shell has the panel's rows: true
+taller after dragging: true; the panel's rows: true
+closed: the editor has the keyboard
+=== chromium: reopened: the same shell ===
+<HOSTNAME>
+<CWD>
+$ echo still-here
+still-here
+$
+reloaded: the same height: true
+=== chromium: reloaded: the panel and the shell are back ===
+<HOSTNAME>
+<CWD>
+$ echo still-here
+still-here
+$
+another session: another shell
+back: the first one again
+=== chromium: the terminal on a phone ===
+<HOSTNAME>
+<CWD>
+$ echo still-here
+still-here
+$
 === chromium: errors ===
 none
 === chromium: accounts: sessions ===
@@ -492,6 +527,41 @@ Transcript
 2 messages
 The survey: 3 files.
 <TIME>
+=== firefox: a shell in the terminal panel ===
+<HOSTNAME>
+<CWD>
+$ echo hello-from-prigh-web
+hello-from-prigh-web
+$ pwd
+<CWD>
+$ cat -v
+^[
+^[
+$
+the shell has the panel's rows: true
+taller after dragging: true; the panel's rows: true
+closed: the editor has the keyboard
+=== firefox: reopened: the same shell ===
+<HOSTNAME>
+<CWD>
+$ echo still-here
+still-here
+$
+reloaded: the same height: true
+=== firefox: reloaded: the panel and the shell are back ===
+<HOSTNAME>
+<CWD>
+$ echo still-here
+still-here
+$
+another session: another shell
+back: the first one again
+=== firefox: the terminal on a phone ===
+<HOSTNAME>
+<CWD>
+$ echo still-here
+still-here
+$
 === firefox: errors ===
 none
 === firefox: accounts: sessions ===
