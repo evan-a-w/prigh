@@ -378,25 +378,60 @@ let thinking_picker (m : Model.t) =
     }
 ;;
 
+let custom_detail (c : Auth_status.Custom.t) =
+  sprintf "custom · %s · %s" c.base_url c.api_label
+;;
+
+let key_source (s : Auth_status.t) =
+  match s.configured with
+  | Some { source = "no key"; _ } | None -> "no key"
+  | Some c -> "key: " ^ c.source
+;;
+
+let is_custom (auth : Auth_status.t list) provider =
+  String.equal provider "custom"
+  || List.exists auth ~f:(fun s ->
+    String.equal s.provider provider && Option.is_some s.custom)
+;;
+
+let add_custom_item =
+  Picker.Item.create
+    ~id:"custom api_key"
+    ~detail:
+      "add an OpenAI-compatible endpoint (aiproxy, LiteLLM, OpenRouter, vLLM, \
+       Ollama…)"
+    ~search:"custom openai compatible endpoint"
+    "Custom provider"
+;;
+
 let login_picker (statuses : Auth_status.t list) =
   let items =
     List.concat_map statuses ~f:(fun s ->
       List.map s.methods ~f:(fun meth ->
-        let configured =
-          match s.configured with
-          | Some c when String.equal c.method_ meth.method_ ->
-            sprintf " · logged in via %s" c.source
-          | _ -> ""
-        in
-        Picker.Item.create
-          ~id:(s.provider ^ " " ^ meth.method_)
-          ~detail:(meth.label ^ configured)
-          ~search:
-            (String.concat
-               ~sep:" "
-               [ s.name; s.provider; meth.method_; meth.label ])
-          ~marked:(not (String.is_empty configured))
-          s.name))
+        match s.custom with
+        | Some c ->
+          Picker.Item.create
+            ~id:(s.provider ^ " " ^ meth.method_)
+            ~detail:(custom_detail c ^ " · edit")
+            ~search:(String.concat ~sep:" " [ s.name; "custom"; c.base_url ])
+            s.name
+        | None ->
+          let configured =
+            match s.configured with
+            | Some c when String.equal c.method_ meth.method_ ->
+              sprintf " · logged in via %s" c.source
+            | _ -> ""
+          in
+          Picker.Item.create
+            ~id:(s.provider ^ " " ^ meth.method_)
+            ~detail:(meth.label ^ configured)
+            ~search:
+              (String.concat
+                 ~sep:" "
+                 [ s.name; s.provider; meth.method_; meth.label ])
+            ~marked:(not (String.is_empty configured))
+            s.name))
+    @ [ add_custom_item ]
   in
   Dialog.Picker
     { kind = Login; picker = Picker.create ~title:"Log in to a provider" items }
@@ -407,7 +442,10 @@ let logout_picker (statuses : Auth_status.t list) =
     Option.map s.configured ~f:(fun c ->
       Picker.Item.create
         ~id:s.provider
-        ~detail:(sprintf "%s via %s" c.method_ c.source)
+        ~detail:
+          (match s.custom with
+           | Some custom -> custom_detail custom ^ " · " ^ key_source s
+           | None -> sprintf "%s via %s" c.method_ c.source)
         ~search:(s.name ^ " " ^ s.provider)
         s.name))
   |> function
@@ -437,6 +475,17 @@ let start_login (m : Model.t) ~provider ~method_ =
              [ "method", str m ]))
           ~tag:Login_started
       ] )
+;;
+
+(* A custom provider's logout asks what to remove; the others just happen. *)
+let logout (m : Model.t) provider =
+  if is_custom m.auth provider
+  then (
+    let m, cmds =
+      open_dialog m (Login (Login_flow.start ~purpose:Logout provider))
+    in
+    m, cmds @ [ rpc "logout" [ "provider", str provider ] ~tag:Login_started ])
+  else m, [ rpc "logout" [ "provider", str provider ] ]
 ;;
 
 let set_thinking (m : Model.t) level =
@@ -553,7 +602,7 @@ let run_command (m : Model.t) ({ name; rest } : Slash.Parsed.t) =
        start_login m ~provider ~method_:(Some method_)
      | _ -> start_login m ~provider:args ~method_:None)
   | "logout", "" -> m, [ rpc "auth_status" [] ~tag:(Auth_status Logout_picker) ]
-  | "logout", provider -> m, [ rpc "logout" [ "provider", str provider ] ]
+  | "logout", provider -> logout m provider
   | "auth", _ -> m, [ rpc "auth_status" [] ~tag:(Auth_status Show) ]
   | "signout", _ -> m, [ Command.Sign_out ]
   | name, _ ->
@@ -675,7 +724,10 @@ let reply (m : Model.t) (tag : Reply_tag.t) result =
     decode m json (decode_list Auth_status.of_json) ~f:(fun auth ->
       let m = { m with auth } in
       match purpose with
-      | Refresh -> m, []
+      | Refresh ->
+        (match m.dialog with
+         | Some (Auth _) -> { m with dialog = Some (Auth auth) }, []
+         | _ -> m, [])
       | Show -> open_dialog m (Auth auth)
       | Login_picker -> open_picker m (login_picker auth)
       | Logout_picker ->
@@ -722,20 +774,50 @@ let reply (m : Model.t) (tag : Reply_tag.t) result =
 let auth_event (m : Model.t) (e : Auth_event.t) =
   match e, m.dialog with
   | Done { provider; method_ }, dialog ->
+    let custom =
+      is_custom m.auth provider
+      ||
+      match dialog with
+      | Some (Login { provider = "custom"; _ }) -> true
+      | _ -> false
+    in
     let m =
       match dialog with
       | Some (Login _) -> { m with dialog = None }
       | _ -> m
     in
-    let m, cmds = toast m (sprintf "Logged in to %s (%s)" provider method_) in
+    let m, cmds =
+      toast
+        m
+        (if custom
+         then
+           sprintf
+             "Saved %s: /model lists its models as %s/<id>"
+             provider
+             provider
+         else sprintf "Logged in to %s (%s)" provider method_)
+    in
     ( m
     , cmds
       @ [ rpc "auth_status" [] ~tag:(Auth_status Refresh)
         ; rpc "list_models" [] ~tag:Models
         ] )
-  | Logged_out provider, _ ->
+  | Logged_out provider, dialog ->
+    let m =
+      match dialog with
+      | Some (Login { purpose = Logout; _ }) -> { m with dialog = None }
+      | _ -> m
+    in
     let m, cmds = toast m (sprintf "Logged out of %s" provider) in
-    m, cmds @ [ rpc "auth_status" [] ~tag:(Auth_status Refresh) ]
+    ( m
+    , cmds
+      @ [ rpc "auth_status" [] ~tag:(Auth_status Refresh)
+        ; rpc "list_models" [] ~tag:Models
+        ] )
+  | Prompt { prompt = Secret _ | Text _ | Manual_code _; _ }, Some (Login flow)
+    ->
+    ( { m with dialog = Some (Login (Login_flow.apply flow e)) }
+    , [ Command.Focus "dialog-input" ] )
   | _, Some (Login flow) ->
     { m with dialog = Some (Login (Login_flow.apply flow e)) }, []
   | Failed { provider; _ }, _
@@ -887,7 +969,7 @@ let picker_accept (m : Model.t) ~kind (item : Picker.Item.t) =
        | Some (provider, method_) ->
          start_login m ~provider ~method_:(Some method_)
        | None -> start_login m ~provider:item.id ~method_:None)
-    | Logout -> m, [ rpc "logout" [ "provider", str item.id ] ]
+    | Logout -> logout m item.id
   in
   m, (if Option.is_none m.dialog then [ focus_editor ] else []) @ cmds
 ;;
@@ -903,8 +985,16 @@ let respond_login (m : Model.t) (flow : Login_flow.t) =
   match Login_flow.answer flow with
   | None -> m, []
   | Some (id, value) ->
-    ( { m with dialog = Some (Login { flow with prompt = None; input = "" }) }
-    , [ rpc "auth_respond" [ "id", str id; "value", str value ] ] )
+    let respond = rpc "auth_respond" [ "id", str id; "value", str value ] in
+    (match flow.purpose with
+     | Login ->
+       ( { m with dialog = Some (Login { flow with prompt = None; input = "" }) }
+       , [ respond ] )
+     (* Its one question answered, a logout ends with [Logged_out] or
+        nothing (kept). *)
+     | Logout ->
+       let m, cmds = close_dialog m in
+       m, cmds @ [ respond ])
 ;;
 
 let dialog_accept (m : Model.t) =
@@ -1059,7 +1149,7 @@ let update (m : Model.t) (action : Action.t) =
        respond_login m flow
      | _ -> m, [])
   | Start_login provider -> start_login m ~provider ~method_:None
-  | Logout provider -> m, [ rpc "logout" [ "provider", str provider ] ]
+  | Logout provider -> logout m provider
   | Cancel_subagent id -> m, [ rpc "cancel_subagent" [ "agent_id", str id ] ]
   | Kill_job id -> m, [ rpc "kill_job" [ "job_id", str id ] ]
   | Dequeue -> m, [ rpc "dequeue" [] ~tag:Dequeued ]
