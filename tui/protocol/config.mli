@@ -7,6 +7,9 @@ type t =
   ; confirm_tools : bool
   ; default_model : string option
   ; default_thinking : string option
+  ; fallback_models : string list
+    (** model keys that take over, in order, when a model's usage runs out *)
+  ; default_cwd : string option (** where new sessions start *)
   }
 [@@deriving sexp_of, equal]
 

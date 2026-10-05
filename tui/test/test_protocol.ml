@@ -759,6 +759,15 @@ let%expect_test "config round trip and config_changed event" =
   show
     (fun j -> Or_error.map (Config.of_json j) ~f:Config.sexp_of_t)
     {|{"default_model":3}|};
+  show
+    (fun j -> Or_error.map (Config.of_json j) ~f:Config.sexp_of_t)
+    {|{"scoped_models":[],"confirm_tools":false,"default_model":null,"default_thinking":null,"fallback_models":["openai-codex/gpt-6-sol","anthropic/claude-opus-5-5"],"default_cwd":"/srv/work"}|};
+  show
+    (fun j -> Or_error.map (Config.of_json j) ~f:Config.sexp_of_t)
+    {|{"fallback_models":"gpt-6-sol"}|};
+  show
+    (fun j -> Or_error.map (Config.of_json j) ~f:Config.sexp_of_t)
+    {|{"default_cwd":["/srv"]}|};
   print_s
     [%sexp
       (Config.to_json
@@ -766,6 +775,9 @@ let%expect_test "config round trip and config_changed event" =
          ; confirm_tools = true
          ; default_model = Some "deepseek/deepseek-flash"
          ; default_thinking = Some "max"
+         ; fallback_models =
+             [ "openai-codex/gpt-6-sol"; "deepseek/deepseek-flash" ]
+         ; default_cwd = Some "~/proj"
          }
        : Json.t)];
   decode
@@ -775,26 +787,44 @@ let%expect_test "config round trip and config_changed event" =
     ((scoped_models (anthropic/claude-fable-5-1 deepseek/deepseek-flash))
      (confirm_tools true)
      (default_model    ())
-     (default_thinking ()))
+     (default_thinking ())
+     (fallback_models  ())
+     (default_cwd      ()))
     ((scoped_models ())
      (confirm_tools false)
      (default_model    ())
-     (default_thinking ()))
+     (default_thinking ())
+     (fallback_models  ())
+     (default_cwd      ()))
     ((scoped_models ())
      (confirm_tools false)
      (default_model ())
-     (default_thinking (low)))
+     (default_thinking (low))
+     (fallback_models ())
+     (default_cwd     ()))
     (decode (e "default_model must be a string"))
+    ((scoped_models ())
+     (confirm_tools false)
+     (default_model    ())
+     (default_thinking ())
+     (fallback_models (openai-codex/gpt-6-sol anthropic/claude-opus-5-5))
+     (default_cwd (/srv/work)))
+    (decode (e "fallback_models must be an array of strings"))
+    (decode (e "default_cwd must be a string"))
     ((scoped_models (a b))
      (confirm_tools    true)
      (default_model    deepseek/deepseek-flash)
-     (default_thinking max))
+     (default_thinking max)
+     (fallback_models (openai-codex/gpt-6-sol deepseek/deepseek-flash))
+     (default_cwd ~/proj))
     (Event (
       Config_changed (
         (scoped_models (a))
         (confirm_tools false)
         (default_model    ())
-        (default_thinking ()))))
+        (default_thinking ())
+        (fallback_models  ())
+        (default_cwd      ()))))
     |}]
 ;;
 
