@@ -14,14 +14,16 @@ open! Import
     or path and registers it as a tool host when it advertises [tools]; hosts
     are visible to every session, so a session can run its tools on a client
     attached elsewhere (replies are routed by exec id). A host is known by its
-    host id: [hello]'s [host_id] (the same on every connection of a tool-host
-    process, so a reconnecting host is the same host and its sessions resume
-    on it), or its client id without one. A newer connection claiming a held
-    host id takes it over and the older one falls back to its client id. The session methods
-    ([new_session], [switch_session], [fork], [clone], [import]) move only
-    the calling client. A session keeps running when its
-    clients disconnect; an idle session with no clients is dropped from
-    memory (it stays on disk). *)
+    host id: [hello]'s [host_id] (the same on every connection from a
+    machine, so a reconnecting or restarted host is the same host and its
+    sessions resume on it), or its client id without one. A newer connection
+    claiming a held host id takes it over and the older one falls back to
+    its client id (with a notice), taking the id back if the newer one
+    disconnects first. The session methods ([new_session],
+    [switch_session], [fork], [clone], [import]) move only the calling
+    client. A session keeps running when its clients disconnect; an idle
+    session with no clients is dropped from memory (it stays on disk, with
+    its tool host, so it is on the same host when loaded again). *)
 
 val methods : string list
 

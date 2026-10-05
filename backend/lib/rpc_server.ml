@@ -150,6 +150,8 @@ module Client = struct
     ; seq : int
     ; mutable host_id : string
       (** what sessions know it by as a tool host: [hello]'s [host_id] or [id] *)
+    ; mutable wanted_host_id : string option
+      (** [hello]'s [host_id], also while a newer connection holds it *)
     ; mutable name : string
     ; mutable tools : bool
     ; mutable cwd : string option
@@ -180,9 +182,6 @@ type t =
   ; mutable btw_seq : int
   ; execs : (string * Agent.t) String.Table.t
     (** in-flight remote executions by exec id: host id and session *)
-  ; parked_host_cwds : string String.Map.t String.Table.t
-    (** [Agent.host_cwds] of evicted sessions, by session id, for when they
-        are loaded again *)
   ; mutable login_owner : string option
     (** the client running the current login flow *)
   ; terminals : Terminal_relay.t
@@ -212,11 +211,7 @@ let maybe_evict t agent =
     && (not (Agent.is_running agent))
     && (not (Agent.has_running_background agent))
     && List.is_empty (clients_of t agent)
-  then (
-    Hashtbl.remove t.agents (session_id agent);
-    let cwds = Agent.host_cwds agent in
-    if not (Map.is_empty cwds)
-    then Hashtbl.set t.parked_host_cwds ~key:(session_id agent) ~data:cwds)
+  then Hashtbl.remove t.agents (session_id agent)
 ;;
 
 (* The tool host clients are few: a scan is fine. *)
@@ -277,9 +272,6 @@ let route t agent (event : Agent.Event.t) =
 (* Hosts are set before subscribing: the state change would otherwise evict
    the agent, which has no client until [attach]. *)
 let register t agent =
-  Option.iter
-    (Hashtbl.find_and_remove t.parked_host_cwds (session_id agent))
-    ~f:(Agent.restore_host_cwds agent);
   Agent.set_hosts agent (hosts t);
   Hashtbl.set t.agents ~key:(session_id agent) ~data:agent;
   Agent.subscribe agent ~f:(route t agent);
@@ -313,7 +305,6 @@ let create
     ; client_seq = 0
     ; btw_seq = 0
     ; execs = String.Table.create ()
-    ; parked_host_cwds = String.Table.create ()
     ; login_owner = None
     ; terminals = Terminal_relay.create ()
     }
@@ -360,6 +351,7 @@ let connect ?signed_in t ~send =
     { Client.id = sprintf "client-%d" t.client_seq
     ; seq = t.client_seq
     ; host_id = sprintf "client-%d" t.client_seq
+    ; wanted_host_id = None
     ; name = sprintf "client-%d" t.client_seq
     ; tools = false
     ; cwd = None
@@ -375,13 +367,44 @@ let connect ?signed_in t ~send =
   client
 ;;
 
+(* Fails what is in flight on [client] as the host it is now. *)
+let release_host_id t (client : Client.t) ~text =
+  let execs =
+    Hashtbl.filter t.execs ~f:(fun (host, _) ->
+      String.equal host client.host_id)
+  in
+  Hashtbl.iteri execs ~f:(fun ~key:exec_id ~data:(_, agent) ->
+    Hashtbl.remove t.execs exec_id;
+    ignore
+      (Agent.tool_exec_result agent ~exec_id (Tool.Result.error text)
+       : unit Or_error.t));
+  Terminal_relay.host_gone t.terminals ~host:client.host_id
+;;
+
+let notice (client : Client.t) text = client.send (Rpc_json.event (Notice text))
+
+(* Several connections may ask for one host id (two frontends on a machine
+   share its id): when the one holding it goes, the newest of the others
+   takes it back, so the host's sessions carry on there. *)
+let hand_over_host_id t (gone : Client.t) =
+  if not (String.equal gone.host_id gone.id)
+  then
+    Hashtbl.data t.clients
+    |> List.filter ~f:(fun (c : Client.t) ->
+      c.tools && Option.equal String.equal c.wanted_host_id (Some gone.host_id))
+    |> List.max_elt ~compare:(fun (a : Client.t) b -> Int.compare a.seq b.seq)
+    |> Option.iter ~f:(fun (next : Client.t) ->
+      release_host_id t next ~text:"[tool host reconnected]";
+      next.host_id <- gone.host_id;
+      notice next (sprintf "this connection is tool host %S again" next.host_id))
+;;
+
 let disconnect t (client : Client.t) =
   Hashtbl.remove t.clients client.id;
   Hashtbl.iter client.btws ~f:Cancellation.cancel;
-  Hashtbl.filter_inplace t.execs ~f:(fun (host, _) ->
-    not (String.equal host client.host_id));
+  release_host_id t client ~text:"[tool host disconnected]";
+  hand_over_host_id t client;
   if client.tools then publish_hosts t;
-  Terminal_relay.host_gone t.terminals ~host:client.host_id;
   maybe_evict t client.agent
 ;;
 
@@ -513,28 +536,13 @@ let relay_terminal t ~host ~key ~cwd ~cols ~rows channel =
              ]))
 ;;
 
-(* Fails what is in flight on [client] as the host it is now. *)
-let release_host_id t (client : Client.t) =
-  let execs =
-    Hashtbl.filter t.execs ~f:(fun (host, _) ->
-      String.equal host client.host_id)
-  in
-  Hashtbl.iteri execs ~f:(fun ~key:exec_id ~data:(_, agent) ->
-    Hashtbl.remove t.execs exec_id;
-    ignore
-      (Agent.tool_exec_result
-         agent
-         ~exec_id
-         (Tool.Result.error "[tool host reconnected]")
-       : unit Or_error.t));
-  Terminal_relay.host_gone t.terminals ~host:client.host_id
-;;
-
 (* A tool host names itself with [host_id], the same on every connection of
-   its process, so that sessions on it resume when it reconnects. The newest
-   connection owns the id: an older one still holding it is one the host
-   gave up on (the backend may notice a dropped connection late), so it is
-   demoted to its client id, failing what was in flight on it. *)
+   its machine, so that sessions on it resume when it reconnects or restarts.
+   The newest connection owns the id: an older one still holding it is one
+   the host gave up on (the backend may notice a dropped connection late) or
+   another frontend on the same machine, so it is demoted to its client id,
+   failing what was in flight on it, until the newer one goes
+   ([hand_over_host_id]). *)
 let claim_host_id t (client : Client.t) host_id =
   if String.equal host_id client.host_id
   then Ok ()
@@ -544,13 +552,22 @@ let claim_host_id t (client : Client.t) host_id =
     || String.is_prefix host_id ~prefix:"client-"
   then Or_error.errorf "param \"host_id\": %S is reserved" host_id
   else (
-    release_host_id t client;
+    let text = "[tool host reconnected]" in
+    release_host_id t client ~text;
     Hashtbl.iter t.clients ~f:(fun (other : Client.t) ->
       if String.equal other.host_id host_id
       then (
-        release_host_id t other;
-        other.host_id <- other.id));
+        release_host_id t other ~text;
+        other.host_id <- other.id;
+        notice
+          other
+          (sprintf
+             "a newer connection is tool host %S now; this one is %S until it \
+              disconnects"
+             host_id
+             other.id)));
     client.host_id <- host_id;
+    client.wanted_host_id <- Some host_id;
     Ok ())
 ;;
 

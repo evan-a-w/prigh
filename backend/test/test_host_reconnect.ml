@@ -22,6 +22,7 @@ module Fake_host = struct
     ; sent : Json.t Queue.t
     ; mutable live : bool
     ; mutable answer : bool (** false: leave execs pending *)
+    ; mutable notices : string list (** received, newest first *)
     }
 
   let answer_exec (h : Test_rpc.H.t) t ~name json =
@@ -69,7 +70,7 @@ module Fake_host = struct
     =
     let sent = Queue.create () in
     let client = Rpc_server.connect h.server ~send:(Queue.enqueue sent) in
-    let t = { client; sent; live = true; answer = true } in
+    let t = { client; sent; live = true; answer = true; notices = [] } in
     let params =
       `Object
         ([ "name", `String name
@@ -109,7 +110,9 @@ module Fake_host = struct
              answer_exec h t ~name json
            | Some json
              when not (String.equal (member_string json "event") "tool_exec") ->
-             ignore (Queue.dequeue_exn sent : Json.t)
+             ignore (Queue.dequeue_exn sent : Json.t);
+             if String.equal (member_string json "event") "notice"
+             then t.notices <- member_string json "text" :: t.notices
            | _ -> ());
           Eio.Fiber.yield ();
           loop ())
@@ -121,6 +124,31 @@ module Fake_host = struct
   let disconnect (h : Test_rpc.H.t) t =
     t.live <- false;
     Rpc_server.disconnect h.server t.client
+  ;;
+
+  (* Prints, then forgets, the notices it received. *)
+  let print_notices t ~name =
+    Queue.filter_inplace t.sent ~f:(fun json ->
+      if String.equal (member_string json "event") "notice"
+      then (
+        t.notices <- member_string json "text" :: t.notices;
+        false)
+      else true);
+    List.iter (List.rev t.notices) ~f:(fun text ->
+      printf "%s notice: %s\n" name text);
+    t.notices <- []
+  ;;
+
+  let agent (h : Test_rpc.H.t) t = Rpc_server.agent_of_client h.server t.client
+
+  (* Sends a request as this client and prints the response. *)
+  let call test (h : Test_rpc.H.t) t ?(params = "{}") meth =
+    let request =
+      Json.of_string
+        (sprintf {|{"id": "r", "method": "%s", "params": %s}|} meth params)
+    in
+    print_endline
+      (mask test (Json.to_string (Rpc_server.handle h.server t.client request)))
   ;;
 end
 
@@ -150,9 +178,12 @@ let call t (h : Test_rpc.H.t) ?params meth = Test_rpc.call t h ?params meth
 
 (* Runs a prompt to the end, then prints its tool results and whether the
    model was told about an environment change. *)
-let prompt t (h : Test_rpc.H.t) agent text =
+let prompt ?via t (h : Test_rpc.H.t) agent text =
   let before = List.length (Agent.messages agent) in
-  call t h ~params:(sprintf {|{"text": "%s"}|} text) "prompt";
+  let params = sprintf {|{"text": "%s"}|} text in
+  (match via with
+   | None -> call t h ~params "prompt"
+   | Some host -> Fake_host.call t h host ~params "prompt");
   Agent.wait_idle agent;
   List.iter
     (List.drop (Agent.messages agent) before)
@@ -441,5 +472,463 @@ let%expect_test "host ids: a newer connection takes the id over; reserved ids" =
     z hello: param "host_id": "" is reserved
     web hello: client_id=client-7 host_id=client-7
     old hello: client_id=client-8 host_id=client-8
+    |}]
+;;
+
+(* Each saved session (by first prompt) and whether it is live. *)
+let show_sessions (h : Test_rpc.H.t) =
+  match
+    Json.member
+      "result"
+      (Rpc_server.handle
+         h.server
+         h.client
+         (Json.of_string {|{"id": "s", "method": "list_sessions"}|}))
+  with
+  | Some (`Array sessions) ->
+    List.iter (List.rev sessions) ~f:(fun s ->
+      printf
+        "session %S live=%s\n"
+        (member_string s "first_prompt")
+        (Json.to_string (Option.value_exn (Json.member "live" s))))
+  | _ -> print_endline "no sessions"
+;;
+
+(* The [cwd] entries of the session's file: where it ran. *)
+let show_cwd_entries t agent =
+  List.iter
+    (In_channel.read_lines (Session.path (Agent.session agent)))
+    ~f:(fun line ->
+      match Json.of_string line with
+      | `Array [ `String "Entry"; entry ] ->
+        (match Json.member "payload" entry with
+         | Some (`Array [ `String "Cwd"; cwd ]) ->
+           print_endline (mask t ("cwd entry: " ^ Json.to_string cwd))
+         | _ -> ())
+      | _ -> ())
+;;
+
+let%expect_test
+    "no backend host: an evicted session comes back on its host, not on the \
+     one that is always connected"
+  =
+  Test_rpc.with_agent
+    ~backend_host:false
+    [ bash "c1"; Reply.text "on desk"; bash "c2"; Reply.text "still on desk" ]
+  @@ fun t _ h ->
+  Eio.Switch.run
+  @@ fun sw ->
+  (* The container's tool host is always connected, before anyone else. *)
+  let _container =
+    Fake_host.connect
+      ~sw
+      h
+      ~name:"container"
+      ~host_id:"container-me"
+      ~cwd:"/workspace/me"
+  in
+  let desk =
+    Fake_host.connect ~sw h ~name:"desk" ~host_id:"host-desk" ~cwd:"/home/me"
+  in
+  let session = Fake_host.agent h desk in
+  show_state t session;
+  Fake_host.call
+    t
+    h
+    desk
+    ~params:{|{"host": "host-desk", "cwd": "/home/me/proj"}|}
+    "set_active_host";
+  prompt ~via:desk t h session "run it";
+  show_state t session;
+  [%expect
+    {|
+    container hello: client_id=client-2 host_id=container-me
+    desk hello: client_id=client-3 host_id=host-desk
+    ((active_host container-me) (cwd /workspace/me)
+     (hosts (container-me=/workspace/me host-desk=/home/me)))
+    {"type":"response","id":"r","ok":true,"result":{}}
+    {"type":"response","id":"r","ok":true,"result":{}}
+    desk ran bash in /home/me/proj
+    tool_result: ran on desk in /home/me/proj
+    ((active_host host-desk) (cwd /home/me/proj)
+     (hosts (container-me=/workspace/me host-desk=/home/me/proj)))
+    |}];
+  (* The desktop TUI goes away: its session has no clients and is evicted. *)
+  Fake_host.disconnect h desk;
+  show_sessions h;
+  [%expect {| session "run it" live=false |}];
+  (* It comes back with the same host id and resumes its session. *)
+  let desk =
+    Fake_host.connect
+      ~sw
+      h
+      ~name:"desk"
+      ~host_id:"host-desk"
+      ~cwd:"/home/me"
+      ~session
+  in
+  let reloaded = Fake_host.agent h desk in
+  printf "reloaded: %b\n" (not (phys_equal reloaded session));
+  show_state t reloaded;
+  prompt ~via:desk t h reloaded "again";
+  show_cwd_entries t reloaded;
+  [%expect
+    {|
+    desk hello: client_id=client-4 host_id=host-desk
+    reloaded: true
+    ((active_host host-desk) (cwd /home/me/proj)
+     (hosts (container-me=/workspace/me host-desk=/home/me/proj)))
+    {"type":"response","id":"r","ok":true,"result":{}}
+    desk ran bash in /home/me/proj
+    tool_result: ran on desk in /home/me/proj
+    cwd entry: {"cwd":"/workspace/me","host":{"id":"container-me","name":"container","pinned":false}}
+    cwd entry: {"cwd":"/home/me/proj","host":{"id":"host-desk","name":"desk","pinned":true}}
+    |}]
+;;
+
+let%expect_test
+    "no backend host: a session that adopted its host keeps it after eviction"
+  =
+  Test_rpc.with_agent
+    ~backend_host:false
+    [ Reply.text "hi"; bash "c1"; Reply.text "ok" ]
+  @@ fun t _ h ->
+  Eio.Switch.run
+  @@ fun sw ->
+  (* The container's host is restarting when the desktop connects. *)
+  let desk =
+    Fake_host.connect ~sw h ~name:"desk" ~host_id:"host-desk" ~cwd:"/home/me"
+  in
+  let session = Fake_host.agent h desk in
+  prompt ~via:desk t h session "hello";
+  let _container =
+    Fake_host.connect
+      ~sw
+      h
+      ~name:"container"
+      ~host_id:"container-me"
+      ~cwd:"/workspace/me"
+  in
+  Fake_host.disconnect h desk;
+  let desk =
+    Fake_host.connect
+      ~sw
+      h
+      ~name:"desk"
+      ~host_id:"host-desk"
+      ~cwd:"/home/me"
+      ~session
+  in
+  let reloaded = Fake_host.agent h desk in
+  show_state t reloaded;
+  prompt ~via:desk t h reloaded "again";
+  [%expect
+    {|
+    desk hello: client_id=client-2 host_id=host-desk
+    {"type":"response","id":"r","ok":true,"result":{}}
+    container hello: client_id=client-3 host_id=container-me
+    desk hello: client_id=client-4 host_id=host-desk
+    ((active_host host-desk) (cwd /home/me)
+     (hosts (container-me=/workspace/me host-desk=/home/me)))
+    {"type":"response","id":"r","ok":true,"result":{}}
+    desk ran bash in /home/me
+    tool_result: ran on desk in /home/me
+    |}]
+;;
+
+let%expect_test
+    "an evicted session whose host is still away waits for it; only \
+     set_active_host moves it"
+  =
+  Test_rpc.with_agent
+    ~backend_host:false
+    [ Reply.text "hi"
+    ; bash "c1"
+    ; Reply.text "waiting"
+    ; bash "c2"
+    ; Reply.text "on container"
+    ]
+  @@ fun t _ h ->
+  Eio.Switch.run
+  @@ fun sw ->
+  let _container =
+    Fake_host.connect
+      ~sw
+      h
+      ~name:"container"
+      ~host_id:"container-me"
+      ~cwd:"/workspace/me"
+  in
+  (* The browser's own new session adopted the container. *)
+  notices t h;
+  let desk =
+    Fake_host.connect ~sw h ~name:"desk" ~host_id:"host-desk" ~cwd:"/home/me"
+  in
+  let session = Fake_host.agent h desk in
+  Fake_host.call t h desk ~params:{|{"host": "host-desk"}|} "set_active_host";
+  prompt ~via:desk t h session "hello";
+  Fake_host.disconnect h desk;
+  (* A browser (no tools) opens it, then a laptop TUI attaches to it. *)
+  call
+    t
+    h
+    ~params:(sprintf {|{"path": "%s"}|} (Session.id (Agent.session session)))
+    "switch_session";
+  let reloaded = Test_rpc.current h in
+  show_state t reloaded;
+  prompt t h reloaded "go";
+  let laptop =
+    Fake_host.connect
+      ~sw
+      h
+      ~name:"laptop"
+      ~host_id:"host-laptop"
+      ~cwd:"/home/me"
+      ~session:reloaded
+  in
+  show_state t reloaded;
+  notices t h;
+  [%expect
+    {|
+    container hello: client_id=client-2 host_id=container-me
+    notice: tools now run on container in /workspace/me
+    desk hello: client_id=client-3 host_id=host-desk
+    {"type":"response","id":"r","ok":true,"result":{}}
+    {"type":"response","id":"r","ok":true,"result":{}}
+    {"type":"response","id":"r1","ok":true,"result":{}}
+    ((active_host host-desk) (cwd /home/me) (hosts (container-me=/workspace/me)))
+    {"type":"response","id":"r1","ok":true,"result":{}}
+    tool_result: waiting for tool host "desk" to reconnect; /host picks another
+    laptop hello: client_id=client-4 host_id=host-laptop
+    ((active_host host-desk) (cwd /home/me)
+     (hosts (container-me=/workspace/me host-laptop=/home/me)))
+    |}];
+  call t h ~params:{|{"host": "container-me"}|} "set_active_host";
+  prompt t h reloaded "on container";
+  show_state t reloaded;
+  ignore laptop;
+  [%expect
+    {|
+    {"type":"response","id":"r1","ok":true,"result":{}}
+    {"type":"response","id":"r1","ok":true,"result":{}}
+    container ran bash in /workspace/me
+    model told: [Environment: the tool host is now container, so tools run there and its filesystem may differ from the one described above. Re-reading AGENTS.md/CLAUDE.md there is at your discretion: they are often unchanged, and missing an update is not serious.]
+    tool_result: ran on container in /workspace/me
+    ((active_host container-me) (cwd /workspace/me)
+     (hosts (container-me=/workspace/me host-laptop=/home/me)))
+    |}]
+;;
+
+let%expect_test "a backend restart keeps each session's host" =
+  with_sandbox
+  @@ fun t ->
+  Eio.Switch.run
+  @@ fun sw ->
+  let server ~backend_host replies =
+    snd
+      (Test_rpc.make_server
+         t
+         ~sw
+         ~backend_host
+         ~provider:(Faux_provider.create replies))
+  in
+  (* Before: the desktop's session on the desktop, pinned; another on the
+     backend, pinned there with /host. *)
+  let h = server ~backend_host:true [ Reply.text "hi"; Reply.text "hi" ] in
+  let desk =
+    Fake_host.connect ~sw h ~name:"desk" ~host_id:"host-desk" ~cwd:"/home/me"
+  in
+  let on_desk = Fake_host.agent h desk in
+  Fake_host.call
+    t
+    h
+    desk
+    ~params:{|{"host": "host-desk", "cwd": "/home/me/proj"}|}
+    "set_active_host";
+  prompt ~via:desk t h on_desk "desk work";
+  let on_backend = Test_rpc.current h in
+  call t h ~params:{|{"host": "backend"}|} "set_active_host";
+  prompt t h on_backend "backend work";
+  Fake_host.disconnect h desk;
+  Rpc_server.shutdown h.server;
+  [%expect
+    {|
+    desk hello: client_id=client-2 host_id=host-desk
+    {"type":"response","id":"r","ok":true,"result":{}}
+    {"type":"response","id":"r","ok":true,"result":{}}
+    {"type":"response","id":"r1","ok":true,"result":{}}
+    {"type":"response","id":"r1","ok":true,"result":{}}
+    |}];
+  (* After: another host connects first; the desktop comes back to its
+     session, and attaching to the other one does not take it over. *)
+  let h =
+    server
+      ~backend_host:true
+      [ bash "c1"; Reply.text "desk"; bash "c2"; Reply.text "backend" ]
+  in
+  let _laptop =
+    Fake_host.connect
+      ~sw
+      h
+      ~name:"laptop"
+      ~host_id:"host-laptop"
+      ~cwd:"/home/me"
+  in
+  let desk =
+    Fake_host.connect
+      ~sw
+      h
+      ~name:"desk"
+      ~host_id:"host-desk"
+      ~cwd:"/home/me"
+      ~session:on_desk
+  in
+  let on_desk = Fake_host.agent h desk in
+  show_state t on_desk;
+  prompt ~via:desk t h on_desk "desk again";
+  Fake_host.call
+    t
+    h
+    desk
+    ~params:(sprintf {|{"path": "%s"}|} (Session.id (Agent.session on_backend)))
+    "switch_session";
+  let on_backend = Fake_host.agent h desk in
+  show_state t on_backend;
+  prompt ~via:desk t h on_backend "backend again";
+  [%expect
+    {|
+    laptop hello: client_id=client-2 host_id=host-laptop
+    desk hello: client_id=client-3 host_id=host-desk
+    ((active_host host-desk) (cwd /home/me/proj)
+     (hosts (backend=/home/me/proj host-laptop=/home/me host-desk=/home/me/proj)))
+    {"type":"response","id":"r","ok":true,"result":{}}
+    desk ran bash in /home/me/proj
+    tool_result: ran on desk in /home/me/proj
+    {"type":"response","id":"r","ok":true,"result":{}}
+    ((active_host backend) (cwd $DIR)
+     (hosts (backend=$DIR host-laptop=/home/me host-desk=/home/me)))
+    {"type":"response","id":"r","ok":true,"result":{}}
+    tool_result: $DIR
+    |}]
+;;
+
+let%expect_test "two frontends on one machine share its host id" =
+  Test_rpc.with_agent
+    [ Reply.text "hi"
+    ; bash "c1"
+    ; Reply.text "on b"
+    ; bash "c2"
+    ; Reply.text "on a"
+    ]
+  @@ fun t _ h ->
+  Eio.Switch.run
+  @@ fun sw ->
+  let a =
+    Fake_host.connect ~sw h ~name:"tui-a" ~host_id:"host-desk" ~cwd:"/a"
+  in
+  let session = Fake_host.agent h a in
+  prompt ~via:a t h session "hello";
+  (* A second TUI on the same machine: the newer connection holds the id; the
+     older one is told and carries on as its own client id. *)
+  let b =
+    Fake_host.connect ~sw h ~name:"tui-b" ~host_id:"host-desk" ~cwd:"/b"
+  in
+  Fake_host.print_notices a ~name:"tui-a";
+  show_state t session;
+  prompt ~via:a t h session "run";
+  [%expect
+    {|
+    tui-a hello: client_id=client-2 host_id=host-desk
+    {"type":"response","id":"r","ok":true,"result":{}}
+    tui-b hello: client_id=client-3 host_id=host-desk
+    tui-a notice: tools now run on tui-a in /a
+    tui-a notice: a newer connection is tool host "host-desk" now; this one is "client-2" until it disconnects
+    ((active_host host-desk) (cwd /a)
+     (hosts (backend=$DIR client-2=/a host-desk=/a)))
+    {"type":"response","id":"r","ok":true,"result":{}}
+    tui-b ran bash in /a
+    tool_result: ran on tui-b in /a
+    |}];
+  (* The newer one quits: the older one takes the id back and the sessions
+     on it carry on there. *)
+  Fake_host.disconnect h b;
+  Fake_host.print_notices a ~name:"tui-a";
+  show_state t session;
+  prompt ~via:a t h session "again";
+  [%expect
+    {|
+    tui-a notice: this connection is tool host "host-desk" again
+    ((active_host host-desk) (cwd /a) (hosts (backend=$DIR host-desk=/a)))
+    {"type":"response","id":"r","ok":true,"result":{}}
+    tui-a ran bash in /a
+    tool_result: ran on tui-a in /a
+    |}]
+;;
+
+let%expect_test
+    "no backend host: after a backend restart the desktop's session is still \
+     on the desktop"
+  =
+  with_sandbox
+  @@ fun t ->
+  Eio.Switch.run
+  @@ fun sw ->
+  let server replies =
+    snd
+      (Test_rpc.make_server
+         t
+         ~sw
+         ~backend_host:false
+         ~provider:(Faux_provider.create replies))
+  in
+  let connect_container h =
+    Fake_host.connect
+      ~sw
+      h
+      ~name:"container"
+      ~host_id:"container-me"
+      ~cwd:"/workspace/me"
+  in
+  let h = server [ Reply.text "hi" ] in
+  let _container = connect_container h in
+  let desk =
+    Fake_host.connect ~sw h ~name:"desk" ~host_id:"host-desk" ~cwd:"/home/me"
+  in
+  let session = Fake_host.agent h desk in
+  Fake_host.call
+    t
+    h
+    desk
+    ~params:{|{"host": "host-desk", "cwd": "/home/me/proj"}|}
+    "set_active_host";
+  prompt ~via:desk t h session "desk work";
+  Rpc_server.shutdown h.server;
+  let h = server [ bash "c1"; Reply.text "desk" ] in
+  let _container = connect_container h in
+  let desk =
+    Fake_host.connect
+      ~sw
+      h
+      ~name:"desk"
+      ~host_id:"host-desk"
+      ~cwd:"/home/me"
+      ~session
+  in
+  let session = Fake_host.agent h desk in
+  show_state t session;
+  prompt ~via:desk t h session "desk again";
+  [%expect
+    {|
+    container hello: client_id=client-2 host_id=container-me
+    desk hello: client_id=client-3 host_id=host-desk
+    {"type":"response","id":"r","ok":true,"result":{}}
+    {"type":"response","id":"r","ok":true,"result":{}}
+    container hello: client_id=client-2 host_id=container-me
+    desk hello: client_id=client-3 host_id=host-desk
+    ((active_host host-desk) (cwd /home/me/proj)
+     (hosts (container-me=/workspace/me host-desk=/home/me/proj)))
+    {"type":"response","id":"r","ok":true,"result":{}}
+    desk ran bash in /home/me/proj
+    tool_result: ran on desk in /home/me/proj
     |}]
 ;;

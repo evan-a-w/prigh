@@ -246,7 +246,7 @@ let entry (e : Session.Entry.t) =
       ]
     | Name { name } -> [ "kind", str "name"; "name", str name ]
     | Description { text } -> [ "kind", str "description"; "text", str text ]
-    | Cwd { cwd } -> [ "kind", str "cwd"; "cwd", str cwd ]
+    | Cwd { cwd; host = _ } -> [ "kind", str "cwd"; "cwd", str cwd ]
     | System_prompt _ -> [ "kind", str "system_prompt" ]
   in
   `Object
