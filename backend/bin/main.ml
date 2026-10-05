@@ -316,6 +316,17 @@ let find_web_root =
       ]
 ;;
 
+(* prigh-web: the DOM frontend (tui/prigh-web/). *)
+let find_prigh_web_root =
+  find_root
+    ~env_var:"PRIGH_PRIGH_WEB_ROOT"
+    ~candidates:
+      [ "../../../../tui/_build/default/prigh-web/bin/site"
+      ; "../../tui/_build/default/prigh-web/bin/site"
+      ; "../share/prigh/prigh-web"
+      ]
+;;
+
 (* The pi web frontend (pi-web/, built with vite). *)
 let find_pi_web_root =
   find_root
@@ -411,6 +422,20 @@ let serve_command =
          ~doc:
            "DIR the built web frontend (default: $PRIGH_WEB_ROOT or the dune \
             build)"
+     and prigh_web =
+       flag
+         "-prigh-web"
+         (optional string)
+         ~doc:
+           "HOST:PORT serve prigh-web (the DOM browser frontend) and accept \
+            its WebSocket clients"
+     and prigh_web_root =
+       flag
+         "-prigh-web-root"
+         (optional string)
+         ~doc:
+           "DIR the built prigh-web site (default: $PRIGH_PRIGH_WEB_ROOT or \
+            the dune build)"
      and pi_web =
        flag
          "-pi-web"
@@ -513,6 +538,14 @@ let serve_command =
              eprintf "%s\n" (Error.to_string_hum e);
              exit 2)
        in
+       let prigh_web =
+         Option.map prigh_web ~f:(fun spec ->
+           match parse_listen_addr spec with
+           | Ok addr -> addr
+           | Error e ->
+             eprintf "%s\n" (Error.to_string_hum e);
+             exit 2)
+       in
        let pi_web =
          Option.map pi_web ~f:(fun spec ->
            match parse_listen_addr spec with
@@ -521,16 +554,14 @@ let serve_command =
              eprintf "%s\n" (Error.to_string_hum e);
              exit 2)
        in
-       if open_browser && Option.is_none web && Option.is_none pi_web
-       then (
-         eprintf "-open needs -web or -pi-web\n";
-         exit 2);
-       let stdio =
-         stdio
-         || (Option.is_none listen
-             && Option.is_none web
-             && Option.is_none pi_web)
+       let browser_ui =
+         Option.is_some web || Option.is_some prigh_web || Option.is_some pi_web
        in
+       if open_browser && not browser_ui
+       then (
+         eprintf "-open needs -web, -prigh-web or -pi-web\n";
+         exit 2);
+       let stdio = stdio || (Option.is_none listen && not browser_ui) in
        Eio_main.run
        @@ fun env ->
        Eio.Switch.run
@@ -659,6 +690,21 @@ let serve_command =
            ~root
            ~root_flag:"-web-root"
            ~env_var:"PRIGH_WEB_ROOT"
+           ~websockets:
+             [ "/ws", Web_server.serve_rpc router; "/terminal", terminal ]
+           addr
+         |> maybe_open);
+       Option.iter prigh_web ~f:(fun addr ->
+         let root =
+           match prigh_web_root with
+           | Some dir -> Some dir
+           | None -> find_prigh_web_root ()
+         in
+         serve_web
+           ~label:"prigh-web"
+           ~root
+           ~root_flag:"-prigh-web-root"
+           ~env_var:"PRIGH_PRIGH_WEB_ROOT"
            ~websockets:
              [ "/ws", Web_server.serve_rpc router; "/terminal", terminal ]
            addr
