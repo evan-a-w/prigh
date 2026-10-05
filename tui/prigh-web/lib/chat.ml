@@ -231,3 +231,35 @@ let rec apply t (event : Event.t) =
   | Terminal_close _
   | Btw_delta _ -> t
 ;;
+
+let rec find_subagent t agent_id =
+  Map.data t.tools
+  |> List.find_map ~f:(fun tool ->
+    Option.bind tool.subagent ~f:(fun s ->
+      if String.equal s.agent_id agent_id
+      then Some s
+      else find_subagent s.chat agent_id))
+;;
+
+let rec map_subagent t agent_id ~f =
+  { t with
+    tools =
+      Map.map t.tools ~f:(fun tool ->
+        match tool.subagent with
+        | None -> tool
+        | Some s when String.equal s.agent_id agent_id ->
+          { tool with subagent = Some (f s) }
+        | Some s ->
+          { tool with
+            subagent = Some { s with chat = map_subagent s.chat agent_id ~f }
+          })
+  }
+;;
+
+let set_nested_subagent t ~parent ~call_id subagent =
+  match parent with
+  | None -> set_subagent t ~call_id subagent
+  | Some parent ->
+    map_subagent t parent ~f:(fun s ->
+      { s with chat = set_subagent s.chat ~call_id subagent })
+;;

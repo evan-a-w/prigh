@@ -640,13 +640,14 @@ let%expect_test "subagent: running shows its latest step" =
   show_subagent ~running:true subagent_running;
   [%expect
     {|
-    <div class="running tool tool-subagent">
-      <div class="tool-head">
+    <div data-call="c12" class="running tool tool-subagent">
+      <div data-agent="a1" title="Follow it in the agents panel" class="tool-head">
         <span class="spinner"> </span>
         <span class="name"> subagent </span>
         <span class="arg task"> Count the lines in src/app.ml and report back. … </span>
         <span class="chip model"> deepseek-flash </span>
         <span class="chip"> 1 turn </span>
+        <span class="open-agent"> Open › </span>
       </div>
       <div class="tool-body">
         <details class="task">
@@ -697,13 +698,14 @@ let%expect_test "subagent: done, with its report and its transcript folded" =
   Chat_harness.text ~selector:".tool-subagent .transcript" chat;
   [%expect
     {|
-    <div class="tool-head">
+    <div data-agent="a1" title="Follow it in the agents panel" class="tool-head">
       <span class="icon"> ✓ </span>
       <span class="name"> subagent </span>
       <span class="arg task"> Count the lines in src/app.ml and report back. … </span>
       <span class="chip model"> deepseek-flash </span>
       <span class="chip"> 2 turns </span>
       <span class="chip"> $0.01 </span>
+      <span class="open-agent"> Open › </span>
     </div>
     <details class="report">
       <summary>
@@ -735,14 +737,15 @@ let%expect_test
        ]);
   [%expect
     {|
-    <div class="running tool tool-subagent">
-      <div class="tool-head">
+    <div data-call="c12" class="running tool tool-subagent">
+      <div data-agent="a1" title="Follow it in the agents panel" class="tool-head">
         <span class="spinner"> </span>
         <span class="name"> subagent </span>
         <span class="arg task"> Count the lines in src/app.ml and report back. … </span>
         <span class="chip job"> agent a1 </span>
         <span class="chip model"> deepseek-flash </span>
         <span class="chip"> 1 turn </span>
+        <span class="open-agent"> Open › </span>
       </div>
       <div class="tool-body">
         <details class="task">
@@ -794,14 +797,15 @@ let%expect_test "subagent: failed" =
     ];
   [%expect
     {|
-    <div class="error tool tool-subagent">
-      <div class="tool-head">
+    <div data-call="c12" class="error tool tool-subagent">
+      <div data-agent="a1" title="Follow it in the agents panel" class="tool-head">
         <span class="icon"> ✕ </span>
         <span class="name"> subagent </span>
         <span class="arg task"> Count the lines in src/app.ml and report back. … </span>
         <span class="chip model"> deepseek-flash </span>
         <span class="chip"> 1 turn </span>
         <span class="chip"> $0.00 </span>
+        <span class="open-agent"> Open › </span>
       </div>
       <div class="tool-body">
         <details class="task">
@@ -848,7 +852,7 @@ let%expect_test "subagent from a reloaded session: no events, only its result" =
   Chat_harness.show ~selector:".tool" chat;
   [%expect
     {|
-    <div class="ok tool tool-subagent">
+    <div data-call="c12" class="ok tool tool-subagent">
       <div class="tool-head">
         <span class="icon"> ✓ </span>
         <span class="name"> subagent </span>

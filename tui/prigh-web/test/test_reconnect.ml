@@ -47,6 +47,8 @@ let%expect_test "reconnecting after the backend goes away" =
     (Set_url_session s1)
     (Rpc (method_ get_messages) (params ()) (tag Messages))
     (Rpc (method_ list_sessions) (params ()) (tag Sessions))
+    (Rpc (method_ list_subagents) (params ()) (tag Subagents))
+    (Rpc (method_ list_jobs) (params ()) (tag Jobs))
     hello
     ((connection Connected) (toasts 1))
     |}]

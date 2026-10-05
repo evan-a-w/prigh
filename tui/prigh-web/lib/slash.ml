@@ -37,7 +37,7 @@ let all =
   ; c "clone" "copy this session into a new one"
   ; c ~argument:Directory ~args:"<path>" "cd" "change the working directory"
   ; c "abort" "stop the current run"
-  ; c "agents" "show background subagents and jobs"
+  ; c ~args:"[n|id]" "agents" "follow subagents and background jobs"
   ; c
       ~argument:Login
       ~args:"[provider]"
