@@ -120,8 +120,20 @@ let rec block ?(tight = false) (b : Block.t) =
       ]
 ;;
 
-let render ?(streaming = false) text =
+let parse ~streaming text =
   Node.div
     ~attrs:(cls "markdown")
     (List.map (Markdown.parse ~partial:streaming text) ~f:block)
+;;
+
+(* The whole transcript is rendered on every event: finished texts are parsed
+   once. *)
+let cache = String.Table.create ()
+
+let render ?(streaming = false) text =
+  if streaming
+  then parse ~streaming text
+  else (
+    if Hashtbl.length cache > 2000 then Hashtbl.clear cache;
+    Hashtbl.find_or_add cache text ~default:(fun () -> parse ~streaming text))
 ;;
