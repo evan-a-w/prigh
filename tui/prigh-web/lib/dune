@@ -5,4 +5,10 @@
  (name prigh_web)
  (preprocess
   (pps ppx_jane js_of_ocaml-ppx))
- (libraries core js_of_ocaml virtual_dom prigh_protocol prigh_ui))
+ (libraries
+  core
+  js_of_ocaml
+  virtual_dom
+  virtual_dom.jsoo_weak_collections
+  prigh_protocol
+  prigh_ui))
