@@ -83,9 +83,29 @@ carrying the host (id, name, whether pinned), so a session loaded again
 on the host it had, in the cwd it had there, exactly like a live one: on it
 if connected, otherwise waiting for it (never adopting another; first-time
 adoption is only for sessions that never had a host, or whose recorded host
-is the disabled backend). A fork or a single-agent `new_session` carries on
-on the current host; files without recorded hosts load as before. When the
-active host is a client, `Agent.host_exec` emits a
+is the disabled backend). A single-agent `new_session` or `fork` carries on
+on the current host; files without recorded hosts load as before.
+
+A brand-new session made by or for a client (`new_session`, `fork`,
+`clone`, `import`, the session a client starts in, and, without the backend
+host, a saved session that never had a host when switched to) starts on a
+host chosen from that client's context (`Rpc_server.start_location`), never
+on whichever host connected first: on the client itself when it is a tool
+host, in the cwd the client's current session had there (`new_session`,
+`fork`, `clone`) or the client's own cwd (or the cwd an imported or loaded
+session recorded there); otherwise where the client's current session is,
+in its cwd, also while that host is away (the new session waits for it like
+the one it came from); only when that session has no host either, where
+any new session would be (the backend, or first-time adoption). The choice
+is recorded in the session before its agent exists, so first-time adoption
+cannot win a race with it; the session a tool host is given on connecting,
+before `hello` says it is one, is replaced by one on it (with the backend
+host it is taken over instead). Such a session is unpinned (its host was a
+default), except that a fork or clone of a session pinned with `/host`
+stays on that host, pinned: it is the same work. A non-tool client's
+`import` follows the rules for loaded sessions (a recorded host is kept).
+
+When the active host is a client, `Agent.host_exec` emits a
 `tool_exec` event to that client only and waits on a promise; the client
 answers with `tool_exec_output` (streamed chunks, fanned out to everyone as
 `tool_output`) and `tool_exec_result`; an abort sends `tool_exec_cancel`.
