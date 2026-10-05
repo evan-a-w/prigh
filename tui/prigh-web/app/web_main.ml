@@ -256,9 +256,13 @@ let narrow () = Dom_html.window##.innerWidth < 760
 
 let install_listeners ~schedule ~current =
   let document = Dom_html.document in
-  let listen event handler =
+  let listen ?(capture = false) event handler =
     ignore
-      (Dom_html.addEventListener document event (Dom.handler handler) Js._false
+      (Dom_html.addEventListener
+         document
+         event
+         (Dom.handler handler)
+         (Js.bool capture)
        : Dom_html.event_listener_id)
   in
   listen Dom_html.Event.keydown (fun ev ->
@@ -305,7 +309,8 @@ let install_listeners ~schedule ~current =
       -. of_int el##.clientHeight
       < 60.)
   in
-  listen (Dom_html.Event.make "scroll") (fun _ ->
+  (* Scroll events do not bubble: only capturing sees the chat's. *)
+  listen ~capture:true (Dom_html.Event.make "scroll") (fun _ ->
     Option.iter (chat ()) ~f:(fun el -> stick := at_bottom el);
     Js._true);
   let observer =

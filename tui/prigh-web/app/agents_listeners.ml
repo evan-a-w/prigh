@@ -185,9 +185,7 @@ let reveal path =
              "scrollIntoView"
              [| Js.Unsafe.inject
                   (Js.Unsafe.obj
-                     [| "block", Js.Unsafe.inject (Js.string "center")
-                      ; "behavior", Js.Unsafe.inject (Js.string "smooth")
-                     |])
+                     [| "block", Js.Unsafe.inject (Js.string "center") |])
              |]
            : Js.Unsafe.any);
         card##.classList##add (Js.string "flash");
