@@ -6,6 +6,8 @@ type t =
   ; confirm_tools : bool
   ; default_model : string option
   ; default_thinking : Thinking.t option
+  ; fallback_models : string list
+  ; default_cwd : string option
   }
 [@@deriving sexp_of]
 
@@ -14,7 +16,15 @@ let default =
   ; confirm_tools = false
   ; default_model = None
   ; default_thinking = None
+  ; fallback_models = []
+  ; default_cwd = None
   }
+;;
+
+let start_model t =
+  match t.default_model with
+  | Some _ as model -> model
+  | None -> List.hd t.fallback_models
 ;;
 
 let path ~home = Filename.concat home ".prigh/config.json"
@@ -27,6 +37,9 @@ let to_json t =
     ; "default_model", option (fun s -> `String s) t.default_model
     ; ( "default_thinking"
       , option (fun th -> `String (Thinking.to_string th)) t.default_thinking )
+    ; ( "fallback_models"
+      , `Array (List.map t.fallback_models ~f:(fun s -> `String s)) )
+    ; "default_cwd", option (fun s -> `String s) t.default_cwd
     ]
 ;;
 
@@ -35,18 +48,27 @@ let of_json json =
   | `Object fields ->
     let open Or_error.Let_syntax in
     let find name = List.Assoc.find fields ~equal:String.equal name in
-    let%bind scoped_models =
-      match find "scoped_models" with
+    let strings name =
+      let error () =
+        Or_error.errorf "config.%s must be an array of strings" name
+      in
+      match find name with
       | None -> Ok []
       | Some (`Array items) ->
         Or_error.all
           (List.map items ~f:(function
              | `String s -> Ok s
-             | _ ->
-               Or_error.error_string
-                 "config.scoped_models must be an array of strings"))
-      | Some _ ->
-        Or_error.error_string "config.scoped_models must be an array of strings"
+             | _ -> error ()))
+      | Some _ -> error ()
+    in
+    let%bind scoped_models = strings "scoped_models" in
+    let%bind fallback_models = strings "fallback_models" in
+    let%bind default_cwd =
+      match find "default_cwd" with
+      | None | Some `Null -> Ok None
+      | Some (`String "") -> Ok None
+      | Some (`String s) -> Ok (Some s)
+      | Some _ -> Or_error.error_string "config.default_cwd must be a string"
     in
     let%bind confirm_tools =
       match find "confirm_tools" with
@@ -70,7 +92,13 @@ let of_json json =
       | Some _ ->
         Or_error.error_string "config.default_thinking must be a string"
     in
-    { scoped_models; confirm_tools; default_model; default_thinking }
+    { scoped_models
+    ; confirm_tools
+    ; default_model
+    ; default_thinking
+    ; fallback_models
+    ; default_cwd
+    }
   | _ -> Or_error.error_string "config must be a JSON object"
 ;;
 

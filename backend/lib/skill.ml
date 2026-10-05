@@ -141,7 +141,11 @@ let expand t ~body ~args =
 ;;
 
 let as_typed text =
-  let re = Re.Perl.compile_pat ~opts:[ `Dotall ] {|^<skill name="([^"]*)" location="[^"]*">\n.*?\n</skill>(\n\n(.*))?$|} in
+  let re =
+    Re.Perl.compile_pat
+      ~opts:[ `Dotall ]
+      {|^<skill name="([^"]*)" location="[^"]*">\n.*?\n</skill>(\n\n(.*))?$|}
+  in
   match Re.exec_opt re text with
   | None -> text
   | Some g ->

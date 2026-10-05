@@ -638,10 +638,10 @@ let%expect_test "config: get, set, invalid, and the config_changed event" =
   call t h ~params:{|{"call_id": "nope", "allow": true}|} "tool_confirm_respond";
   [%expect
     {|
-    {"type":"response","id":"r1","ok":true,"result":{"scoped_models":[],"confirm_tools":false,"default_model":null,"default_thinking":null}}
-    {"type":"event","event":"config_changed","config":{"scoped_models":["a","b"],"confirm_tools":true,"default_model":null,"default_thinking":null}}
-    {"type":"response","id":"r1","ok":true,"result":{"scoped_models":["a","b"],"confirm_tools":true,"default_model":null,"default_thinking":null}}
-    {"type":"response","id":"r1","ok":true,"result":{"scoped_models":["a","b"],"confirm_tools":true,"default_model":null,"default_thinking":null}}
+    {"type":"response","id":"r1","ok":true,"result":{"scoped_models":[],"confirm_tools":false,"default_model":null,"default_thinking":null,"fallback_models":[],"default_cwd":null}}
+    {"type":"event","event":"config_changed","config":{"scoped_models":["a","b"],"confirm_tools":true,"default_model":null,"default_thinking":null,"fallback_models":[],"default_cwd":null}}
+    {"type":"response","id":"r1","ok":true,"result":{"scoped_models":["a","b"],"confirm_tools":true,"default_model":null,"default_thinking":null,"fallback_models":[],"default_cwd":null}}
+    {"type":"response","id":"r1","ok":true,"result":{"scoped_models":["a","b"],"confirm_tools":true,"default_model":null,"default_thinking":null,"fallback_models":[],"default_cwd":null}}
     {"type":"response","id":"r1","ok":false,"error":"config.scoped_models must be an array of strings"}
     {"type":"response","id":"r1","ok":false,"error":"missing param \"config\""}
     {"type":"response","id":"r1","ok":false,"error":"no pending confirmation for tool call \"nope\""}
@@ -1260,9 +1260,9 @@ let%expect_test "change_default saves the current model and thinking level" =
     {|
     {"type":"response","id":"r1","ok":true,"result":{}}
     {"type":"response","id":"r1","ok":true,"result":{}}
-    {"type":"event","event":"config_changed","config":{"scoped_models":[],"confirm_tools":false,"default_model":"deepseek/deepseek-v4-pro","default_thinking":"max"}}
-    {"type":"response","id":"r1","ok":true,"result":{"scoped_models":[],"confirm_tools":false,"default_model":"deepseek/deepseek-v4-pro","default_thinking":"max"}}
-    {"type":"response","id":"r1","ok":true,"result":{"scoped_models":[],"confirm_tools":false,"default_model":"deepseek/deepseek-v4-pro","default_thinking":"max"}}
+    {"type":"event","event":"config_changed","config":{"scoped_models":[],"confirm_tools":false,"default_model":"deepseek/deepseek-v4-pro","default_thinking":"max","fallback_models":[],"default_cwd":null}}
+    {"type":"response","id":"r1","ok":true,"result":{"scoped_models":[],"confirm_tools":false,"default_model":"deepseek/deepseek-v4-pro","default_thinking":"max","fallback_models":[],"default_cwd":null}}
+    {"type":"response","id":"r1","ok":true,"result":{"scoped_models":[],"confirm_tools":false,"default_model":"deepseek/deepseek-v4-pro","default_thinking":"max","fallback_models":[],"default_cwd":null}}
     {"type":"response","id":"r1","ok":true,"result":{}}
     (deepseek/deepseek-v4-pro (On (Max)))
     |}]
@@ -1353,4 +1353,24 @@ let%expect_test "skills: list_skills, /skill: prompts, unknown names refused" =
   call t h "list_mcp";
   [%expect
     {| {"type":"response","id":"r1","ok":false,"error":"MCP is off in this backend (it was started with -no-tools)"} |}]
+;;
+
+let%expect_test "set_config: omitted fields keep their values" =
+  with_agent []
+  @@ fun t _agent h ->
+  call
+    t
+    h
+    "set_config"
+    ~params:
+      {|{"config": {"fallback_models": ["gpt-6-sol", "deepseek-flash"], "default_cwd": "/srv"}}|};
+  call t h "set_config" ~params:{|{"config": {"confirm_tools": true}}|};
+  call t h "set_config" ~params:{|{"config": {"fallback_models": ["nope"]}}|};
+  Queue.clear h.sent;
+  [%expect
+    {|
+    {"type":"response","id":"r1","ok":true,"result":{"scoped_models":[],"confirm_tools":false,"default_model":null,"default_thinking":null,"fallback_models":["openai-codex/gpt-6-sol","deepseek/deepseek-flash"],"default_cwd":"/srv"}}
+    {"type":"response","id":"r1","ok":true,"result":{"scoped_models":[],"confirm_tools":true,"default_model":null,"default_thinking":null,"fallback_models":["openai-codex/gpt-6-sol","deepseek/deepseek-flash"],"default_cwd":"/srv"}}
+    {"type":"response","id":"r1","ok":false,"error":"fallback_models: unknown model \"nope\"; did you mean: openai/o1 (o1), openai/o3 (o3), openai/gpt-4 (GPT-4)"}
+    |}]
 ;;
