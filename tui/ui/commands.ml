@@ -3,6 +3,7 @@ open! Core
 module Argument = struct
   type t =
     | Model
+    | Models
     | Thinking
     | Verbosity
     | Confirm
@@ -11,6 +12,7 @@ module Argument = struct
     | Sessions
     | Path
     | Directory
+    | Default_directory
     | Skill
     | Mcp
   [@@deriving sexp_of, equal]
@@ -45,6 +47,17 @@ let all =
       ""
       "save the current model and thinking level as the default for new \
        sessions"
+  ; c
+      ~argument:Argument.Models
+      "fallback"
+      "[off|model...]"
+      "show or set the models that take over, in order, when a model's usage \
+       runs out"
+  ; c
+      ~argument:Argument.Default_directory
+      "default-dir"
+      "[off|path]"
+      "show or set the directory new sessions start in"
   ; c
       ~argument:Argument.Login
       "login"

@@ -326,4 +326,36 @@ scenario_reconnect() {
 	capture reconnect "prompt works again"
 }
 
+# /fallback and /default-dir through the real TUI, then a run whose model's
+# usage runs out hands over to the next model of the chain.
+setup_fallback() {
+	extra_args="-- -faux-script $tmp/script.json"
+	cat >"$tmp/script.json" <<'JSON'
+[
+  {"text": "", "stop_reason": "error", "error": "HTTP 429: The usage limit has been reached (usage limit reached)"},
+  {"text": "carried on"}
+]
+JSON
+}
+
+scenario_fallback() {
+	wait_for "Ctrl+C twice"
+	type_text "/fallback deepseek/deepseek-flash anthropic/claude-fable-5-1"
+	# Esc closes the completion, so Enter runs the line as typed.
+	keys Escape
+	keys Enter
+	wait_for "fallback: "
+	type_text "/default-dir $tmp/cwd"
+	keys Escape
+	keys Enter
+	wait_for "default directory: "
+	settle
+	capture fallback "chain and default directory set"
+	type_text "go"
+	keys Enter
+	wait_for "carried on"
+	settle
+	capture fallback "handed over"
+}
+
 run_scenario "$1"

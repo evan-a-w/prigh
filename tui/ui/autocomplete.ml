@@ -165,7 +165,7 @@ let mcp_items () =
 
 let argument_items ~kind ~models ~auth ~sessions ~logged_in =
   match (kind : Commands.Argument.t) with
-  | Model -> Some (model_items ~logged_in models)
+  | Model | Models -> Some (model_items ~logged_in models)
   | Thinking -> Some (thinking_items ())
   | Verbosity -> Some (verbosity_items ())
   | Confirm -> Some (confirm_items ())
@@ -180,7 +180,7 @@ let argument_items ~kind ~models ~auth ~sessions ~logged_in =
   | Logout -> Some (provider_items auth)
   | Sessions -> Some (Option.value_map sessions ~default:[] ~f:session_items)
   | Mcp -> Some (mcp_items ())
-  | Path | Directory | Skill -> None
+  | Path | Directory | Default_directory | Skill -> None
 ;;
 
 let argument_start ~line ~name =
@@ -193,7 +193,74 @@ let argument_start ~line ~name =
   skip after
 ;;
 
-let compute_argument ~line ~line_index ~models ~auth ~sessions ~logged_in =
+let words s =
+  String.split_on_chars s ~on:[ ' '; '\t' ]
+  |> List.filter ~f:(Fn.non String.is_empty)
+;;
+
+(* [/fallback]'s models: the word under the cursor, among the models not
+   listed yet ([off] alone clears the list). *)
+let compute_models ~spec ~line ~col ~line_index ~start ~models ~logged_in =
+  let col = Int.max start (Int.min col (String.length line)) in
+  let word_start =
+    match
+      String.rfindi (String.prefix line col) ~f:(fun _ c ->
+        Char.is_whitespace c)
+    with
+    | Some i -> Int.max start (i + 1)
+    | None -> start
+  in
+  let word_end =
+    match String.lfindi line ~pos:col ~f:(fun _ c -> Char.is_whitespace c) with
+    | Some i -> i
+    | None -> String.length line
+  in
+  (* The whole word, so that accepting replaces all of it. *)
+  let prefix = String.sub line ~pos:word_start ~len:(word_end - word_start) in
+  let others =
+    words (String.sub line ~pos:start ~len:(word_start - start))
+    @ words (String.drop_prefix line word_end)
+  in
+  let off =
+    if List.is_empty others
+    then
+      [ Picker.Item.create
+          ~id:"off"
+          ~search:"off"
+          ~detail:"no fallback: a model whose usage runs out stops the run"
+          "off"
+      ]
+    else []
+  in
+  let listed key = List.mem others key ~equal:String.equal in
+  let items =
+    off
+    @ List.filter (model_items ~logged_in models) ~f:(fun item ->
+      not (listed item.id))
+    |> rank ~prefix
+  in
+  Option.some_if
+    (not (List.is_empty items))
+    { source = Source.Argument spec
+    ; prefix
+    ; line = line_index
+    ; start = word_start
+    ; items
+    ; selected = 0
+    ; navigated = false
+    }
+;;
+
+let compute_argument
+      ~line
+      ~col
+      ~line_index
+      ~models
+      ~auth
+      ~sessions
+      ~logged_in
+      ~default_dir_host
+  =
   match String.chop_prefix line ~prefix:"/" with
   | None -> None
   | Some body ->
@@ -209,12 +276,23 @@ let compute_argument ~line ~line_index ~models ~auth ~sessions ~logged_in =
              let prefix = String.strip rest in
              let start = argument_start ~line ~name in
              (match kind with
-              | Commands.Argument.Path | Directory ->
+              | Models ->
+                compute_models
+                  ~spec
+                  ~line
+                  ~col
+                  ~line_index
+                  ~start
+                  ~models
+                  ~logged_in
+              | Commands.Argument.Path | Directory | Default_directory ->
                 (* Filled in asynchronously by the platform. *)
                 Some
                   { source =
                       (match kind with
                        | Directory -> Source.Directory { host = None }
+                       | Default_directory ->
+                         Source.Directory { host = default_dir_host }
                        | _ -> Source.Path)
                   ; prefix
                   ; line = line_index
@@ -289,7 +367,17 @@ let directory ~host ~text =
   }
 ;;
 
-let compute ~line ~col ~line_index ~models ~auth ~sessions ~skills ~logged_in =
+let compute
+      ~line
+      ~col
+      ~line_index
+      ~models
+      ~auth
+      ~sessions
+      ~skills
+      ~logged_in
+      ~default_dir_host
+  =
   match
     Option.first_some
       (compute_skill ~line ~line_index ~skills)
@@ -298,7 +386,15 @@ let compute ~line ~col ~line_index ~models ~auth ~sessions ~skills ~logged_in =
   | Some _ as t -> t
   | None ->
     (match
-       compute_argument ~line ~line_index ~models ~auth ~sessions ~logged_in
+       compute_argument
+         ~line
+         ~col
+         ~line_index
+         ~models
+         ~auth
+         ~sessions
+         ~logged_in
+         ~default_dir_host
      with
      | Some _ as t -> t
      | None -> compute_at ~line ~col ~line_index)
