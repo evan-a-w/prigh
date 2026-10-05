@@ -388,6 +388,13 @@ let close_dialog (m : Model.t) = { m with dialog = None }, [ focus_editor ]
 let list_subagents = rpc "list_subagents" [] ~tag:Subagents
 let list_jobs = rpc "list_jobs" [] ~tag:Jobs
 
+let cancel_btw (m : Model.t) =
+  match m.btw with
+  | Some { status = Streaming; id; _ } ->
+    [ rpc "btw_cancel" [ "btw_id", str id ] ~tag:Ignore ]
+  | _ -> []
+;;
+
 (* A new session (switched, new, forked) starts from its own messages. *)
 let set_state (m : Model.t) (state : State.t) =
   let changed =
@@ -415,14 +422,16 @@ let set_state (m : Model.t) (state : State.t) =
       ; dialog = Option.filter m.dialog ~f:(Fn.non Dialog.per_session)
       ; agents = { Agents.empty with open_ = m.agents.open_ && not m.narrow }
       ; btw = None
+      ; completion = None
       }
-    , [ Command.Set_url_session state.session_id
-      ; rpc "get_messages" [] ~tag:(Messages state.session_id)
-      ; rpc "get_pending" [] ~tag:Pending
-      ; rpc "list_sessions" [] ~tag:Sessions
-      ; list_subagents
-      ; list_jobs
-      ] )
+    , cancel_btw m
+      @ [ Command.Set_url_session state.session_id
+        ; rpc "get_messages" [] ~tag:(Messages state.session_id)
+        ; rpc "get_pending" [] ~tag:Pending
+        ; rpc "list_sessions" [] ~tag:Sessions
+        ; list_subagents
+        ; list_jobs
+        ] )
   else m, background_changed
 ;;
 
@@ -1021,13 +1030,6 @@ let copy_last (m : Model.t) =
     m, Command.Copy text :: cmds
 ;;
 
-let cancel_btw (m : Model.t) =
-  match m.btw with
-  | Some { status = Streaming; id; _ } ->
-    [ rpc "btw_cancel" [ "btw_id", str id ] ~tag:Ignore ]
-  | _ -> []
-;;
-
 (* A newer question replaces (and cancels) the previous one. *)
 let start_btw (m : Model.t) question =
   let id = sprintf "btw-%d" (m.btw_seq + 1) in
@@ -1324,6 +1326,7 @@ let act_as (m : Model.t) user =
 
 (* Everything but the connection belongs to the user we were. *)
 let user_switched (m : Model.t) (hello : Hello_reply.t) =
+  let cancel = cancel_btw m in
   let m =
     { m with
       hello = Some hello
@@ -1347,7 +1350,7 @@ let user_switched (m : Model.t) (hello : Hello_reply.t) =
        | None, Some own -> sprintf "Back to %s" own
        | None, None -> "Switched user")
   in
-  m, cmds @ [ focus_editor ] @ startup
+  m, cancel @ cmds @ [ focus_editor ] @ startup
 ;;
 
 let account_chosen (m : Model.t) id =
