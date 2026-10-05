@@ -3,10 +3,12 @@ open! Core
 module Argument = struct
   type t =
     | Model
+    | Models
     | Thinking
     | Login
     | Logout
     | Directory
+    | Backend_directory
     | Verbosity
     | Confirm
     | Session
@@ -42,6 +44,12 @@ let all =
   ; c ~argument:Model ~args:"[name]" "model" "pick or switch the model"
   ; c "scoped-models" "pick the models Ctrl+P and Alt+P cycle through"
   ; c
+      ~argument:Models
+      ~args:"[model...|off]"
+      "fallback"
+      "show or set the models that take over, in order, when one's usage runs \
+       out"
+  ; c
       ~argument:Thinking
       ~args:"[off|low|on|high|max]"
       "thinking"
@@ -72,6 +80,11 @@ let all =
   ; c "rewind" "go back to an earlier message in this session"
   ; c "tree" "show the session tree and move to any message in it"
   ; c ~argument:Directory ~args:"[path]" "cd" "change the working directory"
+  ; c
+      ~argument:Backend_directory
+      ~args:"[path|off]"
+      "default-dir"
+      "show or set the directory new sessions start in"
   ; c
       ~argument:Host
       ~args:"[name|backend]"

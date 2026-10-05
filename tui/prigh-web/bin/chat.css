@@ -197,6 +197,33 @@ summary:hover > .label { color: var(--fg); }
   white-space: pre-wrap;
   text-align: center;
 }
+
+/* The conversation handed over to the next fallback model */
+.msg.handover {
+  align-self: center;
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  max-width: 100%;
+  min-width: 0;
+  padding: 4px 12px;
+  border: 1px dashed var(--border-2);
+  border-radius: 999px;
+  color: var(--muted);
+  font-size: 12.5px;
+}
+.msg.handover .icon { color: var(--accent); flex-shrink: 0; }
+.msg.handover .what { flex-shrink: 0; white-space: nowrap; }
+.msg.handover .model { font: 12px var(--mono); color: var(--fg); }
+.msg.handover .reason {
+  min-width: 0;
+  color: var(--faint);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.msg.handover .time { flex-shrink: 0; }
+
 .msg.compaction > summary { justify-content: center; }
 .msg.compaction > summary::before,
 .msg.compaction > summary::after {

@@ -40,8 +40,8 @@ val compute
 val same : t -> t -> bool
 
 (** The RPC that lists the items ([list_paths] or [list_dirs]) and its
-    [prefix]. *)
-val request : t -> (string * string) option
+    params. *)
+val request : t -> (string * (string * Json.t) list) option
 
 (** The backend's listing for [prefix]; stale ones are ignored. *)
 val set_results : t -> prefix:string -> string list -> t
