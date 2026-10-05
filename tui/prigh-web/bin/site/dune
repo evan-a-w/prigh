@@ -28,6 +28,38 @@
  (action
   (copy ../agents.css agents.css)))
 
+(rule
+ (target terminal.css)
+ (deps ../terminal.css)
+ (action
+  (copy ../terminal.css terminal.css)))
+
+; The terminal panel's xterm.js and its glue, shared with the -web page.
+
+(rule
+ (target terminal.js)
+ (deps ../../../web-bin/terminal.js)
+ (action
+  (copy ../../../web-bin/terminal.js terminal.js)))
+
+(rule
+ (target xterm.js)
+ (deps ../../../web-bin/vendor/xterm.js)
+ (action
+  (copy ../../../web-bin/vendor/xterm.js xterm.js)))
+
+(rule
+ (target xterm.css)
+ (deps ../../../web-bin/vendor/xterm.css)
+ (action
+  (copy ../../../web-bin/vendor/xterm.css xterm.css)))
+
+(rule
+ (target addon-fit.js)
+ (deps ../../../web-bin/vendor/addon-fit.js)
+ (action
+  (copy ../../../web-bin/vendor/addon-fit.js addon-fit.js)))
+
 (install
  (section share)
  (package prigh_tui)
@@ -36,4 +68,9 @@
   (main.bc.js as prigh-web/main.bc.js)
   (style.css as prigh-web/style.css)
   (chat.css as prigh-web/chat.css)
-  (agents.css as prigh-web/agents.css)))
+  (agents.css as prigh-web/agents.css)
+  (terminal.css as prigh-web/terminal.css)
+  (terminal.js as prigh-web/terminal.js)
+  (xterm.js as prigh-web/xterm.js)
+  (xterm.css as prigh-web/xterm.css)
+  (addon-fit.js as prigh-web/addon-fit.js)))

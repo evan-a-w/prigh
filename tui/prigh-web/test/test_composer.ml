@@ -329,6 +329,7 @@ let%expect_test "slash commands: the popup, arguments, running, unknown ones" =
     /copy copy the last reply to the clipboard
     /btw <question> ask a side question without interrupting the run (not added to the conversation)
     /abort stop the current run
+    /terminal open a shell where the tools run, in the session's directory (Ctrl+`)
     /agents [n|id|cancel <n|id>] follow subagents and background jobs in the agents panel, or cancel one
     /jobs [id|kill <id>] background jobs in the agents panel: list them, show or kill one
     /login [provider] log in to a model provider (or /login custom)
