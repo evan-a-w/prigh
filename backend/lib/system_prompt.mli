@@ -10,10 +10,13 @@ val instruction_files : cwd:string -> home:string -> string list
 val read_instructions : cwd:string -> home:string -> (string * string) list
 
 (** [instructions] (path, text) default to [read_instructions] on this
-    machine; [Agent] fetches them from the session's tool host instead. *)
+    machine; [Agent] fetches them from the session's tool host instead. [nix]
+    (default false), when the tool host has Nix, adds how to get missing tools
+    from nixpkgs. *)
 val build
   :  ?date:string
   -> ?instructions:(string * string) list
+  -> ?nix:bool
   -> cwd:string
   -> home:string
   -> tools:Tool_spec.t list

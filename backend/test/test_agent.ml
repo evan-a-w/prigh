@@ -970,6 +970,30 @@ let%expect_test
     |}]
 ;;
 
+let%expect_test "the system prompt says how to get tools when the host has nix" =
+  List.iter [ true; false ] ~f:(fun nix ->
+    let systems = Queue.create () in
+    with_agent
+      ~on_request:(fun request ->
+        Queue.enqueue systems (Option.value request.system ~default:""))
+      [ Reply.text "ok" ]
+    @@ fun t agent _dump ->
+    with_nix_on_path t ~nix (fun () ->
+      Or_error.ok_exn (Agent.prompt agent "hi");
+      Agent.wait_idle agent);
+    printf
+      "nix on PATH: %b, prompt mentions nixpkgs: %b\n"
+      nix
+      (String.is_substring
+         (Queue.dequeue_exn systems)
+         ~substring:"nix shell nixpkgs#"));
+  [%expect
+    {|
+    nix on PATH: true, prompt mentions nixpkgs: true
+    nix on PATH: false, prompt mentions nixpkgs: false
+    |}]
+;;
+
 let%expect_test
     "auto-describe: after the second user turn, once, off the turn's critical \
      path"

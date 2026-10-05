@@ -85,3 +85,22 @@ let run ?cancel ?on_output t tool args =
       image.mime_type
       (String.length (Base64.decode_exn image.data)))
 ;;
+
+(* Runs [f] with PATH holding only a directory of [t] that has an executable
+   [nix] when [nix] is set, so results don't depend on whether this machine
+   has Nix. *)
+let with_nix_on_path t ~nix f =
+  let bin = Filename.concat t.dir (if nix then "bin-nix" else "bin-empty") in
+  Core_unix.mkdir_p bin;
+  if nix
+  then (
+    let file = Filename.concat bin "nix" in
+    Out_channel.write_all file ~data:"#!/bin/sh\n";
+    Core_unix.chmod file ~perm:0o755);
+  let old = Sys.getenv "PATH" in
+  Core_unix.putenv ~key:"PATH" ~data:bin;
+  Exn.protect ~f ~finally:(fun () ->
+    match old with
+    | Some path -> Core_unix.putenv ~key:"PATH" ~data:path
+    | None -> Core_unix.unsetenv "PATH")
+;;
