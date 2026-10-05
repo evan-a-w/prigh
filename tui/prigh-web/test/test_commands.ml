@@ -351,6 +351,7 @@ let%expect_test "/verbosity and Ctrl+O" =
           <div class="meta"> m · 10 in · 5 out </div>
         </div>
       </div>
+      <Vdom.Node.none-widget> </Vdom.Node.none-widget>
     </div>
     Ready 0% ↑0 ↓0 $0.0000 (quiet)
     |}];
@@ -1214,6 +1215,7 @@ let%expect_test "/setusr: a superuser acts as another user, and back" =
   [%expect
     {|
     (Set_url_session b1)
+    Scroll_to_bottom
     (Rpc (method_ get_messages) (params ()) (tag Messages))
     (Rpc (method_ list_sessions) (params ()) (tag Sessions))
     (Rpc (method_ list_subagents) (params ()) (tag Subagents))
@@ -1281,6 +1283,7 @@ let%expect_test "/retry-backend-connection, /state, /clear, /quit" =
   [%expect
     {|
     (Set_url_session s1)
+    Scroll_to_bottom
     (Rpc (method_ get_messages) (params ()) (tag Messages))
     (Rpc (method_ list_sessions) (params ()) (tag Sessions))
     (Rpc (method_ list_subagents) (params ()) (tag Subagents))

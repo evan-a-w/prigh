@@ -92,6 +92,7 @@ module Command = struct
     | Add_account
     | Scroll_chat of int
     | Jump_to_user_message of int
+    | Scroll_to_bottom
   [@@deriving sexp_of, equal]
 end
 
@@ -221,6 +222,8 @@ module Action = struct
     | Retry_connection
     | Scroll_chat of int
     | Jump_to_user_message of int
+    | Chat_scrolled of { at_bottom : bool }
+    | Jump_to_bottom
     | Run of string
   [@@deriving sexp_of]
 end
@@ -250,6 +253,8 @@ module Model = struct
     ; toasts : Toast.t list
     ; next_toast : int
     ; sidebar_open : bool
+    ; scrolled_up : bool
+    ; unseen : bool
     ; session_query : string
     ; agents : Agents.t
     ; verbosity : Prigh_ui.Verbosity.t
@@ -305,6 +310,8 @@ let init =
   ; toasts = []
   ; next_toast = 0
   ; sidebar_open = true
+  ; scrolled_up = false
+  ; unseen = false
   ; session_query = ""
   ; agents = Agents.empty
   ; verbosity = Normal
@@ -404,8 +411,11 @@ let set_state (m : Model.t) (state : State.t) =
       ; dialog = Option.filter m.dialog ~f:(Fn.non Dialog.per_session)
       ; agents = { Agents.empty with open_ = m.agents.open_ && not m.narrow }
       ; btw = None
+      ; scrolled_up = false
+      ; unseen = false
       }
     , [ Command.Set_url_session state.session_id
+      ; Command.Scroll_to_bottom
       ; rpc "get_messages" [] ~tag:Messages
       ; rpc "list_sessions" [] ~tag:Sessions
       ; list_subagents
@@ -2134,6 +2144,25 @@ let dialog_accept (m : Model.t) =
     )
 ;;
 
+(* Following new output again: the jump button, or sending something. *)
+let to_bottom (m : Model.t) =
+  { m with scrolled_up = false; unseen = false }, [ Command.Scroll_to_bottom ]
+;;
+
+let sent_to_bottom (m : Model.t) (m', cmds) =
+  let sent =
+    List.exists cmds ~f:(function
+      | Command.Rpc { method_ = "prompt" | "steer" | "follow_up" | "shell"; _ }
+        -> true
+      | _ -> false)
+  in
+  if sent && m.scrolled_up
+  then (
+    let m', more = to_bottom m' in
+    m', cmds @ more)
+  else m', cmds
+;;
+
 let update (m : Model.t) (action : Action.t) =
   match action with
   | Start ->
@@ -2146,7 +2175,10 @@ let update (m : Model.t) (action : Action.t) =
     m, (if m.narrow then [] else [ focus_editor ]) @ startup @ probe
   | Hello hello -> { m with hello = Some hello }, []
   | Saved_login -> { m with saved_login = true }, []
-  | Event e -> event m e
+  | Event e ->
+    let m', cmds = event m e in
+    let grew = m.scrolled_up && not (phys_equal m'.chat m.chat) in
+    { m' with unseen = m'.unseen || grew }, cmds
   | Protocol_error e -> error m ("Protocol error: " ^ e)
   | Backend_closed ->
     (match m.connection with
@@ -2178,8 +2210,8 @@ let update (m : Model.t) (action : Action.t) =
   | Load_history entries -> { m with history = History.of_list entries }, []
   | Set_draft draft -> edit m draft
   | Edit { text; cursor } -> edit m ~cursor text
-  | Send -> send m ~follow_up:false
-  | Send_follow_up -> send m ~follow_up:true
+  | Send -> sent_to_bottom m (send m ~follow_up:false)
+  | Send_follow_up -> sent_to_bottom m (send m ~follow_up:true)
   | Abort -> m, [ rpc "abort" [] ~tag:Restored ]
   | History_older ->
     (match History.older m.history ~draft:m.draft with
@@ -2331,6 +2363,10 @@ let update (m : Model.t) (action : Action.t) =
       prompt_input m (Prompt.complete prompt))
   | Retry_connection -> retry_connection m
   | Scroll_chat pages -> m, [ Command.Scroll_chat pages ]
+  | Chat_scrolled { at_bottom } ->
+    ( { m with scrolled_up = not at_bottom; unseen = m.unseen && not at_bottom }
+    , [] )
+  | Jump_to_bottom -> to_bottom m
   | Jump_to_user_message dir -> m, [ Command.Jump_to_user_message dir ]
   | Run command ->
     (match Slash.parse command with
