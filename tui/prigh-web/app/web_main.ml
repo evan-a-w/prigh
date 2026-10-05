@@ -1,0 +1,279 @@
+open! Core
+open! Async_kernel
+open Js_of_ocaml
+open Bonsai_web
+module App = Prigh_web.App
+module Client = Prigh_client.Client
+module Browser = Prigh_ui_web_app.Browser
+module Login = Prigh_ui_web_app.Login
+module Ws_transport = Prigh_ui_web_app.Ws_transport
+
+module Settings = struct
+  type t =
+    { backend : string
+    ; login : Login.t
+    ; session : string option
+    }
+
+  let load () =
+    let non_empty s = Option.filter s ~f:(Fn.non String.is_empty) in
+    { backend =
+        Option.value
+          (non_empty (Browser.query_param "backend"))
+          ~default:(Browser.same_origin_ws_url ())
+    ; login = Login.load Login.Storage.browser
+    ; session = non_empty (Browser.query_param "session")
+    }
+  ;;
+
+  let hello t ~session =
+    [ "name", `String "prigh-web"; "tools", `False ]
+    @ Login.hello_fields t.login
+    @ Option.value_map session ~default:[] ~f:(fun s -> [ "session", `String s ])
+  ;;
+end
+
+let send_hello client settings ~session =
+  Deferred.map
+    (Client.call client "hello" (Settings.hello settings ~session))
+    ~f:(Result.map_error ~f:Error.to_string_hum)
+;;
+
+let perform client settings ctx (command : App.Command.t) =
+  let inject = Bonsai.Apply_action_context.inject ctx in
+  let effect =
+    match command with
+    | Rpc { method_; params; tag } ->
+      let%bind.Effect result =
+        Effect.of_deferred_fun
+          (fun () ->
+            Deferred.map
+              (Client.call client method_ params)
+              ~f:(Result.map_error ~f:Error.to_string_hum))
+          ()
+      in
+      inject (App.Action.Reply (tag, result))
+    | Reconnect { generation; delay_ms; session } ->
+      let%bind.Effect result =
+        Effect.of_deferred_fun
+          (fun () ->
+            let%bind.Deferred () = Clock_ns.after (Time_ns.Span.of_int_ms delay_ms) in
+            match%bind.Deferred Client.connect client with
+            | Error e -> Deferred.return (Error (Error.to_string_hum e))
+            | Ok () -> send_hello client settings ~session)
+          ()
+      in
+      inject (App.Action.Reply (Reconnect generation, result))
+    | Set_url_session session ->
+      Effect.of_sync_fun (Browser.replace_query_param "session") session
+  in
+  Bonsai.Apply_action_context.schedule_event ctx effect
+;;
+
+module Result_ = struct
+  type t =
+    { view : Vdom.Node.t
+    ; inject : App.Action.t -> unit Effect.t
+    }
+
+  type extra = unit
+  type incoming = App.Action.t
+
+  let view t = t.view
+  let extra _ = ()
+  let incoming t action = t.inject action
+end
+
+let component client settings (local_ graph) =
+  let model, inject =
+    Bonsai.state_machine
+      ~sexp_of_action:App.Action.sexp_of_t
+      ~default_model:App.init
+      ~apply_action:(fun ctx model action ->
+        let model, commands = App.update model action in
+        List.iter commands ~f:(perform client settings ctx);
+        model)
+      graph
+  in
+  let open Bonsai.Let_syntax in
+  let%arr model and inject in
+  { Result_.view = Prigh_web.View.view model ~inject; inject }
+;;
+
+let supported_images = [ "image/png"; "image/jpeg"; "image/gif"; "image/webp" ]
+
+(* Pasted or dropped image files become attachments; the backend checks and
+   downscales them. *)
+let read_images ~schedule (files : File.fileList Js.t) =
+  for i = 0 to files##.length - 1 do
+    Js.Opt.iter (files##item i) (fun file ->
+      let mime_type = Js.to_string file##._type in
+      if not (String.is_prefix mime_type ~prefix:"image/")
+      then ()
+      else if not (List.mem supported_images mime_type ~equal:String.equal)
+      then
+        schedule
+          (App.Action.Show_toast
+             { text =
+                 sprintf
+                   "%s is not supported: use PNG, JPEG, GIF or WebP"
+                   mime_type
+             ; error = true
+             })
+      else (
+        let reader = new%js File.fileReader in
+        reader##.onload
+        := Dom.handler (fun _ ->
+             (match Js.Opt.to_option (File.CoerceTo.string reader##.result) with
+              | Some url ->
+                let url = Js.to_string url in
+                (match String.lsplit2 url ~on:',' with
+                 | Some (_, data) ->
+                   schedule
+                     (App.Action.Add_image
+                        { mime_type
+                        ; data
+                        ; bytes = Prigh_protocol.Image.decoded_size data
+                        })
+                 | None -> ())
+              | None -> ());
+             Js._true);
+        reader##readAsDataURL file))
+  done
+;;
+
+let install_listeners ~schedule =
+  let document = Dom_html.document in
+  let listen event handler =
+    ignore
+      (Dom_html.addEventListener document event (Dom.handler handler) Js._false
+       : Dom_html.event_listener_id)
+  in
+  listen Dom_html.Event.paste (fun (ev : Dom_html.clipboardEvent Js.t) ->
+    Js.Opt.iter ev##.clipboardData (fun data ->
+      if data##.files##.length > 0
+      then (
+        Dom.preventDefault ev;
+        read_images ~schedule data##.files));
+    Js._true);
+  listen Dom_html.Event.dragover (fun ev ->
+    Dom.preventDefault ev;
+    Js._true);
+  listen Dom_html.Event.drop (fun (ev : Dom_html.dragEvent Js.t) ->
+    Dom.preventDefault ev;
+    Js.Opt.iter ev##.dataTransfer (fun data -> read_images ~schedule data##.files);
+    Js._true);
+  (* The chat follows new output unless the user has scrolled up. *)
+  let stick = ref true in
+  let chat () = Dom_html.getElementById_opt "chat" in
+  let at_bottom (el : Dom_html.element Js.t) =
+    Float.(
+      of_int el##.scrollHeight -. Js.to_float el##.scrollTop -. of_int el##.clientHeight
+      < 60.)
+  in
+  listen
+    (Dom_html.Event.make "scroll")
+    (fun _ ->
+       Option.iter (chat ()) ~f:(fun el -> stick := at_bottom el);
+       Js._true);
+  let observer =
+    new%js MutationObserver.mutationObserver
+      (Js.wrap_callback (fun _ _ ->
+         if !stick
+         then
+           Option.iter (chat ()) ~f:(fun el ->
+             el##.scrollTop := Js.float (Float.of_int el##.scrollHeight))))
+  in
+  let options = MutationObserver.empty_mutation_observer_init () in
+  options##.childList := true;
+  options##.subtree := true;
+  options##.characterData := true;
+  observer##observe (document :> Dom.node Js.t) options
+;;
+
+let escape s =
+  String.concat_map s ~f:(function
+    | '<' -> "&lt;"
+    | '>' -> "&gt;"
+    | '&' -> "&amp;"
+    | '"' -> "&quot;"
+    | c -> String.of_char c)
+;;
+
+let sign_in_form (settings : Settings.t) ~error =
+  let value = Option.value_map ~default:"" ~f:escape in
+  Browser.set_app_html
+    (sprintf
+       {|<div class="signin-page"><form class="signin" id="signin-form">
+  <div class="brand"><span class="logo">prigh</span><span class="brand-sub">web</span></div>
+  <h1>Sign in</h1>
+  <p class="signin-error">%s</p>
+  <label>User name <input id="user" name="user" value="%s" autocomplete="username" autocapitalize="off" spellcheck="false"></label>
+  <label>Password <input id="password" name="password" type="password" value="%s" autocomplete="current-password"></label>
+  <details><summary>Backend</summary><input id="backend" name="backend" value="%s"></details>
+  <button class="btn primary" type="submit">Sign in</button>
+</form></div>|}
+       (escape error)
+       (value settings.login.user)
+       (value settings.login.password)
+       (escape settings.backend));
+  Option.iter
+    (Dom_html.getElementById_coerce "signin-form" Dom_html.CoerceTo.form)
+    ~f:(fun form ->
+      ignore
+        (Dom_html.addEventListener
+           form
+           Dom_html.Event.submit
+           (Dom.handler (fun ev ->
+              Dom.preventDefault ev;
+              Login.save
+                Login.Storage.browser
+                ~user:(Browser.input_value "user")
+                ~password:(Browser.input_value "password");
+              Browser.reload_with_backend (String.strip (Browser.input_value "backend"));
+              Js._false))
+           Js._false
+         : Dom_html.event_listener_id))
+;;
+
+let run () =
+  Async_js.init ();
+  let settings = Settings.load () in
+  let client =
+    Client.create ~connect:(fun () -> Ws_transport.connect ~url:settings.backend)
+  in
+  don't_wait_for
+    (match%bind.Deferred
+       match%bind.Deferred Client.connect client with
+       | Error e -> Deferred.return (Error (Error.to_string_hum e))
+       | Ok () -> send_hello client settings ~session:settings.session
+     with
+     | Error error ->
+       let%map.Deferred () = Client.close client in
+       sign_in_form settings ~error
+     | Ok reply ->
+       let handle_ref = ref None in
+       let schedule action =
+         Option.iter !handle_ref ~f:(fun handle -> Start.Handle.schedule handle action)
+       in
+       let handle =
+         Start.start_and_get_handle
+           (module Result_)
+           ~bind_to_element_with_id:"app"
+           (component client settings)
+       in
+       handle_ref := Some handle;
+       Option.iter (Prigh_protocol.Hello_reply.of_json reply |> Or_error.ok) ~f:(fun hello ->
+         schedule (App.Action.Hello hello));
+       schedule App.Action.Start;
+       install_listeners ~schedule;
+       don't_wait_for
+         (Pipe.iter_without_pushback (Client.incoming client) ~f:(fun incoming ->
+            schedule
+              (match incoming with
+               | Event e -> Event e
+               | Protocol_error e -> Protocol_error e
+               | Stderr _ -> Show_toast { text = "stderr"; error = false }
+               | Closed -> Backend_closed)));
+       Deferred.unit)
+;;
