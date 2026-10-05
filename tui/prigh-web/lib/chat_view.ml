@@ -77,6 +77,21 @@ let footer (message : Message.Assistant.t) =
   | _ -> Node.none
 ;;
 
+module Deps = struct
+  type t =
+    { running : bool
+    ; tools : Chat.Tool.t option list
+    }
+
+  let equal a b =
+    Bool.equal a.running b.running
+    && List.equal (Option.equal phys_equal) a.tools b.tools
+  ;;
+end
+
+let entries : (Chat.Entry.t, Deps.t) View_cache.t = View_cache.create ()
+let chats : (Chat.t, unit) View_cache.t = View_cache.create ()
+
 let rec assistant chat (message : Message.Assistant.t) ~streaming =
   let count = List.length message.content in
   let blocks =
@@ -110,7 +125,7 @@ let rec assistant chat (message : Message.Assistant.t) ~streaming =
       ((pending :: blocks)
        @ [ stopped; (if streaming then Node.none else footer message) ])
 
-and entry chat (entry : Chat.Entry.t) =
+and render_entry chat (entry : Chat.Entry.t) =
   match entry with
   | User u ->
     (match Prigh_ui.Delivery.parse u.text with
@@ -138,4 +153,31 @@ and entry chat (entry : Chat.Entry.t) =
       (Markdown_view.render summary)
   | Assistant { message; streaming } -> assistant chat message ~streaming
 
-and view chat = div "entries" (List.map (Chat.entries chat) ~f:(entry chat))
+(* An entry's card depends on the state of its tool calls, and on whether the
+   agent is still running while one of them has no result. *)
+and entry chat (entry : Chat.Entry.t) =
+  let tools =
+    match entry with
+    | Assistant { message; _ } ->
+      List.filter_map message.content ~f:(function
+        | Tool_call call -> Some (Chat.tool chat call.id)
+        | Text _ | Thinking _ -> None)
+    | Shell call -> [ Chat.tool chat call.id ]
+    | User _ | Notice _ | Compaction _ -> []
+  in
+  let running =
+    Chat.running chat
+    && List.exists tools ~f:(fun tool ->
+      Option.for_all tool ~f:(fun tool -> Option.is_none tool.result))
+  in
+  View_cache.find
+    entries
+    entry
+    ~deps:{ Deps.running; tools }
+    ~equal:Deps.equal
+    ~f:(fun () -> render_entry chat entry)
+
+and view chat =
+  View_cache.find chats chat ~deps:() ~equal:Unit.equal ~f:(fun () ->
+    div "entries" (List.map (Chat.entries chat) ~f:(entry chat)))
+;;
