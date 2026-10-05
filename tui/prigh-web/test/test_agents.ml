@@ -504,6 +504,7 @@ let%expect_test
   [%expect
     {|
     (Save_history (next))
+    Follow_chat
     (Rpc (method_ prompt) (params ((text next))) (tag Show_error))
     Subagents 1 running
     (1 Draft the docs 0s a2 · deepseek-flash starting…)
@@ -527,7 +528,8 @@ let%expect_test
   [%expect
     {|
     (Set_url_session s2)
-    (Rpc (method_ get_messages) (params ()) (tag Messages))
+    (Rpc (method_ get_messages) (params ()) (tag (Messages s2)))
+    (Rpc (method_ get_pending) (params ()) (tag Pending))
     (Rpc (method_ list_sessions) (params ()) (tag Sessions))
     (Rpc (method_ list_subagents) (params ()) (tag Subagents))
     (Rpc (method_ list_jobs) (params ()) (tag Jobs))
@@ -540,7 +542,7 @@ let%expect_test "after a reload, a nested subagent's transcript is fetched" =
   H.act
     h
     (Reply
-       ( Messages
+       ( Messages "s1"
        , Ok
            (Jsonaf.of_string
               {|[{"role":"user","text":"survey"},
@@ -569,6 +571,7 @@ let%expect_test "after a reload, a nested subagent's transcript is fetched" =
   H.text h ~selector:".agents-detail";
   [%expect
     {|
+    Follow_chat
     (Rpc (method_ get_subagent) (params ((id s1))) (tag (Subagent s1)))
     (Rpc (method_ get_subagent) (params ((id a1/n1))) (tag (Subagent a1/n1)))
     Loading the transcript…

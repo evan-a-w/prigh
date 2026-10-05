@@ -46,10 +46,12 @@ let%expect_test "reconnecting after the backend goes away" =
     (Rpc (method_ auth_status) (params ()) (tag (Auth_status Refresh)))
     (Rpc (method_ get_config) (params ()) (tag Config))
     (Set_url_session s1)
-    (Rpc (method_ get_messages) (params ()) (tag Messages))
+    (Rpc (method_ get_messages) (params ()) (tag (Messages s1)))
+    (Rpc (method_ get_pending) (params ()) (tag Pending))
     (Rpc (method_ list_sessions) (params ()) (tag Sessions))
     (Rpc (method_ list_subagents) (params ()) (tag Subagents))
     (Rpc (method_ list_jobs) (params ()) (tag Jobs))
+    Follow_chat
     hello
     ((connection Connected) (toasts 1))
     |}]

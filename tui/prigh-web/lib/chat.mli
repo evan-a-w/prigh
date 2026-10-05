@@ -46,7 +46,10 @@ module Entry : sig
 end
 
 val empty : t
-val of_messages : Message.t list -> t
+
+(** [running]: the agent is still working, so tool calls without a result
+    are still to get one. *)
+val of_messages : ?running:bool -> Message.t list -> t
 
 (** Oldest first. *)
 val entries : t -> Entry.t list

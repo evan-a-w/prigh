@@ -10,10 +10,12 @@ let%expect_test "startup, a prompt and its streamed reply" =
     (Rpc (method_ auth_status) (params ()) (tag (Auth_status Refresh)))
     (Rpc (method_ get_config) (params ()) (tag Config))
     (Set_url_session s1)
-    (Rpc (method_ get_messages) (params ()) (tag Messages))
+    (Rpc (method_ get_messages) (params ()) (tag (Messages s1)))
+    (Rpc (method_ get_pending) (params ()) (tag Pending))
     (Rpc (method_ list_sessions) (params ()) (tag Sessions))
     (Rpc (method_ list_subagents) (params ()) (tag Subagents))
     (Rpc (method_ list_jobs) (params ()) (tag Jobs))
+    Follow_chat
     |}];
   Harness.act h (Set_draft "hello");
   Harness.act h Send;
@@ -27,6 +29,7 @@ let%expect_test "startup, a prompt and its streamed reply" =
   [%expect
     {|
     (Save_history (hello))
+    Follow_chat
     (Rpc (method_ prompt) (params ((text hello))) (tag Show_error))
     <div class="entries">
       <div class="msg user">

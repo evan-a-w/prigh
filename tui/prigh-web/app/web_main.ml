@@ -126,7 +126,21 @@ let take_adding () =
 
 let chat_element () = Dom_html.getElementById_opt "chat"
 
+(* The chat follows new output unless the user has scrolled up. *)
+let follow = ref true
+
+let scroll_to_end () =
+  Option.iter (chat_element ()) ~f:(fun el ->
+    el##.scrollTop := Js.float (Float.of_int el##.scrollHeight))
+;;
+
+let follow_chat () =
+  follow := true;
+  Browser.after_render scroll_to_end
+;;
+
 let scroll_chat pages =
+  if pages < 0 then follow := false;
   Option.iter (chat_element ()) ~f:(fun chat ->
     let by = Float.of_int (pages * chat##.clientHeight) *. 0.85 in
     chat##.scrollTop := Js.float (Js.to_float chat##.scrollTop +. by))
@@ -135,6 +149,7 @@ let scroll_chat pages =
 (* The previous (or next) of the user's messages above (or below) the top of
    the transcript's view. *)
 let jump_to_user_message direction =
+  if direction < 0 then follow := false;
   Option.iter (chat_element ()) ~f:(fun chat ->
     let top = Js.to_float chat##getBoundingClientRect##.top in
     let offsets =
@@ -211,6 +226,7 @@ let perform client settings ctx (model : App.Model.t) (command : App.Command.t) 
     | Scroll_chat pages -> Effect.of_sync_fun scroll_chat pages
     | Jump_to_user_message direction ->
       Effect.of_sync_fun jump_to_user_message direction
+    | Follow_chat -> Effect.of_sync_fun follow_chat ()
   in
   Bonsai.Apply_action_context.schedule_event ctx eff
 ;;
@@ -239,6 +255,10 @@ let autosize () =
         el##.style##.height := Js.string (sprintf "%dpx" el##.scrollHeight)))
 ;;
 
+(* When the first of the tool confirmations on show appeared: an Enter typed
+   just before must not answer it. *)
+let confirm_shown = ref Time_ns.epoch
+
 let component client settings ~current (local_ graph) =
   let model, inject =
     Bonsai.state_machine
@@ -247,6 +267,8 @@ let component client settings ~current (local_ graph) =
       ~apply_action:(fun ctx model action ->
         let model', commands = App.update model action in
         current := model';
+        if List.is_empty model.confirms && not (List.is_empty model'.confirms)
+        then confirm_shown := Time_ns.now ();
         if
           not
             (String.equal model.draft model'.draft
@@ -317,7 +339,11 @@ let key_target (ev : Dom_html.keyboardEvent Js.t) : Prigh_web.Keys.Target.t =
      | Textarea t when String.equal (Js.to_string t##.id) "editor" ->
        Editor { cursor = t##.selectionStart }
      | Textarea _ | Input _ | Select _ -> Field
-     | _ -> Page)
+     | Button _ | A _ -> Control
+     | _ ->
+       if String.equal (String.lowercase (Js.to_string el##.tagName)) "summary"
+       then Control
+       else Page)
 ;;
 
 (* Selected text in a field or the page (so Ctrl+X cuts or does nothing). *)
@@ -384,6 +410,14 @@ let install_listeners ~schedule ~current =
     (* An IME composing text owns its keys. *)
     if Js.to_bool (Js.Unsafe.coerce ev)##.isComposing
     then Js._true
+    else if
+      (not (List.is_empty (!current : App.Model.t).confirms))
+      && String.equal (key ev).key "Enter"
+      && Time_ns.Span.(
+           Time_ns.diff (Time_ns.now ()) !confirm_shown < of_int_ms 500)
+    then (
+      Dom.preventDefault ev;
+      Js._false)
     else (
       match Prigh_web.Keys.handle !current (key ev) with
       | None -> Js._true
@@ -414,9 +448,6 @@ let install_listeners ~schedule ~current =
     Js._true);
   Chat_listeners.install ();
   Agents_listeners.install ~schedule;
-  (* The chat follows new output unless the user has scrolled up. *)
-  let stick = ref true in
-  let chat () = Dom_html.getElementById_opt "chat" in
   let at_bottom (el : Dom_html.element Js.t) =
     Float.(
       of_int el##.scrollHeight
@@ -424,17 +455,43 @@ let install_listeners ~schedule ~current =
       -. of_int el##.clientHeight
       < 60.)
   in
+  (* Scrolling up stops following at once: a smooth scroll's first frames
+     are still near the end, and new output must not pull it back. *)
+  let last_top = ref 0. in
+  let in_chat target =
+    match chat_element (), Js.Opt.to_option target with
+    | Some chat, Some target ->
+      Js.to_bool
+        (Js.Unsafe.meth_call chat "contains" [| Js.Unsafe.inject target |])
+    | _ -> false
+  in
+  listen
+    ~capture:true
+    Dom_html.Event.wheel
+    (fun (ev : Dom_html.mousewheelEvent Js.t) ->
+       if
+         in_chat ev##.target
+         && Float.(Js.to_float (Js.Unsafe.coerce ev)##.deltaY < 0.)
+       then follow := false;
+       Js._true);
   (* Scroll events do not bubble: only capturing sees the chat's. *)
-  listen ~capture:true (Dom_html.Event.make "scroll") (fun _ ->
-    Option.iter (chat ()) ~f:(fun el -> stick := at_bottom el);
+  listen ~capture:true (Dom_html.Event.make "scroll") (fun ev ->
+    Option.iter (chat_element ()) ~f:(fun el ->
+      let target = Js.Opt.to_option ev##.target in
+      if
+        Option.exists target ~f:(fun t ->
+          Js.strict_equals (Js.Unsafe.coerce t) el)
+      then (
+        let top = Js.to_float el##.scrollTop in
+        if Float.(top < !last_top -. 1.)
+        then follow := false
+        else if at_bottom el
+        then follow := true;
+        last_top := top));
     Js._true);
   let observer =
     new%js MutationObserver.mutationObserver
-      (Js.wrap_callback (fun _ _ ->
-         if !stick
-         then
-           Option.iter (chat ()) ~f:(fun el ->
-             el##.scrollTop := Js.float (Float.of_int el##.scrollHeight))))
+      (Js.wrap_callback (fun _ _ -> if !follow then scroll_to_end ()))
   in
   let options = MutationObserver.empty_mutation_observer_init () in
   options##.childList := true;

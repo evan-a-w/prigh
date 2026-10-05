@@ -17,7 +17,9 @@ let messages =
      {"role":"assistant","content":[{"type":"text","text":"Fixed: the **flag** was wrong."}],"stop_reason":{"type":"end_turn"},"usage":{"input":10,"output":5,"cache_read":0},"model":"m"}]|}
 ;;
 
-let with_messages h = H.act h (Reply (Messages, Ok (Jsonaf.of_string messages)))
+let with_messages h =
+  H.act h (Reply (Messages "s1", Ok (Jsonaf.of_string messages)))
+;;
 
 let%expect_test "every command does something (none is unknown)" =
   List.iter Slash.all ~f:(fun spec ->
@@ -319,6 +321,7 @@ let%expect_test "/verbosity and Ctrl+O" =
   H.text h ~selector:".picker-items";
   [%expect
     {|
+    Follow_chat
     (Save_history (/verbosity))
     (Focus picker-input)
     Quiet tool calls without their output; no thinking
@@ -609,7 +612,7 @@ let%expect_test "/rewind: pick, confirm, reload the messages" =
     (Expire_toast (id 0) (after_ms 4000))
     (Rpc (method_ rewind) (params ((to e1))) (tag Reload_messages))
     (Rpc (method_ get_state) (params ()) (tag State))
-    (Rpc (method_ get_messages) (params ()) (tag Messages))
+    (Rpc (method_ get_messages) (params ()) (tag (Messages s1)))
     |}];
   (* Esc cancels without rewinding. *)
   run h "/rewind";
@@ -937,6 +940,7 @@ let%expect_test "/copy and Ctrl+X copy the last reply" =
   run h "/copy";
   [%expect
     {|
+    Follow_chat
     (Save_history (/copy))
     (Copy "Fixed: the **flag** was wrong.")
     (Expire_toast (id 1) (after_ms 4000))
@@ -1214,7 +1218,8 @@ let%expect_test "/setusr: a superuser acts as another user, and back" =
   [%expect
     {|
     (Set_url_session b1)
-    (Rpc (method_ get_messages) (params ()) (tag Messages))
+    (Rpc (method_ get_messages) (params ()) (tag (Messages b1)))
+    (Rpc (method_ get_pending) (params ()) (tag Pending))
     (Rpc (method_ list_sessions) (params ()) (tag Sessions))
     (Rpc (method_ list_subagents) (params ()) (tag Subagents))
     (Rpc (method_ list_jobs) (params ()) (tag Jobs))
@@ -1281,7 +1286,8 @@ let%expect_test "/retry-backend-connection, /state, /clear, /quit" =
   [%expect
     {|
     (Set_url_session s1)
-    (Rpc (method_ get_messages) (params ()) (tag Messages))
+    (Rpc (method_ get_messages) (params ()) (tag (Messages s1)))
+    (Rpc (method_ get_pending) (params ()) (tag Pending))
     (Rpc (method_ list_sessions) (params ()) (tag Sessions))
     (Rpc (method_ list_subagents) (params ()) (tag Subagents))
     (Rpc (method_ list_jobs) (params ()) (tag Jobs))
@@ -1311,6 +1317,7 @@ let%expect_test "/retry-backend-connection, /state, /clear, /quit" =
     {|
     Close_dialog
     (Focus editor)
+    Follow_chat
     (Save_history (/clear /state /retry-backend-connection))
     (Expire_toast (id 3) (after_ms 4000))
     What are we building?

@@ -39,6 +39,7 @@ let%expect_test
     Send
     (Save_history ( "line one\
                    \nline two"))
+    Follow_chat
     (Rpc (method_ prompt) (params ((text  "line one\
                                          \nline two")))
      (tag Show_error))
@@ -67,11 +68,13 @@ let%expect_test
     Send
     (Save_history ("use the other file"  "line one\
                                         \nline two"))
+    Follow_chat
     (Rpc (method_ steer) (params ((text "use the other file"))) (tag Show_error))
     Send_follow_up
     (Save_history
      ("then run the tests" "use the other file"  "line one\
                                                 \nline two"))
+    Follow_chat
     (Rpc (method_ follow_up) (params ((text "then run the tests")))
      (tag Show_error))
     |}];
@@ -134,6 +137,7 @@ let%expect_test "pending images: thumbnails, remove, sent with the prompt" =
   [%expect
     {|
     Send
+    Follow_chat
     (Rpc (method_ prompt)
      (params ((text "") (images (((mime_type image/png) (data iVBORw0KGgo=))))))
      (tag Show_error))
@@ -147,6 +151,7 @@ let%expect_test "pending images: thumbnails, remove, sent with the prompt" =
   [%expect
     {|
     (Save_history (/help))
+    Follow_chat
     (Rpc (method_ prompt)
      (params
       ((text /help) (images (((mime_type image/png) (data iVBORw0KGgo=))))))
@@ -214,9 +219,11 @@ let%expect_test "prompt history: Up and Down at the first and last line" =
     {|
     (Save_history ("my draft" newest  "older\
                                      \ntwo lines" oldest))
+    Follow_chat
     (Rpc (method_ prompt) (params ((text "my draft"))) (tag Show_error))
     (Save_history ("my draft" newest  "older\
                                      \ntwo lines" oldest))
+    Follow_chat
     (Rpc (method_ prompt) (params ((text "my draft"))) (tag Show_error))
     |}]
 ;;
@@ -395,6 +402,7 @@ let%expect_test "slash commands: the popup, arguments, running, unknown ones" =
     (Save_history
      ("/etc/hosts has a typo?" /frobnicate /compcat /compact
       "/model openai/gpt-6"))
+    Follow_chat
     (Rpc (method_ prompt) (params ((text "/etc/hosts has a typo?")))
      (tag Show_error))
     |}];

@@ -129,7 +129,9 @@ let shell_command (call : Tool_call.t) =
   | Error _ -> ""
 ;;
 
-let of_messages messages = List.fold messages ~init:empty ~f:add_message
+let of_messages ?(running = false) messages =
+  List.fold messages ~init:{ empty with running } ~f:add_message
+;;
 
 let subagents_to_load t =
   Map.data t.tools

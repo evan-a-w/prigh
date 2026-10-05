@@ -4,6 +4,7 @@ module Target = struct
   type t =
     | Editor of { cursor : int }
     | Field
+    | Control
     | Page
   [@@deriving sexp_of]
 end
@@ -68,6 +69,12 @@ let alt_letter t letter =
   alt_only t && String.equal t.code ("Key" ^ String.uppercase letter)
 ;;
 
+let on_control t =
+  match t.target with
+  | Control -> true
+  | Editor _ | Field | Page -> false
+;;
+
 let dialog_key (dialog : Dialog.t) t : App.Action.t option =
   match t.key, dialog with
   | "Escape", _ -> Some Close_dialog
@@ -80,7 +87,7 @@ let dialog_key (dialog : Dialog.t) t : App.Action.t option =
   | "Tab", Scoped_models _ when not t.shift -> Some Dialog_toggle
   | "Tab", Prompt { suggestions = _ :: _; _ } when not t.shift ->
     Some Dialog_complete
-  | "Enter", _ when not t.shift -> Some Dialog_accept
+  | "Enter", _ when (not t.shift) && not (on_control t) -> Some Dialog_accept
   | _ -> None
 ;;
 
@@ -134,7 +141,7 @@ let agents_key (m : App.Model.t) t : App.Action.t option =
              ||
              match t.target with
              | Editor _ -> false
-             | Field | Page -> true) -> Some Agents_back
+             | Field | Control | Page -> true) -> Some Agents_back
   | _ -> None
 ;;
 
@@ -142,7 +149,8 @@ let handle (m : App.Model.t) t : App.Action.t option =
   match m.confirms, m.dialog with
   | c :: _, _ ->
     (match t.key with
-     | "Enter" -> Some (Respond_confirm { call_id = c.call_id; allow = true })
+     | "Enter" when plain t && not (on_control t) ->
+       Some (Respond_confirm { call_id = c.call_id; allow = true })
      | "Escape" -> Some (Respond_confirm { call_id = c.call_id; allow = false })
      | _ -> None)
   | [], Some dialog -> dialog_key dialog t
@@ -172,5 +180,5 @@ let handle (m : App.Model.t) t : App.Action.t option =
        (match agents_key m t, t.target with
         | Some action, _ -> Some action
         | None, Editor { cursor } -> editor_key m t ~cursor
-        | None, (Field | Page) -> None))
+        | None, (Field | Control | Page) -> None))
 ;;

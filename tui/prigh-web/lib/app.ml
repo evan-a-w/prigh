@@ -30,7 +30,8 @@ module Reply_tag = struct
     | Ignore
     | Show_error
     | State
-    | Messages
+    | Messages of string (** the session's id *)
+    | Pending
     | Sessions
     | Models
     | Reload_state
@@ -92,6 +93,8 @@ module Command = struct
     | Add_account
     | Scroll_chat of int
     | Jump_to_user_message of int
+    | Follow_chat
+    (** scroll the main chat to its end, and keep it there as output comes *)
   [@@deriving sexp_of, equal]
 end
 
@@ -373,6 +376,10 @@ let field json name =
   | _ -> None
 ;;
 
+let session_id (m : Model.t) =
+  Option.value_map m.state ~default:"" ~f:(fun s -> s.session_id)
+;;
+
 let close_dialog (m : Model.t) = { m with dialog = None }, [ focus_editor ]
 let list_subagents = rpc "list_subagents" [] ~tag:Subagents
 let list_jobs = rpc "list_jobs" [] ~tag:Jobs
@@ -406,7 +413,8 @@ let set_state (m : Model.t) (state : State.t) =
       ; btw = None
       }
     , [ Command.Set_url_session state.session_id
-      ; rpc "get_messages" [] ~tag:Messages
+      ; rpc "get_messages" [] ~tag:(Messages state.session_id)
+      ; rpc "get_pending" [] ~tag:Pending
       ; rpc "list_sessions" [] ~tag:Sessions
       ; list_subagents
       ; list_jobs
@@ -1558,6 +1566,26 @@ let run_command (m : Model.t) ({ name; rest } : Slash.Parsed.t) =
        | None -> sprintf "Unknown command /%s: /help lists the commands." name)
 ;;
 
+(* A [get_pending] reply: the queue's sizes and the tool calls waiting for
+   the user (asked before a reload, or in another tab). *)
+let pending_of_json json =
+  let open Or_error.Let_syntax in
+  let%bind steer =
+    Json.list_field json "steer_texts" ~f:Json.to_string_or_error
+  in
+  let%bind follow_up =
+    Json.list_field json "follow_up_texts" ~f:Json.to_string_or_error
+  in
+  let%map confirms =
+    Json.list_field json "confirms" ~f:(fun c ->
+      let%bind call_id = Json.string_field c "call_id" in
+      let%bind name = Json.string_field c "name" in
+      let%map summary = Json.string_field c "summary" in
+      { Confirm.call_id; name; summary })
+  in
+  (List.length steer, List.length follow_up), confirms
+;;
+
 (* A [get_subagent] reply. *)
 let subagent_of_json json =
   let open Or_error.Let_syntax in
@@ -1577,7 +1605,7 @@ let subagent_of_json json =
   ( { Chat.Subagent.agent_id
     ; task
     ; model
-    ; chat = Chat.of_messages messages
+    ; chat = Chat.of_messages ~running:(Option.is_none result) messages
     ; turns
     ; cost_usd = None
     ; result
@@ -1644,12 +1672,29 @@ let reply (m : Model.t) (tag : Reply_tag.t) result =
   | Notice text, Ok _ -> toast m text
   | State, Ok json -> decode m json State.of_json ~f:(set_state m)
   | Reload_state, Ok _ -> m, [ rpc "get_state" [] ~tag:State ]
-  | Messages, Ok json ->
+  (* Another session's, asked for before switching again. *)
+  | Messages session, Ok _ when not (String.equal session (session_id m)) ->
+    m, []
+  | Messages _, Ok json ->
     decode m json (decode_list Message.of_json) ~f:(fun messages ->
-      let chat = Chat.of_messages messages in
+      let chat = Chat.of_messages ~running:(Model.running m) messages in
       ( { m with chat }
-      , List.map (Chat.subagents_to_load chat) ~f:(fun call_id ->
+      , Command.Follow_chat
+        :: List.map (Chat.subagents_to_load chat) ~f:(fun call_id ->
           rpc "get_subagent" [ "id", str call_id ] ~tag:(Subagent call_id)) ))
+  | Pending, Ok json ->
+    (match pending_of_json json with
+     | Ok (queue, confirms) ->
+       let confirms =
+         m.confirms
+         @ List.filter confirms ~f:(fun (c : Confirm.t) ->
+           not
+             (List.exists m.confirms ~f:(fun (c' : Confirm.t) ->
+                String.equal c.call_id c'.call_id)))
+       in
+       ( { m with queue; confirms }
+       , if List.is_empty confirms then [] else [ Command.Focus "confirm" ] )
+     | Error e -> error m (Error.to_string_hum e))
   | Job_started, Ok json ->
     (match Json.string_field json "job_id" with
      | Ok id ->
@@ -1754,7 +1799,10 @@ let reply (m : Model.t) (tag : Reply_tag.t) result =
       open_dialog m (Session stats))
   | Entries purpose, Ok json -> entries_picker m purpose json
   | Reload_messages, Ok _ ->
-    m, [ rpc "get_state" [] ~tag:State; rpc "get_messages" [] ~tag:Messages ]
+    ( m
+    , [ rpc "get_state" [] ~tag:State
+      ; rpc "get_messages" [] ~tag:(Messages (session_id m))
+      ] )
   | Exported, Ok json ->
     (match Json.string_field json "path" with
      | Ok path ->
@@ -1944,7 +1992,7 @@ let send (m : Model.t) ~follow_up =
   | _ when String.is_prefix text ~prefix:"!" && List.is_empty m.images ->
     let m, save = sent m in
     let m, cmds = shell m text in
-    m, save @ cmds
+    m, save @ (Command.Follow_chat :: cmds)
   | Some parsed when List.is_empty m.images ->
     let m, save = sent m in
     let m, cmds = run_command m parsed in
@@ -1976,7 +2024,8 @@ let send (m : Model.t) ~follow_up =
         else m.agents
       in
       ( { m with images = []; agents }
-      , save @ [ rpc method_ (("text", str text) :: images) ] ))
+      , save
+        @ [ Command.Follow_chat; rpc method_ (("text", str text) :: images) ] ))
 ;;
 
 let accept_completion (m : Model.t) ~run =
