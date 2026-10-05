@@ -196,7 +196,6 @@ btw backend exited
   event assistant_end (Error"HTTP 429: The usage limit has been reached (usage limit reached)")
   event notice "deepseek/deepseek-flash: HTTP 429: The usage limit has been reached (usage limit reached); handing over to anthropic/claude-fable-5-1"
   event state running=true model=anthropic/claude-fable-5-1
-  event state running=false model=anthropic/claude-fable-5-1
   event state running=true model=anthropic/claude-fable-5-1
   event user "[prigh: deepseek/deepseek-flash cannot continue (HTTP 429: The usage limit has been reached (usage limit reached)), so anthropic/claude-fable-5-1 takes over this conversation from here. Carry on with the task where it left off.]"
   event message_end
