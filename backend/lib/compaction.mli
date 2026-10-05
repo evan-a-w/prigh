@@ -14,12 +14,13 @@ val render_transcript : Message.t list -> string
 
 (** Summarises everything but roughly the last [keep_recent_tokens] worth of
     messages (split at a user message), appends a compaction entry and
-    returns the summary. *)
+    returns the summary. [instructions] (the user's) say what to focus on. *)
 val compact
   :  env:Env.t
   -> provider:Provider.t
   -> model:Model.t
   -> ?keep_recent_tokens:int
   -> ?cancel:Cancellation.t
+  -> ?instructions:string
   -> Session.t
   -> string Or_error.t

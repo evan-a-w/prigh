@@ -267,7 +267,8 @@ val save_as_default : t -> unit Or_error.t
     outstanding for [call_id]. *)
 val respond_confirm : t -> call_id:string -> allow:bool -> unit Or_error.t
 
-val compact : t -> string Or_error.t
+(** [instructions]: what the summary should focus on (the user's). *)
+val compact : ?instructions:string -> t -> string Or_error.t
 
 (** Answers a side question with one tool-less model call over a snapshot of
     the conversation (see {!Btw}), concurrently with any run and without
