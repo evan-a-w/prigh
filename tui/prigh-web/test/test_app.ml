@@ -8,6 +8,7 @@ let%expect_test "startup, a prompt and its streamed reply" =
     (Rpc (method_ get_state) (params ()) (tag State))
     (Rpc (method_ list_models) (params ()) (tag Models))
     (Rpc (method_ auth_status) (params ()) (tag (Auth_status Refresh)))
+    (Rpc (method_ get_config) (params ()) (tag Config))
     (Set_url_session s1)
     (Rpc (method_ get_messages) (params ()) (tag Messages))
     (Rpc (method_ list_sessions) (params ()) (tag Sessions))

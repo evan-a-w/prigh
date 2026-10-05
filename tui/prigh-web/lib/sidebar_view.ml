@@ -78,22 +78,9 @@ let user_footer (m : App.Model.t) ~inject =
       ~on_click:(inject Action.Sign_out)
       [ icon Logout ]
   in
-  match m.hello with
-  | Some ({ user = Some user; _ } as hello) ->
-    div
-      ~cls:"sidebar-footer"
-      [ span ~cls:"avatar" (String.prefix (String.uppercase user) 1)
-      ; div
-          ~cls:"user"
-          [ span ~cls:"user-name" user
-          ; (match Hello_reply.acting_as hello with
-             | Some ns -> span ~cls:"user-acting" ("acting as " ^ ns)
-             | None -> Node.none)
-          ]
-      ; help
-      ; sign_out
-      ]
-  | _ ->
+  match Account_view.trigger m ~inject with
+  | Some account -> div ~cls:"sidebar-footer" [ account; help ]
+  | None ->
     div
       ~cls:"sidebar-footer"
       [ button

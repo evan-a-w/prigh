@@ -6,8 +6,8 @@ open Prigh_web
 type t
 
 (** Started and connected: [state] (a fresh session, default [state_json ()]),
-    the models ([models_json]), the providers ([auth_json]) and [sessions]
-    answered, and the clock at [now]. The startup commands are printed only
+    the models ([models_json]), the providers ([auth_json]), the config
+    ([config_json]) and [sessions] answered, and the clock at [now]. The startup commands are printed only
     when [verbose]. *)
 val create : ?verbose:bool -> ?sessions:string -> ?state:string -> unit -> t
 
@@ -23,6 +23,8 @@ val key
   -> ?alt:bool
   -> ?ctrl:bool
   -> ?meta:bool
+  -> ?selection:bool (** text is selected *)
+  -> ?code:string (** [KeyboardEvent.code]: [Key<letter>] for letters *)
   -> ?target:Keys.Target.t
   -> t
   -> string
@@ -66,6 +68,9 @@ val session_json
 (** GPT-6 (openai), Claude Opus 5.5 and Claude Sonnet 5 (anthropic), and
     DeepSeek Chat (deepseek, no thinking). *)
 val models_json : string
+
+(** No scoped models, no confirmation, no defaults. *)
+val config_json : string
 
 (** Anthropic logged in (oauth); OpenAI and DeepSeek not. *)
 val auth_json : string

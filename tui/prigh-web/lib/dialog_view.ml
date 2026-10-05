@@ -10,12 +10,22 @@ let picker_title : Dialog.Picker_kind.t -> string = function
   | Thinking -> "Thinking"
   | Login -> "Providers"
   | Logout -> "Providers"
+  | Verbosity -> "Levels"
+  | Confirm_tools -> "Settings"
+  | Fork _ | Rewind _ -> "Messages"
+  | Tree -> "Messages"
+  | Hosts -> "Hosts"
+  | Users -> "Users"
+  | Accounts -> "Accounts"
 ;;
 
 let picker ~kind (p : Picker.t) ~inject =
   let visible = Picker.visible p in
   Modal.view
-    ~cls:"picker-dialog"
+    ~cls:
+      (match kind with
+       | Dialog.Picker_kind.Tree -> "picker-dialog tree-dialog"
+       | _ -> "picker-dialog")
     ~title:(Picker.title p)
     ~on_close:(inject Action.Close_dialog)
     ~footer:[ keys_hint "↑↓ move · Enter choose · Esc close" ]
@@ -99,6 +109,8 @@ let help ~inject =
     ; table
         (List.map Slash.all ~f:(fun (s : Slash.Spec.t) ->
            String.strip ("/" ^ s.name ^ " " ^ s.args), s.help))
+    ; Node.h3 [ Node.text "Left to the browser" ]
+    ; table Keys.browser
     ]
 ;;
 
@@ -381,6 +393,7 @@ let agents (m : App.Model.t) ~inject =
 let dialog (m : App.Model.t) ~inject =
   match m.dialog with
   | None -> Node.none
+  | Some (Picker { kind = Accounts; picker = p }) -> Account_view.menu m p ~inject
   | Some (Picker { kind; picker = p }) -> picker ~kind p ~inject
   | Some Help -> help ~inject
   | Some (Rename name) -> rename name ~inject
@@ -388,6 +401,8 @@ let dialog (m : App.Model.t) ~inject =
   | Some (Login flow) -> login m flow ~inject
   | Some (Auth statuses) -> auth statuses ~inject
   | Some Agents -> agents m ~inject
+  | Some dialog ->
+    Option.value (Command_dialog_view.view m dialog ~inject) ~default:Node.none
 ;;
 
 let confirm (m : App.Model.t) ~inject =

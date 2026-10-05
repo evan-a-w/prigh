@@ -52,13 +52,16 @@ let set_query t query =
   { t with query; visible = filter t.items ~query; selected = 0 }
 ;;
 
-let create ?(query = "") ~title items =
+let create ?(query = "") ?highlight ~title items =
   let visible = filter items ~query in
   let selected =
     if String.is_empty query
     then
       Option.value_map
-        (List.findi visible ~f:(fun _ (i : Item.t) -> i.marked))
+        (List.findi visible ~f:(fun _ (i : Item.t) ->
+           match highlight with
+           | Some id -> String.equal i.id id
+           | None -> i.marked))
         ~default:0
         ~f:fst
     else 0

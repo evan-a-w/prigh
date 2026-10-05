@@ -66,7 +66,7 @@ let%expect_test "what counts as a slash command" =
     {|
     "hlep" -> help
     "mdoel" -> model
-    "sess" -> sessions
+    "sess" -> session
     "zzz" -> none
     "" -> none
     |}]

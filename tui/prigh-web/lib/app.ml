@@ -10,6 +10,21 @@ module Auth_purpose = struct
   [@@deriving sexp_of, equal]
 end
 
+module Entries_purpose = struct
+  type t =
+    | Fork
+    | Rewind
+    | Tree
+  [@@deriving sexp_of, equal]
+end
+
+module Users_purpose = struct
+  type t =
+    | Probe
+    | Picker
+  [@@deriving sexp_of, equal]
+end
+
 module Reply_tag = struct
   type t =
     | Ignore
@@ -30,6 +45,22 @@ module Reply_tag = struct
     | Login_started
     | Notice of string
     | Reconnect of int
+    | Config
+    | Config_saved of string
+    | Default_saved
+    | Session_stats
+    | Entries of Entries_purpose.t
+    | Reload_messages
+    | Exported
+    | Imported
+    | Prompt_done of string
+    | Prompt_paths of string
+    | Jobs
+    | Job_output of string
+    | Job_killed of string
+    | Btw of string
+    | Users of Users_purpose.t
+    | User_switched
   [@@deriving sexp_of, equal]
 end
 
@@ -53,6 +84,11 @@ module Command = struct
     | Focus of string
     | Save_history of string list
     | Sign_out
+    | Copy of string
+    | Switch_account of Accounts.Account.t
+    | Add_account
+    | Scroll_chat of int
+    | Jump_to_user_message of int
   [@@deriving sexp_of, equal]
 end
 
@@ -157,6 +193,29 @@ module Action = struct
         }
     | Dismiss_toast of int
     | Sign_out
+    | Set_accounts of
+        { accounts : Accounts.Account.t list
+        ; current : Accounts.Account.t option
+        }
+    | Open_accounts
+    | Switch_account of Accounts.Account.t
+    | Add_account
+    | Act_as of string
+    | Cycle_verbosity
+    | Cycle_model of int
+    | Cycle_thinking
+    | Copy_last
+    | Close_btw
+    | Dialog_toggle
+    | Toggle_scoped of string
+    | Dialog_complete
+    | Choose_suggestion of int
+    | Dialog_delete
+    | Show_job_output of string
+    | Retry_connection
+    | Scroll_chat of int
+    | Jump_to_user_message of int
+    | Run of string
   [@@deriving sexp_of]
 end
 
@@ -186,6 +245,13 @@ module Model = struct
     ; next_toast : int
     ; sidebar_open : bool
     ; session_query : string
+    ; verbosity : Prigh_ui.Verbosity.t
+    ; config : Config.t option
+    ; btw : Btw.t option
+    ; btw_seq : int
+    ; accounts : Accounts.Account.t list
+    ; account : Accounts.Account.t option
+    ; users : string list option
     }
   [@@deriving sexp_of]
 
@@ -228,6 +294,13 @@ let init =
   ; next_toast = 0
   ; sidebar_open = true
   ; session_query = ""
+  ; verbosity = Normal
+  ; config = None
+  ; btw = None
+  ; btw_seq = 0
+  ; accounts = []
+  ; account = None
+  ; users = None
   }
 ;;
 
@@ -257,6 +330,7 @@ let startup =
   [ rpc "get_state" [] ~tag:State
   ; rpc "list_models" [] ~tag:Models
   ; rpc "auth_status" [] ~tag:(Auth_status Refresh)
+  ; rpc "get_config" [] ~tag:Config
   ]
 ;;
 
@@ -303,6 +377,7 @@ let set_state (m : Model.t) (state : State.t) =
       ; confirms = []
       ; queue = 0, 0
       ; dialog = Option.filter m.dialog ~f:(Fn.non Dialog.per_session)
+      ; btw = None
       }
     , [ Command.Set_url_session state.session_id
       ; rpc "get_messages" [] ~tag:Messages
@@ -508,11 +583,15 @@ let set_draft (m : Model.t) ?cursor draft =
 let refresh_completion (m : Model.t) =
   match
     Completion.compute
+      ~sessions:m.sessions
+      ~hosts:(Option.value_map m.state ~default:[] ~f:(fun s -> s.hosts))
+      ~users:(Option.value m.users ~default:[])
       ~text:m.draft
       ~cursor:m.cursor
       ~models:m.models
       ~auth:m.auth
       ~current_model:(Option.map m.state ~f:(fun s -> s.model.key))
+      ()
   with
   | None -> { m with completion = None }, []
   | Some c ->
@@ -540,10 +619,633 @@ let open_rename (m : Model.t) =
   open_dialog m ~focus:"dialog-input" (Rename name)
 ;;
 
+(* ---- parity with the TUI's commands ------------------------------------ *)
+
+let current_state (m : Model.t) ~f =
+  match m.state with
+  | Some state -> f state
+  | None -> error m "Not connected yet: wait for the backend."
+;;
+
+let config (m : Model.t) = Option.value m.config ~default:Config.default
+
+let save_config (m : Model.t) config ~notice =
+  ( { m with config = Some config }
+  , [ rpc "set_config" [ "config", Config.to_json config ] ~tag:(Config_saved notice)
+    ] )
+;;
+
+(* The models Ctrl+P cycles through: the scoped ones, else the logged-in
+   ones, else all. *)
+let scope (m : Model.t) =
+  match m.config with
+  | Some { scoped_models = _ :: _ as keys; _ } ->
+    List.filter m.models ~f:(fun model ->
+      List.mem keys model.key ~equal:String.equal)
+  | _ ->
+    (match List.filter m.models ~f:(fun model -> logged_in m model.provider) with
+     | [] -> m.models
+     | logged -> logged)
+;;
+
+let cycle_model (m : Model.t) step =
+  current_state m ~f:(fun state ->
+    match scope m with
+    | [] -> error m "No models to cycle through: /login logs in to a provider."
+    | [ only ] ->
+      toast
+        m
+        (sprintf
+           "%s is the only model in scope: /scoped-models picks more."
+           only.name)
+    | models ->
+      let n = List.length models in
+      let index =
+        List.findi models ~f:(fun _ (model : Llm.t) ->
+          String.equal model.key state.model.key)
+        |> Option.value_map ~default:(if step > 0 then -1 else 0) ~f:fst
+      in
+      let next = List.nth_exn models (((index + step) % n + n) % n) in
+      let m = { m with state = Some { state with model = next } } in
+      let m, cmds = toast m (sprintf "Model: %s" next.name) in
+      m, cmds @ [ rpc "set_model" [ "model", str next.key ] ])
+;;
+
+let cycle_thinking (m : Model.t) =
+  current_state m ~f:(fun state ->
+    if not state.model.supports_thinking
+    then
+      error
+        m
+        (sprintf
+           "%s has no thinking levels: switch to a model that thinks with /model"
+           state.model.name)
+    else (
+      let index =
+        List.findi thinking_levels ~f:(fun _ l -> String.equal l state.thinking)
+        |> Option.value_map ~default:0 ~f:fst
+      in
+      let next =
+        List.nth_exn thinking_levels ((index + 1) % List.length thinking_levels)
+      in
+      let m = { m with state = Some { state with thinking = next } } in
+      let m, cmds = toast m (sprintf "Thinking: %s" next) in
+      m, cmds @ [ rpc "set_thinking" [ "thinking", str next ] ]))
+;;
+
+let verbosity_detail : Prigh_ui.Verbosity.t -> string = function
+  | Quiet -> "tool calls without their output; no thinking"
+  | Normal -> "tool output and thinking folded"
+  | Verbose -> "everything unfolded"
+;;
+
+let set_verbosity (m : Model.t) verbosity =
+  toast
+    { m with verbosity }
+    (sprintf
+       "Transcript: %s, %s (Ctrl+O cycles)"
+       (Prigh_ui.Verbosity.name verbosity)
+       (verbosity_detail verbosity))
+;;
+
+let verbosity_picker (m : Model.t) =
+  Dialog.Picker
+    { kind = Verbosity
+    ; picker =
+        Picker.create
+          ~title:"Transcript verbosity"
+          (List.map Prigh_ui.Verbosity.all ~f:(fun v ->
+             Picker.Item.create
+               ~id:(Prigh_ui.Verbosity.name v)
+               ~detail:(verbosity_detail v)
+               ~marked:(Prigh_ui.Verbosity.equal v m.verbosity)
+               (String.capitalize (Prigh_ui.Verbosity.name v))))
+    }
+;;
+
+let set_confirm (m : Model.t) enabled =
+  save_config
+    m
+    { (config m) with confirm_tools = enabled }
+    ~notice:
+      (if enabled
+       then "Tool confirmation on: bash, write and edit ask first"
+       else "Tool confirmation off: tools run without asking")
+;;
+
+let confirm_picker (m : Model.t) =
+  let current = Option.map m.config ~f:(fun c -> c.confirm_tools) in
+  Dialog.Picker
+    { kind = Confirm_tools
+    ; picker =
+        Picker.create
+          ~title:"Tool confirmation"
+          [ Picker.Item.create
+              ~id:"on"
+              ~detail:"ask before bash, write and edit run"
+              ~marked:(Option.equal Bool.equal current (Some true))
+              "On"
+          ; Picker.Item.create
+              ~id:"off"
+              ~detail:"run tools without asking"
+              ~marked:(Option.equal Bool.equal current (Some false))
+              "Off"
+          ]
+    }
+;;
+
+let scoped_models_dialog (m : Model.t) =
+  let checked =
+    match m.config with
+    | Some { scoped_models = _ :: _ as keys; _ } -> String.Set.of_list keys
+    | _ ->
+      String.Set.of_list
+        (List.filter_map m.models ~f:(fun model ->
+           Option.some_if (logged_in m model.provider) model.key))
+  in
+  Dialog.Scoped_models
+    { checked
+    ; picker =
+        Picker.create
+          ~title:"Scoped models"
+          (List.map m.models ~f:(fun (model : Llm.t) ->
+             Picker.Item.create
+               ~id:model.key
+               ~detail:model.provider
+               ~search:(model.name ^ " " ^ model.key)
+               ~dimmed:(not (logged_in m model.provider))
+               model.name))
+    }
+;;
+
+let save_scoped (m : Model.t) checked =
+  let scoped_models =
+    List.filter_map m.models ~f:(fun model ->
+      Option.some_if (Set.mem checked model.key) model.key)
+  in
+  save_config
+    { m with dialog = None }
+    { (config m) with scoped_models }
+    ~notice:
+      (match scoped_models with
+       | [] -> "Scope cleared: Ctrl+P cycles through the logged-in models"
+       | l ->
+         sprintf
+           "%d scoped model%s: Ctrl+P and Alt+P cycle through them"
+           (List.length l)
+           (if List.length l = 1 then "" else "s"))
+;;
+
+let last_reply (m : Model.t) =
+  List.rev (Chat.entries m.chat)
+  |> List.find_map ~f:(fun (entry : Chat.Entry.t) ->
+    match entry with
+    | Assistant { message; _ } ->
+      (match
+         List.filter_map message.content ~f:(function
+           | Text t when not (String.is_empty (String.strip t)) ->
+             Some (String.strip t)
+           | _ -> None)
+       with
+       | [] -> None
+       | texts -> Some (String.concat ~sep:"\n\n" texts))
+    | _ -> None)
+;;
+
+let copy_last (m : Model.t) =
+  match last_reply m with
+  | None -> error m "Nothing to copy yet: no reply in this session."
+  | Some text ->
+    let m, cmds = toast m "Copied the last reply to the clipboard" in
+    m, Command.Copy text :: cmds
+;;
+
+let cancel_btw (m : Model.t) =
+  match m.btw with
+  | Some { status = Streaming; id; _ } ->
+    [ rpc "btw_cancel" [ "btw_id", str id ] ~tag:Ignore ]
+  | _ -> []
+;;
+
+(* A newer question replaces (and cancels) the previous one. *)
+let start_btw (m : Model.t) question =
+  let id = sprintf "btw-%d" (m.btw_seq + 1) in
+  ( { m with btw = Some (Btw.create ~id ~question); btw_seq = m.btw_seq + 1 }
+  , cancel_btw m
+    @ [ rpc "btw" [ "question", str question; "btw_id", str id ] ~tag:(Btw id) ]
+  )
+;;
+
+let close_btw (m : Model.t) = { m with btw = None }, cancel_btw m @ [ focus_editor ]
+
+let update_btw (m : Model.t) id ~f =
+  match m.btw with
+  | Some btw when String.equal btw.id id -> { m with btw = Some (f btw) }
+  | _ -> m
+;;
+
+let host_label (m : Model.t) (h : Host.t) =
+  let here =
+    Option.exists m.hello ~f:(fun (hello : Hello_reply.t) ->
+      String.equal hello.client_id h.id)
+  in
+  if here
+  then h.name ^ " (this browser)"
+  else (
+    let ours = Option.map m.state ~f:(fun s -> s.session_id) in
+    match h.session_id with
+    | Some id when not (Option.equal String.equal ours (Some id)) ->
+      sprintf "%s (in %s)" h.name (Option.value h.session_name ~default:id)
+    | _ -> h.name)
+;;
+
+let hosts_picker (m : Model.t) =
+  current_state m ~f:(fun state ->
+    open_picker
+      m
+      (Picker
+         { kind = Hosts
+         ; picker =
+             Picker.create
+               ~title:"Where tools run"
+               (List.map state.hosts ~f:(fun h ->
+                  Picker.Item.create
+                    ~id:h.id
+                    ~detail:h.cwd
+                    ~search:(h.name ^ " " ^ h.id ^ " " ^ h.cwd)
+                    ~marked:(String.equal h.id state.active_host)
+                    (host_label m h)))
+         }))
+;;
+
+let open_prompt (m : Model.t) prompt =
+  let m, cmds = open_dialog m ~focus:"dialog-input" (Prompt prompt) in
+  let method_, params =
+    Prompt.listing
+      prompt
+      ~active_host:
+        (Option.value_map m.state ~default:Host.backend_id ~f:(fun s ->
+           s.active_host))
+  in
+  m, cmds @ [ rpc method_ params ~tag:(Prompt_paths prompt.input) ]
+;;
+
+(* The directory belongs to the host, so switching asks for the one to use
+   there, prefilled with the current one. *)
+let host_prompt (m : Model.t) (host : Host.t) =
+  open_prompt
+    m
+    (Prompt.create
+       ~input:(Option.value_map m.state ~default:host.cwd ~f:(fun s -> s.cwd))
+       (Host_cwd { host = host.id; name = host_label m host }))
+;;
+
+let switch_host (m : Model.t) arg =
+  current_state m ~f:(fun state ->
+    let here (h : Host.t) =
+      String.equal arg "here"
+      && Option.exists m.hello ~f:(fun hello -> String.equal hello.client_id h.id)
+    in
+    match
+      List.filter state.hosts ~f:(fun h ->
+        String.equal h.id arg || String.equal h.name arg || here h)
+    with
+    | [ host ] -> host_prompt m host
+    | [] ->
+      error
+        m
+        (sprintf
+           "No tool host %S: one of %s (/host picks one)."
+           arg
+           (String.concat
+              ~sep:", "
+              (List.map state.hosts ~f:(fun h -> h.name))))
+    | _ -> hosts_picker m)
+;;
+
+let export (m : Model.t) path =
+  let format = if String.is_suffix path ~suffix:".jsonl" then "jsonl" else "markdown" in
+  rpc
+    "export"
+    (("format", str format)
+     :: (if String.is_empty path then [] else [ "path", str path ]))
+    ~tag:Exported
+  |> fun cmd -> m, [ cmd ]
+;;
+
+let submit_prompt (m : Model.t) (prompt : Prompt.t) =
+  let path = String.strip prompt.input in
+  let busy = { m with dialog = Some (Prompt { prompt with busy = true }) } in
+  match prompt.action, path with
+  | Export, path ->
+    let m, cmds = export busy path in
+    m, cmds
+  | (Cd | Host_cwd _ | Import), "" ->
+    ( { m with
+        dialog =
+          Some (Prompt { prompt with error = Some "Type a path (Esc cancels)." })
+      }
+    , [] )
+  | Cd, path ->
+    ( busy
+    , [ rpc
+          "set_cwd"
+          [ "path", str path ]
+          ~tag:(Prompt_done ("Working directory: " ^ path))
+      ] )
+  | Host_cwd { host; name }, path ->
+    ( busy
+    , [ rpc
+          "set_active_host"
+          [ "host", str host; "cwd", str path ]
+          ~tag:(Prompt_done (sprintf "Tools run on %s, in %s" name path))
+      ] )
+  | Import, path -> busy, [ rpc "import" [ "path", str path ] ~tag:Imported ]
+;;
+
+let with_prompt (m : Model.t) ~f =
+  match m.dialog with
+  | Some (Prompt prompt) -> f prompt
+  | _ -> m, []
+;;
+
+let prompt_input (m : Model.t) prompt =
+  let m = { m with dialog = Some (Prompt prompt) } in
+  let method_, params =
+    Prompt.listing
+      prompt
+      ~active_host:
+        (Option.value_map m.state ~default:Host.backend_id ~f:(fun s ->
+           s.active_host))
+  in
+  m, [ rpc method_ params ~tag:(Prompt_paths prompt.input) ]
+;;
+
+(* An inline failure keeps the dialog open so that the answer can be fixed. *)
+let prompt_failed (m : Model.t) e =
+  match m.dialog with
+  | Some (Prompt ({ busy = true; _ } as prompt)) ->
+    { m with dialog = Some (Prompt { prompt with busy = false; error = Some e }) }, []
+  | _ -> error m e
+;;
+
+let prompt_succeeded (m : Model.t) =
+  match m.dialog with
+  | Some (Prompt { busy = true; _ }) -> close_dialog m
+  | _ -> m, []
+;;
+
+let jobs_dialog (m : Model.t) (jobs : Job_info.t list) =
+  match jobs, m.dialog with
+  | [], Some (Jobs _) -> { m with dialog = Some (Jobs { jobs; selected = 0; output = None }) }, []
+  | [], _ -> toast m "No background jobs in this session: !&command starts one."
+  | jobs, Some (Jobs d) ->
+    ( { m with
+        dialog =
+          Some
+            (Jobs
+               { d with
+                 jobs
+               ; selected = Int.min d.selected (List.length jobs - 1)
+               })
+      }
+    , [] )
+  | jobs, _ -> open_dialog m (Jobs { jobs; selected = 0; output = None })
+;;
+
+let job_output (m : Model.t) id =
+  m, [ rpc "job_output" [ "job_id", str id; "lines", Json.int 200 ] ~tag:(Job_output id) ]
+;;
+
+let kill_job (m : Model.t) id =
+  m, [ rpc "kill_job" [ "job_id", str id ] ~tag:(Job_killed id) ]
+;;
+
+let cancel_agent (m : Model.t) arg =
+  current_state m ~f:(fun state ->
+    let by_number =
+      Option.bind (Int.of_string_opt arg) ~f:(fun n -> List.nth state.subagents (n - 1))
+    in
+    match
+      Option.first_some
+        by_number
+        (List.find state.subagents ~f:(fun a -> String.equal a.id arg))
+    with
+    | Some agent ->
+      let m, cmds = toast m (sprintf "Cancelling subagent %s" agent.id) in
+      m, cmds @ [ rpc "cancel_subagent" [ "agent_id", str agent.id ] ]
+    | None ->
+      error
+        m
+        (match state.subagents with
+         | [] -> "No subagents to cancel in this session."
+         | agents ->
+           sprintf
+             "No subagent %S: use 1–%d or an id (/agents lists them)."
+             arg
+             (List.length agents)))
+;;
+
+let help_command (m : Model.t) name =
+  let name = String.chop_prefix_if_exists name ~prefix:"/" in
+  match Slash.find name with
+  | Some spec ->
+    toast m (sprintf "%s — %s" (String.strip ("/" ^ spec.name ^ " " ^ spec.args)) spec.help)
+  | None ->
+    error
+      m
+      (match Slash.closest name with
+       | Some spec -> sprintf "No command /%s. Did you mean /%s?" name spec.name
+       | None -> sprintf "No command /%s: /help lists them." name)
+;;
+
+let retry_connection (m : Model.t) =
+  match m.connection with
+  | Connected -> toast m "The backend is connected."
+  | Reconnecting { attempt; _ } ->
+    let generation = m.generation + 1 in
+    let m =
+      { m with connection = Reconnecting { attempt; generation }; generation }
+    in
+    let m, cmds = toast m "Reconnecting now…" in
+    ( m
+    , cmds
+      @ [ Command.Reconnect
+            { generation
+            ; delay_ms = 0
+            ; session = Option.map m.state ~f:(fun s -> s.session_id)
+            }
+        ] )
+;;
+
+(* ---- accounts ---------------------------------------------------------- *)
+
+let own_user (m : Model.t) = Option.bind m.hello ~f:(fun h -> h.user)
+
+let account_menu (m : Model.t) =
+  let others =
+    List.filter_mapi m.accounts ~f:(fun i account ->
+      if Option.exists m.account ~f:(Accounts.Account.same account)
+      then None
+      else
+        Some
+          (Picker.Item.create
+             ~id:(sprintf "switch %d" i)
+             ~detail:(Accounts.Account.host account)
+             (Accounts.Account.name account)))
+  in
+  let acting = Option.bind m.hello ~f:Hello_reply.acting_as in
+  let act =
+    match m.users, acting, own_user m with
+    | None, _, _ -> []
+    | Some _, None, _ ->
+      [ Picker.Item.create
+          ~id:"act"
+          ~detail:"see and work in another user's sessions"
+          "Act as…"
+      ]
+    | Some _, Some other, own ->
+      [ Picker.Item.create
+          ~id:"act"
+          ~detail:(sprintf "now acting as %s" other)
+          "Act as…"
+      ; Picker.Item.create
+          ~id:"back"
+          ~detail:"your own sessions"
+          ("Back to " ^ Option.value own ~default:"yourself")
+      ]
+  in
+  Dialog.Picker
+    { kind = Accounts
+    ; picker =
+        Picker.create
+          ~title:"Account"
+          (others
+           @ act
+           @ [ Picker.Item.create
+                 ~id:"add"
+                 ~detail:"sign in as another user, or to another backend"
+                 "Add account…"
+             ; Picker.Item.create
+                 ~id:"signout"
+                 ~detail:"forget this account in this browser"
+                 "Sign out"
+             ])
+    }
+;;
+
+let users_picker (m : Model.t) users =
+  let namespace = Option.bind m.hello ~f:(fun h -> h.namespace) in
+  let own = own_user m in
+  open_picker
+    { m with users = Some users }
+    (Picker
+       { kind = Users
+       ; picker =
+           Picker.create
+             ~title:"Act as"
+             (List.map users ~f:(fun user ->
+                Picker.Item.create
+                  ~id:user
+                  ~detail:
+                    (if Option.equal String.equal own (Some user) then "you" else "")
+                  ~marked:(Option.equal String.equal namespace (Some user))
+                  user))
+       })
+;;
+
+let act_as (m : Model.t) user =
+  m, [ rpc "set_user" [ "user", str user ] ~tag:User_switched ]
+;;
+
+(* Everything but the connection belongs to the user we were. *)
+let user_switched (m : Model.t) (hello : Hello_reply.t) =
+  let m =
+    { m with
+      hello = Some hello
+    ; state = None
+    ; chat = Chat.empty
+    ; sessions = []
+    ; session_query = ""
+    ; confirms = []
+    ; queue = 0, 0
+    ; dialog = None
+    ; completion = None
+    ; btw = None
+    ; images = []
+    }
+  in
+  let m, cmds =
+    toast
+      m
+      (match Hello_reply.acting_as hello, hello.user with
+       | Some other, _ -> sprintf "Acting as %s" other
+       | None, Some own -> sprintf "Back to %s" own
+       | None, None -> "Switched user")
+  in
+  m, cmds @ [ focus_editor ] @ startup
+;;
+
+let account_chosen (m : Model.t) id =
+  match String.lsplit2 id ~on:' ', id with
+  | Some ("switch", i), _ ->
+    (match Option.bind (Int.of_string_opt i) ~f:(List.nth m.accounts) with
+     | Some account -> m, [ Command.Switch_account account ]
+     | None -> m, [])
+  | _, "act" -> m, [ rpc "list_users" [] ~tag:(Users Picker) ]
+  | _, "back" ->
+    (match own_user m with
+     | Some own -> act_as m own
+     | None -> m, [])
+  | _, "add" -> m, [ Command.Add_account ]
+  | _, "signout" -> m, [ Command.Sign_out ]
+  | _ -> m, []
+;;
+
+let entries_picker (m : Model.t) (purpose : Entries_purpose.t) json =
+  match Session_tree.of_json json with
+  | Error e -> error m (Error.to_string_hum e)
+  | Ok (head, entries) ->
+    (match purpose with
+     | Fork | Rewind ->
+       (match Session_tree.user_items entries with
+        | [] -> toast m "No messages yet: there is nothing to go back to."
+        | items ->
+          let kind, title =
+            match purpose with
+            | Fork -> Dialog.Picker_kind.Fork entries, "Fork from (edit and resend)"
+            | Rewind | Tree -> Rewind entries, "Rewind to"
+          in
+          open_picker m (Picker { kind; picker = Picker.create ~title items }))
+     | Tree ->
+       (match Session_tree.tree_items entries ~head with
+        | [] -> toast m "No messages yet: the tree is empty."
+        | items ->
+          (* The head may be a model change or a name: highlight the last
+             message before it. *)
+          let highlight =
+            List.rev items
+            |> List.find ~f:(fun (i : Picker.Item.t) -> i.marked)
+            |> Option.map ~f:(fun (i : Picker.Item.t) -> i.id)
+          in
+          ignore (head : string option);
+          open_picker
+            m
+            (Picker
+               { kind = Tree
+               ; picker = Picker.create ?highlight ~title:"Session tree" items
+               })))
+;;
+
 let run_command (m : Model.t) ({ name; rest } : Slash.Parsed.t) =
   let none = "" in
+  let words =
+    String.split rest ~on:' ' |> List.filter ~f:(Fn.non String.is_empty)
+  in
   match name, rest with
-  | "help", _ -> open_dialog m Help
+  | "help", "" -> open_dialog m Help
+  | "help", name -> help_command m name
+  | "hotkeys", _ -> open_dialog m Hotkeys
   | "new", _ -> m, [ rpc "new_session" [] ~tag:Reload_state ]
   | "model", "" -> open_picker m (model_picker m)
   | "model", query ->
@@ -564,6 +1266,10 @@ let run_command (m : Model.t) ({ name; rest } : Slash.Parsed.t) =
                    ~sep:", "
                    (List.map l ~f:(fun (s : Llm.t) -> s.name))
                ^ "?")))
+  | "scoped-models", _ ->
+    if List.is_empty m.models
+    then error m "No models yet: /login logs in to a provider."
+    else open_picker m (scoped_models_dialog m)
   | "thinking", "" -> open_picker m (thinking_picker m)
   | "thinking", level ->
     if List.mem thinking_levels level ~equal:String.equal
@@ -575,15 +1281,49 @@ let run_command (m : Model.t) ({ name; rest } : Slash.Parsed.t) =
            "Unknown thinking level %S: use %s."
            level
            (String.concat ~sep:", " thinking_levels))
-  | "compact", _ ->
+  | "change_default", _ -> m, [ rpc "change_default" [] ~tag:Default_saved ]
+  | "verbosity", "" -> open_picker m (verbosity_picker m)
+  | "verbosity", name ->
+    (match
+       List.find Prigh_ui.Verbosity.all ~f:(fun v ->
+         String.equal (Prigh_ui.Verbosity.name v) name)
+     with
+     | Some v -> set_verbosity m v
+     | None ->
+       error m (sprintf "Unknown verbosity %S: use quiet, normal or verbose." name))
+  | "confirm", "" -> open_picker m (confirm_picker m)
+  | "confirm", ("on" | "true") -> set_confirm m true
+  | "confirm", ("off" | "false") -> set_confirm m false
+  | "confirm", other -> error m (sprintf "Unknown setting %S: use on or off." other)
+  | "compact", instructions ->
     let m, cmds = toast m "Compacting the conversation…" in
-    m, cmds @ [ rpc "compact" [] ~tag:(Notice "Compacted the conversation") ]
+    ( m
+    , cmds
+      @ [ rpc
+            "compact"
+            (if String.is_empty instructions
+             then []
+             else [ "instructions", str instructions ])
+            ~tag:(Notice "Compacted the conversation")
+        ] )
   | "name", "" -> open_rename m
   | "name", name ->
     m, [ rpc "set_session_name" [ "name", str name ] ~tag:Refresh_sessions ]
-  | "sessions", _ -> open_sessions m
+  | "session", _ -> m, [ rpc "session_stats" [] ~tag:Session_stats ]
+  | "sessions", _ | "switch", "" -> open_sessions m
+  | "switch", path ->
+    m, [ rpc "switch_session" [ "path", str path ] ~tag:Reload_state ]
   | "clone", _ -> m, [ rpc "clone" [] ~tag:Reload_state ]
-  | "cd", "" -> error m "Usage: /cd <path> (Tab completes directories)"
+  | "fork", _ -> m, [ rpc "get_entries" [] ~tag:(Entries Fork) ]
+  | "rewind", _ -> m, [ rpc "get_entries" [] ~tag:(Entries Rewind) ]
+  | "tree", _ ->
+    m, [ rpc "get_entries" [ "all", Json.bool true ] ~tag:(Entries Tree) ]
+  | "cd", "" ->
+    open_prompt
+      m
+      (Prompt.create
+         ~input:(Option.value_map m.state ~default:"" ~f:(fun s -> s.cwd))
+         Cd)
   | "cd", path ->
     ( m
     , [ rpc
@@ -591,8 +1331,27 @@ let run_command (m : Model.t) ({ name; rest } : Slash.Parsed.t) =
           [ "path", str path ]
           ~tag:(Notice ("Working directory: " ^ path))
       ] )
+  | "host", "" -> hosts_picker m
+  | "host", arg -> switch_host m arg
+  | "export", "" -> open_prompt m (Prompt.create Export)
+  | "export", path -> export m path
+  | "import", "" -> open_prompt m (Prompt.create Import)
+  | "import", path -> m, [ rpc "import" [ "path", str path ] ~tag:Imported ]
+  | "copy", _ -> copy_last m
+  | "btw", "" -> error m "Usage: /btw <question> (asked aside; the run goes on)"
+  | "btw", question -> start_btw m question
   | "abort", _ -> m, [ rpc "abort" [] ~tag:Restored ]
-  | "agents", _ -> open_dialog m Agents
+  | "agents", "" -> open_dialog m Agents
+  | "agents", _ ->
+    (match words with
+     | [ "cancel"; arg ] -> cancel_agent m arg
+     | _ -> error m "Usage: /agents [cancel <n|id>]")
+  | "jobs", "" -> m, [ rpc "list_jobs" [] ~tag:Jobs ]
+  | "jobs", _ ->
+    (match words with
+     | [ "kill"; id ] -> kill_job m id
+     | [ id ] when not (String.equal id "kill") -> job_output m id
+     | _ -> error m "Usage: /jobs [id | kill <id>]")
   | "login", "" -> m, [ rpc "auth_status" [] ~tag:(Auth_status Login_picker) ]
   | "login", args ->
     (match
@@ -604,7 +1363,31 @@ let run_command (m : Model.t) ({ name; rest } : Slash.Parsed.t) =
   | "logout", "" -> m, [ rpc "auth_status" [] ~tag:(Auth_status Logout_picker) ]
   | "logout", provider -> logout m provider
   | "auth", _ -> m, [ rpc "auth_status" [] ~tag:(Auth_status Show) ]
+  | "setusr", "" -> m, [ rpc "list_users" [] ~tag:(Users Picker) ]
+  | "setusr", user ->
+    (match words with
+     | [ user ] -> act_as m user
+     | _ -> error m (sprintf "Usage: /setusr [user] (not %S)" user))
   | "signout", _ -> m, [ Command.Sign_out ]
+  | "retry-backend-connection", _ -> retry_connection m
+  | "state", _ ->
+    current_state m ~f:(fun state ->
+      open_dialog
+        m
+        (Text
+           { title = "Session state"
+           ; text = Sexp.to_string_hum (State.sexp_of_t state)
+           }))
+  | "clear", _ ->
+    toast
+      { m with chat = Chat.empty }
+      "Cleared the view; the conversation is kept (a reload shows it, /new \
+       starts afresh)"
+  | "quit", _ ->
+    toast
+      m
+      "Close the tab to leave: the session stays in the backend (/signout \
+       signs out)."
   | name, _ ->
     error
       m
@@ -671,7 +1454,18 @@ let reply (m : Model.t) (tag : Reply_tag.t) result =
     in
     m, cmds @ startup
   (* Subagents from before the backend restarted are gone: the report stays. *)
-  | (Ignore | Paths _ | Auth_status Refresh | Subagent _), Error _ -> m, []
+  | ( ( Ignore
+      | Paths _
+      | Auth_status Refresh
+      | Subagent _
+      | Config
+      | Prompt_paths _
+      | Users Probe )
+    , Error _ ) -> m, []
+  | Btw id, Error e -> update_btw m id ~f:(fun b -> Btw.fail b e), []
+  | (Prompt_done _ | Exported | Imported), Error e -> prompt_failed m e
+  | Job_output _, Error e ->
+    error m (e ^ ". /jobs lists the jobs.")
   | Deleted title, Error e ->
     error
       m
@@ -769,6 +1563,90 @@ let reply (m : Model.t) (tag : Reply_tag.t) result =
   | Deleted title, Ok _ ->
     let m, cmds = toast m (sprintf "Deleted %S" title) in
     m, cmds @ [ rpc "list_sessions" [] ~tag:Sessions ]
+  | Config, Ok json ->
+    decode m json Config.of_json ~f:(fun config ->
+      { m with config = Some config }, [])
+  | Config_saved notice, Ok json ->
+    decode m json Config.of_json ~f:(fun config ->
+      toast { m with config = Some config } notice)
+  | Default_saved, Ok json ->
+    decode m json Config.of_json ~f:(fun config ->
+      let show = Option.value ~default:"?" in
+      toast
+        { m with config = Some config }
+        (sprintf
+           "New sessions start with %s, thinking %s"
+           (show config.default_model)
+           (show config.default_thinking)))
+  | Session_stats, Ok json ->
+    decode m json Session_stats.of_json ~f:(fun stats ->
+      open_dialog m (Session stats))
+  | Entries purpose, Ok json -> entries_picker m purpose json
+  | Reload_messages, Ok _ ->
+    ( m
+    , [ rpc "get_state" [] ~tag:State; rpc "get_messages" [] ~tag:Messages ] )
+  | Exported, Ok json ->
+    (match Json.string_field json "path" with
+     | Ok path ->
+       let m, close = prompt_succeeded m in
+       let m, cmds = toast m ("Exported to " ^ path) in
+       m, close @ cmds
+     | Error _ -> prompt_succeeded m)
+  | Imported, Ok json ->
+    let m, close = prompt_succeeded m in
+    let m, cmds =
+      match Json.string_field json "path" with
+      | Ok path -> toast m ("Imported as " ^ path)
+      | Error _ -> m, []
+    in
+    m, close @ cmds @ [ rpc "get_state" [] ~tag:State ]
+  | Prompt_done notice, Ok _ ->
+    let m, close = prompt_succeeded m in
+    let m, cmds = toast m notice in
+    m, close @ cmds
+  | Prompt_paths prefix, Ok json ->
+    (match m.dialog, strings json with
+     | Some (Prompt prompt), Ok paths ->
+       ( { m with
+           dialog = Some (Prompt (Prompt.set_suggestions prompt ~prefix paths))
+         }
+       , [] )
+     | _ -> m, [])
+  | Jobs, Ok json ->
+    decode m json (decode_list Job_info.of_json) ~f:(jobs_dialog m)
+  | Job_output id, Ok json ->
+    (match Json.string_field json "text", m.dialog with
+     | Ok text, Some (Jobs d) ->
+       { m with dialog = Some (Jobs { d with output = Some (id, text) }) }, []
+     | Ok text, _ ->
+       open_dialog
+         m
+         (Text
+            { title = sprintf "Job %s" id
+            ; text = (if String.is_empty text then "(no output yet)" else text)
+            })
+     | Error e, _ -> error m (Error.to_string_hum e))
+  | Job_killed id, Ok _ ->
+    let m, cmds = toast m (sprintf "Killing job %s" id) in
+    ( m
+    , cmds
+      @
+      match m.dialog with
+      | Some (Jobs _) -> [ rpc "list_jobs" [] ~tag:Jobs ]
+      | _ -> [] )
+  | Btw id, Ok json ->
+    let answer =
+      Json.string_field json "text" |> Result.ok |> Option.value ~default:""
+    in
+    update_btw m id ~f:(Btw.finish ~answer), []
+  | Users Probe, Ok json ->
+    (match strings json with
+     | Ok users -> { m with users = Some users }, []
+     | Error _ -> m, [])
+  | Users Picker, Ok json ->
+    decode m json strings ~f:(fun users -> users_picker m users)
+  | User_switched, Ok json ->
+    decode m json Hello_reply.of_json ~f:(user_switched m)
 ;;
 
 let auth_event (m : Model.t) (e : Auth_event.t) =
@@ -851,6 +1729,8 @@ let event (m : Model.t) (event : Event.t) =
       else [] )
   | Agent_end _ -> m, [ rpc "list_sessions" [] ~tag:Sessions ]
   | Auth e -> auth_event m e
+  | Btw_delta { btw_id; delta } ->
+    update_btw m btw_id ~f:(fun b -> Btw.append b delta), []
   | _ -> m, []
 ;;
 
@@ -946,10 +1826,13 @@ let accept_completion (m : Model.t) ~run =
       &&
       match Completion.source c, Completion.selected_item c with
       | Command, Some item ->
+        (* Optional free text (e.g. /compact's instructions) can be left out;
+           an argument with completions is offered next. *)
         (match Slash.find item.id with
-         | Some spec -> String.is_empty spec.args
-         | None -> false)
-      | Argument Directory, _ -> false
+         | Some { args; argument = None; _ } ->
+           String.is_empty args || String.is_prefix args ~prefix:"["
+         | Some { argument = Some _; _ } | None -> false)
+      | Argument (Directory | Path), _ -> false
       | Argument _, _ -> true
       | (Command | Path), _ -> false
     in
@@ -970,6 +1853,44 @@ let picker_accept (m : Model.t) ~kind (item : Picker.Item.t) =
          start_login m ~provider ~method_:(Some method_)
        | None -> start_login m ~provider:item.id ~method_:None)
     | Logout -> logout m item.id
+    | Verbosity ->
+      (match
+         List.find Prigh_ui.Verbosity.all ~f:(fun v ->
+           String.equal (Prigh_ui.Verbosity.name v) item.id)
+       with
+       | Some v -> set_verbosity m v
+       | None -> m, [])
+    | Confirm_tools -> set_confirm m (String.equal item.id "on")
+    | Fork entries ->
+      let m =
+        match Session_tree.user_text entries item.id with
+        | Some text -> set_draft m text
+        | None -> m
+      in
+      let m, cmds =
+        toast m "Forked into a new session: edit the message and send it"
+      in
+      m, cmds @ [ rpc "fork" [ "at", str item.id ] ~tag:Reload_state ]
+    | Rewind entries ->
+      open_dialog
+        m
+        (Rewind_confirm
+           { id = item.id
+           ; text =
+               Option.value
+                 (Session_tree.user_text entries item.id)
+                 ~default:item.label
+           })
+    | Tree -> m, [ rpc "rewind" [ "to", str item.id ] ~tag:Reload_messages ]
+    | Hosts ->
+      (match
+         Option.bind m.state ~f:(fun s ->
+           List.find s.hosts ~f:(fun h -> String.equal h.id item.id))
+       with
+       | Some host -> host_prompt m host
+       | None -> error m (sprintf "Tool host %s has gone: /host lists them." item.id))
+    | Users -> act_as m item.id
+    | Accounts -> account_chosen m item.id
   in
   m, (if Option.is_none m.dialog then [ focus_editor ] else []) @ cmds
 ;;
@@ -978,6 +1899,18 @@ let with_picker (m : Model.t) ~f =
   match m.dialog with
   | Some (Picker { kind; picker }) ->
     { m with dialog = Some (Picker { kind; picker = f picker }) }, []
+  | Some (Scoped_models { picker; checked }) ->
+    { m with dialog = Some (Scoped_models { picker = f picker; checked }) }, []
+  | _ -> m, []
+;;
+
+let toggle_scoped (m : Model.t) key =
+  match m.dialog with
+  | Some (Scoped_models { picker; checked }) ->
+    let checked =
+      if Set.mem checked key then Set.remove checked key else Set.add checked key
+    in
+    { m with dialog = Some (Scoped_models { picker; checked }) }, []
   | _ -> m, []
 ;;
 
@@ -1022,12 +1955,32 @@ let dialog_accept (m : Model.t) =
      | None, Some _ -> respond_login m flow
      | Some _, _ -> close_dialog m
      | None, None -> m, [])
-  | Some (Help | Auth _ | Agents) -> close_dialog m
+  | Some (Help | Hotkeys | Auth _ | Agents | Session _ | Text _) ->
+    close_dialog m
+  | Some (Scoped_models { checked; _ }) ->
+    let m, cmds = save_scoped m checked in
+    m, focus_editor :: cmds
+  | Some (Prompt prompt) -> submit_prompt m prompt
+  | Some (Rewind_confirm { id; _ }) ->
+    let m, cmds = close_dialog m in
+    let m, toast_cmds = toast m "Rewound: later messages stay in /tree" in
+    m, cmds @ toast_cmds @ [ rpc "rewind" [ "to", str id ] ~tag:Reload_messages ]
+  | Some (Jobs { jobs; selected; _ }) ->
+    (match List.nth jobs selected with
+     | Some job -> job_output m job.id
+     | None -> m, [])
 ;;
 
 let update (m : Model.t) (action : Action.t) =
   match action with
-  | Start -> m, (if m.narrow then [] else [ focus_editor ]) @ startup
+  | Start ->
+    let probe =
+      (* Only superusers may list the users: the account menu offers them. *)
+      match own_user m with
+      | Some _ -> [ rpc "list_users" [] ~tag:(Users Probe) ]
+      | None -> []
+    in
+    m, (if m.narrow then [] else [ focus_editor ]) @ startup @ probe
   | Hello hello -> { m with hello = Some hello }, []
   | Saved_login -> { m with saved_login = true }, []
   | Event e -> event m e
@@ -1126,13 +2079,30 @@ let update (m : Model.t) (action : Action.t) =
      | Some (Rename _) -> { m with dialog = Some (Rename text) }, []
      | Some (Login flow) ->
        { m with dialog = Some (Login { flow with input = text }) }, []
-     | Some (Picker _) -> with_picker m ~f:(fun p -> Picker.set_query p text)
+     | Some (Picker _ | Scoped_models _) ->
+       with_picker m ~f:(fun p -> Picker.set_query p text)
+     | Some (Prompt prompt) -> prompt_input m (Prompt.set_input prompt text)
      | _ -> m, [])
   | Dialog_move delta ->
     (match m.dialog with
      | Some (Login flow) ->
        { m with dialog = Some (Login (Login_flow.move flow delta)) }, []
-     | Some (Picker _) -> with_picker m ~f:(fun p -> Picker.move p delta)
+     | Some (Picker _ | Scoped_models _) ->
+       with_picker m ~f:(fun p -> Picker.move p delta)
+     | Some (Prompt prompt) ->
+       { m with dialog = Some (Prompt (Prompt.move prompt delta)) }, []
+     | Some (Jobs d) ->
+       let last = List.length d.jobs - 1 in
+       ( { m with
+           dialog =
+             Some
+               (Jobs
+                  { d with
+                    selected = Int.max 0 (Int.min last (d.selected + delta))
+                  ; output = None
+                  })
+         }
+       , [] )
      | _ -> m, [])
   | Dialog_accept -> dialog_accept m
   | Close_dialog ->
@@ -1151,7 +2121,7 @@ let update (m : Model.t) (action : Action.t) =
   | Start_login provider -> start_login m ~provider ~method_:None
   | Logout provider -> logout m provider
   | Cancel_subagent id -> m, [ rpc "cancel_subagent" [ "agent_id", str id ] ]
-  | Kill_job id -> m, [ rpc "kill_job" [ "job_id", str id ] ]
+  | Kill_job id -> kill_job m id
   | Dequeue -> m, [ rpc "dequeue" [] ~tag:Dequeued ]
   | Toggle_sidebar -> { m with sidebar_open = not m.sidebar_open }, []
   | Respond_confirm { call_id; allow } ->
@@ -1172,4 +2142,45 @@ let update (m : Model.t) (action : Action.t) =
   | Dismiss_toast id ->
     { m with toasts = List.filter m.toasts ~f:(fun t -> t.id <> id) }, []
   | Sign_out -> m, [ Command.Sign_out ]
+  | Set_accounts { accounts; current } ->
+    { m with accounts; account = current }, []
+  | Open_accounts -> open_picker m (account_menu m)
+  | Switch_account account -> m, [ Command.Switch_account account ]
+  | Add_account -> m, [ Command.Add_account ]
+  | Act_as user -> act_as { m with dialog = None } user
+  | Cycle_verbosity -> set_verbosity m (Prigh_ui.Verbosity.next m.verbosity)
+  | Cycle_model step -> cycle_model m step
+  | Cycle_thinking -> cycle_thinking m
+  | Copy_last -> copy_last m
+  | Close_btw -> close_btw m
+  | Dialog_toggle ->
+    (match m.dialog with
+     | Some (Scoped_models { picker; _ }) ->
+       (match Picker.selected_item picker with
+        | Some item -> toggle_scoped m item.id
+        | None -> m, [])
+     | _ -> m, [])
+  | Toggle_scoped key -> toggle_scoped m key
+  | Dialog_complete ->
+    with_prompt m ~f:(fun prompt -> prompt_input m (Prompt.complete prompt))
+  | Choose_suggestion i ->
+    with_prompt m ~f:(fun prompt ->
+      let prompt = { prompt with selected = Some i } in
+      prompt_input m (Prompt.complete prompt))
+  | Dialog_delete ->
+    (match m.dialog with
+     | Some (Jobs { jobs; selected; _ }) ->
+       (match List.nth jobs selected with
+        | Some job when job.running -> kill_job m job.id
+        | Some job -> toast m (sprintf "Job %s has already finished." job.id)
+        | None -> m, [])
+     | _ -> m, [])
+  | Show_job_output id -> job_output m id
+  | Retry_connection -> retry_connection m
+  | Scroll_chat pages -> m, [ Command.Scroll_chat pages ]
+  | Jump_to_user_message dir -> m, [ Command.Jump_to_user_message dir ]
+  | Run command ->
+    (match Slash.parse command with
+     | Some parsed -> run_command { m with dialog = None } parsed
+     | None -> m, [])
 ;;
