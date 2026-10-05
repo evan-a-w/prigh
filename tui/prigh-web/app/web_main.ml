@@ -98,8 +98,9 @@ let navigate ~backend ~session =
 (* Reloading drops the socket; the next page load sees the note and shows the
    sign-in form, with the other saved accounts. *)
 let sign_out (settings : Settings.t) =
-  Option.iter (Accounts.current storage ~backend:settings.backend) ~f:(fun account ->
-    Accounts.remove storage account);
+  Option.iter
+    (Accounts.current storage ~backend:settings.backend)
+    ~f:(fun account -> Accounts.remove storage account);
   Login.forget Login.Storage.browser;
   Browser.reload_without_query_param "session"
 ;;
@@ -143,8 +144,12 @@ let jump_to_user_message direction =
     in
     let target =
       if direction < 0
-      then List.filter offsets ~f:(fun o -> Float.(o < -8.)) |> List.max_elt ~compare:Float.compare
-      else List.filter offsets ~f:(fun o -> Float.(o > 8.)) |> List.min_elt ~compare:Float.compare
+      then
+        List.filter offsets ~f:(fun o -> Float.(o < -8.))
+        |> List.max_elt ~compare:Float.compare
+      else
+        List.filter offsets ~f:(fun o -> Float.(o > 8.))
+        |> List.min_elt ~compare:Float.compare
     in
     Option.iter target ~f:(fun offset ->
       chat##.scrollTop := Js.float (Js.to_float chat##.scrollTop +. offset -. 8.)))
@@ -182,7 +187,10 @@ let perform client settings ctx (model : App.Model.t) (command : App.Command.t) 
         (fun () ->
            Browser.replace_query_param "session" session;
            (* Acting as another user, the session is not this account's. *)
-           match model.account, Option.bind model.hello ~f:Prigh_protocol.Hello_reply.acting_as with
+           match
+             ( model.account
+             , Option.bind model.hello ~f:Prigh_protocol.Hello_reply.acting_as )
+           with
            | Some account, None -> Accounts.set_session storage account session
            | _ -> ())
         ()
@@ -447,11 +455,18 @@ let on_click id f =
 ;;
 
 (* [adding]: another account, keeping the one we are signed in as. *)
-let rec sign_in_form ?(notice = false) ?(adding = false) (settings : Settings.t) ~error =
+let rec sign_in_form
+          ?(notice = false)
+          ?(adding = false)
+          (settings : Settings.t)
+          ~error
+  =
   let value = Option.value_map ~default:"" ~f:escape in
   let accounts = Accounts.load storage in
   let current = Accounts.current storage ~backend:settings.backend in
-  let is_current account = Option.exists current ~f:(Accounts.Account.same account) in
+  let is_current account =
+    Option.exists current ~f:(Accounts.Account.same account)
+  in
   let saved =
     match accounts with
     | [] -> ""
@@ -465,10 +480,15 @@ let rec sign_in_form ?(notice = false) ?(adding = false) (settings : Settings.t)
                 {|<div class="saved-account%s"><button class="saved-switch" type="button" id="account-%d"><span class="avatar">%s</span><span class="saved-who"><span class="saved-name">%s</span><span class="saved-host">%s</span></span>%s</button><button class="btn icon ghost saved-forget" type="button" id="forget-%d" title="Forget %s" aria-label="Forget %s">×</button></div>|}
                 (if is_current account then " current" else "")
                 i
-                (escape (String.prefix (String.uppercase (Accounts.Account.name account)) 1))
+                (escape
+                   (String.prefix
+                      (String.uppercase (Accounts.Account.name account))
+                      1))
                 (escape (Accounts.Account.name account))
                 (escape (Accounts.Account.host account))
-                (if is_current account && not adding then {|<span class="saved-badge">last used</span>|} else "")
+                (if is_current account && not adding
+                 then {|<span class="saved-badge">last used</span>|}
+                 else "")
                 i
                 (escape (Accounts.Account.name account))
                 (escape (Accounts.Account.name account)))))

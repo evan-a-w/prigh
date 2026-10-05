@@ -382,7 +382,7 @@ let%expect_test
   [%expect
     {|
     (Reconnect (generation 1) (delay_ms 0) (session (s1)))
-    Connection lost: reconnecting…
+    Connection lost: reconnecting… (Retry now)
     |}];
   H.act h (Reply (Reconnect 1, Error "refused"));
   H.act h (Reply (Reconnect 1, Error "refused"));
@@ -391,7 +391,7 @@ let%expect_test
     {|
     (Reconnect (generation 1) (delay_ms 250) (session (s1)))
     (Reconnect (generation 1) (delay_ms 500) (session (s1)))
-    Connection lost: reconnecting (attempt 3, next in 0.5s)…
+    Connection lost: reconnecting (attempt 3, next in 0.5s)… (Retry now)
     |}];
   (* A second close while reconnecting changes nothing. *)
   H.act h Backend_closed;
@@ -449,8 +449,7 @@ let%expect_test "signing out" =
     h
     (Hello { client_id = "c1"; namespace = Some "bob"; user = Some "ann" });
   H.text h ~selector:".sidebar-footer";
-  [%expect
-    {| (A ann acting as bob) (Commands and keys (/help)) |}];
+  [%expect {| (A ann acting as bob) (Commands and keys (/help)) |}];
   H.act h Sign_out;
   H.type_ h "/signout";
   H.act h Send;

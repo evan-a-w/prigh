@@ -8,9 +8,13 @@ let initial name = String.prefix (String.uppercase name) 1
 let who (m : App.Model.t) =
   match m.hello, m.account with
   | Some ({ user = Some user; _ } as hello), account ->
-    Some (user, Hello_reply.acting_as hello, Option.map account ~f:Accounts.Account.host)
+    Some
+      ( user
+      , Hello_reply.acting_as hello
+      , Option.map account ~f:Accounts.Account.host )
   | _, Some account ->
-    Some (Accounts.Account.name account, None, Some (Accounts.Account.host account))
+    Some
+      (Accounts.Account.name account, None, Some (Accounts.Account.host account))
   | _, None -> None
 ;;
 
@@ -73,8 +77,9 @@ let menu (m : App.Model.t) (picker : Picker.t) ~inject =
       ]
   in
   let switches, actions =
-    List.partition_tf (List.mapi items ~f:(fun i item -> i, item)) ~f:(fun (_, item) ->
-      String.is_prefix item.id ~prefix:"switch ")
+    List.partition_tf
+      (List.mapi items ~f:(fun i item -> i, item))
+      ~f:(fun (_, item) -> String.is_prefix item.id ~prefix:"switch ")
   in
   Node.div
     ~attrs:
@@ -102,8 +107,7 @@ let menu (m : App.Model.t) (picker : Picker.t) ~inject =
                    ~cls:"account-who"
                    [ span ~cls:"account-name" name
                    ; (match acting with
-                      | Some ns ->
-                        span ~cls:"account-acting" ("acting as " ^ ns)
+                      | Some ns -> span ~cls:"account-acting" ("acting as " ^ ns)
                       | None -> Node.none)
                    ; (match host with
                       | Some host -> span ~cls:"account-host" host
@@ -121,7 +125,9 @@ let menu (m : App.Model.t) (picker : Picker.t) ~inject =
         ; div
             ~cls:"menu-section"
             (List.map actions ~f:(fun (i, item) -> row i item))
-        ; div ~cls:"menu-keys" [ Node.text "↑↓ move · Enter choose · Esc close" ]
+        ; div
+            ~cls:"menu-keys"
+            [ Node.text "↑↓ move · Enter choose · Esc close" ]
         ]
     ]
 ;;

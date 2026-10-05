@@ -17,9 +17,7 @@ let messages =
      {"role":"assistant","content":[{"type":"text","text":"Fixed: the **flag** was wrong."}],"stop_reason":{"type":"end_turn"},"usage":{"input":10,"output":5,"cache_read":0},"model":"m"}]|}
 ;;
 
-let with_messages h =
-  H.act h (Reply (Messages, Ok (Jsonaf.of_string messages)))
-;;
+let with_messages h = H.act h (Reply (Messages, Ok (Jsonaf.of_string messages)))
 
 let%expect_test "every command does something (none is unknown)" =
   List.iter Slash.all ~f:(fun spec ->
@@ -42,10 +40,12 @@ let%expect_test "every command does something (none is unknown)" =
           | Save_history _ | Focus _ -> None
           | c -> Some (Sexp.to_string (App.Command.sexp_of_t c)))
         |> String.concat ~sep:", "
-        |> fun s -> if String.is_empty s && m'.sidebar_open then "sidebar" else s
+        |> fun s ->
+        if String.is_empty s && m'.sidebar_open then "sidebar" else s
     in
     printf "/%-25s %s\n" spec.name what);
-  [%expect {|
+  [%expect
+    {|
     /help                      Help
     /hotkeys                   Hotkeys
     /new                       rpc new_session
@@ -91,7 +91,8 @@ let%expect_test "/help <command> and /hotkeys" =
   run h "/help /tree";
   run h "/help compcat";
   toasts h;
-  [%expect {|
+  [%expect
+    {|
     (Save_history ("/help compact"))
     (Expire_toast (id 0) (after_ms 4000))
     (Save_history ("/help /tree" "/help compact"))
@@ -103,7 +104,8 @@ let%expect_test "/help <command> and /hotkeys" =
     |}];
   run h "/hotkeys";
   H.text h ~selector:".modal";
-  [%expect {|
+  [%expect
+    {|
     (Save_history (/hotkeys "/help compcat" "/help /tree" "/help compact"))
     (Focus dialog)
     Keyboard shortcuts
@@ -136,7 +138,8 @@ let%expect_test "/help <command> and /hotkeys" =
     /help also lists the commands (Done)
     |}];
   H.key h "Escape" ~target:Page;
-  [%expect {|
+  [%expect
+    {|
     Close_dialog
     (Focus editor)
     |}]
@@ -148,7 +151,8 @@ let%expect_test "/scoped-models, Ctrl+P and Alt+P" =
   H.key h "p" ~ctrl:true;
   H.key h "p" ~ctrl:true;
   toasts h;
-  [%expect {|
+  [%expect
+    {|
     (Cycle_model 1)
     (Expire_toast (id 0) (after_ms 4000))
     (Rpc (method_ set_model) (params ((model anthropic/claude-sonnet-5)))
@@ -162,7 +166,8 @@ let%expect_test "/scoped-models, Ctrl+P and Alt+P" =
     |}];
   run h "/scoped-models";
   H.text h ~selector:".modal";
-  [%expect {|
+  [%expect
+    {|
     (Save_history (/scoped-models))
     (Focus picker-input)
     Scoped models
@@ -180,7 +185,8 @@ let%expect_test "/scoped-models, Ctrl+P and Alt+P" =
   H.act h (Picker_query "deep");
   H.key h "Tab" ~target:Field;
   H.text h ~selector:".modal-buttons";
-  [%expect {|
+  [%expect
+    {|
     Dialog_toggle
     Dialog_toggle
     3 checked · Tab toggles · Enter saves (Cancel) (Save)
@@ -191,7 +197,8 @@ let%expect_test "/scoped-models, Ctrl+P and Alt+P" =
     "set_config"
     {|{"scoped_models":["anthropic/claude-opus-5-5","anthropic/claude-sonnet-5","deepseek/deepseek-chat"],"confirm_tools":false}|};
   toasts h;
-  [%expect {|
+  [%expect
+    {|
     Dialog_accept
     (Focus editor)
     (Rpc (method_ set_config)
@@ -210,7 +217,8 @@ let%expect_test "/scoped-models, Ctrl+P and Alt+P" =
   (* Alt+P goes back; on a Mac Option+P types π, so the key's code counts. *)
   H.key h "π" ~alt:true ~code:"KeyP";
   H.key h "p" ~ctrl:true;
-  [%expect {|
+  [%expect
+    {|
     (Cycle_model -1)
     (Expire_toast (id 3) (after_ms 4000))
     (Rpc (method_ set_model) (params ((model deepseek/deepseek-chat)))
@@ -223,14 +231,16 @@ let%expect_test "/scoped-models, Ctrl+P and Alt+P" =
   (* A dialog owns the keyboard: Ctrl+P does not cycle under it. *)
   run h "/scoped-models";
   H.key h "p" ~ctrl:true ~target:Field;
-  [%expect {|
+  [%expect
+    {|
     (Save_history (/scoped-models))
     (Focus picker-input)
     (browser default)
     |}];
   H.key h "Escape" ~target:Field;
   print_s [%sexp ((H.model h).config : Prigh_protocol.Config.t option)];
-  [%expect {|
+  [%expect
+    {|
     Close_dialog
     (Focus editor)
     (((scoped_models
@@ -244,7 +254,8 @@ let%expect_test "/thinking and Alt+T" =
   let h = H.create () in
   H.key h "t" ~alt:true;
   H.key h "†" ~alt:true ~code:"KeyT";
-  [%expect {|
+  [%expect
+    {|
     Cycle_thinking
     (Expire_toast (id 0) (after_ms 4000))
     (Rpc (method_ set_thinking) (params ((thinking high))) (tag Show_error))
@@ -270,7 +281,8 @@ let%expect_test "/thinking and Alt+T" =
           ()));
   H.key h "t" ~alt:true;
   toasts h;
-  [%expect {|
+  [%expect
+    {|
     (Rpc (method_ set_model) (params ((model deepseek/deepseek-chat)))
      (tag Show_error))
     Cycle_thinking
@@ -288,7 +300,8 @@ let%expect_test "/change_default" =
     "change_default"
     {|{"scoped_models":[],"confirm_tools":false,"default_model":"anthropic/claude-opus-5-5","default_thinking":"on"}|};
   toasts h;
-  [%expect {|
+  [%expect
+    {|
     (Save_history (/change_default))
     (Rpc (method_ change_default) (params ()) (tag Default_saved))
     (Expire_toast (id 0) (after_ms 4000))
@@ -301,7 +314,8 @@ let%expect_test "/verbosity and Ctrl+O" =
   with_messages h;
   run h "/verbosity";
   H.text h ~selector:".picker-items";
-  [%expect {|
+  [%expect
+    {|
     (Save_history (/verbosity))
     (Focus picker-input)
     Quiet tool calls without their output; no thinking
@@ -312,7 +326,8 @@ let%expect_test "/verbosity and Ctrl+O" =
   H.key h "Enter" ~target:Field;
   H.show h ~selector:"#chat";
   H.text h ~selector:".status";
-  [%expect {|
+  [%expect
+    {|
     (Dialog_move -1)
     Dialog_accept
     (Focus editor)
@@ -340,7 +355,8 @@ let%expect_test "/verbosity and Ctrl+O" =
   H.key h "o" ~ctrl:true;
   run h "/verbosity loud";
   toasts h;
-  [%expect {|
+  [%expect
+    {|
     Cycle_verbosity
     (Expire_toast (id 1) (after_ms 4000))
     Cycle_verbosity
@@ -359,7 +375,8 @@ let%expect_test "/confirm" =
   let h = H.create () in
   run h "/confirm";
   H.text h ~selector:".picker-items";
-  [%expect {|
+  [%expect
+    {|
     (Save_history (/confirm))
     (Focus picker-input)
     On ask before bash, write and edit run
@@ -374,7 +391,8 @@ let%expect_test "/confirm" =
   run h "/confirm off";
   run h "/confirm maybe";
   toasts h;
-  [%expect {|
+  [%expect
+    {|
     (Focus editor)
     (Rpc (method_ set_config)
      (params
@@ -400,7 +418,8 @@ let%expect_test "/confirm" =
 let%expect_test "/compact with instructions" =
   let h = H.create () in
   run h "/compact keep the file names";
-  [%expect {|
+  [%expect
+    {|
     (Save_history ("/compact keep the file names"))
     (Expire_toast (id 0) (after_ms 4000))
     (Rpc (method_ compact) (params ((instructions "keep the file names")))
@@ -408,7 +427,8 @@ let%expect_test "/compact with instructions" =
     |}];
   H.type_ h "/comp";
   H.key h "Enter";
-  [%expect {|
+  [%expect
+    {|
     (Complete_accept (run true))
     (Save_history (/compact "/compact keep the file names"))
     (Expire_toast (id 1) (after_ms 4000))
@@ -425,7 +445,8 @@ let%expect_test "/session" =
     "session_stats"
     {|{"message_count":12,"turns":4,"tool_calls":{"bash":3,"read":5},"usage":{"input":45000,"output":3200,"cache_read":30000},"cost_usd":0.4321,"context_percent":22.5,"model_changes":1,"compactions":0,"duration_seconds":754.2}|};
   H.text h ~selector:".modal";
-  [%expect {|
+  [%expect
+    {|
     (Save_history (/session))
     (Rpc (method_ session_stats) (params ()) (tag Session_stats))
     (Focus dialog)
@@ -450,27 +471,29 @@ let%expect_test "/session" =
 let%expect_test "/switch" =
   let h =
     H.create
-      ~sessions:
-        (sprintf "[%s]" (H.session_json ~name:"Release notes" "s2"))
+      ~sessions:(sprintf "[%s]" (H.session_json ~name:"Release notes" "s2"))
       ()
   in
   H.type_ h "/switch rel";
   H.text h ~selector:".popup";
-  [%expect {|
+  [%expect
+    {|
     Sessions ↑↓ Tab Enter Esc
     Release notes /work
     |}];
   H.key h "Enter";
-  [%expect {|
+  [%expect
+    {|
     (Complete_accept (run true))
     (Save_history ("/switch /sessions/s2.jsonl"))
     (Rpc (method_ switch_session) (params ((path /sessions/s2.jsonl)))
      (tag Reload_state))
     |}];
-  H.act h (Toggle_sidebar);
+  H.act h Toggle_sidebar;
   run h "/switch";
   print_s [%sexp ((H.model h).sidebar_open : bool)];
-  [%expect {|
+  [%expect
+    {|
     (Save_history (/switch "/switch /sessions/s2.jsonl"))
     (Focus session-search)
     true
@@ -485,7 +508,9 @@ let entry ?parent id kind =
     kind
 ;;
 
-let user text = sprintf {|"kind":"message","message":{"role":"user","text":"%s"}|} text
+let user text =
+  sprintf {|"kind":"message","message":{"role":"user","text":"%s"}|} text
+;;
 
 let assistant text =
   sprintf
@@ -512,7 +537,8 @@ let%expect_test "/fork: pick a message, edit it in a new session" =
   run h "/fork";
   H.reply h "get_entries" linear;
   H.text h ~selector:".modal";
-  [%expect {|
+  [%expect
+    {|
     (Save_history (/fork))
     (Rpc (method_ get_entries) (params ()) (tag (Entries Fork)))
     (Focus picker-input)
@@ -526,7 +552,8 @@ let%expect_test "/fork: pick a message, edit it in a new session" =
   H.key h "ArrowUp" ~target:Field;
   H.key h "Enter" ~target:Field;
   print_s [%sexp ((H.model h).draft : string)];
-  [%expect {|
+  [%expect
+    {|
     (Dialog_move -1)
     Dialog_accept
     (Focus editor)
@@ -538,7 +565,8 @@ let%expect_test "/fork: pick a message, edit it in a new session" =
   run h "/fork";
   H.reply h "get_entries" {|{"head":null,"entries":[]}|};
   toasts h;
-  [%expect {|
+  [%expect
+    {|
     (Save_history (/fork))
     (Rpc (method_ get_entries) (params ()) (tag (Entries Fork)))
     (Expire_toast (id 1) (after_ms 4000))
@@ -554,7 +582,8 @@ let%expect_test "/rewind: pick, confirm, reload the messages" =
   H.key h "ArrowUp" ~target:Field;
   H.key h "Enter" ~target:Field;
   H.text h ~selector:".modal";
-  [%expect {|
+  [%expect
+    {|
     (Save_history (/rewind))
     (Rpc (method_ get_entries) (params ()) (tag (Entries Rewind)))
     (Focus picker-input)
@@ -570,7 +599,8 @@ let%expect_test "/rewind: pick, confirm, reload the messages" =
     |}];
   H.key h "Enter" ~target:Page;
   H.reply h "rewind" "{}";
-  [%expect {|
+  [%expect
+    {|
     Dialog_accept
     (Focus editor)
     (Expire_toast (id 0) (after_ms 4000))
@@ -583,7 +613,8 @@ let%expect_test "/rewind: pick, confirm, reload the messages" =
   H.reply h "get_entries" linear;
   H.key h "Enter" ~target:Field;
   H.key h "Escape" ~target:Page;
-  [%expect {|
+  [%expect
+    {|
     (Save_history (/rewind))
     (Rpc (method_ get_entries) (params ()) (tag (Entries Rewind)))
     (Focus picker-input)
@@ -606,12 +637,16 @@ let%expect_test "/tree shows branches and moves the head" =
        ; entry ~parent:"e1" "e2" (assistant "first answer")
        ; entry ~parent:"e2" "e3" (user "abandoned idea")
        ; entry ~parent:"e3" "e4" (assistant "abandoned answer")
-       ; entry ~parent:"e2" "m1" {|"kind":"model","model":"openai/gpt-6","thinking":"on"|}
+       ; entry
+           ~parent:"e2"
+           "m1"
+           {|"kind":"model","model":"openai/gpt-6","thinking":"on"|}
        ; entry ~parent:"m1" "e5" (user "better idea")
        ; entry ~parent:"e5" "e6" (assistant "better answer")
        ]);
   H.show h ~selector:".picker-items";
-  [%expect {|
+  [%expect
+    {|
     (Save_history (/tree))
     (Rpc (method_ get_entries) (params ((all true))) (tag (Entries Tree)))
     (Focus picker-input)
@@ -649,7 +684,8 @@ let%expect_test "/tree shows branches and moves the head" =
     </div>
     |}];
   H.act h (Picker_choose "e4");
-  [%expect {|
+  [%expect
+    {|
     (Focus editor)
     (Rpc (method_ rewind) (params ((to e4))) (tag Reload_messages))
     |}]
@@ -660,7 +696,8 @@ let%expect_test "/cd: a prompt with directory completion, failures stay in it" =
   run h "/cd";
   H.reply h "list_dirs" {|["/work/src/","/work/test/"]|};
   H.text h ~selector:".modal";
-  [%expect {|
+  [%expect
+    {|
     (Save_history (/cd))
     (Focus dialog-input)
     (Rpc (method_ list_dirs) (params ((prefix /work) (host backend)))
@@ -676,7 +713,8 @@ let%expect_test "/cd: a prompt with directory completion, failures stay in it" =
   H.reply h "list_dirs" {|["/work/src/"]|};
   H.key h "Tab" ~target:Field;
   print_s [%sexp ((H.model h).dialog : Dialog.t option)];
-  [%expect {|
+  [%expect
+    {|
     (Rpc (method_ list_dirs) (params ((prefix /work/s) (host backend)))
      (tag (Prompt_paths /work/s)))
     Dialog_complete
@@ -691,7 +729,8 @@ let%expect_test "/cd: a prompt with directory completion, failures stay in it" =
   H.key h "Enter" ~target:Field;
   H.fail h "set_cwd" "no such directory: /nowhere";
   H.text h ~selector:".modal";
-  [%expect {|
+  [%expect
+    {|
     (Rpc (method_ list_dirs) (params ((prefix /nowhere) (host backend)))
      (tag (Prompt_paths /nowhere)))
     Dialog_accept
@@ -708,7 +747,8 @@ let%expect_test "/cd: a prompt with directory completion, failures stay in it" =
   H.reply h "set_cwd" "{}";
   H.text h ~selector:".modal";
   toasts h;
-  [%expect {|
+  [%expect
+    {|
     (Rpc (method_ list_dirs) (params ((prefix /work/src) (host backend)))
      (tag (Prompt_paths /work/src)))
     Dialog_accept
@@ -723,7 +763,8 @@ let%expect_test "/cd: a prompt with directory completion, failures stay in it" =
   H.act h (Dialog_input "");
   H.key h "Enter" ~target:Field;
   H.text h ~selector:".dialog-error";
-  [%expect {|
+  [%expect
+    {|
     (Save_history (/cd))
     (Focus dialog-input)
     (Rpc (method_ list_dirs) (params ((prefix /work) (host backend)))
@@ -753,7 +794,8 @@ let%expect_test "/host: pick a host, then the directory there" =
   H.act h (Hello { client_id = "c7"; namespace = None; user = None });
   run h "/host";
   H.text h ~selector:".picker-items";
-  [%expect {|
+  [%expect
+    {|
     (Save_history (/host))
     (Focus picker-input)
     backend /work ✓
@@ -763,7 +805,8 @@ let%expect_test "/host: pick a host, then the directory there" =
   H.key h "ArrowDown" ~target:Field;
   H.key h "Enter" ~target:Field;
   H.text h ~selector:".modal";
-  [%expect {|
+  [%expect
+    {|
     (Dialog_move 1)
     Dialog_accept
     (Focus dialog-input)
@@ -781,7 +824,8 @@ let%expect_test "/host: pick a host, then the directory there" =
   H.key h "Enter" ~target:Field;
   H.reply h "set_active_host" "{}";
   toasts h;
-  [%expect {|
+  [%expect
+    {|
     Dialog_accept
     (Rpc (method_ set_active_host) (params ((host c7) (cwd /work)))
      (tag (Prompt_done "Tools run on laptop (this browser), in /work")))
@@ -799,7 +843,8 @@ let%expect_test "/host: pick a host, then the directory there" =
   print_s [%sexp ((H.model h).dialog : Dialog.t option)];
   run h "/host mainframe";
   toasts h;
-  [%expect {|
+  [%expect
+    {|
     (Save_history ("/host ci" /host))
     (Focus dialog-input)
     (Rpc (method_ list_dirs) (params ((prefix /work) (host c9)))
@@ -821,7 +866,8 @@ let%expect_test "/export and /import" =
   run h "/export /tmp/s1.jsonl";
   H.reply h "export" {|{"path":"/tmp/s1.jsonl"}|};
   toasts h;
-  [%expect {|
+  [%expect
+    {|
     (Save_history (/export))
     (Focus dialog-input)
     (Rpc (method_ list_paths) (params ((prefix ""))) (tag (Prompt_paths "")))
@@ -843,7 +889,8 @@ let%expect_test "/export and /import" =
   H.key h "Enter" ~target:Field;
   H.fail h "import" "old.jsonl: no such file";
   H.text h ~selector:".dialog-error";
-  [%expect {|
+  [%expect
+    {|
     (Save_history (/import "/export /tmp/s1.jsonl" /export))
     (Focus dialog-input)
     (Rpc (method_ list_paths) (params ((prefix ""))) (tag (Prompt_paths "")))
@@ -857,7 +904,8 @@ let%expect_test "/export and /import" =
   run h "/import /tmp/s1.jsonl";
   H.reply h "import" {|{"path":"/sessions/s9.jsonl"}|};
   toasts h;
-  [%expect {|
+  [%expect
+    {|
     Close_dialog
     (Focus editor)
     (Rpc (method_ list_paths) (params ((prefix /tmp/s1.jsonl)))
@@ -877,19 +925,22 @@ let%expect_test "/copy and Ctrl+X copy the last reply" =
   let h = H.create () in
   run h "/copy";
   toasts h;
-  [%expect {|
+  [%expect
+    {|
     (Save_history (/copy))
     Nothing to copy yet: no reply in this session.
     |}];
   with_messages h;
   run h "/copy";
-  [%expect {|
+  [%expect
+    {|
     (Save_history (/copy))
     (Copy "Fixed: the **flag** was wrong.")
     (Expire_toast (id 1) (after_ms 4000))
     |}];
   H.key h "x" ~ctrl:true;
-  [%expect {|
+  [%expect
+    {|
     Copy_last
     (Copy "Fixed: the **flag** was wrong.")
     (Expire_toast (id 2) (after_ms 4000))
@@ -906,7 +957,8 @@ let%expect_test "/btw: a side answer streams into a panel" =
   H.event h {|{"event":"btw_delta","btw_id":"btw-1","delta":"It runs "}|};
   H.event h {|{"event":"btw_delta","btw_id":"btw-2","delta":"(stale)"}|};
   H.text h ~selector:"#btw";
-  [%expect {|
+  [%expect
+    {|
     (Save_history (/btw))
     (Save_history ("/btw what does make check run?" /btw))
     (Rpc (method_ btw)
@@ -917,9 +969,13 @@ let%expect_test "/btw: a side answer streams into a panel" =
     Answering…
     Not added to the conversation.
     |}];
-  H.reply h "btw" {|{"btw_id":"btw-1","text":"It runs `dune build @runtest`.","cost_usd":0.001}|};
+  H.reply
+    h
+    "btw"
+    {|{"btw_id":"btw-1","text":"It runs `dune build @runtest`.","cost_usd":0.001}|};
   H.text h ~selector:"#btw";
-  [%expect {|
+  [%expect
+    {|
     btw what does make check run? (Close (Esc))
     It runs dune build @runtest .
     Not added to the conversation.
@@ -927,7 +983,8 @@ let%expect_test "/btw: a side answer streams into a panel" =
   (* A new question replaces the answer; Esc cancels and closes it. *)
   run h "/btw and lint?";
   H.key h "Escape";
-  [%expect {|
+  [%expect
+    {|
     (Save_history ("/btw and lint?" "/btw what does make check run?" /btw))
     (Rpc (method_ btw) (params ((question "and lint?") (btw_id btw-2)))
      (tag (Btw btw-2)))
@@ -941,7 +998,8 @@ let%expect_test "/btw: a side answer streams into a panel" =
   H.fail h "btw" "cancelled";
   H.fail h "btw" "the model is unavailable";
   H.text h ~selector:"#btw";
-  [%expect {|
+  [%expect
+    {|
     (Save_history
      ("/btw again?" "/btw and lint?" "/btw what does make check run?" /btw))
     (Rpc (method_ btw) (params ((question again?) (btw_id btw-3)))
@@ -970,7 +1028,8 @@ let%expect_test "/agents [cancel <n>]" =
   run h "/agents cancel 7";
   run h "/agents kill 1";
   toasts h;
-  [%expect {|
+  [%expect
+    {|
     (Save_history ("/agents cancel 2"))
     (Expire_toast (id 0) (after_ms 4000))
     (Rpc (method_ cancel_subagent) (params ((agent_id a2))) (tag Show_error))
@@ -997,7 +1056,8 @@ let%expect_test "/jobs: list, output, kill" =
   run h "/jobs";
   H.reply h "list_jobs" "[]";
   toasts h;
-  [%expect {|
+  [%expect
+    {|
     (Save_history (/jobs))
     (Rpc (method_ list_jobs) (params ()) (tag Jobs))
     (Expire_toast (id 0) (after_ms 4000))
@@ -1006,7 +1066,8 @@ let%expect_test "/jobs: list, output, kill" =
   run h "/jobs";
   H.reply h "list_jobs" jobs;
   H.text h ~selector:".modal";
-  [%expect {|
+  [%expect
+    {|
     (Save_history (/jobs))
     (Rpc (method_ list_jobs) (params ()) (tag Jobs))
     (Focus dialog)
@@ -1021,7 +1082,8 @@ let%expect_test "/jobs: list, output, kill" =
   H.key h "Enter" ~target:Page;
   H.reply h "job_output" {|{"text":"ok 11 tests\nok 12 tests\n"}|};
   H.text h ~selector:".job-output";
-  [%expect {|
+  [%expect
+    {|
     Dialog_accept
     (Rpc (method_ job_output) (params ((job_id j1) (lines 200)))
      (tag (Job_output j1)))
@@ -1031,7 +1093,8 @@ let%expect_test "/jobs: list, output, kill" =
     |}];
   H.key h "Delete" ~target:Page;
   H.reply h "kill_job" "{}";
-  [%expect {|
+  [%expect
+    {|
     Dialog_delete
     (Rpc (method_ kill_job) (params ((job_id j1))) (tag (Job_killed j1)))
     (Expire_toast (id 1) (after_ms 4000))
@@ -1040,7 +1103,8 @@ let%expect_test "/jobs: list, output, kill" =
   H.key h "ArrowDown" ~target:Page;
   H.key h "Delete" ~target:Page;
   toasts h;
-  [%expect {|
+  [%expect
+    {|
     (Dialog_move 1)
     Dialog_delete
     (Expire_toast (id 2) (after_ms 4000))
@@ -1055,7 +1119,8 @@ let%expect_test "/jobs: list, output, kill" =
   run h "/jobs kill j1";
   run h "/jobs kill";
   H.text h ~selector:".toast.error";
-  [%expect {|
+  [%expect
+    {|
     Close_dialog
     (Focus editor)
     (Save_history ("/jobs j2" /jobs))
@@ -1075,11 +1140,14 @@ let%expect_test "/jobs: list, output, kill" =
 
 let%expect_test "/setusr: a superuser acts as another user, and back" =
   let h = H.create () in
-  H.act h (Hello { client_id = "c1"; namespace = Some "alice"; user = Some "alice" });
+  H.act
+    h
+    (Hello { client_id = "c1"; namespace = Some "alice"; user = Some "alice" });
   run h "/setusr";
   H.reply h "list_users" {|["alice","bob","carol"]|};
   H.text h ~selector:".picker-items";
-  [%expect {|
+  [%expect
+    {|
     (Save_history (/setusr))
     (Rpc (method_ list_users) (params ()) (tag (Users Picker)))
     (Focus picker-input)
@@ -1090,7 +1158,8 @@ let%expect_test "/setusr: a superuser acts as another user, and back" =
   H.key h "ArrowDown" ~target:Field;
   H.key h "Enter" ~target:Field;
   H.reply h "set_user" {|{"client_id":"c1","namespace":"bob","user":"alice"}|};
-  [%expect {|
+  [%expect
+    {|
     (Dialog_move 1)
     Dialog_accept
     (Focus editor)
@@ -1105,7 +1174,8 @@ let%expect_test "/setusr: a superuser acts as another user, and back" =
   H.reply h "get_state" (H.state_json ~fields:[ "session_id", `String "b1" ] ());
   H.text h ~selector:".sidebar-footer";
   H.text h ~selector:".status-item.account";
-  [%expect {|
+  [%expect
+    {|
     (Set_url_session b1)
     (Rpc (method_ get_messages) (params ()) (tag Messages))
     (Rpc (method_ list_sessions) (params ()) (tag Sessions))
@@ -1115,7 +1185,8 @@ let%expect_test "/setusr: a superuser acts as another user, and back" =
   run h "/setusr alice";
   H.reply h "set_user" {|{"client_id":"c1","namespace":"alice","user":"alice"}|};
   toasts h;
-  [%expect {|
+  [%expect
+    {|
     (Save_history ("/setusr alice" /setusr))
     (Rpc (method_ set_user) (params ((user alice))) (tag User_switched))
     (Expire_toast (id 1) (after_ms 4000))
@@ -1130,7 +1201,8 @@ let%expect_test "/setusr: a superuser acts as another user, and back" =
   run h "/setusr";
   H.fail h "list_users" "unauthorised: bob is not a superuser";
   toasts h;
-  [%expect {|
+  [%expect
+    {|
     (Save_history (/setusr "/setusr alice" /setusr))
     (Rpc (method_ list_users) (params ()) (tag (Users Picker)))
     Acting as bob
@@ -1144,7 +1216,8 @@ let%expect_test "/retry-backend-connection, /state, /clear, /quit" =
   run h "/retry-backend-connection";
   H.act h Backend_closed;
   run h "/retry-backend-connection";
-  [%expect {|
+  [%expect
+    {|
     (Save_history (/retry-backend-connection))
     (Expire_toast (id 0) (after_ms 4000))
     (Reconnect (generation 1) (delay_ms 0) (session (s1)))
@@ -1155,7 +1228,8 @@ let%expect_test "/retry-backend-connection, /state, /clear, /quit" =
   (* The first attempt's late reply is stale. *)
   H.act h (Reply (Reconnect 1, Error "refused"));
   H.act h (Reply (Reconnect 2, Ok (Jsonaf.of_string {|{"client_id":"c2"}|})));
-  [%expect {|
+  [%expect
+    {|
     (Expire_toast (id 2) (after_ms 4000))
     (Rpc (method_ get_state) (params ()) (tag State))
     (Rpc (method_ list_models) (params ()) (tag Models))
@@ -1165,7 +1239,8 @@ let%expect_test "/retry-backend-connection, /state, /clear, /quit" =
   H.reply h "get_state" (H.state_json ());
   run h "/state";
   H.text h ~selector:".modal";
-  [%expect {|
+  [%expect
+    {|
     (Set_url_session s1)
     (Rpc (method_ get_messages) (params ()) (tag Messages))
     (Rpc (method_ list_sessions) (params ()) (tag Sessions))
@@ -1191,7 +1266,8 @@ let%expect_test "/retry-backend-connection, /state, /clear, /quit" =
   H.text h ~selector:"#chat";
   run h "/quit";
   toasts h;
-  [%expect {|
+  [%expect
+    {|
     Close_dialog
     (Focus editor)
     (Save_history (/clear /state /retry-backend-connection))
@@ -1220,7 +1296,8 @@ let%expect_test "keys: Alt+Up, Ctrl+Up/Down, PageUp/PageDown, Ctrl+G" =
   H.key h "PageUp";
   H.key h "PageDown";
   H.key h "g" ~ctrl:true;
-  [%expect {|
+  [%expect
+    {|
     Dequeue
     (Rpc (method_ dequeue) (params ()) (tag Dequeued))
     (Jump_to_user_message -1)
@@ -1243,7 +1320,8 @@ let%expect_test "keys: Alt+Up, Ctrl+Up/Down, PageUp/PageDown, Ctrl+G" =
   H.key h "f" ~ctrl:true;
   H.key h "r" ~ctrl:true;
   H.key h "p" ~meta:true;
-  [%expect {|
+  [%expect
+    {|
     (browser default)
     (browser default)
     (browser default)

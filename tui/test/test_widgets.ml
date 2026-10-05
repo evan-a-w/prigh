@@ -637,7 +637,7 @@ let%expect_test "keymap: every binding resolves to its intent and is documented"
     /verbosity [quiet|normal|verbose]  set the transcript verbosity
     /confirm [on|off]                  ask before destructive tools
     /auth                              show which providers are configured
-    /compact                           summarise older messages to free context
+    /compact [instructions]            summarise older messages to free context
     /new                               start a new session
     /name [text]                       set the session name
     /session                           show session statistics

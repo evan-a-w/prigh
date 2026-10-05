@@ -80,10 +80,5 @@ let per_session = function
           | Accounts )
       ; _
       }
-  | Help
-  | Hotkeys
-  | Scoped_models _
-  | Delete _
-  | Login _
-  | Auth _ -> false
+  | Help | Hotkeys | Scoped_models _ | Delete _ | Login _ | Auth _ -> false
 ;;

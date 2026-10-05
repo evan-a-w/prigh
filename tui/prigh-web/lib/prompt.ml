@@ -24,7 +24,13 @@ type t =
 [@@deriving sexp_of, equal]
 
 let create ?(input = "") action =
-  { action; input; suggestions = []; selected = None; error = None; busy = false }
+  { action
+  ; input
+  ; suggestions = []
+  ; selected = None
+  ; error = None
+  ; busy = false
+  }
 ;;
 
 let set_input t input =

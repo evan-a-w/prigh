@@ -14,7 +14,7 @@ let%expect_test "reconnecting after the backend goes away" =
   [%expect
     {|
     (Reconnect (generation 1) (delay_ms 0) (session (s1)))
-    Connection lost: reconnecting…
+    Connection lost: reconnecting… (Retry now)
     |}];
   Harness.act h Backend_closed;
   for _ = 1 to 3 do

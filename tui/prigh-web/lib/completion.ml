@@ -110,7 +110,9 @@ let argument_items
       ]
   | Confirm ->
     simple
-      [ "on", "ask before bash, write and edit"; "off", "run tools without asking" ]
+      [ "on", "ask before bash, write and edit"
+      ; "off", "run tools without asking"
+      ]
   | Session ->
     List.map sessions ~f:(fun s ->
       Picker.Item.create
@@ -181,8 +183,7 @@ let compute
               String.length text - String.length (String.lstrip rest)
             in
             (match kind with
-             | Directory | Path ->
-               Some (make (Argument kind) ~prefix ~start [])
+             | Directory | Path -> Some (make (Argument kind) ~prefix ~start [])
              | _ ->
                (match
                   rank

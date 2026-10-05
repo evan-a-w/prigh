@@ -46,9 +46,11 @@ let help =
 ;;
 
 let browser =
-  [ "Ctrl+C / Ctrl+V / Ctrl+Z", "copy, paste, undo: the browser's (Esc stops a run)"
+  [ ( "Ctrl+C / Ctrl+V / Ctrl+Z"
+    , "copy, paste, undo: the browser's (Esc stops a run)" )
   ; "Ctrl+F", "find in the page, which has the whole transcript"
-  ; "Ctrl+T / Ctrl+N / Ctrl+W", "the browser's tabs and windows: Alt+T cycles thinking"
+  ; ( "Ctrl+T / Ctrl+N / Ctrl+W"
+    , "the browser's tabs and windows: Alt+T cycles thinking" )
   ; "Ctrl+R", "reload: the session comes back (?session=); Tab completes @paths"
   ; "Ctrl+G", "no $EDITOR in a browser: edit here (Shift+Enter for new lines)"
   ]

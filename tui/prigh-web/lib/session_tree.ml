@@ -68,7 +68,8 @@ let tree_items entries ~head =
       | _ -> None)
   in
   let by_id = String.Table.create () in
-  List.iter entries ~f:(fun (e : Entry.t) -> Hashtbl.set by_id ~key:e.id ~data:e);
+  List.iter entries ~f:(fun (e : Entry.t) ->
+    Hashtbl.set by_id ~key:e.id ~data:e);
   (* Non-message entries (model changes, names, …) are skipped: a message
      hangs off its nearest message ancestor. *)
   let rec message_parent (e : Entry.t) =
@@ -82,7 +83,9 @@ let tree_items entries ~head =
       (List.filter_map messages ~f:(fun (e, m) ->
          Option.map (message_parent e) ~f:(fun parent -> parent, (e, m))))
   in
-  let roots = List.filter messages ~f:(fun (e, _) -> Option.is_none (message_parent e)) in
+  let roots =
+    List.filter messages ~f:(fun (e, _) -> Option.is_none (message_parent e))
+  in
   let active =
     let rec go id acc =
       match Hashtbl.find by_id id with
@@ -107,9 +110,9 @@ let tree_items entries ~head =
       ~search:text
       ~marked:(Set.mem active e.id)
       (String.make (2 * depth) ' ' ^ glyph ^ " " ^ text)
-    ::
     (* A conversation stays at its depth; a branch point indents its
        branches. *)
+    ::
     (match Option.value (Map.find children e.id) ~default:[] with
      | [ only ] -> walk depth only
      | branches -> List.concat_map branches ~f:(walk (depth + 1)))

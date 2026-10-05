@@ -736,6 +736,15 @@ copy of the protocol types and the e2e test guards the contract.
       session goes through that one path. Reconnection mirrors `ui/`
       (`Backend_closed` → `Reconnect` with backoff behind a banner; success
       starts over). `!cmd`/`!!cmd`/`!&cmd` go to `shell` like the TUI's.
+      `run_command` has every command of `ui/`'s `Commands` (plus `/copy`);
+      `Model` also holds the transcript `verbosity` (a class on `#chat`:
+      the CSS hides tool output in quiet and opens every `<details>` in
+      verbose), the `Config` (`get_config` at startup: the scope Ctrl+P
+      cycles, `/confirm`), the side question (`Btw`, streamed by
+      `btw_delta`), the saved accounts and whether we may act as others
+      (`list_users` at startup succeeds only for superusers). `set_user`'s
+      reply resets everything that belonged to the old user like a new
+      session does, then starts over.
     - The transcript: `Chat` (one agent: `get_messages` then events; each
       tool call's streamed output and result; subagents' nested chats,
       fetched with `get_subagent` after a reload since `get_messages` only
@@ -752,15 +761,30 @@ copy of the protocol types and the e2e test guards the contract.
       `list_paths`) and `History`, `Dialog`/`Dialog_view`/`Modal`
       (pickers built on `Picker`, help, rename, delete, the login flow
       `Login_flow` — also a custom provider's logout question — tool
-      confirmations), `Status_view`, and `Keys` (which
-      of the dialog, the popup or the editor owns a key).
+      confirmations), `Command_dialog_view` (`/hotkeys`, `/scoped-models`,
+      `Prompt` — a path with the backend's completions whose failures stay
+      in the dialog, for `/cd`, `/host`, `/export`, `/import` — `/rewind`'s
+      confirmation, `/session`, `/jobs`, text), `Session_tree` (`get_entries`
+      as `/fork`/`/rewind`/`/tree` pickers), `Btw_view`, `Account_view` (the
+      sidebar's account button and the account menu, a `Picker` of
+      accounts and actions) over `Accounts` (the saved sign-ins in
+      localStorage, behind a `Storage` record so that tests use a table),
+      `Status_view`, and `Keys` (which of the dialog, the popup or the
+      editor owns a key; `help`, and `browser`: the TUI's keys that the
+      browser keeps).
   - `app/` (`prigh_web_app`) — `Web_main.run`: connects a `Ws_transport`
-    to `?backend=` or the page's `/ws`, sends `hello` with the login saved
-    by the sign-in form (`web-app/`'s `Login`) and `?session=`; on failure
-    it shows the sign-in form, otherwise it runs `App.update` in a
+    to `?backend=` or the page's `/ws`, sends `hello` with the active
+    account (`prigh.user`/`prigh.token`, `web-app/`'s `Login`) and
+    `?session=`; on failure it shows the sign-in form (with the saved
+    accounts, one click each), otherwise it saves the login as an account
+    (`Accounts.remember`) and runs `App.update` in a
     `Bonsai.state_machine`, executes the commands (RPCs through the
     `Client`, replies back as `Action.Reply`; `history.replaceState` for
-    `?session=`), and installs document listeners: keys (through `Keys`),
+    `?session=`, also kept as the account's last session unless acting as
+    another user; the clipboard; switching accounts, which activates one
+    and loads the page for its backend and session; adding one, which
+    shows the sign-in form on the next load; scrolling), and installs
+    document listeners: keys (through `Keys`),
     pasted and dropped image files become attachments (PNG, JPEG, GIF,
     WebP, sent with the prompt as base64; others get a toast), the narrow
     (phone) layout, a clock for ages and toasts, and the chat following new
@@ -878,6 +902,10 @@ the backend's copy of the message via a second WebSocket's
 `get_messages`), a reload rejoining the session from `?session=`, a new
 session and switching back from the sidebar, and the backend dying (the
 banner) and restarting on the same port (the page reconnects to the same
-session and runs another prompt), with no console or page errors.
+session and runs another prompt), with no console or page errors. Then
+`accounts.mjs` runs the account switcher against `serve -tokens
+alice=a,bob=b -superusers alice`: alice signs in, adds bob (each sees only
+their own sessions), switches back in one click, acts as bob and comes
+back, and signs bob out, leaving alice on the sign-in page.
 `SHOTS=DIR` saves a screenshot per step, `UPDATE=1` re-records,
 `ENGINES=chromium` runs one browser.
