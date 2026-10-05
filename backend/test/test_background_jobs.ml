@@ -706,8 +706,8 @@ let%expect_test "jobs on a client tool host: output, list, kill, disconnect" =
         (Faux_provider.create
            [ background
                ~id:"c1"
-               "pwd; echo from-host; while [ ! -f gate ]; do sleep 0.02; done; \
-                echo after-gate"
+               "basename $PWD; echo from-host; while [ ! -f gate ]; do sleep \
+                0.02; done; echo after-gate"
            ; Reply.text "started"
            ; Reply.text "j1 noted"
            ; Reply.text "j2 noted"
@@ -749,10 +749,10 @@ let%expect_test "jobs on a client tool host: output, list, kill, disconnect" =
     connected to 127.0.0.1:PORT as client-2
     {"type":"response","id":"r","ok":true,"result":{}}
     {"type":"response","id":"r","ok":true,"result":{}}
-    {"type":"response","id":"r","ok":true,"result":{"text":"[job j1 running after Ns, 60 bytes; lines 1-2 of 2] pwd; echo from-host; while [ ! -f gate ]; do sleep 0.02; do…\n$DIR/host\nfrom-host"}}
-    {"type":"response","id":"r","ok":true,"result":[{"id":"j1","command":"pwd; echo from-host; while [ ! -f gate ]; do sleep 0.02; done; echo after-gate","running":true,"exit":null,"delivered":false,"elapsed":<t>,"bytes":60,"last_line":"from-host"}]}
-    [{"id":"j1","command":"pwd; echo from-host; while [ ! -f gate ]; do sleep 0.02; done; echo after-gate","running":true,"exit":null}]
-    user: [job j1 exited 0] pwd; echo from-host; while [ ! -f gate ]; do sleep 0.02; do… | $DIR/host | from-host | after-gate
+    {"type":"response","id":"r","ok":true,"result":{"text":"[job j1 running after Ns, 15 bytes; lines 1-2 of 2] basename $PWD; echo from-host; while [ ! -f gate ]; do slee…\nhost\nfrom-host"}}
+    {"type":"response","id":"r","ok":true,"result":[{"id":"j1","command":"basename $PWD; echo from-host; while [ ! -f gate ]; do sleep 0.02; done; echo after-gate","running":true,"exit":null,"delivered":false,"elapsed":<t>,"bytes":15,"last_line":"from-host"}]}
+    [{"id":"j1","command":"basename $PWD; echo from-host; while [ ! -f gate ]; do sleep 0.02; done; echo after-gate","running":true,"exit":null}]
+    user: [job j1 exited 0] basename $PWD; echo from-host; while [ ! -f gate ]; do slee… | host | from-host | after-gate
     assistant: j1 noted
     |}];
   (* [!&cmd]: a job started by the user, then killed. *)

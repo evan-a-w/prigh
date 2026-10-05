@@ -161,18 +161,15 @@ let%expect_test "store: set/read/list/remove, unknown providers preserved" =
   print_s [%sexp (Or_error.is_error (Auth_store.list store) : bool)];
   Out_channel.write_all path ~data:{|{"openai": {"type":"oauth"}}|};
   print_endline
-    (mask
+    (mask_sexp
        t
-       (Sexp.to_string_hum
-          [%sexp
-            (Auth_store.read store Openai : Credential.t option Or_error.t)]));
+       [%sexp (Auth_store.read store Openai : Credential.t option Or_error.t)]);
   [%expect
     {|
     true
     (Error
-     ("auth file: bad credential"
-      (file $DIR/cfg/auth.json)
-      (provider Openai) (e "credential: missing string \"access\"")))
+     ("auth file: bad credential" (file $DIR/cfg/auth.json) (provider Openai)
+      (e "credential: missing string \"access\"")))
     |}]
 ;;
 

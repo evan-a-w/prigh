@@ -62,26 +62,24 @@ let call t server client ?(params = "{}") meth =
 let show_state t agent =
   let state = Agent.state agent in
   print_endline
-    (mask
+    (mask_sexp
        t
-       (Sexp.to_string_hum
-          [%message
-            ""
-              ~active_host:(state.active_host : string)
-              ~cwd:(state.cwd : string)
-              ~git_branch:(state.git_branch : string option)
-              ~hosts:(List.map state.hosts ~f:(fun h -> h.id) : string list)]))
+       [%message
+         ""
+           ~active_host:(state.active_host : string)
+           ~cwd:(state.cwd : string)
+           ~git_branch:(state.git_branch : string option)
+           ~hosts:(List.map state.hosts ~f:(fun h -> h.id) : string list)])
 ;;
 
 let show_target t server ~session =
   print_endline
-    (mask
+    (mask_sexp
        t
-       (Sexp.to_string_hum
-          (match Rpc_server.terminal_target server ~session with
-           | `Backend cwd -> [%message "Backend" cwd]
-           | `Host (id, cwd) -> [%message "Host" id cwd]
-           | `Unavailable reason -> [%message "Unavailable" reason])))
+       (match Rpc_server.terminal_target server ~session with
+        | `Backend cwd -> [%message "Backend" cwd]
+        | `Host (id, cwd) -> [%message "Host" id cwd]
+        | `Unavailable reason -> [%message "Unavailable" reason]))
 ;;
 
 let new_tool_results agent ~seen =
@@ -200,8 +198,7 @@ let%expect_test "backend host disabled" =
       (Session.system_prompt (Agent.session agent) |> Option.is_some : bool)];
   [%expect
     {|
-    ((active_host "") (cwd $DIR)
-     (git_branch ()) (hosts ()))
+    ((active_host "") (cwd $DIR) (git_branch ()) (hosts ()))
     {"type":"response","id":"r","ok":false,"error":"the backend tool host is disabled"}
     {"type":"response","id":"r","ok":false,"error":"unknown tool host \"nobody\""}
     {"type":"response","id":"r","ok":false,"error":"no tool host connected: connect one with `prigh tool-host -connect ...` or a TUI, then pick it with /host"}
@@ -302,8 +299,7 @@ let%expect_test "backend host enabled: git branch and terminal targets" =
   show_target t server ~session;
   [%expect
     {|
-    ((active_host backend) (cwd $DIR)
-     (git_branch (main)) (hosts (backend)))
+    ((active_host backend) (cwd $DIR) (git_branch (main)) (hosts (backend)))
     (Backend $DIR)
     (Backend $DIR)
     (Host client-2 /home/me)

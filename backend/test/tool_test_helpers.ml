@@ -53,11 +53,22 @@ let mask t s =
        ~pattern:(sprintf "tools now run on %s" (Core_unix.gethostname ()))
        ~with_:"tools now run on <host>"
   |> String.substr_replace_all
-       ~pattern:(sprintf "\"%s: not a directory" (Core_unix.gethostname ()))
-       ~with_:"\"<host>: not a directory"
+       ~pattern:(sprintf "%s: not a directory" (Core_unix.gethostname ()))
+       ~with_:"<host>: not a directory"
   |> String.substr_replace_all
        ~pattern:(sprintf "(name %s)" (Core_unix.gethostname ()))
        ~with_:"(name <host>)"
+;;
+
+(* [mask] on the atoms, before the layout: the real path's length must not
+   change where lines wrap. *)
+let mask_sexp t sexp =
+  let rec go : Sexp.t -> Sexp.t = function
+    | Atom s when String.equal s (Core_unix.gethostname ()) -> Atom "<host>"
+    | Atom s -> Atom (mask t s)
+    | List l -> List (List.map l ~f:go)
+  in
+  Sexp.to_string_hum (go sexp)
 ;;
 
 let run ?cancel ?on_output t tool args =

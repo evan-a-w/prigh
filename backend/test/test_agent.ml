@@ -894,11 +894,9 @@ let%expect_test "set_active_host with a cwd validates it on the new host" =
   dump ();
   let switch cwd =
     print_endline
-      (mask
+      (mask_sexp
          t
-         (Sexp.to_string_hum
-            [%sexp
-              (Agent.set_active_host agent "backend" ~cwd : unit Or_error.t)]));
+         [%sexp (Agent.set_active_host agent "backend" ~cwd : unit Or_error.t)]);
     printf
       "cwd=%s hosts=%s\n"
       (mask t (Agent.state agent).cwd)

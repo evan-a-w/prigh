@@ -54,8 +54,19 @@ let normalise s =
   |> sub (Re.repn (Re.alt [ Re.digit; Re.rg 'a' 'f' ]) 16 (Some 16)) "<id>"
 ;;
 
+(* Normalised before the layout, so that the real paths' lengths do not
+   change where lines wrap. *)
 let show label sexp =
-  printf "%s: %s\n" label (normalise (Sexp.to_string_hum sexp))
+  let rec go : Sexp.t -> Sexp.t = function
+    | List [ Atom "duration_seconds"; Atom _ ] ->
+      List [ Atom "duration_seconds"; Atom "<t>" ]
+    | List [ Atom "name"; Atom host ]
+      when String.equal host (Core_unix.gethostname ()) ->
+      List [ Atom "name"; Atom "<host>" ]
+    | Atom s -> Atom (normalise s)
+    | List l -> List (List.map l ~f:go)
+  in
+  printf "%s: %s\n" label (Sexp.to_string_hum (go sexp))
 ;;
 
 let call client method_ params =

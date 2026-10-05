@@ -304,8 +304,9 @@ let%expect_test "reconnecting within the idle timeout reattaches" =
   Peer.close a;
   let b = Peer.connect f query in
   ignore (Peer.read_until f b (Peer.saw "\027[0m") : bool);
-  Peer.type_ b "echo $X\r";
-  print_s [%sexp (Peer.read_until f b (Peer.saw "\r\nkept") : bool)];
+  (* Not "\r\nkept": shells with bracketed paste put escapes before it. *)
+  Peer.type_ b "echo got-$X\r";
+  print_s [%sexp (Peer.read_until f b (Peer.saw "got-kept") : bool)];
   Fixture.print_live f;
   [%expect
     {|

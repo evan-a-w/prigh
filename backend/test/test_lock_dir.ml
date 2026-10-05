@@ -61,13 +61,9 @@ let%expect_test "a live foreign lock is waited for; a stale one is broken" =
        print_endline "unexpected")
    with
    | () -> ()
-   | exception e -> print_endline (mask t (Exn.to_string e)));
+   | exception e -> print_endline (mask_sexp t [%sexp (e : exn)]));
   [%expect
-    {|
-    ("lock is held by another process"
-      (lock $DIR/auth.json.lock)
-      (timeout 50ms))
-    |}];
+    {| ("lock is held by another process" (lock $DIR/auth.json.lock) (timeout 50ms)) |}];
   (* The same lock becomes stale once its mtime is old enough. *)
   let old = Core_unix.gettimeofday () -. 60. in
   Core_unix.utimes lock ~access:old ~modif:old;
