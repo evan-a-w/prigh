@@ -96,8 +96,8 @@ body.resizing { cursor: col-resize; user-select: none; }
 }
 .agents-row > .spinner, .agents-row > .state-icon { margin-top: 3px; }
 .agents-row .state-icon, .detail-title .state-icon { font-size: 12px; width: 14px; text-align: center; line-height: 14px; }
-.agents-row.complete .state-icon, .detail-title .state-icon { color: var(--green); }
-.agents-row.failed .state-icon, .agents-detail .failed .state-icon { color: var(--red); }
+.agents-row.complete .state-icon, .detail-title.complete .state-icon { color: var(--green); }
+.agents-row.failed .state-icon, .detail-title.failed .state-icon { color: var(--red); }
 .row-num {
   font: 10.5px/16px var(--mono);
   height: 17px;
