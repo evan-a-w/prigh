@@ -514,10 +514,10 @@ provider's in the order anthropic, openai-codex, openai, deepseek.
 
 ## Frontend (`tui/`)
 
-Built in the `prigh-ox` opam switch (OxCaml 5.2 with the Jane Street
-`v0.18~preview` packages) or under `nix develop`; the backend stays on the
-vanilla `prigh` switch because some of its dependencies do not compile with
-OxCaml modes. The two only meet over the wire, so the frontend owns its own
+Built with OxCaml 5.2 and the Jane Street `v0.18~preview` packages
+(`nix develop`); the backend stays on vanilla OCaml 5.3 (`nix develop
+.#backend`) because some of its dependencies do not compile with OxCaml
+modes. The two only meet over the wire, so the frontend owns its own
 copy of the protocol types and the e2e test guards the contract.
 
 - `protocol/` (`prigh_protocol`) — `Jsonaf` decoders for everything
