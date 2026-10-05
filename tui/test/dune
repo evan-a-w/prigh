@@ -9,6 +9,9 @@
   core
   async
   async_unix
+  core_unix
+  core_unix.filename_unix
+  core_unix.sys_unix
   expect_test_helpers_core
   expect_test_helpers_async
   bonsai
