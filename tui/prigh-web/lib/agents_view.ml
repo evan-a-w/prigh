@@ -356,7 +356,7 @@ let agent_detail (m : App.Model.t) ~inject (a : Agent.t) =
     ; div
         ~cls:"detail-head"
         [ div
-            ~cls:"detail-title"
+            ~cls:("detail-title " ^ status_cls a.status)
             [ status_icon a.status
             ; span ~cls:"detail-task" (first_line a.task)
             ]
@@ -412,7 +412,7 @@ let job_detail (m : App.Model.t) ~inject (j : Agents.Job.t) =
     [ div
         ~cls:"detail-head"
         [ div
-            ~cls:"detail-title"
+            ~cls:("detail-title " ^ status_cls status)
             [ status_icon status; span ~cls:"detail-command" j.info.command ]
         ; div
             ~cls:"detail-meta"
