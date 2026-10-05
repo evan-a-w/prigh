@@ -14,7 +14,7 @@ let line text =
   |> Option.value_map ~default:"" ~f:String.strip
 ;;
 
-let user_line ({ text; images } : Message.User.t) =
+let user_line ({ text; images; at = _ } : Message.User.t) =
   match line text, images with
   | "", image :: _ -> Image.to_string_hum image
   | line, _ -> line

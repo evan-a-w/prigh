@@ -29,6 +29,7 @@ DeepSeek V4.1 Flash
 off
 === chromium: bash run ===
 count some lines
+<TIME>
 let me look
 ✓
 bash
@@ -37,6 +38,7 @@ one
 two
 three
 three lines
+<TIME>
 === chromium: top bar after a run ===
 count some lines
 <CWD>
@@ -44,12 +46,14 @@ DeepSeek V4.1 Flash
 off
 === chromium: read an image ===
 what does flag.png look like?
+<TIME>
 opening it
 ✓
 read
 flag.png
 Read image file [image/png, 24x16]
 a red flag with a blue stripe
+<TIME>
 === chromium: the read tool's image ===
 data:image/png;base64, 24x16
 === chromium: attached in the composer ===
@@ -101,12 +105,15 @@ token
 switched back: true
 === chromium: switched back ===
 count some lines
+<TIME>
 === chromium: backend gone ===
 Connection lost: reconnecting…
 same session after reconnecting: true
 === chromium: after reconnecting ===
 still there?
+<TIME>
 back again
+<TIME>
 === chromium: agents panel ===
 Agents
 SUBAGENTS
@@ -146,7 +153,9 @@ deepseek-flash
 $<COST>
 Show in chat
 Count the files
+<TIME>
 There are 3 files.
+<TIME>
 the nested card is in view in the chat
 === chromium: a background job ===
 Job j1
@@ -178,6 +187,7 @@ Count the files
 a1/n1 · deepseek-flash · 1 turn · $<COST>
 There are 3 files.
 Survey the project
+<TIME>
 asking a helper
 ✓
 subagent
@@ -191,6 +201,7 @@ There are 3 files.
 Transcript
 2 messages
 The survey: 3 files.
+<TIME>
 === chromium: errors ===
 none
 === chromium: accounts: sessions ===
@@ -308,6 +319,7 @@ DeepSeek V4.1 Flash
 off
 === firefox: bash run ===
 count some lines
+<TIME>
 let me look
 ✓
 bash
@@ -316,6 +328,7 @@ one
 two
 three
 three lines
+<TIME>
 === firefox: top bar after a run ===
 count some lines
 <CWD>
@@ -323,12 +336,14 @@ DeepSeek V4.1 Flash
 off
 === firefox: read an image ===
 what does flag.png look like?
+<TIME>
 opening it
 ✓
 read
 flag.png
 Read image file [image/png, 24x16]
 a red flag with a blue stripe
+<TIME>
 === firefox: the read tool's image ===
 data:image/png;base64, 24x16
 === firefox: attached in the composer ===
@@ -380,12 +395,15 @@ token
 switched back: true
 === firefox: switched back ===
 count some lines
+<TIME>
 === firefox: backend gone ===
 Connection lost: reconnecting…
 same session after reconnecting: true
 === firefox: after reconnecting ===
 still there?
+<TIME>
 back again
+<TIME>
 === firefox: agents panel ===
 Agents
 SUBAGENTS
@@ -425,7 +443,9 @@ deepseek-flash
 $<COST>
 Show in chat
 Count the files
+<TIME>
 There are 3 files.
+<TIME>
 the nested card is in view in the chat
 === firefox: a background job ===
 Job j1
@@ -457,6 +477,7 @@ Count the files
 a1/n1 · deepseek-flash · 1 turn · $<COST>
 There are 3 files.
 Survey the project
+<TIME>
 asking a helper
 ✓
 subagent
@@ -470,6 +491,7 @@ There are 3 files.
 Transcript
 2 messages
 The survey: 3 files.
+<TIME>
 === firefox: errors ===
 none
 === firefox: accounts: sessions ===

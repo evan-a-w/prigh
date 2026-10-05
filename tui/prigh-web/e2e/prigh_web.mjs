@@ -116,9 +116,11 @@ const clean = text => text
   .replace(/just now|\d+[smhd] ago/g, "<AGE>")
   .replace(/\$\d+\.\d+/g, "$<COST>")
   .replace(/\d+% ctx/g, "<CTX>% ctx")
+  // Messages' times, and the day separator a run past midnight would add.
+  .replace(/(Yesterday )?\b\d\d:\d\d\b/g, "<TIME>")
   .split("\n")
   .map(line => line.trim())
-  .filter(line => line !== "")
+  .filter(line => line !== "" && line !== "Today")
   .join("\n");
 
 const section = label => console.log(`=== ${engineName}: ${label} ===`);

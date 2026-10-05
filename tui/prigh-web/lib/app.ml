@@ -147,6 +147,7 @@ module Action = struct
     | Backend_closed
     | Reply of Reply_tag.t * (Json.t, string) Result.t
     | Tick of Time_ns.t
+    | Set_utc_offset of Time_ns.Span.t
     | Set_narrow of bool
     | Load_history of string list
     | Set_draft of string
@@ -251,6 +252,7 @@ module Model = struct
     ; models : Llm.t list
     ; auth : Auth_status.t list
     ; now : Time_ns.t option
+    ; utc_offset : Time_ns.Span.t
     ; narrow : bool
     ; draft : string
     ; cursor : int
@@ -292,6 +294,12 @@ module Model = struct
     t.agents.open_
     && Agents.running_agents t.agents + Agents.running_jobs t.agents > 0
   ;;
+
+  let message_time t =
+    Message_time.create
+      ~now:(Option.value t.now ~default:Time_ns.epoch)
+      ~utc_offset:t.utc_offset
+  ;;
 end
 
 let thinking_levels = Prigh_ui.Commands.thinking_levels
@@ -307,6 +315,7 @@ let init =
   ; models = []
   ; auth = []
   ; now = None
+  ; utc_offset = Time_ns.Span.zero
   ; narrow = false
   ; draft = ""
   ; cursor = 0
@@ -2330,6 +2339,7 @@ let update (m : Model.t) (action : Action.t) =
       | _ -> []
     in
     { m with now = Some now }, refresh
+  | Set_utc_offset utc_offset -> { m with utc_offset }, []
   | Set_narrow narrow ->
     if Bool.equal narrow m.narrow
     then m, []

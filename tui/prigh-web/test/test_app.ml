@@ -47,3 +47,49 @@ let%expect_test "startup, a prompt and its streamed reply" =
     </div>
     |}]
 ;;
+
+let%expect_test "messages' times: in the browser's zone, relative to its day" =
+  let h = Harness.create () in
+  (* 2026-10-05 10:00 UTC; Paris is two hours ahead. *)
+  Harness.act h (Set_utc_offset (Time_ns.Span.of_hr 2.));
+  Harness.event
+    h
+    {|{"event":"message_start","message":{"role":"user","text":"hello","at":1791194280000}}|};
+  Harness.event
+    h
+    {|{"event":"message_end","message":{"role":"assistant","content":[{"type":"text","text":"Hi"}],"stop_reason":{"type":"end_turn"},"usage":{"input":10,"output":5,"cache_read":0},"model":"m","at":1791194350000}}|};
+  let show () = Harness.text h ~selector:".entries" in
+  show ();
+  [%expect
+    {|
+    hello
+    11:58
+    Hi
+    m · 10 in · 5 out · 11:59
+    |}];
+  (* Ten hours behind UTC, it has just turned midnight: they were yesterday. *)
+  Harness.act h (Set_utc_offset (Time_ns.Span.of_hr (-10.)));
+  show ();
+  [%expect
+    {|
+    hello
+    Yesterday 23:58
+    Hi
+    m · 10 in · 5 out · Yesterday 23:59
+    |}];
+  (* A day later in Paris. *)
+  Harness.act h (Set_utc_offset (Time_ns.Span.of_hr 2.));
+  Harness.act h (Tick (Time_ns.add Harness.now (Time_ns.Span.of_day 1.)));
+  show ();
+  [%expect
+    {|
+    (Rpc (method_ list_sessions) (params ()) (tag Sessions))
+    hello
+    Yesterday 11:58
+    Hi
+    m · 10 in · 5 out · Yesterday 11:59
+    |}];
+  Harness.show h ~selector:".msg.user time";
+  [%expect
+    {| <time title="Monday 5 October 2026, 11:58:00" datetime="2026-10-05T09:58:00Z" class="time"> Yesterday 11:58 </time> |}]
+;;

@@ -21,6 +21,7 @@ end
 type t =
   { id : string
   ; parent : string option
+  ; at : Time_ns.Alternate_sexp.t option [@sexp.option]
   ; kind : Kind.t
   }
 [@@deriving sexp_of, equal]
@@ -56,6 +57,7 @@ let of_json j =
   let open Or_error.Let_syntax in
   let%bind id = Json.string_field j "id" in
   let%bind parent = Json.string_opt_field j "parent" in
+  let%bind at = Json.time_ms_opt_field j "at" in
   let%map kind = kind_of_json j in
-  { id; parent; kind }
+  { id; parent; at; kind }
 ;;

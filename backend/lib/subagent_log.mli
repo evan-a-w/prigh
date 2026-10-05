@@ -51,7 +51,7 @@ val record : t -> now:float -> Agent_event.t -> unit
 val summaries : t -> Summary.t list
 
 (** By agent id or by the id of the tool call that started it, with its
-    transcript. *)
-val find : t -> string -> (Summary.t * Message.t list) option
+    transcript (each message at the time its [Message_end] was recorded). *)
+val find : t -> string -> (Summary.t * Timed_message.t list) option
 
 val clear : t -> unit

@@ -90,6 +90,18 @@ let float_field t name =
     | exception _ -> Or_error.errorf "field %S: bad number %S" name n)
 ;;
 
+let time_ms_opt_field t name =
+  match field t name with
+  | None -> Ok None
+  | Some _ ->
+    (* In Int63: a float of nanoseconds since the epoch loses precision. *)
+    Or_error.map (float_field t name) ~f:(fun ms ->
+      Some
+        (Time_ns.of_span_since_epoch
+           (Time_ns.Span.of_int63_ns
+              Int63.(of_float (Float.round_nearest ms) * of_int 1_000_000))))
+;;
+
 let bool_field t name =
   match field t name with
   | Some `True -> Ok true

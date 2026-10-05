@@ -168,8 +168,103 @@ let%expect_test "prompt emits events, get_messages/get_entries reflect the run" 
   call t h "get_entries";
   [%expect
     {|
-    {"type":"response","id":"r1","ok":true,"result":[{"role":"user","text":"what is here?"},{"role":"assistant","content":[{"type":"text","text":"Looking."},{"type":"tool_call","id":"c1","name":"ls","arguments":"{}"}],"stop_reason":{"type":"tool_use"},"usage":{"input":20,"output":8,"cache_read":5},"model":"deepseek-flash"},{"role":"tool_result","tool_call_id":"c1","tool_name":"ls","text":"sessions/\n","is_error":false},{"role":"assistant","content":[{"type":"text","text":"Empty."}],"stop_reason":{"type":"end_turn"},"usage":{"input":10,"output":5,"cache_read":0},"model":"deepseek-flash"}]}
-    {"type":"response","id":"r1","ok":true,"result":{"head":"<id>","entries":[{"id":"<id>","parent":null,"kind":"system_prompt"},{"id":"<id>","parent":"<id>","kind":"message","message":{"role":"user","text":"what is here?"}},{"id":"<id>","parent":"<id>","kind":"message","message":{"role":"assistant","content":[{"type":"text","text":"Looking."},{"type":"tool_call","id":"c1","name":"ls","arguments":"{}"}],"stop_reason":{"type":"tool_use"},"usage":{"input":20,"output":8,"cache_read":5},"model":"deepseek-flash"}},{"id":"<id>","parent":"<id>","kind":"message","message":{"role":"tool_result","tool_call_id":"c1","tool_name":"ls","text":"sessions/\n","is_error":false}},{"id":"<id>","parent":"<id>","kind":"message","message":{"role":"assistant","content":[{"type":"text","text":"Empty."}],"stop_reason":{"type":"end_turn"},"usage":{"input":10,"output":5,"cache_read":0},"model":"deepseek-flash"}}]}}
+    {"type":"response","id":"r1","ok":true,"result":[{"role":"user","text":"what is here?","at":<at>},{"role":"assistant","content":[{"type":"text","text":"Looking."},{"type":"tool_call","id":"c1","name":"ls","arguments":"{}"}],"stop_reason":{"type":"tool_use"},"usage":{"input":20,"output":8,"cache_read":5},"model":"deepseek-flash","at":<at>},{"role":"tool_result","tool_call_id":"c1","tool_name":"ls","text":"sessions/\n","is_error":false,"at":<at>},{"role":"assistant","content":[{"type":"text","text":"Empty."}],"stop_reason":{"type":"end_turn"},"usage":{"input":10,"output":5,"cache_read":0},"model":"deepseek-flash","at":<at>}]}
+    {"type":"response","id":"r1","ok":true,"result":{"head":"<id>","entries":[{"id":"<id>","parent":null,"at":<at>,"kind":"system_prompt"},{"id":"<id>","parent":"<id>","at":<at>,"kind":"message","message":{"role":"user","text":"what is here?"}},{"id":"<id>","parent":"<id>","at":<at>,"kind":"message","message":{"role":"assistant","content":[{"type":"text","text":"Looking."},{"type":"tool_call","id":"c1","name":"ls","arguments":"{}"}],"stop_reason":{"type":"tool_use"},"usage":{"input":20,"output":8,"cache_read":5},"model":"deepseek-flash"}},{"id":"<id>","parent":"<id>","at":<at>,"kind":"message","message":{"role":"tool_result","tool_call_id":"c1","tool_name":"ls","text":"sessions/\n","is_error":false}},{"id":"<id>","parent":"<id>","at":<at>,"kind":"message","message":{"role":"assistant","content":[{"type":"text","text":"Empty."}],"stop_reason":{"type":"end_turn"},"usage":{"input":10,"output":5,"cache_read":0},"model":"deepseek-flash"}}]}}
+    |}]
+;;
+
+(* Clients are sent each message's time ("at", ms since the epoch) with its
+   events, and get it back from [get_messages]: the [message_end] and the
+   session entry agree. *)
+let%expect_test "message times: in message events, get_messages and get_entries"
+  =
+  with_agent [ Reply.text "Hi." ]
+  @@ fun t agent h ->
+  let before = Float.iround_down_exn (Core_unix.gettimeofday () *. 1000.) in
+  call t h ~params:{|{"text": "hello"}|} "prompt";
+  Agent.wait_idle agent;
+  let after = Float.iround_up_exn (Core_unix.gettimeofday () *. 1000.) in
+  let field name : Json.t -> Json.t option = function
+    | `Object fields -> List.Assoc.find fields name ~equal:String.equal
+    | _ -> None
+  in
+  let at json =
+    match field "at" json with
+    | Some (`Number n) -> Some (Int.of_string n)
+    | _ -> None
+  in
+  let role json =
+    match field "role" json with
+    | Some (`String r) -> r
+    | _ -> "?"
+  in
+  let in_run at = before <= at && at <= after in
+  let ends = Queue.create () in
+  Queue.iter h.sent ~f:(fun e ->
+    match field "event" e, field "message" e with
+    | Some (`String event), Some message ->
+      let at = at message in
+      printf
+        "%s %s: at %s\n"
+        event
+        (role message)
+        (Option.value_map at ~default:"missing" ~f:(fun at ->
+           if in_run at then "during the run" else Int.to_string at));
+      if String.equal event "message_end"
+      then Queue.enqueue ends (Option.value_exn at)
+    | _ -> ());
+  [%expect
+    {|
+    {"type":"response","id":"r1","ok":true,"result":{}}
+    message_start user: at during the run
+    message_end user: at during the run
+    message_start assistant: at during the run
+    message_end assistant: at during the run
+    |}];
+  let messages =
+    match
+      Rpc_server.handle
+        h.server
+        h.client
+        (Json.of_string {|{"id": "r1", "method": "get_messages"}|})
+      |> field "result"
+    with
+    | Some (`Array messages) -> messages
+    | _ -> []
+  in
+  List.iter2_exn messages (Queue.to_list ends) ~f:(fun message ended ->
+    let at = Option.value_exn (at message) in
+    printf
+      "get_messages %s: within a second of its message_end: %b\n"
+      (role message)
+      (abs (at - ended) < 1000));
+  [%expect
+    {|
+    get_messages user: within a second of its message_end: true
+    get_messages assistant: within a second of its message_end: true
+    |}];
+  (match
+     Rpc_server.handle
+       h.server
+       h.client
+       (Json.of_string {|{"id": "r1", "method": "get_entries"}|})
+     |> field "result"
+     |> Option.bind ~f:(field "entries")
+   with
+   | Some (`Array entries) ->
+     List.iter entries ~f:(fun entry ->
+       printf
+         "entry %s: at %b\n"
+         (match field "kind" entry with
+          | Some (`String k) -> k
+          | _ -> "?")
+         (Option.exists (at entry) ~f:in_run))
+   | _ -> print_endline "no entries");
+  [%expect
+    {|
+    entry system_prompt: at true
+    entry message: at true
+    entry message: at true
     |}]
 ;;
 
@@ -288,7 +383,7 @@ let%expect_test "images: in prompts, from attachments, and refused" =
   (* The images are in the session and in what clients are sent. *)
   call t h "get_messages";
   [%expect
-    {| {"type":"response","id":"r1","ok":true,"result":[{"role":"user","text":"compare @shot.png\n\n<file path=\"shot.png\">\nRead image file [image/png, 3x2]\n</file>","images":[{"mime_type":"image/gif","data":"R0lGODlhBQAEAPAAAAAA/wAAACH5BAAAAAAALAAAAAAFAAQAAAIEhI+ZBQA7"},{"mime_type":"image/png","data":"iVBORw0KGgoAAAANSUhEUgAAAAMAAAACAQMAAACnuvRZAAAAA1BMVEX/AAAZ4gk3AAAADElEQVQI12NgYGAAAAAEAAEnNCcKAAAAAElFTkSuQmCC"}]},{"role":"assistant","content":[{"type":"text","text":"ok"}],"stop_reason":{"type":"end_turn"},"usage":{"input":10,"output":5,"cache_read":0},"model":"deepseek-flash"},{"role":"user","text":"","images":[{"mime_type":"image/png","data":"iVBORw0KGgoAAAANSUhEUgAAAAMAAAACAQMAAACnuvRZAAAAA1BMVEX/AAAZ4gk3AAAADElEQVQI12NgYGAAAAAEAAEnNCcKAAAAAElFTkSuQmCC"}]},{"role":"assistant","content":[{"type":"text","text":"ok"}],"stop_reason":{"type":"end_turn"},"usage":{"input":10,"output":5,"cache_read":0},"model":"deepseek-flash"}]} |}]
+    {| {"type":"response","id":"r1","ok":true,"result":[{"role":"user","text":"compare @shot.png\n\n<file path=\"shot.png\">\nRead image file [image/png, 3x2]\n</file>","images":[{"mime_type":"image/gif","data":"R0lGODlhBQAEAPAAAAAA/wAAACH5BAAAAAAALAAAAAAFAAQAAAIEhI+ZBQA7"},{"mime_type":"image/png","data":"iVBORw0KGgoAAAANSUhEUgAAAAMAAAACAQMAAACnuvRZAAAAA1BMVEX/AAAZ4gk3AAAADElEQVQI12NgYGAAAAAEAAEnNCcKAAAAAElFTkSuQmCC"}],"at":<at>},{"role":"assistant","content":[{"type":"text","text":"ok"}],"stop_reason":{"type":"end_turn"},"usage":{"input":10,"output":5,"cache_read":0},"model":"deepseek-flash","at":<at>},{"role":"user","text":"","images":[{"mime_type":"image/png","data":"iVBORw0KGgoAAAANSUhEUgAAAAMAAAACAQMAAACnuvRZAAAAA1BMVEX/AAAZ4gk3AAAADElEQVQI12NgYGAAAAAEAAEnNCcKAAAAAElFTkSuQmCC"}],"at":<at>},{"role":"assistant","content":[{"type":"text","text":"ok"}],"stop_reason":{"type":"end_turn"},"usage":{"input":10,"output":5,"cache_read":0},"model":"deepseek-flash","at":<at>}]} |}]
 ;;
 
 let%expect_test "sessions: list, new, switch, fork, rewind" =
@@ -583,7 +678,7 @@ let%expect_test "shell runs a command, streams tool events, and adds to context"
     {"type":"event","event":"message_end","message":{"role":"user","text":"$ printf 'a\\nb'\na\nb"}}
     {"type":"event","event":"state","state":{"session_id":"<id>","session_path":"$DIR/sessions/<stamp>_<id>.jsonl","session_name":null,"session_description":null,"cwd":"$DIR","git_branch":null,"model":{"id":"deepseek-flash","provider":"deepseek","key":"deepseek/deepseek-flash","name":"DeepSeek V4.1 Flash","context_window":1000000,"max_output":384000,"supports_thinking":true,"cost":{"input":0.3,"output":1.2,"cache_read":0.006}},"thinking":"off","running":false,"message_count":1,"usage":{"input":0,"output":0,"cache_read":0},"cost_usd":0,"context_tokens":0,"active_host":"backend","hosts":[{"id":"backend","name":"<host>","cwd":"$DIR","session_id":null,"session_name":null}],"subagents":[],"jobs":[]}}
     {"type":"response","id":"r1","ok":true,"result":{"text":"a\nb","is_error":false}}
-    {"type":"response","id":"r1","ok":true,"result":[{"role":"user","text":"$ printf 'a\\nb'\na\nb"}]}
+    {"type":"response","id":"r1","ok":true,"result":[{"role":"user","text":"$ printf 'a\\nb'\na\nb","at":<at>}]}
     |}]
 ;;
 

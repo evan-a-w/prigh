@@ -682,6 +682,12 @@ let rec sign_in_form
          : Dom_html.event_listener_id))
 ;;
 
+(* [getTimezoneOffset] is UTC minus local time, in minutes. *)
+let utc_offset () =
+  let minutes = (new%js Js.date_now)##getTimezoneOffset in
+  Time_ns.Span.of_min (Float.of_int (-minutes))
+;;
+
 let run_app (settings : Settings.t) =
   let client =
     Client.create ~connect:(fun () ->
@@ -731,7 +737,13 @@ let run_app (settings : Settings.t) =
        schedule (App.Action.Set_narrow (narrow ()));
        schedule (App.Action.Load_history (load_history ()));
        schedule App.Action.Start;
-       let tick () = schedule (App.Action.Tick (Time_ns.now ())) in
+       (* The offset changes with daylight saving time. *)
+       let tick () =
+         schedule (App.Action.Tick (Time_ns.now ()));
+         let utc_offset = utc_offset () in
+         if not (Time_ns.Span.equal utc_offset !current.utc_offset)
+         then schedule (App.Action.Set_utc_offset utc_offset)
+       in
        tick ();
        Clock_ns.every (Time_ns.Span.of_sec 30.) tick;
        Clock_ns.every (Time_ns.Span.of_sec 1.) (fun () ->
@@ -744,7 +756,8 @@ let run_app (settings : Settings.t) =
             ~f:(fun incoming ->
               schedule
                 (match incoming with
-                 | Event e -> Event e
+                 | Event e ->
+                   Event (Prigh_web.Chat.received e ~at:(Time_ns.now ()))
                  | Protocol_error e -> Protocol_error e
                  | Stderr text -> Show_toast { text; error = true }
                  | Closed -> Backend_closed)));

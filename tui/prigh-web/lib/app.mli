@@ -157,6 +157,8 @@ module Action : sig
     | Backend_closed
     | Reply of Reply_tag.t * (Json.t, string) Result.t
     | Tick of Time_ns.t (** the clock, for ages; also refreshes the sessions *)
+    | Set_utc_offset of Time_ns.Span.t
+    (** the browser's time zone, for messages' times *)
     | Set_narrow of bool (** a phone-sized window: the sidebar is a drawer *)
     | Load_history of string list
     | Set_draft of string (** the caret at the end *)
@@ -266,6 +268,7 @@ module Model : sig
     ; models : Llm.t list
     ; auth : Auth_status.t list
     ; now : Time_ns.t option
+    ; utc_offset : Time_ns.Span.t (** local time minus UTC *)
     ; narrow : bool
     ; draft : string
     ; cursor : int (** the caret's byte offset in [draft] *)
@@ -299,6 +302,9 @@ module Model : sig
   (** The agents panel is open with something running: the page sends
       [Clock] every second. *)
   val ticking : t -> bool
+
+  (** How messages' times read: in [utc_offset], relative to [now]'s day. *)
+  val message_time : t -> Message_time.t
 
   (** The completion popup when it has something to show. *)
   val popup : t -> Completion.t option

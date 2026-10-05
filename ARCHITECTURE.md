@@ -386,20 +386,26 @@ two can share one.
   and thinking level there; agents created without an explicit `-model`/
   `-thinking` start from them (a loaded session's own settings still win).
 - `Session` — an append-only JSONL log forming a tree: every entry has a
-  `parent`, the active conversation is the path from the root to `head`.
+  `parent` and `at`, when it was appended (seconds; optional, so files
+  written before it load, without times; a fork keeps the copied entries'
+  times), and the active conversation is the path from the root to `head`.
   Rewinding moves `head`; forking copies the active path to a new file.
   Entries are messages, model/thinking changes, compaction summaries, names,
   descriptions, cwds (so a reload restores both) and the system prompt;
   `Session.messages` is the message list for the next request with the
-  compaction summary replacing everything before `kept_from`. Nothing is
+  compaction summary replacing everything before `kept_from`
+  (`timed_messages`: each with its entry's time, as a `Timed_message.t`;
+  the summary has none). Nothing is
   written to disk until the first message (or name): an abandoned empty
   session leaves no file. `list` returns name, description, cwd,
   timestamps, message count, first prompt and parent, most recently
   modified first; `export` writes markdown or copies the JSONL,
-  `import` copies a file in, and `session_stats` counts turns, tool calls by
+  `import` copies a file in (the markdown has each message's time, in UTC,
+  in its heading), and `session_stats` counts turns, tool calls by
   name, tokens, cost, model changes and compactions. Under the RPC,
   `get_entries` returns `{head, entries}` (`all: true` includes abandoned
-  branches for the tree view).
+  branches for the tree view; entries carry `at` in milliseconds when
+  known).
 - `Compaction` — summarises older messages via the model and keeps a tail;
   manual (`/compact [instructions]`: the RPC's `instructions`, pi's
   `customInstructions`, are appended to the summariser's) or automatic.
@@ -413,7 +419,15 @@ two can share one.
 
 - `Rpc_json` — the wire encoding (plain tagged objects, not the derived
   `["Ctor", ...]` form) for messages, deltas, state, models, sessions,
-  auth status and events.
+  auth status and events. Messages carry `at`, milliseconds since the
+  epoch, when known: in `get_messages` (the session entries' times, none for
+  older entries or the compaction summary) and `get_subagent` (when the
+  subagent's `message_end` arrived), and in `message_start`/`message_end`
+  events (also nested in `subagent` ones), stamped by `Rpc_server` with the
+  time it sends them: a `message_end` is sent as its message is appended,
+  so it agrees with `get_messages` to within milliseconds. A streaming
+  assistant message's `message_start` has its start, its `message_end` its
+  end (the time frontends keep).
 - `Rpc_server` — the connection and session manager: a table of live
   agents by session id, a table of clients, and per-connection
   `serve_lines` (`serve_connection` over newline-delimited flows, or one
@@ -761,7 +775,15 @@ copy of the protocol types and the e2e test guards the contract.
       `Delivery_view` (reports of finished background work, parsed by
       `ui/`'s `Delivery`), `Markdown` (a total parser that also renders
       streaming prefixes) and `Markdown_view`, `Image_view`,
-      `Output_view`.
+      `Output_view`. Messages' times (`at`; the page stamps live events
+      without one, from an older backend, with when it received them,
+      `Chat.received`) show under user messages and in a reply's footer, as
+      `Message_time` formats them: in the browser's time zone
+      (`Model.utc_offset`, which the page sends at startup and when it
+      changes) relative to today (`Model.now`): `14:32`, `Yesterday
+      14:32`, `3 Oct 14:32`, `3 Oct 2025 14:32`, the full date in the
+      `title`; `Chat_view` puts a day separator where consecutive messages'
+      days differ, and nested and agents-panel transcripts get the same.
     - The agents panel: `Agents` (per session: `list_subagents` and
       `list_jobs`, kept live by `subagent_start`/`subagent`/`subagent_end`
       at any depth and by the state's `subagents`/`jobs` changing; nested
@@ -918,7 +940,7 @@ prigh-web's e2e, `tui/prigh-web/e2e/prigh_web.sh` (the flake's Linux
 `prigh_web.mjs` in Chromium and Firefox. The driver owns the backend
 (`serve -prigh-web 127.0.0.1:0 -faux-script ...` with an isolated `HOME`
 and cwd) so that it can restart it, and prints normalised text snapshots
-(ids, cwd, cost and context replaced) diffed against `prigh_web.expected`:
+(ids, cwd, cost, context and messages' times replaced) diffed against `prigh_web.expected`:
 the sign-in form and signing in with the token, the top bar, a scripted
 bash call and its output, the model `read`ing a real PNG (`png.mjs` writes
 it; the tool result's `img` must be a loaded `data:image/png` of the right

@@ -837,6 +837,7 @@ let%expect_test "subagent from a reloaded session: no events, only its result" =
           ; stop_reason = Tool_use
           ; usage = Prigh_protocol.Usage.zero
           ; model = "m"
+          ; at = None
           }
       ; Tool_result
           { tool_call_id = "c12"
@@ -846,6 +847,7 @@ let%expect_test "subagent from a reloaded session: no events, only its result" =
                [subagent: 2 turns, 10 in / 5 out tokens, $0.0010]"
           ; is_error = false
           ; images = []
+          ; at = None
           }
       ]
   in

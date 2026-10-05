@@ -102,15 +102,15 @@ let%expect_test "statuses, activity and transcripts of nested subagents" =
     match Subagent_log.find log key with
     | None -> print_endline "none"
     | Some (s, messages) ->
-      print_s [%sexp (s.id : string), (messages : Message.t list)]
+      print_s [%sexp (s.id : string), (messages : Timed_message.t list)]
   in
   found "a1";
   found "c2";
   found "nope";
   [%expect
     {|
-    (a1 ((User ((text "look around")))))
-    (a1/c2 ((User ((text dig)))))
+    (a1 (((message (User ((text "look around")))) (at (4)))))
+    (a1/c2 (((message (User ((text dig)))) (at (7)))))
     none
     |}];
   Subagent_log.clear log;
