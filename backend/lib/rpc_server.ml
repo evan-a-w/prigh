@@ -876,8 +876,15 @@ let dispatch agent login ~meth ~params : Json.t Or_error.t =
         Agent.set_thinking agent thinking;
         `Object []))
   | "compact" ->
-    Or_error.map (Agent.compact agent) ~f:(fun summary ->
-      `Object [ "summary", `String summary ])
+    Or_error.bind
+      (string_param_opt params "instructions")
+      ~f:(fun instructions ->
+        let instructions =
+          Option.filter instructions ~f:(fun s ->
+            not (String.is_empty (String.strip s)))
+        in
+        Or_error.map (Agent.compact ?instructions agent) ~f:(fun summary ->
+          `Object [ "summary", `String summary ]))
   | "set_session_name" ->
     Or_error.map (string_param params "name") ~f:(fun name ->
       Agent.set_session_name agent name;

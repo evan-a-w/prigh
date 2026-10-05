@@ -113,6 +113,7 @@ let compact
       ~model
       ?(keep_recent_tokens = 8000)
       ?(cancel = Cancellation.never)
+      ?instructions
       session
   =
   let path = Session.active_path session in
@@ -140,7 +141,14 @@ let compact
     else (
       let request =
         { Provider.Request.model
-        ; system = Some summary_instructions
+        ; system =
+            Some
+              (match instructions with
+               | None -> summary_instructions
+               | Some extra ->
+                 summary_instructions
+                 ^ "\n\nThe user's instructions for this summary: "
+                 ^ extra)
         ; messages = [ Message.user (render_transcript older) ]
         ; tools = []
         ; thinking = Off
