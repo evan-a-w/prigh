@@ -443,7 +443,6 @@ kbd {
   min-height: 32px;
   max-height: 40vh;
   overflow-y: auto;
-  field-sizing: content;
 }
 .editor::placeholder { color: var(--faint); }
 .composer-buttons { display: flex; gap: 6px; }

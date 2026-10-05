@@ -33,10 +33,17 @@ module Settings = struct
   ;;
 end
 
+(* A session the backend no longer has (e.g. never saved before it restarted)
+   must not keep us out: start a new one instead. *)
 let send_hello client settings ~session =
-  Deferred.map
-    (Client.call client "hello" (Settings.hello settings ~session))
-    ~f:(Result.map_error ~f:Error.to_string_hum)
+  let hello session =
+    Deferred.map
+      (Client.call client "hello" (Settings.hello settings ~session))
+      ~f:(Result.map_error ~f:Error.to_string_hum)
+  in
+  match%bind.Deferred hello session with
+  | Error _ when Option.is_some session -> hello None
+  | result -> Deferred.return result
 ;;
 
 let history_key = "prigh-web.history"
@@ -144,7 +151,11 @@ let component client settings ~current (local_ graph) =
       ~apply_action:(fun ctx model action ->
         let model', commands = App.update model action in
         current := model';
-        if not (String.equal model.draft model'.draft) then autosize ();
+        if not
+             (String.equal model.draft model'.draft
+              && Bool.equal (App.Model.running model) (App.Model.running model')
+              && Bool.equal model.narrow model'.narrow)
+        then autosize ();
         List.iter commands ~f:(perform client settings ctx);
         model')
       graph

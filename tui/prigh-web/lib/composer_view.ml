@@ -73,7 +73,9 @@ let images (m : App.Model.t) ~inject =
 ;;
 
 let placeholder (m : App.Model.t) =
-  if App.Model.running m
+  if App.Model.running m && m.narrow
+  then "Steer the agent…"
+  else if App.Model.running m
   then "Steer the agent (Enter) or queue a follow-up (Alt+Enter)…"
   else if m.narrow
   then "Ask prigh…  / for commands"
