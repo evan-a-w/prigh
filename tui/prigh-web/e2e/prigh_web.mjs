@@ -94,6 +94,8 @@ page.on("pageerror", error => errors.push(`page: ${error.message}`));
 const clean = text => text
   .replaceAll(cwd, "<CWD>")
   .replace(/[0-9a-f]{16}/g, "<ID>")
+  .replace(/ws:\/\/127\.0\.0\.1:\d+/g, "ws://127.0.0.1:<PORT>")
+  .replace(/just now|\d+[smhd] ago/g, "<AGE>")
   .replace(/\$\d+\.\d+/g, "$<COST>")
   .replace(/\d+% ctx/g, "<CTX>% ctx")
   .split("\n")
@@ -113,7 +115,7 @@ const screenshot = async label => {
 
 // Tool calls and thinking are collapsible: open them so that their text shows.
 const show = async (label, selector) => {
-  await page.evaluate(() => document.querySelectorAll("details").forEach(d => { d.open = true; }));
+  await page.evaluate(() => document.querySelectorAll("details:not(.image)").forEach(d => { d.open = true; }));
   section(label);
   console.log(clean(await page.locator(selector).first().innerText()));
   await screenshot(label);
@@ -131,7 +133,7 @@ const showHeader = async label => {
 
 // From the last prompt to the end of the chat.
 const showTurn = async label => {
-  await page.evaluate(() => document.querySelectorAll("details").forEach(d => { d.open = true; }));
+  await page.evaluate(() => document.querySelectorAll("details:not(.image)").forEach(d => { d.open = true; }));
   section(label);
   console.log(clean(await page.evaluate(() => {
     const prompts = document.querySelectorAll(".chat .msg.user");
@@ -236,7 +238,7 @@ try {
   await bodyHas("a red flag with a blue stripe");
   await idle();
   await showTurn("read an image");
-  await showImages("the read tool's image", page.locator(".tool img"));
+  await showImages("the read tool's image", page.locator(".tool img.thumb"));
 
   // 4. An image pasted and one dropped into the composer go with the prompt.
   await deliver("paste", pasted, "pasted.png");
@@ -248,7 +250,7 @@ try {
   await bodyHas("you sent me two images");
   await idle();
   console.log(`composer cleared: ${(await page.locator(".composer img").count()) === 0}`);
-  await showImages("the prompt's images", page.locator(".msg.user").last().locator("img"));
+  await showImages("the prompt's images", page.locator(".msg.user").last().locator("img.thumb"));
   {
     const messages = await backendMessages(sessionId());
     const user = messages.filter(m => m.role === "user").at(-1);
@@ -303,6 +305,8 @@ try {
 
   // The layout at phone size.
   await page.setViewportSize({ width: 390, height: 844 });
+  await page.waitForFunction(() => document.querySelector(".app.narrow:not(.sidebar-open)"));
+  await page.waitForTimeout(400); // the drawer's slide
   await screenshot("phone");
 
   section("errors");

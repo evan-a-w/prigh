@@ -383,6 +383,12 @@ let run_app (settings : Settings.t) =
      with
      | Error error ->
        let%map.Deferred () = Client.close client in
+       (* Nothing to be wrong about before the first sign-in. *)
+       let error =
+         match settings.login.password with
+         | None when String.is_prefix error ~prefix:"unauthorised" -> ""
+         | _ -> error
+       in
        sign_in_form settings ~error
      | Ok reply ->
        let handle_ref = ref None in
