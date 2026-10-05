@@ -49,9 +49,12 @@ let print_log ~dir =
   List.iter (log ~dir) ~f:(fun line -> print_endline (mask ~dir line))
 ;;
 
-let print_s_masked ~dir sexp =
-  print_endline (mask ~dir (Sexp.to_string_hum sexp))
+let rec mask_sexp ~dir : Sexp.t -> Sexp.t = function
+  | Atom atom -> Atom (mask ~dir atom)
+  | List items -> List (List.map items ~f:(mask_sexp ~dir))
 ;;
+
+let print_s_masked ~dir sexp = print_s (mask_sexp ~dir sexp)
 
 let print_result ~dir ({ text; is_error; images } : Tool_result.t) =
   print_endline (mask ~dir (if is_error then "ERROR: " ^ text else text));

@@ -29,7 +29,10 @@ module Server = struct
   let key t =
     Md5.to_hex
       (Md5.digest_string
-         (Sexp.to_string [%sexp (t.name, t.source, t.dir, t.transport : string * string * string * Transport.t)]))
+         (Sexp.to_string
+            [%sexp
+              ((t.name, t.source, t.dir, t.transport)
+               : string * string * string * Transport.t)]))
   ;;
 end
 
@@ -57,7 +60,9 @@ let ancestors dir =
 (* [${VAR}] and [${VAR:-default}]; an unset variable without a default is
    an error naming it. *)
 let expand ~getenv s =
-  let re = Re.compile (Re.Perl.re {|\$\{([A-Za-z_][A-Za-z0-9_]*)(:-([^}]*))?\}|}) in
+  let re =
+    Re.compile (Re.Perl.re {|\$\{([A-Za-z_][A-Za-z0-9_]*)(:-([^}]*))?\}|})
+  in
   let missing = ref [] in
   let expanded =
     Re.replace re s ~f:(fun g ->
@@ -81,7 +86,7 @@ let strings json ~what =
     List.map items ~f:(function
       | `String s -> Ok s
       | _ -> Or_error.errorf "%s must be a list of strings" what)
-    |> Or_error.combine_errors
+    |> Result.all
   | _ -> Or_error.errorf "%s must be a list of strings" what
 ;;
 
@@ -92,7 +97,7 @@ let string_map json ~what =
       match v with
       | `String s -> Ok (k, s)
       | _ -> Or_error.errorf "%s.%s must be a string" what k)
-    |> Or_error.combine_errors
+    |> Result.all
   | _ -> Or_error.errorf "%s must be an object of strings" what
 ;;
 
@@ -121,19 +126,24 @@ let transport ~getenv json =
     let%bind args = opt "args" ~default:[] ~f:strings in
     let%bind env = opt "env" ~default:[] ~f:string_map in
     let%bind command = expand command in
-    let%bind args = List.map args ~f:expand |> Or_error.combine_errors in
-    let%map env = expand_pairs env |> Or_error.combine_errors in
+    let%bind args = List.map args ~f:expand |> Result.all in
+    let%map env = expand_pairs env |> Result.all in
     Transport.Stdio { command; args; env }
   | (None | Some ("http" | "streamable-http")), _, Some (`String url) ->
     let%bind headers = opt "headers" ~default:[] ~f:string_map in
     let%bind url = expand url in
-    let%map headers = expand_pairs headers |> Or_error.combine_errors in
+    let%map headers = expand_pairs headers |> Result.all in
     Transport.Http { url; headers }
+  | Some "stdio", _, _ ->
+    Or_error.error_string "give the \"command\" to run (a string)"
+  | Some ("http" | "streamable-http"), _, _ ->
+    Or_error.error_string "give the server's \"url\" (a string)"
   | Some "sse", _, _ ->
     Or_error.error_string
       "the legacy SSE transport is not supported; use the server's streamable \
        HTTP endpoint (\"type\": \"http\")"
-  | Some other, _, _ -> Or_error.errorf "unknown type %S; use stdio or http" other
+  | Some other, _, _ ->
+    Or_error.errorf "unknown type %S; use stdio or http" other
   | None, _, _ ->
     Or_error.error_string "give a \"command\" (stdio) or a \"url\" (http)"
 ;;
@@ -149,7 +159,8 @@ let servers_in ~getenv ~source ~project ~dir =
   | None -> [], []
   | Some text ->
     (match Json.parse text with
-     | Error e -> [], [ sprintf "%s: invalid JSON: %s" source (Error.to_string_hum e) ]
+     | Error e ->
+       [], [ sprintf "%s: invalid JSON: %s" source (Error.to_string_hum e) ]
      | Ok json ->
        (match field json "mcpServers" with
         | None -> [], []
@@ -165,7 +176,8 @@ let servers_in ~getenv ~source ~project ~dir =
                 ; transport
                 ; approval =
                     Md5.to_hex
-                      (Md5.digest_string (source ^ "\000" ^ name ^ "\000" ^ Json.to_string spec))
+                      (Md5.digest_string
+                         (source ^ "\000" ^ name ^ "\000" ^ Json.to_string spec))
                 }
             | Error e ->
               Second
@@ -180,13 +192,20 @@ let servers_in ~getenv ~source ~project ~dir =
 let discover ?(getenv = Sys.getenv) ~cwd ~home () =
   let project =
     List.map (ancestors cwd) ~f:(fun dir ->
-      servers_in ~getenv ~source:(Filename.concat dir ".mcp.json") ~project:true ~dir)
+      servers_in
+        ~getenv
+        ~source:(Filename.concat dir ".mcp.json")
+        ~project:true
+        ~dir)
   in
-  let user = servers_in ~getenv ~source:(user_file ~home) ~project:false ~dir:home in
+  let user =
+    servers_in ~getenv ~source:(user_file ~home) ~project:false ~dir:home
+  in
   let found = project @ [ user ] in
   { Discovered.servers =
       List.concat_map found ~f:fst
-      |> List.stable_dedup ~compare:(fun (a : Server.t) b -> String.compare a.name b.name)
+      |> List.stable_dedup ~compare:(fun (a : Server.t) b ->
+        String.compare a.name b.name)
   ; problems = List.concat_map found ~f:snd
   }
 ;;
@@ -203,7 +222,8 @@ let find ?(getenv = Sys.getenv) ~home ~source name =
          String.is_substring p ~substring:(sprintf "server %S:" name))
      with
      | Some problem -> Error (Error.of_string problem)
-     | None -> Or_error.errorf "%s no longer defines the MCP server %S" source name)
+     | None ->
+       Or_error.errorf "%s no longer defines the MCP server %S" source name)
 ;;
 
 let approvals ~home =
@@ -232,6 +252,7 @@ let approve ~home (server : Server.t) =
       Out_channel.write_all
         tmp
         ~data:
-          (Json.to_string (`Array (List.map items ~f:(fun s -> `String s))) ^ "\n");
+          (Json.to_string (`Array (List.map items ~f:(fun s -> `String s)))
+           ^ "\n");
       Core_unix.rename ~src:tmp ~dst:path))
 ;;
