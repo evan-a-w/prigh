@@ -177,7 +177,8 @@ let%expect_test "image sizes come from the base64 length, padded or not" =
     ~f:(fun data ->
       print_s [%message data ~bytes:(Image.decoded_size data : int)]);
   List.iter [ 0; 1023; 1024; 35021; 1_572_864 ] ~f:(fun bytes ->
-    print_endline (Image.to_string_hum { mime_type = "image/jpeg"; bytes; data = "" }));
+    print_endline
+      (Image.to_string_hum { mime_type = "image/jpeg"; bytes; data = "" }));
   [%expect
     {|
     ("" (bytes 0))
@@ -584,7 +585,7 @@ let%expect_test "entries and session stats" =
   (* The optional list-session fields may be absent. *)
   show
     (fun j ->
-      Or_error.map (Session_summary.of_json j) ~f:Session_summary.sexp_of_t)
+       Or_error.map (Session_summary.of_json j) ~f:Session_summary.sexp_of_t)
     {|{"id":"a","path":"/p","cwd":"/c","created_at":"2025-01-01T00:00:00Z","first_prompt":"hi","message_count":3}|};
   show
     (fun j -> Or_error.map (Entry.of_json j) ~f:Entry.sexp_of_t)
@@ -668,7 +669,7 @@ let%expect_test "errors name the field" =
         "while decoding"
         "{\"type\":\"event\",\"event\":\"bogus\"}"
         "unknown event \"bogus\"")))
-    (error (e "json: unexpected string: 'not'"))
+    (error (e "invalid JSON at byte 0: unexpected token"))
     (Response ((id (1)) (result (Ok ((nested (1 2)))))))
     |}]
 ;;
@@ -787,5 +788,44 @@ let%expect_test "hello reply: client id and namespace" =
       (user      ())))
     (Error "missing field \"client_id\"")
     (Error "field \"namespace\": expected string, got 3")
+    |}]
+;;
+
+let%expect_test "Json.parse agrees with Jsonaf, and says where it fails" =
+  let docs =
+    [ {|{"a":1,"b":[true,false,null],"c":{"d":"e\"\\\/\b\f\n\r\t"},"n":-1.5e3}|}
+    ; {|  [ ]  |}
+    ; {|{}|}
+    ; {|"\u00e9\u4e2d\ud83d\ude00"|}
+    ; {|[0, -0, 12.25, 1E2, 3e-4]|}
+    ; {|{"nested":[[[{"x":[1,[2,[3]]]}]]]}|}
+    ]
+  in
+  List.iter docs ~f:(fun doc ->
+    let ours = Json.parse doc |> Or_error.ok_exn in
+    let theirs = Jsonaf.parse doc |> Or_error.ok_exn in
+    printf "%b %s\n" (Jsonaf.exactly_equal ours theirs) (Jsonaf.to_string ours));
+  List.iter
+    [ ""; "[1,]"; {|{"a" 1}|}; "tru"; {|"open|}; "[1] x"; "01"; {|"\q"|} ]
+    ~f:(fun doc ->
+      match Json.parse doc with
+      | Ok j -> printf "%S parsed?! %s\n" doc (Jsonaf.to_string j)
+      | Error e -> printf "%S: %s\n" doc (Error.to_string_hum e));
+  [%expect
+    {|
+    true {"a":1,"b":[true,false,null],"c":{"d":"e\"\\/\b\f\n\r\t"},"n":-1.5e3}
+    true []
+    true {}
+    true "é中😀"
+    true [0,-0,12.25,1E2,3e-4]
+    true {"nested":[[[{"x":[1,[2,[3]]]}]]]}
+    "": invalid JSON at byte 0: unexpected character
+    "[1,]": invalid JSON at byte 3: unexpected character
+    "{\"a\" 1}": invalid JSON at byte 5: expected ':'
+    "tru": invalid JSON at byte 0: unexpected token
+    "\"open": invalid JSON at byte 5: unterminated string
+    "[1] x": invalid JSON at byte 4: trailing characters
+    "01": invalid JSON at byte 0: leading zero
+    "\"\\q\"": invalid JSON at byte 2: bad escape
     |}]
 ;;

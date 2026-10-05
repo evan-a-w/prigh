@@ -9,3 +9,6 @@ val title : Session_summary.t -> string
 (** The sessions matching [query] (title, first prompt, cwd), best first; all of
     them, in the backend's order, when it is empty. *)
 val filter : Session_summary.t list -> query:string -> Session_summary.t list
+
+(** The DOM id of a session's row in the sidebar (focused from the keyboard). *)
+val dom_id : string -> string

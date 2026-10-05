@@ -750,7 +750,11 @@ copy of the protocol types and the e2e test guards the contract.
     - The transcript: `Chat` (one agent: `get_messages` then events; each
       tool call's streamed output and result; subagents' nested chats,
       fetched with `get_subagent` after a reload since `get_messages` only
-      has their reports; `!cmd` runs as `Shell` entries), `Chat_view`,
+      has their reports; `!cmd` runs as `Shell` entries), `Chat_view` (each
+      entry, and the whole transcript, a `Node.lazy_` cached by `View_cache`
+      on the value: virtual_dom skips what did not change, so a streamed
+      delta or a key press costs the same in a long session as in a short
+      one),
       `Tool_view` (a card per tool: bash, read with images, write, edit
       with `Line_diff`/`Diff_view`, ls/grep/find, subagents (marked with
       `data-call` and `data-agent` for the agents panel), jobs),

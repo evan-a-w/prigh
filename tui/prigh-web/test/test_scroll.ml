@@ -41,7 +41,8 @@ let%expect_test "scrolled up: a jump button; it, or sending, follows again" =
   [%expect
     {|
     (Save_history (next))
-    (Rpc (method_ prompt) (params ((text next))) (tag Show_error))
     Scroll_to_bottom
+    (Rpc (method_ prompt) (params ((text next)))
+     (tag (Sent (text next) (images ()))))
     |}]
 ;;

@@ -13,6 +13,7 @@
  (libraries
   core
   expect_test_helpers_core
+  js_of_ocaml
   prigh_protocol
   prigh_web
   virtual_dom

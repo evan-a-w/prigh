@@ -56,7 +56,7 @@ let%expect_test "call/response correlation, events, errors, close" =
     ((a (Ok    pong))
      (b (Error "unknown model")))
     (Event (Notice hello))
-    (Protocol_error "json: unexpected character: 'g'")
+    (Protocol_error "invalid JSON at byte 0: unexpected character")
     (Protocol_error "response for unknown request id 99")
     |}];
   (* The backend going away fails pending calls and delivers [Closed]; the

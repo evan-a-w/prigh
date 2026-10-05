@@ -20,7 +20,7 @@ let float f = `Number (sprintf "%.15g" f)
 let bool b = if b then `True else `False
 let obj fields = `Object fields
 let to_string = Jsonaf.to_string
-let parse = Jsonaf.parse
+let parse = Json_parser.parse
 
 let field t name =
   match t with

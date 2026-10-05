@@ -36,7 +36,12 @@ module Reply_tag : sig
     | Ignore
     | Show_error (** only failures are shown *)
     | State
-    | Messages
+    | Messages of string (** the session's id *)
+    | Pending
+    | Sent of
+        { text : string
+        ; images : Image.t list
+        } (** a prompt, steer or follow-up: back to the editor if it fails *)
     | Sessions
     | Models
     | Reload_state (** the client's session changed: fetch its state *)
@@ -174,6 +179,12 @@ module Action : sig
     | Ask_delete of string (** path *)
     | Set_session_query of string
     | Open_sessions (** the sidebar, with its search focused *)
+    | Session_nav of
+        { from : string option (** a session's id; [None]: the search *)
+        ; by : int
+        } (** the focus to another of the sidebar's sessions *)
+    | Open_first_session (** the search's best match *)
+    | Leave_sidebar (** back to the editor *)
     | Set_model of string (** [provider/id] *)
     | Set_thinking of string
     | Open_model_picker

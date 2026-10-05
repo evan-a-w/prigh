@@ -13,3 +13,5 @@ let filter sessions ~query =
       ~sep:" "
       [ title s; Option.value s.first_prompt ~default:""; s.cwd ])
 ;;
+
+let dom_id id = "session-" ^ id

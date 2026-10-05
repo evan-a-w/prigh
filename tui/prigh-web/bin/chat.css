@@ -225,6 +225,9 @@ summary:hover > .label { color: var(--fg); }
 .markdown table {
   border-collapse: collapse;
   min-width: 100%;
+  /* Words stay whole (the table scrolls instead of wrapping letter by
+     letter on a phone). */
+  overflow-wrap: break-word;
   font-size: 13.5px;
   line-height: 1.5;
 }

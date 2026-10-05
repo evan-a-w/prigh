@@ -92,12 +92,14 @@ let tree_items entries ~head =
       | None -> acc
       | Some (e : Entry.t) ->
         let acc = Set.add acc id in
-        Option.value_map e.parent ~default:acc ~f:(fun p -> go p acc)
+        (match e.parent with
+         | None -> acc
+         | Some p -> go p acc)
     in
     Option.value_map head ~default:String.Set.empty ~f:(fun h ->
       go h String.Set.empty)
   in
-  let rec walk depth ((e : Entry.t), (m : Message.t)) =
+  let item depth ((e : Entry.t), (m : Message.t)) =
     let glyph =
       match m with
       | User _ -> ">"
@@ -110,14 +112,19 @@ let tree_items entries ~head =
       ~search:text
       ~marked:(Set.mem active e.id)
       (String.make (2 * depth) ' ' ^ glyph ^ " " ^ text)
-    (* A conversation stays at its depth; a branch point indents its
-       branches. *)
-    ::
-    (match Option.value (Map.find children e.id) ~default:[] with
-     | [ only ] -> walk depth only
-     | branches -> List.concat_map branches ~f:(walk (depth + 1)))
   in
-  match roots with
-  | [ root ] -> walk 0 root
-  | roots -> List.concat_map roots ~f:(walk 0)
+  (* Depth first, with an explicit stack: a conversation can be thousands of
+     messages long. A conversation stays at its depth; a branch point
+     indents its branches. *)
+  let rec walk acc = function
+    | [] -> List.rev acc
+    | (depth, (((e : Entry.t), _) as node)) :: rest ->
+      let next =
+        match Option.value (Map.find children e.id) ~default:[] with
+        | [ only ] -> [ depth, only ]
+        | branches -> List.map branches ~f:(fun b -> depth + 1, b)
+      in
+      walk (item depth node :: acc) (next @ rest)
+  in
+  walk [] (List.map roots ~f:(fun root -> 0, root))
 ;;
