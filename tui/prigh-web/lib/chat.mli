@@ -15,6 +15,8 @@ module Subagent : sig
     ; task : string
     ; model : string
     ; chat : chat (** its own transcript, from its events *)
+    ; turns : int
+    ; cost_usd : float option (** once it has finished *)
     ; result : Event.Subagent_result.t option
     }
   [@@deriving sexp_of]
@@ -37,7 +39,8 @@ module Entry : sig
         { message : Message.Assistant.t
         ; streaming : bool
         }
-    | Notice of string (** e.g. a compaction summary *)
+    | Notice of string
+    | Compaction of string (** the summary that replaced older messages *)
   [@@deriving sexp_of]
 end
 
@@ -48,5 +51,10 @@ val of_messages : Message.t list -> t
 val entries : t -> Entry.t list
 
 val tool : t -> string -> Tool.t option
+
+(** Whether the agent is working: between its start and end events. A tool
+    call without a result while it is not will never get one. *)
+val running : t -> bool
+
 val apply : t -> Event.t -> t
 val add_notice : t -> string -> t
