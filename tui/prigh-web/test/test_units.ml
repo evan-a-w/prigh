@@ -85,3 +85,23 @@ let%expect_test "history keeps 100 entries, no consecutive duplicates" =
     [%sexp (List.length entries : int), (List.take entries 3 : string list)];
   [%expect {| (100 (104 103 102)) |}]
 ;;
+
+let%expect_test "browser carets (UTF-16) as byte offsets" =
+  let text = "日本 é😀x" in
+  List.iter [ 0; 1; 2; 3; 4; 5; 6; 7; 8; 20 ] ~f:(fun utf16 ->
+    let byte = Utf16.byte_offset text ~utf16 in
+    printf "%d -> %d |%s|\n" utf16 byte (String.prefix text byte));
+  [%expect
+    {|
+    0 -> 0 ||
+    1 -> 3 |日|
+    2 -> 6 |日本|
+    3 -> 7 |日本 |
+    4 -> 9 |日本 é|
+    5 -> 13 |日本 é😀|
+    6 -> 13 |日本 é😀|
+    7 -> 14 |日本 é😀x|
+    8 -> 14 |日本 é😀x|
+    20 -> 14 |日本 é😀x|
+    |}]
+;;

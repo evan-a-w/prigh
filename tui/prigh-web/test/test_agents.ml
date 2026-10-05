@@ -431,6 +431,7 @@ let%expect_test "jobs: listed, their output polled, killed" =
     (sprintf
        "[%s]"
        (job "j1" "make test" ~running:false ~exit:"killed" ~elapsed:6.));
+  (* Its last lines are fetched once more now that it has exited. *)
   H.text h ~selector:".detail-head";
   H.act h (Clock (at 9.));
   print_s [%sexp (App.Model.ticking (H.model h) : bool)];
@@ -439,6 +440,7 @@ let%expect_test "jobs: listed, their output polled, killed" =
     (Rpc (method_ kill_job) (params ((job_id j1))) (tag Show_error))
     (Stopping…)
     (Rpc (method_ list_jobs) (params ()) (tag Jobs))
+    (Rpc (method_ job_output) (params ((job_id j1))) (tag (Job_output j1)))
     ✕ make test
     killed 6s j1
     false
@@ -504,7 +506,9 @@ let%expect_test
   [%expect
     {|
     (Save_history (next))
-    (Rpc (method_ prompt) (params ((text next))) (tag Show_error))
+    Scroll_to_bottom
+    (Rpc (method_ prompt) (params ((text next)))
+     (tag (Sent (text next) (images ()))))
     Subagents 1 running
     (1 Draft the docs 0s a2 · deepseek-flash starting…)
     Earlier (4)
@@ -527,8 +531,8 @@ let%expect_test
   [%expect
     {|
     (Set_url_session s2)
-    Scroll_to_bottom
-    (Rpc (method_ get_messages) (params ()) (tag Messages))
+    (Rpc (method_ get_messages) (params ()) (tag (Messages s2)))
+    (Rpc (method_ get_pending) (params ()) (tag Pending))
     (Rpc (method_ list_sessions) (params ()) (tag Sessions))
     (Rpc (method_ list_subagents) (params ()) (tag Subagents))
     (Rpc (method_ list_jobs) (params ()) (tag Jobs))
@@ -541,7 +545,7 @@ let%expect_test "after a reload, a nested subagent's transcript is fetched" =
   H.act
     h
     (Reply
-       ( Messages
+       ( Messages "s1"
        , Ok
            (Jsonaf.of_string
               {|[{"role":"user","text":"survey"},
@@ -570,6 +574,7 @@ let%expect_test "after a reload, a nested subagent's transcript is fetched" =
   H.text h ~selector:".agents-detail";
   [%expect
     {|
+    Scroll_to_bottom
     (Rpc (method_ get_subagent) (params ((id s1))) (tag (Subagent s1)))
     (Rpc (method_ get_subagent) (params ((id a1/n1))) (tag (Subagent a1/n1)))
     Loading the transcript…

@@ -346,5 +346,70 @@ let%expect_test "notices and compaction" =
 let%expect_test "nothing but whitespace renders nothing" =
   Chat_harness.show
     (Chat_harness.chat [ message_end [ text "  \n"; thinking "" ] ]);
-  [%expect {| <div class="entries"> </div> |}]
+  [%expect
+    {|
+    <div class="entries">
+      <Vdom.Node.none-widget> </Vdom.Node.none-widget>
+    </div>
+    |}]
+;;
+
+(* What virtual_dom compares to skip an entry: the lazy value its thunk
+   holds, the same object while the entry is unchanged. *)
+let thunks (node : Virtual_dom.Vdom.Node.t) =
+  let node =
+    match node with
+    | Lazy { t; _ } -> Lazy.force t
+    | node -> node
+  in
+  let raw = Js_of_ocaml.Js.Unsafe.inject (Virtual_dom.Vdom.Node.to_raw node) in
+  Js_of_ocaml.Js.to_array (Js_of_ocaml.Js.Unsafe.get raw "children")
+  |> Array.map ~f:(fun child -> Js_of_ocaml.Js.Unsafe.get child "args")
+;;
+
+let%expect_test "re-rendering reuses the entries that did not change" =
+  let bash =
+    {|{"type":"event","event":"tool_start","call":{"id":"c1","name":"bash","arguments":"{\"command\":\"ls\"}"}}|}
+  in
+  let chat =
+    Chat_harness.chat
+      ~running:true
+      [ {|{"event":"message_start","message":{"role":"user","text":"one"}}|}
+      ; message_end [ text "first" ]
+      ; bash
+      ; {|{"event":"message_start","message":{"role":"user","text":"two"}}|}
+      ; update [ text "str" ]
+      ]
+  in
+  let compare before after =
+    let before = thunks (Chat_view.view before)
+    and after = thunks (Chat_view.view after) in
+    print_s
+      [%sexp
+        (Array.map2_exn before after ~f:(fun a b ->
+           if phys_equal a b then "same" else "rendered")
+         : string array)]
+  in
+  print_s
+    [%sexp (phys_equal (Chat_view.view chat) (Chat_view.view chat) : bool)];
+  [%expect {| true |}];
+  (* A streamed delta: only the streaming message. *)
+  let chat' = Chat_harness.apply chat (update [ text "streaming" ]) in
+  compare chat chat';
+  [%expect {| (same same same same rendered) |}];
+  (* A tool's output: only its card. *)
+  let chat'' =
+    Chat_harness.apply
+      chat'
+      {|{"event":"tool_output","call_id":"c1","chunk":"a.ml\n"}|}
+  in
+  compare chat' chat'';
+  [%expect {| (same same rendered same same) |}];
+  (* The run ends: the card of a call left without a result changes (it
+     will never get one), the others stay. *)
+  let ended =
+    Chat_harness.apply chat'' {|{"event":"agent_end","messages":[]}|}
+  in
+  compare chat'' ended;
+  [%expect {| (same same rendered same same) |}]
 ;;

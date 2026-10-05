@@ -4,6 +4,9 @@ module Target = struct
   type t =
     | Editor of { cursor : int }
     | Field
+    | Control
+    | Session_search
+    | Session of string
     | Page
   [@@deriving sexp_of]
 end
@@ -38,7 +41,7 @@ let help =
   ; "Ctrl+X", "copy the last reply (when nothing is selected)"
   ; "Ctrl+↑ / Ctrl+↓", "previous / next of your messages in the transcript"
   ; "PageUp / PageDown", "scroll the transcript"
-  ; "Ctrl+K", "search sessions"
+  ; "Ctrl+K", "search sessions (↓ ↑ through them, Enter opens, Delete deletes)"
   ; "Ctrl+B", "show or hide the sidebar"
   ; "Alt+1…9", "follow subagent or job N in the agents panel"
   ; "Alt+] Alt+[", "the next or previous subagent or job"
@@ -68,6 +71,12 @@ let alt_letter t letter =
   alt_only t && String.equal t.code ("Key" ^ String.uppercase letter)
 ;;
 
+let on_control t =
+  match t.target with
+  | Control -> true
+  | Editor _ | Field | Session_search | Session _ | Page -> false
+;;
+
 let dialog_key (dialog : Dialog.t) t : App.Action.t option =
   match t.key, dialog with
   | "Escape", _ -> Some Close_dialog
@@ -80,7 +89,7 @@ let dialog_key (dialog : Dialog.t) t : App.Action.t option =
   | "Tab", Scoped_models _ when not t.shift -> Some Dialog_toggle
   | "Tab", Prompt { suggestions = _ :: _; _ } when not t.shift ->
     Some Dialog_complete
-  | "Enter", _ when not t.shift -> Some Dialog_accept
+  | "Enter", _ when (not t.shift) && not (on_control t) -> Some Dialog_accept
   | _ -> None
 ;;
 
@@ -134,7 +143,35 @@ let agents_key (m : App.Model.t) t : App.Action.t option =
              ||
              match t.target with
              | Editor _ -> false
-             | Field | Page -> true) -> Some Agents_back
+             | Field | Control | Session_search | Session _ | Page -> true) ->
+    Some Agents_back
+  | _ -> None
+;;
+
+(* The sidebar is a picker: ↓ ↑ move from the search through the sessions,
+   Enter opens one (from the search, the best match), Esc goes back to the
+   editor. *)
+let session_search_key t : App.Action.t option =
+  match t.key with
+  | "ArrowDown" when plain t -> Some (Session_nav { from = None; by = 1 })
+  | "Enter" when plain t -> Some Open_first_session
+  | "Escape" -> Some Leave_sidebar
+  | _ -> None
+;;
+
+let session_key (m : App.Model.t) t id : App.Action.t option =
+  match t.key with
+  | "ArrowDown" when plain t -> Some (Session_nav { from = Some id; by = 1 })
+  | "ArrowUp" when plain t -> Some (Session_nav { from = Some id; by = -1 })
+  | ("Enter" | " ") when plain t ->
+    List.find m.sessions ~f:(fun s -> String.equal s.id id)
+    |> Option.map ~f:(fun (s : Prigh_protocol.Session_summary.t) ->
+      App.Action.Switch_session s.path)
+  | "Delete" when plain t ->
+    List.find m.sessions ~f:(fun s -> String.equal s.id id)
+    |> Option.map ~f:(fun (s : Prigh_protocol.Session_summary.t) ->
+      App.Action.Ask_delete s.path)
+  | "Escape" -> Some Leave_sidebar
   | _ -> None
 ;;
 
@@ -142,7 +179,8 @@ let handle (m : App.Model.t) t : App.Action.t option =
   match m.confirms, m.dialog with
   | c :: _, _ ->
     (match t.key with
-     | "Enter" -> Some (Respond_confirm { call_id = c.call_id; allow = true })
+     | "Enter" when plain t && not (on_control t) ->
+       Some (Respond_confirm { call_id = c.call_id; allow = true })
      | "Escape" -> Some (Respond_confirm { call_id = c.call_id; allow = false })
      | _ -> None)
   | [], Some dialog -> dialog_key dialog t
@@ -172,5 +210,7 @@ let handle (m : App.Model.t) t : App.Action.t option =
        (match agents_key m t, t.target with
         | Some action, _ -> Some action
         | None, Editor { cursor } -> editor_key m t ~cursor
-        | None, (Field | Page) -> None))
+        | None, Session_search -> session_search_key t
+        | None, Session id -> session_key m t id
+        | None, (Field | Control | Page) -> None))
 ;;

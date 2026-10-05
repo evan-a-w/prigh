@@ -298,7 +298,8 @@ let%expect_test "switching user resets everything that was the old user's" =
   H.act
     h
     (Reply
-       (Messages, Ok (Jsonaf.of_string {|[{"role":"user","text":"secret"}]|})));
+       ( Messages "s1"
+       , Ok (Jsonaf.of_string {|[{"role":"user","text":"secret"}]|}) ));
   H.act h (Run "/btw what was that?");
   H.act h (Set_session_query "ali");
   H.act h Open_model_picker;
@@ -316,10 +317,12 @@ let%expect_test "switching user resets everything that was the old user's" =
         ~btw:(Option.is_some m.btw : bool)];
   [%expect
     {|
+    Scroll_to_bottom
     (Rpc (method_ btw) (params ((question "what was that?") (btw_id btw-1)))
      (tag (Btw btw-1)))
     (Focus picker-input)
     (Rpc (method_ set_user) (params ((user bob))) (tag User_switched))
+    (Rpc (method_ btw_cancel) (params ((btw_id btw-1))) (tag Ignore))
     (Expire_toast (id 0) (after_ms 4000))
     (Focus editor)
     (Rpc (method_ get_state) (params ()) (tag State))

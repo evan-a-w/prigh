@@ -26,6 +26,10 @@ let session (m : App.Model.t) ~inject ~current (s : Session_summary.t) =
   Node.div
     ~attrs:
       [ classes [ "session" ] [ "selected", selected; "running", running ]
+      ; Attr.id (Session_list.dom_id s.id)
+      ; Attr.tabindex 0
+      ; Attr.role "button"
+      ; Attr.create "data-session" s.id
       ; Attr.on_click (fun _ -> inject (Action.Switch_session s.path))
       ; Attr.title s.path
       ]

@@ -30,7 +30,12 @@ module Reply_tag = struct
     | Ignore
     | Show_error
     | State
-    | Messages
+    | Messages of string (** the session's id *)
+    | Pending
+    | Sent of
+        { text : string
+        ; images : Image.t list
+        }
     | Sessions
     | Models
     | Reload_state
@@ -163,6 +168,12 @@ module Action = struct
     | Ask_delete of string
     | Set_session_query of string
     | Open_sessions
+    | Session_nav of
+        { from : string option
+        ; by : int
+        }
+    | Open_first_session
+    | Leave_sidebar
     | Set_model of string
     | Set_thinking of string
     | Open_model_picker
@@ -329,9 +340,17 @@ let rpc ?(tag = Reply_tag.Show_error) method_ params =
 let str s = `String s
 let max_toasts = 4
 
-let toast (m : Model.t) ?(error = false) text =
+(* A toast replaces the ones saying the same, or, with [replaces], those
+   starting with it: cycling a setting shows only where it ended up. *)
+let toast (m : Model.t) ?(error = false) ?replaces text =
   let id = m.next_toast in
-  let toasts = m.toasts @ [ { Toast.id; text; error } ] in
+  let stale (t : Toast.t) =
+    String.equal t.text text
+    || Option.exists replaces ~f:(fun prefix -> String.is_prefix t.text ~prefix)
+  in
+  let toasts =
+    List.filter m.toasts ~f:(Fn.non stale) @ [ { Toast.id; text; error } ]
+  in
   ( { m with
       toasts = List.drop toasts (List.length toasts - max_toasts)
     ; next_toast = id + 1
@@ -378,9 +397,20 @@ let field json name =
   | _ -> None
 ;;
 
+let session_id (m : Model.t) =
+  Option.value_map m.state ~default:"" ~f:(fun s -> s.session_id)
+;;
+
 let close_dialog (m : Model.t) = { m with dialog = None }, [ focus_editor ]
 let list_subagents = rpc "list_subagents" [] ~tag:Subagents
 let list_jobs = rpc "list_jobs" [] ~tag:Jobs
+
+let cancel_btw (m : Model.t) =
+  match m.btw with
+  | Some { status = Streaming; id; _ } ->
+    [ rpc "btw_cancel" [ "btw_id", str id ] ~tag:Ignore ]
+  | _ -> []
+;;
 
 (* A new session (switched, new, forked) starts from its own messages. *)
 let set_state (m : Model.t) (state : State.t) =
@@ -409,15 +439,17 @@ let set_state (m : Model.t) (state : State.t) =
       ; dialog = Option.filter m.dialog ~f:(Fn.non Dialog.per_session)
       ; agents = { Agents.empty with open_ = m.agents.open_ && not m.narrow }
       ; btw = None
+      ; completion = None
       ; scrolled_up = false
       }
-    , [ Command.Set_url_session state.session_id
-      ; Command.Scroll_to_bottom
-      ; rpc "get_messages" [] ~tag:Messages
-      ; rpc "list_sessions" [] ~tag:Sessions
-      ; list_subagents
-      ; list_jobs
-      ] )
+    , cancel_btw m
+      @ [ Command.Set_url_session state.session_id
+        ; rpc "get_messages" [] ~tag:(Messages state.session_id)
+        ; rpc "get_pending" [] ~tag:Pending
+        ; rpc "list_sessions" [] ~tag:Sessions
+        ; list_subagents
+        ; list_jobs
+        ] )
   else m, background_changed
 ;;
 
@@ -646,6 +678,44 @@ let open_sessions (m : Model.t) =
   { m with sidebar_open = true }, [ Command.Focus "session-search" ]
 ;;
 
+let switch_session (m : Model.t) path =
+  let m = { m with sidebar_open = m.sidebar_open && not m.narrow } in
+  let current = Option.map m.state ~f:(fun s -> s.session_path) in
+  if Option.equal String.equal current (Some path)
+  then m, [ focus_editor ]
+  else
+    ( m
+    , [ rpc "switch_session" [ "path", str path ] ~tag:Reload_state
+      ; focus_editor
+      ] )
+;;
+
+(* The keyboard through the sidebar's (filtered) sessions: down from the
+   search to the first, up from the first back to the search. *)
+let session_nav (m : Model.t) ~from ~by =
+  let ids =
+    List.map
+      (Session_list.filter m.sessions ~query:m.session_query)
+      ~f:(fun s -> s.id)
+  in
+  let index =
+    match from with
+    | None -> -1
+    | Some id ->
+      Option.value_map
+        (List.findi ids ~f:(fun _ id' -> String.equal id id'))
+        ~default:(-1)
+        ~f:fst
+  in
+  let target = index + by in
+  if target < 0
+  then m, [ Command.Focus "session-search" ]
+  else (
+    match List.nth ids (Int.min target (List.length ids - 1)) with
+    | Some id -> m, [ Command.Focus (Session_list.dom_id id) ]
+    | None -> m, [])
+;;
+
 let open_rename (m : Model.t) =
   let name =
     Option.value_map m.state ~default:"" ~f:(fun s ->
@@ -862,7 +932,9 @@ let cycle_model (m : Model.t) step =
       in
       let next = List.nth_exn models ((((index + step) % n) + n) % n) in
       let m = { m with state = Some { state with model = next } } in
-      let m, cmds = toast m (sprintf "Model: %s" next.name) in
+      let m, cmds =
+        toast m ~replaces:"Model: " (sprintf "Model: %s" next.name)
+      in
       m, cmds @ [ rpc "set_model" [ "model", str next.key ] ])
 ;;
 
@@ -885,7 +957,9 @@ let cycle_thinking (m : Model.t) =
         List.nth_exn thinking_levels ((index + 1) % List.length thinking_levels)
       in
       let m = { m with state = Some { state with thinking = next } } in
-      let m, cmds = toast m (sprintf "Thinking: %s" next) in
+      let m, cmds =
+        toast m ~replaces:"Thinking: " (sprintf "Thinking: %s" next)
+      in
       m, cmds @ [ rpc "set_thinking" [ "thinking", str next ] ]))
 ;;
 
@@ -898,6 +972,7 @@ let verbosity_detail : Prigh_ui.Verbosity.t -> string = function
 let set_verbosity (m : Model.t) verbosity =
   toast
     { m with verbosity }
+    ~replaces:"Transcript: "
     (sprintf
        "Transcript: %s, %s (Ctrl+O cycles)"
        (Prigh_ui.Verbosity.name verbosity)
@@ -1014,13 +1089,6 @@ let copy_last (m : Model.t) =
   | Some text ->
     let m, cmds = toast m "Copied the last reply to the clipboard" in
     m, Command.Copy text :: cmds
-;;
-
-let cancel_btw (m : Model.t) =
-  match m.btw with
-  | Some { status = Streaming; id; _ } ->
-    [ rpc "btw_cancel" [ "btw_id", str id ] ~tag:Ignore ]
-  | _ -> []
 ;;
 
 (* A newer question replaces (and cancels) the previous one. *)
@@ -1319,6 +1387,7 @@ let act_as (m : Model.t) user =
 
 (* Everything but the connection belongs to the user we were. *)
 let user_switched (m : Model.t) (hello : Hello_reply.t) =
+  let cancel = cancel_btw m in
   let m =
     { m with
       hello = Some hello
@@ -1342,7 +1411,7 @@ let user_switched (m : Model.t) (hello : Hello_reply.t) =
        | None, Some own -> sprintf "Back to %s" own
        | None, None -> "Switched user")
   in
-  m, cmds @ [ focus_editor ] @ startup
+  m, cancel @ cmds @ [ focus_editor ] @ startup
 ;;
 
 let account_chosen (m : Model.t) id =
@@ -1565,6 +1634,26 @@ let run_command (m : Model.t) ({ name; rest } : Slash.Parsed.t) =
        | None -> sprintf "Unknown command /%s: /help lists the commands." name)
 ;;
 
+(* A [get_pending] reply: the queue's sizes and the tool calls waiting for
+   the user (asked before a reload, or in another tab). *)
+let pending_of_json json =
+  let open Or_error.Let_syntax in
+  let%bind steer =
+    Json.list_field json "steer_texts" ~f:Json.to_string_or_error
+  in
+  let%bind follow_up =
+    Json.list_field json "follow_up_texts" ~f:Json.to_string_or_error
+  in
+  let%map confirms =
+    Json.list_field json "confirms" ~f:(fun c ->
+      let%bind call_id = Json.string_field c "call_id" in
+      let%bind name = Json.string_field c "name" in
+      let%map summary = Json.string_field c "summary" in
+      { Confirm.call_id; name; summary })
+  in
+  (List.length steer, List.length follow_up), confirms
+;;
+
 (* A [get_subagent] reply. *)
 let subagent_of_json json =
   let open Or_error.Let_syntax in
@@ -1584,7 +1673,7 @@ let subagent_of_json json =
   ( { Chat.Subagent.agent_id
     ; task
     ; model
-    ; chat = Chat.of_messages messages
+    ; chat = Chat.of_messages ~running:(Option.is_none result) messages
     ; turns
     ; cost_usd = None
     ; result
@@ -1646,17 +1735,42 @@ let reply (m : Model.t) (tag : Reply_tag.t) result =
      | Some (Login flow) ->
        { m with dialog = Some (Login { flow with failed = Some e }) }, []
      | _ -> error m e)
+  | Sent { text; images }, Error e ->
+    (* Back in the editor, unless something else is being written there. *)
+    if String.is_empty m.draft && List.is_empty m.images
+    then
+      error
+        (set_draft { m with images } text)
+        (sprintf "Couldn't send: %s. Your message is back in the editor." e)
+    else error m (sprintf "Couldn't send: %s. ↑ brings your message back." e)
   | _, Error e -> error m e
-  | (Ignore | Show_error | Login_started), Ok _ -> m, []
+  | (Ignore | Show_error | Login_started | Sent _), Ok _ -> m, []
   | Notice text, Ok _ -> toast m text
   | State, Ok json -> decode m json State.of_json ~f:(set_state m)
   | Reload_state, Ok _ -> m, [ rpc "get_state" [] ~tag:State ]
-  | Messages, Ok json ->
+  (* Another session's, asked for before switching again. *)
+  | Messages session, Ok _ when not (String.equal session (session_id m)) ->
+    m, []
+  | Messages _, Ok json ->
     decode m json (decode_list Message.of_json) ~f:(fun messages ->
-      let chat = Chat.of_messages messages in
-      ( { m with chat }
-      , List.map (Chat.subagents_to_load chat) ~f:(fun call_id ->
+      let chat = Chat.of_messages ~running:(Model.running m) messages in
+      ( { m with chat; scrolled_up = false }
+      , Command.Scroll_to_bottom
+        :: List.map (Chat.subagents_to_load chat) ~f:(fun call_id ->
           rpc "get_subagent" [ "id", str call_id ] ~tag:(Subagent call_id)) ))
+  | Pending, Ok json ->
+    (match pending_of_json json with
+     | Ok (queue, confirms) ->
+       let confirms =
+         m.confirms
+         @ List.filter confirms ~f:(fun (c : Confirm.t) ->
+           not
+             (List.exists m.confirms ~f:(fun (c' : Confirm.t) ->
+                String.equal c.call_id c'.call_id)))
+       in
+       ( { m with queue; confirms }
+       , if List.is_empty confirms then [] else [ Command.Focus "confirm" ] )
+     | Error e -> error m (Error.to_string_hum e))
   | Job_started, Ok json ->
     (match Json.string_field json "job_id" with
      | Ok id ->
@@ -1679,7 +1793,17 @@ let reply (m : Model.t) (tag : Reply_tag.t) result =
       with_agents m ~f:(fun a -> Agents.set_agents a agents), [])
   | Jobs, Ok json ->
     decode m json (decode_list Job_info.of_json) ~f:(fun jobs ->
-      with_agents m ~f:(fun a -> Agents.set_jobs a ~now:(now_of m) jobs), [])
+      let before = m.agents in
+      let m =
+        with_agents m ~f:(fun a -> Agents.set_jobs a ~now:(now_of m) jobs)
+      in
+      (* The shown job's last lines, once it has exited. *)
+      ( m
+      , match m.agents.selected with
+        | Some (Job id as job)
+          when Agents.running before job && not (Agents.running m.agents job) ->
+          [ job_output id ]
+        | _ -> [] ))
   | Job_output id, Ok json ->
     (match field json "text", m.agents.selected with
      | Some (`String text), Some (Job shown) when String.equal id shown ->
@@ -1761,7 +1885,10 @@ let reply (m : Model.t) (tag : Reply_tag.t) result =
       open_dialog m (Session stats))
   | Entries purpose, Ok json -> entries_picker m purpose json
   | Reload_messages, Ok _ ->
-    m, [ rpc "get_state" [] ~tag:State; rpc "get_messages" [] ~tag:Messages ]
+    ( m
+    , [ rpc "get_state" [] ~tag:State
+      ; rpc "get_messages" [] ~tag:(Messages (session_id m))
+      ] )
   | Exported, Ok json ->
     (match Json.string_field json "path" with
      | Ok path ->
@@ -1882,6 +2009,8 @@ let main_event (m : Model.t) (event : Event.t) =
       then [ rpc "list_sessions" [] ~tag:Sessions ]
       else [] )
   | Agent_end _ -> m, [ rpc "list_sessions" [] ~tag:Sessions ]
+  (* Another client's /confirm, /scoped-models or defaults. *)
+  | Config_changed config -> { m with config = Some config }, []
   | Auth e -> auth_event m e
   | Btw_delta { btw_id; delta } ->
     update_btw m btw_id ~f:(fun b -> Btw.append b delta), []
@@ -1951,11 +2080,16 @@ let send (m : Model.t) ~follow_up =
   | _ when String.is_prefix text ~prefix:"!" && List.is_empty m.images ->
     let m, save = sent m in
     let m, cmds = shell m text in
-    m, save @ cmds
+    m, save @ (Command.Scroll_to_bottom :: cmds)
   | Some parsed when List.is_empty m.images ->
     let m, save = sent m in
     let m, cmds = run_command m parsed in
     m, save @ cmds
+  | _ when not (Connection.equal m.connection Connected) ->
+    error
+      m
+      "Not connected to the backend: your message stays here until it is back \
+       (/retry-backend-connection tries now)."
   | _ ->
     if String.is_empty text && List.is_empty m.images
     then m, []
@@ -1983,7 +2117,13 @@ let send (m : Model.t) ~follow_up =
         else m.agents
       in
       ( { m with images = []; agents }
-      , save @ [ rpc method_ (("text", str text) :: images) ] ))
+      , save
+        @ [ Command.Scroll_to_bottom
+          ; rpc
+              method_
+              (("text", str text) :: images)
+              ~tag:(Sent { text; images = m.images })
+          ] ))
 ;;
 
 let accept_completion (m : Model.t) ~run =
@@ -2146,18 +2286,11 @@ let to_bottom (m : Model.t) =
   { m with scrolled_up = false }, [ Command.Scroll_to_bottom ]
 ;;
 
-let sent_to_bottom (m : Model.t) (m', cmds) =
-  let sent =
-    List.exists cmds ~f:(function
-      | Command.Rpc { method_ = "prompt" | "steer" | "follow_up" | "shell"; _ }
-        -> true
-      | _ -> false)
-  in
-  if sent && m.scrolled_up
-  then (
-    let m', more = to_bottom m' in
-    m', cmds @ more)
-  else m', cmds
+(* Sending something goes back to the end of the chat. *)
+let sent_to_bottom ((m : Model.t), cmds) =
+  if List.mem cmds Command.Scroll_to_bottom ~equal:Command.equal
+  then { m with scrolled_up = false }, cmds
+  else m, cmds
 ;;
 
 let update (m : Model.t) (action : Action.t) =
@@ -2204,8 +2337,8 @@ let update (m : Model.t) (action : Action.t) =
   | Load_history entries -> { m with history = History.of_list entries }, []
   | Set_draft draft -> edit m draft
   | Edit { text; cursor } -> edit m ~cursor text
-  | Send -> sent_to_bottom m (send m ~follow_up:false)
-  | Send_follow_up -> sent_to_bottom m (send m ~follow_up:true)
+  | Send -> sent_to_bottom (send m ~follow_up:false)
+  | Send_follow_up -> sent_to_bottom (send m ~follow_up:true)
   | Abort -> m, [ rpc "abort" [] ~tag:Restored ]
   | History_older ->
     (match History.older m.history ~draft:m.draft with
@@ -2232,18 +2365,20 @@ let update (m : Model.t) (action : Action.t) =
   | New_session ->
     ( { m with sidebar_open = m.sidebar_open && not m.narrow }
     , [ rpc "new_session" [] ~tag:Reload_state ] )
-  | Switch_session path ->
-    let m = { m with sidebar_open = m.sidebar_open && not m.narrow } in
-    let current = Option.map m.state ~f:(fun s -> s.session_path) in
-    if Option.equal String.equal current (Some path)
-    then m, []
-    else m, [ rpc "switch_session" [ "path", str path ] ~tag:Reload_state ]
+  | Switch_session path -> switch_session m path
   | Ask_delete path ->
     (match List.find m.sessions ~f:(fun s -> String.equal s.path path) with
      | None -> m, []
      | Some s -> open_dialog m (Delete { path; title = Session_list.title s }))
   | Set_session_query session_query -> { m with session_query }, []
   | Open_sessions -> open_sessions m
+  | Session_nav { from; by } -> session_nav m ~from ~by
+  | Open_first_session ->
+    (match Session_list.filter m.sessions ~query:m.session_query with
+     | [] -> m, []
+     | first :: _ -> switch_session m first.path)
+  | Leave_sidebar ->
+    { m with sidebar_open = m.sidebar_open && not m.narrow }, [ focus_editor ]
   | Set_model key -> set_model m key
   | Set_thinking level -> set_thinking m level
   | Open_model_picker -> open_picker m (model_picker m)

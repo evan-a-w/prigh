@@ -652,9 +652,11 @@ let rec start_run t prompts =
      | (_ : Message.t list) -> ()
      | exception exn ->
        broadcast t (Notice ("run failed: " ^ Exn.to_string exn)));
-    (* Steering messages that arrived after the last turn boundary. *)
+    (* Steering messages that arrived after the last turn boundary go
+       first: they were sent before any follow-up still queued. *)
     if not (Queue.is_empty t.steer_queue)
     then (
+      Queue.blit_transfer ~src:t.follow_up_queue ~dst:t.steer_queue ();
       Queue.blit_transfer ~src:t.steer_queue ~dst:t.follow_up_queue ();
       queue_update t);
     auto_compact t;

@@ -151,6 +151,7 @@ let scroll_to_bottom () =
 ;;
 
 let scroll_chat pages =
+  if pages < 0 then following := false;
   Option.iter (chat_element ()) ~f:(fun chat ->
     let by = Float.of_int (pages * chat##.clientHeight) *. 0.85 in
     chat##.scrollTop := Js.float (Js.to_float chat##.scrollTop +. by))
@@ -159,6 +160,7 @@ let scroll_chat pages =
 (* The previous (or next) of the user's messages above (or below) the top of
    the transcript's view. *)
 let jump_to_user_message direction =
+  if direction < 0 then following := false;
   Option.iter (chat_element ()) ~f:(fun chat ->
     let top = Js.to_float chat##getBoundingClientRect##.top in
     let offsets =
@@ -267,6 +269,10 @@ let autosize () =
         el##.style##.height := Js.string (sprintf "%dpx" el##.scrollHeight)))
 ;;
 
+(* When the first of the tool confirmations on show appeared: an Enter typed
+   just before must not answer it. *)
+let confirm_shown = ref Time_ns.epoch
+
 let component client settings ~current (local_ graph) =
   let model, inject =
     Bonsai.state_machine
@@ -275,6 +281,8 @@ let component client settings ~current (local_ graph) =
       ~apply_action:(fun ctx model action ->
         let model', commands = App.update model action in
         current := model';
+        if List.is_empty model.confirms && not (List.is_empty model'.confirms)
+        then confirm_shown := Time_ns.now ();
         if
           not
             (String.equal model.draft model'.draft
@@ -343,9 +351,28 @@ let key_target (ev : Dom_html.keyboardEvent Js.t) : Prigh_web.Keys.Target.t =
   | Some el ->
     (match Dom_html.tagged el with
      | Textarea t when String.equal (Js.to_string t##.id) "editor" ->
-       Editor { cursor = t##.selectionStart }
+       Editor
+         { cursor =
+             Prigh_web.Utf16.byte_offset
+               (Js.to_string t##.value)
+               ~utf16:t##.selectionStart
+         }
+     | Input i when String.equal (Js.to_string i##.id) "session-search" ->
+       Session_search
      | Textarea _ | Input _ | Select _ -> Field
-     | _ -> Page)
+     | Button _ | A _ -> Control
+     | _ ->
+       (match
+          Js.Opt.to_option (el##getAttribute (Js.string "data-session"))
+        with
+        | Some id -> Session (Js.to_string id)
+        | None ->
+          if
+            String.equal
+              (String.lowercase (Js.to_string el##.tagName))
+              "summary"
+          then Control
+          else Page))
 ;;
 
 (* Selected text in a field or the page (so Ctrl+X cuts or does nothing). *)
@@ -412,6 +439,14 @@ let install_listeners ~schedule ~current =
     (* An IME composing text owns its keys. *)
     if Js.to_bool (Js.Unsafe.coerce ev)##.isComposing
     then Js._true
+    else if
+      (not (List.is_empty (!current : App.Model.t).confirms))
+      && String.equal (key ev).key "Enter"
+      && Time_ns.Span.(
+           Time_ns.diff (Time_ns.now ()) !confirm_shown < of_int_ms 350)
+    then (
+      Dom.preventDefault ev;
+      Js._false)
     else (
       match Prigh_web.Keys.handle !current (key ev) with
       | None -> Js._true

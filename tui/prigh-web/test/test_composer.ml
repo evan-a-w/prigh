@@ -39,9 +39,11 @@ let%expect_test
     Send
     (Save_history ( "line one\
                    \nline two"))
+    Scroll_to_bottom
     (Rpc (method_ prompt) (params ((text  "line one\
                                          \nline two")))
-     (tag Show_error))
+     (tag (Sent (text  "line one\
+                      \nline two") (images ()))))
     |}];
   print_s [%sexp ((H.model h).draft : string)];
   [%expect {| "" |}];
@@ -67,13 +69,16 @@ let%expect_test
     Send
     (Save_history ("use the other file"  "line one\
                                         \nline two"))
-    (Rpc (method_ steer) (params ((text "use the other file"))) (tag Show_error))
+    Scroll_to_bottom
+    (Rpc (method_ steer) (params ((text "use the other file")))
+     (tag (Sent (text "use the other file") (images ()))))
     Send_follow_up
     (Save_history
      ("then run the tests" "use the other file"  "line one\
                                                 \nline two"))
+    Scroll_to_bottom
     (Rpc (method_ follow_up) (params ((text "then run the tests")))
-     (tag Show_error))
+     (tag (Sent (text "then run the tests") (images ()))))
     |}];
   (* Esc stops the run; when idle it does nothing. *)
   H.key h "Escape";
@@ -134,9 +139,10 @@ let%expect_test "pending images: thumbnails, remove, sent with the prompt" =
   [%expect
     {|
     Send
+    Scroll_to_bottom
     (Rpc (method_ prompt)
      (params ((text "") (images (((mime_type image/png) (data iVBORw0KGgo=))))))
-     (tag Show_error))
+     (tag (Sent (text "") (images (((mime_type image/png) (bytes 8)))))))
     |}];
   H.show h ~selector:".pending-images";
   [%expect {| |}];
@@ -147,10 +153,11 @@ let%expect_test "pending images: thumbnails, remove, sent with the prompt" =
   [%expect
     {|
     (Save_history (/help))
+    Scroll_to_bottom
     (Rpc (method_ prompt)
      (params
       ((text /help) (images (((mime_type image/png) (data iVBORw0KGgo=))))))
-     (tag Show_error))
+     (tag (Sent (text /help) (images (((mime_type image/png) (bytes 8)))))))
     |}]
 ;;
 
@@ -214,10 +221,14 @@ let%expect_test "prompt history: Up and Down at the first and last line" =
     {|
     (Save_history ("my draft" newest  "older\
                                      \ntwo lines" oldest))
-    (Rpc (method_ prompt) (params ((text "my draft"))) (tag Show_error))
+    Scroll_to_bottom
+    (Rpc (method_ prompt) (params ((text "my draft")))
+     (tag (Sent (text "my draft") (images ()))))
     (Save_history ("my draft" newest  "older\
                                      \ntwo lines" oldest))
-    (Rpc (method_ prompt) (params ((text "my draft"))) (tag Show_error))
+    Scroll_to_bottom
+    (Rpc (method_ prompt) (params ((text "my draft")))
+     (tag (Sent (text "my draft") (images ()))))
     |}]
 ;;
 
@@ -395,8 +406,9 @@ let%expect_test "slash commands: the popup, arguments, running, unknown ones" =
     (Save_history
      ("/etc/hosts has a typo?" /frobnicate /compcat /compact
       "/model openai/gpt-6"))
+    Scroll_to_bottom
     (Rpc (method_ prompt) (params ((text "/etc/hosts has a typo?")))
-     (tag Show_error))
+     (tag (Sent (text "/etc/hosts has a typo?") (images ()))))
     |}];
   H.type_ h "/help";
   H.key h "Enter";
@@ -444,5 +456,45 @@ let%expect_test "/cd completes directories" =
     (Focus dialog-input)
     (Rpc (method_ list_dirs) (params ((prefix /work) (host backend)))
      (tag (Prompt_paths /work)))
+    |}]
+;;
+
+let%expect_test "a message that cannot be sent comes back to the editor" =
+  let h = H.create () in
+  H.act
+    h
+    (Add_image { mime_type = "image/png"; bytes = 8; data = "iVBORw0KGgo=" });
+  H.type_ h "look at this";
+  H.key h "Enter";
+  H.fail h "prompt" "a run is already in progress";
+  print_s
+    [%sexp ((H.model h).draft : string), (List.length (H.model h).images : int)];
+  H.text h ~selector:".toasts";
+  [%expect
+    {|
+    Send
+    (Save_history ("look at this"))
+    Scroll_to_bottom
+    (Rpc (method_ prompt)
+     (params
+      ((text "look at this")
+       (images (((mime_type image/png) (data iVBORw0KGgo=))))))
+     (tag
+      (Sent (text "look at this") (images (((mime_type image/png) (bytes 8)))))))
+    ("look at this" 1)
+    Couldn't send: a run is already in progress. Your message is back in the editor.
+    |}];
+  (* Without a connection nothing is sent, and the draft stays. *)
+  H.act h Backend_closed;
+  H.key h "Enter";
+  print_s [%sexp ((H.model h).draft : string)];
+  H.text h ~selector:".toasts .error";
+  [%expect
+    {|
+    (Reconnect (generation 1) (delay_ms 0) (session (s1)))
+    Send
+    "look at this"
+    Couldn't send: a run is already in progress. Your message is back in the editor.
+    Not connected to the backend: your message stays here until it is back (/retry-backend-connection tries now).
     |}]
 ;;

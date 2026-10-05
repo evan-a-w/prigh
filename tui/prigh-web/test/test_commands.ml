@@ -17,7 +17,9 @@ let messages =
      {"role":"assistant","content":[{"type":"text","text":"Fixed: the **flag** was wrong."}],"stop_reason":{"type":"end_turn"},"usage":{"input":10,"output":5,"cache_read":0},"model":"m"}]|}
 ;;
 
-let with_messages h = H.act h (Reply (Messages, Ok (Jsonaf.of_string messages)))
+let with_messages h =
+  H.act h (Reply (Messages "s1", Ok (Jsonaf.of_string messages)))
+;;
 
 let%expect_test "every command does something (none is unknown)" =
   List.iter Slash.all ~f:(fun spec ->
@@ -126,7 +128,7 @@ let%expect_test "/help <command> and /hotkeys" =
     Ctrl+X copy the last reply (when nothing is selected)
     Ctrl+↑ / Ctrl+↓ previous / next of your messages in the transcript
     PageUp / PageDown scroll the transcript
-    Ctrl+K search sessions
+    Ctrl+K search sessions (↓ ↑ through them, Enter opens, Delete deletes)
     Ctrl+B show or hide the sidebar
     Alt+1…9 follow subagent or job N in the agents panel
     Alt+] Alt+[ the next or previous subagent or job
@@ -164,7 +166,6 @@ let%expect_test "/scoped-models, Ctrl+P and Alt+P" =
     (Expire_toast (id 1) (after_ms 4000))
     (Rpc (method_ set_model) (params ((model anthropic/claude-opus-5-5)))
      (tag Show_error))
-    Model: Claude Sonnet 5
     Model: Claude Opus 5.5
     |}];
   run h "/scoped-models";
@@ -213,7 +214,6 @@ let%expect_test "/scoped-models, Ctrl+P and Alt+P" =
          (confirm_tools false) (default_model null) (default_thinking null)))))
      (tag (Config_saved "3 scoped models: Ctrl+P and Alt+P cycle through them")))
     (Expire_toast (id 2) (after_ms 4000))
-    Model: Claude Sonnet 5
     Model: Claude Opus 5.5
     3 scoped models: Ctrl+P and Alt+P cycle through them
     |}];
@@ -289,7 +289,6 @@ let%expect_test "/thinking and Alt+T" =
     (Rpc (method_ set_model) (params ((model deepseek/deepseek-chat)))
      (tag Show_error))
     Cycle_thinking
-    Thinking: high
     Thinking: max
     DeepSeek Chat has no thinking levels: switch to a model that thinks with /model
     |}]
@@ -319,6 +318,7 @@ let%expect_test "/verbosity and Ctrl+O" =
   H.text h ~selector:".picker-items";
   [%expect
     {|
+    Scroll_to_bottom
     (Save_history (/verbosity))
     (Focus picker-input)
     Quiet tool calls without their output; no thinking
@@ -366,8 +366,6 @@ let%expect_test "/verbosity and Ctrl+O" =
     Cycle_verbosity
     (Expire_toast (id 2) (after_ms 4000))
     (Save_history ("/verbosity loud" /verbosity))
-    Transcript: quiet, tool calls without their output; no thinking (Ctrl+O cycles)
-    Transcript: normal, tool output and thinking folded (Ctrl+O cycles)
     Transcript: verbose, everything unfolded (Ctrl+O cycles)
     Unknown verbosity "loud": use quiet, normal or verbose.
     |}];
@@ -610,7 +608,7 @@ let%expect_test "/rewind: pick, confirm, reload the messages" =
     (Expire_toast (id 0) (after_ms 4000))
     (Rpc (method_ rewind) (params ((to e1))) (tag Reload_messages))
     (Rpc (method_ get_state) (params ()) (tag State))
-    (Rpc (method_ get_messages) (params ()) (tag Messages))
+    (Rpc (method_ get_messages) (params ()) (tag (Messages s1)))
     |}];
   (* Esc cancels without rewinding. *)
   run h "/rewind";
@@ -693,6 +691,29 @@ let%expect_test "/tree shows branches and moves the head" =
     (Focus editor)
     (Rpc (method_ rewind) (params ((to e4))) (tag Reload_messages))
     |}]
+;;
+
+let%expect_test "/tree of a very long conversation" =
+  let n = 50_000 in
+  let json =
+    entries
+      ~head:(sprintf "e%d" n)
+      (List.init n ~f:(fun i ->
+         entry
+           ?parent:(if i = 0 then None else Some (sprintf "e%d" i))
+           (sprintf "e%d" (i + 1))
+           (if i % 2 = 0 then user "question" else assistant "answer")))
+  in
+  let head, list =
+    Prigh_protocol.Json.parse json
+    |> Or_error.ok_exn
+    |> Prigh_web.Session_tree.of_json
+    |> Or_error.ok_exn
+  in
+  let items = Prigh_web.Session_tree.tree_items list ~head in
+  print_s
+    [%sexp (List.length items : int), ((List.last_exn items).label : string)];
+  [%expect {| (50000 "\194\183 answer") |}]
 ;;
 
 let%expect_test "/cd: a prompt with directory completion, failures stay in it" =
@@ -938,6 +959,7 @@ let%expect_test "/copy and Ctrl+X copy the last reply" =
   run h "/copy";
   [%expect
     {|
+    Scroll_to_bottom
     (Save_history (/copy))
     (Copy "Fixed: the **flag** was wrong.")
     (Expire_toast (id 1) (after_ms 4000))
@@ -1169,9 +1191,9 @@ let%expect_test "/jobs [id|kill <id>]: jobs in the agents panel" =
     (Save_history
      ("/jobs a b" "/jobs kill" "/jobs j9" "/jobs kill j2" "/jobs kill j1"
       "/jobs j2" /jobs "/jobs j1"))
+    No job j1: none has run in this session (!&command starts one).
     Job j2 has already finished.
     No job j9: give its id (j1, j2); /jobs lists them.
-    Usage: /jobs [id | kill <id>] (/jobs lists them)
     Usage: /jobs [id | kill <id>] (/jobs lists them)
     |}]
 ;;
@@ -1215,8 +1237,8 @@ let%expect_test "/setusr: a superuser acts as another user, and back" =
   [%expect
     {|
     (Set_url_session b1)
-    Scroll_to_bottom
-    (Rpc (method_ get_messages) (params ()) (tag Messages))
+    (Rpc (method_ get_messages) (params ()) (tag (Messages b1)))
+    (Rpc (method_ get_pending) (params ()) (tag Pending))
     (Rpc (method_ list_sessions) (params ()) (tag Sessions))
     (Rpc (method_ list_subagents) (params ()) (tag Subagents))
     (Rpc (method_ list_jobs) (params ()) (tag Jobs))
@@ -1283,8 +1305,8 @@ let%expect_test "/retry-backend-connection, /state, /clear, /quit" =
   [%expect
     {|
     (Set_url_session s1)
-    Scroll_to_bottom
-    (Rpc (method_ get_messages) (params ()) (tag Messages))
+    (Rpc (method_ get_messages) (params ()) (tag (Messages s1)))
+    (Rpc (method_ get_pending) (params ()) (tag Pending))
     (Rpc (method_ list_sessions) (params ()) (tag Sessions))
     (Rpc (method_ list_subagents) (params ()) (tag Subagents))
     (Rpc (method_ list_jobs) (params ()) (tag Jobs))
@@ -1314,6 +1336,7 @@ let%expect_test "/retry-backend-connection, /state, /clear, /quit" =
     {|
     Close_dialog
     (Focus editor)
+    Scroll_to_bottom
     (Save_history (/clear /state /retry-backend-connection))
     (Expire_toast (id 3) (after_ms 4000))
     What are we building?

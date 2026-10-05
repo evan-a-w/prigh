@@ -47,7 +47,13 @@ let%expect_test
   H.show h ~selector:".session.selected";
   [%expect
     {|
-    <div title="/sessions/s1.jsonl" class="selected session" @on_click>
+    <div id="session-s1"
+         tabindex="0"
+         role="button"
+         data-session="s1"
+         title="/sessions/s1.jsonl"
+         class="selected session"
+         @on_click>
       <div class="session-top">
         <span title="open in the backend" class="dot live">  </span>
         <span class="session-title"> fix the parser bug </span>
@@ -119,7 +125,7 @@ let%expect_test "no sessions yet" =
 let%expect_test "switching resets what belonged to the old session" =
   let h = H.create ~sessions () in
   H.act h (Switch_session "/sessions/s1.jsonl");
-  [%expect {| |}];
+  [%expect {| (Focus editor) |}];
   H.event
     h
     {|{"event":"message_start","message":{"role":"user","text":"hello"}}|};
@@ -128,11 +134,19 @@ let%expect_test "switching resets what belonged to the old session" =
     h
     {|{"event":"tool_confirm","call_id":"c1","name":"bash","summary":"rm -rf build"}|};
   [%expect {| (Focus confirm) |}];
+  H.act h (Run "/btw why?");
+  H.type_ h "/mo";
+  [%expect
+    {|
+    (Rpc (method_ btw) (params ((question why?) (btw_id btw-1)))
+     (tag (Btw btw-1)))
+    |}];
   H.act h (Switch_session "/sessions/s2.jsonl");
   [%expect
     {|
     (Rpc (method_ switch_session) (params ((path /sessions/s2.jsonl)))
      (tag Reload_state))
+    (Focus editor)
     |}];
   H.event
     h
@@ -147,9 +161,10 @@ let%expect_test "switching resets what belonged to the old session" =
           ()));
   [%expect
     {|
+    (Rpc (method_ btw_cancel) (params ((btw_id btw-1))) (tag Ignore))
     (Set_url_session s2)
-    Scroll_to_bottom
-    (Rpc (method_ get_messages) (params ()) (tag Messages))
+    (Rpc (method_ get_messages) (params ()) (tag (Messages s2)))
+    (Rpc (method_ get_pending) (params ()) (tag Pending))
     (Rpc (method_ list_sessions) (params ()) (tag Sessions))
     (Rpc (method_ list_subagents) (params ()) (tag Subagents))
     (Rpc (method_ list_jobs) (params ()) (tag Jobs))
@@ -159,15 +174,80 @@ let%expect_test "switching resets what belonged to the old session" =
     [%message
       (Prigh_web.Chat.entries m.chat |> List.length : int)
         (m.queue : int * int)
-        (List.length m.confirms : int)];
+        (List.length m.confirms : int)
+        (Option.is_some m.btw : bool)
+        (Option.is_some m.completion : bool)];
   [%expect
     {|
     (("(Prigh_web.Chat.entries m.chat) |> List.length" 0) (m.queue (0 0))
-     ("List.length m.confirms" 0))
+     ("List.length m.confirms" 0) ("Option.is_some m.btw" false)
+     ("Option.is_some m.completion" false))
     |}];
   H.reply h "list_sessions" sessions;
   H.text h ~selector:".session.selected .session-title";
   [%expect {| Release notes |}]
+;;
+
+let%expect_test
+    "a session in progress: its confirmations, queue and running tools come \
+     back; replies for the session we left are dropped"
+  =
+  let h = H.create ~sessions () in
+  H.event
+    h
+    (sprintf
+       {|{"event":"state","state":%s}|}
+       (H.state_json
+          ~fields:[ "session_id", `String "s2"; "running", `True ]
+          ()));
+  [%expect
+    {|
+    (Set_url_session s2)
+    (Rpc (method_ get_messages) (params ()) (tag (Messages s2)))
+    (Rpc (method_ get_pending) (params ()) (tag Pending))
+    (Rpc (method_ list_sessions) (params ()) (tag Sessions))
+    (Rpc (method_ list_subagents) (params ()) (tag Subagents))
+    (Rpc (method_ list_jobs) (params ()) (tag Jobs))
+    |}];
+  H.act
+    h
+    (Reply
+       ( Messages "s1"
+       , Ok (Jsonaf.of_string {|[{"role":"user","text":"from s1"}]|}) ));
+  print_s [%sexp (List.length (Prigh_web.Chat.entries (H.model h).chat) : int)];
+  [%expect {| 0 |}];
+  H.reply
+    h
+    "get_pending"
+    {|{"steer_texts":["a"],"follow_up_texts":["b","c"],"confirms":[{"call_id":"c1","name":"bash","summary":"rm -rf build"}]}|};
+  H.text h ~selector:".modal";
+  H.text h ~selector:".status .queued";
+  [%expect
+    {|
+    (Focus confirm)
+    Allow bash?
+    (Close (Esc))
+    rm -rf build
+    (Deny) (Allow)
+    (3 queued)
+    |}];
+  H.reply
+    h
+    "get_messages"
+    {|[{"role":"user","text":"clean up"},
+       {"role":"assistant","content":[{"type":"tool_call","id":"c1","name":"bash","arguments":"{\"command\":\"rm -rf build\"}"}],"stop_reason":{"type":"tool_use"},"usage":{"input":0,"output":0,"cache_read":0},"model":"m"}]|};
+  H.show h ~selector:".tool";
+  [%expect
+    {|
+    Scroll_to_bottom
+    <div class="running tool tool-bash">
+      <div class="tool-head">
+        <span class="spinner"> </span>
+        <span class="name"> bash </span>
+        <span class="arg command"> rm -rf build </span>
+      </div>
+    </div>
+    |}]
 ;;
 
 let%expect_test "new session" =
@@ -207,10 +287,13 @@ let%expect_test
   H.text h ~selector:".modal";
   [%expect {| |}];
   H.act h (Ask_delete "/sessions/s2.jsonl");
+  (* Enter on a focused button (Tab to Cancel) is the button's. *)
+  H.key h "Enter" ~target:Control;
   H.key h "Enter" ~target:Page;
   [%expect
     {|
     (Focus dialog)
+    (browser default)
     Dialog_accept
     (Focus editor)
     (Rpc (method_ delete_session) (params ((path /sessions/s2.jsonl)))
@@ -313,6 +396,7 @@ let%expect_test
     (Focus session-search)
     (Rpc (method_ switch_session) (params ((path /sessions/s3.jsonl)))
      (tag Reload_state))
+    (Focus editor)
     false
     |}];
   H.act h (Set_narrow false);
@@ -333,15 +417,20 @@ let%expect_test "new session and switching session reload the state" =
   Harness.reply
     h
     "get_state"
-    (Harness.state_json ~fields:[ "session_id", `String "s2" ] ());
+    (Harness.state_json
+       ~fields:
+         [ "session_id", `String "s2"
+         ; "session_path", `String "/sessions/s2.jsonl"
+         ]
+       ());
   Harness.text h ~selector:".chat";
   [%expect
     {|
     (Rpc (method_ new_session) (params ()) (tag Reload_state))
     (Rpc (method_ get_state) (params ()) (tag State))
     (Set_url_session s2)
-    Scroll_to_bottom
-    (Rpc (method_ get_messages) (params ()) (tag Messages))
+    (Rpc (method_ get_messages) (params ()) (tag (Messages s2)))
+    (Rpc (method_ get_pending) (params ()) (tag Pending))
     (Rpc (method_ list_sessions) (params ()) (tag Sessions))
     (Rpc (method_ list_subagents) (params ()) (tag Subagents))
     (Rpc (method_ list_jobs) (params ()) (tag Jobs))
@@ -358,6 +447,83 @@ let%expect_test "new session and switching session reload the state" =
   Harness.reply h "get_state" (Harness.state_json ());
   Harness.reply h "get_messages" {|[{"role":"user","text":"hello"}]|};
   Harness.text h ~selector:".chat";
-  [%expect.unreachable]
-[@@expect.uncaught_exn {| ("no pending request" switch_session) |}]
+  [%expect
+    {|
+    (Rpc (method_ switch_session) (params ((path /sessions/s1.jsonl)))
+     (tag Reload_state))
+    (Focus editor)
+    (Rpc (method_ get_state) (params ()) (tag State))
+    (Set_url_session s1)
+    (Rpc (method_ get_messages) (params ()) (tag (Messages s1)))
+    (Rpc (method_ get_pending) (params ()) (tag Pending))
+    (Rpc (method_ list_sessions) (params ()) (tag Sessions))
+    (Rpc (method_ list_subagents) (params ()) (tag Subagents))
+    (Rpc (method_ list_jobs) (params ()) (tag Jobs))
+    What are we building?
+    /work
+    / commands
+    @ mention a file
+    ! run a command
+    Ctrl+L switch model
+    Ctrl+K find a session
+    |}]
+;;
+
+let%expect_test
+    "the sidebar from the keyboard: ↓ ↑ through the sessions, Enter opens, Esc \
+     goes back to the editor"
+  =
+  let h = H.create ~sessions () in
+  H.key h "k" ~ctrl:true;
+  H.type_ h "";
+  H.act h (Set_session_query "re");
+  H.text h ~selector:".session-title";
+  H.key h "ArrowDown" ~target:Session_search;
+  H.key h "ArrowDown" ~target:(Session "s2");
+  H.key h "ArrowDown" ~target:(Session "s3");
+  H.key h "ArrowUp" ~target:(Session "s2");
+  H.key h "ArrowUp" ~target:(Session "s2");
+  [%expect
+    {|
+    Open_sessions
+    (Focus session-search)
+    Release notes
+    Refactor the lexer
+    fix the parser bug
+    (Session_nav (from ()) (by 1))
+    (Focus session-s2)
+    (Session_nav (from (s2)) (by 1))
+    (Focus session-s3)
+    (Session_nav (from (s3)) (by 1))
+    (Focus session-s1)
+    (Session_nav (from (s2)) (by -1))
+    (Focus session-search)
+    (Session_nav (from (s2)) (by -1))
+    (Focus session-search)
+    |}];
+  H.key h "Enter" ~target:(Session "s3");
+  H.key h "Delete" ~target:(Session "s3");
+  H.key h "Escape" ~target:Page;
+  H.key h "Escape" ~target:(Session "s3");
+  [%expect
+    {|
+    (Switch_session /sessions/s3.jsonl)
+    (Rpc (method_ switch_session) (params ((path /sessions/s3.jsonl)))
+     (tag Reload_state))
+    (Focus editor)
+    (Ask_delete /sessions/s3.jsonl)
+    (Focus dialog)
+    Close_dialog
+    (Focus editor)
+    Leave_sidebar
+    (Focus editor)
+    |}];
+  H.key h "Enter" ~target:Session_search;
+  [%expect
+    {|
+    Open_first_session
+    (Rpc (method_ switch_session) (params ((path /sessions/s2.jsonl)))
+     (tag Reload_state))
+    (Focus editor)
+    |}]
 ;;
