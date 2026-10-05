@@ -32,6 +32,10 @@ module Reply_tag = struct
     | State
     | Messages of string (** the session's id *)
     | Pending
+    | Sent of
+        { text : string
+        ; images : Image.t list
+        }
     | Sessions
     | Models
     | Reload_state
@@ -1667,8 +1671,16 @@ let reply (m : Model.t) (tag : Reply_tag.t) result =
      | Some (Login flow) ->
        { m with dialog = Some (Login { flow with failed = Some e }) }, []
      | _ -> error m e)
+  | Sent { text; images }, Error e ->
+    (* Back in the editor, unless something else is being written there. *)
+    if String.is_empty m.draft && List.is_empty m.images
+    then
+      error
+        (set_draft { m with images } text)
+        (sprintf "Couldn't send: %s. Your message is back in the editor." e)
+    else error m (sprintf "Couldn't send: %s. ↑ brings your message back." e)
   | _, Error e -> error m e
-  | (Ignore | Show_error | Login_started), Ok _ -> m, []
+  | (Ignore | Show_error | Login_started | Sent _), Ok _ -> m, []
   | Notice text, Ok _ -> toast m text
   | State, Ok json -> decode m json State.of_json ~f:(set_state m)
   | Reload_state, Ok _ -> m, [ rpc "get_state" [] ~tag:State ]
@@ -1923,6 +1935,8 @@ let main_event (m : Model.t) (event : Event.t) =
       then [ rpc "list_sessions" [] ~tag:Sessions ]
       else [] )
   | Agent_end _ -> m, [ rpc "list_sessions" [] ~tag:Sessions ]
+  (* Another client's /confirm, /scoped-models or defaults. *)
+  | Config_changed config -> { m with config = Some config }, []
   | Auth e -> auth_event m e
   | Btw_delta { btw_id; delta } ->
     update_btw m btw_id ~f:(fun b -> Btw.append b delta), []
@@ -1997,6 +2011,11 @@ let send (m : Model.t) ~follow_up =
     let m, save = sent m in
     let m, cmds = run_command m parsed in
     m, save @ cmds
+  | _ when not (Connection.equal m.connection Connected) ->
+    error
+      m
+      "Not connected to the backend: your message stays here until it is back \
+       (/retry-backend-connection tries now)."
   | _ ->
     if String.is_empty text && List.is_empty m.images
     then m, []
@@ -2025,7 +2044,12 @@ let send (m : Model.t) ~follow_up =
       in
       ( { m with images = []; agents }
       , save
-        @ [ Command.Follow_chat; rpc method_ (("text", str text) :: images) ] ))
+        @ [ Command.Follow_chat
+          ; rpc
+              method_
+              (("text", str text) :: images)
+              ~tag:(Sent { text; images = m.images })
+          ] ))
 ;;
 
 let accept_completion (m : Model.t) ~run =

@@ -151,7 +151,15 @@ let caret (ev : Dom_html.event Js.t) =
     (fun () -> None)
     (fun target ->
        match Dom_html.tagged target with
-       | Textarea t -> Some t##.selectionStart
-       | Input i -> Some i##.selectionStart
+       | Textarea t ->
+         Some
+           (Utf16.byte_offset
+              (Js.to_string t##.value)
+              ~utf16:t##.selectionStart)
+       | Input i ->
+         Some
+           (Utf16.byte_offset
+              (Js.to_string i##.value)
+              ~utf16:i##.selectionStart)
        | _ -> None)
 ;;

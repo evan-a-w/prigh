@@ -505,7 +505,8 @@ let%expect_test
     {|
     (Save_history (next))
     Follow_chat
-    (Rpc (method_ prompt) (params ((text next))) (tag Show_error))
+    (Rpc (method_ prompt) (params ((text next)))
+     (tag (Sent (text next) (images ()))))
     Subagents 1 running
     (1 Draft the docs 0s a2 · deepseek-flash starting…)
     Earlier (4)

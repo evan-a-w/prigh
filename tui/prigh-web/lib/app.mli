@@ -38,6 +38,10 @@ module Reply_tag : sig
     | State
     | Messages of string (** the session's id *)
     | Pending
+    | Sent of
+        { text : string
+        ; images : Image.t list
+        } (** a prompt, steer or follow-up: back to the editor if it fails *)
     | Sessions
     | Models
     | Reload_state (** the client's session changed: fetch its state *)
