@@ -297,3 +297,76 @@ let%expect_test "html is text" =
     </div>
     |}]
 ;;
+
+let%expect_test "streaming: spans open at the end show as if closed" =
+  let partial text =
+    print_s [%sexp (Markdown.parse ~partial:true text : Markdown.Block.t list)]
+  in
+  partial "Here **is";
+  partial "Here **is *it";
+  partial "Run `make te";
+  partial "See [the docs](https://exa";
+  partial "See [the do";
+  partial "Ends with a marker **";
+  partial "Only the end:\n\na *b c\n\nd *e";
+  partial "- one\n- two **bo";
+  partial "> quoted _it";
+  partial "## Head `co";
+  partial "2 * 3 *";
+  [%expect
+    {|
+    ((Paragraph ((Text "Here ") (Strong ((Text is))))))
+    ((Paragraph ((Text "Here ") (Strong ((Text "is ") (Emph ((Text it))))))))
+    ((Paragraph ((Text "Run ") (Code "make te"))))
+    ((Paragraph ((Text "See ") (Text "the docs"))))
+    ((Paragraph ((Text "See ") (Text "the do"))))
+    ((Paragraph ((Text "Ends with a marker "))))
+    ((Paragraph ((Text "Only the end:"))) (Paragraph ((Text "a *b c")))
+     (Paragraph ((Text "d ") (Emph ((Text e))))))
+    ((List (start ()) (tight true)
+      (items
+       (((checked ()) (blocks ((Paragraph ((Text one))))))
+        ((checked ())
+         (blocks ((Paragraph ((Text "two ") (Strong ((Text bo))))))))))))
+    ((Quote ((Paragraph ((Text "quoted ") (Emph ((Text it))))))))
+    ((Heading 2 ((Text "Head ") (Code co))))
+    ((Paragraph ((Text "2 * 3 "))))
+    |}]
+;;
+
+let%expect_test "previews: the first line as plain text" =
+  List.iter
+    [ "## **Bold** heading\nmore"
+    ; "\n\n- [x] a `task` with [a link](https://x.y)"
+    ; "> quoted ~~text~~"
+    ; "| a | b |\n|---|---|"
+    ; "```ocaml\nlet x = 1\n```"
+    ; "---\nafter the rule"
+    ; ""
+    ]
+    ~f:(fun text -> print_endline (Markdown.preview text));
+  [%expect
+    {|
+    Bold heading
+    a task with a link
+    quoted text
+    a | b
+    let x = 1
+    after the rule
+    |}]
+;;
+
+let%expect_test "line diffs" =
+  let diff old new_ =
+    print_s [%sexp (Line_diff.diff ~old ~new_ : Line_diff.Line.t list)]
+  in
+  diff "a\nb\nc" "a\nB\nc\nd";
+  diff "" "new";
+  diff "old" "";
+  [%expect
+    {|
+    ((Same a) (Removed b) (Added B) (Same c) (Added d))
+    ((Added new))
+    ((Removed old))
+    |}]
+;;

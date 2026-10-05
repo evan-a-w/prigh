@@ -123,9 +123,12 @@ let of_messages messages = List.fold messages ~init:empty ~f:add_message
 let rec apply t (event : Event.t) =
   let t =
     match event with
-    | Agent_start | Turn_start | Message_start _ | Message_update _ | Tool_start _
-    | Tool_output _ ->
-      { t with running = true }
+    | Agent_start
+    | Turn_start
+    | Message_start _
+    | Message_update _
+    | Tool_start _
+    | Tool_output _ -> { t with running = true }
     | Agent_end _ -> { t with running = false }
     | _ -> t
   in

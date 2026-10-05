@@ -1,16 +1,21 @@
 open! Core
 open Js_of_ocaml
 
-let closest (el : Dom_html.element Js.t) selector : Dom_html.element Js.t option =
+let closest (el : Dom_html.element Js.t) selector : Dom_html.element Js.t option
+  =
   Js.Opt.to_option
-    (Js.Unsafe.meth_call el "closest" [| Js.Unsafe.inject (Js.string selector) |])
+    (Js.Unsafe.meth_call
+       el
+       "closest"
+       [| Js.Unsafe.inject (Js.string selector) |])
 ;;
 
 let set_label (button : Dom_html.element Js.t) ~copied =
   if copied
   then button##.classList##add (Js.string "copied")
   else button##.classList##remove (Js.string "copied");
-  button##.textContent := Js.some (Js.string (if copied then "Copied" else "Copy"))
+  button##.textContent
+  := Js.some (Js.string (if copied then "Copied" else "Copy"))
 ;;
 
 let copy (ev : Dom_html.mouseEvent Js.t) =
@@ -40,8 +45,8 @@ let close_image (ev : Dom_html.keyboardEvent Js.t) =
     Js.Opt.iter
       (Dom_html.document##querySelector (Js.string "details.image[open]"))
       (fun details ->
-        details##removeAttribute (Js.string "open");
-        Dom_html.stopPropagation ev)
+         details##removeAttribute (Js.string "open");
+         Dom_html.stopPropagation ev)
 ;;
 
 let install () =

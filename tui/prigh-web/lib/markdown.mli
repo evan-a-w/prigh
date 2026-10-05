@@ -66,8 +66,7 @@ end
 
 val parse : ?partial:bool -> string -> Block.t list
 
-(** The first non-blank line as plain text, without markup: for one-line
-    previews. *)
+(** The first line of text, without markup: for one-line previews. *)
 val preview : string -> string
 
 (** Whether [href] is safe to link to: http, https or mailto. *)

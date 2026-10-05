@@ -4,8 +4,12 @@ open Chat_html
 
 let section (section : Prigh_ui.Delivery.Section.t) =
   let job = String.equal section.kind "job" in
-  let report = Subagent_report.of_string (String.concat ~sep:"\n" section.body) in
-  let body = if job then String.concat ~sep:"\n" section.body else report.text in
+  let report =
+    Subagent_report.of_string (String.concat ~sep:"\n" section.body)
+  in
+  let body =
+    if job then String.concat ~sep:"\n" section.body else report.text
+  in
   let head =
     div
       "delivery-head"
