@@ -23,7 +23,9 @@ end
 let tool_name ~server ~tool =
   let clean s =
     String.map s ~f:(fun c ->
-      if Char.is_alphanum c || Char.equal c '_' || Char.equal c '-' then c else '_')
+      if Char.is_alphanum c || Char.equal c '_' || Char.equal c '-'
+      then c
+      else '_')
   in
   String.prefix (sprintf "mcp__%s__%s" (clean server) (clean tool)) 64
 ;;
@@ -122,9 +124,12 @@ module Listing = struct
     let tool json =
       Option.map (string_field json "name") ~f:(fun name ->
         { Mcp_client.Tool.name
-        ; description = Option.value (string_field json "description") ~default:""
+        ; description =
+            Option.value (string_field json "description") ~default:""
         ; input_schema =
-            Option.value (field json "input_schema") ~default:(`Object [ "type", `String "object" ])
+            Option.value
+              (field json "input_schema")
+              ~default:(`Object [ "type", `String "object" ])
         ; read_only =
             (match field json "read_only" with
              | Some `True -> true
@@ -138,7 +143,11 @@ module Listing = struct
           match string_field json "status" with
           | Some "ready" -> Ready
           | Some "needs_approval" -> Needs_approval
-          | _ -> Failed (Option.value (string_field json "error") ~default:"unknown status")
+          | _ ->
+            Failed
+              (Option.value
+                 (string_field json "error")
+                 ~default:"unknown status")
         in
         Some
           { Server.name
@@ -157,7 +166,10 @@ module Listing = struct
     in
     match field json "servers" with
     | Some (`Array items) ->
-      Ok { servers = List.filter_map items ~f:server; problems = strings "problems" }
+      Ok
+        { servers = List.filter_map items ~f:server
+        ; problems = strings "problems"
+        }
     | _ -> Or_error.error_string "an MCP listing needs \"servers\""
   ;;
 

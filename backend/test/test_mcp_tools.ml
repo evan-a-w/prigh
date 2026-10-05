@@ -35,16 +35,16 @@ let listing =
         ; tools = []
         }
       ]
-  ; problems = [ "/p/.mcp.json: server \"x\": give a \"command\" (stdio) or a \"url\" (http)" ]
+  ; problems =
+      [ "/p/.mcp.json: server \"x\": give a \"command\" (stdio) or a \"url\" \
+         (http)"
+      ]
   }
 ;;
 
 let%expect_test "tool names" =
   List.iter
-    [ "fs", "read_file"
-    ; "my server", "do.it/now"
-    ; "s", String.make 80 'x'
-    ]
+    [ "fs", "read_file"; "my server", "do.it/now"; "s", String.make 80 'x' ]
     ~f:(fun (server, tool) -> print_endline (Mcp_tools.tool_name ~server ~tool));
   [%expect
     {|
@@ -77,11 +77,15 @@ let%expect_test "listing: host wire format round trip, RPC shape, notices" =
     MCP server gh (/h/.prigh/mcp.json) failed: server exited (code 1): no token; fix it, then /mcp reconnect
     MCP server db from /p/.mcp.json is not started until you approve it: /mcp
     |}];
-  print_s [%sexp (Mcp_tools.Listing.of_json (`Object []) : Mcp_tools.Listing.t Or_error.t)];
+  print_s
+    [%sexp
+      (Mcp_tools.Listing.of_json (`Object []) : Mcp_tools.Listing.t Or_error.t)];
   [%expect {| (Error "an MCP listing needs \"servers\"") |}]
 ;;
 
-let%expect_test "tools: only ready servers', flags from readOnlyHint, calls routed" =
+let%expect_test
+    "tools: only ready servers', flags from readOnlyHint, calls routed"
+  =
   let tools =
     Mcp_tools.tools listing ~call:(fun _context ~source ~server ~tool args ->
       Tool_result.ok
@@ -102,5 +106,6 @@ let%expect_test "tools: only ready servers', flags from readOnlyHint, calls rout
       Tool.execute (List.hd_exn tools) context (`Object [ "path", `String "a" ])
     in
     print_s [%sexp (result : Tool_result.t)]);
-  [%expect {| ((text "/p/.mcp.json fs read_file {\"path\":\"a\"}") (is_error false)) |}]
+  [%expect
+    {| ((text "/p/.mcp.json fs read_file {\"path\":\"a\"}") (is_error false)) |}]
 ;;

@@ -780,13 +780,19 @@ let dispatch agent login ~meth ~params : Json.t Or_error.t =
     Or_error.map (Agent.skills agent) ~f:(fun skills ->
       `Object [ "skills", `Array (List.map skills ~f:[%jsonaf_of: Skill.t]) ])
   | "list_mcp" ->
-    Or_error.bind (bool_param params "reconnect" ~default:false) ~f:(fun reconnect ->
-      Or_error.map (Agent.mcp_servers ~reconnect agent) ~f:Mcp_tools.Listing.to_rpc_json)
+    Or_error.bind
+      (bool_param params "reconnect" ~default:false)
+      ~f:(fun reconnect ->
+        Or_error.map
+          (Agent.mcp_servers ~reconnect agent)
+          ~f:Mcp_tools.Listing.to_rpc_json)
   | "mcp_approve" ->
     let open Or_error.Let_syntax in
     let%bind source = string_param params "source" in
     let%bind server = string_param params "server" in
-    Or_error.map (Agent.approve_mcp agent ~source ~server) ~f:Mcp_tools.Listing.to_rpc_json
+    Or_error.map
+      (Agent.approve_mcp agent ~source ~server)
+      ~f:Mcp_tools.Listing.to_rpc_json
   | "abort" ->
     let restored = Agent.abort agent in
     ok
