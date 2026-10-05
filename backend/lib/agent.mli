@@ -390,6 +390,10 @@ val hosts : t -> Host.t list
 
 val active_host : t -> string
 
+(** Where the session runs, as it records it ({!Session.Host}): the active
+    host, connected or not, and the cwd there; [None] while it has none. *)
+val location : t -> (Session.Host.t * string) option
+
 (** Switches where tools run from the next call on. The session cwd becomes
     [cwd], which must be a directory on that host (resolved there; [~/] is
     expanded), or the host's own cwd when omitted. Fails for an unknown host or

@@ -21,9 +21,13 @@ open! Import
     its client id (with a notice), taking the id back if the newer one
     disconnects first. The session methods ([new_session],
     [switch_session], [fork], [clone], [import]) move only the calling
-    client. A session keeps running when its clients disconnect; an idle
-    session with no clients is dropped from memory (it stays on disk, with
-    its tool host, so it is on the same host when loaded again). *)
+    client. A brand-new session starts on a host chosen from the client's
+    context, never on whichever host connected first: on the client itself
+    when it is a tool host, else where the client's session is (see
+    [ARCHITECTURE.md]). A session keeps running when its clients
+    disconnect; an idle session with no clients is dropped from memory (it
+    stays on disk, with its tool host, so it is on the same host when loaded
+    again). *)
 
 val methods : string list
 

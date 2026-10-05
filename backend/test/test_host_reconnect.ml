@@ -544,7 +544,7 @@ let%expect_test
     {|
     container hello: client_id=client-2 host_id=container-me
     desk hello: client_id=client-3 host_id=host-desk
-    ((active_host container-me) (cwd /workspace/me)
+    ((active_host host-desk) (cwd /home/me)
      (hosts (container-me=/workspace/me host-desk=/home/me)))
     {"type":"response","id":"r","ok":true,"result":{}}
     {"type":"response","id":"r","ok":true,"result":{}}
@@ -581,7 +581,7 @@ let%expect_test
     {"type":"response","id":"r","ok":true,"result":{}}
     desk ran bash in /home/me/proj
     tool_result: ran on desk in /home/me/proj
-    cwd entry: {"cwd":"/workspace/me","host":{"id":"container-me","name":"container","pinned":false}}
+    cwd entry: {"cwd":"/home/me","host":{"id":"host-desk","name":"desk","pinned":false}}
     cwd entry: {"cwd":"/home/me/proj","host":{"id":"host-desk","name":"desk","pinned":true}}
     |}]
 ;;
@@ -930,5 +930,395 @@ let%expect_test
     {"type":"response","id":"r","ok":true,"result":{}}
     desk ran bash in /home/me/proj
     tool_result: ran on desk in /home/me/proj
+    |}]
+;;
+
+(* Brand-new sessions (new_session, fork, clone, import, a client's first
+   one, a saved session that never had a host) start on a host chosen from
+   the creating client's context, never on whichever host connected first. *)
+
+(* Where [agent]'s session runs, as it records it. *)
+let where t label agent =
+  print_endline
+    (mask
+       t
+       (sprintf
+          "%s: %s"
+          label
+          (match Agent.location agent with
+           | None -> "no host"
+           | Some (host, cwd) ->
+             sprintf
+               "%s%s in %s"
+               host.id
+               (if host.pinned then " (pinned)" else "")
+               cwd)))
+;;
+
+(* A saved session in the sessions directory, run on [hosts] in turn. *)
+let saved_session t ?(hosts = []) name =
+  let session = Session.create ~dir:(t.dir ^/ "sessions") ~cwd:"/old" () in
+  List.iter hosts ~f:(fun ((id, name), cwd) ->
+    ignore
+      (Session.set_cwd
+         session
+         ~host:{ Session.Host.id; name; pinned = false }
+         ~cwd
+         ()
+       : Session.Entry.t));
+  ignore (Session.set_name session ~name : Session.Entry.t);
+  Session.path session
+;;
+
+let path_param path = sprintf {|{"path": "%s"}|} path
+
+let id_param agent =
+  sprintf {|{"path": "%s"}|} (Session.id (Agent.session agent))
+;;
+
+let container = "container-me", "container"
+let desk = "host-desk", "desk"
+
+let connect_container ~sw h =
+  Fake_host.connect
+    ~sw
+    h
+    ~name:"container"
+    ~host_id:"container-me"
+    ~cwd:"/workspace/me"
+;;
+
+let%expect_test
+    "no backend host: a desktop TUI's new sessions start on the desktop, not \
+     on the container connected first"
+  =
+  Test_rpc.with_agent
+    ~backend_host:false
+    [ bash "c1"; Reply.text "new"; bash "c2"; Reply.text "fork" ]
+  @@ fun t _ h ->
+  Eio.Switch.run
+  @@ fun sw ->
+  let _container = connect_container ~sw h in
+  let desk_tui =
+    Fake_host.connect ~sw h ~name:"desk" ~host_id:"host-desk" ~cwd:"/home/me"
+  in
+  where t "first" (Fake_host.agent h desk_tui);
+  Fake_host.call t h desk_tui ~params:{|{"path": "proj"}|} "set_cwd";
+  Fake_host.call t h desk_tui "new_session";
+  let fresh = Fake_host.agent h desk_tui in
+  where t "new" fresh;
+  prompt ~via:desk_tui t h fresh "run it";
+  Fake_host.call t h desk_tui "fork";
+  where t "fork" (Fake_host.agent h desk_tui);
+  Fake_host.call t h desk_tui "clone";
+  where t "clone" (Fake_host.agent h desk_tui);
+  Fake_host.print_notices desk_tui ~name:"desk";
+  [%expect
+    {|
+    container hello: client_id=client-2 host_id=container-me
+    desk hello: client_id=client-3 host_id=host-desk
+    first: host-desk in /home/me
+    {"type":"response","id":"r","ok":true,"result":{}}
+    {"type":"response","id":"r","ok":true,"result":{}}
+    new: host-desk in /home/me/proj
+    {"type":"response","id":"r","ok":true,"result":{}}
+    desk ran bash in /home/me/proj
+    tool_result: ran on desk in /home/me/proj
+    {"type":"response","id":"r","ok":true,"result":{}}
+    fork: host-desk in /home/me/proj
+    {"type":"response","id":"r","ok":true,"result":{}}
+    clone: host-desk in /home/me/proj
+    |}];
+  (* A session that runs on the container by default (a browser's): its
+     fork and clone made from the desktop, and a new session, are on the
+     desktop, in the cwd the session had there. *)
+  let web = Fake_host.connect ~sw h ~name:"web" ~tools:false ~cwd:"/" in
+  let on_container = Fake_host.agent h web in
+  Fake_host.call t h web ~params:{|{"name": "web"}|} "set_session_name";
+  where t "web's" on_container;
+  Fake_host.call t h desk_tui ~params:(id_param on_container) "switch_session";
+  where t "switched" (Fake_host.agent h desk_tui);
+  Fake_host.call t h desk_tui "fork";
+  let forked = Fake_host.agent h desk_tui in
+  where t "fork" forked;
+  prompt ~via:desk_tui t h forked "fork";
+  Fake_host.call t h desk_tui ~params:(id_param on_container) "switch_session";
+  Fake_host.call t h desk_tui "clone";
+  where t "clone" (Fake_host.agent h desk_tui);
+  Fake_host.call t h desk_tui ~params:(id_param on_container) "switch_session";
+  Fake_host.call t h desk_tui "new_session";
+  where t "new" (Fake_host.agent h desk_tui);
+  [%expect
+    {|
+    web hello: client_id=client-4 host_id=client-4
+    {"type":"response","id":"r","ok":true,"result":{}}
+    web's: container-me in /workspace/me
+    {"type":"response","id":"r","ok":true,"result":{}}
+    switched: container-me in /workspace/me
+    {"type":"response","id":"r","ok":true,"result":{}}
+    fork: host-desk in /home/me
+    {"type":"response","id":"r","ok":true,"result":{}}
+    desk ran bash in /home/me
+    tool_result: ran on desk in /home/me
+    {"type":"response","id":"r","ok":true,"result":{}}
+    {"type":"response","id":"r","ok":true,"result":{}}
+    clone: host-desk in /home/me
+    {"type":"response","id":"r","ok":true,"result":{}}
+    {"type":"response","id":"r","ok":true,"result":{}}
+    new: host-desk in /home/me
+    |}];
+  (* Pinned to the container with /host: a fork or clone (the same work)
+     stays there, pinned; a new session is on the desktop. *)
+  Fake_host.call t h desk_tui ~params:(id_param on_container) "switch_session";
+  Fake_host.call
+    t
+    h
+    desk_tui
+    ~params:{|{"host": "container-me", "cwd": "/workspace/me/x"}|}
+    "set_active_host";
+  Fake_host.print_notices desk_tui ~name:"desk";
+  Fake_host.call t h desk_tui "fork";
+  where t "fork" (Fake_host.agent h desk_tui);
+  Fake_host.call t h desk_tui "clone";
+  where t "clone" (Fake_host.agent h desk_tui);
+  Fake_host.call t h desk_tui "new_session";
+  where t "new" (Fake_host.agent h desk_tui);
+  [%expect
+    {|
+    {"type":"response","id":"r","ok":true,"result":{}}
+    {"type":"response","id":"r","ok":true,"result":{}}
+    desk notice: tools now run on container in /workspace/me/x
+    {"type":"response","id":"r","ok":true,"result":{}}
+    fork: container-me (pinned) in /workspace/me/x
+    {"type":"response","id":"r","ok":true,"result":{}}
+    clone: container-me (pinned) in /workspace/me/x
+    {"type":"response","id":"r","ok":true,"result":{}}
+    new: host-desk in /home/me
+    |}];
+  (* Imported sessions are on the desktop too: in the cwd they had there,
+     else the TUI's. A saved session that never had a host goes there when
+     switched to; one that has a host keeps it. *)
+  let ran_on_both =
+    saved_session
+      t
+      ~hosts:[ desk, "/home/me/old"; container, "/workspace/me" ]
+      "both"
+  in
+  let hostless = saved_session t "hostless" in
+  let on_container = saved_session t ~hosts:[ container, "/w" ] "container" in
+  Fake_host.call t h desk_tui ~params:(path_param ran_on_both) "import";
+  where t "imported" (Fake_host.agent h desk_tui);
+  Fake_host.call t h desk_tui ~params:(path_param hostless) "import";
+  where t "imported hostless" (Fake_host.agent h desk_tui);
+  Fake_host.call t h desk_tui ~params:(path_param hostless) "switch_session";
+  where t "switched hostless" (Fake_host.agent h desk_tui);
+  Fake_host.call t h desk_tui ~params:(path_param on_container) "switch_session";
+  where t "switched on container" (Fake_host.agent h desk_tui);
+  Fake_host.print_notices desk_tui ~name:"desk";
+  [%expect
+    {|
+    {"type":"response","id":"r","ok":true,"result":{"path":"$DIR/sessions/<stamp>_<id>.jsonl"}}
+    imported: host-desk in /home/me/old
+    {"type":"response","id":"r","ok":true,"result":{"path":"$DIR/sessions/<stamp>_<id>.jsonl"}}
+    imported hostless: host-desk in /home/me
+    {"type":"response","id":"r","ok":true,"result":{}}
+    switched hostless: host-desk in /home/me
+    {"type":"response","id":"r","ok":true,"result":{}}
+    switched on container: container-me in /w
+    |}]
+;;
+
+let%expect_test
+    "no backend host: a browser on a desktop session makes new sessions on the \
+     desktop"
+  =
+  Test_rpc.with_agent ~backend_host:false [ bash "c1"; Reply.text "new" ]
+  @@ fun t _ h ->
+  Eio.Switch.run
+  @@ fun sw ->
+  let _container = connect_container ~sw h in
+  let desk_tui =
+    Fake_host.connect ~sw h ~name:"desk" ~host_id:"host-desk" ~cwd:"/home/me"
+  in
+  let on_desk = Fake_host.agent h desk_tui in
+  Fake_host.call t h desk_tui ~params:{|{"path": "proj"}|} "set_cwd";
+  let web =
+    Fake_host.connect ~sw h ~name:"web" ~tools:false ~cwd:"/" ~session:on_desk
+  in
+  Fake_host.call t h web "new_session";
+  let fresh = Fake_host.agent h web in
+  where t "new" fresh;
+  prompt ~via:web t h fresh "run it";
+  Fake_host.call t h web ~params:(id_param on_desk) "switch_session";
+  Fake_host.call t h web "fork";
+  where t "fork" (Fake_host.agent h web);
+  Fake_host.call t h web ~params:(id_param on_desk) "switch_session";
+  Fake_host.call t h web "clone";
+  where t "clone" (Fake_host.agent h web);
+  [%expect
+    {|
+    container hello: client_id=client-2 host_id=container-me
+    desk hello: client_id=client-3 host_id=host-desk
+    {"type":"response","id":"r","ok":true,"result":{}}
+    web hello: client_id=client-4 host_id=client-4
+    {"type":"response","id":"r","ok":true,"result":{}}
+    new: host-desk in /home/me/proj
+    {"type":"response","id":"r","ok":true,"result":{}}
+    desk ran bash in /home/me/proj
+    tool_result: ran on desk in /home/me/proj
+    {"type":"response","id":"r","ok":true,"result":{}}
+    {"type":"response","id":"r","ok":true,"result":{}}
+    fork: host-desk in /home/me/proj
+    {"type":"response","id":"r","ok":true,"result":{}}
+    {"type":"response","id":"r","ok":true,"result":{}}
+    clone: host-desk in /home/me/proj
+    |}];
+  (* Saved sessions without a host, imported or switched to, join it there
+     (one recorded on a host keeps it). *)
+  let hostless = saved_session t "hostless" in
+  let ran_on_container =
+    saved_session t ~hosts:[ container, "/workspace/me/old" ] "container"
+  in
+  Fake_host.call t h web ~params:(id_param on_desk) "switch_session";
+  Fake_host.call t h web ~params:(path_param hostless) "import";
+  where t "imported hostless" (Fake_host.agent h web);
+  Fake_host.call t h web ~params:(id_param on_desk) "switch_session";
+  Fake_host.call t h web ~params:(path_param hostless) "switch_session";
+  where t "switched hostless" (Fake_host.agent h web);
+  Fake_host.call t h web ~params:(path_param ran_on_container) "import";
+  where t "imported from container" (Fake_host.agent h web);
+  [%expect
+    {|
+    {"type":"response","id":"r","ok":true,"result":{}}
+    {"type":"response","id":"r","ok":true,"result":{"path":"$DIR/sessions/<stamp>_<id>.jsonl"}}
+    imported hostless: host-desk in /home/me/proj
+    {"type":"response","id":"r","ok":true,"result":{}}
+    {"type":"response","id":"r","ok":true,"result":{}}
+    switched hostless: host-desk in /home/me/proj
+    {"type":"response","id":"r","ok":true,"result":{"path":"$DIR/sessions/<stamp>_<id>.jsonl"}}
+    imported from container: container-me in /workspace/me/old
+    |}];
+  (* The desktop goes away: a new session from its session is still made
+     there, and waits for it like the one it came from. *)
+  Fake_host.call t h web ~params:(id_param on_desk) "switch_session";
+  Fake_host.disconnect h desk_tui;
+  Fake_host.call t h web "new_session";
+  where t "new" (Fake_host.agent h web);
+  Fake_host.call t h web ~params:{|{"command": "pwd"}|} "shell";
+  [%expect
+    {|
+    {"type":"response","id":"r","ok":true,"result":{}}
+    {"type":"response","id":"r","ok":true,"result":{}}
+    new: host-desk in /home/me/proj
+    {"type":"response","id":"r","ok":true,"result":{"text":"waiting for tool host \"desk\" to reconnect; /host picks another","is_error":true}}
+    |}]
+;;
+
+let%expect_test
+    "no backend host: a browser without a session on a host gets the default"
+  =
+  Test_rpc.with_agent ~backend_host:false []
+  @@ fun t _ h ->
+  Eio.Switch.run
+  @@ fun sw ->
+  (* No host yet: a new session has none, and adopts the first to connect. *)
+  let web = Fake_host.connect ~sw h ~name:"web" ~tools:false ~cwd:"/" in
+  where t "first" (Fake_host.agent h web);
+  Fake_host.call t h web "new_session";
+  let fresh = Fake_host.agent h web in
+  where t "new" fresh;
+  let _container = connect_container ~sw h in
+  where t "new" fresh;
+  Fake_host.print_notices web ~name:"web";
+  let _desk_tui =
+    Fake_host.connect ~sw h ~name:"desk" ~host_id:"host-desk" ~cwd:"/home/me"
+  in
+  Fake_host.call t h web "new_session";
+  where t "another" (Fake_host.agent h web);
+  [%expect
+    {|
+    web hello: client_id=client-2 host_id=client-2
+    first: no host
+    {"type":"response","id":"r","ok":true,"result":{}}
+    new: no host
+    container hello: client_id=client-3 host_id=container-me
+    new: container-me in /workspace/me
+    web notice: tools now run on container in /workspace/me
+    desk hello: client_id=client-4 host_id=host-desk
+    {"type":"response","id":"r","ok":true,"result":{}}
+    another: container-me in /workspace/me
+    |}]
+;;
+
+let%expect_test "backend host: new sessions start where they did" =
+  Test_rpc.with_agent []
+  @@ fun t agent h ->
+  Eio.Switch.run
+  @@ fun sw ->
+  (* A TUI's first session runs on the backend until it attaches. *)
+  let tui =
+    Fake_host.connect ~sw h ~name:"tui" ~host_id:"host-tui" ~cwd:"/home/me"
+  in
+  where t "first" (Fake_host.agent h tui);
+  Fake_host.print_notices tui ~name:"tui";
+  Fake_host.call t h tui ~params:{|{"path": "proj"}|} "set_cwd";
+  Fake_host.call t h tui "new_session";
+  where t "new" (Fake_host.agent h tui);
+  Fake_host.call t h tui "fork";
+  where t "fork" (Fake_host.agent h tui);
+  (* A client without tools on a backend session stays on the backend. *)
+  where t "main" agent;
+  call t h "new_session";
+  where t "main's new" (Test_rpc.current h);
+  call t h "clone";
+  where t "main's clone" (Test_rpc.current h);
+  [%expect
+    {|
+    tui hello: client_id=client-2 host_id=host-tui
+    first: host-tui in /home/me
+    tui notice: tools now run on tui in /home/me
+    {"type":"response","id":"r","ok":true,"result":{}}
+    {"type":"response","id":"r","ok":true,"result":{}}
+    new: host-tui in /home/me/proj
+    {"type":"response","id":"r","ok":true,"result":{}}
+    fork: host-tui in /home/me/proj
+    main: backend in $DIR
+    {"type":"response","id":"r1","ok":true,"result":{}}
+    main's new: backend in $DIR
+    {"type":"response","id":"r1","ok":true,"result":{}}
+    main's clone: backend in $DIR
+    |}];
+  (* Pinned to the backend: the TUI's fork stays there; its new session and
+     a saved session without a host (taken over, as before) are on the TUI. *)
+  call t h ~params:{|{"host": "backend"}|} "set_active_host";
+  let pinned = Test_rpc.current h in
+  Fake_host.call t h tui ~params:(id_param pinned) "switch_session";
+  where t "switched" (Fake_host.agent h tui);
+  Fake_host.call t h tui "fork";
+  where t "fork" (Fake_host.agent h tui);
+  Fake_host.call t h tui "new_session";
+  where t "new" (Fake_host.agent h tui);
+  Fake_host.call
+    t
+    h
+    tui
+    ~params:(path_param (saved_session t "x"))
+    "switch_session";
+  where t "hostless" (Fake_host.agent h tui);
+  call t h ~params:(path_param (saved_session t "y")) "switch_session";
+  where t "main's hostless" (Test_rpc.current h);
+  [%expect
+    {|
+    {"type":"response","id":"r1","ok":true,"result":{}}
+    {"type":"response","id":"r","ok":true,"result":{}}
+    switched: backend (pinned) in $DIR
+    {"type":"response","id":"r","ok":true,"result":{}}
+    fork: backend (pinned) in $DIR
+    {"type":"response","id":"r","ok":true,"result":{}}
+    new: host-tui in /home/me
+    {"type":"response","id":"r","ok":true,"result":{}}
+    hostless: host-tui in /home/me
+    {"type":"response","id":"r1","ok":true,"result":{}}
+    main's hostless: backend in /old
     |}]
 ;;
