@@ -1,5 +1,9 @@
 # pi-web — pi's web UI on the prigh backend
 
+> **Deprecated.** Use prigh-web (`tui/prigh-web/`, `prigh -prigh-web`),
+> which replaces it. pi-web still works but gets no new features, and its
+> Playwright e2e is not maintained.
+
 An alternative browser frontend: a copy of [pi](https://github.com/earendil-works/pi)'s
 `packages/web` (Preact + TypeScript, vite) pointed at the prigh backend. It is
 completely separate from the Bonsai web frontend in `tui/web-app` and has its

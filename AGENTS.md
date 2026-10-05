@@ -8,10 +8,15 @@ prigh is a coding agent. Read `README.md` for what it does and
 | `backend/` | the agent, providers, RPC/web servers (`prigh`) | OCaml 5.3, Eio | `nix develop .#backend`, then `cd backend && dune build @runtest` |
 | `tui/` | terminal and Bonsai web frontends (`prigh-tui`) | OxCaml 5.2, Bonsai | `nix develop`, then `cd tui && dune build @runtest` |
 | `tui/prigh-web/` | prigh-web, the DOM browser frontend (part of `tui/`) | OxCaml 5.2, Bonsai_web | `cd tui && dune build @prigh-web/test/runtest ./prigh-web/bin/site`; e2e: `bash tui/prigh-web/e2e/prigh_web.sh` (backend built, `PLAYWRIGHT_MODULE`/`PLAYWRIGHT_BROWSERS_PATH` set) |
-| `pi-web/` | pi's web UI (Preact/TypeScript) on the backend | node 22 | `npm ci && npm run check && npm test && npm run build` |
+| `pi-web/` | **deprecated**: pi's web UI (Preact/TypeScript) on the backend | node 22 | `npm ci && npm run check && npm test && npm run build` |
 | `docker/` | the image's entrypoint (`prigh-docker`) | bash | `bash docker/test-prigh-docker.sh` (`-promote` re-records) |
 | `nix/` | pins and patches for the flake | | see `nix/README.md` |
 
+- **pi-web is deprecated**: prigh-web replaces it. Don't add features to it,
+  improve its UI or fix its Playwright e2e (known broken); new browser work
+  goes into `tui/prigh-web/`. Only keep it compiling when backend changes
+  touch `Pi_rpc` (its unit tests: `npm run check && npm test`); remove it
+  rather than invest in it.
 - The backend and the TUI need different compilers: build each in its own
   dev shell (the default shell's OxCaml `dune` cannot build the backend).
 - `tui/`'s `@runtest` includes the e2e and tmux tests, which run
@@ -30,8 +35,9 @@ prigh is a coding agent. Read `README.md` for what it does and
 - Only have one dune process running at a time, otherwise it hangs. E.g. if
   you are running tests, don't also `dune exec`.
 - Every new RPC field or method must be mirrored by the frontends that use it
-  (`tui/protocol/`, `pi-web/src/protocol.ts` via `backend/lib/pi_rpc.ml`);
-  the e2e tests guard the contract.
+  (`tui/protocol/`, used by the TUI and prigh-web); the e2e tests guard the
+  contract. pi-web (deprecated) only needs `backend/lib/pi_rpc.ml` to keep
+  working, not new features.
 
 ## OCaml conventions
 
@@ -78,8 +84,11 @@ output of `dune build @runtest`, and if the diffs are right, `dune promote`.
 - TUI: drive `App.update` with keys and events and print the screen the user
   sees (the `H` harness in `tui/test/test_app.ml`); `tui/e2e` and
   `tui/tmux-test` check the real binaries.
-- pi-web: vitest with happy-dom (`pi-web/test`), against a fake backend where
-  state is involved.
+- prigh-web: drive `App.update` through the `Harness` in
+  `tui/prigh-web/test` and print the rendered HTML/text; the Playwright e2e
+  (`tui/prigh-web/e2e`) checks real browsers.
+- pi-web (deprecated): its existing vitest tests (`pi-web/test`) should keep
+  passing; don't add new ones.
 
 ## UI principles
 
