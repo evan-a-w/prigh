@@ -700,7 +700,7 @@ start() {
 				hello=(PRIGH_TOKEN="$token" PRIGH_USER="$name")
 			fi
 			clean "$name" "${hello[@]}" \
-				prigh tool-host -connect "127.0.0.1:$internal_port" -name container -cwd "/workspace/$name"
+				prigh tool-host -connect "127.0.0.1:$internal_port" -name container -host-id "container-$name" -cwd "/workspace/$name"
 			supervise "$name" "${cmd[@]}"
 		done
 	fi

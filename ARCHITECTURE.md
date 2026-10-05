@@ -38,8 +38,8 @@ the JSONL file is the durable state) and every client is attached to exactly
 one session at a time: its requests act on that session and it receives that
 session's events. Several frontends can attach to the same session and each
 sees the same stream. A session keeps running when its clients go away, and
-a client sends `hello` first (name, cwd, whether it can run tools, an
-optional session id or path, the `-token` if the backend requires one, and
+a client sends `hello` first (name, cwd, whether it can run tools and its
+host id, an optional session id or path, the `-token` if the backend requires one, and
 with `-tokens` optionally the user, i.e. the namespace name).
 
 ### Tool hosts
@@ -49,20 +49,36 @@ read, write, edit, ls, grep, find) and `!cmd` shells run. It is either the
 backend itself or a connected client that advertised `tools: true` in
 `hello` (a TUI, or a standalone `prigh tool-host -connect`); the subagent
 tool always runs in the backend but its tool calls follow the same active
-host. With `-no-backend-host` the backend is not a host at all (not listed,
-no in-process tools, instructions, path listings or git branch), and a
-session without a host adopts the first one that connects. Tools default to the frontend: a tool-capable
-client takes over when it attaches unless the user pinned a host with
-`set_active_host` (`/host` in the TUI). The session cwd is a property of the
-host, so switching hosts switches the cwd (and `/cd` validates the directory
-on the host). When the active host is a client, `Agent.host_exec` emits a
+host. A client host is known by its *host id*: the `host_id` it sends in
+`hello` (`prigh tool-host -connect` and the TUI pick a random one per
+process and send it on every reconnect), or its client id without one, so a
+host that reconnects is the same host. A newer connection claiming a held id
+takes it over: the older one is a connection the host gave up on (the
+backend may notice a dropped connection late), so it falls back to its
+client id and its in-flight calls and relayed terminals fail. `hello`
+answers with both `client_id` and `host_id`. With `-no-backend-host` the
+backend is not a host at all (not listed, no in-process tools,
+instructions, path listings or git branch), and a session that never had a
+host adopts the first one that connects. Tools default to the frontend: a
+tool-capable client takes over a session that runs on the backend by
+default or has no host when it attaches, never one the user pinned with
+`set_active_host` (`/host` in the TUI) or whose host is only disconnected.
+The session cwd is a property of the host, so switching hosts switches the
+cwd (and `/cd` validates the directory on the host); a session remembers
+its cwd on each host, also while the host is away (`Rpc_server` keeps them
+for evicted sessions, so a TUI that was its session's only client resumes
+it in place). When the active host is a client, `Agent.host_exec` emits a
 `tool_exec` event to that client only and waits on a promise; the client
 answers with `tool_exec_output` (streamed chunks, fanned out to everyone as
 `tool_output`) and `tool_exec_result`; an abort sends `tool_exec_cancel`.
 Disconnecting the active host fails its in-flight calls with `[tool host
-disconnected]` and later calls with "not connected", so the run continues
-and the model sees the error; the TUI shows `tools:offline` until another
-host is chosen. The frontend does not implement any tools: it proxies
+disconnected]`, but the session stays on that host: later calls fail with
+"waiting for tool host NAME to reconnect; /host picks another" (the run
+continues and the model sees the error) and the TUI shows `tools:offline`.
+When the same host id connects again the session resumes on it in the cwd
+it had there (a `Notice` "tools run on NAME again in CWD", a state change,
+and no environment note for the model). Only `set_active_host` moves a
+session off a disconnected host. The frontend does not implement any tools: it proxies
 `tool_exec` to a local `prigh tool-host` process (`Tool_host` in the backend
 runs `Host_ops.execute`, the same code path the backend uses for itself,
 plus five pseudo-tools: `$resolve_dir` for `/cd` and `/host`, `$read_file`
@@ -775,8 +791,11 @@ copy of the protocol types and the e2e test guards the contract.
   plain `ref`, not Bonsai state, because the handler receives a whole batch
   of events at once and state would only update after the frame, so every key
   in the batch would still see `Idle`.
-  `Term_app.run` sends `hello` before mounting the app and feeds the client
-  id back as `Set_client_id`, so `/host` can mark this frontend as "(here)"
+  `Term_app.run` sends `hello` (`connection_hello`: with local tools, a
+  `host_id` for the life of the process, also sent on reconnects) before
+  mounting the app and feeds the reply back as `Hello`, whose `client_id`
+  is our host id (`Hello_reply` prefers the reply's `host_id`), so `/host`
+  can mark this frontend as "(here)"
   and the status line can show `tools:<host>` when tools run elsewhere or
   `tools:offline` when the active host is gone. Mouse reporting is on so the
   wheel scrolls the transcript (`Scroll_up`/`Scroll_down`, three lines);
@@ -1043,6 +1062,15 @@ job tools, abort, kills that really end the process, id continuity across a
 reload, and jobs on a real `prigh tool-host` connected over TCP (output
 streamed into the job, `kill_job` cancelling the exec on the host, a dropped
 connection failing the job).
+
+`backend/test/test_host_reconnect.ml` covers tool hosts going away: a
+session stays on its disconnected host (also when another host attaches),
+tool calls say it waits for the host, the host reconnecting with the same
+`host_id` resumes it in the same cwd without an environment note, only
+`set_active_host` moves it, an evicted session resumes on its returning
+host, and a newer connection taking over a held host id. The real
+`prigh tool-host` reconnecting with its id is in `test_tool_host.ml`,
+terminals routed by host id in `test_terminal_relay.ml`.
 
 `backend/test/test_pi_rpc.ml` drives `Pi_rpc` over in-memory lines
 (pi commands in, pi events out) for prompts, steering, confirmations,

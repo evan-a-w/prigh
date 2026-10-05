@@ -135,3 +135,68 @@ let%expect_test
   Tool_host.close host;
   Client.close client
 ;;
+
+let%expect_test "the hello carries one host id, also when reconnecting" =
+  let pairs = List.init 2 ~f:(fun _ -> Transport.In_memory.create ()) in
+  let transports = Queue.of_list (List.map pairs ~f:fst) in
+  let client =
+    Client.create ~connect:(fun () ->
+      Deferred.Or_error.return (Queue.dequeue_exn transports))
+  in
+  let hello =
+    Prigh_ui_term.Term_app.connection_hello
+      [ "name", `String "laptop" ]
+      ~local_tools:(Some "prigh")
+  in
+  let host_id = ref None in
+  (* Connects (again), answers the hello and prints it. *)
+  let attempt (_, backend) ~session =
+    let reply =
+      Prigh_ui_term.Term_app.reconnect
+        client
+        ~hello
+        ~delay_ms:0
+        ~session
+        ~as_user:None
+    in
+    let%bind line =
+      Pipe.read_exn (Transport.In_memory.Backend.requests backend)
+    in
+    let request = Or_error.ok_exn (Json.parse line) in
+    let field json name = Option.value_exn (Jsonaf.member name json) in
+    let id =
+      match field (field request "params") "host_id" with
+      | `String id -> id
+      | _ -> assert false
+    in
+    if Option.is_none !host_id then host_id := Some id;
+    Transport.In_memory.Backend.send
+      backend
+      (sprintf
+         {|{"type":"response","id":%s,"ok":true,"result":{"client_id":"c","host_id":"%s"}}|}
+         (Jsonaf.to_string (field request "id"))
+         id);
+    let%map reply in
+    print_endline
+      (String.substr_replace_all
+         line
+         ~pattern:(Option.value_exn !host_id)
+         ~with_:"<host-id>");
+    print_s [%sexp (Result.is_ok reply : bool)]
+  in
+  let%bind () = attempt (List.nth_exn pairs 0) ~session:None in
+  Transport.In_memory.Backend.close (snd (List.nth_exn pairs 0));
+  let%bind () = attempt (List.nth_exn pairs 1) ~session:(Some "s1") in
+  print_endline
+    (String.map (Option.value_exn !host_id) ~f:(fun c ->
+       if Char.is_hex_digit c then 'x' else c));
+  [%expect
+    {|
+    {"id":1,"method":"hello","params":{"name":"laptop","tools":true,"host_id":"<host-id>"}}
+    true
+    {"id":2,"method":"hello","params":{"name":"laptop","tools":true,"host_id":"<host-id>","session":"s1"}}
+    true
+    host-xxxxxxxxxxxxxxxx
+    |}];
+  return ()
+;;
