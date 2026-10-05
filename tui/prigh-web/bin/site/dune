@@ -22,6 +22,12 @@
  (action
   (copy ../chat.css chat.css)))
 
+(rule
+ (target agents.css)
+ (deps ../agents.css)
+ (action
+  (copy ../agents.css agents.css)))
+
 (install
  (section share)
  (package prigh_tui)
@@ -29,4 +35,5 @@
   (index.html as prigh-web/index.html)
   (main.bc.js as prigh-web/main.bc.js)
   (style.css as prigh-web/style.css)
-  (chat.css as prigh-web/chat.css)))
+  (chat.css as prigh-web/chat.css)
+  (agents.css as prigh-web/agents.css)))
