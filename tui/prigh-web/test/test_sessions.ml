@@ -148,7 +148,8 @@ let%expect_test "switching resets what belonged to the old session" =
   [%expect
     {|
     (Set_url_session s2)
-    (Rpc (method_ get_messages) (params ()) (tag Messages))
+    (Rpc (method_ get_messages) (params ()) (tag (Messages s2)))
+    (Rpc (method_ get_pending) (params ()) (tag Pending))
     (Rpc (method_ list_sessions) (params ()) (tag Sessions))
     (Rpc (method_ list_subagents) (params ()) (tag Subagents))
     (Rpc (method_ list_jobs) (params ()) (tag Jobs))
@@ -167,6 +168,68 @@ let%expect_test "switching resets what belonged to the old session" =
   H.reply h "list_sessions" sessions;
   H.text h ~selector:".session.selected .session-title";
   [%expect {| Release notes |}]
+;;
+
+let%expect_test
+    "a session in progress: its confirmations, queue and running tools come \
+     back; replies for the session we left are dropped"
+  =
+  let h = H.create ~sessions () in
+  H.event
+    h
+    (sprintf
+       {|{"event":"state","state":%s}|}
+       (H.state_json
+          ~fields:[ "session_id", `String "s2"; "running", `True ]
+          ()));
+  [%expect
+    {|
+    (Set_url_session s2)
+    (Rpc (method_ get_messages) (params ()) (tag (Messages s2)))
+    (Rpc (method_ get_pending) (params ()) (tag Pending))
+    (Rpc (method_ list_sessions) (params ()) (tag Sessions))
+    (Rpc (method_ list_subagents) (params ()) (tag Subagents))
+    (Rpc (method_ list_jobs) (params ()) (tag Jobs))
+    |}];
+  H.act
+    h
+    (Reply
+       ( Messages "s1"
+       , Ok (Jsonaf.of_string {|[{"role":"user","text":"from s1"}]|}) ));
+  print_s [%sexp (List.length (Prigh_web.Chat.entries (H.model h).chat) : int)];
+  [%expect {| 0 |}];
+  H.reply
+    h
+    "get_pending"
+    {|{"steer_texts":["a"],"follow_up_texts":["b","c"],"confirms":[{"call_id":"c1","name":"bash","summary":"rm -rf build"}]}|};
+  H.text h ~selector:".modal";
+  H.text h ~selector:".status .queued";
+  [%expect
+    {|
+    (Focus confirm)
+    Allow bash?
+    (Close (Esc))
+    rm -rf build
+    (Deny) (Allow)
+    (3 queued)
+    |}];
+  H.reply
+    h
+    "get_messages"
+    {|[{"role":"user","text":"clean up"},
+       {"role":"assistant","content":[{"type":"tool_call","id":"c1","name":"bash","arguments":"{\"command\":\"rm -rf build\"}"}],"stop_reason":{"type":"tool_use"},"usage":{"input":0,"output":0,"cache_read":0},"model":"m"}]|};
+  H.show h ~selector:".tool";
+  [%expect
+    {|
+    Follow_chat
+    <div class="running tool tool-bash">
+      <div class="tool-head">
+        <span class="spinner"> </span>
+        <span class="name"> bash </span>
+        <span class="arg command"> rm -rf build </span>
+      </div>
+    </div>
+    |}]
 ;;
 
 let%expect_test "new session" =
@@ -206,10 +269,13 @@ let%expect_test
   H.text h ~selector:".modal";
   [%expect {| |}];
   H.act h (Ask_delete "/sessions/s2.jsonl");
+  (* Enter on a focused button (Tab to Cancel) is the button's. *)
+  H.key h "Enter" ~target:Control;
   H.key h "Enter" ~target:Page;
   [%expect
     {|
     (Focus dialog)
+    (browser default)
     Dialog_accept
     (Focus editor)
     (Rpc (method_ delete_session) (params ((path /sessions/s2.jsonl)))
@@ -339,7 +405,8 @@ let%expect_test "new session and switching session reload the state" =
     (Rpc (method_ new_session) (params ()) (tag Reload_state))
     (Rpc (method_ get_state) (params ()) (tag State))
     (Set_url_session s2)
-    (Rpc (method_ get_messages) (params ()) (tag Messages))
+    (Rpc (method_ get_messages) (params ()) (tag (Messages s2)))
+    (Rpc (method_ get_pending) (params ()) (tag Pending))
     (Rpc (method_ list_sessions) (params ()) (tag Sessions))
     (Rpc (method_ list_subagents) (params ()) (tag Subagents))
     (Rpc (method_ list_jobs) (params ()) (tag Jobs))

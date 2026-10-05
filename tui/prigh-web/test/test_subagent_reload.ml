@@ -7,7 +7,7 @@ let%expect_test "a reloaded subagent call fetches its transcript" =
   Harness.act
     h
     (Reply
-       ( Messages
+       ( Messages "s1"
        , Ok
            (Jsonaf.of_string
               {|[
@@ -38,6 +38,7 @@ let%expect_test "a reloaded subagent call fetches its transcript" =
   print_s [%sexp (List.length (Harness.model h).toasts : int)];
   [%expect
     {|
+    Follow_chat
     (Rpc (method_ get_subagent) (params ((id s1))) (tag (Subagent s1)))
     (Rpc (method_ get_subagent) (params ((id s2))) (tag (Subagent s2)))
     ((s1 ((a1 2))) (s2 ()))

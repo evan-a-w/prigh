@@ -36,7 +36,8 @@ module Reply_tag : sig
     | Ignore
     | Show_error (** only failures are shown *)
     | State
-    | Messages
+    | Messages of string (** the session's id *)
+    | Pending
     | Sessions
     | Models
     | Reload_state (** the client's session changed: fetch its state *)
@@ -104,6 +105,8 @@ module Command : sig
     | Scroll_chat of int (** by pages *)
     | Jump_to_user_message of int
     (** the previous ([-1]) or next ([1]) user message in view *)
+    | Follow_chat
+    (** scroll the main chat to its end, and keep it there as output comes *)
   [@@deriving sexp_of, equal]
 end
 

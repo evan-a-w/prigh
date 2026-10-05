@@ -53,6 +53,28 @@ let%expect_test "tool confirmations own the keyboard: Enter allows, Esc denies" 
   [%expect {| (Focus confirm) |}]
 ;;
 
+let%expect_test "Enter on a focused button of a confirmation is that button's" =
+  let h = H.create () in
+  H.event h (confirm "c1" "rm -rf build");
+  (* Tab to Deny, then Enter: the browser clicks Deny. *)
+  H.key h "Enter" ~target:Control;
+  H.key h "Enter" ~target:Page ~shift:true;
+  [%expect
+    {|
+    (Focus confirm)
+    (browser default)
+    (browser default)
+    |}];
+  H.key h "Enter" ~target:Page;
+  [%expect
+    {|
+    (Respond_confirm (call_id c1) (allow true))
+    (Rpc (method_ tool_confirm_respond) (params ((call_id c1) (allow true)))
+     (tag Show_error))
+    (Focus editor)
+    |}]
+;;
+
 let%expect_test "help lists every key and command" =
   let h = H.create () in
   H.act h Open_help;
@@ -414,7 +436,8 @@ let%expect_test
   [%expect
     {|
     (Set_url_session s1)
-    (Rpc (method_ get_messages) (params ()) (tag Messages))
+    (Rpc (method_ get_messages) (params ()) (tag (Messages s1)))
+    (Rpc (method_ get_pending) (params ()) (tag Pending))
     (Rpc (method_ list_sessions) (params ()) (tag Sessions))
     (Rpc (method_ list_subagents) (params ()) (tag Subagents))
     (Rpc (method_ list_jobs) (params ()) (tag Jobs))

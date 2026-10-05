@@ -8,6 +8,7 @@ module Target : sig
   type t =
     | Editor of { cursor : int } (** the prompt editor, with its caret *)
     | Field (** another text field *)
+    | Control (** a button, link or fold: Enter and Space are its own *)
     | Page
   [@@deriving sexp_of]
 end
