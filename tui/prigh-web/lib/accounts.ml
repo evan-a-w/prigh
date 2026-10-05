@@ -55,7 +55,9 @@ module Account = struct
   ;;
 
   let to_json t =
-    let opt name = Option.value_map ~default:[] ~f:(fun v -> [ name, `String v ]) in
+    let opt name =
+      Option.value_map ~default:[] ~f:(fun v -> [ name, `String v ])
+    in
     `Object
       ([ "backend", `String t.backend ]
        @ opt "user" t.user
@@ -71,11 +73,7 @@ module Account = struct
       | _ -> None
     in
     let%map backend = str "backend" in
-    { backend
-    ; user = str "user"
-    ; token = str "token"
-    ; session = str "session"
-    }
+    { backend; user = str "user"; token = str "token"; session = str "session" }
   ;;
 end
 
@@ -90,7 +88,9 @@ let saved (storage : Storage.t) =
 ;;
 
 let save (storage : Storage.t) accounts =
-  storage.set key (Json.to_string (`Array (List.map accounts ~f:Account.to_json)))
+  storage.set
+    key
+    (Json.to_string (`Array (List.map accounts ~f:Account.to_json)))
 ;;
 
 let signed_in (storage : Storage.t) ~backend =

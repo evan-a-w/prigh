@@ -208,9 +208,6 @@ module Action : sig
         ; current : Accounts.Account.t option
         } (** the saved sign-ins, from the page *)
     | Open_accounts (** the account menu *)
-    | Switch_account of Accounts.Account.t
-    | Add_account
-    | Act_as of string (** a user's name; one's own goes back *)
     | Cycle_verbosity
     | Cycle_model of int (** through the scoped models, forwards or back *)
     | Cycle_thinking

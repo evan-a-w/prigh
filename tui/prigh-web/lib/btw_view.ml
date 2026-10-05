@@ -12,7 +12,9 @@ let view (m : App.Model.t) ~inject =
       | Streaming ->
         div
           ~cls:"btw-status"
-          [ Node.span ~attrs:[ Attr.class_ "spinner" ] []; Node.text "Answering…" ]
+          [ Node.span ~attrs:[ Attr.class_ "spinner" ] []
+          ; Node.text "Answering…"
+          ]
       | Done -> Node.none
       | Failed e -> div ~cls:"btw-error" [ Node.textf "Failed: %s" e ]
     in
@@ -43,8 +45,6 @@ let view (m : App.Model.t) ~inject =
                  btw.answer)
           ]
       ; status
-      ; div
-          ~cls:"btw-note"
-          [ Node.text "Not added to the conversation." ]
+      ; div ~cls:"btw-note" [ Node.text "Not added to the conversation." ]
       ]
 ;;

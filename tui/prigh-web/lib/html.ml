@@ -103,8 +103,7 @@ module Icon = struct
       {|<rect x="3" y="4" width="18" height="7" rx="2"/><rect x="3" y="13" width="18" height="7" rx="2"/><path d="M7 7.5h.01M7 16.5h.01"/>|}
     | Help ->
       {|<circle cx="12" cy="12" r="9"/><path d="M9.5 9a2.5 2.5 0 0 1 4.9.8c0 1.7-2.4 2.2-2.4 3.7M12 17h.01"/>|}
-    | User ->
-      {|<circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/>|}
+    | User -> {|<circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/>|}
     | Users ->
       {|<circle cx="9" cy="8" r="4"/><path d="M2 21a7 7 0 0 1 14 0M16 3.5a4 4 0 0 1 0 9M22 21a7 7 0 0 0-4-6.3"/>|}
     | User_plus ->

@@ -6,7 +6,10 @@ module Action = App.Action
 let keys_hint text = span ~cls:"keys-hint" text
 
 let done_button ~inject =
-  button ~cls:"primary" ~on_click:(inject Action.Close_dialog) [ Node.text "Done" ]
+  button
+    ~cls:"primary"
+    ~on_click:(inject Action.Close_dialog)
+    [ Node.text "Done" ]
 ;;
 
 let key_table rows =
@@ -15,7 +18,9 @@ let key_table rows =
     [ Node.tbody
         (List.map rows ~f:(fun (key, what) ->
            Node.tr
-             [ Node.td [ Node.kbd [ Node.text key ] ]; Node.td [ Node.text what ] ]))
+             [ Node.td [ Node.kbd [ Node.text key ] ]
+             ; Node.td [ Node.text what ]
+             ]))
     ]
 ;;
 
@@ -71,7 +76,8 @@ let scoped_models (picker : Picker.t) checked ~inject =
         ]
     ; div
         ~cls:"picker-items"
-        ~attrs:[ Attr.role "listbox"; Attr.create "aria-multiselectable" "true" ]
+        ~attrs:
+          [ Attr.role "listbox"; Attr.create "aria-multiselectable" "true" ]
         (List.mapi visible ~f:(fun i (item : Picker.Item.t) ->
            let on = Set.mem checked item.id in
            Node.div
@@ -96,7 +102,11 @@ let scoped_models (picker : Picker.t) checked ~inject =
 let prompt (m : App.Model.t) (p : Prompt.t) ~inject =
   let title, label, placeholder, accept =
     match p.action with
-    | Cd -> "Change directory", "The session's working directory", "/path/to/project", "Change"
+    | Cd ->
+      ( "Change directory"
+      , "The session's working directory"
+      , "/path/to/project"
+      , "Change" )
     | Host_cwd { name; _ } ->
       ( "Run tools on " ^ name
       , "Working directory there"
@@ -115,13 +125,16 @@ let prompt (m : App.Model.t) (p : Prompt.t) ~inject =
   in
   let host_note =
     match p.action, m.state with
-    | Cd, Some state when not (String.equal state.active_host Host.backend_id) ->
+    | Cd, Some state when not (String.equal state.active_host Host.backend_id)
+      ->
       Node.p
         ~attrs:[ Attr.class_ "dialog-note" ]
         [ Node.textf
             "On %s, where tools run (/host changes it)."
-            (List.find state.hosts ~f:(fun h -> String.equal h.id state.active_host)
-             |> Option.value_map ~default:state.active_host ~f:(fun h -> h.name))
+            (List.find state.hosts ~f:(fun h ->
+               String.equal h.id state.active_host)
+             |> Option.value_map ~default:state.active_host ~f:(fun h -> h.name)
+            )
         ]
     | _ -> Node.none
   in
@@ -157,7 +170,8 @@ let prompt (m : App.Model.t) (p : Prompt.t) ~inject =
         ]
     ; host_note
     ; (match p.error with
-       | Some e -> div ~cls:"dialog-error" ~attrs:[ Attr.role "alert" ] [ Node.text e ]
+       | Some e ->
+         div ~cls:"dialog-error" ~attrs:[ Attr.role "alert" ] [ Node.text e ]
        | None -> Node.none)
     ; (match p.suggestions with
        | [] -> Node.none
@@ -197,7 +211,9 @@ let rewind_confirm ~text ~inject =
         [ Node.text (String.prefix text 400) ]
     ; Node.p
         ~attrs:[ Attr.class_ "dialog-note" ]
-        [ Node.text "Later messages are kept as a branch: /tree returns to them." ]
+        [ Node.text
+            "Later messages are kept as a branch: /tree returns to them."
+        ]
     ]
 ;;
 
@@ -233,7 +249,8 @@ let session (m : App.Model.t) (s : Session_stats.t) ~inject =
       [ ( "Name"
         , Option.value
             state.session_name
-            ~default:(Option.value state.session_description ~default:"(unnamed)") )
+            ~default:
+              (Option.value state.session_description ~default:"(unnamed)") )
       ; "Id", state.session_id
       ; "File", state.session_path
       ; "Directory", state.cwd
@@ -273,7 +290,9 @@ let session (m : App.Model.t) (s : Session_stats.t) ~inject =
            ; "Duration", duration s.duration_seconds
            ]
            ~f:(fun (k, v) ->
-             div ~cls:"stat" [ span ~cls:"stat-value" v; span ~cls:"stat-label" k ]))
+             div
+               ~cls:"stat"
+               [ span ~cls:"stat-value" v; span ~cls:"stat-label" k ]))
     ; rows
         [ "Tools", tools
         ; "Model changes", Int.to_string s.model_changes
@@ -287,9 +306,11 @@ let jobs ({ jobs; selected; output } : Dialog.Jobs.t) ~inject =
     ~cls:"jobs-dialog"
     ~title:"Background jobs"
     ~on_close:(inject Action.Close_dialog)
-    ~footer:[ keys_hint "↑↓ move · Enter output · Delete kill"; done_button ~inject ]
+    ~footer:
+      [ keys_hint "↑↓ move · Enter output · Delete kill"; done_button ~inject ]
     [ (match jobs with
-       | [] -> div ~cls:"picker-empty" [ Node.text "No jobs: !&command starts one." ]
+       | [] ->
+         div ~cls:"picker-empty" [ Node.text "No jobs: !&command starts one." ]
        | jobs ->
          div
            ~cls:"picker-items"
@@ -297,7 +318,9 @@ let jobs ({ jobs; selected; output } : Dialog.Jobs.t) ~inject =
            (List.mapi jobs ~f:(fun i (j : Job_info.t) ->
               Node.div
                 ~attrs:
-                  [ classes [ "job-item" ] [ "selected", i = selected; "running", j.running ]
+                  [ classes
+                      [ "job-item" ]
+                      [ "selected", i = selected; "running", j.running ]
                   ; Attr.role "option"
                   ]
                 [ div
@@ -333,9 +356,13 @@ let jobs ({ jobs; selected; output } : Dialog.Jobs.t) ~inject =
        | Some (id, text) ->
          div
            ~cls:"job-output"
-           [ span ~cls:"job-output-title" (sprintf "Output of %s (last 200 lines)" id)
+           [ span
+               ~cls:"job-output-title"
+               (sprintf "Output of %s (last 200 lines)" id)
            ; Node.pre
-               [ Node.text (if String.is_empty text then "(no output yet)" else text) ]
+               [ Node.text
+                   (if String.is_empty text then "(no output yet)" else text)
+               ]
            ])
     ]
 ;;
@@ -352,7 +379,8 @@ let text ~title ~text ~inject =
 let view (m : App.Model.t) (dialog : Dialog.t) ~inject =
   match dialog with
   | Hotkeys -> Some (hotkeys ~inject)
-  | Scoped_models { picker; checked } -> Some (scoped_models picker checked ~inject)
+  | Scoped_models { picker; checked } ->
+    Some (scoped_models picker checked ~inject)
   | Prompt p -> Some (prompt m p ~inject)
   | Rewind_confirm { text = t; _ } -> Some (rewind_confirm ~text:t ~inject)
   | Session stats -> Some (session m stats ~inject)

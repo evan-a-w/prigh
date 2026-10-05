@@ -1192,6 +1192,21 @@ let%expect_test "/session prints the stats table" =
     |}]
 ;;
 
+let%expect_test "/compact passes its instructions on" =
+  let h = connected () in
+  H.keys h "/compact keep the file names";
+  H.enter h;
+  H.keys h "/compact";
+  H.enter h;
+  [%expect {|
+    (Rpc
+      (method_ compact)
+      (params ((instructions "keep the file names")))
+      (tag Compact_done))
+    (Rpc (method_ compact) (params ()) (tag Compact_done))
+    |}]
+;;
+
 let%expect_test "/sessions Ctrl+N filters named only; Ctrl+D confirms delete" =
   let h = connected () in
   H.keys h "/sessions";

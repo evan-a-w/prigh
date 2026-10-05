@@ -1422,7 +1422,16 @@ let run_command m (cmd : Commands.Parsed.t) =
     m, [ rpc "login" ~params ]
   | "logout", [] -> m, [ rpc "auth_status" ~tag:Auth_logout_picker ]
   | "logout", provider :: _ -> logout m provider
-  | "compact", _ -> notice m "compacting…", [ rpc "compact" ~tag:Compact_done ]
+  | "compact", _ ->
+    ( notice m "compacting…"
+    , [ rpc
+          "compact"
+          ~params:
+            (if String.is_empty cmd.rest
+             then []
+             else [ "instructions", str cmd.rest ])
+          ~tag:Compact_done
+      ] )
   | "new", _ ->
     m, [ rpc "new_session" ~tag:(Reload_messages_notice "new session") ]
   | "name", [] ->

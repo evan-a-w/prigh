@@ -19,7 +19,8 @@ let%expect_test "the account store: migration, sign-ins, sessions, removal" =
   storage.set "prigh.token" "a";
   print_s [%sexp (Accounts.load storage : Account.t list)];
   print_s [%sexp (Accounts.remember storage ~backend : Account.t list)];
-  [%expect {|
+  [%expect
+    {|
     ()
     (((backend ws://127.0.0.1:7790/ws) (user (alice)) (token (a)) (session ())))
     |}];
@@ -29,7 +30,8 @@ let%expect_test "the account store: migration, sign-ins, sessions, removal" =
     { backend; user = Some "bob"; token = Some "b"; session = None };
   ignore (Accounts.remember storage ~backend : Account.t list);
   dump storage;
-  [%expect {|
+  [%expect
+    {|
     prigh-web.accounts = [{"backend":"ws://127.0.0.1:7790/ws","user":"alice","token":"a"},{"backend":"ws://127.0.0.1:7790/ws","user":"bob","token":"b"}]
     prigh.user = bob
     prigh.token = b
@@ -41,22 +43,29 @@ let%expect_test "the account store: migration, sign-ins, sessions, removal" =
   storage.set "prigh.token" "b2";
   ignore (Accounts.remember storage ~backend : Account.t list);
   print_s [%sexp (Accounts.current storage ~backend : Account.t option)];
-  [%expect {| (((backend ws://127.0.0.1:7790/ws) (user (bob)) (token (b2)) (session (s7)))) |}];
+  [%expect
+    {| (((backend ws://127.0.0.1:7790/ws) (user (bob)) (token (b2)) (session (s7)))) |}];
   (* Another backend with the same user name is another account. *)
   Accounts.activate
     storage
-    { backend = other_backend; user = Some "bob"; token = Some "x"; session = None };
+    { backend = other_backend
+    ; user = Some "bob"
+    ; token = Some "x"
+    ; session = None
+    };
   ignore (Accounts.remember storage ~backend:other_backend : Account.t list);
   print_s
     [%sexp
       (List.map (Accounts.load storage) ~f:(fun a ->
          Account.name a, Account.host a)
        : (string * string) list)];
-  [%expect {| ((alice 127.0.0.1:7790) (bob 127.0.0.1:7790) (bob prigh.example.com)) |}];
+  [%expect
+    {| ((alice 127.0.0.1:7790) (bob 127.0.0.1:7790) (bob prigh.example.com)) |}];
   (* Removing the active account signs it out; another just goes. *)
   Accounts.remove storage { bob with backend = other_backend };
   dump storage;
-  [%expect {|
+  [%expect
+    {|
     prigh-web.accounts = [{"backend":"ws://127.0.0.1:7790/ws","user":"alice","token":"a"},{"backend":"ws://127.0.0.1:7790/ws","user":"bob","token":"b2","session":"s7"}]
     prigh.user = -
     prigh.token = -
@@ -83,7 +92,8 @@ let%expect_test "accounts without users, and a corrupt list" =
          { backend; user = None; token = Some "sekrit"; session = None }
          { backend; user = None; token = Some "other"; session = None }
        : bool)];
-  [%expect {|
+  [%expect
+    {|
     ()
     ((token 127.0.0.1:7790))
     false
@@ -92,14 +102,19 @@ let%expect_test "accounts without users, and a corrupt list" =
   let storage = Accounts.Storage.in_memory () in
   print_s [%sexp (Accounts.remember storage ~backend : Account.t list)];
   print_s [%sexp (Accounts.current storage ~backend : Account.t option)];
-  [%expect {|
+  [%expect
+    {|
     ()
     ()
     |}]
 ;;
 
 let account ?(backend = backend) ?session user =
-  { Account.backend; user = Some user; token = Some (String.prefix user 1); session }
+  { Account.backend
+  ; user = Some user
+  ; token = Some (String.prefix user 1)
+  ; session
+  }
 ;;
 
 let alice = account "alice"
@@ -114,7 +129,8 @@ let signed_in_as ?(users = false) user =
        { accounts = [ alice; bob; account ~backend:other_backend "carol" ]
        ; current = Some (account user)
        });
-  if users then H.act h (Reply (Users Probe, Ok (Jsonaf.of_string {|["alice","bob"]|})));
+  if users
+  then H.act h (Reply (Users Probe, Ok (Jsonaf.of_string {|["alice","bob"]|})));
   h
 ;;
 
@@ -122,13 +138,15 @@ let%expect_test "the account menu: who we are, the other accounts, actions" =
   let h = signed_in_as "alice" in
   H.text h ~selector:".sidebar-footer";
   H.text h ~selector:".status-item.account";
-  [%expect {|
+  [%expect
+    {|
     (A alice) (Commands and keys (/help))
     (alice)
     |}];
   H.act h Open_accounts;
   H.text h ~selector:".account-menu";
-  [%expect {|
+  [%expect
+    {|
     (Focus dialog)
     A
     alice 127.0.0.1:7790
@@ -144,7 +162,8 @@ let%expect_test "the account menu: who we are, the other accounts, actions" =
     |}];
   (* Enter on the highlighted account switches to it (the page reloads). *)
   H.key h "Enter" ~target:Page;
-  [%expect {|
+  [%expect
+    {|
     Dialog_accept
     (Focus editor)
     (Switch_account
@@ -156,7 +175,8 @@ let%expect_test "the account menu: who we are, the other accounts, actions" =
   H.key h "Enter" ~target:Page;
   H.act h Open_accounts;
   H.act h (Picker_choose "signout");
-  [%expect {|
+  [%expect
+    {|
     (Focus dialog)
     (Dialog_move 1)
     (Dialog_move 1)
@@ -170,7 +190,8 @@ let%expect_test "the account menu: who we are, the other accounts, actions" =
   (* Esc closes it without doing anything. *)
   H.act h Open_accounts;
   H.key h "Escape" ~target:Page;
-  [%expect {|
+  [%expect
+    {|
     (Focus dialog)
     Close_dialog
     (Focus editor)
@@ -179,9 +200,12 @@ let%expect_test "the account menu: who we are, the other accounts, actions" =
 
 let%expect_test "a superuser acts as another user from the account menu" =
   let h = H.create () in
-  H.act h (Hello { client_id = "c1"; namespace = Some "alice"; user = Some "alice" });
+  H.act
+    h
+    (Hello { client_id = "c1"; namespace = Some "alice"; user = Some "alice" });
   H.act h Start;
-  [%expect {|
+  [%expect
+    {|
     (Focus editor)
     (Rpc (method_ get_state) (params ()) (tag State))
     (Rpc (method_ list_models) (params ()) (tag Models))
@@ -192,7 +216,8 @@ let%expect_test "a superuser acts as another user from the account menu" =
   H.reply h "list_users" {|["alice","bob"]|};
   H.act h Open_accounts;
   H.text h ~selector:".account-menu";
-  [%expect {|
+  [%expect
+    {|
     (Focus dialog)
     A
     alice
@@ -206,7 +231,8 @@ let%expect_test "a superuser acts as another user from the account menu" =
   H.reply h "list_users" {|["alice","bob"]|};
   H.act h (Picker_choose "bob");
   H.reply h "set_user" {|{"client_id":"c1","namespace":"bob","user":"alice"}|};
-  [%expect {|
+  [%expect
+    {|
     (Focus editor)
     (Rpc (method_ list_users) (params ()) (tag (Users Picker)))
     (Focus picker-input)
@@ -221,7 +247,8 @@ let%expect_test "a superuser acts as another user from the account menu" =
     |}];
   H.act h Open_accounts;
   H.text h ~selector:".account-menu";
-  [%expect {|
+  [%expect
+    {|
     (Focus dialog)
     A
     alice acting as bob
@@ -233,18 +260,22 @@ let%expect_test "a superuser acts as another user from the account menu" =
     ↑↓ move · Enter choose · Esc close
     |}];
   H.act h (Picker_choose "back");
-  [%expect {|
+  [%expect
+    {|
     (Focus editor)
     (Rpc (method_ set_user) (params ((user alice))) (tag User_switched))
     |}];
   (* Others are not offered acting as anyone. *)
   let h = H.create () in
-  H.act h (Hello { client_id = "c1"; namespace = Some "bob"; user = Some "bob" });
+  H.act
+    h
+    (Hello { client_id = "c1"; namespace = Some "bob"; user = Some "bob" });
   H.act h Start;
   H.fail h "list_users" "unauthorised: bob is not a superuser";
   H.act h Open_accounts;
   H.text h ~selector:".menu-section";
-  [%expect {|
+  [%expect
+    {|
     (Focus editor)
     (Rpc (method_ get_state) (params ()) (tag State))
     (Rpc (method_ list_models) (params ()) (tag Models))
@@ -261,12 +292,17 @@ let%expect_test "switching user resets everything that was the old user's" =
   let h =
     H.create ~sessions:(sprintf "[%s]" (H.session_json ~name:"Alice's" "s2")) ()
   in
-  H.act h (Hello { client_id = "c1"; namespace = Some "alice"; user = Some "alice" });
-  H.act h (Reply (Messages, Ok (Jsonaf.of_string {|[{"role":"user","text":"secret"}]|})));
+  H.act
+    h
+    (Hello { client_id = "c1"; namespace = Some "alice"; user = Some "alice" });
+  H.act
+    h
+    (Reply
+       (Messages, Ok (Jsonaf.of_string {|[{"role":"user","text":"secret"}]|})));
   H.act h (Run "/btw what was that?");
   H.act h (Set_session_query "ali");
   H.act h Open_model_picker;
-  H.act h (Act_as "bob");
+  H.act h (Run "/setusr bob");
   H.reply h "set_user" {|{"client_id":"c1","namespace":"bob","user":"alice"}|};
   let m = H.model h in
   print_s
@@ -278,7 +314,8 @@ let%expect_test "switching user resets everything that was the old user's" =
         ~query:m.session_query
         ~dialog:(Option.is_some m.dialog : bool)
         ~btw:(Option.is_some m.btw : bool)];
-  [%expect {|
+  [%expect
+    {|
     (Rpc (method_ btw) (params ((question "what was that?") (btw_id btw-1)))
      (tag (Btw btw-1)))
     (Focus picker-input)
@@ -302,7 +339,8 @@ let%expect_test "token-only backends show the account too" =
     (Set_accounts
        { accounts =
            [ { backend; user = None; token = Some "t"; session = None } ]
-       ; current = Some { backend; user = None; token = Some "t"; session = None }
+       ; current =
+           Some { backend; user = None; token = Some "t"; session = None }
        });
   H.text h ~selector:".sidebar-footer";
   [%expect {| (T token) (Commands and keys (/help)) |}]

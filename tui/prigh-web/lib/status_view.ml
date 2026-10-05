@@ -147,7 +147,10 @@ let modes (m : App.Model.t) ~inject =
          (Prigh_ui.Verbosity.name v))
   ; (match m.config with
      | Some { confirm_tools = true; _ } ->
-       chip ~title:"Tools ask before running (/confirm)" ~command:"/confirm" "confirm"
+       chip
+         ~title:"Tools ask before running (/confirm)"
+         ~command:"/confirm"
+         "confirm"
      | _ -> Node.none)
   ]
 ;;

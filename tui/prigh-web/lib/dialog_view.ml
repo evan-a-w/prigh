@@ -393,7 +393,8 @@ let agents (m : App.Model.t) ~inject =
 let dialog (m : App.Model.t) ~inject =
   match m.dialog with
   | None -> Node.none
-  | Some (Picker { kind = Accounts; picker = p }) -> Account_view.menu m p ~inject
+  | Some (Picker { kind = Accounts; picker = p }) ->
+    Account_view.menu m p ~inject
   | Some (Picker { kind; picker = p }) -> picker ~kind p ~inject
   | Some Help -> help ~inject
   | Some (Rename name) -> rename name ~inject
