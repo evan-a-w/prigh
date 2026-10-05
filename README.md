@@ -198,7 +198,10 @@ or when the backend stops. Plain `ws://` with a shared token: bind to
 localhost and use an SSH tunnel or a TLS-terminating proxy on untrusted
 networks.
 
-### pi's web UI
+### pi's web UI (deprecated)
+
+pi-web is deprecated: use prigh-web (below), which covers everything it
+does. It still works but gets no new features.
 
 A second, separate browser frontend lives in `pi-web/`: pi's own web UI
 (Preact/TypeScript) on the prigh backend, which speaks pi's RPC protocol for
