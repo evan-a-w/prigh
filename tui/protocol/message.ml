@@ -4,7 +4,7 @@ module User = struct
   type t =
     { text : string
     ; images : Image.t list [@sexp.list]
-    ; at : Time_ns.t option [@sexp.option]
+    ; at : Time_ns.Alternate_sexp.t option [@sexp.option]
     }
   [@@deriving sexp_of, equal]
 
@@ -23,7 +23,7 @@ module Assistant = struct
     ; stop_reason : Stop_reason.t
     ; usage : Usage.t
     ; model : string
-    ; at : Time_ns.t option [@sexp.option]
+    ; at : Time_ns.Alternate_sexp.t option [@sexp.option]
     }
   [@@deriving sexp_of, equal]
 
@@ -47,7 +47,7 @@ module Tool_result = struct
     ; text : string
     ; is_error : bool
     ; images : Image.t list [@sexp.list]
-    ; at : Time_ns.t option [@sexp.option]
+    ; at : Time_ns.Alternate_sexp.t option [@sexp.option]
     }
   [@@deriving sexp_of, equal]
 

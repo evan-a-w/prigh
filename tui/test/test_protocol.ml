@@ -171,6 +171,60 @@ let%expect_test "images in user messages and tool results (absent means none)" =
     |}]
 ;;
 
+let%expect_test "message and entry times (\"at\", ms since the epoch; absent \
+                 means unknown)"
+  =
+  decode
+    {|{"type":"event","event":"message_start","message":{"role":"user","text":"hi","at":1791210730250}}|};
+  decode
+    {|{"type":"event","event":"message_end","message":{"role":"assistant","content":[],"stop_reason":{"type":"end_turn"},"usage":{"input":1,"output":2,"cache_read":0},"model":"m","at":1791210731000}}|};
+  decode
+    {|{"type":"event","event":"message_end","message":{"role":"tool_result","tool_call_id":"c1","tool_name":"bash","text":"out","is_error":false,"at":1791210732000}}|};
+  decode
+    {|{"type":"event","event":"message_end","message":{"role":"user","text":"bad","at":"soon"}}|};
+  let entry json =
+    match Entry.of_json (Jsonaf.of_string json) with
+    | Ok e -> print_s (Entry.sexp_of_t e)
+    | Error e -> print_s [%message "error" (e : Error.t)]
+  in
+  entry {|{"id":"e1","parent":null,"at":1791210730250,"kind":"cwd","cwd":"/w"}|};
+  entry {|{"id":"e2","parent":"e1","kind":"cwd","cwd":"/w"}|};
+  [%expect
+    {|
+    (Event (
+      Message_start (
+        User (
+          (text hi)
+          (at   "2026-10-05 14:32:10.25Z")))))
+    (Event (
+      Message_end (
+        Assistant (
+          (content ())
+          (stop_reason End_turn)
+          (usage (
+            (input      1)
+            (output     2)
+            (cache_read 0)))
+          (model m)
+          (at    "2026-10-05 14:32:11Z")))))
+    (Event (
+      Message_end (
+        Tool_result (
+          (tool_call_id c1)
+          (tool_name    bash)
+          (text         out)
+          (is_error     false)
+          (at           "2026-10-05 14:32:12Z")))))
+    (error (
+      e (
+        "while decoding"
+        "{\"type\":\"event\",\"event\":\"message_end\",\"message\":{\"role\":\"user\",\"text\":\"bad\",\"at\":\"soon\"}}"
+        "field \"at\": expected number, got \"soon\"")))
+    ((id e1) (parent ()) (at "2026-10-05 14:32:10.25Z") (kind (Cwd (cwd /w))))
+    ((id e2) (parent (e1)) (kind (Cwd (cwd /w))))
+    |}]
+;;
+
 let%expect_test "image sizes come from the base64 length, padded or not" =
   List.iter
     [ ""; "QQ=="; "QQ"; "QUI="; "QUI"; "QUJD"; "iVBORw0KGgo=" ]
