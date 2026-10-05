@@ -79,9 +79,9 @@ let editor_key (m : App.Model.t) t ~cursor : App.Action.t option =
   | _ -> None
 ;;
 
-(* The agents panel's keys. Alt+digit (not Shift+Tab, which moves the focus
-   back, as the TUI does) and only with Alt alone: AltGr is Ctrl+Alt on
-   Windows, and macOS's Option types characters, so its keys are left to it. *)
+(* The agents panel's keys: the TUI's Alt+digit, but not its Shift+Tab (the
+   browser's way to move the focus back). Only Alt alone: AltGr is Ctrl+Alt
+   on Windows, and macOS's Option types characters, which are left to it. *)
 let agents_key (m : App.Model.t) t : App.Action.t option =
   let alt = t.alt && not (t.ctrl || t.meta || t.shift) in
   let listed = List.length (Agents.listed m.agents) in
