@@ -337,9 +337,17 @@ let rpc ?(tag = Reply_tag.Show_error) method_ params =
 let str s = `String s
 let max_toasts = 4
 
-let toast (m : Model.t) ?(error = false) text =
+(* A toast replaces the ones saying the same, or, with [replaces], those
+   starting with it: cycling a setting shows only where it ended up. *)
+let toast (m : Model.t) ?(error = false) ?replaces text =
   let id = m.next_toast in
-  let toasts = m.toasts @ [ { Toast.id; text; error } ] in
+  let stale (t : Toast.t) =
+    String.equal t.text text
+    || Option.exists replaces ~f:(fun prefix -> String.is_prefix t.text ~prefix)
+  in
+  let toasts =
+    List.filter m.toasts ~f:(Fn.non stale) @ [ { Toast.id; text; error } ]
+  in
   ( { m with
       toasts = List.drop toasts (List.length toasts - max_toasts)
     ; next_toast = id + 1
@@ -920,7 +928,9 @@ let cycle_model (m : Model.t) step =
       in
       let next = List.nth_exn models ((((index + step) % n) + n) % n) in
       let m = { m with state = Some { state with model = next } } in
-      let m, cmds = toast m (sprintf "Model: %s" next.name) in
+      let m, cmds =
+        toast m ~replaces:"Model: " (sprintf "Model: %s" next.name)
+      in
       m, cmds @ [ rpc "set_model" [ "model", str next.key ] ])
 ;;
 
@@ -943,7 +953,9 @@ let cycle_thinking (m : Model.t) =
         List.nth_exn thinking_levels ((index + 1) % List.length thinking_levels)
       in
       let m = { m with state = Some { state with thinking = next } } in
-      let m, cmds = toast m (sprintf "Thinking: %s" next) in
+      let m, cmds =
+        toast m ~replaces:"Thinking: " (sprintf "Thinking: %s" next)
+      in
       m, cmds @ [ rpc "set_thinking" [ "thinking", str next ] ]))
 ;;
 
@@ -956,6 +968,7 @@ let verbosity_detail : Prigh_ui.Verbosity.t -> string = function
 let set_verbosity (m : Model.t) verbosity =
   toast
     { m with verbosity }
+    ~replaces:"Transcript: "
     (sprintf
        "Transcript: %s, %s (Ctrl+O cycles)"
        (Prigh_ui.Verbosity.name verbosity)

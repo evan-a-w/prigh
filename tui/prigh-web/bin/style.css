@@ -247,8 +247,12 @@ kbd {
 .session-name.muted { color: var(--muted); font-weight: 400; }
 .session-name .edit-hint { width: 13px; height: 13px; color: var(--faint); opacity: 0; transition: opacity 0.15s; }
 .session-name:hover .edit-hint, .session-name:focus-visible .edit-hint { opacity: 1; }
-.session-where { display: flex; gap: 10px; color: var(--muted); font: 12px var(--mono); min-width: 0; }
+.session-where { display: flex; gap: 10px; color: var(--muted); font: 12px var(--mono); min-width: 0; max-width: 100%; }
 .where { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* Long paths lose their start, not the directory they end in (the mark
+   keeps the leading "/" in place). */
+.where, .session-cwd { direction: rtl; text-align: left; }
+.where::before, .session-cwd::before { content: "\200E"; }
 .branch { display: inline-flex; align-items: center; gap: 3px; white-space: nowrap; }
 .branch .icon { width: 12px; height: 12px; }
 

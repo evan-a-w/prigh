@@ -429,7 +429,7 @@ let install_listeners ~schedule ~current =
       (not (List.is_empty (!current : App.Model.t).confirms))
       && String.equal (key ev).key "Enter"
       && Time_ns.Span.(
-           Time_ns.diff (Time_ns.now ()) !confirm_shown < of_int_ms 500)
+           Time_ns.diff (Time_ns.now ()) !confirm_shown < of_int_ms 350)
     then (
       Dom.preventDefault ev;
       Js._false)

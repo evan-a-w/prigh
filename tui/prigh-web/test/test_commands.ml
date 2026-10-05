@@ -166,7 +166,6 @@ let%expect_test "/scoped-models, Ctrl+P and Alt+P" =
     (Expire_toast (id 1) (after_ms 4000))
     (Rpc (method_ set_model) (params ((model anthropic/claude-opus-5-5)))
      (tag Show_error))
-    Model: Claude Sonnet 5
     Model: Claude Opus 5.5
     |}];
   run h "/scoped-models";
@@ -215,7 +214,6 @@ let%expect_test "/scoped-models, Ctrl+P and Alt+P" =
          (confirm_tools false) (default_model null) (default_thinking null)))))
      (tag (Config_saved "3 scoped models: Ctrl+P and Alt+P cycle through them")))
     (Expire_toast (id 2) (after_ms 4000))
-    Model: Claude Sonnet 5
     Model: Claude Opus 5.5
     3 scoped models: Ctrl+P and Alt+P cycle through them
     |}];
@@ -291,7 +289,6 @@ let%expect_test "/thinking and Alt+T" =
     (Rpc (method_ set_model) (params ((model deepseek/deepseek-chat)))
      (tag Show_error))
     Cycle_thinking
-    Thinking: high
     Thinking: max
     DeepSeek Chat has no thinking levels: switch to a model that thinks with /model
     |}]
@@ -368,8 +365,6 @@ let%expect_test "/verbosity and Ctrl+O" =
     Cycle_verbosity
     (Expire_toast (id 2) (after_ms 4000))
     (Save_history ("/verbosity loud" /verbosity))
-    Transcript: quiet, tool calls without their output; no thinking (Ctrl+O cycles)
-    Transcript: normal, tool output and thinking folded (Ctrl+O cycles)
     Transcript: verbose, everything unfolded (Ctrl+O cycles)
     Unknown verbosity "loud": use quiet, normal or verbose.
     |}];
@@ -1172,9 +1167,9 @@ let%expect_test "/jobs [id|kill <id>]: jobs in the agents panel" =
     (Save_history
      ("/jobs a b" "/jobs kill" "/jobs j9" "/jobs kill j2" "/jobs kill j1"
       "/jobs j2" /jobs "/jobs j1"))
+    No job j1: none has run in this session (!&command starts one).
     Job j2 has already finished.
     No job j9: give its id (j1, j2); /jobs lists them.
-    Usage: /jobs [id | kill <id>] (/jobs lists them)
     Usage: /jobs [id | kill <id>] (/jobs lists them)
     |}]
 ;;
