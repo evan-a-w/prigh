@@ -136,8 +136,8 @@ val create
   -> ?backend_host:bool
        (** whether the backend itself is a tool host (default: true). Without
            it, [on_host] tools, instructions, path listings and the git branch
-           never touch the backend's filesystem, and a session adopts the
-           first connected client host when its own is missing. *)
+           never touch the backend's filesystem, and a session that never
+           had a host adopts the first connected client host. *)
   -> ?mcp:Mcp_hub.t
   -> ?use_default_cwd:bool
        (** start a new session in the config's [default_cwd] rather than
@@ -316,7 +316,10 @@ val btw
 (** In-place session replacement for a single-agent embedding (the CLI and
     tests); background subagents are cancelled and their reports dropped.
     [Rpc_server] instead keeps one agent per session and moves clients
-    between them, so they keep running and deliver to their own session. *)
+    between them, so they keep running and deliver to their own session.
+    A new session or a fork carries on on the active host, in the same cwd;
+    a session switched to (or imported) goes back to the host it last ran
+    on, or where a new agent would start when it recorded none. *)
 val new_session : t -> unit
 
 val switch_session : t -> path:string -> unit Or_error.t
@@ -357,7 +360,12 @@ val import_session : t -> path:string -> string Or_error.t
 
 val session_stats : t -> Session_stats.t
 
-(** {2 Tool hosts} *)
+(** {2 Tool hosts}
+
+    The active host is recorded in the session with its cwd (a [cwd] entry,
+    see [Session.Host]), so a session loaded again ({!create} with
+    [session], {!switch_session}) is on the host it last ran on, connected
+    or not, in the cwd it had there. *)
 
 (** Replaces the client hosts (every connected client able to run tools,
     whichever session it is attached to). In-flight executions on hosts that
@@ -376,13 +384,6 @@ val prefer_host : t -> string -> unit
 (** Why tools cannot run while the active host is not connected: no host
     yet, or waiting for it to reconnect. *)
 val host_unavailable_message : t -> string
-
-(** Where this session last was on each client host, for a reloaded agent of
-    the same session ({!restore_host_cwds}). *)
-val host_cwds : t -> string String.Map.t
-
-(** Adds [host_cwds] it does not know yet. *)
-val restore_host_cwds : t -> string String.Map.t -> unit
 
 (** The backend first (unless disabled), then the client hosts. *)
 val hosts : t -> Host.t list

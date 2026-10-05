@@ -388,19 +388,22 @@ let with_test_driver ~client ~(terminal : Test_terminal.t) ~writer ~reader f =
       f driver)
 ;;
 
-let connection_hello hello ~local_tools =
-  match local_tools with
+let connection_hello hello ~host_id =
+  match host_id with
   | None -> hello @ [ "tools", `False ]
-  | Some _ ->
-    hello
-    @ [ "tools", `True
-      ; "host_id", `String (Prigh_client_unix.Tool_host.new_host_id ())
-      ]
+  | Some id -> hello @ [ "tools", `True; "host_id", `String id ]
 ;;
 
 let run ~connect ~hello ~local_tools =
   let client = Client.create ~connect in
-  let hello = connection_hello hello ~local_tools in
+  let host_id_warning = ref None in
+  let host_id =
+    Option.map local_tools ~f:(fun _ ->
+      Prigh_client_unix.Host_id.choose
+        ~home:(Option.value (Sys.getenv "HOME") ~default:".")
+        ~warn:(fun warning -> host_id_warning := Some warning))
+  in
+  let hello = connection_hello hello ~host_id in
   match%bind.Deferred
     match%bind.Deferred Client.connect client with
     | Error _ as e -> Deferred.return e
@@ -447,6 +450,10 @@ let run ~connect ~hello ~local_tools =
        install_repaint driver;
        Option.iter hello_reply ~f:(fun reply ->
          Driver.send_incoming_event driver (App.Action.Hello reply));
+       Option.iter !host_id_warning ~f:(fun warning ->
+         Driver.send_incoming_event
+           driver
+           (App.Action.Event (Notice warning)));
        don't_wait_for
          (Pipe.iter_without_pushback
             (Client.incoming client)

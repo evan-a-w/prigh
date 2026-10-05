@@ -408,12 +408,6 @@ let serve_connection
   !outcome
 ;;
 
-let new_host_id () =
-  let state = Random.State.make_self_init ~allow_in_tests:true () in
-  "host-"
-  ^ String.init 16 ~f:(fun _ -> "0123456789abcdef".[Random.State.int state 16])
-;;
-
 let connect
       ~env
       ?terminals
@@ -424,7 +418,7 @@ let connect
       ~port
       ~token
       ?user
-      ?(host_id = new_host_id ())
+      ?(host_id = Host_id.generate ())
       ~name
       ~cwd
       ()

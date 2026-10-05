@@ -24,7 +24,7 @@ module H = struct
     }
 end
 
-let make_server ?token ?namespace t ~sw ~provider =
+let make_server ?token ?namespace ?(backend_host = true) t ~sw ~provider =
   let login = login_manager t ~sw in
   let sessions_dir = Filename.concat t.dir "sessions" in
   let new_agent ?session ~cwd () =
@@ -36,6 +36,7 @@ let make_server ?token ?namespace t ~sw ~provider =
       ~sessions_dir
       ~home:t.dir
       ?session
+      ~backend_host
       ~cwd
       ()
   in
@@ -45,6 +46,7 @@ let make_server ?token ?namespace t ~sw ~provider =
       ~sw
       ?token
       ?namespace
+      ~backend_host
       ~login
       ~sessions_dir
       ~cwd:t.dir
@@ -56,12 +58,14 @@ let make_server ?token ?namespace t ~sw ~provider =
   Rpc_server.agent_of_client server client, { H.server; client; login; sent }
 ;;
 
-let with_agent replies f =
+let with_agent ?backend_host replies f =
   with_sandbox
   @@ fun t ->
   Eio.Switch.run
   @@ fun sw ->
-  let agent, h = make_server t ~sw ~provider:(Faux_provider.create replies) in
+  let agent, h =
+    make_server ?backend_host t ~sw ~provider:(Faux_provider.create replies)
+  in
   f t agent h
 ;;
 

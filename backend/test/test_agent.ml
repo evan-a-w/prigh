@@ -1186,3 +1186,57 @@ let%expect_test "session_description: cleaning replies" =
     "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\226\128\166"
     |}]
 ;;
+
+let%expect_test "switch_session: the session's recorded host comes with it" =
+  with_agent [ Reply.text "a1" ]
+  @@ fun t agent _dump ->
+  let show () =
+    let s = Agent.state agent in
+    print_endline
+      (mask_sexp
+         t
+         [%message
+           ""
+             ~active_host:(s.active_host : string)
+             ~cwd:(s.cwd : string)
+             ~connected:
+               (List.exists s.hosts ~f:(fun h ->
+                  String.equal h.id s.active_host)
+                : bool)])
+  in
+  let elsewhere =
+    Session.create ~dir:(Filename.concat t.dir "sessions") ~cwd:"/home/me" ()
+  in
+  let (_ : Session.Entry.t) =
+    Session.set_cwd
+      elsewhere
+      ~host:{ id = "host-desk"; name = "desk"; pinned = true }
+      ~cwd:"/home/me/proj"
+      ()
+  in
+  let (_ : Session.Entry.t) =
+    Session.append_message elsewhere (Message.user "hi")
+  in
+  Or_error.ok_exn (Agent.prompt agent "a");
+  Agent.wait_idle agent;
+  let first = (Agent.state agent).session_path in
+  show ();
+  Or_error.ok_exn (Agent.switch_session agent ~path:(Session.path elsewhere));
+  show ();
+  (* A new session stays where it is; one that recorded no host is where a
+     new agent starts. *)
+  Agent.new_session agent;
+  show ();
+  Or_error.ok_exn (Agent.switch_session agent ~path:first);
+  show ();
+  Or_error.ok_exn (Agent.fork agent ());
+  show ();
+  [%expect
+    {|
+    ((active_host backend) (cwd $DIR) (connected true))
+    ((active_host host-desk) (cwd /home/me/proj) (connected false))
+    ((active_host host-desk) (cwd /home/me/proj) (connected false))
+    ((active_host backend) (cwd $DIR) (connected true))
+    ((active_host backend) (cwd $DIR) (connected true))
+    |}]
+;;

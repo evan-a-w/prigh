@@ -33,15 +33,13 @@ val run
   -> unit
   -> unit
 
-(** A fresh random host id, [host-] and 16 hex digits. *)
-val new_host_id : unit -> string
-
 (** Connects to a backend's JSON-lines port as an RPC client, says [hello]
     as a tool host and serves its [tool_exec], [tool_exec_cancel] and
     [terminal_*] events, reconnecting with exponential backoff (from
     [initial_backoff], default 0.5s, up to [max_backoff], default 10s) when
     the connection fails or drops. Every [hello] carries the same [host_id]
-    (default: a random {!new_host_id}), so the backend sees a reconnect as the
+    (default: a random {!Host_id.generate}; [prigh tool-host] passes
+    {!Host_id.load_or_create}'s), so the backend sees a reconnect as the
     same host and its sessions resume on it. Never returns; [log] defaults to
     stderr. *)
 val connect
