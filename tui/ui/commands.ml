@@ -11,6 +11,8 @@ module Argument = struct
     | Sessions
     | Path
     | Directory
+    | Skill
+    | Mcp
   [@@deriving sexp_of, equal]
 end
 
@@ -113,6 +115,18 @@ let all =
       "<question>"
       "ask a side question without interrupting the turn (not added to the \
        conversation)"
+  ; c "skills" "" "pick a skill to run (Enter puts /skill:NAME in the editor)"
+  ; c
+      ~argument:Argument.Skill
+      "skill:"
+      "NAME [args]"
+      "run a skill, with what follows as its arguments"
+  ; c
+      ~argument:Argument.Mcp
+      "mcp"
+      "[reconnect]"
+      "list MCP servers (Enter approves one or lists its tools); reconnect \
+       restarts failed ones"
   ; c
       "retry-backend-connection"
       ""
@@ -129,6 +143,11 @@ let all =
 ;;
 
 let find name = List.find all ~f:(fun s -> String.equal s.name name)
+
+let usage (s : Spec.t) =
+  let sep = if String.is_suffix s.name ~suffix:":" then "" else " " in
+  String.strip ("/" ^ s.name ^ sep ^ s.args)
+;;
 
 module Parsed = struct
   type t =
@@ -163,8 +182,7 @@ let closest name =
 
 let help : Content.t =
   let rows =
-    List.map all ~f:(fun s ->
-      String.strip ("/" ^ s.name ^ " " ^ s.args), s.help)
+    List.map all ~f:(fun s -> usage s, s.help)
   in
   let width =
     List.fold rows ~init:0 ~f:(fun acc (k, _) -> Int.max acc (String.length k))

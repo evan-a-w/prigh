@@ -7,6 +7,7 @@ module Source = struct
     | Argument of Commands.Spec.t
     | Path
     | Directory of { host : string option }
+    | Skill
   [@@deriving sexp_of, equal]
 end
 
@@ -31,7 +32,7 @@ let set_items t items = { t with items; selected = 0 }
 let accepts_on_enter t =
   match t.source with
   | Source.Command -> true
-  | Argument _ | Path | Directory _ ->
+  | Argument _ | Path | Directory _ | Skill ->
     t.navigated || not (String.is_empty t.prefix)
 ;;
 
@@ -72,6 +73,40 @@ let compute_command ~line ~line_index =
       ; selected = 0
       ; navigated = false
       }
+  | _ -> None
+;;
+
+let skill_prefix = "/skill:"
+
+let skill_items ~prefix (skills : P.Skill.t list) =
+  Fuzzy.rank ~query:prefix skills ~key:(fun (s : P.Skill.t) -> s.name)
+  |> List.map ~f:(fun (s : P.Skill.t) ->
+    Picker.Item.create ~id:s.name ~detail:s.description ~search:s.name s.name)
+;;
+
+(* [skills] is [None] while they are being fetched: the completion opens empty
+   and the app fills it in. It stays open, empty, when there are none, so that
+   Enter runs [/skill:] (the picker, which says where to add skills). *)
+let compute_skill ~line ~line_index ~skills =
+  match String.chop_prefix line ~prefix:skill_prefix with
+  | Some prefix when not (has_whitespace prefix) ->
+    let t =
+      { source = Source.Skill
+      ; prefix
+      ; line = line_index
+      ; start = String.length skill_prefix
+      ; items = []
+      ; selected = 0
+      ; navigated = false
+      }
+    in
+    (match skills with
+     | None -> Some t
+     | Some skills ->
+       let items = skill_items ~prefix skills in
+       Option.some_if
+         ((not (List.is_empty items)) || String.is_empty prefix)
+         { t with items })
   | _ -> None
 ;;
 
@@ -119,6 +154,15 @@ let session_items (sessions : P.Session_summary.t list) =
       first)
 ;;
 
+let mcp_items () =
+  [ Picker.Item.create
+      ~id:"reconnect"
+      ~search:"reconnect"
+      ~detail:"restart failed or stopped servers"
+      "reconnect"
+  ]
+;;
+
 let argument_items ~kind ~models ~auth ~sessions ~logged_in =
   match (kind : Commands.Argument.t) with
   | Model -> Some (model_items ~logged_in models)
@@ -135,7 +179,8 @@ let argument_items ~kind ~models ~auth ~sessions ~logged_in =
          ])
   | Logout -> Some (provider_items auth)
   | Sessions -> Some (Option.value_map sessions ~default:[] ~f:session_items)
-  | Path | Directory -> None
+  | Mcp -> Some (mcp_items ())
+  | Path | Directory | Skill -> None
 ;;
 
 let argument_start ~line ~name =
@@ -244,8 +289,12 @@ let directory ~host ~text =
   }
 ;;
 
-let compute ~line ~col ~line_index ~models ~auth ~sessions ~logged_in =
-  match compute_command ~line ~line_index with
+let compute ~line ~col ~line_index ~models ~auth ~sessions ~skills ~logged_in =
+  match
+    Option.first_some
+      (compute_skill ~line ~line_index ~skills)
+      (compute_command ~line ~line_index)
+  with
   | Some _ as t -> t
   | None ->
     (match
@@ -263,7 +312,10 @@ let accept t ~editor_text =
     | None -> t.prefix
     | Some item ->
       (match t.source with
-       | Source.Command -> item.id ^ " "
+       | Source.Command ->
+         (* [skill:] continues with the skill's name *)
+         if String.is_suffix item.id ~suffix:":" then item.id else item.id ^ " "
+       | Skill -> item.id ^ " "
        | Argument _ | Path | Directory _ -> item.id)
   in
   let before = String.prefix line t.start in
