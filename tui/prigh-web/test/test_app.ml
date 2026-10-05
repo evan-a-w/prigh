@@ -1,7 +1,7 @@
 open! Core
 
 let%expect_test "startup, a prompt and its streamed reply" =
-  let h = Harness.create () in
+  let h = Harness.create ~verbose:true () in
   [%expect
     {|
     (Rpc (method_ get_state) (params ()) (tag State))
