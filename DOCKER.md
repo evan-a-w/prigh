@@ -113,9 +113,11 @@ name in the container. At startup, the entrypoint (as root):
   `-host-id container-<name>`, so its sessions resume on it after a
   restart, and it is not confused with a TUI run as that user in the
   container, which would use `/home/<name>/.prigh/host-id`). The backend
-  runs no tools itself (`-no-backend-host`). A new session adopts its
-  user's first connected tool host, normally this one; `/host` picks
-  another, and a session stays on the host it has (waiting while that host
+  runs no tools itself (`-no-backend-host`). A new session made from a
+  TUI starts on that TUI's machine (one made from the browser, where the
+  session it came from runs); otherwise it adopts its user's first
+  connected tool host, normally this one. `/host` picks another, and a
+  session stays on the host it has (waiting while that host
   is away, also across the backend's restarts) until `/host` moves it;
 - runs the backend as `prigh`.
 
