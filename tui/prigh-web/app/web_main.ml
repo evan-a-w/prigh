@@ -163,6 +163,7 @@ let install_listeners ~schedule =
     Dom.preventDefault ev;
     Js.Opt.iter ev##.dataTransfer (fun data -> read_images ~schedule data##.files);
     Js._true);
+  Chat_listeners.install ();
   (* The chat follows new output unless the user has scrolled up. *)
   let stick = ref true in
   let chat () = Dom_html.getElementById_opt "chat" in
