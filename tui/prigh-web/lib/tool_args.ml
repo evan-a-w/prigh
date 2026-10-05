@@ -113,9 +113,3 @@ let edits t =
       | _ -> None)
   | _ -> []
 ;;
-
-let to_string_hum t =
-  match t with
-  | Complete json -> Jsonaf.to_string_hum json
-  | Partial s -> s
-;;

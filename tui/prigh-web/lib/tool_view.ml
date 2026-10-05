@@ -180,6 +180,13 @@ let reports text =
     ]
 ;;
 
+let cancelled (r : Message.Tool_result.t) =
+  let text = String.strip r.text in
+  r.is_error
+  && (String.is_prefix text ~prefix:"[cancelled]"
+      || String.is_suffix text ~suffix:"[cancelled]")
+;;
+
 type presentation =
   { arg : Node.t option
   ; chips : Node.t list
@@ -214,7 +221,10 @@ let present ~nested ~streaming ~live (call : Tool_call.t) ~result ~subagent =
               (background && Option.is_none job)
               (chip "background")
           ; Option.map job ~f:(fun id -> chip ~cls:"job" ("job " ^ id))
-          ; Option.map outcome ~f:(chip ~cls:"bad")
+          ; Option.map outcome ~f:(fun outcome ->
+              chip
+                ~cls:(if String.equal outcome "cancelled" then "" else "bad")
+                outcome)
           ]
     ; body =
         [ (if String.mem (String.strip command) '\n'
@@ -394,10 +404,26 @@ let view
       (tool : Chat.Tool.t option)
   =
   let result = Option.bind tool ~f:(fun t -> t.result) in
+  let cancelled = Option.exists result ~f:cancelled in
+  (* What a cancelled call managed to do is not an error. *)
+  let result =
+    Option.map result ~f:(fun r ->
+      if cancelled
+      then
+        { r with
+          is_error = false
+        ; text =
+            (if String.equal (String.strip r.text) "[cancelled]"
+             then ""
+             else r.text)
+        }
+      else r)
+  in
   let live = Option.value_map tool ~default:"" ~f:(fun t -> t.output) in
   let subagent = Option.bind tool ~f:(fun t -> t.subagent) in
   let status : Status.t =
     match result, subagent with
+    | _ when cancelled -> Interrupted
     | Some { is_error = true; _ }, _
     | _, Some { result = Some { is_error = true; _ }; _ } -> Failed
     | _, Some { result = None; _ } -> Running
@@ -411,8 +437,10 @@ let view
   in
   let chips =
     match status with
-    | Interrupted -> chips @ [ chip "no result" ]
-    | Preparing | Running | Done | Failed -> chips
+    | Interrupted when Option.is_none result -> chips @ [ chip "no result" ]
+    | Interrupted when not (String.equal call.name "bash") ->
+      chips @ [ chip "cancelled" ]
+    | Preparing | Running | Done | Failed | Interrupted -> chips
   in
   let body = Chat_html.present body in
   div

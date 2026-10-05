@@ -995,6 +995,38 @@ let%expect_test "a call that never got a result: the agent stopped" =
     |}]
 ;;
 
+let%expect_test "cancelled calls: what they did, not as errors" =
+  show
+    [ {|{"type":"event","event":"tool_end","call":{"id":"c1","name":"bash","arguments":"{\"command\":\"for i in 1 2 3 4 5 6; do echo step $i; sleep 0.6; done\"}"},"result":{"role":"tool_result","tool_call_id":"c1","tool_name":"bash","text":"step 1\nstep 2\n[cancelled]","is_error":true}}|}
+    ; {|{"event":"tool_end","call":{"id":"c2","name":"grep","arguments":"{\"pattern\":\"x\"}"},"result":{"role":"tool_result","tool_call_id":"c2","tool_name":"grep","text":"[cancelled]","is_error":true}}|}
+    ];
+  [%expect
+    {|
+    <div class="interrupted tool tool-bash">
+      <div class="tool-head">
+        <span class="icon"> ■ </span>
+        <span class="name"> bash </span>
+        <span class="arg command"> for i in 1 2 3 4 5 6; do echo step $i; sleep 0.6; done </span>
+        <span class="chip"> cancelled </span>
+      </div>
+      <div class="tool-body">
+        <div class="output">
+          <pre> step 1
+    step 2 </pre>
+        </div>
+      </div>
+    </div>
+    <div class="interrupted tool tool-grep">
+      <div class="tool-head">
+        <span class="icon"> ■ </span>
+        <span class="name"> grep </span>
+        <span class="arg pattern"> x </span>
+        <span class="chip"> cancelled </span>
+      </div>
+    </div>
+    |}]
+;;
+
 let%expect_test "other tools: their main argument and output" =
   show
     [ {|{"event":"tool_end","call":{"id":"c1","name":"web_fetch","arguments":"{\"url\":\"https://x\"}"},"result":{"role":"tool_result","tool_call_id":"c1","tool_name":"web_fetch","text":"fetched","is_error":false}}|}

@@ -18,6 +18,3 @@ val strings : t -> string -> string list
 
 (** [(old_text, new_text)] pairs of an [edit] call. *)
 val edits : t -> (string * string) list
-
-(** The complete arguments as indented JSON, or the raw text so far. *)
-val to_string_hum : t -> string
