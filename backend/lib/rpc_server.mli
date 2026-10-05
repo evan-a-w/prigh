@@ -13,7 +13,11 @@ open! Import
     when one is given); [hello] can attach it to an existing session by id
     or path and registers it as a tool host when it advertises [tools]; hosts
     are visible to every session, so a session can run its tools on a client
-    attached elsewhere (replies are routed by exec id). The session methods
+    attached elsewhere (replies are routed by exec id). A host is known by its
+    host id: [hello]'s [host_id] (the same on every connection of a tool-host
+    process, so a reconnecting host is the same host and its sessions resume
+    on it), or its client id without one. A newer connection claiming a held
+    host id takes it over and the older one falls back to its client id. The session methods
     ([new_session], [switch_session], [fork], [clone], [import]) move only
     the calling client. A session keeps running when its
     clients disconnect; an idle session with no clients is dropped from
@@ -94,11 +98,11 @@ val terminal_target
   :  t
   -> session:string option
   -> [ `Backend of string (** cwd *)
-     | `Host of string * string (** client id, cwd on that host *)
+     | `Host of string * string (** host id, cwd on that host *)
      | `Unavailable of string (** reason *)
      ]
 
-(** Relays a terminal channel to the tool-host client [host] (see
+(** Relays a terminal channel to the client that is tool host [host] (see
     {!Terminal_relay}) until either side closes. *)
 val relay_terminal
   :  t

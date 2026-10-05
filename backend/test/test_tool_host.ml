@@ -72,7 +72,7 @@ module Host = struct
 
   (* Runs [Tool_host.connect] until [sw] ends; logs are kept, with the port
      masked. *)
-  let start ?terminals ?user t ~sw ~port ~token ~cwd =
+  let start ?terminals ?user ?host_id t ~sw ~port ~token ~cwd =
     let logs = Queue.create () in
     Eio.Fiber.fork_daemon ~sw (fun () ->
       Tool_host.connect
@@ -91,6 +91,7 @@ module Host = struct
         ~port
         ~token
         ?user
+        ?host_id
         ~name:"box"
         ~cwd
         ());
@@ -121,11 +122,25 @@ let call t (h : Test_rpc.H.t) meth params =
                    params)))))
 ;;
 
-let show_hosts t agent =
+(* [host_id], when given, is shown as <host-id>. *)
+let show_hosts ?host_id t agent =
+  let mask s =
+    mask
+      t
+      (match host_id with
+       | None -> s
+       | Some id -> String.substr_replace_all s ~pattern:id ~with_:"<host-id>")
+  in
   printf
     "active=%s hosts=%s\n"
-    (Agent.active_host agent)
-    (mask t (Sexp.to_string [%sexp (Agent.hosts agent : Agent.Host.t list)]))
+    (mask (Agent.active_host agent))
+    (mask (Sexp.to_string [%sexp (Agent.hosts agent : Agent.Host.t list)]))
+;;
+
+let tool_result_texts agent =
+  List.filter_map (Agent.messages agent) ~f:(function
+    | Message.Tool_result r -> Some r.text
+    | _ -> None)
 ;;
 
 let tool_results t agent =
@@ -176,6 +191,7 @@ let%expect_test "network tool host: the user name must be the namespace's" =
       ~sw
       ~port:listener.port
       ~user:"me"
+      ~host_id:"host-box"
       ~token:(Some "sekrit")
       ~cwd:t.dir
   in
@@ -190,7 +206,7 @@ let%expect_test "network tool host: the user name must be the namespace's" =
   [%expect
     {|
     connected to 127.0.0.1:PORT as client-3
-    ((client-3 box))
+    ((host-box box))
     |}]
 ;;
 
@@ -214,50 +230,69 @@ let%expect_test "network tool host: hello, run tools, reconnect, bad token" =
                ~arguments:{|{"command":"pwd; echo from-host"}|}
                ()
            ; Reply.text "done"
+           ; Reply.tool_call
+               ~id:"c2"
+               ~name:"bash"
+               ~arguments:{|{"command":"pwd"}|}
+               ()
+           ; Reply.text "done again"
            ])
   in
+  Core_unix.mkdir_p (Filename.concat host_dir "sub");
   call t h "hello" {|{"token": "sekrit"}|};
   let listener = Listener.start t ~sw h.server in
   let host =
     Host.start t ~sw ~port:listener.port ~token:(Some "sekrit") ~cwd:host_dir
   in
   Host.wait_logs t host 1;
-  show_hosts t agent;
+  (* One random host id for the life of the process, sent in every hello. *)
+  let host_id =
+    (List.find_exn (Agent.hosts agent) ~f:(fun h ->
+       not (String.equal h.id Agent.Host.backend_id)))
+      .id
+  in
+  printf
+    "host id: %s\n"
+    (String.map host_id ~f:(fun c -> if Char.is_hex_digit c then 'x' else c));
+  show_hosts ~host_id t agent;
   [%expect
     {|
-    {"type":"response","id":"r","ok":true,"result":{"client_id":"client-1","namespace":null,"user":null,"superuser":false,"state":{"session_id":"<id>","session_path":"$DIR/sessions/<stamp>_<id>.jsonl","session_name":null,"session_description":null,"cwd":"$DIR","git_branch":null,"model":{"id":"deepseek-flash","provider":"deepseek","key":"deepseek/deepseek-flash","name":"DeepSeek V4.1 Flash","context_window":1000000,"max_output":384000,"supports_thinking":true,"cost":{"input":0.3,"output":1.2,"cache_read":0.006}},"thinking":"off","running":false,"message_count":0,"usage":{"input":0,"output":0,"cache_read":0},"cost_usd":0,"context_tokens":0,"active_host":"backend","hosts":[{"id":"backend","name":"<host>","cwd":"$DIR","session_id":null,"session_name":null}],"subagents":[],"jobs":[]}}}
+    {"type":"response","id":"r","ok":true,"result":{"client_id":"client-1","host_id":"client-1","namespace":null,"user":null,"superuser":false,"state":{"session_id":"<id>","session_path":"$DIR/sessions/<stamp>_<id>.jsonl","session_name":null,"session_description":null,"cwd":"$DIR","git_branch":null,"model":{"id":"deepseek-flash","provider":"deepseek","key":"deepseek/deepseek-flash","name":"DeepSeek V4.1 Flash","context_window":1000000,"max_output":384000,"supports_thinking":true,"cost":{"input":0.3,"output":1.2,"cache_read":0.006}},"thinking":"off","running":false,"message_count":0,"usage":{"input":0,"output":0,"cache_read":0},"cost_usd":0,"context_tokens":0,"active_host":"backend","hosts":[{"id":"backend","name":"<host>","cwd":"$DIR","session_id":null,"session_name":null}],"subagents":[],"jobs":[]}}}
     connected to 127.0.0.1:PORT as client-2
-    active=backend hosts=(((id backend)(name <host>)(cwd $DIR)(session_id())(session_name()))((id client-2)(name box)(cwd $DIR/host)(session_id(<id>))(session_name())))
+    host id: host-xxxxxxxxxxxxxxxx
+    active=backend hosts=(((id backend)(name <host>)(cwd $DIR)(session_id())(session_name()))((id <host-id>)(name box)(cwd $DIR/host)(session_id(<id>))(session_name())))
     |}];
   (* Switching resolves the directory on the host; the bash call runs there. *)
-  call t h "set_active_host" {|{"host": "client-2"}|};
+  call t h "set_active_host" (sprintf {|{"host": "%s", "cwd": "sub"}|} host_id);
   call t h "prompt" {|{"text": "run it"}|};
   Agent.wait_idle agent;
-  show_hosts t agent;
+  show_hosts ~host_id t agent;
   tool_results t agent;
   [%expect
     {|
     {"type":"response","id":"r","ok":true,"result":{}}
     {"type":"response","id":"r","ok":true,"result":{}}
-    active=client-2 hosts=(((id backend)(name <host>)(cwd $DIR)(session_id())(session_name()))((id client-2)(name box)(cwd $DIR/host)(session_id(<id>))(session_name())))
-    tool_result: "$DIR/host\nfrom-host\n"
+    active=<host-id> hosts=(((id backend)(name <host>)(cwd $DIR)(session_id())(session_name()))((id <host-id>)(name box)(cwd $DIR/host/sub)(session_id(<id>))(session_name())))
+    tool_result: "$DIR/host/sub\nfrom-host\n"
     |}];
-  (* The server dropping the connection: the host comes back as a new
-     client. *)
+  (* The server dropping the connection: the host comes back on a new
+     connection with the same host id, and the session resumes on it in the
+     same directory. *)
   Listener.drop listener;
   Host.wait_logs t host 3;
-  ignore
-    (eventually t (fun () ->
-       List.exists (Agent.hosts agent) ~f:(fun h ->
-         String.equal h.id "client-3"))
-     : bool);
-  show_hosts t agent;
+  ignore (eventually t (fun () -> List.length (Agent.hosts agent) = 2) : bool);
+  show_hosts ~host_id t agent;
+  call t h "prompt" {|{"text": "again"}|};
+  Agent.wait_idle agent;
+  print_endline (mask t (List.last_exn (tool_result_texts agent)));
   [%expect
     {|
     disconnected from 127.0.0.1:PORT
     retrying in 50ms
     connected to 127.0.0.1:PORT as client-3
-    active=client-2 hosts=(((id backend)(name <host>)(cwd $DIR)(session_id())(session_name()))((id client-3)(name box)(cwd $DIR/host)(session_id(<id>))(session_name())))
+    active=<host-id> hosts=(((id backend)(name <host>)(cwd $DIR)(session_id())(session_name()))((id <host-id>)(name box)(cwd $DIR/host/sub)(session_id(<id>))(session_name())))
+    {"type":"response","id":"r","ok":true,"result":{}}
+    $DIR/host/sub
     |}];
   (* A wrong token is refused, and retried with a growing delay. *)
   Eio.Switch.run (fun sw ->
@@ -328,9 +363,17 @@ let%expect_test "network tool host: images read on the host reach the model" =
   in
   call t h "hello" {|{}|};
   let listener = Listener.start t ~sw h.server in
-  let host = Host.start t ~sw ~port:listener.port ~token:None ~cwd:host_dir in
+  let host =
+    Host.start
+      t
+      ~sw
+      ~port:listener.port
+      ~host_id:"host-box"
+      ~token:None
+      ~cwd:host_dir
+  in
   Host.wait_logs t host 1;
-  call t h "set_active_host" {|{"host": "client-2"}|};
+  call t h "set_active_host" {|{"host": "host-box"}|};
   call
     t
     h
@@ -340,7 +383,7 @@ let%expect_test "network tool host: images read on the host reach the model" =
   tool_results t agent;
   [%expect
     {|
-    {"type":"response","id":"r","ok":true,"result":{"client_id":"client-1","namespace":null,"user":null,"superuser":false,"state":{"session_id":"<id>","session_path":"$DIR/sessions/<stamp>_<id>.jsonl","session_name":null,"session_description":null,"cwd":"$DIR","git_branch":null,"model":{"id":"deepseek-flash","provider":"deepseek","key":"deepseek/deepseek-flash","name":"DeepSeek V4.1 Flash","context_window":1000000,"max_output":384000,"supports_thinking":true,"cost":{"input":0.3,"output":1.2,"cache_read":0.006}},"thinking":"off","running":false,"message_count":0,"usage":{"input":0,"output":0,"cache_read":0},"cost_usd":0,"context_tokens":0,"active_host":"backend","hosts":[{"id":"backend","name":"<host>","cwd":"$DIR","session_id":null,"session_name":null}],"subagents":[],"jobs":[]}}}
+    {"type":"response","id":"r","ok":true,"result":{"client_id":"client-1","host_id":"client-1","namespace":null,"user":null,"superuser":false,"state":{"session_id":"<id>","session_path":"$DIR/sessions/<stamp>_<id>.jsonl","session_name":null,"session_description":null,"cwd":"$DIR","git_branch":null,"model":{"id":"deepseek-flash","provider":"deepseek","key":"deepseek/deepseek-flash","name":"DeepSeek V4.1 Flash","context_window":1000000,"max_output":384000,"supports_thinking":true,"cost":{"input":0.3,"output":1.2,"cache_read":0.006}},"thinking":"off","running":false,"message_count":0,"usage":{"input":0,"output":0,"cache_read":0},"cost_usd":0,"context_tokens":0,"active_host":"backend","hosts":[{"id":"backend","name":"<host>","cwd":"$DIR","session_id":null,"session_name":null}],"subagents":[],"jobs":[]}}}
     connected to 127.0.0.1:PORT as client-2
     {"type":"response","id":"r","ok":true,"result":{}}
     {"type":"response","id":"r","ok":true,"result":{}}

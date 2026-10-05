@@ -106,14 +106,14 @@ let%expect_test "terminal relay: target, frames both ways, closes, host loss" =
        laptop
        (Json.of_string
           (sprintf
-             {|{"id": 1, "method": "hello", "params": {"name": "laptop", "tools": true, "cwd": "/home/me/proj", "session": "%s"}}|}
+             {|{"id": 1, "method": "hello", "params": {"name": "laptop", "tools": true, "host_id": "host-laptop", "cwd": "/home/me/proj", "session": "%s"}}|}
              session))
      : Json.t);
   print_target t h.server ~session:(Some session);
-  [%expect {| Host client-2 /home/me/proj |}];
+  [%expect {| Host host-laptop /home/me/proj |}];
   Queue.clear sent;
   let browser =
-    Browser.open_ ~sw h ~host:"client-2" ~key:session ~cwd:"/home/me/proj"
+    Browser.open_ ~sw h ~host:"host-laptop" ~key:session ~cwd:"/home/me/proj"
   in
   Terminal_channel.Fed.push browser.fed (`Binary "echo hi\r");
   Terminal_channel.Fed.push browser.fed (`Text {|{"type":"ping"}|});
@@ -121,9 +121,9 @@ let%expect_test "terminal relay: target, frames both ways, closes, host loss" =
   print_terminal_events t sent;
   [%expect
     {|
-    {"type":"event","event":"terminal_open","host":"client-2","term_id":"term-1","key":"<id>","cwd":"/home/me/proj","cols":80,"rows":24}
-    {"type":"event","event":"terminal_frame","host":"client-2","term_id":"term-1","kind":"binary","data":"ZWNobyBoaQ0="}
-    {"type":"event","event":"terminal_frame","host":"client-2","term_id":"term-1","kind":"text","data":"{\"type\":\"ping\"}"}
+    {"type":"event","event":"terminal_open","host":"host-laptop","term_id":"term-1","key":"<id>","cwd":"/home/me/proj","cols":80,"rows":24}
+    {"type":"event","event":"terminal_frame","host":"host-laptop","term_id":"term-1","kind":"binary","data":"ZWNobyBoaQ0="}
+    {"type":"event","event":"terminal_frame","host":"host-laptop","term_id":"term-1","kind":"text","data":"{\"type\":\"ping\"}"}
     |}];
   (* The host answers; only it may write to its terminals. *)
   let frame client fields =
@@ -189,7 +189,9 @@ let%expect_test "terminal relay: target, frames both ways, closes, host loss" =
     {"type":"response","id":"terminal_closed","ok":false,"error":"no terminal \"term-1\""}
     |}];
   (* The browser going away tells the host. *)
-  let browser = Browser.open_ ~sw h ~host:"client-2" ~key:session ~cwd:"/x" in
+  let browser =
+    Browser.open_ ~sw h ~host:"host-laptop" ~key:session ~cwd:"/x"
+  in
   Terminal_channel.Fed.close browser.fed;
   settle ();
   Browser.print browser;
@@ -197,24 +199,94 @@ let%expect_test "terminal relay: target, frames both ways, closes, host loss" =
   [%expect
     {|
     relay finished: true
-    {"type":"event","event":"terminal_open","host":"client-2","term_id":"term-2","key":"<id>","cwd":"/x","cols":80,"rows":24}
-    {"type":"event","event":"terminal_close","host":"client-2","term_id":"term-2"}
+    {"type":"event","event":"terminal_open","host":"host-laptop","term_id":"term-2","key":"<id>","cwd":"/x","cols":80,"rows":24}
+    {"type":"event","event":"terminal_close","host":"host-laptop","term_id":"term-2"}
     |}];
   (* The host going away closes the browser side with an error; the session
      keeps it as its active host, so new terminals are refused. *)
-  let browser = Browser.open_ ~sw h ~host:"client-2" ~key:session ~cwd:"/x" in
+  let browser =
+    Browser.open_ ~sw h ~host:"host-laptop" ~key:session ~cwd:"/x"
+  in
   Rpc_server.disconnect h.server laptop;
   settle ();
   Browser.print browser;
   print_target t h.server ~session:(Some session);
-  let late = Browser.open_ ~sw h ~host:"client-2" ~key:session ~cwd:"/x" in
+  let late = Browser.open_ ~sw h ~host:"host-laptop" ~key:session ~cwd:"/x" in
   Browser.print late;
   [%expect
     {|
     (Text "{\"type\":\"error\",\"message\":\"the tool host disconnected\"}")
     relay finished: true
-    Unavailable "the tool host \"client-2\" is not connected"
+    Unavailable "waiting for tool host \"laptop\" to reconnect; /host picks another"
     (Text "{\"type\":\"error\",\"message\":\"the tool host disconnected\"}")
+    relay finished: true
+    |}];
+  (* The host reconnecting (same host id, new connection) serves terminals
+     again; they are routed to the new connection. *)
+  let connect_laptop () =
+    let sent = Queue.create () in
+    let client = Rpc_server.connect h.server ~send:(Queue.enqueue sent) in
+    let reply =
+      Rpc_server.handle
+        h.server
+        client
+        (Json.of_string
+           {|{"id": 1, "method": "hello", "params": {"name": "laptop", "tools": true, "host_id": "host-laptop", "cwd": "/home/me"}}|})
+    in
+    let field name =
+      Option.bind (Json.member "result" reply) ~f:(Json.member name)
+      |> Option.value_map ~default:"" ~f:Json.to_string
+    in
+    printf
+      "connected: client_id=%s host_id=%s\n"
+      (field "client_id")
+      (field "host_id");
+    client, sent
+  in
+  Queue.clear sent;
+  let laptop2, sent2 = connect_laptop () in
+  print_target t h.server ~session:(Some session);
+  let browser =
+    Browser.open_ ~sw h ~host:"host-laptop" ~key:session ~cwd:"/x"
+  in
+  print_terminal_events t sent2;
+  frame
+    laptop2
+    [ "term_id", `String "term-4"; "kind", `String "text"; "data", `String "y" ];
+  settle ();
+  Browser.print browser;
+  [%expect
+    {|
+    connected: client_id="client-3" host_id="host-laptop"
+    Host host-laptop /home/me/proj
+    {"type":"event","event":"terminal_open","host":"host-laptop","term_id":"term-4","key":"<id>","cwd":"/x","cols":80,"rows":24}
+    {"type":"response","id":"terminal_frame","ok":true,"result":{}}
+    (Text y)
+    relay finished: false
+    |}];
+  (* A newer connection claiming the id takes it over: the older one's
+     terminals end, and it can no longer write to them. *)
+  let _laptop3, sent3 = connect_laptop () in
+  settle ();
+  Browser.print browser;
+  frame
+    laptop2
+    [ "term_id", `String "term-4"; "kind", `String "text"; "data", `String "z" ];
+  let browser =
+    Browser.open_ ~sw h ~host:"host-laptop" ~key:session ~cwd:"/x"
+  in
+  print_terminal_events t sent2;
+  print_terminal_events t sent3;
+  Terminal_channel.Fed.close browser.fed;
+  settle ();
+  Browser.print browser;
+  [%expect
+    {|
+    connected: client_id="client-4" host_id="host-laptop"
+    (Text "{\"type\":\"error\",\"message\":\"the tool host disconnected\"}")
+    relay finished: true
+    {"type":"response","id":"terminal_frame","ok":false,"error":"no terminal \"term-4\""}
+    {"type":"event","event":"terminal_open","host":"host-laptop","term_id":"term-5","key":"<id>","cwd":"/x","cols":80,"rows":24}
     relay finished: true
     |}]
 ;;

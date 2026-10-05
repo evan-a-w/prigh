@@ -608,12 +608,13 @@ let%expect_test "a terminal on a network tool host, relayed end to end" =
               ~sw:host_sw
               ~terminals:(lazy host_terminals)
               ~port
+              ~host_id:"host-box"
               ~token:(Some "sekrit")
               ~cwd:host_dir
           in
           Prigh_test.Test_tool_host.Host.wait_logs sandbox host 1;
           call "hello" {|{"token": "sekrit"}|};
-          call "set_active_host" {|{"host": "client-2"}|};
+          call "set_active_host" {|{"host": "host-box"}|};
           let a = Peer.connect f query in
           ignore (Peer.read_until f a (Peer.saw "$") : bool);
           Peer.type_ a "pwd\r";
@@ -693,6 +694,6 @@ let%expect_test "a terminal on a network tool host, relayed end to end" =
         {|
         true
         ("{\"type\":\"error\",\"message\":\"the tool host disconnected\"}")
-        ("{\"type\":\"error\",\"message\":\"no terminal: the tool host \\\"client-2\\\" is not connected\"}")
+        ("{\"type\":\"error\",\"message\":\"no terminal: waiting for tool host \\\"box\\\" to reconnect; /host picks another\"}")
         |}])
 ;;
