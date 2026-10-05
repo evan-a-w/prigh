@@ -1,6 +1,14 @@
 {
   description = "prigh — OCaml backend, Bonsai_term and Bonsai_web frontends on OxCaml";
 
+  # The OxCaml toolchain and packages, prebuilt (see README.md).
+  nixConfig = {
+    extra-substituters = [ "https://prigh.cachix.org" ];
+    extra-trusted-public-keys = [
+      "prigh.cachix.org-1:1kHKoGOetNmpzJg8lJ1nvQzwzTL0XiOs5GInELMgSoI="
+    ];
+  };
+
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
     flake-utils.url = "github:numtide/flake-utils";

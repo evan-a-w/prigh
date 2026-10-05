@@ -1,6 +1,15 @@
 {
   description = "prigh with pi's web UI — the pi web frontend (Preact/TS) on the prigh backend";
 
+  # nixConfig is only read from the flake being built: the same cache as
+  # ../flake.nix, for the backend this one builds.
+  nixConfig = {
+    extra-substituters = [ "https://prigh.cachix.org" ];
+    extra-trusted-public-keys = [
+      "prigh.cachix.org-1:1kHKoGOetNmpzJg8lJ1nvQzwzTL0XiOs5GInELMgSoI="
+    ];
+  };
+
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
     flake-utils.url = "github:numtide/flake-utils";
