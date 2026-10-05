@@ -1,10 +1,10 @@
 open! Core
 
-(** An image in a message. The frontend never needs the pixels, so only the
-    MIME type and the decoded size are kept. *)
+(** An image in a message. Sexps leave out the (base64) [data]. *)
 type t =
   { mime_type : string
   ; bytes : int
+  ; data : string
   }
 [@@deriving sexp_of, equal]
 

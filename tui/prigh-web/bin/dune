@@ -1,0 +1,12 @@
+; prigh-web: main.bc.js plus the page, assembled under site/ (serve it with
+; `prigh serve -web HOST:PORT -web-root .../prigh-web/bin/site`).
+
+(executable
+ (name main)
+ (modes js)
+ (preprocess
+  (pps ppx_jane js_of_ocaml-ppx))
+ (js_of_ocaml
+  (flags
+   (:standard --opt 3)))
+ (libraries prigh_web_app))
