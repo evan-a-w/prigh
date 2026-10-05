@@ -259,10 +259,27 @@ let queue_update t =
 
 let config t = t.config
 
-let set_config t config =
-  Or_error.map (Config.save ~home:t.home config) ~f:(fun () ->
-    t.config <- config;
-    broadcast t (Config_changed config))
+(* Fallback models are stored as keys, so a name or prefix that resolves
+   now keeps meaning the same model. *)
+let set_config t (config : Config.t) =
+  let open Or_error.Let_syntax in
+  let%bind fallback_models =
+    List.map config.fallback_models ~f:(fun name ->
+      Model_registry.resolve t.models name
+      |> Or_error.map ~f:Model.key
+      |> Result.map_error ~f:(fun e ->
+        Error.createf "fallback_models: %s" (Error.to_string_hum e)))
+    |> Or_error.all
+  in
+  let config =
+    { config with
+      fallback_models =
+        List.stable_dedup fallback_models ~compare:String.compare
+    }
+  in
+  let%map () = Config.save ~home:t.home config in
+  t.config <- config;
+  broadcast t (Config_changed config)
 ;;
 
 let save_as_default t =
@@ -736,8 +753,57 @@ let deliveries t =
   | tasks -> [ Background_tasks.delivery_message tasks ]
 ;;
 
-(* Finished background tasks not delivered yet go first. *)
-let rec start_run t prompts =
+let set_model t model =
+  t.model <- model;
+  ignore
+    (Session.set_model t.session ~model:(Model.key model) ~thinking:t.thinking
+     : Session.Entry.t);
+  state_changed t
+;;
+
+(* The model to continue with when [model] cannot be used: the next one in
+   [fallback_models] after it (or the first, if it is not listed) that this
+   hand-over chain has not tried yet. *)
+let next_model t ~tried =
+  let chain = t.config.fallback_models in
+  let after =
+    match
+      List.findi chain ~f:(fun _ key ->
+        match Model_registry.find t.models key with
+        | Some m -> String.equal (Model.key m) (Model.key t.model)
+        | None -> false)
+    with
+    | Some (i, _) -> List.drop chain (i + 1)
+    | None -> chain
+  in
+  List.find_map after ~f:(fun key ->
+    match Model_registry.find t.models key with
+    | Some m when not (Set.mem tried (Model.key m)) -> Some m
+    | Some _ | None -> None)
+;;
+
+let unavailable_error added =
+  List.find_map (List.rev added) ~f:(function
+    | Message.Assistant { stop_reason = Error message; _ }
+      when Usage_limit.unavailable message -> Some message
+    | Message.Assistant _ -> Some ""
+    | User _ | Tool_result _ -> None)
+  |> Option.filter ~f:(Fn.non String.is_empty)
+;;
+
+let handover_message ~from ~(to_ : Model.t) ~error =
+  Message.user
+    (sprintf
+       "[prigh: %s cannot continue (%s), so %s takes over this conversation \
+        from here. Carry on with the task where it left off.]"
+       from
+       error
+       (Model.key to_))
+;;
+
+(* Finished background tasks not delivered yet go first. [tried] are the
+   models a hand-over chain has used so far (empty for a user's prompt). *)
+let rec start_run ?(tried = String.Set.empty) t prompts =
   t.git_branch <- find_branch t ~cwd:t.cwd;
   let cancel = Cancellation.create () in
   let finished, resolve = Promise.create () in
@@ -752,37 +818,71 @@ let rec start_run t prompts =
       state_changed t
     in
     refresh_mcp t ~cancel;
-    (match
-       Agent_loop.run
-         ~env:t.env
-         ~provider:t.provider
-         ~config:(loop_config t)
-         ~cwd:t.cwd
-         ~cancel
-         ~confirm:(confirm_hook t cancel)
-         ~execute:(executor t)
-         ~background:t.background
-         ~steer:(fun () ->
-           let l = Queue.to_list t.steer_queue in
-           if not (List.is_empty l)
-           then (
-             Queue.clear t.steer_queue;
-             queue_update t);
-           deliveries t @ List.map l ~f:(user_message t))
-         ~emit:(fun event ->
-           account_subagent t event;
-           (match event with
-            | Message_end m ->
-              ignore (Session.append_message session m : Session.Entry.t)
-            | _ -> ());
-           broadcast t (Loop event))
-         ~context:(Session.messages session)
-         ~prompts
-         ()
-     with
-     | (_ : Message.t list) -> ()
-     | exception exn ->
-       broadcast t (Notice ("run failed: " ^ Exn.to_string exn)));
+    let added =
+      match
+        Agent_loop.run
+          ~env:t.env
+          ~provider:t.provider
+          ~config:(loop_config t)
+          ~cwd:t.cwd
+          ~cancel
+          ~confirm:(confirm_hook t cancel)
+          ~execute:(executor t)
+          ~background:t.background
+          ~steer:(fun () ->
+            let l = Queue.to_list t.steer_queue in
+            if not (List.is_empty l)
+            then (
+              Queue.clear t.steer_queue;
+              queue_update t);
+            deliveries t @ List.map l ~f:(user_message t))
+          ~emit:(fun event ->
+            account_subagent t event;
+            (match event with
+             | Message_end m ->
+               ignore (Session.append_message session m : Session.Entry.t)
+             | _ -> ());
+            broadcast t (Loop event))
+          ~context:(Session.messages session)
+          ~prompts
+          ()
+      with
+      | added -> added
+      | exception exn ->
+        broadcast t (Notice ("run failed: " ^ Exn.to_string exn));
+        []
+    in
+    let tried = Set.add tried (Model.key t.model) in
+    let handover =
+      if Cancellation.is_cancelled cancel || not (phys_equal session t.session)
+      then None
+      else
+        Option.bind (unavailable_error added) ~f:(fun error ->
+          match next_model t ~tried with
+          | None ->
+            if not (List.is_empty t.config.fallback_models)
+            then
+              broadcast
+                t
+                (Notice
+                   (sprintf
+                      "%s cannot continue and no model in fallback_models is \
+                       left to hand over to; /model picks another"
+                      (Model.key t.model)));
+            None
+          | Some next ->
+            let from = Model.key t.model in
+            broadcast
+              t
+              (Notice
+                 (sprintf
+                    "%s: %s; handing over to %s"
+                    from
+                    error
+                    (Model.key next)));
+            set_model t next;
+            Some [ handover_message ~from ~to_:next ~error ])
+    in
     (* Steering messages that arrived after the last turn boundary go
        first: they were sent before any follow-up still queued. *)
     if not (Queue.is_empty t.steer_queue)
@@ -794,19 +894,24 @@ let rec start_run t prompts =
     (* After an abort, finished tasks wait for the next prompt (or the next
        one to finish) rather than restarting the run at once. *)
     let next =
-      match Queue.dequeue t.follow_up_queue with
-      | Some queued ->
-        queue_update t;
-        Some [ user_message t queued ]
+      match handover with
+      | Some prompts -> Some (`Handover prompts)
       | None ->
-        if
-          Background_tasks.has_undelivered t.background
-          && not (Cancellation.is_cancelled cancel)
-        then Some []
-        else None
+        (match Queue.dequeue t.follow_up_queue with
+         | Some queued ->
+           queue_update t;
+           Some (`Prompts [ user_message t queued ])
+         | None ->
+           if
+             Background_tasks.has_undelivered t.background
+             && not (Cancellation.is_cancelled cancel)
+           then Some (`Prompts [])
+           else None)
     in
     finish ();
-    Option.iter next ~f:(start_run t);
+    Option.iter next ~f:(function
+      | `Handover prompts -> start_run ~tried t prompts
+      | `Prompts prompts -> start_run t prompts);
     auto_describe t)
 
 (* Runs after the turn is over so the user is not kept waiting; [wait_idle]
@@ -920,7 +1025,7 @@ let create
     match model with
     | Some model -> model
     | None ->
-      Option.bind config.default_model ~f:(Model_registry.find models)
+      Option.bind (Config.start_model config) ~f:(Model_registry.find models)
       |> Option.value ~default:fallback_model
   in
   let thinking =
@@ -930,7 +1035,14 @@ let create
   let session =
     match session with
     | Some s -> s
-    | None -> Session.create ~dir:sessions_dir ~cwd ()
+    | None ->
+      let cwd =
+        match Option.map config.default_cwd ~f:Tool.expand_home with
+        | Some dir when (not backend_host) || Sys_unix.is_directory_exn dir ->
+          dir
+        | Some _ | None -> cwd
+      in
+      Session.create ~dir:sessions_dir ~cwd ()
   in
   let cwd = Session.cwd session in
   let t =
@@ -1183,14 +1295,6 @@ let shell t ~command ~add_to_context =
       broadcast t (Loop (Message_end message));
       state_changed t);
     Ok result)
-;;
-
-let set_model t model =
-  t.model <- model;
-  ignore
-    (Session.set_model t.session ~model:(Model.key model) ~thinking:t.thinking
-     : Session.Entry.t);
-  state_changed t
 ;;
 
 let set_thinking t thinking =

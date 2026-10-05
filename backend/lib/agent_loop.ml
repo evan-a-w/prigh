@@ -26,6 +26,7 @@ let is_retryable_error message =
     ; "timed out"
     ]
     ~f:(fun prefix -> String.is_prefix message ~prefix)
+  && not (Usage_limit.unavailable message)
 ;;
 
 let cancelled_result (call : Content.Tool_call.t) =

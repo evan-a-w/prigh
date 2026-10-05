@@ -24,5 +24,12 @@ val run
   -> unit
   -> Outcome.t
 
-val error_message_of_body : status:int -> string -> string
+(** With [limit_rejected] (default false), or an error code saying the
+    usage allowance is used up, the message ends in {!Usage_limit.marker}. *)
+val error_message_of_body
+  :  ?limit_rejected:bool
+  -> status:int
+  -> string
+  -> string
+
 val member_string : string -> Json.t -> string option

@@ -12,7 +12,7 @@ let%expect_test "a missing file yields the default" =
     {|
     (Ok
      ((scoped_models ()) (confirm_tools false) (default_model ())
-      (default_thinking ())))
+      (default_thinking ()) (fallback_models ()) (default_cwd ())))
     |}]
 ;;
 
@@ -24,6 +24,8 @@ let%expect_test "save then load round trips" =
     ; confirm_tools = true
     ; default_model = Some "anthropic/claude-fable-5"
     ; default_thinking = Some (On (Some High))
+    ; fallback_models = []
+    ; default_cwd = None
     }
   in
   print_s [%sexp (Config.save ~home:t.dir config : unit Or_error.t)];
@@ -39,12 +41,14 @@ let%expect_test "save then load round trips" =
       ],
       "confirm_tools": true,
       "default_model": "anthropic/claude-fable-5",
-      "default_thinking": "high"
+      "default_thinking": "high",
+      "fallback_models": [],
+      "default_cwd": null
     }
     (Ok
      ((scoped_models (anthropic/claude-fable-5 deepseek-v4-pro))
       (confirm_tools true) (default_model (anthropic/claude-fable-5))
-      (default_thinking ((On (High))))))
+      (default_thinking ((On (High)))) (fallback_models ()) (default_cwd ())))
     |}]
 ;;
 
@@ -60,7 +64,7 @@ let%expect_test "unknown fields are ignored" =
     {|
     (Ok
      ((scoped_models (x)) (confirm_tools true) (default_model ())
-      (default_thinking ())))
+      (default_thinking ()) (fallback_models ()) (default_cwd ())))
     |}]
 ;;
 
@@ -108,9 +112,10 @@ let%expect_test "null defaults are unset" =
     {|
     (Ok
      ((scoped_models ()) (confirm_tools false) (default_model ())
-      (default_thinking ())))
+      (default_thinking ()) (fallback_models ()) (default_cwd ())))
     (Ok
      ((scoped_models ()) (confirm_tools false)
-      (default_model (deepseek/deepseek-flash)) (default_thinking ((On ())))))
+      (default_model (deepseek/deepseek-flash)) (default_thinking ((On ())))
+      (fallback_models ()) (default_cwd ())))
     |}]
 ;;

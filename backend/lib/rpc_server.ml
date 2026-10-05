@@ -950,6 +950,17 @@ let dispatch agent login ~meth ~params : Json.t Or_error.t =
     (match param params "config" with
      | None -> Or_error.error_string "missing param \"config\""
      | Some json ->
+       (* Fields left out keep their values, so a frontend that does not know
+          a field cannot reset it. *)
+       let json =
+         match Config.to_json (Agent.config agent), json with
+         | `Object current, `Object given ->
+           `Object
+             (List.filter current ~f:(fun (k, _) ->
+                not (List.Assoc.mem given ~equal:String.equal k))
+              @ given)
+         | _, json -> json
+       in
        Or_error.bind (Config.of_json json) ~f:(fun config ->
          Or_error.map (Agent.set_config agent config) ~f:(fun () ->
            Config.to_json (Agent.config agent))))
