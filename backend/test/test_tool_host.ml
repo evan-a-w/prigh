@@ -131,7 +131,12 @@ let show_hosts t agent =
 let tool_results t agent =
   List.iter (Agent.messages agent) ~f:(function
     | Message.Tool_result r ->
-      print_endline (mask t (sprintf "tool_result: %S" r.text))
+      print_endline (mask t (sprintf "tool_result: %S" r.text));
+      List.iter r.images ~f:(fun i ->
+        printf
+          "  <image %s, %d bytes>\n"
+          i.mime_type
+          (String.length (Base64.decode_exn i.data)))
     | _ -> ())
 ;;
 
@@ -292,6 +297,60 @@ let%expect_test "network tool host: hello, run tools, reconnect, bad token" =
     |}]
 ;;
 
+let%expect_test "network tool host: images read on the host reach the model" =
+  with_sandbox
+  @@ fun t ->
+  Eio.Switch.run
+  @@ fun sw ->
+  let host_dir = Filename.concat t.dir "host" in
+  write t "host/shot.png" (Image_fixtures.bytes Image_fixtures.png_3x2);
+  write t "host/notes.txt" "hi\n";
+  let on_request (request : Provider.Request.t) =
+    List.iter request.messages ~f:(function
+      | Message.User { images = _ :: _ as images; _ } ->
+        printf "model sees a prompt with %d image(s)\n" (List.length images)
+      | _ -> ())
+  in
+  let agent, h =
+    Test_rpc.make_server
+      t
+      ~sw
+      ~provider:
+        (Faux_provider.create
+           ~on_request
+           [ Reply.tool_call
+               ~id:"c1"
+               ~name:"read"
+               ~arguments:{|{"path":"shot.png"}|}
+               ()
+           ; Reply.text "a red square"
+           ])
+  in
+  call t h "hello" {|{}|};
+  let listener = Listener.start t ~sw h.server in
+  let host = Host.start t ~sw ~port:listener.port ~token:None ~cwd:host_dir in
+  Host.wait_logs t host 1;
+  call t h "set_active_host" {|{"host": "client-2"}|};
+  call
+    t
+    h
+    "prompt"
+    {|{"text": "and @shot.png", "attachments": ["shot.png", "notes.txt"]}|};
+  Agent.wait_idle agent;
+  tool_results t agent;
+  [%expect
+    {|
+    {"type":"response","id":"r","ok":true,"result":{"client_id":"client-1","namespace":null,"user":null,"superuser":false,"state":{"session_id":"<id>","session_path":"$DIR/sessions/<stamp>_<id>.jsonl","session_name":null,"session_description":null,"cwd":"$DIR","git_branch":null,"model":{"id":"deepseek-flash","provider":"deepseek","key":"deepseek/deepseek-flash","name":"DeepSeek V4.1 Flash","context_window":1000000,"max_output":384000,"supports_thinking":true,"cost":{"input":0.3,"output":1.2,"cache_read":0.006}},"thinking":"off","running":false,"message_count":0,"usage":{"input":0,"output":0,"cache_read":0},"cost_usd":0,"context_tokens":0,"active_host":"backend","hosts":[{"id":"backend","name":"<host>","cwd":"$DIR","session_id":null,"session_name":null}],"subagents":[],"jobs":[]}}}
+    connected to 127.0.0.1:PORT as client-2
+    {"type":"response","id":"r","ok":true,"result":{}}
+    {"type":"response","id":"r","ok":true,"result":{}}
+    model sees a prompt with 1 image(s)
+    model sees a prompt with 1 image(s)
+    tool_result: "Read image file [image/png, 3x2]"
+      <image image/png, 84 bytes>
+    |}]
+;;
+
 (* The stdio worker, driven over pipes like a frontend does. *)
 module Worker = struct
   type t =
@@ -347,6 +406,13 @@ let%expect_test "stdio worker: exec, output, cancel" =
       then until_result ()
   in
   until_result ();
+  write t "shot.png" (Image_fixtures.bytes Image_fixtures.png_3x2);
+  Worker.send
+    w
+    (sprintf
+       {|{"type":"exec","exec_id":"e1b","name":"read","arguments":{"path":"shot.png"},"cwd":"%s"}|}
+       t.dir);
+  until_result ();
   Worker.send
     w
     {|{"type":"exec","exec_id":"e2","name":"bash","arguments":{"command":"sleep 30"}}|};
@@ -359,6 +425,7 @@ let%expect_test "stdio worker: exec, output, cancel" =
     {|
     {"type":"output","exec_id":"e1","chunk":"one $DIR\n"}
     {"type":"result","exec_id":"e1","text":"one $DIR\n","is_error":false}
+    {"type":"result","exec_id":"e1b","text":"Read image file [image/png, 3x2]","is_error":false,"images":[{"mime_type":"image/png","data":"iVBORw0KGgoAAAANSUhEUgAAAAMAAAACAQMAAACnuvRZAAAAA1BMVEX/AAAZ4gk3AAAADElEQVQI12NgYGAAAAAEAAEnNCcKAAAAAElFTkSuQmCC"}]}
     {"type":"result","exec_id":"e2","text":"[cancelled]","is_error":true}
     (worker finished)
     ()

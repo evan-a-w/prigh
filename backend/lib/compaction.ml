@@ -1,7 +1,20 @@
 open! Core
 open! Import
 
+(* Anthropic charges about (width * height) / 750 tokens for an image, at
+   most about 1600 after its own downscaling. *)
+let tokens_per_image = 1600
+
 let estimate_tokens messages =
+  let images =
+    List.sum
+      (module Int)
+      messages
+      ~f:(function
+        | Message.User u -> List.length u.images
+        | Tool_result r -> List.length r.images
+        | Assistant _ -> 0)
+  in
   let chars =
     List.sum
       (module Int)
@@ -18,7 +31,12 @@ let estimate_tokens messages =
               | Thinking th -> String.length th.text
               | Tool_call c -> String.length c.arguments + String.length c.name))
   in
-  chars / 4
+  (chars / 4) + (images * tokens_per_image)
+;;
+
+let image_lines (images : Image.t list) =
+  List.map images ~f:(fun i -> sprintf "\n[image: %s]" i.mime_type)
+  |> String.concat
 ;;
 
 let should_compact (model : Model.t) ~input_tokens =
@@ -31,13 +49,14 @@ let render_transcript messages =
   String.concat
     ~sep:"\n\n"
     (List.map messages ~f:(function
-       | Message.User u -> "USER:\n" ^ u.text
+       | Message.User u -> "USER:\n" ^ u.text ^ image_lines u.images
        | Tool_result r ->
          sprintf
-           "TOOL RESULT (%s%s):\n%s"
+           "TOOL RESULT (%s%s):\n%s%s"
            r.tool_name
            (if r.is_error then ", error" else "")
            (String.prefix r.text 2000)
+           (image_lines r.images)
        | Assistant a ->
          let text = Message.Assistant.text a in
          let calls =

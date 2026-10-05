@@ -43,6 +43,10 @@ module Reply = struct
       ; "text", `String result.text
       ; ("is_error", if result.is_error then `True else `False)
       ]
+      @
+      if List.is_empty result.images
+      then []
+      else [ "images", [%jsonaf_of: Image.t list] result.images ]
     | Terminal_frame { term_id; frame } ->
       ("term_id", `String term_id) :: Terminal_channel.Frame.to_fields frame
     | Terminal_closed { term_id } -> [ "term_id", `String term_id ]

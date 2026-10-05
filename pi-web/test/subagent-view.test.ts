@@ -93,6 +93,47 @@ describe("transcript reducers", () => {
 			y: { name: "read", args: { path: "f" }, status: "running", output: undefined, isError: undefined },
 		});
 	});
+
+	it("keeps a result's image blocks, from events and from the history", () => {
+		const png = { type: "image" as const, data: "iVBO", mimeType: "image/png" };
+		const content = [{ type: "text", text: "Read image file" }, png, { type: "image", data: 1 }, null];
+		let states = applyToolEvent({}, { type: "tool_execution_start", toolCallId: "t", toolName: "read" });
+		states = applyToolEvent(states, { type: "tool_execution_end", toolCallId: "t", result: { content } });
+		expect(states.t).toMatchObject({ status: "done", output: "Read image file", images: [png] });
+		expect(
+			applyToolEvent(states, { type: "tool_execution_start", toolCallId: "t", toolName: "read" }).t.images,
+		).toBeUndefined();
+		expect(
+			applyToolEvent({}, { type: "tool_execution_end", toolCallId: "t", result: { content: [] } }).t.images,
+		).toBeUndefined();
+
+		const states2 = rebuildToolStates([
+			{
+				role: "assistant",
+				content: [{ type: "toolCall", id: "r", name: "read", arguments: { path: "a.png" } }],
+				provider: "p",
+				model: "m",
+				stopReason: "toolUse",
+				timestamp: 1,
+			},
+			{
+				role: "toolResult",
+				toolCallId: "r",
+				toolName: "read",
+				content: [{ type: "text", text: "Read image file" }, png],
+				isError: false,
+				timestamp: 2,
+			},
+		]);
+		expect(states2.r).toEqual({
+			name: "read",
+			args: { path: "a.png" },
+			status: "done",
+			output: "Read image file",
+			images: [png],
+			isError: false,
+		});
+	});
 });
 
 describe("subagent view state", () => {

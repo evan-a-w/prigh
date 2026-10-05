@@ -30,7 +30,7 @@ end
 
 module Item : sig
   type t =
-    | User of string
+    | User of P.Message.User.t
     | Assistant of
         { text : string
         ; final : bool

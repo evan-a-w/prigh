@@ -12,14 +12,27 @@ let wire_tool_call (c : Content.Tool_call.t) : Json.t =
     ]
 ;;
 
+(* DeepSeek's models take no images; the model is told what it missed. *)
+let with_images text (images : Image.t list) =
+  String.concat
+    ~sep:"\n"
+    ((if String.is_empty text then [] else [ text ])
+     @ List.map images ~f:(fun image ->
+       sprintf
+         "[%s image omitted: this model cannot see images]"
+         image.mime_type))
+;;
+
 let wire_message (m : Message.t) : Json.t =
   match m with
-  | User { text } -> `Object [ "role", `String "user"; "content", `String text ]
-  | Tool_result { tool_call_id; text; tool_name = _; is_error = _ } ->
+  | User { text; images } ->
+    `Object
+      [ "role", `String "user"; "content", `String (with_images text images) ]
+  | Tool_result { tool_call_id; text; images; tool_name = _; is_error = _ } ->
     `Object
       [ "role", `String "tool"
       ; "tool_call_id", `String tool_call_id
-      ; "content", `String text
+      ; "content", `String (with_images text images)
       ]
   | Assistant a ->
     let thinking = Message.Assistant.thinking a in

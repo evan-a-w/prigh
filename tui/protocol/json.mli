@@ -23,5 +23,13 @@ val int64_field : t -> string -> Int64.t Or_error.t
 val float_field : t -> string -> float Or_error.t
 val bool_field : t -> string -> bool Or_error.t
 val list_field : t -> string -> f:(t -> 'a Or_error.t) -> 'a list Or_error.t
+
+(** [list_field], with [\[\]] when the field is absent. *)
+val optional_list_field
+  :  t
+  -> string
+  -> f:(t -> 'a Or_error.t)
+  -> 'a list Or_error.t
+
 val object_field : t -> string -> t Or_error.t
 val to_string_or_error : t -> string Or_error.t

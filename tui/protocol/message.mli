@@ -1,5 +1,15 @@
 open! Core
 
+module User : sig
+  type t =
+    { text : string
+    ; images : Image.t list [@sexp.list]
+    }
+  [@@deriving sexp_of, equal]
+
+  val of_json : Json.t -> t Or_error.t
+end
+
 module Assistant : sig
   type t =
     { content : Content.t list
@@ -18,6 +28,7 @@ module Tool_result : sig
     ; tool_name : string
     ; text : string
     ; is_error : bool
+    ; images : Image.t list [@sexp.list]
     }
   [@@deriving sexp_of, equal]
 
@@ -25,7 +36,7 @@ module Tool_result : sig
 end
 
 type t =
-  | User of string
+  | User of User.t
   | Assistant of Assistant.t
   | Tool_result of Tool_result.t
 [@@deriving sexp_of, equal]

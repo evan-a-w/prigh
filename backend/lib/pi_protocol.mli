@@ -38,7 +38,13 @@ val commands : Json.t
 val server_commands : string list
 
 (** The [content] list of a tool result. *)
-val tool_result_content : string -> Json.t
+val tool_result_content : ?images:Json.t list -> string -> Json.t
+
+(** A prigh message's or result's [images] as pi image blocks. *)
+val image_blocks : Json.t -> Json.t list
+
+(** A pi command's [images] as prigh's. *)
+val prigh_images : Json.t -> Json.t list
 
 (** A tool call's [arguments] string as a JSON object (pi wants an object;
     a partial or invalid string becomes [{}]). *)

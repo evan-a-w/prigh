@@ -53,7 +53,7 @@ let%expect_test "instruction discovery and prompt" =
     - Ask before destructive or irreversible actions.
 
     Available tools:
-    - read: Read a text file. Returns the content; large files are truncated and can be read
+    - read: Read a text or image file. Returns the content; large text files are truncated a
     - ls: List a directory. Directories are shown with a trailing slash.
 
     Environment:

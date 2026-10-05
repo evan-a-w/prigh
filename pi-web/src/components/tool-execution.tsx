@@ -4,6 +4,7 @@ import { useContext, useState } from "preact/hooks";
 import { openSubagent, toolStates } from "../state.ts";
 import type { ToolStates } from "../transcript.ts";
 import { diffLineCount, editsOf, summarizeArgs } from "../tool-args.ts";
+import { ImageThumb } from "./image-thumb.tsx";
 
 const COLLAPSE_LINE_THRESHOLD = 15;
 const COLLAPSE_CHAR_THRESHOLD = 2000;
@@ -76,6 +77,7 @@ export function ToolExecution({
 	const status = live?.status ?? "running";
 	const isError = live?.isError ?? false;
 	const output = live?.output ?? live?.partial ?? "";
+	const images = live?.images ?? [];
 
 	const [expanded, setExpanded] = useState(expandedToolCalls.get(toolCallId) ?? false);
 	const toggleExpanded = () => {
@@ -112,6 +114,13 @@ export function ToolExecution({
 				<div class={`tool-body ${isLong && !expanded ? "collapsed" : ""}`}>
 					{hasDiff && <ArgsDiff name={name} args={args} />}
 					{output && <pre class="tool-output">{output}</pre>}
+				</div>
+			)}
+			{images.length > 0 && (
+				<div class="tool-images">
+					{images.map((image, index) => (
+						<ImageThumb key={`${image.mimeType}-${index}`} image={image} alt={`${name} result`} />
+					))}
 				</div>
 			)}
 			{isLong && (

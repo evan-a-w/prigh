@@ -87,6 +87,22 @@ subagents; **← Back to chat** closes it, as does switching sessions; a
 reconnect re-watches it. The backend keeps transcripts in memory while the
 session is loaded.
 
+## Images
+
+Images pasted or dropped into the editor are attached to the next prompt
+(click a thumbnail above the editor to remove it) and sent in the `images`
+field of `prompt`. The backend accepts PNG, JPEG, GIF and WebP up to
+2000x2000 px and 4.5 MB of base64, so pi-web prepares them first
+(`image-fit.ts`, with a canvas in `image-file.ts`): an image that already fits
+is sent byte for byte; a larger one is downscaled (PNG first, then JPEG at
+decreasing quality and smaller sizes) and other types (BMP, SVG, TIFF, ...)
+are converted to PNG or JPEG. An image that cannot be read or made small
+enough is not attached and a toast says why.
+
+Images in user messages and in tool results (e.g. `read` on a PNG), live and
+in the history, show as thumbnails under the tool's output, in the chat and
+in the subagent view; a click shows one full size, another shrinks it.
+
 ## Provider (OAuth) login
 
 `/login anthropic` (or `openai-codex`) opens one dialog with the
@@ -105,9 +121,10 @@ cd pi-web
 npm install
 npm run check                 # tsc
 npm test                      # vitest: connection.ts, sessions.ts, tool-args.ts, chat-items.ts,
-                              #   subagent-view.ts, transcript.ts, the sign-in form, the provider
-                              #   login dialog, and state.ts / the subagent view against a fake
-                              #   backend (test/fake-backend.ts; happy-dom)
+                              #   subagent-view.ts, transcript.ts, image-fit.ts, image-file.ts, the
+                              #   sign-in form, the provider login dialog, and state.ts / the subagent
+                              #   view / tool result images against a fake backend
+                              #   (test/fake-backend.ts; happy-dom)
 npm run build                 # dist/
 npm run dev                   # vite dev server on :5173, proxies /ws to a backend on :7789:
                               #   ../backend/_build/default/bin/main.exe serve -pi-web 127.0.0.1:7789 -faux
@@ -141,8 +158,11 @@ Changed:
   `/sessions`, `/switch`, `/host`, `/help` are sent as prompts and run by the
   backend, which answers with custom chat messages and `select`/`input`
   dialogs.
+- `editor.tsx` — pasted and dropped images are downscaled or converted to
+  what the backend accepts (`image-fit.ts`, `image-file.ts`).
 - `tool-execution.tsx` — diffs for prigh's `edit` (`edits: [{old_text,
-  new_text}]`) and `write` (`content`) arguments (`tool-args.ts`).
+  new_text}]`) and `write` (`content`) arguments (`tool-args.ts`); the
+  result's images as thumbnails.
 - `sidebar.tsx` — prigh sessions (name / description / first prompt, age,
   message count), click to switch, "New".
 - `terminal-panel.tsx` — the topbar's Terminal button opens the Bonsai web
@@ -155,7 +175,7 @@ Changed:
 
 | pi | prigh |
 |---|---|
-| `prompt` (`streamingBehavior: steer`/`followUp`) | `prompt` / `steer` / `follow_up` |
+| `prompt` (`streamingBehavior: steer`/`followUp`, `images`) | `prompt` / `steer` / `follow_up` (with the images) |
 | `get_state`, `get_messages`, `get_session_stats` | `get_state`, `get_messages`, `session_stats` (messages get index timestamps; pi keys them by role + timestamp) |
 | `set_model {provider, modelId}` | `set_model {model: provider/id}` |
 | `set_thinking_level`, `cycle_thinking_level`, `get_available_thinking_levels` | `set_thinking` (`minimal`→`low`, `medium`→`on`, `xhigh`→`max`) |

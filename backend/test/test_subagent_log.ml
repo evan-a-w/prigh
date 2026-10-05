@@ -18,7 +18,7 @@ let finish ?(is_error = false) agent_id text : Agent_event.t =
     ; usage = Usage.zero
     ; turns = 1
     ; cost_usd = 0.
-    ; result = { text; is_error }
+    ; result = { text; is_error; images = [] }
     }
 ;;
 
@@ -65,6 +65,7 @@ let%expect_test "statuses, activity and transcripts of nested subagents" =
               ; tool_name = "ls"
               ; text = "x"
               ; is_error = false
+              ; images = []
               }
           }));
   record (finish "a1" "report");

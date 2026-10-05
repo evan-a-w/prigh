@@ -315,6 +315,10 @@ Ctrl+O cycles the transcript verbosity:
 `/verbosity [quiet|normal|verbose]` sets it directly; the status line shows
 `view:`.
 
+The terminal does not draw images: each one in a prompt or a tool result shows
+as a line like `[image: image/png, 34.2 KB]` (in quiet, the tool line counts
+them: `✓ 1 line, 1 image`).
+
 Subagents run in the background. A `subagent` tool call returns at once
 (`started agent a1 (...)`) and the main agent's turn carries on or ends, so
 you can keep talking to it. When a subagent finishes (or fails, or is
@@ -375,6 +379,17 @@ shell command through the backend (streamed output shown as a tool item) and
 adds it and its output to the context; `!!cmd` runs it without adding to the
 context; `!&cmd` starts it as a background job (also while a turn is running)
 whose exit is reported to the agent like the agent's own jobs.
+
+Models see images. The `read` tool returns PNG, JPEG, GIF and WebP files
+(recognised by content, not by name) as images the model can look at, and an
+`@shot.png` attachment adds the image to the prompt; pi-web also sends images
+pasted or dropped into its editor. Images over 2000x2000 px or about 3.4 MB
+are downscaled with ImageMagick (`magick` or `convert`) or macOS `sips` on
+the machine that reads them (the tool host); without one, images up to the
+providers' hard limit (8000x8000 px) are sent as they are and larger ones
+fail with a message saying how to shrink them. Anthropic and OpenAI models get
+the images; DeepSeek's cannot see them and are told one was left out. Images
+are stored in the session file.
 
 Submitted prompts are kept in `~/.prigh/history` (one JSON string per line,
 last 500) and loaded on start; secrets from login prompts are never recorded.

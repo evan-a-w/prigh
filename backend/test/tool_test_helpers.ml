@@ -78,5 +78,10 @@ let run ?cancel ?on_output t tool args =
   let result = Tool.execute tool context (Jsonaf.of_string args) in
   let text = mask t result.text in
   let text = if String.is_suffix text ~suffix:"\n" then text else text ^ "\n" in
-  print_string (if result.is_error then "ERROR: " ^ text else text)
+  print_string (if result.is_error then "ERROR: " ^ text else text);
+  List.iter result.images ~f:(fun image ->
+    printf
+      "<image %s, %d bytes>\n"
+      image.mime_type
+      (String.length (Base64.decode_exn image.data)))
 ;;

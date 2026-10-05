@@ -1,6 +1,7 @@
 import { useState } from "preact/hooks";
 import { copyText } from "../copy.ts";
 import type { AgentMessage, AssistantMessage, ImageContent, ThinkingContent, UserMessage } from "../protocol.ts";
+import { ImageThumb } from "./image-thumb.tsx";
 import { MarkdownView } from "./markdown-view.tsx";
 import { ToolExecution } from "./tool-execution.tsx";
 
@@ -61,12 +62,7 @@ export function UserMessageView({ message }: { message: UserMessage }) {
 			{text && <CopyButton text={text} />}
 			{text && <div class="msg-user-text">{text}</div>}
 			{images.map((image, index) => (
-				<img
-					key={`${image.mimeType}-${index}`}
-					class="msg-image"
-					src={`data:${image.mimeType};base64,${image.data}`}
-					alt="attached"
-				/>
+				<ImageThumb key={`${image.mimeType}-${index}`} image={image} alt="attached" />
 			))}
 		</div>
 	);

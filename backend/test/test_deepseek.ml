@@ -39,6 +39,7 @@ let%expect_test
         ; tool_name = "bash"
         ; text = "a\nb"
         ; is_error = false
+        ; images = []
         }
     ]
   in
@@ -458,5 +459,45 @@ let%expect_test "stream: cancellation keeps partial content" =
     ((content ((Text first))) (stop_reason Aborted)
      (usage ((input 0) (output 0) (cache_read 0)))
      (model deepseek/deepseek-flash))
+    |}]
+;;
+
+let%expect_test "images: replaced by a note, the model cannot see them" =
+  let body =
+    T.request_body
+      (request (Image_fixtures.conversation ~model:(Model.key model)))
+  in
+  print_endline (Json.to_string_hum (Json.member_exn "messages" body));
+  [%expect
+    {|
+    [
+      {
+        "role": "user",
+        "content": "what is this?\n[image/png image omitted: this model cannot see images]"
+      },
+      {
+        "role": "user",
+        "content": "[image/jpeg image omitted: this model cannot see images]"
+      },
+      {
+        "role": "assistant",
+        "content": "",
+        "tool_calls": [
+          {
+            "id": "call_1",
+            "type": "function",
+            "function": {
+              "name": "read",
+              "arguments": "{\"path\":\"a.png\"}"
+            }
+          }
+        ]
+      },
+      {
+        "role": "tool",
+        "tool_call_id": "call_1",
+        "content": "Read image file [image/png, 3x2]\n[image/png image omitted: this model cannot see images]"
+      }
+    ]
     |}]
 ;;

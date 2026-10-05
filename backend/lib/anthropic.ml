@@ -105,12 +105,36 @@ let assistant_blocks ~oauth ~replay_thinking (a : Message.Assistant.t) =
             ]))
 ;;
 
+let image_block (image : Image.t) =
+  `Object
+    [ "type", `String "image"
+    ; ( "source"
+      , `Object
+          [ "type", `String "base64"
+          ; "media_type", `String image.mime_type
+          ; "data", `String image.data
+          ] )
+    ]
+;;
+
+(* Text blocks may not be empty. *)
+let user_blocks ({ text; images } : Message.User.t) =
+  (if String.is_empty text && not (List.is_empty images)
+   then []
+   else [ text_block text ])
+  @ List.map images ~f:image_block
+;;
+
 let tool_result_block (r : Message.Tool_result.t) =
+  let text = if String.is_empty r.text then "(no output)" else r.text in
   `Object
     [ "type", `String "tool_result"
     ; "tool_use_id", `String r.tool_call_id
     ; ( "content"
-      , `String (if String.is_empty r.text then "(no output)" else r.text) )
+      , match r.images with
+        | [] -> `String text
+        | images -> `Array (text_block text :: List.map images ~f:image_block)
+      )
     ; ("is_error", if r.is_error then `True else `False)
     ]
 ;;
@@ -127,7 +151,7 @@ let wire_messages ~oauth (messages : Message.t list) =
   let turns =
     List.filter_map messages ~f:(fun m ->
       match m with
-      | User { text } -> Some ("user", [ text_block text ])
+      | User u -> Some ("user", user_blocks u)
       | Tool_result r -> Some ("user", [ tool_result_block r ])
       | Assistant a ->
         (match assistant_blocks ~oauth ~replay_thinking:(same_provider a) a with

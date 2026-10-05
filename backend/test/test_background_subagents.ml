@@ -10,7 +10,7 @@ let one_line s =
 
 let message_line (m : Message.t) =
   match m with
-  | User { text } -> "user: " ^ one_line text
+  | User { text; _ } -> "user: " ^ one_line text
   | Assistant a ->
     let calls =
       List.map (Message.Assistant.tool_calls a) ~f:(fun c ->

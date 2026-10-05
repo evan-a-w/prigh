@@ -778,6 +778,7 @@ let%expect_test "bash timeout is merged into the tool line at each verbosity" =
     ; tool_name = "bash"
     ; text = "partial output\n[timed out after 120s]"
     ; is_error = true
+    ; images = []
     }
   in
   let item =
@@ -965,7 +966,12 @@ let%expect_test "markdown: every construct at width 40 and 80" =
 ;;
 
 let edit_result text : Prigh_protocol.Message.Tool_result.t =
-  { tool_call_id = "c1"; tool_name = "edit"; text; is_error = false }
+  { tool_call_id = "c1"
+  ; tool_name = "edit"
+  ; text
+  ; is_error = false
+  ; images = []
+  }
 ;;
 
 let%expect_test "diff colouring at Normal and Verbose through to_styled" =

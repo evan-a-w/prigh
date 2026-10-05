@@ -60,12 +60,14 @@ let conversation =
       ; tool_name = "bash"
       ; text = "a\nb"
       ; is_error = false
+      ; images = []
       }
   ; Tool_result
       { tool_call_id = "toolu_2"
       ; tool_name = "subagent"
       ; text = ""
       ; is_error = true
+      ; images = []
       }
   ; Assistant
       { content =
@@ -532,5 +534,84 @@ let%expect_test "thinking: budget models vs adaptive models (effort)" =
       (On(Low))    thinking={"type":"adaptive"} output_config={"effort":"low"} interleaved-beta=false
       (On(High))   thinking={"type":"adaptive"} output_config={"effort":"high"} interleaved-beta=false
       (On(Max))    thinking={"type":"adaptive"} output_config={"effort":"max"} interleaved-beta=false
+    |}]
+;;
+
+let%expect_test "images: in prompts and tool results" =
+  let body =
+    T.request_body
+      ~oauth:false
+      (request (Image_fixtures.conversation ~model:(Model.key model)))
+  in
+  print_endline (Json.to_string_hum (Json.member_exn "messages" body));
+  [%expect
+    {|
+    [
+      {
+        "role": "user",
+        "content": [
+          {
+            "type": "text",
+            "text": "what is this?"
+          },
+          {
+            "type": "image",
+            "source": {
+              "type": "base64",
+              "media_type": "image/png",
+              "data": "SHOT"
+            }
+          },
+          {
+            "type": "image",
+            "source": {
+              "type": "base64",
+              "media_type": "image/jpeg",
+              "data": "PHOTO"
+            }
+          }
+        ]
+      },
+      {
+        "role": "assistant",
+        "content": [
+          {
+            "type": "tool_use",
+            "id": "call_1",
+            "name": "read",
+            "input": {
+              "path": "a.png"
+            }
+          }
+        ]
+      },
+      {
+        "role": "user",
+        "content": [
+          {
+            "type": "tool_result",
+            "tool_use_id": "call_1",
+            "content": [
+              {
+                "type": "text",
+                "text": "Read image file [image/png, 3x2]"
+              },
+              {
+                "type": "image",
+                "source": {
+                  "type": "base64",
+                  "media_type": "image/png",
+                  "data": "READ"
+                }
+              }
+            ],
+            "is_error": false,
+            "cache_control": {
+              "type": "ephemeral"
+            }
+          }
+        ]
+      }
+    ]
     |}]
 ;;

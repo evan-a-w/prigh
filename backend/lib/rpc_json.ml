@@ -40,14 +40,21 @@ let content (c : Content.t) =
       ]
 ;;
 
+(* Only when there are any. *)
+let images_field = function
+  | [] -> []
+  | images -> [ "images", [%jsonaf_of: Image.t list] images ]
+;;
+
 let tool_result (r : Message.Tool_result.t) =
   `Object
-    [ "role", str "tool_result"
-    ; "tool_call_id", str r.tool_call_id
-    ; "tool_name", str r.tool_name
-    ; "text", str r.text
-    ; "is_error", bool r.is_error
-    ]
+    ([ "role", str "tool_result"
+     ; "tool_call_id", str r.tool_call_id
+     ; "tool_name", str r.tool_name
+     ; "text", str r.text
+     ; "is_error", bool r.is_error
+     ]
+     @ images_field r.images)
 ;;
 
 let tool_result_value (r : Tool_result.t) =
@@ -66,7 +73,8 @@ let assistant (a : Message.Assistant.t) =
 
 let message (m : Message.t) =
   match m with
-  | User u -> `Object [ "role", str "user"; "text", str u.text ]
+  | User u ->
+    `Object ([ "role", str "user"; "text", str u.text ] @ images_field u.images)
   | Assistant a -> assistant a
   | Tool_result r -> tool_result r
 ;;

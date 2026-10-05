@@ -52,6 +52,7 @@ val stats_json : string
 val auth_json : string
 val config_json : string
 val messages_json : string
+val user : ?images:P.Image.t list -> string -> P.Message.t
 val assistant : ?stop:string -> string -> P.Message.t
 val partial : P.Message.Assistant.t
 val tool_call : ?name:string -> ?arguments:string -> string -> P.Tool_call.t
@@ -59,6 +60,7 @@ val tool_call : ?name:string -> ?arguments:string -> string -> P.Tool_call.t
 val tool_result
   :  ?name:string
   -> ?is_error:bool
+  -> ?images:P.Image.t list
   -> id:string
   -> string
   -> P.Message.Tool_result.t

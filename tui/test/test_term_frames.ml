@@ -494,7 +494,7 @@ let%expect_test "mouse wheel scrolls the transcript; Up walks history" =
       H.incoming
         h
         (Prigh_ui.App.Action.Event
-           (P.Event.Message_start (P.Message.User (sprintf "line %d" i)))));
+           (P.Event.Message_start (user (sprintf "line %d" i)))));
     let%bind () = H.paint h in
     H.wheel h `Up;
     let%bind () = H.paint h in

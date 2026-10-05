@@ -259,8 +259,8 @@ let%expect_test "dequeue pops the most recently queued message" =
   dump ();
   [%expect
     {|
-    (((text "follow up") (attachments ())))
-    (((text "steer one") (attachments ())))
+    (((text "follow up") (attachments ()) (images ())))
+    (((text "steer one") (attachments ()) (images ())))
     ()
     state: running=true messages=0
     user: go

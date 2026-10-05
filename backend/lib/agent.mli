@@ -94,6 +94,7 @@ module Queued : sig
   type t =
     { text : string
     ; attachments : string list
+    ; images : Image.t list
     }
   [@@deriving sexp_of]
 end
@@ -138,21 +139,37 @@ val create
 val subscribe : t -> f:(Event.t -> unit) -> unit
 val state : t -> State.t
 val session : t -> Session.t
+val env : t -> Env.t
 val messages : t -> Message.t list
 
 (** Attachments are paths (relative to the agent cwd or absolute) whose
     contents are appended to the user message as [<file>] blocks, read with
-    [Tool_read] limits. *)
+    [Tool_read] limits (image files are attached as images, like [images]). *)
 
 (** Starts a run. Fails if one is already running. *)
-val prompt : ?attachments:string list -> t -> string -> unit Or_error.t
+val prompt
+  :  ?attachments:string list
+  -> ?images:Image.t list
+  -> t
+  -> string
+  -> unit Or_error.t
 
 (** Queued and injected after the current turn's tool results, or starts a
     run when idle. *)
-val steer : ?attachments:string list -> t -> string -> unit
+val steer
+  :  ?attachments:string list
+  -> ?images:Image.t list
+  -> t
+  -> string
+  -> unit
 
 (** Queued to run after the current run finishes, or starts a run when idle. *)
-val follow_up : ?attachments:string list -> t -> string -> unit
+val follow_up
+  :  ?attachments:string list
+  -> ?images:Image.t list
+  -> t
+  -> string
+  -> unit
 
 (** Cancels the active run (if any) and clears the queues. Returns the texts
     that were queued and are therefore restored to the caller: steer messages
@@ -331,9 +348,4 @@ val set_active_host : t -> string -> cwd:string option -> unit Or_error.t
 val tool_exec_output : t -> exec_id:string -> chunk:string -> unit Or_error.t
 
 (** Completes a remote execution. *)
-val tool_exec_result
-  :  t
-  -> exec_id:string
-  -> text:string
-  -> is_error:bool
-  -> unit Or_error.t
+val tool_exec_result : t -> exec_id:string -> Tool_result.t -> unit Or_error.t

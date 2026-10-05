@@ -1,5 +1,6 @@
 import { computed, signal } from "@preact/signals";
 import { useEffect, useRef } from "preact/hooks";
+import { prepareImageFile } from "../image-file.ts";
 import type { ImageContent, RpcSlashCommand } from "../protocol.ts";
 import {
 	editorText,
@@ -13,6 +14,7 @@ import {
 	slashCommands,
 	workingMessage,
 } from "../state.ts";
+import { imageSrc } from "./image-thumb.tsx";
 
 const TUI_BUILTIN_COMMAND_ORDER = new Map(
 	[
@@ -204,24 +206,23 @@ const isBusy = computed(() => sessionState.value?.isStreaming === true || workin
 // the send button is the send affordance. On desktop Enter sends.
 const isCoarsePointer = window.matchMedia("(pointer: coarse)").matches;
 
-function readFileAsImage(file: File): Promise<ImageContent> {
-	return new Promise((resolve, reject) => {
-		const reader = new FileReader();
-		reader.onload = () => {
-			const dataUrl = String(reader.result);
-			const base64 = dataUrl.slice(dataUrl.indexOf(",") + 1);
-			resolve({ type: "image", data: base64, mimeType: file.type || "image/png" });
-		};
-		reader.onerror = () => reject(reader.error);
-		reader.readAsDataURL(file);
-	});
+/** Attaches the image files among `files`, downscaled or converted as the backend needs. */
+function attachImages(files: File[]): void {
+	for (const file of files) {
+		if (!file.type.startsWith("image/")) continue;
+		void prepareImageFile(file)
+			.then((fitted) => {
+				if (fitted.ok) pendingImages.value = [...pendingImages.value, fitted.image];
+				else pushToast(fitted.error, "error");
+			})
+			.catch(() => pushToast(`Failed to read ${file.name || "the image"}`, "error"));
+	}
 }
 
 async function send(): Promise<void> {
 	const text = draftText.value.trim();
 	const images = pendingImages.value;
 	if (sending.value || (text === "" && images.length === 0)) return;
-	if (text === "") return;
 	sending.value = true;
 	draftText.value = "";
 	pendingImages.value = [];
@@ -314,20 +315,24 @@ export function Editor() {
 		const files = [...(event.clipboardData?.files ?? [])];
 		if (files.length === 0) return;
 		event.preventDefault();
-		for (const file of files) {
-			if (!file.type.startsWith("image/")) continue;
-			void readFileAsImage(file)
-				.then((image) => {
-					pendingImages.value = [...pendingImages.value, image];
-				})
-				.catch(() => pushToast("Failed to read pasted image", "error"));
-		}
+		attachImages(files);
+	};
+
+	const handleDragOver = (event: DragEvent) => {
+		if (event.dataTransfer?.types.includes("Files")) event.preventDefault();
+	};
+
+	const handleDrop = (event: DragEvent) => {
+		const files = [...(event.dataTransfer?.files ?? [])];
+		if (files.length === 0) return;
+		event.preventDefault();
+		attachImages(files);
 	};
 
 	const queuedMessages = [...queue.value.steering, ...queue.value.followUp];
 
 	return (
-		<div class="editor-area">
+		<div class="editor-area" onDragOver={handleDragOver} onDrop={handleDrop}>
 			{queuedMessages.length > 0 && (
 				<div class="queue-indicator">
 					{queuedMessages.map((text, index) => (
@@ -349,7 +354,7 @@ export function Editor() {
 								pendingImages.value = pendingImages.value.filter((_, i) => i !== index);
 							}}
 						>
-							<img src={`data:${image.mimeType};base64,${image.data}`} alt="attachment" />
+							<img src={imageSrc(image)} alt="attachment" />
 						</button>
 					))}
 				</div>

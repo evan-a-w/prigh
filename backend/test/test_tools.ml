@@ -163,17 +163,19 @@ let%expect_test "read_for_context: shared truncation and errors" =
   with_sandbox
   @@ fun t ->
   write t "a.txt" "line1\nline2\n";
+  let read = Tool_read.read_for_context ~env:t.env ~cwd:t.dir in
   let show = function
-    | Ok s -> print_endline (mask t ("Ok:\n" ^ s))
-    | Error e -> print_endline (mask t ("Error: " ^ Error.to_string_hum e))
+    | { Tool.Result.is_error = false; text = s; _ } ->
+      print_endline (mask t ("Ok:\n" ^ s))
+    | { is_error = true; text = e; _ } -> print_endline (mask t ("Error: " ^ e))
   in
-  show (Tool_read.read_for_context ~cwd:t.dir "a.txt");
-  show (Tool_read.read_for_context ~cwd:t.dir "missing.txt");
-  show (Tool_read.read_for_context ~cwd:t.dir ".");
+  show (read "a.txt");
+  show (read "missing.txt");
+  show (read ".");
   write t "big.txt" (String.concat_lines (List.init 3000 ~f:Int.to_string));
-  (match Tool_read.read_for_context ~cwd:t.dir "big.txt" with
-   | Error _ -> print_endline "unexpected error"
-   | Ok s ->
+  (match read "big.txt" with
+   | { is_error = true; _ } -> print_endline "unexpected error"
+   | { text = s; _ } ->
      let lines = String.split_lines s in
      print_s [%sexp (List.length lines : int), (List.last_exn lines : string)]);
   [%expect
@@ -185,6 +187,31 @@ let%expect_test "read_for_context: shared truncation and errors" =
     Error: file not found: $DIR/missing.txt
     Error: $DIR is a directory; use ls
     (2002 "[showing lines 1-2000 of 3000; use offset=2001 to continue]")
+    |}]
+;;
+
+let%expect_test "read: images are attached for the model" =
+  with_sandbox
+  @@ fun t ->
+  let module F = Image_fixtures in
+  write t "shot.png" (F.bytes F.png_3x2);
+  (* Recognised by content, whatever the name. *)
+  write t "photo.dat" (F.bytes F.jpeg_7x6);
+  write t "anim.gif" (F.bytes F.gif_5x4);
+  write t "x.bmp" (F.bytes F.bmp_2x2);
+  run t Tool_read.tool {|{"path": "shot.png"}|};
+  run t Tool_read.tool {|{"path": "photo.dat", "offset": 3}|};
+  run t Tool_read.tool {|{"path": "anim.gif"}|};
+  run t Tool_read.tool {|{"path": "x.bmp"}|};
+  [%expect
+    {|
+    Read image file [image/png, 3x2]
+    <image image/png, 84 bytes>
+    Read image file [image/jpeg, 7x6]
+    <image image/jpeg, 286 bytes>
+    Read image file [image/gif, 5x4]
+    <image image/gif, 45 bytes>
+    ERROR: $DIR/x.bmp looks like a binary file
     |}]
 ;;
 

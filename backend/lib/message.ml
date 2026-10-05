@@ -2,7 +2,12 @@ open! Core
 open! Import
 
 module User = struct
-  type t = { text : string } [@@deriving sexp, jsonaf, equal]
+  type t =
+    { text : string
+    ; images : Image.t list
+          [@sexp.list] [@jsonaf.default []] [@jsonaf_drop_default.equal]
+    }
+  [@@deriving sexp, jsonaf, equal]
 end
 
 module Assistant = struct
@@ -41,6 +46,8 @@ module Tool_result = struct
     ; tool_name : string
     ; text : string
     ; is_error : bool
+    ; images : Image.t list
+          [@sexp.list] [@jsonaf.default []] [@jsonaf_drop_default.equal]
     }
   [@@deriving sexp, jsonaf, equal]
 end
@@ -51,4 +58,4 @@ type t =
   | Tool_result of Tool_result.t
 [@@deriving sexp, jsonaf, equal]
 
-let user text = User { text }
+let user ?(images = []) text = User { text; images }

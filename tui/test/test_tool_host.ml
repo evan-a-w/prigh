@@ -105,3 +105,33 @@ let%expect_test "a worker that cannot start closes the terminal and fails the \
     |}];
   Client.close client
 ;;
+
+let%expect_test
+    "a result's images are forwarded verbatim, and only when there are some"
+  =
+  let%bind client, requests = connected_client () in
+  let worker, fake_worker = Transport.In_memory.create () in
+  let host =
+    Tool_host.create ~client ~spawn:(fun () -> Deferred.Or_error.return worker)
+  in
+  Tool_host.handle
+    host
+    (event
+       {|{"type":"event","event":"tool_exec","host":"client-1","exec_id":"e1","call_id":"c1","name":"read","arguments":{"path":"shot.png"},"cwd":"/work"}|});
+  let%bind () = print_next (Transport.In_memory.Backend.requests fake_worker) in
+  List.iter
+    ~f:(Transport.In_memory.Backend.send fake_worker)
+    [ {|{"type":"result","exec_id":"e1","text":"Read image file [image/png, 1x1]","is_error":false,"images":[{"mime_type":"image/png","data":"iVBORw0KGgo="}]}|}
+    ; {|{"type":"result","exec_id":"e2","text":"no images","is_error":false,"images":[]}|}
+    ];
+  let%bind () = print_next requests in
+  let%bind () = print_next requests in
+  [%expect
+    {|
+    {"type":"exec","exec_id":"e1","name":"read","arguments":{"path":"shot.png"},"cwd":"/work"}
+    {"id":1,"method":"tool_exec_result","params":{"exec_id":"e1","text":"Read image file [image/png, 1x1]","is_error":false,"images":[{"mime_type":"image/png","data":"iVBORw0KGgo="}]}}
+    {"id":2,"method":"tool_exec_result","params":{"exec_id":"e2","text":"no images","is_error":false}}
+    |}];
+  Tool_host.close host;
+  Client.close client
+;;

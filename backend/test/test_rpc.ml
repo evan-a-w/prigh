@@ -213,6 +213,84 @@ let%expect_test "prompt attachments are inlined into the user message" =
     |}]
 ;;
 
+let%expect_test "images: in prompts, from attachments, and refused" =
+  with_sandbox
+  @@ fun t ->
+  Eio.Switch.run
+  @@ fun sw ->
+  let module F = Image_fixtures in
+  write t "shot.png" (F.bytes F.png_3x2);
+  let on_request (request : Provider.Request.t) =
+    match List.last request.messages with
+    | Some (Message.User u) ->
+      print_endline (mask t u.text);
+      List.iter u.images ~f:(fun i ->
+        printf "<image %s, %d bytes>\n" i.mime_type (String.length i.data))
+    | _ -> ()
+  in
+  let agent, h =
+    make_server
+      t
+      ~sw
+      ~provider:
+        (Faux_provider.create ~on_request [ Reply.text "ok"; Reply.text "ok" ])
+  in
+  call
+    t
+    h
+    ~params:
+      (sprintf
+         {|{"text": "compare @shot.png", "attachments": ["shot.png"], "images": [{"mime_type": "image/gif", "data": "%s"}]}|}
+         F.gif_5x4)
+    "prompt";
+  Agent.wait_idle agent;
+  [%expect
+    {|
+    compare @shot.png
+
+    <file path="shot.png">
+    Read image file [image/png, 3x2]
+    </file>
+    <image image/gif, 60 bytes>
+    <image image/png, 112 bytes>
+    {"type":"response","id":"r1","ok":true,"result":{}}
+    |}];
+  call
+    t
+    h
+    ~params:
+      (sprintf
+         {|{"text": "", "images": [{"mime_type": "image/bmp", "data": "%s"}]}|}
+         F.bmp_2x2)
+    "prompt";
+  call
+    t
+    h
+    ~params:{|{"text": "", "images": [{"mime_type": "image/png"}]}|}
+    "prompt";
+  call
+    t
+    h
+    ~params:
+      (sprintf
+         {|{"text": "", "images": [{"mime_type": "image/png", "data": "%s"}]}|}
+         F.png_3x2)
+    "follow_up";
+  Agent.wait_idle agent;
+  [%expect
+    {|
+    {"type":"response","id":"r1","ok":false,"error":"unsupported image type image/bmp; models accept image/png, image/jpeg, image/gif and image/webp"}
+    {"type":"response","id":"r1","ok":false,"error":"param \"images\" must contain {mime_type, data} objects"}
+
+    <image image/png, 112 bytes>
+    {"type":"response","id":"r1","ok":true,"result":{}}
+    |}];
+  (* The images are in the session and in what clients are sent. *)
+  call t h "get_messages";
+  [%expect
+    {| {"type":"response","id":"r1","ok":true,"result":[{"role":"user","text":"compare @shot.png\n\n<file path=\"shot.png\">\nRead image file [image/png, 3x2]\n</file>","images":[{"mime_type":"image/gif","data":"R0lGODlhBQAEAPAAAAAA/wAAACH5BAAAAAAALAAAAAAFAAQAAAIEhI+ZBQA7"},{"mime_type":"image/png","data":"iVBORw0KGgoAAAANSUhEUgAAAAMAAAACAQMAAACnuvRZAAAAA1BMVEX/AAAZ4gk3AAAADElEQVQI12NgYGAAAAAEAAEnNCcKAAAAAElFTkSuQmCC"}]},{"role":"assistant","content":[{"type":"text","text":"ok"}],"stop_reason":{"type":"end_turn"},"usage":{"input":10,"output":5,"cache_read":0},"model":"deepseek-flash"},{"role":"user","text":"","images":[{"mime_type":"image/png","data":"iVBORw0KGgoAAAANSUhEUgAAAAMAAAACAQMAAACnuvRZAAAAA1BMVEX/AAAZ4gk3AAAADElEQVQI12NgYGAAAAAEAAEnNCcKAAAAAElFTkSuQmCC"}]},{"role":"assistant","content":[{"type":"text","text":"ok"}],"stop_reason":{"type":"end_turn"},"usage":{"input":10,"output":5,"cache_read":0},"model":"deepseek-flash"}]} |}]
+;;
+
 let%expect_test "sessions: list, new, switch, fork, rewind" =
   with_agent [ Reply.text "one"; Reply.text "two" ]
   @@ fun t agent h ->

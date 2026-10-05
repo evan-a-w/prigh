@@ -110,6 +110,12 @@ let list_field t name ~f =
   | None -> missing name
 ;;
 
+let optional_list_field t name ~f =
+  match field t name with
+  | None -> Ok []
+  | Some _ -> list_field t name ~f
+;;
+
 let object_field t name =
   match field t name with
   | Some (`Object _ as o) -> Ok o

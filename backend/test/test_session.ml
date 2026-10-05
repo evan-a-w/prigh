@@ -122,6 +122,7 @@ let%expect_test "loading a file with invalid utf-8 repairs it" =
          ; tool_name = "bash"
          ; text = "(\xE2\x88\xA8 ((\xC2\n3:"
          ; is_error = false
+         ; images = []
          })
   in
   let show_text t =
@@ -458,6 +459,7 @@ let%expect_test "markdown export renders user, assistant, tool and result" =
          ; tool_name = "bash"
          ; text = "file1\nfile2"
          ; is_error = false
+         ; images = []
          })
   in
   let (_ : Session.Entry.t) = Session.append_message t (assistant "done") in

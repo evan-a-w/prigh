@@ -142,6 +142,8 @@ let messages_json =
   {|[{"role":"user","text":"earlier question"},{"role":"assistant","content":[{"type":"text","text":"earlier **answer**"}],"stop_reason":{"type":"end_turn"},"usage":{"input":1,"output":2,"cache_read":0},"model":"m"}]|}
 ;;
 
+let user ?(images = []) text : P.Message.t = User { text; images }
+
 let assistant ?(stop = "end_turn") text =
   Or_error.ok_exn
     (P.Message.of_json
@@ -163,8 +165,8 @@ let tool_call ?(name = "bash") ?(arguments = "{}") id : P.Tool_call.t =
   { id; name; arguments }
 ;;
 
-let tool_result ?(name = "bash") ?(is_error = false) ~id text
+let tool_result ?(name = "bash") ?(is_error = false) ?(images = []) ~id text
   : P.Message.Tool_result.t
   =
-  { tool_call_id = id; tool_name = name; text; is_error }
+  { tool_call_id = id; tool_name = name; text; is_error; images }
 ;;

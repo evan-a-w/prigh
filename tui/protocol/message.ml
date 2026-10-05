@@ -1,5 +1,20 @@
 open! Core
 
+module User = struct
+  type t =
+    { text : string
+    ; images : Image.t list [@sexp.list]
+    }
+  [@@deriving sexp_of, equal]
+
+  let of_json j =
+    let open Or_error.Let_syntax in
+    let%bind text = Json.string_field j "text" in
+    let%map images = Json.optional_list_field j "images" ~f:Image.of_json in
+    { text; images }
+  ;;
+end
+
 module Assistant = struct
   type t =
     { content : Content.t list
@@ -27,6 +42,7 @@ module Tool_result = struct
     ; tool_name : string
     ; text : string
     ; is_error : bool
+    ; images : Image.t list [@sexp.list]
     }
   [@@deriving sexp_of, equal]
 
@@ -35,20 +51,21 @@ module Tool_result = struct
     let%bind tool_call_id = Json.string_field j "tool_call_id" in
     let%bind tool_name = Json.string_field j "tool_name" in
     let%bind text = Json.string_field j "text" in
-    let%map is_error = Json.bool_field j "is_error" in
-    { tool_call_id; tool_name; text; is_error }
+    let%bind is_error = Json.bool_field j "is_error" in
+    let%map images = Json.optional_list_field j "images" ~f:Image.of_json in
+    { tool_call_id; tool_name; text; is_error; images }
   ;;
 end
 
 type t =
-  | User of string
+  | User of User.t
   | Assistant of Assistant.t
   | Tool_result of Tool_result.t
 [@@deriving sexp_of, equal]
 
 let of_json j =
   match%bind.Or_error Json.string_field j "role" with
-  | "user" -> Or_error.map (Json.string_field j "text") ~f:(fun t -> User t)
+  | "user" -> Or_error.map (User.of_json j) ~f:(fun u -> User u)
   | "assistant" -> Or_error.map (Assistant.of_json j) ~f:(fun a -> Assistant a)
   | "tool_result" ->
     Or_error.map (Tool_result.of_json j) ~f:(fun r -> Tool_result r)

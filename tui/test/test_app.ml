@@ -62,16 +62,6 @@ let connected ?width ?height ?model () =
   h
 ;;
 
-let tool_call ?(name = "bash") ?(arguments = "{}") id : P.Tool_call.t =
-  { id; name; arguments }
-;;
-
-let tool_result ?(name = "bash") ?(is_error = false) ~id text
-  : P.Message.Tool_result.t
-  =
-  { tool_call_id = id; tool_name = name; text; is_error }
-;;
-
 let%expect_test "startup: requests state, messages and auth; renders history" =
   let h = H.create () in
   H.show h;
@@ -132,7 +122,7 @@ let%expect_test "prompt, streaming with embedded newlines, tool call, steer \
     (Append_history "list the files")
     |}];
   H.event h (State (state ~running:true ()));
-  H.event h (Message_start (User "list the files"));
+  H.event h (Message_start (user "list the files"));
   H.event h (Message_update { partial; delta = Thinking_delta "let me look" });
   H.event h (Message_update { partial; delta = Text_delta "Sure, here" });
   H.event
@@ -193,6 +183,7 @@ let%expect_test "prompt, streaming with embedded newlines, tool call, steer \
            ; tool_name = "bash"
            ; text = "a.ml\nb.ml\npartial\n"
            ; is_error = false
+           ; images = []
            }
        });
   H.event h (Message_end (assistant "Sure, here they are:\nfirst line done"));
@@ -1622,7 +1613,7 @@ let%expect_test "verbosity cycles Normal / Verbose / Quiet; /verbosity sets it" 
   H.keys h "run it";
   H.enter h;
   H.event h (State (state ~running:true ()));
-  H.event h (Message_start (User "run it"));
+  H.event h (Message_start (user "run it"));
   let call = tool_call ~arguments:{|{"command":"ls -la"}|} "c1" in
   H.event h (Tool_start call);
   H.event h (Tool_output { call_id = "c1"; chunk = "a\nb\n" });
@@ -1709,6 +1700,152 @@ let%expect_test "verbosity cycles Normal / Verbose / Quiet; /verbosity sets it" 
     |}]
 ;;
 
+let png : P.Image.t = { mime_type = "image/png"; bytes = 35021 }
+
+let%expect_test
+    "images show as a line each: a user attachment and a read result, at every \
+     verbosity"
+  =
+  let h = connected ~height:16 () in
+  H.event h (State (state ~running:true ()));
+  H.event
+    h
+    (Message_start
+       (user
+          ~images:[ png; { mime_type = "image/jpeg"; bytes = 512 } ]
+          "what is in these?"));
+  let call = tool_call ~name:"read" ~arguments:{|{"path":"shot.png"}|} "c1" in
+  H.event h (Tool_start call);
+  H.event
+    h
+    (Tool_end
+       { call
+       ; result =
+           tool_result
+             ~name:"read"
+             ~id:"c1"
+             ~images:[ png ]
+             "Read image file [image/png, 800x600]\n\
+              [Image downscaled from 4000x3000 to fit]"
+       });
+  H.event h (Message_update { partial; delta = Text_delta "A cat." });
+  H.event h (Message_end (assistant "A cat."));
+  H.event h (State (state ()));
+  H.show h;
+  [%expect
+    {|
+    session abc123 in /work. /help for commands, Esc aborts,
+    Ctrl+C twice quits.
+    > earlier question
+    earlier answer
+    > what is in these?
+    > [image: image/png, 34.2 KB]
+    > [image: image/jpeg, 512 B]
+    ⚙ read path=shot.png
+      Read image file [image/png, 800x600]
+      [Image downscaled from 4000x3000 to fit]
+      [image: image/png, 34.2 KB]
+    A cat.
+    ────────────────────────────────────────────────────────────
+    > ▏
+    …deepseek-flash  think:off  view:normal  ctx:0% 1.5k  $0.01
+    |}];
+  H.key h (Key.ctrl 'o');
+  H.show h;
+  [%expect
+    {|
+    earlier answer
+    > what is in these?
+    > [image: image/png, 34.2 KB]
+    > [image: image/jpeg, 512 B]
+    ⚙ read
+      {
+        path: "shot.png"
+      }
+      Read image file [image/png, 800x600]
+      [Image downscaled from 4000x3000 to fit]
+      [image: image/png, 34.2 KB]
+    A cat.
+    view: verbose — everything is shown
+    ────────────────────────────────────────────────────────────
+    > ▏
+    …deepseek-flash  think:off  view:verbose  ctx:0% 1.5k  $0.01
+    |}];
+  H.key h (Key.ctrl 'o');
+  H.show h;
+  [%expect
+    {|
+    > earlier question
+    earlier answer
+    > what is in these?
+    > [image: image/png, 34.2 KB]
+    > [image: image/jpeg, 512 B]
+    ⚙ read shot.png ✓ 2 lines, 1 image
+    A cat.
+    ────────────────────────────────────────────────────────────
+    > ▏
+    …deepseek-flash  think:off  view:quiet  ctx:0% 1.5k  $0.01
+    |}]
+;;
+
+let%expect_test
+    "images in reloaded history; an image-only message is labelled by its \
+     image in pickers"
+  =
+  let h = connected () in
+  H.reply ~quiet:true h Reload_messages "null";
+  H.reply
+    h
+    Initial_messages
+    {|[{"role":"user","text":"","images":[{"mime_type":"image/gif","data":"R0lGODlhAQABAAAAACw="}]},{"role":"assistant","content":[{"type":"tool_call","id":"c1","name":"read","arguments":"{\"path\":\"a.webp\"}"}],"stop_reason":{"type":"tool_use"},"usage":{"input":1,"output":2,"cache_read":0},"model":"m"},{"role":"tool_result","tool_call_id":"c1","tool_name":"read","text":"Read image file [image/webp, 2x2]","is_error":false,"images":[{"mime_type":"image/webp","data":"UklGRiQAAABXRUJQ"},{"mime_type":"image/webp","data":"UklGRg=="}]}]|};
+  H.show h;
+  [%expect
+    {|
+    > [image: image/gif, 14 B]
+    ⚙ read path=a.webp
+      Read image file [image/webp, 2x2]
+      [image: image/webp, 12 B]
+      [image: image/webp, 4 B]
+    ────────────────────────────────────────────────────────────
+    > ▏
+    …deepseek-flash  think:off  view:normal  ctx:0% 1.5k  $0.01
+    |}];
+  H.keys h "/verbosity quiet";
+  H.enter h;
+  H.show h;
+  [%expect
+    {|
+    > [image: image/gif, 14 B]
+    ⚙ read a.webp ✓ 1 line, 2 images
+    ────────────────────────────────────────────────────────────
+    > ▏
+    …deepseek-flash  think:off  view:quiet  ctx:0% 1.5k  $0.01
+    |}];
+  H.keys h "/rewind";
+  H.enter h;
+  H.reply
+    h
+    Entries_for_rewind
+    {|{"head":"u1","entries":[{"id":"u1","parent":null,"kind":"message","message":{"role":"user","text":"","images":[{"mime_type":"image/gif","data":"R0lGODlhAQABAAAAACw="}]}}]}|};
+  H.show h;
+  [%expect
+    {|
+    (Rpc (method_ get_entries) (params ()) (tag Entries_for_rewind))
+
+
+
+
+
+    > [image: image/gif, 14 B]
+    ⚙ read a.webp ✓ 1 line, 2 images
+    Rewind to  (1)
+    / ▏
+    ▸* [image: image/gif, 14 B]  #1
+    ────────────────────────────────────────────────────────────
+    …deepseek-flash  ctx:0% 1.5k  Enter selects · Esc closes
+    |}]
+;;
+
 let%expect_test "/verbosity with no argument opens argument completion" =
   let h = connected () in
   H.keys h "/verbosity";
@@ -1749,7 +1886,7 @@ let%expect_test "quiet hides intermediate text and thinking" =
   H.keys h "/verbosity quiet";
   H.enter h;
   H.event h (State (state ~running:true ()));
-  H.event h (Message_start (User "hi"));
+  H.event h (Message_start (user "hi"));
   H.event
     h
     (Message_update
@@ -2358,7 +2495,7 @@ let%expect_test "background subagent: runs while main is idle, survives a \
   H.keys h "go";
   H.enter h;
   H.event h (State (state ~running:true ()));
-  H.event h (Message_start (User "go"));
+  H.event h (Message_start (user "go"));
   let call =
     tool_call ~name:"subagent" ~arguments:{|{"task":"index the repo"}|} "c1"
   in
@@ -2426,7 +2563,7 @@ let%expect_test "background subagent: runs while main is idle, survives a \
   H.event
     h
     (State (state ~running:true ~subagents:[ "a1", "index the repo", true ] ()));
-  H.event h (Message_start (User "meanwhile"));
+  H.event h (Message_start (user "meanwhile"));
   say h "sure";
   H.event h (State (state ~subagents:[ "a1", "index the repo", true ] ()));
   H.next_agent h;
@@ -2499,7 +2636,7 @@ let%expect_test "background subagent: runs while main is idle, survives a \
   H.event h (State (state ~running:true ()));
   H.event
     h
-    (Message_start (User ("[subagent a1 failed] index the repo\n" ^ report)));
+    (Message_start (user ("[subagent a1 failed] index the repo\n" ^ report)));
   say h "it was cancelled";
   H.event h (State (state ()));
   H.keys h "/agents cancel 1";
@@ -2591,7 +2728,7 @@ let%expect_test "two parallel subagents: strip, live tails, focus cycling, Esc" 
     (Append_history go)
     |}];
   H.event h (State (state ~running:true ()));
-  H.event h (Message_start (User "go"));
+  H.event h (Message_start (user "go"));
   let call1 =
     tool_call
       ~name:"subagent"
@@ -2627,7 +2764,7 @@ let%expect_test "two parallel subagents: strip, live tails, focus cycling, Esc" 
     (Subagent
        { call_id = "c1"
        ; agent_id = "c1"
-       ; event = Message_start (User "find all auth code in the repository")
+       ; event = Message_start (user "find all auth code in the repository")
        });
   H.event
     h
@@ -4057,7 +4194,7 @@ let%expect_test "search: Ctrl+F, type, n, N, Esc" =
 let%expect_test "Ctrl+Up / Ctrl+Down jump between user messages at height 8" =
   let h = connected ~height:8 () in
   let add_exchange question answer =
-    H.event h (Message_start (User question));
+    H.event h (Message_start (user question));
     H.event h (Message_update { partial; delta = Text_delta answer });
     H.event h (Message_end (assistant answer))
   in
@@ -4178,6 +4315,7 @@ let%expect_test "bash result at Normal shows the head and tail" =
                  (List.init 20 ~f:(fun i -> sprintf "line %d" (i + 1)))
                ^ "\n"
            ; is_error = false
+           ; images = []
            }
        });
   H.show h;
@@ -4571,6 +4709,7 @@ let%expect_test "bash timeout is merged into the tool line" =
            ; tool_name = "bash"
            ; text = "partial output\n[timed out after 120s]"
            ; is_error = true
+           ; images = []
            }
        });
   H.show h;
@@ -4928,7 +5067,7 @@ let%expect_test "wide characters keep the editor cursor column" =
     …deepseek-flash  ctx:0% 1.5k  $0.01
     |}];
   H.enter h;
-  H.event h (Message_start (User "日本語🐹 wide"));
+  H.event h (Message_start (user "日本語🐹 wide"));
   H.event h (Message_update { partial; delta = Text_delta "emoji 🐹 and 日本語" });
   H.event h (Message_end (assistant "emoji 🐹 and 日本語"));
   H.show h;
@@ -5380,7 +5519,7 @@ let%expect_test "wheel scrolling moves the transcript a few lines; arrows \
   let h = connected ~height:10 () in
   H.reply ~quiet:true h History {|["older prompt","newer prompt"]|};
   List.iter (List.range 0 8) ~f:(fun i ->
-    H.event h (Message_start (User (sprintf "message %d" i))));
+    H.event h (Message_start (user (sprintf "message %d" i))));
   H.show h;
   [%expect
     {|
@@ -6005,7 +6144,7 @@ let%expect_test "scrolled up: the status says so, and Esc returns to the \
   =
   let h = connected ~height:8 () in
   List.iter (List.range 0 6) ~f:(fun i ->
-    H.event h (Message_start (User (sprintf "line %d" i))));
+    H.event h (Message_start (user (sprintf "line %d" i))));
   H.key h (Key.plain Page_up);
   H.show h;
   [%expect
@@ -6321,7 +6460,7 @@ let%expect_test "background jobs: !&, status line while idle, /jobs picker, \
   H.event
     h
     (Message_start
-       (User
+       (user
           "[job j1 killed] make test\n\
            ok parser\n\
            PASS parser\n\n\

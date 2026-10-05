@@ -5,6 +5,7 @@ module Queued = struct
   type t =
     { text : string
     ; attachments : string list
+    ; images : Image.t list
     }
   [@@deriving sexp_of]
 end
@@ -384,12 +385,14 @@ let tool_exec_output t ~exec_id ~chunk =
     Ok ()
 ;;
 
-let tool_exec_result t ~exec_id ~text ~is_error =
+let env t = t.env
+
+let tool_exec_result t ~exec_id result =
   match Hashtbl.find t.pending_execs exec_id with
   | None -> Or_error.errorf "no tool execution %S" exec_id
   | Some e ->
     Hashtbl.remove t.pending_execs exec_id;
-    Promise.resolve e.resolver { Tool_result.text; is_error };
+    Promise.resolve e.resolver result;
     Ok ()
 ;;
 
@@ -457,8 +460,8 @@ let resolve_dir_on t (host : Host.t) path =
       ~name:Host_ops.resolve_dir_op
       ~arguments:(`Object [ "path", `String path ])
   with
-  | { is_error = true; text } -> Or_error.errorf "%s: %s" host.name text
-  | { is_error = false; text } -> Ok text
+  | { is_error = true; text; _ } -> Or_error.errorf "%s: %s" host.name text
+  | { is_error = false; text; _ } -> Ok text
 ;;
 
 (* The session cwd is a property of the host, so switching hosts means
@@ -542,9 +545,10 @@ let loop_config t =
   }
 ;;
 
+(* The text with the attachments' [<file>] blocks, and their images. *)
 let with_attachments t text attachments =
   match attachments with
-  | [] -> text
+  | [] -> text, []
   | _ ->
     let block path =
       let result =
@@ -558,21 +562,22 @@ let with_attachments t text attachments =
           ~arguments:(`Object [ "path", `String path ])
       in
       match result with
-      | { is_error = true; text } ->
-        sprintf "<file path=%S error=%S/>" path text
-      | { is_error = false; text = content } ->
+      | { is_error = true; text; images = _ } ->
+        sprintf "<file path=%S error=%S/>" path text, []
+      | { is_error = false; text = content; images } ->
         let content =
           if String.is_suffix content ~suffix:"\n"
           then content
           else content ^ "\n"
         in
-        sprintf "<file path=%S>\n%s</file>" path content
+        sprintf "<file path=%S>\n%s</file>" path content, images
     in
-    text ^ "\n\n" ^ String.concat (List.map attachments ~f:block) ~sep:"\n\n"
+    let blocks, images = List.unzip (List.map attachments ~f:block) in
+    text ^ "\n\n" ^ String.concat blocks ~sep:"\n\n", List.concat images
 ;;
 
 let user_message t (q : Queued.t) =
-  let text = with_attachments t q.text q.attachments in
+  let text, attached = with_attachments t q.text q.attachments in
   let text =
     match t.environment_notes with
     | [] -> text
@@ -580,7 +585,7 @@ let user_message t (q : Queued.t) =
       t.environment_notes <- [];
       String.concat ~sep:"\n" notes ^ "\n\n" ^ text
   in
-  Message.user text
+  Message.user ~images:(q.images @ attached) text
 ;;
 
 let account_subagent t (event : Agent_event.t) =
@@ -742,7 +747,7 @@ let last_job_number messages =
       match (message : Message.t) with
       | Tool_result r when String.equal r.tool_name "bash" ->
         Option.to_list (number_after r.text ~prefix:"started job j")
-      | User { text } ->
+      | User { text; images = _ } ->
         List.filter_map
           (String.split_lines text)
           ~f:(number_after ~prefix:"[job j")
@@ -841,17 +846,17 @@ let create
   t
 ;;
 
-let prompt ?(attachments = []) t text =
+let prompt ?(attachments = []) ?(images = []) t text =
   if is_running t
   then
     Or_error.error_string "a run is already in progress; use steer or follow_up"
   else (
-    start_run t [ user_message t { text; attachments } ];
+    start_run t [ user_message t { text; attachments; images } ];
     Ok ())
 ;;
 
-let enqueue t queue ?(attachments = []) text =
-  let queued = { Queued.text; attachments } in
+let enqueue t queue ?(attachments = []) ?(images = []) text =
+  let queued = { Queued.text; attachments; images } in
   if is_running t
   then (
     Queue.enqueue queue queued;
@@ -859,10 +864,12 @@ let enqueue t queue ?(attachments = []) text =
   else start_run t [ user_message t queued ]
 ;;
 
-let steer ?attachments t text = enqueue t t.steer_queue ?attachments text
+let steer ?attachments ?images t text =
+  enqueue t t.steer_queue ?attachments ?images text
+;;
 
-let follow_up ?attachments t text =
-  enqueue t t.follow_up_queue ?attachments text
+let follow_up ?attachments ?images t text =
+  enqueue t t.follow_up_queue ?attachments ?images text
 ;;
 
 (* Queued text is restored verbatim: attachments are only inlined when the
@@ -1004,6 +1011,7 @@ let shell t ~command ~add_to_context =
                 ; tool_name = "shell"
                 ; text = result.text
                 ; is_error = result.is_error
+                ; images = []
                 }
             }));
     if add_to_context
@@ -1168,8 +1176,8 @@ let list_paths t ~prefix =
       ~name:Host_ops.list_paths_op
       ~arguments:(`Object [ "prefix", `String prefix ])
   with
-  | { is_error = true; text } -> Or_error.error_string text
-  | { is_error = false; text } -> Json.parse text
+  | { is_error = true; text; _ } -> Or_error.error_string text
+  | { is_error = false; text; _ } -> Json.parse text
 ;;
 
 let list_dirs ?host t ~prefix =
@@ -1198,8 +1206,8 @@ let list_dirs ?host t ~prefix =
            ~name:Host_ops.list_dirs_op
            ~arguments:(`Object [ "prefix", `String prefix ])
        with
-       | { is_error = true; text } -> Or_error.error_string text
-       | { is_error = false; text } -> Json.parse text))
+       | { is_error = true; text; _ } -> Or_error.error_string text
+       | { is_error = false; text; _ } -> Json.parse text))
 ;;
 
 let delete_session t ~path =
@@ -1248,7 +1256,7 @@ let export t ~format ?path () =
         ~arguments:
           (`Object [ "path", `String path; "content", `String (data ()) ])
     with
-    | { is_error = true; text } -> Or_error.error_string text
+    | { is_error = true; text; _ } -> Or_error.error_string text
     | { is_error = false; _ } ->
       Ok
         (if Filename.is_absolute path then path else Filename.concat t.cwd path))
