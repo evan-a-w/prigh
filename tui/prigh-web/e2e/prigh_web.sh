@@ -3,7 +3,8 @@
 # then accounts.mjs, the account switcher on a backend with users) in each
 # browser and diffs the output with prigh_web.expected. Needs node,
 # PLAYWRIGHT_MODULE (the playwright package's index.mjs) and
-# PLAYWRIGHT_BROWSERS_PATH, plus:
+# PLAYWRIGHT_BROWSERS_PATH, tmux (on the PATH or $PRIGH_TMUX) for the
+# terminal panel, plus:
 #   PRIGH_BACKEND        the backend binary (default: the dune build)
 #   PRIGH_PRIGH_WEB_ROOT the built site (default: the dune build)
 #   ENGINES              browsers to run (default: chromium firefox)

@@ -28,7 +28,9 @@ let act t action =
      | Add_account
      | Scroll_chat _
      | Jump_to_user_message _
-     | Scroll_to_bottom -> ());
+     | Scroll_to_bottom
+     | Focus_terminal
+     | Remember_terminal _ -> ());
     if not t.quiet then print_s [%sexp (command : App.Command.t)])
 ;;
 
@@ -210,7 +212,15 @@ let create ?(verbose = false) ?(sessions = "[]") ?(state = state_json ()) () =
 let node t ?selector () =
   let node =
     Node_helpers.unsafe_convert_exn
-      (View.view t.model ~inject:(fun _ -> Virtual_dom.Vdom.Effect.Ignore))
+      (View.view
+         t.model
+         ~inject:(fun _ -> Virtual_dom.Vdom.Effect.Ignore)
+         ~terminal:(fun target ->
+           Virtual_dom.Vdom.Node.div
+             ~attrs:[ Virtual_dom.Vdom.Attr.class_ "xterm-widget" ]
+             [ Virtual_dom.Vdom.Node.text
+                 (Sexp.to_string (Terminal.Target.sexp_of_t target))
+             ]))
   in
   match selector with
   | None -> [ node ]

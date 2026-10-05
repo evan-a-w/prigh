@@ -731,7 +731,9 @@ copy of the protocol types and the e2e test guards the contract.
   `Vdom.Node.widget` around `web-bin/terminal.js` (xterm.js and its fit
   addon, vendored in `web-bin/vendor/`): connect with the size, reset on
   open (the first message is the replay), reconnect with backoff, ping, and
-  a key after the shell exits starts a new one. Keys, pastes, wheel and
+  a key after the shell exits starts a new one. `mount`'s options let a
+  page show the connection's state itself (`onStatus`, as prigh-web
+  does), not focus at once, and set the theme. Keys, pastes, wheel and
   touches inside the panel are left to xterm.js. `web-bin/` is
   the js_of_ocaml executable plus `index.html`/`style.css`/`terminal.js`
   and the vendored xterm.js, assembled under `web-bin/site/` and installed
@@ -798,6 +800,20 @@ copy of the protocol types and the e2e test guards the contract.
       something running (`Model.ticking`); running jobs are then polled
       every 2s. `Reveal` scrolls the chat to a subagent's card through the
       `subagent` call ids from the top-level one down.
+    - The terminal panel: `Terminal` (open, the dragged height, a
+      generation that "New shell"/"Retry" bump, and the widget's last
+      `Status` with the key of the target it is about) and
+      `Terminal_view` (a header with the active host's name and directory
+      and the connection's state, a notice when the shell exited or could
+      not start — `Terminal.advice` says what to do — and the top bar's
+      toggle). The view does not know xterm.js: `View.view` takes the
+      widget as a function of a `Terminal.Target.t` (session, active host
+      and whether it is connected, the user acted as, generation), so
+      switching session, host or user, the host coming back or a new shell
+      is a new target and a new connection, and tests print the target.
+      Keys inside the panel (`Keys.Target.Terminal`) are the shell's, Esc
+      and Enter included, even with a dialog or a tool confirmation
+      showing; only Ctrl+` (by `code`) is ours, toggling the panel.
     - Around it: `Sidebar_view`/`Session_list` (fuzzy search, ages from
       `Rel_time`), `Topbar_view`, `Composer_view` with `Completion`
       (slash commands from `Slash`, their arguments, `@` paths via
@@ -837,8 +853,23 @@ copy of the protocol types and the e2e test guards the contract.
     left edge (`--agents-width`, remembered in local storage), keeps a
     shown transcript or job output at its end unless scrolled up, and
     performs `Reveal` (opening the folds the card is in).
-  - `bin/` — `main.bc.js` plus `index.html`, `style.css`, `chat.css` and
-    `agents.css`, assembled under
+    `Terminal_widget` is the terminal panel's xterm.js: a
+    `Vdom.Node.widget_of_module` around `web-bin/terminal.js` (loaded with
+    the vendored xterm.js, its fit addon and `xterm.css` the first time the
+    panel opens), connected to `Prigh_ui_web_app.Terminal_panel.url` with
+    the page's user and token and the target's `as_user`; a new target key
+    disposes the old connection (the backend keeps the shell) and mounts a
+    new one; `terminal.js` reports its state through `onStatus`, which
+    becomes `Action.Terminal_status`. It also resizes the panel from its
+    top edge (`--terminal-height`, remembered with whether the panel is
+    open, so a reload reopens it), and focuses the shell for
+    `Focus_terminal`. The document listeners leave keys (a capture
+    listener takes only Ctrl+`, before xterm.js), pastes and drops inside
+    the panel to it, and the chat's and agents panel's mutation observers
+    ignore xterm.js redrawing.
+  - `bin/` — `main.bc.js` plus `index.html`, `style.css`, `chat.css`,
+    `agents.css` and `terminal.css`, and `web-bin`'s `terminal.js` and
+    vendored xterm.js (copied by dune rules, not duplicated), assembled under
     `bin/site/` and installed to `share/prigh_tui/prigh-web` (the Nix
     wrapper exports it as `$PRIGH_PRIGH_WEB_ROOT`). The dev profile links
     separately compiled units with inline source maps (~49 MB, fast to
@@ -953,8 +984,13 @@ banner) and restarting on the same port (the page reconnects to the same
 session and runs another prompt), and the agents panel (a background
 subagent running a synchronous one and a background job: the list, the
 nested one in full via Alt+2 and its card revealed in the chat, the job's
-output, a card in the chat opening its agent), with no console or page
-errors. Then `accounts.mjs` runs the account switcher against `serve -tokens
+output, a card in the chat opening its agent), and the terminal panel (a
+real shell through tmux, on a private tmux server via `TMUX_TMPDIR` with
+`SHELL=/bin/sh` and a fixed prompt: typed output, Esc reaching `cat -v`,
+`stty size` matching xterm.js's rows before and after dragging the panel
+taller, Ctrl+` closing it with the focus back in the editor, the replay
+after reopening and after a reload, another session's shell and back, the
+phone sheet), with no console or page errors. Then `accounts.mjs` runs the account switcher against `serve -tokens
 alice=a,bob=b -superusers alice`: alice signs in, adds bob (each sees only
 their own sessions), switches back in one click, acts as bob and comes
 back, and signs bob out, leaving alice on the sign-in page.

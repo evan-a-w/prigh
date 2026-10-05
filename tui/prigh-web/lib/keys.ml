@@ -7,6 +7,7 @@ module Target = struct
     | Control
     | Session_search
     | Session of string
+    | Terminal
     | Page
   [@@deriving sexp_of]
 end
@@ -46,6 +47,9 @@ let help =
   ; "Alt+1…9", "follow subagent or job N in the agents panel"
   ; "Alt+] Alt+[", "the next or previous subagent or job"
   ; "Alt+0", "close the agents panel"
+  ; ( "Ctrl+`"
+    , "open or close the terminal (/terminal); in it, every other key goes to \
+       the shell" )
   ; "Tab (in /scoped-models)", "check or uncheck the highlighted model"
   ]
 ;;
@@ -74,8 +78,11 @@ let alt_letter t letter =
 let on_control t =
   match t.target with
   | Control -> true
-  | Editor _ | Field | Session_search | Session _ | Page -> false
+  | Editor _ | Field | Session_search | Session _ | Terminal | Page -> false
 ;;
+
+(* Ctrl+` by the key's position, whatever the layout types there. *)
+let terminal_toggle t = ctrl_only t && String.equal t.code "Backquote"
 
 let dialog_key (dialog : Dialog.t) t : App.Action.t option =
   match t.key, dialog with
@@ -142,7 +149,7 @@ let agents_key (m : App.Model.t) t : App.Action.t option =
          && (m.narrow
              ||
              match t.target with
-             | Editor _ -> false
+             | Editor _ | Terminal -> false
              | Field | Control | Session_search | Session _ | Page -> true) ->
     Some Agents_back
   | _ -> None
@@ -176,16 +183,21 @@ let session_key (m : App.Model.t) t id : App.Action.t option =
 ;;
 
 let handle (m : App.Model.t) t : App.Action.t option =
-  match m.confirms, m.dialog with
-  | c :: _, _ ->
+  match t.target, m.confirms, m.dialog with
+  (* Inside the terminal every key but Ctrl+` is the shell's, Esc and Enter
+     included, even with a dialog or a confirmation showing. *)
+  | Terminal, _, _ ->
+    Option.some_if (terminal_toggle t) App.Action.Toggle_terminal
+  | _, c :: _, _ ->
     (match t.key with
      | "Enter" when plain t && not (on_control t) ->
        Some (Respond_confirm { call_id = c.call_id; allow = true })
      | "Escape" -> Some (Respond_confirm { call_id = c.call_id; allow = false })
      | _ -> None)
-  | [], Some dialog -> dialog_key dialog t
-  | [], None ->
+  | _, [], Some dialog -> dialog_key dialog t
+  | _, [], None ->
     (match t.key with
+     | _ when terminal_toggle t -> Some Toggle_terminal
      | ("l" | "L") when command t -> Some Open_model_picker
      | ("k" | "K") when command t -> Some Open_sessions
      | ("b" | "B") when command t -> Some Toggle_sidebar
@@ -212,5 +224,5 @@ let handle (m : App.Model.t) t : App.Action.t option =
         | None, Editor { cursor } -> editor_key m t ~cursor
         | None, Session_search -> session_search_key t
         | None, Session id -> session_key m t id
-        | None, (Field | Control | Page) -> None))
+        | None, (Field | Control | Terminal | Page) -> None))
 ;;

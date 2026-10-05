@@ -110,6 +110,9 @@ module Command : sig
     | Jump_to_user_message of int
     (** the previous ([-1]) or next ([1]) user message in view *)
     | Scroll_to_bottom (** and follow new output again *)
+    | Focus_terminal (** the terminal panel's shell, once mounted *)
+    | Remember_terminal of bool
+    (** whether the panel is open, for [Reopen_terminal] after a reload *)
   [@@deriving sexp_of, equal]
 end
 
@@ -253,6 +256,15 @@ module Action : sig
         end *)
     | Jump_to_bottom
     | Run of string (** a slash command, e.g. from a button *)
+    | Toggle_terminal
+    | Reopen_terminal (** it was open before the page reloaded *)
+    | Close_terminal
+    | New_shell (** after the shell exited or failed to start *)
+    | Terminal_status of
+        { key : string (** the [Terminal.Target.key] it is about *)
+        ; status : Terminal.Status.t
+        } (** from the page's widget *)
+    | Set_terminal_height of int (** dragged, or remembered *)
   [@@deriving sexp_of]
 end
 
@@ -294,6 +306,7 @@ module Model : sig
     ; account : Accounts.Account.t option (** the one signed in *)
     ; users : string list option
       (** the users we may act as: [Some] for superusers *)
+    ; terminal : Terminal.t
     }
   [@@deriving sexp_of]
 

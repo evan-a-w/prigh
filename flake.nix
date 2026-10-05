@@ -213,6 +213,11 @@
           test -f ${prighWebRoot}/index.html
           test -f ${prighWebRoot}/main.bc.js
           test -f ${prighWebRoot}/style.css
+          test -f ${prighWebRoot}/terminal.css
+          test -f ${prighWebRoot}/terminal.js
+          test -f ${prighWebRoot}/xterm.js
+          test -f ${prighWebRoot}/xterm.css
+          test -f ${prighWebRoot}/addon-fit.js
           # the release build: whole-program, no source map
           test "$(stat -c %s ${prighWebRoot}/main.bc.js)" -lt 5000000
           touch "$out"
@@ -245,6 +250,7 @@
                 export PLAYWRIGHT_MODULE=${pkgs.playwright-test}/lib/node_modules/playwright/index.mjs
                 export PRIGH_BACKEND=${prighBackend}/bin/prigh
                 export PRIGH_PRIGH_WEB_ROOT=${prighWebRoot}
+                export PRIGH_TMUX=${pkgs.tmux}/bin/tmux
                 export HOME="$PWD/home"
                 mkdir -p "$HOME"
                 cp -r ${./tui/prigh-web/e2e} e2e

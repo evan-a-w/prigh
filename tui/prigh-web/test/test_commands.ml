@@ -74,6 +74,7 @@ let%expect_test "every command does something (none is unknown)" =
     /copy                      toast: Nothing to copy yet: no reply in this session.
     /btw                       toast: Usage: /btw <question> (asked aside; the run goes on)
     /abort                     rpc abort
+    /terminal                  (Remember_terminal true), Focus_terminal
     /agents                    agents panel
     /jobs                      agents panel
     /login                     rpc auth_status
@@ -133,6 +134,7 @@ let%expect_test "/help <command> and /hotkeys" =
     Alt+1…9 follow subagent or job N in the agents panel
     Alt+] Alt+[ the next or previous subagent or job
     Alt+0 close the agents panel
+    Ctrl+` open or close the terminal (/terminal); in it, every other key goes to the shell
     Tab (in /scoped-models) check or uncheck the highlighted model
     Left to the browser
     Ctrl+C / Ctrl+V / Ctrl+Z copy, paste, undo: the browser's (Esc stops a run)

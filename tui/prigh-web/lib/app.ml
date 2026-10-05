@@ -98,6 +98,8 @@ module Command = struct
     | Scroll_chat of int
     | Jump_to_user_message of int
     | Scroll_to_bottom
+    | Focus_terminal
+    | Remember_terminal of bool
   [@@deriving sexp_of, equal]
 end
 
@@ -237,6 +239,15 @@ module Action = struct
     | Chat_scrolled of { at_bottom : bool }
     | Jump_to_bottom
     | Run of string
+    | Toggle_terminal
+    | Reopen_terminal
+    | Close_terminal
+    | New_shell
+    | Terminal_status of
+        { key : string
+        ; status : Terminal.Status.t
+        }
+    | Set_terminal_height of int
   [@@deriving sexp_of]
 end
 
@@ -276,6 +287,7 @@ module Model = struct
     ; accounts : Accounts.Account.t list
     ; account : Accounts.Account.t option
     ; users : string list option
+    ; terminal : Terminal.t
     }
   [@@deriving sexp_of]
 
@@ -339,6 +351,7 @@ let init =
   ; accounts = []
   ; account = None
   ; users = None
+  ; terminal = Terminal.closed
   }
 ;;
 
@@ -731,6 +744,32 @@ let open_rename (m : Model.t) =
       Option.value s.session_name ~default:"")
   in
   open_dialog m ~focus:"dialog-input" (Rename name)
+;;
+
+(* ---- the terminal panel *)
+
+let with_terminal (m : Model.t) ~f = { m with terminal = f m.terminal }
+
+(* The shell takes the keyboard (Ctrl+` gives it back); on a phone the panel
+   covers the page, the sidebar's drawer included. *)
+let open_terminal (m : Model.t) =
+  ( { m with
+      terminal = { m.terminal with open_ = true }
+    ; sidebar_open = m.sidebar_open && not m.narrow
+    }
+  , (if m.terminal.open_ then [] else [ Command.Remember_terminal true ])
+    @ [ Command.Focus_terminal ] )
+;;
+
+let close_terminal (m : Model.t) =
+  ( with_terminal m ~f:(fun t -> { t with open_ = false })
+  , [ Command.Remember_terminal false; focus_editor ] )
+;;
+
+let new_shell (m : Model.t) =
+  ( with_terminal m ~f:(fun t ->
+      { t with open_ = true; generation = t.generation + 1 })
+  , [ Command.Focus_terminal ] )
 ;;
 
 (* ---- the agents panel *)
@@ -1582,6 +1621,9 @@ let run_command (m : Model.t) ({ name; rest } : Slash.Parsed.t) =
   | "btw", "" -> error m "Usage: /btw <question> (asked aside; the run goes on)"
   | "btw", question -> start_btw m question
   | "abort", _ -> m, [ rpc "abort" [] ~tag:Restored ]
+  | "terminal", "" -> open_terminal m
+  | "terminal", _ ->
+    error m "Usage: /terminal (Ctrl+` opens and closes it; × in its header too)"
   | "agents", "" -> open_agents m None
   | "agents", _ ->
     (match words with
@@ -2509,4 +2551,15 @@ let update (m : Model.t) (action : Action.t) =
     (match Slash.parse command with
      | Some parsed -> run_command { m with dialog = None } parsed
      | None -> m, [])
+  | Toggle_terminal ->
+    if m.terminal.open_ then close_terminal m else open_terminal m
+  | Reopen_terminal -> with_terminal m ~f:(fun t -> { t with open_ = true }), []
+  | Close_terminal -> close_terminal m
+  | New_shell -> new_shell m
+  | Terminal_status { key; status } ->
+    with_terminal m ~f:(fun t -> { t with status = Some (key, status) }), []
+  | Set_terminal_height px ->
+    ( with_terminal m ~f:(fun t ->
+        { t with height = Some (Int.max Terminal.min_height px) })
+    , [] )
 ;;
