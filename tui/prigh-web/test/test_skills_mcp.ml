@@ -473,48 +473,6 @@ let%expect_test "an invoked skill in the page: verbosity classes, /fork" =
     |}]
 ;;
 
-let%expect_test "Skill_message.parse" =
-  let show text =
-    print_s [%sexp (Skill_message.parse text : Skill_message.t option)]
-  in
-  show skill_text;
-  (* The arguments may mention the closing tag, and so may the body. *)
-  show
-    "<skill name=\"x\" location=\"/s/x/SKILL.md\">\n\
-     Write </skill> in HTML.\n\
-     </skill>\n\n\
-     why does\n\
-     </skill>\n\
-     close it?";
-  show "<skill name=\"x\" location=\"/s/x/SKILL.md\">\n</skill>";
-  (* Not an invocation. *)
-  show "<skill name=\"x\">\nbody\n</skill>";
-  show "<skill name=\"x\" location=\"/s/x/SKILL.md\">\nno end";
-  show "look at <skill name=\"x\" location=\"y\">\n</skill>";
-  show "<skill name=\"x";
-  [%expect
-    {|
-    (((name frontend-design)
-      (location /work/.claude/skills/frontend-design/SKILL.md)
-      (body
-        "References are relative to /work/.claude/skills/frontend-design.\
-       \n\
-       \n# Frontend design\
-       \n\
-       \nUse **bold** typography.")
-      (args "the pricing page")))
-    (((name x) (location /s/x/SKILL.md) (body "Write </skill> in HTML.")
-      (args  "why does\
-            \n</skill>\
-            \nclose it?")))
-    (((name x) (location /s/x/SKILL.md) (body "") (args "")))
-    ()
-    ()
-    ()
-    ()
-    |}]
-;;
-
 let mcp_json =
   {|{"servers":[
      {"name":"fs","source":"/home/u/.prigh/mcp.json","project":false,"status":"ready","tools":[

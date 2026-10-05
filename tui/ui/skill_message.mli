@@ -7,12 +7,13 @@ open! Core
 type t =
   { name : string
   ; location : string (** the skill's [SKILL.md] *)
-  ; body : string
+  ; body : string (** what the model was given, without the [<skill>] tags *)
   ; args : string
   }
 [@@deriving sexp_of, equal]
 
-(** [None] unless [text] is an expanded skill invocation. *)
+(** [None] unless [text] is an expanded skill invocation. The location may
+    contain quotes; the body and arguments are stripped. *)
 val parse : string -> t option
 
 (** What the user typed: [/skill:NAME ARGS]. *)

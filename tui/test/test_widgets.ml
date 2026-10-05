@@ -1233,9 +1233,15 @@ let%expect_test "skill messages: parsed back into name, location, body and \
     [ head ^ "References are relative to /p.\n\nRead the diff.\n</skill>"
     ; head ^ "Read the diff.\n</skill>\n\nfocus on app.ml\n\nand tests"
     ; head ^ "Quote:\n</skill>\nnot the end\n</skill>\n\nargs"
+    ; head
+      ^ "Write </skill> in HTML.\n</skill>\n\nwhy does\n</skill>\nclose it?"
     ; head ^ "</skill>"
+    ; head ^ "  Read the diff.\n\n</skill>\n\n  focus \n"
+    ; "<skill name=\"x\" location=\"/p/\"q\">/SKILL.md\">\nbody\n</skill>"
     ; head ^ "no closing tag"
     ; "<skill name=\"x\">\nbody\n</skill>"
+    ; "look at " ^ head ^ "body\n</skill>"
+    ; "<skill name=\"x"
     ; "/skill:review focus"
     ]
     ~f:(fun text ->
@@ -1269,9 +1275,29 @@ let%expect_test "skill messages: parsed back into name, location, body and \
     ((t (
        (name     review)
        (location /p/.prigh/skills/review/SKILL.md)
+       (body     "Write </skill> in HTML.")
+       (args     "why does\n</skill>\nclose it?")))
+     (invocation "/skill:review why does\n</skill>\nclose it?"))
+    ((t (
+       (name     review)
+       (location /p/.prigh/skills/review/SKILL.md)
        (body     "")
        (args     "")))
      (invocation /skill:review))
+    ((t (
+       (name     review)
+       (location /p/.prigh/skills/review/SKILL.md)
+       (body     "Read the diff.")
+       (args     focus)))
+     (invocation "/skill:review focus"))
+    ((t (
+       (name     x)
+       (location "/p/\"q\">/SKILL.md")
+       (body     body)
+       (args     "")))
+     (invocation /skill:x))
+    none
+    none
     none
     none
     none
@@ -1368,11 +1394,21 @@ let%expect_test "hand-over messages: parsed back into from, to and the error" =
        on with the task where it left off.]"
     ; "[prigh: a/b cannot continue (no, so what), so c/d takes over this \
        conversation from here. Carry on with the task where it left off.]"
+    ; "[prigh: a/x cannot continue (HTTP 429: {\"error\": \"usage limit \
+       reached (plan: pro), try later\"}), so b/y takes over this conversation \
+       from here. Carry on with the task where it left off.]"
+    ; "[prigh: a/x cannot continue (quota (daily), so wait; b/y takes over \
+       this conversation), so b/y takes over this conversation from here. \
+       Carry on with the task where it left off.]"
+    ; "[prigh: something else]"
     ; "[prigh: a/b cannot continue (x), so c/d takes over this conversation \
        from here."
     ; "[prigh: a/b cannot continue (x) and c/d takes over this conversation.]"
     ; "please: [prigh: a/b cannot continue (x), so c/d takes over this \
        conversation.]"
+    ; "[prigh: a/b cannot continue (x), so c d takes over this conversation.]"
+    ; "[prigh: a b cannot continue (x), so c/d takes over this conversation.]"
+    ; "[prigh:  cannot continue (x), so c/d takes over this conversation.]"
     ]
     ~f:(fun text ->
       match Handover_message.parse text with
@@ -1390,6 +1426,19 @@ let%expect_test "hand-over messages: parsed back into from, to and the error" =
      (to_   c/d)
      (error "no, so what"))
     ↪ handed over from a/b to c/d
+    ((from a/x)
+     (to_  b/y)
+     (error
+      "HTTP 429: {\"error\": \"usage limit reached (plan: pro), try later\"}"))
+    ↪ handed over from a/x to b/y
+    ((from a/x)
+     (to_  b/y)
+     (error "quota (daily), so wait; b/y takes over this conversation"))
+    ↪ handed over from a/x to b/y
+    none
+    none
+    none
+    none
     none
     none
     none

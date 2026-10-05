@@ -513,38 +513,6 @@ let%expect_test "a hand-over in /fork and /tree" =
     |}]
 ;;
 
-let%expect_test "Handover_message.parse" =
-  let show text =
-    print_s [%sexp (Handover_message.parse text : Handover_message.t option)]
-  in
-  show handover_text;
-  Option.iter (Handover_message.parse handover_text) ~f:(fun h ->
-    print_endline (Handover_message.summary h));
-  (* The error may say "), so " and " takes over this conversation" too. *)
-  show
-    "[prigh: a/x cannot continue (quota (daily), so wait; b/y takes over this \
-     conversation), so b/y takes over this conversation from here. Carry on \
-     with the task where it left off.]";
-  (* Not hand-overs. *)
-  show "[prigh: something else]";
-  show
-    "please: [prigh: a/x cannot continue (e), so b/y takes over this \
-     conversation";
-  show "[prigh: a/x cannot continue (e), so b y takes over this conversation";
-  [%expect
-    {|
-    (((from openai/gpt-6) (to_ anthropic/claude-opus-5-5)
-      (error
-       "HTTP 429: {\"error\": \"usage limit reached (plan: pro), try later\"} (usage limit reached)")))
-    ↪ handed over from openai/gpt-6 to anthropic/claude-opus-5-5 (HTTP 429: {"error": "usage limit reached (plan: pro), try later"} (usage limit reached))
-    (((from a/x) (to_ b/y)
-      (error "quota (daily), so wait; b/y takes over this conversation")))
-    ()
-    ()
-    ()
-    |}]
-;;
-
 let%expect_test "/help fallback and default-dir" =
   let h = H.create () in
   run h "/help fallback";

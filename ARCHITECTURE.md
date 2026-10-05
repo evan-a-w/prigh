@@ -746,7 +746,8 @@ copy of the protocol types and the e2e test guards the contract.
     tool host and directory (a stale key or reply fetches again or is
     dropped) and emptied on reloads, `/setusr` and reconnects.
     `Skill_message` parses the backend's expansion (`<skill name=…
-    location=…>`) back into name, file, body and arguments: `Transcript`
+    location=…>`) back into name, file, body and arguments (prigh-web uses
+    it too): `Transcript`
     renders it as a `Skill` item (`skill NAME` and the arguments; the body
     only in verbose), and `/fork` lists and restores it as
     `/skill:NAME ARGS`.
@@ -759,8 +760,8 @@ copy of the protocol types and the e2e test guards the contract.
     suggestions) puts the command back in the editor. `Autocomplete`
     completes `/fallback` word by word (the models not listed yet, `off`
     first) and `/default-dir` with `list_dirs` on the backend's host when
-    it runs tools. `Handover_message` parses the user message the backend
-    starts a hand-over run with (`[prigh: A cannot continue (ERROR), so B
+    it runs tools. `Handover_message` (prigh-web uses it too) parses the
+    user message the backend starts a hand-over run with (`[prigh: A cannot continue (ERROR), so B
     takes over …]`): `Transcript` renders it as a `Handover` item (`↪
     handed over from A to B`; the error only in verbose, since the failed
     reply above it shows it) and `/fork` lists it by that line.
@@ -939,9 +940,9 @@ copy of the protocol types and the e2e test guards the contract.
       reply for another place is ignored; switching user empties it), and
       builds `/skills`' picker; `Completion` offers the names right after
       `/skill:`, and `send` sends `/skill:NAME args` as a prompt (or steer
-      or follow-up) for the backend to expand. `Skill_message` parses the
-      expanded user message (`<skill name location>…</skill>` then the
-      arguments), which `Chat_view` renders as a folded card above the
+      or follow-up) for the backend to expand. `Prigh_ui.Skill_message` (shared with
+      the TUI) parses the expanded user message (`<skill name
+      location>…</skill>` then the arguments), which `Chat_view` renders as a folded card above the
       arguments and `Session_tree` labels as typed. `Mcp_servers` turns
       `list_mcp`/`mcp_approve` replies (`Mcp_list`) into `/mcp`'s picker
       (servers to act on first; the problems under it, in `Dialog_view`),
@@ -953,9 +954,10 @@ copy of the protocol types and the e2e test guards the contract.
       names resolved to keys). `Completion`'s `Models` argument completes
       the word under the cursor, leaving out the models already listed;
       `Backend_directory` is `list_dirs` with `host: backend`.
-      `Handover_message` parses the user message the backend starts the
-      next model's run with, which `Chat_view` renders as a hand-over line
-      and `Session_tree` labels the same way.
+      `Prigh_ui.Handover_message` (shared with the TUI) parses the user
+      message the backend starts the next model's run with, which
+      `Chat_view` renders as a hand-over line with the error and
+      `Session_tree` labels the same way.
   - `app/` (`prigh_web_app`) — `Web_main.run`: connects a `Ws_transport`
     to `?backend=` or the page's `/ws`, sends `hello` with the active
     account (`prigh.user`/`prigh.token`, `web-app/`'s `Login`) and
