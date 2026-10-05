@@ -1,0 +1,112 @@
+/* The terminal panel: a shell docked under the chat and the composer (a
+   sheet over the page on phones). Its height is --terminal-height, set by
+   dragging its top edge. xterm.css comes with xterm.js, on first use. */
+
+.terminal-panel {
+  position: relative;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  height: var(--terminal-height, 38%);
+  min-height: 120px;
+  max-height: calc(100% - 160px);
+  background: #0b0d11;
+  border-top: 1px solid var(--border);
+  animation: terminal-in 0.16s ease-out;
+}
+@keyframes terminal-in { from { opacity: 0; transform: translateY(12px); } }
+
+.terminal-resize {
+  position: absolute;
+  top: -5px;
+  left: 0;
+  right: 0;
+  height: 9px;
+  cursor: row-resize;
+  z-index: 2;
+  touch-action: none;
+}
+.terminal-resize:hover, body.resizing-terminal .terminal-resize {
+  background: linear-gradient(to bottom, transparent 4px, var(--accent-2) 4px, var(--accent-2) 6px, transparent 6px);
+}
+body.resizing-terminal { cursor: row-resize; user-select: none; }
+body.resizing-terminal .terminal-body { pointer-events: none; }
+
+.terminal-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 36px;
+  padding: 2px 6px 2px 12px;
+  background: var(--panel);
+  border-bottom: 1px solid var(--border);
+  font-size: 12.5px;
+}
+.terminal-icon { width: 14px; height: 14px; color: var(--accent); }
+.terminal-machine { font-weight: 600; white-space: nowrap; }
+.terminal-cwd { color: var(--muted); font: 12px var(--mono); min-width: 0; }
+.terminal-state { color: var(--yellow); font-size: 12px; white-space: nowrap; }
+.terminal-state.failed { color: var(--red); }
+.terminal-close { margin-left: auto; width: 28px; height: 28px; }
+
+.terminal-body {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  padding: 6px 0 0 10px;
+}
+.terminal-host { position: relative; flex: 1; min-height: 0; overflow: hidden; }
+.terminal-host .xterm { height: 100%; }
+.terminal-host .xterm-viewport {
+  background-color: #0b0d11 !important;
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-2) transparent;
+}
+.terminal-waiting { color: var(--muted); padding: 10px 2px; }
+
+.terminal-notice {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  background: var(--panel-2);
+  border-top: 1px solid var(--border-2);
+  color: var(--muted);
+  font-size: 13px;
+  z-index: 3;
+}
+.terminal-notice.failed {
+  top: 0;
+  flex-direction: column;
+  justify-content: center;
+  text-align: center;
+  gap: 12px;
+  border-top: 0;
+  background: #0b0d11ee;
+}
+.terminal-notice.failed > div { display: flex; flex-direction: column; gap: 4px; max-width: 560px; }
+.terminal-error { color: #ffc2c2; font: 12.5px var(--mono); overflow-wrap: anywhere; }
+.terminal-advice { color: var(--fg); }
+
+.terminal-toggle.open { color: var(--accent); background: var(--accent-bg); }
+
+/* Phones: a full-screen sheet, under dialogs. */
+.app.narrow .terminal-panel {
+  position: fixed;
+  inset: 0;
+  height: auto;
+  max-height: none;
+  z-index: 35;
+  border-top: 0;
+  animation: terminal-up 0.2s ease-out;
+}
+.app.narrow .terminal-resize { display: none; }
+.app.narrow .terminal-head { min-height: 50px; padding-left: 14px; }
+.app.narrow .terminal-body { padding: 4px 0 0 6px; }
+@keyframes terminal-up { from { opacity: 0; transform: translateY(24px); } }

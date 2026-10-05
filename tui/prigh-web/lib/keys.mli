@@ -1,8 +1,9 @@
 open! Core
 
 (** What a key does. The page listens on the whole document and asks [handle]:
-    dialogs own the keyboard, then the completion popup, then the editor; a few
-    shortcuts work everywhere. *)
+    the terminal panel's keys are the shell's, then dialogs own the keyboard,
+    then the completion popup, then the editor; a few shortcuts work
+    everywhere. *)
 
 module Target : sig
   type t =
@@ -11,6 +12,7 @@ module Target : sig
     | Control (** a button, link or fold: Enter and Space are its own *)
     | Session_search (** the sidebar's search *)
     | Session of string (** a session's row in the sidebar, by id *)
+    | Terminal (** the terminal panel: its keys are the shell's but Ctrl+` *)
     | Page
   [@@deriving sexp_of]
 end

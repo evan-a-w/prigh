@@ -2,7 +2,8 @@
 // backend's /terminal, whose protocol is described in
 // backend/lib/terminals.mli. The Bonsai app mounts it through
 // [window.prighTerminal.mount] (see tui/web-app/terminal_panel.ml), and so
-// does pi-web (pi-web/src/components/terminal-panel.tsx).
+// do prigh-web (tui/prigh-web/app/terminal_widget.ml) and pi-web
+// (pi-web/src/components/terminal-panel.tsx).
 "use strict";
 
 (() => {
@@ -20,16 +21,31 @@
   /**
    * @param {HTMLElement} host
    * @param {string} url ws(s)://.../terminal?token=...&session=...
+   * @param {{
+   *   onStatus?: (status: "connecting" | "open" | "reconnecting" | "exited"
+   *     | "failed", message?: string) => void,
+   *   focus?: boolean,
+   *   theme?: object,
+   * }} [options] with [onStatus] the caller shows the connection's state
+   *   (otherwise a line over the terminal does); [focus] (default true)
+   *   focuses the terminal once it is open; [theme] is xterm.js's.
    * @returns {{ focus(): void, dispose(): void }}
    */
-  const mount = (host, url) => {
-    const status = document.createElement("div");
-    status.className = "terminal-status";
-    host.appendChild(status);
-    const setStatus = text => {
-      status.textContent = text;
-      status.hidden = text === "";
+  const mount = (host, url, options = {}) => {
+    let status;
+    if (!options.onStatus) {
+      status = document.createElement("div");
+      status.className = "terminal-status";
+      host.appendChild(status);
+    }
+    const report = (state, text, message) => {
+      if (options.onStatus) options.onStatus(state, message);
+      else {
+        status.textContent = text;
+        status.hidden = text === "";
+      }
     };
+    let focusWhenOpen = options.focus ?? true;
 
     const encoder = new TextEncoder();
     let term;
@@ -54,13 +70,14 @@
       target.searchParams.set("rows", String(term.rows));
       const socket = new WebSocket(target);
       ws = socket;
+      if (retryMs === 250) report("connecting", "");
       socket.binaryType = "arraybuffer";
       socket.onopen = () => {
         // The first message is a replay of the whole screen.
         term.reset();
         retryMs = 250;
         lastHeard = Date.now();
-        setStatus("");
+        report("open", "");
       };
       socket.onmessage = event => {
         lastHeard = Date.now();
@@ -71,10 +88,10 @@
         const message = JSON.parse(event.data);
         if (message.type === "exit") {
           state = "exited";
-          setStatus("shell exited — press a key for a new one");
+          report("exited", "shell exited — press a key for a new one");
         } else if (message.type === "error") {
           state = "failed";
-          setStatus(`terminal unavailable: ${message.message}`);
+          report("failed", `terminal unavailable: ${message.message}`, message.message);
         }
       };
       socket.onclose = () => {
@@ -85,7 +102,7 @@
     };
 
     const reconnect = () => {
-      setStatus("reconnecting…");
+      report("reconnecting", "reconnecting…");
       clearTimeout(retryTimer);
       retryTimer = setTimeout(connect, retryMs);
       retryMs = Math.min(retryMs * 2, MAX_RETRY_MS);
@@ -111,7 +128,11 @@
           '"JetBrains Mono", "Fira Code", Menlo, Consolas, "DejaVu Sans Mono", monospace',
         fontSize: 14,
         scrollback: 5000,
-        theme: { background: "#1e1e1e", foreground: "#d4d4d4", cursor: "#d4d4d4" },
+        theme: options.theme ?? {
+          background: "#1e1e1e",
+          foreground: "#d4d4d4",
+          cursor: "#d4d4d4",
+        },
       });
       fit = new FitAddon.FitAddon();
       term.loadAddon(fit);
@@ -120,7 +141,6 @@
       term.onData(data => {
         if (state === "exited") {
           state = "open";
-          setStatus("");
           connect();
         } else {
           send(encoder.encode(data));
@@ -136,13 +156,16 @@
       observer.observe(host);
       pingTimer = setInterval(heartbeat, PING_MS);
       connect();
-      term.focus();
+      if (focusWhenOpen) term.focus();
     };
 
     whenConnected(host, start);
 
     return {
-      focus: () => term?.focus(),
+      focus: () => {
+        if (term) term.focus();
+        else focusWhenOpen = true;
+      },
       dispose: () => {
         state = "disposed";
         clearTimeout(retryTimer);

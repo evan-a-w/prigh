@@ -241,6 +241,8 @@ let perform client settings ctx (model : App.Model.t) (command : App.Command.t) 
         ()
     | Jump_to_user_message direction ->
       Effect.of_sync_fun jump_to_user_message direction
+    | Focus_terminal -> Effect.of_sync_fun Terminal_widget.focus ()
+    | Remember_terminal open_ -> Effect.of_sync_fun Terminal_widget.remember open_
   in
   Bonsai.Apply_action_context.schedule_event ctx eff
 ;;
@@ -273,6 +275,25 @@ let autosize () =
    just before must not answer it. *)
 let confirm_shown = ref Time_ns.epoch
 
+let terminal
+      (settings : Settings.t)
+      ~inject
+      (target : Prigh_web.Terminal.Target.t)
+  =
+  let key = Prigh_web.Terminal.Target.key target in
+  Terminal_widget.view
+    ~url:
+      (Prigh_ui_web_app.Terminal_panel.url
+         ~backend:settings.backend
+         ~user:settings.login.user
+         ~as_user:target.as_user
+         ~token:settings.login.password
+         ~session:(Some target.session))
+    ~key
+    ~on_status:(fun status ->
+      inject (App.Action.Terminal_status { key; status }))
+;;
+
 let component client settings ~current (local_ graph) =
   let model, inject =
     Bonsai.state_machine
@@ -296,7 +317,10 @@ let component client settings ~current (local_ graph) =
   let open Bonsai.Let_syntax in
   let%arr model
   and inject in
-  { Result_.view = Prigh_web.View.view model ~inject; inject }
+  { Result_.view =
+      Prigh_web.View.view model ~inject ~terminal:(terminal settings ~inject)
+  ; inject
+  }
 ;;
 
 let supported_images = [ "image/png"; "image/jpeg"; "image/gif"; "image/webp" ]
@@ -348,6 +372,7 @@ let read_images ~schedule (files : File.fileList Js.t) =
 let key_target (ev : Dom_html.keyboardEvent Js.t) : Prigh_web.Keys.Target.t =
   match Js.Opt.to_option ev##.target with
   | None -> Page
+  | Some el when Terminal_widget.contains el -> Terminal
   | Some el ->
     (match Dom_html.tagged el with
      | Textarea t when String.equal (Js.to_string t##.id) "editor" ->
@@ -435,9 +460,25 @@ let install_listeners ~schedule ~current =
          (Js.bool capture)
        : Dom_html.event_listener_id)
   in
+  let in_terminal (ev : #Dom_html.event Js.t) =
+    Js.Opt.case ev##.target (fun () -> false) Terminal_widget.contains
+  in
+  (* Before xterm.js, which keeps the keys it handles to itself: only Ctrl+`
+     is ours there. *)
+  listen ~capture:true Dom_html.Event.keydown (fun ev ->
+    match
+      if in_terminal ev then Prigh_web.Keys.handle !current (key ev) else None
+    with
+    | Some action ->
+      Dom.preventDefault ev;
+      Dom_html.stopPropagation ev;
+      current := fst (App.update !current action);
+      schedule action;
+      Js._false
+    | None -> Js._true);
   listen Dom_html.Event.keydown (fun ev ->
     (* An IME composing text owns its keys. *)
-    if Js.to_bool (Js.Unsafe.coerce ev)##.isComposing
+    if Js.to_bool (Js.Unsafe.coerce ev)##.isComposing || in_terminal ev
     then Js._true
     else if
       (not (List.is_empty (!current : App.Model.t).confirms))
@@ -462,7 +503,7 @@ let install_listeners ~schedule ~current =
     schedule (App.Action.Set_narrow (narrow ())));
   listen Dom_html.Event.paste (fun (ev : Dom_html.clipboardEvent Js.t) ->
     Js.Opt.iter ev##.clipboardData (fun data ->
-      if data##.files##.length > 0
+      if data##.files##.length > 0 && not (in_terminal ev)
       then (
         Dom.preventDefault ev;
         read_images ~schedule data##.files));
@@ -472,11 +513,14 @@ let install_listeners ~schedule ~current =
     Js._true);
   listen Dom_html.Event.drop (fun (ev : Dom_html.dragEvent Js.t) ->
     Dom.preventDefault ev;
-    Js.Opt.iter ev##.dataTransfer (fun data ->
-      read_images ~schedule data##.files);
+    if not (in_terminal ev)
+    then
+      Js.Opt.iter ev##.dataTransfer (fun data ->
+        read_images ~schedule data##.files);
     Js._true);
   Chat_listeners.install ();
   Agents_listeners.install ~schedule;
+  Terminal_widget.install ~schedule;
   (* The chat follows new output unless the user has scrolled up. The page
      hears of a change of mind ([Chat_scrolled]) to show the jump button. *)
   let reported = ref true in
@@ -537,8 +581,9 @@ let install_listeners ~schedule ~current =
     Js._true);
   let observer =
     new%js MutationObserver.mutationObserver
-      (Js.wrap_callback (fun _ _ ->
-         if !following then Option.iter (chat_element ()) ~f:follow_to_end))
+      (Js.wrap_callback (fun records _ ->
+         if !following && not (Terminal_widget.only_inside records)
+         then Option.iter (chat_element ()) ~f:follow_to_end))
   in
   let options = MutationObserver.empty_mutation_observer_init () in
   options##.childList := true;

@@ -6,7 +6,7 @@ let%expect_test
   =
   let h = H.create () in
   H.text h ~selector:".controls";
-  [%expect {| (Claude Opus 5.5) (on) |}];
+  [%expect {| (Claude Opus 5.5) (on) (Terminal (Ctrl+`)) |}];
   H.key h "l" ~ctrl:true;
   H.text h ~selector:".modal";
   [%expect
@@ -154,7 +154,7 @@ let%expect_test "thinking: a picker and /thinking, when the model supports it" =
           ~fields:[ "model", deepseek; "thinking", `String "off" ]
           ()));
   H.text h ~selector:".controls";
-  [%expect {| (DeepSeek Chat) |}];
+  [%expect {| (DeepSeek Chat) (Terminal (Ctrl+`)) |}];
   H.type_ h "/thinking high";
   H.act h Send;
   H.text h ~selector:".toast.error";

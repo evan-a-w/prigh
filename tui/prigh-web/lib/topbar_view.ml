@@ -88,6 +88,7 @@ let view (m : App.Model.t) ~inject =
                  ; icon ~cls:"chevron" Chevron
                  ]
              else Node.none)
+          ; Terminal_view.toggle m ~inject
           ; Agents_view.toggle m ~inject
           ]
       ]

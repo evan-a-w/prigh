@@ -103,6 +103,7 @@ let%expect_test "help lists every key and command" =
     Alt+1…9 follow subagent or job N in the agents panel
     Alt+] Alt+[ the next or previous subagent or job
     Alt+0 close the agents panel
+    Ctrl+` open or close the terminal (/terminal); in it, every other key goes to the shell
     Tab (in /scoped-models) check or uncheck the highlighted model
     Commands
     /help [command] show commands and keys, or a command's usage
@@ -130,6 +131,7 @@ let%expect_test "help lists every key and command" =
     /copy copy the last reply to the clipboard
     /btw <question> ask a side question without interrupting the run (not added to the conversation)
     /abort stop the current run
+    /terminal open a shell where the tools run, in the session's directory (Ctrl+`)
     /agents [n|id|cancel <n|id>] follow subagents and background jobs in the agents panel, or cancel one
     /jobs [id|kill <id>] background jobs in the agents panel: list them, show or kill one
     /login [provider] log in to a model provider (or /login custom)

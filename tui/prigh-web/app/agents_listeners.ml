@@ -111,19 +111,22 @@ let install_follow () =
     | _ -> ());
   let observer =
     new%js MutationObserver.mutationObserver
-      (Js.wrap_callback (fun _ _ ->
-         Option.iter (body ()) ~f:(fun body ->
-           let now_shown =
-             Js.Opt.to_option
-               (body##querySelector (Js.string ".agents-detail[data-shown]"))
-             |> Option.bind ~f:(fun el -> attribute el "data-shown")
-           in
-           if not (Option.equal String.equal now_shown !shown)
-           then (
-             shown := now_shown;
-             stick := true);
-           if Option.is_some now_shown && !stick
-           then body##.scrollTop := Js.float (Float.of_int body##.scrollHeight))))
+      (Js.wrap_callback (fun records _ ->
+         if not (Terminal_widget.only_inside records)
+         then
+           Option.iter (body ()) ~f:(fun body ->
+             let now_shown =
+               Js.Opt.to_option
+                 (body##querySelector (Js.string ".agents-detail[data-shown]"))
+               |> Option.bind ~f:(fun el -> attribute el "data-shown")
+             in
+             if not (Option.equal String.equal now_shown !shown)
+             then (
+               shown := now_shown;
+               stick := true);
+             if Option.is_some now_shown && !stick
+             then
+               body##.scrollTop := Js.float (Float.of_int body##.scrollHeight))))
   in
   let options = MutationObserver.empty_mutation_observer_init () in
   options##.childList := true;
