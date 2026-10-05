@@ -293,10 +293,20 @@ when the backend refuses it; `/agents` and `/jobs` open the agents panel
 (above); `/btw` answers in a panel above the composer (Esc closes it);
 `/verbosity` (Ctrl+O cycles) hides tool output and thinking (quiet) or
 unfolds everything (verbose); `/copy` (Ctrl+X with nothing selected) copies
-the last reply. Ctrl+P/Alt+P cycle the scoped models, Alt+T the thinking
-level (Ctrl+T is the browser's), Alt+↑ takes back a queued message, Ctrl+↑/↓
-jump between your messages; `/help` and `/hotkeys` also list the TUI's keys
-that the browser keeps (Ctrl+C, Ctrl+Z, Ctrl+F, Ctrl+R, $EDITOR's Ctrl+G)
+the last reply. `/skills` is a picker of the skills where the tools run
+(name, description, directory) whose Enter puts `/skill:name ` in the
+editor for you to add the arguments; typing `/skill:` completes their
+names (listed once per session, directory and tool host). A message that
+invoked a skill shows as a folded `skill name` card (its location and
+instructions; verbose unfolds it) above the arguments you typed, and
+`/fork` and `/tree` show it as typed. `/mcp` lists the MCP servers with
+their status, tool count or error and config file, the configuration's
+problems under them: Enter approves (and starts) a project's server,
+restarts a failed one, or lists a ready one's tools; `/mcp reconnect`
+restarts the failed ones and reports. Ctrl+P/Alt+P cycle the scoped
+models, Alt+T the thinking level (Ctrl+T is the browser's), Alt+↑ takes
+back a queued message, Ctrl+↑/↓ jump between your messages; `/help` and
+`/hotkeys` also list the TUI's keys that the browser keeps (Ctrl+C, Ctrl+Z, Ctrl+F, Ctrl+R, $EDITOR's Ctrl+G)
 and what to use instead, and `/quit` says to close the tab.
 
 The account at the bottom of the sidebar (also in the status line) opens the
