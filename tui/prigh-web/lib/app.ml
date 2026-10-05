@@ -1732,7 +1732,17 @@ let reply (m : Model.t) (tag : Reply_tag.t) result =
       with_agents m ~f:(fun a -> Agents.set_agents a agents), [])
   | Jobs, Ok json ->
     decode m json (decode_list Job_info.of_json) ~f:(fun jobs ->
-      with_agents m ~f:(fun a -> Agents.set_jobs a ~now:(now_of m) jobs), [])
+      let before = m.agents in
+      let m =
+        with_agents m ~f:(fun a -> Agents.set_jobs a ~now:(now_of m) jobs)
+      in
+      (* The shown job's last lines, once it has exited. *)
+      ( m
+      , match m.agents.selected with
+        | Some (Job id as job)
+          when Agents.running before job && not (Agents.running m.agents job)
+          -> [ job_output id ]
+        | _ -> [] ))
   | Job_output id, Ok json ->
     (match field json "text", m.agents.selected with
      | Some (`String text), Some (Job shown) when String.equal id shown ->
