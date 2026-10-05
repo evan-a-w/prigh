@@ -9,6 +9,11 @@ open Prigh_client
     [terminal_closed] requests on the client. *)
 type t
 
+(** A fresh random host id ([host-] and 16 hex digits), for [hello]'s
+    [host_id]: the same on every connection of this process, so the backend
+    knows us again when we reconnect. *)
+val new_host_id : unit -> string
+
 (** Spawns [backend tool-host]. *)
 val spawn_worker : backend:string -> unit -> Transport.t Deferred.Or_error.t
 
