@@ -303,7 +303,7 @@ let%expect_test "slash commands: the popup, arguments, running, unknown ones" =
     /clone copy this session into a new one
     /cd <path> change the working directory
     /abort stop the current run
-    /agents show background subagents and jobs
+    /agents [n|id] follow subagents and background jobs
     /login [provider] log in to a model provider (or /login custom)
     /logout [provider] remove a provider's login
     /auth show which providers are logged in

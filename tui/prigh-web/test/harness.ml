@@ -21,7 +21,8 @@ let act t action =
      | Expire_toast _
      | Focus _
      | Save_history _
-     | Sign_out -> ());
+     | Sign_out
+     | Reveal _ -> ());
     if not t.quiet then print_s [%sexp (command : App.Command.t)])
 ;;
 

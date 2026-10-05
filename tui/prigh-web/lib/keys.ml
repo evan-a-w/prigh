@@ -31,6 +31,9 @@ let help =
   ; "Ctrl+L", "switch model"
   ; "Ctrl+K", "search sessions"
   ; "Ctrl+B", "show or hide the sidebar"
+  ; "Alt+1…9", "follow subagent or job N in the agents panel"
+  ; "Alt+] Alt+[", "the next or previous subagent or job"
+  ; "Alt+0", "close the agents panel"
   ]
 ;;
 
@@ -76,6 +79,29 @@ let editor_key (m : App.Model.t) t ~cursor : App.Action.t option =
   | _ -> None
 ;;
 
+(* The agents panel's keys. Alt+digit (not Shift+Tab, which moves the focus
+   back, as the TUI does) and only with Alt alone: AltGr is Ctrl+Alt on
+   Windows, and macOS's Option types characters, so its keys are left to it. *)
+let agents_key (m : App.Model.t) t : App.Action.t option =
+  let alt = t.alt && not (t.ctrl || t.meta || t.shift) in
+  let listed = List.length (Agents.listed m.agents) in
+  match t.key with
+  | "0" when alt && m.agents.open_ -> Some Toggle_subagents
+  | ("1" | "2" | "3" | "4" | "5" | "6" | "7" | "8" | "9") when alt ->
+    let n = Int.of_string t.key in
+    Option.some_if (n <= listed) (App.Action.Focus_agent n)
+  | "]" when alt && listed > 0 -> Some (Cycle_agent 1)
+  | "[" when alt && listed > 0 -> Some (Cycle_agent (-1))
+  | "Escape"
+    when m.agents.open_
+         && (m.narrow
+             ||
+             match t.target with
+             | Editor _ -> false
+             | Field | Page -> true) -> Some Agents_back
+  | _ -> None
+;;
+
 let handle (m : App.Model.t) t : App.Action.t option =
   match m.confirms, m.dialog with
   | c :: _, _ ->
@@ -91,7 +117,8 @@ let handle (m : App.Model.t) t : App.Action.t option =
      | ("b" | "B") when command t -> Some Toggle_sidebar
      | "Escape" when m.narrow && m.sidebar_open -> Some Toggle_sidebar
      | _ ->
-       (match t.target with
-        | Editor { cursor } -> editor_key m t ~cursor
-        | Field | Page -> None))
+       (match agents_key m t, t.target with
+        | Some action, _ -> Some action
+        | None, Editor { cursor } -> editor_key m t ~cursor
+        | None, (Field | Page) -> None))
 ;;

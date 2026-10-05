@@ -118,6 +118,7 @@ let perform client settings ctx (command : App.Command.t) =
     | Focus id -> Effect.of_sync_fun focus id
     | Save_history entries -> Effect.of_sync_fun save_history entries
     | Sign_out -> Effect.of_sync_fun sign_out ()
+    | Reveal path -> Effect.of_sync_fun Agents_listeners.reveal path
   in
   Bonsai.Apply_action_context.schedule_event ctx eff
 ;;
@@ -293,6 +294,7 @@ let install_listeners ~schedule ~current =
       read_images ~schedule data##.files);
     Js._true);
   Chat_listeners.install ();
+  Agents_listeners.install ~schedule;
   (* The chat follows new output unless the user has scrolled up. *)
   let stick = ref true in
   let chat () = Dom_html.getElementById_opt "chat" in
@@ -417,6 +419,9 @@ let run_app (settings : Settings.t) =
        let tick () = schedule (App.Action.Tick (Time_ns.now ())) in
        tick ();
        Clock_ns.every (Time_ns.Span.of_sec 30.) tick;
+       Clock_ns.every (Time_ns.Span.of_sec 1.) (fun () ->
+         if App.Model.ticking !current
+         then schedule (App.Action.Clock (Time_ns.now ())));
        install_listeners ~schedule ~current;
        don't_wait_for
          (Pipe.iter_without_pushback

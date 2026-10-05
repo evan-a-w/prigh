@@ -517,15 +517,12 @@ kbd {
 .login-waiting { display: flex; align-items: center; gap: 8px; color: var(--muted); }
 .login-failed { color: var(--red); background: var(--red-bg); border: 1px solid var(--red-border); border-radius: 8px; padding: 8px 12px; }
 
-.auth-list, .bg-list { display: flex; flex-direction: column; }
-.auth-row, .bg-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 8px 0; }
-.auth-row + .auth-row, .bg-row + .bg-row { border-top: 1px solid var(--border); }
-.auth-name, .bg-text { display: flex; flex-direction: column; min-width: 0; }
+.auth-list { display: flex; flex-direction: column; }
+.auth-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 8px 0; }
+.auth-row + .auth-row { border-top: 1px solid var(--border); }
+.auth-name { display: flex; flex-direction: column; min-width: 0; }
 .auth-name .picker-detail { margin: 0; white-space: normal; overflow-wrap: anywhere; }
 .auth-buttons { display: flex; gap: 6px; flex-shrink: 0; }
-.bg-title { font-family: var(--mono); font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.bg-status { font-size: 12px; color: var(--muted); }
-.bg-status.running { color: var(--green); }
 
 /* Toasts */
 

@@ -24,7 +24,11 @@ module Reply_tag : sig
     | Sessions
     | Models
     | Reload_state (** the client's session changed: fetch its state *)
-    | Subagent of string (** [get_subagent] for this [subagent] call *)
+    | Subagent of string
+    (** [get_subagent] for this [subagent] call or agent id *)
+    | Subagents (** [list_subagents], for the agents panel *)
+    | Jobs (** [list_jobs] *)
+    | Job_output of string (** the job's id *)
     | Job_started (** [!&command]: the job's id *)
     | Auth_status of Auth_purpose.t
     | Paths of string (** the completion prefix listed *)
@@ -61,6 +65,9 @@ module Command : sig
     | Focus of string (** the element with this id, once rendered *)
     | Save_history of string list (** newest first *)
     | Sign_out (** forget the saved login and reload *)
+    | Reveal of string list
+    (** scroll the main chat to a subagent's card, opening the transcripts
+        it is in: the [subagent] call ids from the top-level one down *)
   [@@deriving sexp_of, equal]
 end
 
@@ -136,7 +143,17 @@ module Action : sig
     | Open_thinking_picker
     | Open_help
     | Open_rename
-    | Open_agents
+    | Open_subagents of string option
+    (** the agents panel: its list, or the agent or job with this number
+        (in the list), id or call id *)
+    | Toggle_subagents
+    | Select_item of Agents.Item.t (** shown in full in the panel *)
+    | Agents_back (** from an agent to the list; from the list, closed *)
+    | Focus_agent of int (** the [n]th listed, from 1 *)
+    | Cycle_agent of int (** the next (1) or previous (-1) listed *)
+    | Show_in_chat of string (** a subagent's card in the main chat *)
+    | Clock of Time_ns.t
+    (** every second while [Model.ticking]: elapsed times, polling jobs *)
     | Picker_query of string
     | Picker_move of int
     | Picker_accept
@@ -148,8 +165,8 @@ module Action : sig
     | Login_choose of int (** a login select option, clicked *)
     | Start_login of string (** provider, with its default method *)
     | Logout of string (** provider *)
-    | Cancel_subagent of string
-    | Kill_job of string
+    | Cancel_subagent of string (** agent id *)
+    | Kill_job of string (** job id *)
     | Dequeue (** the last queued message back into the editor *)
     | Toggle_sidebar
     | Respond_confirm of
@@ -194,10 +211,15 @@ module Model : sig
     ; next_toast : int
     ; sidebar_open : bool
     ; session_query : string
+    ; agents : Agents.t (** the agents panel, per session *)
     }
   [@@deriving sexp_of]
 
   val running : t -> bool
+
+  (** The agents panel is open with something running: the page sends
+      [Clock] every second. *)
+  val ticking : t -> bool
 
   (** The completion popup when it has something to show. *)
   val popup : t -> Completion.t option
