@@ -73,7 +73,7 @@ let sign_out () =
 
 let perform client settings ctx (command : App.Command.t) =
   let inject = Bonsai.Apply_action_context.inject ctx in
-  let effect =
+  let eff =
     match command with
     | Rpc { method_; params; tag } ->
       let%bind.Effect result =
@@ -109,7 +109,7 @@ let perform client settings ctx (command : App.Command.t) =
     | Save_history entries -> Effect.of_sync_fun save_history entries
     | Sign_out -> Effect.of_sync_fun sign_out ()
   in
-  Bonsai.Apply_action_context.schedule_event ctx effect
+  Bonsai.Apply_action_context.schedule_event ctx eff
 ;;
 
 module Result_ = struct
@@ -302,19 +302,22 @@ let escape s =
     | c -> String.of_char c)
 ;;
 
-let sign_in_form (settings : Settings.t) ~error =
+let sign_in_form ?(notice = false) (settings : Settings.t) ~error =
   let value = Option.value_map ~default:"" ~f:escape in
   Browser.set_app_html
     (sprintf
        {|<div class="signin-page"><form class="signin" id="signin-form">
   <div class="brand"><span class="logo">prigh</span><span class="brand-sub">web</span></div>
   <h1>Sign in</h1>
-  <p class="signin-error">%s</p>
-  <label>User name <input id="user" name="user" value="%s" autocomplete="username" autocapitalize="off" spellcheck="false"></label>
+  <p class="signin-sub">to the prigh backend at %s</p>
+  <p class="signin-error%s">%s</p>
+  <label>User name <input id="user" name="user" value="%s" autofocus autocomplete="username" autocapitalize="off" spellcheck="false"></label>
   <label>Password <input id="password" name="password" type="password" value="%s" autocomplete="current-password"></label>
   <details><summary>Backend</summary><input id="backend" name="backend" value="%s"></details>
   <button class="btn primary" type="submit">Sign in</button>
 </form></div>|}
+       (escape settings.backend)
+       (if notice then " notice" else "")
        (escape error)
        (value settings.login.user)
        (value settings.login.password)
@@ -387,6 +390,6 @@ let run () =
   Async_js.init ();
   let settings = Settings.load () in
   if Login.take_signed_out Login.Storage.browser
-  then sign_in_form settings ~error:"Signed out."
+  then sign_in_form settings ~notice:true ~error:"Signed out."
   else run_app settings
 ;;
