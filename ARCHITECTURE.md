@@ -716,6 +716,20 @@ copy of the protocol types and the e2e test guards the contract.
     renders it as a `Skill` item (`skill NAME` and the arguments; the body
     only in verbose), and `/fork` lists and restores it as
     `/skill:NAME ARGS`.
+  - Model hand-over and default directory: `/fallback` and `/default-dir`
+    show `Config`'s `fallback_models`/`default_cwd`, or send `set_config`
+    with only that field. The backend keeps the fields a `set_config`
+    leaves out, so every one the app sends (`/confirm`, `/scoped-models`
+    too) carries only its own field and a stale or missing `Config` cannot
+    undo another change. A refusal (an unknown model, with the backend's
+    suggestions) puts the command back in the editor. `Autocomplete`
+    completes `/fallback` word by word (the models not listed yet, `off`
+    first) and `/default-dir` with `list_dirs` on the backend's host when
+    it runs tools. `Handover_message` parses the user message the backend
+    starts a hand-over run with (`[prigh: A cannot continue (ERROR), so B
+    takes over …]`): `Transcript` renders it as a `Handover` item (`↪
+    handed over from A to B`; the error only in verbose, since the failed
+    reply above it shows it) and `/fork` lists it by that line.
   - `Key.t` → `Intent.t` through `Keymap` (the one binding table; `/help`
     prints it). `Mode.t` (`Editing | Picker | Login_prompt | Text_prompt |
     Confirm | Search`) says who owns the keyboard; dialogs never stack, Esc

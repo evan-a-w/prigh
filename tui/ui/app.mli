@@ -33,7 +33,11 @@ module Reply_tag : sig
     | Config
     | Config_saved
     | Default_saved
-    | Config_for_confirm of bool
+    | Fallback_shown (** [get_config] for [/fallback] *)
+    | Fallback_saved of string
+    (** [set_config] of [/fallback]'s text, back in the editor if refused *)
+    | Default_dir_shown (** [get_config] for [/default-dir] *)
+    | Default_dir_saved of string (** like [Fallback_saved] *)
     | Models_catalog
     | Models_for_scoped
     | Compact_done
