@@ -23,8 +23,7 @@ let hunk_starts line =
       Int.of_string_opt (List.hd_exn (String.split s ~on:',')))
   in
   match String.split line ~on:' ' with
-  | "@@" :: old :: new_ :: _ ->
-    Option.both (number old) (number new_)
+  | "@@" :: old :: new_ :: _ -> Option.both (number old) (number new_)
   | _ -> None
 ;;
 
@@ -32,7 +31,9 @@ let unified_rows text =
   let old_n = ref 0 in
   let new_n = ref 0 in
   List.filter_map (String.split_lines text) ~f:(fun line ->
-    if String.is_prefix line ~prefix:"--- " || String.is_prefix line ~prefix:"+++ "
+    if
+      String.is_prefix line ~prefix:"--- "
+      || String.is_prefix line ~prefix:"+++ "
     then None
     else if String.is_prefix line ~prefix:"@@"
     then (
@@ -49,9 +50,12 @@ let unified_rows text =
       in
       match String.prefix line 1 with
       | "+" ->
-        Some (Line { kind = `Added; old_line = None; new_line = next new_n; text })
+        Some
+          (Line { kind = `Added; old_line = None; new_line = next new_n; text })
       | "-" ->
-        Some (Line { kind = `Removed; old_line = next old_n; new_line = None; text })
+        Some
+          (Line
+             { kind = `Removed; old_line = next old_n; new_line = None; text })
       | "\\" -> None
       | _ ->
         let old_line = next old_n in
@@ -97,7 +101,8 @@ let table ~numbers rows =
              Node.tr
                ~attrs:[ Attr.class_ "hunk" ]
                [ Node.td
-                   ~attrs:[ Attr.create "colspan" (if numbers then "4" else "2") ]
+                   ~attrs:
+                     [ Attr.create "colspan" (if numbers then "4" else "2") ]
                    [ Node.text text ]
                ]
            | Line { kind; old_line; new_line; text } ->
@@ -109,7 +114,9 @@ let table ~numbers rows =
              in
              Node.tr
                ~attrs:[ Attr.class_ cls ]
-               ((if numbers then [ td "ln" (num old_line); td "ln" (num new_line) ] else [])
+               ((if numbers
+                 then [ td "ln" (num old_line); td "ln" (num new_line) ]
+                 else [])
                 @ [ td "sign" sign; td "text" text ])))
     ]
 ;;
@@ -121,7 +128,7 @@ let view ~numbers ~max_rows rows =
     then rows, []
     else List.take rows max_rows, List.drop rows max_rows
   in
-  Html.div
+  Chat_html.div
     "diff-view"
     [ table ~numbers shown
     ; (match rest with
@@ -130,11 +137,16 @@ let view ~numbers ~max_rows rows =
          Node.details
            ~attrs:[ Attr.class_ "more" ]
            [ Node.summary
-               [ Node.text (Html.plural (List.length rest) "more line") ]
+               [ Node.text (Chat_html.plural (List.length rest) "more line") ]
            ; table ~numbers rest
            ])
     ]
 ;;
 
-let unified ?(max_rows = 40) text = view ~numbers:true ~max_rows (unified_rows text)
-let edits ?(max_rows = 40) edits = view ~numbers:false ~max_rows (edit_rows edits)
+let unified ?(max_rows = 40) text =
+  view ~numbers:true ~max_rows (unified_rows text)
+;;
+
+let edits ?(max_rows = 40) edits =
+  view ~numbers:false ~max_rows (edit_rows edits)
+;;

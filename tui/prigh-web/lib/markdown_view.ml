@@ -98,14 +98,18 @@ let rec block ?(tight = false) (b : Block.t) =
      | Some start ->
        Node.ol
          ~attrs:
-           (if start = 1 then [] else [ Attr.create "start" (Int.to_string start) ])
+           (if start = 1
+            then []
+            else [ Attr.create "start" (Int.to_string start) ])
          (List.map items ~f:item))
   | Table { aligns; header; rows } ->
     let row ~head cells =
       Node.tr
         (List.map2_exn aligns cells ~f:(fun align c ->
            let attrs = align_attr align in
-           if head then Node.th ~attrs (inlines c) else Node.td ~attrs (inlines c)))
+           if head
+           then Node.th ~attrs (inlines c)
+           else Node.td ~attrs (inlines c)))
     in
     Node.div
       ~attrs:(cls "table-wrap")
