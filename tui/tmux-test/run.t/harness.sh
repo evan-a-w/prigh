@@ -90,6 +90,8 @@ normalise() {
 		-e 's/[⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏]/<spin>/g' \
 		-e 's/session [0-9a-f]{16}/session <id>/g' \
 		-e 's/[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9:.]+Z?/<time>/g' \
+		-e 's/^(\[[0-9]+\]\+ +Stopped) +/\1 /' \
+		-e 's/^bash-[0-9.]+\$/bash$/' \
 		-e 's/[[:space:]]+$//'
 }
 
@@ -101,7 +103,8 @@ capture() {
 
 run_scenario() {
 	local name=$1 status=0
-	tmp="$(mktemp -d)"
+	# Fixed length, so that lines wrap the same everywhere.
+	tmp="$(mktemp -d /tmp/prigh-tmux.XXXXXX)"
 	extra_args=""
 	interactive=""
 	if declare -F "setup_$name" >/dev/null; then "setup_$name"; fi

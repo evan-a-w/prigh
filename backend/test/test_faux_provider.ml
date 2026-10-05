@@ -86,8 +86,7 @@ let%expect_test "of_script_file reads an array of replies" =
   @@ fun t ->
   write t "script.json" script;
   let show result =
-    print_endline
-      (mask t (Sexp.to_string_hum [%sexp (result : Reply.t list Or_error.t)]))
+    print_endline (mask_sexp t [%sexp (result : Reply.t list Or_error.t)])
   in
   show (Faux_provider.of_script_file (Filename.concat t.dir "script.json"));
   write t "bad.json" {|{"text": "not an array"}|};
@@ -110,8 +109,6 @@ let%expect_test "of_script_file reads an array of replies" =
       ((events ((Text_delta cut))) (stop_reason Length)
        (usage ((input 0) (output 0) (cache_read 0))))))
     (Error "faux script must be a JSON array of replies")
-    (Error
-     (Sys_error
-      "$DIR/nope.json: No such file or directory"))
+    (Error (Sys_error "$DIR/nope.json: No such file or directory"))
     |}]
 ;;

@@ -19,3 +19,10 @@
   prigh_ui
   prigh_ui_term
   bonsai_term))
+
+; Rendering depends on TERM (OSC 8 hyperlinks or inline URLs): fix it.
+
+(env
+ (_
+  (env-vars
+   (TERM dumb))))

@@ -1,9 +1,6 @@
 <- ping: pong
-<- get_state: ((session_id <id>)
- (session_path
-  $TMP/.prigh/sessions/<stamp>_<id>.jsonl)
- (session_name null) (session_description null)
- (cwd $TMP) (git_branch null)
+<- get_state: ((session_id <id>) (session_path $TMP/.prigh/sessions/<stamp>_<id>.jsonl)
+ (session_name null) (session_description null) (cwd $TMP) (git_branch null)
  (model
   ((id deepseek-flash) (provider deepseek) (key deepseek/deepseek-flash)
    (name "DeepSeek V4.1 Flash") (context_window 1000000) (max_output 384000)
@@ -13,8 +10,7 @@
  (usage ((input 0) (output 0) (cache_read 0))) (cost_usd 0)
  (context_tokens 0) (active_host backend)
  (hosts
-  (((id backend) (name <host>)
-    (cwd $TMP) (session_id null)
+  (((id backend) (name <host>) (cwd $TMP) (session_id null)
     (session_name null))))
  (subagents ()) (jobs ()))
 <- prompt: ()
@@ -68,11 +64,9 @@
   event auth (Logged_out deepseek)
 <- list_sessions: 1 session(s), 2 message(s)
 <- set_session_name: ()
-<- get_state: ((session_id <id>)
- (session_path
-  $TMP/.prigh/sessions/<stamp>_<id>.jsonl)
- (session_name "e2e session") (session_description null)
- (cwd $TMP) (git_branch null)
+<- get_state: ((session_id <id>) (session_path $TMP/.prigh/sessions/<stamp>_<id>.jsonl)
+ (session_name "e2e session") (session_description null) (cwd $TMP)
+ (git_branch null)
  (model
   ((id claude-fable-5-1) (provider anthropic)
    (key anthropic/claude-fable-5-1) (name "Claude Fable 5.1")
@@ -82,8 +76,7 @@
  (usage ((input 10) (output 5) (cache_read 0))) (cost_usd 0.00035)
  (context_tokens 10) (active_host backend)
  (hosts
-  (((id backend) (name <host>)
-    (cwd $TMP) (session_id null)
+  (((id backend) (name <host>) (cwd $TMP) (session_id null)
     (session_name null))))
  (subagents ()) (jobs ()))
 <- session_stats: ((message_count 2) (turns 1) (tool_calls ())
@@ -100,12 +93,11 @@
      ((role assistant) (content (((type text) (text "faux reply"))))
       (stop_reason ((type end_turn)))
       (usage ((input 10) (output 5) (cache_read 0))) (model deepseek-flash))))
-   ((id <id>) (parent <id>) (kind model)
-    (model anthropic/claude-fable-5-1) (thinking off))
-   ((id <id>) (parent <id>) (kind model)
-    (model anthropic/claude-fable-5-1) (thinking high))
-   ((id <id>) (parent <id>) (kind name)
-    (name "e2e session")))))
+   ((id <id>) (parent <id>) (kind model) (model anthropic/claude-fable-5-1)
+    (thinking off))
+   ((id <id>) (parent <id>) (kind model) (model anthropic/claude-fable-5-1)
+    (thinking high))
+   ((id <id>) (parent <id>) (kind name) (name "e2e session")))))
 <- bogus ERROR: "unknown method \"bogus\""
 backend exited
 <- ping: pong
