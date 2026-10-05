@@ -337,7 +337,12 @@ let key_target (ev : Dom_html.keyboardEvent Js.t) : Prigh_web.Keys.Target.t =
   | Some el ->
     (match Dom_html.tagged el with
      | Textarea t when String.equal (Js.to_string t##.id) "editor" ->
-       Editor { cursor = t##.selectionStart }
+       Editor
+         { cursor =
+             Prigh_web.Utf16.byte_offset
+               (Js.to_string t##.value)
+               ~utf16:t##.selectionStart
+         }
      | Textarea _ | Input _ | Select _ -> Field
      | Button _ | A _ -> Control
      | _ ->
