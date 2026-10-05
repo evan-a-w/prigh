@@ -69,7 +69,10 @@ let all =
       "[on|off]"
       "ask before destructive tools"
   ; c "auth" "" "show which providers are configured"
-  ; c "compact" "" "summarise older messages to free context"
+  ; c
+      "compact"
+      "[instructions]"
+      "summarise older messages to free context"
   ; c "new" "" "start a new session"
   ; c "name" "[text]" "set the session name"
   ; c "session" "" "show session statistics"

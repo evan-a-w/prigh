@@ -10,6 +10,12 @@ module Argument : sig
     | Login
     | Logout
     | Directory
+    | Verbosity
+    | Confirm
+    | Session (** saved sessions' paths *)
+    | Path (** [list_paths] *)
+    | Host
+    | User (** the users a superuser can act as *)
   [@@deriving sexp_of, equal]
 end
 

@@ -1058,7 +1058,7 @@ let set_thinking t thinking =
   state_changed t
 ;;
 
-let compact t =
+let compact ?instructions t =
   if is_running t
   then Or_error.error_string "cannot compact while a run is in progress"
   else (
@@ -1067,6 +1067,7 @@ let compact t =
         ~env:t.env
         ~provider:t.provider
         ~model:t.model
+        ?instructions
         t.session
     in
     Result.iter result ~f:(fun summary ->

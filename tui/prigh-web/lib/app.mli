@@ -15,6 +15,22 @@ module Auth_purpose : sig
   [@@deriving sexp_of, equal]
 end
 
+module Entries_purpose : sig
+  (** Why we asked for [get_entries]. *)
+  type t =
+    | Fork
+    | Rewind
+    | Tree
+  [@@deriving sexp_of, equal]
+end
+
+module Users_purpose : sig
+  type t =
+    | Probe (** at startup: only superusers may list them *)
+    | Picker
+  [@@deriving sexp_of, equal]
+end
+
 module Reply_tag : sig
   type t =
     | Ignore
@@ -39,6 +55,20 @@ module Reply_tag : sig
     | Login_started
     | Notice of string (** shown on success *)
     | Reconnect of int (** generation; stale replies are ignored *)
+    | Config (** [get_config] *)
+    | Config_saved of string (** the new config; the notice is shown *)
+    | Default_saved
+    | Session_stats
+    | Entries of Entries_purpose.t
+    | Reload_messages (** the head moved: fetch state and messages *)
+    | Exported
+    | Imported
+    | Prompt_done of string
+    (** closes the prompt dialog with this notice; failures show in it *)
+    | Prompt_paths of string (** the prompt's input listed *)
+    | Btw of string (** the side question's id *)
+    | Users of Users_purpose.t
+    | User_switched (** [set_user]'s reply, like [hello]'s *)
   [@@deriving sexp_of, equal]
 end
 
@@ -64,10 +94,16 @@ module Command : sig
         } (** [Dismiss_toast id] after [after_ms] *)
     | Focus of string (** the element with this id, once rendered *)
     | Save_history of string list (** newest first *)
-    | Sign_out (** forget the saved login and reload *)
+    | Sign_out (** forget this account's saved login and reload *)
     | Reveal of string list
     (** scroll the main chat to a subagent's card, opening the transcripts
         it is in: the [subagent] call ids from the top-level one down *)
+    | Copy of string (** to the clipboard *)
+    | Switch_account of Accounts.Account.t (** reload signed in as it *)
+    | Add_account (** the sign-in form, keeping the saved accounts *)
+    | Scroll_chat of int (** by pages *)
+    | Jump_to_user_message of int
+    (** the previous ([-1]) or next ([1]) user message in view *)
   [@@deriving sexp_of, equal]
 end
 
@@ -181,6 +217,24 @@ module Action : sig
         }
     | Dismiss_toast of int
     | Sign_out
+    | Set_accounts of
+        { accounts : Accounts.Account.t list
+        ; current : Accounts.Account.t option
+        } (** the saved sign-ins, from the page *)
+    | Open_accounts (** the account menu *)
+    | Cycle_verbosity
+    | Cycle_model of int (** through the scoped models, forwards or back *)
+    | Cycle_thinking
+    | Copy_last (** the last reply, to the clipboard *)
+    | Close_btw
+    | Dialog_toggle (** check or uncheck the highlighted scoped model *)
+    | Toggle_scoped of string (** a model key, clicked *)
+    | Dialog_complete (** a prompt's highlighted completion *)
+    | Choose_suggestion of int (** a prompt's completion, clicked *)
+    | Retry_connection
+    | Scroll_chat of int
+    | Jump_to_user_message of int
+    | Run of string (** a slash command, e.g. from a button *)
   [@@deriving sexp_of]
 end
 
@@ -212,6 +266,14 @@ module Model : sig
     ; sidebar_open : bool
     ; session_query : string
     ; agents : Agents.t (** the agents panel, per session *)
+    ; verbosity : Prigh_ui.Verbosity.t
+    ; config : Config.t option
+    ; btw : Btw.t option
+    ; btw_seq : int
+    ; accounts : Accounts.Account.t list (** saved in this browser *)
+    ; account : Accounts.Account.t option (** the one signed in *)
+    ; users : string list option
+      (** the users we may act as: [Some] for superusers *)
     }
   [@@deriving sexp_of]
 

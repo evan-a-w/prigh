@@ -153,7 +153,8 @@ directory (`/switch`, `/import`, deleting sessions), and `/export` writes
 on the tool host.
 
 `-superusers NAME,...` (`$PRIGH_SUPERUSERS`) lets those users act as any
-other: `/setusr NAME` (in the TUI, the web UI and pi-web) switches the
+other: `/setusr NAME` (in the TUI, the web UI, pi-web and prigh-web, where
+the account menu's "Act as…" does it too) switches the
 connection to NAME's sessions, logins and tool hosts (the status line shows
 `user:<me> as <them>`), `/setusr` alone lists the users and `/setusr <me>`
 switches back. Everyone else gets an error. `-host-tokens NAME=TOKEN,...`
@@ -240,12 +241,13 @@ turns and current tool, and the background jobs with their last line.
 Selecting one shows a subagent's live transcript and report (with Cancel
 and "Show in chat", which scrolls to its card) or a job's output (with
 Kill). It opens from the status line ("2 agents running"), the top bar's
-robot button, a subagent's card in the chat, `/agents [n|id]`, and
-Alt+1…9 (the Nth listed; Alt+] and Alt+[ step through them, Alt+0 closes
+robot button, a subagent's card in the chat, `/agents [n|id]` and `/jobs
+[id]`, and Alt+1…9 (the Nth listed; Alt+] and Alt+[ step through them, Alt+0 closes
 it, Esc goes back from outside the editor). Unlike the TUI, Shift+Tab is
 left to the browser (it moves the focus back), and on macOS Option+digit
 types its character instead. What finished before your latest prompt
-folds under "Earlier"; switching sessions empties the panel.
+folds under "Earlier"; switching sessions empties the panel. `/agents cancel
+<n|id>` and `/jobs kill <id>` open the item there and stop it.
 
 ```
 ./prigh -prigh-web -faux -cwd ~/proj           # development: dune-built site and backend, 127.0.0.1:7790
@@ -260,6 +262,32 @@ without it the backend looks next to its dune build and in
 goes away, and takes `?backend=ws://host:port/ws` like the `-web` page.
 One backend can serve all three web UIs on different ports. In Docker it
 is `PRIGH_MODE=prigh-web` (port 7790, see `DOCKER.md`).
+
+prigh-web has every slash command of the table below, as pickers and
+dialogs rather than lines in a transcript: `/session` is a dialog of the
+session's details and statistics; `/fork`, `/rewind` (with a confirmation)
+and `/tree` (the whole tree, branches indented) pick a message;
+`/scoped-models` is a checklist (Tab or a click checks a model, Enter
+saves); `/cd`, `/host`'s directory, `/export` and `/import` ask for a path
+with completions from the backend and keep the dialog open, with the error,
+when the backend refuses it; `/agents` and `/jobs` open the agents panel
+(above); `/btw` answers in a panel above the composer (Esc closes it);
+`/verbosity` (Ctrl+O cycles) hides tool output and thinking (quiet) or
+unfolds everything (verbose); `/copy` (Ctrl+X with nothing selected) copies
+the last reply. Ctrl+P/Alt+P cycle the scoped models, Alt+T the thinking
+level (Ctrl+T is the browser's), Alt+↑ takes back a queued message, Ctrl+↑/↓
+jump between your messages; `/help` and `/hotkeys` also list the TUI's keys
+that the browser keeps (Ctrl+C, Ctrl+Z, Ctrl+F, Ctrl+R, $EDITOR's Ctrl+G)
+and what to use instead, and `/quit` says to close the tab.
+
+The account at the bottom of the sidebar (also in the status line) opens the
+account menu: switch to another saved account in one click (the page
+reloads signed in as it, in its last session), add an account (the sign-in
+form, keeping the others; it may be on another backend), sign out of this
+one, and, for `-superusers`, act as another user and come back. The
+accounts (user, token, backend, last session) are kept in localStorage
+(`prigh-web.accounts`); the active one is also in `prigh.user`/`prigh.token`,
+where the `-web` page keeps its login, and the sign-in page lists them.
 
 If the backend goes away (the spawned process dies, or the TCP connection
 drops) the TUI reconnects on its own — immediately, then with exponential
@@ -529,7 +557,7 @@ destructive `bash`/`write`/`edit`; `/confirm on|off`) and
 | `/thinking [off\|on\|low\|high\|max]` | set the thinking level |
 | `/verbosity [quiet\|normal\|verbose]` | set the transcript verbosity |
 | `/confirm [on\|off]` | ask before destructive tools |
-| `/compact` | summarise older messages to free context |
+| `/compact [instructions]` | summarise older messages to free context, focusing on the instructions |
 | `/new`, `/clear`, `/quit` | new session / clear transcript / exit |
 | `/name [text]` | set the session name |
 | `/session` | show session statistics |
@@ -545,6 +573,7 @@ destructive `bash`/`write`/`edit`; `/confirm on|off`) and
 | `/btw <question>` | ask a side question without interrupting the run |
 | `/retry-backend-connection` | reconnect to the backend now |
 | `/state` | show session state |
+| `/copy` | (prigh-web) copy the last reply to the clipboard |
 
 `/model` also accepts a display name, id, `provider/id` or unique prefix, and
 `/login`/`/logout`/`/thinking`/`/sessions` open fuzzy pickers.

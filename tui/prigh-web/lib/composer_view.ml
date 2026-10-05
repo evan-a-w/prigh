@@ -14,7 +14,12 @@ let popup (m : App.Model.t) ~inject =
       | Argument Thinking -> "Thinking"
       | Argument (Login | Logout) -> "Providers"
       | Argument Directory -> "Directories"
-      | Path -> "Files"
+      | Argument Path | Path -> "Files"
+      | Argument Verbosity -> "Verbosity"
+      | Argument Confirm -> "Tool confirmation"
+      | Argument Session -> "Sessions"
+      | Argument Host -> "Hosts"
+      | Argument User -> "Users"
     in
     div
       ~cls:"popup"

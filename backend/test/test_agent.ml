@@ -496,6 +496,34 @@ let%expect_test "manual compaction" =
     |}]
 ;;
 
+let%expect_test "compaction instructions reach the summariser" =
+  let long = String.make 40_000 'x' in
+  let on_request (r : Provider.Request.t) =
+    match r.system with
+    | Some system when String.is_prefix system ~prefix:"Summarise" ->
+      (* The default instructions, then the user's. *)
+      print_endline (List.last_exn (String.split_lines system))
+    | _ -> ()
+  in
+  with_agent
+    ~on_request
+    [ Reply.text long; Reply.text "recent reply"; Reply.text "SUMMARY" ]
+  @@ fun _t agent _dump ->
+  Or_error.ok_exn (Agent.prompt agent "old question");
+  Agent.wait_idle agent;
+  Or_error.ok_exn (Agent.prompt agent "recent question");
+  Agent.wait_idle agent;
+  print_s
+    [%sexp
+      (Agent.compact ~instructions:"keep the file names" agent
+       : string Or_error.t)];
+  [%expect
+    {|
+    The user's instructions for this summary: keep the file names
+    (Ok SUMMARY)
+    |}]
+;;
+
 let%expect_test "delete_session refuses the active session" =
   with_agent [ Reply.text "hi" ]
   @@ fun _t agent _dump ->

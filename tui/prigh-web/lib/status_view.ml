@@ -89,16 +89,58 @@ let host (state : State.t) =
     item ~cls:"host" ~title:"Tools run here" [ icon Server; Node.text name ])
 ;;
 
-let user (m : App.Model.t) =
-  match m.hello with
-  | Some ({ user = Some user; _ } as hello) ->
-    let text =
-      match Hello_reply.acting_as hello with
-      | Some ns -> sprintf "%s as %s" user ns
-      | None -> user
-    in
-    item ~cls:"user" ~title:"Signed in" [ Node.text text ]
-  | _ -> Node.none
+let user (m : App.Model.t) ~inject =
+  let name =
+    match m.hello, m.account with
+    | Some ({ user = Some user; _ } as hello), _ ->
+      Some
+        (match Hello_reply.acting_as hello with
+         | Some ns -> sprintf "%s as %s" user ns
+         | None -> user)
+    | _, Some account when not (List.is_empty m.accounts) ->
+      Some (Accounts.Account.name account)
+    | _ -> None
+  in
+  match name with
+  | None -> Node.none
+  | Some text ->
+    Node.button
+      ~attrs:
+        [ Attr.class_ "status-item link account"
+        ; Attr.type_ "button"
+        ; Attr.title "Signed in: switch account"
+        ; Attr.on_click (fun _ -> inject Action.Open_accounts)
+        ]
+      [ icon User; Node.text text ]
+;;
+
+(* Modes and settings that change what you see or what happens. *)
+let modes (m : App.Model.t) ~inject =
+  let chip ~title ~command text =
+    Node.button
+      ~attrs:
+        [ Attr.class_ "status-item link mode"
+        ; Attr.type_ "button"
+        ; Attr.title title
+        ; Attr.on_click (fun _ -> inject (Action.Run command))
+        ]
+      [ Node.text text ]
+  in
+  [ (match m.verbosity with
+     | Normal -> Node.none
+     | v ->
+       chip
+         ~title:"Transcript verbosity (Ctrl+O cycles)"
+         ~command:"/verbosity"
+         (Prigh_ui.Verbosity.name v))
+  ; (match m.config with
+     | Some { confirm_tools = true; _ } ->
+       chip
+         ~title:"Tools ask before running (/confirm)"
+         ~command:"/confirm"
+         "confirm"
+     | _ -> Node.none)
+  ]
 ;;
 
 let view (m : App.Model.t) ~inject =
@@ -152,7 +194,8 @@ let view (m : App.Model.t) ~inject =
          else Node.none)
       ; background m ~inject
       ; host state
+      ; Node.fragment (modes m ~inject)
       ; div ~cls:"status-spacer" []
-      ; user m
+      ; user m ~inject
       ]
 ;;

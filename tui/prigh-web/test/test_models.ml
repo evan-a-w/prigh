@@ -209,7 +209,7 @@ let%expect_test
     (Rpc (method_ list_subagents) (params ()) (tag Subagents))
     (Rpc (method_ list_jobs) (params ()) (tag Jobs))
     Working 75% ↑123k ↓7.9k $1.2345 (3 queued) laptop
-    ann as bob
+    (ann as bob)
     |}];
   H.show h ~selector:".context";
   [%expect

@@ -64,32 +64,67 @@ let%expect_test "help lists every key and command" =
     Enter send; while running, steer the agent
     Alt+Enter queue a follow-up for after the run
     Shift+Enter new line
-    Esc stop the run; close a dialog or popup
+    Esc stop the run; close a dialog, popup or side answer
     ↑ ↓ earlier prompts (in an empty editor or its first line)
-    Tab complete a /command or @path
+    Alt+↑ take the last queued message back into the editor
+    Tab complete a /command, its argument or an @path
     !cmd run a shell command (!!cmd: not added to the context; !&cmd: as a background job)
     Ctrl+L switch model
+    Ctrl+P / Alt+P next / previous scoped model (/scoped-models)
+    Alt+T cycle the thinking level
+    Ctrl+O cycle the transcript verbosity
+    Ctrl+X copy the last reply (when nothing is selected)
+    Ctrl+↑ / Ctrl+↓ previous / next of your messages in the transcript
+    PageUp / PageDown scroll the transcript
     Ctrl+K search sessions
     Ctrl+B show or hide the sidebar
     Alt+1…9 follow subagent or job N in the agents panel
     Alt+] Alt+[ the next or previous subagent or job
     Alt+0 close the agents panel
+    Tab (in /scoped-models) check or uncheck the highlighted model
     Commands
-    /help show commands and keys
+    /help [command] show commands and keys, or a command's usage
+    /hotkeys show the keyboard shortcuts
     /new start a new session
     /model [name] pick or switch the model
+    /scoped-models pick the models Ctrl+P and Alt+P cycle through
     /thinking [off|low|on|high|max] pick or set the thinking level
-    /compact summarise older messages to free context
+    /change_default save the model and thinking level as the default for new sessions
+    /verbosity [quiet|normal|verbose] how much of tool calls and thinking the transcript shows
+    /confirm [on|off] ask before bash, write and edit run
+    /compact [instructions] summarise older messages to free context
     /name [name] rename the session
+    /session show the session's details and statistics
     /sessions search the saved sessions
+    /switch [path] switch to a saved session
     /clone copy this session into a new one
-    /cd <path> change the working directory
+    /fork start a new session from an earlier message
+    /rewind go back to an earlier message in this session
+    /tree show the session tree and move to any message in it
+    /cd [path] change the working directory
+    /host [name|backend] pick where tools run, and the directory there
+    /export [path] export the transcript on the backend (markdown, or .jsonl)
+    /import [path] import a session from a JSONL file on the backend
+    /copy copy the last reply to the clipboard
+    /btw <question> ask a side question without interrupting the run (not added to the conversation)
     /abort stop the current run
-    /agents [n|id] follow subagents and background jobs
+    /agents [n|id|cancel <n|id>] follow subagents and background jobs in the agents panel, or cancel one
+    /jobs [id|kill <id>] background jobs in the agents panel: list them, show or kill one
     /login [provider] log in to a model provider (or /login custom)
     /logout [provider] remove a provider's login
     /auth show which providers are logged in
-    /signout sign out of this backend
+    /setusr [user] act as another user (superusers); without a user, pick one
+    /signout sign out of this account
+    /retry-backend-connection reconnect to the backend now
+    /state show the session state as the backend reports it
+    /clear clear the transcript view (the conversation is kept)
+    /quit how to leave (close the tab; /signout signs out)
+    Left to the browser
+    Ctrl+C / Ctrl+V / Ctrl+Z copy, paste, undo: the browser's (Esc stops a run)
+    Ctrl+F find in the page, which has the whole transcript
+    Ctrl+T / Ctrl+N / Ctrl+W the browser's tabs and windows: Alt+T cycles thinking
+    Ctrl+R reload: the session comes back (?session=); Tab completes @paths
+    Ctrl+G no $EDITOR in a browser: edit here (Shift+Enter for new lines)
     |}];
   H.key h "Enter" ~target:Page;
   [%expect
@@ -349,7 +384,7 @@ let%expect_test
   [%expect
     {|
     (Reconnect (generation 1) (delay_ms 0) (session (s1)))
-    Connection lost: reconnecting…
+    Connection lost: reconnecting… (Retry now)
     |}];
   H.act h (Reply (Reconnect 1, Error "refused"));
   H.act h (Reply (Reconnect 1, Error "refused"));
@@ -358,7 +393,7 @@ let%expect_test
     {|
     (Reconnect (generation 1) (delay_ms 250) (session (s1)))
     (Reconnect (generation 1) (delay_ms 500) (session (s1)))
-    Connection lost: reconnecting (attempt 3, next in 0.5s)…
+    Connection lost: reconnecting (attempt 3, next in 0.5s)… (Retry now)
     |}];
   (* A second close while reconnecting changes nothing. *)
   H.act h Backend_closed;
@@ -370,6 +405,7 @@ let%expect_test
     (Rpc (method_ get_state) (params ()) (tag State))
     (Rpc (method_ list_models) (params ()) (tag Models))
     (Rpc (method_ auth_status) (params ()) (tag (Auth_status Refresh)))
+    (Rpc (method_ get_config) (params ()) (tag Config))
     |}];
   H.text h ~selector:".banner";
   H.text h ~selector:".toast";
@@ -417,12 +453,7 @@ let%expect_test "signing out" =
     h
     (Hello { client_id = "c1"; namespace = Some "bob"; user = Some "ann" });
   H.text h ~selector:".sidebar-footer";
-  [%expect
-    {|
-    A
-    ann acting as bob
-    (Commands and keys (/help)) (Sign out)
-    |}];
+  [%expect {| (A ann acting as bob) (Commands and keys (/help)) |}];
   H.act h Sign_out;
   H.type_ h "/signout";
   H.act h Send;
