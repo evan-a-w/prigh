@@ -682,7 +682,7 @@ let first_line text =
   | [] -> ""
 ;;
 
-let user_first_line ({ text; images } : P.Message.User.t) =
+let user_first_line ({ text; images; at = _ } : P.Message.User.t) =
   match first_line text, images with
   | "", image :: _ -> P.Image.to_string_hum image
   | line, _ -> line

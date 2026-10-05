@@ -226,7 +226,10 @@ val subagents : t -> Subagent_log.Summary.t list
 
 (** One of [subagents] by agent id or starting tool call id, with its
     transcript. *)
-val subagent : t -> string -> (Subagent_log.Summary.t * Message.t list) option
+val subagent
+  :  t
+  -> string
+  -> (Subagent_log.Summary.t * Timed_message.t list) option
 
 (** Cancels one; its partial report is still delivered. *)
 val cancel_subagent : t -> agent_id:string -> unit Or_error.t

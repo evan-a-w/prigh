@@ -22,6 +22,9 @@ val int_field : t -> string -> int Or_error.t
 val int64_field : t -> string -> Int64.t Or_error.t
 val float_field : t -> string -> float Or_error.t
 val bool_field : t -> string -> bool Or_error.t
+
+(** A time in milliseconds since the epoch; [None] when absent or [`Null]. *)
+val time_ms_opt_field : t -> string -> Time_ns.t option Or_error.t
 val list_field : t -> string -> f:(t -> 'a Or_error.t) -> 'a list Or_error.t
 
 (** [list_field], with [\[\]] when the field is absent. *)

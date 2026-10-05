@@ -5,6 +5,10 @@ open! Import
     derived [["Ctor", ...]] form. *)
 
 val message : Message.t -> Json.t
+
+(** [message] with ["at"], milliseconds since the epoch, when known. *)
+val timed_message : Timed_message.t -> Json.t
+
 val delta : Assistant_event.t -> Json.t
 val state : Agent.State.t -> Json.t
 val config : Config.t -> Json.t
@@ -21,8 +25,12 @@ val thinking : Thinking.t -> Json.t
 val thinking_of_string : string -> Thinking.t Or_error.t
 val auth_status : Provider_auth.Status.t -> Json.t
 
-(** [("type", "event"); ("event", name); ...fields]. *)
-val event : Agent.Event.t -> Json.t
+(** [("type", "event"); ("event", name); ...fields]. With [now] (seconds),
+    the messages of [message_start] and [message_end] events, also nested in
+    [subagent] ones, carry it as their ["at"]: a [message_end] is sent as its
+    message is appended to the session, so it agrees with [get_messages]
+    (and [get_subagent]) to within milliseconds. *)
+val event : ?now:float -> Agent.Event.t -> Json.t
 
 (** [("type", "event"); ("event", "auth"); ("kind", ...); ...fields]. *)
 val login_event : Login_manager.Event.t -> Json.t
@@ -32,7 +40,7 @@ val login_event : Login_manager.Event.t -> Json.t
 val subagent_summary : Subagent_log.Summary.t -> Json.t
 
 (** [{"subagent": summary, "messages": transcript}]. *)
-val subagent : Subagent_log.Summary.t * Message.t list -> Json.t
+val subagent : Subagent_log.Summary.t * Timed_message.t list -> Json.t
 
 (** [{"steer_texts", "follow_up_texts", "confirms": [{call_id, name,
     summary}]}]. *)

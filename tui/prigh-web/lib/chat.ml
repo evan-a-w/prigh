@@ -234,6 +234,23 @@ let rec apply t (event : Event.t) =
   | Btw_delta _ -> t
 ;;
 
+let rec received (event : Event.t) ~at : Event.t =
+  let stamp (message : Message.t) : Message.t =
+    match message with
+    | User ({ at = None; _ } as u) -> User { u with at = Some at }
+    | Assistant ({ at = None; _ } as a) -> Assistant { a with at = Some at }
+    | Tool_result ({ at = None; _ } as r) -> Tool_result { r with at = Some at }
+    | User { at = Some _; _ }
+    | Assistant { at = Some _; _ }
+    | Tool_result { at = Some _; _ } -> message
+  in
+  match event with
+  | Message_start m -> Message_start (stamp m)
+  | Message_end m -> Message_end (stamp m)
+  | Subagent s -> Subagent { s with event = received s.event ~at }
+  | _ -> event
+;;
+
 let rec find_subagent t agent_id =
   Map.data t.tools
   |> List.find_map ~f:(fun tool ->

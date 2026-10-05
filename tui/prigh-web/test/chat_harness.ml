@@ -20,6 +20,7 @@ let with_card chat (event : Event.t) =
             ; stop_reason = Tool_use
             ; usage = Usage.zero
             ; model = "m"
+            ; at = None
             }))
   | _ -> chat
 ;;
@@ -36,5 +37,12 @@ let chat ?(running = false) events =
   if running then chat else Chat.apply chat (Agent_end [])
 ;;
 
-let show ?selector chat = Render.html ?selector (Chat_view.view chat)
-let text ?selector chat = Render.text ?selector (Chat_view.view chat)
+(* Monday 5 October 2026, 15:00 in UTC+2. *)
+let times =
+  Message_time.create
+    ~now:(Time_ns.of_string_with_utc_offset "2026-10-05 13:00:00Z")
+    ~utc_offset:(Time_ns.Span.of_hr 2.)
+;;
+
+let show ?selector chat = Render.html ?selector (Chat_view.view times chat)
+let text ?selector chat = Render.text ?selector (Chat_view.view times chat)

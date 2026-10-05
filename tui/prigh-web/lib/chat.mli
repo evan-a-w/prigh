@@ -62,6 +62,11 @@ val running : t -> bool
 
 val apply : t -> Event.t -> t
 
+(** Gives the messages of [message_start] and [message_end] events (also a
+    subagent's) without a time, from a backend that does not send them, the
+    time the page received them. *)
+val received : Event.t -> at:Time_ns.t -> Event.t
+
 (** The ids of [subagent] calls without a transcript: [get_messages] only
     has their reports, the backend keeps the rest ([get_subagent]). *)
 val subagents_to_load : t -> string list

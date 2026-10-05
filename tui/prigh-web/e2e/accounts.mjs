@@ -56,9 +56,11 @@ page.on("pageerror", error => errors.push(`page: ${error.message}`));
 
 const clean = text => text
   .replace(/127\.0\.0\.1:\d+/g, "127.0.0.1:<PORT>")
+  // Messages' times, and the day separator a run past midnight would add.
+  .replace(/(Yesterday )?\b\d\d:\d\d\b/g, "<TIME>")
   .split("\n")
   .map(line => line.trim())
-  .filter(line => line !== "")
+  .filter(line => line !== "" && line !== "Today")
   .join("\n");
 const section = label => console.log(`=== ${engineName}: accounts: ${label} ===`);
 let shot = 0;

@@ -85,19 +85,19 @@
  (duration_seconds <t>))
 <- get_entries: ((head <id>)
  (entries
-  (((id <id>) (parent null) (kind system_prompt))
-   ((id <id>) (parent <id>) (kind message)
+  (((id <id>) (parent null) (at <at>) (kind system_prompt))
+   ((id <id>) (parent <id>) (at <at>) (kind message)
     (message ((role user) (text "hello there"))))
-   ((id <id>) (parent <id>) (kind message)
+   ((id <id>) (parent <id>) (at <at>) (kind message)
     (message
      ((role assistant) (content (((type text) (text "faux reply"))))
       (stop_reason ((type end_turn)))
       (usage ((input 10) (output 5) (cache_read 0))) (model deepseek-flash))))
-   ((id <id>) (parent <id>) (kind model) (model anthropic/claude-fable-5-1)
-    (thinking off))
-   ((id <id>) (parent <id>) (kind model) (model anthropic/claude-fable-5-1)
-    (thinking high))
-   ((id <id>) (parent <id>) (kind name) (name "e2e session")))))
+   ((id <id>) (parent <id>) (at <at>) (kind model)
+    (model anthropic/claude-fable-5-1) (thinking off))
+   ((id <id>) (parent <id>) (at <at>) (kind model)
+    (model anthropic/claude-fable-5-1) (thinking high))
+   ((id <id>) (parent <id>) (at <at>) (kind name) (name "e2e session")))))
 <- bogus ERROR: "unknown method \"bogus\""
 backend exited
 <- ping: pong
@@ -198,7 +198,8 @@ btw backend exited
   \nRead image file [image/png, 3x2]\
   \n</file>")
  (images
-  (((mime_type image/gif) (bytes 45)) ((mime_type image/png) (bytes 84)))))
+  (((mime_type image/gif) (bytes 45)) ((mime_type image/png) (bytes 84))))
+ (at <at>))
 <- tool_result: ((tool_call_id i1) (tool_name read) (text "Read image file [image/png, 3x2]")
- (is_error false) (images (((mime_type image/png) (bytes 84)))))
+ (is_error false) (images (((mime_type image/png) (bytes 84)))) (at <at>))
 images backend exited

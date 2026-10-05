@@ -88,7 +88,7 @@ let view (m : Model.t) ~inject =
   let chat =
     match Chat.entries m.chat with
     | [] -> empty m
-    | _ -> Chat_view.view m.chat
+    | _ -> Chat_view.view (Model.message_time m) m.chat
   in
   Node.div
     ~attrs:

@@ -12,14 +12,38 @@ let tokens n =
   else sprintf "%dk" (n / 1000)
 ;;
 
-let user ({ text; images } : Message.User.t) =
+let time times at =
+  Node.create
+    "time"
+    ~attrs:
+      [ Attr.class_ "time"
+      ; Attr.title (Message_time.full times at)
+      ; Attr.create
+          "datetime"
+          (let date, ofday = Time_ns.to_date_ofday at ~zone:Time_ns.Zone.utc in
+           sprintf
+             "%sT%sZ"
+             (Date.to_string date)
+             (Time_ns.Ofday.to_sec_string ofday))
+      ]
+    [ Node.text (Message_time.short times at) ]
+;;
+
+let user times ({ text; images; at } : Message.User.t) =
   div
     "msg user"
     [ Image_view.thumbs images
     ; (if String.is_empty (String.strip text)
        then Node.none
        else div "bubble" [ Node.text text ])
+    ; Option.value_map at ~default:Node.none ~f:(time times)
     ]
+;;
+
+let day_separator times date =
+  Node.div
+    ~attrs:[ Attr.class_ "day-sep"; Attr.create "role" "separator" ]
+    [ Node.span [ Node.text (Message_time.day_label times date) ] ]
 ;;
 
 let thinking ~live text =
@@ -59,40 +83,51 @@ let stopped (message : Message.Assistant.t) =
   | End_turn | Tool_use -> Node.none
 ;;
 
-let footer (message : Message.Assistant.t) =
-  match message.stop_reason with
-  | End_turn when message.usage.output > 0 ->
-    let { Usage.input; output; cache_read } = message.usage in
-    div
-      "meta"
-      [ Node.text
-          (String.concat
-             ~sep:" · "
-             ([ message.model; tokens (input + cache_read) ^ " in" ]
-              @ (if cache_read > 0
-                 then [ tokens cache_read ^ " cached" ]
-                 else [])
-              @ [ tokens output ^ " out" ]))
-      ]
-  | _ -> Node.none
+(* A reply's model and tokens, and when it ended; a step that goes on with
+   tool calls has neither. *)
+let footer times (message : Message.Assistant.t) =
+  let usage =
+    match message.stop_reason with
+    | End_turn when message.usage.output > 0 ->
+      let { Usage.input; output; cache_read } = message.usage in
+      [ message.model; tokens (input + cache_read) ^ " in" ]
+      @ (if cache_read > 0 then [ tokens cache_read ^ " cached" ] else [])
+      @ [ tokens output ^ " out" ]
+    | _ -> []
+  in
+  let at =
+    match message.stop_reason with
+    | Tool_use -> None
+    | End_turn | Length | Aborted | Error _ -> message.at
+  in
+  match
+    (if List.is_empty usage
+     then []
+     else [ Node.text (String.concat ~sep:" · " usage) ])
+    @ Option.to_list (Option.map at ~f:(time times))
+  with
+  | [] -> Node.none
+  | parts -> div "meta" (List.intersperse parts ~sep:(Node.text " · "))
 ;;
 
 module Deps = struct
   type t =
     { running : bool
     ; tools : Chat.Tool.t option list
+    ; times : Message_time.t
     }
 
   let equal a b =
     Bool.equal a.running b.running
     && List.equal (Option.equal phys_equal) a.tools b.tools
+    && Message_time.equal a.times b.times
   ;;
 end
 
 let entries : (Chat.Entry.t, Deps.t) View_cache.t = View_cache.create ()
-let chats : (Chat.t, unit) View_cache.t = View_cache.create ()
+let chats : (Chat.t, Message_time.t) View_cache.t = View_cache.create ()
 
-let rec assistant chat (message : Message.Assistant.t) ~streaming =
+let rec assistant times chat (message : Message.Assistant.t) ~streaming =
   let count = List.length message.content in
   let blocks =
     List.mapi message.content ~f:(fun i content ->
@@ -104,7 +139,7 @@ let rec assistant chat (message : Message.Assistant.t) ~streaming =
       | Thinking text -> thinking ~live:(streaming && last) text
       | Tool_call call ->
         Tool_view.view
-          ~nested:view
+          ~nested:(view times)
           ~streaming:(streaming && last)
           ~running:(Chat.running chat)
           call
@@ -123,21 +158,21 @@ let rec assistant chat (message : Message.Assistant.t) ~streaming =
     div
       (if streaming then "msg assistant streaming" else "msg assistant")
       ((pending :: blocks)
-       @ [ stopped; (if streaming then Node.none else footer message) ])
+       @ [ stopped; (if streaming then Node.none else footer times message) ])
 
-and render_entry chat (entry : Chat.Entry.t) =
+and render_entry times chat (entry : Chat.Entry.t) =
   match entry with
   | User u ->
     (match Prigh_ui.Delivery.parse u.text with
      | Some sections -> div "msg" [ Delivery_view.view sections ]
-     | None -> user u)
+     | None -> user times u)
   | Notice text -> div "msg notice" [ Node.text text ]
   | Shell call ->
     let tool = Chat.tool chat call.id in
     div
       "msg shell"
       [ Tool_view.view
-          ~nested:view
+          ~nested:(view times)
           ~streaming:false
           ~running:
             (Option.value_map tool ~default:true ~f:(fun t ->
@@ -151,11 +186,11 @@ and render_entry chat (entry : Chat.Entry.t) =
       ~label:"Context compacted"
       ~preview:(Markdown.preview summary)
       (Markdown_view.render summary)
-  | Assistant { message; streaming } -> assistant chat message ~streaming
+  | Assistant { message; streaming } -> assistant times chat message ~streaming
 
 (* An entry's card depends on the state of its tool calls, and on whether the
    agent is still running while one of them has no result. *)
-and entry chat (entry : Chat.Entry.t) =
+and entry times chat (entry : Chat.Entry.t) =
   let tools =
     match entry with
     | Assistant { message; _ } ->
@@ -173,11 +208,35 @@ and entry chat (entry : Chat.Entry.t) =
   View_cache.find
     entries
     entry
-    ~deps:{ Deps.running; tools }
+    ~deps:{ Deps.running; tools; times }
     ~equal:Deps.equal
-    ~f:(fun () -> render_entry chat entry)
+    ~f:(fun () -> render_entry times chat entry)
 
-and view chat =
-  View_cache.find chats chat ~deps:() ~equal:Unit.equal ~f:(fun () ->
-    div "entries" (List.map (Chat.entries chat) ~f:(entry chat)))
+(* Days are marked where they change, not above the first message: its time
+   already says which day it is. *)
+and view times chat =
+  View_cache.find chats chat ~deps:times ~equal:Message_time.equal ~f:(fun () ->
+    entries_view times chat)
+
+and entries_view times chat =
+  let entry_time : Chat.Entry.t -> Time_ns.t option = function
+    | User u -> u.at
+    | Assistant { message; _ } -> message.at
+    | Notice _ | Shell _ | Compaction _ -> None
+  in
+  let _, rev_nodes =
+    List.fold
+      (Chat.entries chat)
+      ~init:(None, [])
+      ~f:(fun (last_day, rev_nodes) e ->
+        let day = Option.map (entry_time e) ~f:(Message_time.date times) in
+        let rev_nodes =
+          match last_day, day with
+          | Some last, Some day when not (Date.equal last day) ->
+            day_separator times day :: rev_nodes
+          | _ -> rev_nodes
+        in
+        Option.first_some day last_day, entry times chat e :: rev_nodes)
+  in
+  div "entries" (List.rev rev_nodes)
 ;;

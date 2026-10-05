@@ -218,6 +218,125 @@ let%expect_test "how a reply stopped: error, interrupted, length" =
     |}]
 ;;
 
+let%expect_test
+    "times: under user messages and in replies' footers; days marked where \
+     they change"
+  =
+  let user ?at text =
+    sprintf
+      {|{"event":"message_start","message":{"role":"user","text":%S%s}}|}
+      text
+      (Option.value_map at ~default:"" ~f:(sprintf {|,"at":%s|}))
+  in
+  let reply ?(stop = {|{"type":"end_turn"}|}) ~at content =
+    sprintf
+      {|{"event":"message_end","message":{"role":"assistant","content":[%s],"stop_reason":%s,"usage":{"input":1200,"output":40,"cache_read":0},"model":"m","at":%s}}|}
+      (String.concat ~sep:"," content)
+      stop
+      at
+  in
+  (* Read on Monday 5 October 2026 at 15:00, two hours ahead of UTC. Times
+     are strings: under js_of_ocaml an [int] has 32 bits. *)
+  let chat =
+    Chat_harness.chat
+      [ user ~at:"1767218340000" "New year's eve" (* 2025-12-31 21:59Z *)
+      ; reply ~at:"1767225660000" [ text "Happy new year" ]
+        (* 2026-01-01 00:01Z *)
+      ; user "Written before sessions kept times"
+      ; user ~at:"1791021600000" "Saturday" (* 2026-10-03 10:00Z *)
+      ; reply
+          ~stop:{|{"type":"tool_use"}|}
+          ~at:"1791147600000" (* 2026-10-04 21:00Z: 23:00 local *)
+          [ text "Working late" ]
+      ; reply ~at:"1791153000000" [ text "Past midnight" ] (* 00:30 local *)
+      ; reply
+          ~stop:{|{"type":"aborted"}|}
+          ~at:"1791205170000" (* 14:59:30 local *)
+          [ text "Stopped" ]
+      ]
+  in
+  Chat_harness.text chat;
+  [%expect
+    {| New year's eve 31 Dec 2025 23:59 Thu 1 Jan Happy new year m · 1.2k in · 40 out · 1 Jan 02:01 Written before sessions kept times Sat 3 Oct Saturday 3 Oct 12:00 Yesterday Working late Today Past midnight m · 1.2k in · 40 out · 00:30 Stopped Interrupted 14:59 |}];
+  Chat_harness.show ~selector:".msg.user" chat;
+  [%expect
+    {|
+    <div class="msg user">
+      <div class="bubble"> New year's eve </div>
+      <time title="Wednesday 31 December 2025, 23:59:00" datetime="2025-12-31T21:59:00Z" class="time"> 31 Dec 2025 23:59 </time>
+    </div>
+    <div class="msg user">
+      <div class="bubble"> Written before sessions kept times </div>
+    </div>
+    <div class="msg user">
+      <div class="bubble"> Saturday </div>
+      <time title="Saturday 3 October 2026, 12:00:00" datetime="2026-10-03T10:00:00Z" class="time"> 3 Oct 12:00 </time>
+    </div>
+    |}];
+  Chat_harness.show ~selector:".meta" chat;
+  [%expect
+    {|
+    <div class="meta">
+      m · 1.2k in · 40 out
+       ·
+      <time title="Thursday 1 January 2026, 02:01:00" datetime="2026-01-01T00:01:00Z" class="time"> 1 Jan 02:01 </time>
+    </div>
+    <div class="meta">
+      m · 1.2k in · 40 out
+       ·
+      <time title="Monday 5 October 2026, 00:30:00" datetime="2026-10-04T22:30:00Z" class="time"> 00:30 </time>
+    </div>
+    <div class="meta">
+      <time title="Monday 5 October 2026, 14:59:30" datetime="2026-10-05T12:59:30Z" class="time"> 14:59 </time>
+    </div>
+    |}];
+  Chat_harness.show ~selector:".day-sep" chat;
+  [%expect
+    {|
+    <div role="separator" class="day-sep">
+      <span> Thu 1 Jan </span>
+    </div>
+    <div role="separator" class="day-sep">
+      <span> Sat 3 Oct </span>
+    </div>
+    <div role="separator" class="day-sep">
+      <span> Yesterday </span>
+    </div>
+    <div role="separator" class="day-sep">
+      <span> Today </span>
+    </div>
+    |}]
+;;
+
+let%expect_test
+    "live messages without a time get the one the page received them at"
+  =
+  let at = Time_ns.of_string_with_utc_offset "2026-10-05 12:59:00Z" in
+  List.iter
+    [ {|{"event":"message_start","message":{"role":"user","text":"no time"}}|}
+    ; {|{"event":"message_end","message":{"role":"user","text":"sent","at":1791194280000}}|}
+    ; {|{"event":"subagent","call_id":"c1","agent_id":"a1","inner":{"event":"message_end","message":{"role":"tool_result","tool_call_id":"c2","tool_name":"ls","text":"","is_error":false}}}|}
+    ; {|{"event":"tool_output","call_id":"c1","chunk":"x"}|}
+    ]
+    ~f:(fun json ->
+      let event =
+        Prigh_protocol.Event.of_json (Jsonaf.of_string json) |> Or_error.ok_exn
+      in
+      print_s [%sexp (Chat.received event ~at : Prigh_protocol.Event.t)]);
+  [%expect
+    {|
+    (Message_start (User ((text "no time") (at "2026-10-05 12:59:00Z"))))
+    (Message_end (User ((text sent) (at "2026-10-05 09:58:00Z"))))
+    (Subagent (call_id c1) (agent_id a1)
+     (event
+      (Message_end
+       (Tool_result
+        ((tool_call_id c2) (tool_name ls) (text "") (is_error false)
+         (at "2026-10-05 12:59:00Z"))))))
+    (Tool_output (call_id c1) (chunk x))
+    |}]
+;;
+
 let%expect_test "deliveries of background work: compact cards" =
   Chat_harness.show
     (Chat_harness.chat
@@ -382,8 +501,8 @@ let%expect_test "re-rendering reuses the entries that did not change" =
       ]
   in
   let compare before after =
-    let before = thunks (Chat_view.view before)
-    and after = thunks (Chat_view.view after) in
+    let before = thunks (Chat_view.view Chat_harness.times before)
+    and after = thunks (Chat_view.view Chat_harness.times after) in
     print_s
       [%sexp
         (Array.map2_exn before after ~f:(fun a b ->
@@ -391,7 +510,11 @@ let%expect_test "re-rendering reuses the entries that did not change" =
          : string array)]
   in
   print_s
-    [%sexp (phys_equal (Chat_view.view chat) (Chat_view.view chat) : bool)];
+    [%sexp
+      (phys_equal
+         (Chat_view.view Chat_harness.times chat)
+         (Chat_view.view Chat_harness.times chat)
+       : bool)];
   [%expect {| true |}];
   (* A streamed delta: only the streaming message. *)
   let chat' = Chat_harness.apply chat (update [ text "streaming" ]) in

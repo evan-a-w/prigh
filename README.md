@@ -232,7 +232,10 @@ built for the browser rather than mounting the terminal UI: a real DOM
 (Bonsai_web, js_of_ocaml) with a session sidebar, a chat transcript with
 markdown, collapsible tool calls and their images, model and thinking
 selectors, and a composer that takes pasted or dropped images, `/`
-commands, `@` paths and `!cmd` like the TUI. It speaks
+commands, `@` paths and `!cmd` like the TUI. Messages show when they were
+sent, in the browser's time zone (`14:32`, `Yesterday 14:32`, `3 Oct
+14:32`; the full date on hover): under your messages and in a reply's
+footer, with a separator where the day changes. It speaks
 prigh's own RPC (the same `/ws` protocol as `-web`), so it gets every
 backend feature without a translation layer like pi-web's.
 
@@ -590,7 +593,10 @@ never added to the conversation; their cost counts towards the session's.
 a JSON array of scripted provider replies, so demos and tests run without API
 calls; it implies `-faux`.
 
-Sessions are JSONL trees under `~/.prigh/sessions/`. Project instructions are
+Sessions are JSONL trees under `~/.prigh/sessions/`; each entry records when
+it was written (sessions from before that still load, without times), and
+the markdown `/export` puts each message's time (UTC) in its heading.
+Project instructions are
 read from `AGENTS.md`/`CLAUDE.md` files between `/` and the working
 directory, plus `~/.prigh/AGENTS.md`. When the tool host has `nix` on its
 PATH (as in the Docker image), the system prompt also tells the model to get
