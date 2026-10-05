@@ -10,6 +10,12 @@ type t =
   ; sends : unit Sequencer.t
   }
 
+let new_host_id () =
+  let state = Random.State.make_self_init ~allow_in_tests:true () in
+  "host-"
+  ^ String.init 16 ~f:(fun _ -> "0123456789abcdef".[Random.State.int state 16])
+;;
+
 let spawn_worker ~backend () =
   Stdio_transport.spawn ~prog:backend ~args:[ "tool-host" ] ()
 ;;
