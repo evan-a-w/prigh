@@ -832,7 +832,7 @@ let dialog_accept (m : Model.t) =
 
 let update (m : Model.t) (action : Action.t) =
   match action with
-  | Start -> m, startup
+  | Start -> m, (if m.narrow then [] else [ focus_editor ]) @ startup
   | Hello hello -> { m with hello = Some hello }, []
   | Event e -> event m e
   | Protocol_error e -> error m ("Protocol error: " ^ e)

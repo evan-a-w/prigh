@@ -309,9 +309,9 @@ let%expect_test "slash commands: the popup, arguments, running, unknown ones" =
     (Complete_accept (run false))
     "/model "
     Models ↑↓ Tab Enter Esc
-    GPT-6 openai
     Claude Opus 5.5 anthropic
     Claude Sonnet 5 anthropic
+    GPT-6 openai
     DeepSeek Chat deepseek
     |}];
   H.type_ h "/model gpt";

@@ -53,13 +53,15 @@ let argument_items
   =
   match kind with
   | Model ->
-    List.map models ~f:(fun model ->
+    let usable (model : Llm.t) = List.is_empty auth || logged_in auth model.provider in
+    List.stable_sort models ~compare:(fun a b -> Bool.compare (usable b) (usable a))
+    |> List.map ~f:(fun model ->
       Picker.Item.create
         ~id:model.key
         ~detail:model.provider
         ~search:(model.name ^ " " ^ model.key)
         ~marked:(Option.equal String.equal current_model (Some model.key))
-        ~dimmed:(not (List.is_empty auth || logged_in auth model.provider))
+        ~dimmed:(not (usable model))
         model.name)
   | Thinking ->
     List.map Prigh_ui.Commands.thinking_levels ~f:(fun level ->
