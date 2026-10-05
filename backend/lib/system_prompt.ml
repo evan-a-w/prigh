@@ -55,9 +55,12 @@ let base ~nix ~tools =
           [ "Subagents run in the background: subagent returns at once, and \
              each one's final report arrives later as a message starting with \
              \"[subagent <id> finished]\" (or failed), sent automatically, not \
-             typed by the user. While they run, keep working or end your turn; \
-             call subagent_wait only when you cannot continue without a \
-             result."
+             typed by the user. While they run, keep working on whatever does \
+             not depend on them, or end your turn: you are woken by each \
+             report, so never call subagent_wait (or job_wait) just to pass \
+             the time or to collect results you could take as they arrive. \
+             Wait only when you cannot do anything useful without a result, \
+             and then wait for that one (ids, all=false), not all of them."
           ; ""
           ]
         else [])
