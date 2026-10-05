@@ -789,6 +789,21 @@ samp {
 	border-radius: var(--radius-sm);
 	display: block;
 	margin-top: 6px;
+	cursor: zoom-in;
+}
+
+.msg-image.full {
+	max-width: 100%;
+	max-height: none;
+	cursor: zoom-out;
+}
+
+.tool-images {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: flex-start;
+	gap: 6px;
+	padding: 0 10px 8px;
 }
 
 .msg-assistant {

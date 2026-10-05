@@ -891,3 +891,48 @@ let%expect_test
     {"type":"agent_settled"}
     |}]
 ;;
+
+let%expect_test "images: prompts carry them, tool results and history show them"
+  =
+  with_server
+    [ Reply.tool_call
+        ~id:"c1"
+        ~name:"read"
+        ~arguments:{|{"path":"shot.png"}|}
+        ()
+    ; Reply.text "A red square."
+    ]
+  @@ fun h ->
+  let module F = Image_fixtures in
+  write h.sandbox "shot.png" (F.bytes F.png_3x2);
+  H.dump h;
+  cmd
+    h
+    ~fields:
+      (sprintf
+         {|, "message": "what is this?", "images": [{"type": "image", "data": "%s", "mimeType": "image/gif"}]|}
+         F.gif_5x4)
+    "prompt";
+  H.wait_for h "agent_settled";
+  keep
+    h
+    [ {|"type":"message_end","message":{"role":"user"|}; "tool_execution_end" ];
+  cmd
+    h
+    ~fields:
+      {|, "message": "", "images": [{"type": "image", "data": "Qk0=", "mimeType": "image/bmp"}]|}
+    "prompt";
+  H.dump h;
+  [%expect
+    {|
+    {"type":"extension_ui_request","id":"status-host","method":"setStatus","statusKey":"host","statusText":null}
+    {"type":"extension_ui_request","id":"status-branch","method":"setStatus","statusKey":"branch","statusText":null}
+    {"type":"message_end","message":{"role":"user","content":[{"type":"text","text":"what is this?"},{"type":"image","data":"R0lGODlhBQAEAPAAAAAA/wAAACH5BAAAAAAALAAAAAAFAAQAAAIEhI+ZBQA7","mimeType":"image/gif"}],"timestamp":0}}
+    {"type":"tool_execution_end","toolCallId":"c1","toolName":"read","args":{"path":"shot.png"},"result":{"content":[{"type":"text","text":"Read image file [image/png, 3x2]"},{"type":"image","data":"iVBORw0KGgoAAAANSUhEUgAAAAMAAAACAQMAAACnuvRZAAAAA1BMVEX/AAAZ4gk3AAAADElEQVQI12NgYGAAAAAEAAEnNCcKAAAAAElFTkSuQmCC","mimeType":"image/png"}]},"isError":false}
+    {"id":"q","type":"response","command":"prompt","success":false,"error":"unsupported image type image/bmp; models accept image/png, image/jpeg, image/gif and image/webp"}
+    |}];
+  cmd h "get_messages";
+  H.dump h;
+  [%expect
+    {| {"id":"q","type":"response","command":"get_messages","success":true,"data":{"messages":[{"role":"user","content":[{"type":"text","text":"what is this?"},{"type":"image","data":"R0lGODlhBQAEAPAAAAAA/wAAACH5BAAAAAAALAAAAAAFAAQAAAIEhI+ZBQA7","mimeType":"image/gif"}],"timestamp":0},{"role":"assistant","content":[{"type":"toolCall","id":"c1","name":"read","arguments":{"path":"shot.png"}}],"provider":"prigh","model":"deepseek-flash","stopReason":"toolUse","timestamp":1},{"role":"toolResult","toolCallId":"c1","toolName":"read","content":[{"type":"text","text":"Read image file [image/png, 3x2]"},{"type":"image","data":"iVBORw0KGgoAAAANSUhEUgAAAAMAAAACAQMAAACnuvRZAAAAA1BMVEX/AAAZ4gk3AAAADElEQVQI12NgYGAAAAAEAAEnNCcKAAAAAElFTkSuQmCC","mimeType":"image/png"}],"isError":false,"timestamp":2},{"role":"assistant","content":[{"type":"text","text":"A red square."}],"provider":"prigh","model":"deepseek-flash","stopReason":"stop","timestamp":3}]}} |}]
+;;

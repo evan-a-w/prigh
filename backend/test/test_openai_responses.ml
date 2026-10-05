@@ -57,6 +57,7 @@ let conversation =
       ; tool_name = "bash"
       ; text = "a\nb"
       ; is_error = false
+      ; images = []
       }
   ; Assistant
       { content =
@@ -363,5 +364,66 @@ let%expect_test "stream end to end against the codex endpoint" =
     openai-beta: responses=experimental
     originator: prigh
     {"effort":"medium","summary":"auto"}
+    |}]
+;;
+
+let%expect_test "images: in prompts and tool results" =
+  let body =
+    T.request_body
+      ~endpoint:(Codex { access_token = "t"; account_id = "acct" })
+      (request (Image_fixtures.conversation ~model:(Model.key codex_model)))
+  in
+  print_endline (Json.to_string_hum (Json.member_exn "input" body));
+  [%expect
+    {|
+    [
+      {
+        "type": "message",
+        "role": "user",
+        "content": [
+          {
+            "type": "input_text",
+            "text": "what is this?"
+          },
+          {
+            "type": "input_image",
+            "detail": "auto",
+            "image_url": "data:image/png;base64,SHOT"
+          }
+        ]
+      },
+      {
+        "type": "message",
+        "role": "user",
+        "content": [
+          {
+            "type": "input_image",
+            "detail": "auto",
+            "image_url": "data:image/jpeg;base64,PHOTO"
+          }
+        ]
+      },
+      {
+        "type": "function_call",
+        "call_id": "call_1",
+        "name": "read",
+        "arguments": "{\"path\":\"a.png\"}"
+      },
+      {
+        "type": "function_call_output",
+        "call_id": "call_1",
+        "output": [
+          {
+            "type": "input_text",
+            "text": "Read image file [image/png, 3x2]"
+          },
+          {
+            "type": "input_image",
+            "detail": "auto",
+            "image_url": "data:image/png;base64,READ"
+          }
+        ]
+      }
+    ]
     |}]
 ;;

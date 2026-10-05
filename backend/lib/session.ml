@@ -505,9 +505,14 @@ let tool_call_block (call : Content.Tool_call.t) =
 ;;
 
 let to_markdown t =
+  let images (images : Image.t list) =
+    List.map images ~f:(fun i -> sprintf "\n\n*[image: %s]*" i.mime_type)
+    |> String.concat
+  in
   let block (e : Entry.t) =
     match e.payload with
-    | Message (User u) -> Some (sprintf "## User\n\n%s" (String.strip u.text))
+    | Message (User u) ->
+      Some (sprintf "## User\n\n%s%s" (String.strip u.text) (images u.images))
     | Message (Assistant a) ->
       let segments =
         List.filter_map a.content ~f:(function
@@ -525,9 +530,10 @@ let to_markdown t =
     | Message (Tool_result r) ->
       Some
         (sprintf
-           "### Tool: %s\n\n```\n%s\n```"
+           "### Tool: %s\n\n```\n%s\n```%s"
            r.tool_name
-           (String.strip r.text))
+           (String.strip r.text)
+           (images r.images))
     | Model _ | Compaction _ | Name _ | Description _ | Cwd _ | System_prompt _
       -> None
   in

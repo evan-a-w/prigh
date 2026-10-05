@@ -61,10 +61,8 @@ let list_dirs ~cwd prefix =
   |> fun items -> Tool.Result.ok (Json.to_string (`Array items))
 ;;
 
-let read_file ~cwd path =
-  match Tool_read.read_for_context ~cwd path with
-  | Ok content -> Tool.Result.ok content
-  | Error e -> Tool.Result.error (Error.to_string_hum e)
+let read_file ~env ~cancel ~cwd path =
+  Tool_read.read_for_context ~env ~cancel ~cwd path
 ;;
 
 let instructions_op = "$instructions"
@@ -133,7 +131,7 @@ let execute ~env ~cancel ~on_output ~cwd ~name ~(arguments : Json.t) =
   else if String.equal name read_file_op
   then (
     match string_arg "path" with
-    | Ok path -> read_file ~cwd path
+    | Ok path -> read_file ~env ~cancel ~cwd path
     | Error e -> Tool.Result.error (Error.to_string_hum e))
   else if String.equal name list_paths_op
   then (

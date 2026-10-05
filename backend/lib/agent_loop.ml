@@ -33,6 +33,7 @@ let cancelled_result (call : Content.Tool_call.t) =
   ; tool_name = call.name
   ; text = "[cancelled]"
   ; is_error = true
+  ; images = []
   }
 ;;
 
@@ -100,6 +101,7 @@ let execute_tool
   ; tool_name = call.name
   ; text = result.text
   ; is_error = result.is_error
+  ; images = result.images
   }
 ;;
 

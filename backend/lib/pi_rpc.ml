@@ -502,7 +502,11 @@ let tool_end tools json =
     tool_fields tools id
     @ [ ( "result"
         , `Object
-            [ "content", P.tool_result_content (string_field "text" result) ] )
+            [ ( "content"
+              , P.tool_result_content
+                  ~images:(P.image_blocks result)
+                  (string_field "text" result) )
+            ] )
       ; "isError", field "is_error" result
       ]
   in
@@ -1019,6 +1023,13 @@ let set_thinking t level =
 
 let run_command t json =
   let arg name = string_field name json in
+  let message_params text =
+    ("text", str text)
+    ::
+    (match P.prigh_images json with
+     | [] -> []
+     | images -> [ "images", `Array images ])
+  in
   match string_field "type" json with
   | "prompt" ->
     let text = arg "message" in
@@ -1037,9 +1048,9 @@ let run_command t json =
         | "followUp" -> "follow_up"
         | _ -> "prompt"
       in
-      unit_ok (call t meth [ "text", str text ]))
-  | "steer" -> unit_ok (call t "steer" [ "text", str (arg "message") ])
-  | "follow_up" -> unit_ok (call t "follow_up" [ "text", str (arg "message") ])
+      unit_ok (call t meth (message_params text)))
+  | "steer" -> unit_ok (call t "steer" (message_params (arg "message")))
+  | "follow_up" -> unit_ok (call t "follow_up" (message_params (arg "message")))
   | "abort" -> unit_ok (call t "abort" [])
   | "get_state" ->
     Or_error.map (call t "get_state" []) ~f:(fun state ->

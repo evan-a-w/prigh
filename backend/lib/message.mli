@@ -1,7 +1,11 @@
 open! Core
 
 module User : sig
-  type t = { text : string } [@@deriving sexp, jsonaf, equal]
+  type t =
+    { text : string
+    ; images : Image.t list
+    }
+  [@@deriving sexp, jsonaf, equal]
 end
 
 module Assistant : sig
@@ -24,6 +28,7 @@ module Tool_result : sig
     ; tool_name : string
     ; text : string
     ; is_error : bool
+    ; images : Image.t list
     }
   [@@deriving sexp, jsonaf, equal]
 end
@@ -34,4 +39,4 @@ type t =
   | Tool_result of Tool_result.t
 [@@deriving sexp, jsonaf, equal]
 
-val user : string -> t
+val user : ?images:Image.t list -> string -> t

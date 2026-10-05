@@ -52,24 +52,43 @@ let same_provider ~provider (a : Message.Assistant.t) =
   | None -> false
 ;;
 
+let input_text text =
+  `Object [ "type", `String "input_text"; "text", `String text ]
+;;
+
+let input_image (image : Image.t) =
+  `Object
+    [ "type", `String "input_image"
+    ; "detail", `String "auto"
+    ; ( "image_url"
+      , `String (sprintf "data:%s;base64,%s" image.mime_type image.data) )
+    ]
+;;
+
 let input_items ~provider (messages : Message.t list) =
   List.concat_mapi messages ~f:(fun message_index m ->
     match m with
-    | User { text } ->
+    | User { text; images } ->
       [ `Object
           [ "type", `String "message"
           ; "role", `String "user"
           ; ( "content"
             , `Array
-                [ `Object [ "type", `String "input_text"; "text", `String text ]
-                ] )
+                ((if String.is_empty text && not (List.is_empty images)
+                  then []
+                  else [ input_text text ])
+                 @ List.map images ~f:input_image) )
           ]
       ]
     | Tool_result r ->
       [ `Object
           [ "type", `String "function_call_output"
           ; "call_id", `String r.tool_call_id
-          ; "output", `String r.text
+          ; ( "output"
+            , match r.images with
+              | [] -> `String r.text
+              | images ->
+                `Array (input_text r.text :: List.map images ~f:input_image) )
           ]
       ]
     | Assistant a ->

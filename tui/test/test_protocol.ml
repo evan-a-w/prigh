@@ -73,7 +73,7 @@ let%expect_test "state event and messages" =
         (hosts     ())
         (subagents ())
         (jobs      ()))))
-    (Event (Message_start (User hi)))
+    (Event (Message_start (User ((text hi)))))
     (Event (
       Message_end (
         Assistant (
@@ -120,13 +120,78 @@ let%expect_test "state event and messages" =
       Tool_output
       (call_id c1)
       (chunk   "line\n")))
-    (Event (Agent_end ((User x))))
+    (Event (Agent_end ((User ((text x))))))
     (Event (Compacted s))
     (Event (Notice n))
     (Event (
       Queue_update
       (steer     2)
       (follow_up 1)))
+    |}]
+;;
+
+let%expect_test "images in user messages and tool results (absent means none)" =
+  decode
+    {|{"type":"event","event":"message_start","message":{"role":"user","text":"what is this?","images":[{"mime_type":"image/png","data":"iVBORw0KGgo="},{"mime_type":"image/webp","data":"UklGRg"}]}}|};
+  decode
+    {|{"type":"event","event":"message_start","message":{"role":"user","text":"none","images":[]}}|};
+  decode
+    {|{"type":"event","event":"tool_end","call":{"id":"c1","name":"read","arguments":"{\"path\":\"shot.png\"}"},"result":{"role":"tool_result","tool_call_id":"c1","tool_name":"read","text":"Read image file [image/png, 800x600]","is_error":false,"images":[{"mime_type":"image/png","data":"iVBORw0KGgo="}]}}|};
+  decode
+    {|{"type":"event","event":"message_end","message":{"role":"tool_result","tool_call_id":"c1","tool_name":"read","text":"t","is_error":false,"images":[{"mime_type":"image/png"}]}}|};
+  [%expect
+    {|
+    (Event (
+      Message_start (
+        User (
+          (text "what is this?")
+          (images (
+            ((mime_type image/png)  (bytes 8))
+            ((mime_type image/webp) (bytes 4))))))))
+    (Event (Message_start (User ((text none)))))
+    (Event (
+      Tool_end
+      (call (
+        (id        c1)
+        (name      read)
+        (arguments "{\"path\":\"shot.png\"}")))
+      (result (
+        (tool_call_id c1)
+        (tool_name    read)
+        (text         "Read image file [image/png, 800x600]")
+        (is_error     false)
+        (images ((
+          (mime_type image/png)
+          (bytes     8))))))))
+    (error (
+      e (
+        "while decoding"
+        "{\"type\":\"event\",\"event\":\"message_end\",\"message\":{\"role\":\"tool_result\",\"tool_call_id\":\"c1\",\"tool_name\":\"read\",\"text\":\"t\",\"is_error\":false,\"images\":[{\"mime_type\":\"image/png\"}]}}"
+        (in images[0] "missing field \"data\""))))
+    |}]
+;;
+
+let%expect_test "image sizes come from the base64 length, padded or not" =
+  List.iter
+    [ ""; "QQ=="; "QQ"; "QUI="; "QUI"; "QUJD"; "iVBORw0KGgo=" ]
+    ~f:(fun data ->
+      print_s [%message data ~bytes:(Image.decoded_size data : int)]);
+  List.iter [ 0; 1023; 1024; 35021; 1_572_864 ] ~f:(fun bytes ->
+    print_endline (Image.to_string_hum { mime_type = "image/jpeg"; bytes }));
+  [%expect
+    {|
+    ("" (bytes 0))
+    (QQ== (bytes 1))
+    (QQ (bytes 1))
+    (QUI= (bytes 2))
+    (QUI (bytes 2))
+    (QUJD (bytes 3))
+    (iVBORw0KGgo= (bytes 8))
+    [image: image/jpeg, 0 B]
+    [image: image/jpeg, 1023 B]
+    [image: image/jpeg, 1.0 KB]
+    [image: image/jpeg, 34.2 KB]
+    [image: image/jpeg, 1.5 MB]
     |}]
 ;;
 
@@ -508,7 +573,7 @@ let%expect_test "entries and session stats" =
      (live    false)
      (running false)
      (clients 0))
-    ((id e1) (parent ()) (kind (Message (User "first\nsecond"))))
+    ((id e1) (parent ()) (kind (Message (User ((text "first\nsecond"))))))
     ((id e2)
      (parent (e1))
      (kind (

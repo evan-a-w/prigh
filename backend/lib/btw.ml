@@ -7,6 +7,7 @@ let still_running (call : Content.Tool_call.t) =
     ; tool_name = call.name
     ; text = "[still running: no result yet]"
     ; is_error = false
+    ; images = []
     }
 ;;
 

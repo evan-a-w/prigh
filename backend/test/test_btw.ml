@@ -25,6 +25,7 @@ let result id =
     ; tool_name = "ls"
     ; text = "out-" ^ id
     ; is_error = false
+    ; images = []
     }
 ;;
 

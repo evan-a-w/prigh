@@ -51,13 +51,19 @@ let relay t line =
          | Some `True -> true
          | _ -> false
        in
+       let images =
+         match field "images" with
+         | Some (`Array (_ :: _) as images) -> [ "images", images ]
+         | _ -> []
+       in
        call
          t
          "tool_exec_result"
-         [ "exec_id", `String exec_id
-         ; "text", `String (string_field "text")
-         ; ("is_error", if is_error then `True else `False)
-         ]
+         ([ "exec_id", `String exec_id
+          ; "text", `String (string_field "text")
+          ; ("is_error", if is_error then `True else `False)
+          ]
+          @ images)
      | Some (`String "terminal_frame"), _, Some (`String term_id) ->
        call
          t

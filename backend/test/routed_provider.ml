@@ -16,7 +16,7 @@ let key_of (request : Provider.Request.t) =
   then "main"
   else (
     match request.messages with
-    | Message.User { text } :: _ -> text
+    | Message.User { text; _ } :: _ -> text
     | _ -> "?")
 ;;
 

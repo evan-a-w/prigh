@@ -640,9 +640,15 @@ let first_line text =
   | [] -> ""
 ;;
 
+let user_first_line ({ text; images } : P.Message.User.t) =
+  match first_line text, images with
+  | "", image :: _ -> P.Image.to_string_hum image
+  | line, _ -> line
+;;
+
 let message_first_line (m : P.Message.t) =
   match m with
-  | P.Message.User text -> first_line text
+  | P.Message.User user -> user_first_line user
   | P.Message.Assistant { content; _ } ->
     (match
        List.find_map content ~f:(function
@@ -659,7 +665,7 @@ let message_first_line (m : P.Message.t) =
 let user_entries entries =
   List.filter_map entries ~f:(fun (entry : P.Entry.t) ->
     match entry.kind with
-    | P.Entry.Kind.Message (P.Message.User text) -> Some (entry, text)
+    | P.Entry.Kind.Message (P.Message.User user) -> Some (entry, user)
     | _ -> None)
 ;;
 
@@ -667,12 +673,12 @@ let entry_picker m kind ~title entries =
   let users = user_entries entries in
   let count = List.length users in
   let items =
-    List.mapi users ~f:(fun i ((entry : P.Entry.t), text) ->
+    List.mapi users ~f:(fun i ((entry : P.Entry.t), user) ->
       Picker.Item.create
         ~id:entry.id
         ~detail:(sprintf "#%d" (i + 1))
         ~marked:(i = count - 1)
-        (first_line text))
+        (user_first_line user))
   in
   if List.is_empty items
   then notice m "no user messages"
@@ -2081,7 +2087,7 @@ let picker_selected m (kind : Mode.Picker_kind.t) (item : Picker.Item.t) =
        List.find entries ~f:(fun (entry : P.Entry.t) ->
          String.equal entry.id item.id)
      with
-     | Some { kind = P.Entry.Kind.Message (P.Message.User text); _ } ->
+     | Some { kind = P.Entry.Kind.Message (P.Message.User { text; _ }); _ } ->
        ( { m with editor = Editor.set_text m.editor text }
        , [ rpc "fork" ~params:[ "at", str item.id ] ~tag:Reload_messages ] )
      | _ -> m, [])

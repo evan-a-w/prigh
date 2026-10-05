@@ -4,7 +4,7 @@
  * calls. Used for the session's chat (state.ts) and a subagent's
  * (subagent-view.ts).
  */
-import type { AgentMessage, ToolResultLike, ToolResultMessage } from "./protocol.ts";
+import type { AgentMessage, ImageContent, ToolResultLike, ToolResultMessage } from "./protocol.ts";
 
 export interface ToolDisplayState {
 	name: string;
@@ -12,6 +12,8 @@ export interface ToolDisplayState {
 	status: "running" | "done";
 	partial?: string;
 	output?: string;
+	/** The result's image blocks (e.g. `read` on a png). */
+	images?: ImageContent[];
 	isError?: boolean;
 }
 
@@ -55,6 +57,28 @@ export function extractResultText(result: ToolResultLike | undefined): string | 
 	return texts.length > 0 ? texts.join("\n") : undefined;
 }
 
+export function extractResultImages(result: ToolResultLike | undefined): ImageContent[] | undefined {
+	if (!result || !Array.isArray(result.content)) {
+		return undefined;
+	}
+	const images: ImageContent[] = [];
+	for (const block of result.content) {
+		if (
+			block &&
+			typeof block === "object" &&
+			"type" in block &&
+			block.type === "image" &&
+			"data" in block &&
+			typeof block.data === "string" &&
+			"mimeType" in block &&
+			typeof block.mimeType === "string"
+		) {
+			images.push({ type: "image", data: block.data, mimeType: block.mimeType });
+		}
+	}
+	return images.length > 0 ? images : undefined;
+}
+
 /** Tool states as the history alone tells them: calls without a result are still running. */
 export function rebuildToolStates(history: AgentMessage[]): ToolStates {
 	const resultsByToolCallId = new Map<string, ToolResultMessage>();
@@ -74,6 +98,7 @@ export function rebuildToolStates(history: AgentMessage[]): ToolStates {
 				args: toolCall.arguments,
 				status: result ? "done" : "running",
 				output: result ? extractResultText(result) : undefined,
+				images: result ? extractResultImages(result) : undefined,
 				isError: result?.isError,
 			};
 		}
@@ -96,6 +121,7 @@ export function applyToolEvent(states: ToolStates, event: ConversationEvent): To
 				status: "running",
 				partial: undefined,
 				output: undefined,
+				images: undefined,
 				isError: undefined,
 			});
 		case "tool_execution_update":
@@ -104,6 +130,7 @@ export function applyToolEvent(states: ToolStates, event: ConversationEvent): To
 			return setToolState(states, event.toolCallId, {
 				status: "done",
 				output: extractResultText(event.result),
+				images: extractResultImages(event.result),
 				isError: event.isError,
 			});
 		default:

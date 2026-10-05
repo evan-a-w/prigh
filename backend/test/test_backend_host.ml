@@ -244,7 +244,7 @@ let%expect_test "backend host disabled" =
     name ^ " ran on laptop");
   new_tool_results agent ~seen;
   List.iter (Agent.messages agent) ~f:(function
-    | User { text } when String.is_prefix text ~prefix:"[subagent" ->
+    | User { text; _ } when String.is_prefix text ~prefix:"[subagent" ->
       printf "delivered: %S\n" text
     | _ -> ());
   [%expect
@@ -310,7 +310,7 @@ let%expect_test "backend host enabled: git branch and terminal targets" =
 
 let delivered agent =
   List.iter (Agent.messages agent) ~f:(function
-    | User { text } when String.is_prefix text ~prefix:"[subagent" ->
+    | User { text; _ } when String.is_prefix text ~prefix:"[subagent" ->
       printf "delivered: %S\n" text
     | _ -> ())
 ;;

@@ -16,7 +16,8 @@ prigh is a coding agent. Read `README.md` for what it does and
 - `tui/`'s `@runtest` includes the e2e and tmux tests, which run
   `backend/_build/default/bin/main.exe`: build the backend first. They need
   a terminal multiplexer (`tmux`) and can be slow; `dune build @test/runtest`
-  runs only the unit tests.
+  runs only the unit tests. `$PRIGH_BACKEND` overrides that path: unset it
+  (e.g. when working inside prigh, which sets it) to test your build.
 - The flakes use the binary cache `prigh.cachix.org`; pass
   `--accept-flake-config` to Nix in non-interactive use.
 - Only have one dune process running at a time, otherwise it hangs. E.g. if
@@ -103,6 +104,3 @@ Keep docs current: update `README.md`, `ARCHITECTURE.md`, `DOCKER.md` or
 `pi-web/README.md` when behaviour they describe changes, and this file when
 the conventions or the workflow change. Don't add plan or handoff documents
 to the repository.
-
-Please limit usage of claude models. If I have explicitly chosen you to be
-claude, that's fine, but for subagents prefer non claude models.

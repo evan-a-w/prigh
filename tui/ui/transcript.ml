@@ -28,7 +28,7 @@ end
 
 module Item = struct
   type t =
-    | User of string
+    | User of P.Message.User.t
     | Assistant of
         { text : string
         ; final : bool
@@ -133,8 +133,10 @@ module Delivery = struct
   ;;
 end
 
-let user_item text : Item.t =
-  if Option.is_some (Delivery.parse text) then Delivery text else User text
+let user_item (user : P.Message.User.t) : Item.t =
+  if Option.is_some (Delivery.parse user.text)
+  then Delivery user.text
+  else User user
 ;;
 
 module Stream_kind = struct
@@ -247,7 +249,7 @@ let pair_result t (r : P.Message.Tool_result.t) =
 
 let add_message t (m : P.Message.t) =
   match m with
-  | User text -> add t (user_item text)
+  | User user -> add t (user_item user)
   | Tool_result r -> pair_result t r
   | Assistant a ->
     let final = P.Stop_reason.equal P.Stop_reason.End_turn a.stop_reason in
@@ -278,6 +280,7 @@ let dim = Style.dim Style.plain
 let red = Style.fg Red
 let green = Style.fg Green
 let magenta = Style.fg Magenta
+let cyan = Style.fg Cyan
 
 let summarise_arguments (call : P.Tool_call.t) =
   match P.Json.parse call.arguments with
@@ -328,6 +331,17 @@ let rec pretty_json ?(indent = 0) (json : P.Json.t) : string list =
 
 let count_lines text = List.length (String.split_lines (String.rstrip text))
 let plural_lines n = if n = 1 then "1 line" else sprintf "%d lines" n
+
+let plural_images = function
+  | [] -> ""
+  | [ _ ] -> ", 1 image"
+  | images -> sprintf ", %d images" (List.length images)
+;;
+
+let render_images images : Content.t =
+  List.map images ~f:(fun image ->
+    Content.Line.of_string ~style:cyan ("  " ^ P.Image.to_string_hum image))
+;;
 
 let first_line text =
   match String.split_lines text with
@@ -463,7 +477,7 @@ let merged_tool_line
       | Some r ->
         ( (if r.is_error then "✗" else "✓")
         , (if r.is_error then red else green)
-        , " " ^ plural_lines (count_lines r.text) )
+        , " " ^ plural_lines (count_lines r.text) ^ plural_images r.images )
     in
     (match result with
      | Some r when r.is_error ->
@@ -490,7 +504,8 @@ let render_tool
     let merged = merged_tool_line call result in
     (match result with
      | Some r when r.is_error ->
-       merged :: render_result ~show_more:false r ~max_lines:3
+       (merged :: render_result ~show_more:false r ~max_lines:3)
+       @ render_images r.images
      | _ -> [ merged ])
   | Normal ->
     (match result with
@@ -501,13 +516,14 @@ let render_tool
          match result with
          | None -> render_live_tail live_tail ~max_lines:1
          | Some r ->
-           if r.is_error
-           then render_result r ~max_lines:8
-           else if is_diff r.text
-           then render_diff r.text ~max_lines:5
-           else if String.equal call.name "bash"
-           then render_bash r
-           else render_result r ~max_lines:5
+           (if r.is_error
+            then render_result r ~max_lines:8
+            else if is_diff r.text
+            then render_diff r.text ~max_lines:5
+            else if String.equal call.name "bash"
+            then render_bash r
+            else render_result r ~max_lines:5)
+           @ render_images r.images
        in
        render_call call @ output)
   | Verbose ->
@@ -515,9 +531,10 @@ let render_tool
       match result with
       | None -> render_live_tail live_tail ~max_lines:tail_lines
       | Some r ->
-        if is_diff r.text
-        then render_diff r.text
-        else render_result r ~max_lines:Int.max_value
+        (if is_diff r.text
+         then render_diff r.text
+         else render_result r ~max_lines:Int.max_value)
+        @ render_images r.images
     in
     render_call_full call @ output
 ;;
@@ -621,6 +638,7 @@ let finish_subagent
     ; tool_name = "subagent"
     ; text = result.text
     ; is_error = result.is_error
+    ; images = []
     }
   in
   let rec go acc = function
@@ -654,7 +672,7 @@ let finish_subagent
 let apply t (event : P.Event.t) =
   match event with
   | P.Event.State state -> if state.running then t else flush t
-  | P.Event.Message_start (P.Message.User text) -> add t (user_item text)
+  | P.Event.Message_start (P.Message.User user) -> add t (user_item user)
   | P.Event.Message_start _ -> t
   | P.Event.Message_update { delta = P.Delta.Text_delta text; _ } ->
     append t Text text
@@ -758,11 +776,15 @@ let render_subagent ~(verbosity : Verbosity.t) (s : Subagent.t) : Content.t =
 
 let render_item (item : Item.t) ~(verbosity : Verbosity.t) : Content.t =
   match item with
-  | User text ->
-    List.map (String.split_lines text) ~f:(fun l ->
+  | User { text; images } ->
+    let line text style : Content.Line.t =
       [ { Content.Span.text = "> "; style = Style.bold (Style.fg Green) }
-      ; { text = l; style = Style.bold Style.plain }
-      ])
+      ; { text; style }
+      ]
+    in
+    List.map (String.split_lines text) ~f:(fun l ->
+      line l (Style.bold Style.plain))
+    @ List.map images ~f:(fun image -> line (P.Image.to_string_hum image) cyan)
   | Assistant { text; final } ->
     (match verbosity with
      | Quiet when not final ->

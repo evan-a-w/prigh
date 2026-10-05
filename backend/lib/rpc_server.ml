@@ -90,6 +90,31 @@ let string_list_param params name =
   | Some _ -> Or_error.errorf "param %S must be an array of strings" name
 ;;
 
+(* Images from clients are checked, and downscaled when too large. *)
+let images_param ~env params =
+  match param params "images" with
+  | None | Some `Null -> Ok []
+  | Some (`Array items) ->
+    Or_error.all
+      (List.map items ~f:(fun item ->
+         match Json.member "mime_type" item, Json.member "data" item with
+         | Some (`String mime_type), Some (`String data) ->
+           Image.of_base64 ~env ~mime_type data
+         | _ ->
+           Or_error.error_string
+             "param \"images\" must contain {mime_type, data} objects"))
+  | Some _ -> Or_error.error_string "param \"images\" must be an array"
+;;
+
+(* From a tool host: already checked there. *)
+let tool_images_param params =
+  match param params "images" with
+  | None | Some `Null -> Ok []
+  | Some json ->
+    Or_error.try_with (fun () -> [%of_jsonaf: Image.t list] json)
+    |> Or_error.tag ~tag:"param \"images\""
+;;
+
 let ok json = Ok json
 let empty = ok (`Object [])
 let unit_result r = Or_error.map r ~f:(fun () -> `Object [])
@@ -598,13 +623,16 @@ let dispatch_server t (client : Client.t) ~meth ~params
   | "tool_exec_result" ->
     Some
       (Or_error.bind (exec_param t params) ~f:(fun (exec_id, agent) ->
-         Or_error.bind (string_param params "text") ~f:(fun text ->
-           Or_error.bind
-             (bool_param params "is_error" ~default:false)
-             ~f:(fun is_error ->
-               Hashtbl.remove t.execs exec_id;
-               unit_result
-                 (Agent.tool_exec_result agent ~exec_id ~text ~is_error)))))
+         let open Or_error.Let_syntax in
+         let%bind text = string_param params "text" in
+         let%bind is_error = bool_param params "is_error" ~default:false in
+         let%bind images = tool_images_param params in
+         Hashtbl.remove t.execs exec_id;
+         unit_result
+           (Agent.tool_exec_result
+              agent
+              ~exec_id
+              { Tool_result.text; is_error; images })))
   | "btw" -> Some (btw t client params)
   | "btw_cancel" ->
     Some
@@ -686,26 +714,19 @@ let dispatch_server t (client : Client.t) ~meth ~params
 let dispatch agent login ~meth ~params : Json.t Or_error.t =
   match meth with
   | "ping" -> ok (`String "pong")
-  | "prompt" ->
-    Or_error.bind (string_param params "text") ~f:(fun text ->
-      Or_error.bind
-        (string_list_param params "attachments")
-        ~f:(fun attachments ->
-          unit_result (Agent.prompt ~attachments agent text)))
-  | "steer" ->
-    Or_error.bind (string_param params "text") ~f:(fun text ->
-      Or_error.map
-        (string_list_param params "attachments")
-        ~f:(fun attachments ->
-          Agent.steer ~attachments agent text;
-          `Object []))
-  | "follow_up" ->
-    Or_error.bind (string_param params "text") ~f:(fun text ->
-      Or_error.map
-        (string_list_param params "attachments")
-        ~f:(fun attachments ->
-          Agent.follow_up ~attachments agent text;
-          `Object []))
+  | ("prompt" | "steer" | "follow_up") as meth ->
+    let open Or_error.Let_syntax in
+    let%bind text = string_param params "text" in
+    let%bind attachments = string_list_param params "attachments" in
+    let%bind images = images_param ~env:(Agent.env agent) params in
+    (match meth with
+     | "prompt" -> unit_result (Agent.prompt ~attachments ~images agent text)
+     | "steer" ->
+       Agent.steer ~attachments ~images agent text;
+       empty
+     | _ ->
+       Agent.follow_up ~attachments ~images agent text;
+       empty)
   | "abort" ->
     let restored = Agent.abort agent in
     ok

@@ -176,3 +176,29 @@ jobs backend exited
   event state running=false model=deepseek/deepseek-flash
 <- get_messages: 4 message(s)
 btw backend exited
+<- prompt: ()
+  event state running=true model=deepseek/deepseek-flash
+  event user "what is in @shot.png?\n\n<file path=\"shot.png\">\nRead image file [image/png, 3x2]\n</file>"
+  event message_end
+  event message_start
+  event text_delta "reading"
+  event assistant_end Tool_use
+  event tool_start read
+  event tool_end read
+  event message_start
+  event message_end
+  event message_start
+  event text_delta "a red square"
+  event assistant_end End_turn
+  event state running=false model=deepseek/deepseek-flash
+<- user: ((text
+   "what is in @shot.png?\
+  \n\
+  \n<file path=\"shot.png\">\
+  \nRead image file [image/png, 3x2]\
+  \n</file>")
+ (images
+  (((mime_type image/gif) (bytes 45)) ((mime_type image/png) (bytes 84)))))
+<- tool_result: ((tool_call_id i1) (tool_name read) (text "Read image file [image/png, 3x2]")
+ (is_error false) (images (((mime_type image/png) (bytes 84)))))
+images backend exited

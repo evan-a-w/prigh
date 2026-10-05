@@ -501,7 +501,7 @@ let%expect_test "job ids continue after a reload; subagents cannot start jobs" =
   Agent.wait_idle second;
   print_messages
     (List.drop_while (Agent.messages second) ~f:(function
-       | User { text } -> not (String.equal text "again")
+       | User { text; _ } -> not (String.equal text "again")
        | _ -> true));
   [%expect
     {|

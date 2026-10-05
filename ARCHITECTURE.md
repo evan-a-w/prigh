@@ -104,6 +104,14 @@ while it is waiting on the browser.
   items) and is echoed back only to the provider that produced it.
 - `Message` — `User | Assistant | Tool_result`; assistant messages carry
   usage, stop reason and the `provider/id` key of the model that wrote them.
+  User messages and tool results carry `images` (`Image.t`: MIME type and
+  base64), as do `Tool_result.t`s; in sessions and on the wire the field is
+  omitted when empty.
+- `Image` — what models accept: PNG/JPEG/GIF/WebP sniffed from the bytes,
+  dimensions from the header, and `load`, which downscales anything over
+  2000 px or 4.5 MB of base64 by running ImageMagick or `sips` (PNG, then
+  JPEG at falling quality and size) and adds a note with the scale factor
+  for the model; without one, images within the hard limits go as they are.
 - `Assistant_event` / `Assistant_builder` — the streaming delta vocabulary
   (`Text_delta`, `Thinking_delta`, `Thinking_signature`, `Tool_call_start`,
   `Tool_call_delta`) and the accumulator that turns deltas into a message.
@@ -120,10 +128,14 @@ while it is waiting on the browser.
 
 Each provider module converts `Provider.Request.t` (model, system prompt,
 messages, tool specs, thinking level) to its wire format, streams SSE, and
-maps events back to `Assistant_event.t`:
+maps events back to `Assistant_event.t`. Images follow the text: Anthropic
+`image` blocks (base64 source; a tool result's `content` becomes a block
+list), OpenAI `input_image` data URLs (a `function_call_output`'s `output`
+becomes a list):
 
 - `Deepseek` — OpenAI-compatible chat completions (`reasoning_content`,
-  index-based tool-call argument accumulation).
+  index-based tool-call argument accumulation). Its models take no images:
+  each becomes a line saying it was omitted.
 - `Anthropic` — Messages API. Consecutive same-role turns are merged, the
   last block and the system blocks carry cache breakpoints, thinking blocks
   are replayed only with a signature. With an OAuth token (Claude Pro/Max) the
@@ -203,7 +215,8 @@ two can share one.
   worker loop around it (`exec`/`cancel` in, `output`/`result` out, one fiber
   per exec).
 - `Tool_bash` (streamed output, timeout, cancellation; with `background`
-  at depth 0 it starts a job instead, see below), `Tool_read`,
+  at depth 0 it starts a job instead, see below), `Tool_read` (images
+  through `Image.load`, as an image result),
   `Tool_write` (`wrote N lines`), `Tool_edit` (multi-edit, unique
   non-overlapping matches, atomic; returns a unified diff from `Udiff`),
   `Tool_ls`, `Tool_grep`/`Tool_find` (via `rg`).
@@ -309,7 +322,9 @@ two can share one.
   id); `queued_texts` and `pending_confirms` back `get_pending`; the in-place
   `new_session`/`switch_session` cancel them and drop their reports.
   `prompt`/`steer`/`follow_up` accept optional `attachments`
-  (paths whose contents are appended to the user message as `<file>` blocks).
+  (paths whose contents are appended to the user message as `<file>` blocks;
+  image files are read like `read` does and attached as images) and
+  `images`.
   Subagent and `btw` usage is rolled up into `State.usage`/`cost_usd`
   (never `context_tokens`), and `State` also carries the session name, cwd
   and `git_branch`. `respond_confirm` answers a pending `Tool_confirm`.
@@ -464,7 +479,9 @@ two can share one.
 - `Pi_protocol` / `Pi_rpc` — pi's RPC protocol (what pi's web UI in
   `pi-web/` speaks) on top of `Rpc_server`: one WebSocket connection is one
   prigh client (`connect`/`handle`/`disconnect`); pi commands become prigh
-  requests (`prompt` with `streamingBehavior` → `steer`/`follow_up`,
+  requests (`prompt` with `streamingBehavior` → `steer`/`follow_up`, its
+  `images` passed on, which come back as pi `image` blocks in user and tool
+  result content,
   `set_model {provider, modelId}` → `provider/id`, pi's seven thinking
   levels ↔ prigh's five, `fork {entryId}` → fork at the entry's parent,
   `bash` → `shell`) and prigh events become pi's (`message_update` carrying
@@ -534,7 +551,7 @@ copy of the protocol types and the e2e test guards the contract.
   spawns the backend, `Tcp_transport` connects to `-listen` — and
   `Tool_host` (spawns `prigh tool-host` lazily and proxies
   `Tool_exec`/`Tool_exec_cancel` events to it and its `output`/`result`
-  lines back as `tool_exec_*` requests).
+  lines back as `tool_exec_*` requests, a result's `images` verbatim).
 - `ui/` (`prigh_ui`) — **platform-agnostic**, depends only on `core` and
   `bonsai`; it is what both the terminal and a future web frontend mount.
   - `App` is an Elm-style pure state machine: `update : Model.t -> Action.t

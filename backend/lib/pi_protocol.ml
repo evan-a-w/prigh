@@ -69,8 +69,25 @@ let arguments_object s =
   | Ok _ | Error _ -> `Object []
 ;;
 
-let tool_result_content text =
-  `Array [ `Object [ "type", str "text"; "text", str text ] ]
+let text_block text = `Object [ "type", str "text"; "text", str text ]
+
+let image_blocks json =
+  List.map (list_field "images" json) ~f:(fun image ->
+    `Object
+      [ "type", str "image"
+      ; "data", field "data" image
+      ; "mimeType", field "mime_type" image
+      ])
+;;
+
+let tool_result_content ?(images = []) text = `Array (text_block text :: images)
+
+let prigh_images json =
+  List.filter_map (list_field "images" json) ~f:(fun image ->
+    match field "data" image, field "mimeType" image with
+    | (`String _ as data), (`String _ as mime_type) ->
+      Some (`Object [ "mime_type", mime_type; "data", data ])
+    | _ -> None)
 ;;
 
 let stop_reason json =
@@ -125,13 +142,23 @@ let message ~timestamp json =
       ([ "role", str "toolResult"
        ; "toolCallId", str (string_field "tool_call_id" json)
        ; "toolName", str (string_field "tool_name" json)
-       ; "content", tool_result_content (string_field "text" json)
+       ; ( "content"
+         , tool_result_content
+             ~images:(image_blocks json)
+             (string_field "text" json) )
        ; "isError", bool (bool_field "is_error" json)
        ]
        @ ts)
   | _ ->
-    `Object
-      ([ "role", str "user"; "content", str (string_field "text" json) ] @ ts)
+    let text = string_field "text" json in
+    let content =
+      match image_blocks json with
+      | [] -> str text
+      | images ->
+        `Array
+          ((if String.is_empty text then [] else [ text_block text ]) @ images)
+    in
+    `Object ([ "role", str "user"; "content", content ] @ ts)
 ;;
 
 let model json =
