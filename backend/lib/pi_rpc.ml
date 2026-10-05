@@ -618,6 +618,23 @@ let auth_event t json =
             ; ( "options"
               , `Array (List.map options ~f:(fun (label, _) -> str label)) )
             ])
+     | "text" ->
+       (* pi-web prefills; an empty answer means the default anyway. *)
+       let default = string_field "default" json in
+       let placeholder =
+         if String.is_empty default
+         then string_field "placeholder" json
+         else default
+       in
+       Hashtbl.set t.dialogs ~key:dialog_id ~data:on_response;
+       t.write
+         (P.ui_request
+            ~id:dialog_id
+            ~meth:"input"
+            [ "title", str message
+            ; "placeholder", str placeholder
+            ; "prefill", str default
+            ])
      | _ ->
        Hashtbl.set t.dialogs ~key:dialog_id ~data:on_response;
        t.write
@@ -805,13 +822,30 @@ let auth_status t =
                 (string_field "source" c)
             | _ -> "not logged in"
           in
-          sprintf
-            "- **%s** `%s`: %s"
-            (string_field "name" s)
-            (string_field "provider" s)
-            configured)
+          match field "custom" s with
+          | `Object _ as c ->
+            sprintf
+              "- **%s** (custom) %s, %s: %s"
+              (string_field "provider" s)
+              (string_field "base_url" c)
+              (string_field "api_label" c)
+              (match field "configured" s with
+               | `Object _ as c -> string_field "source" c
+               | _ -> "no key")
+          | _ ->
+            sprintf
+              "- **%s** `%s`: %s"
+              (string_field "name" s)
+              (string_field "provider" s)
+              configured)
     in
-    show t ~kind:"auth" (String.concat ~sep:"\n" ("Providers:" :: lines)))
+    show
+      t
+      ~kind:"auth"
+      (String.concat
+         ~sep:"\n"
+         (("Providers:" :: lines)
+          @ [ ""; "`/login custom` adds an OpenAI-compatible endpoint." ])))
 ;;
 
 let login t args =
@@ -829,8 +863,16 @@ let login t args =
           (Option.value (Json.list statuses) ~default:[])
           ~f:(fun s ->
             List.map (list_field "methods" s) ~f:(fun m ->
-              ( string_field "label" m
+              ( (match field "custom" s with
+                 | `Object c ->
+                   sprintf
+                     "%s (custom: %s)"
+                     (string_field "provider" s)
+                     (string_field "base_url" (`Object c))
+                 | _ -> string_field "label" m)
               , (string_field "provider" s, string_field "method" m) )))
+        @ [ "Custom (add an OpenAI-compatible endpoint)", ("custom", "api_key")
+          ]
       in
       select t ~title:"Log in to" options ~f:(fun (provider, method_) ->
         report

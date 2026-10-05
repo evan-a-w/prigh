@@ -128,8 +128,8 @@ let provider_of_string login s =
      | Some p -> Ok (Custom_provider.provider_id p)
      | None ->
        Or_error.errorf
-         "unknown provider %S (one of: %s; or custom to add an OpenAI-compatible \
-          endpoint)"
+         "unknown provider %S (one of: %s; or custom to add an \
+          OpenAI-compatible endpoint)"
          s
          (String.concat
             ~sep:", "
@@ -724,20 +724,20 @@ let dispatch_server t (client : Client.t) ~meth ~params
     in
     Option.some
     @@
-    (match param params "provider" with
-     | Some (`String "custom") -> owned (Login_manager.start_custom t.login)
-     | _ ->
-       Or_error.bind (provider_param t.login params) ~f:(fun provider ->
-         let method_ =
-           match param params "method" with
-           | Some (`String s) ->
-             (match Provider_auth.Method.of_string s with
-              | Some m -> Ok m
-              | None -> Or_error.errorf "unknown login method %S" s)
-           | _ -> Ok (List.hd_exn (Provider_auth.methods provider))
-         in
-         Or_error.bind method_ ~f:(fun method_ ->
-           owned (fun () -> Login_manager.start t.login provider method_))))
+      (match param params "provider" with
+      | Some (`String "custom") -> owned (Login_manager.start_custom t.login)
+      | _ ->
+        Or_error.bind (provider_param t.login params) ~f:(fun provider ->
+          let method_ =
+            match param params "method" with
+            | Some (`String s) ->
+              (match Provider_auth.Method.of_string s with
+               | Some m -> Ok m
+               | None -> Or_error.errorf "unknown login method %S" s)
+            | _ -> Ok (List.hd_exn (Provider_auth.methods provider))
+          in
+          Or_error.bind method_ ~f:(fun method_ ->
+            owned (fun () -> Login_manager.start t.login provider method_))))
   | "logout" ->
     (* A custom provider's logout asks the caller a question. *)
     Option.some
@@ -752,7 +752,8 @@ let dispatch_server t (client : Client.t) ~meth ~params
     let models = Login_manager.models t.login in
     Model_registry.reload models;
     tell_problems client (Model_registry.problems models);
-    Some (ok (`Array (List.map (Model_registry.models models) ~f:Rpc_json.model)))
+    Some
+      (ok (`Array (List.map (Model_registry.models models) ~f:Rpc_json.model)))
   | _ -> None
 ;;
 
@@ -864,9 +865,11 @@ let dispatch agent login ~meth ~params : Json.t Or_error.t =
           ])
   | "set_model" ->
     Or_error.bind (string_param params "model") ~f:(fun id ->
-      Or_error.map (Model_registry.resolve (Login_manager.models login) id) ~f:(fun model ->
-        Agent.set_model agent model;
-        `Object []))
+      Or_error.map
+        (Model_registry.resolve (Login_manager.models login) id)
+        ~f:(fun model ->
+          Agent.set_model agent model;
+          `Object []))
   | "set_thinking" ->
     Or_error.bind (string_param params "thinking") ~f:(fun s ->
       Or_error.map (Rpc_json.thinking_of_string s) ~f:(fun thinking ->

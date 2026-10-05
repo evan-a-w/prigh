@@ -455,7 +455,7 @@ let%expect_test "auth: status, login via prompt, logout" =
   [%expect
     {|
     {"type":"response","id":"r1","ok":true,"result":[{"provider":"anthropic","name":"Anthropic","methods":[{"method":"oauth","label":"Anthropic (Claude Pro/Max)"},{"method":"api_key","label":"Anthropic API key"}],"configured":null,"expires_ms":null},{"provider":"openai","name":"OpenAI","methods":[{"method":"api_key","label":"OpenAI API key"}],"configured":null,"expires_ms":null},{"provider":"openai-codex","name":"OpenAI Codex (ChatGPT)","methods":[{"method":"oauth","label":"OpenAI (ChatGPT Plus/Pro)"}],"configured":null,"expires_ms":null},{"provider":"deepseek","name":"DeepSeek","methods":[{"method":"api_key","label":"DeepSeek API key"}],"configured":null,"expires_ms":null}]}
-    {"type":"response","id":"r1","ok":false,"error":"unknown provider \"groq\" (one of: anthropic, openai, openai-codex, deepseek)"}
+    {"type":"response","id":"r1","ok":false,"error":"unknown provider \"groq\" (one of: anthropic, openai, openai-codex, deepseek; or custom to add an OpenAI-compatible endpoint)"}
     {"type":"response","id":"r1","ok":false,"error":"(\"login method not supported by provider\" (provider Deepseek)\n (method_ Oauth))"}
     {"type":"event","event":"auth","kind":"prompt","id":"p1","prompt":"secret","message":"Enter DeepSeek API key"}
     {"type":"response","id":"r1","ok":true,"result":{}}

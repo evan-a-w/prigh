@@ -124,8 +124,8 @@ let resolve
          })
   | Some (Oauth _) when Provider_id.is_custom provider ->
     Or_error.errorf
-      "auth.json's %S entry is an OAuth login, not an API key (another tool may \
-       use that name): /logout %s, then /login %s"
+      "auth.json's %S entry is an OAuth login, not an API key (another tool \
+       may use that name): /logout %s, then /login %s"
       (Provider_id.to_string provider)
       (Provider_id.to_string provider)
       (Provider_id.to_string provider)
@@ -181,7 +181,9 @@ let status ?(getenv = Sys.getenv) ?(custom = []) store =
            | Some (Oauth _) -> Some (Method.Oauth, "oauth (not usable)")
            | None ->
              Some
-               (Option.value (from_env provider) ~default:(Method.Api_key, "no key"))
+               (Option.value
+                  (from_env provider)
+                  ~default:(Method.Api_key, "no key"))
          in
          { Status.provider
          ; methods = methods provider

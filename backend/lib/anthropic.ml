@@ -153,7 +153,12 @@ let wire_messages ~oauth ~provider (messages : Message.t list) =
       | User u -> Some ("user", user_blocks u)
       | Tool_result r -> Some ("user", [ tool_result_block r ])
       | Assistant a ->
-        (match assistant_blocks ~oauth ~replay_thinking:(same_provider ~provider a) a with
+        (match
+           assistant_blocks
+             ~oauth
+             ~replay_thinking:(same_provider ~provider a)
+             a
+         with
          | [] -> None
          | blocks -> Some ("assistant", blocks)))
   in
@@ -268,7 +273,10 @@ let request_body ~oauth (r : Provider.Request.t) : Json.t =
          ; "stream", `True
          ]
        ; (if List.is_empty system then [] else [ "system", `Array system ])
-       ; [ "messages", `Array (wire_messages ~oauth ~provider:r.model.provider r.messages) ]
+       ; [ ( "messages"
+           , `Array (wire_messages ~oauth ~provider:r.model.provider r.messages)
+           )
+         ]
        ; (if List.is_empty r.tools
           then []
           else [ "tools", `Array (List.map r.tools ~f:(wire_tool ~oauth)) ])

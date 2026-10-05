@@ -100,7 +100,12 @@ let list t =
    entries prigh cannot read under other names. *)
 let read t provider =
   Or_error.bind (load t) ~f:(fun fields ->
-    match List.Assoc.find fields ~equal:String.equal (Provider_id.to_string provider) with
+    match
+      List.Assoc.find
+        fields
+        ~equal:String.equal
+        (Provider_id.to_string provider)
+    with
     | None -> Ok None
     | Some json ->
       (match Credential.of_json json with

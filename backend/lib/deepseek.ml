@@ -15,7 +15,9 @@ let create ~env ?(base_url = default_base_url) ?timeout ~api_key () =
 ;;
 
 module For_testing = struct
-  let request_body = Openai_chat.For_testing.request_body ~quirks:Openai_chat.Quirks.deepseek
+  let request_body =
+    Openai_chat.For_testing.request_body ~quirks:Openai_chat.Quirks.deepseek
+  ;;
 
   module Chunk = Openai_chat.For_testing.Chunk
 

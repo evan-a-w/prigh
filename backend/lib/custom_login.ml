@@ -12,7 +12,14 @@ end
 let ( let* ) = Or_error.( >>= )
 
 (* An empty answer takes the default: the CLI and pi-web cannot prefill. *)
-let ask_text (i : Auth_interaction.t) ~message ~placeholder ~default ~validate () =
+let ask_text
+      (i : Auth_interaction.t)
+      ~message
+      ~placeholder
+      ~default
+      ~validate
+      ()
+  =
   let rec loop ~error ~default =
     let message =
       match error with
@@ -41,8 +48,8 @@ let ask_name i ~models ~store =
   ask_text
     i
     ~message:
-      "Name of the provider (models are then <name>/<model id>; an existing custom \
-       provider's name edits it)"
+      "Name of the provider (models are then <name>/<model id>; an existing \
+       custom provider's name edits it)"
     ~placeholder:"aiproxy"
     ~default:""
     ~validate:(fun answer ->
@@ -54,8 +61,8 @@ let ask_name i ~models ~store =
         if taken
         then
           Or_error.errorf
-            "auth.json already has an entry named %S (another tool, such as pi, may \
-             use it): choose another name"
+            "auth.json already has an entry named %S (another tool, such as \
+             pi, may use it): choose another name"
             name
         else Ok name)
     ()
@@ -67,8 +74,8 @@ let ask_base_url (i : Auth_interaction.t) ~name ~default =
       i
       ~message:
         (sprintf
-           "Base URL of %s's API (the part before /chat/completions, usually ending \
-            in /v1)"
+           "Base URL of %s's API (the part before /chat/completions, usually \
+            ending in /v1)"
            name)
       ~placeholder:"http://localhost:3000/v1"
       ~default
@@ -80,14 +87,19 @@ let ask_base_url (i : Auth_interaction.t) ~name ~default =
   let url, typed = url in
   let typed = String.rstrip typed ~drop:(Char.equal '/') in
   if not (String.equal url typed)
-  then i.notify (Progress (sprintf "Using %s (the endpoint paths are added per request)" url));
+  then
+    i.notify
+      (Progress
+         (sprintf "Using %s (the endpoint paths are added per request)" url));
   Ok url
 ;;
 
 let ask_api i ~name ~(current : Custom_provider.Api.t) =
   let ordered =
     current
-    :: List.filter Custom_provider.Api.all ~f:(Fn.non (Custom_provider.Api.equal current))
+    :: List.filter
+         Custom_provider.Api.all
+         ~f:(Fn.non (Custom_provider.Api.equal current))
   in
   let* id =
     select
@@ -119,21 +131,30 @@ let ask_key (i : Auth_interaction.t) ~name ~stored ~getenv =
     (match choice with
      | "new" ->
        let* key =
-         i.prompt (Secret { message = sprintf "API key for %s" name; allow_empty = false })
+         i.prompt
+           (Secret
+              { message = sprintf "API key for %s" name; allow_empty = false })
        in
-       Ok (if String.is_empty (String.strip key) then Key.Keep else Set (String.strip key))
+       Ok
+         (if String.is_empty (String.strip key)
+          then Key.Keep
+          else Set (String.strip key))
      | "none" -> Ok Key.Clear
      | _ -> Ok Key.Keep)
   | None ->
     let var = Custom_provider.env_var name in
     let empty =
       match getenv var with
-      | Some v when not (String.is_empty v) -> sprintf "leave empty to use $%s" var
+      | Some v when not (String.is_empty v) ->
+        sprintf "leave empty to use $%s" var
       | _ -> "leave empty if the server needs none"
     in
     let* key =
       i.prompt
-        (Secret { message = sprintf "API key for %s (%s)" name empty; allow_empty = true })
+        (Secret
+           { message = sprintf "API key for %s (%s)" name empty
+           ; allow_empty = true
+           })
     in
     let key = String.strip key in
     Ok (if String.is_empty key then Key.Keep else Set key)
@@ -147,7 +168,9 @@ let effective_key ~(key : Key.t) ~stored ~getenv ~name =
     (match stored with
      | Some k -> Some k
      | None ->
-       Option.filter (getenv (Custom_provider.env_var name)) ~f:(Fn.non String.is_empty))
+       Option.filter
+         (getenv (Custom_provider.env_var name))
+         ~f:(Fn.non String.is_empty))
 ;;
 
 let summary (listed : Custom_provider.Listed_model.t list) =
@@ -180,7 +203,8 @@ let login ~env ~models ~store ~getenv ?name (i : Auth_interaction.t) =
       | Ok None -> Ok None
       | Ok (Some (Oauth _)) ->
         Or_error.errorf
-          "auth.json's %S entry is an OAuth login; choose another name or /logout %s"
+          "auth.json's %S entry is an OAuth login; choose another name or \
+           /logout %s"
           name
           name
       | Error e -> Error e
@@ -193,7 +217,8 @@ let login ~env ~models ~store ~getenv ?name (i : Auth_interaction.t) =
         { name
         ; base_url
         ; api
-        ; headers = Option.value_map existing ~default:[] ~f:(fun p -> p.headers)
+        ; headers =
+            Option.value_map existing ~default:[] ~f:(fun p -> p.headers)
         ; models = Option.value_map existing ~default:[] ~f:(fun p -> p.models)
         }
       in
@@ -211,11 +236,14 @@ let login ~env ~models ~store ~getenv ?name (i : Auth_interaction.t) =
              (match listed with
               | [] ->
                 sprintf
-                  "The server listed no models; name them under providers.%s.models in \
-                   config.json"
+                  "The server listed no models; name them under \
+                   providers.%s.models in config.json"
                   name
               | listed ->
-                sprintf "Found %d models: %s" (List.length listed) (summary listed)));
+                sprintf
+                  "Found %d models: %s"
+                  (List.length listed)
+                  (summary listed)));
         Ok (candidate, key, Some listed)
       | Error e ->
         let* choice =
@@ -224,8 +252,8 @@ let login ~env ~models ~store ~getenv ?name (i : Auth_interaction.t) =
             ~message:
               (sprintf
                  "Could not list %s's models: %s\n\
-                  Check the base URL (it usually ends in /v1), the API key, and that \
-                  the server is running."
+                  Check the base URL (it usually ends in /v1), the API key, \
+                  and that the server is running."
                  name
                  (Error.to_string_hum e))
             [ "save", "Save anyway"
@@ -240,8 +268,13 @@ let login ~env ~models ~store ~getenv ?name (i : Auth_interaction.t) =
     in
     let* provider, key, listed =
       settings
-        ~base_url:(Option.value_map existing ~default:"" ~f:(fun p -> p.base_url))
-        ~api:(Option.value_map existing ~default:Custom_provider.Api.Chat ~f:(fun p -> p.api))
+        ~base_url:
+          (Option.value_map existing ~default:"" ~f:(fun p -> p.base_url))
+        ~api:
+          (Option.value_map
+             existing
+             ~default:Custom_provider.Api.Chat
+             ~f:(fun p -> p.api))
     in
     let* () = Custom_provider.save ~home provider in
     let id = Custom_provider.provider_id provider in
@@ -251,7 +284,9 @@ let login ~env ~models ~store ~getenv ?name (i : Auth_interaction.t) =
       | Set k -> Auth_store.set store id (Api_key k)
       | Clear -> Auth_store.remove store id
     in
-    Model_registry.reload ?listed:(Option.map listed ~f:(fun l -> name, l)) models;
+    Model_registry.reload
+      ?listed:(Option.map listed ~f:(fun l -> name, l))
+      models;
     Ok provider)
 ;;
 
@@ -265,8 +300,11 @@ end
 
 let logout ~models ~store name (i : Auth_interaction.t) =
   let id = Provider_id.Custom name in
-  match Model_registry.find_provider models name, Model_registry.home models with
-  | None, _ | _, None -> Or_error.map (Auth_store.remove store id) ~f:(fun () -> Logout.Key_removed)
+  match
+    Model_registry.find_provider models name, Model_registry.home models
+  with
+  | None, _ | _, None ->
+    Or_error.map (Auth_store.remove store id) ~f:(fun () -> Logout.Key_removed)
   | Some p, Some home ->
     Auth_interaction.run i ~f:(fun () ->
       let* stored = Auth_store.read store id in
@@ -280,7 +318,9 @@ let logout ~models ~store name (i : Auth_interaction.t) =
              ; "all", "Remove the API key and the provider"
              ]
            | None ->
-             [ "all", "Remove the provider from config.json"; "keep", "Keep it" ])
+             [ "all", "Remove the provider from config.json"
+             ; "keep", "Keep it"
+             ])
       in
       let* () = Auth_store.remove store id in
       match choice with

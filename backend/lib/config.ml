@@ -100,7 +100,9 @@ let write_fields ~home fields =
     Core_unix.rename ~src:tmp ~dst:path)
 ;;
 
-let load ~home = Or_error.bind (read_fields ~home) ~f:(fun f -> of_json (`Object f))
+let load ~home =
+  Or_error.bind (read_fields ~home) ~f:(fun f -> of_json (`Object f))
+;;
 
 (* Fields this module does not own ([providers], anything hand-added) are
    kept, in place. *)
@@ -113,7 +115,10 @@ let save ~home t =
     in
     let replaced =
       List.map existing ~f:(fun (name, value) ->
-        name, Option.value (List.Assoc.find ours ~equal:String.equal name) ~default:value)
+        ( name
+        , Option.value
+            (List.Assoc.find ours ~equal:String.equal name)
+            ~default:value ))
     in
     let added =
       List.filter ours ~f:(fun (name, _) ->

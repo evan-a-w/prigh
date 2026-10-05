@@ -94,7 +94,8 @@ let with_server
                ~provider
                ~current_model:(fun () -> Model.default)
                ~current_thinking:(fun () -> Off)
-               ~home:"/nonexistent" ()
+               ~home:"/nonexistent"
+               ()
            ])
   in
   let new_agent ?session ~cwd () =
@@ -562,13 +563,13 @@ let%expect_test "/help, /auth and /login dialogs; a secret prompt is an input" =
     {|
     {"type":"message_end","message":{"role":"custom","customType":"help","content":"- `/compact [instructions]` — Compact the context\n- `/new` — Start a new session\n- `/name <name>` — Name the session\n- `/model [name]` — Pick a model\n- `/thinking [level]` — Set or cycle the thinking level\n- `/session` — Show session info\n- `/export [path]` — Export the session as markdown (on the backend)\n- `/copy` — Copy the last assistant message\n- `/fork` — Fork the session from an earlier message\n- `/clone` — Clone the session\n- `/cd [dir]` — Change the working directory\n- `/login [provider] [oauth|api_key]` — Log in to a provider\n- `/logout <provider>` — Log out of a provider\n- `/auth` — Show provider credentials\n- `/sessions` — Pick a saved session to switch to\n- `/switch <id|path>` — Switch to a session by id or path\n- `/host` — Pick where tools run\n- `/setusr [user]` — Act as another user (superusers)\n- `/change_default` — Save the current model and thinking level as the default\n- `/help` — List the commands","display":true,"timestamp":0}}
     {"id":"q","type":"response","command":"prompt","success":true,"data":{}}
-    {"type":"message_end","message":{"role":"custom","customType":"auth","content":"Providers:\n- **Anthropic** `anthropic`: not logged in\n- **OpenAI** `openai`: not logged in\n- **OpenAI Codex (ChatGPT)** `openai-codex`: not logged in\n- **DeepSeek** `deepseek`: not logged in","display":true,"timestamp":1}}
+    {"type":"message_end","message":{"role":"custom","customType":"auth","content":"Providers:\n- **Anthropic** `anthropic`: not logged in\n- **OpenAI** `openai`: not logged in\n- **OpenAI Codex (ChatGPT)** `openai-codex`: not logged in\n- **DeepSeek** `deepseek`: not logged in\n\n`/login custom` adds an OpenAI-compatible endpoint.","display":true,"timestamp":1}}
     {"id":"q","type":"response","command":"prompt","success":true,"data":{}}
-    {"type":"extension_ui_request","id":"dialog-1","method":"select","title":"Log in to","options":["Anthropic (Claude Pro/Max)","Anthropic API key","OpenAI API key","OpenAI (ChatGPT Plus/Pro)","DeepSeek API key"]}
+    {"type":"extension_ui_request","id":"dialog-1","method":"select","title":"Log in to","options":["Anthropic (Claude Pro/Max)","Anthropic API key","OpenAI API key","OpenAI (ChatGPT Plus/Pro)","DeepSeek API key","Custom (add an OpenAI-compatible endpoint)"]}
     {"id":"q","type":"response","command":"prompt","success":true,"data":{}}
     {"type":"extension_ui_request","id":"auth-p1","method":"input","title":"Enter DeepSeek API key","placeholder":""}
     {"type":"extension_ui_request","id":"notify-2","method":"notify","message":"logged in to deepseek (api_key)","notifyType":"info"}
-    {"type":"message_end","message":{"role":"custom","customType":"auth","content":"Providers:\n- **Anthropic** `anthropic`: not logged in\n- **OpenAI** `openai`: not logged in\n- **OpenAI Codex (ChatGPT)** `openai-codex`: not logged in\n- **DeepSeek** `deepseek`: api_key (stored api key)","display":true,"timestamp":2}}
+    {"type":"message_end","message":{"role":"custom","customType":"auth","content":"Providers:\n- **Anthropic** `anthropic`: not logged in\n- **OpenAI** `openai`: not logged in\n- **OpenAI Codex (ChatGPT)** `openai-codex`: not logged in\n- **DeepSeek** `deepseek`: api_key (stored api key)\n\n`/login custom` adds an OpenAI-compatible endpoint.","display":true,"timestamp":2}}
     {"id":"q","type":"response","command":"prompt","success":true,"data":{}}
     {"type":"extension_ui_request","id":"auth-p2","method":"input","title":"Enter Anthropic API key","placeholder":""}
     {"id":"q","type":"response","command":"prompt","success":true,"data":{}}
@@ -576,7 +577,7 @@ let%expect_test "/help, /auth and /login dialogs; a secret prompt is an input" =
     {"type":"extension_ui_request","id":"notify-4","method":"notify","message":"logged out of deepseek","notifyType":"info"}
     {"id":"q","type":"response","command":"prompt","success":true,"data":{}}
     {"id":"q","type":"response","command":"prompt","success":false,"error":"usage: /logout <provider>"}
-    {"id":"q","type":"response","command":"prompt","success":false,"error":"unknown provider \"groq\" (one of: anthropic, openai, openai-codex, deepseek)"}
+    {"id":"q","type":"response","command":"prompt","success":false,"error":"unknown provider \"groq\" (one of: anthropic, openai, openai-codex, deepseek; or custom to add an OpenAI-compatible endpoint)"}
     |}]
 ;;
 

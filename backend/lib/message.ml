@@ -65,7 +65,9 @@ let with_image_notes text (images : Image.t list) =
     ~sep:"\n"
     ((if String.is_empty text then [] else [ text ])
      @ List.map images ~f:(fun image ->
-       sprintf "[%s image omitted: this model cannot see images]" image.mime_type))
+       sprintf
+         "[%s image omitted: this model cannot see images]"
+         image.mime_type))
 ;;
 
 let omit_images = function

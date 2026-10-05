@@ -27,8 +27,8 @@ let provider_of_arg models s =
      | Some p -> Custom_provider.provider_id p
      | None ->
        eprintf
-         "unknown provider %s; one of: %s (or custom, to add an OpenAI-compatible \
-          endpoint)\n"
+         "unknown provider %s; one of: %s (or custom, to add an \
+          OpenAI-compatible endpoint)\n"
          s
          (String.concat
             ~sep:", "
@@ -218,7 +218,9 @@ let run_command =
        @@ fun env ->
        Eio.Switch.run
        @@ fun sw ->
-       let { Setup.session; cwd; new_agent; models; _ } = make_agent ~env ~sw () in
+       let { Setup.session; cwd; new_agent; models; _ } =
+         make_agent ~env ~sw ()
+       in
        Model_registry.subscribe models ~f:(eprintf "%s\n%!");
        List.iter (Model_registry.problems models) ~f:(eprintf "%s\n%!");
        let agent = new_agent ?session ~cwd () in
@@ -813,8 +815,8 @@ let with_registry ~store f =
 let login_command =
   Command.basic
     ~summary:
-      "Log in to a provider (anthropic, openai, openai-codex, deepseek, a custom \
-       one), or add a custom OpenAI-compatible provider (custom)"
+      "Log in to a provider (anthropic, openai, openai-codex, deepseek, a \
+       custom one), or add a custom OpenAI-compatible provider (custom)"
     (let%map_open.Command store = auth_file_flag
      and provider = anon ("PROVIDER" %: string)
      and method_ =
@@ -836,12 +838,18 @@ let login_command =
        in
        let custom ?name () =
          match
-           Custom_login.login ~env ~models ~store ~getenv:Sys.getenv ?name interaction
+           Custom_login.login
+             ~env
+             ~models
+             ~store
+             ~getenv:Sys.getenv
+             ?name
+             interaction
          with
          | Ok p ->
            eprintf
-             "Saved %s (%s, %s) to %s; its models are %s/<model id> (prigh models \
-              lists them)\n"
+             "Saved %s (%s, %s) to %s; its models are %s/<model id> (prigh \
+              models lists them)\n"
              p.name
              p.base_url
              (Custom_provider.Api.to_string p.api)
@@ -867,7 +875,9 @@ let login_command =
                    eprintf "unknown method %s (api_key or oauth)\n" s;
                    exit 2)
             in
-            (match Provider_auth.login ~env store provider method_ interaction with
+            (match
+               Provider_auth.login ~env store provider method_ interaction
+             with
              | Ok () ->
                eprintf
                  "Logged in to %s (%s); saved to %s\n"
@@ -881,7 +891,9 @@ let login_command =
 
 let logout_command =
   Command.basic
-    ~summary:"Remove a provider's stored credential (and, for a custom one, maybe the provider)"
+    ~summary:
+      "Remove a provider's stored credential (and, for a custom one, maybe the \
+       provider)"
     (let%map_open.Command store = auth_file_flag
      and provider = anon ("PROVIDER" %: string) in
      fun () ->
@@ -933,7 +945,10 @@ let auth_command =
              (match s.custom with
               | None -> Provider_id.display_name s.provider
               | Some c ->
-                sprintf "%s (%s)" c.base_url (Custom_provider.Api.to_string c.api))
+                sprintf
+                  "%s (%s)"
+                  c.base_url
+                  (Custom_provider.Api.to_string c.api))
              (match s.configured with
               | None ->
                 sprintf
@@ -949,7 +964,10 @@ let models_command =
     ~summary:"List the models (custom providers' lists are fetched first)"
     (let%map_open.Command store = auth_file_flag
      and provider =
-       flag "-provider" (optional string) ~doc:"NAME only this provider's models"
+       flag
+         "-provider"
+         (optional string)
+         ~doc:"NAME only this provider's models"
      in
      fun () ->
        with_registry ~store
@@ -959,7 +977,10 @@ let models_command =
        List.iter (Model_registry.problems models) ~f:(fun p ->
          if not (List.mem before p ~equal:String.equal) then eprintf "%s\n%!" p);
        List.iter (Model_registry.models models) ~f:(fun (m : Model.t) ->
-         if Option.for_all provider ~f:(String.equal (Provider_id.to_string m.provider))
+         if
+           Option.for_all
+             provider
+             ~f:(String.equal (Provider_id.to_string m.provider))
          then printf "%-50s %s\n" (Model.key m) m.name))
 ;;
 

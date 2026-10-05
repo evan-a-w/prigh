@@ -249,35 +249,35 @@ let entry (e : Session.Entry.t) =
 let auth_status (s : Provider_auth.Status.t) =
   `Object
     ([ "provider", str (Provider_id.to_string s.provider)
-    ; "name", str (Provider_id.display_name s.provider)
-    ; ( "methods"
-      , `Array
-          (List.map s.methods ~f:(fun m ->
-             `Object
-               [ "method", str (Provider_auth.Method.to_string m)
-               ; "label", str (Provider_auth.Method.label s.provider m)
-               ])) )
-    ; ( "configured"
-      , match s.configured with
-        | None -> `Null
-        | Some (m, source) ->
-          `Object
-            [ "method", str (Provider_auth.Method.to_string m)
-            ; "source", str source
-            ] )
-    ; "expires_ms", Option.value_map s.expires_ms ~default:`Null ~f:int
-    ]
-    @
-    match s.custom with
-    | None -> []
-    | Some c ->
-      [ ( "custom"
-        , `Object
-            [ "base_url", str c.base_url
-            ; "api", str (Custom_provider.Api.to_string c.api)
-            ; "api_label", str (Custom_provider.Api.label c.api)
-            ] )
-      ])
+     ; "name", str (Provider_id.display_name s.provider)
+     ; ( "methods"
+       , `Array
+           (List.map s.methods ~f:(fun m ->
+              `Object
+                [ "method", str (Provider_auth.Method.to_string m)
+                ; "label", str (Provider_auth.Method.label s.provider m)
+                ])) )
+     ; ( "configured"
+       , match s.configured with
+         | None -> `Null
+         | Some (m, source) ->
+           `Object
+             [ "method", str (Provider_auth.Method.to_string m)
+             ; "source", str source
+             ] )
+     ; "expires_ms", Option.value_map s.expires_ms ~default:`Null ~f:int
+     ]
+     @
+     match s.custom with
+     | None -> []
+     | Some c ->
+       [ ( "custom"
+         , `Object
+             [ "base_url", str c.base_url
+             ; "api", str (Custom_provider.Api.to_string c.api)
+             ; "api_label", str (Custom_provider.Api.label c.api)
+             ] )
+       ])
 ;;
 
 let auth_prompt (p : Auth_interaction.Prompt.t) =
@@ -325,10 +325,7 @@ let login_event (e : Login_manager.Event.t) =
       ; "method", str (Provider_auth.Method.to_string method_)
       ]
     | Failed { provider; error } ->
-      [ "kind", str "failed"
-      ; "provider", str provider
-      ; "error", str error
-      ]
+      [ "kind", str "failed"; "provider", str provider; "error", str error ]
     | Logged_out provider ->
       [ "kind", str "logged_out"
       ; "provider", str (Provider_id.to_string provider)

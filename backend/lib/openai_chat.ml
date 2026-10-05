@@ -33,12 +33,15 @@ let image_part (image : Image.t) : Json.t =
     [ "type", `String "image_url"
     ; ( "image_url"
       , `Object
-          [ "url", `String (sprintf "data:%s;base64,%s" image.mime_type image.data)
+          [ ( "url"
+            , `String (sprintf "data:%s;base64,%s" image.mime_type image.data) )
           ] )
     ]
 ;;
 
-let text_part text : Json.t = `Object [ "type", `String "text"; "text", `String text ]
+let text_part text : Json.t =
+  `Object [ "type", `String "text"; "text", `String text ]
+;;
 
 let user_message ~text (images : Image.t list) : Json.t =
   let content =
@@ -57,7 +60,9 @@ let assistant_message ~(quirks : Quirks.t) (a : Message.Assistant.t) : Json.t =
   let tool_calls = Message.Assistant.tool_calls a in
   `Object
     (List.concat
-       [ [ "role", `String "assistant"; "content", `String (Message.Assistant.text a) ]
+       [ [ "role", `String "assistant"
+         ; "content", `String (Message.Assistant.text a)
+         ]
        ; (if (not quirks.replay_reasoning) || String.is_empty thinking
           then []
           else [ "reasoning_content", `String thinking ])
@@ -83,14 +88,16 @@ let wire_messages ~quirks (messages : Message.t list) : Json.t list =
           [ "role", `String "user"
           ; ( "content"
             , `Array
-                (List.concat_map pending ~f:(fun ((r : Message.Tool_result.t), images) ->
-                   text_part
-                     (sprintf
-                        "[%s from the %s result %s]"
-                        (image_count (List.length images))
-                        r.tool_name
-                        r.tool_call_id)
-                   :: List.map images ~f:image_part)) )
+                (List.concat_map
+                   pending
+                   ~f:(fun ((r : Message.Tool_result.t), images) ->
+                     text_part
+                       (sprintf
+                          "[%s from the %s result %s]"
+                          (image_count (List.length images))
+                          r.tool_name
+                          r.tool_call_id)
+                     :: List.map images ~f:image_part)) )
           ]
       ]
   in
@@ -191,10 +198,11 @@ end
 module Tool_calls = struct
   type t =
     { mutable started : Int.Set.t
+    ; mutable ids : (string * int) list
     ; mutable last : int
     }
 
-  let create () = { started = Int.Set.empty; last = 0 }
+  let create () = { started = Int.Set.empty; ids = []; last = 0 }
 end
 
 let member_string name json =
@@ -211,10 +219,15 @@ let parse_usage json =
     match member_int "prompt_cache_hit_tokens" json with
     | Some n -> n
     | None ->
-      Option.bind (Json.member "prompt_tokens_details" json) ~f:(member_int "cached_tokens")
+      Option.bind
+        (Json.member "prompt_tokens_details" json)
+        ~f:(member_int "cached_tokens")
       |> Option.value ~default:0
   in
-  { Usage.input = get "prompt_tokens"; output = get "completion_tokens"; cache_read }
+  { Usage.input = get "prompt_tokens"
+  ; output = get "completion_tokens"
+  ; cache_read
+  }
 ;;
 
 let parse_tool_call_delta (state : Tool_calls.t) json : Assistant_event.t list =
@@ -224,22 +237,30 @@ let parse_tool_call_delta (state : Tool_calls.t) json : Assistant_event.t list =
     |> Option.filter ~f:(Fn.non String.is_empty)
   in
   let arguments = Option.bind function_ ~f:(member_string "arguments") in
+  let id =
+    member_string "id" json |> Option.filter ~f:(Fn.non String.is_empty)
+  in
   let index =
-    match member_int "index" json, name with
-    | Some index, _ -> index
-    | None, Some _ when not (Set.is_empty state.started) -> state.last + 1
-    | None, _ -> state.last
+    match member_int "index" json with
+    | Some index -> index
+    | None ->
+      (match
+         Option.bind id ~f:(List.Assoc.find state.ids ~equal:String.equal), name
+       with
+       | Some index, _ -> index
+       | None, Some _ when not (Set.is_empty state.started) ->
+         1 + Option.value_exn (Set.max_elt state.started)
+       | None, _ -> state.last)
   in
   state.last <- index;
+  Option.iter id ~f:(fun id ->
+    if not (List.Assoc.mem state.ids ~equal:String.equal id)
+    then state.ids <- (id, index) :: state.ids);
   let start =
     match name with
     | Some name when not (Set.mem state.started index) ->
       state.started <- Set.add state.started index;
-      let id =
-        match member_string "id" json with
-        | Some id when not (String.is_empty id) -> id
-        | _ -> sprintf "call_%d" index
-      in
+      let id = Option.value id ~default:(sprintf "call_%d" index) in
       [ Assistant_event.Tool_call_start { index; id; name } ]
     | _ -> []
   in
@@ -252,7 +273,8 @@ let parse_tool_call_delta (state : Tool_calls.t) json : Assistant_event.t list =
   start @ delta
 ;;
 
-let parse_chunk ?(tool_calls = Tool_calls.create ()) (json : Json.t) : Chunk.t Or_error.t
+let parse_chunk ?(tool_calls = Tool_calls.create ()) (json : Json.t)
+  : Chunk.t Or_error.t
   =
   match Json.member "error" json with
   | Some err ->
@@ -271,7 +293,9 @@ let parse_chunk ?(tool_calls = Tool_calls.create ()) (json : Json.t) : Chunk.t O
       match delta with
       | None -> []
       | Some delta ->
-        let text s = if String.is_empty s then [] else [ Assistant_event.Text_delta s ] in
+        let text s =
+          if String.is_empty s then [] else [ Assistant_event.Text_delta s ]
+        in
         let thinking s =
           if String.is_empty s then [] else [ Assistant_event.Thinking_delta s ]
         in
@@ -302,13 +326,22 @@ let parse_chunk ?(tool_calls = Tool_calls.create ()) (json : Json.t) : Chunk.t O
 let stop_reason_of_finish ~saw_tool_call = function
   | Some ("tool_calls" | "function_call") -> Stop_reason.Tool_use
   | Some "length" -> Length
-  | Some "content_filter" -> Error "the reply was stopped by the server's content filter"
+  | Some "content_filter" ->
+    Error "the reply was stopped by the server's content filter"
   | Some ("stop" | "end_turn" | "eos") | None ->
     if saw_tool_call then Tool_use else End_turn
   | Some other -> Error ("unexpected finish_reason: " ^ other)
 ;;
 
-let stream ~env ~url ~timeout ~headers ~quirks (request : Provider.Request.t) ~cancel ~on_event
+let stream
+      ~env
+      ~url
+      ~timeout
+      ~headers
+      ~quirks
+      (request : Provider.Request.t)
+      ~cancel
+      ~on_event
   =
   let builder = Assistant_builder.create ~model:(Model.key request.model) in
   let tool_calls = Tool_calls.create () in
@@ -320,7 +353,8 @@ let stream ~env ~url ~timeout ~headers ~quirks (request : Provider.Request.t) ~c
     then (
       match Json.parse event.data with
       | Error e ->
-        api_error := Some (sprintf "bad JSON in stream: %s" (Error.to_string_hum e))
+        api_error
+        := Some (sprintf "bad JSON in stream: %s" (Error.to_string_hum e))
       | Ok json ->
         (match parse_chunk ~tool_calls json with
          | Error e -> api_error := Some (Error.to_string_hum e)
