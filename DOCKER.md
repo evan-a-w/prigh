@@ -54,10 +54,12 @@ serves all of them, and they share sessions:
 |---|---|---|---|
 | `web` (default) | 7788 | `PRIGH_WEB_PORT` | the Bonsai browser UI; also accepts terminal frontends and tool hosts (`prigh-tui -connect`, `prigh tool-host -connect`) |
 | `pi-web` | 7789 | `PRIGH_PI_WEB_PORT` | pi's web UI (`pi-web/`) |
+| `prigh-web` | 7790 | `PRIGH_PRIGH_WEB_PORT` | prigh-web, the DOM browser UI (`tui/prigh-web/`); like `web`, also accepts terminal frontends and tool hosts |
 | `server` | 7777 | `PRIGH_SERVER_PORT` | plain TCP for terminal frontends and tool hosts only |
 | `tui` | – | – | an interactive TUI as the container's main process (must be the only entry; single-user, see below) |
 
-For example, `PRIGH_MODE=web,pi-web` serves both web UIs.
+For example, `PRIGH_MODE=web,pi-web` serves two web UIs, and
+`PRIGH_MODE=prigh-web` only prigh-web.
 
 ### TUI
 
@@ -152,7 +154,7 @@ user, `default`.
 | `PRIGH_NO_BACKEND_HOST` | – | `1`: no tool hosts in the container; tools and terminals run only on hosts the users connect |
 | `PRIGH_ALLOW_NO_TOKEN` | – | set to `1` to start without a token (only behind something else that authenticates) |
 | `PRIGH_BIND` | `0.0.0.0` | host address the ports are published on (`127.0.0.1` keeps them local, e.g. behind a reverse proxy) |
-| `PRIGH_WEB_PORT`, `PRIGH_PI_WEB_PORT`, `PRIGH_SERVER_PORT` | 7788, 7789, 7777 | host ports |
+| `PRIGH_WEB_PORT`, `PRIGH_PI_WEB_PORT`, `PRIGH_PRIGH_WEB_PORT`, `PRIGH_SERVER_PORT` | 7788, 7789, 7790, 7777 | host ports |
 | `PRIGH_WORKSPACE` | volume `prigh-workspace` | host path to bind at `/workspace` instead of the named volume. It must be world-searchable (`o+x`) so that users reach their `/workspace/<name>` |
 | `PRIGH_ARGS` | – | extra backend arguments, e.g. `-model anthropic/claude-sonnet-4-5 -thinking high`, or `-faux` for a scripted provider with no API calls |
 | `PRIGH_TUI_ARGS` | – | extra `prigh-tui` arguments for `PRIGH_MODE=tui` |

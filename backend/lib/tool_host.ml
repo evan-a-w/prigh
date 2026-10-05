@@ -96,6 +96,16 @@ module Worker = struct
       let arguments =
         Option.value (field json "arguments") ~default:(`Object [])
       in
+      (* The backend's home is not ours: instructions come from this machine's
+         ~/.prigh. *)
+      let arguments =
+        match arguments with
+        | `Object fields when String.equal name Host_ops.instructions_op ->
+          `Object
+            (List.filter fields ~f:(fun (key, _) ->
+               not (String.equal key "home")))
+        | arguments -> arguments
+      in
       let cwd = Option.value (string_field json "cwd") ~default:t.default_cwd in
       let cancel = Cancellation.create () in
       Hashtbl.set t.running ~key:exec_id ~data:cancel;

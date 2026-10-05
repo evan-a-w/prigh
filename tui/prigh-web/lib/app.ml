@@ -19,6 +19,7 @@ module Reply_tag = struct
     | Sessions
     | Models
     | Reload_state
+    | Subagent of string (** the [subagent] call *)
     | Auth_status of Auth_purpose.t
     | Paths of string
     | Restored
@@ -566,6 +567,30 @@ let run_command (m : Model.t) ({ name; rest } : Slash.Parsed.t) =
        | None -> sprintf "Unknown command /%s: /help lists the commands." name)
 ;;
 
+(* A [get_subagent] reply. *)
+let subagent_of_json json : Chat.Subagent.t Or_error.t =
+  let open Or_error.Let_syntax in
+  let%bind summary = Json.object_field json "subagent" in
+  let%bind agent_id = Json.string_field summary "id" in
+  let%bind task = Json.string_field summary "task" in
+  let%bind model = Json.string_field summary "model" in
+  let%bind turns = Json.int_field summary "turns" in
+  let%bind result =
+    match Json.field summary "result" with
+    | None -> Ok None
+    | Some r -> Or_error.map (Event.Subagent_result.of_json r) ~f:Option.some
+  in
+  let%map messages = Json.list_field json "messages" ~f:Message.of_json in
+  { Chat.Subagent.agent_id
+  ; task
+  ; model
+  ; chat = Chat.of_messages messages
+  ; turns
+  ; cost_usd = None
+  ; result
+  }
+;;
+
 let reply (m : Model.t) (tag : Reply_tag.t) result =
   match tag, result with
   | Reconnect generation, _ when generation <> m.generation -> m, []
@@ -595,7 +620,8 @@ let reply (m : Model.t) (tag : Reply_tag.t) result =
       toast { m with state = None; chat = Chat.empty } "Reconnected"
     in
     m, cmds @ startup
-  | (Ignore | Paths _ | Auth_status Refresh), Error _ -> m, []
+  (* Subagents from before the backend restarted are gone: the report stays. *)
+  | (Ignore | Paths _ | Auth_status Refresh | Subagent _), Error _ -> m, []
   | Deleted title, Error e ->
     error
       m
@@ -619,7 +645,15 @@ let reply (m : Model.t) (tag : Reply_tag.t) result =
   | Reload_state, Ok _ -> m, [ rpc "get_state" [] ~tag:State ]
   | Messages, Ok json ->
     decode m json (decode_list Message.of_json) ~f:(fun messages ->
-      { m with chat = Chat.of_messages messages }, [])
+      let chat = Chat.of_messages messages in
+      ( { m with chat }
+      , List.map (Chat.subagents_to_load chat) ~f:(fun call_id ->
+          rpc "get_subagent" [ "id", str call_id ] ~tag:(Subagent call_id)) ))
+  | Subagent call_id, Ok json ->
+    (match subagent_of_json json with
+     | Ok subagent ->
+       { m with chat = Chat.set_subagent m.chat ~call_id subagent }, []
+     | Error _ -> m, [])
   | Sessions, Ok json ->
     decode m json (decode_list Session_summary.of_json) ~f:(fun sessions ->
       { m with sessions }, [])

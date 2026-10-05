@@ -32,6 +32,7 @@ services:
     ports:
       - "${PRIGH_BIND:-0.0.0.0}:${PRIGH_WEB_PORT:-7788}:7788"
       - "${PRIGH_BIND:-0.0.0.0}:${PRIGH_PI_WEB_PORT:-7789}:7789"
+      - "${PRIGH_BIND:-0.0.0.0}:${PRIGH_PRIGH_WEB_PORT:-7790}:7790"
       - "${PRIGH_BIND:-0.0.0.0}:${PRIGH_SERVER_PORT:-7777}:7777"
     volumes:
       # Every user's home: /home/<name> (~/.ssh, ~/.gitconfig), and /home/prigh,

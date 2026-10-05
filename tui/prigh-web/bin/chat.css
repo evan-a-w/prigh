@@ -506,6 +506,9 @@ details.image > summary::-webkit-details-marker { display: none; }
   display: block;
   max-width: min(260px, 100%);
   max-height: 180px;
+  /* Icons and other tiny images are scaled up to be seen; the width follows. */
+  min-height: 48px;
+  object-fit: contain;
   border-radius: 8px;
   border: 1px solid var(--border);
   background: repeating-conic-gradient(#ffffff0d 0 25%, transparent 0 50%) 0 0 / 16px 16px;
