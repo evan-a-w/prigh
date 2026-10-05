@@ -541,7 +541,7 @@ details.image[open] .lightbox {
   .markdown { font-size: 14.5px; }
   .tool-head { padding: 7px 10px; gap: 7px; }
   .tool-body { padding: 8px 10px 10px; }
-  .tool .chip:not(.bad):not(.add):not(.del):not(.job) { display: none; }
+  .tool-head .chip:not(.bad):not(.add):not(.del):not(.job) { display: none; }
   .delivery-head .stats { display: none; }
   .code pre { padding: 10px 12px; }
 }
