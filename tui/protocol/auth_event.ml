@@ -2,7 +2,15 @@ open! Core
 
 module Prompt = struct
   type t =
-    | Secret of { message : string }
+    | Secret of
+        { message : string
+        ; allow_empty : bool
+        }
+    | Text of
+        { message : string
+        ; placeholder : string
+        ; default : string (** prefilled *)
+        }
     | Manual_code of
         { message : string
         ; placeholder : string
@@ -14,15 +22,27 @@ module Prompt = struct
   [@@deriving sexp_of, equal]
 
   let message = function
-    | Secret { message } | Manual_code { message; _ } | Select { message; _ } ->
-      message
+    | Secret { message; _ }
+    | Text { message; _ }
+    | Manual_code { message; _ }
+    | Select { message; _ } -> message
   ;;
 
   let of_json j =
     let open Or_error.Let_syntax in
     let%bind message = Json.string_field j "message" in
     match%bind Json.string_field j "prompt" with
-    | "secret" -> Ok (Secret { message })
+    | "secret" ->
+      let%map allow_empty =
+        match Json.field j "allow_empty" with
+        | None -> Ok false
+        | Some _ -> Json.bool_field j "allow_empty"
+      in
+      Secret { message; allow_empty }
+    | "text" ->
+      let%bind placeholder = Json.string_field j "placeholder" in
+      let%map default = Json.string_field j "default" in
+      Text { message; placeholder; default }
     | "manual_code" ->
       let%map placeholder = Json.string_field j "placeholder" in
       Manual_code { message; placeholder }

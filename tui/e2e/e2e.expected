@@ -42,7 +42,7 @@
   (methods (((method api_key) (label "DeepSeek API key")))) (configured null)
   (expires_ms null)))
 <- login: ()
-  event auth (Prompt(id p1)(prompt(Secret(message"Enter DeepSeek API key"))))
+  event auth (Prompt(id p1)(prompt(Secret(message"Enter DeepSeek API key")(allow_empty false))))
 <- auth_respond: ()
   event auth (Done(provider deepseek)(method_ api_key))
 <- auth_status: (((provider anthropic) (name Anthropic)
