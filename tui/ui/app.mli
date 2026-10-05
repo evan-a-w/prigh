@@ -47,6 +47,9 @@ module Reply_tag : sig
     | Btw of string (** btw id *)
     | Users_list
     | User_switched
+    | Jobs_picker
+    | Job_output
+    | Job_started
   [@@deriving sexp_of, equal]
 end
 
@@ -156,6 +159,9 @@ module Model : sig
   (** Whether any subagent is running, including background ones the main agent
       is no longer waiting for. *)
   val agents_running : t -> bool
+
+  (** Background shell jobs of this session still running. *)
+  val jobs_running : t -> bool
 
   val backend_gone : t -> bool
 

@@ -17,6 +17,25 @@ module Subagent = struct
   ;;
 end
 
+module Job = struct
+  type t =
+    { id : string
+    ; command : string
+    ; running : bool
+    ; exit : string option
+    }
+  [@@deriving sexp_of, equal]
+
+  let of_json j =
+    let open Or_error.Let_syntax in
+    let%bind id = Json.string_field j "id" in
+    let%bind command = Json.string_field j "command" in
+    let%bind running = Json.bool_field j "running" in
+    let%map exit = Json.string_opt_field j "exit" in
+    { id; command; running; exit }
+  ;;
+end
+
 type t =
   { session_id : string
   ; session_path : string
@@ -35,6 +54,7 @@ type t =
   ; hosts : Host.t list
   (** backend first, then connected tool-capable clients *)
   ; subagents : Subagent.t list
+  ; jobs : Job.t list
   }
 [@@deriving sexp_of, equal]
 
@@ -65,9 +85,14 @@ let of_json j =
     | Ok hosts -> Ok hosts
     | Error _ -> Ok []
   in
-  let%map subagents =
+  let%bind subagents =
     match Json.list_field j "subagents" ~f:Subagent.of_json with
     | Ok subagents -> Ok subagents
+    | Error _ -> Ok []
+  in
+  let%map jobs =
+    match Json.list_field j "jobs" ~f:Job.of_json with
+    | Ok jobs -> Ok jobs
     | Error _ -> Ok []
   in
   { session_id
@@ -86,5 +111,6 @@ let of_json j =
   ; active_host
   ; hosts
   ; subagents
+  ; jobs
   }
 ;;

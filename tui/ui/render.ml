@@ -101,6 +101,29 @@ let agents_part (m : App.Model.t) : Content.Line.t option =
        @ if background then [ span ~style:(Style.fg Yellow) " bg" ] else []))
 ;;
 
+let jobs_part (m : App.Model.t) : Content.Line.t option =
+  let running =
+    Option.value_map m.state ~default:0 ~f:(fun s ->
+      List.count s.jobs ~f:(fun (j : P.State.Job.t) -> j.running))
+  in
+  if running = 0
+  then None
+  else (
+    let idle = not (App.Model.running m) in
+    Some
+      ([ span ~style:(Style.bold Style.plain) "jobs:"
+       ; span (Int.to_string running)
+       ]
+       @
+       if idle
+       then
+         [ span
+             ~style:(Style.fg Yellow)
+             (" " ^ spinner_frames.(m.spinner % Array.length spinner_frames))
+         ]
+       else []))
+;;
+
 let mode_hint (m : App.Model.t) : Content.Line.t option =
   match m.connection with
   | Reconnecting { attempt; delay_ms; _ } ->
@@ -137,6 +160,9 @@ let mode_hint (m : App.Model.t) : Content.Line.t option =
             ]
         | Picker { kind = Agents; _ } ->
           Some [ span ~style:dim "Enter focuses · Esc closes · Ctrl+D cancels" ]
+        | Picker { kind = Jobs; _ } ->
+          Some
+            [ span ~style:dim "Enter shows output · Esc closes · Ctrl+D kills" ]
         | Picker _ -> Some [ span ~style:dim "Enter selects · Esc closes" ]
         | Login_prompt _ ->
           Some [ span ~style:dim "login: Enter answers, Esc cancels" ]
@@ -278,6 +304,7 @@ let status (m : App.Model.t) : Content.Line.t =
          then [ 3, [ span ~style:base (sprintf "queued:%d" queued) ] ]
          else [])
       @ Option.to_list (Option.map (agents_part m) ~f:(fun p -> 3, p))
+      @ Option.to_list (Option.map (jobs_part m) ~f:(fun p -> 3, p))
       @ (match m.viewport with
          | Viewport.Anchored { new_lines; _ } when new_lines > 0 ->
            [ 1, [ span ~style:base (sprintf "↓ %d new" new_lines) ] ]

@@ -47,18 +47,21 @@ module Item = struct
   [@@deriving sexp_of, equal]
 end
 
-(* The backend hands finished background subagents to the main agent as a user
-   message of reports, each starting [[subagent <id> finished] <task>] (or
-   [failed]). *)
+(* The backend hands finished background subagents and shell jobs to the main
+   agent as a user message of reports, each starting
+   [[subagent <id> finished] <task>] (or [failed]) or
+   [[job <id> <status>] <command>] (status [exited N], [killed], ...). *)
 module Delivery = struct
   type section =
-    { id : string
+    { kind : string (** [subagent] or [job] *)
+    ; id : string
     ; ok : bool
+    ; status : string
     ; task : string
     ; body : string list
     }
 
-  let header line =
+  let subagent_header line =
     let open Option.Let_syntax in
     let%bind rest = String.chop_prefix line ~prefix:"[subagent " in
     let%bind id, rest = String.lsplit2 rest ~on:' ' in
@@ -69,8 +72,41 @@ module Delivery = struct
         String.chop_prefix rest ~prefix:"failed]"
         |> Option.map ~f:(fun task -> false, task)
     in
-    Some (id, ok, String.strip task)
+    Some
+      { kind = "subagent"
+      ; id
+      ; ok
+      ; status = (if ok then "finished" else "failed")
+      ; task = String.strip task
+      ; body = []
+      }
   ;;
+
+  let job_header line =
+    let open Option.Let_syntax in
+    let%bind rest = String.chop_prefix line ~prefix:"[job " in
+    let%bind id, rest = String.lsplit2 rest ~on:' ' in
+    let%bind digits = String.chop_prefix id ~prefix:"j" in
+    let%bind status, command = String.lsplit2 rest ~on:']' in
+    if String.is_empty digits
+       || (not (String.for_all digits ~f:Char.is_digit))
+       || not
+            (List.exists
+               [ "exited "; "killed"; "timed out"; "failed" ]
+               ~f:(fun prefix -> String.is_prefix status ~prefix))
+    then None
+    else
+      Some
+        { kind = "job"
+        ; id
+        ; ok = String.equal status "exited 0"
+        ; status
+        ; task = String.strip command
+        ; body = []
+        }
+  ;;
+
+  let header line = Option.first_some (subagent_header line) (job_header line)
 
   let parse text =
     match String.split_lines text with
@@ -78,7 +114,7 @@ module Delivery = struct
       let sections =
         List.fold lines ~init:[] ~f:(fun acc line ->
           match header line, acc with
-          | Some (id, ok, task), _ -> { id; ok; task; body = [] } :: acc
+          | Some section, _ -> section :: acc
           | None, current :: rest ->
             { current with body = line :: current.body } :: rest
           | None, [] -> acc)
@@ -770,10 +806,12 @@ let render_item (item : Item.t) ~(verbosity : Verbosity.t) : Content.t =
       (Option.value (Delivery.parse text) ~default:[])
       ~f:(fun (section : Delivery.section) ->
         let header : Content.Line.t =
-          [ { Content.Span.text = "↩ subagent " ^ section.id; style = magenta }
-          ; (if section.ok
-             then { text = " finished"; style = green }
-             else { text = " failed"; style = red })
+          [ { Content.Span.text = sprintf "↩ %s %s" section.kind section.id
+            ; style = magenta
+            }
+          ; { text = " " ^ section.status
+            ; style = (if section.ok then green else red)
+            }
           ; { text = " " ^ subagent_task_quoted section.task; style = dim }
           ]
         in

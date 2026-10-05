@@ -43,6 +43,9 @@ module Reply_tag = struct
     | Btw of string (** btw id *)
     | Users_list
     | User_switched
+    | Jobs_picker
+    | Job_output
+    | Job_started
   [@@deriving sexp_of, equal]
 end
 
@@ -169,6 +172,11 @@ module Model = struct
       Agent_view.Status.equal a.status Running)
     || Option.exists t.state ~f:(fun s ->
       List.exists s.subagents ~f:(fun a -> a.running))
+  ;;
+
+  let jobs_running t =
+    Option.exists t.state ~f:(fun s ->
+      List.exists s.jobs ~f:(fun (j : P.State.Job.t) -> j.running))
   ;;
 
   let backend_gone t =
@@ -782,6 +790,60 @@ let agents_picker m =
     open_picker m Agents (Picker.create ~title:"Subagents" items), [])
 ;;
 
+let format_elapsed seconds =
+  let s = Float.iround_down_exn seconds in
+  if s < 60
+  then sprintf "%ds" s
+  else if s < 3600
+  then sprintf "%dm%02ds" (s / 60) (s % 60)
+  else sprintf "%dh%02dm" (s / 3600) (s % 3600 / 60)
+;;
+
+let jobs_picker m (jobs : P.Job_info.t list) =
+  if List.is_empty jobs
+  then notice m "no jobs", []
+  else (
+    let items =
+      List.map jobs ~f:(fun (j : P.Job_info.t) ->
+        let state =
+          match j.exit with
+          | None -> "running"
+          | Some status -> status
+        in
+        Picker.Item.create
+          ~id:j.id
+          ~detail:
+            (sprintf
+               "%s  %s  %s%s"
+               j.id
+               state
+               (format_elapsed j.elapsed)
+               (Option.value_map j.last_line ~default:"" ~f:(fun l ->
+                  "  " ^ String.prefix l 80)))
+          ~search:(j.id ^ " " ^ j.command)
+          j.command)
+    in
+    open_picker m Jobs (Picker.create ~title:"Jobs" items), [])
+;;
+
+let kill_job m id =
+  ( m
+  , [ rpc
+        "kill_job"
+        ~params:[ "job_id", str id ]
+        ~tag:(Notice_on_success (sprintf "killing job %s" id))
+    ] )
+;;
+
+let job_output m id =
+  ( { m with mode = Editing }
+  , [ rpc
+        "job_output"
+        ~params:[ "job_id", str id; "lines", P.Json.int 200 ]
+        ~tag:Job_output
+    ] )
+;;
+
 (* A host's display name: "(here)" marks this frontend, "(in ...)" a client
    attached to another session. *)
 let host_label m (h : P.Host.t) =
@@ -1323,6 +1385,10 @@ let run_command m (cmd : Commands.Parsed.t) =
   | "agents", [ "cancel"; arg ] -> cancel_agent m arg
   | "agents", "cancel" :: _ -> error m "usage: /agents cancel <n|id>", []
   | "agents", _ -> agents_picker m
+  | "jobs", [ "kill"; id ] -> kill_job m id
+  | "jobs", "kill" :: _ -> error m "usage: /jobs kill <id>", []
+  | "jobs", [] -> m, [ rpc "list_jobs" ~tag:Jobs_picker ]
+  | "jobs", [ id ] -> job_output m id
   | "host", [] -> hosts_picker m
   | "host", _ -> switch_host m cmd.rest
   | "sessions", _ | "switch", [] ->
@@ -1427,7 +1493,19 @@ let user_params m text =
 ;;
 
 let shell_command m text =
-  if Model.running m
+  if String.is_prefix text ~prefix:"!&"
+  then (
+    let command = String.drop_prefix text 2 |> String.strip in
+    if String.is_empty command
+    then error m "usage: !&command (runs it as a background job)", []
+    else
+      ( m
+      , [ rpc
+            "shell"
+            ~params:[ "command", str command; "background", P.Json.bool true ]
+            ~tag:Job_started
+        ] ))
+  else if Model.running m
   then warn m "wait for the current turn", []
   else (
     let add_to_context = not (String.is_prefix text ~prefix:"!!") in
@@ -2028,6 +2106,7 @@ let picker_selected m (kind : Mode.Picker_kind.t) (item : Picker.Item.t) =
   | Tree _ ->
     m, [ rpc "rewind" ~params:[ "to", str item.id ] ~tag:Reload_messages ]
   | Agents -> set_focus m (`Agent item.id), []
+  | Jobs -> job_output m item.id
   | Hosts ->
     (match
        Option.bind m.state ~f:(fun s ->
@@ -2094,6 +2173,10 @@ let picker m (kind : Mode.Picker_kind.t) picker (intent : Intent.t) =
        (match Picker.selected_item picker with
         | None -> m, []
         | Some item -> cancel_agent { m with mode = Editing } item.id)
+     | Jobs ->
+       (match Picker.selected_item picker with
+        | None -> m, []
+        | Some item -> kill_job { m with mode = Editing } item.id)
      | Sessions { sessions; _ } ->
        (match Picker.selected_item picker with
         | None -> m, []
@@ -2752,6 +2835,25 @@ let reply m (tag : Reply_tag.t) (result : (P.Json.t, string) Result.t) =
            ( notice m (sprintf "model set to %s; /model to change" model.key)
            , [ set_model_command model.key ] )
          | None -> m, [])
+     | Jobs_picker ->
+       decode json ~f:(decode_list ~f:P.Job_info.of_json) (jobs_picker m)
+     | Job_output ->
+       decode
+         json
+         ~f:(fun json -> P.Json.string_field json "text")
+         (fun text -> block m (Content.lines text), [])
+     | Job_started ->
+       decode
+         json
+         ~f:(fun json -> P.Json.string_field json "job_id")
+         (fun id ->
+           ( notice
+               m
+               (sprintf
+                  "started job %s; /jobs shows it, and its exit is reported to \
+                   the agent"
+                  id)
+           , [] ))
      | Sessions_picker ->
        decode
          json

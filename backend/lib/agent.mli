@@ -41,8 +41,10 @@ module State : sig
               host is disabled and no client host was ever adopted *)
     ; hosts : Host.t list
       (** the backend first (unless disabled), then connected clients *)
-    ; subagents : Subagent_jobs.Summary.t list
+    ; subagents : Background_tasks.Summary.t list
       (** background subagents still running or not yet delivered *)
+    ; jobs : Background_tasks.Summary.t list
+      (** background shell jobs still running or not yet delivered *)
     }
   [@@deriving sexp_of]
 end
@@ -182,18 +184,22 @@ val shell
 val is_running : t -> bool
 
 (** Blocks until no run is active, the queues are empty and no background
-    subagent is running (their deliveries included). *)
+    subagent or job is running (their deliveries included). *)
 val wait_idle : t -> unit
 
-(** {2 Background subagents}
+(** {2 Background subagents and jobs}
 
-    The [subagent] tool starts them and returns at once. A finished one's
-    report becomes a user message: an idle agent starts a turn for it, a
-    running one injects it at the next turn boundary (with steering), unless
-    [subagent_wait]/[subagent_cancel] already returned it. [abort] leaves them
+    The [subagent] tool and [bash] with [background] start them and return at
+    once. A finished one's report becomes a user message (several finishing
+    together share one): an idle agent starts a turn for it, a running one
+    injects it at the next turn boundary (with steering), unless
+    [subagent_wait]/[job_wait]/... already returned it. [abort] leaves them
     running; after an abort, reports that are ready wait for the next run. *)
 
 val has_running_subagents : t -> bool
+
+(** Subagents or jobs. *)
+val has_running_background : t -> bool
 
 (** Every subagent run since the agent was created (or its session was
     replaced), with status and activity, oldest first. *)
@@ -206,8 +212,22 @@ val subagent : t -> string -> (Subagent_log.Summary.t * Message.t list) option
 (** Cancels one; its partial report is still delivered. *)
 val cancel_subagent : t -> agent_id:string -> unit Or_error.t
 
-(** Cancels every running one; with [discard] their reports are dropped. *)
-val cancel_subagents : ?discard:bool -> t -> unit
+(** Cancels every running subagent and job; with [discard] their reports are
+    dropped. *)
+val cancel_background : ?discard:bool -> t -> unit
+
+(** Every job of this agent, oldest first. *)
+val jobs : t -> Background_tasks.Task.t list
+
+(** Kills a running job (on its host); its report is still delivered. *)
+val kill_job : t -> job_id:string -> unit Or_error.t
+
+(** The last [lines] lines of a job's output, under a header line. *)
+val job_output : t -> job_id:string -> lines:int -> string Or_error.t
+
+(** Starts [command] as a background job on the active host (for [!&cmd]);
+    returns its id. *)
+val start_job : t -> command:string -> string
 
 val set_model : t -> Model.t -> unit
 val set_thinking : t -> Thinking.t -> unit

@@ -324,12 +324,37 @@ has been delivered, then until the next prompt. The status line shows an
 delivered report shows as `↩ subagent a1 finished "task"` and the report's
 first lines.
 
-Esc/abort stops the main turn only; background subagents keep running (reports
-that are ready when you abort wait for your next message). Subagents belong to
-their session: `/new` or switching sessions leaves them running in the old
-session (which stays live until they finish and deliver there). Stopping the
-backend loses running subagents; nothing is resumed, and the session simply
-has no report for them.
+Long commands run as background jobs: the model calls `bash` with
+`background: true` (the system prompt tells it to for anything that may take
+more than about a minute: builds, test suites, deployments, servers,
+watchers) and gets `started job j1: ...` back at once. The job runs on the
+session's active tool host like any `bash` call (the backend, or a frontend's
+`prigh tool-host`), with no default timeout; its output is kept in memory
+(the last 1 MB). When it exits, a message like `[job j1 exited 0] make test`
+plus the last 40 lines of output reaches the main agent exactly like a
+subagent report (an idle agent starts a turn; reports finishing together, jobs
+and subagents alike, arrive as one message). Killed jobs report `killed`, a
+host that disconnects fails its jobs (`failed: tool host disconnected`). The
+model also has `job_status`, `job_output` (peek at recent output, paging back
+with `offset`), `job_wait` (block on some or all jobs; returned reports are
+not delivered again) and `job_kill`. Subagents' `bash` has no `background`.
+
+The status line shows `jobs:N` with a spinner while jobs run and the agent is
+idle. `/jobs` opens a picker (id, state, elapsed time, command, last output
+line): Enter prints the job's recent output into the transcript, Ctrl+D kills
+it; `/jobs <id>` and `/jobs kill <id>` do the same directly. A delivered job
+report shows as `↩ job j1 exited 0 "make test"` with its output tail.
+
+Esc/abort stops the main turn only; background subagents and jobs keep
+running (reports that are ready when you abort wait for your next message).
+They belong to their session: `/new` or switching sessions leaves them running
+in the old session (which stays live until they finish and deliver there).
+Stopping the backend kills running jobs and loses running subagents; nothing
+is resumed, and the session simply has no report for them. Job ids continue
+after a restart (`j3` after a session that already had `j1` and `j2`).
+Headless `prigh run` waits for running subagents and jobs, and the turns that
+their reports start, before it exits (a server started in the background
+keeps it running until the model kills it, or you interrupt it).
 
 Typing `/` opens inline autocomplete (commands, then per-command arguments
 such as models, sessions and directories). Typing `@` completes file paths
@@ -337,7 +362,8 @@ under the session's working directory; on submit the referenced files are sent a
 backend appends them to the user message as `<file>` blocks. `!cmd` runs a
 shell command through the backend (streamed output shown as a tool item) and
 adds it and its output to the context; `!!cmd` runs it without adding to the
-context.
+context; `!&cmd` starts it as a background job (also while a turn is running)
+whose exit is reported to the agent like the agent's own jobs.
 
 Submitted prompts are kept in `~/.prigh/history` (one JSON string per line,
 last 500) and loaded on start; secrets from login prompts are never recorded.
@@ -369,6 +395,7 @@ destructive `bash`/`write`/`edit`; `/confirm on|off`) and
 | `/fork`, `/rewind`, `/tree`, `/clone` | branch the session tree |
 | `/export [path]`, `/import [path]` | markdown or `.jsonl` |
 | `/agents [cancel <n>]` | focus a subagent (Ctrl+D in the picker cancels one), or cancel subagent n |
+| `/jobs [<id>\|kill <id>]` | list background jobs (Enter shows recent output, Ctrl+D kills one), or show/kill one |
 | `/host [name\|backend]` | pick where tools run, and the directory there |
 | `/abort` | abort the current run |
 | `/btw <question>` | ask a side question without interrupting the run |

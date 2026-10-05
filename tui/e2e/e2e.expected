@@ -16,7 +16,7 @@
   (((id backend) (name <host>)
     (cwd $TMP) (session_id null)
     (session_name null))))
- (subagents ()))
+ (subagents ()) (jobs ()))
 <- prompt: ()
   event state running=true model=deepseek/deepseek-flash
   event user "hello there"
@@ -85,7 +85,7 @@
   (((id backend) (name <host>)
     (cwd $TMP) (session_id null)
     (session_name null))))
- (subagents ()))
+ (subagents ()) (jobs ()))
 <- session_stats: ((message_count 2) (turns 1) (tool_calls ())
  (usage ((input 10) (output 5) (cache_read 0))) (cost_usd 0.00035)
  (context_percent 0.001) (model_changes 2) (compactions 0)
@@ -137,6 +137,31 @@ backend exited
   event subagent a1: assistant_end End_turn
   event subagent_end a1 turns=1 cost=0.0000 is_error=false text="child says hi\n[subagent: 1 turns, 0 in / 0 out tokens, $0.0000]"
 subagent backend exited
+<- prompt: ()
+  event state running=true jobs=[]
+  event user "build it"
+  event message_end
+  event message_start
+  event text_delta "building"
+  event assistant_end Tool_use
+  event tool_start bash
+  event state running=true jobs=[j1:running]
+  event tool_end bash
+  event message_start
+  event message_end
+  event message_start
+  event text_delta "started the build"
+  event assistant_end End_turn
+  event state running=false jobs=[j1:running]
+  event state running=true jobs=[]
+  event user "[job j1 exited 0] sleep 0.5; echo built\nbuilt"
+  event message_end
+  event message_start
+  event text_delta "the build passed"
+  event assistant_end End_turn
+  event state running=false jobs=[]
+<- job_output: {"text":"[job j1 exited 0 after Ns, 6 bytes; lines 1-1 of 1] sleep 0.5; echo built\nbuilt"}
+jobs backend exited
 <- prompt: ()
   event state running=true model=deepseek/deepseek-flash
   event user "sleep a bit"

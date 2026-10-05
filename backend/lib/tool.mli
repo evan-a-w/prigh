@@ -16,9 +16,9 @@ and context =
   ; call_id : string
   ; tools : t list (** tools available to this agent *)
   ; emit : Agent_event.t -> unit
-  ; jobs : Subagent_jobs.t option
-    (** where the [subagent] tool starts background agents; [None] runs them
-        synchronously *)
+  ; background : Background_tasks.t option
+    (** where [subagent] and [bash] with [background] start background work;
+        [None] runs them synchronously *)
   ; execute : executor
     (** how tool calls of this agent (and of its subagents) are run; the
         default runs them in this process *)
@@ -38,7 +38,7 @@ module Context : sig
     -> ?call_id:string
     -> ?tools:t list
     -> ?emit:(Agent_event.t -> unit)
-    -> ?jobs:Subagent_jobs.t
+    -> ?background:Background_tasks.t
     -> env:Env.t
     -> cwd:string
     -> unit

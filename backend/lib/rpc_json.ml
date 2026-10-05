@@ -145,10 +145,42 @@ let state (s : Agent.State.t) =
                ])) )
     ; ( "subagents"
       , `Array
-          (List.map s.subagents ~f:(fun (a : Subagent_jobs.Summary.t) ->
+          (List.map s.subagents ~f:(fun (a : Background_tasks.Summary.t) ->
              `Object
-               [ "id", str a.id; "task", str a.task; "running", bool a.running ]))
-      )
+               [ "id", str a.id
+               ; "task", str a.label
+               ; "running", bool a.running
+               ])) )
+    ; ( "jobs"
+      , `Array
+          (List.map s.jobs ~f:(fun (j : Background_tasks.Summary.t) ->
+             `Object
+               [ "id", str j.id
+               ; "command", str j.label
+               ; "running", bool j.running
+               ; "exit", Option.value_map j.status ~default:`Null ~f:str
+               ])) )
+    ]
+;;
+
+let job ~now task =
+  let module Task = Background_tasks.Task in
+  let output = Task.output task in
+  `Object
+    [ "id", str (Task.id task)
+    ; "command", str (Task.label task)
+    ; "running", bool (Task.running task)
+    ; ( "exit"
+      , Option.value_map (Task.outcome task) ~default:`Null ~f:(fun o ->
+          str o.status) )
+    ; "delivered", bool (Task.delivered task)
+    ; ( "elapsed"
+      , float
+          (Option.value (Task.finished_at task) ~default:now
+           -. Task.started_at task) )
+    ; "bytes", int (Output_tail.total_bytes output)
+    ; ( "last_line"
+      , Option.value_map (Output_tail.last_line output) ~default:`Null ~f:str )
     ]
 ;;
 

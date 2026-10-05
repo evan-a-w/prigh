@@ -25,6 +25,8 @@ val state_json
   -> ?session_name:string
   -> ?session:string * string (** id, path *)
   -> ?subagents:(string * string * bool) list (** id, task, running *)
+  -> ?jobs:(string * string * string option) list
+       (** id, command, exit status (running when absent) *)
   -> unit
   -> string
 
@@ -38,6 +40,8 @@ val state
   -> ?cost_usd:float
   -> ?session_name:string
   -> ?subagents:(string * string * bool) list
+  -> ?jobs:(string * string * string option) list
+       (** id, command, exit status (running when absent) *)
   -> unit
   -> P.State.t
 

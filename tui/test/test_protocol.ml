@@ -71,7 +71,8 @@ let%expect_test "state event and messages" =
         (context_tokens 160)
         (active_host    backend)
         (hosts     ())
-        (subagents ()))))
+        (subagents ())
+        (jobs      ()))))
     (Event (Message_start (User hi)))
     (Event (
       Message_end (
@@ -241,7 +242,8 @@ let%expect_test "tool host events and state hosts" =
           (cwd  /work)
           (session_id   ())
           (session_name ()))))
-        (subagents ()))))
+        (subagents ())
+        (jobs      ()))))
     |}]
 ;;
 
@@ -262,6 +264,44 @@ let%expect_test "state lists background subagents (absent means none)" =
     (((id a1) (task "look around") (running true))
      ((id a2) (task "run tests")   (running false)))
     ()
+    |}]
+;;
+
+let%expect_test "state lists background jobs; list_jobs entries" =
+  (match
+     Json.parse
+       (Fixtures.state_json
+          ~jobs:[ "j1", "make test", None; "j2", "npm run dev", Some "killed" ]
+          ())
+     |> Or_error.bind ~f:State.of_json
+   with
+   | Ok state -> print_s [%sexp (state.jobs : State.Job.t list)]
+   | Error e -> print_s [%message "error" (e : Error.t)]);
+  print_s
+    [%sexp
+      (Json.parse
+         {|{"id":"j1","command":"make","running":false,"exit":"exited 2","delivered":true,"elapsed":1.5,"bytes":12,"last_line":"Error 2"}|}
+       |> Or_error.bind ~f:Job_info.of_json
+       : Job_info.t Or_error.t)];
+  [%expect
+    {|
+    (((id      j1)
+      (command "make test")
+      (running true)
+      (exit ()))
+     ((id      j2)
+      (command "npm run dev")
+      (running false)
+      (exit (killed))))
+    (Ok (
+      (id      j1)
+      (command make)
+      (running false)
+      (exit ("exited 2"))
+      (delivered true)
+      (elapsed   1.5)
+      (bytes     12)
+      (last_line ("Error 2"))))
     |}]
 ;;
 

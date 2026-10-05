@@ -48,7 +48,8 @@ module State = struct
     ; context_tokens : int
     ; active_host : string
     ; hosts : Host.t list
-    ; subagents : Subagent_jobs.Summary.t list
+    ; subagents : Background_tasks.Summary.t list
+    ; jobs : Background_tasks.Summary.t list
     }
   [@@deriving sexp_of]
 end
@@ -144,7 +145,7 @@ type t =
   ; mutable exec_seq : int
   ; mutable environment_notes : string list
     (** cwd/host changes not yet told to the model, oldest first *)
-  ; jobs : Subagent_jobs.t
+  ; background : Background_tasks.t
   ; subagent_log : Subagent_log.t
   }
 
@@ -228,7 +229,8 @@ let state t =
   ; context_tokens
   ; active_host = t.active_host
   ; hosts = hosts t
-  ; subagents = Subagent_jobs.summaries t.jobs
+  ; subagents = Background_tasks.summaries t.background ~kind:Subagent
+  ; jobs = Background_tasks.summaries t.background ~kind:Job
   }
 ;;
 
@@ -482,6 +484,7 @@ let executor t : Tool.executor =
   if
     (not tool.spec.on_host)
     || (String.equal t.active_host Host.backend_id && t.backend_host_enabled)
+    || Tool_bash.starts_job context arguments
   then Tool.execute tool context arguments
   else
     host_exec
@@ -589,12 +592,12 @@ let account_subagent t (event : Agent_event.t) =
 ;;
 
 let deliveries t =
-  match Subagent_jobs.take_undelivered t.jobs with
+  match Background_tasks.take_undelivered t.background with
   | [] -> []
-  | jobs -> [ Subagent_jobs.delivery_message jobs ]
+  | tasks -> [ Background_tasks.delivery_message tasks ]
 ;;
 
-(* Finished background agents not delivered yet go first. *)
+(* Finished background tasks not delivered yet go first. *)
 let rec start_run t prompts =
   t.git_branch <- find_branch t ~cwd:t.cwd;
   let cancel = Cancellation.create () in
@@ -618,7 +621,7 @@ let rec start_run t prompts =
          ~cancel
          ~confirm:(confirm_hook t cancel)
          ~execute:(executor t)
-         ~jobs:t.jobs
+         ~background:t.background
          ~steer:(fun () ->
            let l = Queue.to_list t.steer_queue in
            if not (List.is_empty l)
@@ -646,7 +649,7 @@ let rec start_run t prompts =
       Queue.blit_transfer ~src:t.steer_queue ~dst:t.follow_up_queue ();
       queue_update t);
     auto_compact t;
-    (* After an abort, finished agents wait for the next prompt (or the next
+    (* After an abort, finished tasks wait for the next prompt (or the next
        one to finish) rather than restarting the run at once. *)
     let next =
       match Queue.dequeue t.follow_up_queue with
@@ -655,7 +658,7 @@ let rec start_run t prompts =
         Some [ user_message t queued ]
       | None ->
         if
-          Subagent_jobs.has_undelivered t.jobs
+          Background_tasks.has_undelivered t.background
           && not (Cancellation.is_cancelled cancel)
         then Some []
         else None
@@ -706,16 +709,16 @@ and auto_compact t =
       broadcast t (Notice ("auto-compaction failed: " ^ Error.to_string_hum e)))
 ;;
 
-(* A background agent finished (or was delivered): an idle agent starts a
+(* A background task finished (or was delivered): an idle agent starts a
    turn to receive it; a running one picks it up at its next turn boundary. *)
-let subagents_changed t =
-  if (not (is_running t)) && Subagent_jobs.has_undelivered t.jobs
+let background_changed t =
+  if (not (is_running t)) && Background_tasks.has_undelivered t.background
   then start_run t [];
   state_changed t
 ;;
 
-(* Seeds background agent ids so they do not repeat ids the model has
-   already seen in this conversation. *)
+(* Seeds subagent ids so they do not repeat ids the model has already seen
+   in this conversation. *)
 let subagent_calls messages =
   List.sum
     (module Int)
@@ -725,6 +728,27 @@ let subagent_calls messages =
         List.count (Message.Assistant.tool_calls a) ~f:(fun call ->
           String.equal call.name "subagent")
       | User _ | Tool_result _ -> 0)
+;;
+
+(* Jobs appear as [started job j<n>: ...] results and [[job j<n> ...]]
+   report lines. *)
+let last_job_number messages =
+  let number_after s ~prefix =
+    Option.bind (String.chop_prefix s ~prefix) ~f:(fun rest ->
+      Int.of_string_opt (String.take_while rest ~f:Char.is_digit))
+  in
+  List.fold messages ~init:0 ~f:(fun acc message ->
+    let numbers =
+      match (message : Message.t) with
+      | Tool_result r when String.equal r.tool_name "bash" ->
+        Option.to_list (number_after r.text ~prefix:"started job j")
+      | User { text } ->
+        List.filter_map
+          (String.split_lines text)
+          ~f:(number_after ~prefix:"[job j")
+      | Tool_result _ | Assistant _ -> []
+    in
+    List.fold numbers ~init:acc ~f:Int.max)
 ;;
 
 let create
@@ -797,22 +821,23 @@ let create
     ; pending_execs = String.Table.create ()
     ; exec_seq = 0
     ; environment_notes = []
-    ; jobs =
-        Subagent_jobs.create
+    ; background =
+        Background_tasks.create
           ~env
           ~sw
-          ~first_id:(subagent_calls (Session.messages session) + 1)
+          ~first_subagent_id:(subagent_calls (Session.messages session) + 1)
+          ~first_job_id:(last_job_number (Session.messages session) + 1)
           ()
     ; subagent_log = Subagent_log.create ()
     }
   in
   restore_settings t;
-  Subagent_jobs.connect
-    t.jobs
+  Background_tasks.connect
+    t.background
     ~emit:(fun event ->
       account_subagent t event;
       broadcast t (Loop event))
-    ~on_change:(fun () -> subagents_changed t);
+    ~on_change:(fun () -> background_changed t);
   t
 ;;
 
@@ -862,13 +887,54 @@ let rec wait_idle t =
     Promise.await describing;
     wait_idle t
   | None, None ->
-    if Subagent_jobs.has_running t.jobs
+    if Background_tasks.has_running t.background
     then (
-      Subagent_jobs.wait_all t.jobs;
+      Background_tasks.wait_all t.background;
       wait_idle t)
 ;;
 
-let has_running_subagents t = Subagent_jobs.has_running t.jobs
+let has_running_subagents t =
+  Background_tasks.has_running ~kind:Subagent t.background
+;;
+
+let has_running_background t = Background_tasks.has_running t.background
+
+let cancel_subagent t ~agent_id =
+  Background_tasks.cancel t.background ~kind:Subagent agent_id
+;;
+
+let cancel_background ?discard t =
+  Background_tasks.cancel_all ?discard t.background
+;;
+
+let jobs t = Background_tasks.tasks t.background ~kind:Job
+let kill_job t ~job_id = Background_tasks.cancel t.background ~kind:Job job_id
+
+let job_output t ~job_id ~lines =
+  Or_error.map
+    (Background_tasks.find t.background ~kind:Job job_id)
+    ~f:(fun task ->
+      Tool_jobs.output_text
+        task
+        ~now:(Eio.Time.now (Eio.Stdenv.clock t.env))
+        ~lines
+        ~offset:0)
+;;
+
+let start_job t ~command =
+  Tool_bash.start_job t.background ~command ~run:(fun ~id ~cancel ~on_output ->
+    host_exec
+      t
+      ~cancel
+      ~on_output
+      ~call_id:id
+      ~cwd:t.cwd
+      ~name:"bash"
+      ~arguments:
+        (Tool_bash.foreground_arguments
+           (`Object [ "command", `String command ])))
+;;
+
 let subagents t = Subagent_log.summaries t.subagent_log
 let subagent t key = Subagent_log.find t.subagent_log key
 
@@ -878,9 +944,6 @@ let pending_confirms t =
   |> List.sort ~compare:(fun (a : Pending_confirm.t) b ->
     String.compare a.call_id b.call_id)
 ;;
-
-let cancel_subagent t ~agent_id = Subagent_jobs.cancel t.jobs agent_id
-let cancel_subagents ?discard t = Subagent_jobs.cancel_all ?discard t.jobs
 
 (* Pops the most recently queued message: follow-ups take priority over steer
    messages, and within each queue the back (last enqueued) is removed. *)
@@ -1031,7 +1094,7 @@ let btw t ~question ~cancel ~on_delta =
 
 let replace_session t session =
   ignore (abort t);
-  Subagent_jobs.cancel_all ~discard:true t.jobs;
+  Background_tasks.cancel_all ~discard:true t.background;
   wait_idle t;
   Subagent_log.clear t.subagent_log;
   t.session <- session;
