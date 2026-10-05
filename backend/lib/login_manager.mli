@@ -46,6 +46,7 @@ val models : t -> Model_registry.t
 
 (** Rereads the custom providers first, so hand edits show. *)
 val status : t -> Provider_auth.Status.t list Or_error.t
+
 val in_progress : t -> bool
 
 (** Starts the flow in the background; completion is reported by [Done] or
@@ -58,6 +59,7 @@ val start_custom : t -> ?name:string -> unit -> unit Or_error.t
 val respond : t -> id:string -> string -> unit Or_error.t
 val cancel : t -> unit
 val wait : t -> unit
+
 (** For a configured custom provider this is a flow ({!Custom_login.logout}:
     its prompt asks whether to remove the definition too) ending in
     [Logged_out], or nothing when the user keeps everything or cancels. *)
