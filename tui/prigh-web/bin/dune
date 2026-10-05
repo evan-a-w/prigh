@@ -1,5 +1,7 @@
-; prigh-web: main.bc.js plus the page, assembled under site/ (serve it with
-; `prigh serve -web HOST:PORT -web-root .../prigh-web/bin/site`).
+; prigh-web: main.bc.js plus the page, assembled under site/ (what
+; `prigh serve -prigh-web` serves). The dev profile compiles separately with
+; inline source maps (~49 MB, quick to relink); release builds (`-p`, Nix)
+; are whole-program (~1.4 MB).
 
 (executable
  (name main)

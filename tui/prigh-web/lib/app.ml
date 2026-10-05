@@ -9,6 +9,7 @@ module Reply_tag = struct
     | Messages
     | Sessions
     | Models
+    | Reload_state
     | Reconnect of int
   [@@deriving sexp_of, equal]
 end
@@ -189,13 +190,14 @@ let set_state (m : Model.t) (state : State.t) =
 let reply (m : Model.t) (tag : Reply_tag.t) result =
   match tag, result with
   | Reconnect generation, _ when generation <> m.generation -> m, []
-  | Reconnect _, Error error ->
+  (* The banner says that we are reconnecting: a toast per attempt would
+     pile up over the page. *)
+  | Reconnect _, Error _ ->
     (match m.connection with
      | Connected -> m, []
      | Reconnecting { attempt; generation } ->
        let attempt = attempt + 1 in
-       let m = { m with connection = Reconnecting { attempt; generation } } in
-       ( toast m ~error:true (sprintf "reconnecting: %s" error)
+       ( { m with connection = Reconnecting { attempt; generation } }
        , [ Command.Reconnect
              { generation
              ; delay_ms = Connection.delay_ms ~attempt
@@ -217,6 +219,7 @@ let reply (m : Model.t) (tag : Reply_tag.t) result =
      | _ -> toast m ~error:true error, [])
   | (Ignore | Show_error), Ok _ -> m, []
   | State, Ok json -> decode m json State.of_json ~f:(set_state m)
+  | Reload_state, Ok _ -> m, [ rpc "get_state" [] ~tag:State ]
   | Messages, Ok json ->
     decode
       m
@@ -307,8 +310,9 @@ let update (m : Model.t) (action : Action.t) =
   | Send -> send m ~follow_up:false
   | Send_follow_up -> send m ~follow_up:true
   | Abort -> m, [ rpc "abort" [] ]
-  | New_session -> m, [ rpc "new_session" [] ]
-  | Switch_session path -> m, [ rpc "switch_session" [ "path", `String path ] ]
+  | New_session -> m, [ rpc "new_session" [] ~tag:Reload_state ]
+  | Switch_session path ->
+    m, [ rpc "switch_session" [ "path", `String path ] ~tag:Reload_state ]
   | Set_model key -> m, [ rpc "set_model" [ "model", `String key ] ]
   | Set_thinking level ->
     m, [ rpc "set_thinking" [ "thinking", `String level ] ]

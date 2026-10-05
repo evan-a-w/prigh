@@ -13,6 +13,7 @@ module Reply_tag : sig
     | Messages
     | Sessions
     | Models
+    | Reload_state (** the client's session changed: fetch its state *)
     | Reconnect of int (** generation; stale replies are ignored *)
   [@@deriving sexp_of, equal]
 end

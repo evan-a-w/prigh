@@ -13,6 +13,7 @@ in.
 ./prigh -cwd ~/proj     # ... in another directory
 ./prigh -faux           # scripted provider, no API calls
 ./prigh -web            # the same UI in a browser (serves it on 127.0.0.1:7788 and opens it)
+./prigh -prigh-web      # prigh-web, the browser-native UI (127.0.0.1:7790)
 ```
 
 ## Build
@@ -56,7 +57,10 @@ nix develop .#backend                # backend toolchain (OCaml 5.3)
 
 `prigh -web [serve options]` runs the backend with the browser frontend
 (`prigh serve -web 127.0.0.1:7788 -open`); `PRIGH_WEB_ROOT` points at the
-built assets (the Nix wrapper sets it).
+built assets (the Nix wrapper sets it). Likewise `prigh -prigh-web [serve
+options]` (`nix run . -- -prigh-web -cwd ~/proj`) runs `prigh serve
+-prigh-web 127.0.0.1:7790 -open` (`$PRIGH_PRIGH_WEB_LISTEN`) with
+`PRIGH_PRIGH_WEB_ROOT` set to the installed prigh-web site.
 
 `prigh-tui` flags: `-faux`, `-session PATH`, `-model ID`, `-thinking LEVEL`,
 `-cwd DIR`, `-auth-file PATH`, `-backend PATH` (same as `$PRIGH_BACKEND`),
@@ -216,6 +220,29 @@ cd ~/dev/prigh && PRIGH_PI_WEB_LISTEN=0.0.0.0:7789 nix run ./pi-web -- -web 0.0.
 ```
 
 See `pi-web/README.md` for what was kept, dropped and mapped.
+
+### prigh-web
+
+`tui/prigh-web/` is a third browser frontend, in OCaml like the TUI but
+built for the browser rather than mounting the terminal UI: a real DOM
+(Bonsai_web, js_of_ocaml) with a session sidebar, a chat transcript with
+markdown, collapsible tool calls and their images, model and thinking
+selectors, and a composer that takes pasted or dropped images. It speaks
+prigh's own RPC (the same `/ws` protocol as `-web`), so it gets every
+backend feature without a translation layer like pi-web's.
+
+```
+./prigh -prigh-web -faux -cwd ~/proj           # development: dune-built site and backend, 127.0.0.1:7790
+nix run . -- -prigh-web -cwd ~/proj            # the packaged site and backend
+prigh serve -prigh-web 0.0.0.0:7790 -token sekrit   # remote; the page asks for the token
+```
+
+`-prigh-web-root DIR` (`$PRIGH_PRIGH_WEB_ROOT`) points at the site;
+without it the backend looks next to its dune build and in
+`../share/prigh/prigh-web`. The page keeps `?session=` in the address bar
+(a reload rejoins the session), reconnects with backoff when the backend
+goes away, and takes `?backend=ws://host:port/ws` like the `-web` page.
+One backend can serve all three web UIs on different ports.
 
 If the backend goes away (the spawned process dies, or the TCP connection
 drops) the TUI reconnects on its own — immediately, then with exponential
@@ -471,6 +498,11 @@ promote` accepts new output everywhere:
    tmux and compares the captured panes, including a backend kill and
    reconnect.
 
+The browser frontends have their own: `tui/test-web` and
+`tui/prigh-web/test` run under node in `@runtest`, and the Playwright e2es
+(`tui/e2e-web`, `tui/prigh-web/e2e`, `pi-web/e2e`) drive Chromium and
+Firefox against the real backend; the flake runs them as checks.
+
 ## Layout
 
 - `backend/lib` — `Agent_loop` (stream, run tools, repeat), `Agent`
@@ -487,6 +519,7 @@ promote` accepts new output everywhere:
   `Editor`, `Picker`, `Transcript`, `Render` to styled `Content`), `term/`
   (Bonsai_term views + backend process), `web/` + `web-app/` + `web-bin/`
   (DOM rendering, key mapping, WebSocket transport, the js_of_ocaml page),
-  `test/`, `test-web/`, `e2e/`.
+  `prigh-web/` (the DOM-native browser frontend), `test/`, `test-web/`,
+  `e2e/`.
 - `ARCHITECTURE.md` — how the pieces fit together; `DOCKER.md` — the
   container; `AGENTS.md` — conventions for working on the code.
