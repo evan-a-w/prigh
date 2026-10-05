@@ -6,6 +6,7 @@ let%expect_test "startup, a prompt and its streamed reply" =
     {|
     (Rpc (method_ get_state) (params ()) (tag State))
     (Rpc (method_ list_models) (params ()) (tag Models))
+    (Rpc (method_ auth_status) (params ()) (tag (Auth_status Refresh)))
     (Set_url_session s1)
     (Rpc (method_ get_messages) (params ()) (tag Messages))
     (Rpc (method_ list_sessions) (params ()) (tag Sessions))
@@ -21,6 +22,7 @@ let%expect_test "startup, a prompt and its streamed reply" =
   Harness.show h ~selector:".entries";
   [%expect
     {|
+    (Save_history (hello))
     (Rpc (method_ prompt) (params ((text hello))) (tag Show_error))
     <div class="entries">
       <div class="msg user">

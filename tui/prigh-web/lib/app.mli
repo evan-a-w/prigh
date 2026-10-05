@@ -143,6 +143,7 @@ module Action : sig
     | Close_dialog (** no side effects, except cancelling a login *)
     | Login_choose of int (** a login select option, clicked *)
     | Start_login of string (** provider, with its default method *)
+    | Logout of string (** provider *)
     | Cancel_subagent of string
     | Kill_job of string
     | Dequeue (** the last queued message back into the editor *)

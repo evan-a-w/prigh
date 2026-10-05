@@ -11,7 +11,13 @@ module Item = struct
     }
   [@@deriving sexp_of, equal]
 
-  let create ?(detail = "") ?search ?(marked = false) ?(dimmed = false) ~id label
+  let create
+        ?(detail = "")
+        ?search
+        ?(marked = false)
+        ?(dimmed = false)
+        ~id
+        label
     =
     { id
     ; label

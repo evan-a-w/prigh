@@ -46,7 +46,10 @@ let dialog_key (dialog : Dialog.t) t : App.Action.t option =
 ;;
 
 let first_line text ~cursor = not (String.mem (String.prefix text cursor) '\n')
-let last_line text ~cursor = not (String.mem (String.drop_prefix text cursor) '\n')
+
+let last_line text ~cursor =
+  not (String.mem (String.drop_prefix text cursor) '\n')
+;;
 
 let editor_key (m : App.Model.t) t ~cursor : App.Action.t option =
   match t.key, App.Model.popup m with

@@ -28,10 +28,16 @@ let context (state : State.t) =
   then Node.none
   else (
     let percent =
-      100. *. Float.of_int state.context_tokens /. Float.of_int state.model.context_window
+      100.
+      *. Float.of_int state.context_tokens
+      /. Float.of_int state.model.context_window
     in
     let level =
-      if Float.(percent >= 85.) then "hot" else if Float.(percent >= 60.) then "warm" else ""
+      if Float.(percent >= 85.)
+      then "hot"
+      else if Float.(percent >= 60.)
+      then "warm"
+      else ""
     in
     item
       ~cls:("context " ^ level)
@@ -45,7 +51,10 @@ let context (state : State.t) =
           [ Node.span
               ~attrs:
                 [ Attr.class_ "meter-fill"
-                ; Attr.style (Css_gen.width (`Percent (Percent.of_percentage (Float.min 100. percent))))
+                ; Attr.style
+                    (Css_gen.width
+                       (`Percent
+                           (Percent.of_percentage (Float.min 100. percent))))
                 ]
               []
           ]
@@ -61,7 +70,9 @@ let background (state : State.t) ~inject =
       [ Option.some_if
           (not (List.is_empty state.subagents))
           (plural (List.length state.subagents) "subagent")
-      ; Option.some_if (not (List.is_empty state.jobs)) (plural (List.length state.jobs) "job")
+      ; Option.some_if
+          (not (List.is_empty state.jobs))
+          (plural (List.length state.jobs) "job")
       ]
   in
   match parts with
@@ -69,7 +80,9 @@ let background (state : State.t) ~inject =
   | parts ->
     Node.button
       ~attrs:
-        [ classes [ "status-item"; "link"; "background" ] [ "active", running_agents + running_jobs > 0 ]
+        [ classes
+            [ "status-item"; "link"; "background" ]
+            [ "active", running_agents + running_jobs > 0 ]
         ; Attr.type_ "button"
         ; Attr.title "Background work (/agents)"
         ; Attr.on_click (fun _ -> inject Action.Open_agents)
@@ -108,8 +121,18 @@ let view (m : App.Model.t) ~inject =
     div
       ~cls:"status"
       [ (if state.running
-         then item ~cls:"running" [ Node.span ~attrs:[ Attr.class_ "spinner" ] []; Node.text "Working" ]
-         else item ~cls:"idle" [ Node.span ~attrs:[ Attr.class_ "idle-dot" ] []; Node.text "Ready" ])
+         then
+           item
+             ~cls:"running"
+             [ Node.span ~attrs:[ Attr.class_ "spinner" ] []
+             ; Node.text "Working"
+             ]
+         else
+           item
+             ~cls:"idle"
+             [ Node.span ~attrs:[ Attr.class_ "idle-dot" ] []
+             ; Node.text "Ready"
+             ])
       ; context state
       ; item
           ~cls:"tokens"
@@ -119,8 +142,15 @@ let view (m : App.Model.t) ~inject =
                state.usage.input
                state.usage.output
                state.usage.cache_read)
-          [ Node.textf "↑%s ↓%s" (tokens state.usage.input) (tokens state.usage.output) ]
-      ; item ~cls:"cost" ~title:"Session cost" [ Node.textf "$%.4f" state.cost_usd ]
+          [ Node.textf
+              "↑%s ↓%s"
+              (tokens state.usage.input)
+              (tokens state.usage.output)
+          ]
+      ; item
+          ~cls:"cost"
+          ~title:"Session cost"
+          [ Node.textf "$%.4f" state.cost_usd ]
       ; (if steer + follow_up > 0
          then
            Node.button

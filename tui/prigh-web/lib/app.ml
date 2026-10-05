@@ -136,6 +136,7 @@ module Action = struct
     | Close_dialog
     | Login_choose of int
     | Start_login of string
+    | Logout of string
     | Cancel_subagent of string
     | Kill_job of string
     | Dequeue
@@ -236,8 +237,9 @@ let toast (m : Model.t) ?(error = false) text =
       toasts = List.drop toasts (List.length toasts - max_toasts)
     ; next_toast = id + 1
     }
-  , if error then [] else [ Command.Expire_toast { id; after_ms = Toast.lifetime_ms } ]
-  )
+  , if error
+    then []
+    else [ Command.Expire_toast { id; after_ms = Toast.lifetime_ms } ] )
 ;;
 
 let error m text = toast m ~error:true text
@@ -308,7 +310,10 @@ let logged_in (m : Model.t) provider =
 
 let compact_tokens n =
   if n >= 1_000_000
-  then sprintf "%gM" (Float.round_decimal ~decimal_digits:1 (Float.of_int n /. 1e6))
+  then
+    sprintf
+      "%gM"
+      (Float.round_decimal ~decimal_digits:1 (Float.of_int n /. 1e6))
   else if n >= 1000
   then sprintf "%dk" (n / 1000)
   else Int.to_string n
@@ -382,7 +387,8 @@ let login_picker (statuses : Auth_status.t list) =
           ~marked:(not (String.is_empty configured))
           s.name))
   in
-  Dialog.Picker { kind = Login; picker = Picker.create ~title:"Log in to" items }
+  Dialog.Picker
+    { kind = Login; picker = Picker.create ~title:"Log in to" items }
 ;;
 
 let logout_picker (statuses : Auth_status.t list) =
@@ -396,7 +402,9 @@ let logout_picker (statuses : Auth_status.t list) =
   |> function
   | [] -> None
   | items ->
-    Some (Dialog.Picker { kind = Logout; picker = Picker.create ~title:"Log out of" items })
+    Some
+      (Dialog.Picker
+         { kind = Logout; picker = Picker.create ~title:"Log out of" items })
 ;;
 
 let open_dialog (m : Model.t) ?(focus = "dialog") dialog =
@@ -412,7 +420,8 @@ let start_login (m : Model.t) ~provider ~method_ =
     @ [ rpc
           "login"
           (("provider", str provider)
-           :: Option.value_map method_ ~default:[] ~f:(fun m -> [ "method", str m ]))
+           :: Option.value_map method_ ~default:[] ~f:(fun m ->
+             [ "method", str m ]))
           ~tag:Login_started
       ] )
 ;;
@@ -449,10 +458,10 @@ let refresh_completion (m : Model.t) =
      | Some old when Completion.same old c -> m, []
      | _ ->
        ( { m with completion = Some c }
-       , match Completion.request c with
-         | None -> []
-         | Some (method_, prefix) ->
-           [ rpc method_ [ "prefix", str prefix ] ~tag:(Paths prefix) ] ))
+       , (match Completion.request c with
+          | None -> []
+          | Some (method_, prefix) ->
+            [ rpc method_ [ "prefix", str prefix ] ~tag:(Paths prefix) ]) ))
 ;;
 
 let edit m ?cursor text = refresh_completion (set_draft m ?cursor text)
@@ -489,7 +498,9 @@ let run_command (m : Model.t) ({ name; rest } : Slash.Parsed.t) =
              | [] -> none
              | l ->
                " Did you mean "
-               ^ String.concat ~sep:", " (List.map l ~f:(fun (s : Llm.t) -> s.name))
+               ^ String.concat
+                   ~sep:", "
+                   (List.map l ~f:(fun (s : Llm.t) -> s.name))
                ^ "?")))
   | "thinking", "" -> open_picker m (thinking_picker m)
   | "thinking", level ->
@@ -506,18 +517,27 @@ let run_command (m : Model.t) ({ name; rest } : Slash.Parsed.t) =
     let m, cmds = toast m "Compacting the conversation…" in
     m, cmds @ [ rpc "compact" [] ~tag:(Notice "Compacted the conversation") ]
   | "name", "" -> open_rename m
-  | "name", name -> m, [ rpc "set_session_name" [ "name", str name ] ~tag:Refresh_sessions ]
+  | "name", name ->
+    m, [ rpc "set_session_name" [ "name", str name ] ~tag:Refresh_sessions ]
   | "sessions", _ -> open_sessions m
   | "clone", _ -> m, [ rpc "clone" [] ]
   | "cd", "" -> error m "Usage: /cd <path> (Tab completes directories)"
   | "cd", path ->
-    m, [ rpc "set_cwd" [ "path", str path ] ~tag:(Notice ("Working directory: " ^ path)) ]
+    ( m
+    , [ rpc
+          "set_cwd"
+          [ "path", str path ]
+          ~tag:(Notice ("Working directory: " ^ path))
+      ] )
   | "abort", _ -> m, [ rpc "abort" [] ~tag:Restored ]
   | "agents", _ -> open_dialog m Agents
   | "login", "" -> m, [ rpc "auth_status" [] ~tag:(Auth_status Login_picker) ]
   | "login", args ->
-    (match String.split args ~on:' ' |> List.filter ~f:(Fn.non String.is_empty) with
-     | provider :: method_ :: _ -> start_login m ~provider ~method_:(Some method_)
+    (match
+       String.split args ~on:' ' |> List.filter ~f:(Fn.non String.is_empty)
+     with
+     | provider :: method_ :: _ ->
+       start_login m ~provider ~method_:(Some method_)
      | _ -> start_login m ~provider:args ~method_:None)
   | "logout", "" -> m, [ rpc "auth_status" [] ~tag:(Auth_status Logout_picker) ]
   | "logout", provider -> m, [ rpc "logout" [ "provider", str provider ] ]
@@ -528,9 +548,11 @@ let run_command (m : Model.t) ({ name; rest } : Slash.Parsed.t) =
       m
       (match Slash.closest name with
        | Some spec ->
-         sprintf "Unknown command /%s. Did you mean /%s? (/help lists them)" name spec.name
+         sprintf
+           "Unknown command /%s. Did you mean /%s? (/help lists them)"
+           name
+           spec.name
        | None -> sprintf "Unknown command /%s: /help lists the commands." name)
-
 ;;
 
 let reply (m : Model.t) (tag : Reply_tag.t) result =
@@ -556,7 +578,9 @@ let reply (m : Model.t) (tag : Reply_tag.t) result =
       | Error _ -> m
     in
     (* The session may have moved on while we were away: start over. *)
-    let m, cmds = toast { m with state = None; chat = Chat.empty } "Reconnected" in
+    let m, cmds =
+      toast { m with state = None; chat = Chat.empty } "Reconnected"
+    in
     m, cmds @ startup
   | (Ignore | Paths _ | Auth_status Refresh), Error _ -> m, []
   | Deleted title, Error e ->
@@ -567,7 +591,8 @@ let reply (m : Model.t) (tag : Reply_tag.t) result =
          title
          e
          (if String.is_substring e ~substring:"live"
-          then ". Switch to another session and close other tabs using it first."
+          then
+            ". Switch to another session and close other tabs using it first."
           else ""))
   | Login_started, Error e ->
     (match m.dialog with
@@ -586,7 +611,8 @@ let reply (m : Model.t) (tag : Reply_tag.t) result =
       { m with sessions }, [])
   | Refresh_sessions, Ok _ -> m, [ rpc "list_sessions" [] ~tag:Sessions ]
   | Models, Ok json ->
-    decode m json (decode_list Llm.of_json) ~f:(fun models -> { m with models }, [])
+    decode m json (decode_list Llm.of_json) ~f:(fun models ->
+      { m with models }, [])
   | Auth_status purpose, Ok json ->
     decode m json (decode_list Auth_status.of_json) ~f:(fun auth ->
       let m = { m with auth } in
@@ -607,7 +633,9 @@ let reply (m : Model.t) (tag : Reply_tag.t) result =
     (match Option.map (field json "restored") ~f:strings with
      | Some (Ok (_ :: _ as texts)) ->
        let draft =
-         String.concat ~sep:"\n\n" (texts @ List.filter [ m.draft ] ~f:(Fn.non String.is_empty))
+         String.concat
+           ~sep:"\n\n"
+           (texts @ List.filter [ m.draft ] ~f:(Fn.non String.is_empty))
        in
        let m = set_draft m draft in
        let m, cmds =
@@ -623,7 +651,9 @@ let reply (m : Model.t) (tag : Reply_tag.t) result =
   | Dequeued, Ok json ->
     (match field json "text" with
      | Some (`String text) ->
-       let draft = if String.is_empty m.draft then text else text ^ "\n\n" ^ m.draft in
+       let draft =
+         if String.is_empty m.draft then text else text ^ "\n\n" ^ m.draft
+       in
        set_draft m draft, [ focus_editor ]
      | _ -> toast m "Nothing is queued")
   | Deleted title, Ok _ ->
@@ -648,7 +678,8 @@ let auth_event (m : Model.t) (e : Auth_event.t) =
   | Logged_out provider, _ ->
     let m, cmds = toast m (sprintf "Logged out of %s" provider) in
     m, cmds @ [ rpc "auth_status" [] ~tag:(Auth_status Refresh) ]
-  | _, Some (Login flow) -> { m with dialog = Some (Login (Login_flow.apply flow e)) }, []
+  | _, Some (Login flow) ->
+    { m with dialog = Some (Login (Login_flow.apply flow e)) }, []
   | Failed { provider; error = e }, _ ->
     error m (sprintf "Login to %s failed: %s. /login tries again." provider e)
   | (Auth_url _ | Prompt _), _ ->
@@ -668,7 +699,8 @@ let event (m : Model.t) (event : Event.t) =
   | Tool_end { call; _ } ->
     ( { m with
         confirms =
-          List.filter m.confirms ~f:(fun c -> not (String.equal c.call_id call.id))
+          List.filter m.confirms ~f:(fun c ->
+            not (String.equal c.call_id call.id))
       }
     , [] )
   | Agent_end _ -> m, [ rpc "list_sessions" [] ~tag:Sessions ]
@@ -684,7 +716,8 @@ let send (m : Model.t) ~follow_up =
   let text = String.strip m.draft in
   let sent (m : Model.t) =
     let history = History.add m.history text in
-    { (set_draft m "") with history; completion = None }, [ Command.Save_history (History.to_list history) ]
+    ( { (set_draft m "") with history; completion = None }
+    , [ Command.Save_history (History.to_list history) ] )
   in
   match Slash.parse text with
   | Some parsed when List.is_empty m.images ->
@@ -696,7 +729,11 @@ let send (m : Model.t) ~follow_up =
     then m, []
     else (
       let method_ =
-        if follow_up then "follow_up" else if Model.running m then "steer" else "prompt"
+        if follow_up
+        then "follow_up"
+        else if Model.running m
+        then "steer"
+        else "prompt"
       in
       let images =
         match m.images with
@@ -704,9 +741,12 @@ let send (m : Model.t) ~follow_up =
         | images -> [ "images", `Array (List.map images ~f:image_json) ]
       in
       let m, save =
-        if String.is_empty text then { m with completion = None }, [] else sent m
+        if String.is_empty text
+        then { m with completion = None }, []
+        else sent m
       in
-      { m with images = [] }, save @ [ rpc method_ (("text", str text) :: images) ])
+      ( { m with images = [] }
+      , save @ [ rpc method_ (("text", str text) :: images) ] ))
 ;;
 
 let accept_completion (m : Model.t) ~run =
@@ -739,7 +779,8 @@ let picker_accept (m : Model.t) ~kind (item : Picker.Item.t) =
     | Thinking -> set_thinking m item.id
     | Login ->
       (match String.lsplit2 item.id ~on:' ' with
-       | Some (provider, method_) -> start_login m ~provider ~method_:(Some method_)
+       | Some (provider, method_) ->
+         start_login m ~provider ~method_:(Some method_)
        | None -> start_login m ~provider:item.id ~method_:None)
     | Logout -> m, [ rpc "logout" [ "provider", str item.id ] ]
   in
@@ -774,7 +815,10 @@ let dialog_accept (m : Model.t) =
     then error m "Type a name for the session (Esc keeps the current one)."
     else (
       let m, cmds = close_dialog m in
-      m, cmds @ [ rpc "set_session_name" [ "name", str name ] ~tag:Refresh_sessions ])
+      ( m
+      , cmds
+        @ [ rpc "set_session_name" [ "name", str name ] ~tag:Refresh_sessions ]
+      ))
   | Some (Delete { path; title }) ->
     let m, cmds = close_dialog m in
     m, cmds @ [ rpc "delete_session" [ "path", str path ] ~tag:(Deleted title) ]
@@ -797,7 +841,10 @@ let update (m : Model.t) (action : Action.t) =
      | Reconnecting _ -> m, []
      | Connected ->
        let generation = m.generation + 1 in
-       ( { m with connection = Reconnecting { attempt = 0; generation }; generation }
+       ( { m with
+           connection = Reconnecting { attempt = 0; generation }
+         ; generation
+         }
        , [ Command.Reconnect
              { generation
              ; delay_ms = 0
@@ -831,7 +878,11 @@ let update (m : Model.t) (action : Action.t) =
      | None -> m, []
      | Some (history, text) -> edit { m with history } text)
   | Complete_move delta ->
-    { m with completion = Option.map m.completion ~f:(fun c -> Completion.move c delta) }, []
+    ( { m with
+        completion =
+          Option.map m.completion ~f:(fun c -> Completion.move c delta)
+      }
+    , [] )
   | Complete_accept { run } -> accept_completion m ~run
   | Complete_choose i ->
     (match m.completion with
@@ -841,7 +892,8 @@ let update (m : Model.t) (action : Action.t) =
        accept_completion { m with completion = Some c } ~run:true)
   | Complete_close -> { m with completion = None }, []
   | New_session ->
-    { m with sidebar_open = m.sidebar_open && not m.narrow }, [ rpc "new_session" [] ]
+    ( { m with sidebar_open = m.sidebar_open && not m.narrow }
+    , [ rpc "new_session" [] ] )
   | Switch_session path ->
     let m = { m with sidebar_open = m.sidebar_open && not m.narrow } in
     let current = Option.map m.state ~f:(fun s -> s.session_path) in
@@ -867,14 +919,17 @@ let update (m : Model.t) (action : Action.t) =
   | Picker_choose id ->
     (match m.dialog with
      | Some (Picker { kind; picker }) ->
-       (match List.find (Picker.visible picker) ~f:(fun i -> String.equal i.id id) with
+       (match
+          List.find (Picker.visible picker) ~f:(fun i -> String.equal i.id id)
+        with
         | Some item -> picker_accept m ~kind item
         | None -> m, [])
      | _ -> m, [])
   | Dialog_input text ->
     (match m.dialog with
      | Some (Rename _) -> { m with dialog = Some (Rename text) }, []
-     | Some (Login flow) -> { m with dialog = Some (Login { flow with input = text }) }, []
+     | Some (Login flow) ->
+       { m with dialog = Some (Login { flow with input = text }) }, []
      | Some (Picker _) -> with_picker m ~f:(fun p -> Picker.set_query p text)
      | _ -> m, [])
   | Dialog_move delta ->
@@ -898,6 +953,7 @@ let update (m : Model.t) (action : Action.t) =
        respond_login m flow
      | _ -> m, [])
   | Start_login provider -> start_login m ~provider ~method_:None
+  | Logout provider -> m, [ rpc "logout" [ "provider", str provider ] ]
   | Cancel_subagent id -> m, [ rpc "cancel_subagent" [ "agent_id", str id ] ]
   | Kill_job id -> m, [ rpc "kill_job" [ "job_id", str id ] ]
   | Dequeue -> m, [ rpc "dequeue" [] ~tag:Dequeued ]
@@ -905,7 +961,8 @@ let update (m : Model.t) (action : Action.t) =
   | Respond_confirm { call_id; allow } ->
     ( { m with
         confirms =
-          List.filter m.confirms ~f:(fun c -> not (String.equal c.call_id call_id))
+          List.filter m.confirms ~f:(fun c ->
+            not (String.equal c.call_id call_id))
       }
     , [ rpc
           "tool_confirm_respond"
@@ -913,7 +970,8 @@ let update (m : Model.t) (action : Action.t) =
       ; focus_editor
       ] )
   | Add_image image -> { m with images = m.images @ [ image ] }, []
-  | Remove_image i -> { m with images = List.filteri m.images ~f:(fun j _ -> j <> i) }, []
+  | Remove_image i ->
+    { m with images = List.filteri m.images ~f:(fun j _ -> j <> i) }, []
   | Show_toast { text; error } -> toast m ~error text
   | Dismiss_toast id ->
     { m with toasts = List.filter m.toasts ~f:(fun t -> t.id <> id) }, []

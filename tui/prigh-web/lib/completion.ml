@@ -46,10 +46,10 @@ let logged_in (auth : Auth_status.t list) provider =
 ;;
 
 let argument_items
-  (kind : Slash.Argument.t)
-  ~(models : Llm.t list)
-  ~(auth : Auth_status.t list)
-  ~current_model
+      (kind : Slash.Argument.t)
+      ~(models : Llm.t list)
+      ~(auth : Auth_status.t list)
+      ~current_model
   =
   match kind with
   | Model ->
@@ -85,14 +85,17 @@ let argument_items
 let word_at text ~cursor =
   let cursor = Int.max 0 (Int.min cursor (String.length text)) in
   let start =
-    match String.rfindi (String.prefix text cursor) ~f:(fun _ c ->
-            Char.is_whitespace c)
+    match
+      String.rfindi (String.prefix text cursor) ~f:(fun _ c ->
+        Char.is_whitespace c)
     with
     | Some i -> i + 1
     | None -> 0
   in
   let stop =
-    match String.lfindi text ~pos:cursor ~f:(fun _ c -> Char.is_whitespace c) with
+    match
+      String.lfindi text ~pos:cursor ~f:(fun _ c -> Char.is_whitespace c)
+    with
     | Some i -> i
     | None -> String.length text
   in
@@ -117,12 +120,16 @@ let compute ~text ~cursor ~models ~auth ~current_model =
          (match Slash.find name with
           | Some { argument = Some kind; _ } ->
             let prefix = String.strip rest in
-            let start = String.length text - String.length (String.lstrip rest) in
+            let start =
+              String.length text - String.length (String.lstrip rest)
+            in
             (match kind with
              | Directory -> Some (make (Argument kind) ~prefix ~start [])
              | _ ->
                (match
-                  rank ~prefix (argument_items kind ~models ~auth ~current_model)
+                  rank
+                    ~prefix
+                    (argument_items kind ~models ~auth ~current_model)
                 with
                 | [] -> None
                 | items -> Some (make (Argument kind) ~prefix ~start items)))
@@ -179,5 +186,6 @@ let accept t ~text =
     in
     let before = String.prefix text t.start in
     let after = String.drop_prefix text (t.start + String.length t.prefix) in
-    before ^ replacement ^ after, String.length before + String.length replacement
+    ( before ^ replacement ^ after
+    , String.length before + String.length replacement )
 ;;

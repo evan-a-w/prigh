@@ -15,7 +15,12 @@ let act t action =
   List.iter commands ~f:(fun (command : App.Command.t) ->
     (match command with
      | Rpc { method_; tag; _ } -> t.pending <- t.pending @ [ method_, tag ]
-     | Reconnect _ | Set_url_session _ -> ());
+     | Reconnect _
+     | Set_url_session _
+     | Expire_toast _
+     | Focus _
+     | Save_history _
+     | Sign_out -> ());
     print_s [%sexp (command : App.Command.t)])
 ;;
 
