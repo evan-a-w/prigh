@@ -128,7 +128,7 @@ let%expect_test "/help <command> and /hotkeys" =
     Ctrl+X copy the last reply (when nothing is selected)
     Ctrl+↑ / Ctrl+↓ previous / next of your messages in the transcript
     PageUp / PageDown scroll the transcript
-    Ctrl+K search sessions
+    Ctrl+K search sessions (↓ ↑ through them, Enter opens, Delete deletes)
     Ctrl+B show or hide the sidebar
     Alt+1…9 follow subagent or job N in the agents panel
     Alt+] Alt+[ the next or previous subagent or job

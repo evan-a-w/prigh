@@ -549,6 +549,8 @@ kbd {
   animation: drop 0.18s ease-out;
 }
 .toast.error { background: var(--red-bg); border-color: var(--red-border); color: #ffc2c2; }
+/* Not over the agents panel. */
+.app.agents-open:not(.narrow) .toasts { right: calc(var(--agents-width, 420px) + 16px); }
 
 /* Sign in */
 

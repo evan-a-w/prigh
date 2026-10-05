@@ -169,6 +169,12 @@ module Action = struct
     | Ask_delete of string
     | Set_session_query of string
     | Open_sessions
+    | Session_nav of
+        { from : string option
+        ; by : int
+        }
+    | Open_first_session
+    | Leave_sidebar
     | Set_model of string
     | Set_thinking of string
     | Open_model_picker
@@ -658,6 +664,44 @@ let edit m ?cursor text = refresh_completion (set_draft m ?cursor text)
 
 let open_sessions (m : Model.t) =
   { m with sidebar_open = true }, [ Command.Focus "session-search" ]
+;;
+
+let switch_session (m : Model.t) path =
+  let m = { m with sidebar_open = m.sidebar_open && not m.narrow } in
+  let current = Option.map m.state ~f:(fun s -> s.session_path) in
+  if Option.equal String.equal current (Some path)
+  then m, [ focus_editor ]
+  else
+    ( m
+    , [ rpc "switch_session" [ "path", str path ] ~tag:Reload_state
+      ; focus_editor
+      ] )
+;;
+
+(* The keyboard through the sidebar's (filtered) sessions: down from the
+   search to the first, up from the first back to the search. *)
+let session_nav (m : Model.t) ~from ~by =
+  let ids =
+    List.map
+      (Session_list.filter m.sessions ~query:m.session_query)
+      ~f:(fun s -> s.id)
+  in
+  let index =
+    match from with
+    | None -> -1
+    | Some id ->
+      Option.value_map
+        (List.findi ids ~f:(fun _ id' -> String.equal id id'))
+        ~default:(-1)
+        ~f:fst
+  in
+  let target = index + by in
+  if target < 0
+  then m, [ Command.Focus "session-search" ]
+  else (
+    match List.nth ids (Int.min target (List.length ids - 1)) with
+    | Some id -> m, [ Command.Focus (Session_list.dom_id id) ]
+    | None -> m, [])
 ;;
 
 let open_rename (m : Model.t) =
@@ -1740,8 +1784,8 @@ let reply (m : Model.t) (tag : Reply_tag.t) result =
       ( m
       , match m.agents.selected with
         | Some (Job id as job)
-          when Agents.running before job && not (Agents.running m.agents job)
-          -> [ job_output id ]
+          when Agents.running before job && not (Agents.running m.agents job) ->
+          [ job_output id ]
         | _ -> [] ))
   | Job_output id, Ok json ->
     (match field json "text", m.agents.selected with
@@ -2292,18 +2336,20 @@ let update (m : Model.t) (action : Action.t) =
   | New_session ->
     ( { m with sidebar_open = m.sidebar_open && not m.narrow }
     , [ rpc "new_session" [] ~tag:Reload_state ] )
-  | Switch_session path ->
-    let m = { m with sidebar_open = m.sidebar_open && not m.narrow } in
-    let current = Option.map m.state ~f:(fun s -> s.session_path) in
-    if Option.equal String.equal current (Some path)
-    then m, []
-    else m, [ rpc "switch_session" [ "path", str path ] ~tag:Reload_state ]
+  | Switch_session path -> switch_session m path
   | Ask_delete path ->
     (match List.find m.sessions ~f:(fun s -> String.equal s.path path) with
      | None -> m, []
      | Some s -> open_dialog m (Delete { path; title = Session_list.title s }))
   | Set_session_query session_query -> { m with session_query }, []
   | Open_sessions -> open_sessions m
+  | Session_nav { from; by } -> session_nav m ~from ~by
+  | Open_first_session ->
+    (match Session_list.filter m.sessions ~query:m.session_query with
+     | [] -> m, []
+     | first :: _ -> switch_session m first.path)
+  | Leave_sidebar ->
+    { m with sidebar_open = m.sidebar_open && not m.narrow }, [ focus_editor ]
   | Set_model key -> set_model m key
   | Set_thinking level -> set_thinking m level
   | Open_model_picker -> open_picker m (model_picker m)

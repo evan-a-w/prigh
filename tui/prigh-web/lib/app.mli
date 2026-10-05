@@ -180,6 +180,12 @@ module Action : sig
     | Ask_delete of string (** path *)
     | Set_session_query of string
     | Open_sessions (** the sidebar, with its search focused *)
+    | Session_nav of
+        { from : string option (** a session's id; [None]: the search *)
+        ; by : int
+        } (** the focus to another of the sidebar's sessions *)
+    | Open_first_session (** the search's best match *)
+    | Leave_sidebar (** back to the editor *)
     | Set_model of string (** [provider/id] *)
     | Set_thinking of string
     | Open_model_picker
