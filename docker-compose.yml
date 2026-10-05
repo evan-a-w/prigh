@@ -1,0 +1,69 @@
+# prigh as a Docker Compose / Portainer stack. Configuration is through
+# environment variables (Portainer: "Environment variables" on the stack);
+# see DOCKER.md for all of them.
+name: prigh
+
+services:
+  prigh:
+    build:
+      context: .
+      args:
+        EXTRA_APT_PACKAGES: ${PRIGH_EXTRA_APT_PACKAGES:-}
+        PRIGH_UID: ${PRIGH_UID:-1000}
+        PRIGH_GID: ${PRIGH_GID:-1000}
+        NIX_SUBSTITUTER: ${PRIGH_NIX_SUBSTITUTER-https://prigh.cachix.org}
+        NIX_SUBSTITUTER_KEY: ${PRIGH_NIX_SUBSTITUTER_KEY:-prigh.cachix.org-1:1kHKoGOetNmpzJg8lJ1nvQzwzTL0XiOs5GInELMgSoI=}
+    image: prigh:local
+    restart: unless-stopped
+    environment:
+      PRIGH_MODE: ${PRIGH_MODE:-web}
+      PRIGH_TOKEN: ${PRIGH_TOKEN:-}
+      PRIGH_TOKENS: ${PRIGH_TOKENS:-}
+      PRIGH_SUPERUSERS: ${PRIGH_SUPERUSERS:-}
+      PRIGH_NO_BACKEND_HOST: ${PRIGH_NO_BACKEND_HOST:-}
+      PRIGH_ALLOW_NO_TOKEN: ${PRIGH_ALLOW_NO_TOKEN:-}
+      PRIGH_ARGS: ${PRIGH_ARGS:-}
+      PRIGH_TUI_ARGS: ${PRIGH_TUI_ARGS:-}
+      PRIGH_CWD: ${PRIGH_CWD:-}
+      GH_TOKEN: ${GH_TOKEN:-}
+      PRIGH_GH_TOKENS: ${PRIGH_GH_TOKENS:-}
+      PRIGH_GIT_NAME: ${PRIGH_GIT_NAME:-}
+      PRIGH_GIT_EMAIL: ${PRIGH_GIT_EMAIL:-}
+    ports:
+      - "${PRIGH_BIND:-0.0.0.0}:${PRIGH_WEB_PORT:-7788}:7788"
+      - "${PRIGH_BIND:-0.0.0.0}:${PRIGH_PI_WEB_PORT:-7789}:7789"
+      - "${PRIGH_BIND:-0.0.0.0}:${PRIGH_SERVER_PORT:-7777}:7777"
+    volumes:
+      # Every user's home: /home/<name> (~/.ssh, ~/.gitconfig), and /home/prigh,
+      # the backend's sessions, logins and config.
+      - prigh-home:/home
+      # What the agents work on, /workspace/<name> per user. Set
+      # PRIGH_WORKSPACE to a host path to bind it instead (it must be
+      # world-searchable, e.g. mode 755).
+      - ${PRIGH_WORKSPACE:-prigh-workspace}:/workspace
+    # Only the two volumes above, a scratch /tmp and /run (the per-user
+    # accounts) are writable; the agents see nothing else of the host.
+    read_only: true
+    tmpfs:
+      - /tmp:exec,mode=1777
+      - /run:mode=0755
+    # The entrypoint runs as root to create the users; everything it starts
+    # runs as an unprivileged user with no capabilities (see DOCKER.md).
+    cap_drop:
+      - ALL
+    cap_add:
+      - CHOWN
+      - DAC_OVERRIDE
+      - FOWNER
+      - SETUID
+      - SETGID
+      - KILL
+    security_opt:
+      - no-new-privileges:true
+    # For PRIGH_MODE=tui (attach to the container); harmless otherwise.
+    stdin_open: true
+    tty: true
+
+volumes:
+  prigh-home:
+  prigh-workspace:

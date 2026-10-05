@@ -25,9 +25,13 @@ module H = struct
     ignore t
   ;;
 
+  (* Epoch milliseconds (subagent times come from the real clock). *)
+  let epoch_ms_re = Re.Perl.compile_pat {|\b1[0-9]{12}\b|}
+
   let dump t =
     Queue.iter t.output ~f:(fun line ->
       mask t.sandbox line
+      |> Re.replace_string epoch_ms_re ~by:"<ms>"
       |> String.substr_replace_all
            ~pattern:(Core_unix.gethostname () ^ " (")
            ~with_:"<host> ("
@@ -57,6 +61,7 @@ let with_server
       ?hello_token
       ?session
       ?(confirm_tools = false)
+      ?provider
       replies
       f
   =
@@ -66,7 +71,11 @@ let with_server
   then write sandbox ".prigh/config.json" {|{"confirm_tools": true}|};
   Eio.Switch.run
   @@ fun sw ->
-  let provider = Faux_provider.create replies in
+  let provider =
+    match provider with
+    | Some provider -> provider
+    | None -> Faux_provider.create replies
+  in
   let login =
     Login_manager.create
       ~env:sandbox.env
@@ -161,7 +170,7 @@ let%expect_test "hello sets status entries; state, commands, models, stats" =
     {"type":"extension_ui_request","id":"status-host","method":"setStatus","statusKey":"host","statusText":null}
     {"type":"extension_ui_request","id":"status-branch","method":"setStatus","statusKey":"branch","statusText":null}
     {"id":"q","type":"response","command":"get_state","success":true,"data":{"model":{"id":"deepseek-flash","name":"DeepSeek V4.1 Flash","provider":"deepseek","reasoning":true,"contextWindow":1000000},"cwd":"$DIR","thinkingLevel":"off","isStreaming":false,"isCompacting":false,"steeringMode":"all","followUpMode":"all","sessionFile":"$DIR/sessions/<stamp>_<id>.jsonl","sessionId":"<id>","autoCompactionEnabled":true,"messageCount":0,"pendingMessageCount":0}}
-    {"id":"q","type":"response","command":"get_commands","success":true,"data":{"commands":[{"name":"compact","description":"Compact the context","source":"builtin","argumentHint":"[instructions]"},{"name":"new","description":"Start a new session","source":"builtin"},{"name":"name","description":"Name the session","source":"builtin","argumentHint":"<name>"},{"name":"model","description":"Pick a model","source":"builtin","argumentHint":"[name]"},{"name":"thinking","description":"Set or cycle the thinking level","source":"builtin","argumentHint":"[level]"},{"name":"session","description":"Show session info","source":"builtin"},{"name":"export","description":"Export the session as markdown (on the backend)","source":"builtin","argumentHint":"[path]"},{"name":"copy","description":"Copy the last assistant message","source":"builtin"},{"name":"fork","description":"Fork the session from an earlier message","source":"builtin"},{"name":"clone","description":"Clone the session","source":"builtin"},{"name":"cd","description":"Change the working directory","source":"builtin","argumentHint":"[dir]"},{"name":"login","description":"Log in to a provider","source":"extension","argumentHint":"[provider] [oauth|api_key]"},{"name":"logout","description":"Log out of a provider","source":"extension","argumentHint":"<provider>"},{"name":"auth","description":"Show provider credentials","source":"extension"},{"name":"sessions","description":"Pick a saved session to switch to","source":"extension"},{"name":"switch","description":"Switch to a session by id or path","source":"extension","argumentHint":"<id|path>"},{"name":"host","description":"Pick where tools run","source":"extension"},{"name":"change_default","description":"Save the current model and thinking level as the default","source":"extension"},{"name":"help","description":"List the commands","source":"extension"}]}}
+    {"id":"q","type":"response","command":"get_commands","success":true,"data":{"commands":[{"name":"compact","description":"Compact the context","source":"builtin","argumentHint":"[instructions]"},{"name":"new","description":"Start a new session","source":"builtin"},{"name":"name","description":"Name the session","source":"builtin","argumentHint":"<name>"},{"name":"model","description":"Pick a model","source":"builtin","argumentHint":"[name]"},{"name":"thinking","description":"Set or cycle the thinking level","source":"builtin","argumentHint":"[level]"},{"name":"session","description":"Show session info","source":"builtin"},{"name":"export","description":"Export the session as markdown (on the backend)","source":"builtin","argumentHint":"[path]"},{"name":"copy","description":"Copy the last assistant message","source":"builtin"},{"name":"fork","description":"Fork the session from an earlier message","source":"builtin"},{"name":"clone","description":"Clone the session","source":"builtin"},{"name":"cd","description":"Change the working directory","source":"builtin","argumentHint":"[dir]"},{"name":"login","description":"Log in to a provider","source":"extension","argumentHint":"[provider] [oauth|api_key]"},{"name":"logout","description":"Log out of a provider","source":"extension","argumentHint":"<provider>"},{"name":"auth","description":"Show provider credentials","source":"extension"},{"name":"sessions","description":"Pick a saved session to switch to","source":"extension"},{"name":"switch","description":"Switch to a session by id or path","source":"extension","argumentHint":"<id|path>"},{"name":"host","description":"Pick where tools run","source":"extension"},{"name":"setusr","description":"Act as another user (superusers)","source":"extension","argumentHint":"[user]"},{"name":"change_default","description":"Save the current model and thinking level as the default","source":"extension"},{"name":"help","description":"List the commands","source":"extension"}]}}
     {"id":"q","type":"response","command":"get_session_stats","success":true,"data":{"sessionFile":"$DIR/sessions/<stamp>_<id>.jsonl","sessionId":"<id>","userMessages":0,"assistantMessages":0,"toolCalls":0,"toolResults":0,"totalMessages":0,"tokens":{"input":0,"output":0,"cacheRead":0,"cacheWrite":0,"total":0},"cost":0,"contextUsage":{"tokens":0,"contextWindow":1000000,"percent":0}}}
     {"id":"q","type":"response","command":"get_messages","success":true,"data":{"messages":[]}}
     {"id":"q","type":"response","command":"nope","success":false,"error":"command \"nope\" is not supported by prigh"}
@@ -504,10 +513,10 @@ let%expect_test "sessions: list, switch, /sessions dialog, /switch" =
     {"id":"q","type":"response","command":"get_messages","success":true,"data":{"messages":[{"role":"user","content":"first","timestamp":0},{"role":"assistant","content":[{"type":"text","text":"hi"}],"provider":"prigh","model":"deepseek-flash","stopReason":"stop","timestamp":1}]}}
     {"id":"q","type":"response","command":"new_session","success":true,"data":{}}
     {"id":"q","type":"response","command":"get_messages","success":true,"data":{"messages":[]}}
-    {"type":"extension_ui_request","id":"dialog-13","method":"select","title":"Switch to session","options":["first · 2 msgs · <id>"]}
+    {"type":"extension_ui_request","id":"dialog-1","method":"select","title":"Switch to session","options":["first · 2 msgs · <id>"]}
     {"id":"q","type":"response","command":"prompt","success":true,"data":{}}
     {"type":"extension_ui_request","id":"notify-1","method":"notify","message":"unknown choice no such label","notifyType":"error"}
-    {"type":"extension_ui_request","id":"dialog-15","method":"select","title":"Switch to session","options":["first · 2 msgs · <id>"]}
+    {"type":"extension_ui_request","id":"dialog-2","method":"select","title":"Switch to session","options":["first · 2 msgs · <id>"]}
     {"id":"q","type":"response","command":"prompt","success":true,"data":{}}
     {"type":"session_reloaded"}
     {"id":"q","type":"response","command":"get_messages","success":true,"data":{"messages":[{"role":"user","content":"first","timestamp":0},{"role":"assistant","content":[{"type":"text","text":"hi"}],"provider":"prigh","model":"deepseek-flash","stopReason":"stop","timestamp":1}]}}
@@ -551,11 +560,11 @@ let%expect_test "/help, /auth and /login dialogs; a secret prompt is an input" =
   H.dump h;
   [%expect
     {|
-    {"type":"message_end","message":{"role":"custom","customType":"help","content":"- `/compact [instructions]` — Compact the context\n- `/new` — Start a new session\n- `/name <name>` — Name the session\n- `/model [name]` — Pick a model\n- `/thinking [level]` — Set or cycle the thinking level\n- `/session` — Show session info\n- `/export [path]` — Export the session as markdown (on the backend)\n- `/copy` — Copy the last assistant message\n- `/fork` — Fork the session from an earlier message\n- `/clone` — Clone the session\n- `/cd [dir]` — Change the working directory\n- `/login [provider] [oauth|api_key]` — Log in to a provider\n- `/logout <provider>` — Log out of a provider\n- `/auth` — Show provider credentials\n- `/sessions` — Pick a saved session to switch to\n- `/switch <id|path>` — Switch to a session by id or path\n- `/host` — Pick where tools run\n- `/change_default` — Save the current model and thinking level as the default\n- `/help` — List the commands","display":true,"timestamp":0}}
+    {"type":"message_end","message":{"role":"custom","customType":"help","content":"- `/compact [instructions]` — Compact the context\n- `/new` — Start a new session\n- `/name <name>` — Name the session\n- `/model [name]` — Pick a model\n- `/thinking [level]` — Set or cycle the thinking level\n- `/session` — Show session info\n- `/export [path]` — Export the session as markdown (on the backend)\n- `/copy` — Copy the last assistant message\n- `/fork` — Fork the session from an earlier message\n- `/clone` — Clone the session\n- `/cd [dir]` — Change the working directory\n- `/login [provider] [oauth|api_key]` — Log in to a provider\n- `/logout <provider>` — Log out of a provider\n- `/auth` — Show provider credentials\n- `/sessions` — Pick a saved session to switch to\n- `/switch <id|path>` — Switch to a session by id or path\n- `/host` — Pick where tools run\n- `/setusr [user]` — Act as another user (superusers)\n- `/change_default` — Save the current model and thinking level as the default\n- `/help` — List the commands","display":true,"timestamp":0}}
     {"id":"q","type":"response","command":"prompt","success":true,"data":{}}
     {"type":"message_end","message":{"role":"custom","customType":"auth","content":"Providers:\n- **Anthropic** `anthropic`: not logged in\n- **OpenAI** `openai`: not logged in\n- **OpenAI Codex (ChatGPT)** `openai-codex`: not logged in\n- **DeepSeek** `deepseek`: not logged in","display":true,"timestamp":1}}
     {"id":"q","type":"response","command":"prompt","success":true,"data":{}}
-    {"type":"extension_ui_request","id":"dialog-4","method":"select","title":"Log in to","options":["Anthropic (Claude Pro/Max)","Anthropic API key","OpenAI API key","OpenAI (ChatGPT Plus/Pro)","DeepSeek API key"]}
+    {"type":"extension_ui_request","id":"dialog-1","method":"select","title":"Log in to","options":["Anthropic (Claude Pro/Max)","Anthropic API key","OpenAI API key","OpenAI (ChatGPT Plus/Pro)","DeepSeek API key"]}
     {"id":"q","type":"response","command":"prompt","success":true,"data":{}}
     {"type":"extension_ui_request","id":"auth-p1","method":"input","title":"Enter DeepSeek API key","placeholder":""}
     {"type":"extension_ui_request","id":"notify-2","method":"notify","message":"logged in to deepseek (api_key)","notifyType":"info"}
@@ -577,7 +586,7 @@ let%expect_test "a bad token fails hello" =
   cmd h "get_state";
   H.dump h;
   [%expect
-    {| {"type":"prigh_hello_failed","error":"unauthorised: bad or missing token"} |}]
+    {| {"type":"prigh_hello_failed","error":"unauthorised: bad user name or password"} |}]
 ;;
 
 let%expect_test "the token and session from the query string are used" =
@@ -610,13 +619,14 @@ let%expect_test "subagents feed the agents rail widget; the parent sees a tool" 
   [%expect
     {|
     {"type":"tool_execution_start","toolCallId":"p1","toolName":"subagent","args":{"task":"look around\nin detail"}}
-    {"type":"extension_ui_request","id":"widget-subagents","method":"setWidget","widgetKey":"subagents","widgetLines":["PI_SUBAGENT_ASYNC_JSON:{\"generatedAt\":3000,\"omitted\":{\"runs\":0,\"children\":0,\"byteLimitExceeded\":false},\"runs\":[{\"id\":\"p1\",\"kind\":\"subagent\",\"label\":\"look around\",\"state\":\"running\",\"startedAt\":2000,\"updatedAt\":2000,\"activity\":{\"turnCount\":0,\"toolCount\":0}}]}"]}
-    {"type":"extension_ui_request","id":"widget-subagents","method":"setWidget","widgetKey":"subagents","widgetLines":["PI_SUBAGENT_ASYNC_JSON:{\"generatedAt\":8000,\"omitted\":{\"runs\":0,\"children\":0,\"byteLimitExceeded\":false},\"runs\":[{\"id\":\"p1\",\"kind\":\"subagent\",\"label\":\"look around\",\"state\":\"running\",\"startedAt\":2000,\"updatedAt\":7000,\"activity\":{\"turnCount\":1,\"toolCount\":0}}]}"]}
-    {"type":"extension_ui_request","id":"widget-subagents","method":"setWidget","widgetKey":"subagents","widgetLines":["PI_SUBAGENT_ASYNC_JSON:{\"generatedAt\":14000,\"omitted\":{\"runs\":0,\"children\":0,\"byteLimitExceeded\":false},\"runs\":[{\"id\":\"p1\",\"kind\":\"subagent\",\"label\":\"look around\",\"state\":\"running\",\"startedAt\":2000,\"updatedAt\":13000,\"activity\":{\"turnCount\":1,\"toolCount\":1,\"currentTool\":\"ls\",\"currentToolStartedAt\":13000}}]}"]}
-    {"type":"extension_ui_request","id":"widget-subagents","method":"setWidget","widgetKey":"subagents","widgetLines":["PI_SUBAGENT_ASYNC_JSON:{\"generatedAt\":16000,\"omitted\":{\"runs\":0,\"children\":0,\"byteLimitExceeded\":false},\"runs\":[{\"id\":\"p1\",\"kind\":\"subagent\",\"label\":\"look around\",\"state\":\"running\",\"startedAt\":2000,\"updatedAt\":15000,\"activity\":{\"turnCount\":1,\"toolCount\":1}}]}"]}
-    {"type":"extension_ui_request","id":"widget-subagents","method":"setWidget","widgetKey":"subagents","widgetLines":["PI_SUBAGENT_ASYNC_JSON:{\"generatedAt\":21000,\"omitted\":{\"runs\":0,\"children\":0,\"byteLimitExceeded\":false},\"runs\":[{\"id\":\"p1\",\"kind\":\"subagent\",\"label\":\"look around\",\"state\":\"running\",\"startedAt\":2000,\"updatedAt\":20000,\"activity\":{\"turnCount\":2,\"toolCount\":1}}]}"]}
-    {"type":"extension_ui_request","id":"widget-subagents","method":"setWidget","widgetKey":"subagents","widgetLines":["PI_SUBAGENT_ASYNC_JSON:{\"generatedAt\":28000,\"omitted\":{\"runs\":0,\"children\":0,\"byteLimitExceeded\":false},\"runs\":[{\"id\":\"p1\",\"kind\":\"subagent\",\"label\":\"look around\",\"state\":\"complete\",\"startedAt\":2000,\"updatedAt\":27000,\"endedAt\":27000,\"activity\":{\"turnCount\":2,\"toolCount\":1}}]}"]}
-    {"type":"tool_execution_end","toolCallId":"p1","toolName":"subagent","args":{"task":"look around\nin detail"},"result":{"content":[{"type":"text","text":"child report\n[subagent: 2 turns, 30 in / 13 out tokens, $0.0000]"}]},"isError":false}
+    {"type":"extension_ui_request","id":"widget-subagents","method":"setWidget","widgetKey":"subagents","widgetLines":["PI_SUBAGENT_ASYNC_JSON:{\"generatedAt\":2000,\"omitted\":{\"runs\":0,\"children\":0,\"byteLimitExceeded\":false},\"runs\":[{\"id\":\"a1\",\"kind\":\"subagent\",\"label\":\"look around\",\"state\":\"running\",\"startedAt\":<ms>,\"updatedAt\":<ms>,\"activity\":{\"turnCount\":0,\"toolCount\":0}}]}"]}
+    {"type":"extension_ui_request","id":"widget-subagents","method":"setWidget","widgetKey":"subagents","widgetLines":["PI_SUBAGENT_ASYNC_JSON:{\"generatedAt\":3000,\"omitted\":{\"runs\":0,\"children\":0,\"byteLimitExceeded\":false},\"runs\":[{\"id\":\"a1\",\"kind\":\"subagent\",\"label\":\"look around\",\"state\":\"running\",\"startedAt\":<ms>,\"updatedAt\":<ms>,\"activity\":{\"turnCount\":1,\"toolCount\":0}}]}"]}
+    {"type":"tool_execution_end","toolCallId":"p1","toolName":"subagent","args":{"task":"look around\nin detail"},"result":{"content":[{"type":"text","text":"started agent a1 (look around); its result will be delivered to you when it finishes; use subagent_wait to block on it"}]},"isError":false}
+    {"type":"extension_ui_request","id":"widget-subagents","method":"setWidget","widgetKey":"subagents","widgetLines":["PI_SUBAGENT_ASYNC_JSON:{\"generatedAt\":4000,\"omitted\":{\"runs\":0,\"children\":0,\"byteLimitExceeded\":false},\"runs\":[{\"id\":\"a1\",\"kind\":\"subagent\",\"label\":\"look around\",\"state\":\"running\",\"startedAt\":<ms>,\"updatedAt\":<ms>,\"activity\":{\"turnCount\":1,\"toolCount\":1,\"currentTool\":\"ls\",\"currentToolStartedAt\":<ms>}}]}"]}
+    {"type":"extension_ui_request","id":"widget-subagents","method":"setWidget","widgetKey":"subagents","widgetLines":["PI_SUBAGENT_ASYNC_JSON:{\"generatedAt\":5000,\"omitted\":{\"runs\":0,\"children\":0,\"byteLimitExceeded\":false},\"runs\":[{\"id\":\"a1\",\"kind\":\"subagent\",\"label\":\"look around\",\"state\":\"running\",\"startedAt\":<ms>,\"updatedAt\":<ms>,\"activity\":{\"turnCount\":1,\"toolCount\":1}}]}"]}
+    {"type":"extension_ui_request","id":"widget-subagents","method":"setWidget","widgetKey":"subagents","widgetLines":["PI_SUBAGENT_ASYNC_JSON:{\"generatedAt\":6000,\"omitted\":{\"runs\":0,\"children\":0,\"byteLimitExceeded\":false},\"runs\":[{\"id\":\"a1\",\"kind\":\"subagent\",\"label\":\"look around\",\"state\":\"running\",\"startedAt\":<ms>,\"updatedAt\":<ms>,\"activity\":{\"turnCount\":2,\"toolCount\":1}}]}"]}
+    {"type":"extension_ui_request","id":"widget-subagents","method":"setWidget","widgetKey":"subagents","widgetLines":["PI_SUBAGENT_ASYNC_JSON:{\"generatedAt\":7000,\"omitted\":{\"runs\":0,\"children\":0,\"byteLimitExceeded\":false},\"runs\":[{\"id\":\"a1\",\"kind\":\"subagent\",\"label\":\"look around\",\"state\":\"complete\",\"startedAt\":<ms>,\"updatedAt\":<ms>,\"endedAt\":<ms>,\"activity\":{\"turnCount\":2,\"toolCount\":1}}]}"]}
+    {"type":"extension_ui_request","id":"widget-subagents","method":"setWidget","widgetKey":"subagents","widgetLines":null}
     |}]
 ;;
 
@@ -650,7 +660,7 @@ let%expect_test "compaction, export, /host" =
     {"id":"q","type":"response","command":"compact","success":true,"data":{"summary":"SUMMARY OF OLD STUFF"}}
     {"id":"q","type":"response","command":"export_html","success":true,"data":{"path":"$DIR/sessions/exports/<stamp>_<id>.md"}}
     {"id":"q","type":"response","command":"export_html","success":true,"data":{"path":"$DIR/out.md"}}
-    {"type":"extension_ui_request","id":"dialog-8","method":"select","title":"Run tools on","options":["<host> ($DIR) · active"]}
+    {"type":"extension_ui_request","id":"dialog-1","method":"select","title":"Run tools on","options":["<host> ($DIR) · active"]}
     {"id":"q","type":"response","command":"prompt","success":true,"data":{}}
     {"type":"extension_ui_request","id":"notify-5","method":"notify","message":"unknown choice nowhere","notifyType":"error"}
     |}]
@@ -678,5 +688,206 @@ let%expect_test "/change_default saves the model and thinking level" =
       "default_model": "deepseek/deepseek-v4-pro",
       "default_thinking": "high"
     }
+    |}]
+;;
+
+let spawn_reply ?(id = "p1") task =
+  Reply.tool_call
+    ~id
+    ~name:"subagent"
+    ~arguments:(sprintf {|{"task":%S}|} task)
+    ()
+;;
+
+(* The child's [n]th request waits for [release]. *)
+let hold_request ~key ~n release =
+  let count = ref 0 in
+  fun ~key:k ->
+    if String.equal k key
+    then (
+      incr count;
+      if !count = n then Eio.Promise.await release)
+;;
+
+let keep h substrings =
+  Queue.filter_inplace h.H.output ~f:(fun line ->
+    List.exists substrings ~f:(fun substring ->
+      String.is_substring line ~substring))
+;;
+
+let%expect_test "watch_subagent: the transcript, then the subagent's own events"
+  =
+  let release, released = Eio.Promise.create () in
+  let provider =
+    Routed_provider.create
+      ~before:(hold_request ~key:"look around" ~n:2 release)
+      ~main:
+        [ spawn_reply "look around"
+        ; Reply.text "started it"
+        ; Reply.text "thanks"
+        ]
+      [ ( "look around"
+        , [ Reply.tool_call ~id:"c1" ~name:"ls" ~arguments:"{}" ()
+          ; Reply.text "child report"
+          ] )
+      ]
+  in
+  with_server ~provider []
+  @@ fun h ->
+  cmd h ~fields:{|, "message": "go"|} "prompt";
+  H.wait_for h "agent_settled";
+  H.wait_for h {|\"toolCount\":1}|};
+  Queue.clear h.output;
+  cmd h ~fields:{|, "agentId": "a1"|} "watch_subagent";
+  H.dump h;
+  [%expect
+    {| {"id":"q","type":"response","command":"watch_subagent","success":true,"data":{"subagent":{"id":"a1","kind":"subagent","label":"look around","state":"running","startedAt":<ms>,"updatedAt":<ms>,"activity":{"turnCount":2,"toolCount":1},"task":"look around","model":"deepseek-flash","callId":"p1","parentId":null,"result":null},"messages":[{"role":"user","content":"look around","timestamp":0},{"role":"assistant","content":[{"type":"toolCall","id":"c1","name":"ls","arguments":{}}],"provider":"prigh","model":"deepseek-flash","stopReason":"toolUse","timestamp":1},{"role":"toolResult","toolCallId":"c1","toolName":"ls","content":[{"type":"text","text":"sessions/\n"}],"isError":false,"timestamp":2}]}} |}];
+  Eio.Promise.resolve released ();
+  H.wait_for h "\"thanks\"";
+  H.wait_for h "agent_settled";
+  keep h [ "prigh_subagent_event" ];
+  H.dump h;
+  [%expect
+    {|
+    {"type":"prigh_subagent_event","agentId":"a1","event":{"type":"message_update","message":{"role":"assistant","content":[{"type":"text","text":"child report"}],"provider":"prigh","model":"deepseek-flash","stopReason":"stop","timestamp":3}}}
+    {"type":"prigh_subagent_event","agentId":"a1","event":{"type":"message_end","message":{"role":"assistant","content":[{"type":"text","text":"child report"}],"provider":"prigh","model":"deepseek-flash","stopReason":"stop","timestamp":3}}}
+    {"type":"prigh_subagent_event","agentId":"a1","event":{"type":"subagent_info","subagent":{"id":"a1","kind":"subagent","label":"look around","state":"complete","startedAt":<ms>,"updatedAt":<ms>,"endedAt":<ms>,"activity":{"turnCount":2,"toolCount":1},"task":"look around","model":"deepseek-flash","callId":"p1","parentId":null,"result":{"text":"child report\n[subagent: 2 turns, 30 in / 13 out tokens, $0.0000]","isError":false}}}}
+    |}];
+  (* By the tool call that started it; unknown ones; stopping. *)
+  cmd h ~fields:{|, "toolCallId": "p1"|} "watch_subagent";
+  let _, data = last_response h in
+  print_s
+    [%sexp
+      (List.map
+         (Json.list_exn (Json.member_exn "messages" data))
+         ~f:(fun m -> Json.string_exn (Json.member_exn "role" m))
+       : string list)];
+  Queue.clear h.output;
+  cmd h ~fields:{|, "agentId": "a9"|} "watch_subagent";
+  cmd h "watch_subagent";
+  H.dump h;
+  [%expect
+    {|
+    (user assistant toolResult assistant)
+    {"id":"q","type":"response","command":"watch_subagent","success":false,"error":"unknown subagent \"a9\""}
+    {"id":"q","type":"response","command":"watch_subagent","success":true,"data":{}}
+    |}]
+;;
+
+let%expect_test
+    "subagents are re-read from the session: switching away drops the watch, \
+     coming back shows them again"
+  =
+  let release, released = Eio.Promise.create () in
+  let provider =
+    Routed_provider.create
+      ~before:(hold_request ~key:"look around" ~n:1 release)
+      ~main:
+        [ spawn_reply "look around"
+        ; Reply.text "started it"
+        ; Reply.text "thanks"
+        ]
+      [ "look around", [ Reply.text "child report" ] ]
+  in
+  with_server ~provider []
+  @@ fun h ->
+  cmd h ~fields:{|, "message": "go"|} "prompt";
+  H.wait_for h "agent_settled";
+  cmd h ~fields:{|, "agentId": "a1"|} "watch_subagent";
+  cmd h "get_state";
+  let _, state = last_response h in
+  let path = Json.string_exn (Json.member_exn "sessionFile" state) in
+  Queue.clear h.output;
+  cmd h "new_session";
+  cmd h "get_state";
+  keep h [ "widget"; "response" ];
+  H.dump h;
+  [%expect
+    {|
+    {"type":"extension_ui_request","id":"widget-subagents","method":"setWidget","widgetKey":"subagents","widgetLines":null}
+    {"id":"q","type":"response","command":"new_session","success":true,"data":{}}
+    {"id":"q","type":"response","command":"get_state","success":true,"data":{"model":{"id":"deepseek-flash","name":"DeepSeek V4.1 Flash","provider":"deepseek","reasoning":true,"contextWindow":1000000},"cwd":"$DIR","thinkingLevel":"off","isStreaming":false,"isCompacting":false,"steeringMode":"all","followUpMode":"all","sessionFile":"$DIR/sessions/<stamp>_<id>.jsonl","sessionId":"<id>","autoCompactionEnabled":true,"messageCount":0,"pendingMessageCount":0}}
+    |}];
+  cmd h ~fields:(sprintf {|, "path": "%s"|} path) "switch_session";
+  cmd h "get_state";
+  keep h [ "widget"; "session_reloaded" ];
+  H.dump h;
+  [%expect
+    {|
+    {"type":"extension_ui_request","id":"widget-subagents","method":"setWidget","widgetKey":"subagents","widgetLines":["PI_SUBAGENT_ASYNC_JSON:{\"generatedAt\":5000,\"omitted\":{\"runs\":0,\"children\":0,\"byteLimitExceeded\":false},\"runs\":[{\"id\":\"a1\",\"kind\":\"subagent\",\"label\":\"look around\",\"state\":\"running\",\"startedAt\":<ms>,\"updatedAt\":<ms>,\"activity\":{\"turnCount\":1,\"toolCount\":0}}]}"]}
+    {"type":"session_reloaded"}
+    {"type":"extension_ui_request","id":"widget-subagents","method":"setWidget","widgetKey":"subagents","widgetLines":["PI_SUBAGENT_ASYNC_JSON:{\"generatedAt\":6000,\"omitted\":{\"runs\":0,\"children\":0,\"byteLimitExceeded\":false},\"runs\":[{\"id\":\"a1\",\"kind\":\"subagent\",\"label\":\"look around\",\"state\":\"running\",\"startedAt\":<ms>,\"updatedAt\":<ms>,\"activity\":{\"turnCount\":1,\"toolCount\":0}}]}"]}
+    |}];
+  Eio.Promise.resolve released ();
+  H.wait_for h "\"thanks\"";
+  H.wait_for h "agent_settled";
+  keep h [ "prigh_subagent_event" ];
+  H.dump h;
+  [%expect {| |}]
+;;
+
+let%expect_test
+    "get_state re-sends the queue and pending confirmations; they stay with \
+     their session"
+  =
+  with_server
+    ~confirm_tools:true
+    [ Reply.tool_call
+        ~id:"c1"
+        ~name:"bash"
+        ~arguments:{|{"command":"echo hi"}|}
+        ()
+    ; Reply.text "after"
+    ]
+  @@ fun h ->
+  cmd h ~fields:{|, "message": "go"|} "prompt";
+  H.wait_for h "\"method\":\"confirm\"";
+  cmd
+    h
+    ~fields:{|, "message": "also this", "streamingBehavior": "steer"|}
+    "prompt";
+  cmd h "get_state";
+  let _, state = last_response h in
+  let path = Json.string_exn (Json.member_exn "sessionFile" state) in
+  Queue.clear h.output;
+  cmd h "get_state";
+  keep h [ "queue_update"; "extension_ui"; "agent_settled" ];
+  H.dump h;
+  [%expect
+    {|
+    {"type":"queue_update","steering":["also this"],"followUp":[]}
+    {"type":"extension_ui_request","id":"confirm-c1","method":"confirm","title":"Run bash?","message":"echo hi"}
+    |}];
+  cmd h "new_session";
+  cmd h "get_state";
+  keep h [ "queue_update"; "extension_ui"; "agent_settled"; "response" ];
+  H.dump h;
+  [%expect
+    {|
+    {"type":"extension_ui_cancel","id":"confirm-c1"}
+    {"type":"agent_settled"}
+    {"id":"q","type":"response","command":"new_session","success":true,"data":{}}
+    {"id":"q","type":"response","command":"get_state","success":true,"data":{"model":{"id":"deepseek-flash","name":"DeepSeek V4.1 Flash","provider":"deepseek","reasoning":true,"contextWindow":1000000},"cwd":"$DIR","thinkingLevel":"off","isStreaming":false,"isCompacting":false,"steeringMode":"all","followUpMode":"all","sessionFile":"$DIR/sessions/<stamp>_<id>.jsonl","sessionId":"<id>","autoCompactionEnabled":true,"messageCount":0,"pendingMessageCount":0}}
+    |}];
+  answer h ~fields:{|"confirmed": true|} "confirm-c1";
+  cmd h ~fields:(sprintf {|, "path": "%s"|} path) "switch_session";
+  cmd h "get_state";
+  keep h [ "queue_update"; "extension_ui"; "session_reloaded" ];
+  H.dump h;
+  [%expect
+    {|
+    {"type":"session_reloaded"}
+    {"type":"queue_update","steering":["also this"],"followUp":[]}
+    {"type":"extension_ui_request","id":"confirm-c1","method":"confirm","title":"Run bash?","message":"echo hi"}
+    |}];
+  answer h ~fields:{|"confirmed": true|} "confirm-c1";
+  H.wait_for h "agent_settled";
+  keep h [ "queue_update"; "tool_execution_end"; "agent_settled" ];
+  H.dump h;
+  [%expect
+    {|
+    {"type":"tool_execution_end","toolCallId":"c1","toolName":"bash","args":{"command":"echo hi"},"result":{"content":[{"type":"text","text":"hi\n"}]},"isError":false}
+    {"type":"queue_update","steering":[],"followUp":[]}
+    {"type":"agent_settled"}
     |}]
 ;;

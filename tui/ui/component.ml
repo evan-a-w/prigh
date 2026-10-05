@@ -10,6 +10,7 @@ module Platform = struct
         -> (P.Json.t, string) Result.t Bonsai.Effect.t
     ; open_browser : string -> unit Bonsai.Effect.t
     ; quit : unit Bonsai.Effect.t
+    ; sign_out : (unit, string) Result.t Bonsai.Effect.t
     ; load_history : unit -> (P.Json.t, string) Result.t Bonsai.Effect.t
     ; append_history : string -> unit Bonsai.Effect.t
     ; copy_to_clipboard : string -> unit Bonsai.Effect.t
@@ -18,6 +19,7 @@ module Platform = struct
     ; reconnect :
         delay_ms:int
         -> session:string option
+        -> as_user:string option
         -> (P.Json.t, string) Result.t Bonsai.Effect.t
     }
 end
@@ -42,9 +44,16 @@ let perform ctx (platform : Platform.t) (command : App.Command.t) =
         (App.Action.Reply
            ( App.Reply_tag.Editor_text
            , Result.map result ~f:(fun contents -> `String contents) ))
-    | Reconnect { generation; delay_ms; session } ->
-      let%bind.Bonsai.Effect result = platform.reconnect ~delay_ms ~session in
+    | Reconnect { generation; delay_ms; session; as_user } ->
+      let%bind.Bonsai.Effect result =
+        platform.reconnect ~delay_ms ~session ~as_user
+      in
       inject (App.Action.Reply (App.Reply_tag.Reconnect generation, result))
+    | Sign_out ->
+      let%bind.Bonsai.Effect result = platform.sign_out in
+      inject
+        (App.Action.Reply
+           (App.Reply_tag.Show_error, Result.map result ~f:(fun () -> `Null)))
     | Quit -> platform.quit
   in
   Bonsai.Apply_action_context.schedule_event ctx effect
@@ -74,7 +83,10 @@ let create ?(start_on_activate = true) platform (local_ graph) =
       graph;
   let running =
     let%arr model in
-    App.Model.running model && not (Mode.is_dialog model.mode)
+    (App.Model.running model
+     || App.Model.agents_running model
+     || App.Model.jobs_running model)
+    && not (Mode.is_dialog model.mode)
   in
   let (_ : unit Bonsai.t) =
     match%sub running with

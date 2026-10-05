@@ -33,6 +33,9 @@ val create
   :  env:Env.t
   -> sw:Switch.t
   -> ?token:string
+  -> ?namespace:string
+  -> ?backend_host:bool
+       (** whether [new_agent] makes the backend a tool host (default: true) *)
   -> login:Login_manager.t
   -> sessions_dir:string
   -> cwd:string
@@ -42,8 +45,14 @@ val create
   -> t
 
 (** Registers a client whose outgoing lines go through [send]; it starts
-    in a new session in [cwd] (or the default one). *)
-val connect : t -> send:(Json.t -> unit) -> Client.t
+    in a new session in [cwd] (or the default one). With [signed_in] (the
+    router checked its credentials) it needs no token in [hello], and can
+    [list_users] and [set_user] as [signed_in] allows. *)
+val connect
+  :  ?signed_in:User_access.Signed_in.t
+  -> t
+  -> send:(Json.t -> unit)
+  -> Client.t
 
 (** Dispatches one request from [client] and returns the response. Blocking
     methods block the caller. *)
@@ -53,27 +62,50 @@ val handle : t -> Client.t -> Json.t -> Json.t
 val disconnect : t -> Client.t -> unit
 
 (** Serves one connection until [read_line] returns [None]; each request is
-    handled in its own fiber. *)
+    handled in its own fiber. An allowed [set_user] request ends it too,
+    unanswered: the result is its id and the user to serve the rest of the
+    connection as. *)
 val serve_lines
-  :  t
+  :  ?signed_in:User_access.Signed_in.t
+  -> t
   -> read_line:(unit -> string option)
   -> write_line:(string -> unit)
-  -> unit
-
-(** [serve_lines] over newline-delimited flows. *)
-val serve_connection
-  :  t
-  -> input:_ Eio.Flow.source
-  -> output:_ Eio.Flow.sink
-  -> unit
+  -> (Json.t * string) option
 
 (** Aborts every session and waits for them to finish. *)
 val shutdown : t -> unit
 
 val agent_of_client : t -> Client.t -> Agent.t
 
-(** Whether [token] is the one [hello] requires (always, without one). *)
-val token_ok : t -> string option -> bool
+(** The error for any failed authentication. *)
+val unauthorised : string
 
-(** The backend host's directory for a live session, else the server's. *)
-val backend_cwd : t -> session:string option -> string
+(** Whether [hello] would accept this token (always, without one) and [user]:
+    with a namespace, a given [user] must be its name; otherwise [user] is
+    ignored. *)
+val credentials_ok : t -> ?user:string -> string option -> bool
+
+val namespace : t -> string option
+
+(** Where [session]'s terminal should run: on its active tool host, in that
+    host's cwd for the session. Without a live session, the backend in the
+    server's cwd (if it is a host). *)
+val terminal_target
+  :  t
+  -> session:string option
+  -> [ `Backend of string (** cwd *)
+     | `Host of string * string (** client id, cwd on that host *)
+     | `Unavailable of string (** reason *)
+     ]
+
+(** Relays a terminal channel to the tool-host client [host] (see
+    {!Terminal_relay}) until either side closes. *)
+val relay_terminal
+  :  t
+  -> host:string
+  -> key:string
+  -> cwd:string
+  -> cols:int
+  -> rows:int
+  -> Terminal_channel.t
+  -> unit

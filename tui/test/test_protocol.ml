@@ -70,7 +70,9 @@ let%expect_test "state event and messages" =
         (cost_usd       0.0032)
         (context_tokens 160)
         (active_host    backend)
-        (hosts ()))))
+        (hosts     ())
+        (subagents ())
+        (jobs      ()))))
     (Event (Message_start (User hi)))
     (Event (
       Message_end (
@@ -147,6 +149,45 @@ let%expect_test "tool_confirm event" =
     |}]
 ;;
 
+let%expect_test "terminal relay events" =
+  decode
+    {|{"type":"event","event":"terminal_open","host":"client-2","term_id":"t1","key":"sess-1","cwd":"/work","cols":120,"rows":40}|};
+  decode
+    {|{"type":"event","event":"terminal_frame","host":"client-2","term_id":"t1","kind":"binary","data":"bHMK"}|};
+  decode
+    {|{"type":"event","event":"terminal_frame","host":"client-2","term_id":"t1","kind":"text","data":"{\"type\":\"ping\"}"}|};
+  decode
+    {|{"type":"event","event":"terminal_frame","host":"client-2","term_id":"t1","kind":"video","data":""}|};
+  decode
+    {|{"type":"event","event":"terminal_close","host":"client-2","term_id":"t1"}|};
+  [%expect
+    {|
+    (Event (
+      Terminal_open
+      (term_id t1)
+      (key     sess-1)
+      (cwd     /work)
+      (cols    120)
+      (rows    40)))
+    (Event (
+      Terminal_frame
+      (term_id t1)
+      (kind    Binary)
+      (data    bHMK)))
+    (Event (
+      Terminal_frame
+      (term_id t1)
+      (kind    Text)
+      (data    "{\"type\":\"ping\"}")))
+    (error (
+      e (
+        "while decoding"
+        "{\"type\":\"event\",\"event\":\"terminal_frame\",\"host\":\"client-2\",\"term_id\":\"t1\",\"kind\":\"video\",\"data\":\"\"}"
+        "unknown frame kind \"video\"")))
+    (Event (Terminal_close t1))
+    |}]
+;;
+
 let%expect_test "tool host events and state hosts" =
   decode
     {|{"type":"event","event":"tool_exec","host":"client-2","exec_id":"c1-0","call_id":"c1","name":"bash","arguments":{"command":"ls"},"cwd":"/work"}|};
@@ -200,7 +241,67 @@ let%expect_test "tool host events and state hosts" =
           (name srv)
           (cwd  /work)
           (session_id   ())
-          (session_name ())))))))
+          (session_name ()))))
+        (subagents ())
+        (jobs      ()))))
+    |}]
+;;
+
+let%expect_test "state lists background subagents (absent means none)" =
+  let subagents json =
+    match Json.parse json |> Or_error.bind ~f:State.of_json with
+    | Ok state -> print_s [%sexp (state.subagents : State.Subagent.t list)]
+    | Error e -> print_s [%message "error" (e : Error.t)]
+  in
+  subagents
+    (Fixtures.state_json
+       ~subagents:[ "a1", "look around", true; "a2", "run tests", false ]
+       ());
+  subagents
+    {|{"session_id":"s1","session_path":"/tmp/s1.jsonl","cwd":"/work","model":{"id":"m","provider":"p","key":"p/m","name":"M","context_window":1,"max_output":1,"supports_thinking":false,"cost":{"input":0,"output":0,"cache_read":0}},"thinking":"off","running":false,"message_count":0,"usage":{"input":0,"output":0,"cache_read":0},"cost_usd":0,"context_tokens":0}|};
+  [%expect
+    {|
+    (((id a1) (task "look around") (running true))
+     ((id a2) (task "run tests")   (running false)))
+    ()
+    |}]
+;;
+
+let%expect_test "state lists background jobs; list_jobs entries" =
+  (match
+     Json.parse
+       (Fixtures.state_json
+          ~jobs:[ "j1", "make test", None; "j2", "npm run dev", Some "killed" ]
+          ())
+     |> Or_error.bind ~f:State.of_json
+   with
+   | Ok state -> print_s [%sexp (state.jobs : State.Job.t list)]
+   | Error e -> print_s [%message "error" (e : Error.t)]);
+  print_s
+    [%sexp
+      (Json.parse
+         {|{"id":"j1","command":"make","running":false,"exit":"exited 2","delivered":true,"elapsed":1.5,"bytes":12,"last_line":"Error 2"}|}
+       |> Or_error.bind ~f:Job_info.of_json
+       : Job_info.t Or_error.t)];
+  [%expect
+    {|
+    (((id      j1)
+      (command "make test")
+      (running true)
+      (exit ()))
+     ((id      j2)
+      (command "npm run dev")
+      (running false)
+      (exit (killed))))
+    (Ok (
+      (id      j1)
+      (command make)
+      (running false)
+      (exit ("exited 2"))
+      (delivered true)
+      (elapsed   1.5)
+      (bytes     12)
+      (last_line ("Error 2"))))
     |}]
 ;;
 
@@ -528,5 +629,52 @@ let%expect_test "config round trip and config_changed event" =
         (confirm_tools false)
         (default_model    ())
         (default_thinking ()))))
+    |}]
+;;
+
+let%expect_test "btw_delta" =
+  decode
+    {|{"type":"event","event":"btw_delta","btw_id":"btw-1","delta":"It is "}|};
+  decode {|{"type":"event","event":"btw_delta","btw_id":"btw-1"}|};
+  [%expect
+    {|
+    (Event (
+      Btw_delta
+      (btw_id btw-1)
+      (delta  "It is ")))
+    (error (
+      e (
+        "while decoding"
+        "{\"type\":\"event\",\"event\":\"btw_delta\",\"btw_id\":\"btw-1\"}"
+        "missing field \"delta\"")))
+    |}]
+;;
+
+let%expect_test "hello reply: client id and namespace" =
+  List.iter
+    [ {|{"client_id":"client-1","namespace":"lloyd","state":{}}|}
+    ; {|{"client_id":"client-1","namespace":null}|}
+    ; {|{"client_id":"client-1"}|}
+    ; {|{"namespace":"lloyd"}|}
+    ; {|{"client_id":"client-1","namespace":3}|}
+    ]
+    ~f:(fun json ->
+      print_s
+        [%sexp
+          (Hello_reply.of_json (Or_error.ok_exn (Json.parse json))
+           : Hello_reply.t Or_error.t)]);
+  [%expect
+    {|
+    (Ok ((client_id client-1) (namespace (lloyd)) (user ())))
+    (Ok (
+      (client_id client-1)
+      (namespace ())
+      (user      ())))
+    (Ok (
+      (client_id client-1)
+      (namespace ())
+      (user      ())))
+    (Error "missing field \"client_id\"")
+    (Error "field \"namespace\": expected string, got 3")
     |}]
 ;;

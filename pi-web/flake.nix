@@ -36,7 +36,7 @@
               in
               name != "node_modules" && name != "dist" && name != "e2e" && name != "flake.nix" && name != "flake.lock";
           };
-          npmDepsHash = "sha256-JlRK5p9GUNW+NM4FbNWpbQN97lFVg3m2z2O5QfiICwU=";
+          npmDepsHash = "sha256-FAK5OvBZvLiBuogNbgAfaKqQXdt1ImEWr/eY1wtzUF0=";
           npmBuildScript = "build";
           # The terminal panel's script and xterm.js (see vite.config.ts).
           PRIGH_TERMINAL_ASSETS = "${prigh}/tui/web-bin";

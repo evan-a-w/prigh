@@ -1,19 +1,20 @@
 import { describe, expect, it } from "vitest";
-import { connectionFor, saveToken, type Storage, TOKEN_STORAGE_KEY, terminalUrl } from "../src/connection.ts";
-
-function memoryStorage(initial: Record<string, string> = {}): Storage & { data: Record<string, string> } {
-	const data = { ...initial };
-	return {
-		data,
-		getItem: (key) => data[key] ?? null,
-		setItem: (key, value) => {
-			data[key] = value;
-		},
-		removeItem: (key) => {
-			delete data[key];
-		},
-	};
-}
+import {
+	AS_USER_STORAGE_KEY,
+	connectionFor,
+	forgetAsUser,
+	forgetCredentials,
+	loadAsUser,
+	loadCredentials,
+	saveAsUser,
+	saveCredentials,
+	searchAfterLogin,
+	searchWithoutSession,
+	TOKEN_STORAGE_KEY,
+	terminalUrl,
+	USER_STORAGE_KEY,
+} from "../src/connection.ts";
+import { memoryStorage } from "./memory-storage.ts";
 
 const page = (search: string, overrides: Partial<Parameters<typeof connectionFor>[0]> = {}) => ({
 	protocol: "http:",
@@ -46,6 +47,19 @@ describe("connectionFor", () => {
 		expect(connection.url).toBe("ws://127.0.0.1:7789/ws?token=sek%26ret&session=abc");
 	});
 
+	it("stashes ?user and ?token together", () => {
+		const storage = memoryStorage({ [USER_STORAGE_KEY]: "old" });
+		const connection = connectionFor(page("?user=bob&token=pw&name=n"), storage);
+		expect(storage.data).toEqual({ [USER_STORAGE_KEY]: "bob", [TOKEN_STORAGE_KEY]: "pw" });
+		expect(connection.cleanedSearch).toBe("?name=n");
+		expect(connection.url).toBe("ws://127.0.0.1:7789/ws?user=bob&token=pw&name=n");
+	});
+
+	it("sends the stored user name alone (no password)", () => {
+		const connection = connectionFor(page(""), memoryStorage({ [USER_STORAGE_KEY]: "a b" }));
+		expect(connection.url).toBe("ws://127.0.0.1:7789/ws?user=a+b");
+	});
+
 	it("sends the stored token, session and name", () => {
 		const storage = memoryStorage({ [TOKEN_STORAGE_KEY]: "t" });
 		const connection = connectionFor(page("?session=s1&name=laptop"), storage);
@@ -59,13 +73,29 @@ describe("connectionFor", () => {
 	});
 });
 
-describe("saveToken", () => {
-	it("stores a token and clears it when empty", () => {
+describe("credentials", () => {
+	it("stores the user name and password under separate keys; empty ones are removed", () => {
 		const storage = memoryStorage();
-		saveToken(storage, "abc");
-		expect(storage.data[TOKEN_STORAGE_KEY]).toBe("abc");
-		saveToken(storage, "");
-		expect(storage.data[TOKEN_STORAGE_KEY]).toBeUndefined();
+		saveCredentials(storage, { user: "alice", password: "pw" });
+		expect(storage.data).toEqual({ [USER_STORAGE_KEY]: "alice", [TOKEN_STORAGE_KEY]: "pw" });
+		expect(loadCredentials(storage)).toEqual({ user: "alice", password: "pw" });
+		saveCredentials(storage, { user: "", password: "pw2" });
+		expect(storage.data).toEqual({ [TOKEN_STORAGE_KEY]: "pw2" });
+		expect(loadCredentials(storage)).toEqual({ user: "", password: "pw2" });
+	});
+
+	it("signing out forgets both and leaves other keys alone", () => {
+		const storage = memoryStorage({ [USER_STORAGE_KEY]: "a", [TOKEN_STORAGE_KEY]: "b", "prigh-pi-web:theme": "light" });
+		forgetCredentials(storage);
+		expect(storage.data).toEqual({ "prigh-pi-web:theme": "light" });
+		expect(connectionFor(page(""), storage).url).toBe("ws://127.0.0.1:7789/ws");
+	});
+
+	it("a session in the address bar belongs to the previous user", () => {
+		expect(searchAfterLogin("?session=s1&name=x", "alice", "alice")).toBe("?session=s1&name=x");
+		expect(searchAfterLogin("?session=s1&name=x", "alice", "bob")).toBe("?name=x");
+		expect(searchAfterLogin("?session=s1", "", "bob")).toBe("");
+		expect(searchWithoutSession("?backend=ws%3A%2F%2Fh%2Fws&session=s")).toBe("?backend=ws%3A%2F%2Fh%2Fws");
 	});
 });
 
@@ -76,8 +106,48 @@ describe("terminalUrl", () => {
 		);
 	});
 
+	it("keeps the user name", () => {
+		expect(terminalUrl("ws://h/ws?user=alice&token=pw&session=old", "s2")).toBe(
+			"ws://h/terminal?user=alice&token=pw&session=s2",
+		);
+	});
+
 	it("keeps the scheme and base path, and works without token or session", () => {
 		expect(terminalUrl("wss://host/pi/ws", undefined)).toBe("wss://host/pi/terminal");
 		expect(terminalUrl("ws://other:1/", "x")).toBe("ws://other:1/terminal?session=x");
+	});
+});
+
+describe("acting as another user", () => {
+	it("as_user goes in the /ws URL and on to /terminal", () => {
+		const storage = memoryStorage({ [USER_STORAGE_KEY]: "evan", [TOKEN_STORAGE_KEY]: "pw" });
+		saveAsUser(storage, "alice");
+		expect(storage.data[AS_USER_STORAGE_KEY]).toBe("alice");
+		expect(loadAsUser(storage)).toBe("alice");
+		const url = connectionFor(page("?session=s1"), storage).url;
+		expect(url).toBe("ws://127.0.0.1:7789/ws?user=evan&token=pw&as_user=alice&session=s1");
+		expect(terminalUrl(url, "s2")).toBe("ws://127.0.0.1:7789/terminal?user=evan&token=pw&as_user=alice&session=s2");
+	});
+
+	it("is not sent when unset", () => {
+		const storage = memoryStorage({ [USER_STORAGE_KEY]: "evan" });
+		saveAsUser(storage, "");
+		expect(storage.data).toEqual({ [USER_STORAGE_KEY]: "evan" });
+		expect(connectionFor(page(""), storage).url).toBe("ws://127.0.0.1:7789/ws?user=evan");
+	});
+
+	it("signing in or out (as anyone) forgets it", () => {
+		const storage = memoryStorage({ [USER_STORAGE_KEY]: "evan", [AS_USER_STORAGE_KEY]: "alice" });
+		saveCredentials(storage, { user: "evan", password: "pw" });
+		expect(loadAsUser(storage)).toBe("");
+		saveAsUser(storage, "alice");
+		forgetCredentials(storage);
+		expect(storage.data).toEqual({});
+		saveAsUser(storage, "alice");
+		connectionFor(page("?user=bob&token=x"), storage);
+		expect(storage.data).toEqual({ [USER_STORAGE_KEY]: "bob", [TOKEN_STORAGE_KEY]: "x" });
+		saveAsUser(storage, "alice");
+		forgetAsUser(storage);
+		expect(loadAsUser(storage)).toBe("");
 	});
 });

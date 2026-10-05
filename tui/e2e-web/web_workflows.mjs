@@ -50,7 +50,7 @@ const mobile = async () => {
   const phone = await ctx.newPage();
   phone.on("pageerror", error => errors.push(`phone: ${error.message}`));
   await phone.goto(url);
-  await phone.locator("#token").click();
+  await phone.locator("#password").click();
   await phone.keyboard.type(token);
   await phone.locator("#connect-form button").click();
   await phone.waitForFunction(() =>
@@ -193,10 +193,10 @@ try {
   }
   await page.locator("#scratch").evaluate(input => input.remove());
 
-  await page.locator("#token").click();
+  await page.locator("#password").click();
   await page.keyboard.type(token, { delay: 20 });
-  if (await page.locator("#token").inputValue() !== token) {
-    throw new Error(`connect form lost the typed token: ${JSON.stringify(await page.locator("#token").inputValue())}`);
+  if (await page.locator("#password").inputValue() !== token) {
+    throw new Error(`connect form lost the typed token: ${JSON.stringify(await page.locator("#password").inputValue())}`);
   }
   await page.locator("#connect-form button").click();
   await page.waitForURL(/\?backend=/);

@@ -40,9 +40,18 @@ val reload_with_backend : string -> unit
 (** [search] with [name] set to [value] (replacing any previous value). *)
 val with_query_param : search:string -> string -> string -> string
 
+(** [search] without [name] (["?a=1&b=2"], or [""] when nothing is left). *)
+val without_query_param : search:string -> string -> string
+
+(** Loads this page again without the query parameter [name]. *)
+val reload_without_query_param : string -> unit
+
 (** Sets a query parameter of the page's URL without reloading or adding a
     history entry. *)
 val replace_query_param : string -> string -> unit
+
+(** Removes a query parameter like [replace_query_param] sets one. *)
+val remove_query_param : string -> unit
 
 val set_app_html : string -> unit
 val input_value : string -> string

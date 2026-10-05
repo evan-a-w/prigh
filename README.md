@@ -58,7 +58,8 @@ built assets (the Nix wrapper sets it).
 
 `prigh-tui` flags: `-faux`, `-session PATH`, `-model ID`, `-thinking LEVEL`,
 `-cwd DIR`, `-auth-file PATH`, `-backend PATH` (same as `$PRIGH_BACKEND`),
-`-connect HOST:PORT`, `-token SECRET`, `-tools local|remote`, `-name NAME`,
+`-connect HOST:PORT`, `-token SECRET`, `-user NAME` (with `-tokens`),
+`-tools local|remote`, `-name NAME`,
 and `-- <extra backend args>`. The Nix wrapper sets `PRIGH_BACKEND` to the
 Nix-built backend by default; set `PRIGH_BACKEND` or pass `-backend` to override
 it.
@@ -96,6 +97,55 @@ to one session (`/sessions` marks live ones) and all see the same stream; a
 session keeps running when its frontends disconnect. Plain TCP with a shared
 token: bind to localhost and use an SSH tunnel on untrusted networks.
 
+A tool host doesn't need a TUI: `prigh tool-host -connect server:7777 -token
+sekrit -cwd ~/proj [-name NAME]` connects on its own (reconnecting when the
+connection drops) and hosts the session's tools *and* its `>_` terminal, so
+a browser-only user can pick it with `/host`. The web UI's terminal always
+runs on the session's active host, relayed through the backend.
+
+### Several users (namespaces)
+
+```
+prigh serve -web 0.0.0.0:7788 -tokens 'me=sekrit,alice=0ther'   # or $PRIGH_TOKENS
+```
+
+Each `name=token` entry is a user: log in with the name as the user name
+and the token as the password. The web UI's connect form asks for both
+(and remembers them in the browser); `/signout` or the page's `sign out`
+button forgets them and shows the form again, so someone else can log in.
+The TUI and tool hosts take `-user NAME -token TOKEN` (`$PRIGH_USER`,
+`$PRIGH_TOKEN`); the token alone is still accepted, so scripts need not send
+a user name, but a user name that doesn't match the token is refused like a
+wrong password. Both UIs show the logged-in user as `user:<name>` in the
+status line. Outside this mode the user name is ignored (leave it empty) and
+`/signout` only forgets the saved token; in the terminal TUI `/signout`
+just explains that it is browser-only (restart with other credentials).
+
+Each user has its own namespace: its own provider logins, sessions,
+config (`default_model`, scoped models, ...), global `AGENTS.md`, connected
+tool hosts and terminals, under `~/.prigh/namespaces/<name>/` (the name
+`default` keeps the usual `~/.prigh` and `~/.config/prigh` paths). Clients
+in one namespace never see another's. In this mode provider keys are never
+read from the environment; log in per namespace with `/login`.
+
+`-no-backend-host` (or `PRIGH_NO_BACKEND_HOST=1`) removes the backend's own
+tool host: nothing runs on the server, every session's tools and terminal
+run only on hosts its namespace has connected (`prigh tool-host -connect`
+or a TUI), so namespaces cannot reach each other's files through the
+server.
+Then the server also refuses clients' paths outside their sessions
+directory (`/switch`, `/import`, deleting sessions), and `/export` writes
+on the tool host.
+
+`-superusers NAME,...` (`$PRIGH_SUPERUSERS`) lets those users act as any
+other: `/setusr NAME` (in the TUI, the web UI and pi-web) switches the
+connection to NAME's sessions, logins and tool hosts (the status line shows
+`user:<me> as <them>`), `/setusr` alone lists the users and `/setusr <me>`
+switches back. Everyone else gets an error. `-host-tokens NAME=TOKEN,...`
+(`$PRIGH_HOST_TOKENS`) adds tokens that sign in as NAME but never as a
+superuser, for tool hosts that should not hold the user's own token (the
+Docker image starts one per user with one).
+
 ## In a browser
 
 The frontend also runs as a web page, with the same keys, commands, pickers
@@ -108,8 +158,8 @@ serves it and speaks the RPC protocol over a WebSocket at `/ws`:
 
 # remote: on the server (or PRIGH_WEB_LISTEN=0.0.0.0:7788 ./prigh -web -token sekrit)
 prigh serve -web 0.0.0.0:7788 -token sekrit
-# then open http://server:7788/ and type the token into the connect form
-# (the browser remembers it in localStorage)
+# then open http://server:7788/ and type the token into the connect form's
+# Password field (the browser remembers it in localStorage; /signout forgets it)
 prigh-tui -connect server:7788 -token sekrit -cwd ~/proj   # terminals use the same port
 ```
 
@@ -254,10 +304,57 @@ Ctrl+O cycles the transcript verbosity:
 `/verbosity [quiet|normal|verbose]` sets it directly; the status line shows
 `view:`.
 
-A `subagent` tool call gets its own transcript. Shift+Tab cycles focus main →
-agent 1 → …, Alt+1…9 jumps, and `/agents` opens a picker; Esc returns to main.
-Finished agents stay cyclable until the next prompt. The status line shows an
-`agents:` strip.
+Subagents run in the background. A `subagent` tool call returns at once
+(`started agent a1 (...)`) and the main agent's turn carries on or ends, so
+you can keep talking to it. When a subagent finishes (or fails, or is
+cancelled) its report is handed to the main agent as a message starting
+`[subagent a1 finished]`: an idle agent starts a turn for it, a running one
+gets it after its current tool calls (several finishing together arrive as one
+message). The model also has `subagent_wait` (block on some or all of them,
+optionally with a timeout; what it returns is not delivered again),
+`subagent_status` and `subagent_cancel`. Subagents started by a subagent stay
+synchronous (and cannot delegate further).
+
+Each subagent gets its own transcript. Shift+Tab cycles focus main → agent 1 →
+…, Alt+1…9 jumps, and `/agents` opens a picker (Enter focuses, Ctrl+D cancels
+the highlighted one); `/agents cancel <n|id>` cancels by number or id; Esc
+returns to main. Agents stay cyclable while they run and until their report
+has been delivered, then until the next prompt. The status line shows an
+`agents:` strip, with `bg` while agents run and the main agent is idle; a
+delivered report shows as `↩ subagent a1 finished "task"` and the report's
+first lines.
+
+Long commands run as background jobs: the model calls `bash` with
+`background: true` (the system prompt tells it to for anything that may take
+more than about a minute: builds, test suites, deployments, servers,
+watchers) and gets `started job j1: ...` back at once. The job runs on the
+session's active tool host like any `bash` call (the backend, or a frontend's
+`prigh tool-host`), with no default timeout; its output is kept in memory
+(the last 1 MB). When it exits, a message like `[job j1 exited 0] make test`
+plus the last 40 lines of output reaches the main agent exactly like a
+subagent report (an idle agent starts a turn; reports finishing together, jobs
+and subagents alike, arrive as one message). Killed jobs report `killed`, a
+host that disconnects fails its jobs (`failed: tool host disconnected`). The
+model also has `job_status`, `job_output` (peek at recent output, paging back
+with `offset`), `job_wait` (block on some or all jobs; returned reports are
+not delivered again) and `job_kill`. Subagents' `bash` has no `background`.
+
+The status line shows `jobs:N` with a spinner while jobs run and the agent is
+idle. `/jobs` opens a picker (id, state, elapsed time, command, last output
+line): Enter prints the job's recent output into the transcript, Ctrl+D kills
+it; `/jobs <id>` and `/jobs kill <id>` do the same directly. A delivered job
+report shows as `↩ job j1 exited 0 "make test"` with its output tail.
+
+Esc/abort stops the main turn only; background subagents and jobs keep
+running (reports that are ready when you abort wait for your next message).
+They belong to their session: `/new` or switching sessions leaves them running
+in the old session (which stays live until they finish and deliver there).
+Stopping the backend kills running jobs and loses running subagents; nothing
+is resumed, and the session simply has no report for them. Job ids continue
+after a restart (`j3` after a session that already had `j1` and `j2`).
+Headless `prigh run` waits for running subagents and jobs, and the turns that
+their reports start, before it exits (a server started in the background
+keeps it running until the model kills it, or you interrupt it).
 
 Typing `/` opens inline autocomplete (commands, then per-command arguments
 such as models, sessions and directories). Typing `@` completes file paths
@@ -265,7 +362,8 @@ under the session's working directory; on submit the referenced files are sent a
 backend appends them to the user message as `<file>` blocks. `!cmd` runs a
 shell command through the backend (streamed output shown as a tool item) and
 adds it and its output to the context; `!!cmd` runs it without adding to the
-context.
+context; `!&cmd` starts it as a background job (also while a turn is running)
+whose exit is reported to the agent like the agent's own jobs.
 
 Submitted prompts are kept in `~/.prigh/history` (one JSON string per line,
 last 500) and loaded on start; secrets from login prompts are never recorded.
@@ -296,14 +394,21 @@ destructive `bash`/`write`/`edit`; `/confirm on|off`) and
 | `/cd [path]` | change the working directory |
 | `/fork`, `/rewind`, `/tree`, `/clone` | branch the session tree |
 | `/export [path]`, `/import [path]` | markdown or `.jsonl` |
-| `/agents` | focus a subagent |
+| `/agents [cancel <n>]` | focus a subagent (Ctrl+D in the picker cancels one), or cancel subagent n |
+| `/jobs [<id>\|kill <id>]` | list background jobs (Enter shows recent output, Ctrl+D kills one), or show/kill one |
 | `/host [name\|backend]` | pick where tools run, and the directory there |
 | `/abort` | abort the current run |
+| `/btw <question>` | ask a side question without interrupting the run |
 | `/retry-backend-connection` | reconnect to the backend now |
 | `/state` | show session state |
 
 `/model` also accepts a display name, id, `provider/id` or unique prefix, and
 `/login`/`/logout`/`/thinking`/`/sessions` open fuzzy pickers.
+
+`/btw` works while a turn is running: one extra model call (no tools) answers
+from the session's current context, streaming into a box above the editor
+that Esc dismisses (without aborting the run). The question and answer are
+never added to the conversation; their cost counts towards the session's.
 
 `-faux-script FILE` (a backend flag, passed through the TUI after `--`) plays
 a JSON array of scripted provider replies, so demos and tests run without API

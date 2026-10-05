@@ -60,6 +60,16 @@ let read_body body ~on_chunk =
   | End_of_file -> ()
 ;;
 
+(* An explicit port makes the address lookup numeric: by name ("https") it
+   needs /etc/services, which minimal containers lack. *)
+let with_default_port uri =
+  match Uri.port uri, Uri.scheme uri with
+  | Some _, _ -> uri
+  | None, Some "https" -> Uri.with_port uri (Some 443)
+  | None, Some "http" -> Uri.with_port uri (Some 80)
+  | None, _ -> uri
+;;
+
 let post_stream
       ~(env : Env.t)
       ?(cancel = Cancellation.never)
@@ -83,7 +93,7 @@ let post_stream
         ~sw
         ~headers:(Http.Header.of_list headers)
         ~body:(Cohttp_eio.Body.of_string body)
-        (Uri.of_string url)
+        (with_default_port (Uri.of_string url))
     with
     | exception
         (( Eio.Io _

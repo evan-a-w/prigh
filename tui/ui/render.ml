@@ -59,8 +59,21 @@ let agent_marker text ~active =
 
 (** The M3 agent strip, folded into the status line as [agents:[main] 1⠋ 2✓]. *)
 let agents_part (m : App.Model.t) : Content.Line.t option =
+  let background = (not (App.Model.running m)) && App.Model.agents_running m in
   if List.is_empty m.agents
-  then None
+  then (
+    (* Running agents whose events this client missed (e.g. it reconnected). *)
+    let running =
+      Option.value_map m.state ~default:0 ~f:(fun s ->
+        List.count s.subagents ~f:(fun a -> a.running))
+    in
+    if running = 0
+    then None
+    else
+      Some
+        [ span ~style:(Style.bold Style.plain) "agents:"
+        ; span (sprintf "%d running" running)
+        ])
   else (
     let main =
       agent_marker
@@ -84,7 +97,31 @@ let agents_part (m : App.Model.t) : Content.Line.t option =
     Some
       ([ span ~style:(Style.bold Style.plain) "agents:" ]
        @ main
-       @ List.concat_map agents ~f:(fun a -> span " " :: a)))
+       @ List.concat_map agents ~f:(fun a -> span " " :: a)
+       @ if background then [ span ~style:(Style.fg Yellow) " bg" ] else []))
+;;
+
+let jobs_part (m : App.Model.t) : Content.Line.t option =
+  let running =
+    Option.value_map m.state ~default:0 ~f:(fun s ->
+      List.count s.jobs ~f:(fun (j : P.State.Job.t) -> j.running))
+  in
+  if running = 0
+  then None
+  else (
+    let idle = not (App.Model.running m) in
+    Some
+      ([ span ~style:(Style.bold Style.plain) "jobs:"
+       ; span (Int.to_string running)
+       ]
+       @
+       if idle
+       then
+         [ span
+             ~style:(Style.fg Yellow)
+             (" " ^ spinner_frames.(m.spinner % Array.length spinner_frames))
+         ]
+       else []))
 ;;
 
 let mode_hint (m : App.Model.t) : Content.Line.t option =
@@ -121,6 +158,11 @@ let mode_hint (m : App.Model.t) : Content.Line.t option =
                 ~style:dim
                 "Enter selects · Esc closes · Ctrl+N named · Ctrl+D delete"
             ]
+        | Picker { kind = Agents; _ } ->
+          Some [ span ~style:dim "Enter focuses · Esc closes · Ctrl+D cancels" ]
+        | Picker { kind = Jobs; _ } ->
+          Some
+            [ span ~style:dim "Enter shows output · Esc closes · Ctrl+D kills" ]
         | Picker _ -> Some [ span ~style:dim "Enter selects · Esc closes" ]
         | Login_prompt _ ->
           Some [ span ~style:dim "login: Enter answers, Esc cancels" ]
@@ -151,6 +193,17 @@ let mode_hint (m : App.Model.t) : Content.Line.t option =
            | None ->
              if m.pending_quit
              then Some [ span ~style:dim "Ctrl+C again quits" ]
+             else if Option.is_some m.btw
+             then
+               Some
+                 [ span
+                     ~style:dim
+                     (if s.running
+                      then
+                        spinner_frames.(m.spinner % Array.length spinner_frames)
+                        ^ " working (Esc dismisses btw; Enter steers)"
+                      else "Esc dismisses btw")
+                 ]
              else if s.running
              then
                Some
@@ -238,12 +291,20 @@ let status (m : App.Model.t) : Content.Line.t =
           ] )
       ; 4, [ span ~style:base (sprintf "$%.2f" s.cost_usd) ]
       ]
+      @ Option.value_map m.namespace ~default:[] ~f:(fun namespace ->
+        let text =
+          match App.Model.acting_as m, m.user with
+          | Some _, Some user -> sprintf "user:%s as %s" user namespace
+          | _ -> "user:" ^ namespace
+        in
+        [ 6, [ span ~style:base text ] ])
       @ tools_part m s
       @ (let queued = Queue_counts.total m.queued in
          if queued > 0
          then [ 3, [ span ~style:base (sprintf "queued:%d" queued) ] ]
          else [])
       @ Option.to_list (Option.map (agents_part m) ~f:(fun p -> 3, p))
+      @ Option.to_list (Option.map (jobs_part m) ~f:(fun p -> 3, p))
       @ (match m.viewport with
          | Viewport.Anchored { new_lines; _ } when new_lines > 0 ->
            [ 1, [ span ~style:base (sprintf "↓ %d new" new_lines) ] ]
@@ -570,49 +631,6 @@ let subagent_header (m : App.Model.t) (a : Agent_view.t) : Content.Line.t =
   ]
 ;;
 
-let pad_line_to (line : Content.Line.t) ~width =
-  let w = Content.Line.width line in
-  if w >= width
-  then Content.Line.truncate line ~width
-  else
-    line
-    @ [ { Content.Span.text = String.make (width - w) ' '; style = Style.plain }
-      ]
-;;
-
-let border = Style.fg Gray
-
-let boxed ~title ~(body : Content.t) ~width : Content.t =
-  let inner = Int.max 1 (width - 4) in
-  let title = Text_width.truncate title ~width:(Int.max 1 (width - 6)) in
-  let title_w = Text_width.string title in
-  let fill = Int.max 0 (width - 5 - title_w) in
-  let top : Content.Line.t =
-    [ span ~style:border "┌─ "
-    ; span ~style:(Style.bold Style.plain) title
-    ; span ~style:border " "
-    ; span ~style:border (String.concat (List.init fill ~f:(fun _ -> "─")))
-    ; span ~style:border "┐"
-    ]
-  in
-  let rows =
-    List.map body ~f:(fun line ->
-      let line =
-        pad_line_to (Content.Line.truncate line ~width:inner) ~width:inner
-      in
-      (span ~style:border "│ " :: line) @ [ span ~style:border " │" ])
-  in
-  let bottom : Content.Line.t =
-    [ span ~style:border "└"
-    ; span
-        ~style:border
-        (String.concat (List.init (Int.max 0 (width - 2)) ~f:(fun _ -> "─")))
-    ; span ~style:border "┘"
-    ]
-  in
-  (top :: rows) @ [ bottom ]
-;;
-
 let screen (m : App.Model.t) : Screen.t =
   let width = Int.max 1 m.width in
   let height = Int.max 3 m.height in
@@ -634,10 +652,10 @@ let screen (m : App.Model.t) : Screen.t =
           ~marker_style:(Style.bold (Style.fg Yellow))
           ~mask:false
       in
-      ( boxed
+      ( Boxed.render
           ~title:"Confirm"
-          ~body:[ [ span ~style:(Style.bold (Style.fg Yellow)) question ] ]
           ~width
+          [ [ span ~style:(Style.bold (Style.fg Yellow)) question ] ]
       , rows
       , cursor )
     | Login_prompt { prompt; _ } ->
@@ -653,10 +671,10 @@ let screen (m : App.Model.t) : Screen.t =
           ~marker_style:(Style.bold (Style.fg Yellow))
           ~mask
       in
-      ( boxed
+      ( Boxed.render
           ~title:"Log in"
-          ~body:(List.map m.login_lines ~f:Content.Line.of_string)
           ~width
+          (List.map m.login_lines ~f:Content.Line.of_string)
       , rows
       , cursor )
     | Text_prompt { question; _ } ->
@@ -667,7 +685,7 @@ let screen (m : App.Model.t) : Screen.t =
           ~marker_style:(Style.bold (Style.fg Yellow))
           ~mask:false
       in
-      boxed ~title:question ~body:[] ~width, rows, cursor
+      Boxed.render ~title:question ~width [], rows, cursor
     | Search { query; _ } ->
       let row : Content.Line.t =
         [ span ~style:(Style.bold (Style.fg Cyan)) "/ "; span query ]
@@ -681,7 +699,13 @@ let screen (m : App.Model.t) : Screen.t =
           ~marker_style:(Style.bold (Style.fg Cyan))
           ~mask:false
       in
-      [], rows, cursor
+      let btw =
+        match m.btw with
+        | Some box ->
+          Btw_box.render box ~width ~max_rows:(Btw_box.max_rows ~height)
+        | None -> []
+      in
+      btw, rows, cursor
   in
   let autocomplete_rows =
     match m.mode, m.autocomplete with

@@ -1,0 +1,706 @@
+#!/usr/bin/env bash
+# The container's entrypoint (see DOCKER.md). It starts as root, creates one
+# Linux user per namespace and runs everything else without root: the backend
+# as the prigh service user, each namespace's tool host as its own user.
+#
+#   prigh-docker                            start what $PRIGH_MODE says
+#   prigh-docker tui [ARGS]                 a TUI on the running server
+#   prigh-docker as NAME CMD [ARGS]         run CMD as user NAME (or prigh)
+#   prigh-docker login NAME PROVIDER [ARGS] log namespace NAME in to a provider
+#   prigh-docker ssh-key [NAME]             create NAME's ~/.ssh/id_ed25519 if missing; print the public key
+#   prigh-docker users                      list the users
+#   prigh-docker healthcheck                exit 0 when every enabled port accepts connections
+#   prigh-docker CMD [ARGS]                 run CMD as the prigh service user
+#
+# For docker/test-prigh-docker.sh: PRIGH_DOCKER_ROOT is prefixed to every
+# path the script reads or writes, and PRIGH_DOCKER_DRY_RUN=1 prints the
+# privileged steps (chown, setpriv, exec, the tool host loops) instead of
+# running them, records ownership in $PRIGH_DOCKER_ROOT/owners and pretends
+# to be root (unless PRIGH_DOCKER_UID says otherwise).
+set -euo pipefail
+shopt -s nullglob
+
+root="${PRIGH_DOCKER_ROOT:-}"
+dry_run="${PRIGH_DOCKER_DRY_RUN:-}"
+if [ -n "$dry_run" ]; then
+	my_uid="${PRIGH_DOCKER_UID:-0}"
+else
+	my_uid=$(id -u)
+fi
+mode="${PRIGH_MODE:-web}"
+web_port=7788
+pi_web_port=7789
+server_port=7777
+state=/run/prigh
+extrausers="$state/extrausers"
+users_file="$state/users"
+min_uid=10000
+service_user=prigh
+user_shell=/bin/bash
+
+die() {
+	echo "prigh-docker: $*" >&2
+	exit 2
+}
+
+log() {
+	echo "prigh-docker: $*" >&2
+}
+
+trim() {
+	local s="$1"
+	s="${s#"${s%%[![:space:]]*}"}"
+	printf '%s' "${s%"${s##*[![:space:]]}"}"
+}
+
+# --- Privileged steps (stubbed by PRIGH_DOCKER_DRY_RUN) -----------------------
+
+show() {
+	local prefix="$1" a out=()
+	shift
+	for a in "$@"; do
+		out+=("$(printf '%q' "${a#"$root"}")")
+	done
+	echo "$prefix ${out[*]}"
+}
+
+run() {
+	if [ -n "$dry_run" ]; then show + "$@"; else "$@"; fi
+}
+
+run_exec() {
+	if [ -n "$dry_run" ]; then
+		show exec "$@"
+		exit 0
+	fi
+	exec "$@"
+}
+
+owner_of() {
+	if [ -n "$dry_run" ]; then
+		awk -v p="${1#"$root"}" '$1 == p { u = $2 } END { print (u == "" ? 0 : u) }' "$root/owners" 2>/dev/null || echo 0
+	else
+		stat -c %u -- "$1"
+	fi
+}
+
+mode_of() {
+	stat -c %a -- "$1"
+}
+
+# set_owner [-R] UID PATH (the group is the uid too)
+set_owner() {
+	local opts=()
+	if [ "$1" = -R ]; then
+		opts=(-R)
+		shift
+	fi
+	if [ -n "$dry_run" ]; then
+		show + chown "${opts[@]}" "$1:$1" "$2"
+		echo "${2#"$root"} $1" >>"$root/owners"
+	else
+		chown "${opts[@]}" "$1:$1" -- "$2"
+	fi
+}
+
+set_mode() {
+	[ "$(mode_of "$2")" = "$1" ] && return 0
+	if [ -n "$dry_run" ]; then show + chmod "$1" "$2"; fi
+	chmod "$1" -- "$2"
+}
+
+# As the owner: without CAP_FSETID, root's chmod would drop the setgid bit of
+# a directory whose group it is not in.
+set_mode_as_owner() {
+	local uid="$1"
+	[ "$(mode_of "$3")" = "$2" ] && return 0
+	if [ -n "$dry_run" ]; then
+		show + setpriv --reuid="$uid" --regid="$uid" --clear-groups chmod "$2" "$3"
+		chmod "$2" -- "$3"
+	else
+		setpriv --reuid="$uid" --regid="$uid" --clear-groups chmod "$2" -- "$3"
+	fi
+}
+
+# --- PRIGH_MODE ---------------------------------------------------------------
+
+# Parallel arrays of serve flags and ports.
+flags=()
+ports=()
+tui_mode=false
+IFS=',' read -ra entries <<<"${mode//[[:space:]]/}"
+for m in "${entries[@]}"; do
+	case "$m" in
+	web) flags+=(-web) ports+=("$web_port") ;;
+	pi-web) flags+=(-pi-web) ports+=("$pi_web_port") ;;
+	server) flags+=(-listen) ports+=("$server_port") ;;
+	tui) tui_mode=true ;;
+	"") ;;
+	*) die "unknown PRIGH_MODE entry '$m' (expected web, pi-web, server or tui)" ;;
+	esac
+done
+if $tui_mode && [ ${#flags[@]} -gt 0 ]; then
+	die "PRIGH_MODE=tui cannot be combined with other modes"
+fi
+
+# The JSON-lines port that tool hosts and `prigh-docker tui` connect to. With
+# only pi-web, the backend also listens on it, on loopback only.
+internal_port=""
+internal_listen=false
+for i in "${!flags[@]}"; do
+	case "${flags[$i]}" in
+	-listen) internal_port="${ports[$i]}" ;;
+	-web) [ -n "$internal_port" ] || internal_port="${ports[$i]}" ;;
+	esac
+done
+if [ -z "$internal_port" ] && [ ${#flags[@]} -gt 0 ]; then
+	internal_port="$server_port"
+	internal_listen=true
+fi
+
+extra_args=()
+if [ -n "${PRIGH_ARGS:-}" ]; then
+	read -ra extra_args <<<"$PRIGH_ARGS"
+fi
+
+no_backend_host=false
+[ "${PRIGH_NO_BACKEND_HOST:-}" = 1 ] && no_backend_host=true
+
+# --- Users --------------------------------------------------------------------
+
+# parse_pairs WHAT SPEC: NAME=VALUE,... into pair_names / pair_values.
+parse_pairs() {
+	local what="$1" entry name i=0
+	local -a raw
+	pair_names=()
+	pair_values=()
+	IFS=',' read -ra raw <<<"$2"
+	for entry in "${raw[@]}"; do
+		entry=$(trim "$entry")
+		[ -n "$entry" ] || continue
+		i=$((i + 1))
+		[[ $entry == *=* ]] || die "$what: entry $i must be NAME=VALUE"
+		name=$(trim "${entry%%=*}")
+		pair_names+=("$name")
+		pair_values+=("$(trim "${entry#*=}")")
+		[ -n "${pair_values[-1]}" ] || die "$what: empty value for '$name'"
+	done
+}
+
+declare -A system_names=() system_ids=()
+read_system_accounts() {
+	local name id file
+	for file in "$root/etc/passwd" "$root/etc/group"; do
+		while IFS=: read -r name _ id _; do
+			[ -n "$name" ] || continue
+			system_names[$name]=1
+			system_ids[$id]=1
+		done <"$file"
+	done
+}
+
+check_user_name() {
+	[[ $1 =~ ^[A-Za-z_][A-Za-z0-9_-]*$ ]] ||
+		die "'$1' cannot be a user name: use letters, digits, _ and -, not starting with a digit or -"
+	[ ${#1} -le 32 ] || die "user name '$1' is longer than 32 characters"
+	[ -z "${system_names[$1]:-}" ] ||
+		die "user name '$1' is taken by a system user or group of the image; choose another namespace name"
+}
+
+# users (in PRIGH_TOKENS order), user_tokens, superusers, auth (tokens|none).
+declare -A user_tokens=() is_superuser=() gh_tokens=()
+users=()
+superusers=()
+load_users() {
+	local i name
+	read_system_accounts
+	if [ -n "${PRIGH_TOKENS:-}" ]; then
+		[ -z "${PRIGH_TOKEN:-}" ] || log "PRIGH_TOKENS is set, ignoring PRIGH_TOKEN"
+		parse_pairs PRIGH_TOKENS "$PRIGH_TOKENS"
+		[ ${#pair_names[@]} -gt 0 ] || die "PRIGH_TOKENS has no NAME=TOKEN entries"
+		for i in "${!pair_names[@]}"; do
+			name="${pair_names[$i]}"
+			check_user_name "$name"
+			[ -z "${user_tokens[$name]:-}" ] || die "PRIGH_TOKENS: duplicate user '$name'"
+			users+=("$name")
+			user_tokens[$name]="${pair_values[$i]}"
+		done
+		auth=tokens
+	elif [ -n "${PRIGH_TOKEN:-}" ]; then
+		users=(default)
+		user_tokens[default]="$PRIGH_TOKEN"
+		auth=tokens
+	elif [ "${PRIGH_ALLOW_NO_TOKEN:-}" = 1 ]; then
+		users=(default)
+		auth=none
+	else
+		die "set PRIGH_TOKEN or PRIGH_TOKENS (anyone who can reach the port can use prigh); PRIGH_ALLOW_NO_TOKEN=1 to skip"
+	fi
+	local -a names
+	IFS=',' read -ra names <<<"${PRIGH_SUPERUSERS:-}"
+	for name in "${names[@]}"; do
+		name=$(trim "$name")
+		[ -n "$name" ] || continue
+		[ "$auth" = tokens ] || die "PRIGH_SUPERUSERS needs PRIGH_TOKEN or PRIGH_TOKENS"
+		[ -n "${user_tokens[$name]:-}" ] || die "PRIGH_SUPERUSERS: '$name' is not a user from PRIGH_TOKENS"
+		[ -n "${is_superuser[$name]:-}" ] || superusers+=("$name")
+		is_superuser[$name]=1
+	done
+	load_gh_tokens
+	for name in "${!gh_tokens[@]}"; do
+		[[ " ${users[*]} " == *" $name "* ]] || die "PRIGH_GH_TOKENS: '$name' is not a user"
+	done
+}
+
+load_gh_tokens() {
+	local i
+	parse_pairs PRIGH_GH_TOKENS "${PRIGH_GH_TOKENS:-}"
+	for i in "${!pair_names[@]}"; do
+		gh_tokens[${pair_names[$i]}]="${pair_values[$i]}"
+	done
+}
+
+# Stable uids: a user keeps the owner of its home (else of its workspace) when
+# that is >= min_uid; others get the lowest uid that no system account,
+# directory or other user has.
+declare -A uid_of=()
+allocate_uids() {
+	local name kind dir uid next="$min_uid"
+	local -A claimed=() used=()
+	for dir in "$root"/home/* "$root"/workspace/*; do
+		[ -d "$dir" ] || continue
+		uid=$(owner_of "$dir")
+		[ "$uid" -lt "$min_uid" ] || claimed[$uid]=1
+	done
+	local -a sorted
+	mapfile -t sorted < <(printf '%s\n' "${users[@]}" | LC_ALL=C sort)
+	for kind in home workspace; do
+		for name in "${sorted[@]}"; do
+			[ -z "${uid_of[$name]:-}" ] || continue
+			dir="$root/$kind/$name"
+			[ -d "$dir" ] || continue
+			uid=$(owner_of "$dir")
+			if [ "$uid" -ge "$min_uid" ] && [ -z "${system_ids[$uid]:-}${used[$uid]:-}" ]; then
+				uid_of[$name]="$uid"
+				used[$uid]=1
+			fi
+		done
+	done
+	for name in "${sorted[@]}"; do
+		[ -z "${uid_of[$name]:-}" ] || continue
+		while [ -n "${system_ids[$next]:-}${claimed[$next]:-}${used[$next]:-}" ]; do
+			next=$((next + 1))
+		done
+		uid_of[$name]="$next"
+		used[$next]=1
+	done
+}
+
+write_accounts() {
+	local dir="$root$extrausers" name members su
+	mkdir -p "$dir"
+	chmod 755 "$root$state" "$dir"
+	: >"$dir/passwd"
+	: >"$dir/group"
+	(umask 077 && : >"$dir/shadow")
+	: >"$root$users_file"
+	for name in "${users[@]}"; do
+		members=()
+		for su in "${superusers[@]}"; do
+			[ "$su" = "$name" ] || members+=("$su")
+		done
+		echo "$name:x:${uid_of[$name]}:${uid_of[$name]}:prigh user $name:/home/$name:$user_shell" >>"$dir/passwd"
+		echo "$name:x:${uid_of[$name]}:$(
+			IFS=,
+			echo "${members[*]}"
+		)" >>"$dir/group"
+		echo "$name:*:::::::" >>"$dir/shadow"
+		printf '%s\t%s\t%s\n' "$name" "${uid_of[$name]}" "${is_superuser[$name]:+yes}" >>"$root$users_file"
+	done
+}
+
+require_accounts() {
+	[ -f "$root$users_file" ] ||
+		die "no users are set up ($users_file is missing): is the container running (through its entrypoint, in a network mode)?"
+}
+
+# lookup_user NAME: u_uid, u_home of a container user or prigh.
+lookup_user() {
+	local line file="$root$extrausers/passwd"
+	if [ "$1" = "$service_user" ]; then
+		file="$root/etc/passwd"
+	else
+		require_accounts
+	fi
+	line=$(awk -F: -v n="$1" '$1 == n' "$file")
+	[ -n "$line" ] || die "no user '$1' (see prigh-docker users)"
+	IFS=: read -r _ _ u_uid _ _ u_home _ <<<"$line"
+}
+
+# --- Environments and privilege dropping --------------------------------------
+
+# user_env NAME: a clean environment for NAME into env_vars.
+user_env() {
+	env_vars=(HOME="$u_home" USER="$1" LOGNAME="$1" SHELL="$user_shell" PATH="$PATH"
+		LANG="${LANG:-C.UTF-8}" GIT_TERMINAL_PROMPT=0)
+	# Bash sets an unexported TERM=dumb when there is none.
+	[[ "$(declare -p TERM 2>/dev/null)" != "declare -x"* ]] || env_vars+=(TERM="$TERM")
+	if [ "$1" = "$service_user" ]; then
+		local v
+		for v in PRIGH_BACKEND PRIGH_WEB_ROOT PRIGH_PI_WEB_ROOT; do
+			[ -z "${!v:-}" ] || env_vars+=("$v=${!v}")
+		done
+	else
+		[ ${#gh_tokens[@]} -gt 0 ] || load_gh_tokens
+		local gh="${gh_tokens[$1]:-${GH_TOKEN:-}}"
+		[ -z "$gh" ] || env_vars+=(GH_TOKEN="$gh")
+	fi
+}
+
+# as_user NAME: the command prefix that runs a program as NAME, into as_prefix.
+as_user() {
+	lookup_user "$1"
+	if [ "$my_uid" = "$u_uid" ]; then
+		as_prefix=()
+	elif [ "$my_uid" = 0 ]; then
+		as_prefix=(setpriv --reuid="$u_uid" --regid="$u_uid" --init-groups)
+	else
+		die "must run as root (or as $1) to run commands as $1"
+	fi
+}
+
+# clean NAME [VAR=VALUE]... CMD...: CMD as NAME in NAME's clean environment,
+# into cmd.
+clean() {
+	as_user "$1"
+	user_env "$1"
+	shift
+	cmd=("${as_prefix[@]}" env -i "${env_vars[@]}" "$@")
+}
+
+# service [-u VAR]... [VAR=VALUE]... CMD...: CMD as prigh in the container's
+# environment minus the per-user secrets, into cmd.
+service() {
+	as_user "$service_user"
+	local unset=(-u PRIGH_TOKEN -u PRIGH_GH_TOKENS -u PRIGH_HOST_TOKENS)
+	while [ "${1:-}" = -u ]; do
+		unset+=(-u "$2")
+		shift 2
+	done
+	cmd=("${as_prefix[@]}" env "${unset[@]}"
+		HOME="$u_home" USER="$service_user" LOGNAME="$service_user" SHELL="$user_shell" "$@")
+}
+
+require_root() {
+	[ "$my_uid" = 0 ] ||
+		die "the container must start as root (uid $my_uid now): it creates a Linux user per namespace and then drops privileges itself; remove \`user:\`/--user"
+}
+
+# --- Directories --------------------------------------------------------------
+
+# Old layout: the volume (now at /home) was prigh's home itself.
+migrate_home() {
+	local h="$root/home" tmp="$root/home/.prigh-migrating" e
+	[ -e "$h/.prigh" ] || [ -e "$h/.config" ] || [ -d "$tmp" ] || return 0
+	[ ! -e "$h/prigh" ] ||
+		die "/home has both an old-layout home (.prigh or .config) and /home/prigh; move the old files into /home/prigh by hand"
+	log "moving the old home volume's contents (prigh's home) into /home/prigh"
+	mkdir -p "$tmp"
+	for e in "$h"/* "$h"/.[!.]* "$h"/..?*; do
+		[ "$e" = "$tmp" ] || mv -- "$e" "$tmp/"
+	done
+	mv -- "$tmp" "$h/prigh"
+}
+
+# ensure_dir PATH UID MODE: a directory owned by UID:UID with MODE; an existing
+# one owned by someone else is chowned recursively.
+ensure_dir() {
+	local dir="$1" uid="$2" dmode="$3"
+	[ ! -L "$dir" ] || die "${dir#"$root"} is a symlink"
+	if [ ! -e "$dir" ]; then
+		mkdir -p "$dir"
+		case "$dir" in "$root"/home/*) cp -a "$root/etc/skel/." "$dir/" ;; esac
+		set_owner -R "$uid" "$dir"
+	elif [ "$(owner_of "$dir")" != "$uid" ]; then
+		log "${dir#"$root"} is owned by uid $(owner_of "$dir"), not $uid: chowning it recursively"
+		set_owner -R "$uid" "$dir"
+	fi
+	case "$dmode" in
+	2*) set_mode_as_owner "$uid" "$dmode" "$dir" ;;
+	*) set_mode "$dmode" "$dir" ;;
+	esac
+}
+
+setup_service_home() {
+	local h="$root/home"
+	mkdir -p "$h"
+	migrate_home
+	if [ "$(owner_of "$h")" != 0 ]; then set_owner 0 "$h"; fi
+	set_mode 755 "$h"
+	lookup_user "$service_user"
+	ensure_dir "$h/$service_user" "$u_uid" 700
+}
+
+setup_user_dirs() {
+	local name ws="$root/workspace" wmode
+	mkdir -p "$ws"
+	wmode=$(mode_of "$ws")
+	((8#$wmode & 1)) ||
+		die "/workspace has mode $wmode, so users cannot reach /workspace/<name>: make it world-searchable (chmod o+x, on the host for a bind mount)"
+	for name in "${users[@]}"; do
+		ensure_dir "$root/home/$name" "${uid_of[$name]}" 700
+		ensure_dir "$ws/$name" "${uid_of[$name]}" 2770
+	done
+}
+
+# Run as NAME, so that it neither overrides the user's own config nor leaves
+# root-owned files behind.
+git_defaults() {
+	[ -n "${PRIGH_GIT_NAME:-}${PRIGH_GIT_EMAIL:-}" ] || return 0
+	# shellcheck disable=SC2016
+	clean "$1" sh -c 'for kv in "user.name=$1" "user.email=$2"; do
+  [ -z "${kv#*=}" ] || git config --global --get "${kv%%=*}" >/dev/null || git config --global "${kv%%=*}" "${kv#*=}"
+done' sh "${PRIGH_GIT_NAME:-}" "${PRIGH_GIT_EMAIL:-}"
+	run "${cmd[@]}"
+}
+
+random_token() {
+	if [ -n "$dry_run" ]; then
+		echo "host-token-$1"
+	else
+		od -An -tx1 -N32 /dev/urandom | tr -d ' \n'
+	fi
+}
+
+# supervise NAME CMD...: CMD in NAME's workspace in the background, restarted
+# whenever it exits.
+supervise() {
+	local name="$1"
+	shift
+	if [ -n "$dry_run" ]; then
+		show "supervise in /workspace/$name:" "$@"
+		return
+	fi
+	(
+		cd "$root/workspace/$name"
+		while :; do
+			"$@" </dev/null && status=0 || status=$?
+			log "tool host of $name exited ($status), restarting"
+			sleep 2
+		done
+	) &
+}
+
+# --- Commands -----------------------------------------------------------------
+
+start_tui_mode() {
+	local cwd="${PRIGH_CWD:-/workspace/$service_user}"
+	setup_service_home
+	lookup_user "$service_user"
+	local prigh_uid="$u_uid"
+	if [ ! -e "$root$cwd" ]; then
+		mkdir -p "$root$cwd"
+		set_owner "$prigh_uid" "$root$cwd"
+	fi
+	git_defaults "$service_user"
+	[ -n "$dry_run" ] || [ -t 0 ] ||
+		die "PRIGH_MODE=tui needs a terminal: run with -it (compose: stdin_open + tty) and attach"
+	local tui_args=()
+	if [ -n "${PRIGH_TUI_ARGS:-}" ]; then
+		read -ra tui_args <<<"$PRIGH_TUI_ARGS"
+	fi
+	cd "$root$cwd"
+	service prigh-tui -cwd "$cwd" "${tui_args[@]}" -- "${extra_args[@]}"
+	log "mode=tui cwd=$cwd (single user: tools run as $service_user)"
+	run_exec "${cmd[@]}"
+}
+
+start() {
+	require_root
+	if $tui_mode; then
+		start_tui_mode
+	fi
+	[ ${#flags[@]} -gt 0 ] || die "PRIGH_MODE='$mode' enables nothing"
+	load_users
+	setup_service_home
+	allocate_uids
+	write_accounts
+	setup_user_dirs
+
+	local name host_tokens=() summary=() hello
+	for name in "${users[@]}"; do
+		summary+=("$name(${uid_of[$name]}${is_superuser[$name]:+,superuser})")
+		git_defaults "$name"
+	done
+	if ! $no_backend_host; then
+		for name in "${users[@]}"; do
+			hello=()
+			if [ "$auth" = tokens ]; then
+				local token
+				token=$(random_token "$name")
+				host_tokens+=("$name=$token")
+				hello=(PRIGH_TOKEN="$token" PRIGH_USER="$name")
+			fi
+			clean "$name" "${hello[@]}" \
+				prigh tool-host -connect "127.0.0.1:$internal_port" -name container -cwd "/workspace/$name"
+			supervise "$name" "${cmd[@]}"
+		done
+	fi
+
+	local serve_args=(-cwd /workspace -no-backend-host) i
+	for i in "${!flags[@]}"; do
+		serve_args+=("${flags[$i]}" "0.0.0.0:${ports[$i]}")
+	done
+	! $internal_listen || serve_args+=(-listen "127.0.0.1:$internal_port")
+	local backend_env=(-u GH_TOKEN -u PRIGH_TOKENS -u PRIGH_SUPERUSERS)
+	if [ "$auth" = tokens ]; then
+		local specs=()
+		for name in "${users[@]}"; do
+			specs+=("$name=${user_tokens[$name]}")
+		done
+		backend_env+=("PRIGH_TOKENS=$(
+			IFS=,
+			echo "${specs[*]}"
+		)")
+	fi
+	if [ ${#host_tokens[@]} -gt 0 ]; then
+		backend_env+=("PRIGH_HOST_TOKENS=$(
+			IFS=,
+			echo "${host_tokens[*]}"
+		)")
+	fi
+	if [ ${#superusers[@]} -gt 0 ]; then
+		backend_env+=("PRIGH_SUPERUSERS=$(
+			IFS=,
+			echo "${superusers[*]}"
+		)")
+	fi
+	local hosts="one per user, as that user"
+	! $no_backend_host || hosts="none in the container (PRIGH_NO_BACKEND_HOST=1)"
+	log "mode=$mode users: ${summary[*]}; tool hosts: $hosts"
+	cd "$root/workspace"
+	service "${backend_env[@]}" prigh serve "${serve_args[@]}" "${extra_args[@]}"
+	run_exec "${cmd[@]}"
+}
+
+tui() {
+	local a prev="" tools=(-tools remote)
+	for a in "$@"; do
+		if [ "$prev" = -tools ]; then
+			[ "$a" != local ] ||
+				die "-tools local would run the agent's tools as the $service_user service user, which can read every namespace's logins; use the container's tool hosts (the default), or run a TUI as a user: prigh-docker as NAME prigh-tui -connect 127.0.0.1:${internal_port:-$web_port} -user NAME -token TOKEN -tools local"
+			tools=()
+		fi
+		prev="$a"
+	done
+	if $tui_mode; then
+		service prigh-tui -cwd "${PRIGH_CWD:-/workspace/$service_user}" "$@" -- "${extra_args[@]}"
+		run_exec "${cmd[@]}"
+	fi
+	local token_env=()
+	if [ -z "${PRIGH_TOKENS:-}" ] && [ -n "${PRIGH_TOKEN:-}" ]; then
+		token_env=(PRIGH_TOKEN="$PRIGH_TOKEN")
+	fi
+	clean "$service_user" "${token_env[@]}" prigh-tui -connect "127.0.0.1:$internal_port" "${tools[@]}" "$@"
+	run_exec "${cmd[@]}"
+}
+
+as() {
+	[ $# -ge 2 ] || die "usage: prigh-docker as NAME CMD [ARGS]"
+	clean "$@"
+	run_exec "${cmd[@]}"
+}
+
+login() {
+	[ $# -ge 2 ] || die "usage: prigh-docker login NAME PROVIDER [ARGS]"
+	local name="$1" dir
+	shift
+	if $tui_mode; then
+		[ "$name" = default ] || die "PRIGH_MODE=tui has only the namespace default"
+	else
+		lookup_user "$name"
+	fi
+	if [ "$name" = default ]; then
+		dir="/home/$service_user/.config/prigh"
+	else
+		dir="/home/$service_user/.prigh/namespaces/$name/.config/prigh"
+	fi
+	clean "$service_user" mkdir -p "$dir"
+	run "${cmd[@]}"
+	clean "$service_user" prigh login -auth-file "$dir/auth.json" "$@"
+	run_exec "${cmd[@]}"
+}
+
+ssh_key() {
+	local name="${1:-}"
+	if [ -z "$name" ]; then
+		if $tui_mode; then
+			name="$service_user"
+		else
+			require_accounts
+			local -a names
+			mapfile -t names < <(cut -f1 "$root$users_file")
+			[ ${#names[@]} -eq 1 ] || die "several users (${names[*]}): prigh-docker ssh-key NAME"
+			name="${names[0]}"
+		fi
+	fi
+	# shellcheck disable=SC2016
+	clean "$name" sh -c 'key="$HOME/.ssh/id_ed25519"
+if [ ! -f "$key" ]; then
+  mkdir -p "$HOME/.ssh" && chmod 700 "$HOME/.ssh" && ssh-keygen -q -t ed25519 -N "" -C "$1" -f "$key"
+fi
+cat "$key.pub"' sh "$name@prigh"
+	run_exec "${cmd[@]}"
+}
+
+list_users() {
+	require_accounts
+	local name uid su
+	printf '%-16s %-6s %-22s %-28s %s\n' NAME UID HOME WORKSPACE SUPERUSER
+	while IFS=$'\t' read -r name uid su; do
+		printf '%-16s %-6s %-22s %-28s %s\n' "$name" "$uid" "/home/$name" "/workspace/$name" "${su:-no}"
+	done <"$root$users_file"
+}
+
+port_open() {
+	(exec 3<>"/dev/tcp/127.0.0.1/$1") 2>/dev/null
+}
+
+healthcheck() {
+	local i
+	for i in "${!flags[@]}"; do
+		port_open "${ports[$i]}" || {
+			echo "port ${ports[$i]} (${flags[$i]}) is not accepting connections" >&2
+			exit 1
+		}
+	done
+}
+
+case "${1:-}" in
+"" | start) start ;;
+tui)
+	shift
+	tui "$@"
+	;;
+as)
+	shift
+	as "$@"
+	;;
+login)
+	shift
+	login "$@"
+	;;
+ssh-key)
+	shift
+	ssh_key "$@"
+	;;
+users) list_users ;;
+healthcheck) healthcheck ;;
+*)
+	if [ "$my_uid" != 0 ]; then
+		run_exec "$@"
+	fi
+	clean "$service_user" "$@"
+	run_exec "${cmd[@]}"
+	;;
+esac

@@ -74,7 +74,15 @@ let all =
   ; c "name" "[text]" "set the session name"
   ; c "session" "" "show session statistics"
   ; c "sessions" "" "pick a saved session (Ctrl+N named, Ctrl+D delete)"
-  ; c "agents" "" "focus a subagent"
+  ; c
+      "agents"
+      "[cancel <n>]"
+      "focus a subagent (Ctrl+D cancels one), or cancel subagent n"
+  ; c
+      "jobs"
+      "[id|kill <id>]"
+      "list background jobs (Enter shows output, Ctrl+D kills), or show/kill \
+       one"
   ; c
       "host"
       "[name|backend]"
@@ -98,11 +106,21 @@ let all =
       "import a session from a JSONL file"
   ; c "abort" "" "abort the current run"
   ; c
+      "btw"
+      "<question>"
+      "ask a side question without interrupting the turn (not added to the \
+       conversation)"
+  ; c
       "retry-backend-connection"
       ""
       "reconnect to the backend now instead of waiting for the next retry"
   ; c "state" "" "show session state"
   ; c "clear" "" "clear the transcript"
+  ; c "signout" "" "sign out to log in as another user (browser only)"
+  ; c
+      "setusr"
+      "[user]"
+      "act as another user (superusers only); without a user, list them"
   ; c "quit" "" "exit"
   ]
 ;;

@@ -346,7 +346,7 @@ let%expect_test "fuzzy ranking: command names" =
     {|
     "mo" -> model scoped-models import
     "lo" -> login logout clone
-    "s"  -> state switch session sessions scoped-models host agents hotkeys verbosity
+    "s"  -> state switch setusr session signout sessions scoped-models jobs host agents hotkeys verbosity
     "sw" -> switch
     "xyz" ->
     |}]
@@ -642,7 +642,8 @@ let%expect_test "keymap: every binding resolves to its intent and is documented"
     /name [text]                       set the session name
     /session                           show session statistics
     /sessions                          pick a saved session (Ctrl+N named, Ctrl+D delete)
-    /agents                            focus a subagent
+    /agents [cancel <n>]               focus a subagent (Ctrl+D cancels one), or cancel subagent n
+    /jobs [id|kill <id>]               list background jobs (Enter shows output, Ctrl+D kills), or show/kill one
     /host [name|backend]               pick where tools run (this frontend, another one, or the backend) and the directory there
     /switch [path]                     switch to a saved session
     /cd [path]                         change the working directory
@@ -653,9 +654,12 @@ let%expect_test "keymap: every binding resolves to its intent and is documented"
     /export [path]                     export the transcript (markdown or .jsonl)
     /import [path]                     import a session from a JSONL file
     /abort                             abort the current run
+    /btw <question>                    ask a side question without interrupting the turn (not added to the conversation)
     /retry-backend-connection          reconnect to the backend now instead of waiting for the next retry
     /state                             show session state
     /clear                             clear the transcript
+    /signout                           sign out to log in as another user (browser only)
+    /setusr [user]                     act as another user (superusers only); without a user, list them
     /quit                              exit
     |}]
 ;;

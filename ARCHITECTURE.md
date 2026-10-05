@@ -37,15 +37,19 @@ one session at a time: its requests act on that session and it receives that
 session's events. Several frontends can attach to the same session and each
 sees the same stream. A session keeps running when its clients go away, and
 a client sends `hello` first (name, cwd, whether it can run tools, an
-optional session id or path, the `-token` if the backend requires one).
+optional session id or path, the `-token` if the backend requires one, and
+with `-tokens` optionally the user, i.e. the namespace name).
 
 ### Tool hosts
 
 Each session has an *active tool host*: where its `on_host` tools (bash,
 read, write, edit, ls, grep, find) and `!cmd` shells run. It is either the
 backend itself or a connected client that advertised `tools: true` in
-`hello`; the subagent tool always runs in the backend but its tool calls
-follow the same active host. Tools default to the frontend: a tool-capable
+`hello` (a TUI, or a standalone `prigh tool-host -connect`); the subagent
+tool always runs in the backend but its tool calls follow the same active
+host. With `-no-backend-host` the backend is not a host at all (not listed,
+no in-process tools, instructions, path listings or git branch), and a
+session without a host adopts the first one that connects. Tools default to the frontend: a tool-capable
 client takes over when it attaches unless the user pinned a host with
 `set_active_host` (`/host` in the TUI). The session cwd is a property of the
 host, so switching hosts switches the cwd (and `/cd` validates the directory
@@ -198,7 +202,8 @@ two can share one.
   name plus `$resolve_dir`/`$read_file`/`$list_paths`/`$instructions`. `Tool_host` is the `prigh tool-host`
   worker loop around it (`exec`/`cancel` in, `output`/`result` out, one fiber
   per exec).
-- `Tool_bash` (streamed output, timeout, cancellation), `Tool_read`,
+- `Tool_bash` (streamed output, timeout, cancellation; with `background`
+  at depth 0 it starts a job instead, see below), `Tool_read`,
   `Tool_write` (`wrote N lines`), `Tool_edit` (multi-edit, unique
   non-overlapping matches, atomic; returns a unified diff from `Udiff`),
   `Tool_ls`, `Tool_grep`/`Tool_find` (via `rg`).
@@ -206,10 +211,42 @@ two can share one.
   plus optional `tools` (a subset of the parent's, default all), `model`
   (`Model.resolve`; default the parent's), `cwd`, `max_turns` (default 50)
   and `context` (extra system text). It runs a nested `Agent_loop`
-  in-process sharing the parent's provider and cancellation, and returns the
-  child's final text plus a `[subagent: N turns, in/out tokens, $cost]`
-  trailer. Progress comes back as nested `Subagent*` events (below), not
-  text chunks.
+  in-process sharing the parent's provider, whose report is the child's final
+  text plus a `[subagent: N turns, in/out tokens, $cost]` trailer. Progress
+  comes back as nested `Subagent*` events (below), not text chunks. At depth 0
+  the context carries the agent's `Background_tasks` and the call only spawns
+  the loop there, with its own cancellation, and returns `started agent
+  a<n> (...)`; deeper calls (no jobs) block and return the report.
+  `subagent_wait`/`subagent_status`/`subagent_cancel` act on the jobs and are
+  dropped below depth 0.
+- `Background_tasks` — one agent's background work, of two kinds:
+  subagents (ids `a<n>`, seeded past the subagent calls already in the
+  session) and shell jobs (ids `j<n>`, seeded past the `started job j<n>`
+  results and `[job j<n> ...]` reports already in it). Each task has its
+  label (task or command), start time, its own cancellation, last activity
+  (subagents, from their events), an `Output_tail` (jobs: the last 1 MB of
+  output and the total byte count), an outcome (`status` such as `finished`,
+  `exited 2`, `killed`, `failed: ...`, a body and `is_error`) and a
+  `delivered` flag. Each finished task's report (`[<kind> <id> <status>]
+  <label>` and the body) is delivered exactly once, by `take_undelivered`
+  (the agent turns a batch, subagents and jobs together, into one user
+  message) or by `wait`/`cancel_and_wait` (tool results). Events and changes
+  go to the hooks `Agent` installs with `connect`.
+- Background jobs — `bash` with `background: true` at depth 0 spawns a job
+  whose fiber runs the same call in the foreground (`background` dropped,
+  no timeout unless one was given) through the context's executor, so it
+  runs on the session's active host exactly like a normal call: in-process,
+  or as a `Tool_exec` round trip that the backend keeps pending in the job's
+  fiber while the turn goes on, its streamed `tool_exec_output` chunks
+  feeding the job's buffer (`Agent.executor` runs the spawning call itself in
+  the backend, never on the host). Killing a job cancels that call, which
+  kills the process group (locally, or on the host via `tool_exec_cancel`); a
+  host disconnecting fails it. The outcome's status is read from the
+  foreground result's trailer (`[exit code N]`, `[cancelled]`, `[killed by
+  ...]`, `[timed out ...]`), its body is the last 40 lines of output.
+  `Tool_jobs` has `job_status`, `job_output` (`lines`, `offset` from the
+  end), `job_wait` and `job_kill`; like the subagent controls they and
+  `background` itself are dropped below depth 0.
 - `Tools.all` is the fixed built-in set; `Tools.for_context` builds the
   per-agent tool list (`parent`, `depth`, optional `only`), so the
   subagent's tool set can be restricted and the `subagent` tool is dropped at
@@ -244,7 +281,9 @@ two can share one.
 - `Agent_event` — the loop's event vocabulary (`Agent_start/end`, `Turn_*`,
   `Message_*`, `Tool_start/output/end`, `Tool_confirm`, and the recursive
   `Subagent` / `Subagent_start` / `Subagent_end`, whose inner events carry
-  `call_id`/`agent_id`), so the UI can build a transcript per agent.
+  `call_id`/`agent_id`), so the UI can build a transcript per agent. A
+  background subagent's events keep arriving after its `subagent` call's
+  `Tool_end`, possibly during later turns or while the agent is idle.
 - `Agent` — one conversation: owns the session, model, thinking level and
   `Config`, the tool hosts (`add_host`/`remove_host`/`set_active_host`,
   `host_exec` and the pending remote executions), the run lifecycle (`prompt`, `steer` = after the current turn,
@@ -253,9 +292,25 @@ two can share one.
   a `!cmd` through the bash machinery), automatic compaction at 80% of the
   context window, and a subscriber list receiving `Agent.Event.t` (`Loop of
   Agent_event.t | State_changed | Compacted | Notice | Config_changed |
-  Queue_update`). `prompt`/`steer`/`follow_up` accept optional `attachments`
+  Queue_update`). Background subagents and jobs (`Background_tasks`) run in
+  the agent's switch, not the run's: `abort` leaves them running,
+  `cancel_subagent`/`kill_job` stop one, `start_job` starts a job for a
+  user's `!&cmd`. When one finishes, an idle agent starts a run whose prompts
+  begin with the delivery message; a running loop gets it from `steer` at
+  the next turn boundary (after the turn's tool results, so tool calls and
+  results stay paired), or the run's tail starts a new run unless it was
+  aborted (then the report waits for the next prompt, which it precedes).
+  `wait_idle` also waits for running subagents and jobs and their
+  deliveries (so headless `run` does too); `State.subagents` and
+  `State.jobs` list the running and undelivered ones; `Subagent_log`
+  records every subagent's status, activity and transcript (nested ones as
+  `<parent>/<call id>`) from the agent's own events, for `subagents`/
+  `subagent` (`list_subagents`, `get_subagent {id}` by agent or tool call
+  id); `queued_texts` and `pending_confirms` back `get_pending`; the in-place
+  `new_session`/`switch_session` cancel them and drop their reports.
+  `prompt`/`steer`/`follow_up` accept optional `attachments`
   (paths whose contents are appended to the user message as `<file>` blocks).
-  Subagent usage is rolled up into `State.usage`/`cost_usd`
+  Subagent and `btw` usage is rolled up into `State.usage`/`cost_usd`
   (never `context_tokens`), and `State` also carries the session name, cwd
   and `git_branch`. `respond_confirm` answers a pending `Tool_confirm`.
 - `Config` — `~/.prigh/config.json` (`scoped_models : string list`,
@@ -308,18 +363,37 @@ two can share one.
   (`new_session`, `switch_session` by id or path, `fork`, `clone`, `import`)
   create or load an agent and move only the calling client; `list_sessions`
   marks live sessions with `live`, `running` and `clients`; `delete_session`
-  refuses live ones. `set_model` goes through `Model.resolve` (key, id,
+  refuses live ones. A session with running background subagents or jobs
+  is not evicted (it delivers their reports into its own session even with
+  no client attached); `shutdown` cancels them (killing the jobs).
+  `kill_job {job_id}`, `job_output {job_id, lines}` (`{text}`: a header line
+  and the last lines) and `list_jobs` (every job of the session: id,
+  command, running, exit, delivered, elapsed, bytes, last_line) serve the
+  `/jobs` picker, and `shell {command, background: true}` (`!&cmd`) returns
+  `{job_id}`. `set_model` goes through `Model.resolve` (key, id,
   display name or unique case-insensitive prefix; otherwise "did you mean"
   by edit distance). Methods: `hello`, `ping`, `prompt`, `steer`,
-  `follow_up`, `abort`, `dequeue`, `shell`, `get_state`, `get_messages`,
+  `follow_up`, `abort`, `dequeue`, `cancel_subagent`, `list_subagents`,
+  `get_subagent`, `get_pending`, `kill_job`, `job_output`, `list_jobs`,
+  `shell`, `get_state`, `get_messages`,
   `get_entries`, `set_model`, `set_thinking`, `list_models`, `compact`,
   `new_session`, `switch_session`, `list_sessions`, `set_session_name`,
   `delete_session`, `export`, `import`, `fork`, `clone`, `rewind`,
   `session_stats`, `set_cwd`, `list_paths`, `list_dirs`, `get_config`, `set_config`,
-  `change_default`,
+  `change_default`, `btw`, `btw_cancel`,
   `tool_confirm_respond`, `set_active_host`, `tool_exec_output`,
   `tool_exec_result`, `auth_status`, `login`, `auth_respond`, `auth_cancel`,
   `logout`. `State` carries `active_host` and `hosts` (the backend first).
+  `btw {question, btw_id?}` (`/btw`) answers a side question with one
+  tool-less model call (`Btw`, `Agent.btw`) over the session's recorded
+  system prompt and a snapshot of its messages, sanitised because it may be
+  taken mid-turn (a tool call without its result yet gets a "still running"
+  placeholder), plus the question. It runs in the request's fiber, takes
+  no run lock and never writes to the session; the answer streams to the
+  calling client only as `btw_delta {btw_id, delta}` events and the
+  response is `{btw_id, text, usage, cost_usd}`. `btw_cancel {btw_id}`
+  (or the client disconnecting) cancels it. Its usage is added to the
+  in-memory `State.usage`/`cost_usd` like subagents'.
 - `Websocket` — a minimal RFC 6455 server side (handshake key, frame
   encode/decode with client masking, fragment reassembly, ping/pong and
   close) and `Web_server` — the `-web` listener: a connection whose first
@@ -332,6 +406,41 @@ two can share one.
   found via `-web-root`, `$PRIGH_WEB_ROOT` or next to the executable;
   no `..`, no dot files). The token check is the same `hello` check as
   for TCP; the static files are public.
+- `Rpc_router` / `Namespace` — `-tokens name=token,...`: one `Rpc_server`
+  per namespace, each with its own home (sessions, config, `auth.json`,
+  global `AGENTS.md`) under `~/.prigh/namespaces/<name>` and no provider keys
+  from the environment. Every listener goes through the router, which reads
+  a connection's first line (a `hello` with a known token) and hands the
+  connection to that namespace's server; `/terminal` and pi-web look the
+  server up by the query `token` (and `user`). Without `-tokens` it wraps
+  one server. Logins are user name + password: `hello`'s optional `user`
+  must then be the token's namespace name (`Rpc_server.credentials_ok`,
+  shared by the router and `hello`; without it the token alone still
+  selects the namespace), every failure is `unauthorised: bad user name or
+  password`, and the `hello` result carries `namespace` (null outside this
+  mode). Single-token servers ignore `user`.
+- `User_access` — who may act as which namespace: login tokens,
+  `-host-tokens` (sign in as their namespace, never as a superuser) and
+  `-superusers`. The router authenticates the first `hello`, including its
+  optional `as_user` (superusers only), and connects the client to that
+  namespace's server pre-authenticated (`Rpc_server.connect ~signed_in`),
+  so its `hello` result also carries the signed-in `user` and `superuser`.
+  `list_users` and `set_user` answer from the client's credentials; an
+  allowed `set_user` ends `Rpc_server.serve_lines` and the router serves
+  the rest of the connection from the new namespace's server, answering
+  `set_user` with a `hello` of the first one's client details. pi-web
+  instead reconnects with `as_user` (Pi_rpc's `/setusr` sends
+  `prigh_set_user`), as do `/terminal` URLs. Without the backend host,
+  `Rpc_server.session_file` keeps session paths inside the sessions
+  directory and `Agent.export` writes through the tool host.
+- `Terminal_channel` / `Terminal_relay` — terminals run on the session's
+  active host (`Rpc_server.terminal_target`). `Terminals.serve` speaks to an
+  abstract frame channel (a WebSocket, or frames fed by a relay). For a
+  client host the backend relays the browser socket as `terminal_open` /
+  `terminal_frame` / `terminal_close` events to that host and its
+  `terminal_frame` / `terminal_closed` requests back; the host runs the same
+  `Terminals` code (`Tool_host`, also behind the TUI's stdio worker, which
+  forwards the same messages as lines).
 - `Terminal` / `Terminals` / `Tmux_control` — the browser's shell panel.
   A `Terminal` is a tmux session on the server `-L prigh` (session names
   carry the backend's pid; `$PRIGH_TMUX` picks the binary) driven by one
@@ -363,14 +472,22 @@ two can share one.
   messages by; `tool_execution_*` with accumulated output; `tool_confirm`
   and login prompts as `extension_ui_request` dialogs answered through
   `tool_confirm_respond`/`auth_respond`; notices as toasts; subagents as the
-  agents-rail widget snapshot; `session_reloaded`/`session_info_changed`/
+  agents-rail widget snapshot, re-read from `list_subagents` on every
+  subagent lifecycle event; `session_reloaded`/`session_info_changed`/
   `thinking_level_changed`/`agent_settled` derived by diffing `state`
   events, suppressed while running a command the frontend re-syncs after).
   The prigh-only slash commands (`/login`, `/logout`, `/auth`, `/sessions`,
   `/switch`, `/host`, `/change_default`, `/help`) arrive as prompts and run in the adapter;
   `list_sessions`/`switch_session` are pi-protocol additions for the
-  sidebar. `serve -pi-web HOST:PORT` is a second `Web_server` listener whose
-  `/ws?token=&session=&name=` goes to `Pi_rpc.serve_websocket` (the query
+  sidebar. `get_state` also re-sends the session's non-empty live state
+  (status entries, queue, pending confirmations, agents rail) since the
+  frontend clears it when it re-syncs after connecting or switching; a
+  session change cancels the old session's confirmation dialogs.
+  `watch_subagent {agentId | toolCallId}` answers with a subagent's
+  transcript (`get_subagent`) and forwards its own message and tool events
+  as `prigh_subagent_event`s until unwatched or the session changes (the
+  pi-web subagent view). `serve -pi-web HOST:PORT` is a second `Web_server` listener whose
+  `/ws?token=&user=&session=&name=` goes to `Pi_rpc.serve_websocket` (the query
   string becomes the `hello`; a refused hello is reported as
   `prigh_hello_failed` and the socket closed) and whose `/terminal` is the
   same `Terminals` as the `-web` listener's.
@@ -446,8 +563,16 @@ copy of the protocol types and the e2e test guards the contract.
     subagent), `Viewport` (`Follow | Anchored`, so new output never pushes an
     anchored view), `Verbosity` (quiet/normal/verbose), `Autocomplete`
     (inline command/argument/path completion), `Agent_view` (per-subagent
-    transcript and status), `Commands` (slash table, parse, complete,
-    closest), `Model_match` (display-name/prefix/did-you-mean), `Markdown`.
+    transcript and status; the app keeps an agent while it runs or while
+    `State.subagents` lists it as undelivered, then until the next prompt;
+    a delivered report, a subagent's or a job's, renders as a compact
+    `Transcript` `Delivery` item; `/jobs` lists `list_jobs` in a picker,
+    Enter adds `job_output` to the transcript as a block, Ctrl+D kills),
+    `Commands` (slash table, parse, complete,
+    closest), `Model_match` (display-name/prefix/did-you-mean), `Markdown`,
+    `Btw_box` (the `/btw` panel above the editor: a newer question cancels
+    and replaces it; Esc dismisses it before Esc's other meanings, so it
+    never aborts the run), `Boxed` (the framed dialogs).
   - `Key.t` → `Intent.t` through `Keymap` (the one binding table; `/help`
     prints it). `Mode.t` (`Editing | Picker | Login_prompt | Text_prompt |
     Confirm | Search`) says who owns the keyboard; dialogs never stack, Esc
@@ -455,7 +580,7 @@ copy of the protocol types and the e2e test guards the contract.
   - `Render.screen : Model.t -> Screen.t` lays out a frame as `Content.t`
     (styled spans with `Text_width`-aware wrapping) plus the cursor cell. The
     status line keeps the cwd and model, then fills remaining width by
-    priority (context, cost/queued/agents, thinking, verbosity, new-line
+    priority (context, cost/queued/agents/jobs, thinking, verbosity, new-line
     count, mode hint) and left-truncates, so the model key stays visible at
     narrow widths.
 - `term/` (`prigh_ui_term`) — `Key_of_event` (Bonsai_term events → `Key.t`,
@@ -494,7 +619,8 @@ copy of the protocol types and the e2e test guards the contract.
   WebSocket as a `Transport.t`), `Browser` (localStorage, query string,
   clipboard, the cell measurement that turns the window into columns and
   rows) and `Web_app`, the counterpart of `Term_app`: reads
-  `?backend=`/`?session=`/`?name=` plus the token saved by the connect form
+  `?backend=`/`?session=`/`?name=` plus the user name and password (the
+  token) saved by the connect form (`Login`: `prigh.user`, `prigh.token`)
   (using the page's origin `/ws` when no backend is explicit), sends `hello` with
   `tools: false`, mounts the shared component with
   `Bonsai_web.Start.start_and_get_handle` (incoming actions through the
@@ -502,8 +628,12 @@ copy of the protocol types and the e2e test guards the contract.
   listeners, and implements the platform: history in `localStorage`,
   `navigator.clipboard`, `window.open`; suspend and the external editor
   report themselves unavailable. A failed first `hello` shows a connect
-  form instead (the token is saved and the selected backend is put in the
-  reloaded page's query string). The page's `?session=` follows the current
+  form instead (user name, password with a Caps Lock warning; both are
+  saved and the selected backend is put in the reloaded page's query
+  string). `/signout` (the `Sign_out` command; the terminal's platform
+  answers that it is browser-only) and the `sign out` button next to `>_`
+  forget the login, note it, and reload without `?session=`, so every socket
+  is dropped and the next load shows the form instead of connecting. The page's `?session=` follows the current
   session (`history.replaceState`), so a reload rejoins it. The app sits in
   `#screen-area` (whose height `Browser.grid_size` measures) next to an
   optional `Terminal_panel`: a `>_` button opens it, and it is a
@@ -518,7 +648,7 @@ copy of the protocol types and the e2e test guards the contract.
 - `bin/` — `prigh-tui` (`-faux`, `-session`, `-model`, `-cwd`, `-auth-file`,
   `-backend`; `PRIGH_BACKEND` overrides the backend path). `-connect
   HOST:PORT` (`$PRIGH_CONNECT`) joins a running backend instead of spawning
-  one, with `-token` (`$PRIGH_TOKEN`) and `-name`; `-tools local|remote`
+  one, with `-token` (`$PRIGH_TOKEN`), `-user` (`$PRIGH_USER`) and `-name`; `-tools local|remote`
   says where this session's tools run (local = this machine through
   `tool-host`, the default with `-connect`; remote = the backend, the default
   when spawning, where the two coincide).
@@ -567,6 +697,13 @@ eaten by the tty's line discipline (fixed by clearing `IEXTEN`) and the quit
 hang (`Driver.finished` never resolving), and the paste scenario caught the
 batched-event buffering bug.
 
+`backend/test/test_background_jobs.ml` covers background jobs: delivery
+while idle and at a turn boundary (batched with a subagent's report), the
+job tools, abort, kills that really end the process, id continuity across a
+reload, and jobs on a real `prigh tool-host` connected over TCP (output
+streamed into the job, `kill_job` cancelling the exec on the host, a dropped
+connection failing the job).
+
 `backend/test/test_pi_rpc.ml` drives `Pi_rpc` over in-memory lines
 (pi commands in, pi events out) for prompts, steering, confirmations,
 thinking levels, forks, sessions, login dialogs, subagents and compaction;
@@ -586,7 +723,7 @@ JavaScript runtime; skipped without `node`). On Linux, the flake's
 that the opened URL does not carry the token and that the secret never reaches
 the log, fetches the installed bundle, and then drives real browsers with
 Playwright (Chromium and Firefox): it submits the connect form by typing the
-token, verifies the token is remembered and the page reloads to an
+token into the Password field, verifies the token is remembered and the page reloads to an
 authenticated WebSocket session, then types into the hidden keyboard input,
 edits with arrow/backspace, submits a prompt to the faux provider and reloads
 to prove the session survives. Every step saves a normalised ASCII snapshot of

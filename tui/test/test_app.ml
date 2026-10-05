@@ -732,7 +732,7 @@ let%expect_test "typing / lists commands, Down twice + Tab fills /login " =
       /login [provider] [api_key|oauth]  log in to a provider
       /logout [provider]              remove a provider's store…
       /thinking [off|low|on|high|max]  pick or set the thinking…
-      ↕ 1–8 of 31
+      ↕ 1–8 of 35
     …deepseek-flash  ctx:0% 1.5k  Tab/Enter accept · Esc close
     |}];
   H.key h (Key.plain Down);
@@ -749,7 +749,7 @@ let%expect_test "typing / lists commands, Down twice + Tab fills /login " =
       /login [provider] [api_key|oauth]  log in to a provider
       /logout [provider]              remove a provider's store…
       /thinking [off|low|on|high|max]  pick or set the thinking…
-      ↕ 1–8 of 31
+      ↕ 1–8 of 35
     …deepseek-flash  ctx:0% 1.5k  Tab/Enter accept · Esc close
     |}];
   H.key h (Key.plain Down);
@@ -766,7 +766,7 @@ let%expect_test "typing / lists commands, Down twice + Tab fills /login " =
       /login [provider] [api_key|oauth]  log in to a provider
       /logout [provider]              remove a provider's store…
       /thinking [off|low|on|high|max]  pick or set the thinking…
-      ↕ 1–8 of 31
+      ↕ 1–8 of 35
     …deepseek-flash  ctx:0% 1.5k  Tab/Enter accept · Esc close
     |}];
   H.key h (Key.plain Tab);
@@ -1985,7 +1985,8 @@ let%expect_test "backend crash shows the stderr tail; Ctrl+C quits" =
     (Reconnect
       (generation 1)
       (delay_ms   0)
-      (session (/home/u/.prigh/sessions/1.jsonl)))
+      (session (/home/u/.prigh/sessions/1.jsonl))
+      (as_user ()))
     session abc123 in /work. /help for commands, Esc aborts,
     Ctrl+C twice quits.
     > earlier question
@@ -2344,6 +2345,242 @@ let%expect_test "abort restore is singular, prepends, and tolerates no field" =
     |}]
 ;;
 
+let say h text =
+  H.event h (Message_update { partial; delta = Text_delta text });
+  H.event h (Message_end (assistant text))
+;;
+
+let%expect_test "background subagent: runs while main is idle, survives a \
+                 prompt, cancelled from the picker, delivery rendered \
+                 compactly"
+  =
+  let h = connected ~width:100 ~height:16 () in
+  H.keys h "go";
+  H.enter h;
+  H.event h (State (state ~running:true ()));
+  H.event h (Message_start (User "go"));
+  let call =
+    tool_call ~name:"subagent" ~arguments:{|{"task":"index the repo"}|} "c1"
+  in
+  H.event h (Tool_start call);
+  H.event
+    h
+    (Subagent_start
+       { call_id = "c1"
+       ; agent_id = "a1"
+       ; task = "index the repo"
+       ; model = "claude-haiku"
+       ; tools = [ "bash" ]
+       });
+  H.event
+    h
+    (Tool_end
+       { call
+       ; result =
+           tool_result
+             ~name:"subagent"
+             ~id:"c1"
+             "started agent a1 (index the repo); its result will be delivered \
+              to you when it finishes; use subagent_wait to block on it"
+       });
+  say h "started it";
+  H.event h (State (state ~subagents:[ "a1", "index the repo", true ] ()));
+  (* Events keep arriving after the spawning call ended and the turn is over. *)
+  H.event h (Subagent { call_id = "c1"; agent_id = "a1"; event = Turn_start });
+  H.event
+    h
+    (Subagent
+       { call_id = "c1"
+       ; agent_id = "a1"
+       ; event =
+           Tool_start
+             (tool_call ~name:"bash" ~arguments:{|{"command":"ls -R"}|} "t1")
+       });
+  H.show h;
+  [%expect
+    {|
+    (Rpc (method_ prompt) (params ((text go))) (tag Show_error))
+    (Append_history go)
+
+
+
+
+
+
+    session abc123 in /work. /help for commands, Esc aborts, Ctrl+C twice quits.
+    > earlier question
+    earlier answer
+    > go
+    ⚙ subagent "index the repo" … 1 turns
+      ⚙ bash ls -R
+    started it
+    ────────────────────────────────────────────────────────────────────────────────────────────────────
+    > ▏
+    /work  deepseek-flash  think:off  view:normal  ctx:0% 1.5k  $0.01  agents:[main] 1⠋ bg
+    |}];
+  print_s [%sexp (App.Model.agents_running h.model : bool)];
+  [%expect {| true |}];
+  (* A new prompt keeps the running agent cyclable. *)
+  H.keys h "meanwhile";
+  H.enter h;
+  H.event
+    h
+    (State (state ~running:true ~subagents:[ "a1", "index the repo", true ] ()));
+  H.event h (Message_start (User "meanwhile"));
+  say h "sure";
+  H.event h (State (state ~subagents:[ "a1", "index the repo", true ] ()));
+  H.next_agent h;
+  H.show h;
+  [%expect
+    {|
+    (Rpc (method_ prompt) (params ((text meanwhile))) (tag Show_error))
+    (Append_history meanwhile)
+    ◆ subagent 1/1  claude-haiku  ⠋ running 1 turns  "index the repo"
+
+
+
+
+
+
+
+
+
+
+
+    ⚙ bash command=ls -R
+    ────────────────────────────────────────────────────────────────────────────────────────────────────
+    > ▏
+    /work  deepseek-flash  think:off  view:normal  ctx:0% 1.5k  $0.01  agents:main [1⠋] bg
+    |}];
+  H.next_agent h;
+  (* Ctrl+D in the picker cancels the highlighted running agent. *)
+  H.keys h "/agents";
+  H.enter h;
+  H.show h;
+  H.key h (Key.ctrl 'd');
+  H.mode h;
+  [%expect
+    {|
+    session abc123 in /work. /help for commands, Esc aborts, Ctrl+C twice quits.
+    > earlier question
+    earlier answer
+    > go
+    ⚙ subagent "index the repo" … 1 turns
+      ⚙ bash ls -R
+    started it
+    > meanwhile
+    sure
+    Subagents  (1)
+    / ▏
+    ▸  index the repo  a1  running  claude-haiku
+    ────────────────────────────────────────────────────────────────────────────────────────────────────
+    …deepseek-flash  ctx:0% 1.5k  agents:[main] 1⠋ bg  Enter focuses · Esc closes · Ctrl+D cancels
+    (Rpc
+      (method_ cancel_subagent)
+      (params ((agent_id a1)))
+      (tag (Notice_on_success "cancelling subagent a1")))
+    editing
+    |}];
+  H.reply h (Notice_on_success "cancelling subagent a1") "{}";
+  let report =
+    "[cancelled]\n[subagent: 1 turns, 10 in / 5 out tokens, $0.0000]"
+  in
+  H.event
+    h
+    (Subagent_end
+       { call_id = "c1"
+       ; agent_id = "a1"
+       ; usage = { input = 10; output = 5; cache_read = 0 }
+       ; turns = 1
+       ; cost_usd = 0.
+       ; result = { text = report; is_error = true }
+       });
+  (* The backend hands the report to the idle main agent as a new turn. *)
+  H.event h (State (state ~running:true ()));
+  H.event
+    h
+    (Message_start (User ("[subagent a1 failed] index the repo\n" ^ report)));
+  say h "it was cancelled";
+  H.event h (State (state ()));
+  H.keys h "/agents cancel 1";
+  H.enter h;
+  H.show h;
+  [%expect
+    {|
+    > go
+    ⚙ subagent "index the repo" ✗ failed
+      [cancelled]
+      [subagent: 1 turns, 10 in / 5 out tokens, $0.0000]
+    started it
+    > meanwhile
+    sure
+    cancelling subagent a1
+    ↩ subagent a1 failed "index the repo"
+      [cancelled]
+      [subagent: 1 turns, 10 in / 5 out tokens, $0.0000]
+    it was cancelled
+    subagent a1 is not running
+    ────────────────────────────────────────────────────────────────────────────────────────────────────
+    > ▏
+    /work  deepseek-flash  think:off  view:normal  ctx:0% 1.5k  $0.01  agents:[main] 1✗
+    |}];
+  (* Delivered and finished: the next prompt drops it. *)
+  H.keys h "next";
+  H.enter h;
+  H.keys h "/agents";
+  H.enter h;
+  H.keys h "/agents cancel 3";
+  H.enter h;
+  H.show h;
+  [%expect
+    {|
+    (Rpc (method_ prompt) (params ((text next))) (tag Show_error))
+    (Append_history next)
+      [cancelled]
+      [subagent: 1 turns, 10 in / 5 out tokens, $0.0000]
+    started it
+    > meanwhile
+    sure
+    cancelling subagent a1
+    ↩ subagent a1 failed "index the repo"
+      [cancelled]
+      [subagent: 1 turns, 10 in / 5 out tokens, $0.0000]
+    it was cancelled
+    subagent a1 is not running
+    no subagents
+    no subagent 3
+    ────────────────────────────────────────────────────────────────────────────────────────────────────
+    > ▏
+    /work  deepseek-flash  think:off  view:normal  ctx:0% 1.5k  $0.01
+    |}]
+;;
+
+let%expect_test "delivered reports reload compactly; unseen agents still show" =
+  let h = connected ~width:90 ~height:12 () in
+  H.reply
+    ~quiet:true
+    h
+    Initial_messages
+    {|[{"role":"user","text":"[subagent a1 finished] find auth\nauth lives in src/auth.ml\n[subagent: 2 turns, 1 in / 2 out tokens, $0.0100]\n\n[subagent a2 failed] run tests\nsubagent failed: boom\n[subagent: 1 turns, 1 in / 1 out tokens, $0.0000]"}]|};
+  H.event h (State (state ~subagents:[ "a3", "elsewhere", true ] ()));
+  H.show h;
+  [%expect
+    {|
+    session abc123 in /work. /help for commands, Esc aborts, Ctrl+C twice quits.
+    > earlier question
+    earlier answer
+    ↩ subagent a1 finished "find auth"
+      auth lives in src/auth.ml
+      [subagent: 2 turns, 1 in / 2 out tokens, $0.0100]
+    ↩ subagent a2 failed "run tests"
+      subagent failed: boom
+      [subagent: 1 turns, 1 in / 1 out tokens, $0.0000]
+    ──────────────────────────────────────────────────────────────────────────────────────────
+    > ▏
+    /work  deepseek-flash  think:off  view:normal  ctx:0% 1.5k  $0.01  agents:1 running
+    |}]
+;;
+
 let%expect_test "two parallel subagents: strip, live tails, focus cycling, Esc" =
   let h = connected ~width:80 ~height:18 () in
   H.keys h "go";
@@ -2693,10 +2930,10 @@ let%expect_test "/agents picker lists task, status and model; Enter focuses" =
     earlier answer
     Subagents  (2)
     / ▏
-    ▸  find auth  running  claude-haiku
-       run tests  done 3 turns $0.02  claude-sonnet
+    ▸  find auth  c1  running  claude-haiku
+       run tests  c2  done 3 turns $0.02  claude-sonnet
     ──────────────────────────────────────────────────────────────────────
-    /work  deepseek-flash  ctx:0% 1.5k  $0.01  Enter selects · Esc closes
+    …deepseek-flash  $0.01  Enter focuses · Esc closes · Ctrl+D cancels
     |}];
   H.enter h;
   H.show h;
@@ -3593,7 +3830,7 @@ let%expect_test "status line: width 120 full, width 40 keeps the model and \
        });
   print_endline (Content.Line.to_plain (Render.status h.model));
   [%expect
-    {| ~/proj (main) "my session"  claude-fable-5-1  think:high  view:normal  ctx:42% 61k  $0.12  queued:1  agents:[main] 1⠋ 2✓ |}];
+    {| …claude-fable-5-1  think:high  view:normal  ctx:42% 61k  $0.12  queued:1  agents:[main] 1⠋ 2✓ bg |}];
   H.step ~quiet:true h (Resize { width = 40; height = 20 });
   print_endline (Content.Line.to_plain (Render.status h.model));
   [%expect {| …claude-fable-5-1  ctx:42% 61k  queued:1 |}]
@@ -4888,7 +5125,8 @@ let%expect_test "reconnect: backoff doubles to the 60s cap, stale replies are \
     (Reconnect
       (generation 1)
       (delay_ms   0)
-      (session (/home/u/.prigh/sessions/1.jsonl)))
+      (session (/home/u/.prigh/sessions/1.jsonl))
+      (as_user ()))
     |}];
   (* Losing the transport again mid-reconnect counts as a failed attempt. *)
   H.step h Backend_closed;
@@ -4897,7 +5135,8 @@ let%expect_test "reconnect: backoff doubles to the 60s cap, stale replies are \
     (Reconnect
       (generation 2)
       (delay_ms   500)
-      (session (/home/u/.prigh/sessions/1.jsonl)))
+      (session (/home/u/.prigh/sessions/1.jsonl))
+      (as_user ()))
     |}];
   let fail generation =
     H.reply_error h (Reconnect generation) "connection refused"
@@ -4910,31 +5149,38 @@ let%expect_test "reconnect: backoff doubles to the 60s cap, stale replies are \
     (Reconnect
       (generation 3)
       (delay_ms   1000)
-      (session (/home/u/.prigh/sessions/1.jsonl)))
+      (session (/home/u/.prigh/sessions/1.jsonl))
+      (as_user ()))
     (Reconnect
       (generation 4)
       (delay_ms   2000)
-      (session (/home/u/.prigh/sessions/1.jsonl)))
+      (session (/home/u/.prigh/sessions/1.jsonl))
+      (as_user ()))
     (Reconnect
       (generation 5)
       (delay_ms   4000)
-      (session (/home/u/.prigh/sessions/1.jsonl)))
+      (session (/home/u/.prigh/sessions/1.jsonl))
+      (as_user ()))
     (Reconnect
       (generation 6)
       (delay_ms   8000)
-      (session (/home/u/.prigh/sessions/1.jsonl)))
+      (session (/home/u/.prigh/sessions/1.jsonl))
+      (as_user ()))
     (Reconnect
       (generation 7)
       (delay_ms   16000)
-      (session (/home/u/.prigh/sessions/1.jsonl)))
+      (session (/home/u/.prigh/sessions/1.jsonl))
+      (as_user ()))
     (Reconnect
       (generation 8)
       (delay_ms   32000)
-      (session (/home/u/.prigh/sessions/1.jsonl)))
+      (session (/home/u/.prigh/sessions/1.jsonl))
+      (as_user ()))
     (Reconnect
       (generation 9)
       (delay_ms   60000)
-      (session (/home/u/.prigh/sessions/1.jsonl)))
+      (session (/home/u/.prigh/sessions/1.jsonl))
+      (as_user ()))
     |}];
   print_s [%sexp (h.model.connection : App.Connection.t)];
   [%expect
@@ -4981,7 +5227,8 @@ let%expect_test "reconnect: backoff doubles to the 60s cap, stale replies are \
     (Reconnect
       (generation 10)
       (delay_ms   0)
-      (session (/home/u/.prigh/sessions/1.jsonl)))
+      (session (/home/u/.prigh/sessions/1.jsonl))
+      (as_user ()))
     |}];
   fail 9;
   [%expect {| |}];
@@ -5033,7 +5280,8 @@ let%expect_test "reconnect: backoff doubles to the 60s cap, stale replies are \
     (Reconnect
       (generation 11)
       (delay_ms   0)
-      (session (/home/u/.prigh/sessions/1.jsonl)))
+      (session (/home/u/.prigh/sessions/1.jsonl))
+      (as_user ()))
     |}]
 ;;
 
@@ -5047,7 +5295,8 @@ let%expect_test "reconnect: a session the backend no longer knows (never \
     (Reconnect
       (generation 1)
       (delay_ms   0)
-      (session (/home/u/.prigh/sessions/1.jsonl)))
+      (session (/home/u/.prigh/sessions/1.jsonl))
+      (as_user ()))
     |}];
   (* A fresh backend has no record of an empty session: it was never written to
      disk. The retry is immediate, without the session, and keeps the attempt
@@ -5058,7 +5307,8 @@ let%expect_test "reconnect: a session the backend no longer knows (never \
     (Reconnect
       (generation 2)
       (delay_ms   0)
-      (session ()))
+      (session ())
+      (as_user ()))
     |}];
   print_s [%sexp (h.model.connection : App.Connection.t)];
   [%expect
@@ -5078,11 +5328,13 @@ let%expect_test "reconnect: a session the backend no longer knows (never \
     (Reconnect
       (generation 3)
       (delay_ms   500)
-      (session ()))
+      (session ())
+      (as_user ()))
     (Reconnect
       (generation 4)
       (delay_ms   1000)
-      (session ()))
+      (session ())
+      (as_user ()))
     |}];
   H.reply h (Reconnect 4) {|{"client_id":"client-2"}|};
   [%expect
@@ -5117,7 +5369,8 @@ let%expect_test "reconnect: a session the backend no longer knows (never \
     (Reconnect
       (generation 5)
       (delay_ms   0)
-      (session (/home/u/.prigh/sessions/2.jsonl)))
+      (session (/home/u/.prigh/sessions/2.jsonl))
+      (as_user ()))
     |}]
 ;;
 
@@ -5198,7 +5451,7 @@ let%expect_test "switching tool host asks for the directory there, prefilled \
                {|{"session_id":"abc123","session_path":"/s","session_name":null,"cwd":"/work","git_branch":null,"model":{"id":"m","provider":"deepseek","key":"deepseek/m","name":"M","context_window":1000,"max_output":10,"supports_thinking":false,"cost":{"input":1,"output":1,"cache_read":1}},"thinking":"off","running":false,"message_count":0,"usage":{"input":0,"output":0,"cache_read":0},"cost_usd":0,"context_tokens":0,"active_host":"backend","hosts":[{"id":"backend","name":"srv","cwd":"/work"},{"id":"client-1","name":"laptop","cwd":"/home/me"}]}|})))
   in
   H.event h (State state);
-  H.step h (Set_client_id "client-1");
+  H.step h (Hello { client_id = "client-1"; namespace = None; user = None });
   H.keys h "/host laptop";
   H.enter h;
   H.show h;
@@ -5336,7 +5589,7 @@ let%expect_test "the host picker shows which session other frontends are in" =
                {|{"session_id":"abc123","session_path":"/s","session_name":null,"cwd":"/work","git_branch":null,"model":{"id":"m","provider":"deepseek","key":"deepseek/m","name":"M","context_window":1000,"max_output":10,"supports_thinking":false,"cost":{"input":1,"output":1,"cache_read":1}},"thinking":"off","running":false,"message_count":0,"usage":{"input":0,"output":0,"cache_read":0},"cost_usd":0,"context_tokens":0,"active_host":"client-3","hosts":[{"id":"backend","name":"srv","cwd":"/work","session_id":null,"session_name":null},{"id":"client-1","name":"laptop","cwd":"/home/me","session_id":"abc123","session_name":null},{"id":"client-2","name":"desktop","cwd":"/home/me/other","session_id":"def456","session_name":"refactor"},{"id":"client-3","name":"pi","cwd":"/pi","session_id":"9876","session_name":null}]}|})))
   in
   H.event h (State state);
-  H.step h (Set_client_id "client-1");
+  H.step h (Hello { client_id = "client-1"; namespace = None; user = None });
   H.keys h "/host";
   H.enter h;
   H.show h;
@@ -5667,7 +5920,7 @@ let%expect_test "Tab on an empty editor opens the command list; the list shows \
       /login [provider] [api_key|oauth]  log in to a provider
       /logout [provider]              remove a provider's store…
       /thinking [off|low|on|high|max]  pick or set the thinking…
-      ↕ 1–8 of 31
+      ↕ 1–8 of 35
     …deepseek-flash  ctx:0% 1.5k  Tab/Enter accept · Esc close
     |}];
   H.key h (Key.plain End);
@@ -5684,7 +5937,7 @@ let%expect_test "Tab on an empty editor opens the command list; the list shows \
       /login [provider] [api_key|oauth]  log in to a provider
       /logout [provider]              remove a provider's store…
       /thinking [off|low|on|high|max]  pick or set the thinking…
-      ↕ 1–8 of 31
+      ↕ 1–8 of 35
     …deepseek-flash  ctx:0% 1.5k  Tab/Enter accept · Esc close
     |}];
   H.keys h "qu";
@@ -5859,5 +6112,361 @@ let%expect_test "/new and /switch leave the previous session's subagents behind"
     (Rpc (method_ get_state) (params ()) (tag Initial_state))
     (0 Main)
     Main
+    |}]
+;;
+
+let%expect_test "logged-in user: shown in the status line, kept across \
+                 reconnects; /signout asks the platform"
+  =
+  let h = connected ~width:80 () in
+  H.step h (Hello
+       { client_id = "client-1"; namespace = Some "lloyd"; user = Some "lloyd" });
+  H.show h;
+  [%expect
+    {|
+    session abc123 in /work. /help for commands, Esc aborts, Ctrl+C twice quits.
+    > earlier question
+    earlier answer
+    ────────────────────────────────────────────────────────────────────────────────
+    > ▏
+    /work  deepseek-flash  think:off  view:normal  ctx:0% 1.5k  $0.01  user:lloyd
+    |}];
+  (* Narrow screens drop it before the more useful parts. *)
+  H.step h (Resize { width = 50; height = 12 });
+  H.show h;
+  [%expect
+    {|
+    session abc123 in /work. /help for commands, Esc
+    aborts, Ctrl+C twice quits.
+    > earlier question
+    earlier answer
+    ──────────────────────────────────────────────────
+    > ▏
+    …deepseek-flash  think:off  ctx:0% 1.5k  $0.01
+    |}];
+  H.step h (Resize { width = 80; height = 12 });
+  H.step ~quiet:true h Backend_closed;
+  H.reply
+    ~quiet:true
+    h
+    (Reconnect 1)
+    {|{"client_id":"client-2","namespace":"alice"}|};
+  print_s
+    [%sexp
+      (h.model.client_id : string option), (h.model.namespace : string option)];
+  [%expect {|
+    ((client-2)
+     (alice))
+    |}];
+  (* Outside namespace mode the reply's namespace is null: nothing is shown. *)
+  H.step ~quiet:true h Backend_closed;
+  H.reply
+    ~quiet:true
+    h
+    (Reconnect 2)
+    {|{"client_id":"client-3","namespace":null}|};
+  print_s
+    [%sexp
+      (h.model.client_id : string option), (h.model.namespace : string option)];
+  H.reply ~quiet:true h Initial_state (state_json ());
+  H.show h;
+  [%expect
+    {|
+    ((client-3) ())
+
+
+
+
+
+
+
+    reconnected to the backend
+    session abc123 in /work. /help for commands, Esc aborts, Ctrl+C twice quits.
+    ────────────────────────────────────────────────────────────────────────────────
+    > ▏
+    /work  deepseek-flash  think:off  view:normal  ctx:0% 1.5k  $0.01
+    |}];
+  H.keys h "/signout";
+  H.enter h;
+  [%expect {| Sign_out |}]
+;;
+
+let jobs_json =
+  {|[{"id":"j1","command":"make test","running":true,"exit":null,"delivered":false,"elapsed":75.4,"bytes":2048,"last_line":"PASS parser"},{"id":"j2","command":"docker build .","running":false,"exit":"exited 0","delivered":true,"elapsed":3.2,"bytes":10,"last_line":null}]|}
+;;
+
+let%expect_test "background jobs: !&, status line while idle, /jobs picker, \
+                 output, kill, delivery"
+  =
+  let h = connected ~width:100 ~height:16 () in
+  H.keys h "!&make test";
+  H.enter h;
+  H.reply h Job_started {|{"job_id":"j1"}|};
+  H.event h (State (state ~jobs:[ "j1", "make test", None ] ()));
+  H.show h;
+  print_s [%sexp (App.Model.jobs_running h.model : bool)];
+  [%expect
+    {|
+    (Rpc
+      (method_ shell)
+      (params (
+        (command    "make test")
+        (background true)))
+      (tag Job_started))
+    (Append_history "!&make test")
+
+
+
+
+
+
+
+
+
+    session abc123 in /work. /help for commands, Esc aborts, Ctrl+C twice quits.
+    > earlier question
+    earlier answer
+    started job j1; /jobs shows it, and its exit is reported to the agent
+    ────────────────────────────────────────────────────────────────────────────────────────────────────
+    > ▏
+    /work  deepseek-flash  think:off  view:normal  ctx:0% 1.5k  $0.01  jobs:1 ⠋
+    true
+    |}];
+  (* The picker lists id, state, elapsed time and the last line; Ctrl+D kills
+     the highlighted job. *)
+  H.keys h "/jobs";
+  H.enter h;
+  H.reply h Jobs_picker jobs_json;
+  H.show h;
+  H.key h (Key.ctrl 'd');
+  H.mode h;
+  [%expect
+    {|
+    (Rpc (method_ list_jobs) (params ()) (tag Jobs_picker))
+
+
+
+
+
+
+    session abc123 in /work. /help for commands, Esc aborts, Ctrl+C twice quits.
+    > earlier question
+    earlier answer
+    started job j1; /jobs shows it, and its exit is reported to the agent
+    Jobs  (2)
+    / ▏
+    ▸  make test       j1  running  1m15s  PASS parser
+       docker build .  j2  exited 0  3s
+    ────────────────────────────────────────────────────────────────────────────────────────────────────
+    /work  deepseek-flash  ctx:0% 1.5k  $0.01  jobs:1 ⠋  Enter shows output · Esc closes · Ctrl+D kills
+    (Rpc
+      (method_ kill_job)
+      (params ((job_id j1)))
+      (tag (Notice_on_success "killing job j1")))
+    editing
+    |}];
+  (* Enter shows the recent output in the transcript. *)
+  H.keys h "/jobs";
+  H.enter h;
+  H.reply ~quiet:true h Jobs_picker jobs_json;
+  H.key h (Key.plain Down);
+  H.enter h;
+  H.reply
+    h
+    Job_output
+    {|{"text":"[job j2 exited 0 after 3s, 10 bytes; lines 1-2 of 2] docker build .\nStep 1/2\nStep 2/2"}|};
+  H.keys h "/jobs kill j1";
+  H.enter h;
+  H.keys h "/jobs j1";
+  H.enter h;
+  H.show h;
+  [%expect
+    {|
+    (Rpc (method_ list_jobs) (params ()) (tag Jobs_picker))
+    (Rpc
+      (method_ job_output)
+      (params (
+        (job_id j2)
+        (lines  200)))
+      (tag Job_output))
+    (Rpc
+      (method_ kill_job)
+      (params ((job_id j1)))
+      (tag (Notice_on_success "killing job j1")))
+    (Rpc
+      (method_ job_output)
+      (params (
+        (job_id j1)
+        (lines  200)))
+      (tag Job_output))
+
+
+
+
+
+
+    session abc123 in /work. /help for commands, Esc aborts, Ctrl+C twice quits.
+    > earlier question
+    earlier answer
+    started job j1; /jobs shows it, and its exit is reported to the agent
+    [job j2 exited 0 after 3s, 10 bytes; lines 1-2 of 2] docker build .
+    Step 1/2
+    Step 2/2
+    ────────────────────────────────────────────────────────────────────────────────────────────────────
+    > ▏
+    /work  deepseek-flash  think:off  view:normal  ctx:0% 1.5k  $0.01  jobs:1 ⠋
+    |}];
+  (* The exit report reaches the idle agent and renders compactly. *)
+  H.event h (State (state ~running:true ()));
+  H.event
+    h
+    (Message_start
+       (User
+          "[job j1 killed] make test\n\
+           ok parser\n\
+           PASS parser\n\n\
+           [job j3 exited 2] make lint\n\
+           lint.ml:3: error"));
+  say h "the tests were killed";
+  H.event h (State (state ()));
+  H.show h;
+  [%expect
+    {|
+    session abc123 in /work. /help for commands, Esc aborts, Ctrl+C twice quits.
+    > earlier question
+    earlier answer
+    started job j1; /jobs shows it, and its exit is reported to the agent
+    [job j2 exited 0 after 3s, 10 bytes; lines 1-2 of 2] docker build .
+    Step 1/2
+    Step 2/2
+    ↩ job j1 killed "make test"
+      ok parser
+      PASS parser
+    ↩ job j3 exited 2 "make lint"
+      lint.ml:3: error
+    the tests were killed
+    ────────────────────────────────────────────────────────────────────────────────────────────────────
+    > ▏
+    /work  deepseek-flash  think:off  view:normal  ctx:0% 1.5k  $0.01
+    |}]
+;;
+
+let%expect_test "job reports reload compactly; look-alike text stays a user \
+                 message"
+  =
+  let h = connected ~width:80 ~height:12 () in
+  H.reply
+    ~quiet:true
+    h
+    Initial_messages
+    {|[{"role":"user","text":"[job j4 failed: tool host disconnected] npm run dev\nlistening on :3000"},{"role":"user","text":"[job board] what is on it?"}]|};
+  H.show h;
+  [%expect
+    {|
+    session abc123 in /work. /help for commands, Esc aborts, Ctrl+C twice quits.
+    > earlier question
+    earlier answer
+    ↩ job j4 failed: tool host disconnected "npm run dev"
+      listening on :3000
+    > [job board] what is on it?
+    ────────────────────────────────────────────────────────────────────────────────
+    > ▏
+    /work  deepseek-flash  think:off  view:normal  ctx:0% 1.5k  $0.01
+    |}]
+;;
+
+let%expect_test "/setusr: lists users, acts as one, reconnects as them" =
+  let h = connected ~width:80 () in
+  H.step
+    h
+    (Hello { client_id = "client-1"; namespace = Some "s"; user = Some "s" });
+  H.keys h "/setusr";
+  H.enter h;
+  [%expect {| (Rpc (method_ list_users) (params ()) (tag Users_list)) |}];
+  H.reply ~quiet:true h Users_list {|["a","s"]|};
+  H.reply ~quiet:true h Users_list {|{"oops":1}|};
+  H.show h;
+  H.keys h "/setusr a";
+  H.enter h;
+  [%expect
+    {|
+    session abc123 in /work. /help for commands, Esc aborts, Ctrl+C twice quits.
+    > earlier question
+    earlier answer
+    users (/setusr NAME to act as one):
+      a
+      s
+    protocol error: expected array, got {"oops":1}
+    ────────────────────────────────────────────────────────────────────────────────
+    > ▏
+    /work  deepseek-flash  think:off  view:normal  ctx:0% 1.5k  $0.01  user:s
+    (Rpc (method_ set_user) (params ((user a))) (tag User_switched))
+    |}];
+  H.reply
+    h
+    User_switched
+    {|{"client_id":"client-2","namespace":"a","user":"s"}|};
+  H.reply ~quiet:true h Initial_state (state_json ());
+  H.show h;
+  print_s [%sexp (App.Model.acting_as h.model : string option)];
+  [%expect {|
+    (Rpc (method_ get_state) (params ()) (tag Initial_state))
+    (Rpc (method_ get_messages) (params ()) (tag Initial_messages))
+    (Rpc (method_ auth_status) (params ()) (tag Auth_refresh))
+    (Rpc (method_ get_config) (params ()) (tag Config))
+
+
+
+
+
+
+
+    acting as a
+    session abc123 in /work. /help for commands, Esc aborts, Ctrl+C twice quits.
+    ────────────────────────────────────────────────────────────────────────────────
+    > ▏
+    /work  deepseek-flash  think:off  view:normal  ctx:0% 1.5k  $0.01  user:s as a
+    (a)
+    |}];
+  (* A reconnect asks to act as a again. *)
+  H.step h Backend_closed;
+  [%expect {|
+    (Reconnect
+      (generation 1)
+      (delay_ms   0)
+      (session (/home/u/.prigh/sessions/1.jsonl))
+      (as_user (a)))
+    |}];
+  H.reply
+    ~quiet:true
+    h
+    (Reconnect 1)
+    {|{"client_id":"client-3","namespace":"a","user":"s"}|};
+  H.keys h "/setusr s";
+  H.enter h;
+  H.reply
+    ~quiet:true
+    h
+    User_switched
+    {|{"client_id":"client-4","namespace":"s","user":"s"}|};
+  print_s [%sexp (App.Model.acting_as h.model : string option)];
+  H.keys h "/setusr a b";
+  H.enter h;
+  H.show h;
+  [%expect {|
+    (Rpc (method_ set_user) (params ((user s))) (tag User_switched))
+    ()
+
+
+
+
+
+
+
+    back to s
+    usage: /setusr [user]
+    ────────────────────────────────────────────────────────────────────────────────
+    > ▏
+    /work  deepseek-flash  think:off  view:normal  ctx:0% 1.5k  $0.01  user:s
     |}]
 ;;

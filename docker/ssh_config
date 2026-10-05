@@ -1,0 +1,4 @@
+# The agent's commands are non-interactive: trust a host on first use instead
+# of prompting (GitHub's keys are pinned in /etc/ssh/ssh_known_hosts).
+Host *
+    StrictHostKeyChecking accept-new

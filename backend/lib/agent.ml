@@ -9,6 +9,15 @@ module Queued = struct
   [@@deriving sexp_of]
 end
 
+module Pending_confirm = struct
+  type t =
+    { call_id : string
+    ; name : string
+    ; summary : string
+    }
+  [@@deriving sexp_of]
+end
+
 module Host = struct
   type t =
     { id : string
@@ -39,6 +48,8 @@ module State = struct
     ; context_tokens : int
     ; active_host : string
     ; hosts : Host.t list
+    ; subagents : Background_tasks.Summary.t list
+    ; jobs : Background_tasks.Summary.t list
     }
   [@@deriving sexp_of]
 end
@@ -106,6 +117,7 @@ type t =
   ; tools : Tool.t list
   ; sessions_dir : string
   ; home : string
+  ; backend_host_enabled : bool
   ; mutable session : Session.t
   ; mutable cwd : string
   ; mutable git_branch : string option
@@ -117,10 +129,10 @@ type t =
   ; steer_queue : Queued.t Queue.t
   ; follow_up_queue : Queued.t Queue.t
   ; mutable subscribers : (Event.t -> unit) list
-  ; mutable subagent_usage : Usage.t
-  ; mutable subagent_cost_usd : float
+  ; mutable extra_usage : Usage.t (** subagents and [btw] calls *)
+  ; mutable extra_cost_usd : float
   ; mutable config : Config.t
-  ; pending_confirms : bool Promise.u String.Table.t
+  ; pending_confirms : (Pending_confirm.t * bool Promise.u) String.Table.t
   ; mutable shell_seq : int
   ; mutable hosts : Host.t list
     (** every connected client able to run tools, set by the server *)
@@ -133,6 +145,8 @@ type t =
   ; mutable exec_seq : int
   ; mutable environment_notes : string list
     (** cwd/host changes not yet told to the model, oldest first *)
+  ; background : Background_tasks.t
+  ; subagent_log : Subagent_log.t
   }
 
 let restore_settings t =
@@ -141,80 +155,6 @@ let restore_settings t =
     Option.iter (Model.find model_id) ~f:(fun m -> t.model <- m);
     t.thinking <- thinking
   | None -> ()
-;;
-
-let create
-      ~env
-      ~sw
-      ~provider
-      ~tools
-      ~sessions_dir
-      ~home
-      ?session
-      ?model
-      ?thinking
-      ?(fallback_model = Model.default)
-      ?(auto_describe = false)
-      ~cwd
-      ()
-  =
-  let config =
-    match Config.load ~home with
-    | Ok config -> config
-    | Error _ -> Config.default
-  in
-  let model =
-    match model with
-    | Some model -> model
-    | None ->
-      Option.bind config.default_model ~f:Model.find
-      |> Option.value ~default:fallback_model
-  in
-  let thinking =
-    Option.first_some thinking config.default_thinking
-    |> Option.value ~default:Thinking.Off
-  in
-  let session =
-    match session with
-    | Some s -> s
-    | None -> Session.create ~dir:sessions_dir ~cwd ()
-  in
-  let cwd = Session.cwd session in
-  let t =
-    { env
-    ; sw
-    ; provider
-    ; tools
-    ; sessions_dir
-    ; home
-    ; session
-    ; cwd
-    ; git_branch = Git_branch.find ~cwd
-    ; model
-    ; thinking
-    ; run = None
-    ; describing = None
-    ; auto_describe
-    ; steer_queue = Queue.create ()
-    ; follow_up_queue = Queue.create ()
-    ; subscribers = []
-    ; subagent_usage = Usage.zero
-    ; subagent_cost_usd = 0.
-    ; config
-    ; pending_confirms = String.Table.create ()
-    ; shell_seq = 0
-    ; hosts = []
-    ; host_cwds = String.Table.create ()
-    ; backend_cwd = cwd
-    ; active_host = Host.backend_id
-    ; host_pinned = false
-    ; pending_execs = String.Table.create ()
-    ; exec_seq = 0
-    ; environment_notes = []
-    }
-  in
-  restore_settings t;
-  t
 ;;
 
 let backend_host t =
@@ -227,16 +167,33 @@ let backend_host t =
 ;;
 
 let hosts t =
-  backend_host t
-  :: List.map t.hosts ~f:(fun h ->
-    match Hashtbl.find t.host_cwds h.id with
-    | Some cwd -> { h with cwd }
-    | None -> h)
+  let clients =
+    List.map t.hosts ~f:(fun h ->
+      match Hashtbl.find t.host_cwds h.id with
+      | Some cwd -> { h with cwd }
+      | None -> h)
+  in
+  if t.backend_host_enabled then backend_host t :: clients else clients
+;;
+
+let find_branch t ~cwd =
+  if t.backend_host_enabled then Git_branch.find ~cwd else None
 ;;
 
 let active_host t = t.active_host
 let subscribe t ~f = t.subscribers <- f :: t.subscribers
-let broadcast t event = List.iter (List.rev t.subscribers) ~f:(fun f -> f event)
+
+let broadcast t (event : Event.t) =
+  (match event with
+   | Loop e ->
+     Subagent_log.record
+       t.subagent_log
+       ~now:(Eio.Time.now (Eio.Stdenv.clock t.env))
+       e
+   | _ -> ());
+  List.iter (List.rev t.subscribers) ~f:(fun f -> f event)
+;;
+
 let session t = t.session
 let messages t = Session.messages t.session
 let is_running t = Option.is_some t.run
@@ -252,7 +209,7 @@ let state t =
     List.fold assistant_messages ~init:Usage.zero ~f:(fun acc a ->
       Usage.add acc a.usage)
   in
-  let usage = Usage.add assistant_usage t.subagent_usage in
+  let usage = Usage.add assistant_usage t.extra_usage in
   let context_tokens =
     Option.value_map (List.last assistant_messages) ~default:0 ~f:(fun a ->
       a.usage.input)
@@ -268,26 +225,27 @@ let state t =
   ; running = is_running t
   ; message_count = List.length messages
   ; usage
-  ; cost_usd = Model.cost_usd t.model assistant_usage +. t.subagent_cost_usd
+  ; cost_usd = Model.cost_usd t.model assistant_usage +. t.extra_cost_usd
   ; context_tokens
   ; active_host = t.active_host
   ; hosts = hosts t
+  ; subagents = Background_tasks.summaries t.background ~kind:Subagent
+  ; jobs = Background_tasks.summaries t.background ~kind:Job
   }
 ;;
 
 let state_changed t = broadcast t (State_changed (state t))
 
+let queued_texts t =
+  let texts queue =
+    List.map (Queue.to_list queue) ~f:(fun (q : Queued.t) -> q.text)
+  in
+  texts t.steer_queue, texts t.follow_up_queue
+;;
+
 let queue_update t =
-  broadcast
-    t
-    (Queue_update
-       { steer =
-           List.map (Queue.to_list t.steer_queue) ~f:(fun (q : Queued.t) ->
-             q.text)
-       ; follow_up =
-           List.map (Queue.to_list t.follow_up_queue) ~f:(fun (q : Queued.t) ->
-             q.text)
-       })
+  let steer, follow_up = queued_texts t in
+  broadcast t (Queue_update { steer; follow_up })
 ;;
 
 let config t = t.config
@@ -311,7 +269,7 @@ let save_as_default t =
 let respond_confirm t ~call_id ~allow =
   match Hashtbl.find t.pending_confirms call_id with
   | None -> Or_error.errorf "no pending confirmation for tool call %S" call_id
-  | Some resolver ->
+  | Some (_, resolver) ->
     Hashtbl.remove t.pending_confirms call_id;
     Promise.resolve resolver allow;
     Ok ()
@@ -322,7 +280,12 @@ let confirm_hook t cancel call ~summary =
   then true
   else (
     let promise, resolver = Promise.create () in
-    Hashtbl.set t.pending_confirms ~key:call.Content.Tool_call.id ~data:resolver;
+    Hashtbl.set
+      t.pending_confirms
+      ~key:call.Content.Tool_call.id
+      ~data:
+        ( { Pending_confirm.call_id = call.id; name = call.name; summary }
+        , resolver );
     broadcast
       t
       (Loop (Tool_confirm { call_id = call.id; name = call.name; summary }));
@@ -363,7 +326,7 @@ let set_host_cwd t (host : Host.t) ~cwd =
   if not (String.equal t.cwd cwd)
   then (
     t.cwd <- cwd;
-    t.git_branch <- Git_branch.find ~cwd;
+    t.git_branch <- find_branch t ~cwd;
     ignore (Session.set_cwd t.session ~cwd : Session.Entry.t);
     add_environment_note t (System_prompt.cwd_changed_note ~cwd));
   if String.equal host.id Host.backend_id
@@ -380,18 +343,24 @@ let activate_host t (host : Host.t) ~cwd =
   state_changed t
 ;;
 
-let set_hosts t hosts =
-  if not (List.equal Host.equal t.hosts hosts)
+(* Without the backend there is nothing to fall back on, so a session whose
+   host is gone adopts the first connected one. *)
+let set_hosts t clients =
+  if not (List.equal Host.equal t.hosts clients)
   then (
     let gone =
       List.filter t.hosts ~f:(fun h ->
-        not (List.exists hosts ~f:(fun h' -> String.equal h.id h'.id)))
+        not (List.exists clients ~f:(fun h' -> String.equal h.id h'.id)))
     in
-    t.hosts <- hosts;
+    t.hosts <- clients;
     List.iter gone ~f:(fun h ->
       Hashtbl.remove t.host_cwds h.id;
       fail_execs t ~host:h.id ~text:"[tool host disconnected]");
-    state_changed t)
+    match List.hd (hosts t) with
+    | Some host
+      when (not t.backend_host_enabled) && not (active_host_connected t) ->
+      activate_host t host ~cwd:host.cwd
+    | _ -> state_changed t)
 ;;
 
 (* Tools default to the frontend: a host attaching takes over unless the user
@@ -436,7 +405,7 @@ let host_exec_on
       ~name
       ~arguments
   =
-  if String.equal host.id Host.backend_id
+  if String.equal host.id Host.backend_id && t.backend_host_enabled
   then Host_ops.execute ~env:t.env ~cancel ~on_output ~cwd ~name ~arguments
   else (
     let exec_id =
@@ -459,8 +428,14 @@ let host_exec_on
       Tool.Result.error "[cancelled]")
 ;;
 
+let no_host_message =
+  "no tool host connected: connect one with `prigh tool-host -connect ...` or \
+   a TUI, then pick it with /host"
+;;
+
 let host_exec t ~cancel ~on_output ~call_id ~cwd ~name ~arguments =
   match find_host t t.active_host with
+  | None when List.is_empty (hosts t) -> Tool.Result.error no_host_message
   | None ->
     Tool.Result.error
       (sprintf
@@ -490,6 +465,8 @@ let resolve_dir_on t (host : Host.t) path =
    choosing a directory there; without [cwd] the host's own is used. *)
 let set_active_host t id ~cwd =
   match find_host t id with
+  | None when String.equal id Host.backend_id && not t.backend_host_enabled ->
+    Or_error.error_string "the backend tool host is disabled"
   | None -> Or_error.errorf "unknown tool host %S" id
   | Some host ->
     let cwd =
@@ -504,7 +481,10 @@ let set_active_host t id ~cwd =
 
 let executor t : Tool.executor =
   fun context tool arguments ->
-  if (not tool.spec.on_host) || String.equal t.active_host Host.backend_id
+  if
+    (not tool.spec.on_host)
+    || (String.equal t.active_host Host.backend_id && t.backend_host_enabled)
+    || Tool_bash.starts_job context arguments
   then Tool.execute tool context arguments
   else
     host_exec
@@ -533,18 +513,20 @@ let instructions t ~cwd =
 (* Built once per conversation and recorded in the session, so the prompt
    prefix stays cacheable; later cwd/host changes reach the model as notes on
    the next user message instead. *)
+let build_system_prompt t =
+  System_prompt.build
+    ~instructions:(instructions t ~cwd:t.cwd)
+    ~cwd:t.cwd
+    ~home:t.home
+    ~tools:(Tools.specs t.tools)
+    ()
+;;
+
 let system_prompt t =
   match Session.system_prompt t.session with
   | Some text -> text
   | None ->
-    let text =
-      System_prompt.build
-        ~instructions:(instructions t ~cwd:t.cwd)
-        ~cwd:t.cwd
-        ~home:t.home
-        ~tools:(Tools.specs t.tools)
-        ()
-    in
+    let text = build_system_prompt t in
     ignore (Session.set_system_prompt t.session ~text : Session.Entry.t);
     text
 ;;
@@ -601,11 +583,27 @@ let user_message t (q : Queued.t) =
   Message.user text
 ;;
 
+let account_subagent t (event : Agent_event.t) =
+  match event with
+  | Subagent_end { usage; cost_usd; _ } ->
+    t.extra_usage <- Usage.add t.extra_usage usage;
+    t.extra_cost_usd <- t.extra_cost_usd +. cost_usd
+  | _ -> ()
+;;
+
+let deliveries t =
+  match Background_tasks.take_undelivered t.background with
+  | [] -> []
+  | tasks -> [ Background_tasks.delivery_message tasks ]
+;;
+
+(* Finished background tasks not delivered yet go first. *)
 let rec start_run t prompts =
-  t.git_branch <- Git_branch.find ~cwd:t.cwd;
+  t.git_branch <- find_branch t ~cwd:t.cwd;
   let cancel = Cancellation.create () in
   let finished, resolve = Promise.create () in
   t.run <- Some { cancel; finished };
+  let prompts = deliveries t @ prompts in
   state_changed t;
   Fiber.fork ~sw:t.sw (fun () ->
     let session = t.session in
@@ -623,19 +621,16 @@ let rec start_run t prompts =
          ~cancel
          ~confirm:(confirm_hook t cancel)
          ~execute:(executor t)
+         ~background:t.background
          ~steer:(fun () ->
            let l = Queue.to_list t.steer_queue in
            if not (List.is_empty l)
            then (
              Queue.clear t.steer_queue;
              queue_update t);
-           List.map l ~f:(user_message t))
+           deliveries t @ List.map l ~f:(user_message t))
          ~emit:(fun event ->
-           (match event with
-            | Subagent_end { usage; cost_usd; _ } ->
-              t.subagent_usage <- Usage.add t.subagent_usage usage;
-              t.subagent_cost_usd <- t.subagent_cost_usd +. cost_usd
-            | _ -> ());
+           account_subagent t event;
            (match event with
             | Message_end m ->
               ignore (Session.append_message session m : Session.Entry.t)
@@ -654,13 +649,23 @@ let rec start_run t prompts =
       Queue.blit_transfer ~src:t.steer_queue ~dst:t.follow_up_queue ();
       queue_update t);
     auto_compact t;
+    (* After an abort, finished tasks wait for the next prompt (or the next
+       one to finish) rather than restarting the run at once. *)
+    let next =
+      match Queue.dequeue t.follow_up_queue with
+      | Some queued ->
+        queue_update t;
+        Some [ user_message t queued ]
+      | None ->
+        if
+          Background_tasks.has_undelivered t.background
+          && not (Cancellation.is_cancelled cancel)
+        then Some []
+        else None
+    in
     finish ();
-    auto_describe t;
-    match Queue.dequeue t.follow_up_queue with
-    | Some queued ->
-      queue_update t;
-      start_run t [ user_message t queued ]
-    | None -> ())
+    Option.iter next ~f:(start_run t);
+    auto_describe t)
 
 (* Runs after the turn is over so the user is not kept waiting; [wait_idle]
    still covers it. *)
@@ -702,6 +707,138 @@ and auto_compact t =
     | Ok summary -> broadcast t (Compacted { summary })
     | Error e ->
       broadcast t (Notice ("auto-compaction failed: " ^ Error.to_string_hum e)))
+;;
+
+(* A background task finished (or was delivered): an idle agent starts a
+   turn to receive it; a running one picks it up at its next turn boundary. *)
+let background_changed t =
+  if (not (is_running t)) && Background_tasks.has_undelivered t.background
+  then start_run t [];
+  state_changed t
+;;
+
+(* Seeds subagent ids so they do not repeat ids the model has already seen
+   in this conversation. *)
+let subagent_calls messages =
+  List.sum
+    (module Int)
+    messages
+    ~f:(function
+      | Message.Assistant a ->
+        List.count (Message.Assistant.tool_calls a) ~f:(fun call ->
+          String.equal call.name "subagent")
+      | User _ | Tool_result _ -> 0)
+;;
+
+(* Jobs appear as [started job j<n>: ...] results and [[job j<n> ...]]
+   report lines. *)
+let last_job_number messages =
+  let number_after s ~prefix =
+    Option.bind (String.chop_prefix s ~prefix) ~f:(fun rest ->
+      Int.of_string_opt (String.take_while rest ~f:Char.is_digit))
+  in
+  List.fold messages ~init:0 ~f:(fun acc message ->
+    let numbers =
+      match (message : Message.t) with
+      | Tool_result r when String.equal r.tool_name "bash" ->
+        Option.to_list (number_after r.text ~prefix:"started job j")
+      | User { text } ->
+        List.filter_map
+          (String.split_lines text)
+          ~f:(number_after ~prefix:"[job j")
+      | Tool_result _ | Assistant _ -> []
+    in
+    List.fold numbers ~init:acc ~f:Int.max)
+;;
+
+let create
+      ~env
+      ~sw
+      ~provider
+      ~tools
+      ~sessions_dir
+      ~home
+      ?session
+      ?model
+      ?thinking
+      ?(fallback_model = Model.default)
+      ?(auto_describe = false)
+      ?(backend_host = true)
+      ~cwd
+      ()
+  =
+  let config =
+    match Config.load ~home with
+    | Ok config -> config
+    | Error _ -> Config.default
+  in
+  let model =
+    match model with
+    | Some model -> model
+    | None ->
+      Option.bind config.default_model ~f:Model.find
+      |> Option.value ~default:fallback_model
+  in
+  let thinking =
+    Option.first_some thinking config.default_thinking
+    |> Option.value ~default:Thinking.Off
+  in
+  let session =
+    match session with
+    | Some s -> s
+    | None -> Session.create ~dir:sessions_dir ~cwd ()
+  in
+  let cwd = Session.cwd session in
+  let t =
+    { env
+    ; sw
+    ; provider
+    ; tools
+    ; sessions_dir
+    ; home
+    ; backend_host_enabled = backend_host
+    ; session
+    ; cwd
+    ; git_branch = (if backend_host then Git_branch.find ~cwd else None)
+    ; model
+    ; thinking
+    ; run = None
+    ; describing = None
+    ; auto_describe
+    ; steer_queue = Queue.create ()
+    ; follow_up_queue = Queue.create ()
+    ; subscribers = []
+    ; extra_usage = Usage.zero
+    ; extra_cost_usd = 0.
+    ; config
+    ; pending_confirms = String.Table.create ()
+    ; shell_seq = 0
+    ; hosts = []
+    ; host_cwds = String.Table.create ()
+    ; backend_cwd = cwd
+    ; active_host = (if backend_host then Host.backend_id else "")
+    ; host_pinned = false
+    ; pending_execs = String.Table.create ()
+    ; exec_seq = 0
+    ; environment_notes = []
+    ; background =
+        Background_tasks.create
+          ~env
+          ~sw
+          ~first_subagent_id:(subagent_calls (Session.messages session) + 1)
+          ~first_job_id:(last_job_number (Session.messages session) + 1)
+          ()
+    ; subagent_log = Subagent_log.create ()
+    }
+  in
+  restore_settings t;
+  Background_tasks.connect
+    t.background
+    ~emit:(fun event ->
+      account_subagent t event;
+      broadcast t (Loop event))
+    ~on_change:(fun () -> background_changed t);
+  t
 ;;
 
 let prompt ?(attachments = []) t text =
@@ -749,7 +886,63 @@ let rec wait_idle t =
   | None, Some describing ->
     Promise.await describing;
     wait_idle t
-  | None, None -> ()
+  | None, None ->
+    if Background_tasks.has_running t.background
+    then (
+      Background_tasks.wait_all t.background;
+      wait_idle t)
+;;
+
+let has_running_subagents t =
+  Background_tasks.has_running ~kind:Subagent t.background
+;;
+
+let has_running_background t = Background_tasks.has_running t.background
+
+let cancel_subagent t ~agent_id =
+  Background_tasks.cancel t.background ~kind:Subagent agent_id
+;;
+
+let cancel_background ?discard t =
+  Background_tasks.cancel_all ?discard t.background
+;;
+
+let jobs t = Background_tasks.tasks t.background ~kind:Job
+let kill_job t ~job_id = Background_tasks.cancel t.background ~kind:Job job_id
+
+let job_output t ~job_id ~lines =
+  Or_error.map
+    (Background_tasks.find t.background ~kind:Job job_id)
+    ~f:(fun task ->
+      Tool_jobs.output_text
+        task
+        ~now:(Eio.Time.now (Eio.Stdenv.clock t.env))
+        ~lines
+        ~offset:0)
+;;
+
+let start_job t ~command =
+  Tool_bash.start_job t.background ~command ~run:(fun ~id ~cancel ~on_output ->
+    host_exec
+      t
+      ~cancel
+      ~on_output
+      ~call_id:id
+      ~cwd:t.cwd
+      ~name:"bash"
+      ~arguments:
+        (Tool_bash.foreground_arguments
+           (`Object [ "command", `String command ])))
+;;
+
+let subagents t = Subagent_log.summaries t.subagent_log
+let subagent t key = Subagent_log.find t.subagent_log key
+
+let pending_confirms t =
+  Hashtbl.data t.pending_confirms
+  |> List.map ~f:fst
+  |> List.sort ~compare:(fun (a : Pending_confirm.t) b ->
+    String.compare a.call_id b.call_id)
 ;;
 
 (* Pops the most recently queued message: follow-ups take priority over steer
@@ -868,15 +1061,48 @@ let compact t =
     result)
 ;;
 
+let btw t ~question ~cancel ~on_delta =
+  let session = t.session in
+  let model = t.model in
+  let system =
+    match Session.system_prompt session with
+    | Some text -> text
+    | None -> build_system_prompt t
+  in
+  let request =
+    Btw.request ~model ~system ~messages:(Session.messages session) ~question
+  in
+  let reply =
+    t.provider.stream request ~cancel ~on_event:(function
+      | Text_delta text -> on_delta text
+      | Thinking_delta _
+      | Thinking_signature _
+      | Tool_call_start _
+      | Tool_call_delta _ -> ())
+  in
+  let cost_usd = Model.cost_usd model reply.usage in
+  if phys_equal session t.session
+  then (
+    t.extra_usage <- Usage.add t.extra_usage reply.usage;
+    t.extra_cost_usd <- t.extra_cost_usd +. cost_usd;
+    state_changed t);
+  match reply.stop_reason with
+  | Error e -> Or_error.error_string e
+  | Aborted -> Or_error.error_string "cancelled"
+  | End_turn | Tool_use | Length -> Ok (reply, cost_usd)
+;;
+
 let replace_session t session =
   ignore (abort t);
+  Background_tasks.cancel_all ~discard:true t.background;
   wait_idle t;
+  Subagent_log.clear t.subagent_log;
   t.session <- session;
   t.cwd <- Session.cwd session;
-  t.git_branch <- Git_branch.find ~cwd:t.cwd;
+  t.git_branch <- find_branch t ~cwd:t.cwd;
   t.environment_notes <- [];
-  t.subagent_usage <- Usage.zero;
-  t.subagent_cost_usd <- 0.;
+  t.extra_usage <- Usage.zero;
+  t.extra_cost_usd <- 0.;
   restore_settings t;
   state_changed t
 ;;
@@ -918,6 +1144,7 @@ let set_cwd t ~path =
     Or_error.error_string "cannot change directory while a run is in progress"
   else (
     match find_host t t.active_host with
+    | None when List.is_empty (hosts t) -> Or_error.error_string no_host_message
     | None ->
       Or_error.errorf
         "tool host %S is not connected; use set_active_host to pick another"
@@ -982,30 +1209,49 @@ let delete_session t ~path =
 ;;
 
 let export t ~format ?path () =
-  let path =
-    match path with
-    | Some p -> resolve_path t p
-    | None ->
-      let base = Filename.basename (Session.path t.session) in
-      let stamp = List.hd_exn (String.split base ~on:'_') in
-      Filename.concat
-        (Filename.concat t.sessions_dir "exports")
-        (sprintf
-           "%s_%s.%s"
-           stamp
-           (Session.id t.session)
-           (Session.Export_format.extension format))
+  let name =
+    let base = Filename.basename (Session.path t.session) in
+    let stamp = List.hd_exn (String.split base ~on:'_') in
+    sprintf
+      "%s_%s.%s"
+      stamp
+      (Session.id t.session)
+      (Session.Export_format.extension format)
   in
-  Or_error.try_with (fun () ->
-    Core_unix.mkdir_p (Filename.dirname path);
-    (match format with
-     | Session.Export_format.Markdown ->
-       Out_channel.write_all path ~data:(Session.to_markdown t.session)
-     | Jsonl ->
-       Out_channel.write_all
-         path
-         ~data:(In_channel.read_all (Session.path t.session)));
-    path)
+  let data () =
+    match format with
+    | Session.Export_format.Markdown -> Session.to_markdown t.session
+    | Jsonl -> In_channel.read_all (Session.path t.session)
+  in
+  if t.backend_host_enabled
+  then (
+    let path =
+      match path with
+      | Some p -> resolve_path t p
+      | None -> Filename.concat (Filename.concat t.sessions_dir "exports") name
+    in
+    Or_error.try_with (fun () ->
+      Core_unix.mkdir_p (Filename.dirname path);
+      Out_channel.write_all path ~data:(data ());
+      path))
+  else (
+    (* The backend's files are not the user's: write on the tool host. *)
+    let path = Option.value path ~default:name in
+    match
+      host_exec
+        t
+        ~cancel:Cancellation.never
+        ~on_output:ignore
+        ~call_id:"export"
+        ~cwd:t.cwd
+        ~name:"write"
+        ~arguments:
+          (`Object [ "path", `String path; "content", `String (data ()) ])
+    with
+    | { is_error = true; text } -> Or_error.error_string text
+    | { is_error = false; _ } ->
+      Ok
+        (if Filename.is_absolute path then path else Filename.concat t.cwd path))
 ;;
 
 let import_session t ~path =

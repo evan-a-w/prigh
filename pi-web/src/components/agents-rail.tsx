@@ -1,5 +1,5 @@
 import { useEffect, useState } from "preact/hooks";
-import { agentsRailOpen, subagentSnapshot, toggleAgentsRail } from "../state.ts";
+import { agentsRailOpen, openSubagent, subagentSnapshot, subagentView, toggleAgentsRail } from "../state.ts";
 import type { AsyncStatusSnapshotNode, AsyncStatusSnapshotState } from "../subagent-status.ts";
 
 const STATE_LABEL: Record<AsyncStatusSnapshotState, string> = {
@@ -60,12 +60,17 @@ function NodeCard({ node, now, depth }: { node: AsyncStatusSnapshotNode; now: nu
 			? Math.max(0, now - node.activity.currentToolStartedAt)
 			: undefined;
 	return (
-		<div class="agents-rail-node">
-			<div class="agents-rail-node-header" title={node.label}>
+		<div class={`agents-rail-node ${subagentView.value?.agentId === node.id ? "selected" : ""}`}>
+			<button
+				type="button"
+				class="agents-rail-node-header"
+				title={`Show ${node.label}`}
+				onClick={() => void openSubagent({ agentId: node.id })}
+			>
 				<span class="agents-rail-node-label">{node.label}</span>
 				<span class="agents-rail-node-kind">{node.kind}</span>
 				<StatePill state={node.state} />
-			</div>
+			</button>
 			<div class="agents-rail-node-meta">
 				{elapsed !== undefined ? <span>{formatElapsed(elapsed)}</span> : null}
 				<NodeStats node={node} />
