@@ -70,6 +70,8 @@ module Reply_tag = struct
     | Reconnect of int
     | Config
     | Config_saved of string
+    | Fallback_saved
+    | Default_dir_saved
     | Default_saved
     | Session_stats
     | Entries of Entries_purpose.t
@@ -718,8 +720,8 @@ let complete_draft (m : Model.t) ~skills =
        ( { m with completion = Some c }
        , (match Completion.request c with
           | None -> []
-          | Some (method_, prefix) ->
-            [ rpc method_ [ "prefix", str prefix ] ~tag:(Paths prefix) ]) ))
+          | Some (method_, params) ->
+            [ rpc method_ params ~tag:(Paths (Completion.prefix c)) ]) ))
 ;;
 
 (* [/skill:] completes the skills listed where the tools run, fetched the
@@ -987,13 +989,29 @@ let current_state (m : Model.t) ~f =
 
 let config (m : Model.t) = Option.value m.config ~default:Config.default
 
-let save_config (m : Model.t) config ~notice =
+(* Only [fields] are sent: the backend keeps the others, which another client
+   may have changed meanwhile. *)
+let set_config config ~fields ~tag =
+  let changed =
+    match Config.to_json config with
+    | `Object all ->
+      `Object
+        (List.filter all ~f:(fun (name, _) ->
+           List.mem fields name ~equal:String.equal))
+    | json -> json
+  in
+  rpc "set_config" [ "config", changed ] ~tag
+;;
+
+let save_config (m : Model.t) config ~fields ~notice =
   ( { m with config = Some config }
-  , [ rpc
-        "set_config"
-        [ "config", Config.to_json config ]
-        ~tag:(Config_saved notice)
-    ] )
+  , [ set_config config ~fields ~tag:(Config_saved notice) ] )
+;;
+
+let with_config (m : Model.t) ~f =
+  match m.config with
+  | Some config -> f config
+  | None -> error m "Not connected yet: wait for the backend."
 ;;
 
 (* The models Ctrl+P cycles through: the scoped ones, else the logged-in
@@ -1096,6 +1114,7 @@ let set_confirm (m : Model.t) enabled =
   save_config
     m
     { (config m) with confirm_tools = enabled }
+    ~fields:[ "confirm_tools" ]
     ~notice:
       (if enabled
        then "Tool confirmation on: bash, write and edit ask first"
@@ -1155,6 +1174,7 @@ let save_scoped (m : Model.t) checked =
   save_config
     { m with dialog = None }
     { (config m) with scoped_models }
+    ~fields:[ "scoped_models" ]
     ~notice:
       (match scoped_models with
        | [] -> "Scope cleared: Ctrl+P cycles through the logged-in models"
@@ -1163,6 +1183,100 @@ let save_scoped (m : Model.t) checked =
            "%d scoped model%s: Ctrl+P and Alt+P cycle through them"
            (List.length l)
            (if List.length l = 1 then "" else "s"))
+;;
+
+let fallback_summary (m : Model.t) (config : Config.t) =
+  match config.fallback_models with
+  | [] ->
+    "No fallback models: /fallback MODEL [MODEL...] sets the chain that takes \
+     over when a model's usage runs out"
+  | keys ->
+    sprintf
+      "Fallback: %s%s"
+      (String.concat ~sep:" → " keys)
+      (Option.value_map m.state ~default:"" ~f:(fun s ->
+         sprintf " (now on %s)" s.model.key))
+;;
+
+(* The backend resolves names and prefixes as /model does, and says which
+   models come closest to one it doesn't know. *)
+let set_fallback (m : Model.t) models =
+  with_config m ~f:(fun config ->
+    ( m
+    , [ set_config
+          { config with fallback_models = models }
+          ~fields:[ "fallback_models" ]
+          ~tag:Fallback_saved
+      ] ))
+;;
+
+let fallback_saved (m : Model.t) (config : Config.t) =
+  match config.fallback_models with
+  | [] ->
+    toast
+      m
+      "Fallback cleared: a model whose usage runs out stops the run (/fallback \
+       MODEL... sets a chain)"
+  | _ -> toast m (fallback_summary m config)
+;;
+
+let default_dir_summary (config : Config.t) =
+  match config.default_cwd with
+  | Some dir ->
+    sprintf
+      "Default directory: %s (new sessions start there; /default-dir off \
+       clears it)"
+      dir
+  | None ->
+    "No default directory: new sessions start where the backend was started; \
+     /default-dir PATH sets one"
+;;
+
+(* The backend resolves [default_cwd] where it was started, which the user
+   cannot see, so a relative path is taken from the directory completion
+   listed: the backend host's. *)
+let default_dir (m : Model.t) dir =
+  let normalize path =
+    String.split path ~on:'/'
+    |> List.fold ~init:[] ~f:(fun parts part ->
+      match part, parts with
+      | ("" | "."), _ | "..", [] -> parts
+      | "..", _ :: parent -> parent
+      | part, _ -> part :: parts)
+    |> List.rev
+    |> String.concat ~sep:"/"
+    |> ( ^ ) "/"
+  in
+  let backend_cwd (s : State.t) =
+    if String.equal s.active_host Host.backend_id
+    then Some s.cwd
+    else
+      List.find_map s.hosts ~f:(fun (h : Host.t) ->
+        Option.some_if (String.equal h.id Host.backend_id) h.cwd)
+  in
+  if String.is_prefix dir ~prefix:"~"
+  then Ok dir
+  else if String.is_prefix dir ~prefix:"/"
+  then Ok (normalize dir)
+  else (
+    match Option.bind m.state ~f:backend_cwd with
+    | Some cwd -> Ok (normalize (cwd ^ "/" ^ dir))
+    | None ->
+      Error
+        (sprintf
+           "Relative to what? The backend's directory isn't known yet: give an \
+            absolute path (/default-dir /path/to/%s)"
+           dir))
+;;
+
+let set_default_dir (m : Model.t) dir =
+  with_config m ~f:(fun config ->
+    ( m
+    , [ set_config
+          { config with default_cwd = dir }
+          ~fields:[ "default_cwd" ]
+          ~tag:Default_dir_saved
+      ] ))
 ;;
 
 let last_reply (m : Model.t) =
@@ -1641,6 +1755,9 @@ let run_command (m : Model.t) ({ name; rest } : Slash.Parsed.t) =
     if List.is_empty m.models
     then error m "No models yet: /login logs in to a provider."
     else open_picker m (scoped_models_dialog m)
+  | "fallback", "" -> with_config m ~f:(fun c -> toast m (fallback_summary m c))
+  | "fallback", "off" -> set_fallback m []
+  | "fallback", _ -> set_fallback m words
   | "thinking", "" -> open_picker m (thinking_picker m)
   | "thinking", level ->
     if List.mem thinking_levels level ~equal:String.equal
@@ -1705,6 +1822,13 @@ let run_command (m : Model.t) ({ name; rest } : Slash.Parsed.t) =
           [ "path", str path ]
           ~tag:(Notice ("Working directory: " ^ path))
       ] )
+  | "default-dir", "" ->
+    with_config m ~f:(fun c -> toast m (default_dir_summary c))
+  | "default-dir", "off" -> set_default_dir m None
+  | "default-dir", dir ->
+    (match default_dir m dir with
+     | Ok dir -> set_default_dir m (Some dir)
+     | Error message -> error m message)
   | "host", "" -> hosts_picker m
   | "host", arg -> switch_host m arg
   | "export", "" -> open_prompt m (Prompt.create Export)
@@ -1889,6 +2013,10 @@ let reply (m : Model.t) (tag : Reply_tag.t) result =
   | Mcp (Picker | Reconnect), Error e ->
     error m (sprintf "Couldn't list the MCP servers: %s" e)
   | (Prompt_done _ | Exported | Imported), Error e -> prompt_failed m e
+  | Fallback_saved, Error e ->
+    error m (sprintf "Couldn't set the fallback models: %s" e)
+  | Default_dir_saved, Error e ->
+    error m (sprintf "Couldn't set the default directory: %s" e)
   | Deleted title, Error e ->
     error
       m
@@ -2041,6 +2169,18 @@ let reply (m : Model.t) (tag : Reply_tag.t) result =
   | Config_saved notice, Ok json ->
     decode m json Config.of_json ~f:(fun config ->
       toast { m with config = Some config } notice)
+  | Fallback_saved, Ok json ->
+    decode m json Config.of_json ~f:(fun config ->
+      fallback_saved { m with config = Some config } config)
+  | Default_dir_saved, Ok json ->
+    decode m json Config.of_json ~f:(fun config ->
+      toast
+        { m with config = Some config }
+        (match config.default_cwd with
+         | Some _ -> default_dir_summary config
+         | None ->
+           "Default directory cleared: new sessions start where the backend \
+            was started"))
   | Default_saved, Ok json ->
     decode m json Config.of_json ~f:(fun config ->
       let show = Option.value ~default:"?" in
@@ -2323,6 +2463,13 @@ let send (m : Model.t) ~follow_up =
 let accept_completion (m : Model.t) ~run =
   match Model.popup m with
   | None -> m, []
+  (* Model keys complete word by word; Enter before another one is typed or
+     picked sends the command as it is. *)
+  | Some c
+    when run
+         && Completion.Source.equal (Completion.source c) (Argument Models)
+         && String.is_empty (Completion.prefix c)
+         && Completion.selected c = 0 -> send m ~follow_up:false
   | Some c ->
     let draft, cursor = Completion.accept c ~text:m.draft in
     let runs =
@@ -2336,7 +2483,7 @@ let accept_completion (m : Model.t) ~run =
          | Some { args; argument = None; _ } ->
            String.is_empty args || String.is_prefix args ~prefix:"["
          | Some { argument = Some _; _ } | None -> false)
-      | Argument (Directory | Path | Skill), _ -> false
+      | Argument (Directory | Backend_directory | Path | Skill), _ -> false
       | Argument _, _ -> true
       | (Command | Path), _ -> false
     in

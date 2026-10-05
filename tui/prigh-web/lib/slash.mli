@@ -6,10 +6,12 @@ module Argument : sig
   (** What the completion popup offers after the command name. *)
   type t =
     | Model
+    | Models (** model keys, one per word, then [off] *)
     | Thinking
     | Login
     | Logout
     | Directory
+    | Backend_directory (** directories on the backend's host *)
     | Verbosity
     | Confirm
     | Session (** saved sessions' paths *)
