@@ -248,4 +248,5 @@ body.resizing { cursor: col-resize; user-select: none; }
 }
 .app.narrow .agents-resize { display: none; }
 .app.narrow .agents-head { min-height: 50px; padding-left: 12px; }
+.app.narrow .crumb { max-width: 40vw; }
 @keyframes agents-up { from { opacity: 0; transform: translateY(24px); } }
