@@ -119,6 +119,16 @@ const show = async (label, selector) => {
   await screenshot(label);
 };
 
+// The top bar's text, with each select showing its chosen option.
+const showHeader = async label => {
+  section(label);
+  console.log(clean(await page.evaluate(() =>
+    [...document.querySelectorAll("header *")]
+      .filter(e => e.tagName === "SELECT" || (e.children.length === 0 && e.tagName !== "OPTION"))
+      .map(e => (e.tagName === "SELECT" ? `[${e.selectedOptions[0]?.text ?? ""}]` : e.textContent))
+      .join("\n"))));
+};
+
 // From the last prompt to the end of the chat.
 const showTurn = async label => {
   await page.evaluate(() => document.querySelectorAll("details").forEach(d => { d.open = true; }));
@@ -186,11 +196,15 @@ const deliver = (kind, bytes, name) =>
       data.items.add(new File([new Uint8Array(bytes)], name, { type: "image/png" }));
       const target = document.querySelector(".composer textarea");
       const init = { bubbles: true, cancelable: true };
-      target.dispatchEvent(
-        kind === "paste"
-          ? new ClipboardEvent("paste", { ...init, clipboardData: data })
-          : new DragEvent("drop", { ...init, dataTransfer: data }),
-      );
+      let event;
+      if (kind === "paste") {
+        // Firefox ignores [clipboardData] in a script's ClipboardEvent.
+        event = new ClipboardEvent("paste", init);
+        Object.defineProperty(event, "clipboardData", { value: data });
+      } else {
+        event = new DragEvent("drop", { ...init, dataTransfer: data });
+      }
+      target.dispatchEvent(event);
     },
     [kind, [...bytes], name],
   );
@@ -207,6 +221,7 @@ try {
   await page.waitForSelector(".sidebar");
   await show("signed in: sidebar", ".sidebar");
   await show("signed in: chat", ".chat");
+  await showHeader("signed in: top bar");
 
   // 2. A scripted run with a bash tool call and its output.
   await send("count some lines");
@@ -214,6 +229,7 @@ try {
   await idle();
   await page.locator(".tool").first().waitFor();
   await showTurn("bash run");
+  await showHeader("top bar after a run");
 
   // 3. The model reads a real PNG: the tool result shows it.
   await send("what does flag.png look like?");
