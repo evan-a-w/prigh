@@ -227,7 +227,8 @@ See `pi-web/README.md` for what was kept, dropped and mapped.
 built for the browser rather than mounting the terminal UI: a real DOM
 (Bonsai_web, js_of_ocaml) with a session sidebar, a chat transcript with
 markdown, collapsible tool calls and their images, model and thinking
-selectors, and a composer that takes pasted or dropped images. It speaks
+selectors, and a composer that takes pasted or dropped images, `/`
+commands, `@` paths and `!cmd` like the TUI. It speaks
 prigh's own RPC (the same `/ws` protocol as `-web`), so it gets every
 backend feature without a translation layer like pi-web's.
 
@@ -242,7 +243,8 @@ without it the backend looks next to its dune build and in
 `../share/prigh/prigh-web`. The page keeps `?session=` in the address bar
 (a reload rejoins the session), reconnects with backoff when the backend
 goes away, and takes `?backend=ws://host:port/ws` like the `-web` page.
-One backend can serve all three web UIs on different ports.
+One backend can serve all three web UIs on different ports. In Docker it
+is `PRIGH_MODE=prigh-web` (port 7790, see `DOCKER.md`).
 
 If the backend goes away (the spawned process dies, or the TCP connection
 drops) the TUI reconnects on its own — immediately, then with exponential

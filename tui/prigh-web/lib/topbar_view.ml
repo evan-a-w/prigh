@@ -13,7 +13,13 @@ let session_title (m : App.Model.t) (state : State.t) =
      with
      | Some s when Option.is_some s.description || Option.is_some s.first_prompt
        -> Session_list.title s
-     | _ -> "New session")
+     | _ ->
+       (* Before the session list knows it: the first prompt, at once. *)
+       List.find_map (Chat.entries m.chat) ~f:(function
+         | User { text; _ } when not (String.is_empty (String.strip text)) ->
+           Some (List.hd_exn (String.split_lines (String.strip text)))
+         | _ -> None)
+       |> Option.value ~default:"New session")
 ;;
 
 let view (m : App.Model.t) ~inject =

@@ -20,6 +20,7 @@ module Reply_tag = struct
     | Models
     | Reload_state
     | Subagent of string (** the [subagent] call *)
+    | Job_started
     | Auth_status of Auth_purpose.t
     | Paths of string
     | Restored
@@ -649,6 +650,15 @@ let reply (m : Model.t) (tag : Reply_tag.t) result =
       ( { m with chat }
       , List.map (Chat.subagents_to_load chat) ~f:(fun call_id ->
           rpc "get_subagent" [ "id", str call_id ] ~tag:(Subagent call_id)) ))
+  | Job_started, Ok json ->
+    (match Json.string_field json "job_id" with
+     | Ok id ->
+       toast
+         m
+         (sprintf
+            "Started job %s: its result reaches the agent when it exits."
+            id)
+     | Error _ -> m, [])
   | Subagent call_id, Ok json ->
     (match subagent_of_json json with
      | Ok subagent ->
@@ -753,7 +763,10 @@ let event (m : Model.t) (event : Event.t) =
           List.filter m.confirms ~f:(fun c ->
             not (String.equal c.call_id call.id))
       }
-    , [] )
+    , (* A [!command] may have just saved the session. *)
+      if String.equal call.name "shell"
+      then [ rpc "list_sessions" [] ~tag:Sessions ]
+      else [] )
   | Agent_end _ -> m, [ rpc "list_sessions" [] ~tag:Sessions ]
   | Auth e -> auth_event m e
   | _ -> m, []
@@ -761,6 +774,43 @@ let event (m : Model.t) (event : Event.t) =
 
 let image_json (image : Image.t) =
   `Object [ "mime_type", str image.mime_type; "data", str image.data ]
+;;
+
+(* [!cmd] runs a command and adds it and its output to the context, [!!cmd]
+   only shows it, [!&cmd] starts a background job (also while running). *)
+let shell (m : Model.t) text =
+  let run ~prefix =
+    String.strip (String.drop_prefix text (String.length prefix))
+  in
+  if String.is_prefix text ~prefix:"!&"
+  then (
+    match run ~prefix:"!&" with
+    | "" -> error m "Type a command after !& to start it as a background job."
+    | command ->
+      ( m
+      , [ rpc
+            "shell"
+            [ "command", str command; "background", Json.bool true ]
+            ~tag:Job_started
+        ] ))
+  else if Model.running m
+  then
+    error
+      m
+      "Wait for the agent to finish (or Esc to stop it) before running \
+       !commands; !&command starts a background job now."
+  else (
+    let add_to_context = not (String.is_prefix text ~prefix:"!!") in
+    match run ~prefix:(if add_to_context then "!" else "!!") with
+    | "" -> error m "Type a command after ! to run it."
+    | command ->
+      ( m
+      , [ rpc
+            "shell"
+            [ "command", str command
+            ; "add_to_context", Json.bool add_to_context
+            ]
+        ] ))
 ;;
 
 let send (m : Model.t) ~follow_up =
@@ -771,6 +821,10 @@ let send (m : Model.t) ~follow_up =
     , [ Command.Save_history (History.to_list history) ] )
   in
   match Slash.parse text with
+  | _ when String.is_prefix text ~prefix:"!" && List.is_empty m.images ->
+    let m, save = sent m in
+    let m, cmds = shell m text in
+    m, save @ cmds
   | Some parsed when List.is_empty m.images ->
     let m, save = sent m in
     let m, cmds = run_command m parsed in

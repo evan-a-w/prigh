@@ -117,6 +117,19 @@ and entry chat (entry : Chat.Entry.t) =
      | Some sections -> div "msg" [ Delivery_view.view sections ]
      | None -> user u)
   | Notice text -> div "msg notice" [ Node.text text ]
+  | Shell call ->
+    let tool = Chat.tool chat call.id in
+    div
+      "msg shell"
+      [ Tool_view.view
+          ~nested:view
+          ~streaming:false
+          ~running:
+            (Option.value_map tool ~default:true ~f:(fun t ->
+               Option.is_none t.result))
+          { call with name = "bash" }
+          tool
+      ]
   | Compaction summary ->
     folded
       ~cls:"msg compaction"

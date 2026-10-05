@@ -25,6 +25,7 @@ module Reply_tag : sig
     | Models
     | Reload_state (** the client's session changed: fetch its state *)
     | Subagent of string (** [get_subagent] for this [subagent] call *)
+    | Job_started (** [!&command]: the job's id *)
     | Auth_status of Auth_purpose.t
     | Paths of string (** the completion prefix listed *)
     | Restored (** [abort]: queued prompts back to the editor *)

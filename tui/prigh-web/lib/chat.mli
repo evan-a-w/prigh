@@ -40,6 +40,7 @@ module Entry : sig
         ; streaming : bool
         }
     | Notice of string
+    | Shell of Tool_call.t (** a [!command] the user ran *)
     | Compaction of string (** the summary that replaced older messages *)
   [@@deriving sexp_of]
 end

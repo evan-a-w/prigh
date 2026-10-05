@@ -53,6 +53,7 @@ let empty (m : Model.t) =
         ~attrs:[ Attr.class_ "empty-hints" ]
         [ hint "/" " commands"
         ; hint "@" " mention a file"
+        ; hint "!" " run a command"
         ; hint "Ctrl+L" " switch model"
         ; hint "Ctrl+K" " find a session"
         ]
