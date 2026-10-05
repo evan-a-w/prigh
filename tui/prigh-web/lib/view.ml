@@ -4,6 +4,30 @@ open Html
 module Model = App.Model
 module Action = App.Action
 
+(* While the chat is scrolled up: back to the end (and following again).
+   Inside the chat, stuck to its bottom edge, so the wheel over it still
+   scrolls the chat. *)
+let jump_to_bottom (m : Model.t) ~inject =
+  if not m.scrolled_up
+  then Node.none
+  else
+    Node.div
+      ~attrs:[ Attr.class_ "jump-anchor" ]
+      [ Node.button
+          ~attrs:
+            [ Attr.classes
+                ([ "jump-to-bottom" ] @ if m.unseen then [ "unseen" ] else [])
+            ; Attr.title "Jump to the latest"
+            ; Attr.on_click (fun _ -> inject Action.Jump_to_bottom)
+            ]
+          [ icon Arrow_down
+          ; (if m.unseen
+             then Node.span [ Node.text "New output" ]
+             else Node.none)
+          ]
+      ]
+;;
+
 let banner (m : Model.t) ~inject =
   match m.connection with
   | Connected -> Node.none
@@ -100,7 +124,7 @@ let view (m : Model.t) ~inject =
                   [ "chat"; "verbosity-" ^ Prigh_ui.Verbosity.name m.verbosity ]
               ; Attr.id "chat"
               ]
-            [ chat ]
+            [ chat; jump_to_bottom m ~inject ]
         ; Btw_view.view m ~inject
         ; Composer_view.view m ~inject
         ]

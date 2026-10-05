@@ -126,6 +126,30 @@ let take_adding () =
 
 let chat_element () = Dom_html.getElementById_opt "chat"
 
+(* Whether the chat follows new output: until the user scrolls up, again once
+   they scroll back to the end, press the jump button or send something. *)
+let following = ref true
+
+(* Where we last put the chat's scroll position, to tell the user's scrolls
+   from ours. *)
+let last_set = ref None
+
+let at_end (el : Dom_html.element Js.t) =
+  Float.(
+    of_int el##.scrollHeight -. Js.to_float el##.scrollTop -. of_int el##.clientHeight
+    < 40.)
+;;
+
+let follow_to_end (el : Dom_html.element Js.t) =
+  el##.scrollTop := Js.float (Float.of_int el##.scrollHeight);
+  last_set := Some (Js.to_float el##.scrollTop)
+;;
+
+let scroll_to_bottom () =
+  following := true;
+  Option.iter (chat_element ()) ~f:follow_to_end
+;;
+
 let scroll_chat pages =
   Option.iter (chat_element ()) ~f:(fun chat ->
     let by = Float.of_int (pages * chat##.clientHeight) *. 0.85 in
@@ -209,6 +233,10 @@ let perform client settings ctx (model : App.Model.t) (command : App.Command.t) 
     | Switch_account account -> Effect.of_sync_fun switch_account account
     | Add_account -> Effect.of_sync_fun add_account ()
     | Scroll_chat pages -> Effect.of_sync_fun scroll_chat pages
+    | Scroll_to_bottom ->
+      Effect.of_sync_fun
+        (fun () -> Browser.after_render scroll_to_bottom)
+        ()
     | Jump_to_user_message direction ->
       Effect.of_sync_fun jump_to_user_message direction
   in
@@ -414,27 +442,68 @@ let install_listeners ~schedule ~current =
     Js._true);
   Chat_listeners.install ();
   Agents_listeners.install ~schedule;
-  (* The chat follows new output unless the user has scrolled up. *)
-  let stick = ref true in
-  let chat () = Dom_html.getElementById_opt "chat" in
-  let at_bottom (el : Dom_html.element Js.t) =
-    Float.(
-      of_int el##.scrollHeight
-      -. Js.to_float el##.scrollTop
-      -. of_int el##.clientHeight
-      < 60.)
+  (* The chat follows new output unless the user has scrolled up. The page
+     hears of a change of mind ([Chat_scrolled]) to show the jump button. *)
+  let reported = ref true in
+  let set_following value =
+    following := value;
+    if not (Bool.equal value !reported)
+    then (
+      reported := value;
+      schedule (App.Action.Chat_scrolled { at_bottom = value }))
   in
-  (* Scroll events do not bubble: only capturing sees the chat's. *)
-  listen ~capture:true (Dom_html.Event.make "scroll") (fun _ ->
-    Option.iter (chat ()) ~f:(fun el -> stick := at_bottom el);
+  let in_chat (ev : #Dom_html.event Js.t) =
+    match chat_element () with
+    | None -> false
+    | Some chat ->
+      Js.Opt.case
+        ev##.target
+        (fun () -> false)
+        (fun target ->
+           Js.to_bool
+             ((Js.Unsafe.coerce chat)##contains target : bool Js.t))
+  in
+  (* Intent first: a wheel or swipe up stops following at once, before the
+     scroll it causes lands, so output arriving meanwhile cannot undo it. *)
+  listen
+    (Dom_html.Event.make "wheel")
+    (fun (ev : Dom_html.mouseScrollEvent Js.t) ->
+       if in_chat ev && Float.(Js.to_float (Js.Unsafe.coerce ev)##.deltaY < 0.)
+       then set_following false;
+       Js._true);
+  let touch_y = ref None in
+  listen Dom_html.Event.touchstart (fun (ev : Dom_html.touchEvent Js.t) ->
+    touch_y
+    := Js.Optdef.to_option (ev##.touches##item 0)
+       |> Option.map ~f:(fun t -> Js.to_float t##.clientY);
+    Js._true);
+  listen Dom_html.Event.touchmove (fun (ev : Dom_html.touchEvent Js.t) ->
+    (match !touch_y, Js.Optdef.to_option (ev##.touches##item 0) with
+     | Some y0, Some t when in_chat ev && Float.(Js.to_float t##.clientY > y0 +. 4.)
+       -> set_following false
+     | _ -> ());
+    Js._true);
+  (* Scroll events do not bubble: only capturing sees the chat's. Scrolling
+     back to the end follows again; scrolling up any other way (scrollbar,
+     keys) stops. *)
+  listen ~capture:true (Dom_html.Event.make "scroll") (fun ev ->
+    (match chat_element () with
+     | Some el when phys_equal (Dom_html.eventTarget ev :> Dom.node Js.t) (el :> Dom.node Js.t) ->
+       let top = Js.to_float el##.scrollTop in
+       let ours =
+         Option.value_map !last_set ~default:false ~f:(fun s ->
+           Float.(abs (top -. s) < 2.))
+       in
+       if at_end el
+       then set_following true
+       else if not ours
+       then set_following false
+     | _ -> ());
     Js._true);
   let observer =
     new%js MutationObserver.mutationObserver
       (Js.wrap_callback (fun _ _ ->
-         if !stick
-         then
-           Option.iter (chat ()) ~f:(fun el ->
-             el##.scrollTop := Js.float (Float.of_int el##.scrollHeight))))
+         if !following then Option.iter (chat_element ()) ~f:follow_to_end))
   in
   let options = MutationObserver.empty_mutation_observer_init () in
   options##.childList := true;

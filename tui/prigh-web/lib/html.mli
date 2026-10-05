@@ -28,6 +28,7 @@ module Icon : sig
     | Send
     | Stop
     | Chevron
+    | Arrow_down
     | Brain
     | Folder
     | Branch

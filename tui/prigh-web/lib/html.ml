@@ -52,6 +52,7 @@ module Icon = struct
     | Send
     | Stop
     | Chevron
+    | Arrow_down
     | Brain
     | Folder
     | Branch
@@ -87,6 +88,7 @@ module Icon = struct
     | Stop ->
       {|<rect x="6" y="6" width="12" height="12" rx="2" fill="currentColor"/>|}
     | Chevron -> {|<path d="m6 9 6 6 6-6"/>|}
+    | Arrow_down -> {|<path d="M12 5v14"/><path d="m19 12-7 7-7-7"/>|}
     | Brain ->
       {|<path d="M12 5a3 3 0 0 0-5.8-1A3 3 0 0 0 4 8a3 3 0 0 0 0 6 3 3 0 0 0 3 4 3 3 0 0 0 5 1M12 5a3 3 0 0 1 5.8-1A3 3 0 0 1 20 8a3 3 0 0 1 0 6 3 3 0 0 1-3 4 3 3 0 0 1-5 1M12 5v14"/>|}
     | Folder ->

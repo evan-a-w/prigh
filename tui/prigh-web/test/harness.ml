@@ -27,7 +27,8 @@ let act t action =
      | Switch_account _
      | Add_account
      | Scroll_chat _
-     | Jump_to_user_message _ -> ());
+     | Jump_to_user_message _
+     | Scroll_to_bottom -> ());
     if not t.quiet then print_s [%sexp (command : App.Command.t)])
 ;;
 

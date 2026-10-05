@@ -414,6 +414,7 @@ let%expect_test
   [%expect
     {|
     (Set_url_session s1)
+    Scroll_to_bottom
     (Rpc (method_ get_messages) (params ()) (tag Messages))
     (Rpc (method_ list_sessions) (params ()) (tag Sessions))
     (Rpc (method_ list_subagents) (params ()) (tag Subagents))

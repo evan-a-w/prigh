@@ -148,6 +148,7 @@ let%expect_test "switching resets what belonged to the old session" =
   [%expect
     {|
     (Set_url_session s2)
+    Scroll_to_bottom
     (Rpc (method_ get_messages) (params ()) (tag Messages))
     (Rpc (method_ list_sessions) (params ()) (tag Sessions))
     (Rpc (method_ list_subagents) (params ()) (tag Subagents))
@@ -339,6 +340,7 @@ let%expect_test "new session and switching session reload the state" =
     (Rpc (method_ new_session) (params ()) (tag Reload_state))
     (Rpc (method_ get_state) (params ()) (tag State))
     (Set_url_session s2)
+    Scroll_to_bottom
     (Rpc (method_ get_messages) (params ()) (tag Messages))
     (Rpc (method_ list_sessions) (params ()) (tag Sessions))
     (Rpc (method_ list_subagents) (params ()) (tag Subagents))

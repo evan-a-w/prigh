@@ -104,6 +104,7 @@ module Command : sig
     | Scroll_chat of int (** by pages *)
     | Jump_to_user_message of int
     (** the previous ([-1]) or next ([1]) user message in view *)
+    | Scroll_to_bottom (** and follow new output again *)
   [@@deriving sexp_of, equal]
 end
 
@@ -234,6 +235,10 @@ module Action : sig
     | Retry_connection
     | Scroll_chat of int
     | Jump_to_user_message of int
+    | Chat_scrolled of { at_bottom : bool }
+    (** from the page: the user scrolled the chat away from (or back to) its
+        end *)
+    | Jump_to_bottom
     | Run of string (** a slash command, e.g. from a button *)
   [@@deriving sexp_of]
 end
@@ -264,6 +269,8 @@ module Model : sig
     ; toasts : Toast.t list
     ; next_toast : int
     ; sidebar_open : bool
+    ; scrolled_up : bool (** the chat is not following new output *)
+    ; unseen : bool (** output arrived while [scrolled_up] *)
     ; session_query : string
     ; agents : Agents.t (** the agents panel, per session *)
     ; verbosity : Prigh_ui.Verbosity.t
