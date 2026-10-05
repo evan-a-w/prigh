@@ -320,64 +320,6 @@ let auth (statuses : Auth_status.t list) ~inject =
     ]
 ;;
 
-let agents (m : App.Model.t) ~inject =
-  let subagents, jobs =
-    match m.state with
-    | Some s -> s.subagents, s.jobs
-    | None -> [], []
-  in
-  let row ~cls ~title ~status ~running ~on_stop ~stop_label =
-    div
-      ~cls:("bg-row " ^ cls)
-      [ div
-          ~cls:"bg-text"
-          [ span ~cls:"bg-title" title
-          ; span
-              ~cls:(if running then "bg-status running" else "bg-status")
-              status
-          ]
-      ; (if running
-         then button ~cls:"small" ~on_click:on_stop [ Node.text stop_label ]
-         else Node.none)
-      ]
-  in
-  Modal.view
-    ~title:"Background work"
-    ~on_close:(inject Action.Close_dialog)
-    ~footer:
-      [ button
-          ~cls:"primary"
-          ~on_click:(inject Action.Close_dialog)
-          [ Node.text "Done" ]
-      ]
-    (match subagents, jobs with
-     | [], [] ->
-       [ div
-           ~cls:"picker-empty"
-           [ Node.text "No subagents or jobs in this session." ]
-       ]
-     | _ ->
-       List.map subagents ~f:(fun (a : State.Subagent.t) ->
-         row
-           ~cls:"subagent-row"
-           ~title:a.task
-           ~status:(if a.running then "running" else "done, reporting")
-           ~running:a.running
-           ~on_stop:(inject (Action.Cancel_subagent a.id))
-           ~stop_label:"Cancel")
-       @ List.map jobs ~f:(fun (j : State.Job.t) ->
-         row
-           ~cls:"job-row"
-           ~title:j.command
-           ~status:
-             (if j.running
-              then "running"
-              else Option.value j.exit ~default:"finished")
-           ~running:j.running
-           ~on_stop:(inject (Action.Kill_job j.id))
-           ~stop_label:"Kill"))
-;;
-
 let dialog (m : App.Model.t) ~inject =
   match m.dialog with
   | None -> Node.none
@@ -387,7 +329,6 @@ let dialog (m : App.Model.t) ~inject =
   | Some (Delete { title; _ }) -> delete ~title ~inject
   | Some (Login flow) -> login m flow ~inject
   | Some (Auth statuses) -> auth statuses ~inject
-  | Some Agents -> agents m ~inject
 ;;
 
 let confirm (m : App.Model.t) ~inject =

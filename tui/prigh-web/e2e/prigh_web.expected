@@ -104,6 +104,90 @@ same session after reconnecting: true
 === chromium: after reconnecting ===
 still there?
 back again
+=== chromium: agents panel ===
+Agents
+SUBAGENTS
+2
+1
+✓
+Survey the project
+<T>
+a1 · deepseek-flash · 2 turns · 1 tool call · $<COST>
+The survey: 3 files.
+2
+✓
+Count the files
+<T>
+a1/n1 · deepseek-flash · 1 turn · $<COST>
+There are 3 files.
+JOBS
+1
+3
+✓
+sleep 1; echo built
+<T>
+j1 · exited 0 · 6 B
+built
+=== chromium: a nested subagent ===
+Subagent a1/n1
+Survey the project
+›
+Count the files
+✓
+Count the files
+complete
+<T>
+a1/n1
+deepseek-flash
+1 turn
+$<COST>
+Show in chat
+Count the files
+There are 3 files.
+the nested card is in view in the chat
+=== chromium: a background job ===
+Job j1
+✓
+sleep 1; echo built
+exited 0
+<T>
+j1
+6 B
+Output, lines 1-1 of 1
+built
+=== chromium: a card opens its agent ===
+Subagent a1
+✓
+Survey the project
+complete
+<T>
+a1
+deepseek-flash
+2 turns
+1 tool call
+$<COST>
+Show in chat
+ITS SUBAGENTS
+1
+✓
+Count the files
+<T>
+a1/n1 · deepseek-flash · 1 turn · $<COST>
+There are 3 files.
+Survey the project
+asking a helper
+✓
+subagent
+Count the files
+deepseek-flash
+1 turn
+$<COST>
+Open ›
+Report
+There are 3 files.
+Transcript
+2 messages
+The survey: 3 files.
 === chromium: errors ===
 none
 === firefox: sign-in page ===
@@ -212,5 +296,89 @@ same session after reconnecting: true
 === firefox: after reconnecting ===
 still there?
 back again
+=== firefox: agents panel ===
+Agents
+SUBAGENTS
+2
+1
+✓
+Survey the project
+<T>
+a1 · deepseek-flash · 2 turns · 1 tool call · $<COST>
+The survey: 3 files.
+2
+✓
+Count the files
+<T>
+a1/n1 · deepseek-flash · 1 turn · $<COST>
+There are 3 files.
+JOBS
+1
+3
+✓
+sleep 1; echo built
+<T>
+j1 · exited 0 · 6 B
+built
+=== firefox: a nested subagent ===
+Subagent a1/n1
+Survey the project
+›
+Count the files
+✓
+Count the files
+complete
+<T>
+a1/n1
+deepseek-flash
+1 turn
+$<COST>
+Show in chat
+Count the files
+There are 3 files.
+the nested card is in view in the chat
+=== firefox: a background job ===
+Job j1
+✓
+sleep 1; echo built
+exited 0
+<T>
+j1
+6 B
+Output, lines 1-1 of 1
+built
+=== firefox: a card opens its agent ===
+Subagent a1
+✓
+Survey the project
+complete
+<T>
+a1
+deepseek-flash
+2 turns
+1 tool call
+$<COST>
+Show in chat
+ITS SUBAGENTS
+1
+✓
+Count the files
+<T>
+a1/n1 · deepseek-flash · 1 turn · $<COST>
+There are 3 files.
+Survey the project
+asking a helper
+✓
+subagent
+Count the files
+deepseek-flash
+1 turn
+$<COST>
+Open ›
+Report
+There are 3 files.
+Transcript
+2 messages
+The survey: 3 files.
 === firefox: errors ===
 none

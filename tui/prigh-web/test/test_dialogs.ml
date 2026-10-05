@@ -71,6 +71,9 @@ let%expect_test "help lists every key and command" =
     Ctrl+L switch model
     Ctrl+K search sessions
     Ctrl+B show or hide the sidebar
+    Alt+1…9 follow subagent or job N in the agents panel
+    Alt+] Alt+[ the next or previous subagent or job
+    Alt+0 close the agents panel
     Commands
     /help show commands and keys
     /new start a new session
@@ -82,7 +85,7 @@ let%expect_test "help lists every key and command" =
     /clone copy this session into a new one
     /cd <path> change the working directory
     /abort stop the current run
-    /agents show background subagents and jobs
+    /agents [n|id] follow subagents and background jobs
     /login [provider] log in to a model provider (or /login custom)
     /logout [provider] remove a provider's login
     /auth show which providers are logged in
@@ -377,6 +380,8 @@ let%expect_test
     (Set_url_session s1)
     (Rpc (method_ get_messages) (params ()) (tag Messages))
     (Rpc (method_ list_sessions) (params ()) (tag Sessions))
+    (Rpc (method_ list_subagents) (params ()) (tag Subagents))
+    (Rpc (method_ list_jobs) (params ()) (tag Jobs))
     |}];
   (* Replies to an older connection's reconnects are ignored. *)
   H.act h (Reply (Reconnect 0, Error "late"));

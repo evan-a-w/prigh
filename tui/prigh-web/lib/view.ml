@@ -68,7 +68,12 @@ let view (m : Model.t) ~inject =
   in
   Node.div
     ~attrs:
-      [ classes [ "app" ] [ "sidebar-open", m.sidebar_open; "narrow", m.narrow ]
+      [ classes
+          [ "app" ]
+          [ "sidebar-open", m.sidebar_open
+          ; "narrow", m.narrow
+          ; "agents-open", m.agents.open_
+          ]
       ]
     [ Sidebar_view.view m ~inject
     ; (if m.narrow && m.sidebar_open
@@ -87,6 +92,7 @@ let view (m : Model.t) ~inject =
         ; Node.div ~attrs:[ Attr.class_ "chat"; Attr.id "chat" ] [ chat ]
         ; Composer_view.view m ~inject
         ]
+    ; Agents_view.view m ~inject
     ; Dialog_view.view m ~inject
     ; toasts m ~inject
     ]

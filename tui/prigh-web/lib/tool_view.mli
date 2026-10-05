@@ -13,3 +13,7 @@ val view
   -> Tool_call.t
   -> Chat.Tool.t option
   -> Node.t
+
+(** A subagent's latest step: its current tool call, or the last line of its
+    text. *)
+val last_activity : Chat.t -> string option

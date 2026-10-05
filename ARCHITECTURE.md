@@ -741,11 +741,26 @@ copy of the protocol types and the e2e test guards the contract.
       fetched with `get_subagent` after a reload since `get_messages` only
       has their reports; `!cmd` runs as `Shell` entries), `Chat_view`,
       `Tool_view` (a card per tool: bash, read with images, write, edit
-      with `Line_diff`/`Diff_view`, ls/grep/find, subagents, jobs),
+      with `Line_diff`/`Diff_view`, ls/grep/find, subagents (marked with
+      `data-call` and `data-agent` for the agents panel), jobs),
       `Delivery_view` (reports of finished background work, parsed by
       `ui/`'s `Delivery`), `Markdown` (a total parser that also renders
       streaming prefixes) and `Markdown_view`, `Image_view`,
       `Output_view`.
+    - The agents panel: `Agents` (per session: `list_subagents` and
+      `list_jobs`, kept live by `subagent_start`/`subagent`/`subagent_end`
+      at any depth and by the state's `subagents`/`jobs` changing; nested
+      ids `<parent>/<call>` make a tree; finished items fold under
+      "earlier" at the next prompt; the selection, cancels and kills in
+      flight, a job's polled `job_output`) and `Agents_view` (the list, a
+      subagent in full — its transcript is the one in `Chat`, found by
+      agent id at any depth, fetched with `get_subagent` when nested ones
+      are missing after a reload — or a job's output; the status line's
+      summary and the top bar's toggle). Elapsed times tick with `Clock`,
+      which the page sends every second only while the panel is open with
+      something running (`Model.ticking`); running jobs are then polled
+      every 2s. `Reveal` scrolls the chat to a subagent's card through the
+      `subagent` call ids from the top-level one down.
     - Around it: `Sidebar_view`/`Session_list` (fuzzy search, ages from
       `Rel_time`), `Topbar_view`, `Composer_view` with `Completion`
       (slash commands from `Slash`, their arguments, `@` paths via
@@ -765,8 +780,13 @@ copy of the protocol types and the e2e test guards the contract.
     WebP, sent with the prompt as base64; others get a toast), the narrow
     (phone) layout, a clock for ages and toasts, and the chat following new
     output unless scrolled up. `Chat_listeners` copies code blocks and
-    closes an open image with Esc.
-  - `bin/` — `main.bc.js` plus `index.html`/`style.css`, assembled under
+    closes an open image with Esc; `Agents_listeners` opens a subagent's
+    card (`data-agent`) in the agents panel, resizes the panel from its
+    left edge (`--agents-width`, remembered in local storage), keeps a
+    shown transcript or job output at its end unless scrolled up, and
+    performs `Reveal` (opening the folds the card is in).
+  - `bin/` — `main.bc.js` plus `index.html`, `style.css`, `chat.css` and
+    `agents.css`, assembled under
     `bin/site/` and installed to `share/prigh_tui/prigh-web` (the Nix
     wrapper exports it as `$PRIGH_PRIGH_WEB_ROOT`). The dev profile links
     separately compiled units with inline source maps (~49 MB, fast to
@@ -876,8 +896,12 @@ natural size), an image pasted and one dropped into the composer (shown,
 sent, cleared, rendered in the prompt, and present with the right sizes in
 the backend's copy of the message via a second WebSocket's
 `get_messages`), a reload rejoining the session from `?session=`, a new
-session and switching back from the sidebar, and the backend dying (the
+session and switching back from the sidebar, the backend dying (the
 banner) and restarting on the same port (the page reconnects to the same
-session and runs another prompt), with no console or page errors.
+session and runs another prompt), and the agents panel (a background
+subagent running a synchronous one and a background job: the list, the
+nested one in full via Alt+2 and its card revealed in the chat, the job's
+output, a card in the chat opening its agent), with no console or page
+errors.
 `SHOTS=DIR` saves a screenshot per step, `UPDATE=1` re-records,
 `ENGINES=chromium` runs one browser.

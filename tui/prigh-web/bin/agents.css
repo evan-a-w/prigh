@@ -1,0 +1,252 @@
+/* The agents panel: subagents and background jobs, right of the chat (a
+   sheet over the page on phones). Its width is --agents-width, set by
+   dragging its left edge. */
+
+.agents-panel {
+  position: relative;
+  width: var(--agents-width, 420px);
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  background: var(--panel);
+  border-left: 1px solid var(--border);
+  animation: agents-in 0.16s ease-out;
+}
+@keyframes agents-in { from { opacity: 0; transform: translateX(12px); } }
+
+.agents-resize {
+  position: absolute;
+  left: -4px;
+  top: 0;
+  bottom: 0;
+  width: 8px;
+  cursor: col-resize;
+  z-index: 2;
+  touch-action: none;
+}
+.agents-resize:hover, body.resizing .agents-resize { background: linear-gradient(to right, transparent 3px, var(--accent-2) 3px, var(--accent-2) 5px, transparent 5px); }
+body.resizing { cursor: col-resize; user-select: none; }
+
+.agents-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 54px;
+  padding: 8px 8px 8px 14px;
+  border-bottom: 1px solid var(--border);
+}
+.agents-head > .btn.icon:first-child { margin-left: -8px; }
+.agents-head-icon { color: var(--accent); }
+.agents-title { font-weight: 600; font-size: 14.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.agents-running { color: var(--green); font-size: 12px; white-space: nowrap; }
+.agents-close { margin-left: auto; }
+
+.agents-body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 10px 10px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.agents-section { display: flex; flex-direction: column; gap: 2px; }
+.agents-section-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  padding: 0 6px 4px;
+  color: var(--faint);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.agents-section-count { font-weight: 500; letter-spacing: 0; text-transform: none; }
+
+.agents-row {
+  display: grid;
+  grid-template-columns: 18px 14px minmax(0, 1fr);
+  align-items: start;
+  gap: 2px 8px;
+  width: 100%;
+  padding: 8px 10px 8px calc(8px + var(--depth, 0) * 20px);
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: none;
+  text-align: left;
+  cursor: pointer;
+  position: relative;
+}
+.agents-row:hover { background: var(--panel-2); }
+.agents-row:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+.agents-row.selected { background: var(--accent-bg); border-color: #5b7cf055; }
+.agents-row.nested::before {
+  content: "";
+  position: absolute;
+  left: calc(var(--depth) * 20px - 2px);
+  top: 0;
+  bottom: 50%;
+  width: 9px;
+  border-left: 1px solid var(--border-2);
+  border-bottom: 1px solid var(--border-2);
+  border-bottom-left-radius: 6px;
+}
+.agents-row > .spinner, .agents-row > .state-icon { margin-top: 3px; }
+.agents-row .state-icon, .detail-title .state-icon { font-size: 12px; width: 14px; text-align: center; line-height: 14px; }
+.agents-row.complete .state-icon, .detail-title.complete .state-icon { color: var(--green); }
+.agents-row.failed .state-icon, .detail-title.failed .state-icon { color: var(--red); }
+.row-num {
+  font: 10.5px/16px var(--mono);
+  height: 17px;
+  min-width: 17px;
+  padding: 0 4px;
+  margin-top: 1px;
+  text-align: center;
+  color: var(--muted);
+}
+.row-num.none { visibility: hidden; }
+.row-main { display: flex; flex-direction: column; min-width: 0; gap: 1px; }
+.row-top { display: flex; align-items: baseline; gap: 8px; min-width: 0; }
+.row-title { flex: 1; min-width: 0; font-size: 13.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.job .row-title { font: 12.5px var(--mono); }
+.row-elapsed { font: 11.5px var(--mono); color: var(--muted); white-space: nowrap; font-variant-numeric: tabular-nums; }
+.agents-row.running .row-elapsed { color: var(--green); }
+.row-meta, .row-line { font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.row-meta { color: var(--faint); }
+.row-line { color: var(--muted); }
+.agents-row.running .row-line::before { content: "↳ "; color: var(--accent); }
+.agents-row.failed .row-line { color: #ffa3a3; }
+.job .row-line { font: 11.5px var(--mono); }
+
+.agents-empty { color: var(--muted); font-size: 13px; padding: 18px 8px; }
+.agents-empty p { margin: 0 0 8px; }
+.agents-empty .hint { color: var(--faint); font-size: 12.5px; }
+
+.agents-earlier > summary {
+  cursor: pointer;
+  padding: 4px 6px;
+  color: var(--faint);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  list-style: none;
+}
+.agents-earlier > summary::before { content: "› "; }
+.agents-earlier[open] > summary::before { content: "⌄ "; }
+.agents-earlier .agents-row { opacity: 0.75; }
+
+/* One agent or job in full */
+
+.agents-detail { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+.agents-crumbs { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; font-size: 12px; color: var(--faint); padding: 0 4px; }
+.crumb { background: none; border: 0; padding: 0; color: var(--accent); cursor: pointer; max-width: 180px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 12px; }
+.crumb:hover { text-decoration: underline; }
+.crumb.current { color: var(--muted); }
+
+.detail-head {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px 12px 12px;
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+}
+.detail-title { display: flex; align-items: flex-start; gap: 8px; font-weight: 600; font-size: 14px; line-height: 1.4; }
+.detail-title > .spinner, .detail-title > .state-icon { margin-top: 3px; }
+.detail-task { overflow-wrap: anywhere; }
+.detail-command { font: 13px var(--mono); overflow-wrap: anywhere; }
+.detail-command::before { content: "$ "; color: var(--green); }
+.detail-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; font-size: 12px; color: var(--muted); }
+.detail-elapsed { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+.detail-chip { font-size: 11.5px; padding: 0 7px; line-height: 18px; border: 1px solid var(--border-2); border-radius: 999px; white-space: nowrap; }
+.pill { font-size: 11px; font-weight: 600; padding: 0 8px; line-height: 18px; border-radius: 999px; text-transform: lowercase; }
+.pill.running { color: var(--green); background: #3ecf8e1c; }
+.pill.complete { color: var(--accent); background: var(--accent-bg); }
+.pill.failed { color: var(--red); background: var(--red-bg); }
+.detail-actions { display: flex; gap: 6px; flex-wrap: wrap; }
+.detail-actions .btn { display: inline-flex; align-items: center; gap: 6px; }
+.detail-actions .icon { width: 13px; height: 13px; }
+.detail-actions .stop .icon { width: 10px; height: 10px; }
+
+.agents-note { display: flex; align-items: center; gap: 8px; color: var(--muted); font-size: 13px; padding: 4px; }
+.agents-note.small { font-size: 12px; color: var(--faint); }
+
+.agents-transcript .entries { max-width: none; gap: 12px; font-size: 13.5px; }
+.agents-transcript .empty { display: none; }
+
+.agents-result {
+  border: 1px solid #2f3d66;
+  border-radius: 10px;
+  padding: 10px 12px;
+  background: #5b7cf00f;
+}
+.agents-result.failed { border-color: var(--red-border); background: var(--red-bg); }
+.agents-result-head { font-size: 11px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--accent); margin-bottom: 4px; }
+.agents-result.failed .agents-result-head { color: var(--red); }
+.agents-result pre { margin: 0; white-space: pre-wrap; font: 12.5px var(--mono); color: #ffc2c2; }
+
+.job-output {
+  margin: 0;
+  padding: 10px 12px;
+  background: var(--code-bg, #0b0d11);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font: 12px/1.5 var(--mono);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+/* The top bar's toggle and the cards in the chat */
+
+.agents-toggle { position: relative; }
+.agents-toggle.open { color: var(--accent); background: var(--accent-bg); }
+.agents-toggle .badge {
+  position: absolute;
+  top: 1px;
+  right: 0;
+  min-width: 15px;
+  height: 15px;
+  padding: 0 4px;
+  border-radius: 999px;
+  background: var(--green);
+  color: #08140e;
+  font: 600 10px/15px var(--sans);
+}
+.tool-subagent > .tool-head[data-agent] { cursor: pointer; border-radius: 10px; }
+.tool-subagent > .tool-head[data-agent]:hover { background: var(--panel-2); }
+.tool-head .open-agent { margin-left: auto; color: var(--accent); font-size: 12px; white-space: nowrap; opacity: 0.7; }
+.tool-head[data-agent]:hover .open-agent { opacity: 1; }
+.tool.flash { animation: flash 1.6s ease-out; }
+@keyframes flash { 0%, 40% { box-shadow: 0 0 0 2px var(--accent); } 100% { box-shadow: 0 0 0 2px transparent; } }
+
+/* Not enough room for three columns: the panel lies over the chat. */
+@media (max-width: 1180px) {
+  .app:not(.narrow) .agents-panel {
+    position: fixed;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 20;
+    max-width: 86vw;
+    box-shadow: -16px 0 40px #0008;
+  }
+}
+
+/* Phones: a full-screen sheet. */
+.app.narrow .agents-panel {
+  position: fixed;
+  inset: 0;
+  width: auto;
+  z-index: 40;
+  border-left: 0;
+  animation: agents-up 0.2s ease-out;
+}
+.app.narrow .agents-resize { display: none; }
+.app.narrow .agents-head { min-height: 50px; padding-left: 12px; }
+.app.narrow .crumb { max-width: 40vw; }
+@keyframes agents-up { from { opacity: 0; transform: translateY(24px); } }

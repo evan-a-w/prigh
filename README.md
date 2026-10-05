@@ -232,6 +232,21 @@ commands, `@` paths and `!cmd` like the TUI. It speaks
 prigh's own RPC (the same `/ws` protocol as `-web`), so it gets every
 backend feature without a translation layer like pi-web's.
 
+Subagents and background jobs have their own panel, a resizable column
+right of the chat (drag its left edge; a full-screen sheet on a phone):
+the session's subagents as a tree (nested ones under the background agent
+that started them), running first, with their task, model, elapsed time,
+turns and current tool, and the background jobs with their last line.
+Selecting one shows a subagent's live transcript and report (with Cancel
+and "Show in chat", which scrolls to its card) or a job's output (with
+Kill). It opens from the status line ("2 agents running"), the top bar's
+robot button, a subagent's card in the chat, `/agents [n|id]`, and
+Alt+1…9 (the Nth listed; Alt+] and Alt+[ step through them, Alt+0 closes
+it, Esc goes back from outside the editor). Unlike the TUI, Shift+Tab is
+left to the browser (it moves the focus back), and on macOS Option+digit
+types its character instead. What finished before your latest prompt
+folds under "Earlier"; switching sessions empties the panel.
+
 ```
 ./prigh -prigh-web -faux -cwd ~/proj           # development: dune-built site and backend, 127.0.0.1:7790
 nix run . -- -prigh-web -cwd ~/proj            # the packaged site and backend

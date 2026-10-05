@@ -206,7 +206,9 @@ let%expect_test
   H.text h ~selector:".status";
   [%expect
     {|
-    Working 75% ↑123k ↓7.9k $1.2345 (3 queued) (1 subagent · 2 jobs) laptop
+    (Rpc (method_ list_subagents) (params ()) (tag Subagents))
+    (Rpc (method_ list_jobs) (params ()) (tag Jobs))
+    Working 75% ↑123k ↓7.9k $1.2345 (3 queued) laptop
     ann as bob
     |}];
   H.show h ~selector:".context";
@@ -240,25 +242,6 @@ let%expect_test
     (Rpc (method_ dequeue) (params ()) (tag Dequeued))
     (Expire_toast (id 0) (after_ms 4000))
     Nothing is queued
-    |}];
-  (* Background work: its dialog cancels subagents and kills jobs. *)
-  H.act h Open_agents;
-  H.text h ~selector:".modal-body";
-  [%expect
-    {|
-    (Focus dialog)
-    read the tests running
-    (Cancel)
-    make test running
-    (Kill)
-    sleep 1 exited 0
-    |}];
-  H.act h (Cancel_subagent "a1");
-  H.act h (Kill_job "j1");
-  [%expect
-    {|
-    (Rpc (method_ cancel_subagent) (params ((agent_id a1))) (tag Show_error))
-    (Rpc (method_ kill_job) (params ((job_id j1))) (tag Show_error))
     |}]
 ;;
 
@@ -266,7 +249,12 @@ let%expect_test "aborting brings the queued prompts back into the editor" =
   let h = H.create () in
   H.event h (sprintf {|{"event":"state","state":%s}|} busy_state);
   H.text h ~selector:".composer-buttons";
-  [%expect {| (Stop (Esc)) (Steer (Enter)) |}];
+  [%expect
+    {|
+    (Rpc (method_ list_subagents) (params ()) (tag Subagents))
+    (Rpc (method_ list_jobs) (params ()) (tag Jobs))
+    (Stop (Esc)) (Steer (Enter))
+    |}];
   H.type_ h "half-written";
   H.key h "Escape";
   [%expect
