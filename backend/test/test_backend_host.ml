@@ -250,7 +250,7 @@ let%expect_test "backend host disabled" =
   [%expect
     {|
     {"type":"response","id":"r","ok":true,"result":{}}
-    exec: {"type":"event","event":"tool_exec","host":"client-2","exec_id":"<id>/c3-1","call_id":"c3","name":"$instructions","arguments":{"home":"$DIR"},"cwd":"/home/me/proj"}
+    exec: {"type":"event","event":"tool_exec","host":"client-2","exec_id":"<id>/c3-1","call_id":"c3","name":"$instructions","arguments":{"home":"$DIR","with_nix":true},"cwd":"/home/me/proj"}
     exec: {"type":"event","event":"tool_exec","host":"client-2","exec_id":"<id>/s1-2","call_id":"s1","name":"ls","arguments":{},"cwd":"/home/me/proj"}
     tool_result subagent: "started agent a1 (look around); its result will be delivered to you when it finishes; use subagent_wait to block on it"
     delivered: "[subagent a1 finished] look around\nsub done\n[subagent: 2 turns, 30 in / 13 out tokens, $0.0000]"

@@ -24,7 +24,7 @@ let instruction_files ~cwd ~home =
   Option.to_list global @ project
 ;;
 
-let base ~tools =
+let base ~nix ~tools =
   let tool_list =
     String.concat
       ~sep:"\n"
@@ -75,6 +75,19 @@ let base ~tools =
           ; ""
           ]
         else [])
+     @ (if nix
+        then
+          [ "Get tools that are not installed from nixpkgs, not with apt or \
+             sudo (you may have no root): `nix shell nixpkgs#python3 \
+             nixpkgs#nodejs -c <cmd>` runs a command with those packages (any \
+             number of them), `nix run nixpkgs#<pkg> -- <args>` runs a \
+             package's program, `nix search nixpkgs <term>` finds package \
+             names (slow the first time), and `nix profile install \
+             nixpkgs#<pkg>` keeps a tool on PATH across sessions. Packages are \
+             cached and shared, so repeating these is cheap."
+          ; ""
+          ]
+        else [])
      @ [ (if List.is_empty tools
           then "No tools are available in this session."
           else "Available tools:\n" ^ tool_list)
@@ -86,7 +99,7 @@ let read_instructions ~cwd ~home =
     path, String.strip (In_channel.read_all path))
 ;;
 
-let build ?date ?instructions ~cwd ~home ~tools () =
+let build ?date ?instructions ?(nix = false) ~cwd ~home ~tools () =
   let date =
     match date with
     | Some d -> d
@@ -108,7 +121,7 @@ let build ?date ?instructions ~cwd ~home ~tools () =
     List.map instructions ~f:(fun (path, text) ->
       sprintf "Instructions from %s:\n%s" path text)
   in
-  String.concat ~sep:"\n\n" ([ base ~tools; environment ] @ instructions)
+  String.concat ~sep:"\n\n" ([ base ~nix ~tools; environment ] @ instructions)
 ;;
 
 let discretion =

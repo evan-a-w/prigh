@@ -124,3 +124,53 @@ let%expect_test "background guidance follows the tools" =
     - Ask before destructive or irreversible actions.
     |}]
 ;;
+
+let%expect_test "how to get tools, only when the host has nix" =
+  let prompt ~nix =
+    System_prompt.build
+      ~date:"2026-01-02"
+      ~instructions:[]
+      ~nix
+      ~cwd:"/proj"
+      ~home:"/home"
+      ~tools:(Tools.specs Tools.all)
+      ()
+  in
+  let with_nix = prompt ~nix:true in
+  let without = prompt ~nix:false in
+  print_endline
+    (String.split with_nix ~on:'\n'
+     |> List.take_while ~f:(fun line ->
+       not (String.equal line "Available tools:"))
+     |> String.concat ~sep:"\n");
+  [%expect
+    {|
+    You are prigh, a coding agent working in the user's project from the command line.
+
+    Guidelines:
+    - Use the tools to inspect and change the project; do not guess file contents.
+    - Prefer edit over write for existing files. Keep changes minimal and focused.
+    - After making changes, verify them (build, tests) when a way to do so exists.
+    - Be concise. Explain non-trivial decisions briefly. No filler.
+    - Ask before destructive or irreversible actions.
+
+    Get tools that are not installed from nixpkgs, not with apt or sudo (you may have no root): `nix shell nixpkgs#python3 nixpkgs#nodejs -c <cmd>` runs a command with those packages (any number of them), `nix run nixpkgs#<pkg> -- <args>` runs a package's program, `nix search nixpkgs <term>` finds package names (slow the first time), and `nix profile install nixpkgs#<pkg>` keeps a tool on PATH across sessions. Packages are cached and shared, so repeating these is cheap.
+    |}];
+  let lines s = String.split s ~on:'\n' in
+  let only_in a b =
+    List.filter (lines a) ~f:(fun l ->
+      not (List.mem (lines b) l ~equal:String.equal))
+  in
+  print_s
+    [%sexp
+      { only_with_nix =
+          (only_in with_nix without |> List.map ~f:(fun l -> String.prefix l 40)
+           : string list)
+      ; only_without = (only_in without with_nix : string list)
+      }];
+  [%expect
+    {|
+    ((only_with_nix ("Get tools that are not installed from ni"))
+     (only_without ()))
+    |}]
+;;

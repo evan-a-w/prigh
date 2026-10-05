@@ -41,7 +41,10 @@ services:
       # PRIGH_WORKSPACE to a host path to bind it instead (it must be
       # world-searchable, e.g. mode 755).
       - ${PRIGH_WORKSPACE:-prigh-workspace}:/workspace
-    # Only the two volumes above, a scratch /tmp and /run (the per-user
+      # The Nix store the agents install tools into, shared by all users and
+      # kept across restarts and upgrades; also holds prigh's own runtime.
+      - prigh-nix:/nix
+    # Only the volumes above, a scratch /tmp and /run (the per-user
     # accounts) are writable; the agents see nothing else of the host.
     read_only: true
     tmpfs:
@@ -67,3 +70,4 @@ services:
 volumes:
   prigh-home:
   prigh-workspace:
+  prigh-nix:
