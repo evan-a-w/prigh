@@ -732,7 +732,7 @@ let%expect_test "typing / lists commands, Down twice + Tab fills /login " =
       /login [provider] [api_key|oauth]  log in to a provider
       /logout [provider]              remove a provider's store…
       /thinking [off|low|on|high|max]  pick or set the thinking…
-      ↕ 1–8 of 34
+      ↕ 1–8 of 35
     …deepseek-flash  ctx:0% 1.5k  Tab/Enter accept · Esc close
     |}];
   H.key h (Key.plain Down);
@@ -749,7 +749,7 @@ let%expect_test "typing / lists commands, Down twice + Tab fills /login " =
       /login [provider] [api_key|oauth]  log in to a provider
       /logout [provider]              remove a provider's store…
       /thinking [off|low|on|high|max]  pick or set the thinking…
-      ↕ 1–8 of 34
+      ↕ 1–8 of 35
     …deepseek-flash  ctx:0% 1.5k  Tab/Enter accept · Esc close
     |}];
   H.key h (Key.plain Down);
@@ -766,7 +766,7 @@ let%expect_test "typing / lists commands, Down twice + Tab fills /login " =
       /login [provider] [api_key|oauth]  log in to a provider
       /logout [provider]              remove a provider's store…
       /thinking [off|low|on|high|max]  pick or set the thinking…
-      ↕ 1–8 of 34
+      ↕ 1–8 of 35
     …deepseek-flash  ctx:0% 1.5k  Tab/Enter accept · Esc close
     |}];
   H.key h (Key.plain Tab);
@@ -1985,7 +1985,8 @@ let%expect_test "backend crash shows the stderr tail; Ctrl+C quits" =
     (Reconnect
       (generation 1)
       (delay_ms   0)
-      (session (/home/u/.prigh/sessions/1.jsonl)))
+      (session (/home/u/.prigh/sessions/1.jsonl))
+      (as_user ()))
     session abc123 in /work. /help for commands, Esc aborts,
     Ctrl+C twice quits.
     > earlier question
@@ -5124,7 +5125,8 @@ let%expect_test "reconnect: backoff doubles to the 60s cap, stale replies are \
     (Reconnect
       (generation 1)
       (delay_ms   0)
-      (session (/home/u/.prigh/sessions/1.jsonl)))
+      (session (/home/u/.prigh/sessions/1.jsonl))
+      (as_user ()))
     |}];
   (* Losing the transport again mid-reconnect counts as a failed attempt. *)
   H.step h Backend_closed;
@@ -5133,7 +5135,8 @@ let%expect_test "reconnect: backoff doubles to the 60s cap, stale replies are \
     (Reconnect
       (generation 2)
       (delay_ms   500)
-      (session (/home/u/.prigh/sessions/1.jsonl)))
+      (session (/home/u/.prigh/sessions/1.jsonl))
+      (as_user ()))
     |}];
   let fail generation =
     H.reply_error h (Reconnect generation) "connection refused"
@@ -5146,31 +5149,38 @@ let%expect_test "reconnect: backoff doubles to the 60s cap, stale replies are \
     (Reconnect
       (generation 3)
       (delay_ms   1000)
-      (session (/home/u/.prigh/sessions/1.jsonl)))
+      (session (/home/u/.prigh/sessions/1.jsonl))
+      (as_user ()))
     (Reconnect
       (generation 4)
       (delay_ms   2000)
-      (session (/home/u/.prigh/sessions/1.jsonl)))
+      (session (/home/u/.prigh/sessions/1.jsonl))
+      (as_user ()))
     (Reconnect
       (generation 5)
       (delay_ms   4000)
-      (session (/home/u/.prigh/sessions/1.jsonl)))
+      (session (/home/u/.prigh/sessions/1.jsonl))
+      (as_user ()))
     (Reconnect
       (generation 6)
       (delay_ms   8000)
-      (session (/home/u/.prigh/sessions/1.jsonl)))
+      (session (/home/u/.prigh/sessions/1.jsonl))
+      (as_user ()))
     (Reconnect
       (generation 7)
       (delay_ms   16000)
-      (session (/home/u/.prigh/sessions/1.jsonl)))
+      (session (/home/u/.prigh/sessions/1.jsonl))
+      (as_user ()))
     (Reconnect
       (generation 8)
       (delay_ms   32000)
-      (session (/home/u/.prigh/sessions/1.jsonl)))
+      (session (/home/u/.prigh/sessions/1.jsonl))
+      (as_user ()))
     (Reconnect
       (generation 9)
       (delay_ms   60000)
-      (session (/home/u/.prigh/sessions/1.jsonl)))
+      (session (/home/u/.prigh/sessions/1.jsonl))
+      (as_user ()))
     |}];
   print_s [%sexp (h.model.connection : App.Connection.t)];
   [%expect
@@ -5217,7 +5227,8 @@ let%expect_test "reconnect: backoff doubles to the 60s cap, stale replies are \
     (Reconnect
       (generation 10)
       (delay_ms   0)
-      (session (/home/u/.prigh/sessions/1.jsonl)))
+      (session (/home/u/.prigh/sessions/1.jsonl))
+      (as_user ()))
     |}];
   fail 9;
   [%expect {| |}];
@@ -5269,7 +5280,8 @@ let%expect_test "reconnect: backoff doubles to the 60s cap, stale replies are \
     (Reconnect
       (generation 11)
       (delay_ms   0)
-      (session (/home/u/.prigh/sessions/1.jsonl)))
+      (session (/home/u/.prigh/sessions/1.jsonl))
+      (as_user ()))
     |}]
 ;;
 
@@ -5283,7 +5295,8 @@ let%expect_test "reconnect: a session the backend no longer knows (never \
     (Reconnect
       (generation 1)
       (delay_ms   0)
-      (session (/home/u/.prigh/sessions/1.jsonl)))
+      (session (/home/u/.prigh/sessions/1.jsonl))
+      (as_user ()))
     |}];
   (* A fresh backend has no record of an empty session: it was never written to
      disk. The retry is immediate, without the session, and keeps the attempt
@@ -5294,7 +5307,8 @@ let%expect_test "reconnect: a session the backend no longer knows (never \
     (Reconnect
       (generation 2)
       (delay_ms   0)
-      (session ()))
+      (session ())
+      (as_user ()))
     |}];
   print_s [%sexp (h.model.connection : App.Connection.t)];
   [%expect
@@ -5314,11 +5328,13 @@ let%expect_test "reconnect: a session the backend no longer knows (never \
     (Reconnect
       (generation 3)
       (delay_ms   500)
-      (session ()))
+      (session ())
+      (as_user ()))
     (Reconnect
       (generation 4)
       (delay_ms   1000)
-      (session ()))
+      (session ())
+      (as_user ()))
     |}];
   H.reply h (Reconnect 4) {|{"client_id":"client-2"}|};
   [%expect
@@ -5353,7 +5369,8 @@ let%expect_test "reconnect: a session the backend no longer knows (never \
     (Reconnect
       (generation 5)
       (delay_ms   0)
-      (session (/home/u/.prigh/sessions/2.jsonl)))
+      (session (/home/u/.prigh/sessions/2.jsonl))
+      (as_user ()))
     |}]
 ;;
 
@@ -5903,7 +5920,7 @@ let%expect_test "Tab on an empty editor opens the command list; the list shows \
       /login [provider] [api_key|oauth]  log in to a provider
       /logout [provider]              remove a provider's store…
       /thinking [off|low|on|high|max]  pick or set the thinking…
-      ↕ 1–8 of 34
+      ↕ 1–8 of 35
     …deepseek-flash  ctx:0% 1.5k  Tab/Enter accept · Esc close
     |}];
   H.key h (Key.plain End);
@@ -5920,7 +5937,7 @@ let%expect_test "Tab on an empty editor opens the command list; the list shows \
       /login [provider] [api_key|oauth]  log in to a provider
       /logout [provider]              remove a provider's store…
       /thinking [off|low|on|high|max]  pick or set the thinking…
-      ↕ 1–8 of 34
+      ↕ 1–8 of 35
     …deepseek-flash  ctx:0% 1.5k  Tab/Enter accept · Esc close
     |}];
   H.keys h "qu";

@@ -346,7 +346,7 @@ let%expect_test "fuzzy ranking: command names" =
     {|
     "mo" -> model scoped-models import
     "lo" -> login logout clone
-    "s"  -> state switch setusr session signout sessions scoped-models host agents hotkeys verbosity
+    "s"  -> state switch setusr session signout sessions scoped-models jobs host agents hotkeys verbosity
     "sw" -> switch
     "xyz" ->
     |}]
