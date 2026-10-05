@@ -234,7 +234,11 @@ let publish_hosts t =
    it is attached to. Execs are keyed by id (not by the answering client's
    session) so a host can run tools for other sessions. *)
 let route t agent (event : Agent.Event.t) =
-  let json = Rpc_json.event event in
+  let json =
+    Rpc_json.event
+      ~now:(Eio.Time.now (Eio.Stdenv.clock (Agent.env agent)))
+      event
+  in
   (match event with
    | Tool_exec { host; exec_id; _ } ->
      Hashtbl.set t.execs ~key:exec_id ~data:(host, agent);
@@ -844,7 +848,11 @@ let dispatch agent login ~meth ~params : Json.t Or_error.t =
       | Some found -> ok (Rpc_json.subagent found)
       | None -> Or_error.errorf "unknown subagent %S" id)
   | "get_messages" ->
-    ok (`Array (List.map (Agent.messages agent) ~f:Rpc_json.message))
+    ok
+      (`Array
+          (List.map
+             (Session.timed_messages (Agent.session agent))
+             ~f:Rpc_json.timed_message))
   | "get_entries" ->
     (* [all] includes abandoned branches (for a tree view); the default is
        the active path. *)
