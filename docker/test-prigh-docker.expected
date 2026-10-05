@@ -13,7 +13,7 @@ $ PRIGH_TOKENS= alice=tok-a , bob=tok-b PRIGH_SUPERUSERS=alice PRIGH_GH_TOKENS=b
 + nix-store --check-validity --print-invalid <the 3 paths in /opt/nix-seed/store>
 prigh-docker: adding the image's store paths to /nix (3 missing or unregistered)
 + nix-store --load-db < /opt/nix-seed/registration
-supervise nix-daemon: env -i PATH=$PATH LANG=C.UTF-8 HOME=/root XDG_CACHE_HOME=/nix/var/cache/root nix-daemon
+supervise nix-daemon: env -i PATH=$PATH LANG=C.UTF-8 HOME=/root XDG_CACHE_HOME=/nix/var/cache/root nix-daemon --quiet
 + setpriv --reuid=10000 --regid=10000 --init-groups env -i HOME=/home/alice USER=alice LOGNAME=alice SHELL=/bin/bash NIX_REMOTE=daemon PATH=/home/alice/.nix-profile/bin:/home/alice/.local/state/nix/profile/bin:$PATH LANG=C.UTF-8 GIT_TERMINAL_PROMPT=0 GH_TOKEN=gh-shared sh -c $'for kv in "user.name=$1" "user.email=$2"; do\n  [ -z "${kv#*=}" ] || git config --global --get "${kv%%=*}" >/dev/null || git config --global "${kv%%=*}" "${kv#*=}"\ndone' sh Ada\ L ada@example.com
 + setpriv --reuid=10001 --regid=10001 --init-groups env -i HOME=/home/bob USER=bob LOGNAME=bob SHELL=/bin/bash NIX_REMOTE=daemon PATH=/home/bob/.nix-profile/bin:/home/bob/.local/state/nix/profile/bin:$PATH LANG=C.UTF-8 GIT_TERMINAL_PROMPT=0 GH_TOKEN=gh-b sh -c $'for kv in "user.name=$1" "user.email=$2"; do\n  [ -z "${kv#*=}" ] || git config --global --get "${kv%%=*}" >/dev/null || git config --global "${kv%%=*}" "${kv#*=}"\ndone' sh Ada\ L ada@example.com
 supervise in /workspace/alice: setpriv --reuid=10000 --regid=10000 --init-groups env -i HOME=/home/alice USER=alice LOGNAME=alice SHELL=/bin/bash NIX_REMOTE=daemon PATH=/home/alice/.nix-profile/bin:/home/alice/.local/state/nix/profile/bin:$PATH LANG=C.UTF-8 GIT_TERMINAL_PROMPT=0 GH_TOKEN=gh-shared PRIGH_TOKEN=host-token-alice PRIGH_USER=alice prigh tool-host -connect 127.0.0.1:7788 -name container -cwd /workspace/alice
@@ -117,7 +117,7 @@ $ PRIGH_TOKENS=carol=tok-c,bob=tok-b,alice=tok-a PRIGH_SUPERUSERS=alice, bob PRI
 + chown -R 10003:10003 /workspace/carol
 + setpriv --reuid=10003 --regid=10003 --clear-groups chmod 2770 /workspace/carol
 + nix-store --check-validity --print-invalid <the 3 paths in /opt/nix-seed/store>
-supervise nix-daemon: env -i PATH=$PATH LANG=C.UTF-8 HOME=/root XDG_CACHE_HOME=/nix/var/cache/root nix-daemon
+supervise nix-daemon: env -i PATH=$PATH LANG=C.UTF-8 HOME=/root XDG_CACHE_HOME=/nix/var/cache/root nix-daemon --quiet
 supervise in /workspace/carol: setpriv --reuid=10003 --regid=10003 --init-groups env -i HOME=/home/carol USER=carol LOGNAME=carol SHELL=/bin/bash NIX_REMOTE=daemon PATH=/home/carol/.nix-profile/bin:/home/carol/.local/state/nix/profile/bin:$PATH LANG=C.UTF-8 GIT_TERMINAL_PROMPT=0 PRIGH_TOKEN=host-token-carol PRIGH_USER=carol prigh tool-host -connect 127.0.0.1:7777 -name container -cwd /workspace/carol
 supervise in /workspace/bob: setpriv --reuid=10001 --regid=10001 --init-groups env -i HOME=/home/bob USER=bob LOGNAME=bob SHELL=/bin/bash NIX_REMOTE=daemon PATH=/home/bob/.nix-profile/bin:/home/bob/.local/state/nix/profile/bin:$PATH LANG=C.UTF-8 GIT_TERMINAL_PROMPT=0 PRIGH_TOKEN=host-token-bob PRIGH_USER=bob prigh tool-host -connect 127.0.0.1:7777 -name container -cwd /workspace/bob
 supervise in /workspace/alice: setpriv --reuid=10000 --regid=10000 --init-groups env -i HOME=/home/alice USER=alice LOGNAME=alice SHELL=/bin/bash NIX_REMOTE=daemon PATH=/home/alice/.nix-profile/bin:/home/alice/.local/state/nix/profile/bin:$PATH LANG=C.UTF-8 GIT_TERMINAL_PROMPT=0 PRIGH_TOKEN=host-token-alice PRIGH_USER=alice prigh tool-host -connect 127.0.0.1:7777 -name container -cwd /workspace/alice
@@ -140,7 +140,7 @@ $ PRIGH_TOKEN=tok prigh-docker
 + chown -R 10004:10004 /workspace/default
 + setpriv --reuid=10004 --regid=10004 --clear-groups chmod 2770 /workspace/default
 + nix-store --check-validity --print-invalid <the 3 paths in /opt/nix-seed/store>
-supervise nix-daemon: env -i PATH=$PATH LANG=C.UTF-8 HOME=/root XDG_CACHE_HOME=/nix/var/cache/root nix-daemon
+supervise nix-daemon: env -i PATH=$PATH LANG=C.UTF-8 HOME=/root XDG_CACHE_HOME=/nix/var/cache/root nix-daemon --quiet
 supervise in /workspace/default: setpriv --reuid=10004 --regid=10004 --init-groups env -i HOME=/home/default USER=default LOGNAME=default SHELL=/bin/bash NIX_REMOTE=daemon PATH=/home/default/.nix-profile/bin:/home/default/.local/state/nix/profile/bin:$PATH LANG=C.UTF-8 GIT_TERMINAL_PROMPT=0 PRIGH_TOKEN=host-token-default PRIGH_USER=default prigh tool-host -connect 127.0.0.1:7788 -name container -cwd /workspace/default
 prigh-docker: mode=web users: default(10004); tool hosts: one per user, as that user; nix: daemon started
 exec setpriv --reuid=1000 --regid=1000 --init-groups env -u PRIGH_TOKEN -u PRIGH_GH_TOKENS -u PRIGH_HOST_TOKENS -u GH_TOKEN -u PRIGH_TOKENS -u PRIGH_SUPERUSERS HOME=/home/prigh USER=prigh LOGNAME=prigh SHELL=/bin/bash NIX_REMOTE=daemon PATH=/home/prigh/.nix-profile/bin:/home/prigh/.local/state/nix/profile/bin:$PATH PRIGH_TOKENS=default=tok PRIGH_HOST_TOKENS=default=host-token-default prigh serve -cwd /workspace -no-backend-host -web 0.0.0.0:7788
@@ -148,7 +148,7 @@ $ PRIGH_TOKEN=tok prigh-docker
 + nix-store --check-validity --print-invalid <the 3 paths in /opt/nix-seed/store>
 prigh-docker: adding the image's store paths to /nix (2 missing or unregistered)
 + nix-store --load-db < /opt/nix-seed/registration
-supervise nix-daemon: env -i PATH=$PATH LANG=C.UTF-8 HOME=/root XDG_CACHE_HOME=/nix/var/cache/root nix-daemon
+supervise nix-daemon: env -i PATH=$PATH LANG=C.UTF-8 HOME=/root XDG_CACHE_HOME=/nix/var/cache/root nix-daemon --quiet
 supervise in /workspace/default: setpriv --reuid=10004 --regid=10004 --init-groups env -i HOME=/home/default USER=default LOGNAME=default SHELL=/bin/bash NIX_REMOTE=daemon PATH=/home/default/.nix-profile/bin:/home/default/.local/state/nix/profile/bin:$PATH LANG=C.UTF-8 GIT_TERMINAL_PROMPT=0 PRIGH_TOKEN=host-token-default PRIGH_USER=default prigh tool-host -connect 127.0.0.1:7788 -name container -cwd /workspace/default
 prigh-docker: mode=web users: default(10004); tool hosts: one per user, as that user; nix: daemon started
 exec setpriv --reuid=1000 --regid=1000 --init-groups env -u PRIGH_TOKEN -u PRIGH_GH_TOKENS -u PRIGH_HOST_TOKENS -u GH_TOKEN -u PRIGH_TOKENS -u PRIGH_SUPERUSERS HOME=/home/prigh USER=prigh LOGNAME=prigh SHELL=/bin/bash NIX_REMOTE=daemon PATH=/home/prigh/.nix-profile/bin:/home/prigh/.local/state/nix/profile/bin:$PATH PRIGH_TOKENS=default=tok PRIGH_HOST_TOKENS=default=host-token-default prigh serve -cwd /workspace -no-backend-host -web 0.0.0.0:7788
@@ -176,7 +176,7 @@ $ PRIGH_TOKEN=tok prigh-docker
 prigh-docker: /nix/store/eeee-openssl-3 is in the store but not registered: replacing it with the image's copy
 prigh-docker: adding the image's store paths to /nix (1 missing or unregistered)
 + nix-store --load-db < /opt/nix-seed/registration
-supervise nix-daemon: env -i PATH=$PATH LANG=C.UTF-8 HOME=/root XDG_CACHE_HOME=/nix/var/cache/root nix-daemon
+supervise nix-daemon: env -i PATH=$PATH LANG=C.UTF-8 HOME=/root XDG_CACHE_HOME=/nix/var/cache/root nix-daemon --quiet
 supervise in /workspace/default: setpriv --reuid=10004 --regid=10004 --init-groups env -i HOME=/home/default USER=default LOGNAME=default SHELL=/bin/bash NIX_REMOTE=daemon PATH=/home/default/.nix-profile/bin:/home/default/.local/state/nix/profile/bin:$PATH LANG=C.UTF-8 GIT_TERMINAL_PROMPT=0 PRIGH_TOKEN=host-token-default PRIGH_USER=default prigh tool-host -connect 127.0.0.1:7788 -name container -cwd /workspace/default
 prigh-docker: mode=web users: default(10004); tool hosts: one per user, as that user; nix: daemon started
 exec setpriv --reuid=1000 --regid=1000 --init-groups env -u PRIGH_TOKEN -u PRIGH_GH_TOKENS -u PRIGH_HOST_TOKENS -u GH_TOKEN -u PRIGH_TOKENS -u PRIGH_SUPERUSERS HOME=/home/prigh USER=prigh LOGNAME=prigh SHELL=/bin/bash NIX_REMOTE=daemon PATH=/home/prigh/.nix-profile/bin:/home/prigh/.local/state/nix/profile/bin:$PATH PRIGH_TOKENS=default=tok PRIGH_HOST_TOKENS=default=host-token-default prigh serve -cwd /workspace -no-backend-host -web 0.0.0.0:7788
@@ -249,7 +249,7 @@ prigh-docker: /home/erin is owned by uid 10003, not 10004: chowning it recursive
 + nix-store --check-validity --print-invalid <the 3 paths in /opt/nix-seed/store>
 prigh-docker: adding the image's store paths to /nix (3 missing or unregistered)
 + nix-store --load-db < /opt/nix-seed/registration
-supervise nix-daemon: env -i PATH=$PATH LANG=C.UTF-8 HOME=/root XDG_CACHE_HOME=/nix/var/cache/root nix-daemon
+supervise nix-daemon: env -i PATH=$PATH LANG=C.UTF-8 HOME=/root XDG_CACHE_HOME=/nix/var/cache/root nix-daemon --quiet
 prigh-docker: mode=web users: alice(10001) bob(10007) carol(10002) dave(10003) erin(10004); tool hosts: none in the container (PRIGH_NO_BACKEND_HOST=1); nix: daemon started
 exec setpriv --reuid=1000 --regid=1000 --init-groups env -u PRIGH_TOKEN -u PRIGH_GH_TOKENS -u PRIGH_HOST_TOKENS -u GH_TOKEN -u PRIGH_TOKENS -u PRIGH_SUPERUSERS HOME=/home/prigh USER=prigh LOGNAME=prigh SHELL=/bin/bash NIX_REMOTE=daemon PATH=/home/prigh/.nix-profile/bin:/home/prigh/.local/state/nix/profile/bin:$PATH PRIGH_TOKENS=alice=a\,bob=b\,carol=c\,dave=d\,erin=e prigh serve -cwd /workspace -no-backend-host -web 0.0.0.0:7788
 --- /run/prigh/users
@@ -288,7 +288,7 @@ prigh-docker: /workspace/default is owned by uid 1000, not 10000: chowning it re
 + nix-store --check-validity --print-invalid <the 3 paths in /opt/nix-seed/store>
 prigh-docker: adding the image's store paths to /nix (3 missing or unregistered)
 + nix-store --load-db < /opt/nix-seed/registration
-supervise nix-daemon: env -i PATH=$PATH LANG=C.UTF-8 HOME=/root XDG_CACHE_HOME=/nix/var/cache/root nix-daemon
+supervise nix-daemon: env -i PATH=$PATH LANG=C.UTF-8 HOME=/root XDG_CACHE_HOME=/nix/var/cache/root nix-daemon --quiet
 supervise in /workspace/default: setpriv --reuid=10000 --regid=10000 --init-groups env -i HOME=/home/default USER=default LOGNAME=default SHELL=/bin/bash NIX_REMOTE=daemon PATH=/home/default/.nix-profile/bin:/home/default/.local/state/nix/profile/bin:$PATH LANG=C.UTF-8 GIT_TERMINAL_PROMPT=0 PRIGH_TOKEN=host-token-default PRIGH_USER=default prigh tool-host -connect 127.0.0.1:7777 -name container -cwd /workspace/default
 prigh-docker: mode=pi-web users: default(10000); tool hosts: one per user, as that user; nix: daemon started
 exec setpriv --reuid=1000 --regid=1000 --init-groups env -u PRIGH_TOKEN -u PRIGH_GH_TOKENS -u PRIGH_HOST_TOKENS -u GH_TOKEN -u PRIGH_TOKENS -u PRIGH_SUPERUSERS HOME=/home/prigh USER=prigh LOGNAME=prigh SHELL=/bin/bash NIX_REMOTE=daemon PATH=/home/prigh/.nix-profile/bin:/home/prigh/.local/state/nix/profile/bin:$PATH PRIGH_TOKENS=default=tok PRIGH_HOST_TOKENS=default=host-token-default prigh serve -cwd /workspace -no-backend-host -pi-web 0.0.0.0:7789 -listen 127.0.0.1:7777
@@ -327,7 +327,7 @@ $ PRIGH_ALLOW_NO_TOKEN=1 PRIGH_MODE=server PRIGH_SUPERUSERS= prigh-docker
 + nix-store --check-validity --print-invalid <the 3 paths in /opt/nix-seed/store>
 prigh-docker: adding the image's store paths to /nix (3 missing or unregistered)
 + nix-store --load-db < /opt/nix-seed/registration
-supervise nix-daemon: env -i PATH=$PATH LANG=C.UTF-8 HOME=/root XDG_CACHE_HOME=/nix/var/cache/root nix-daemon
+supervise nix-daemon: env -i PATH=$PATH LANG=C.UTF-8 HOME=/root XDG_CACHE_HOME=/nix/var/cache/root nix-daemon --quiet
 supervise in /workspace/default: setpriv --reuid=10000 --regid=10000 --init-groups env -i HOME=/home/default USER=default LOGNAME=default SHELL=/bin/bash NIX_REMOTE=daemon PATH=/home/default/.nix-profile/bin:/home/default/.local/state/nix/profile/bin:$PATH LANG=C.UTF-8 GIT_TERMINAL_PROMPT=0 prigh tool-host -connect 127.0.0.1:7777 -name container -cwd /workspace/default
 prigh-docker: mode=server users: default(10000); tool hosts: one per user, as that user; nix: daemon started
 exec setpriv --reuid=1000 --regid=1000 --init-groups env -u PRIGH_TOKEN -u PRIGH_GH_TOKENS -u PRIGH_HOST_TOKENS -u GH_TOKEN -u PRIGH_TOKENS -u PRIGH_SUPERUSERS HOME=/home/prigh USER=prigh LOGNAME=prigh SHELL=/bin/bash NIX_REMOTE=daemon PATH=/home/prigh/.nix-profile/bin:/home/prigh/.local/state/nix/profile/bin:$PATH prigh serve -cwd /workspace -no-backend-host -listen 0.0.0.0:7777
@@ -340,14 +340,14 @@ $ PRIGH_MODE=tui PRIGH_TUI_ARGS=-model m PRIGH_GIT_EMAIL=me@example.com GH_TOKEN
 + nix-store --check-validity --print-invalid <the 3 paths in /opt/nix-seed/store>
 prigh-docker: adding the image's store paths to /nix (3 missing or unregistered)
 + nix-store --load-db < /opt/nix-seed/registration
-supervise nix-daemon: env -i PATH=$PATH LANG=C.UTF-8 HOME=/root XDG_CACHE_HOME=/nix/var/cache/root nix-daemon
+supervise nix-daemon: env -i PATH=$PATH LANG=C.UTF-8 HOME=/root XDG_CACHE_HOME=/nix/var/cache/root nix-daemon --quiet
 + chown 1000:1000 /workspace/prigh
 + setpriv --reuid=1000 --regid=1000 --init-groups env -i HOME=/home/prigh USER=prigh LOGNAME=prigh SHELL=/bin/bash NIX_REMOTE=daemon PATH=/home/prigh/.nix-profile/bin:/home/prigh/.local/state/nix/profile/bin:$PATH LANG=C.UTF-8 GIT_TERMINAL_PROMPT=0 sh -c $'for kv in "user.name=$1" "user.email=$2"; do\n  [ -z "${kv#*=}" ] || git config --global --get "${kv%%=*}" >/dev/null || git config --global "${kv%%=*}" "${kv#*=}"\ndone' sh '' me@example.com
 prigh-docker: mode=tui cwd=/workspace/prigh (single user: tools run as prigh); nix: daemon started
 exec setpriv --reuid=1000 --regid=1000 --init-groups env -u PRIGH_TOKEN -u PRIGH_GH_TOKENS -u PRIGH_HOST_TOKENS HOME=/home/prigh USER=prigh LOGNAME=prigh SHELL=/bin/bash NIX_REMOTE=daemon PATH=/home/prigh/.nix-profile/bin:/home/prigh/.local/state/nix/profile/bin:$PATH prigh-tui -cwd /workspace/prigh -model m --
 $ PRIGH_MODE=tui PRIGH_CWD=/workspace/proj prigh-docker 
 + nix-store --check-validity --print-invalid <the 3 paths in /opt/nix-seed/store>
-supervise nix-daemon: env -i PATH=$PATH LANG=C.UTF-8 HOME=/root XDG_CACHE_HOME=/nix/var/cache/root nix-daemon
+supervise nix-daemon: env -i PATH=$PATH LANG=C.UTF-8 HOME=/root XDG_CACHE_HOME=/nix/var/cache/root nix-daemon --quiet
 + chown 1000:1000 /workspace/proj
 prigh-docker: mode=tui cwd=/workspace/proj (single user: tools run as prigh); nix: daemon started
 exec setpriv --reuid=1000 --regid=1000 --init-groups env -u PRIGH_TOKEN -u PRIGH_GH_TOKENS -u PRIGH_HOST_TOKENS HOME=/home/prigh USER=prigh LOGNAME=prigh SHELL=/bin/bash NIX_REMOTE=daemon PATH=/home/prigh/.nix-profile/bin:/home/prigh/.local/state/nix/profile/bin:$PATH prigh-tui -cwd /workspace/proj --

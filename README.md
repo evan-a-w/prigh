@@ -442,11 +442,14 @@ calls; it implies `-faux`.
 
 Sessions are JSONL trees under `~/.prigh/sessions/`. Project instructions are
 read from `AGENTS.md`/`CLAUDE.md` files between `/` and the working
-directory, plus `~/.prigh/AGENTS.md`. The system prompt is built once, at a
-session's first run, and recorded in the session so the cached prompt prefix
-survives `/cd`, `/host` and backend restarts; later directory or host changes
-reach the model as a short note on the next message, leaving it to re-read
-the instructions if that seems worthwhile.
+directory, plus `~/.prigh/AGENTS.md`. When the tool host has `nix` on its
+PATH (as in the Docker image), the system prompt also tells the model to get
+missing tools from nixpkgs (`nix shell`, `nix run`, `nix profile install`)
+rather than apt or sudo. The system prompt is built once, at a session's
+first run, and recorded in the session so the cached prompt prefix survives
+`/cd`, `/host` and backend restarts; later directory or host changes reach
+the model as a short note on the next message, leaving it to re-read the
+instructions if that seems worthwhile.
 
 ### Testing
 
