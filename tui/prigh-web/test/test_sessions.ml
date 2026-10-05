@@ -128,6 +128,13 @@ let%expect_test "switching resets what belonged to the old session" =
     h
     {|{"event":"tool_confirm","call_id":"c1","name":"bash","summary":"rm -rf build"}|};
   [%expect {| (Focus confirm) |}];
+  H.act h (Run "/btw why?");
+  H.type_ h "/mo";
+  [%expect
+    {|
+    (Rpc (method_ btw) (params ((question why?) (btw_id btw-1)))
+     (tag (Btw btw-1)))
+    |}];
   H.act h (Switch_session "/sessions/s2.jsonl");
   [%expect
     {|
@@ -147,6 +154,7 @@ let%expect_test "switching resets what belonged to the old session" =
           ()));
   [%expect
     {|
+    (Rpc (method_ btw_cancel) (params ((btw_id btw-1))) (tag Ignore))
     (Set_url_session s2)
     (Rpc (method_ get_messages) (params ()) (tag (Messages s2)))
     (Rpc (method_ get_pending) (params ()) (tag Pending))
@@ -159,11 +167,14 @@ let%expect_test "switching resets what belonged to the old session" =
     [%message
       (Prigh_web.Chat.entries m.chat |> List.length : int)
         (m.queue : int * int)
-        (List.length m.confirms : int)];
+        (List.length m.confirms : int)
+        (Option.is_some m.btw : bool)
+        (Option.is_some m.completion : bool)];
   [%expect
     {|
     (("(Prigh_web.Chat.entries m.chat) |> List.length" 0) (m.queue (0 0))
-     ("List.length m.confirms" 0))
+     ("List.length m.confirms" 0) ("Option.is_some m.btw" false)
+     ("Option.is_some m.completion" false))
     |}];
   H.reply h "list_sessions" sessions;
   H.text h ~selector:".session.selected .session-title";

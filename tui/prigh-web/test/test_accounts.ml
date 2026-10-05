@@ -322,6 +322,7 @@ let%expect_test "switching user resets everything that was the old user's" =
      (tag (Btw btw-1)))
     (Focus picker-input)
     (Rpc (method_ set_user) (params ((user bob))) (tag User_switched))
+    (Rpc (method_ btw_cancel) (params ((btw_id btw-1))) (tag Ignore))
     (Expire_toast (id 0) (after_ms 4000))
     (Focus editor)
     (Rpc (method_ get_state) (params ()) (tag State))
