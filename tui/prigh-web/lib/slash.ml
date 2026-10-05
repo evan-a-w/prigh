@@ -13,6 +13,7 @@ module Argument = struct
     | Path
     | Host
     | User
+    | Skill
   [@@deriving sexp_of, equal]
 end
 
@@ -24,6 +25,12 @@ module Spec = struct
     ; argument : Argument.t option
     }
   [@@deriving sexp_of, equal]
+
+  let usage t =
+    if String.is_suffix t.name ~suffix:":"
+    then "/" ^ t.name ^ t.args
+    else String.strip ("/" ^ t.name ^ " " ^ t.args)
+  ;;
 end
 
 let c ?argument ?(args = "") name help = { Spec.name; args; help; argument }
@@ -80,6 +87,16 @@ let all =
       ~args:"[path]"
       "import"
       "import a session from a JSONL file on the backend"
+  ; c "skills" "pick a skill to invoke (/skill:name)"
+  ; c
+      ~argument:Skill
+      ~args:"<name> [args]"
+      "skill:"
+      "send a skill's instructions to the agent, with your arguments"
+  ; c
+      ~args:"[reconnect]"
+      "mcp"
+      "MCP servers: their tools, approve a project's, or restart failed ones"
   ; c "copy" "copy the last reply to the clipboard"
   ; c
       ~args:"<question>"

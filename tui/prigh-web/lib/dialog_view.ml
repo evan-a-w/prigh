@@ -17,6 +17,19 @@ let picker_title : Dialog.Picker_kind.t -> string = function
   | Hosts -> "Hosts"
   | Users -> "Users"
   | Accounts -> "Accounts"
+  | Skills -> "Skills"
+  | Mcp _ -> "Servers"
+;;
+
+(* What is wrong with the MCP configuration, under its servers. *)
+let mcp_problems : Dialog.Picker_kind.t -> Node.t = function
+  | Mcp { problems = _ :: _ as problems; _ } ->
+    div
+      ~cls:"mcp-problems"
+      [ Node.h3 [ Node.text "Configuration problems" ]
+      ; Node.ul (List.map problems ~f:(fun p -> Node.li [ Node.text p ]))
+      ]
+  | _ -> Node.none
 ;;
 
 let picker ~kind (p : Picker.t) ~inject =
@@ -25,6 +38,7 @@ let picker ~kind (p : Picker.t) ~inject =
     ~cls:
       (match kind with
        | Dialog.Picker_kind.Tree -> "picker-dialog tree-dialog"
+       | Mcp _ -> "picker-dialog mcp-dialog"
        | _ -> "picker-dialog")
     ~title:(Picker.title p)
     ~on_close:(inject Action.Close_dialog)
@@ -45,15 +59,17 @@ let picker ~kind (p : Picker.t) ~inject =
               ]
             ()
         ]
-    ; (match visible with
-       | [] ->
+    ; (match visible, kind with
+       | [], Mcp { servers = []; _ } ->
+         div ~cls:"picker-empty" [ Node.text Mcp_servers.none ]
+       | [], _ ->
          div
            ~cls:"picker-empty"
            [ Node.textf
                "Nothing matches “%s”: Backspace widens the search."
                (Picker.query p)
            ]
-       | visible ->
+       | visible, _ ->
          div
            ~cls:"picker-items"
            ~attrs:[ Attr.role "listbox" ]
@@ -78,6 +94,7 @@ let picker ~kind (p : Picker.t) ~inject =
                    then span ~cls:"picker-check" "✓"
                    else Node.none)
                 ])))
+    ; mcp_problems kind
     ]
 ;;
 
@@ -108,7 +125,7 @@ let help ~inject =
     ; Node.h3 [ Node.text "Commands" ]
     ; table
         (List.map Slash.all ~f:(fun (s : Slash.Spec.t) ->
-           String.strip ("/" ^ s.name ^ " " ^ s.args), s.help))
+           Slash.Spec.usage s, s.help))
     ; Node.h3 [ Node.text "Left to the browser" ]
     ; table Keys.browser
     ]

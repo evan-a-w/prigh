@@ -15,6 +15,8 @@ module Picker_kind = struct
     | Hosts
     | Users
     | Accounts
+    | Skills
+    | Mcp of Mcp_list.t
   [@@deriving sexp_of, equal]
 end
 
@@ -46,11 +48,13 @@ type t =
       { title : string
       ; text : string
       }
+  | Mcp_tools of Mcp_server.t
 [@@deriving sexp_of, equal]
 
 let per_session = function
-  | Rename _ | Prompt _ | Rewind_confirm _ | Session _ | Text _
-  | Picker { kind = Fork _ | Rewind _ | Tree | Hosts; _ } -> true
+  | Rename _ | Prompt _ | Rewind_confirm _ | Session _ | Text _ | Mcp_tools _
+  | Picker { kind = Fork _ | Rewind _ | Tree | Hosts | Skills | Mcp _; _ } ->
+    true
   | Picker
       { kind =
           ( Models

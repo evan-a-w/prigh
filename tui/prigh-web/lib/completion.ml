@@ -37,12 +37,17 @@ let command_items ~prefix =
       ~id:s.name
       ~detail:s.help
       ~search:s.name
-      (String.strip ("/" ^ s.name ^ " " ^ s.args)))
+      (Slash.Spec.usage s))
 ;;
 
 let logged_in (auth : Auth_status.t list) provider =
   List.exists auth ~f:(fun s ->
     String.equal s.provider provider && Option.is_some s.configured)
+;;
+
+let skill_items skills =
+  List.map skills ~f:(fun (s : Skill.t) ->
+    Picker.Item.create ~id:s.name ~detail:s.description s.name)
 ;;
 
 let argument_items
@@ -53,6 +58,7 @@ let argument_items
       ~(sessions : Session_summary.t list)
       ~(hosts : Host.t list)
       ~users
+      ~(skills : Skill.t list)
   =
   let simple items =
     List.map items ~f:(fun (id, detail) -> Picker.Item.create ~id ~detail id)
@@ -128,6 +134,7 @@ let argument_items
         ~search:(h.name ^ " " ^ h.id)
         h.name)
   | User -> List.map users ~f:(fun u -> Picker.Item.create ~id:u u)
+  | Skill -> skill_items skills
   | Directory | Path -> []
 ;;
 
@@ -159,6 +166,7 @@ let compute
       ?(sessions = [])
       ?(hosts = [])
       ?(users = [])
+      ?(skills = [])
       ~text
       ~cursor
       ~models
@@ -167,8 +175,25 @@ let compute
       ()
   =
   let in_first_line = not (String.mem (String.prefix text cursor) '\n') in
+  let skill_start = String.length "/skill:" in
   let slash =
     match String.chop_prefix text ~prefix:"/" with
+    | Some body
+      when in_first_line
+           && (not (String.mem body '\n'))
+           && String.is_prefix body ~prefix:"skill:"
+           && cursor >= skill_start ->
+      let after = String.drop_prefix text skill_start in
+      let name =
+        Option.value_map (String.lsplit2 after ~on:' ') ~f:fst ~default:after
+      in
+      if cursor > skill_start + String.length name
+      then None
+      else (
+        match rank ~prefix:name (skill_items skills) with
+        | [] -> None
+        | items ->
+          Some (make (Argument Skill) ~prefix:name ~start:skill_start items))
     | Some body when in_first_line && not (String.mem body '\n') ->
       (match String.lsplit2 body ~on:' ' with
        | None when cursor >= 1 ->
@@ -195,7 +220,8 @@ let compute
                        ~current_model
                        ~sessions
                        ~hosts
-                       ~users)
+                       ~users
+                       ~skills)
                 with
                 | [] -> None
                 | items -> Some (make (Argument kind) ~prefix ~start items)))
@@ -245,14 +271,18 @@ let accept t ~text =
   match selected_item t with
   | None -> text, String.length text
   | Some item ->
-    let replacement =
-      match t.source with
-      | Command -> item.id ^ " "
-      | Path when not (String.is_suffix item.id ~suffix:"/") -> item.id ^ " "
-      | Path | Argument _ -> item.id
-    in
     let before = String.prefix text t.start in
     let after = String.drop_prefix text (t.start + String.length t.prefix) in
+    let replacement =
+      match t.source with
+      (* [/skill:] completes the skill's name straight after the colon. *)
+      | Command when String.is_suffix item.id ~suffix:":" -> item.id
+      | Command -> item.id ^ " "
+      | Path when not (String.is_suffix item.id ~suffix:"/") -> item.id ^ " "
+      | Argument Skill when not (String.is_prefix after ~prefix:" ") ->
+        item.id ^ " "
+      | Path | Argument _ -> item.id
+    in
     ( before ^ replacement ^ after
     , String.length before + String.length replacement )
 ;;

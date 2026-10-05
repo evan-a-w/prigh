@@ -34,6 +34,12 @@ let act t action =
     if not t.quiet then print_s [%sexp (command : App.Command.t)])
 ;;
 
+let quiet t f =
+  let was = t.quiet in
+  t.quiet <- true;
+  Exn.protect ~f ~finally:(fun () -> t.quiet <- was)
+;;
+
 let reply t method_ json =
   match List.findi t.pending ~f:(fun _ (m, _) -> String.equal m method_) with
   | None -> raise_s [%message "no pending request" method_]

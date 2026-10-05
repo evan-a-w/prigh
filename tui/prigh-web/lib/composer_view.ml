@@ -20,6 +20,7 @@ let popup (m : App.Model.t) ~inject =
       | Argument Session -> "Sessions"
       | Argument Host -> "Hosts"
       | Argument User -> "Users"
+      | Argument Skill -> "Skills"
     in
     div
       ~cls:"popup"
