@@ -2144,7 +2144,7 @@ let update (m : Model.t) (action : Action.t) =
   | Sign_out -> m, [ Command.Sign_out ]
   | Set_accounts { accounts; current } ->
     { m with accounts; account = current }, []
-  | Open_accounts -> open_picker m (account_menu m)
+  | Open_accounts -> open_dialog m (account_menu m)
   | Switch_account account -> m, [ Command.Switch_account account ]
   | Add_account -> m, [ Command.Add_account ]
   | Act_as user -> act_as { m with dialog = None } user
