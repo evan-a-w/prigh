@@ -118,6 +118,7 @@ let perform client settings ctx (command : App.Command.t) =
     | Focus id -> Effect.of_sync_fun focus id
     | Save_history entries -> Effect.of_sync_fun save_history entries
     | Sign_out -> Effect.of_sync_fun sign_out ()
+    | Reveal path -> Effect.of_sync_fun Agents_listeners.reveal path
   in
   Bonsai.Apply_action_context.schedule_event ctx eff
 ;;
@@ -255,9 +256,13 @@ let narrow () = Dom_html.window##.innerWidth < 760
 
 let install_listeners ~schedule ~current =
   let document = Dom_html.document in
-  let listen event handler =
+  let listen ?(capture = false) event handler =
     ignore
-      (Dom_html.addEventListener document event (Dom.handler handler) Js._false
+      (Dom_html.addEventListener
+         document
+         event
+         (Dom.handler handler)
+         (Js.bool capture)
        : Dom_html.event_listener_id)
   in
   listen Dom_html.Event.keydown (fun ev ->
@@ -293,6 +298,7 @@ let install_listeners ~schedule ~current =
       read_images ~schedule data##.files);
     Js._true);
   Chat_listeners.install ();
+  Agents_listeners.install ~schedule;
   (* The chat follows new output unless the user has scrolled up. *)
   let stick = ref true in
   let chat () = Dom_html.getElementById_opt "chat" in
@@ -303,7 +309,8 @@ let install_listeners ~schedule ~current =
       -. of_int el##.clientHeight
       < 60.)
   in
-  listen (Dom_html.Event.make "scroll") (fun _ ->
+  (* Scroll events do not bubble: only capturing sees the chat's. *)
+  listen ~capture:true (Dom_html.Event.make "scroll") (fun _ ->
     Option.iter (chat ()) ~f:(fun el -> stick := at_bottom el);
     Js._true);
   let observer =
@@ -417,6 +424,9 @@ let run_app (settings : Settings.t) =
        let tick () = schedule (App.Action.Tick (Time_ns.now ())) in
        tick ();
        Clock_ns.every (Time_ns.Span.of_sec 30.) tick;
+       Clock_ns.every (Time_ns.Span.of_sec 1.) (fun () ->
+         if App.Model.ticking !current
+         then schedule (App.Action.Clock (Time_ns.now ())));
        install_listeners ~schedule ~current;
        don't_wait_for
          (Pipe.iter_without_pushback

@@ -38,6 +38,9 @@ module Icon : sig
     | Key
     | Server
     | Help
+    | Bot
+    | Back
+    | Locate
 
   (** An inline SVG; tests show [<icon name>]. *)
   val view : ?cls:string -> t -> Node.t

@@ -11,6 +11,8 @@ let%expect_test "startup, a prompt and its streamed reply" =
     (Set_url_session s1)
     (Rpc (method_ get_messages) (params ()) (tag Messages))
     (Rpc (method_ list_sessions) (params ()) (tag Sessions))
+    (Rpc (method_ list_subagents) (params ()) (tag Subagents))
+    (Rpc (method_ list_jobs) (params ()) (tag Jobs))
     |}];
   Harness.act h (Set_draft "hello");
   Harness.act h Send;

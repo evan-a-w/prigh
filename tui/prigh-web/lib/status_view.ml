@@ -13,8 +13,6 @@ let tokens n =
   else Int.to_string n
 ;;
 
-let plural n word = sprintf "%d %s%s" n word (if n = 1 then "" else "s")
-
 let item ?(cls = "") ?title children =
   Node.span
     ~attrs:
@@ -62,32 +60,22 @@ let context (state : State.t) =
       ])
 ;;
 
-let background (state : State.t) ~inject =
-  let running_agents = List.count state.subagents ~f:(fun s -> s.running) in
-  let running_jobs = List.count state.jobs ~f:(fun j -> j.running) in
-  let parts =
-    List.filter_opt
-      [ Option.some_if
-          (not (List.is_empty state.subagents))
-          (plural (List.length state.subagents) "subagent")
-      ; Option.some_if
-          (not (List.is_empty state.jobs))
-          (plural (List.length state.jobs) "job")
-      ]
-  in
-  match parts with
-  | [] -> Node.none
-  | parts ->
+let background (m : App.Model.t) ~inject =
+  match Agents_view.summary m.agents with
+  | None -> Node.none
+  | Some (text, running) ->
     Node.button
       ~attrs:
-        [ classes
-            [ "status-item"; "link"; "background" ]
-            [ "active", running_agents + running_jobs > 0 ]
+        [ classes [ "status-item"; "link"; "background" ] [ "active", running ]
         ; Attr.type_ "button"
-        ; Attr.title "Background work (/agents)"
-        ; Attr.on_click (fun _ -> inject Action.Open_agents)
+        ; Attr.title "Subagents and jobs (/agents)"
+        ; Attr.on_click (fun _ -> inject (Action.Open_subagents None))
         ]
-      [ icon Cpu; Node.text (String.concat ~sep:" · " parts) ]
+      [ (if running
+         then Node.span ~attrs:[ Attr.class_ "spinner" ] []
+         else icon Bot)
+      ; Node.text text
+      ]
 ;;
 
 let host (state : State.t) =
@@ -162,7 +150,7 @@ let view (m : App.Model.t) ~inject =
                ]
              [ icon Undo; Node.text (sprintf "%d queued" (steer + follow_up)) ]
          else Node.none)
-      ; background state ~inject
+      ; background m ~inject
       ; host state
       ; div ~cls:"status-spacer" []
       ; user m

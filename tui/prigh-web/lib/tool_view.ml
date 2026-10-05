@@ -443,15 +443,40 @@ let view
     | Preparing | Running | Done | Failed | Interrupted -> chips
   in
   let body = Chat_html.present body in
-  div
-    (String.concat ~sep:" " [ "tool"; "tool-" ^ call.name; Status.cls status ])
-    [ div
-        "tool-head"
-        ([ Status.icon status; span "name" call.name ]
-         @ Option.to_list arg
-         @ chips)
-    ; (match body with
-       | [] -> Node.none
-       | body -> div "tool-body" body)
-    ]
+  (* A subagent's card opens it in the agents panel (the page listens for
+     clicks on [data-agent]); [data-call] finds the card from the panel. *)
+  let agent =
+    match subagent, result with
+    | Some s, _ -> Some s.agent_id
+    | None, Some { is_error = false; text; _ } -> Subagent_report.started text
+    | None, _ -> None
+  in
+  let head =
+    [ Status.icon status; span "name" call.name ] @ Option.to_list arg @ chips
+  in
+  let cls =
+    String.concat ~sep:" " [ "tool"; "tool-" ^ call.name; Status.cls status ]
+  in
+  let body =
+    match body with
+    | [] -> Node.none
+    | body -> div "tool-body" body
+  in
+  if String.equal call.name "subagent"
+  then
+    Node.div
+      ~attrs:[ Attr.class_ cls; Attr.create "data-call" call.id ]
+      [ (match agent with
+         | Some id ->
+           Node.div
+             ~attrs:
+               [ Attr.class_ "tool-head"
+               ; Attr.create "data-agent" id
+               ; Attr.title "Follow it in the agents panel"
+               ]
+             (head @ [ span "open-agent" "Open ›" ])
+         | None -> div "tool-head" head)
+      ; body
+      ]
+  else div cls [ div "tool-head" head; body ]
 ;;

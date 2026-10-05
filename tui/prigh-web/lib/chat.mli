@@ -66,4 +66,16 @@ val subagents_to_load : t -> string list
 (** Fills in a [subagent] call's transcript, unless events already did. *)
 val set_subagent : t -> call_id:string -> Subagent.t -> t
 
+(** A subagent by its agent id, at any depth. *)
+val find_subagent : t -> string -> Subagent.t option
+
+(** [set_subagent] in the transcript of the subagent [parent] (at any depth),
+    or in [t] itself. *)
+val set_nested_subagent
+  :  t
+  -> parent:string option
+  -> call_id:string
+  -> Subagent.t
+  -> t
+
 val add_notice : t -> string -> t

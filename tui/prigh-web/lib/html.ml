@@ -62,6 +62,9 @@ module Icon = struct
     | Key
     | Server
     | Help
+    | Bot
+    | Back
+    | Locate
   [@@deriving sexp_of]
 
   (* Paths in the style of Lucide (24x24, stroked). *)
@@ -98,6 +101,11 @@ module Icon = struct
       {|<rect x="3" y="4" width="18" height="7" rx="2"/><rect x="3" y="13" width="18" height="7" rx="2"/><path d="M7 7.5h.01M7 16.5h.01"/>|}
     | Help ->
       {|<circle cx="12" cy="12" r="9"/><path d="M9.5 9a2.5 2.5 0 0 1 4.9.8c0 1.7-2.4 2.2-2.4 3.7M12 17h.01"/>|}
+    | Bot ->
+      {|<rect x="4" y="8" width="16" height="12" rx="2"/><path d="M12 8V4M9 13v2M15 13v2M2 14h2M20 14h2"/>|}
+    | Back -> {|<path d="M19 12H5M12 19l-7-7 7-7"/>|}
+    | Locate ->
+      {|<circle cx="12" cy="12" r="7"/><circle cx="12" cy="12" r="2"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/>|}
   ;;
 
   let name t = String.lowercase (Sexp.to_string (sexp_of_t t))
