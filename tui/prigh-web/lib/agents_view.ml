@@ -40,7 +40,7 @@ let report_text (r : Event.Subagent_result.t) =
 (* What it is doing, or how it ended. *)
 let activity (m : App.Model.t) (a : Agent.t) =
   match a.result with
-  | Some r -> first_line (report_text r)
+  | Some r -> Markdown.preview (report_text r)
   | None ->
     let latest =
       Option.bind (Chat.find_subagent m.chat a.id) ~f:(fun s ->
@@ -73,7 +73,7 @@ let row ~inject ~item ~status ~selected ~depth ~number ~title ~elapsed ~meta ~li
           [ "agents-row"; status_cls status ]
           [ "selected", selected; "nested", depth > 0 ]
       ; Attr.type_ "button"
-      ; Attr.style (Css_gen.create ~field:"--depth" ~value:(Int.to_string depth))
+      ; Attr.create "style" (sprintf "--depth: %d" depth)
       ; Attr.on_click (fun _ -> inject (Action.Select_item item))
       ]
     [ number_badge number
@@ -107,12 +107,29 @@ let bytes n =
   else sprintf "%.1f MB" (Float.of_int n /. 1048576.)
 ;;
 
-let job_meta (j : Agents.Job.t) =
+let job_meta ?(exit = true) (j : Agents.Job.t) =
   List.filter_opt
     [ Some j.info.id
-    ; Option.some_if (not j.info.running) (Option.value j.info.exit ~default:"finished")
+    ; Option.some_if
+        (exit && not j.info.running)
+        (Option.value j.info.exit ~default:"finished")
     ; Option.some_if (j.info.bytes > 0) (bytes j.info.bytes)
     ]
+;;
+
+(* [job_output]'s text starts with a line about the job (shown above) and
+   which lines follow. *)
+let split_output text =
+  match String.lsplit2 text ~on:'\n' with
+  | Some (header, body) when String.is_prefix header ~prefix:"[job " ->
+    let lines =
+      String.lsplit2 header ~on:';'
+      |> Option.bind ~f:(fun (_, rest) -> String.lsplit2 rest ~on:']')
+      |> Option.map ~f:(fun (lines, _) -> String.strip lines)
+    in
+    lines, body
+  | None when String.is_prefix text ~prefix:"[job " -> None, ""
+  | _ -> None, text
 ;;
 
 let item_row (m : App.Model.t) ~inject ~number (item, depth) =
@@ -274,9 +291,11 @@ let agent_detail (m : App.Model.t) ~inject (a : Agent.t) =
         ; Node.text "Loading the transcript…"
         ]
   in
+  (* The transcript ends with the report. *)
   let result =
     match a.result with
     | None -> Node.none
+    | Some { is_error = false; _ } when Option.is_some sub -> Node.none
     | Some ({ is_error = false; _ } as r) ->
       div
         ~cls:"agents-result"
@@ -335,7 +354,7 @@ let job_detail (m : App.Model.t) ~inject (j : Agents.Job.t) =
   let status = job_status j in
   let output =
     match m.agents.output with
-    | Some (id, text) when String.equal id j.info.id -> Some text
+    | Some (id, text) when String.equal id j.info.id -> Some (split_output text)
     | _ -> None
   in
   div
@@ -351,7 +370,7 @@ let job_detail (m : App.Model.t) ~inject (j : Agents.Job.t) =
             ([ pill status (if j.info.running then "running" else Option.value j.info.exit ~default:"finished")
              ; span ~cls:"detail-elapsed" (Agents.format_span (Agents.job_elapsed j ~now:(now m)))
              ]
-             @ List.map (job_meta j) ~f:(span ~cls:"detail-chip"))
+             @ List.map (job_meta ~exit:false j) ~f:(span ~cls:"detail-chip"))
         ; (if j.info.running
            then
              div
@@ -371,9 +390,15 @@ let job_detail (m : App.Model.t) ~inject (j : Agents.Job.t) =
          div
            ~cls:"agents-note"
            [ Node.span ~attrs:[ Attr.class_ "spinner" ] []; Node.text "Loading the output…" ]
-       | Some text when String.is_empty (String.strip text) ->
+       | Some (_, text) when String.is_empty (String.strip text) ->
          div ~cls:"agents-note" [ Node.text "No output yet." ]
-       | Some text -> Node.pre ~attrs:[ Attr.class_ "job-output" ] [ Node.text text ])
+       | Some (lines, text) ->
+         Node.fragment
+           [ (match lines with
+              | Some lines -> div ~cls:"agents-note small" [ Node.text ("Output, " ^ lines) ]
+              | None -> Node.none)
+           ; Node.pre ~attrs:[ Attr.class_ "job-output" ] [ Node.text text ]
+           ])
     ; (if j.info.running
        then div ~cls:"agents-note small" [ Node.text "Its output refreshes while it runs." ]
        else Node.none)

@@ -21,7 +21,8 @@ module Status = struct
   ;;
 end
 
-let of_ms ms = Time_ns.of_span_since_epoch (Time_ns.Span.of_int_ms ms)
+(* Floats: milliseconds since the epoch overflow JavaScript's 32-bit ints. *)
+let of_ms ms = Time_ns.of_span_since_epoch (Time_ns.Span.of_ms ms)
 
 module Agent = struct
   type t =
@@ -45,14 +46,14 @@ module Agent = struct
     let ms_opt name =
       match Json.field json name with
       | None | Some `Null -> Ok None
-      | Some _ -> Json.int_field json name >>| fun ms -> Some (of_ms ms)
+      | Some _ -> Json.float_field json name >>| fun ms -> Some (of_ms ms)
     in
     let%bind id = Json.string_field json "id" in
     let%bind call_id = Json.string_field json "call_id" in
     let%bind parent = Json.string_opt_field json "parent" in
     let%bind task = Json.string_field json "task" in
     let%bind model = Json.string_field json "model" in
-    let%bind started_at = Json.int_field json "started_at_ms" >>| of_ms in
+    let%bind started_at = Json.float_field json "started_at_ms" >>| of_ms in
     let%bind ended_at = ms_opt "ended_at_ms" in
     let%bind turns = Json.int_field json "turns" in
     let%bind tool_calls = Json.int_field json "tool_calls" in
