@@ -269,6 +269,19 @@ goes away, and takes `?backend=ws://host:port/ws` like the `-web` page.
 One backend can serve all three web UIs on different ports. In Docker it
 is `PRIGH_MODE=prigh-web` (port 7790, see `DOCKER.md`).
 
+The terminal button in the top bar (or `/terminal`, or Ctrl+`) opens a
+shell where the session's tools run (the active `/host`, in its
+directory) in a panel under the chat: drag its top edge to resize it (the
+height is remembered), a full-screen sheet on a phone. Keys typed in it
+are the shell's, Esc included; Ctrl+` closes it (so does its ×) and
+gives the keyboard back to the editor. Like the `-web` page's `>_` panel
+it is a tmux session, so closing the panel, reloading the page (which
+reopens it) or losing the connection keeps the shell; it is killed after
+10 minutes with no page attached. It follows the session, `/host` and
+the user you act as; when the shell exits, "New shell" starts another,
+and when there is none (no tmux on the host, a host that has gone) the
+panel says why and what to do.
+
 prigh-web has every slash command of the table below, as pickers and
 dialogs rather than lines in a transcript: `/session` is a dialog of the
 session's details and statistics; `/fork`, `/rewind` (with a confirmation)

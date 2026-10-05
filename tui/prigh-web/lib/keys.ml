@@ -184,7 +184,8 @@ let session_key (m : App.Model.t) t id : App.Action.t option =
 
 let handle (m : App.Model.t) t : App.Action.t option =
   match t.target, m.confirms, m.dialog with
-  (* The shell's keys, Esc and Enter included, are the shell's. *)
+  (* Inside the terminal every key but Ctrl+` is the shell's, Esc and Enter
+     included, even with a dialog or a confirmation showing. *)
   | Terminal, _, _ ->
     Option.some_if (terminal_toggle t) App.Action.Toggle_terminal
   | _, c :: _, _ ->

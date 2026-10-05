@@ -1,8 +1,9 @@
 open! Core
 
 (** What a key does. The page listens on the whole document and asks [handle]:
-    dialogs own the keyboard, then the completion popup, then the editor; a few
-    shortcuts work everywhere. *)
+    the terminal panel's keys are the shell's, then dialogs own the keyboard,
+    then the completion popup, then the editor; a few shortcuts work
+    everywhere. *)
 
 module Target : sig
   type t =
