@@ -108,7 +108,7 @@ let%expect_test "background guidance follows the tools" =
     - Be concise. Explain non-trivial decisions briefly. No filler.
     - Ask before destructive or irreversible actions.
 
-    Subagents run in the background: subagent returns at once, and each one's final report arrives later as a message starting with "[subagent <id> finished]" (or failed), sent automatically, not typed by the user. While they run, keep working or end your turn; call subagent_wait only when you cannot continue without a result.
+    Subagents run in the background: subagent returns at once, and each one's final report arrives later as a message starting with "[subagent <id> finished]" (or failed), sent automatically, not typed by the user. While they run, keep working on whatever does not depend on them, or end your turn: you are woken by each report, so never call subagent_wait (or job_wait) just to pass the time or to collect results you could take as they arrive. Wait only when you cannot do anything useful without a result, and then wait for that one (ids, all=false), not all of them.
 
     Commands that may take more than about a minute (builds, test suites, image builds, deployments, servers, watchers) belong in the background: run them with bash background: true, then continue with other useful work or end your turn. When one exits, its status and output tail arrive automatically in a message starting with "[job <id> exited <code>]" (or killed, failed). Never poll with sleep loops; if you truly need the result before continuing, use job_wait. Run long-running servers as background jobs and stop them with job_kill when done.
     |}];
