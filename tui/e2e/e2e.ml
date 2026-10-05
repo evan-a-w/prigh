@@ -529,14 +529,13 @@ let main () =
         in
         let%bind () = set_config [ "default_cwd", `Null ] in
         let%bind () = call client "prompt" [ "text", Json.str "fix the bug" ] in
-        let idle = ref 0 in
+        (* A hand-over goes straight into the next run: the first idle
+           state is the end. *)
         let%bind () =
           with_deadline
             "fallback"
             (drain client ~stop:(function
-               | State { running = false; _ } ->
-                 incr idle;
-                 !idle = 2
+               | State { running = false; _ } -> true
                | _ -> false))
         in
         let%bind () = Client.close client in

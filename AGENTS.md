@@ -20,7 +20,12 @@ prigh is a coding agent. Read `README.md` for what it does and
 - The backend and the TUI need different compilers: build each in its own
   dev shell (the default shell's OxCaml `dune` cannot build the backend).
 - `tui/`'s `@runtest` includes the e2e and tmux tests, which run
-  `backend/_build/default/bin/main.exe`: build the backend first. They need
+  `backend/_build/default/bin/main.exe`: build the backend first (`dune
+  build`, not just `@runtest`, which does not rebuild `main.exe`). Dune does
+  not see the backend binary as a dependency, so after changing only the
+  backend, clear the stale results (`rm -rf
+  tui/_build/default/tmux-test/.cram.run.t`) or the tmux tests report the
+  old run. They need
   a terminal multiplexer (`tmux`) and can be slow; `dune build @test/runtest`
   runs only the unit tests. `$PRIGH_BACKEND` overrides that path: unset it
   (e.g. when working inside prigh, which sets it) to test your build.
