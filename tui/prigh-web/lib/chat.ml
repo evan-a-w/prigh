@@ -13,6 +13,7 @@ and entry =
       ; streaming : bool
       }
   | Notice of string
+  | Compaction of string
 
 and tool =
   { call : Tool_call.t
@@ -26,6 +27,8 @@ and subagent =
   ; task : string
   ; model : string
   ; chat : t
+  ; turns : int
+  ; cost_usd : float option
   ; result : Event.Subagent_result.t option
   }
 [@@deriving sexp_of]
@@ -36,6 +39,8 @@ module Subagent = struct
     ; task : string
     ; model : string
     ; chat : t
+    ; turns : int
+    ; cost_usd : float option
     ; result : Event.Subagent_result.t option
     }
   [@@deriving sexp_of]
@@ -59,6 +64,7 @@ module Entry = struct
         ; streaming : bool
         }
     | Notice of string
+  | Compaction of string
   [@@deriving sexp_of]
 end
 
@@ -129,22 +135,37 @@ let rec apply t (event : Event.t) =
   | Subagent_start { call_id; agent_id; task; model; tools = _ } ->
     update_tool t call_id ~f:(fun tool ->
       { tool with
-        subagent = Some { agent_id; task; model; chat = empty; result = None }
+        subagent =
+          Some
+            { agent_id
+            ; task
+            ; model
+            ; chat = empty
+            ; turns = 0
+            ; cost_usd = None
+            ; result = None
+            }
       })
   | Subagent { call_id; agent_id = _; event } ->
     update_tool t call_id ~f:(fun tool ->
       { tool with
         subagent =
           Option.map tool.subagent ~f:(fun s ->
-            { s with chat = apply s.chat event })
+            let turns =
+              match event with
+              | Turn_start -> s.turns + 1
+              | _ -> s.turns
+            in
+            { s with chat = apply s.chat event; turns })
       })
-  | Subagent_end { call_id; result; _ } ->
+  | Subagent_end { call_id; result; turns; cost_usd; _ } ->
     update_tool t call_id ~f:(fun tool ->
       { tool with
         subagent =
-          Option.map tool.subagent ~f:(fun s -> { s with result = Some result })
+          Option.map tool.subagent ~f:(fun s ->
+            { s with result = Some result; turns; cost_usd = Some cost_usd })
       })
-  | Compacted summary -> add_notice t ("Compacted: " ^ summary)
+  | Compacted summary -> add t (Compaction summary)
   | Agent_start
   | Agent_end _
   | Turn_start
