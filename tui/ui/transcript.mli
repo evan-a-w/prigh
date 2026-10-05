@@ -47,6 +47,11 @@ module Item : sig
     | Compaction of string
     | Delivery of string
     (** finished background subagents' reports handed to the main agent *)
+    | Skill of
+        { skill : Skill_message.t
+        ; images : P.Image.t list
+        }
+    (** a user message invoking a skill ([/skill:NAME ARGS], expanded) *)
   [@@deriving sexp_of, equal]
 end
 

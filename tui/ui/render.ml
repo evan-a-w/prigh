@@ -163,6 +163,18 @@ let mode_hint (m : App.Model.t) : Content.Line.t option =
         | Picker { kind = Jobs; _ } ->
           Some
             [ span ~style:dim "Enter shows output · Esc closes · Ctrl+D kills" ]
+        | Picker { kind = Skills; _ } ->
+          Some
+            [ span
+                ~style:dim
+                "Enter puts /skill:NAME in the editor · Esc closes"
+            ]
+        | Picker { kind = Mcp _; _ } ->
+          Some
+            [ span
+                ~style:dim
+                "Enter approves a server or lists its tools · Esc closes"
+            ]
         | Picker _ -> Some [ span ~style:dim "Enter selects · Esc closes" ]
         | Login_prompt _ ->
           Some [ span ~style:dim "login: Enter answers, Esc cancels" ]
@@ -546,11 +558,10 @@ let autocomplete_block (ac : Autocomplete.t) ~width : Content.t =
   (match Autocomplete.source ac with
    | Autocomplete.Source.Command ->
      let usage (item : Picker.Item.t) =
-       let args =
-         Option.value_map (Commands.find item.id) ~default:"" ~f:(fun s ->
-           s.args)
-       in
-       "/" ^ item.label ^ if String.is_empty args then "" else " " ^ args
+       Option.value_map
+         (Commands.find item.id)
+         ~default:("/" ^ item.label)
+         ~f:Commands.usage
      in
      let usage_width =
        List.fold shown ~init:0 ~f:(fun acc item ->
@@ -577,7 +588,7 @@ let autocomplete_block (ac : Autocomplete.t) ~width : Content.t =
          ; span ~style:(style dim) ("  " ^ help)
          ]
          ~width)
-   | Autocomplete.Source.Argument _ | Path | Directory _ ->
+   | Autocomplete.Source.Argument _ | Path | Directory _ | Skill ->
      let label_width =
        List.fold shown ~init:0 ~f:(fun acc (item : Picker.Item.t) ->
          Int.max acc (Text_width.string item.label))
