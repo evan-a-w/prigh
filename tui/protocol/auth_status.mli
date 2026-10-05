@@ -16,12 +16,23 @@ module Configured : sig
   [@@deriving sexp_of, equal]
 end
 
+(** A custom OpenAI-compatible provider's endpoint. *)
+module Custom : sig
+  type t =
+    { base_url : string
+    ; api : string (** chat, responses or anthropic *)
+    ; api_label : string
+    }
+  [@@deriving sexp_of, equal]
+end
+
 type t =
   { provider : string
   ; name : string
   ; methods : Method.t list
   ; configured : Configured.t option
   ; expires_ms : Int64.t option
+  ; custom : Custom.t option
   }
 [@@deriving sexp_of, equal]
 
