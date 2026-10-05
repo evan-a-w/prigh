@@ -11,7 +11,8 @@ val of_json : Json.t -> (string option * Entry.t list) Or_error.t
 (** The user messages, oldest first, numbered; the last is marked. *)
 val user_items : Entry.t list -> Picker.Item.t list
 
-(** A user message's text, by entry id. *)
+(** A user message's text, by entry id; a skill's invocation as it was typed
+    ([/skill:NAME ARGS]), as are labels. *)
 val user_text : Entry.t list -> string -> string option
 
 (** Messages in depth-first order ([>] user, [·] assistant, [⚙] tool result),

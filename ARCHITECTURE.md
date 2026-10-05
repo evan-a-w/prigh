@@ -869,6 +869,19 @@ copy of the protocol types and the e2e test guards the contract.
       `Status_view`, and `Keys` (which of the dialog, the popup or the
       editor owns a key; `help`, and `browser`: the TUI's keys that the
       browser keeps).
+    - Skills and MCP: `Skills` caches `list_skills` for `/skill:`'s
+      completion, keyed by the session, its directory and tool host (a
+      reply for another place is ignored; switching user empties it), and
+      builds `/skills`' picker; `Completion` offers the names right after
+      `/skill:`, and `send` sends `/skill:NAME args` as a prompt (or steer
+      or follow-up) for the backend to expand. `Skill_message` parses the
+      expanded user message (`<skill name location>…</skill>` then the
+      arguments), which `Chat_view` renders as a folded card above the
+      arguments and `Session_tree` labels as typed. `Mcp_servers` turns
+      `list_mcp`/`mcp_approve` replies (`Mcp_list`) into `/mcp`'s picker
+      (servers to act on first; the problems under it, in `Dialog_view`),
+      `/mcp reconnect`'s report and what became of an approved or restarted
+      server; a ready one's tools are the `Mcp_tools` dialog.
   - `app/` (`prigh_web_app`) — `Web_main.run`: connects a `Ws_transport`
     to `?backend=` or the page's `/ws`, sends `hello` with the active
     account (`prigh.user`/`prigh.token`, `web-app/`'s `Login`) and
