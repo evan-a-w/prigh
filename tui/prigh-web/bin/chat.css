@@ -69,6 +69,30 @@ summary:hover > .label { color: var(--fg); }
   overflow-wrap: anywhere;
 }
 .msg.user .images { justify-content: flex-end; }
+.msg.user .time { margin: -2px 6px 0 0; }
+
+/* When messages were sent, and where the day changes */
+
+.msg .time {
+  color: var(--faint);
+  font-size: 11.5px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  cursor: default;
+}
+.day-sep {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  color: var(--faint);
+  font-size: 11.5px;
+  font-weight: 500;
+}
+.day-sep::before, .day-sep::after {
+  content: "";
+  flex: 1;
+  border-top: 1px solid var(--border);
+}
 
 /* Background work handed back to the agent */
 
