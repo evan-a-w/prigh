@@ -33,6 +33,36 @@ prigh:x:1000:
 EOF
 	echo '# skeleton' >"$r/etc/skel/.bashrc"
 	: >"$r/owners"
+	nix_seed 1 aaaa-glibc-2.40 bbbb-nix-2.35 cccc-curl-8.9
+}
+
+# nix_seed ID PATH...: the image's Nix seed: store paths with some
+# content, the first two of them GC roots.
+nix_seed() {
+	local s="$r/opt/nix-seed" id="$1" p
+	shift
+	rm -rf "$s"
+	mkdir -p "$s/store"
+	for p in "$@"; do
+		mkdir -p "$s/store/$p/bin"
+		echo "$p" >"$s/store/$p/bin/tool"
+	done
+	printf '/nix/store/%s\n' "$1" "$2" >"$s/roots"
+	echo "seed-$id" >"$s/id"
+	printf '%s\n' "$@" >"$s/registration"
+}
+
+# The /nix volume: store entries, valid paths (fake database), GC roots, stamp.
+nix_volume() {
+	local p
+	echo "--- /nix/store"
+	(cd "$r/nix/store" && find . -mindepth 1 -maxdepth 1 | sed 's|^\./||' | LC_ALL=C sort)
+	files /nix/var/nix/db/valid
+	echo "--- $(basename "$r/nix/var/nix/gcroots/prigh")/ GC roots"
+	for p in "$r"/nix/var/nix/gcroots/prigh/*; do
+		echo "${p##*/} -> $(readlink "$p")"
+	done
+	files /nix/var/prigh/seed
 }
 
 # owned PATH UID: PATH (created as a directory if missing) is owned by UID.
@@ -55,7 +85,7 @@ pd() {
 	echo "\$ ${vars[*]}${vars[*]:+ }prigh-docker $*"
 	out=$(env -i PATH="$PATH" LANG=C.UTF-8 PRIGH_DOCKER_ROOT="$r" PRIGH_DOCKER_DRY_RUN=1 \
 		"${vars[@]}" bash "$entry" "$@" 2>&1) && status=0 || status=$?
-	printf '%s\n' "$out" | sed -e "s|$work|WORK|g" -e "s|PATH=${PATH//|/\\|}|PATH=\$PATH|g"
+	printf '%s\n' "$out" | sed -e "s|$work|WORK|g" -e "s|${PATH//|/\\|}|\$PATH|g"
 	[ "$status" = 0 ] || echo "[exit $status]"
 }
 
@@ -86,6 +116,7 @@ run_tests() {
 		GH_TOKEN=gh-shared PRIGH_GIT_NAME="Ada L" PRIGH_GIT_EMAIL=ada@example.com PRIGH_ARGS="-model m"
 	files /run/prigh/extrausers/passwd /run/prigh/extrausers/group /run/prigh/extrausers/shadow
 	dirs
+	nix_volume
 
 	section "commands in the running container (docker compose exec)"
 	pd users
@@ -118,6 +149,29 @@ run_tests() {
 	files /run/prigh/extrausers/group
 	pd users
 
+	section "Nix: restart with the same image, then an upgrade"
+	pd PRIGH_TOKEN=tok
+	nix_seed 2 dddd-glibc-2.41 bbbb-nix-2.35 eeee-openssl-3
+	pd PRIGH_TOKEN=tok
+	nix_volume
+
+	section "Nix: a store path left unregistered (interrupted copy) is replaced"
+	rm "$r/nix/var/prigh/seed"
+	sed -i '/eeee-openssl-3/d' "$r/nix/var/nix/db/valid"
+	echo partial >"$r/nix/store/eeee-openssl-3/bin/tool"
+	mkdir "$r/nix/store/.prigh-seed-dddd-glibc-2.41"
+	pd PRIGH_TOKEN=tok
+	cat "$r/nix/store/eeee-openssl-3/bin/tool"
+	nix_volume
+
+	section "Nix: other commands seed a fresh volume first (docker compose run)"
+	fake_root
+	owned /home/prigh 1000
+	pd prigh sessions list
+	nix_volume
+	pd prigh sessions list
+	pd PRIGH_DOCKER_UID=1000 prigh sessions list
+
 	section "uids from existing directories"
 	fake_root
 	sed -i '$a svc:x:10000:10000::/:/bin/false' "$r/etc/passwd"
@@ -148,6 +202,13 @@ run_tests() {
 	owned /home/prigh 1000
 	mkdir -p "$r/home/.config"
 	pd PRIGH_TOKEN=tok
+
+	section "prigh-web: alone (tool hosts connect to it), and with pi-web"
+	fake_root
+	owned /home/prigh 1000
+	pd PRIGH_TOKEN=tok PRIGH_MODE=prigh-web
+	pd PRIGH_TOKEN=tok PRIGH_MODE=pi-web,prigh-web
+	pd PRIGH_TOKEN=tok PRIGH_MODE=prigh-web healthcheck
 
 	section "no token: no auth, one tool host as default without a token"
 	fake_root

@@ -145,18 +145,19 @@ let execute
       | Some extra -> extra ^ "\n\n" ^ instructions
       | None -> instructions
     in
-    let instructions =
+    let { Host_ops.Instructions.files; nix } =
       Host_ops.instructions_of_result
         (Tool.execute_via
            { context with cwd = p.cwd; on_output = ignore }
            Host_ops.instructions_tool
-           (`Object [ "home", `String home ]))
+           (Host_ops.instructions_args ~home))
     in
     Some
       (base
        ^ "\n\n"
        ^ System_prompt.build
-           ~instructions
+           ~instructions:files
+           ~nix
            ~cwd:p.cwd
            ~home
            ~tools:(Tools.specs p.tools)

@@ -512,15 +512,17 @@ let instructions t ~cwd =
        ~call_id:"instructions"
        ~cwd
        ~name:Host_ops.instructions_op
-       ~arguments:(`Object [ "home", `String t.home ]))
+       ~arguments:(Host_ops.instructions_args ~home:t.home))
 ;;
 
 (* Built once per conversation and recorded in the session, so the prompt
    prefix stays cacheable; later cwd/host changes reach the model as notes on
    the next user message instead. *)
 let build_system_prompt t =
+  let { Host_ops.Instructions.files; nix } = instructions t ~cwd:t.cwd in
   System_prompt.build
-    ~instructions:(instructions t ~cwd:t.cwd)
+    ~instructions:files
+    ~nix
     ~cwd:t.cwd
     ~home:t.home
     ~tools:(Tools.specs t.tools)

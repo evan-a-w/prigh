@@ -56,6 +56,40 @@ let%expect_test "tools subset is passed to the child; unknown names error" =
     |}]
 ;;
 
+let%expect_test
+    "the child's system prompt says how to get tools when the host has nix"
+  =
+  with_sandbox
+  @@ fun t ->
+  List.iter [ true; false ] ~f:(fun nix ->
+    let system = ref "" in
+    let provider =
+      Faux_provider.create
+        ~on_request:(fun r -> system := Option.value r.system ~default:"")
+        [ Reply.text "done" ]
+    in
+    let subagent = subagent ~provider in
+    with_nix_on_path t ~nix (fun () ->
+      let (_ : Tool.Result.t) =
+        run_tool
+          t
+          ~tools:(Tools.all @ [ subagent ])
+          ~emit:ignore
+          subagent
+          {|{"task":"x"}|}
+      in
+      ());
+    printf
+      "nix on PATH: %b, prompt mentions nixpkgs: %b\n"
+      nix
+      (String.is_substring !system ~substring:"nix shell nixpkgs#"));
+  [%expect
+    {|
+    nix on PATH: true, prompt mentions nixpkgs: true
+    nix on PATH: false, prompt mentions nixpkgs: false
+    |}]
+;;
+
 let%expect_test "model override and bad model" =
   with_sandbox
   @@ fun t ->

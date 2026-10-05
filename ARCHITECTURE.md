@@ -71,7 +71,10 @@ completion in `/cd` and the `/host` prompt (one level, in the notation
 typed: absolute, `~/` or relative; `list_dirs` takes a `host` so the `/host`
 prompt completes on the host being switched to), and `$instructions`, called when a session's system
 prompt is first built and by every subagent, so that `AGENTS.md`/`CLAUDE.md`
-come from the host's cwd ancestors and the host's own `~/.prigh/`).
+come from the host's cwd ancestors and the host's own `~/.prigh/`; asked
+`with_nix`, it also says whether `nix` is on the host's PATH, and
+`instructions_of_result` still accepts the bare array of files that older
+hosts reply with).
 
 The backend is direct-style Eio code. Every I/O function takes `~env`
 (`Eio_unix.Stdenv.base`), and long-running work runs in fibers forked into a
@@ -270,7 +273,9 @@ two can share one.
 - `System_prompt` — built-in guidance plus environment facts plus
   `AGENTS.md`/`CLAUDE.md` files from `/` down to the cwd and
   `~/.prigh/AGENTS.md`; `read_instructions` scans the local filesystem and
-  `build ?instructions` accepts files fetched elsewhere (the tool host).
+  `build ?instructions ?nix` accepts files fetched elsewhere (the tool host)
+  and whether that host has Nix, which adds how to get missing tools from
+  nixpkgs.
   `Agent` builds it once, at the session's first run, and records it as a
   `System_prompt` session entry so every later request (and every reload)
   sends the same prefix, which is what provider prompt caches key on. When
@@ -507,14 +512,18 @@ two can share one.
   `/ws?token=&user=&session=&name=` goes to `Pi_rpc.serve_websocket` (the query
   string becomes the `hello`; a refused hello is reported as
   `prigh_hello_failed` and the socket closed) and whose `/terminal` is the
-  same `Terminals` as the `-web` listener's.
+  same `Terminals` as the `-web` listener's. `serve -prigh-web HOST:PORT`
+  is a third, serving prigh-web's site with the same `/ws` (prigh's RPC) and
+  `/terminal` as `-web`.
 
 ### CLI (`backend/bin/main.ml`)
 
 `serve` (RPC on stdio; `-listen HOST:PORT` accepts TCP clients instead,
 `-web HOST:PORT` serves the browser frontend, WebSocket clients and TCP
 `-connect` clients on one port (`-open` launches a browser, `-web-root DIR`
-overrides the assets), `-stdio` as well,
+overrides the assets), `-prigh-web HOST:PORT` and `-pi-web HOST:PORT` the
+other two web frontends (`-prigh-web-root`, `-pi-web-root`), `-stdio` as
+well,
 `-token SECRET`/`$PRIGH_TOKEN` gates them; with stdio the backend exits when
 the spawning frontend closes it, with `-listen`/`-web` only it runs until
 killed), `tool-host` (the local tool worker), `run <prompt>`
@@ -662,6 +671,59 @@ copy of the protocol types and the e2e test guards the contract.
   the js_of_ocaml executable plus `index.html`/`style.css`/`terminal.js`
   and the vendored xterm.js, assembled under `web-bin/site/` and installed
   to `share/prigh_tui/web`.
+- `prigh-web/` — the DOM-native browser frontend. Unlike `web-app/` it does
+  not mount `ui/`'s cell-grid `App`: it has its own Elm-style state
+  machine over the same `prigh_protocol` types and `prigh_client`, and
+  renders HTML.
+  - `lib/` (`prigh_web`, pure: `core` + `virtual_dom`):
+    - `App` — `update : Model.t -> Action.t -> Model.t * Command.t list`;
+      commands are `Rpc` tagged with a `Reply_tag.t`, `Reconnect`,
+      `Set_url_session`, history saves, focus and toast expiry. Startup asks
+      for `get_state` and `list_models`; a state with a new session id
+      resets everything that belongs to the session and fetches its
+      messages and the session list, and `new_session`/`switch_session`/
+      `clone` are answered with `Reload_state`, so every way of changing
+      session goes through that one path. Reconnection mirrors `ui/`
+      (`Backend_closed` → `Reconnect` with backoff behind a banner; success
+      starts over). `!cmd`/`!!cmd`/`!&cmd` go to `shell` like the TUI's.
+    - The transcript: `Chat` (one agent: `get_messages` then events; each
+      tool call's streamed output and result; subagents' nested chats,
+      fetched with `get_subagent` after a reload since `get_messages` only
+      has their reports; `!cmd` runs as `Shell` entries), `Chat_view`,
+      `Tool_view` (a card per tool: bash, read with images, write, edit
+      with `Line_diff`/`Diff_view`, ls/grep/find, subagents, jobs),
+      `Delivery_view` (reports of finished background work, parsed by
+      `ui/`'s `Delivery`), `Markdown` (a total parser that also renders
+      streaming prefixes) and `Markdown_view`, `Image_view`,
+      `Output_view`.
+    - Around it: `Sidebar_view`/`Session_list` (fuzzy search, ages from
+      `Rel_time`), `Topbar_view`, `Composer_view` with `Completion`
+      (slash commands from `Slash`, their arguments, `@` paths via
+      `list_paths`) and `History`, `Dialog`/`Dialog_view`/`Modal`
+      (pickers built on `Picker`, help, rename, delete, the login flow
+      `Login_flow`, tool confirmations), `Status_view`, and `Keys` (which
+      of the dialog, the popup or the editor owns a key).
+  - `app/` (`prigh_web_app`) — `Web_main.run`: connects a `Ws_transport`
+    to `?backend=` or the page's `/ws`, sends `hello` with the login saved
+    by the sign-in form (`web-app/`'s `Login`) and `?session=`; on failure
+    it shows the sign-in form, otherwise it runs `App.update` in a
+    `Bonsai.state_machine`, executes the commands (RPCs through the
+    `Client`, replies back as `Action.Reply`; `history.replaceState` for
+    `?session=`), and installs document listeners: keys (through `Keys`),
+    pasted and dropped image files become attachments (PNG, JPEG, GIF,
+    WebP, sent with the prompt as base64; others get a toast), the narrow
+    (phone) layout, a clock for ages and toasts, and the chat following new
+    output unless scrolled up. `Chat_listeners` copies code blocks and
+    closes an open image with Esc.
+  - `bin/` — `main.bc.js` plus `index.html`/`style.css`, assembled under
+    `bin/site/` and installed to `share/prigh_tui/prigh-web` (the Nix
+    wrapper exports it as `$PRIGH_PRIGH_WEB_ROOT`). The dev profile links
+    separately compiled units with inline source maps (~49 MB, fast to
+    relink); release builds (`dune build -p`, so Nix) are whole-program at
+    `--opt 3`, ~1.4 MB (400 KB gzipped; `web-bin` is ~1.65 MB).
+  - `test/` — inline expect tests under node: a `Harness` drives
+    `App.update`, answers RPCs and prints the commands and the rendered
+    page. `e2e/` — the Playwright e2e (see Testing).
 - `bin/` — `prigh-tui` (`-faux`, `-session`, `-model`, `-cwd`, `-auth-file`,
   `-backend`; `PRIGH_BACKEND` overrides the backend path). `-connect
   HOST:PORT` (`$PRIGH_CONNECT`) joins a running backend instead of spawning
@@ -748,3 +810,22 @@ the screen and the expected output lives in `tui/e2e-web/web_workflows.expected`
 Additional interactions (`/help`, pickers, `@` completion, `!` shell, paste,
 resize, `?backend=` to a second backend, quit and reconnect after a backend
 restart) have been exercised manually.
+
+prigh-web's e2e, `tui/prigh-web/e2e/prigh_web.sh` (the flake's Linux
+`prigh-web-e2e` check, against the packaged backend and site), runs
+`prigh_web.mjs` in Chromium and Firefox. The driver owns the backend
+(`serve -prigh-web 127.0.0.1:0 -faux-script ...` with an isolated `HOME`
+and cwd) so that it can restart it, and prints normalised text snapshots
+(ids, cwd, cost and context replaced) diffed against `prigh_web.expected`:
+the sign-in form and signing in with the token, the top bar, a scripted
+bash call and its output, the model `read`ing a real PNG (`png.mjs` writes
+it; the tool result's `img` must be a loaded `data:image/png` of the right
+natural size), an image pasted and one dropped into the composer (shown,
+sent, cleared, rendered in the prompt, and present with the right sizes in
+the backend's copy of the message via a second WebSocket's
+`get_messages`), a reload rejoining the session from `?session=`, a new
+session and switching back from the sidebar, and the backend dying (the
+banner) and restarting on the same port (the page reconnects to the same
+session and runs another prompt), with no console or page errors.
+`SHOTS=DIR` saves a screenshot per step, `UPDATE=1` re-records,
+`ENGINES=chromium` runs one browser.
