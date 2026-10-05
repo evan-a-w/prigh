@@ -86,7 +86,7 @@ let strings json ~what =
     List.map items ~f:(function
       | `String s -> Ok s
       | _ -> Or_error.errorf "%s must be a list of strings" what)
-    |> Or_error.combine_errors
+    |> Result.all
   | _ -> Or_error.errorf "%s must be a list of strings" what
 ;;
 
@@ -97,7 +97,7 @@ let string_map json ~what =
       match v with
       | `String s -> Ok (k, s)
       | _ -> Or_error.errorf "%s.%s must be a string" what k)
-    |> Or_error.combine_errors
+    |> Result.all
   | _ -> Or_error.errorf "%s must be an object of strings" what
 ;;
 
@@ -126,14 +126,18 @@ let transport ~getenv json =
     let%bind args = opt "args" ~default:[] ~f:strings in
     let%bind env = opt "env" ~default:[] ~f:string_map in
     let%bind command = expand command in
-    let%bind args = List.map args ~f:expand |> Or_error.combine_errors in
-    let%map env = expand_pairs env |> Or_error.combine_errors in
+    let%bind args = List.map args ~f:expand |> Result.all in
+    let%map env = expand_pairs env |> Result.all in
     Transport.Stdio { command; args; env }
   | (None | Some ("http" | "streamable-http")), _, Some (`String url) ->
     let%bind headers = opt "headers" ~default:[] ~f:string_map in
     let%bind url = expand url in
-    let%map headers = expand_pairs headers |> Or_error.combine_errors in
+    let%map headers = expand_pairs headers |> Result.all in
     Transport.Http { url; headers }
+  | Some "stdio", _, _ ->
+    Or_error.error_string "give the \"command\" to run (a string)"
+  | Some ("http" | "streamable-http"), _, _ ->
+    Or_error.error_string "give the server's \"url\" (a string)"
   | Some "sse", _, _ ->
     Or_error.error_string
       "the legacy SSE transport is not supported; use the server's streamable \
