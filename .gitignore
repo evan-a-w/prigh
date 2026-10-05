@@ -77,7 +77,8 @@
 .vscode/
 .zed/
 .idea/
-.claude/
+.claude/*
+!.claude/skills/
 *.swp
 *.swo
 *~
