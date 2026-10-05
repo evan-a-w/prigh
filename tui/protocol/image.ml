@@ -3,8 +3,13 @@ open! Core
 type t =
   { mime_type : string
   ; bytes : int
+  ; data : string
   }
-[@@deriving sexp_of, equal]
+[@@deriving equal]
+
+let sexp_of_t { mime_type; bytes; data = _ } =
+  [%sexp { mime_type : string; bytes : int }]
+;;
 
 let decoded_size data =
   let data = String.rstrip data ~drop:(Char.equal '=') in
@@ -15,7 +20,7 @@ let of_json j =
   let open Or_error.Let_syntax in
   let%bind mime_type = Json.string_field j "mime_type" in
   let%map data = Json.string_field j "data" in
-  { mime_type; bytes = decoded_size data }
+  { mime_type; bytes = decoded_size data; data }
 ;;
 
 let size_to_string bytes =

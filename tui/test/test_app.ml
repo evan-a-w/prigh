@@ -1720,7 +1720,7 @@ let%expect_test "verbosity cycles Normal / Verbose / Quiet; /verbosity sets it" 
     |}]
 ;;
 
-let png : P.Image.t = { mime_type = "image/png"; bytes = 35021 }
+let png : P.Image.t = { mime_type = "image/png"; bytes = 35021; data = "" }
 
 let%expect_test
     "images show as a line each: a user attachment and a read result, at every \
@@ -1732,7 +1732,7 @@ let%expect_test
     h
     (Message_start
        (user
-          ~images:[ png; { mime_type = "image/jpeg"; bytes = 512 } ]
+          ~images:[ png; { mime_type = "image/jpeg"; bytes = 512; data = "" } ]
           "what is in these?"));
   let call = tool_call ~name:"read" ~arguments:{|{"path":"shot.png"}|} "c1" in
   H.event h (Tool_start call);

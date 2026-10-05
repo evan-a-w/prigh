@@ -130,16 +130,22 @@
 
         # `prigh` runs the TUI; `prigh -web [serve options]` runs the backend
         # with the browser frontend instead (`prigh serve -web 127.0.0.1:7788
-        # -open ...`).
+        # -open ...`), and `prigh -prigh-web` with prigh-web (127.0.0.1:7790).
+        prighWebRoot = "${prighTui}/share/prigh_tui/prigh-web";
         prigh = pkgs.writeShellApplication {
           name = "prigh";
           text = ''
             export PRIGH_BACKEND="''${PRIGH_BACKEND:-${prighBackend}/bin/prigh}"
             export PRIGH_WEB_ROOT="''${PRIGH_WEB_ROOT:-${prighTui}/share/prigh_tui/web}"
+            export PRIGH_PRIGH_WEB_ROOT="''${PRIGH_PRIGH_WEB_ROOT:-${prighWebRoot}}"
             export PRIGH_TMUX="''${PRIGH_TMUX:-${pkgs.tmux}/bin/tmux}"
             if [ "''${1:-}" = "-web" ]; then
               shift
               exec "$PRIGH_BACKEND" serve -web "''${PRIGH_WEB_LISTEN:-127.0.0.1:7788}" -open "$@"
+            fi
+            if [ "''${1:-}" = "-prigh-web" ]; then
+              shift
+              exec "$PRIGH_BACKEND" serve -prigh-web "''${PRIGH_PRIGH_WEB_LISTEN:-127.0.0.1:7790}" -open "$@"
             fi
             exec ${prighTui}/bin/prigh-tui "$@"
           '';
@@ -164,6 +170,7 @@
           #!${pkgs.runtimeShell}
           printf '%s\n' "$@" > "$ARGS_OUT"
           printf '%s\n' "$PRIGH_WEB_ROOT" > "$ROOT_OUT"
+          printf '%s\n' "$PRIGH_PRIGH_WEB_ROOT" >> "$ROOT_OUT"
           EOF
           chmod +x fake-backend
           ARGS_OUT="$PWD/args" ROOT_OUT="$PWD/root" \
@@ -179,7 +186,7 @@
             -cwd
             /work
           ''} args
-          test "$(cat root)" = "${prighTui}/share/prigh_tui/web"
+          test "$(head -1 root)" = "${prighTui}/share/prigh_tui/web"
           test -f ${prighTui}/share/prigh_tui/web/index.html
           test -f ${prighTui}/share/prigh_tui/web/main.bc.js
           test -f ${prighTui}/share/prigh_tui/web/style.css
@@ -190,9 +197,63 @@
           ARGS_OUT="$PWD/override-args" ROOT_OUT="$PWD/override-root" \
             PRIGH_BACKEND="$PWD/fake-backend" PRIGH_WEB_ROOT=/custom \
             ${prigh}/bin/prigh -web
-          test "$(cat override-root)" = /custom
+          test "$(head -1 override-root)" = /custom
+          ARGS_OUT="$PWD/prigh-web-args" ROOT_OUT="$PWD/prigh-web-root" \
+            PRIGH_BACKEND="$PWD/fake-backend" \
+            ${prigh}/bin/prigh -prigh-web -token sekrit
+          diff -u ${pkgs.writeText "expected-prigh-web-args" ''
+            serve
+            -prigh-web
+            127.0.0.1:7790
+            -open
+            -token
+            sekrit
+          ''} prigh-web-args
+          test "$(tail -1 prigh-web-root)" = "${prighWebRoot}"
+          test -f ${prighWebRoot}/index.html
+          test -f ${prighWebRoot}/main.bc.js
+          test -f ${prighWebRoot}/style.css
+          # the release build: whole-program, no source map
+          test "$(stat -c %s ${prighWebRoot}/main.bc.js)" -lt 5000000
           touch "$out"
         '';
+
+        # tui/prigh-web/e2e: Chromium and Firefox against the built backend
+        # and the installed prigh-web site.
+        checks.prigh-web-e2e =
+          if pkgs.stdenv.hostPlatform.isLinux then
+            pkgs.runCommand "prigh-web-e2e"
+              {
+                nativeBuildInputs = [
+                  pkgs.nodejs
+                  pkgs.playwright-test
+                  pkgs.playwright-driver.browsers
+                  pkgs.dejavu_fonts
+                ];
+              }
+              ''
+                cat > fonts.conf <<EOF
+                <?xml version="1.0"?>
+                <!DOCTYPE fontconfig SYSTEM "fonts.dtd">
+                <fontconfig>
+                  <dir>${pkgs.dejavu_fonts}/share/fonts</dir>
+                  <cachedir>$PWD/font-cache</cachedir>
+                </fontconfig>
+                EOF
+                export FONTCONFIG_FILE="$PWD/fonts.conf"
+                export PLAYWRIGHT_BROWSERS_PATH=${pkgs.playwright-driver.browsers}
+                export PLAYWRIGHT_MODULE=${pkgs.playwright-test}/lib/node_modules/playwright/index.mjs
+                export PRIGH_BACKEND=${prighBackend}/bin/prigh
+                export PRIGH_PRIGH_WEB_ROOT=${prighWebRoot}
+                export HOME="$PWD/home"
+                mkdir -p "$HOME"
+                cp -r ${./tui/prigh-web/e2e} e2e
+                chmod -R u+w e2e
+                ${pkgs.runtimeShell} e2e/prigh_web.sh
+                mkdir "$out"
+              ''
+          else
+            pkgs.runCommand "prigh-web-e2e-skipped" { } ''touch "$out"'';
 
         checks.web-workflows =
           if pkgs.stdenv.hostPlatform.isLinux then

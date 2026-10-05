@@ -8,8 +8,10 @@ variables.
 Each user (namespace) is its own Linux user in the container. Its agent's
 tools (bash, edits, the `>_` shell) run as that user, in
 `/workspace/<name>`, with its own home `/home/<name>`. The backend runs as
-the separate `prigh` service user, and nothing runs as root after startup.
-See [Users](#users) and [Isolation](#isolation).
+the separate `prigh` service user, and nothing but `nix-daemon` runs as root
+after startup. Agents install the tools they need with Nix, into a store
+shared by all users. See [Users](#users), [Installing tools](#installing-tools)
+and [Isolation](#isolation).
 
 ## Portainer
 
@@ -52,10 +54,12 @@ serves all of them, and they share sessions:
 |---|---|---|---|
 | `web` (default) | 7788 | `PRIGH_WEB_PORT` | the Bonsai browser UI; also accepts terminal frontends and tool hosts (`prigh-tui -connect`, `prigh tool-host -connect`) |
 | `pi-web` | 7789 | `PRIGH_PI_WEB_PORT` | pi's web UI (`pi-web/`) |
+| `prigh-web` | 7790 | `PRIGH_PRIGH_WEB_PORT` | prigh-web, the DOM browser UI (`tui/prigh-web/`); like `web`, also accepts terminal frontends and tool hosts |
 | `server` | 7777 | `PRIGH_SERVER_PORT` | plain TCP for terminal frontends and tool hosts only |
 | `tui` | – | – | an interactive TUI as the container's main process (must be the only entry; single-user, see below) |
 
-For example, `PRIGH_MODE=web,pi-web` serves both web UIs.
+For example, `PRIGH_MODE=web,pi-web` serves two web UIs, and
+`PRIGH_MODE=prigh-web` only prigh-web.
 
 ### TUI
 
@@ -150,7 +154,7 @@ user, `default`.
 | `PRIGH_NO_BACKEND_HOST` | – | `1`: no tool hosts in the container; tools and terminals run only on hosts the users connect |
 | `PRIGH_ALLOW_NO_TOKEN` | – | set to `1` to start without a token (only behind something else that authenticates) |
 | `PRIGH_BIND` | `0.0.0.0` | host address the ports are published on (`127.0.0.1` keeps them local, e.g. behind a reverse proxy) |
-| `PRIGH_WEB_PORT`, `PRIGH_PI_WEB_PORT`, `PRIGH_SERVER_PORT` | 7788, 7789, 7777 | host ports |
+| `PRIGH_WEB_PORT`, `PRIGH_PI_WEB_PORT`, `PRIGH_PRIGH_WEB_PORT`, `PRIGH_SERVER_PORT` | 7788, 7789, 7790, 7777 | host ports |
 | `PRIGH_WORKSPACE` | volume `prigh-workspace` | host path to bind at `/workspace` instead of the named volume. It must be world-searchable (`o+x`) so that users reach their `/workspace/<name>` |
 | `PRIGH_ARGS` | – | extra backend arguments, e.g. `-model anthropic/claude-sonnet-4-5 -thinking high`, or `-faux` for a scripted provider with no API calls |
 | `PRIGH_TUI_ARGS` | – | extra `prigh-tui` arguments for `PRIGH_MODE=tui` |
@@ -160,12 +164,64 @@ user, `default`.
 | `PRIGH_GIT_NAME`, `PRIGH_GIT_EMAIL` | – | commit author written to a user's `~/.gitconfig` at start if it has none yet |
 | `PRIGH_UID`, `PRIGH_GID` | 1000 | (build) uid/gid of the `prigh` service user. `/home/prigh` is chowned to it at start if it differs |
 | `PRIGH_NIX_SUBSTITUTER`, `PRIGH_NIX_SUBSTITUTER_KEY` | `https://prigh.cachix.org` and its key | (build) the Nix binary cache. Set the substituter to an empty value to compile everything |
-| `PRIGH_EXTRA_APT_PACKAGES` | – | (build) extra Debian packages for the agents to use, e.g. `python3 build-essential` |
+| `PRIGH_EXTRA_APT_PACKAGES` | – | (build) extra Debian packages baked into the image, e.g. `python3 build-essential` |
 
-The image ships `bash git ripgrep tmux curl jq less openssh-client
-procps`. Anything else the agents need at runtime must be added with
-`PRIGH_EXTRA_APT_PACKAGES`, because they run as unprivileged users on a
-read-only root filesystem.
+## Installing tools
+
+The image ships `bash git ripgrep tmux curl jq less openssh-client procps`
+and Nix. The agents run as unprivileged users on a read-only root
+filesystem, so apt and sudo are out; any user (agent or `>_` shell) gets
+other tools from nixpkgs instead, as itself:
+
+```
+nix shell nixpkgs#python3 nixpkgs#nodejs -c python3 script.py   # for one command
+nix run nixpkgs#cowsay -- hi                                      # a package's program
+nix search nixpkgs ripgrep                                        # find a package's name
+nix profile install nixpkgs#gh                                    # keep it on PATH (~/.nix-profile/bin)
+```
+
+The system prompt tells the model this whenever its tool host has `nix` on
+PATH. Packages come prebuilt from `cache.nixos.org` and land in `/nix`, the
+`prigh-nix` volume, shared by all users: a package one user fetched is there
+for the others, and everything survives restarts and upgrades. `nixpkgs`
+means the revision in prigh's `flake.lock` (pinned in
+`/etc/nix/flake-registry.json`), so every user sees the same package
+versions; the first `nixpkgs#` use per user unpacks it (a few seconds), and
+the first `nix search` evaluates all of nixpkgs (slow). Other flakes work
+too (`nix run github:owner/repo`).
+
+`PRIGH_EXTRA_APT_PACKAGES` still adds Debian packages at build time, for
+tools that every user should have without asking.
+
+How it fits together:
+
+- **The daemon.** All store writes go through `nix-daemon`, which the
+  entrypoint starts as root (and restarts if it exits; if it keeps failing,
+  prigh runs on without it and the startup line says `nix: NOT RUNNING`).
+  Every user's environment (tool hosts, `prigh-docker as`) has
+  `NIX_REMOTE=daemon` and `~/.nix-profile/bin` on PATH.
+- **Users are not trusted** by Nix (`/etc/nix/nix.conf`): they cannot add
+  substituters or keys or change the sandbox settings, so everything they
+  substitute is signed by `cache.nixos.org`. Packages not in the cache are
+  built locally, as the `nixbld1`…`nixbld8` users.
+- **Seeding.** prigh itself links against store paths (glibc), and nix is a
+  store path too. Since the volume hides the image's `/nix`, the image keeps
+  them in `/opt/nix-seed`, and the entrypoint copies any that are missing
+  into `/nix/store` and registers them at every start (the first start
+  copies about 160 MB). `/usr/local/bin/nix*` link to the seeded nix.
+- **Garbage collection.** When Nix fetches or builds with less than 2 GiB
+  free on the volume's filesystem, it deletes unused paths until 8 GiB is
+  free. What users
+  installed with `nix profile` stays; what they only used with `nix shell`
+  or `nix run` may be deleted and is fetched again when needed. GC roots in
+  `/nix/var/nix/gcroots/prigh` keep the paths prigh and nix need. Collect by
+  hand with `docker compose exec prigh nix store gc`.
+- **Upgrades.** A new image brings its seed; the entrypoint adds what is new
+  and moves the GC roots to it, so the old image's paths become garbage.
+  Users' profiles and packages are kept. If an image ever ships an older
+  Nix than the volume was used with, Nix may refuse the newer database: then
+  remove the volume (`docker volume rm <project>_prigh-nix`; users reinstall
+  their profile packages).
 
 ## Logging in
 
@@ -239,6 +295,7 @@ What a user's agent (and `>_` shell) can and cannot see:
 | `/workspace/<name>` (mode 2770) | read/write | no access, except superusers (group members) |
 | `/home/prigh` (mode 700: sessions, provider logins, tokens) | no access | no access |
 | `/tmp` (shared tmpfs, mode 1777) | its own files | files others make world-readable |
+| `/nix/store` (written only by `nix-daemon`) | read | read: everything in the store is world-readable, so nothing secret belongs there |
 | processes | full control | visible in `ps`, but not their environment (no tokens are in command lines) |
 
 - Agents see only the container filesystem. `read_only: true` makes
@@ -251,11 +308,24 @@ What a user's agent (and `>_` shell) can and cannot see:
   e.g. a bound `/workspace` or the old home layout), `FOWNER` (set the mode
   of the users' directories), `SETUID`/`SETGID` (switch to the users with
   `setpriv`) and `KILL` (`tini` forwards stop signals to processes of other
-  users). Only the entrypoint and its tool host restart loops run as root;
-  they run nothing model-controlled. The processes they start (backend,
-  tool hosts, `prigh-docker as/tui/login/ssh-key`) switch uid and so have
-  no capabilities at all, and `no-new-privileges` keeps setuid binaries
-  from regaining any.
+  users). Only the entrypoint, its tool host restart loops and `nix-daemon`
+  run as root. The processes they start (backend, tool hosts, `prigh-docker
+  as/tui/login/ssh-key`) switch uid and so have no capabilities at all, and
+  `no-new-privileges` keeps setuid binaries from regaining any.
+- `nix-daemon` needs no capability beyond these: it chowns and fixes the
+  permissions of store paths (`CHOWN`, `FOWNER`, `DAC_OVERRIDE`), runs
+  builds as the `nixbld` users (`SETUID`, `SETGID`) and kills their leftover
+  processes (`KILL`). It is the one root process that model-controlled
+  requests reach, through its socket, as with any multi-user Nix install.
+  Without `CAP_SYS_ADMIN` there is no build sandbox (`sandbox = false`, no
+  seccomp filter): a local build runs as a `nixbld` user with network
+  access and sees what that user can, e.g. world-readable files in `/tmp`,
+  but not the users' homes or workspaces. A user could thus make a build
+  of their own impure, and another user who later uses that same store path
+  gets the impure result. Substituted paths are unaffected (they are
+  checked against `cache.nixos.org`'s signature), and so are paths already
+  in the store. If that matters, don't let mutually distrusting users share
+  a container.
 - The backend holds every token and provider login. A tool host has only a
   token of its own user, without superuser rights, plus that user's
   `GH_TOKEN`; neither `PRIGH_TOKENS`, `PRIGH_GH_TOKENS` nor other users'
@@ -275,11 +345,14 @@ What a user's agent (and `>_` shell) can and cannot see:
 | `/home/prigh` | `prigh-home` | the backend's data: sessions (`.prigh/sessions`, per user `.prigh/namespaces/<name>/`), provider logins, config, prompt history |
 | `/home/<name>` | `prigh-home` | user `<name>`'s home: `~/.ssh`, `~/.gitconfig`, shell history |
 | `/workspace/<name>` | `prigh-workspace` or `PRIGH_WORKSPACE` | user `<name>`'s default working directory. Clone projects here (`/cd` switches between them) |
+| `/nix` | `prigh-nix` | the Nix store: what users installed (see [Installing tools](#installing-tools)), and prigh's own runtime, copied in from the image at start |
 | `/run/prigh` | tmpfs | the users (`extrausers/passwd`, `group`, `shadow`), rebuilt at each start |
 
 Removing the stack keeps named volumes unless they are removed
 explicitly (`docker compose down -v` deletes them, logins and sessions
-included).
+included). `prigh-nix` alone can be removed at any time with the stack
+down: the next start seeds a fresh store, and users reinstall their
+packages.
 
 ## Migrating from the single-user layout
 
@@ -313,6 +386,7 @@ prefix them with `prigh-docker`, which runs them without root:
 docker compose exec prigh prigh-docker users                 # name, uid, home, workspace, superuser
 docker compose exec -it prigh prigh-docker as alice bash     # a shell as alice, in alice's clean environment
 docker compose exec prigh prigh-docker prigh sessions list   # any other command runs as prigh
+docker compose exec prigh prigh-docker as alice nix profile list
 docker compose run --rm prigh bash                           # likewise, in a new container
 ```
 
@@ -338,11 +412,15 @@ build slower but does not break it.
 1. A `nixos/nix` stage builds `.#backend` and `.#tui` from the flake. It
    first builds only their dependencies, from a copy of the files that
    determine them, so that layer stays cached. It then keeps just the two
-   binaries, the web assets and the few store paths the binaries link
-   against (glibc, gmp), about 50 MB instead of the ~10 GB build closure.
+   binaries, the web assets and, as the Nix seed, the few store paths the
+   binaries link against (glibc, gmp) plus the `nix` of the `nixos/nix`
+   image with its closure and their database registration (`nix-store
+   --dump-db`), about 160 MB instead of the ~10 GB build closure. It also
+   writes the flake registry that pins `nixpkgs` to `flake.lock`.
 2. A `node` stage builds `pi-web/` with `npm ci && npm run build`.
 3. The runtime stage is `debian:bookworm-slim`. `tini -g` is PID 1, so
    signals reach the backend and tool hosts and child processes are
    reaped. `libnss-extrausers` lets the entrypoint add users at runtime
    despite the read-only root (`/var/lib/extrausers` points into `/run`);
-   the build checks that lookups through it work.
+   the build checks that lookups through it work. The `nixbld` group and
+   users and `/etc/nix/nix.conf` (from `docker/nix.conf`) are baked in.

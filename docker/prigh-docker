@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # The container's entrypoint (see DOCKER.md). It starts as root, creates one
 # Linux user per namespace and runs everything else without root: the backend
-# as the prigh service user, each namespace's tool host as its own user.
+# as the prigh service user, each namespace's tool host as its own user. The
+# exception is nix-daemon, which the users install tools through.
 #
 #   prigh-docker                            start what $PRIGH_MODE says
 #   prigh-docker tui [ARGS]                 a TUI on the running server
@@ -14,8 +15,9 @@
 #
 # For docker/test-prigh-docker.sh: PRIGH_DOCKER_ROOT is prefixed to every
 # path the script reads or writes, and PRIGH_DOCKER_DRY_RUN=1 prints the
-# privileged steps (chown, setpriv, exec, the tool host loops) instead of
-# running them, records ownership in $PRIGH_DOCKER_ROOT/owners and pretends
+# privileged steps (chown, setpriv, exec, the tool host loops, Nix) instead
+# of running them, records ownership in $PRIGH_DOCKER_ROOT/owners and the
+# valid store paths in $PRIGH_DOCKER_ROOT/nix/var/nix/db/valid, and pretends
 # to be root (unless PRIGH_DOCKER_UID says otherwise).
 set -euo pipefail
 shopt -s nullglob
@@ -30,6 +32,7 @@ fi
 mode="${PRIGH_MODE:-web}"
 web_port=7788
 pi_web_port=7789
+prigh_web_port=7790
 server_port=7777
 state=/run/prigh
 extrausers="$state/extrausers"
@@ -37,6 +40,10 @@ users_file="$state/users"
 min_uid=10000
 service_user=prigh
 user_shell=/bin/bash
+nix_seed=/opt/nix-seed
+nix_seed_stamp=/nix/var/prigh/seed
+nix_roots=/nix/var/nix/gcroots/prigh
+nix_socket=/nix/var/nix/daemon-socket/socket
 
 die() {
 	echo "prigh-docker: $*" >&2
@@ -133,10 +140,11 @@ for m in "${entries[@]}"; do
 	case "$m" in
 	web) flags+=(-web) ports+=("$web_port") ;;
 	pi-web) flags+=(-pi-web) ports+=("$pi_web_port") ;;
+	prigh-web) flags+=(-prigh-web) ports+=("$prigh_web_port") ;;
 	server) flags+=(-listen) ports+=("$server_port") ;;
 	tui) tui_mode=true ;;
 	"") ;;
-	*) die "unknown PRIGH_MODE entry '$m' (expected web, pi-web, server or tui)" ;;
+	*) die "unknown PRIGH_MODE entry '$m' (expected web, pi-web, prigh-web, server or tui)" ;;
 	esac
 done
 if $tui_mode && [ ${#flags[@]} -gt 0 ]; then
@@ -150,7 +158,7 @@ internal_listen=false
 for i in "${!flags[@]}"; do
 	case "${flags[$i]}" in
 	-listen) internal_port="${ports[$i]}" ;;
-	-web) [ -n "$internal_port" ] || internal_port="${ports[$i]}" ;;
+	-web | -prigh-web) [ -n "$internal_port" ] || internal_port="${ports[$i]}" ;;
 	esac
 done
 if [ -z "$internal_port" ] && [ ${#flags[@]} -gt 0 ]; then
@@ -339,15 +347,22 @@ lookup_user() {
 
 # --- Environments and privilege dropping --------------------------------------
 
+# nix_env HOME: the variables that let a user run nix through the daemon and
+# the tools it installs in its profile, into nix_vars.
+nix_env() {
+	nix_vars=(NIX_REMOTE=daemon PATH="$1/.nix-profile/bin:$1/.local/state/nix/profile/bin:$PATH")
+}
+
 # user_env NAME: a clean environment for NAME into env_vars.
 user_env() {
-	env_vars=(HOME="$u_home" USER="$1" LOGNAME="$1" SHELL="$user_shell" PATH="$PATH"
+	nix_env "$u_home"
+	env_vars=(HOME="$u_home" USER="$1" LOGNAME="$1" SHELL="$user_shell" "${nix_vars[@]}"
 		LANG="${LANG:-C.UTF-8}" GIT_TERMINAL_PROMPT=0)
 	# Bash sets an unexported TERM=dumb when there is none.
 	[[ "$(declare -p TERM 2>/dev/null)" != "declare -x"* ]] || env_vars+=(TERM="$TERM")
 	if [ "$1" = "$service_user" ]; then
 		local v
-		for v in PRIGH_BACKEND PRIGH_WEB_ROOT PRIGH_PI_WEB_ROOT; do
+		for v in PRIGH_BACKEND PRIGH_WEB_ROOT PRIGH_PI_WEB_ROOT PRIGH_PRIGH_WEB_ROOT; do
 			[ -z "${!v:-}" ] || env_vars+=("$v=${!v}")
 		done
 	else
@@ -387,8 +402,9 @@ service() {
 		unset+=(-u "$2")
 		shift 2
 	done
+	nix_env "$u_home"
 	cmd=("${as_prefix[@]}" env "${unset[@]}"
-		HOME="$u_home" USER="$service_user" LOGNAME="$service_user" SHELL="$user_shell" "$@")
+		HOME="$u_home" USER="$service_user" LOGNAME="$service_user" SHELL="$user_shell" "${nix_vars[@]}" "$@")
 }
 
 require_root() {
@@ -491,11 +507,151 @@ supervise() {
 	) &
 }
 
+# --- Nix ----------------------------------------------------------------------
+
+# nix_root_env: the environment of root's Nix processes, into nix_root_vars:
+# none of the container's secrets, the local store, and caches on /nix since
+# root's home is read-only.
+nix_root_env() {
+	local v
+	nix_root_vars=(PATH="$PATH" LANG="${LANG:-C.UTF-8}" HOME=/root XDG_CACHE_HOME=/nix/var/cache/root)
+	for v in http_proxy https_proxy ftp_proxy all_proxy no_proxy HTTP_PROXY HTTPS_PROXY FTP_PROXY ALL_PROXY NO_PROXY; do
+		[ -z "${!v:-}" ] || nix_root_vars+=("$v=${!v}")
+	done
+}
+
+# store_invalid PATH...: those of the store paths that the Nix database does
+# not have.
+store_invalid() {
+	if [ -n "$dry_run" ]; then
+		echo "+ nix-store --check-validity --print-invalid <the $# paths in $nix_seed/store>" >&2
+		local p
+		for p in "$@"; do
+			grep -qxF -- "$p" "$root/nix/var/nix/db/valid" 2>/dev/null || echo "$p"
+		done
+	else
+		nix_root_env
+		env -i "${nix_root_vars[@]}" nix-store --check-validity --print-invalid "$@"
+	fi
+}
+
+load_seed_db() {
+	if [ -n "$dry_run" ]; then
+		echo "+ nix-store --load-db < $nix_seed/registration"
+		local db="$root/nix/var/nix/db/valid" p
+		mkdir -p "${db%/*}"
+		touch "$db"
+		for p in "$root$nix_seed"/store/*; do
+			echo "/nix/store/${p##*/}"
+		done | LC_ALL=C sort -u -o "$db" - "$db"
+	else
+		nix_root_env
+		env -i "${nix_root_vars[@]}" nix-store --load-db <"$nix_seed/registration"
+	fi
+}
+
+# Atomically, so that an interrupted copy is never mistaken for a whole one.
+copy_store_path() {
+	local tmp="$root/nix/store/.prigh-seed-$1"
+	rm -rf "$tmp"
+	cp -a "$root$nix_seed/store/$1" "$tmp"
+	mv "$tmp" "$root/nix/store/$1"
+}
+
+# The image's store paths (prigh's runtime and nix) go into the /nix volume,
+# which hides the image's /nix: those missing are copied and registered, and
+# GC roots keep them. Roots of an older image are dropped, so that the garbage
+# collector can reclaim what only it used.
+seed_nix() {
+	local seed="$root$nix_seed" store="$root/nix/store" p base
+	local paths=() copied=() invalid=()
+	[ -d "$seed/store" ] || die "the image has no Nix seed ($nix_seed): prigh cannot run"
+	mkdir -p "$store"
+	rm -rf "$store"/.prigh-seed-*
+	for p in "$seed"/store/*; do
+		base="${p##*/}"
+		paths+=("/nix/store/$base")
+		if [ ! -e "$store/$base" ]; then
+			copy_store_path "$base"
+			copied+=("$base")
+		fi
+	done
+	mapfile -t invalid < <(store_invalid "${paths[@]}")
+	for p in "${invalid[@]}"; do
+		base="${p##*/}"
+		if [[ " ${copied[*]} " != *" $base "* ]]; then
+			log "$p is in the store but not registered: replacing it with the image's copy"
+			rm -rf "${store:?}/$base"
+			copy_store_path "$base"
+		fi
+	done
+	if [ ${#invalid[@]} -gt 0 ]; then
+		log "adding the image's store paths to /nix (${#invalid[@]} missing or unregistered)"
+		load_seed_db
+	fi
+	rm -rf "$root$nix_roots"
+	mkdir -p "$root$nix_roots"
+	while read -r p; do
+		ln -s "$p" "$root$nix_roots/${p##*/}"
+	done <"$seed/roots"
+	mkdir -p "$root${nix_seed_stamp%/*}" "$root/nix/var/cache/root"
+	cp "$seed/id" "$root$nix_seed_stamp"
+}
+
+# For commands other than start: a new container (docker compose run) may be
+# the first to use the volume.
+ensure_seeded() {
+	[ "$my_uid" = 0 ] || return 0
+	cmp -s "$root$nix_seed/id" "$root$nix_seed_stamp" || seed_nix
+}
+
+# nix-daemon as root in the background, restarted unless it keeps failing. A
+# failure leaves prigh running, just without nix for the users. Sets
+# nix_status for the summary.
+start_nix_daemon() {
+	local sock="$root$nix_socket" i
+	nix_root_env
+	# --quiet: no log line per connection.
+	local daemon=(env -i "${nix_root_vars[@]}" nix-daemon --quiet)
+	if [ -n "$dry_run" ]; then
+		show "supervise nix-daemon:" "${daemon[@]}"
+		nix_status="daemon started"
+		return
+	fi
+	rm -f "$sock"
+	(
+		fails=0
+		while :; do
+			started=$SECONDS
+			"${daemon[@]}" </dev/null && status=0 || status=$?
+			if [ $((SECONDS - started)) -lt 10 ]; then fails=$((fails + 1)); else fails=0; fi
+			if [ "$fails" -ge 3 ]; then
+				log "nix-daemon exited ($status) 3 times in a row soon after starting: giving up, nix is unavailable to the users"
+				exit 0
+			fi
+			log "nix-daemon exited ($status), restarting"
+			sleep 2
+		done
+	) &
+	for i in $(seq 50); do
+		[ ! -S "$sock" ] || break
+		sleep 0.1
+	done
+	if [ -S "$sock" ]; then
+		nix_status="daemon running"
+	else
+		nix_status="NOT RUNNING, users cannot install tools (see the nix-daemon messages above)"
+		log "nix-daemon has not created $nix_socket after 5 s"
+	fi
+}
+
 # --- Commands -----------------------------------------------------------------
 
 start_tui_mode() {
 	local cwd="${PRIGH_CWD:-/workspace/$service_user}"
 	setup_service_home
+	seed_nix
+	start_nix_daemon
 	lookup_user "$service_user"
 	local prigh_uid="$u_uid"
 	if [ ! -e "$root$cwd" ]; then
@@ -511,7 +667,7 @@ start_tui_mode() {
 	fi
 	cd "$root$cwd"
 	service prigh-tui -cwd "$cwd" "${tui_args[@]}" -- "${extra_args[@]}"
-	log "mode=tui cwd=$cwd (single user: tools run as $service_user)"
+	log "mode=tui cwd=$cwd (single user: tools run as $service_user); nix: $nix_status"
 	run_exec "${cmd[@]}"
 }
 
@@ -526,6 +682,8 @@ start() {
 	allocate_uids
 	write_accounts
 	setup_user_dirs
+	seed_nix
+	start_nix_daemon
 
 	local name host_tokens=() summary=() hello
 	for name in "${users[@]}"; do
@@ -577,7 +735,7 @@ start() {
 	fi
 	local hosts="one per user, as that user"
 	! $no_backend_host || hosts="none in the container (PRIGH_NO_BACKEND_HOST=1)"
-	log "mode=$mode users: ${summary[*]}; tool hosts: $hosts"
+	log "mode=$mode users: ${summary[*]}; tool hosts: $hosts; nix: $nix_status"
 	cd "$root/workspace"
 	service "${backend_env[@]}" prigh serve "${serve_args[@]}" "${extra_args[@]}"
 	run_exec "${cmd[@]}"
@@ -680,14 +838,17 @@ case "${1:-}" in
 "" | start) start ;;
 tui)
 	shift
+	ensure_seeded
 	tui "$@"
 	;;
 as)
 	shift
+	ensure_seeded
 	as "$@"
 	;;
 login)
 	shift
+	ensure_seeded
 	login "$@"
 	;;
 ssh-key)
@@ -700,6 +861,7 @@ healthcheck) healthcheck ;;
 	if [ "$my_uid" != 0 ]; then
 		run_exec "$@"
 	fi
+	ensure_seeded
 	clean "$service_user" "$@"
 	run_exec "${cmd[@]}"
 	;;

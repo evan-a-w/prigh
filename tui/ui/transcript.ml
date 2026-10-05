@@ -47,92 +47,6 @@ module Item = struct
   [@@deriving sexp_of, equal]
 end
 
-(* The backend hands finished background subagents and shell jobs to the main
-   agent as a user message of reports, each starting
-   [[subagent <id> finished] <task>] (or [failed]) or
-   [[job <id> <status>] <command>] (status [exited N], [killed], ...). *)
-module Delivery = struct
-  type section =
-    { kind : string (** [subagent] or [job] *)
-    ; id : string
-    ; ok : bool
-    ; status : string
-    ; task : string
-    ; body : string list
-    }
-
-  let subagent_header line =
-    let open Option.Let_syntax in
-    let%bind rest = String.chop_prefix line ~prefix:"[subagent " in
-    let%bind id, rest = String.lsplit2 rest ~on:' ' in
-    let%bind ok, task =
-      match String.chop_prefix rest ~prefix:"finished]" with
-      | Some task -> Some (true, task)
-      | None ->
-        String.chop_prefix rest ~prefix:"failed]"
-        |> Option.map ~f:(fun task -> false, task)
-    in
-    Some
-      { kind = "subagent"
-      ; id
-      ; ok
-      ; status = (if ok then "finished" else "failed")
-      ; task = String.strip task
-      ; body = []
-      }
-  ;;
-
-  let job_header line =
-    let open Option.Let_syntax in
-    let%bind rest = String.chop_prefix line ~prefix:"[job " in
-    let%bind id, rest = String.lsplit2 rest ~on:' ' in
-    let%bind digits = String.chop_prefix id ~prefix:"j" in
-    let%bind status, command = String.lsplit2 rest ~on:']' in
-    if String.is_empty digits
-       || (not (String.for_all digits ~f:Char.is_digit))
-       || not
-            (List.exists
-               [ "exited "; "killed"; "timed out"; "failed" ]
-               ~f:(fun prefix -> String.is_prefix status ~prefix))
-    then None
-    else
-      Some
-        { kind = "job"
-        ; id
-        ; ok = String.equal status "exited 0"
-        ; status
-        ; task = String.strip command
-        ; body = []
-        }
-  ;;
-
-  let header line = Option.first_some (subagent_header line) (job_header line)
-
-  let parse text =
-    match String.split_lines text with
-    | first :: _ as lines when Option.is_some (header first) ->
-      let sections =
-        List.fold lines ~init:[] ~f:(fun acc line ->
-          match header line, acc with
-          | Some section, _ -> section :: acc
-          | None, current :: rest ->
-            { current with body = line :: current.body } :: rest
-          | None, [] -> acc)
-      in
-      Some
-        (List.rev_map sections ~f:(fun s ->
-           { s with
-             body =
-               List.rev s.body
-               |> List.drop_while ~f:String.is_empty
-               |> List.rev
-               |> List.drop_while ~f:String.is_empty
-               |> List.rev
-           }))
-    | _ -> None
-  ;;
-end
-
 let user_item (user : P.Message.User.t) : Item.t =
   if Option.is_some (Delivery.parse user.text)
   then Delivery user.text
@@ -826,7 +740,7 @@ let render_item (item : Item.t) ~(verbosity : Verbosity.t) : Content.t =
   | Delivery text ->
     List.concat_map
       (Option.value (Delivery.parse text) ~default:[])
-      ~f:(fun (section : Delivery.section) ->
+      ~f:(fun (section : Delivery.Section.t) ->
         let header : Content.Line.t =
           [ { Content.Span.text = sprintf "↩ %s %s" section.kind section.id
             ; style = magenta
