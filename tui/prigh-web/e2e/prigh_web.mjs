@@ -32,7 +32,25 @@ const script = [
   { text: "second session reply" },
 ];
 // After the restart.
-const script2 = [{ text: "back again" }];
+const script2 = [
+  { text: "back again" },
+  // A background subagent that runs a synchronous one, and a background job;
+  // the main agent sleeps meanwhile, so the order is fixed.
+  {
+    text: "delegating",
+    tool_calls: [
+      { id: "s1", name: "subagent", arguments: { task: "Survey the project" } },
+      { id: "j1", name: "bash", arguments: { command: "sleep 1; echo built", background: true } },
+      { id: "w1", name: "bash", arguments: { command: "sleep 2" } },
+    ],
+  },
+  { text: "asking a helper", tool_calls: [{ id: "n1", name: "subagent", arguments: { task: "Count the files" } }] },
+  { text: "There are **3** files." },
+  { text: "The survey: 3 files." },
+  { text: "Started a survey and a job." },
+  { text: "Noted." },
+  { text: "Noted." },
+];
 writeFileSync(join(dir, "script.json"), JSON.stringify(script));
 writeFileSync(join(dir, "script2.json"), JSON.stringify(script2));
 
@@ -154,6 +172,13 @@ const showImages = async (label, locator) => {
   while (!(images = await describe())) await page.waitForTimeout(50);
   section(label);
   console.log(images.join("\n"));
+};
+
+// The agents panel, with its elapsed times replaced.
+const showPanel = async label => {
+  section(label);
+  console.log(clean(await page.locator(".agents-panel").innerText()).replace(/\b\d+(m \d\d)?s\b/g, "<T>"));
+  await screenshot(label);
 };
 
 const bodyHas = text => page.waitForFunction(t => document.body.innerText.includes(t), text);
@@ -302,6 +327,37 @@ try {
   await bodyHas("back again");
   await idle();
   await showTurn("after reconnecting");
+
+  // 8. Subagents (one nested in a background one) and a background job in
+  //    the agents panel: the list, one in full, its card in the chat, the
+  //    job's output; a card in the chat opens its agent.
+  await send("survey it");
+  await bodyHas("Started a survey and a job.");
+  await idle();
+  await page.locator(".status .background").click();
+  await page.waitForFunction(() =>
+    document.querySelectorAll(".agents-row").length === 3 && !document.querySelector(".agents-row.running"));
+  await showPanel("agents panel");
+  await page.keyboard.press("Alt+2");
+  await page.waitForSelector(".agents-detail .agents-transcript .entries");
+  await showPanel("a nested subagent");
+  await page.locator(".detail-actions .btn", { hasText: "Show in chat" }).click();
+  await page.waitForFunction(() => {
+    const card = document.querySelector("#chat [data-call=s1] [data-call=n1]");
+    const chat = document.getElementById("chat").getBoundingClientRect();
+    const box = card?.getBoundingClientRect();
+    return box && box.top >= chat.top && box.bottom <= chat.bottom;
+  });
+  console.log("the nested card is in view in the chat");
+  await page.keyboard.press("Alt+3");
+  await page.waitForSelector(".job-output");
+  await showPanel("a background job");
+  await page.keyboard.press("Alt+0");
+  await page.waitForSelector(".agents-panel", { state: "detached" });
+  await page.locator("#chat [data-agent=a1]").click();
+  await page.waitForSelector(".agents-detail .agents-transcript .entries");
+  await showPanel("a card opens its agent");
+  await page.locator(".agents-close").click();
 
   // The layout at phone size.
   await page.setViewportSize({ width: 390, height: 844 });
