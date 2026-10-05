@@ -1,6 +1,15 @@
 open! Core
 open! Import
 
+module Host = struct
+  type t =
+    { id : string
+    ; name : string
+    ; pinned : bool
+    }
+  [@@deriving sexp, jsonaf, equal]
+end
+
 module Entry = struct
   module Payload = struct
     type t =
@@ -15,7 +24,10 @@ module Entry = struct
           }
       | Name of { name : string }
       | Description of { text : string }
-      | Cwd of { cwd : string }
+      | Cwd of
+          { cwd : string
+          ; host : Host.t option [@jsonaf.option] [@sexp.option]
+          }
       | System_prompt of { text : string }
     [@@deriving sexp, jsonaf]
   end
@@ -46,6 +58,8 @@ type t =
   { id : string
   ; path : string
   ; mutable cwd : string
+  ; mutable host : Host.t option
+  ; host_cwds : string String.Table.t
   ; created_at : Time_float.t
   ; parent : string option
   ; mutable entries : Entry.t list (* reversed *)
@@ -59,6 +73,8 @@ type t =
 let id t = t.id
 let path t = t.path
 let cwd t = t.cwd
+let host t = t.host
+let host_cwds t = String.Map.of_hashtbl_exn t.host_cwds
 let parent t = t.parent
 let head t = t.head
 let entries t = List.rev t.entries
@@ -180,6 +196,8 @@ let create ~dir ~cwd ?parent () =
     { id
     ; path
     ; cwd
+    ; host = None
+    ; host_cwds = String.Table.create ()
     ; created_at
     ; parent
     ; entries = []
@@ -196,7 +214,11 @@ let add_entry t (entry : Entry.t) =
   Hashtbl.set t.by_id ~key:entry.id ~data:entry;
   t.head <- Some entry.id;
   match entry.payload with
-  | Cwd { cwd } -> t.cwd <- cwd
+  | Cwd { cwd; host } ->
+    t.cwd <- cwd;
+    Option.iter host ~f:(fun host ->
+      t.host <- Some host;
+      Hashtbl.set t.host_cwds ~key:host.id ~data:cwd)
   | Message _
   | Model _
   | Compaction _
@@ -228,6 +250,8 @@ let load path =
         { id
         ; path
         ; cwd
+        ; host = None
+        ; host_cwds = String.Table.create ()
         ; created_at
         ; parent
         ; entries = []
@@ -259,7 +283,7 @@ let append_message t ?at message = append ?at t (Message message)
 let set_model t ~model ~thinking = append t (Model { model; thinking })
 let set_name t ~name = append t (Name { name })
 let set_description t ~text = append t (Description { text })
-let set_cwd t ~cwd = append t (Cwd { cwd })
+let set_cwd t ?host ~cwd () = append t (Cwd { cwd; host })
 let set_system_prompt t ~text = append t (System_prompt { text })
 
 let name t =

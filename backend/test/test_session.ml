@@ -244,7 +244,7 @@ let%expect_test "nothing is written until a message or a name" =
   let t = Session.create ~dir ~cwd:"/a" () in
   let exists () = Sys_unix.file_exists_exn (Session.path t) in
   let (_ : Session.Entry.t) = Session.set_model t ~model:"m" ~thinking:Off in
-  let (_ : Session.Entry.t) = Session.set_cwd t ~cwd:"/b" in
+  let (_ : Session.Entry.t) = Session.set_cwd t ~cwd:"/b" () in
   let (_ : Session.Entry.t) = Session.set_system_prompt t ~text:"sys" in
   print_s
     [%sexp
@@ -788,4 +788,80 @@ let%expect_test "Filter.matches and delete (sessions prune)" =
     long
     short
     |}]
+;;
+
+let%expect_test "cwd entries record the tool host; load restores it" =
+  with_dir
+  @@ fun dir ->
+  let t = Session.create ~dir ~cwd:"/proj" () in
+  let show t =
+    print_s
+      [%message
+        ""
+          ~cwd:(Session.cwd t : string)
+          ~host:(Session.host t : Session.Host.t option)
+          ~host_cwds:(Session.host_cwds t : string String.Map.t)]
+  in
+  let host id ~pinned = { Session.Host.id; name = id ^ "-name"; pinned } in
+  show t;
+  let (_ : Session.Entry.t) =
+    Session.set_cwd t ~host:(host "desk" ~pinned:false) ~cwd:"/home/me" ()
+  in
+  let (_ : Session.Entry.t) = Session.append_message t (Message.user "hi") in
+  let (_ : Session.Entry.t) =
+    Session.set_cwd t ~host:(host "box" ~pinned:true) ~cwd:"/srv" ()
+  in
+  let (_ : Session.Entry.t) =
+    Session.set_cwd t ~host:(host "desk" ~pinned:true) ~cwd:"/home/me/proj" ()
+  in
+  show t;
+  let loaded = Or_error.ok_exn (Session.load (Session.path t)) in
+  show loaded;
+  (* A [cwd] entry without a host keeps the last recorded one. *)
+  let (_ : Session.Entry.t) = Session.set_cwd loaded ~cwd:"/tmp" () in
+  show (Or_error.ok_exn (Session.load (Session.path t)));
+  (* As written: the payload of each [cwd] entry. *)
+  List.iter
+    (In_channel.read_lines (Session.path t))
+    ~f:(fun line ->
+      match Jsonaf.of_string line with
+      | `Array [ `String "Entry"; entry ] ->
+        (match Jsonaf.member "payload" entry with
+         | Some (`Array [ `String "Cwd"; cwd ]) ->
+           print_endline (Jsonaf.to_string cwd)
+         | _ -> ())
+      | _ -> ());
+  [%expect
+    {|
+    ((cwd /proj) (host ()) (host_cwds ()))
+    ((cwd /home/me/proj) (host (((id desk) (name desk-name) (pinned true))))
+     (host_cwds ((box /srv) (desk /home/me/proj))))
+    ((cwd /home/me/proj) (host (((id desk) (name desk-name) (pinned true))))
+     (host_cwds ((box /srv) (desk /home/me/proj))))
+    ((cwd /tmp) (host (((id desk) (name desk-name) (pinned true))))
+     (host_cwds ((box /srv) (desk /home/me/proj))))
+    {"cwd":"/home/me","host":{"id":"desk","name":"desk-name","pinned":false}}
+    {"cwd":"/srv","host":{"id":"box","name":"box-name","pinned":true}}
+    {"cwd":"/home/me/proj","host":{"id":"desk","name":"desk-name","pinned":true}}
+    {"cwd":"/tmp"}
+    |}]
+;;
+
+let%expect_test "files written before hosts were recorded still load" =
+  with_dir
+  @@ fun dir ->
+  let path = dir ^/ "old.jsonl" in
+  Out_channel.write_lines
+    path
+    [ {|["Header",{"id":"s1","cwd":"/a","created_at":"2026-01-01 00:00:00Z"}]|}
+    ; {|["Entry",{"id":"e1","parent":null,"payload":["Message",["User",{"text":"hi"}]]}]|}
+    ; {|["Entry",{"id":"e2","parent":"e1","payload":["Cwd",{"cwd":"/b"}]}]|}
+    ];
+  let t = Session.load path in
+  print_s
+    [%sexp
+      (Or_error.map t ~f:(fun t ->
+         Session.cwd t, Session.host t, Session.host_cwds t)
+       : (string * Session.Host.t option * string String.Map.t) Or_error.t)];
+  [%expect {| (Ok (/b () ())) |}]
 ;;

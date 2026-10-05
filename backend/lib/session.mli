@@ -5,6 +5,16 @@ open! Import
     conversation is the path from the root to [head]; rewinding moves [head]
     to an earlier entry so new messages branch from there. *)
 
+(** The tool host a session runs on (see [Agent]). *)
+module Host : sig
+  type t =
+    { id : string
+    ; name : string (** as last seen, for when it is disconnected *)
+    ; pinned : bool (** chosen explicitly rather than by default *)
+    }
+  [@@deriving sexp, jsonaf, equal]
+end
+
 module Entry : sig
   module Payload : sig
     type t =
@@ -21,7 +31,13 @@ module Entry : sig
       | Name of { name : string }
       | Description of { text : string }
       (** model-written one-line summary, see [Session_description] *)
-      | Cwd of { cwd : string }
+      | Cwd of
+          { cwd : string
+          ; host : Host.t option
+            (** where [cwd] is: from here on the session runs there;
+                absent before a session has a host, and in files written
+                before hosts were recorded *)
+          }
       | System_prompt of { text : string }
     [@@deriving sexp, jsonaf]
   end
@@ -51,6 +67,13 @@ val persisted : t -> bool
 val id : t -> string
 val path : t -> string
 val cwd : t -> string
+
+(** The host of the last [cwd] entry that has one. *)
+val host : t -> Host.t option
+
+(** The last [cwd] on each host, by [Host.id]. *)
+val host_cwds : t -> string String.Map.t
+
 val parent : t -> string option
 val head : t -> string option
 val entries : t -> Entry.t list
@@ -92,7 +115,7 @@ val set_name : t -> name:string -> Entry.t
 val set_description : t -> text:string -> Entry.t
 
 (** Records a [cwd] entry; a subsequent [load] restores it. *)
-val set_cwd : t -> cwd:string -> Entry.t
+val set_cwd : t -> ?host:Host.t -> cwd:string -> unit -> Entry.t
 
 val append_compaction : t -> summary:string -> kept_from:string -> Entry.t
 val rewind : t -> to_:string -> unit Or_error.t
