@@ -303,7 +303,14 @@ instructions; verbose unfolds it) above the arguments you typed, and
 their status, tool count or error and config file, the configuration's
 problems under them: Enter approves (and starts) a project's server,
 restarts a failed one, or lists a ready one's tools; `/mcp reconnect`
-restarts the failed ones and reports. Ctrl+P/Alt+P cycle the scoped
+restarts the failed ones and reports. `/fallback` completes a model for
+each word, in order (or `off`), and shows the backend's error, with the
+closest models, for one it doesn't know; `/default-dir` completes
+directories on the backend's host, where new sessions start, and takes a
+relative path from the backend's directory. When a model's usage runs out
+and the next fallback model takes over, the transcript shows a `↪ handed
+over from A to B (error)` line rather than the message as a prompt, and
+`/fork` and `/tree` label it the same way. Ctrl+P/Alt+P cycle the scoped
 models, Alt+T the thinking level (Ctrl+T is the browser's), Alt+↑ takes
 back a queued message, Ctrl+↑/↓ jump between your messages; `/help` and
 `/hotkeys` also list the TUI's keys that the browser keeps (Ctrl+C, Ctrl+Z, Ctrl+F, Ctrl+R, $EDITOR's Ctrl+G)

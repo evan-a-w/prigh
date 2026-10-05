@@ -896,6 +896,15 @@ copy of the protocol types and the e2e test guards the contract.
       (servers to act on first; the problems under it, in `Dialog_view`),
       `/mcp reconnect`'s report and what became of an approved or restarted
       server; a ready one's tools are the `Mcp_tools` dialog.
+    - Model hand-over: `/fallback` and `/default-dir` send `set_config`
+      with only the field they change (as `/confirm` and `/scoped-models`
+      do), and show the config the backend replies with (`/fallback`'s
+      names resolved to keys). `Completion`'s `Models` argument completes
+      the word under the cursor, leaving out the models already listed;
+      `Backend_directory` is `list_dirs` with `host: backend`.
+      `Handover_message` parses the user message the backend starts the
+      next model's run with, which `Chat_view` renders as a hand-over line
+      and `Session_tree` labels the same way.
   - `app/` (`prigh_web_app`) — `Web_main.run`: connects a `Ws_transport`
     to `?backend=` or the page's `/ws`, sends `hello` with the active
     account (`prigh.user`/`prigh.token`, `web-app/`'s `Login`) and

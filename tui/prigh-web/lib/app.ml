@@ -1228,8 +1228,8 @@ let default_dir_summary (config : Config.t) =
        clears it)"
       dir
   | None ->
-    "No default directory: new sessions start where the backend was started; \
-     /default-dir PATH sets one"
+    "No default directory: new sessions start in the backend's working \
+     directory; /default-dir PATH sets one"
 ;;
 
 (* The backend resolves [default_cwd] where it was started, which the user
@@ -2179,8 +2179,8 @@ let reply (m : Model.t) (tag : Reply_tag.t) result =
         (match config.default_cwd with
          | Some _ -> default_dir_summary config
          | None ->
-           "Default directory cleared: new sessions start where the backend \
-            was started"))
+           "Default directory cleared: new sessions start in the backend's \
+            working directory"))
   | Default_saved, Ok json ->
     decode m json Config.of_json ~f:(fun config ->
       let show = Option.value ~default:"?" in

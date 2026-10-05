@@ -69,7 +69,7 @@ let%expect_test "every command does something (none is unknown)" =
     /rewind                    rpc get_entries
     /tree                      rpc get_entries
     /cd                        path prompt
-    /default-dir               toast: No default directory: new sessions start where the backend was started; /default-dir PATH sets one
+    /default-dir               toast: No default directory: new sessions start in the backend's working directory; /default-dir PATH sets one
     /host                      picker: Where tools run
     /export                    path prompt
     /import                    path prompt
