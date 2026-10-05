@@ -369,7 +369,7 @@ kbd {
 
 .pending-images { display: flex; gap: 8px; flex-wrap: wrap; padding: 2px 2px 0; }
 .pending-image { position: relative; }
-.pending-image img { display: block; height: 64px; max-width: 120px; object-fit: cover; border-radius: 8px; border: 1px solid var(--border); }
+.pending-image img { display: block; height: 64px; max-width: 120px; object-fit: contain; background: var(--panel-2); border-radius: 8px; border: 1px solid var(--border); }
 .remove-image {
   position: absolute;
   top: -6px;

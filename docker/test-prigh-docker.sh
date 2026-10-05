@@ -203,6 +203,13 @@ run_tests() {
 	mkdir -p "$r/home/.config"
 	pd PRIGH_TOKEN=tok
 
+	section "prigh-web: alone (tool hosts connect to it), and with pi-web"
+	fake_root
+	owned /home/prigh 1000
+	pd PRIGH_TOKEN=tok PRIGH_MODE=prigh-web
+	pd PRIGH_TOKEN=tok PRIGH_MODE=pi-web,prigh-web
+	pd PRIGH_TOKEN=tok PRIGH_MODE=prigh-web healthcheck
+
 	section "no token: no auth, one tool host as default without a token"
 	fake_root
 	owned /home/prigh 1000

@@ -41,6 +41,7 @@ RUN nix build --out-link /out/backend path:/src#backend \
  && mkdir -p /opt/prigh/bin /opt/prigh/share \
  && cp -L /out/backend/bin/prigh /out/tui/bin/prigh-tui /opt/prigh/bin/ \
  && cp -rL /out/tui/share/prigh_tui/web /opt/prigh/share/web \
+ && cp -rL /out/tui/share/prigh_tui/prigh-web /opt/prigh/share/prigh-web \
  && chmod -R u+w /opt/prigh \
  && refs=$(grep -raoh '/nix/store/[a-z0-9]\{32\}-[-a-zA-Z0-9+._?=]*' /opt/prigh | sort -u) \
  && echo "runtime store paths: $refs" \
@@ -120,6 +121,7 @@ ENV LANG=C.UTF-8 \
     PRIGH_BACKEND=/opt/prigh/bin/prigh \
     PRIGH_WEB_ROOT=/opt/prigh/share/web \
     PRIGH_PI_WEB_ROOT=/opt/prigh/share/pi-web \
+    PRIGH_PRIGH_WEB_ROOT=/opt/prigh/share/prigh-web \
     PRIGH_MODE=web \
     GIT_TERMINAL_PROMPT=0
 
@@ -127,7 +129,7 @@ ENV LANG=C.UTF-8 \
 # Each user's own directory is /workspace/<name>.
 WORKDIR /workspace
 VOLUME ["/home", "/workspace", "/nix"]
-EXPOSE 7777 7788 7789
+EXPOSE 7777 7788 7789 7790
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s CMD ["prigh-docker", "healthcheck"]
 # -g: stop signals go to the whole process group (backend and tool hosts).
 ENTRYPOINT ["tini", "-g", "--", "prigh-docker"]

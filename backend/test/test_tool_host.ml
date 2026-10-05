@@ -431,3 +431,39 @@ let%expect_test "stdio worker: exec, output, cancel" =
     ()
     |}]
 ;;
+
+let%expect_test "stdio worker: instructions come from the host's own home" =
+  with_sandbox
+  @@ fun t ->
+  Eio.Switch.run
+  @@ fun sw ->
+  write t "backend-home/.prigh/AGENTS.md" "the backend's";
+  write t "host-home/.prigh/AGENTS.md" "the host's";
+  Core_unix.mkdir_p (Filename.concat t.dir "proj");
+  let old_home = Sys.getenv "HOME" in
+  Core_unix.putenv ~key:"HOME" ~data:(Filename.concat t.dir "host-home");
+  let w = Worker.start t ~sw in
+  Worker.send
+    w
+    (sprintf
+       {|{"type":"exec","exec_id":"i1","name":"$instructions","arguments":{"home":"%s/backend-home","with_nix":true},"cwd":"%s/proj"}|}
+       t.dir
+       t.dir);
+  let reply = Worker.read_line w in
+  Option.iter old_home ~f:(fun data -> Core_unix.putenv ~key:"HOME" ~data);
+  Option.iter reply ~f:(fun line ->
+    print_endline
+      (mask
+         t
+         (Re.replace_string
+            (Re.Perl.compile_pat {|\\"nix\\":(true|false)|})
+            ~by:{|\"nix\":<bool>|}
+            line)));
+  Worker.close w;
+  ignore (Worker.read_line w : string option);
+  [%expect
+    {|
+    {"type":"result","exec_id":"i1","text":"{\"files\":[{\"path\":\"$DIR/host-home/.prigh/AGENTS.md\",\"text\":\"the host's\"}],\"nix\":<bool>}","is_error":false}
+    (worker finished)
+    |}]
+;;

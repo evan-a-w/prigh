@@ -120,6 +120,21 @@ let add_message t (message : Message.t) =
 
 let of_messages messages = List.fold messages ~init:empty ~f:add_message
 
+let subagents_to_load t =
+  Map.data t.tools
+  |> List.filter_map ~f:(fun tool ->
+    if String.equal tool.call.name "subagent" && Option.is_none tool.subagent
+    then Some tool.call.id
+    else None)
+;;
+
+let set_subagent t ~call_id subagent =
+  update_tool t call_id ~f:(fun tool ->
+    match tool.subagent with
+    | Some _ -> tool
+    | None -> { tool with subagent = Some subagent })
+;;
+
 let rec apply t (event : Event.t) =
   let t =
     match event with

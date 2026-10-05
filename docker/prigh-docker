@@ -32,6 +32,7 @@ fi
 mode="${PRIGH_MODE:-web}"
 web_port=7788
 pi_web_port=7789
+prigh_web_port=7790
 server_port=7777
 state=/run/prigh
 extrausers="$state/extrausers"
@@ -139,10 +140,11 @@ for m in "${entries[@]}"; do
 	case "$m" in
 	web) flags+=(-web) ports+=("$web_port") ;;
 	pi-web) flags+=(-pi-web) ports+=("$pi_web_port") ;;
+	prigh-web) flags+=(-prigh-web) ports+=("$prigh_web_port") ;;
 	server) flags+=(-listen) ports+=("$server_port") ;;
 	tui) tui_mode=true ;;
 	"") ;;
-	*) die "unknown PRIGH_MODE entry '$m' (expected web, pi-web, server or tui)" ;;
+	*) die "unknown PRIGH_MODE entry '$m' (expected web, pi-web, prigh-web, server or tui)" ;;
 	esac
 done
 if $tui_mode && [ ${#flags[@]} -gt 0 ]; then
@@ -156,7 +158,7 @@ internal_listen=false
 for i in "${!flags[@]}"; do
 	case "${flags[$i]}" in
 	-listen) internal_port="${ports[$i]}" ;;
-	-web) [ -n "$internal_port" ] || internal_port="${ports[$i]}" ;;
+	-web | -prigh-web) [ -n "$internal_port" ] || internal_port="${ports[$i]}" ;;
 	esac
 done
 if [ -z "$internal_port" ] && [ ${#flags[@]} -gt 0 ]; then
@@ -360,7 +362,7 @@ user_env() {
 	[[ "$(declare -p TERM 2>/dev/null)" != "declare -x"* ]] || env_vars+=(TERM="$TERM")
 	if [ "$1" = "$service_user" ]; then
 		local v
-		for v in PRIGH_BACKEND PRIGH_WEB_ROOT PRIGH_PI_WEB_ROOT; do
+		for v in PRIGH_BACKEND PRIGH_WEB_ROOT PRIGH_PI_WEB_ROOT PRIGH_PRIGH_WEB_ROOT; do
 			[ -z "${!v:-}" ] || env_vars+=("$v=${!v}")
 		done
 	else

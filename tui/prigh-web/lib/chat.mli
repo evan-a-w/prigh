@@ -57,4 +57,12 @@ val tool : t -> string -> Tool.t option
 val running : t -> bool
 
 val apply : t -> Event.t -> t
+
+(** The ids of [subagent] calls without a transcript: [get_messages] only
+    has their reports, the backend keeps the rest ([get_subagent]). *)
+val subagents_to_load : t -> string list
+
+(** Fills in a [subagent] call's transcript, unless events already did. *)
+val set_subagent : t -> call_id:string -> Subagent.t -> t
+
 val add_notice : t -> string -> t
