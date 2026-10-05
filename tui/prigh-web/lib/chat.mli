@@ -15,6 +15,8 @@ module Subagent : sig
     ; task : string
     ; model : string
     ; chat : chat (** its own transcript, from its events *)
+    ; turns : int
+    ; cost_usd : float option (** once it has finished *)
     ; result : Event.Subagent_result.t option
     }
   [@@deriving sexp_of]
@@ -37,7 +39,8 @@ module Entry : sig
         { message : Message.Assistant.t
         ; streaming : bool
         }
-    | Notice of string (** e.g. a compaction summary *)
+    | Notice of string
+    | Compaction of string (** the summary that replaced older messages *)
   [@@deriving sexp_of]
 end
 

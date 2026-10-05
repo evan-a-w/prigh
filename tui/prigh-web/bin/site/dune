@@ -16,10 +16,17 @@
  (action
   (copy ../style.css style.css)))
 
+(rule
+ (target chat.css)
+ (deps ../chat.css)
+ (action
+  (copy ../chat.css chat.css)))
+
 (install
  (section share)
  (package prigh_tui)
  (files
   (index.html as prigh-web/index.html)
   (main.bc.js as prigh-web/main.bc.js)
-  (style.css as prigh-web/style.css)))
+  (style.css as prigh-web/style.css)
+  (chat.css as prigh-web/chat.css)))
