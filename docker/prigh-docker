@@ -609,7 +609,8 @@ ensure_seeded() {
 start_nix_daemon() {
 	local sock="$root$nix_socket" i
 	nix_root_env
-	local daemon=(env -i "${nix_root_vars[@]}" nix-daemon)
+	# --quiet: no log line per connection.
+	local daemon=(env -i "${nix_root_vars[@]}" nix-daemon --quiet)
 	if [ -n "$dry_run" ]; then
 		show "supervise nix-daemon:" "${daemon[@]}"
 		nix_status="daemon started"
