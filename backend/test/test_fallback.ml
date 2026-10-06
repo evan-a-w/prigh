@@ -240,7 +240,7 @@ let%expect_test "set_config: fallback models resolved to keys, errors name them"
   [%expect
     {|
     (openai-codex/gpt-6-sol anthropic/claude-opus-5-5 deepseek/deepseek-flash)
-    fallback_models: unknown model "gpt-6-soll"; did you mean: openai-codex/gpt-6-sol (GPT-6 Sol), openai/gpt-5.6-sol (GPT-5.6 Sol), openai-codex/gpt-5.6-sol (GPT-5.6 Sol)
+    fallback_models: unknown model "gpt-6-soll"; did you mean: openai-codex/gpt-6-sol (GPT-6 Sol), openai/gpt-5.6-sol (GPT-5.6 Sol), openai/gpt-6.1-sol (GPT-6.1 Sol)
     |}]
 ;;
 

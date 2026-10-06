@@ -1117,7 +1117,7 @@ let create
   in
   let thinking =
     Option.first_some thinking config.default_thinking
-    |> Option.value ~default:Thinking.Off
+    |> Option.value ~default:Thinking.default
   in
   let session =
     match session with
