@@ -6,7 +6,7 @@
    (name "DeepSeek V4.1 Flash") (context_window 1000000) (max_output 384000)
    (supports_thinking true)
    (cost ((input 0.3) (output 1.2) (cache_read 0.006)))))
- (thinking off) (running false) (message_count 0)
+ (thinking on) (running false) (message_count 0)
  (usage ((input 0) (output 0) (cache_read 0))) (cost_usd 0)
  (context_tokens 0) (active_host backend)
  (hosts
@@ -94,7 +94,7 @@
       (stop_reason ((type end_turn)))
       (usage ((input 10) (output 5) (cache_read 0))) (model deepseek-flash))))
    ((id <id>) (parent <id>) (at <at>) (kind model)
-    (model anthropic/claude-fable-5-1) (thinking off))
+    (model anthropic/claude-fable-5-1) (thinking on))
    ((id <id>) (parent <id>) (at <at>) (kind model)
     (model anthropic/claude-fable-5-1) (thinking high))
    ((id <id>) (parent <id>) (at <at>) (kind name) (name "e2e session")))))
