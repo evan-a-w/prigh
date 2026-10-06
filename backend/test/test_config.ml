@@ -72,7 +72,11 @@ let%expect_test "malformed JSON and wrong types are errors" =
   with_sandbox
   @@ fun t ->
   write t ".prigh/config.json" "{not json";
-  print_s [%sexp (Config.load ~home:t.dir : Config.t Or_error.t)];
+  print_endline
+    (mask
+       t
+       (Sexp.to_string_hum
+          [%sexp (Config.load ~home:t.dir : Config.t Or_error.t)]));
   write t ".prigh/config.json" {|{"scoped_models": "x"}|};
   print_s [%sexp (Config.load ~home:t.dir : Config.t Or_error.t)];
   write t ".prigh/config.json" {|{"confirm_tools": 1}|};
@@ -85,7 +89,8 @@ let%expect_test "malformed JSON and wrong types are errors" =
   print_s [%sexp (Config.load ~home:t.dir : Config.t Or_error.t)];
   [%expect
     {|
-    (Error "json > object: char '}'")
+    (Error
+     "$DIR/.prigh/config.json is not valid JSON (json > object: char '}')")
     (Error "config.scoped_models must be an array of strings")
     (Error "config.confirm_tools must be a boolean")
     (Error "config.default_model must be a string")
@@ -93,6 +98,30 @@ let%expect_test "malformed JSON and wrong types are errors" =
      (config.default_thinking "thinking must be one of: off, on, low, high, max"))
     (Error "config.default_thinking must be a string")
     |}]
+;;
+
+let%expect_test
+    "problems: wrong types and unknown settings say where and what to do"
+  =
+  with_sandbox
+  @@ fun t ->
+  let show contents =
+    write t ".prigh/config.json" contents;
+    List.iter (Config.problems ~home:t.dir) ~f:(fun p ->
+      print_endline (mask t p))
+  in
+  show {|{"scoped_models": [], "providers": {}, "default_cwd": null}|};
+  [%expect {| |}];
+  show {|{"confirm_tools": "yes", "providrs": {}, "colour": "blue"}|};
+  [%expect
+    {|
+    config.confirm_tools must be a boolean (in $DIR/.prigh/config.json); prigh ignores the file's settings until it is fixed
+    unknown setting "providrs" in $DIR/.prigh/config.json is ignored; did you mean "providers"?
+    unknown setting "colour" in $DIR/.prigh/config.json is ignored (known: providers, scoped_models, confirm_tools, default_model, default_thinking, fallback_models, default_cwd)
+    |}];
+  (* Unparsable files are [read_fields]' error, reported once elsewhere. *)
+  show "{not json";
+  [%expect {| |}]
 ;;
 
 let%expect_test "null defaults are unset" =

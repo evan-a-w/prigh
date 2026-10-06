@@ -247,11 +247,37 @@ let same_endpoint (a : Custom_provider.t) (b : Custom_provider.t) =
   && [%equal: (string * string) list] a.headers b.headers
 ;;
 
+(* New sessions silently fall back to another model when the configured one
+   is unknown, so say so. *)
+let unknown_start_model t ~home =
+  match Config.load ~home with
+  | Error _ -> []
+  | Ok config ->
+    (match Config.start_model config with
+     | None -> []
+     | Some key when Option.is_some (find t key) -> []
+     | Some key ->
+       [ sprintf
+           "%s %S (in %s) is not a known model, so new sessions start on \
+            another; did you mean %s? (/change_default saves the current model \
+            as the default)"
+           (if Option.is_some config.default_model
+            then "default_model"
+            else "fallback_models' first")
+           key
+           (Config.path ~home)
+           (String.concat
+              ~sep:" or "
+              (List.map (Model.closest_in (models t) key) ~f:Model.key))
+       ])
+;;
+
 let reload ?listed t =
   match t.source with
   | None -> ()
   | Some source ->
     let providers, problems = Custom_provider.load ~home:source.home in
+    let problems = problems @ Config.problems ~home:source.home in
     let just_listed p =
       Option.value_map listed ~default:false ~f:(fun (name, _) ->
         String.equal name p.Custom_provider.name)
@@ -264,17 +290,18 @@ let reload ?listed t =
         | Some old -> not (same_endpoint old p)
         | None -> true)
     in
-    let new_problems =
-      List.filter problems ~f:(fun p ->
-        not (List.mem t.config_problems p ~equal:String.equal))
-    in
     t.providers <- providers;
-    t.config_problems <- problems;
     Hashtbl.filter_keys_inplace t.listings ~f:(fun name ->
       Option.is_some (find_provider t name));
     List.iter changed ~f:(fun p -> Hashtbl.remove t.listings p.name);
     Option.iter listed ~f:(fun (name, models) ->
       if Option.is_some (find_provider t name) then set_listed t name models);
+    let problems = problems @ unknown_start_model t ~home:source.home in
+    let new_problems =
+      List.filter problems ~f:(fun p ->
+        not (List.mem t.config_problems p ~equal:String.equal))
+    in
+    t.config_problems <- problems;
     List.iter new_problems ~f:(announce t);
     if source.auto_fetch && not (List.is_empty changed)
     then
