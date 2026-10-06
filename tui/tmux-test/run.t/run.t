@@ -3,58 +3,61 @@ prints the captured panes.
 
   $ bash ./harness.sh startup
   === initial screen
-  session <id> in $TMP/cwd. /help for commands, Esc aborts, Ctrl+C twice
-  quits.
+    session <id> in $TMP/cwd. /help for commands, Esc aborts, Ctrl+C
+    twice quits.
   ────────────────────────────────────────────────────────────────────────────────────────────────────
   >
   $TMP/cwd  deepseek-flash  think:on  view:normal  ctx:0% 0  $0.00
   $ bash ./harness.sh prompt
   === typed
-  session <id> in $TMP/cwd. /help for commands, Esc aborts, Ctrl+C twice
-  quits.
+    session <id> in $TMP/cwd. /help for commands, Esc aborts, Ctrl+C
+    twice quits.
   ────────────────────────────────────────────────────────────────────────────────────────────────────
   > hello there
   $TMP/cwd  deepseek-flash  think:on  view:normal  ctx:0% 0  $0.00
   === after reply
-  session <id> in $TMP/cwd. /help for commands, Esc aborts, Ctrl+C twice
-  quits.
-  > hello there
-  faux reply
+    session <id> in $TMP/cwd. /help for commands, Esc aborts, Ctrl+C
+    twice quits.
+  
+  ▌ hello there
+    faux reply
   ────────────────────────────────────────────────────────────────────────────────────────────────────
   >
   $TMP/cwd  deepseek-flash  think:on  view:normal  ctx:0% 10  $0.00
   $ bash ./harness.sh ctrl_o
   === after C-o
-  session <id> in $TMP/cwd. /help for commands, Esc aborts, Ctrl+C twice
-  quits.
-  view: verbose — everything is shown
+    session <id> in $TMP/cwd. /help for commands, Esc aborts, Ctrl+C
+    twice quits.
+    view: verbose — everything is shown
   ────────────────────────────────────────────────────────────────────────────────────────────────────
   >
   $TMP/cwd  deepseek-flash  think:on  view:verbose  ctx:0% 0  $0.00
   $ bash ./harness.sh resize
   === 40x12
-  session <id> in
-  $TMP/cwd. /help for
-  commands, Esc aborts, Ctrl+C twice
-  quits.
-  > first
-  faux reply
+    session <id> in
+    $TMP/cwd. /help for
+    commands, Esc aborts, Ctrl+C twice
+    quits.
+  
+  ▌ first
+    faux reply
   ────────────────────────────────────────
   >
   …deepseek-flash  ctx:0% 10  $0.00
   === 100x30
-  session <id> in $TMP/cwd. /help for commands, Esc aborts, Ctrl+C twice
-  quits.
-  > first
-  faux reply
+    session <id> in $TMP/cwd. /help for commands, Esc aborts, Ctrl+C
+    twice quits.
+  
+  ▌ first
+    faux reply
   ────────────────────────────────────────────────────────────────────────────────────────────────────
   >
   $TMP/cwd  deepseek-flash  think:on  view:normal  ctx:0% 10  $0.00
   $ bash ./harness.sh quit
   === after first C-c
-  session <id> in $TMP/cwd. /help for commands, Esc aborts, Ctrl+C twice
-  quits.
-  press Ctrl+C again to quit
+    session <id> in $TMP/cwd. /help for commands, Esc aborts, Ctrl+C
+    twice quits.
+    press Ctrl+C again to quit
   ────────────────────────────────────────────────────────────────────────────────────────────────────
   >
   …deepseek-flash  think:on  view:normal  ctx:0% 0  $0.00  Ctrl+C again quits
@@ -63,74 +66,75 @@ prints the captured panes.
   ixon isig icanon iexten echo
   $ bash ./harness.sh tools
   === normal
-  session <id> in $TMP/cwd. /help for commands, Esc aborts, Ctrl+C twice
-  quits.
-  > go
-  let me look
-  ⚙ bash command=printf 'one\ntwo\nthree\n'
-    one
-    two
-    three
-  three lines. now delegating
-  ⚙ subagent "count files" ✓ 1 turns $0.00
-    child reporting: done
-    [subagent: 1 turns, 0 in / 0 out tokens, $0.0000]
-  ⚙ subagent "say hello" ✓ 1 turns $0.00
-    child reporting: done
-    [subagent: 1 turns, 0 in / 0 out tokens, $0.0000]
-  waiting for both
-  ⚙ subagent_wait
-    [subagent a1 finished] count files
-    child reporting: done
-    [subagent: 1 turns, 0 in / 0 out tokens, $0.0000]
+    session <id> in $TMP/cwd. /help for commands, Esc aborts, Ctrl+C
+    twice quits.
   
-    [subagent a2 finished] say hello
-    … (2 more)
-  all done
+  ▌ go
+    let me look
+  ✓ bash $ printf 'one\ntwo\nthree\n'
+      one
+      two
+      three
+    three lines. now delegating
+  ✓ subagent count files  1 turn $0.00
+      child reporting: done
+      [subagent: 1 turns, 0 in / 0 out tokens, $0.0000]
+  ✓ subagent say hello  1 turn $0.00
+      child reporting: done
+      [subagent: 1 turns, 0 in / 0 out tokens, $0.0000]
+    waiting for both
+  ✓ subagent_wait
+      [subagent a1 finished] count files
+      child reporting: done
+      [subagent: 1 turns, 0 in / 0 out tokens, $0.0000]
+  
+      [subagent a2 finished] say hello
+      … 2 more lines
+    all done
   ────────────────────────────────────────────────────────────────────────────────────────────────────
   >
   …deepseek-flash  think:on  view:normal  ctx:0% 0  $0.00  agents:[main] 1✓ 2✓
   === verbose
-  let me look
-  ⚙ bash
-    {
-      command: "printf 'one\\ntwo\\nthree\\n'"
-    }
-    one
-    two
-    three
-  three lines. now delegating
-  ⚙ subagent "count files" ✓ 1 turns $0.00
-    child reporting: done
-    [subagent: 1 turns, 0 in / 0 out tokens, $0.0000]
-  ⚙ subagent "say hello" ✓ 1 turns $0.00
-    child reporting: done
-    [subagent: 1 turns, 0 in / 0 out tokens, $0.0000]
-  waiting for both
-  ⚙ subagent_wait
-    {}
-    [subagent a1 finished] count files
-    child reporting: done
-    [subagent: 1 turns, 0 in / 0 out tokens, $0.0000]
+    let me look
+  ✓ bash $ printf 'one\ntwo\nthree\n'
+      {
+        command: "printf 'one\\ntwo\\nthree\\n'"
+      }
+      one
+      two
+      three
+    three lines. now delegating
+  ✓ subagent count files  1 turn $0.00
+      child reporting: done
+      [subagent: 1 turns, 0 in / 0 out tokens, $0.0000]
+  ✓ subagent say hello  1 turn $0.00
+      child reporting: done
+      [subagent: 1 turns, 0 in / 0 out tokens, $0.0000]
+    waiting for both
+  ✓ subagent_wait
+      {}
+      [subagent a1 finished] count files
+      child reporting: done
+      [subagent: 1 turns, 0 in / 0 out tokens, $0.0000]
   
-    [subagent a2 finished] say hello
-    child reporting: done
-    [subagent: 1 turns, 0 in / 0 out tokens, $0.0000]
-  all done
-  view: verbose — everything is shown
+      [subagent a2 finished] say hello
+      child reporting: done
+      [subagent: 1 turns, 0 in / 0 out tokens, $0.0000]
+    all done
+    view: verbose — everything is shown
   ────────────────────────────────────────────────────────────────────────────────────────────────────
   >
   …deepseek-flash  think:on  view:verbose  ctx:0% 0  $0.00  agents:[main] 1✓ 2✓
   === quiet
-  > go
-  let me look
-  ⚙ bash printf 'one\ntwo\nthree\n' ✓ 3 lines
-  three lines. now delegating
-  ⚙ subagent "count files" ✓ 1 turns $0.00
-  ⚙ subagent "say hello" ✓ 1 turns $0.00
-  waiting for both
-  ⚙ subagent_wait ✓ 7 lines
-  all done
+  ▌ go
+    let me look
+  ✓ bash $ printf 'one\ntwo\nthree\n'  3 lines
+    three lines. now delegating
+  ✓ subagent count files  1 turn $0.00
+  ✓ subagent say hello  1 turn $0.00
+    waiting for both
+  ✓ subagent_wait  7 lines
+    all done
   ────────────────────────────────────────────────────────────────────────────────────────────────────
   >
   …deepseek-flash  think:on  view:quiet  ctx:0% 0  $0.00  agents:[main] 1✓ 2✓
@@ -160,8 +164,8 @@ prints the captured panes.
   
   
   
-  > count files
-  child reporting: done
+  ▌ count files
+    child reporting: done
   ────────────────────────────────────────────────────────────────────────────────────────────────────
   >
   …deepseek-flash  think:on  view:quiet  ctx:0% 0  $0.00  agents:main [1✓] 2✓
@@ -191,21 +195,21 @@ prints the captured panes.
   
   
   
-  > say hello
-  child reporting: done
+  ▌ say hello
+    child reporting: done
   ────────────────────────────────────────────────────────────────────────────────────────────────────
   >
   …deepseek-flash  think:on  view:quiet  ctx:0% 0  $0.00  agents:main 1✓ [2✓]
   === main again
-  > go
-  let me look
-  ⚙ bash printf 'one\ntwo\nthree\n' ✓ 3 lines
-  three lines. now delegating
-  ⚙ subagent "count files" ✓ 1 turns $0.00
-  ⚙ subagent "say hello" ✓ 1 turns $0.00
-  waiting for both
-  ⚙ subagent_wait ✓ 7 lines
-  all done
+  ▌ go
+    let me look
+  ✓ bash $ printf 'one\ntwo\nthree\n'  3 lines
+    three lines. now delegating
+  ✓ subagent count files  1 turn $0.00
+  ✓ subagent say hello  1 turn $0.00
+    waiting for both
+  ✓ subagent_wait  7 lines
+    all done
   ────────────────────────────────────────────────────────────────────────────────────────────────────
   >
   …deepseek-flash  think:on  view:quiet  ctx:0% 0  $0.00  agents:[main] 1✓ 2✓
@@ -214,36 +218,39 @@ prints the captured panes.
   [1]+  Stopped sh $TMP/run.sh
   bash$
   === after fg (repainted)
-  session <id> in $TMP/cwd. /help for commands, Esc aborts, Ctrl+C twice
-  quits.
-  > before
-  faux reply
+    session <id> in $TMP/cwd. /help for commands, Esc aborts, Ctrl+C
+    twice quits.
+  
+  ▌ before
+    faux reply
   ────────────────────────────────────────────────────────────────────────────────────────────────────
   >
   $TMP/cwd  deepseek-flash  think:on  view:normal  ctx:0% 10  $0.00
   === editor works
-  session <id> in $TMP/cwd. /help for commands, Esc aborts, Ctrl+C twice
-  quits.
-  > before
-  faux reply
+    session <id> in $TMP/cwd. /help for commands, Esc aborts, Ctrl+C
+    twice quits.
+  
+  ▌ before
+    faux reply
   ────────────────────────────────────────────────────────────────────────────────────────────────────
   > still typing
   $TMP/cwd  deepseek-flash  think:on  view:normal  ctx:0% 10  $0.00
   $ bash ./harness.sh editor
   === after Ctrl+G round trip
-  session <id> in $TMP/cwd. /help for commands, Esc aborts, Ctrl+C twice
-  quits.
+    session <id> in $TMP/cwd. /help for commands, Esc aborts, Ctrl+C
+    twice quits.
   ────────────────────────────────────────────────────────────────────────────────────────────────────
   > draftedited by editor
   
   $TMP/cwd  deepseek-flash  think:on  view:normal  ctx:0% 0  $0.00
   $ bash ./harness.sh confirm
   === dialog
-  session <id> in $TMP/cwd. /help for commands, Esc aborts, Ctrl+C twice
-  quits.
-  > go
-  running
-  ⚙ bash command=echo ran-it
+    session <id> in $TMP/cwd. /help for commands, Esc aborts, Ctrl+C
+    twice quits.
+  
+  ▌ go
+    running
+  … bash $ echo ran-it
   ┌─ Confirm ────────────────────────────────────────────────────────────────────────────────────────┐
   │ Run bash: echo ran-it? (y/n)                                                                     │
   └──────────────────────────────────────────────────────────────────────────────────────────────────┘
@@ -251,43 +258,46 @@ prints the captured panes.
   ?
   $TMP/cwd  deepseek-flash  think:on  view:normal  ctx:0% 0  $0.00  confirm: y / n
   === allowed
-  session <id> in $TMP/cwd. /help for commands, Esc aborts, Ctrl+C twice
-  quits.
-  > go
-  running
-  ⚙ bash command=echo ran-it
-    ran-it
-  first done
+    session <id> in $TMP/cwd. /help for commands, Esc aborts, Ctrl+C
+    twice quits.
+  
+  ▌ go
+    running
+  ✓ bash $ echo ran-it
+      ran-it
+    first done
   ────────────────────────────────────────────────────────────────────────────────────────────────────
   >
   $TMP/cwd  deepseek-flash  think:on  view:normal  ctx:0% 0  $0.00
   === denied
-  session <id> in $TMP/cwd. /help for commands, Esc aborts, Ctrl+C twice
-  quits.
-  > go
-  running
-  ⚙ bash command=echo ran-it
-    ran-it
-  first done
-  > go again
-  again
-  ⚙ bash command=echo never
-    [denied by user]
-  denied bash
-  second done
+    session <id> in $TMP/cwd. /help for commands, Esc aborts, Ctrl+C
+    twice quits.
+  
+  ▌ go
+    running
+  ✓ bash $ echo ran-it
+      ran-it
+    first done
+  
+  ▌ go again
+    again
+  ✕ bash $ echo never
+      [denied by user]
+    denied bash
+    second done
   ────────────────────────────────────────────────────────────────────────────────────────────────────
   >
   $TMP/cwd  deepseek-flash  think:on  view:normal  ctx:0% 0  $0.00
   $ bash ./harness.sh paste
   === chip after a 5-line paste
-  session <id> in $TMP/cwd. /help for commands, Esc aborts, Ctrl+C twice
-  quits.
+    session <id> in $TMP/cwd. /help for commands, Esc aborts, Ctrl+C
+    twice quits.
   ────────────────────────────────────────────────────────────────────────────────────────────────────
   > [5 lines pasted]
   $TMP/cwd  deepseek-flash  think:on  view:normal  ctx:0% 0  $0.00
   === cursor inside expands the chip
-  session <id> in $TMP/cwd. /help for commands, Esc aborts, Ctrl+C twice
-  quits.
+    session <id> in $TMP/cwd. /help for commands, Esc aborts, Ctrl+C
+    twice quits.
   ────────────────────────────────────────────────────────────────────────────────────────────────────
   > line one
     line two
@@ -296,58 +306,65 @@ prints the captured panes.
     line five
   $TMP/cwd  deepseek-flash  think:on  view:normal  ctx:0% 0  $0.00
   === submitted as one message
-  session <id> in $TMP/cwd. /help for commands, Esc aborts, Ctrl+C twice
-  quits.
-  > line one
-  > line two
-  > line three
-  > line four
-  > line five
-  faux reply
+    session <id> in $TMP/cwd. /help for commands, Esc aborts, Ctrl+C
+    twice quits.
+  
+  ▌ line one
+  ▌ line two
+  ▌ line three
+  ▌ line four
+  ▌ line five
+    faux reply
   ────────────────────────────────────────────────────────────────────────────────────────────────────
   >
   $TMP/cwd  deepseek-flash  think:on  view:normal  ctx:0% 10  $0.00
   $ bash ./harness.sh reconnect
   === after the backend was killed
-  reconnected to the backend
-  session <id> in $TMP/cwd. /help for commands, Esc aborts, Ctrl+C twice
-  quits.
-  > before
-  faux reply
+    reconnected to the backend
+    session <id> in $TMP/cwd. /help for commands, Esc aborts, Ctrl+C
+    twice quits.
+  
+  ▌ before
+    faux reply
   ────────────────────────────────────────────────────────────────────────────────────────────────────
   >
   $TMP/cwd  deepseek-flash  think:on  view:normal  ctx:0% 10  $0.00
   === prompt works again
-  reconnected to the backend
-  session <id> in $TMP/cwd. /help for commands, Esc aborts, Ctrl+C twice
-  quits.
-  > before
-  faux reply
-  > after
-  faux reply
+    reconnected to the backend
+    session <id> in $TMP/cwd. /help for commands, Esc aborts, Ctrl+C
+    twice quits.
+  
+  ▌ before
+    faux reply
+  
+  ▌ after
+    faux reply
   ────────────────────────────────────────────────────────────────────────────────────────────────────
   >
   $TMP/cwd  deepseek-flash  think:on  view:normal  ctx:0% 10  $0.00
   $ bash ./harness.sh fallback
   === chain and default directory set
-  session <id> in $TMP/cwd. /help for commands, Esc aborts, Ctrl+C twice
-  quits.
-  fallback: deepseek/deepseek-flash → anthropic/claude-fable-5-1 (now on deepseek/deepseek-flash)
-  default directory: $TMP/cwd (new sessions start there; /default-dir off clears it)
+    session <id> in $TMP/cwd. /help for commands, Esc aborts, Ctrl+C
+    twice quits.
+    fallback: deepseek/deepseek-flash → anthropic/claude-fable-5-1 (now on deepseek/deepseek-flash)
+    default directory: $TMP/cwd (new sessions start there; /default-dir off clears
+    it)
   ────────────────────────────────────────────────────────────────────────────────────────────────────
   >
   $TMP/cwd  deepseek-flash  think:on  view:normal  ctx:0% 0  $0.00
   === handed over
-  session <id> in $TMP/cwd. /help for commands, Esc aborts, Ctrl+C twice
-  quits.
-  fallback: deepseek/deepseek-flash → anthropic/claude-fable-5-1 (now on deepseek/deepseek-flash)
-  default directory: $TMP/cwd (new sessions start there; /default-dir off clears it)
-  > go
-  error: HTTP 429: The usage limit has been reached (usage limit reached)
-  deepseek/deepseek-flash: HTTP 429: The usage limit has been reached (usage limit reached); handing
-  over to anthropic/claude-fable-5-1
-  ↪ handed over from deepseek/deepseek-flash to anthropic/claude-fable-5-1
-  carried on
+    session <id> in $TMP/cwd. /help for commands, Esc aborts, Ctrl+C
+    twice quits.
+    fallback: deepseek/deepseek-flash → anthropic/claude-fable-5-1 (now on deepseek/deepseek-flash)
+    default directory: $TMP/cwd (new sessions start there; /default-dir off clears
+    it)
+  
+  ▌ go
+    error: HTTP 429: The usage limit has been reached (usage limit reached)
+    deepseek/deepseek-flash: HTTP 429: The usage limit has been reached (usage limit reached); handing
+    over to anthropic/claude-fable-5-1
+    ↪ handed over from deepseek/deepseek-flash to anthropic/claude-fable-5-1
+    carried on
   ────────────────────────────────────────────────────────────────────────────────────────────────────
   >
   $TMP/cwd  claude-fable-5-1  think:on  view:normal  ctx:0% 0  $0.00

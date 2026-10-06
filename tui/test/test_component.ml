@@ -158,8 +158,8 @@ let%expect_test "component: startup requests, key handling, rpc round trip, \
 
 
 
-    session abc in /w. /help for commands, Esc aborts,
-    Ctrl+C twice quits.
+      session abc in /w. /help for commands, Esc
+      aborts, Ctrl+C twice quits.
     ──────────────────────────────────────────────────
     > ▏
     /w  m  think:n/a  view:normal  ctx:0% 0  $0.00
@@ -177,9 +177,9 @@ let%expect_test "component: startup requests, key handling, rpc round trip, \
     spinner=0 running=false
 
 
-    session abc in /w. /help for commands, Esc aborts,
-    Ctrl+C twice quits.
-    thinking must be one of: off, on, low, high, max
+      session abc in /w. /help for commands, Esc
+      aborts, Ctrl+C twice quits.
+      thinking must be one of: off, on, low, high, max
     ──────────────────────────────────────────────────
     > ▏
     /w  m  think:n/a  view:normal  ctx:0% 0  $0.00
@@ -202,9 +202,9 @@ let%expect_test "component: startup requests, key handling, rpc round trip, \
     spinner=2 running=true
 
 
-    session abc in /w. /help for commands, Esc aborts,
-    Ctrl+C twice quits.
-    thinking must be one of: off, on, low, high, max
+      session abc in /w. /help for commands, Esc
+      aborts, Ctrl+C twice quits.
+      thinking must be one of: off, on, low, high, max
     ──────────────────────────────────────────────────
     > ▏
     …m  ctx:0% 0  ⠹ working (Esc aborts; Enter steers)
@@ -226,9 +226,9 @@ let%expect_test "component: startup requests, key handling, rpc round trip, \
     spinner=2 running=false
 
 
-    reconnected to the backend
-    session abc in /w. /help for commands, Esc aborts,
-    Ctrl+C twice quits.
+      reconnected to the backend
+      session abc in /w. /help for commands, Esc
+      aborts, Ctrl+C twice quits.
     ──────────────────────────────────────────────────
     > ▏
     /w  m  think:n/a  view:normal  ctx:0% 0  $0.00
@@ -273,9 +273,9 @@ let%expect_test "component: /signout runs the platform's sign-out and shows \
     spinner=0 running=false
 
 
-    session abc in /w. /help for commands, Esc aborts,
-    Ctrl+C twice quits.
-    not here
+      session abc in /w. /help for commands, Esc
+      aborts, Ctrl+C twice quits.
+      not here
     ──────────────────────────────────────────────────
     > ▏
     /w  m  think:n/a  view:normal  ctx:0% 0  $0.00

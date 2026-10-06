@@ -2,11 +2,11 @@ open! Core
 open! Import
 
 type t =
-  | Complete of Json.t
+  | Complete of P.Json.t
   | Partial of string
 
-let of_call (call : Tool_call.t) =
-  match Json.parse call.arguments with
+let of_call (call : P.Tool_call.t) =
+  match P.Json.parse call.arguments with
   | Ok json -> Complete json
   | Error _ -> Partial call.arguments
 ;;
@@ -66,7 +66,7 @@ let partial_field s key =
 
 let field t key =
   match t with
-  | Complete json -> Json.field json key
+  | Complete json -> P.Json.field json key
   | Partial _ -> None
 ;;
 
@@ -107,7 +107,7 @@ let edits t =
   match field t "edits" with
   | Some (`Array items) ->
     List.filter_map items ~f:(fun item ->
-      match Json.field item "old_text", Json.field item "new_text" with
+      match P.Json.field item "old_text", P.Json.field item "new_text" with
       | Some (`String old_text), Some (`String new_text) ->
         Some (old_text, new_text)
       | _ -> None)
