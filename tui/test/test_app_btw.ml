@@ -28,7 +28,7 @@ let%expect_test "/btw while running: streamed box, Esc dismisses without \
 
 
 
-    prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
     ▌ earlier question
       earlier answer
@@ -47,7 +47,7 @@ let%expect_test "/btw while running: streamed box, Esc dismisses without \
   H.show h;
   [%expect
     {|
-    prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
     ▌ earlier question
       earlier answer
@@ -75,7 +75,7 @@ let%expect_test "/btw while running: streamed box, Esc dismisses without \
 
 
 
-    prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
     ▌ earlier question
       earlier answer
@@ -123,7 +123,7 @@ let%expect_test "/btw: a newer question replaces the box; final reply; errors" =
   H.show h;
   [%expect
     {|
-    prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
     ▌ earlier question
       earlier answer
@@ -159,7 +159,7 @@ let%expect_test "/btw: a newer question replaces the box; final reply; errors" =
 
 
 
-    prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
     ▌ earlier question
       earlier answer
@@ -178,7 +178,7 @@ let%expect_test "/btw: a newer question replaces the box; final reply; errors" =
   H.show h;
   [%expect
     {|
-    prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
     ▌ earlier question
       earlier answer
@@ -212,7 +212,7 @@ let%expect_test "/btw: a long answer shows its tail within half the screen" =
         (btw_id   btw-1)))
       (tag (Btw btw-1)))
 
-    prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
     ▌ earlier question
       earlier answer
@@ -236,7 +236,7 @@ let%expect_test "/bt autocompletes to /btw" =
   H.show h;
   [%expect
     {|
-    prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
     ▌ earlier question
       earlier answer

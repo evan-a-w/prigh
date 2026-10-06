@@ -891,12 +891,20 @@ let with_item (m : Model.t) arg ~f =
            (List.length listed))
 ;;
 
+(* On a phone the panel covers the page, so it takes the focus from the
+   editor behind it. *)
 let open_agents (m : Model.t) arg =
-  match arg with
-  | None ->
-    ( with_agents m ~f:(fun a -> { a with open_ = true; selected = None })
-    , [ list_subagents; list_jobs ] )
-  | Some arg -> with_item m arg ~f:select
+  let m, commands =
+    match arg with
+    | None ->
+      ( with_agents m ~f:(fun a -> { a with open_ = true; selected = None })
+      , [ list_subagents; list_jobs ] )
+    | Some arg -> with_item m arg ~f:select
+  in
+  ( m
+  , if m.narrow && m.agents.open_
+    then commands @ [ Command.Focus "agents-panel" ]
+    else commands )
 ;;
 
 let close_agents (m : Model.t) =

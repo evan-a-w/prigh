@@ -67,7 +67,7 @@ let%expect_test
   H.show h;
   [%expect
     {|
-    prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
     ▌ earlier question
       earlier answer
@@ -92,7 +92,7 @@ let%expect_test
   H.show h;
   [%expect
     {|
-    prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
     ▌ earlier question
       earlier answer
@@ -111,7 +111,7 @@ let%expect_test
   H.show h;
   [%expect
     {|
-    prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
     ▌ earlier question
       earlier answer
@@ -146,7 +146,7 @@ let%expect_test
   H.show h;
   [%expect
     {|
-    prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
     ▌ earlier question
       earlier answer
@@ -173,7 +173,7 @@ let%expect_test
   H.show h;
   [%expect
     {|
-    prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
     ▌ earlier question
       earlier answer
@@ -213,7 +213,7 @@ let%expect_test "/fallback off clears the chain" =
   H.show h;
   [%expect
     {|
-    prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
     ▌ earlier question
       earlier answer
@@ -247,7 +247,7 @@ let%expect_test
   H.show h;
   [%expect
     {|
-    prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
     ▌ earlier question
       earlier answer
@@ -421,7 +421,7 @@ let%expect_test
     ────────────────────────────────────────────────────────────
     > ▏
     /work  claude-fable-5-1  think:off  ctx:0.1%/1.0M  $0.01
-    prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
     ▌ earlier question
       earlier answer
@@ -461,7 +461,7 @@ let%expect_test "a hand-over in the history and in /fork's list" =
   H.show h;
   [%expect
     {|
-    prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
     ▌ earlier question
       earlier answer

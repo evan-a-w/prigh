@@ -514,6 +514,7 @@ let view (m : App.Model.t) ~inject =
       ~attrs:
         [ Attr.class_ "agents-panel"
         ; Attr.id "agents-panel"
+        ; Attr.tabindex (-1)
         ; Attr.create "aria-label" "Subagents and jobs"
         ]
       [ div

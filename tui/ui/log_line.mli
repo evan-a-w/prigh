@@ -9,7 +9,7 @@ type t
 
 val gutter_width : int
 
-(** At the left edge, no gutter (blank separators, command output). *)
+(** At the left edge, no gutter (the blank line before a turn). *)
 val flush : Content.Line.t -> t
 
 (** [mark] (one column) in the gutter of the first wrapped line. *)

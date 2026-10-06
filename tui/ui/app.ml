@@ -1592,18 +1592,21 @@ let update_btw m id ~f =
   | _ -> m
 ;;
 
-(* The command goes back into the editor, corrected when one is close, so
-   Enter runs the suggestion and nothing typed is lost. *)
+(* The command goes back into the editor as typed, so nothing is lost; the
+   error names the closest command to fix it to. *)
 let unknown_command m name ~retry =
+  let m = { m with editor = Editor.set_text m.editor (retry name) } in
   match Commands.closest name with
   | Some c ->
-    let fixed = retry c.name in
     error
-      { m with editor = Editor.set_text m.editor fixed }
-      (sprintf "unknown command /%s; corrected to %s in the editor" name fixed)
+      m
+      (sprintf
+         "unknown command /%s (back in the editor); did you mean /%s?"
+         name
+         c.name)
   | None ->
     error
-      { m with editor = Editor.set_text m.editor (retry name) }
+      m
       (sprintf
          "unknown command /%s (back in the editor); Tab or / lists commands"
          name)

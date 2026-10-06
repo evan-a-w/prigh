@@ -538,3 +538,22 @@ let%expect_test "signing out" =
     Sign_out
     |}]
 ;;
+
+let%expect_test "on a phone the agents panel is a sheet with the keyboard" =
+  let h = H.create () in
+  let inert () = H.elements h ~selector:"[inert]" in
+  H.act h (Set_narrow true);
+  H.act h Toggle_subagents;
+  inert ();
+  [%expect
+    {|
+    (Rpc (method_ list_subagents) (params ()) (tag Subagents))
+    (Rpc (method_ list_jobs) (params ()) (tag Jobs))
+    (Focus agents-panel)
+    <aside class="sidebar">
+    <main class="main">
+    |}];
+  H.act h Toggle_subagents;
+  inert ();
+  [%expect {| |}]
+;;

@@ -89,7 +89,7 @@ let%expect_test "startup: requests state, messages and auth; renders history" =
   H.show h;
   [%expect
     {|
-    prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
     ▌ earlier question
       earlier answer
@@ -107,7 +107,7 @@ let%expect_test "prompt, streaming with embedded newlines, tool call, steer \
   H.show h;
   [%expect
     {|
-    prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
     ▌ earlier question
       earlier answer
@@ -131,7 +131,7 @@ let%expect_test "prompt, streaming with embedded newlines, tool call, steer \
   H.show h;
   [%expect
     {|
-    prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
     ▌ earlier question
       earlier answer
@@ -221,7 +221,7 @@ let%expect_test "error and aborted stop reasons are surfaced once" =
   H.show h;
   [%expect
     {|
-    prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
     ▌ earlier question
       earlier answer
@@ -245,7 +245,7 @@ let%expect_test "/model opens the picker; typing filters; Enter sets the model" 
   H.show h;
   [%expect
     {|
-    prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
     ▌ earlier question
       earlier answer
@@ -262,7 +262,7 @@ let%expect_test "/model opens the picker; typing filters; Enter sets the model" 
   H.show h;
   [%expect
     {|
-    prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
     ▌ earlier question
       earlier answer
@@ -295,7 +295,7 @@ let%expect_test "/model opens the picker; typing filters; Enter sets the model" 
 
 
 
-    prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
     ▌ earlier question
       earlier answer
@@ -350,7 +350,7 @@ let%expect_test "/model <display name> switches directly; unknown suggests and \
 
 
 
-    prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
     ▌ earlier question
       earlier answer
@@ -408,7 +408,7 @@ let%expect_test "Esc closes autocomplete or dialog without aborting; Esc while \
   H.show h;
   [%expect
     {|
-    prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
     ▌ earlier question
       earlier answer
@@ -435,7 +435,7 @@ let%expect_test "Esc closes autocomplete or dialog without aborting; Esc while \
   H.show h;
   [%expect
     {|
-    prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
     ▌ earlier question
       earlier answer
@@ -458,7 +458,7 @@ let%expect_test "Esc closes autocomplete or dialog without aborting; Esc while \
   H.show h;
   [%expect
     {|
-    prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
     ▌ earlier question
       earlier answer
@@ -555,7 +555,7 @@ let%expect_test "login: url, masked secret prompt, answer, done switches \
   H.show h;
   [%expect
     {|
-    prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
     ▌ earlier question
       earlier answer
@@ -585,7 +585,7 @@ let%expect_test "login: select prompt is a picker; Esc cancels; backend \
   H.show h;
   [%expect
     {|
-    prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
     ▌ earlier question
       earlier answer
@@ -624,7 +624,7 @@ let%expect_test "login: select prompt is a picker; Esc cancels; backend \
   H.show h;
   [%expect
     {|
-    prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
     ▌ earlier question
       earlier answer
@@ -652,7 +652,7 @@ let%expect_test "login: select prompt is a picker; Esc cancels; backend \
 
 
 
-    prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
     ▌ earlier question
       earlier answer
@@ -672,7 +672,7 @@ let%expect_test "Ctrl+C clears, then warns, then quits; never quits with a \
   H.show h;
   [%expect
     {|
-    prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
     ▌ earlier question
       earlier answer
@@ -684,7 +684,7 @@ let%expect_test "Ctrl+C clears, then warns, then quits; never quits with a \
   H.show h;
   [%expect
     {|
-    prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
     ▌ earlier question
       earlier answer
@@ -784,7 +784,7 @@ let%expect_test "typing / lists commands, Down twice + Tab fills /login " =
   H.show h;
   [%expect
     {|
-    prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
     ▌ earlier question
       earlier answer
@@ -805,7 +805,7 @@ let%expect_test "/mo Enter opens argument completion over models; typing fab \
   H.show h;
   [%expect
     {|
-    prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
     ▌ earlier question
       earlier answer
@@ -821,7 +821,7 @@ let%expect_test "/mo Enter opens argument completion over models; typing fab \
   H.show h;
   [%expect
     {|
-    prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
     ▌ earlier question
       earlier answer
@@ -848,7 +848,7 @@ let%expect_test "Esc closes autocomplete without abort while running" =
   H.show h;
   [%expect
     {|
-    prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
     ▌ earlier question
       earlier answer
@@ -863,7 +863,7 @@ let%expect_test "Esc closes autocomplete without abort while running" =
   H.show h;
   [%expect
     {|
-    prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
     ▌ earlier question
       earlier answer
@@ -905,7 +905,7 @@ let%expect_test "@ completion is asynchronous and drops stale replies" =
   H.show h;
   [%expect
     {|
-    prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
     ▌ earlier question
       earlier answer
@@ -917,7 +917,7 @@ let%expect_test "@ completion is asynchronous and drops stale replies" =
   H.show h;
   [%expect
     {|
-    prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
     ▌ earlier question
       earlier answer
@@ -970,7 +970,7 @@ let%expect_test "/switch fetches sessions then reopens completion" =
   H.show h;
   [%expect
     {|
-    prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
     ▌ earlier question
       earlier answer
@@ -996,7 +996,7 @@ let%expect_test "/cd completes paths and submits the selected one" =
   H.show h;
   [%expect
     {|
-    prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
     ▌ earlier question
       earlier answer
@@ -1033,7 +1033,7 @@ let%expect_test "/sessions picker switches and reloads; /logout confirms" =
   H.show h;
   [%expect
     {|
-    prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
     ▌ earlier question
       earlier answer
@@ -1133,7 +1133,7 @@ let%expect_test "/name sets the name directly or prompts in a text dialog" =
   H.show h;
   [%expect
     {|
-    prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
     ▌ earlier question
       earlier answer
@@ -1147,7 +1147,7 @@ let%expect_test "/name sets the name directly or prompts in a text dialog" =
   H.show h;
   [%expect
     {|
-    prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
     ▌ earlier question
       earlier answer
@@ -1181,15 +1181,15 @@ let%expect_test "/session prints the stats table" =
   H.show h;
   [%expect
     {|
-    messages       4
-    turns          2
-    tools          bash 1, read 2
-    usage          in 30 out 13 cache 5
-    cost           $0.0001
-    context        1.5%
-    model changes  1
-    compactions    0
-    duration       12.5s
+      messages       4
+      turns          2
+      tools          bash 1, read 2
+      usage          in 30 out 13 cache 5
+      cost           $0.0001
+      context        1.5%
+      model changes  1
+      compactions    0
+      duration       12.5s
     ────────────────────────────────────────────────────────────
     > ▏
     …deepseek-flash  think:off  ctx:0.1%/1.0M  $0.01
@@ -1224,7 +1224,7 @@ let%expect_test "/sessions Ctrl+N filters named only; Ctrl+D confirms delete" =
 
 
 
-    prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
     ▌ earlier question
       earlier answer
@@ -1239,7 +1239,7 @@ let%expect_test "/sessions Ctrl+N filters named only; Ctrl+D confirms delete" =
   H.show h;
   [%expect
     {|
-    prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
     ▌ earlier question
       earlier answer
@@ -1280,7 +1280,7 @@ let%expect_test "/fork picks a user message, forks at it and prefills the \
   H.show h;
   [%expect
     {|
-    prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
     ▌ earlier question
       earlier answer
@@ -1296,7 +1296,7 @@ let%expect_test "/fork picks a user message, forks at it and prefills the \
   H.show h;
   [%expect
     {|
-    prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
     ▌ earlier question
       earlier answer
@@ -1318,7 +1318,7 @@ let%expect_test "/rewind picks a user message, then confirms the rewind" =
     (Rpc (method_ get_entries) (params ()) (tag Entries_for_rewind))
 
 
-    prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
     ▌ earlier question
       earlier answer
@@ -1333,7 +1333,7 @@ let%expect_test "/rewind picks a user message, then confirms the rewind" =
   H.show h;
   [%expect
     {|
-    prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
     ▌ earlier question
       earlier answer
@@ -1451,7 +1451,7 @@ let%expect_test "/export chooses jsonl by extension, or prompts for a path" =
       (tag (Paths_for_autocomplete "")))
 
 
-    prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
     ▌ earlier question
       earlier answer
@@ -1499,7 +1499,7 @@ let%expect_test "/import imports a path or prompts for one" =
 
 
 
-    prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
     ▌ earlier question
       earlier answer
@@ -1546,7 +1546,7 @@ let%expect_test "/cd changes the directory or prompts for a path" =
 
 
 
-    prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
     ▌ earlier question
       earlier answer
@@ -1586,15 +1586,15 @@ let%expect_test "/auth, /help, /state, /clear, unknown method errors" =
 
 
 
-    prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
     ▌ earlier question
       earlier answer
-    anthropic  not configured  [oauth (Claude Pro/Max), api_key
-    (API key)]
-    openai     not configured  [api_key (API key)]
-    deepseek   logged in via auth.json  [api_key (API key)]
-    /login custom adds an OpenAI-compatible endpoint
+      anthropic  not configured  [oauth (Claude Pro/Max),
+      api_key (API key)]
+      openai     not configured  [api_key (API key)]
+      deepseek   logged in via auth.json  [api_key (API key)]
+      /login custom adds an OpenAI-compatible endpoint
     ────────────────────────────────────────────────────────────
     > ▏
     …deepseek-flash  think:off  ctx:0.1%/1.0M  $0.01
@@ -1606,19 +1606,19 @@ let%expect_test "/auth, /help, /state, /clear, unknown method errors" =
   H.show h;
   [%expect
     {|
-    Ctrl+C                  clear the editor or abort the turn,
-    then (again) quit
-    Ctrl+D                  quit
+      turn, then (again) quit
+      Ctrl+D                  quit
 
-    In lists
-    type                     filter the list (fuzzy)
-    Enter / Esc              accept the highlighted item / close
-    without changes
-    Ctrl+D                   /sessions: delete · /agents: cancel
-    · /jobs: kill
-    Ctrl+N                   /sessions: named only · /model:
-    logged-in only
-    Space / Ctrl+A / Ctrl+X  /scoped-models: toggle / all / none
+      In lists
+      type                     filter the list (fuzzy)
+      Enter / Esc              accept the highlighted item /
+      close without changes
+      Ctrl+D                   /sessions: delete · /agents:
+      cancel · /jobs: kill
+      Ctrl+N                   /sessions: named only · /model:
+      logged-in only
+      Space / Ctrl+A / Ctrl+X  /scoped-models: toggle / all /
+      none
     ────────────────────────────────────────────────────────────
     > ▏
     …deepseek-flash  think:off  ctx:0.1%/1.0M  $0.01
@@ -1631,17 +1631,17 @@ let%expect_test "/auth, /help, /state, /clear, unknown method errors" =
   [%expect
     {|
     (Rpc (method_ list_models) (params ()) (tag (Models_for_picker "")))
-    Ctrl+D                  quit
 
-    In lists
-    type                     filter the list (fuzzy)
-    Enter / Esc              accept the highlighted item / close
-    without changes
-    Ctrl+D                   /sessions: delete · /agents: cancel
-    · /jobs: kill
-    Ctrl+N                   /sessions: named only · /model:
-    logged-in only
-    Space / Ctrl+A / Ctrl+X  /scoped-models: toggle / all / none
+      In lists
+      type                     filter the list (fuzzy)
+      Enter / Esc              accept the highlighted item /
+      close without changes
+      Ctrl+D                   /sessions: delete · /agents:
+      cancel · /jobs: kill
+      Ctrl+N                   /sessions: named only · /model:
+      logged-in only
+      Space / Ctrl+A / Ctrl+X  /scoped-models: toggle / all /
+      none
       unknown method "bogus"
       protocol error: bad line
     ────────────────────────────────────────────────────────────
@@ -1711,7 +1711,7 @@ let%expect_test "verbosity cycles Normal / Verbose / Quiet; /verbosity sets it" 
   H.show h;
   [%expect
     {|
-    prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
     ▌ earlier question
       earlier answer
@@ -1779,7 +1779,7 @@ let%expect_test
   H.show h;
   [%expect
     {|
-    prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
     ▌ earlier question
       earlier answer
@@ -1819,7 +1819,7 @@ let%expect_test
   H.show h;
   [%expect
     {|
-    prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
     ▌ earlier question
       earlier answer
@@ -1899,7 +1899,7 @@ let%expect_test "/verbosity with no argument opens argument completion" =
   H.show h;
   [%expect
     {|
-    prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
     ▌ earlier question
       earlier answer
@@ -1916,7 +1916,7 @@ let%expect_test "/verbosity with no argument opens argument completion" =
   H.show h;
   [%expect
     {|
-    prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
     ▌ earlier question
       earlier answer
@@ -1949,7 +1949,7 @@ let%expect_test "quiet hides intermediate text and thinking" =
   H.show h;
   [%expect
     {|
-    prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
     ▌ earlier question
       earlier answer
@@ -1983,7 +1983,7 @@ let%expect_test "tool error is always visible in Quiet" =
   H.show h;
   [%expect
     {|
-    prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
     ▌ earlier question
       earlier answer
@@ -2092,7 +2092,7 @@ let%expect_test "multi-line editing: Alt+J, cursor movement, history" =
   H.show h;
   [%expect
     {|
-    prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
     ▌ earlier question
       earlier answer
@@ -2113,7 +2113,7 @@ let%expect_test "multi-line editing: Alt+J, cursor movement, history" =
   H.show h;
   [%expect
     {|
-    prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
     ▌ earlier question
       earlier answer
@@ -2126,7 +2126,7 @@ let%expect_test "multi-line editing: Alt+J, cursor movement, history" =
   H.show h;
   [%expect
     {|
-    prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
     ▌ earlier question
       earlier answer
@@ -2139,7 +2139,7 @@ let%expect_test "multi-line editing: Alt+J, cursor movement, history" =
   H.show h;
   [%expect
     {|
-    prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
     ▌ earlier question
       earlier answer
@@ -2159,7 +2159,7 @@ let%expect_test "backend crash shows the stderr tail; Ctrl+C quits" =
   H.show h;
   [%expect
     {|
-    prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
     ▌ earlier question
       earlier answer
@@ -2176,15 +2176,15 @@ let%expect_test "backend crash shows the stderr tail; Ctrl+C quits" =
       (delay_ms   0)
       (session (/home/u/.prigh/sessions/1.jsonl))
       (as_user ()))
-    prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
     ▌ earlier question
       earlier answer
       backend connection lost; reconnecting
       (/retry-backend-connection to retry now, Ctrl+C quits)
-    warn one
-    warn two
-    warn three
+      warn one
+      warn two
+      warn three
     ────────────────────────────────────────────────────────────
     > ▏
     …deepseek-flash  ctx:0.1%/1.0M  backend gone · retry 1 in 0s
@@ -2197,9 +2197,9 @@ let%expect_test "backend crash shows the stderr tail; Ctrl+C quits" =
       earlier answer
       backend connection lost; reconnecting
       (/retry-backend-connection to retry now, Ctrl+C quits)
-    warn one
-    warn two
-    warn three
+      warn one
+      warn two
+      warn three
       backend is gone
     ────────────────────────────────────────────────────────────
     > ▏
@@ -2238,7 +2238,7 @@ let%expect_test "abort restores queued messages" =
   H.show h;
   [%expect
     {|
-    prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
     ▌ earlier question
       earlier answer
@@ -2255,7 +2255,7 @@ let%expect_test "abort restores queued messages" =
   H.show h;
   [%expect
     {|
-    prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
     ▌ earlier question
       earlier answer
@@ -2270,7 +2270,7 @@ let%expect_test "abort restores queued messages" =
   H.show h;
   [%expect
     {|
-    prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
     ▌ earlier question
       earlier answer
@@ -2509,7 +2509,7 @@ let%expect_test "abort restore is singular, prepends, and tolerates no field" =
   H.show h;
   [%expect
     {|
-    prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
     ▌ earlier question
       earlier answer
@@ -2524,7 +2524,7 @@ let%expect_test "abort restore is singular, prepends, and tolerates no field" =
   H.show h;
   [%expect
     {|
-    prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
     ▌ earlier question
       earlier answer
@@ -2597,7 +2597,7 @@ let%expect_test "background subagent: runs while main is idle, survives a \
 
 
 
-    prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
     ▌ earlier question
       earlier answer
@@ -2880,7 +2880,7 @@ let%expect_test "two parallel subagents: strip, live tails, focus cycling, Esc" 
   H.show h;
   [%expect
     {|
-    prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
     ▌ earlier question
       earlier answer
@@ -2944,7 +2944,7 @@ let%expect_test "two parallel subagents: strip, live tails, focus cycling, Esc" 
   H.show h;
   [%expect
     {|
-    prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
     ▌ earlier question
       earlier answer
@@ -2986,7 +2986,7 @@ let%expect_test "two parallel subagents: strip, live tails, focus cycling, Esc" 
   H.show h;
   [%expect
     {|
-    prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
     ▌ earlier question
       earlier answer
@@ -3122,7 +3122,7 @@ let%expect_test "/agents picker lists task, status and model; Enter focuses" =
   H.show h;
   [%expect
     {|
-    prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
     ▌ earlier question
       earlier answer
@@ -3182,7 +3182,7 @@ let%expect_test "new user prompt clears finished agents" =
   H.show h;
   [%expect
     {|
-    prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
     ▌ earlier question
       earlier answer
@@ -3200,7 +3200,7 @@ let%expect_test "new user prompt clears finished agents" =
   H.show h;
   [%expect
     {|
-    prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
     ▌ earlier question
       earlier answer
@@ -3386,7 +3386,7 @@ let%expect_test "Alt+Enter queues a follow-up; queued block and status" =
   H.show h;
   [%expect
     {|
-    prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
     ▌ earlier question
       earlier answer
@@ -3407,7 +3407,7 @@ let%expect_test "Alt+Enter queues a follow-up; queued block and status" =
   H.show h;
   [%expect
     {|
-    prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
     ▌ earlier question
       earlier answer
@@ -3438,7 +3438,7 @@ let%expect_test "Alt+Up dequeues the last queued message into the editor" =
   H.show h;
   [%expect
     {|
-    prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
     ▌ earlier question
       earlier answer
@@ -3456,7 +3456,7 @@ let%expect_test "Alt+Up dequeues the last queued message into the editor" =
   H.show h;
   [%expect
     {|
-    prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
     ▌ earlier question
       earlier answer
@@ -3491,7 +3491,7 @@ let%expect_test "inline bash: !cmd adds to context, !!cmd does not" =
   H.show h;
   [%expect
     {|
-    prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
     ▌ earlier question
       earlier answer
@@ -3522,7 +3522,7 @@ let%expect_test "inline bash: !cmd adds to context, !!cmd does not" =
     {|
     (Append_history "!echo hi")
 
-    prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
     ▌ earlier question
       earlier answer
@@ -3542,7 +3542,7 @@ let%expect_test "bracketed paste renders a chip until the cursor enters it" =
   H.show h;
   [%expect
     {|
-    prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
     ▌ earlier question
       earlier answer
@@ -3554,7 +3554,7 @@ let%expect_test "bracketed paste renders a chip until the cursor enters it" =
   H.show h;
   [%expect
     {|
-    prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
     ▌ earlier question
       earlier answer
@@ -3574,7 +3574,7 @@ let%expect_test "history loads at start and is appended on submit" =
   H.show h;
   [%expect
     {|
-    prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
     ▌ earlier question
       earlier answer
@@ -3601,7 +3601,7 @@ let%expect_test "Ctrl+G edits externally and the reply replaces the prompt" =
   H.show h;
   [%expect
     {|
-    prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
     ▌ earlier question
       earlier answer
@@ -3674,7 +3674,7 @@ let%expect_test "Ctrl+Z suspends; Ctrl+R completes a path; Ctrl+L picks a model"
   H.show h;
   [%expect
     {|
-    prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
     ▌ earlier question
       earlier answer
@@ -3691,7 +3691,7 @@ let%expect_test "Ctrl+Z suspends; Ctrl+R completes a path; Ctrl+L picks a model"
   H.show h;
   [%expect
     {|
-    prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
     ▌ earlier question
       earlier answer
@@ -3762,7 +3762,7 @@ let%expect_test "/scoped-models: multi-select toggle, Ctrl+A, Ctrl+X, save" =
   H.show h;
   [%expect
     {|
-    prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
     ▌ earlier question
       earlier answer
@@ -3779,7 +3779,7 @@ let%expect_test "/scoped-models: multi-select toggle, Ctrl+A, Ctrl+X, save" =
   H.show h;
   [%expect
     {|
-    prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
     ▌ earlier question
       earlier answer
@@ -3796,7 +3796,7 @@ let%expect_test "/scoped-models: multi-select toggle, Ctrl+A, Ctrl+X, save" =
   H.show h;
   [%expect
     {|
-    prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
     ▌ earlier question
       earlier answer
@@ -3813,7 +3813,7 @@ let%expect_test "/scoped-models: multi-select toggle, Ctrl+A, Ctrl+X, save" =
   H.show h;
   [%expect
     {|
-    prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
     ▌ earlier question
       earlier answer
@@ -3848,7 +3848,7 @@ let%expect_test "/scoped-models: multi-select toggle, Ctrl+A, Ctrl+X, save" =
   H.show h;
   [%expect
     {|
-    prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
     ▌ earlier question
       earlier answer
@@ -3923,7 +3923,7 @@ let%expect_test "Ctrl+P with one scoped model notices instead of switching" =
   H.show h;
   [%expect
     {|
-    prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
     ▌ earlier question
       earlier answer
@@ -3949,7 +3949,7 @@ let%expect_test "Ctrl+T cycles off/low/on/high/max and is n/a when unsupported" 
     (Rpc (method_ set_thinking) (params ((thinking high))) (tag Show_error))
     (Rpc (method_ set_thinking) (params ((thinking max))) (tag Show_error))
     (Rpc (method_ set_thinking) (params ((thinking off))) (tag Show_error))
-    prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
     ▌ earlier question
       earlier answer
@@ -3980,7 +3980,7 @@ let%expect_test "Ctrl+T cycles off/low/on/high/max and is n/a when unsupported" 
       thinking: high
       thinking: max
       thinking: off
-    prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
       thinking: n/a for this model
     ────────────────────────────────────────────────────────────
     > ▏
@@ -4109,7 +4109,7 @@ let%expect_test "/model Ctrl+N filters to logged-in models; scoped mark" =
   H.show h;
   [%expect
     {|
-    prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
     ▌ earlier question
       earlier answer
@@ -4126,7 +4126,7 @@ let%expect_test "/model Ctrl+N filters to logged-in models; scoped mark" =
   H.show h;
   [%expect
     {|
-    prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
     ▌ earlier question
       earlier answer
@@ -4184,7 +4184,7 @@ let%expect_test "confirm dialog is a bordered block" =
   H.show h;
   [%expect
     {|
-    prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
     ▌ earlier question
       earlier answer
@@ -4203,7 +4203,7 @@ let%expect_test "search: Ctrl+F, type, n, N, Esc" =
   H.show h;
   [%expect
     {|
-    prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
     ▌ earlier question
       earlier answer
@@ -4215,7 +4215,7 @@ let%expect_test "search: Ctrl+F, type, n, N, Esc" =
   H.show h;
   [%expect
     {|
-    prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
     ▌ earlier question
       earlier answer
@@ -4227,7 +4227,7 @@ let%expect_test "search: Ctrl+F, type, n, N, Esc" =
   H.show h;
   [%expect
     {|
-    prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
     ▌ earlier question
       earlier answer
@@ -4239,7 +4239,7 @@ let%expect_test "search: Ctrl+F, type, n, N, Esc" =
   H.show h;
   [%expect
     {|
-    prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
     ▌ earlier question
       earlier answer
@@ -4258,7 +4258,7 @@ let%expect_test "search: Ctrl+F, type, n, N, Esc" =
 
 
 
-    prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
     ▌ earlier question
       earlier answer
@@ -4420,15 +4420,15 @@ let%expect_test "/hotkeys prints the keys half of /help" =
   H.show h;
   [%expect
     {|
-    In lists
-    type                     filter the list (fuzzy)
-    Enter / Esc              accept the highlighted item / close
-    without changes
-    Ctrl+D                   /sessions: delete · /agents: cancel
-    · /jobs: kill
-    Ctrl+N                   /sessions: named only · /model:
-    logged-in only
-    Space / Ctrl+A / Ctrl+X  /scoped-models: toggle / all / none
+      type                     filter the list (fuzzy)
+      Enter / Esc              accept the highlighted item /
+      close without changes
+      Ctrl+D                   /sessions: delete · /agents:
+      cancel · /jobs: kill
+      Ctrl+N                   /sessions: named only · /model:
+      logged-in only
+      Space / Ctrl+A / Ctrl+X  /scoped-models: toggle / all /
+      none
     ────────────────────────────────────────────────────────────
     > ▏
     …deepseek-flash  think:off  ctx:0.1%/1.0M  $0.01
@@ -4442,11 +4442,11 @@ let%expect_test "/help model prints one command's usage" =
   H.show h;
   [%expect
     {|
-    prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
     ▌ earlier question
       earlier answer
-    /model [name|id|provider/id]  pick or switch the model
+      /model [name|id|provider/id]  pick or switch the model
     ────────────────────────────────────────────────────────────
     > ▏
     …deepseek-flash  think:off  ctx:0.1%/1.0M  $0.01
@@ -4460,14 +4460,14 @@ let%expect_test "/help with an unknown command suggests the closest name" =
   H.show h;
   [%expect
     {|
-    prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
     ▌ earlier question
       earlier answer
-      unknown command /modle; corrected to /help model in the
-      editor
+      unknown command /modle (back in the editor); did you mean
+      /model?
     ────────────────────────────────────────────────────────────
-    > /help model▏
+    > /help modle▏
     …deepseek-flash  think:off  ctx:0.1%/1.0M  $0.01
     |}]
 ;;
@@ -4481,7 +4481,7 @@ let%expect_test "tool confirm: allow, deny, queue and Esc-abort" =
   H.show h;
   [%expect
     {|
-    prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
     ▌ earlier question
       earlier answer
@@ -4523,7 +4523,7 @@ let%expect_test "tool confirm: allow, deny, queue and Esc-abort" =
 
 
 
-    prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
     ▌ earlier question
       earlier answer
@@ -4546,7 +4546,7 @@ let%expect_test "tool confirm: allow, deny, queue and Esc-abort" =
   H.show h;
   [%expect
     {|
-    prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
     ▌ earlier question
       earlier answer
@@ -4569,7 +4569,7 @@ let%expect_test "tool confirm: allow, deny, queue and Esc-abort" =
       (tag Ignore))
 
 
-    prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
     ▌ earlier question
       earlier answer
@@ -4592,7 +4592,7 @@ let%expect_test "tool confirm: allow, deny, queue and Esc-abort" =
       (tag Ignore))
 
 
-    prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
     ▌ earlier question
       earlier answer
@@ -4667,7 +4667,7 @@ let%expect_test "/change_default saves the model and thinking level" =
 
 
 
-    prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
     ▌ earlier question
       earlier answer
@@ -4702,7 +4702,7 @@ let%expect_test "/confirm on saves confirm_tools through set_config" =
   H.show h;
   [%expect
     {|
-    prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
     ▌ earlier question
       earlier answer
@@ -4717,7 +4717,7 @@ let%expect_test "/confirm on saves confirm_tools through set_config" =
   H.show h;
   [%expect
     {|
-    prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
     ▌ earlier question
       earlier answer
@@ -4743,7 +4743,7 @@ let%expect_test "/confirm on saves confirm_tools through set_config" =
   H.show h;
   [%expect
     {|
-    prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
     ▌ earlier question
       earlier answer
@@ -4776,7 +4776,7 @@ let%expect_test "bash timeout is merged into the tool line" =
   H.show h;
   [%expect
     {|
-    prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
     ▌ earlier question
       earlier answer
@@ -4797,7 +4797,7 @@ let%expect_test "resize keeps the confirm dialog and picker within the width" =
   H.show h;
   [%expect
     {|
-    prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
     ▌ earlier question
       earlier answer
@@ -4812,8 +4812,8 @@ let%expect_test "resize keeps the confirm dialog and picker within the width" =
   H.show h;
   [%expect
     {|
-    prigh in /work · /help · Esc aborts ·
-    Ctrl+C twice quits
+      prigh in /work · /help · Esc aborts ·
+      Ctrl+C twice quits
 
     ▌ earlier question
       earlier answer
@@ -4838,7 +4838,7 @@ let%expect_test "resize keeps the confirm dialog and picker within the width" =
 
 
 
-    prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
     ▌ earlier question
       earlier answer
@@ -4853,8 +4853,8 @@ let%expect_test "resize keeps the confirm dialog and picker within the width" =
   H.show h;
   [%expect
     {|
-    prigh in /work · /help · Esc aborts ·
-    Ctrl+C twice quits
+      prigh in /work · /help · Esc aborts ·
+      Ctrl+C twice quits
 
     ▌ earlier question
       earlier answer
@@ -4968,7 +4968,7 @@ let%expect_test "login end to end includes a prompt_cancelled" =
   H.show h;
   [%expect
     {|
-    prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
     ▌ earlier question
       earlier answer
@@ -4994,7 +4994,7 @@ let%expect_test "login end to end includes a prompt_cancelled" =
 
 
 
-    prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
     ▌ earlier question
       earlier answer
@@ -5069,7 +5069,7 @@ let%expect_test "stderr lines are dim notices at Verbose only" =
   H.show h;
   [%expect
     {|
-    prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
     ▌ earlier question
       earlier answer
@@ -5082,7 +5082,7 @@ let%expect_test "stderr lines are dim notices at Verbose only" =
   H.show h;
   [%expect
     {|
-    prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
     ▌ earlier question
       earlier answer
@@ -5100,8 +5100,8 @@ let%expect_test "wide characters keep the editor cursor column" =
   H.show h;
   [%expect
     {|
-    prigh in /work · /help · Esc aborts ·
-    Ctrl+C twice quits
+      prigh in /work · /help · Esc aborts ·
+      Ctrl+C twice quits
 
     ▌ earlier question
       earlier answer
@@ -5114,8 +5114,8 @@ let%expect_test "wide characters keep the editor cursor column" =
   H.show h;
   [%expect
     {|
-    prigh in /work · /help · Esc aborts ·
-    Ctrl+C twice quits
+      prigh in /work · /help · Esc aborts ·
+      Ctrl+C twice quits
 
     ▌ earlier question
       earlier answer
@@ -5128,8 +5128,8 @@ let%expect_test "wide characters keep the editor cursor column" =
   H.show h;
   [%expect
     {|
-    prigh in /work · /help · Esc aborts ·
-    Ctrl+C twice quits
+      prigh in /work · /help · Esc aborts ·
+      Ctrl+C twice quits
 
     ▌ earlier question
       earlier answer
@@ -5150,8 +5150,8 @@ let%expect_test "wide characters keep the editor cursor column" =
       (tag Show_error))
     (Append_history "\230\151\165\230\156\172\232\170\158\240\159\144\185!")
 
-    prigh in /work · /help · Esc aborts ·
-    Ctrl+C twice quits
+      prigh in /work · /help · Esc aborts ·
+      Ctrl+C twice quits
 
     ▌ earlier question
       earlier answer
@@ -5171,7 +5171,7 @@ let%expect_test "editing intents: cursor, word, kill, yank, undo, delete" =
   H.show h;
   [%expect
     {|
-    prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
     ▌ earlier question
       earlier answer
@@ -5184,7 +5184,7 @@ let%expect_test "editing intents: cursor, word, kill, yank, undo, delete" =
   H.show h;
   [%expect
     {|
-    prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
     ▌ earlier question
       earlier answer
@@ -5196,7 +5196,7 @@ let%expect_test "editing intents: cursor, word, kill, yank, undo, delete" =
   H.show h;
   [%expect
     {|
-    prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
     ▌ earlier question
       earlier answer
@@ -5208,7 +5208,7 @@ let%expect_test "editing intents: cursor, word, kill, yank, undo, delete" =
   H.show h;
   [%expect
     {|
-    prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
     ▌ earlier question
       earlier answer
@@ -5223,7 +5223,7 @@ let%expect_test "editing intents: cursor, word, kill, yank, undo, delete" =
   H.show h;
   [%expect
     {|
-    prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
     ▌ earlier question
       earlier answer
@@ -5238,7 +5238,7 @@ let%expect_test "editing intents: cursor, word, kill, yank, undo, delete" =
   H.show h;
   [%expect
     {|
-    prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
     ▌ earlier question
       earlier answer
@@ -5462,7 +5462,7 @@ let%expect_test "reconnect: backoff doubles to the 60s cap, stale replies are \
   [%expect
     {|
       reconnected to the backend
-    prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
     ▌ earlier question
     ──────────────────────────────────────────────────────────────────────
@@ -5475,7 +5475,7 @@ let%expect_test "reconnect: backoff doubles to the 60s cap, stale replies are \
   [%expect
     {|
       reconnected to the backend
-    prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
     ▌ earlier question
       backend is connected
@@ -5566,7 +5566,7 @@ let%expect_test "reconnect: a session the backend no longer knows (never \
       reconnected to the backend
       session /home/u/.prigh/sessions/1.jsonl no longer exists (it was
       never saved, or was deleted); starting a new one
-    prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
     ──────────────────────────────────────────────────────────────────────
     > ▏
     /work  deepseek-flash  think:off  view:normal  ctx:0.1%/1.0M  $0.01
@@ -5665,7 +5665,7 @@ let%expect_test "switching tool host asks for the directory there, prefilled \
   H.show h;
   [%expect
     {|
-    prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
     ▌ earlier question
       earlier answer
@@ -5691,7 +5691,7 @@ let%expect_test "switching tool host asks for the directory there, prefilled \
   H.show h;
   [%expect
     {|
-    prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
     ▌ earlier question
       earlier answer
@@ -5718,7 +5718,7 @@ let%expect_test "switching tool host asks for the directory there, prefilled \
   H.show h;
   [%expect
     {|
-    prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
     ▌ earlier question
       earlier answer
@@ -5754,7 +5754,7 @@ let%expect_test "switching tool host asks for the directory there, prefilled \
 
 
 
-    prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
     ▌ earlier question
       earlier answer
@@ -5776,7 +5776,7 @@ let%expect_test "switching tool host asks for the directory there, prefilled \
 
 
 
-    prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
     ▌ earlier question
       earlier answer
@@ -5817,7 +5817,7 @@ let%expect_test "the hello's host id marks this frontend, also after a \
   picker ();
   [%expect
     {|
-    prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
     ▌ earlier question
       earlier answer
@@ -5852,7 +5852,7 @@ let%expect_test "the hello's host id marks this frontend, also after a \
 
 
       reconnected to the backend
-    prigh in /home/me · /help · Esc aborts · Ctrl+C twice quits
+      prigh in /home/me · /help · Esc aborts · Ctrl+C twice quits
     Tool host  (3)
     / ▏
        srv            /work
@@ -5879,7 +5879,7 @@ let%expect_test "the host picker shows which session other frontends are in" =
   H.show h;
   [%expect
     {|
-    prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
     ▌ earlier question
       earlier answer
@@ -5898,7 +5898,7 @@ let%expect_test "the host picker shows which session other frontends are in" =
   H.show h;
   [%expect
     {|
-    prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
     ▌ earlier question
       earlier answer
@@ -5922,7 +5922,7 @@ let%expect_test "/model Enter Enter opens the picker instead of silently \
   H.show h;
   [%expect
     {|
-    prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
     ▌ earlier question
       earlier answer
@@ -5941,7 +5941,7 @@ let%expect_test "/model Enter Enter opens the picker instead of silently \
   [%expect
     {|
     picker
-    prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
     ▌ earlier question
       earlier answer
@@ -5961,7 +5961,7 @@ let%expect_test "/model Enter Enter opens the picker instead of silently \
   H.show h;
   [%expect
     {|
-    prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
     ▌ earlier question
       earlier answer
@@ -5997,7 +5997,7 @@ let%expect_test "/model Enter Enter opens the picker instead of silently \
   H.show h;
   [%expect
     {|
-    prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
     ▌ earlier question
       earlier answer
@@ -6020,7 +6020,7 @@ let%expect_test "/model Enter Enter opens the picker instead of silently \
 
 
 
-    prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
     ▌ earlier question
       earlier answer
@@ -6059,7 +6059,7 @@ let%expect_test "picking a model reports it, and flags a provider that is not \
 
 
 
-    prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
     ▌ earlier question
       earlier answer
@@ -6080,7 +6080,7 @@ let%expect_test "the scoped mark only appears when the scope is a real subset" =
   H.show h;
   [%expect
     {|
-    prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
     ▌ earlier question
       earlier answer
@@ -6100,7 +6100,7 @@ let%expect_test "the scoped mark only appears when the scope is a real subset" =
   H.show h;
   [%expect
     {|
-    prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
     ▌ earlier question
       earlier answer
@@ -6139,7 +6139,7 @@ let%expect_test "picker: Enter with no match keeps it open; the title shows \
 
 
 
-    prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
     ▌ earlier question
       earlier answer
@@ -6254,7 +6254,7 @@ let%expect_test "Ctrl+C while a turn runs aborts it first; the next press quits"
 
 
 
-    prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
     ▌ earlier question
       earlier answer
@@ -6269,7 +6269,7 @@ let%expect_test "Ctrl+C while a turn runs aborts it first; the next press quits"
   H.show h;
   [%expect
     {|
-    prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
     ▌ earlier question
       earlier answer
@@ -6407,7 +6407,7 @@ let%expect_test "logged-in user: shown in the status line, kept across \
   H.show h;
   [%expect
     {|
-    prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
     ▌ earlier question
       earlier answer
@@ -6420,8 +6420,8 @@ let%expect_test "logged-in user: shown in the status line, kept across \
   H.show h;
   [%expect
     {|
-    prigh in /work · /help · Esc aborts · Ctrl+C twice
-    quits
+      prigh in /work · /help · Esc aborts · Ctrl+C
+      twice quits
 
     ▌ earlier question
       earlier answer
@@ -6466,7 +6466,7 @@ let%expect_test "logged-in user: shown in the status line, kept across \
 
 
       reconnected to the backend
-    prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
     ────────────────────────────────────────────────────────────────────────────────
     > ▏
     /work  deepseek-flash  think:off  view:normal  ctx:0.1%/1.0M  $0.01
@@ -6507,7 +6507,7 @@ let%expect_test "background jobs: !&, status line while idle, /jobs picker, \
 
 
 
-    prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
     ▌ earlier question
       earlier answer
@@ -6533,7 +6533,7 @@ let%expect_test "background jobs: !&, status line while idle, /jobs picker, \
 
 
 
-    prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
     ▌ earlier question
       earlier answer
@@ -6589,14 +6589,14 @@ let%expect_test "background jobs: !&, status line while idle, /jobs picker, \
 
 
 
-    prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
     ▌ earlier question
       earlier answer
       started job j1; /jobs shows it, and its exit is reported to the agent
-    [job j2 exited 0 after 3s, 10 bytes; lines 1-2 of 2] docker build .
-    Step 1/2
-    Step 2/2
+      [job j2 exited 0 after 3s, 10 bytes; lines 1-2 of 2] docker build .
+      Step 1/2
+      Step 2/2
     ────────────────────────────────────────────────────────────────────────────────────────────────────
     > ▏
     /work  deepseek-flash  think:off  view:normal  ctx:0.1%/1.0M  $0.01  jobs:1 ⠋
@@ -6620,9 +6620,9 @@ let%expect_test "background jobs: !&, status line while idle, /jobs picker, \
     ▌ earlier question
       earlier answer
       started job j1; /jobs shows it, and its exit is reported to the agent
-    [job j2 exited 0 after 3s, 10 bytes; lines 1-2 of 2] docker build .
-    Step 1/2
-    Step 2/2
+      [job j2 exited 0 after 3s, 10 bytes; lines 1-2 of 2] docker build .
+      Step 1/2
+      Step 2/2
     ↩ job j1 "make test"  killed
         ok parser
         PASS parser
@@ -6647,7 +6647,7 @@ let%expect_test "job reports reload compactly; look-alike text stays a user \
   H.show h;
   [%expect
     {|
-    prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
     ▌ earlier question
       earlier answer
@@ -6676,13 +6676,13 @@ let%expect_test "/setusr: lists users, acts as one, reconnects as them" =
   H.enter h;
   [%expect
     {|
-    prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
     ▌ earlier question
       earlier answer
-    users (/setusr NAME to act as one):
-      a
-      s
+      users (/setusr NAME to act as one):
+        a
+        s
       protocol error: expected array, got {"oops":1}
     ────────────────────────────────────────────────────────────────────────────────
     > ▏
@@ -6709,7 +6709,7 @@ let%expect_test "/setusr: lists users, acts as one, reconnects as them" =
 
 
       acting as a
-    prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
     ────────────────────────────────────────────────────────────────────────────────
     > ▏
     /work  deepseek-flash  think:off  view:normal  ctx:0.1%/1.0M  $0.01  user:s as a
@@ -6779,7 +6779,7 @@ let%expect_test
 
 
 
-    prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
     ▌ earlier question
       earlier answer
@@ -6819,7 +6819,7 @@ let%expect_test
   H.show h;
   [%expect
     {|
-    prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
     ▌ earlier question
       earlier answer
@@ -6862,7 +6862,7 @@ let%expect_test
   H.enter h;
   [%expect
     {|
-    prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
     ▌ earlier question
       earlier answer
@@ -6896,7 +6896,7 @@ let%expect_test
   H.enter h;
   [%expect
     {|
-    prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
     ▌ earlier question
       earlier answer
@@ -6943,7 +6943,7 @@ let%expect_test
 
 
 
-    prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
     ▌ earlier question
       earlier answer
@@ -6959,7 +6959,7 @@ let%expect_test
   H.show h;
   [%expect
     {|
-    prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
     ▌ earlier question
       earlier answer
@@ -7021,14 +7021,14 @@ let%expect_test
     {|
     (Rpc (method_ auth_status) (params ()) (tag Auth_show))
 
-    prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
     ▌ earlier question
       earlier answer
       logged out of ollama
-    deepseek  logged in via auth.json  [api_key (API key)]
-    ollama    custom http://localhost:11434/v1 (chat)  no key
-    /login custom adds an OpenAI-compatible endpoint
+      deepseek  logged in via auth.json  [api_key (API key)]
+      ollama    custom http://localhost:11434/v1 (chat)  no key
+      /login custom adds an OpenAI-compatible endpoint
     ──────────────────────────────────────────────────────────────────────────────────────────
     > ▏
     /work  deepseek-flash  think:off  view:normal  ctx:0.1%/1.0M  $0.01
@@ -7056,11 +7056,7 @@ let%expect_test
       || String.is_prefix plain ~prefix:"~/proj"
     then print_endline (Content.to_styled [ line ]));
   [%expect
-    {|
-    [gray]prigh in /work · /help · Esc aborts · Ctrl+C twice quits[/]
-    [gray]prigh in ~/proj "refactor" · /help · Esc aborts · Ctrl+C twice quits[/]
-    [gray]~/proj "refactor"[/]  [gray]deepseek-flash[/]  [gray]think:off[/]  [gray]view:normal[/]  [gray]ctx:0.1%/1.0M[/]  [gray]$0.01[/]
-    |}]
+    {| [gray]~/proj "refactor"[/]  [gray]deepseek-flash[/]  [gray]think:off[/]  [gray]view:normal[/]  [gray]ctx:0.1%/1.0M[/]  [gray]$0.01[/] |}]
 ;;
 
 let%expect_test
@@ -7123,8 +7119,8 @@ let%expect_test "a mode hint that does not fit is cut short, not hidden" =
 ;;
 
 let%expect_test
-    "unknown commands go back into the editor, corrected when a command is \
-     close"
+    "unknown commands go back into the editor as typed, naming the closest \
+     command"
   =
   let h = connected ~width:80 () in
   H.keys h "/modle gpt";
@@ -7132,13 +7128,13 @@ let%expect_test
   H.show h;
   [%expect
     {|
-    prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
     ▌ earlier question
       earlier answer
-      unknown command /modle; corrected to /model gpt in the editor
+      unknown command /modle (back in the editor); did you mean /model?
     ────────────────────────────────────────────────────────────────────────────────
-    > /model gpt▏
+    > /modle gpt▏
     /work  deepseek-flash  think:off  view:normal  ctx:0.1%/1.0M  $0.01
     |}];
   H.key h (Key.ctrl 'u');
@@ -7149,11 +7145,11 @@ let%expect_test
   H.show h;
   [%expect
     {|
-    prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
     ▌ earlier question
       earlier answer
-      unknown command /modle; corrected to /model gpt in the editor
+      unknown command /modle (back in the editor); did you mean /model?
       unknown command /usr/bin/env (back in the editor); Tab or / lists commands
     ────────────────────────────────────────────────────────────────────────────────
     > /usr/bin/env is missing on the box▏
@@ -7165,15 +7161,15 @@ let%expect_test
   H.show h;
   [%expect
     {|
-    prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
     ▌ earlier question
       earlier answer
-      unknown command /modle; corrected to /model gpt in the editor
+      unknown command /modle (back in the editor); did you mean /model?
       unknown command /usr/bin/env (back in the editor); Tab or / lists commands
-      unknown command /thnking; corrected to /help thinking in the editor
+      unknown command /thnking (back in the editor); did you mean /thinking?
     ────────────────────────────────────────────────────────────────────────────────
-    > /help thinking▏
+    > /help thnking▏
     /work  deepseek-flash  think:off  view:normal  ctx:0.1%/1.0M  $0.01
     |}]
 ;;
@@ -7213,7 +7209,7 @@ let%expect_test
 
 
 
-    prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
     ▌ earlier question
       earlier answer
@@ -7272,7 +7268,7 @@ let%expect_test
 
 
 
-    prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
     ▌ earlier question
       earlier answer
@@ -7295,7 +7291,7 @@ let%expect_test
   H.show h;
   [%expect
     {|
-    prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
     ▌ earlier question
       earlier answer
@@ -7320,7 +7316,7 @@ let%expect_test "a shell command during a turn stays in the editor" =
 
 
 
-    prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
     ▌ earlier question
       earlier answer
@@ -7345,7 +7341,7 @@ let%expect_test "/agents cancel: errors say what exists" =
   H.show h;
   [%expect
     {|
-    prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
     ▌ earlier question
       earlier answer
@@ -7384,7 +7380,7 @@ let%expect_test
 
 
 
-    prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
     ▌ earlier question
       earlier answer
@@ -7403,7 +7399,7 @@ let%expect_test
   H.show h;
   [%expect
     {|
-    prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
     ▌ earlier question
       earlier answer
@@ -7429,7 +7425,7 @@ let%expect_test
 
 
 
-    prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
     ▌ earlier question
       earlier answer

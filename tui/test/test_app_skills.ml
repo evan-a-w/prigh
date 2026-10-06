@@ -44,7 +44,7 @@ let%expect_test "/skills: a fuzzy picker; Enter puts /skill:NAME in the editor" 
   H.show h;
   [%expect
     {|
-    prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
     ▌ earlier question
       earlier answer
@@ -60,7 +60,7 @@ let%expect_test "/skills: a fuzzy picker; Enter puts /skill:NAME in the editor" 
   H.show h;
   [%expect
     {|
-    prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
     ▌ earlier question
       earlier answer
@@ -76,7 +76,7 @@ let%expect_test "/skills: a fuzzy picker; Enter puts /skill:NAME in the editor" 
   H.show h;
   [%expect
     {|
-    prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
     ▌ earlier question
       earlier answer
@@ -119,7 +119,7 @@ let%expect_test "/skills: Esc closes without side effects; none says where to \
 
 
 
-    prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
     ▌ earlier question
       earlier answer
@@ -145,7 +145,7 @@ let%expect_test "/skills: Esc closes without side effects; none says where to \
 
 
 
-    prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
     ▌ earlier question
       earlier answer
@@ -168,7 +168,7 @@ let%expect_test "/skills: Esc closes without side effects; none says where to \
 
 
 
-    prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
     ▌ earlier question
       earlier answer
@@ -188,7 +188,7 @@ let%expect_test "/skill: completes skill names, fetched once per session" =
   H.show h;
   [%expect
     {|
-    prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
     ▌ earlier question
       earlier answer
@@ -211,7 +211,7 @@ let%expect_test "/skill: completes skill names, fetched once per session" =
   H.show h;
   [%expect
     {|
-    prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
     ▌ earlier question
       earlier answer
@@ -223,7 +223,7 @@ let%expect_test "/skill: completes skill names, fetched once per session" =
   H.show h;
   [%expect
     {|
-    prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
     ▌ earlier question
       earlier answer
@@ -239,7 +239,7 @@ let%expect_test "/skill: completes skill names, fetched once per session" =
   H.show h;
   [%expect
     {|
-    prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
     ▌ earlier question
       earlier answer
@@ -253,7 +253,7 @@ let%expect_test "/skill: completes skill names, fetched once per session" =
   H.show h;
   [%expect
     {|
-    prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
     ▌ earlier question
       earlier answer
@@ -296,7 +296,7 @@ let%expect_test "/skill: completes skill names, fetched once per session" =
   H.show h;
   [%expect
     {|
-    prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
     ▌ earlier question
       earlier answer
@@ -308,7 +308,7 @@ let%expect_test "/skill: completes skill names, fetched once per session" =
   H.show h;
   [%expect
     {|
-    prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
     ▌ earlier question
       earlier answer
@@ -329,7 +329,7 @@ let%expect_test "/skill: completes skill names, fetched once per session" =
 
 
 
-    prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
     ▌ earlier question
       earlier answer
@@ -464,7 +464,7 @@ let%expect_test "an unknown skill: the backend's error, and the text is back \
   H.show h;
   [%expect
     {|
-    prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
     ▌ earlier question
       earlier answer
@@ -501,7 +501,7 @@ let%expect_test "an unknown skill: the backend's error, and the text is back \
 
 
 
-    prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
     ▌ earlier question
       earlier answer
@@ -521,7 +521,7 @@ let%expect_test "an unknown skill: the backend's error, and the text is back \
   H.show h;
   [%expect
     {|
-    prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
     ▌ earlier question
       earlier answer
@@ -545,7 +545,7 @@ let%expect_test "skill messages render compactly; verbose shows the skill file" 
   H.show h;
   [%expect
     {|
-    prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
     ▌ earlier question
       earlier answer
@@ -584,7 +584,7 @@ let%expect_test "skill messages render compactly; verbose shows the skill file" 
   H.show h;
   [%expect
     {|
-    prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
     ▌ earlier question
       earlier answer
@@ -665,7 +665,7 @@ let%expect_test "/fork lists and restores a skill message as /skill:NAME ARGS" =
 
 
 
-    prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
     ▌ earlier question
       earlier answer
@@ -690,7 +690,7 @@ let%expect_test "/fork lists and restores a skill message as /skill:NAME ARGS" =
 
 
 
-    prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
     ▌ earlier question
       earlier answer
@@ -718,7 +718,7 @@ let%expect_test "/mcp: servers with their status; Enter lists tools, explains \
   H.show h;
   [%expect
     {|
-    prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
     ▌ earlier question
       earlier answer
@@ -736,15 +736,15 @@ let%expect_test "/mcp: servers with their status; Enter lists tools, explains \
   H.show h;
   [%expect
     {|
-    prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
     ▌ earlier question
       earlier answer
       MCP config: /work/.mcp.json: server "x": give a "command" (stdio) or a "url"
       (http)
-    fs  2 tools  /home/u/.prigh/mcp.json
-      mcp__fs__read_file  Read a file
-      mcp__fs__list       List a directory
+      fs  2 tools  /home/u/.prigh/mcp.json
+        mcp__fs__read_file  Read a file
+        mcp__fs__list       List a directory
     ────────────────────────────────────────────────────────────────────────────────
     > ▏
     /work  deepseek-flash  think:off  view:normal  ctx:0.1%/1.0M  $0.01
@@ -759,15 +759,15 @@ let%expect_test "/mcp: servers with their status; Enter lists tools, explains \
   [%expect
     {|
     (Rpc (method_ list_mcp) (params ()) (tag Mcp_picker))
-    prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
     ▌ earlier question
       earlier answer
       MCP config: /work/.mcp.json: server "x": give a "command" (stdio) or a "url"
       (http)
-    fs  2 tools  /home/u/.prigh/mcp.json
-      mcp__fs__read_file  Read a file
-      mcp__fs__list       List a directory
+      fs  2 tools  /home/u/.prigh/mcp.json
+        mcp__fs__read_file  Read a file
+        mcp__fs__list       List a directory
       MCP config: /work/.mcp.json: server "x": give a "command" (stdio) or a "url"
       (http)
       gh failed: exited with 1: gh-mcp: command not found; check its entry in
@@ -795,9 +795,9 @@ let%expect_test "/mcp: servers with their status; Enter lists tools, explains \
       earlier answer
       MCP config: /work/.mcp.json: server "x": give a "command" (stdio) or a "url"
       (http)
-    fs  2 tools  /home/u/.prigh/mcp.json
-      mcp__fs__read_file  Read a file
-      mcp__fs__list       List a directory
+      fs  2 tools  /home/u/.prigh/mcp.json
+        mcp__fs__read_file  Read a file
+        mcp__fs__list       List a directory
       MCP config: /work/.mcp.json: server "x": give a "command" (stdio) or a "url"
       (http)
       gh failed: exited with 1: gh-mcp: command not found; check its entry in
@@ -821,7 +821,7 @@ let%expect_test "/mcp: servers with their status; Enter lists tools, explains \
   H.show h;
   [%expect
     {|
-      mcp__fs__list       List a directory
+        mcp__fs__list       List a directory
       MCP config: /work/.mcp.json: server "x": give a "command" (stdio) or a "url"
       (http)
       gh failed: exited with 1: gh-mcp: command not found; check its entry in
@@ -855,8 +855,8 @@ let%expect_test "/mcp: servers with their status; Enter lists tools, explains \
   H.show h;
   [%expect
     {|
-      mcp__fs__read_file  Read a file
-      mcp__fs__list       List a directory
+        mcp__fs__read_file  Read a file
+        mcp__fs__list       List a directory
       MCP config: /work/.mcp.json: server "x": give a "command" (stdio) or a "url"
       (http)
       gh failed: exited with 1: gh-mcp: command not found; check its entry in
@@ -887,17 +887,17 @@ let%expect_test "/mcp reconnect reports every server; no servers says where to \
     (Rpc (method_ list_mcp) (params ((reconnect true))) (tag Mcp_reconnected))
 
 
-    prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
     ▌ earlier question
       earlier answer
       reconnecting MCP servers…
       MCP config: /work/.mcp.json: server "x": give a "command"
       (stdio) or a "url" (http)
-    fs  ready, 2 tools  /home/u/.prigh/mcp.json
-    gh  failed: exited with 1: gh-mcp: command not found
-    /work/.mcp.json
-    db  needs approval  /work/.mcp.json
+      fs  ready, 2 tools  /home/u/.prigh/mcp.json
+      gh  failed: exited with 1: gh-mcp: command not found
+      /work/.mcp.json
+      db  needs approval  /work/.mcp.json
     ────────────────────────────────────────────────────────────
     > ▏
     …deepseek-flash  think:off  ctx:0.1%/1.0M  $0.01
@@ -918,10 +918,10 @@ let%expect_test "/mcp reconnect reports every server; no servers says where to \
       reconnecting MCP servers…
       MCP config: /work/.mcp.json: server "x": give a "command"
       (stdio) or a "url" (http)
-    fs  ready, 2 tools  /home/u/.prigh/mcp.json
-    gh  failed: exited with 1: gh-mcp: command not found
-    /work/.mcp.json
-    db  needs approval  /work/.mcp.json
+      fs  ready, 2 tools  /home/u/.prigh/mcp.json
+      gh  failed: exited with 1: gh-mcp: command not found
+      /work/.mcp.json
+      db  needs approval  /work/.mcp.json
       no MCP servers; configure servers under "mcpServers" in
       ~/.prigh/mcp.json or a project's .mcp.json
       usage: /mcp [reconnect]
@@ -940,14 +940,14 @@ let%expect_test "/help lists the skill and MCP commands" =
   H.show h;
   [%expect
     {|
-    prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
     ▌ earlier question
       earlier answer
-    /skill:NAME [args]  run a skill, with what follows as its
-    arguments
-    /mcp [reconnect]  list MCP servers (Enter approves one or
-    lists its tools); reconnect restarts failed ones
+      /skill:NAME [args]  run a skill, with what follows as its
+      arguments
+      /mcp [reconnect]  list MCP servers (Enter approves one or
+      lists its tools); reconnect restarts failed ones
     ────────────────────────────────────────────────────────────
     > ▏
     …deepseek-flash  think:off  ctx:0.1%/1.0M  $0.01
