@@ -197,6 +197,7 @@ module Stream_state = struct
     ; mutable tool_count : int
     ; mutable saw_tool_call : bool
     ; mutable incomplete_reason : string option
+    ; mutable finished : bool
     ; mutable usage : Usage.t
     ; mutable error : string option
     }
@@ -207,6 +208,7 @@ module Stream_state = struct
     ; tool_count = 0
     ; saw_tool_call = false
     ; incomplete_reason = None
+    ; finished = false
     ; usage = Usage.zero
     ; error = None
     }
@@ -304,23 +306,31 @@ let parse_event (state : Stream_state.t) (event : Sse.Event.t)
            | _ -> [])
         | _ -> [])
      | ("response.completed" | "response.incomplete") as type_ ->
-       (* A completed response may carry [incomplete_details: null]: only a
-          reason, or the incomplete event itself, means it was cut short. *)
+       (* The response's status says how it ended, as pi reads it: a
+          completed one may still carry [incomplete_details: null]. *)
+       state.finished <- true;
        let response = Json.member "response" json in
        Option.iter
          (Option.bind response ~f:(Json.member "usage"))
          ~f:(fun u -> state.usage <- parse_usage u);
-       let reason =
-         Option.bind response ~f:(Json.member "incomplete_details")
-         |> Option.bind ~f:(member "reason")
+       let status =
+         match Option.bind response ~f:(member "status") with
+         | Some status -> status
+         | None -> String.chop_prefix_exn type_ ~prefix:"response."
        in
-       (match reason, type_ with
-        | Some reason, _ -> state.incomplete_reason <- Some reason
-        | None, "response.incomplete" ->
-          state.incomplete_reason <- Some "no reason given"
-        | None, _ -> ());
+       (match status with
+        | "incomplete" ->
+          state.incomplete_reason
+          <- Some
+               (Option.bind response ~f:(Json.member "incomplete_details")
+                |> Option.bind ~f:(member "reason")
+                |> Option.value ~default:"no reason given")
+        | "failed" | "cancelled" ->
+          state.error <- Some (sprintf "the response was %s" status)
+        | _ -> ());
        []
      | "response.failed" ->
+       state.finished <- true;
        let message =
          Option.bind (Json.member "response" json) ~f:(Json.member "error")
          |> Option.bind ~f:(member "message")
@@ -329,6 +339,7 @@ let parse_event (state : Stream_state.t) (event : Sse.Event.t)
        state.error <- Some message;
        []
      | "error" ->
+       state.finished <- true;
        let message =
          Option.first_some
            (member "message" json)
@@ -346,6 +357,8 @@ let stop_reason (state : Stream_state.t) : Stop_reason.t =
   | None, Some "max_output_tokens" -> Length
   | None, Some reason ->
     Error (sprintf "the response was cut short (%s)" reason)
+  | None, None when not state.finished ->
+    Error "the stream ended before the response finished"
   | None, None -> if state.saw_tool_call then Tool_use else End_turn
 ;;
 
