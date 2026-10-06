@@ -59,7 +59,9 @@ let toasts (m : Model.t) ~inject =
            ; Attr.title "Dismiss"
            ; Attr.on_click (fun _ -> inject (Action.Dismiss_toast t.id))
            ]
-         [ Node.text t.text ]))
+         [ Node.span [ Node.text t.text ]
+         ; (if t.error then icon ~cls:"toast-close" Close else Node.none)
+         ]))
 ;;
 
 let empty (m : Model.t) =
@@ -84,7 +86,25 @@ let empty (m : Model.t) =
     ]
 ;;
 
+(* Under a dialog the page is inert: Tab and clicks cannot reach it, so the
+   dialog owns the keyboard until it closes. *)
+let rec inert (node : Node.t) : Node.t =
+  match node with
+  | Element e ->
+    Element
+      (Node.Element.map_attrs e ~f:(fun a ->
+         Attr.many [ a; Attr.create "inert" "" ]))
+  | Lazy { key; t } -> Lazy { key; t = lazy (inert (Lazy.force t)) }
+  | Fragment nodes -> Fragment (List.map nodes ~f:inert)
+  | (None | Text _ | Widget _) as node -> node
+;;
+
 let view (m : Model.t) ~inject ~terminal =
+  let behind =
+    if Option.is_some m.dialog || not (List.is_empty m.confirms)
+    then inert
+    else Fn.id
+  in
   let chat =
     match Chat.entries m.chat with
     | [] -> empty m
@@ -100,7 +120,7 @@ let view (m : Model.t) ~inject ~terminal =
           ; "terminal-open", m.terminal.open_
           ]
       ]
-    [ Sidebar_view.view m ~inject
+    [ behind (Sidebar_view.view m ~inject)
     ; (if m.narrow && m.sidebar_open
        then
          Node.div
@@ -110,22 +130,25 @@ let view (m : Model.t) ~inject ~terminal =
              ]
            []
        else Node.none)
-    ; Node.main
-        ~attrs:[ Attr.class_ "main" ]
-        [ Topbar_view.view m ~inject
-        ; banner m ~inject
-        ; Node.div
-            ~attrs:
-              [ Attr.classes
-                  [ "chat"; "verbosity-" ^ Prigh_ui.Verbosity.name m.verbosity ]
-              ; Attr.id "chat"
-              ]
-            [ chat; jump_to_bottom m ~inject ]
-        ; Btw_view.view m ~inject
-        ; Composer_view.view m ~inject
-        ; Terminal_view.view m ~inject ~widget:terminal
-        ]
-    ; Agents_view.view m ~inject
+    ; behind
+      @@ Node.main
+           ~attrs:[ Attr.class_ "main" ]
+           [ Topbar_view.view m ~inject
+           ; banner m ~inject
+           ; Node.div
+               ~attrs:
+                 [ Attr.classes
+                     [ "chat"
+                     ; "verbosity-" ^ Prigh_ui.Verbosity.name m.verbosity
+                     ]
+                 ; Attr.id "chat"
+                 ]
+               [ chat; jump_to_bottom m ~inject ]
+           ; Btw_view.view m ~inject
+           ; Composer_view.view m ~inject
+           ; Terminal_view.view m ~inject ~widget:terminal
+           ]
+    ; behind (Agents_view.view m ~inject)
     ; Dialog_view.view m ~inject
     ; toasts m ~inject
     ]

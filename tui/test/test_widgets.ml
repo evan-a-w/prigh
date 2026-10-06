@@ -336,6 +336,32 @@ let%expect_test "fuzzy ranking" =
     |}]
 ;;
 
+let%expect_test "fuzzy ranking: a typo's subsequence prefers runs of letters" =
+  (* The picker's search text: name, provider and key. *)
+  let candidates =
+    [ "GPT-5.6 Sol openai openai/gpt-5.6-sol"
+    ; "GPT-6 Astra openai openai/gpt-6-astra"
+    ; "Claude Sonnet 5 anthropic anthropic/claude-sonnet-5"
+    ; "DeepSeek V4.1 Flash deepseek deepseek/deepseek-flash"
+    ]
+  in
+  List.iter [ "sonet"; "clsn"; "dpsk flsh"; "astr" ] ~f:(fun query ->
+    printf
+      "%-11S -> %s\n"
+      query
+      (String.concat
+         ~sep:" | "
+         (List.map (Fuzzy.rank ~query candidates ~key:Fn.id) ~f:(fun c ->
+            String.concat ~sep:" " (List.take (String.split c ~on:' ') 3)))));
+  [%expect
+    {|
+    "sonet"     -> Claude Sonnet 5 | GPT-5.6 Sol openai | GPT-6 Astra openai
+    "clsn"      -> Claude Sonnet 5
+    "dpsk flsh" -> DeepSeek V4.1 Flash
+    "astr"      -> GPT-6 Astra openai | Claude Sonnet 5
+    |}]
+;;
+
 let%expect_test "fuzzy ranking: command names" =
   let names = List.map Commands.all ~f:(fun (c : Commands.Spec.t) -> c.name) in
   List.iter [ "mo"; "lo"; "s"; "sw"; "xyz" ] ~f:(fun query ->

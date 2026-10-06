@@ -27,6 +27,18 @@ New session
 <CWD>
 DeepSeek V4.1 Flash
 on
+=== chromium: a dialog keeps the focus ===
+Tab: dialog: Close (Esc)
+Tab: dialog: Keys
+Tab: dialog: Done
+Shift+Tab: dialog: Keys
+Shift+Tab: dialog: Close (Esc)
+Shift+Tab: dialog: Done
+Shift+Tab: dialog: Keys
+after Esc: editor
+=== chromium: a mistyped command ===
+Unknown command /modle. Did you mean /model? (/help lists them)
+editor: /modle
 === chromium: bash run ===
 count some lines
 <TIME>
@@ -352,6 +364,18 @@ New session
 <CWD>
 DeepSeek V4.1 Flash
 on
+=== firefox: a dialog keeps the focus ===
+Tab: dialog: Close (Esc)
+Tab: dialog: Keys
+Tab: dialog: Done
+Shift+Tab: dialog: Keys
+Shift+Tab: dialog: Close (Esc)
+Shift+Tab: dialog: Done
+Shift+Tab: dialog: Keys
+after Esc: editor
+=== firefox: a mistyped command ===
+Unknown command /modle. Did you mean /model? (/help lists them)
+editor: /modle
 === firefox: bash run ===
 count some lines
 <TIME>

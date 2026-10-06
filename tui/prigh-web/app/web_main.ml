@@ -447,6 +447,53 @@ let reveal_selected () =
                   [| "block", Js.Unsafe.inject (Js.string "nearest") |]))))
 ;;
 
+(* Tab and Shift+Tab go round the open dialog (the page behind is inert),
+   not out to the browser's toolbar. *)
+let wrap_focus (ev : Dom_html.keyboardEvent Js.t) =
+  let k = key ev in
+  if (not (String.equal k.key "Tab")) || k.alt || k.ctrl || k.meta
+  then false
+  else (
+    match
+      List.last
+        (Dom.list_of_nodeList
+           (Dom_html.document##querySelectorAll (Js.string ".modal")))
+    with
+    | None -> false
+    | Some modal ->
+      let focusable =
+        Dom.list_of_nodeList
+          (modal##querySelectorAll
+             (Js.string
+                "button:not(:disabled), input:not(:disabled), \
+                 textarea:not(:disabled), select:not(:disabled), a[href], \
+                 summary, [tabindex]:not([tabindex='-1'])"))
+      in
+      (match List.hd focusable, List.last focusable with
+       | Some first, Some last ->
+         let active : Dom_html.element Js.t option =
+           Js.Opt.to_option (Js.Unsafe.coerce Dom_html.document)##.activeElement
+         in
+         let is el =
+           Option.exists active ~f:(fun a -> phys_equal (Js.Unsafe.coerce a) el)
+         in
+         let inside =
+           Option.exists active ~f:(fun a ->
+             Js.to_bool ((Js.Unsafe.coerce modal)##contains a))
+         in
+         let target =
+           if k.shift
+           then Option.some_if ((not inside) || is first || is modal) last
+           else Option.some_if ((not inside) || is last) first
+         in
+         (match target with
+          | Some el ->
+            el##focus;
+            true
+          | None -> false)
+       | _ -> false))
+;;
+
 let narrow () = Dom_html.window##.innerWidth < 760
 
 let install_listeners ~schedule ~current =
@@ -490,7 +537,12 @@ let install_listeners ~schedule ~current =
       Js._false)
     else (
       match Prigh_web.Keys.handle !current (key ev) with
-      | None -> Js._true
+      | None ->
+        if wrap_focus ev
+        then (
+          Dom.preventDefault ev;
+          Js._false)
+        else Js._true
       | Some action ->
         Dom.preventDefault ev;
         (* Bonsai applies it on the next frame: a key pressed before then must

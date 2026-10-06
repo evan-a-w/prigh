@@ -299,7 +299,13 @@ and when there is none (no tmux on the host, a host that has gone) the
 panel says why and what to do.
 
 prigh-web has every slash command of the table below, as pickers and
-dialogs rather than lines in a transcript: `/session` is a dialog of the
+dialogs rather than lines in a transcript (a dialog keeps the keyboard
+until Esc closes it: Tab goes round it, the page behind is inert). A
+command it refuses (a typo, an unknown model) stays in the editor for you
+to correct, its error saying what to do; errors stay until dismissed (×),
+the next message or command you send, or switching session. Choosing a
+model whose provider is not logged in says which `/login` to run.
+`/session` is a dialog of the
 session's details and statistics; `/fork`, `/rewind` (with a confirmation)
 and `/tree` (the whole tree, branches indented) pick a message;
 `/scoped-models` is a checklist (Tab or a click checks a model, Enter
