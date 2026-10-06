@@ -1036,7 +1036,9 @@ copy of the protocol types and the e2e test guards the contract.
     the panel to it, and the chat's and agents panel's mutation observers
     ignore xterm.js redrawing.
   - `bin/` — `main.bc.js` plus `index.html`, `style.css`, `chat.css`,
-    `agents.css` and `terminal.css`, and `web-bin`'s `terminal.js` and
+    `agents.css` and `terminal.css` (design tokens in `style.css`'s
+    `:root`), the Recursive font cut to two woff2 instances (sans and mono;
+    `recursive-OFL.txt`), and `web-bin`'s `terminal.js` and
     vendored xterm.js (copied by dune rules, not duplicated), assembled under
     `bin/site/` and installed to `share/prigh_tui/prigh-web` (the Nix
     wrapper exports it as `$PRIGH_PRIGH_WEB_ROOT`). The dev profile links
