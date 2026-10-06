@@ -74,7 +74,7 @@ let%expect_test "listing: host wire format round trip, RPC shape, notices" =
   [%expect
     {|
     /p/.mcp.json: server "x": give a "command" (stdio) or a "url" (http)
-    MCP server gh (/h/.prigh/mcp.json) failed: server exited (code 1): no token; fix it, then /mcp reconnect
+    MCP server gh (/h/.prigh/mcp.json) failed: server exited (code 1): no token; once that is fixed, /mcp reconnect starts it
     MCP server db from /p/.mcp.json is not started until you approve it: /mcp
     |}];
   print_s

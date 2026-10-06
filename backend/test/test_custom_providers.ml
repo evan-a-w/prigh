@@ -249,12 +249,16 @@ let%expect_test "config: valid entries load, bad ones are reported and skipped" 
             (Custom_provider.load ~home:t.dir
              : Custom_provider.t list * string list)]));
   write_config t {|{"providers": |};
-  print_s [%sexp (snd (Custom_provider.load ~home:t.dir) : string list)];
+  print_endline
+    (mask
+       t
+       (Sexp.to_string_hum
+          [%sexp (snd (Custom_provider.load ~home:t.dir) : string list)]));
   [%expect
     {|
     (()
      ("\"providers\" must be an object of provider names to definitions (in $DIR/.prigh/config.json)"))
-    ("json > object: not enough input; custom providers are not loaded")
+    ("$DIR/.prigh/config.json is not valid JSON (json > object: not enough input); its settings and custom providers are ignored until it is fixed")
     |}]
 ;;
 
@@ -418,7 +422,7 @@ let%expect_test
     (deepseek/deepseek-flash (deepseek/deepseek-flash))
     (aiproxy/not-listed
      (Error
-      "unknown model \"aiproxy/not-listed\"; did you mean: aiproxy/local-only (Local only), aiproxy/gpt-4o (gpt-4o), aiproxy/meta-llama/llama-3.1-8b (meta-llama/llama-3.1-8b)"))
+      "unknown model \"aiproxy/not-listed\"; did you mean: aiproxy/local-only (Local only), aiproxy/gpt-4o (gpt-4o)"))
     (down/anything (Ok down/anything))
     (meta-llama (Ok aiproxy/meta-llama/llama-3.1-8b))
     ("Local only" (Ok aiproxy/local-only))
@@ -1555,7 +1559,7 @@ let%expect_test
     {|
     {"type":"event","event":"state","state":{"session_id":"<id>","session_path":"$DIR/sessions/<stamp>_<id>.jsonl","session_name":null,"session_description":null,"cwd":"$DIR","git_branch":null,"model":{"id":"openai/gpt-4o-mini","provider":"aiproxy","key":"aiproxy/openai/gpt-4o-mini","name":"openai/gpt-4o-mini","context_window":128000,"max_output":16384,"supports_thinking":false,"cost":{"input":0,"output":0,"cache_read":0}},"thinking":"on","running":false,"message_count":0,"usage":{"input":0,"output":0,"cache_read":0},"cost_usd":0,"context_tokens":0,"active_host":"backend","hosts":[{"id":"backend","name":"<host>","cwd":"$DIR","session_id":null,"session_name":null}],"subagents":[],"jobs":[]}}
     {"type":"response","id":"r1","ok":true,"result":{}}
-    {"type":"response","id":"r1","ok":false,"error":"unknown model \"aiproxy/gpt-5\"; did you mean: aiproxy/gpt-4o (gpt-4o), aiproxy/openai/gpt-4o-mini (openai/gpt-4o-mini)"}
+    {"type":"response","id":"r1","ok":false,"error":"unknown model \"aiproxy/gpt-5\"; did you mean: aiproxy/gpt-4o (gpt-4o)"}
     ("\"aiproxy/openai/gpt-4o-mini\"")
     {"provider":"aiproxy","name":"aiproxy","methods":[{"method":"api_key","label":"aiproxy API key"}],"configured":{"method":"api_key","source":"no key"},"expires_ms":null,"custom":{"base_url":"http://127.0.0.1:PORT/v1","api":"chat","api_label":"OpenAI chat completions (/chat/completions)"}}
     |}];
@@ -1575,4 +1579,29 @@ let%expect_test
     ()
     {"type":"response","id":"r1","ok":false,"error":"unknown provider \"aiproxy\" (one of: anthropic, openai, openai-codex, deepseek; or custom to add an OpenAI-compatible endpoint)"}
     |}]
+;;
+
+let%expect_test "config problems: unknown default model and settings are told" =
+  with_sandbox
+  @@ fun t ->
+  Eio.Switch.run
+  @@ fun sw ->
+  write_config
+    t
+    {|{"default_model": "anthropic/claude-opus-55", "scoped_modles": []}|};
+  let registry = registry t ~sw in
+  show_models t registry;
+  [%expect
+    {|
+    problem: unknown setting "scoped_modles" in $DIR/.prigh/config.json is ignored; did you mean "scoped_models"?
+    problem: default_model "anthropic/claude-opus-55" (in $DIR/.prigh/config.json) is not a known model, so new sessions start on another; did you mean anthropic/claude-opus-5 or anthropic/claude-opus-5-5 or anthropic/claude-opus-4-5? (/change_default saves the current model as the default)
+    |}];
+  (* A custom provider's model is known before its list is fetched. *)
+  write_config
+    t
+    {|{"fallback_models": ["local/some-model"],
+       "providers": {"local": {"base_url": "http://127.0.0.1:9/v1"}}}|};
+  Model_registry.reload registry;
+  show_models t registry;
+  [%expect {| |}]
 ;;

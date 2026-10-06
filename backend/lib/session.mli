@@ -161,6 +161,10 @@ end
 (** Most recently updated first. *)
 val list : dir:string -> Summary.t list
 
+(** The summary whose id is [key], else the only one whose id starts with
+    it; errors say whether none or several matched. *)
+val find_summary : Summary.t list -> string -> Summary.t Or_error.t
+
 (** Which saved sessions [prune] should delete; every given field must
     match. [cwd] is compared verbatim, so resolve it first. *)
 module Filter : sig

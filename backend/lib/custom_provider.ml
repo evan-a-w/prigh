@@ -421,7 +421,10 @@ let hint ~home = sprintf " (in %s)" (Config.path ~home)
 let load ~home =
   match Config.read_fields ~home with
   | Error e ->
-    [], [ Error.to_string_hum e ^ "; custom providers are not loaded" ]
+    ( []
+    , [ Error.to_string_hum e
+        ^ "; its settings and custom providers are ignored until it is fixed"
+      ] )
   | Ok fields ->
     (match List.Assoc.find fields ~equal:String.equal "providers" with
      | None | Some `Null -> [], []

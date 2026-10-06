@@ -41,12 +41,24 @@ let load t : (string * Json.t) list Or_error.t =
       match Json.parse contents with
       | Ok (`Object fields) -> Ok fields
       | Ok _ ->
-        Or_error.error_s
-          [%message "auth file must be a JSON object" ~file:(t.path : string)]
+        Or_error.errorf
+          "%s must be a JSON object of credentials: fix it, or move it aside \
+           and log in again"
+          t.path
       | Error e ->
-        Or_error.error_s
-          [%message
-            "auth file is not valid JSON" ~file:(t.path : string) (e : Error.t)])
+        Or_error.errorf
+          "%s is not valid JSON (%s): fix it, or move it aside and log in again"
+          t.path
+          (Error.to_string_hum e))
+;;
+
+let bad_credential ~file provider e =
+  Or_error.errorf
+    "%s: the %s credential is unreadable (%s): log in to %s again"
+    file
+    (Provider_id.to_string provider)
+    (Error.to_string_hum e)
+    (Provider_id.to_string provider)
 ;;
 
 let save t fields =
@@ -79,14 +91,7 @@ let parse_entry ~file (provider, json) =
   | Some provider ->
     (match Credential.of_json json with
      | Ok c -> Some (Ok (provider, c))
-     | Error e ->
-       Some
-         (Or_error.error_s
-            [%message
-              "auth file: bad credential"
-                (file : string)
-                (provider : Provider_id.t)
-                (e : Error.t)]))
+     | Error e -> Some (bad_credential ~file provider e))
 ;;
 
 let list t =
@@ -110,13 +115,7 @@ let read t provider =
     | Some json ->
       (match Credential.of_json json with
        | Ok c -> Ok (Some c)
-       | Error e ->
-         Or_error.error_s
-           [%message
-             "auth file: bad credential"
-               ~file:(t.path : string)
-               (provider : Provider_id.t)
-               (e : Error.t)]))
+       | Error e -> bad_credential ~file:t.path provider e))
 ;;
 
 let mem t name =
