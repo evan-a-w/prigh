@@ -25,6 +25,38 @@ let word_start s i =
   || Char.equal p '.'
 ;;
 
+(* How well [word] matches [s] as a subsequence, if it does: the best over
+   where its first letter is found, counting letters that follow each other
+   or start a word, less the gaps between them. *)
+let subsequence_quality ~word s =
+  let n = String.length word in
+  let from start =
+    let rec go qi si prev quality =
+      if qi >= n
+      then Some quality
+      else if si >= String.length s
+      then None
+      else (
+        match String.index_from s si word.[qi] with
+        | None -> None
+        | Some p ->
+          let quality =
+            quality
+            + (if p = prev + 1 then 16 else -Int.min 8 (p - prev - 1))
+            + if word_start s p then 12 else 0
+          in
+          go (qi + 1) (p + 1) p quality)
+    in
+    go 1 (start + 1) start (if word_start s start then 12 else 0)
+  in
+  if n = 0
+  then Some 0
+  else
+    List.filter_mapi (String.to_list s) ~f:(fun i c ->
+      if Char.equal c word.[0] then from i else None)
+    |> List.max_elt ~compare:Int.compare
+;;
+
 let score ~query candidate =
   let query = String.lowercase (String.strip query) in
   let s = String.lowercase candidate in
@@ -45,7 +77,15 @@ let score ~query candidate =
           String.split query ~on:' ' |> List.filter ~f:(Fn.non String.is_empty)
         in
         if List.for_all words ~f:(fun w -> is_subsequence ~query:w s)
-        then Some (1000 - length_penalty)
+        then (
+          let quality =
+            List.sum
+              (module Int)
+              words
+              ~f:(fun word ->
+                Option.value ~default:0 (subsequence_quality ~word s))
+          in
+          Some (1000 + Int.clamp_exn quality ~min:0 ~max:900 - length_penalty))
         else None))
 ;;
 
