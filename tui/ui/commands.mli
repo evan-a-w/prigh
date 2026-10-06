@@ -55,3 +55,6 @@ val parse : string -> Parsed.t option
 
 val closest : string -> Spec.t option
 val help : Content.t
+
+(** The prefixes a prompt can start with ([!command], [@path], ...). *)
+val input_help : Content.t

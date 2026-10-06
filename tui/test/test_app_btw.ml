@@ -28,8 +28,8 @@ let%expect_test "/btw while running: streamed box, Esc dismisses without \
 
 
 
-    session abc123 in /work. /help for commands, Esc aborts,
-    Ctrl+C twice quits.
+
+    prigh in /work · /help · Esc aborts · Ctrl+C twice quits
     > earlier question
     earlier answer
     Working on it
@@ -39,7 +39,7 @@ let%expect_test "/btw while running: streamed box, Esc dismisses without \
     └──────────────────────────────────────────────────────────┘
     ────────────────────────────────────────────────────────────
     > ▏
-    …deepseek-flash  ⠋ working (Esc dismisses btw; Enter steers)
+    …deepseek-flash  ⠋ working · Esc closes btw · Enter steers
     |}];
   H.event h (Btw_delta { btw_id = "btw-1"; delta = "It is `app.ml`, " });
   H.event h (Btw_delta { btw_id = "btw-1"; delta = "around **line 40**." });
@@ -47,8 +47,7 @@ let%expect_test "/btw while running: streamed box, Esc dismisses without \
   H.show h;
   [%expect
     {|
-    session abc123 in /work. /help for commands, Esc aborts,
-    Ctrl+C twice quits.
+    prigh in /work · /help · Esc aborts · Ctrl+C twice quits
     > earlier question
     earlier answer
     Working on it
@@ -59,7 +58,7 @@ let%expect_test "/btw while running: streamed box, Esc dismisses without \
     └──────────────────────────────────────────────────────────┘
     ────────────────────────────────────────────────────────────
     > ▏
-    …deepseek-flash  ⠋ working (Esc dismisses btw; Enter steers)
+    …deepseek-flash  ⠋ working · Esc closes btw · Enter steers
     |}];
   (* Esc cancels the in-flight call and closes the box; no abort. *)
   H.esc h;
@@ -75,14 +74,14 @@ let%expect_test "/btw while running: streamed box, Esc dismisses without \
 
 
 
-    session abc123 in /work. /help for commands, Esc aborts,
-    Ctrl+C twice quits.
+
+    prigh in /work · /help · Esc aborts · Ctrl+C twice quits
     > earlier question
     earlier answer
     Working on it
     ────────────────────────────────────────────────────────────
     > ▏
-    …deepseek-flash  $0.01  ⠋ working (Esc aborts; Enter steers)
+    …deepseek-flash  ⠋ working · Esc aborts · Enter steers
     |}];
   H.reply_error h (Btw "btw-1") "cancelled";
   printf "transcript unchanged: %b\n" (Sexp.equal before (transcript_sexp h));
@@ -123,8 +122,7 @@ let%expect_test "/btw: a newer question replaces the box; final reply; errors" =
   H.show h;
   [%expect
     {|
-    session abc123 in /work. /help for commands, Esc aborts,
-    Ctrl+C twice quits.
+    prigh in /work · /help · Esc aborts · Ctrl+C twice quits
     > earlier question
     earlier answer
     ┌─ btw ────────────────────────────────────────────────────┐
@@ -137,7 +135,7 @@ let%expect_test "/btw: a newer question replaces the box; final reply; errors" =
     └──────────────────────────────────────────────────────────┘
     ────────────────────────────────────────────────────────────
     > ▏
-    /work  deepseek-flash  ctx:0% 1.5k  $0.01  Esc dismisses btw
+    …deepseek-flash  ctx:0.1%/1.0M  $0.01  Esc dismisses btw
     |}];
   (* A finished answer needs no cancel. *)
   H.esc h;
@@ -159,8 +157,8 @@ let%expect_test "/btw: a newer question replaces the box; final reply; errors" =
 
 
 
-    session abc123 in /work. /help for commands, Esc aborts,
-    Ctrl+C twice quits.
+
+    prigh in /work · /help · Esc aborts · Ctrl+C twice quits
     > earlier question
     earlier answer
     ┌─ btw ────────────────────────────────────────────────────┐
@@ -170,7 +168,7 @@ let%expect_test "/btw: a newer question replaces the box; final reply; errors" =
     └──────────────────────────────────────────────────────────┘
     ────────────────────────────────────────────────────────────
     > ▏
-    /work  deepseek-flash  ctx:0% 1.5k  $0.01  Esc dismisses btw
+    …deepseek-flash  ctx:0.1%/1.0M  $0.01  Esc dismisses btw
     |}];
   H.esc h;
   H.keys h "/btw";
@@ -178,14 +176,13 @@ let%expect_test "/btw: a newer question replaces the box; final reply; errors" =
   H.show h;
   [%expect
     {|
-    session abc123 in /work. /help for commands, Esc aborts,
-    Ctrl+C twice quits.
+    prigh in /work · /help · Esc aborts · Ctrl+C twice quits
     > earlier question
     earlier answer
     usage: /btw <question>
     ────────────────────────────────────────────────────────────
     > ▏
-    …deepseek-flash  think:off  view:normal  ctx:0% 1.5k  $0.01
+    …deepseek-flash  think:off  ctx:0.1%/1.0M  $0.01
     |}]
 ;;
 
@@ -212,8 +209,8 @@ let%expect_test "/btw: a long answer shows its tail within half the screen" =
         (btw_id   btw-1)))
       (tag (Btw btw-1)))
 
-    session abc123 in /work. /help for commands, Esc aborts,
-    Ctrl+C twice quits.
+
+    prigh in /work · /help · Esc aborts · Ctrl+C twice quits
     > earlier question
     earlier answer
     ┌─ btw ────────────────────────────────────────────────────┐
@@ -226,7 +223,7 @@ let%expect_test "/btw: a long answer shows its tail within half the screen" =
     └──────────────────────────────────────────────────────────┘
     ────────────────────────────────────────────────────────────
     > ▏
-    /work  deepseek-flash  ctx:0% 1.5k  $0.01  Esc dismisses btw
+    …deepseek-flash  ctx:0.1%/1.0M  $0.01  Esc dismisses btw
     |}]
 ;;
 
@@ -236,8 +233,7 @@ let%expect_test "/bt autocompletes to /btw" =
   H.show h;
   [%expect
     {|
-    session abc123 in /work. /help for commands, Esc aborts,
-    Ctrl+C twice quits.
+    prigh in /work · /help · Esc aborts · Ctrl+C twice quits
     > earlier question
     earlier answer
     ────────────────────────────────────────────────────────────
@@ -246,6 +242,6 @@ let%expect_test "/bt autocompletes to /btw" =
       /abort                          abort the current run
       /verbosity [quiet|normal|verbose]  set the transcript ver…
       /retry-backend-connection       reconnect to the backend …
-    …deepseek-flash  ctx:0% 1.5k  Tab/Enter accept · Esc close
+    …deepseek-flash  ctx:0.1%/1.0M  Tab/Enter accept · Esc close
     |}]
 ;;

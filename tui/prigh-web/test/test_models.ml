@@ -104,7 +104,7 @@ let%expect_test "/model with a name switches, or says what matches" =
     {|
     (Focus editor)
     (Save_history ("/model gemini" "/model claude" "/model sonnet"))
-    No model matches "gemini". Did you mean GPT-6, DeepSeek Chat, Claude Sonnet 5? Ctrl+L lists them all.
+    No model matches "gemini". Ctrl+L lists them all.
     |}]
 ;;
 
