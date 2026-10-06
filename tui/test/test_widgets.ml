@@ -53,7 +53,8 @@ let%expect_test "text width and wrapping" =
           ; { text = "defgh"; style = Style.plain }
           ]
           ~width:6));
-  [%expect {|
+  [%expect
+    {|
     a long …
     abcde…
     |}]
@@ -332,6 +333,32 @@ let%expect_test "fuzzy ranking" =
     "5.5"      -> GPT-5.5 | gpt-5.5-fast
     "zzz"      ->
     ""         -> Claude Fable 5 | Claude Fable 5.1 | GPT-5.5 | o4-mini | DeepSeek V4.1 Flash | gpt-5.5-fast
+    |}]
+;;
+
+let%expect_test "fuzzy ranking: a typo's subsequence prefers runs of letters" =
+  (* The picker's search text: name, provider and key. *)
+  let candidates =
+    [ "GPT-5.6 Sol openai openai/gpt-5.6-sol"
+    ; "GPT-6 Astra openai openai/gpt-6-astra"
+    ; "Claude Sonnet 5 anthropic anthropic/claude-sonnet-5"
+    ; "DeepSeek V4.1 Flash deepseek deepseek/deepseek-flash"
+    ]
+  in
+  List.iter [ "sonet"; "clsn"; "dpsk flsh"; "astr" ] ~f:(fun query ->
+    printf
+      "%-11S -> %s\n"
+      query
+      (String.concat
+         ~sep:" | "
+         (List.map (Fuzzy.rank ~query candidates ~key:Fn.id) ~f:(fun c ->
+            String.concat ~sep:" " (List.take (String.split c ~on:' ') 3)))));
+  [%expect
+    {|
+    "sonet"     -> Claude Sonnet 5 | GPT-5.6 Sol openai | GPT-6 Astra openai
+    "clsn"      -> Claude Sonnet 5
+    "dpsk flsh" -> DeepSeek V4.1 Flash
+    "astr"      -> GPT-6 Astra openai | Claude Sonnet 5
     |}]
 ;;
 
@@ -1087,8 +1114,9 @@ let%expect_test "markdown never raises on malformed input" =
     |}]
 ;;
 
-let%expect_test "autocomplete: Enter accepts arguments only after a filter or \
-                 navigation; /cd keeps directories only"
+let%expect_test
+    "autocomplete: Enter accepts arguments only after a filter or navigation; \
+     /cd keeps directories only"
   =
   let models =
     Or_error.ok_exn
@@ -1223,8 +1251,8 @@ let%expect_test "autocomplete: /skill: completes skill names" =
     |}]
 ;;
 
-let%expect_test "skill messages: parsed back into name, location, body and \
-                 arguments"
+let%expect_test
+    "skill messages: parsed back into name, location, body and arguments"
   =
   let head =
     "<skill name=\"review\" location=\"/p/.prigh/skills/review/SKILL.md\">\n"
@@ -1304,8 +1332,9 @@ let%expect_test "skill messages: parsed back into name, location, body and \
     |}]
 ;;
 
-let%expect_test "autocomplete: /fallback completes each word with a model not \
-                 listed yet; /default-dir lists directories on its host"
+let%expect_test
+    "autocomplete: /fallback completes each word with a model not listed yet; \
+     /default-dir lists directories on its host"
   =
   let models =
     Or_error.ok_exn
