@@ -492,6 +492,7 @@ let set_state (m : Model.t) (state : State.t) =
       ; completion = None
       ; scrolled_up = false
       ; skills = Skills.empty
+      ; toasts = List.filter m.toasts ~f:(fun t -> not t.error)
       }
     , cancel_btw m
       @ [ Command.Set_url_session state.session_id
@@ -692,7 +693,23 @@ let set_thinking (m : Model.t) level =
   | _ -> m, [ rpc "set_thinking" [ "thinking", str level ] ]
 ;;
 
-let set_model (m : Model.t) key = m, [ rpc "set_model" [ "model", str key ] ]
+let set_model (m : Model.t) key =
+  let set = rpc "set_model" [ "model", str key ] in
+  match List.find m.models ~f:(fun model -> String.equal model.key key) with
+  | Some model
+    when (not (List.is_empty m.auth)) && not (logged_in m model.provider) ->
+    let m, cmds =
+      toast
+        m
+        (sprintf
+           "%s needs %s, which is not logged in: /login %s logs in."
+           model.name
+           model.provider
+           model.provider)
+    in
+    m, set :: cmds
+  | _ -> m, [ set ]
+;;
 
 let set_draft (m : Model.t) ?cursor draft =
   { m with draft; cursor = Option.value cursor ~default:(String.length draft) }
@@ -874,12 +891,20 @@ let with_item (m : Model.t) arg ~f =
            (List.length listed))
 ;;
 
+(* On a phone the panel covers the page, so it takes the focus from the
+   editor behind it. *)
 let open_agents (m : Model.t) arg =
-  match arg with
-  | None ->
-    ( with_agents m ~f:(fun a -> { a with open_ = true; selected = None })
-    , [ list_subagents; list_jobs ] )
-  | Some arg -> with_item m arg ~f:select
+  let m, commands =
+    match arg with
+    | None ->
+      ( with_agents m ~f:(fun a -> { a with open_ = true; selected = None })
+      , [ list_subagents; list_jobs ] )
+    | Some arg -> with_item m arg ~f:select
+  in
+  ( m
+  , if m.narrow && m.agents.open_
+    then commands @ [ Command.Focus "agents-panel" ]
+    else commands )
 ;;
 
 let close_agents (m : Model.t) =
@@ -2405,6 +2430,8 @@ let invokes_skill ({ name; _ } : Slash.Parsed.t) =
 
 let send (m : Model.t) ~follow_up =
   let text = String.strip m.draft in
+  (* The errors were about what was sent before. *)
+  let m = { m with toasts = List.filter m.toasts ~f:(fun t -> not t.error) } in
   let sent (m : Model.t) =
     let history = History.add m.history text in
     ( { (set_draft m "") with history; completion = None }
@@ -2416,9 +2443,17 @@ let send (m : Model.t) ~follow_up =
     let m, cmds = shell m text in
     m, save @ (Command.Scroll_to_bottom :: cmds)
   | Some parsed when List.is_empty m.images && not (invokes_skill parsed) ->
+    let first_toast = m.next_toast in
     let m, save = sent m in
     let m, cmds = run_command m parsed in
-    m, save @ cmds
+    (* A command refused without doing anything stays to be corrected. *)
+    let refused =
+      List.exists m.toasts ~f:(fun t -> t.error && t.id >= first_toast)
+      && List.for_all cmds ~f:(function
+        | Expire_toast _ -> true
+        | _ -> false)
+    in
+    (if refused then set_draft m text else m), save @ cmds
   | _ when not (Connection.equal m.connection Connected) ->
     error
       m
@@ -2709,7 +2744,7 @@ let update (m : Model.t) (action : Action.t) =
   | Complete_close -> { m with completion = None }, []
   | New_session ->
     ( { m with sidebar_open = m.sidebar_open && not m.narrow }
-    , [ rpc "new_session" [] ~tag:Reload_state ] )
+    , [ rpc "new_session" [] ~tag:Reload_state; focus_editor ] )
   | Switch_session path -> switch_session m path
   | Ask_delete path ->
     (match List.find m.sessions ~f:(fun s -> String.equal s.path path) with

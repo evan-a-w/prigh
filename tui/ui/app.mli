@@ -61,6 +61,13 @@ module Reply_tag : sig
     | Mcp_picker
     | Mcp_reconnected
     | Mcp_approved of string (** server *)
+    | Retry_in_editor of
+        { command : string
+        ; hint : string
+        ; then_ : t
+        }
+    (** on failure the command goes back into the editor, with [hint] after
+        the error *)
   [@@deriving sexp_of, equal]
 end
 
@@ -143,7 +150,7 @@ module Model : sig
     ; skills : Skill_cache.t
     ; known_paths : String.Set.t
     ; queued : Queue_counts.t
-    ; queued_texts : string list
+    ; queued_messages : Queued_message.t list
     ; login_lines : string list
     ; viewport : Viewport.t
     ; pending_quit : bool
@@ -191,6 +198,9 @@ val init : Model.t
 val wheel_lines : int
 
 val format_tokens : int -> string
+
+(** [path] with the home directory shown as [~]. *)
+val tilde : Model.t -> string -> string
 
 (** Rows a picker lists at once (its page size), capped by the screen. *)
 val picker_rows : height:int -> int

@@ -193,17 +193,13 @@ let closest name =
   |> Option.map ~f:snd
 ;;
 
-let help : Content.t =
-  let rows =
-    List.map all ~f:(fun s -> usage s, s.help)
-  in
-  let width =
-    List.fold rows ~init:0 ~f:(fun acc (k, _) -> Int.max acc (String.length k))
-  in
-  List.map rows ~f:(fun (k, help) ->
-    [ { Content.Span.text = Text_width.pad_right k ~width
-      ; style = Style.bold Style.plain
-      }
-    ; { text = "  " ^ help; style = Style.plain }
-    ])
+let help = Help_table.render (List.map all ~f:(fun s -> usage s, s.help))
+
+let input_help =
+  Help_table.render
+    [ "!command", "run a shell command; its output joins the context"
+    ; "!!command", "run a shell command without adding it to the context"
+    ; "!&command", "run a shell command as a background job (/jobs)"
+    ; "@path", "attach a file (Ctrl+R completes paths)"
+    ]
 ;;

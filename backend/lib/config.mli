@@ -25,6 +25,11 @@ val start_model : t -> string option
     {!default}; unknown fields are ignored. *)
 val load : home:string -> t Or_error.t
 
+(** What is wrong with the file, each saying where and what to do: settings
+    of the wrong type (which make {!load} fail) and unknown top-level fields.
+    Unreadable or invalid JSON is {!read_fields}'s error, not repeated here. *)
+val problems : home:string -> string list
+
 (** Writes [~/.prigh/config.json], creating parent directories, as pretty
     JSON. Fields it does not own (such as [providers]) are kept. *)
 val save : home:string -> t -> unit Or_error.t

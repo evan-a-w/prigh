@@ -44,45 +44,45 @@ let%expect_test "/skills: a fuzzy picker; Enter puts /skill:NAME in the editor" 
   H.show h;
   [%expect
     {|
-    session abc123 in /work. /help for commands, Esc aborts,
-    Ctrl+C twice quits.
-    > earlier question
-    earlier answer
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+
+    ▌ earlier question
+      earlier answer
     Skills  (3)
     / ▏
     ▸  frontend-design  Build distinctive, production-grade UIs…
        release          Cut a release  ~/.prigh/skills/release …
        review           Review a diff  /work/.prigh/skills/revi…
     ────────────────────────────────────────────────────────────
-    …deepseek-flash  think:off  view:normal  ctx:0% 1.5k  $0.01
+    …deepseek-flash  ctx:0.1%/1.0M  Enter puts /skill:NAME in t…
     |}];
   H.keys h "rel";
   H.show h;
   [%expect
     {|
-    session abc123 in /work. /help for commands, Esc aborts,
-    Ctrl+C twice quits.
-    > earlier question
-    earlier answer
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+
+    ▌ earlier question
+      earlier answer
     Skills  (3)
     / rel▏
     ▸  release          Cut a release  ~/.prigh/skills/release …
        review           Review a diff  /work/.prigh/skills/revi…
        frontend-design  Build distinctive, production-grade UIs…
     ────────────────────────────────────────────────────────────
-    …deepseek-flash  think:off  view:normal  ctx:0% 1.5k  $0.01
+    …deepseek-flash  ctx:0.1%/1.0M  Enter puts /skill:NAME in t…
     |}];
   H.enter h;
   H.show h;
   [%expect
     {|
-    session abc123 in /work. /help for commands, Esc aborts,
-    Ctrl+C twice quits.
-    > earlier question
-    earlier answer
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+
+    ▌ earlier question
+      earlier answer
     ────────────────────────────────────────────────────────────
     > /skill:release ▏
-    …deepseek-flash  think:off  view:normal  ctx:0% 1.5k  $0.01
+    …deepseek-flash  think:off  ctx:0.1%/1.0M  $0.01
     |}];
   H.keys h "v1.2";
   H.enter h;
@@ -119,13 +119,13 @@ let%expect_test "/skills: Esc closes without side effects; none says where to \
 
 
 
-    session abc123 in /work. /help for commands, Esc aborts,
-    Ctrl+C twice quits.
-    > earlier question
-    earlier answer
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+
+    ▌ earlier question
+      earlier answer
     ────────────────────────────────────────────────────────────
     > ▏
-    …deepseek-flash  think:off  view:normal  ctx:0% 1.5k  $0.01
+    …deepseek-flash  think:off  ctx:0.1%/1.0M  $0.01
     |}];
   (* [/skill:] without a name is the picker too. *)
   H.keys h "/skill:";
@@ -145,16 +145,16 @@ let%expect_test "/skills: Esc closes without side effects; none says where to \
 
 
 
-    session abc123 in /work. /help for commands, Esc aborts,
-    Ctrl+C twice quits.
-    > earlier question
-    earlier answer
-    no skills here; add one as .prigh/skills/<name>/SKILL.md (or
-    .claude/skills/<name>/) in the project, or under
-    ~/.prigh/skills/
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+
+    ▌ earlier question
+      earlier answer
+      no skills here; add one as .prigh/skills/<name>/SKILL.md
+      (or .claude/skills/<name>/) in the project, or under
+      ~/.prigh/skills/
     ────────────────────────────────────────────────────────────
     > ▏
-    …deepseek-flash  think:off  view:normal  ctx:0% 1.5k  $0.01
+    …deepseek-flash  think:off  ctx:0.1%/1.0M  $0.01
     |}];
   H.keys h "/skills";
   H.enter h;
@@ -168,17 +168,17 @@ let%expect_test "/skills: Esc closes without side effects; none says where to \
 
 
 
-    session abc123 in /work. /help for commands, Esc aborts,
-    Ctrl+C twice quits.
-    > earlier question
-    earlier answer
-    no skills here; add one as .prigh/skills/<name>/SKILL.md (or
-    .claude/skills/<name>/) in the project, or under
-    ~/.prigh/skills/
-    unknown method list_skills
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+
+    ▌ earlier question
+      earlier answer
+      no skills here; add one as .prigh/skills/<name>/SKILL.md
+      (or .claude/skills/<name>/) in the project, or under
+      ~/.prigh/skills/
+      unknown method list_skills
     ────────────────────────────────────────────────────────────
     > ▏
-    …deepseek-flash  think:off  view:normal  ctx:0% 1.5k  $0.01
+    …deepseek-flash  think:off  ctx:0.1%/1.0M  $0.01
     |}]
 ;;
 
@@ -188,15 +188,15 @@ let%expect_test "/skill: completes skill names, fetched once per session" =
   H.show h;
   [%expect
     {|
-    session abc123 in /work. /help for commands, Esc aborts,
-    Ctrl+C twice quits.
-    > earlier question
-    earlier answer
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+
+    ▌ earlier question
+      earlier answer
     ────────────────────────────────────────────────────────────
     > /sk▏
     ▸ /skills             pick a skill to run (Enter puts /skil…
       /skill:NAME [args]  run a skill, with what follows as its…
-    …deepseek-flash  ctx:0% 1.5k  Tab/Enter accept · Esc close
+    …deepseek-flash  ctx:0.1%/1.0M  Tab/Enter accept · Esc close
     |}];
   (* Accepting [/skill:] goes straight on to the skill names. *)
   H.key h (Key.plain Down);
@@ -211,10 +211,10 @@ let%expect_test "/skill: completes skill names, fetched once per session" =
   H.show h;
   [%expect
     {|
-    session abc123 in /work. /help for commands, Esc aborts,
-    Ctrl+C twice quits.
-    > earlier question
-    earlier answer
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+
+    ▌ earlier question
+      earlier answer
     ────────────────────────────────────────────────────────────
     > /skill:▏
     …deepseek-flash  Tab accepts · Enter runs as typed · Esc
@@ -223,10 +223,10 @@ let%expect_test "/skill: completes skill names, fetched once per session" =
   H.show h;
   [%expect
     {|
-    session abc123 in /work. /help for commands, Esc aborts,
-    Ctrl+C twice quits.
-    > earlier question
-    earlier answer
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+
+    ▌ earlier question
+      earlier answer
     ────────────────────────────────────────────────────────────
     > /skill:▏
     ▸ frontend-design  Build distinctive, production-grade UIs
@@ -239,27 +239,27 @@ let%expect_test "/skill: completes skill names, fetched once per session" =
   H.show h;
   [%expect
     {|
-    session abc123 in /work. /help for commands, Esc aborts,
-    Ctrl+C twice quits.
-    > earlier question
-    earlier answer
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+
+    ▌ earlier question
+      earlier answer
     ────────────────────────────────────────────────────────────
     > /skill:fr▏
     ▸ frontend-design  Build distinctive, production-grade UIs
-    …deepseek-flash  ctx:0% 1.5k  Tab/Enter accept · Esc close
+    …deepseek-flash  ctx:0.1%/1.0M  Tab/Enter accept · Esc close
     |}];
   H.key h (Key.plain Tab);
   H.keys h "make it bold";
   H.show h;
   [%expect
     {|
-    session abc123 in /work. /help for commands, Esc aborts,
-    Ctrl+C twice quits.
-    > earlier question
-    earlier answer
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+
+    ▌ earlier question
+      earlier answer
     ────────────────────────────────────────────────────────────
     > /skill:frontend-design make it bold▏
-    …deepseek-flash  think:off  view:normal  ctx:0% 1.5k  $0.01
+    …deepseek-flash  think:off  ctx:0.1%/1.0M  $0.01
     |}];
   H.enter h;
   [%expect
@@ -296,10 +296,10 @@ let%expect_test "/skill: completes skill names, fetched once per session" =
   H.show h;
   [%expect
     {|
-    session abc123 in /work. /help for commands, Esc aborts,
-    Ctrl+C twice quits.
-    > earlier question
-    earlier answer
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+
+    ▌ earlier question
+      earlier answer
     ────────────────────────────────────────────────────────────
     > /skill:▏
     …deepseek-flash  Tab accepts · Enter runs as typed · Esc
@@ -308,10 +308,10 @@ let%expect_test "/skill: completes skill names, fetched once per session" =
   H.show h;
   [%expect
     {|
-    session abc123 in /work. /help for commands, Esc aborts,
-    Ctrl+C twice quits.
-    > earlier question
-    earlier answer
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+
+    ▌ earlier question
+      earlier answer
     ────────────────────────────────────────────────────────────
     > /skill:▏
     …deepseek-flash  Tab accepts · Enter runs as typed · Esc
@@ -329,16 +329,16 @@ let%expect_test "/skill: completes skill names, fetched once per session" =
 
 
 
-    session abc123 in /work. /help for commands, Esc aborts,
-    Ctrl+C twice quits.
-    > earlier question
-    earlier answer
-    no skills here; add one as .prigh/skills/<name>/SKILL.md (or
-    .claude/skills/<name>/) in the project, or under
-    ~/.prigh/skills/
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+
+    ▌ earlier question
+      earlier answer
+      no skills here; add one as .prigh/skills/<name>/SKILL.md
+      (or .claude/skills/<name>/) in the project, or under
+      ~/.prigh/skills/
     ────────────────────────────────────────────────────────────
     > ▏
-    …deepseek-flash  think:off  view:normal  ctx:0% 1.5k  $0.01
+    …deepseek-flash  think:off  ctx:0.1%/1.0M  $0.01
     |}];
   H.event h (State (state_for ~cwd:"/elsewhere" "s2"));
   H.keys h "/skill:";
@@ -431,10 +431,10 @@ let%expect_test "/skill: cache is reset by switching sessions, users and \
 
 
 
-    reconnected to the backend
+      reconnected to the backend
     ────────────────────────────────────────────────────────────
     > /skill:x▏
-    …deepseek-flash  think:off  view:normal  ctx:0% 1.5k  $0.01
+    …deepseek-flash  think:off  ctx:0.1%/1.0M  $0.01
     |}]
 ;;
 
@@ -464,15 +464,15 @@ let%expect_test "an unknown skill: the backend's error, and the text is back \
   H.show h;
   [%expect
     {|
-    session abc123 in /work. /help for commands, Esc aborts,
-    Ctrl+C twice quits.
-    > earlier question
-    earlier answer
-    unknown skill "fronted"; did you mean: frontend-design
-    (/skills lists them all)
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+
+    ▌ earlier question
+      earlier answer
+      unknown skill "fronted"; did you mean: frontend-design
+      (/skills lists them all)
     ────────────────────────────────────────────────────────────
     > /skill:fronted make it bold▏
-    …deepseek-flash  think:off  view:normal  ctx:0% 1.5k  $0.01
+    …deepseek-flash  think:off  ctx:0.1%/1.0M  $0.01
     |}];
   (* While a turn runs it is a steer (or, with Alt+Enter, a follow-up); a
      failure takes it off the queue. Text typed since stays. *)
@@ -501,18 +501,18 @@ let%expect_test "an unknown skill: the backend's error, and the text is back \
 
 
 
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
-
-    session abc123 in /work. /help for commands, Esc aborts,
-    Ctrl+C twice quits.
-    > earlier question
-    earlier answer
-    unknown skill "fronted"; did you mean: frontend-design
-    (/skills lists them all)
+    ▌ earlier question
+      earlier answer
+      unknown skill "fronted"; did you mean: frontend-design
+      (/skills lists them all)
     ────────────────────────────────────────────────────────────
-    queued (2): /skill:revew now ∣ /skill:review later
+    queued (2) · Alt+Up edits the last
+      steer      /skill:revew now
+      follow-up  /skill:review later
     > draft▏
-    …deepseek-flash  $0.01  ⠋ working (Esc aborts; Enter steers)
+    …deepseek-flash  ⠋ working · Esc aborts · Enter steers
     |}];
   H.reply_error
     h
@@ -521,18 +521,20 @@ let%expect_test "an unknown skill: the backend's error, and the text is back \
   H.show h;
   [%expect
     {|
-    session abc123 in /work. /help for commands, Esc aborts,
-    Ctrl+C twice quits.
-    > earlier question
-    earlier answer
-    unknown skill "fronted"; did you mean: frontend-design
-    (/skills lists them all)
-    unknown skill "revew"; did you mean: review (/skills lists
-    them all)
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+
+    ▌ earlier question
+      earlier answer
+      unknown skill "fronted"; did you mean: frontend-design
+      (/skills lists them all)
+      unknown skill "revew"; did you mean: review (/skills lists
+      them all)
     ────────────────────────────────────────────────────────────
-    queued (2): /skill:review later
+    queued (2) · Alt+Up edits the last
+      follow-up  /skill:review later
+      +1 more
     > draft▏
-    …deepseek-flash  $0.01  ⠋ working (Esc aborts; Enter steers)
+    …deepseek-flash  ⠋ working · Esc aborts · Enter steers
     |}]
 ;;
 
@@ -543,51 +545,58 @@ let%expect_test "skill messages render compactly; verbose shows the skill file" 
   H.show h;
   [%expect
     {|
-    session abc123 in /work. /help for commands, Esc aborts,
-    Ctrl+C twice quits.
-    > earlier question
-    earlier answer
-    > skill frontend-design
-    > make it bold
-    > and blue
-    > skill frontend-design
-    ────────────────────────────────────────────────────────────
-    > ▏
-    …deepseek-flash  think:off  view:normal  ctx:0% 1.5k  $0.01
-    |}];
-  H.key h (Key.ctrl 'o');
-  H.show h;
-  [%expect
-    {|
-      # Frontend design
-      Pick a bold aesthetic direction.
-    > make it bold
-    > and blue
-    > skill frontend-design
-    /work/.claude/skills/frontend-design/SKILL.md
-      References are relative to
-    /work/.claude/skills/frontend-design.
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
-      # Frontend design
-      Pick a bold aesthetic direction.
-    view: verbose — everything is shown
+    ▌ earlier question
+      earlier answer
+
+    ▌ skill frontend-design
+    ▌ make it bold
+    ▌ and blue
+
+    ▌ skill frontend-design
     ────────────────────────────────────────────────────────────
     > ▏
-    …deepseek-flash  think:off  view:verbose  ctx:0% 1.5k  $0.01
+    …deepseek-flash  think:off  ctx:0.1%/1.0M  $0.01
     |}];
   H.key h (Key.ctrl 'o');
   H.show h;
   [%expect
     {|
-    > earlier question
-    earlier answer
-    > skill frontend-design
-    > make it bold
-    > and blue
-    > skill frontend-design
+    ▌ # Frontend design
+    ▌ Pick a bold aesthetic direction.
+    ▌ make it bold
+    ▌ and blue
+
+    ▌ skill frontend-design
+    ▌ /work/.claude/skills/frontend-design/SKILL.md
+    ▌ References are relative to
+    ▌ /work/.claude/skills/frontend-design.
+    ▌
+    ▌ # Frontend design
+    ▌ Pick a bold aesthetic direction.
+      view: verbose — everything is shown
     ────────────────────────────────────────────────────────────
     > ▏
-    …deepseek-flash  think:off  view:quiet  ctx:0% 1.5k  $0.01
+    /work  deepseek-flash  think:off  ctx:0.1%/1.0M  $0.01
+    |}];
+  H.key h (Key.ctrl 'o');
+  H.show h;
+  [%expect
+    {|
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+
+    ▌ earlier question
+      earlier answer
+
+    ▌ skill frontend-design
+    ▌ make it bold
+    ▌ and blue
+
+    ▌ skill frontend-design
+    ────────────────────────────────────────────────────────────
+    > ▏
+    …deepseek-flash  think:off  view:quiet  ctx:0.1%/1.0M  $0.01
     |}];
   (* Ctrl+Up jumps to them like to any user message. *)
   H.key h (Key.ctrl 'o');
@@ -596,43 +605,43 @@ let%expect_test "skill messages render compactly; verbose shows the skill file" 
   H.show h;
   [%expect
     {|
-    > skill frontend-design
-    /work/.claude/skills/frontend-design/SKILL.md
-      References are relative to
-    /work/.claude/skills/frontend-design.
+    ▌ skill frontend-design
+    ▌ /work/.claude/skills/frontend-design/SKILL.md
+    ▌ References are relative to
+    ▌ /work/.claude/skills/frontend-design.
+    ▌
+    ▌ # Frontend design
+    ▌ Pick a bold aesthetic direction.
+    ▌ make it bold
+    ▌ and blue
 
-      # Frontend design
-      Pick a bold aesthetic direction.
-    > make it bold
-    > and blue
-    > skill frontend-design
-    /work/.claude/skills/frontend-design/SKILL.md
-      References are relative to
-    /work/.claude/skills/frontend-design.
+    ▌ skill frontend-design
+    ▌ /work/.claude/skills/frontend-design/SKILL.md
+    ▌ References are relative to
     ────────────────────────────────────────────────────────────
     > ▏
-    …deepseek-flash  think:off  ctx:0% 1.5k  $0.01  ↑ scrolled
+    …deepseek-flash  think:off  ctx:0.1%/1.0M  $0.01  ↑ scrolled
     |}];
   H.key h { (Key.plain Up) with ctrl = true };
   H.show h;
   [%expect
     {|
-    > earlier question
-    earlier answer
-    > skill frontend-design
-    /work/.claude/skills/frontend-design/SKILL.md
-      References are relative to
-    /work/.claude/skills/frontend-design.
+    ▌ earlier question
+      earlier answer
 
-      # Frontend design
-      Pick a bold aesthetic direction.
-    > make it bold
-    > and blue
-    > skill frontend-design
-    /work/.claude/skills/frontend-design/SKILL.md
+    ▌ skill frontend-design
+    ▌ /work/.claude/skills/frontend-design/SKILL.md
+    ▌ References are relative to
+    ▌ /work/.claude/skills/frontend-design.
+    ▌
+    ▌ # Frontend design
+    ▌ Pick a bold aesthetic direction.
+    ▌ make it bold
+    ▌ and blue
+
     ────────────────────────────────────────────────────────────
     > ▏
-    …deepseek-flash  think:off  ctx:0% 1.5k  $0.01  ↑ scrolled
+    …deepseek-flash  think:off  ctx:0.1%/1.0M  $0.01  ↑ scrolled
     |}]
 ;;
 
@@ -656,16 +665,16 @@ let%expect_test "/fork lists and restores a skill message as /skill:NAME ARGS" =
 
 
 
-    session abc123 in /work. /help for commands, Esc aborts,
-    Ctrl+C twice quits.
-    > earlier question
-    earlier answer
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+
+    ▌ earlier question
+      earlier answer
     Fork at  (2)
     / ▏
        hello                           #1
     ▸* /skill:frontend-design make it bold  #2
     ────────────────────────────────────────────────────────────
-    …deepseek-flash  ctx:0% 1.5k  Enter selects · Esc closes
+    …deepseek-flash  ctx:0.1%/1.0M  Enter selects · Esc closes
     |}];
   H.enter h;
   H.show h;
@@ -681,13 +690,13 @@ let%expect_test "/fork lists and restores a skill message as /skill:NAME ARGS" =
 
 
 
-    session abc123 in /work. /help for commands, Esc aborts,
-    Ctrl+C twice quits.
-    > earlier question
-    earlier answer
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+
+    ▌ earlier question
+      earlier answer
     ────────────────────────────────────────────────────────────
     > /skill:frontend-design make it bold▏
-    …deepseek-flash  think:off  view:normal  ctx:0% 1.5k  $0.01
+    …deepseek-flash  think:off  ctx:0.1%/1.0M  $0.01
     |}]
 ;;
 
@@ -709,11 +718,12 @@ let%expect_test "/mcp: servers with their status; Enter lists tools, explains \
   H.show h;
   [%expect
     {|
-    session abc123 in /work. /help for commands, Esc aborts, Ctrl+C twice quits.
-    > earlier question
-    earlier answer
-    MCP config: /work/.mcp.json: server "x": give a "command" (stdio) or a "url"
-    (http)
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+
+    ▌ earlier question
+      earlier answer
+      MCP config: /work/.mcp.json: server "x": give a "command" (stdio) or a "url"
+      (http)
     MCP servers  (3)
     / ▏
     ▸  fs  ready, 2 tools  /home/u/.prigh/mcp.json
@@ -726,17 +736,18 @@ let%expect_test "/mcp: servers with their status; Enter lists tools, explains \
   H.show h;
   [%expect
     {|
-    session abc123 in /work. /help for commands, Esc aborts, Ctrl+C twice quits.
-    > earlier question
-    earlier answer
-    MCP config: /work/.mcp.json: server "x": give a "command" (stdio) or a "url"
-    (http)
-    fs  2 tools  /home/u/.prigh/mcp.json
-      mcp__fs__read_file  Read a file
-      mcp__fs__list       List a directory
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+
+    ▌ earlier question
+      earlier answer
+      MCP config: /work/.mcp.json: server "x": give a "command" (stdio) or a "url"
+      (http)
+      fs  2 tools  /home/u/.prigh/mcp.json
+        mcp__fs__read_file  Read a file
+        mcp__fs__list       List a directory
     ────────────────────────────────────────────────────────────────────────────────
     > ▏
-    /work  deepseek-flash  think:off  view:normal  ctx:0% 1.5k  $0.01
+    /work  deepseek-flash  think:off  view:normal  ctx:0.1%/1.0M  $0.01
     |}];
   H.keys h "/mcp";
   H.enter h;
@@ -748,22 +759,22 @@ let%expect_test "/mcp: servers with their status; Enter lists tools, explains \
   [%expect
     {|
     (Rpc (method_ list_mcp) (params ()) (tag Mcp_picker))
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
-    session abc123 in /work. /help for commands, Esc aborts, Ctrl+C twice quits.
-    > earlier question
-    earlier answer
-    MCP config: /work/.mcp.json: server "x": give a "command" (stdio) or a "url"
-    (http)
-    fs  2 tools  /home/u/.prigh/mcp.json
-      mcp__fs__read_file  Read a file
-      mcp__fs__list       List a directory
-    MCP config: /work/.mcp.json: server "x": give a "command" (stdio) or a "url"
-    (http)
-    gh failed: exited with 1: gh-mcp: command not found; check its entry in
-    /work/.mcp.json, then /mcp reconnect
+    ▌ earlier question
+      earlier answer
+      MCP config: /work/.mcp.json: server "x": give a "command" (stdio) or a "url"
+      (http)
+      fs  2 tools  /home/u/.prigh/mcp.json
+        mcp__fs__read_file  Read a file
+        mcp__fs__list       List a directory
+      MCP config: /work/.mcp.json: server "x": give a "command" (stdio) or a "url"
+      (http)
+      gh failed: exited with 1: gh-mcp: command not found; check its entry in
+      /work/.mcp.json, then /mcp reconnect
     ────────────────────────────────────────────────────────────────────────────────
     > ▏
-    /work  deepseek-flash  think:off  view:normal  ctx:0% 1.5k  $0.01
+    /work  deepseek-flash  think:off  view:normal  ctx:0.1%/1.0M  $0.01
     |}];
   H.keys h "/mcp";
   H.enter h;
@@ -781,22 +792,22 @@ let%expect_test "/mcp: servers with their status; Enter lists tools, explains \
         (source /work/.mcp.json)
         (server db)))
       (tag (Mcp_approved db)))
-    earlier answer
-    MCP config: /work/.mcp.json: server "x": give a "command" (stdio) or a "url"
-    (http)
-    fs  2 tools  /home/u/.prigh/mcp.json
-      mcp__fs__read_file  Read a file
-      mcp__fs__list       List a directory
-    MCP config: /work/.mcp.json: server "x": give a "command" (stdio) or a "url"
-    (http)
-    gh failed: exited with 1: gh-mcp: command not found; check its entry in
-    /work/.mcp.json, then /mcp reconnect
-    MCP config: /work/.mcp.json: server "x": give a "command" (stdio) or a "url"
-    (http)
-    approving db from /work/.mcp.json…
+      earlier answer
+      MCP config: /work/.mcp.json: server "x": give a "command" (stdio) or a "url"
+      (http)
+      fs  2 tools  /home/u/.prigh/mcp.json
+        mcp__fs__read_file  Read a file
+        mcp__fs__list       List a directory
+      MCP config: /work/.mcp.json: server "x": give a "command" (stdio) or a "url"
+      (http)
+      gh failed: exited with 1: gh-mcp: command not found; check its entry in
+      /work/.mcp.json, then /mcp reconnect
+      MCP config: /work/.mcp.json: server "x": give a "command" (stdio) or a "url"
+      (http)
+      approving db from /work/.mcp.json…
     ────────────────────────────────────────────────────────────────────────────────
     > ▏
-    /work  deepseek-flash  think:off  view:normal  ctx:0% 1.5k  $0.01
+    /work  deepseek-flash  think:off  view:normal  ctx:0.1%/1.0M  $0.01
     |}];
   (* The reply is the new list: the picker comes back with it. *)
   H.reply
@@ -810,15 +821,15 @@ let%expect_test "/mcp: servers with their status; Enter lists tools, explains \
   H.show h;
   [%expect
     {|
-      mcp__fs__list       List a directory
-    MCP config: /work/.mcp.json: server "x": give a "command" (stdio) or a "url"
-    (http)
-    gh failed: exited with 1: gh-mcp: command not found; check its entry in
-    /work/.mcp.json, then /mcp reconnect
-    MCP config: /work/.mcp.json: server "x": give a "command" (stdio) or a "url"
-    (http)
-    approving db from /work/.mcp.json…
-    approved db: ready, 1 tool
+        mcp__fs__list       List a directory
+      MCP config: /work/.mcp.json: server "x": give a "command" (stdio) or a "url"
+      (http)
+      gh failed: exited with 1: gh-mcp: command not found; check its entry in
+      /work/.mcp.json, then /mcp reconnect
+      MCP config: /work/.mcp.json: server "x": give a "command" (stdio) or a "url"
+      (http)
+      approving db from /work/.mcp.json…
+      approved db: ready, 1 tool
     MCP servers  (3)
     / ▏
     ▸  fs  ready, 2 tools  /home/u/.prigh/mcp.json
@@ -844,22 +855,22 @@ let%expect_test "/mcp: servers with their status; Enter lists tools, explains \
   H.show h;
   [%expect
     {|
-      mcp__fs__read_file  Read a file
-      mcp__fs__list       List a directory
-    MCP config: /work/.mcp.json: server "x": give a "command" (stdio) or a "url"
-    (http)
-    gh failed: exited with 1: gh-mcp: command not found; check its entry in
-    /work/.mcp.json, then /mcp reconnect
-    MCP config: /work/.mcp.json: server "x": give a "command" (stdio) or a "url"
-    (http)
-    approving db from /work/.mcp.json…
-    approved db: ready, 1 tool
-    approving MCP server db failed: no MCP server "db" in /work/.mcp.json
-    approved db, but it failed: connection refused; check its entry in
-    /work/.mcp.json, then /mcp reconnect
+        mcp__fs__read_file  Read a file
+        mcp__fs__list       List a directory
+      MCP config: /work/.mcp.json: server "x": give a "command" (stdio) or a "url"
+      (http)
+      gh failed: exited with 1: gh-mcp: command not found; check its entry in
+      /work/.mcp.json, then /mcp reconnect
+      MCP config: /work/.mcp.json: server "x": give a "command" (stdio) or a "url"
+      (http)
+      approving db from /work/.mcp.json…
+      approved db: ready, 1 tool
+      approving MCP server db failed: no MCP server "db" in /work/.mcp.json
+      approved db, but it failed: connection refused; check its entry in
+      /work/.mcp.json, then /mcp reconnect
     ────────────────────────────────────────────────────────────────────────────────
     > draft▏
-    /work  deepseek-flash  think:off  view:normal  ctx:0% 1.5k  $0.01
+    /work  deepseek-flash  think:off  view:normal  ctx:0.1%/1.0M  $0.01
     |}]
 ;;
 
@@ -876,20 +887,20 @@ let%expect_test "/mcp reconnect reports every server; no servers says where to \
     (Rpc (method_ list_mcp) (params ((reconnect true))) (tag Mcp_reconnected))
 
 
-    session abc123 in /work. /help for commands, Esc aborts,
-    Ctrl+C twice quits.
-    > earlier question
-    earlier answer
-    reconnecting MCP servers…
-    MCP config: /work/.mcp.json: server "x": give a "command"
-    (stdio) or a "url" (http)
-    fs  ready, 2 tools  /home/u/.prigh/mcp.json
-    gh  failed: exited with 1: gh-mcp: command not found
-    /work/.mcp.json
-    db  needs approval  /work/.mcp.json
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+
+    ▌ earlier question
+      earlier answer
+      reconnecting MCP servers…
+      MCP config: /work/.mcp.json: server "x": give a "command"
+      (stdio) or a "url" (http)
+      fs  ready, 2 tools  /home/u/.prigh/mcp.json
+      gh  failed: exited with 1: gh-mcp: command not found
+      /work/.mcp.json
+      db  needs approval  /work/.mcp.json
     ────────────────────────────────────────────────────────────
     > ▏
-    …deepseek-flash  think:off  view:normal  ctx:0% 1.5k  $0.01
+    …deepseek-flash  think:off  ctx:0.1%/1.0M  $0.01
     |}];
   H.keys h "/mcp";
   H.enter h;
@@ -901,22 +912,22 @@ let%expect_test "/mcp reconnect reports every server; no servers says where to \
   [%expect
     {|
     (Rpc (method_ list_mcp) (params ()) (tag Mcp_picker))
-    Ctrl+C twice quits.
-    > earlier question
-    earlier answer
-    reconnecting MCP servers…
-    MCP config: /work/.mcp.json: server "x": give a "command"
-    (stdio) or a "url" (http)
-    fs  ready, 2 tools  /home/u/.prigh/mcp.json
-    gh  failed: exited with 1: gh-mcp: command not found
-    /work/.mcp.json
-    db  needs approval  /work/.mcp.json
-    no MCP servers; configure servers under "mcpServers" in
-    ~/.prigh/mcp.json or a project's .mcp.json
-    usage: /mcp [reconnect]
+
+    ▌ earlier question
+      earlier answer
+      reconnecting MCP servers…
+      MCP config: /work/.mcp.json: server "x": give a "command"
+      (stdio) or a "url" (http)
+      fs  ready, 2 tools  /home/u/.prigh/mcp.json
+      gh  failed: exited with 1: gh-mcp: command not found
+      /work/.mcp.json
+      db  needs approval  /work/.mcp.json
+      no MCP servers; configure servers under "mcpServers" in
+      ~/.prigh/mcp.json or a project's .mcp.json
+      usage: /mcp [reconnect]
     ────────────────────────────────────────────────────────────
     > ▏
-    …deepseek-flash  think:off  view:normal  ctx:0% 1.5k  $0.01
+    …deepseek-flash  think:off  ctx:0.1%/1.0M  $0.01
     |}]
 ;;
 
@@ -929,16 +940,16 @@ let%expect_test "/help lists the skill and MCP commands" =
   H.show h;
   [%expect
     {|
-    session abc123 in /work. /help for commands, Esc aborts,
-    Ctrl+C twice quits.
-    > earlier question
-    earlier answer
-    /skill:NAME [args]  run a skill, with what follows as its
-    arguments
-    /mcp [reconnect]  list MCP servers (Enter approves one or
-    lists its tools); reconnect restarts failed ones
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+
+    ▌ earlier question
+      earlier answer
+      /skill:NAME [args]  run a skill, with what follows as its
+      arguments
+      /mcp [reconnect]  list MCP servers (Enter approves one or
+      lists its tools); reconnect restarts failed ones
     ────────────────────────────────────────────────────────────
     > ▏
-    …deepseek-flash  think:off  view:normal  ctx:0% 1.5k  $0.01
+    …deepseek-flash  think:off  ctx:0.1%/1.0M  $0.01
     |}]
 ;;

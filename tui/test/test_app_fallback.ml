@@ -67,19 +67,19 @@ let%expect_test
   H.show h;
   [%expect
     {|
-    session abc123 in /work. /help for commands, Esc aborts,
-    Ctrl+C twice quits.
-    > earlier question
-    earlier answer
-    no fallback models: /fallback MODEL [MODEL...] sets the
-    chain that takes over when a model's usage runs out
-    no fallback models: /fallback MODEL [MODEL...] sets the
-    chain that takes over when a model's usage runs out
-    fallback: anthropic/claude-fable-5-1 →
-    deepseek/deepseek-flash (now on deepseek/deepseek-flash)
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+
+    ▌ earlier question
+      earlier answer
+      no fallback models: /fallback MODEL [MODEL...] sets the
+      chain that takes over when a model's usage runs out
+      no fallback models: /fallback MODEL [MODEL...] sets the
+      chain that takes over when a model's usage runs out
+      fallback: anthropic/claude-fable-5-1 →
+      deepseek/deepseek-flash (now on deepseek/deepseek-flash)
     ────────────────────────────────────────────────────────────
     > ▏
-    …deepseek-flash  think:off  view:normal  ctx:0% 1.5k  $0.01
+    …deepseek-flash  think:off  ctx:0.1%/1.0M  $0.01
     |}]
 ;;
 
@@ -92,10 +92,10 @@ let%expect_test
   H.show h;
   [%expect
     {|
-    session abc123 in /work. /help for commands, Esc aborts,
-    Ctrl+C twice quits.
-    > earlier question
-    earlier answer
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+
+    ▌ earlier question
+      earlier answer
     ────────────────────────────────────────────────────────────
     > /fallback ▏
     ▸ off                  no fallback: a model whose usage run…
@@ -111,10 +111,10 @@ let%expect_test
   H.show h;
   [%expect
     {|
-    session abc123 in /work. /help for commands, Esc aborts,
-    Ctrl+C twice quits.
-    > earlier question
-    earlier answer
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+
+    ▌ earlier question
+      earlier answer
     ────────────────────────────────────────────────────────────
     > /fallback anthropic/claude-fable-5-1 ▏
     ▸ Claude Fable 5       anthropic/claude-fable-5
@@ -146,15 +146,15 @@ let%expect_test
   H.show h;
   [%expect
     {|
-    session abc123 in /work. /help for commands, Esc aborts,
-    Ctrl+C twice quits.
-    > earlier question
-    earlier answer
-    fallback: anthropic/claude-fable-5-1 →
-    deepseek/deepseek-flash (now on deepseek/deepseek-flash)
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+
+    ▌ earlier question
+      earlier answer
+      fallback: anthropic/claude-fable-5-1 →
+      deepseek/deepseek-flash (now on deepseek/deepseek-flash)
     ────────────────────────────────────────────────────────────
     > ▏
-    …deepseek-flash  think:off  view:normal  ctx:0% 1.5k  $0.01
+    …deepseek-flash  think:off  ctx:0.1%/1.0M  $0.01
     |}];
   (* Names and prefixes are the backend's to resolve, like /model's. *)
   H.keys h "/fallback gpt-5.5 zzz";
@@ -173,17 +173,17 @@ let%expect_test
   H.show h;
   [%expect
     {|
-    session abc123 in /work. /help for commands, Esc aborts,
-    Ctrl+C twice quits.
-    > earlier question
-    earlier answer
-    fallback: anthropic/claude-fable-5-1 →
-    deepseek/deepseek-flash (now on deepseek/deepseek-flash)
-    fallback_models: unknown model "zzz"; did you mean:
-    openai/gpt-5.5 (GPT-5.5)
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+
+    ▌ earlier question
+      earlier answer
+      fallback: anthropic/claude-fable-5-1 →
+      deepseek/deepseek-flash (now on deepseek/deepseek-flash)
+      fallback_models: unknown model "zzz"; did you mean:
+      openai/gpt-5.5 (GPT-5.5)
     ────────────────────────────────────────────────────────────
     > /fallback gpt-5.5 zzz▏
-    …deepseek-flash  think:off  view:normal  ctx:0% 1.5k  $0.01
+    …deepseek-flash  think:off  ctx:0.1%/1.0M  $0.01
     |}];
   print_s [%sexp (h.model.config : P.Config.t option)];
   [%expect
@@ -213,15 +213,15 @@ let%expect_test "/fallback off clears the chain" =
   H.show h;
   [%expect
     {|
-    session abc123 in /work. /help for commands, Esc aborts,
-    Ctrl+C twice quits.
-    > earlier question
-    earlier answer
-    no fallback models: /fallback MODEL [MODEL...] sets the
-    chain that takes over when a model's usage runs out
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+
+    ▌ earlier question
+      earlier answer
+      no fallback models: /fallback MODEL [MODEL...] sets the
+      chain that takes over when a model's usage runs out
     ────────────────────────────────────────────────────────────
     > ▏
-    …deepseek-flash  think:off  view:normal  ctx:0% 1.5k  $0.01
+    …deepseek-flash  think:off  ctx:0.1%/1.0M  $0.01
     |}]
 ;;
 
@@ -247,17 +247,17 @@ let%expect_test
   H.show h;
   [%expect
     {|
-    session abc123 in /work. /help for commands, Esc aborts,
-    Ctrl+C twice quits.
-    > earlier question
-    earlier answer
-    no default directory: /default-dir PATH makes new sessions
-    start there
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+
+    ▌ earlier question
+      earlier answer
+      no default directory: /default-dir PATH makes new sessions
+      start there
     ────────────────────────────────────────────────────────────
     > /default-dir ~/p▏
     ▸ ~/proj/
       ~/play/
-    …deepseek-flash  ctx:0% 1.5k  Tab/Enter accept · Esc close
+    …deepseek-flash  ctx:0.1%/1.0M  Tab/Enter accept · Esc close
     |}];
   H.enter h;
   [%expect
@@ -303,20 +303,20 @@ let%expect_test
       (method_ set_config)
       (params ((config ((default_cwd "/no such")))))
       (tag (Default_dir_saved "/default-dir /no such")))
-    > earlier question
-    earlier answer
-    no default directory: /default-dir PATH makes new sessions
-    start there
-    default directory: ~/proj/ (new sessions start there;
-    /default-dir off clears it)
-    default directory: ~/proj/ (new sessions start there;
-    /default-dir off clears it)
-    no default directory: /default-dir PATH makes new sessions
-    start there
-    cannot save /home/u/.prigh/config.json: Permission denied
+    ▌ earlier question
+      earlier answer
+      no default directory: /default-dir PATH makes new sessions
+      start there
+      default directory: ~/proj/ (new sessions start there;
+      /default-dir off clears it)
+      default directory: ~/proj/ (new sessions start there;
+      /default-dir off clears it)
+      no default directory: /default-dir PATH makes new sessions
+      start there
+      cannot save /home/u/.prigh/config.json: Permission denied
     ────────────────────────────────────────────────────────────
     > /default-dir /no such▏
-    …deepseek-flash  think:off  view:normal  ctx:0% 1.5k  $0.01
+    …deepseek-flash  think:off  ctx:0.1%/1.0M  $0.01
     |}]
 ;;
 
@@ -383,20 +383,20 @@ let%expect_test
     {|
     (Rpc (method_ prompt) (params ((text "fix the bug"))) (tag Show_error))
     (Append_history "fix the bug")
-    > earlier question
-    earlier answer
-    > fix the bug
-    error: HTTP 429: The usage limit has been reached (usage
-    limit reached)
-    deepseek/deepseek-flash: HTTP 429: The usage limit has been
-    reached (usage limit reached); handing over to
-    anthropic/claude-fable-5-1
-    ↪ handed over from deepseek/deepseek-flash to
-    anthropic/claude-fable-5-1
-    fixed it
+      earlier answer
+
+    ▌ fix the bug
+      error: HTTP 429: The usage limit has been reached (usage
+      limit reached)
+      deepseek/deepseek-flash: HTTP 429: The usage limit has
+      been reached (usage limit reached); handing over to
+      anthropic/claude-fable-5-1
+      ↪ handed over from deepseek/deepseek-flash to
+      anthropic/claude-fable-5-1
+      fixed it
     ────────────────────────────────────────────────────────────
     > ▏
-    …claude-fable-5-1  think:off  ctx:0% 1.5k  $0.01
+    /work  claude-fable-5-1  think:off  ctx:0.1%/1.0M  $0.01
     |}];
   (* Verbose adds the error; quiet keeps the line. *)
   H.keys h "/verbosity verbose";
@@ -407,34 +407,34 @@ let%expect_test
   H.show h;
   [%expect
     {|
-    > fix the bug
-    error: HTTP 429: The usage limit has been reached (usage
-    limit reached)
-    deepseek/deepseek-flash: HTTP 429: The usage limit has been
-    reached (usage limit reached); handing over to
-    anthropic/claude-fable-5-1
-    ↪ handed over from deepseek/deepseek-flash to
-    anthropic/claude-fable-5-1 (HTTP 429: The usage limit has
-    been reached (usage limit reached))
-    fixed it
-    view: verbose — everything is shown
+    ▌ fix the bug
+      error: HTTP 429: The usage limit has been reached (usage
+      limit reached)
+      deepseek/deepseek-flash: HTTP 429: The usage limit has
+      been reached (usage limit reached); handing over to
+      anthropic/claude-fable-5-1
+      ↪ handed over from deepseek/deepseek-flash to
+      anthropic/claude-fable-5-1 (HTTP 429: The usage limit has
+      been reached (usage limit reached))
+      fixed it
+      view: verbose — everything is shown
     ────────────────────────────────────────────────────────────
     > ▏
-    /work  claude-fable-5-1  think:off  ctx:0% 1.5k  $0.01
+    /work  claude-fable-5-1  think:off  ctx:0.1%/1.0M  $0.01
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
+    ▌ earlier question
+      earlier answer
 
-
-    > earlier question
-    earlier answer
-    > fix the bug
-    error: HTTP 429: The usage limit has been reached (usage
-    limit reached)
-    ↪ handed over from deepseek/deepseek-flash to
-    anthropic/claude-fable-5-1
-    fixed it
+    ▌ fix the bug
+      error: HTTP 429: The usage limit has been reached (usage
+      limit reached)
+      ↪ handed over from deepseek/deepseek-flash to
+      anthropic/claude-fable-5-1
+      fixed it
     ────────────────────────────────────────────────────────────
     > ▏
-    …claude-fable-5-1  think:off  view:quiet  ctx:0% 1.5k  $0.01
+    /work  claude-fable-5-1  think:off  ctx:0.1%/1.0M  $0.01
     |}]
 ;;
 
@@ -461,31 +461,32 @@ let%expect_test "a hand-over in the history and in /fork's list" =
   H.show h;
   [%expect
     {|
-    session abc123 in /work. /help for commands, Esc aborts,
-    Ctrl+C twice quits.
-    > earlier question
-    earlier answer
-    > fix the bug
-    ↪ handed over from deepseek/deepseek-flash to
-    anthropic/claude-fable-5-1
-    fixed it
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+
+    ▌ earlier question
+      earlier answer
+
+    ▌ fix the bug
+      ↪ handed over from deepseek/deepseek-flash to
+      anthropic/claude-fable-5-1
+      fixed it
     ────────────────────────────────────────────────────────────
     > ▏
-    …deepseek-flash  think:off  view:normal  ctx:0% 1.5k  $0.01
+    …deepseek-flash  think:off  ctx:0.1%/1.0M  $0.01
     (Rpc (method_ get_entries) (params ()) (tag Entries_for_fork))
-    session abc123 in /work. /help for commands, Esc aborts,
-    Ctrl+C twice quits.
-    > earlier question
-    earlier answer
-    > fix the bug
-    ↪ handed over from deepseek/deepseek-flash to
-    anthropic/claude-fable-5-1
-    fixed it
+
+    ▌ earlier question
+      earlier answer
+
+    ▌ fix the bug
+      ↪ handed over from deepseek/deepseek-flash to
+      anthropic/claude-fable-5-1
+      fixed it
     Fork at  (2)
     / ▏
        fix the bug                     #1
     ▸* ↪ handed over from deepseek/deepseek-flash to anthropic/…
     ────────────────────────────────────────────────────────────
-    …deepseek-flash  ctx:0% 1.5k  Enter selects · Esc closes
+    …deepseek-flash  ctx:0.1%/1.0M  Enter selects · Esc closes
     |}]
 ;;

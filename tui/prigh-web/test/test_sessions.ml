@@ -135,6 +135,7 @@ let%expect_test "switching resets what belonged to the old session" =
     {|{"event":"tool_confirm","call_id":"c1","name":"bash","summary":"rm -rf build"}|};
   [%expect {| (Focus confirm) |}];
   H.act h (Run "/btw why?");
+  H.act h (Show_toast { text = "Agent a9 has already finished."; error = true });
   H.type_ h "/mo";
   [%expect
     {|
@@ -176,12 +177,13 @@ let%expect_test "switching resets what belonged to the old session" =
         (m.queue : int * int)
         (List.length m.confirms : int)
         (Option.is_some m.btw : bool)
-        (Option.is_some m.completion : bool)];
+        (Option.is_some m.completion : bool)
+        (List.length m.toasts : int)];
   [%expect
     {|
     (("(Prigh_web.Chat.entries m.chat) |> List.length" 0) (m.queue (0 0))
      ("List.length m.confirms" 0) ("Option.is_some m.btw" false)
-     ("Option.is_some m.completion" false))
+     ("Option.is_some m.completion" false) ("List.length m.toasts" 0))
     |}];
   H.reply h "list_sessions" sessions;
   H.text h ~selector:".session.selected .session-title";
@@ -253,7 +255,11 @@ let%expect_test
 let%expect_test "new session" =
   let h = H.create ~sessions () in
   H.act h New_session;
-  [%expect {| (Rpc (method_ new_session) (params ()) (tag Reload_state)) |}];
+  [%expect
+    {|
+    (Rpc (method_ new_session) (params ()) (tag Reload_state))
+    (Focus editor)
+    |}];
   H.act h (Edit { text = "/new"; cursor = 4 });
   H.key h "Enter";
   [%expect
@@ -427,6 +433,7 @@ let%expect_test "new session and switching session reload the state" =
   [%expect
     {|
     (Rpc (method_ new_session) (params ()) (tag Reload_state))
+    (Focus editor)
     (Rpc (method_ get_state) (params ()) (tag State))
     (Set_url_session s2)
     (Rpc (method_ get_messages) (params ()) (tag (Messages s2)))

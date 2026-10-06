@@ -40,7 +40,8 @@ val run
     the connection fails or drops. Every [hello] carries the same [host_id]
     (default: a random {!Host_id.generate}; [prigh tool-host] passes
     {!Host_id.load_or_create}'s), so the backend sees a reconnect as the
-    same host and its sessions resume on it. Never returns; [log] defaults to
+    same host and its sessions resume on it. Returns only when the backend
+    refuses the credentials (retrying cannot help then); [log] defaults to
     stderr. *)
 val connect
   :  env:Env.t
@@ -56,4 +57,4 @@ val connect
   -> name:string
   -> cwd:string
   -> unit
-  -> _
+  -> Error.t

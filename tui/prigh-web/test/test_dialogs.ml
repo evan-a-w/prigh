@@ -53,6 +53,50 @@ let%expect_test "tool confirmations own the keyboard: Enter allows, Esc denies" 
   [%expect {| (Focus confirm) |}]
 ;;
 
+let%expect_test "a dialog makes the page behind it inert: Tab stays in it" =
+  let h = H.create () in
+  let inert () = H.elements h ~selector:"[inert]" in
+  inert ();
+  [%expect {| |}];
+  H.act h Open_help;
+  inert ();
+  [%expect
+    {|
+    (Focus dialog)
+    <aside class="sidebar">
+    <main class="main">
+    |}];
+  H.key h "Escape" ~target:Page;
+  inert ();
+  [%expect
+    {|
+    Close_dialog
+    (Focus editor)
+    |}];
+  (* The agents panel too, and under a tool's confirmation. *)
+  H.act h Toggle_subagents;
+  H.event h (confirm "c1" "rm -rf build");
+  inert ();
+  [%expect
+    {|
+    (Rpc (method_ list_subagents) (params ()) (tag Subagents))
+    (Rpc (method_ list_jobs) (params ()) (tag Jobs))
+    (Focus confirm)
+    <aside class="sidebar">
+    <main class="main">
+    <aside class="agents-panel">
+    |}];
+  H.key h "Escape" ~target:Page;
+  inert ();
+  [%expect
+    {|
+    (Respond_confirm (call_id c1) (allow false))
+    (Rpc (method_ tool_confirm_respond) (params ((call_id c1) (allow false)))
+     (tag Show_error))
+    (Focus editor)
+    |}]
+;;
+
 let%expect_test "Enter on a focused button of a confirmation is that button's" =
   let h = H.create () in
   H.event h (confirm "c1" "rm -rf build");
@@ -493,4 +537,23 @@ let%expect_test "signing out" =
     (Save_history (/signout))
     Sign_out
     |}]
+;;
+
+let%expect_test "on a phone the agents panel is a sheet with the keyboard" =
+  let h = H.create () in
+  let inert () = H.elements h ~selector:"[inert]" in
+  H.act h (Set_narrow true);
+  H.act h Toggle_subagents;
+  inert ();
+  [%expect
+    {|
+    (Rpc (method_ list_subagents) (params ()) (tag Subagents))
+    (Rpc (method_ list_jobs) (params ()) (tag Jobs))
+    (Focus agents-panel)
+    <aside class="sidebar">
+    <main class="main">
+    |}];
+  H.act h Toggle_subagents;
+  inert ();
+  [%expect {| |}]
 ;;

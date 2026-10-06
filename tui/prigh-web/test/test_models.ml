@@ -38,12 +38,16 @@ let%expect_test
     (Dialog_move 1)
     GPT-6 openai · 200k ctx · not logged in
     |}];
+  (* It switches, and says how to log in to its provider. *)
   H.key h "Enter" ~target:Field;
+  H.text h ~selector:".toast";
   [%expect
     {|
     Dialog_accept
     (Focus editor)
     (Rpc (method_ set_model) (params ((model openai/gpt-6))) (tag Show_error))
+    (Expire_toast (id 0) (after_ms 4000))
+    GPT-6 needs openai, which is not logged in: /login openai logs in.
     |}];
   H.text h ~selector:".modal";
   [%expect {| |}];
@@ -65,6 +69,7 @@ let%expect_test
     (Focus editor)
     (Rpc (method_ set_model) (params ((model deepseek/deepseek-chat)))
      (tag Show_error))
+    (Expire_toast (id 1) (after_ms 4000))
     |}];
   H.act h Open_model_picker;
   H.act h (Picker_query "zz");
@@ -104,7 +109,7 @@ let%expect_test "/model with a name switches, or says what matches" =
     {|
     (Focus editor)
     (Save_history ("/model gemini" "/model claude" "/model sonnet"))
-    No model matches "gemini". Did you mean GPT-6, DeepSeek Chat, Claude Sonnet 5? Ctrl+L lists them all.
+    No model matches "gemini". Ctrl+L lists them all.
     |}]
 ;;
 
@@ -161,7 +166,6 @@ let%expect_test "thinking: a picker and /thinking, when the model supports it" =
   [%expect
     {|
     (Save_history ("/thinking high" "/thinking lots" "/thinking max"))
-    Unknown thinking level "lots": use off, low, on, high, max.
     DeepSeek Chat has no thinking levels: switch to a model that thinks with /model
     |}]
 ;;

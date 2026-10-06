@@ -469,7 +469,9 @@ two can share one.
   `confirm_tools : bool`, `default_model`/`default_thinking`,
   `fallback_models` (model keys) and `default_cwd`), loaded at agent
   creation, read/written through `get_config`/`set_config`; unknown fields
-  are ignored. Each namespace has its own file, so each has its own
+  are ignored by `load` but reported by `problems` (with wrong-typed ones),
+  which `Model_registry` adds to its problems along with an unknown
+  `default_model`. Each namespace has its own file, so each has its own
   defaults. `set_config` merges the given fields over the current ones and
   resolves `fallback_models` like `set_model` (stored as keys). A new
   session starts in `default_cwd` (on the backend host) and on
@@ -589,6 +591,9 @@ two can share one.
   response is `{btw_id, text, usage, cost_usd}`. `btw_cancel {btw_id}`
   (or the client disconnecting) cancels it. Its usage is added to the
   in-memory `State.usage`/`cost_usd` like subagents'.
+- `Net_error` — a failed bind or connect as a short phrase ("address
+  already in use", "connection refused") instead of Eio's exception dump,
+  for `prigh serve`'s listeners and `prigh tool-host -connect`.
 - `Websocket` — a minimal RFC 6455 server side (handshake key, frame
   encode/decode with client masking, fragment reassembly, ping/pong and
   close) and `Web_server` — the `-web` listener: a connection whose first
@@ -707,7 +712,8 @@ killed), `tool-host` (the local tool worker), `run <prompt>`
 `logout <provider>`, `auth`. All commands share `-auth-file`; `run`/`serve`
 share `-model`, `-thinking`, `-session`, `-cwd`, `-no-tools`, `-faux` (and
 `-faux-script FILE`, a JSON array of scripted replies that implies `-faux`);
-for `serve`, `-session` is the default session, the one a client lands on
+`-session` takes a saved session's id, a unique prefix of it, or its file;
+for `serve`, it is the default session, the one a client lands on
 when its `hello` names none; without it every new client starts in a fresh
 session of its own (sharing one is explicit: `hello` with the session id or
 path, which is also how a frontend reattaches after a reconnect). With no explicit model, a new
@@ -765,7 +771,10 @@ copy of the protocol types and the e2e test guards the contract.
     pastes, persistent history), `Picker` (fuzzy list with `Fuzzy` ranking),
     `Transcript` (items plus streaming tails; `Transcript.apply` is the one
     event→transcript function, used for the main transcript and each
-    subagent), `Viewport` (`Follow | Anchored`, so new output never pushes an
+    subagent; it renders items as `Log_line`s, lines with a two-column
+    gutter that holds a turn's bar or a step's mark and survives wrapping,
+    and each tool call through `Tool_render`, which reads arguments with
+    `Tool_args` (shared with prigh-web's `Tool_view`)), `Viewport` (`Follow | Anchored`, so new output never pushes an
     anchored view), `Verbosity` (quiet/normal/verbose), `Autocomplete`
     (inline command/argument/path completion), `Agent_view` (per-subagent
     transcript and status; the app keeps an agent while it runs or while
@@ -813,9 +822,16 @@ copy of the protocol types and the e2e test guards the contract.
   - `Render.screen : Model.t -> Screen.t` lays out a frame as `Content.t`
     (styled spans with `Text_width`-aware wrapping) plus the cursor cell. The
     status line keeps the cwd and model, then fills remaining width by
-    priority (context, cost/queued/agents/jobs, thinking, verbosity, new-line
-    count, mode hint) and left-truncates, so the model key stays visible at
-    narrow widths.
+    priority (mode hint, scroll position, context, queued/agents/jobs, cost,
+    thinking, verbosity; a mode hint too wide to fit whole is cut short after
+    the context) and left-truncates, so the model key stays visible at
+    narrow widths. It is gray; yellow marks modes, running work and warm
+    context, red a full context or a lost backend.
+  - `Queued_message` tracks what this client steered or queued while a turn
+    runs (kind and text), shown above the editor; a delivered user message,
+    `dequeue` or an empty `queue_update` removes them.
+  - Replies tagged `Retry_in_editor` put the command back in the editor
+    with a hint when the backend refuses it (`/switch`, `/cd`).
 - `term/` (`prigh_ui_term`) — `Key_of_event` (Bonsai_term events → `Key.t`,
   bracketed paste → one `Insert`), `View_of_content` (spans → notty attrs,
   including OSC-8 links),
@@ -965,7 +981,8 @@ copy of the protocol types and the e2e test guards the contract.
       `list_paths`) and `History`, `Dialog`/`Dialog_view`/`Modal`
       (pickers built on `Picker`, help, rename, delete, the login flow
       `Login_flow` — also a custom provider's logout question — tool
-      confirmations), `Command_dialog_view` (`/hotkeys`, `/scoped-models`,
+      confirmations; while one shows, `View` makes the page behind it
+      `inert`), `Command_dialog_view` (`/hotkeys`, `/scoped-models`,
       `Prompt` — a path with the backend's completions whose failures stay
       in the dialog, for `/cd`, `/host`, `/export`, `/import` — `/rewind`'s
       confirmation, `/session`, text), `Session_tree` (`get_entries`
@@ -1011,7 +1028,8 @@ copy of the protocol types and the e2e test guards the contract.
     another user; the clipboard; switching accounts, which activates one
     and loads the page for its backend and session; adding one, which
     shows the sign-in form on the next load; scrolling), and installs
-    document listeners: keys (through `Keys`),
+    document listeners: keys (through `Keys`; a Tab no binding takes goes
+    round the open dialog),
     pasted and dropped image files become attachments (PNG, JPEG, GIF,
     WebP, sent with the prompt as base64; others get a toast), the narrow
     (phone) layout, a clock for ages and toasts, and the chat following new
@@ -1116,6 +1134,12 @@ tool calls say it waits for the host, the host reconnecting with the same
 host, and a newer connection taking over a held host id. The real
 `prigh tool-host` reconnecting with its id is in `test_tool_host.ml`,
 terminals routed by host id in `test_terminal_relay.ml`.
+
+`backend/test/test_cli.ml` runs the built `prigh` binary in a sandboxed
+`HOME` and prints what the user sees for wrong input: bad flag values,
+running without a login, `-session` by id, broken `config.json` and
+`auth.json`, a taken `-listen`/`-web` port and a tool host whose token the
+backend refuses. Each error names the flag or file and what to do next.
 
 `backend/test/test_pi_rpc.ml` drives `Pi_rpc` over in-memory lines
 (pi commands in, pi events out) for prompts, steering, confirmations,

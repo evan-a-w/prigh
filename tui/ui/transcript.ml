@@ -112,7 +112,7 @@ let mark_final t =
   { t with items_rev = go t.items_rev }
 ;;
 
-let tail_lines = 5
+let tail_lines = Tool_render.live_tail_lines
 
 let update_tail previous chunk =
   let combined = Option.value previous ~default:"" ^ chunk in
@@ -200,293 +200,18 @@ let add_message t (m : P.Message.t) =
      | End_turn | Tool_use -> t)
 ;;
 
-let gray = Style.fg Gray
-let dim = Style.dim Style.plain
-let red = Style.fg Red
-let green = Style.fg Green
-let magenta = Style.fg Magenta
-let cyan = Style.fg Cyan
-
-let summarise_arguments (call : P.Tool_call.t) =
-  match P.Json.parse call.arguments with
-  | Ok (`Object fields) ->
-    String.concat
-      ~sep:" "
-      (List.map fields ~f:(fun (key, value) ->
-         let shown =
-           match value with
-           | `String s -> s
-           | other -> P.Json.to_string other
-         in
-         let one_line = String.concat ~sep:"⏎" (String.split_lines shown) in
-         key ^ "=" ^ Text_width.truncate one_line ~width:80))
-  | _ -> call.arguments
-;;
-
-let first_string_argument (call : P.Tool_call.t) =
-  match P.Json.parse call.arguments with
-  | Ok (`Object fields) ->
-    List.find_map fields ~f:(fun (_, value) ->
-      match value with
-      | `String s -> Some s
-      | _ -> None)
-  | _ -> None
-;;
-
-let rec pretty_json ?(indent = 0) (json : P.Json.t) : string list =
-  let pad = String.make indent ' ' in
-  match json with
-  | `Object [] -> [ pad ^ "{}" ]
-  | `Object fields ->
-    ((pad ^ "{")
-     :: List.concat_map fields ~f:(fun (key, value) ->
-       match value with
-       | `Object _ | `Array _ ->
-         sprintf "%s  %s:" pad key :: pretty_json ~indent:(indent + 4) value
-       | _ -> [ sprintf "%s  %s: %s" pad key (P.Json.to_string value) ]))
-    @ [ pad ^ "}" ]
-  | `Array [] -> [ pad ^ "[]" ]
-  | `Array items ->
-    ((pad ^ "[")
-     :: List.concat_map items ~f:(fun item ->
-       pretty_json ~indent:(indent + 2) item))
-    @ [ pad ^ "]" ]
-  | _ -> [ pad ^ P.Json.to_string json ]
-;;
-
-let count_lines text = List.length (String.split_lines (String.rstrip text))
-let plural_lines n = if n = 1 then "1 line" else sprintf "%d lines" n
-
-let plural_images = function
-  | [] -> ""
-  | [ _ ] -> ", 1 image"
-  | images -> sprintf ", %d images" (List.length images)
-;;
-
-let render_images images : Content.t =
-  List.map images ~f:(fun image ->
-    Content.Line.of_string ~style:cyan ("  " ^ P.Image.to_string_hum image))
-;;
-
-let first_line text =
-  match String.split_lines text with
-  | first :: _ -> first
-  | [] -> ""
-;;
-
-let render_call (call : P.Tool_call.t) : Content.t =
-  [ [ { Content.Span.text = "⚙ " ^ call.name; style = magenta }
-    ; { text = " " ^ summarise_arguments call; style = dim }
-    ]
-  ]
-;;
-
-let render_call_full (call : P.Tool_call.t) : Content.t =
-  let header : Content.Line.t =
-    [ { Content.Span.text = "⚙ " ^ call.name; style = magenta } ]
-  in
-  let arguments =
-    match P.Json.parse call.arguments with
-    | Ok json ->
-      List.map (pretty_json json) ~f:(fun line ->
-        Content.Line.of_string ~style:dim ("  " ^ line))
-    | Error _ -> Content.lines ~style:dim call.arguments
-  in
-  header :: arguments
-;;
-
-let render_result ?(show_more = true) (r : P.Message.Tool_result.t) ~max_lines
-  : Content.t
-  =
-  let lines = String.split_lines (String.rstrip r.text) in
-  let shown = List.take lines max_lines in
-  let more =
-    if show_more && List.length lines > max_lines
-    then [ sprintf "… (%d more)" (List.length lines - max_lines) ]
-    else []
-  in
-  let style = if r.is_error then red else gray in
-  List.map (shown @ more) ~f:(fun line ->
-    Content.Line.of_string ~style ("  " ^ line))
-;;
-
-let is_diff text = String.is_prefix text ~prefix:"--- a/"
-
-let diff_style line =
-  if String.is_prefix line ~prefix:"+++" || String.is_prefix line ~prefix:"---"
-  then dim
-  else if String.is_prefix line ~prefix:"@@"
-  then Style.fg Cyan
-  else if String.is_prefix line ~prefix:"+"
-  then green
-  else if String.is_prefix line ~prefix:"-"
-  then red
-  else gray
-;;
-
-let render_diff ?(max_lines = Int.max_value) text : Content.t =
-  let lines = String.split_lines (String.rstrip text) in
-  let shown = List.take lines max_lines in
-  let more =
-    if List.length lines > max_lines
-    then [ sprintf "… (%d more)" (List.length lines - max_lines) ]
-    else []
-  in
-  List.map (shown @ more) ~f:(fun line ->
-    Content.Line.of_string ~style:(diff_style line) ("  " ^ line))
-;;
-
-let render_bash ?(head = 5) ?(tail = 3) (r : P.Message.Tool_result.t)
-  : Content.t
-  =
-  let lines = String.split_lines (String.rstrip r.text) in
-  let count = List.length lines in
-  let selected =
-    if count <= head + tail
-    then lines
-    else
-      List.take lines head
-      @ [ sprintf "… (%d lines hidden)" (count - head - tail) ]
-      @ List.drop lines (count - tail)
-  in
-  let base = if r.is_error then red else gray in
-  List.map selected ~f:(fun line ->
-    let style = if String.is_prefix line ~prefix:"… (" then dim else base in
-    Content.Line.of_string ~style ("  " ^ line))
-;;
-
-let render_live_tail live_tail ~max_lines : Content.t =
-  match live_tail with
-  | None -> []
-  | Some text ->
-    let lines = String.split_lines text in
-    let lines = List.drop lines (Int.max 0 (List.length lines - max_lines)) in
-    List.map lines ~f:(fun line ->
-      Content.Line.of_string ~style:gray ("  " ^ line))
-;;
-
-let timed_out text =
-  List.find_map (String.split_lines text) ~f:(fun line ->
-    match
-      String.chop_prefix (String.strip line) ~prefix:"[timed out after "
-    with
-    | Some rest -> String.chop_suffix rest ~suffix:"]"
-    | None -> None)
-;;
-
-let merged_tool_line
-  (call : P.Tool_call.t)
-  (result : P.Message.Tool_result.t option)
-  : Content.Line.t
-  =
-  let argument =
-    match first_string_argument call with
-    | Some s when not (String.is_empty (String.strip s)) ->
-      " "
-      ^ Text_width.truncate
-          (String.concat ~sep:" " (String.split_lines s))
-          ~width:60
-    | _ -> ""
-  in
-  match Option.bind result ~f:(fun r -> timed_out r.text) with
-  | Some t ->
-    [ { Content.Span.text = "⚙ " ^ call.name; style = magenta }
-    ; { text = argument; style = dim }
-    ; { text = " ✗"; style = red }
-    ; { text = " timed out after " ^ t; style = red }
-    ]
-  | None ->
-    let status, style, count =
-      match result with
-      | None -> "…", Style.fg Yellow, ""
-      | Some r ->
-        ( (if r.is_error then "✗" else "✓")
-        , (if r.is_error then red else green)
-        , " " ^ plural_lines (count_lines r.text) ^ plural_images r.images )
-    in
-    (match result with
-     | Some r when r.is_error ->
-       Content.Line.of_string
-         ~style:red
-         (sprintf "⚙ %s%s %s%s" call.name argument status count)
-     | _ ->
-       [ { Content.Span.text = "⚙ " ^ call.name; style = magenta }
-       ; { text = argument; style = dim }
-       ; { text = " " ^ status; style }
-       ; { text = count; style = dim }
-       ])
-;;
-
-let render_tool
-  ~(verbosity : Verbosity.t)
-  (call : P.Tool_call.t)
-  result
-  live_tail
-  : Content.t
-  =
-  match verbosity with
-  | Quiet ->
-    let merged = merged_tool_line call result in
-    (match result with
-     | Some r when r.is_error ->
-       (merged :: render_result ~show_more:false r ~max_lines:3)
-       @ render_images r.images
-     | _ -> [ merged ])
-  | Normal ->
-    (match result with
-     | Some r when Option.is_some (timed_out r.text) ->
-       [ merged_tool_line call result ]
-     | _ ->
-       let output =
-         match result with
-         | None -> render_live_tail live_tail ~max_lines:1
-         | Some r ->
-           (if r.is_error
-            then render_result r ~max_lines:8
-            else if is_diff r.text
-            then render_diff r.text ~max_lines:5
-            else if String.equal call.name "bash"
-            then render_bash r
-            else render_result r ~max_lines:5)
-           @ render_images r.images
-       in
-       render_call call @ output)
-  | Verbose ->
-    let output =
-      match result with
-      | None -> render_live_tail live_tail ~max_lines:tail_lines
-      | Some r ->
-        (if is_diff r.text
-         then render_diff r.text
-         else render_result r ~max_lines:Int.max_value)
-        @ render_images r.images
-    in
-    render_call_full call @ output
-;;
-
-let subagent_task_quoted task =
-  let one_line = String.concat ~sep:" " (String.split_lines task) in
-  "\"" ^ Text_width.truncate one_line ~width:50 ^ "\""
+let one_line text =
+  Text_width.truncate
+    (String.concat ~sep:" " (String.split_lines (String.strip text)))
+    ~width:60
 ;;
 
 let assistant_text (a : P.Message.Assistant.t) =
   String.concat
     ~sep:"\n"
     (List.filter_map a.content ~f:(function
-      | P.Content.Text text -> Some text
-      | P.Content.Thinking _ | P.Content.Tool_call _ -> None))
-;;
-
-let tool_line (call : P.Tool_call.t) =
-  let short text =
-    Text_width.truncate
-      (String.concat ~sep:" " (String.split_lines text))
-      ~width:60
-  in
-  match first_string_argument call with
-  | Some s when not (String.is_empty (String.strip s)) ->
-    sprintf "⚙ %s %s" call.name (short s)
-  | _ -> "⚙ " ^ call.name
+       | P.Content.Text text -> Some text
+       | P.Content.Thinking _ | P.Content.Tool_call _ -> None))
 ;;
 
 let update_tool_subagent t ~call_id ~f =
@@ -504,7 +229,7 @@ let update_tool_subagent t ~call_id ~f =
 let rec update_subagent (s : Subagent.t) (event : P.Event.t) =
   match event with
   | P.Event.Tool_start call ->
-    let line = tool_line call in
+    let line = Tool_render.summary call in
     { s with last_tool = Some line; nested = s.nested @ [ line ] }
   | P.Event.Turn_start -> { s with turns = s.turns + 1 }
   | P.Event.Message_end (P.Message.Assistant a) ->
@@ -513,7 +238,7 @@ let rec update_subagent (s : Subagent.t) (event : P.Event.t) =
     then s
     else { s with report = Some text }
   | P.Event.Subagent_start { task; _ } ->
-    let line = sprintf "⚙ subagent %s" (subagent_task_quoted task) in
+    let line = "subagent " ^ one_line task in
     { s with last_tool = Some line; nested = s.nested @ [ line ] }
   | P.Event.Subagent { event; _ } -> update_subagent s event
   | _ -> s
@@ -546,12 +271,12 @@ let mark_subagent t ~call_id ~agent_id ~task ~model =
 ;;
 
 let finish_subagent
-  t
-  ~call_id
-  ~agent_id
-  ~turns
-  ~cost_usd
-  (result : P.Event.Subagent_result.t)
+      t
+      ~call_id
+      ~agent_id
+      ~turns
+      ~cost_usd
+      (result : P.Event.Subagent_result.t)
   =
   let status =
     if result.is_error
@@ -650,79 +375,92 @@ let apply t (event : P.Event.t) =
   | P.Event.Config_changed _ -> t
 ;;
 
-let render_report ~max_lines text : Content.t =
-  let lines = String.split_lines (String.rstrip text) in
-  let shown = List.take lines max_lines in
-  let more =
-    if List.length lines > max_lines
-    then [ sprintf "… (%d more)" (List.length lines - max_lines) ]
-    else []
-  in
-  List.map (shown @ more) ~f:(fun line ->
-    Content.Line.of_string ~style:gray ("  " ^ line))
+let gray = Style.fg Gray
+let dim = Style.dim Style.plain
+let red = Style.fg Red
+let green = Style.fg Green
+let yellow = Style.fg Yellow
+let cyan = Style.fg Cyan
+
+let lines_at ?(depth = 1) ~style text =
+  List.map
+    (String.split_lines (String.rstrip text))
+    ~f:(fun line -> Log_line.indent ~depth (Content.Line.of_string ~style line))
 ;;
 
-let render_subagent ~(verbosity : Verbosity.t) (s : Subagent.t) : Content.t =
-  let status_text, status_style =
+let report ?(style = gray) ~(verbosity : Verbosity.t) text =
+  match verbosity with
+  | Quiet -> []
+  | Normal -> Tool_render.output ~style ~head:5 text
+  | Verbose -> Tool_render.output ~style ~head:Int.max_value text
+;;
+
+let cancelled report =
+  List.exists (String.split_lines report) ~f:(fun line ->
+    String.equal (String.strip line) "[cancelled]")
+;;
+
+let render_subagent ~verbosity ~width (s : Subagent.t) =
+  let chip = Tool_render.chip in
+  let turns n = if n = 1 then "1 turn" else sprintf "%d turns" n in
+  let mark, chips =
     match s.status with
-    | Subagent.Status.Running -> sprintf "… %d turns" s.turns, Style.fg Yellow
-    | Subagent.Status.Done { turns; cost_usd } ->
-      sprintf "✓ %d turns $%.2f" turns cost_usd, green
-    | Subagent.Status.Failed _ -> "✗ failed", red
+    | Running ->
+      ( Tool_render.Mark.Running
+      , if s.turns > 0 then [ chip (turns s.turns) ] else [] )
+    | Done { turns = n; cost_usd } ->
+      Done, [ chip (turns n); chip (sprintf "$%.2f" cost_usd) ]
+    | Failed message when cancelled message -> Interrupted, [ chip "cancelled" ]
+    | Failed _ -> Failed, [ chip ~style:red "failed" ]
   in
-  let header : Content.Line.t =
-    [ { Content.Span.text = "⚙ subagent"; style = magenta }
-    ; { text = " " ^ subagent_task_quoted s.task; style = dim }
-    ; { text = " " ^ status_text; style = status_style }
-    ]
+  let header =
+    Tool_render.header
+      ~width
+      ~mark
+      ~name:"subagent"
+      ~arg:(one_line s.task)
+      chips
   in
-  match s.status with
-  | Subagent.Status.Running ->
-    header
-    :: List.map (Option.to_list s.last_tool) ~f:(fun line ->
-      Content.Line.of_string ~style:gray ("  " ^ line))
-  | Subagent.Status.Failed message ->
-    (match verbosity with
-     | Quiet -> [ header ]
-     | Normal -> header :: render_report ~max_lines:5 message
-     | Verbose -> header :: render_report ~max_lines:Int.max_value message)
-  | Subagent.Status.Done _ ->
-    (match verbosity with
-     | Quiet -> [ header ]
-     | Normal ->
-       header :: render_report ~max_lines:5 (Option.value s.report ~default:"")
-     | Verbose ->
-       header
-       :: (List.map s.nested ~f:(fun line ->
-             Content.Line.of_string ~style:gray ("  " ^ line))
-           @ render_report
-               ~max_lines:Int.max_value
-               (Option.value s.report ~default:"")))
+  let step line =
+    Log_line.indent ~depth:2 [ { text = "↳ " ^ line; style = gray } ]
+  in
+  header
+  ::
+  (match s.status with
+   | Running -> List.map (Option.to_list s.last_tool) ~f:step
+   | Failed message ->
+     report ~style:(if cancelled message then gray else red) ~verbosity message
+   | Done _ ->
+     let nested =
+       match verbosity with
+       | Verbose -> List.map s.nested ~f:step
+       | Quiet | Normal -> []
+     in
+     nested @ report ~verbosity (Option.value s.report ~default:""))
 ;;
 
-let user_prompt = "> "
-let user_prompt_style = Style.bold (Style.fg Green)
+(* The user's turn starts with a blank line and carries the bar. *)
+let turn_bar : Content.Span.t = { text = "▌"; style = yellow }
 
-let render_user text images : Content.t =
-  let line text style : Content.Line.t =
-    [ { Content.Span.text = user_prompt; style = user_prompt_style }
-    ; { text; style }
-    ]
-  in
-  List.map (String.split_lines text) ~f:(fun l ->
-    line l (Style.bold Style.plain))
-  @ List.map images ~f:(fun image -> line (P.Image.to_string_hum image) cyan)
+let user_lines text images =
+  List.map (String.split_lines text) ~f:(fun line ->
+    Log_line.bar
+      turn_bar
+      (Content.Line.of_string ~style:(Style.bold Style.plain) line))
+  @ List.map images ~f:(fun image ->
+    Log_line.bar
+      turn_bar
+      (Content.Line.of_string ~style:cyan (P.Image.to_string_hum image)))
 ;;
+
+let turn_start = Log_line.flush []
 
 (* The skill's file is long and the user did not type it: a header stands for
    it, and only verbose mode shows it. *)
-let render_skill (skill : Skill_message.t) images ~(verbosity : Verbosity.t)
-  : Content.t
-  =
+let render_skill (skill : Skill_message.t) images ~(verbosity : Verbosity.t) =
   let header : Content.Line.t =
-    [ { Content.Span.text = user_prompt; style = user_prompt_style }
-    ; { text = "skill "; style = magenta }
-    ; { text = skill.name; style = Style.bold magenta }
+    [ { text = "skill "; style = dim }
+    ; { text = skill.name; style = Style.bold Style.plain }
     ]
   in
   let header, body =
@@ -731,48 +469,67 @@ let render_skill (skill : Skill_message.t) images ~(verbosity : Verbosity.t)
     | Verbose ->
       ( header @ [ { text = "  " ^ skill.location; style = dim } ]
       , List.map (String.split_lines skill.body) ~f:(fun line ->
-          Content.Line.of_string ~style:dim ("  " ^ line)) )
+          Log_line.bar turn_bar (Content.Line.of_string ~style:dim line)) )
   in
-  (header :: body) @ render_user skill.args images
+  (turn_start :: Log_line.bar turn_bar header :: body)
+  @ user_lines skill.args images
 ;;
 
-let render_item (item : Item.t) ~(verbosity : Verbosity.t) : Content.t =
+let thinking_rail : Content.Span.t = { text = "┆"; style = dim }
+
+let render_thinking text ~(verbosity : Verbosity.t) =
+  let lines = String.split_lines (String.strip text) in
+  let lines =
+    match verbosity with
+    | Quiet -> []
+    | Normal when List.length lines > 3 -> List.take lines 3 @ [ "…" ]
+    | Normal | Verbose -> lines
+  in
+  List.map lines ~f:(fun line ->
+    Log_line.bar
+      thinking_rail
+      (Content.Line.of_string ~style:(Style.italic dim) line))
+;;
+
+let rows (item : Item.t) ~(verbosity : Verbosity.t) ~width : Log_line.t list =
+  let markdown text =
+    let width =
+      if width = Int.max_value
+      then None
+      else Some (width - Log_line.gutter_width)
+    in
+    List.map (Markdown.render ?width text) ~f:Log_line.indent
+  in
   match item with
-  | User { text; images; at = _ } -> render_user text images
+  | User { text; images; at = _ } -> turn_start :: user_lines text images
   | Skill { skill; images } -> render_skill skill images ~verbosity
   | Handover handover ->
-    let header : Content.Span.t =
-      { text = Handover_message.summary handover; style = magenta }
+    let summary : Content.Span.t =
+      { text = Handover_message.summary handover; style = yellow }
     in
     (* The failed reply above it already shows the error. *)
     (match verbosity with
-     | Quiet | Normal -> [ [ header ] ]
+     | Quiet | Normal -> [ Log_line.indent [ summary ] ]
      | Verbose ->
-       [ [ header; { text = sprintf " (%s)" handover.error; style = dim } ] ])
+       [ Log_line.indent
+           [ summary; { text = sprintf " (%s)" handover.error; style = dim } ]
+       ])
   | Assistant { text; final } ->
     (match verbosity with
      | Quiet when not final ->
-       let more =
-         if List.length (String.split_lines (String.strip text)) > 1
-         then Content.lines ~style:dim "…"
-         else []
+       let first =
+         match String.split_lines (String.strip text) with
+         | first :: _ :: _ -> first ^ " …"
+         | [ first ] -> first
+         | [] -> ""
        in
-       Markdown.render (first_line text) @ more
-     | Quiet | Normal | Verbose -> Markdown.render text)
-  | Thinking text ->
-    (match verbosity with
-     | Quiet -> []
-     | Normal ->
-       let lines = List.take (String.split_lines text) 3 in
-       List.map lines ~f:(fun line ->
-         Content.Line.of_string ~style:dim ("  " ^ line))
-     | Verbose ->
-       List.map (String.split_lines text) ~f:(fun line ->
-         Content.Line.of_string ~style:dim ("  " ^ line)))
+       markdown first
+     | Quiet | Normal | Verbose -> markdown text)
+  | Thinking text -> render_thinking text ~verbosity
   | Tool { call; result; live_tail; subagent } ->
     (match subagent with
-     | Some s -> render_subagent ~verbosity s
-     | None -> render_tool ~verbosity call result live_tail)
+     | Some s -> render_subagent ~verbosity ~width s
+     | None -> Tool_render.render ~verbosity ~width call result ~live_tail)
   | Notice (severity, text) ->
     (match verbosity, severity with
      | Quiet, (Info | Debug) -> []
@@ -780,38 +537,41 @@ let render_item (item : Item.t) ~(verbosity : Verbosity.t) : Content.t =
      | _ ->
        let style =
          match severity with
-         | Debug -> Style.dim Style.plain
-         | Info -> Style.fg Yellow
-         | Warn -> Style.bold (Style.fg Yellow)
-         | Error -> Style.bold (Style.fg Red)
+         | Debug -> dim
+         | Info -> yellow
+         | Warn -> Style.bold yellow
+         | Error -> Style.bold red
        in
-       Content.lines ~style text)
-  | Block content -> content
+       lines_at ~style text)
+  | Block content -> List.map content ~f:(Log_line.indent ~depth:1)
   | Delivery text ->
     List.concat_map
       (Option.value (Delivery.parse text) ~default:[])
       ~f:(fun (section : Delivery.Section.t) ->
-        let header : Content.Line.t =
-          [ { Content.Span.text = sprintf "↩ %s %s" section.kind section.id
-            ; style = magenta
-            }
-          ; { text = " " ^ section.status
-            ; style = (if section.ok then green else red)
-            }
-          ; { text = " " ^ subagent_task_quoted section.task; style = dim }
-          ]
+        let header =
+          Log_line.mark
+            { text = "↩"; style = (if section.ok then green else red) }
+            [ { text = section.kind; style = Style.bold Style.plain }
+            ; { text = " " ^ section.id; style = Style.plain }
+            ; { text = " \"" ^ one_line section.task ^ "\""; style = dim }
+            ; { text = "  " ^ section.status
+              ; style = (if section.ok then dim else red)
+              }
+            ]
         in
-        let body = String.concat ~sep:"\n" section.body in
-        match verbosity with
-        | Quiet -> [ header ]
-        | Normal -> header :: render_report ~max_lines:5 body
-        | Verbose -> header :: render_report ~max_lines:Int.max_value body)
+        header :: report ~verbosity (String.concat ~sep:"\n" section.body))
   | Compaction summary ->
-    let heading = Content.lines ~style:(Style.fg Cyan) "context compacted" in
+    let heading =
+      Log_line.indent (Content.Line.of_string ~style:cyan "context compacted")
+    in
     (match verbosity with
      | Verbose when not (String.is_empty (String.strip summary)) ->
-       heading @ Content.lines ~style:dim summary
-     | Quiet | Normal | Verbose -> heading)
+       heading :: lines_at ~style:dim summary
+     | Quiet | Normal | Verbose -> [ heading ])
+;;
+
+let render_item ?(width = Int.max_value) item ~verbosity =
+  Log_line.wrap (rows item ~verbosity ~width) ~width
 ;;
 
 let live_items t : Item.t list =
@@ -832,7 +592,7 @@ let render_tail t ~width ~rows ~skip ~verbosity : Content.t =
       match items with
       | [] -> acc
       | item :: rest ->
-        let lines = Content.wrap (render_item item ~verbosity) ~width in
+        let lines = render_item item ~width ~verbosity in
         gather rest (lines @ acc) (count + List.length lines))
   in
   let lines = gather (all_items_rev t) [] 0 in
@@ -843,14 +603,16 @@ let render_tail t ~width ~rows ~skip ~verbosity : Content.t =
 ;;
 
 let line_count t ~width ~verbosity =
-  List.sum (module Int) (all_items_rev t) ~f:(fun item ->
-    List.length (Content.wrap (render_item item ~verbosity) ~width))
+  List.sum
+    (module Int)
+    (all_items_rev t)
+    ~f:(fun item -> List.length (render_item item ~width ~verbosity))
 ;;
 
 let render_all t ~width ~verbosity : Content.t =
   List.concat_map
     (List.rev (all_items_rev t))
-    ~f:(fun item -> Content.wrap (render_item item ~verbosity) ~width)
+    ~f:(fun item -> render_item item ~width ~verbosity)
 ;;
 
 let user_message_lines t ~width ~verbosity : int list =
@@ -860,13 +622,11 @@ let user_message_lines t ~width ~verbosity : int list =
     | item :: rest ->
       let acc =
         match item with
-        | Item.User _ | Item.Skill _ -> offset :: acc
+        (* Past the blank line that opens the turn. *)
+        | Item.User _ | Item.Skill _ -> (offset + 1) :: acc
         | _ -> acc
       in
-      let count =
-        List.length (Content.wrap (render_item item ~verbosity) ~width)
-      in
-      go rest acc (offset + count)
+      go rest acc (offset + List.length (render_item item ~width ~verbosity))
   in
   go (List.rev (all_items_rev t)) [] 0
 ;;
