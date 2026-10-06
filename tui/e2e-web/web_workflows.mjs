@@ -54,7 +54,7 @@ const mobile = async () => {
   await phone.keyboard.type(token);
   await phone.locator("#connect-form button").click();
   await phone.waitForFunction(() =>
-    document.body.textContent.includes("/help for commands")
+    document.body.textContent.includes("Ctrl+C twice quits")
     && !document.body.textContent.includes("connecting…"));
   const active = () => phone.evaluate(() => document.activeElement?.id);
   const rows = () => phone.evaluate(() => document.querySelectorAll("pre.screen .line").length);
