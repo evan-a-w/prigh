@@ -615,7 +615,6 @@ let%expect_test "/mcp: Enter restarts a failed server; failures say what next" =
     (Expire_toast (id 2) (after_ms 4000))
     (Rpc (method_ mcp_approve) (params ((source /work/.mcp.json) (server db)))
      (tag (Mcp (Refreshed /work/.mcp.json#db))))
-    web failed: spawn uvx: not found. Fix it in /home/u/.prigh/mcp.json, then /mcp reconnect.
     Couldn't start the MCP server: no server "db" in /work/.mcp.json. /mcp reconnect retries.
     |}]
 ;;

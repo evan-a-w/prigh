@@ -368,6 +368,7 @@ let%expect_test "slash commands: the popup, arguments, running, unknown ones" =
     (Complete_accept (run true))
     (Save_history ("/model openai/gpt-6"))
     (Rpc (method_ set_model) (params ((model openai/gpt-6))) (tag Show_error))
+    (Expire_toast (id 0) (after_ms 4000))
     |}];
   H.type_ h "/comp";
   H.key h "Enter";
@@ -376,32 +377,42 @@ let%expect_test "slash commands: the popup, arguments, running, unknown ones" =
     {|
     (Complete_accept (run true))
     (Save_history (/compact "/model openai/gpt-6"))
-    (Expire_toast (id 0) (after_ms 4000))
+    (Expire_toast (id 1) (after_ms 4000))
     (Rpc (method_ compact) (params ())
      (tag (Notice "Compacted the conversation")))
+    GPT-6 needs openai, which is not logged in: /login openai logs in.
     Compacting the conversation…
     |}];
   H.reply h "compact" {|{"summary":"..."}|};
   H.text h ~selector:".toast";
   [%expect
     {|
-    (Expire_toast (id 1) (after_ms 4000))
+    (Expire_toast (id 2) (after_ms 4000))
+    GPT-6 needs openai, which is not logged in: /login openai logs in.
     Compacting the conversation…
     Compacted the conversation
     |}];
   H.act h (Dismiss_toast 0);
   H.act h (Dismiss_toast 1);
-  (* Unknown commands name the closest one. *)
+  H.act h (Dismiss_toast 2);
+  (* Unknown commands name the closest one, and stay in the editor to be
+     corrected. *)
   H.type_ h "/compcat";
   H.act h Send;
+  print_s [%sexp ((H.model h).draft : string)];
+  H.text h ~selector:".toast";
   H.type_ h "/frobnicate";
   H.act h Send;
+  print_s [%sexp ((H.model h).draft : string)];
+  (* Sending again clears the errors about what was sent before. *)
   H.text h ~selector:".toast";
   [%expect
     {|
     (Save_history (/compcat /compact "/model openai/gpt-6"))
-    (Save_history (/frobnicate /compcat /compact "/model openai/gpt-6"))
+    /compcat
     Unknown command /compcat. Did you mean /compact? (/help lists them)
+    (Save_history (/frobnicate /compcat /compact "/model openai/gpt-6"))
+    /frobnicate
     Unknown command /frobnicate: /help lists the commands.
     |}];
   (* A path with a question is a prompt, not a command. *)
@@ -500,7 +511,6 @@ let%expect_test "a message that cannot be sent comes back to the editor" =
     (Reconnect (generation 1) (delay_ms 0) (session (s1)))
     Send
     "look at this"
-    Couldn't send: a run is already in progress. Your message is back in the editor.
     Not connected to the backend: your message stays here until it is back (/retry-backend-connection tries now).
     |}]
 ;;
