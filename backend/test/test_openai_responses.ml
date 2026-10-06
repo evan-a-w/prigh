@@ -288,11 +288,25 @@ let%expect_test
     [ {|{"type":"response.failed","response":{"error":{"code":"server_error","message":"boom"}}}|}
     ];
   show [ {|{"type":"error","code":"usage_limit_reached","message":"limit"}|} ];
+  (* Completed, with [incomplete_details: null]: not cut short. *)
+  show
+    [ {|{"type":"response.output_text.delta","output_index":0,"delta":"done"}|}
+    ; {|{"type":"response.completed","response":{"incomplete_details":null,"usage":{"input_tokens":1,"output_tokens":2}}}|}
+    ];
+  show
+    [ {|{"type":"response.incomplete","response":{"incomplete_details":{"reason":"content_filter"}}}|}
+    ];
+  show
+    [ {|{"type":"response.incomplete","response":{"incomplete_details":null}}|}
+    ];
   [%expect
     {|
     (((Text_delta partial)) Length)
     (() (Error boom))
     (() (Error limit))
+    (((Text_delta done)) End_turn)
+    (() (Error "the response was cut short (content_filter)"))
+    (() (Error "the response was cut short (no reason given)"))
     |}]
 ;;
 

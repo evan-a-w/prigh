@@ -303,13 +303,22 @@ let parse_event (state : Stream_state.t) (event : Sse.Event.t)
               | _ -> [])
            | _ -> [])
         | _ -> [])
-     | "response.completed" | "response.incomplete" ->
-       Option.iter (Json.member "response" json) ~f:(fun response ->
-         Option.iter (Json.member "usage" response) ~f:(fun u ->
-           state.usage <- parse_usage u);
-         Option.iter (Json.member "incomplete_details" response) ~f:(fun d ->
-           state.incomplete_reason
-           <- Some (Option.value (member "reason" d) ~default:"incomplete")));
+     | ("response.completed" | "response.incomplete") as type_ ->
+       (* A completed response may carry [incomplete_details: null]: only a
+          reason, or the incomplete event itself, means it was cut short. *)
+       let response = Json.member "response" json in
+       Option.iter
+         (Option.bind response ~f:(Json.member "usage"))
+         ~f:(fun u -> state.usage <- parse_usage u);
+       let reason =
+         Option.bind response ~f:(Json.member "incomplete_details")
+         |> Option.bind ~f:(member "reason")
+       in
+       (match reason, type_ with
+        | Some reason, _ -> state.incomplete_reason <- Some reason
+        | None, "response.incomplete" ->
+          state.incomplete_reason <- Some "no reason given"
+        | None, _ -> ());
        []
      | "response.failed" ->
        let message =
@@ -335,7 +344,8 @@ let stop_reason (state : Stream_state.t) : Stop_reason.t =
   match state.error, state.incomplete_reason with
   | Some e, _ -> Error e
   | None, Some "max_output_tokens" -> Length
-  | None, Some reason -> Error ("incomplete: " ^ reason)
+  | None, Some reason ->
+    Error (sprintf "the response was cut short (%s)" reason)
   | None, None -> if state.saw_tool_call then Tool_use else End_turn
 ;;
 
