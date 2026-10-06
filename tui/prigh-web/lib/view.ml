@@ -105,6 +105,11 @@ let view (m : Model.t) ~inject ~terminal =
     then inert
     else Fn.id
   in
+  (* On a phone the agents panel is a sheet over the page: it has the
+     keyboard while open. *)
+  let under_sheet =
+    if m.narrow && m.agents.open_ then Fn.compose inert behind else behind
+  in
   let chat =
     match Chat.entries m.chat with
     | [] -> empty m
@@ -120,7 +125,7 @@ let view (m : Model.t) ~inject ~terminal =
           ; "terminal-open", m.terminal.open_
           ]
       ]
-    [ behind (Sidebar_view.view m ~inject)
+    [ under_sheet (Sidebar_view.view m ~inject)
     ; (if m.narrow && m.sidebar_open
        then
          Node.div
@@ -130,7 +135,7 @@ let view (m : Model.t) ~inject ~terminal =
              ]
            []
        else Node.none)
-    ; behind
+    ; under_sheet
       @@ Node.main
            ~attrs:[ Attr.class_ "main" ]
            [ Topbar_view.view m ~inject

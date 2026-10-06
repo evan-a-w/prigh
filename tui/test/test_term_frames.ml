@@ -202,7 +202,7 @@ let%expect_test "startup frame matches the pure renderer" =
 
 
 
-      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+        prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
       ▌ earlier question
         earlier answer
@@ -238,7 +238,7 @@ let%expect_test "typing, streamed reply, Ctrl+O and Alt+Enter through the \
 
 
 
-      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+        prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
       ▌ earlier question
         earlier answer
@@ -269,7 +269,7 @@ let%expect_test "typing, streamed reply, Ctrl+O and Alt+Enter through the \
 
 
 
-      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+        prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
       ▌ earlier question
         earlier answer
@@ -297,7 +297,7 @@ let%expect_test "typing, streamed reply, Ctrl+O and Alt+Enter through the \
 
 
 
-      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+        prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
       ▌ earlier question
         earlier answer
@@ -326,7 +326,7 @@ let%expect_test "typing, streamed reply, Ctrl+O and Alt+Enter through the \
 
 
 
-      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+        prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
       ▌ earlier question
         earlier answer
@@ -368,7 +368,7 @@ let%expect_test "bracketed paste produces the paste chip" =
 
 
 
-      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+        prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
       ▌ earlier question
         earlier answer
@@ -401,8 +401,8 @@ let%expect_test "resize 80 -> 40 keeps the frame matching" =
 
 
 
-      prigh in /work · /help · Esc aborts ·
-      Ctrl+C twice quits
+        prigh in /work · /help · Esc aborts ·
+        Ctrl+C twice quits
 
       ▌ earlier question
         earlier answer
@@ -459,7 +459,7 @@ let%expect_test "styled frame: markdown link, diff and autocomplete" =
 
 
 
-      [gray]prigh in /work · /help · Esc aborts · Ctrl+C twice quits[/]
+        [gray]prigh in /work · /help · Esc aborts · Ctrl+C twice quits[/]
 
       [yellow]▌ [/][bold]earlier question[/]
         earlier [bold]answer[/]

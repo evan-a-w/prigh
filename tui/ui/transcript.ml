@@ -543,7 +543,7 @@ let rows (item : Item.t) ~(verbosity : Verbosity.t) ~width : Log_line.t list =
          | Error -> Style.bold red
        in
        lines_at ~style text)
-  | Block content -> List.map content ~f:Log_line.flush
+  | Block content -> List.map content ~f:(Log_line.indent ~depth:1)
   | Delivery text ->
     List.concat_map
       (Option.value (Delivery.parse text) ~default:[])

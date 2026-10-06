@@ -530,9 +530,9 @@ The status line is quiet gray: cwd, model, `think:`, `view:`, the context
 tool host — with the current mode's keys (`⠋ working · Esc aborts · Enter
 steers`, a picker's keys) in yellow. Queued steers and follow-ups are listed
 above the editor, one per line, until they are delivered. An unknown command
-goes back into the editor, corrected when a command is close (`/modle gpt` →
-`/model gpt`), and a failed `/switch` or `/cd` puts the command back with
-what to try next.
+goes back into the editor as typed, the error naming the closest command
+(`/modle gpt`: did you mean `/model`?), and a failed `/switch` or `/cd` puts
+the command back with what to try next.
 
 Ctrl+O cycles the transcript verbosity:
 

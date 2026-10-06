@@ -541,7 +541,7 @@ let%expect_test "dom_of_screen: a rendered app screen round-trips to plain text"
   else print_endline dom_text;
   [%expect
     {|
-    prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
     ────────────────────────────────────────────────────────────
     > hi
     …deepseek-flash  think:off  ctx:0.1%/1.0M  $0.01

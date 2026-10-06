@@ -158,8 +158,8 @@ let%expect_test "component: startup requests, key handling, rpc round trip, \
 
 
 
-    prigh in /w · /help · Esc aborts · Ctrl+C twice
-    quits
+      prigh in /w · /help · Esc aborts · Ctrl+C twice
+      quits
     ──────────────────────────────────────────────────
     > ▏
     …m  think:n/a  view:normal  ctx:0.0%/1.0k  $0.00
@@ -177,8 +177,8 @@ let%expect_test "component: startup requests, key handling, rpc round trip, \
     spinner=0 running=false
 
 
-    prigh in /w · /help · Esc aborts · Ctrl+C twice
-    quits
+      prigh in /w · /help · Esc aborts · Ctrl+C twice
+      quits
       thinking must be one of: off, on, low, high, max
     ──────────────────────────────────────────────────
     > ▏
@@ -202,8 +202,8 @@ let%expect_test "component: startup requests, key handling, rpc round trip, \
     spinner=2 running=true
 
 
-    prigh in /w · /help · Esc aborts · Ctrl+C twice
-    quits
+      prigh in /w · /help · Esc aborts · Ctrl+C twice
+      quits
       thinking must be one of: off, on, low, high, max
     ──────────────────────────────────────────────────
     > ▏
@@ -227,8 +227,8 @@ let%expect_test "component: startup requests, key handling, rpc round trip, \
 
 
       reconnected to the backend
-    prigh in /w · /help · Esc aborts · Ctrl+C twice
-    quits
+      prigh in /w · /help · Esc aborts · Ctrl+C twice
+      quits
     ──────────────────────────────────────────────────
     > ▏
     …m  think:n/a  view:normal  ctx:0.0%/1.0k  $0.00
@@ -273,8 +273,8 @@ let%expect_test "component: /signout runs the platform's sign-out and shows \
     spinner=0 running=false
 
 
-    prigh in /w · /help · Esc aborts · Ctrl+C twice
-    quits
+      prigh in /w · /help · Esc aborts · Ctrl+C twice
+      quits
       not here
     ──────────────────────────────────────────────────
     > ▏
