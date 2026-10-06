@@ -299,6 +299,15 @@ let%expect_test
   show
     [ {|{"type":"response.incomplete","response":{"incomplete_details":null}}|}
     ];
+  (* The status decides, whichever event carries it. *)
+  show
+    [ {|{"type":"response.completed","response":{"status":"incomplete","incomplete_details":{"reason":"max_output_tokens"}}}|}
+    ];
+  show [ {|{"type":"response.completed","response":{"status":"cancelled"}}|} ];
+  (* No terminal event: the connection closed mid-response. *)
+  show
+    [ {|{"type":"response.output_text.delta","output_index":0,"delta":"half"}|}
+    ];
   [%expect
     {|
     (((Text_delta partial)) Length)
@@ -307,6 +316,9 @@ let%expect_test
     (((Text_delta done)) End_turn)
     (() (Error "the response was cut short (content_filter)"))
     (() (Error "the response was cut short (no reason given)"))
+    (() Length)
+    (() (Error "the response was cancelled"))
+    (((Text_delta half)) (Error "the stream ended before the response finished"))
     |}]
 ;;
 
