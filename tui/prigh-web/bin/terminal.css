@@ -10,8 +10,8 @@
   height: var(--terminal-height, 38%);
   min-height: 120px;
   max-height: calc(100% - 160px);
-  background: #0b0d11;
-  border-top: 1px solid var(--border);
+  background: var(--well);
+  border-top: 1px solid var(--rule);
   animation: terminal-in 0.16s ease-out;
 }
 @keyframes terminal-in { from { opacity: 0; transform: translateY(12px); } }
@@ -26,9 +26,8 @@
   z-index: 2;
   touch-action: none;
 }
-.terminal-resize:hover, body.resizing-terminal .terminal-resize {
-  background: linear-gradient(to bottom, transparent 4px, var(--accent-2) 4px, var(--accent-2) 6px, transparent 6px);
-}
+.terminal-resize::after { content: ""; position: absolute; left: 0; right: 0; top: 4px; height: 2px; }
+.terminal-resize:hover::after, body.resizing-terminal .terminal-resize::after { background: var(--sodium); }
 body.resizing-terminal { cursor: row-resize; user-select: none; }
 body.resizing-terminal .terminal-body { pointer-events: none; }
 
@@ -36,17 +35,17 @@ body.resizing-terminal .terminal-body { pointer-events: none; }
   display: flex;
   align-items: center;
   gap: 8px;
-  min-height: 36px;
-  padding: 2px 6px 2px 12px;
-  background: var(--panel);
-  border-bottom: 1px solid var(--border);
+  min-height: 38px;
+  padding: 3px 8px 3px 14px;
+  background: var(--slate);
+  border-bottom: 1px solid var(--rule);
   font-size: 12.5px;
 }
-.terminal-icon { width: 14px; height: 14px; color: var(--accent); }
-.terminal-machine { font-weight: 600; white-space: nowrap; }
-.terminal-cwd { color: var(--muted); font: 12px var(--mono); min-width: 0; }
-.terminal-state { color: var(--yellow); font-size: 12px; white-space: nowrap; }
-.terminal-state.failed { color: var(--red); }
+.terminal-icon { width: 16px; height: 16px; color: var(--muted); }
+.terminal-machine { font-weight: 600; font-size: 14px; white-space: nowrap; }
+.terminal-cwd { color: var(--muted); font: 12.5px var(--mono); min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.terminal-state { color: var(--sodium); font-size: 12.5px; white-space: nowrap; }
+.terminal-state.failed { color: var(--brick); }
 .terminal-close { margin-left: auto; width: 28px; height: 28px; }
 
 .terminal-body {
@@ -59,12 +58,12 @@ body.resizing-terminal .terminal-body { pointer-events: none; }
 }
 .terminal-host { position: relative; flex: 1; min-height: 0; overflow: hidden; }
 .terminal-host .xterm { height: 100%; }
-.terminal-host .xterm-viewport {
-  background-color: #0b0d11 !important;
+.terminal-host .xterm-viewport, .terminal-host .xterm-rows, .terminal-host .xterm-screen {
+  background-color: var(--well) !important;
   scrollbar-width: thin;
-  scrollbar-color: var(--border-2) transparent;
+  scrollbar-color: var(--rule-2) transparent;
 }
-.terminal-waiting { color: var(--muted); padding: 10px 2px; }
+.terminal-waiting { color: var(--muted); font-size: 14px; padding: 10px 2px; }
 
 .terminal-notice {
   position: absolute;
@@ -75,10 +74,10 @@ body.resizing-terminal .terminal-body { pointer-events: none; }
   align-items: center;
   gap: 10px;
   padding: 8px 12px;
-  background: var(--panel-2);
-  border-top: 1px solid var(--border-2);
+  background: var(--slate);
+  border-top: 1px solid var(--rule);
   color: var(--muted);
-  font-size: 13px;
+  font-size: 14px;
   z-index: 3;
 }
 .terminal-notice.failed {
@@ -88,13 +87,13 @@ body.resizing-terminal .terminal-body { pointer-events: none; }
   text-align: center;
   gap: 12px;
   border-top: 0;
-  background: #0b0d11ee;
+  background: color-mix(in srgb, var(--well) 94%, transparent);
 }
 .terminal-notice.failed > div { display: flex; flex-direction: column; gap: 4px; max-width: 560px; }
-.terminal-error { color: #ffc2c2; font: 12.5px var(--mono); overflow-wrap: anywhere; }
-.terminal-advice { color: var(--fg); }
+.terminal-error { color: var(--brick); font: 12.5px var(--mono); overflow-wrap: anywhere; }
+.terminal-advice { color: var(--chalk); }
 
-.terminal-toggle.open { color: var(--accent); background: var(--accent-bg); }
+.terminal-toggle.open { color: var(--sodium); background: var(--sodium-wash); }
 
 /* Phones: a full-screen sheet, under dialogs. */
 .app.narrow .terminal-panel {
@@ -110,3 +109,7 @@ body.resizing-terminal .terminal-body { pointer-events: none; }
 .app.narrow .terminal-head { min-height: 50px; padding-left: 14px; }
 .app.narrow .terminal-body { padding: 4px 0 0 6px; }
 @keyframes terminal-up { from { opacity: 0; transform: translateY(24px); } }
+
+@media (prefers-reduced-motion: reduce) {
+  .terminal-panel, .app.narrow .terminal-panel { animation: none; }
+}

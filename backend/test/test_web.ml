@@ -131,8 +131,9 @@ let%expect_test "web server: path safety and content types" =
         path
         (Sexp.to_string
            [%sexp (Web_server.For_testing.safe_relative path : string option)]));
-  List.iter [ "index.html"; "main.bc.js"; "style.css"; "x.wasm" ] ~f:(fun f ->
-    printf "%s: %s\n" f (Web_server.For_testing.content_type f));
+  List.iter
+    [ "index.html"; "main.bc.js"; "style.css"; "a.woff2"; "x.wasm" ]
+    ~f:(fun f -> printf "%s: %s\n" f (Web_server.For_testing.content_type f));
   [%expect
     {|
     "/" -> ("")
@@ -144,6 +145,7 @@ let%expect_test "web server: path safety and content types" =
     index.html: text/html; charset=utf-8
     main.bc.js: text/javascript; charset=utf-8
     style.css: text/css; charset=utf-8
+    a.woff2: font/woff2
     x.wasm: application/octet-stream
     |}]
 ;;
