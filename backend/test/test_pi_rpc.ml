@@ -170,7 +170,7 @@ let%expect_test "hello sets status entries; state, commands, models, stats" =
     {|
     {"type":"extension_ui_request","id":"status-host","method":"setStatus","statusKey":"host","statusText":null}
     {"type":"extension_ui_request","id":"status-branch","method":"setStatus","statusKey":"branch","statusText":null}
-    {"id":"q","type":"response","command":"get_state","success":true,"data":{"model":{"id":"deepseek-flash","name":"DeepSeek V4.1 Flash","provider":"deepseek","reasoning":true,"contextWindow":1000000},"cwd":"$DIR","thinkingLevel":"off","isStreaming":false,"isCompacting":false,"steeringMode":"all","followUpMode":"all","sessionFile":"$DIR/sessions/<stamp>_<id>.jsonl","sessionId":"<id>","autoCompactionEnabled":true,"messageCount":0,"pendingMessageCount":0}}
+    {"id":"q","type":"response","command":"get_state","success":true,"data":{"model":{"id":"deepseek-flash","name":"DeepSeek V4.1 Flash","provider":"deepseek","reasoning":true,"contextWindow":1000000},"cwd":"$DIR","thinkingLevel":"medium","isStreaming":false,"isCompacting":false,"steeringMode":"all","followUpMode":"all","sessionFile":"$DIR/sessions/<stamp>_<id>.jsonl","sessionId":"<id>","autoCompactionEnabled":true,"messageCount":0,"pendingMessageCount":0}}
     {"id":"q","type":"response","command":"get_commands","success":true,"data":{"commands":[{"name":"compact","description":"Compact the context","source":"builtin","argumentHint":"[instructions]"},{"name":"new","description":"Start a new session","source":"builtin"},{"name":"name","description":"Name the session","source":"builtin","argumentHint":"<name>"},{"name":"model","description":"Pick a model","source":"builtin","argumentHint":"[name]"},{"name":"thinking","description":"Set or cycle the thinking level","source":"builtin","argumentHint":"[level]"},{"name":"session","description":"Show session info","source":"builtin"},{"name":"export","description":"Export the session as markdown (on the backend)","source":"builtin","argumentHint":"[path]"},{"name":"copy","description":"Copy the last assistant message","source":"builtin"},{"name":"fork","description":"Fork the session from an earlier message","source":"builtin"},{"name":"clone","description":"Clone the session","source":"builtin"},{"name":"cd","description":"Change the working directory","source":"builtin","argumentHint":"[dir]"},{"name":"login","description":"Log in to a provider","source":"extension","argumentHint":"[provider] [oauth|api_key]"},{"name":"logout","description":"Log out of a provider","source":"extension","argumentHint":"<provider>"},{"name":"auth","description":"Show provider credentials","source":"extension"},{"name":"sessions","description":"Pick a saved session to switch to","source":"extension"},{"name":"switch","description":"Switch to a session by id or path","source":"extension","argumentHint":"<id|path>"},{"name":"host","description":"Pick where tools run","source":"extension"},{"name":"setusr","description":"Act as another user (superusers)","source":"extension","argumentHint":"[user]"},{"name":"change_default","description":"Save the current model and thinking level as the default","source":"extension"},{"name":"help","description":"List the commands","source":"extension"}]}}
     {"id":"q","type":"response","command":"get_session_stats","success":true,"data":{"sessionFile":"$DIR/sessions/<stamp>_<id>.jsonl","sessionId":"<id>","userMessages":0,"assistantMessages":0,"toolCalls":0,"toolResults":0,"totalMessages":0,"tokens":{"input":0,"output":0,"cacheRead":0,"cacheWrite":0,"total":0},"cost":0,"contextUsage":{"tokens":0,"contextWindow":1000000,"percent":0}}}
     {"id":"q","type":"response","command":"get_messages","success":true,"data":{"messages":[]}}
@@ -349,7 +349,7 @@ let%expect_test "models are listed in pi's shape" =
     ~f:(fun m -> print_endline (Json.to_string m));
   [%expect
     {|
-    65
+    67
     {"id":"claude-fable-5","name":"Claude Fable 5","provider":"anthropic","reasoning":true,"contextWindow":1000000}
     {"id":"claude-fable-5-1","name":"Claude Fable 5.1","provider":"anthropic","reasoning":true,"contextWindow":1000000}
     {"id":"deepseek-v4-pro","name":"DeepSeek V4 Pro","provider":"deepseek","reasoning":true,"contextWindow":1000000}
@@ -448,7 +448,7 @@ let%expect_test "fork picks the messages before a user entry; clone and cd" =
     {"id":"q","type":"response","command":"clone","success":true,"data":{"cancelled":false}}
     {"id":"q","type":"response","command":"change_cwd","success":false,"error":"<host>: not a directory: /nonexistent-dir"}
     {"id":"q","type":"response","command":"change_cwd","success":true,"data":{"cancelled":false,"cwd":"/"}}
-    {"id":"q","type":"response","command":"get_state","success":true,"data":{"model":{"id":"deepseek-flash","name":"DeepSeek V4.1 Flash","provider":"deepseek","reasoning":true,"contextWindow":1000000},"cwd":"/","thinkingLevel":"off","isStreaming":false,"isCompacting":false,"steeringMode":"all","followUpMode":"all","sessionFile":"$DIR/sessions/<stamp>_<id>.jsonl","sessionId":"<id>","autoCompactionEnabled":true,"messageCount":2,"pendingMessageCount":0}}
+    {"id":"q","type":"response","command":"get_state","success":true,"data":{"model":{"id":"deepseek-flash","name":"DeepSeek V4.1 Flash","provider":"deepseek","reasoning":true,"contextWindow":1000000},"cwd":"/","thinkingLevel":"medium","isStreaming":false,"isCompacting":false,"steeringMode":"all","followUpMode":"all","sessionFile":"$DIR/sessions/<stamp>_<id>.jsonl","sessionId":"<id>","autoCompactionEnabled":true,"messageCount":2,"pendingMessageCount":0}}
     |}]
 ;;
 
@@ -809,7 +809,7 @@ let%expect_test
     {|
     {"type":"extension_ui_request","id":"widget-subagents","method":"setWidget","widgetKey":"subagents","widgetLines":null}
     {"id":"q","type":"response","command":"new_session","success":true,"data":{}}
-    {"id":"q","type":"response","command":"get_state","success":true,"data":{"model":{"id":"deepseek-flash","name":"DeepSeek V4.1 Flash","provider":"deepseek","reasoning":true,"contextWindow":1000000},"cwd":"$DIR","thinkingLevel":"off","isStreaming":false,"isCompacting":false,"steeringMode":"all","followUpMode":"all","sessionFile":"$DIR/sessions/<stamp>_<id>.jsonl","sessionId":"<id>","autoCompactionEnabled":true,"messageCount":0,"pendingMessageCount":0}}
+    {"id":"q","type":"response","command":"get_state","success":true,"data":{"model":{"id":"deepseek-flash","name":"DeepSeek V4.1 Flash","provider":"deepseek","reasoning":true,"contextWindow":1000000},"cwd":"$DIR","thinkingLevel":"medium","isStreaming":false,"isCompacting":false,"steeringMode":"all","followUpMode":"all","sessionFile":"$DIR/sessions/<stamp>_<id>.jsonl","sessionId":"<id>","autoCompactionEnabled":true,"messageCount":0,"pendingMessageCount":0}}
     |}];
   cmd h ~fields:(sprintf {|, "path": "%s"|} path) "switch_session";
   cmd h "get_state";
@@ -870,7 +870,7 @@ let%expect_test
     {"type":"extension_ui_cancel","id":"confirm-c1"}
     {"type":"agent_settled"}
     {"id":"q","type":"response","command":"new_session","success":true,"data":{}}
-    {"id":"q","type":"response","command":"get_state","success":true,"data":{"model":{"id":"deepseek-flash","name":"DeepSeek V4.1 Flash","provider":"deepseek","reasoning":true,"contextWindow":1000000},"cwd":"$DIR","thinkingLevel":"off","isStreaming":false,"isCompacting":false,"steeringMode":"all","followUpMode":"all","sessionFile":"$DIR/sessions/<stamp>_<id>.jsonl","sessionId":"<id>","autoCompactionEnabled":true,"messageCount":0,"pendingMessageCount":0}}
+    {"id":"q","type":"response","command":"get_state","success":true,"data":{"model":{"id":"deepseek-flash","name":"DeepSeek V4.1 Flash","provider":"deepseek","reasoning":true,"contextWindow":1000000},"cwd":"$DIR","thinkingLevel":"medium","isStreaming":false,"isCompacting":false,"steeringMode":"all","followUpMode":"all","sessionFile":"$DIR/sessions/<stamp>_<id>.jsonl","sessionId":"<id>","autoCompactionEnabled":true,"messageCount":0,"pendingMessageCount":0}}
     |}];
   answer h ~fields:{|"confirmed": true|} "confirm-c1";
   cmd h ~fields:(sprintf {|, "path": "%s"|} path) "switch_session";

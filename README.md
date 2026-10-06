@@ -595,6 +595,8 @@ through; `/scoped-models` edits it), `confirm_tools` (ask before
 destructive `bash`/`write`/`edit`; `/confirm on|off`) and
 `default_model`/`default_thinking` (what new sessions start with unless
 `-model`/`-thinking` is given; `/change_default` saves the current ones).
+Without a `default_thinking`, sessions start with thinking `on`; models that
+cannot think ignore it. A fallback model keeps the session's thinking level.
 
 `fallback_models` is a chain of models that take over from each other
 (`/fallback MODEL...` sets it; names, ids and prefixes work as for

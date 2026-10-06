@@ -106,16 +106,16 @@ end
 (* prigh-web's palette (bin/style.css). *)
 let theme () =
   Js.Unsafe.obj
-    [| "background", Js.Unsafe.inject (Js.string "#0b0d11")
-     ; "foreground", Js.Unsafe.inject (Js.string "#e6e8ee")
-     ; "cursor", Js.Unsafe.inject (Js.string "#7c9cff")
-     ; "cursorAccent", Js.Unsafe.inject (Js.string "#0b0d11")
-     ; "selectionBackground", Js.Unsafe.inject (Js.string "#5b7cf066")
+    [| "background", Js.Unsafe.inject (Js.string "#15171b")
+     ; "foreground", Js.Unsafe.inject (Js.string "#e3e5e1")
+     ; "cursor", Js.Unsafe.inject (Js.string "#f0b44c")
+     ; "cursorAccent", Js.Unsafe.inject (Js.string "#15171b")
+     ; "selectionBackground", Js.Unsafe.inject (Js.string "#f0b44c40")
      ; "blue", Js.Unsafe.inject (Js.string "#7c9cff")
      ; "brightBlue", Js.Unsafe.inject (Js.string "#9db4ff")
-     ; "green", Js.Unsafe.inject (Js.string "#3ecf8e")
-     ; "red", Js.Unsafe.inject (Js.string "#ff6b6b")
-     ; "yellow", Js.Unsafe.inject (Js.string "#f2c94c")
+     ; "green", Js.Unsafe.inject (Js.string "#8cc7a1")
+     ; "red", Js.Unsafe.inject (Js.string "#e8806f")
+     ; "yellow", Js.Unsafe.inject (Js.string "#f0b44c")
     |]
 ;;
 
