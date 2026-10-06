@@ -318,3 +318,14 @@ let render node =
 ;;
 
 let text ?selector t = List.iter (node t ?selector ()) ~f:render
+
+let elements ~selector t =
+  List.iter (node t ~selector ()) ~f:(function
+    | Element e ->
+      let class_ =
+        List.Assoc.find e.attributes ~equal:String.equal "class"
+        |> Option.value ~default:""
+      in
+      printf "<%s class=%S>\n" e.tag_name class_
+    | Text _ | Widget -> ())
+;;
