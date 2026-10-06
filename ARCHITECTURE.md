@@ -771,7 +771,10 @@ copy of the protocol types and the e2e test guards the contract.
     pastes, persistent history), `Picker` (fuzzy list with `Fuzzy` ranking),
     `Transcript` (items plus streaming tails; `Transcript.apply` is the one
     event→transcript function, used for the main transcript and each
-    subagent), `Viewport` (`Follow | Anchored`, so new output never pushes an
+    subagent; it renders items as `Log_line`s, lines with a two-column
+    gutter that holds a turn's bar or a step's mark and survives wrapping,
+    and each tool call through `Tool_render`, which reads arguments with
+    `Tool_args` (shared with prigh-web's `Tool_view`)), `Viewport` (`Follow | Anchored`, so new output never pushes an
     anchored view), `Verbosity` (quiet/normal/verbose), `Autocomplete`
     (inline command/argument/path completion), `Agent_view` (per-subagent
     transcript and status; the app keeps an agent while it runs or while

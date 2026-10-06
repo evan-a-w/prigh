@@ -7,7 +7,7 @@ open! Import
 
 type t
 
-val of_call : Tool_call.t -> t
+val of_call : P.Tool_call.t -> t
 
 (** A string field; while streaming, its text so far. *)
 val string : t -> string -> string option
