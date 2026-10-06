@@ -17,6 +17,8 @@ type t =
   | On of Level.t option
 [@@deriving sexp, jsonaf, equal]
 
+let default = On None
+
 let to_string = function
   | Off -> "off"
   | On None -> "on"

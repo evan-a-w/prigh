@@ -26,7 +26,7 @@ Ctrl+K find a session
 New session
 <CWD>
 DeepSeek V4.1 Flash
-off
+on
 === chromium: bash run ===
 count some lines
 <TIME>
@@ -43,7 +43,7 @@ three lines
 count some lines
 <CWD>
 DeepSeek V4.1 Flash
-off
+on
 === chromium: read an image ===
 what does flag.png look like?
 <TIME>
@@ -116,7 +116,7 @@ back again
 <TIME>
 === chromium: agents panel ===
 Agents
-SUBAGENTS
+Subagents
 2
 1
 ✓
@@ -130,7 +130,7 @@ Count the files
 <T>
 a1/n1 · deepseek-flash · 1 turn · $<COST>
 There are 3 files.
-JOBS
+Jobs
 1
 3
 ✓
@@ -179,7 +179,7 @@ deepseek-flash
 1 tool call
 $<COST>
 Show in chat
-ITS SUBAGENTS
+Its subagents
 1
 ✓
 Count the files
@@ -258,7 +258,7 @@ prigh
 web
 Add an account
 to the prigh backend at ws://127.0.0.1:<PORT>/ws
-SAVED ACCOUNTS
+Saved accounts
 A
 alice
 127.0.0.1:<PORT>
@@ -276,7 +276,7 @@ B
 bob
 127.0.0.1:<PORT>
 signed in
-SWITCH TO
+Switch to
 A
 alice
 127.0.0.1:<PORT>
@@ -306,7 +306,7 @@ web
 Sign in
 to the prigh backend at ws://127.0.0.1:<PORT>/ws
 Signed out.
-CONTINUE AS
+Continue as
 A
 alice
 127.0.0.1:<PORT>
@@ -351,7 +351,7 @@ Ctrl+K find a session
 New session
 <CWD>
 DeepSeek V4.1 Flash
-off
+on
 === firefox: bash run ===
 count some lines
 <TIME>
@@ -368,7 +368,7 @@ three lines
 count some lines
 <CWD>
 DeepSeek V4.1 Flash
-off
+on
 === firefox: read an image ===
 what does flag.png look like?
 <TIME>
@@ -441,7 +441,7 @@ back again
 <TIME>
 === firefox: agents panel ===
 Agents
-SUBAGENTS
+Subagents
 2
 1
 ✓
@@ -455,7 +455,7 @@ Count the files
 <T>
 a1/n1 · deepseek-flash · 1 turn · $<COST>
 There are 3 files.
-JOBS
+Jobs
 1
 3
 ✓
@@ -504,7 +504,7 @@ deepseek-flash
 1 tool call
 $<COST>
 Show in chat
-ITS SUBAGENTS
+Its subagents
 1
 ✓
 Count the files
@@ -583,7 +583,7 @@ prigh
 web
 Add an account
 to the prigh backend at ws://127.0.0.1:<PORT>/ws
-SAVED ACCOUNTS
+Saved accounts
 A
 alice
 127.0.0.1:<PORT>
@@ -601,7 +601,7 @@ B
 bob
 127.0.0.1:<PORT>
 signed in
-SWITCH TO
+Switch to
 A
 alice
 127.0.0.1:<PORT>
@@ -631,7 +631,7 @@ web
 Sign in
 to the prigh backend at ws://127.0.0.1:<PORT>/ws
 Signed out.
-CONTINUE AS
+Continue as
 A
 alice
 127.0.0.1:<PORT>

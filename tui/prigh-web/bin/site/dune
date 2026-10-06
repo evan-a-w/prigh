@@ -34,6 +34,28 @@
  (action
   (copy ../terminal.css terminal.css)))
 
+; Recursive (SIL OFL 1.1, recursive-OFL.txt), cut down by
+; fontTools to Latin and two instances: sans (casual axis kept, for
+; thinking) and mono.
+
+(rule
+ (target recursive-sans.woff2)
+ (deps ../recursive-sans.woff2)
+ (action
+  (copy ../recursive-sans.woff2 recursive-sans.woff2)))
+
+(rule
+ (target recursive-mono.woff2)
+ (deps ../recursive-mono.woff2)
+ (action
+  (copy ../recursive-mono.woff2 recursive-mono.woff2)))
+
+(rule
+ (target recursive-OFL.txt)
+ (deps ../recursive-OFL.txt)
+ (action
+  (copy ../recursive-OFL.txt recursive-OFL.txt)))
+
 ; The terminal panel's xterm.js and its glue, shared with the -web page.
 
 (rule
@@ -70,6 +92,9 @@
   (chat.css as prigh-web/chat.css)
   (agents.css as prigh-web/agents.css)
   (terminal.css as prigh-web/terminal.css)
+  (recursive-sans.woff2 as prigh-web/recursive-sans.woff2)
+  (recursive-mono.woff2 as prigh-web/recursive-mono.woff2)
+  (recursive-OFL.txt as prigh-web/recursive-OFL.txt)
   (terminal.js as prigh-web/terminal.js)
   (xterm.js as prigh-web/xterm.js)
   (xterm.css as prigh-web/xterm.css)
