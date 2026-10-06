@@ -171,7 +171,7 @@ let common_params =
           ~models
           ~provider
           ~current_model:(current (fun s -> s.model) Model.default)
-          ~current_thinking:(current (fun s -> s.thinking) Thinking.Off)
+          ~current_thinking:(current (fun s -> s.thinking) Thinking.default)
           ~home
           ()
       in

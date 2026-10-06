@@ -26,7 +26,7 @@ Ctrl+K find a session
 New session
 <CWD>
 DeepSeek V4.1 Flash
-off
+on
 === chromium: bash run ===
 count some lines
 <TIME>
@@ -43,7 +43,7 @@ three lines
 count some lines
 <CWD>
 DeepSeek V4.1 Flash
-off
+on
 === chromium: read an image ===
 what does flag.png look like?
 <TIME>
@@ -351,7 +351,7 @@ Ctrl+K find a session
 New session
 <CWD>
 DeepSeek V4.1 Flash
-off
+on
 === firefox: bash run ===
 count some lines
 <TIME>
@@ -368,7 +368,7 @@ three lines
 count some lines
 <CWD>
 DeepSeek V4.1 Flash
-off
+on
 === firefox: read an image ===
 what does flag.png look like?
 <TIME>
