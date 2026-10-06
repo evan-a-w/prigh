@@ -3,71 +3,62 @@ prints the captured panes.
 
   $ bash ./harness.sh startup
   === initial screen
-    session <id> in $TMP/cwd. /help for commands, Esc aborts, Ctrl+C
-    twice quits.
+  prigh in $TMP/cwd · /help · Esc aborts · Ctrl+C twice quits
   ────────────────────────────────────────────────────────────────────────────────────────────────────
   >
-  $TMP/cwd  deepseek-flash  think:on  view:normal  ctx:0% 0  $0.00
+  $TMP/cwd  deepseek-flash  think:on  view:normal  ctx:0.0%/1.0M  $0.00
   $ bash ./harness.sh prompt
   === typed
-    session <id> in $TMP/cwd. /help for commands, Esc aborts, Ctrl+C
-    twice quits.
+  prigh in $TMP/cwd · /help · Esc aborts · Ctrl+C twice quits
   ────────────────────────────────────────────────────────────────────────────────────────────────────
   > hello there
-  $TMP/cwd  deepseek-flash  think:on  view:normal  ctx:0% 0  $0.00
+  $TMP/cwd  deepseek-flash  think:on  view:normal  ctx:0.0%/1.0M  $0.00
   === after reply
-    session <id> in $TMP/cwd. /help for commands, Esc aborts, Ctrl+C
-    twice quits.
+  prigh in $TMP/cwd · /help · Esc aborts · Ctrl+C twice quits
   
   ▌ hello there
     faux reply
   ────────────────────────────────────────────────────────────────────────────────────────────────────
   >
-  $TMP/cwd  deepseek-flash  think:on  view:normal  ctx:0% 10  $0.00
+  $TMP/cwd  deepseek-flash  think:on  view:normal  ctx:0.0%/1.0M  $0.00
   $ bash ./harness.sh ctrl_o
   === after C-o
-    session <id> in $TMP/cwd. /help for commands, Esc aborts, Ctrl+C
-    twice quits.
+  prigh in $TMP/cwd · /help · Esc aborts · Ctrl+C twice quits
     view: verbose — everything is shown
   ────────────────────────────────────────────────────────────────────────────────────────────────────
   >
-  $TMP/cwd  deepseek-flash  think:on  view:verbose  ctx:0% 0  $0.00
+  $TMP/cwd  deepseek-flash  think:on  view:verbose  ctx:0.0%/1.0M  $0.00
   $ bash ./harness.sh resize
   === 40x12
-    session <id> in
-    $TMP/cwd. /help for
-    commands, Esc aborts, Ctrl+C twice
-    quits.
+  prigh in $TMP/cwd ·
+  /help · Esc aborts · Ctrl+C twice quits
   
   ▌ first
     faux reply
   ────────────────────────────────────────
   >
-  …deepseek-flash  ctx:0% 10  $0.00
+  …deepseek-flash  ctx:0.0%/1.0M  $0.00
   === 100x30
-    session <id> in $TMP/cwd. /help for commands, Esc aborts, Ctrl+C
-    twice quits.
+  prigh in $TMP/cwd · /help · Esc aborts · Ctrl+C twice quits
   
   ▌ first
     faux reply
   ────────────────────────────────────────────────────────────────────────────────────────────────────
   >
-  $TMP/cwd  deepseek-flash  think:on  view:normal  ctx:0% 10  $0.00
+  $TMP/cwd  deepseek-flash  think:on  view:normal  ctx:0.0%/1.0M  $0.00
   $ bash ./harness.sh quit
   === after first C-c
-    session <id> in $TMP/cwd. /help for commands, Esc aborts, Ctrl+C
-    twice quits.
+  prigh in $TMP/cwd · /help · Esc aborts · Ctrl+C twice quits
     press Ctrl+C again to quit
   ────────────────────────────────────────────────────────────────────────────────────────────────────
   >
-  …deepseek-flash  think:on  view:normal  ctx:0% 0  $0.00  Ctrl+C again quits
+  …deepseek-flash  think:on  view:normal  ctx:0.0%/1.0M  $0.00  Ctrl+C again quits
   === exited (tty flags)
   EXITED
   ixon isig icanon iexten echo
   $ bash ./harness.sh tools
   === normal
-    session <id> in $TMP/cwd. /help for commands, Esc aborts, Ctrl+C
-    twice quits.
+  prigh in $TMP/cwd · /help · Esc aborts · Ctrl+C twice quits
   
   ▌ go
     let me look
@@ -93,7 +84,7 @@ prints the captured panes.
     all done
   ────────────────────────────────────────────────────────────────────────────────────────────────────
   >
-  …deepseek-flash  think:on  view:normal  ctx:0% 0  $0.00  agents:[main] 1✓ 2✓
+  …deepseek-flash  think:on  view:normal  ctx:0.0%/1.0M  $0.00  agents:[main] 1✓ 2✓
   === verbose
     let me look
   ✓ bash $ printf 'one\ntwo\nthree\n'
@@ -124,8 +115,10 @@ prints the captured panes.
     view: verbose — everything is shown
   ────────────────────────────────────────────────────────────────────────────────────────────────────
   >
-  …deepseek-flash  think:on  view:verbose  ctx:0% 0  $0.00  agents:[main] 1✓ 2✓
+  …deepseek-flash  think:on  view:verbose  ctx:0.0%/1.0M  $0.00  agents:[main] 1✓ 2✓
   === quiet
+  prigh in $TMP/cwd · /help · Esc aborts · Ctrl+C twice quits
+  
   ▌ go
     let me look
   ✓ bash $ printf 'one\ntwo\nthree\n'  3 lines
@@ -137,7 +130,7 @@ prints the captured panes.
     all done
   ────────────────────────────────────────────────────────────────────────────────────────────────────
   >
-  …deepseek-flash  think:on  view:quiet  ctx:0% 0  $0.00  agents:[main] 1✓ 2✓
+  …deepseek-flash  think:on  view:quiet  ctx:0.0%/1.0M  $0.00  agents:[main] 1✓ 2✓
   === agent 1
   ◆ subagent 1/2  deepseek-flash  ✓ done 1 turns $0.00  "count files"
   
@@ -168,7 +161,7 @@ prints the captured panes.
     child reporting: done
   ────────────────────────────────────────────────────────────────────────────────────────────────────
   >
-  …deepseek-flash  think:on  view:quiet  ctx:0% 0  $0.00  agents:main [1✓] 2✓
+  …deepseek-flash  think:on  view:quiet  ctx:0.0%/1.0M  $0.00  agents:main [1✓] 2✓
   === agent 2
   ◆ subagent 2/2  deepseek-flash  ✓ done 1 turns $0.00  "say hello"
   
@@ -199,8 +192,10 @@ prints the captured panes.
     child reporting: done
   ────────────────────────────────────────────────────────────────────────────────────────────────────
   >
-  …deepseek-flash  think:on  view:quiet  ctx:0% 0  $0.00  agents:main 1✓ [2✓]
+  …deepseek-flash  think:on  view:quiet  ctx:0.0%/1.0M  $0.00  agents:main 1✓ [2✓]
   === main again
+  prigh in $TMP/cwd · /help · Esc aborts · Ctrl+C twice quits
+  
   ▌ go
     let me look
   ✓ bash $ printf 'one\ntwo\nthree\n'  3 lines
@@ -212,41 +207,37 @@ prints the captured panes.
     all done
   ────────────────────────────────────────────────────────────────────────────────────────────────────
   >
-  …deepseek-flash  think:on  view:quiet  ctx:0% 0  $0.00  agents:[main] 1✓ 2✓
+  …deepseek-flash  think:on  view:quiet  ctx:0.0%/1.0M  $0.00  agents:[main] 1✓ 2✓
   $ bash ./harness.sh suspend
   === suspended (shell visible)
   [1]+  Stopped sh $TMP/run.sh
   bash$
   === after fg (repainted)
-    session <id> in $TMP/cwd. /help for commands, Esc aborts, Ctrl+C
-    twice quits.
+  prigh in $TMP/cwd · /help · Esc aborts · Ctrl+C twice quits
   
   ▌ before
     faux reply
   ────────────────────────────────────────────────────────────────────────────────────────────────────
   >
-  $TMP/cwd  deepseek-flash  think:on  view:normal  ctx:0% 10  $0.00
+  $TMP/cwd  deepseek-flash  think:on  view:normal  ctx:0.0%/1.0M  $0.00
   === editor works
-    session <id> in $TMP/cwd. /help for commands, Esc aborts, Ctrl+C
-    twice quits.
+  prigh in $TMP/cwd · /help · Esc aborts · Ctrl+C twice quits
   
   ▌ before
     faux reply
   ────────────────────────────────────────────────────────────────────────────────────────────────────
   > still typing
-  $TMP/cwd  deepseek-flash  think:on  view:normal  ctx:0% 10  $0.00
+  $TMP/cwd  deepseek-flash  think:on  view:normal  ctx:0.0%/1.0M  $0.00
   $ bash ./harness.sh editor
   === after Ctrl+G round trip
-    session <id> in $TMP/cwd. /help for commands, Esc aborts, Ctrl+C
-    twice quits.
+  prigh in $TMP/cwd · /help · Esc aborts · Ctrl+C twice quits
   ────────────────────────────────────────────────────────────────────────────────────────────────────
   > draftedited by editor
   
-  $TMP/cwd  deepseek-flash  think:on  view:normal  ctx:0% 0  $0.00
+  $TMP/cwd  deepseek-flash  think:on  view:normal  ctx:0.0%/1.0M  $0.00
   $ bash ./harness.sh confirm
   === dialog
-    session <id> in $TMP/cwd. /help for commands, Esc aborts, Ctrl+C
-    twice quits.
+  prigh in $TMP/cwd · /help · Esc aborts · Ctrl+C twice quits
   
   ▌ go
     running
@@ -256,10 +247,9 @@ prints the captured panes.
   └──────────────────────────────────────────────────────────────────────────────────────────────────┘
   ────────────────────────────────────────────────────────────────────────────────────────────────────
   ?
-  $TMP/cwd  deepseek-flash  think:on  view:normal  ctx:0% 0  $0.00  confirm: y / n
+  …deepseek-flash  think:on  view:normal  ctx:0.0%/1.0M  $0.00  confirm: y / n
   === allowed
-    session <id> in $TMP/cwd. /help for commands, Esc aborts, Ctrl+C
-    twice quits.
+  prigh in $TMP/cwd · /help · Esc aborts · Ctrl+C twice quits
   
   ▌ go
     running
@@ -268,10 +258,9 @@ prints the captured panes.
     first done
   ────────────────────────────────────────────────────────────────────────────────────────────────────
   >
-  $TMP/cwd  deepseek-flash  think:on  view:normal  ctx:0% 0  $0.00
+  $TMP/cwd  deepseek-flash  think:on  view:normal  ctx:0.0%/1.0M  $0.00
   === denied
-    session <id> in $TMP/cwd. /help for commands, Esc aborts, Ctrl+C
-    twice quits.
+  prigh in $TMP/cwd · /help · Esc aborts · Ctrl+C twice quits
   
   ▌ go
     running
@@ -287,27 +276,24 @@ prints the captured panes.
     second done
   ────────────────────────────────────────────────────────────────────────────────────────────────────
   >
-  $TMP/cwd  deepseek-flash  think:on  view:normal  ctx:0% 0  $0.00
+  $TMP/cwd  deepseek-flash  think:on  view:normal  ctx:0.0%/1.0M  $0.00
   $ bash ./harness.sh paste
   === chip after a 5-line paste
-    session <id> in $TMP/cwd. /help for commands, Esc aborts, Ctrl+C
-    twice quits.
+  prigh in $TMP/cwd · /help · Esc aborts · Ctrl+C twice quits
   ────────────────────────────────────────────────────────────────────────────────────────────────────
   > [5 lines pasted]
-  $TMP/cwd  deepseek-flash  think:on  view:normal  ctx:0% 0  $0.00
+  $TMP/cwd  deepseek-flash  think:on  view:normal  ctx:0.0%/1.0M  $0.00
   === cursor inside expands the chip
-    session <id> in $TMP/cwd. /help for commands, Esc aborts, Ctrl+C
-    twice quits.
+  prigh in $TMP/cwd · /help · Esc aborts · Ctrl+C twice quits
   ────────────────────────────────────────────────────────────────────────────────────────────────────
   > line one
     line two
     line three
     line four
     line five
-  $TMP/cwd  deepseek-flash  think:on  view:normal  ctx:0% 0  $0.00
+  $TMP/cwd  deepseek-flash  think:on  view:normal  ctx:0.0%/1.0M  $0.00
   === submitted as one message
-    session <id> in $TMP/cwd. /help for commands, Esc aborts, Ctrl+C
-    twice quits.
+  prigh in $TMP/cwd · /help · Esc aborts · Ctrl+C twice quits
   
   ▌ line one
   ▌ line two
@@ -317,22 +303,20 @@ prints the captured panes.
     faux reply
   ────────────────────────────────────────────────────────────────────────────────────────────────────
   >
-  $TMP/cwd  deepseek-flash  think:on  view:normal  ctx:0% 10  $0.00
+  $TMP/cwd  deepseek-flash  think:on  view:normal  ctx:0.0%/1.0M  $0.00
   $ bash ./harness.sh reconnect
   === after the backend was killed
     reconnected to the backend
-    session <id> in $TMP/cwd. /help for commands, Esc aborts, Ctrl+C
-    twice quits.
+  prigh in $TMP/cwd · /help · Esc aborts · Ctrl+C twice quits
   
   ▌ before
     faux reply
   ────────────────────────────────────────────────────────────────────────────────────────────────────
   >
-  $TMP/cwd  deepseek-flash  think:on  view:normal  ctx:0% 10  $0.00
+  $TMP/cwd  deepseek-flash  think:on  view:normal  ctx:0.0%/1.0M  $0.00
   === prompt works again
     reconnected to the backend
-    session <id> in $TMP/cwd. /help for commands, Esc aborts, Ctrl+C
-    twice quits.
+  prigh in $TMP/cwd · /help · Esc aborts · Ctrl+C twice quits
   
   ▌ before
     faux reply
@@ -341,20 +325,18 @@ prints the captured panes.
     faux reply
   ────────────────────────────────────────────────────────────────────────────────────────────────────
   >
-  $TMP/cwd  deepseek-flash  think:on  view:normal  ctx:0% 10  $0.00
+  $TMP/cwd  deepseek-flash  think:on  view:normal  ctx:0.0%/1.0M  $0.00
   $ bash ./harness.sh fallback
   === chain and default directory set
-    session <id> in $TMP/cwd. /help for commands, Esc aborts, Ctrl+C
-    twice quits.
+  prigh in $TMP/cwd · /help · Esc aborts · Ctrl+C twice quits
     fallback: deepseek/deepseek-flash → anthropic/claude-fable-5-1 (now on deepseek/deepseek-flash)
     default directory: $TMP/cwd (new sessions start there; /default-dir off clears
     it)
   ────────────────────────────────────────────────────────────────────────────────────────────────────
   >
-  $TMP/cwd  deepseek-flash  think:on  view:normal  ctx:0% 0  $0.00
+  $TMP/cwd  deepseek-flash  think:on  view:normal  ctx:0.0%/1.0M  $0.00
   === handed over
-    session <id> in $TMP/cwd. /help for commands, Esc aborts, Ctrl+C
-    twice quits.
+  prigh in $TMP/cwd · /help · Esc aborts · Ctrl+C twice quits
     fallback: deepseek/deepseek-flash → anthropic/claude-fable-5-1 (now on deepseek/deepseek-flash)
     default directory: $TMP/cwd (new sessions start there; /default-dir off clears
     it)
@@ -367,4 +349,4 @@ prints the captured panes.
     carried on
   ────────────────────────────────────────────────────────────────────────────────────────────────────
   >
-  $TMP/cwd  claude-fable-5-1  think:on  view:normal  ctx:0% 0  $0.00
+  $TMP/cwd  claude-fable-5-1  think:on  view:normal  ctx:0.0%/1.0M  $0.00

@@ -512,6 +512,22 @@ src/retry.ml`, `bash $ make test`, `subagent <task>`) and chips: `5 lines`,
 `+4 −2` for an edit, `exit code 1`, `job j1`. Its output or diff is indented
 under it.
 
+In lists (pickers) typing filters fuzzily, Enter accepts and Esc closes
+without changes; Ctrl+D deletes a session, cancels a subagent or kills a job,
+and `/scoped-models` toggles with Space (Ctrl+A all, Ctrl+X none). `/help`
+lists the commands, the prompt prefixes (`!cmd`, `!!cmd`, `!&cmd`, `@path`)
+and these keys.
+
+The status line is quiet gray: cwd, model, `think:`, `view:`, the context
+(`ctx:12%/200k`, the share of the model's window; yellow from 50%, red from
+80%), cost, and then whatever is going on — `queued:N`, agents, jobs, the
+tool host — with the current mode's keys (`⠋ working · Esc aborts · Enter
+steers`, a picker's keys) in yellow. Queued steers and follow-ups are listed
+above the editor, one per line, until they are delivered. An unknown command
+goes back into the editor, corrected when a command is close (`/modle gpt` →
+`/model gpt`), and a failed `/switch` or `/cd` puts the command back with
+what to try next.
+
 Ctrl+O cycles the transcript verbosity:
 
 | Level | Shows |

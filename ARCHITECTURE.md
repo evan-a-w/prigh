@@ -822,9 +822,16 @@ copy of the protocol types and the e2e test guards the contract.
   - `Render.screen : Model.t -> Screen.t` lays out a frame as `Content.t`
     (styled spans with `Text_width`-aware wrapping) plus the cursor cell. The
     status line keeps the cwd and model, then fills remaining width by
-    priority (context, cost/queued/agents/jobs, thinking, verbosity, new-line
-    count, mode hint) and left-truncates, so the model key stays visible at
-    narrow widths.
+    priority (mode hint, scroll position, context, queued/agents/jobs, cost,
+    thinking, verbosity; a mode hint too wide to fit whole is cut short after
+    the context) and left-truncates, so the model key stays visible at
+    narrow widths. It is gray; yellow marks modes, running work and warm
+    context, red a full context or a lost backend.
+  - `Queued_message` tracks what this client steered or queued while a turn
+    runs (kind and text), shown above the editor; a delivered user message,
+    `dequeue` or an empty `queue_update` removes them.
+  - Replies tagged `Retry_in_editor` put the command back in the editor
+    with a hint when the backend refuses it (`/switch`, `/cd`).
 - `term/` (`prigh_ui_term`) — `Key_of_event` (Bonsai_term events → `Key.t`,
   bracketed paste → one `Insert`), `View_of_content` (spans → notty attrs,
   including OSC-8 links),

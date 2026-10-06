@@ -45,8 +45,11 @@ let resolve (models : Model.t list) query =
                  in
                  d, m)
              in
+             (* Only near misses: the nearest of unrelated names is noise. *)
+             let near = Int.max 2 (String.length q / 3) in
              Not_found
-               (List.stable_sort scored ~compare:(fun (a, _) (b, _) ->
+               (List.filter scored ~f:(fun (d, _) -> d <= near)
+                |> List.stable_sort ~compare:(fun (a, _) (b, _) ->
                   Int.compare a b)
                 |> List.map ~f:snd
                 |> fun l -> List.take l 3))))

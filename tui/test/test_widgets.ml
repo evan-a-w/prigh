@@ -502,7 +502,7 @@ let%expect_test "model matching" =
     "deep"                       -> found deepseek/deepseek-flash
     "flash"                      -> found deepseek/deepseek-flash
     "claud fabel 5"              -> ambiguous anthropic/claude-fable-5, anthropic/claude-fable-5-1
-    "zzz"                        -> not found; did you mean openai/gpt-5.5, openai-codex/gpt-5.5, anthropic/claude-fable-5
+    "zzz"                        -> not found; did you mean
     |}]
 ;;
 
@@ -583,6 +583,8 @@ let%expect_test "keymap: every binding resolves to its intent and is documented"
     |}];
   print_endline (Content.to_plain Keymap.help);
   print_endline (Content.to_plain Commands.help);
+  print_endline (Content.to_plain Commands.input_help);
+  print_endline (Content.to_plain Keymap.list_help);
   [%expect
     {|
     Enter                   send the prompt / accept the highlighted item
@@ -667,6 +669,15 @@ let%expect_test "keymap: every binding resolves to its intent and is documented"
     /signout                           sign out to log in as another user (browser only)
     /setusr [user]                     act as another user (superusers only); without a user, list them
     /quit                              exit
+    !command   run a shell command; its output joins the context
+    !!command  run a shell command without adding it to the context
+    !&command  run a shell command as a background job (/jobs)
+    @path      attach a file (Ctrl+R completes paths)
+    type                     filter the list (fuzzy)
+    Enter / Esc              accept the highlighted item / close without changes
+    Ctrl+D                   /sessions: delete · /agents: cancel · /jobs: kill
+    Ctrl+N                   /sessions: named only · /model: logged-in only
+    Space / Ctrl+A / Ctrl+X  /scoped-models: toggle / all / none
     |}]
 ;;
 
