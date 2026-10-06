@@ -59,7 +59,9 @@ let toasts (m : Model.t) ~inject =
            ; Attr.title "Dismiss"
            ; Attr.on_click (fun _ -> inject (Action.Dismiss_toast t.id))
            ]
-         [ Node.text t.text ]))
+         [ Node.span [ Node.text t.text ]
+         ; (if t.error then icon ~cls:"toast-close" Close else Node.none)
+         ]))
 ;;
 
 let empty (m : Model.t) =

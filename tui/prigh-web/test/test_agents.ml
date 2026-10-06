@@ -358,7 +358,6 @@ let%expect_test "/agents and its argument" =
     ((Agent a1/n1))
     (Save_history
      ("/agents nope" "/agents n1" "/agents a1" "/agents 2" "/agents 9"))
-    No subagent or job 9: none has run in this session.
     No subagent or job nope: give its number (1-2) or id; /agents lists them.
     |}]
 ;;
