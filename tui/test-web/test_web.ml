@@ -541,8 +541,8 @@ let%expect_test "dom_of_screen: a rendered app screen round-trips to plain text"
   else print_endline dom_text;
   [%expect
     {|
-    session abc123 in /work. /help for commands, Esc aborts,
-    Ctrl+C twice quits.
+      session abc123 in /work. /help for commands, Esc aborts,
+      Ctrl+C twice quits.
     ────────────────────────────────────────────────────────────
     > hi
     …deepseek-flash  think:off  view:normal  ctx:0% 1.5k  $0.01

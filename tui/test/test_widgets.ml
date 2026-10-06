@@ -53,7 +53,8 @@ let%expect_test "text width and wrapping" =
           ; { text = "defgh"; style = Style.plain }
           ]
           ~width:6));
-  [%expect {|
+  [%expect
+    {|
     a long …
     abcde…
     |}]
@@ -757,20 +758,20 @@ let%expect_test "live tool tail keeps the last five lines at each verbosity" =
   [%expect
     {|
     == quiet ==
-    ⚙ bash seq 7 …
+    … bash $ seq 7
     == normal ==
-    ⚙ bash command=seq 7
-      line 6
+    … bash $ seq 7
+        line 6
     == verbose ==
-    ⚙ bash
-      {
-        command: "seq 7"
-      }
-      line 2
-      line 3
-      line 4
-      line 5
-      line 6
+    … bash $ seq 7
+        {
+          command: "seq 7"
+        }
+        line 2
+        line 3
+        line 4
+        line 5
+        line 6
     |}]
 ;;
 
@@ -797,18 +798,17 @@ let%expect_test "bash timeout is merged into the tool line at each verbosity" =
   [%expect
     {|
     == quiet ==
-    ⚙ bash sleep 999 ✗ timed out after 120s
-      partial output
-      [timed out after 120s]
+    ✕ bash $ sleep 999  timed out after 120s
+        partial output
     == normal ==
-    ⚙ bash sleep 999 ✗ timed out after 120s
+    ✕ bash $ sleep 999  timed out after 120s
+        partial output
     == verbose ==
-    ⚙ bash
-      {
-        command: "sleep 999"
-      }
-      partial output
-      [timed out after 120s]
+    ✕ bash $ sleep 999  timed out after 120s
+        {
+          command: "sleep 999"
+        }
+        partial output
     |}]
 ;;
 
@@ -1008,23 +1008,507 @@ let%expect_test "diff colouring at Normal and Verbose through to_styled" =
   [%expect
     {|
     == normal ==
-    [magenta]⚙ edit[/][dim] [/]
-    [dim]  --- a/f.ml[/]
-    [dim]  +++ b/f.ml[/]
-    [cyan]  @@ -1,3 +1,3 @@[/]
-    [red]  -old line[/]
-    [green]  +new line[/]
-    [gray]  … (2 more)[/]
+    [green]✓ [/][bold]edit[/]  [green]+1[/] [red]−1[/]
+        [cyan]@@ -1,3 +1,3 @@[/]
+        [red]-old line[/]
+        [green]+new line[/]
+        [gray]  context[/]
+        [gray]  more context[/]
     == verbose ==
-    [magenta]⚙ edit[/]
-    [dim]  {}[/]
-    [dim]  --- a/f.ml[/]
-    [dim]  +++ b/f.ml[/]
-    [cyan]  @@ -1,3 +1,3 @@[/]
-    [red]  -old line[/]
-    [green]  +new line[/]
-    [gray]    context[/]
-    [gray]    more context[/]
+    [green]✓ [/][bold]edit[/]  [green]+1[/] [red]−1[/]
+        [dim]{}[/]
+        [cyan]@@ -1,3 +1,3 @@[/]
+        [red]-old line[/]
+        [green]+new line[/]
+        [gray]  context[/]
+        [gray]  more context[/]
+    |}]
+;;
+
+let tool_result ?(is_error = false) text : Prigh_protocol.Message.Tool_result.t =
+  { tool_call_id = "c1"
+  ; tool_name = "t"
+  ; text
+  ; is_error
+  ; images = []
+  ; at = None
+  }
+;;
+
+let tool ?result ?live_tail name arguments =
+  Transcript.Item.Tool
+    { call = { id = "c1"; name; arguments }
+    ; result
+    ; live_tail
+    ; subagent = None
+    }
+;;
+
+let show_tool ?width ?(styled = false) ?result ?live_tail name arguments =
+  let item = tool ?result ?live_tail name arguments in
+  List.iter Verbosity.all ~f:(fun verbosity ->
+    printf "== %s ==\n" (Verbosity.name verbosity);
+    let content = Transcript.render_item ?width item ~verbosity in
+    print_endline
+      (if styled then Content.to_styled content else Content.to_plain content))
+;;
+
+let numbered n = String.concat ~sep:"\n" (List.init n ~f:(sprintf "line %d"))
+
+let%expect_test "tools: read shows the path and how much it read" =
+  show_tool
+    ~styled:true
+    "read"
+    {|{"path":"src/retry.ml"}|}
+    ~result:(tool_result (numbered 5));
+  [%expect
+    {|
+    == quiet ==
+    [green]✓ [/][bold]read[/] src/retry.ml  [dim]5 lines[/]
+    == normal ==
+    [green]✓ [/][bold]read[/] src/retry.ml  [dim]5 lines[/]
+    == verbose ==
+    [green]✓ [/][bold]read[/] src/retry.ml  [dim]5 lines[/]
+        [dim]{[/]
+        [dim]  path: "src/retry.ml"[/]
+        [dim]}[/]
+        [gray]line 0[/]
+        [gray]line 1[/]
+        [gray]line 2[/]
+        [gray]line 3[/]
+        [gray]line 4[/]
+    |}];
+  show_tool
+    "read"
+    {|{"path":"a.ml","offset":10,"limit":20}|}
+    ~result:(tool_result (numbered 20));
+  [%expect
+    {|
+    == quiet ==
+    ✓ read a.ml  lines 10–29 20 lines
+    == normal ==
+    ✓ read a.ml  lines 10–29 20 lines
+    == verbose ==
+    ✓ read a.ml  lines 10–29 20 lines
+        {
+          path: "a.ml"
+          offset: 10
+          limit: 20
+        }
+        line 0
+        line 1
+        line 2
+        line 3
+        line 4
+        line 5
+        line 6
+        line 7
+        line 8
+        line 9
+        line 10
+        line 11
+        line 12
+        line 13
+        line 14
+        line 15
+        line 16
+        line 17
+        line 18
+        line 19
+    |}];
+  show_tool
+    ~styled:true
+    "read"
+    {|{"path":"nope.ml"}|}
+    ~result:(tool_result ~is_error:true "no such file: nope.ml");
+  [%expect
+    {|
+    == quiet ==
+    [red]✕ [/][bold]read[/] nope.ml
+        [red]no such file: nope.ml[/]
+    == normal ==
+    [red]✕ [/][bold]read[/] nope.ml
+        [red]no such file: nope.ml[/]
+    == verbose ==
+    [red]✕ [/][bold]read[/] nope.ml
+        [dim]{[/]
+        [dim]  path: "nope.ml"[/]
+        [dim]}[/]
+        [red]no such file: nope.ml[/]
+    |}]
+;;
+
+let%expect_test "tools: write counts lines; edit counts its diff" =
+  show_tool
+    "write"
+    {|{"path":"notes.md","content":"a\nb\nc\n"}|}
+    ~result:(tool_result "overwrote notes.md");
+  [%expect
+    {|
+    == quiet ==
+    ✓ write notes.md  3 lines overwrote
+    == normal ==
+    ✓ write notes.md  3 lines overwrote
+    == verbose ==
+    ✓ write notes.md  3 lines overwrote
+        {
+          path: "notes.md"
+          content: "a\nb\nc\n"
+        }
+        a
+        b
+        c
+    |}];
+  let diff =
+    "--- a/f.ml\n+++ b/f.ml\n@@ -1,6 +1,6 @@\n"
+    ^ String.concat
+        ~sep:"\n"
+        (List.init 6 ~f:(fun i -> sprintf "-old %d\n+new %d" i i))
+  in
+  show_tool "edit" {|{"path":"f.ml"}|} ~result:(tool_result diff);
+  [%expect
+    {|
+    == quiet ==
+    ✓ edit f.ml  +6 −6
+    == normal ==
+    ✓ edit f.ml  +6 −6
+        @@ -1,6 +1,6 @@
+        -old 0
+        +new 0
+        -old 1
+        +new 1
+        -old 2
+        +new 2
+        -old 3
+        … 5 more lines
+    == verbose ==
+    ✓ edit f.ml  +6 −6
+        {
+          path: "f.ml"
+        }
+        @@ -1,6 +1,6 @@
+        -old 0
+        +new 0
+        -old 1
+        +new 1
+        -old 2
+        +new 2
+        -old 3
+        +new 3
+        -old 4
+        +new 4
+        -old 5
+        +new 5
+    |}];
+  show_tool
+    "edit"
+    {|{"path":"f.ml"}|}
+    ~result:(tool_result ~is_error:true "old_text not found in f.ml");
+  [%expect
+    {|
+    == quiet ==
+    ✕ edit f.ml
+        old_text not found in f.ml
+    == normal ==
+    ✕ edit f.ml
+        old_text not found in f.ml
+    == verbose ==
+    ✕ edit f.ml
+        {
+          path: "f.ml"
+        }
+        old_text not found in f.ml
+    |}]
+;;
+
+let%expect_test "tools: bash shows the command, its outcome as a chip" =
+  show_tool "bash" {|{"command":"seq 20"}|} ~result:(tool_result (numbered 20));
+  [%expect
+    {|
+    == quiet ==
+    ✓ bash $ seq 20  20 lines
+    == normal ==
+    ✓ bash $ seq 20
+        line 0
+        line 1
+        line 2
+        line 3
+        line 4
+        … 12 more lines
+        line 17
+        line 18
+        line 19
+    == verbose ==
+    ✓ bash $ seq 20
+        {
+          command: "seq 20"
+        }
+        line 0
+        line 1
+        line 2
+        line 3
+        line 4
+        line 5
+        line 6
+        line 7
+        line 8
+        line 9
+        line 10
+        line 11
+        line 12
+        line 13
+        line 14
+        line 15
+        line 16
+        line 17
+        line 18
+        line 19
+    |}];
+  show_tool
+    ~styled:true
+    "bash"
+    {|{"command":"make test\nmake lint"}|}
+    ~result:(tool_result ~is_error:true "test.ml:3: failure\n[exit code 2]");
+  [%expect
+    {|
+    == quiet ==
+    [red]✕ [/][bold]bash[/] $ make test …  [red]exit code 2[/]
+        [red]test.ml:3: failure[/]
+    == normal ==
+    [red]✕ [/][bold]bash[/] $ make test …  [red]exit code 2[/]
+        [red]test.ml:3: failure[/]
+    == verbose ==
+    [red]✕ [/][bold]bash[/] $ make test …  [red]exit code 2[/]
+        [dim]{[/]
+        [dim]  command: "make test\nmake lint"[/]
+        [dim]}[/]
+        [red]test.ml:3: failure[/]
+    |}];
+  show_tool
+    "bash"
+    {|{"command":"npm run dev","background":true}|}
+    ~result:(tool_result "started job j1: npm run dev");
+  [%expect
+    {|
+    == quiet ==
+    ✓ bash $ npm run dev  job j1
+    == normal ==
+    ✓ bash $ npm run dev  job j1
+    == verbose ==
+    ✓ bash $ npm run dev  job j1
+        {
+          command: "npm run dev"
+          background: true
+        }
+    |}];
+  (* Aborting cancels the call: what it printed is kept, but it did not fail. *)
+  show_tool
+    ~styled:true
+    "bash"
+    {|{"command":"sleep 9"}|}
+    ~result:(tool_result ~is_error:true "partial\n[cancelled]");
+  [%expect
+    {|
+    == quiet ==
+    [dim]■ [/][bold]bash[/] $ sleep 9  [dim]1 line[/] [dim]cancelled[/]
+    == normal ==
+    [dim]■ [/][bold]bash[/] $ sleep 9  [dim]cancelled[/]
+        [gray]partial[/]
+    == verbose ==
+    [dim]■ [/][bold]bash[/] $ sleep 9  [dim]cancelled[/]
+        [dim]{[/]
+        [dim]  command: "sleep 9"[/]
+        [dim]}[/]
+        [gray]partial[/]
+    |}];
+  show_tool
+    ~styled:true
+    "bash"
+    {|{"command":"make"}|}
+    ~live_tail:"cc a.c\ncc b.c\n";
+  [%expect
+    {|
+    == quiet ==
+    [yellow]… [/][bold]bash[/] $ make
+    == normal ==
+    [yellow]… [/][bold]bash[/] $ make
+        [gray]cc b.c[/]
+    == verbose ==
+    [yellow]… [/][bold]bash[/] $ make
+        [dim]{[/]
+        [dim]  command: "make"[/]
+        [dim]}[/]
+        [gray]cc a.c[/]
+        [gray]cc b.c[/]
+    |}]
+;;
+
+let%expect_test "tools: search flags, other tools, and narrow terminals" =
+  show_tool
+    "grep"
+    {|{"pattern":"retry","path":"src","glob":"*.ml","ignore_case":true}|}
+    ~result:(tool_result "src/a.ml:1:retry\nsrc/b.ml:4:Retry");
+  [%expect
+    {|
+    == quiet ==
+    ✓ grep retry  in src *.ml ignore case 2 lines
+    == normal ==
+    ✓ grep retry  in src *.ml ignore case
+        src/a.ml:1:retry
+        src/b.ml:4:Retry
+    == verbose ==
+    ✓ grep retry  in src *.ml ignore case
+        {
+          pattern: "retry"
+          path: "src"
+          glob: "*.ml"
+          ignore_case: true
+        }
+        src/a.ml:1:retry
+        src/b.ml:4:Retry
+    |}];
+  show_tool "web_search" {|{"limit":3,"query":"ocaml eio"}|};
+  [%expect
+    {|
+    == quiet ==
+    … web_search ocaml eio
+    == normal ==
+    … web_search ocaml eio
+    == verbose ==
+    … web_search ocaml eio
+        {
+          limit: 3
+          query: "ocaml eio"
+        }
+    |}];
+  (* The argument gives way so that the outcome stays on the line. *)
+  show_tool
+    ~width:40
+    "bash"
+    {|{"command":"dune build @runtest --force 2>&1 | tail -n 40"}|}
+    ~result:
+      (tool_result
+         ~is_error:true
+         "Error: a long error message that has to wrap\n[exit code 1]");
+  [%expect
+    {|
+    == quiet ==
+    ✕ bash $ dune build @runte…  exit code 1
+        Error: a long error message that has
+        to wrap
+    == normal ==
+    ✕ bash $ dune build @runte…  exit code 1
+        Error: a long error message that has
+        to wrap
+    == verbose ==
+    ✕ bash $ dune build @runte…  exit code 1
+        {
+          command: "dune build @runtest
+        --force 2>&1 | tail -n 40"
+        }
+        Error: a long error message that has
+        to wrap
+    |}]
+;;
+
+let%expect_test "turns: the prompt opens a turn; the agent's steps hang below" =
+  let user text : Prigh_protocol.Message.User.t =
+    { text; images = []; at = None }
+  in
+  let t =
+    List.fold
+      [ Transcript.Item.User (user "first question")
+      ; Assistant { text = "first answer"; final = true }
+      ; User (user "make retries back off exponentially, and keep the cap")
+      ; Thinking "one\ntwo\nthree\nfour"
+      ; Assistant { text = "I'll read the loop first."; final = false }
+      ; tool
+          "read"
+          {|{"path":"src/retry.ml"}|}
+          ~result:(tool_result (numbered 5))
+      ; Notice (Warn, "[aborted]")
+      ]
+      ~init:Transcript.empty
+      ~f:Transcript.add
+  in
+  List.iter Verbosity.all ~f:(fun verbosity ->
+    printf "== %s ==\n" (Verbosity.name verbosity);
+    print_endline
+      (Content.to_plain (Transcript.render_all t ~width:30 ~verbosity));
+    print_s
+      [%sexp (Transcript.user_message_lines t ~width:30 ~verbosity : int list)]);
+  [%expect
+    {|
+    == quiet ==
+
+    ▌ first question
+      first answer
+
+    ▌ make retries back off
+    ▌ exponentially, and keep the
+    ▌ cap
+      I'll read the loop first.
+    ✓ read src/retry.ml  5 lines
+      [aborted]
+    (1 4)
+    == normal ==
+
+    ▌ first question
+      first answer
+
+    ▌ make retries back off
+    ▌ exponentially, and keep the
+    ▌ cap
+    ┆ one
+    ┆ two
+    ┆ three
+    ┆ …
+      I'll read the loop first.
+    ✓ read src/retry.ml  5 lines
+      [aborted]
+    (1 4)
+    == verbose ==
+
+    ▌ first question
+      first answer
+
+    ▌ make retries back off
+    ▌ exponentially, and keep the
+    ▌ cap
+    ┆ one
+    ┆ two
+    ┆ three
+    ┆ four
+      I'll read the loop first.
+    ✓ read src/retry.ml  5 lines
+        {
+          path: "src/retry.ml"
+        }
+        line 0
+        line 1
+        line 2
+        line 3
+        line 4
+      [aborted]
+    (1 4)
+    |}];
+  print_endline
+    (Content.to_styled (Transcript.render_all t ~width:30 ~verbosity:Normal));
+  [%expect
+    {|
+    [yellow]▌ [/][bold]first question[/]
+      first answer
+
+    [yellow]▌ [/][bold]make [/][bold]retries [/][bold]back [/][bold]off [/]
+    [yellow]▌ [/][bold]exponentially, [/][bold]and [/][bold]keep [/][bold]the [/]
+    [yellow]▌ [/][bold]cap[/]
+    [dim]┆ [/][dim][italic]one[/]
+    [dim]┆ [/][dim][italic]two[/]
+    [dim]┆ [/][dim][italic]three[/]
+    [dim]┆ [/][dim][italic]…[/]
+      I'll read the loop first.
+    [green]✓ [/][bold]read[/] src/retry.ml  [dim]5 lines[/]
+      [yellow][bold][aborted][/]
     |}]
 ;;
 
@@ -1087,8 +1571,9 @@ let%expect_test "markdown never raises on malformed input" =
     |}]
 ;;
 
-let%expect_test "autocomplete: Enter accepts arguments only after a filter or \
-                 navigation; /cd keeps directories only"
+let%expect_test
+    "autocomplete: Enter accepts arguments only after a filter or navigation; \
+     /cd keeps directories only"
   =
   let models =
     Or_error.ok_exn
@@ -1223,8 +1708,8 @@ let%expect_test "autocomplete: /skill: completes skill names" =
     |}]
 ;;
 
-let%expect_test "skill messages: parsed back into name, location, body and \
-                 arguments"
+let%expect_test
+    "skill messages: parsed back into name, location, body and arguments"
   =
   let head =
     "<skill name=\"review\" location=\"/p/.prigh/skills/review/SKILL.md\">\n"
@@ -1304,8 +1789,9 @@ let%expect_test "skill messages: parsed back into name, location, body and \
     |}]
 ;;
 
-let%expect_test "autocomplete: /fallback completes each word with a model not \
-                 listed yet; /default-dir lists directories on its host"
+let%expect_test
+    "autocomplete: /fallback completes each word with a model not listed yet; \
+     /default-dir lists directories on its host"
   =
   let models =
     Or_error.ok_exn

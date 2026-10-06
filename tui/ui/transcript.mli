@@ -50,8 +50,7 @@ module Item : sig
     | Skill of
         { skill : Skill_message.t
         ; images : P.Image.t list
-        }
-    (** a user message invoking a skill ([/skill:NAME ARGS], expanded) *)
+        } (** a user message invoking a skill ([/skill:NAME ARGS], expanded) *)
     | Handover of Handover_message.t
     (** the backend's message handing the conversation to the next fallback
         model *)
@@ -115,7 +114,7 @@ val line_count : t -> width:int -> verbosity:Verbosity.t -> int
 (** Every wrapped line, oldest first. *)
 val render_all : t -> width:int -> verbosity:Verbosity.t -> Content.t
 
-(** Wrapped line index where each [User] item starts, oldest first. *)
+(** Wrapped line index of each user turn's first line, oldest first. *)
 val user_message_lines : t -> width:int -> verbosity:Verbosity.t -> int list
 
 (** Renders the wrapped lines in [\[top, top + rows)]. *)
@@ -127,4 +126,5 @@ val render_window
   -> verbosity:Verbosity.t
   -> Content.t
 
-val render_item : Item.t -> verbosity:Verbosity.t -> Content.t
+(** The item's lines in the work log, wrapped at [width] if given. *)
+val render_item : ?width:int -> Item.t -> verbosity:Verbosity.t -> Content.t

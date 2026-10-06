@@ -89,10 +89,11 @@ let%expect_test "startup: requests state, messages and auth; renders history" =
   H.show h;
   [%expect
     {|
-    session abc123 in /work. /help for commands, Esc aborts,
-    Ctrl+C twice quits.
-    > earlier question
-    earlier answer
+      session abc123 in /work. /help for commands, Esc aborts,
+      Ctrl+C twice quits.
+
+    ▌ earlier question
+      earlier answer
     ────────────────────────────────────────────────────────────
     > ▏
     …deepseek-flash  think:off  view:normal  ctx:0% 1.5k  $0.01
@@ -107,10 +108,11 @@ let%expect_test "prompt, streaming with embedded newlines, tool call, steer \
   H.show h;
   [%expect
     {|
-    session abc123 in /work. /help for commands, Esc aborts,
-    Ctrl+C twice quits.
-    > earlier question
-    earlier answer
+      session abc123 in /work. /help for commands, Esc aborts,
+      Ctrl+C twice quits.
+
+    ▌ earlier question
+      earlier answer
     ────────────────────────────────────────────────────────────
     > list the files▏
     …deepseek-flash  think:off  view:normal  ctx:0% 1.5k  $0.01
@@ -131,14 +133,15 @@ let%expect_test "prompt, streaming with embedded newlines, tool call, steer \
   H.show h;
   [%expect
     {|
-    session abc123 in /work. /help for commands, Esc aborts,
-    Ctrl+C twice quits.
-    > earlier question
-    earlier answer
-    > list the files
-      let me look
-    Sure, here they are:
-    first li
+      Ctrl+C twice quits.
+
+    ▌ earlier question
+      earlier answer
+
+    ▌ list the files
+    ┆ let me look
+      Sure, here they are:
+      first li
     ────────────────────────────────────────────────────────────
     > ▏
     …deepseek-flash  $0.01  ⠋ working (Esc aborts; Enter steers)
@@ -152,15 +155,15 @@ let%expect_test "prompt, streaming with embedded newlines, tool call, steer \
   H.show h;
   [%expect
     {|
-    Ctrl+C twice quits.
-    > earlier question
-    earlier answer
-    > list the files
-      let me look
-    Sure, here they are:
-    first line done
-    ⚙ bash command=ls -la⏎/work
-      part
+    ▌ earlier question
+      earlier answer
+
+    ▌ list the files
+    ┆ let me look
+      Sure, here they are:
+      first line done
+    … bash $ ls -la …
+        part
     ────────────────────────────────────────────────────────────
     > ▏
     …deepseek-flash  $0.01  ⠋ working (Esc aborts; Enter steers)
@@ -192,15 +195,14 @@ let%expect_test "prompt, streaming with embedded newlines, tool call, steer \
   H.show h;
   [%expect
     {|
-    earlier answer
-    > list the files
-      let me look
-    Sure, here they are:
-    first line done
-    ⚙ bash command=ls -la⏎/work
-      a.ml
-      b.ml
-      partial
+    ▌ list the files
+    ┆ let me look
+      Sure, here they are:
+      first line done
+    ✓ bash $ ls -la …
+        a.ml
+        b.ml
+        partial
     ────────────────────────────────────────────────────────────
     > ▏
     …deepseek-flash  think:off  view:normal  ctx:0% 1.5k  $0.01
@@ -221,12 +223,13 @@ let%expect_test "error and aborted stop reasons are surfaced once" =
   H.show h;
   [%expect
     {|
-    session abc123 in /work. /help for commands, Esc aborts,
-    Ctrl+C twice quits.
-    > earlier question
-    earlier answer
-    [aborted]
-    error: HTTP 401: not logged in; use /login anthropic
+      session abc123 in /work. /help for commands, Esc aborts,
+      Ctrl+C twice quits.
+
+    ▌ earlier question
+      earlier answer
+      [aborted]
+      error: HTTP 401: not logged in; use /login anthropic
     ────────────────────────────────────────────────────────────
     > ▏
     …deepseek-flash  think:off  view:normal  ctx:0% 1.5k  $0.01
@@ -245,10 +248,10 @@ let%expect_test "/model opens the picker; typing filters; Enter sets the model" 
   H.show h;
   [%expect
     {|
-    session abc123 in /work. /help for commands, Esc aborts,
-    Ctrl+C twice quits.
-    > earlier question
-    earlier answer
+      Ctrl+C twice quits.
+
+    ▌ earlier question
+      earlier answer
     Model  (4)
     / ▏
        Claude Fable 5       anthropic/claude-fable-5  ctx 1.0M …
@@ -262,10 +265,11 @@ let%expect_test "/model opens the picker; typing filters; Enter sets the model" 
   H.show h;
   [%expect
     {|
-    session abc123 in /work. /help for commands, Esc aborts,
-    Ctrl+C twice quits.
-    > earlier question
-    earlier answer
+      session abc123 in /work. /help for commands, Esc aborts,
+      Ctrl+C twice quits.
+
+    ▌ earlier question
+      earlier answer
     Model  (2)
     / fable▏
     ▸  Claude Fable 5    anthropic/claude-fable-5  ctx 1.0M  $1…
@@ -294,11 +298,11 @@ let%expect_test "/model opens the picker; typing filters; Enter sets the model" 
 
 
 
+      session abc123 in /work. /help for commands, Esc aborts,
+      Ctrl+C twice quits.
 
-    session abc123 in /work. /help for commands, Esc aborts,
-    Ctrl+C twice quits.
-    > earlier question
-    earlier answer
+    ▌ earlier question
+      earlier answer
     ────────────────────────────────────────────────────────────
     > ▏
     …claude-fable-5-1  think:off  ctx:0% 1.5k  $0.01
@@ -349,11 +353,11 @@ let%expect_test "/model <display name> switches directly; unknown suggests and \
 
 
 
+      session abc123 in /work. /help for commands, Esc aborts,
+      Ctrl+C twice quits.
 
-    session abc123 in /work. /help for commands, Esc aborts,
-    Ctrl+C twice quits.
-    > earlier question
-    earlier answer
+    ▌ earlier question
+      earlier answer
     ────────────────────────────────────────────────────────────
     > ▏
     …deepseek-flash  think:off  view:normal  ctx:0% 1.5k  $0.01
@@ -364,12 +368,13 @@ let%expect_test "/model <display name> switches directly; unknown suggests and \
   H.show h;
   [%expect
     {|
-    session abc123 in /work. /help for commands, Esc aborts,
-    Ctrl+C twice quits.
-    > earlier question
-    earlier answer
-    unknown model "zzz"; did you mean: GPT-5.5, Claude Fable 5,
-    DeepSeek V4.1 Flash
+      session abc123 in /work. /help for commands, Esc aborts,
+      Ctrl+C twice quits.
+
+    ▌ earlier question
+      earlier answer
+      unknown model "zzz"; did you mean: GPT-5.5, Claude Fable
+      5, DeepSeek V4.1 Flash
     Model  (0)
     / zzz▏
       no matches
@@ -383,10 +388,10 @@ let%expect_test "/model <display name> switches directly; unknown suggests and \
   H.show h;
   [%expect
     {|
-    earlier answer
-    unknown model "zzz"; did you mean: GPT-5.5, Claude Fable 5,
-    DeepSeek V4.1 Flash
-    unknown model "q"; did you mean: a, b
+      earlier answer
+      unknown model "zzz"; did you mean: GPT-5.5, Claude Fable
+      5, DeepSeek V4.1 Flash
+      unknown model "q"; did you mean: a, b
     Model  (4)
     / ▏
        Claude Fable 5       anthropic/claude-fable-5  ctx 1.0M …
@@ -408,10 +413,10 @@ let%expect_test "Esc closes autocomplete or dialog without aborting; Esc while \
   H.show h;
   [%expect
     {|
-    session abc123 in /work. /help for commands, Esc aborts,
-    Ctrl+C twice quits.
-    > earlier question
-    earlier answer
+      Ctrl+C twice quits.
+
+    ▌ earlier question
+      earlier answer
     ────────────────────────────────────────────────────────────
     > /thinking ▏
     ▸ off
@@ -435,10 +440,11 @@ let%expect_test "Esc closes autocomplete or dialog without aborting; Esc while \
   H.show h;
   [%expect
     {|
-    session abc123 in /work. /help for commands, Esc aborts,
-    Ctrl+C twice quits.
-    > earlier question
-    earlier answer
+      session abc123 in /work. /help for commands, Esc aborts,
+      Ctrl+C twice quits.
+
+    ▌ earlier question
+      earlier answer
     ┌─ Confirm ────────────────────────────────────────────────┐
     │ Log out of deepseek and delete its credential? (y/n)     │
     └──────────────────────────────────────────────────────────┘
@@ -458,13 +464,14 @@ let%expect_test "Esc closes autocomplete or dialog without aborting; Esc while \
   H.show h;
   [%expect
     {|
-    session abc123 in /work. /help for commands, Esc aborts,
-    Ctrl+C twice quits.
-    > earlier question
-    earlier answer
-    login prompt arrived while a dialog was open; press Esc to
-    reach it
-    cancelled
+      session abc123 in /work. /help for commands, Esc aborts,
+      Ctrl+C twice quits.
+
+    ▌ earlier question
+      earlier answer
+      login prompt arrived while a dialog was open; press Esc to
+      reach it
+      cancelled
     ────────────────────────────────────────────────────────────
     > ▏
     …deepseek-flash  $0.01  ⠋ working (Esc aborts; Enter steers)
@@ -513,9 +520,8 @@ let%expect_test "login: url, masked secret prompt, answer, done switches \
   H.show h;
   [%expect
     {|
-    Ctrl+C twice quits.
-    > earlier question
-    earlier answer
+    ▌ earlier question
+      earlier answer
     ┌─ Log in ─────────────────────────────────────────────────┐
     │ Open this URL to log in:                                 │
     │   https://claude.ai/oauth?x=1                            │
@@ -556,12 +562,13 @@ let%expect_test "login: url, masked secret prompt, answer, done switches \
   H.show h;
   [%expect
     {|
-    session abc123 in /work. /help for commands, Esc aborts,
-    Ctrl+C twice quits.
-    > earlier question
-    earlier answer
-    logged in to anthropic (api_key)
-    model set to anthropic/claude-fable-5; /model to change
+      session abc123 in /work. /help for commands, Esc aborts,
+      Ctrl+C twice quits.
+
+    ▌ earlier question
+      earlier answer
+      logged in to anthropic (api_key)
+      model set to anthropic/claude-fable-5; /model to change
     ────────────────────────────────────────────────────────────
     > ▏
     …deepseek-flash  think:off  view:normal  ctx:0% 1.5k  $0.01
@@ -586,10 +593,11 @@ let%expect_test "login: select prompt is a picker; Esc cancels; backend \
   H.show h;
   [%expect
     {|
-    session abc123 in /work. /help for commands, Esc aborts,
-    Ctrl+C twice quits.
-    > earlier question
-    earlier answer
+      session abc123 in /work. /help for commands, Esc aborts,
+      Ctrl+C twice quits.
+
+    ▌ earlier question
+      earlier answer
     Choose a login method  (2)
     / ▏
     ▸  Claude Pro/Max  oauth
@@ -625,10 +633,11 @@ let%expect_test "login: select prompt is a picker; Esc cancels; backend \
   H.show h;
   [%expect
     {|
-    session abc123 in /work. /help for commands, Esc aborts,
-    Ctrl+C twice quits.
-    > earlier question
-    earlier answer
+      session abc123 in /work. /help for commands, Esc aborts,
+      Ctrl+C twice quits.
+
+    ▌ earlier question
+      earlier answer
     ────────────────────────────────────────────────────────────
     > ▏
     …deepseek-flash  think:off  view:normal  ctx:0% 1.5k  $0.01
@@ -652,12 +661,12 @@ let%expect_test "login: select prompt is a picker; Esc cancels; backend \
 
 
 
+      session abc123 in /work. /help for commands, Esc aborts,
+      Ctrl+C twice quits.
 
-    session abc123 in /work. /help for commands, Esc aborts,
-    Ctrl+C twice quits.
-    > earlier question
-    earlier answer
-    login to anthropic failed: denied
+    ▌ earlier question
+      earlier answer
+      login to anthropic failed: denied
     ────────────────────────────────────────────────────────────
     > ▏
     …deepseek-flash  think:off  view:normal  ctx:0% 1.5k  $0.01
@@ -673,10 +682,11 @@ let%expect_test "Ctrl+C clears, then warns, then quits; never quits with a \
   H.show h;
   [%expect
     {|
-    session abc123 in /work. /help for commands, Esc aborts,
-    Ctrl+C twice quits.
-    > earlier question
-    earlier answer
+      session abc123 in /work. /help for commands, Esc aborts,
+      Ctrl+C twice quits.
+
+    ▌ earlier question
+      earlier answer
     ────────────────────────────────────────────────────────────
     > ▏
     …deepseek-flash  think:off  view:normal  ctx:0% 1.5k  $0.01
@@ -685,11 +695,12 @@ let%expect_test "Ctrl+C clears, then warns, then quits; never quits with a \
   H.show h;
   [%expect
     {|
-    session abc123 in /work. /help for commands, Esc aborts,
-    Ctrl+C twice quits.
-    > earlier question
-    earlier answer
-    press Ctrl+C again to quit
+      session abc123 in /work. /help for commands, Esc aborts,
+      Ctrl+C twice quits.
+
+    ▌ earlier question
+      earlier answer
+      press Ctrl+C again to quit
     ────────────────────────────────────────────────────────────
     > ▏
     …deepseek-flash  ctx:0% 1.5k  $0.01  Ctrl+C again quits
@@ -785,10 +796,11 @@ let%expect_test "typing / lists commands, Down twice + Tab fills /login " =
   H.show h;
   [%expect
     {|
-    session abc123 in /work. /help for commands, Esc aborts,
-    Ctrl+C twice quits.
-    > earlier question
-    earlier answer
+      session abc123 in /work. /help for commands, Esc aborts,
+      Ctrl+C twice quits.
+
+    ▌ earlier question
+      earlier answer
     ────────────────────────────────────────────────────────────
     > /model ▏
     …deepseek-flash  think:off  view:normal  ctx:0% 1.5k  $0.01
@@ -806,10 +818,11 @@ let%expect_test "/mo Enter opens argument completion over models; typing fab \
   H.show h;
   [%expect
     {|
-    session abc123 in /work. /help for commands, Esc aborts,
-    Ctrl+C twice quits.
-    > earlier question
-    earlier answer
+      session abc123 in /work. /help for commands, Esc aborts,
+      Ctrl+C twice quits.
+
+    ▌ earlier question
+      earlier answer
     ────────────────────────────────────────────────────────────
     > /model ▏
     ▸ Claude Fable 5       anthropic/claude-fable-5
@@ -822,10 +835,11 @@ let%expect_test "/mo Enter opens argument completion over models; typing fab \
   H.show h;
   [%expect
     {|
-    session abc123 in /work. /help for commands, Esc aborts,
-    Ctrl+C twice quits.
-    > earlier question
-    earlier answer
+      session abc123 in /work. /help for commands, Esc aborts,
+      Ctrl+C twice quits.
+
+    ▌ earlier question
+      earlier answer
     ────────────────────────────────────────────────────────────
     > /model fab▏
     ▸ Claude Fable 5    anthropic/claude-fable-5
@@ -849,10 +863,11 @@ let%expect_test "Esc closes autocomplete without abort while running" =
   H.show h;
   [%expect
     {|
-    session abc123 in /work. /help for commands, Esc aborts,
-    Ctrl+C twice quits.
-    > earlier question
-    earlier answer
+      session abc123 in /work. /help for commands, Esc aborts,
+      Ctrl+C twice quits.
+
+    ▌ earlier question
+      earlier answer
     ────────────────────────────────────────────────────────────
     > /mo▏
     ▸ /model [name|id|provider/id]  pick or switch the model
@@ -864,10 +879,11 @@ let%expect_test "Esc closes autocomplete without abort while running" =
   H.show h;
   [%expect
     {|
-    session abc123 in /work. /help for commands, Esc aborts,
-    Ctrl+C twice quits.
-    > earlier question
-    earlier answer
+      session abc123 in /work. /help for commands, Esc aborts,
+      Ctrl+C twice quits.
+
+    ▌ earlier question
+      earlier answer
     ────────────────────────────────────────────────────────────
     > /mo▏
     …deepseek-flash  $0.01  ⠋ working (Esc aborts; Enter steers)
@@ -906,10 +922,11 @@ let%expect_test "@ completion is asynchronous and drops stale replies" =
   H.show h;
   [%expect
     {|
-    session abc123 in /work. /help for commands, Esc aborts,
-    Ctrl+C twice quits.
-    > earlier question
-    earlier answer
+      session abc123 in /work. /help for commands, Esc aborts,
+      Ctrl+C twice quits.
+
+    ▌ earlier question
+      earlier answer
     ────────────────────────────────────────────────────────────
     > @src▏
     …deepseek-flash  ctx:0% 1.5k  Tab/Enter accept · Esc close
@@ -918,10 +935,11 @@ let%expect_test "@ completion is asynchronous and drops stale replies" =
   H.show h;
   [%expect
     {|
-    session abc123 in /work. /help for commands, Esc aborts,
-    Ctrl+C twice quits.
-    > earlier question
-    earlier answer
+      session abc123 in /work. /help for commands, Esc aborts,
+      Ctrl+C twice quits.
+
+    ▌ earlier question
+      earlier answer
     ────────────────────────────────────────────────────────────
     > @src▏
     ▸ src/
@@ -971,10 +989,11 @@ let%expect_test "/switch fetches sessions then reopens completion" =
   H.show h;
   [%expect
     {|
-    session abc123 in /work. /help for commands, Esc aborts,
-    Ctrl+C twice quits.
-    > earlier question
-    earlier answer
+      session abc123 in /work. /help for commands, Esc aborts,
+      Ctrl+C twice quits.
+
+    ▌ earlier question
+      earlier answer
     ────────────────────────────────────────────────────────────
     > /switch ▏
     ▸ fix the build please  /work
@@ -997,10 +1016,11 @@ let%expect_test "/cd completes paths and submits the selected one" =
   H.show h;
   [%expect
     {|
-    session abc123 in /work. /help for commands, Esc aborts,
-    Ctrl+C twice quits.
-    > earlier question
-    earlier answer
+      session abc123 in /work. /help for commands, Esc aborts,
+      Ctrl+C twice quits.
+
+    ▌ earlier question
+      earlier answer
     ────────────────────────────────────────────────────────────
     > /cd sr▏
     ▸ src/
@@ -1030,10 +1050,11 @@ let%expect_test "/sessions picker switches and reloads; /logout confirms" =
   H.show h;
   [%expect
     {|
-    session abc123 in /work. /help for commands, Esc aborts,
-    Ctrl+C twice quits.
-    > earlier question
-    earlier answer
+      session abc123 in /work. /help for commands, Esc aborts,
+      Ctrl+C twice quits.
+
+    ▌ earlier question
+      earlier answer
     Sessions  (2)
     / ▏
     ▸* build fix ∣ 2025-06-01T10:00 ∣ 12 msgs ∣ fix the build p…
@@ -1064,7 +1085,7 @@ let%expect_test "/sessions picker switches and reloads; /logout confirms" =
   H.show h;
   [%expect
     {|
-    > in the other session
+    ▌ in the other session
     ────────────────────────────────────────────────────────────
     > ▏
     …deepseek-flash  think:off  view:normal  ctx:0% 1.5k  $0.01
@@ -1074,7 +1095,7 @@ let%expect_test "/sessions picker switches and reloads; /logout confirms" =
   H.show h;
   [%expect
     {|
-    > in the other session
+    ▌ in the other session
     ┌─ Confirm ────────────────────────────────────────────────┐
     │ Log out of deepseek and delete its credential? (y/n)     │
     └──────────────────────────────────────────────────────────┘
@@ -1098,8 +1119,8 @@ let%expect_test "/sessions picker switches and reloads; /logout confirms" =
 
 
 
-    > in the other session
-    cancelled
+    ▌ in the other session
+      cancelled
     Log out of  (1)
     / ▏
     ▸  DeepSeek  api_key via auth.json
@@ -1130,11 +1151,12 @@ let%expect_test "/name sets the name directly or prompts in a text dialog" =
   H.show h;
   [%expect
     {|
-    session abc123 in /work. /help for commands, Esc aborts,
-    Ctrl+C twice quits.
-    > earlier question
-    earlier answer
-    session named
+      session abc123 in /work. /help for commands, Esc aborts,
+      Ctrl+C twice quits.
+
+    ▌ earlier question
+      earlier answer
+      session named
     ────────────────────────────────────────────────────────────
     > ▏
     …deepseek-flash  think:off  view:normal  ctx:0% 1.5k  $0.01
@@ -1144,11 +1166,12 @@ let%expect_test "/name sets the name directly or prompts in a text dialog" =
   H.show h;
   [%expect
     {|
-    session abc123 in /work. /help for commands, Esc aborts,
-    Ctrl+C twice quits.
-    > earlier question
-    earlier answer
-    session named
+      session abc123 in /work. /help for commands, Esc aborts,
+      Ctrl+C twice quits.
+
+    ▌ earlier question
+      earlier answer
+      session named
     ┌─ Session name ───────────────────────────────────────────┐
     └──────────────────────────────────────────────────────────┘
     ────────────────────────────────────────────────────────────
@@ -1220,11 +1243,11 @@ let%expect_test "/sessions Ctrl+N filters named only; Ctrl+D confirms delete" =
     (Rpc (method_ list_sessions) (params ()) (tag Sessions_picker))
 
 
+      session abc123 in /work. /help for commands, Esc aborts,
+      Ctrl+C twice quits.
 
-    session abc123 in /work. /help for commands, Esc aborts,
-    Ctrl+C twice quits.
-    > earlier question
-    earlier answer
+    ▌ earlier question
+      earlier answer
     Sessions (named)  (1)
     / ▏
     ▸* build fix ∣ 2025-06-01T10:00 ∣ 12 msgs ∣ fix the build p…
@@ -1236,10 +1259,11 @@ let%expect_test "/sessions Ctrl+N filters named only; Ctrl+D confirms delete" =
   H.show h;
   [%expect
     {|
-    session abc123 in /work. /help for commands, Esc aborts,
-    Ctrl+C twice quits.
-    > earlier question
-    earlier answer
+      session abc123 in /work. /help for commands, Esc aborts,
+      Ctrl+C twice quits.
+
+    ▌ earlier question
+      earlier answer
     ┌─ Confirm ────────────────────────────────────────────────┐
     │ Delete session build fix? (y/n)                          │
     └──────────────────────────────────────────────────────────┘
@@ -1277,10 +1301,11 @@ let%expect_test "/fork picks a user message, forks at it and prefills the \
   H.show h;
   [%expect
     {|
-    session abc123 in /work. /help for commands, Esc aborts,
-    Ctrl+C twice quits.
-    > earlier question
-    earlier answer
+      session abc123 in /work. /help for commands, Esc aborts,
+      Ctrl+C twice quits.
+
+    ▌ earlier question
+      earlier answer
     Fork at  (2)
     / ▏
        first question   #1
@@ -1293,10 +1318,11 @@ let%expect_test "/fork picks a user message, forks at it and prefills the \
   H.show h;
   [%expect
     {|
-    session abc123 in /work. /help for commands, Esc aborts,
-    Ctrl+C twice quits.
-    > earlier question
-    earlier answer
+      session abc123 in /work. /help for commands, Esc aborts,
+      Ctrl+C twice quits.
+
+    ▌ earlier question
+      earlier answer
     ────────────────────────────────────────────────────────────
     > second question
       more▏
@@ -1314,11 +1340,11 @@ let%expect_test "/rewind picks a user message, then confirms the rewind" =
     {|
     (Rpc (method_ get_entries) (params ()) (tag Entries_for_rewind))
 
+      session abc123 in /work. /help for commands, Esc aborts,
+      Ctrl+C twice quits.
 
-    session abc123 in /work. /help for commands, Esc aborts,
-    Ctrl+C twice quits.
-    > earlier question
-    earlier answer
+    ▌ earlier question
+      earlier answer
     Rewind to  (2)
     / ▏
        first question   #1
@@ -1330,10 +1356,11 @@ let%expect_test "/rewind picks a user message, then confirms the rewind" =
   H.show h;
   [%expect
     {|
-    session abc123 in /work. /help for commands, Esc aborts,
-    Ctrl+C twice quits.
-    > earlier question
-    earlier answer
+      session abc123 in /work. /help for commands, Esc aborts,
+      Ctrl+C twice quits.
+
+    ▌ earlier question
+      earlier answer
     ┌─ Confirm ────────────────────────────────────────────────┐
     │ Rewind to "second question"? Later messages are abandon… │
     └──────────────────────────────────────────────────────────┘
@@ -1356,9 +1383,8 @@ let%expect_test "/tree renders branches with the active path marked" =
   H.show h;
   [%expect
     {|
-    Ctrl+C twice quits.
-    > earlier question
-    earlier answer
+    ▌ earlier question
+      earlier answer
     Session tree  (5)
     / ▏
     ▸* > root question
@@ -1398,7 +1424,7 @@ let%expect_test "/clone reloads and notices" =
   H.show h;
   [%expect
     {|
-    cloned session
+      cloned session
     ────────────────────────────────────────────────────────────
     > ▏
     …deepseek-flash  think:off  view:normal  ctx:0% 1.5k  $0.01
@@ -1448,12 +1474,12 @@ let%expect_test "/export chooses jsonl by extension, or prompts for a path" =
       (params ((prefix "")))
       (tag (Paths_for_autocomplete "")))
 
+      session abc123 in /work. /help for commands, Esc aborts,
+      Ctrl+C twice quits.
 
-    session abc123 in /work. /help for commands, Esc aborts,
-    Ctrl+C twice quits.
-    > earlier question
-    earlier answer
-    exported to /tmp/notes.md
+    ▌ earlier question
+      earlier answer
+      exported to /tmp/notes.md
     ┌─ Export to ──────────────────────────────────────────────┐
     └──────────────────────────────────────────────────────────┘
     ────────────────────────────────────────────────────────────
@@ -1496,11 +1522,11 @@ let%expect_test "/import imports a path or prompts for one" =
       (tag (Paths_for_autocomplete "")))
 
 
+      session abc123 in /work. /help for commands, Esc aborts,
+      Ctrl+C twice quits.
 
-    session abc123 in /work. /help for commands, Esc aborts,
-    Ctrl+C twice quits.
-    > earlier question
-    earlier answer
+    ▌ earlier question
+      earlier answer
     ┌─ Import from ────────────────────────────────────────────┐
     └──────────────────────────────────────────────────────────┘
     ────────────────────────────────────────────────────────────
@@ -1539,11 +1565,11 @@ let%expect_test "/cd changes the directory or prompts for a path" =
       (tag (Dirs_for_autocomplete "")))
 
 
+      session abc123 in /work. /help for commands, Esc aborts,
+      Ctrl+C twice quits.
 
-    session abc123 in /work. /help for commands, Esc aborts,
-    Ctrl+C twice quits.
-    > earlier question
-    earlier answer
+    ▌ earlier question
+      earlier answer
     ┌─ Change directory to ────────────────────────────────────┐
     └──────────────────────────────────────────────────────────┘
     ────────────────────────────────────────────────────────────
@@ -1579,11 +1605,11 @@ let%expect_test "/auth, /help, /state, /clear, unknown method errors" =
 
 
 
+      session abc123 in /work. /help for commands, Esc aborts,
+      Ctrl+C twice quits.
 
-    session abc123 in /work. /help for commands, Esc aborts,
-    Ctrl+C twice quits.
-    > earlier question
-    earlier answer
+    ▌ earlier question
+      earlier answer
     anthropic  not configured  [oauth (Claude Pro/Max), api_key
     (API key)]
     openai     not configured  [api_key (API key)]
@@ -1636,8 +1662,8 @@ let%expect_test "/auth, /help, /state, /clear, unknown method errors" =
     Ctrl+C                  clear the editor or abort the turn,
     then (again) quit
     Ctrl+D                  quit
-    unknown method "bogus"
-    protocol error: bad line
+      unknown method "bogus"
+      protocol error: bad line
     ────────────────────────────────────────────────────────────
     > ▏
     …deepseek-flash  think:off  view:normal  ctx:0% 1.5k  $0.01
@@ -1667,17 +1693,17 @@ let%expect_test "verbosity cycles Normal / Verbose / Quiet; /verbosity sets it" 
     {|
     (Rpc (method_ prompt) (params ((text "run it"))) (tag Show_error))
     (Append_history "run it")
-    ⚙ bash command=ls -la
-      out 0
-      out 1
-      out 2
-      out 3
-      out 4
-      … (12 lines hidden)
-      out 17
-      out 18
-      out 19
-    all done
+    ✓ bash $ ls -la
+        out 0
+        out 1
+        out 2
+        out 3
+        out 4
+        … 12 more lines
+        out 17
+        out 18
+        out 19
+      all done
     ────────────────────────────────────────────────────────────
     > ▏
     …deepseek-flash  think:off  view:normal  ctx:0% 1.5k  $0.01
@@ -1686,17 +1712,17 @@ let%expect_test "verbosity cycles Normal / Verbose / Quiet; /verbosity sets it" 
   H.show h;
   [%expect
     {|
-      out 11
-      out 12
-      out 13
-      out 14
-      out 15
-      out 16
-      out 17
-      out 18
-      out 19
-    all done
-    view: verbose — everything is shown
+        out 11
+        out 12
+        out 13
+        out 14
+        out 15
+        out 16
+        out 17
+        out 18
+        out 19
+      all done
+      view: verbose — everything is shown
     ────────────────────────────────────────────────────────────
     > ▏
     …deepseek-flash  think:off  view:verbose  ctx:0% 1.5k  $0.01
@@ -1705,11 +1731,12 @@ let%expect_test "verbosity cycles Normal / Verbose / Quiet; /verbosity sets it" 
   H.show h;
   [%expect
     {|
-    > earlier question
-    earlier answer
-    > run it
-    ⚙ bash ls -la ✓ 20 lines
-    all done
+    ▌ earlier question
+      earlier answer
+
+    ▌ run it
+    ✓ bash $ ls -la  20 lines
+      all done
     ────────────────────────────────────────────────────────────
     > ▏
     …deepseek-flash  think:off  view:quiet  ctx:0% 1.5k  $0.01
@@ -1719,17 +1746,17 @@ let%expect_test "verbosity cycles Normal / Verbose / Quiet; /verbosity sets it" 
   H.show h;
   [%expect
     {|
-      out 2
-      out 3
-      out 4
-      … (12 lines hidden)
-      out 17
-      out 18
-      out 19
-    all done
-    view: verbose — everything is shown
-    view: quiet — intermediate output and thinking are hidden
-    view: normal — tool output is summarised
+        out 2
+        out 3
+        out 4
+        … 12 more lines
+        out 17
+        out 18
+        out 19
+      all done
+      view: verbose — everything is shown
+      view: quiet — intermediate output and thinking are hidden
+      view: normal — tool output is summarised
     ────────────────────────────────────────────────────────────
     > ▏
     …deepseek-flash  think:off  view:normal  ctx:0% 1.5k  $0.01
@@ -1770,18 +1797,18 @@ let%expect_test
   H.show h;
   [%expect
     {|
-    session abc123 in /work. /help for commands, Esc aborts,
-    Ctrl+C twice quits.
-    > earlier question
-    earlier answer
-    > what is in these?
-    > [image: image/png, 34.2 KB]
-    > [image: image/jpeg, 512 B]
-    ⚙ read path=shot.png
-      Read image file [image/png, 800x600]
-      [Image downscaled from 4000x3000 to fit]
-      [image: image/png, 34.2 KB]
-    A cat.
+      session abc123 in /work. /help for commands, Esc aborts,
+      Ctrl+C twice quits.
+
+    ▌ earlier question
+      earlier answer
+
+    ▌ what is in these?
+    ▌ [image: image/png, 34.2 KB]
+    ▌ [image: image/jpeg, 512 B]
+    ✓ read shot.png  1 image
+        [image: image/png, 34.2 KB]
+      A cat.
     ────────────────────────────────────────────────────────────
     > ▏
     …deepseek-flash  think:off  view:normal  ctx:0% 1.5k  $0.01
@@ -1790,19 +1817,19 @@ let%expect_test
   H.show h;
   [%expect
     {|
-    earlier answer
-    > what is in these?
-    > [image: image/png, 34.2 KB]
-    > [image: image/jpeg, 512 B]
-    ⚙ read
-      {
-        path: "shot.png"
-      }
-      Read image file [image/png, 800x600]
-      [Image downscaled from 4000x3000 to fit]
-      [image: image/png, 34.2 KB]
-    A cat.
-    view: verbose — everything is shown
+    ▌ earlier question
+      earlier answer
+
+    ▌ what is in these?
+    ▌ [image: image/png, 34.2 KB]
+    ▌ [image: image/jpeg, 512 B]
+    ✓ read shot.png  1 image
+        {
+          path: "shot.png"
+        }
+        [image: image/png, 34.2 KB]
+      A cat.
+      view: verbose — everything is shown
     ────────────────────────────────────────────────────────────
     > ▏
     …deepseek-flash  think:off  view:verbose  ctx:0% 1.5k  $0.01
@@ -1811,13 +1838,14 @@ let%expect_test
   H.show h;
   [%expect
     {|
-    > earlier question
-    earlier answer
-    > what is in these?
-    > [image: image/png, 34.2 KB]
-    > [image: image/jpeg, 512 B]
-    ⚙ read shot.png ✓ 2 lines, 1 image
-    A cat.
+    ▌ earlier question
+      earlier answer
+
+    ▌ what is in these?
+    ▌ [image: image/png, 34.2 KB]
+    ▌ [image: image/jpeg, 512 B]
+    ✓ read shot.png  1 image
+      A cat.
     ────────────────────────────────────────────────────────────
     > ▏
     …deepseek-flash  think:off  view:quiet  ctx:0% 1.5k  $0.01
@@ -1837,11 +1865,10 @@ let%expect_test
   H.show h;
   [%expect
     {|
-    > [image: image/gif, 14 B]
-    ⚙ read path=a.webp
-      Read image file [image/webp, 2x2]
-      [image: image/webp, 12 B]
-      [image: image/webp, 4 B]
+    ▌ [image: image/gif, 14 B]
+    ✓ read a.webp  2 images
+        [image: image/webp, 12 B]
+        [image: image/webp, 4 B]
     ────────────────────────────────────────────────────────────
     > ▏
     …deepseek-flash  think:off  view:normal  ctx:0% 1.5k  $0.01
@@ -1851,8 +1878,8 @@ let%expect_test
   H.show h;
   [%expect
     {|
-    > [image: image/gif, 14 B]
-    ⚙ read a.webp ✓ 1 line, 2 images
+    ▌ [image: image/gif, 14 B]
+    ✓ read a.webp  2 images
     ────────────────────────────────────────────────────────────
     > ▏
     …deepseek-flash  think:off  view:quiet  ctx:0% 1.5k  $0.01
@@ -1872,8 +1899,8 @@ let%expect_test
 
 
 
-    > [image: image/gif, 14 B]
-    ⚙ read a.webp ✓ 1 line, 2 images
+    ▌ [image: image/gif, 14 B]
+    ✓ read a.webp  2 images
     Rewind to  (1)
     / ▏
     ▸* [image: image/gif, 14 B]  #1
@@ -1889,10 +1916,11 @@ let%expect_test "/verbosity with no argument opens argument completion" =
   H.show h;
   [%expect
     {|
-    session abc123 in /work. /help for commands, Esc aborts,
-    Ctrl+C twice quits.
-    > earlier question
-    earlier answer
+      session abc123 in /work. /help for commands, Esc aborts,
+      Ctrl+C twice quits.
+
+    ▌ earlier question
+      earlier answer
     ────────────────────────────────────────────────────────────
     > /verbosity ▏
     ▸ Quiet
@@ -1906,11 +1934,12 @@ let%expect_test "/verbosity with no argument opens argument completion" =
   H.show h;
   [%expect
     {|
-    session abc123 in /work. /help for commands, Esc aborts,
-    Ctrl+C twice quits.
-    > earlier question
-    earlier answer
-    view: verbose — everything is shown
+      session abc123 in /work. /help for commands, Esc aborts,
+      Ctrl+C twice quits.
+
+    ▌ earlier question
+      earlier answer
+      view: verbose — everything is shown
     ────────────────────────────────────────────────────────────
     > ▏
     …deepseek-flash  think:off  view:verbose  ctx:0% 1.5k  $0.01
@@ -1939,12 +1968,13 @@ let%expect_test "quiet hides intermediate text and thinking" =
   H.show h;
   [%expect
     {|
-    > earlier question
-    earlier answer
-    > hi
-    let me look at the files
-    ⚙ bash ls ✓ 2 lines
-    all done
+    ▌ earlier question
+      earlier answer
+
+    ▌ hi
+      let me look at the files
+    ✓ bash $ ls  2 lines
+      all done
     ────────────────────────────────────────────────────────────
     > ▏
     …deepseek-flash  think:off  view:quiet  ctx:0% 1.5k  $0.01
@@ -1970,12 +2000,13 @@ let%expect_test "tool error is always visible in Quiet" =
   H.show h;
   [%expect
     {|
-    > earlier question
-    earlier answer
-    ⚙ bash cat missing ✗ 4 lines
-      no such file
-      second line
-      third line
+    ▌ earlier question
+      earlier answer
+    ✕ bash $ cat missing
+        no such file
+        second line
+        third line
+        … 1 more line
     ────────────────────────────────────────────────────────────
     > ▏
     …deepseek-flash  think:off  view:quiet  ctx:0% 1.5k  $0.01
@@ -2004,8 +2035,8 @@ let%expect_test "reload pairs tool calls with their results" =
 
 
 
-    > go
-    ⚙ bash ls ✓ 2 lines
+    ▌ go
+    ✓ bash $ ls  2 lines
     ────────────────────────────────────────────────────────────
     > ▏
     …deepseek-flash  think:off  view:quiet  ctx:0% 1.5k  $0.01
@@ -2027,11 +2058,11 @@ let%expect_test "resize mid-stream re-wraps without losing lines" =
   H.show h;
   [%expect
     {|
-    > earlier question
-    earlier answer
-    The quick brown fox jumps over the lazy dog and keeps
-    running.
-    second
+    ▌ earlier question
+      earlier answer
+      The quick brown fox jumps over the lazy dog and keeps
+      running.
+      second
     ────────────────────────────────────────────────────────────
     > ▏
     …deepseek-flash  $0.01  ⠋ working (Esc aborts; Enter steers)
@@ -2040,11 +2071,11 @@ let%expect_test "resize mid-stream re-wraps without losing lines" =
   H.show h;
   [%expect
     {|
-    earlier answer
-    The quick brown fox jumps over
-    the lazy dog and keeps
-    running.
-    second
+      earlier answer
+      The quick brown fox jumps
+      over the lazy dog and keeps
+      running.
+      second
     ──────────────────────────────
     > ▏
     …deepseek-flash  ctx:0% 1.5k
@@ -2054,11 +2085,11 @@ let%expect_test "resize mid-stream re-wraps without losing lines" =
   H.show h;
   [%expect
     {|
-    > earlier question
-    earlier answer
-    The quick brown fox jumps over the lazy dog and keeps
-    running.
-    second part
+    ▌ earlier question
+      earlier answer
+      The quick brown fox jumps over the lazy dog and keeps
+      running.
+      second part
     ────────────────────────────────────────────────────────────
     > ▏
     …deepseek-flash  $0.01  ⠋ working (Esc aborts; Enter steers)
@@ -2076,10 +2107,11 @@ let%expect_test "multi-line editing: Alt+J, cursor movement, history" =
   H.show h;
   [%expect
     {|
-    session abc123 in /work. /help for commands, Esc aborts,
-    Ctrl+C twice quits.
-    > earlier question
-    earlier answer
+      session abc123 in /work. /help for commands, Esc aborts,
+      Ctrl+C twice quits.
+
+    ▌ earlier question
+      earlier answer
     ────────────────────────────────────────────────────────────
     > f▏rst line
       second
@@ -2097,10 +2129,11 @@ let%expect_test "multi-line editing: Alt+J, cursor movement, history" =
   H.show h;
   [%expect
     {|
-    session abc123 in /work. /help for commands, Esc aborts,
-    Ctrl+C twice quits.
-    > earlier question
-    earlier answer
+      session abc123 in /work. /help for commands, Esc aborts,
+      Ctrl+C twice quits.
+
+    ▌ earlier question
+      earlier answer
     ────────────────────────────────────────────────────────────
     > first line
       second▏
@@ -2110,10 +2143,11 @@ let%expect_test "multi-line editing: Alt+J, cursor movement, history" =
   H.show h;
   [%expect
     {|
-    session abc123 in /work. /help for commands, Esc aborts,
-    Ctrl+C twice quits.
-    > earlier question
-    earlier answer
+      session abc123 in /work. /help for commands, Esc aborts,
+      Ctrl+C twice quits.
+
+    ▌ earlier question
+      earlier answer
     ────────────────────────────────────────────────────────────
     > ▏
     …deepseek-flash  think:off  view:normal  ctx:0% 1.5k  $0.01
@@ -2123,10 +2157,11 @@ let%expect_test "multi-line editing: Alt+J, cursor movement, history" =
   H.show h;
   [%expect
     {|
-    session abc123 in /work. /help for commands, Esc aborts,
-    Ctrl+C twice quits.
-    > earlier question
-    earlier answer
+      session abc123 in /work. /help for commands, Esc aborts,
+      Ctrl+C twice quits.
+
+    ▌ earlier question
+      earlier answer
     ────────────────────────────────────────────────────────────
     > a
       b
@@ -2143,10 +2178,11 @@ let%expect_test "backend crash shows the stderr tail; Ctrl+C quits" =
   H.show h;
   [%expect
     {|
-    session abc123 in /work. /help for commands, Esc aborts,
-    Ctrl+C twice quits.
-    > earlier question
-    earlier answer
+      session abc123 in /work. /help for commands, Esc aborts,
+      Ctrl+C twice quits.
+
+    ▌ earlier question
+      earlier answer
     ────────────────────────────────────────────────────────────
     > ▏
     …deepseek-flash  think:off  view:normal  ctx:0% 1.5k  $0.01
@@ -2160,12 +2196,12 @@ let%expect_test "backend crash shows the stderr tail; Ctrl+C quits" =
       (delay_ms   0)
       (session (/home/u/.prigh/sessions/1.jsonl))
       (as_user ()))
-    session abc123 in /work. /help for commands, Esc aborts,
-    Ctrl+C twice quits.
-    > earlier question
-    earlier answer
-    backend connection lost; reconnecting
-    (/retry-backend-connection to retry now, Ctrl+C quits)
+      Ctrl+C twice quits.
+
+    ▌ earlier question
+      earlier answer
+      backend connection lost; reconnecting
+      (/retry-backend-connection to retry now, Ctrl+C quits)
     warn one
     warn two
     warn three
@@ -2177,15 +2213,14 @@ let%expect_test "backend crash shows the stderr tail; Ctrl+C quits" =
   H.show h;
   [%expect
     {|
-    Ctrl+C twice quits.
-    > earlier question
-    earlier answer
-    backend connection lost; reconnecting
-    (/retry-backend-connection to retry now, Ctrl+C quits)
+    ▌ earlier question
+      earlier answer
+      backend connection lost; reconnecting
+      (/retry-backend-connection to retry now, Ctrl+C quits)
     warn one
     warn two
     warn three
-    backend is gone
+      backend is gone
     ────────────────────────────────────────────────────────────
     > ▏
     …deepseek-flash  ctx:0% 1.5k  backend gone · retry 1 in 0s
@@ -2223,9 +2258,10 @@ let%expect_test "abort restores queued messages" =
   H.show h;
   [%expect
     {|
-    session abc123 in /work. /help for commands, Esc aborts, Ctrl+C twice quits.
-    > earlier question
-    earlier answer
+      session abc123 in /work. /help for commands, Esc aborts, Ctrl+C twice quits.
+
+    ▌ earlier question
+      earlier answer
     ────────────────────────────────────────────────────────────────────────────────────────────────────
     queued (2): first ∣ second
     > ▏
@@ -2237,10 +2273,11 @@ let%expect_test "abort restores queued messages" =
   H.show h;
   [%expect
     {|
-    session abc123 in /work. /help for commands, Esc aborts, Ctrl+C twice quits.
-    > earlier question
-    earlier answer
-    restored 2 queued messages to the editor
+      session abc123 in /work. /help for commands, Esc aborts, Ctrl+C twice quits.
+
+    ▌ earlier question
+      earlier answer
+      restored 2 queued messages to the editor
     ────────────────────────────────────────────────────────────────────────────────────────────────────
     queued (2): first ∣ second
     > first
@@ -2252,10 +2289,11 @@ let%expect_test "abort restores queued messages" =
   H.show h;
   [%expect
     {|
-    session abc123 in /work. /help for commands, Esc aborts, Ctrl+C twice quits.
-    > earlier question
-    earlier answer
-    restored 2 queued messages to the editor
+      session abc123 in /work. /help for commands, Esc aborts, Ctrl+C twice quits.
+
+    ▌ earlier question
+      earlier answer
+      restored 2 queued messages to the editor
     ────────────────────────────────────────────────────────────────────────────────────────────────────
     > first
 
@@ -2284,13 +2322,13 @@ let%expect_test "scroll stays anchored while streaming" =
   H.show h;
   [%expect
     {|
-    line 5
-    line 6
-    line 7
-    line 8
-    line 9
-    line 10
-    line 11
+      line 5
+      line 6
+      line 7
+      line 8
+      line 9
+      line 10
+      line 11
     ────────────────────────────────────────────────────────────────────────────────────────────────────
     > ▏
     /work  deepseek-flash  think:off  view:normal  ctx:0% 1.5k  $0.01
@@ -2299,13 +2337,13 @@ let%expect_test "scroll stays anchored while streaming" =
   H.show h;
   [%expect
     {|
-    line 0
-    line 1
-    line 2
-    line 3
-    line 4
-    line 5
-    line 6
+      line 0
+      line 1
+      line 2
+      line 3
+      line 4
+      line 5
+      line 6
     ────────────────────────────────────────────────────────────────────────────────────────────────────
     > ▏
     /work  deepseek-flash  think:off  view:normal  ctx:0% 1.5k  $0.01  ↑ scrolled
@@ -2314,13 +2352,13 @@ let%expect_test "scroll stays anchored while streaming" =
   H.show h;
   [%expect
     {|
-    line 0
-    line 1
-    line 2
-    line 3
-    line 4
-    line 5
-    line 6
+      line 0
+      line 1
+      line 2
+      line 3
+      line 4
+      line 5
+      line 6
     ────────────────────────────────────────────────────────────────────────────────────────────────────
     > ▏
     /work  deepseek-flash  think:off  view:normal  ctx:0% 1.5k  $0.01  ↓ 10 new
@@ -2328,13 +2366,13 @@ let%expect_test "scroll stays anchored while streaming" =
   H.show h;
   [%expect
     {|
-    line 0
-    line 1
-    line 2
-    line 3
-    line 4
-    line 5
-    line 6
+      line 0
+      line 1
+      line 2
+      line 3
+      line 4
+      line 5
+      line 6
     ────────────────────────────────────────────────────────────────────────────────────────────────────
     > ▏
     /work  deepseek-flash  think:off  view:normal  ctx:0% 1.5k  $0.01  ↓ 10 new
@@ -2343,13 +2381,13 @@ let%expect_test "scroll stays anchored while streaming" =
   H.show h;
   [%expect
     {|
-    line 15
-    line 16
-    line 17
-    line 18
-    line 19
-    line 20
-    line 21
+      line 15
+      line 16
+      line 17
+      line 18
+      line 19
+      line 20
+      line 21
     ────────────────────────────────────────────────────────────────────────────────────────────────────
     > ▏
     /work  deepseek-flash  think:off  view:normal  ctx:0% 1.5k  $0.01
@@ -2370,13 +2408,13 @@ let%expect_test "page_down past the bottom returns to follow" =
   H.show h;
   [%expect
     {|
-    line 8
-    line 9
-    line 10
-    line 11
-    line 12
-    line 13
-    line 14
+      line 8
+      line 9
+      line 10
+      line 11
+      line 12
+      line 13
+      line 14
     ────────────────────────────────────────────────────────────────────────────────────────────────────
     > ▏
     /work  deepseek-flash  think:off  view:normal  ctx:0% 1.5k  $0.01  ↑ scrolled
@@ -2385,13 +2423,13 @@ let%expect_test "page_down past the bottom returns to follow" =
   H.show h;
   [%expect
     {|
-    line 3
-    line 4
-    line 5
-    line 6
-    line 7
-    line 8
-    line 9
+      line 3
+      line 4
+      line 5
+      line 6
+      line 7
+      line 8
+      line 9
     ────────────────────────────────────────────────────────────────────────────────────────────────────
     > ▏
     /work  deepseek-flash  think:off  view:normal  ctx:0% 1.5k  $0.01  ↑ scrolled
@@ -2400,13 +2438,13 @@ let%expect_test "page_down past the bottom returns to follow" =
   H.show h;
   [%expect
     {|
-    line 8
-    line 9
-    line 10
-    line 11
-    line 12
-    line 13
-    line 14
+      line 8
+      line 9
+      line 10
+      line 11
+      line 12
+      line 13
+      line 14
     ────────────────────────────────────────────────────────────────────────────────────────────────────
     > ▏
     /work  deepseek-flash  think:off  view:normal  ctx:0% 1.5k  $0.01  ↑ scrolled
@@ -2415,13 +2453,13 @@ let%expect_test "page_down past the bottom returns to follow" =
   H.show h;
   [%expect
     {|
-    line 13
-    line 14
-    line 15
-    line 16
-    line 17
-    line 18
-    line 19
+      line 13
+      line 14
+      line 15
+      line 16
+      line 17
+      line 18
+      line 19
     ────────────────────────────────────────────────────────────────────────────────────────────────────
     > ▏
     /work  deepseek-flash  think:off  view:normal  ctx:0% 1.5k  $0.01
@@ -2446,13 +2484,13 @@ let%expect_test "home/end with text in the editor move the cursor, not the \
   H.show h;
   [%expect
     {|
-    line 8
-    line 9
-    line 10
-    line 11
-    line 12
-    line 13
-    line 14
+      line 8
+      line 9
+      line 10
+      line 11
+      line 12
+      line 13
+      line 14
     ────────────────────────────────────────────────────────────────────────────────────────────────────
     > draft▏
     /work  deepseek-flash  think:off  view:normal  ctx:0% 1.5k  $0.01  ↑ scrolled
@@ -2461,13 +2499,13 @@ let%expect_test "home/end with text in the editor move the cursor, not the \
   H.show h;
   [%expect
     {|
-    line 8
-    line 9
-    line 10
-    line 11
-    line 12
-    line 13
-    line 14
+      line 8
+      line 9
+      line 10
+      line 11
+      line 12
+      line 13
+      line 14
     ────────────────────────────────────────────────────────────────────────────────────────────────────
     > ▏raft
     /work  deepseek-flash  think:off  view:normal  ctx:0% 1.5k  $0.01  ↑ scrolled
@@ -2490,10 +2528,11 @@ let%expect_test "abort restore is singular, prepends, and tolerates no field" =
   H.show h;
   [%expect
     {|
-    session abc123 in /work. /help for commands, Esc aborts, Ctrl+C twice quits.
-    > earlier question
-    earlier answer
-    restored 1 queued message to the editor
+      session abc123 in /work. /help for commands, Esc aborts, Ctrl+C twice quits.
+
+    ▌ earlier question
+      earlier answer
+      restored 1 queued message to the editor
     ────────────────────────────────────────────────────────────────────────────────────────────────────
     queued (1): queued
     > queued
@@ -2505,10 +2544,11 @@ let%expect_test "abort restore is singular, prepends, and tolerates no field" =
   H.show h;
   [%expect
     {|
-    session abc123 in /work. /help for commands, Esc aborts, Ctrl+C twice quits.
-    > earlier question
-    earlier answer
-    restored 1 queued message to the editor
+      session abc123 in /work. /help for commands, Esc aborts, Ctrl+C twice quits.
+
+    ▌ earlier question
+      earlier answer
+      restored 1 queued message to the editor
     ────────────────────────────────────────────────────────────────────────────────────────────────────
     queued (1): queued
     > queued
@@ -2578,15 +2618,15 @@ let%expect_test "background subagent: runs while main is idle, survives a \
 
 
 
+      session abc123 in /work. /help for commands, Esc aborts, Ctrl+C twice quits.
 
+    ▌ earlier question
+      earlier answer
 
-    session abc123 in /work. /help for commands, Esc aborts, Ctrl+C twice quits.
-    > earlier question
-    earlier answer
-    > go
-    ⚙ subagent "index the repo" … 1 turns
-      ⚙ bash ls -R
-    started it
+    ▌ go
+    … subagent index the repo  1 turn
+        ↳ bash $ ls -R
+      started it
     ────────────────────────────────────────────────────────────────────────────────────────────────────
     > ▏
     /work  deepseek-flash  think:off  view:normal  ctx:0% 1.5k  $0.01  agents:[main] 1⠋ bg
@@ -2620,7 +2660,7 @@ let%expect_test "background subagent: runs while main is idle, survives a \
 
 
 
-    ⚙ bash command=ls -R
+    … bash $ ls -R
     ────────────────────────────────────────────────────────────────────────────────────────────────────
     > ▏
     /work  deepseek-flash  think:off  view:normal  ctx:0% 1.5k  $0.01  agents:main [1⠋] bg
@@ -2634,15 +2674,16 @@ let%expect_test "background subagent: runs while main is idle, survives a \
   H.mode h;
   [%expect
     {|
-    session abc123 in /work. /help for commands, Esc aborts, Ctrl+C twice quits.
-    > earlier question
-    earlier answer
-    > go
-    ⚙ subagent "index the repo" … 1 turns
-      ⚙ bash ls -R
-    started it
-    > meanwhile
-    sure
+    ▌ earlier question
+      earlier answer
+
+    ▌ go
+    … subagent index the repo  1 turn
+        ↳ bash $ ls -R
+      started it
+
+    ▌ meanwhile
+      sure
     Subagents  (1)
     / ▏
     ▸  index the repo  a1  running  claude-haiku
@@ -2680,19 +2721,19 @@ let%expect_test "background subagent: runs while main is idle, survives a \
   H.show h;
   [%expect
     {|
-    > go
-    ⚙ subagent "index the repo" ✗ failed
-      [cancelled]
-      [subagent: 1 turns, 10 in / 5 out tokens, $0.0000]
-    started it
-    > meanwhile
-    sure
-    cancelling subagent a1
-    ↩ subagent a1 failed "index the repo"
-      [cancelled]
-      [subagent: 1 turns, 10 in / 5 out tokens, $0.0000]
-    it was cancelled
-    subagent a1 is not running
+    ■ subagent index the repo  cancelled
+        [cancelled]
+        [subagent: 1 turns, 10 in / 5 out tokens, $0.0000]
+      started it
+
+    ▌ meanwhile
+      sure
+      cancelling subagent a1
+    ↩ subagent a1 "index the repo"  failed
+        [cancelled]
+        [subagent: 1 turns, 10 in / 5 out tokens, $0.0000]
+      it was cancelled
+      subagent a1 is not running
     ────────────────────────────────────────────────────────────────────────────────────────────────────
     > ▏
     /work  deepseek-flash  think:off  view:normal  ctx:0% 1.5k  $0.01  agents:[main] 1✗
@@ -2709,19 +2750,19 @@ let%expect_test "background subagent: runs while main is idle, survives a \
     {|
     (Rpc (method_ prompt) (params ((text next))) (tag Show_error))
     (Append_history next)
-      [cancelled]
-      [subagent: 1 turns, 10 in / 5 out tokens, $0.0000]
-    started it
-    > meanwhile
-    sure
-    cancelling subagent a1
-    ↩ subagent a1 failed "index the repo"
-      [cancelled]
-      [subagent: 1 turns, 10 in / 5 out tokens, $0.0000]
-    it was cancelled
-    subagent a1 is not running
-    no subagents
-    no subagent 3
+        [subagent: 1 turns, 10 in / 5 out tokens, $0.0000]
+      started it
+
+    ▌ meanwhile
+      sure
+      cancelling subagent a1
+    ↩ subagent a1 "index the repo"  failed
+        [cancelled]
+        [subagent: 1 turns, 10 in / 5 out tokens, $0.0000]
+      it was cancelled
+      subagent a1 is not running
+      no subagents
+      no subagent 3
     ────────────────────────────────────────────────────────────────────────────────────────────────────
     > ▏
     /work  deepseek-flash  think:off  view:normal  ctx:0% 1.5k  $0.01
@@ -2739,15 +2780,14 @@ let%expect_test "delivered reports reload compactly; unseen agents still show" =
   H.show h;
   [%expect
     {|
-    session abc123 in /work. /help for commands, Esc aborts, Ctrl+C twice quits.
-    > earlier question
-    earlier answer
-    ↩ subagent a1 finished "find auth"
-      auth lives in src/auth.ml
-      [subagent: 2 turns, 1 in / 2 out tokens, $0.0100]
-    ↩ subagent a2 failed "run tests"
-      subagent failed: boom
-      [subagent: 1 turns, 1 in / 1 out tokens, $0.0000]
+    ▌ earlier question
+      earlier answer
+    ↩ subagent a1 "find auth"  finished
+        auth lives in src/auth.ml
+        [subagent: 2 turns, 1 in / 2 out tokens, $0.0100]
+    ↩ subagent a2 "run tests"  failed
+        subagent failed: boom
+        [subagent: 1 turns, 1 in / 1 out tokens, $0.0000]
     ──────────────────────────────────────────────────────────────────────────────────────────
     > ▏
     /work  deepseek-flash  think:off  view:normal  ctx:0% 1.5k  $0.01  agents:1 running
@@ -2861,14 +2901,16 @@ let%expect_test "two parallel subagents: strip, live tails, focus cycling, Esc" 
   H.show h;
   [%expect
     {|
-    session abc123 in /work. /help for commands, Esc aborts, Ctrl+C twice quits.
-    > earlier question
-    earlier answer
-    > go
-    ⚙ subagent "find all auth code in the repository" … 1 turns
-      ⚙ bash grep -r auth src
-    ⚙ subagent "run the test suite" ✓ 1 turns $0.02
-      all tests pass
+      session abc123 in /work. /help for commands, Esc aborts, Ctrl+C twice quits.
+
+    ▌ earlier question
+      earlier answer
+
+    ▌ go
+    … subagent find all auth code in the repository  1 turn
+        ↳ bash $ grep -r auth src
+    ✓ subagent run the test suite  1 turn $0.02
+        all tests pass
     ────────────────────────────────────────────────────────────────────────────────
     > ▏
     /work  deepseek-flash  ctx:0% 1.5k  $0.01  ⠋ working (Esc aborts; Enter steers)
@@ -2890,8 +2932,8 @@ let%expect_test "two parallel subagents: strip, live tails, focus cycling, Esc" 
 
 
 
-    > find all auth code in the repository
-    ⚙ bash command=grep -r auth src
+    ▌ find all auth code in the repository
+    … bash $ grep -r auth src
     ────────────────────────────────────────────────────────────────────────────────
     > ▏
     /work  deepseek-flash  ctx:0% 1.5k  $0.01  ⠋ working (Esc aborts; Enter steers)
@@ -2913,8 +2955,8 @@ let%expect_test "two parallel subagents: strip, live tails, focus cycling, Esc" 
 
 
 
-    ⚙ bash command=dune runtest
-    all tests pass
+    … bash $ dune runtest
+      all tests pass
     ────────────────────────────────────────────────────────────────────────────────
     > ▏
     /work  deepseek-flash  ctx:0% 1.5k  $0.01  ⠋ working (Esc aborts; Enter steers)
@@ -2923,14 +2965,16 @@ let%expect_test "two parallel subagents: strip, live tails, focus cycling, Esc" 
   H.show h;
   [%expect
     {|
-    session abc123 in /work. /help for commands, Esc aborts, Ctrl+C twice quits.
-    > earlier question
-    earlier answer
-    > go
-    ⚙ subagent "find all auth code in the repository" … 1 turns
-      ⚙ bash grep -r auth src
-    ⚙ subagent "run the test suite" ✓ 1 turns $0.02
-      all tests pass
+      session abc123 in /work. /help for commands, Esc aborts, Ctrl+C twice quits.
+
+    ▌ earlier question
+      earlier answer
+
+    ▌ go
+    … subagent find all auth code in the repository  1 turn
+        ↳ bash $ grep -r auth src
+    ✓ subagent run the test suite  1 turn $0.02
+        all tests pass
     ────────────────────────────────────────────────────────────────────────────────
     > ▏
     /work  deepseek-flash  ctx:0% 1.5k  $0.01  ⠋ working (Esc aborts; Enter steers)
@@ -2953,8 +2997,8 @@ let%expect_test "two parallel subagents: strip, live tails, focus cycling, Esc" 
 
 
 
-    ⚙ bash command=dune runtest
-    all tests pass
+    … bash $ dune runtest
+      all tests pass
     ────────────────────────────────────────────────────────────────────────────────
     > ▏
     /work  deepseek-flash  ctx:0% 1.5k  $0.01  ⠋ working (Esc aborts; Enter steers)
@@ -2963,14 +3007,16 @@ let%expect_test "two parallel subagents: strip, live tails, focus cycling, Esc" 
   H.show h;
   [%expect
     {|
-    session abc123 in /work. /help for commands, Esc aborts, Ctrl+C twice quits.
-    > earlier question
-    earlier answer
-    > go
-    ⚙ subagent "find all auth code in the repository" … 1 turns
-      ⚙ bash grep -r auth src
-    ⚙ subagent "run the test suite" ✓ 1 turns $0.02
-      all tests pass
+      session abc123 in /work. /help for commands, Esc aborts, Ctrl+C twice quits.
+
+    ▌ earlier question
+      earlier answer
+
+    ▌ go
+    … subagent find all auth code in the repository  1 turn
+        ↳ bash $ grep -r auth src
+    ✓ subagent run the test suite  1 turn $0.02
+        all tests pass
     ────────────────────────────────────────────────────────────────────────────────
     > ▏
     /work  deepseek-flash  ctx:0% 1.5k  $0.01  ⠋ working (Esc aborts; Enter steers)
@@ -3025,15 +3071,15 @@ let%expect_test "verbosity applies inside an agent view" =
 
 
 
-    ⚙ bash command=ls
-      line 0
-      line 1
-      line 2
-      line 3
-      line 4
-      line 5
-      line 6
-      line 7
+    ✓ bash $ ls
+        line 0
+        line 1
+        line 2
+        line 3
+        line 4
+        line 5
+        line 6
+        line 7
     ──────────────────────────────────────────────────────────────────────
     > ▏
     …deepseek-flash  ctx:0% 1.5k  ⠋ working (Esc aborts; Enter steers)
@@ -3043,18 +3089,18 @@ let%expect_test "verbosity applies inside an agent view" =
   [%expect
     {|
     ◆ subagent 1/1  claude-haiku  ⠋ running 1 turns  "audit"
-    ⚙ bash
-      {
-        command: "ls"
-      }
-      line 0
-      line 1
-      line 2
-      line 3
-      line 4
-      line 5
-      line 6
-      line 7
+    ✓ bash $ ls
+        {
+          command: "ls"
+        }
+        line 0
+        line 1
+        line 2
+        line 3
+        line 4
+        line 5
+        line 6
+        line 7
     ──────────────────────────────────────────────────────────────────────
     > ▏
     …deepseek-flash  ctx:0% 1.5k  ⠋ working (Esc aborts; Enter steers)
@@ -3097,10 +3143,11 @@ let%expect_test "/agents picker lists task, status and model; Enter focuses" =
   H.show h;
   [%expect
     {|
-    session abc123 in /work. /help for commands, Esc aborts, Ctrl+C twice
-    quits.
-    > earlier question
-    earlier answer
+      session abc123 in /work. /help for commands, Esc aborts, Ctrl+C
+      twice quits.
+
+    ▌ earlier question
+      earlier answer
     Subagents  (2)
     / ▏
     ▸  find auth  c1  running  claude-haiku
@@ -3157,10 +3204,11 @@ let%expect_test "new user prompt clears finished agents" =
   H.show h;
   [%expect
     {|
-    session abc123 in /work. /help for commands, Esc aborts, Ctrl+C twice
-    quits.
-    > earlier question
-    earlier answer
+      session abc123 in /work. /help for commands, Esc aborts, Ctrl+C
+      twice quits.
+
+    ▌ earlier question
+      earlier answer
     ──────────────────────────────────────────────────────────────────────
     > ▏
     /work  deepseek-flash  think:off  ctx:0% 1.5k  $0.01  agents:[main] 1✓
@@ -3175,10 +3223,11 @@ let%expect_test "new user prompt clears finished agents" =
   H.show h;
   [%expect
     {|
-    session abc123 in /work. /help for commands, Esc aborts, Ctrl+C twice
-    quits.
-    > earlier question
-    earlier answer
+      session abc123 in /work. /help for commands, Esc aborts, Ctrl+C
+      twice quits.
+
+    ▌ earlier question
+      earlier answer
     ──────────────────────────────────────────────────────────────────────
     > ▏
     /work  deepseek-flash  think:off  view:normal  ctx:0% 1.5k  $0.01
@@ -3240,9 +3289,9 @@ let%expect_test "session reload drops subagent transcripts and focus" =
   H.show h;
   [%expect
     {|
-    > go
-    ⚙ subagent task=look
-      report
+    ▌ go
+    ✓ subagent look
+        report
     ──────────────────────────────────────────────────────────────────────
     > ▏
     …deepseek-flash  ctx:0% 1.5k  ⠋ working (Esc aborts; Enter steers)
@@ -3339,8 +3388,8 @@ let%expect_test "nested subagent events recurse into the parent's children" =
 
 
 
-    ⚙ subagent "inner task" ✓ 1 turns $0.00
-      inner done
+    ✓ subagent inner task  1 turn $0.00
+        inner done
     ──────────────────────────────────────────────────────────────────────
     > ▏
     …deepseek-flash  ctx:0% 1.5k  ⠋ working (Esc aborts; Enter steers)
@@ -3361,9 +3410,10 @@ let%expect_test "Alt+Enter queues a follow-up; queued block and status" =
   H.show h;
   [%expect
     {|
-    session abc123 in /work. /help for commands, Esc aborts, Ctrl+C twice quits.
-    > earlier question
-    earlier answer
+      session abc123 in /work. /help for commands, Esc aborts, Ctrl+C twice quits.
+
+    ▌ earlier question
+      earlier answer
     ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
     queued (1): after this
     > ▏
@@ -3380,9 +3430,10 @@ let%expect_test "Alt+Enter queues a follow-up; queued block and status" =
   H.show h;
   [%expect
     {|
-    session abc123 in /work. /help for commands, Esc aborts, Ctrl+C twice quits.
-    > earlier question
-    earlier answer
+      session abc123 in /work. /help for commands, Esc aborts, Ctrl+C twice quits.
+
+    ▌ earlier question
+      earlier answer
     ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
     queued (2): after this ∣ and more
     > ▏
@@ -3408,9 +3459,10 @@ let%expect_test "Alt+Up dequeues the last queued message into the editor" =
   H.show h;
   [%expect
     {|
-    session abc123 in /work. /help for commands, Esc aborts, Ctrl+C twice quits.
-    > earlier question
-    earlier answer
+      session abc123 in /work. /help for commands, Esc aborts, Ctrl+C twice quits.
+
+    ▌ earlier question
+      earlier answer
     ────────────────────────────────────────────────────────────────────────────────────────────────────
     queued (1)
     > queued text
@@ -3425,10 +3477,11 @@ let%expect_test "Alt+Up dequeues the last queued message into the editor" =
   H.show h;
   [%expect
     {|
-    session abc123 in /work. /help for commands, Esc aborts, Ctrl+C twice quits.
-    > earlier question
-    earlier answer
-    nothing queued
+      session abc123 in /work. /help for commands, Esc aborts, Ctrl+C twice quits.
+
+    ▌ earlier question
+      earlier answer
+      nothing queued
     ────────────────────────────────────────────────────────────────────────────────────────────────────
     > queued text
 
@@ -3459,12 +3512,13 @@ let%expect_test "inline bash: !cmd adds to context, !!cmd does not" =
   H.show h;
   [%expect
     {|
-    session abc123 in /work. /help for commands, Esc aborts, Ctrl+C twice quits.
-    > earlier question
-    earlier answer
-    ⚙ shell command=ls -la
-      a.ml
-      b.ml
+      session abc123 in /work. /help for commands, Esc aborts, Ctrl+C twice quits.
+
+    ▌ earlier question
+      earlier answer
+    ✓ shell ls -la
+        a.ml
+        b.ml
     ────────────────────────────────────────────────────────────────────────────────────────────────────
     > ▏
     /work  deepseek-flash  think:off  view:normal  ctx:0% 1.5k  $0.01
@@ -3489,14 +3543,14 @@ let%expect_test "inline bash: !cmd adds to context, !!cmd does not" =
     {|
     (Append_history "!echo hi")
 
+      session abc123 in /work. /help for commands, Esc aborts, Ctrl+C twice quits.
 
-    session abc123 in /work. /help for commands, Esc aborts, Ctrl+C twice quits.
-    > earlier question
-    earlier answer
-    ⚙ shell command=ls -la
-      a.ml
-      b.ml
-    wait for the current turn
+    ▌ earlier question
+      earlier answer
+    ✓ shell ls -la
+        a.ml
+        b.ml
+      wait for the current turn
     ────────────────────────────────────────────────────────────────────────────────────────────────────
     > ▏
     …deepseek-flash  think:off  view:normal  ctx:0% 1.5k  $0.01  ⠋ working (Esc aborts; Enter steers)
@@ -3509,9 +3563,10 @@ let%expect_test "bracketed paste renders a chip until the cursor enters it" =
   H.show h;
   [%expect
     {|
-    session abc123 in /work. /help for commands, Esc aborts, Ctrl+C twice quits.
-    > earlier question
-    earlier answer
+      session abc123 in /work. /help for commands, Esc aborts, Ctrl+C twice quits.
+
+    ▌ earlier question
+      earlier answer
     ────────────────────────────────────────────────────────────────────────────────
     > [4 lines pasted]▏
     /work  deepseek-flash  think:off  view:normal  ctx:0% 1.5k  $0.01
@@ -3520,9 +3575,10 @@ let%expect_test "bracketed paste renders a chip until the cursor enters it" =
   H.show h;
   [%expect
     {|
-    session abc123 in /work. /help for commands, Esc aborts, Ctrl+C twice quits.
-    > earlier question
-    earlier answer
+      session abc123 in /work. /help for commands, Esc aborts, Ctrl+C twice quits.
+
+    ▌ earlier question
+      earlier answer
     ────────────────────────────────────────────────────────────────────────────────
     > one
       two
@@ -3539,9 +3595,10 @@ let%expect_test "history loads at start and is appended on submit" =
   H.show h;
   [%expect
     {|
-    session abc123 in /work. /help for commands, Esc aborts, Ctrl+C twice quits.
-    > earlier question
-    earlier answer
+      session abc123 in /work. /help for commands, Esc aborts, Ctrl+C twice quits.
+
+    ▌ earlier question
+      earlier answer
     ────────────────────────────────────────────────────────────────────────────────────────────────────
     > old two▏
     /work  deepseek-flash  think:off  view:normal  ctx:0% 1.5k  $0.01
@@ -3565,10 +3622,11 @@ let%expect_test "Ctrl+G edits externally and the reply replaces the prompt" =
   H.show h;
   [%expect
     {|
-    session abc123 in /work. /help for commands, Esc aborts,
-    Ctrl+C twice quits.
-    > earlier question
-    earlier answer
+      session abc123 in /work. /help for commands, Esc aborts,
+      Ctrl+C twice quits.
+
+    ▌ earlier question
+      earlier answer
     ────────────────────────────────────────────────────────────
     > from the editor▏
     …deepseek-flash  think:off  view:normal  ctx:0% 1.5k  $0.01
@@ -3638,10 +3696,11 @@ let%expect_test "Ctrl+Z suspends; Ctrl+R completes a path; Ctrl+L picks a model"
   H.show h;
   [%expect
     {|
-    session abc123 in /work. /help for commands, Esc aborts,
-    Ctrl+C twice quits.
-    > earlier question
-    earlier answer
+      session abc123 in /work. /help for commands, Esc aborts,
+      Ctrl+C twice quits.
+
+    ▌ earlier question
+      earlier answer
     ────────────────────────────────────────────────────────────
     > @sr▏
     ▸ src/
@@ -3655,10 +3714,10 @@ let%expect_test "Ctrl+Z suspends; Ctrl+R completes a path; Ctrl+L picks a model"
   H.show h;
   [%expect
     {|
-    session abc123 in /work. /help for commands, Esc aborts,
-    Ctrl+C twice quits.
-    > earlier question
-    earlier answer
+      Ctrl+C twice quits.
+
+    ▌ earlier question
+      earlier answer
     Model  (4)
     / ▏
        Claude Fable 5       anthropic/claude-fable-5  ctx 1.0M …
@@ -3726,10 +3785,10 @@ let%expect_test "/scoped-models: multi-select toggle, Ctrl+A, Ctrl+X, save" =
   H.show h;
   [%expect
     {|
-    session abc123 in /work. /help for commands, Esc aborts,
-    Ctrl+C twice quits.
-    > earlier question
-    earlier answer
+      Ctrl+C twice quits.
+
+    ▌ earlier question
+      earlier answer
     Scoped models  (4)
     / ▏
     ▸[ ] Claude Fable 5       Claude Fable 5
@@ -3743,10 +3802,10 @@ let%expect_test "/scoped-models: multi-select toggle, Ctrl+A, Ctrl+X, save" =
   H.show h;
   [%expect
     {|
-    session abc123 in /work. /help for commands, Esc aborts,
-    Ctrl+C twice quits.
-    > earlier question
-    earlier answer
+      Ctrl+C twice quits.
+
+    ▌ earlier question
+      earlier answer
     Scoped models  (4)
     / ▏
     ▸[x] Claude Fable 5       Claude Fable 5
@@ -3760,10 +3819,10 @@ let%expect_test "/scoped-models: multi-select toggle, Ctrl+A, Ctrl+X, save" =
   H.show h;
   [%expect
     {|
-    session abc123 in /work. /help for commands, Esc aborts,
-    Ctrl+C twice quits.
-    > earlier question
-    earlier answer
+      Ctrl+C twice quits.
+
+    ▌ earlier question
+      earlier answer
     Scoped models  (4)
     / ▏
     ▸[x] Claude Fable 5       Claude Fable 5
@@ -3777,10 +3836,10 @@ let%expect_test "/scoped-models: multi-select toggle, Ctrl+A, Ctrl+X, save" =
   H.show h;
   [%expect
     {|
-    session abc123 in /work. /help for commands, Esc aborts,
-    Ctrl+C twice quits.
-    > earlier question
-    earlier answer
+      Ctrl+C twice quits.
+
+    ▌ earlier question
+      earlier answer
     Scoped models  (4)
     / ▏
     ▸[ ] Claude Fable 5       Claude Fable 5
@@ -3812,11 +3871,12 @@ let%expect_test "/scoped-models: multi-select toggle, Ctrl+A, Ctrl+X, save" =
   H.show h;
   [%expect
     {|
-    session abc123 in /work. /help for commands, Esc aborts,
-    Ctrl+C twice quits.
-    > earlier question
-    earlier answer
-    scoped models saved (4)
+      session abc123 in /work. /help for commands, Esc aborts,
+      Ctrl+C twice quits.
+
+    ▌ earlier question
+      earlier answer
+      scoped models saved (4)
     ────────────────────────────────────────────────────────────
     > ▏
     …deepseek-flash  think:off  view:normal  ctx:0% 1.5k  $0.01
@@ -3860,15 +3920,15 @@ let%expect_test "Ctrl+P cycles the scoped models and wraps; Alt+P goes back" =
       (method_ set_model)
       (params ((model openai/gpt-5.5)))
       (tag (Set_model_done openai/gpt-5.5)))
-    Ctrl+C twice quits.
-    > earlier question
-    earlier answer
-    model: anthropic/claude-fable-5-1 (not logged in; /login
-    anthropic)
-    model: openai/gpt-5.5 (not logged in; /login openai)
-    model: anthropic/claude-fable-5 (not logged in; /login
-    anthropic)
-    model: openai/gpt-5.5 (not logged in; /login openai)
+
+    ▌ earlier question
+      earlier answer
+      model: anthropic/claude-fable-5-1 (not logged in; /login
+      anthropic)
+      model: openai/gpt-5.5 (not logged in; /login openai)
+      model: anthropic/claude-fable-5 (not logged in; /login
+      anthropic)
+      model: openai/gpt-5.5 (not logged in; /login openai)
     ────────────────────────────────────────────────────────────
     > ▏
     /work  gpt-5.5  think:off  view:normal  ctx:0% 1.5k  $0.01
@@ -3887,11 +3947,12 @@ let%expect_test "Ctrl+P with one scoped model notices instead of switching" =
   H.show h;
   [%expect
     {|
-    session abc123 in /work. /help for commands, Esc aborts,
-    Ctrl+C twice quits.
-    > earlier question
-    earlier answer
-    only one model in scope
+      session abc123 in /work. /help for commands, Esc aborts,
+      Ctrl+C twice quits.
+
+    ▌ earlier question
+      earlier answer
+      only one model in scope
     ────────────────────────────────────────────────────────────
     > ▏
     …deepseek-flash  think:off  view:normal  ctx:0% 1.5k  $0.01
@@ -3913,15 +3974,15 @@ let%expect_test "Ctrl+T cycles off/low/on/high/max and is n/a when unsupported" 
     (Rpc (method_ set_thinking) (params ((thinking high))) (tag Show_error))
     (Rpc (method_ set_thinking) (params ((thinking max))) (tag Show_error))
     (Rpc (method_ set_thinking) (params ((thinking off))) (tag Show_error))
-    session abc123 in /work. /help for commands, Esc aborts,
-    Ctrl+C twice quits.
-    > earlier question
-    earlier answer
-    thinking: low
-    thinking: on
-    thinking: high
-    thinking: max
-    thinking: off
+      Ctrl+C twice quits.
+
+    ▌ earlier question
+      earlier answer
+      thinking: low
+      thinking: on
+      thinking: high
+      thinking: max
+      thinking: off
     ────────────────────────────────────────────────────────────
     > ▏
     …claude-fable-5-1  think:off  ctx:0% 1.5k  $0.01
@@ -3937,15 +3998,15 @@ let%expect_test "Ctrl+T cycles off/low/on/high/max and is n/a when unsupported" 
   H.show h;
   [%expect
     {|
-    earlier answer
-    thinking: low
-    thinking: on
-    thinking: high
-    thinking: max
-    thinking: off
-    session abc123 in /work. /help for commands, Esc aborts,
-    Ctrl+C twice quits.
-    thinking: n/a for this model
+      earlier answer
+      thinking: low
+      thinking: on
+      thinking: high
+      thinking: max
+      thinking: off
+      session abc123 in /work. /help for commands, Esc aborts,
+      Ctrl+C twice quits.
+      thinking: n/a for this model
     ────────────────────────────────────────────────────────────
     > ▏
     /work  gpt-5.5  think:n/a  view:normal  ctx:0% 1.5k  $0.01
@@ -4073,10 +4134,10 @@ let%expect_test "/model Ctrl+N filters to logged-in models; scoped mark" =
   H.show h;
   [%expect
     {|
-    session abc123 in /work. /help for commands, Esc aborts,
-    Ctrl+C twice quits.
-    > earlier question
-    earlier answer
+      Ctrl+C twice quits.
+
+    ▌ earlier question
+      earlier answer
     Model  (4)
     / ▏
        Claude Fable 5       anthropic/claude-fable-5  ctx 1.0M …
@@ -4090,10 +4151,11 @@ let%expect_test "/model Ctrl+N filters to logged-in models; scoped mark" =
   H.show h;
   [%expect
     {|
-    session abc123 in /work. /help for commands, Esc aborts,
-    Ctrl+C twice quits.
-    > earlier question
-    earlier answer
+      session abc123 in /work. /help for commands, Esc aborts,
+      Ctrl+C twice quits.
+
+    ▌ earlier question
+      earlier answer
     Model (logged in)  (1)
     / ▏
     ▸* DeepSeek V4.1 Flash  deepseek/deepseek-flash  ctx 1.0M  …
@@ -4126,8 +4188,8 @@ let%expect_test "login dialog is a bordered block with url, progress and prompt"
   [%expect
     {|
     (Open_browser https://claude.ai/oauth?x=1)
-    > earlier question
-    earlier answer
+    ▌ earlier question
+      earlier answer
     ┌─ Log in ─────────────────────────────────────────────────┐
     │ Open this URL to log in:                                 │
     │   https://claude.ai/oauth?x=1                            │
@@ -4148,10 +4210,11 @@ let%expect_test "confirm dialog is a bordered block" =
   H.show h;
   [%expect
     {|
-    session abc123 in /work. /help for commands, Esc aborts,
-    Ctrl+C twice quits.
-    > earlier question
-    earlier answer
+      session abc123 in /work. /help for commands, Esc aborts,
+      Ctrl+C twice quits.
+
+    ▌ earlier question
+      earlier answer
     ┌─ Confirm ────────────────────────────────────────────────┐
     │ Log out of deepseek and delete its credential? (y/n)     │
     └──────────────────────────────────────────────────────────┘
@@ -4167,10 +4230,11 @@ let%expect_test "search: Ctrl+F, type, n, N, Esc" =
   H.show h;
   [%expect
     {|
-    session abc123 in /work. /help for commands, Esc aborts,
-    Ctrl+C twice quits.
-    > earlier question
-    earlier answer
+      session abc123 in /work. /help for commands, Esc aborts,
+      Ctrl+C twice quits.
+
+    ▌ earlier question
+      earlier answer
     ────────────────────────────────────────────────────────────
     / ▏
     …deepseek-flash  $0.01  search: type to find · Esc closes
@@ -4179,10 +4243,11 @@ let%expect_test "search: Ctrl+F, type, n, N, Esc" =
   H.show h;
   [%expect
     {|
-    session abc123 in /work. /help for commands, Esc aborts,
-    Ctrl+C twice quits.
-    > earlier question
-    earlier answer
+      session abc123 in /work. /help for commands, Esc aborts,
+      Ctrl+C twice quits.
+
+    ▌ earlier question
+      earlier answer
     ────────────────────────────────────────────────────────────
     / earlier▏
     …deepseek-flash  search 1/2 · ↓↑ next/prev · Esc closes
@@ -4191,10 +4256,11 @@ let%expect_test "search: Ctrl+F, type, n, N, Esc" =
   H.show h;
   [%expect
     {|
-    session abc123 in /work. /help for commands, Esc aborts,
-    Ctrl+C twice quits.
-    > earlier question
-    earlier answer
+      session abc123 in /work. /help for commands, Esc aborts,
+      Ctrl+C twice quits.
+
+    ▌ earlier question
+      earlier answer
     ────────────────────────────────────────────────────────────
     / earlier▏
     …deepseek-flash  search 2/2 · ↓↑ next/prev · Esc closes
@@ -4203,10 +4269,11 @@ let%expect_test "search: Ctrl+F, type, n, N, Esc" =
   H.show h;
   [%expect
     {|
-    session abc123 in /work. /help for commands, Esc aborts,
-    Ctrl+C twice quits.
-    > earlier question
-    earlier answer
+      session abc123 in /work. /help for commands, Esc aborts,
+      Ctrl+C twice quits.
+
+    ▌ earlier question
+      earlier answer
     ────────────────────────────────────────────────────────────
     / earlier▏
     …deepseek-flash  search 1/2 · ↓↑ next/prev · Esc closes
@@ -4221,11 +4288,11 @@ let%expect_test "search: Ctrl+F, type, n, N, Esc" =
 
 
 
+      session abc123 in /work. /help for commands, Esc aborts,
+      Ctrl+C twice quits.
 
-    session abc123 in /work. /help for commands, Esc aborts,
-    Ctrl+C twice quits.
-    > earlier question
-    earlier answer
+    ▌ earlier question
+      earlier answer
     ────────────────────────────────────────────────────────────
     > ▏
     …deepseek-flash  think:off  ctx:0% 1.5k  $0.01  ↑ scrolled
@@ -4244,11 +4311,11 @@ let%expect_test "Ctrl+Up / Ctrl+Down jump between user messages at height 8" =
   H.show h;
   [%expect
     {|
-    earlier answer
-    > second question
-    second answer
-    > third question
-    third answer
+    ▌ second question
+      second answer
+
+    ▌ third question
+      third answer
     ────────────────────────────────────────────────────────────
     > ▏
     …deepseek-flash  think:off  view:normal  ctx:0% 1.5k  $0.01
@@ -4259,11 +4326,11 @@ let%expect_test "Ctrl+Up / Ctrl+Down jump between user messages at height 8" =
   H.show h;
   [%expect
     {|
-    > earlier question
-    earlier answer
-    > second question
-    second answer
-    > third question
+    ▌ earlier question
+      earlier answer
+
+    ▌ second question
+      second answer
     ────────────────────────────────────────────────────────────
     > ▏
     …deepseek-flash  think:off  ctx:0% 1.5k  $0.01  ↑ scrolled
@@ -4272,11 +4339,11 @@ let%expect_test "Ctrl+Up / Ctrl+Down jump between user messages at height 8" =
   H.show h;
   [%expect
     {|
-    > earlier question
-    earlier answer
-    > second question
-    second answer
-    > third question
+    ▌ earlier question
+      earlier answer
+
+    ▌ second question
+      second answer
     ────────────────────────────────────────────────────────────
     > ▏
     …deepseek-flash  think:off  ctx:0% 1.5k  $0.01  ↓ 1 new
@@ -4285,11 +4352,11 @@ let%expect_test "Ctrl+Up / Ctrl+Down jump between user messages at height 8" =
   H.show h;
   [%expect
     {|
-    > second question
-    second answer
-    > third question
-    third answer
-    no earlier message
+    ▌ second question
+      second answer
+
+    ▌ third question
+      third answer
     ────────────────────────────────────────────────────────────
     > ▏
     …deepseek-flash  think:off  ctx:0% 1.5k  $0.01  ↑ scrolled
@@ -4298,11 +4365,11 @@ let%expect_test "Ctrl+Up / Ctrl+Down jump between user messages at height 8" =
   H.show h;
   [%expect
     {|
-    > second question
-    second answer
-    > third question
-    third answer
-    no earlier message
+      second answer
+
+    ▌ third question
+      third answer
+      no earlier message
     ────────────────────────────────────────────────────────────
     > ▏
     …deepseek-flash  think:off  ctx:0% 1.5k  $0.01  ↑ scrolled
@@ -4311,11 +4378,11 @@ let%expect_test "Ctrl+Up / Ctrl+Down jump between user messages at height 8" =
   H.show h;
   [%expect
     {|
-    > second question
-    second answer
-    > third question
-    third answer
-    no earlier message
+      second answer
+
+    ▌ third question
+      third answer
+      no earlier message
     ────────────────────────────────────────────────────────────
     > ▏
     …deepseek-flash  think:off  view:normal  ctx:0% 1.5k  $0.01
@@ -4326,11 +4393,10 @@ let%expect_test "Ctrl+Up / Ctrl+Down jump between user messages at height 8" =
   H.show h;
   [%expect
     {|
-    second answer
-    > third question
-    third answer
-    no earlier message
-    tail notice
+    ▌ third question
+      third answer
+      no earlier message
+      tail notice
     ────────────────────────────────────────────────────────────
     > ▏
     …deepseek-flash  think:off  view:normal  ctx:0% 1.5k  $0.01
@@ -4363,15 +4429,15 @@ let%expect_test "bash result at Normal shows the head and tail" =
   H.show h;
   [%expect
     {|
-      line 1
-      line 2
-      line 3
-      line 4
-      line 5
-      … (12 lines hidden)
-      line 18
-      line 19
-      line 20
+        line 1
+        line 2
+        line 3
+        line 4
+        line 5
+        … 12 more lines
+        line 18
+        line 19
+        line 20
     ────────────────────────────────────────────────────────────
     > ▏
     …deepseek-flash  think:off  view:normal  ctx:0% 1.5k  $0.01
@@ -4407,10 +4473,11 @@ let%expect_test "/help model prints one command's usage" =
   H.show h;
   [%expect
     {|
-    session abc123 in /work. /help for commands, Esc aborts,
-    Ctrl+C twice quits.
-    > earlier question
-    earlier answer
+      session abc123 in /work. /help for commands, Esc aborts,
+      Ctrl+C twice quits.
+
+    ▌ earlier question
+      earlier answer
     /model [name|id|provider/id]  pick or switch the model
     ────────────────────────────────────────────────────────────
     > ▏
@@ -4425,11 +4492,12 @@ let%expect_test "/help with an unknown command suggests the closest name" =
   H.show h;
   [%expect
     {|
-    session abc123 in /work. /help for commands, Esc aborts,
-    Ctrl+C twice quits.
-    > earlier question
-    earlier answer
-    unknown command /modle; did you mean /model?
+      session abc123 in /work. /help for commands, Esc aborts,
+      Ctrl+C twice quits.
+
+    ▌ earlier question
+      earlier answer
+      unknown command /modle; did you mean /model?
     ────────────────────────────────────────────────────────────
     > ▏
     …deepseek-flash  think:off  view:normal  ctx:0% 1.5k  $0.01
@@ -4445,10 +4513,11 @@ let%expect_test "tool confirm: allow, deny, queue and Esc-abort" =
   H.show h;
   [%expect
     {|
-    session abc123 in /work. /help for commands, Esc aborts,
-    Ctrl+C twice quits.
-    > earlier question
-    earlier answer
+      session abc123 in /work. /help for commands, Esc aborts,
+      Ctrl+C twice quits.
+
+    ▌ earlier question
+      earlier answer
     ┌─ Confirm ────────────────────────────────────────────────┐
     │ Run bash: rm -rf build? (y/n)                            │
     └──────────────────────────────────────────────────────────┘
@@ -4486,12 +4555,12 @@ let%expect_test "tool confirm: allow, deny, queue and Esc-abort" =
 
 
 
+      session abc123 in /work. /help for commands, Esc aborts,
+      Ctrl+C twice quits.
 
-    session abc123 in /work. /help for commands, Esc aborts,
-    Ctrl+C twice quits.
-    > earlier question
-    earlier answer
-    denied bash
+    ▌ earlier question
+      earlier answer
+      denied bash
     ────────────────────────────────────────────────────────────
     > ▏
     …deepseek-flash  $0.01  ⠋ working (Esc aborts; Enter steers)
@@ -4510,10 +4579,11 @@ let%expect_test "tool confirm: allow, deny, queue and Esc-abort" =
   H.show h;
   [%expect
     {|
-    session abc123 in /work. /help for commands, Esc aborts,
-    Ctrl+C twice quits.
-    > earlier question
-    earlier answer
+      session abc123 in /work. /help for commands, Esc aborts,
+      Ctrl+C twice quits.
+
+    ▌ earlier question
+      earlier answer
     ┌─ Confirm ────────────────────────────────────────────────┐
     │ Run bash: rm -rf build? (y/n)                            │
     └──────────────────────────────────────────────────────────┘
@@ -4532,11 +4602,11 @@ let%expect_test "tool confirm: allow, deny, queue and Esc-abort" =
         (allow   true)))
       (tag Ignore))
 
+      session abc123 in /work. /help for commands, Esc aborts,
+      Ctrl+C twice quits.
 
-    session abc123 in /work. /help for commands, Esc aborts,
-    Ctrl+C twice quits.
-    > earlier question
-    earlier answer
+    ▌ earlier question
+      earlier answer
     ┌─ Confirm ────────────────────────────────────────────────┐
     │ Write /work/a.txt? (y/n)                                 │
     └──────────────────────────────────────────────────────────┘
@@ -4555,11 +4625,11 @@ let%expect_test "tool confirm: allow, deny, queue and Esc-abort" =
         (allow   true)))
       (tag Ignore))
 
+      session abc123 in /work. /help for commands, Esc aborts,
+      Ctrl+C twice quits.
 
-    session abc123 in /work. /help for commands, Esc aborts,
-    Ctrl+C twice quits.
-    > earlier question
-    earlier answer
+    ▌ earlier question
+      earlier answer
     ┌─ Confirm ────────────────────────────────────────────────┐
     │ Edit /work/b.txt? (y/n)                                  │
     └──────────────────────────────────────────────────────────┘
@@ -4630,12 +4700,12 @@ let%expect_test "/change_default saves the model and thinking level" =
 
 
 
+      session abc123 in /work. /help for commands, Esc aborts,
+      Ctrl+C twice quits.
 
-    session abc123 in /work. /help for commands, Esc aborts,
-    Ctrl+C twice quits.
-    > earlier question
-    earlier answer
-    default: deepseek/deepseek-flash, thinking high
+    ▌ earlier question
+      earlier answer
+      default: deepseek/deepseek-flash, thinking high
     ────────────────────────────────────────────────────────────
     > ▏
     …deepseek-flash  think:off  view:normal  ctx:0% 1.5k  $0.01
@@ -4666,11 +4736,12 @@ let%expect_test "/confirm on saves confirm_tools through set_config" =
   H.show h;
   [%expect
     {|
-    session abc123 in /work. /help for commands, Esc aborts,
-    Ctrl+C twice quits.
-    > earlier question
-    earlier answer
-    tool confirmation on
+      session abc123 in /work. /help for commands, Esc aborts,
+      Ctrl+C twice quits.
+
+    ▌ earlier question
+      earlier answer
+      tool confirmation on
     ────────────────────────────────────────────────────────────
     > ▏
     …deepseek-flash  think:off  view:normal  ctx:0% 1.5k  $0.01
@@ -4681,12 +4752,13 @@ let%expect_test "/confirm on saves confirm_tools through set_config" =
   H.show h;
   [%expect
     {|
-    session abc123 in /work. /help for commands, Esc aborts,
-    Ctrl+C twice quits.
-    > earlier question
-    earlier answer
-    tool confirmation on
-    tool confirmation on
+      session abc123 in /work. /help for commands, Esc aborts,
+      Ctrl+C twice quits.
+
+    ▌ earlier question
+      earlier answer
+      tool confirmation on
+      tool confirmation on
     ────────────────────────────────────────────────────────────
     > ▏
     …deepseek-flash  think:off  view:normal  ctx:0% 1.5k  $0.01
@@ -4707,11 +4779,12 @@ let%expect_test "/confirm on saves confirm_tools through set_config" =
   H.show h;
   [%expect
     {|
-    session abc123 in /work. /help for commands, Esc aborts,
-    Ctrl+C twice quits.
-    > earlier question
-    earlier answer
-    tool confirmation off
+      session abc123 in /work. /help for commands, Esc aborts,
+      Ctrl+C twice quits.
+
+    ▌ earlier question
+      earlier answer
+      tool confirmation off
     ────────────────────────────────────────────────────────────
     > ▏
     …deepseek-flash  think:off  view:normal  ctx:0% 1.5k  $0.01
@@ -4740,11 +4813,13 @@ let%expect_test "bash timeout is merged into the tool line" =
   H.show h;
   [%expect
     {|
-    session abc123 in /work. /help for commands, Esc aborts,
-    Ctrl+C twice quits.
-    > earlier question
-    earlier answer
-    ⚙ bash sleep 999 ✗ timed out after 120s
+      session abc123 in /work. /help for commands, Esc aborts,
+      Ctrl+C twice quits.
+
+    ▌ earlier question
+      earlier answer
+    ✕ bash $ sleep 999  timed out after 120s
+        partial output
     ────────────────────────────────────────────────────────────
     > ▏
     …deepseek-flash  think:off  view:normal  ctx:0% 1.5k  $0.01
@@ -4760,9 +4835,10 @@ let%expect_test "resize keeps the confirm dialog and picker within the width" =
   H.show h;
   [%expect
     {|
-    session abc123 in /work. /help for commands, Esc aborts, Ctrl+C twice quits.
-    > earlier question
-    earlier answer
+      session abc123 in /work. /help for commands, Esc aborts, Ctrl+C twice quits.
+
+    ▌ earlier question
+      earlier answer
     ┌─ Confirm ────────────────────────────────────────────────────────────────────────────────────────────────────────────┐
     │ Run bash: rm -rf build? (y/n)                                                                                        │
     └──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┘
@@ -4774,11 +4850,12 @@ let%expect_test "resize keeps the confirm dialog and picker within the width" =
   H.show h;
   [%expect
     {|
-    session abc123 in /work. /help for
-    commands, Esc aborts, Ctrl+C twice
-    quits.
-    > earlier question
-    earlier answer
+      session abc123 in /work. /help for
+      commands, Esc aborts, Ctrl+C twice
+      quits.
+
+    ▌ earlier question
+      earlier answer
     ┌─ Confirm ────────────────────────────┐
     │ Run bash: rm -rf build? (y/n)        │
     └──────────────────────────────────────┘
@@ -4800,10 +4877,10 @@ let%expect_test "resize keeps the confirm dialog and picker within the width" =
 
 
 
+      session abc123 in /work. /help for commands, Esc aborts, Ctrl+C twice quits.
 
-    session abc123 in /work. /help for commands, Esc aborts, Ctrl+C twice quits.
-    > earlier question
-    earlier answer
+    ▌ earlier question
+      earlier answer
     Sessions  (2)
     / ▏
     ▸* build fix ∣ 2025-06-01T10:00 ∣ 12 msgs ∣ fix the build please  /work
@@ -4815,11 +4892,12 @@ let%expect_test "resize keeps the confirm dialog and picker within the width" =
   H.show h;
   [%expect
     {|
-    session abc123 in /work. /help for
-    commands, Esc aborts, Ctrl+C twice
-    quits.
-    > earlier question
-    earlier answer
+      session abc123 in /work. /help for
+      commands, Esc aborts, Ctrl+C twice
+      quits.
+
+    ▌ earlier question
+      earlier answer
     Sessions  (2)
     / ▏
     ▸* build fix ∣ 2025-06-01T10:00 ∣ 12 ms…
@@ -4848,15 +4926,14 @@ let%expect_test "resize 120->40 mid-stream keeps every line" =
   H.show h;
   [%expect
     {|
-    session abc123 in /work. /help for commands, Esc aborts, Ctrl+C twice quits.
-    > earlier question
-    earlier answer
-    delta 1 with several words that wrap at forty columns
-    delta 2 with several words that wrap at forty columns
-    delta 3 with several words that wrap at forty columns
-    delta 4 with several words that wrap at forty columns
-    delta 5 with several words that wrap at forty columns
-    delta 6 with several words that wrap at forty columns
+    ▌ earlier question
+      earlier answer
+      delta 1 with several words that wrap at forty columns
+      delta 2 with several words that wrap at forty columns
+      delta 3 with several words that wrap at forty columns
+      delta 4 with several words that wrap at forty columns
+      delta 5 with several words that wrap at forty columns
+      delta 6 with several words that wrap at forty columns
     ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
     > ▏
     /work  deepseek-flash  think:off  view:normal  ctx:0% 1.5k  $0.01  ⠋ working (Esc aborts; Enter steers)
@@ -4865,15 +4942,15 @@ let%expect_test "resize 120->40 mid-stream keeps every line" =
   H.show h;
   [%expect
     {|
-    forty columns
-    delta 3 with several words that wrap at
-    forty columns
-    delta 4 with several words that wrap at
-    forty columns
-    delta 5 with several words that wrap at
-    forty columns
-    delta 6 with several words that wrap at
-    forty columns
+      at forty columns
+      delta 3 with several words that wrap
+      at forty columns
+      delta 4 with several words that wrap
+      at forty columns
+      delta 5 with several words that wrap
+      at forty columns
+      delta 6 with several words that wrap
+      at forty columns
     ────────────────────────────────────────
     > ▏
     …deepseek-flash  ctx:0% 1.5k  $0.01
@@ -4913,9 +4990,8 @@ let%expect_test "login end to end includes a prompt_cancelled" =
   H.show h;
   [%expect
     {|
-    Ctrl+C twice quits.
-    > earlier question
-    earlier answer
+    ▌ earlier question
+      earlier answer
     ┌─ Log in ─────────────────────────────────────────────────┐
     │ Open this URL to log in:                                 │
     │   https://claude.ai/oauth?x=1                            │
@@ -4932,10 +5008,11 @@ let%expect_test "login end to end includes a prompt_cancelled" =
   H.show h;
   [%expect
     {|
-    session abc123 in /work. /help for commands, Esc aborts,
-    Ctrl+C twice quits.
-    > earlier question
-    earlier answer
+      session abc123 in /work. /help for commands, Esc aborts,
+      Ctrl+C twice quits.
+
+    ▌ earlier question
+      earlier answer
     ────────────────────────────────────────────────────────────
     > ▏
     …deepseek-flash  think:off  view:normal  ctx:0% 1.5k  $0.01
@@ -4957,13 +5034,13 @@ let%expect_test "login end to end includes a prompt_cancelled" =
       (tag (Set_model_done anthropic/claude-fable-5)))
 
 
+      session abc123 in /work. /help for commands, Esc aborts,
+      Ctrl+C twice quits.
 
-    session abc123 in /work. /help for commands, Esc aborts,
-    Ctrl+C twice quits.
-    > earlier question
-    earlier answer
-    logged in to anthropic (api_key)
-    model set to anthropic/claude-fable-5; /model to change
+    ▌ earlier question
+      earlier answer
+      logged in to anthropic (api_key)
+      model set to anthropic/claude-fable-5; /model to change
     ────────────────────────────────────────────────────────────
     > ▏
     …deepseek-flash  think:off  view:normal  ctx:0% 1.5k  $0.01
@@ -5033,10 +5110,11 @@ let%expect_test "stderr lines are dim notices at Verbose only" =
   H.show h;
   [%expect
     {|
-    session abc123 in /work. /help for commands, Esc aborts,
-    Ctrl+C twice quits.
-    > earlier question
-    earlier answer
+      session abc123 in /work. /help for commands, Esc aborts,
+      Ctrl+C twice quits.
+
+    ▌ earlier question
+      earlier answer
     ────────────────────────────────────────────────────────────
     > ▏
     …deepseek-flash  think:off  view:normal  ctx:0% 1.5k  $0.01
@@ -5046,12 +5124,13 @@ let%expect_test "stderr lines are dim notices at Verbose only" =
   H.show h;
   [%expect
     {|
-    session abc123 in /work. /help for commands, Esc aborts,
-    Ctrl+C twice quits.
-    > earlier question
-    earlier answer
-    backend: warning from backend
-    view: verbose — everything is shown
+      session abc123 in /work. /help for commands, Esc aborts,
+      Ctrl+C twice quits.
+
+    ▌ earlier question
+      earlier answer
+      backend: warning from backend
+      view: verbose — everything is shown
     ────────────────────────────────────────────────────────────
     > ▏
     …deepseek-flash  think:off  view:verbose  ctx:0% 1.5k  $0.01
@@ -5064,11 +5143,12 @@ let%expect_test "wide characters keep the editor cursor column" =
   H.show h;
   [%expect
     {|
-    session abc123 in /work. /help for
-    commands, Esc aborts, Ctrl+C twice
-    quits.
-    > earlier question
-    earlier answer
+      session abc123 in /work. /help for
+      commands, Esc aborts, Ctrl+C twice
+      quits.
+
+    ▌ earlier question
+      earlier answer
     ────────────────────────────────────────
     > 日本語▏
     …deepseek-flash  ctx:0% 1.5k  $0.01
@@ -5078,11 +5158,12 @@ let%expect_test "wide characters keep the editor cursor column" =
   H.show h;
   [%expect
     {|
-    session abc123 in /work. /help for
-    commands, Esc aborts, Ctrl+C twice
-    quits.
-    > earlier question
-    earlier answer
+      session abc123 in /work. /help for
+      commands, Esc aborts, Ctrl+C twice
+      quits.
+
+    ▌ earlier question
+      earlier answer
     ────────────────────────────────────────
     > 日▏本語
     …deepseek-flash  ctx:0% 1.5k  $0.01
@@ -5092,11 +5173,12 @@ let%expect_test "wide characters keep the editor cursor column" =
   H.show h;
   [%expect
     {|
-    session abc123 in /work. /help for
-    commands, Esc aborts, Ctrl+C twice
-    quits.
-    > earlier question
-    earlier answer
+      session abc123 in /work. /help for
+      commands, Esc aborts, Ctrl+C twice
+      quits.
+
+    ▌ earlier question
+      earlier answer
     ────────────────────────────────────────
     > 日本語🐹!▏
     …deepseek-flash  ctx:0% 1.5k  $0.01
@@ -5113,15 +5195,15 @@ let%expect_test "wide characters keep the editor cursor column" =
       (params ((text "\230\151\165\230\156\172\232\170\158\240\159\144\185!")))
       (tag Show_error))
     (Append_history "\230\151\165\230\156\172\232\170\158\240\159\144\185!")
+      session abc123 in /work. /help for
+      commands, Esc aborts, Ctrl+C twice
+      quits.
 
+    ▌ earlier question
+      earlier answer
 
-    session abc123 in /work. /help for
-    commands, Esc aborts, Ctrl+C twice
-    quits.
-    > earlier question
-    earlier answer
-    > 日本語🐹 wide
-    emoji 🐹 and 日本語
+    ▌ 日本語🐹 wide
+      emoji 🐹 and 日本語
     ────────────────────────────────────────
     > ▏
     …deepseek-flash  ctx:0% 1.5k  $0.01
@@ -5135,10 +5217,11 @@ let%expect_test "editing intents: cursor, word, kill, yank, undo, delete" =
   H.show h;
   [%expect
     {|
-    session abc123 in /work. /help for commands, Esc aborts,
-    Ctrl+C twice quits.
-    > earlier question
-    earlier answer
+      session abc123 in /work. /help for commands, Esc aborts,
+      Ctrl+C twice quits.
+
+    ▌ earlier question
+      earlier answer
     ────────────────────────────────────────────────────────────
     > one two thre▏
     …deepseek-flash  think:off  view:normal  ctx:0% 1.5k  $0.01
@@ -5148,10 +5231,11 @@ let%expect_test "editing intents: cursor, word, kill, yank, undo, delete" =
   H.show h;
   [%expect
     {|
-    session abc123 in /work. /help for commands, Esc aborts,
-    Ctrl+C twice quits.
-    > earlier question
-    earlier answer
+      session abc123 in /work. /help for commands, Esc aborts,
+      Ctrl+C twice quits.
+
+    ▌ earlier question
+      earlier answer
     ────────────────────────────────────────────────────────────
     > one two ▏hree
     …deepseek-flash  think:off  view:normal  ctx:0% 1.5k  $0.01
@@ -5160,10 +5244,11 @@ let%expect_test "editing intents: cursor, word, kill, yank, undo, delete" =
   H.show h;
   [%expect
     {|
-    session abc123 in /work. /help for commands, Esc aborts,
-    Ctrl+C twice quits.
-    > earlier question
-    earlier answer
+      session abc123 in /work. /help for commands, Esc aborts,
+      Ctrl+C twice quits.
+
+    ▌ earlier question
+      earlier answer
     ────────────────────────────────────────────────────────────
     > one two three▏
     …deepseek-flash  think:off  view:normal  ctx:0% 1.5k  $0.01
@@ -5172,10 +5257,11 @@ let%expect_test "editing intents: cursor, word, kill, yank, undo, delete" =
   H.show h;
   [%expect
     {|
-    session abc123 in /work. /help for commands, Esc aborts,
-    Ctrl+C twice quits.
-    > earlier question
-    earlier answer
+      session abc123 in /work. /help for commands, Esc aborts,
+      Ctrl+C twice quits.
+
+    ▌ earlier question
+      earlier answer
     ────────────────────────────────────────────────────────────
     > one two three▏
     …deepseek-flash  think:off  view:normal  ctx:0% 1.5k  $0.01
@@ -5187,10 +5273,11 @@ let%expect_test "editing intents: cursor, word, kill, yank, undo, delete" =
   H.show h;
   [%expect
     {|
-    session abc123 in /work. /help for commands, Esc aborts,
-    Ctrl+C twice quits.
-    > earlier question
-    earlier answer
+      session abc123 in /work. /help for commands, Esc aborts,
+      Ctrl+C twice quits.
+
+    ▌ earlier question
+      earlier answer
     ────────────────────────────────────────────────────────────
     > one two three▏
     …deepseek-flash  think:off  view:normal  ctx:0% 1.5k  $0.01
@@ -5202,10 +5289,11 @@ let%expect_test "editing intents: cursor, word, kill, yank, undo, delete" =
   H.show h;
   [%expect
     {|
-    session abc123 in /work. /help for commands, Esc aborts,
-    Ctrl+C twice quits.
-    > earlier question
-    earlier answer
+      session abc123 in /work. /help for commands, Esc aborts,
+      Ctrl+C twice quits.
+
+    ▌ earlier question
+      earlier answer
     ────────────────────────────────────────────────────────────
     > ▏
     …deepseek-flash  think:off  view:normal  ctx:0% 1.5k  $0.01
@@ -5380,15 +5468,15 @@ let%expect_test "reconnect: backoff doubles to the 60s cap, stale replies are \
   H.show h;
   [%expect
     {|
-    backend connection lost; reconnecting (/retry-backend-connection to
-    retry now, Ctrl+C quits)
-    reconnect failed: connection refused; retrying in 1s (attempt 3)
-    reconnect failed: connection refused; retrying in 2s (attempt 4)
-    reconnect failed: connection refused; retrying in 4s (attempt 5)
-    reconnect failed: connection refused; retrying in 8s (attempt 6)
-    reconnect failed: connection refused; retrying in 16s (attempt 7)
-    reconnect failed: connection refused; retrying in 32s (attempt 8)
-    reconnect failed: connection refused; retrying in 60s (attempt 9)
+      backend connection lost; reconnecting (/retry-backend-connection to
+      retry now, Ctrl+C quits)
+      reconnect failed: connection refused; retrying in 1s (attempt 3)
+      reconnect failed: connection refused; retrying in 2s (attempt 4)
+      reconnect failed: connection refused; retrying in 4s (attempt 5)
+      reconnect failed: connection refused; retrying in 8s (attempt 6)
+      reconnect failed: connection refused; retrying in 16s (attempt 7)
+      reconnect failed: connection refused; retrying in 32s (attempt 8)
+      reconnect failed: connection refused; retrying in 60s (attempt 9)
     ──────────────────────────────────────────────────────────────────────
     > ▏
     …deepseek-flash  ctx:0% 1.5k  $0.01  backend gone · retry 9 in 60s
@@ -5425,10 +5513,11 @@ let%expect_test "reconnect: backoff doubles to the 60s cap, stale replies are \
   H.show h;
   [%expect
     {|
-    reconnected to the backend
-    session abc123 in /work. /help for commands, Esc aborts, Ctrl+C twice
-    quits.
-    > earlier question
+      reconnected to the backend
+      session abc123 in /work. /help for commands, Esc aborts, Ctrl+C
+      twice quits.
+
+    ▌ earlier question
     ──────────────────────────────────────────────────────────────────────
     > ▏
     /work  deepseek-flash  think:off  view:normal  ctx:0% 1.5k  $0.01
@@ -5438,11 +5527,12 @@ let%expect_test "reconnect: backoff doubles to the 60s cap, stale replies are \
   H.show h;
   [%expect
     {|
-    reconnected to the backend
-    session abc123 in /work. /help for commands, Esc aborts, Ctrl+C twice
-    quits.
-    > earlier question
-    backend is connected
+      reconnected to the backend
+      session abc123 in /work. /help for commands, Esc aborts, Ctrl+C
+      twice quits.
+
+    ▌ earlier question
+      backend is connected
     ──────────────────────────────────────────────────────────────────────
     > ▏
     /work  deepseek-flash  think:off  view:normal  ctx:0% 1.5k  $0.01
@@ -5527,11 +5617,11 @@ let%expect_test "reconnect: a session the backend no longer knows (never \
   H.show h;
   [%expect
     {|
-    reconnected to the backend
-    session /home/u/.prigh/sessions/1.jsonl no longer exists (it was never
-    saved, or was deleted); starting a new one
-    session fresh1 in /work. /help for commands, Esc aborts, Ctrl+C twice
-    quits.
+      reconnected to the backend
+      session /home/u/.prigh/sessions/1.jsonl no longer exists (it was
+      never saved, or was deleted); starting a new one
+      session fresh1 in /work. /help for commands, Esc aborts, Ctrl+C
+      twice quits.
     ──────────────────────────────────────────────────────────────────────
     > ▏
     /work  deepseek-flash  think:off  view:normal  ctx:0% 1.5k  $0.01
@@ -5558,13 +5648,13 @@ let%expect_test "wheel scrolling moves the transcript a few lines; arrows \
   H.show h;
   [%expect
     {|
-    > message 1
-    > message 2
-    > message 3
-    > message 4
-    > message 5
-    > message 6
-    > message 7
+    ▌ message 4
+
+    ▌ message 5
+
+    ▌ message 6
+
+    ▌ message 7
     ────────────────────────────────────────────────────────────
     > ▏
     …deepseek-flash  think:off  view:normal  ctx:0% 1.5k  $0.01
@@ -5573,13 +5663,12 @@ let%expect_test "wheel scrolling moves the transcript a few lines; arrows \
   H.show h;
   [%expect
     {|
-    > earlier question
-    earlier answer
-    > message 0
-    > message 1
-    > message 2
-    > message 3
-    > message 4
+    ▌ message 3
+
+    ▌ message 4
+
+    ▌ message 5
+
     ────────────────────────────────────────────────────────────
     > ▏
     …deepseek-flash  think:off  ctx:0% 1.5k  $0.01  ↑ scrolled
@@ -5592,7 +5681,7 @@ let%expect_test "wheel scrolling moves the transcript a few lines; arrows \
   [%expect
     {|
     (Anchored
-      (top       0)
+      (top       8)
       (new_lines 0))
     Follow
     |}];
@@ -5600,13 +5689,13 @@ let%expect_test "wheel scrolling moves the transcript a few lines; arrows \
   H.show h;
   [%expect
     {|
-    > message 1
-    > message 2
-    > message 3
-    > message 4
-    > message 5
-    > message 6
-    > message 7
+    ▌ message 4
+
+    ▌ message 5
+
+    ▌ message 6
+
+    ▌ message 7
     ────────────────────────────────────────────────────────────
     > newer prompt▏
     …deepseek-flash  think:off  view:normal  ctx:0% 1.5k  $0.01
@@ -5631,10 +5720,11 @@ let%expect_test "switching tool host asks for the directory there, prefilled \
   H.show h;
   [%expect
     {|
-    session abc123 in /work. /help for commands, Esc aborts, Ctrl+C twice
-    quits.
-    > earlier question
-    earlier answer
+      session abc123 in /work. /help for commands, Esc aborts, Ctrl+C
+      twice quits.
+
+    ▌ earlier question
+      earlier answer
     ┌─ Working directory on laptop (here) ───────────────────────────────┐
     └────────────────────────────────────────────────────────────────────┘
     ──────────────────────────────────────────────────────────────────────
@@ -5657,10 +5747,11 @@ let%expect_test "switching tool host asks for the directory there, prefilled \
   H.show h;
   [%expect
     {|
-    session abc123 in /work. /help for commands, Esc aborts, Ctrl+C twice
-    quits.
-    > earlier question
-    earlier answer
+      session abc123 in /work. /help for commands, Esc aborts, Ctrl+C
+      twice quits.
+
+    ▌ earlier question
+      earlier answer
     ┌─ Working directory on laptop (here) ───────────────────────────────┐
     └────────────────────────────────────────────────────────────────────┘
     ──────────────────────────────────────────────────────────────────────
@@ -5684,10 +5775,11 @@ let%expect_test "switching tool host asks for the directory there, prefilled \
   H.show h;
   [%expect
     {|
-    session abc123 in /work. /help for commands, Esc aborts, Ctrl+C twice
-    quits.
-    > earlier question
-    earlier answer
+      session abc123 in /work. /help for commands, Esc aborts, Ctrl+C
+      twice quits.
+
+    ▌ earlier question
+      earlier answer
     ┌─ Working directory on laptop (here) ───────────────────────────────┐
     └────────────────────────────────────────────────────────────────────┘
     ──────────────────────────────────────────────────────────────────────
@@ -5719,11 +5811,11 @@ let%expect_test "switching tool host asks for the directory there, prefilled \
     picker
 
 
+      session abc123 in /work. /help for commands, Esc aborts, Ctrl+C
+      twice quits.
 
-    session abc123 in /work. /help for commands, Esc aborts, Ctrl+C twice
-    quits.
-    > earlier question
-    earlier answer
+    ▌ earlier question
+      earlier answer
     ┌─ Working directory on laptop (here) ───────────────────────────────┐
     └────────────────────────────────────────────────────────────────────┘
     ──────────────────────────────────────────────────────────────────────
@@ -5741,12 +5833,12 @@ let%expect_test "switching tool host asks for the directory there, prefilled \
 
 
 
+      session abc123 in /work. /help for commands, Esc aborts, Ctrl+C
+      twice quits.
 
-    session abc123 in /work. /help for commands, Esc aborts, Ctrl+C twice
-    quits.
-    > earlier question
-    earlier answer
-    unknown host "nope"; one of: srv, laptop (here)
+    ▌ earlier question
+      earlier answer
+      unknown host "nope"; one of: srv, laptop (here)
     ──────────────────────────────────────────────────────────────────────
     > ▏
     /work  m  think:n/a  view:normal  ctx:0% 0  $0.00
@@ -5783,10 +5875,11 @@ let%expect_test "the hello's host id marks this frontend, also after a \
   picker ();
   [%expect
     {|
-    session abc123 in /work. /help for commands, Esc aborts, Ctrl+C twice
-    quits.
-    > earlier question
-    earlier answer
+      session abc123 in /work. /help for commands, Esc aborts, Ctrl+C
+      twice quits.
+
+    ▌ earlier question
+      earlier answer
     Tool host  (3)
     / ▏
        srv            /work
@@ -5816,9 +5909,9 @@ let%expect_test "the hello's host id marks this frontend, also after a \
     (host-abc)
 
 
-    reconnected to the backend
-    session abc123 in /home/me. /help for commands, Esc aborts, Ctrl+C
-    twice quits.
+      reconnected to the backend
+      session abc123 in /home/me. /help for commands, Esc aborts, Ctrl+C
+      twice quits.
     Tool host  (3)
     / ▏
        srv            /work
@@ -5845,10 +5938,10 @@ let%expect_test "the host picker shows which session other frontends are in" =
   H.show h;
   [%expect
     {|
-    session abc123 in /work. /help for commands, Esc aborts, Ctrl+C twice
-    quits.
-    > earlier question
-    earlier answer
+      twice quits.
+
+    ▌ earlier question
+      earlier answer
     Tool host  (4)
     / ▏
        srv                    /work
@@ -5864,10 +5957,11 @@ let%expect_test "the host picker shows which session other frontends are in" =
   H.show h;
   [%expect
     {|
-    session abc123 in /work. /help for commands, Esc aborts, Ctrl+C twice
-    quits.
-    > earlier question
-    earlier answer
+      session abc123 in /work. /help for commands, Esc aborts, Ctrl+C
+      twice quits.
+
+    ▌ earlier question
+      earlier answer
     ┌─ Working directory on desktop (in refactor) ───────────────────────┐
     └────────────────────────────────────────────────────────────────────┘
     ──────────────────────────────────────────────────────────────────────
@@ -5888,10 +5982,11 @@ let%expect_test "/model Enter Enter opens the picker instead of silently \
   H.show h;
   [%expect
     {|
-    session abc123 in /work. /help for commands, Esc aborts,
-    Ctrl+C twice quits.
-    > earlier question
-    earlier answer
+      session abc123 in /work. /help for commands, Esc aborts,
+      Ctrl+C twice quits.
+
+    ▌ earlier question
+      earlier answer
     ────────────────────────────────────────────────────────────
     > /model ▏
     ▸ Claude Fable 5       anthropic/claude-fable-5
@@ -5907,10 +6002,10 @@ let%expect_test "/model Enter Enter opens the picker instead of silently \
   [%expect
     {|
     picker
-    session abc123 in /work. /help for commands, Esc aborts,
-    Ctrl+C twice quits.
-    > earlier question
-    earlier answer
+      Ctrl+C twice quits.
+
+    ▌ earlier question
+      earlier answer
     Model  (4)
     / ▏
        Claude Fable 5       anthropic/claude-fable-5  ctx 1.0M …
@@ -5927,10 +6022,11 @@ let%expect_test "/model Enter Enter opens the picker instead of silently \
   H.show h;
   [%expect
     {|
-    session abc123 in /work. /help for commands, Esc aborts,
-    Ctrl+C twice quits.
-    > earlier question
-    earlier answer
+      session abc123 in /work. /help for commands, Esc aborts,
+      Ctrl+C twice quits.
+
+    ▌ earlier question
+      earlier answer
     ────────────────────────────────────────────────────────────
     > /model ▏
       Claude Fable 5       anthropic/claude-fable-5
@@ -5963,10 +6059,11 @@ let%expect_test "/model Enter Enter opens the picker instead of silently \
   H.show h;
   [%expect
     {|
-    session abc123 in /work. /help for commands, Esc aborts,
-    Ctrl+C twice quits.
-    > earlier question
-    earlier answer
+      session abc123 in /work. /help for commands, Esc aborts,
+      Ctrl+C twice quits.
+
+    ▌ earlier question
+      earlier answer
     ────────────────────────────────────────────────────────────
     > /model anthropic/claude-fable-5▏
     …deepseek-flash  think:off  view:normal  ctx:0% 1.5k  $0.01
@@ -5985,11 +6082,11 @@ let%expect_test "/model Enter Enter opens the picker instead of silently \
 
 
 
+      session abc123 in /work. /help for commands, Esc aborts,
+      Ctrl+C twice quits.
 
-    session abc123 in /work. /help for commands, Esc aborts,
-    Ctrl+C twice quits.
-    > earlier question
-    earlier answer
+    ▌ earlier question
+      earlier answer
     ────────────────────────────────────────────────────────────
     > /cd ▏
     ▸ src/
@@ -6024,13 +6121,13 @@ let%expect_test "picking a model reports it, and flags a provider that is not \
       (tag (Set_model_done deepseek/deepseek-flash)))
 
 
+      session abc123 in /work. /help for commands, Esc aborts,
+      Ctrl+C twice quits.
 
-    session abc123 in /work. /help for commands, Esc aborts,
-    Ctrl+C twice quits.
-    > earlier question
-    earlier answer
-    model: openai/gpt-5.5 (not logged in; /login openai)
-    model: deepseek/deepseek-flash
+    ▌ earlier question
+      earlier answer
+      model: openai/gpt-5.5 (not logged in; /login openai)
+      model: deepseek/deepseek-flash
     ────────────────────────────────────────────────────────────
     > ▏
     …deepseek-flash  think:off  view:normal  ctx:0% 1.5k  $0.01
@@ -6046,10 +6143,10 @@ let%expect_test "the scoped mark only appears when the scope is a real subset" =
   H.show h;
   [%expect
     {|
-    session abc123 in /work. /help for commands, Esc aborts,
-    Ctrl+C twice quits.
-    > earlier question
-    earlier answer
+      Ctrl+C twice quits.
+
+    ▌ earlier question
+      earlier answer
     Model  (4)
     / ▏
        Claude Fable 5       anthropic/claude-fable-5  ctx 1.0M …
@@ -6066,10 +6163,10 @@ let%expect_test "the scoped mark only appears when the scope is a real subset" =
   H.show h;
   [%expect
     {|
-    session abc123 in /work. /help for commands, Esc aborts,
-    Ctrl+C twice quits.
-    > earlier question
-    earlier answer
+      Ctrl+C twice quits.
+
+    ▌ earlier question
+      earlier answer
     Model  (4)
     / ▏
        Claude Fable 5       anthropic/claude-fable-5  ctx 1.0M …
@@ -6104,11 +6201,11 @@ let%expect_test "picker: Enter with no match keeps it open; the title shows \
     picker
 
 
+      session abc123 in /work. /help for commands, Esc aborts, Ctrl+C
+      twice quits.
 
-    session abc123 in /work. /help for commands, Esc aborts, Ctrl+C twice
-    quits.
-    > earlier question
-    earlier answer
+    ▌ earlier question
+      earlier answer
     Model  (0)
     / zzz▏
       no matches
@@ -6119,7 +6216,7 @@ let%expect_test "picker: Enter with no match keeps it open; the title shows \
   H.show h;
   [%expect
     {|
-    earlier answer
+      earlier answer
     Model  (1–7 of 25)
     / ▏
     ▸  Model 00  anthropic/m-00  ctx 1.0M  $10/$50 per M  not logged in
@@ -6137,7 +6234,7 @@ let%expect_test "picker: Enter with no match keeps it open; the title shows \
   H.show h;
   [%expect
     {|
-    earlier answer
+      earlier answer
     Model  (12–18 of 25)
     / ▏
        Model 11  anthropic/m-11  ctx 1.0M  $10/$50 per M  not logged in
@@ -6219,12 +6316,12 @@ let%expect_test "Ctrl+C while a turn runs aborts it first; the next press quits"
 
 
 
+      session abc123 in /work. /help for commands, Esc aborts,
+      Ctrl+C twice quits.
 
-    session abc123 in /work. /help for commands, Esc aborts,
-    Ctrl+C twice quits.
-    > earlier question
-    earlier answer
-    aborting; Ctrl+C again quits
+    ▌ earlier question
+      earlier answer
+      aborting; Ctrl+C again quits
     ────────────────────────────────────────────────────────────
     > ▏
     …deepseek-flash  ctx:0% 1.5k  $0.01  Ctrl+C again quits
@@ -6235,11 +6332,12 @@ let%expect_test "Ctrl+C while a turn runs aborts it first; the next press quits"
   H.show h;
   [%expect
     {|
-    session abc123 in /work. /help for commands, Esc aborts,
-    Ctrl+C twice quits.
-    > earlier question
-    earlier answer
-    aborting; Ctrl+C again quits
+      session abc123 in /work. /help for commands, Esc aborts,
+      Ctrl+C twice quits.
+
+    ▌ earlier question
+      earlier answer
+      aborting; Ctrl+C again quits
     ────────────────────────────────────────────────────────────
     > ▏
     …deepseek-flash  $0.01  ⠋ working (Esc aborts; Enter steers)
@@ -6260,11 +6358,11 @@ let%expect_test "scrolled up: the status says so, and Esc returns to the \
   H.show h;
   [%expect
     {|
-    Ctrl+C twice quits.
-    > earlier question
-    earlier answer
-    > line 0
-    > line 1
+    ▌ line 1
+
+    ▌ line 2
+
+    ▌ line 3
     ────────────────────────────────────────────────────────────
     > ▏
     …deepseek-flash  think:off  ctx:0% 1.5k  $0.01  ↑ scrolled
@@ -6273,11 +6371,11 @@ let%expect_test "scrolled up: the status says so, and Esc returns to the \
   H.show h;
   [%expect
     {|
-    > line 1
-    > line 2
-    > line 3
-    > line 4
-    > line 5
+    ▌ line 3
+
+    ▌ line 4
+
+    ▌ line 5
     ────────────────────────────────────────────────────────────
     > ▏
     …deepseek-flash  think:off  view:normal  ctx:0% 1.5k  $0.01
@@ -6289,7 +6387,7 @@ let%expect_test "scrolled up: the status says so, and Esc returns to the \
   print_s [%sexp (h.model.viewport : Viewport.t)];
   [%expect {|
     (Anchored
-      (top       1)
+      (top       8)
       (new_lines 0))
     |}]
 ;;
@@ -6304,9 +6402,8 @@ let%expect_test "/thinking lists levels in cycling order with the default \
   H.show h;
   [%expect
     {|
-    Ctrl+C twice quits.
-    > earlier question
-    earlier answer
+    ▌ earlier question
+      earlier answer
     Thinking level  (5)
     / ▏
     ▸* off
@@ -6374,9 +6471,10 @@ let%expect_test "logged-in user: shown in the status line, kept across \
   H.show h;
   [%expect
     {|
-    session abc123 in /work. /help for commands, Esc aborts, Ctrl+C twice quits.
-    > earlier question
-    earlier answer
+      session abc123 in /work. /help for commands, Esc aborts, Ctrl+C twice quits.
+
+    ▌ earlier question
+      earlier answer
     ────────────────────────────────────────────────────────────────────────────────
     > ▏
     /work  deepseek-flash  think:off  view:normal  ctx:0% 1.5k  $0.01  user:lloyd
@@ -6386,10 +6484,11 @@ let%expect_test "logged-in user: shown in the status line, kept across \
   H.show h;
   [%expect
     {|
-    session abc123 in /work. /help for commands, Esc
-    aborts, Ctrl+C twice quits.
-    > earlier question
-    earlier answer
+      session abc123 in /work. /help for commands, Esc
+      aborts, Ctrl+C twice quits.
+
+    ▌ earlier question
+      earlier answer
     ──────────────────────────────────────────────────
     > ▏
     …deepseek-flash  think:off  ctx:0% 1.5k  $0.01
@@ -6430,8 +6529,8 @@ let%expect_test "logged-in user: shown in the status line, kept across \
 
 
 
-    reconnected to the backend
-    session abc123 in /work. /help for commands, Esc aborts, Ctrl+C twice quits.
+      reconnected to the backend
+      session abc123 in /work. /help for commands, Esc aborts, Ctrl+C twice quits.
     ────────────────────────────────────────────────────────────────────────────────
     > ▏
     /work  deepseek-flash  think:off  view:normal  ctx:0% 1.5k  $0.01
@@ -6472,11 +6571,11 @@ let%expect_test "background jobs: !&, status line while idle, /jobs picker, \
 
 
 
+      session abc123 in /work. /help for commands, Esc aborts, Ctrl+C twice quits.
 
-    session abc123 in /work. /help for commands, Esc aborts, Ctrl+C twice quits.
-    > earlier question
-    earlier answer
-    started job j1; /jobs shows it, and its exit is reported to the agent
+    ▌ earlier question
+      earlier answer
+      started job j1; /jobs shows it, and its exit is reported to the agent
     ────────────────────────────────────────────────────────────────────────────────────────────────────
     > ▏
     /work  deepseek-flash  think:off  view:normal  ctx:0% 1.5k  $0.01  jobs:1 ⠋
@@ -6498,11 +6597,11 @@ let%expect_test "background jobs: !&, status line while idle, /jobs picker, \
 
 
 
+      session abc123 in /work. /help for commands, Esc aborts, Ctrl+C twice quits.
 
-    session abc123 in /work. /help for commands, Esc aborts, Ctrl+C twice quits.
-    > earlier question
-    earlier answer
-    started job j1; /jobs shows it, and its exit is reported to the agent
+    ▌ earlier question
+      earlier answer
+      started job j1; /jobs shows it, and its exit is reported to the agent
     Jobs  (2)
     / ▏
     ▸  make test       j1  running  1m15s  PASS parser
@@ -6554,11 +6653,11 @@ let%expect_test "background jobs: !&, status line while idle, /jobs picker, \
 
 
 
+      session abc123 in /work. /help for commands, Esc aborts, Ctrl+C twice quits.
 
-    session abc123 in /work. /help for commands, Esc aborts, Ctrl+C twice quits.
-    > earlier question
-    earlier answer
-    started job j1; /jobs shows it, and its exit is reported to the agent
+    ▌ earlier question
+      earlier answer
+      started job j1; /jobs shows it, and its exit is reported to the agent
     [job j2 exited 0 after 3s, 10 bytes; lines 1-2 of 2] docker build .
     Step 1/2
     Step 2/2
@@ -6582,19 +6681,18 @@ let%expect_test "background jobs: !&, status line while idle, /jobs picker, \
   H.show h;
   [%expect
     {|
-    session abc123 in /work. /help for commands, Esc aborts, Ctrl+C twice quits.
-    > earlier question
-    earlier answer
-    started job j1; /jobs shows it, and its exit is reported to the agent
+    ▌ earlier question
+      earlier answer
+      started job j1; /jobs shows it, and its exit is reported to the agent
     [job j2 exited 0 after 3s, 10 bytes; lines 1-2 of 2] docker build .
     Step 1/2
     Step 2/2
-    ↩ job j1 killed "make test"
-      ok parser
-      PASS parser
-    ↩ job j3 exited 2 "make lint"
-      lint.ml:3: error
-    the tests were killed
+    ↩ job j1 "make test"  killed
+        ok parser
+        PASS parser
+    ↩ job j3 "make lint"  exited 2
+        lint.ml:3: error
+      the tests were killed
     ────────────────────────────────────────────────────────────────────────────────────────────────────
     > ▏
     /work  deepseek-flash  think:off  view:normal  ctx:0% 1.5k  $0.01
@@ -6613,12 +6711,14 @@ let%expect_test "job reports reload compactly; look-alike text stays a user \
   H.show h;
   [%expect
     {|
-    session abc123 in /work. /help for commands, Esc aborts, Ctrl+C twice quits.
-    > earlier question
-    earlier answer
-    ↩ job j4 failed: tool host disconnected "npm run dev"
-      listening on :3000
-    > [job board] what is on it?
+      session abc123 in /work. /help for commands, Esc aborts, Ctrl+C twice quits.
+
+    ▌ earlier question
+      earlier answer
+    ↩ job j4 "npm run dev"  failed: tool host disconnected
+        listening on :3000
+
+    ▌ [job board] what is on it?
     ────────────────────────────────────────────────────────────────────────────────
     > ▏
     /work  deepseek-flash  think:off  view:normal  ctx:0% 1.5k  $0.01
@@ -6640,13 +6740,14 @@ let%expect_test "/setusr: lists users, acts as one, reconnects as them" =
   H.enter h;
   [%expect
     {|
-    session abc123 in /work. /help for commands, Esc aborts, Ctrl+C twice quits.
-    > earlier question
-    earlier answer
+      session abc123 in /work. /help for commands, Esc aborts, Ctrl+C twice quits.
+
+    ▌ earlier question
+      earlier answer
     users (/setusr NAME to act as one):
       a
       s
-    protocol error: expected array, got {"oops":1}
+      protocol error: expected array, got {"oops":1}
     ────────────────────────────────────────────────────────────────────────────────
     > ▏
     /work  deepseek-flash  think:off  view:normal  ctx:0% 1.5k  $0.01  user:s
@@ -6671,8 +6772,8 @@ let%expect_test "/setusr: lists users, acts as one, reconnects as them" =
 
 
 
-    acting as a
-    session abc123 in /work. /help for commands, Esc aborts, Ctrl+C twice quits.
+      acting as a
+      session abc123 in /work. /help for commands, Esc aborts, Ctrl+C twice quits.
     ────────────────────────────────────────────────────────────────────────────────
     > ▏
     /work  deepseek-flash  think:off  view:normal  ctx:0% 1.5k  $0.01  user:s as a
@@ -6713,8 +6814,8 @@ let%expect_test "/setusr: lists users, acts as one, reconnects as them" =
 
 
 
-    back to s
-    usage: /setusr [user]
+      back to s
+      usage: /setusr [user]
     ────────────────────────────────────────────────────────────────────────────────
     > ▏
     /work  deepseek-flash  think:off  view:normal  ctx:0% 1.5k  $0.01  user:s
@@ -6741,11 +6842,11 @@ let%expect_test
     (Rpc (method_ auth_status) (params ()) (tag Auth_login_picker))
 
 
+      session abc123 in /work. /help for commands, Esc aborts,
+      Ctrl+C twice quits.
 
-    session abc123 in /work. /help for commands, Esc aborts,
-    Ctrl+C twice quits.
-    > earlier question
-    earlier answer
+    ▌ earlier question
+      earlier answer
     Log in to  (3)
     / ▏
     ▸* DeepSeek (api_key)              API key  logged in via a…
@@ -6782,10 +6883,11 @@ let%expect_test
   H.show h;
   [%expect
     {|
-    session abc123 in /work. /help for commands, Esc aborts,
-    Ctrl+C twice quits.
-    > earlier question
-    earlier answer
+      session abc123 in /work. /help for commands, Esc aborts,
+      Ctrl+C twice quits.
+
+    ▌ earlier question
+      earlier answer
     ┌─ Log in ─────────────────────────────────────────────────┐
     │ "AI Proxy" is not a valid name: use lowercase letters    │
     │ Name of the provider                                     │
@@ -6825,10 +6927,11 @@ let%expect_test
   H.enter h;
   [%expect
     {|
-    session abc123 in /work. /help for commands, Esc aborts,
-    Ctrl+C twice quits.
-    > earlier question
-    earlier answer
+      session abc123 in /work. /help for commands, Esc aborts,
+      Ctrl+C twice quits.
+
+    ▌ earlier question
+      earlier answer
     ┌─ Log in ─────────────────────────────────────────────────┐
     │ Base URL of aiproxy's API                                │
     │ e.g. http://localhost:3000/v1                            │
@@ -6859,10 +6962,11 @@ let%expect_test
   H.enter h;
   [%expect
     {|
-    session abc123 in /work. /help for commands, Esc aborts,
-    Ctrl+C twice quits.
-    > earlier question
-    earlier answer
+      session abc123 in /work. /help for commands, Esc aborts,
+      Ctrl+C twice quits.
+
+    ▌ earlier question
+      earlier answer
     ┌─ Log in ─────────────────────────────────────────────────┐
     │ API key for aiproxy (leave empty if the server needs     │
     │ none)                                                    │
@@ -6905,13 +7009,13 @@ let%expect_test
 
 
 
+      session abc123 in /work. /help for commands, Esc aborts,
+      Ctrl+C twice quits.
 
-    session abc123 in /work. /help for commands, Esc aborts,
-    Ctrl+C twice quits.
-    > earlier question
-    earlier answer
-    logged in to aiproxy (api_key)
-    model set to aiproxy/gpt-4o; /model to change
+    ▌ earlier question
+      earlier answer
+      logged in to aiproxy (api_key)
+      model set to aiproxy/gpt-4o; /model to change
     ────────────────────────────────────────────────────────────
     > ▏
     …deepseek-flash  think:off  view:normal  ctx:0% 1.5k  $0.01
@@ -6922,12 +7026,13 @@ let%expect_test
   H.show h;
   [%expect
     {|
-    session abc123 in /work. /help for commands, Esc aborts,
-    Ctrl+C twice quits.
-    > earlier question
-    earlier answer
-    logged in to aiproxy (api_key)
-    model set to aiproxy/gpt-4o; /model to change
+      session abc123 in /work. /help for commands, Esc aborts,
+      Ctrl+C twice quits.
+
+    ▌ earlier question
+      earlier answer
+      logged in to aiproxy (api_key)
+      model set to aiproxy/gpt-4o; /model to change
     Model  (1)
     / ▏
     ▸  gpt-4o  aiproxy/gpt-4o  ctx 128k  price unknown
@@ -6984,11 +7089,11 @@ let%expect_test
     {|
     (Rpc (method_ auth_status) (params ()) (tag Auth_show))
 
+      session abc123 in /work. /help for commands, Esc aborts, Ctrl+C twice quits.
 
-    session abc123 in /work. /help for commands, Esc aborts, Ctrl+C twice quits.
-    > earlier question
-    earlier answer
-    logged out of ollama
+    ▌ earlier question
+      earlier answer
+      logged out of ollama
     deepseek  logged in via auth.json  [api_key (API key)]
     ollama    custom http://localhost:11434/v1 (chat)  no key
     /login custom adds an OpenAI-compatible endpoint

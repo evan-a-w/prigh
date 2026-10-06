@@ -501,12 +501,21 @@ backend/_build/default/bin/main.exe serve      # JSON-lines RPC on stdio
 | Ctrl+C | clear the editor, or abort the running turn; again to quit |
 | Ctrl+D | quit |
 
+The transcript reads as a log of work: each of your prompts opens a turn
+with a yellow `▌` bar and a blank line before it, and the agent's steps hang
+below it. Thinking is dim italic on a `┆` rail. A tool call is one line, its
+outcome marked in the gutter (`✓` done, `✕` failed, `…` running, `■`
+cancelled), then its name, the argument that says what it did (`read
+src/retry.ml`, `bash $ make test`, `subagent <task>`) and chips: `5 lines`,
+`+4 −2` for an edit, `exit code 1`, `job j1`. Its output or diff is indented
+under it.
+
 Ctrl+O cycles the transcript verbosity:
 
 | Level | Shows |
 |---|---|
-| quiet | user and final assistant text only; tool calls and subagents collapse to one line |
-| normal | thinking (first 3 lines), tool calls with a short result tail, subagent live tails |
+| quiet | user and assistant text (only the first line of intermediate text); tool calls and subagents collapse to their line, with failures' first output lines |
+| normal | thinking (first 3 lines), tool calls with the head of their output or diff (`read` and `write` show only their line), subagent live tails |
 | verbose | full thinking, tool arguments and results, every nested subagent event |
 
 `/verbosity [quiet|normal|verbose]` sets it directly; the status line shows
@@ -514,7 +523,7 @@ Ctrl+O cycles the transcript verbosity:
 
 The terminal does not draw images: each one in a prompt or a tool result shows
 as a line like `[image: image/png, 34.2 KB]` (in quiet, the tool line counts
-them: `✓ 1 line, 1 image`).
+them: `✓ read shot.png  1 image`).
 
 Subagents run in the background. A `subagent` tool call returns at once
 (`started agent a1 (...)`) and the main agent's turn carries on or ends, so
