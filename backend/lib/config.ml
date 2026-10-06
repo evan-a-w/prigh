@@ -116,7 +116,11 @@ let read_fields ~home =
           match Json.parse data with
           | Ok (`Object fields) -> Ok fields
           | Ok _ -> Or_error.errorf "%s must be a JSON object" path
-          | Error e -> Error e))
+          | Error e ->
+            Or_error.errorf
+              "%s is not valid JSON (%s)"
+              path
+              (Error.to_string_hum e)))
 ;;
 
 let write_fields ~home fields =
@@ -130,6 +134,47 @@ let write_fields ~home fields =
 
 let load ~home =
   Or_error.bind (read_fields ~home) ~f:(fun f -> of_json (`Object f))
+;;
+
+let known_fields =
+  "providers"
+  ::
+  (match to_json default with
+   | `Object fields -> List.map fields ~f:fst
+   | _ -> [])
+;;
+
+let problems ~home =
+  match read_fields ~home with
+  | Error _ -> []
+  | Ok fields ->
+    let invalid =
+      match of_json (`Object fields) with
+      | Ok _ -> []
+      | Error e ->
+        [ sprintf
+            "%s (in %s); prigh ignores the file's settings until it is fixed"
+            (Error.to_string_hum e)
+            (path ~home)
+        ]
+    in
+    let unknown =
+      List.filter_map fields ~f:(fun (name, _) ->
+        if List.mem known_fields name ~equal:String.equal
+        then None
+        else
+          Some
+            (sprintf
+               "unknown setting %S in %s is ignored%s"
+               name
+               (path ~home)
+               (match Edit_distance.closest ~n:1 known_fields name with
+                | [ close ] when Edit_distance.caseless close name <= 3 ->
+                  sprintf "; did you mean %S?" close
+                | _ ->
+                  sprintf " (known: %s)" (String.concat ~sep:", " known_fields))))
+    in
+    invalid @ unknown
 ;;
 
 (* Fields this module does not own ([providers], anything hand-added) are

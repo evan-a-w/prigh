@@ -779,10 +779,43 @@ let find_in models s =
 ;;
 
 let find = find_in all
+let names t = [ key t; t.id; t.name ]
+
+let closest_in models query =
+  let q = String.lowercase (String.strip query) in
+  (* [anthropic/nope]: that provider's models, not every close id. *)
+  let candidates =
+    match
+      Option.bind (key_provider q) ~f:(fun provider ->
+        match
+          List.filter models ~f:(fun t ->
+            String.equal (Provider_id.to_string t.provider) provider)
+        with
+        | [] -> None
+        | some -> Some some)
+    with
+    | Some some -> some
+    | None -> models
+  in
+  let scored =
+    List.map candidates ~f:(fun t ->
+      ( List.min_elt
+          (List.map (names t) ~f:(fun n -> Edit_distance.caseless n q))
+          ~compare:Int.compare
+        |> Option.value ~default:Int.max_value
+      , t ))
+    |> List.stable_sort ~compare:(fun (a, _) (b, _) -> Int.compare a b)
+  in
+  match scored with
+  | [] -> []
+  | (best, _) :: _ ->
+    List.take_while scored ~f:(fun (d, _) -> d <= best + 2)
+    |> Fn.flip List.take 3
+    |> List.map ~f:snd
+;;
 
 let resolve_in models query =
   let q = String.lowercase (String.strip query) in
-  let names t = [ key t; t.id; t.name ] in
   let matches ~f = List.filter models ~f:(fun t -> List.exists (names t) ~f) in
   let keys ts = String.concat ~sep:", " (List.map ts ~f:key) in
   match find_in models query with
@@ -800,22 +833,13 @@ let resolve_in models query =
         | _ :: _ as many ->
           Or_error.errorf "model %S is ambiguous; one of: %s" query (keys many)
         | [] ->
-          let closest =
-            List.map models ~f:(fun t ->
-              ( List.min_elt
-                  (List.map (names t) ~f:(fun n -> Edit_distance.caseless n q))
-                  ~compare:Int.compare
-                |> Option.value ~default:Int.max_value
-              , t ))
-            |> List.stable_sort ~compare:(fun (a, _) (b, _) -> Int.compare a b)
-            |> fun l -> List.take l 3 |> List.map ~f:snd
-          in
           Or_error.errorf
             "unknown model %S; did you mean: %s"
             query
             (String.concat
                ~sep:", "
-               (List.map closest ~f:(fun t -> sprintf "%s (%s)" (key t) t.name)))))
+               (List.map (closest_in models query) ~f:(fun t ->
+                  sprintf "%s (%s)" (key t) t.name)))))
 ;;
 
 let resolve = resolve_in all
