@@ -117,18 +117,18 @@ let lookup (key : Key.t) =
      | _ -> None)
 ;;
 
-let help : Content.t =
-  let rows =
-    List.map bindings ~f:(fun b ->
-      String.concat ~sep:" / " (List.map b.keys ~f:Key.to_string), b.help)
-  in
-  let width =
-    List.fold rows ~init:0 ~f:(fun acc (k, _) -> Int.max acc (String.length k))
-  in
-  List.map rows ~f:(fun (k, help) ->
-    [ { Content.Span.text = Text_width.pad_right k ~width
-      ; style = Style.bold Style.plain
-      }
-    ; { text = "  " ^ help; style = Style.plain }
-    ])
+let help =
+  Help_table.render
+    (List.map bindings ~f:(fun b ->
+       String.concat ~sep:" / " (List.map b.keys ~f:Key.to_string), b.help))
+;;
+
+let list_help =
+  Help_table.render
+    [ "type", "filter the list (fuzzy)"
+    ; "Enter / Esc", "accept the highlighted item / close without changes"
+    ; "Ctrl+D", "/sessions: delete · /agents: cancel · /jobs: kill"
+    ; "Ctrl+N", "/sessions: named only · /model: logged-in only"
+    ; "Space / Ctrl+A / Ctrl+X", "/scoped-models: toggle / all / none"
+    ]
 ;;

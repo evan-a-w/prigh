@@ -168,8 +168,7 @@ let%expect_test "store: set/read/list/remove, unknown providers preserved" =
     {|
     true
     (Error
-     ("auth file: bad credential" (file $DIR/cfg/auth.json) (provider Openai)
-      (e "credential: missing string \"access\"")))
+     "$DIR/cfg/auth.json: the openai credential is unreadable (credential: missing string \"access\"): log in to openai again")
     |}]
 ;;
 

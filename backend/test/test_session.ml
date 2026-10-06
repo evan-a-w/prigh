@@ -865,3 +865,37 @@ let%expect_test "files written before hosts were recorded still load" =
        : (string * Session.Host.t option * string String.Map.t) Or_error.t)];
   [%expect {| (Ok (/b () ())) |}]
 ;;
+
+let%expect_test "find_summary: exact id, unique prefix, ambiguous, missing" =
+  let summary id =
+    { Session.Summary.id
+    ; path = id ^ ".jsonl"
+    ; name = None
+    ; description = None
+    ; cwd = "/a"
+    ; created_at = ""
+    ; updated_at = ""
+    ; first_prompt = None
+    ; message_count = 0
+    ; parent = None
+    }
+  in
+  let all = List.map [ "abc1"; "abc12"; "abd"; "f00" ] ~f:summary in
+  List.iter [ "abc1"; "abd"; "f"; " f00 "; "ab"; "zzz"; "" ] ~f:(fun key ->
+    print_s
+      [%sexp
+        (key : string)
+      , (Session.find_summary all key
+         |> Or_error.map ~f:(fun (s : Session.Summary.t) -> s.id)
+         : string Or_error.t)]);
+  [%expect
+    {|
+    (abc1 (Ok abc1))
+    (abd (Ok abd))
+    (f (Ok f00))
+    (" f00 " (Ok f00))
+    (ab (Error "session \"ab\" is ambiguous: abc1, abc12, abd"))
+    (zzz (Error "no session \"zzz\""))
+    ("" (Error "no session id given"))
+    |}]
+;;

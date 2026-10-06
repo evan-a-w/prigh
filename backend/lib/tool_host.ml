@@ -294,7 +294,8 @@ let worker_kind = function
   | _ -> None
 ;;
 
-(* One connection: [`Served] once [hello] succeeded, else why it did not. *)
+(* One connection: [`Served] once [hello] succeeded, [`Refused] when the
+   backend rejected the credentials, else why it did not. *)
 let serve_connection
       ~env
       ~terminals
@@ -353,7 +354,7 @@ let serve_connection
     | exception (End_of_file | Eio.Io _) ->
       (match !outcome with
        | `Served -> log (sprintf "disconnected from %s" address)
-       | `Failed _ -> ())
+       | `Failed _ | `Refused _ -> ())
     | line ->
       let continue =
         match Json.parse line with
@@ -375,7 +376,10 @@ let serve_connection
                         ~default:"?"));
                 true
               | Some (`String "hello"), _ ->
-                outcome := `Failed ("hello failed: " ^ error);
+                outcome
+                := if String.is_prefix error ~prefix:"unauthorised"
+                   then `Refused error
+                   else `Failed ("hello failed: " ^ error);
                 false
               | Some (`Number id), ok ->
                 let meth =
@@ -451,20 +455,25 @@ let connect
           flow)
   in
   let rec loop backoff =
-    let backoff =
-      match attempt () with
-      | `Served -> initial_backoff
-      | `Failed message ->
-        log message;
-        backoff
-      | exception (Eio.Cancel.Cancelled _ as exn) -> raise exn
-      | exception exn ->
-        log (sprintf "cannot connect to %s: %s" address (Exn.to_string exn));
-        backoff
+    let retry backoff =
+      log (sprintf "retrying in %s" (Time_ns.Span.to_string_hum backoff));
+      Eio.Time.sleep (Eio.Stdenv.clock env) (Time_ns.Span.to_sec backoff);
+      loop (Time_ns.Span.min max_backoff (Time_ns.Span.scale backoff 2.))
     in
-    log (sprintf "retrying in %s" (Time_ns.Span.to_string_hum backoff));
-    Eio.Time.sleep (Eio.Stdenv.clock env) (Time_ns.Span.to_sec backoff);
-    loop (Time_ns.Span.min max_backoff (Time_ns.Span.scale backoff 2.))
+    match attempt () with
+    | `Served -> retry initial_backoff
+    | `Refused error -> Error.createf "%s refused the login: %s" address error
+    | `Failed message ->
+      log message;
+      retry backoff
+    | exception (Eio.Cancel.Cancelled _ as exn) -> raise exn
+    | exception exn ->
+      log
+        (sprintf
+           "cannot connect to %s: %s"
+           address
+           (Net_error.to_string_hum exn));
+      retry backoff
   in
   loop initial_backoff
 ;;

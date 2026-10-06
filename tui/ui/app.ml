@@ -55,6 +55,11 @@ module Reply_tag = struct
     | Mcp_picker
     | Mcp_reconnected
     | Mcp_approved of string (** server *)
+    | Retry_in_editor of
+        { command : string
+        ; hint : string
+        ; then_ : t
+        }
   [@@deriving sexp_of, equal]
 end
 
@@ -150,7 +155,7 @@ module Model = struct
     ; skills : Skill_cache.t
     ; known_paths : String.Set.t
     ; queued : Queue_counts.t
-    ; queued_texts : string list
+    ; queued_messages : Queued_message.t list
     ; login_lines : string list
     ; viewport : Viewport.t
     ; pending_quit : bool
@@ -336,6 +341,27 @@ let block m content =
 
 let follow m = { m with viewport = Viewport.Follow }
 
+let tilde m path =
+  match m.home with
+  | Some home when String.equal path home -> "~"
+  | Some home when String.is_prefix path ~prefix:(home ^ "/") ->
+    "~" ^ String.drop_prefix path (String.length home)
+  | _ -> path
+;;
+
+let banner m (state : P.State.t) : Content.Line.t =
+  let where =
+    match state.session_name with
+    | Some name -> sprintf "%s %S" (tilde m state.cwd) name
+    | None -> tilde m state.cwd
+  in
+  [ { text =
+        sprintf "prigh in %s · /help · Esc aborts · Ctrl+C twice quits" where
+    ; style = Style.fg Gray
+    }
+  ]
+;;
+
 let set_verbosity m verbosity =
   follow (notice { m with verbosity } (verbosity_notice verbosity))
 ;;
@@ -354,7 +380,7 @@ let init =
   ; skills = Skill_cache.empty
   ; known_paths = String.Set.empty
   ; queued = Queue_counts.zero
-  ; queued_texts = []
+  ; queued_messages = []
   ; login_lines = []
   ; viewport = Viewport.Follow
   ; pending_quit = false
@@ -937,10 +963,7 @@ let skill_location m (skill : P.Skill.t) =
       (String.chop_suffix skill.path ~suffix:"/SKILL.md")
       ~default:skill.path
   in
-  match m.home with
-  | Some home when String.is_prefix dir ~prefix:(home ^ "/") ->
-    "~" ^ String.drop_prefix dir (String.length home)
-  | _ -> dir
+  tilde m dir
 ;;
 
 let skills_picker m (skills : P.Skill.t list) =
@@ -1176,7 +1199,15 @@ let cancel_agent m arg =
     | None -> Agent_view.find m.agents arg
   in
   match agent with
-  | None -> error m (sprintf "no subagent %s" arg), []
+  | None when List.is_empty m.agents -> error m "no subagents to cancel", []
+  | None ->
+    ( error
+        m
+        (sprintf
+           "no subagent %s; /agents lists them (1–%d), Ctrl+D there cancels"
+           arg
+           (List.length m.agents))
+    , [] )
   | Some a when not (Agent_view.Status.equal a.status Running) ->
     notice m (sprintf "subagent %s is not running" a.id), []
   | Some a ->
@@ -1396,15 +1427,16 @@ let switch_model m arg =
     ( model_picker (notice m (sprintf "several models match %S" arg)) ~query:arg
     , [] )
   | Not_found suggestions ->
-    let m =
-      error
-        m
-        (sprintf
-           "unknown model %S; did you mean: %s"
-           arg
-           (String.concat ~sep:", " (List.map suggestions ~f:(fun s -> s.name))))
+    let hint =
+      match suggestions with
+      | [] -> ""
+      | l ->
+        sprintf
+          " (did you mean %s?)"
+          (String.concat ~sep:", " (List.map l ~f:(fun s -> s.name)))
     in
-    model_picker m ~query:arg, []
+    let m = error m (sprintf "unknown model %S%s; pick one below" arg hint) in
+    model_picker m ~query:"", []
 ;;
 
 let cycle_model m ~step =
@@ -1560,17 +1592,45 @@ let update_btw m id ~f =
   | _ -> m
 ;;
 
+(* The command goes back into the editor as typed, so nothing is lost; the
+   error names the closest command to fix it to. *)
+let unknown_command m name ~retry =
+  let m = { m with editor = Editor.set_text m.editor (retry name) } in
+  match Commands.closest name with
+  | Some c ->
+    error
+      m
+      (sprintf
+         "unknown command /%s (back in the editor); did you mean /%s?"
+         name
+         c.name)
+  | None ->
+    error
+      m
+      (sprintf
+         "unknown command /%s (back in the editor); Tab or / lists commands"
+         name)
+;;
+
+let help_heading text : Content.Line.t =
+  [ { text; style = Style.bold (Style.fg Gray) } ]
+;;
+
 let run_command m (cmd : Commands.Parsed.t) =
   match cmd.name, cmd.args with
   | "", _ -> m, []
   | "help", [] ->
-    let heading text : Content.Line.t =
-      [ { text; style = Style.bold (Style.fg Cyan) } ]
-    in
     ( block
         m
-        ((heading "Commands" :: Commands.help)
-         @ ([] :: heading "Keys" :: Keymap.help))
+        (List.concat
+           [ help_heading "Commands" :: Commands.help
+           ; [ []; help_heading "In the prompt" ]
+           ; Commands.input_help
+           ; [ []; help_heading "Keys" ]
+           ; Keymap.help
+           ; [ []; help_heading "In lists" ]
+           ; Keymap.list_help
+           ])
     , [] )
   | "help", name :: _ ->
     (match Commands.find name with
@@ -1583,18 +1643,13 @@ let run_command m (cmd : Commands.Parsed.t) =
              ]
            ]
        , [] )
-     | None ->
-       let hint =
-         match Commands.closest name with
-         | Some c -> sprintf "; did you mean /%s?" c.name
-         | None -> ""
-       in
-       error m (sprintf "unknown command /%s%s" name hint), [])
+     | None -> unknown_command m name ~retry:(fun name -> "/help " ^ name), [])
   | "hotkeys", _ ->
-    let heading text : Content.Line.t =
-      [ { text; style = Style.bold (Style.fg Cyan) } ]
-    in
-    block m (heading "Keys" :: Keymap.help), []
+    ( block
+        m
+        ((help_heading "Keys" :: Keymap.help)
+         @ ([] :: help_heading "In lists" :: Keymap.list_help))
+    , [] )
   | "model", [] ->
     if List.is_empty m.models
     then m, [ rpc "list_models" ~tag:(Models_for_picker "") ]
@@ -1697,7 +1752,12 @@ let run_command m (cmd : Commands.Parsed.t) =
     , [ rpc
           "switch_session"
           ~params:[ "path", str cmd.rest ]
-          ~tag:Reload_messages
+          ~tag:
+            (Retry_in_editor
+               { command = "/switch " ^ cmd.rest
+               ; hint = "/sessions lists them, or Tab after /switch completes"
+               ; then_ = Reload_messages
+               })
       ] )
   | "cd", [] ->
     ( { m with
@@ -1710,7 +1770,12 @@ let run_command m (cmd : Commands.Parsed.t) =
     , [ rpc
           "set_cwd"
           ~params:[ "path", str cmd.rest ]
-          ~tag:(Notice_on_success "cwd changed")
+          ~tag:
+            (Retry_in_editor
+               { command = "/cd " ^ cmd.rest
+               ; hint = "Tab after /cd completes directories"
+               ; then_ = Notice_on_success "cwd changed"
+               })
       ] )
   | "fork", _ -> m, [ rpc "get_entries" ~tag:Entries_for_fork ]
   | "rewind", _ -> m, [ rpc "get_entries" ~tag:Entries_for_rewind ]
@@ -1763,14 +1828,8 @@ let run_command m (cmd : Commands.Parsed.t) =
   | "setusr", _ -> error m "usage: /setusr [user]", []
   | "quit", _ | "exit", _ -> { m with quitting = true }, [ Quit ]
   | name, _ ->
-    let hint =
-      match Commands.closest name with
-      | Some c -> sprintf "; did you mean /%s?" c.name
-      | None -> ""
-    in
-    ( error
-        m
-        (sprintf "unknown command /%s%s (Tab or / lists commands)" name hint)
+    ( unknown_command m name ~retry:(fun name ->
+        String.strip (sprintf "/%s %s" name cmd.rest))
     , [] )
 ;;
 
@@ -1811,7 +1870,15 @@ let shell_command m text =
             ~tag:Job_started
         ] ))
   else if Model.running m
-  then warn m "wait for the current turn", []
+  then
+    ( warn
+        { m with editor = Editor.set_text m.editor text }
+        (sprintf
+           "%s waits for the turn to end (kept in the editor); !&%s runs it in \
+            the background now"
+           text
+           (String.lstrip (String.lstrip ~drop:(Char.equal '!') text)))
+    , [] )
   else (
     let add_to_context = not (String.is_prefix text ~prefix:"!!") in
     let command =
@@ -1848,7 +1915,9 @@ let send_prompt m text =
     then shell_command m text
     else if Model.running m
     then
-      ( { m with queued_texts = m.queued_texts @ [ text ] }
+      ( { m with
+          queued_messages = m.queued_messages @ [ { kind = Steer; text } ]
+        }
       , [ rpc "steer" ~params:(user_params m text) ~tag:(prompt_tag text) ] )
     else
       ( prune_agents m
@@ -1880,7 +1949,11 @@ let queue_follow_up m =
     then m, []
     else (
       let m = follow { m with editor; autocomplete = None } in
-      let m = { m with queued_texts = m.queued_texts @ [ text ] } in
+      let m =
+        { m with
+          queued_messages = m.queued_messages @ [ { kind = Follow_up; text } ]
+        }
+      in
       ( m
       , [ rpc "follow_up" ~params:(user_params m text) ~tag:(prompt_tag text)
         ; Command.Append_history text
@@ -2936,10 +3009,15 @@ let event m (e : P.Event.t) =
   match e with
   | State state -> { m with state = Some state }, []
   | Queue_update { steer; follow_up } ->
-    let queued_texts =
-      if steer = 0 && follow_up = 0 then [] else m.queued_texts
+    let queued_messages =
+      if steer = 0 && follow_up = 0 then [] else m.queued_messages
     in
-    { m with queued = { Queue_counts.steer; follow_up }; queued_texts }, []
+    { m with queued = { Queue_counts.steer; follow_up }; queued_messages }, []
+  | Message_start (User { text; _ }) ->
+    ( { m with
+        queued_messages = Queued_message.remove_first m.queued_messages ~text
+      }
+    , [] )
   | Config_changed config -> { m with config = Some config }, []
   | Auth a -> auth_event m a
   | Tool_confirm { call_id; name; summary } ->
@@ -2978,15 +3056,11 @@ let decode_skills json = P.Json.list_field json "skills" ~f:P.Skill.of_json
 (* Back in the editor (unless something else is there now) so the name can be
    fixed, and no longer queued. *)
 let skill_prompt_failed m text e =
-  let queued_texts =
-    match List.findi m.queued_texts ~f:(fun _ q -> String.equal q text) with
-    | Some (i, _) -> List.filteri m.queued_texts ~f:(fun j _ -> j <> i)
-    | None -> m.queued_texts
-  in
+  let queued_messages = Queued_message.remove_first m.queued_messages ~text in
   let editor =
     if Editor.is_empty m.editor then Editor.set_text m.editor text else m.editor
   in
-  error { m with queued_texts; editor } e
+  error { m with queued_messages; editor } e
 ;;
 
 let skills_for_autocomplete m =
@@ -3020,7 +3094,7 @@ let mcp_approved m server (list : P.Mcp_list.t) =
   else mcp_picker ~problems:false m list, []
 ;;
 
-let reply m (tag : Reply_tag.t) (result : (P.Json.t, string) Result.t) =
+let rec reply m (tag : Reply_tag.t) (result : (P.Json.t, string) Result.t) =
   let decode json ~f k =
     match f json with
     | Ok v -> k v
@@ -3029,6 +3103,13 @@ let reply m (tag : Reply_tag.t) (result : (P.Json.t, string) Result.t) =
   match result with
   | Error e ->
     (match tag with
+     | Retry_in_editor { command; hint; then_ = _ } ->
+       let editor =
+         if Editor.is_empty m.editor
+         then Editor.set_text m.editor command
+         else m.editor
+       in
+       error { m with editor } (sprintf "%s; %s" e hint), []
      | Ignore -> m, []
      | Btw id -> update_btw m id ~f:(fun box -> Btw_box.fail box e), []
      | Set_model_done _ ->
@@ -3051,6 +3132,7 @@ let reply m (tag : Reply_tag.t) (result : (P.Json.t, string) Result.t) =
      | _ -> error m e, [])
   | Ok json ->
     (match tag with
+     | Retry_in_editor { then_; _ } -> reply m then_ result
      | Ignore | Show_error | Reconnect _ -> m, []
      | Skill_prompt _ -> m, []
      | Skills_picker ->
@@ -3102,22 +3184,19 @@ let reply m (tag : Reply_tag.t) (result : (P.Json.t, string) Result.t) =
            in
            let count = List.length restored in
            let noun = if count = 1 then "message" else "messages" in
-           let m = { m with editor = Editor.set_text m.editor text } in
+           let m =
+             { m with
+               editor = Editor.set_text m.editor text
+             ; queued = Queue_counts.zero
+             ; queued_messages = []
+             }
+           in
            ( notice m (sprintf "restored %d queued %s to the editor" count noun)
            , [] ))
      | Initial_state ->
        decode json ~f:P.State.of_json (fun state ->
          let m = { m with state = Some state } in
-         let m =
-           notice
-             m
-             (sprintf
-                "session %s in %s. /help for commands, Esc aborts, Ctrl+C \
-                 twice quits."
-                state.session_id
-                state.cwd)
-         in
-         m, [])
+         block m [ banner m state ], [])
      | Initial_messages ->
        decode json ~f:(decode_list ~f:P.Message.of_json) (fun messages ->
          let transcript =
@@ -3130,6 +3209,8 @@ let reply m (tag : Reply_tag.t) (result : (P.Json.t, string) Result.t) =
            skills = Skill_cache.empty
          ; agents = []
          ; focus = `Main
+         ; queued = Queue_counts.zero
+         ; queued_messages = []
          ; transcript = Transcript.clear m.transcript
          }
        in
@@ -3173,7 +3254,7 @@ let reply m (tag : Reply_tag.t) (result : (P.Json.t, string) Result.t) =
               ; agents = []
               ; focus = `Main
               ; queued = Queue_counts.zero
-              ; queued_texts = []
+              ; queued_messages = []
               ; transcript = Transcript.clear m.transcript
               }
             in
@@ -3322,10 +3403,10 @@ let reply m (tag : Reply_tag.t) (result : (P.Json.t, string) Result.t) =
                 else
                   Editor.set_text m.editor (text ^ "\n\n" ^ Editor.text m.editor)
               in
-              let queued_texts =
-                List.drop_last m.queued_texts |> Option.value ~default:[]
+              let queued_messages =
+                Queued_message.remove_last m.queued_messages ~text
               in
-              { m with editor; queued_texts }, []))
+              { m with editor; queued_messages }, []))
      | Paths_for_autocomplete prefix ->
        decode json ~f:(decode_list ~f:P.Json.to_string_or_error) (fun paths ->
          let m =

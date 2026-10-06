@@ -276,6 +276,36 @@ try {
   await show("signed in: chat", ".chat");
   await showHeader("signed in: top bar");
 
+  // A dialog owns the keyboard: Tab and Shift+Tab go round it, and Esc gives
+  // the focus back to the editor. A refused command stays in the editor.
+  await composer().fill("/help");
+  await composer().press("Enter");
+  await page.locator(".modal").waitFor();
+  // The dialog takes the focus after it renders.
+  await page.waitForFunction(() => document.activeElement?.classList.contains("modal"));
+  const focusIn = () => page.evaluate(() =>
+    { const e = document.activeElement; if (!e) return "none"; return e.closest(".modal") ? `dialog: ${e.title || e.innerText.split("\n")[0]}` : e.className; });
+  const tabs = [];
+  for (const key of ["Tab", "Tab", "Tab", "Shift+Tab", "Shift+Tab", "Shift+Tab", "Shift+Tab"]) {
+    await page.keyboard.press(key);
+    tabs.push(`${key}: ${await focusIn()}`);
+  }
+  await page.keyboard.press("Escape");
+  await page.waitForFunction(() => !document.querySelector(".modal"));
+  await page.waitForFunction(() => document.activeElement?.closest(".composer"), null, { timeout: 2000 }).catch(() => {});
+  section("a dialog keeps the focus");
+  console.log(tabs.join("\n"));
+  console.log(`after Esc: ${await focusIn()}`);
+  await composer().fill("/modle");
+  await composer().press("Enter");
+  await page.locator(".toast.error").waitFor();
+  section("a mistyped command");
+  console.log(clean(await page.locator(".toasts").innerText()));
+  console.log(`editor: ${await composer().inputValue()}`);
+  await screenshot("a mistyped command");
+  await composer().fill("");
+  await page.locator(".toast.error").click();
+
   // 2. A scripted run with a bash tool call and its output.
   await send("count some lines");
   await bodyHas("three lines");

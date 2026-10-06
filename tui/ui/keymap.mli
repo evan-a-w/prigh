@@ -17,3 +17,6 @@ val bindings : Binding.t list
 val lookup : Key.t -> Intent.t option
 
 val help : Content.t
+
+(** Keys inside pickers, some of which mean something else there. *)
+val list_help : Content.t

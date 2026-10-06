@@ -128,7 +128,8 @@ token: bind to localhost and use an SSH tunnel on untrusted networks.
 
 A tool host doesn't need a TUI: `prigh tool-host -connect server:7777 -token
 sekrit -cwd ~/proj [-name NAME] [-host-id ID]` connects on its own
-(reconnecting when the connection drops; it is the machine's host, by
+(reconnecting when the connection drops, but exiting with what to fix
+when the backend refuses its `-token`/`-user`; it is the machine's host, by
 `~/.prigh/host-id`, unless `-host-id` names another) and hosts the session's tools *and* its `>_` terminal, so
 a browser-only user can pick it with `/host`. The web UI's terminal always
 runs on the session's active host, relayed through the backend.
@@ -298,7 +299,13 @@ and when there is none (no tmux on the host, a host that has gone) the
 panel says why and what to do.
 
 prigh-web has every slash command of the table below, as pickers and
-dialogs rather than lines in a transcript: `/session` is a dialog of the
+dialogs rather than lines in a transcript (a dialog keeps the keyboard
+until Esc closes it: Tab goes round it, the page behind is inert). A
+command it refuses (a typo, an unknown model) stays in the editor for you
+to correct, its error saying what to do; errors stay until dismissed (×),
+the next message or command you send, or switching session. Choosing a
+model whose provider is not logged in says which `/login` to run.
+`/session` is a dialog of the
 session's details and statistics; `/fork`, `/rewind` (with a confirmation)
 and `/tree` (the whole tree, branches indented) pick a message;
 `/scoped-models` is a checklist (Tab or a click checks a model, Enter
@@ -453,8 +460,9 @@ Then:
 ```
 tui/_build/default/bin/main.exe                # interactive TUI (PRIGH_BACKEND or the dune build)
 backend/_build/default/bin/main.exe run "explain this repo"    # headless
+backend/_build/default/bin/main.exe run -session ID "go on"     # continue a saved session (id, unique prefix or file)
 backend/_build/default/bin/main.exe sessions list          # saved sessions
-backend/_build/default/bin/main.exe sessions delete ID...  # ids may be prefixes
+backend/_build/default/bin/main.exe sessions delete ID...  # ids may be unique prefixes; nothing is deleted if one matches none or several
 backend/_build/default/bin/main.exe sessions prune -dry-run                        # empty sessions
 backend/_build/default/bin/main.exe sessions prune -max-messages 2 -cwd /tmp       # filters: -older-than DAYS, -prompt TEXT
 backend/_build/default/bin/main.exe serve      # JSON-lines RPC on stdio
@@ -501,12 +509,37 @@ backend/_build/default/bin/main.exe serve      # JSON-lines RPC on stdio
 | Ctrl+C | clear the editor, or abort the running turn; again to quit |
 | Ctrl+D | quit |
 
+The transcript reads as a log of work: each of your prompts opens a turn
+with a yellow `▌` bar and a blank line before it, and the agent's steps hang
+below it. Thinking is dim italic on a `┆` rail. A tool call is one line, its
+outcome marked in the gutter (`✓` done, `✕` failed, `…` running, `■`
+cancelled), then its name, the argument that says what it did (`read
+src/retry.ml`, `bash $ make test`, `subagent <task>`) and chips: `5 lines`,
+`+4 −2` for an edit, `exit code 1`, `job j1`. Its output or diff is indented
+under it.
+
+In lists (pickers) typing filters fuzzily, Enter accepts and Esc closes
+without changes; Ctrl+D deletes a session, cancels a subagent or kills a job,
+and `/scoped-models` toggles with Space (Ctrl+A all, Ctrl+X none). `/help`
+lists the commands, the prompt prefixes (`!cmd`, `!!cmd`, `!&cmd`, `@path`)
+and these keys.
+
+The status line is quiet gray: cwd, model, `think:`, `view:`, the context
+(`ctx:12%/200k`, the share of the model's window; yellow from 50%, red from
+80%), cost, and then whatever is going on — `queued:N`, agents, jobs, the
+tool host — with the current mode's keys (`⠋ working · Esc aborts · Enter
+steers`, a picker's keys) in yellow. Queued steers and follow-ups are listed
+above the editor, one per line, until they are delivered. An unknown command
+goes back into the editor as typed, the error naming the closest command
+(`/modle gpt`: did you mean `/model`?), and a failed `/switch` or `/cd` puts
+the command back with what to try next.
+
 Ctrl+O cycles the transcript verbosity:
 
 | Level | Shows |
 |---|---|
-| quiet | user and final assistant text only; tool calls and subagents collapse to one line |
-| normal | thinking (first 3 lines), tool calls with a short result tail, subagent live tails |
+| quiet | user and assistant text (only the first line of intermediate text); tool calls and subagents collapse to their line, with failures' first output lines |
+| normal | thinking (first 3 lines), tool calls with the head of their output or diff (`read` and `write` show only their line), subagent live tails |
 | verbose | full thinking, tool arguments and results, every nested subagent event |
 
 `/verbosity [quiet|normal|verbose]` sets it directly; the status line shows
@@ -514,7 +547,7 @@ Ctrl+O cycles the transcript verbosity:
 
 The terminal does not draw images: each one in a prompt or a tool result shows
 as a line like `[image: image/png, 34.2 KB]` (in quiet, the tool line counts
-them: `✓ 1 line, 1 image`).
+them: `✓ read shot.png  1 image`).
 
 Subagents run in the background. A `subagent` tool call returns at once
 (`started agent a1 (...)`) and the main agent's turn carries on or ends, so
@@ -613,7 +646,11 @@ directory, on the backend's host (`~` allowed), that a session starts in
 when the backend starts one for a frontend, instead of the backend's
 working directory; it is ignored if it is not a directory there. Like the
 rest of `config.json`, both are per namespace
-(`~/.prigh/namespaces/<name>/config.json` under `-tokens`).
+(`~/.prigh/namespaces/<name>/config.json` under `-tokens`). Mistakes in the
+file are reported (at `prigh run`'s start and as notices in the UIs) rather
+than silently ignored: invalid JSON or a setting of the wrong type (prigh
+then ignores the file's settings), an unknown setting (with the closest
+known one), and a `default_model` that names no known model.
 
 ### Slash commands
 

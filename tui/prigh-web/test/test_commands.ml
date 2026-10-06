@@ -295,8 +295,10 @@ let%expect_test "/thinking and Alt+T" =
     {|
     (Rpc (method_ set_model) (params ((model deepseek/deepseek-chat)))
      (tag Show_error))
+    (Expire_toast (id 2) (after_ms 4000))
     Cycle_thinking
     Thinking: max
+    DeepSeek Chat needs deepseek, which is not logged in: /login deepseek logs in.
     DeepSeek Chat has no thinking levels: switch to a model that thinks with /model
     |}]
 ;;
@@ -1083,9 +1085,12 @@ let%expect_test "/agents [n|id|cancel <n|id>]: the agents panel" =
   run h "/agents cancel 2";
   H.text h ~selector:".agents-panel";
   run h "/agents cancel a1";
-  run h "/agents cancel a3";
-  run h "/agents cancel 7";
-  run h "/agents cancel";
+  (* Each refusal replaces the last. *)
+  List.iter
+    [ "/agents cancel a3"; "/agents cancel 7"; "/agents cancel" ]
+    ~f:(fun c ->
+      run h c;
+      toasts h);
   run h "/agents 2";
   H.text h ~selector:".toast";
   [%expect
@@ -1106,20 +1111,19 @@ let%expect_test "/agents [n|id|cancel <n|id>]: the agents panel" =
      ("/agents cancel a3" "/agents cancel a1" "/agents cancel 2" /agents
       "/agents cancel 1"))
     (Rpc (method_ get_subagent) (params ((id a3))) (tag (Subagent a3)))
+    Subagent a3 has already finished.
     (Save_history
      ("/agents cancel 7" "/agents cancel a3" "/agents cancel a1"
       "/agents cancel 2" /agents "/agents cancel 1"))
+    No subagent or job 7: give its number (1-3) or id; /agents lists them.
     (Save_history
      ("/agents cancel" "/agents cancel 7" "/agents cancel a3" "/agents cancel a1"
       "/agents cancel 2" /agents "/agents cancel 1"))
+    Usage: /agents cancel <n|id> (/agents lists them)
     (Save_history
      ("/agents 2" "/agents cancel" "/agents cancel 7" "/agents cancel a3"
       "/agents cancel a1" "/agents cancel 2" /agents "/agents cancel 1"))
     (Rpc (method_ get_subagent) (params ((id a2))) (tag (Subagent a2)))
-    No subagent or job 1: none has run in this session.
-    Subagent a3 has already finished.
-    No subagent or job 7: give its number (1-3) or id; /agents lists them.
-    Usage: /agents cancel <n|id> (/agents lists them)
     |}]
 ;;
 
@@ -1173,26 +1177,26 @@ let%expect_test "/jobs [id|kill <id>]: jobs in the agents panel" =
     Loading the output…
     Its output refreshes while it runs.
     |}];
-  run h "/jobs kill j2";
-  run h "/jobs j9";
-  run h "/jobs kill";
-  run h "/jobs a b";
-  H.text h ~selector:".toast";
+  List.iter
+    [ "/jobs kill j2"; "/jobs j9"; "/jobs kill"; "/jobs a b" ]
+    ~f:(fun c ->
+      run h c;
+      toasts h);
   [%expect
     {|
     (Save_history ("/jobs kill j2" "/jobs kill j1" "/jobs j2" /jobs "/jobs j1"))
     (Rpc (method_ job_output) (params ((job_id j2))) (tag (Job_output j2)))
+    Job j2 has already finished.
     (Save_history
      ("/jobs j9" "/jobs kill j2" "/jobs kill j1" "/jobs j2" /jobs "/jobs j1"))
+    No job j9: give its id (j1, j2); /jobs lists them.
     (Save_history
      ("/jobs kill" "/jobs j9" "/jobs kill j2" "/jobs kill j1" "/jobs j2" /jobs
       "/jobs j1"))
+    Usage: /jobs [id | kill <id>] (/jobs lists them)
     (Save_history
      ("/jobs a b" "/jobs kill" "/jobs j9" "/jobs kill j2" "/jobs kill j1"
       "/jobs j2" /jobs "/jobs j1"))
-    No job j1: none has run in this session (!&command starts one).
-    Job j2 has already finished.
-    No job j9: give its id (j1, j2); /jobs lists them.
     Usage: /jobs [id | kill <id>] (/jobs lists them)
     |}]
 ;;

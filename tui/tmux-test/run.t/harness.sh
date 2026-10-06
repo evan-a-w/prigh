@@ -117,13 +117,13 @@ run_scenario() {
 # ---- scenarios ------------------------------------------------------------
 
 scenario_startup() {
-	wait_for "Ctrl+C twice"
+	wait_for "Ctrl+C"
 	settle
 	capture startup "initial screen"
 }
 
 scenario_prompt() {
-	wait_for "Ctrl+C twice"
+	wait_for "Ctrl+C"
 	type_text "hello there"
 	settle
 	capture prompt "typed"
@@ -136,7 +136,7 @@ scenario_prompt() {
 scenario_ctrl_o() {
 	# ^O is VDISCARD: without IEXTEN cleared the tty swallows it and the
 	# status line never changes. The screen must differ after C-o.
-	wait_for "Ctrl+C twice"
+	wait_for "Ctrl+C"
 	settle
 	local before after
 	before="$(tmux capture-pane -p -t "$session")"
@@ -152,7 +152,7 @@ scenario_ctrl_o() {
 }
 
 scenario_resize() {
-	wait_for "Ctrl+C twice"
+	wait_for "Ctrl+C"
 	type_text "first"
 	keys Enter
 	wait_for "faux reply"
@@ -165,7 +165,7 @@ scenario_resize() {
 }
 
 scenario_quit() {
-	wait_for "Ctrl+C twice"
+	wait_for "Ctrl+C"
 	keys C-c
 	wait_for "Ctrl+C again"
 	capture quit "after first C-c"
@@ -199,7 +199,7 @@ JSON
 }
 
 scenario_tools() {
-	wait_for "Ctrl+C twice"
+	wait_for "Ctrl+C"
 	type_text "go"
 	keys Enter
 	wait_for "all done"
@@ -225,7 +225,7 @@ scenario_tools() {
 setup_suspend() { interactive=1; }
 
 scenario_suspend() {
-	wait_for "Ctrl+C twice"
+	wait_for "Ctrl+C"
 	type_text "before"
 	keys Enter
 	wait_for "faux reply"
@@ -251,7 +251,7 @@ setup_editor() {
 }
 
 scenario_editor() {
-	wait_for "Ctrl+C twice"
+	wait_for "Ctrl+C"
 	type_text "draft"
 	keys C-g
 	wait_for "edited by editor"
@@ -274,7 +274,7 @@ JSON
 }
 
 scenario_confirm() {
-	wait_for "Ctrl+C twice"
+	wait_for "Ctrl+C"
 	type_text "go"
 	keys Enter
 	wait_for "Run bash"
@@ -294,7 +294,7 @@ scenario_confirm() {
 }
 
 scenario_paste() {
-	wait_for "Ctrl+C twice"
+	wait_for "Ctrl+C"
 	# Bracketed paste: Enter inside the paste must not submit.
 	paste "$(printf 'line one\nline two\nline three\nline four\nline five')"
 	settle
@@ -311,7 +311,7 @@ scenario_paste() {
 # The spawned backend dies; the TUI reconnects (respawning it) and rejoins
 # the same session.
 scenario_reconnect() {
-	wait_for "Ctrl+C twice"
+	wait_for "Ctrl+C"
 	type_text "before"
 	keys Enter
 	wait_for "faux reply"
@@ -321,7 +321,7 @@ scenario_reconnect() {
 	capture reconnect "after the backend was killed"
 	type_text "after"
 	keys Enter
-	wait_for "> after"
+	wait_for "▌ after"
 	settle
 	capture reconnect "prompt works again"
 }
@@ -339,7 +339,7 @@ JSON
 }
 
 scenario_fallback() {
-	wait_for "Ctrl+C twice"
+	wait_for "Ctrl+C"
 	type_text "/fallback deepseek/deepseek-flash anthropic/claude-fable-5-1"
 	# Esc closes the completion, so Enter runs the line as typed.
 	keys Escape
