@@ -556,6 +556,16 @@ let all =
       ~cache_read:1.
   ; m
       Openai
+      "gpt-6.1-sol"
+      "GPT-6.1 Sol"
+      ~ctx:272000
+      ~max:128000
+      ~thinking:true
+      ~input:2.
+      ~output:10.
+      ~cache_read:0.1
+  ; m
+      Openai
       "gpt-realtime-2.1"
       "GPT-Realtime-2.1"
       ~ctx:128000
@@ -704,6 +714,16 @@ let all =
       ~input:2.
       ~output:10.
       ~cache_read:0.2
+  ; m
+      Openai_codex
+      "gpt-6.1-sol"
+      "GPT-6.1 Sol"
+      ~ctx:272000
+      ~max:128000
+      ~thinking:true
+      ~input:2.
+      ~output:10.
+      ~cache_read:0.1
   ; m
       ~images:false
       Deepseek
