@@ -965,7 +965,8 @@ copy of the protocol types and the e2e test guards the contract.
       `list_paths`) and `History`, `Dialog`/`Dialog_view`/`Modal`
       (pickers built on `Picker`, help, rename, delete, the login flow
       `Login_flow` — also a custom provider's logout question — tool
-      confirmations), `Command_dialog_view` (`/hotkeys`, `/scoped-models`,
+      confirmations; while one shows, `View` makes the page behind it
+      `inert`), `Command_dialog_view` (`/hotkeys`, `/scoped-models`,
       `Prompt` — a path with the backend's completions whose failures stay
       in the dialog, for `/cd`, `/host`, `/export`, `/import` — `/rewind`'s
       confirmation, `/session`, text), `Session_tree` (`get_entries`
@@ -1011,7 +1012,8 @@ copy of the protocol types and the e2e test guards the contract.
     another user; the clipboard; switching accounts, which activates one
     and loads the page for its backend and session; adding one, which
     shows the sign-in form on the next load; scrolling), and installs
-    document listeners: keys (through `Keys`),
+    document listeners: keys (through `Keys`; a Tab no binding takes goes
+    round the open dialog),
     pasted and dropped image files become attachments (PNG, JPEG, GIF,
     WebP, sent with the prompt as base64; others get a toast), the narrow
     (phone) layout, a clock for ages and toasts, and the chat following new
