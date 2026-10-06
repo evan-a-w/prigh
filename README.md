@@ -128,7 +128,8 @@ token: bind to localhost and use an SSH tunnel on untrusted networks.
 
 A tool host doesn't need a TUI: `prigh tool-host -connect server:7777 -token
 sekrit -cwd ~/proj [-name NAME] [-host-id ID]` connects on its own
-(reconnecting when the connection drops; it is the machine's host, by
+(reconnecting when the connection drops, but exiting with what to fix
+when the backend refuses its `-token`/`-user`; it is the machine's host, by
 `~/.prigh/host-id`, unless `-host-id` names another) and hosts the session's tools *and* its `>_` terminal, so
 a browser-only user can pick it with `/host`. The web UI's terminal always
 runs on the session's active host, relayed through the backend.
@@ -453,8 +454,9 @@ Then:
 ```
 tui/_build/default/bin/main.exe                # interactive TUI (PRIGH_BACKEND or the dune build)
 backend/_build/default/bin/main.exe run "explain this repo"    # headless
+backend/_build/default/bin/main.exe run -session ID "go on"     # continue a saved session (id, unique prefix or file)
 backend/_build/default/bin/main.exe sessions list          # saved sessions
-backend/_build/default/bin/main.exe sessions delete ID...  # ids may be prefixes
+backend/_build/default/bin/main.exe sessions delete ID...  # ids may be unique prefixes; nothing is deleted if one matches none or several
 backend/_build/default/bin/main.exe sessions prune -dry-run                        # empty sessions
 backend/_build/default/bin/main.exe sessions prune -max-messages 2 -cwd /tmp       # filters: -older-than DAYS, -prompt TEXT
 backend/_build/default/bin/main.exe serve      # JSON-lines RPC on stdio
@@ -613,7 +615,11 @@ directory, on the backend's host (`~` allowed), that a session starts in
 when the backend starts one for a frontend, instead of the backend's
 working directory; it is ignored if it is not a directory there. Like the
 rest of `config.json`, both are per namespace
-(`~/.prigh/namespaces/<name>/config.json` under `-tokens`).
+(`~/.prigh/namespaces/<name>/config.json` under `-tokens`). Mistakes in the
+file are reported (at `prigh run`'s start and as notices in the UIs) rather
+than silently ignored: invalid JSON or a setting of the wrong type (prigh
+then ignores the file's settings), an unknown setting (with the closest
+known one), and a `default_model` that names no known model.
 
 ### Slash commands
 

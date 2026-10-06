@@ -82,7 +82,9 @@ let common_params =
     flag
       "-session"
       (optional string)
-      ~doc:"PATH continue an existing session file"
+      ~doc:
+        "ID|PATH continue a saved session: its id (or a unique prefix of it), \
+         as prigh sessions list shows, or its file"
   and cwd =
     flag
       "-cwd"
@@ -110,6 +112,11 @@ let common_params =
     in
     let { Namespace.World.home; sessions_dir; store; getenv } = world in
     let cwd_given = Option.is_some cwd in
+    Option.iter cwd ~f:(fun dir ->
+      if backend_host && not (Sys_unix.is_directory_exn dir)
+      then (
+        eprintf "-cwd %s: no such directory\n" dir;
+        exit 2));
     let cwd = Option.value cwd ~default:(Core_unix.getcwd ()) in
     let models = Model_registry.create ~env ~sw ~home ~store ~getenv () in
     let model =
@@ -117,7 +124,9 @@ let common_params =
         match Model_registry.resolve models id with
         | Ok m -> m
         | Error e ->
-          eprintf "%s\n" (Error.to_string_hum e);
+          eprintf
+            "-model: %s\nprigh models lists them all\n"
+            (Error.to_string_hum e);
           exit 2)
     in
     let thinking =
@@ -125,7 +134,7 @@ let common_params =
         match Rpc_json.thinking_of_string s with
         | Ok t -> t
         | Error e ->
-          eprintf "%s\n" (Error.to_string_hum e);
+          eprintf "-thinking %s: %s\n" s (Error.to_string_hum e);
           exit 2)
     in
     let provider =
@@ -151,11 +160,25 @@ let common_params =
         else Provider_router.create ~env ~getenv ~models ~store ()
     in
     let session =
-      Option.map session ~f:(fun path ->
-        match Session.load path with
+      Option.map session ~f:(fun key ->
+        let path =
+          if Sys_unix.file_exists_exn key
+          then Ok key
+          else if String.mem key '/'
+          then Or_error.error_string "no such file"
+          else
+            Session.find_summary (Session.list ~dir:sessions_dir) key
+            |> Or_error.map ~f:(fun (s : Session.Summary.t) -> s.path)
+        in
+        match Or_error.bind path ~f:Session.load with
         | Ok s -> s
         | Error e ->
-          eprintf "cannot load session: %s\n" (Error.to_string_hum e);
+          eprintf
+            "-session %s: %s\n\
+             prigh sessions list shows the saved sessions (in %s)\n"
+            key
+            (Error.to_string_hum e)
+            sessions_dir;
           exit 2)
     in
     let mcp = if no_tools then None else Some (Mcp_hub.create ~env ~sw ()) in
@@ -207,6 +230,12 @@ let common_params =
     { Setup.session; cwd; new_agent; world; models }
 ;;
 
+(* Errors from the agent name the slash command; on the command line the
+   subcommand does the same. *)
+let cli_hints message =
+  String.substr_replace_all message ~pattern:"/login " ~with_:"prigh login "
+;;
+
 let run_command =
   Command.basic
     ~summary:"Run a single prompt headlessly, streaming the reply to stdout"
@@ -225,8 +254,10 @@ let run_command =
        let { Setup.session; cwd; new_agent; models; _ } =
          make_agent ~env ~sw ()
        in
-       Model_registry.subscribe models ~f:(eprintf "%s\n%!");
-       List.iter (Model_registry.problems models) ~f:(eprintf "%s\n%!");
+       Model_registry.subscribe models ~f:(fun p ->
+         eprintf "%s\n%!" (cli_hints p));
+       List.iter (Model_registry.problems models) ~f:(fun p ->
+         eprintf "%s\n%!" (cli_hints p));
        let agent = new_agent ?session ~cwd () in
        let flush_out () = Out_channel.flush stdout in
        let note fmt =
@@ -278,7 +309,7 @@ let run_command =
               | Aborted | End_turn | Tool_use | Length -> ());
              if not (String.is_empty (Message.Assistant.text a))
              then print_endline "")
-         | Notice n -> eprintf "%s\n%!" n
+         | Notice n -> eprintf "%s\n%!" (cli_hints n)
          | _ -> ()
        in
        Agent.subscribe agent ~f:(handle ~in_subagent:false);
@@ -295,22 +326,71 @@ let run_command =
          state.session_path;
        match !failed with
        | Some e ->
-         eprintf "error: %s\n" e;
+         eprintf "error: %s\n" (cli_hints e);
          exit 1
        | None -> ())
 ;;
 
-let parse_listen_addr spec =
-  match String.rsplit2 spec ~on:':' with
-  | None -> Or_error.errorf "listen address must be HOST:PORT, got %S" spec
-  | Some (host, port) ->
-    (match Int.of_string_opt port with
-     | None -> Or_error.errorf "bad port %S" port
-     | Some port ->
-       let host = if String.is_empty host then "0.0.0.0" else host in
-       (match Core_unix.Inet_addr.of_string_or_getbyname host with
-        | addr -> Ok (Eio_unix.Net.Ipaddr.of_unix addr, port)
-        | exception _ -> Or_error.errorf "cannot resolve host %S" host))
+let parse_listen_addr ~flag spec =
+  let usage () =
+    match Int.of_string_opt spec with
+    | Some port ->
+      sprintf
+        "%s must be HOST:PORT, got %S; did you mean 127.0.0.1:%d (this machine \
+         only) or 0.0.0.0:%d (all interfaces)?"
+        flag
+        spec
+        port
+        port
+    | None ->
+      sprintf "%s must be HOST:PORT such as 127.0.0.1:7788, got %S" flag spec
+  in
+  let addr =
+    match String.rsplit2 spec ~on:':' with
+    | None -> Error (usage ())
+    | Some (host, port) ->
+      (match Int.of_string_opt port with
+       | Some port when port >= 0 && port < 65536 ->
+         let host = if String.is_empty host then "0.0.0.0" else host in
+         (match Core_unix.Inet_addr.of_string_or_getbyname host with
+          | addr -> Ok (Eio_unix.Net.Ipaddr.of_unix addr, port)
+          | exception _ ->
+            Error (sprintf "%s %s: cannot resolve host %S" flag spec host))
+       | Some _ | None ->
+         Error
+           (sprintf
+              "%s %s: the port must be a number from 0 to 65535"
+              flag
+              spec))
+  in
+  match addr with
+  | Ok addr -> addr
+  | Error message ->
+    eprintf "%s\n" message;
+    exit 2
+;;
+
+(* Binding fails for reasons the user can fix: say which flag, and how. *)
+let listen_or_exit ~flag (addr, port) f =
+  match f () with
+  | result -> result
+  | exception (Eio.Cancel.Cancelled _ as exn) -> raise exn
+  | exception exn ->
+    eprintf
+      "prigh: cannot listen on %s for %s: %s\n%s\n%!"
+      (Format.asprintf "%a" Eio.Net.Sockaddr.pp (`Tcp (addr, port)))
+      flag
+      (Net_error.to_string_hum exn)
+      (match Net_error.unix_error exn with
+       | Some EADDRINUSE ->
+         sprintf
+           "Another program (perhaps another prigh serve) has that port: stop \
+            it, or pass %s another port (0 picks a free one)."
+           flag
+       | Some EACCES ->
+         sprintf "Ports below 1024 need root: pass %s a higher port." flag
+       | _ -> sprintf "Check the address given to %s." flag);
+    exit 2
 ;;
 
 (* A frontend's built assets: the environment variable, or a directory
@@ -546,38 +626,12 @@ let serve_command =
                  (Sys.getenv "PRIGH_NO_BACKEND_HOST")
                  (Some "1"))
        in
-       let listen =
-         Option.map listen ~f:(fun spec ->
-           match parse_listen_addr spec with
-           | Ok addr -> addr
-           | Error e ->
-             eprintf "%s\n" (Error.to_string_hum e);
-             exit 2)
-       in
-       let web =
-         Option.map web ~f:(fun spec ->
-           match parse_listen_addr spec with
-           | Ok addr -> addr
-           | Error e ->
-             eprintf "%s\n" (Error.to_string_hum e);
-             exit 2)
-       in
+       let listen = Option.map listen ~f:(parse_listen_addr ~flag:"-listen") in
+       let web = Option.map web ~f:(parse_listen_addr ~flag:"-web") in
        let prigh_web =
-         Option.map prigh_web ~f:(fun spec ->
-           match parse_listen_addr spec with
-           | Ok addr -> addr
-           | Error e ->
-             eprintf "%s\n" (Error.to_string_hum e);
-             exit 2)
+         Option.map prigh_web ~f:(parse_listen_addr ~flag:"-prigh-web")
        in
-       let pi_web =
-         Option.map pi_web ~f:(fun spec ->
-           match parse_listen_addr spec with
-           | Ok addr -> addr
-           | Error e ->
-             eprintf "%s\n" (Error.to_string_hum e);
-             exit 2)
-       in
+       let pi_web = Option.map pi_web ~f:(parse_listen_addr ~flag:"-pi-web") in
        let browser_ui =
          Option.is_some web || Option.is_some prigh_web || Option.is_some pi_web
        in
@@ -641,17 +695,20 @@ let serve_command =
        in
        Option.iter listen ~f:(fun (addr, port) ->
          let socket =
-           Eio.Net.listen
-             ~sw
-             ~backlog:16
-             ~reuse_addr:true
-             (Eio.Stdenv.net env)
-             (`Tcp (addr, port))
+           listen_or_exit ~flag:"-listen" (addr, port) (fun () ->
+             Eio.Net.listen
+               ~sw
+               ~backlog:16
+               ~reuse_addr:true
+               (Eio.Stdenv.net env)
+               (`Tcp (addr, port)))
          in
          eprintf
            "prigh: listening on %s\n%!"
-           (Eio.Net.Sockaddr.pp Format.str_formatter (`Tcp (addr, port));
-            Format.flush_str_formatter ());
+           (Format.asprintf
+              "%a"
+              Eio.Net.Sockaddr.pp
+              (Eio.Net.listening_addr socket));
          Eio.Fiber.fork ~sw (fun () ->
            while true do
              Eio.Net.accept_fork
@@ -662,16 +719,25 @@ let serve_command =
                (fun flow _addr ->
                   Rpc_router.serve_connection router ~input:flow ~output:flow)
            done));
-       let serve_web ~label ~root ~root_flag ~env_var ~websockets (addr, port) =
-         let port =
-           Web_server.listen
-             ~env
-             ~sw
-             ~addr
-             ~port
+       let serve_web
+             ~label
+             ~flag
              ~root
+             ~root_flag
+             ~env_var
              ~websockets
-             ~on_lines:(Rpc_router.serve_lines router)
+             (addr, port)
+         =
+         let port =
+           listen_or_exit ~flag (addr, port) (fun () ->
+             Web_server.listen
+               ~env
+               ~sw
+               ~addr
+               ~port
+               ~root
+               ~websockets
+               ~on_lines:(Rpc_router.serve_lines router))
          in
          let host =
            match Format.asprintf "%a" Eio.Net.Ipaddr.pp addr with
@@ -712,6 +778,7 @@ let serve_command =
          in
          serve_web
            ~label:"web ui"
+           ~flag:"-web"
            ~root
            ~root_flag:"-web-root"
            ~env_var:"PRIGH_WEB_ROOT"
@@ -727,6 +794,7 @@ let serve_command =
          in
          serve_web
            ~label:"prigh-web"
+           ~flag:"-prigh-web"
            ~root
            ~root_flag:"-prigh-web-root"
            ~env_var:"PRIGH_PRIGH_WEB_ROOT"
@@ -742,6 +810,7 @@ let serve_command =
          in
          serve_web
            ~label:"pi-web"
+           ~flag:"-pi-web"
            ~root
            ~root_flag:"-pi-web-root"
            ~env_var:"PRIGH_PI_WEB_ROOT"
@@ -825,7 +894,10 @@ let tool_host_command =
                   && Option.is_some (Int.of_string_opt port) ->
              host, Int.of_string port
            | _ ->
-             eprintf "-connect must be HOST:PORT, got %S\n" spec;
+             eprintf
+               "-connect must be HOST:PORT (the backend's -listen or -web \
+                address), got %S\n"
+               spec;
              exit 2
          in
          let cwd =
@@ -844,18 +916,38 @@ let tool_host_command =
          in
          (* Not for the tools it runs. *)
          List.iter [ "PRIGH_TOKEN"; "PRIGH_USER" ] ~f:Core_unix.unsetenv;
-         Eio_main.run
-         @@ fun env ->
-         Tool_host.connect
-           ~env
-           ~host
-           ~port
-           ~token
-           ?user
-           ~host_id
-           ~name:(Option.value name ~default:(Core_unix.gethostname ()))
-           ~cwd
-           ())
+         let user_given = Option.is_some user in
+         let token_given = Option.is_some token in
+         let refused =
+           Eio_main.run
+           @@ fun env ->
+           Tool_host.connect
+             ~env
+             ~host
+             ~port
+             ~token
+             ?user
+             ~host_id
+             ~name:(Option.value name ~default:(Core_unix.gethostname ()))
+             ~cwd
+             ()
+         in
+         eprintf
+           "prigh tool-host: %s\n%s\n"
+           (Error.to_string_hum refused)
+           (match token_given, user_given with
+            | false, _ ->
+              "No token was given: pass the backend's with -token SECRET (or \
+               $PRIGH_TOKEN)."
+            | true, false ->
+              "Check -token (or $PRIGH_TOKEN) against the backend's; if it \
+               serves several users (-tokens), also give -user NAME (or \
+               $PRIGH_USER)."
+            | true, true ->
+              "Check -user and -token (or $PRIGH_USER and $PRIGH_TOKEN) \
+               against the backend's -tokens NAME=TOKEN (or -host-tokens) \
+               entries.");
+         exit 1)
 ;;
 
 (* The CLI's view of the legacy (non-namespace) world. *)
@@ -1038,6 +1130,8 @@ let models_command =
      fun () ->
        with_registry ~store
        @@ fun ~env:_ ~sw:_ models ->
+       Option.iter provider ~f:(fun p ->
+         ignore (provider_of_arg models p : Provider_id.t));
        let before = Model_registry.problems models in
        Model_registry.refresh models ();
        List.iter (Model_registry.problems models) ~f:(fun p ->
@@ -1085,16 +1179,17 @@ let sessions_delete_command =
        let all = Session.list ~dir:(sessions_dir ()) in
        let found, missing =
          List.partition_map ids ~f:(fun id ->
-           match
-             List.find all ~f:(fun s ->
-               String.equal s.id id || String.is_prefix s.id ~prefix:id)
-           with
-           | Some s -> First s
-           | None -> Second id)
+           match Session.find_summary all id with
+           | Ok s -> First s
+           | Error e -> Second (Error.to_string_hum e))
        in
-       List.iter missing ~f:(eprintf "no session %s\n");
-       delete_sessions found;
-       if not (List.is_empty missing) then exit 1)
+       List.iter missing ~f:(eprintf "%s\n");
+       if not (List.is_empty missing)
+       then (
+         eprintf
+           "Nothing deleted; prigh sessions list shows the saved sessions\n";
+         exit 1);
+       delete_sessions found)
 ;;
 
 let sessions_prune_command =

@@ -181,7 +181,8 @@ module Listing = struct
       | Failed e ->
         Some
           (sprintf
-             "MCP server %s (%s) failed: %s; fix it, then /mcp reconnect"
+             "MCP server %s (%s) failed: %s; once that is fixed, /mcp \
+              reconnect starts it"
              s.name
              s.source
              e)

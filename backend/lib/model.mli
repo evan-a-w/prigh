@@ -56,6 +56,10 @@ val find_in : t list -> string -> t option
 
 val find : string -> t option
 
+(** The (at most three) models closest to [query], by key, id or name; only
+    the named provider's when [query] starts with one. *)
+val closest_in : t list -> string -> t list
+
 (** What a user typed: [find], then case-insensitive display name, then a
     unique case-insensitive prefix of the key, id or name. Failures explain
     themselves ("did you mean: ..." ranked by edit distance, or the

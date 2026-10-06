@@ -3,12 +3,13 @@
  (preprocess
   (pps ppx_jane ppx_jsonaf_conv))
  (inline_tests
-  (deps fake_mcp_server/fake_mcp_server.exe))
+  (deps fake_mcp_server/fake_mcp_server.exe ../bin/main.exe))
  (libraries
   core
   core_unix
   core_unix.filename_unix
   core_unix.sys_unix
+  core_unix.signal_unix
   jsonaf
   prigh
   eio
