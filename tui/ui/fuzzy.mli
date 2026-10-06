@@ -1,7 +1,8 @@
 open! Core
 
 (** Subsequence matching with ranking: prefix > word start > substring >
-    subsequence; ties broken by shorter candidate. Case-insensitive. *)
+    subsequence, subsequences by how many of their letters are adjacent or
+    start words; ties broken by shorter candidate. Case-insensitive. *)
 
 val score : query:string -> string -> int option
 

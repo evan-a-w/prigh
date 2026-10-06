@@ -581,7 +581,12 @@ kbd {
   white-space: pre-wrap;
   font-size: 14px;
   animation: drop 0.18s ease-out;
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
 }
+.toast-close { width: 14px; height: 14px; margin-top: 3px; color: var(--faint); }
+.toast:hover .toast-close { color: var(--chalk); }
 .toast.error { border-color: var(--brick-line); box-shadow: inset 2px 0 0 var(--brick), var(--float-shadow); color: var(--brick); }
 /* Not over the agents panel. */
 .app.agents-open:not(.narrow) .toasts { right: calc(var(--agents-width, 420px) + 16px); }
