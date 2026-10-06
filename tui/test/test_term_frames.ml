@@ -203,12 +203,12 @@ let%expect_test "startup frame matches the pure renderer" =
 
 
 
-      session abc123 in /work. /help for commands, Esc aborts, Ctrl+C twice quits.
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
       > earlier question
       earlier answer
       ────────────────────────────────────────────────────────────────────────────────
       > ▏
-      /work  deepseek-flash  think:off  view:normal  ctx:0% 1.5k  $0.01
+      /work  deepseek-flash  think:off  view:normal  ctx:0.1%/1.0M  $0.01
       same: true
       |}];
     return ())
@@ -239,12 +239,12 @@ let%expect_test "typing, streamed reply, Ctrl+O and Alt+Enter through the \
 
 
 
-      session abc123 in /work. /help for commands, Esc aborts, Ctrl+C twice quits.
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
       > earlier question
       earlier answer
       ────────────────────────────────────────────────────────────────────────────────
       > hello▏
-      /work  deepseek-flash  think:off  view:normal  ctx:0% 1.5k  $0.01
+      /work  deepseek-flash  think:off  view:normal  ctx:0.1%/1.0M  $0.01
       same: true
       |}];
     (* A streamed assistant reply arrives as an incoming action. *)
@@ -270,14 +270,14 @@ let%expect_test "typing, streamed reply, Ctrl+O and Alt+Enter through the \
 
 
 
-      session abc123 in /work. /help for commands, Esc aborts, Ctrl+C twice quits.
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
       > earlier question
       earlier answer
 
       streamed reply
       ────────────────────────────────────────────────────────────────────────────────
       > hello▏
-      /work  deepseek-flash  think:off  view:normal  ctx:0% 1.5k  $0.01
+      /work  deepseek-flash  think:off  view:normal  ctx:0.1%/1.0M  $0.01
       same: true
       |}];
     (* Raw ^O (ASCII '\015') goes through Key_of_event and cycles verbosity. *)
@@ -298,7 +298,7 @@ let%expect_test "typing, streamed reply, Ctrl+O and Alt+Enter through the \
 
 
 
-      session abc123 in /work. /help for commands, Esc aborts, Ctrl+C twice quits.
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
       > earlier question
       earlier answer
       view: verbose — everything is shown
@@ -306,7 +306,7 @@ let%expect_test "typing, streamed reply, Ctrl+O and Alt+Enter through the \
       streamed reply
       ────────────────────────────────────────────────────────────────────────────────
       > hello▏
-      /work  deepseek-flash  think:off  view:verbose  ctx:0% 1.5k  $0.01
+      /work  deepseek-flash  think:off  view:verbose  ctx:0.1%/1.0M  $0.01
       same: true
       |}];
     (* Alt+Enter is a raw Enter with the Meta modifier; it queues a follow-up. *)
@@ -327,7 +327,7 @@ let%expect_test "typing, streamed reply, Ctrl+O and Alt+Enter through the \
 
 
 
-      session abc123 in /work. /help for commands, Esc aborts, Ctrl+C twice quits.
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
       > earlier question
       earlier answer
       view: verbose — everything is shown
@@ -335,7 +335,7 @@ let%expect_test "typing, streamed reply, Ctrl+O and Alt+Enter through the \
       streamed reply
       ────────────────────────────────────────────────────────────────────────────────
       > ▏
-      /work  deepseek-flash  think:off  view:verbose  ctx:0% 1.5k  $0.01
+      /work  deepseek-flash  think:off  view:verbose  ctx:0.1%/1.0M  $0.01
       same: true
       |}];
     return ())
@@ -369,12 +369,12 @@ let%expect_test "bracketed paste produces the paste chip" =
 
 
 
-      session abc123 in /work. /help for commands, Esc aborts, Ctrl+C twice quits.
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
       > earlier question
       earlier answer
       ────────────────────────────────────────────────────────────────────────────────
       > [4 lines pasted]▏
-      /work  deepseek-flash  think:off  view:normal  ctx:0% 1.5k  $0.01
+      /work  deepseek-flash  think:off  view:normal  ctx:0.1%/1.0M  $0.01
       same: true
       |}];
     return ())
@@ -401,14 +401,14 @@ let%expect_test "resize 80 -> 40 keeps the frame matching" =
 
 
 
-      session abc123 in /work. /help for
-      commands, Esc aborts, Ctrl+C twice
-      quits.
+
+      prigh in /work · /help · Esc aborts ·
+      Ctrl+C twice quits
       > earlier question
       earlier answer
       ────────────────────────────────────────
       > ▏
-      …deepseek-flash  ctx:0% 1.5k  $0.01
+      …deepseek-flash  ctx:0.1%/1.0M  $0.01
       same: true
       |}];
     return ())
@@ -460,7 +460,7 @@ let%expect_test "styled frame: markdown link, diff and autocomplete" =
 
 
 
-      [yellow]session abc123 in /work. /help for commands, Esc aborts, Ctrl+C twice quits.[/]
+      [gray]prigh in /work · /help · Esc aborts · Ctrl+C twice quits[/]
       [green][bold]> [/][bold]earlier question[/]
       earlier [bold]answer[/]
       See the docs (https://example.com).
@@ -472,7 +472,7 @@ let%expect_test "styled frame: markdown link, diff and autocomplete" =
       [green]  +new[/]
       [gray]  … (1 more)[/]
       [gray]────────────────────────────────────────────────────────────────────────────────[/]
-      [cyan][bold]> [/]/
+      [yellow][bold]> [/]/
       [invert]▸ [/][bold][invert]/help[/][gray][invert]                              show commands and keys[/]
         [bold]/hotkeys[/][gray]                           show keyboard shortcuts[/]
         [bold]/model[/][gray] [name|id|provider/id]       pick or switch the model[/]
@@ -482,7 +482,7 @@ let%expect_test "styled frame: markdown link, diff and autocomplete" =
         [bold]/default-dir[/][gray] [off|path]            show or set the directory new sessions sta…[/]
         [bold]/login[/][gray] [provider] [api_key|oauth]  log in to a provider[/]
       [gray]  ↕ 1–8 of 40[/]
-      …[gray]deepseek-flash[/]  [gray]think:off[/]  [green]ctx:0% 1.5k[/]  [gray]$0.01[/]  [gray]Tab/Enter accept · Esc close[/]
+      …[gray]deepseek-flash[/]  [gray]think:off[/]  [gray]ctx:0.1%/1.0M[/]  [gray]$0.01[/]  [yellow]Tab/Enter accept · Esc close[/]
       |}];
     return ())
 ;;
@@ -511,7 +511,7 @@ let%expect_test "mouse wheel scrolls the transcript; Up walks history" =
       > line 2
       ────────────────────────────────────────────────────────────────────────────────
       > ▏
-      /work  deepseek-flash  think:off  view:normal  ctx:0% 1.5k  $0.01  ↑ scrolled
+      /work  deepseek-flash  think:off  view:normal  ctx:0.1%/1.0M  $0.01  ↑ scrolled
       same: true
       |}];
     H.wheel h `Down;
@@ -531,7 +531,7 @@ let%expect_test "mouse wheel scrolls the transcript; Up walks history" =
       > line 5
       ────────────────────────────────────────────────────────────────────────────────
       > hello▏
-      /work  deepseek-flash  think:off  view:normal  ctx:0% 1.5k  $0.01
+      /work  deepseek-flash  think:off  view:normal  ctx:0.1%/1.0M  $0.01
       same: true
       |}];
     return ())
