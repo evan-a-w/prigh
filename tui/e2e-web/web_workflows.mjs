@@ -27,7 +27,7 @@ const clean = text => text
   .replace(/ws:\/\/127\.0\.0\.1:\d+\/ws/g, "<BACKEND>")
   .replace(/session [0-9a-f]+/g, "session <ID>")
   .replace(/─+/g, "<RULE>")
-  .replace(/ctx:\d+% [0-9.km]+/g, "ctx:<USAGE>")
+  .replace(/ctx:[0-9.]+%\/[0-9.]+[kM]?/g, "ctx:<USAGE>")
   .replace(/\$\d+\.\d+/g, "$<COST>")
   .split("\n")
   .map(line => line.trim())
