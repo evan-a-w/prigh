@@ -448,7 +448,9 @@ let reveal_selected () =
 ;;
 
 (* Tab and Shift+Tab go round the open dialog (the page behind is inert),
-   not out to the browser's toolbar. *)
+   not out to the browser's toolbar. The page moves the focus itself, so the
+   order does not depend on where each browser starts sequential navigation;
+   a scrolling body is a stop, as browsers make it one. *)
 let wrap_focus (ev : Dom_html.keyboardEvent Js.t) =
   let k = key ev in
   if (not (String.equal k.key "Tab")) || k.alt || k.ctrl || k.meta
@@ -461,37 +463,41 @@ let wrap_focus (ev : Dom_html.keyboardEvent Js.t) =
     with
     | None -> false
     | Some modal ->
-      let focusable =
+      let stops =
         Dom.list_of_nodeList
           (modal##querySelectorAll
              (Js.string
                 "button:not(:disabled), input:not(:disabled), \
                  textarea:not(:disabled), select:not(:disabled), a[href], \
-                 summary, [tabindex]:not([tabindex='-1'])"))
+                 summary, [tabindex]:not([tabindex='-1']), .modal-body"))
+        |> List.filter ~f:(fun (el : Dom_html.element Js.t) ->
+          if Js.to_bool (el##.classList##contains (Js.string "modal-body"))
+          then el##.scrollHeight > el##.clientHeight
+          else true)
+        |> Array.of_list
       in
-      (match List.hd focusable, List.last focusable with
-       | Some first, Some last ->
-         let active : Dom_html.element Js.t option =
-           Js.Opt.to_option (Js.Unsafe.coerce Dom_html.document)##.activeElement
-         in
-         let is el =
-           Option.exists active ~f:(fun a -> phys_equal (Js.Unsafe.coerce a) el)
-         in
-         let inside =
-           Option.exists active ~f:(fun a ->
-             Js.to_bool ((Js.Unsafe.coerce modal)##contains a))
-         in
-         let target =
-           if k.shift
-           then Option.some_if ((not inside) || is first || is modal) last
-           else Option.some_if ((not inside) || is last) first
-         in
-         (match target with
-          | Some el ->
-            el##focus;
-            true
-          | None -> false)
-       | _ -> false))
+      let n = Array.length stops in
+      if n = 0
+      then false
+      else (
+        let active : Dom_html.element Js.t option =
+          Js.Opt.to_option (Js.Unsafe.coerce Dom_html.document)##.activeElement
+        in
+        let index =
+          Option.bind active ~f:(fun a ->
+            Array.findi stops ~f:(fun _ el ->
+              phys_equal (Js.Unsafe.coerce a) el)
+            |> Option.map ~f:fst)
+        in
+        let target =
+          match index, k.shift with
+          | Some i, false -> (i + 1) % n
+          | Some i, true -> (i - 1 + n) % n
+          | None, false -> 0
+          | None, true -> n - 1
+        in
+        stops.(target)##focus;
+        true))
 ;;
 
 let narrow () = Dom_html.window##.innerWidth < 760

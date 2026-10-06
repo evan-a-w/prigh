@@ -281,6 +281,8 @@ try {
   await composer().fill("/help");
   await composer().press("Enter");
   await page.locator(".modal").waitFor();
+  // The dialog takes the focus after it renders.
+  await page.waitForFunction(() => document.activeElement?.classList.contains("modal"));
   const focusIn = () => page.evaluate(() =>
     { const e = document.activeElement; if (!e) return "none"; return e.closest(".modal") ? `dialog: ${e.title || e.innerText.split("\n")[0]}` : e.className; });
   const tabs = [];
