@@ -70,21 +70,23 @@ end
 module Host = struct
   type t = { logs : string Queue.t }
 
-  (* Runs [Tool_host.connect] until [sw] ends; logs are kept, with the port
-     masked. *)
+  (* Runs [Tool_host.connect] until [sw] ends or it gives up; logs (and why
+     it gave up) are kept, with the port masked. *)
   let start ?terminals ?user ?host_id t ~sw ~port ~token ~cwd =
     let logs = Queue.create () in
+    let log line =
+      Queue.enqueue
+        logs
+        (String.substr_replace_all
+           line
+           ~pattern:(sprintf ":%d" port)
+           ~with_:":PORT")
+    in
     Eio.Fiber.fork_daemon ~sw (fun () ->
       Tool_host.connect
         ~env:t.env
         ?terminals
-        ~log:(fun line ->
-          Queue.enqueue
-            logs
-            (String.substr_replace_all
-               line
-               ~pattern:(sprintf ":%d" port)
-               ~with_:":PORT"))
+        ~log
         ~initial_backoff:(Time_ns.Span.of_sec 0.05)
         ~max_backoff:(Time_ns.Span.of_sec 0.2)
         ~host:"127.0.0.1"
@@ -94,7 +96,11 @@ module Host = struct
         ?host_id
         ~name:"box"
         ~cwd
-        ());
+        ()
+      |> Error.to_string_hum
+      |> sprintf "gave up: %s"
+      |> log;
+      `Stop_daemon);
     { logs }
   ;;
 
@@ -179,12 +185,9 @@ let%expect_test "network tool host: the user name must be the namespace's" =
         ~token:(Some "sekrit")
         ~cwd:t.dir
     in
-    Host.wait_logs t bad 2);
+    Host.wait_logs t bad 1);
   [%expect
-    {|
-    hello failed: unauthorised: bad user name or password
-    retrying in 50ms
-    |}];
+    {| gave up: 127.0.0.1:PORT refused the login: unauthorised: bad user name or password |}];
   let host =
     Host.start
       t
@@ -294,40 +297,24 @@ let%expect_test "network tool host: hello, run tools, reconnect, bad token" =
     {"type":"response","id":"r","ok":true,"result":{}}
     $DIR/host/sub
     |}];
-  (* A wrong token is refused, and retried with a growing delay. *)
+  (* A wrong token is refused once: retrying cannot fix it. *)
   Eio.Switch.run (fun sw ->
     let bad =
       Host.start t ~sw ~port:listener.port ~token:(Some "nope") ~cwd:host_dir
     in
-    Host.wait_logs t bad 8);
+    Host.wait_logs t bad 1);
   [%expect
-    {|
-    hello failed: unauthorised: bad user name or password
-    retrying in 50ms
-    hello failed: unauthorised: bad user name or password
-    retrying in 100ms
-    hello failed: unauthorised: bad user name or password
-    retrying in 200ms
-    hello failed: unauthorised: bad user name or password
-    retrying in 200ms
-    |}];
+    {| gave up: 127.0.0.1:PORT refused the login: unauthorised: bad user name or password |}];
   (* Nothing listening. *)
   let closed_port =
     Eio.Switch.run (fun sw -> (Listener.start t ~sw h.server).port)
   in
   Eio.Switch.run (fun sw ->
     let host = Host.start t ~sw ~port:closed_port ~token:None ~cwd:host_dir in
-    ignore (eventually t (fun () -> Queue.length host.logs >= 2) : bool);
-    List.iter
-      (List.take (Queue.to_list host.logs) 2)
-      ~f:(fun line ->
-        print_endline
-          (match String.substr_index line ~pattern:"PORT: " with
-           | Some i -> String.prefix line (i + 4) ^ " ..."
-           | None -> line)));
+    Host.wait_logs t host 2);
   [%expect
     {|
-    cannot connect to 127.0.0.1:PORT ...
+    cannot connect to 127.0.0.1:PORT: connection refused
     retrying in 50ms
     |}]
 ;;

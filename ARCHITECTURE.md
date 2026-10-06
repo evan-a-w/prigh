@@ -469,7 +469,9 @@ two can share one.
   `confirm_tools : bool`, `default_model`/`default_thinking`,
   `fallback_models` (model keys) and `default_cwd`), loaded at agent
   creation, read/written through `get_config`/`set_config`; unknown fields
-  are ignored. Each namespace has its own file, so each has its own
+  are ignored by `load` but reported by `problems` (with wrong-typed ones),
+  which `Model_registry` adds to its problems along with an unknown
+  `default_model`. Each namespace has its own file, so each has its own
   defaults. `set_config` merges the given fields over the current ones and
   resolves `fallback_models` like `set_model` (stored as keys). A new
   session starts in `default_cwd` (on the backend host) and on
@@ -589,6 +591,9 @@ two can share one.
   response is `{btw_id, text, usage, cost_usd}`. `btw_cancel {btw_id}`
   (or the client disconnecting) cancels it. Its usage is added to the
   in-memory `State.usage`/`cost_usd` like subagents'.
+- `Net_error` — a failed bind or connect as a short phrase ("address
+  already in use", "connection refused") instead of Eio's exception dump,
+  for `prigh serve`'s listeners and `prigh tool-host -connect`.
 - `Websocket` — a minimal RFC 6455 server side (handshake key, frame
   encode/decode with client masking, fragment reassembly, ping/pong and
   close) and `Web_server` — the `-web` listener: a connection whose first
@@ -707,7 +712,8 @@ killed), `tool-host` (the local tool worker), `run <prompt>`
 `logout <provider>`, `auth`. All commands share `-auth-file`; `run`/`serve`
 share `-model`, `-thinking`, `-session`, `-cwd`, `-no-tools`, `-faux` (and
 `-faux-script FILE`, a JSON array of scripted replies that implies `-faux`);
-for `serve`, `-session` is the default session, the one a client lands on
+`-session` takes a saved session's id, a unique prefix of it, or its file;
+for `serve`, it is the default session, the one a client lands on
 when its `hello` names none; without it every new client starts in a fresh
 session of its own (sharing one is explicit: `hello` with the session id or
 path, which is also how a frontend reattaches after a reconnect). With no explicit model, a new
@@ -1116,6 +1122,12 @@ tool calls say it waits for the host, the host reconnecting with the same
 host, and a newer connection taking over a held host id. The real
 `prigh tool-host` reconnecting with its id is in `test_tool_host.ml`,
 terminals routed by host id in `test_terminal_relay.ml`.
+
+`backend/test/test_cli.ml` runs the built `prigh` binary in a sandboxed
+`HOME` and prints what the user sees for wrong input: bad flag values,
+running without a login, `-session` by id, broken `config.json` and
+`auth.json`, a taken `-listen`/`-web` port and a tool host whose token the
+backend refuses. Each error names the flag or file and what to do next.
 
 `backend/test/test_pi_rpc.ml` drives `Pi_rpc` over in-memory lines
 (pi commands in, pi events out) for prompts, steering, confirmations,

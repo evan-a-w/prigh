@@ -460,6 +460,29 @@ let list ~dir =
     |> List.map ~f:snd
 ;;
 
+let find_summary summaries key =
+  let key = String.strip key in
+  match
+    List.find summaries ~f:(fun (s : Summary.t) -> String.equal s.id key)
+  with
+  | Some s -> Ok s
+  | None when String.is_empty key -> Or_error.error_string "no session id given"
+  | None ->
+    (match
+       List.filter summaries ~f:(fun (s : Summary.t) ->
+         String.is_prefix s.id ~prefix:key)
+     with
+     | [ s ] -> Ok s
+     | [] -> Or_error.errorf "no session %S" key
+     | many ->
+       Or_error.errorf
+         "session %S is ambiguous: %s"
+         key
+         (String.concat
+            ~sep:", "
+            (List.map many ~f:(fun (s : Summary.t) -> s.id))))
+;;
+
 let has_id ~dir id =
   match Sys_unix.is_directory dir with
   | `No | `Unknown -> false
