@@ -22,7 +22,18 @@ module Reply_tag = struct
     | Entries_for_rewind
     | Entries_for_tree
     | Export_done
-    | Deleted_session
+    | Sessions_refresh (** the open sessions picker and the cache *)
+    | Sessions_deleted
+    | Sessions_to_delete of string list (** [/delete]'s arguments *)
+    | Archived_to_delete
+    | Archive_done of
+        { name : string
+        ; archived : bool
+        }
+    | Session_to_archive of
+        { arg : string
+        ; archived : bool
+        }
     | Paths_for_autocomplete of string
     | Dirs_for_autocomplete of string
     | Set_model_done of string (** the key requested *)
@@ -635,45 +646,64 @@ let logout_picker m (statuses : P.Auth_status.t list) =
   else open_picker m Logout (Picker.create ~title:"Log out of" items)
 ;;
 
-let session_picker_items m (sessions : P.Session_summary.t list) =
-  let current = Option.map m.state ~f:(fun s -> s.session_path) in
-  List.map sessions ~f:(fun s ->
-    let name = Option.value s.name ~default:"(unnamed)" in
-    let date = String.prefix (Option.value s.updated_at ~default:"") 16 in
-    let first = Text_width.truncate (P.Session_summary.blurb s) ~width:60 in
-    Picker.Item.create
-      ~id:s.path
-      ~detail:s.cwd
-      ~search:(name ^ " " ^ first ^ " " ^ s.cwd ^ " " ^ date)
-      ~marked:(Option.value_map current ~default:false ~f:(String.equal s.path))
-      (sprintf
-         "%s%s ∣ %s ∣ %d msgs ∣ %s"
-         (if s.running then "▶ " else if s.live then "● " else "")
-         name
-         date
-         s.message_count
-         first))
+let current_session m = Option.map m.state ~f:(fun s -> s.session_path)
+
+let sessions_picker ?named_only m (sessions : P.Session_summary.t list) =
+  let selection = Session_selection.create ?named_only sessions in
+  let picker =
+    Session_selection.picker selection ~current:(current_session m)
+  in
+  if List.is_empty (Picker.visible picker)
+  then notice m "no saved sessions"
+  else open_picker m (Sessions selection) picker
 ;;
 
-let sessions_picker
-  ?(named_only = false)
-  m
-  (sessions : P.Session_summary.t list)
-  =
-  let shown =
-    if named_only
-    then List.filter sessions ~f:(fun s -> Option.is_some s.name)
-    else sessions
-  in
-  let items = session_picker_items m shown in
-  if List.is_empty items
-  then notice m "no saved sessions"
-  else (
-    let title = if named_only then "Sessions (named)" else "Sessions" in
-    open_picker
-      m
-      (Sessions { named_only; sessions })
-      (Picker.create ~title items))
+(* Back in the editor (unless something else is there now), to correct rather
+   than retype. *)
+let restore_command m command =
+  if Editor.is_empty m.editor
+  then { m with editor = Editor.set_text m.editor command }
+  else m
+;;
+
+let archive_verb ~archived = if archived then "archived" else "unarchived"
+
+(* No argument: the current session; otherwise it is looked up in the list
+   ([Session_to_archive]). *)
+let archive_command m ~archived arg =
+  match arg, m.state with
+  | "", None -> error m "not connected", []
+  | "", Some state ->
+    ( m
+    , [ call
+          (Set_archived { path = state.session_path; archived })
+          ~tag:
+            (Notice_on_success
+               (if archived
+                then "archived this session (your next message unarchives it)"
+                else "unarchived this session"))
+      ] )
+  | arg, _ ->
+    m, [ rpc "list_sessions" ~tag:(Session_to_archive { arg; archived }) ]
+;;
+
+let archive_resolved m ~arg ~archived sessions =
+  match Session_selection.resolve sessions [ arg ] with
+  | Error e ->
+    let command =
+      sprintf "/%s %s" (if archived then "archive" else "unarchive") arg
+    in
+    error (restore_command m command) e, []
+  | Ok found ->
+    let set (s : P.Session_summary.t) =
+      let notice =
+        sprintf "%s %s" (archive_verb ~archived) (Session_selection.describe s)
+      in
+      call
+        (Set_archived { path = s.path; archived })
+        ~tag:(Notice_on_success notice)
+    in
+    m, List.map found ~f:set
 ;;
 
 let format_stats (s : P.Session_stats.t) : Content.t =
@@ -794,11 +824,27 @@ let rewind_picker m entries =
 ;;
 
 let tree_items entries head =
+  let by_id =
+    String.Map.of_alist_reduce
+      (List.map entries ~f:(fun (e : P.Entry.t) -> e.id, e))
+      ~f:(fun first _ -> first)
+  in
+  let is_message (e : P.Entry.t) =
+    match e.kind with
+    | P.Entry.Kind.Message _ -> true
+    | _ -> false
+  in
+  (* Settings entries (model, name, cwd, archived...) are not listed: a
+     message hangs under the nearest message above it. *)
+  let rec message_parent parent =
+    match Option.bind parent ~f:(Map.find by_id) with
+    | None -> parent
+    | Some (e : P.Entry.t) ->
+      if is_message e then Some e.id else message_parent e.parent
+  in
   let entries =
-    List.filter entries ~f:(fun (e : P.Entry.t) ->
-      match e.kind with
-      | P.Entry.Kind.Message _ -> true
-      | _ -> false)
+    List.filter_map entries ~f:(fun (e : P.Entry.t) ->
+      Option.some_if (is_message e) { e with parent = message_parent e.parent })
   in
   let ids =
     String.Set.of_list (List.map entries ~f:(fun (e : P.Entry.t) -> e.id))
@@ -826,7 +872,7 @@ let tree_items entries head =
          | None -> acc
          | Some parent -> go parent acc)
     in
-    match head with
+    match message_parent head with
     | None -> String.Set.empty
     | Some head -> go head String.Set.empty
   in
@@ -1747,8 +1793,12 @@ let run_command m (cmd : Commands.Parsed.t) =
   | "jobs", [ id ] -> job_output m id
   | "host", [] -> hosts_picker m
   | "host", _ -> switch_host m cmd.rest
-  | "sessions", _ | "switch", [] ->
+  | "sessions", _ | "switch", [] | "delete", [] ->
     m, [ rpc "list_sessions" ~tag:Sessions_picker ]
+  | "delete", args -> m, [ rpc "list_sessions" ~tag:(Sessions_to_delete args) ]
+  | "delete-archived", _ -> m, [ rpc "list_sessions" ~tag:Archived_to_delete ]
+  | (("archive" | "unarchive") as verb), _ ->
+    archive_command m ~archived:(String.equal verb "archive") cmd.rest
   | "switch", _ ->
     ( m
     , [ rpc
@@ -2040,7 +2090,8 @@ let fetch_autocomplete m ac =
        , [ call List_skills ~tag:(Skills_for_autocomplete key) ] ))
   | Autocomplete.Source.Argument spec
     when match spec.argument with
-         | Some Commands.Argument.Sessions -> Option.is_none m.sessions
+         | Some (Commands.Argument.Sessions | Session_list) ->
+           Option.is_none m.sessions
          | _ -> false ->
     ( { m with autocomplete = Some ac }
     , [ rpc "list_sessions" ~tag:Sessions_cache ] )
@@ -2367,6 +2418,7 @@ let editing_intent m (intent : Intent.t) =
   | Search -> open_search m, []
   | Prev_user_message -> jump_user_message m ~direction:`Prev
   | Next_user_message -> jump_user_message m ~direction:`Next
+  | Toggle_archived -> m, []
 ;;
 
 (* Autocomplete is a sub-state of editing: while it is open it owns a few keys,
@@ -2442,6 +2494,7 @@ let editing m (intent : Intent.t) =
         | Picker_toggle_filter
         | Prev_user_message
         | Next_user_message
+        | Toggle_archived
         | Search ->
           let m, cmds = editing_intent m intent in
           let m, more = refresh_autocomplete m in
@@ -2547,25 +2600,155 @@ let save_scoped_models m picker =
     ] )
 ;;
 
+(* ---- sessions picker --------------------------------------------------- *)
+
+let confirm_delete m ~back (sessions : P.Session_summary.t list) =
+  match sessions with
+  | [] -> m, []
+  | sessions ->
+    ( { m with
+        mode =
+          Confirm
+            { question = Session_selection.delete_question sessions
+            ; action =
+                Delete_sessions
+                  { paths =
+                      List.map sessions ~f:(fun (s : P.Session_summary.t) ->
+                        s.path)
+                  ; back
+                  }
+            }
+      }
+    , [] )
+;;
+
+let confirm_delete_archived m ~back selection =
+  match Session_selection.delete_archived_question selection with
+  | None -> notice m "no archived sessions to delete", []
+  | Some question ->
+    ( { m with mode = Confirm { question; action = Delete_archived { back } } }
+    , [] )
+;;
+
+(* The row that takes the highlighted one's place when it moves to the other
+   section. *)
+let neighbour picker =
+  let visible = Picker.visible picker in
+  let index = Picker.selected picker in
+  Option.map
+    (Option.first_some
+       (List.nth visible (index + 1))
+       (List.nth visible (index - 1)))
+    ~f:(fun (item : Picker.Item.t) -> item.id)
+;;
+
+let toggle_archived m selection picker =
+  match
+    Option.bind (Picker.selected_item picker) ~f:(fun item ->
+      Session_selection.find selection item.id)
+  with
+  | None -> m, []
+  | Some session when session.running && not session.archived ->
+    ( error
+        m
+        (sprintf
+           "%s is running: wait for it, or switch to it and /abort, before \
+            archiving"
+           (Session_selection.describe session))
+    , [] )
+  | Some session ->
+    let archived = not session.archived in
+    let selection =
+      Session_selection.set_archived selection ~path:session.path ~archived
+    in
+    let picker =
+      Session_selection.picker
+        ~previous:picker
+        ?select:(neighbour picker)
+        selection
+        ~current:(current_session m)
+    in
+    ( { m with mode = Picker { kind = Sessions selection; picker } }
+    , [ call
+          (Set_archived { path = session.path; archived })
+          ~tag:
+            (Archive_done
+               { name = Session_selection.describe session; archived })
+      ] )
+;;
+
+(* Applies [f] to the sessions picker, open or waiting behind a confirmation. *)
+let map_sessions_picker m ~f =
+  let current = current_session m in
+  let update selection picker =
+    let selection = f selection in
+    ( Mode.Picker_kind.Sessions selection
+    , Session_selection.picker ~previous:picker selection ~current )
+  in
+  match m.mode with
+  | Picker { kind = Sessions selection; picker } ->
+    let kind, picker = update selection picker in
+    { m with mode = Picker { kind; picker } }
+  | Confirm
+      { question
+      ; action =
+          ( Delete_sessions
+              { back = Some { kind = Sessions selection; picker }; _ }
+          | Delete_archived
+              { back = Some { kind = Sessions selection; picker } } ) as action
+      } ->
+    let kind, picker = update selection picker in
+    let back = Some { Mode.Open_picker.kind; picker } in
+    let action : Mode.Confirm_action.t =
+      match action with
+      | Delete_sessions { paths; _ } -> Delete_sessions { paths; back }
+      | _ -> Delete_archived { back }
+    in
+    { m with mode = Confirm { question; action } }
+  | _ -> m
+;;
+
+let sessions_picker_shown m =
+  match m.mode with
+  | Picker { kind = Sessions _; _ }
+  | Confirm
+      { action =
+          ( Delete_sessions { back = Some { kind = Sessions _; _ }; _ }
+          | Delete_archived { back = Some { kind = Sessions _; _ } } )
+      ; _
+      } -> true
+  | _ -> false
+;;
+
 let picker m (kind : Mode.Picker_kind.t) picker (intent : Intent.t) =
+  let back = Some { Mode.Open_picker.kind; picker } in
   match intent with
+  | (Complete | Toggle_archived | Delete_word_forward)
+    when match kind with
+         | Sessions _ -> true
+         | _ -> false ->
+    (match kind, intent with
+     | Sessions _, Complete ->
+       ( { m with mode = Picker { kind; picker = Picker.toggle_check picker } }
+       , [] )
+     | Sessions selection, Toggle_archived -> toggle_archived m selection picker
+     | Sessions selection, _ -> confirm_delete_archived m ~back selection
+     | _ -> m, [])
   | Picker_toggle_filter ->
     (match kind with
-     | Sessions { named_only; sessions } ->
-       let named_only = not named_only in
-       let shown =
-         if named_only
-         then List.filter sessions ~f:(fun s -> Option.is_some s.name)
-         else sessions
+     | Sessions selection ->
+       let selection =
+         { selection with named_only = not selection.named_only }
        in
-       let items = session_picker_items m shown in
-       let title = if named_only then "Sessions (named)" else "Sessions" in
        ( { m with
            mode =
              Picker
-               { kind = Sessions { named_only; sessions }
+               { kind = Sessions selection
                ; picker =
-                   Picker.create ~query:(Picker.query picker) ~title items
+                   Session_selection.picker
+                     ~previous:picker
+                     selection
+                     ~current:(current_session m)
                }
          }
        , [] )
@@ -2587,31 +2770,8 @@ let picker m (kind : Mode.Picker_kind.t) picker (intent : Intent.t) =
        (match Picker.selected_item picker with
         | None -> m, []
         | Some item -> kill_job { m with mode = Editing } item.id)
-     | Sessions { sessions; _ } ->
-       (match Picker.selected_item picker with
-        | None -> m, []
-        | Some item ->
-          (match
-             List.find sessions ~f:(fun s -> String.equal s.path item.id)
-           with
-           | None -> m, []
-           | Some session ->
-             let name =
-               Option.value
-                 session.name
-                 ~default:
-                   (String.prefix
-                      (Option.value session.updated_at ~default:"")
-                      16)
-             in
-             ( { m with
-                 mode =
-                   Confirm
-                     { question = sprintf "Delete session %s? (y/n)" name
-                     ; action = Delete_session session.path
-                     }
-               }
-             , [] )))
+     | Sessions selection ->
+       confirm_delete m ~back (Session_selection.targets selection picker)
      | _ -> { m with quitting = true }, [ Command.Quit ])
   | _ ->
     (match
@@ -2681,6 +2841,7 @@ let login_prompt m ~id ~(prompt : P.Auth_event.Prompt.t) (intent : Intent.t) =
   | Search
   | Prev_user_message
   | Next_user_message
+  | Toggle_archived
   | Newline -> m, []
   | Insert _
   | Paste _
@@ -2846,10 +3007,17 @@ let text_prompt m ~(action : Mode.Text_prompt_action.t) (intent : Intent.t) =
   | Picker_toggle_filter
   | Search
   | Prev_user_message
-  | Next_user_message -> m, []
+  | Next_user_message
+  | Toggle_archived -> m, []
 ;;
 
 (* ---- confirm mode ----------------------------------------------------- *)
+
+let back_to m (back : Mode.Open_picker.t option) =
+  match back with
+  | Some { kind; picker } -> { m with mode = Picker { kind; picker } }
+  | None -> m
+;;
 
 let confirm m ~(action : Mode.Confirm_action.t) (intent : Intent.t) =
   let yes m =
@@ -2858,10 +3026,10 @@ let confirm m ~(action : Mode.Confirm_action.t) (intent : Intent.t) =
       m, [ rpc "logout" ~params:[ "provider", str provider ] ]
     | Rewind id ->
       m, [ rpc "rewind" ~params:[ "to", str id ] ~tag:Reload_messages ]
-    | Delete_session path ->
-      ( m
-      , [ rpc "delete_session" ~params:[ "path", str path ] ~tag:Deleted_session
-        ] )
+    | Delete_sessions { paths; back } ->
+      back_to m back, [ call (Delete_sessions paths) ~tag:Sessions_deleted ]
+    | Delete_archived { back } ->
+      back_to m back, [ call Delete_archived ~tag:Sessions_deleted ]
     | Tool_confirm { call_id; _ } ->
       ( m
       , [ rpc
@@ -2879,7 +3047,10 @@ let confirm m ~(action : Mode.Confirm_action.t) (intent : Intent.t) =
             ~params:[ "call_id", str call_id; "allow", P.Json.bool false ]
             ~tag:Ignore
         ] )
-    | Logout _ | Rewind _ | Delete_session _ -> notice m "cancelled", []
+    | Delete_sessions { back = Some _ as back; _ }
+    | Delete_archived { back = Some _ as back } -> back_to m back, []
+    | Logout _ | Rewind _ | Delete_sessions _ | Delete_archived _ ->
+      notice m "cancelled", []
   in
   match intent with
   | Insert ("y" | "Y") | Submit -> yes { m with mode = Editing }
@@ -3048,8 +3219,11 @@ let event m (e : P.Event.t) =
   | Tool_exec_cancel _
   | Terminal_open _
   | Terminal_frame _
-  | Sessions_changed
   | Terminal_close _ -> m, []
+  | Sessions_changed ->
+    if sessions_picker_shown m || Option.is_some m.sessions
+    then m, [ rpc "list_sessions" ~tag:Sessions_refresh ]
+    else m, []
 ;;
 
 (* ---- rpc replies ------------------------------------------------------ *)
@@ -3132,6 +3306,9 @@ let rec reply m (tag : Reply_tag.t) (result : (P.Json.t, string) Result.t) =
          { m with skills = Skill_cache.set m.skills ~key [] }
      | Mcp_approved server ->
        error m (sprintf "approving MCP server %s failed: %s" server e), []
+     | Archive_done _ ->
+       (* Undo the picker's optimistic change. *)
+       error m e, [ rpc "list_sessions" ~tag:Sessions_refresh ]
      | _ -> error m e, [])
   | Ok json ->
     (match tag with
@@ -3253,6 +3430,7 @@ let rec reply m (tag : Reply_tag.t) (result : (P.Json.t, string) Result.t) =
                 client_id = Some client_id
               ; namespace
               ; user
+              ; sessions = None
               ; skills = Skill_cache.empty
               ; agents = []
               ; focus = `Main
@@ -3292,8 +3470,76 @@ let rec reply m (tag : Reply_tag.t) (result : (P.Json.t, string) Result.t) =
          json
          ~f:(fun j -> P.Json.string_field j "path")
          (fun path -> notice m (sprintf "exported to %s" path), [])
-     | Deleted_session ->
-       notice m "session deleted", [ rpc "list_sessions" ~tag:Sessions_picker ]
+     | Sessions_deleted ->
+       decode json ~f:P.Delete_result.of_json (fun result ->
+         let severity : Severity.t =
+           match result.deleted, result.refused with
+           | _, [] -> Info
+           | [], _ -> Error
+           | _ -> Warn
+         in
+         let paths =
+           List.map result.deleted ~f:(fun (d : P.Delete_result.Deleted.t) ->
+             d.path)
+         in
+         let m = map_sessions_picker m ~f:(Session_selection.remove ~paths) in
+         let m =
+           { m with
+             sessions =
+               Option.map m.sessions ~f:(fun sessions ->
+                 (Session_selection.remove
+                    (Session_selection.create sessions)
+                    ~paths)
+                   .sessions)
+           }
+         in
+         notice ~severity m (P.Delete_result.summary result), [])
+     | Sessions_to_delete args ->
+       decode
+         json
+         ~f:(decode_list ~f:P.Session_summary.of_json)
+         (fun sessions ->
+            match Session_selection.resolve sessions args with
+            | Error e ->
+              ( error
+                  (restore_command m ("/delete " ^ String.concat ~sep:" " args))
+                  e
+              , [] )
+            | Ok _ when Mode.is_dialog m.mode ->
+              warn m "close the current dialog first (Esc)", []
+            | Ok found -> confirm_delete m ~back:None found)
+     | Archived_to_delete ->
+       decode
+         json
+         ~f:(decode_list ~f:P.Session_summary.of_json)
+         (fun sessions ->
+            if Mode.is_dialog m.mode
+            then warn m "close the current dialog first (Esc)", []
+            else
+              confirm_delete_archived
+                m
+                ~back:None
+                (Session_selection.create sessions))
+     | Archive_done { name; archived } ->
+       notice m (sprintf "%s %s" (archive_verb ~archived) name), []
+     | Session_to_archive { arg; archived } ->
+       decode
+         json
+         ~f:(decode_list ~f:P.Session_summary.of_json)
+         (archive_resolved m ~arg ~archived)
+     | Sessions_refresh ->
+       decode
+         json
+         ~f:(decode_list ~f:P.Session_summary.of_json)
+         (fun sessions ->
+            let m =
+              map_sessions_picker m ~f:(fun selection ->
+                { selection with sessions })
+            in
+            let m = { m with sessions = Some sessions } in
+            match m.mode, m.autocomplete with
+            | Editing, Some _ -> refresh_autocomplete m
+            | _ -> m, [])
      | Auth_refresh ->
        decode json ~f:(decode_list ~f:P.Auth_status.of_json) (fun auth ->
          { m with auth }, [])

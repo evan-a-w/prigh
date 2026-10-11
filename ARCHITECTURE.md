@@ -479,6 +479,19 @@ two can share one.
   background task with its id, or the main run for its synchronous ones)
   gets a synthetic `Subagent_end` (`[interrupted] <why>`, zero usage),
   broadcast inside its ancestors' `Subagent` envelopes like a real one.
+  The log follows the session (`Agent.create` and the in-place
+  `new_session`/`switch_session`/`fork` `Subagent_log.load` it): it is
+  appended to the session's `subagents.jsonl` (one JSON line per subagent
+  start, `message_end` and end, with their times and turn/tool counts, and
+  per top-level run once the file exists, for `stale`; nothing per
+  delta, nothing before the session file exists) and replayed from it when
+  the session is loaded again (after eviction, a restart, `-session`),
+  skipping lines that do not parse. Memory stays the source of truth for
+  reads. Subagents saved as running load as failed (`[interrupted] the
+  backend stopped before it finished`, ended at their last saved
+  activity), and the background task ids skip the reloaded ones
+  (`Background_tasks.avoid_subagent_ids`), so a rewound conversation does
+  not reuse `a<n>`.
   `queued_texts` and `pending_confirms` back `get_pending`; the in-place
   `new_session`/`switch_session` cancel them, drop their reports and
   forget the finished tasks (`list_jobs` starts empty).
@@ -858,6 +871,24 @@ copy of the protocol types and the e2e test guards the contract.
     renders it as a `Skill` item (`skill NAME` and the arguments; the body
     only in verbose), and `/fork` lists and restores it as
     `/skill:NAME ARGS`.
+  - Sessions: `/sessions` is a picker over `list_sessions` laid out by
+    `Session_selection` (active sessions first, then the archived ones,
+    dimmed: `Picker.Item.section` keeps sections apart, also when filtering,
+    and `Render` draws a divider naming each). Tab marks rows
+    (`Picker.toggle_check`); Ctrl+D asks to delete the marked (or the
+    highlighted) sessions and Alt+D every archived one, with the count and
+    `bytes` (`Confirm_action.Delete_sessions`/`Delete_archived` carry the
+    picker as `Open_picker`, so Esc and Enter go back to it); the
+    `delete_sessions`/`delete_archived` reply (`Delete_result`) is the
+    notice, refusals included. Alt+A flips `archived` in the picker at once
+    and sends `set_archived` (a refusal refetches the list). `/archive`,
+    `/unarchive` and `/delete` look their arguments up in a fresh list
+    (`Session_selection.resolve`: path, id, unique id prefix or name).
+    `sessions_changed` refetches `list_sessions` (`Sessions_refresh`) while
+    the picker is open (or behind its confirmation) or the completion's
+    list is cached; `Picker.set_items` keeps the query, marks and highlight.
+    `/tree` hangs each message under the nearest message above it, skipping
+    settings entries (model, name, cwd, archived).
   - Model hand-over and default directory: `/fallback` and `/default-dir`
     show `Config`'s `fallback_models`/`default_cwd`, or send `set_config`
     with only that field. The backend keeps the fields a `set_config`
@@ -1165,7 +1196,10 @@ copy of the protocol types and the e2e test guards the contract.
 - `~/.config/prigh/auth.json` — credentials (pi-compatible).
 - `~/.prigh/sessions/<stamp>_<id>.jsonl` — session logs.
 - `~/.prigh/sessions/<stamp>_<id>/` — per-session data (`Session.data_dir`),
-  deleted with the session and counted in its `bytes`.
+  deleted with the session and counted in its `bytes`: `subagents.jsonl`
+  (the `Subagent_log`: `["Start",{id,call_id,parent,task,model,at,run}]`,
+  `["Message",{id,at,turns,tool_calls,message}]`,
+  `["End",{id,at,run,turns,tool_calls,result}]`, `["Run",{run}]`).
 - `~/.prigh/sessions/exports/` — default `/export` output.
 - `~/.prigh/history` — prompt history (one JSON string per line, last 500).
 - `~/.prigh/config.json` — `scoped_models`, `confirm_tools`, `providers`

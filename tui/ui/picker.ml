@@ -8,6 +8,7 @@ module Item = struct
     ; search : string
     ; marked : bool
     ; dimmed : bool
+    ; section : string [@default ""] [@sexp_drop_default.equal]
     }
   [@@deriving sexp_of, equal]
 
@@ -16,6 +17,7 @@ module Item = struct
     ?search
     ?(marked = false)
     ?(dimmed = false)
+    ?(section = "")
     ~id
     label
     =
@@ -25,6 +27,7 @@ module Item = struct
     ; search = Option.value search ~default:(label ^ " " ^ detail ^ " " ^ id)
     ; marked
     ; dimmed
+    ; section
     }
   ;;
 end
@@ -38,11 +41,29 @@ type t =
   ; multi : bool
   ; checked : String.Set.t
   }
-[@@deriving sexp_of]
+[@@deriving sexp_of, equal]
+
+(* Sections keep the order in which they first appear in [items]. *)
+let by_section items visible =
+  let order =
+    List.fold items ~init:[] ~f:(fun acc (i : Item.t) ->
+      if List.mem acc i.section ~equal:String.equal
+      then acc
+      else i.section :: acc)
+    |> List.rev
+  in
+  match order with
+  | [] | [ _ ] -> visible
+  | order ->
+    List.concat_map order ~f:(fun section ->
+      List.filter visible ~f:(fun (i : Item.t) ->
+        String.equal i.section section))
+;;
 
 let refilter t =
   let visible =
     Fuzzy.rank ~query:t.query t.items ~key:(fun i -> i.Item.search)
+    |> by_section t.items
   in
   let selected =
     if String.is_empty t.query
@@ -72,6 +93,49 @@ let selected t = t.selected
 let selected_item t = List.nth t.visible t.selected
 let multi t = t.multi
 let checked t = t.checked
+
+let select_id t id =
+  match List.findi t.visible ~f:(fun _ i -> String.equal i.Item.id id) with
+  | Some (index, _) -> { t with selected = index }
+  | None -> t
+;;
+
+let set_items ?title ?select t items =
+  let ids = String.Set.of_list (List.map items ~f:(fun (i : Item.t) -> i.id)) in
+  let select =
+    match select with
+    | Some _ -> select
+    | None -> Option.map (selected_item t) ~f:(fun i -> i.id)
+  in
+  let before = t.selected in
+  let t =
+    refilter
+      { t with
+        title = Option.value title ~default:t.title
+      ; items
+      ; checked = Set.inter t.checked ids
+      }
+  in
+  match select with
+  | Some id when Set.mem ids id -> select_id t id
+  | Some _ | None ->
+    { t with selected = Int.max 0 (Int.min before (List.length t.visible - 1)) }
+;;
+
+let toggle_check t =
+  match selected_item t with
+  | None -> t
+  | Some item ->
+    let checked =
+      if Set.mem t.checked item.id
+      then Set.remove t.checked item.id
+      else Set.add t.checked item.id
+    in
+    { t with
+      checked
+    ; selected = Int.min (t.selected + 1) (List.length t.visible - 1)
+    }
+;;
 
 module Outcome = struct
   type nonrec t =
@@ -157,5 +221,6 @@ let handle t (intent : Intent.t) ~page : Outcome.t =
   | Picker_toggle_filter
   | Search
   | Prev_user_message
-  | Next_user_message -> Continue t
+  | Next_user_message
+  | Toggle_archived -> Continue t
 ;;

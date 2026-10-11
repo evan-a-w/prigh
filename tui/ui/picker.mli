@@ -10,6 +10,9 @@ module Item : sig
     ; search : string (** what the filter matches against *)
     ; marked : bool (** the current value *)
     ; dimmed : bool (** e.g. provider not logged in *)
+    ; section : string
+      (** items are listed by section, in the order sections first appear, with
+        a divider naming each non-empty one; [""] by default *)
     }
   [@@deriving sexp_of, equal]
 
@@ -18,12 +21,13 @@ module Item : sig
     -> ?search:string
     -> ?marked:bool
     -> ?dimmed:bool
+    -> ?section:string
     -> id:string
     -> string
     -> t
 end
 
-type t [@@deriving sexp_of]
+type t [@@deriving sexp_of, equal]
 
 val create
   :  ?query:string
@@ -42,8 +46,17 @@ val selected_item : t -> Item.t option
 (** Whether Space/Enter and the [checked] set apply (multi-select mode). *)
 val multi : t -> bool
 
-(** The ids currently checked in a multi-select picker. *)
+(** The ids currently checked in a multi-select picker, or marked with
+    [toggle_check]. *)
 val checked : t -> String.Set.t
+
+(** Replaces the items, keeping the query, the checks of items still there and
+    the highlight on [select] (default: the highlighted item), else at the same
+    row. *)
+val set_items : ?title:string -> ?select:string -> t -> Item.t list -> t
+
+(** Checks or unchecks the highlighted item and moves to the next one. *)
+val toggle_check : t -> t
 
 module Outcome : sig
   type nonrec t =

@@ -11,10 +11,7 @@ module Picker_kind : sig
     | Verbosity
     | Login
     | Logout
-    | Sessions of
-        { named_only : bool
-        ; sessions : Session_summary.t list
-        }
+    | Sessions of Session_selection.t
     | Fork of Entry.t list
     | Rewind of Entry.t list
     | Tree of Entry.t list
@@ -37,11 +34,24 @@ module Text_prompt_action : sig
   [@@deriving sexp_of, equal]
 end
 
+(** A picker to go back to. *)
+module Open_picker : sig
+  type t =
+    { kind : Picker_kind.t
+    ; picker : Picker.t
+    }
+  [@@deriving sexp_of, equal]
+end
+
 module Confirm_action : sig
   type t =
     | Logout of string
     | Rewind of string
-    | Delete_session of string
+    | Delete_sessions of
+        { paths : string list
+        ; back : Open_picker.t option (** where Esc and Enter return *)
+        }
+    | Delete_archived of { back : Open_picker.t option }
     | Tool_confirm of
         { call_id : string
         ; name : string
