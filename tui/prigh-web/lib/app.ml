@@ -2804,8 +2804,11 @@ let rec reply_to (m : Model.t) (tag : Reply_tag.t) result =
           ~old:m.chat
           (Chat.of_messages ~running:(Model.running m) messages)
       in
-      ( { m with chat }
-      , List.map (Chat.subagents_to_load chat) ~f:(fun call_id ->
+      (* The session was still loading when the connection went. *)
+      let loading = m.pending.messages in
+      ( { m with chat; pending = { m.pending with messages = false } }
+      , (if loading then [ Command.Scroll_to_bottom ] else [])
+        @ List.map (Chat.subagents_to_load chat) ~f:(fun call_id ->
           rpc "get_subagent" [ "id", str call_id ] ~tag:(Subagent call_id)) ))
   | Resync_pending, Ok json ->
     decode m json Pending.of_json ~f:(fun pending ->
@@ -2941,6 +2944,8 @@ let rec reply_to (m : Model.t) (tag : Reply_tag.t) result =
     error
       { m with pending = { m.pending with session = None } }
       (sprintf "Couldn't open the session: %s" e)
+  (* Still loading: the messages come with the reconnect's [Resync]. *)
+  | Messages _, Error "backend closed" -> m, []
   | Messages session, Error e when String.equal session (session_id m) ->
     error
       { m with pending = { m.pending with messages = false } }
@@ -2956,6 +2961,8 @@ let rec reply_to (m : Model.t) (tag : Reply_tag.t) result =
     error
       { m with pending = { m.pending with thinking = None } }
       (String.capitalize e)
+  (* The connection went with the call: the banner says so. *)
+  | _, Error "backend closed" -> m, []
   | _, Error e -> error m (String.capitalize e)
   | Sent _, Ok _ ->
     { m with pending = In_flight.answered m.pending ~failed:None }, []

@@ -23,46 +23,50 @@ let jump_to_bottom (m : Model.t) ~inject =
       ]
 ;;
 
+(* Over the top of the chat: the transcript does not move. *)
 let banner (m : Model.t) ~inject =
+  let over banner = div ~cls:"banner-anchor" [ banner ] in
   match m.connection, m.session_gone with
   | Connected, None -> Node.none
   | Connected, Some _ ->
-    div
-      ~cls:"banner gone"
-      ~attrs:[ Attr.role "alert" ]
-      [ Node.text
-          "This session is no longer on the backend (it restarted before \
-           saving it): what it showed stays here, read-only."
-      ; button
-          ~cls:"small"
-          ~title:"/new"
-          ~on_click:(inject Action.New_session)
-          [ Node.text "New session" ]
-      ; button
-          ~cls:"small"
-          ~title:"Ctrl+K"
-          ~on_click:(inject Action.Open_sessions)
-          [ Node.text "Sessions" ]
-      ]
+    over
+    @@ div
+         ~cls:"banner gone"
+         ~attrs:[ Attr.role "alert" ]
+         [ Node.text
+             "This session is no longer on the backend (it restarted before \
+              saving it): what it showed stays here, read-only."
+         ; button
+             ~cls:"small"
+             ~title:"/new"
+             ~on_click:(inject Action.New_session)
+             [ Node.text "New session" ]
+         ; button
+             ~cls:"small"
+             ~title:"Ctrl+K"
+             ~on_click:(inject Action.Open_sessions)
+             [ Node.text "Sessions" ]
+         ]
   | Reconnecting { attempt; _ }, _ ->
-    div
-      ~cls:"banner"
-      ~attrs:[ Attr.role "status" ]
-      [ Html.lamp ()
-      ; Node.text
-          (if attempt = 0
-           then "Connection lost: reconnecting…"
-           else
-             sprintf
-               "Connection lost: reconnecting (attempt %d, next in %.1fs)…"
-               (attempt + 1)
-               (Float.of_int (App.Connection.delay_ms ~attempt) /. 1000.))
-      ; button
-          ~cls:"small"
-          ~title:"/retry-backend-connection"
-          ~on_click:(inject Action.Retry_connection)
-          [ Node.text "Retry now" ]
-      ]
+    over
+    @@ div
+         ~cls:"banner"
+         ~attrs:[ Attr.role "status" ]
+         [ Html.lamp ()
+         ; Node.text
+             (if attempt = 0
+              then "Connection lost: reconnecting…"
+              else
+                sprintf
+                  "Connection lost: reconnecting (attempt %d, next in %.1fs)…"
+                  (attempt + 1)
+                  (Float.of_int (App.Connection.delay_ms ~attempt) /. 1000.))
+         ; button
+             ~cls:"small"
+             ~title:"/retry-backend-connection"
+             ~on_click:(inject Action.Retry_connection)
+             [ Node.text "Retry now" ]
+         ]
 ;;
 
 (* Over the bottom of the chat, above the composer: not over the transcript's
@@ -231,7 +235,7 @@ let view (m : Model.t) ~inject ~terminal =
         (List.map
            ~f:under_sheet
            [ Topbar_view.view m ~inject
-           ; div ~cls:"banner-anchor" [ banner m ~inject ]
+           ; banner m ~inject
            ; Node.div
                ~attrs:
                  [ Attr.classes

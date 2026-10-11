@@ -501,3 +501,60 @@ let%expect_test "merging the messages after reconnecting" =
   print_s [%message "" ~entries:(List.length (Chat.entries merged) : int)];
   [%expect {| (entries 2) |}]
 ;;
+
+(* The connection went while the session was loading: the calls it took
+   with it say nothing (the banner does), the skeleton stays until the
+   reconnect brings the messages. *)
+let%expect_test "losing the connection while a session loads" =
+  let h = Harness.create () in
+  Harness.act h (Switch_session "/sessions/s2.jsonl");
+  Harness.reply h "switch_session" "{}";
+  Harness.reply
+    h
+    "get_state"
+    (Harness.state_json ~fields:[ "session_id", `String "s2" ] ());
+  Harness.act h Backend_closed;
+  Harness.fail h "get_messages" "backend closed";
+  Harness.fail h "list_sessions" "backend closed";
+  Harness.text h ~selector:".chat";
+  Harness.text h ~selector:".toasts";
+  [%expect
+    {|
+    (Rpc (method_ switch_session) (params ((path /sessions/s2.jsonl)))
+     (tag Reload_state))
+    (Focus editor)
+    (Rpc (method_ get_state) (params ()) (tag State))
+    (Set_url_session s2)
+    (Rpc (method_ get_messages) (params ()) (tag (Messages s2)))
+    (Rpc (method_ get_pending) (params ()) (tag Pending))
+    (Rpc (method_ list_sessions) (params ()) (tag Sessions))
+    (Rpc (method_ list_subagents) (params ()) (tag Subagents))
+    (Rpc (method_ list_jobs) (params ()) (tag Jobs))
+    (Reconnect (generation 1) (delay_ms 0) (session (s2)))
+    Loading the session…
+    |}];
+  Harness.act h (Reply (Reconnect 1, Ok (Jsonaf.of_string "{}")));
+  Harness.quiet h (fun () ->
+    Harness.reply
+      h
+      "get_state"
+      (Harness.state_json ~fields:[ "session_id", `String "s2" ] ()));
+  Harness.reply h "get_messages" (messages [ user "hi"; assistant "hello" ]);
+  Harness.text h ~selector:".chat";
+  [%expect
+    {|
+    (Expire_toast (id 0) (after_ms 2500))
+    (Rpc (method_ get_state) (params ()) (tag State))
+    (Rpc (method_ list_models) (params ()) (tag Models))
+    (Rpc (method_ auth_status) (params ()) (tag (Auth_status Refresh)))
+    (Rpc (method_ get_config) (params ()) (tag Config))
+    (Rpc (method_ get_messages) (params ()) (tag (Resync s2)))
+    (Rpc (method_ get_pending) (params ()) (tag Resync_pending))
+    (Rpc (method_ list_sessions) (params ()) (tag Sessions))
+    (Rpc (method_ list_subagents) (params ()) (tag Subagents))
+    (Rpc (method_ list_jobs) (params ()) (tag Jobs))
+    Scroll_to_bottom
+    hi
+    hello
+    |}]
+;;
