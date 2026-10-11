@@ -325,3 +325,48 @@ let set_nested_subagent t ~parent ~call_id subagent =
     map_subagent t parent ~f:(fun s ->
       { s with chat = set_subagent s.chat ~call_id subagent })
 ;;
+
+let same_entry (a : entry) (b : entry) =
+  match a, b with
+  | User a, User b -> Message.User.equal a b
+  | Assistant a, Assistant b ->
+    Bool.equal a.streaming b.streaming && Message.Assistant.equal a.message b.message
+  | Notice a, Notice b | Compaction a, Compaction b -> String.equal a b
+  | Shell a, Shell b -> Tool_call.equal a b
+  | (User _ | Assistant _ | Notice _ | Shell _ | Compaction _), _ -> false
+;;
+
+(* A call's card stays as it was (with the output it streamed) while the
+   backend says the same about it; an unfinished subagent's transcript is
+   loaded again. *)
+let same_tool (old : tool) (fresh : tool) =
+  Tool_call.equal old.call fresh.call
+  && Option.equal Message.Tool_result.equal old.result fresh.result
+  && Option.for_all old.subagent ~f:(fun s -> Option.is_some s.result)
+;;
+
+let reconcile ~old fresh =
+  let rec entries old fresh_entries =
+    match old, fresh_entries with
+    | o :: old, f :: rest -> (if same_entry o f then o else f) :: entries old rest
+    (* The message being streamed is only in [get_messages] once it ends. *)
+    | [ (Assistant { streaming = true; _ } as o) ], [] when fresh.running -> [ o ]
+    | _, rest -> rest
+  in
+  let rev_entries =
+    List.rev (entries (List.rev old.rev_entries) (List.rev fresh.rev_entries))
+  in
+  let tools =
+    Map.mapi fresh.tools ~f:(fun ~key ~data ->
+      match Map.find old.tools key with
+      | Some o when same_tool o data -> o
+      | _ -> data)
+  in
+  let same_list = List.equal phys_equal in
+  if
+    Bool.equal old.running fresh.running
+    && same_list old.rev_entries rev_entries
+    && Map.equal phys_equal old.tools tools
+  then old
+  else { rev_entries; tools; running = fresh.running }
+;;

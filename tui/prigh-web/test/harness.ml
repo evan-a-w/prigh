@@ -36,7 +36,10 @@ let act t action =
      | Save_notifications _
      | Set_title _
      | Files _
-     | Save_size _ -> ());
+     | Save_size _
+     | Probe_connection
+     | Drop_connection
+     | Auth_failed _ -> ());
     if not t.quiet then print_s [%sexp (command : App.Command.t)])
 ;;
 
@@ -232,6 +235,10 @@ let create ?(verbose = false) ?(sessions = "[]") ?(state = state_json ()) () =
   reply t "auth_status" auth_json;
   reply t "get_config" config_json;
   reply t "get_messages" "[]";
+  reply
+    t
+    "get_pending"
+    {|{"steer_texts":[],"follow_up_texts":[],"confirms":[],"questions":[]}|};
   reply t "list_sessions" sessions;
   act t (Tick now);
   t.quiet <- false;

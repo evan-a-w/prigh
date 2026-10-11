@@ -115,6 +115,18 @@ module Reply_tag : sig
         ; images : Image.t list
         ; attachments : Files.Attachment.t list
         } (** [Sent] with attachments: back to the composer if it fails *)
+    | Resync of string
+    (** the session's messages after reconnecting: merged into the
+        transcript on show *)
+    | Resync_pending
+    (** [get_pending] after reconnecting: what is no longer waited for
+        closes, the rest stays as it was *)
+    | Session_gone of
+        { generation : int
+        ; session : string
+        }
+    (** like [Reconnect generation], but the backend no longer has [session]
+        (it restarted before saving it): we are on another one *)
   [@@deriving sexp_of, equal]
 end
 
@@ -131,7 +143,9 @@ module Command : sig
         ; session : string option
         }
     (** After [delay_ms], connect again and send [hello] (rejoining [session]);
-        answered by [Reply (Reconnect generation, hello reply)]. *)
+        answered by [Reply (Reconnect generation, hello reply)], or by
+        [Reply (Session_gone _, hello reply)]. Without a [session], the one
+        in the page's URL. *)
     | Set_url_session of string
     (** the page's [?session=], so a reload rejoins *)
     | Expire_toast of
@@ -161,6 +175,13 @@ module Command : sig
     | Set_title of string (** the tab's, with the count of unseen events *)
     | Files of Files.Page.t
     | Save_size of Resize.Save.t (** a panel's size, in the browser *)
+    | Probe_connection
+    (** the socket may have died unnoticed (a suspended page, a new network):
+        drop it ([Backend_closed]) unless the backend answers soon *)
+    | Drop_connection (** the network went away: [Backend_closed] follows *)
+    | Auth_failed of string
+    (** the backend refused the saved sign-in: the sign-in page, saying
+        this, keeping the session to return to *)
   [@@deriving sexp_of, equal]
 end
 
@@ -192,7 +213,8 @@ module Action : sig
     | Set_utc_offset of Time_ns.Span.t
     (** the browser's time zone, for messages' times *)
     | Set_narrow of bool (** a phone-sized window: the sidebar is a drawer *)
-    | Page_hidden of bool (** the tab was hidden or shown again *)
+    | Page_hidden of bool
+    (** the tab was hidden or shown again (reconnect now, or check the socket) *)
     | Set_notifications of
         { enabled : bool
         ; permission : string
@@ -328,6 +350,8 @@ module Action : sig
     | Resize of Resize.Action.t
     (** a panel's handle dragged or moved with the keys, the window resized,
         the sizes kept in the browser *)
+    | Network of bool
+    (** the browser's [online] (reconnect now) and [offline] events *)
   [@@deriving sexp_of]
 end
 
@@ -382,6 +406,9 @@ module Model : sig
     ; notifications : Page_notify.t
     ; files : Files.t
     ; layout : Resize.t (** the panels' sizes *)
+    ; session_gone : string option
+    (** reconnected to a backend that no longer has this session: its
+        transcript stays on show, read-only, until another is chosen *)
     }
   [@@deriving sexp_of]
 

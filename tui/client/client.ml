@@ -115,6 +115,7 @@ let call t method_ params =
 ;;
 
 let is_connected t = Option.is_some t.transport
+let disconnect t = Option.iter t.transport ~f:(fun transport -> transport.close ())
 let incoming t = t.incoming_r
 
 let close t =

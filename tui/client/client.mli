@@ -26,6 +26,10 @@ val connect : t -> unit Deferred.Or_error.t
 
 val is_connected : t -> bool
 
+(** Closes the transport (if any) as if the backend had: pending calls fail
+    and [Closed] is delivered; [connect] opens a new one. *)
+val disconnect : t -> unit
+
 (** Fails immediately with "not connected" while disconnected. *)
 val call : t -> string -> (string * Json.t) list -> Json.t Deferred.Or_error.t
 

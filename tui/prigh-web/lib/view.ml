@@ -24,9 +24,27 @@ let jump_to_bottom (m : Model.t) ~inject =
 ;;
 
 let banner (m : Model.t) ~inject =
-  match m.connection with
-  | Connected -> Node.none
-  | Reconnecting { attempt; _ } ->
+  match m.connection, m.session_gone with
+  | Connected, None -> Node.none
+  | Connected, Some _ ->
+    div
+      ~cls:"banner gone"
+      ~attrs:[ Attr.role "alert" ]
+      [ Node.text
+          "This session is no longer on the backend (it restarted before \
+           saving it): what it showed stays here, read-only."
+      ; button
+          ~cls:"small"
+          ~title:"/new"
+          ~on_click:(inject Action.New_session)
+          [ Node.text "New session" ]
+      ; button
+          ~cls:"small"
+          ~title:"Ctrl+K"
+          ~on_click:(inject Action.Open_sessions)
+          [ Node.text "Sessions" ]
+      ]
+  | Reconnecting { attempt; _ }, _ ->
     div
       ~cls:"banner"
       ~attrs:[ Attr.role "status" ]

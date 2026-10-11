@@ -64,6 +64,12 @@ val of_messages : ?running:bool -> Message.t list -> t
 (** Oldest first. *)
 val entries : t -> Entry.t list
 
+(** [fresh] (from [get_messages] after reconnecting) with [old]'s entries and
+    tool calls wherever they are the same, so that their views are kept (and
+    [old] itself when nothing changed). A message still streaming in [old]
+    stays while [fresh] is running. *)
+val reconcile : old:t -> t -> t
+
 val tool : t -> string -> Tool.t option
 
 (** Whether the agent is working: between its start and end events. A tool
