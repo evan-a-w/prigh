@@ -316,3 +316,49 @@ let%expect_test "decisions" =
       mcp__x__y  {}                                   ask [mcp__x__y]
     |}]
 ;;
+
+(* What each mode holds back, without rules, among the main agent's built-in
+   tools (MCP tools ask unless they are read-only). The frontends' mode
+   descriptions ([Session_mode.describe] in tui/ui) say this: update them
+   when it changes. *)
+let%expect_test "which built-in tools ask in each mode" =
+  let tools =
+    Tools.builtin
+    @ Tool_subagent.control_tools
+    @ Tool_jobs.tools
+    @ Tools.interaction
+  in
+  List.iter
+    [ "ask", Approval_mode.Ask, false
+    ; "auto-edit", Auto_edit, false
+    ; "auto", Auto, false
+    ; "plan", Ask, true
+    ]
+    ~f:(fun (label, mode, plan) ->
+      let held =
+        List.filter_map tools ~f:(fun tool ->
+          let name = Tool.name tool in
+          match
+            Approval.decide
+              ~mode
+              ~plan
+              ~rules:Approval.Rules.empty
+              ~session:[]
+              ~cwd:"/w"
+              ~home:"/h"
+              ~destructive:tool.spec.destructive
+              (Approval_rule.Call.create ~cwd:"/w" ~tool:name (`Object []))
+          with
+          | Allow -> None
+          | Ask _ -> Some name
+          | Deny _ -> Some (name ^ " (denied)"))
+      in
+      printf "%-10s %s\n" label (String.concat ~sep:", " held));
+  [%expect
+    {|
+    ask        bash, write, edit, apply_patch, job_input
+    auto-edit  bash, job_input
+    auto
+    plan       bash, write (denied), edit (denied), apply_patch (denied), job_input
+    |}]
+;;

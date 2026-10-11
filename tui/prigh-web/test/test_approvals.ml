@@ -42,14 +42,14 @@ let%expect_test "the mode chip, Alt+M, and set_mode's reply or failure" =
     (Rpc (method_ set_mode) (params ((approval_mode auto) (plan_mode true)))
      (tag
       (Mode_set
-       "Mode: plan \226\128\148 read-only planning: no file edits, commands ask first")))
+       "Mode: plan \226\128\148 read-only planning: no file edits; bash, job_input and MCP tools ask first")))
     Ready 0% ↑0 ↓0 $0.0000 (plan)
     |}];
   H.show h ~selector:".status .mode";
   [%expect
     {|
     <button type="button"
-            title="Mode: read-only planning: no file edits, commands ask first (/mode picks, Alt+M cycles)"
+            title="Mode: read-only planning: no file edits; bash, job_input and MCP tools ask first (/mode picks, Alt+M cycles)"
             class="link mode plan-mode status-item"
             @on_click> plan </button>
     |}];
@@ -58,7 +58,7 @@ let%expect_test "the mode chip, Alt+M, and set_mode's reply or failure" =
   [%expect
     {|
     (Expire_toast (id 0) (after_ms 4000))
-    Mode: plan — read-only planning: no file edits, commands ask first
+    Mode: plan — read-only planning: no file edits; bash, job_input and MCP tools ask first
     |}];
   (* Option+M types a symbol on a Mac: the physical key counts. *)
   H.key h "µ" ~alt:true ~code:"KeyM";
@@ -69,9 +69,10 @@ let%expect_test "the mode chip, Alt+M, and set_mode's reply or failure" =
     Cycle_mode
     (Rpc (method_ set_mode) (params ((approval_mode ask) (plan_mode false)))
      (tag
-      (Mode_set "Mode: ask \226\128\148 bash, edits and MCP tools ask first")))
+      (Mode_set
+       "Mode: ask \226\128\148 bash, job_input, edits and MCP tools ask first")))
     Ready 0% ↑0 ↓0 $0.0000 (ask)
-    Mode: plan — read-only planning: no file edits, commands ask first
+    Mode: plan — read-only planning: no file edits; bash, job_input and MCP tools ask first
     |}];
   (* Not taken: said, and the backend's state shown again. *)
   H.fail h "set_mode" "no session";
@@ -82,7 +83,7 @@ let%expect_test "the mode chip, Alt+M, and set_mode's reply or failure" =
     {|
     (Rpc (method_ get_state) (params ()) (tag State))
     Ready 0% ↑0 ↓0 $0.0000 (plan)
-    Mode: plan — read-only planning: no file edits, commands ask first
+    Mode: plan — read-only planning: no file edits; bash, job_input and MCP tools ask first
     Couldn't set the mode: no session
     |}];
   (* Clicking the chip picks the mode. *)
@@ -95,10 +96,10 @@ let%expect_test "the mode chip, Alt+M, and set_mode's reply or failure" =
     Mode (Alt+M cycles)
     (Close (Esc))
     []
-    ask bash, edits and MCP tools ask first
-    auto-edit file edits run; bash and MCP tools ask first
+    ask bash, job_input, edits and MCP tools ask first
+    auto-edit file edits run; bash, job_input and MCP tools ask first
     auto tools run without asking
-    plan read-only planning: no file edits, commands ask first ✓
+    plan read-only planning: no file edits; bash, job_input and MCP tools ask first ✓
     ↑↓ move · Enter choose · Esc close
     |}];
   H.key h "ArrowUp" ~target:Field;
@@ -115,7 +116,7 @@ let%expect_test "the mode chip, Alt+M, and set_mode's reply or failure" =
      (params ((approval_mode auto-edit) (plan_mode false)))
      (tag
       (Mode_set
-       "Mode: auto-edit \226\128\148 file edits run; bash and MCP tools ask first")))
+       "Mode: auto-edit \226\128\148 file edits run; bash, job_input and MCP tools ask first")))
     Ready 0% ↑0 ↓0 $0.0000 (auto-edit)
     |}]
 ;;
@@ -157,7 +158,7 @@ let%expect_test "/mode NAME, /plan, /confirm" =
     (Rpc (method_ set_mode) (params ((approval_mode auto) (plan_mode true)))
      (tag
       (Mode_set
-       "Mode: plan \226\128\148 read-only planning: no file edits, commands ask first")))
+       "Mode: plan \226\128\148 read-only planning: no file edits; bash, job_input and MCP tools ask first")))
     Ready 0% ↑0 ↓0 $0.0000 (plan)
     (Save_history (/plan "/mode auto" "/mode bogus"))
     (Rpc (method_ set_mode) (params ((approval_mode auto) (plan_mode false)))
@@ -167,7 +168,7 @@ let%expect_test "/mode NAME, /plan, /confirm" =
     (Rpc (method_ set_mode) (params ((approval_mode auto) (plan_mode true)))
      (tag
       (Mode_set
-       "Mode: plan \226\128\148 read-only planning: no file edits, commands ask first")))
+       "Mode: plan \226\128\148 read-only planning: no file edits; bash, job_input and MCP tools ask first")))
     (Save_history ("/plan off" "/plan on" /plan "/mode auto" "/mode bogus"))
     (Rpc (method_ set_mode) (params ((approval_mode auto) (plan_mode false)))
      (tag (Mode_set "Mode: auto \226\128\148 tools run without asking")))
@@ -186,7 +187,7 @@ let%expect_test "/mode NAME, /plan, /confirm" =
     (Rpc (method_ set_config) (params ((config ((approval_mode ask)))))
      (tag
       (Config_saved
-       "Tool confirmation on (mode ask, also for new sessions): bash, edits and MCP tools ask first")))
+       "Tool confirmation on (mode ask, also for new sessions): bash, job_input, edits and MCP tools ask first")))
     Ready 0% ↑0 ↓0 $0.0000 (ask)
     |}];
   (* The arguments complete. *)
@@ -197,10 +198,10 @@ let%expect_test "/mode NAME, /plan, /confirm" =
   [%expect
     {|
     Modes ↑↓ Tab Enter Esc
-    ask bash, edits and MCP tools ask first
-    auto-edit file edits run; bash and MCP tools ask first
+    ask bash, job_input, edits and MCP tools ask first
+    auto-edit file edits run; bash, job_input and MCP tools ask first
     auto tools run without asking
-    plan read-only planning: no file edits, commands ask first
+    plan read-only planning: no file edits; bash, job_input and MCP tools ask first
     Plan mode ↑↓ Tab Enter Esc
     on read-only planning until you approve the plan
     off leave plan mode
@@ -287,7 +288,7 @@ let%expect_test "/permissions" =
     (Focus dialog)
     Permissions
     (Close (Esc))
-    Mode: auto-edit — file edits run; bash and MCP tools ask first
+    Mode: auto-edit — file edits run; bash, job_input and MCP tools ask first
     Allowed this session: bash(make:*)
 
     Rules are permissions in ~/.prigh/config.json, e.g. {"allow": ["bash(git status:*)"], "deny": ["bash(rm:*)"]}.
@@ -298,7 +299,7 @@ let%expect_test "/permissions" =
     (Focus dialog)
     Permissions
     (Close (Esc))
-    Mode: plan — read-only planning: no file edits, commands ask first
+    Mode: plan — read-only planning: no file edits; bash, job_input and MCP tools ask first
     Allowed this session: nothing yet (a confirmation's "always" adds to it)
     allow (config): bash(git status:*)
     deny (config): bash(rm:*), write(/etc/**)
