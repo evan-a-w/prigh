@@ -71,6 +71,10 @@ val session_json
   -> ?messages:int
   -> ?live:bool
   -> ?running:bool
+  -> ?background:int
+  -> ?clients:int
+  -> ?archived:bool
+  -> ?bytes:int
   -> string
   -> string
 

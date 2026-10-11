@@ -38,11 +38,11 @@ let%expect_test
   [%expect
     {|
     fix the parser bug just now
-    /work 1 msg (Delete session)
+    /work 1 msg (Archive (A)) (Delete session (Delete))
     Release notes 3h ago
-    ~/docs 4 msgs (Delete session)
+    ~/docs 4 msgs (Archive (A)) (Delete session (Delete))
     Refactor the lexer 15d ago
-    ~/src/compiler 12 msgs (Delete session)
+    ~/src/compiler 12 msgs (Archive (A)) (Delete session (Delete))
     |}];
   H.show h ~selector:".session.selected";
   [%expect
@@ -57,14 +57,24 @@ let%expect_test
       <div class="session-top">
         <span title="open in the backend" class="dot live">  </span>
         <span class="session-title"> fix the parser bug </span>
+        <Vdom.Node.none-widget> </Vdom.Node.none-widget>
         <span class="session-age"> just now </span>
       </div>
       <div class="session-meta">
         <span class="session-cwd"> /work </span>
         <span class="session-count"> 1 msg </span>
-        <button type="button" title="Delete session" class="btn delete ghost icon" @on_click>
-          <icon class="trash"> </icon>
-        </button>
+        <Vdom.Node.none-widget> </Vdom.Node.none-widget>
+        <span class="session-actions">
+          <button type="button" title="Archive (A)" class="archive btn ghost icon" @on_click>
+            <icon class="archive"> </icon>
+          </button>
+          <button type="button"
+                  title="Delete session (Delete)"
+                  class="btn delete ghost icon"
+                  @on_click>
+            <icon class="trash"> </icon>
+          </button>
+        </span>
       </div>
     </div>
     |}];
@@ -82,7 +92,6 @@ let%expect_test
   H.text h ~selector:".session-age";
   [%expect
     {|
-    (Rpc (method_ list_sessions) (params ()) (tag Sessions))
     5m ago
     3h ago
     15d ago
@@ -281,7 +290,8 @@ let%expect_test
     (Focus dialog)
     Delete session?
     (Close (Esc))
-    “Refactor the lexer” will be deleted. This can't be undone.
+    It will be deleted, with its subagent logs: 0 B on disk. This can't be undone.
+    Refactor the lexer 0 B
     (Cancel) (Delete)
     |}];
   H.key h "Escape" ~target:Page;
@@ -302,27 +312,44 @@ let%expect_test
     (browser default)
     Dialog_accept
     (Focus editor)
-    (Rpc (method_ delete_session) (params ((path /sessions/s2.jsonl)))
-     (tag (Deleted "Release notes")))
+    (Rpc (method_ delete_sessions) (params ((paths (/sessions/s2.jsonl))))
+     (tag Sessions_deleted))
     |}];
-  H.fail h "delete_session" "cannot delete a live session";
+  H.reply
+    h
+    "delete_sessions"
+    {|{"deleted":[],"refused":[{"path":"/sessions/s2.jsonl","error":"session \"Release notes\" is running: wait for it or /abort it first"}]}|};
   H.text h ~selector:".toasts";
   [%expect
-    {| Couldn't delete "Release notes": cannot delete a live session. Switch to another session and close other tabs using it first. |}];
+    {|
+    (Rpc (method_ list_sessions) (params ()) (tag Sessions))
+    Not deleted: session "Release notes" is running: wait for it or /abort it first
+    |}];
   H.act h (Ask_delete "/sessions/s3.jsonl");
   H.act h Dialog_accept;
-  H.reply h "delete_session" "{}";
+  H.reply
+    h
+    "delete_sessions"
+    {|{"deleted":[{"path":"/sessions/s3.jsonl","id":"s3","bytes":2048}],"refused":[]}|};
   [%expect
     {|
     (Focus dialog)
     (Focus editor)
-    (Rpc (method_ delete_session) (params ((path /sessions/s3.jsonl)))
-     (tag (Deleted "Refactor the lexer")))
+    (Rpc (method_ delete_sessions) (params ((paths (/sessions/s3.jsonl))))
+     (tag Sessions_deleted))
     (Expire_toast (id 1) (after_ms 4000))
     (Rpc (method_ list_sessions) (params ()) (tag Sessions))
     |}];
   H.text h ~selector:".toast:not(.error)";
-  [%expect {| Deleted "Refactor the lexer" |}]
+  [%expect {| Deleted 1 session (2.0 KB) |}];
+  (* Gone from the sidebar at once. *)
+  H.text h ~selector:".sessions";
+  [%expect {|
+    fix the parser bug just now
+    /work 1 msg (Archive (A)) (Delete session (Delete))
+    Release notes 3h ago
+    ~/docs 4 msgs (Archive (A)) (Delete session (Delete))
+    |}]
 ;;
 
 let%expect_test "renaming the current session" =
@@ -484,6 +511,7 @@ let%expect_test "new session and switching session reload the state" =
     <div class="session-top">
       <span title="opening…" class="spinner"> </span>
       <span class="session-title"> older work </span>
+      <Vdom.Node.none-widget> </Vdom.Node.none-widget>
       <span class="session-age"> 2m ago </span>
     </div>
     Loading the session…

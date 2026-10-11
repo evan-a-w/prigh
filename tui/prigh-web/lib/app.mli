@@ -73,7 +73,11 @@ module Reply_tag : sig
     | Paths of string (** the completion prefix listed *)
     | Restored (** [abort]: queued prompts back to the editor *)
     | Dequeued
-    | Deleted of string (** the session's title *)
+    | Sessions_deleted (** [delete_sessions] or [delete_archived] *)
+    | Archived_set of
+        { title : string
+        ; archived : bool
+        }
     | Refresh_sessions (** on success, list the sessions again *)
     | Login_started
     | Notice of string (** shown on success *)
@@ -208,7 +212,19 @@ module Action : sig
     | Complete_close
     | New_session
     | Switch_session of string (** path *)
-    | Ask_delete of string (** path *)
+    | Ask_delete of string
+    (** path; the marked sessions instead when it is one of them *)
+    | Select_sessions of bool (** the sidebar's selection mode, on or off *)
+    | Mark_session of
+        { path : string
+        ; range : bool (** shift-click: from the last one clicked *)
+        }
+    | Delete_marked
+    | Ask_delete_archived
+    | Set_archived of
+        { path : string
+        ; archived : bool
+        }
     | Set_session_query of string
     | Open_sessions (** the sidebar, with its search focused *)
     | Session_nav of
@@ -340,10 +356,15 @@ module Model : sig
     ; terminal : Terminal.t
     ; skills : Skills.t (** for [/skill:]'s completion *)
     ; pending : Pending.t (** what we wait on the backend for, on show *)
+    ; marks : Session_marks.t (** the sidebar's selection *)
     }
   [@@deriving sexp_of]
 
+  (** The session's turn runs. *)
   val running : t -> bool
+
+  (** The turn or background subagents or jobs run: the session is busy. *)
+  val active : t -> bool
 
   (** The agents panel is open with something running: the page sends
       [Clock] every second. *)

@@ -63,7 +63,11 @@ module Reply_tag = struct
     | Paths of string
     | Restored
     | Dequeued
-    | Deleted of string
+    | Sessions_deleted
+    | Archived_set of
+        { title : string
+        ; archived : bool
+        }
     | Refresh_sessions
     | Login_started
     | Notice of string
@@ -193,6 +197,17 @@ module Action = struct
     | New_session
     | Switch_session of string
     | Ask_delete of string
+    | Select_sessions of bool
+    | Mark_session of
+        { path : string
+        ; range : bool
+        }
+    | Delete_marked
+    | Ask_delete_archived
+    | Set_archived of
+        { path : string
+        ; archived : bool
+        }
     | Set_session_query of string
     | Open_sessions
     | Session_nav of
@@ -316,12 +331,22 @@ module Model = struct
     ; terminal : Terminal.t
     ; skills : Skills.t
     ; pending : Pending.t
+    ; marks : Session_marks.t
     }
   [@@deriving sexp_of]
 
   let running t =
     match t.state with
     | Some s -> s.running
+    | None -> false
+  ;;
+
+  let active t =
+    match t.state with
+    | Some s ->
+      s.running
+      || List.exists s.subagents ~f:(fun a -> a.running)
+      || List.exists s.jobs ~f:(fun j -> j.running)
     | None -> false
   ;;
 
@@ -385,6 +410,7 @@ let init =
   ; terminal = Terminal.closed
   ; skills = Skills.empty
   ; pending = Pending.none
+  ; marks = Session_marks.empty
   }
 ;;
 
@@ -819,6 +845,83 @@ let switch_session (m : Model.t) path =
     , [ rpc "switch_session" [ "path", str path ] ~tag:Reload_state
       ; focus_editor
       ] )
+;;
+
+(* The sidebar's sessions in the order it shows them: active, then archived. *)
+let session_order (m : Model.t) =
+  let active, archived = Session_list.sections m.sessions ~query:m.session_query in
+  List.map (active @ archived) ~f:(fun (s : Session_summary.t) -> s.path)
+;;
+
+let find_session_by_path (m : Model.t) path =
+  List.find m.sessions ~f:(fun s -> String.equal s.path path)
+;;
+
+(* A path, an id, a unique id prefix or a name, as /archive and /delete take. *)
+let find_session (m : Model.t) key =
+  let key = String.strip key in
+  let exactly =
+    List.filter m.sessions ~f:(fun (s : Session_summary.t) ->
+      String.equal s.path key
+      || String.equal s.id key
+      || Option.exists s.name ~f:(String.equal key))
+  in
+  let candidates =
+    match exactly with
+    | [] ->
+      List.filter m.sessions ~f:(fun (s : Session_summary.t) ->
+        String.is_prefix s.id ~prefix:key)
+    | exactly -> exactly
+  in
+  match candidates with
+  | [ s ] -> Ok s
+  | [] ->
+    Error
+      (sprintf
+         "No session %S: give its name, id or path (Ctrl+K searches them)."
+         key)
+  | several ->
+    Error
+      (sprintf
+         "%S matches %d sessions (%s): give more of the id."
+         key
+         (List.length several)
+         (String.concat
+            ~sep:", "
+            (List.map (List.take several 3) ~f:(fun (s : Session_summary.t) ->
+               String.prefix s.id 8))))
+;;
+
+let set_archived (m : Model.t) (s : Session_summary.t) ~archived =
+  if archived && s.running
+  then
+    error
+      m
+      (sprintf
+         "%S is running: wait for it or stop it (Esc in it) before archiving."
+         (Session_list.title s))
+  else
+    ( { m with
+        sessions =
+          List.map m.sessions ~f:(fun (x : Session_summary.t) ->
+            if String.equal x.path s.path then { x with archived } else x)
+      }
+    , [ call
+          (Set_archived { path = s.path; archived })
+          ~tag:(Archived_set { title = Session_list.title s; archived })
+      ] )
+;;
+
+let ask_delete (m : Model.t) paths =
+  match paths with
+  | [] -> toast m "Select the sessions to delete first (click them)."
+  | paths -> open_dialog m (Delete (Sessions paths))
+;;
+
+let ask_delete_archived (m : Model.t) =
+  if List.exists m.sessions ~f:(fun s -> s.archived)
+  then open_dialog m (Delete Archived)
+  else toast m "There are no archived sessions."
 ;;
 
 (* A new session (or a clone, a fork) is on its way: the chat says so. *)
@@ -1673,6 +1776,7 @@ let user_switched (m : Model.t) (hello : Hello_reply.t) =
     ; state = None
     ; chat = Chat.empty
     ; sessions = []
+    ; marks = Session_marks.empty
     ; session_query = ""
     ; confirms = []
     ; queue = 0, 0
@@ -1879,6 +1983,35 @@ let run_command (m : Model.t) ({ name; rest } : Slash.Parsed.t) =
   | "session", _ ->
     loading m "Session" [ rpc "session_stats" [] ~tag:Session_stats ]
   | "sessions", _ | "switch", "" -> open_sessions m
+  | (("archive" | "unarchive") as name), key ->
+    let archived = String.equal name "archive" in
+    let session =
+      if String.is_empty key
+      then (
+        let path = Option.value_map m.state ~default:"" ~f:(fun s -> s.session_path) in
+        match find_session_by_path m path with
+        | Some s -> Ok s
+        | None -> Error "This session isn't saved yet: send a message first.")
+      else find_session m key
+    in
+    (match session with
+     | Ok s -> set_archived m s ~archived
+     | Error e -> prompt_failed m e)
+  | "delete", "" ->
+    let m, cmds =
+      toast m "Click the sessions to delete (Shift+click for a range), then Delete."
+    in
+    { m with sidebar_open = true; marks = { m.marks with selecting = true } }, cmds
+  | "delete", keys ->
+    (match
+       String.split keys ~on:' '
+       |> List.filter ~f:(Fn.non String.is_empty)
+       |> List.map ~f:(find_session m)
+       |> Result.all
+     with
+     | Ok sessions -> ask_delete m (List.map sessions ~f:(fun s -> s.path))
+     | Error e -> prompt_failed m e)
+  | "delete-archived", _ -> ask_delete_archived m
   | "switch", path -> switch_session m path
   | "clone", _ -> starting m, [ rpc "clone" [] ~tag:Reload_state ]
   | "fork", _ ->
@@ -2112,17 +2245,19 @@ let reply_to (m : Model.t) (tag : Reply_tag.t) result =
     error m (sprintf "Couldn't set the fallback models: %s" e)
   | Default_dir_saved, Error e ->
     error m (sprintf "Couldn't set the default directory: %s" e)
-  | Deleted title, Error e ->
-    error
-      m
-      (sprintf
-         "Couldn't delete %S: %s%s"
-         title
-         e
-         (if String.is_substring e ~substring:"live"
-          then
-            ". Switch to another session and close other tabs using it first."
-          else ""))
+  | Sessions_deleted, Error e ->
+    error m (sprintf "Couldn't delete: %s" e)
+  | Archived_set { title; archived }, Error e ->
+    let m, cmds =
+      error
+        m
+        (sprintf
+           "Couldn't %s %S: %s"
+           (if archived then "archive" else "unarchive")
+           title
+           e)
+    in
+    m, cmds @ [ rpc "list_sessions" [] ~tag:Sessions ]
   | Login_started, Error e ->
     (match m.dialog with
      | Some (Login flow) ->
@@ -2243,7 +2378,14 @@ let reply_to (m : Model.t) (tag : Reply_tag.t) result =
      | _ -> m, [])
   | Sessions, Ok json ->
     decode m json (decode_list Session_summary.of_json) ~f:(fun sessions ->
-      { m with sessions }, [])
+      ( { m with
+          sessions
+        ; marks =
+            Session_marks.prune
+              m.marks
+              ~paths:(List.map sessions ~f:(fun s -> s.path))
+        }
+      , [] ))
   | Refresh_sessions, Ok _ -> m, [ rpc "list_sessions" [] ~tag:Sessions ]
   | Models, Ok json ->
     decode m json (decode_list Llm.of_json) ~f:(fun models ->
@@ -2294,9 +2436,35 @@ let reply_to (m : Model.t) (tag : Reply_tag.t) result =
        in
        set_draft m draft, [ focus_editor ]
      | _ -> toast m "Nothing is queued")
-  | Deleted title, Ok _ ->
-    let m, cmds = toast m (sprintf "Deleted %S" title) in
-    m, cmds @ [ rpc "list_sessions" [] ~tag:Sessions ]
+  | Sessions_deleted, Ok json ->
+    decode m json Delete_result.of_json ~f:(fun result ->
+      let gone =
+        String.Set.of_list
+          (List.map result.deleted ~f:(fun (d : Delete_result.Deleted.t) -> d.path))
+      in
+      let m =
+        { m with
+          sessions =
+            List.filter m.sessions ~f:(fun s -> not (Set.mem gone s.path))
+        ; marks =
+            (match result.refused with
+             | [] -> Session_marks.empty
+             | _ -> { m.marks with marked = Set.diff m.marks.marked gone })
+        }
+      in
+      let m, cmds =
+        toast
+          m
+          ~error:(not (List.is_empty result.refused))
+          (Delete_result.summary result)
+      in
+      m, cmds @ [ rpc "list_sessions" [] ~tag:Sessions ])
+  | Archived_set { title; archived }, Ok _ ->
+    toast
+      m
+      (if archived
+       then sprintf "Archived %S (a new message unarchives it)" title
+       else sprintf "Unarchived %S" title)
   | Config, Ok json ->
     decode m json Config.of_json ~f:(fun config ->
       { m with config = Some config }, [])
@@ -2488,11 +2656,8 @@ let main_event (m : Model.t) (event : Event.t) =
           List.filter m.confirms ~f:(fun c ->
             not (String.equal c.call_id call.id))
       }
-    , (* A [!command] may have just saved the session. *)
-      if String.equal call.name "shell"
-      then [ rpc "list_sessions" [] ~tag:Sessions ]
-      else [] )
-  | Agent_end _ -> m, [ rpc "list_sessions" [] ~tag:Sessions ]
+    , [] )
+  | Sessions_changed -> m, [ rpc "list_sessions" [] ~tag:Sessions ]
   (* Another client's /confirm, /scoped-models or defaults. *)
   | Config_changed config -> { m with config = Some config }, []
   | Auth e -> auth_event m e
@@ -2779,9 +2944,14 @@ let dialog_accept (m : Model.t) =
       , cmds
         @ [ rpc "set_session_name" [ "name", str name ] ~tag:Refresh_sessions ]
       ))
-  | Some (Delete { path; title }) ->
+  | Some (Delete target) ->
     let m, cmds = close_dialog m in
-    m, cmds @ [ rpc "delete_session" [ "path", str path ] ~tag:(Deleted title) ]
+    let method_ : Request.Method.t =
+      match target with
+      | Sessions paths -> Delete_sessions paths
+      | Archived -> Delete_archived
+    in
+    m, cmds @ [ call method_ ~tag:Sessions_deleted ]
   | Some (Login flow) ->
     (match flow.failed, flow.prompt with
      | None, Some _ -> respond_login m flow
@@ -2844,13 +3014,8 @@ let update (m : Model.t) (action : Action.t) =
              }
          ] ))
   | Reply (tag, result) -> reply m tag result
-  | Tick now ->
-    let refresh =
-      match m.connection, m.now with
-      | Connected, Some _ -> [ rpc "list_sessions" [] ~tag:Sessions ]
-      | _ -> []
-    in
-    { m with now = Some now }, refresh
+  (* The ages in the sidebar; the list itself follows [sessions_changed]. *)
+  | Tick now -> { m with now = Some now }, []
   | Set_utc_offset utc_offset -> { m with utc_offset }, []
   | Set_narrow narrow ->
     if Bool.equal narrow m.narrow
@@ -2889,9 +3054,23 @@ let update (m : Model.t) (action : Action.t) =
     , [ rpc "new_session" [] ~tag:Reload_state; focus_editor ] )
   | Switch_session path -> switch_session m path
   | Ask_delete path ->
-    (match List.find m.sessions ~f:(fun s -> String.equal s.path path) with
-     | None -> m, []
-     | Some s -> open_dialog m (Delete { path; title = Session_list.title s }))
+    if Set.mem m.marks.marked path
+    then ask_delete m (List.map (Session_marks.marked m.marks m.sessions) ~f:(fun s -> s.path))
+    else ask_delete m [ path ]
+  | Select_sessions on ->
+    { m with marks = (if on then Session_marks.start else Session_marks.empty) }, []
+  | Mark_session { path; range } ->
+    ( { m with
+        marks = Session_marks.click m.marks ~path ~range ~order:(session_order m)
+      }
+    , [] )
+  | Delete_marked ->
+    ask_delete m (List.map (Session_marks.marked m.marks m.sessions) ~f:(fun s -> s.path))
+  | Ask_delete_archived -> ask_delete_archived m
+  | Set_archived { path; archived } ->
+    (match find_session_by_path m path with
+     | Some s -> set_archived m s ~archived
+     | None -> m, [])
   | Set_session_query session_query -> { m with session_query }, []
   | Open_sessions -> open_sessions m
   | Session_nav { from; by } -> session_nav m ~from ~by

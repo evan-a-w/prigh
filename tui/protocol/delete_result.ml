@@ -54,17 +54,20 @@ let of_json j =
 
 let summary t =
   let deleted =
-    match t.deleted with
-    | [] -> "Deleted nothing"
-    | deleted ->
+    match t.deleted, t.refused with
+    | [], [] -> Some "Deleted nothing"
+    | [], _ :: _ -> None
+    | deleted, _ ->
       sprintf
         "Deleted %d session%s (%s)"
         (List.length deleted)
         (if List.length deleted = 1 then "" else "s")
         (Session_summary.size_string
            (List.sum (module Int) deleted ~f:(fun d -> d.bytes)))
+      |> Option.some
   in
   String.concat
     ~sep:"\n"
-    (deleted :: List.map t.refused ~f:(fun r -> "Not deleted: " ^ r.error))
+    (Option.to_list deleted
+     @ List.map t.refused ~f:(fun r -> "Not deleted: " ^ r.error))
 ;;

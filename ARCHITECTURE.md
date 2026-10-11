@@ -800,8 +800,9 @@ copy of the protocol types and the e2e test guards the contract.
 - `protocol/` (`prigh_protocol`) — `Jsonaf` decoders for everything
   `Rpc_json` emits (`Message`, `Delta`, `State`, `Model`, `Session_summary`,
   `Auth_status`, `Auth_event`, `Event`, `Server_message`, `Skill`,
-  `Mcp_server`, `Mcp_list`) and the `Request` encoder (`Request.Method` has
-  typed constructors for `list_skills`, `list_mcp` and `mcp_approve`).
+  `Mcp_server`, `Mcp_list`, `Delete_result`) and the `Request` encoder
+  (`Request.Method` has typed constructors for `list_skills`, `list_mcp`,
+  `mcp_approve`, `set_archived`, `delete_sessions` and `delete_archived`).
 - `client/` (`prigh_client`, `Async_kernel` only so it links under
   js_of_ocaml) — `Transport.t` (a line channel; an in-memory pair for
   tests) and `Client` (created with a `connect` thunk and
@@ -1093,7 +1094,17 @@ copy of the protocol types and the e2e test guards the contract.
       and Enter included, even with a dialog or a tool confirmation
       showing; only Ctrl+` (by `code`) is ours, toggling the panel.
     - Around it: `Sidebar_view`/`Session_list` (fuzzy search, ages from
-      `Rel_time`), `Topbar_view`, `Composer_view` with `Completion`
+      `Rel_time`; active sessions, then a divider with the archived ones'
+      count, size and "Delete all", muted; a session is running while its
+      turn or background work runs (`list_sessions`' `running`, and
+      `Model.active` for the current one); the list is refetched on
+      `sessions_changed`, never polled; each row's archive/unarchive and
+      delete buttons; `Session_marks`, the selection mode: clicks and
+      Space mark, shift-click and Shift+Space mark the range from the last
+      one; the `Delete` dialog (`Dialog.Delete_target`: paths or every
+      archived one) lists them with their sizes and warns about those the
+      backend will keep, running, open elsewhere or our own, and the
+      `Delete_result` reply is a toast), `Topbar_view`, `Composer_view` with `Completion`
       (slash commands from `Slash`, their arguments, `@` paths via
       `list_paths`) and `History`, `Dialog`/`Dialog_view`/`Modal`
       (pickers built on `Picker`, help, rename, delete, the login flow

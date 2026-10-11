@@ -43,6 +43,11 @@ let help =
   ; "Ctrl+↑ / Ctrl+↓", "previous / next of your messages in the transcript"
   ; "PageUp / PageDown", "scroll the transcript"
   ; "Ctrl+K", "search sessions (↓ ↑ through them, Enter opens, Delete deletes)"
+  ; ( "A (on a session)"
+    , "archive or unarchive it (archived sessions are listed last, muted)" )
+  ; ( "Space (selecting)"
+    , "mark a session (Shift: the range from the last one); Delete deletes the \
+       marked ones, Esc stops selecting" )
   ; "Ctrl+B", "show or hide the sidebar"
   ; "Alt+1…9", "follow subagent or job N in the agents panel"
   ; "Alt+] Alt+[", "the next or previous subagent or job"
@@ -167,17 +172,22 @@ let session_search_key t : App.Action.t option =
 ;;
 
 let session_key (m : App.Model.t) t id : App.Action.t option =
+  let session f =
+    List.find m.sessions ~f:(fun s -> String.equal s.id id) |> Option.map ~f
+  in
   match t.key with
   | "ArrowDown" when plain t -> Some (Session_nav { from = Some id; by = 1 })
   | "ArrowUp" when plain t -> Some (Session_nav { from = Some id; by = -1 })
+  | ("Enter" | " ") when m.marks.selecting && not (t.ctrl || t.alt || t.meta) ->
+    session (fun s -> App.Action.Mark_session { path = s.path; range = t.shift })
   | ("Enter" | " ") when plain t ->
-    List.find m.sessions ~f:(fun s -> String.equal s.id id)
-    |> Option.map ~f:(fun (s : Prigh_protocol.Session_summary.t) ->
-      App.Action.Switch_session s.path)
-  | "Delete" when plain t ->
-    List.find m.sessions ~f:(fun s -> String.equal s.id id)
-    |> Option.map ~f:(fun (s : Prigh_protocol.Session_summary.t) ->
-      App.Action.Ask_delete s.path)
+    session (fun s -> App.Action.Switch_session s.path)
+  | ("Delete" | "Backspace") when plain t ->
+    session (fun s -> App.Action.Ask_delete s.path)
+  | ("a" | "A") when not (t.ctrl || t.alt || t.meta) ->
+    session (fun s ->
+      App.Action.Set_archived { path = s.path; archived = not s.archived })
+  | "Escape" when m.marks.selecting -> Some (Select_sessions false)
   | "Escape" -> Some Leave_sidebar
   | _ -> None
 ;;
