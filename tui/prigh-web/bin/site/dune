@@ -34,6 +34,12 @@
  (action
   (copy ../terminal.css terminal.css)))
 
+(rule
+ (target files.css)
+ (deps ../files.css)
+ (action
+  (copy ../files.css files.css)))
+
 ; Recursive (SIL OFL 1.1, recursive-OFL.txt), cut down by
 ; fontTools to Latin and two instances: sans (casual axis kept, for
 ; thinking) and mono.
@@ -92,6 +98,7 @@
   (chat.css as prigh-web/chat.css)
   (agents.css as prigh-web/agents.css)
   (terminal.css as prigh-web/terminal.css)
+  (files.css as prigh-web/files.css)
   (recursive-sans.woff2 as prigh-web/recursive-sans.woff2)
   (recursive-mono.woff2 as prigh-web/recursive-mono.woff2)
   (recursive-OFL.txt as prigh-web/recursive-OFL.txt)

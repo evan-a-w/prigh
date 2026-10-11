@@ -288,7 +288,7 @@ let%expect_test
      (tag (Command_prompt "/review main look at errors")))
     Nothing to review: no changes against main in /work. /review main look at errors is back in the editor.
     [/review main look at errors]
-    (Send (Enter))
+    (Attach files (or drop them here)) (Send (Enter))
     Ready 0% ↑0 ↓0 $0.0000
     |}];
   H.quiet h (fun () -> H.act h (Set_draft ""));
@@ -327,6 +327,7 @@ let%expect_test "/diff, /review and /init are in the completions and /help" =
     /import [path] import a session from a JSONL file on the backend
     /diff [path] show the uncommitted changes where the tools run, untracked files too
     /quit how to leave (close the tab; /signout signs out)
+    /files [path] browse, preview, upload and download files where the tools run (Ctrl+Shift+F)
     /login [provider] log in to a model provider (or /login custom)
     /notify [on|off] tell you when a turn ends or something waits for you while the tab is hidden
     /review [base] [instructions] review the uncommitted changes, or those against a base branch, for prioritised findings

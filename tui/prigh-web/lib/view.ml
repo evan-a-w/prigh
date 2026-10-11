@@ -145,12 +145,16 @@ let rec inert (node : Node.t) : Node.t =
 
 let view (m : Model.t) ~inject ~terminal =
   let behind =
-    if Option.is_some m.dialog || Model.waiting m then inert else Fn.id
+    if Option.is_some m.dialog || Model.waiting m || Files.asking m.files
+    then inert
+    else Fn.id
   in
   (* On a phone the agents panel is a sheet over the page: it has the
      keyboard while open. *)
   let under_sheet =
-    if m.narrow && m.agents.open_ then Fn.compose inert behind else behind
+    if m.narrow && (m.agents.open_ || m.files.open_)
+    then Fn.compose inert behind
+    else behind
   in
   let chat =
     match loading m, Chat.entries m.chat, m.pending.prompts with
@@ -173,6 +177,7 @@ let view (m : Model.t) ~inject ~terminal =
           ; "narrow", m.narrow
           ; "agents-open", m.agents.open_
           ; "terminal-open", m.terminal.open_
+          ; "files-open", m.files.open_
           ]
       ]
     [ under_sheet (Sidebar_view.view m ~inject)
@@ -203,8 +208,11 @@ let view (m : Model.t) ~inject ~terminal =
            ; Composer_view.view m ~inject
            ; Terminal_view.view m ~inject ~widget:terminal
            ]
+    ; behind (Files_view.view m ~inject)
     ; behind (Agents_view.view m ~inject)
     ; Dialog_view.view m ~inject
+    ; Files_view.dialog m ~inject
+    ; Files_view.pickers
     ; toasts m ~inject
     ]
 ;;
