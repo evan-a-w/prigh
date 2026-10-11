@@ -53,6 +53,7 @@ module Item = struct
         { kind : P.Origin.Kind.t
         ; title : string
         ; text : string
+        ; joined : bool
         }
   [@@deriving sexp_of, equal]
 end
@@ -67,7 +68,8 @@ let user_item (user : P.Message.User.t) : Item.t =
       (Option.value
          (String.chop_prefix user.text ~prefix:summary_prefix)
          ~default:user.text)
-  | Some { kind; title } -> Note { kind; title; text = user.text }
+  | Some { kind; title } ->
+    Note { kind; title; text = user.text; joined = false }
   | None ->
     (match Skill_message.parse (P.Message.User.body user) with
      | Some skill -> Skill { skill; user }
@@ -81,7 +83,7 @@ let user_items (user : P.Message.User.t) : Item.t list =
   let origin = Option.value user.origin ~default:P.Origin.empty in
   let notes =
     List.map origin.notes ~f:(fun (n : P.Origin.Note.t) : Item.t ->
-      Note { kind = n.kind; title = n.title; text = n.text })
+      Note { kind = n.kind; title = n.title; text = n.text; joined = false })
   in
   match P.Message.User.source user with
   | Some _ -> notes @ [ user_item user ]
@@ -108,7 +110,14 @@ type t =
 
 let empty = { items_rev = []; stream = None }
 let items t = List.rev t.items_rev
-let add t item = { t with items_rev = item :: t.items_rev }
+let add t (item : Item.t) =
+  let item : Item.t =
+    match item, t.items_rev with
+    | Note note, Note _ :: _ -> Note { note with joined = true }
+    | item, _ -> item
+  in
+  { t with items_rev = item :: t.items_rev }
+;;
 let notice ?(severity = Severity.Info) t text = add t (Notice (severity, text))
 let clear t = { t with items_rev = [] }
 
@@ -648,8 +657,9 @@ let rows (item : Item.t) ~(verbosity : Verbosity.t) ~width : Log_line.t list =
     @ user_lines (P.Message.User.body user) user.images
     @ attachment_lines user
   | Skill { skill; user } -> render_skill skill user ~verbosity
-  | Note { kind; title; text } ->
-    turn_start :: note_lines ~kind ~title ~text ~verbosity
+  | Note { kind; title; text; joined } ->
+    let lines = note_lines ~kind ~title ~text ~verbosity in
+    if joined then lines else turn_start :: lines
   | Assistant { text; final } ->
     (match verbosity with
      | Quiet when not final ->
