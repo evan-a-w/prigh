@@ -521,7 +521,8 @@ two can share one.
   `retry-after`); with `resume_on_limit_reset`, a fiber sleeps until then
   (`?sleep_until`, injectable for tests) and starts a run with a message to
   carry on. `State.resume_at` shows it; `cancel_resume`, `resume_now`,
-  `abort`, any new run and a session switch end it. It is not persisted.
+  `abort`, any new run and a session switch end it. It is not persisted;
+  `Rpc_server` keeps the agent loaded while one is scheduled.
 - `Config` — `~/.prigh/config.json` (`scoped_models : string list`,
   `confirm_tools : bool`, `default_model`/`default_thinking`,
   `fallback_models` (model keys), `default_cwd`, `max_budget_usd`,
