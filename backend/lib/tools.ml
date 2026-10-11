@@ -12,7 +12,46 @@ let all =
   ]
 ;;
 
-let find name = List.find all ~f:(fun t -> String.equal (Tool.name t) name)
+let variants = [ Tool_apply_patch.tool ]
+let builtin = all @ variants
+let find name = List.find builtin ~f:(fun t -> String.equal (Tool.name t) name)
+
+let uses_apply_patch (model : Model.t) =
+  match model.provider with
+  | Openai | Openai_codex ->
+    (match String.chop_prefix model.id ~prefix:"gpt-" with
+     | Some rest ->
+       (match Int.of_string_opt (String.take_while rest ~f:Char.is_digit) with
+        | Some major ->
+          major >= 5 && not (String.is_substring rest ~substring:"-chat")
+        | None -> false)
+     | None -> false)
+  | Anthropic | Deepseek | Custom _ -> false
+;;
+
+let editors = [ Tool_edit.tool; Tool_apply_patch.tool ]
+
+let is_editor t =
+  List.exists editors ~f:(fun e -> String.equal (Tool.name e) (Tool.name t))
+;;
+
+let editor tools = List.find tools ~f:is_editor
+
+let for_model model tools =
+  let editor =
+    if uses_apply_patch model then Tool_apply_patch.tool else Tool_edit.tool
+  in
+  let replaced = ref false in
+  List.filter_map tools ~f:(fun t ->
+    if not (is_editor t)
+    then Some t
+    else if !replaced
+    then None
+    else (
+      replaced := true;
+      Some editor))
+;;
+
 let specs tools = List.map tools ~f:(fun (t : Tool.t) -> t.spec)
 
 let background_control =
@@ -41,6 +80,16 @@ let for_context ~parent ~depth ?only () =
   match only with
   | None -> Ok available
   | Some names ->
+    (* Either editor's name stands for the one this model has. *)
+    let names =
+      match editor available with
+      | None -> names
+      | Some editor ->
+        List.map names ~f:(fun name ->
+          if List.exists editors ~f:(fun e -> String.equal (Tool.name e) name)
+          then Tool.name editor
+          else name)
+    in
     let valid = List.map available ~f:Tool.name in
     let unknown =
       List.filter names ~f:(fun name ->

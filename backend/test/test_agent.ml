@@ -953,6 +953,62 @@ let%expect_test
     |}]
 ;;
 
+let%expect_test
+    "switching to a model with another file editor swaps the tool and tells \
+     the model"
+  =
+  let requests = Queue.create () in
+  with_agent
+    ~on_request:(fun request -> Queue.enqueue requests request)
+    [ Reply.text "one"; Reply.text "two"; Reply.text "three" ]
+  @@ fun _t agent _dump ->
+  let send text =
+    Or_error.ok_exn (Agent.prompt agent text);
+    Agent.wait_idle agent;
+    let request : Provider.Request.t = Queue.last_exn requests in
+    let last_user =
+      List.find_map (List.rev request.messages) ~f:(function
+        | Message.User u -> Some u.text
+        | _ -> None)
+    in
+    print_s
+      [%sexp
+        (request.model.id : string)
+      , (List.filter_map request.tools ~f:(fun t ->
+           Option.some_if
+             (List.mem [ "edit"; "apply_patch" ] t.name ~equal:String.equal)
+             t.name)
+         : string list)
+      , (last_user : string option)]
+  in
+  send "first";
+  Agent.set_model agent (Option.value_exn (Model.find "openai-codex/gpt-5.5"));
+  Agent.set_model agent (Option.value_exn (Model.find "openai/gpt-5.4"));
+  send "second";
+  Agent.set_model agent (Option.value_exn (Model.find "deepseek-flash"));
+  send "third";
+  let systems =
+    Queue.to_list requests
+    |> List.map ~f:(fun (r : Provider.Request.t) -> r.system)
+  in
+  printf
+    "identical system prompts: %b\n"
+    (List.all_equal systems ~equal:[%equal: string option] |> Option.is_some);
+  [%expect
+    {|
+    (deepseek-flash (edit) (first))
+    (gpt-5.4 (apply_patch)
+     ( "[Tools: apply_patch replaces edit for editing files; edit is no longer available.]\
+      \n\
+      \nsecond"))
+    (deepseek-flash (edit)
+     ( "[Tools: edit replaces apply_patch for editing files; apply_patch is no longer available.]\
+      \n\
+      \nthird"))
+    identical system prompts: true
+    |}]
+;;
+
 let%expect_test "set_active_host with a cwd validates it on the new host" =
   with_agent [ Reply.text "ok" ]
   @@ fun t agent dump ->

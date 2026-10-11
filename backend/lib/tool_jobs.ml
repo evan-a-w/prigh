@@ -16,6 +16,7 @@ let spec ~name ~description parameters =
   { Tool_spec.name
   ; parallel_safe = true
   ; on_host = false
+  ; freeform = None
   ; destructive = false
   ; description
   ; parameters

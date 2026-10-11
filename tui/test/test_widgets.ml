@@ -1258,6 +1258,432 @@ let%expect_test "tools: write counts lines; edit counts its diff" =
     |}]
 ;;
 
+let patch_args input =
+  Prigh_protocol.Json.to_string (`Object [ "input", `String input ])
+;;
+
+let single_patch =
+  "*** Begin Patch\n\
+   *** Update File: src/retry.ml\n\
+   @@ let delay attempt =\n\
+   -  0.1 *. float attempt\n\
+   +  0.1 *. (2. ** float attempt)\n\
+   *** End Patch\n"
+;;
+
+let single_result =
+  "Success. Updated the following files:\n\
+   M src/retry.ml\n\n\
+   --- a/src/retry.ml\n\
+   +++ b/src/retry.ml\n\
+   @@ -3,3 +3,3 @@\n\
+  \ let delay attempt =\n\
+   -  0.1 *. float attempt\n\
+   +  0.1 *. (2. ** float attempt)\n\
+  \ ;;\n"
+;;
+
+let multi_patch =
+  "*** Begin Patch\n\
+   *** Add File: src/new.ml\n\
+   +let x = 1\n\
+   +let y = 2\n\
+   +let z = 3\n\
+   *** Update File: src/a.ml\n\
+   *** Move to: src/b.ml\n\
+   @@ let f x =\n\
+   -  x\n\
+   +  x + 1\n\
+   *** Delete File: src/old.ml\n\
+   *** Update File: src/c.ml\n\
+   @@\n"
+  ^ String.concat
+      ~sep:""
+      (List.init 6 ~f:(fun i -> sprintf "-old %d\n+new %d\n" i i))
+  ^ "*** End of File\n*** End Patch\n"
+;;
+
+let multi_result =
+  "Success. Updated the following files:\n\
+   A src/new.ml\n\
+   M src/b.ml\n\
+   D src/old.ml\n\
+   M src/c.ml\n\n\
+   --- a/src/b.ml\n\
+   +++ b/src/b.ml\n\
+   @@ -1,2 +1,2 @@\n\
+  \ let f x =\n\
+   -  x\n\
+   +  x + 1\n\
+   --- a/src/c.ml\n\
+   +++ b/src/c.ml\n\
+   @@ -1,6 +1,6 @@\n"
+  ^ String.concat
+      ~sep:"\n"
+      (List.init 6 ~f:(fun i -> sprintf "-old %d\n+new %d" i i))
+  ^ "\n"
+;;
+
+let%expect_test "Patch.parse: files from the input, diffs from the result" =
+  let input =
+    "*** Begin Patch\n\
+     *** Update File: q.sql\n\
+     @@\n\
+     --- old comment\n\
+     +-- new comment\n\n\
+    \ select 1;\n\
+     *** Update File: r.sql\n\
+     -a\n\
+     +b\n\
+     *** End Patch"
+  in
+  let result =
+    "Success. Updated the following files:\n\
+     M q.sql\n\
+     M r.sql\n\n\
+     --- a/q.sql\n\
+     +++ b/q.sql\n\
+     @@ -1,3 +1,3 @@\n\
+     --- old comment\n\
+     +-- new comment\n\
+    \ \n\
+    \ select 1;\n\
+     --- a/r.sql\n\
+     +++ b/r.sql\n\
+     @@ -1 +1 @@\n\
+     -a\n\
+     +b\n\
+     \\ No newline at end of file\n"
+  in
+  print_s [%sexp (Patch.parse ~input ~result:None : Patch.File.t list)];
+  print_s [%sexp (Patch.parse ~input ~result:(Some result) : Patch.File.t list)];
+  [%expect
+    {|
+    (((kind Update)
+      (path q.sql)
+      (move_to ())
+      (input (@@ "--- old comment" "+-- new comment" " " " select 1;"))
+      (diff ()))
+     ((kind Update)
+      (path r.sql)
+      (move_to ())
+      (input (-a +b))
+      (diff ())))
+    (((kind Update)
+      (path q.sql)
+      (move_to ())
+      (input (@@ "--- old comment" "+-- new comment" " " " select 1;"))
+      (diff ((
+        "@@ -1,3 +1,3 @@" "--- old comment" "+-- new comment" " " " select 1;"))))
+     ((kind Update)
+      (path r.sql)
+      (move_to ())
+      (input (-a +b))
+      (diff (("@@ -1 +1 @@" -a +b)))))
+    |}]
+;;
+
+let%expect_test "tools: apply_patch on one file shows its diff like edit" =
+  show_tool
+    ~styled:true
+    "apply_patch"
+    (patch_args single_patch)
+    ~result:(tool_result single_result);
+  [%expect
+    {|
+    == quiet ==
+    [green]✓ [/][bold]apply_patch[/] src/retry.ml  [green]+1[/] [red]−1[/]
+    == normal ==
+    [green]✓ [/][bold]apply_patch[/] src/retry.ml  [green]+1[/] [red]−1[/]
+        [cyan]@@ -3,3 +3,3 @@[/]
+        [gray] let delay attempt =[/]
+        [red]-  0.1 *. float attempt[/]
+        [green]+  0.1 *. (2. ** float attempt)[/]
+        [gray] ;;[/]
+    == verbose ==
+    [green]✓ [/][bold]apply_patch[/] src/retry.ml  [green]+1[/] [red]−1[/]
+        [cyan]@@ -3,3 +3,3 @@[/]
+        [gray] let delay attempt =[/]
+        [red]-  0.1 *. float attempt[/]
+        [green]+  0.1 *. (2. ** float attempt)[/]
+        [gray] ;;[/]
+    |}]
+;;
+
+let%expect_test "tools: apply_patch on several files, each with its diff" =
+  show_tool
+    "apply_patch"
+    (patch_args multi_patch)
+    ~result:(tool_result multi_result);
+  [%expect
+    {|
+    == quiet ==
+    ✓ apply_patch src/new.ml  4 files +10 −7
+    == normal ==
+    ✓ apply_patch src/new.ml  4 files +10 −7
+        A src/new.ml
+        +let x = 1
+        +let y = 2
+        +let z = 3
+        M src/a.ml → src/b.ml
+        @@ -1,2 +1,2 @@
+         let f x =
+        -  x
+        +  x + 1
+        D src/old.ml
+        M src/c.ml
+        @@ -1,6 +1,6 @@
+        -old 0
+        +new 0
+        -old 1
+        +new 1
+        -old 2
+        +new 2
+        -old 3
+        … 5 more lines
+    == verbose ==
+    ✓ apply_patch src/new.ml  4 files +10 −7
+        A src/new.ml
+        +let x = 1
+        +let y = 2
+        +let z = 3
+        M src/a.ml → src/b.ml
+        @@ -1,2 +1,2 @@
+         let f x =
+        -  x
+        +  x + 1
+        D src/old.ml
+        M src/c.ml
+        @@ -1,6 +1,6 @@
+        -old 0
+        +new 0
+        -old 1
+        +new 1
+        -old 2
+        +new 2
+        -old 3
+        +new 3
+        -old 4
+        +new 4
+        -old 5
+        +new 5
+    |}];
+  show_tool
+    ~styled:true
+    ~width:60
+    "apply_patch"
+    (patch_args multi_patch)
+    ~result:(tool_result multi_result);
+  [%expect
+    {|
+    == quiet ==
+    [green]✓ [/][bold]apply_patch[/] src/new.ml  [dim]4 files[/] [green]+10[/] [red]−7[/]
+    == normal ==
+    [green]✓ [/][bold]apply_patch[/] src/new.ml  [dim]4 files[/] [green]+10[/] [red]−7[/]
+        [green]A [/]src/new.ml
+        [green]+let x = 1[/]
+        [green]+let y = 2[/]
+        [green]+let z = 3[/]
+        [yellow]M [/]src/a.ml → src/b.ml
+        [cyan]@@ -1,2 +1,2 @@[/]
+        [gray] let f x =[/]
+        [red]-  x[/]
+        [green]+  x + 1[/]
+        [red]D [/]src/old.ml
+        [yellow]M [/]src/c.ml
+        [cyan]@@ -1,6 +1,6 @@[/]
+        [red]-old 0[/]
+        [green]+new 0[/]
+        [red]-old 1[/]
+        [green]+new 1[/]
+        [red]-old 2[/]
+        [green]+new 2[/]
+        [red]-old 3[/]
+        [dim]… 5 more lines[/]
+    == verbose ==
+    [green]✓ [/][bold]apply_patch[/] src/new.ml  [dim]4 files[/] [green]+10[/] [red]−7[/]
+        [green]A [/]src/new.ml
+        [green]+let x = 1[/]
+        [green]+let y = 2[/]
+        [green]+let z = 3[/]
+        [yellow]M [/]src/a.ml → src/b.ml
+        [cyan]@@ -1,2 +1,2 @@[/]
+        [gray] let f x =[/]
+        [red]-  x[/]
+        [green]+  x + 1[/]
+        [red]D [/]src/old.ml
+        [yellow]M [/]src/c.ml
+        [cyan]@@ -1,6 +1,6 @@[/]
+        [red]-old 0[/]
+        [green]+new 0[/]
+        [red]-old 1[/]
+        [green]+new 1[/]
+        [red]-old 2[/]
+        [green]+new 2[/]
+        [red]-old 3[/]
+        [green]+new 3[/]
+        [red]-old 4[/]
+        [green]+new 4[/]
+        [red]-old 5[/]
+        [green]+new 5[/]
+    |}]
+;;
+
+let%expect_test "tools: apply_patch adding or deleting a single file" =
+  show_tool
+    "apply_patch"
+    (patch_args
+       "*** Begin Patch\n\
+        *** Add File: notes.md\n\
+        +# Notes\n\
+        +\n\
+        +todo\n\
+        *** End Patch")
+    ~result:(tool_result "Success. Updated the following files:\nA notes.md\n");
+  [%expect
+    {|
+    == quiet ==
+    ✓ apply_patch notes.md  new file +3 −0
+    == normal ==
+    ✓ apply_patch notes.md  new file +3 −0
+        +# Notes
+        +
+        +todo
+    == verbose ==
+    ✓ apply_patch notes.md  new file +3 −0
+        +# Notes
+        +
+        +todo
+    |}];
+  show_tool
+    "apply_patch"
+    (patch_args "*** Begin Patch\n*** Delete File: notes.md\n*** End Patch")
+    ~result:(tool_result "Success. Updated the following files:\nD notes.md\n");
+  [%expect
+    {|
+    == quiet ==
+    ✓ apply_patch notes.md  deleted
+    == normal ==
+    ✓ apply_patch notes.md  deleted
+    == verbose ==
+    ✓ apply_patch notes.md  deleted
+    |}]
+;;
+
+let%expect_test "tools: apply_patch errors show the input's files" =
+  show_tool
+    "apply_patch"
+    (patch_args multi_patch)
+    ~result:
+      (tool_result
+         ~is_error:true
+         "Failed to find expected lines in src/c.ml:\nold 0\nold 1");
+  [%expect
+    {|
+    == quiet ==
+    ✕ apply_patch src/new.ml  4 files
+        Failed to find expected lines in src/c.ml:
+        old 0
+        old 1
+    == normal ==
+    ✕ apply_patch src/new.ml  4 files
+        Failed to find expected lines in src/c.ml:
+        old 0
+        old 1
+    == verbose ==
+    ✕ apply_patch src/new.ml  4 files
+        *** Begin Patch
+        *** Add File: src/new.ml
+        +let x = 1
+        +let y = 2
+        +let z = 3
+        *** Update File: src/a.ml
+        *** Move to: src/b.ml
+        @@ let f x =
+        -  x
+        +  x + 1
+        *** Delete File: src/old.ml
+        *** Update File: src/c.ml
+        @@
+        -old 0
+        +new 0
+        -old 1
+        +new 1
+        -old 2
+        +new 2
+        -old 3
+        +new 3
+        -old 4
+        +new 4
+        -old 5
+        +new 5
+        *** End of File
+        *** End Patch
+        Failed to find expected lines in src/c.ml:
+        old 0
+        old 1
+    |}]
+;;
+
+let%expect_test "tools: a pending apply_patch shows the files streamed so far" =
+  let args = patch_args multi_patch in
+  let partial =
+    String.prefix
+      args
+      (String.substr_index_exn args ~pattern:"*** Delete"
+       + String.length "*** Delete File: src/o")
+  in
+  print_endline partial;
+  show_tool "apply_patch" partial;
+  [%expect
+    {|
+    {"input":"*** Begin Patch\n*** Add File: src/new.ml\n+let x = 1\n+let y = 2\n+let z = 3\n*** Update File: src/a.ml\n*** Move to: src/b.ml\n@@ let f x =\n-  x\n+  x + 1\n*** Delete File: src/o
+    == quiet ==
+    … apply_patch src/new.ml  3 files
+    == normal ==
+    … apply_patch src/new.ml  3 files
+        A src/new.ml
+        M src/a.ml → src/b.ml
+        D src/o
+    == verbose ==
+    … apply_patch src/new.ml  3 files
+        *** Begin Patch
+        *** Add File: src/new.ml
+        +let x = 1
+        +let y = 2
+        +let z = 3
+        *** Update File: src/a.ml
+        *** Move to: src/b.ml
+        @@ let f x =
+        -  x
+        +  x + 1
+        *** Delete File: src/o
+    |}];
+  show_tool "apply_patch" {|{"input":"*** Begin Patch\n*** Update File: src/re|};
+  [%expect
+    {|
+    == quiet ==
+    … apply_patch src/re
+    == normal ==
+    … apply_patch src/re
+    == verbose ==
+    … apply_patch src/re
+        *** Begin Patch
+        *** Update File: src/re
+    |}];
+  show_tool "apply_patch" {|{"inp|};
+  [%expect
+    {|
+    == quiet ==
+    … apply_patch
+    == normal ==
+    … apply_patch
+    == verbose ==
+    … apply_patch
+        {"inp
+    |}]
+;;
+
 let%expect_test "tools: bash shows the command, its outcome as a chip" =
   show_tool "bash" {|{"command":"seq 20"}|} ~result:(tool_result (numbered 20));
   [%expect

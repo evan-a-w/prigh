@@ -12,13 +12,24 @@ let first_line s =
   | None -> s
 ;;
 
+let patch_files ?result args =
+  Prigh_ui.Patch.parse
+    ~input:(Option.value (Tool_args.string args "input") ~default:"")
+    ~result
+;;
+
 let summary (call : Tool_call.t) =
   let args = Tool_args.of_call call in
-  List.find_map
-    [ "command"; "path"; "pattern"; "task"; "id"; "url"; "query" ]
-    ~f:(Tool_args.string args)
-  |> Option.value
-       ~default:(String.concat ~sep:" " (Tool_args.strings args "ids"))
+  if String.equal call.name "apply_patch"
+  then
+    List.hd (patch_files args)
+    |> Option.value_map ~default:"" ~f:Prigh_ui.Patch.File.name
+  else
+    List.find_map
+      [ "command"; "path"; "pattern"; "task"; "id"; "url"; "query" ]
+      ~f:(Tool_args.string args)
+    |> Option.value
+         ~default:(String.concat ~sep:" " (Tool_args.strings args "ids"))
 ;;
 
 module Status = struct
@@ -312,6 +323,71 @@ let present ~nested ~streaming ~live (call : Tool_call.t) ~result ~subagent =
            | `Edits [] -> Node.none
            | `Edits edits -> Diff_view.edits edits)
         ]
+    }
+  | "apply_patch" ->
+    let module Patch = Prigh_ui.Patch in
+    let result_text =
+      match result with
+      | Some { is_error = false; text; _ } when Patch.is_success text ->
+        Some text
+      | _ -> None
+    in
+    let files = patch_files args ?result:result_text in
+    let single = List.length files = 1 in
+    let added, removed = Patch.counts files in
+    let diff (file : Patch.File.t) =
+      match file.kind, file.diff with
+      | Delete, _ | _, Some [] -> Node.none
+      | Update, Some lines -> Diff_view.unified (String.concat ~sep:"\n" lines)
+      | Add, _ when Option.is_some result_text ->
+        let lines = Patch.File.lines file in
+        Diff_view.unified
+          (String.concat
+             ~sep:"\n"
+             (sprintf "@@ -0,0 +1,%d @@" (List.length lines) :: lines))
+      | (Add | Update), _ ->
+        (match file.input with
+         | [] -> Node.none
+         | lines -> Diff_view.hunks lines)
+    in
+    let label (file : Patch.File.t) =
+      let kind =
+        match file.kind with
+        | Add -> "add"
+        | Update -> "update"
+        | Delete -> "del"
+      in
+      div
+        ("patch-file " ^ kind)
+        [ span "kind" (Patch.Kind.letter file.kind)
+        ; span "path" (Patch.File.name file)
+        ]
+    in
+    { arg =
+        List.hd files
+        |> Option.map ~f:(fun file -> span "arg path" (Patch.File.name file))
+    ; chips =
+        ((match files with
+          | [ { kind = Add; _ } ] -> [ chip "new file" ]
+          | [ { kind = Delete; _ } ] -> [ chip "deleted" ]
+          | [] | [ { kind = Update; _ } ] -> []
+          | files -> [ chip (plural (List.length files) "file") ])
+         @
+         if added + removed = 0
+         then []
+         else
+           [ chip ~cls:"add" (sprintf "+%d" added)
+           ; chip ~cls:"del" (sprintf "−%d" removed)
+           ])
+    ; body =
+        (match result with
+         | Some { is_error = false; text; _ }
+           when List.is_empty files || not (Patch.is_success text) ->
+           [ output ~head:8 text ]
+         | _ ->
+           error_body
+           :: List.concat_map files ~f:(fun file ->
+             if single then [ diff file ] else [ label file; diff file ]))
     }
   | ("ls" | "grep" | "find") as name ->
     let ls = String.equal name "ls" in

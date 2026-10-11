@@ -7,6 +7,7 @@ let spec =
   { Tool_spec.name = "grep"
   ; parallel_safe = true
   ; on_host = true
+  ; freeform = None
   ; destructive = false
   ; description =
       "Search file contents with a regular expression (ripgrep syntax). \

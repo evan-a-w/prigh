@@ -38,13 +38,15 @@ let cancelled_result (call : Content.Tool_call.t) =
   }
 ;;
 
-let tool_summary (args : Json.t) =
+let tool_summary (call : Content.Tool_call.t) (args : Json.t) =
   match args with
   | `Object fields ->
     let find name = List.Assoc.find fields ~equal:String.equal name in
-    (match find "command", find "path" with
-     | Some (`String s), _ -> s
-     | _, Some (`String s) -> s
+    (match find "command", find "path", find "input" with
+     | Some (`String s), _, _ -> s
+     | _, Some (`String s), _ -> s
+     | _, _, Some (`String patch) when String.equal call.name "apply_patch" ->
+       String.concat ~sep:", " (Apply_patch.paths patch)
      | _ -> "")
   | _ -> ""
 ;;
@@ -74,7 +76,7 @@ let execute_tool
        | Ok args ->
          if
            tool.spec.destructive
-           && not (confirm call ~summary:(tool_summary args))
+           && not (confirm call ~summary:(tool_summary call args))
          then
            if Cancellation.is_cancelled cancel
            then Tool.Result.error "[cancelled]"

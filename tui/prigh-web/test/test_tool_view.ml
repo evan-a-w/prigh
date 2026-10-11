@@ -1053,3 +1053,309 @@ let%expect_test "other tools: their main argument and output" =
     </div>
     |}]
 ;;
+
+let patch_call ?(id = "p1") input =
+  let arguments =
+    Prigh_protocol.Json.to_string (`Object [ "input", `String input ])
+  in
+  Prigh_protocol.Json.to_string
+    (`Object
+        [ "id", `String id
+        ; "name", `String "apply_patch"
+        ; "arguments", `String arguments
+        ])
+;;
+
+let patch_end ?(is_error = false) ?id input text =
+  sprintf
+    {|{"event":"tool_end","call":%s,"result":{"role":"tool_result","tool_call_id":"p1","tool_name":"apply_patch","text":%s,"is_error":%b}}|}
+    (patch_call ?id input)
+    (Prigh_protocol.Json.to_string (`String text))
+    is_error
+;;
+
+let multi_patch =
+  "*** Begin Patch\n\
+   *** Add File: src/new.ml\n\
+   +let x = 1\n\
+   +let y = 2\n\
+   *** Update File: src/a.ml\n\
+   *** Move to: src/b.ml\n\
+   @@ let f x =\n\
+   -  x\n\
+   +  x + 1\n\
+   *** Delete File: src/old.ml\n\
+   *** End Patch\n"
+;;
+
+let%expect_test "apply_patch: one file's diff, like edit" =
+  let input =
+    "*** Begin Patch\n\
+     *** Update File: src/retry.ml\n\
+     @@ let delay attempt =\n\
+     -  0.1 *. float attempt\n\
+     +  0.1 *. (2. ** float attempt)\n\
+     *** End Patch\n"
+  in
+  show
+    [ patch_end
+        input
+        "Success. Updated the following files:\n\
+         M src/retry.ml\n\n\
+         --- a/src/retry.ml\n\
+         +++ b/src/retry.ml\n\
+         @@ -3,2 +3,2 @@\n\
+        \ let delay attempt =\n\
+         -  0.1 *. float attempt\n\
+         +  0.1 *. (2. ** float attempt)\n"
+    ];
+  [%expect
+    {|
+    <div class="ok tool tool-apply_patch">
+      <div class="tool-head">
+        <span class="icon"> ✓ </span>
+        <span class="name"> apply_patch </span>
+        <span class="arg path"> src/retry.ml </span>
+        <span class="add chip"> +1 </span>
+        <span class="chip del"> −1 </span>
+      </div>
+      <div class="tool-body">
+        <div class="diff-view">
+          <table class="diff">
+            <tbody>
+              <tr class="hunk">
+                <td colspan="4"> @@ -3,2 +3,2 @@ </td>
+              </tr>
+              <tr class="same">
+                <td class="ln"> 3 </td>
+                <td class="ln"> 3 </td>
+                <td class="sign">   </td>
+                <td class="text"> let delay attempt = </td>
+              </tr>
+              <tr class="del">
+                <td class="ln"> 4 </td>
+                <td class="ln">  </td>
+                <td class="sign"> - </td>
+                <td class="text">   0.1 *. float attempt </td>
+              </tr>
+              <tr class="add">
+                <td class="ln">  </td>
+                <td class="ln"> 4 </td>
+                <td class="sign"> + </td>
+                <td class="text">   0.1 *. (2. ** float attempt) </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+    |}]
+;;
+
+let%expect_test "apply_patch: several files, each named above its diff" =
+  show
+    [ patch_end
+        multi_patch
+        "Success. Updated the following files:\n\
+         A src/new.ml\n\
+         M src/b.ml\n\
+         D src/old.ml\n\n\
+         --- a/src/b.ml\n\
+         +++ b/src/b.ml\n\
+         @@ -1,2 +1,2 @@\n\
+        \ let f x =\n\
+         -  x\n\
+         +  x + 1\n"
+    ];
+  [%expect
+    {|
+    <div class="ok tool tool-apply_patch">
+      <div class="tool-head">
+        <span class="icon"> ✓ </span>
+        <span class="name"> apply_patch </span>
+        <span class="arg path"> src/new.ml </span>
+        <span class="chip"> 3 files </span>
+        <span class="add chip"> +3 </span>
+        <span class="chip del"> −1 </span>
+      </div>
+      <div class="tool-body">
+        <div class="add patch-file">
+          <span class="kind"> A </span>
+          <span class="path"> src/new.ml </span>
+        </div>
+        <div class="diff-view">
+          <table class="diff">
+            <tbody>
+              <tr class="hunk">
+                <td colspan="4"> @@ -0,0 +1,2 @@ </td>
+              </tr>
+              <tr class="add">
+                <td class="ln">  </td>
+                <td class="ln"> 1 </td>
+                <td class="sign"> + </td>
+                <td class="text"> let x = 1 </td>
+              </tr>
+              <tr class="add">
+                <td class="ln">  </td>
+                <td class="ln"> 2 </td>
+                <td class="sign"> + </td>
+                <td class="text"> let y = 2 </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="patch-file update">
+          <span class="kind"> M </span>
+          <span class="path"> src/a.ml → src/b.ml </span>
+        </div>
+        <div class="diff-view">
+          <table class="diff">
+            <tbody>
+              <tr class="hunk">
+                <td colspan="4"> @@ -1,2 +1,2 @@ </td>
+              </tr>
+              <tr class="same">
+                <td class="ln"> 1 </td>
+                <td class="ln"> 1 </td>
+                <td class="sign">   </td>
+                <td class="text"> let f x = </td>
+              </tr>
+              <tr class="del">
+                <td class="ln"> 2 </td>
+                <td class="ln">  </td>
+                <td class="sign"> - </td>
+                <td class="text">   x </td>
+              </tr>
+              <tr class="add">
+                <td class="ln">  </td>
+                <td class="ln"> 2 </td>
+                <td class="sign"> + </td>
+                <td class="text">   x + 1 </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="del patch-file">
+          <span class="kind"> D </span>
+          <span class="path"> src/old.ml </span>
+        </div>
+      </div>
+    </div>
+    |}]
+;;
+
+let%expect_test "apply_patch: an error, with the patch it tried" =
+  show
+    [ patch_end
+        ~is_error:true
+        multi_patch
+        "Failed to find expected lines in src/a.ml:\n  x"
+    ];
+  [%expect
+    {|
+    <div class="error tool tool-apply_patch">
+      <div class="tool-head">
+        <span class="icon"> ✕ </span>
+        <span class="name"> apply_patch </span>
+        <span class="arg path"> src/new.ml </span>
+        <span class="chip"> 3 files </span>
+        <span class="add chip"> +3 </span>
+        <span class="chip del"> −1 </span>
+      </div>
+      <div class="tool-body">
+        <div class="error output">
+          <pre> Failed to find expected lines in src/a.ml:
+      x </pre>
+        </div>
+        <div class="add patch-file">
+          <span class="kind"> A </span>
+          <span class="path"> src/new.ml </span>
+        </div>
+        <div class="diff-view">
+          <table class="diff">
+            <tbody>
+              <tr class="add">
+                <td class="sign"> + </td>
+                <td class="text"> let x = 1 </td>
+              </tr>
+              <tr class="add">
+                <td class="sign"> + </td>
+                <td class="text"> let y = 2 </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="patch-file update">
+          <span class="kind"> M </span>
+          <span class="path"> src/a.ml → src/b.ml </span>
+        </div>
+        <div class="diff-view">
+          <table class="diff">
+            <tbody>
+              <tr class="hunk">
+                <td colspan="2"> @@ let f x = </td>
+              </tr>
+              <tr class="del">
+                <td class="sign"> - </td>
+                <td class="text">   x </td>
+              </tr>
+              <tr class="add">
+                <td class="sign"> + </td>
+                <td class="text">   x + 1 </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="del patch-file">
+          <span class="kind"> D </span>
+          <span class="path"> src/old.ml </span>
+        </div>
+      </div>
+    </div>
+    |}]
+;;
+
+let%expect_test "apply_patch: the files streamed so far" =
+  let arguments =
+    {|{"input":"*** Begin Patch\n*** Add File: src/new.ml\n+let x = 1\n*** Update File: src/a.ml\n*** Move to: src/b|}
+  in
+  show
+    ~running:true
+    [ sprintf
+        {|{"event":"message_update","partial":{"role":"assistant","content":[{"type":"tool_call","id":"p1","name":"apply_patch","arguments":%s}],"stop_reason":{"type":"end_turn"},"usage":{"input":0,"output":0,"cache_read":0},"model":"m"},"delta":{"type":"tool_call_delta","index":0,"arguments":"x"}}|}
+        (Prigh_protocol.Json.to_string (`String arguments))
+    ];
+  [%expect
+    {|
+    <div class="running tool tool-apply_patch">
+      <div class="tool-head">
+        <span class="spinner"> </span>
+        <span class="name"> apply_patch </span>
+        <span class="arg path"> src/new.ml </span>
+        <span class="chip"> 2 files </span>
+        <span class="add chip"> +1 </span>
+        <span class="chip del"> −0 </span>
+      </div>
+      <div class="tool-body">
+        <div class="add patch-file">
+          <span class="kind"> A </span>
+          <span class="path"> src/new.ml </span>
+        </div>
+        <div class="diff-view">
+          <table class="diff">
+            <tbody>
+              <tr class="add">
+                <td class="sign"> + </td>
+                <td class="text"> let x = 1 </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="patch-file update">
+          <span class="kind"> M </span>
+          <span class="path"> src/a.ml → src/b </span>
+        </div>
+      </div>
+    </div>
+    |}]
+;;

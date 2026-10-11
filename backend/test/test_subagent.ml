@@ -90,6 +90,40 @@ let%expect_test
     |}]
 ;;
 
+let%expect_test
+    "the child gets the file editor of its model, whichever editor is named"
+  =
+  with_sandbox
+  @@ fun t ->
+  let requests = ref [] in
+  let provider =
+    Faux_provider.create
+      ~on_request:(fun r ->
+        requests
+        := (r.model.id, List.map r.tools ~f:(fun s -> s.name)) :: !requests)
+      [ Reply.text "a"; Reply.text "b"; Reply.text "c" ]
+  in
+  let subagent = subagent ~provider in
+  List.iter
+    [ Tools.all, {|{"task":"x","model":"openai/gpt-5","tools":["read","edit"]}|}
+    ; ( Tools.for_model (Option.value_exn (Model.find "openai/gpt-5")) Tools.all
+      , {|{"task":"x","model":"anthropic/claude-opus-4-6","tools":["apply_patch"]}|}
+      )
+    ; Tools.all, {|{"task":"x","model":"openai/gpt-5"}|}
+    ]
+    ~f:(fun (tools, args) ->
+      let (_ : Tool.Result.t) =
+        run_tool t ~tools:(tools @ [ subagent ]) ~emit:ignore subagent args
+      in
+      ());
+  print_s [%sexp (List.rev !requests : (string * string list) list)];
+  [%expect
+    {|
+    ((gpt-5 (read apply_patch)) (claude-opus-4-6 (edit))
+     (gpt-5 (bash read write apply_patch ls grep find subagent)))
+    |}]
+;;
+
 let%expect_test "model override and bad model" =
   with_sandbox
   @@ fun t ->

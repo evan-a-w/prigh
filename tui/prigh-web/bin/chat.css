@@ -685,6 +685,19 @@ table.diff tr.hunk td {
 }
 .diff-view .more > summary { padding: 3px 12px; }
 
+/* apply_patch: each file's name above its diff */
+.patch-file {
+  display: flex;
+  gap: 8px;
+  font: 12.5px/1.55 var(--mono);
+  color: var(--fg);
+  margin: 6px 0 3px;
+}
+.patch-file:first-child { margin-top: 0; }
+.patch-file .kind { color: var(--sodium); font-weight: 600; }
+.patch-file.add .kind { color: var(--sage); }
+.patch-file.del .kind { color: var(--brick); }
+
 /* Images: a thumbnail opens full size; clicking anywhere closes it */
 
 .images { display: flex; flex-wrap: wrap; gap: 8px; }

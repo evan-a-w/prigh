@@ -312,8 +312,11 @@ two can share one.
   bounds output by lines and bytes. `Tool_spec` carries the flags the
   harness reasons about: `parallel_safe` (safe to run concurrently with
   other tools), `destructive` (held for confirmation when `confirm_tools`
-  is on) and `on_host` (runs on the active tool host rather than always in
-  the backend).
+  is on), `on_host` (runs on the active tool host rather than always in
+  the backend) and `freeform` (a Lark grammar: the Responses API sends the
+  tool as an OpenAI custom tool, whose free-text input streams and is
+  replayed as the `input` string argument; other providers send the JSON
+  schema).
 - `Host_ops` — what a tool host does for a session: the `on_host` tools by
   name plus `$resolve_dir`/`$read_file`/`$list_paths`/`$instructions` (whose
   reply also lists the host's skills), `$skill` (one skill's file, for
@@ -352,7 +355,12 @@ two can share one.
   through `Image.load`, as an image result),
   `Tool_write` (`wrote N lines`), `Tool_edit` (multi-edit, unique
   non-overlapping matches, atomic; returns a unified diff from `Udiff`),
-  `Tool_ls`, `Tool_grep`/`Tool_find` (via `rg`).
+  `Tool_apply_patch` (Codex's patch format, parsed and matched by
+  `Apply_patch` with Codex's whitespace and punctuation leniency; adds,
+  deletes, moves and updates several files, writing nothing unless all of
+  it applies; returns Codex's `Success. Updated the following files:` list
+  plus the updated files' diffs), `Tool_ls`, `Tool_grep`/`Tool_find` (via
+  `rg`).
 - `Tool_subagent` — one tool, no roles: the model passes `task` (required)
   plus optional `tools` (a subset of the parent's, default all), `model`
   (`Model.resolve`; default the parent's), `cwd`, `max_turns` (default 50)
@@ -393,10 +401,17 @@ two can share one.
   `Tool_jobs` has `job_status`, `job_output` (`lines`, `offset` from the
   end), `job_wait` and `job_kill`; like the subagent controls they and
   `background` itself are dropped below depth 0.
-- `Tools.all` is the fixed built-in set; `Tools.for_context` builds the
-  per-agent tool list (`parent`, `depth`, optional `only`), so the
-  subagent's tool set can be restricted and the `subagent` tool is dropped at
-  depth 2; unknown names are an argument error.
+- `Tools.all` is the fixed built-in set; `Tools.builtin` adds the variants
+  (`apply_patch`) that a tool host can also run. `Tools.for_model` gives a
+  model the file editor it is trained on: `apply_patch` for OpenAI's GPT-5
+  and later (Codex's tool, sent freeform), `edit` for the rest. `Agent`
+  applies it to every run and to the system prompt; when a model change
+  swaps the editor, the next user message carries a note saying so (the
+  prompt stays fixed). `Tools.for_context` builds the per-agent tool list
+  (`parent`, `depth`, optional `only`), so the subagent's tool set can be
+  restricted and the `subagent` tool is dropped at depth 2; unknown names
+  are an argument error, and either editor's name means the child model's
+  editor (`Tool_subagent` applies `for_model` for the child's model).
 
 ### Harness
 
@@ -774,7 +789,8 @@ copy of the protocol types and the e2e test guards the contract.
     subagent; it renders items as `Log_line`s, lines with a two-column
     gutter that holds a turn's bar or a step's mark and survives wrapping,
     and each tool call through `Tool_render`, which reads arguments with
-    `Tool_args` (shared with prigh-web's `Tool_view`)), `Viewport` (`Follow | Anchored`, so new output never pushes an
+    `Tool_args` and `apply_patch`'s per-file changes with `Patch` (both
+    shared with prigh-web's `Tool_view`)), `Viewport` (`Follow | Anchored`, so new output never pushes an
     anchored view), `Verbosity` (quiet/normal/verbose), `Autocomplete`
     (inline command/argument/path completion), `Agent_view` (per-subagent
     transcript and status; the app keeps an agent while it runs or while
@@ -933,8 +949,9 @@ copy of the protocol types and the e2e test guards the contract.
       delta or a key press costs the same in a long session as in a short
       one),
       `Tool_view` (a card per tool: bash, read with images, write, edit
-      with `Line_diff`/`Diff_view`, ls/grep/find, subagents (marked with
-      `data-call` and `data-agent` for the agents panel), jobs),
+      with `Line_diff`/`Diff_view`, apply_patch file by file,
+      ls/grep/find, subagents (marked with `data-call` and `data-agent`
+      for the agents panel), jobs),
       `Delivery_view` (reports of finished background work, parsed by
       `ui/`'s `Delivery`), `Markdown` (a total parser that also renders
       streaming prefixes) and `Markdown_view`, `Image_view`,

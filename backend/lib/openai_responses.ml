@@ -74,7 +74,17 @@ let input_image (image : Image.t) =
     ]
 ;;
 
-let input_items ~provider (messages : Message.t list) =
+(* The text a freeform tool call carries: its [input] argument. *)
+let freeform_input arguments =
+  match Json.parse arguments with
+  | Ok (`Object fields) ->
+    (match List.Assoc.find fields ~equal:String.equal "input" with
+     | Some (`String input) -> input
+     | _ -> arguments)
+  | Ok _ | Error _ -> arguments
+;;
+
+let input_items ~provider ~freeform (messages : Message.t list) =
   List.concat_mapi messages ~f:(fun message_index m ->
     match m with
     | User { text; images } ->
@@ -87,6 +97,13 @@ let input_items ~provider (messages : Message.t list) =
                   then []
                   else [ input_text text ])
                  @ List.map images ~f:input_image) )
+          ]
+      ]
+    | Tool_result r when freeform r.tool_name ->
+      [ `Object
+          [ "type", `String "custom_tool_call_output"
+          ; "call_id", `String r.tool_call_id
+          ; "output", `String r.text
           ]
       ]
     | Tool_result r ->
@@ -130,6 +147,14 @@ let input_items ~provider (messages : Message.t list) =
         | Thinking { signature = Some item; _ } when replay_reasoning ->
           Result.ok (Json.parse item)
         | Thinking _ -> None
+        | Tool_call call when freeform call.name ->
+          Some
+            (`Object
+                [ "type", `String "custom_tool_call"
+                ; "call_id", `String call.id
+                ; "name", `String call.name
+                ; "input", `String (freeform_input call.arguments)
+                ])
         | Tool_call call ->
           Some
             (`Object
@@ -141,18 +166,41 @@ let input_items ~provider (messages : Message.t list) =
 ;;
 
 let wire_tool (t : Tool_spec.t) =
-  `Object
-    [ "type", `String "function"
-    ; "name", `String t.name
-    ; "description", `String t.description
-    ; "parameters", t.parameters
-    ; "strict", `False
-    ]
+  match t.freeform with
+  | Some grammar ->
+    `Object
+      [ "type", `String "custom"
+      ; "name", `String t.name
+      ; ( "description"
+        , `String
+            (t.description
+             ^ "\n\n\
+                This is a FREEFORM tool: send the input as plain text, not \
+                wrapped in JSON.") )
+      ; ( "format"
+        , `Object
+            [ "type", `String "grammar"
+            ; "syntax", `String "lark"
+            ; "definition", `String grammar
+            ] )
+      ]
+  | None ->
+    `Object
+      [ "type", `String "function"
+      ; "name", `String t.name
+      ; "description", `String t.description
+      ; "parameters", t.parameters
+      ; "strict", `False
+      ]
 ;;
 
 let request_body ~(endpoint : Endpoint.t) (r : Provider.Request.t) : Json.t =
   let r = Provider.Request.omit_unsupported_images r in
   let provider = Endpoint.provider_id endpoint in
+  let freeform name =
+    List.exists r.tools ~f:(fun (t : Tool_spec.t) ->
+      String.equal t.name name && Option.is_some t.freeform)
+  in
   let reasoning =
     if not r.model.supports_thinking
     then []
@@ -173,7 +221,7 @@ let request_body ~(endpoint : Endpoint.t) (r : Provider.Request.t) : Json.t =
          ; ( "instructions"
            , `String
                (Option.value r.system ~default:"You are a helpful assistant.") )
-         ; "input", `Array (input_items ~provider r.messages)
+         ; "input", `Array (input_items ~provider ~freeform r.messages)
          ; "include", `Array [ `String "reasoning.encrypted_content" ]
          ; "tool_choice", `String "auto"
          ; "parallel_tool_calls", `True
@@ -232,6 +280,16 @@ let parse_usage json =
   }
 ;;
 
+(* A custom tool call's free text streams as the [input] string of JSON
+   arguments, escaped piece by piece. *)
+let json_string_fragment text =
+  let quoted = Json.to_string (`String text) in
+  String.sub quoted ~pos:1 ~len:(String.length quoted - 2)
+;;
+
+let freeform_open = {|{"input":"|}
+let freeform_close = {|"}|}
+
 let parse_event (state : Stream_state.t) (event : Sse.Event.t)
   : Assistant_event.t list
   =
@@ -250,17 +308,24 @@ let parse_event (state : Stream_state.t) (event : Sse.Event.t)
     (match Option.value (member "type" json) ~default:"" with
      | "response.output_item.added" ->
        (match item_type (), item () with
-        | Some "function_call", Some item ->
+        | Some (("function_call" | "custom_tool_call") as type_), Some item ->
           let tool_index = state.tool_count in
           state.tool_count <- tool_index + 1;
           state.tools <- (output_index (), tool_index) :: state.tools;
           state.saw_tool_call <- true;
-          [ Assistant_event.Tool_call_start
+          let start =
+            Assistant_event.Tool_call_start
               { index = tool_index
               ; id = Option.value (member "call_id" item) ~default:""
               ; name = Option.value (member "name" item) ~default:""
               }
-          ]
+          in
+          if String.equal type_ "custom_tool_call"
+          then
+            [ start
+            ; Tool_call_delta { index = tool_index; arguments = freeform_open }
+            ]
+          else [ start ]
         | _ -> [])
      | "response.output_text.delta" | "response.refusal.delta" ->
        let d = delta () in
@@ -273,7 +338,8 @@ let parse_event (state : Stream_state.t) (event : Sse.Event.t)
        if Option.value (int_member "summary_index" json) ~default:0 > 0
        then [ Thinking_delta "\n\n" ]
        else []
-     | "response.function_call_arguments.delta" ->
+     | ( "response.function_call_arguments.delta"
+       | "response.custom_tool_call_input.delta" ) as type_ ->
        (match
           List.Assoc.find state.tools ~equal:Int.equal (output_index ())
         with
@@ -283,7 +349,12 @@ let parse_event (state : Stream_state.t) (event : Sse.Event.t)
           then []
           else (
             state.tool_arguments_seen <- index :: state.tool_arguments_seen;
-            [ Tool_call_delta { index; arguments = d } ])
+            let arguments =
+              if String.equal type_ "response.custom_tool_call_input.delta"
+              then json_string_fragment d
+              else d
+            in
+            [ Tool_call_delta { index; arguments } ])
         | None -> [])
      | "response.output_item.done" ->
        (match item_type (), item () with
@@ -304,6 +375,21 @@ let parse_event (state : Stream_state.t) (event : Sse.Event.t)
                 [ Tool_call_delta { index; arguments } ]
               | _ -> [])
            | _ -> [])
+        | Some "custom_tool_call", Some item ->
+          (match
+             List.Assoc.find state.tools ~equal:Int.equal (output_index ())
+           with
+           | Some index ->
+             let rest =
+               if List.mem state.tool_arguments_seen index ~equal:Int.equal
+               then []
+               else
+                 Option.to_list (member "input" item)
+                 |> List.map ~f:json_string_fragment
+             in
+             List.map (rest @ [ freeform_close ]) ~f:(fun arguments ->
+               Assistant_event.Tool_call_delta { index; arguments })
+           | None -> [])
         | _ -> [])
      | ("response.completed" | "response.incomplete") as type_ ->
        (* The response's status says how it ended, as pi reads it: a

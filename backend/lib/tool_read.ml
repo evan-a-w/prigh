@@ -5,6 +5,7 @@ let spec =
   { Tool_spec.name = "read"
   ; parallel_safe = true
   ; on_host = true
+  ; freeform = None
   ; destructive = false
   ; description =
       "Read a text or image file. Returns the content; large text files are \

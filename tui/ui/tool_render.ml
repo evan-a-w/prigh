@@ -85,6 +85,14 @@ let arg (call : P.Tool_call.t) =
     match call.name with
     | "bash" -> Option.map (str "command") ~f:(fun c -> "$ " ^ one_line c)
     | "read" | "write" | "edit" -> str "path"
+    | "apply_patch" ->
+      (match
+         Patch.parse
+           ~input:(Option.value (str "input") ~default:"")
+           ~result:None
+       with
+       | [] -> None
+       | file :: _ -> Some (Patch.File.name file))
     | "ls" -> Some (Option.value (str "path") ~default:".")
     | "grep" | "find" -> str "pattern"
     | "subagent" -> str "task"
@@ -151,10 +159,16 @@ let rec pretty_json ?(indent = 0) (json : P.Json.t) : string list =
 ;;
 
 let arguments (call : P.Tool_call.t) =
+  let patch =
+    if String.equal call.name "apply_patch"
+    then Tool_args.string (Tool_args.of_call call) "input"
+    else None
+  in
   let lines =
-    match P.Json.parse call.arguments with
-    | Ok json -> pretty_json json
-    | Error _ -> String.split_lines call.arguments
+    match patch, P.Json.parse call.arguments with
+    | Some patch, _ -> String.split_lines patch
+    | None, Ok json -> pretty_json json
+    | None, Error _ -> String.split_lines call.arguments
   in
   List.map lines ~f:(fun line ->
     Log_line.indent ~depth:2 (Content.Line.of_string ~style:dim line))
@@ -409,6 +423,69 @@ let render
             | Normal -> diff ~max_lines:8 lines
             | Verbose -> diff ~max_lines:all lines) )
        | None -> generic result)
+    | "apply_patch", _ ->
+      let files =
+        Patch.parse
+          ~input:(str "input")
+          ~result:
+            (match result with
+             | Some { is_error = false; text; _ } -> Some text
+             | Some { is_error = true; _ } | None -> None)
+      in
+      let single = List.length files = 1 in
+      let kind_chip =
+        match files with
+        | [ { kind = Add; _ } ] -> [ chip "new file" ]
+        | [ { kind = Delete; _ } ] -> [ chip "deleted" ]
+        | [] | [ { kind = Update; _ } ] -> []
+        | files -> [ chip (plural (List.length files) "file") ]
+      in
+      let max_lines =
+        match verbosity with
+        | Quiet -> 0
+        | Normal -> 8
+        | Verbose -> all
+      in
+      let label (file : Patch.File.t) =
+        let style : Style.t =
+          match file.kind with
+          | Add -> green
+          | Update -> Style.fg Yellow
+          | Delete -> red
+        in
+        Log_line.indent
+          ~depth:2
+          [ { text = Patch.Kind.letter file.kind ^ " "; style }
+          ; { text = Patch.File.name file; style = Style.plain }
+          ]
+      in
+      let labels () =
+        match verbosity with
+        | Normal when not single -> List.map files ~f:label
+        | Normal | Quiet | Verbose -> []
+      in
+      (match result with
+       | None -> kind_chip, labels ()
+       | Some ({ is_error = true; _ } as r) -> kind_chip, error r.text
+       | Some r when List.is_empty files || not (Patch.is_success r.text) ->
+         generic result
+       | Some _ ->
+         let added, removed = Patch.counts files in
+         let counts =
+           if List.for_all files ~f:(fun f -> Patch.Kind.equal f.kind Delete)
+           then []
+           else
+             [ chip ~style:green (sprintf "+%d" added)
+             ; chip ~style:red (sprintf "−%d" removed)
+             ]
+         in
+         ( kind_chip @ counts
+         , if quiet
+           then []
+           else
+             List.concat_map files ~f:(fun file ->
+               let lines = diff ~max_lines (Patch.File.lines file) in
+               if single then lines else label file :: lines) ))
     | ("ls" | "grep" | "find"), _ ->
       let flags =
         List.filter_opt
@@ -431,10 +508,16 @@ let render
     | Interrupted -> chips @ [ chip "cancelled" ]
     | Running | Done | Failed -> chips
   in
+  (* A patch that applied is all in its diffs. *)
+  let applied =
+    String.equal call.name "apply_patch"
+    && Option.exists result ~f:(fun r ->
+      (not r.is_error) && Patch.is_success r.text)
+  in
   let arguments =
     match verbosity with
-    | Verbose -> arguments call
-    | Quiet | Normal -> []
+    | Verbose when not applied -> arguments call
+    | Verbose | Quiet | Normal -> []
   in
   (header ~width ~mark ~name:call.name ?arg:(arg call) chips :: arguments)
   @ body

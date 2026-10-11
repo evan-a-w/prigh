@@ -33,6 +33,7 @@ let spec =
   { Tool_spec.name = "subagent"
   ; parallel_safe = true
   ; on_host = false
+  ; freeform = None
   ; destructive = false
   ; description = background_description
   ; parameters =
@@ -111,7 +112,13 @@ let prepare
   in
   let depth = context.depth + 1 in
   let tools =
-    match Tools.for_context ~parent:context.tools ~depth ?only () with
+    match
+      Tools.for_context
+        ~parent:(Tools.for_model model context.tools)
+        ~depth
+        ?only
+        ()
+    with
     | Ok tools ->
       List.map tools ~f:(fun (tool : Tool.t) ->
         if String.equal (Tool.name tool) spec.name
@@ -330,6 +337,7 @@ let control_spec ~name ~description parameters =
   { Tool_spec.name
   ; parallel_safe = true
   ; on_host = false
+  ; freeform = None
   ; destructive = false
   ; description
   ; parameters

@@ -147,6 +147,18 @@ let unified ?(max_rows = 40) text =
   view ~numbers:true ~max_rows (unified_rows text)
 ;;
 
+let hunks ?(max_rows = 40) lines =
+  let rows =
+    List.map
+      (unified_rows (String.concat ~sep:"\n" lines))
+      ~f:(fun (row : Row.t) ->
+        match row with
+        | Hunk _ -> row
+        | Line l -> Line { l with old_line = None; new_line = None })
+  in
+  view ~numbers:false ~max_rows rows
+;;
+
 let edits ?(max_rows = 40) edits =
   view ~numbers:false ~max_rows (edit_rows edits)
 ;;

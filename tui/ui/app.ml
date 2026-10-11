@@ -304,6 +304,7 @@ let confirm_question ~name ~summary =
   | "bash" -> sprintf "Run bash: %s? (y/n)" summary
   | "write" -> sprintf "Write %s? (y/n)" summary
   | "edit" -> sprintf "Edit %s? (y/n)" summary
+  | "apply_patch" -> sprintf "Apply patch to %s? (y/n)" summary
   | name -> sprintf "Run %s: %s? (y/n)" name summary
 ;;
 

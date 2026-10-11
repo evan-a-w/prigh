@@ -112,6 +112,7 @@ let instructions_tool =
       ; parallel_safe = true
       ; destructive = false
       ; on_host = true
+      ; freeform = None
       }
   ; run =
       (fun context args ->
@@ -284,7 +285,7 @@ let mcp ~mcp ~cancel ~cwd ~name ~(arguments : Json.t) =
 ;;
 
 let host_tools () =
-  instructions_tool :: List.filter Tools.all ~f:(fun t -> t.spec.on_host)
+  instructions_tool :: List.filter Tools.builtin ~f:(fun t -> t.spec.on_host)
 ;;
 
 let execute ~mcp:hub ~env ~cancel ~on_output ~cwd ~name ~(arguments : Json.t) =

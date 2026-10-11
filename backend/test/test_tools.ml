@@ -15,6 +15,49 @@ let%expect_test "registry" =
     |}]
 ;;
 
+let%expect_test "the file editor suits the model" =
+  let names tools = List.map tools ~f:Tool.name in
+  List.iter
+    [ "openai-codex/gpt-5.5"
+    ; "openai/gpt-5"
+    ; "openai/gpt-6.1-sol"
+    ; "openai/gpt-5-chat-latest"
+    ; "openai/gpt-4.1"
+    ; "anthropic/claude-opus-4-6"
+    ; "deepseek/deepseek-flash"
+    ]
+    ~f:(fun key ->
+      let model = Option.value_exn (Model.find key) in
+      print_s
+        [%sexp
+          (key : string)
+        , (Tools.uses_apply_patch model : bool)
+        , (names (Tools.for_model model Tools.all) : string list)]);
+  [%expect
+    {|
+    (openai-codex/gpt-5.5 true (bash read write apply_patch ls grep find))
+    (openai/gpt-5 true (bash read write apply_patch ls grep find))
+    (openai/gpt-6.1-sol true (bash read write apply_patch ls grep find))
+    (openai/gpt-5-chat-latest false (bash read write edit ls grep find))
+    (openai/gpt-4.1 false (bash read write edit ls grep find))
+    (anthropic/claude-opus-4-6 false (bash read write edit ls grep find))
+    (deepseek/deepseek-flash false (bash read write edit ls grep find))
+    |}];
+  let gpt = Option.value_exn (Model.find "openai/gpt-5") in
+  let claude = Option.value_exn (Model.find "anthropic/claude-opus-4-6") in
+  (* Back again, and lists without an editor stay as they are. *)
+  print_s
+    [%sexp
+      (names (Tools.for_model claude (Tools.for_model gpt Tools.all))
+       : string list)
+    , (names (Tools.for_model gpt [ Tool_bash.tool ]) : string list)
+    , (Option.map (Tools.editor (Tools.for_model gpt Tools.all)) ~f:Tool.name
+       : string option)
+    , (Option.map (Tools.find "apply_patch") ~f:Tool.name : string option)];
+  [%expect
+    {| ((bash read write edit ls grep find) (bash) (apply_patch) (apply_patch)) |}]
+;;
+
 let%expect_test "bash: output, exit codes, cwd, streaming" =
   with_sandbox
   @@ fun t ->
@@ -286,7 +329,8 @@ let%expect_test "edit" =
     t
     Tool_edit.tool
     {|{"path": "f.ml", "edits": [{"old_text": "nope", "new_text": "x"}]}|};
-  [%expect {| ERROR: edit 1: old_text not found in file |}];
+  [%expect
+    {| ERROR: edit 1: old_text not found in file; read the file to get its current text |}];
   run
     t
     Tool_edit.tool
@@ -506,5 +550,253 @@ let%expect_test "directory completion keeps the typed notation" =
     "$DIR/other/proj/" -> ["$DIR/other/proj/deep/"]
     "nowhere/" -> []
     "notes.txt/" -> []
+    |}]
+;;
+
+let%expect_test "apply_patch: writes every file, or none" =
+  with_sandbox
+  @@ fun t ->
+  let patch lines =
+    Jsonaf.to_string (`Object [ "input", `String (String.concat_lines lines) ])
+  in
+  let tree () =
+    let files =
+      Core_unix.open_process_in
+        (sprintf "cd %s && find . -type f | sort" (Filename.quote t.dir))
+      |> In_channel.input_all
+    in
+    print_string files
+  in
+  write t "src/a.ml" (String.concat_lines (List.init 8 ~f:(sprintf "a%d")));
+  write t "old.txt" "old\n";
+  write t "gone.txt" "bye\n";
+  run
+    t
+    Tool_apply_patch.tool
+    (patch
+       [ "*** Begin Patch"
+       ; "*** Add File: new/dir/n.txt"
+       ; "+hello"
+       ; "*** Update File: src/a.ml"
+       ; "@@"
+       ; " a2"
+       ; " a3"
+       ; "-a4"
+       ; "+A4"
+       ; " a5"
+       ; "*** Update File: old.txt"
+       ; "*** Move to: moved/new.txt"
+       ; "-old"
+       ; "+new"
+       ; "*** Delete File: gone.txt"
+       ; "*** End Patch"
+       ]);
+  tree ();
+  print_string (read t "moved/new.txt");
+  [%expect
+    {|
+    Success. Updated the following files:
+    A new/dir/n.txt
+    M src/a.ml
+    M moved/new.txt
+    D gone.txt
+
+    --- a/src/a.ml
+    +++ b/src/a.ml
+    @@ -2,7 +2,7 @@
+     a1
+     a2
+     a3
+    -a4
+    +A4
+     a5
+     a6
+     a7
+    --- a/moved/new.txt
+    +++ b/moved/new.txt
+    @@ -1,1 +1,1 @@
+    -old
+    +new
+    ./moved/new.txt
+    ./new/dir/n.txt
+    ./src/a.ml
+    new
+    |}];
+  (* The second operation fails: the first one is not written either. *)
+  run
+    t
+    Tool_apply_patch.tool
+    (patch
+       [ "*** Begin Patch"
+       ; "*** Update File: src/a.ml"
+       ; "-A4"
+       ; "+B4"
+       ; "*** Update File: src/a.ml"
+       ; "-nope"
+       ; "+x"
+       ; "*** End Patch"
+       ]);
+  print_string (read t "src/a.ml");
+  [%expect
+    {|
+    ERROR: Failed to find expected lines in src/a.ml:
+    nope
+    a0
+    a1
+    a2
+    a3
+    A4
+    a5
+    a6
+    a7
+    |}];
+  run t Tool_apply_patch.tool (patch [ "*** Update File: x" ]);
+  run
+    t
+    Tool_apply_patch.tool
+    (patch
+       [ "*** Begin Patch"; "*** Delete File: missing.txt"; "*** End Patch" ]);
+  (* Absolute paths work and are shown relative to the cwd. *)
+  run
+    t
+    Tool_apply_patch.tool
+    (patch
+       [ "*** Begin Patch"
+       ; "*** Update File: " ^ Filename.concat t.dir "moved/new.txt"
+       ; "-new"
+       ; "+newer"
+       ; "*** End Patch"
+       ]);
+  [%expect
+    {|
+    ERROR: line 1: expected '*** Begin Patch', got '*** Update File: x'
+    ERROR: Failed to delete missing.txt: the file does not exist
+    Success. Updated the following files:
+    M moved/new.txt
+
+    --- a/moved/new.txt
+    +++ b/moved/new.txt
+    @@ -1,1 +1,1 @@
+    -new
+    +newer
+    |}]
+;;
+
+let%expect_test "apply_patch asks for confirmation naming its files" =
+  with_sandbox
+  @@ fun t ->
+  let summaries = ref [] in
+  let provider =
+    Faux_provider.create
+      [ Faux_provider.Reply.tool_call
+          ~id:"c1"
+          ~name:"apply_patch"
+          ~arguments:
+            (Jsonaf.to_string
+               (`Object
+                   [ ( "input"
+                     , `String
+                         "*** Begin Patch\n\
+                          *** Add File: a.txt\n\
+                          +x\n\
+                          *** Update File: b.txt\n\
+                          *** Move to: c.txt\n\
+                          *** End Patch" )
+                   ]))
+          ()
+      ; Faux_provider.Reply.text "done"
+      ]
+  in
+  let (_ : Message.t list) =
+    Agent_loop.run
+      ~env:t.env
+      ~provider
+      ~config:
+        { Agent_loop.Config.model = Model.default
+        ; thinking = Off
+        ; system = None
+        ; tools = [ Tool_apply_patch.tool ]
+        ; max_turns = None
+        ; max_tokens = None
+        ; retries = 0
+        }
+      ~cwd:t.dir
+      ~confirm:(fun _ ~summary ->
+        summaries := summary :: !summaries;
+        false)
+      ~context:[]
+      ~prompts:[ Message.user "go" ]
+      ()
+  in
+  print_s [%sexp (!summaries : string list)];
+  [%expect {| ("a.txt, b.txt, c.txt") |}]
+;;
+
+let%expect_test
+    "edit: lenient matching when old_text is not in the file as written"
+  =
+  with_sandbox
+  @@ fun t ->
+  let edit path edits =
+    run
+      t
+      Tool_edit.tool
+      (Jsonaf.to_string
+         (`Object
+             [ "path", `String path
+             ; ( "edits"
+               , `Array
+                   (List.map edits ~f:(fun (o, n) ->
+                      `Object [ "old_text", `String o; "new_text", `String n ]))
+               )
+             ]))
+  in
+  (* Curly quotes and an en dash in the file, typed as ASCII; trailing
+     spaces in the file. *)
+  write t "q.txt" "say \u{201C}hi\u{201D} \u{2013} ok   \nnext\n";
+  edit "q.txt" [ "say \"hi\" - ok\nnext", "said hi\nnext" ];
+  print_string (read t "q.txt");
+  (* CRLF file, LF old_text and new_text: the replacement keeps CRLF. *)
+  write t "crlf.txt" "a\r\nb\r\nc\r\n";
+  edit "crlf.txt" [ "a\nb\n", "A\nB\n" ];
+  print_s [%sexp (read t "crlf.txt" : string)];
+  (* Exact matches win; a lenient one must be unique too. *)
+  write t "two.txt" "x \nx\t\n";
+  edit "two.txt" [ "x\n", "y\n" ];
+  edit "two.txt" [ "x \nx", "z" ];
+  write t "amb.txt" "\u{2018}a\u{2019}\n'a' \n";
+  edit "amb.txt" [ "'a'\n", "b\n" ];
+  [%expect
+    {|
+    edit 1 matched only after normalising whitespace and punctuation; the diff shows the result
+    --- a/q.txt
+    +++ b/q.txt
+    @@ -1,2 +1,2 @@
+    -say “hi” – ok
+    +said hi
+     next
+    said hi
+    next
+    edit 1 matched only after normalising whitespace and punctuation; the diff shows the result
+    --- a/crlf.txt
+    +++ b/crlf.txt
+    @@ -1,3 +1,3 @@
+    -a
+    -b
+    +A
+    +B
+     c
+     "A\r\
+    \nB\r\
+    \nc\r\
+    \n"
+    ERROR: edit 1: old_text is not in the file as written, and matches 2 places when whitespace and punctuation are normalised; copy it exactly from the file
+    --- a/two.txt
+    +++ b/two.txt
+    @@ -1,2 +1,1 @@
+    -x
+    -x
+    +z
+    ERROR: edit 1: old_text is not in the file as written, and matches 2 places when whitespace and punctuation are normalised; copy it exactly from the file
     |}]
 ;;

@@ -12,6 +12,7 @@ let tools =
   [ { Tool_spec.name = "bash"
     ; parallel_safe = false
     ; on_host = true
+    ; freeform = None
     ; destructive = true
     ; description = "Run a command"
     ; parameters =
@@ -451,5 +452,121 @@ let%expect_test "images: in prompts and tool results" =
         ]
       }
     ]
+    |}]
+;;
+
+let%expect_test
+    "freeform tools: sent as custom tools, replayed as custom tool calls, \
+     streamed into an [input] argument"
+  =
+  let patch_tool = Tool_apply_patch.tool.spec in
+  let messages =
+    [ Message.user "fix it"
+    ; Assistant
+        { content =
+            [ Tool_call
+                { id = "call_1"
+                ; name = "apply_patch"
+                ; arguments =
+                    {|{"input":"*** Begin Patch\n*** Delete File: a\n*** End Patch"}|}
+                }
+            ; Tool_call
+                { id = "call_2"; name = "bash"; arguments = {|{"cmd":"ls"}|} }
+            ]
+        ; stop_reason = Tool_use
+        ; usage = Usage.zero
+        ; model = Model.key codex_model
+        }
+    ; Tool_result
+        { tool_call_id = "call_1"
+        ; tool_name = "apply_patch"
+        ; text = "Success. Updated the following files:\nD a"
+        ; is_error = false
+        ; images = []
+        }
+    ; Tool_result
+        { tool_call_id = "call_2"
+        ; tool_name = "bash"
+        ; text = "b"
+        ; is_error = false
+        ; images = []
+        }
+    ]
+  in
+  let body =
+    T.request_body
+      ~endpoint:(Codex { access_token = "t"; account_id = "a" })
+      (request ~tools:(tools @ [ patch_tool ]) messages)
+  in
+  let member name json = Option.value_exn (Json.member name json) in
+  let rec elide : Json.t -> Json.t = function
+    | `String s when String.length s > 50 -> `String (String.prefix s 50 ^ "...")
+    | `Object fields -> `Object (List.map fields ~f:(fun (k, v) -> k, elide v))
+    | `Array items -> `Array (List.map items ~f:elide)
+    | json -> json
+  in
+  let show_object json = print_endline (Json.to_string (elide json)) in
+  List.iter (Json.list_exn (member "tools" body)) ~f:show_object;
+  List.iter (Json.list_exn (member "input" body)) ~f:show_object;
+  print_endline
+    (String.split_lines
+       (Json.string_exn
+          (member
+             "description"
+             (List.last_exn (Json.list_exn (member "tools" body)))))
+     |> List.last_exn);
+  [%expect
+    {|
+    {"type":"function","name":"bash","description":"Run a command","parameters":{"type":"object","properties":{"cmd":{"type":"string"}}},"strict":false}
+    {"type":"custom","name":"apply_patch","description":"Use the `apply_patch` tool to edit files.\nYour pat...","format":{"type":"grammar","syntax":"lark","definition":"start: begin_patch hunk+ end_patch\nbegin_patch: \"*..."}}
+    {"type":"message","role":"user","content":[{"type":"input_text","text":"fix it"}]}
+    {"type":"custom_tool_call","call_id":"call_1","name":"apply_patch","input":"*** Begin Patch\n*** Delete File: a\n*** End Patch"}
+    {"type":"function_call","call_id":"call_2","name":"bash","arguments":"{\"cmd\":\"ls\"}"}
+    {"type":"custom_tool_call_output","call_id":"call_1","output":"Success. Updated the following files:\nD a"}
+    {"type":"function_call_output","call_id":"call_2","output":"b"}
+    This is a FREEFORM tool: send the input as plain text, not wrapped in JSON.
+    |}];
+  let events, stop, _ =
+    T.parse_events
+      [ {|{"type":"response.output_item.added","output_index":0,"item":{"type":"custom_tool_call","call_id":"call_3","name":"apply_patch","input":""}}|}
+      ; {|{"type":"response.custom_tool_call_input.delta","output_index":0,"delta":"*** Begin Patch\n*** Add File: \"q\".txt\n"}|}
+      ; {|{"type":"response.custom_tool_call_input.delta","output_index":0,"delta":"+caf\u00e9 \\ tab\t\n*** End Patch"}|}
+      ; {|{"type":"response.output_item.done","output_index":0,"item":{"type":"custom_tool_call","call_id":"call_3","name":"apply_patch","input":"ignored: deltas were seen"}}|}
+      ; {|{"type":"response.output_item.added","output_index":1,"item":{"type":"custom_tool_call","call_id":"call_4","name":"apply_patch","input":""}}|}
+      ; {|{"type":"response.output_item.done","output_index":1,"item":{"type":"custom_tool_call","call_id":"call_4","name":"apply_patch","input":"whole \"input\""}}|}
+      ; {|{"type":"response.completed","response":{"status":"completed"}}|}
+      ]
+  in
+  print_s [%sexp (events : Assistant_event.t list), (stop : Stop_reason.t)];
+  let builder = Assistant_builder.create ~model:"m" in
+  List.iter events ~f:(Assistant_builder.apply builder);
+  let message =
+    Assistant_builder.finish builder ~stop_reason:stop ~usage:Usage.zero
+  in
+  List.iter (Message.Assistant.tool_calls message) ~f:(fun call ->
+    print_s [%sexp (Content.Tool_call.parse_arguments call : Json.t Or_error.t)]);
+  [%expect
+    {|
+    (((Tool_call_start (index 0) (id call_3) (name apply_patch))
+      (Tool_call_delta (index 0) (arguments "{\"input\":\""))
+      (Tool_call_delta (index 0)
+       (arguments "*** Begin Patch\\n*** Add File: \\\"q\\\".txt\\n"))
+      (Tool_call_delta (index 0)
+       (arguments "+caf\195\169 \\\\ tab\\t\\n*** End Patch"))
+      (Tool_call_delta (index 0) (arguments "\"}"))
+      (Tool_call_start (index 1) (id call_4) (name apply_patch))
+      (Tool_call_delta (index 1) (arguments "{\"input\":\""))
+      (Tool_call_delta (index 1) (arguments "whole \\\"input\\\""))
+      (Tool_call_delta (index 1) (arguments "\"}")))
+     Tool_use)
+    (Ok
+     (Object
+      ((input
+        (String
+          "*** Begin Patch\
+         \n*** Add File: \"q\".txt\
+         \n+caf\195\169 \\ tab\t\
+         \n*** End Patch")))))
+    (Ok (Object ((input (String "whole \"input\"")))))
     |}]
 ;;
