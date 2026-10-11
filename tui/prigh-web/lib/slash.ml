@@ -11,6 +11,7 @@ module Argument = struct
     | Backend_directory
     | Verbosity
     | Confirm
+    | Notify
     | Session
     | Path
     | Host
@@ -70,6 +71,12 @@ let all =
       ~args:"[on|off]"
       "confirm"
       "ask before bash, write and edit run"
+  ; c
+      ~argument:Notify
+      ~args:"[on|off]"
+      "notify"
+      "tell you when a turn ends or something waits for you while the tab is \
+       hidden"
   ; c
       ~args:"[instructions]"
       "compact"

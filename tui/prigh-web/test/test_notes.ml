@@ -35,8 +35,9 @@ let source ~kind ~title text =
     title
 ;;
 
-let%expect_test "notes stand in the margin above the prompt, which shows only \
-                 what the user wrote"
+let%expect_test
+    "notes stand in the margin above the prompt, which shows only what the \
+     user wrote"
   =
   let chat = Chat_harness.chat [ noted ] in
   Chat_harness.show chat;
@@ -65,8 +66,8 @@ let%expect_test "notes stand in the margin above the prompt, which shows only \
     |}]
 ;;
 
-let%expect_test "the harness's own messages are notes, the summary is the \
-                 compaction fold"
+let%expect_test
+    "the harness's own messages are notes, the summary is the compaction fold"
   =
   let chat =
     Chat_harness.chat
@@ -74,9 +75,18 @@ let%expect_test "the harness's own messages are notes, the summary is the \
           ~kind:"goal_continuation"
           ~title:"Goal: continuing (3/20)"
           "[prigh goal: continuation 3 of 20] Continue working toward the goal"
-      ; source ~kind:"resume" ~title:"Usage limit reset: carrying on" "[prigh: the usage limit has reset.]"
-      ; source ~kind:"review" ~title:"Review of changes against main" "[prigh review] Review the changes"
-      ; source ~kind:"init" ~title:"Write or improve AGENTS.md" "[prigh init] Write an AGENTS.md"
+      ; source
+          ~kind:"resume"
+          ~title:"Usage limit reset: carrying on"
+          "[prigh: the usage limit has reset.]"
+      ; source
+          ~kind:"review"
+          ~title:"Review of changes against main"
+          "[prigh review] Review the changes"
+      ; source
+          ~kind:"init"
+          ~title:"Write or improve AGENTS.md"
+          "[prigh init] Write an AGENTS.md"
       ; source
           ~kind:"shell"
           ~title:"Output of $ ls added to the context"
@@ -100,7 +110,9 @@ let%expect_test "/fork and /tree label the harness's messages by their notes" =
   let message json =
     (* The message of an event, as an entry carries it. *)
     match Jsonaf.of_string json with
-    | `Object fields -> Jsonaf.to_string (List.Assoc.find_exn fields "message" ~equal:String.equal)
+    | `Object fields ->
+      Jsonaf.to_string
+        (List.Assoc.find_exn fields "message" ~equal:String.equal)
     | _ -> assert false
   in
   run h "/fork";
@@ -111,7 +123,10 @@ let%expect_test "/fork and /tree label the harness's messages by their notes" =
        {|{"head":"e2","entries":[{"id":"e1","parent":null,"kind":"message","message":%s},{"id":"e2","parent":"e1","kind":"message","message":%s}]}|}
        (message noted)
        (message
-          (source ~kind:"review" ~title:"Review of uncommitted changes" "[prigh review] …")));
+          (source
+             ~kind:"review"
+             ~title:"Review of uncommitted changes"
+             "[prigh review] …")));
   H.text h ~selector:".picker-items";
   [%expect
     {|
@@ -127,14 +142,16 @@ let diff_json =
   {|{"root":"/work","against":"HEAD","truncated":false,"diff":"diff --git a/src/a.ml b/src/a.ml\nindex 1..2 100644\n--- a/src/a.ml\n+++ b/src/a.ml\n@@ -1,2 +1,2 @@\n let x = 1\n-let y = 2\n+let y = 3\ndiff --git a/notes.txt b/notes.txt\nnew file mode 100644\nindex 0..1\n--- /dev/null\n+++ b/notes.txt\n@@ -0,0 +1 @@\n+hello\n"}|}
 ;;
 
-let%expect_test "/diff opens the changes file by file; none, or not a \
-                 repository, is a toast"
+let%expect_test
+    "/diff opens the changes file by file; none, or not a repository, is a \
+     toast"
   =
   let h = H.create () in
   run h "/diff";
   H.reply h "git_diff" diff_json;
   H.show h ~selector:".diff-dialog";
-  [%expect {|
+  [%expect
+    {|
     (Save_history (/diff))
     (Expire_toast (id 0) (after_ms 4000))
     (Rpc (method_ git_diff) (params ()) (tag Git_diff))
@@ -232,9 +249,13 @@ let%expect_test "/diff opens the changes file by file; none, or not a \
     "git_diff"
     {|{"root":"/work","against":"HEAD","truncated":false,"diff":""}|};
   run h "/diff";
-  H.fail h "git_diff" "not a git repository: /work (git init starts one, or /cd into one)";
+  H.fail
+    h
+    "git_diff"
+    "not a git repository: /work (git init starts one, or /cd into one)";
   H.text h ~selector:".toast";
-  [%expect {|
+  [%expect
+    {|
     (Focus editor)
     (Rpc (method_ list_paths) (params ((prefix src))) (tag (Paths src)))
     (Save_history ("/diff src" /diff))
@@ -250,15 +271,17 @@ let%expect_test "/diff opens the changes file by file; none, or not a \
     |}]
 ;;
 
-let%expect_test "/review and /init: refused ones go back to the editor; a \
-                 busy agent queues them"
+let%expect_test
+    "/review and /init: refused ones go back to the editor; a busy agent \
+     queues them"
   =
   let h = H.create () in
   run h "/review main look at errors";
   H.fail h "review" "nothing to review: no changes against main in /work";
   H.text h ~selector:".toast";
   H.text h ~selector:".composer";
-  [%expect {|
+  [%expect
+    {|
     (Save_history ("/review main look at errors"))
     (Expire_toast (id 0) (after_ms 4000))
     (Rpc (method_ review) (params ((args "main look at errors")))
@@ -278,7 +301,8 @@ let%expect_test "/review and /init: refused ones go back to the editor; a \
   run h "/init";
   H.reply h "init" "{}";
   H.text h ~selector:".toast";
-  [%expect {|
+  [%expect
+    {|
     (Save_history (/init "/review main look at errors"))
     (Rpc (method_ init) (params ()) (tag (Command_prompt /init)))
     (Expire_toast (id 2) (after_ms 4000))
@@ -293,7 +317,8 @@ let%expect_test "/diff, /review and /init are in the completions and /help" =
   H.text h ~selector:".popup";
   H.type_ h "/i";
   H.text h ~selector:".popup";
-  [%expect {|
+  [%expect
+    {|
     Commands ↑↓ Tab Enter Esc
     /diff [path] show the uncommitted changes where the tools run, untracked files too
     /default-dir [path|off] show or set the directory new sessions start in
@@ -304,6 +329,7 @@ let%expect_test "/diff, /review and /init are in the completions and /help" =
     /diff [path] show the uncommitted changes where the tools run, untracked files too
     /quit how to leave (close the tab; /signout signs out)
     /login [provider] log in to a model provider (or /login custom)
+    /notify [on|off] tell you when a turn ends or something waits for you while the tab is hidden
     /review [base] [instructions] review the uncommitted changes, or those against a base branch, for prioritised findings
     /switch [path] switch to a saved session
     /rewind go back to an earlier message in this session
@@ -318,5 +344,104 @@ let%expect_test "/diff, /review and /init are in the completions and /help" =
     /verbosity [quiet|normal|verbose] how much of tool calls and thinking the transcript shows
     /default-dir [path|off] show or set the directory new sessions start in
     /retry-backend-connection reconnect to the backend now
+    |}]
+;;
+
+let%expect_test
+    "notifications: asked for from /notify on, raised only while the tab is \
+     hidden, counted in the title until it is seen"
+  =
+  let h = H.create () in
+  H.act h (Set_notifications { enabled = true; permission = "default" });
+  run h "/notify";
+  H.text h ~selector:".toast";
+  [%expect
+    {|
+    (Save_history (/notify))
+    (Expire_toast (id 0) (after_ms 4000))
+    Notifications are on, but the browser has not been asked yet: /notify on asks it
+    |}];
+  run h "/notify on";
+  H.act h (Notification_permission "granted");
+  H.text h ~selector:".toast";
+  [%expect
+    {|
+    (Save_history ("/notify on" /notify))
+    (Save_notifications true)
+    Request_notification_permission
+    (Expire_toast (id 1) (after_ms 4000))
+    Notifications are on, but the browser has not been asked yet: /notify on asks it
+    Notifications are on: the browser tells you when a turn ends, a tool waits for you or background work finishes while this tab is hidden
+    |}];
+  let finish () =
+    H.event
+      h
+      {|{"event":"agent_end","messages":[{"role":"assistant","content":[{"type":"text","text":"All tests pass."}],"stop_reason":{"type":"end_turn"},"usage":{"input":1,"output":1,"cache_read":0},"model":"m"}]}|}
+  in
+  (* Seen: nothing. *)
+  finish ();
+  [%expect {| (Rpc (method_ list_sessions) (params ()) (tag Sessions)) |}];
+  H.act h (Page_hidden true);
+  finish ();
+  H.event
+    h
+    {|{"event":"tool_confirm","call_id":"c1","name":"bash","summary":"rm -rf build"}|};
+  [%expect
+    {|
+    (Rpc (method_ list_sessions) (params ()) (tag Sessions))
+    (Set_title "(1) prigh")
+    (Notify ((title "prigh: done in work") (body "All tests pass.")))
+    (Focus confirm)
+    (Set_title "(2) prigh")
+    (Notify
+     ((title "prigh: waiting for you in work")
+      (body "Allow bash: rm -rf build?")))
+    |}];
+  H.act h (Page_hidden false);
+  [%expect {| (Set_title prigh) |}];
+  (* Off: the title still counts, no notification. *)
+  run h "/notify off";
+  H.act h (Page_hidden true);
+  finish ();
+  H.act h (Page_hidden false);
+  [%expect
+    {|
+    (Save_history ("/notify off" "/notify on" /notify))
+    (Save_notifications false)
+    (Expire_toast (id 2) (after_ms 4000))
+    (Rpc (method_ list_sessions) (params ()) (tag Sessions))
+    (Set_title "(1) prigh")
+    (Set_title prigh)
+    |}]
+;;
+
+let%expect_test
+    "notifications the browser refuses say how to allow them; the account menu \
+     turns them on and off"
+  =
+  let h = H.create () in
+  H.act h (Set_notifications { enabled = false; permission = "denied" });
+  H.act h Open_accounts;
+  H.act h (Picker_choose "notify on");
+  H.text h ~selector:".toast";
+  [%expect
+    {|
+    (Focus dialog)
+    (Focus editor)
+    (Focus editor)
+    (Save_notifications true)
+    The browser blocks notifications for this page: allow them in its site settings (the icon left of the address), then /notify on
+    |}];
+  H.act h (Set_notifications { enabled = true; permission = "unsupported" });
+  run h "/notify";
+  run h "/notify loud";
+  H.text h ~selector:".toast";
+  [%expect
+    {|
+    (Save_history (/notify))
+    (Expire_toast (id 1) (after_ms 4000))
+    (Save_history ("/notify loud" /notify))
+    This browser cannot show notifications here (they need https or localhost); the tab's title still counts what happened
+    Unknown /notify argument "loud": /notify on or /notify off (/notify alone says what is on)
     |}]
 ;;

@@ -243,6 +243,16 @@ let perform client settings ctx (model : App.Model.t) (command : App.Command.t) 
       Effect.of_sync_fun jump_to_user_message direction
     | Focus_terminal -> Effect.of_sync_fun Terminal_widget.focus ()
     | Remember_terminal open_ -> Effect.of_sync_fun Terminal_widget.remember open_
+    | Notify notification ->
+      Effect.of_sync_fun Page_notifications.show notification
+    | Request_notification_permission ->
+      let%bind.Effect permission =
+        Effect.of_deferred_fun Page_notifications.request_permission ()
+      in
+      inject (App.Action.Notification_permission permission)
+    | Save_notifications enabled ->
+      Effect.of_sync_fun Page_notifications.save enabled
+    | Set_title title -> Effect.of_sync_fun Page_notifications.set_title title
   in
   Bonsai.Apply_action_context.schedule_event ctx eff
 ;;
@@ -838,6 +848,14 @@ let run_app (settings : Settings.t) =
             ; current = Accounts.current storage ~backend:settings.backend
             });
        schedule (App.Action.Set_narrow (narrow ()));
+       schedule
+         (App.Action.Set_notifications
+            { enabled = Page_notifications.saved ()
+            ; permission = Page_notifications.permission ()
+            });
+       Page_notifications.set_title "prigh";
+       Page_notifications.on_visibility_change (fun hidden ->
+         schedule (App.Action.Page_hidden hidden));
        schedule (App.Action.Load_history (load_history ()));
        schedule App.Action.Start;
        (* The offset changes with daylight saving time. *)

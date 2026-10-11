@@ -314,6 +314,7 @@ let%expect_test "slash commands: the popup, arguments, running, unknown ones" =
     /change_default save the model and thinking level as the default for new sessions
     /verbosity [quiet|normal|verbose] how much of tool calls and thinking the transcript shows
     /confirm [on|off] ask before bash, write and edit run
+    /notify [on|off] tell you when a turn ends or something waits for you while the tab is hidden
     /compact [instructions] summarise older messages to free context
     /diff [path] show the uncommitted changes where the tools run, untracked files too
     /review [base] [instructions] review the uncommitted changes, or those against a base branch, for prioritised findings
