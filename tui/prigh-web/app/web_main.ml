@@ -42,8 +42,10 @@ module Settings = struct
   ;;
 end
 
+let refused error = String.is_prefix error ~prefix:"unauthorised"
+
 (* A session the backend no longer has (e.g. never saved before it restarted)
-   must not keep us out: start a new one instead. *)
+   must not keep us out: we join another, and say which one we lost. *)
 let send_hello client settings ~session =
   let hello session =
     Deferred.map
@@ -51,8 +53,59 @@ let send_hello client settings ~session =
       ~f:(Result.map_error ~f:Error.to_string_hum)
   in
   match%bind.Deferred hello session with
-  | Error _ when Option.is_some session -> hello None
-  | result -> Deferred.return result
+  | Error error when Option.is_some session && not (refused error) ->
+    Deferred.map (hello None) ~f:(Result.map ~f:(fun reply -> reply, session))
+  | result -> Deferred.return (Result.map result ~f:(fun reply -> reply, None))
+;;
+
+let url_session () =
+  Option.filter (Browser.query_param "session") ~f:(Fn.non String.is_empty)
+;;
+
+(* A socket on a flaky network can take minutes to fail: give up sooner and
+   try again. *)
+let connect_timeout = Time_ns.Span.of_sec 10.
+
+let reconnect client settings ~generation ~session =
+  let session = Option.first_some session (url_session ()) in
+  match%map.Deferred
+    Clock_ns.with_timeout
+      connect_timeout
+      (match%bind.Deferred Client.connect client with
+       | Error e -> Deferred.return (Error (Error.to_string_hum e))
+       | Ok () -> send_hello client settings ~session)
+  with
+  | `Timeout ->
+    Client.disconnect client;
+    App.Reply_tag.Reconnect generation, Error "timed out"
+  | `Result (Error e) -> Reconnect generation, Error e
+  | `Result (Ok (reply, None)) -> Reconnect generation, Ok reply
+  | `Result (Ok (reply, Some session)) ->
+    Session_gone { generation; session }, Ok reply
+;;
+
+(* After a suspension or a change of network, a socket can look open but
+   carry nothing: one that does not answer soon is dropped (and so
+   reconnected). *)
+let probe client =
+  if not (Client.is_connected client)
+  then Deferred.unit
+  else (
+    match%map.Deferred
+      Clock_ns.with_timeout
+        (Time_ns.Span.of_sec 5.)
+        (Client.call client "get_state" [])
+    with
+    | `Timeout -> Client.disconnect client
+    | `Result _ -> ())
+;;
+
+(* The page that loads next shows the sign-in form with this. *)
+let refused_key = "prigh-web.refused"
+
+let auth_failed message =
+  Browser.set_item refused_key message;
+  Dom_html.window##.location##reload
 ;;
 
 let history_key = "prigh-web.history"
@@ -150,6 +203,28 @@ let scroll_to_bottom () =
   Option.iter (chat_element ()) ~f:follow_to_end
 ;;
 
+(* Where the chat was before the page reloaded. Not ours as far as the scroll
+   listener knows, so it stops following (and shows the jump button). What is
+   above may still grow (fonts, images): it is put back while it does. *)
+let restore_scroll top =
+  following := false;
+  let rec put tries =
+    Option.iter (chat_element ()) ~f:(fun chat ->
+      let now = Js.to_float chat##.scrollTop in
+      let clamped =
+        Float.(now >= of_int Int.(chat##.scrollHeight - chat##.clientHeight) -. 2.)
+      in
+      if (not !following) && clamped && Float.(abs (now -. top) > 2.)
+      then chat##.scrollTop := Js.float top;
+      if tries > 0
+      then
+        ignore
+          (Dom_html.setTimeout (fun () -> put (tries - 1)) 150.
+           : Dom_html.timeout_id_safe))
+  in
+  put 6
+;;
+
 let scroll_chat pages =
   if pages < 0 then following := false;
   Option.iter (chat_element ()) ~f:(fun chat ->
@@ -196,18 +271,19 @@ let perform client settings ctx (model : App.Model.t) (command : App.Command.t) 
       in
       inject (App.Action.Reply (tag, result))
     | Reconnect { generation; delay_ms; session } ->
-      let%bind.Effect result =
+      let%bind.Effect tag, result =
         Effect.of_deferred_fun
           (fun () ->
              let%bind.Deferred () =
                Clock_ns.after (Time_ns.Span.of_int_ms delay_ms)
              in
-             match%bind.Deferred Client.connect client with
-             | Error e -> Deferred.return (Error (Error.to_string_hum e))
-             | Ok () -> send_hello client settings ~session)
+             reconnect client settings ~generation ~session)
           ()
       in
-      inject (App.Action.Reply (Reconnect generation, result))
+      inject (App.Action.Reply (tag, result))
+    | Probe_connection -> Effect.of_deferred_fun probe client
+    | Drop_connection -> Effect.of_sync_fun Client.disconnect client
+    | Auth_failed message -> Effect.of_sync_fun auth_failed message
     | Set_url_session session ->
       Effect.of_sync_fun
         (fun () ->
@@ -237,7 +313,11 @@ let perform client settings ctx (model : App.Model.t) (command : App.Command.t) 
     | Scroll_chat pages -> Effect.of_sync_fun scroll_chat pages
     | Scroll_to_bottom ->
       Effect.of_sync_fun
-        (fun () -> Browser.after_render scroll_to_bottom)
+        (fun () ->
+           Browser.after_render (fun () ->
+             match Scroll_memory.take () with
+             | Some top -> restore_scroll top
+             | None -> scroll_to_bottom ()))
         ()
     | Jump_to_user_message direction ->
       Effect.of_sync_fun jump_to_user_message direction
@@ -664,6 +744,7 @@ let install_listeners ~schedule ~current =
   listen ~capture:true (Dom_html.Event.make "scroll") (fun ev ->
     (match chat_element () with
      | Some el when phys_equal (Dom_html.eventTarget ev :> Dom.node Js.t) (el :> Dom.node Js.t) ->
+       Scroll_memory.save el;
        let top = Js.to_float el##.scrollTop in
        let ours =
          Option.value_map !last_set ~default:false ~f:(fun s ->
@@ -834,13 +915,28 @@ let run_app (settings : Settings.t) =
     Client.create ~connect:(fun () ->
       Ws_transport.connect ~url:settings.backend)
   in
+  (* A page that was in a session before (reloaded, or brought back by the
+     browser) on a network that is down starts offline and reconnects. *)
+  let known () =
+    Option.is_some settings.session
+    || List.exists (Accounts.load storage) ~f:(fun a ->
+      String.equal a.backend settings.backend)
+  in
   don't_wait_for
     (match%bind.Deferred
-       match%bind.Deferred Client.connect client with
-       | Error e -> Deferred.return (Error (Error.to_string_hum e))
-       | Ok () -> send_hello client settings ~session:settings.session
+       match%map.Deferred
+         Clock_ns.with_timeout
+           connect_timeout
+           (match%bind.Deferred Client.connect client with
+            | Error e -> Deferred.return (Error (Error.to_string_hum e))
+            | Ok () -> send_hello client settings ~session:settings.session)
+       with
+       | `Timeout ->
+         Client.disconnect client;
+         Error "timed out"
+       | `Result result -> result
      with
-     | Error error ->
+     | Error error when refused error || not (known ()) ->
        let%map.Deferred () = Client.close client in
        (* Nothing to be wrong about before the first sign-in. *)
        let error =
@@ -849,7 +945,7 @@ let run_app (settings : Settings.t) =
          | _ -> error
        in
        sign_in_form settings ~error
-     | Ok reply ->
+     | result ->
        let handle_ref = ref None in
        let current = ref App.init in
        let schedule action =
@@ -863,16 +959,20 @@ let run_app (settings : Settings.t) =
            (component client settings ~current)
        in
        handle_ref := Some handle;
-       Option.iter
-         (Prigh_protocol.Hello_reply.of_json reply |> Or_error.ok)
-         ~f:(fun hello -> schedule (App.Action.Hello hello));
+       Option.iter (Result.ok result) ~f:(fun (reply, _) ->
+         Option.iter
+           (Prigh_protocol.Hello_reply.of_json reply |> Or_error.ok)
+           ~f:(fun hello -> schedule (App.Action.Hello hello)));
        if
          Option.is_some settings.login.password
          || Option.is_some settings.login.user
        then schedule App.Action.Saved_login;
        schedule
          (App.Action.Set_accounts
-            { accounts = Accounts.remember storage ~backend:settings.backend
+            { accounts =
+                (if Result.is_ok result
+                 then Accounts.remember storage ~backend:settings.backend
+                 else Accounts.load storage)
             ; current = Accounts.current storage ~backend:settings.backend
             });
        schedule (App.Action.Set_narrow (narrow ()));
@@ -885,7 +985,33 @@ let run_app (settings : Settings.t) =
        Page_notifications.on_visibility_change (fun hidden ->
          schedule (App.Action.Page_hidden hidden));
        schedule (App.Action.Load_history (load_history ()));
-       schedule App.Action.Start;
+       (match result with
+        | Ok (_, None) -> schedule App.Action.Start
+        | Ok (_, Some lost) ->
+          schedule App.Action.Start;
+          schedule
+            (App.Action.Show_toast
+               { text =
+                   sprintf
+                     "Session %s is no longer on the backend (it restarted \
+                      before saving it): this is another one."
+                     lost
+               ; error = true
+               })
+        | Error _ -> schedule App.Action.Backend_closed);
+       let on_window event action =
+         ignore
+           (Dom_html.addEventListener
+              Dom_html.window
+              (Dom_html.Event.make event)
+              (Dom.handler (fun _ ->
+                 schedule action;
+                 Js._true))
+              Js._false
+            : Dom_html.event_listener_id)
+       in
+       on_window "online" (App.Action.Network true);
+       on_window "offline" (App.Action.Network false);
        (* The offset changes with daylight saving time. *)
        let tick () =
          schedule (App.Action.Tick (Time_ns.now ()));
@@ -918,9 +1044,12 @@ let run_app (settings : Settings.t) =
 let run () =
   Async_js.init ();
   let settings = Settings.load () in
-  if Login.take_signed_out Login.Storage.browser
-  then sign_in_form settings ~notice:true ~error:"Signed out."
-  else if take_adding ()
-  then sign_in_form settings ~adding:true ~error:""
-  else run_app settings
+  let refused_message = Browser.get_item refused_key in
+  Browser.remove_item refused_key;
+  match refused_message with
+  | Some message -> sign_in_form settings ~notice:true ~error:message
+  | None when Login.take_signed_out Login.Storage.browser ->
+    sign_in_form settings ~notice:true ~error:"Signed out."
+  | None when take_adding () -> sign_in_form settings ~adding:true ~error:""
+  | None -> run_app settings
 ;;

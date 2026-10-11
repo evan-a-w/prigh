@@ -104,6 +104,13 @@ module Reply_tag = struct
         ; images : Image.t list
         ; attachments : Files.Attachment.t list
         }
+    | Resync of string (** the session's messages after reconnecting *)
+    | Resync_pending
+    | Session_gone of
+        { generation : int
+        ; session : string
+        }
+    (** reconnected, but the backend no longer has [session] *)
   [@@deriving sexp_of, equal]
 end
 
@@ -144,6 +151,12 @@ module Command = struct
     | Set_title of string
     | Files of Files.Page.t
     | Save_size of Resize.Save.t
+    | Probe_connection
+    (** the socket may have died unnoticed (a suspended page, a new network):
+        drop it unless the backend answers soon *)
+    | Drop_connection
+    | Auth_failed of string
+    (** the backend refused the saved sign-in: the sign-in page, saying this *)
   [@@deriving sexp_of, equal]
 end
 
@@ -302,6 +315,7 @@ module Action = struct
         }
     | Files of Files.Action.t
     | Resize of Resize.Action.t
+    | Network of bool (** the browser's [online] and [offline] events *)
   [@@deriving sexp_of]
 end
 
@@ -352,6 +366,9 @@ module Model = struct
     ; notifications : Page_notify.t
     ; files : Files.t
     ; layout : Resize.t
+    ; session_gone : string option
+    (** reconnected to a backend that no longer has this session: its
+        transcript stays on show, read-only *)
     }
   [@@deriving sexp_of]
 
@@ -447,6 +464,7 @@ let init =
   ; notifications = Page_notify.init
   ; files = Files.closed
   ; layout = Resize.empty
+  ; session_gone = None
   }
 ;;
 
@@ -627,6 +645,7 @@ let set_state_without_files (m : Model.t) (state : State.t) =
       ; scrolled_up = false
       ; skills = Skills.empty
       ; toasts = List.filter m.toasts ~f:(fun t -> not t.error)
+      ; session_gone = None
       }
     , cancel_btw m
       @ [ Command.Set_url_session state.session_id
@@ -2667,6 +2686,84 @@ let subagent_of_json json =
   , `Call call_id )
 ;;
 
+let start_commands (m : Model.t) =
+  let probe =
+    (* Only superusers may list the users: the account menu offers them. *)
+    match own_user m with
+    | Some _ -> [ rpc "list_users" [] ~tag:(Users Probe) ]
+    | None -> []
+  in
+  (if m.narrow then [] else [ focus_editor ]) @ startup @ probe
+;;
+
+(* Back in touch with the backend. Nothing on show is rebuilt: the session's
+   messages are fetched again and merged into the transcript (which keeps its
+   place), the rest is asked for again. *)
+module Rejoin = struct
+  let refused e = String.is_prefix e ~prefix:"unauthorised"
+
+  let refused_message e =
+    sprintf
+      "The backend no longer accepts this sign-in (%s): sign in again to go \
+       back to the session."
+      e
+  ;;
+
+  let connected (m : Model.t) json =
+    let m = { m with connection = Connected } in
+    match Hello_reply.of_json json with
+    | Ok hello -> { m with hello = Some hello }
+    | Error _ -> m
+  ;;
+
+  let rejoined (m : Model.t) json =
+    let m, toast_cmds = toast (connected m json) "Reconnected" in
+    match m.state with
+    | None -> m, toast_cmds @ start_commands m
+    | Some state ->
+      ( m
+      , toast_cmds
+        @ startup
+        @ [ rpc "get_messages" [] ~tag:(Resync state.session_id)
+          ; rpc "get_pending" [] ~tag:Resync_pending
+          ; rpc "list_sessions" [] ~tag:Sessions
+          ; list_subagents
+          ; list_jobs
+          ] )
+  ;;
+
+  (* An empty session was never saved: the new one the backend gave us does
+     as well. *)
+  let gone (m : Model.t) json ~session =
+    let m = connected m json in
+    if List.is_empty (Chat.entries m.chat)
+    then { m with state = None }, start_commands m
+    else
+      ( { m with session_gone = Some session }
+      , [ rpc "list_models" [] ~tag:Models
+        ; rpc "auth_status" [] ~tag:(Auth_status Refresh)
+        ; rpc "get_config" [] ~tag:Config
+        ; rpc "list_sessions" [] ~tag:Sessions
+        ] )
+  ;;
+
+  (* The network is back or the page is on show again: try now (the backoff
+     starts over), or check that the socket still works. *)
+  let now (m : Model.t) =
+    match m.connection with
+    | Connected -> m, [ Command.Probe_connection ]
+    | Reconnecting _ ->
+      let generation = m.generation + 1 in
+      ( { m with connection = Reconnecting { attempt = 0; generation }; generation }
+      , [ Command.Reconnect
+            { generation
+            ; delay_ms = 0
+            ; session = Option.map m.state ~f:(fun s -> s.session_id)
+            }
+        ] )
+  ;;
+end
+
 let rec reply_to (m : Model.t) (tag : Reply_tag.t) result =
   match tag, result with
   | Reconnect generation, _ when generation <> m.generation -> m, []
@@ -2676,6 +2773,8 @@ let rec reply_to (m : Model.t) (tag : Reply_tag.t) result =
     (match result with
      | Ok _ -> m, cmds
      | Error _ -> { m with files = Files.restore m.files attachments }, cmds)
+  | Reconnect _, Error e when Rejoin.refused e ->
+    m, [ Command.Auth_failed (Rejoin.refused_message e) ]
   (* The banner says that we are reconnecting: a toast per attempt would
      pile up over the page. *)
   | Reconnect _, Error _ ->
@@ -2690,18 +2789,53 @@ let rec reply_to (m : Model.t) (tag : Reply_tag.t) result =
              ; session = Option.map m.state ~f:(fun s -> s.session_id)
              }
          ] ))
-  | Reconnect _, Ok json ->
-    let m = { m with connection = Connected } in
-    let m =
-      match Hello_reply.of_json json with
-      | Ok hello -> { m with hello = Some hello }
-      | Error _ -> m
-    in
-    (* The session may have moved on while we were away: start over. *)
-    let m, cmds =
-      toast { m with state = None; chat = Chat.empty } "Reconnected"
-    in
-    m, cmds @ startup
+  | Session_gone { generation; _ }, _ when generation <> m.generation -> m, []
+  | Session_gone { generation; _ }, Error e -> reply_to m (Reconnect generation) (Error e)
+  | Reconnect _, Ok json -> Rejoin.rejoined m json
+  | Session_gone { session; _ }, Ok json -> Rejoin.gone m json ~session
+  | Resync session, Ok _ when not (String.equal session (session_id m)) -> m, []
+  | Resync _, Ok json ->
+    decode m json (decode_list Message.of_json) ~f:(fun messages ->
+      let chat =
+        Chat.reconcile
+          ~old:m.chat
+          (Chat.of_messages ~running:(Model.running m) messages)
+      in
+      ( { m with chat }
+      , List.map (Chat.subagents_to_load chat) ~f:(fun call_id ->
+          rpc "get_subagent" [ "id", str call_id ] ~tag:(Subagent call_id)) ))
+  | Resync_pending, Ok json ->
+    decode m json Pending.of_json ~f:(fun pending ->
+      (* The backend's word on each confirmation (e.g. the rules to always
+         allow), in the order on show. *)
+      let confirms =
+        List.filter_map m.confirms ~f:(fun c ->
+          List.find pending.confirms ~f:(same_confirm c))
+      in
+      let questions =
+        List.filter m.questions ~f:(fun (q : Question_dialog.t) ->
+          List.exists pending.questions ~f:(fun (p : Pending.Ask.t) ->
+            String.equal p.call_id q.call_id))
+      in
+      let confirm_reason =
+        match m.confirms, confirms with
+        | first :: _, first' :: _ when same_confirm first first' ->
+          m.confirm_reason
+        | _ -> None
+      in
+      add_waiting
+        { m with
+          confirms
+        ; questions
+        ; confirm_reason
+        ; queue =
+            Queued.update
+              Queued.empty
+              ~steer:pending.steer_texts
+              ~follow_up:pending.follow_up_texts
+        }
+        ~confirms:pending.confirms
+        ~questions:pending.questions)
   (* Subagents from before the backend restarted are gone: the report stays. *)
   | ( ( Ignore | Paths _
       | Auth_status Refresh
@@ -3333,6 +3467,11 @@ let send (m : Model.t) ~follow_up =
         | _ -> false)
     in
     (if refused then set_draft m text else m), save @ cmds
+  | _ when Option.is_some m.session_gone ->
+    error
+      m
+      "This session is no longer on the backend: start a new one (/new) or \
+       pick another in the sidebar. Your message stays here."
   | _ when not (Connection.equal m.connection Connected) ->
     error
       m
@@ -3576,16 +3715,16 @@ let sent_to_bottom ((m : Model.t), cmds) =
 
 let update (m : Model.t) (action : Action.t) =
   match action with
-  | Start ->
-    let probe =
-      (* Only superusers may list the users: the account menu offers them. *)
-      match own_user m with
-      | Some _ -> [ rpc "list_users" [] ~tag:(Users Probe) ]
-      | None -> []
-    in
-    m, (if m.narrow then [] else [ focus_editor ]) @ startup @ probe
+  | Start -> m, start_commands m
   | Hello hello -> { m with hello = Some hello }, []
   | Saved_login -> { m with saved_login = true }, []
+  (* What another session does is not this one's. *)
+  | Event e
+    when Option.is_some m.session_gone
+         &&
+         match e with
+         | Sessions_changed -> false
+         | _ -> true -> m, []
   | Event e ->
     let m, cmds = event m e in
     let notifications, notification =
@@ -3603,10 +3742,19 @@ let update (m : Model.t) (action : Action.t) =
         [ Command.Notify n ]) )
   | Page_hidden hidden ->
     let notifications = Page_notify.set_hidden m.notifications hidden in
-    ( { m with notifications }
-    , if notifications.unseen = m.notifications.unseen
+    let title =
+      if notifications.unseen = m.notifications.unseen
       then []
-      else [ Command.Set_title (Page_notify.title notifications) ] )
+      else [ Command.Set_title (Page_notify.title notifications) ]
+    in
+    let m = { m with notifications } in
+    let m, reconnect = if hidden then m, [] else Rejoin.now m in
+    m, title @ reconnect
+  | Network true -> Rejoin.now m
+  | Network false ->
+    (match m.connection with
+     | Connected -> m, [ Command.Drop_connection ]
+     | Reconnecting _ -> m, [])
   | Set_notifications { enabled; permission } ->
     ( { m with
         notifications =
@@ -3628,14 +3776,9 @@ let update (m : Model.t) (action : Action.t) =
      | Reconnecting _ -> m, []
      | Connected ->
        let generation = m.generation + 1 in
-       (* What the agent waits for comes back with [get_pending]. *)
-       ( { m with
-           connection = Reconnecting { attempt = 0; generation }
-         ; generation
-         ; confirms = []
-         ; confirm_reason = None
-         ; questions = []
-         }
+       (* Everything on show stays, also what the agent waits for: once back,
+          [get_pending] says what still does. *)
+       ( { m with connection = Reconnecting { attempt = 0; generation }; generation }
        , [ Command.Reconnect
              { generation
              ; delay_ms = 0

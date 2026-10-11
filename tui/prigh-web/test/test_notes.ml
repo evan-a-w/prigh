@@ -457,7 +457,10 @@ let%expect_test
      ((title "prigh: a question for you in work") (body "Which database?")))
     |}];
   H.act h (Page_hidden false);
-  [%expect {| (Set_title prigh) |}];
+  [%expect {|
+    (Set_title prigh)
+    Probe_connection
+    |}];
   (* Off: the title still counts, no notification. *)
   run h "/notify off";
   H.act h (Page_hidden true);
@@ -470,6 +473,7 @@ let%expect_test
     (Expire_toast (id 2) (after_ms 3220))
     (Set_title "(1) prigh")
     (Set_title prigh)
+    Probe_connection
     |}]
 ;;
 
