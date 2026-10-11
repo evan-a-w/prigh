@@ -334,6 +334,77 @@ let%expect_test "streaming: spans open at the end show as if closed" =
     |}]
 ;;
 
+let%expect_test "streaming: complete blocks are cut off, to be parsed once" =
+  let text =
+    "# Plan\n\n\
+     First *this*.\n\n\
+     - one\n\n\
+     - two\n\
+    \  more\n\n\
+     1. a\n\n\
+     2) b\n\n\
+     ```\n\
+     code\n\n\
+     still code\n\
+     ```\n\n\
+     > quote\n\n\
+     > again\n\n\
+     | a |\n\
+     |---|\n\n\
+     Last -\n\n\
+     -"
+  in
+  let starts = Markdown.block_starts text in
+  List.iter starts ~f:(fun i ->
+    print_endline
+      (String.escaped (String.prefix (String.drop_prefix text i) 12)));
+  [%expect
+    {|
+    First *this*
+    - one\n\n- two
+    ```\ncode\n\nst
+    > quote\n\n> a
+    | a |\n|---|\n
+    Last -\n\n-
+    -
+    |}];
+  (* The parts parse as the whole does, at every prefix. *)
+  for len = 0 to String.length text do
+    let prefix = String.prefix text len in
+    let rec parts pos = function
+      | [] -> [ String.drop_prefix prefix pos ]
+      | start :: rest ->
+        String.sub prefix ~pos ~len:(start - pos) :: parts start rest
+    in
+    let pieces = parts 0 (Markdown.block_starts prefix) in
+    let separately = List.concat_map pieces ~f:(fun p -> Markdown.parse p) in
+    if not ([%equal: Markdown.Block.t list] separately (Markdown.parse prefix))
+    then print_s [%message "differs" (prefix : string)]
+  done;
+  [%expect {| |}]
+;;
+
+let%expect_test "streaming: a part per complete block, then the rest" =
+  let after =
+    Markdown_view.render ~streaming:true "Para one.\n\nPara two.\n\nPara th"
+  in
+  Render.html after;
+  [%expect
+    {|
+    <div class="markdown">
+      <div class="md-part">
+        <p> Para one. </p>
+      </div>
+      <div class="md-part">
+        <p> Para two. </p>
+      </div>
+      <div class="md-part">
+        <p> Para th </p>
+      </div>
+    </div>
+    |}]
+;;
+
 let%expect_test "previews: the first line as plain text" =
   List.iter
     [ "## **Bold** heading\nmore"

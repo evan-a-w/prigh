@@ -367,7 +367,7 @@ let%expect_test "slash commands: the popup, arguments, running, unknown ones" =
     {|
     (Complete_accept (run true))
     (Save_history ("/model openai/gpt-6"))
-    (Rpc (method_ set_model) (params ((model openai/gpt-6))) (tag Show_error))
+    (Rpc (method_ set_model) (params ((model openai/gpt-6))) (tag Model_set))
     (Expire_toast (id 0) (after_ms 4000))
     |}];
   H.type_ h "/comp";

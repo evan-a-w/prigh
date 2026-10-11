@@ -44,5 +44,10 @@ let times =
     ~utc_offset:(Time_ns.Span.of_hr 2.)
 ;;
 
-let show ?selector chat = Render.html ?selector (Chat_view.view times chat)
-let text ?selector chat = Render.text ?selector (Chat_view.view times chat)
+let show ?fold ?selector chat =
+  Render.html ?selector (Chat_view.view ?fold times chat)
+;;
+
+let text ?fold ?selector chat =
+  Render.text ?selector (Chat_view.view ?fold times chat)
+;;

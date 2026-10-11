@@ -82,6 +82,7 @@ let%expect_test "/login custom: name, base URL, API style, key; then /model" =
   [%expect
     {|
     (Save_history (/login))
+    (Focus dialog)
     (Rpc (method_ auth_status) (params ()) (tag (Auth_status Login_picker)))
     (Focus picker-input)
     Custom provider add an OpenAI-compatible endpoint (aiproxy, LiteLLM, OpenRouter, vLLM, Ollama…)
@@ -262,7 +263,7 @@ let%expect_test "/login custom: name, base URL, API style, key; then /model" =
     Dialog_accept
     (Focus editor)
     (Rpc (method_ set_model) (params ((model aiproxy/openai/gpt-4o-mini)))
-     (tag Show_error))
+     (tag Model_set))
     |}]
 ;;
 
@@ -317,6 +318,7 @@ let%expect_test "custom providers in /auth, /login and /logout: edit and remove"
   [%expect
     {|
     (Save_history (/auth))
+    (Focus dialog)
     (Rpc (method_ auth_status) (params ()) (tag (Auth_status Show)))
     (Focus dialog)
     Providers
@@ -378,6 +380,7 @@ let%expect_test "custom providers in /auth, /login and /logout: edit and remove"
     {|
     (Focus editor)
     (Save_history (/login /auth))
+    (Focus dialog)
     (Rpc (method_ auth_status) (params ()) (tag (Auth_status Login_picker)))
     (Focus picker-input)
     Anthropic Claude subscription · logged in via auth.json ✓
@@ -411,6 +414,7 @@ let%expect_test "custom providers in /auth, /login and /logout: edit and remove"
   [%expect
     {|
     (Save_history (/logout /login /auth))
+    (Focus dialog)
     (Rpc (method_ auth_status) (params ()) (tag (Auth_status Logout_picker)))
     (Focus picker-input)
     Anthropic oauth via auth.json

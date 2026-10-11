@@ -255,6 +255,25 @@ footer, with a separator where the day changes. It speaks
 prigh's own RPC (the same `/ws` protocol as `-web`), so it gets every
 backend feature without a translation layer like pi-web's.
 
+Tool output folds to a few lines, as in the TUI: a running command's last
+lines (under how many came before), then a finished one's first and last
+lines, a file read or written, a listing or a diff cut short, each with a
+"Show all N lines" toggle that unfolds it in place (and "Fold to N lines",
+kept in view at its bottom, to fold it again). `/verbosity verbose`
+unfolds them all and `quiet` hides them; changing it, or the session,
+starts the toggles afresh.
+
+Every action shows at once, before the backend answers: a session clicked
+in the sidebar spins there while the chat shows what it is loading (also
+while connecting, and for a new session), a prompt shows as "Sending…"
+with the send button busy until the transcript has it, a model or
+thinking level chosen shows (disabled, with a spinner) until the backend
+confirms it, and a command that lists something (`/login`, `/fork`,
+`/tree`, `/session`, `/skills`, `/mcp`, `/setusr`…) opens its dialog with
+a loading row (Esc closes it, and the late answer then opens nothing).
+While the connection is down the composer is dashed and the status line
+says "Reconnecting…": what you write stays until it is back.
+
 Subagents and background jobs have their own panel, a resizable column
 right of the chat (drag its left edge; a full-screen sheet on a phone):
 the session's subagents as a tree (nested ones under the background agent
@@ -644,8 +663,19 @@ the chain's first model. `/fallback` shows the chain and `/fallback off`
 clears it. `default_cwd` (`/default-dir PATH`, `/default-dir off`) is the
 directory, on the backend's host (`~` allowed), that a session starts in
 when the backend starts one for a frontend, instead of the backend's
-working directory; it is ignored if it is not a directory there. Like the
-rest of `config.json`, both are per namespace
+working directory; it is ignored if it is not a directory there.
+`archive_after_days` (default 7, `0` = never) archives a session
+automatically once its last message is that many days old: the session
+lists show it as archived (frontends put archived ones apart). Archiving
+or unarchiving by hand is recorded in the session file; a new message
+unarchives it, an unarchived one stays active for another
+`archive_after_days`, and a session is never archived while a run or a
+background subagent or job of it is going on. Deleting a session (one, a
+selection, or every archived one) removes its file and its directory
+(`~/.prigh/sessions/<stamp>_<id>/`, where per-session data is kept) and
+kills its terminal; it is refused for a session that is running, open in
+another frontend, the one you are in or the backend's `-session`. Like the
+rest of `config.json`, these settings are per namespace
 (`~/.prigh/namespaces/<name>/config.json` under `-tokens`). Mistakes in the
 file are reported (at `prigh run`'s start and as notices in the UIs) rather
 than silently ignored: invalid JSON or a setting of the wrong type (prigh

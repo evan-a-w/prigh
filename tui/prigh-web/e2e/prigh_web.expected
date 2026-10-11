@@ -56,6 +56,22 @@ count some lines
 <CWD>
 DeepSeek V4.1 Flash
 on
+=== chromium: long output, folded ===
+✓
+bash
+seq 1 30
+1
+2
+3
+4
+5
+Show all 30 lines (22 hidden)
+28
+29
+30
+=== chromium: long output, expanded ===
+34 lines, ending: 30 / Fold to 8 lines
+folded again: Show all 30 lines (22 hidden)
 === chromium: read an image ===
 what does flag.png look like?
 <TIME>
@@ -88,7 +104,7 @@ New session
 count some lines
 <AGE>
 <CWD>
-10 msgs
+14 msgs
 T
 token
 === chromium: new session ===
@@ -99,6 +115,10 @@ What are we building?
 ! run a command
 Ctrl+L switch model
 Ctrl+K find a session
+=== chromium: sending ===
+hello again
+Sending…
+send button: Sending…
 new session in the url: true
 === chromium: two sessions ===
 prigh
@@ -111,15 +131,22 @@ hello again
 count some lines
 <AGE>
 <CWD>
-10 msgs
+14 msgs
 T
 token
+=== chromium: switching ===
+Loading the session…
+marked in the sidebar: count some lines
+<AGE>
+<CWD>
+14 msgs
 switched back: true
 === chromium: switched back ===
 count some lines
 <TIME>
 === chromium: backend gone ===
 Connection lost: reconnecting…
+Reconnecting…
 same session after reconnecting: true
 === chromium: after reconnecting ===
 still there?
@@ -393,6 +420,22 @@ count some lines
 <CWD>
 DeepSeek V4.1 Flash
 on
+=== firefox: long output, folded ===
+✓
+bash
+seq 1 30
+1
+2
+3
+4
+5
+Show all 30 lines (22 hidden)
+28
+29
+30
+=== firefox: long output, expanded ===
+34 lines, ending: 30 / Fold to 8 lines
+folded again: Show all 30 lines (22 hidden)
 === firefox: read an image ===
 what does flag.png look like?
 <TIME>
@@ -425,7 +468,7 @@ New session
 count some lines
 <AGE>
 <CWD>
-10 msgs
+14 msgs
 T
 token
 === firefox: new session ===
@@ -436,6 +479,10 @@ What are we building?
 ! run a command
 Ctrl+L switch model
 Ctrl+K find a session
+=== firefox: sending ===
+hello again
+Sending…
+send button: Sending…
 new session in the url: true
 === firefox: two sessions ===
 prigh
@@ -448,15 +495,22 @@ hello again
 count some lines
 <AGE>
 <CWD>
-10 msgs
+14 msgs
 T
 token
+=== firefox: switching ===
+Loading the session…
+marked in the sidebar: count some lines
+<AGE>
+<CWD>
+14 msgs
 switched back: true
 === firefox: switched back ===
 count some lines
 <TIME>
 === firefox: backend gone ===
 Connection lost: reconnecting…
+Reconnecting…
 same session after reconnecting: true
 === firefox: after reconnecting ===
 still there?

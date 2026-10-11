@@ -47,6 +47,7 @@ let%expect_test "/skills: a fuzzy picker; Enter puts /skill:name in the editor" 
   [%expect
     {|
     (Save_history (/skills))
+    (Focus dialog)
     (Rpc (method_ list_skills) (params ())
      (tag (Skills (place  "s1\
                          \nbackend\
@@ -93,6 +94,7 @@ let%expect_test "/skills: a fuzzy picker; Enter puts /skill:name in the editor" 
   [%expect
     {|
     (Save_history ("/skills front" /skills))
+    (Focus dialog)
     (Rpc (method_ list_skills) (params ())
      (tag (Skills (place  "s1\
                          \nbackend\
@@ -116,16 +118,20 @@ let%expect_test "/skills with none, and when listing fails" =
   [%expect
     {|
     (Save_history (/skills))
+    (Focus dialog)
     (Rpc (method_ list_skills) (params ())
      (tag (Skills (place  "s1\
                          \nbackend\
                          \n/work") (purpose (Picker "")))))
     (Expire_toast (id 0) (after_ms 4000))
+    (Focus editor)
     (Save_history (/skill: /skills))
+    (Focus dialog)
     (Rpc (method_ list_skills) (params ())
      (tag (Skills (place  "s1\
                          \nbackend\
                          \n/work") (purpose (Picker "")))))
+    (Focus editor)
     No skills here: put one in .prigh/skills/<name>/SKILL.md (or .claude/skills/, .agents/skills/) in the project, or in ~/.prigh/skills/.
     Couldn't list the skills: unknown method list_skills
     false
@@ -462,6 +468,7 @@ let%expect_test "an invoked skill in the page: verbosity classes, /fork" =
   [%expect
     {|
     (Save_history (/fork))
+    (Focus dialog)
     (Rpc (method_ get_entries) (params ()) (tag (Entries Fork)))
     (Focus picker-input)
     /skill:frontend-design the pricing page #1 ✓
@@ -502,6 +509,7 @@ let%expect_test "/mcp: servers to act on first, problems below; Enter approves" 
   [%expect
     {|
     (Save_history (/mcp))
+    (Focus dialog)
     (Rpc (method_ list_mcp) (params ()) (tag (Mcp Picker)))
     (Focus picker-input)
     MCP servers
@@ -577,6 +585,7 @@ let%expect_test "/mcp: Enter restarts a failed server; failures say what next" =
   [%expect
     {|
     (Save_history (/mcp))
+    (Focus dialog)
     (Rpc (method_ list_mcp) (params ()) (tag (Mcp Picker)))
     (Focus picker-input)
     Dialog_accept
@@ -608,6 +617,7 @@ let%expect_test "/mcp: Enter restarts a failed server; failures say what next" =
     {|
     (Focus editor)
     (Save_history (/mcp /hotkeys /mcp))
+    (Focus dialog)
     (Rpc (method_ list_mcp) (params ()) (tag (Mcp Picker)))
     (Focus picker-input)
     Dialog_accept
@@ -672,6 +682,7 @@ let%expect_test "/mcp with only problems; the dialog closes with the session" =
   [%expect
     {|
     (Save_history (/mcp))
+    (Focus dialog)
     (Rpc (method_ list_mcp) (params ()) (tag (Mcp Picker)))
     (Focus picker-input)
     MCP servers

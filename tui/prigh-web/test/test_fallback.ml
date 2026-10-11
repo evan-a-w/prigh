@@ -492,6 +492,7 @@ let%expect_test "a hand-over in /fork and /tree" =
   [%expect
     {|
     (Save_history (/fork))
+    (Focus dialog)
     (Rpc (method_ get_entries) (params ()) (tag (Entries Fork)))
     (Focus picker-input)
     fix the build #1
@@ -506,6 +507,7 @@ let%expect_test "a hand-over in /fork and /tree" =
     Close_dialog
     (Focus editor)
     (Save_history (/tree /fork))
+    (Focus dialog)
     (Rpc (method_ get_entries) (params ((all true))) (tag (Entries Tree)))
     (Focus picker-input)
     > fix the build ✓

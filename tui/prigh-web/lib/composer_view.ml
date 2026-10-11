@@ -80,12 +80,22 @@ let images (m : App.Model.t) ~inject =
            ]))
 ;;
 
+let connected (m : App.Model.t) =
+  match m.connection, m.state with
+  | Connected, Some _ -> true
+  | Reconnecting _, _ | _, None -> false
+;;
+
 let placeholder (m : App.Model.t) =
-  if App.Model.running m && m.narrow
+  (* A phone, or the chat beside the agents panel. *)
+  let cramped = m.narrow || m.agents.open_ in
+  if not (connected m)
+  then "Not connected yet: you can write, and send once it is back"
+  else if App.Model.running m && cramped
   then "Steer the agent…"
   else if App.Model.running m
   then "Steer the agent (Enter) or queue a follow-up (Alt+Enter)…"
-  else if m.narrow
+  else if cramped
   then "Ask prigh…  / for commands"
   else "Ask prigh anything…  / for commands, @ for files, paste images"
 ;;
@@ -95,8 +105,12 @@ let view (m : App.Model.t) ~inject =
   let has_input =
     not (String.is_empty (String.strip m.draft) && List.is_empty m.images)
   in
+  let sending = m.pending.sending > 0 in
+  let connected = connected m in
   Node.footer
-    ~attrs:[ Attr.class_ "composer" ]
+    ~attrs:
+      [ classes [ "composer" ] [ "offline", not connected; "sending", sending ]
+      ]
     [ popup m ~inject
     ; div
         ~cls:"composer-box"
@@ -131,12 +145,27 @@ let view (m : App.Model.t) ~inject =
                        ~on_click:(inject Action.Abort)
                        [ icon Stop ]
                    else Node.none)
-                ; button
-                    ~cls:"primary send"
-                    ~title:(if running then "Steer (Enter)" else "Send (Enter)")
-                    ~disabled:(not has_input)
-                    ~on_click:(inject Action.Send)
-                    [ icon Send ]
+                ; (if sending
+                   then
+                     button
+                       ~cls:"primary send busy"
+                       ~title:"Sending…"
+                       ~disabled:true
+                       ~attrs:[ Attr.create "aria-busy" "true" ]
+                       ~on_click:Effect.Ignore
+                       [ Node.span ~attrs:[ Attr.class_ "spinner" ] [] ]
+                   else
+                     button
+                       ~cls:"primary send"
+                       ~title:
+                         (if not connected
+                          then "Not connected to the backend"
+                          else if running
+                          then "Steer (Enter)"
+                          else "Send (Enter)")
+                       ~disabled:((not has_input) || not connected)
+                       ~on_click:(inject Action.Send)
+                       [ icon Send ])
                 ]
             ]
         ]

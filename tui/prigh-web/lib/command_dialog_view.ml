@@ -338,6 +338,20 @@ let mcp_tools (server : Mcp_server.t) ~inject =
     ]
 ;;
 
+(* Shown at once while the backend lists what the dialog shows. *)
+let loading ~title ~inject =
+  Modal.view
+    ~cls:"loading-dialog"
+    ~title
+    ~on_close:(inject Action.Close_dialog)
+    ~footer:[ keys_hint "Esc closes" ]
+    [ div
+        ~cls:"loading-row"
+        ~attrs:[ Attr.role "status" ]
+        [ Node.span ~attrs:[ Attr.class_ "spinner" ] []; Node.text "Loading…" ]
+    ]
+;;
+
 let view (m : App.Model.t) (dialog : Dialog.t) ~inject =
   match dialog with
   | Hotkeys -> Some (hotkeys ~inject)
@@ -348,5 +362,6 @@ let view (m : App.Model.t) (dialog : Dialog.t) ~inject =
   | Session stats -> Some (session m stats ~inject)
   | Text { title; text = t } -> Some (text ~title ~text:t ~inject)
   | Mcp_tools server -> Some (mcp_tools server ~inject)
+  | Loading title -> Some (loading ~title ~inject)
   | Picker _ | Help | Rename _ | Delete _ | Login _ | Auth _ -> None
 ;;

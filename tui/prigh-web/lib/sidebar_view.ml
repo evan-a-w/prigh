@@ -23,9 +23,17 @@ let age (m : App.Model.t) (s : Session_summary.t) =
 let session (m : App.Model.t) ~inject ~current (s : Session_summary.t) =
   let selected = Option.equal String.equal current (Some s.id) in
   let running = if selected then App.Model.running m else s.running in
+  let loading =
+    match m.pending.session with
+    | Some (Switching path) -> String.equal path s.path
+    | Some Starting | None -> false
+  in
   Node.div
     ~attrs:
-      [ classes [ "session" ] [ "selected", selected; "running", running ]
+      [ classes
+          [ "session" ]
+          [ "selected", selected; "running", running; "opening", loading ]
+      ; (if loading then Attr.create "aria-busy" "true" else Attr.empty)
       ; Attr.id (Session_list.dom_id s.id)
       ; Attr.tabindex 0
       ; Attr.role "button"
@@ -35,7 +43,12 @@ let session (m : App.Model.t) ~inject ~current (s : Session_summary.t) =
       ]
     [ div
         ~cls:"session-top"
-        [ (if running
+        [ (if loading
+           then
+             Node.span
+               ~attrs:[ Attr.class_ "spinner"; Attr.title "opening…" ]
+               []
+           else if running
            then span ~cls:"dot running" ~attrs:[ Attr.title "running" ] ""
            else if s.live
            then
@@ -112,11 +125,22 @@ let view (m : App.Model.t) ~inject =
             ~on_click:(inject Action.Toggle_sidebar)
             [ icon Sidebar ]
         ]
-    ; button
-        ~cls:"new-session"
-        ~title:"Start a new session (/new)"
-        ~on_click:(inject Action.New_session)
-        [ icon Plus; Node.text "New session" ]
+    ; (match m.pending.session with
+       | Some Starting ->
+         button
+           ~cls:"new-session opening"
+           ~title:"Starting a session…"
+           ~disabled:true
+           ~on_click:Effect.Ignore
+           [ Node.span ~attrs:[ Attr.class_ "spinner" ] []
+           ; Node.text "Starting…"
+           ]
+       | Some (Switching _) | None ->
+         button
+           ~cls:"new-session"
+           ~title:"Start a new session (/new)"
+           ~on_click:(inject Action.New_session)
+           [ icon Plus; Node.text "New session" ])
     ; div
         ~cls:"search"
         [ icon Search

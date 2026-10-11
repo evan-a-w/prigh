@@ -11,6 +11,9 @@ type t
     when [verbose]. *)
 val create : ?verbose:bool -> ?sessions:string -> ?state:string -> unit -> t
 
+(** Started, with nothing answered yet. *)
+val connecting : unit -> t
+
 val model : t -> App.Model.t
 
 (** Applies an action and prints the commands it issued. *)

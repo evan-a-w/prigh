@@ -25,7 +25,10 @@ end
 module Tool : sig
   type t =
     { call : Tool_call.t
-    ; output : string (** streamed so far *)
+    ; output : string
+      (** streamed so far: the last [live_limit] bytes or so, from a line
+              start *)
+    ; lines : int (** the newlines in all the output streamed *)
     ; result : Message.Tool_result.t option
     ; subagent : Subagent.t option
     }
@@ -44,6 +47,13 @@ module Entry : sig
     | Compaction of string (** the summary that replaced older messages *)
   [@@deriving sexp_of]
 end
+
+(** How much of a running call's output is kept, in bytes (at most twice
+    this). *)
+val live_limit : int
+
+(** How many ['\n'] [s] has. *)
+val newlines : string -> int
 
 val empty : t
 

@@ -49,10 +49,17 @@ type t =
       ; text : string
       }
   | Mcp_tools of Mcp_server.t
+  | Loading of string
 [@@deriving sexp_of, equal]
 
 let per_session = function
-  | Rename _ | Prompt _ | Rewind_confirm _ | Session _ | Text _ | Mcp_tools _
+  | Rename _
+  | Prompt _
+  | Rewind_confirm _
+  | Session _
+  | Text _
+  | Mcp_tools _
+  | Loading _
   | Picker { kind = Fork _ | Rewind _ | Tree | Hosts | Skills | Mcp _; _ } ->
     true
   | Picker

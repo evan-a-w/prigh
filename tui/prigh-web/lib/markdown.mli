@@ -71,3 +71,9 @@ val preview : string -> string
 
 (** Whether [href] is safe to link to: http, https or mailto. *)
 val safe_href : string -> bool
+
+(** Where [text] can be cut into parts that parse alone as they do together,
+    however it goes on: the starts of its top-level blocks after a blank
+    line, outside code, that cannot continue a list. Ascending. While a
+    reply streams, the parts before the last one are complete. *)
+val block_starts : string -> int list

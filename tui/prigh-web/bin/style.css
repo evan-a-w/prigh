@@ -889,3 +889,19 @@ kbd {
 .jump-to-bottom:focus-visible { outline: 2px solid var(--sodium); outline-offset: 2px; }
 .jump-to-bottom .icon { width: 16px; height: 16px; }
 @keyframes jump-in { from { opacity: 0; transform: translate(-50%, 6px); } }
+
+/* Choices and actions the backend has still to confirm. */
+.chip-button.awaiting { opacity: 1; color: var(--muted); border-style: dashed; }
+.chip-button.awaiting .spinner { width: 10px; height: 10px; }
+.new-session.opening:disabled { opacity: 1; color: var(--muted); }
+.new-session .spinner, .session-top > .spinner { width: 10px; height: 10px; }
+.session.opening { background: var(--slate-2); }
+.session.opening .session-title { color: var(--muted); }
+.composer-buttons .send.busy:disabled { background: var(--sodium-wash); border-color: var(--sodium-line); }
+.composer-buttons .send.busy .spinner { width: 12px; height: 12px; }
+.composer.offline .composer-box { border-style: dashed; }
+.status-item.connecting { color: var(--muted); }
+.status-item.connecting.offline { color: var(--brick); }
+.loading-row { display: flex; align-items: center; gap: 10px; padding: 18px 4px; color: var(--muted); }
+/* Under the reconnecting banner. */
+.app:has(.banner) .toasts { top: 100px; }

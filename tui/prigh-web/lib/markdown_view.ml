@@ -120,20 +120,48 @@ let rec block ?(tight = false) (b : Block.t) =
       ]
 ;;
 
-let parse ~streaming text =
-  Node.div
-    ~attrs:(cls "markdown")
-    (List.map (Markdown.parse ~partial:streaming text) ~f:block)
+let blocks ~streaming text =
+  List.map (Markdown.parse ~partial:streaming text) ~f:block
+;;
+
+let cached table text ~f =
+  if Hashtbl.length table > 2000 then Hashtbl.clear table;
+  Hashtbl.find_or_add table text ~default:(fun () -> f text)
 ;;
 
 (* The whole transcript is rendered on every event: finished texts are parsed
    once. *)
 let cache = String.Table.create ()
 
+(* A streaming reply's complete blocks, parsed once each (as lazy nodes that
+   virtual_dom skips when they are reused): only its last part is parsed
+   again at each delta. *)
+let parts = String.Table.create ()
+
+let part text =
+  Node.lazy_
+    (lazy (Node.div ~attrs:(cls "md-part") (blocks ~streaming:false text)))
+;;
+
+let render_streaming text =
+  let rec split pos = function
+    | [] -> [ String.drop_prefix text pos ]
+    | start :: rest ->
+      String.sub text ~pos ~len:(start - pos) :: split start rest
+  in
+  let pieces = split 0 (Markdown.block_starts text) in
+  let settled = List.drop_last_exn pieces in
+  let last = List.last_exn pieces in
+  Node.div
+    ~attrs:(cls "markdown")
+    (List.map settled ~f:(cached parts ~f:part)
+     @ [ Node.div ~attrs:(cls "md-part") (blocks ~streaming:true last) ])
+;;
+
 let render ?(streaming = false) text =
   if streaming
-  then parse ~streaming text
-  else (
-    if Hashtbl.length cache > 2000 then Hashtbl.clear cache;
-    Hashtbl.find_or_add cache text ~default:(fun () -> parse ~streaming text))
+  then render_streaming text
+  else
+    cached cache text ~f:(fun text ->
+      Node.div ~attrs:(cls "markdown") (blocks ~streaming:false text))
 ;;
