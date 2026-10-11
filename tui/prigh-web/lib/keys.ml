@@ -303,6 +303,9 @@ let handle (m : App.Model.t) t : App.Action.t option =
      | "ArrowUp" when ctrl_only t -> Some (Jump_to_user_message (-1))
      | "ArrowDown" when ctrl_only t -> Some (Jump_to_user_message 1)
      | "Escape" when m.narrow && m.sidebar_open -> Some Toggle_sidebar
+     (* On a phone the file browser is a sheet: Esc closes it from anywhere. *)
+     | "Escape" when m.narrow && m.files.open_ && not (Files.asking m.files) ->
+       Some (Files Close)
      | _ ->
        (match agents_key m t, t.target with
         | Some action, _ -> Some action

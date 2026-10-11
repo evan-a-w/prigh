@@ -701,3 +701,15 @@ let%expect_test "another session or host resets the browser and drops the chips"
   H.text h ~selector:".files-panel .files-crumbs";
   [%expect {| /home/me/proj |}]
 ;;
+
+let%expect_test "on a phone the browser is a sheet that Esc closes" =
+  let h = opened () in
+  H.quiet h (fun () -> H.act h (Set_narrow true));
+  H.elements h ~selector:".app";
+  H.key h "Escape" ~target:Control;
+  [%expect {|
+    <div class="app files-open narrow">
+    (Files Close)
+    (Focus editor)
+    |}]
+;;
