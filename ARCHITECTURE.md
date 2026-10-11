@@ -308,11 +308,16 @@ two can share one.
   carries an `execute : executor` hook (`Tool.execute_via`) through which
   the loop runs every call; the default runs in-process and `Agent`
   installs one that forwards `on_host` tools to the session's active host.
+  The context also carries `approve` (checks a model's call before it
+  runs: `Some result` refuses it with that result) and `ask_user` (how the
+  `ask_user` tool reaches the user); `Agent_loop` puts the ones it is given
+  into every call's context and `Tool_subagent` hands `approve` down to its
+  nested loop, so subagents are checked too.
   `Tool_args` gives typed accessors and builds the JSON schema; `Truncate`
   bounds output by lines and bytes. `Tool_spec` carries the flags the
   harness reasons about: `parallel_safe` (safe to run concurrently with
-  other tools), `destructive` (held for confirmation when `confirm_tools`
-  is on), `on_host` (runs on the active tool host rather than always in
+  other tools), `destructive` (what the approval modes hold for
+  confirmation, see `Approval`), `on_host` (runs on the active tool host rather than always in
   the backend) and `freeform` (a Lark grammar: the Responses API sends the
   tool as an OpenAI custom tool, whose free-text input streams and is
   replayed as the `input` string argument; other providers send the JSON
@@ -401,6 +406,26 @@ two can share one.
   `Tool_jobs` has `job_status`, `job_output` (`lines`, `offset` from the
   end), `job_wait` and `job_kill`; like the subagent controls they and
   `background` itself are dropped below depth 0.
+- Approvals — `Approval_mode` (`Ask | Auto_edit | Auto`), `Approval_rule`
+  (Claude Code's `TOOL(PATTERN)` rules: parsing, `Call.create` (a call's
+  command or the paths it touches, `..` resolved lexically), `covers` (all
+  of a call's parts, a command's segments or paths, matched by some rule;
+  never commands with substitutions or output redirections), `touches`
+  (any part), `suggest` (what "don't ask again" adds: `bash(PREFIX:*)` per
+  segment, `edit`, the tool's name) and the command splitter) and
+  `Approval` (`Rules`, config's `permissions` with its problems, and
+  `decide`: deny rule → plan mode refuses edits → ask rule (no
+  suggestions) → allow rules, the config's and the session's → plan mode
+  asks for other destructive tools → the mode).
+- `Plan` — `update_plan` (Codex's): steps with statuses, validated (one in
+  progress at most), and `latest`, the plan as of the last successful call
+  in a list of messages, which is how `Agent` keeps it as session state
+  (persisted for free, following rewinds and forks). `User_question`
+  (`ask_user`'s questions, answers checked against them, the result text)
+  and `Tool_ask_user`; `Tool_exit_plan_mode` (its call is handled entirely
+  by the agent's approver). `Tools.interaction` holds the three; they are
+  not tool-host tools, and `Tools.for_context` drops them for subagents,
+  which cannot ask the user.
 - `Tools.all` is the fixed built-in set; `Tools.builtin` adds the variants
   (`apply_patch`) that a tool host can also run. `Tools.for_model` gives a
   model the file editor it is trained on: `apply_patch` for OpenAI's GPT-5
@@ -435,14 +460,16 @@ two can share one.
   messages to inject before the next turn. A turn whose calls are all
   `parallel_safe` runs them through `Eio.Fiber.List.map`; a mixed turn stays
   sequential, and results are appended in call order regardless of completion
-  order so the context stays deterministic. Destructive tools block on a
-  `Tool_confirm` event until `respond_confirm` when `confirm_tools` is set; a
-  deny becomes an error result. Stops on `End_turn` without tool calls,
+  order so the context stays deterministic. Every call goes through the
+  context's `approve` first (the agent's: the approval mode, plan mode and
+  rules; a call waiting for the user blocks on a `Tool_confirm` event); a
+  refusal becomes the call's result. Stops on `End_turn` without tool calls,
   `Length`, `Error`, `Aborted`, `max_turns` or cancellation. Every tool call
   always gets a result (a `[cancelled]` one if needed) so the context stays
   valid.
 - `Agent_event` — the loop's event vocabulary (`Agent_start/end`, `Turn_*`,
   `Message_*`, `Tool_start/output/end`, `Tool_confirm`, and the recursive
+  `Tool_confirm_done`, `Ask_user`, `Ask_user_done`, and the recursive
   `Subagent` / `Subagent_start` / `Subagent_end`, whose inner events carry
   `call_id`/`agent_id`), so the UI can build a transcript per agent. A
   background subagent's events keep arriving after its `subagent` call's
@@ -479,9 +506,31 @@ two can share one.
   `images`.
   Subagent and `btw` usage is rolled up into `State.usage`/`cost_usd`
   (never `context_tokens`), and `State` also carries the session name, cwd
-  and `git_branch`. `respond_confirm` answers a pending `Tool_confirm`.
+  and `git_branch`. Approvals: the agent's approver (`approve`, given to
+  every run and through it to subagents) runs `Approval.decide` with the
+  session's mode, plan mode, the config's `permissions` and the session's
+  rules; a call that needs the user emits `Tool_confirm` (call id, agent id
+  for a subagent's, summary, the rules "always" would add) and waits;
+  `respond_confirm` answers it (`Allow`, `Always` (adds the rules, recorded
+  in the session, and lets through any other pending call they now cover),
+  `Deny reason`), a mode change lets through those it no longer stops, and
+  `Tool_confirm_done` follows whatever ends it, so every frontend closes its
+  dialog. `exit_plan_mode` is answered by the approver itself: a
+  confirmation whose summary is the plan; approving leaves plan mode.
+  `set_mode` switches the approval mode and/or plan mode (recorded in the
+  session; a changed config `approval_mode` switches the session too). The
+  model is told about plan mode by `System_prompt.plan_mode_note`, on the
+  next user message or, while a loop runs, as a message of its own at the
+  next turn boundary. `ask_user` emits `Ask_user` and waits for
+  `answer_question` (the first answer wins; abort withdraws it;
+  `Ask_user_done` follows). `pending_confirms`/`pending_questions` back
+  `get_pending`, so a reconnecting frontend shows them again. `State`
+  carries `approval_mode`, `plan_mode`, `plan` (`Plan.latest` of the active
+  path, updated on each successful `update_plan`) and `session_rules`.
 - `Config` — `~/.prigh/config.json` (`scoped_models : string list`,
-  `confirm_tools : bool`, `default_model`/`default_thinking`,
+  `approval_mode` (new sessions' mode; read from `confirm_tools` when
+  absent, which saving replaces), `permissions` (allow/ask/deny rules;
+  saving keeps the file's as written), `default_model`/`default_thinking`,
   `fallback_models` (model keys) and `default_cwd`), loaded at agent
   creation, read/written through `get_config`/`set_config`; unknown fields
   are ignored by `load` but reported by `problems` (with wrong-typed ones),
@@ -514,7 +563,9 @@ two can share one.
   Rewinding moves `head`; forking copies the active path to a new file.
   Entries are messages, model/thinking changes, compaction summaries, names,
   descriptions, cwds with the tool host they are on (so a reload restores
-  where the session runs) and the system prompt;
+  where the session runs), the system prompt, the approval mode with plan
+  mode (`approval`) and rules the user allowed for the session
+  (`allow_rule`);
   `Session.messages` is the message list for the next request with the
   compaction summary replacing everything before `kept_from`
   (`timed_messages`: each with its entry's time, as a `Timed_message.t`;
@@ -588,7 +639,10 @@ two can share one.
   `delete_session`, `export`, `import`, `fork`, `clone`, `rewind`,
   `session_stats`, `set_cwd`, `list_paths`, `list_dirs`, `get_config`, `set_config`,
   `change_default`, `btw`, `btw_cancel`,
-  `tool_confirm_respond`, `set_active_host`, `tool_exec_output`,
+  `tool_confirm_respond` (`{call_id, agent_id?, allow, always?, reason?}`),
+  `set_mode` (`{approval_mode?, plan_mode?}`, answered with the state),
+  `ask_user_respond` (`{call_id, answers: [[string]]}` or `{call_id,
+  decline: true}`), `set_active_host`, `tool_exec_output`,
   `list_skills` (`{skills: [{name, description, path, model_invocable}]}`),
   `list_mcp {reconnect?}` and `mcp_approve {source, server}` (both
   `{servers: [{name, source, project, status: ready|failed|needs_approval,
@@ -723,7 +777,8 @@ well,
 `-token SECRET`/`$PRIGH_TOKEN` gates them; with stdio the backend exits when
 the spawning frontend closes it, with `-listen`/`-web` only it runs until
 killed), `tool-host` (the local tool worker), `run <prompt>`
-(headless, streams to stdout), `sessions`, `login <provider> [-method]`,
+(headless, streams to stdout; it denies confirmations and answers
+`ask_user` as unavailable, since nobody is there), `sessions`, `login <provider> [-method]`,
 `logout <provider>`, `auth`. All commands share `-auth-file`; `run`/`serve`
 share `-model`, `-thinking`, `-session`, `-cwd`, `-no-tools`, `-faux` (and
 `-faux-script FILE`, a JSON array of scripted replies that implies `-faux`);
@@ -833,8 +888,22 @@ copy of the protocol types and the e2e test guards the contract.
     reply above it shows it) and `/fork` lists it by that line.
   - `Key.t` → `Intent.t` through `Keymap` (the one binding table; `/help`
     prints it). `Mode.t` (`Editing | Picker | Login_prompt | Text_prompt |
-    Confirm | Search`) says who owns the keyboard; dialogs never stack, Esc
-    always closes.
+    Confirm | Question | Search`) says who owns the keyboard; dialogs never
+    stack, Esc always closes.
+  - Approvals, shared with prigh-web: `Session_mode` (the approval mode, or
+    plan mode, as the status lines show it; Alt+M's cycle; `set_mode`'s
+    parameters), `Confirm_prompt` (a confirmation's title and answers with
+    their keys, y/a/n/r, and `tool_confirm_respond`'s parameters),
+    `Question_form` (answering an `ask_user` call with keys), `Plan_view`
+    (`plan 2/5: step`, the checklist) and `Mode_note` (the backend's plan
+    mode notes, shown as one line). Confirmations and questions queue in the
+    model (`pending_confirms`, `pending_questions`) and open one at a time
+    when the editor has the keyboard; `tool_confirm_done`/`ask_user_done`
+    close one answered elsewhere, `get_pending` at startup (and after a
+    reconnect) brings back what is still waiting. Deny with a reason is a
+    `Text_prompt` (`Deny_reason`, keeping the editor's draft; Esc goes back
+    to the confirmation). `Tool_render` draws `update_plan`, `ask_user` and
+    `exit_plan_mode` calls.
   - `Render.screen : Model.t -> Screen.t` lays out a frame as `Content.t`
     (styled spans with `Text_width`-aware wrapping) plus the cursor cell. The
     status line keeps the cwd and model, then fills remaining width by
@@ -1007,9 +1076,17 @@ copy of the protocol types and the e2e test guards the contract.
       sidebar's account button and the account menu, a `Picker` of
       accounts and actions) over `Accounts` (the saved sign-ins in
       localStorage, behind a `Storage` record so that tests use a table),
-      `Status_view`, and `Keys` (which of the dialog, the popup or the
-      editor owns a key; `help`, and `browser`: the TUI's keys that the
-      browser keeps).
+      `Status_view` (with the mode and plan chips), and `Keys` (which of the
+      dialog, the popup or the editor owns a key; `help`, and `browser`:
+      the TUI's keys that the browser keeps).
+    - Approvals: the confirmation dialog (`Dialog_view`, answers from
+      `Prigh_ui.Confirm_prompt` as buttons, a reason field, the plan of
+      `exit_plan_mode` as markdown) and `Question_dialog`/`Question_view`
+      (the model's `ask_user`, over `Prigh_ui.Question_form`: radio buttons
+      or checkboxes and an own answer, keys and clicks); both queue
+      (`Model.confirms`, `questions`), close on `tool_confirm_done` /
+      `ask_user_done` and come back from `get_pending` (`Pending`).
+      `/mode`, `/plan`, `/todos`, `/permissions` and Alt+M as in the TUI.
     - Skills and MCP: `Skills` caches `list_skills` for `/skill:`'s
       completion, keyed by the session, its directory and tool host (a
       reply for another place is ignored; switching user empties it), and
@@ -1097,7 +1174,7 @@ copy of the protocol types and the e2e test guards the contract.
 - `~/.prigh/sessions/<stamp>_<id>.jsonl` — session logs.
 - `~/.prigh/sessions/exports/` — default `/export` output.
 - `~/.prigh/history` — prompt history (one JSON string per line, last 500).
-- `~/.prigh/config.json` — `scoped_models`, `confirm_tools`, `providers`
+- `~/.prigh/config.json` — `scoped_models`, `approval_mode`, `permissions`, `providers`
   (custom endpoints; their keys are in `auth.json` under their names).
 - `~/.prigh/AGENTS.md` — global instructions.
 
@@ -1127,8 +1204,10 @@ Four layers, cheapest first.
    the built TUI inside a detached tmux session, keys sent with `tmux
    send-keys`, panes captured and normalised (spinners, paths) into the
    cram output, so `dune promote` re-records. Scenarios: startup, prompt,
-   ctrl_o, resize, quit, tools, suspend, editor, confirm, paste, reconnect
-   (the backend is killed; the TUI respawns it and rejoins the session).
+   ctrl_o, resize, quit, tools, suspend, editor, confirm, approvals (always
+   allow, deny with a reason, Alt+M), plan (plan mode and approving the
+   plan), question (`ask_user`), paste, reconnect (the backend is killed;
+   the TUI respawns it and rejoins the session), fallback.
 
 The last two layers are the only ones that exercise the real terminal, and
 they paid for themselves immediately: the tmux layer caught `Ctrl+O` being
@@ -1142,6 +1221,19 @@ job tools, abort, kills that really end the process, id continuity across a
 reload, and jobs on a real `prigh tool-host` connected over TCP (output
 streamed into the job, `kill_job` cancelling the exec on the host, a dropped
 connection failing the job).
+
+`backend/test/test_approval_rules.ml` covers rule parsing, command
+splitting, globs, which calls rules cover and touch, suggestions and
+`Approval.decide` across the modes; `test_approvals.ml` drives agents with
+`Faux_provider` through the modes, always-allow rules surviving a reload,
+deny with a reason, config rules, subagents' confirmations, plan mode (edits
+refused, notes, `exit_plan_mode` approved or not, switched on mid-run),
+`update_plan` and `ask_user` (answers, first answer wins, abort); and
+`test_approvals_rpc.ml` the same over the RPC with two clients
+(`set_mode`, `get_pending`, `tool_confirm_done`, `ask_user_respond`). The
+TUI's `test_app_approvals.ml`, prigh-web's `test_approvals.ml`, the e2e's
+approvals block and the tmux scenarios `approvals`, `plan` and `question`
+cover the frontends.
 
 `backend/test/test_host_reconnect.ml` covers tool hosts going away: a
 session stays on its disconnected host (also when another host attaches),
