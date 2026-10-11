@@ -227,10 +227,10 @@ let%expect_test
   [%expect
     {|
     (Focus confirm)
-    Allow bash?
+    Confirm
     (Close (Esc))
-    rm -rf build
-    (Deny) (Allow)
+    Run bash: rm -rf build?
+    (y allow once) (n deny) (r deny, saying why)
     (3 queued)
     |}];
   H.reply

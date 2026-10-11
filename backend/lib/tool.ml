@@ -21,9 +21,12 @@ and context =
   ; cache_key : string option
   ; halt : unit -> string option
   ; stdin : Stdin_feed.t option
+  ; approve : approver
+  ; ask_user : call_id:string -> User_question.t list -> User_question.Reply.t
   }
 
 and executor = context -> t -> Json.t -> Tool_result.t
+and approver = context -> t -> Json.t -> Tool_result.t option
 
 module Result = Tool_result
 
@@ -57,6 +60,9 @@ module Context = struct
         ?cache_key
         ?(halt = fun () -> None)
         ?stdin
+        ?(approve = fun _ _ _ -> None)
+        ?(ask_user =
+          fun ~call_id:_ _ -> User_question.Reply.Unavailable "no user to ask")
         ~env
         ~cwd
         ()
@@ -75,6 +81,8 @@ module Context = struct
     ; cache_key
     ; halt
     ; stdin
+    ; approve
+    ; ask_user
     }
   ;;
 end

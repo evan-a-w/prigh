@@ -65,6 +65,18 @@ let user_item (user : P.Message.User.t) : Item.t =
        | None -> User user))
 ;;
 
+(* A plan mode note becomes a line of its own before what the user wrote. *)
+let user_items (user : P.Message.User.t) : Item.t list =
+  match Mode_note.split user.text with
+  | None -> [ user_item user ]
+  | Some (on, rest) ->
+    Notice (Info, Mode_note.summary ~on)
+    ::
+    (if String.is_empty rest && List.is_empty user.images
+     then []
+     else [ user_item { user with text = rest } ])
+;;
+
 module Stream_kind = struct
   type t =
     | Text
@@ -175,7 +187,7 @@ let pair_result t (r : P.Message.Tool_result.t) =
 
 let add_message t (m : P.Message.t) =
   match m with
-  | User user -> add t (user_item user)
+  | User user -> List.fold (user_items user) ~init:t ~f:add
   | Tool_result r -> pair_result t r
   | Assistant a ->
     let final = P.Stop_reason.equal P.Stop_reason.End_turn a.stop_reason in
@@ -396,7 +408,8 @@ let finish_subagent
 let apply t (event : P.Event.t) =
   match event with
   | P.Event.State state -> if state.running then t else flush t
-  | P.Event.Message_start (P.Message.User user) -> add t (user_item user)
+  | P.Event.Message_start (P.Message.User user) ->
+    List.fold (user_items user) ~init:t ~f:add
   | P.Event.Message_start _ -> t
   | P.Event.Message_update { delta = P.Delta.Text_delta text; _ } ->
     append t Text text
@@ -441,6 +454,9 @@ let apply t (event : P.Event.t) =
   | P.Event.Turn_end _
   | P.Event.Queue_update _
   | P.Event.Tool_confirm _
+  | P.Event.Tool_confirm_done _
+  | P.Event.Ask_user _
+  | P.Event.Ask_user_done _
   | P.Event.Auth _
   | P.Event.Tool_exec _
   | P.Event.Tool_exec_cancel _

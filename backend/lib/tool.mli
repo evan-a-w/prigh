@@ -31,11 +31,20 @@ and context =
   ; stdin : Stdin_feed.t option
     (** input for the process this call starts (a background job's [bash]);
         without it the process's stdin is empty *)
+  ; approve : approver
+    (** checks a model's tool call before it runs (the session's approval
+        mode and rules, see [Approval]); subagents inherit it *)
+  ; ask_user : call_id:string -> User_question.t list -> User_question.Reply.t
+    (** asks the user (the [ask_user] tool); only the main agent can *)
   }
 
 (** Runs a tool call. [Agent] installs one that forwards [on_host] tools to
     the session's active tool host. *)
 and executor = context -> t -> Json.t -> Tool_result.t
+
+(** [Some result] refuses the call with that result (denied, cancelled);
+    [None] lets it run. *)
+and approver = context -> t -> Json.t -> Tool_result.t option
 
 module Context : sig
   val create
@@ -51,6 +60,9 @@ module Context : sig
     -> ?cache_key:string
     -> ?halt:(unit -> string option)
     -> ?stdin:Stdin_feed.t
+    -> ?approve:approver
+    -> ?ask_user:
+         (call_id:string -> User_question.t list -> User_question.Reply.t)
     -> env:Env.t
     -> cwd:string
     -> unit

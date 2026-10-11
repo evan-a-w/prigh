@@ -55,7 +55,8 @@ let%expect_test "/fallback shows the chain, sets only it, and clears it" =
   toasts h;
   [%expect
     {|
-    (((scoped_models ()) (confirm_tools false) (default_model ())
+    (((scoped_models ()) (approval_mode Auto)
+      (permissions ((allow ()) (ask ()) (deny ()))) (default_model ())
       (default_thinking ()) (fallback_models ()) (default_cwd ())))
     (Save_history (/fallback))
     (Expire_toast (id 0) (after_ms 4000))
@@ -78,7 +79,8 @@ let%expect_test "/fallback shows the chain, sets only it, and clears it" =
     (Expire_toast (id 1) (after_ms 4000))
     No fallback models: /fallback MODEL [MODEL...] sets the chain that takes over when a model's usage runs out
     Fallback: openai/gpt-6 → anthropic/claude-sonnet-5 (now on anthropic/claude-opus-5-5)
-    (((scoped_models ()) (confirm_tools false) (default_model ())
+    (((scoped_models ()) (approval_mode Auto)
+      (permissions ((allow ()) (ask ()) (deny ()))) (default_model ())
       (default_thinking ())
       (fallback_models (openai/gpt-6 anthropic/claude-sonnet-5))
       (default_cwd ())))
@@ -120,7 +122,8 @@ let%expect_test "/fallback shows the chain, sets only it, and clears it" =
      (tag Fallback_saved))
     (Expire_toast (id 4) (after_ms 4000))
     Fallback cleared: a model whose usage runs out stops the run (/fallback MODEL... sets a chain)
-    (((scoped_models ()) (confirm_tools false) (default_model ())
+    (((scoped_models ()) (approval_mode Auto)
+      (permissions ((allow ()) (ask ()) (deny ()))) (default_model ())
       (default_thinking ()) (fallback_models ()) (default_cwd ())))
     |}]
 ;;
@@ -142,7 +145,8 @@ let%expect_test
     (Rpc (method_ set_config)
      (params ((config ((fallback_models (gpt-6 nope)))))) (tag Fallback_saved))
     Couldn't set the fallback models: fallback_models: unknown model "nope"; did you mean: openai/gpt-6 (GPT-6)
-    (((scoped_models ()) (confirm_tools false) (default_model ())
+    (((scoped_models ()) (approval_mode Auto)
+      (permissions ((allow ()) (ask ()) (deny ()))) (default_model ())
       (default_thinking ()) (fallback_models ()) (default_cwd ())))
     |}];
   (* Before the config has arrived there is nothing to show or keep. *)
@@ -257,7 +261,8 @@ let%expect_test "/default-dir shows, sets and clears where new sessions start" =
      (tag Default_dir_saved))
     (Expire_toast (id 1) (after_ms 4000))
     Default directory: ~/proj (new sessions start there; /default-dir off clears it)
-    (((scoped_models ()) (confirm_tools false) (default_model ())
+    (((scoped_models ()) (approval_mode Auto)
+      (permissions ((allow ()) (ask ()) (deny ()))) (default_model ())
       (default_thinking ()) (fallback_models ()) (default_cwd (~/proj))))
     |}];
   run h "/default-dir";

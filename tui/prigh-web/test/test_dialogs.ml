@@ -16,31 +16,33 @@ let%expect_test "tool confirmations own the keyboard: Enter allows, Esc denies" 
   [%expect
     {|
     (Focus confirm)
-    (Focus confirm)
-    Allow bash?
+    Confirm
     (Close (Esc))
-    rm -rf build
-    1 more waiting (Deny) (Allow)
+    Run bash: rm -rf build?
+    (y allow once) (n deny) (r deny, saying why)
+    1 more waiting
     |}];
   (* Even with the editor focused and a popup open. *)
   H.type_ h "/";
   H.key h "Enter";
   [%expect
     {|
-    (Respond_confirm (call_id c1) (allow true))
+    (Answer_confirm (call_id c1) (agent_id ()) (answer Allow))
     (Rpc (method_ tool_confirm_respond) (params ((call_id c1) (allow true)))
      (tag Show_error))
-    (Focus editor)
+    (Focus confirm)
+    (Expire_toast (id 0) (after_ms 4000))
     |}];
   H.key h "ArrowDown";
   H.key h "Escape";
   [%expect
     {|
     (browser default)
-    (Respond_confirm (call_id c2) (allow false))
+    (Answer_confirm (call_id c2) (agent_id ()) (answer Deny))
     (Rpc (method_ tool_confirm_respond) (params ((call_id c2) (allow false)))
      (tag Show_error))
     (Focus editor)
+    (Expire_toast (id 1) (after_ms 4000))
     |}];
   H.text h ~selector:".modal";
   [%expect {| |}];
@@ -50,7 +52,11 @@ let%expect_test "tool confirmations own the keyboard: Enter allows, Esc denies" 
     h
     {|{"event":"tool_end","call":{"id":"c3","name":"bash","arguments":"{\"command\":\"ls\"}"},"result":{"tool_call_id":"c3","tool_name":"bash","text":"cancelled","is_error":true}}|};
   H.text h ~selector:".modal";
-  [%expect {| (Focus confirm) |}]
+  [%expect
+    {|
+    (Focus confirm)
+    (Focus editor)
+    |}]
 ;;
 
 let%expect_test "a dialog makes the page behind it inert: Tab stays in it" =
@@ -90,10 +96,11 @@ let%expect_test "a dialog makes the page behind it inert: Tab stays in it" =
   inert ();
   [%expect
     {|
-    (Respond_confirm (call_id c1) (allow false))
+    (Answer_confirm (call_id c1) (agent_id ()) (answer Deny))
     (Rpc (method_ tool_confirm_respond) (params ((call_id c1) (allow false)))
      (tag Show_error))
     (Focus editor)
+    (Expire_toast (id 0) (after_ms 4000))
     |}]
 ;;
 
@@ -112,10 +119,11 @@ let%expect_test "Enter on a focused button of a confirmation is that button's" =
   H.key h "Enter" ~target:Page;
   [%expect
     {|
-    (Respond_confirm (call_id c1) (allow true))
+    (Answer_confirm (call_id c1) (agent_id ()) (answer Allow))
     (Rpc (method_ tool_confirm_respond) (params ((call_id c1) (allow true)))
      (tag Show_error))
     (Focus editor)
+    (Expire_toast (id 0) (after_ms 4000))
     |}]
 ;;
 
@@ -138,6 +146,7 @@ let%expect_test "help lists every key and command" =
     Ctrl+L switch model
     Ctrl+P / Alt+P next / previous scoped model (/scoped-models)
     Alt+T cycle the thinking level
+    Alt+M cycle the mode: ask → auto-edit → auto → plan (/mode, /plan)
     Ctrl+O cycle the transcript verbosity
     Ctrl+X copy the last reply (when nothing is selected)
     Ctrl+↑ / Ctrl+↓ previous / next of your messages in the transcript
@@ -149,6 +158,8 @@ let%expect_test "help lists every key and command" =
     Alt+0 close the agents panel
     Ctrl+` open or close the terminal (/terminal); in it, every other key goes to the shell
     Tab (in /scoped-models) check or uncheck the highlighted model
+    y / a / n / r (confirmation) allow once, always allow (its rules, this session), deny, deny saying why; Enter allows, Esc denies
+    ↑↓ Space ←→ (question) choose, pick, previous / next question; type for your own answer; Enter accepts, Esc declines
     Commands
     /help [command] show commands and keys, or a command's usage
     /hotkeys show the keyboard shortcuts
@@ -159,7 +170,11 @@ let%expect_test "help lists every key and command" =
     /thinking [off|low|on|high|max] pick or set the thinking level
     /change_default save the model and thinking level as the default for new sessions
     /verbosity [quiet|normal|verbose] how much of tool calls and thinking the transcript shows
-    /confirm [on|off] ask before bash, write and edit run
+    /confirm [on|off] ask before bash, edits and MCP tools run (mode ask or auto, also for new sessions)
+    /mode [ask|auto-edit|auto|plan] pick or set the mode: what asks first, or read-only planning (Alt+M cycles)
+    /plan [on|off] toggle plan mode: the model investigates and plans, changing no files, until you approve its plan
+    /todos show the model's plan (its update_plan steps)
+    /permissions show the mode and the allow/ask/deny rules (config and this session)
     /compact [instructions] summarise older messages to free context
     /name [name] rename the session
     /session show the session's details and statistics

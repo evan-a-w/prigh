@@ -101,9 +101,7 @@ let rec inert (node : Node.t) : Node.t =
 
 let view (m : Model.t) ~inject ~terminal =
   let behind =
-    if Option.is_some m.dialog || not (List.is_empty m.confirms)
-    then inert
-    else Fn.id
+    if Option.is_some m.dialog || Model.waiting m then inert else Fn.id
   in
   (* On a phone the agents panel is a sheet over the page: it has the
      keyboard while open. *)

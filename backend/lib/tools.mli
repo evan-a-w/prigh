@@ -4,6 +4,11 @@ open! Core
 
 val all : Tool.t list
 
+(** The main agent's tools for the user and the session: [update_plan]
+    ({!Plan}), [ask_user] and [exit_plan_mode]. Not in [all]: tool hosts do
+    not run them. *)
+val interaction : Tool.t list
+
 (** Built-in tools that stand in for one of [all] for some models
     ([apply_patch]). *)
 val variants : Tool.t list
@@ -30,8 +35,9 @@ val specs : Tool.t list -> Tool_spec.t list
 (** The tools available to an agent at [depth]: the parent's [parent] tools,
     restricted to [only] if given. The [subagent] tool is dropped at depth 2
     and beyond so that delegation cannot recurse further, and the background
-    controls ([subagent_wait], [job_wait], ...) at depth 1 and beyond, where
-    subagents and [bash] run synchronously ([bash] loses [background]). *)
+    controls ([subagent_wait], [job_wait], ...), {!interaction} and [goal_complete] at depth 1
+    and beyond, where subagents and [bash] run synchronously ([bash] loses
+    [background]) and nobody can be asked. *)
 val for_context
   :  parent:Tool.t list
   -> depth:int

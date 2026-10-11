@@ -2,9 +2,23 @@ open! Core
 
 (** TUI mirror of the backend's persisted configuration. *)
 
+(** [permissions]: the allow/ask/deny rules, as written. *)
+module Permissions : sig
+  type t =
+    { allow : string list
+    ; ask : string list
+    ; deny : string list
+    }
+  [@@deriving sexp_of, equal]
+
+  val empty : t
+end
+
 type t =
   { scoped_models : string list
-  ; confirm_tools : bool
+  ; approval_mode : Approval_mode.t
+  ; permissions : Permissions.t
+    (** the mode new sessions start in ([confirm_tools] from older backends) *)
   ; default_model : string option
   ; default_thinking : string option
   ; fallback_models : string list

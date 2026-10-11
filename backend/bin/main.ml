@@ -221,7 +221,8 @@ let common_params =
              else
                Tools.all
                @ (subagent :: Tool_subagent.control_tools)
-               @ Tool_jobs.tools)
+               @ Tool_jobs.tools
+               @ Tools.interaction)
           ~sessions_dir
           ~home
           ?session
@@ -326,6 +327,32 @@ let run_command =
          | Loop (Compacted _) | Compacted _ ->
            note "[compacted the conversation to fit the context window]"
          | Notice n -> eprintf "%s\n%!" (cli_hints n)
+         (* Nobody is there to answer: refuse rather than wait forever. *)
+         | Loop (Tool_confirm { call_id; agent_id; name; summary; _ }) ->
+           note
+             "[tool] %s %s needs confirmation: denied (headless)"
+             name
+             summary;
+           ignore
+             (Agent.respond_confirm
+                ?agent_id
+                agent
+                ~call_id
+                (Deny
+                   (Some
+                      "prigh run is headless, so nobody can confirm it; the \
+                       user can allow it with approval_mode or permissions in \
+                       ~/.prigh/config.json"))
+              : unit Or_error.t)
+         | Loop (Ask_user { call_id; _ }) ->
+           ignore
+             (Agent.answer_question
+                agent
+                ~call_id
+                (Unavailable
+                   "prigh run is headless, so nobody can answer; decide \
+                    yourself and say what you assumed")
+              : unit Or_error.t)
          | _ -> ()
        in
        Agent.subscribe agent ~f:(handle ~in_subagent:false);

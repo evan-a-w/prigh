@@ -371,9 +371,9 @@ let%expect_test "fuzzy ranking: command names" =
       (String.concat ~sep:" " (Fuzzy.rank ~query names ~key:Fn.id)));
   [%expect
     {|
-    "mo" -> model scoped-models import
+    "mo" -> mode model scoped-models import permissions
     "lo" -> login logout clone
-    "s"  -> state switch skills skill: setusr session signout sessions scoped-models jobs host resume agents hotkeys verbosity
+    "s"  -> state switch skills skill: setusr session signout sessions scoped-models jobs host todos resume agents hotkeys verbosity permissions
     "sw" -> switch
     "xyz" ->
     |}]
@@ -465,7 +465,7 @@ let%expect_test "commands" =
         s (Option.map (Commands.closest s) ~f:(fun c -> c.name) : string option)]);
   [%expect
     {|
-    (modle ("Option.map (Commands.closest s) ~f:(fun c -> c.name)" (model)))
+    (modle ("Option.map (Commands.closest s) ~f:(fun c -> c.name)" (mode)))
     (hlep ("Option.map (Commands.closest s) ~f:(fun c -> c.name)" (help)))
     (sess ("Option.map (Commands.closest s) ~f:(fun c -> c.name)" (session)))
     (zzzz ("Option.map (Commands.closest s) ~f:(fun c -> c.name)" ()))
@@ -594,6 +594,7 @@ let%expect_test "keymap: every binding resolves to its intent and is documented"
     Ctrl+P           Next_model
     Alt+P            Prev_model
     Ctrl+T           Next_thinking
+    Alt+M            Cycle_mode
     Ctrl+N           Picker_toggle_filter
     Ctrl+X           Copy_last
     Ctrl+Z           Suspend
@@ -648,6 +649,7 @@ let%expect_test "keymap: every binding resolves to its intent and is documented"
     Ctrl+P                  cycle to the next scoped model (Shift+Ctrl+P is unavailable; Alt+P goes back)
     Alt+P                   cycle to the previous scoped model
     Ctrl+T                  cycle the thinking level
+    Alt+M                   cycle the mode: ask → auto-edit → auto → plan (read-only)
     Ctrl+N                  picker: toggle the named-only / logged-in-only filter
     Ctrl+X                  copy the last assistant message
     Ctrl+Z                  suspend to the shell
@@ -666,7 +668,11 @@ let%expect_test "keymap: every binding resolves to its intent and is documented"
     /logout [provider]                 remove a provider's stored credential
     /thinking [off|low|on|high|max]    pick or set the thinking level
     /verbosity [quiet|normal|verbose]  set the transcript verbosity
-    /confirm [on|off]                  ask before destructive tools
+    /confirm [on|off]                  ask before destructive tools (approval mode ask or auto, also for new sessions)
+    /mode [ask|auto-edit|auto|plan]    pick or set the mode: what asks first, or read-only planning (Alt+M cycles)
+    /plan [on|off]                     toggle plan mode: the model investigates and plans, changing no files, until you approve its plan
+    /todos                             show the model's plan (its update_plan steps)
+    /permissions                       show the mode and the allow/ask/deny rules (config and this session)
     /auth                              show which providers are configured
     /budget [dollars|off]              show or set the session's cost budget: no turn starts once it is spent
     /goal [text|off|resume]            set a goal the agent keeps working toward until it is met; show, clear or resume it
@@ -2089,7 +2095,7 @@ let%expect_test
   show "host prompt" (Autocomplete.directory ~host:"client-1" ~text:"~/de");
   [%expect
     {|
-    /mo          command    prefix="mo" navigated=false enter_accepts=true items=3
+    /mo          command    prefix="mo" navigated=false enter_accepts=true items=5
     /model       arg:model  prefix="" navigated=false enter_accepts=false items=4
     /model down  arg:model  prefix="" navigated=true enter_accepts=true items=4
     /model gp    arg:model  prefix="gp" navigated=false enter_accepts=true items=1

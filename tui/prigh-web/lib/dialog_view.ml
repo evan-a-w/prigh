@@ -12,6 +12,7 @@ let picker_title : Dialog.Picker_kind.t -> string = function
   | Logout -> "Providers"
   | Verbosity -> "Levels"
   | Confirm_tools -> "Settings"
+  | Modes -> "Modes"
   | Fork _ | Rewind _ -> "Messages"
   | Tree -> "Messages"
   | Hosts -> "Hosts"
@@ -368,33 +369,98 @@ let confirm (m : App.Model.t) ~inject =
   match m.confirms with
   | [] -> Node.none
   | c :: rest ->
-    let respond allow =
-      inject (Action.Respond_confirm { call_id = c.call_id; allow })
+    let answer answer =
+      inject
+        (Action.Answer_confirm
+           { call_id = c.call_id; agent_id = c.agent_id; answer })
+    in
+    let plan = Confirm_prompt.is_plan c in
+    let waiting =
+      match rest with
+      | [] -> []
+      | rest -> [ keys_hint (sprintf "%d more waiting" (List.length rest)) ]
+    in
+    let body, footer, on_close =
+      match m.confirm_reason with
+      | None ->
+        ( [ Node.p
+              ~attrs:[ Attr.class_ "confirm-question" ]
+              [ Node.text (Confirm_prompt.title c) ]
+          ; (if plan
+             then div ~cls:"confirm-plan" [ Markdown_view.render c.summary ]
+             else Node.none)
+          ; div
+              ~cls:"confirm-answers"
+              (List.map (Confirm_prompt.answers c) ~f:(fun (a, key, label) ->
+                 let cls =
+                   match a with
+                   | Allow -> "primary allow"
+                   | Always -> "always"
+                   | Deny -> "deny"
+                   | Deny_with_reason -> "reason"
+                 in
+                 button
+                   ~cls:("confirm-answer " ^ cls)
+                   ~title:
+                     (match a with
+                      | Allow -> key ^ " or Enter"
+                      | Deny -> key ^ " or Esc"
+                      | Always | Deny_with_reason -> key)
+                   ~on_click:(answer a)
+                   [ Node.kbd [ Node.text key ]; Node.text label ]))
+          ]
+        , waiting
+        , answer Deny )
+      | Some reason ->
+        let back = inject Action.Cancel_confirm_reason in
+        ( [ Node.p
+              ~attrs:[ Attr.class_ "confirm-question" ]
+              [ Node.text (Confirm_prompt.title c) ]
+          ; Node.label
+              ~attrs:
+                [ Attr.class_ "confirm-reason-label"
+                ; Attr.for_ "confirm-reason"
+                ]
+              [ Node.text (Confirm_prompt.reason_question c) ]
+          ; Node.input
+              ~attrs:
+                [ Attr.id "confirm-reason"
+                ; Attr.class_ "text-input"
+                ; Attr.type_ "text"
+                ; Attr.value reason
+                ; Attr.create "autocomplete" "off"
+                ; Attr.on_input (fun _ text ->
+                    inject (Action.Confirm_reason_input text))
+                ]
+              ()
+          ]
+        , waiting
+          @ [ button ~title:"Esc" ~on_click:back [ Node.text "Back" ]
+            ; button
+                ~cls:"danger"
+                ~title:"Enter"
+                ~on_click:(inject Action.Send_confirm_reason)
+                [ Node.text (if plan then "Keep planning" else "Deny") ]
+            ]
+        , back )
     in
     Modal.view
       ~id:"confirm"
-      ~cls:"confirm-dialog"
-      ~title:(sprintf "Allow %s?" c.name)
-      ~on_close:(respond false)
-      ~footer:
-        [ (match rest with
-           | [] -> Node.none
-           | rest -> keys_hint (sprintf "%d more waiting" (List.length rest)))
-        ; button
-            ~cls:"deny"
-            ~title:"Esc"
-            ~on_click:(respond false)
-            [ Node.text "Deny" ]
-        ; button
-            ~cls:"primary allow"
-            ~title:"Enter"
-            ~on_click:(respond true)
-            [ Node.text "Allow" ]
-        ]
-      [ Node.pre
-          ~attrs:[ Attr.class_ "confirm-summary" ]
-          [ Node.text c.summary ]
-      ]
+      ~cls:(if plan then "confirm-dialog plan-dialog" else "confirm-dialog")
+      ~title:(if plan then "Plan" else "Confirm")
+      ~on_close
+      ~footer
+      body
 ;;
 
-let view m ~inject = Node.fragment [ dialog m ~inject; confirm m ~inject ]
+let view m ~inject =
+  Node.fragment
+    [ dialog m ~inject
+    ; (if List.is_empty m.confirms
+       then
+         Question_view.view m.questions ~inject:(fun a ->
+           inject (Action.Question a))
+       else Node.none)
+    ; confirm m ~inject
+    ]
+;;

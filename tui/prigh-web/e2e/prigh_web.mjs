@@ -52,8 +52,33 @@ const script2 = [
   { text: "Noted." },
   { text: "Noted." },
 ];
+// After another restart: a bash call that asks first, a question, a plan to
+// approve.
+const script3 = [
+  { text: "building", tool_calls: [{ id: "b1", name: "bash", arguments: { command: "echo built-ok" } }] },
+  { text: "Built." },
+  {
+    text: "one question",
+    tool_calls: [{
+      id: "q1", name: "ask_user",
+      arguments: { questions: [{ question: "Which database?", header: "Storage",
+        options: [{ label: "Postgres", description: "the one in prod" }, { label: "SQLite" }] }] },
+    }],
+  },
+  { text: "SQLite it is." },
+  {
+    text: "here is the plan",
+    tool_calls: [
+      { id: "p1", name: "update_plan",
+        arguments: { plan: [{ step: "Write the schema", status: "in_progress" }, { step: "Test it", status: "pending" }] } },
+      { id: "p2", name: "exit_plan_mode", arguments: { plan: "1. Write the **schema**\n2. Test it" } },
+    ],
+  },
+  { text: "Implementing." },
+];
 writeFileSync(join(dir, "script.json"), JSON.stringify(script));
 writeFileSync(join(dir, "script2.json"), JSON.stringify(script2));
+writeFileSync(join(dir, "script3.json"), JSON.stringify(script3));
 
 const blue = [40, 80, 220];
 const red = [220, 40, 40];
@@ -501,6 +526,53 @@ try {
   await page.waitForSelector(".terminal-panel", { state: "detached" });
   await page.setViewportSize({ width: 1280, height: 800 });
   await page.waitForFunction(() => document.querySelector(".app:not(.narrow)"));
+
+  // 10. Approvals. In mode ask a bash call asks first: "always" allows its
+  //     rule for the rest of the session. The model's question is answered
+  //     with clicks; in plan mode its plan is approved with y.
+  await stopServer();
+  await bodyHas("reconnecting");
+  await startServer(`127.0.0.1:${port}`, join(dir, "script3.json"));
+  await bodyLacks("Connection lost");
+  await send("/mode ask");
+  await page.locator(".toast", { hasText: "Mode: ask" }).waitFor();
+  await show("mode ask", ".status");
+  await send("build it");
+  await page.locator("#confirm").waitFor();
+  await show("a confirmation", "#confirm");
+  await page.locator("#confirm .confirm-answer.always").click();
+  await bodyHas("Built.");
+  await idle();
+  await showTurn("allowed always");
+  await send("ask me");
+  await page.locator("#question").waitFor();
+  await show("a question", "#question");
+  await page.locator("#question .question-choice", { hasText: "SQLite" }).click();
+  await page.locator("#question .modal-buttons .primary").click();
+  await bodyHas("SQLite it is.");
+  await idle();
+  await showTurn("answered");
+  await page.keyboard.press("Alt+M");
+  await page.keyboard.press("Alt+M");
+  await page.keyboard.press("Alt+M");
+  // Each step is shown at once; the backend's replies settle on the last.
+  await page.locator(".toast", { hasText: "Mode: plan" }).waitFor();
+  await page.waitForSelector(".status .mode.plan-mode");
+  await show("plan mode (Alt+M)", ".status");
+  await send("plan it");
+  await page.locator("#confirm.plan-dialog").waitFor();
+  await show("a plan to approve", "#confirm");
+  await page.keyboard.press("y");
+  await bodyHas("Implementing.");
+  await idle();
+  await page.waitForFunction(() => !document.querySelector(".status .plan-mode"));
+  await show("the plan approved", ".status");
+  await showTurn("implementing");
+  await send("/permissions");
+  await page.locator(".modal").waitFor();
+  await show("permissions", ".modal");
+  await page.keyboard.press("Escape");
+  await page.waitForFunction(() => !document.querySelector(".modal"));
 
   // The layout at phone size.
   await page.setViewportSize({ width: 390, height: 844 });

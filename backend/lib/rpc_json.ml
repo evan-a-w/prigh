@@ -218,6 +218,10 @@ let state (s : Agent.State.t) =
              | Stopped { reason } -> [ "reason", str reason ])) )
     ; ( "resume_at_ms"
       , Option.value_map s.resume_at ~default:`Null ~f:(fun at -> ms at) )
+    ; "approval_mode", str (Approval_mode.to_string s.approval_mode)
+    ; "plan_mode", bool s.plan_mode
+    ; "plan", Option.value_map s.plan ~default:`Null ~f:Plan.to_json
+    ; "session_rules", `Array (List.map s.session_rules ~f:str)
     ]
 ;;
 
@@ -291,6 +295,9 @@ let entry (e : Session.Entry.t) =
     | System_prompt _ -> [ "kind", str "system_prompt" ]
     | Goal _ -> [ "kind", str "goal" ]
     | Budget _ -> [ "kind", str "budget" ]
+    | Approval { mode; plan } ->
+      [ "kind", str "approval"; "mode", str mode; "plan", bool plan ]
+    | Allow_rule { rule } -> [ "kind", str "allow_rule"; "rule", str rule ]
   in
   `Object
     ([ "id", str e.id
@@ -415,11 +422,25 @@ let rec event ?now (e : Agent.Event.t) =
       [ "event", str "tool_start"; "call", tool_call call ]
     | Loop (Tool_output { call_id; chunk }) ->
       [ "event", str "tool_output"; "call_id", str call_id; "chunk", str chunk ]
-    | Loop (Tool_confirm { call_id; name; summary }) ->
+    | Loop (Tool_confirm { call_id; agent_id; name; summary; rules }) ->
       [ "event", str "tool_confirm"
       ; "call_id", str call_id
+      ; "agent_id", Option.value_map agent_id ~default:`Null ~f:str
       ; "name", str name
       ; "summary", str summary
+      ; "rules", `Array (List.map rules ~f:str)
+      ]
+    | Loop (Tool_confirm_done { call_id; agent_id }) ->
+      [ "event", str "tool_confirm_done"
+      ; "call_id", str call_id
+      ; "agent_id", Option.value_map agent_id ~default:`Null ~f:str
+      ]
+    | Loop (Ask_user_done { call_id }) ->
+      [ "event", str "ask_user_done"; "call_id", str call_id ]
+    | Loop (Ask_user { call_id; questions }) ->
+      [ "event", str "ask_user"
+      ; "call_id", str call_id
+      ; "questions", `Array (List.map questions ~f:User_question.to_json)
       ]
     | Loop (Tool_end { call; result }) ->
       [ "event", str "tool_end"
@@ -525,7 +546,7 @@ let subagent ((s : Subagent_log.Summary.t), messages) =
     ]
 ;;
 
-let pending ~steer ~follow_up ~confirms =
+let pending ~steer ~follow_up ~confirms ~questions =
   `Object
     [ "steer_texts", `Array (List.map steer ~f:str)
     ; "follow_up_texts", `Array (List.map follow_up ~f:str)
@@ -534,8 +555,18 @@ let pending ~steer ~follow_up ~confirms =
           (List.map confirms ~f:(fun (c : Agent.Pending_confirm.t) ->
              `Object
                [ "call_id", str c.call_id
+               ; "agent_id", Option.value_map c.agent_id ~default:`Null ~f:str
                ; "name", str c.name
                ; "summary", str c.summary
+               ; "rules", `Array (List.map c.rules ~f:str)
+               ])) )
+    ; ( "questions"
+      , `Array
+          (List.map questions ~f:(fun (q : Agent.Pending_question.t) ->
+             `Object
+               [ "call_id", str q.call_id
+               ; ( "questions"
+                 , `Array (List.map q.questions ~f:User_question.to_json) )
                ])) )
     ]
 ;;

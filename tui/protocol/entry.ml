@@ -15,6 +15,9 @@ module Kind = struct
     | Description of { text : string }
     | Cwd of { cwd : string }
     | System_prompt
+    | Other of string
+    (** a kind this frontend does not show (approval mode changes, session
+        rules, newer ones) *)
   [@@deriving sexp_of, equal]
 end
 
@@ -50,7 +53,7 @@ let kind_of_json j =
   | "cwd" ->
     Or_error.map (Json.string_field j "cwd") ~f:(fun cwd -> Kind.Cwd { cwd })
   | "system_prompt" -> Ok Kind.System_prompt
-  | other -> Or_error.errorf "unknown entry kind %S" other
+  | other -> Ok (Kind.Other other)
 ;;
 
 let of_json j =

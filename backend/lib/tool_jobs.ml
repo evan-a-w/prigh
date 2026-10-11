@@ -254,6 +254,7 @@ let input_tool =
             ]))
       with
       parallel_safe = false
+    ; destructive = true (* the job may run what it reads *)
     }
   in
   let run (context : Tool.Context.t) args =

@@ -46,6 +46,13 @@ module Entry : sig
       | Goal of { goal : Goal.t option } (** [None]: cleared *)
       | Budget of { usd : float option }
       (** the session's cost budget; [None]: none, overriding the default *)
+      | Approval of
+          { mode : string (** an [Approval_mode] *)
+          ; plan : bool
+          }
+      (** the session's approval mode and whether it is in plan mode *)
+      | Allow_rule of { rule : string }
+      (** an [Approval_rule] the user allowed for the session *)
     [@@deriving sexp, jsonaf]
   end
 
@@ -134,6 +141,16 @@ val set_goal : t -> Goal.t option -> Entry.t
 val budget : t -> float option option
 
 val set_budget : t -> usd:float option -> Entry.t
+
+(** The last [approval] entry on the active path. *)
+val approval : t -> (string * bool) option
+
+val set_approval : t -> mode:string -> plan:bool -> Entry.t
+
+(** The [allow_rule] entries on the active path, oldest first. *)
+val allow_rules : t -> string list
+
+val add_allow_rule : t -> rule:string -> Entry.t
 (** [at] defaults to now. *)
 val append_message : t -> ?at:float -> Message.t -> Entry.t
 

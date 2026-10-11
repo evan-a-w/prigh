@@ -325,10 +325,11 @@ let%expect_test "keys inside the terminal stay out of dialogs and confirmations"
     (Focus confirm)
     (browser default)
     (browser default)
-    (Respond_confirm (call_id t1) (allow true))
+    (Answer_confirm (call_id t1) (agent_id ()) (answer Allow))
     (Rpc (method_ tool_confirm_respond) (params ((call_id t1) (allow true)))
      (tag Show_error))
     (Focus editor)
+    (Expire_toast (id 0) (after_ms 4000))
     |}];
   H.act h Open_help;
   H.key h "`" ~ctrl:true ~code:"Backquote" ~target:Page;

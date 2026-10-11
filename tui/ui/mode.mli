@@ -20,6 +20,7 @@ module Picker_kind : sig
     | Tree of Entry.t list
     | Agents
     | Jobs
+    | Modes (** [/mode]: approval modes and plan mode *)
     | Hosts
     | Skills
     | Mcp of Mcp_list.t
@@ -33,6 +34,10 @@ module Text_prompt_action : sig
     | Cd
     | Export_path
     | Import_path
+    | Deny_reason of
+        { confirm : Pending.Confirm.t
+        ; draft : string (** the editor's text, restored afterwards *)
+        } (** the reason for denying a tool call, which the model sees *)
     | Host_cwd of string (** host id; the text is the directory there *)
   [@@deriving sexp_of, equal]
 end
@@ -42,10 +47,7 @@ module Confirm_action : sig
     | Logout of string
     | Rewind of string
     | Delete_session of string
-    | Tool_confirm of
-        { call_id : string
-        ; name : string
-        }
+    | Tool_confirm of Pending.Confirm.t
   [@@deriving sexp_of, equal]
 end
 
@@ -67,6 +69,10 @@ type t =
       { question : string
       ; action : Confirm_action.t
       }
+  | Question of
+      { call_id : string
+      ; form : Question_form.t
+      } (** the model's [ask_user] *)
   | Search of
       { query : string
       ; matches : int list (** wrapped transcript line indexes *)

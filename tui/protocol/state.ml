@@ -58,6 +58,10 @@ type t =
   ; budget_usd : float option
   ; goal : Goal.t option
   ; resume_at : Time_ns.t option
+  ; approval_mode : Approval_mode.t
+  ; plan_mode : bool
+  ; plan : Plan.t option
+  ; session_rules : string list
   }
 [@@deriving sexp_of, equal]
 
@@ -108,7 +112,26 @@ let of_json j =
     | None -> Ok None
     | Some goal -> Goal.of_json goal >>| Option.some
   in
-  let%map resume_at = Json.time_ms_opt_field j "resume_at_ms" in
+  let%bind resume_at = Json.time_ms_opt_field j "resume_at_ms" in
+  (* Older backends have none of these. *)
+  let%bind approval_mode =
+    match Json.field j "approval_mode" with
+    | None -> Ok Approval_mode.Auto
+    | Some mode -> Approval_mode.of_json mode
+  in
+  let%bind plan_mode =
+    match Json.field j "plan_mode" with
+    | None -> Ok false
+    | Some _ -> Json.bool_field j "plan_mode"
+  in
+  let%bind plan =
+    match Json.field j "plan" with
+    | None -> Ok None
+    | Some plan -> Or_error.map (Plan.of_json plan) ~f:Option.some
+  in
+  let%map session_rules =
+    Json.optional_list_field j "session_rules" ~f:Json.to_string_or_error
+  in
   { session_id
   ; session_path
   ; session_name
@@ -129,5 +152,9 @@ let of_json j =
   ; budget_usd
   ; goal
   ; resume_at
+  ; approval_mode
+  ; plan_mode
+  ; plan
+  ; session_rules
   }
 ;;

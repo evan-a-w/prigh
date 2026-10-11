@@ -214,6 +214,7 @@ let execute
       ~cwd:p.cwd
       ~cancel:context.cancel
       ~execute:context.execute
+      ~approve:context.approve
       ~depth:p.depth
       ~agent_id
       ~emit

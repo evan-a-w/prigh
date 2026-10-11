@@ -42,14 +42,28 @@ let skill_card (skill : Skill_message.t) =
        ])
 ;;
 
-let user ?skill times ({ text; images; at } : Message.User.t) =
+(* The backend's note telling the model about plan mode: a line, not the
+   note itself. *)
+let mode_note ~on =
+  div
+    (if on then "mode-note on" else "mode-note off")
+    [ span "icon" (if on then "◇" else "◆"); Node.text (Mode_note.summary ~on) ]
+;;
+
+let user
+      ?(note = Node.none)
+      ?skill
+      times
+      ({ text; images; at } : Message.User.t)
+  =
   let text =
     Option.value_map skill ~default:text ~f:(fun (s : Skill_message.t) ->
       s.args)
   in
   div
     (if Option.is_some skill then "msg user skill" else "msg user")
-    [ Option.value_map skill ~default:Node.none ~f:skill_card
+    [ note
+    ; Option.value_map skill ~default:Node.none ~f:skill_card
     ; Image_view.thumbs images
     ; (if String.is_empty (String.strip text)
        then Node.none
@@ -205,7 +219,17 @@ and render_entry times chat (entry : Chat.Entry.t) =
     (match Handover_message.parse u.text, Prigh_ui.Delivery.parse u.text with
      | Some h, _ -> handover times h u.at
      | None, Some sections -> div "msg" [ Delivery_view.view sections ]
-     | None, None -> user ?skill:(Skill_message.parse u.text) times u)
+     | None, None ->
+       (match Mode_note.split u.text with
+        | None -> user ?skill:(Skill_message.parse u.text) times u
+        | Some (on, rest) when String.is_empty rest && List.is_empty u.images ->
+          div "msg" [ mode_note ~on ]
+        | Some (on, rest) ->
+          user
+            ~note:(mode_note ~on)
+            ?skill:(Skill_message.parse rest)
+            times
+            { u with text = rest }))
   | Notice text -> div "msg notice" [ Node.text text ]
   | Shell call ->
     let tool = Chat.tool chat call.id in

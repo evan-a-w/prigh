@@ -315,7 +315,19 @@ let watch_subagent t key =
 
 let confirm_dialog t json =
   let call_id = string_field "call_id" json in
-  let dialog_id = "confirm-" ^ call_id in
+  (* A subagent's call is answered with its agent id. *)
+  let agent_id =
+    match field "agent_id" json with
+    | `String a -> [ "agent_id", str a ]
+    | _ -> []
+  in
+  let dialog_id =
+    "confirm-"
+    ^
+    match agent_id with
+    | [ (_, `String a) ] -> a ^ "/" ^ call_id
+    | _ -> call_id
+  in
   Hashtbl.set t.dialogs ~key:dialog_id ~data:(fun response ->
     let allow = Json.exactly_equal (field "confirmed" response) `True in
     report
@@ -323,7 +335,8 @@ let confirm_dialog t json =
       (call
          t
          "tool_confirm_respond"
-         [ "call_id", str call_id; ("allow", if allow then `True else `False) ]
+         ([ "call_id", str call_id; ("allow", if allow then `True else `False) ]
+          @ agent_id)
        |> Or_error.ignore_m));
   t.write
     (P.ui_request
