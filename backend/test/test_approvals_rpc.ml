@@ -125,6 +125,9 @@ let%expect_test "set_mode, confirmations with rules, the first answer wins" =
        "tool_confirm_respond");
   show
     (call a ~params:{|{"call_id": "c1", "allow": true}|} "tool_confirm_respond");
+  (* The other frontend closes its dialog. *)
+  wait_for "tool_confirm_done" a_sent;
+  List.iter (events "tool_confirm_done" a_sent) ~f:show;
   Queue.clear a_sent;
   wait_for "tool_confirm" a_sent;
   show
@@ -159,6 +162,7 @@ let%expect_test "set_mode, confirmations with rules, the first answer wins" =
     {"steer_texts":[],"follow_up_texts":[],"confirms":[{"call_id":"c1","agent_id":null,"name":"bash","summary":"echo one","rules":["bash(echo:*)"]}],"questions":[]}
     {"type":"response","id":"r","ok":true,"result":{}}
     {"type":"response","id":"r","ok":false,"error":"no pending confirmation for tool call \"c1\""}
+    {"type":"event","event":"tool_confirm_done","call_id":"c1","agent_id":null}
     {"type":"response","id":"r","ok":true,"result":{}}
     one
 
@@ -203,6 +207,8 @@ let%expect_test
        "ask_user_respond");
   show
     (call a ~params:{|{"call_id": "q1", "decline": true}|} "ask_user_respond");
+  wait_for "ask_user_done" a_sent;
+  List.iter (events "ask_user_done" a_sent) ~f:show;
   Agent.wait_idle agent;
   List.iter (Agent.messages agent) ~f:(function
     | Tool_result r -> print_string r.text
@@ -216,6 +222,7 @@ let%expect_test
     {"type":"response","id":"r","ok":false,"error":"expected 2 answers (one list per question), got 1"}
     {"type":"response","id":"r","ok":true,"result":{}}
     {"type":"response","id":"r","ok":false,"error":"no pending question for tool call \"q1\": it was answered or withdrawn"}
+    {"type":"event","event":"ask_user_done","call_id":"q1"}
     The user answered:
     Q: Which?
     A: x

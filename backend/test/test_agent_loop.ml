@@ -38,6 +38,8 @@ let rec show_event (e : Agent_event.t) =
   | Tool_output { chunk; _ } -> sprintf "  tool_output %S" chunk
   | Tool_confirm { call_id; name; summary; agent_id = _; rules = _ } ->
     sprintf "tool_confirm %s %s %S" call_id name summary
+  | Tool_confirm_done { call_id; _ } -> "tool_confirm_done " ^ call_id
+  | Ask_user_done { call_id } -> "ask_user_done " ^ call_id
   | Ask_user { call_id; questions } ->
     sprintf "ask_user %s (%d questions)" call_id (List.length questions)
   | Tool_end { result; _ } ->
