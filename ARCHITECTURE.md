@@ -354,8 +354,11 @@ two can share one.
   of every run (so tools follow host and cwd changes), adds the tools to the
   run's and its subagents' tool lists, and reports each problem once as a
   `Notice`.
-- `Tool_bash` (streamed output, timeout, cancellation; with `background`
-  at depth 0 it starts a job instead, see below), `Tool_read` (images
+- `Tool_bash` (streamed output, timeout, cancellation; long output keeps
+  its beginning and end (`Truncate.head_and_tail`) and the full output is
+  saved under `$TMPDIR/prigh-output/` on the host, kept for 7 days, its
+  path in the result; with `background` at depth 0 it starts a job instead,
+  see below), `Tool_read` (images
   through `Image.load`, as an image result),
   `Tool_write` (`wrote N lines`), `Tool_edit` (multi-edit, unique
   non-overlapping matches, atomic; returns a unified diff from `Udiff`),
