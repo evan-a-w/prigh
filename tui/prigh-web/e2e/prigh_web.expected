@@ -255,6 +255,39 @@ back: the first one again
 $ echo still-here
 still-here
 $
+=== chromium: /diff ===
+Changes
+<CWD> against HEAD 2 files changed, +5 −1
+notes.txt
++2
+−1
+@@ -1,3 +1,4 @@
+1	1		one
+2		-	two
+2	+	2
+3	3		three
+4	+	four
+todo.md
+new
++3
+−0
+@@ -0,0 +1,3 @@
+1	+	# Todo
+2	+
+3	+	- ship it
+/diff PATH shows one file or directory
+Done
+=== chromium: an environment note above the prompt ===
+cwd closed: ⌂
+Working directory is now <CWD>/sub
+=== chromium: the prompt shows only what was typed ===
+anything new?
+<TIME>
+=== chromium: a margin note unfolded ===
+[Environment: the working directory is now <CWD>/sub. Project instructions for it may differ from the ones above. Re-reading AGENTS.md/CLAUDE.md there is at your discretion: they are often unchanged, and missing an update is not serious.]
+=== chromium: the model saw the note ===
+[Environment: the working directory is now <CWD>/sub. Project instructions for it may differ from the ones above. Re-reading AGENTS.md/CLAUDE.md there is at your discretion: they are often unchanged, and missing an update is not serious.]
+anything new?
 === chromium: errors ===
 none
 === chromium: accounts: sessions ===
@@ -268,6 +301,8 @@ Act as…
 see and work in another user's sessions
 Add account…
 sign in as another user, or to another backend
+Turn notifications off
+stop telling you what happens while the tab is hidden
 Sign out
 forget this account in this browser
 ↑↓ move · Enter choose · Esc close
@@ -300,6 +335,8 @@ alice
 127.0.0.1:<PORT>
 Add account…
 sign in as another user, or to another backend
+Turn notifications off
+stop telling you what happens while the tab is hidden
 Sign out
 forget this account in this browser
 ↑↓ move · Enter choose · Esc close
@@ -598,6 +635,39 @@ back: the first one again
 $ echo still-here
 still-here
 $
+=== firefox: /diff ===
+Changes
+<CWD> against HEAD 2 files changed, +5 −1
+notes.txt
++2
+−1
+@@ -1,3 +1,4 @@
+1	1		one
+2		-	two
+2	+	2
+3	3		three
+4	+	four
+todo.md
+new
++3
+−0
+@@ -0,0 +1,3 @@
+1	+	# Todo
+2	+
+3	+	- ship it
+/diff PATH shows one file or directory
+Done
+=== firefox: an environment note above the prompt ===
+cwd closed: ⌂
+Working directory is now <CWD>/sub
+=== firefox: the prompt shows only what was typed ===
+anything new?
+<TIME>
+=== firefox: a margin note unfolded ===
+[Environment: the working directory is now <CWD>/sub. Project instructions for it may differ from the ones above. Re-reading AGENTS.md/CLAUDE.md there is at your discretion: they are often unchanged, and missing an update is not serious.]
+=== firefox: the model saw the note ===
+[Environment: the working directory is now <CWD>/sub. Project instructions for it may differ from the ones above. Re-reading AGENTS.md/CLAUDE.md there is at your discretion: they are often unchanged, and missing an update is not serious.]
+anything new?
 === firefox: errors ===
 none
 === firefox: accounts: sessions ===
@@ -611,6 +681,8 @@ Act as…
 see and work in another user's sessions
 Add account…
 sign in as another user, or to another backend
+Turn notifications off
+stop telling you what happens while the tab is hidden
 Sign out
 forget this account in this browser
 ↑↓ move · Enter choose · Esc close
@@ -643,6 +715,8 @@ alice
 127.0.0.1:<PORT>
 Add account…
 sign in as another user, or to another backend
+Turn notifications off
+stop telling you what happens while the tab is hidden
 Sign out
 forget this account in this browser
 ↑↓ move · Enter choose · Esc close

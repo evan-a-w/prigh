@@ -266,7 +266,6 @@ let%expect_test
     (Expire_toast (id 3) (after_ms 4000))
     (Rpc (method_ git_diff) (params ()) (tag Git_diff))
     No changes in /work against HEAD
-    Reading the changes…
     not a git repository: /work (git init starts one, or /cd into one)
     |}]
 ;;
@@ -286,7 +285,6 @@ let%expect_test
     (Expire_toast (id 0) (after_ms 4000))
     (Rpc (method_ review) (params ((args "main look at errors")))
      (tag (Command_prompt "/review main look at errors")))
-    Reading the changes to review…
     Nothing to review: no changes against main in /work. /review main look at errors is back in the editor.
     [/review main look at errors]
     (Send (Enter))
@@ -306,7 +304,6 @@ let%expect_test
     (Save_history (/init "/review main look at errors"))
     (Rpc (method_ init) (params ()) (tag (Command_prompt /init)))
     (Expire_toast (id 2) (after_ms 4000))
-    Reading the changes to review…
     Queued: it starts when the current run ends
     |}]
 ;;

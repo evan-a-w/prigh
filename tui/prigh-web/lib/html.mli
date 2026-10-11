@@ -51,6 +51,8 @@ module Icon : sig
     | Restart
     | Target
     | Clock
+    | Bell
+    | Bell_off
 
   (** An inline SVG; tests show [<icon name>]. *)
   val view : ?cls:string -> t -> Node.t
