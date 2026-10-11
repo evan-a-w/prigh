@@ -517,23 +517,20 @@ let%expect_test
     (Rpc (method_ list_models) (params ()) (tag Models))
     (Rpc (method_ auth_status) (params ()) (tag (Auth_status Refresh)))
     (Rpc (method_ get_config) (params ()) (tag Config))
+    (Rpc (method_ get_messages_page)
+     (params ((session /sessions/s1.jsonl) (limit 1000000)))
+     (tag (Resync (session s1) (from ()))))
+    (Rpc (method_ get_pending) (params ()) (tag Resync_pending))
+    (Rpc (method_ list_sessions) (params ()) (tag Sessions))
+    (Rpc (method_ list_subagents) (params ()) (tag Subagents))
+    (Rpc (method_ list_jobs) (params ()) (tag Jobs))
     |}];
   H.text h ~selector:".banner";
   H.text h ~selector:".toast";
   [%expect {| Reconnected |}];
   H.reply h "get_state" (H.state_json ());
   [%expect
-    {|
-    (Set_url_session s1)
-    (Rpc (method_ get_messages_page)
-     (params ((session /sessions/s1.jsonl) (limit 60)))
-     (tag (Page (path /sessions/s1.jsonl) (before ()))))
-    Scroll_to_bottom
-    (Rpc (method_ get_pending) (params ()) (tag Pending))
-    (Rpc (method_ list_sessions) (params ()) (tag Sessions))
-    (Rpc (method_ list_subagents) (params ()) (tag Subagents))
-    (Rpc (method_ list_jobs) (params ()) (tag Jobs))
-    |}];
+    {| |}];
   (* Replies to an older connection's reconnects are ignored. *)
   H.act h (Reply (Reconnect 0, Error "late"));
   [%expect {| |}];

@@ -40,7 +40,12 @@ let connect ~url =
             | CONNECTING | CLOSING | CLOSED -> ())
       ; lines = lines_r
       ; stderr_lines = stderr_r
-      ; close = (fun () -> ws##close)
+      ; close =
+          (fun () ->
+            (* A dead network may not finish the closing handshake for
+               minutes: the transport is closed now. *)
+            ws##close;
+            finish ())
       ; closed = Ivar.read closed
       }
 ;;

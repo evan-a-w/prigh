@@ -514,6 +514,17 @@ kbd {
   font-weight: 500;
   border-bottom: 1px solid var(--sodium-line);
 }
+/* Over the top of the chat rather than above it: the transcript does not
+   move when the connection comes and goes. */
+.banner-anchor { position: relative; height: 0; z-index: 5; }
+.banner-anchor > .banner {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  background: linear-gradient(var(--sodium-wash), var(--sodium-wash)), var(--graphite);
+}
+.banner.gone { flex-wrap: wrap; text-align: center; }
 
 /* A tool confirmation: what will run, then an answer per key */
 

@@ -26,6 +26,9 @@ module Method : sig
         { session : string (** a path or id; need not be the client's *)
         ; before : string option
           (** {!Message_page.before}; [None]: the newest page *)
+        ; from : string option
+          (** an entry id ({!Message_page.before} of a page): the messages
+              from that one to the newest, whatever [limit] *)
         ; limit : int
         } (** see {!Message_page} *)
     | Get_tool_output of

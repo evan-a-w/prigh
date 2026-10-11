@@ -143,7 +143,8 @@ let unit_result r = Or_error.map r ~f:(fun () -> `Object [])
 let queued_json (queued : Agent.Queued.t) =
   `Object
     [ "text", `String queued.text
-    ; "attachments", `Array (List.map queued.attachments ~f:(fun a -> `String a))
+    ; ( "attachments"
+      , `Array (List.map queued.attachments ~f:(fun a -> `String a)) )
     ]
 ;;
 
@@ -682,13 +683,18 @@ let messages_page t (client : Client.t) params =
   let open Or_error.Let_syntax in
   let%bind limit = int_param params "limit" ~default:100 in
   let%bind before = string_param_opt params "before" in
+  let%bind from = string_param_opt params "from" in
   let%bind session =
     match%bind string_param_opt params "session" with
     | None -> Ok (Agent.session client.agent)
     | Some key -> session_to_read t key
   in
   let%map page =
-    Message_page.create (Session.identified_messages session) ~limit ~before
+    Message_page.create
+      ?from
+      (Session.identified_messages session)
+      ~limit
+      ~before
   in
   Message_page.to_json page
 ;;
@@ -1419,8 +1425,7 @@ let dispatch agent login ~meth ~params : Json.t Or_error.t =
       | Some (`Number n) ->
         (match Int.of_string_opt n with
          | Some i when i >= 0 -> Ok i
-         | _ ->
-           Or_error.error_string "param \"index\" must be a natural number")
+         | _ -> Or_error.error_string "param \"index\" must be a natural number")
       | Some _ | None ->
         Or_error.error_string "param \"index\" must be a natural number"
     in

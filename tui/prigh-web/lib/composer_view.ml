@@ -88,7 +88,7 @@ let images (m : App.Model.t) ~inject =
 
 let connected (m : App.Model.t) =
   match m.connection, m.state with
-  | Connected, Some _ -> true
+  | Connected, Some _ -> Option.is_none m.session_gone
   | Reconnecting _, _ | _, None -> false
 ;;
 
@@ -96,7 +96,9 @@ let connected (m : App.Model.t) =
 let placeholder (m : App.Model.t) =
   (* A phone, or the chat beside a side panel. *)
   let cramped = m.narrow || m.agents.open_ || m.files.open_ in
-  if not (connected m)
+  if Option.is_some m.session_gone
+  then "Session gone: /new starts one"
+  else if not (connected m)
   then
     if cramped
     then "Offline: send once back"

@@ -24,6 +24,7 @@ module Method = struct
     | Get_messages_page of
         { session : string
         ; before : string option
+        ; from : string option
         ; limit : int
         }
     | Get_tool_output of
@@ -51,10 +52,11 @@ module Method = struct
     | Set_archived { path; archived } ->
       [ "path", Json.str path; "archived", Json.bool archived ]
     | Delete_sessions paths -> [ "paths", `Array (List.map paths ~f:Json.str) ]
-    | Get_messages_page { session; before; limit } ->
+    | Get_messages_page { session; before; from; limit } ->
       [ "session", Json.str session ]
       @ Option.value_map before ~default:[] ~f:(fun b ->
         [ "before", Json.str b ])
+      @ Option.value_map from ~default:[] ~f:(fun f -> [ "from", Json.str f ])
       @ [ "limit", Json.int limit ]
     | Get_tool_output { call_id; agent_id } ->
       [ "call_id", Json.str call_id ]

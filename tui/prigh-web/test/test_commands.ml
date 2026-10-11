@@ -1365,21 +1365,19 @@ let%expect_test "/retry-backend-connection, /state, /clear, /quit" =
     (Rpc (method_ list_models) (params ()) (tag Models))
     (Rpc (method_ auth_status) (params ()) (tag (Auth_status Refresh)))
     (Rpc (method_ get_config) (params ()) (tag Config))
+    (Rpc (method_ get_messages_page)
+     (params ((session /sessions/s1.jsonl) (limit 1000000)))
+     (tag (Resync (session s1) (from ()))))
+    (Rpc (method_ get_pending) (params ()) (tag Resync_pending))
+    (Rpc (method_ list_sessions) (params ()) (tag Sessions))
+    (Rpc (method_ list_subagents) (params ()) (tag Subagents))
+    (Rpc (method_ list_jobs) (params ()) (tag Jobs))
     |}];
   H.reply h "get_state" (H.state_json ());
   run h "/state";
   H.text h ~selector:".modal";
   [%expect
     {|
-    (Set_url_session s1)
-    (Rpc (method_ get_messages_page)
-     (params ((session /sessions/s1.jsonl) (limit 60)))
-     (tag (Page (path /sessions/s1.jsonl) (before ()))))
-    Scroll_to_bottom
-    (Rpc (method_ get_pending) (params ()) (tag Pending))
-    (Rpc (method_ list_sessions) (params ()) (tag Sessions))
-    (Rpc (method_ list_subagents) (params ()) (tag Subagents))
-    (Rpc (method_ list_jobs) (params ()) (tag Jobs))
     (Save_history (/state /retry-backend-connection))
     (Focus dialog)
     Session state
