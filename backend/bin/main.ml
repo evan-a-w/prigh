@@ -713,19 +713,23 @@ let serve_command =
                exit 2);
              new_agent ~session ~cwd:(Session.cwd session) ())
          in
-         Rpc_server.create
-           ~env
-           ~sw
-           ?token
-           ?namespace
-           ~backend_host
-           ~home:world.home
-           ~login
-           ~sessions_dir:world.sessions_dir
-           ~cwd
-           ~new_agent
-           ?default_agent
-           ()
+         let server =
+           Rpc_server.create
+             ~env
+             ~sw
+             ?token
+             ?namespace
+             ~backend_host
+             ~home:world.home
+             ~login
+             ~sessions_dir:world.sessions_dir
+             ~cwd
+             ~new_agent
+             ?default_agent
+             ()
+         in
+         Rpc_server.restore_resumes server;
+         server
        in
        let router =
          match access with

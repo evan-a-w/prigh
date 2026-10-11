@@ -55,6 +55,15 @@ module Entry : sig
       | Archived of { archived : bool }
       (** archived or unarchived by hand (see {!Summary.is_archived}); not
           copied by [fork] *)
+      | Spend of
+          { usage : Usage.t
+          ; cost_usd : float
+          }
+      (** spend the messages do not record: a subagent's response, a
+          compaction, a [btw] answer *)
+      | Resume_at of { at : float option }
+      (** a run scheduled to resume when a usage limit resets (seconds since
+          the epoch); [None]: no longer *)
     [@@deriving sexp, jsonaf]
   end
 
@@ -76,6 +85,9 @@ type t
 val create : dir:string -> cwd:string -> ?parent:string -> unit -> t
 
 val load : string -> t Or_error.t
+
+(** Whether its file was written and has been deleted since. *)
+val gone : t -> bool
 
 (** Whether the file at [path] exists yet. *)
 val persisted : t -> bool
@@ -161,6 +173,16 @@ val set_model : t -> model:string -> thinking:Thinking.t -> Entry.t
 val set_name : t -> name:string -> Entry.t
 val set_description : t -> text:string -> Entry.t
 val set_archived : t -> archived:bool -> Entry.t
+val add_spend : t -> usage:Usage.t -> cost_usd:float -> Entry.t
+
+(** The [Spend] entries' total, on every branch. *)
+val spend : t -> Usage.t * float
+
+(** The last [Resume_at] entry's time, on any branch. *)
+val resume_at : t -> float option
+
+(** Appends a [Resume_at] entry unless [resume_at] already says so. *)
+val set_resume_at : t -> float option -> unit
 
 (** Records a [cwd] entry; a subsequent [load] restores it. *)
 val set_cwd : t -> ?host:Host.t -> cwd:string -> unit -> Entry.t
@@ -213,6 +235,7 @@ module Summary : sig
     ; last_activity : float
       (** seconds since the epoch: the last message's time (else the file's
           mtime), or a later unarchiving *)
+    ; resume_at : float option (** {!resume_at} *)
     ; bytes : int (** {!disk_usage} *)
     }
   [@@deriving sexp_of]

@@ -629,9 +629,10 @@ two can share one.
   `images`.
   `State.usage`/`cost_usd` count every assistant message in the session file
   (all branches, also those compacted away), each at its own model's price,
-  plus what the file does not record, counted as it happens: subagents'
-  responses (from their nested `Message_end`s, so a running subagent's spend
-  shows), compactions and `btw` (never `context_tokens`). `State` also
+  plus the `Spend` entries recorded as it happens for what the messages do
+  not hold: subagents' responses (from their nested `Message_end`s, so a
+  running subagent's spend shows), compactions and `btw` (never
+  `context_tokens`); being in the file, they survive a restart. `State` also
   carries the session name, cwd and `git_branch`.
   Approvals: the agent's approver (`approve`, given to
   every run and through it to subagents) runs `Approval.decide` with the
@@ -678,7 +679,13 @@ two can share one.
   `retry-after`); with `resume_on_limit_reset`, a fiber sleeps until then
   (`?sleep_until`, injectable for tests) and starts a run with a message to
   carry on. `State.resume_at` shows it; `cancel_resume`, `resume_now`,
-  `abort`, any new run and a session switch end it. It is not persisted;
+  `abort`, any new run and a session switch end it. It is recorded in the
+  session (`Resume_at`; `None` when it runs or ends): an agent created for
+  (or switched to) the session arms it again while its time is still to
+  come, and drops it otherwise; `Rpc_server.restore_resumes` (called by
+  `main` for each server at startup) loads every session whose recorded
+  resume is to come. When the timer fires on a session whose file was
+  deleted meanwhile (`Session.gone`), a notice says so and nothing runs.
   `Rpc_server` keeps the agent loaded while one is scheduled.
 - `Config` — `~/.prigh/config.json` (`scoped_models : string list`,
   `approval_mode` (new sessions' mode; read from `confirm_tools` when
@@ -720,9 +727,13 @@ two can share one.
   Entries are messages, model/thinking changes, compaction summaries, names,
   descriptions, cwds with the tool host they are on (so a reload restores
   where the session runs), the system prompt, the approval mode with plan
-  mode (`approval`), rules the user allowed for the session (`allow_rule`)
-  and `Archived {archived}` (archived or unarchived by hand; ignored by
-  `messages`, not copied by `fork`);
+  mode (`approval`), rules the user allowed for the session (`allow_rule`),
+  `Archived {archived}` (archived or unarchived by hand), `Spend {usage,
+  cost_usd}` (what the messages do not record: subagents' responses,
+  compactions, `btw`; `spend` totals them on all branches) and `Resume_at
+  {at}` (a scheduled resume after a usage limit, `None` once it ran or was
+  cancelled; `resume_at`, also in `Summary`) — these three are ignored by
+  `messages` and not copied by `fork`;
   `Session.messages` is the message list for the next request with the
   compaction summary replacing everything before `kept_from`, preceded by
   the compaction's `pinned` message (the user's latest, kept verbatim when
@@ -750,7 +761,9 @@ two can share one.
   name, tokens, cost, model changes and compactions. Under the RPC,
   `get_entries` returns `{head, entries}` (`all: true` includes abandoned
   branches for the tree view; entries carry `at` in milliseconds when
-  known; an `Archived` entry is `{kind: "archived", archived}`).
+  known; an `Archived` entry is `{kind: "archived", archived}`, a `Spend`
+  `{kind: "spend", usage, cost_usd}`, a `Resume_at` `{kind: "resume_at",
+  at}` (ms or null); the frontends ignore the last two).
 - `Compaction` — summarises older messages via the model and keeps a tail;
   manual (`/compact [instructions]`: the RPC's `instructions`, pi's
   `customInstructions`, are appended to the summariser's) or automatic.

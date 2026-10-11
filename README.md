@@ -814,7 +814,10 @@ the status line shows `resumes 14:05`. `/resume now` retries at once,
 `/resume cancel` (or an abort, or a new prompt) cancels it. When the
 provider does not say, a note says so and nothing is scheduled.
 `resume_on_limit_reset: false` in `config.json` turns this off. A scheduled
-resume lives in the backend's memory, not in the session.
+resume is recorded in the session: a backend that restarts before the reset
+loads the session and resumes it on time (one whose reset passed while the
+backend was down is dropped; send a message to carry on), and a session
+deleted meanwhile is not resumed.
 
 Responses API requests (OpenAI and ChatGPT/Codex) carry a `prompt_cache_key`
 (the session id; a subagent's adds its id) so requests that share a prefix

@@ -489,6 +489,24 @@ let loaded_start t (client : Client.t) session =
 
 let fresh_agent t = register t (t.new_agent ~cwd:t.cwd ())
 
+(* Sessions waiting for a usage limit to reset when the backend last ran are
+   loaded again, so that they resume on time with nobody attached. *)
+let restore_resumes t =
+  let now = t.now () in
+  List.iter (Session.list ~dir:t.sessions_dir) ~f:(fun summary ->
+    match summary.resume_at with
+    | Some at when Float.( > ) at now && not (Hashtbl.mem t.agents summary.id)
+      ->
+      (match Session.load summary.path with
+       | Ok session -> ignore (start_agent t session None : Agent.t)
+       | Error error ->
+         eprintf
+           "prigh: session %s will not resume: %s\n%!"
+           summary.id
+           (Error.to_string_hum error))
+    | Some _ | None -> ())
+;;
+
 let connect ?signed_in t ~send =
   t.client_seq <- t.client_seq + 1;
   let agent, placeholder =

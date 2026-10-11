@@ -38,6 +38,11 @@ module Entry = struct
           }
       | Allow_rule of { rule : string }
       | Archived of { archived : bool }
+      | Spend of
+          { usage : Usage.t
+          ; cost_usd : float
+          }
+      | Resume_at of { at : float option }
     [@@deriving sexp, jsonaf]
   end
 
@@ -139,13 +144,16 @@ let worth_saving (line : Line.t) =
           | Budget _
           | Approval _
           | Allow_rule _
-          | Archived _ )
+          | Archived _
+          | Spend _
+          | Resume_at _ )
       ; _
       }
   | Header _ | Head _ -> false
 ;;
 
 let persisted t = t.persisted
+let gone t = t.persisted && not (Sys_unix.file_exists_exn t.path)
 
 (* The file is created on the first line worth saving, with everything
    recorded in memory so far; before that nothing touches the disk. *)
@@ -256,7 +264,9 @@ let add_entry t (entry : Entry.t) =
   | Budget _
   | Approval _
   | Allow_rule _
-  | Archived _ -> ()
+  | Archived _
+  | Spend _
+  | Resume_at _ -> ()
 ;;
 
 let read_lines path =
@@ -322,6 +332,30 @@ let set_budget t ~usd = append t (Budget { usd })
 let set_approval t ~mode ~plan = append t (Approval { mode; plan })
 let add_allow_rule t ~rule = append t (Allow_rule { rule })
 let set_archived t ~archived = append t (Archived { archived })
+let add_spend t ~usage ~cost_usd = append t (Spend { usage; cost_usd })
+
+let spend t =
+  List.fold
+    t.entries
+    ~init:(Usage.zero, 0.)
+    ~f:(fun (usage, cost) (e : Entry.t) ->
+      match e.payload with
+      | Spend s -> Usage.add usage s.usage, cost +. s.cost_usd
+      | _ -> usage, cost)
+;;
+
+let resume_at t =
+  List.find_map t.entries ~f:(fun (e : Entry.t) ->
+    match e.payload with
+    | Resume_at { at } -> Some at
+    | _ -> None)
+  |> Option.join
+;;
+
+let set_resume_at t at =
+  if not (Option.equal Float.equal (resume_at t) at)
+  then ignore (append t (Resume_at { at }) : Entry.t)
+;;
 
 let name t =
   List.find_map t.entries ~f:(fun (e : Entry.t) ->
@@ -337,7 +371,9 @@ let name t =
     | Budget _
     | Approval _
     | Allow_rule _
-    | Archived _ -> None)
+    | Archived _
+    | Spend _
+    | Resume_at _ -> None)
 ;;
 
 let description t =
@@ -354,7 +390,9 @@ let description t =
     | Budget _
     | Approval _
     | Allow_rule _
-    | Archived _ -> None)
+    | Archived _
+    | Spend _
+    | Resume_at _ -> None)
 ;;
 
 let append_compaction ?pinned t ~summary ~kept_from =
@@ -417,7 +455,9 @@ let context t =
       | Budget _
       | Approval _
       | Allow_rule _
-      | Archived _ -> acc)
+      | Archived _
+      | Spend _
+      | Resume_at _ -> acc)
   in
   let messages entries =
     List.filter_map entries ~f:(fun (e : Entry.t) ->
@@ -433,7 +473,9 @@ let context t =
       | Budget _
       | Approval _
       | Allow_rule _
-      | Archived _ -> None)
+      | Archived _
+      | Spend _
+      | Resume_at _ -> None)
   in
   match compaction with
   | None -> messages path
@@ -470,7 +512,9 @@ let system_prompt t =
     | Budget _
     | Approval _
     | Allow_rule _
-    | Archived _ -> acc)
+    | Archived _
+    | Spend _
+    | Resume_at _ -> acc)
 ;;
 
 let goal t =
@@ -487,7 +531,9 @@ let goal t =
     | Budget _
     | Approval _
     | Allow_rule _
-    | Archived _ -> acc)
+    | Archived _
+    | Spend _
+    | Resume_at _ -> acc)
 ;;
 
 let budget t =
@@ -504,7 +550,9 @@ let budget t =
     | Goal _
     | Approval _
     | Allow_rule _
-    | Archived _ -> acc)
+    | Archived _
+    | Spend _
+    | Resume_at _ -> acc)
 ;;
 
 let model t =
@@ -521,7 +569,9 @@ let model t =
     | Budget _
     | Approval _
     | Allow_rule _
-    | Archived _ -> acc)
+    | Archived _
+    | Spend _
+    | Resume_at _ -> acc)
 ;;
 
 let rewind t ~to_ =
@@ -559,7 +609,7 @@ let fork ?at t ~dir =
                    ; kept_from = renamed kept_from
                    ; pinned = Option.map pinned ~f:renamed
                    })
-            | Archived _ -> None
+            | Archived _ | Spend _ | Resume_at _ -> None
             | payload -> Some payload
           in
           Option.iter payload ~f:(fun payload ->
@@ -585,6 +635,7 @@ module Summary = struct
     ; parent : string option
     ; archived : bool option
     ; last_activity : float
+    ; resume_at : float option
     ; bytes : int
     }
   [@@deriving sexp_of]
@@ -658,7 +709,9 @@ let archived_and_activity t ~mtime =
         | Goal _
         | Budget _
         | Approval _
-        | Allow_rule _ -> last_message, marker)
+        | Allow_rule _
+        | Spend _
+        | Resume_at _ -> last_message, marker)
   in
   let activity = Option.value (Option.join last_message_at) ~default:mtime in
   let activity =
@@ -689,6 +742,7 @@ let summarise t ~path ~mtime =
   ; parent = t.parent
   ; archived
   ; last_activity
+  ; resume_at = resume_at t
   ; bytes = 0
   }
 ;;
@@ -915,7 +969,9 @@ let to_markdown t =
     | Budget _
     | Approval _
     | Allow_rule _
-    | Archived _ -> None
+    | Archived _
+    | Spend _
+    | Resume_at _ -> None
   in
   let blocks = List.filter_map (active_path t) ~f:block in
   String.concat (("# Session " ^ t.id) :: blocks) ~sep:"\n\n" ^ "\n"

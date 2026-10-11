@@ -57,6 +57,11 @@ val create
   -> unit
   -> t
 
+(** Loads the sessions that recorded a resume after a usage limit still to
+    come ([Session.resume_at]), so that they resume on time with nobody
+    attached; one that cannot be loaded is skipped with a line on stderr. *)
+val restore_resumes : t -> unit
+
 (** Registers a client whose outgoing lines go through [send]; it starts
     in a new session in [cwd] (or the default one). With [signed_in] (the
     router checked its credentials) it needs no token in [hello], and can
