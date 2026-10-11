@@ -2310,7 +2310,17 @@ let reply_to (m : Model.t) (tag : Reply_tag.t) result =
       json
       State.of_json
       ~f:(set_state { m with pending = { m.pending with session = None } })
-  | Reload_state, Ok _ -> m, [ rpc "get_state" [] ~tag:State ]
+  (* The backend answers a change of session with the new state; an older
+     one only with [{}]. *)
+  | Reload_state, Ok json ->
+    (match field json "state" with
+     | Some state ->
+       decode
+         m
+         state
+         State.of_json
+         ~f:(set_state { m with pending = { m.pending with session = None } })
+     | None -> m, [ rpc "get_state" [] ~tag:State ])
   (* Another session's, asked for before switching again. *)
   | Messages session, Ok _ when not (String.equal session (session_id m)) ->
     m, []

@@ -695,7 +695,7 @@ let%expect_test
     desk hello: client_id=client-3 host_id=host-desk
     {"type":"response","id":"r","ok":true,"result":{}}
     {"type":"response","id":"r","ok":true,"result":{}}
-    {"type":"response","id":"r1","ok":true,"result":{}}
+    {"type":"response","id":"r1","ok":true,"result":{"state":{"session_id":"<id>","session_path":"$DIR/sessions/<stamp>_<id>.jsonl","session_name":null,"session_description":null,"cwd":"/home/me","git_branch":null,"model":{"id":"deepseek-flash","provider":"deepseek","key":"deepseek/deepseek-flash","name":"DeepSeek V4.1 Flash","context_window":1000000,"max_output":384000,"supports_thinking":true,"cost":{"input":0.3,"output":1.2,"cache_read":0.006}},"thinking":"on","running":false,"message_count":2,"usage":{"input":10,"output":5,"cache_read":0},"cost_usd":9e-06,"context_tokens":10,"active_host":"host-desk","hosts":[{"id":"container-me","name":"container","cwd":"/workspace/me","session_id":"<id>","session_name":null}],"subagents":[],"jobs":[]}}}
     ((active_host host-desk) (cwd /home/me) (hosts (container-me=/workspace/me)))
     {"type":"response","id":"r1","ok":true,"result":{}}
     tool_result: waiting for tool host "desk" to reconnect; /host picks another
@@ -804,7 +804,7 @@ let%expect_test "a backend restart keeps each session's host" =
     {"type":"response","id":"r","ok":true,"result":{}}
     desk ran bash in /home/me/proj
     tool_result: ran on desk in /home/me/proj
-    {"type":"response","id":"r","ok":true,"result":{}}
+    {"type":"response","id":"r","ok":true,"result":{"state":{"session_id":"<id>","session_path":"$DIR/sessions/<stamp>_<id>.jsonl","session_name":null,"session_description":null,"cwd":"$DIR","git_branch":null,"model":{"id":"deepseek-flash","provider":"deepseek","key":"deepseek/deepseek-flash","name":"DeepSeek V4.1 Flash","context_window":1000000,"max_output":384000,"supports_thinking":true,"cost":{"input":0.3,"output":1.2,"cache_read":0.006}},"thinking":"on","running":false,"message_count":2,"usage":{"input":10,"output":5,"cache_read":0},"cost_usd":9e-06,"context_tokens":10,"active_host":"backend","hosts":[{"id":"backend","name":"<host>","cwd":"$DIR","session_id":null,"session_name":null},{"id":"host-laptop","name":"laptop","cwd":"/home/me","session_id":"<id>","session_name":null},{"id":"host-desk","name":"desk","cwd":"/home/me","session_id":"<id>","session_name":null}],"subagents":[],"jobs":[]}}}
     ((active_host backend) (cwd $DIR)
      (hosts (backend=$DIR host-laptop=/home/me host-desk=/home/me)))
     {"type":"response","id":"r","ok":true,"result":{}}
@@ -1019,14 +1019,14 @@ let%expect_test
     desk hello: client_id=client-3 host_id=host-desk
     first: host-desk in /home/me
     {"type":"response","id":"r","ok":true,"result":{}}
-    {"type":"response","id":"r","ok":true,"result":{}}
+    {"type":"response","id":"r","ok":true,"result":{"state":{"session_id":"<id>","session_path":"$DIR/sessions/<stamp>_<id>.jsonl","session_name":null,"session_description":null,"cwd":"/home/me/proj","git_branch":null,"model":{"id":"deepseek-flash","provider":"deepseek","key":"deepseek/deepseek-flash","name":"DeepSeek V4.1 Flash","context_window":1000000,"max_output":384000,"supports_thinking":true,"cost":{"input":0.3,"output":1.2,"cache_read":0.006}},"thinking":"on","running":false,"message_count":0,"usage":{"input":0,"output":0,"cache_read":0},"cost_usd":0,"context_tokens":0,"active_host":"host-desk","hosts":[{"id":"container-me","name":"container","cwd":"/workspace/me","session_id":"<id>","session_name":null},{"id":"host-desk","name":"desk","cwd":"/home/me/proj","session_id":"<id>","session_name":null}],"subagents":[],"jobs":[]}}}
     new: host-desk in /home/me/proj
     {"type":"response","id":"r","ok":true,"result":{}}
     desk ran bash in /home/me/proj
     tool_result: ran on desk in /home/me/proj
-    {"type":"response","id":"r","ok":true,"result":{}}
+    {"type":"response","id":"r","ok":true,"result":{"state":{"session_id":"<id>","session_path":"$DIR/sessions/<stamp>_<id>.jsonl","session_name":null,"session_description":null,"cwd":"/home/me/proj","git_branch":null,"model":{"id":"deepseek-flash","provider":"deepseek","key":"deepseek/deepseek-flash","name":"DeepSeek V4.1 Flash","context_window":1000000,"max_output":384000,"supports_thinking":true,"cost":{"input":0.3,"output":1.2,"cache_read":0.006}},"thinking":"on","running":false,"message_count":4,"usage":{"input":30,"output":13,"cache_read":5},"cost_usd":2.313e-05,"context_tokens":10,"active_host":"host-desk","hosts":[{"id":"container-me","name":"container","cwd":"/workspace/me","session_id":"<id>","session_name":null},{"id":"host-desk","name":"desk","cwd":"/home/me/proj","session_id":"<id>","session_name":null}],"subagents":[],"jobs":[]}}}
     fork: host-desk in /home/me/proj
-    {"type":"response","id":"r","ok":true,"result":{}}
+    {"type":"response","id":"r","ok":true,"result":{"state":{"session_id":"<id>","session_path":"$DIR/sessions/<stamp>_<id>.jsonl","session_name":null,"session_description":null,"cwd":"/home/me/proj","git_branch":null,"model":{"id":"deepseek-flash","provider":"deepseek","key":"deepseek/deepseek-flash","name":"DeepSeek V4.1 Flash","context_window":1000000,"max_output":384000,"supports_thinking":true,"cost":{"input":0.3,"output":1.2,"cache_read":0.006}},"thinking":"on","running":false,"message_count":4,"usage":{"input":30,"output":13,"cache_read":5},"cost_usd":2.313e-05,"context_tokens":10,"active_host":"host-desk","hosts":[{"id":"container-me","name":"container","cwd":"/workspace/me","session_id":"<id>","session_name":null},{"id":"host-desk","name":"desk","cwd":"/home/me/proj","session_id":"<id>","session_name":null}],"subagents":[],"jobs":[]}}}
     clone: host-desk in /home/me/proj
     |}];
   (* A session that runs on the container by default (a browser's): its
@@ -1053,18 +1053,18 @@ let%expect_test
     web hello: client_id=client-4 host_id=client-4
     {"type":"response","id":"r","ok":true,"result":{}}
     web's: container-me in /workspace/me
-    {"type":"response","id":"r","ok":true,"result":{}}
+    {"type":"response","id":"r","ok":true,"result":{"state":{"session_id":"<id>","session_path":"$DIR/sessions/<stamp>_<id>.jsonl","session_name":"web","session_description":null,"cwd":"/workspace/me","git_branch":null,"model":{"id":"deepseek-flash","provider":"deepseek","key":"deepseek/deepseek-flash","name":"DeepSeek V4.1 Flash","context_window":1000000,"max_output":384000,"supports_thinking":true,"cost":{"input":0.3,"output":1.2,"cache_read":0.006}},"thinking":"on","running":false,"message_count":0,"usage":{"input":0,"output":0,"cache_read":0},"cost_usd":0,"context_tokens":0,"active_host":"container-me","hosts":[{"id":"container-me","name":"container","cwd":"/workspace/me","session_id":"<id>","session_name":null},{"id":"host-desk","name":"desk","cwd":"/home/me","session_id":"<id>","session_name":"web"}],"subagents":[],"jobs":[]}}}
     switched: container-me in /workspace/me
-    {"type":"response","id":"r","ok":true,"result":{}}
+    {"type":"response","id":"r","ok":true,"result":{"state":{"session_id":"<id>","session_path":"$DIR/sessions/<stamp>_<id>.jsonl","session_name":"web","session_description":null,"cwd":"/home/me","git_branch":null,"model":{"id":"deepseek-flash","provider":"deepseek","key":"deepseek/deepseek-flash","name":"DeepSeek V4.1 Flash","context_window":1000000,"max_output":384000,"supports_thinking":true,"cost":{"input":0.3,"output":1.2,"cache_read":0.006}},"thinking":"on","running":false,"message_count":0,"usage":{"input":0,"output":0,"cache_read":0},"cost_usd":0,"context_tokens":0,"active_host":"host-desk","hosts":[{"id":"container-me","name":"container","cwd":"/workspace/me","session_id":"<id>","session_name":null},{"id":"host-desk","name":"desk","cwd":"/home/me","session_id":"<id>","session_name":"web"}],"subagents":[],"jobs":[]}}}
     fork: host-desk in /home/me
     {"type":"response","id":"r","ok":true,"result":{}}
     desk ran bash in /home/me
     tool_result: ran on desk in /home/me
-    {"type":"response","id":"r","ok":true,"result":{}}
-    {"type":"response","id":"r","ok":true,"result":{}}
+    {"type":"response","id":"r","ok":true,"result":{"state":{"session_id":"<id>","session_path":"$DIR/sessions/<stamp>_<id>.jsonl","session_name":"web","session_description":null,"cwd":"/workspace/me","git_branch":null,"model":{"id":"deepseek-flash","provider":"deepseek","key":"deepseek/deepseek-flash","name":"DeepSeek V4.1 Flash","context_window":1000000,"max_output":384000,"supports_thinking":true,"cost":{"input":0.3,"output":1.2,"cache_read":0.006}},"thinking":"on","running":false,"message_count":0,"usage":{"input":0,"output":0,"cache_read":0},"cost_usd":0,"context_tokens":0,"active_host":"container-me","hosts":[{"id":"container-me","name":"container","cwd":"/workspace/me","session_id":"<id>","session_name":null},{"id":"host-desk","name":"desk","cwd":"/home/me","session_id":"<id>","session_name":"web"}],"subagents":[],"jobs":[]}}}
+    {"type":"response","id":"r","ok":true,"result":{"state":{"session_id":"<id>","session_path":"$DIR/sessions/<stamp>_<id>.jsonl","session_name":"web","session_description":null,"cwd":"/home/me","git_branch":null,"model":{"id":"deepseek-flash","provider":"deepseek","key":"deepseek/deepseek-flash","name":"DeepSeek V4.1 Flash","context_window":1000000,"max_output":384000,"supports_thinking":true,"cost":{"input":0.3,"output":1.2,"cache_read":0.006}},"thinking":"on","running":false,"message_count":0,"usage":{"input":0,"output":0,"cache_read":0},"cost_usd":0,"context_tokens":0,"active_host":"host-desk","hosts":[{"id":"container-me","name":"container","cwd":"/workspace/me","session_id":"<id>","session_name":null},{"id":"host-desk","name":"desk","cwd":"/home/me","session_id":"<id>","session_name":"web"}],"subagents":[],"jobs":[]}}}
     clone: host-desk in /home/me
-    {"type":"response","id":"r","ok":true,"result":{}}
-    {"type":"response","id":"r","ok":true,"result":{}}
+    {"type":"response","id":"r","ok":true,"result":{"state":{"session_id":"<id>","session_path":"$DIR/sessions/<stamp>_<id>.jsonl","session_name":"web","session_description":null,"cwd":"/workspace/me","git_branch":null,"model":{"id":"deepseek-flash","provider":"deepseek","key":"deepseek/deepseek-flash","name":"DeepSeek V4.1 Flash","context_window":1000000,"max_output":384000,"supports_thinking":true,"cost":{"input":0.3,"output":1.2,"cache_read":0.006}},"thinking":"on","running":false,"message_count":0,"usage":{"input":0,"output":0,"cache_read":0},"cost_usd":0,"context_tokens":0,"active_host":"container-me","hosts":[{"id":"container-me","name":"container","cwd":"/workspace/me","session_id":"<id>","session_name":null},{"id":"host-desk","name":"desk","cwd":"/home/me","session_id":"<id>","session_name":"web"}],"subagents":[],"jobs":[]}}}
+    {"type":"response","id":"r","ok":true,"result":{"state":{"session_id":"<id>","session_path":"$DIR/sessions/<stamp>_<id>.jsonl","session_name":null,"session_description":null,"cwd":"/home/me","git_branch":null,"model":{"id":"deepseek-flash","provider":"deepseek","key":"deepseek/deepseek-flash","name":"DeepSeek V4.1 Flash","context_window":1000000,"max_output":384000,"supports_thinking":true,"cost":{"input":0.3,"output":1.2,"cache_read":0.006}},"thinking":"on","running":false,"message_count":0,"usage":{"input":0,"output":0,"cache_read":0},"cost_usd":0,"context_tokens":0,"active_host":"host-desk","hosts":[{"id":"container-me","name":"container","cwd":"/workspace/me","session_id":"<id>","session_name":null},{"id":"host-desk","name":"desk","cwd":"/home/me","session_id":"<id>","session_name":null}],"subagents":[],"jobs":[]}}}
     new: host-desk in /home/me
     |}];
   (* Pinned to the container with /host: a fork or clone (the same work)
@@ -1085,14 +1085,14 @@ let%expect_test
   where t "new" (Fake_host.agent h desk_tui);
   [%expect
     {|
-    {"type":"response","id":"r","ok":true,"result":{}}
+    {"type":"response","id":"r","ok":true,"result":{"state":{"session_id":"<id>","session_path":"$DIR/sessions/<stamp>_<id>.jsonl","session_name":"web","session_description":null,"cwd":"/workspace/me","git_branch":null,"model":{"id":"deepseek-flash","provider":"deepseek","key":"deepseek/deepseek-flash","name":"DeepSeek V4.1 Flash","context_window":1000000,"max_output":384000,"supports_thinking":true,"cost":{"input":0.3,"output":1.2,"cache_read":0.006}},"thinking":"on","running":false,"message_count":0,"usage":{"input":0,"output":0,"cache_read":0},"cost_usd":0,"context_tokens":0,"active_host":"container-me","hosts":[{"id":"container-me","name":"container","cwd":"/workspace/me","session_id":"<id>","session_name":null},{"id":"host-desk","name":"desk","cwd":"/home/me","session_id":"<id>","session_name":"web"}],"subagents":[],"jobs":[]}}}
     {"type":"response","id":"r","ok":true,"result":{}}
     desk notice: tools now run on container in /workspace/me/x
-    {"type":"response","id":"r","ok":true,"result":{}}
+    {"type":"response","id":"r","ok":true,"result":{"state":{"session_id":"<id>","session_path":"$DIR/sessions/<stamp>_<id>.jsonl","session_name":"web","session_description":null,"cwd":"/workspace/me/x","git_branch":null,"model":{"id":"deepseek-flash","provider":"deepseek","key":"deepseek/deepseek-flash","name":"DeepSeek V4.1 Flash","context_window":1000000,"max_output":384000,"supports_thinking":true,"cost":{"input":0.3,"output":1.2,"cache_read":0.006}},"thinking":"on","running":false,"message_count":0,"usage":{"input":0,"output":0,"cache_read":0},"cost_usd":0,"context_tokens":0,"active_host":"container-me","hosts":[{"id":"container-me","name":"container","cwd":"/workspace/me/x","session_id":"<id>","session_name":null},{"id":"host-desk","name":"desk","cwd":"/home/me","session_id":"<id>","session_name":"web"}],"subagents":[],"jobs":[]}}}
     fork: container-me (pinned) in /workspace/me/x
-    {"type":"response","id":"r","ok":true,"result":{}}
+    {"type":"response","id":"r","ok":true,"result":{"state":{"session_id":"<id>","session_path":"$DIR/sessions/<stamp>_<id>.jsonl","session_name":"web","session_description":null,"cwd":"/workspace/me/x","git_branch":null,"model":{"id":"deepseek-flash","provider":"deepseek","key":"deepseek/deepseek-flash","name":"DeepSeek V4.1 Flash","context_window":1000000,"max_output":384000,"supports_thinking":true,"cost":{"input":0.3,"output":1.2,"cache_read":0.006}},"thinking":"on","running":false,"message_count":0,"usage":{"input":0,"output":0,"cache_read":0},"cost_usd":0,"context_tokens":0,"active_host":"container-me","hosts":[{"id":"container-me","name":"container","cwd":"/workspace/me/x","session_id":"<id>","session_name":null},{"id":"host-desk","name":"desk","cwd":"/home/me","session_id":"<id>","session_name":"web"}],"subagents":[],"jobs":[]}}}
     clone: container-me (pinned) in /workspace/me/x
-    {"type":"response","id":"r","ok":true,"result":{}}
+    {"type":"response","id":"r","ok":true,"result":{"state":{"session_id":"<id>","session_path":"$DIR/sessions/<stamp>_<id>.jsonl","session_name":null,"session_description":null,"cwd":"/home/me","git_branch":null,"model":{"id":"deepseek-flash","provider":"deepseek","key":"deepseek/deepseek-flash","name":"DeepSeek V4.1 Flash","context_window":1000000,"max_output":384000,"supports_thinking":true,"cost":{"input":0.3,"output":1.2,"cache_read":0.006}},"thinking":"on","running":false,"message_count":0,"usage":{"input":0,"output":0,"cache_read":0},"cost_usd":0,"context_tokens":0,"active_host":"host-desk","hosts":[{"id":"container-me","name":"container","cwd":"/workspace/me","session_id":"<id>","session_name":null},{"id":"host-desk","name":"desk","cwd":"/home/me","session_id":"<id>","session_name":null}],"subagents":[],"jobs":[]}}}
     new: host-desk in /home/me
     |}];
   (* Imported sessions are on the desktop too: in the cwd they had there,
@@ -1121,9 +1121,9 @@ let%expect_test
     imported: host-desk in /home/me/old
     {"type":"response","id":"r","ok":true,"result":{"path":"$DIR/sessions/<stamp>_<id>.jsonl"}}
     imported hostless: host-desk in /home/me
-    {"type":"response","id":"r","ok":true,"result":{}}
+    {"type":"response","id":"r","ok":true,"result":{"state":{"session_id":"<id>","session_path":"$DIR/sessions/<stamp>_<id>.jsonl","session_name":"hostless","session_description":null,"cwd":"/home/me","git_branch":null,"model":{"id":"deepseek-flash","provider":"deepseek","key":"deepseek/deepseek-flash","name":"DeepSeek V4.1 Flash","context_window":1000000,"max_output":384000,"supports_thinking":true,"cost":{"input":0.3,"output":1.2,"cache_read":0.006}},"thinking":"on","running":false,"message_count":0,"usage":{"input":0,"output":0,"cache_read":0},"cost_usd":0,"context_tokens":0,"active_host":"host-desk","hosts":[{"id":"container-me","name":"container","cwd":"/workspace/me","session_id":"<id>","session_name":null},{"id":"host-desk","name":"desk","cwd":"/home/me","session_id":"<id>","session_name":"hostless"}],"subagents":[],"jobs":[]}}}
     switched hostless: host-desk in /home/me
-    {"type":"response","id":"r","ok":true,"result":{}}
+    {"type":"response","id":"r","ok":true,"result":{"state":{"session_id":"<id>","session_path":"$DIR/sessions/<stamp>_<id>.jsonl","session_name":"container","session_description":null,"cwd":"/w","git_branch":null,"model":{"id":"deepseek-flash","provider":"deepseek","key":"deepseek/deepseek-flash","name":"DeepSeek V4.1 Flash","context_window":1000000,"max_output":384000,"supports_thinking":true,"cost":{"input":0.3,"output":1.2,"cache_read":0.006}},"thinking":"on","running":false,"message_count":0,"usage":{"input":0,"output":0,"cache_read":0},"cost_usd":0,"context_tokens":0,"active_host":"container-me","hosts":[{"id":"container-me","name":"container","cwd":"/w","session_id":"<id>","session_name":null},{"id":"host-desk","name":"desk","cwd":"/home/me","session_id":"<id>","session_name":"container"}],"subagents":[],"jobs":[]}}}
     switched on container: container-me in /w
     |}]
 ;;
@@ -1161,16 +1161,16 @@ let%expect_test
     desk hello: client_id=client-3 host_id=host-desk
     {"type":"response","id":"r","ok":true,"result":{}}
     web hello: client_id=client-4 host_id=client-4
-    {"type":"response","id":"r","ok":true,"result":{}}
+    {"type":"response","id":"r","ok":true,"result":{"state":{"session_id":"<id>","session_path":"$DIR/sessions/<stamp>_<id>.jsonl","session_name":null,"session_description":null,"cwd":"/home/me/proj","git_branch":null,"model":{"id":"deepseek-flash","provider":"deepseek","key":"deepseek/deepseek-flash","name":"DeepSeek V4.1 Flash","context_window":1000000,"max_output":384000,"supports_thinking":true,"cost":{"input":0.3,"output":1.2,"cache_read":0.006}},"thinking":"on","running":false,"message_count":0,"usage":{"input":0,"output":0,"cache_read":0},"cost_usd":0,"context_tokens":0,"active_host":"host-desk","hosts":[{"id":"container-me","name":"container","cwd":"/workspace/me","session_id":"<id>","session_name":null},{"id":"host-desk","name":"desk","cwd":"/home/me/proj","session_id":"<id>","session_name":null}],"subagents":[],"jobs":[]}}}
     new: host-desk in /home/me/proj
     {"type":"response","id":"r","ok":true,"result":{}}
     desk ran bash in /home/me/proj
     tool_result: ran on desk in /home/me/proj
-    {"type":"response","id":"r","ok":true,"result":{}}
-    {"type":"response","id":"r","ok":true,"result":{}}
+    {"type":"response","id":"r","ok":true,"result":{"state":{"session_id":"<id>","session_path":"$DIR/sessions/<stamp>_<id>.jsonl","session_name":null,"session_description":null,"cwd":"/home/me/proj","git_branch":null,"model":{"id":"deepseek-flash","provider":"deepseek","key":"deepseek/deepseek-flash","name":"DeepSeek V4.1 Flash","context_window":1000000,"max_output":384000,"supports_thinking":true,"cost":{"input":0.3,"output":1.2,"cache_read":0.006}},"thinking":"on","running":false,"message_count":0,"usage":{"input":0,"output":0,"cache_read":0},"cost_usd":0,"context_tokens":0,"active_host":"host-desk","hosts":[{"id":"container-me","name":"container","cwd":"/workspace/me","session_id":"<id>","session_name":null},{"id":"host-desk","name":"desk","cwd":"/home/me/proj","session_id":"<id>","session_name":null}],"subagents":[],"jobs":[]}}}
+    {"type":"response","id":"r","ok":true,"result":{"state":{"session_id":"<id>","session_path":"$DIR/sessions/<stamp>_<id>.jsonl","session_name":null,"session_description":null,"cwd":"/home/me/proj","git_branch":null,"model":{"id":"deepseek-flash","provider":"deepseek","key":"deepseek/deepseek-flash","name":"DeepSeek V4.1 Flash","context_window":1000000,"max_output":384000,"supports_thinking":true,"cost":{"input":0.3,"output":1.2,"cache_read":0.006}},"thinking":"on","running":false,"message_count":0,"usage":{"input":0,"output":0,"cache_read":0},"cost_usd":0,"context_tokens":0,"active_host":"host-desk","hosts":[{"id":"container-me","name":"container","cwd":"/workspace/me","session_id":"<id>","session_name":null},{"id":"host-desk","name":"desk","cwd":"/home/me/proj","session_id":"<id>","session_name":null}],"subagents":[],"jobs":[]}}}
     fork: host-desk in /home/me/proj
-    {"type":"response","id":"r","ok":true,"result":{}}
-    {"type":"response","id":"r","ok":true,"result":{}}
+    {"type":"response","id":"r","ok":true,"result":{"state":{"session_id":"<id>","session_path":"$DIR/sessions/<stamp>_<id>.jsonl","session_name":null,"session_description":null,"cwd":"/home/me/proj","git_branch":null,"model":{"id":"deepseek-flash","provider":"deepseek","key":"deepseek/deepseek-flash","name":"DeepSeek V4.1 Flash","context_window":1000000,"max_output":384000,"supports_thinking":true,"cost":{"input":0.3,"output":1.2,"cache_read":0.006}},"thinking":"on","running":false,"message_count":0,"usage":{"input":0,"output":0,"cache_read":0},"cost_usd":0,"context_tokens":0,"active_host":"host-desk","hosts":[{"id":"container-me","name":"container","cwd":"/workspace/me","session_id":"<id>","session_name":null},{"id":"host-desk","name":"desk","cwd":"/home/me/proj","session_id":"<id>","session_name":null}],"subagents":[],"jobs":[]}}}
+    {"type":"response","id":"r","ok":true,"result":{"state":{"session_id":"<id>","session_path":"$DIR/sessions/<stamp>_<id>.jsonl","session_name":null,"session_description":null,"cwd":"/home/me/proj","git_branch":null,"model":{"id":"deepseek-flash","provider":"deepseek","key":"deepseek/deepseek-flash","name":"DeepSeek V4.1 Flash","context_window":1000000,"max_output":384000,"supports_thinking":true,"cost":{"input":0.3,"output":1.2,"cache_read":0.006}},"thinking":"on","running":false,"message_count":0,"usage":{"input":0,"output":0,"cache_read":0},"cost_usd":0,"context_tokens":0,"active_host":"host-desk","hosts":[{"id":"container-me","name":"container","cwd":"/workspace/me","session_id":"<id>","session_name":null},{"id":"host-desk","name":"desk","cwd":"/home/me/proj","session_id":"<id>","session_name":null}],"subagents":[],"jobs":[]}}}
     clone: host-desk in /home/me/proj
     |}];
   (* Saved sessions without a host, imported or switched to, join it there
@@ -1189,11 +1189,11 @@ let%expect_test
   where t "imported from container" (Fake_host.agent h web);
   [%expect
     {|
-    {"type":"response","id":"r","ok":true,"result":{}}
+    {"type":"response","id":"r","ok":true,"result":{"state":{"session_id":"<id>","session_path":"$DIR/sessions/<stamp>_<id>.jsonl","session_name":null,"session_description":null,"cwd":"/home/me/proj","git_branch":null,"model":{"id":"deepseek-flash","provider":"deepseek","key":"deepseek/deepseek-flash","name":"DeepSeek V4.1 Flash","context_window":1000000,"max_output":384000,"supports_thinking":true,"cost":{"input":0.3,"output":1.2,"cache_read":0.006}},"thinking":"on","running":false,"message_count":0,"usage":{"input":0,"output":0,"cache_read":0},"cost_usd":0,"context_tokens":0,"active_host":"host-desk","hosts":[{"id":"container-me","name":"container","cwd":"/workspace/me","session_id":"<id>","session_name":null},{"id":"host-desk","name":"desk","cwd":"/home/me/proj","session_id":"<id>","session_name":null}],"subagents":[],"jobs":[]}}}
     {"type":"response","id":"r","ok":true,"result":{"path":"$DIR/sessions/<stamp>_<id>.jsonl"}}
     imported hostless: host-desk in /home/me/proj
-    {"type":"response","id":"r","ok":true,"result":{}}
-    {"type":"response","id":"r","ok":true,"result":{}}
+    {"type":"response","id":"r","ok":true,"result":{"state":{"session_id":"<id>","session_path":"$DIR/sessions/<stamp>_<id>.jsonl","session_name":null,"session_description":null,"cwd":"/home/me/proj","git_branch":null,"model":{"id":"deepseek-flash","provider":"deepseek","key":"deepseek/deepseek-flash","name":"DeepSeek V4.1 Flash","context_window":1000000,"max_output":384000,"supports_thinking":true,"cost":{"input":0.3,"output":1.2,"cache_read":0.006}},"thinking":"on","running":false,"message_count":0,"usage":{"input":0,"output":0,"cache_read":0},"cost_usd":0,"context_tokens":0,"active_host":"host-desk","hosts":[{"id":"container-me","name":"container","cwd":"/workspace/me","session_id":"<id>","session_name":null},{"id":"host-desk","name":"desk","cwd":"/home/me/proj","session_id":"<id>","session_name":null}],"subagents":[],"jobs":[]}}}
+    {"type":"response","id":"r","ok":true,"result":{"state":{"session_id":"<id>","session_path":"$DIR/sessions/<stamp>_<id>.jsonl","session_name":"hostless","session_description":null,"cwd":"/home/me/proj","git_branch":null,"model":{"id":"deepseek-flash","provider":"deepseek","key":"deepseek/deepseek-flash","name":"DeepSeek V4.1 Flash","context_window":1000000,"max_output":384000,"supports_thinking":true,"cost":{"input":0.3,"output":1.2,"cache_read":0.006}},"thinking":"on","running":false,"message_count":0,"usage":{"input":0,"output":0,"cache_read":0},"cost_usd":0,"context_tokens":0,"active_host":"host-desk","hosts":[{"id":"container-me","name":"container","cwd":"/workspace/me","session_id":"<id>","session_name":null},{"id":"host-desk","name":"desk","cwd":"/home/me/proj","session_id":"<id>","session_name":null}],"subagents":[],"jobs":[]}}}
     switched hostless: host-desk in /home/me/proj
     {"type":"response","id":"r","ok":true,"result":{"path":"$DIR/sessions/<stamp>_<id>.jsonl"}}
     imported from container: container-me in /workspace/me/old
@@ -1207,8 +1207,8 @@ let%expect_test
   Fake_host.call t h web ~params:{|{"command": "pwd"}|} "shell";
   [%expect
     {|
-    {"type":"response","id":"r","ok":true,"result":{}}
-    {"type":"response","id":"r","ok":true,"result":{}}
+    {"type":"response","id":"r","ok":true,"result":{"state":{"session_id":"<id>","session_path":"$DIR/sessions/<stamp>_<id>.jsonl","session_name":null,"session_description":null,"cwd":"/home/me/proj","git_branch":null,"model":{"id":"deepseek-flash","provider":"deepseek","key":"deepseek/deepseek-flash","name":"DeepSeek V4.1 Flash","context_window":1000000,"max_output":384000,"supports_thinking":true,"cost":{"input":0.3,"output":1.2,"cache_read":0.006}},"thinking":"on","running":false,"message_count":0,"usage":{"input":0,"output":0,"cache_read":0},"cost_usd":0,"context_tokens":0,"active_host":"host-desk","hosts":[{"id":"container-me","name":"container","cwd":"/workspace/me","session_id":"<id>","session_name":null},{"id":"host-desk","name":"desk","cwd":"/home/me/proj","session_id":"<id>","session_name":null}],"subagents":[],"jobs":[]}}}
+    {"type":"response","id":"r","ok":true,"result":{"state":{"session_id":"<id>","session_path":"$DIR/sessions/<stamp>_<id>.jsonl","session_name":null,"session_description":null,"cwd":"/home/me/proj","git_branch":null,"model":{"id":"deepseek-flash","provider":"deepseek","key":"deepseek/deepseek-flash","name":"DeepSeek V4.1 Flash","context_window":1000000,"max_output":384000,"supports_thinking":true,"cost":{"input":0.3,"output":1.2,"cache_read":0.006}},"thinking":"on","running":false,"message_count":0,"usage":{"input":0,"output":0,"cache_read":0},"cost_usd":0,"context_tokens":0,"active_host":"host-desk","hosts":[{"id":"container-me","name":"container","cwd":"/workspace/me","session_id":"<id>","session_name":null}],"subagents":[],"jobs":[]}}}
     new: host-desk in /home/me/proj
     {"type":"response","id":"r","ok":true,"result":{"text":"waiting for tool host \"desk\" to reconnect; /host picks another","is_error":true}}
     |}]
@@ -1239,13 +1239,13 @@ let%expect_test
     {|
     web hello: client_id=client-2 host_id=client-2
     first: no host
-    {"type":"response","id":"r","ok":true,"result":{}}
+    {"type":"response","id":"r","ok":true,"result":{"state":{"session_id":"<id>","session_path":"$DIR/sessions/<stamp>_<id>.jsonl","session_name":null,"session_description":null,"cwd":"$DIR","git_branch":null,"model":{"id":"deepseek-flash","provider":"deepseek","key":"deepseek/deepseek-flash","name":"DeepSeek V4.1 Flash","context_window":1000000,"max_output":384000,"supports_thinking":true,"cost":{"input":0.3,"output":1.2,"cache_read":0.006}},"thinking":"on","running":false,"message_count":0,"usage":{"input":0,"output":0,"cache_read":0},"cost_usd":0,"context_tokens":0,"active_host":"","hosts":[],"subagents":[],"jobs":[]}}}
     new: no host
     container hello: client_id=client-3 host_id=container-me
     new: container-me in /workspace/me
     web notice: tools now run on container in /workspace/me
     desk hello: client_id=client-4 host_id=host-desk
-    {"type":"response","id":"r","ok":true,"result":{}}
+    {"type":"response","id":"r","ok":true,"result":{"state":{"session_id":"<id>","session_path":"$DIR/sessions/<stamp>_<id>.jsonl","session_name":null,"session_description":null,"cwd":"/workspace/me","git_branch":null,"model":{"id":"deepseek-flash","provider":"deepseek","key":"deepseek/deepseek-flash","name":"DeepSeek V4.1 Flash","context_window":1000000,"max_output":384000,"supports_thinking":true,"cost":{"input":0.3,"output":1.2,"cache_read":0.006}},"thinking":"on","running":false,"message_count":0,"usage":{"input":0,"output":0,"cache_read":0},"cost_usd":0,"context_tokens":0,"active_host":"container-me","hosts":[{"id":"container-me","name":"container","cwd":"/workspace/me","session_id":"<id>","session_name":null},{"id":"host-desk","name":"desk","cwd":"/home/me","session_id":"<id>","session_name":null}],"subagents":[],"jobs":[]}}}
     another: container-me in /workspace/me
     |}]
 ;;
@@ -1278,14 +1278,14 @@ let%expect_test "backend host: new sessions start where they did" =
     first: host-tui in /home/me
     tui notice: tools now run on tui in /home/me
     {"type":"response","id":"r","ok":true,"result":{}}
-    {"type":"response","id":"r","ok":true,"result":{}}
+    {"type":"response","id":"r","ok":true,"result":{"state":{"session_id":"<id>","session_path":"$DIR/sessions/<stamp>_<id>.jsonl","session_name":null,"session_description":null,"cwd":"/home/me/proj","git_branch":null,"model":{"id":"deepseek-flash","provider":"deepseek","key":"deepseek/deepseek-flash","name":"DeepSeek V4.1 Flash","context_window":1000000,"max_output":384000,"supports_thinking":true,"cost":{"input":0.3,"output":1.2,"cache_read":0.006}},"thinking":"on","running":false,"message_count":0,"usage":{"input":0,"output":0,"cache_read":0},"cost_usd":0,"context_tokens":0,"active_host":"host-tui","hosts":[{"id":"backend","name":"<host>","cwd":"/home/me/proj","session_id":null,"session_name":null},{"id":"host-tui","name":"tui","cwd":"/home/me/proj","session_id":"<id>","session_name":null}],"subagents":[],"jobs":[]}}}
     new: host-tui in /home/me/proj
-    {"type":"response","id":"r","ok":true,"result":{}}
+    {"type":"response","id":"r","ok":true,"result":{"state":{"session_id":"<id>","session_path":"$DIR/sessions/<stamp>_<id>.jsonl","session_name":null,"session_description":null,"cwd":"/home/me/proj","git_branch":null,"model":{"id":"deepseek-flash","provider":"deepseek","key":"deepseek/deepseek-flash","name":"DeepSeek V4.1 Flash","context_window":1000000,"max_output":384000,"supports_thinking":true,"cost":{"input":0.3,"output":1.2,"cache_read":0.006}},"thinking":"on","running":false,"message_count":0,"usage":{"input":0,"output":0,"cache_read":0},"cost_usd":0,"context_tokens":0,"active_host":"host-tui","hosts":[{"id":"backend","name":"<host>","cwd":"/home/me/proj","session_id":null,"session_name":null},{"id":"host-tui","name":"tui","cwd":"/home/me/proj","session_id":"<id>","session_name":null}],"subagents":[],"jobs":[]}}}
     fork: host-tui in /home/me/proj
     main: backend in $DIR
-    {"type":"response","id":"r1","ok":true,"result":{}}
+    {"type":"response","id":"r1","ok":true,"result":{"state":{"session_id":"<id>","session_path":"$DIR/sessions/<stamp>_<id>.jsonl","session_name":null,"session_description":null,"cwd":"$DIR","git_branch":null,"model":{"id":"deepseek-flash","provider":"deepseek","key":"deepseek/deepseek-flash","name":"DeepSeek V4.1 Flash","context_window":1000000,"max_output":384000,"supports_thinking":true,"cost":{"input":0.3,"output":1.2,"cache_read":0.006}},"thinking":"on","running":false,"message_count":0,"usage":{"input":0,"output":0,"cache_read":0},"cost_usd":0,"context_tokens":0,"active_host":"backend","hosts":[{"id":"backend","name":"<host>","cwd":"$DIR","session_id":null,"session_name":null},{"id":"host-tui","name":"tui","cwd":"/home/me","session_id":"<id>","session_name":null}],"subagents":[],"jobs":[]}}}
     main's new: backend in $DIR
-    {"type":"response","id":"r1","ok":true,"result":{}}
+    {"type":"response","id":"r1","ok":true,"result":{"state":{"session_id":"<id>","session_path":"$DIR/sessions/<stamp>_<id>.jsonl","session_name":null,"session_description":null,"cwd":"$DIR","git_branch":null,"model":{"id":"deepseek-flash","provider":"deepseek","key":"deepseek/deepseek-flash","name":"DeepSeek V4.1 Flash","context_window":1000000,"max_output":384000,"supports_thinking":true,"cost":{"input":0.3,"output":1.2,"cache_read":0.006}},"thinking":"on","running":false,"message_count":0,"usage":{"input":0,"output":0,"cache_read":0},"cost_usd":0,"context_tokens":0,"active_host":"backend","hosts":[{"id":"backend","name":"<host>","cwd":"$DIR","session_id":null,"session_name":null},{"id":"host-tui","name":"tui","cwd":"/home/me","session_id":"<id>","session_name":null}],"subagents":[],"jobs":[]}}}
     main's clone: backend in $DIR
     |}];
   (* Pinned to the backend: the TUI's fork stays there; its new session and
@@ -1310,15 +1310,15 @@ let%expect_test "backend host: new sessions start where they did" =
   [%expect
     {|
     {"type":"response","id":"r1","ok":true,"result":{}}
-    {"type":"response","id":"r","ok":true,"result":{}}
+    {"type":"response","id":"r","ok":true,"result":{"state":{"session_id":"<id>","session_path":"$DIR/sessions/<stamp>_<id>.jsonl","session_name":null,"session_description":null,"cwd":"$DIR","git_branch":null,"model":{"id":"deepseek-flash","provider":"deepseek","key":"deepseek/deepseek-flash","name":"DeepSeek V4.1 Flash","context_window":1000000,"max_output":384000,"supports_thinking":true,"cost":{"input":0.3,"output":1.2,"cache_read":0.006}},"thinking":"on","running":false,"message_count":0,"usage":{"input":0,"output":0,"cache_read":0},"cost_usd":0,"context_tokens":0,"active_host":"backend","hosts":[{"id":"backend","name":"<host>","cwd":"$DIR","session_id":null,"session_name":null},{"id":"host-tui","name":"tui","cwd":"/home/me","session_id":"<id>","session_name":null}],"subagents":[],"jobs":[]}}}
     switched: backend (pinned) in $DIR
-    {"type":"response","id":"r","ok":true,"result":{}}
+    {"type":"response","id":"r","ok":true,"result":{"state":{"session_id":"<id>","session_path":"$DIR/sessions/<stamp>_<id>.jsonl","session_name":null,"session_description":null,"cwd":"$DIR","git_branch":null,"model":{"id":"deepseek-flash","provider":"deepseek","key":"deepseek/deepseek-flash","name":"DeepSeek V4.1 Flash","context_window":1000000,"max_output":384000,"supports_thinking":true,"cost":{"input":0.3,"output":1.2,"cache_read":0.006}},"thinking":"on","running":false,"message_count":0,"usage":{"input":0,"output":0,"cache_read":0},"cost_usd":0,"context_tokens":0,"active_host":"backend","hosts":[{"id":"backend","name":"<host>","cwd":"$DIR","session_id":null,"session_name":null},{"id":"host-tui","name":"tui","cwd":"/home/me","session_id":"<id>","session_name":null}],"subagents":[],"jobs":[]}}}
     fork: backend (pinned) in $DIR
-    {"type":"response","id":"r","ok":true,"result":{}}
+    {"type":"response","id":"r","ok":true,"result":{"state":{"session_id":"<id>","session_path":"$DIR/sessions/<stamp>_<id>.jsonl","session_name":null,"session_description":null,"cwd":"/home/me","git_branch":null,"model":{"id":"deepseek-flash","provider":"deepseek","key":"deepseek/deepseek-flash","name":"DeepSeek V4.1 Flash","context_window":1000000,"max_output":384000,"supports_thinking":true,"cost":{"input":0.3,"output":1.2,"cache_read":0.006}},"thinking":"on","running":false,"message_count":0,"usage":{"input":0,"output":0,"cache_read":0},"cost_usd":0,"context_tokens":0,"active_host":"host-tui","hosts":[{"id":"backend","name":"<host>","cwd":"/home/me","session_id":null,"session_name":null},{"id":"host-tui","name":"tui","cwd":"/home/me","session_id":"<id>","session_name":null}],"subagents":[],"jobs":[]}}}
     new: host-tui in /home/me
-    {"type":"response","id":"r","ok":true,"result":{}}
+    {"type":"response","id":"r","ok":true,"result":{"state":{"session_id":"<id>","session_path":"$DIR/sessions/<stamp>_<id>.jsonl","session_name":"x","session_description":null,"cwd":"/home/me","git_branch":null,"model":{"id":"deepseek-flash","provider":"deepseek","key":"deepseek/deepseek-flash","name":"DeepSeek V4.1 Flash","context_window":1000000,"max_output":384000,"supports_thinking":true,"cost":{"input":0.3,"output":1.2,"cache_read":0.006}},"thinking":"on","running":false,"message_count":0,"usage":{"input":0,"output":0,"cache_read":0},"cost_usd":0,"context_tokens":0,"active_host":"host-tui","hosts":[{"id":"backend","name":"<host>","cwd":"/old","session_id":null,"session_name":null},{"id":"host-tui","name":"tui","cwd":"/home/me","session_id":"<id>","session_name":"x"}],"subagents":[],"jobs":[]}}}
     hostless: host-tui in /home/me
-    {"type":"response","id":"r1","ok":true,"result":{}}
+    {"type":"response","id":"r1","ok":true,"result":{"state":{"session_id":"<id>","session_path":"$DIR/sessions/<stamp>_<id>.jsonl","session_name":"y","session_description":null,"cwd":"/old","git_branch":null,"model":{"id":"deepseek-flash","provider":"deepseek","key":"deepseek/deepseek-flash","name":"DeepSeek V4.1 Flash","context_window":1000000,"max_output":384000,"supports_thinking":true,"cost":{"input":0.3,"output":1.2,"cache_read":0.006}},"thinking":"on","running":false,"message_count":0,"usage":{"input":0,"output":0,"cache_read":0},"cost_usd":0,"context_tokens":0,"active_host":"backend","hosts":[{"id":"backend","name":"<host>","cwd":"/old","session_id":null,"session_name":null},{"id":"host-tui","name":"tui","cwd":"/home/me","session_id":"<id>","session_name":"x"}],"subagents":[],"jobs":[]}}}
     main's hostless: backend in /old
     |}]
 ;;
