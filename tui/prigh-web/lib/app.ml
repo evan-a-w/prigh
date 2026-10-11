@@ -161,16 +161,7 @@ module Connection = struct
   ;;
 end
 
-module Toast = struct
-  type t =
-    { id : int
-    ; text : string
-    ; error : bool
-    }
-  [@@deriving sexp_of, equal]
-
-  let lifetime_ms = 4000
-end
+module Toast = Toast
 
 module Action = struct
   type t =
@@ -454,26 +445,15 @@ let call ?tag (method_ : Request.Method.t) =
 ;;
 
 let str s = `String s
-let max_toasts = 4
 
-(* A toast replaces the ones saying the same, or, with [replaces], those
-   starting with it: cycling a setting shows only where it ended up. *)
 let toast (m : Model.t) ?(error = false) ?replaces text =
-  let id = m.next_toast in
-  let stale (t : Toast.t) =
-    String.equal t.text text
-    || Option.exists replaces ~f:(fun prefix -> String.is_prefix t.text ~prefix)
+  let toasts, toast =
+    Toast.push m.toasts ~id:m.next_toast ?replaces ~error text
   in
-  let toasts =
-    List.filter m.toasts ~f:(Fn.non stale) @ [ { Toast.id; text; error } ]
-  in
-  ( { m with
-      toasts = List.drop toasts (List.length toasts - max_toasts)
-    ; next_toast = id + 1
-    }
-  , if error
-    then []
-    else [ Command.Expire_toast { id; after_ms = Toast.lifetime_ms } ] )
+  ( { m with toasts; next_toast = m.next_toast + 1 }
+  , match Toast.lifetime_ms toast with
+    | None -> []
+    | Some after_ms -> [ Command.Expire_toast { id = toast.id; after_ms } ] )
 ;;
 
 let error m text = toast m ~error:true text

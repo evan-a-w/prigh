@@ -58,7 +58,7 @@ let%expect_test "!command, !!command and !&command" =
   Harness.text h ~selector:".toast";
   [%expect
     {|
-    (Expire_toast (id 1) (after_ms 4000))
+    (Expire_toast (id 1) (after_ms 3860))
     Type a command after ! to run it.
     Started job j1: its result reaches the agent when it exits.
     |}];

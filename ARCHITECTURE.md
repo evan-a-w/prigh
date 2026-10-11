@@ -1455,8 +1455,14 @@ copy of the protocol types and the e2e test guards the contract.
       sidebar's account button and the account menu, a `Picker` of
       accounts and actions) over `Accounts` (the saved sign-ins in
       localStorage, behind a `Storage` record so that tests use a table),
-      `Status_view` (with the mode and plan chips and the notifications
-      bell), `Html.lamp` (the work-in-progress sign everywhere; `View` marks
+      `Status_view` (with the mode and plan chips, the transfers in
+      progress from `Files.transfers` and the notifications bell),
+      `Toast` (at most two, the newest, over the bottom of the chat
+      column; a repeat is counted rather than stacked, a notice's lifetime
+      grows with its length, errors stay until dismissed, long paths are
+      elided in the middle with the whole text as the title; with a dialog
+      or a phone's sheet open, the newest one at the bottom of the page,
+      under the dialog and outside its `inert` page), `Html.lamp` (the work-in-progress sign everywhere; `View` marks
       the page `offline` while reconnecting, which stills the others), and `Keys` (which of the
       dialog, the popup or the editor owns a key; `help`, and `browser`:
       the TUI's keys that the browser keeps).

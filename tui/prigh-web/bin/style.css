@@ -588,6 +588,8 @@ kbd {
   overflow-y: auto;
 }
 .editor::placeholder { color: var(--faint); }
+/* The placeholder is one line, cut rather than wrapped. */
+.editor:placeholder-shown { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .composer-buttons { display: flex; gap: 6px; }
 .composer-buttons .btn { width: 32px; height: 32px; padding: 0; border-radius: var(--r-control); transition: none; }
 .composer-buttons .send .icon { color: var(--sodium-ink); }
@@ -691,6 +693,8 @@ kbd {
 }
 .status-item.mode.plan { color: var(--muted); max-width: 260px; overflow: hidden; text-overflow: ellipsis; }
 .status-item.background.active { color: var(--sodium); gap: 7px; }
+.status-item.transfers { color: var(--sodium); gap: 7px; min-width: 0; max-width: 32ch; overflow: hidden; text-overflow: ellipsis; display: inline-block; }
+.status-item.transfers .lamp { margin-right: 7px; vertical-align: 1px; }
 .status-item.host { color: var(--sodium); }
 .status-item.cost.budget { font: 11.5px var(--mono); }
 .status-item.warm { color: var(--sodium); }
@@ -771,38 +775,65 @@ kbd {
 .auth-name .picker-detail { margin: 0; white-space: normal; overflow-wrap: anywhere; }
 .auth-buttons { display: flex; gap: 6px; flex-shrink: 0; }
 
-/* Toasts */
+/* Toasts: over the bottom of the chat column, above the composer, the
+   newest nearest to it. */
 
+.toast-anchor { position: relative; height: 0; max-width: 852px; width: 100%; margin: 0 auto; }
 .toasts {
-  position: fixed;
-  top: 62px;
+  position: absolute;
+  bottom: 10px;
+  left: 16px;
   right: 16px;
   display: flex;
   flex-direction: column;
   align-items: flex-end;
-  gap: 8px;
-  z-index: 50;
-  max-width: min(340px, calc(100vw - 24px));
+  gap: 6px;
+  z-index: 4;
+  pointer-events: none;
 }
 .toast {
-  background: var(--slate);
+  pointer-events: auto;
+  max-width: min(460px, 100%);
+  background: var(--slate-2);
   border: 1px solid var(--rule-2);
-  border-radius: var(--r-surface);
-  padding: 8px 14px;
+  border-radius: var(--r-control);
+  padding: 6px 12px;
   cursor: pointer;
   box-shadow: var(--float-shadow);
   white-space: pre-wrap;
-  font-size: 14px;
-  animation: drop 0.18s ease-out;
+  overflow-wrap: anywhere;
+  font-size: 13px;
+  line-height: 1.45;
+  animation: rise 0.14s ease-out;
   display: flex;
   align-items: flex-start;
-  gap: 10px;
+  gap: 8px;
 }
-.toast-close { width: 14px; height: 14px; margin-top: 3px; color: var(--faint); }
+.toast-repeats { font: 11.5px/1.7 var(--mono); color: var(--faint); }
+.toast-close { width: 13px; height: 13px; margin-top: 3px; flex-shrink: 0; color: var(--faint); }
 .toast:hover .toast-close { color: var(--chalk); }
 .toast.error { border-color: var(--brick-line); box-shadow: inset 2px 0 0 var(--brick), var(--float-shadow); color: var(--brick); }
-/* Not over the agents panel. */
-.app.agents-open:not(.narrow) .toasts { right: calc(var(--agents-width, 420px) + 16px); }
+/* Above the jump-to-the-end button; under the composer's popup. */
+.main:has(.jump-to-bottom) .toasts { bottom: 56px; }
+/* A dialog or a phone's sheet covers the chat: the newest one under it, at
+   the bottom of the page. */
+.app:has(.modal-backdrop) .toasts,
+.app.narrow.files-open .toasts,
+.app.narrow.agents-open .toasts {
+  position: fixed;
+  left: 50%;
+  right: auto;
+  bottom: 12px;
+  width: max-content;
+  max-width: min(460px, calc(100vw - 24px));
+  transform: translateX(-50%);
+  align-items: center;
+  z-index: 45;
+}
+.app:has(.modal-backdrop) .toast:not(:last-child),
+.app.narrow.files-open .toast:not(:last-child),
+.app.narrow.agents-open .toast:not(:last-child) { display: none; }
+.app:has(.modal-backdrop) .toast { max-width: 100%; }
 
 /* Sign in */
 
@@ -890,9 +921,7 @@ kbd {
   .status { gap: 2px 10px; }
   .status .tokens, .status .account { display: none; }
   .chip-button > .icon:first-child { display: none; }
-  .toasts { top: 56px; left: 12px; right: 12px; max-width: none; align-items: stretch; }
-  /* The newest two: more would cover the page. */
-  .toast:nth-last-child(n + 3) { display: none; }
+  .toasts { left: 8px; right: 8px; align-items: stretch; }
   .modal-backdrop { padding-top: 8vh; }
   .help-table td:first-child { white-space: normal; }
   /* No room beside the name: the detail goes under it, whole. */
@@ -1166,10 +1195,6 @@ kbd {
 .status-item.connecting { color: var(--muted); }
 .status-item.connecting.offline { color: var(--brick); }
 .loading-row { display: flex; align-items: center; gap: 10px; padding: 18px 4px; color: var(--muted); }
-/* Under the reconnecting banner. */
-.app:has(.banner) .toasts { top: 100px; }
-/* Not over a dialog's title and filter: under it. */
-.app:has(.modal-backdrop) .toasts { top: auto; bottom: 16px; }
 
 /* Notifications: a quiet bell when on, struck through when off. */
 .status-item.notify { display: inline-grid; place-items: center; width: 22px; height: 22px; margin: -4px 0; }

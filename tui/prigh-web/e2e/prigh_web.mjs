@@ -781,7 +781,7 @@ try {
   await showImages("files: an image preview", page.locator(".files-image img"));
   await screenshot("files: an image preview");
   await page.locator("#files-upload-input").setInputFiles({ name: "hello.txt", mimeType: "text/plain", buffer: Buffer.from("hello\n") });
-  await toast("Uploaded hello.txt");
+  await toast('Uploaded "hello.txt"');
   await row("hello.txt").waitFor();
   console.log(`on the host: ${await hostFile(join(cwd, "hello.txt"), "hello\n")}`);
   await page.locator("#files-upload-input").setInputFiles({ name: "hello.txt", mimeType: "text/plain", buffer: Buffer.from("hello again\n") });
@@ -827,25 +827,29 @@ try {
   await page.locator(".files-tool[title='New folder']").click();
   await page.locator("#files-ask-input").fill("made");
   await page.keyboard.press("Enter");
-  await toast("Created made");
+  await toast('Created folder "made"');
   await page.locator(".files-row.selected[data-name=made]").waitFor();
   await page.locator("#files-list").focus();
   await page.keyboard.press("F2");
   await page.locator("#files-ask-input").fill("renamed");
   await page.keyboard.press("Enter");
-  await toast("Renamed made to renamed");
+  await toast('Renamed "made" to "renamed"');
   await page.locator(".files-row.selected[data-name=renamed]").waitFor();
   await page.locator("#files-list").focus();
   await page.keyboard.press("Delete");
   await page.locator(".files-ask").waitFor();
   await show("files: delete?", ".files-ask");
   await page.locator(".files-ask .btn.danger").click();
-  await toast("Deleted renamed");
+  await toast('Deleted "renamed"');
   console.log(`renamed on the host: ${existsSync(join(cwd, "renamed"))}`);
   await showFiles("files: after the changes");
   // Attached from the browser, dropped on the composer, picked.
   await row("hello.txt").click();
   await page.locator(".files-actions .btn", { hasText: "Attach" }).click();
+  // Uploads held back a moment: the status line shows them.
+  let release;
+  const held = new Promise(resolve => (release = resolve));
+  await page.route("**/files/upload**", async route => { await held; await route.continue(); });
   await page.evaluate(() => {
     const data = new DataTransfer();
     data.items.add(new File(["dropped text\n"], "dropped.txt", { type: "text/plain" }));
@@ -853,6 +857,11 @@ try {
       new DragEvent("drop", { bubbles: true, cancelable: true, dataTransfer: data }));
   });
   await page.locator("#chat-attach-input").setInputFiles({ name: "data.bin", mimeType: "application/octet-stream", buffer: Buffer.from([0, 1, 2, 3, 255, 0, 7]) });
+  await page.waitForFunction(() => /^Uploading 2 files/.test(document.querySelector(".status .transfers")?.textContent ?? ""));
+  section("files: uploads in the status line");
+  console.log(clean(await page.locator(".status .transfers").innerText()).replace(/ \d+%$| …$|…$/, ""));
+  await screenshot("files: uploads in the status line");
+  release();
   await page.waitForFunction(() => document.querySelectorAll(".attach-chip.ready").length === 3);
   section("files: attachments in the composer");
   console.log(clean(await page.locator(".attach-chips").innerText()));

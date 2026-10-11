@@ -62,7 +62,7 @@ let%expect_test "the mode chip, Alt+M, and set_mode's reply or failure" =
   toasts h;
   [%expect
     {|
-    (Expire_toast (id 0) (after_ms 4000))
+    (Expire_toast (id 0) (after_ms 4140))
     Mode: plan (read-only planning: no file edits, commands ask first)
     |}];
   (* Option+M types a symbol on a Mac: the physical key counts. *)
@@ -228,7 +228,7 @@ let%expect_test "the plan: its chip, /todos" =
   [%expect
     {|
     (Save_history (/todos))
-    (Expire_toast (id 0) (after_ms 4000))
+    (Expire_toast (id 0) (after_ms 4220))
     No plan: the model has not made one (it makes one with update_plan).
     |}];
   H.event h (sprintf {|{"event":"state","state":%s}|} (state ~plan ()));
@@ -395,7 +395,7 @@ let%expect_test "a confirmation: allow once, always, deny, deny with a reason" =
     (Rpc (method_ tool_confirm_respond)
      (params ((call_id c1) (allow true) (always true))) (tag Show_error))
     (Focus confirm)
-    (Expire_toast (id 0) (after_ms 4000))
+    (Expire_toast (id 0) (after_ms 2860))
     Allowed bash; always: bash(make:*)
     Confirm
     (Close (Esc))
@@ -449,7 +449,7 @@ let%expect_test "a confirmation: allow once, always, deny, deny with a reason" =
      (params ((call_id c2) (allow false) (reason "it deletes the cache")))
      (tag Show_error))
     (Focus confirm)
-    (Expire_toast (id 1) (after_ms 4000))
+    (Expire_toast (id 1) (after_ms 2500))
     Allowed bash; always: bash(make:*)
     Denied bash
     Confirm
@@ -466,7 +466,7 @@ let%expect_test "a confirmation: allow once, always, deny, deny with a reason" =
     (Rpc (method_ tool_confirm_respond)
      (params ((call_id c3) (allow true) (agent_id a1))) (tag Show_error))
     (Focus editor)
-    (Expire_toast (id 2) (after_ms 4000))
+    (Expire_toast (id 2) (after_ms 2500))
     |}]
 ;;
 
@@ -526,7 +526,7 @@ let%expect_test "approving the plan" =
     (Rpc (method_ tool_confirm_respond)
      (params ((call_id p1) (allow false) (reason "add docs"))) (tag Show_error))
     (Focus editor)
-    (Expire_toast (id 0) (after_ms 4000))
+    (Expire_toast (id 0) (after_ms 2820))
     Plan not approved: still planning
     |}];
   H.event h (confirm ~name:"exit_plan_mode" "p2" "1. Do it");
@@ -539,7 +539,7 @@ let%expect_test "approving the plan" =
     (Rpc (method_ tool_confirm_respond) (params ((call_id p2) (allow true)))
      (tag Show_error))
     (Focus editor)
-    (Expire_toast (id 1) (after_ms 4000))
+    (Expire_toast (id 1) (after_ms 2500))
     Plan not approved: still planning
     Plan approved
     |}]
@@ -560,7 +560,7 @@ let%expect_test "a confirmation answered elsewhere, or withdrawn, closes" =
     (Answer_confirm (call_id c1) (agent_id ()) (answer Deny_with_reason))
     (Focus confirm-reason)
     (Confirm_reason_input "half typed")
-    (Expire_toast (id 0) (after_ms 4000))
+    (Expire_toast (id 0) (after_ms 2740))
     Confirm
     (Close (Esc))
     Run bash: make?
@@ -574,8 +574,8 @@ let%expect_test "a confirmation answered elsewhere, or withdrawn, closes" =
   [%expect
     {|
     (Focus editor)
-    (Expire_toast (id 1) (after_ms 4000))
-    Confirmation answered elsewhere
+    (Expire_toast (id 1) (after_ms 2740))
+    Confirmation answered elsewhere ×2
     |}];
   (* Answered here: the backend's word that it is done changes nothing. *)
   H.event h (confirm "c2" "make");
@@ -589,8 +589,8 @@ let%expect_test "a confirmation answered elsewhere, or withdrawn, closes" =
     (Rpc (method_ tool_confirm_respond) (params ((call_id c2) (allow true)))
      (tag Show_error))
     (Focus editor)
-    (Expire_toast (id 2) (after_ms 4000))
-    Confirmation answered elsewhere
+    (Expire_toast (id 2) (after_ms 2500))
+    Confirmation answered elsewhere ×2
     Allowed bash
     |}]
 ;;
@@ -622,7 +622,9 @@ let%expect_test "a question dialog: keys" =
     []
     Space or a click picks, ↑↓ choose, Enter accepts, Esc declines (Decline) (Next)
     <aside class="sidebar">
-    <main class="main">
+    <header class="topbar">
+    <div class="chat verbosity-normal">
+    <footer class="composer">
     |}];
   H.show h ~selector:".question-choices";
   [%expect
@@ -738,7 +740,7 @@ let%expect_test "a question dialog: keys" =
      (params ((call_id q1) (answers ((SQLite) (lint bench fuzz) (no)))))
      (tag Show_error))
     (Focus editor)
-    (Expire_toast (id 0) (after_ms 4000))
+    (Expire_toast (id 0) (after_ms 2500))
     Answered
     |}]
 ;;
@@ -812,7 +814,7 @@ let%expect_test "a question dialog: clicks" =
      (params ((call_id q1) (answers ((SQLite) (bench) ("ship it")))))
      (tag Show_error))
     (Focus editor)
-    (Expire_toast (id 0) (after_ms 4000))
+    (Expire_toast (id 0) (after_ms 2500))
     |}]
 ;;
 
@@ -842,7 +844,7 @@ let%expect_test
     (Rpc (method_ tool_confirm_respond) (params ((call_id c1) (allow true)))
      (tag Show_error))
     (Focus question-own)
-    (Expire_toast (id 0) (after_ms 4000))
+    (Expire_toast (id 0) (after_ms 2500))
     Question
     (Close (Esc))
     Ready?
@@ -858,7 +860,7 @@ let%expect_test
     (Rpc (method_ ask_user_respond) (params ((call_id q1) (decline true)))
      (tag Show_error))
     (Focus question-own)
-    (Expire_toast (id 1) (after_ms 4000))
+    (Expire_toast (id 1) (after_ms 3460))
     Question
     (Close (Esc))
     Sure?
@@ -875,8 +877,7 @@ let%expect_test
   [%expect
     {|
     (Focus editor)
-    (Expire_toast (id 2) (after_ms 4000))
-    Allowed bash
+    (Expire_toast (id 2) (after_ms 3380))
     Declined to answer: the model goes on without one
     Question answered elsewhere, or the run stopped
     |}];
@@ -907,7 +908,7 @@ let%expect_test
     {|
     (Focus confirm)
     (Reconnect (generation 1) (delay_ms 0) (session (s1)))
-    (Expire_toast (id 0) (after_ms 4000))
+    (Expire_toast (id 0) (after_ms 2500))
     (Rpc (method_ get_state) (params ()) (tag State))
     (Rpc (method_ list_models) (params ()) (tag Models))
     (Rpc (method_ auth_status) (params ()) (tag (Auth_status Refresh)))
@@ -946,17 +947,17 @@ let%expect_test
     (Rpc (method_ tool_confirm_respond)
      (params ((call_id c1) (allow true) (always true))) (tag Show_error))
     (Focus confirm)
-    (Expire_toast (id 1) (after_ms 4000))
+    (Expire_toast (id 1) (after_ms 2860))
     (Answer_confirm (call_id c2) (agent_id (a1)) (answer Deny))
     (Rpc (method_ tool_confirm_respond)
      (params ((call_id c2) (allow false) (agent_id a1))) (tag Show_error))
     (Focus question)
-    (Expire_toast (id 2) (after_ms 4000))
+    (Expire_toast (id 2) (after_ms 2500))
     (Question Accept)
     (Rpc (method_ ask_user_respond) (params ((call_id q3) (answers ((yes)))))
      (tag Show_error))
     (Focus editor)
-    (Expire_toast (id 3) (after_ms 4000))
+    (Expire_toast (id 3) (after_ms 2500))
     |}]
 ;;
 
@@ -1143,7 +1144,7 @@ let%expect_test "plan mode notes are margin notes, not the user's words" =
     ◇ Plan mode off: the model was told it can change files #2 ✓
     Dialog_accept
     (Focus editor)
-    (Expire_toast (id 0) (after_ms 4000))
+    (Expire_toast (id 0) (after_ms 3700))
     (Rpc (method_ fork) (params ((at e2))) (tag Reload_state))
     ""
     |}]

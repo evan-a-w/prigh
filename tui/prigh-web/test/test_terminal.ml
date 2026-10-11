@@ -164,7 +164,7 @@ let%expect_test "the panel follows the session, the host and the user" =
   [%expect
     {|
     (Reconnect (generation 1) (delay_ms 0) (session (s2)))
-    (Expire_toast (id 0) (after_ms 4000))
+    (Expire_toast (id 0) (after_ms 2500))
     (Rpc (method_ get_state) (params ()) (tag State))
     (Rpc (method_ list_models) (params ()) (tag Models))
     (Rpc (method_ auth_status) (params ()) (tag (Auth_status Refresh)))
@@ -329,7 +329,7 @@ let%expect_test "keys inside the terminal stay out of dialogs and confirmations"
     (Rpc (method_ tool_confirm_respond) (params ((call_id t1) (allow true)))
      (tag Show_error))
     (Focus editor)
-    (Expire_toast (id 0) (after_ms 4000))
+    (Expire_toast (id 0) (after_ms 2500))
     |}];
   H.act h Open_help;
   H.key h "`" ~ctrl:true ~code:"Backquote" ~target:Page;

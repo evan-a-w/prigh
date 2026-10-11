@@ -46,7 +46,7 @@ let%expect_test
     Dialog_accept
     (Focus editor)
     (Rpc (method_ set_model) (params ((model openai/gpt-6))) (tag Model_set))
-    (Expire_toast (id 0) (after_ms 4000))
+    (Expire_toast (id 0) (after_ms 4140))
     GPT-6 needs openai, which is not logged in: /login openai logs in.
     |}];
   H.text h ~selector:".modal";
@@ -69,7 +69,7 @@ let%expect_test
     (Focus editor)
     (Rpc (method_ set_model) (params ((model deepseek/deepseek-chat)))
      (tag Model_set))
-    (Expire_toast (id 1) (after_ms 4000))
+    (Expire_toast (id 1) (after_ms 4620))
     |}];
   H.act h Open_model_picker;
   H.act h (Picker_query "zz");
@@ -248,7 +248,7 @@ let%expect_test
   [%expect
     {|
     (Rpc (method_ dequeue) (params ()) (tag Dequeued))
-    (Expire_toast (id 0) (after_ms 4000))
+    (Expire_toast (id 0) (after_ms 2500))
     Nothing is queued
     |}]
 ;;
@@ -275,7 +275,7 @@ let%expect_test "aborting brings the queued prompts back into the editor" =
   H.text h ~selector:".toast";
   [%expect
     {|
-    (Expire_toast (id 0) (after_ms 4000))
+    (Expire_toast (id 0) (after_ms 3300))
     (Focus editor)
     first
 

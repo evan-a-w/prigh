@@ -346,7 +346,7 @@ let%expect_test
     (Focus editor)
     (Rpc (method_ delete_sessions) (params ((paths (/sessions/s3.jsonl))))
      (tag Sessions_deleted))
-    (Expire_toast (id 1) (after_ms 4000))
+    (Expire_toast (id 1) (after_ms 2540))
     (Rpc (method_ list_sessions) (params ()) (tag Sessions))
     |}];
   H.text h ~selector:".toast:not(.error)";

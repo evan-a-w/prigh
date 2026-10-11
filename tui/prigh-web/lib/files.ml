@@ -600,7 +600,7 @@ let upload_done t ~file result =
            { t with selected = Some u.local.name }, cmds)
          else t, []
        in
-       t, toast (sprintf "Uploaded %s" u.local.name) :: cmds
+       t, toast (sprintf "Uploaded \"%s\"" u.local.name) :: cmds
      | Error e ->
        ( t
        , [ toast
@@ -618,6 +618,43 @@ let remove_attachment t i =
     , (match a.file, a.status with
        | Some file, Uploading _ -> [ Out.Page (Abort_upload file) ]
        | _ -> []) )
+;;
+
+let transfers t =
+  let moving =
+    List.map t.uploads ~f:(fun u -> u.local.name, Some u.local.size, u.sent)
+    @ List.filter_map t.attachments ~f:(fun a ->
+      match a.status with
+      | Uploading sent -> Some (a.name, a.size, sent)
+      | Ready _ | Failed _ -> None)
+  in
+  match moving with
+  | [] -> t.busy
+  | _ ->
+    let what =
+      match moving with
+      | [ (name, _, _) ] -> name
+      | _ -> sprintf "%d files" (List.length moving)
+    in
+    let total =
+      List.sum
+        (module Int)
+        moving
+        ~f:(fun (_, size, _) -> Option.value size ~default:0)
+    in
+    let sent =
+      List.sum
+        (module Int)
+        moving
+        ~f:(fun (_, _, sent) -> Option.value sent ~default:0)
+    in
+    let started =
+      List.exists moving ~f:(fun (_, _, sent) -> Option.is_some sent)
+    in
+    Some
+      (if started && total > 0
+       then sprintf "Uploading %s %d%%" what (Int.min 100 (100 * sent / total))
+       else sprintf "Uploading %s…" what)
 ;;
 
 let prompt_attachments t =
@@ -686,7 +723,9 @@ let ask_accept t =
              ; params = [ "path", `String (join dir name) ]
              ; reply =
                  Changed
-                   { notice = sprintf "Created %s" name; select = Some name }
+                   { notice = sprintf "Created folder \"%s\"" name
+                   ; select = Some name
+                   }
              }
          ] ))
   | Some (Rename ({ path; input; _ } as a)) ->
@@ -707,7 +746,10 @@ let ask_accept t =
              ; reply =
                  Changed
                    { notice =
-                       sprintf "Renamed %s to %s" (Filename.basename path) name
+                       sprintf
+                         "Renamed \"%s\" to \"%s\""
+                         (Filename.basename path)
+                         name
                    ; select = Some name
                    }
              }
@@ -719,7 +761,7 @@ let ask_accept t =
           ; params = [ "path", `String path ]
           ; reply =
               Changed
-                { notice = sprintf "Deleted %s" (Filename.basename path)
+                { notice = sprintf "Deleted \"%s\"" (Filename.basename path)
                 ; select = None
                 }
           }
@@ -795,7 +837,7 @@ let attach t name =
         { Attachment.file = None; name; size = entry.size; status = Ready path }
       in
       ( { t with attachments = t.attachments @ [ a ] }
-      , [ toast (sprintf "Attached %s to the next message" name) ] )))
+      , [ toast (sprintf "Attached \"%s\" to the next message" name) ] )))
 ;;
 
 let key t ~key ~shift ~ctrl ~alt : Action.t option =
@@ -903,7 +945,10 @@ let update t (action : Action.t) =
   | Ask_accept -> ask_accept t
   | Ask_cancel -> ask_cancel t
   | Copy_path path ->
-    t, [ Out.Copy path; toast (sprintf "Copied %s" (display_path t path)) ]
+    ( t
+    , [ Out.Copy path
+      ; toast (sprintf "Copied the path %s" (display_path t path))
+      ] )
   | Insert_path path -> t, [ Out.Insert ("@" ^ mention t path) ]
   | Attach name -> attach t name
   | Remove_attachment i -> remove_attachment t i
@@ -973,7 +1018,7 @@ let reply t (reply : Reply.t) result =
      | Ok url, Ok name ->
        ( t
        , [ Out.Page (Download { url = link t url; name })
-         ; toast (sprintf "Downloading %s" name)
+         ; toast (sprintf "Downloading \"%s\"" name)
          ] )
      | _ ->
        t, [ toast ~error:true "The backend sent no download link: try again." ])

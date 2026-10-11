@@ -367,7 +367,9 @@ like an `@file`: the model gets text files in `<file>` blocks and a
 binary file's path and size, to inspect with its tools. Each shows as a
 chip with its name, size and upload progress (× removes it) until it is
 sent, and in the transcript as an `@path` chip. A message waits for its
-uploads; one that failed says to remove it or attach it again.
+uploads; one that failed says to remove it or attach it again. While
+files upload (or a download is being prepared), the status line says so
+with the work lamp: "Uploading 2 files 40%".
 
 Transfers go through the backend, so they work on any tool host: the page
 asks over its signed-in connection for a one-time link (a random ticket,

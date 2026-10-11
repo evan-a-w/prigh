@@ -215,7 +215,7 @@ let%expect_test "archiving and unarchiving: at once, and back if refused" =
   H.text h ~selector:".toast";
   [%expect
     {|
-    (Expire_toast (id 0) (after_ms 4000))
+    (Expire_toast (id 0) (after_ms 3860))
     Archived "fix the parser bug" (a new message unarchives it)
     |}];
   (* Running sessions are refused here, before asking the backend. *)
@@ -475,7 +475,7 @@ let%expect_test "deleting every archived session" =
     {|
     (Focus editor)
     (Rpc (method_ delete_archived) (params ()) (tag Sessions_deleted))
-    (Expire_toast (id 0) (after_ms 4000))
+    (Expire_toast (id 0) (after_ms 2580))
     (Rpc (method_ list_sessions) (params ()) (tag Sessions))
     Deleted 2 sessions (1.4 MB)
     |}];
@@ -486,7 +486,7 @@ let%expect_test "deleting every archived session" =
   [%expect
     {|
     (Save_history (/delete-archived))
-    (Expire_toast (id 1) (after_ms 4000))
+    (Expire_toast (id 1) (after_ms 2740))
     Deleted 2 sessions (1.4 MB)
     There are no archived sessions.
     |}]
@@ -520,7 +520,7 @@ let%expect_test "/delete: by name or id with a confirmation, or select them" =
     {|
     (Focus editor)
     (Save_history (/delete "/delete s4 s5" "/delete s4 Older docs"))
-    (Expire_toast (id 1) (after_ms 4000))
+    (Expire_toast (id 1) (after_ms 4220))
     Select sessions Shift for a range
     |}]
 ;;

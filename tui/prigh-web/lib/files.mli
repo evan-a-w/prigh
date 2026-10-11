@@ -275,6 +275,11 @@ val set_where : t -> Where.t option -> t * Out.t list
 (** A dialog is open: it has the keyboard. *)
 val asking : t -> bool
 
+(** What is being transferred, for the status line while it lasts:
+    ["Uploading notes.txt 40%"], ["Uploading 3 files 12%"], or the download
+    being prepared. *)
+val transfers : t -> string option
+
 (** The paths to send with the prompt, or why it cannot be sent yet. *)
 val prompt_attachments : t -> string list Or_error.t
 

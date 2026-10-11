@@ -484,7 +484,7 @@ three
 four
 === chromium: files: an image preview ===
  24x16
-toast: Uploaded hello.txt
+toast: Uploaded "hello.txt"
 on the host: "hello\n"
 === chromium: files: replace? ===
 Replace hello.txt?
@@ -504,14 +504,14 @@ inner.txt
 sub.tar.gz
 sub/
 sub/inner.txt
-toast: Created made
-toast: Renamed made to renamed
+toast: Created folder "made"
+toast: Renamed "made" to "renamed"
 === chromium: files: delete? ===
 Delete renamed?
 <CWD>/renamed and everything in it will be deleted from <HOSTNAME>. This cannot be undone.
 Cancel
 Delete
-toast: Deleted renamed
+toast: Deleted "renamed"
 renamed on the host: false
 === chromium: files: after the changes ===
 sub/
@@ -528,6 +528,8 @@ notes.txt
 todo.md
 18 B
 <TIME>
+=== chromium: files: uploads in the status line ===
+Uploading 2 files
 === chromium: files: attachments in the composer ===
 hello.txt
 12 B
@@ -1140,7 +1142,7 @@ three
 four
 === firefox: files: an image preview ===
  24x16
-toast: Uploaded hello.txt
+toast: Uploaded "hello.txt"
 on the host: "hello\n"
 === firefox: files: replace? ===
 Replace hello.txt?
@@ -1160,14 +1162,14 @@ inner.txt
 sub.tar.gz
 sub/
 sub/inner.txt
-toast: Created made
-toast: Renamed made to renamed
+toast: Created folder "made"
+toast: Renamed "made" to "renamed"
 === firefox: files: delete? ===
 Delete renamed?
 <CWD>/renamed and everything in it will be deleted from <HOSTNAME>. This cannot be undone.
 Cancel
 Delete
-toast: Deleted renamed
+toast: Deleted "renamed"
 renamed on the host: false
 === firefox: files: after the changes ===
 sub/
@@ -1184,6 +1186,8 @@ notes.txt
 todo.md
 18 B
 <TIME>
+=== firefox: files: uploads in the status line ===
+Uploading 2 files
 === firefox: files: attachments in the composer ===
 hello.txt
 12 B
