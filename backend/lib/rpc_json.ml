@@ -387,6 +387,13 @@ let rec event ?now (e : Agent.Event.t) =
       ; "summary", str summary
       ; "rules", `Array (List.map rules ~f:str)
       ]
+    | Loop (Tool_confirm_done { call_id; agent_id }) ->
+      [ "event", str "tool_confirm_done"
+      ; "call_id", str call_id
+      ; "agent_id", Option.value_map agent_id ~default:`Null ~f:str
+      ]
+    | Loop (Ask_user_done { call_id }) ->
+      [ "event", str "ask_user_done"; "call_id", str call_id ]
     | Loop (Ask_user { call_id; questions }) ->
       [ "event", str "ask_user"
       ; "call_id", str call_id

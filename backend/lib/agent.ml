@@ -403,6 +403,7 @@ let confirm t (context : Tool.Context.t) ~name ~summary ~rules ~recheck =
     Cancellation.protect context.cancel ~f:(fun () -> Promise.await promise)
   in
   Hashtbl.remove t.pending_confirms key;
+  broadcast t (Loop (Tool_confirm_done { call_id; agent_id }));
   answer
 ;;
 
@@ -533,6 +534,7 @@ let ask_user t ~cancel ~call_id questions =
     | Some reply -> reply
   in
   Hashtbl.remove t.pending_questions call_id;
+  broadcast t (Loop (Ask_user_done { call_id }));
   reply
 ;;
 
