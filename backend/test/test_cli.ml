@@ -93,10 +93,14 @@ let%expect_test "sessions list: archived sessions last, under their heading" =
        : Session.Entry.t);
     s
   in
-  let _recent = session ~days_ago:0. "recent work" in
+  let recent = session ~days_ago:0. "recent work" in
   let by_hand = session ~days_ago:1. "archived by hand" in
   ignore (Session.set_archived by_hand ~archived:true : Session.Entry.t);
-  let _idle = session ~days_ago:30. "idle for a month" in
+  let idle = session ~days_ago:30. "idle for a month" in
+  (* Listed newest file first: make the order not depend on timing. *)
+  List.iteri [ idle; by_hand; recent ] ~f:(fun i s ->
+    let at = Core_unix.gettimeofday () -. Float.of_int (10 - i) in
+    Core_unix.utimes (Session.path s) ~access:at ~modif:at);
   let hide = List.map (Session.list ~dir) ~f:(fun s -> s.id, "<id>") in
   prigh ~hide t [ "sessions"; "list" ];
   write t ".prigh/config.json" {|{"archive_after_days": 0}|};
