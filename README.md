@@ -278,7 +278,20 @@ lamp) until the backend confirms it, and a command that lists something (`/login
 `/tree`, `/session`, `/skills`, `/mcp`, `/setusr`…) opens its dialog with
 a loading row (Esc closes it, and the late answer then opens nothing).
 While the connection is down the composer is dashed and the status line
-says "Reconnecting…": what you write stays until it is back.
+says "Reconnecting…": what you write stays until it is back (sending is
+refused, saying so, rather than queued).
+
+Losing the connection (a flaky mobile network, the phone locked, the
+backend restarting) changes nothing on the page: the banner sits over the
+top of the chat, and once back the session's new messages are merged into
+the transcript in place, without moving it, with the draft, attachments,
+open panels and dialogs as they were. The page reconnects at once when the
+network comes back or the tab is shown again (and checks a socket that
+may have died while it was hidden), with backoff otherwise. Only the
+backend refusing the saved sign-in leads to the sign-in page, saying so;
+a session the backend no longer has (it restarted before saving it)
+stays on show, read-only, with a banner offering a new session or the
+list.
 
 The sidebar lists the active sessions first (a session is running, with
 its lamp lit, while its turn or its background subagents and jobs run),
@@ -321,8 +334,10 @@ prigh serve -prigh-web 0.0.0.0:7790 -token sekrit   # remote; the page asks for 
 `-prigh-web-root DIR` (`$PRIGH_PRIGH_WEB_ROOT`) points at the site;
 without it the backend looks next to its dune build and in
 `../share/prigh/prigh-web`. The page keeps `?session=` in the address bar
-(a reload rejoins the session), reconnects with backoff when the backend
-goes away, and takes `?backend=ws://host:port/ws` like the `-web` page.
+and the chat's scroll position and draft in the tab's sessionStorage (a
+reload, or a phone bringing back a discarded tab, returns to the same place,
+waiting for the backend if it is out of reach), reconnects when the
+backend goes away (see above), and takes `?backend=ws://host:port/ws` like the `-web` page.
 One backend can serve all three web UIs on different ports. In Docker it
 is `PRIGH_MODE=prigh-web` (port 7790, see `DOCKER.md`).
 

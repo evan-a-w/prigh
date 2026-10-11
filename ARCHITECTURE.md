@@ -1343,9 +1343,24 @@ copy of the protocol types and the e2e test guards the contract.
       resets everything that belongs to the session and fetches its
       messages and the session list, and `new_session`/`switch_session`/
       `clone` are tagged `Reload_state`, whose reply carries the new
-      state, so every way of changing session goes through that one path. Reconnection mirrors `ui/`
-      (`Backend_closed` → `Reconnect` with backoff behind a banner; success
-      starts over). `!cmd`/`!!cmd`/`!&cmd` go to `shell` like the TUI's.
+      state, so every way of changing session goes through that one path. Reconnection
+      (`Rejoin`): `Backend_closed` → `Reconnect` with backoff behind a
+      banner, keeping everything on show (transcript, draft, attachments,
+      panels, dialogs and the confirmations and questions waiting). Back,
+      the state, `get_messages` (tagged `Resync`) and `get_pending`
+      (`Resync_pending`) are fetched again: `Chat.reconcile` merges the
+      messages into the transcript, keeping the same entry and call values
+      where nothing changed (so `Chat_view`'s caches, and the DOM and its
+      scroll position, stay), and only what is no longer waited for
+      closes. `Network false` drops the socket (`Drop_connection`);
+      `Network true` and the page shown again reconnect at once with the
+      backoff reset, or, while connected, `Probe_connection` (a `get_state`
+      that must answer within 5s, else the socket is dropped). A refusal
+      (`unauthorised…`) is `Auth_failed`, the only way back to the sign-in
+      page; a session the backend no longer has (`Session_gone`, from the
+      page's `hello` falling back to no session) stays on show read-only
+      (`session_gone`) with a banner offering a new session or the list,
+      unless it was empty. `!cmd`/`!!cmd`/`!&cmd` go to `shell` like the TUI's.
       `run_command` has every command of `ui/`'s `Commands` (plus `/copy`;
       `/agents` and `/jobs` open, select and stop items in the agents
       panel); `Model` also holds the transcript `verbosity` (a class on
@@ -1585,15 +1600,23 @@ copy of the protocol types and the e2e test guards the contract.
   - `app/` (`prigh_web_app`) — `Web_main.run`: connects a `Ws_transport`
     to `?backend=` or the page's `/ws`, sends `hello` with the active
     account (`prigh.user`/`prigh.token`, `web-app/`'s `Login`) and
-    `?session=`; on failure it shows the sign-in form (with the saved
-    accounts, one click each), otherwise it saves the login as an account
+    `?session=` (giving up after 10s); when the backend refuses, or the
+    page has never been in a session on that backend, it shows the
+    sign-in form (with the saved accounts, one click each); when it is
+    only out of reach the app starts offline and reconnects (a phone
+    bringing back a discarded tab); otherwise it saves the login as an account
     (`Accounts.remember`) and runs `App.update` in a
     `Bonsai.state_machine`, executes the commands (RPCs through the
     `Client`, replies back as `Action.Reply`; `history.replaceState` for
     `?session=`, also kept as the account's last session unless acting as
     another user; the clipboard; switching accounts, which activates one
     and loads the page for its backend and session; adding one, which
-    shows the sign-in form on the next load; scrolling), and installs
+    shows the sign-in form on the next load; scrolling; `Auth_failed`
+    notes its message in localStorage (`prigh-web.refused`) and reloads
+    into the sign-in form, keeping `?session=`), keeps the chat's scroll
+    position and the draft in sessionStorage (`Tab_memory`:
+    `prigh-web.scroll`, `prigh-web.draft`, for the URL's session) and puts
+    them back after a reload, listens to `online`/`offline`, and installs
     document listeners: keys (through `Keys`; a Tab no binding takes goes
     round the open dialog), the folds' buttons,
     pasted and dropped image files become attachments (PNG, JPEG, GIF,
@@ -1827,6 +1850,14 @@ ellipsis; the controls' menu under its button, closed by a choice and by
 Esc), with no console or page errors. Then `accounts.mjs` runs the account switcher against `serve -tokens
 alice=a,bob=b -superusers alice`: alice signs in, adds bob (each sees only
 their own sessions), switches back in one click, acts as bob and comes
-back, and signs bob out, leaving alice on the sign-in page.
+back, and signs bob out, leaving alice on the sign-in page. Then
+`reconnect.mjs`, at phone size: a long session scrolled halfway up with a
+draft and a pasted image; `context.setOffline` and back, then the backend
+killed and restarted: each time the same session, the same scroll
+position (within 4px), the draft and image kept, the transcript's DOM
+untouched (a marker attribute survives), no page load and no sign-in
+page; a reload returns to the same session, scroll position and draft,
+also when the backend is out of reach as the page loads (a wrapped
+`WebSocket`), until an `online` event.
 `SHOTS=DIR` saves a screenshot per step, `UPDATE=1` re-records,
 `ENGINES=chromium` runs one browser.

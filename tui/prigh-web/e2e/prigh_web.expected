@@ -759,6 +759,47 @@ alice
 alice
 === chromium: accounts: errors ===
 none
+=== chromium: reconnect: a long session, halfway up ===
+scrolled: true
+draft: half-written thought
+images in the composer: 1
+=== chromium: reconnect: offline ===
+Connection lost: reconnecting…
+composer: Offline: send once back
+=== chromium: reconnect: network back ===
+same session: true
+scroll position kept: true
+draft: half-written thought
+images in the composer: 1
+transcript DOM kept: true
+sign-in page: false
+pages loaded since: 0
+=== chromium: reconnect: backend gone ===
+Connection lost: reconnecting…
+=== chromium: reconnect: backend back ===
+same session: true
+scroll position kept: true
+draft: half-written thought
+images in the composer: 1
+transcript DOM kept: true
+sign-in page: false
+pages loaded since: 0
+=== chromium: reconnect: reloaded ===
+same session: true
+scroll position kept: true
+draft: half-written thought
+sign-in page: false
+jump button: 1
+=== chromium: reconnect: reloaded out of reach ===
+Connection lost: reconnecting…
+sign-in page: false
+=== chromium: reconnect: back in reach ===
+same session: true
+scroll position kept: true
+draft: half-written thought
+sign-in page: false
+=== chromium: reconnect: errors ===
+none
 === firefox: sign-in page ===
 prigh
 web
@@ -1519,4 +1560,45 @@ alice
 === firefox: accounts: saved accounts ===
 alice
 === firefox: accounts: errors ===
+none
+=== firefox: reconnect: a long session, halfway up ===
+scrolled: true
+draft: half-written thought
+images in the composer: 1
+=== firefox: reconnect: offline ===
+Connection lost: reconnecting…
+composer: Offline: send once back
+=== firefox: reconnect: network back ===
+same session: true
+scroll position kept: true
+draft: half-written thought
+images in the composer: 1
+transcript DOM kept: true
+sign-in page: false
+pages loaded since: 0
+=== firefox: reconnect: backend gone ===
+Connection lost: reconnecting…
+=== firefox: reconnect: backend back ===
+same session: true
+scroll position kept: true
+draft: half-written thought
+images in the composer: 1
+transcript DOM kept: true
+sign-in page: false
+pages loaded since: 0
+=== firefox: reconnect: reloaded ===
+same session: true
+scroll position kept: true
+draft: half-written thought
+sign-in page: false
+jump button: 1
+=== firefox: reconnect: reloaded out of reach ===
+Connection lost: reconnecting…
+sign-in page: false
+=== firefox: reconnect: back in reach ===
+same session: true
+scroll position kept: true
+draft: half-written thought
+sign-in page: false
+=== firefox: reconnect: errors ===
 none

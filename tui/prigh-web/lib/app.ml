@@ -109,8 +109,7 @@ module Reply_tag = struct
     | Session_gone of
         { generation : int
         ; session : string
-        }
-    (** reconnected, but the backend no longer has [session] *)
+        } (** reconnected, but the backend no longer has [session] *)
   [@@deriving sexp_of, equal]
 end
 
@@ -367,8 +366,8 @@ module Model = struct
     ; files : Files.t
     ; layout : Resize.t
     ; session_gone : string option
-    (** reconnected to a backend that no longer has this session: its
-        transcript stays on show, read-only *)
+      (** reconnected to a backend that no longer has this session: its
+          transcript stays on show, read-only *)
     }
   [@@deriving sexp_of]
 
@@ -2754,7 +2753,10 @@ module Rejoin = struct
     | Connected -> m, [ Command.Probe_connection ]
     | Reconnecting _ ->
       let generation = m.generation + 1 in
-      ( { m with connection = Reconnecting { attempt = 0; generation }; generation }
+      ( { m with
+          connection = Reconnecting { attempt = 0; generation }
+        ; generation
+        }
       , [ Command.Reconnect
             { generation
             ; delay_ms = 0
@@ -2790,7 +2792,8 @@ let rec reply_to (m : Model.t) (tag : Reply_tag.t) result =
              }
          ] ))
   | Session_gone { generation; _ }, _ when generation <> m.generation -> m, []
-  | Session_gone { generation; _ }, Error e -> reply_to m (Reconnect generation) (Error e)
+  | Session_gone { generation; _ }, Error e ->
+    reply_to m (Reconnect generation) (Error e)
   | Reconnect _, Ok json -> Rejoin.rejoined m json
   | Session_gone { session; _ }, Ok json -> Rejoin.gone m json ~session
   | Resync session, Ok _ when not (String.equal session (session_id m)) -> m, []
@@ -3778,7 +3781,10 @@ let update (m : Model.t) (action : Action.t) =
        let generation = m.generation + 1 in
        (* Everything on show stays, also what the agent waits for: once back,
           [get_pending] says what still does. *)
-       ( { m with connection = Reconnecting { attempt = 0; generation }; generation }
+       ( { m with
+           connection = Reconnecting { attempt = 0; generation }
+         ; generation
+         }
        , [ Command.Reconnect
              { generation
              ; delay_ms = 0

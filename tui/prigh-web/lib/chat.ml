@@ -330,7 +330,8 @@ let same_entry (a : entry) (b : entry) =
   match a, b with
   | User a, User b -> Message.User.equal a b
   | Assistant a, Assistant b ->
-    Bool.equal a.streaming b.streaming && Message.Assistant.equal a.message b.message
+    Bool.equal a.streaming b.streaming
+    && Message.Assistant.equal a.message b.message
   | Notice a, Notice b | Compaction a, Compaction b -> String.equal a b
   | Shell a, Shell b -> Tool_call.equal a b
   | (User _ | Assistant _ | Notice _ | Shell _ | Compaction _), _ -> false
@@ -348,9 +349,11 @@ let same_tool (old : tool) (fresh : tool) =
 let reconcile ~old fresh =
   let rec entries old fresh_entries =
     match old, fresh_entries with
-    | o :: old, f :: rest -> (if same_entry o f then o else f) :: entries old rest
+    | o :: old, f :: rest ->
+      (if same_entry o f then o else f) :: entries old rest
     (* The message being streamed is only in [get_messages] once it ends. *)
-    | [ (Assistant { streaming = true; _ } as o) ], [] when fresh.running -> [ o ]
+    | [ (Assistant { streaming = true; _ } as o) ], [] when fresh.running ->
+      [ o ]
     | _, rest -> rest
   in
   let rev_entries =
