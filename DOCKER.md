@@ -343,6 +343,11 @@ What a user's agent (and `>_` shell) can and cannot see:
 - Network access is unrestricted: agents need it for provider APIs, and
   they can reach anything the Docker network can, including the backend's
   ports. Put the stack on an isolated network if that matters.
+- The file browser (prigh-web's folder button) reaches files only through
+  the session's tool host, as its user: a user's own container tool host
+  sees what that Linux user may (the table above); the backend's own files
+  are never reachable, since it runs no tools here. Transfer links are
+  one-time tickets issued over the signed-in connection.
 - The token is the only authentication, and the traffic is plain HTTP/WS.
   Outside a trusted LAN, set `PRIGH_BIND=127.0.0.1` and put a
   TLS-terminating reverse proxy (Caddy, Traefik, nginx; it must pass
@@ -360,7 +365,18 @@ What a user's agent (and `>_` shell) can and cannot see:
 
 Removing the stack keeps named volumes unless they are removed
 explicitly (`docker compose down -v` deletes them, logins and sessions
-included). `prigh-nix` alone can be removed at any time with the stack
+included).
+
+**Getting files out (and in).** In prigh-web (`PRIGH_MODE=prigh-web`,
+port 7790), the folder button in the top bar (Ctrl+Shift+F) browses the
+session's directory in the container: select a file and Download it, or a
+directory to download it as a `.tar.gz` (`tar -tzf` lists it; `tar -xzf`
+unpacks it into a directory of its name). The upload button, or files
+dropped on the browser, put files into the directory shown; files dropped
+on the message box go to `.prigh/uploads/` in the session's directory and
+are attached to the message. From the Docker host, `docker compose cp
+prigh:/workspace/<name>/proj ./proj` (the service is `prigh`) copies whole
+trees. `prigh-nix` alone can be removed at any time with the stack
 down: the next start seeds a fresh store, and users reinstall their
 packages.
 
