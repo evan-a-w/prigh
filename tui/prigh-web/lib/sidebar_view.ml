@@ -89,6 +89,12 @@ let session (m : App.Model.t) ~inject ~current (s : Session_summary.t) =
           if selecting
           then inject (Action.Mark_session { path = s.path; range = shift_click ev })
           else inject (Action.Switch_session s.path))
+      (* Its transcript is fetched ahead while the pointer rests on it (or a
+         finger or the keyboard is on it), so that the click shows it at
+         once. *)
+      ; Attr.on_pointerenter (fun _ -> inject (Action.Prefetch_session s.path))
+      ; Attr.on_pointerdown (fun _ -> inject (Action.Prefetch_session s.path))
+      ; Attr.on_focus (fun _ -> inject (Action.Prefetch_session s.path))
       ; Attr.title s.path
       ]
     [ (if selecting

@@ -525,7 +525,10 @@ let%expect_test
   [%expect
     {|
     (Set_url_session s1)
-    (Rpc (method_ get_messages) (params ()) (tag (Messages s1)))
+    (Rpc (method_ get_messages_page)
+     (params ((session /sessions/s1.jsonl) (limit 60)))
+     (tag (Page (path /sessions/s1.jsonl) (before ()))))
+    Scroll_to_bottom
     (Rpc (method_ get_pending) (params ()) (tag Pending))
     (Rpc (method_ list_sessions) (params ()) (tag Sessions))
     (Rpc (method_ list_subagents) (params ()) (tag Subagents))

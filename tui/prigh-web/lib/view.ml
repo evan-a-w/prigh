@@ -153,6 +153,14 @@ let rec inert (node : Node.t) : Node.t =
   | (None | Text _ | Widget _) as node -> node
 ;;
 
+(* What is loaded of the transcript, after how much is not. *)
+let transcript (m : Model.t) ~inject =
+  Node.fragment
+    [ Paging.view m.paging ~load:(inject Action.Load_older)
+    ; Chat_view.view ~fold:(Model.fold m) (Model.message_time m) m.chat
+    ]
+;;
+
 let view (m : Model.t) ~inject ~terminal =
   let behind =
     if Option.is_some m.dialog || Model.waiting m || Files.asking m.files
@@ -171,13 +179,8 @@ let view (m : Model.t) ~inject ~terminal =
     | Some text, _, _ -> placeholder text
     | None, [], [] -> empty m
     | None, [], _ -> echoes m
-    | None, _, [] ->
-      Chat_view.view ~fold:(Model.fold m) (Model.message_time m) m.chat
-    | None, _, _ ->
-      Node.fragment
-        [ Chat_view.view ~fold:(Model.fold m) (Model.message_time m) m.chat
-        ; echoes m
-        ]
+    | None, _, [] -> transcript m ~inject
+    | None, _, _ -> Node.fragment [ transcript m ~inject; echoes m ]
   in
   Node.div
     ~attrs:

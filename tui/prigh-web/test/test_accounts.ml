@@ -302,8 +302,9 @@ let%expect_test "switching user resets everything that was the old user's" =
   H.act
     h
     (Reply
-       ( Messages "s1"
-       , Ok (Jsonaf.of_string {|[{"role":"user","text":"secret"}]|}) ));
+       ( H.newest "s1"
+       , Ok (Jsonaf.of_string @@ H.page {|[{"role":"user","text":"secret"}]|})
+       ));
   H.act h (Run "/btw what was that?");
   H.act h (Set_session_query "ali");
   H.act h Open_model_picker;

@@ -18,7 +18,7 @@ let messages =
 ;;
 
 let with_messages h =
-  H.act h (Reply (Messages "s1", Ok (Jsonaf.of_string messages)))
+  H.act h (Reply (H.newest "s1", Ok (Jsonaf.of_string (H.page messages))))
 ;;
 
 let%expect_test "every command does something (none is unknown)" =
@@ -375,6 +375,7 @@ let%expect_test "/verbosity and Ctrl+O" =
     (Focus editor)
     (Expire_toast (id 0) (after_ms 4660))
     <div id="chat" class="chat verbosity-quiet">
+      <Vdom.Node.none-widget> </Vdom.Node.none-widget>
       <div class="entries">
         <div class="msg user">
           <div class="bubble"> fix the build </div>
@@ -535,6 +536,9 @@ let%expect_test "/switch" =
     (Save_history ("/switch /sessions/s2.jsonl"))
     (Rpc (method_ switch_session) (params ((path /sessions/s2.jsonl)))
      (tag Reload_state))
+    (Rpc (method_ get_messages_page)
+     (params ((session /sessions/s2.jsonl) (limit 60)))
+     (tag (Page (path /sessions/s2.jsonl) (before ()))))
     (Focus editor)
     |}];
   H.act h Toggle_sidebar;
@@ -658,7 +662,9 @@ let%expect_test "/rewind: pick, confirm, reload the messages" =
     (Expire_toast (id 0) (after_ms 2980))
     (Rpc (method_ rewind) (params ((to e1))) (tag Reload_messages))
     (Rpc (method_ get_state) (params ()) (tag State))
-    (Rpc (method_ get_messages) (params ()) (tag (Messages s1)))
+    (Rpc (method_ get_messages_page)
+     (params ((session /sessions/s1.jsonl) (limit 60)))
+     (tag (Page (path /sessions/s1.jsonl) (before ()))))
     |}];
   (* Esc cancels without rewinding. *)
   run h "/rewind";
@@ -1146,7 +1152,8 @@ let%expect_test "/agents [n|id|cancel <n|id>]: the agents panel" =
   [%expect
     {|
     (Save_history ("/agents cancel 2" /agents "/agents cancel 1"))
-    (Rpc (method_ get_subagent) (params ((id a2))) (tag (Subagent a2)))
+    (Rpc (method_ get_subagent) (params ((id a2) (elide true)))
+     (tag (Subagent a2)))
     (Rpc (method_ cancel_subagent) (params ((agent_id a2))) (tag Show_error))
     (All agents (Esc)) Subagent a2 2 agents running (Close (Alt+0))
     lint
@@ -1155,12 +1162,14 @@ let%expect_test "/agents [n|id|cancel <n|id>]: the agents panel" =
     Loading the transcript…
     (Save_history
      ("/agents cancel a1" "/agents cancel 2" /agents "/agents cancel 1"))
-    (Rpc (method_ get_subagent) (params ((id a1))) (tag (Subagent a1)))
+    (Rpc (method_ get_subagent) (params ((id a1) (elide true)))
+     (tag (Subagent a1)))
     (Rpc (method_ cancel_subagent) (params ((agent_id a1))) (tag Show_error))
     (Save_history
      ("/agents cancel a3" "/agents cancel a1" "/agents cancel 2" /agents
       "/agents cancel 1"))
-    (Rpc (method_ get_subagent) (params ((id a3))) (tag (Subagent a3)))
+    (Rpc (method_ get_subagent) (params ((id a3) (elide true)))
+     (tag (Subagent a3)))
     Subagent a3 has already finished.
     (Save_history
      ("/agents cancel 7" "/agents cancel a3" "/agents cancel a1"
@@ -1173,7 +1182,8 @@ let%expect_test "/agents [n|id|cancel <n|id>]: the agents panel" =
     (Save_history
      ("/agents 2" "/agents cancel" "/agents cancel 7" "/agents cancel a3"
       "/agents cancel a1" "/agents cancel 2" /agents "/agents cancel 1"))
-    (Rpc (method_ get_subagent) (params ((id a2))) (tag (Subagent a2)))
+    (Rpc (method_ get_subagent) (params ((id a2) (elide true)))
+     (tag (Subagent a2)))
     |}]
 ;;
 
@@ -1291,7 +1301,9 @@ let%expect_test "/setusr: a superuser acts as another user, and back" =
   [%expect
     {|
     (Set_url_session b1)
-    (Rpc (method_ get_messages) (params ()) (tag (Messages b1)))
+    (Rpc (method_ get_messages_page)
+     (params ((session /sessions/b1.jsonl) (limit 60)))
+     (tag (Page (path /sessions/b1.jsonl) (before ()))))
     (Rpc (method_ get_pending) (params ()) (tag Pending))
     (Rpc (method_ list_sessions) (params ()) (tag Sessions))
     (Rpc (method_ list_subagents) (params ()) (tag Subagents))
@@ -1360,7 +1372,10 @@ let%expect_test "/retry-backend-connection, /state, /clear, /quit" =
   [%expect
     {|
     (Set_url_session s1)
-    (Rpc (method_ get_messages) (params ()) (tag (Messages s1)))
+    (Rpc (method_ get_messages_page)
+     (params ((session /sessions/s1.jsonl) (limit 60)))
+     (tag (Page (path /sessions/s1.jsonl) (before ()))))
+    Scroll_to_bottom
     (Rpc (method_ get_pending) (params ()) (tag Pending))
     (Rpc (method_ list_sessions) (params ()) (tag Sessions))
     (Rpc (method_ list_subagents) (params ()) (tag Subagents))

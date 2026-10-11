@@ -26,7 +26,7 @@ let%expect_test "connecting: the chat, the composer and the status say so" =
   H.quiet h (fun () -> H.reply h "get_state" (H.state_json ()));
   H.text h ~selector:".chat";
   [%expect {| Loading the session… |}];
-  H.reply h "get_messages" "[]";
+  H.reply h "get_messages_page" (H.page "[]");
   H.text h ~selector:".chat .empty h2";
   H.text h ~selector:".status-item.idle";
   H.elements h ~selector:".composer";
@@ -230,6 +230,9 @@ let%expect_test "switching: the old session's events meanwhile change nothing" =
     {|
     (Rpc (method_ switch_session) (params ((path /sessions/s2.jsonl)))
      (tag Reload_state))
+    (Rpc (method_ get_messages_page)
+     (params ((session /sessions/s2.jsonl) (limit 60)))
+     (tag (Page (path /sessions/s2.jsonl) (before ()))))
     (Focus editor)
     Loading the session…
     |}];

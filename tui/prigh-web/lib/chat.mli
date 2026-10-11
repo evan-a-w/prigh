@@ -64,6 +64,14 @@ val of_messages : ?running:bool -> Message.t list -> t
 (** Oldest first. *)
 val entries : t -> Entry.t list
 
+(** The number of the oldest of [entries]: they are numbered in order, and
+    keep their numbers as messages are added after them or [prepend]ed
+    before them. *)
+val first : t -> int
+
+(** Adds older messages (a page before those loaded) before the entries. *)
+val prepend : t -> Message.t list -> t
+
 val tool : t -> string -> Tool.t option
 
 (** Whether the agent is working: between its start and end events. A tool
@@ -97,3 +105,11 @@ val set_nested_subagent
   -> t
 
 val add_notice : t -> string -> t
+
+(** A tool call of the transcript, or of the transcript of the subagent
+    [agent_id] (at any depth). *)
+val find_tool : t -> agent_id:string option -> call_id:string -> Tool.t option
+
+(** Gives a call's result its whole [text], once fetched in place of what was
+    [elided]. *)
+val set_output : t -> agent_id:string option -> call_id:string -> string -> t

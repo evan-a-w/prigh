@@ -21,6 +21,15 @@ module Method = struct
         }
     | Delete_sessions of string list
     | Delete_archived
+    | Get_messages_page of
+        { session : string
+        ; before : string option
+        ; limit : int
+        }
+    | Get_tool_output of
+        { call_id : string
+        ; agent_id : string option
+        }
   [@@deriving sexp_of, equal]
 
   let name = function
@@ -30,6 +39,8 @@ module Method = struct
     | Set_archived _ -> "set_archived"
     | Delete_sessions _ -> "delete_sessions"
     | Delete_archived -> "delete_archived"
+    | Get_messages_page _ -> "get_messages_page"
+    | Get_tool_output _ -> "get_tool_output"
   ;;
 
   let params = function
@@ -40,6 +51,15 @@ module Method = struct
     | Set_archived { path; archived } ->
       [ "path", Json.str path; "archived", Json.bool archived ]
     | Delete_sessions paths -> [ "paths", `Array (List.map paths ~f:Json.str) ]
+    | Get_messages_page { session; before; limit } ->
+      [ "session", Json.str session ]
+      @ Option.value_map before ~default:[] ~f:(fun b ->
+        [ "before", Json.str b ])
+      @ [ "limit", Json.int limit ]
+    | Get_tool_output { call_id; agent_id } ->
+      [ "call_id", Json.str call_id ]
+      @ Option.value_map agent_id ~default:[] ~f:(fun a ->
+        [ "agent_id", Json.str a ])
   ;;
 end
 

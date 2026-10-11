@@ -83,10 +83,10 @@ let job_started text =
 ;;
 
 (* A few lines of each output: the first, or the last of an error. *)
-let output ~fold ?(error = false) ?(lines = 6) text =
+let output ~fold ?(error = false) ?(lines = 6) ?elided text =
   if String.is_empty (String.strip text)
   then Node.none
-  else Output_view.view ~fold ~error ~lines text
+  else Output_view.view ~fold ~error ~lines ?elided text
 ;;
 
 let live_tail = 6
@@ -98,7 +98,7 @@ let live ~lines text =
 ;;
 
 let error_output ~fold (r : Message.Tool_result.t) =
-  output ~fold ~error:true r.text
+  output ~fold ~error:true ?elided:r.elided r.text
 ;;
 
 (* The subagent's latest step, for a running card. *)
@@ -345,7 +345,7 @@ let present
            else (
              match result with
              | None -> running_output ()
-             | Some r -> output ~fold ~error:r.is_error text))
+             | Some r -> output ~fold ~error:r.is_error ?elided:r.elided text))
         ]
     }
   | "read" ->
@@ -362,7 +362,7 @@ let present
       | Some { is_error = true; _ } -> [ error_body ]
       | Some { images = _ :: _ as images; text; _ } ->
         [ Image_view.thumbs images; span "caption" text ]
-      | Some { text; _ } -> [ output ~fold ~lines:0 text ]
+      | Some { text; elided; _ } -> [ output ~fold ~lines:0 ?elided text ]
     in
     { arg = Some (span "arg path" (str "path")); chips = range; body }
   | "write" ->
@@ -508,7 +508,7 @@ let present
     ; body =
         (match result with
          | None -> []
-         | Some r -> [ output ~fold ~error:r.is_error r.text ])
+         | Some r -> [ output ~fold ~error:r.is_error ?elided:r.elided r.text ])
     }
   | "subagent" ->
     let task = str "task" in
@@ -586,8 +586,11 @@ let present
     ; body =
         (match result, fetched with
          | None, _ -> [ running_output () ]
+         | Some { elided = Some elided; text; _ }, _ ->
+           [ output ~fold ~elided text ]
          | Some _, Some fetched -> [ output ~fold fetched.body ]
-         | Some r, None -> [ output ~fold ~error:r.is_error r.text ])
+         | Some r, None ->
+           [ output ~fold ~error:r.is_error ?elided:r.elided r.text ])
     }
   | "job_input" ->
     { arg =
@@ -598,7 +601,7 @@ let present
     ; body =
         (match result with
          | None -> []
-         | Some r -> [ output ~fold ~error:r.is_error r.text ])
+         | Some r -> [ output ~fold ~error:r.is_error ?elided:r.elided r.text ])
     }
   | "job_wait" | "job_kill" | "subagent_wait" | "subagent_cancel" ->
     let ids = Tool_args.strings args "ids" @ Tool_args.strings args "id" in
@@ -620,7 +623,7 @@ let present
        ; chips = []
        ; body =
            [ (match result with
-              | Some r -> output ~fold ~error:r.is_error r.text
+              | Some r -> output ~fold ~error:r.is_error ?elided:r.elided r.text
               | None -> Node.none)
            ]
        }
@@ -687,7 +690,9 @@ let present
         (match result with
          | None -> [ running_output () ]
          | Some r ->
-           [ output ~fold ~error:r.is_error r.text; Image_view.thumbs r.images ])
+           [ output ~fold ~error:r.is_error ?elided:r.elided r.text
+           ; Image_view.thumbs r.images
+           ])
     }
 ;;
 

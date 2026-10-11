@@ -413,6 +413,7 @@ let finish_subagent
     ; is_error = result.is_error
     ; images = []
     ; at = None
+    ; elided = None
     }
   in
   let rec go acc = function

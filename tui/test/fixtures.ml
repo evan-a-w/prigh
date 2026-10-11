@@ -175,7 +175,14 @@ let tool_call ?(name = "bash") ?(arguments = "{}") id : P.Tool_call.t =
 let tool_result ?(name = "bash") ?(is_error = false) ?(images = []) ~id text
   : P.Message.Tool_result.t
   =
-  { tool_call_id = id; tool_name = name; text; is_error; images; at = None }
+  { tool_call_id = id
+  ; tool_name = name
+  ; text
+  ; is_error
+  ; images
+  ; at = None
+  ; elided = None
+  }
 ;;
 
 let delivery text =

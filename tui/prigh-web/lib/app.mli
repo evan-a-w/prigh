@@ -54,7 +54,14 @@ module Reply_tag : sig
     | Ignore
     | Show_error (** only failures are shown *)
     | State
-    | Messages of string (** the session's id *)
+    | Page of
+        { path : string
+        ; before : string option (** [None]: the newest page *)
+        }
+    | Tool_output of
+        { agent_id : string option
+        ; call_id : string
+        }
     | Pending
     | Sent of
         { text : string
@@ -161,6 +168,8 @@ module Command : sig
     | Set_title of string (** the tab's, with the count of unseen events *)
     | Files of Files.Page.t
     | Save_size of Resize.Save.t (** a panel's size, in the browser *)
+    | Keep_scroll_position
+    (** older messages are being added above: what shows stays in place *)
   [@@deriving sexp_of, equal]
 end
 
@@ -328,6 +337,10 @@ module Action : sig
     | Resize of Resize.Action.t
     (** a panel's handle dragged or moved with the keys, the window resized,
         the sizes kept in the browser *)
+    | Load_older (** the page of the transcript before those loaded *)
+    | Prefetch_session of string
+    (** a session's path: the pointer rests on it in the sidebar *)
+    | Load_output of string (** a [Fold] key: the whole of an elided output *)
   [@@deriving sexp_of]
 end
 
@@ -382,6 +395,10 @@ module Model : sig
     ; notifications : Page_notify.t
     ; files : Files.t
     ; layout : Resize.t (** the panels' sizes *)
+    ; paging : Paging.t (** how much of the transcript is loaded *)
+    ; chat_cache : Chat_cache.t
+    ; outputs_loading : String.Set.t
+    (** [Fold] keys of elided outputs being fetched whole *)
     }
   [@@deriving sexp_of]
 

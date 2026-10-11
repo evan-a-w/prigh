@@ -530,7 +530,9 @@ let%expect_test
   [%expect
     {|
     (Set_url_session s2)
-    (Rpc (method_ get_messages) (params ()) (tag (Messages s2)))
+    (Rpc (method_ get_messages_page)
+     (params ((session /sessions/s2.jsonl) (limit 60)))
+     (tag (Page (path /sessions/s2.jsonl) (before ()))))
     (Rpc (method_ get_pending) (params ()) (tag Pending))
     (Rpc (method_ list_sessions) (params ()) (tag Sessions))
     (Rpc (method_ list_subagents) (params ()) (tag Subagents))
@@ -544,10 +546,11 @@ let%expect_test "after a reload, a nested subagent's transcript is fetched" =
   H.act
     h
     (Reply
-       ( Messages "s1"
+       ( H.newest "s1"
        , Ok
            (Jsonaf.of_string
-              {|[{"role":"user","text":"survey"},
+            @@ H.page
+                 {|[{"role":"user","text":"survey"},
                  {"role":"assistant","content":[{"type":"tool_call","id":"s1","name":"subagent","arguments":"{\"task\":\"Survey the repository\"}"}],"stop_reason":{"type":"tool_use"},"usage":{"input":0,"output":0,"cache_read":0},"model":"m"},
                  {"role":"tool_result","tool_call_id":"s1","tool_name":"subagent","text":"started agent a1 (Survey the repository); ...","is_error":false}]|})
        ));
@@ -574,8 +577,10 @@ let%expect_test "after a reload, a nested subagent's transcript is fetched" =
   [%expect
     {|
     Scroll_to_bottom
-    (Rpc (method_ get_subagent) (params ((id s1))) (tag (Subagent s1)))
-    (Rpc (method_ get_subagent) (params ((id a1/n1))) (tag (Subagent a1/n1)))
+    (Rpc (method_ get_subagent) (params ((id s1) (elide true)))
+     (tag (Subagent s1)))
+    (Rpc (method_ get_subagent) (params ((id a1/n1) (elide true)))
+     (tag (Subagent a1/n1)))
     Loading the transcript…
     (Survey the repository) › Count the modules
     ✓ Count the modules

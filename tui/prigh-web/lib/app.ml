@@ -45,7 +45,14 @@ module Reply_tag = struct
     | Ignore
     | Show_error
     | State
-    | Messages of string (** the session's id *)
+    | Page of
+        { path : string
+        ; before : string option (** [None]: the newest page *)
+        }
+    | Tool_output of
+        { agent_id : string option
+        ; call_id : string
+        }
     | Pending
     | Sent of
         { text : string
@@ -144,6 +151,8 @@ module Command = struct
     | Set_title of string
     | Files of Files.Page.t
     | Save_size of Resize.Save.t
+    | Keep_scroll_position
+    (** older messages are being added above: what shows stays in place *)
   [@@deriving sexp_of, equal]
 end
 
@@ -302,6 +311,9 @@ module Action = struct
         }
     | Files of Files.Action.t
     | Resize of Resize.Action.t
+    | Load_older
+    | Prefetch_session of string (** a path *)
+    | Load_output of string (** a [Fold] key *)
   [@@deriving sexp_of]
 end
 
@@ -352,6 +364,9 @@ module Model = struct
     ; notifications : Page_notify.t
     ; files : Files.t
     ; layout : Resize.t
+    ; paging : Paging.t
+    ; chat_cache : Chat_cache.t
+    ; outputs_loading : String.Set.t (** [Fold] keys *)
     }
   [@@deriving sexp_of]
 
@@ -447,6 +462,9 @@ let init =
   ; notifications = Page_notify.init
   ; files = Files.closed
   ; layout = Resize.empty
+  ; paging = Paging.all
+  ; chat_cache = Chat_cache.empty
+  ; outputs_loading = String.Set.empty
   }
 ;;
 
@@ -527,10 +545,6 @@ let field json name =
   | _ -> None
 ;;
 
-let session_id (m : Model.t) =
-  Option.value_map m.state ~default:"" ~f:(fun s -> s.session_id)
-;;
-
 let close_dialog (m : Model.t) = { m with dialog = None }, [ focus_editor ]
 let list_subagents = rpc "list_subagents" [] ~tag:Subagents
 let list_jobs = rpc "list_jobs" [] ~tag:Jobs
@@ -579,7 +593,56 @@ let files_where (m : Model.t) =
     })
 ;;
 
+(* ---- the transcript a page at a time *)
+
+let page_rpc path ~before =
+  call
+    (Get_messages_page { session = path; before; limit = Paging.size })
+    ~tag:(Page { path; before })
+;;
+
+let session_path (m : Model.t) = Option.map m.state ~f:(fun s -> s.session_path)
+
+let is_current (m : Model.t) path =
+  Option.equal String.equal (session_path m) (Some path)
+;;
+
+(* The transcript we leave stays at hand for coming back to it, its newest
+   page forgotten if it changed since it came (it is refreshed then). *)
+let keep_chat (m : Model.t) =
+  match session_path m with
+  | Some path when not m.pending.messages ->
+    let entry =
+      match Chat_cache.find m.chat_cache path with
+      | Some cached when phys_equal cached.chat m.chat -> cached
+      | Some _ | None ->
+        { Chat_cache.Entry.chat = m.chat
+        ; paging = { m.paging with loading = false }
+        ; newest = []
+        }
+    in
+    Chat_cache.set m.chat_cache path entry
+  | Some _ | None -> m.chat_cache
+;;
+
+(* The newest page of [path], unless on its way. *)
+let fetch_newest (m : Model.t) path =
+  if Chat_cache.loading m.chat_cache path
+  then m, []
+  else
+    ( { m with chat_cache = Chat_cache.set_loading m.chat_cache path true }
+    , [ page_rpc path ~before:None ] )
+;;
+
+let subagent_rpc call_id =
+  rpc
+    "get_subagent"
+    [ "id", str call_id; "elide", `True ]
+    ~tag:(Subagent call_id)
+;;
+
 let set_state_without_files (m : Model.t) (state : State.t) =
+  let chat_cache = keep_chat m in
   let changed =
     match m.state with
     | Some old -> not (String.equal old.session_id state.session_id)
@@ -611,10 +674,15 @@ let set_state_without_files (m : Model.t) (state : State.t) =
   in
   let m = { m with state = Some state; pending } in
   if changed
-  then
+  then (
+    let cached = Chat_cache.find chat_cache state.session_path in
+    let m, fetch = fetch_newest { m with chat_cache } state.session_path in
     ( { m with
-        pending = { In_flight.none with messages = true }
-      ; chat = Chat.empty
+        pending = { In_flight.none with messages = Option.is_none cached }
+      ; chat = Option.value_map cached ~default:Chat.empty ~f:(fun c -> c.chat)
+      ; paging =
+          Option.value_map cached ~default:Paging.all ~f:(fun c -> c.paging)
+      ; outputs_loading = String.Set.empty
       ; folds = String.Set.empty
       ; confirms = []
       ; confirm_reason = None
@@ -629,13 +697,14 @@ let set_state_without_files (m : Model.t) (state : State.t) =
       ; toasts = List.filter m.toasts ~f:(fun t -> not t.error)
       }
     , cancel_btw m
-      @ [ Command.Set_url_session state.session_id
-        ; rpc "get_messages" [] ~tag:(Messages state.session_id)
-        ; rpc "get_pending" [] ~tag:Pending
+      @ [ Command.Set_url_session state.session_id ]
+      @ fetch
+      @ (if Option.is_some cached then [ Command.Scroll_to_bottom ] else [])
+      @ [ rpc "get_pending" [] ~tag:Pending
         ; rpc "list_sessions" [] ~tag:Sessions
         ; list_subagents
         ; list_jobs
-        ] )
+        ] ))
   else m, background_changed
 ;;
 
@@ -942,11 +1011,12 @@ let switch_session (m : Model.t) path =
   let current = Option.map m.state ~f:(fun s -> s.session_path) in
   if Option.equal String.equal current (Some path)
   then m, [ focus_editor ]
-  else
+  else (
+    let m, fetch = fetch_newest m path in
     ( { m with pending = { m.pending with session = Some (Switching path) } }
-    , [ rpc "switch_session" [ "path", str path ] ~tag:Reload_state
-      ; focus_editor
-      ] )
+    , [ rpc "switch_session" [ "path", str path ] ~tag:Reload_state ]
+      @ fetch
+      @ [ focus_editor ] ))
 ;;
 
 (* The sidebar's sessions in the order it shows them: active, then archived. *)
@@ -1105,8 +1175,7 @@ let fetch_transcript (m : Model.t) id =
   Agents.lineage m.agents id
   |> List.filter ~f:(fun (a : Agents.Agent.t) ->
     Option.is_none (Chat.find_subagent m.chat a.id))
-  |> List.map ~f:(fun (a : Agents.Agent.t) ->
-    rpc "get_subagent" [ "id", str a.id ] ~tag:(Subagent a.id))
+  |> List.map ~f:(fun (a : Agents.Agent.t) -> subagent_rpc a.id)
 ;;
 
 let select (m : Model.t) (item : Agents.Item.t) =
@@ -2055,6 +2124,8 @@ let user_switched (m : Model.t) (hello : Hello_reply.t) =
       hello = Some hello
     ; state = None
     ; chat = Chat.empty
+    ; paging = Paging.all
+    ; chat_cache = Chat_cache.empty
     ; sessions = []
     ; marks = Session_marks.empty
     ; session_query = ""
@@ -2500,7 +2571,7 @@ let run_command (m : Model.t) ({ name; rest } : Slash.Parsed.t) =
            }))
   | "clear", _ ->
     toast
-      { m with chat = Chat.empty }
+      { m with chat = Chat.empty; paging = Paging.all }
       "Cleared the view; the conversation is kept (a reload shows it, /new \
        starts afresh)"
   | "quit", _ ->
@@ -2667,6 +2738,99 @@ let subagent_of_json json =
   , `Call call_id )
 ;;
 
+(* ---- pages of the transcript, cached transcripts, whole outputs *)
+
+let prefetch_next (m : Model.t) =
+  let chat_cache, next = Chat_cache.next_prefetch m.chat_cache in
+  ( { m with chat_cache }
+  , Option.to_list (Option.map next ~f:(fun path -> page_rpc path ~before:None))
+  )
+;;
+
+let newest_page (m : Model.t) path (page : Message_page.t) =
+  let current = is_current m path in
+  let chat_cache, entry =
+    Chat_cache.add_page
+      (Chat_cache.set_loading m.chat_cache path false)
+      path
+      page
+      ~running:(current && Model.running m)
+  in
+  let m, prefetch = prefetch_next { m with chat_cache } in
+  if not current
+  then m, prefetch
+  else if phys_equal entry.chat m.chat && not m.pending.messages
+  then m, prefetch
+  else
+    ( { m with
+        chat = entry.chat
+      ; paging = entry.paging
+      ; scrolled_up = false
+      ; pending = { m.pending with messages = false }
+      }
+    , (Command.Scroll_to_bottom
+       :: List.map (Chat.subagents_to_load entry.chat) ~f:subagent_rpc)
+      @ prefetch )
+;;
+
+let older_page (m : Model.t) path ~before (page : Message_page.t) =
+  if
+    is_current m path
+    && m.paging.loading
+    && Option.equal String.equal m.paging.before (Some before)
+  then (
+    let loaded = String.Set.of_list (Chat.subagents_to_load m.chat) in
+    let chat = Chat.prepend m.chat page.messages in
+    ( { m with chat; paging = Paging.of_page page }
+    , Command.Keep_scroll_position
+      :: List.filter_map (Chat.subagents_to_load chat) ~f:(fun call_id ->
+        Option.some_if (not (Set.mem loaded call_id)) (subagent_rpc call_id)) ))
+  else m, []
+;;
+
+let load_older (m : Model.t) =
+  match session_path m, Paging.next m.paging with
+  | Some path, Some before ->
+    ( { m with paging = { m.paging with loading = true } }
+    , [ page_rpc path ~before:(Some before) ] )
+  | _ -> m, []
+;;
+
+let prefetch_session (m : Model.t) path =
+  if is_current m path
+  then m, []
+  else (
+    let chat_cache, fetch = Chat_cache.prefetch m.chat_cache path in
+    ( { m with chat_cache }
+    , Option.to_list
+        (Option.map fetch ~f:(fun path -> page_rpc path ~before:None)) ))
+;;
+
+(* A fold's key is the call id, after the subagent's id and a slash in a
+   subagent's transcript. *)
+let output_key ~agent_id ~call_id =
+  match agent_id with
+  | None -> call_id
+  | Some agent_id -> Fold.key (Fold.scoped Fold.default agent_id) call_id
+;;
+
+let load_output (m : Model.t) key =
+  let agent_id, call_id =
+    match String.rsplit2 key ~on:'/' with
+    | Some (agent_id, call_id) -> Some agent_id, call_id
+    | None -> None, key
+  in
+  match Chat.find_tool m.chat ~agent_id ~call_id with
+  | Some { result = Some { elided = Some _; _ }; _ }
+    when not (Set.mem m.outputs_loading key) ->
+    ( { m with outputs_loading = Set.add m.outputs_loading key }
+    , [ call
+          (Get_tool_output { call_id; agent_id })
+          ~tag:(Tool_output { agent_id; call_id })
+      ] )
+  | _ -> m, []
+;;
+
 let rec reply_to (m : Model.t) (tag : Reply_tag.t) result =
   match tag, result with
   | Reconnect generation, _ when generation <> m.generation -> m, []
@@ -2804,13 +2968,30 @@ let rec reply_to (m : Model.t) (tag : Reply_tag.t) result =
     error
       { m with pending = { m.pending with session = None } }
       (sprintf "Couldn't open the session: %s" e)
-  | Messages session, Error e when String.equal session (session_id m) ->
+  | Page { path; before = None }, Error e ->
+    let m =
+      { m with chat_cache = Chat_cache.set_loading m.chat_cache path false }
+    in
+    if is_current m path
+    then
+      error
+        { m with pending = { m.pending with messages = false } }
+        (sprintf
+           "Couldn't load the session's messages: %s. Reload the page to try \
+            again."
+           e)
+    else prefetch_next m
+  | Page { path; before = Some _ }, Error e when is_current m path ->
     error
-      { m with pending = { m.pending with messages = false } }
-      (sprintf
-         "Couldn't load the session's messages: %s. Reload the page to try \
-          again."
-         e)
+      { m with paging = { m.paging with loading = false } }
+      (sprintf "Couldn't load earlier messages: %s. Scroll up to try again." e)
+  | Tool_output { agent_id; call_id }, Error e ->
+    error
+      { m with
+        outputs_loading =
+          Set.remove m.outputs_loading (output_key ~agent_id ~call_id)
+      }
+      (sprintf "Couldn't load the whole output: %s" e)
   | Model_set, Error e ->
     error
       { m with pending = { m.pending with model = None } }
@@ -2846,20 +3027,21 @@ let rec reply_to (m : Model.t) (tag : Reply_tag.t) result =
          State.of_json
          ~f:(set_state { m with pending = { m.pending with session = None } })
      | None -> m, [ rpc "get_state" [] ~tag:State ])
-  (* Another session's, asked for before switching again. *)
-  | Messages session, Ok _ when not (String.equal session (session_id m)) ->
-    m, []
-  | Messages _, Ok json ->
-    decode m json (decode_list Message.of_json) ~f:(fun messages ->
-      let chat = Chat.of_messages ~running:(Model.running m) messages in
-      ( { m with
-          chat
-        ; scrolled_up = false
-        ; pending = { m.pending with messages = false }
-        }
-      , Command.Scroll_to_bottom
-        :: List.map (Chat.subagents_to_load chat) ~f:(fun call_id ->
-          rpc "get_subagent" [ "id", str call_id ] ~tag:(Subagent call_id)) ))
+  | Page { path; before = None }, Ok json ->
+    decode m json Message_page.of_json ~f:(newest_page m path)
+  | Page { path; before = Some before }, Ok json ->
+    decode m json Message_page.of_json ~f:(older_page m path ~before)
+  | Tool_output { agent_id; call_id }, Ok json ->
+    let m =
+      { m with
+        outputs_loading =
+          Set.remove m.outputs_loading (output_key ~agent_id ~call_id)
+      }
+    in
+    (match Json.string_field json "text" with
+     | Ok text ->
+       { m with chat = Chat.set_output m.chat ~agent_id ~call_id text }, []
+     | Error e -> error m (Error.to_string_hum e))
   | Pending, Ok json ->
     decode m json Pending.of_json ~f:(fun pending ->
       add_waiting
@@ -3038,10 +3220,15 @@ let rec reply_to (m : Model.t) (tag : Reply_tag.t) result =
       open_dialog m (Session stats))
   | Entries purpose, Ok json -> entries_picker m purpose json
   | Reload_messages, Ok _ ->
-    ( m
-    , [ rpc "get_state" [] ~tag:State
-      ; rpc "get_messages" [] ~tag:(Messages (session_id m))
-      ] )
+    let m, fetch =
+      match session_path m with
+      | Some path ->
+        fetch_newest
+          { m with chat_cache = Chat_cache.remove m.chat_cache path }
+          path
+      | None -> m, []
+    in
+    m, rpc "get_state" [] ~tag:State :: fetch
   | Exported, Ok json ->
     (match Json.string_field json "path" with
      | Ok path ->
@@ -3835,7 +4022,11 @@ let update (m : Model.t) (action : Action.t) =
       then Set.remove m.folds key
       else Set.add m.folds key
     in
-    { m with folds }, []
+    let m = { m with folds } in
+    if Fold.expanded (Model.fold m) key then load_output m key else m, []
+  | Load_output key -> load_output m key
+  | Load_older -> load_older m
+  | Prefetch_session path -> prefetch_session m path
   | Cycle_model step -> cycle_model m step
   | Cycle_thinking -> cycle_thinking m
   | Copy_last -> copy_last m

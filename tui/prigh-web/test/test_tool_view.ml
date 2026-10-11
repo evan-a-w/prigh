@@ -881,6 +881,7 @@ let%expect_test "subagent from a reloaded session: no events, only its result" =
           ; is_error = false
           ; images = []
           ; at = None
+          ; elided = None
           }
       ]
   in

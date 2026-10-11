@@ -9,6 +9,9 @@ open! Import
 val view
   :  ?error:bool
   -> ?from_end:bool
+  -> ?elided:Elided.t
+       (** [text] is cut: its first and last lines; expanded, a button
+           ([load_attribute]) fetches the rest *)
   -> fold:Fold.t * string
   -> lines:int
   -> string
@@ -21,3 +24,7 @@ val live : lines:int -> tail:int -> string -> Node.t
 
 (** The number of lines of [text], ignoring a trailing newline. *)
 val line_count : string -> int
+
+(** The attribute holding the [Fold] key of the output a button loads whole:
+    the page listens for clicks on it. *)
+val load_attribute : string
