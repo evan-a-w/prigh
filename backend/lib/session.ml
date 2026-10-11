@@ -673,8 +673,13 @@ let summarise t ~path ~mtime =
       Time_float.to_string_utc
         (Time_float.of_span_since_epoch (Time_float.Span.of_sec mtime))
   ; first_prompt =
+      (* The user's words, not the notes the harness put before them. *)
       List.find_map messages ~f:(function
-        | Message.User u -> Some (Skill.as_typed u.text)
+        | Message.User u ->
+          let body = Message.User.body u in
+          Option.some_if
+            (not (String.is_empty (String.strip body)))
+            (Skill.as_typed body)
         | _ -> None)
   ; message_count = List.length messages
   ; parent = t.parent

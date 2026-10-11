@@ -7,7 +7,7 @@ open! Import
     output. *)
 val view : App.Model.t -> inject:(App.Action.t -> unit Effect.t) -> Node.t
 
-(** What is running, for the status line: ["2 agents · 1 job running"], or
+(** What is running, for the status line: ["2 agents, 1 job running"], or
     what has run when nothing is. [None] when nothing has. *)
 val summary : Agents.t -> (string * bool) option
 

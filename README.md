@@ -255,35 +255,43 @@ footer, with a separator where the day changes. It speaks
 prigh's own RPC (the same `/ws` protocol as `-web`), so it gets every
 backend feature without a translation layer like pi-web's.
 
-Tool output folds to a few lines, as in the TUI: a running command's last
-lines (under how many came before), then a finished one's first and last
-lines, a file read or written, a listing or a diff cut short, each with a
-"Show all N lines" toggle that unfolds it in place (and "Fold to N lines",
-kept in view at its bottom, to fold it again). `/verbosity verbose`
+Tool output folds to a few lines: a running command's last lines (under
+how many came before), a finished one's first six (an error's last six,
+where the error is), a file read or written, a listing or a diff cut
+short, faded where it goes on, each with a "Show all N lines" toggle that
+unfolds it in place (and "Fold to N lines", kept in view at its bottom, to
+fold it again). `/verbosity verbose`
 unfolds them all and `quiet` hides them; changing it, or the session,
 starts the toggles afresh.
 
+Work in progress has one sign, a small sodium lamp that breathes (still
+under reduced motion): next to a running session in the sidebar, on a
+running tool, subagent or job, on the status line ("Working"), and on
+whatever waits for the backend; nothing finished glows, and while the
+connection is down only the reconnecting banner and status line do.
 Every action shows at once, before the backend answers: a session clicked
-in the sidebar spins there while the chat shows what it is loading (also
-while connecting, and for a new session), a prompt shows as "Sending…"
-with the send button busy until the transcript has it, a model or
-thinking level chosen shows (disabled, with a spinner) until the backend
-confirms it, and a command that lists something (`/login`, `/fork`,
+in the sidebar lights its lamp while the chat shows the shape of a
+transcript (also while connecting, and for a new session), a prompt shows
+as "Sending…" with the send button busy until the transcript has it, a
+model or thinking level chosen shows (disabled, with the lamp) until the
+backend confirms it, and a command that lists something (`/login`, `/fork`,
 `/tree`, `/session`, `/skills`, `/mcp`, `/setusr`…) opens its dialog with
 a loading row (Esc closes it, and the late answer then opens nothing).
 While the connection is down the composer is dashed and the status line
 says "Reconnecting…": what you write stays until it is back.
 
-The sidebar lists the active sessions first (a session is running, with a
-dot, while its turn or its background subagents and jobs run: "2 bg"),
-then, under an "Archived" divider with their count and size, the archived
-ones, muted. Hovering a session shows its archive (or unarchive) and delete
+The sidebar lists the active sessions first (a session is running, with
+its lamp lit, while its turn or its background subagents and jobs run),
+each with its age and directory, then a faint "Archived 14" rule that
+unfolds the archived ones, muted (a search shows the matching ones
+either way). Hovering a session shows its archive (or unarchive) and delete
 buttons; on a focused session A archives or unarchives it and Delete
 deletes it. "Select" (or `/delete` with no argument) turns the list into
 checkboxes: click or Space marks a session, Shift+click or Shift+Space the
-range from the last one (across the divider), and Delete asks to delete the
-marked ones; the divider's "Delete all" (`/delete-archived`) every archived
-one. The confirmation says how many sessions and how much disk they use, and
+range from the last one (across the divider), and Delete (or the bar at
+the foot of the list, "Delete 3 sessions (12.4 MB)") asks to delete the
+marked ones; "Delete archived" under the archived ones
+(`/delete-archived`) every archived one. The confirmation says how many sessions and how much disk they use, and
 which ones the backend will keep (running, open in another tab or terminal,
 or the one you are in). `/archive`, `/unarchive` and `/delete` also take
 sessions by name, id or path. The list follows the backend as it changes.
@@ -902,7 +910,8 @@ notifications while the tab is hidden: `/notify on` (or the account menu's
 turns them off (kept in localStorage, `prigh-web.notify`); the tab's title
 and favicon count what happened while it was hidden, notifications on or
 not. A blocked or unsupported browser (plain http other than localhost) is
-named with what to do.
+named with what to do. The status line's bell shows whether notifications
+are on (struck through when off or blocked) and turns them on or off.
 
 Text the harness adds to what the model reads is recorded with the message
 (`origin` in the session file and the RPC: environment notes about a new

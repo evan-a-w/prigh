@@ -223,7 +223,7 @@ summary:focus-visible { outline: 2px solid var(--sodium); outline-offset: 2px; b
 
 .delivery { display: flex; flex-direction: column; gap: 6px; }
 .delivery-section {
-  font-size: 13px;
+  font-size: 12.5px;
   display: flex;
   flex-direction: column;
   gap: 6px;
@@ -234,9 +234,9 @@ summary:focus-visible { outline: 2px solid var(--sodium); outline-offset: 2px; b
   left: calc(-1 * var(--gutter) - 8px + var(--spine) / 2);
   width: 16px;
   text-align: center;
-  color: var(--muted);
+  font: 12px/1.6 var(--mono);
+  color: var(--faint);
   background: var(--graphite);
-  line-height: 1.5;
 }
 .delivery-head .kind { font-family: var(--mono); font-size: 12.5px; flex-shrink: 0; color: var(--muted); }
 .delivery-head .task {

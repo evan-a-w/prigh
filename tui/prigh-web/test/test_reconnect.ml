@@ -56,3 +56,22 @@ let%expect_test "reconnecting after the backend goes away" =
     ((connection Connected) (toasts 1))
     |}]
 ;;
+
+(* Out of touch, nothing is known to be working: the page says it is
+   offline (its lamps go dark, but for the banner's and the status line's). *)
+let%expect_test "the page is offline while it reconnects" =
+  let h = Harness.create () in
+  Harness.elements h ~selector:".app";
+  Harness.act h Backend_closed;
+  Harness.elements h ~selector:".app";
+  Harness.elements h ~selector:".banner .lamp";
+  Harness.elements h ~selector:".status .lamp";
+  [%expect
+    {|
+    <div class="app sidebar-open">
+    (Reconnect (generation 1) (delay_ms 0) (session (s1)))
+    <div class="app offline sidebar-open">
+    <span class="lamp">
+    <span class="lamp">
+    |}]
+;;

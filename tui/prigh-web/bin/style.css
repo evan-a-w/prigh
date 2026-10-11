@@ -212,7 +212,7 @@ kbd {
 
 /* Layout */
 
-.app { display: flex; height: 100%; height: 100dvh; overflow: hidden; }
+.app { display: flex; height: 100%; height: 100dvh; overflow: hidden; overflow: clip; }
 
 .main {
   flex: 1;
@@ -284,10 +284,11 @@ kbd {
 /* Archive and delete, over the row's right end while it is pointed at. */
 .session-actions {
   position: absolute;
-  top: 50%;
-  right: 4px;
-  transform: translateY(-50%);
+  top: 2px;
+  bottom: 2px;
+  right: 2px;
   display: flex;
+  align-items: center;
   padding-left: 18px;
   border-radius: var(--r-control);
   background: linear-gradient(to right, transparent, var(--slate-2) 16px);
@@ -299,13 +300,17 @@ kbd {
 .session-actions .btn:hover { background: transparent; color: var(--chalk); }
 .session-actions .delete:hover { color: var(--brick); }
 @media (hover: none) {
-  .session-actions { position: static; transform: none; padding: 0; background: none; opacity: 0.7; align-self: center; }
+  .session-actions { position: static; padding: 0; background: none; opacity: 0.7; align-self: center; }
+  .session-actions .btn { width: 36px; height: 36px; }
+  .sessions-divider, .delete-archived { min-height: 36px; }
 }
 
 /* Archived sessions: folded under a faint rule with their count; quiet
    rows, no lamp, no lift. */
 .session.archived .session-title { color: var(--faint); }
 .session.archived:hover { background: none; }
+.session.archived .session-actions { background: linear-gradient(to right, transparent, var(--slate) 16px); }
+.session.archived.selected .session-actions { background: linear-gradient(to right, transparent, var(--slate-2) 16px); }
 .session.archived:hover .session-title, .session.archived.selected .session-title { color: var(--muted); }
 .session.archived.selected { background: var(--slate-2); }
 .sessions-divider {
@@ -886,8 +891,13 @@ kbd {
   .status .tokens, .status .account { display: none; }
   .chip-button > .icon:first-child { display: none; }
   .toasts { top: 56px; left: 12px; right: 12px; max-width: none; align-items: stretch; }
+  /* The newest two: more would cover the page. */
+  .toast:nth-last-child(n + 3) { display: none; }
   .modal-backdrop { padding-top: 8vh; }
   .help-table td:first-child { white-space: normal; }
+  /* No room beside the name: the detail goes under it, whole. */
+  .modal .picker-item { flex-wrap: wrap; row-gap: 0; }
+  .modal .picker-detail { flex-basis: 100%; margin-left: 0; white-space: normal; }
 }
 
 /* Command parity: account menu, side questions, command dialogs, verbosity */
@@ -1158,3 +1168,20 @@ kbd {
 .loading-row { display: flex; align-items: center; gap: 10px; padding: 18px 4px; color: var(--muted); }
 /* Under the reconnecting banner. */
 .app:has(.banner) .toasts { top: 100px; }
+/* Not over a dialog's title and filter: under it. */
+.app:has(.modal-backdrop) .toasts { top: auto; bottom: 16px; }
+
+/* Notifications: a quiet bell when on, struck through when off. */
+.status-item.notify { display: inline-grid; place-items: center; width: 22px; height: 22px; margin: -4px 0; }
+.status-item.notify .icon { width: 14px; height: 14px; }
+.status-item.notify.off { color: var(--faint); }
+.status-item.notify.warm { color: var(--sodium); }
+.status-item.notify:hover { text-decoration: none; }
+
+/* Out of touch with the backend, nothing is known to be working: the lamps
+   go dark but for the one that says it is reconnecting. */
+.app.offline .lamp { animation: none; opacity: 0.35; box-shadow: var(--lamp-ring); }
+.app.offline :is(.banner, .status) .lamp { animation: breathe 2s ease-in-out infinite; opacity: 1; }
+@media (prefers-reduced-motion: reduce) {
+  .app.offline :is(.banner, .status) .lamp { animation: none !important; }
+}

@@ -56,13 +56,16 @@ let%expect_test
   [%expect
     {|
     Ready 0% ↑0 ↓0 $0.0000
+    (Notifications not allowed yet: click to ask the browser)
     Ready 0% ↑0 ↓0 ($4.20/$5.00)
+    (Notifications not allowed yet: click to ask the browser)
     <button class="budget cost link status-item warm">
-    Ready 0% ↑0 ↓0 ($5.50/$5.00) (goal:3/20) (resumes 14:05)
+    Ready 0% ↑0 ↓0 ($5.50/$5.00) (Goal 3/20) (Resumes 14:05)
+    (Notifications not allowed yet: click to ask the browser)
     <button class="budget cost hot link status-item">
     <button class="goal link status-item warm">
     <button class="link resume status-item warm">
-    (resumes 16:05)
+    (Resumes 16:05)
     |}];
   H.act h (Run "/goal");
   toasts h;

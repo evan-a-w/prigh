@@ -96,7 +96,13 @@ let goal (state : State.t) ~inject =
   match state.goal with
   | None -> Node.none
   | Some g ->
-    let text, level = Prigh_ui.Loop_status.goal_part g in
+    let level = snd (Prigh_ui.Loop_status.goal_part g) in
+    let text =
+      match g.status with
+      | Active -> sprintf "Goal %d/%d" g.continuations g.max_continuations
+      | Done -> "Goal done"
+      | Stopped -> "Goal stopped"
+    in
     chip
       ~cls:("goal " ^ level_class level)
       ~title:("Goal: " ^ g.text ^ " (/goal)")
@@ -116,7 +122,9 @@ let resume (m : App.Model.t) (state : State.t) ~inject =
       ~command:"/resume"
       ~inject
       [ icon Clock
-      ; Node.text (Prigh_ui.Loop_status.resume_part at ~utc_offset:m.utc_offset)
+      ; Node.text
+          (String.capitalize
+             (Prigh_ui.Loop_status.resume_part at ~utc_offset:m.utc_offset))
       ]
 ;;
 
@@ -168,6 +176,39 @@ let user (m : App.Model.t) ~inject =
         ; Attr.on_click (fun _ -> inject Action.Open_accounts)
         ]
       [ icon User; Node.text text ]
+;;
+
+(* Whether the browser tells you what happens while the tab is hidden; a
+   click turns it off, or on (asking the browser if it has to). *)
+let notifications (m : App.Model.t) ~inject =
+  let n = m.notifications in
+  let on = n.enabled && Page_notify.Permission.equal n.permission Granted in
+  let cls =
+    if on
+    then "on"
+    else if n.enabled && Page_notify.Permission.equal n.permission Denied
+    then "warm"
+    else "off"
+  in
+  let label =
+    match n.enabled, n.permission with
+    | false, _ -> "Notifications off (/notify on)"
+    | true, Granted -> "Notifications on (/notify off)"
+    | true, Default -> "Notifications not allowed yet: click to ask the browser"
+    | true, Denied ->
+      "Notifications blocked by the browser: click for how to allow them"
+    | true, Unsupported -> "Notifications need https or localhost"
+  in
+  Node.button
+    ~attrs:
+      [ Attr.class_ ("status-item link notify " ^ cls)
+      ; Attr.type_ "button"
+      ; Attr.title label
+      ; Attr.create "aria-label" label
+      ; Attr.on_click (fun _ ->
+          inject (Action.Run (if on then "/notify off" else "/notify on")))
+      ]
+    [ icon (if on then Bell else Bell_off) ]
 ;;
 
 (* Modes and settings that change what you see or what happens. *)
@@ -271,6 +312,7 @@ let view (m : App.Model.t) ~inject =
       ; host state
       ; Node.fragment (modes m ~inject)
       ; div ~cls:"status-spacer" []
+      ; notifications m ~inject
       ; user m ~inject
       ]
 ;;
