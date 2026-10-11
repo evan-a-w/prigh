@@ -12,6 +12,8 @@ end
 module Relay = struct
   type t =
     { host : string
+    ; key : string
+    ; send_event : Json.t -> unit
     ; outgoing : Outgoing.t Eio.Stream.t
     ; mutable overflowed : bool
     }
@@ -55,6 +57,8 @@ let serve t ~host ~send_event ~key ~cwd ~cols ~rows channel =
   let term_id = sprintf "term-%d" t.seq in
   let relay =
     { Relay.host
+    ; key
+    ; send_event
     ; outgoing = Eio.Stream.create Int.max_value
     ; overflowed = false
     }
@@ -121,6 +125,14 @@ let frame t ~host params =
 
 let closed t ~host params =
   Or_error.map (find t ~host params) ~f:(fun relay -> push relay Closed)
+;;
+
+let close_key t ~key =
+  Hashtbl.iteri t.relays ~f:(fun ~key:term_id ~data:(relay : Relay.t) ->
+    if String.equal relay.key key
+    then (
+      relay.send_event (event "terminal_close" ~host:relay.host ~term_id []);
+      push relay Closed))
 ;;
 
 let host_gone t ~host =

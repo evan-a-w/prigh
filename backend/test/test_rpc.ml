@@ -406,7 +406,7 @@ let%expect_test "sessions: list, new, switch, fork, rewind" =
     {|
     {"type":"response","id":"r1","ok":true,"result":{}}
     {"type":"response","id":"r1","ok":true,"result":{}}
-    {"type":"response","id":"r1","ok":true,"result":[{"id":"<id>","path":"$DIR/sessions/<stamp>_<id>.jsonl","name":null,"description":null,"cwd":"$DIR","created_at":"<time>","updated_at":"<time>","first_prompt":"first","message_count":2,"parent":null,"live":false}]}
+    {"type":"response","id":"r1","ok":true,"result":[{"id":"<id>","path":"$DIR/sessions/<stamp>_<id>.jsonl","name":null,"description":null,"cwd":"$DIR","created_at":"<time>","updated_at":"<time>","first_prompt":"first","message_count":2,"parent":null,"bytes":<n>,"live":false,"running":false,"background":0,"archived":false}]}
     {"type":"response","id":"r1","ok":true,"result":{}}
     {"type":"response","id":"r1","ok":false,"error":"no session \"/nowhere.jsonl\""}
     {"type":"response","id":"r1","ok":true,"result":{}}
@@ -482,9 +482,11 @@ let%expect_test
     response id=1 ok=true
     response id=null ok=false "invalid JSON: json: unexpected string: 'not'"
     event "state"
+    event "sessions_changed"
     event "agent_start"
     event "message_start"
     event "message_end"
+    event "sessions_changed"
     event "turn_start"
     event "message_start"
     response id=2 ok=true
@@ -642,10 +644,10 @@ let%expect_test "config: get, set, invalid, and the config_changed event" =
   call t h ~params:{|{"call_id": "nope", "allow": true}|} "tool_confirm_respond";
   [%expect
     {|
-    {"type":"response","id":"r1","ok":true,"result":{"scoped_models":[],"confirm_tools":false,"default_model":null,"default_thinking":null,"fallback_models":[],"default_cwd":null}}
-    {"type":"event","event":"config_changed","config":{"scoped_models":["a","b"],"confirm_tools":true,"default_model":null,"default_thinking":null,"fallback_models":[],"default_cwd":null}}
-    {"type":"response","id":"r1","ok":true,"result":{"scoped_models":["a","b"],"confirm_tools":true,"default_model":null,"default_thinking":null,"fallback_models":[],"default_cwd":null}}
-    {"type":"response","id":"r1","ok":true,"result":{"scoped_models":["a","b"],"confirm_tools":true,"default_model":null,"default_thinking":null,"fallback_models":[],"default_cwd":null}}
+    {"type":"response","id":"r1","ok":true,"result":{"scoped_models":[],"confirm_tools":false,"default_model":null,"default_thinking":null,"fallback_models":[],"default_cwd":null,"archive_after_days":7}}
+    {"type":"event","event":"config_changed","config":{"scoped_models":["a","b"],"confirm_tools":true,"default_model":null,"default_thinking":null,"fallback_models":[],"default_cwd":null,"archive_after_days":7}}
+    {"type":"response","id":"r1","ok":true,"result":{"scoped_models":["a","b"],"confirm_tools":true,"default_model":null,"default_thinking":null,"fallback_models":[],"default_cwd":null,"archive_after_days":7}}
+    {"type":"response","id":"r1","ok":true,"result":{"scoped_models":["a","b"],"confirm_tools":true,"default_model":null,"default_thinking":null,"fallback_models":[],"default_cwd":null,"archive_after_days":7}}
     {"type":"response","id":"r1","ok":false,"error":"config.scoped_models must be an array of strings"}
     {"type":"response","id":"r1","ok":false,"error":"missing param \"config\""}
     {"type":"response","id":"r1","ok":false,"error":"no pending confirmation for tool call \"nope\""}
@@ -1174,7 +1176,7 @@ let%expect_test "each client starts in its own, unsaved session" =
   Rpc_server.disconnect h.server h.client;
   call t h "list_sessions";
   [%expect
-    {| {"type":"response","id":"r1","ok":true,"result":[{"id":"<id>","path":"$DIR/sessions/<stamp>_<id>.jsonl","name":null,"description":null,"cwd":"$DIR","created_at":"<time>","updated_at":"<time>","first_prompt":"hello","message_count":2,"parent":null,"live":false}]} |}]
+    {| {"type":"response","id":"r1","ok":true,"result":[{"id":"<id>","path":"$DIR/sessions/<stamp>_<id>.jsonl","name":null,"description":null,"cwd":"$DIR","created_at":"<time>","updated_at":"<time>","first_prompt":"hello","message_count":2,"parent":null,"bytes":<n>,"live":false,"running":false,"background":0,"archived":false}]} |}]
 ;;
 
 let%expect_test "list_dirs: on the active host, or a named one" =
@@ -1264,9 +1266,9 @@ let%expect_test "change_default saves the current model and thinking level" =
     {|
     {"type":"response","id":"r1","ok":true,"result":{}}
     {"type":"response","id":"r1","ok":true,"result":{}}
-    {"type":"event","event":"config_changed","config":{"scoped_models":[],"confirm_tools":false,"default_model":"deepseek/deepseek-v4-pro","default_thinking":"max","fallback_models":[],"default_cwd":null}}
-    {"type":"response","id":"r1","ok":true,"result":{"scoped_models":[],"confirm_tools":false,"default_model":"deepseek/deepseek-v4-pro","default_thinking":"max","fallback_models":[],"default_cwd":null}}
-    {"type":"response","id":"r1","ok":true,"result":{"scoped_models":[],"confirm_tools":false,"default_model":"deepseek/deepseek-v4-pro","default_thinking":"max","fallback_models":[],"default_cwd":null}}
+    {"type":"event","event":"config_changed","config":{"scoped_models":[],"confirm_tools":false,"default_model":"deepseek/deepseek-v4-pro","default_thinking":"max","fallback_models":[],"default_cwd":null,"archive_after_days":7}}
+    {"type":"response","id":"r1","ok":true,"result":{"scoped_models":[],"confirm_tools":false,"default_model":"deepseek/deepseek-v4-pro","default_thinking":"max","fallback_models":[],"default_cwd":null,"archive_after_days":7}}
+    {"type":"response","id":"r1","ok":true,"result":{"scoped_models":[],"confirm_tools":false,"default_model":"deepseek/deepseek-v4-pro","default_thinking":"max","fallback_models":[],"default_cwd":null,"archive_after_days":7}}
     {"type":"response","id":"r1","ok":true,"result":{}}
     (deepseek/deepseek-v4-pro (On (Max)))
     |}]
@@ -1373,8 +1375,8 @@ let%expect_test "set_config: omitted fields keep their values" =
   Queue.clear h.sent;
   [%expect
     {|
-    {"type":"response","id":"r1","ok":true,"result":{"scoped_models":[],"confirm_tools":false,"default_model":null,"default_thinking":null,"fallback_models":["openai-codex/gpt-6-sol","deepseek/deepseek-flash"],"default_cwd":"/srv"}}
-    {"type":"response","id":"r1","ok":true,"result":{"scoped_models":[],"confirm_tools":true,"default_model":null,"default_thinking":null,"fallback_models":["openai-codex/gpt-6-sol","deepseek/deepseek-flash"],"default_cwd":"/srv"}}
+    {"type":"response","id":"r1","ok":true,"result":{"scoped_models":[],"confirm_tools":false,"default_model":null,"default_thinking":null,"fallback_models":["openai-codex/gpt-6-sol","deepseek/deepseek-flash"],"default_cwd":"/srv","archive_after_days":7}}
+    {"type":"response","id":"r1","ok":true,"result":{"scoped_models":[],"confirm_tools":true,"default_model":null,"default_thinking":null,"fallback_models":["openai-codex/gpt-6-sol","deepseek/deepseek-flash"],"default_cwd":"/srv","archive_after_days":7}}
     {"type":"response","id":"r1","ok":false,"error":"fallback_models: unknown model \"nope\"; did you mean: openai/o1 (o1), openai/o3 (o3), openai/gpt-4 (GPT-4)"}
     |}]
 ;;

@@ -223,3 +223,8 @@ let close_all t =
     (fun (entry : Entry.t) -> Terminal.kill entry.terminal)
     (Hashtbl.data t.entries)
 ;;
+
+let kill t ~key =
+  Option.iter (Hashtbl.find t.entries key) ~f:(fun (entry : Entry.t) ->
+    Terminal.kill entry.terminal)
+;;

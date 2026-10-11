@@ -8,6 +8,7 @@ type t =
   ; default_thinking : Thinking.t option
   ; fallback_models : string list
   ; default_cwd : string option
+  ; archive_after_days : float
   }
 [@@deriving sexp_of]
 
@@ -18,6 +19,7 @@ let default =
   ; default_thinking = None
   ; fallback_models = []
   ; default_cwd = None
+  ; archive_after_days = 7.
   }
 ;;
 
@@ -40,6 +42,7 @@ let to_json t =
     ; ( "fallback_models"
       , `Array (List.map t.fallback_models ~f:(fun s -> `String s)) )
     ; "default_cwd", option (fun s -> `String s) t.default_cwd
+    ; "archive_after_days", `Number (sprintf "%g" t.archive_after_days)
     ]
 ;;
 
@@ -70,6 +73,19 @@ let of_json json =
       | Some (`String s) -> Ok (Some s)
       | Some _ -> Or_error.error_string "config.default_cwd must be a string"
     in
+    let%bind archive_after_days =
+      let error () =
+        Or_error.error_string
+          "config.archive_after_days must be a number of days (0: never)"
+      in
+      match find "archive_after_days" with
+      | None | Some `Null -> Ok default.archive_after_days
+      | Some (`Number n) ->
+        (match Float.of_string_opt n with
+         | Some days when Float.(days >= 0.) -> Ok days
+         | Some _ | None -> error ())
+      | Some _ -> error ()
+    in
     let%bind confirm_tools =
       match find "confirm_tools" with
       | None -> Ok false
@@ -98,6 +114,7 @@ let of_json json =
     ; default_thinking
     ; fallback_models
     ; default_cwd
+    ; archive_after_days
     }
   | _ -> Or_error.error_string "config must be a JSON object"
 ;;

@@ -316,7 +316,8 @@ let%expect_test
       "default_model": null,
       "default_thinking": null,
       "fallback_models": [],
-      "default_cwd": null
+      "default_cwd": null,
+      "archive_after_days": 7
     }
     (((name aiproxy) (base_url http://localhost:11434/v1) (api Responses)
       (headers ()) (models ())))

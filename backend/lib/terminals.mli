@@ -52,3 +52,6 @@ val live : t -> (string * string * int) list
 
 (** Kills every terminal. *)
 val close_all : t -> unit
+
+(** Kills the terminal for [key], if there is one (its session is gone). *)
+val kill : t -> key:string -> unit

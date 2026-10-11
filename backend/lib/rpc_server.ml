@@ -39,6 +39,9 @@ let methods =
   ; "list_sessions"
   ; "set_session_name"
   ; "delete_session"
+  ; "delete_sessions"
+  ; "delete_archived"
+  ; "set_archived"
   ; "export"
   ; "import"
   ; "fork"
@@ -144,6 +147,28 @@ let provider_param login params =
   Or_error.bind (string_param params "provider") ~f:(provider_of_string login)
 ;;
 
+(* What [list_sessions] shows of a live session that changes as it runs. *)
+module Listed = struct
+  type t =
+    { running : bool
+    ; background : int
+    ; persisted : bool
+    ; name : string option
+    ; description : string option
+    }
+  [@@deriving equal]
+
+  let of_agent agent =
+    let session = Agent.session agent in
+    { running = Agent.is_running agent
+    ; background = Agent.running_background agent
+    ; persisted = Session.persisted session
+    ; name = Session.name session
+    ; description = Session.description session
+    }
+  ;;
+end
+
 module Client = struct
   type t =
     { id : string
@@ -188,6 +213,11 @@ type t =
   ; mutable login_owner : string option
     (** the client running the current login flow *)
   ; terminals : Terminal_relay.t
+  ; home : string option (** for the current [config.json] *)
+  ; now : unit -> float
+  ; listed : Listed.t String.Table.t
+    (** what [list_sessions] last showed of each live session *)
+  ; mutable on_session_deleted : (key:string -> unit) list
   }
 
 let agent_of_client _t (client : Client.t) = client.agent
@@ -214,7 +244,32 @@ let maybe_evict t agent =
     && (not (Agent.is_running agent))
     && (not (Agent.has_running_background agent))
     && List.is_empty (clients_of t agent)
-  then Hashtbl.remove t.agents (session_id agent)
+  then (
+    Hashtbl.remove t.agents (session_id agent);
+    Hashtbl.remove t.listed (session_id agent))
+;;
+
+(* Every client of the server, whichever session it is in: they refetch
+   [list_sessions]. *)
+let sessions_changed t =
+  let json =
+    `Object [ "type", `String "event"; "event", `String "sessions_changed" ]
+  in
+  Hashtbl.iter t.clients ~f:(fun (c : Client.t) -> c.send json)
+;;
+
+(* Only for changes: what is shown at [register] is the baseline. *)
+let note_listed t agent =
+  let id = session_id agent in
+  match Hashtbl.find t.listed id with
+  | Some before
+    when Option.exists (Hashtbl.find t.agents id) ~f:(phys_equal agent) ->
+    let listed = Listed.of_agent agent in
+    if not (Listed.equal before listed)
+    then (
+      Hashtbl.set t.listed ~key:id ~data:listed;
+      sessions_changed t)
+  | Some _ | None -> ()
 ;;
 
 (* The tool host clients are few: a scan is fine. *)
@@ -263,6 +318,9 @@ let route t agent (event : Agent.Event.t) =
      Hashtbl.remove t.execs exec_id;
      Option.iter (host_client t host) ~f:(fun c -> c.send json)
    | _ -> List.iter (clients_of t agent) ~f:(fun c -> c.send json));
+  (match event with
+   | State_changed _ | Loop (Message_end _) -> note_listed t agent
+   | _ -> ());
   match event with
   | State_changed { running; _ } ->
     if not running then maybe_evict t agent;
@@ -277,16 +335,18 @@ let route t agent (event : Agent.Event.t) =
 let register t agent =
   Agent.set_hosts agent (hosts t);
   Hashtbl.set t.agents ~key:(session_id agent) ~data:agent;
+  Hashtbl.set t.listed ~key:(session_id agent) ~data:(Listed.of_agent agent);
   Agent.subscribe agent ~f:(route t agent);
   agent
 ;;
 
 let create
-      ~env:_
+      ~env
       ~sw:_
       ?token
       ?namespace
       ?(backend_host = true)
+      ?home
       ~login
       ~sessions_dir
       ~cwd
@@ -310,6 +370,10 @@ let create
     ; execs = String.Table.create ()
     ; login_owner = None
     ; terminals = Terminal_relay.create ()
+    ; home
+    ; now = (fun () -> Eio.Time.now (Eio.Stdenv.clock env))
+    ; listed = String.Table.create ()
+    ; on_session_deleted = []
     }
   in
   Option.iter default_agent ~f:(fun agent ->
@@ -577,6 +641,14 @@ let credentials_ok t ?user given =
 
 let namespace t = t.namespace
 
+let terminal_key t ~session =
+  match t.namespace with
+  | None -> session
+  | Some namespace -> namespace ^ ":" ^ session
+;;
+
+let on_session_deleted t ~f = t.on_session_deleted <- f :: t.on_session_deleted
+
 let terminal_target t ~session =
   match Option.bind session ~f:(Hashtbl.find t.agents) with
   | None ->
@@ -718,21 +790,196 @@ let hello t (client : Client.t) params =
             ]))))
 ;;
 
-let list_sessions t =
+(* The file is reread so that a change made from another session counts. *)
+let archive_after_days t (client : Client.t) =
+  let config =
+    match Option.map t.home ~f:(fun home -> Config.load ~home) with
+    | Some (Ok config) -> config
+    | Some (Error _) | None -> Agent.config client.agent
+  in
+  config.archive_after_days
+;;
+
+(* A saved session as [list_sessions] shows it. *)
+module Listing = struct
+  type t =
+    { summary : Session.Summary.t
+    ; agent : Agent.t option
+    ; active : bool (** a run, or background work *)
+    ; background : int
+    ; archived : bool
+    }
+end
+
+let listings t client =
+  let now = t.now () in
+  let archive_after_days = archive_after_days t client in
+  List.map (Session.list ~dir:t.sessions_dir) ~f:(fun summary ->
+    let agent = Hashtbl.find t.agents summary.id in
+    let background =
+      Option.value_map agent ~default:0 ~f:Agent.running_background
+    in
+    let active = background > 0 || Option.exists agent ~f:Agent.is_running in
+    { Listing.summary
+    ; agent
+    ; active
+    ; background
+    ; archived =
+        Session.Summary.is_archived summary ~now ~archive_after_days ~active
+    })
+;;
+
+let list_sessions t client =
+  let bool b = if b then `True else `False in
+  let int n = `Number (Int.to_string n) in
   `Array
-    (List.map (Session.list ~dir:t.sessions_dir) ~f:(fun summary ->
-       let base = Rpc_json.session_summary summary in
-       match Hashtbl.find t.agents summary.id, base with
-       | Some agent, `Object fields ->
+    (List.map (listings t client) ~f:(fun (l : Listing.t) ->
+       let live =
+         match l.agent with
+         | Some agent ->
+           [ "live", `True; "clients", int (List.length (clients_of t agent)) ]
+         | None -> [ "live", `False ]
+       in
+       match Rpc_json.session_summary l.summary with
+       | `Object fields ->
          `Object
            (fields
-            @ [ "live", `True
-              ; ("running", if Agent.is_running agent then `True else `False)
-              ; ( "clients"
-                , `Number (Int.to_string (List.length (clients_of t agent))) )
+            @ live
+            @ [ "running", bool l.active
+              ; "background", int l.background
+              ; "archived", bool l.archived
               ])
-       | _, `Object fields -> `Object (fields @ [ "live", `False ])
-       | _, other -> other))
+       | other -> other))
+;;
+
+(* A saved session by its file (as the summaries give it) or its id. *)
+let find_saved t key =
+  Or_error.bind
+    (if String.mem key '/' then session_file t key else Ok key)
+    ~f:(fun key ->
+      match
+        List.find (Session.list ~dir:t.sessions_dir) ~f:(fun s ->
+          String.equal s.path key || String.equal s.id key)
+      with
+      | Some summary -> Ok summary
+      | None -> Or_error.errorf "no such session %S" key)
+;;
+
+let display (s : Session.Summary.t) =
+  match s.name with
+  | Some name -> sprintf "session %S" name
+  | None -> "session " ^ s.id
+;;
+
+let is_active agent =
+  Agent.is_running agent || Agent.has_running_background agent
+;;
+
+(* Why [client] may not delete [summary], if it may not. *)
+let refusal t (client : Client.t) (summary : Session.Summary.t) =
+  let name = display summary in
+  let agent = Hashtbl.find t.agents summary.id in
+  if String.equal (session_id client.agent) summary.id
+  then
+    Some
+      (sprintf "%s is the session you are in: switch to another one first" name)
+  else if
+    Option.exists t.default_agent ~f:(fun a ->
+      String.equal (session_id a) summary.id)
+  then
+    Some
+      (sprintf
+         "%s is the backend's default session (-session): restart the backend \
+          without -session to delete it"
+         name)
+  else (
+    match agent with
+    | Some agent when is_active agent ->
+      Some (sprintf "%s is running: wait for it or /abort it first" name)
+    | Some agent when not (List.is_empty (clients_of t agent)) ->
+      Some
+        (sprintf
+           "%s is open in %d other frontend(s): close it there first"
+           name
+           (List.length (clients_of t agent)))
+    | Some _ | None -> None)
+;;
+
+module Deleted = struct
+  type t =
+    { path : string
+    ; id : string
+    ; bytes : int
+    }
+
+  let to_json t =
+    `Object
+      [ "path", `String t.path
+      ; "id", `String t.id
+      ; "bytes", `Number (Int.to_string t.bytes)
+      ]
+  ;;
+end
+
+(* Deletes the session's files and everything kept for it in memory. *)
+let delete_saved t client (summary : Session.Summary.t) =
+  match refusal t client summary with
+  | Some refused -> Or_error.error_string refused
+  | None ->
+    Or_error.try_with (fun () ->
+      let bytes = Session.disk_usage summary.path in
+      Session.delete_files summary.path;
+      Hashtbl.remove t.agents summary.id;
+      Hashtbl.remove t.listed summary.id;
+      let key = terminal_key t ~session:summary.id in
+      Terminal_relay.close_key t.terminals ~key;
+      List.iter t.on_session_deleted ~f:(fun f -> f ~key);
+      { Deleted.path = summary.path; id = summary.id; bytes })
+;;
+
+(* One [sessions_changed] for the lot. *)
+let delete_many t client keys =
+  let results =
+    List.map keys ~f:(fun key ->
+      ( key
+      , Or_error.bind (find_saved t key) ~f:(fun summary ->
+          delete_saved t client summary) ))
+  in
+  let deleted = List.filter_map results ~f:(fun (_, r) -> Result.ok r) in
+  if not (List.is_empty deleted) then sessions_changed t;
+  `Object
+    [ "deleted", `Array (List.map deleted ~f:Deleted.to_json)
+    ; ( "refused"
+      , `Array
+          (List.filter_map results ~f:(fun (key, r) ->
+             match r with
+             | Ok _ -> None
+             | Error e ->
+               Some
+                 (`Object
+                     [ "path", `String key
+                     ; "error", `String (Error.to_string_hum e)
+                     ]))) )
+    ]
+;;
+
+let set_archived t ~key ~archived =
+  Or_error.bind (find_saved t key) ~f:(fun summary ->
+    let agent = Hashtbl.find t.agents summary.id in
+    if archived && Option.exists agent ~f:is_active
+    then
+      Or_error.errorf
+        "%s is running: wait for it or /abort it before archiving"
+        (display summary)
+    else (
+      let session =
+        match agent with
+        | Some agent -> Ok (Agent.session agent)
+        | None -> Session.load summary.path
+      in
+      Or_error.map session ~f:(fun session ->
+        ignore (Session.set_archived session ~archived : Session.Entry.t);
+        sessions_changed t)))
 ;;
 
 let exec_param t params =
@@ -866,18 +1113,41 @@ let dispatch_server t (client : Client.t) ~meth ~params
          Or_error.map (find_agent t client key) ~f:(fun target ->
            attach t client target;
            `Object [])))
-  | "list_sessions" -> Some (ok (list_sessions t))
+  | "list_sessions" -> Some (ok (list_sessions t client))
   | "delete_session" ->
     Some
-      (Or_error.bind (string_param params "path") ~f:(fun path ->
-         Or_error.bind (session_file t path) ~f:(fun path ->
-           if
-             Hashtbl.data t.agents
-             |> List.exists ~f:(fun a ->
-               String.equal (Session.path (Agent.session a)) path)
-           then Or_error.error_string "cannot delete a live session"
-           else
-             Or_error.try_with (fun () -> Core_unix.unlink path) |> unit_result)))
+      (Or_error.bind (string_param params "path") ~f:(fun key ->
+         Or_error.map
+           (Or_error.bind (find_saved t key) ~f:(delete_saved t client))
+           ~f:(fun (_ : Deleted.t) ->
+             sessions_changed t;
+             `Object [])))
+  | "delete_sessions" ->
+    Some
+      (Or_error.map
+         (string_list_param params "paths")
+         ~f:(delete_many t client))
+  | "delete_archived" ->
+    Some
+      (ok
+         (delete_many
+            t
+            client
+            (List.filter_map (listings t client) ~f:(fun (l : Listing.t) ->
+               Option.some_if l.archived l.summary.path))))
+  | "set_archived" ->
+    Some
+      (Or_error.bind (string_param params "path") ~f:(fun key ->
+         let archived =
+           match param params "archived" with
+           | Some `True -> Ok true
+           | Some `False -> Ok false
+           | Some _ ->
+             Or_error.error_string "param \"archived\" must be a boolean"
+           | None -> Or_error.error_string "missing param \"archived\""
+         in
+         Or_error.bind archived ~f:(fun archived ->
+           unit_result (set_archived t ~key ~archived))))
   | "import" ->
     Some
       (Or_error.bind (string_param params "path") ~f:(fun path ->
@@ -894,6 +1164,7 @@ let dispatch_server t (client : Client.t) ~meth ~params
                  else loaded_start t client session
                in
                start_agent t session start |> attach t client;
+               sessions_changed t;
                `Object [ "path", `String (Session.path session) ]))))
   | "fork" | "clone" ->
     let at =
@@ -912,6 +1183,7 @@ let dispatch_server t (client : Client.t) ~meth ~params
              | Some _ | None -> start_location client ~cwd:(own_cwd client)
            in
            start_agent t session start |> attach t client;
+           if Session.persisted session then sessions_changed t;
            `Object []))
   | "login" ->
     (* The flow may emit its first event before it is started. *)
