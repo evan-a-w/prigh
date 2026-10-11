@@ -2164,6 +2164,25 @@ let dequeue t =
   popped
 ;;
 
+let remove_queued t ~queue ~index ~text =
+  let q =
+    match queue with
+    | `Steer -> t.steer_queue
+    | `Follow_up -> t.follow_up_queue
+  in
+  let items = Queue.to_list q in
+  match List.nth items index with
+  | Some (item : Queued.t)
+    when Option.for_all text ~f:(String.equal item.text) ->
+    Queue.clear q;
+    List.iteri items ~f:(fun i item -> if i <> index then Queue.enqueue q item);
+    queue_update t;
+    Ok item
+  | _ ->
+    Or_error.error_string
+      "that message is no longer queued: it was delivered or removed already"
+;;
+
 let shell t ~command ~add_to_context =
   if is_running t
   then
