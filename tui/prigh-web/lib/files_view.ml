@@ -325,7 +325,11 @@ let actions (t : Files.t) ~inject =
       ]
 ;;
 
+(* Highlighted once per preview, not at every render. *)
+let highlighted = View_cache.create ()
+
 let text_preview (p : File_preview.t) ~text ~truncated =
+  let lang = Highlight.Lang.of_path p.name in
   let lines = String.split_lines text in
   let count = Int.max 1 (List.length lines) in
   [ Node.div
@@ -338,8 +342,21 @@ let text_preview (p : File_preview.t) ~text ~truncated =
                  ~sep:"\n"
                  (List.init count ~f:(fun i -> Int.to_string (i + 1))))
           ]
-      ; Node.pre ~attrs:[ Attr.class_ "files-code" ] [ Node.text text ]
+      ; View_cache.find highlighted p ~deps:() ~equal:Unit.equal ~f:(fun () ->
+          Node.pre
+            ~attrs:[ Attr.class_ "files-code" ]
+            (Highlight_view.code lang text))
       ]
+  ; (if Option.is_some lang && String.length text > Highlight_view.default_limit
+     then
+       div
+         ~cls:"files-note"
+         [ Node.text
+             (sprintf
+                "Colours stop after the first %s."
+                (size Highlight_view.default_limit))
+         ]
+     else Node.none)
   ; (if truncated
      then
        div
@@ -555,6 +572,9 @@ let body (m : App.Model.t) (t : Files.t) ~inject =
   div
     ~cls:(if previewing then "files-body previewing" else "files-body")
     [ div ~cls:"files-browse" (listing_body @ [ actions t ~inject ])
+    ; (if previewing
+       then Resize_view.handle m ~inject Files_split
+       else Node.none)
     ; preview m t ~inject
     ]
 ;;
@@ -582,7 +602,8 @@ let view (m : App.Model.t) ~inject =
                (Option.value_map t.listing ~default:"here" ~f:(fun l ->
                   Files.display_path t l.path)))
         ]
-      [ div
+      [ Resize_view.handle m ~inject Files
+      ; div
           ~cls:"files-head"
           [ glyph ~cls:"files-head-icon" Folder
           ; span

@@ -193,8 +193,12 @@ let view (m : Model.t) ~inject ~terminal =
               | Connected -> false )
           ; "files-open", m.files.open_
           ]
+      ; Resize_view.vars m
       ]
     [ under_sheet (Sidebar_view.view m ~inject)
+    ; (if m.sidebar_open
+       then Resize_view.handle m ~inject Sidebar
+       else Node.none)
     ; (if m.narrow && m.sidebar_open
        then
          Node.div

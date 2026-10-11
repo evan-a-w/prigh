@@ -9,6 +9,7 @@ module Target = struct
     | Session of string
     | Terminal
     | Files
+    | Resize of Resize.Handle.t
     | Page
   [@@deriving sexp_of]
 end
@@ -51,6 +52,9 @@ let help =
     , "mark a session (Shift: the range from the last one); Delete deletes the \
        marked ones, Esc stops selecting" )
   ; "Ctrl+B", "show or hide the sidebar"
+  ; ( "← → / ↑ ↓ (on a panel's edge)"
+    , "resize the panel (Shift: faster; Home / End: smallest / largest; Enter: \
+       the default size); or drag the edge, double-click to reset" )
   ; "Alt+1…9", "follow subagent or job N in the agents panel"
   ; "Alt+] Alt+[", "the next or previous subagent or job"
   ; "Alt+0", "close the agents panel"
@@ -94,8 +98,14 @@ let alt_letter t letter =
 let on_control t =
   match t.target with
   | Control -> true
-  | Editor _ | Field | Session_search | Session _ | Terminal | Files | Page ->
-    false
+  | Editor _
+  | Field
+  | Session_search
+  | Session _
+  | Terminal
+  | Files
+  | Resize _
+  | Page -> false
 ;;
 
 (* Ctrl+` by the key's position, whatever the layout types there. *)
@@ -167,9 +177,27 @@ let agents_key (m : App.Model.t) t : App.Action.t option =
              ||
              match t.target with
              | Editor _ | Terminal | Files -> false
-             | Field | Control | Session_search | Session _ | Page -> true) ->
-    Some Agents_back
+             | Field | Control | Session_search | Session _ | Resize _ | Page ->
+               true) -> Some Agents_back
   | _ -> None
+;;
+
+(* On a panel's edge: the arrows along it move it (Shift: four times as
+   far). *)
+let resize_key h t : Resize.Action.t option =
+  let module H = Resize.Handle in
+  let steps = if t.shift then 4 else 1 in
+  let move by = Some (Resize.Action.Nudge (h, by * steps * H.grows h)) in
+  if t.ctrl || t.alt || t.meta
+  then None
+  else (
+    match t.key, H.vertical h with
+    | "ArrowLeft", true | "ArrowUp", false -> move (-1)
+    | "ArrowRight", true | "ArrowDown", false -> move 1
+    | "Home", _ -> Some (Smallest h)
+    | "End", _ -> Some (Largest h)
+    | "Enter", _ -> Some (Reset h)
+    | _ -> None)
 ;;
 
 (* The sidebar is a picker: ↓ ↑ move from the search through the sessions,
@@ -242,8 +270,14 @@ let question_key t : Question_dialog.Action.t option =
   let field =
     match t.target with
     | Field -> true
-    | Editor _ | Control | Session_search | Session _ | Terminal | Files | Page
-      -> false
+    | Editor _
+    | Control
+    | Session_search
+    | Session _
+    | Terminal
+    | Files
+    | Resize _
+    | Page -> false
   in
   match t.key with
   | "Escape" -> Some Decline
@@ -315,5 +349,7 @@ let handle (m : App.Model.t) t : App.Action.t option =
         | None, Files ->
           Files.key m.files ~key:t.key ~shift:t.shift ~ctrl:t.ctrl ~alt:t.alt
           |> Option.map ~f:(fun a -> App.Action.Files a)
+        | None, Resize h ->
+          resize_key h t |> Option.map ~f:(fun a -> App.Action.Resize a)
         | None, (Field | Control | Terminal | Page) -> None))
 ;;

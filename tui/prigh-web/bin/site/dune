@@ -40,6 +40,18 @@
  (action
   (copy ../files.css files.css)))
 
+(rule
+ (target highlight.css)
+ (deps ../highlight.css)
+ (action
+  (copy ../highlight.css highlight.css)))
+
+(rule
+ (target resize.css)
+ (deps ../resize.css)
+ (action
+  (copy ../resize.css resize.css)))
+
 ; Recursive (SIL OFL 1.1, recursive-OFL.txt), cut down by
 ; fontTools to Latin and two instances: sans (casual axis kept, for
 ; thinking) and mono.
@@ -99,6 +111,8 @@
   (agents.css as prigh-web/agents.css)
   (terminal.css as prigh-web/terminal.css)
   (files.css as prigh-web/files.css)
+  (highlight.css as prigh-web/highlight.css)
+  (resize.css as prigh-web/resize.css)
   (recursive-sans.woff2 as prigh-web/recursive-sans.woff2)
   (recursive-mono.woff2 as prigh-web/recursive-mono.woff2)
   (recursive-OFL.txt as prigh-web/recursive-OFL.txt)

@@ -518,10 +518,7 @@ let view (m : App.Model.t) ~inject =
         ; Attr.tabindex (-1)
         ; Attr.create "aria-label" "Subagents and jobs"
         ]
-      [ div
-          ~cls:"agents-resize"
-          ~attrs:[ Attr.title "Drag to resize"; Attr.role "separator" ]
-          []
+      [ Resize_view.handle m ~inject Agents
       ; div
           ~cls:"agents-head"
           [ (match a.selected with

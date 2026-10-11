@@ -31,61 +31,6 @@ let listen ?(capture = false) event handler =
      : Dom_html.event_listener_id)
 ;;
 
-(* ---- width *)
-
-let width_key = "prigh-web.agents-width"
-
-let set_width px =
-  let style = (Js.Unsafe.coerce Dom_html.document##.documentElement)##.style in
-  ignore
-    (Js.Unsafe.meth_call
-       style
-       "setProperty"
-       [| Js.Unsafe.inject (Js.string "--agents-width")
-        ; Js.Unsafe.inject (Js.string (sprintf "%dpx" px))
-       |]
-     : Js.Unsafe.any)
-;;
-
-let clamp px =
-  let max = Dom_html.window##.innerWidth * 6 / 10 in
-  Int.max 300 (Int.min px max)
-;;
-
-let install_resize () =
-  Option.iter
-    (Option.bind (Browser.get_item width_key) ~f:Int.of_string_opt)
-    ~f:(fun px -> set_width (clamp px));
-  let dragging = ref None in
-  listen Dom_html.Event.pointerdown (fun (ev : Dom_html.pointerEvent Js.t) ->
-    match
-      Option.bind (target ev) ~f:(fun el -> closest el ".agents-resize")
-    with
-    | None -> ()
-    | Some _ ->
-      Dom.preventDefault ev;
-      dragging := Some 0;
-      Dom_html.document##.body##.classList##add (Js.string "resizing"));
-  listen Dom_html.Event.pointermove (fun (ev : Dom_html.pointerEvent Js.t) ->
-    match !dragging with
-    | None -> ()
-    | Some _ ->
-      let px =
-        clamp
-          (Dom_html.window##.innerWidth
-           - Float.iround_nearest_exn (Js.to_float ev##.clientX))
-      in
-      dragging := Some px;
-      set_width px);
-  listen Dom_html.Event.pointerup (fun (_ : Dom_html.pointerEvent Js.t) ->
-    match !dragging with
-    | None -> ()
-    | Some px ->
-      dragging := None;
-      Dom_html.document##.body##.classList##remove (Js.string "resizing");
-      if px > 0 then Browser.set_item width_key (Int.to_string px))
-;;
-
 (* ---- following *)
 
 let body () = Dom_html.getElementById_opt "agents-body"
@@ -142,7 +87,6 @@ let install ~schedule =
     | Some el ->
       Option.iter (attribute el "data-agent") ~f:(fun id ->
         schedule (Action.Open_subagents (Some id))));
-  install_resize ();
   install_follow ()
 ;;
 

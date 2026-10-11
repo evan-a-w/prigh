@@ -1,6 +1,6 @@
 /* The agents panel: subagents and background jobs, right of the chat (a
    sheet over the page on phones). Its width is --agents-width, set by
-   dragging its left edge. */
+   dragging its left edge (resize.css). */
 
 .agents-panel {
   position: relative;
@@ -14,20 +14,6 @@
   animation: agents-in 0.16s ease-out;
 }
 @keyframes agents-in { from { opacity: 0; transform: translateX(12px); } }
-
-.agents-resize {
-  position: absolute;
-  left: -4px;
-  top: 0;
-  bottom: 0;
-  width: 8px;
-  cursor: col-resize;
-  z-index: 2;
-  touch-action: none;
-}
-.agents-resize::after { content: ""; position: absolute; top: 0; bottom: 0; left: 3px; width: 2px; }
-.agents-resize:hover::after, body.resizing .agents-resize::after { background: var(--sodium); }
-body.resizing { cursor: col-resize; user-select: none; }
 
 .agents-head {
   display: flex;
@@ -288,7 +274,6 @@ body.resizing { cursor: col-resize; user-select: none; }
   border-left: 0;
   animation: agents-up 0.2s ease-out;
 }
-.app.narrow .agents-resize { display: none; }
 .app.narrow .agents-head { min-height: 50px; padding-left: 12px; }
 .app.narrow .crumb { max-width: 40vw; }
 @keyframes agents-up { from { opacity: 0; transform: translateY(24px); } }

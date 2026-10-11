@@ -160,6 +160,7 @@ module Command : sig
     | Save_notifications of bool (** [/notify on|off], in the browser *)
     | Set_title of string (** the tab's, with the count of unseen events *)
     | Files of Files.Page.t
+    | Save_size of Resize.Save.t (** a panel's size, in the browser *)
   [@@deriving sexp_of, equal]
 end
 
@@ -323,8 +324,10 @@ module Action : sig
         { key : string (** the [Terminal.Target.key] it is about *)
         ; status : Terminal.Status.t
         } (** from the page's widget *)
-    | Set_terminal_height of int (** dragged, or remembered *)
     | Files of Files.Action.t (** the file browser and the attachments *)
+    | Resize of Resize.Action.t
+    (** a panel's handle dragged or moved with the keys, the window resized,
+        the sizes kept in the browser *)
   [@@deriving sexp_of]
 end
 
@@ -378,6 +381,7 @@ module Model : sig
     ; marks : Session_marks.t (** the sidebar's selection *)
     ; notifications : Page_notify.t
     ; files : Files.t
+    ; layout : Resize.t (** the panels' sizes *)
     }
   [@@deriving sexp_of]
 
@@ -402,6 +406,9 @@ module Model : sig
 
   (** How tool outputs fold in the transcripts. *)
   val fold : t -> Fold.t
+
+  (** What the panels' sizes depend on. *)
+  val shown : t -> Resize.Shown.t
 end
 
 val thinking_levels : string list

@@ -1,6 +1,6 @@
 /* The terminal panel: a shell docked under the chat and the composer (a
    sheet over the page on phones). Its height is --terminal-height, set by
-   dragging its top edge. xterm.css comes with xterm.js, on first use. */
+   dragging its top edge (resize.css). xterm.css comes with xterm.js, on first use. */
 
 .terminal-panel {
   position: relative;
@@ -15,21 +15,6 @@
   animation: terminal-in 0.16s ease-out;
 }
 @keyframes terminal-in { from { opacity: 0; transform: translateY(12px); } }
-
-.terminal-resize {
-  position: absolute;
-  top: -5px;
-  left: 0;
-  right: 0;
-  height: 9px;
-  cursor: row-resize;
-  z-index: 2;
-  touch-action: none;
-}
-.terminal-resize::after { content: ""; position: absolute; left: 0; right: 0; top: 4px; height: 2px; }
-.terminal-resize:hover::after, body.resizing-terminal .terminal-resize::after { background: var(--sodium); }
-body.resizing-terminal { cursor: row-resize; user-select: none; }
-body.resizing-terminal .terminal-body { pointer-events: none; }
 
 .terminal-head {
   display: flex;
@@ -103,7 +88,6 @@ body.resizing-terminal .terminal-body { pointer-events: none; }
   border-top: 0;
   animation: terminal-up 0.2s ease-out;
 }
-.app.narrow .terminal-resize { display: none; }
 .app.narrow .terminal-head { min-height: 50px; padding-left: 14px; }
 .app.narrow .terminal-body { padding: 4px 0 0 6px; }
 @keyframes terminal-up { from { opacity: 0; transform: translateY(24px); } }

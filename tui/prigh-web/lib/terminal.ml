@@ -26,14 +26,12 @@ end
 
 type t =
   { open_ : bool
-  ; height : int option
   ; generation : int
   ; status : (string * Status.t) option
   }
 [@@deriving sexp_of]
 
-let closed = { open_ = false; height = None; generation = 0; status = None }
-let min_height = 120
+let closed = { open_ = false; generation = 0; status = None }
 
 let active_host (state : State.t) =
   List.find state.hosts ~f:(fun h -> String.equal h.id state.active_host)

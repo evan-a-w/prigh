@@ -28,7 +28,7 @@ let code_block ~lang ~text ~closed =
         [ Node.code
             ~attrs:
               (if String.is_empty lang then [] else cls ("language-" ^ lang))
-            [ Node.text text ]
+            (Highlight_view.code (Highlight.Lang.of_name lang) text)
         ]
     ]
 ;;
