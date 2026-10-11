@@ -274,6 +274,20 @@ a loading row (Esc closes it, and the late answer then opens nothing).
 While the connection is down the composer is dashed and the status line
 says "Reconnecting…": what you write stays until it is back.
 
+The sidebar lists the active sessions first (a session is running, with a
+dot, while its turn or its background subagents and jobs run: "2 bg"),
+then, under an "Archived" divider with their count and size, the archived
+ones, muted. Hovering a session shows its archive (or unarchive) and delete
+buttons; on a focused session A archives or unarchives it and Delete
+deletes it. "Select" (or `/delete` with no argument) turns the list into
+checkboxes: click or Space marks a session, Shift+click or Shift+Space the
+range from the last one (across the divider), and Delete asks to delete the
+marked ones; the divider's "Delete all" (`/delete-archived`) every archived
+one. The confirmation says how many sessions and how much disk they use, and
+which ones the backend will keep (running, open in another tab or terminal,
+or the one you are in). `/archive`, `/unarchive` and `/delete` also take
+sessions by name, id or path. The list follows the backend as it changes.
+
 Subagents and background jobs have their own panel, a resizable column
 right of the chat (drag its left edge; a full-screen sheet on a phone):
 the session's subagents as a tree (nested ones under the background agent

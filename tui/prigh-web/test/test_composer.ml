@@ -319,6 +319,10 @@ let%expect_test "slash commands: the popup, arguments, running, unknown ones" =
     /session show the session's details and statistics
     /sessions search the saved sessions
     /switch [path] switch to a saved session
+    /archive [session] archive a session (this one without an argument): it moves under Archived in the sidebar
+    /unarchive [session] unarchive a session (this one without an argument)
+    /delete [session...] delete sessions, after a confirmation (none: select them in the sidebar)
+    /delete-archived delete every archived session, after a confirmation
     /clone copy this session into a new one
     /fork start a new session from an earlier message
     /rewind go back to an earlier message in this session

@@ -85,7 +85,6 @@ let%expect_test "messages' times: in the browser's zone, relative to its day" =
   show ();
   [%expect
     {|
-    (Rpc (method_ list_sessions) (params ()) (tag Sessions))
     hello
     Yesterday 11:58
     Hi

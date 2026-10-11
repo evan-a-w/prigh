@@ -7,7 +7,7 @@
 // TEST_DIR (scratch: home/, cwd/, the faux scripts), TOKEN, and optionally
 // SHOTS (a directory for screenshots of each step).
 import { spawn } from "node:child_process";
-import { mkdirSync, writeFileSync } from "node:fs";
+import { mkdirSync, readdirSync, writeFileSync } from "node:fs";
 import { hostname } from "node:os";
 import { join } from "node:path";
 import { png, pngSize } from "./png.mjs";
@@ -555,6 +555,51 @@ try {
   await page.waitForFunction(() => document.querySelector(".app.narrow:not(.sidebar-open)"));
   await page.waitForTimeout(400); // the drawer's slide
   await screenshot("phone");
+  await page.setViewportSize({ width: 1280, height: 800 });
+  await page.waitForFunction(() => document.querySelector(".app:not(.narrow)"));
+
+  // 10. Sessions: archiving one moves it under a divider, muted; selecting
+  //     several (a shift-click takes the range, across the divider) and
+  //     deleting them asks first with their count and size, then removes
+  //     their files.
+  const sizes = text => clean(text).replace(/\d+(\.\d+)? (B|KB|MB)\b/g, "<SIZE>");
+  const sessionFiles = () =>
+    readdirSync(join(home, ".prigh", "sessions")).filter(f => f.endsWith(".jsonl")).length;
+  await page.locator(".sidebar").getByRole("button", { name: /new session/i }).click();
+  await page.locator(".chat .empty").waitFor();
+  await send("one more");
+  await bodyHas("Noted.");
+  await idle();
+  await page.waitForFunction(() => document.querySelectorAll(".sidebar .session").length === 3);
+  const hello = page.locator(".sidebar .session", { hasText: "hello again" });
+  await hello.hover();
+  await hello.locator(".archive").click();
+  await page.locator(".sessions-divider").waitFor();
+  section("archived");
+  console.log(sizes(await page.locator(".sidebar .sessions").innerText()));
+  console.log(`muted: ${await page.locator(".session.archived").count()}`);
+  await screenshot("archived");
+  await page.locator(".sessions-toolbar").getByRole("button", { name: "Select" }).click();
+  await page.locator(".sidebar .session", { hasText: "count some lines" }).click();
+  await hello.click({ modifiers: ["Shift"] });
+  await page.waitForFunction(() => document.querySelectorAll(".session.marked").length === 2);
+  section("selected");
+  console.log(sizes(await page.locator(".sessions-toolbar").innerText()));
+  await screenshot("selected");
+  await page.locator(".sessions-toolbar .danger").click();
+  await page.locator(".modal").waitFor();
+  section("delete confirmation");
+  console.log(sizes(await page.locator(".modal").innerText()));
+  await screenshot("delete confirmation");
+  console.log(`session files before: ${sessionFiles()}`);
+  await page.locator(".modal .btn.danger").click();
+  await page.waitForFunction(() => document.querySelectorAll(".sidebar .session").length === 1);
+  section("deleted");
+  await page.locator(".toast", { hasText: "Deleted" }).waitFor();
+  console.log(sizes(await page.locator(".toast", { hasText: "Deleted" }).innerText()));
+  console.log(sizes(await page.locator(".sidebar .sessions").innerText()));
+  console.log(`session files after: ${sessionFiles()}`);
+  await screenshot("deleted");
 
   section("errors");
   console.log(errors.length ? errors.join("\n") : "none");

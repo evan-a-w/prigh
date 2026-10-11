@@ -143,6 +143,8 @@ let%expect_test "help lists every key and command" =
     Ctrl+↑ / Ctrl+↓ previous / next of your messages in the transcript
     PageUp / PageDown scroll the transcript
     Ctrl+K search sessions (↓ ↑ through them, Enter opens, Delete deletes)
+    A (on a session) archive or unarchive it (archived sessions are listed last, muted)
+    Space (selecting) mark a session (Shift: the range from the last one); Delete deletes the marked ones, Esc stops selecting
     Ctrl+B show or hide the sidebar
     Alt+1…9 follow subagent or job N in the agents panel
     Alt+] Alt+[ the next or previous subagent or job
@@ -165,6 +167,10 @@ let%expect_test "help lists every key and command" =
     /session show the session's details and statistics
     /sessions search the saved sessions
     /switch [path] switch to a saved session
+    /archive [session] archive a session (this one without an argument): it moves under Archived in the sidebar
+    /unarchive [session] unarchive a session (this one without an argument)
+    /delete [session...] delete sessions, after a confirmation (none: select them in the sidebar)
+    /delete-archived delete every archived session, after a confirmation
     /clone copy this session into a new one
     /fork start a new session from an earlier message
     /rewind go back to an earlier message in this session

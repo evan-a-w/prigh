@@ -29,5 +29,6 @@ type t =
 
 val of_json : Json.t -> t Or_error.t
 
-(** ["Deleted 3 sessions (1.2 MB)"], then each refusal. *)
+(** ["Deleted 3 sessions (1.2 MB)"] (unless nothing was but something was
+    refused), then each refusal: ["Not deleted: <why and what to do>"]. *)
 val summary : t -> string

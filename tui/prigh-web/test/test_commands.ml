@@ -72,6 +72,10 @@ let%expect_test "every command does something (none is unknown)" =
     /session                   loading Session: rpc session_stats
     /sessions                  sidebar
     /switch                    sidebar
+    /archive                   toast: This session isn't saved yet: send a message first.
+    /unarchive                 toast: This session isn't saved yet: send a message first.
+    /delete                    toast: Click the sessions to delete (Shift+click for a range), then Delete.
+    /delete-archived           toast: There are no archived sessions.
     /clone                     rpc clone
     /fork                      loading Fork from: rpc get_entries
     /rewind                    loading Rewind to: rpc get_entries
@@ -143,6 +147,8 @@ let%expect_test "/help <command> and /hotkeys" =
     Ctrl+↑ / Ctrl+↓ previous / next of your messages in the transcript
     PageUp / PageDown scroll the transcript
     Ctrl+K search sessions (↓ ↑ through them, Enter opens, Delete deletes)
+    A (on a session) archive or unarchive it (archived sessions are listed last, muted)
+    Space (selecting) mark a session (Shift: the range from the last one); Delete deletes the marked ones, Esc stops selecting
     Ctrl+B show or hide the sidebar
     Alt+1…9 follow subagent or job N in the agents panel
     Alt+] Alt+[ the next or previous subagent or job

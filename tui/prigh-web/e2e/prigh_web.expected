@@ -101,6 +101,8 @@ same session after reload: true
 prigh
 web
 New session
+SESSIONS
+Select
 count some lines
 <AGE>
 <CWD>
@@ -124,6 +126,8 @@ new session in the url: true
 prigh
 web
 New session
+SESSIONS
+Select
 hello again
 <AGE>
 <CWD>
@@ -276,6 +280,43 @@ back: the first one again
 $ echo still-here
 still-here
 $
+=== chromium: archived ===
+one more
+<AGE>
+<CWD>
+2 msgs
+count some lines
+<AGE>
+<CWD>
+23 msgs
+ARCHIVED · 1 · <SIZE>
+Delete all
+hello again
+<AGE>
+<CWD>
+2 msgs
+muted: 1
+=== chromium: selected ===
+2 selected · <SIZE>
+Delete
+Done
+=== chromium: delete confirmation ===
+Delete 2 sessions?
+They will be deleted, with their subagent logs: <SIZE> on disk. This can't be undone.
+hello again
+<SIZE>
+count some lines
+<SIZE>
+Cancel
+Delete 2
+session files before: 3
+=== chromium: deleted ===
+Deleted 2 sessions (<SIZE>)
+one more
+<AGE>
+<CWD>
+2 msgs
+session files after: 1
 === chromium: errors ===
 none
 === chromium: accounts: sessions ===
@@ -465,6 +506,8 @@ same session after reload: true
 prigh
 web
 New session
+SESSIONS
+Select
 count some lines
 <AGE>
 <CWD>
@@ -488,6 +531,8 @@ new session in the url: true
 prigh
 web
 New session
+SESSIONS
+Select
 hello again
 <AGE>
 <CWD>
@@ -640,6 +685,43 @@ back: the first one again
 $ echo still-here
 still-here
 $
+=== firefox: archived ===
+one more
+<AGE>
+<CWD>
+2 msgs
+count some lines
+<AGE>
+<CWD>
+23 msgs
+ARCHIVED · 1 · <SIZE>
+Delete all
+hello again
+<AGE>
+<CWD>
+2 msgs
+muted: 1
+=== firefox: selected ===
+2 selected · <SIZE>
+Delete
+Done
+=== firefox: delete confirmation ===
+Delete 2 sessions?
+They will be deleted, with their subagent logs: <SIZE> on disk. This can't be undone.
+hello again
+<SIZE>
+count some lines
+<SIZE>
+Cancel
+Delete 2
+session files before: 3
+=== firefox: deleted ===
+Deleted 2 sessions (<SIZE>)
+one more
+<AGE>
+<CWD>
+2 msgs
+session files after: 1
 === firefox: errors ===
 none
 === firefox: accounts: sessions ===

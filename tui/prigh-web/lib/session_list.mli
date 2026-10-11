@@ -12,3 +12,9 @@ val filter : Session_summary.t list -> query:string -> Session_summary.t list
 
 (** The DOM id of a session's row in the sidebar (focused from the keyboard). *)
 val dom_id : string -> string
+
+(** [filter], then split: the active sessions, then the archived ones. *)
+val sections
+  :  Session_summary.t list
+  -> query:string
+  -> Session_summary.t list * Session_summary.t list
