@@ -47,4 +47,5 @@ type t =
   | Search
   | Prev_user_message
   | Next_user_message
+  | Toggle_archived
 [@@deriving sexp_of, equal, compare]

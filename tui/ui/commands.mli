@@ -12,6 +12,7 @@ module Argument : sig
     | Login
     | Logout
     | Sessions
+    | Session_list (** several, completed word by word *)
     | Path
     | Directory
     | Default_directory

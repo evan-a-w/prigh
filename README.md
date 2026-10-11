@@ -521,6 +521,7 @@ backend/_build/default/bin/main.exe serve      # JSON-lines RPC on stdio
 | Ctrl+P / Alt+P | cycle to the next / previous scoped model |
 | Ctrl+T | cycle the thinking level |
 | Ctrl+N | picker: toggle the named-only / logged-in-only filter |
+| Tab / Alt+A / Alt+D | `/sessions`: mark a session / archive or unarchive it / delete every archived one |
 | Ctrl+X | copy the last assistant message |
 | Ctrl+Z | suspend to the shell |
 | Shift+Tab | cycle subagent focus: main → agent 1 → … → main |
@@ -538,10 +539,24 @@ src/retry.ml`, `bash $ make test`, `subagent <task>`) and chips: `5 lines`,
 under it.
 
 In lists (pickers) typing filters fuzzily, Enter accepts and Esc closes
-without changes; Ctrl+D deletes a session, cancels a subagent or kills a job,
+without changes; Ctrl+D deletes sessions, cancels a subagent or kills a job,
 and `/scoped-models` toggles with Space (Ctrl+A all, Ctrl+X none). `/help`
 lists the commands, the prompt prefixes (`!cmd`, `!!cmd`, `!&cmd`, `@path`)
 and these keys.
+
+`/sessions` lists the active sessions first and then, after an `── archived
+──` divider and dimmed, the archived ones. `▶` marks a running session (its
+turn, or background subagents and jobs: `2 in background`), `●` one loaded
+in the backend and `*` the one you are in; the list follows changes made
+anywhere (other frontends, other sessions). In it Tab marks or unmarks a
+session (`✓`; the status line shows how many and their size), Ctrl+D
+deletes the marked sessions (or the highlighted one), Alt+A archives or
+unarchives the highlighted one, Alt+D deletes every archived session, and
+Ctrl+N shows only named ones. Deleting always asks first, with the count and
+the disk space (`Delete 3 sessions (1.2 MB)? Enter deletes, Esc keeps
+them`); Esc goes back to the list unchanged. Afterwards a notice says what
+was deleted and why any session was not (it is running, open in another
+frontend, or the one you are in).
 
 The status line is quiet gray: cwd, model, `think:`, `view:`, the context
 (`ctx:12%/200k`, the share of the model's window; yellow from 50%, red from
@@ -700,7 +715,10 @@ known one), and a `default_model` that names no known model.
 | `/new`, `/clear`, `/quit` | new session / clear transcript / exit |
 | `/name [text]` | set the session name |
 | `/session` | show session statistics |
-| `/sessions` | pick a saved session (Ctrl+N named-only, Ctrl+D delete) |
+| `/sessions` | pick a saved session (Tab marks, Ctrl+D deletes, Alt+A archives/unarchives, Alt+D deletes all archived, Ctrl+N named-only) |
+| `/archive [session]`, `/unarchive [session]` | archive or unarchive a session (id, unique id prefix, name or path; the current one without an argument) |
+| `/delete [session...]` | delete sessions after a confirmation (without arguments: pick them in `/sessions`) |
+| `/delete-archived` | delete every archived session after a confirmation |
 | `/switch [path]` | switch to a saved session |
 | `/cd [path]` | change the working directory |
 | `/fork`, `/rewind`, `/tree`, `/clone` | branch the session tree |
