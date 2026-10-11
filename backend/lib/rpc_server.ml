@@ -16,6 +16,7 @@ let methods =
   ; "follow_up"
   ; "abort"
   ; "dequeue"
+  ; "remove_queued"
   ; "cancel_subagent"
   ; "list_subagents"
   ; "get_subagent"
@@ -136,6 +137,13 @@ let tool_images_param params =
 let ok json = Ok json
 let empty = ok (`Object [])
 let unit_result r = Or_error.map r ~f:(fun () -> `Object [])
+
+let queued_json (queued : Agent.Queued.t) =
+  `Object
+    [ "text", `String queued.text
+    ; "attachments", `Array (List.map queued.attachments ~f:(fun a -> `String a))
+    ]
+;;
 
 let provider_of_string login s =
   let models = Login_manager.models login in
@@ -1321,12 +1329,30 @@ let dispatch agent login ~meth ~params : Json.t Or_error.t =
     ok
       (match Agent.dequeue agent with
        | None -> `Null
-       | Some (queued : Agent.Queued.t) ->
-         `Object
-           [ "text", `String queued.text
-           ; ( "attachments"
-             , `Array (List.map queued.attachments ~f:(fun a -> `String a)) )
-           ])
+       | Some queued -> queued_json queued)
+  | "remove_queued" ->
+    let open Or_error.Let_syntax in
+    let%bind queue =
+      match%bind string_param params "queue" with
+      | "steer" -> Ok `Steer
+      | "follow_up" -> Ok `Follow_up
+      | other ->
+        Or_error.errorf
+          "param \"queue\" is %S: use \"steer\" or \"follow_up\""
+          other
+    in
+    let%bind index =
+      match param params "index" with
+      | Some (`Number n) ->
+        (match Int.of_string_opt n with
+         | Some i when i >= 0 -> Ok i
+         | _ ->
+           Or_error.error_string "param \"index\" must be a natural number")
+      | Some _ | None ->
+        Or_error.error_string "param \"index\" must be a natural number"
+    in
+    let%bind text = string_param_opt params "text" in
+    Or_error.map (Agent.remove_queued agent ~queue ~index ~text) ~f:queued_json
   | "shell" ->
     Or_error.bind (string_param params "command") ~f:(fun command ->
       Or_error.bind
