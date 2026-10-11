@@ -34,6 +34,7 @@ type t =
   | Next_model
   | Prev_model
   | Next_thinking
+  | Cycle_mode
   | Next_agent
   | Focus_agent of int
   | Queue_follow_up

@@ -55,6 +55,10 @@ type t =
   (** backend first, then connected tool-capable clients *)
   ; subagents : Subagent.t list
   ; jobs : Job.t list
+  ; approval_mode : Approval_mode.t
+  ; plan_mode : bool
+  ; plan : Plan.t option
+  ; session_rules : string list
   }
 [@@deriving sexp_of, equal]
 
@@ -90,10 +94,29 @@ let of_json j =
     | Ok subagents -> Ok subagents
     | Error _ -> Ok []
   in
-  let%map jobs =
+  let%bind jobs =
     match Json.list_field j "jobs" ~f:Job.of_json with
     | Ok jobs -> Ok jobs
     | Error _ -> Ok []
+  in
+  (* Older backends have none of these. *)
+  let%bind approval_mode =
+    match Json.field j "approval_mode" with
+    | None -> Ok Approval_mode.Auto
+    | Some mode -> Approval_mode.of_json mode
+  in
+  let%bind plan_mode =
+    match Json.field j "plan_mode" with
+    | None -> Ok false
+    | Some _ -> Json.bool_field j "plan_mode"
+  in
+  let%bind plan =
+    match Json.field j "plan" with
+    | None -> Ok None
+    | Some plan -> Or_error.map (Plan.of_json plan) ~f:Option.some
+  in
+  let%map session_rules =
+    Json.optional_list_field j "session_rules" ~f:Json.to_string_or_error
   in
   { session_id
   ; session_path
@@ -112,5 +135,9 @@ let of_json j =
   ; hosts
   ; subagents
   ; jobs
+  ; approval_mode
+  ; plan_mode
+  ; plan
+  ; session_rules
   }
 ;;

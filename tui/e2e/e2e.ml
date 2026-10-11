@@ -99,7 +99,11 @@ let rec summarise (e : Event.t) : string option =
   | Tool_start c -> Some (sprintf "tool_start %s" c.name)
   | Tool_output _ -> None
   | Tool_end { result; _ } -> Some (sprintf "tool_end %s" result.tool_name)
-  | Tool_confirm _ -> None
+  | Tool_confirm c -> Some (sprintf "tool_confirm %s %s" c.name c.summary)
+  | Tool_confirm_done { call_id; _ } -> Some ("tool_confirm_done " ^ call_id)
+  | Ask_user { call_id; questions } ->
+    Some (sprintf "ask_user %s (%d questions)" call_id (List.length questions))
+  | Ask_user_done call_id -> Some ("ask_user_done " ^ call_id)
   | Compacted _ -> Some "compacted"
   | Config_changed _ -> None
   | Queue_update _ -> None
@@ -540,6 +544,107 @@ let main () =
         in
         let%bind () = Client.close client in
         print_endline "fallback backend exited";
+        return ()
+    in
+    (* Approvals, the plan and questions: set_mode, a confirmation answered
+       with "always", get_pending as a reconnecting frontend sees it, and an
+       ask_user answered. *)
+    let approvals_script = Filename.concat tmp "approvals.json" in
+    Out_channel.write_all
+      approvals_script
+      ~data:
+        {|[
+  {"text":"planning","tool_calls":[{"id":"p1","name":"update_plan","arguments":{"plan":[{"step":"look","status":"completed"},{"step":"ask","status":"in_progress"}]}}]},
+  {"text":"running","tool_calls":[{"id":"c1","name":"bash","arguments":{"command":"echo e2e-ran"}}]},
+  {"text":"asking","tool_calls":[{"id":"q1","name":"ask_user","arguments":{"questions":[{"question":"Which?","options":[{"label":"x"},{"label":"y"}]}]}}]},
+  {"text":"done"}
+]|};
+    let%bind () =
+      let client =
+        Client.create
+          ~connect:
+            (spawn
+               [ "serve"
+               ; "-faux-script"
+               ; approvals_script
+               ; "-auth-file"
+               ; Filename.concat tmp "auth7.json"
+               ; "-cwd"
+               ; tmp
+               ; "-model"
+               ; "deepseek/deepseek-flash"
+               ])
+      in
+      match%bind Client.connect client with
+      | Error e ->
+        print_s [%message "cannot start approvals backend" (e : Error.t)];
+        return ()
+      | Ok () ->
+        let decoded name f params =
+          match%map Client.call client name params with
+          | Ok json -> show ("<- " ^ name) (f json)
+          | Error e ->
+            show
+              ("<- " ^ name ^ " ERROR")
+              [%sexp (Error.to_string_hum e : string)]
+        in
+        let state json =
+          match State.of_json json with
+          | Ok s ->
+            [%sexp
+              { approval_mode = (s.approval_mode : Approval_mode.t)
+              ; plan_mode = (s.plan_mode : bool)
+              ; plan = (s.plan : Plan.t option)
+              ; session_rules = (s.session_rules : string list)
+              }]
+          | Error e -> [%sexp (e : Error.t)]
+        in
+        let pending json =
+          [%sexp (Pending.of_json json : Pending.t Or_error.t)]
+        in
+        let%bind () =
+          decoded "set_mode" state [ "approval_mode", Json.str "ask" ]
+        in
+        let%bind () = call client "prompt" [ "text", Json.str "go" ] in
+        let%bind () =
+          drain client ~stop:(function
+            | Tool_confirm _ -> true
+            | _ -> false)
+        in
+        let%bind () = decoded "get_pending" pending [] in
+        let%bind () =
+          call
+            client
+            "tool_confirm_respond"
+            [ "call_id", Json.str "c1"
+            ; "allow", Json.bool true
+            ; "always", Json.bool true
+            ]
+        in
+        let%bind () =
+          drain client ~stop:(function
+            | Ask_user _ -> true
+            | _ -> false)
+        in
+        let%bind () = decoded "get_pending" pending [] in
+        let%bind () =
+          call
+            client
+            "ask_user_respond"
+            [ "call_id", Json.str "q1"
+            ; "answers", `Array [ `Array [ Json.str "y" ] ]
+            ]
+        in
+        let%bind () =
+          with_deadline
+            "approvals"
+            (drain client ~stop:(function
+               | State { running = false; _ } -> true
+               | _ -> false))
+        in
+        let%bind () = decoded "get_state" state [] in
+        let%bind () = Client.close client in
+        print_endline "approvals backend exited";
         return ()
     in
     (* Images: a prompt's own, an attached image file, and [read] on one;

@@ -72,7 +72,11 @@ let%expect_test "state event and messages" =
         (active_host    backend)
         (hosts     ())
         (subagents ())
-        (jobs      ()))))
+        (jobs      ())
+        (approval_mode Auto)
+        (plan_mode     false)
+        (plan          ())
+        (session_rules ()))))
     (Event (Message_start (User ((text hi)))))
     (Event (
       Message_end (
@@ -257,10 +261,12 @@ let%expect_test "tool_confirm event" =
   [%expect
     {|
     (Event (
-      Tool_confirm
-      (call_id c1)
-      (name    bash)
-      (summary "rm -rf build")))
+      Tool_confirm (
+        (call_id c1)
+        (agent_id ())
+        (name    bash)
+        (summary "rm -rf build")
+        (rules ()))))
     (error (
       e (
         "while decoding"
@@ -363,7 +369,11 @@ let%expect_test "tool host events and state hosts" =
           (session_id   ())
           (session_name ()))))
         (subagents ())
-        (jobs      ()))))
+        (jobs      ())
+        (approval_mode Auto)
+        (plan_mode     false)
+        (plan          ())
+        (session_rules ()))))
     |}]
 ;;
 
@@ -772,7 +782,8 @@ let%expect_test "config round trip and config_changed event" =
     [%sexp
       (Config.to_json
          { Config.scoped_models = [ "a"; "b" ]
-         ; confirm_tools = true
+         ; approval_mode = Ask
+         ; permissions = Config.Permissions.empty
          ; default_model = Some "deepseek/deepseek-flash"
          ; default_thinking = Some "max"
          ; fallback_models =
@@ -785,26 +796,42 @@ let%expect_test "config round trip and config_changed event" =
   [%expect
     {|
     ((scoped_models (anthropic/claude-fable-5-1 deepseek/deepseek-flash))
-     (confirm_tools true)
+     (approval_mode Ask)
+     (permissions (
+       (allow ())
+       (ask   ())
+       (deny  ())))
      (default_model    ())
      (default_thinking ())
      (fallback_models  ())
      (default_cwd      ()))
     ((scoped_models ())
-     (confirm_tools false)
+     (approval_mode Auto)
+     (permissions (
+       (allow ())
+       (ask   ())
+       (deny  ())))
      (default_model    ())
      (default_thinking ())
      (fallback_models  ())
      (default_cwd      ()))
     ((scoped_models ())
-     (confirm_tools false)
+     (approval_mode Auto)
+     (permissions (
+       (allow ())
+       (ask   ())
+       (deny  ())))
      (default_model ())
      (default_thinking (low))
      (fallback_models ())
      (default_cwd     ()))
     (decode (e "default_model must be a string"))
     ((scoped_models ())
-     (confirm_tools false)
+     (approval_mode Auto)
+     (permissions (
+       (allow ())
+       (ask   ())
+       (deny  ())))
      (default_model    ())
      (default_thinking ())
      (fallback_models (openai-codex/gpt-6-sol anthropic/claude-opus-5-5))
@@ -812,7 +839,11 @@ let%expect_test "config round trip and config_changed event" =
     (decode (e "fallback_models must be an array of strings"))
     (decode (e "default_cwd must be a string"))
     ((scoped_models (a b))
-     (confirm_tools    true)
+     (approval_mode ask)
+     (permissions (
+       (allow ())
+       (ask   ())
+       (deny  ())))
      (default_model    deepseek/deepseek-flash)
      (default_thinking max)
      (fallback_models (openai-codex/gpt-6-sol deepseek/deepseek-flash))
@@ -820,7 +851,11 @@ let%expect_test "config round trip and config_changed event" =
     (Event (
       Config_changed (
         (scoped_models (a))
-        (confirm_tools false)
+        (approval_mode Auto)
+        (permissions (
+          (allow ())
+          (ask   ())
+          (deny  ())))
         (default_model    ())
         (default_thinking ())
         (fallback_models  ())

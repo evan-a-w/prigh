@@ -15,6 +15,9 @@ module Kind : sig
     | Description of { text : string }
     | Cwd of { cwd : string }
     | System_prompt
+    | Other of string
+    (** a kind this frontend does not show (approval mode changes, session
+        rules, newer ones) *)
   [@@deriving sexp_of, equal]
 end
 

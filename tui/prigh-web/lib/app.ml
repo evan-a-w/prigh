@@ -1138,8 +1138,8 @@ let verbosity_picker (m : Model.t) =
 let set_confirm (m : Model.t) enabled =
   save_config
     m
-    { (config m) with confirm_tools = enabled }
-    ~fields:[ "confirm_tools" ]
+    { (config m) with approval_mode = (if enabled then Ask else Auto) }
+    ~fields:[ "approval_mode" ]
     ~notice:
       (if enabled
        then "Tool confirmation on: bash, write and edit ask first"
@@ -1147,7 +1147,10 @@ let set_confirm (m : Model.t) enabled =
 ;;
 
 let confirm_picker (m : Model.t) =
-  let current = Option.map m.config ~f:(fun c -> c.confirm_tools) in
+  let current =
+    Option.map m.config ~f:(fun c ->
+      not (Prigh_protocol.Approval_mode.equal c.approval_mode Auto))
+  in
   Dialog.Picker
     { kind = Confirm_tools
     ; picker =
@@ -2347,7 +2350,7 @@ let main_event (m : Model.t) (event : Event.t) =
   | State state -> set_state m state
   | Notice text -> toast m text
   | Queue_update { steer; follow_up } -> { m with queue = steer, follow_up }, []
-  | Tool_confirm { call_id; name; summary } ->
+  | Tool_confirm { call_id; name; summary; _ } ->
     ( { m with confirms = m.confirms @ [ { call_id; name; summary } ] }
     , [ Command.Focus "confirm" ] )
   | Tool_end { call; _ } ->

@@ -7,6 +7,8 @@ module Argument = struct
     | Thinking
     | Verbosity
     | Confirm
+    | Mode
+    | Plan
     | Login
     | Logout
     | Sessions
@@ -82,7 +84,25 @@ let all =
       ~argument:Argument.Confirm
       "confirm"
       "[on|off]"
-      "ask before destructive tools"
+      "ask before destructive tools (approval mode ask or auto, also for new \
+       sessions)"
+  ; c
+      ~argument:Argument.Mode
+      "mode"
+      "[ask|auto-edit|auto|plan]"
+      "pick or set the mode: what asks first, or read-only planning (Alt+M \
+       cycles)"
+  ; c
+      ~argument:Argument.Plan
+      "plan"
+      "[on|off]"
+      "toggle plan mode: the model investigates and plans, changing no files, \
+       until you approve its plan"
+  ; c "todos" "" "show the model's plan (its update_plan steps)"
+  ; c
+      "permissions"
+      ""
+      "show the mode and the allow/ask/deny rules (config and this session)"
   ; c "auth" "" "show which providers are configured"
   ; c
       "compact"

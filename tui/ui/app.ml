@@ -55,6 +55,9 @@ module Reply_tag = struct
     | Mcp_picker
     | Mcp_reconnected
     | Mcp_approved of string (** server *)
+    | Pending
+    | Mode_set of string (** the notice *)
+    | Refresh_state
     | Retry_in_editor of
         { command : string
         ; hint : string
@@ -167,7 +170,8 @@ module Model = struct
     ; namespace : string option
     ; user : string option
     ; stderr_tail : string list
-    ; pending_confirms : (string * string * string) list
+    ; pending_confirms : P.Pending.Confirm.t list
+    ; pending_questions : P.Pending.Ask.t list
     ; connection : Connection.t
     ; reconnect_generation : int
     ; btw : Btw_box.t option
@@ -299,34 +303,83 @@ let notice ?severity m text =
 let error m text = notice ~severity:Error m text
 let warn m text = notice ~severity:Warn m text
 
-let confirm_question ~name ~summary =
-  match name with
-  | "bash" -> sprintf "Run bash: %s? (y/n)" summary
-  | "write" -> sprintf "Write %s? (y/n)" summary
-  | "edit" -> sprintf "Edit %s? (y/n)" summary
-  | "apply_patch" -> sprintf "Apply patch to %s? (y/n)" summary
-  | name -> sprintf "Run %s: %s? (y/n)" name summary
-;;
-
-let confirm_tool m ~call_id ~name ~summary =
+let confirm_tool m (c : P.Pending.Confirm.t) =
   { m with
     mode =
-      Confirm
-        { question = confirm_question ~name ~summary
-        ; action = Tool_confirm { call_id; name }
-        }
+      Confirm { question = Confirm_prompt.title c; action = Tool_confirm c }
   ; autocomplete = None
   }
 ;;
 
+let same_confirm (a : P.Pending.Confirm.t) (b : P.Pending.Confirm.t) =
+  String.equal a.call_id b.call_id
+  && Option.equal String.equal a.agent_id b.agent_id
+;;
+
+(* What is shown or queued already is not added again ([get_pending] after
+   the events). *)
+let add_pending_confirms m confirms =
+  let known (c : P.Pending.Confirm.t) =
+    List.exists m.pending_confirms ~f:(same_confirm c)
+    ||
+    match m.mode with
+    | Confirm { action = Tool_confirm shown; _ } -> same_confirm shown c
+    | Text_prompt { action = Deny_reason { confirm; _ }; _ } ->
+      same_confirm confirm c
+    | _ -> false
+  in
+  { m with
+    pending_confirms =
+      m.pending_confirms @ List.filter confirms ~f:(Fn.non known)
+  }
+;;
+
+let add_pending_questions m questions =
+  let known (q : P.Pending.Ask.t) =
+    List.exists m.pending_questions ~f:(fun p ->
+      String.equal p.call_id q.call_id)
+    ||
+    match m.mode with
+    | Question { call_id; _ } -> String.equal call_id q.call_id
+    | _ -> false
+  in
+  { m with
+    pending_questions =
+      m.pending_questions @ List.filter questions ~f:(Fn.non known)
+  }
+;;
+
+(* Confirmations first, then the model's questions, one dialog at a time. *)
 let maybe_open_pending m =
   if Model.backend_gone m
   then m
   else (
-    match m.mode, m.pending_confirms with
-    | Editing, (call_id, name, summary) :: rest ->
-      { (confirm_tool m ~call_id ~name ~summary) with pending_confirms = rest }
+    match m.mode, m.pending_confirms, m.pending_questions with
+    | Editing, c :: rest, _ ->
+      { (confirm_tool m c) with pending_confirms = rest }
+    | Editing, [], (q : P.Pending.Ask.t) :: rest ->
+      { m with
+        mode =
+          Question
+            { call_id = q.call_id; form = Question_form.create q.questions }
+      ; autocomplete = None
+      ; pending_questions = rest
+      }
     | _ -> m)
+;;
+
+let answer_confirm
+      ?reason
+      m
+      (c : P.Pending.Confirm.t)
+      (answer : Confirm_prompt.Answer.t)
+  =
+  ( notice m (Confirm_prompt.acknowledgement c answer)
+  , [ rpc
+        "tool_confirm_respond"
+        ~params:(Confirm_prompt.params c answer ~reason)
+        ~tag:Show_error
+    ] )
 ;;
 
 let verbosity_notice = function
@@ -394,6 +447,7 @@ let init =
   ; user = None
   ; stderr_tail = []
   ; pending_confirms = []
+  ; pending_questions = []
   ; connection = Connected
   ; reconnect_generation = 0
   ; btw = None
@@ -410,6 +464,7 @@ let start_commands =
   ; rpc "auth_status" ~tag:Auth_refresh
   ; rpc "get_config" ~tag:Config
   ; rpc "list_models" ~tag:Models_catalog
+  ; rpc "get_pending" ~tag:Pending
   ; Command.Load_history
   ]
 ;;
@@ -737,9 +792,11 @@ let user_text text =
 
 let user_first_line ({ text; images; at = _ } : P.Message.User.t) =
   let text =
-    match Handover_message.parse text with
-    | Some handover -> Handover_message.summary handover
-    | None -> user_text text
+    match Handover_message.parse text, Mode_note.split text with
+    | Some handover, _ -> Handover_message.summary handover
+    | None, Some (on, "") -> Mode_note.summary ~on
+    | None, Some (_, rest) -> user_text rest
+    | None, None -> user_text text
   in
   match first_line text, images with
   | "", image :: _ -> P.Image.to_string_hum image
@@ -842,7 +899,8 @@ let tree_items entries head =
       | P.Entry.Kind.Name _
       | P.Entry.Kind.Description _
       | P.Entry.Kind.Cwd _
-      | P.Entry.Kind.System_prompt -> "·"
+      | P.Entry.Kind.System_prompt
+      | P.Entry.Kind.Other _ -> "·"
     in
     let label =
       sprintf
@@ -1303,7 +1361,15 @@ let backend_closed m =
   let m =
     { m with
       pending_confirms = []
+    ; pending_questions = []
     ; state = Option.map m.state ~f:(fun s -> { s with running = false })
+    ; mode =
+        (* They come back with [get_pending] once reconnected. *)
+        (match m.mode with
+         | Confirm { action = Tool_confirm _; _ }
+         | Question _
+         | Text_prompt { action = Deny_reason _; _ } -> Editing
+         | mode -> mode)
     }
   in
   let m =
@@ -1495,19 +1561,138 @@ let set_config ~tag fields =
   rpc "set_config" ~params:[ "config", `Object fields ] ~tag
 ;;
 
+(* The default mode for new sessions, which the backend applies to this
+   one too. *)
 let set_confirm m enabled =
+  let approval_mode : P.Approval_mode.t = if enabled then Ask else Auto in
   let label =
-    sprintf "tool confirmation %s" (if enabled then "on" else "off")
+    sprintf
+      "tool confirmation %s (approval mode %s, also for new sessions)"
+      (if enabled then "on" else "off")
+      (P.Approval_mode.to_string approval_mode)
   in
   ( { m with
       config =
         Option.map m.config ~f:(fun config ->
-          { config with P.Config.confirm_tools = enabled })
+          { config with P.Config.approval_mode })
     }
   , [ set_config
         ~tag:(Notice_on_success label)
-        [ "confirm_tools", P.Json.bool enabled ]
+        [ "approval_mode", str (P.Approval_mode.to_string approval_mode) ]
     ] )
+;;
+
+(* Shown at once; the backend's state follows. *)
+let set_mode m (mode : Session_mode.t) =
+  match m.state with
+  | None -> notice m "not connected", []
+  | Some s ->
+    let m =
+      { m with
+        state =
+          Some { s with approval_mode = mode.approval; plan_mode = mode.plan }
+      }
+    in
+    ( m
+    , [ rpc
+          "set_mode"
+          ~params:(Session_mode.params mode)
+          ~tag:
+            (Mode_set
+               (sprintf
+                  "mode: %s — %s"
+                  (Session_mode.label mode)
+                  (Session_mode.describe mode)))
+      ] )
+;;
+
+let cycle_mode m =
+  match m.state with
+  | None -> notice m "not connected", []
+  | Some s -> set_mode m (Session_mode.cycle (Session_mode.of_state s))
+;;
+
+let mode_picker m =
+  match m.state with
+  | None -> notice m "not connected", []
+  | Some s ->
+    let current = Session_mode.of_state s in
+    let items =
+      List.map (Session_mode.choices ~current) ~f:(fun mode ->
+        Picker.Item.create
+          ~id:(Session_mode.label mode)
+          ~detail:(Session_mode.describe mode)
+          ~marked:(Session_mode.equal mode current)
+          (Session_mode.label mode))
+    in
+    open_picker m Modes (Picker.create ~title:"Mode (Alt+M cycles)" items), []
+;;
+
+let mode_by_name m name =
+  match m.state with
+  | None -> notice m "not connected", []
+  | Some s ->
+    (match Session_mode.of_name ~current:(Session_mode.of_state s) name with
+     | Some mode -> set_mode m mode
+     | None ->
+       ( error
+           m
+           (sprintf
+              "unknown mode %S; use %s"
+              name
+              (String.concat ~sep:", " Session_mode.names))
+       , [] ))
+;;
+
+let show_plan m =
+  match Option.bind m.state ~f:(fun s -> s.plan) with
+  | None ->
+    notice m "no plan: the model has not made one (it uses update_plan)", []
+  | Some plan ->
+    ( block
+        m
+        (Content.lines
+           (String.concat
+              ~sep:"\n"
+              (sprintf
+                 "plan %d/%d"
+                 (P.Plan.completed plan)
+                 (List.length plan.steps)
+               :: Plan_view.lines plan)))
+    , [] )
+;;
+
+let show_permissions m =
+  match m.state with
+  | None -> notice m "not connected", []
+  | Some s ->
+    let mode = Session_mode.of_state s in
+    let rules title = function
+      | [] -> []
+      | rules -> [ title ^ ": " ^ String.concat ~sep:", " rules ]
+    in
+    let config =
+      match m.config with
+      | None -> []
+      | Some c ->
+        rules "allow (config)" c.permissions.allow
+        @ rules "ask (config)" c.permissions.ask
+        @ rules "deny (config)" c.permissions.deny
+    in
+    let lines =
+      [ sprintf
+          "mode: %s — %s"
+          (Session_mode.label mode)
+          (Session_mode.describe mode)
+      ]
+      @ rules "allowed this session" s.session_rules
+      @ config
+      @ [ "rules: permissions in ~/.prigh/config.json, e.g. {\"allow\": \
+           [\"bash(git status:*)\"], \"deny\": [\"bash(rm:*)\"]}; /mode or \
+           Alt+M switches the mode"
+        ]
+    in
+    block m (Content.lines (String.concat ~sep:"\n" lines)), []
 ;;
 
 let fallback_summary m (config : P.Config.t) =
@@ -1679,16 +1864,38 @@ let run_command m (cmd : Commands.Parsed.t) =
            (sprintf "unknown verbosity %S; use quiet, normal or verbose" name)
        , [] ))
   | "confirm", [] ->
-    (match m.config with
-     | Some config ->
+    (match m.state with
+     | Some s ->
+       let mode = Session_mode.of_state s in
        ( notice
            m
            (sprintf
-              "tool confirmation %s"
-              (if config.P.Config.confirm_tools then "on" else "off"))
+              "mode: %s — %s (/confirm on|off sets ask or auto; /mode has all)"
+              (Session_mode.label mode)
+              (Session_mode.describe mode))
        , [] )
-     | None ->
-       notice m "tool confirmation: unknown", [ rpc "get_config" ~tag:Config ])
+     | None -> notice m "not connected", [])
+  | "mode", [] -> mode_picker m
+  | "mode", name :: _ -> mode_by_name m name
+  | "plan", [] ->
+    (match m.state with
+     | None -> notice m "not connected", []
+     | Some s ->
+       set_mode m { (Session_mode.of_state s) with plan = not s.plan_mode })
+  | "plan", (("on" | "off") as on) :: _ ->
+    (match m.state with
+     | None -> notice m "not connected", []
+     | Some s ->
+       set_mode m { (Session_mode.of_state s) with plan = String.equal on "on" })
+  | "plan", other :: _ ->
+    ( error
+        m
+        (sprintf
+           "unknown argument %S; use on or off (or nothing to toggle)"
+           other)
+    , [] )
+  | "todos", _ -> show_plan m
+  | "permissions", _ -> show_permissions m
   | "confirm", ("on" | "true") :: _ -> set_confirm m true
   | "confirm", ("off" | "false") :: _ -> set_confirm m false
   | "confirm", other :: _ ->
@@ -2132,13 +2339,15 @@ let accept_autocomplete m ~submit_now =
 (* Denies pending tool confirmations and aborts the running turn. *)
 let abort m =
   let denies =
-    List.map m.pending_confirms ~f:(fun (call_id, _, _) ->
+    List.map m.pending_confirms ~f:(fun c ->
       rpc
         "tool_confirm_respond"
-        ~params:[ "call_id", str call_id; "allow", P.Json.bool false ]
+        ~params:(Confirm_prompt.params c Deny ~reason:None)
         ~tag:Ignore)
   in
-  { m with pending_confirms = [] }, denies @ [ rpc "abort" ~tag:Abort_done ]
+  (* The backend withdraws the questions as the run stops. *)
+  ( { m with pending_confirms = []; pending_questions = [] }
+  , denies @ [ rpc "abort" ~tag:Abort_done ] )
 ;;
 
 (* Ctrl+C: clear the editor; else abort the running turn; else quit on the
@@ -2350,6 +2559,7 @@ let editing_intent m (intent : Intent.t) =
   | Next_model -> cycle_model m ~step:1
   | Prev_model -> cycle_model m ~step:(-1)
   | Next_thinking -> cycle_thinking m
+  | Cycle_mode -> cycle_mode m
   | Next_agent -> cycle_focus m, []
   | Focus_agent n -> focus_agent m n, []
   | Queue_follow_up -> queue_follow_up m
@@ -2429,6 +2639,7 @@ let editing m (intent : Intent.t) =
         | Next_model
         | Prev_model
         | Next_thinking
+        | Cycle_mode
         | Next_agent
         | Focus_agent _
         | Queue_follow_up
@@ -2464,6 +2675,7 @@ let picker_selected m (kind : Mode.Picker_kind.t) (item : Picker.Item.t) =
   | Models _ -> m, [ set_model_command item.id ]
   | Scoped_models -> m, []
   | Thinking -> m, [ rpc "set_thinking" ~params:[ "thinking", str item.id ] ]
+  | Modes -> mode_by_name m item.id
   | Verbosity ->
     let verbosity =
       Option.value
@@ -2667,6 +2879,7 @@ let login_prompt m ~id ~(prompt : P.Auth_event.Prompt.t) (intent : Intent.t) =
   | Next_model
   | Prev_model
   | Next_thinking
+  | Cycle_mode
   | Next_agent
   | Focus_agent _
   | Queue_follow_up
@@ -2747,6 +2960,12 @@ let text_prompt m ~(action : Mode.Text_prompt_action.t) (intent : Intent.t) =
       if String.is_empty text
       then m, []
       else m, [ set_host_command ~host ~cwd:text ]
+    | Deny_reason { confirm; draft } ->
+      answer_confirm
+        { m with editor = Editor.set_text m.editor draft }
+        confirm
+        Deny_with_reason
+        ~reason:text
   in
   let submit_text m =
     let text, _ = Editor.submit m.editor in
@@ -2759,7 +2978,7 @@ let text_prompt m ~(action : Mode.Text_prompt_action.t) (intent : Intent.t) =
       Some
         (Option.value_map m.state ~default:"backend" ~f:(fun s -> s.active_host))
     | Host_cwd host -> Some host
-    | Name | Export_path | Import_path -> None
+    | Name | Export_path | Import_path | Deny_reason _ -> None
   in
   let edit m =
     let m', cmds = editing_intent m intent in
@@ -2798,12 +3017,20 @@ let text_prompt m ~(action : Mode.Text_prompt_action.t) (intent : Intent.t) =
   | Cancel when Option.is_some m.autocomplete ->
     { m with autocomplete = None }, []
   | Cancel | Interrupt ->
-    ( { m with
-        editor = Editor.clear m.editor
-      ; mode = Editing
-      ; autocomplete = None
-      }
-    , [] )
+    (match action with
+     | Deny_reason { confirm; draft } ->
+       (* Back to the question, nothing answered yet. *)
+       ( { (confirm_tool m confirm) with
+           editor = Editor.set_text m.editor draft
+         }
+       , [] )
+     | Name | Cd | Export_path | Import_path | Host_cwd _ ->
+       ( { m with
+           editor = Editor.clear m.editor
+         ; mode = Editing
+         ; autocomplete = None
+         }
+       , [] ))
   | Force_quit -> { m with quitting = true }, [ Quit ]
   | Newline -> m, []
   | Insert _
@@ -2833,6 +3060,7 @@ let text_prompt m ~(action : Mode.Text_prompt_action.t) (intent : Intent.t) =
   | Next_model
   | Prev_model
   | Next_thinking
+  | Cycle_mode
   | Next_agent
   | Focus_agent _
   | Queue_follow_up
@@ -2861,28 +3089,62 @@ let confirm m ~(action : Mode.Confirm_action.t) (intent : Intent.t) =
       ( m
       , [ rpc "delete_session" ~params:[ "path", str path ] ~tag:Deleted_session
         ] )
-    | Tool_confirm { call_id; _ } ->
-      ( m
-      , [ rpc
-            "tool_confirm_respond"
-            ~params:[ "call_id", str call_id; "allow", P.Json.bool true ]
-            ~tag:Ignore
-        ] )
+    | Tool_confirm c -> answer_confirm m c Allow
   in
   let no m =
     match action with
-    | Tool_confirm { call_id; name } ->
-      ( notice m (sprintf "denied %s" name)
-      , [ rpc
-            "tool_confirm_respond"
-            ~params:[ "call_id", str call_id; "allow", P.Json.bool false ]
-            ~tag:Ignore
-        ] )
+    | Tool_confirm c -> answer_confirm m c Deny
     | Logout _ | Rewind _ | Delete_session _ -> notice m "cancelled", []
   in
+  match intent, action with
+  | (Insert ("y" | "Y") | Submit), _ -> yes { m with mode = Editing }
+  | (Insert ("n" | "N") | Cancel | Interrupt), _ -> no { m with mode = Editing }
+  | Insert ("a" | "A"), Tool_confirm ({ rules = _ :: _; _ } as c)
+    when not (Confirm_prompt.is_plan c) ->
+    answer_confirm { m with mode = Editing } c Always
+  | Insert ("r" | "R"), Tool_confirm c ->
+    ( { m with
+        mode =
+          Text_prompt
+            { question = Confirm_prompt.reason_question c
+            ; action = Deny_reason { confirm = c; draft = Editor.text m.editor }
+            }
+      ; editor = Editor.clear m.editor
+      ; autocomplete = None
+      }
+    , [] )
+  | Force_quit, _ -> { m with quitting = true }, [ Quit ]
+  | _ -> m, []
+;;
+
+(* ---- question mode ---------------------------------------------------- *)
+
+let question m ~call_id ~form (intent : Intent.t) =
+  let respond m params =
+    ( { m with mode = Editing }
+    , [ rpc "ask_user_respond" ~params:(("call_id", str call_id) :: params) ] )
+  in
+  let set form = { m with mode = Question { call_id; form } }, [] in
   match intent with
-  | Insert ("y" | "Y") | Submit -> yes { m with mode = Editing }
-  | Insert ("n" | "N") | Cancel | Interrupt -> no { m with mode = Editing }
+  | Submit ->
+    (match Question_form.accept form with
+     | `Next form -> set form
+     | `Done answers ->
+       respond
+         (notice m "answered")
+         [ ( "answers"
+           , `Array (List.map answers ~f:(fun a -> `Array (List.map a ~f:str)))
+           )
+         ])
+  | Cancel | Interrupt ->
+    respond (notice m "declined to answer") [ "decline", P.Json.bool true ]
+  | Up -> set (Question_form.up form)
+  | Down -> set (Question_form.down form)
+  | Left -> set (Question_form.prev form)
+  | Right | Complete -> set (Question_form.next form)
+  | Insert " " -> set (Question_form.toggle form)
+  | Insert text | Paste text -> set (Question_form.insert form text)
+  | Backspace -> set (Question_form.backspace form)
   | Force_quit -> { m with quitting = true }, [ Quit ]
   | _ -> m, []
 ;;
@@ -2897,6 +3159,7 @@ let intent m (intent : Intent.t) =
   | Login_prompt { id; prompt } -> login_prompt m ~id ~prompt intent
   | Text_prompt { action; _ } -> text_prompt m ~action intent
   | Confirm { action; _ } -> confirm m ~action intent
+  | Question { call_id; form } -> question m ~call_id ~form intent
   | Search _ -> search m intent
 ;;
 
@@ -3021,11 +3284,40 @@ let event m (e : P.Event.t) =
     , [] )
   | Config_changed config -> { m with config = Some config }, []
   | Auth a -> auth_event m a
-  | Tool_confirm { call_id; name; summary } ->
-    ( { m with
-        pending_confirms = m.pending_confirms @ [ call_id, name, summary ]
+  | Tool_confirm c -> add_pending_confirms m [ c ], []
+  | Tool_confirm_done { call_id; agent_id } ->
+    let done_ (c : P.Pending.Confirm.t) =
+      String.equal c.call_id call_id
+      && Option.equal String.equal c.agent_id agent_id
+    in
+    let m =
+      { m with
+        pending_confirms = List.filter m.pending_confirms ~f:(Fn.non done_)
       }
-    , [] )
+    in
+    (match m.mode with
+     | Confirm { action = Tool_confirm c; _ } when done_ c ->
+       notice { m with mode = Editing } "confirmation answered elsewhere", []
+     | Text_prompt { action = Deny_reason { confirm; draft }; _ }
+       when done_ confirm ->
+       ( notice
+           { m with mode = Editing; editor = Editor.set_text m.editor draft }
+           "confirmation answered elsewhere"
+       , [] )
+     | _ -> m, [])
+  | Ask_user a -> add_pending_questions m [ a ], []
+  | Ask_user_done call_id ->
+    let m =
+      { m with
+        pending_questions =
+          List.filter m.pending_questions ~f:(fun q ->
+            not (String.equal q.call_id call_id))
+      }
+    in
+    (match m.mode with
+     | Question { call_id = shown; _ } when String.equal shown call_id ->
+       notice { m with mode = Editing } "question answered elsewhere", []
+     | _ -> m, [])
   | Btw_delta { btw_id; delta } ->
     update_btw m btw_id ~f:(fun box -> Btw_box.add_delta box delta), []
   | Agent_start
@@ -3130,6 +3422,9 @@ let rec reply m (tag : Reply_tag.t) (result : (P.Json.t, string) Result.t) =
          { m with skills = Skill_cache.set m.skills ~key [] }
      | Mcp_approved server ->
        error m (sprintf "approving MCP server %s failed: %s" server e), []
+     | Mode_set _ ->
+       (* The mode shown at once was not taken. *)
+       error m e, [ rpc "get_state" ~tag:Refresh_state ]
      | _ -> error m e, [])
   | Ok json ->
     (match tag with
@@ -3152,6 +3447,18 @@ let rec reply m (tag : Reply_tag.t) (result : (P.Json.t, string) Result.t) =
          else block m (mcp_summary list), [])
      | Mcp_approved server ->
        decode json ~f:P.Mcp_list.of_json (mcp_approved m server)
+     | Pending ->
+       decode json ~f:P.Pending.of_json (fun pending ->
+         ( add_pending_questions
+             (add_pending_confirms m pending.confirms)
+             pending.questions
+         , [] ))
+     | Mode_set text ->
+       decode json ~f:P.State.of_json (fun state ->
+         notice { m with state = Some state } text, [])
+     | Refresh_state ->
+       decode json ~f:P.State.of_json (fun state ->
+         { m with state = Some state }, [])
      | Btw id ->
        decode
          json
