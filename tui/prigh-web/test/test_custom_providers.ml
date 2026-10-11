@@ -249,12 +249,12 @@ let%expect_test "/login custom: name, base URL, API style, key; then /model" =
     {|
     (Save_history (/model /login))
     (Focus picker-input)
-    Claude Opus 5.5 anthropic · 200k ctx ✓
-    Claude Sonnet 5 anthropic · 200k ctx
-    gpt-4o aiproxy · 128k ctx
-    openai/gpt-4o-mini aiproxy · 128k ctx
-    GPT-6 openai · 200k ctx · not logged in
-    DeepSeek Chat deepseek · 200k ctx · not logged in
+    Claude Opus 5.5 anthropic, 200k ctx ✓
+    Claude Sonnet 5 anthropic, 200k ctx
+    gpt-4o aiproxy, 128k ctx
+    openai/gpt-4o-mini aiproxy, 128k ctx
+    GPT-6 openai, 200k ctx, not logged in
+    DeepSeek Chat deepseek, 200k ctx, not logged in
     |}];
   H.act h (Picker_query "mini");
   H.key h "Enter" ~target:Field;
@@ -329,7 +329,7 @@ let%expect_test "custom providers in /auth, /login and /logout: edit and remove"
     (Log in)
     DeepSeek not logged in
     (Log in)
-    aiproxy custom · http://localhost:3000/v1 · OpenAI chat completions (/chat/completions) · no key
+    aiproxy custom, http://localhost:3000/v1, OpenAI chat completions (/chat/completions), no key
     (Edit) (Remove)
     /login and /logout pick a provider (Add a custom provider) (Done)
     |}];
@@ -383,11 +383,11 @@ let%expect_test "custom providers in /auth, /login and /logout: edit and remove"
     (Focus dialog)
     (Rpc (method_ auth_status) (params ()) (tag (Auth_status Login_picker)))
     (Focus picker-input)
-    Anthropic Claude subscription · logged in via auth.json ✓
+    Anthropic Claude subscription, logged in via auth.json ✓
     Anthropic API key
     OpenAI API key
     DeepSeek API key
-    aiproxy custom · http://localhost:3000/v1 · OpenAI chat completions (/chat/completions) · edit
+    aiproxy custom, http://localhost:3000/v1, OpenAI chat completions (/chat/completions), edit
     Custom provider add an OpenAI-compatible endpoint (aiproxy, LiteLLM, OpenRouter, vLLM, Ollama…)
     |}];
   H.act h Close_dialog;
@@ -400,7 +400,7 @@ let%expect_test "custom providers in /auth, /login and /logout: edit and remove"
     Anthropic logged in
     OpenAI
     DeepSeek
-    aiproxy custom · http://localhost:3000/v1
+    aiproxy custom, http://localhost:3000/v1
     custom add an OpenAI-compatible endpoint
     |}];
   (* Removing asks what to remove; answered, the dialog closes. *)
@@ -418,7 +418,7 @@ let%expect_test "custom providers in /auth, /login and /logout: edit and remove"
     (Rpc (method_ auth_status) (params ()) (tag (Auth_status Logout_picker)))
     (Focus picker-input)
     Anthropic oauth via auth.json
-    aiproxy custom · http://localhost:3000/v1 · OpenAI chat completions (/chat/completions) · key: auth.json
+    aiproxy custom, http://localhost:3000/v1, OpenAI chat completions (/chat/completions), key: auth.json
     |}];
   H.act h (Picker_query "aiproxy");
   H.key h "Enter" ~target:Field;

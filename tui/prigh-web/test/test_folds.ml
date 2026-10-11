@@ -30,13 +30,41 @@ let output h text =
        (Jsonaf.to_string (`String text)))
 ;;
 
-let finish h text =
+let finish ?(is_error = false) h text =
   H.event
     h
     (sprintf
-       {|{"event":"tool_end","call":%s,"result":{"role":"tool_result","tool_call_id":"c1","tool_name":"bash","text":%s,"is_error":false}}|}
+       {|{"event":"tool_end","call":%s,"result":{"role":"tool_result","tool_call_id":"c1","tool_name":"bash","text":%s,"is_error":%b}}|}
        bash_call
-       (Jsonaf.to_string (`String text)))
+       (Jsonaf.to_string (`String text))
+       is_error)
+;;
+
+let%expect_test "a failure folds to its last lines, where the error is" =
+  let h = H.create () in
+  start h;
+  finish ~is_error:true h (lines 20 ^ "Error: line 20 is wrong\n[exit code 2]");
+  H.elements h ~selector:".output";
+  H.text h ~selector:".tool-body";
+  [%expect
+    {|
+    <div class="clipped error from-end output">
+    line 16
+    line 17
+    line 18
+    line 19
+    line 20
+    Error: line 20 is wrong
+    (Show all 21 lines)
+    |}];
+  H.act h (Toggle_fold "c1");
+  H.elements h ~selector:".output";
+  H.text h ~selector:"button.fold";
+  [%expect
+    {|
+    <div class="error expanded output">
+    (Fold to 6 lines)
+    |}]
 ;;
 
 let%expect_test "bash: the last lines while it runs, then folded, expanded" =
@@ -55,9 +83,10 @@ let%expect_test "bash: the last lines while it runs, then folded, expanded" =
   H.show h ~selector:".output";
   [%expect
     {|
-    <div class="live output">
-      <div class="earlier"> 10 earlier lines </div>
-      <pre> line 8
+    <div class="clipped from-end live output">
+      <div class="earlier"> 9 earlier lines </div>
+      <pre> line 7
+    line 8
     line 9
     line 10
     line 11
@@ -73,17 +102,19 @@ let%expect_test "bash: the last lines while it runs, then folded, expanded" =
     line 3
     line 4
     line 5
-    (Show all 30 lines (22 hidden))
-    line 28
-    line 29
-    line 30
+    line 6
+    (Show all 30 lines)
     |}];
   H.show h ~selector:"button.fold";
   [%expect
     {|
     <button type="button" data-fold="c1" aria-expanded="false" class="fold">
       <span class="chev"> </span>
-      Show all 30 lines (22 hidden)
+      <span>
+        Show all
+        <span class="count"> 30 </span>
+         lines
+      </span>
     </button>
     |}];
   H.act h (Toggle_fold "c1");
@@ -120,7 +151,7 @@ let%expect_test "bash: the last lines while it runs, then folded, expanded" =
     line 28
     line 29
     line 30
-    (Fold to 8 lines)
+    (Fold to 6 lines)
     |}];
   H.elements h ~selector:".output";
   [%expect {| <div class="expanded output"> |}];
@@ -129,8 +160,8 @@ let%expect_test "bash: the last lines while it runs, then folded, expanded" =
   H.text h ~selector:"button.fold";
   [%expect
     {|
-    <div class="output">
-    (Show all 30 lines (22 hidden))
+    <div class="clipped from-start output">
+    (Show all 30 lines)
     |}]
 ;;
 
@@ -145,12 +176,12 @@ let%expect_test "verbosity: verbose unfolds everything, quiet hides it" =
     {|
     (Expire_toast (id 0) (after_ms 4000))
     <div class="chat verbosity-verbose">
-    (Fold to 8 lines)
+    (Fold to 6 lines)
     |}];
   (* In verbose the toggle folds one. *)
   H.act h (Toggle_fold "c1");
   H.text h ~selector:"button.fold";
-  [%expect {| (Show all 20 lines (12 hidden)) |}];
+  [%expect {| (Show all 20 lines) |}];
   (* Changing the level starts from what it shows. *)
   H.act h Cycle_verbosity;
   H.elements h ~selector:".chat";
@@ -160,7 +191,7 @@ let%expect_test "verbosity: verbose unfolds everything, quiet hides it" =
     {|
     (Expire_toast (id 1) (after_ms 4000))
     <div class="chat verbosity-quiet">
-    (Show all 20 lines (12 hidden))
+    (Show all 20 lines)
     ()
     |}];
   H.act h Cycle_verbosity;
@@ -170,7 +201,7 @@ let%expect_test "verbosity: verbose unfolds everything, quiet hides it" =
     {|
     (Expire_toast (id 2) (after_ms 4000))
     <div class="chat verbosity-normal">
-    (Show all 20 lines (12 hidden))
+    (Show all 20 lines)
     |}]
 ;;
 
@@ -213,7 +244,8 @@ let%expect_test "a long stream keeps only its end" =
   [%expect
     {|
     ((kept_under_twice_the_limit true) (starts_a_line true) (lines 20000))
-    19995 earlier lines line 996
+    19994 earlier lines line 995
+    line 996
     line 997
     line 998
     line 999
@@ -249,7 +281,7 @@ let%expect_test "diffs fold to 8 rows" =
   in
   Chat_harness.text ~selector:".diff-view" chat;
   [%expect
-    {| - line 1 - line 2 - line 3 - line 4 - line 5 - line 6 - line 7 - line 8 Show all 24 lines (16 hidden) |}];
+    {| - line 1 - line 2 - line 3 - line 4 - line 5 - line 6 - line 7 - line 8 Show all 24 lines |}];
   Chat_harness.text
     ~fold:(Fold.create ~verbosity:Verbose ~toggled:String.Set.empty)
     ~selector:"button.fold"
@@ -285,12 +317,12 @@ let%expect_test "a delivered job's output: its last lines, unfolded on demand" =
   [%expect
     {|
     ↩ job j1 exited 0 make
-    (Show all 12 lines (7 hidden))
     line 8
     line 9
     line 10
     line 11
     line 12
+    (Show all 12 lines)
     |}];
   H.act h (Toggle_fold "job:j1");
   H.text h ~selector:".delivery-section button.fold";

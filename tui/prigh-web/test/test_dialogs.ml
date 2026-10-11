@@ -19,7 +19,7 @@ let%expect_test "tool confirmations own the keyboard: Enter allows, Esc denies" 
     Confirm
     (Close (Esc))
     Run bash: rm -rf build?
-    (y allow once) (n deny) (r deny, saying why)
+    (y Allow once) (n Deny) (r Deny, saying why)
     1 more waiting
     |}];
   (* Even with the editor focused and a popup open. *)
@@ -247,7 +247,7 @@ let%expect_test "logging in: pick a provider, open the URL, answer the prompts" 
     (Focus dialog)
     (Rpc (method_ auth_status) (params ()) (tag (Auth_status Login_picker)))
     (Focus picker-input)
-    Anthropic Claude subscription · logged in via auth.json ✓
+    Anthropic Claude subscription, logged in via auth.json ✓
     Anthropic API key
     OpenAI API key
     DeepSeek API key

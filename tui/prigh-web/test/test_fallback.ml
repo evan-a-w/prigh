@@ -539,7 +539,7 @@ let%expect_test "/help fallback and default-dir" =
     (Expire_toast (id 0) (after_ms 4000))
     (Save_history ("/help /default-dir" "/help fallback"))
     (Expire_toast (id 1) (after_ms 4000))
-    /fallback [model...|off] — show or set the models that take over, in order, when one's usage runs out
-    /default-dir [path|off] — show or set the directory new sessions start in
+    /fallback [model...|off]: show or set the models that take over, in order, when one's usage runs out
+    /default-dir [path|off]: show or set the directory new sessions start in
     |}]
 ;;

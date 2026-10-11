@@ -16,6 +16,10 @@ val button
   -> Node.t list
   -> Node.t
 
+(** The sodium lamp that glows wherever work is in progress (a running
+    session, tool, agent or request); [title] says what works. *)
+val lamp : ?title:string -> unit -> Node.t
+
 module Icon : sig
   type t =
     | Menu

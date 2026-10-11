@@ -42,7 +42,7 @@ let%expect_test "the mode chip, Alt+M, and set_mode's reply or failure" =
     (Rpc (method_ set_mode) (params ((approval_mode auto) (plan_mode true)))
      (tag
       (Mode_set
-       "Mode: plan \226\128\148 read-only planning: no file edits, commands ask first")))
+       "Mode: plan (read-only planning: no file edits, commands ask first)")))
     Ready 0% ↑0 ↓0 $0.0000 (plan)
     |}];
   H.show h ~selector:".status .mode";
@@ -58,7 +58,7 @@ let%expect_test "the mode chip, Alt+M, and set_mode's reply or failure" =
   [%expect
     {|
     (Expire_toast (id 0) (after_ms 4000))
-    Mode: plan — read-only planning: no file edits, commands ask first
+    Mode: plan (read-only planning: no file edits, commands ask first)
     |}];
   (* Option+M types a symbol on a Mac: the physical key counts. *)
   H.key h "µ" ~alt:true ~code:"KeyM";
@@ -68,10 +68,9 @@ let%expect_test "the mode chip, Alt+M, and set_mode's reply or failure" =
     {|
     Cycle_mode
     (Rpc (method_ set_mode) (params ((approval_mode ask) (plan_mode false)))
-     (tag
-      (Mode_set "Mode: ask \226\128\148 bash, edits and MCP tools ask first")))
+     (tag (Mode_set "Mode: ask (bash, edits and MCP tools ask first)")))
     Ready 0% ↑0 ↓0 $0.0000 (ask)
-    Mode: plan — read-only planning: no file edits, commands ask first
+    Mode: plan (read-only planning: no file edits, commands ask first)
     |}];
   (* Not taken: said, and the backend's state shown again. *)
   H.fail h "set_mode" "no session";
@@ -82,7 +81,7 @@ let%expect_test "the mode chip, Alt+M, and set_mode's reply or failure" =
     {|
     (Rpc (method_ get_state) (params ()) (tag State))
     Ready 0% ↑0 ↓0 $0.0000 (plan)
-    Mode: plan — read-only planning: no file edits, commands ask first
+    Mode: plan (read-only planning: no file edits, commands ask first)
     Couldn't set the mode: no session
     |}];
   (* Clicking the chip picks the mode. *)
@@ -99,7 +98,7 @@ let%expect_test "the mode chip, Alt+M, and set_mode's reply or failure" =
     auto-edit file edits run; bash and MCP tools ask first
     auto tools run without asking
     plan read-only planning: no file edits, commands ask first ✓
-    ↑↓ move · Enter choose · Esc close
+    ↑↓ to move, Enter to choose, Esc to close
     |}];
   H.key h "ArrowUp" ~target:Field;
   H.key h "ArrowUp" ~target:Field;
@@ -114,8 +113,7 @@ let%expect_test "the mode chip, Alt+M, and set_mode's reply or failure" =
     (Rpc (method_ set_mode)
      (params ((approval_mode auto-edit) (plan_mode false)))
      (tag
-      (Mode_set
-       "Mode: auto-edit \226\128\148 file edits run; bash and MCP tools ask first")))
+      (Mode_set "Mode: auto-edit (file edits run; bash and MCP tools ask first)")))
     Ready 0% ↑0 ↓0 $0.0000 (auto-edit)
     |}]
 ;;
@@ -139,7 +137,7 @@ let%expect_test "/mode NAME, /plan, /confirm" =
     {|
     (Save_history ("/mode auto" "/mode bogus"))
     (Rpc (method_ set_mode) (params ((approval_mode auto) (plan_mode false)))
-     (tag (Mode_set "Mode: auto \226\128\148 tools run without asking")))
+     (tag (Mode_set "Mode: auto (tools run without asking)")))
     Ready 0% ↑0 ↓0 $0.0000
     |}];
   (* /plan toggles, keeping the approval mode to go back to. *)
@@ -157,20 +155,20 @@ let%expect_test "/mode NAME, /plan, /confirm" =
     (Rpc (method_ set_mode) (params ((approval_mode auto) (plan_mode true)))
      (tag
       (Mode_set
-       "Mode: plan \226\128\148 read-only planning: no file edits, commands ask first")))
+       "Mode: plan (read-only planning: no file edits, commands ask first)")))
     Ready 0% ↑0 ↓0 $0.0000 (plan)
     (Save_history (/plan "/mode auto" "/mode bogus"))
     (Rpc (method_ set_mode) (params ((approval_mode auto) (plan_mode false)))
-     (tag (Mode_set "Mode: auto \226\128\148 tools run without asking")))
+     (tag (Mode_set "Mode: auto (tools run without asking)")))
     Ready 0% ↑0 ↓0 $0.0000
     (Save_history ("/plan on" /plan "/mode auto" "/mode bogus"))
     (Rpc (method_ set_mode) (params ((approval_mode auto) (plan_mode true)))
      (tag
       (Mode_set
-       "Mode: plan \226\128\148 read-only planning: no file edits, commands ask first")))
+       "Mode: plan (read-only planning: no file edits, commands ask first)")))
     (Save_history ("/plan off" "/plan on" /plan "/mode auto" "/mode bogus"))
     (Rpc (method_ set_mode) (params ((approval_mode auto) (plan_mode false)))
-     (tag (Mode_set "Mode: auto \226\128\148 tools run without asking")))
+     (tag (Mode_set "Mode: auto (tools run without asking)")))
     (Save_history
      ("/plan maybe" "/plan off" "/plan on" /plan "/mode auto" "/mode bogus"))
     Unknown argument "maybe": use /plan on, /plan off, or /plan to toggle.
@@ -287,7 +285,7 @@ let%expect_test "/permissions" =
     (Focus dialog)
     Permissions
     (Close (Esc))
-    Mode: auto-edit — file edits run; bash and MCP tools ask first
+    Mode: auto-edit (file edits run; bash and MCP tools ask first)
     Allowed this session: bash(make:*)
 
     Rules are permissions in ~/.prigh/config.json, e.g. {"allow": ["bash(git status:*)"], "deny": ["bash(rm:*)"]}.
@@ -298,7 +296,7 @@ let%expect_test "/permissions" =
     (Focus dialog)
     Permissions
     (Close (Esc))
-    Mode: plan — read-only planning: no file edits, commands ask first
+    Mode: plan (read-only planning: no file edits, commands ask first)
     Allowed this session: nothing yet (a confirmation's "always" adds to it)
     allow (config): bash(git status:*)
     deny (config): bash(rm:*), write(/etc/**)
@@ -333,7 +331,7 @@ let%expect_test "a confirmation: allow once, always, deny, deny with a reason" =
     Confirm
     (Close (Esc))
     Run bash: make test?
-    (y allow once) (a always allow bash(make:*) this session) (n deny) (r deny, saying why)
+    (y Allow once) (a Always allow bash(make:*) this session) (n Deny) (r Deny, saying why)
     2 more waiting
     |}];
   H.show h ~selector:".confirm-answers";
@@ -346,11 +344,11 @@ let%expect_test "a confirmation: allow once, always, deny, deny with a reason" =
               class="allow btn confirm-answer primary"
               @on_click>
         <kbd> y </kbd>
-        allow once
+        Allow once
       </button>
       <button type="button" title="a" aria-label="a" class="always btn confirm-answer" @on_click>
         <kbd> a </kbd>
-        always allow bash(make:*) this session
+        Always allow bash(make:*) this session
       </button>
       <button type="button"
               title="n or Esc"
@@ -358,11 +356,11 @@ let%expect_test "a confirmation: allow once, always, deny, deny with a reason" =
               class="btn confirm-answer deny"
               @on_click>
         <kbd> n </kbd>
-        deny
+        Deny
       </button>
       <button type="button" title="r" aria-label="r" class="btn confirm-answer reason" @on_click>
         <kbd> r </kbd>
-        deny, saying why
+        Deny, saying why
       </button>
     </div>
     |}];
@@ -377,11 +375,11 @@ let%expect_test "a confirmation: allow once, always, deny, deny with a reason" =
      (params ((call_id c1) (allow true) (always true))) (tag Show_error))
     (Focus confirm)
     (Expire_toast (id 0) (after_ms 4000))
-    allowed bash; always: bash(make:*)
+    Allowed bash; always: bash(make:*)
     Confirm
     (Close (Esc))
     Run bash: rm -rf build?
-    (y allow once) (n deny) (r deny, saying why)
+    (y Allow once) (n Deny) (r Deny, saying why)
     1 more waiting
     |}];
   (* No rules, no always. *)
@@ -412,7 +410,7 @@ let%expect_test "a confirmation: allow once, always, deny, deny with a reason" =
     Confirm
     (Close (Esc))
     Run bash: rm -rf build?
-    (y allow once) (n deny) (r deny, saying why)
+    (y Allow once) (n Deny) (r Deny, saying why)
     1 more waiting
     |}];
   H.click h ~selector:".confirm-answer.reason";
@@ -431,12 +429,12 @@ let%expect_test "a confirmation: allow once, always, deny, deny with a reason" =
      (tag Show_error))
     (Focus confirm)
     (Expire_toast (id 1) (after_ms 4000))
-    allowed bash; always: bash(make:*)
-    denied bash
+    Allowed bash; always: bash(make:*)
+    Denied bash
     Confirm
     (Close (Esc))
     [a1] Write notes.md?
-    (y allow once) (a always allow edit this session) (n deny) (r deny, saying why)
+    (y Allow once) (a Always allow edit this session) (n Deny) (r Deny, saying why)
     |}];
   (* A subagent's: its id is sent back. *)
   H.click h ~selector:".confirm-answer.allow";
@@ -471,7 +469,7 @@ let%expect_test "approving the plan" =
     Plan
     Change main.ml
     Test
-    (y approve: leave plan mode and implement) (n keep planning) (r keep planning, saying what to change)
+    (y Approve: leave plan mode and implement) (n Keep planning) (r Keep planning, saying what to change)
     <div class="confirm-plan">
       <div class="markdown">
         <h2> Plan </h2>
@@ -508,7 +506,7 @@ let%expect_test "approving the plan" =
      (params ((call_id p1) (allow false) (reason "add docs"))) (tag Show_error))
     (Focus editor)
     (Expire_toast (id 0) (after_ms 4000))
-    plan not approved: still planning
+    Plan not approved: still planning
     |}];
   H.event h (confirm ~name:"exit_plan_mode" "p2" "1. Do it");
   H.key h "y";
@@ -521,8 +519,8 @@ let%expect_test "approving the plan" =
      (tag Show_error))
     (Focus editor)
     (Expire_toast (id 1) (after_ms 4000))
-    plan not approved: still planning
-    plan approved
+    Plan not approved: still planning
+    Plan approved
     |}]
 ;;
 
@@ -572,7 +570,7 @@ let%expect_test "a confirmation answered elsewhere, or withdrawn, closes" =
     (Focus editor)
     (Expire_toast (id 2) (after_ms 4000))
     Confirmation answered elsewhere
-    allowed bash
+    Allowed bash
     |}]
 ;;
 
@@ -601,7 +599,7 @@ let%expect_test "a question dialog: keys" =
     ○ SQLite
     Other:
     []
-    Space or a click picks · ↑↓ choose · Enter accepts · Esc declines (Decline) (Next)
+    Space or a click picks, ↑↓ choose, Enter accepts, Esc declines (Decline) (Next)
     <aside class="sidebar">
     <main class="main">
     |}];
@@ -637,7 +635,7 @@ let%expect_test "a question dialog: keys" =
     ☐ bench
     Other:
     []
-    Space toggles · ↑↓ choose · Enter accepts · Esc declines (Decline) (Back) (Next)
+    Space toggles, ↑↓ choose, Enter accepts, Esc declines (Decline) (Back) (Next)
     |}];
   (* Several: Space toggles; typing goes to the own answer. *)
   H.key h " " ~target:Page;
@@ -673,7 +671,7 @@ let%expect_test "a question dialog: keys" =
     ☑ bench
     Other:
     [fuzz]
-    Space toggles · ↑↓ choose · Enter accepts · Esc declines (Decline) (Back) (Next)
+    Space toggles, ↑↓ choose, Enter accepts, Esc declines (Decline) (Back) (Next)
     |}];
   (* ← back to the first question: its answer is kept. *)
   H.key h "ArrowUp" ~target:Field;
@@ -694,7 +692,7 @@ let%expect_test "a question dialog: keys" =
     ◉ SQLite
     Other:
     []
-    Space or a click picks · ↑↓ choose · Enter accepts · Esc declines (Decline) (Next)
+    Space or a click picks, ↑↓ choose, Enter accepts, Esc declines (Decline) (Next)
     (Question Next)
     (Question Accept)
     (Focus question-own)
@@ -702,7 +700,7 @@ let%expect_test "a question dialog: keys" =
     (Close (Esc))
     Anything else?
     []
-    type your answer · ↑↓ choose · Enter accepts · Esc declines (Decline) (Back) (Send)
+    type your answer, ↑↓ choose, Enter accepts, Esc declines (Decline) (Back) (Send)
     |}];
   (* The last question has no choices: only the own answer. *)
   H.key h "n" ~target:Page;
@@ -778,7 +776,7 @@ let%expect_test "a question dialog: clicks" =
     ☑ bench
     Other:
     []
-    Space toggles · ↑↓ choose · Enter accepts · Esc declines (Decline) (Back) (Next)
+    Space toggles, ↑↓ choose, Enter accepts, Esc declines (Decline) (Back) (Next)
     |}];
   H.click h ~selector:".modal-buttons .primary";
   H.input h ~selector:"#question-own" "ship it";
@@ -813,7 +811,7 @@ let%expect_test
     Confirm
     (Close (Esc))
     Run bash: make?
-    (y allow once) (n deny) (r deny, saying why)
+    (y Allow once) (n Deny) (r Deny, saying why)
     |}];
   H.key h "y";
   modal h;
@@ -828,7 +826,7 @@ let%expect_test
     (Close (Esc))
     Ready?
     []
-    type your answer · ↑↓ choose · Enter accepts · Esc declines · 1 more waiting (Decline) (Send)
+    type your answer, ↑↓ choose, Enter accepts, Esc declines, 1 more waiting (Decline) (Send)
     |}];
   H.key h "Escape" ~target:Page;
   modal h;
@@ -844,8 +842,8 @@ let%expect_test
     (Close (Esc))
     Sure?
     []
-    type your answer · ↑↓ choose · Enter accepts · Esc declines (Decline) (Send)
-    allowed bash
+    type your answer, ↑↓ choose, Enter accepts, Esc declines (Decline) (Send)
+    Allowed bash
     Declined to answer: the model goes on without one
     |}];
   (* Answered in another tab, or the run stopped. *)
@@ -857,7 +855,7 @@ let%expect_test
     {|
     (Focus editor)
     (Expire_toast (id 2) (after_ms 4000))
-    allowed bash
+    Allowed bash
     Declined to answer: the model goes on without one
     Question answered elsewhere, or the run stopped
     |}];
@@ -903,7 +901,7 @@ let%expect_test
     Confirm
     (Close (Esc))
     Run bash: make?
-    (y allow once) (a always allow bash(make:*) this session) (n deny) (r deny, saying why)
+    (y Allow once) (a Always allow bash(make:*) this session) (n Deny) (r Deny, saying why)
     1 more waiting
     Ready 0% ↑0 ↓0 $0.0000 (1 queued)
     |}];

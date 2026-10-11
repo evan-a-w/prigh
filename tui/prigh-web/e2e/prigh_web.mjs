@@ -689,10 +689,10 @@ try {
   await page.setViewportSize({ width: 1280, height: 800 });
   await page.waitForFunction(() => document.querySelector(".app:not(.narrow)"));
 
-  // 12. Sessions: archiving one moves it under a divider, muted; selecting
-  //     several (a shift-click takes the range, across the divider) and
-  //     deleting them asks first with their count and size, then removes
-  //     their files.
+  // 12. Sessions: archiving one moves it under a divider that folds the
+  //     archived away (a click unfolds them, muted); selecting several (a
+  //     shift-click takes the range, across the divider) and deleting them
+  //     asks first with their count and size, then removes their files.
   const sizes = text => clean(text).replace(/\d+(\.\d+)? (B|KB|MB)\b/g, "<SIZE>");
   const sessionFiles = () =>
     readdirSync(join(home, ".prigh", "sessions")).filter(f => f.endsWith(".jsonl")).length;
@@ -706,6 +706,12 @@ try {
   await hello.hover();
   await hello.locator(".archive").click();
   await page.locator(".sessions-divider").waitFor();
+  section("archived, folded");
+  console.log(sizes(await page.locator(".sidebar .sessions").innerText()));
+  await page.mouse.move(700, 400);
+  await screenshot("archived folded");
+  await page.locator(".sessions-divider").click();
+  await page.locator(".session.archived").waitFor();
   section("archived");
   console.log(sizes(await page.locator(".sidebar .sessions").innerText()));
   console.log(`muted: ${await page.locator(".session.archived").count()}`);
@@ -715,9 +721,9 @@ try {
   await hello.click({ modifiers: ["Shift"] });
   await page.waitForFunction(() => document.querySelectorAll(".session.marked").length === 2);
   section("selected");
-  console.log(sizes(await page.locator(".sessions-toolbar").innerText()));
+  console.log(sizes(await page.locator(".sidebar .selection-bar").innerText()));
   await screenshot("selected");
-  await page.locator(".sessions-toolbar .danger").click();
+  await page.locator(".sidebar .selection-bar .danger").click();
   await page.locator(".modal").waitFor();
   section("delete confirmation");
   console.log(sizes(await page.locator(".modal").innerText()));

@@ -1,14 +1,16 @@
 open! Core
 open! Import
 
-(** Tool output as a monospace block. Beyond [head + tail] lines the middle
-    folds behind a "Show all N lines" toggle of the [fold] with that key,
-    unless it is expanded, when everything shows above a toggle back. *)
+(** Tool output as a monospace block. Beyond [lines] lines it is clipped to
+    them, faded where it goes on, over a "Show all N lines" toggle of the
+    [fold] with that key; expanded, everything shows above a toggle back.
+    [from_end] (by default [error], where the error is at the end) shows the
+    last lines rather than the first. *)
 val view
   :  ?error:bool
+  -> ?from_end:bool
   -> fold:Fold.t * string
-  -> head:int
-  -> tail:int
+  -> lines:int
   -> string
   -> Node.t
 

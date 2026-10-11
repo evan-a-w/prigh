@@ -56,15 +56,15 @@ let%expect_test "/skills: a fuzzy picker; Enter puts /skill:name in the editor" 
     Skills
     (Close (Esc))
     []
-    frontend-design Distinctive, production-grade web pages · /work/.claude/skills/frontend-design
-    release Cut a release: changelog, tag, publish · /home/u/.prigh/skills/release · only you invoke it
-    ↑↓ move · Enter choose · Esc close
+    frontend-design Distinctive, production-grade web pages, /work/.claude/skills/frontend-design
+    release Cut a release: changelog, tag, publish, /home/u/.prigh/skills/release, only you invoke it
+    ↑↓ to move, Enter to choose, Esc to close
     |}];
   (* The description is searched too. *)
   H.act h (Picker_query "changelog");
   H.text h ~selector:".picker-items";
   [%expect
-    {| release Cut a release: changelog, tag, publish · /home/u/.prigh/skills/release · only you invoke it |}];
+    {| release Cut a release: changelog, tag, publish, /home/u/.prigh/skills/release, only you invoke it |}];
   H.key h "Enter" ~target:Field;
   draft h;
   H.text h ~selector:"#editor";
@@ -100,7 +100,7 @@ let%expect_test "/skills: a fuzzy picker; Enter puts /skill:name in the editor" 
                          \nbackend\
                          \n/work") (purpose (Picker front)))))
     (Focus picker-input)
-    frontend-design Distinctive, production-grade web pages · /work/.claude/skills/frontend-design
+    frontend-design Distinctive, production-grade web pages, /work/.claude/skills/frontend-design
     Close_dialog
     (Focus editor)
     ((m.draft "") (m.cursor 0))
@@ -515,19 +515,19 @@ let%expect_test "/mcp: servers to act on first, problems below; Enter approves" 
     MCP servers
     (Close (Esc))
     []
-    db needs your approval · Enter starts it · /work/.mcp.json
-    web failed: spawn uvx: not found · Enter restarts it · /home/u/.prigh/mcp.json
-    fs ready · 2 tools · /home/u/.prigh/mcp.json
+    db needs your approval: Enter starts it, /work/.mcp.json
+    web failed: spawn uvx: not found. Enter restarts it, /home/u/.prigh/mcp.json
+    fs ready, 2 tools, /home/u/.prigh/mcp.json
     Configuration problems
     /work/.mcp.json: server "x": give a "command" (stdio) or a "url" (http)
-    ↑↓ move · Enter choose · Esc close
+    ↑↓ to move, Enter to choose, Esc to close
     |}];
   H.show h ~selector:".picker-item.dimmed";
   [%expect
     {|
     <div role="option" class="dimmed picker-item" @on_click>
       <span class="picker-label"> web </span>
-      <span class="picker-detail"> failed: spawn uvx: not found · Enter restarts it · /home/u/.prigh/mcp.json </span>
+      <span class="picker-detail"> failed: spawn uvx: not found. Enter restarts it, /home/u/.prigh/mcp.json </span>
       <Vdom.Node.none-widget> </Vdom.Node.none-widget>
     </div>
     |}];
@@ -549,9 +549,9 @@ let%expect_test "/mcp: servers to act on first, problems below; Enter approves" 
     (Focus picker-input)
     Approved db: starting it…
     db is ready with 1 tool: Enter lists them
-    web failed: spawn uvx: not found · Enter restarts it · /home/u/.prigh/mcp.json
-    fs ready · 2 tools · /home/u/.prigh/mcp.json
-    db ready · 1 tool · /work/.mcp.json
+    web failed: spawn uvx: not found. Enter restarts it, /home/u/.prigh/mcp.json
+    fs ready, 2 tools, /home/u/.prigh/mcp.json
+    db ready, 1 tool, /work/.mcp.json
     |}];
   (* The approved server stays highlighted: Enter shows its tools. *)
   H.key h "Enter" ~target:Field;
@@ -640,7 +640,7 @@ let%expect_test "/mcp reconnect reports; no servers says where to add them" =
     (Expire_toast (id 0) (after_ms 4000))
     (Rpc (method_ list_mcp) (params ((reconnect true))) (tag (Mcp Reconnect)))
     Restarting the failed MCP servers…
-    MCP servers: 1 ready (2 tools), 1 failed (web: spawn uvx: not found), 1 awaiting approval, 1 configuration problem — /mcp shows them
+    MCP servers: 1 ready (2 tools), 1 failed (web: spawn uvx: not found), 1 awaiting approval, 1 configuration problem: /mcp shows them
     |}];
   let last_toast () = print_endline (List.last_exn (H.model h).toasts).text in
   H.quiet h (fun () ->
@@ -691,7 +691,7 @@ let%expect_test "/mcp with only problems; the dialog closes with the session" =
     No MCP servers: configure them under "mcpServers" in ~/.prigh/mcp.json, or in a project's .mcp.json.
     Configuration problems
     /home/u/.prigh/mcp.json: expected an object "mcpServers"
-    ↑↓ move · Enter choose · Esc close
+    ↑↓ to move, Enter to choose, Esc to close
     |}];
   set_state h ~session:"s2" ();
   print_s [%sexp ((H.model h).dialog : Dialog.t option)];
@@ -718,7 +718,7 @@ let%expect_test "/help /skill: and /help mcp" =
     (Expire_toast (id 0) (after_ms 4000))
     (Save_history ("/help mcp" "/help skill:"))
     (Expire_toast (id 1) (after_ms 4000))
-    /skill:<name> [args] — send a skill's instructions to the agent, with your arguments
-    /mcp [reconnect] — MCP servers: their tools, approve a project's, or restart failed ones
+    /skill:<name> [args]: send a skill's instructions to the agent, with your arguments
+    /mcp [reconnect]: MCP servers: their tools, approve a project's, or restart failed ones
     |}]
 ;;

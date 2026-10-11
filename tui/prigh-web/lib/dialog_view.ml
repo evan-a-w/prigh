@@ -43,7 +43,7 @@ let picker ~kind (p : Picker.t) ~inject =
        | _ -> "picker-dialog")
     ~title:(Picker.title p)
     ~on_close:(inject Action.Close_dialog)
-    ~footer:[ keys_hint "↑↓ move · Enter choose · Esc close" ]
+    ~footer:[ keys_hint "↑↓ to move, Enter to choose, Esc to close" ]
     [ div
         ~cls:"search"
         [ icon Search
@@ -335,7 +335,7 @@ let login (m : App.Model.t) (flow : Login_flow.t) ~inject =
     | None, None ->
       ( div
           ~cls:"login-waiting"
-          [ Node.span ~attrs:[ Attr.class_ "spinner" ] []
+          [ Html.lamp ()
           ; Node.text "Waiting for the provider…"
           ]
       , [ button ~on_click:(inject Action.Close_dialog) [ Node.text "Cancel" ] ]
@@ -381,7 +381,7 @@ let auth (statuses : Auth_status.t list) ~inject =
                         (match s.custom, s.configured with
                          | Some c, configured ->
                            sprintf
-                             "custom · %s · %s · %s"
+                             "custom, %s, %s, %s"
                              c.base_url
                              c.api_label
                              (match configured with
@@ -475,7 +475,9 @@ let confirm (m : App.Model.t) ~inject =
                       | Deny -> key ^ " or Esc"
                       | Always | Deny_with_reason -> key)
                    ~on_click:(answer a)
-                   [ Node.kbd [ Node.text key ]; Node.text label ]))
+                   [ Node.kbd [ Node.text key ]
+                   ; Node.text (String.capitalize label)
+                   ]))
           ]
         , waiting
         , answer Deny )

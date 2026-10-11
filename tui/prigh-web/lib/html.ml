@@ -40,6 +40,14 @@ let button
     children
 ;;
 
+let lamp ?title () =
+  Node.span
+    ~attrs:
+      (Attr.class_ "lamp"
+       :: Option.value_map title ~default:[] ~f:(fun t -> [ Attr.title t ]))
+    []
+;;
+
 module Icon = struct
   type t =
     | Menu

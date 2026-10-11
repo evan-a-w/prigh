@@ -49,7 +49,7 @@ module Status = struct
 
   let icon t =
     match t with
-    | Preparing | Running -> Node.span ~attrs:[ Attr.class_ "spinner" ] []
+    | Preparing | Running -> Html.lamp ()
     | Done -> span "icon" "✓"
     | Failed -> span "icon" "✕"
     | Interrupted -> span "icon" "■"
@@ -82,14 +82,14 @@ let job_started text =
   id
 ;;
 
-(* Folded as the TUI folds them: a few lines of each output. *)
-let output ~fold ?(error = false) ?(head = 5) ?(tail = 0) text =
+(* A few lines of each output: the first, or the last of an error. *)
+let output ~fold ?(error = false) ?(lines = 6) text =
   if String.is_empty (String.strip text)
   then Node.none
-  else Output_view.view ~fold ~error ~head ~tail text
+  else Output_view.view ~fold ~error ~lines text
 ;;
 
-let live_tail = 5
+let live_tail = 6
 
 let live ~lines text =
   if String.is_empty (String.strip text)
@@ -98,7 +98,7 @@ let live ~lines text =
 ;;
 
 let error_output ~fold (r : Message.Tool_result.t) =
-  output ~fold ~error:true ~head:8 r.text
+  output ~fold ~error:true r.text
 ;;
 
 (* The subagent's latest step, for a running card. *)
@@ -157,7 +157,7 @@ let subagent_body ~nested ~fold (s : Chat.Subagent.t) =
     | Some { text; is_error = false } ->
       report (Subagent_report.of_string text).text
     | Some { text; is_error = true } ->
-      output ~fold ~error:true ~head:8 (Subagent_report.of_string text).text
+      output ~fold ~error:true (Subagent_report.of_string text).text
     | None -> Node.none
   in
   [ activity; result; transcript ]
@@ -235,7 +235,7 @@ let search_results (results : Tool_summary.Search_result.t list) =
     ~label:(plural (List.length results) "result")
     ~preview:
       (String.concat
-         ~sep:" · "
+         ~sep:"   "
          (List.map results ~f:(fun (r : Tool_summary.Search_result.t) ->
             r.title)))
     (Node.ol
@@ -345,7 +345,7 @@ let present
            else (
              match result with
              | None -> running_output ()
-             | Some r -> output ~fold ~error:r.is_error ~head:5 ~tail:3 text))
+             | Some r -> output ~fold ~error:r.is_error text))
         ]
     }
   | "read" ->
@@ -362,7 +362,7 @@ let present
       | Some { is_error = true; _ } -> [ error_body ]
       | Some { images = _ :: _ as images; text; _ } ->
         [ Image_view.thumbs images; span "caption" text ]
-      | Some { text; _ } -> [ output ~fold ~head:0 text ]
+      | Some { text; _ } -> [ output ~fold ~lines:0 text ]
     in
     { arg = Some (span "arg path" (str "path")); chips = range; body }
   | "write" ->
@@ -557,7 +557,7 @@ let present
         (match result, results with
          | None, _ -> []
          | Some { is_error = true; _ }, _ -> [ error_body ]
-         | Some { text; _ }, [] -> [ output ~fold ~head:8 text ]
+         | Some { text; _ }, [] -> [ output ~fold text ]
          | Some _, results -> [ search_results results ])
     }
   | "web_fetch" ->
@@ -583,8 +583,8 @@ let present
     ; body =
         (match result, fetched with
          | None, _ -> [ running_output () ]
-         | Some _, Some fetched -> [ output ~fold ~head:6 fetched.body ]
-         | Some r, None -> [ output ~fold ~error:r.is_error ~head:8 r.text ])
+         | Some _, Some fetched -> [ output ~fold fetched.body ]
+         | Some r, None -> [ output ~fold ~error:r.is_error r.text ])
     }
   | "job_input" ->
     { arg =
@@ -595,7 +595,7 @@ let present
     ; body =
         (match result with
          | None -> []
-         | Some r -> [ output ~fold ~error:r.is_error ~head:8 r.text ])
+         | Some r -> [ output ~fold ~error:r.is_error r.text ])
     }
   | "job_wait" | "job_kill" | "subagent_wait" | "subagent_cancel" ->
     let ids = Tool_args.strings args "ids" @ Tool_args.strings args "id" in
@@ -617,7 +617,7 @@ let present
        ; chips = []
        ; body =
            [ (match result with
-              | Some r -> output ~fold ~error:r.is_error ~head:8 r.text
+              | Some r -> output ~fold ~error:r.is_error r.text
               | None -> Node.none)
            ]
        }
@@ -640,7 +640,7 @@ let present
        ; body =
            [ output
                ~fold
-               ~head:12
+               ~lines:12
                (Option.value
                   (String.chop_prefix text ~prefix:"The user answered:\n")
                   ~default:text)

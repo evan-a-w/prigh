@@ -60,8 +60,6 @@ body.resizing-terminal .terminal-body { pointer-events: none; }
 .terminal-host .xterm { height: 100%; }
 .terminal-host .xterm-viewport, .terminal-host .xterm-rows, .terminal-host .xterm-screen {
   background-color: var(--well) !important;
-  scrollbar-width: thin;
-  scrollbar-color: var(--rule-2) transparent;
 }
 .terminal-waiting { color: var(--muted); font-size: 14px; padding: 10px 2px; }
 

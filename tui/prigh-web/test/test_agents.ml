@@ -152,7 +152,7 @@ let%expect_test "subagents start, nest and show in the panel, live" =
     (Rpc (method_ list_jobs) (params ()) (tag Jobs))
     Agents 2 agents running (Close (Alt+0))
     Subagents 2 running
-    (1 Survey the repository 0s a1 · deepseek-flash · 1 turn · 1 tool call subagent Count the modules · 0s) (2 Count the modules 0s a1/n1 · deepseek-flash · 1 turn · 1 tool call bash ls lib | wc -l · 0s)
+    (1 Survey the repository 0s a1  deepseek-flash  1 turn  1 tool call subagent Count the modules (0s)) (2 Count the modules 0s a1/n1  deepseek-flash  1 turn  1 tool call bash ls lib | wc -l (0s))
     |}];
   (* The clock ticks while something runs. *)
   print_s [%sexp (App.Model.ticking (H.model h) : bool)];
@@ -161,7 +161,7 @@ let%expect_test "subagents start, nest and show in the panel, live" =
   [%expect
     {|
     true
-    (2 Count the modules 1m 15s a1/n1 · deepseek-flash · 1 turn · 1 tool call bash ls lib | wc -l · 1m 15s)
+    (2 Count the modules 1m 15s a1/n1  deepseek-flash  1 turn  1 tool call bash ls lib | wc -l (1m 15s))
     |}];
   (* The backend's record has the real start times. *)
   H.reply
@@ -178,7 +178,7 @@ let%expect_test "subagents start, nest and show in the panel, live" =
   [%expect
     {|
     Subagents 2 running
-    (1 Survey the repository 1m 45s a1 · deepseek-flash · 1 turn · 1 tool call subagent Count the modules · 1m 15s) (2 Count the modules 1m 14s a1/n1 · deepseek-flash · 1 turn · 1 tool call bash ls lib | wc -l · 1m 13s)
+    (1 Survey the repository 1m 45s a1  deepseek-flash  1 turn  1 tool call subagent Count the modules (1m 15s)) (2 Count the modules 1m 14s a1/n1  deepseek-flash  1 turn  1 tool call bash ls lib | wc -l (1m 13s))
     |}];
   (* The nested one finishes, then a1 (whose report is delivered), and a
      second one fails. *)
@@ -227,7 +227,7 @@ let%expect_test "subagents start, nest and show in the panel, live" =
     (Rpc (method_ list_subagents) (params ()) (tag Subagents))
     Agents (Close (Alt+0))
     Subagents 3
-    (1 ✓ Survey the repository 1m 45s a1 · deepseek-flash · 2 turns · 1 tool call · $0.01 Survey) (2 ✓ Count the modules 1m 14s a1/n1 · deepseek-flash · 2 turns · 1 tool call · $0.01 There are 42 modules.) (3 ✕ Draft the docs 0s a2 · deepseek-flash · 1 turn · $0.01 subagent failed: rate limited (429))
+    (1 ✓ Survey the repository 1m 45s a1  deepseek-flash  2 turns  1 tool call  $0.01 Survey) (2 ✓ Count the modules 1m 14s a1/n1  deepseek-flash  2 turns  1 tool call  $0.01 There are 42 modules.) (3 ✕ Draft the docs 0s a2  deepseek-flash  1 turn  $0.01 subagent failed: rate limited (429))
     (3 agents)
     false
     |}]
@@ -247,7 +247,7 @@ let%expect_test "a subagent in full: its transcript, cancelling it, its card" =
     (All agents (Esc)) Subagent a1/n1 2 agents running (Close (Alt+0))
     (Survey the repository) › Count the modules
     Count the modules
-    running 0s a1/n1 deepseek-flash 1 turn 1 tool call
+    Running 0s a1/n1 deepseek-flash 1 turn 1 tool call
     (Cancel) (Show in chat)
     Count the modules
     bash ls lib | wc -l
@@ -287,7 +287,7 @@ let%expect_test "a subagent in full: its transcript, cancelling it, its card" =
   [%expect
     {|
     Its subagents 1
-    (Count the modules 0s a1/n1 · deepseek-flash · 1 turn · 1 tool call bash ls lib | wc -l · 0s)
+    (Count the modules 0s a1/n1  deepseek-flash  1 turn  1 tool call bash ls lib | wc -l (0s))
     Agents_back
     ()
     (Cycle_agent 1)
@@ -322,7 +322,7 @@ let%expect_test "a subagent in full: its transcript, cancelling it, its card" =
     (Rpc (method_ list_subagents) (params ()) (tag Subagents))
     (Survey the repository) › Count the modules
     ✕ Count the modules
-    failed 0s a1/n1 deepseek-flash 1 turn 1 tool call $0.01
+    Failed 0s a1/n1 deepseek-flash 1 turn 1 tool call $0.01
     (Show in chat)
     Count the modules
     ✓ bash ls lib | wc -l cancelled
@@ -492,11 +492,11 @@ let%expect_test
     (Rpc (method_ list_subagents) (params ()) (tag Subagents))
     (Rpc (method_ list_jobs) (params ()) (tag Jobs))
     Subagents 1 running
-    (1 Draft the docs 0s a2 · deepseek-flash starting…) (2 ✓ Survey the repository 0s a1 · deepseek-flash · 2 turns · 1 tool call · $0.01 done) (3 ✓ Count the modules 0s a1/n1 · deepseek-flash · 1 turn · 1 tool call · $0.01 42)
+    (1 Draft the docs 0s a2  deepseek-flash starting…) (2 ✓ Survey the repository 0s a1  deepseek-flash  2 turns  1 tool call  $0.01 done) (3 ✓ Count the modules 0s a1/n1  deepseek-flash  1 turn  1 tool call  $0.01 42)
     Jobs 1
-    (4 ✓ sleep 1 1s j1 · exited 0)
+    (4 ✓ sleep 1 1s j1  exited 0)
     Earlier (1)
-    (✓ old 1s j0 · exited 0)
+    (✓ old 1s j0  exited 0)
     |}];
   (* a2 still runs: it stays. *)
   H.type_ h "next";
@@ -509,11 +509,11 @@ let%expect_test
     (Rpc (method_ prompt) (params ((text next)))
      (tag (Sent (text next) (images ()))))
     Subagents 1 running
-    (1 Draft the docs 0s a2 · deepseek-flash starting…)
+    (1 Draft the docs 0s a2  deepseek-flash starting…)
     Earlier (4)
-    (✓ Survey the repository 0s a1 · deepseek-flash · 2 turns · 1 tool call · $0.01 done) (✓ Count the modules 0s a1/n1 · deepseek-flash · 1 turn · 1 tool call · $0.01 42)
-    (✓ sleep 1 1s j1 · exited 0)
-    (✓ old 1s j0 · exited 0)
+    (✓ Survey the repository 0s a1  deepseek-flash  2 turns  1 tool call  $0.01 done) (✓ Count the modules 0s a1/n1  deepseek-flash  1 turn  1 tool call  $0.01 42)
+    (✓ sleep 1 1s j1  exited 0)
+    (✓ old 1s j0  exited 0)
     |}];
   H.act h (Select_item (Agent "a2"));
   H.event
@@ -579,7 +579,7 @@ let%expect_test "after a reload, a nested subagent's transcript is fetched" =
     Loading the transcript…
     (Survey the repository) › Count the modules
     ✓ Count the modules
-    complete 30s a1/n1 deepseek-flash 2 turns 1 tool call
+    Complete 30s a1/n1 deepseek-flash 2 turns 1 tool call
     (Show in chat)
     Count the modules
     42 modules

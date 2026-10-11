@@ -90,7 +90,7 @@ let view (questions : Question_dialog.t list) ~inject =
         [ span
             ~cls:"keys-hint"
             (String.concat
-               ~sep:" · "
+               ~sep:", "
                ([ hint; "↑↓ choose"; "Enter accepts"; "Esc declines" ]
                 @
                 match rest with

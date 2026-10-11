@@ -213,6 +213,7 @@ module Action = struct
         ; archived : bool
         }
     | Set_session_query of string
+    | Toggle_archived
     | Open_sessions
     | Session_nav of
         { from : string option
@@ -331,6 +332,7 @@ module Model = struct
     ; sidebar_open : bool
     ; scrolled_up : bool
     ; session_query : string
+    ; archived_open : bool
     ; agents : Agents.t
     ; verbosity : Prigh_ui.Verbosity.t
     ; folds : String.Set.t
@@ -415,6 +417,7 @@ let init =
   ; sidebar_open = true
   ; scrolled_up = false
   ; session_query = ""
+  ; archived_open = false
   ; agents = Agents.empty
   ; verbosity = Normal
   ; folds = String.Set.empty
@@ -611,10 +614,10 @@ let model_picker ?(query = "") (m : Model.t) =
         ~id:model.key
         ~detail:
           (sprintf
-             "%s · %s ctx%s"
+             "%s, %s ctx%s"
              model.provider
              (compact_tokens model.context_window)
-             (if usable model then "" else " · not logged in"))
+             (if usable model then "" else ", not logged in"))
         ~search:(model.name ^ " " ^ model.provider ^ " " ^ model.key)
         ~marked:(Option.equal String.equal current (Some model.key))
         ~dimmed:(not (usable model))
@@ -649,7 +652,7 @@ let thinking_picker (m : Model.t) =
 ;;
 
 let custom_detail (c : Auth_status.Custom.t) =
-  sprintf "custom · %s · %s" c.base_url c.api_label
+  sprintf "custom, %s, %s" c.base_url c.api_label
 ;;
 
 let key_source (s : Auth_status.t) =
@@ -682,14 +685,14 @@ let login_picker (statuses : Auth_status.t list) =
         | Some c ->
           Picker.Item.create
             ~id:(s.provider ^ " " ^ meth.method_)
-            ~detail:(custom_detail c ^ " · edit")
+            ~detail:(custom_detail c ^ ", edit")
             ~search:(String.concat ~sep:" " [ s.name; "custom"; c.base_url ])
             s.name
         | None ->
           let configured =
             match s.configured with
             | Some c when String.equal c.method_ meth.method_ ->
-              sprintf " · logged in via %s" c.source
+              sprintf ", logged in via %s" c.source
             | _ -> ""
           in
           Picker.Item.create
@@ -714,7 +717,7 @@ let logout_picker (statuses : Auth_status.t list) =
         ~id:s.provider
         ~detail:
           (match s.custom with
-           | Some custom -> custom_detail custom ^ " · " ^ key_source s
+           | Some custom -> custom_detail custom ^ ", " ^ key_source s
            | None -> sprintf "%s via %s" c.method_ c.source)
         ~search:(s.name ^ " " ^ s.provider)
         s.name))
@@ -877,9 +880,15 @@ let switch_session (m : Model.t) path =
 ;;
 
 (* The sidebar's sessions in the order it shows them: active, then archived. *)
+let shown_sessions (m : Model.t) =
+  Session_list.shown
+    m.sessions
+    ~query:m.session_query
+    ~archived_open:m.archived_open
+;;
+
 let session_order (m : Model.t) =
-  let active, archived = Session_list.sections m.sessions ~query:m.session_query in
-  List.map (active @ archived) ~f:(fun (s : Session_summary.t) -> s.path)
+  List.map (shown_sessions m) ~f:(fun (s : Session_summary.t) -> s.path)
 ;;
 
 let find_session_by_path (m : Model.t) path =
@@ -961,11 +970,7 @@ let starting (m : Model.t) =
 (* The keyboard through the sidebar's (filtered) sessions: down from the
    search to the first, up from the first back to the search. *)
 let session_nav (m : Model.t) ~from ~by =
-  let ids =
-    List.map
-      (Session_list.filter m.sessions ~query:m.session_query)
-      ~f:(fun s -> s.id)
-  in
+  let ids = List.map (shown_sessions m) ~f:(fun s -> s.id) in
   let index =
     match from with
     | None -> -1
@@ -1341,7 +1346,7 @@ let set_confirm (m : Model.t) enabled =
 ;;
 
 let mode_text (mode : Session_mode.t) =
-  sprintf "Mode: %s — %s" (Session_mode.label mode) (Session_mode.describe mode)
+  sprintf "Mode: %s (%s)" (Session_mode.label mode) (Session_mode.describe mode)
 ;;
 
 (* Shown at once; [set_mode]'s reply is the backend's state. *)
@@ -1826,7 +1831,7 @@ let prompt_succeeded (m : Model.t) =
 let help_command (m : Model.t) name =
   let name = String.chop_prefix_if_exists name ~prefix:"/" in
   match Slash.find name with
-  | Some spec -> toast m (sprintf "%s — %s" (Slash.Spec.usage spec) spec.help)
+  | Some spec -> toast m (sprintf "%s: %s" (Slash.Spec.usage spec) spec.help)
   | None ->
     error
       m
@@ -2518,7 +2523,9 @@ let answer_confirm (m : Model.t) ~call_id ~agent_id answer ~reason =
   | None -> m, []
   | Some c ->
     let m, focus = remove_confirm m ~call_id ~agent_id in
-    let m, toast_cmds = toast m (Confirm_prompt.acknowledgement c answer) in
+    let m, toast_cmds =
+      toast m (String.capitalize (Confirm_prompt.acknowledgement c answer))
+    in
     ( m
     , [ rpc "tool_confirm_respond" (Confirm_prompt.params c answer ~reason) ]
       @ focus
@@ -3561,10 +3568,11 @@ let update (m : Model.t) (action : Action.t) =
      | Some s -> set_archived m s ~archived
      | None -> m, [])
   | Set_session_query session_query -> { m with session_query }, []
+  | Toggle_archived -> { m with archived_open = not m.archived_open }, []
   | Open_sessions -> open_sessions m
   | Session_nav { from; by } -> session_nav m ~from ~by
   | Open_first_session ->
-    (match Session_list.filter m.sessions ~query:m.session_query with
+    (match shown_sessions m with
      | [] -> m, []
      | first :: _ -> switch_session m first.path)
   | Leave_sidebar ->

@@ -53,7 +53,7 @@ let live ~lines ~tail text =
   let shown = tail_lines (trim text) tail in
   let hidden = Int.max 0 (total - count_lines shown) in
   Chat_html.div
-    "output live"
+    (if hidden > 0 then "output live clipped from-end" else "output live")
     [ (if hidden > 0
        then note "earlier" (Chat_html.plural hidden "earlier line")
        else Node.none)
@@ -61,28 +61,24 @@ let live ~lines ~tail text =
     ]
 ;;
 
-let view ?(error = false) ~fold:(fold, key) ~head ~tail text =
+let view ?(error = false) ?(from_end = error) ~fold:(fold, key) ~lines text =
   let text = trim text in
   let total = count_lines text in
-  let body, expanded =
-    if total <= head + tail + 1
-    then [ pre text ], false
+  let classes, body =
+    if total <= lines + 1
+    then [], [ pre text ]
     else if Fold.expanded fold key
-    then [ pre text; Fold.button fold key ~total ~shown:(head + tail) ], true
+    then [ "expanded" ], [ pre text; Fold.button fold key ~total ~shown:lines ]
     else
-      ( [ pre (head_lines text head)
-        ; Fold.button fold key ~total ~shown:(head + tail)
-        ; pre (tail_lines text tail)
-        ]
-      , false )
+      ( [ "clipped"; (if from_end then "from-end" else "from-start") ]
+      , [ pre
+            (if from_end then tail_lines text lines else head_lines text lines)
+        ; Fold.button fold key ~total ~shown:lines
+        ] )
   in
   Chat_html.div
     (String.concat
        ~sep:" "
-       (List.filter_opt
-          [ Some "output"
-          ; Option.some_if error "error"
-          ; Option.some_if expanded "expanded"
-          ]))
+       ("output" :: ((if error then [ "error" ] else []) @ classes)))
     body
 ;;

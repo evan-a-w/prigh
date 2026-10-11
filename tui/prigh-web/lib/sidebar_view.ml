@@ -38,33 +38,33 @@ let session (m : App.Model.t) ~inject ~current (s : Session_summary.t) =
         [ Attr.class_ ("btn icon ghost " ^ cls)
         ; Attr.type_ "button"
         ; Attr.title title
+        ; Attr.create "aria-label" title
         ; Attr.on_click (fun ev ->
             Js_of_ocaml.Dom_html.stopPropagation ev;
             effect)
         ]
       [ icon i ]
   in
-  let status =
+  (* The lamp: work in progress here (its turn, or only its subagents and
+     jobs), or the row being opened. Archived sessions never run. *)
+  let mark =
     if loading
-    then Node.span ~attrs:[ Attr.class_ "spinner"; Attr.title "opening…" ] []
+    then lamp ~title:"Opening…" ()
     else if running
     then
-      span
-        ~cls:"dot running"
-        ~attrs:
-          [ Attr.title
-              (if s.background > 0 && not (selected && App.Model.running m)
-               then
-                 sprintf
-                   "running: %d subagent%s or job%s in the background"
-                   s.background
-                   (if s.background = 1 then "" else "s")
-                   (if s.background = 1 then "" else "s")
-               else "running")
-          ]
-        ""
-    else if s.live
-    then span ~cls:"dot live" ~attrs:[ Attr.title "open in the backend" ] ""
+      lamp
+        ~title:
+          (if s.background > 0 && not (selected && App.Model.running m)
+           then
+             sprintf
+               "Running: %d subagent%s or job%s in the background"
+               s.background
+               (if s.background = 1 then "" else "s")
+               (if s.background = 1 then "" else "s")
+           else "Running")
+        ()
+    else if s.live && not s.archived
+    then span ~cls:"live" ~attrs:[ Attr.title "Open in the backend" ] ""
     else Node.none
   in
   Node.div
@@ -91,93 +91,64 @@ let session (m : App.Model.t) ~inject ~current (s : Session_summary.t) =
           else inject (Action.Switch_session s.path))
       ; Attr.title s.path
       ]
-    [ div
-        ~cls:"session-top"
-        [ (if selecting
-           then
-             Node.span
-               ~attrs:[ classes [ "check" ] [ "on", marked ] ]
-               [ (if marked then icon Check else Node.none) ]
-           else status)
-        ; span ~cls:"session-title" (Session_list.title s)
-        ; (if s.background > 0
-           then
-             span
-               ~cls:"session-bg"
-               ~attrs:[ Attr.title "subagents and jobs running in the background" ]
-               (sprintf "%d bg" s.background)
-           else Node.none)
-        ; span ~cls:"session-age" (age m s)
-        ]
+    [ (if selecting
+       then
+         Node.span
+           ~attrs:[ classes [ "check" ] [ "on", marked ] ]
+           [ (if marked then icon Check else Node.none) ]
+       else Node.none)
+    ; div ~cls:"session-mark" [ mark ]
     ; div
-        ~cls:"session-meta"
-        [ span ~cls:"session-cwd" (home_relative s.cwd)
-        ; span
-            ~cls:"session-count"
-            (sprintf
-               "%d msg%s"
-               s.message_count
-               (if s.message_count = 1 then "" else "s"))
-        ; (if selecting
-           then span ~cls:"session-size" (Session_summary.size_string s.bytes)
-           else Node.none)
-        ; (if selecting
-           then Node.none
-           else
-             Node.span
-               ~attrs:[ Attr.class_ "session-actions" ]
-               [ (if s.archived
-                  then
-                    action
-                      ~cls:"unarchive"
-                      ~title:"Unarchive (A)"
-                      ~icon:Unarchive
-                      (inject (Action.Set_archived { path = s.path; archived = false }))
-                  else
-                    action
-                      ~cls:"archive"
-                      ~title:"Archive (A)"
-                      ~icon:Archive
-                      (inject (Action.Set_archived { path = s.path; archived = true })))
-               ; action
-                   ~cls:"delete"
-                   ~title:"Delete session (Delete)"
-                   ~icon:Trash
-                   (inject (Action.Ask_delete s.path))
-               ])
+        ~cls:"session-main"
+        [ span ~cls:"session-title" (Session_list.title s)
+        ; div
+            ~cls:"session-meta"
+            [ span ~cls:"session-age" (age m s)
+            ; span ~cls:"session-cwd" (home_relative s.cwd)
+            ; (if selecting
+               then span ~cls:"session-size" (Session_summary.size_string s.bytes)
+               else Node.none)
+            ]
         ]
+    ; (if selecting
+       then Node.none
+       else
+         Node.span
+           ~attrs:[ Attr.class_ "session-actions" ]
+           [ (if s.archived
+              then
+                action
+                  ~cls:"unarchive"
+                  ~title:"Unarchive (A)"
+                  ~icon:Unarchive
+                  (inject (Action.Set_archived { path = s.path; archived = false }))
+              else
+                action
+                  ~cls:"archive"
+                  ~title:"Archive (A)"
+                  ~icon:Archive
+                  (inject (Action.Set_archived { path = s.path; archived = true })))
+           ; action
+               ~cls:"delete"
+               ~title:"Delete session (Delete)"
+               ~icon:Trash
+               (inject (Action.Ask_delete s.path))
+           ])
     ]
 ;;
 
-(* Above the list: how to select several sessions, or what is selected. *)
+(* Above the list: its name and how to select several sessions, or how
+   selecting works. *)
 let toolbar (m : App.Model.t) ~inject =
   if m.marks.selecting
-  then (
-    let marked = Session_marks.marked m.marks m.sessions in
-    let count = List.length marked in
+  then
     div
       ~cls:"sessions-toolbar selecting"
-      [ span
-          ~cls:"selection-count"
-          (if count = 0
-           then "Click sessions to select"
-           else
-             sprintf
-               "%d selected · %s"
-               count
-               (Session_summary.size_string (Session_summary.total_bytes marked)))
-      ; button
-          ~cls:"small danger"
-          ~title:"Delete the selected sessions (Delete)"
-          ~disabled:(count = 0)
-          ~on_click:(inject Action.Delete_marked)
-          [ Node.text "Delete" ]
-      ; button
-          ~cls:"small ghost"
-          ~title:"Stop selecting (Esc)"
-          ~on_click:(inject (Action.Select_sessions false))
-          [ Node.text "Done" ]
-      ])
+      [ span ~cls:"sessions-label" "Select sessions"
+      ; Node.span
+          ~attrs:[ Attr.class_ "sessions-hint" ]
+          [ Node.kbd [ Node.text "Shift" ]; Node.text " for a range" ]
+      ]
   else
     div
       ~cls:"sessions-toolbar"
@@ -190,24 +161,64 @@ let toolbar (m : App.Model.t) ~inject =
       ]
 ;;
 
-let archived_divider (m : App.Model.t) ~inject archived =
+(* Selecting: what deleting would remove, at the foot of the list. *)
+let selection_bar (m : App.Model.t) ~inject =
+  let marked = Session_marks.marked m.marks m.sessions in
+  let count = List.length marked in
   div
-    ~cls:"sessions-divider"
-    [ span
-        ~cls:"divider-label"
-        (sprintf
-           "Archived · %d · %s"
-           (List.length archived)
-           (Session_summary.size_string (Session_summary.total_bytes archived)))
-    ; (if m.marks.selecting
-       then Node.none
-       else
-         button
-           ~cls:"small ghost danger-text"
-           ~title:"Delete every archived session (/delete-archived)"
-           ~on_click:(inject Action.Ask_delete_archived)
-           [ Node.text "Delete all" ])
+    ~cls:"selection-bar"
+    [ button
+        ~cls:"small ghost"
+        ~title:"Stop selecting (Esc)"
+        ~on_click:(inject (Action.Select_sessions false))
+        [ Node.text "Cancel" ]
+    ; button
+        ~cls:"small danger"
+        ~title:"Delete the selected sessions (Delete)"
+        ~disabled:(count = 0)
+        ~on_click:(inject Action.Delete_marked)
+        [ Node.text
+            (if count = 0
+             then "Delete sessions"
+             else
+               sprintf
+                 "Delete %s (%s)"
+                 (if count = 1 then "1 session" else sprintf "%d sessions" count)
+                 (Session_summary.size_string (Session_summary.total_bytes marked)))
+        ]
     ]
+;;
+
+(* A faint rule with the count, folding the archived sessions away. *)
+let archived_divider ~inject ~shown archived =
+  Node.button
+    ~attrs:
+      [ Attr.class_ "sessions-divider"
+      ; Attr.type_ "button"
+      ; Attr.create "aria-expanded" (Bool.to_string shown)
+      ; Attr.title
+          (if shown then "Hide the archived sessions" else "Show the archived sessions")
+      ; Attr.on_click (fun _ -> inject Action.Toggle_archived)
+      ]
+    [ span ~cls:"divider-label" "Archived"
+    ; span ~cls:"divider-count" (Int.to_string (List.length archived))
+    ; Node.span ~attrs:[ Attr.class_ "divider-rule" ] []
+    ; Node.span ~attrs:[ Attr.class_ "chev" ] []
+    ]
+;;
+
+let delete_archived ~inject archived =
+  Node.button
+    ~attrs:
+      [ Attr.class_ "delete-archived"
+      ; Attr.type_ "button"
+      ; Attr.title
+          (sprintf
+             "Delete every archived session, %s (/delete-archived)"
+             (Session_summary.size_string (Session_summary.total_bytes archived)))
+      ; Attr.on_click (fun _ -> inject Action.Ask_delete_archived)
+      ]
+    [ Node.text "Delete archived" ]
 ;;
 
 let user_footer (m : App.Model.t) ~inject =
@@ -262,9 +273,7 @@ let view (m : App.Model.t) ~inject =
            ~title:"Starting a session…"
            ~disabled:true
            ~on_click:Effect.Ignore
-           [ Node.span ~attrs:[ Attr.class_ "spinner" ] []
-           ; Node.text "Starting…"
-           ]
+           [ lamp (); Node.text "Starting…" ]
        | Some (Switching _) | None ->
          button
            ~cls:"new-session"
@@ -278,7 +287,7 @@ let view (m : App.Model.t) ~inject =
             ~attrs:
               [ Attr.id "session-search"
               ; Attr.type_ "search"
-              ; Attr.placeholder "Search sessions  (Ctrl+K)"
+              ; Attr.placeholder "Search sessions (Ctrl+K)"
               ; Attr.value m.session_query
               ; Attr.create "autocomplete" "off"
               ; Attr.on_input (fun _ text ->
@@ -293,7 +302,10 @@ let view (m : App.Model.t) ~inject =
         ~cls:"sessions"
         (match sessions, m.sessions with
          | [], [] ->
-           [ div ~cls:"sessions-empty" [ Node.text "No saved sessions yet." ] ]
+           [ div
+               ~cls:"sessions-empty"
+               [ Node.text "No sessions yet: send a message to start one." ]
+           ]
          | [], _ ->
            [ div
                ~cls:"sessions-empty"
@@ -303,12 +315,27 @@ let view (m : App.Model.t) ~inject =
            let active, archived =
              Session_list.sections m.sessions ~query:m.session_query
            in
+           let shown =
+             Session_list.archived_shown
+               ~query:m.session_query
+               ~archived_open:m.archived_open
+           in
            List.map active ~f:(session m ~inject ~current)
-           @ (match archived with
-              | [] -> []
-              | archived ->
-                archived_divider m ~inject archived
-                :: List.map archived ~f:(session m ~inject ~current)))
+           @
+           (match archived with
+            | [] -> []
+            | archived ->
+              archived_divider ~inject ~shown archived
+              ::
+              (if shown
+               then
+                 List.map archived ~f:(session m ~inject ~current)
+                 @
+                 if m.marks.selecting
+                 then []
+                 else [ delete_archived ~inject archived ]
+               else [])))
+    ; (if m.marks.selecting then selection_bar m ~inject else Node.none)
     ; user_footer m ~inject
     ]
 ;;

@@ -47,7 +47,7 @@ let picker ?query skills =
                ~id:s.name
                ~detail:
                  (String.concat
-                    ~sep:" · "
+                    ~sep:", "
                     ([ s.description; Filename.dirname s.path ]
                      @
                      if s.model_invocable then [] else [ "only you invoke it" ]

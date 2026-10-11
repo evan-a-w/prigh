@@ -131,11 +131,7 @@ let background (m : App.Model.t) ~inject =
         ; Attr.title "Subagents and jobs (/agents)"
         ; Attr.on_click (fun _ -> inject (Action.Open_subagents None))
         ]
-      [ (if running
-         then Node.span ~attrs:[ Attr.class_ "spinner" ] []
-         else icon Bot)
-      ; Node.text text
-      ]
+      [ (if running then Html.lamp () else icon Bot); Node.text text ]
 ;;
 
 let host (state : State.t) =
@@ -222,9 +218,7 @@ let modes (m : App.Model.t) ~inject =
   ]
 ;;
 
-let waiting cls text =
-  item ~cls [ Node.span ~attrs:[ Attr.class_ "spinner" ] []; Node.text text ]
-;;
+let waiting cls text = item ~cls [ Html.lamp (); Node.text text ]
 
 let view (m : App.Model.t) ~inject =
   match m.state, m.connection with
@@ -238,12 +232,7 @@ let view (m : App.Model.t) ~inject =
       [ (if m.pending.sending > 0 && not state.running
          then waiting "running" "Sending…"
          else if state.running
-         then
-           item
-             ~cls:"running"
-             [ Node.span ~attrs:[ Attr.class_ "spinner" ] []
-             ; Node.text "Working"
-             ]
+         then item ~cls:"running" [ Html.lamp (); Node.text "Working" ]
          else
            item
              ~cls:"idle"

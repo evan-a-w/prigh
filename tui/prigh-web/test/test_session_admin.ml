@@ -30,7 +30,8 @@ let sessions =
 
 let sidebar h =
   H.text h ~selector:".sidebar .sessions-toolbar";
-  H.text h ~selector:".sidebar .sessions"
+  H.text h ~selector:".sidebar .sessions";
+  H.text h ~selector:".sidebar .selection-bar"
 ;;
 
 let%expect_test "active sessions first, then the archived ones under a divider" =
@@ -39,17 +40,16 @@ let%expect_test "active sessions first, then the archived ones under a divider" 
   [%expect
     {|
     Sessions (Select)
-    fix the parser bug 2m ago
-    /work 4 msgs (Archive (A)) (Delete session (Delete))
-    Release notes 2 bg 2m ago
-    /work 4 msgs (Archive (A)) (Delete session (Delete))
-    Open elsewhere 2m ago
-    /work 4 msgs (Archive (A)) (Delete session (Delete))
-    Archived · 2 · 1.4 MB (Delete all)
-    Old lexer 2m ago
-    /work 4 msgs (Unarchive (A)) (Delete session (Delete))
-    Older docs 2m ago
-    /work 4 msgs (Unarchive (A)) (Delete session (Delete))
+    fix the parser bug
+    2m ago /work
+    (Archive (A)) (Delete session (Delete))
+    Release notes
+    2m ago /work
+    (Archive (A)) (Delete session (Delete))
+    Open elsewhere
+    2m ago /work
+    (Archive (A)) (Delete session (Delete))
+    (Archived 2)
     |}];
   H.elements h ~selector:".session";
   [%expect
@@ -57,17 +57,87 @@ let%expect_test "active sessions first, then the archived ones under a divider" 
     <div class="selected session">
     <div class="running session">
     <div class="session">
-    <div class="archived session">
-    <div class="archived session">
     |}];
   (* A session whose turn has ended but whose background work runs is
      running. *)
-  H.elements h ~selector:".session .dot";
-  [%expect
-    {|
-    <span class="dot live">
-    <span class="dot running">
-    <span class="dot live">
+  H.elements h ~selector:".session-mark > *";
+  [%expect {|
+    <span class="live">
+    <span class="lamp">
+    <span class="live">
+    |}];
+  (* The archived sessions are folded under their divider: a click unfolds
+     them (ending with a way to delete them all) and the keyboard reaches
+     them; folded, it skips them. *)
+  H.show h ~selector:".sessions-divider";
+  H.act h Toggle_archived;
+  sidebar h;
+  H.elements h ~selector:".sessions-divider[aria-expanded=true]";
+  H.elements h ~selector:".session.archived .lamp";
+  H.elements h ~selector:".session.archived .live";
+  [%expect {|
+    <button type="button"
+            aria-expanded="false"
+            title="Show the archived sessions"
+            class="sessions-divider"
+            @on_click>
+      <span class="divider-label"> Archived </span>
+      <span class="divider-count"> 2 </span>
+      <span class="divider-rule"> </span>
+      <span class="chev"> </span>
+    </button>
+    Sessions (Select)
+    fix the parser bug
+    2m ago /work
+    (Archive (A)) (Delete session (Delete))
+    Release notes
+    2m ago /work
+    (Archive (A)) (Delete session (Delete))
+    Open elsewhere
+    2m ago /work
+    (Archive (A)) (Delete session (Delete))
+    (Archived 2)
+    Old lexer
+    2m ago /work
+    (Unarchive (A)) (Delete session (Delete))
+    Older docs
+    2m ago /work
+    (Unarchive (A)) (Delete session (Delete))
+    (Delete archived)
+    <button class="sessions-divider">
+    |}];
+  H.key h "ArrowDown" ~target:(Session "s3");
+  H.act h Toggle_archived;
+  H.key h "ArrowDown" ~target:(Session "s3");
+  H.text h ~selector:".sessions";
+  [%expect {|
+    (Session_nav (from (s3)) (by 1))
+    (Focus session-s4)
+    (Session_nav (from (s3)) (by 1))
+    (Focus session-s3)
+    fix the parser bug
+    2m ago /work
+    (Archive (A)) (Delete session (Delete))
+    Release notes
+    2m ago /work
+    (Archive (A)) (Delete session (Delete))
+    Open elsewhere
+    2m ago /work
+    (Archive (A)) (Delete session (Delete))
+    (Archived 2)
+    |}];
+  (* A search shows the archived sessions that match, folded or not. *)
+  H.act h (Set_session_query "old");
+  H.text h ~selector:".sessions";
+  [%expect {|
+    (Archived 2)
+    Old lexer
+    2m ago /work
+    (Unarchive (A)) (Delete session (Delete))
+    Older docs
+    2m ago /work
+    (Unarchive (A)) (Delete session (Delete))
+    (Delete archived)
     |}]
 ;;
 
@@ -80,33 +150,33 @@ let%expect_test "the current session is active while its subagents or jobs run" 
     [ ( "subagents"
       , Jsonaf.of_string {|[{"id":"a1","task":"survey","running":true}]|} )
     ];
-  H.elements h ~selector:"#session-s1 .dot";
+  H.elements h ~selector:"#session-s1 .session-mark > *";
   [%expect
     {|
     (Rpc (method_ list_subagents) (params ()) (tag Subagents))
-    <span class="dot running">
+    <span class="lamp">
     |}];
   state
     [ ( "subagents"
       , Jsonaf.of_string {|[{"id":"a1","task":"survey","running":false}]|} )
     ];
-  H.elements h ~selector:"#session-s1 .dot";
+  H.elements h ~selector:"#session-s1 .session-mark > *";
   [%expect
     {|
     (Rpc (method_ list_subagents) (params ()) (tag Subagents))
-    <span class="dot live">
+    <span class="live">
     |}];
   state
     [ ( "jobs"
       , Jsonaf.of_string
           {|[{"id":"j1","command":"make","running":true,"exit":null}]|} )
     ];
-  H.elements h ~selector:"#session-s1 .dot";
+  H.elements h ~selector:"#session-s1 .session-mark > *";
   [%expect
     {|
     (Rpc (method_ list_subagents) (params ()) (tag Subagents))
     (Rpc (method_ list_jobs) (params ()) (tag Jobs))
-    <span class="dot running">
+    <span class="lamp">
     |}]
 ;;
 
@@ -133,17 +203,13 @@ let%expect_test "archiving and unarchiving: at once, and back if refused" =
   [%expect
     {|
     Sessions (Select)
-    Release notes 2 bg 2m ago
-    /work 4 msgs (Archive (A)) (Delete session (Delete))
-    Open elsewhere 2m ago
-    /work 4 msgs (Archive (A)) (Delete session (Delete))
-    Archived · 3 · 1.4 MB (Delete all)
-    fix the parser bug 2m ago
-    /work 4 msgs (Unarchive (A)) (Delete session (Delete))
-    Old lexer 2m ago
-    /work 4 msgs (Unarchive (A)) (Delete session (Delete))
-    Older docs 2m ago
-    /work 4 msgs (Unarchive (A)) (Delete session (Delete))
+    Release notes
+    2m ago /work
+    (Archive (A)) (Delete session (Delete))
+    Open elsewhere
+    2m ago /work
+    (Archive (A)) (Delete session (Delete))
+    (Archived 3)
     |}];
   H.reply h "set_archived" "{}";
   H.text h ~selector:".toast";
@@ -228,37 +294,39 @@ let%expect_test "/archive and /unarchive: this session, or one by name or id" =
 
 let%expect_test "selecting sessions: click, shift-click a range, delete them" =
   let h = H.create ~sessions () in
+  H.act h Toggle_archived;
   H.act h (Select_sessions true);
   sidebar h;
   [%expect
     {|
-    Click sessions to select (Delete) (Done)
-    fix the parser bug 2m ago
-    /work 4 msgs 3.9 KB
-    Release notes 2 bg 2m ago
-    /work 4 msgs 11.7 KB
-    Open elsewhere 2m ago
-    /work 4 msgs 2.9 KB
-    Archived · 2 · 1.4 MB
-    Old lexer 2m ago
-    /work 4 msgs 195.3 KB
-    Older docs 2m ago
-    /work 4 msgs 1.2 MB
+    Select sessions Shift for a range
+    fix the parser bug
+    2m ago /work 3.9 KB
+    Release notes
+    2m ago /work 11.7 KB
+    Open elsewhere
+    2m ago /work 2.9 KB
+    (Archived 2)
+    Old lexer
+    2m ago /work 195.3 KB
+    Older docs
+    2m ago /work 1.2 MB
+    (Cancel) (Delete sessions)
     |}];
-  H.elements h ~selector:".sessions-toolbar button[disabled]";
+  H.elements h ~selector:".selection-bar button[disabled]";
   [%expect {| <button class="btn danger small"> |}];
   (* A click marks; a shift-click marks everything from the last click,
      across the divider. *)
   H.act h (Mark_session { path = "/sessions/s2.jsonl"; range = false });
   H.act h (Mark_session { path = "/sessions/s4.jsonl"; range = true });
   H.elements h ~selector:".session.marked";
-  H.text h ~selector:".sessions-toolbar";
+  H.text h ~selector:".selection-bar";
   [%expect
     {|
     <div class="marked running session">
     <div class="marked session">
     <div class="archived marked session">
-    3 selected · 210.0 KB (Delete) (Done)
+    (Cancel) (Delete 3 sessions (210.0 KB))
     |}];
   (* Space does what a click does (unmarking s3), Shift+Space what a
      shift-click does (marking from s3, the last one, to s5). *)
@@ -326,13 +394,14 @@ let%expect_test "selecting sessions: click, shift-click a range, delete them" =
   sidebar h;
   [%expect
     {|
-    2 selected · 14.6 KB (Delete) (Done)
-    fix the parser bug 2m ago
-    /work 4 msgs 3.9 KB
-    Release notes 2 bg 2m ago
-    /work 4 msgs 11.7 KB
-    Open elsewhere 2m ago
-    /work 4 msgs 2.9 KB
+    Select sessions Shift for a range
+    fix the parser bug
+    2m ago /work 3.9 KB
+    Release notes
+    2m ago /work 11.7 KB
+    Open elsewhere
+    2m ago /work 2.9 KB
+    (Cancel) (Delete 2 sessions (14.6 KB))
     |}];
   H.key h "Escape" ~target:(Session "s2");
   sidebar h;
@@ -340,12 +409,15 @@ let%expect_test "selecting sessions: click, shift-click a range, delete them" =
     {|
     (Select_sessions false)
     Sessions (Select)
-    fix the parser bug 2m ago
-    /work 4 msgs (Archive (A)) (Delete session (Delete))
-    Release notes 2 bg 2m ago
-    /work 4 msgs (Archive (A)) (Delete session (Delete))
-    Open elsewhere 2m ago
-    /work 4 msgs (Archive (A)) (Delete session (Delete))
+    fix the parser bug
+    2m ago /work
+    (Archive (A)) (Delete session (Delete))
+    Release notes
+    2m ago /work
+    (Archive (A)) (Delete session (Delete))
+    Open elsewhere
+    2m ago /work
+    (Archive (A)) (Delete session (Delete))
     |}]
 ;;
 
@@ -449,6 +521,6 @@ let%expect_test "/delete: by name or id with a confirmation, or select them" =
     (Focus editor)
     (Save_history (/delete "/delete s4 s5" "/delete s4 Older docs"))
     (Expire_toast (id 1) (after_ms 4000))
-    Click sessions to select (Delete) (Done)
+    Select sessions Shift for a range
     |}]
 ;;

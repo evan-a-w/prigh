@@ -233,6 +233,7 @@ module Action : sig
         ; archived : bool
         }
     | Set_session_query of string
+    | Toggle_archived (** fold or unfold the sidebar's archived sessions *)
     | Open_sessions (** the sidebar, with its search focused *)
     | Session_nav of
         { from : string option (** a session's id; [None]: the search *)
@@ -358,6 +359,7 @@ module Model : sig
     ; sidebar_open : bool
     ; scrolled_up : bool (** the chat is not following new output *)
     ; session_query : string
+    ; archived_open : bool (** the sidebar shows the archived sessions *)
     ; agents : Agents.t (** the agents panel, per session *)
     ; verbosity : Prigh_ui.Verbosity.t
     ; folds : String.Set.t
