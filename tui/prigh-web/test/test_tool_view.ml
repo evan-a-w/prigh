@@ -364,22 +364,40 @@ let%expect_test "edit: the diff it returned, or its edits before it has run" =
               </tr>
               <tr class="del">
                 <td class="sign"> - </td>
-                <td class="text"> let greet name = "Hello, " ^ name </td>
+                <td class="text">
+                  <span class="hl-kw"> let </span>
+                   greet name =
+                  <span class="hl-str"> "Hello, " </span>
+                   ^ name
+                </td>
               </tr>
               <tr class="add">
                 <td class="sign"> + </td>
-                <td class="text"> let salute name = "Hi, " ^ name </td>
+                <td class="text">
+                  <span class="hl-kw"> let </span>
+                   salute name =
+                  <span class="hl-str"> "Hi, " </span>
+                   ^ name
+                </td>
               </tr>
               <tr class="hunk">
                 <td colspan="2"> edit 2 </td>
               </tr>
               <tr class="del">
                 <td class="sign"> - </td>
-                <td class="text">   print_endline (greet "world"); </td>
+                <td class="text">
+                    print_endline (greet
+                  <span class="hl-str"> "world" </span>
+                  );
+                </td>
               </tr>
               <tr class="add">
                 <td class="sign"> + </td>
-                <td class="text">   print_endline (salute "world"); </td>
+                <td class="text">
+                    print_endline (salute
+                  <span class="hl-str"> "world" </span>
+                  );
+                </td>
               </tr>
             </tbody>
           </table>
@@ -413,43 +431,67 @@ let%expect_test "edit: the diff it returned, or its edits before it has run" =
                 <td class="ln"> 1 </td>
                 <td class="ln">  </td>
                 <td class="sign"> - </td>
-                <td class="text"> let greet name = "Hello, " ^ name </td>
+                <td class="text">
+                  <span class="hl-kw"> let </span>
+                   greet name =
+                  <span class="hl-str"> "Hello, " </span>
+                   ^ name
+                </td>
               </tr>
               <tr class="add">
                 <td class="ln">  </td>
                 <td class="ln"> 1 </td>
                 <td class="sign"> + </td>
-                <td class="text"> let salute name = "Hi, " ^ name </td>
+                <td class="text">
+                  <span class="hl-kw"> let </span>
+                   salute name =
+                  <span class="hl-str"> "Hi, " </span>
+                   ^ name
+                </td>
               </tr>
               <tr class="same">
                 <td class="ln"> 2 </td>
                 <td class="ln"> 2 </td>
                 <td class="sign">   </td>
-                <td class="text">  </td>
+                <td class="text"> </td>
               </tr>
               <tr class="same">
                 <td class="ln"> 3 </td>
                 <td class="ln"> 3 </td>
                 <td class="sign">   </td>
-                <td class="text"> let main () = </td>
+                <td class="text">
+                  <span class="hl-kw"> let </span>
+                   main () =
+                </td>
               </tr>
               <tr class="del">
                 <td class="ln"> 4 </td>
                 <td class="ln">  </td>
                 <td class="sign"> - </td>
-                <td class="text">   print_endline (greet "world"); </td>
+                <td class="text">
+                    print_endline (greet
+                  <span class="hl-str"> "world" </span>
+                  );
+                </td>
               </tr>
               <tr class="add">
                 <td class="ln">  </td>
                 <td class="ln"> 4 </td>
                 <td class="sign"> + </td>
-                <td class="text">   print_endline (salute "world"); </td>
+                <td class="text">
+                    print_endline (salute
+                  <span class="hl-str"> "world" </span>
+                  );
+                </td>
               </tr>
               <tr class="same">
                 <td class="ln"> 5 </td>
                 <td class="ln"> 5 </td>
                 <td class="sign">   </td>
-                <td class="text">   exit 0 </td>
+                <td class="text">
+                    exit
+                  <span class="hl-num"> 0 </span>
+                </td>
               </tr>
             </tbody>
           </table>
@@ -484,22 +526,40 @@ let%expect_test "edit: the diff it returned, or its edits before it has run" =
               </tr>
               <tr class="del">
                 <td class="sign"> - </td>
-                <td class="text"> let greet name = "Hello, " ^ name </td>
+                <td class="text">
+                  <span class="hl-kw"> let </span>
+                   greet name =
+                  <span class="hl-str"> "Hello, " </span>
+                   ^ name
+                </td>
               </tr>
               <tr class="add">
                 <td class="sign"> + </td>
-                <td class="text"> let salute name = "Hi, " ^ name </td>
+                <td class="text">
+                  <span class="hl-kw"> let </span>
+                   salute name =
+                  <span class="hl-str"> "Hi, " </span>
+                   ^ name
+                </td>
               </tr>
               <tr class="hunk">
                 <td colspan="2"> edit 2 </td>
               </tr>
               <tr class="del">
                 <td class="sign"> - </td>
-                <td class="text">   print_endline (greet "world"); </td>
+                <td class="text">
+                    print_endline (greet
+                  <span class="hl-str"> "world" </span>
+                  );
+                </td>
               </tr>
               <tr class="add">
                 <td class="sign"> + </td>
-                <td class="text">   print_endline (salute "world"); </td>
+                <td class="text">
+                    print_endline (salute
+                  <span class="hl-str"> "world" </span>
+                  );
+                </td>
               </tr>
             </tbody>
           </table>
@@ -1097,19 +1157,36 @@ let%expect_test "apply_patch: one file's diff, like edit" =
                 <td class="ln"> 3 </td>
                 <td class="ln"> 3 </td>
                 <td class="sign">   </td>
-                <td class="text"> let delay attempt = </td>
+                <td class="text">
+                  <span class="hl-kw"> let </span>
+                   delay attempt =
+                </td>
               </tr>
               <tr class="del">
                 <td class="ln"> 4 </td>
                 <td class="ln">  </td>
                 <td class="sign"> - </td>
-                <td class="text">   0.1 *. float attempt </td>
+                <td class="text">
+
+                  <span class="hl-num"> 0.1 </span>
+                   *.
+                  <span class="hl-ty"> float </span>
+                   attempt
+                </td>
               </tr>
               <tr class="add">
                 <td class="ln">  </td>
                 <td class="ln"> 4 </td>
                 <td class="sign"> + </td>
-                <td class="text">   0.1 *. (2. ** float attempt) </td>
+                <td class="text">
+
+                  <span class="hl-num"> 0.1 </span>
+                   *. (
+                  <span class="hl-num"> 2. </span>
+                   **
+                  <span class="hl-ty"> float </span>
+                   attempt)
+                </td>
               </tr>
             </tbody>
           </table>
@@ -1160,13 +1237,21 @@ let%expect_test "apply_patch: several files, each named above its diff" =
                 <td class="ln">  </td>
                 <td class="ln"> 1 </td>
                 <td class="sign"> + </td>
-                <td class="text"> let x = 1 </td>
+                <td class="text">
+                  <span class="hl-kw"> let </span>
+                   x =
+                  <span class="hl-num"> 1 </span>
+                </td>
               </tr>
               <tr class="add">
                 <td class="ln">  </td>
                 <td class="ln"> 2 </td>
                 <td class="sign"> + </td>
-                <td class="text"> let y = 2 </td>
+                <td class="text">
+                  <span class="hl-kw"> let </span>
+                   y =
+                  <span class="hl-num"> 2 </span>
+                </td>
               </tr>
             </tbody>
           </table>
@@ -1185,7 +1270,10 @@ let%expect_test "apply_patch: several files, each named above its diff" =
                 <td class="ln"> 1 </td>
                 <td class="ln"> 1 </td>
                 <td class="sign">   </td>
-                <td class="text"> let f x = </td>
+                <td class="text">
+                  <span class="hl-kw"> let </span>
+                   f x =
+                </td>
               </tr>
               <tr class="del">
                 <td class="ln"> 2 </td>
@@ -1197,7 +1285,10 @@ let%expect_test "apply_patch: several files, each named above its diff" =
                 <td class="ln">  </td>
                 <td class="ln"> 2 </td>
                 <td class="sign"> + </td>
-                <td class="text">   x + 1 </td>
+                <td class="text">
+                    x +
+                  <span class="hl-num"> 1 </span>
+                </td>
               </tr>
             </tbody>
           </table>
@@ -1243,11 +1334,19 @@ let%expect_test "apply_patch: an error, with the patch it tried" =
             <tbody>
               <tr class="add">
                 <td class="sign"> + </td>
-                <td class="text"> let x = 1 </td>
+                <td class="text">
+                  <span class="hl-kw"> let </span>
+                   x =
+                  <span class="hl-num"> 1 </span>
+                </td>
               </tr>
               <tr class="add">
                 <td class="sign"> + </td>
-                <td class="text"> let y = 2 </td>
+                <td class="text">
+                  <span class="hl-kw"> let </span>
+                   y =
+                  <span class="hl-num"> 2 </span>
+                </td>
               </tr>
             </tbody>
           </table>
@@ -1268,7 +1367,10 @@ let%expect_test "apply_patch: an error, with the patch it tried" =
               </tr>
               <tr class="add">
                 <td class="sign"> + </td>
-                <td class="text">   x + 1 </td>
+                <td class="text">
+                    x +
+                  <span class="hl-num"> 1 </span>
+                </td>
               </tr>
             </tbody>
           </table>
@@ -1313,7 +1415,11 @@ let%expect_test "apply_patch: the files streamed so far" =
             <tbody>
               <tr class="add">
                 <td class="sign"> + </td>
-                <td class="text"> let x = 1 </td>
+                <td class="text">
+                  <span class="hl-kw"> let </span>
+                   x =
+                  <span class="hl-num"> 1 </span>
+                </td>
               </tr>
             </tbody>
           </table>

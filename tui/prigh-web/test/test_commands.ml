@@ -163,6 +163,7 @@ let%expect_test "/help <command> and /hotkeys" =
     A (on a session) archive or unarchive it (archived sessions are listed last, muted)
     Space (selecting) mark a session (Shift: the range from the last one); Delete deletes the marked ones, Esc stops selecting
     Ctrl+B show or hide the sidebar
+    ← → / ↑ ↓ (on a panel's edge) resize the panel (Shift: faster; Home / End: smallest / largest; Enter: the default size); or drag the edge, double-click to reset
     Alt+1…9 follow subagent or job N in the agents panel
     Alt+] Alt+[ the next or previous subagent or job
     Alt+0 close the agents panel

@@ -55,7 +55,21 @@ let%expect_test
   [%expect
     {|
     <section id="terminal-panel" aria-label="Terminal" class="terminal-panel">
-      <div title="Drag to resize" role="separator" class="terminal-resize"> </div>
+      <div role="separator"
+           tabindex="0"
+           aria-label="Resize the terminal"
+           aria-orientation="horizontal"
+           aria-valuenow="304"
+           aria-valuemin="120"
+           aria-valuemax="540"
+           title="Drag to resize, double-click for the default size"
+           data-resize="terminal"
+           data-resize-var="--terminal-height"
+           data-resize-unit="px"
+           data-resize-grows="-1"
+           data-resize-target="#terminal-panel"
+           class="resizer resizer-terminal"
+           @on_dblclick> </div>
       <div class="terminal-head">
         <icon class="terminal"> </icon>
         <span class="terminal-machine"> backend </span>
@@ -256,20 +270,46 @@ let%expect_test "/terminal, the top bar's button and the height" =
       <icon class="terminal"> </icon>
     </button>
     |}];
-  H.act h (Set_terminal_height 40);
-  H.show h ~selector:".terminal-panel > .terminal-resize";
-  print_s [%sexp ((H.model h).terminal.height : int option)];
-  H.act h (Set_terminal_height 300);
+  (* Its top edge resizes it: no lower than 120px. *)
+  H.act h (Resize (Set (Terminal, 40)));
+  H.show h ~selector:".terminal-panel > .resizer";
+  H.act h (Resize (Set (Terminal, 300)));
   H.show h ~selector:"#terminal-panel";
   [%expect
     {|
-    <div title="Drag to resize" role="separator" class="terminal-resize"> </div>
-    (120)
-    <section id="terminal-panel"
-             aria-label="Terminal"
-             class="terminal-panel"
-             custom-css-vars=((--terminal-height 300px))>
-      <div title="Drag to resize" role="separator" class="terminal-resize"> </div>
+    (Save_size ((key prigh-web.terminal-height) (value (120))))
+    <div role="separator"
+         tabindex="0"
+         aria-label="Resize the terminal"
+         aria-orientation="horizontal"
+         aria-valuenow="120"
+         aria-valuemin="120"
+         aria-valuemax="540"
+         title="Drag to resize, double-click for the default size"
+         data-resize="terminal"
+         data-resize-var="--terminal-height"
+         data-resize-unit="px"
+         data-resize-grows="-1"
+         data-resize-target="#terminal-panel"
+         class="resizer resizer-terminal"
+         @on_dblclick> </div>
+    (Save_size ((key prigh-web.terminal-height) (value (300))))
+    <section id="terminal-panel" aria-label="Terminal" class="terminal-panel">
+      <div role="separator"
+           tabindex="0"
+           aria-label="Resize the terminal"
+           aria-orientation="horizontal"
+           aria-valuenow="300"
+           aria-valuemin="120"
+           aria-valuemax="540"
+           title="Drag to resize, double-click for the default size"
+           data-resize="terminal"
+           data-resize-var="--terminal-height"
+           data-resize-unit="px"
+           data-resize-grows="-1"
+           data-resize-target="#terminal-panel"
+           class="resizer resizer-terminal"
+           @on_dblclick> </div>
       <div class="terminal-head">
         <icon class="terminal"> </icon>
         <span class="terminal-machine"> backend </span>

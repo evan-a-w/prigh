@@ -89,19 +89,11 @@ let view (m : App.Model.t) ~inject ~widget =
     Node.create
       "section"
       ~attrs:
-        ([ Attr.class_ "terminal-panel"
-         ; Attr.id "terminal-panel"
-         ; Attr.create "aria-label" "Terminal"
-         ]
-         @
-         match t.height with
-         | Some px ->
-           [ Attr.css_var ~name:"terminal-height" (sprintf "%dpx" px) ]
-         | None -> [])
-      [ div
-          ~cls:"terminal-resize"
-          ~attrs:[ Attr.title "Drag to resize"; Attr.role "separator" ]
-          []
+        [ Attr.class_ "terminal-panel"
+        ; Attr.id "terminal-panel"
+        ; Attr.create "aria-label" "Terminal"
+        ]
+      [ Resize_view.handle m ~inject Terminal
       ; div
           ~cls:"terminal-head"
           ((icon ~cls:"terminal-icon" Terminal :: head) @ [ close ~inject ])

@@ -21,8 +21,7 @@ val focus : unit -> unit
 (** Whether the panel is open, for [install] after a reload. *)
 val remember : bool -> unit
 
-(** The panel's top edge resizes it. Restores the height it was given and
-    reopens it if it was open before the page reloaded. *)
+(** Reopens the panel if it was open before the page reloaded. *)
 val install : schedule:(Prigh_web.App.Action.t -> unit) -> unit
 
 (** Whether an event happened in the panel, whose keys, pastes and drops are

@@ -79,6 +79,7 @@ const script3 = [
   { text: "Implementing." },
   { text: "Noted." },
   { text: "Read the attachments." },
+  { text: "Like this:\n\n```ocaml\nlet rec fib n = if n < 2 then n else fib (n - 1) + fib (n - 2) (* slow *)\n```\n\n```json\n{\"name\": \"prigh\", \"ok\": true, \"n\": 3}\n```" },
 ];
 writeFileSync(join(dir, "script.json"), JSON.stringify(script));
 writeFileSync(join(dir, "script2.json"), JSON.stringify(script2));
@@ -153,7 +154,7 @@ const errors = [];
 page.on("console", message => {
   const text = message.text();
   // The backend going away (step 7) is logged by the browser.
-  if (message.type() === "error" && !/favicon\.ico|WebSocket|ERR_CONNECTION_REFUSED/.test(text)) {
+  if (message.type() === "error" && !/favicon\.ico|WebSocket|ERR_CONNECTION_REFUSED|establish a connection/.test(text)) {
     errors.push(`console: ${text}`);
   }
 });
@@ -543,7 +544,7 @@ try {
   };
   const before = await shellRows();
   console.log(`the shell has the panel's rows: ${before === (await terminalRows()).length}`);
-  const edge = await page.locator(".terminal-resize").boundingBox();
+  const edge = await page.locator(".resizer-terminal").boundingBox();
   await page.mouse.move(edge.x + 300, edge.y + edge.height / 2);
   await page.mouse.down();
   await page.mouse.move(edge.x + 300, edge.y - 160, { steps: 8 });
@@ -552,6 +553,7 @@ try {
   await page.waitForFunction(n => document.querySelectorAll(".terminal-panel .xterm-rows > div").length > n, before);
   const after = await shellRows();
   console.log(`taller after dragging: ${after > before}; the panel's rows: ${after === (await terminalRows()).length}`);
+  const draggedHeight = await page.evaluate(() => document.querySelector(".terminal-panel").offsetHeight);
   await shell(clearScreen);
   await cleared();
   await shell("echo still-here", "still-here");
@@ -565,8 +567,8 @@ try {
   await page.reload();
   await composer().waitFor();
   await terminalHas("still-here");
-  console.log(`reloaded: the same height: ${await page.evaluate(() =>
-    getComputedStyle(document.querySelector(".terminal-panel")).getPropertyValue("--terminal-height") !== "")}`);
+  console.log(`reloaded: the same height: ${await page.evaluate(h =>
+    Math.abs(document.querySelector(".terminal-panel").offsetHeight - h) <= 1, draggedHeight)}`);
   await showTerminal("reloaded: the panel and the shell are back");
   await page.locator(".sidebar .session", { hasText: "hello again" }).click();
   await bodyHas("second session reply");
@@ -887,6 +889,103 @@ try {
   await page.waitForSelector(".files-panel", { state: "detached" });
   await page.setViewportSize({ width: 1280, height: 800 });
   await page.waitForFunction(() => document.querySelector(".app:not(.narrow)"));
+
+  // 14. Every panel resizes from its inner edge: dragged (the size shows at
+  //     once and is kept), double-clicked back to its default, moved with
+  //     the arrow keys; sizes fit the window. Code is highlighted in the
+  //     file preview and in replies.
+  const width = selector => page.evaluate(s => Math.round(document.querySelector(s).getBoundingClientRect().width), selector);
+  const height = selector => page.evaluate(s => Math.round(document.querySelector(s).getBoundingClientRect().height), selector);
+  const handle = name => page.locator(`.resizer[data-resize="${name}"]`);
+  const valueNow = async name => Number(await handle(name).getAttribute("aria-valuenow"));
+  // Released: the model has the size once the handle says so.
+  const drag = async (name, dx, dy) => {
+    const before = await valueNow(name);
+    const box = await handle(name).boundingBox();
+    const x = box.x + box.width / 2, y = box.y + box.height / 2;
+    await page.mouse.move(x, y);
+    await page.mouse.down();
+    await page.mouse.move(x + dx / 2, y + dy / 2, { steps: 4 });
+    const during = await page.evaluate(() => document.body.className);
+    await page.mouse.move(x + dx, y + dy, { steps: 4 });
+    await page.mouse.up();
+    await page.waitForFunction(([n, v]) =>
+      document.querySelector(`.resizer[data-resize="${n}"]`).getAttribute("aria-valuenow") !== String(v), [name, before]);
+    return during;
+  };
+  const tokens = selector => page.evaluate(s =>
+    [...document.querySelectorAll(`${s} [class^="hl-"]`)].slice(0, 12).map(e => `${e.className}:${e.textContent}`).join(" "), selector);
+  writeFileSync(join(cwd, "sample.py"),
+    "import os\n\n\n@cache\ndef greet(name: str = \"world\") -> str:\n    # say hello\n    return f\"hello {name}\" * 2\n");
+  await page.keyboard.press("Control+Shift+F");
+  await page.locator(".files-panel").waitFor();
+  await page.locator(".files-tool[title='Refresh']").click();
+  await row("sample.py").click();
+  await page.locator(".files-code .hl-kw").first().waitFor();
+  await page.waitForTimeout(200);
+  section("resize: a highlighted preview");
+  console.log(await tokens(".files-code"));
+  await screenshot("resize: a highlighted preview");
+  section("resize: the file browser's edge");
+  console.log(`handles: ${await page.evaluate(() => [...document.querySelectorAll(".resizer")].map(h => `${h.dataset.resize} ${h.getAttribute("aria-valuenow")}`).join(", "))}`);
+  const filesBefore = await width(".files-panel");
+  const bodyWhileDragging = await drag("files", -160, 0);
+  console.log(`while dragging: ${bodyWhileDragging}; no text selected: ${await page.evaluate(() => getSelection().toString() === "")}`);
+  console.log(`dragged 160px left: ${filesBefore} -> ${await width(".files-panel")} (aria ${await valueNow("files")}), kept ${await page.evaluate(() => localStorage.getItem("prigh-web.files-width"))}`);
+  await page.waitForFunction(() => !document.body.className.includes("resizing"));
+  await screenshot("resize: the file browser wider");
+  await drag("files", -600, 0);
+  console.log(`as wide as it goes: ${await width(".files-panel")}, the chat keeps ${await width(".main")}`);
+  await handle("files").dblclick();
+  await page.waitForFunction(() => document.querySelector(".resizer[data-resize=files]").getAttribute("aria-valuenow") === "400");
+  console.log(`double-clicked: ${await width(".files-panel")}, kept ${await page.evaluate(() => localStorage.getItem("prigh-web.files-width"))}`);
+  await handle("files").focus();
+  await page.keyboard.press("ArrowLeft");
+  await page.keyboard.press("Shift+ArrowLeft");
+  await page.waitForFunction(() => document.querySelector(".resizer[data-resize=files]").getAttribute("aria-valuenow") === "480");
+  console.log(`arrow keys: ${await width(".files-panel")}`);
+  await screenshot("resize: a focused handle");
+  section("resize: the list over the preview");
+  const listBefore = await height(".files-browse");
+  await drag("files-split", 0, 120);
+  console.log(`dragged down: the list ${listBefore < (await height(".files-browse")) ? "taller" : "not taller"}, over 45%: ${(await valueNow("files-split")) > 45}`);
+  section("resize: the sidebar's edge");
+  const sidebarBefore = await width(".sidebar");
+  await drag("sidebar", 80, 0);
+  console.log(`dragged 80px right: ${sidebarBefore} -> ${await width(".sidebar")}`);
+  await screenshot("resize: a wider sidebar");
+  section("resize: kept after a reload");
+  await page.reload();
+  await composer().waitFor();
+  await page.keyboard.press("Control+Shift+F");
+  await row("sample.py").waitFor();
+  await page.waitForFunction(() => !document.querySelector(".files-panel .loading, .files-wait"));
+  console.log(`sidebar ${await width(".sidebar")}, files ${await width(".files-panel")}`);
+  section("resize: a narrower window");
+  await page.setViewportSize({ width: 1120, height: 800 });
+  await page.waitForFunction(() => document.querySelector(".resizer[data-resize=files]").getAttribute("aria-valuenow") !== "480");
+  console.log(`sidebar ${await width(".sidebar")}, files ${await width(".files-panel")}, chat ${await width(".main")}`);
+  await screenshot("resize: a narrower window");
+  await page.setViewportSize({ width: 1280, height: 800 });
+  await page.waitForFunction(() => document.querySelector(".resizer[data-resize=files]").getAttribute("aria-valuenow") === "480");
+  console.log(`wide again: sidebar ${await width(".sidebar")}, files ${await width(".files-panel")}`);
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.waitForFunction(() => document.querySelector(".app.narrow"));
+  await page.waitForTimeout(400);
+  console.log(`on a phone: ${await page.locator(".resizer").count()} handles`);
+  await screenshot("resize: no handles on a phone");
+  await page.locator(".files-close").click();
+  await page.waitForSelector(".files-panel", { state: "detached" });
+  await page.setViewportSize({ width: 1280, height: 800 });
+  await page.waitForFunction(() => document.querySelector(".app:not(.narrow)"));
+  await handle("sidebar").dblclick();
+  await send("show me code");
+  await bodyHas("Like this:");
+  await idle();
+  section("resize: highlighted code in a reply");
+  for (const lang of ["ocaml", "json"]) console.log(await tokens(`.code code.language-${lang}`));
+  await page.locator(".code").last().scrollIntoViewIfNeeded();
+  await screenshot("resize: highlighted code in a reply");
 
   section("errors");
   console.log(errors.length ? errors.join("\n") : "none");

@@ -236,28 +236,6 @@ end
 
 let widget = Staged.unstage (Vdom.Node.widget_of_module (module Widget))
 let view ~url ~key ~on_status = widget { Input.url; key; on_status }
-
-(* ---- height *)
-
-let height_key = "prigh-web.terminal-height"
-
-let clamp px =
-  Int.max
-    Prigh_web.Terminal.min_height
-    (Int.min px (Dom_html.window##.innerHeight - 160))
-;;
-
-let panel () = Dom_html.getElementById_opt "terminal-panel"
-
-let closest (el : Dom_html.element Js.t) selector =
-  Js.Opt.test
-    (Js.Unsafe.meth_call
-       el
-       "closest"
-       [| Js.Unsafe.inject (Js.string selector) |]
-     : Dom_html.element Js.t Js.opt)
-;;
-
 let open_key = "prigh-web.terminal-open"
 
 let remember open_ =
@@ -266,58 +244,5 @@ let remember open_ =
 
 let install ~schedule =
   if Option.is_some (Browser.get_item open_key)
-  then schedule Prigh_web.App.Action.Reopen_terminal;
-  Option.iter
-    (Option.bind (Browser.get_item height_key) ~f:Int.of_string_opt)
-    ~f:(fun px ->
-      schedule (Prigh_web.App.Action.Set_terminal_height (clamp px)));
-  let listen event handler =
-    ignore
-      (Dom_html.addEventListener
-         Dom_html.document
-         event
-         (Dom.handler (fun ev ->
-            handler ev;
-            Js._true))
-         Js._false
-       : Dom_html.event_listener_id)
-  in
-  let dragging = ref None in
-  let body_class = Js.string "resizing-terminal" in
-  listen Dom_html.Event.pointerdown (fun (ev : Dom_html.pointerEvent Js.t) ->
-    match Js.Opt.to_option ev##.target with
-    | Some el when closest el ".terminal-resize" ->
-      Dom.preventDefault ev;
-      dragging := Some None;
-      Dom_html.document##.body##.classList##add body_class
-    | _ -> ());
-  listen Dom_html.Event.pointermove (fun (ev : Dom_html.pointerEvent Js.t) ->
-    match !dragging, panel () with
-    | Some _, Some panel ->
-      let bottom = Js.to_float panel##getBoundingClientRect##.bottom in
-      let px =
-        clamp (Float.iround_nearest_exn (bottom -. Js.to_float ev##.clientY))
-      in
-      dragging := Some (Some px);
-      ignore
-        (Js.Unsafe.meth_call
-           panel##.style
-           "setProperty"
-           [| Js.Unsafe.inject (Js.string "--terminal-height")
-            ; Js.Unsafe.inject (Js.string (sprintf "%dpx" px))
-           |]
-         : Js.Unsafe.any)
-    | _ -> ());
-  let stop (_ : Dom_html.pointerEvent Js.t) =
-    match !dragging with
-    | None -> ()
-    | Some px ->
-      dragging := None;
-      Dom_html.document##.body##.classList##remove body_class;
-      Option.iter px ~f:(fun px ->
-        Browser.set_item height_key (Int.to_string px);
-        schedule (Prigh_web.App.Action.Set_terminal_height px))
-  in
-  listen Dom_html.Event.pointerup stop;
-  listen (Dom_html.Event.make "pointercancel") stop
+  then schedule Prigh_web.App.Action.Reopen_terminal
 ;;

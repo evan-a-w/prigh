@@ -71,7 +71,7 @@
 
 .files-body { flex: 1; min-height: 0; display: flex; flex-direction: column; }
 .files-browse { flex: 1; min-height: 0; display: flex; flex-direction: column; }
-.files-body.previewing .files-browse { flex: 0 1 45%; }
+.files-body.previewing .files-browse { flex: 0 1 var(--files-split, 45%); }
 
 .files-columns, .files-row {
   display: grid;

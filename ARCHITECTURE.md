@@ -1393,7 +1393,7 @@ copy of the protocol types and the e2e test guards the contract.
       something running (`Model.ticking`); running jobs are then polled
       every 2s. `Reveal` scrolls the chat to a subagent's card through the
       `subagent` call ids from the top-level one down.
-    - The terminal panel: `Terminal` (open, the dragged height, a
+    - The terminal panel: `Terminal` (open, a
       generation that "New shell"/"Retry" bump, and the widget's last
       `Status` with the key of the target it is about) and
       `Terminal_view` (a header with the active host's name and directory
@@ -1428,6 +1428,37 @@ copy of the protocol types and the e2e test guards the contract.
       file pickers. Keys: Ctrl+Shift+F everywhere; in the list
       (`Keys.Target.Files`) ↑↓, Enter, Backspace, F2, Delete, Esc; with
       its dialog open, Enter and Esc.
+    - Panel sizes: `Resize` (pure: per `Handle` — the sidebar, the file
+      browser, its list/preview split in percent, the agents panel, the
+      terminal — the preference kept in the browser, and the window's
+      `Viewport`; `bounds` gives a handle's size, minimum and maximum in
+      that window given what is open (`App.Model.shown`): the side panels
+      docked beside the chat (the file browser floats over it below
+      1100px, the agents panel below 1180px, as in the CSS) share its
+      width less `chat_min` (400px), shrinking in proportion to what they
+      have above their minimums when they would not fit, while the
+      preferences stay; `update` returns the `Save`s for local storage)
+      and `Resize_view` (the handles: `role=separator`, focusable, with
+      `aria-valuenow/min/max` and `data-resize-*` for the page's drag
+      code, a double click resetting; none on a phone; and the sizes as
+      CSS variables on `.app`). `Keys.Target.Resize` gives a focused
+      handle the arrows along its axis (Shift: ×4), Home, End and Enter.
+    - Syntax highlighting: `Highlight` (pure, total: `Lang.of_name`
+      for fences, `Lang.of_path` for files; `line` tokenizes one line from
+      a `State` carrying block comments, multi-line strings, Markdown
+      fences and HTML tags and embedded script/style across lines, with
+      a generic scanner configured per language — comments, strings with
+      prefixes and raw forms, keyword/type/constant sets, capitalised
+      types, keys — plus hooks; loops are self tail calls, so a 256 KiB
+      minified line is fine in js_of_ocaml) and `Highlight_view` (spans
+      with `hl-*` classes; past 64 KiB the rest is plain text). Hand-written
+      rather than a vendored JS highlighter: no bundling or JS interop,
+      a few tens of KB in the bundle, testable in expect tests, ~20ms per
+      64 KiB. Used by `Markdown_view`'s code blocks (a streaming reply's
+      settled parts are cached, so only the open block is highlighted
+      again per delta), `Files_view`'s text preview (cached per preview by
+      `View_cache`) and `Diff_view` (`?lang`, from the edited path: the old
+      and new sides each carry their own state, reset at each hunk).
     - Around it: `Sidebar_view`/`Session_list` (fuzzy search, ages from
       `Rel_time`; active sessions, then a divider with the archived ones'
       count that folds them (`Model.archived_open`, `Session_list.shown`,
@@ -1521,8 +1552,7 @@ copy of the protocol types and the e2e test guards the contract.
     (phone) layout, a clock for ages and toasts, and the chat following new
     output unless scrolled up. `Chat_listeners` copies code blocks and
     closes an open image with Esc; `Agents_listeners` opens a subagent's
-    card (`data-agent`) in the agents panel, resizes the panel from its
-    left edge (`--agents-width`, remembered in local storage), keeps a
+    card (`data-agent`) in the agents panel, keeps a
     shown transcript or job output at its end unless scrolled up, and
     performs `Reveal` (opening the folds the card is in).
     `Terminal_widget` is the terminal panel's xterm.js: a
@@ -1532,9 +1562,8 @@ copy of the protocol types and the e2e test guards the contract.
     the page's user and token and the target's `as_user`; a new target key
     disposes the old connection (the backend keeps the shell) and mounts a
     new one; `terminal.js` reports its state through `onStatus`, which
-    becomes `Action.Terminal_status`. It also resizes the panel from its
-    top edge (`--terminal-height`, remembered with whether the panel is
-    open, so a reload reopens it), and focuses the shell for
+    becomes `Action.Terminal_status`. It also remembers whether the panel
+    is open, so a reload reopens it, and focuses the shell for
     `Focus_terminal`. The document listeners leave keys (a capture
     listener takes only Ctrl+`, before xterm.js), pastes and drops inside
     the panel to it, and the chat's and agents panel's mutation observers
@@ -1545,10 +1574,20 @@ copy of the protocol types and the e2e test guards the contract.
     drawer to its directory and other dropped or pasted files that are not
     PNG/JPEG/GIF/WebP images to the attachments (marking where a drag
     would land); transfer links go to the backend's web address, from the
-    WebSocket's (`Files.http_base`).
+    WebSocket's (`Files.http_base`). `Resize_widget` drags the resize
+    handles: on `pointerdown` on a `[data-resize]` it captures the
+    pointer, reads the size and bounds from the handle's `aria-value*`,
+    and at each animation frame sets the CSS variable on the panel itself
+    (`data-resize-target`), so a drag re-renders nothing; `pointerup`
+    commits `Resize (Set _)` once and, after that render, removes the
+    panel's own variable (Esc while dragging puts it back). It also
+    sends the window's size (`Resize (Viewport _)`, again on every
+    viewport change), restores the kept sizes from local storage at
+    startup and performs `Save_size`.
   - `bin/` — `main.bc.js` plus `index.html`, `style.css`, `chat.css`,
-    `agents.css`, `terminal.css` and `files.css` (design tokens in `style.css`'s
-    `:root`), the Recursive font cut to two woff2 instances (sans and mono;
+    `agents.css`, `terminal.css`, `files.css`, `highlight.css` (the
+    tokens' colours) and `resize.css` (the handles) (design tokens in
+    `style.css`'s `:root`), the Recursive font cut to two woff2 instances (sans and mono;
     `recursive-OFL.txt`), and `web-bin`'s `terminal.js` and
     vendored xterm.js (copied by dune rules, not duplicated), assembled under
     `bin/site/` and installed to `share/prigh_tui/prigh-web` (the Nix

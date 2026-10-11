@@ -195,19 +195,31 @@ let%expect_test
                   <td class="ln"> 1 </td>
                   <td class="ln"> 1 </td>
                   <td class="sign">   </td>
-                  <td class="text"> let x = 1 </td>
+                  <td class="text">
+                    <span class="hl-kw"> let </span>
+                     x =
+                    <span class="hl-num"> 1 </span>
+                  </td>
                 </tr>
                 <tr class="del">
                   <td class="ln"> 2 </td>
                   <td class="ln">  </td>
                   <td class="sign"> - </td>
-                  <td class="text"> let y = 2 </td>
+                  <td class="text">
+                    <span class="hl-kw"> let </span>
+                     y =
+                    <span class="hl-num"> 2 </span>
+                  </td>
                 </tr>
                 <tr class="add">
                   <td class="ln">  </td>
                   <td class="ln"> 2 </td>
                   <td class="sign"> + </td>
-                  <td class="text"> let y = 3 </td>
+                  <td class="text">
+                    <span class="hl-kw"> let </span>
+                     y =
+                    <span class="hl-num"> 3 </span>
+                  </td>
                 </tr>
               </tbody>
             </table>

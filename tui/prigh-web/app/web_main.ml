@@ -254,6 +254,7 @@ let perform client settings ctx (model : App.Model.t) (command : App.Command.t) 
       Effect.of_sync_fun Page_notifications.save enabled
     | Set_title title -> Effect.of_sync_fun Page_notifications.set_title title
     | Files page -> Effect.of_sync_fun Files_widget.perform page
+    | Save_size save -> Effect.of_sync_fun Resize_widget.save save
   in
   Bonsai.Apply_action_context.schedule_event ctx eff
 ;;
@@ -387,10 +388,18 @@ let read_images ~schedule (files : File.fileList Js.t) =
   Files_widget.choose Chat (List.rev !others)
 ;;
 
+let resize_handle (el : Dom_html.element Js.t) =
+  Js.Opt.to_option (el##getAttribute (Js.string "data-resize"))
+  |> Option.bind ~f:(fun name ->
+    Prigh_web.Resize.Handle.of_name (Js.to_string name))
+;;
+
 let key_target (ev : Dom_html.keyboardEvent Js.t) : Prigh_web.Keys.Target.t =
   match Js.Opt.to_option ev##.target with
   | None -> Page
   | Some el when Terminal_widget.contains el -> Terminal
+  | Some el when Option.is_some (resize_handle el) ->
+    Resize (Option.value_exn (resize_handle el))
   | Some el
     when Files_widget.in_panel el
          &&
@@ -583,7 +592,8 @@ let install_listeners ~schedule ~current =
         Js._false));
   Browser.on_viewport_change (fun () ->
     autosize ();
-    schedule (App.Action.Set_narrow (narrow ())));
+    schedule (App.Action.Set_narrow (narrow ()));
+    schedule (Resize_widget.viewport ()));
   listen Dom_html.Event.paste (fun (ev : Dom_html.clipboardEvent Js.t) ->
     Js.Opt.iter ev##.clipboardData (fun data ->
       if data##.files##.length > 0 && not (in_terminal ev)
@@ -890,6 +900,7 @@ let run_app (settings : Settings.t) =
          then schedule (App.Action.Clock (Time_ns.now ())));
        install_listeners ~schedule ~current;
        Files_widget.install ~schedule ~backend:settings.backend;
+       Resize_widget.install ~schedule;
        don't_wait_for
          (Pipe.iter_without_pushback
             (Client.incoming client)
