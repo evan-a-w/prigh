@@ -341,7 +341,12 @@ let active_path t =
 ;;
 
 let summary_prefix = "Summary of the conversation so far:\n"
-let summary_message summary = Message.user (summary_prefix ^ summary)
+
+let summary_message summary =
+  Message.user
+    ~origin:{ Injected.empty with source = Some Summary }
+    (summary_prefix ^ summary)
+;;
 
 let is_summary_message : Message.t -> bool = function
   | User { text; _ } -> String.is_prefix text ~prefix:summary_prefix

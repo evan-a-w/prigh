@@ -4,8 +4,15 @@ module User : sig
   type t =
     { text : string
     ; images : Image.t list
+    ; origin : Injected.t option
+      (** how [text] is made up, when the harness added to it; [None] for the
+        user's own text and for messages recorded before it *)
     }
   [@@deriving sexp, jsonaf, equal]
+
+  (** What the user wrote: [text] without the harness's notes and attached
+      files (recorded or recognised). *)
+  val body : t -> string
 end
 
 module Assistant : sig
@@ -39,7 +46,7 @@ type t =
   | Tool_result of Tool_result.t
 [@@deriving sexp, jsonaf, equal]
 
-val user : ?images:Image.t list -> string -> t
+val user : ?images:Image.t list -> ?origin:Injected.t -> string -> t
 
 (** Each image becomes a line of text saying it was left out, for models that
     cannot see images. *)

@@ -340,6 +340,8 @@ let execute
     match string_arg "prefix" with
     | Ok prefix -> list_dirs ~cwd prefix
     | Error e -> Tool.Result.error (Error.to_string_hum e))
+  else if String.equal name Git_diff.op
+  then Git_diff.run ~env ~cancel ~cwd ~arguments
   else (
     match
       List.find (host_tools ()) ~f:(fun t -> String.equal (Tool.name t) name)

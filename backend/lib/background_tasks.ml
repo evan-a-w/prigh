@@ -242,7 +242,21 @@ let take_undelivered t =
 ;;
 
 let delivery_message tasks =
-  Message.user (String.concat ~sep:"\n\n" (List.map tasks ~f:Task.report))
+  let reports = List.map tasks ~f:Task.report in
+  Message.user
+    ~origin:
+      { Injected.empty with
+        source =
+          Some
+            (Delivery
+               { reports =
+                   List.filter_map reports ~f:(fun report ->
+                     String.chop_prefix report ~prefix:"["
+                     |> Option.bind ~f:(String.lsplit2 ~on:']')
+                     |> Option.map ~f:fst)
+               })
+      }
+    (String.concat ~sep:"\n\n" reports)
 ;;
 
 let find t ~kind id =

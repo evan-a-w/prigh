@@ -34,6 +34,9 @@ let methods =
   ; "set_thinking"
   ; "list_models"
   ; "compact"
+  ; "git_diff"
+  ; "review"
+  ; "init"
   ; "set_budget"
   ; "set_goal"
   ; "clear_goal"
@@ -1123,6 +1126,15 @@ let dispatch agent login ~meth ~params : Json.t Or_error.t =
         in
         Or_error.map (Agent.compact ?instructions agent) ~f:(fun summary ->
           `Object [ "summary", `String summary ]))
+  | "git_diff" ->
+    Or_error.bind (string_param_opt params "path") ~f:(fun path ->
+      Or_error.map
+        (Agent.git_diff ?path agent)
+        ~f:[%jsonaf_of: Git_diff.Result.t])
+  | "review" ->
+    Or_error.bind (string_param_opt params "args") ~f:(fun args ->
+      unit_result (Agent.review agent ~args:(Option.value args ~default:"")))
+  | "init" -> unit_result (Agent.init agent)
   | "set_budget" ->
     (match param params "usd" with
      | None | Some `Null -> unit_result (Agent.set_budget agent None)
