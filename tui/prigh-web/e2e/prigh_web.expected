@@ -800,6 +800,26 @@ draft: half-written thought
 sign-in page: false
 === chromium: reconnect: errors ===
 none
+=== chromium: paging: opened ===
+steps 26 to 40 (15)
+earlier: Show earlier messages 100 more
+at the end: true
+=== chromium: paging: scrolled up ===
+steps 11 to 40 (30)
+earlier: Show earlier messages 40 more
+step 26 kept in place: true
+=== chromium: paging: at the start ===
+steps 1 to 40 (40)
+earlier: none
+=== chromium: paging: a long output ===
+shown lines: 6
+toggle: Show all 2000 lines
+loaded whole: 2000 lines
+=== chromium: paging: reloaded ===
+steps 1 to 40 (40)
+step 5 at the same place: true
+=== chromium: paging: errors ===
+none
 === firefox: sign-in page ===
 prigh
 web
@@ -1601,4 +1621,24 @@ scroll position kept: true
 draft: half-written thought
 sign-in page: false
 === firefox: reconnect: errors ===
+none
+=== firefox: paging: opened ===
+steps 26 to 40 (15)
+earlier: Show earlier messages 100 more
+at the end: true
+=== firefox: paging: scrolled up ===
+steps 11 to 40 (30)
+earlier: Show earlier messages 40 more
+step 26 kept in place: true
+=== firefox: paging: at the start ===
+steps 1 to 40 (40)
+earlier: none
+=== firefox: paging: a long output ===
+shown lines: 6
+toggle: Show all 2000 lines
+loaded whole: 2000 lines
+=== firefox: paging: reloaded ===
+steps 1 to 40 (40)
+step 5 at the same place: true
+=== firefox: paging: errors ===
 none

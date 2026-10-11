@@ -203,29 +203,46 @@ let scroll_to_bottom () =
   Option.iter (chat_element ()) ~f:follow_to_end
 ;;
 
-(* Where the chat was before the page reloaded. Not ours as far as the scroll
-   listener knows, so it stops following (and shows the jump button). What is
-   above may still grow (fonts, images): it is put back while it does. *)
-let restore_scroll top =
+(* The user scrolled the chat themselves (wheel, touch, scrollbar, keys). *)
+let user_scrolled = ref false
+
+(* Where the chat was before the page reloaded, [from_end] its end. Not ours
+   as far as the scroll listener knows, so it stops following (and shows the
+   jump button). Older pages load until it is reached; what is above may
+   still grow (fonts, images): it is put back while it does, until the user
+   scrolls. *)
+let restore_scroll from_end =
   following := false;
+  user_scrolled := false;
   let rec put tries =
     Option.iter (chat_element ()) ~f:(fun chat ->
-      let now = Js.to_float chat##.scrollTop in
-      let clamped =
-        Float.(now >= of_int Int.(chat##.scrollHeight - chat##.clientHeight) -. 2.)
-      in
-      if (not !following) && clamped && Float.(abs (now -. top) > 2.)
-      then chat##.scrollTop := Js.float top;
-      if tries > 0
-      then
-        ignore
-          (Dom_html.setTimeout (fun () -> put (tries - 1)) 150.
-           : Dom_html.timeout_id_safe))
+      if not (!following || !user_scrolled)
+      then (
+        let target = Float.of_int chat##.scrollHeight -. from_end in
+        let tries =
+          if Float.(target < 0.) && Paging_listeners.more ()
+          then (
+            chat##.scrollTop := Js.float 0.;
+            Paging_listeners.load_older ();
+            tries)
+          else (
+            if Float.(abs (Js.to_float chat##.scrollTop -. target) > 2.)
+            then chat##.scrollTop := Js.float (Float.max 0. target);
+            (* Reached: a little longer, while what is above settles. *)
+            Int.min tries 6)
+        in
+        if tries > 0
+        then
+          ignore
+            (Dom_html.setTimeout (fun () -> put (tries - 1)) 150.
+             : Dom_html.timeout_id_safe)))
   in
-  put 6
+  (* 9 s: time for a few older pages. *)
+  put 60
 ;;
 
 let scroll_chat pages =
+  user_scrolled := true;
   if pages < 0 then following := false;
   Option.iter (chat_element ()) ~f:(fun chat ->
     let by = Float.of_int (pages * chat##.clientHeight) *. 0.85 in
@@ -235,6 +252,7 @@ let scroll_chat pages =
 (* The previous (or next) of the user's messages above (or below) the top of
    the transcript's view. *)
 let jump_to_user_message direction =
+  user_scrolled := true;
   if direction < 0 then following := false;
   Option.iter (chat_element ()) ~f:(fun chat ->
     let top = Js.to_float chat##getBoundingClientRect##.top in
@@ -316,7 +334,7 @@ let perform client settings ctx (model : App.Model.t) (command : App.Command.t) 
         (fun () ->
            Browser.after_render (fun () ->
              match Tab_memory.take_scroll () with
-             | Some top -> restore_scroll top
+             | Some from_end -> restore_scroll from_end
              | None -> scroll_to_bottom ()))
         ()
     | Jump_to_user_message direction ->
@@ -723,6 +741,34 @@ let install_listeners ~schedule ~current =
            Js.to_bool
              ((Js.Unsafe.coerce chat)##contains target : bool Js.t))
   in
+  (* The scroll events miss what changed the chat's height since the last
+     one (an output folded, a message added): leaving the page has the last
+     word. *)
+  let save_scroll () =
+    Option.iter (chat_element ()) ~f:Tab_memory.save_scroll
+  in
+  ignore
+    (Dom_html.addEventListener
+       Dom_html.window
+       (Dom_html.Event.make "pagehide")
+       (Dom.handler (fun _ ->
+          save_scroll ();
+          Js._true))
+       Js._false
+     : Dom_html.event_listener_id);
+  listen (Dom_html.Event.make "visibilitychange") (fun _ ->
+    if Js.to_bool (Js.Unsafe.get Dom_html.document "hidden")
+    then save_scroll ();
+    Js._true);
+  List.iter
+    [ Dom_html.Event.make "wheel"
+    ; Dom_html.Event.make "touchstart"
+    ; Dom_html.Event.mousedown
+    ]
+    ~f:(fun event ->
+      listen event (fun ev ->
+        if in_chat ev then user_scrolled := true;
+        Js._true));
   (* Intent first: a wheel or swipe up stops following at once, before the
      scroll it causes lands, so output arriving meanwhile cannot undo it. *)
   listen

@@ -41,22 +41,22 @@ let for_this_session = function
   | _ -> None
 ;;
 
+(* From the end rather than the top: only the newest page loads at first,
+   and the older ones loaded to get back there keep this in place. *)
 let save_scroll (el : Dom_html.element Js.t) =
-  let top = Js.to_float el##.scrollTop in
-  let at_end =
-    Float.(of_int el##.scrollHeight -. top -. of_int el##.clientHeight < 40.)
-  in
+  let from_end = Float.of_int el##.scrollHeight -. Js.to_float el##.scrollTop in
+  let at_end = Float.(from_end -. of_int el##.clientHeight < 40.) in
   save
     scroll_key
-    [ "top", `Number (sprintf "%.0f" top)
+    [ "from_end", `Number (sprintf "%.0f" from_end)
     ; ("at_end", if at_end then `True else `False)
     ]
 ;;
 
 let scroll =
   load scroll_key ~f:(fun json ->
-    match Jsonaf.member "top" json, Jsonaf.member "at_end" json with
-    | Some (`Number top), Some `False -> Some (Float.of_string top)
+    match Jsonaf.member "from_end" json, Jsonaf.member "at_end" json with
+    | Some (`Number from_end), Some `False -> Some (Float.of_string from_end)
     | _ -> None)
 ;;
 

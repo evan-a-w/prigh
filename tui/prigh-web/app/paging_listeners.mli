@@ -10,3 +10,10 @@ val install : schedule:(Prigh_web.App.Action.t -> unit) -> unit
 (** Before the older messages are added: the next change of the
     transcript's height goes above what shows. *)
 val keep_position : unit -> unit
+
+(** Whether older messages are left to load. *)
+val more : unit -> bool
+
+(** Asks for the page before those loaded (nothing while one is on its
+    way). *)
+val load_older : unit -> unit

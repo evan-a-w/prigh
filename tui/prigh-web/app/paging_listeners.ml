@@ -44,7 +44,11 @@ let more () =
     (Dom_html.document##querySelector (Js.string "#chat [data-older]"))
 ;;
 
+let scheduler = ref (fun (_ : Prigh_web.App.Action.t) -> ())
+let load_older () = !scheduler Prigh_web.App.Action.Load_older
+
 let install ~schedule =
+  scheduler := schedule;
   let maybe_load (ev : #Dom_html.event Js.t) =
     match chat () with
     | Some el
