@@ -281,10 +281,20 @@ While the connection is down the composer is dashed and the status line
 says "Reconnecting…": what you write stays until it is back (sending is
 refused, saying so, rather than queued).
 
+Long sessions open fast: the page asks for the newest 60 messages only,
+shows them at the end, and loads the ones before as you scroll near the
+top (or press "Show earlier messages", which says how many there are),
+without moving what you are reading. Tool outputs over 8 KiB come cut to
+their first and last 20 lines; unfolding one loads the rest. The last
+eight sessions you looked at stay in the page, so going back to one shows
+it at once (then brings it up to date), and resting the pointer on a
+session in the sidebar fetches its newest messages ahead of the click.
+
 Losing the connection (a flaky mobile network, the phone locked, the
 backend restarting) changes nothing on the page: the banner sits over the
 top of the chat, and once back the session's new messages are merged into
-the transcript in place, without moving it, with the draft, attachments,
+the transcript in place (keeping the older messages you had loaded),
+without moving it, with the draft, attachments,
 open panels and dialogs as they were. The page reconnects at once when the
 network comes back or the tab is shown again (and checks a socket that
 may have died while it was hidden), with backoff otherwise. Only the
@@ -333,7 +343,10 @@ prigh serve -prigh-web 0.0.0.0:7790 -token sekrit   # remote; the page asks for 
 
 `-prigh-web-root DIR` (`$PRIGH_PRIGH_WEB_ROOT`) points at the site;
 without it the backend looks next to its dune build and in
-`../share/prigh/prigh-web`. The page keeps `?session=` in the address bar
+`../share/prigh/prigh-web`. The Nix package (`nix run . -- -prigh-web`)
+installs the release build of the page (whole-program js_of_ocaml, about
+1.8 MB of JavaScript); a dune build in the dev profile makes a ~50 MB one
+with inline source maps, quicker to relink but slow to load. The page keeps `?session=` in the address bar
 and the chat's scroll position and draft in the tab's sessionStorage (a
 reload, or a phone bringing back a discarded tab, returns to the same place,
 waiting for the backend if it is out of reach), reconnects when the
