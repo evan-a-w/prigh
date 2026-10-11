@@ -849,6 +849,18 @@ let sweep_orphans t ~main_running =
     ~f:(fun event -> broadcast t (Loop event))
 ;;
 
+(* The log follows the session, saved in its data directory once the
+   session file exists. *)
+let load_subagent_log t =
+  Subagent_log.load t.subagent_log ~dir:(fun () ->
+    if Session.persisted t.session
+    then Some (Session.data_dir (Session.path t.session))
+    else None);
+  Background_tasks.avoid_subagent_ids
+    t.background
+    (List.map (Subagent_log.summaries t.subagent_log) ~f:(fun s -> s.id))
+;;
+
 let deliveries t =
   match Background_tasks.take_undelivered t.background with
   | [] -> []
@@ -1213,6 +1225,7 @@ let create
   in
   restore_settings t;
   restore_host t;
+  load_subagent_log t;
   Background_tasks.connect
     t.background
     ~emit:(fun event ->
@@ -1483,8 +1496,8 @@ let replace_session t session ~keep_host =
   Background_tasks.cancel_all ~discard:true t.background;
   wait_idle t;
   Background_tasks.forget_finished t.background;
-  Subagent_log.clear t.subagent_log;
   t.session <- session;
+  load_subagent_log t;
   if keep_host then record_location t else t.cwd <- Session.cwd session;
   t.git_branch <- find_branch t ~cwd:t.cwd;
   restore_host t;

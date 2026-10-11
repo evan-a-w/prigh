@@ -77,6 +77,10 @@ val create
   -> unit
   -> t
 
+(** New subagents get ids other than [ids] (those of a reloaded
+    [Subagent_log]). *)
+val avoid_subagent_ids : t -> string list -> unit
+
 (** [emit] receives the tasks' events (the agent broadcasts them and rolls up
     their usage); [on_change] is called whenever a task starts, finishes or is
     delivered, after its state is updated. *)

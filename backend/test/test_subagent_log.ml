@@ -113,7 +113,7 @@ let%expect_test "statuses, activity and transcripts of nested subagents" =
     (a1/c2 (((message (User ((text dig)))) (at (7)))))
     none
     |}];
-  Subagent_log.clear log;
+  Subagent_log.load log ~dir:(fun () -> None);
   show log;
   [%expect {| |}]
 ;;

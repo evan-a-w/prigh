@@ -131,6 +131,15 @@ let rec activity (event : Agent_event.t) =
   | _ -> None
 ;;
 
+let avoid_subagent_ids t ids =
+  List.iter ids ~f:(fun id ->
+    Option.iter
+      (Option.bind
+         (String.chop_prefix id ~prefix:(Kind.id_prefix Subagent))
+         ~f:Int.of_string_opt)
+      ~f:(fun n -> t.next_subagent_id <- Int.max t.next_subagent_id (n + 1)))
+;;
+
 let next_id t (kind : Kind.t) =
   let n =
     match kind with
