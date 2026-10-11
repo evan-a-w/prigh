@@ -101,8 +101,18 @@ let messages list = "[" ^ String.concat ~sep:"," list ^ "]"
 let session () =
   let h = Harness.create ~state:(state ()) () in
   Harness.quiet h (fun () ->
-    Harness.act h (Reply (Messages "s1", Ok (Jsonaf.of_string (messages
-      [ user "first"; assistant "one"; user "second"; assistant "two" ])))));
+    Harness.act
+      h
+      (Reply
+         ( Messages "s1"
+         , Ok
+             (Jsonaf.of_string
+                (messages
+                   [ user "first"
+                   ; assistant "one"
+                   ; user "second"
+                   ; assistant "two"
+                   ])) )));
   h
 ;;
 
@@ -164,7 +174,9 @@ let%expect_test "a reconnect keeps the page as it was and merges what is new" =
      (draft "half a thought") (scrolled_up true) (files_open true) (dialog true)
      (same_entries 4))
     |}];
-  Harness.act h (Reply (Reconnect 1, Ok (Jsonaf.of_string {|{"client_id":"c2"}|})));
+  Harness.act
+    h
+    (Reply (Reconnect 1, Ok (Jsonaf.of_string {|{"client_id":"c2"}|})));
   Harness.reply h "get_state" (state ());
   [%expect
     {|
@@ -435,7 +447,8 @@ let%expect_test "merging the messages after reconnecting" =
     Chat.of_messages
       ~running
       (List.map list ~f:(fun json ->
-         Prigh_protocol.Message.of_json (Jsonaf.of_string json) |> Or_error.ok_exn))
+         Prigh_protocol.Message.of_json (Jsonaf.of_string json)
+         |> Or_error.ok_exn))
   in
   let old =
     List.fold
@@ -477,8 +490,7 @@ let%expect_test "merging the messages after reconnecting" =
           (Option.bind (Chat.tool merged "c1") ~f:(fun t -> t.result)
            |> Option.map ~f:(fun r -> r.text)
            : string option)];
-  [%expect
-    {| ((kept (true true true)) (result ("built\n"))) |}];
+  [%expect {| ((kept (true true true)) (result ("built\n"))) |}];
   (* Once it has stopped, the message being streamed is in [get_messages] (or
      never will be). *)
   let merged =

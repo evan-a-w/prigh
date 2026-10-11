@@ -315,7 +315,7 @@ let perform client settings ctx (model : App.Model.t) (command : App.Command.t) 
       Effect.of_sync_fun
         (fun () ->
            Browser.after_render (fun () ->
-             match Scroll_memory.take () with
+             match Tab_memory.take_scroll () with
              | Some top -> restore_scroll top
              | None -> scroll_to_bottom ()))
         ()
@@ -394,6 +394,8 @@ let component client settings ~current (local_ graph) =
       ~apply_action:(fun ctx model action ->
         let model', commands = App.update model action in
         current := model';
+        if not (String.equal model.draft model'.draft)
+        then Tab_memory.save_draft model'.draft;
         (* A confirmation or question just showed (also one over another). *)
         if
           (App.Model.waiting model' && not (App.Model.waiting model))
@@ -744,7 +746,7 @@ let install_listeners ~schedule ~current =
   listen ~capture:true (Dom_html.Event.make "scroll") (fun ev ->
     (match chat_element () with
      | Some el when phys_equal (Dom_html.eventTarget ev :> Dom.node Js.t) (el :> Dom.node Js.t) ->
-       Scroll_memory.save el;
+       Tab_memory.save_scroll el;
        let top = Js.to_float el##.scrollTop in
        let ours =
          Option.value_map !last_set ~default:false ~f:(fun s ->
@@ -985,6 +987,8 @@ let run_app (settings : Settings.t) =
        Page_notifications.on_visibility_change (fun hidden ->
          schedule (App.Action.Page_hidden hidden));
        schedule (App.Action.Load_history (load_history ()));
+       Option.iter (Tab_memory.saved_draft ()) ~f:(fun draft ->
+         schedule (App.Action.Set_draft draft));
        (match result with
         | Ok (_, None) -> schedule App.Action.Start
         | Ok (_, Some lost) ->

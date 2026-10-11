@@ -231,7 +231,7 @@ let view (m : Model.t) ~inject ~terminal =
         (List.map
            ~f:under_sheet
            [ Topbar_view.view m ~inject
-           ; banner m ~inject
+           ; div ~cls:"banner-anchor" [ banner m ~inject ]
            ; Node.div
                ~attrs:
                  [ Attr.classes
