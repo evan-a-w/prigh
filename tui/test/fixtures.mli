@@ -54,7 +54,7 @@ val stats_json : string
 val auth_json : string
 val config_json : string
 val messages_json : string
-val user : ?images:P.Image.t list -> string -> P.Message.t
+val user : ?images:P.Image.t list -> ?origin:P.Origin.t -> string -> P.Message.t
 val assistant : ?stop:string -> string -> P.Message.t
 val partial : P.Message.Assistant.t
 val tool_call : ?name:string -> ?arguments:string -> string -> P.Tool_call.t
@@ -66,3 +66,6 @@ val tool_result
   -> id:string
   -> string
   -> P.Message.Tool_result.t
+
+(** A report of background work as the backend delivers it. *)
+val delivery : string -> P.Message.t

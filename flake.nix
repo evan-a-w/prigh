@@ -234,6 +234,7 @@
                   pkgs.playwright-test
                   pkgs.playwright-driver.browsers
                   pkgs.dejavu_fonts
+                  pkgs.git # /diff
                 ];
               }
               ''

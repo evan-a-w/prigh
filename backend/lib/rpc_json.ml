@@ -84,7 +84,13 @@ let assistant (a : Message.Assistant.t) =
 let message (m : Message.t) =
   match m with
   | User u ->
-    `Object ([ "role", str "user"; "text", str u.text ] @ images_field u.images)
+    `Object
+      ([ "role", str "user"; "text", str u.text ]
+       @ images_field u.images
+       @
+       match Injected.of_message ~origin:u.origin u.text with
+       | None -> []
+       | Some origin -> [ "origin", Injected.to_json origin ~text:u.text ])
   | Assistant a -> assistant a
   | Tool_result r -> tool_result r
 ;;

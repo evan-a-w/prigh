@@ -47,34 +47,50 @@ module Item = struct
     | Delivery of string
     | Skill of
         { skill : Skill_message.t
-        ; images : P.Image.t list
+        ; user : P.Message.User.t
         }
-    | Handover of Handover_message.t
+    | Note of
+        { kind : P.Origin.Kind.t
+        ; title : string
+        ; text : string
+        }
   [@@deriving sexp_of, equal]
 end
 
+let summary_prefix = "Summary of the conversation so far:\n"
+
 let user_item (user : P.Message.User.t) : Item.t =
-  if Option.is_some (Delivery.parse user.text)
-  then Delivery user.text
-  else (
-    match Skill_message.parse user.text with
-    | Some skill -> Skill { skill; images = user.images }
-    | None ->
-      (match Handover_message.parse user.text with
-       | Some handover -> Handover handover
-       | None -> User user))
+  match P.Message.User.source user with
+  | Some { kind = Delivery; _ } -> Delivery user.text
+  | Some { kind = Summary; _ } ->
+    Compaction
+      (Option.value
+         (String.chop_prefix user.text ~prefix:summary_prefix)
+         ~default:user.text)
+  | Some { kind; title } -> Note { kind; title; text = user.text }
+  | None ->
+    (match Skill_message.parse (P.Message.User.body user) with
+     | Some skill -> Skill { skill; user }
+     | None -> User user)
 ;;
 
-(* A plan mode note becomes a line of its own before what the user wrote. *)
+(* A message of the harness's shows its notes (plan mode turned on with a
+   goal's message) before its own line; one of notes only (sent between
+   turns) is just them. A user's message shows them itself. *)
 let user_items (user : P.Message.User.t) : Item.t list =
-  match Mode_note.split user.text with
+  let origin = Option.value user.origin ~default:P.Origin.empty in
+  let notes =
+    List.map origin.notes ~f:(fun (n : P.Origin.Note.t) : Item.t ->
+      Note { kind = n.kind; title = n.title; text = n.text })
+  in
+  match P.Message.User.source user with
+  | Some _ -> notes @ [ user_item user ]
+  | None
+    when (not (List.is_empty notes))
+         && String.is_empty (String.strip (P.Message.User.body user))
+         && List.is_empty user.images
+         && List.is_empty origin.attachments -> notes
   | None -> [ user_item user ]
-  | Some (on, rest) ->
-    Notice (Info, Mode_note.summary ~on)
-    ::
-    (if String.is_empty rest && List.is_empty user.images
-     then []
-     else [ user_item { user with text = rest } ])
 ;;
 
 module Stream_kind = struct
@@ -549,9 +565,39 @@ let user_lines text images =
 
 let turn_start = Log_line.flush []
 
+(* The harness's notes: a glyph in the gutter and a title, quiet; verbose
+   adds the text the model saw. *)
+let note_lines ~kind ~title ~text ~(verbosity : Verbosity.t) =
+  Log_line.mark
+    { text = Injected_note.glyph kind; style = gray }
+    [ { text = title; style = gray } ]
+  ::
+  (match verbosity with
+   | Verbose -> lines_at ~depth:1 ~style:dim text
+   | Quiet | Normal -> [])
+;;
+
+(* Notes in front of the user's text come first, and the attached files are
+   named after it. *)
+let user_notes (user : P.Message.User.t) ~verbosity =
+  Option.value_map user.origin ~default:[] ~f:(fun origin ->
+    List.concat_map origin.notes ~f:(fun (n : P.Origin.Note.t) ->
+      note_lines ~kind:n.kind ~title:n.title ~text:n.text ~verbosity))
+;;
+
+let attachment_lines (user : P.Message.User.t) =
+  Option.value_map user.origin ~default:[] ~f:(fun origin ->
+    List.map origin.attachments ~f:(fun path ->
+      Log_line.bar
+        turn_bar
+        [ { text = "@" ^ path; style = cyan }
+        ; { text = "  attached"; style = dim }
+        ]))
+;;
+
 (* The skill's file is long and the user did not type it: a header stands for
    it, and only verbose mode shows it. *)
-let render_skill (skill : Skill_message.t) images ~(verbosity : Verbosity.t) =
+let render_skill (skill : Skill_message.t) user ~(verbosity : Verbosity.t) =
   let header : Content.Line.t =
     [ { text = "skill "; style = dim }
     ; { text = skill.name; style = Style.bold Style.plain }
@@ -565,8 +611,10 @@ let render_skill (skill : Skill_message.t) images ~(verbosity : Verbosity.t) =
       , List.map (String.split_lines skill.body) ~f:(fun line ->
           Log_line.bar turn_bar (Content.Line.of_string ~style:dim line)) )
   in
-  (turn_start :: Log_line.bar turn_bar header :: body)
-  @ user_lines skill.args images
+  (turn_start :: user_notes user ~verbosity)
+  @ (Log_line.bar turn_bar header :: body)
+  @ user_lines skill.args user.images
+  @ attachment_lines user
 ;;
 
 let thinking_rail : Content.Span.t = { text = "┆"; style = dim }
@@ -595,19 +643,13 @@ let rows (item : Item.t) ~(verbosity : Verbosity.t) ~width : Log_line.t list =
     List.map (Markdown.render ?width text) ~f:Log_line.indent
   in
   match item with
-  | User { text; images; at = _ } -> turn_start :: user_lines text images
-  | Skill { skill; images } -> render_skill skill images ~verbosity
-  | Handover handover ->
-    let summary : Content.Span.t =
-      { text = Handover_message.summary handover; style = yellow }
-    in
-    (* The failed reply above it already shows the error. *)
-    (match verbosity with
-     | Quiet | Normal -> [ Log_line.indent [ summary ] ]
-     | Verbose ->
-       [ Log_line.indent
-           [ summary; { text = sprintf " (%s)" handover.error; style = dim } ]
-       ])
+  | User user ->
+    (turn_start :: user_notes user ~verbosity)
+    @ user_lines (P.Message.User.body user) user.images
+    @ attachment_lines user
+  | Skill { skill; user } -> render_skill skill user ~verbosity
+  | Note { kind; title; text } ->
+    turn_start :: note_lines ~kind ~title ~text ~verbosity
   | Assistant { text; final } ->
     (match verbosity with
      | Quiet when not final ->

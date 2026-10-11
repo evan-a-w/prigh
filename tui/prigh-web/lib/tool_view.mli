@@ -20,11 +20,7 @@ val view
 (** A tool the provider ran (web search) as a card like a tool call's.
     [running]: its message is still streaming, so a missing output is still
     to come. *)
-val server_tool
-  :  fold:Fold.t
-  -> running:bool
-  -> Content.Server_tool.t
-  -> Node.t
+val server_tool : fold:Fold.t -> running:bool -> Content.Server_tool.t -> Node.t
 
 (** A subagent's latest step: its current tool call, or the last line of its
     text. *)

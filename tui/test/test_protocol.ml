@@ -803,6 +803,7 @@ let%expect_test "config round trip and config_changed event" =
              [ "openai-codex/gpt-6-sol"; "deepseek/deepseek-flash" ]
          ; default_cwd = Some "~/proj"
          ; archive_after_days = 7.
+         ; notify = "desktop"
          }
        : Json.t)];
   decode
@@ -819,7 +820,8 @@ let%expect_test "config round trip and config_changed event" =
      (default_thinking ())
      (fallback_models  ())
      (default_cwd      ())
-     (archive_after_days 7))
+     (archive_after_days 7)
+     (notify             bell))
     ((scoped_models ())
      (approval_mode Auto)
      (permissions (
@@ -830,7 +832,8 @@ let%expect_test "config round trip and config_changed event" =
      (default_thinking ())
      (fallback_models  ())
      (default_cwd      ())
-     (archive_after_days 7))
+     (archive_after_days 7)
+     (notify             bell))
     ((scoped_models ())
      (approval_mode Auto)
      (permissions (
@@ -841,7 +844,8 @@ let%expect_test "config round trip and config_changed event" =
      (default_thinking (low))
      (fallback_models ())
      (default_cwd     ())
-     (archive_after_days 7))
+     (archive_after_days 7)
+     (notify             bell))
     (decode (e "default_model must be a string"))
     ((scoped_models ())
      (approval_mode Auto)
@@ -853,7 +857,8 @@ let%expect_test "config round trip and config_changed event" =
      (default_thinking ())
      (fallback_models (openai-codex/gpt-6-sol anthropic/claude-opus-5-5))
      (default_cwd (/srv/work))
-     (archive_after_days 7))
+     (archive_after_days 7)
+     (notify             bell))
     (decode (e "fallback_models must be an array of strings"))
     (decode (e "default_cwd must be a string"))
     ((scoped_models (a b))
@@ -866,7 +871,8 @@ let%expect_test "config round trip and config_changed event" =
      (default_thinking max)
      (fallback_models (openai-codex/gpt-6-sol deepseek/deepseek-flash))
      (default_cwd        ~/proj)
-     (archive_after_days 7))
+     (archive_after_days 7)
+     (notify             desktop))
     (Event (
       Config_changed (
         (scoped_models (a))
@@ -879,7 +885,8 @@ let%expect_test "config round trip and config_changed event" =
         (default_thinking ())
         (fallback_models  ())
         (default_cwd      ())
-        (archive_after_days 7))))
+        (archive_after_days 7)
+        (notify             bell))))
     |}]
 ;;
 

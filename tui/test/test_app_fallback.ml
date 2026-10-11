@@ -31,6 +31,25 @@ let handover ~from ~to_ =
     to_
 ;;
 
+(* What the backend sends with it. *)
+let handover_origin ~from ~to_ : P.Origin.t =
+  { body = None
+  ; notes = []
+  ; attachments = []
+  ; source =
+      Some
+        { kind = Handover; title = sprintf "Handed over from %s to %s" from to_ }
+  }
+;;
+
+let handover_json ~from ~to_ =
+  sprintf
+    {|{"role":"user","text":%s,"origin":{"source":{"kind":"handover","title":"Handed over from %s to %s"}}}|}
+    (P.Json.to_string (P.Json.str (handover ~from ~to_)))
+    from
+    to_
+;;
+
 let type_quietly h text =
   String.iter text ~f:(fun c -> H.step ~quiet:true h (Key (Key.char c)))
 ;;
@@ -199,7 +218,8 @@ let%expect_test
       (default_thinking ())
       (fallback_models (anthropic/claude-fable-5-1 deepseek/deepseek-flash))
       (default_cwd ())
-      (archive_after_days 7)))
+      (archive_after_days 7)
+      (notify             bell)))
     |}]
 ;;
 
@@ -379,6 +399,10 @@ let%expect_test
     h
     (Message_start
        (user
+          ~origin:
+            (handover_origin
+               ~from:"deepseek/deepseek-flash"
+               ~to_:"anthropic/claude-fable-5-1")
           (handover
              ~from:"deepseek/deepseek-flash"
              ~to_:"anthropic/claude-fable-5-1")));
@@ -390,7 +414,6 @@ let%expect_test
     {|
     (Rpc (method_ prompt) (params ((text "fix the bug"))) (tag Show_error))
     (Append_history "fix the bug")
-      earlier answer
 
     ▌ fix the bug
       error: HTTP 429: The usage limit has been reached (usage
@@ -398,7 +421,8 @@ let%expect_test
       deepseek/deepseek-flash: HTTP 429: The usage limit has
       been reached (usage limit reached); handing over to
       anthropic/claude-fable-5-1
-      ↪ handed over from deepseek/deepseek-flash to
+
+    ↪ Handed over from deepseek/deepseek-flash to
       anthropic/claude-fable-5-1
       fixed it
     ────────────────────────────────────────────────────────────
@@ -414,21 +438,20 @@ let%expect_test
   H.show h;
   [%expect
     {|
-    ▌ fix the bug
-      error: HTTP 429: The usage limit has been reached (usage
-      limit reached)
-      deepseek/deepseek-flash: HTTP 429: The usage limit has
       been reached (usage limit reached); handing over to
       anthropic/claude-fable-5-1
-      ↪ handed over from deepseek/deepseek-flash to
-      anthropic/claude-fable-5-1 (HTTP 429: The usage limit has
-      been reached (usage limit reached))
+
+    ↪ Handed over from deepseek/deepseek-flash to
+      anthropic/claude-fable-5-1
+      [prigh: deepseek/deepseek-flash cannot continue (HTTP 429:
+      The usage limit has been reached (usage limit reached)),
+      so anthropic/claude-fable-5-1 takes over this conversation
+      from here. Carry on with the task where it left off.]
       fixed it
       view: verbose — everything is shown
     ────────────────────────────────────────────────────────────
     > ▏
     /work  claude-fable-5-1  think:off  ctx:0.1%/1.0M  $0.01
-      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
     ▌ earlier question
       earlier answer
@@ -436,7 +459,8 @@ let%expect_test
     ▌ fix the bug
       error: HTTP 429: The usage limit has been reached (usage
       limit reached)
-      ↪ handed over from deepseek/deepseek-flash to
+
+    ↪ Handed over from deepseek/deepseek-flash to
       anthropic/claude-fable-5-1
       fixed it
     ────────────────────────────────────────────────────────────
@@ -447,15 +471,17 @@ let%expect_test
 
 let%expect_test "a hand-over in the history and in /fork's list" =
   let h = connected () in
-  let text =
-    handover ~from:"deepseek/deepseek-flash" ~to_:"anthropic/claude-fable-5-1"
+  let message =
+    handover_json
+      ~from:"deepseek/deepseek-flash"
+      ~to_:"anthropic/claude-fable-5-1"
   in
   H.reply
     h
     Initial_messages
     (sprintf
-       {|[{"role":"user","text":"fix the bug"},{"role":"user","text":%s},{"role":"assistant","content":[{"type":"text","text":"fixed it"}],"stop_reason":{"type":"end_turn"},"usage":{"input":1,"output":2,"cache_read":0},"model":"m"}]|}
-       (P.Json.to_string (P.Json.str text)));
+       {|[{"role":"user","text":"fix the bug"},%s,{"role":"assistant","content":[{"type":"text","text":"fixed it"}],"stop_reason":{"type":"end_turn"},"usage":{"input":1,"output":2,"cache_read":0},"model":"m"}]|}
+       message);
   H.show h;
   H.keys h "/fork";
   H.enter h;
@@ -463,8 +489,8 @@ let%expect_test "a hand-over in the history and in /fork's list" =
     h
     Entries_for_fork
     (sprintf
-       {|{"head":"u2","entries":[{"id":"u1","parent":null,"kind":"message","message":{"role":"user","text":"fix the bug"}},{"id":"u2","parent":"u1","kind":"message","message":{"role":"user","text":%s}}]}|}
-       (P.Json.to_string (P.Json.str text)));
+       {|{"head":"u2","entries":[{"id":"u1","parent":null,"kind":"message","message":{"role":"user","text":"fix the bug"}},{"id":"u2","parent":"u1","kind":"message","message":%s}]}|}
+       message);
   H.show h;
   [%expect
     {|
@@ -474,25 +500,26 @@ let%expect_test "a hand-over in the history and in /fork's list" =
       earlier answer
 
     ▌ fix the bug
-      ↪ handed over from deepseek/deepseek-flash to
+
+    ↪ Handed over from deepseek/deepseek-flash to
       anthropic/claude-fable-5-1
       fixed it
     ────────────────────────────────────────────────────────────
     > ▏
     …deepseek-flash  think:off  ctx:0.1%/1.0M  $0.01
     (Rpc (method_ get_entries) (params ()) (tag Entries_for_fork))
-
     ▌ earlier question
       earlier answer
 
     ▌ fix the bug
-      ↪ handed over from deepseek/deepseek-flash to
+
+    ↪ Handed over from deepseek/deepseek-flash to
       anthropic/claude-fable-5-1
       fixed it
     Fork at  (2)
     / ▏
        fix the bug                     #1
-    ▸* ↪ handed over from deepseek/deepseek-flash to anthropic/…
+    ▸* ↪ Handed over from deepseek/deepseek-flash to anthropic/…
     ────────────────────────────────────────────────────────────
     …deepseek-flash  ctx:0.1%/1.0M  Enter selects · Esc closes
     |}]

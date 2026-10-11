@@ -42,54 +42,86 @@ let skill_card (skill : Skill_message.t) =
        ])
 ;;
 
-(* The backend's note telling the model about plan mode: a line, not the
-   note itself. *)
-let mode_note ~on =
-  div
-    (if on then "mode-note on" else "mode-note off")
-    [ span "icon" (if on then "◇" else "◆"); Node.text (Mode_note.summary ~on) ]
+(* A note of the harness's in the transcript's margin: a glyph and a line,
+   unfolding to exactly what the model saw. *)
+let note ?at times ~(kind : Origin.Kind.t) ~title text =
+  Node.details
+    ~attrs:
+      [ Attr.class_ "note"
+      ; Attr.create
+          "data-kind"
+          (match kind with
+           | Other other -> other
+           | kind ->
+             String.lowercase (Sexp.to_string [%sexp (kind : Origin.Kind.t)]))
+      ]
+    [ Node.summary
+        (present
+           [ Node.span
+               ~attrs:[ Attr.class_ "glyph"; Attr.create "aria-hidden" "true" ]
+               [ Node.text (Injected_note.glyph kind) ]
+           ; span "title" title
+           ; Option.value_map at ~default:Node.none ~f:(time times)
+           ])
+    ; Node.pre ~attrs:[ Attr.class_ "note-text" ] [ Node.text text ]
+    ]
 ;;
 
-let user
-      ?(note = Node.none)
-      ?skill
-      times
-      ({ text; images; at } : Message.User.t)
-  =
-  let text =
-    Option.value_map skill ~default:text ~f:(fun (s : Skill_message.t) ->
-      s.args)
+let margin_note ?at times (n : Origin.Note.t) =
+  note ?at times ~kind:n.kind ~title:n.title n.text
+;;
+
+let user ?skill times (u : Message.User.t) =
+  let notes, attachments =
+    match u.origin with
+    | None -> [], []
+    | Some origin -> origin.notes, origin.attachments
   in
-  div
-    (if Option.is_some skill then "msg user skill" else "msg user")
-    [ note
-    ; Option.value_map skill ~default:Node.none ~f:skill_card
-    ; Image_view.thumbs images
-    ; (if String.is_empty (String.strip text)
-       then Node.none
-       else div "bubble" [ Node.text text ])
-    ; Option.value_map at ~default:Node.none ~f:(time times)
-    ]
+  let text =
+    Option.value_map
+      skill
+      ~default:(Message.User.body u)
+      ~f:(fun (s : Skill_message.t) -> s.args)
+  in
+  let prompt =
+    div
+      (if Option.is_some skill then "msg user skill" else "msg user")
+      [ Option.value_map skill ~default:Node.none ~f:skill_card
+      ; Image_view.thumbs u.images
+      ; (if String.is_empty (String.strip text)
+         then Node.none
+         else div "bubble" [ Node.text text ])
+      ; (match attachments with
+         | [] -> Node.none
+         | paths ->
+           div
+             "attachments"
+             (List.map paths ~f:(fun path ->
+                Node.span
+                  ~attrs:[ Attr.class_ "attachment"; Attr.title "Attached file" ]
+                  [ Node.text ("@" ^ path) ])))
+      ; Option.value_map u.at ~default:Node.none ~f:(time times)
+      ]
+  in
+  match notes with
+  | [] -> prompt
+  | notes
+    when String.is_empty (String.strip text)
+         && List.is_empty u.images
+         && List.is_empty attachments ->
+    (* Notes sent between turns, with nothing of the user's. *)
+    div "msg noted" (List.map notes ~f:(margin_note ?at:u.at times))
+  | notes -> div "msg noted" (List.map notes ~f:(margin_note times) @ [ prompt ])
 ;;
 
-(* The backend's message handing the conversation to the next fallback
-   model: a line between the replies, not a prompt of the user's. *)
-let handover times (h : Handover_message.t) at =
-  div
-    "msg handover"
-    [ span "icon" "↪"
-    ; Node.span
-        ~attrs:[ Attr.class_ "what" ]
-        [ Node.text "handed over from "
-        ; span "model" h.from
-        ; Node.text " to "
-        ; span "model" h.to_
-        ]
-    ; Node.span
-        ~attrs:[ Attr.class_ "reason"; Attr.title h.error ]
-        [ Node.text ("(" ^ h.error ^ ")") ]
-    ; Option.value_map at ~default:Node.none ~f:(time times)
-    ]
+let summary_prefix = "Summary of the conversation so far:\n"
+
+let compaction summary =
+  folded
+    ~cls:"msg compaction"
+    ~label:"Context compacted"
+    ~preview:(Markdown.preview summary)
+    (Markdown_view.render summary)
 ;;
 
 let day_separator times date =
@@ -232,20 +264,30 @@ and assistant ~fold times chat (message : Message.Assistant.t) ~streaming =
 and render_entry ~fold times chat (entry : Chat.Entry.t) =
   match entry with
   | User u ->
-    (match Handover_message.parse u.text, Prigh_ui.Delivery.parse u.text with
-     | Some h, _ -> handover times h u.at
-     | None, Some sections -> div "msg" [ Delivery_view.view ~fold sections ]
-     | None, None ->
-       (match Mode_note.split u.text with
-        | None -> user ?skill:(Skill_message.parse u.text) times u
-        | Some (on, rest) when String.is_empty rest && List.is_empty u.images ->
-          div "msg" [ mode_note ~on ]
-        | Some (on, rest) ->
-          user
-            ~note:(mode_note ~on)
-            ?skill:(Skill_message.parse rest)
-            times
-            { u with text = rest }))
+    let notes =
+      Option.value_map u.origin ~default:[] ~f:(fun (o : Origin.t) -> o.notes)
+    in
+    (* Notes before a message of the harness's: plan mode turned on or off
+       with a goal's message. *)
+    let noted main =
+      match notes with
+      | [] -> main
+      | notes ->
+        div "msg noted" (List.map notes ~f:(margin_note times) @ [ main ])
+    in
+    (match Message.User.source u with
+     | Some { kind = Delivery; title } ->
+       noted
+         (match Prigh_ui.Delivery.parse u.text with
+          | Some sections -> div "msg" [ Delivery_view.view ~fold sections ]
+          | None -> note ?at:u.at times ~kind:Delivery ~title u.text)
+     | Some { kind = Summary; _ } ->
+       compaction
+         (Option.value
+            (String.chop_prefix u.text ~prefix:summary_prefix)
+            ~default:u.text)
+     | Some { kind; title } -> noted (note ?at:u.at times ~kind ~title u.text)
+     | None -> user ?skill:(Skill_message.parse (Message.User.body u)) times u)
   | Notice text -> div "msg notice" [ Node.text text ]
   | Shell call ->
     let tool = Chat.tool chat call.id in
@@ -261,12 +303,7 @@ and render_entry ~fold times chat (entry : Chat.Entry.t) =
           { call with name = "bash" }
           tool
       ]
-  | Compaction summary ->
-    folded
-      ~cls:"msg compaction"
-      ~label:"Context compacted"
-      ~preview:(Markdown.preview summary)
-      (Markdown_view.render summary)
+  | Compaction summary -> compaction summary
   | Assistant { message; streaming } ->
     assistant ~fold times chat message ~streaming
 

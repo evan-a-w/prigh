@@ -318,7 +318,11 @@ let%expect_test "slash commands: the popup, arguments, running, unknown ones" =
     /plan [on|off] toggle plan mode: the model investigates and plans, changing no files, until you approve its plan
     /todos show the model's plan (its update_plan steps)
     /permissions show the mode and the allow/ask/deny rules (config and this session)
+    /notify [on|off] tell you when a turn ends or something waits for you while the tab is hidden
     /compact [instructions] summarise older messages to free context
+    /diff [path] show the uncommitted changes where the tools run, untracked files too
+    /review [base] [instructions] review the uncommitted changes, or those against a base branch, for prioritised findings
+    /init write or improve the project's AGENTS.md
     /name [name] rename the session
     /session show the session's details and statistics
     /sessions search the saved sessions
@@ -350,10 +354,6 @@ let%expect_test "slash commands: the popup, arguments, running, unknown ones" =
     /jobs [id|kill <id>] background jobs in the agents panel: list them, show or kill one
     /login [provider] log in to a model provider (or /login custom)
     /logout [provider] remove a provider's login
-    /auth show which providers are logged in
-    /setusr [user] act as another user (superusers); without a user, pick one
-    /signout sign out of this account
-    /retry-backend-connection reconnect to the backend now
     |}];
   H.type_ h "/mod";
   H.key h "Tab";

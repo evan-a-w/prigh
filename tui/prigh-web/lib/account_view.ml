@@ -46,6 +46,8 @@ let item_icon (id : string) : Icon.t =
   | "act" -> Users
   | "back" -> Undo
   | "signout" -> Logout
+  | "notify on" -> Bell
+  | "notify off" -> Bell_off
   | _ -> User
 ;;
 

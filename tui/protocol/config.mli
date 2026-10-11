@@ -26,6 +26,9 @@ type t =
   ; default_cwd : string option (** where new sessions start *)
   ; archive_after_days : float
     (** sessions inactive this long show as archived; [0.]: never *)
+  ; notify : string
+    (** how the terminal frontend notifies: [off], [bell] (default) or
+        [desktop] *)
   }
 [@@deriving sexp_of, equal]
 

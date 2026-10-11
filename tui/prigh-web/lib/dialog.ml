@@ -55,6 +55,7 @@ type t =
       }
   | Mcp_tools of Mcp_server.t
   | Loading of string
+  | Diff of Git_diff.t
 [@@deriving sexp_of, equal]
 
 let per_session = function
@@ -65,6 +66,7 @@ let per_session = function
   | Text _
   | Mcp_tools _
   | Loading _
+  | Diff _
   | Picker
       { kind = Fork _ | Rewind _ | Tree | Hosts | Skills | Mcp _ | Modes; _ } ->
     true

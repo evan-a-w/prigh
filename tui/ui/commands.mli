@@ -11,6 +11,7 @@ module Argument : sig
     | Confirm
     | Mode
     | Plan
+    | Notify (** [off], [bell] or [desktop] *)
     | Login
     | Logout
     | Sessions

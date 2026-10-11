@@ -5,8 +5,9 @@ open! Import
     folds behind a "Show all N lines" toggle of the [fold] with that key,
     unless it is expanded. *)
 
-(** A unified diff (what [edit] returns), with old and new line numbers. *)
-val unified : fold:Fold.t * string -> string -> Node.t
+(** A unified diff (what [edit] returns), with old and new line numbers,
+    folded to [max_rows] (default 8). *)
+val unified : ?max_rows:int -> fold:Fold.t * string -> string -> Node.t
 
 (** Diff lines without line numbers: an [apply_patch] input's hunks. *)
 val hunks : fold:Fold.t * string -> string list -> Node.t

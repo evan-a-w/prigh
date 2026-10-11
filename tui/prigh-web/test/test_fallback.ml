@@ -58,7 +58,7 @@ let%expect_test "/fallback shows the chain, sets only it, and clears it" =
     (((scoped_models ()) (approval_mode Auto)
       (permissions ((allow ()) (ask ()) (deny ()))) (default_model ())
       (default_thinking ()) (fallback_models ()) (default_cwd ())
-      (archive_after_days 7)))
+      (archive_after_days 7) (notify bell)))
     (Save_history (/fallback))
     (Expire_toast (id 0) (after_ms 4000))
     No fallback models: /fallback MODEL [MODEL...] sets the chain that takes over when a model's usage runs out
@@ -84,7 +84,7 @@ let%expect_test "/fallback shows the chain, sets only it, and clears it" =
       (permissions ((allow ()) (ask ()) (deny ()))) (default_model ())
       (default_thinking ())
       (fallback_models (openai/gpt-6 anthropic/claude-sonnet-5)) (default_cwd ())
-      (archive_after_days 7)))
+      (archive_after_days 7) (notify bell)))
     |}];
   (* After a hand-over the status line's model moves on, and so does
      /fallback's "now on". *)
@@ -126,7 +126,7 @@ let%expect_test "/fallback shows the chain, sets only it, and clears it" =
     (((scoped_models ()) (approval_mode Auto)
       (permissions ((allow ()) (ask ()) (deny ()))) (default_model ())
       (default_thinking ()) (fallback_models ()) (default_cwd ())
-      (archive_after_days 7)))
+      (archive_after_days 7) (notify bell)))
     |}]
 ;;
 
@@ -150,7 +150,7 @@ let%expect_test
     (((scoped_models ()) (approval_mode Auto)
       (permissions ((allow ()) (ask ()) (deny ()))) (default_model ())
       (default_thinking ()) (fallback_models ()) (default_cwd ())
-      (archive_after_days 7)))
+      (archive_after_days 7) (notify bell)))
     |}];
   (* Before the config has arrived there is nothing to show or keep. *)
   let m, cmds = App.update { App.init with draft = "/fallback gpt-6" } Send in
@@ -267,7 +267,7 @@ let%expect_test "/default-dir shows, sets and clears where new sessions start" =
     (((scoped_models ()) (approval_mode Auto)
       (permissions ((allow ()) (ask ()) (deny ()))) (default_model ())
       (default_thinking ()) (fallback_models ()) (default_cwd (~/proj))
-      (archive_after_days 7)))
+      (archive_after_days 7) (notify bell)))
     |}];
   run h "/default-dir";
   H.text h ~selector:".toast:last-child";
@@ -408,13 +408,18 @@ let handover_text =
    with the task where it left off.]"
 ;;
 
+let handover_origin =
+  {|"origin":{"source":{"kind":"handover","title":"Handed over from openai/gpt-6 to anthropic/claude-opus-5-5"}}|}
+;;
+
 let%expect_test "a hand-over: a line, not a prompt bubble" =
   let chat =
     Chat_harness.chat
       [ {|{"event":"message_start","message":{"role":"user","text":"fix the build"}}|}
       ; sprintf
-          {|{"event":"message_start","message":{"role":"user","text":%s,"at":1791194280000}}|}
+          {|{"event":"message_start","message":{"role":"user","text":%s,%s,"at":1791194280000}}|}
           (Jsonaf.to_string (`String handover_text))
+          handover_origin
       ]
   in
   Chat_harness.show chat;
@@ -424,25 +429,21 @@ let%expect_test "a hand-over: a line, not a prompt bubble" =
       <div class="msg user">
         <div class="bubble"> fix the build </div>
       </div>
-      <div class="handover msg">
-        <span class="icon"> ↪ </span>
-        <span class="what">
-          handed over from
-          <span class="model"> openai/gpt-6 </span>
-           to
-          <span class="model"> anthropic/claude-opus-5-5 </span>
-        </span>
-        <span title="HTTP 429: {"error": "usage limit reached (plan: pro), try later"} (usage limit reached)"
-              class="reason">
-          (HTTP 429: {"error": "usage limit reached (plan: pro), try later"} (usage limit reached))
-        </span>
-        <time title="Monday 5 October 2026, 11:58:00" datetime="2026-10-05T09:58:00Z" class="time"> 11:58 </time>
-      </div>
+      <details data-kind="handover" class="note">
+        <summary>
+          <span aria-hidden="true" class="glyph"> ↪ </span>
+          <span class="title"> Handed over from openai/gpt-6 to anthropic/claude-opus-5-5 </span>
+          <time title="Monday 5 October 2026, 11:58:00" datetime="2026-10-05T09:58:00Z" class="time"> 11:58 </time>
+        </summary>
+        <pre class="note-text">
+          [prigh: openai/gpt-6 cannot continue (HTTP 429: {"error": "usage limit reached (plan: pro), try later"} (usage limit reached)), so anthropic/claude-opus-5-5 takes over this conversation from here. Carry on with the task where it left off.]
+        </pre>
+      </details>
     </div>
     |}];
   Chat_harness.text chat;
   [%expect
-    {| fix the build ↪ handed over from openai/gpt-6 to anthropic/claude-opus-5-5 (HTTP 429: {"error": "usage limit reached (plan: pro), try later"} (usage limit reached)) 11:58 |}]
+    {| fix the build ↪ Handed over from openai/gpt-6 to anthropic/claude-opus-5-5 11:58 [prigh: openai/gpt-6 cannot continue (HTTP 429: {"error": "usage limit reached (plan: pro), try later"} (usage limit reached)), so anthropic/claude-opus-5-5 takes over this conversation from here. Carry on with the task where it left off.] |}]
 ;;
 
 let%expect_test "a hand-over as it happens: notice, model, line" =
@@ -462,8 +463,9 @@ let%expect_test "a hand-over as it happens: notice, model, line" =
   H.event
     h
     (sprintf
-       {|{"event":"message_start","message":{"role":"user","text":%s}}|}
-       (Jsonaf.to_string (`String handover_text)));
+       {|{"event":"message_start","message":{"role":"user","text":%s,%s}}|}
+       (Jsonaf.to_string (`String handover_text))
+       handover_origin);
   H.text h ~selector:".entries";
   H.text h ~selector:".toast";
   H.text h ~selector:".controls";
@@ -472,7 +474,8 @@ let%expect_test "a hand-over as it happens: notice, model, line" =
     (GPT-6) (on) (Terminal (Ctrl+`))
     (Expire_toast (id 0) (after_ms 4000))
     fix the build
-    ↪ handed over from openai/gpt-6 to anthropic/claude-opus-5-5 (HTTP 429: {"error": "usage limit reached (plan: pro), try later"} (usage limit reached))
+    ↪ Handed over from openai/gpt-6 to anthropic/claude-opus-5-5
+    [prigh: openai/gpt-6 cannot continue (HTTP 429: {"error": "usage limit reached (plan: pro), try later"} (usage limit reached)), so anthropic/claude-opus-5-5 takes over this conversation from here. Carry on with the task where it left off.]
     openai/gpt-6: HTTP 429: quota (usage limit reached); handing over to anthropic/claude-opus-5-5
     (Claude Opus 5.5) (on) (Terminal (Ctrl+`))
     |}];
@@ -492,8 +495,9 @@ let%expect_test "a hand-over in /fork and /tree" =
     sprintf
       {|{"head":"e2","entries":[
          {"id":"e1","parent":null,"kind":"message","message":{"role":"user","text":"fix the build"}},
-         {"id":"e2","parent":"e1","kind":"message","message":{"role":"user","text":%s}}]}|}
+         {"id":"e2","parent":"e1","kind":"message","message":{"role":"user","text":%s,%s}}]}|}
       (Jsonaf.to_string (`String handover_text))
+      handover_origin
   in
   run h "/fork";
   H.reply h "get_entries" entries;
@@ -505,7 +509,7 @@ let%expect_test "a hand-over in /fork and /tree" =
     (Rpc (method_ get_entries) (params ()) (tag (Entries Fork)))
     (Focus picker-input)
     fix the build #1
-    ↪ handed over from openai/gpt-6 to anthropic/claude-opus-5-5 (HTTP 429: {"error": "usage limit reached (plan: pro), try later"} (usage limit reached)) #2 ✓
+    ↪ Handed over from openai/gpt-6 to anthropic/claude-opus-5-5 #2 ✓
     |}];
   H.key h "Escape" ~target:Field;
   run h "/tree";
@@ -520,7 +524,7 @@ let%expect_test "a hand-over in /fork and /tree" =
     (Rpc (method_ get_entries) (params ((all true))) (tag (Entries Tree)))
     (Focus picker-input)
     > fix the build ✓
-    > ↪ handed over from openai/gpt-6 to anthropic/claude-opus-5-5 (HTTP 429: {"error": "usage limit reached (plan: pro), try later"} (usage limit reached)) ✓
+    > ↪ Handed over from openai/gpt-6 to anthropic/claude-opus-5-5 ✓
     |}]
 ;;
 

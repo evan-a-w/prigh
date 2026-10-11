@@ -137,6 +137,11 @@ let argument_items
       [ "on", "read-only planning until you approve the plan"
       ; "off", "leave plan mode"
       ]
+  | Notify ->
+    simple
+      [ "on", "notify when the tab is hidden"
+      ; "off", "no browser notifications"
+      ]
   | Session ->
     List.map sessions ~f:(fun s ->
       Picker.Item.create

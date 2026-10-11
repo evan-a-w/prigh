@@ -71,7 +71,11 @@ let%expect_test "every command does something (none is unknown)" =
     /plan                      rpc set_mode
     /todos                     toast: No plan: the model has not made one (it makes one with update_plan).
     /permissions               text: Permissions
+    /notify                    toast: Notifications are on, but the browser has not been asked yet: /notify on asks it
     /compact                   toast: Compacting the conversation…
+    /diff                      toast: Reading the changes…
+    /review                    toast: Reading the changes to review…
+    /init                      rpc init
     /name                      (Rename"")
     /session                   loading Session: rpc session_stats
     /sessions                  sidebar
@@ -281,7 +285,7 @@ let%expect_test "/scoped-models, Ctrl+P and Alt+P" =
         deepseek/deepseek-chat))
       (approval_mode Auto) (permissions ((allow ()) (ask ()) (deny ())))
       (default_model ()) (default_thinking ()) (fallback_models ())
-      (default_cwd ()) (archive_after_days 7)))
+      (default_cwd ()) (archive_after_days 7) (notify bell)))
     |}]
 ;;
 

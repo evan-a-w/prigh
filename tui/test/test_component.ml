@@ -38,6 +38,14 @@ let make_platform ~replies : Component.Platform.t =
   ; copy_to_clipboard =
       (fun text ->
         Bonsai.Effect.of_sync_fun (fun () -> printf "copy %s\n" text) ())
+  ; notify =
+      (fun mode n ->
+        Bonsai.Effect.of_sync_fun
+          (fun () ->
+            print_s
+              [%sexp
+                "notify", (mode : Prigh_ui.Notify.Mode.t), (n : Prigh_ui.Notify.t)])
+          ())
   ; suspend = Bonsai.Effect.of_sync_fun (fun () -> print_endline "suspend") ()
   ; edit_externally =
       (fun text ->

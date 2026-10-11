@@ -52,6 +52,8 @@ module Reply_tag : sig
     | Models_catalog
     | Models_for_scoped
     | Compact_done
+    | Git_diff
+    | Review_started
     | Abort_done
     | Notice_on_success of string
     | History
@@ -108,6 +110,12 @@ module Command : sig
         [as_user]) and answer [Reply (Reconnect generation, hello reply)]. *)
     | Sign_out
     (** Forget the stored credentials and offer to log in again (browser only). *)
+    | Notify of
+        { mode : Notify.Mode.t
+        ; notification : Notify.t
+        }
+    (** Ring the bell or raise a desktop notification: sent only while the
+        terminal reports that it does not have the focus. *)
     | Quit
   [@@deriving sexp_of, equal]
 end
@@ -143,6 +151,7 @@ module Action : sig
     | Set_home of string
     | Set_utc_offset of Time_ns.Span.t
     (** the local time zone's, for times shown *)
+    | Focus of bool (** the terminal reported gaining or losing the focus *)
     | Hello of P.Hello_reply.t (** the [hello] reply *)
     | Resize of
         { width : int
@@ -188,6 +197,7 @@ module Model : sig
     ; height : int
     ; quitting : bool
     ; utc_offset : Time_ns.Span.t
+    ; terminal_focus : Focus.t (** whether the terminal or page has the focus *)
     }
   [@@deriving sexp_of]
 

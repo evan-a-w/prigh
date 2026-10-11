@@ -148,7 +148,7 @@ let image_block (image : Image.t) =
 ;;
 
 (* Text blocks may not be empty. *)
-let user_blocks ({ text; images } : Message.User.t) =
+let user_blocks ({ text; images; origin = _ } : Message.User.t) =
   (if String.is_empty text && not (List.is_empty images)
    then []
    else [ text_block text ])

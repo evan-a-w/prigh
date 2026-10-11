@@ -1,6 +1,20 @@
 open! Core
 open! Import
 
+(** How the terminal frontend tells the user that something needs them while
+    they look elsewhere ([/notify]); prigh-web keeps its own setting in the
+    browser. *)
+module Notify : sig
+  type t =
+    | Off
+    | Bell (** the terminal bell *)
+    | Desktop (** a desktop notification (OSC 9 / OSC 777) *)
+  [@@deriving sexp_of, equal, enumerate]
+
+  val to_string : t -> string
+  val of_string : string -> t Or_error.t
+end
+
 type t =
   { scoped_models : string list
   ; approval_mode : Approval_mode.t
@@ -26,6 +40,7 @@ type t =
   ; archive_after_days : float
     (** a session inactive for this long is archived (default 7; 0: never),
         see {!Session.Summary.is_archived} *)
+  ; notify : Notify.t (** default [Bell] *)
   }
 [@@deriving sexp_of]
 

@@ -14,6 +14,7 @@ module Platform = struct
     ; load_history : unit -> (P.Json.t, string) Result.t Bonsai.Effect.t
     ; append_history : string -> unit Bonsai.Effect.t
     ; copy_to_clipboard : string -> unit Bonsai.Effect.t
+    ; notify : Notify.Mode.t -> Notify.t -> unit Bonsai.Effect.t
     ; suspend : unit Bonsai.Effect.t
     ; edit_externally : string -> (string, string) Result.t Bonsai.Effect.t
     ; reconnect :
@@ -37,6 +38,7 @@ let perform ctx (platform : Platform.t) (command : App.Command.t) =
       inject (App.Action.Reply (App.Reply_tag.History, result))
     | Append_history text -> platform.append_history text
     | Copy_to_clipboard text -> platform.copy_to_clipboard text
+    | Notify { mode; notification } -> platform.notify mode notification
     | Suspend -> platform.suspend
     | Edit_externally text ->
       let%bind.Bonsai.Effect result = platform.edit_externally text in

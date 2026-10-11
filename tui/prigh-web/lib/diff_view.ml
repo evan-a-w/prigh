@@ -121,9 +121,9 @@ let table ~numbers rows =
     ]
 ;;
 
-let max_rows = 8
+let default_max_rows = 8
 
-let view ~fold:(fold, key) ~numbers rows =
+let view ?(max_rows = default_max_rows) ~fold:(fold, key) ~numbers rows =
   let count = List.length rows in
   let shown, toggle =
     if count <= max_rows + 1
@@ -135,7 +135,9 @@ let view ~fold:(fold, key) ~numbers rows =
   Chat_html.div "diff-view" [ table ~numbers shown; toggle ]
 ;;
 
-let unified ~fold text = view ~fold ~numbers:true (unified_rows text)
+let unified ?max_rows ~fold text =
+  view ?max_rows ~fold ~numbers:true (unified_rows text)
+;;
 
 let hunks ~fold lines =
   let rows =

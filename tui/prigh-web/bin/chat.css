@@ -228,7 +228,7 @@ summary:focus-visible { outline: 2px solid var(--sodium); outline-offset: 2px; b
   left: calc(-1 * var(--gutter) - 8px + var(--spine) / 2);
   width: 16px;
   text-align: center;
-  color: var(--sodium);
+  color: var(--muted);
   background: var(--graphite);
   line-height: 1.5;
 }
@@ -307,40 +307,75 @@ summary:focus-visible { outline: 2px solid var(--sodium); outline-offset: 2px; b
   text-align: center;
 }
 
-/* The backend's plan mode note: alone, or above what the user wrote */
-.mode-note {
-  display: flex;
-  gap: 6px;
+/* The harness's notes (tools moved, another directory, plan mode, a
+   hand-over, a goal's continuation, /review, ...): a glyph on the spine and a quiet line,
+   unfolding to exactly what the model saw. Not the user's words, so no
+   bubble. */
+.note {
+  position: relative;
+  padding-left: var(--gutter);
   color: var(--muted);
   font-size: 12.5px;
+  min-width: 0;
 }
-.msg > .mode-note:only-child { justify-content: center; }
-.mode-note .icon { color: var(--sodium); }
-
-/* The conversation handed over to the next fallback model */
-.msg.handover {
+.entries .note > summary {
   display: flex;
   align-items: baseline;
   gap: 8px;
-  max-width: 100%;
   min-width: 0;
-  padding: 6px 0;
-  border-top: 1px dashed var(--rule-2);
-  border-bottom: 1px dashed var(--rule-2);
-  color: var(--muted);
-  font-size: 12.5px;
 }
-.msg.handover .icon { color: var(--sodium); flex-shrink: 0; }
-.msg.handover .what { flex-shrink: 0; white-space: nowrap; }
-.msg.handover .model { font: 12px var(--mono); color: var(--fg); }
-.msg.handover .reason {
-  min-width: 0;
+.note .glyph {
+  position: absolute;
+  left: calc(var(--spine) / 2 - 8px);
+  width: 16px;
+  text-align: center;
+  font: 12px var(--mono);
   color: var(--faint);
+  background: var(--graphite);
+  line-height: 1.6;
+}
+.note[data-kind="plan_mode"] .glyph { color: var(--sodium); }
+.note .title {
+  min-width: 0;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
-.msg.handover .time { flex-shrink: 0; margin-left: auto; }
+.entries > .note { margin-top: 12px; }
+.entries > .note:first-child { margin-top: 0; }
+.note[open] .title { white-space: normal; overflow-wrap: anywhere; }
+.note summary:hover .title { color: var(--fg); }
+.note .time { flex-shrink: 0; margin-left: auto; }
+.note-text {
+  margin: 6px 0 2px;
+  padding-left: 10px;
+  border-left: 1px solid var(--rule);
+  font: 11.5px/1.5 var(--mono);
+  color: var(--faint);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  max-height: 40vh;
+  overflow: auto;
+}
+.note[open] .note-text { animation: note-open 0.15s ease-out; }
+@keyframes note-open { from { opacity: 0; transform: translateY(-2px); } }
+@media (prefers-reduced-motion: reduce) { .note[open] .note-text { animation: none; } }
+
+/* Notes that came with the user's message stand above its prompt. */
+.entries > .msg.noted { margin-top: 34px; display: flex; flex-direction: column; gap: 6px; }
+.entries > .msg.noted:first-child, .entries > .day-sep + .msg.noted { margin-top: 0; }
+.msg.noted > .msg.user { margin-top: 4px; }
+
+/* Files attached with @path */
+.msg.user .attachments { display: flex; flex-wrap: wrap; gap: 6px; }
+.msg.user .attachment {
+  font: 12px var(--mono);
+  color: var(--muted);
+  background: var(--well);
+  border-radius: var(--r-chip);
+  padding: 1px 6px;
+  overflow-wrap: anywhere;
+}
 
 .msg.compaction > summary { justify-content: center; }
 .msg.compaction > summary::before,

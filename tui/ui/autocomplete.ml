@@ -129,6 +129,16 @@ let mode_items () =
   List.map Session_mode.names ~f:(fun name -> Picker.Item.create ~id:name name)
 ;;
 
+let notify_items () =
+  List.map
+    [ "off", "no notifications"
+    ; "bell", "ring the terminal bell"
+    ; "desktop", "a desktop notification (OSC 9 or 777)"
+    ]
+    ~f:(fun (name, detail) ->
+      Picker.Item.create ~id:name ~detail (String.capitalize name))
+;;
+
 let provider_items (auth : P.Auth_status.t list) =
   List.map auth ~f:(fun (s : P.Auth_status.t) ->
     Picker.Item.create
@@ -174,6 +184,7 @@ let argument_items ~kind ~models ~auth ~sessions ~logged_in =
   | Verbosity -> Some (verbosity_items ())
   | Confirm | Plan -> Some (confirm_items ())
   | Mode -> Some (mode_items ())
+  | Notify -> Some (notify_items ())
   | Login ->
     Some
       (provider_items auth

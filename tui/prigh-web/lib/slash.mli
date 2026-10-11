@@ -16,6 +16,7 @@ module Argument : sig
     | Confirm
     | Mode
     | Plan
+    | Notify (** [on] or [off] *)
     | Session (** saved sessions' paths *)
     | Path (** [list_paths] *)
     | Host

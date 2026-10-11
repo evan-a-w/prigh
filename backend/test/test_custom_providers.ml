@@ -320,7 +320,8 @@ let%expect_test
       "max_budget_usd": null,
       "goal_max_continuations": 20,
       "resume_on_limit_reset": true,
-      "archive_after_days": 7
+      "archive_after_days": 7,
+      "notify": "bell"
     }
     (((name aiproxy) (base_url http://localhost:11434/v1) (api Responses)
       (headers ()) (models ())))
