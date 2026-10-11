@@ -62,6 +62,26 @@ let json_tool_calls json =
   | Some _ -> Or_error.error_string "tool_calls must be an array"
 ;;
 
+let context_overflow_message =
+  "HTTP 400: prompt is too long: 213462 tokens > 200000 maximum"
+;;
+
+let usage_limit_message ?resets_at () =
+  "HTTP 429: The usage limit has been reached "
+  ^ Usage_limit.marker
+  ^ Option.value_map resets_at ~default:"" ~f:Usage_limit.reset_note
+;;
+
+let json_float json name =
+  match Json.member name json with
+  | None | Some `Null -> Ok None
+  | Some (`Number n) ->
+    (match Float.of_string_opt n with
+     | Some f -> Ok (Some f)
+     | None -> Or_error.errorf "%s must be a number" name)
+  | Some _ -> Or_error.errorf "%s must be a number" name
+;;
+
 let json_stop_reason json ~has_tool_calls =
   if has_tool_calls
   then Ok Stop_reason.Tool_use
@@ -73,6 +93,11 @@ let json_stop_reason json ~has_tool_calls =
     | Some (`String "error") ->
       Or_error.map (required_string json "error") ~f:(fun error ->
         Stop_reason.Error error)
+    | Some (`String "context_overflow") ->
+      Ok (Stop_reason.Error context_overflow_message)
+    | Some (`String "usage_limit") ->
+      Or_error.map (json_float json "resets_at") ~f:(fun resets_at ->
+        Stop_reason.Error (usage_limit_message ?resets_at ()))
     | Some (`String s) -> Or_error.errorf "unknown stop_reason %S" s
     | Some _ -> Or_error.error_string "stop_reason must be a string")
 ;;
@@ -127,6 +152,13 @@ module Reply = struct
   let tool_call ?text ~id ~name ~arguments () =
     tool_calls ?text [ id, name, arguments ]
   ;;
+
+  let error message =
+    { events = []; stop_reason = Error message; usage = Usage.zero }
+  ;;
+
+  let context_overflow () = error context_overflow_message
+  let usage_limit ?resets_at () = error (usage_limit_message ?resets_at ())
 
   let of_json json =
     Or_error.bind (json_string json "text") ~f:(fun text ->

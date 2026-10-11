@@ -719,6 +719,7 @@ let%expect_test "apply_patch asks for confirmation naming its files" =
         ; max_turns = None
         ; max_tokens = None
         ; retries = 0
+        ; cache_key = None
         }
       ~cwd:t.dir
       ~confirm:(fun _ ~summary ->

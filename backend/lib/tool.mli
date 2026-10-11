@@ -22,6 +22,12 @@ and context =
   ; execute : executor
     (** how tool calls of this agent (and of its subagents) are run; the
         default runs them in this process *)
+  ; cache_key : string option
+    (** the agent's [Provider.Request.cache_key], from which a subagent's
+        is derived *)
+  ; halt : unit -> string option
+    (** why no further turn may start (the session's budget is spent), polled
+        by subagents before each of their turns *)
   }
 
 (** Runs a tool call. [Agent] installs one that forwards [on_host] tools to
@@ -39,6 +45,8 @@ module Context : sig
     -> ?tools:t list
     -> ?emit:(Agent_event.t -> unit)
     -> ?background:Background_tasks.t
+    -> ?cache_key:string
+    -> ?halt:(unit -> string option)
     -> env:Env.t
     -> cwd:string
     -> unit

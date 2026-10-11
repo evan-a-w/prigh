@@ -294,6 +294,7 @@ let%expect_test "provider router: unauthenticated request fails with a hint" =
         ; tools = []
         ; thinking = Off
         ; max_tokens = None
+        ; cache_key = None
         }
         ~cancel:Cancellation.never
         ~on_event:ignore

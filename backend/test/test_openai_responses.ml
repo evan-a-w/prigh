@@ -31,9 +31,17 @@ let request
       ?(tools = tools)
       ?system
       ?max_tokens
+      ?cache_key
       messages
   =
-  { Provider.Request.model; system; messages; tools; thinking; max_tokens }
+  { Provider.Request.model
+  ; system
+  ; messages
+  ; tools
+  ; thinking
+  ; max_tokens
+  ; cache_key
+  }
 ;;
 
 let reasoning_item =
@@ -210,6 +218,40 @@ let%expect_test
   print_endline (Json.to_string body);
   [%expect
     {| {"model":"gpt-5.5","stream":true,"store":false,"instructions":"You are a helpful assistant.","input":[{"type":"message","role":"user","content":[{"type":"input_text","text":"hi"}]}],"include":["reasoning.encrypted_content"],"tool_choice":"auto","parallel_tool_calls":true,"max_output_tokens":500} |}]
+;;
+
+let%expect_test
+    "prompt_cache_key: sent to OpenAI and Codex, not to custom servers"
+  =
+  let cache_key_of endpoint ~cache_key =
+    match
+      Json.member
+        "prompt_cache_key"
+        (T.request_body
+           ~endpoint
+           (request ?cache_key ~tools:[] [ Message.user "hi" ]))
+    with
+    | Some json -> Json.to_string json
+    | None -> "(absent)"
+  in
+  List.iter
+    [ "openai", Openai_responses.Endpoint.Openai { api_key = "k" }
+    ; "codex", Codex { access_token = "t"; account_id = "a" }
+    ; ( "custom"
+      , Custom { provider = Custom "local"; api_key = None; headers = [] } )
+    ]
+    ~f:(fun (name, endpoint) ->
+      printf
+        "%s: %s, without a key: %s\n"
+        name
+        (cache_key_of endpoint ~cache_key:(Some "session-1"))
+        (cache_key_of endpoint ~cache_key:None));
+  [%expect
+    {|
+    openai: "session-1", without a key: (absent)
+    codex: "session-1", without a key: (absent)
+    custom: (absent), without a key: (absent)
+    |}]
 ;;
 
 let%expect_test "headers" =

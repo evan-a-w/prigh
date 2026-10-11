@@ -415,7 +415,8 @@ let%expect_test "save_as_default applies to new agents, not saved sessions" =
     ("no default: fallback" deepseek/deepseek-v4-pro (On ()))
     ((scoped_models (a)) (confirm_tools false)
      (default_model (deepseek/deepseek-flash)) (default_thinking ((On (High))))
-     (fallback_models ()) (default_cwd ()))
+     (fallback_models ()) (default_cwd ()) (max_budget_usd ())
+     (goal_max_continuations 20) (resume_on_limit_reset true))
     {
       "scoped_models": [
         "a"
@@ -424,7 +425,10 @@ let%expect_test "save_as_default applies to new agents, not saved sessions" =
       "default_model": "deepseek/deepseek-flash",
       "default_thinking": "high",
       "fallback_models": [],
-      "default_cwd": null
+      "default_cwd": null,
+      "max_budget_usd": null,
+      "goal_max_continuations": 20,
+      "resume_on_limit_reset": true
     }
     (default deepseek/deepseek-flash (On (High)))
     (explicit deepseek/deepseek-v4-pro Off)

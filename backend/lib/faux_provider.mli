@@ -26,8 +26,21 @@ module Reply : sig
 
   val tool_calls : ?text:string -> (string * string * string) list -> t
 
+  (** A failed request: no content, no usage. *)
+  val error : string -> t
+
+  (** Anthropic's error for a request over the context window. *)
+  val context_overflow : unit -> t
+
+  (** A usage limit reached ({!Usage_limit.unavailable}), with its reset time
+      noted ({!Usage_limit.reset_note}) when given. *)
+  val usage_limit : ?resets_at:float -> unit -> t
+
   (** Parses a single scripted reply:
-      [{ text; thinking; tool_calls; stop_reason; usage; chunks }]. *)
+      [{ text; thinking; tool_calls; stop_reason; usage; chunks }], where
+      [stop_reason] is [end_turn], [length], [error] (with [error], the
+      message), [context_overflow] or [usage_limit] (with an optional
+      [resets_at], seconds since the epoch). *)
   val of_json : Json.t -> t Or_error.t
 end
 

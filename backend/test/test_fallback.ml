@@ -178,6 +178,7 @@ let%expect_test "the end of the chain stops; other errors never hand over" =
     request to deepseek/deepseek-flash, last user: [prigh: anthropic/claude-opus-5-5 cannot continue (HTTP 429: The usage limit has been reached (usage limit reached)), so deepseek/deepseek-flash takes over this conversation from here. Carry on with the task where it left off.]
     assistant (deepseek-flash):  (Error"HTTP 429: The usage limit has been reached (usage limit reached)")
     notice: deepseek/deepseek-flash cannot continue and no model in fallback_models is left to hand over to; /model picks another
+    notice: deepseek/deepseek-flash: the usage limit is reached and the provider did not say when it resets, so the run will not resume by itself; send a message to try again, or /model picks another model
     |}];
   (* A new prompt starts a new chain from the current model; an ordinary
      error just stops. *)
@@ -216,6 +217,7 @@ let%expect_test "no chain: the error stands" =
     {|
     request to deepseek/deepseek-flash, last user: go
     assistant (deepseek-flash):  (Error"HTTP 429: The usage limit has been reached (usage limit reached)")
+    notice: deepseek/deepseek-flash: the usage limit is reached and the provider did not say when it resets, so the run will not resume by itself; send a message to try again, or /model picks another model
     |}]
 ;;
 

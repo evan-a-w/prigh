@@ -21,6 +21,7 @@ module Entry = struct
       | Compaction of
           { summary : string
           ; kept_from : string
+          ; pinned : string option [@jsonaf.option] [@sexp.option]
           }
       | Name of { name : string }
       | Description of { text : string }
@@ -29,6 +30,8 @@ module Entry = struct
           ; host : Host.t option [@jsonaf.option] [@sexp.option]
           }
       | System_prompt of { text : string }
+      | Goal of { goal : Goal.t option }
+      | Budget of { usd : float option }
     [@@deriving sexp, jsonaf]
   end
 
@@ -121,7 +124,13 @@ let worth_saving (line : Line.t) =
   | Entry { payload = Message _ | Name _; _ } -> true
   | Entry
       { payload =
-          Model _ | Compaction _ | Description _ | Cwd _ | System_prompt _
+          ( Model _
+          | Compaction _
+          | Description _
+          | Cwd _
+          | System_prompt _
+          | Goal _
+          | Budget _ )
       ; _
       }
   | Header _ | Head _ -> false
@@ -224,7 +233,9 @@ let add_entry t (entry : Entry.t) =
   | Compaction _
   | Name _
   | Description _
-  | System_prompt _ -> ()
+  | System_prompt _
+  | Goal _
+  | Budget _ -> ()
 ;;
 
 let read_lines path =
@@ -285,6 +296,8 @@ let set_name t ~name = append t (Name { name })
 let set_description t ~text = append t (Description { text })
 let set_cwd t ?host ~cwd () = append t (Cwd { cwd; host })
 let set_system_prompt t ~text = append t (System_prompt { text })
+let set_goal t goal = append t (Goal { goal })
+let set_budget t ~usd = append t (Budget { usd })
 
 let name t =
   List.find_map t.entries ~f:(fun (e : Entry.t) ->
@@ -295,19 +308,27 @@ let name t =
     | Compaction _
     | Description _
     | Cwd _
-    | System_prompt _ -> None)
+    | System_prompt _
+    | Goal _
+    | Budget _ -> None)
 ;;
 
 let description t =
   List.find_map t.entries ~f:(fun (e : Entry.t) ->
     match e.payload with
     | Description { text } -> Some text
-    | Message _ | Model _ | Compaction _ | Name _ | Cwd _ | System_prompt _ ->
-      None)
+    | Message _
+    | Model _
+    | Compaction _
+    | Name _
+    | Cwd _
+    | System_prompt _
+    | Goal _
+    | Budget _ -> None)
 ;;
 
-let append_compaction t ~summary ~kept_from =
-  append t (Compaction { summary; kept_from })
+let append_compaction ?pinned t ~summary ~kept_from =
+  append t (Compaction { summary; kept_from; pinned })
 ;;
 
 let active_path t =
@@ -319,44 +340,62 @@ let active_path t =
   go t.head []
 ;;
 
-let timed_messages t =
+let summary_prefix = "Summary of the conversation so far:\n"
+let summary_message summary = Message.user (summary_prefix ^ summary)
+
+let is_summary_message : Message.t -> bool = function
+  | User { text; _ } -> String.is_prefix text ~prefix:summary_prefix
+  | Assistant _ | Tool_result _ -> false
+;;
+
+(* The messages of the next request, each with the id of its entry (none for
+   a compaction's summary): after a compaction, its pinned message, the
+   summary, then the path from [kept_from]. *)
+let context t =
   let path = active_path t in
   let compaction =
     List.fold path ~init:None ~f:(fun acc (e : Entry.t) ->
       match e.payload with
-      | Compaction { summary; kept_from } -> Some (summary, kept_from)
-      | Message _ | Model _ | Name _ | Description _ | Cwd _ | System_prompt _
-        -> acc)
+      | Compaction { summary; kept_from; pinned } ->
+        Some (summary, kept_from, pinned)
+      | Message _
+      | Model _
+      | Name _
+      | Description _
+      | Cwd _
+      | System_prompt _
+      | Goal _
+      | Budget _ -> acc)
   in
-  let path =
-    match compaction with
-    | None -> path
-    | Some (summary, kept_from) ->
-      let kept =
-        List.drop_while path ~f:(fun e -> not (String.equal e.id kept_from))
-      in
-      let kept =
-        List.filter kept ~f:(fun e ->
-          match e.payload with
-          | Compaction _ | Name _ | Description _ | Cwd _ | System_prompt _ ->
-            false
-          | Message _ | Model _ -> true)
-      in
-      { Entry.id = "summary"
-      ; parent = None
-      ; at = None
-      ; payload =
-          Message
-            (Message.user ("Summary of the conversation so far:\n" ^ summary))
-      }
-      :: kept
+  let messages entries =
+    List.filter_map entries ~f:(fun (e : Entry.t) ->
+      match e.payload with
+      | Message message -> Some (Some e.id, { Timed_message.message; at = e.at })
+      | Model _
+      | Compaction _
+      | Name _
+      | Description _
+      | Cwd _
+      | System_prompt _
+      | Goal _
+      | Budget _ -> None)
   in
-  List.filter_map path ~f:(fun e ->
-    match e.payload with
-    | Message message -> Some { Timed_message.message; at = e.at }
-    | Model _ | Compaction _ | Name _ | Description _ | Cwd _ | System_prompt _
-      -> None)
+  match compaction with
+  | None -> messages path
+  | Some (summary, kept_from, pinned) ->
+    let kept =
+      List.drop_while path ~f:(fun e -> not (String.equal e.id kept_from))
+    in
+    let pinned =
+      Option.bind pinned ~f:(Hashtbl.find t.by_id) |> Option.to_list
+    in
+    messages pinned
+    @ [ None, { Timed_message.message = summary_message summary; at = None } ]
+    @ messages kept
 ;;
+
+let timed_messages t = List.map (context t) ~f:snd
+let context_ids t = List.map (context t) ~f:fst
 
 let messages t =
   List.map (timed_messages t) ~f:(fun (m : Timed_message.t) -> m.message)
@@ -366,7 +405,42 @@ let system_prompt t =
   List.fold (active_path t) ~init:None ~f:(fun acc (e : Entry.t) ->
     match e.payload with
     | System_prompt { text } -> Some text
-    | Message _ | Model _ | Compaction _ | Name _ | Description _ | Cwd _ -> acc)
+    | Message _
+    | Model _
+    | Compaction _
+    | Name _
+    | Description _
+    | Cwd _
+    | Goal _
+    | Budget _ -> acc)
+;;
+
+let goal t =
+  List.fold (active_path t) ~init:None ~f:(fun acc (e : Entry.t) ->
+    match e.payload with
+    | Goal { goal } -> goal
+    | Message _
+    | Model _
+    | Compaction _
+    | Name _
+    | Description _
+    | Cwd _
+    | System_prompt _
+    | Budget _ -> acc)
+;;
+
+let budget t =
+  List.fold (active_path t) ~init:None ~f:(fun acc (e : Entry.t) ->
+    match e.payload with
+    | Budget { usd } -> Some usd
+    | Message _
+    | Model _
+    | Compaction _
+    | Name _
+    | Description _
+    | Cwd _
+    | System_prompt _
+    | Goal _ -> acc)
 ;;
 
 let model t =
@@ -378,7 +452,9 @@ let model t =
     | Name _
     | Description _
     | Cwd _
-    | System_prompt _ -> acc)
+    | System_prompt _
+    | Goal _
+    | Budget _ -> acc)
 ;;
 
 let rewind t ~to_ =
@@ -612,8 +688,14 @@ let to_markdown t =
            r.tool_name
            (String.strip r.text)
            (images r.images))
-    | Model _ | Compaction _ | Name _ | Description _ | Cwd _ | System_prompt _
-      -> None
+    | Model _
+    | Compaction _
+    | Name _
+    | Description _
+    | Cwd _
+    | System_prompt _
+    | Goal _
+    | Budget _ -> None
   in
   let blocks = List.filter_map (active_path t) ~f:block in
   String.concat (("# Session " ^ t.id) :: blocks) ~sep:"\n\n" ^ "\n"

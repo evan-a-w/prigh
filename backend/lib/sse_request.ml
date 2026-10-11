@@ -22,7 +22,7 @@ let quota_codes =
 (* The message, plus [Usage_limit.marker] when the error's type or code (or,
    for Anthropic's subscriptions, [limit_rejected]) says the allowance is used
    up rather than briefly rate limited. *)
-let error_message_of_body ?(limit_rejected = false) ~status body =
+let error_message_of_body ?(limit_rejected = false) ?resets_at ~status body =
   let detail, code =
     match Json.parse body with
     | Ok json ->
@@ -43,7 +43,12 @@ let error_message_of_body ?(limit_rejected = false) ~status body =
     "HTTP %d: %s%s"
     status
     (String.strip detail)
-    (if exhausted then " " ^ Usage_limit.marker else "")
+    (if exhausted
+     then
+       " "
+       ^ Usage_limit.marker
+       ^ Option.value_map resets_at ~default:"" ~f:Usage_limit.reset_note
+     else "")
 ;;
 
 let run ~env ?timeout ~cancel ~url ~headers ~body ~on_event () =
@@ -74,8 +79,14 @@ let run ~env ?timeout ~cancel ~url ~headers ~body ~on_event () =
   | Error Cancelled -> Outcome.Aborted
   | Error e -> Failed (Http_client.Error.to_string e)
   | Ok response when response.status / 100 <> 2 ->
+    let body = Buffer.contents error_body in
     Failed
       (error_message_of_body
+         ?resets_at:
+           (Usage_limit.reset_time
+              ~now:(Eio.Time.now (Eio.Stdenv.clock env))
+              ~headers:response.headers
+              ~body)
          ~limit_rejected:
            (Option.equal
               String.equal
@@ -84,6 +95,6 @@ let run ~env ?timeout ~cancel ~url ~headers ~body ~on_event () =
                  "anthropic-ratelimit-unified-status")
               (Some "rejected"))
          ~status:response.status
-         (Buffer.contents error_body))
+         body)
   | Ok _ -> Completed
 ;;

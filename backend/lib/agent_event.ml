@@ -29,6 +29,11 @@ type t =
       { call : Content.Tool_call.t
       ; result : Message.Tool_result.t
       }
+  | Compacted of
+      { summary : string
+      ; usage : Usage.t (** of the summarising request *)
+      ; cost_usd : float
+      }
   | Subagent_start of
       { call_id : string
       ; agent_id : string

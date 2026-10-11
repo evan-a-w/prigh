@@ -12,7 +12,9 @@ let%expect_test "a missing file yields the default" =
     {|
     (Ok
      ((scoped_models ()) (confirm_tools false) (default_model ())
-      (default_thinking ()) (fallback_models ()) (default_cwd ())))
+      (default_thinking ()) (fallback_models ()) (default_cwd ())
+      (max_budget_usd ()) (goal_max_continuations 20)
+      (resume_on_limit_reset true)))
     |}]
 ;;
 
@@ -26,6 +28,9 @@ let%expect_test "save then load round trips" =
     ; default_thinking = Some (On (Some High))
     ; fallback_models = []
     ; default_cwd = None
+    ; max_budget_usd = None
+    ; goal_max_continuations = 20
+    ; resume_on_limit_reset = true
     }
   in
   print_s [%sexp (Config.save ~home:t.dir config : unit Or_error.t)];
@@ -43,12 +48,17 @@ let%expect_test "save then load round trips" =
       "default_model": "anthropic/claude-fable-5",
       "default_thinking": "high",
       "fallback_models": [],
-      "default_cwd": null
+      "default_cwd": null,
+      "max_budget_usd": null,
+      "goal_max_continuations": 20,
+      "resume_on_limit_reset": true
     }
     (Ok
      ((scoped_models (anthropic/claude-fable-5 deepseek-v4-pro))
       (confirm_tools true) (default_model (anthropic/claude-fable-5))
-      (default_thinking ((On (High)))) (fallback_models ()) (default_cwd ())))
+      (default_thinking ((On (High)))) (fallback_models ()) (default_cwd ())
+      (max_budget_usd ()) (goal_max_continuations 20)
+      (resume_on_limit_reset true)))
     |}]
 ;;
 
@@ -64,7 +74,9 @@ let%expect_test "unknown fields are ignored" =
     {|
     (Ok
      ((scoped_models (x)) (confirm_tools true) (default_model ())
-      (default_thinking ()) (fallback_models ()) (default_cwd ())))
+      (default_thinking ()) (fallback_models ()) (default_cwd ())
+      (max_budget_usd ()) (goal_max_continuations 20)
+      (resume_on_limit_reset true)))
     |}]
 ;;
 
@@ -117,7 +129,7 @@ let%expect_test
     {|
     config.confirm_tools must be a boolean (in $DIR/.prigh/config.json); prigh ignores the file's settings until it is fixed
     unknown setting "providrs" in $DIR/.prigh/config.json is ignored; did you mean "providers"?
-    unknown setting "colour" in $DIR/.prigh/config.json is ignored (known: providers, scoped_models, confirm_tools, default_model, default_thinking, fallback_models, default_cwd)
+    unknown setting "colour" in $DIR/.prigh/config.json is ignored (known: providers, scoped_models, confirm_tools, default_model, default_thinking, fallback_models, default_cwd, max_budget_usd, goal_max_continuations, resume_on_limit_reset)
     |}];
   (* Unparsable files are [read_fields]' error, reported once elsewhere. *)
   show "{not json";
@@ -141,10 +153,13 @@ let%expect_test "null defaults are unset" =
     {|
     (Ok
      ((scoped_models ()) (confirm_tools false) (default_model ())
-      (default_thinking ()) (fallback_models ()) (default_cwd ())))
+      (default_thinking ()) (fallback_models ()) (default_cwd ())
+      (max_budget_usd ()) (goal_max_continuations 20)
+      (resume_on_limit_reset true)))
     (Ok
      ((scoped_models ()) (confirm_tools false)
       (default_model (deepseek/deepseek-flash)) (default_thinking ((On ())))
-      (fallback_models ()) (default_cwd ())))
+      (fallback_models ()) (default_cwd ()) (max_budget_usd ())
+      (goal_max_continuations 20) (resume_on_limit_reset true)))
     |}]
 ;;

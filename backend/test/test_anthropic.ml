@@ -39,7 +39,14 @@ let request
       ?max_tokens
       messages
   =
-  { Provider.Request.model; system; messages; tools; thinking; max_tokens }
+  { Provider.Request.model
+  ; system
+  ; messages
+  ; tools
+  ; thinking
+  ; max_tokens
+  ; cache_key = None
+  }
 ;;
 
 let conversation =

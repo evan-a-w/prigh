@@ -35,8 +35,10 @@ module State : sig
     ; running : bool
     ; message_count : int
     ; usage : Usage.t
-      (** assistant messages on the active path, plus subagents and [btw] calls since the agent loaded the session *)
-    ; cost_usd : float
+      (** every assistant message in the session file (all branches, also
+          those compacted away), plus subagents, compactions and [btw] calls
+          since the agent loaded the session *)
+    ; cost_usd : float (** of [usage], each response at its model's price *)
     ; context_tokens : int (** input tokens of the last request, if any *)
     ; active_host : string
       (** [Host.id]; absent from [hosts] while that host is disconnected, or
@@ -48,6 +50,13 @@ module State : sig
       (** background subagents still running or not yet delivered *)
     ; jobs : Background_tasks.Summary.t list
       (** background shell jobs still running or not yet delivered *)
+    ; budget_usd : float option
+      (** no turn starts once [cost_usd] reaches it, see {!set_budget} *)
+    ; goal : Goal.t option
+    ; goal_max_continuations : int
+    ; resume_at : float option
+      (** when a run stopped by a usage limit resumes (seconds since the
+          epoch) *)
     }
   [@@deriving sexp_of]
 end
@@ -144,6 +153,12 @@ val create
            [cwd] (default: true; false when [cwd] was given explicitly) *)
        (** the backend's MCP servers, when it is the tool host; without it
            sessions use no MCP servers on any host *)
+  -> ?max_budget_usd:float
+       (** the budget of sessions that set none (the CLI's
+           [-max-budget-usd]), instead of the config's [max_budget_usd] *)
+  -> ?sleep_until:(float -> unit)
+       (** waits until a time (seconds since the epoch) for {!resume_now}'s
+           automatic counterpart; default: the clock, plus a few seconds *)
   -> cwd:string
   -> unit
   -> t
@@ -299,8 +314,41 @@ val save_as_default : t -> unit Or_error.t
     outstanding for [call_id]. *)
 val respond_confirm : t -> call_id:string -> allow:bool -> unit Or_error.t
 
-(** [instructions]: what the summary should focus on (the user's). *)
+(** [instructions]: what the summary should focus on (the user's). Runs
+    also compact by themselves: after a run whose last request crossed
+    {!Compaction.should_compact}'s threshold, between the turns of a run
+    (see {!Agent_loop.run}), and when a request overflows the context
+    window. Each emits [Compacted]. *)
 val compact : ?instructions:string -> t -> string Or_error.t
+
+(** {2 Budget, goal and resume} *)
+
+(** Sets the session's cost budget ([None]: none, also overriding the
+    default), recorded in the session. Once [State.cost_usd] reaches it no
+    turn starts (subagents' included): the run stops with a [Notice] saying
+    how to raise it, and prompts are refused. *)
+val set_budget : t -> float option -> unit Or_error.t
+
+(** Sets the goal (recorded in the session) and, when idle, starts working
+    on it. While it is active the model has [goal_complete], and each run
+    that ends normally is followed by a continuation restating it, up to the
+    config's [goal_max_continuations]; an abort, a failed run, the budget or
+    the cap stop it (with a [Notice]). *)
+val set_goal : t -> string -> unit Or_error.t
+
+val clear_goal : t -> unit Or_error.t
+
+(** Makes a stopped or completed goal active again, with its continuations
+    reset, and starts working on it when idle. *)
+val resume_goal : t -> unit Or_error.t
+
+(** When a run stops at a usage limit with no fallback model left, and the
+    config's [resume_on_limit_reset] is on, it resumes by itself once the
+    limit resets, if the provider said when ([State.resume_at]); an abort or
+    a new run cancels that. These fail when nothing is scheduled. *)
+val cancel_resume : t -> unit Or_error.t
+
+val resume_now : t -> unit Or_error.t
 
 (** Answers a side question with one tool-less model call over a snapshot of
     the conversation (see {!Btw}), concurrently with any run and without

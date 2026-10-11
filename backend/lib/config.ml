@@ -8,6 +8,9 @@ type t =
   ; default_thinking : Thinking.t option
   ; fallback_models : string list
   ; default_cwd : string option
+  ; max_budget_usd : float option
+  ; goal_max_continuations : int
+  ; resume_on_limit_reset : bool
   }
 [@@deriving sexp_of]
 
@@ -18,6 +21,9 @@ let default =
   ; default_thinking = None
   ; fallback_models = []
   ; default_cwd = None
+  ; max_budget_usd = None
+  ; goal_max_continuations = Goal.default_max_continuations
+  ; resume_on_limit_reset = true
   }
 ;;
 
@@ -40,6 +46,13 @@ let to_json t =
     ; ( "fallback_models"
       , `Array (List.map t.fallback_models ~f:(fun s -> `String s)) )
     ; "default_cwd", option (fun s -> `String s) t.default_cwd
+    ; ( "max_budget_usd"
+      , option
+          (fun usd -> `Number (Float.to_string_hum ~strip_zero:true usd))
+          t.max_budget_usd )
+    ; "goal_max_continuations", `Number (Int.to_string t.goal_max_continuations)
+    ; ( "resume_on_limit_reset"
+      , if t.resume_on_limit_reset then `True else `False )
     ]
 ;;
 
@@ -83,6 +96,41 @@ let of_json json =
       | Some (`String s) -> Ok (Some s)
       | Some _ -> Or_error.error_string "config.default_model must be a string"
     in
+    let%bind max_budget_usd =
+      match find "max_budget_usd" with
+      | None | Some `Null -> Ok None
+      | Some (`Number n) ->
+        (match Float.of_string_opt n with
+         | Some usd when Float.( > ) usd 0. -> Ok (Some usd)
+         | Some _ | None ->
+           Or_error.error_string
+             "config.max_budget_usd must be a positive number of dollars (or \
+              null for none)")
+      | Some _ ->
+        Or_error.error_string
+          "config.max_budget_usd must be a number of dollars (or null for none)"
+    in
+    let%bind goal_max_continuations =
+      match find "goal_max_continuations" with
+      | None | Some `Null -> Ok Goal.default_max_continuations
+      | Some (`Number n) ->
+        (match Int.of_string_opt n with
+         | Some n when n >= 0 -> Ok n
+         | Some _ | None ->
+           Or_error.error_string
+             "config.goal_max_continuations must be a whole number, 0 or more")
+      | Some _ ->
+        Or_error.error_string
+          "config.goal_max_continuations must be a whole number"
+    in
+    let%bind resume_on_limit_reset =
+      match find "resume_on_limit_reset" with
+      | None | Some `Null -> Ok true
+      | Some `True -> Ok true
+      | Some `False -> Ok false
+      | Some _ ->
+        Or_error.error_string "config.resume_on_limit_reset must be a boolean"
+    in
     let%map default_thinking =
       match find "default_thinking" with
       | None | Some `Null -> Ok None
@@ -98,6 +146,9 @@ let of_json json =
     ; default_thinking
     ; fallback_models
     ; default_cwd
+    ; max_budget_usd
+    ; goal_max_continuations
+    ; resume_on_limit_reset
     }
   | _ -> Or_error.error_string "config must be a JSON object"
 ;;

@@ -14,6 +14,7 @@ module Config : sig
     ; max_turns : int option
     ; max_tokens : int option
     ; retries : int (** retries per turn for transient provider errors *)
+    ; cache_key : string option (** see [Provider.Request.cache_key] *)
     }
 
   val default_retries : int
@@ -23,7 +24,16 @@ val is_retryable_error : string -> bool
 
 (** Returns the messages added to the context (prompts, assistant messages
     and tool results). [steer] is polled after each turn's tool results; any
-    messages it returns are appended before the next provider request. *)
+    messages it returns are appended before the next provider request.
+
+    Between turns, when the latest response's tokens (plus what was added
+    since) cross {!Compaction.should_compact}'s threshold, the context is
+    compacted with [compact] (default: {!Compaction.compact_messages}, in
+    memory) and the run continues on the result; a request the provider
+    rejects as too long ({!Context_overflow}) is compacted and sent again,
+    keeping less the second time, before the run fails with what to do.
+    Each compaction emits [Compacted]. [halt] is polled before each turn
+    (also passed to tools, for subagents): [Some _] ends the run there. *)
 val run
   :  env:Env.t
   -> provider:Provider.t
@@ -38,6 +48,12 @@ val run
   -> ?execute:Tool.executor
   -> ?background:Background_tasks.t
   -> ?retry_delay:(attempt:int -> unit)
+  -> ?compact:
+       (keep_recent_tokens:int
+        -> cancel:Cancellation.t
+        -> Message.t list
+        -> (Message.t list * Compaction.Outcome.t) Or_error.t)
+  -> ?halt:(unit -> string option)
   -> context:Message.t list
   -> prompts:Message.t list
   -> unit

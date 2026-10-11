@@ -316,7 +316,10 @@ let%expect_test
       "default_model": null,
       "default_thinking": null,
       "fallback_models": [],
-      "default_cwd": null
+      "default_cwd": null,
+      "max_budget_usd": null,
+      "goal_max_continuations": 20,
+      "resume_on_limit_reset": true
     }
     (((name aiproxy) (base_url http://localhost:11434/v1) (api Responses)
       (headers ()) (models ())))
@@ -1039,6 +1042,7 @@ let request ?(thinking = Thinking.On (Some High)) model =
   ; tools = []
   ; thinking
   ; max_tokens = None
+  ; cache_key = None
   }
 ;;
 
@@ -1381,6 +1385,7 @@ let%expect_test "router: keyless servers, other API styles, unknown providers" =
           ; tools = []
           ; thinking = Off
           ; max_tokens = None
+          ; cache_key = None
           }
           ~cancel:Cancellation.never
           ~on_event:ignore
@@ -1406,6 +1411,7 @@ let%expect_test "router: keyless servers, other API styles, unknown providers" =
           ; tools = []
           ; thinking = Off
           ; max_tokens = None
+          ; cache_key = None
           }
           ~cancel:Cancellation.never
           ~on_event:ignore)
@@ -1557,7 +1563,7 @@ let%expect_test
   custom_entries (call_quiet "auth_status") ~f:Fn.id;
   [%expect
     {|
-    {"type":"event","event":"state","state":{"session_id":"<id>","session_path":"$DIR/sessions/<stamp>_<id>.jsonl","session_name":null,"session_description":null,"cwd":"$DIR","git_branch":null,"model":{"id":"openai/gpt-4o-mini","provider":"aiproxy","key":"aiproxy/openai/gpt-4o-mini","name":"openai/gpt-4o-mini","context_window":128000,"max_output":16384,"supports_thinking":false,"cost":{"input":0,"output":0,"cache_read":0}},"thinking":"on","running":false,"message_count":0,"usage":{"input":0,"output":0,"cache_read":0},"cost_usd":0,"context_tokens":0,"active_host":"backend","hosts":[{"id":"backend","name":"<host>","cwd":"$DIR","session_id":null,"session_name":null}],"subagents":[],"jobs":[]}}
+    {"type":"event","event":"state","state":{"session_id":"<id>","session_path":"$DIR/sessions/<stamp>_<id>.jsonl","session_name":null,"session_description":null,"cwd":"$DIR","git_branch":null,"model":{"id":"openai/gpt-4o-mini","provider":"aiproxy","key":"aiproxy/openai/gpt-4o-mini","name":"openai/gpt-4o-mini","context_window":128000,"max_output":16384,"supports_thinking":false,"cost":{"input":0,"output":0,"cache_read":0}},"thinking":"on","running":false,"message_count":0,"usage":{"input":0,"output":0,"cache_read":0},"cost_usd":0,"context_tokens":0,"active_host":"backend","hosts":[{"id":"backend","name":"<host>","cwd":"$DIR","session_id":null,"session_name":null}],"subagents":[],"jobs":[],"budget_usd":null,"goal":null,"resume_at_ms":null}}
     {"type":"response","id":"r1","ok":true,"result":{}}
     {"type":"response","id":"r1","ok":false,"error":"unknown model \"aiproxy/gpt-5\"; did you mean: aiproxy/gpt-4o (gpt-4o)"}
     ("\"aiproxy/openai/gpt-4o-mini\"")

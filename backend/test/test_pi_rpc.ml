@@ -689,7 +689,10 @@ let%expect_test "/change_default saves the model and thinking level" =
       "default_model": "deepseek/deepseek-v4-pro",
       "default_thinking": "high",
       "fallback_models": [],
-      "default_cwd": null
+      "default_cwd": null,
+      "max_budget_usd": null,
+      "goal_max_continuations": 20,
+      "resume_on_limit_reset": true
     }
     |}]
 ;;

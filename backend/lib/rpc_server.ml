@@ -34,6 +34,12 @@ let methods =
   ; "set_thinking"
   ; "list_models"
   ; "compact"
+  ; "set_budget"
+  ; "set_goal"
+  ; "clear_goal"
+  ; "resume_goal"
+  ; "cancel_resume"
+  ; "resume_now"
   ; "new_session"
   ; "switch_session"
   ; "list_sessions"
@@ -1102,6 +1108,22 @@ let dispatch agent login ~meth ~params : Json.t Or_error.t =
         in
         Or_error.map (Agent.compact ?instructions agent) ~f:(fun summary ->
           `Object [ "summary", `String summary ]))
+  | "set_budget" ->
+    (match param params "usd" with
+     | None | Some `Null -> unit_result (Agent.set_budget agent None)
+     | Some (`Number n) ->
+       (match Float.of_string_opt n with
+        | Some usd -> unit_result (Agent.set_budget agent (Some usd))
+        | None -> Or_error.error_string "param \"usd\" must be a number")
+     | Some _ ->
+       Or_error.error_string "param \"usd\" must be a number of dollars or null")
+  | "set_goal" ->
+    Or_error.bind (string_param params "text") ~f:(fun text ->
+      unit_result (Agent.set_goal agent text))
+  | "clear_goal" -> unit_result (Agent.clear_goal agent)
+  | "resume_goal" -> unit_result (Agent.resume_goal agent)
+  | "cancel_resume" -> unit_result (Agent.cancel_resume agent)
+  | "resume_now" -> unit_result (Agent.resume_now agent)
   | "set_session_name" ->
     Or_error.map (string_param params "name") ~f:(fun name ->
       Agent.set_session_name agent name;

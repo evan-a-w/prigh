@@ -106,3 +106,23 @@ let with_nix_on_path t ~nix f =
     | Some path -> Core_unix.putenv ~key:"PATH" ~data:path
     | None -> Core_unix.unsetenv "PATH")
 ;;
+
+(* A tool whose result is [size] characters long, to grow the context. *)
+let filler =
+  { Tool.spec =
+      { Tool_spec.name = "filler"
+      ; description = "returns SIZE characters"
+      ; parameters = Tool_args.schema [ "size", `Integer, "how many" ]
+      ; parallel_safe = false
+      ; destructive = false
+      ; on_host = false
+      ; freeform = None
+      }
+  ; run =
+      (fun _ args ->
+        Tool.Result.ok
+          (String.make
+             (Option.value (Tool_args.int_opt args "size") ~default:1)
+             'x'))
+  }
+;;

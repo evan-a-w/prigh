@@ -502,7 +502,7 @@ let%expect_test "cancel_subagent delivers the partial report; usage rolls up" =
     agent_end
     state: running=false subagents=[]
     (Error "subagent a1 already finished")
-    (((input 50) (output 23) (cache_read 5)) 4.1129999999999994E-05)
+    (((input 50) (output 23) (cache_read 5)) 4.113E-05)
     |}]
 ;;
 

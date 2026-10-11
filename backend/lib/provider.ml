@@ -9,6 +9,9 @@ module Request = struct
     ; tools : Tool_spec.t list
     ; thinking : Thinking.t
     ; max_tokens : int option
+    ; cache_key : string option
+      (** groups requests that share a prompt prefix (a session, a
+          subagent), for providers that route caching by key *)
     }
   [@@deriving sexp_of]
 
