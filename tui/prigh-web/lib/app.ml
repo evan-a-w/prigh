@@ -97,6 +97,12 @@ module Reply_tag = struct
     | Thinking_set
     | Git_diff
     | Command_prompt of string (** [/review] or [/init] as typed *)
+    | Files of Files.Reply.t
+    | Sent_with_files of
+        { text : string
+        ; images : Image.t list
+        ; attachments : Files.Attachment.t list
+        }
   [@@deriving sexp_of, equal]
 end
 
@@ -135,6 +141,7 @@ module Command = struct
     | Request_notification_permission
     | Save_notifications of bool
     | Set_title of string
+    | Files of Files.Page.t
   [@@deriving sexp_of, equal]
 end
 
@@ -299,6 +306,7 @@ module Action = struct
         ; status : Terminal.Status.t
         }
     | Set_terminal_height of int
+    | Files of Files.Action.t
   [@@deriving sexp_of]
 end
 
@@ -347,6 +355,7 @@ module Model = struct
     ; pending : In_flight.t
     ; marks : Session_marks.t
     ; notifications : Page_notify.t
+    ; files : Files.t
     }
   [@@deriving sexp_of]
 
@@ -432,6 +441,7 @@ let init =
   ; pending = In_flight.none
   ; marks = Session_marks.empty
   ; notifications = Page_notify.init
+  ; files = Files.closed
   }
 ;;
 
@@ -528,7 +538,43 @@ let cancel_btw (m : Model.t) =
 ;;
 
 (* A new session (switched, new, forked) starts from its own messages. *)
-let set_state (m : Model.t) (state : State.t) =
+(* ---- the file browser and the attachments *)
+
+let files_out (m : Model.t) (outs : Files.Out.t list) =
+  List.fold outs ~init:(m, []) ~f:(fun (m, cmds) (out : Files.Out.t) ->
+    match out with
+    | Rpc { method_; params; reply } ->
+      m, cmds @ [ rpc method_ params ~tag:(Files reply) ]
+    | Page page -> m, cmds @ [ Command.Files page ]
+    | Toast { text; error } ->
+      let m, more = toast m ~error text in
+      m, cmds @ more
+    | Copy text -> m, cmds @ [ Command.Copy text ]
+    | Insert text ->
+      let draft =
+        if
+          String.is_empty m.draft
+          || Char.is_whitespace (String.get m.draft (String.length m.draft - 1))
+        then m.draft ^ text ^ " "
+        else m.draft ^ " " ^ text ^ " "
+      in
+      { m with draft; cursor = String.length draft }, cmds @ [ focus_editor ]
+    | Focus_editor -> m, cmds @ [ focus_editor ])
+;;
+
+let with_files (m : Model.t) (files, outs) = files_out { m with files } outs
+
+let files_where (m : Model.t) =
+  Option.map m.state ~f:(fun (state : State.t) ->
+    let name, _ = Terminal.where state in
+    { Files.Where.session = state.session_id
+    ; host = state.active_host
+    ; host_name = name
+    ; cwd = state.cwd
+    })
+;;
+
+let set_state_without_files (m : Model.t) (state : State.t) =
   let changed =
     match m.state with
     | Some old -> not (String.equal old.session_id state.session_id)
@@ -582,6 +628,12 @@ let set_state (m : Model.t) (state : State.t) =
         ; list_jobs
         ] )
   else m, background_changed
+;;
+
+let set_state (m : Model.t) (state : State.t) =
+  let m, cmds = set_state_without_files m state in
+  let m, more = with_files m (Files.set_where m.files (files_where m)) in
+  m, cmds @ more
 ;;
 
 let logged_in (m : Model.t) provider =
@@ -2371,6 +2423,8 @@ let run_command (m : Model.t) ({ name; rest } : Slash.Parsed.t) =
   | "btw", "" -> error m "Usage: /btw <question> (asked aside; the run goes on)"
   | "btw", question -> start_btw m question
   | "abort", _ -> m, [ rpc "abort" [] ~tag:Restored ]
+  | "files", "" -> with_files m (Files.update m.files (Open None))
+  | "files", path -> with_files m (Files.update m.files (Open (Some path)))
   | "terminal", "" -> open_terminal m
   | "terminal", _ ->
     error m "Usage: /terminal (Ctrl+` opens and closes it; × in its header too)"
@@ -2592,9 +2646,15 @@ let subagent_of_json json =
   , `Call call_id )
 ;;
 
-let reply_to (m : Model.t) (tag : Reply_tag.t) result =
+let rec reply_to (m : Model.t) (tag : Reply_tag.t) result =
   match tag, result with
   | Reconnect generation, _ when generation <> m.generation -> m, []
+  | Files reply, result -> with_files m (Files.reply m.files reply result)
+  | Sent_with_files { text; images; attachments }, result ->
+    let m, cmds = reply_to m (Sent { text; images }) result in
+    (match result with
+     | Ok _ -> m, cmds
+     | Error _ -> { m with files = Files.restore m.files attachments }, cmds)
   (* The banner says that we are reconnecting: a toast per attempt would
      pile up over the page. *)
   | Reconnect _, Error _ ->
@@ -3202,12 +3262,18 @@ let send (m : Model.t) ~follow_up =
     ( { (set_draft m "") with history; completion = None }
     , [ Command.Save_history (History.to_list history) ] )
   in
+  let attached = not (List.is_empty m.files.attachments) in
   match Slash.parse text with
-  | _ when String.is_prefix text ~prefix:"!" && List.is_empty m.images ->
+  | _
+    when String.is_prefix text ~prefix:"!"
+         && List.is_empty m.images
+         && not attached ->
     let m, save = sent m in
     let m, cmds = shell m text in
     m, save @ (Command.Scroll_to_bottom :: cmds)
-  | Some parsed when List.is_empty m.images && not (invokes_skill parsed) ->
+  | Some parsed
+    when List.is_empty m.images && (not attached) && not (invokes_skill parsed)
+    ->
     let first_toast = m.next_toast in
     let m, save = sent m in
     let m, cmds = run_command m parsed in
@@ -3224,8 +3290,12 @@ let send (m : Model.t) ~follow_up =
       m
       "Not connected to the backend: your message stays here until it is back \
        (/retry-backend-connection tries now)."
+  | _ when attached && Or_error.is_error (Files.prompt_attachments m.files) ->
+    (match Files.prompt_attachments m.files with
+     | Error e -> error m (Error.to_string_hum e)
+     | Ok _ -> m, [])
   | _ ->
-    if String.is_empty text && List.is_empty m.images
+    if String.is_empty text && List.is_empty m.images && not attached
     then m, []
     else (
       let method_ =
@@ -3252,13 +3322,23 @@ let send (m : Model.t) ~follow_up =
           m.pending
           (Option.some_if prompt { In_flight.Prompt.text; images = m.images })
       in
-      ( { m with images = []; agents; pending }
+      let attachments =
+        match Files.prompt_attachments m.files with
+        | Ok (_ :: _ as paths) ->
+          [ "attachments", `Array (List.map paths ~f:str) ]
+        | Ok [] | Error _ -> []
+      in
+      let tag : Reply_tag.t =
+        if attached
+        then
+          Sent_with_files
+            { text; images = m.images; attachments = m.files.attachments }
+        else Sent { text; images = m.images }
+      in
+      ( { m with images = []; agents; pending; files = Files.sent m.files }
       , save
         @ [ Command.Scroll_to_bottom
-          ; rpc
-              method_
-              (("text", str text) :: images)
-              ~tag:(Sent { text; images = m.images })
+          ; rpc method_ ((("text", str text) :: images) @ attachments) ~tag
           ] ))
 ;;
 
@@ -3736,4 +3816,5 @@ let update (m : Model.t) (action : Action.t) =
     ( with_terminal m ~f:(fun t ->
         { t with height = Some (Int.max Terminal.min_height px) })
     , [] )
+  | Files action -> with_files m (Files.update m.files action)
 ;;

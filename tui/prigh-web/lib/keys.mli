@@ -13,6 +13,7 @@ module Target : sig
     | Session_search (** the sidebar's search *)
     | Session of string (** a session's row in the sidebar, by id *)
     | Terminal (** the terminal panel: its keys are the shell's but Ctrl+` *)
+    | Files (** the file browser's list (not its fields) *)
     | Page
   [@@deriving sexp_of]
 end

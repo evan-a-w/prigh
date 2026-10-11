@@ -103,6 +103,7 @@ let%expect_test "every command does something (none is unknown)" =
     /btw                       toast: Usage: /btw <question> (asked aside; the run goes on)
     /abort                     rpc abort
     /terminal                  (Remember_terminal true), Focus_terminal
+    /files                     rpc fs_list, (Files(Focus files-list))
     /agents                    agents panel
     /jobs                      agents panel
     /login                     loading Log in to a provider: rpc auth_status
@@ -165,6 +166,7 @@ let%expect_test "/help <command> and /hotkeys" =
     Alt+1…9 follow subagent or job N in the agents panel
     Alt+] Alt+[ the next or previous subagent or job
     Alt+0 close the agents panel
+    Ctrl+Shift+F open or close the file browser (/files): ↑↓ select, Enter opens, Backspace goes up, F2 renames, Delete deletes, Esc closes
     Ctrl+` open or close the terminal (/terminal); in it, every other key goes to the shell
     Tab (in /scoped-models) check or uncheck the highlighted model
     y / a / n / r (confirmation) allow once, always allow (its rules, this session), deny, deny saying why; Enter allows, Esc denies

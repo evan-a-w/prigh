@@ -109,7 +109,10 @@ let placeholder (m : App.Model.t) =
 let view (m : App.Model.t) ~inject =
   let running = App.Model.running m in
   let has_input =
-    not (String.is_empty (String.strip m.draft) && List.is_empty m.images)
+    not
+      (String.is_empty (String.strip m.draft)
+       && List.is_empty m.images
+       && List.is_empty m.files.attachments)
   in
   let sending = m.pending.sending > 0 in
   let connected = connected m in
@@ -121,6 +124,7 @@ let view (m : App.Model.t) ~inject =
     ; div
         ~cls:"composer-box"
         [ images m ~inject
+        ; Files_view.chips m ~inject
         ; div
             ~cls:"composer-row"
             [ Node.textarea
@@ -143,7 +147,8 @@ let view (m : App.Model.t) ~inject =
                 []
             ; div
                 ~cls:"composer-buttons"
-                [ (if running
+                [ Files_view.attach_button m ~inject
+                ; (if running
                    then
                      button
                        ~cls:"stop"

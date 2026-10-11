@@ -11,7 +11,7 @@ let%expect_test
   [%expect
     {|
     []
-    (Send (Enter))
+    (Attach files (or drop them here)) (Send (Enter))
     |}];
   H.show h ~selector:".send";
   [%expect
@@ -350,10 +350,10 @@ let%expect_test "slash commands: the popup, arguments, running, unknown ones" =
     /btw <question> ask a side question without interrupting the run (not added to the conversation)
     /abort stop the current run
     /terminal open a shell where the tools run, in the session's directory (Ctrl+`)
+    /files [path] browse, preview, upload and download files where the tools run (Ctrl+Shift+F)
     /agents [n|id|cancel <n|id>] follow subagents and background jobs in the agents panel, or cancel one
     /jobs [id|kill <id>] background jobs in the agents panel: list them, show or kill one
     /login [provider] log in to a model provider (or /login custom)
-    /logout [provider] remove a provider's login
     |}];
   H.type_ h "/mod";
   H.key h "Tab";

@@ -108,6 +108,12 @@ module Reply_tag : sig
     | Thinking_set
     | Git_diff
     | Command_prompt of string (** [/review] or [/init] as typed *)
+    | Files of Files.Reply.t
+    | Sent_with_files of
+        { text : string
+        ; images : Image.t list
+        ; attachments : Files.Attachment.t list
+        } (** [Sent] with attachments: back to the composer if it fails *)
   [@@deriving sexp_of, equal]
 end
 
@@ -152,6 +158,7 @@ module Command : sig
     (** answered by [Notification_permission] *)
     | Save_notifications of bool (** [/notify on|off], in the browser *)
     | Set_title of string (** the tab's, with the count of unseen events *)
+    | Files of Files.Page.t
   [@@deriving sexp_of, equal]
 end
 
@@ -324,6 +331,7 @@ module Action : sig
         ; status : Terminal.Status.t
         } (** from the page's widget *)
     | Set_terminal_height of int (** dragged, or remembered *)
+    | Files of Files.Action.t (** the file browser and the attachments *)
   [@@deriving sexp_of]
 end
 
@@ -376,6 +384,7 @@ module Model : sig
     ; pending : In_flight.t (** what we wait on the backend for, on show *)
     ; marks : Session_marks.t (** the sidebar's selection *)
     ; notifications : Page_notify.t
+    ; files : Files.t
     }
   [@@deriving sexp_of]
 

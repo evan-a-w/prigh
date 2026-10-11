@@ -253,6 +253,7 @@ let perform client settings ctx (model : App.Model.t) (command : App.Command.t) 
     | Save_notifications enabled ->
       Effect.of_sync_fun Page_notifications.save enabled
     | Set_title title -> Effect.of_sync_fun Page_notifications.set_title title
+    | Files page -> Effect.of_sync_fun Files_widget.perform page
   in
   Bonsai.Apply_action_context.schedule_event ctx eff
 ;;
@@ -349,26 +350,18 @@ let component client settings ~current (local_ graph) =
 
 let supported_images = [ "image/png"; "image/jpeg"; "image/gif"; "image/webp" ]
 
-(* Pasted or dropped image files become attachments; the backend checks and
-   downscales them. *)
+(* Pasted or dropped image files become images in the prompt (the backend
+   checks and downscales them); other files are uploaded to the tool host and
+   attached by path. *)
 let read_images ~schedule (files : File.fileList Js.t) =
+  let others = ref [] in
   for i = 0 to files##.length - 1 do
     Js.Opt.iter
       (files##item i)
       (fun file ->
          let mime_type = Js.to_string file##._type in
-         if not (String.is_prefix mime_type ~prefix:"image/")
-         then ()
-         else if not (List.mem supported_images mime_type ~equal:String.equal)
-         then
-           schedule
-             (App.Action.Show_toast
-                { text =
-                    sprintf
-                      "%s is not supported: use PNG, JPEG, GIF or WebP"
-                      mime_type
-                ; error = true
-                })
+         if not (List.mem supported_images mime_type ~equal:String.equal)
+         then others := file :: !others
          else (
            let reader = new%js File.fileReader in
            reader##.onload
@@ -390,13 +383,20 @@ let read_images ~schedule (files : File.fileList Js.t) =
                  | None -> ());
                 Js._true);
            reader##readAsDataURL file))
-  done
+  done;
+  Files_widget.choose Chat (List.rev !others)
 ;;
 
 let key_target (ev : Dom_html.keyboardEvent Js.t) : Prigh_web.Keys.Target.t =
   match Js.Opt.to_option ev##.target with
   | None -> Page
   | Some el when Terminal_widget.contains el -> Terminal
+  | Some el
+    when Files_widget.in_panel el
+         &&
+         match Dom_html.tagged el with
+         | Input _ | Textarea _ | Select _ | Button _ | A _ -> false
+         | _ -> true -> Files
   | Some el ->
     (match Dom_html.tagged el with
      | Textarea t when String.equal (Js.to_string t##.id) "editor" ->
@@ -596,10 +596,13 @@ let install_listeners ~schedule ~current =
     Js._true);
   listen Dom_html.Event.drop (fun (ev : Dom_html.dragEvent Js.t) ->
     Dom.preventDefault ev;
+    Files_widget.drag_end ();
     if not (in_terminal ev)
     then
       Js.Opt.iter ev##.dataTransfer (fun data ->
-        read_images ~schedule data##.files);
+        if Js.Opt.case ev##.target (fun () -> false) Files_widget.in_panel
+        then Files_widget.choose Here (Files_widget.files_of data##.files)
+        else read_images ~schedule data##.files);
     Js._true);
   Chat_listeners.install ~schedule;
   Agents_listeners.install ~schedule;
@@ -886,6 +889,7 @@ let run_app (settings : Settings.t) =
          if App.Model.ticking !current
          then schedule (App.Action.Clock (Time_ns.now ())));
        install_listeners ~schedule ~current;
+       Files_widget.install ~schedule ~backend:settings.backend;
        don't_wait_for
          (Pipe.iter_without_pushback
             (Client.incoming client)
