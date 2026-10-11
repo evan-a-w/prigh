@@ -134,7 +134,7 @@ let modes (m : App.Model.t) ~inject =
          ~command:"/verbosity"
          (Prigh_ui.Verbosity.name v))
   ; (match m.config with
-     | Some { confirm_tools = true; _ } ->
+     | Some { approval_mode = Ask | Auto_edit; _ } ->
        chip
          ~title:"Tools ask before running (/confirm)"
          ~command:"/confirm"

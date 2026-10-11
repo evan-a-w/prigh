@@ -56,11 +56,13 @@ type t =
       { call : Tool_call.t
       ; result : Message.Tool_result.t
       }
-  | Tool_confirm of
+  | Tool_confirm of Pending.Confirm.t
+  | Tool_confirm_done of
       { call_id : string
-      ; name : string
-      ; summary : string
-      }
+      ; agent_id : string option
+      } (** answered by any frontend, let through or withdrawn: close it *)
+  | Ask_user of Pending.Ask.t
+  | Ask_user_done of string (** call id: answered or withdrawn *)
   | State of State.t
   | Compacted of string
   | Config_changed of Config.t
@@ -156,11 +158,14 @@ let rec of_json j =
       Json.object_field j "result" >>= Message.Tool_result.of_json
     in
     Tool_end { call; result }
-  | "tool_confirm" ->
+  | "tool_confirm" -> Pending.Confirm.of_json j >>| fun c -> Tool_confirm c
+  | "tool_confirm_done" ->
     let%bind call_id = Json.string_field j "call_id" in
-    let%bind name = Json.string_field j "name" in
-    let%map summary = Json.string_field j "summary" in
-    Tool_confirm { call_id; name; summary }
+    let%map agent_id = Json.string_opt_field j "agent_id" in
+    Tool_confirm_done { call_id; agent_id }
+  | "ask_user_done" ->
+    Json.string_field j "call_id" >>| fun call_id -> Ask_user_done call_id
+  | "ask_user" -> Pending.Ask.of_json j >>| fun a -> Ask_user a
   | "state" ->
     Json.object_field j "state" >>= State.of_json >>| fun s -> State s
   | "compacted" -> Json.string_field j "summary" >>| fun s -> Compacted s

@@ -18,6 +18,7 @@ module Picker_kind = struct
     | Tree of Entry.t list
     | Agents
     | Jobs
+    | Modes (** [/mode]: approval modes and plan mode *)
     | Hosts
     | Skills
     | Mcp of Mcp_list.t
@@ -31,6 +32,10 @@ module Text_prompt_action = struct
     | Cd
     | Export_path
     | Import_path
+    | Deny_reason of
+        { confirm : Pending.Confirm.t
+        ; draft : string (** the editor's text, restored afterwards *)
+        } (** the reason for denying a tool call, which the model sees *)
     | Host_cwd of string (** host id; the text is the directory there *)
   [@@deriving sexp_of, equal]
 end
@@ -40,10 +45,7 @@ module Confirm_action = struct
     | Logout of string
     | Rewind of string
     | Delete_session of string
-    | Tool_confirm of
-        { call_id : string
-        ; name : string
-        }
+    | Tool_confirm of Pending.Confirm.t
   [@@deriving sexp_of, equal]
 end
 
@@ -65,6 +67,10 @@ type t =
       { question : string
       ; action : Confirm_action.t
       }
+  | Question of
+      { call_id : string
+      ; form : Question_form.t
+      } (** the model's [ask_user] *)
   | Search of
       { query : string
       ; matches : int list
@@ -74,7 +80,7 @@ type t =
 
 let is_dialog = function
   | Editing | Search _ -> false
-  | Picker _ | Login_prompt _ | Text_prompt _ | Confirm _ -> true
+  | Picker _ | Login_prompt _ | Text_prompt _ | Confirm _ | Question _ -> true
 ;;
 
 let name = function
@@ -83,5 +89,6 @@ let name = function
   | Login_prompt _ -> "login"
   | Text_prompt _ -> "text_prompt"
   | Confirm _ -> "confirm"
+  | Question _ -> "question"
   | Search _ -> "search"
 ;;

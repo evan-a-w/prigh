@@ -81,6 +81,10 @@ let bindings =
   ; b [ Key.alt (Char "p") ] Prev_model "cycle to the previous scoped model"
   ; b [ Key.ctrl 't' ] Next_thinking "cycle the thinking level"
   ; b
+      [ Key.alt (Char "m") ]
+      Cycle_mode
+      "cycle the mode: ask → auto-edit → auto → plan (read-only)"
+  ; b
       [ Key.ctrl 'n' ]
       Picker_toggle_filter
       "picker: toggle the named-only / logged-in-only filter"

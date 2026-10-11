@@ -42,6 +42,11 @@ type t =
   (** backend first, then connected tool-capable clients *)
   ; subagents : Subagent.t list
   ; jobs : Job.t list
+  ; approval_mode : Approval_mode.t
+  ; plan_mode : bool (** read-only planning, see [exit_plan_mode] *)
+  ; plan : Plan.t option (** the model's [update_plan] *)
+  ; session_rules : string list
+    (** rules the user allowed for the session ("don't ask again") *)
   }
 [@@deriving sexp_of, equal]
 

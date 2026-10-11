@@ -221,6 +221,9 @@ let rec apply t (event : Event.t) =
   | Turn_start
   | Turn_end _
   | Tool_confirm _
+  | Tool_confirm_done _
+  | Ask_user _
+  | Ask_user_done _
   | State _
   | Config_changed _
   | Notice _

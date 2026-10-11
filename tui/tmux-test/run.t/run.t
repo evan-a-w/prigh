@@ -244,11 +244,15 @@ prints the captured panes.
     running
   … bash $ echo ran-it
   ┌─ Confirm ────────────────────────────────────────────────────────────────────────────────────────┐
-  │ Run bash: echo ran-it? (y/n)                                                                     │
+  │ Run bash: echo ran-it?                                                                           │
+  │ y  allow once                                                                                    │
+  │ a  always allow bash(echo:*) this session                                                        │
+  │ n  deny                                                                                          │
+  │ r  deny, saying why                                                                              │
   └──────────────────────────────────────────────────────────────────────────────────────────────────┘
   ────────────────────────────────────────────────────────────────────────────────────────────────────
   ?
-  …deepseek-flash  think:on  view:normal  ctx:0.0%/1.0M  $0.00  confirm: y / n
+  …deepseek-flash  think:on  view:normal  ctx:0.0%/1.0M  $0.00  mode:ask  confirm: y/a/n/r
   === allowed
     prigh in $TMP/cwd · /help · Esc aborts · Ctrl+C twice quits
   
@@ -256,10 +260,11 @@ prints the captured panes.
     running
   ✓ bash $ echo ran-it
       ran-it
+    allowed bash
     first done
   ────────────────────────────────────────────────────────────────────────────────────────────────────
   >
-  $TMP/cwd  deepseek-flash  think:on  view:normal  ctx:0.0%/1.0M  $0.00
+  $TMP/cwd  deepseek-flash  think:on  view:normal  ctx:0.0%/1.0M  $0.00  mode:ask
   === denied
     prigh in $TMP/cwd · /help · Esc aborts · Ctrl+C twice quits
   
@@ -267,6 +272,7 @@ prints the captured panes.
     running
   ✓ bash $ echo ran-it
       ran-it
+    allowed bash
     first done
   
   ▌ go again
@@ -275,6 +281,188 @@ prints the captured panes.
       [denied by user]
     denied bash
     second done
+  ────────────────────────────────────────────────────────────────────────────────────────────────────
+  >
+  $TMP/cwd  deepseek-flash  think:on  view:normal  ctx:0.0%/1.0M  $0.00  mode:ask
+  $ bash ./harness.sh approvals
+  === dialog with always
+    prigh in $TMP/cwd · /help · Esc aborts · Ctrl+C twice quits
+  
+  ▌ go
+    one
+  … bash $ echo first-run
+  ┌─ Confirm ────────────────────────────────────────────────────────────────────────────────────────┐
+  │ Run bash: echo first-run?                                                                        │
+  │ y  allow once                                                                                    │
+  │ a  always allow bash(echo:*) this session                                                        │
+  │ n  deny                                                                                          │
+  │ r  deny, saying why                                                                              │
+  └──────────────────────────────────────────────────────────────────────────────────────────────────┘
+  ────────────────────────────────────────────────────────────────────────────────────────────────────
+  ?
+  …deepseek-flash  think:on  view:normal  ctx:0.0%/1.0M  $0.00  mode:ask  confirm: y/a/n/r
+  === the second echo ran without asking
+    prigh in $TMP/cwd · /help · Esc aborts · Ctrl+C twice quits
+  
+  ▌ go
+    one
+  ✓ bash $ echo first-run
+      first-run
+    allowed bash; always: bash(echo:*)
+    first done
+  
+  ▌ again
+    two
+  ✓ bash $ echo second-run
+      second-run
+    second done
+  ────────────────────────────────────────────────────────────────────────────────────────────────────
+  >
+  $TMP/cwd  deepseek-flash  think:on  view:normal  ctx:0.0%/1.0M  $0.00  mode:ask
+  === denied with a reason
+    prigh in $TMP/cwd · /help · Esc aborts · Ctrl+C twice quits
+  
+  ▌ go
+    one
+  ✓ bash $ echo first-run
+      first-run
+    allowed bash; always: bash(echo:*)
+    first done
+  
+  ▌ again
+    two
+  ✓ bash $ echo second-run
+      second-run
+    second done
+  
+  ▌ deploy
+    three
+  ✕ bash $ make deploy
+      [denied by user] Their reason: not on a Friday
+    denied bash
+    third done
+  ────────────────────────────────────────────────────────────────────────────────────────────────────
+  >
+  $TMP/cwd  deepseek-flash  think:on  view:normal  ctx:0.0%/1.0M  $0.00  mode:ask
+  === Alt+M: auto-edit
+    prigh in $TMP/cwd · /help · Esc aborts · Ctrl+C twice quits
+  
+  ▌ go
+    one
+  ✓ bash $ echo first-run
+      first-run
+    allowed bash; always: bash(echo:*)
+    first done
+  
+  ▌ again
+    two
+  ✓ bash $ echo second-run
+      second-run
+    second done
+  
+  ▌ deploy
+    three
+  ✕ bash $ make deploy
+      [denied by user] Their reason: not on a Friday
+    denied bash
+    third done
+    mode: auto-edit — file edits run; bash and MCP tools ask first
+  ────────────────────────────────────────────────────────────────────────────────────────────────────
+  >
+  …deepseek-flash  think:on  view:normal  ctx:0.0%/1.0M  $0.00  mode:auto-edit
+  $ bash ./harness.sh plan
+  === the plan to approve
+    prigh in $TMP/cwd · /help · Esc aborts · Ctrl+C twice quits
+    mode: plan — read-only planning: no file edits, commands ask first
+    plan mode on: the model was told to plan, not change files
+  
+  ▌ add a.txt
+    looking
+  ✕ write a.txt  1 line
+      [plan mode] Files cannot be changed while planning. Keep investigating with read-only tools,
+      then call exit_plan_mode with the plan for the user to approve.
+    planned
+  … exit_plan_mode  waiting for your approval
+      1. Write a.txt
+      2. Check it
+  ┌─ Plan ───────────────────────────────────────────────────────────────────────────────────────────┐
+  │ Approve the plan and start implementing?                                                         │
+  │ 1. Write a.txt                                                                                   │
+  │ 2. Check it                                                                                      │
+  │                                                                                                  │
+  │ y  approve: leave plan mode and implement                                                        │
+  │ n  keep planning                                                                                 │
+  │ r  keep planning, saying what to change                                                          │
+  └──────────────────────────────────────────────────────────────────────────────────────────────────┘
+  ────────────────────────────────────────────────────────────────────────────────────────────────────
+  ?
+  …deepseek-flash  think:on  view:normal  ctx:0.0%/1.0M  $0.00  mode:plan  confirm: y/n/r
+  === approved and implemented
+    prigh in $TMP/cwd · /help · Esc aborts · Ctrl+C twice quits
+    mode: plan — read-only planning: no file edits, commands ask first
+    plan mode on: the model was told to plan, not change files
+  
+  ▌ add a.txt
+    looking
+  ✕ write a.txt  1 line
+      [plan mode] Files cannot be changed while planning. Keep investigating with read-only tools,
+      then call exit_plan_mode with the plan for the user to approve.
+    planned
+  ✓ exit_plan_mode  approved
+      1. Write a.txt
+      2. Check it
+    plan approved
+    implementing
+  ✓ write a.txt  1 line
+    all done
+  ────────────────────────────────────────────────────────────────────────────────────────────────────
+  >
+  $TMP/cwd  deepseek-flash  think:on  view:normal  ctx:0.0%/1.0M  $0.00
+  $ bash ./harness.sh question
+  === first question
+    prigh in $TMP/cwd · /help · Esc aborts · Ctrl+C twice quits
+  
+  ▌ go
+    asking
+  … ask_user  waiting for your answer
+      ? Which database?
+      ? Anything else?
+  ┌─ Storage (1/2) ──────────────────────────────────────────────────────────────────────────────────┐
+  │ Which database?                                                                                  │
+  │ › ( ) Postgres  what prod uses                                                                   │
+  │   ( ) SQLite                                                                                     │
+  │   Other:                                                                                         │
+  │ Enter picks                                                                                      │
+  └──────────────────────────────────────────────────────────────────────────────────────────────────┘
+  ────────────────────────────────────────────────────────────────────────────────────────────────────
+  …deepseek-flash  ctx:0.0%/1.0M  ↑↓ choose · Space picks · type to answer · ←→ questions · Enter acc…
+  === second question
+    prigh in $TMP/cwd · /help · Esc aborts · Ctrl+C twice quits
+  
+  ▌ go
+    asking
+  … ask_user  waiting for your answer
+      ? Which database?
+      ? Anything else?
+  ┌─ Question 2/2 ───────────────────────────────────────────────────────────────────────────────────┐
+  │ Anything else?                                                                                   │
+  │ › keep it small                                                                                  │
+  │ Enter answers                                                                                    │
+  └──────────────────────────────────────────────────────────────────────────────────────────────────┘
+  ────────────────────────────────────────────────────────────────────────────────────────────────────
+  …deepseek-flash  ctx:0.0%/1.0M  ↑↓ choose · Space picks · type to answer · ←→ questions · Enter acc…
+  === answered
+    prigh in $TMP/cwd · /help · Esc aborts · Ctrl+C twice quits
+  
+  ▌ go
+    asking
+  ✓ ask_user
+      Q: Which database?
+      A: SQLite
+      Q: Anything else?
+      A: keep it small
+    answered
+    thanks
   ────────────────────────────────────────────────────────────────────────────────────────────────────
   >
   $TMP/cwd  deepseek-flash  think:on  view:normal  ctx:0.0%/1.0M  $0.00

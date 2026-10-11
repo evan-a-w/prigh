@@ -37,6 +37,7 @@ type t =
   | Next_model (** Ctrl+P: cycle forward through the scoped models *)
   | Prev_model (** Alt+P: cycle backward *)
   | Next_thinking (** Ctrl+T: cycle the thinking level *)
+  | Cycle_mode (** Alt+M: cycle ask / auto-edit / auto / plan *)
   | Next_agent
   | Focus_agent of int
   | Queue_follow_up

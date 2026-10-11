@@ -255,8 +255,9 @@ let%expect_test "/scoped-models, Ctrl+P and Alt+P" =
     (((scoped_models
        (anthropic/claude-opus-5-5 anthropic/claude-sonnet-5
         deepseek/deepseek-chat))
-      (confirm_tools false) (default_model ()) (default_thinking ())
-      (fallback_models ()) (default_cwd ())))
+      (approval_mode Auto) (permissions ((allow ()) (ask ()) (deny ())))
+      (default_model ()) (default_thinking ()) (fallback_models ())
+      (default_cwd ())))
     |}]
 ;;
 
@@ -405,12 +406,12 @@ let%expect_test "/confirm" =
   [%expect
     {|
     (Focus editor)
-    (Rpc (method_ set_config) (params ((config ((confirm_tools true)))))
+    (Rpc (method_ set_config) (params ((config ((approval_mode ask)))))
      (tag (Config_saved "Tool confirmation on: bash, write and edit ask first")))
     (Expire_toast (id 0) (after_ms 4000))
     Ready 0% ↑0 ↓0 $0.0000 (confirm)
     (Save_history ("/confirm off" /confirm))
-    (Rpc (method_ set_config) (params ((config ((confirm_tools false)))))
+    (Rpc (method_ set_config) (params ((config ((approval_mode auto)))))
      (tag (Config_saved "Tool confirmation off: tools run without asking")))
     (Save_history ("/confirm maybe" "/confirm off" /confirm))
     Tool confirmation on: bash, write and edit ask first
@@ -1325,8 +1326,8 @@ let%expect_test "/retry-backend-connection, /state, /clear, /quit" =
        (supports_thinking true) (cost ((input 5) (output 25) (cache_read 0.5)))))
      (thinking on) (running false) (message_count 0)
      (usage ((input 0) (output 0) (cache_read 0))) (cost_usd 0)
-     (context_tokens 0) (active_host backend) (hosts ()) (subagents ())
-     (jobs ()))
+     (context_tokens 0) (active_host backend) (hosts ()) (subagents ()) (jobs ())
+     (approval_mode Auto) (plan_mode false) (plan ()) (session_rules ()))
     (Done)
     |}];
   H.key h "Escape" ~target:Page;

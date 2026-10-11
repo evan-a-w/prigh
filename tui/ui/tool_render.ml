@@ -96,6 +96,7 @@ let arg (call : P.Tool_call.t) =
     | "ls" -> Some (Option.value (str "path") ~default:".")
     | "grep" | "find" -> str "pattern"
     | "subagent" -> str "task"
+    | "ask_user" | "update_plan" | "exit_plan_mode" -> None
     | "job_wait" | "job_kill" | "subagent_wait" | "subagent_cancel" -> ids ()
     | _ ->
       (match
@@ -109,6 +110,21 @@ let arg (call : P.Tool_call.t) =
   Option.bind arg ~f:(fun s ->
     let s = one_line s in
     Option.some_if (not (String.is_empty s)) s)
+;;
+
+let parsed_arguments (call : P.Tool_call.t) =
+  Result.ok (P.Json.parse call.arguments)
+;;
+
+let plan_of_call call =
+  Option.bind (parsed_arguments call) ~f:(fun json ->
+    Option.join (Result.ok (P.Plan.of_arguments json)))
+;;
+
+let questions_of_call call =
+  Option.value_map (parsed_arguments call) ~default:[] ~f:(fun json ->
+    Result.ok (P.Json.list_field json "questions" ~f:P.Question.of_json)
+    |> Option.value ~default:[])
 ;;
 
 let summary call =
@@ -486,6 +502,63 @@ let render
              List.concat_map files ~f:(fun file ->
                let lines = diff ~max_lines (Patch.File.lines file) in
                if single then lines else label file :: lines) ))
+    | "update_plan", _ ->
+      (match plan_of_call call with
+       | None -> generic result
+       | Some plan ->
+         ( [ chip
+               (sprintf
+                  "%d/%d done"
+                  (P.Plan.completed plan)
+                  (List.length plan.steps))
+           ]
+         , (match result with
+            | Some ({ is_error = true; _ } as r) -> error r.text
+            | Some _ | None ->
+              if quiet
+              then []
+              else
+                List.map (Plan_view.lines plan) ~f:(fun line ->
+                  Log_line.indent ~depth:2 (Content.Line.of_string line))) ))
+    | "ask_user", _ ->
+      (match result with
+       | Some { is_error = false; text; _ } ->
+         let text =
+           Option.value
+             (String.chop_prefix text ~prefix:"The user answered:\n")
+             ~default:text
+         in
+         [], output ~head:(if quiet then 0 else all) text
+       | Some ({ is_error = true; _ } as r) ->
+         [ chip "no answer" ], error r.text
+       | None ->
+         ( [ chip ~style:(Style.fg Yellow) "waiting for your answer" ]
+         , List.map (questions_of_call call) ~f:(fun (q : P.Question.t) ->
+             Log_line.indent
+               ~depth:2
+               (Content.Line.of_string ("? " ^ q.question))) ))
+    | "exit_plan_mode", _ ->
+      let plan = str "plan" in
+      let chips =
+        match result with
+        | Some { is_error = false; _ } -> [ chip ~style:green "approved" ]
+        | Some { is_error = true; text; _ }
+          when String.is_prefix text ~prefix:"[the user did not approve" ->
+          [ chip ~style:red "not approved" ]
+        | Some _ -> []
+        | None -> [ chip ~style:(Style.fg Yellow) "waiting for your approval" ]
+      in
+      let refusal =
+        match result with
+        | Some ({ is_error = true; _ } as r) -> error r.text
+        | Some _ | None -> []
+      in
+      ( chips
+      , (match verbosity with
+         | Quiet -> []
+         | Normal -> output ~style:Style.plain ~head:30 plan
+         | Verbose -> output ~style:Style.plain ~head:all plan)
+        @ refusal )
     | ("ls" | "grep" | "find"), _ ->
       let flags =
         List.filter_opt

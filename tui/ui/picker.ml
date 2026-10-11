@@ -146,6 +146,7 @@ let handle t (intent : Intent.t) ~page : Outcome.t =
   | Next_model
   | Prev_model
   | Next_thinking
+  | Cycle_mode
   | Next_agent
   | Focus_agent _
   | Queue_follow_up

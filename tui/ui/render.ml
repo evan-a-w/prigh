@@ -202,7 +202,24 @@ let mode_hint (m : App.Model.t) : Content.Line.t option =
                [ span ~style:attention "Tab completes · Enter submits · Esc" ]
            | None ->
              Some [ span ~style:attention "Enter submits · Esc cancels" ])
+        | Confirm { action = Tool_confirm c; _ } ->
+          Some
+            [ span
+                ~style:attention
+                ("confirm: "
+                 ^ String.concat
+                     ~sep:"/"
+                     (List.map (Confirm_prompt.answers c) ~f:(fun (_, key, _) ->
+                        key)))
+            ]
         | Confirm _ -> Some [ span ~style:attention "confirm: y / n" ]
+        | Question _ ->
+          Some
+            [ span
+                ~style:attention
+                "↑↓ choose · Space picks · type to answer · ←→ questions · \
+                 Enter accepts · Esc declines"
+            ]
         | Search { query = _; matches; current } ->
           if List.is_empty matches
           then
@@ -294,6 +311,120 @@ let tools_part (m : App.Model.t) (s : P.State.t) =
   | Some h -> [ 4, [ span ~style:attention ("tools:" ^ h.name) ] ]
 ;;
 
+(* Any mode in which something asks first or is refused; plan mode in
+   yellow. [auto], where nothing is in the way, shows nothing. *)
+let mode_part (s : P.State.t) =
+  let mode = Session_mode.of_state s in
+  if (not mode.plan) && P.Approval_mode.equal mode.approval Auto
+  then []
+  else (
+    let style = if mode.plan then attention else gray in
+    [ 3, [ span ~style ("mode:" ^ Session_mode.label mode) ] ])
+;;
+
+let plan_part (s : P.State.t) =
+  match Option.bind s.plan ~f:Plan_view.status with
+  | None -> []
+  | Some text -> [ 3, [ span ~style:gray text ] ]
+;;
+
+let confirm_dialog ~width (c : P.Pending.Confirm.t) =
+  let inner = Boxed.inner_width ~width in
+  let question =
+    span ~style:(Style.bold (Style.fg Yellow)) (Confirm_prompt.title c)
+  in
+  let plan =
+    if Confirm_prompt.is_plan c
+    then
+      Content.wrap
+        (List.map (String.split_lines c.summary) ~f:Content.Line.of_string)
+        ~width:inner
+      @ [ [] ]
+    else []
+  in
+  let answers =
+    List.map (Confirm_prompt.answers c) ~f:(fun (_, key, label) ->
+      [ span ~style:(Style.bold Style.plain) key
+      ; span ~style:gray ("  " ^ label)
+      ])
+  in
+  Boxed.render
+    ~title:(if Confirm_prompt.is_plan c then "Plan" else "Confirm")
+    ~width
+    (Content.wrap [ [ question ] ] ~width:inner @ plan @ answers)
+;;
+
+(* The dialog and where the cursor goes in it (the own answer's end). *)
+let question_dialog ~width form =
+  let inner = Boxed.inner_width ~width in
+  let questions = Question_form.questions form in
+  let index = Question_form.current form in
+  let q : P.Question.t = List.nth_exn questions index in
+  let total = List.length questions in
+  let title =
+    match q.header with
+    | Some header when total > 1 ->
+      sprintf "%s (%d/%d)" header (index + 1) total
+    | Some header -> header
+    | None when total > 1 -> sprintf "Question %d/%d" (index + 1) total
+    | None -> "Question"
+  in
+  let wrapped =
+    Content.wrap
+      [ [ span ~style:(Style.bold (Style.fg Yellow)) q.question ] ]
+      ~width:inner
+  in
+  let pointer row = if Question_form.cursor form = row then "› " else "  " in
+  let choices =
+    List.mapi q.choices ~f:(fun i (c : P.Question.Choice.t) ->
+      let picked = Question_form.is_picked form ~question:index ~choice:i in
+      let mark =
+        match q.multiple, picked with
+        | true, true -> "[x] "
+        | true, false -> "[ ] "
+        | false, true -> "(•) "
+        | false, false -> "( ) "
+      in
+      [ span ~style:attention (pointer i)
+      ; span mark
+      ; span
+          ~style:(if picked then Style.bold Style.plain else Style.plain)
+          c.label
+      ]
+      @ Option.value_map c.description ~default:[] ~f:(fun d ->
+        [ span ~style:gray ("  " ^ d) ]))
+  in
+  let own_row = List.length q.choices in
+  let own_prefix =
+    pointer own_row ^ if List.is_empty q.choices then "" else "Other: "
+  in
+  let own = Question_form.own_answer form ~question:index in
+  let own_line = [ span ~style:attention own_prefix; span own ] in
+  let hint =
+    [ span
+        ~style:gray
+        (if q.multiple
+         then "Space toggles · Enter: next"
+         else if List.is_empty q.choices
+         then "Enter answers"
+         else "Enter picks")
+    ]
+  in
+  let body = wrapped @ choices @ [ own_line; hint ] in
+  let cursor =
+    if Question_form.on_own_answer form
+    then
+      ( 1 + List.length wrapped + List.length choices
+      , 2 + Text_width.string own_prefix + Text_width.string own )
+    else (
+      (* after the label, not over the pointer *)
+      let row = Question_form.cursor form in
+      let label = (List.nth_exn q.choices row).label in
+      1 + List.length wrapped + row, 2 + 2 + 4 + Text_width.string label)
+  in
+  Boxed.render ~title ~width body, cursor
+;;
+
 let status (m : App.Model.t) : Content.Line.t =
   match m.state with
   | None -> [ span ~style:gray "connecting…" ]
@@ -329,6 +460,8 @@ let status (m : App.Model.t) : Content.Line.t =
         in
         [ 6, [ span ~style:base text ] ])
       @ tools_part m s
+      @ mode_part s
+      @ plan_part s
       @ (let queued = Queue_counts.total m.queued in
          if queued > 0
          then [ 3, [ span ~style:base (sprintf "queued:%d" queued) ] ]
@@ -697,6 +830,18 @@ let screen (m : App.Model.t) : Screen.t =
       let block, cursor_row = picker_block picker ~width ~height in
       let query_width = Text_width.string (Picker.query picker) in
       block, [], (cursor_row, 2 + query_width)
+    | Confirm { action = Tool_confirm c; _ } ->
+      let rows, cursor =
+        editor_rows
+          m
+          ~marker:"? "
+          ~marker_style:(Style.bold (Style.fg Yellow))
+          ~mask:false
+      in
+      confirm_dialog ~width c, rows, cursor
+    | Question { form; _ } ->
+      let dialog, cursor = question_dialog ~width form in
+      dialog, [], cursor
     | Confirm { question; _ } ->
       let rows, cursor =
         editor_rows
@@ -829,7 +974,7 @@ let screen (m : App.Model.t) : Screen.t =
     let row, col = cursor in
     let base =
       match m.mode with
-      | Picker _ -> transcript_area_rows
+      | Picker _ | Question _ -> transcript_area_rows
       | _ -> transcript_area_rows + dialog_rows + 1 + queued_rows
     in
     Some (base + row, Int.min col (width - 1))

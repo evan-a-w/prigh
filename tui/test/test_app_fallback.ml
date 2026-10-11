@@ -190,7 +190,11 @@ let%expect_test
     {|
     ((
       (scoped_models (deepseek/deepseek-flash))
-      (confirm_tools true)
+      (approval_mode Ask)
+      (permissions (
+        (allow ())
+        (ask   ())
+        (deny  ())))
       (default_model    ())
       (default_thinking ())
       (fallback_models (anthropic/claude-fable-5-1 deepseek/deepseek-flash))
@@ -335,8 +339,10 @@ let%expect_test
     {|
     (Rpc
       (method_ set_config)
-      (params ((config ((confirm_tools true)))))
-      (tag (Notice_on_success "tool confirmation on")))
+      (params ((config ((approval_mode ask)))))
+      (tag (
+        Notice_on_success
+        "tool confirmation on (approval mode ask, also for new sessions)")))
     (Rpc
       (method_ set_config)
       (params ((config ((scoped_models (deepseek/deepseek-flash))))))
