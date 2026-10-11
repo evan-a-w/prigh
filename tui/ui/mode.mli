@@ -17,6 +17,7 @@ module Picker_kind : sig
     | Tree of Entry.t list
     | Agents
     | Jobs
+    | Queue (** [/queue]: the queued steers and follow-ups *)
     | Modes (** [/mode]: approval modes and plan mode *)
     | Hosts
     | Skills

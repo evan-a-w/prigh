@@ -112,7 +112,7 @@ let%expect_test
       [P1] Fix the count a.ml:2
     ────────────────────────────────────────────────────────────────────────
     > ▏
-    /work  deepseek-flash  think:off  view:normal  ctx:0.1%/1.0M  $0.01
+    /work  deepseek-flash  think:off  mode:auto  ctx:0.1%/1.0M  $0.01
     |}];
   H.keys h "/verbosity verbose";
   H.enter h;
@@ -148,7 +148,7 @@ let%expect_test
       view: verbose — everything is shown
     ────────────────────────────────────────────────────────────────────────
     > ▏
-    /work  deepseek-flash  think:off  view:verbose  ctx:0.1%/1.0M  $0.01
+    /work  deepseek-flash  think:off  mode:auto  ctx:0.1%/1.0M  $0.01
     |}]
 ;;
 
@@ -173,7 +173,7 @@ let%expect_test "a note arriving live, before the user's text" =
     ▌ @Makefile  attached
     ────────────────────────────────────────────────────────────────────────
     > ▏
-    /work  deepseek-flash  think:off  view:normal  ctx:0.1%/1.0M  $0.01
+    /work  deepseek-flash  think:off  mode:auto  ctx:0.1%/1.0M  $0.01
     |}]
 ;;
 
@@ -206,7 +206,7 @@ let%expect_test "/fork lists the harness's messages by their notes and \
        ◷ Goal: continuing (3/20)        #2
     ▸* ⚑ Review of uncommitted changes  #3
     ────────────────────────────────────────────────────────────────────────
-    /work  deepseek-flash  ctx:0.1%/1.0M  $0.01  Enter selects · Esc closes
+    …deepseek-flash  think:off  ctx:0.1%/1.0M  Enter selects · Esc closes
     |}];
   H.step ~quiet:true h (Key (Key.plain Up));
   H.step ~quiet:true h (Key (Key.plain Up));
@@ -226,7 +226,7 @@ let%expect_test "/fork lists the harness's messages by their notes and \
       earlier answer
     ────────────────────────────────────────────────────────────────────────
     > fix the build▏
-    /work  deepseek-flash  think:off  view:normal  ctx:0.1%/1.0M  $0.01
+    /work  deepseek-flash  think:off  mode:auto  ctx:0.1%/1.0M  $0.01
     |}]
 ;;
 
@@ -294,7 +294,7 @@ let%expect_test "plan mode notes: before a prompt, alone, before a goal" =
       planning the goal
     ────────────────────────────────────────────────────────────────────────
     > ▏
-    /work  deepseek-flash  think:off  view:normal  ctx:0.1%/1.0M  $0.01
+    /work  deepseek-flash  think:off  mode:auto  ctx:0.1%/1.0M  $0.01
     |}];
   H.keys h "/fork";
   H.enter h;
@@ -331,7 +331,7 @@ let%expect_test "plan mode notes: before a prompt, alone, before a goal" =
        look around                           #1
     ▸* ◇ Plan mode off: the model was told it can change files  #2
     ────────────────────────────────────────────────────────────────────────
-    /work  deepseek-flash  ctx:0.1%/1.0M  $0.01  Enter selects · Esc closes
+    …deepseek-flash  think:off  ctx:0.1%/1.0M  Enter selects · Esc closes
     |}]
 ;;
 
@@ -412,7 +412,7 @@ let%expect_test "every kind of note: groups read as one block" =
       going
     ────────────────────────────────────────────────────────────────────────
     > ▏
-    /work  deepseek-flash  think:off  view:normal  ctx:0.1%/1.0M  $0.01
+    /work  deepseek-flash  think:off  mode:auto  ctx:0.1%/1.0M  $0.01
     |}]
 ;;
 
@@ -446,7 +446,7 @@ let%expect_test "/diff: the changes in colour, a path, none, not a repository" =
         +hello
     ────────────────────────────────────────────────────────────────────────
     > ▏
-    /work  deepseek-flash  think:off  view:normal  ctx:0.1%/1.0M  $0.01
+    /work  deepseek-flash  think:off  mode:auto  ctx:0.1%/1.0M  $0.01
     |}];
   print_endline
     (Content.to_styled
@@ -514,7 +514,7 @@ let%expect_test "/diff: the changes in colour, a path, none, not a repository" =
       not a git repository: /work (git init starts one, or /cd into one)
     ────────────────────────────────────────────────────────────────────────
     > ▏
-    /work  deepseek-flash  think:off  view:normal  ctx:0.1%/1.0M  $0.01
+    /work  deepseek-flash  think:off  mode:auto  ctx:0.1%/1.0M  $0.01
     |}]
 ;;
 
@@ -552,7 +552,7 @@ let%expect_test "/review and /init: sent to the backend; refusals go back to \
       nothing to review: no changes against main in /work
     ────────────────────────────────────────────────────────────────────────
     > /review main look at errors▏
-    /work  deepseek-flash  think:off  view:normal  ctx:0.1%/1.0M  $0.01
+    /work  deepseek-flash  think:off  mode:auto  ctx:0.1%/1.0M  $0.01
     |}];
   H.step ~quiet:true h (Key (Key.ctrl 'u'));
   H.event h (State (state ~running:true ()));
@@ -598,7 +598,7 @@ let%expect_test "/notify: the setting, and notifications only while the \
       this terminal is not focused (it has not reported focus yet: in tmux, set -g focus-events on)
     ────────────────────────────────────────────────────────────────────────────────────────────────────
     > ▏
-    /work  deepseek-flash  think:off  view:normal  ctx:0.1%/1.0M  $0.01
+    /work  deepseek-flash  think:off  mode:auto  view:normal  ctx:0.1%/1.0M  $0.01
     |}];
   let finish () =
     H.event h (Agent_end [ assistant "All tests pass.\nDetails follow." ])
@@ -712,6 +712,6 @@ let%expect_test "/notify: the setting, and notifications only while the \
       notifications off (/notify bell or /notify desktop turns them on)
     ────────────────────────────────────────────────────────────────────────────────────────────────────
     > ▏
-    /work  deepseek-flash  think:off  view:normal  ctx:0.1%/1.0M  $0.01
+    /work  deepseek-flash  think:off  mode:auto  view:normal  ctx:0.1%/1.0M  $0.01
     |}]
 ;;

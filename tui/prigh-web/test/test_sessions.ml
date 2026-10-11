@@ -147,7 +147,9 @@ let%expect_test "switching resets what belonged to the old session" =
   H.event
     h
     {|{"event":"message_start","message":{"role":"user","text":"hello"}}|};
-  H.event h {|{"event":"queue_update","steer":1,"follow_up":1}|};
+  H.event
+    h
+    {|{"event":"queue_update","steer":1,"follow_up":1,"steer_texts":["also this"],"follow_up_texts":["then that"]}|};
   H.event
     h
     {|{"event":"tool_confirm","call_id":"c1","name":"bash","summary":"rm -rf build"}|};
@@ -192,16 +194,17 @@ let%expect_test "switching resets what belonged to the old session" =
   print_s
     [%message
       (Prigh_web.Chat.entries m.chat |> List.length : int)
-        (m.queue : int * int)
+        (Prigh_web.Queued.count m.queue : int)
         (List.length m.confirms : int)
         (Option.is_some m.btw : bool)
         (Option.is_some m.completion : bool)
         (List.length m.toasts : int)];
   [%expect
     {|
-    (("(Prigh_web.Chat.entries m.chat) |> List.length" 0) (m.queue (0 0))
-     ("List.length m.confirms" 0) ("Option.is_some m.btw" false)
-     ("Option.is_some m.completion" false) ("List.length m.toasts" 0))
+    (("(Prigh_web.Chat.entries m.chat) |> List.length" 0)
+     ("Prigh_web.Queued.count m.queue" 0) ("List.length m.confirms" 0)
+     ("Option.is_some m.btw" false) ("Option.is_some m.completion" false)
+     ("List.length m.toasts" 0))
     |}];
   H.reply h "list_sessions" sessions;
   H.text h ~selector:".session.selected .session-title";

@@ -37,7 +37,8 @@ let%expect_test "state event and messages" =
     {|{"type":"event","event":"agent_end","messages":[{"role":"user","text":"x"}]}|};
   decode {|{"type":"event","event":"compacted","summary":"s"}|};
   decode {|{"type":"event","event":"notice","text":"n"}|};
-  decode {|{"type":"event","event":"queue_update","steer":2,"follow_up":1}|};
+  decode
+    {|{"type":"event","event":"queue_update","steer":2,"follow_up":1,"steer_texts":["a","b"],"follow_up_texts":["c"]}|};
   [%expect
     {|
     (Event (
@@ -130,10 +131,7 @@ let%expect_test "state event and messages" =
     (Event (Agent_end ((User ((text x))))))
     (Event (Compacted s))
     (Event (Notice n))
-    (Event (
-      Queue_update
-      (steer     2)
-      (follow_up 1)))
+    (Event (Queue_update (steer (a b)) (follow_up (c))))
     |}]
 ;;
 

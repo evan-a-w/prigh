@@ -26,6 +26,10 @@ val choices : current:t -> t list
 (** What [/mode NAME] means, as from [current]; [None] for an unknown name. *)
 val of_name : current:t -> string -> t option
 
+(** What asks first, in a few words for a control: ["Asks: edits &
+    commands"], ["Asks: commands"], ["Auto: never asks"], ["Plan mode"]. *)
+val title : t -> string
+
 (** One line on what the mode does, for notices and pickers. *)
 val describe : t -> string
 

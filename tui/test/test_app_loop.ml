@@ -66,12 +66,12 @@ let%expect_test
   status h;
   [%expect
     {|
-    /work  deepseek-flash  think:off  view:normal  ctx:0.1%/1.0M  $0.01
-    /work  deepseek-flash  think:off  view:normal  ctx:0.1%/1.0M  $0.01/$5.00
-    /work  deepseek-flash  think:off  view:normal  ctx:0.1%/1.0M  $4.20/$5.00
-    /work  deepseek-flash  think:off  view:normal  ctx:0.1%/1.0M  $5.01/$5.00  goal:3/20
-    /work  deepseek-flash  think:off  view:normal  ctx:0.1%/1.0M  $0.01  goal:done  resumes 14:05
-    /work  deepseek-flash  think:off  view:normal  ctx:0.1%/1.0M  $0.01  goal:done  resumes 16:05
+    /work  deepseek-flash  think:off  mode:auto  view:normal  ctx:0.1%/1.0M  $0.01
+    /work  deepseek-flash  think:off  mode:auto  view:normal  ctx:0.1%/1.0M  $0.01/$5.00
+    /work  deepseek-flash  think:off  mode:auto  view:normal  ctx:0.1%/1.0M  $4.20/$5.00
+    /work  deepseek-flash  think:off  mode:auto  view:normal  ctx:0.1%/1.0M  $5.01/$5.00  goal:3/20
+    /work  deepseek-flash  think:off  mode:auto  ctx:0.1%/1.0M  $0.01  goal:done  resumes 14:05
+    /work  deepseek-flash  think:off  mode:auto  ctx:0.1%/1.0M  $0.01  goal:done  resumes 16:05
     |}]
 ;;
 
@@ -111,7 +111,7 @@ let%expect_test
       budget $5.00, $0.01 spent: /budget DOLLARS changes it, /budget off removes it
     ────────────────────────────────────────────────────────────────────────────────────────────────────
     > ▏
-    /work  deepseek-flash  think:off  view:normal  ctx:0.1%/1.0M  $0.01/$5.00
+    /work  deepseek-flash  think:off  mode:auto  view:normal  ctx:0.1%/1.0M  $0.01/$5.00
     |}]
 ;;
 
@@ -162,7 +162,7 @@ let%expect_test "/goal sets, shows, clears and resumes the goal" =
       it, /goal off clears it
     ────────────────────────────────────────────────────────────────────────────────────────────────────
     > ▏
-    /work  deepseek-flash  think:off  view:normal  ctx:0.1%/1.0M  $0.01  goal:stopped
+    /work  deepseek-flash  think:off  mode:auto  view:normal  ctx:0.1%/1.0M  $0.01  goal:stopped
     |}]
 ;;
 
@@ -198,7 +198,7 @@ let%expect_test "a refused /goal goes back into the editor" =
       the session's budget of $1.00 is spent ($1.20 so far): /budget 3 raises it, /budget off removes it
     ────────────────────────────────────────────────────────────────────────────────────────────────────
     > /goal ship it▏
-    /work  deepseek-flash  think:off  view:normal  ctx:0.1%/1.0M  $0.01
+    /work  deepseek-flash  think:off  mode:auto  view:normal  ctx:0.1%/1.0M  $0.01
     |}]
 ;;
 
@@ -230,7 +230,7 @@ let%expect_test "/resume shows, runs now or cancels the automatic resume" =
       usage: /resume [now|cancel]
     ────────────────────────────────────────────────────────────────────────────────────────────────────
     > ▏
-    /work  deepseek-flash  think:off  view:normal  ctx:0.1%/1.0M  $0.01  resumes 14:05
+    /work  deepseek-flash  think:off  mode:auto  view:normal  ctx:0.1%/1.0M  $0.01  resumes 14:05
     |}]
 ;;
 
@@ -256,7 +256,7 @@ let%expect_test "completion offers the keywords, but not over a goal's text" =
     > /goal ▏
     ▸ off     clear the goal
       resume  make a stopped goal active again
-    /work  deepseek-flash  think:off  ctx:0.1%/1.0M  $0.01  Tab accepts · Enter runs as typed · Esc
+    …deepseek-flash  think:off  mode:auto  ctx:0.1%/1.0M  $0.01  Tab accepts · Enter runs as typed · Esc
 
 
       prigh in /work · /help · Esc aborts · Ctrl+C twice quits
@@ -266,7 +266,7 @@ let%expect_test "completion offers the keywords, but not over a goal's text" =
     ────────────────────────────────────────────────────────────────────────────────────────────────────
     > /goal re▏
     ▸ resume  make a stopped goal active again
-    /work  deepseek-flash  think:off  view:normal  ctx:0.1%/1.0M  $0.01  Tab/Enter accept · Esc close
+    /work  deepseek-flash  think:off  mode:auto  ctx:0.1%/1.0M  $0.01  Tab/Enter accept · Esc close
 
 
 
@@ -276,7 +276,7 @@ let%expect_test "completion offers the keywords, but not over a goal's text" =
       earlier answer
     ────────────────────────────────────────────────────────────────────────────────────────────────────
     > /goal refactor▏
-    /work  deepseek-flash  think:off  view:normal  ctx:0.1%/1.0M  $0.01
+    /work  deepseek-flash  think:off  mode:auto  view:normal  ctx:0.1%/1.0M  $0.01
 
       prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
@@ -286,7 +286,7 @@ let%expect_test "completion offers the keywords, but not over a goal's text" =
     > /resume ▏
     ▸ now     retry the run at once
       cancel  stay stopped until you send a message
-    /work  deepseek-flash  think:off  ctx:0.1%/1.0M  $0.01  Tab accepts · Enter runs as typed · Esc
+    …deepseek-flash  think:off  mode:auto  ctx:0.1%/1.0M  $0.01  Tab accepts · Enter runs as typed · Esc
 
 
       prigh in /work · /help · Esc aborts · Ctrl+C twice quits
@@ -296,6 +296,6 @@ let%expect_test "completion offers the keywords, but not over a goal's text" =
     ────────────────────────────────────────────────────────────────────────────────────────────────────
     > /budget o▏
     ▸ off  no budget: turns start whatever the session has cost
-    /work  deepseek-flash  think:off  view:normal  ctx:0.1%/1.0M  $0.01  Tab/Enter accept · Esc close
+    /work  deepseek-flash  think:off  mode:auto  ctx:0.1%/1.0M  $0.01  Tab/Enter accept · Esc close
     |}]
 ;;

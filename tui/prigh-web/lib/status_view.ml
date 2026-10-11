@@ -218,7 +218,8 @@ let notifications (m : App.Model.t) ~inject =
     [ icon (if on then Bell else Bell_off) ]
 ;;
 
-(* Modes and settings that change what you see or what happens. *)
+(* Settings that change what you see, and the model's plan; the approval
+   mode is in the top bar. *)
 let modes (m : App.Model.t) ~inject =
   let chip ?(cls = "") ~title ~command text =
     Node.button
@@ -237,22 +238,6 @@ let modes (m : App.Model.t) ~inject =
          ~title:"Transcript verbosity (Ctrl+O cycles)"
          ~command:"/verbosity"
          (Prigh_ui.Verbosity.name v))
-  ; (match m.state with
-     | Some s ->
-       (* [auto], where nothing asks first, shows nothing. *)
-       let mode = Session_mode.of_state s in
-       if (not mode.plan) && Approval_mode.equal mode.approval Auto
-       then Node.none
-       else
-         chip
-           ~cls:(if mode.plan then "plan-mode" else "")
-           ~title:
-             (sprintf
-                "Mode: %s (/mode picks, Alt+M cycles)"
-                (Session_mode.describe mode))
-           ~command:"/mode"
-           (Session_mode.label mode)
-     | None -> Node.none)
   ; (match
        Option.bind m.state ~f:(fun s -> Option.bind s.plan ~f:Plan_view.status)
      with
@@ -274,7 +259,7 @@ let view (m : App.Model.t) ~inject =
   | _, Reconnecting _ ->
     div ~cls:"status" [ waiting "connecting offline" "Reconnecting…" ]
   | Some state, Connected ->
-    let steer, follow_up = m.queue in
+    let queued = Queued.count m.queue in
     div
       ~cls:"status"
       [ (if m.pending.sending > 0 && not state.running
@@ -304,7 +289,7 @@ let view (m : App.Model.t) ~inject =
       ; cost state ~inject
       ; goal state ~inject
       ; resume m state ~inject
-      ; (if steer + follow_up > 0
+      ; (if queued > 0
          then
            Node.button
              ~attrs:
@@ -313,7 +298,7 @@ let view (m : App.Model.t) ~inject =
                ; Attr.title "Take the last queued message back into the editor"
                ; Attr.on_click (fun _ -> inject Action.Dequeue)
                ]
-             [ icon Undo; Node.text (sprintf "%d queued" (steer + follow_up)) ]
+             [ icon Undo; Node.text (sprintf "%d queued" queued) ]
          else Node.none)
       ; background m ~inject
       ; transfers m

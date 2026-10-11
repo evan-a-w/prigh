@@ -174,7 +174,6 @@ module Model : sig
     ; sessions : P.Session_summary.t list option
     ; skills : Skill_cache.t
     ; known_paths : String.Set.t
-    ; queued : Queue_counts.t
     ; queued_messages : Queued_message.t list
     ; login_lines : string list
     ; viewport : Viewport.t

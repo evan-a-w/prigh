@@ -23,6 +23,7 @@ type t =
   ; sending : int
   ; model : string option
   ; thinking : string option
+  ; mode : Session_mode.t option
   }
 [@@deriving sexp_of]
 
@@ -33,6 +34,7 @@ let none =
   ; sending = 0
   ; model = None
   ; thinking = None
+  ; mode = None
   }
 ;;
 

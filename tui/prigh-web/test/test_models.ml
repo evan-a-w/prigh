@@ -6,7 +6,7 @@ let%expect_test
   =
   let h = H.create () in
   H.text h ~selector:".controls";
-  [%expect {| (Claude Opus 5.5) (on) (Files (Ctrl+Shift+F)) (Terminal (Ctrl+`)) |}];
+  [%expect {| (Claude Opus 5.5) (Thinking on) (Auto: never asks) |}];
   H.key h "l" ~ctrl:true;
   H.text h ~selector:".modal";
   [%expect
@@ -159,7 +159,7 @@ let%expect_test "thinking: a picker and /thinking, when the model supports it" =
           ~fields:[ "model", deepseek; "thinking", `String "off" ]
           ()));
   H.text h ~selector:".controls";
-  [%expect {| (DeepSeek Chat) (Files (Ctrl+Shift+F)) (Terminal (Ctrl+`)) |}];
+  [%expect {| (DeepSeek Chat) (No thinking) (Auto: never asks) |}];
   H.type_ h "/thinking high";
   H.act h Send;
   H.text h ~selector:".toast.error";
@@ -210,7 +210,9 @@ let%expect_test
     h
     (Hello { client_id = "c1"; namespace = Some "bob"; user = Some "ann" });
   H.event h (sprintf {|{"event":"state","state":%s}|} busy_state);
-  H.event h {|{"event":"queue_update","steer":1,"follow_up":2}|};
+  H.event
+    h
+    {|{"event":"queue_update","steer":1,"follow_up":2,"steer_texts":["a"],"follow_up_texts":["b","c"]}|};
   H.text h ~selector:".status";
   [%expect
     {|

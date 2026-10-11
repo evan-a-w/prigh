@@ -694,6 +694,7 @@ let%expect_test "keymap: every binding resolves to its intent and is documented"
     /delete-archived                   delete every archived session, after a confirmation
     /agents [cancel <n>]               focus a subagent (Ctrl+D cancels one), or cancel subagent n
     /jobs [id|kill <id>]               list background jobs (Enter shows output, Ctrl+D kills), or show/kill one
+    /queue                             the queued steers and follow-ups (Enter edits one, Ctrl+D removes it)
     /host [name|backend]               pick where tools run (this frontend, another one, or the backend) and the directory there
     /switch [path]                     switch to a saved session
     /cd [path]                         change the working directory
@@ -720,7 +721,7 @@ let%expect_test "keymap: every binding resolves to its intent and is documented"
     @path      attach a file (Ctrl+R completes paths)
     type                     filter the list (fuzzy)
     Enter / Esc              accept the highlighted item / close without changes
-    Ctrl+D                   /sessions: delete the marked or highlighted sessions · /agents: cancel · /jobs: kill
+    Ctrl+D                   /sessions: delete the marked or highlighted sessions · /agents: cancel · /jobs: kill · /queue: remove
     Tab                      /sessions: mark or unmark the highlighted session
     Alt+A                    /sessions: archive or unarchive the highlighted session
     Alt+D                    /sessions: delete every archived session

@@ -137,7 +137,7 @@ let list_help =
     ; "Enter / Esc", "accept the highlighted item / close without changes"
     ; ( "Ctrl+D"
       , "/sessions: delete the marked or highlighted sessions · /agents: \
-         cancel · /jobs: kill" )
+         cancel · /jobs: kill · /queue: remove" )
     ; "Tab", "/sessions: mark or unmark the highlighted session"
     ; "Alt+A", "/sessions: archive or unarchive the highlighted session"
     ; "Alt+D", "/sessions: delete every archived session"
