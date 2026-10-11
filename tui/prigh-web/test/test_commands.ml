@@ -60,6 +60,9 @@ let%expect_test "every command does something (none is unknown)" =
     /verbosity                 picker: Transcript verbosity
     /confirm                   picker: Tool confirmation
     /compact                   toast: Compacting the conversation…
+    /diff                      toast: Reading the changes…
+    /review                    toast: Reading the changes to review…
+    /init                      rpc init
     /name                      (Rename"")
     /session                   rpc session_stats
     /sessions                  sidebar

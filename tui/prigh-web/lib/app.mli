@@ -99,6 +99,8 @@ module Reply_tag : sig
         ; purpose : Skills_purpose.t
         }
     | Mcp of Mcp_purpose.t
+    | Git_diff
+    | Command_prompt of string (** [/review] or [/init] as typed *)
   [@@deriving sexp_of, equal]
 end
 

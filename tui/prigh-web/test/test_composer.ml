@@ -315,6 +315,9 @@ let%expect_test "slash commands: the popup, arguments, running, unknown ones" =
     /verbosity [quiet|normal|verbose] how much of tool calls and thinking the transcript shows
     /confirm [on|off] ask before bash, write and edit run
     /compact [instructions] summarise older messages to free context
+    /diff [path] show the uncommitted changes where the tools run, untracked files too
+    /review [base] [instructions] review the uncommitted changes, or those against a base branch, for prioritised findings
+    /init write or improve the project's AGENTS.md
     /name [name] rename the session
     /session show the session's details and statistics
     /sessions search the saved sessions
