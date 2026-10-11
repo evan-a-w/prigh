@@ -4,7 +4,7 @@ open! Import
 let glyph : P.Origin.Kind.t -> string = function
   | Host -> "⇄"
   | Cwd -> "⌂"
-  | Editor -> "✎"
+  | Tools -> "±"
   | Plan_mode -> "◇"
   | Delivery -> "↩"
   | Handover -> "↪"

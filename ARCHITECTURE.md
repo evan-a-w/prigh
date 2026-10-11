@@ -180,7 +180,9 @@ while it is waiting on the browser.
   base64), as do `Tool_result.t`s; in sessions and on the wire the field is
   omitted when empty. User messages may carry an `origin`
   (`Injected.t`): what the harness put into the text — environment notes
-  in front (`Note`: host, cwd, editing tool, plan mode; a plan mode note
+  in front (`Note`: host, cwd, tools added/removed by a model change
+  (`Tools`; the older editor note is recognised as one too), plan mode; a
+  plan mode note
   sent between turns is a message of notes only, with an empty body), `@`
   files behind
   (`Attachment`: path and length), or a whole message written in the
@@ -514,8 +516,11 @@ two can share one.
   model the file editor it is trained on: `apply_patch` for OpenAI's GPT-5
   and later (Codex's tool, sent freeform), `edit` for the rest. `Agent`
   applies it to every run and to the system prompt; when a model change
-  swaps the editor, the next user message carries a note saying so (the
-  prompt stays fixed). `Tools.for_context` builds the per-agent tool list
+  changes the tool list (another editor, or `web_search` that only some
+  providers run), the next user message carries a note naming the tools
+  now available and no longer available (the prompt stays fixed). Several
+  switches before that message give one note with the net change, none if
+  the tools end up as they were. `Tools.for_context` builds the per-agent tool list
   (`parent`, `depth`, optional `only`), so the subagent's tool set can be
   restricted and the `subagent` tool is dropped at depth 2; unknown names
   are an argument error, and either editor's name means the child model's

@@ -9,7 +9,8 @@ module Kind : sig
   type t =
     | Host (** tools now run on another host *)
     | Cwd (** another working directory *)
-    | Editor (** another file-editing tool *)
+    | Tools
+    (** a model change added or removed tools ([editor] from older backends) *)
     | Plan_mode (** plan mode turned on or off *)
     | Delivery (** reports of finished subagents and jobs *)
     | Handover (** another model takes over *)

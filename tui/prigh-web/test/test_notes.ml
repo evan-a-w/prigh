@@ -66,6 +66,43 @@ let%expect_test
     |}]
 ;;
 
+let%expect_test "tools a model change added or removed, also an older backend's"
+  =
+  let notes kind title text =
+    sprintf
+      {|{"type":"event","event":"message_start","message":{"role":"user","text":%s,"origin":{"body":"go on","notes":[{"kind":"%s","title":"%s","text":%s}]}}}|}
+      (Jsonaf.to_string (`String (text ^ "\n\ngo on")))
+      kind
+      title
+      (Jsonaf.to_string (`String text))
+  in
+  let chat =
+    Chat_harness.chat
+      [ notes
+          "tools"
+          "Tools changed: web_search removed"
+          "[Tools: the tools changed with the model. No longer available: \
+           web_search.]"
+      ; notes
+          "editor"
+          "File edits now use edit instead of apply_patch"
+          "[Tools: edit replaces apply_patch for editing files; apply_patch is \
+           no longer available.]"
+      ]
+  in
+  Chat_harness.show ~selector:"details.note summary" chat;
+  [%expect {|
+    <summary>
+      <span aria-hidden="true" class="glyph"> ± </span>
+      <span class="title"> Tools changed: web_search removed </span>
+    </summary>
+    <summary>
+      <span aria-hidden="true" class="glyph"> ± </span>
+      <span class="title"> File edits now use edit instead of apply_patch </span>
+    </summary>
+    |}]
+;;
+
 let%expect_test
     "the harness's own messages are notes, the summary is the compaction fold"
   =

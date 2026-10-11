@@ -906,7 +906,7 @@ named with what to do.
 
 Text the harness adds to what the model reads is recorded with the message
 (`origin` in the session file and the RPC: environment notes about a new
-tool host, directory or editing tool; attached `@` files; and the messages
+tool host or directory, or tools a model change added or removed; attached `@` files; and the messages
 it writes in your place: reports of finished background work, a fallback
 model's hand-over, goal starts and continuations, the resume after a usage
 limit, `!cmd` output, the compaction summary, `/review` and `/init`). The

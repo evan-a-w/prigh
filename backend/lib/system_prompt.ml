@@ -143,12 +143,16 @@ let discretion =
    unchanged, and missing an update is not serious."
 ;;
 
-let editor_changed_note ~before ~after =
-  sprintf
-    "[Tools: %s replaces %s for editing files; %s is no longer available.]"
-    after
-    before
-    before
+let tools_changed_note ~added ~removed =
+  let section label = function
+    | [] -> []
+    | tools -> [ sprintf " %s: %s." label (String.concat ~sep:", " tools) ]
+  in
+  String.concat
+    ([ "[Tools: the tools changed with the model." ]
+     @ section "Now available" added
+     @ section "No longer available" removed
+     @ [ "]" ])
 ;;
 
 let host_changed_note ~host =

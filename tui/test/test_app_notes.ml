@@ -369,7 +369,7 @@ let%expect_test "every kind of note: groups read as one block" =
              [ note_json "host" "Tools now run on laptop"
              ; note_json "cwd" "Working directory is now /work/sub"
              ]
-         ; notes_only [ note_json "editor" "Editing with apply_patch now" ]
+         ; notes_only [ note_json "tools" "Tools changed: web_search removed" ]
          ; with_source
              ~kind:"handover"
              ~title:"Hand-over from deepseek-flash"
@@ -397,7 +397,7 @@ let%expect_test "every kind of note: groups read as one block" =
 
     ⇄ Tools now run on laptop
     ⌂ Working directory is now /work/sub
-    ✎ Editing with apply_patch now
+    ± Tools changed: web_search removed
     ◇ Plan mode off
     ↪ Hand-over from deepseek-flash
       taking over

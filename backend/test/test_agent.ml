@@ -964,13 +964,18 @@ let%expect_test
 ;;
 
 let%expect_test
-    "switching to a model with another file editor swaps the tool and tells \
-     the model"
+    "switching to a model with other tools swaps them and tells the model the \
+     net change"
   =
   let requests = Queue.create () in
   with_agent
     ~on_request:(fun request -> Queue.enqueue requests request)
-    [ Reply.text "one"; Reply.text "two"; Reply.text "three" ]
+    [ Reply.text "one"
+    ; Reply.text "two"
+    ; Reply.text "three"
+    ; Reply.text "four"
+    ; Reply.text "five"
+    ]
   @@ fun _t agent _dump ->
   let send text =
     Or_error.ok_exn (Agent.prompt agent text);
@@ -986,7 +991,10 @@ let%expect_test
         (request.model.id : string)
       , (List.filter_map request.tools ~f:(fun t ->
            Option.some_if
-             (List.mem [ "edit"; "apply_patch" ] t.name ~equal:String.equal)
+             (List.mem
+                [ "edit"; "apply_patch"; "web_search" ]
+                t.name
+                ~equal:String.equal)
              t.name)
          : string list)
       , (last_user : string option)]
@@ -997,6 +1005,14 @@ let%expect_test
   send "second";
   Agent.set_model agent (Option.value_exn (Model.find "deepseek-flash"));
   send "third";
+  (* Away and back before the next message: nothing changed for the model. *)
+  let claude = Option.value_exn (Model.find "anthropic/claude-opus-4-6") in
+  Agent.set_model agent claude;
+  Agent.set_model agent (Option.value_exn (Model.find "deepseek-flash"));
+  send "fourth";
+  Agent.set_model agent (Option.value_exn (Model.find "openai/gpt-5.4"));
+  Agent.set_model agent claude;
+  send "fifth";
   let systems =
     Queue.to_list requests
     |> List.map ~f:(fun (r : Provider.Request.t) -> r.system)
@@ -1007,14 +1023,19 @@ let%expect_test
   [%expect
     {|
     (deepseek-flash (edit) (first))
-    (gpt-5.4 (apply_patch)
-     ( "[Tools: apply_patch replaces edit for editing files; edit is no longer available.]\
+    (gpt-5.4 (apply_patch web_search)
+     ( "[Tools: the tools changed with the model. Now available: apply_patch, web_search. No longer available: edit.]\
       \n\
       \nsecond"))
     (deepseek-flash (edit)
-     ( "[Tools: edit replaces apply_patch for editing files; apply_patch is no longer available.]\
+     ( "[Tools: the tools changed with the model. Now available: edit. No longer available: apply_patch, web_search.]\
       \n\
       \nthird"))
+    (deepseek-flash (edit) (fourth))
+    (claude-opus-4-6 (edit web_search)
+     ( "[Tools: the tools changed with the model. Now available: web_search.]\
+      \n\
+      \nfifth"))
     identical system prompts: true
     |}]
 ;;
