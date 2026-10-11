@@ -149,10 +149,19 @@ let persisted t = t.persisted
 
 (* The file is created on the first line worth saving, with everything
    recorded in memory so far; before that nothing touches the disk. *)
+(* Once the file exists, a line is only appended to it, never creates it: a
+   session deleted while something still holds it (e.g. its description
+   being written) stays deleted. *)
 let write_line t (line : Line.t) =
   if t.persisted
-  then
-    Out_channel.with_file t.path ~append:true ~f:(fun oc -> output_line oc line)
+  then (
+    match Core_unix.openfile t.path ~mode:[ O_WRONLY; O_APPEND ] with
+    | exception Core_unix.Unix_error (ENOENT, _, _) -> ()
+    | fd ->
+      let oc = Core_unix.out_channel_of_descr fd in
+      Exn.protect
+        ~f:(fun () -> output_line oc line)
+        ~finally:(fun () -> Out_channel.close oc))
   else if worth_saving line
   then (
     Core_unix.mkdir_p (Filename.dirname t.path);
