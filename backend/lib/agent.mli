@@ -122,7 +122,7 @@ module Queued : sig
   type t =
     { text : string (** as typed, e.g. [/skill:NAME ARGS] *)
     ; expanded : string option
-    (** what the model gets instead: the expanded skill invocation, or a
+      (** what the model gets instead: the expanded skill invocation, or a
         command's prompt *)
     ; source : Injected.Source.t option
     ; attachments : string list
@@ -137,8 +137,7 @@ module Pending_confirm : sig
     { call_id : string
     ; agent_id : string option (** a subagent's call *)
     ; name : string
-    ; summary : string
-      (** what the call does; [exit_plan_mode]'s is the plan *)
+    ; summary : string (** what the call does; [exit_plan_mode]'s is the plan *)
     ; rules : string list
       (** what [Always] adds ({!Approval_rule.suggest}); empty when it is
           not offered *)
@@ -192,11 +191,11 @@ val create
            never touch the backend's filesystem, and a session that never
            had a host adopts the first connected client host. *)
   -> ?mcp:Mcp_hub.t
+       (** the backend's MCP servers, when it is the tool host; without it
+           sessions use no MCP servers on any host *)
   -> ?use_default_cwd:bool
        (** start a new session in the config's [default_cwd] rather than
            [cwd] (default: true; false when [cwd] was given explicitly) *)
-       (** the backend's MCP servers, when it is the tool host; without it
-           sessions use no MCP servers on any host *)
   -> ?max_budget_usd:float
        (** the budget of sessions that set none (the CLI's
            [-max-budget-usd]), instead of the config's [max_budget_usd] *)

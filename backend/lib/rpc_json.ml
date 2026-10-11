@@ -309,6 +309,12 @@ let entry (e : Session.Entry.t) =
       [ "kind", str "archived"
       ; ("archived", if archived then `True else `False)
       ]
+    | Spend { usage = u; cost_usd } ->
+      [ "kind", str "spend"; "usage", usage u; "cost_usd", float cost_usd ]
+    | Resume_at { at } ->
+      [ "kind", str "resume_at"
+      ; "at", Option.value_map at ~default:`Null ~f:ms
+      ]
   in
   `Object
     ([ "id", str e.id

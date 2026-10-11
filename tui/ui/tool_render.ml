@@ -315,6 +315,7 @@ let search_results ~max (results : Tool_summary.Search_result.t list) =
 
 let render_step
       ?(arg = arg)
+      ?(ended = false)
       ~(verbosity : Verbosity.t)
       ~width
       (call : P.Tool_call.t)
@@ -344,7 +345,7 @@ let render_step
     | _ when interrupted -> Interrupted
     | Some { is_error = true; _ } -> Failed
     | Some _ -> Done
-    | None -> Running
+    | None -> if ended then Interrupted else Running
   in
   let quiet = Verbosity.equal verbosity Quiet in
   let error text =
@@ -646,6 +647,7 @@ let render_step
   in
   let chips =
     match mark with
+    | Interrupted when Option.is_none result -> chips @ [ chip "no result" ]
     | Interrupted -> chips @ [ chip "cancelled" ]
     | Running | Done | Failed -> chips
   in
@@ -674,10 +676,11 @@ let render ~verbosity ~width call result ~live_tail =
   render_step ~verbosity ~width call result ~live_tail
 ;;
 
-let server_tool ~verbosity ~width (s : P.Content.Server_tool.t) =
+let server_tool ~verbosity ~width ~ended (s : P.Content.Server_tool.t) =
   let call, result = Tool_summary.as_call s in
   render_step
     ~arg:(fun _ -> Tool_summary.server_tool_arg s)
+    ~ended
     ~verbosity
     ~width
     call

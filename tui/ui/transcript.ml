@@ -40,7 +40,10 @@ module Item = struct
         ; live_tail : string option
         ; subagent : Subagent.t option
         }
-    | Server_tool of P.Content.Server_tool.t
+    | Server_tool of
+        { tool : P.Content.Server_tool.t
+        ; ended : bool
+        }
     | Notice of Severity.t * string
     | Block of Content.t
     | Compaction of string
@@ -53,6 +56,7 @@ module Item = struct
         { kind : P.Origin.Kind.t
         ; title : string
         ; text : string
+        ; joined : bool
         }
   [@@deriving sexp_of, equal]
 end
@@ -67,7 +71,8 @@ let user_item (user : P.Message.User.t) : Item.t =
       (Option.value
          (String.chop_prefix user.text ~prefix:summary_prefix)
          ~default:user.text)
-  | Some { kind; title } -> Note { kind; title; text = user.text }
+  | Some { kind; title } ->
+    Note { kind; title; text = user.text; joined = false }
   | None ->
     (match Skill_message.parse (P.Message.User.body user) with
      | Some skill -> Skill { skill; user }
@@ -81,7 +86,7 @@ let user_items (user : P.Message.User.t) : Item.t list =
   let origin = Option.value user.origin ~default:P.Origin.empty in
   let notes =
     List.map origin.notes ~f:(fun (n : P.Origin.Note.t) : Item.t ->
-      Note { kind = n.kind; title = n.title; text = n.text })
+      Note { kind = n.kind; title = n.title; text = n.text; joined = false })
   in
   match P.Message.User.source user with
   | Some _ -> notes @ [ user_item user ]
@@ -108,7 +113,14 @@ type t =
 
 let empty = { items_rev = []; stream = None }
 let items t = List.rev t.items_rev
-let add t item = { t with items_rev = item :: t.items_rev }
+let add t (item : Item.t) =
+  let item : Item.t =
+    match item, t.items_rev with
+    | Note note, Note _ :: _ -> Note { note with joined = true }
+    | item, _ -> item
+  in
+  { t with items_rev = item :: t.items_rev }
+;;
 let notice ?(severity = Severity.Info) t text = add t (Notice (severity, text))
 let clear t = { t with items_rev = [] }
 
@@ -220,7 +232,7 @@ let add_message t (m : P.Message.t) =
           add
             t
             (Tool { call; result = None; live_tail = None; subagent = None })
-        | Server_tool s -> add t (Server_tool s))
+        | Server_tool tool -> add t (Server_tool { tool; ended = true }))
     in
     (match a.stop_reason with
      | Error e -> add t (Notice (Error, "error: " ^ e))
@@ -247,7 +259,7 @@ let assistant_text (a : P.Message.Assistant.t) =
 
 let find_server_tool items_rev id =
   List.find_map items_rev ~f:(function
-    | Item.Server_tool s when String.equal s.id id -> Some s
+    | Item.Server_tool { tool; _ } when String.equal tool.id id -> Some tool
     | _ -> None)
 ;;
 
@@ -258,8 +270,8 @@ let update_server_tool t ~id ~f =
   | Some s ->
     let items_rev =
       List.map t.items_rev ~f:(function
-        | Item.Server_tool s' when String.equal s'.id id ->
-          Item.Server_tool (f s)
+        | Item.Server_tool { tool; ended } when String.equal tool.id id ->
+          Item.Server_tool { tool = f s; ended }
         | item -> item)
     in
     { t with items_rev }
@@ -267,7 +279,7 @@ let update_server_tool t ~id ~f =
     let created : P.Content.Server_tool.t =
       { id; name = "server_tool"; input = ""; output = None; is_error = false }
     in
-    add (flush t) (Server_tool (f created))
+    add (flush t) (Server_tool { tool = f created; ended = false })
 ;;
 
 let server_tool_delta t ~(partial : P.Message.Assistant.t) (delta : P.Delta.t) =
@@ -294,13 +306,23 @@ let server_tool_delta t ~(partial : P.Message.Assistant.t) (delta : P.Delta.t) =
   | Tool_call_delta _ -> t
 ;;
 
-(* The final message has the last word on blocks the deltas made. *)
+(* The final message has the last word on blocks the deltas made; a block
+   still without output then never gets one. *)
 let settle_server_tools t (a : P.Message.Assistant.t) =
-  List.fold a.content ~init:t ~f:(fun t -> function
-    | P.Content.Server_tool s
-      when Option.is_some (find_server_tool t.items_rev s.id) ->
-      update_server_tool t ~id:s.id ~f:(fun _ -> s)
-    | _ -> t)
+  let t =
+    List.fold a.content ~init:t ~f:(fun t -> function
+      | P.Content.Server_tool s
+        when Option.is_some (find_server_tool t.items_rev s.id) ->
+        update_server_tool t ~id:s.id ~f:(fun _ -> s)
+      | _ -> t)
+  in
+  { t with
+    items_rev =
+      List.map t.items_rev ~f:(function
+        | Item.Server_tool { tool; ended = false } ->
+          Item.Server_tool { tool; ended = true }
+        | item -> item)
+  }
 ;;
 
 let update_tool_subagent t ~call_id ~f =
@@ -480,6 +502,7 @@ let apply t (event : P.Event.t) =
   | P.Event.Terminal_open _
   | P.Event.Terminal_frame _
   | P.Event.Terminal_close _
+  | P.Event.Terminal_kill _
   | P.Event.Btw_delta _
   | P.Event.Sessions_changed
   | P.Event.Config_changed _ -> t
@@ -648,8 +671,9 @@ let rows (item : Item.t) ~(verbosity : Verbosity.t) ~width : Log_line.t list =
     @ user_lines (P.Message.User.body user) user.images
     @ attachment_lines user
   | Skill { skill; user } -> render_skill skill user ~verbosity
-  | Note { kind; title; text } ->
-    turn_start :: note_lines ~kind ~title ~text ~verbosity
+  | Note { kind; title; text; joined } ->
+    let lines = note_lines ~kind ~title ~text ~verbosity in
+    if joined then lines else turn_start :: lines
   | Assistant { text; final } ->
     (match verbosity with
      | Quiet when not final ->
@@ -666,7 +690,8 @@ let rows (item : Item.t) ~(verbosity : Verbosity.t) ~width : Log_line.t list =
     (match subagent with
      | Some s -> render_subagent ~verbosity ~width s
      | None -> Tool_render.render ~verbosity ~width call result ~live_tail)
-  | Server_tool s -> Tool_render.server_tool ~verbosity ~width s
+  | Server_tool { tool; ended } ->
+    Tool_render.server_tool ~verbosity ~width ~ended tool
   | Notice (severity, text) ->
     (match verbosity, severity with
      | Quiet, (Info | Debug) -> []

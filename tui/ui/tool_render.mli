@@ -52,9 +52,11 @@ val render
   -> Log_line.t list
 
 (** A tool the provider ran (web search), as a step like a tool call's: its
-    query, running until it has output, then its results. *)
+    query, running until it has output, then its results; interrupted ("no
+    result") when its message [ended] without output. *)
 val server_tool
   :  verbosity:Verbosity.t
   -> width:int
+  -> ended:bool
   -> P.Content.Server_tool.t
   -> Log_line.t list

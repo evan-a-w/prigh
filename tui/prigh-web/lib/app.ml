@@ -1370,11 +1370,11 @@ let set_confirm (m : Model.t) enabled =
     ~notice:
       (if enabled
        then
-         "Tool confirmation on (mode ask, also for new sessions): bash, edits \
-          and MCP tools ask first"
+         "Tool confirmation on (mode ask, also for new sessions): "
+         ^ Session_mode.describe { approval = Ask; plan = false }
        else
-         "Tool confirmation off (mode auto, also for new sessions): tools run \
-          without asking")
+         "Tool confirmation off (mode auto, also for new sessions): "
+         ^ Session_mode.describe { approval = Auto; plan = false })
 ;;
 
 let mode_text (mode : Session_mode.t) =

@@ -21,10 +21,16 @@ end
 
 type t =
   { relays : Relay.t String.Table.t
+  ; hosts_of_key : String.Set.t String.Table.t
   ; mutable seq : int
   }
 
-let create () = { relays = String.Table.create (); seq = 0 }
+let create () =
+  { relays = String.Table.create ()
+  ; hosts_of_key = String.Table.create ()
+  ; seq = 0
+  }
+;;
 
 (* A browser that cannot keep up is dropped; it reconnects and gets a fresh
    replay from the host. *)
@@ -64,6 +70,8 @@ let serve t ~host ~send_event ~key ~cwd ~cols ~rows channel =
     }
   in
   Hashtbl.set t.relays ~key:term_id ~data:relay;
+  Hashtbl.update t.hosts_of_key key ~f:(fun hosts ->
+    Set.add (Option.value hosts ~default:String.Set.empty) host);
   send_event
     (event
        "terminal_open"
@@ -132,7 +140,20 @@ let close_key t ~key =
     if String.equal relay.key key
     then (
       relay.send_event (event "terminal_close" ~host:relay.host ~term_id []);
-      push relay Closed))
+      push relay Closed));
+  Option.value_map
+    (Hashtbl.find_and_remove t.hosts_of_key key)
+    ~default:[]
+    ~f:Set.to_list
+;;
+
+let kill_event ~host ~key =
+  `Object
+    [ "type", `String "event"
+    ; "event", `String "terminal_kill"
+    ; "host", `String host
+    ; "key", `String key
+    ]
 ;;
 
 let host_gone t ~host =

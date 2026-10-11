@@ -289,6 +289,8 @@ let%expect_test "terminal relay events" =
     {|{"type":"event","event":"terminal_frame","host":"client-2","term_id":"t1","kind":"video","data":""}|};
   decode
     {|{"type":"event","event":"terminal_close","host":"client-2","term_id":"t1"}|};
+  decode
+    {|{"type":"event","event":"terminal_kill","host":"client-2","key":"sess-1"}|};
   [%expect
     {|
     (Event (
@@ -314,6 +316,7 @@ let%expect_test "terminal relay events" =
         "{\"type\":\"event\",\"event\":\"terminal_frame\",\"host\":\"client-2\",\"term_id\":\"t1\",\"kind\":\"video\",\"data\":\"\"}"
         "unknown frame kind \"video\"")))
     (Event (Terminal_close t1))
+    (Event (Terminal_kill sess-1))
     |}]
 ;;
 

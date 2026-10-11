@@ -282,6 +282,57 @@ let%expect_test
     |}]
 ;;
 
+let%expect_test
+    "a server starting loads the sessions waiting to resume, to resume on time"
+  =
+  with_sandbox
+  @@ fun t ->
+  Eio.Switch.run
+  @@ fun sw ->
+  let now = Core_unix.gettimeofday () in
+  let waiting = saved t "waiting" in
+  Session.set_resume_at waiting (Some (now +. 3600.));
+  let lapsed = saved t "lapsed" ~days_ago:0.1 in
+  Session.set_resume_at lapsed (Some (now -. 60.));
+  let (_ : Session.t) = saved t "plain" ~days_ago:0.2 in
+  (* Listed in the order of their messages. *)
+  List.iter
+    [ waiting, now; lapsed, now -. (0.1 *. day) ]
+    ~f:(fun (s, at) -> Core_unix.utimes (Session.path s) ~access:at ~modif:at);
+  let provider = Faux_provider.create [] in
+  let server = Server.create t ~sw ~provider in
+  Rpc_server.restore_resumes server.server;
+  let a = Client.connect server "a" in
+  print_sessions a;
+  (match Client.result (Client.request a "switch_session" (path waiting)) with
+   | Ok result ->
+     (match Json.member "state" result with
+      | Some state ->
+        printf
+          "resume_at_ms set: %b\n"
+          (match Json.member "resume_at_ms" state with
+           | Some (`Number _) -> true
+           | _ -> false)
+      | None -> print_endline "no state")
+   | Error e -> print_endline e);
+  Client.call t a "cancel_resume" [];
+  print_endline
+    (Option.value_map
+       (Session.resume_at
+          (Or_error.ok_exn (Session.load (Session.path waiting))))
+       ~default:"no resume recorded"
+       ~f:(fun _ -> "still recorded"));
+  [%expect
+    {|
+    waiting    live background=0 clients=0
+    lapsed      background=0 clients=-
+    plain       background=0 clients=-
+    resume_at_ms set: true
+    {"type":"response","id":"r","ok":true,"result":{}}
+    no resume recorded
+    |}]
+;;
+
 let gated = "while [ ! -f gate ]; do sleep 0.02; done; echo done"
 
 let%expect_test "a session is active while its background work runs" =

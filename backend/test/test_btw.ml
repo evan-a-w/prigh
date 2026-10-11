@@ -122,7 +122,10 @@ let print_btw_deltas t sent =
     print_endline (mask t (Json.to_string json)))
 ;;
 
-let%expect_test "btw while idle answers without touching the session" =
+let%expect_test
+    "btw while idle answers without touching the conversation, recording its \
+     spend"
+  =
   with_btw_server
     [ Reply.text "Hello there."
     ; { Reply.events = [ Text_delta "It "; Text_delta "said hello." ]
@@ -142,9 +145,9 @@ let%expect_test "btw while idle answers without touching the session" =
   call t h ~params:{|{"question": "what did you say?"}|} "btw";
   print_btw_deltas t h.sent;
   printf "messages after: %d\n" (count ());
-  printf
-    "session file unchanged: %b\n"
-    (String.equal before (session_file agent));
+  let after = session_file agent in
+  printf "session file only gained:\n";
+  print_file_lines t (String.drop_prefix after (String.length before));
   Queue.iter requests ~f:summarize_request;
   let state = Agent.state agent in
   printf
@@ -163,7 +166,8 @@ let%expect_test "btw while idle answers without touching the session" =
     {"type":"event","event":"btw_delta","btw_id":"btw-1","delta":"It "}
     {"type":"event","event":"btw_delta","btw_id":"btw-1","delta":"said hello."}
     messages after: 2
-    session file unchanged: true
+    session file only gained:
+    ["Entry",{"id":"<id>","parent":"<id>","at":<at>,"payload":["Spend",{"u
     model=deepseek-flash thinking=Off tools=0 system=<prigh system prompt>
     user: say hello
     assistant: Hello there.

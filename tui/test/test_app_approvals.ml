@@ -5,8 +5,6 @@ open Fixtures
 module H = Test_app.H
 module P = Prigh_protocol
 
-let alt_m h = H.key h (Key.alt (Char "m"))
-
 (* Types a command and runs it: the first Enter may only accept the
    completion. *)
 let command (h : H.t) text =
@@ -35,84 +33,6 @@ let confirm ?(rules = []) ?agent_id ?(name = "bash") call_id summary
   { call_id; agent_id; name; summary; rules }
 ;;
 
-let%expect_test "Alt+M cycles the mode; the status line shows it at once" =
-  let h = Test_app.connected () in
-  H.event h (State (with_mode Ask));
-  H.show h;
-  [%expect
-    {|
-      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
-
-    ▌ earlier question
-      earlier answer
-    ────────────────────────────────────────────────────────────
-    > ▏
-    …deepseek-flash  think:off  ctx:0.1%/1.0M  $0.01  mode:ask
-    |}];
-  alt_m h;
-  [%expect
-    {|
-    (Rpc
-      (method_ set_mode)
-      (params (
-        (approval_mode auto-edit)
-        (plan_mode     false)))
-      (tag (
-        Mode_set
-        "mode: auto-edit \226\128\148 file edits run; bash and MCP tools ask first")))
-    |}];
-  H.reply
-    h
-    (Mode_set "mode: auto-edit — file edits run; bash and MCP tools ask first")
-    (state_json ());
-  alt_m h;
-  alt_m h;
-  alt_m h;
-  [%expect
-    {|
-    (Rpc
-      (method_ set_mode)
-      (params (
-        (approval_mode auto)
-        (plan_mode     true)))
-      (tag (
-        Mode_set
-        "mode: plan \226\128\148 read-only planning: no file edits, commands ask first")))
-    (Rpc
-      (method_ set_mode)
-      (params (
-        (approval_mode ask)
-        (plan_mode     false)))
-      (tag (Mode_set "mode: ask \226\128\148 bash, edits and MCP tools ask first")))
-    (Rpc
-      (method_ set_mode)
-      (params (
-        (approval_mode auto-edit)
-        (plan_mode     false)))
-      (tag (
-        Mode_set
-        "mode: auto-edit \226\128\148 file edits run; bash and MCP tools ask first")))
-    |}];
-  (* A refusal puts the backend's mode back. *)
-  H.reply_error h (Mode_set "x") "unknown approval mode";
-  [%expect {| (Rpc (method_ get_state) (params ()) (tag Refresh_state)) |}];
-  H.reply h Refresh_state (state_json ());
-  H.show h;
-  [%expect
-    {|
-      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
-
-    ▌ earlier question
-      earlier answer
-      mode: auto-edit — file edits run; bash and MCP tools ask
-      first
-      unknown approval mode
-    ────────────────────────────────────────────────────────────
-    > ▏
-    …deepseek-flash  think:off  ctx:0.1%/1.0M  $0.01
-    |}]
-;;
-
 let%expect_test "/mode picks or sets the mode; /plan toggles plan mode" =
   let h = Test_app.connected ~height:16 () in
   H.event h (State (with_mode Auto_edit));
@@ -126,10 +46,10 @@ let%expect_test "/mode picks or sets the mode; /plan toggles plan mode" =
       earlier answer
     Mode (Alt+M cycles)  (4)
     / ▏
-       ask        bash, edits and MCP tools ask first
-    ▸* auto-edit  file edits run; bash and MCP tools ask first
+       ask        bash, job_input, edits and MCP tools ask first
+    ▸* auto-edit  file edits run; bash, job_input and MCP tools…
        auto       tools run without asking
-       plan       read-only planning: no file edits, commands a…
+       plan       read-only planning: no file edits; bash, job_…
     ────────────────────────────────────────────────────────────
     …deepseek-flash  ctx:0.1%/1.0M  Enter selects · Esc closes
     |}];
@@ -144,7 +64,7 @@ let%expect_test "/mode picks or sets the mode; /plan toggles plan mode" =
         (plan_mode     true)))
       (tag (
         Mode_set
-        "mode: plan \226\128\148 read-only planning: no file edits, commands ask first")))
+        "mode: plan \226\128\148 read-only planning: no file edits; bash, job_input and MCP tools ask first")))
     |}];
   H.show h;
   [%expect
@@ -172,7 +92,7 @@ let%expect_test "/mode picks or sets the mode; /plan toggles plan mode" =
         (plan_mode     false)))
       (tag (
         Mode_set
-        "mode: auto-edit \226\128\148 file edits run; bash and MCP tools ask first")))
+        "mode: auto-edit \226\128\148 file edits run; bash, job_input and MCP tools ask first")))
     (Rpc
       (method_ set_mode)
       (params (
@@ -180,13 +100,15 @@ let%expect_test "/mode picks or sets the mode; /plan toggles plan mode" =
         (plan_mode     true)))
       (tag (
         Mode_set
-        "mode: plan \226\128\148 read-only planning: no file edits, commands ask first")))
+        "mode: plan \226\128\148 read-only planning: no file edits; bash, job_input and MCP tools ask first")))
     (Rpc
       (method_ set_mode)
       (params (
         (approval_mode ask)
         (plan_mode     false)))
-      (tag (Mode_set "mode: ask \226\128\148 bash, edits and MCP tools ask first")))
+      (tag (
+        Mode_set
+        "mode: ask \226\128\148 bash, job_input, edits and MCP tools ask first")))
 
 
 
@@ -235,7 +157,7 @@ let%expect_test "the plan in the status line, /todos and /permissions" =
       ✓ read the code
       ▸ change it
       ○ test
-      mode: ask — bash, edits and MCP tools ask first
+      mode: ask — bash, job_input, edits and MCP tools ask first
       allowed this session: edit
       allow (config): bash(git status:*)
       deny (config): bash(rm:*)

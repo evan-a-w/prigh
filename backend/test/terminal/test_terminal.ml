@@ -497,6 +497,15 @@ let%expect_test "stdio worker: terminals over JSON lines" =
            [ "k1", "t1-k1", 0 ])
        : bool)];
   [%expect {| true |}];
+  (* Its session being deleted kills it; an unknown key is ignored. *)
+  Worker.send w {|{"type":"terminal_kill","key":"nosuch"}|};
+  Worker.send w {|{"type":"terminal_kill","key":"k1"}|};
+  print_s
+    [%sexp
+      (Fixture.eventually f (fun () ->
+         List.is_empty (Terminals.live f.terminals))
+       : bool)];
+  [%expect {| true |}];
   (* The shell ending is reported, then the viewer is closed. *)
   Worker.send
     w

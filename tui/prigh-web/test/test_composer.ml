@@ -313,7 +313,7 @@ let%expect_test "slash commands: the popup, arguments, running, unknown ones" =
     /thinking [off|low|on|high|max] pick or set the thinking level
     /change_default save the model and thinking level as the default for new sessions
     /verbosity [quiet|normal|verbose] how much of tool calls and thinking the transcript shows
-    /confirm [on|off] ask before bash, edits and MCP tools run (mode ask or auto, also for new sessions)
+    /confirm [on|off] ask before bash, job_input, edits and MCP tools run (mode ask or auto, also for new sessions)
     /mode [ask|auto-edit|auto|plan] pick or set the mode: what asks first, or read-only planning (Alt+M cycles)
     /plan [on|off] toggle plan mode: the model investigates and plans, changing no files, until you approve its plan
     /todos show the model's plan (its update_plan steps)
@@ -364,10 +364,10 @@ let%expect_test "slash commands: the popup, arguments, running, unknown ones" =
     (Complete_accept (run false))
     "/mode "
     Modes ↑↓ Tab Enter Esc
-    ask bash, edits and MCP tools ask first
-    auto-edit file edits run; bash and MCP tools ask first
+    ask bash, job_input, edits and MCP tools ask first
+    auto-edit file edits run; bash, job_input and MCP tools ask first
     auto tools run without asking
-    plan read-only planning: no file edits, commands ask first
+    plan read-only planning: no file edits; bash, job_input and MCP tools ask first
     |}];
   H.type_ h "/model gpt";
   H.key h "Enter";

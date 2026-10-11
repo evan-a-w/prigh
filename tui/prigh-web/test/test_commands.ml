@@ -448,8 +448,8 @@ let%expect_test "/confirm" =
     (Rpc (method_ set_config) (params ((config ((approval_mode ask)))))
      (tag
       (Config_saved
-       "Tool confirmation on (mode ask, also for new sessions): bash, edits and MCP tools ask first")))
-    (Expire_toast (id 0) (after_ms 5140))
+       "Tool confirmation on (mode ask, also for new sessions): bash, job_input, edits and MCP tools ask first")))
+    (Expire_toast (id 0) (after_ms 5580))
     Ready 0% ↑0 ↓0 $0.0000 (ask)
     (Notifications not allowed yet: click to ask the browser)
     (Save_history ("/confirm off" /confirm))
@@ -458,7 +458,7 @@ let%expect_test "/confirm" =
       (Config_saved
        "Tool confirmation off (mode auto, also for new sessions): tools run without asking")))
     (Save_history ("/confirm maybe" "/confirm off" /confirm))
-    Tool confirmation on (mode ask, also for new sessions): bash, edits and MCP tools ask first
+    Tool confirmation on (mode ask, also for new sessions): bash, job_input, edits and MCP tools ask first
     Unknown setting "maybe": use on or off.
     |}]
 ;;

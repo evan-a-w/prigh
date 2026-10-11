@@ -72,8 +72,8 @@ let all =
       ~argument:Confirm
       ~args:"[on|off]"
       "confirm"
-      "ask before bash, edits and MCP tools run (mode ask or auto, also for \
-       new sessions)"
+      "ask before bash, job_input, edits and MCP tools run (mode ask or \
+       auto, also for new sessions)"
   ; c
       ~argument:Mode
       ~args:"[ask|auto-edit|auto|plan]"

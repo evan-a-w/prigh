@@ -272,6 +272,7 @@ let rec apply t (event : Event.t) =
   | Terminal_open _
   | Terminal_frame _
   | Terminal_close _
+  | Terminal_kill _
   | Btw_delta _
   | Sessions_changed -> t
 ;;
