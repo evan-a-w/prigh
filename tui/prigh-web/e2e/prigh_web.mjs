@@ -7,7 +7,7 @@
 // TEST_DIR (scratch: home/, cwd/, the faux scripts), TOKEN, and optionally
 // SHOTS (a directory for screenshots of each step).
 import { execFileSync, spawn } from "node:child_process";
-import { mkdirSync, readdirSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
 import { hostname } from "node:os";
 import { join } from "node:path";
 import { png, pngSize } from "./png.mjs";
@@ -78,6 +78,7 @@ const script3 = [
   },
   { text: "Implementing." },
   { text: "Noted." },
+  { text: "Read the attachments." },
 ];
 writeFileSync(join(dir, "script.json"), JSON.stringify(script));
 writeFileSync(join(dir, "script2.json"), JSON.stringify(script2));
@@ -731,6 +732,155 @@ try {
   console.log(sizes(await page.locator(".sidebar .sessions").innerText()));
   console.log(`session files after: ${sessionFiles()}`);
   await screenshot("deleted");
+
+  // 13. The file browser (Ctrl+Shift+F) on the session's host: browse,
+  //     preview, upload (asking before replacing), download a file and a
+  //     directory, new folder, rename, delete; then files attached to a
+  //     prompt from the browser, dropped on the composer and picked with
+  //     the attach button.
+  const showFiles = async label => {
+    section(label);
+    console.log(clean(await page.locator(".files-list").innerText()));
+    await screenshot(label);
+  };
+  const toast = async text => {
+    await page.locator(".toast", { hasText: text }).first().waitFor();
+    console.log(`toast: ${clean(await page.locator(".toast", { hasText: text }).first().innerText())}`);
+  };
+  const row = name => page.locator(`.files-row[data-name="${name}"]`);
+  const hostFile = async (path, content) => {
+    for (let i = 0; i < 100 && !(existsSync(path) && readFileSync(path, "utf8") === content); i++) {
+      await page.waitForTimeout(50);
+    }
+    return JSON.stringify(readFileSync(path, "utf8"));
+  };
+  writeFileSync(join(cwd, "sub", "inner.txt"), "inside\n");
+  await send(`/cd ${cwd}`);
+  await page.waitForFunction(c => document.querySelector(".topbar .where")?.title === c, cwd);
+  await page.keyboard.press("Control+Shift+F");
+  await page.locator(".files-panel").waitFor();
+  await row("flag.png").waitFor();
+  await page.waitForTimeout(200); // the drawer's slide
+  section("files: the session's directory");
+  console.log(clean(await page.locator(".files-head").innerText()));
+  console.log(clean(await page.locator(".files-crumb.current").innerText()));
+  await showFiles("files: listed");
+  await row("notes.txt").click();
+  await page.locator(".files-code").waitFor();
+  section("files: a text preview");
+  console.log(clean(await page.locator(".files-preview").innerText()));
+  await screenshot("files: a text preview");
+  await row("flag.png").click();
+  await page.locator(".files-image img").waitFor();
+  await showImages("files: an image preview", page.locator(".files-image img"));
+  await screenshot("files: an image preview");
+  await page.locator("#files-upload-input").setInputFiles({ name: "hello.txt", mimeType: "text/plain", buffer: Buffer.from("hello\n") });
+  await toast("Uploaded hello.txt");
+  await row("hello.txt").waitFor();
+  console.log(`on the host: ${await hostFile(join(cwd, "hello.txt"), "hello\n")}`);
+  await page.locator("#files-upload-input").setInputFiles({ name: "hello.txt", mimeType: "text/plain", buffer: Buffer.from("hello again\n") });
+  await page.locator(".files-ask").waitFor();
+  await show("files: replace?", ".files-ask");
+  await page.locator(".files-ask .btn.danger").click();
+  console.log(`replaced: ${await hostFile(join(cwd, "hello.txt"), "hello again\n")}`);
+  await page.waitForFunction(() => !document.querySelector(".files-transfers"));
+  {
+    await row("notes.txt").click();
+    const [download] = await Promise.all([
+      page.waitForEvent("download"),
+      page.locator(".files-actions .btn", { hasText: "Download" }).click(),
+    ]);
+    section("files: a downloaded file");
+    console.log(download.suggestedFilename());
+    console.log(JSON.stringify(readFileSync(await download.path(), "utf8")));
+  }
+  {
+    // A path typed (relative to the directory shown), then back up: sub/ is
+    // selected, its actions show.
+    await page.locator(".files-edit-path").click();
+    await page.locator("#files-path").fill("sub");
+    await page.locator("#files-path").press("Enter");
+    await row("inner.txt").waitFor();
+    section("files: a typed path");
+    console.log(clean(await page.locator(".files-crumb.current").innerText()));
+    console.log(clean(await page.locator(".files-list").innerText()));
+    await page.locator("#files-list").focus();
+    await page.keyboard.press("Backspace");
+    await page.locator(".files-row.selected[data-name=sub]").waitFor();
+    await screenshot("files: a directory selected");
+    const [download] = await Promise.all([
+      page.waitForEvent("download"),
+      page.locator(".files-actions .btn", { hasText: "Download .tar.gz" }).click(),
+    ]);
+    const archive = join(dir, "sub.tar.gz");
+    await download.saveAs(archive);
+    section("files: a directory downloaded");
+    console.log(download.suggestedFilename());
+    console.log(execFileSync("tar", ["-tzf", archive], { encoding: "utf8" }).trim().split("\n").sort().join("\n"));
+  }
+  await page.locator(".files-tool[title='New folder']").click();
+  await page.locator("#files-ask-input").fill("made");
+  await page.keyboard.press("Enter");
+  await toast("Created made");
+  await page.locator(".files-row.selected[data-name=made]").waitFor();
+  await page.locator("#files-list").focus();
+  await page.keyboard.press("F2");
+  await page.locator("#files-ask-input").fill("renamed");
+  await page.keyboard.press("Enter");
+  await toast("Renamed made to renamed");
+  await page.locator(".files-row.selected[data-name=renamed]").waitFor();
+  await page.locator("#files-list").focus();
+  await page.keyboard.press("Delete");
+  await page.locator(".files-ask").waitFor();
+  await show("files: delete?", ".files-ask");
+  await page.locator(".files-ask .btn.danger").click();
+  await toast("Deleted renamed");
+  console.log(`renamed on the host: ${existsSync(join(cwd, "renamed"))}`);
+  await showFiles("files: after the changes");
+  // Attached from the browser, dropped on the composer, picked.
+  await row("hello.txt").click();
+  await page.locator(".files-actions .btn", { hasText: "Attach" }).click();
+  await page.evaluate(() => {
+    const data = new DataTransfer();
+    data.items.add(new File(["dropped text\n"], "dropped.txt", { type: "text/plain" }));
+    document.querySelector(".composer textarea").dispatchEvent(
+      new DragEvent("drop", { bubbles: true, cancelable: true, dataTransfer: data }));
+  });
+  await page.locator("#chat-attach-input").setInputFiles({ name: "data.bin", mimeType: "application/octet-stream", buffer: Buffer.from([0, 1, 2, 3, 255, 0, 7]) });
+  await page.waitForFunction(() => document.querySelectorAll(".attach-chip.ready").length === 3);
+  section("files: attachments in the composer");
+  console.log(clean(await page.locator(".attach-chips").innerText()));
+  await screenshot("files: attachments in the composer");
+  console.log(`uploads on the host: ${readdirSync(join(cwd, ".prigh", "uploads")).sort().join(" ")}`);
+  await page.keyboard.press("Control+Shift+F");
+  await page.waitForSelector(".files-panel", { state: "detached" });
+  await send("read these");
+  await bodyHas("Read the attachments.");
+  await idle();
+  await page.waitForFunction(() => !document.querySelector(".attach-chip"));
+  await showTurn("files: sent with the prompt");
+  {
+    const messages = await backendMessages(sessionId());
+    const user = messages.filter(m => m.role === "user").at(-1);
+    section("files: what the model saw");
+    console.log(clean(user.text).split("\n").filter(l => l.startsWith("<file") || l.startsWith("[binary") || l === "read these" || l === "hello again" || l === "dropped text").join("\n"));
+  }
+  // At phone size the browser is a sheet; a preview takes it over.
+  await page.waitForFunction(() => !document.querySelector(".toast"));
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.waitForFunction(() => document.querySelector(".app.narrow:not(.sidebar-open)"));
+  await page.locator(".files-toggle").click();
+  await row("todo.md").waitFor();
+  await page.waitForTimeout(400); // the sheet's slide
+  await showFiles("files on a phone");
+  await row("todo.md").click();
+  await page.locator(".files-code").waitFor();
+  await page.waitForTimeout(200);
+  await screenshot("files: a preview on a phone");
+  await page.locator(".files-close").click();
+  await page.waitForSelector(".files-panel", { state: "detached" });
+  await page.setViewportSize({ width: 1280, height: 800 });
+  await page.waitForFunction(() => document.querySelector(".app:not(.narrow)"));
 
   section("errors");
   console.log(errors.length ? errors.join("\n") : "none");
