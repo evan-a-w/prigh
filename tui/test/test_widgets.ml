@@ -672,6 +672,9 @@ let%expect_test "keymap: every binding resolves to its intent and is documented"
     /goal [text|off|resume]            set a goal the agent keeps working toward until it is met; show, clear or resume it
     /resume [now|cancel]               show, run now or cancel the automatic resume after a usage limit
     /compact [instructions]            summarise older messages to free context
+    /diff [path]                       show the uncommitted changes where the tools run (git diff, untracked files too)
+    /review [base] [instructions]      review the uncommitted changes, or those against a base branch, for prioritised findings
+    /init                              write or improve the project's AGENTS.md
     /new                               start a new session
     /name [text]                       set the session name
     /session                           show session statistics
@@ -1879,7 +1882,7 @@ let%expect_test "tools: search flags, other tools, and narrow terminals" =
 
 let%expect_test "turns: the prompt opens a turn; the agent's steps hang below" =
   let user text : Prigh_protocol.Message.User.t =
-    { text; images = []; at = None }
+    { text; images = []; origin = None; at = None }
   in
   let t =
     List.fold
@@ -2338,61 +2341,3 @@ let%expect_test
     |}]
 ;;
 
-let%expect_test "hand-over messages: parsed back into from, to and the error" =
-  List.iter
-    [ "[prigh: openai-codex/gpt-6-sol cannot continue (HTTP 429: The usage \
-       limit has been reached (usage limit reached)), so \
-       anthropic/claude-opus-5-5 takes over this conversation from here. Carry \
-       on with the task where it left off.]"
-    ; "[prigh: a/b cannot continue (no, so what), so c/d takes over this \
-       conversation from here. Carry on with the task where it left off.]"
-    ; "[prigh: a/x cannot continue (HTTP 429: {\"error\": \"usage limit \
-       reached (plan: pro), try later\"}), so b/y takes over this conversation \
-       from here. Carry on with the task where it left off.]"
-    ; "[prigh: a/x cannot continue (quota (daily), so wait; b/y takes over \
-       this conversation), so b/y takes over this conversation from here. \
-       Carry on with the task where it left off.]"
-    ; "[prigh: something else]"
-    ; "[prigh: a/b cannot continue (x), so c/d takes over this conversation \
-       from here."
-    ; "[prigh: a/b cannot continue (x) and c/d takes over this conversation.]"
-    ; "please: [prigh: a/b cannot continue (x), so c/d takes over this \
-       conversation.]"
-    ; "[prigh: a/b cannot continue (x), so c d takes over this conversation.]"
-    ; "[prigh: a b cannot continue (x), so c/d takes over this conversation.]"
-    ; "[prigh:  cannot continue (x), so c/d takes over this conversation.]"
-    ]
-    ~f:(fun text ->
-      match Handover_message.parse text with
-      | None -> print_endline "none"
-      | Some t ->
-        print_s [%sexp (t : Handover_message.t)];
-        print_endline (Handover_message.summary t));
-  [%expect
-    {|
-    ((from openai-codex/gpt-6-sol)
-     (to_  anthropic/claude-opus-5-5)
-     (error "HTTP 429: The usage limit has been reached (usage limit reached)"))
-    ↪ handed over from openai-codex/gpt-6-sol to anthropic/claude-opus-5-5
-    ((from  a/b)
-     (to_   c/d)
-     (error "no, so what"))
-    ↪ handed over from a/b to c/d
-    ((from a/x)
-     (to_  b/y)
-     (error
-      "HTTP 429: {\"error\": \"usage limit reached (plan: pro), try later\"}"))
-    ↪ handed over from a/x to b/y
-    ((from a/x)
-     (to_  b/y)
-     (error "quota (daily), so wait; b/y takes over this conversation"))
-    ↪ handed over from a/x to b/y
-    none
-    none
-    none
-    none
-    none
-    none
-    none
-    |}]
-;;

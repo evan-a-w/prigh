@@ -36,6 +36,8 @@ module Reply_tag = struct
     | Models_catalog
     | Models_for_scoped
     | Compact_done
+    | Git_diff
+    | Review_started
     | Abort_done
     | Notice_on_success of string
     | History
@@ -737,23 +739,7 @@ let first_line text =
   | [] -> ""
 ;;
 
-(* What the user typed: a skill's expansion stands for [/skill:NAME ARGS]. *)
-let user_text text =
-  match Skill_message.parse text with
-  | Some skill -> Skill_message.invocation skill
-  | None -> text
-;;
-
-let user_first_line ({ text; images; at = _ } : P.Message.User.t) =
-  let text =
-    match Handover_message.parse text with
-    | Some handover -> Handover_message.summary handover
-    | None -> user_text text
-  in
-  match first_line text, images with
-  | "", image :: _ -> P.Image.to_string_hum image
-  | line, _ -> line
-;;
+let user_first_line = Injected_note.label
 
 let message_first_line (m : P.Message.t) =
   match m with
@@ -1782,6 +1768,27 @@ let run_command m (cmd : Commands.Parsed.t) =
              else [ "instructions", str cmd.rest ])
           ~tag:Compact_done
       ] )
+  | "diff", _ ->
+    ( notice m "reading the changes…"
+    , [ rpc
+          "git_diff"
+          ~params:
+            (if String.is_empty cmd.rest then [] else [ "path", str cmd.rest ])
+          ~tag:Git_diff
+      ] )
+  | "review", _ ->
+    ( notice m "reading the changes to review…"
+    , [ rpc
+          "review"
+          ~params:[ "args", str cmd.rest ]
+          ~tag:
+            (Retry_in_editor
+               { command = String.strip ("/review " ^ cmd.rest)
+               ; hint = ""
+               ; then_ = Review_started
+               })
+      ] )
+  | "init", _ -> m, [ rpc "init" ~tag:Review_started ]
   | "new", _ ->
     m, [ rpc "new_session" ~tag:(Reload_messages_notice "new session") ]
   | "name", [] ->
@@ -2553,8 +2560,8 @@ let picker_selected m (kind : Mode.Picker_kind.t) (item : Picker.Item.t) =
        List.find entries ~f:(fun (entry : P.Entry.t) ->
          String.equal entry.id item.id)
      with
-     | Some { kind = P.Entry.Kind.Message (P.Message.User { text; _ }); _ } ->
-       ( { m with editor = Editor.set_text m.editor (user_text text) }
+     | Some { kind = P.Entry.Kind.Message (P.Message.User user); _ } ->
+       ( { m with editor = Editor.set_text m.editor (Injected_note.typed user) }
        , [ rpc "fork" ~params:[ "at", str item.id ] ~tag:Reload_messages ] )
      | _ -> m, [])
   | Rewind entries ->
@@ -3075,9 +3082,12 @@ let event m (e : P.Event.t) =
       if steer = 0 && follow_up = 0 then [] else m.queued_messages
     in
     { m with queued = { Queue_counts.steer; follow_up }; queued_messages }, []
-  | Message_start (User { text; _ }) ->
+  | Message_start (User user) ->
     ( { m with
-        queued_messages = Queued_message.remove_first m.queued_messages ~text
+        queued_messages =
+          Queued_message.remove_first
+            m.queued_messages
+            ~text:(Injected_note.typed user)
       }
     , [] )
   | Config_changed config -> { m with config = Some config }, []
@@ -3237,6 +3247,24 @@ let rec reply m (tag : Reply_tag.t) (result : (P.Json.t, string) Result.t) =
           , [] )
         | _ -> notice m (sprintf "model: %s" key), [])
      | Compact_done -> notice m "context compacted", []
+     | Git_diff ->
+       decode json ~f:P.Git_diff.of_json (fun diff ->
+         if String.is_empty diff.diff
+         then
+           ( notice
+               m
+               (sprintf
+                  "no changes in %s against %s"
+                  diff.root
+                  (Diff_files.against diff))
+           , [] )
+         else follow (block m (Diff_files.render diff)), [])
+     | Review_started ->
+       (* The run's first message shows what started; a busy agent queues it. *)
+       (match m.state with
+        | Some { running = true; _ } ->
+          notice m "queued: it starts when the current run ends", []
+        | Some _ | None -> m, [])
      | Abort_done ->
        decode json ~f:decode_restored (fun restored ->
          match restored with

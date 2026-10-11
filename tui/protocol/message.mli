@@ -4,11 +4,19 @@ module User : sig
   type t =
     { text : string
     ; images : Image.t list [@sexp.list]
+    ; origin : Origin.t option [@sexp.option]
+    (** how [text] is made up, when the harness added to it *)
     ; at : Time_ns.Alternate_sexp.t option [@sexp.option]
     }
   [@@deriving sexp_of, equal]
 
   val of_json : Json.t -> t Or_error.t
+
+  (** The message is the harness's, not the user's. *)
+  val source : t -> Origin.Source.t option
+
+  (** What the user wrote: [text] without the notes and attached files. *)
+  val body : t -> string
 end
 
 module Assistant : sig

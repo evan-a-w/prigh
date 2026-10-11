@@ -16,8 +16,10 @@ let session_title (m : App.Model.t) (state : State.t) =
      | _ ->
        (* Before the session list knows it: the first prompt, at once. *)
        List.find_map (Chat.entries m.chat) ~f:(function
-         | User { text; _ } when not (String.is_empty (String.strip text)) ->
-           Some (List.hd_exn (String.split_lines (String.strip text)))
+         | User u ->
+           (match String.strip (Injected_note.typed u) with
+            | "" -> None
+            | text -> Some (List.hd_exn (String.split_lines text)))
          | _ -> None)
        |> Option.value ~default:"New session")
 ;;

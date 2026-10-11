@@ -147,7 +147,9 @@ let messages_json =
   {|[{"role":"user","text":"earlier question"},{"role":"assistant","content":[{"type":"text","text":"earlier **answer**"}],"stop_reason":{"type":"end_turn"},"usage":{"input":1,"output":2,"cache_read":0},"model":"m"}]|}
 ;;
 
-let user ?(images = []) text : P.Message.t = User { text; images; at = None }
+let user ?(images = []) ?origin text : P.Message.t =
+  User { text; images; origin; at = None }
+;;
 
 let assistant ?(stop = "end_turn") text =
   Or_error.ok_exn
@@ -174,4 +176,15 @@ let tool_result ?(name = "bash") ?(is_error = false) ?(images = []) ~id text
   : P.Message.Tool_result.t
   =
   { tool_call_id = id; tool_name = name; text; is_error; images; at = None }
+;;
+
+let delivery text =
+  user
+    ~origin:
+      { body = None
+      ; notes = []
+      ; attachments = []
+      ; source = Some { kind = Delivery; title = "Reports" }
+      }
+    text
 ;;

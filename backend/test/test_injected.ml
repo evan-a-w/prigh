@@ -228,3 +228,57 @@ let%expect_test "goals, shell output and a legacy session line" =
     ["User",{"text":"unchanged"}]
     |}]
 ;;
+
+let%expect_test "hand-overs recorded before origins: the error may contain anything" =
+  List.iter
+    [ "[prigh: openai-codex/gpt-6-sol cannot continue (HTTP 429: The usage \
+       limit has been reached (usage limit reached)), so \
+       anthropic/claude-opus-5-5 takes over this conversation from here. Carry \
+       on with the task where it left off.]"
+    ; "[prigh: a/b cannot continue (no, so what), so c/d takes over this \
+       conversation from here. Carry on with the task where it left off.]"
+    ; "[prigh: a/x cannot continue (HTTP 429: {\"error\": \"usage limit \
+       reached (plan: pro), try later\"}), so b/y takes over this conversation \
+       from here. Carry on with the task where it left off.]"
+    ; "[prigh: a/x cannot continue (quota (daily), so wait; b/y takes over \
+       this conversation), so b/y takes over this conversation from here. \
+       Carry on with the task where it left off.]"
+    ; "[prigh: something else]"
+    ; "[prigh: a/b cannot continue (x), so c/d takes over this conversation \
+       from here."
+    ; "[prigh: a/b cannot continue (x) and c/d takes over this conversation.]"
+    ; "please: [prigh: a/b cannot continue (x), so c/d takes over this \
+       conversation.]"
+    ; "[prigh: a/b cannot continue (x), so c d takes over this conversation.]"
+    ; "[prigh: a b cannot continue (x), so c/d takes over this conversation.]"
+    ; "[prigh:  cannot continue (x), so c/d takes over this conversation.]"
+    ]
+    ~f:(fun text ->
+      match Injected.infer text with
+      | None -> print_endline "none"
+      | Some { source = Some source; _ } ->
+        print_s [%sexp (source : Injected.Source.t)];
+        print_endline (Injected.Source.title source)
+      | Some other -> print_s [%sexp (other : Injected.t)]);
+  [%expect {|
+    (Handover (from openai-codex/gpt-6-sol) (to_ anthropic/claude-opus-5-5)
+     (error "HTTP 429: The usage limit has been reached (usage limit reached)"))
+    Handed over from openai-codex/gpt-6-sol to anthropic/claude-opus-5-5
+    (Handover (from a/b) (to_ c/d) (error "no, so what"))
+    Handed over from a/b to c/d
+    (Handover (from a/x) (to_ b/y)
+     (error
+      "HTTP 429: {\"error\": \"usage limit reached (plan: pro), try later\"}"))
+    Handed over from a/x to b/y
+    (Handover (from a/x) (to_ b/y)
+     (error "quota (daily), so wait; b/y takes over this conversation"))
+    Handed over from a/x to b/y
+    none
+    none
+    none
+    none
+    none
+    none
+    none
+    |}]
+;;
