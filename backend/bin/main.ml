@@ -209,7 +209,8 @@ let common_params =
              else
                Tools.all
                @ (subagent :: Tool_subagent.control_tools)
-               @ Tool_jobs.tools)
+               @ Tool_jobs.tools
+               @ Tools.interaction)
           ~sessions_dir
           ~home
           ?session

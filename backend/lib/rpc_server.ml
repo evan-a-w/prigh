@@ -52,6 +52,8 @@ let methods =
   ; "set_config"
   ; "change_default"
   ; "tool_confirm_respond"
+  ; "set_mode"
+  ; "ask_user_respond"
   ; "btw"
   ; "btw_cancel"
   ; "auth_status"
@@ -1048,7 +1050,8 @@ let dispatch agent login ~meth ~params : Json.t Or_error.t =
       (Rpc_json.pending
          ~steer
          ~follow_up
-         ~confirms:(Agent.pending_confirms agent))
+         ~confirms:(Agent.pending_confirms agent)
+         ~questions:(Agent.pending_questions agent))
   | "list_subagents" ->
     ok (`Array (List.map (Agent.subagents agent) ~f:Rpc_json.subagent_summary))
   | "get_subagent" ->
@@ -1148,9 +1151,18 @@ let dispatch agent login ~meth ~params : Json.t Or_error.t =
        let json =
          match Config.to_json (Agent.config agent), json with
          | `Object current, `Object given ->
+           (* [confirm_tools] from an older frontend stands for
+              [approval_mode]. *)
+           let given_names =
+             List.map given ~f:fst
+             @
+             if List.Assoc.mem given ~equal:String.equal "confirm_tools"
+             then [ "approval_mode" ]
+             else []
+           in
            `Object
              (List.filter current ~f:(fun (k, _) ->
-                not (List.Assoc.mem given ~equal:String.equal k))
+                not (List.mem given_names k ~equal:String.equal))
               @ given)
          | _, json -> json
        in
@@ -1161,15 +1173,74 @@ let dispatch agent login ~meth ~params : Json.t Or_error.t =
     Or_error.map (Agent.save_as_default agent) ~f:(fun () ->
       Config.to_json (Agent.config agent))
   | "tool_confirm_respond" ->
-    Or_error.bind (string_param params "call_id") ~f:(fun call_id ->
-      Or_error.bind
-        (match param params "allow" with
-         | Some `True -> Ok true
-         | Some `False -> Ok false
-         | Some _ -> Or_error.error_string "param \"allow\" must be a boolean"
-         | None -> Or_error.error_string "missing param \"allow\"")
-        ~f:(fun allow ->
-          unit_result (Agent.respond_confirm agent ~call_id ~allow)))
+    let open Or_error.Let_syntax in
+    let%bind call_id = string_param params "call_id" in
+    let%bind agent_id = string_param_opt params "agent_id" in
+    let%bind allow =
+      match param params "allow" with
+      | Some `True -> Ok true
+      | Some `False -> Ok false
+      | Some _ -> Or_error.error_string "param \"allow\" must be a boolean"
+      | None -> Or_error.error_string "missing param \"allow\""
+    in
+    let%bind always = bool_param params "always" ~default:false in
+    let%bind reason = string_param_opt params "reason" in
+    let reason =
+      Option.filter reason ~f:(fun r -> not (String.is_empty (String.strip r)))
+    in
+    let answer : Agent.Confirm_answer.t =
+      match allow, always with
+      | true, true -> Always
+      | true, false -> Allow
+      | false, _ -> Deny reason
+    in
+    unit_result (Agent.respond_confirm ?agent_id agent ~call_id answer)
+  | "set_mode" ->
+    let open Or_error.Let_syntax in
+    let%bind approval =
+      match%bind string_param_opt params "approval_mode" with
+      | None -> Ok None
+      | Some s -> Or_error.map (Approval_mode.of_string s) ~f:Option.some
+    in
+    let%bind plan =
+      match param params "plan_mode" with
+      | None | Some `Null -> Ok None
+      | Some `True -> Ok (Some true)
+      | Some `False -> Ok (Some false)
+      | Some _ -> Or_error.error_string "param \"plan_mode\" must be a boolean"
+    in
+    Agent.set_mode ?approval ?plan agent;
+    ok (Rpc_json.state (Agent.state agent))
+  | "ask_user_respond" ->
+    let open Or_error.Let_syntax in
+    let%bind call_id = string_param params "call_id" in
+    let%bind decline = bool_param params "decline" ~default:false in
+    let%bind reply =
+      if decline
+      then Ok User_question.Reply.Declined
+      else (
+        match param params "answers" with
+        | Some (`Array answers) ->
+          Or_error.all
+            (List.map answers ~f:(function
+               | `Array items ->
+                 Or_error.all
+                   (List.map items ~f:(function
+                      | `String s -> Ok s
+                      | _ ->
+                        Or_error.error_string
+                          "param \"answers\" must be an array of arrays of \
+                           strings"))
+               | _ ->
+                 Or_error.error_string
+                   "param \"answers\" must be an array of arrays of strings"))
+          |> Or_error.map ~f:(fun answers ->
+            User_question.Reply.Answered answers)
+        | _ ->
+          Or_error.error_string
+            "missing param \"answers\" (or \"decline\": true)")
+    in
+    unit_result (Agent.answer_question agent ~call_id reply)
   | "auth_status" ->
     Or_error.map (Login_manager.status login) ~f:(fun statuses ->
       `Array (List.map statuses ~f:Rpc_json.auth_status))

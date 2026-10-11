@@ -12,6 +12,9 @@ let all =
   ]
 ;;
 
+(* What the main agent uses to talk to the user: [update_plan], [ask_user],
+   [exit_plan_mode]. *)
+let interaction = [ Plan.tool; Tool_ask_user.tool; Tool_exit_plan_mode.tool ]
 let variants = [ Tool_apply_patch.tool ]
 let builtin = all @ variants
 let find name = List.find builtin ~f:(fun t -> String.equal (Tool.name t) name)
@@ -65,13 +68,20 @@ let background_control =
   ]
 ;;
 
+(* The session's plan, plan mode and the user belong to the main agent. *)
+let main_agent_only =
+  [ Plan.tool_name; Tool_ask_user.name; Tool_exit_plan_mode.name ]
+;;
+
 let for_context ~parent ~depth ?only () =
   let available =
     List.filter_map parent ~f:(fun t ->
       let name = Tool.name t in
       if
         (depth >= 2 && String.equal name "subagent")
-        || (depth >= 1 && List.mem background_control name ~equal:String.equal)
+        || (depth >= 1
+            && (List.mem background_control name ~equal:String.equal
+                || List.mem main_agent_only name ~equal:String.equal))
       then None
       else if depth >= 1 && String.equal name "bash"
       then Some Tool_bash.foreground_tool

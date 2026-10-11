@@ -685,7 +685,7 @@ let%expect_test "/change_default saves the model and thinking level" =
     {"id":"q","type":"response","command":"prompt","success":true,"data":{}}
     {
       "scoped_models": [],
-      "confirm_tools": false,
+      "approval_mode": "auto",
       "default_model": "deepseek/deepseek-v4-pro",
       "default_thinking": "high",
       "fallback_models": [],

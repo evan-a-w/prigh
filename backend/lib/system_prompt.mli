@@ -33,3 +33,7 @@ val cwd_changed_note : cwd:string -> string
 
 (** After a model change swaps the file editor ([edit], [apply_patch]). *)
 val editor_changed_note : before:string -> after:string -> string
+
+(** When plan mode is switched on or off (before the next message, or
+    between turns of a run). *)
+val plan_mode_note : on:bool -> string

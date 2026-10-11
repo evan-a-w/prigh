@@ -102,7 +102,9 @@ let split_point ~keep_recent_tokens (entries : Session.Entry.t list) =
        | Name _
        | Description _
        | Cwd _
-       | System_prompt _ -> go rest tokens candidate)
+       | System_prompt _
+       | Approval _
+       | Allow_rule _ -> go rest tokens candidate)
   in
   go (List.rev entries) 0 None
 ;;
@@ -131,7 +133,9 @@ let compact
         | Name _
         | Description _
         | Cwd _
-        | System_prompt _ -> false)
+        | System_prompt _
+        | Approval _
+        | Allow_rule _ -> false)
     in
     let older =
       List.take messages_before (List.length messages_before - kept_count)
