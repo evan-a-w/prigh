@@ -413,14 +413,15 @@ let%expect_test "save_as_default applies to new agents, not saved sessions" =
   [%expect
     {|
     ("no default: fallback" deepseek/deepseek-v4-pro (On ()))
-    ((scoped_models (a)) (confirm_tools false)
+    ((scoped_models (a)) (approval_mode Auto)
+     (permissions ((allow ()) (ask ()) (deny ())))
      (default_model (deepseek/deepseek-flash)) (default_thinking ((On (High))))
      (fallback_models ()) (default_cwd ()))
     {
       "scoped_models": [
         "a"
       ],
-      "confirm_tools": false,
+      "approval_mode": "auto",
       "default_model": "deepseek/deepseek-flash",
       "default_thinking": "high",
       "fallback_models": [],
@@ -649,7 +650,7 @@ let%expect_test "git_branch is read from .git/HEAD and refreshed" =
 
 let confirm_tools agent =
   Or_error.ok_exn
-    (Agent.set_config agent { Config.default with confirm_tools = true })
+    (Agent.set_config agent { Config.default with approval_mode = Ask })
 ;;
 
 let tool_results t agent =
@@ -672,15 +673,14 @@ let%expect_test "confirm_tools: denying a destructive tool continues the run" =
   let confirmed, resolver = Eio.Promise.create () in
   Agent.subscribe agent ~f:(fun e ->
     match e with
-    | Loop (Tool_confirm { call_id; name; summary }) ->
+    | Loop (Tool_confirm { call_id; name; summary; _ }) ->
       print_s [%sexp (call_id : string), (name : string), (summary : string)];
       Eio.Promise.resolve resolver call_id
     | _ -> ());
   Or_error.ok_exn (Agent.prompt agent "go");
   let call_id = Eio.Promise.await confirmed in
   print_s
-    [%sexp
-      (Agent.respond_confirm agent ~call_id ~allow:false : unit Or_error.t)];
+    [%sexp (Agent.respond_confirm agent ~call_id (Deny None) : unit Or_error.t)];
   Agent.wait_idle agent;
   print_s [%sexp (tool_results t agent : (string * bool) list)];
   dump ();
@@ -689,6 +689,7 @@ let%expect_test "confirm_tools: denying a destructive tool continues the run" =
     (c1 bash "echo hi")
     (Ok ())
     (("[denied by user]" true))
+    state: running=false messages=0
     state: running=true messages=0
     user: go
     assistant:
@@ -716,8 +717,7 @@ let%expect_test "confirm_tools: allowing a destructive tool runs it" =
     | _ -> ());
   Or_error.ok_exn (Agent.prompt agent "go");
   let call_id = Eio.Promise.await confirmed in
-  print_s
-    [%sexp (Agent.respond_confirm agent ~call_id ~allow:true : unit Or_error.t)];
+  print_s [%sexp (Agent.respond_confirm agent ~call_id Allow : unit Or_error.t)];
   Agent.wait_idle agent;
   print_s [%sexp (tool_results t agent : (string * bool) list)];
   dump ();
@@ -725,6 +725,7 @@ let%expect_test "confirm_tools: allowing a destructive tool runs it" =
     {|
     (Ok ())
     (("hi\n" false))
+    state: running=false messages=0
     state: running=true messages=0
     user: go
     assistant:
@@ -749,11 +750,10 @@ let%expect_test "confirm_tools: summaries are path/command by tool" =
   confirm_tools agent;
   Agent.subscribe agent ~f:(fun e ->
     match e with
-    | Loop (Tool_confirm { call_id; name; summary }) ->
+    | Loop (Tool_confirm { call_id; name; summary; _ }) ->
       print_s [%sexp (name : string), (summary : string)];
       print_s
-        [%sexp
-          (Agent.respond_confirm agent ~call_id ~allow:true : unit Or_error.t)]
+        [%sexp (Agent.respond_confirm agent ~call_id Allow : unit Or_error.t)]
     | _ -> ());
   Or_error.ok_exn (Agent.prompt agent "go");
   Agent.wait_idle agent;
@@ -766,6 +766,7 @@ let%expect_test "confirm_tools: summaries are path/command by tool" =
     (Ok ())
     (bash "echo hi")
     (Ok ())
+    state: running=false messages=0
     state: running=true messages=0
     user: go
     assistant:
@@ -803,6 +804,7 @@ let%expect_test "confirm_tools: read is not gated" =
     {|
     confirms=0
     (("file not found: $DIR/missing" true))
+    state: running=false messages=0
     state: running=true messages=0
     user: go
     assistant:
@@ -837,6 +839,7 @@ let%expect_test "confirm_tools: abort while waiting cancels the tool" =
   [%expect
     {|
     (([cancelled] true))
+    state: running=false messages=0
     state: running=true messages=0
     user: go
     assistant:
@@ -852,8 +855,7 @@ let%expect_test "confirm_tools: responding to an unknown call id is an error" =
   confirm_tools agent;
   print_s
     [%sexp
-      (Agent.respond_confirm agent ~call_id:"nope" ~allow:true
-       : unit Or_error.t)];
+      (Agent.respond_confirm agent ~call_id:"nope" Allow : unit Or_error.t)];
   [%expect {| (Error "no pending confirmation for tool call \"nope\"") |}]
 ;;
 

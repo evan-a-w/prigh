@@ -29,6 +29,11 @@ module Entry = struct
           ; host : Host.t option [@jsonaf.option] [@sexp.option]
           }
       | System_prompt of { text : string }
+      | Approval of
+          { mode : string
+          ; plan : bool
+          }
+      | Allow_rule of { rule : string }
     [@@deriving sexp, jsonaf]
   end
 
@@ -121,7 +126,13 @@ let worth_saving (line : Line.t) =
   | Entry { payload = Message _ | Name _; _ } -> true
   | Entry
       { payload =
-          Model _ | Compaction _ | Description _ | Cwd _ | System_prompt _
+          ( Model _
+          | Compaction _
+          | Description _
+          | Cwd _
+          | System_prompt _
+          | Approval _
+          | Allow_rule _ )
       ; _
       }
   | Header _ | Head _ -> false
@@ -224,7 +235,9 @@ let add_entry t (entry : Entry.t) =
   | Compaction _
   | Name _
   | Description _
-  | System_prompt _ -> ()
+  | System_prompt _
+  | Approval _
+  | Allow_rule _ -> ()
 ;;
 
 let read_lines path =
@@ -285,6 +298,8 @@ let set_name t ~name = append t (Name { name })
 let set_description t ~text = append t (Description { text })
 let set_cwd t ?host ~cwd () = append t (Cwd { cwd; host })
 let set_system_prompt t ~text = append t (System_prompt { text })
+let set_approval t ~mode ~plan = append t (Approval { mode; plan })
+let add_allow_rule t ~rule = append t (Allow_rule { rule })
 
 let name t =
   List.find_map t.entries ~f:(fun (e : Entry.t) ->
@@ -295,15 +310,23 @@ let name t =
     | Compaction _
     | Description _
     | Cwd _
-    | System_prompt _ -> None)
+    | System_prompt _
+    | Approval _
+    | Allow_rule _ -> None)
 ;;
 
 let description t =
   List.find_map t.entries ~f:(fun (e : Entry.t) ->
     match e.payload with
     | Description { text } -> Some text
-    | Message _ | Model _ | Compaction _ | Name _ | Cwd _ | System_prompt _ ->
-      None)
+    | Message _
+    | Model _
+    | Compaction _
+    | Name _
+    | Cwd _
+    | System_prompt _
+    | Approval _
+    | Allow_rule _ -> None)
 ;;
 
 let append_compaction t ~summary ~kept_from =
@@ -319,14 +342,34 @@ let active_path t =
   go t.head []
 ;;
 
+let approval t =
+  List.fold (active_path t) ~init:None ~f:(fun acc (e : Entry.t) ->
+    match e.payload with
+    | Approval { mode; plan } -> Some (mode, plan)
+    | _ -> acc)
+;;
+
+let allow_rules t =
+  List.filter_map (active_path t) ~f:(fun (e : Entry.t) ->
+    match e.payload with
+    | Allow_rule { rule } -> Some rule
+    | _ -> None)
+;;
+
 let timed_messages t =
   let path = active_path t in
   let compaction =
     List.fold path ~init:None ~f:(fun acc (e : Entry.t) ->
       match e.payload with
       | Compaction { summary; kept_from } -> Some (summary, kept_from)
-      | Message _ | Model _ | Name _ | Description _ | Cwd _ | System_prompt _
-        -> acc)
+      | Message _
+      | Model _
+      | Name _
+      | Description _
+      | Cwd _
+      | System_prompt _
+      | Approval _
+      | Allow_rule _ -> acc)
   in
   let path =
     match compaction with
@@ -338,8 +381,13 @@ let timed_messages t =
       let kept =
         List.filter kept ~f:(fun e ->
           match e.payload with
-          | Compaction _ | Name _ | Description _ | Cwd _ | System_prompt _ ->
-            false
+          | Compaction _
+          | Name _
+          | Description _
+          | Cwd _
+          | System_prompt _
+          | Approval _
+          | Allow_rule _ -> false
           | Message _ | Model _ -> true)
       in
       { Entry.id = "summary"
@@ -354,8 +402,14 @@ let timed_messages t =
   List.filter_map path ~f:(fun e ->
     match e.payload with
     | Message message -> Some { Timed_message.message; at = e.at }
-    | Model _ | Compaction _ | Name _ | Description _ | Cwd _ | System_prompt _
-      -> None)
+    | Model _
+    | Compaction _
+    | Name _
+    | Description _
+    | Cwd _
+    | System_prompt _
+    | Approval _
+    | Allow_rule _ -> None)
 ;;
 
 let messages t =
@@ -366,7 +420,14 @@ let system_prompt t =
   List.fold (active_path t) ~init:None ~f:(fun acc (e : Entry.t) ->
     match e.payload with
     | System_prompt { text } -> Some text
-    | Message _ | Model _ | Compaction _ | Name _ | Description _ | Cwd _ -> acc)
+    | Message _
+    | Model _
+    | Compaction _
+    | Name _
+    | Description _
+    | Cwd _
+    | Approval _
+    | Allow_rule _ -> acc)
 ;;
 
 let model t =
@@ -378,7 +439,9 @@ let model t =
     | Name _
     | Description _
     | Cwd _
-    | System_prompt _ -> acc)
+    | System_prompt _
+    | Approval _
+    | Allow_rule _ -> acc)
 ;;
 
 let rewind t ~to_ =
@@ -612,8 +675,14 @@ let to_markdown t =
            r.tool_name
            (String.strip r.text)
            (images r.images))
-    | Model _ | Compaction _ | Name _ | Description _ | Cwd _ | System_prompt _
-      -> None
+    | Model _
+    | Compaction _
+    | Name _
+    | Description _
+    | Cwd _
+    | System_prompt _
+    | Approval _
+    | Allow_rule _ -> None
   in
   let blocks = List.filter_map (active_path t) ~f:block in
   String.concat (("# Session " ^ t.id) :: blocks) ~sep:"\n\n" ^ "\n"

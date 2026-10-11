@@ -18,9 +18,12 @@ and context =
   ; emit : Agent_event.t -> unit
   ; background : Background_tasks.t option
   ; execute : executor
+  ; approve : approver
+  ; ask_user : call_id:string -> User_question.t list -> User_question.Reply.t
   }
 
 and executor = context -> t -> Json.t -> Tool_result.t
+and approver = context -> t -> Json.t -> Tool_result.t option
 
 module Result = Tool_result
 
@@ -51,6 +54,9 @@ module Context = struct
         ?(tools = [])
         ?(emit = ignore)
         ?background
+        ?(approve = fun _ _ _ -> None)
+        ?(ask_user =
+          fun ~call_id:_ _ -> User_question.Reply.Unavailable "no user to ask")
         ~env
         ~cwd
         ()
@@ -66,6 +72,8 @@ module Context = struct
     ; emit
     ; background
     ; execute
+    ; approve
+    ; ask_user
     }
   ;;
 end

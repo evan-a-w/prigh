@@ -11,7 +11,8 @@ let%expect_test "a missing file yields the default" =
   [%expect
     {|
     (Ok
-     ((scoped_models ()) (confirm_tools false) (default_model ())
+     ((scoped_models ()) (approval_mode Auto)
+      (permissions ((allow ()) (ask ()) (deny ()))) (default_model ())
       (default_thinking ()) (fallback_models ()) (default_cwd ())))
     |}]
 ;;
@@ -21,7 +22,8 @@ let%expect_test "save then load round trips" =
   @@ fun t ->
   let config =
     { Config.scoped_models = [ "anthropic/claude-fable-5"; "deepseek-v4-pro" ]
-    ; confirm_tools = true
+    ; approval_mode = Ask
+    ; permissions = Approval.Rules.empty
     ; default_model = Some "anthropic/claude-fable-5"
     ; default_thinking = Some (On (Some High))
     ; fallback_models = []
@@ -39,7 +41,7 @@ let%expect_test "save then load round trips" =
         "anthropic/claude-fable-5",
         "deepseek-v4-pro"
       ],
-      "confirm_tools": true,
+      "approval_mode": "ask",
       "default_model": "anthropic/claude-fable-5",
       "default_thinking": "high",
       "fallback_models": [],
@@ -47,8 +49,9 @@ let%expect_test "save then load round trips" =
     }
     (Ok
      ((scoped_models (anthropic/claude-fable-5 deepseek-v4-pro))
-      (confirm_tools true) (default_model (anthropic/claude-fable-5))
-      (default_thinking ((On (High)))) (fallback_models ()) (default_cwd ())))
+      (approval_mode Ask) (permissions ((allow ()) (ask ()) (deny ())))
+      (default_model (anthropic/claude-fable-5)) (default_thinking ((On (High))))
+      (fallback_models ()) (default_cwd ())))
     |}]
 ;;
 
@@ -63,7 +66,8 @@ let%expect_test "unknown fields are ignored" =
   [%expect
     {|
     (Ok
-     ((scoped_models (x)) (confirm_tools true) (default_model ())
+     ((scoped_models (x)) (approval_mode Ask)
+      (permissions ((allow ()) (ask ()) (deny ()))) (default_model ())
       (default_thinking ()) (fallback_models ()) (default_cwd ())))
     |}]
 ;;
@@ -117,7 +121,7 @@ let%expect_test
     {|
     config.confirm_tools must be a boolean (in $DIR/.prigh/config.json); prigh ignores the file's settings until it is fixed
     unknown setting "providrs" in $DIR/.prigh/config.json is ignored; did you mean "providers"?
-    unknown setting "colour" in $DIR/.prigh/config.json is ignored (known: providers, scoped_models, confirm_tools, default_model, default_thinking, fallback_models, default_cwd)
+    unknown setting "colour" in $DIR/.prigh/config.json is ignored (known: providers, confirm_tools, scoped_models, approval_mode, permissions, default_model, default_thinking, fallback_models, default_cwd)
     |}];
   (* Unparsable files are [read_fields]' error, reported once elsewhere. *)
   show "{not json";
@@ -140,10 +144,12 @@ let%expect_test "null defaults are unset" =
   [%expect
     {|
     (Ok
-     ((scoped_models ()) (confirm_tools false) (default_model ())
+     ((scoped_models ()) (approval_mode Auto)
+      (permissions ((allow ()) (ask ()) (deny ()))) (default_model ())
       (default_thinking ()) (fallback_models ()) (default_cwd ())))
     (Ok
-     ((scoped_models ()) (confirm_tools false)
+     ((scoped_models ()) (approval_mode Auto)
+      (permissions ((allow ()) (ask ()) (deny ())))
       (default_model (deepseek/deepseek-flash)) (default_thinking ((On ())))
       (fallback_models ()) (default_cwd ())))
     |}]

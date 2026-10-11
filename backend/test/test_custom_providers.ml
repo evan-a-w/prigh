@@ -289,7 +289,7 @@ let%expect_test
   ok_exn
     (Config.save
        ~home:t.dir
-       { (ok_exn (Config.load ~home:t.dir)) with confirm_tools = true });
+       { (ok_exn (Config.load ~home:t.dir)) with approval_mode = Ask });
   show_file t ".prigh/config.json";
   ok_exn (Custom_provider.remove ~home:t.dir "ollama");
   print_s
@@ -312,7 +312,7 @@ let%expect_test
           "api": "responses"
         }
       },
-      "confirm_tools": true,
+      "approval_mode": "ask",
       "default_model": null,
       "default_thinking": null,
       "fallback_models": [],
@@ -1557,7 +1557,7 @@ let%expect_test
   custom_entries (call_quiet "auth_status") ~f:Fn.id;
   [%expect
     {|
-    {"type":"event","event":"state","state":{"session_id":"<id>","session_path":"$DIR/sessions/<stamp>_<id>.jsonl","session_name":null,"session_description":null,"cwd":"$DIR","git_branch":null,"model":{"id":"openai/gpt-4o-mini","provider":"aiproxy","key":"aiproxy/openai/gpt-4o-mini","name":"openai/gpt-4o-mini","context_window":128000,"max_output":16384,"supports_thinking":false,"cost":{"input":0,"output":0,"cache_read":0}},"thinking":"on","running":false,"message_count":0,"usage":{"input":0,"output":0,"cache_read":0},"cost_usd":0,"context_tokens":0,"active_host":"backend","hosts":[{"id":"backend","name":"<host>","cwd":"$DIR","session_id":null,"session_name":null}],"subagents":[],"jobs":[]}}
+    {"type":"event","event":"state","state":{"session_id":"<id>","session_path":"$DIR/sessions/<stamp>_<id>.jsonl","session_name":null,"session_description":null,"cwd":"$DIR","git_branch":null,"model":{"id":"openai/gpt-4o-mini","provider":"aiproxy","key":"aiproxy/openai/gpt-4o-mini","name":"openai/gpt-4o-mini","context_window":128000,"max_output":16384,"supports_thinking":false,"cost":{"input":0,"output":0,"cache_read":0}},"thinking":"on","running":false,"message_count":0,"usage":{"input":0,"output":0,"cache_read":0},"cost_usd":0,"context_tokens":0,"active_host":"backend","hosts":[{"id":"backend","name":"<host>","cwd":"$DIR","session_id":null,"session_name":null}],"subagents":[],"jobs":[],"approval_mode":"auto","plan_mode":false,"plan":null,"session_rules":[]}}
     {"type":"response","id":"r1","ok":true,"result":{}}
     {"type":"response","id":"r1","ok":false,"error":"unknown model \"aiproxy/gpt-5\"; did you mean: aiproxy/gpt-4o (gpt-4o)"}
     ("\"aiproxy/openai/gpt-4o-mini\"")

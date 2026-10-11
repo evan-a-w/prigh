@@ -38,14 +38,14 @@ let cancelled_result (call : Content.Tool_call.t) =
   }
 ;;
 
-let tool_summary (call : Content.Tool_call.t) (args : Json.t) =
+let tool_summary ~name (args : Json.t) =
   match args with
   | `Object fields ->
     let find name = List.Assoc.find fields ~equal:String.equal name in
     (match find "command", find "path", find "input" with
      | Some (`String s), _, _ -> s
      | _, Some (`String s), _ -> s
-     | _, _, Some (`String patch) when String.equal call.name "apply_patch" ->
+     | _, _, Some (`String patch) when String.equal name "apply_patch" ->
        String.concat ~sep:", " (Apply_patch.paths patch)
      | _ -> "")
   | _ -> ""
@@ -59,7 +59,8 @@ let execute_tool
       ~emit
       ~depth
       ~(agent_id : string option)
-      ?(confirm = fun _ ~summary:_ -> true)
+      ?approve
+      ?ask_user
       ?execute
       ?background
       (call : Content.Tool_call.t)
@@ -74,31 +75,27 @@ let execute_tool
        | Error e ->
          Tool.Result.error ("invalid arguments: " ^ Error.to_string_hum e)
        | Ok args ->
-         if
-           tool.spec.destructive
-           && not (confirm call ~summary:(tool_summary call args))
-         then
-           if Cancellation.is_cancelled cancel
-           then Tool.Result.error "[cancelled]"
-           else Tool.Result.error "[denied by user]"
-         else (
-           let context =
-             Tool.Context.create
-               ~cancel
-               ?execute
-               ~on_output:(fun chunk ->
-                 emit (Agent_event.Tool_output { call_id = call.id; chunk }))
-               ~emit
-               ~depth
-               ?agent_id
-               ~call_id:call.id
-               ~tools:config.tools
-               ?background
-               ~env
-               ~cwd
-               ()
-           in
-           Tool.execute_via context tool args))
+         let context =
+           Tool.Context.create
+             ~cancel
+             ?execute
+             ?approve
+             ?ask_user
+             ~on_output:(fun chunk ->
+               emit (Agent_event.Tool_output { call_id = call.id; chunk }))
+             ~emit
+             ~depth
+             ?agent_id
+             ~call_id:call.id
+             ~tools:config.tools
+             ?background
+             ~env
+             ~cwd
+             ()
+         in
+         (match context.approve context tool args with
+          | Some refusal -> refusal
+          | None -> Tool.execute_via context tool args))
   in
   { Message.Tool_result.tool_call_id = call.id
   ; tool_name = call.name
@@ -118,7 +115,8 @@ let run
       ?agent_id
       ?(steer = fun () -> [])
       ?(emit = ignore)
-      ?confirm
+      ?approve
+      ?ask_user
       ?execute
       ?background
       ?retry_delay
@@ -200,7 +198,8 @@ let run
             ~emit
             ~depth
             ~agent_id
-            ?confirm
+            ?approve
+            ?ask_user
             ?execute
             ?background
             call

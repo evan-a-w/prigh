@@ -166,3 +166,17 @@ let cwd_changed_note ~cwd =
     cwd
     discretion
 ;;
+
+let plan_mode_note ~on =
+  if on
+  then
+    "[Plan mode is on: you are planning, not implementing. Investigate with \
+     read-only tools (bash only for read-only commands; the user confirms each \
+     one), ask the user about anything unclear with ask_user, and do not \
+     change any files: edits are refused. Keep the steps in update_plan. When \
+     the plan is ready, call exit_plan_mode with it; the user approves it \
+     before you implement it.]"
+  else
+    "[Plan mode is off: you can change files and run commands again, as the \
+     user's approval mode allows.]"
+;;

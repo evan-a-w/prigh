@@ -14,10 +14,44 @@ end
 module Pending_confirm = struct
   type t =
     { call_id : string
+    ; agent_id : string option
     ; name : string
     ; summary : string
+    ; rules : string list
     }
   [@@deriving sexp_of]
+
+  let key ~call_id ~agent_id =
+    match agent_id with
+    | None -> call_id
+    | Some agent -> agent ^ "/" ^ call_id
+  ;;
+end
+
+module Confirm_answer = struct
+  type t =
+    | Allow
+    | Always
+    | Deny of string option
+  [@@deriving sexp_of]
+end
+
+module Pending_question = struct
+  type t =
+    { call_id : string
+    ; questions : User_question.t list
+    }
+  [@@deriving sexp_of]
+end
+
+(* A confirmation as the agent keeps it: [recheck] says whether the call
+   would now run without asking (after a rule or mode change). *)
+module Waiting_confirm = struct
+  type t =
+    { pending : Pending_confirm.t
+    ; resolver : Confirm_answer.t Promise.u
+    ; recheck : unit -> bool
+    }
 end
 
 module Host = struct
@@ -52,6 +86,10 @@ module State = struct
     ; hosts : Host.t list
     ; subagents : Background_tasks.Summary.t list
     ; jobs : Background_tasks.Summary.t list
+    ; approval_mode : Approval_mode.t
+    ; plan_mode : bool
+    ; plan : Plan.t option
+    ; session_rules : string list
     }
   [@@deriving sexp_of]
 end
@@ -135,7 +173,14 @@ type t =
   ; mutable extra_usage : Usage.t (** subagents and [btw] calls *)
   ; mutable extra_cost_usd : float
   ; mutable config : Config.t
-  ; pending_confirms : (Pending_confirm.t * bool Promise.u) String.Table.t
+  ; pending_confirms : Waiting_confirm.t String.Table.t
+  ; pending_questions :
+      (Pending_question.t * User_question.Reply.t Promise.u) String.Table.t
+  ; mutable approval_mode : Approval_mode.t
+  ; mutable plan_mode : bool
+  ; mutable told_plan_mode : bool (** what the model was last told *)
+  ; mutable session_rules : Approval_rule.t list
+  ; mutable plan : Plan.t option
   ; mutable shell_seq : int
   ; mutable hosts : Host.t list
     (** every connected client able to run tools, set by the server *)
@@ -159,13 +204,41 @@ type t =
     (** MCP problems already reported, so each is told once *)
   }
 
+let path_messages session =
+  List.filter_map (Session.active_path session) ~f:(fun (e : Session.Entry.t) ->
+    match e.payload with
+    | Message m -> Some m
+    | _ -> None)
+;;
+
+(* The approval mode, plan mode, the session's rules and its plan, as the
+   session recorded them; a session without an approval entry starts in the
+   config's mode. *)
+let restore_approvals t =
+  (match Session.approval t.session with
+   | Some (mode, plan) ->
+     t.approval_mode
+     <- Result.ok (Approval_mode.of_string mode)
+        |> Option.value ~default:t.config.approval_mode;
+     t.plan_mode <- plan
+   | None ->
+     t.approval_mode <- t.config.approval_mode;
+     t.plan_mode <- false);
+  t.told_plan_mode <- t.plan_mode;
+  t.session_rules
+  <- List.filter_map (Session.allow_rules t.session) ~f:(fun rule ->
+       Result.ok (Approval_rule.of_string rule));
+  t.plan <- Plan.latest (path_messages t.session)
+;;
+
 let restore_settings t =
-  match Session.model t.session with
-  | Some (model_id, thinking) ->
-    Option.iter (Model_registry.find t.models model_id) ~f:(fun m ->
-      t.model <- m);
-    t.thinking <- thinking
-  | None -> ()
+  (match Session.model t.session with
+   | Some (model_id, thinking) ->
+     Option.iter (Model_registry.find t.models model_id) ~f:(fun m ->
+       t.model <- m);
+     t.thinking <- thinking
+   | None -> ());
+  restore_approvals t
 ;;
 
 let backend_host t =
@@ -242,6 +315,10 @@ let state t =
   ; hosts = hosts t
   ; subagents = Background_tasks.summaries t.background ~kind:Subagent
   ; jobs = Background_tasks.summaries t.background ~kind:Job
+  ; approval_mode = t.approval_mode
+  ; plan_mode = t.plan_mode
+  ; plan = t.plan
+  ; session_rules = List.map t.session_rules ~f:Approval_rule.to_string
   }
 ;;
 
@@ -257,6 +334,246 @@ let queued_texts t =
 let queue_update t =
   let steer, follow_up = queued_texts t in
   broadcast t (Queue_update { steer; follow_up })
+;;
+
+(* ---- approvals, plan mode and questions --------------------------------- *)
+
+let record_approval t =
+  ignore
+    (Session.set_approval
+       t.session
+       ~mode:(Approval_mode.to_string t.approval_mode)
+       ~plan:t.plan_mode
+     : Session.Entry.t)
+;;
+
+(* Confirmations whose call would now run without asking (a rule was added,
+   the mode changed) are allowed. *)
+let recheck_confirms t =
+  Hashtbl.filter t.pending_confirms ~f:(fun (w : Waiting_confirm.t) ->
+    w.recheck ())
+  |> Hashtbl.iteri ~f:(fun ~key ~data:(w : Waiting_confirm.t) ->
+    Hashtbl.remove t.pending_confirms key;
+    Promise.resolve w.resolver Confirm_answer.Allow)
+;;
+
+let set_mode ?approval ?plan t =
+  let approval = Option.value approval ~default:t.approval_mode in
+  let plan = Option.value plan ~default:t.plan_mode in
+  if
+    not
+      (Approval_mode.equal approval t.approval_mode
+       && Bool.equal plan t.plan_mode)
+  then (
+    t.approval_mode <- approval;
+    t.plan_mode <- plan;
+    record_approval t;
+    recheck_confirms t;
+    state_changed t)
+;;
+
+let set_approval_mode t mode = set_mode t ~approval:mode
+
+(* The note for the model when plan mode changed since it was last told. *)
+let plan_mode_note t =
+  if Bool.equal t.plan_mode t.told_plan_mode
+  then None
+  else (
+    t.told_plan_mode <- t.plan_mode;
+    Some (System_prompt.plan_mode_note ~on:t.plan_mode))
+;;
+
+let confirm t (context : Tool.Context.t) ~name ~summary ~rules ~recheck =
+  let call_id = context.call_id in
+  let agent_id = context.agent_id in
+  let key = Pending_confirm.key ~call_id ~agent_id in
+  let rules = List.map rules ~f:Approval_rule.to_string in
+  let promise, resolver = Promise.create () in
+  Hashtbl.set
+    t.pending_confirms
+    ~key
+    ~data:
+      { Waiting_confirm.pending =
+          { Pending_confirm.call_id; agent_id; name; summary; rules }
+      ; resolver
+      ; recheck
+      };
+  broadcast t (Loop (Tool_confirm { call_id; agent_id; name; summary; rules }));
+  let answer =
+    Cancellation.protect context.cancel ~f:(fun () -> Promise.await promise)
+  in
+  Hashtbl.remove t.pending_confirms key;
+  answer
+;;
+
+let respond_confirm ?agent_id t ~call_id (answer : Confirm_answer.t) =
+  let key = Pending_confirm.key ~call_id ~agent_id in
+  match Hashtbl.find t.pending_confirms key with
+  | None -> Or_error.errorf "no pending confirmation for tool call %S" call_id
+  | Some w ->
+    Hashtbl.remove t.pending_confirms key;
+    (match answer with
+     | Always ->
+       let added =
+         List.filter_map w.pending.rules ~f:(fun rule ->
+           match Approval_rule.of_string rule with
+           | Ok rule
+             when not (List.mem t.session_rules rule ~equal:Approval_rule.equal)
+             -> Some rule
+           | Ok _ | Error _ -> None)
+       in
+       List.iter added ~f:(fun rule ->
+         ignore
+           (Session.add_allow_rule
+              t.session
+              ~rule:(Approval_rule.to_string rule)
+            : Session.Entry.t));
+       t.session_rules <- t.session_rules @ added;
+       Promise.resolve w.resolver answer;
+       recheck_confirms t;
+       if not (List.is_empty added) then state_changed t
+     | Allow | Deny _ -> Promise.resolve w.resolver answer);
+    Ok ()
+;;
+
+let denied_text = function
+  | None -> "[denied by user]"
+  | Some reason -> sprintf "[denied by user] Their reason: %s" reason
+;;
+
+let exit_plan_mode t context args =
+  if not t.plan_mode
+  then
+    Tool.Result.error
+      "plan mode is not on, so there is no plan to approve: go ahead"
+  else (
+    match
+      confirm
+        t
+        context
+        ~name:Tool_exit_plan_mode.name
+        ~summary:(Tool_exit_plan_mode.plan args)
+        ~rules:[]
+        ~recheck:(fun () -> not t.plan_mode)
+    with
+    | None -> Tool.Result.error "[cancelled]"
+    | Some (Allow | Always) ->
+      t.told_plan_mode <- false;
+      set_mode t ~plan:false;
+      Tool.Result.ok
+        (sprintf
+           "The user approved the plan. Plan mode is off (approval mode: %s), \
+            so you can change files now: implement the plan."
+           (Approval_mode.to_string t.approval_mode))
+    | Some (Deny reason) ->
+      Tool.Result.error
+        (sprintf
+           "[the user did not approve the plan%s] Stay in plan mode: revise \
+            the plan and call exit_plan_mode again when it is ready."
+           (match reason with
+            | None -> ""
+            | Some reason -> "; their feedback: " ^ reason)))
+;;
+
+let approve t : Tool.approver =
+  fun context tool args ->
+  let name = Tool.name tool in
+  if String.equal name Tool_exit_plan_mode.name
+  then Some (exit_plan_mode t context args)
+  else (
+    let call = Approval_rule.Call.create ~cwd:context.cwd ~tool:name args in
+    let decide () =
+      Approval.decide
+        ~mode:t.approval_mode
+        ~plan:t.plan_mode
+        ~rules:t.config.permissions
+        ~session:t.session_rules
+        ~cwd:context.cwd
+        ~home:(Tool.expand_home "~")
+        ~destructive:tool.spec.destructive
+        call
+    in
+    match decide () with
+    | Allow -> None
+    | Deny text -> Some (Tool.Result.error text)
+    | Ask { rules } ->
+      let recheck () =
+        match decide () with
+        | Allow -> true
+        | Ask _ | Deny _ -> false
+      in
+      (match
+         confirm
+           t
+           context
+           ~name
+           ~summary:(Agent_loop.tool_summary ~name args)
+           ~rules
+           ~recheck
+       with
+       | None -> Some (Tool.Result.error "[cancelled]")
+       | Some (Deny reason) -> Some (Tool.Result.error (denied_text reason))
+       | Some (Allow | Always) ->
+         (* Plan mode may have started while the user was deciding. *)
+         (match decide () with
+          | Deny text -> Some (Tool.Result.error text)
+          | Allow | Ask _ -> None)))
+;;
+
+let ask_user t ~cancel ~call_id questions =
+  let promise, resolver = Promise.create () in
+  Hashtbl.set
+    t.pending_questions
+    ~key:call_id
+    ~data:({ Pending_question.call_id; questions }, resolver);
+  broadcast t (Loop (Ask_user { call_id; questions }));
+  let reply =
+    match Cancellation.protect cancel ~f:(fun () -> Promise.await promise) with
+    | None -> User_question.Reply.Cancelled
+    | Some reply -> reply
+  in
+  Hashtbl.remove t.pending_questions call_id;
+  reply
+;;
+
+let answer_question t ~call_id (reply : User_question.Reply.t) =
+  match Hashtbl.find t.pending_questions call_id with
+  | None ->
+    Or_error.errorf
+      "no pending question for tool call %S: it was answered or withdrawn"
+      call_id
+  | Some ({ questions; _ }, resolver) ->
+    let checked =
+      match reply with
+      | Answered answers -> User_question.check_answers questions answers
+      | Declined | Cancelled | Unavailable _ -> Ok ()
+    in
+    Or_error.map checked ~f:(fun () ->
+      Hashtbl.remove t.pending_questions call_id;
+      Promise.resolve resolver reply)
+;;
+
+let pending_questions t =
+  Hashtbl.data t.pending_questions
+  |> List.map ~f:fst
+  |> List.sort ~compare:(fun (a : Pending_question.t) b ->
+    String.compare a.call_id b.call_id)
+;;
+
+let track_plan t (event : Agent_event.t) =
+  match event with
+  | Tool_end { call; result }
+    when String.equal call.name Plan.tool_name && not result.is_error ->
+    (match
+       Or_error.bind
+         (Content.Tool_call.parse_arguments call)
+         ~f:Plan.of_arguments
+     with
+     | Ok plan ->
+       t.plan <- plan;
+       state_changed t
+     | Error _ -> ())
+  | _ -> ()
 ;;
 
 let config t = t.config
@@ -293,8 +610,13 @@ let set_config t (config : Config.t) =
     | Some _ | None -> Ok ()
   in
   let%map () = Config.save ~home:t.home config in
+  let mode_changed =
+    not (Approval_mode.equal config.approval_mode t.config.approval_mode)
+  in
   t.config <- config;
-  broadcast t (Config_changed config)
+  broadcast t (Config_changed config);
+  (* [/confirm on|off] changes the default and the session at once. *)
+  if mode_changed then set_approval_mode t config.approval_mode
 ;;
 
 let save_as_default t =
@@ -305,40 +627,6 @@ let save_as_default t =
         default_model = Some (Model.key t.model)
       ; default_thinking = Some t.thinking
       })
-;;
-
-let respond_confirm t ~call_id ~allow =
-  match Hashtbl.find t.pending_confirms call_id with
-  | None -> Or_error.errorf "no pending confirmation for tool call %S" call_id
-  | Some (_, resolver) ->
-    Hashtbl.remove t.pending_confirms call_id;
-    Promise.resolve resolver allow;
-    Ok ()
-;;
-
-let confirm_hook t cancel call ~summary =
-  if not t.config.confirm_tools
-  then true
-  else (
-    let promise, resolver = Promise.create () in
-    Hashtbl.set
-      t.pending_confirms
-      ~key:call.Content.Tool_call.id
-      ~data:
-        ( { Pending_confirm.call_id = call.id; name = call.name; summary }
-        , resolver );
-    broadcast
-      t
-      (Loop (Tool_confirm { call_id = call.id; name = call.name; summary }));
-    let allow =
-      match
-        Cancellation.protect cancel ~f:(fun () -> Promise.await promise)
-      with
-      | None -> false
-      | Some allow -> allow
-    in
-    Hashtbl.remove t.pending_confirms call.id;
-    allow)
 ;;
 
 (* ---- tool hosts ------------------------------------------------------- *)
@@ -809,12 +1097,12 @@ let with_attachments t text attachments =
 let user_message t (q : Queued.t) =
   let text = Option.value q.skill ~default:q.text in
   let text, attached = with_attachments t text q.attachments in
+  let notes = t.environment_notes @ Option.to_list (plan_mode_note t) in
+  t.environment_notes <- [];
   let text =
-    match t.environment_notes with
+    match notes with
     | [] -> text
-    | notes ->
-      t.environment_notes <- [];
-      String.concat ~sep:"\n" notes ^ "\n\n" ^ text
+    | notes -> String.concat ~sep:"\n" notes ^ "\n\n" ^ text
   in
   Message.user ~images:(q.images @ attached) text
 ;;
@@ -913,7 +1201,8 @@ let rec start_run ?(tried = String.Set.empty) t prompts =
           ~config:(loop_config t)
           ~cwd:t.cwd
           ~cancel
-          ~confirm:(confirm_hook t cancel)
+          ~approve:(approve t)
+          ~ask_user:(ask_user t ~cancel)
           ~execute:(executor t)
           ~background:t.background
           ~steer:(fun () ->
@@ -922,9 +1211,18 @@ let rec start_run ?(tried = String.Set.empty) t prompts =
             then (
               Queue.clear t.steer_queue;
               queue_update t);
-            deliveries t @ List.map l ~f:(user_message t))
+            let queued = List.map l ~f:(user_message t) in
+            (* A plan mode switched during the run is told between turns. *)
+            let note =
+              if List.is_empty queued
+              then
+                Option.to_list (Option.map (plan_mode_note t) ~f:Message.user)
+              else []
+            in
+            deliveries t @ note @ queued)
           ~emit:(fun event ->
             account_subagent t event;
+            track_plan t event;
             (match event with
              | Message_end m ->
                ignore (Session.append_message session m : Session.Entry.t)
@@ -1164,6 +1462,12 @@ let create
     ; extra_cost_usd = 0.
     ; config
     ; pending_confirms = String.Table.create ()
+    ; pending_questions = String.Table.create ()
+    ; approval_mode = config.approval_mode
+    ; plan_mode = false
+    ; told_plan_mode = false
+    ; session_rules = []
+    ; plan = None
     ; shell_seq = 0
     ; hosts = []
     ; host_cwds = String.Table.create ()
@@ -1305,7 +1609,7 @@ let subagent t key = Subagent_log.find t.subagent_log key
 
 let pending_confirms t =
   Hashtbl.data t.pending_confirms
-  |> List.map ~f:fst
+  |> List.map ~f:(fun (w : Waiting_confirm.t) -> w.pending)
   |> List.sort ~compare:(fun (a : Pending_confirm.t) b ->
     String.compare a.call_id b.call_id)
 ;;
@@ -1495,7 +1799,9 @@ let rewind t ~to_ =
   if is_running t
   then Or_error.error_string "cannot rewind while a run is in progress"
   else
-    Or_error.map (Session.rewind t.session ~to_) ~f:(fun () -> state_changed t)
+    Or_error.map (Session.rewind t.session ~to_) ~f:(fun () ->
+      t.plan <- Plan.latest (path_messages t.session);
+      state_changed t)
 ;;
 
 let set_session_name t name =

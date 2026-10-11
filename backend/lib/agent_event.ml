@@ -22,8 +22,15 @@ type t =
       }
   | Tool_confirm of
       { call_id : string
+      ; agent_id : string option (** a subagent's call *)
       ; name : string
       ; summary : string
+      ; rules : string list
+        (** what "don't ask again" adds; none when it is not offered *)
+      }
+  | Ask_user of
+      { call_id : string
+      ; questions : User_question.t list
       }
   | Tool_end of
       { call : Content.Tool_call.t

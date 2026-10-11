@@ -3,7 +3,8 @@ open! Import
 
 type t =
   { scoped_models : string list
-  ; confirm_tools : bool
+  ; approval_mode : Approval_mode.t
+  ; permissions : Approval.Rules.t
   ; default_model : string option
   ; default_thinking : Thinking.t option
   ; fallback_models : string list
@@ -13,7 +14,8 @@ type t =
 
 let default =
   { scoped_models = []
-  ; confirm_tools = false
+  ; approval_mode = Auto
+  ; permissions = Approval.Rules.empty
   ; default_model = None
   ; default_thinking = None
   ; fallback_models = []
@@ -33,7 +35,8 @@ let to_json t =
   let option f = Option.value_map ~default:`Null ~f in
   `Object
     [ "scoped_models", `Array (List.map t.scoped_models ~f:(fun s -> `String s))
-    ; ("confirm_tools", if t.confirm_tools then `True else `False)
+    ; "approval_mode", `String (Approval_mode.to_string t.approval_mode)
+    ; "permissions", Approval.Rules.to_json t.permissions
     ; "default_model", option (fun s -> `String s) t.default_model
     ; ( "default_thinking"
       , option (fun th -> `String (Thinking.to_string th)) t.default_thinking )
@@ -70,12 +73,24 @@ let of_json json =
       | Some (`String s) -> Ok (Some s)
       | Some _ -> Or_error.error_string "config.default_cwd must be a string"
     in
-    let%bind confirm_tools =
-      match find "confirm_tools" with
-      | None -> Ok false
-      | Some `True -> Ok true
-      | Some `False -> Ok false
-      | Some _ -> Or_error.error_string "config.confirm_tools must be a boolean"
+    (* [confirm_tools] is what [approval_mode] replaced: on is [ask], off
+       is [auto]. *)
+    let%bind approval_mode =
+      match find "approval_mode", find "confirm_tools" with
+      | Some (`String s), _ ->
+        Approval_mode.of_string s |> Or_error.tag ~tag:"config.approval_mode"
+      | Some _, _ ->
+        Or_error.error_string "config.approval_mode must be a string"
+      | None, (None | Some `False) -> Ok Approval_mode.Auto
+      | None, Some `True -> Ok Approval_mode.Ask
+      | None, Some _ ->
+        Or_error.error_string "config.confirm_tools must be a boolean"
+    in
+    let%bind permissions =
+      Or_error.map
+        (Approval.Rules.of_json
+           (Option.value (find "permissions") ~default:`Null))
+        ~f:fst
     in
     let%bind default_model =
       match find "default_model" with
@@ -93,7 +108,8 @@ let of_json json =
         Or_error.error_string "config.default_thinking must be a string"
     in
     { scoped_models
-    ; confirm_tools
+    ; approval_mode
+    ; permissions
     ; default_model
     ; default_thinking
     ; fallback_models
@@ -138,6 +154,7 @@ let load ~home =
 
 let known_fields =
   "providers"
+  :: "confirm_tools"
   ::
   (match to_json default with
    | `Object fields -> List.map fields ~f:fst
@@ -174,17 +191,35 @@ let problems ~home =
                 | _ ->
                   sprintf " (known: %s)" (String.concat ~sep:", " known_fields))))
     in
-    invalid @ unknown
+    let rules =
+      match List.Assoc.find fields ~equal:String.equal "permissions" with
+      | None -> []
+      | Some json ->
+        (match Approval.Rules.of_json json with
+         | Ok (_, problems) ->
+           List.map problems ~f:(fun p -> sprintf "%s in %s" p (path ~home))
+         | Error _ -> [])
+    in
+    invalid @ rules @ unknown
 ;;
 
 (* Fields this module does not own ([providers], anything hand-added) are
    kept, in place. *)
 let save ~home t =
   Or_error.bind (read_fields ~home) ~f:(fun existing ->
+    (* [permissions] is the user's to edit by hand: it is written as they
+       wrote it, invalid rules included. *)
     let ours =
       match to_json t with
-      | `Object fields -> fields
+      | `Object fields ->
+        List.filter fields ~f:(fun (name, _) ->
+          not (String.equal name "permissions"))
       | _ -> assert false
+    in
+    (* [approval_mode] replaces it. *)
+    let existing =
+      List.filter existing ~f:(fun (name, _) ->
+        not (String.equal name "confirm_tools"))
     in
     let replaced =
       List.map existing ~f:(fun (name, value) ->
