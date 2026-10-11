@@ -42,8 +42,10 @@ let base ~nix ~tools =
      ; "Guidelines:"
      ; "- Use the tools to inspect and change the project; do not guess file \
         contents."
-     ; "- Prefer edit over write for existing files. Keep changes minimal and \
-        focused."
+     ; sprintf
+         "- Prefer %s over write for existing files. Keep changes minimal and \
+          focused."
+         (if has "apply_patch" then "apply_patch" else "edit")
      ; "- After making changes, verify them (build, tests) when a way to do so \
         exists."
      ; "- Be concise. Explain non-trivial decisions briefly. No filler."
@@ -139,6 +141,14 @@ let build ?date ?instructions ?(nix = false) ?(skills = []) ~cwd ~home ~tools ()
 let discretion =
   "Re-reading AGENTS.md/CLAUDE.md there is at your discretion: they are often \
    unchanged, and missing an update is not serious."
+;;
+
+let editor_changed_note ~before ~after =
+  sprintf
+    "[Tools: %s replaces %s for editing files; %s is no longer available.]"
+    after
+    before
+    before
 ;;
 
 let host_changed_note ~host =

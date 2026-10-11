@@ -7,6 +7,9 @@ open! Import
 (** A unified diff (what [edit] returns), with old and new line numbers. *)
 val unified : ?max_rows:int -> string -> Node.t
 
+(** Diff lines without line numbers: an [apply_patch] input's hunks. *)
+val hunks : ?max_rows:int -> string list -> Node.t
+
 (** An [edit] call's [(old_text, new_text)] pairs, diffed line by line. *)
 val edits : ?max_rows:int -> (string * string) list -> Node.t
 

@@ -4543,6 +4543,13 @@ let%expect_test "tool confirm: allow, deny, queue and Esc-abort" =
   H.event
     h
     (Tool_confirm { call_id = "c3"; name = "edit"; summary = "/work/b.txt" });
+  H.event
+    h
+    (Tool_confirm
+       { call_id = "c4"
+       ; name = "apply_patch"
+       ; summary = "src/a.ml, src/b.ml"
+       });
   H.show h;
   [%expect
     {|
@@ -4611,6 +4618,31 @@ let%expect_test "tool confirm: allow, deny, queue and Esc-abort" =
       (params (
         (call_id c3)
         (allow   false)))
+      (tag Ignore))
+    |}];
+  H.show h;
+  [%expect
+    {|
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+
+    ▌ earlier question
+      earlier answer
+      denied edit
+    ┌─ Confirm ────────────────────────────────────────────────┐
+    │ Apply patch to src/a.ml, src/b.ml? (y/n)                 │
+    └──────────────────────────────────────────────────────────┘
+    ────────────────────────────────────────────────────────────
+    ? ▏
+    /work  deepseek-flash  ctx:0.1%/1.0M  $0.01  confirm: y / n
+    |}];
+  H.keys h "y";
+  [%expect
+    {|
+    (Rpc
+      (method_ tool_confirm_respond)
+      (params (
+        (call_id c4)
+        (allow   true)))
       (tag Ignore))
     |}];
   let h = connected () in

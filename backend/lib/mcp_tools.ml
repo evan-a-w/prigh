@@ -211,6 +211,7 @@ let tools (listing : Listing.t) ~call =
             ; parallel_safe = tool.read_only
             ; destructive = not tool.read_only
             ; on_host = false
+            ; freeform = None
             }
         ; run =
             (fun context args ->

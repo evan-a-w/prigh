@@ -47,6 +47,7 @@ let%expect_test
     [ { Tool_spec.name = "bash"
       ; parallel_safe = false
       ; on_host = true
+      ; freeform = None
       ; destructive = true
       ; description = "Run a command"
       ; parameters =

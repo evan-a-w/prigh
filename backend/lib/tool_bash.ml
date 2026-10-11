@@ -26,6 +26,7 @@ let spec_with parameters =
   { Tool_spec.name = "bash"
   ; parallel_safe = false
   ; on_host = true
+  ; freeform = None
   ; destructive = true
   ; description
   ; parameters = Tool_args.schema ~required:[ "command" ] parameters

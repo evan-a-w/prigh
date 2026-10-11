@@ -114,6 +114,7 @@ let hold_tool promise =
       ; parallel_safe = false
       ; destructive = false
       ; on_host = false
+      ; freeform = None
       }
   ; run =
       (fun _ _ ->

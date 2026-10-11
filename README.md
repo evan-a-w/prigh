@@ -625,7 +625,7 @@ Submitted prompts are kept in `~/.prigh/history` (one JSON string per line,
 last 500) and loaded on start; secrets from login prompts are never recorded.
 `~/.prigh/config.json` holds `scoped_models` (the models Ctrl+P cycles
 through; `/scoped-models` edits it), `confirm_tools` (ask before
-destructive `bash`/`write`/`edit`; `/confirm on|off`) and
+destructive `bash`/`write`/`edit`/`apply_patch`; `/confirm on|off`) and
 `default_model`/`default_thinking` (what new sessions start with unless
 `-model`/`-thinking` is given; `/change_default` saves the current ones).
 Without a `default_thinking`, sessions start with thinking `on`; models that

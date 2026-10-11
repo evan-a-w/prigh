@@ -175,3 +175,24 @@ let%expect_test "how to get tools, only when the host has nix" =
      (only_without ()))
     |}]
 ;;
+
+let%expect_test "the guidelines name the model's file editor" =
+  List.iter [ "anthropic/claude-opus-4-6"; "openai/gpt-5" ] ~f:(fun key ->
+    let model = Option.value_exn (Model.find key) in
+    let prompt =
+      System_prompt.build
+        ~instructions:[]
+        ~cwd:"/"
+        ~home:"/nonexistent"
+        ~tools:(Tools.specs (Tools.for_model model Tools.all))
+        ()
+    in
+    String.split_lines prompt
+    |> List.filter ~f:(String.is_prefix ~prefix:"- Prefer")
+    |> List.iter ~f:print_endline);
+  [%expect
+    {|
+    - Prefer edit over write for existing files. Keep changes minimal and focused.
+    - Prefer apply_patch over write for existing files. Keep changes minimal and focused.
+    |}]
+;;

@@ -5,6 +5,7 @@ let spec =
   { Tool_spec.name = "edit"
   ; parallel_safe = false
   ; on_host = true
+  ; freeform = None
   ; destructive = true
   ; description =
       "Edit a file by exact text replacement. Each old_text must occur exactly \
@@ -51,35 +52,71 @@ let occurrences content pattern =
   go 0 []
 ;;
 
-(* Returns [(start, end, new_text)] sorted by start, or an error message. *)
+(* With CRLF in the replaced text, a LF-only replacement gets CRLF too. *)
+let match_line_endings content ~start ~stop new_text =
+  if
+    String.is_substring
+      (String.sub content ~pos:start ~len:(stop - start))
+      ~substring:"\r\n"
+    && not (String.mem new_text '\r')
+  then String.substr_replace_all new_text ~pattern:"\n" ~with_:"\r\n"
+  else new_text
+;;
+
+(* Returns [(start, end, new_text)] sorted by start and the numbers of the
+   edits that only matched leniently, or an error message. *)
 let locate content (edits : Edit.t list) =
   let located =
     List.mapi edits ~f:(fun i edit ->
+      let n = i + 1 in
       if String.is_empty edit.old_text
-      then Error (sprintf "edit %d: old_text must not be empty" (i + 1))
+      then Error (sprintf "edit %d: old_text must not be empty" n)
       else (
         match occurrences content edit.old_text with
         | [ start ] ->
-          Ok (start, start + String.length edit.old_text, edit.new_text)
-        | [] -> Error (sprintf "edit %d: old_text not found in file" (i + 1))
+          Ok ((start, start + String.length edit.old_text, edit.new_text), None)
+        | [] ->
+          (match Lenient_match.find content ~pattern:edit.old_text with
+           | [ (start, stop) ] ->
+             Ok
+               ( ( start
+                 , stop
+                 , match_line_endings content ~start ~stop edit.new_text )
+               , Some n )
+           | [] ->
+             Error
+               (sprintf
+                  "edit %d: old_text not found in file; read the file to get \
+                   its current text"
+                  n)
+           | matches ->
+             Error
+               (sprintf
+                  "edit %d: old_text is not in the file as written, and \
+                   matches %d places when whitespace and punctuation are \
+                   normalised; copy it exactly from the file"
+                  n
+                  (List.length matches)))
         | matches ->
           Error
             (sprintf
                "edit %d: old_text occurs %d times; add context to make it \
                 unique"
-               (i + 1)
+               n
                (List.length matches))))
   in
   match Result.all located with
   | Error _ as e -> e
   | Ok located ->
+    let lenient = List.filter_map located ~f:snd in
     let sorted =
-      List.sort located ~compare:(fun (a, _, _) (b, _, _) -> Int.compare a b)
+      List.map located ~f:fst
+      |> List.sort ~compare:(fun (a, _, _) (b, _, _) -> Int.compare a b)
     in
     let rec check = function
       | (_, e1, _) :: ((s2, _, _) :: _ as rest) ->
         if e1 > s2 then Error "edits overlap" else check rest
-      | _ -> Ok sorted
+      | _ -> Ok (sorted, lenient)
     in
     check sorted
 ;;
@@ -119,14 +156,25 @@ let run (context : Tool.Context.t) args =
     let content = In_channel.read_all path in
     match locate content edits with
     | Error msg -> Tool.Result.error msg
-    | Ok located ->
+    | Ok (located, lenient) ->
       let updated = apply content located in
       Out_channel.write_all path ~data:updated;
+      let note =
+        match lenient with
+        | [] -> ""
+        | edits ->
+          sprintf
+            "edit%s %s matched only after normalising whitespace and \
+             punctuation; the diff shows the result\n"
+            (if List.length edits = 1 then "" else "s")
+            (String.concat ~sep:", " (List.map edits ~f:Int.to_string))
+      in
       Tool.Result.ok
-        (Udiff.hunks
-           ~path:(relative_path ~cwd:context.cwd path)
-           ~before:content
-           ~after:updated))
+        (note
+         ^ Udiff.hunks
+             ~path:(relative_path ~cwd:context.cwd path)
+             ~before:content
+             ~after:updated))
 ;;
 
 let tool = { Tool.spec; run }

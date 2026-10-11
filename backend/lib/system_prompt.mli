@@ -30,3 +30,6 @@ val build
 val host_changed_note : host:string -> string
 
 val cwd_changed_note : cwd:string -> string
+
+(** After a model change swaps the file editor ([edit], [apply_patch]). *)
+val editor_changed_note : before:string -> after:string -> string

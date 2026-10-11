@@ -5,10 +5,11 @@ let spec =
   { Tool_spec.name = "write"
   ; parallel_safe = false
   ; on_host = true
+  ; freeform = None
   ; destructive = true
   ; description =
       "Write a file, creating it (and parent directories) or overwriting it \
-       entirely. Prefer edit for changing parts of an existing file."
+       entirely. To change parts of an existing file, edit it instead."
   ; parameters =
       Tool_args.schema
         ~required:[ "path"; "content" ]

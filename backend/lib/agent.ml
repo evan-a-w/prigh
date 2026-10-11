@@ -629,7 +629,7 @@ let instructions t ~cwd =
 (* Built once per conversation and recorded in the session, so the prompt
    prefix stays cacheable; later cwd/host changes reach the model as notes on
    the next user message instead. *)
-let tools t = t.tools @ t.mcp_tools
+let tools t = Tools.for_model t.model (t.tools @ t.mcp_tools)
 
 let build_system_prompt t =
   let { Host_ops.Instructions.files; nix; skills } =
@@ -833,8 +833,15 @@ let deliveries t =
   | tasks -> [ Background_tasks.delivery_message tasks ]
 ;;
 
+(* The system prompt names the tools of the model it was built for. *)
 let set_model t model =
+  let editor () = Option.map (Tools.editor (tools t)) ~f:Tool.name in
+  let before = editor () in
   t.model <- model;
+  (match before, editor () with
+   | Some before, Some after when not (String.equal before after) ->
+     add_environment_note t (System_prompt.editor_changed_note ~before ~after)
+   | _ -> ());
   ignore
     (Session.set_model t.session ~model:(Model.key model) ~thinking:t.thinking
      : Session.Entry.t);
