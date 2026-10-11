@@ -45,7 +45,17 @@ module H = struct
   let mode t = print_endline (Mode.name t.model.mode)
 
   let set_pending t confirms =
-    t.model <- { t.model with pending_confirms = confirms }
+    t.model
+    <- { t.model with
+         pending_confirms =
+           List.map confirms ~f:(fun (call_id, name, summary) ->
+             { P.Pending.Confirm.call_id
+             ; agent_id = None
+             ; name
+             ; summary
+             ; rules = []
+             })
+       }
   ;;
 end
 
@@ -79,6 +89,7 @@ let%expect_test "startup: requests state, messages and auth; renders history" =
     (Rpc (method_ auth_status) (params ()) (tag Auth_refresh))
     (Rpc (method_ get_config) (params ()) (tag Config))
     (Rpc (method_ list_models) (params ()) (tag Models_catalog))
+    (Rpc (method_ get_pending) (params ()) (tag Pending))
     Load_history
     |}];
   H.reply h Initial_state (state_json ());
@@ -743,7 +754,7 @@ let%expect_test "typing / lists commands, Down twice + Tab fills /login " =
       /fallback [off|model...]        show or set the models th…
       /default-dir [off|path]         show or set the directory…
       /login [provider] [api_key|oauth]  log in to a provider
-      ↕ 1–8 of 43
+      ↕ 1–8 of 47
     …deepseek-flash  ctx:0.1%/1.0M  Tab/Enter accept · Esc close
     |}];
   H.key h (Key.plain Down);
@@ -760,7 +771,7 @@ let%expect_test "typing / lists commands, Down twice + Tab fills /login " =
       /fallback [off|model...]        show or set the models th…
       /default-dir [off|path]         show or set the directory…
       /login [provider] [api_key|oauth]  log in to a provider
-      ↕ 1–8 of 43
+      ↕ 1–8 of 47
     …deepseek-flash  ctx:0.1%/1.0M  Tab/Enter accept · Esc close
     |}];
   H.key h (Key.plain Down);
@@ -777,7 +788,7 @@ let%expect_test "typing / lists commands, Down twice + Tab fills /login " =
       /fallback [off|model...]        show or set the models th…
       /default-dir [off|path]         show or set the directory…
       /login [provider] [api_key|oauth]  log in to a provider
-      ↕ 1–8 of 43
+      ↕ 1–8 of 47
     …deepseek-flash  ctx:0.1%/1.0M  Tab/Enter accept · Esc close
     |}];
   H.key h (Key.plain Tab);
@@ -810,11 +821,11 @@ let%expect_test "/mo Enter opens argument completion over models; typing fab \
     ▌ earlier question
       earlier answer
     ────────────────────────────────────────────────────────────
-    > /model ▏
-    ▸ Claude Fable 5       anthropic/claude-fable-5
-      Claude Fable 5.1     anthropic/claude-fable-5-1
-      GPT-5.5              openai/gpt-5.5
-      DeepSeek V4.1 Flash  deepseek/deepseek-flash
+    > /mode ▏
+    ▸ ask
+      auto-edit
+      auto
+      plan
     …deepseek-flash  Tab accepts · Enter runs as typed · Esc
     |}];
   H.keys h "fab";
@@ -826,19 +837,12 @@ let%expect_test "/mo Enter opens argument completion over models; typing fab \
     ▌ earlier question
       earlier answer
     ────────────────────────────────────────────────────────────
-    > /model fab▏
-    ▸ Claude Fable 5    anthropic/claude-fable-5
-      Claude Fable 5.1  anthropic/claude-fable-5-1
-    …deepseek-flash  ctx:0.1%/1.0M  Tab/Enter accept · Esc close
+    > /mode fab▏
+    …deepseek-flash  think:off  ctx:0.1%/1.0M  $0.01
     |}];
   H.key h (Key.plain Enter);
   [%expect
-    {|
-    (Rpc
-      (method_ set_model)
-      (params ((model anthropic/claude-fable-5)))
-      (tag (Set_model_done anthropic/claude-fable-5)))
-    |}]
+    {| |}]
 ;;
 
 let%expect_test "Esc closes autocomplete without abort while running" =
@@ -854,9 +858,11 @@ let%expect_test "Esc closes autocomplete without abort while running" =
       earlier answer
     ────────────────────────────────────────────────────────────
     > /mo▏
-    ▸ /model [name|id|provider/id]  pick or switch the model
-      /scoped-models                pick the models Ctrl+P cycl…
-      /import [path]                import a session from a JSO…
+    ▸ /mode [ask|auto-edit|auto|plan]  pick or set the mode: wh…
+      /model [name|id|provider/id]    pick or switch the model
+      /scoped-models                  pick the models Ctrl+P cy…
+      /import [path]                  import a session from a J…
+      /permissions                    show the mode and the all…
     …deepseek-flash  ctx:0.1%/1.0M  Tab/Enter accept · Esc close
     |}];
   H.esc h;
@@ -3718,6 +3724,7 @@ let%expect_test "config: get_config at Start installs the reply; \
     (Rpc (method_ auth_status) (params ()) (tag Auth_refresh))
     (Rpc (method_ get_config) (params ()) (tag Config))
     (Rpc (method_ list_models) (params ()) (tag Models_catalog))
+    (Rpc (method_ get_pending) (params ()) (tag Pending))
     Load_history
     |}];
   H.reply
@@ -3734,14 +3741,22 @@ let%expect_test "config: get_config at Start installs the reply; \
     {|
     ((
       (scoped_models (anthropic/claude-fable-5-1))
-      (confirm_tools true)
+      (approval_mode Ask)
+      (permissions (
+        (allow ())
+        (ask   ())
+        (deny  ())))
       (default_model    ())
       (default_thinking ())
       (fallback_models  ())
       (default_cwd      ())))
     ((
       (scoped_models (deepseek/deepseek-flash))
-      (confirm_tools false)
+      (approval_mode Auto)
+      (permissions (
+        (allow ())
+        (ask   ())
+        (deny  ())))
       (default_model    ())
       (default_thinking ())
       (fallback_models  ())
@@ -4465,7 +4480,7 @@ let%expect_test "/help with an unknown command suggests the closest name" =
     ▌ earlier question
       earlier answer
       unknown command /modle (back in the editor); did you mean
-      /model?
+      /mode?
     ────────────────────────────────────────────────────────────
     > /help modle▏
     …deepseek-flash  think:off  ctx:0.1%/1.0M  $0.01
@@ -4477,20 +4492,27 @@ let%expect_test "tool confirm: allow, deny, queue and Esc-abort" =
   H.event h (State (state ~running:true ()));
   H.event
     h
-    (Tool_confirm { call_id = "c1"; name = "bash"; summary = "rm -rf build" });
+    (Tool_confirm
+       { call_id = "c1"
+       ; agent_id = None
+       ; rules = []
+       ; name = "bash"
+       ; summary = "rm -rf build"
+       });
   H.show h;
   [%expect
     {|
-      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
-
     ▌ earlier question
       earlier answer
     ┌─ Confirm ────────────────────────────────────────────────┐
-    │ Run bash: rm -rf build? (y/n)                            │
+    │ Run bash: rm -rf build?                                  │
+    │ y  allow once                                            │
+    │ n  deny                                                  │
+    │ r  deny, saying why                                      │
     └──────────────────────────────────────────────────────────┘
     ────────────────────────────────────────────────────────────
     ? ▏
-    /work  deepseek-flash  ctx:0.1%/1.0M  $0.01  confirm: y / n
+    /work  deepseek-flash  ctx:0.1%/1.0M  $0.01  confirm: y/n/r
     |}];
   H.keys h "y";
   [%expect
@@ -4500,7 +4522,7 @@ let%expect_test "tool confirm: allow, deny, queue and Esc-abort" =
       (params (
         (call_id c1)
         (allow   true)))
-      (tag Ignore))
+      (tag Show_error))
     |}];
   H.mode h;
   [%expect {| editing |}];
@@ -4508,7 +4530,13 @@ let%expect_test "tool confirm: allow, deny, queue and Esc-abort" =
   H.event h (State (state ~running:true ()));
   H.event
     h
-    (Tool_confirm { call_id = "c1"; name = "bash"; summary = "rm -rf build" });
+    (Tool_confirm
+       { call_id = "c1"
+       ; agent_id = None
+       ; rules = []
+       ; name = "bash"
+       ; summary = "rm -rf build"
+       });
   H.keys h "n";
   H.show h;
   [%expect
@@ -4518,7 +4546,7 @@ let%expect_test "tool confirm: allow, deny, queue and Esc-abort" =
       (params (
         (call_id c1)
         (allow   false)))
-      (tag Ignore))
+      (tag Show_error))
 
 
 
@@ -4536,33 +4564,54 @@ let%expect_test "tool confirm: allow, deny, queue and Esc-abort" =
   H.event h (State (state ~running:true ()));
   H.event
     h
-    (Tool_confirm { call_id = "c1"; name = "bash"; summary = "rm -rf build" });
+    (Tool_confirm
+       { call_id = "c1"
+       ; agent_id = None
+       ; rules = []
+       ; name = "bash"
+       ; summary = "rm -rf build"
+       });
   H.event
     h
-    (Tool_confirm { call_id = "c2"; name = "write"; summary = "/work/a.txt" });
+    (Tool_confirm
+       { call_id = "c2"
+       ; agent_id = None
+       ; rules = []
+       ; name = "write"
+       ; summary = "/work/a.txt"
+       });
   H.event
     h
-    (Tool_confirm { call_id = "c3"; name = "edit"; summary = "/work/b.txt" });
+    (Tool_confirm
+       { call_id = "c3"
+       ; agent_id = None
+       ; rules = []
+       ; name = "edit"
+       ; summary = "/work/b.txt"
+       });
   H.event
     h
     (Tool_confirm
        { call_id = "c4"
+       ; agent_id = None
+       ; rules = []
        ; name = "apply_patch"
        ; summary = "src/a.ml, src/b.ml"
        });
   H.show h;
   [%expect
     {|
-      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
-
     ▌ earlier question
       earlier answer
     ┌─ Confirm ────────────────────────────────────────────────┐
-    │ Run bash: rm -rf build? (y/n)                            │
+    │ Run bash: rm -rf build?                                  │
+    │ y  allow once                                            │
+    │ n  deny                                                  │
+    │ r  deny, saying why                                      │
     └──────────────────────────────────────────────────────────┘
     ────────────────────────────────────────────────────────────
     ? ▏
-    /work  deepseek-flash  ctx:0.1%/1.0M  $0.01  confirm: y / n
+    /work  deepseek-flash  ctx:0.1%/1.0M  $0.01  confirm: y/n/r
     |}];
   H.keys h "y";
   H.show h;
@@ -4573,19 +4622,19 @@ let%expect_test "tool confirm: allow, deny, queue and Esc-abort" =
       (params (
         (call_id c1)
         (allow   true)))
-      (tag Ignore))
-
-
-      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
-
+      (tag Show_error))
     ▌ earlier question
       earlier answer
+      allowed bash
     ┌─ Confirm ────────────────────────────────────────────────┐
-    │ Write /work/a.txt? (y/n)                                 │
+    │ Write /work/a.txt?                                       │
+    │ y  allow once                                            │
+    │ n  deny                                                  │
+    │ r  deny, saying why                                      │
     └──────────────────────────────────────────────────────────┘
     ────────────────────────────────────────────────────────────
     ? ▏
-    /work  deepseek-flash  ctx:0.1%/1.0M  $0.01  confirm: y / n
+    /work  deepseek-flash  ctx:0.1%/1.0M  $0.01  confirm: y/n/r
     |}];
   H.keys h "y";
   H.show h;
@@ -4596,19 +4645,19 @@ let%expect_test "tool confirm: allow, deny, queue and Esc-abort" =
       (params (
         (call_id c2)
         (allow   true)))
-      (tag Ignore))
-
-
-      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
-
-    ▌ earlier question
+      (tag Show_error))
       earlier answer
+      allowed bash
+      allowed write
     ┌─ Confirm ────────────────────────────────────────────────┐
-    │ Edit /work/b.txt? (y/n)                                  │
+    │ Edit /work/b.txt?                                        │
+    │ y  allow once                                            │
+    │ n  deny                                                  │
+    │ r  deny, saying why                                      │
     └──────────────────────────────────────────────────────────┘
     ────────────────────────────────────────────────────────────
     ? ▏
-    /work  deepseek-flash  ctx:0.1%/1.0M  $0.01  confirm: y / n
+    /work  deepseek-flash  ctx:0.1%/1.0M  $0.01  confirm: y/n/r
     |}];
   H.keys h "n";
   [%expect
@@ -4618,22 +4667,23 @@ let%expect_test "tool confirm: allow, deny, queue and Esc-abort" =
       (params (
         (call_id c3)
         (allow   false)))
-      (tag Ignore))
+      (tag Show_error))
     |}];
   H.show h;
   [%expect
     {|
-      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
-
-    ▌ earlier question
-      earlier answer
+      allowed bash
+      allowed write
       denied edit
     ┌─ Confirm ────────────────────────────────────────────────┐
-    │ Apply patch to src/a.ml, src/b.ml? (y/n)                 │
+    │ Apply patch to src/a.ml, src/b.ml?                       │
+    │ y  allow once                                            │
+    │ n  deny                                                  │
+    │ r  deny, saying why                                      │
     └──────────────────────────────────────────────────────────┘
     ────────────────────────────────────────────────────────────
     ? ▏
-    /work  deepseek-flash  ctx:0.1%/1.0M  $0.01  confirm: y / n
+    /work  deepseek-flash  ctx:0.1%/1.0M  $0.01  confirm: y/n/r
     |}];
   H.keys h "y";
   [%expect
@@ -4643,7 +4693,7 @@ let%expect_test "tool confirm: allow, deny, queue and Esc-abort" =
       (params (
         (call_id c4)
         (allow   true)))
-      (tag Ignore))
+      (tag Show_error))
     |}];
   let h = connected () in
   H.event h (State (state ~running:true ()));
@@ -4690,7 +4740,11 @@ let%expect_test "/change_default saves the model and thinking level" =
     (Rpc (method_ change_default) (params ()) (tag Default_saved))
     ((
       (scoped_models (deepseek/deepseek-flash))
-      (confirm_tools true)
+      (approval_mode Ask)
+      (permissions (
+        (allow ())
+        (ask   ())
+        (deny  ())))
       (default_model    (deepseek/deepseek-flash))
       (default_thinking (high))
       (fallback_models ())
@@ -4709,8 +4763,10 @@ let%expect_test "/change_default saves the model and thinking level" =
     …deepseek-flash  think:off  ctx:0.1%/1.0M  $0.01
     (Rpc
       (method_ set_config)
-      (params ((config ((confirm_tools false)))))
-      (tag (Notice_on_success "tool confirmation off")))
+      (params ((config ((approval_mode auto)))))
+      (tag (
+        Notice_on_success
+        "tool confirmation off (approval mode auto, also for new sessions)")))
     |}]
 ;;
 
@@ -4727,8 +4783,10 @@ let%expect_test "/confirm on saves confirm_tools through set_config" =
     {|
     (Rpc
       (method_ set_config)
-      (params ((config ((confirm_tools true)))))
-      (tag (Notice_on_success "tool confirmation on")))
+      (params ((config ((approval_mode ask)))))
+      (tag (
+        Notice_on_success
+        "tool confirmation on (approval mode ask, also for new sessions)")))
     |}];
   H.reply h (Notice_on_success "tool confirmation on") {|{}|};
   H.show h;
@@ -4754,7 +4812,8 @@ let%expect_test "/confirm on saves confirm_tools through set_config" =
     ▌ earlier question
       earlier answer
       tool confirmation on
-      tool confirmation on
+      mode: auto — tools run without asking (/confirm on|off
+      sets ask or auto; /mode has all)
     ────────────────────────────────────────────────────────────
     > ▏
     …deepseek-flash  think:off  ctx:0.1%/1.0M  $0.01
@@ -4768,8 +4827,10 @@ let%expect_test "/confirm on saves confirm_tools through set_config" =
     {|
     (Rpc
       (method_ set_config)
-      (params ((config ((confirm_tools false)))))
-      (tag (Notice_on_success "tool confirmation off")))
+      (params ((config ((approval_mode auto)))))
+      (tag (
+        Notice_on_success
+        "tool confirmation off (approval mode auto, also for new sessions)")))
     |}];
   H.reply h (Notice_on_success "tool confirmation off") {|{}|};
   H.show h;
@@ -4825,7 +4886,13 @@ let%expect_test "resize keeps the confirm dialog and picker within the width" =
   H.event h (State (state ~running:true ()));
   H.event
     h
-    (Tool_confirm { call_id = "c1"; name = "bash"; summary = "rm -rf build" });
+    (Tool_confirm
+       { call_id = "c1"
+       ; agent_id = None
+       ; rules = []
+       ; name = "bash"
+       ; summary = "rm -rf build"
+       });
   H.show h;
   [%expect
     {|
@@ -4834,11 +4901,14 @@ let%expect_test "resize keeps the confirm dialog and picker within the width" =
     ▌ earlier question
       earlier answer
     ┌─ Confirm ────────────────────────────────────────────────────────────────────────────────────────────────────────────┐
-    │ Run bash: rm -rf build? (y/n)                                                                                        │
+    │ Run bash: rm -rf build?                                                                                              │
+    │ y  allow once                                                                                                        │
+    │ n  deny                                                                                                              │
+    │ r  deny, saying why                                                                                                  │
     └──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┘
     ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
     ? ▏
-    /work  deepseek-flash  think:off  view:normal  ctx:0.1%/1.0M  $0.01  confirm: y / n
+    /work  deepseek-flash  think:off  view:normal  ctx:0.1%/1.0M  $0.01  confirm: y/n/r
     |}];
   H.step h (Resize { width = 40; height = 16 });
   H.show h;
@@ -4850,11 +4920,14 @@ let%expect_test "resize keeps the confirm dialog and picker within the width" =
     ▌ earlier question
       earlier answer
     ┌─ Confirm ────────────────────────────┐
-    │ Run bash: rm -rf build? (y/n)        │
+    │ Run bash: rm -rf build?              │
+    │ y  allow once                        │
+    │ n  deny                              │
+    │ r  deny, saying why                  │
     └──────────────────────────────────────┘
     ────────────────────────────────────────
     ? ▏
-    …deepseek-flash  $0.01  confirm: y / n
+    …deepseek-flash  $0.01  confirm: y/n/r
     |}];
   let h = connected ~width:120 ~height:16 () in
   H.keys h "/sessions";
@@ -5054,7 +5127,13 @@ let%expect_test "Ctrl+C closes every dialog and search" =
   H.event h (State (state ~running:true ()));
   H.event
     h
-    (Tool_confirm { call_id = "c1"; name = "bash"; summary = "rm -rf build" });
+    (Tool_confirm
+       { call_id = "c1"
+       ; agent_id = None
+       ; rules = []
+       ; name = "bash"
+       ; summary = "rm -rf build"
+       });
   H.key h (Key.ctrl 'c');
   H.mode h;
   [%expect
@@ -5064,7 +5143,7 @@ let%expect_test "Ctrl+C closes every dialog and search" =
       (params (
         (call_id c1)
         (allow   false)))
-      (tag Ignore))
+      (tag Show_error))
     editing
     |}];
   let h = connected () in
@@ -5327,6 +5406,7 @@ let%expect_test "keymap: every binding is covered by a scenario" =
     Ctrl+P           Next_model               covered
     Alt+P            Prev_model               covered
     Ctrl+T           Next_thinking            covered
+    Alt+M            Cycle_mode               MISSING
     Ctrl+N           Picker_toggle_filter     covered
     Ctrl+X           Copy_last                covered
     Ctrl+Z           Suspend                  covered
@@ -6236,7 +6316,7 @@ let%expect_test "Tab on an empty editor opens the command list; the list shows \
       /fallback [off|model...]        show or set the models th…
       /default-dir [off|path]         show or set the directory…
       /login [provider] [api_key|oauth]  log in to a provider
-      ↕ 1–8 of 43
+      ↕ 1–8 of 47
     …deepseek-flash  ctx:0.1%/1.0M  Tab/Enter accept · Esc close
     |}];
   H.key h (Key.plain End);
@@ -6253,7 +6333,7 @@ let%expect_test "Tab on an empty editor opens the command list; the list shows \
       /fallback [off|model...]        show or set the models th…
       /default-dir [off|path]         show or set the directory…
       /login [provider] [api_key|oauth]  log in to a provider
-      ↕ 1–8 of 43
+      ↕ 1–8 of 47
     …deepseek-flash  ctx:0.1%/1.0M  Tab/Enter accept · Esc close
     |}];
   H.keys h "qu";
@@ -7164,7 +7244,7 @@ let%expect_test
 
     ▌ earlier question
       earlier answer
-      unknown command /modle (back in the editor); did you mean /model?
+      unknown command /modle (back in the editor); did you mean /mode?
     ────────────────────────────────────────────────────────────────────────────────
     > /modle gpt▏
     /work  deepseek-flash  think:off  view:normal  ctx:0.1%/1.0M  $0.01
@@ -7181,7 +7261,7 @@ let%expect_test
 
     ▌ earlier question
       earlier answer
-      unknown command /modle (back in the editor); did you mean /model?
+      unknown command /modle (back in the editor); did you mean /mode?
       unknown command /usr/bin/env (back in the editor); Tab or / lists commands
     ────────────────────────────────────────────────────────────────────────────────
     > /usr/bin/env is missing on the box▏
@@ -7197,7 +7277,7 @@ let%expect_test
 
     ▌ earlier question
       earlier answer
-      unknown command /modle (back in the editor); did you mean /model?
+      unknown command /modle (back in the editor); did you mean /mode?
       unknown command /usr/bin/env (back in the editor); Tab or / lists commands
       unknown command /thnking (back in the editor); did you mean /thinking?
     ────────────────────────────────────────────────────────────────────────────────

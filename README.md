@@ -332,7 +332,14 @@ directories on the backend's host, where new sessions start, and takes a
 relative path from the backend's directory. When a model's usage runs out
 and the next fallback model takes over, the transcript shows a `↪ handed
 over from A to B (error)` line rather than the message as a prompt, and
-`/fork` and `/tree` label it the same way. Ctrl+P/Alt+P cycle the scoped
+`/fork` and `/tree` label it the same way. The status line's mode chip
+(ask, auto-edit, plan) runs `/mode` and its plan chip (`plan 2/5: step`)
+`/todos`; Alt+M cycles the mode. A tool confirmation is a dialog with a
+button per answer (y, a for always with the rule it adds, n, r for a
+reason typed in the dialog, Esc going back to the buttons), the plan of
+`exit_plan_mode` rendered as markdown; the model's questions are a dialog of
+radio buttons or checkboxes with an "Other" field (keys as in the TUI, or
+clicks). Ctrl+P/Alt+P cycle the scoped
 models, Alt+T the thinking level (Ctrl+T is the browser's), Alt+↑ takes
 back a queued message, Ctrl+↑/↓ jump between your messages; `/help` and
 `/hotkeys` also list the TUI's keys that the browser keeps (Ctrl+C, Ctrl+Z, Ctrl+F, Ctrl+R, $EDITOR's Ctrl+G)
@@ -501,6 +508,7 @@ backend/_build/default/bin/main.exe serve      # JSON-lines RPC on stdio
 | Ctrl+L | pick a model |
 | Ctrl+P / Alt+P | cycle to the next / previous scoped model |
 | Ctrl+T | cycle the thinking level |
+| Alt+M | cycle the mode: ask → auto-edit → auto → plan (read-only) |
 | Ctrl+N | picker: toggle the named-only / logged-in-only filter |
 | Ctrl+X | copy the last assistant message |
 | Ctrl+Z | suspend to the shell |
@@ -652,7 +660,7 @@ results folded underneath, and are replayed to the same provider as it sent
 them (to another provider as text). Models of other providers (DeepSeek,
 custom endpoints) do not get `web_search`; they can still `web_fetch` a
 search page. Neither tool is destructive, so neither asks for confirmation
-under `/confirm on`.
+in the `ask` approval mode.
 
 Models see images. The `read` tool returns PNG, JPEG, GIF and WebP files
 (recognised by content, not by name) as images the model can look at, and an
@@ -668,8 +676,11 @@ are stored in the session file.
 Submitted prompts are kept in `~/.prigh/history` (one JSON string per line,
 last 500) and loaded on start; secrets from login prompts are never recorded.
 `~/.prigh/config.json` holds `scoped_models` (the models Ctrl+P cycles
-through; `/scoped-models` edits it), `confirm_tools` (ask before
-destructive `bash`/`write`/`edit`/`apply_patch`; `/confirm on|off`) and
+through; `/scoped-models` edits it), `approval_mode` (`ask`, `auto-edit`
+or `auto`: the mode new sessions start in, see below; `/confirm on|off`
+sets `ask` or `auto`; files with the older `confirm_tools` still work, and
+it is replaced by `approval_mode` when prigh saves the file),
+`permissions` (allow/ask/deny rules, below; edited by hand) and
 `default_model`/`default_thinking` (what new sessions start with unless
 `-model`/`-thinking` is given; `/change_default` saves the current ones).
 Without a `default_thinking`, sessions start with thinking `on`; models that
@@ -758,7 +769,11 @@ it.
 | `/login [provider\|custom] [api_key\|oauth]`, `/logout [provider]`, `/auth` | credentials; `/login custom` adds an OpenAI-compatible endpoint |
 | `/thinking [off\|on\|low\|high\|max]` | set the thinking level |
 | `/verbosity [quiet\|normal\|verbose]` | set the transcript verbosity |
-| `/confirm [on\|off]` | ask before destructive tools |
+| `/confirm [on\|off]` | ask before destructive tools: sets the approval mode `ask` or `auto`, here and for new sessions |
+| `/mode [ask\|auto-edit\|auto\|plan]` | pick or set this session's mode (Alt+M cycles) |
+| `/plan [on\|off]` | toggle plan mode (read-only planning until you approve the plan) |
+| `/todos` | show the model's plan (its `update_plan` steps) |
+| `/permissions` | show the mode and the allow/ask/deny rules (config and this session) |
 | `/compact [instructions]` | summarise older messages to free context, focusing on the instructions |
 | `/budget [dollars\|off]` | show or set the session's cost budget: no turn starts once it is spent |
 | `/goal [text\|off\|resume]` | set a goal the agent keeps working toward until it is met; show, clear or resume it |
@@ -817,6 +832,91 @@ first run, and recorded in the session so the cached prompt prefix survives
 the model as a short note on the next message, leaving it to re-read the
 instructions if that seems worthwhile.
 
+### Approvals, plan mode and questions
+
+Each session has an approval mode, shown in the status line (`mode:ask`,
+`mode:auto-edit`, `mode:plan`; nothing for `auto`) and switched with
+`/mode` or Alt+M (ask → auto-edit → auto → plan → ask):
+
+- `ask`: destructive tools (`bash`, `write`, `edit`, `apply_patch`,
+  `job_input`, which writes to a running job that may run what it reads,
+  and MCP tools that are not read-only) wait for your answer.
+- `auto-edit`: file edits run without asking; `bash`, `job_input` and MCP
+  tools still ask.
+- `auto`: nothing asks (the default, as before).
+
+A new session starts in the config's `approval_mode`; a session keeps its
+mode (and the rules below) in its file, so it survives a reload or a backend
+restart, and forks take it along. Subagents' tool calls are checked like the
+main agent's (their confirmations name the subagent).
+
+A confirmation offers: `y` allow once; `a` always allow, for the rest of the
+session, the rule shown (for `bash`, the program, with its subcommand for
+tools like `git`, `npm`, `cargo` or `dune`, e.g. `bash(git status:*)`; for
+file edits, `edit`; for other tools, the tool); `n` deny; `r` deny with a
+reason you type, which the model sees as the tool's result. A confirmation
+answered in another frontend closes in the others, and one still waiting
+reappears after a reconnect.
+
+Rules in `config.json`'s `permissions` refine every mode, written like
+Claude Code's:
+
+```json
+{
+  "approval_mode": "auto-edit",
+  "permissions": {
+    "allow": ["bash(git status:*)", "bash(dune build:*)", "read"],
+    "ask": ["bash(git push:*)", "edit(*.lock)"],
+    "deny": ["bash(rm -rf:*)", "write(/etc/**)", "mcp__github__delete_*"]
+  }
+}
+```
+
+`TOOL` alone covers every call of the tool (`*` in a name matches anything,
+so `mcp__github__*` is a server's tools); `edit` stands for every file
+change (`edit`, `write`, `apply_patch`) and `read` for every file read
+(`read`, `ls`, `grep`, `find`). A `bash` pattern `PREFIX:*` matches commands
+that are `PREFIX` or start with it and a space; other patterns are globs.
+Commands are split at `;`, `&`, `&&`, `|`, `||` and newlines: allow rules
+must cover every part (`git status && rm x` is not allowed by
+`bash(git status:*)`), and never cover commands with `$(...)`, backquotes,
+`<(...)` or output redirections (other than to `/dev/null`), while a deny or
+ask rule matching any part applies. File tools' patterns are globs over the
+paths a call touches (`**` across directories; relative to the session's
+directory; `~/` is the home directory). Deny rules win, then ask rules,
+then allow rules; a denied call is refused with a message the model sees.
+`/permissions` lists the rules in force; invalid ones are reported and left
+out. There is no per-project config: rules are per user (per namespace).
+
+Plan mode (`/plan`, `/mode plan` or Alt+M) is for investigating and
+planning before changing anything: file edits are refused, and every other
+destructive tool asks (in every approval mode) unless an allow rule covers
+it, so read-only commands can run once you allow them. The model is told
+when plan mode starts and ends. It keeps its steps with `update_plan` and,
+when the plan is ready, calls `exit_plan_mode` with it: the plan shows as a
+confirmation, and approving it leaves plan mode (back to the approval mode
+you had) for the model to implement it; `n` or `r` keep it planning, with
+your feedback. An active `/goal` gets no automatic continuations while plan
+mode is on (the model cannot make progress on it, only plan); leaving plan
+mode carries on with it.
+
+The model's plan (`update_plan`: steps pending, in progress or done, as in
+Codex) is session state: the status line shows `plan 2/5: current step`
+while steps remain, `/todos` shows it whole, and the transcript shows every
+update as a checklist.
+
+With `ask_user` the model asks you one or more questions, each with
+optional choices (one, or several to pick) and room for your own answer. A
+dialog takes the keyboard: ↑/↓ choose, Space picks, typing writes your own
+answer, ←/→ move between questions, Enter answers (the last one sends), Esc
+declines. The first frontend to answer wins and the others' dialogs close;
+an unanswered question comes back after a reconnect, and aborting the run
+withdraws it. Subagents cannot ask (nor plan, nor leave plan mode): they
+put open questions in their report for the main agent to ask. Headless
+`prigh run` has nobody to answer, so it refuses confirmations (the model is
+told to have them allowed in the config) and questions (the model decides
+itself).
+
 ### Skills
 
 A skill is a directory with a `SKILL.md` whose YAML frontmatter has a
@@ -855,7 +955,7 @@ HTTP transport. Strings may use `${VAR}` and `${VAR:-default}`. Servers
 start when a run first needs them and keep running for every session on
 that host; their tools are offered to the model as
 `mcp__<server>__<tool>` (read-only ones may run in parallel; the others
-count as destructive for `/confirm`). A project's servers run commands that
+count as destructive: they ask first in the `ask` and `auto-edit` modes). A project's servers run commands that
 came with the project, so they only start once you approve them in `/mcp`
 (the approval lasts until their definition changes; it is kept in
 `~/.prigh/mcp-approvals.json`). Problems, failed starts and servers awaiting

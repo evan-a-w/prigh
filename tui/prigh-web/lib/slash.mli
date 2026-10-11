@@ -14,6 +14,8 @@ module Argument : sig
     | Backend_directory (** directories on the backend's host *)
     | Verbosity
     | Confirm
+    | Mode
+    | Plan
     | Session (** saved sessions' paths *)
     | Path (** [list_paths] *)
     | Host

@@ -22,6 +22,10 @@ end
 
 val is_retryable_error : string -> bool
 
+(** What a call does, for confirmations: [bash]'s command, a file tool's
+    path, the files an [apply_patch] touches, what [job_input] writes. *)
+val tool_summary : name:string -> Json.t -> string
+
 (** Returns the messages added to the context (prompts, assistant messages
     and tool results). [steer] is polled after each turn's tool results; any
     messages it returns are appended before the next provider request.
@@ -33,7 +37,10 @@ val is_retryable_error : string -> bool
     rejects as too long ({!Context_overflow}) is compacted and sent again,
     keeping less the second time, before the run fails with what to do.
     Each compaction emits [Compacted]. [halt] is polled before each turn
-    (also passed to tools, for subagents): [Some _] ends the run there. *)
+    (also passed to tools, for subagents): [Some _] ends the run there.
+    [approve] checks every tool call before it runs (default: all run);
+    [ask_user] is how the [ask_user] tool reaches the user. Both are passed
+    on to the tools' contexts, so [subagent] can hand [approve] down. *)
 val run
   :  env:Env.t
   -> provider:Provider.t
@@ -44,7 +51,8 @@ val run
   -> ?agent_id:string
   -> ?steer:(unit -> Message.t list)
   -> ?emit:(Agent_event.t -> unit)
-  -> ?confirm:(Content.Tool_call.t -> summary:string -> bool)
+  -> ?approve:Tool.approver
+  -> ?ask_user:(call_id:string -> User_question.t list -> User_question.Reply.t)
   -> ?execute:Tool.executor
   -> ?background:Background_tasks.t
   -> ?retry_delay:(attempt:int -> unit)

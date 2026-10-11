@@ -121,6 +121,7 @@ let%expect_test "component: a driver can schedule startup explicitly" =
     rpc auth_status ()
     rpc get_config ()
     rpc list_models ()
+    rpc get_pending ()
     load history
     |}]
 ;;
@@ -153,6 +154,7 @@ let%expect_test "component: startup requests, key handling, rpc round trip, \
     rpc auth_status ()
     rpc get_config ()
     rpc list_models ()
+    rpc get_pending ()
     load history
     spinner=0 running=false
 
@@ -268,6 +270,7 @@ let%expect_test "component: /signout runs the platform's sign-out and shows \
     rpc auth_status ()
     rpc get_config ()
     rpc list_models ()
+    rpc get_pending ()
     load history
     sign out
     spinner=0 running=false

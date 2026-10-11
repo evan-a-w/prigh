@@ -3,7 +3,11 @@ open! Import
 
 type t =
   { scoped_models : string list
-  ; confirm_tools : bool
+  ; approval_mode : Approval_mode.t
+    (** the mode new sessions start in; [confirm_tools] (true: [ask], false:
+        [auto]) in files written before it, replaced by it on save *)
+  ; permissions : Approval.Rules.t
+    (** [permissions]: allow/ask/deny rules for every session *)
   ; default_model : string option
     (** model key for new sessions, set by [/change_default] *)
   ; default_thinking : Thinking.t option
@@ -38,7 +42,9 @@ val load : home:string -> t Or_error.t
 val problems : home:string -> string list
 
 (** Writes [~/.prigh/config.json], creating parent directories, as pretty
-    JSON. Fields it does not own (such as [providers]) are kept. *)
+    JSON. Fields it does not own (such as [providers]) are kept, and so is
+    [permissions], which is edited by hand; [confirm_tools] is dropped in
+    favour of [approval_mode]. *)
 val save : home:string -> t -> unit Or_error.t
 
 (** The file's top-level fields ([[]] when it is missing), for the parts of

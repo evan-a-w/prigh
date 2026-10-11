@@ -22,9 +22,21 @@ type t =
       }
   | Tool_confirm of
       { call_id : string
+      ; agent_id : string option (** a subagent's call *)
       ; name : string
       ; summary : string
+      ; rules : string list
+        (** what "don't ask again" adds; none when it is not offered *)
       }
+  | Tool_confirm_done of
+      { call_id : string
+      ; agent_id : string option
+      } (** answered (by any frontend), let through or withdrawn *)
+  | Ask_user of
+      { call_id : string
+      ; questions : User_question.t list
+      }
+  | Ask_user_done of { call_id : string }
   | Tool_end of
       { call : Content.Tool_call.t
       ; result : Message.Tool_result.t

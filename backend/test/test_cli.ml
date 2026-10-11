@@ -224,3 +224,37 @@ let%expect_test "serve: a taken port, a refused tool host" =
     [exit 1]
     |}]
 ;;
+
+let%expect_test "run: confirmations and questions are refused, not waited for" =
+  with_sandbox
+  @@ fun t ->
+  write t ".prigh/config.json" {|{"approval_mode": "ask"}|};
+  write
+    t
+    "script.json"
+    {|[
+  {"text": "", "tool_calls": [{"id": "c1", "name": "bash", "arguments": {"command": "echo hi"}}]},
+  {"text": "", "tool_calls": [{"id": "q1", "name": "ask_user", "arguments": {"questions": [{"question": "Which?"}]}}]},
+  {"text": "done"}
+]|};
+  prigh
+    t
+    [ "run"
+    ; "-faux-script"
+    ; Filename.concat t.dir "script.json"
+    ; "-cwd"
+    ; t.dir
+    ; "go"
+    ];
+  [%expect
+    {|
+    $ prigh run -faux-script $DIR/script.json -cwd $DIR go
+    done
+    [tool] bash {"command":"echo hi"}
+    [tool] bash echo hi needs confirmation: denied (headless)
+    [tool] error: [denied by user] Their reason: prigh run is headless, so nobody can confirm it; the user can allow it with approval_mode or permissions in ~/.prigh/config.json
+    [tool] ask_user {"questions":[{"question":"Which?"}]}
+    [tool] error: [cannot ask: prigh run is headless, so nobody can answer; decide yourself and say what you assumed]
+    [deepseek-flash] tokens: in=0 (cached 0) out=0 cost=$0.0000 session=$DIR/.prigh/sessions/<stamp>_<id>.jsonl
+    |}]
+;;

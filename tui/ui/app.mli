@@ -61,6 +61,9 @@ module Reply_tag : sig
     | Mcp_picker
     | Mcp_reconnected
     | Mcp_approved of string (** server *)
+    | Pending (** [get_pending]: confirmations and questions to show *)
+    | Mode_set of string (** the notice *)
+    | Refresh_state
     | Retry_in_editor of
         { command : string
         ; hint : string
@@ -164,7 +167,8 @@ module Model : sig
     ; namespace : string option (** the user whose sessions we see *)
     ; user : string option (** the user we signed in as *)
     ; stderr_tail : string list
-    ; pending_confirms : (string * string * string) list
+    ; pending_confirms : P.Pending.Confirm.t list
+    ; pending_questions : P.Pending.Ask.t list
     ; connection : Connection.t
     ; reconnect_generation : int
     ; btw : Btw_box.t option

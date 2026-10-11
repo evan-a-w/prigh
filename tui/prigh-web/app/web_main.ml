@@ -302,7 +302,11 @@ let component client settings ~current (local_ graph) =
       ~apply_action:(fun ctx model action ->
         let model', commands = App.update model action in
         current := model';
-        if List.is_empty model.confirms && not (List.is_empty model'.confirms)
+        (* A confirmation or question just showed (also one over another). *)
+        if
+          (App.Model.waiting model' && not (App.Model.waiting model))
+          || (List.is_empty model.confirms
+              && not (List.is_empty model'.confirms))
         then confirm_shown := Time_ns.now ();
         if
           not
@@ -534,7 +538,7 @@ let install_listeners ~schedule ~current =
     if Js.to_bool (Js.Unsafe.coerce ev)##.isComposing || in_terminal ev
     then Js._true
     else if
-      (not (List.is_empty (!current : App.Model.t).confirms))
+      App.Model.waiting !current
       && String.equal (key ev).key "Enter"
       && Time_ns.Span.(
            Time_ns.diff (Time_ns.now ()) !confirm_shown < of_int_ms 350)

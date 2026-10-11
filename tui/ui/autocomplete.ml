@@ -125,6 +125,10 @@ let confirm_items () =
     Picker.Item.create ~id:name (String.capitalize name))
 ;;
 
+let mode_items () =
+  List.map Session_mode.names ~f:(fun name -> Picker.Item.create ~id:name name)
+;;
+
 let provider_items (auth : P.Auth_status.t list) =
   List.map auth ~f:(fun (s : P.Auth_status.t) ->
     Picker.Item.create
@@ -168,7 +172,8 @@ let argument_items ~kind ~models ~auth ~sessions ~logged_in =
   | Model | Models -> Some (model_items ~logged_in models)
   | Thinking -> Some (thinking_items ())
   | Verbosity -> Some (verbosity_items ())
-  | Confirm -> Some (confirm_items ())
+  | Confirm | Plan -> Some (confirm_items ())
+  | Mode -> Some (mode_items ())
   | Login ->
     Some
       (provider_items auth

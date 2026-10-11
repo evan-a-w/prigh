@@ -1,8 +1,37 @@
 open! Core
 
+module Permissions = struct
+  type t =
+    { allow : string list
+    ; ask : string list
+    ; deny : string list
+    }
+  [@@deriving sexp_of, equal]
+
+  let empty = { allow = []; ask = []; deny = [] }
+
+  let of_json j =
+    let open Or_error.Let_syntax in
+    let list name =
+      Json.optional_list_field j name ~f:Json.to_string_or_error
+    in
+    let%bind allow = list "allow" in
+    let%bind ask = list "ask" in
+    let%map deny = list "deny" in
+    { allow; ask; deny }
+  ;;
+
+  let to_json t =
+    let strings l = `Array (List.map l ~f:(fun s -> `String s)) in
+    `Object
+      [ "allow", strings t.allow; "ask", strings t.ask; "deny", strings t.deny ]
+  ;;
+end
+
 type t =
   { scoped_models : string list
-  ; confirm_tools : bool
+  ; approval_mode : Approval_mode.t
+  ; permissions : Permissions.t
   ; default_model : string option
   ; default_thinking : string option
   ; fallback_models : string list
@@ -12,7 +41,8 @@ type t =
 
 let default =
   { scoped_models = []
-  ; confirm_tools = false
+  ; approval_mode = Auto
+  ; permissions = Permissions.empty
   ; default_model = None
   ; default_thinking = None
   ; fallback_models = []
@@ -30,12 +60,18 @@ let of_json j =
     | Some _ -> Or_error.errorf "%s must be an array of strings" name
   in
   let%bind scoped_models = strings "scoped_models" in
-  let%bind confirm_tools =
-    match Json.field j "confirm_tools" with
-    | None -> Ok false
-    | Some `True -> Ok true
-    | Some `False -> Ok false
-    | Some _ -> Or_error.error_string "confirm_tools must be a boolean"
+  (* Older backends send [confirm_tools]. *)
+  let%bind approval_mode =
+    match Json.field j "approval_mode", Json.field j "confirm_tools" with
+    | Some mode, _ -> Approval_mode.of_json mode
+    | None, Some `True -> Ok Approval_mode.Ask
+    | None, (None | Some `False) -> Ok Approval_mode.Auto
+    | None, Some _ -> Or_error.error_string "confirm_tools must be a boolean"
+  in
+  let%bind permissions =
+    match Json.field j "permissions" with
+    | None -> Ok Permissions.empty
+    | Some p -> Permissions.of_json p
   in
   let optional_string name =
     match Json.field j name with
@@ -48,7 +84,8 @@ let of_json j =
   let%bind fallback_models = strings "fallback_models" in
   let%map default_cwd = optional_string "default_cwd" in
   { scoped_models
-  ; confirm_tools
+  ; approval_mode
+  ; permissions
   ; default_model
   ; default_thinking
   ; fallback_models
@@ -61,7 +98,8 @@ let to_json t =
   let strings l = `Array (List.map l ~f:(fun s -> `String s)) in
   `Object
     [ "scoped_models", strings t.scoped_models
-    ; ("confirm_tools", if t.confirm_tools then `True else `False)
+    ; "approval_mode", `String (Approval_mode.to_string t.approval_mode)
+    ; "permissions", Permissions.to_json t.permissions
     ; "default_model", optional t.default_model
     ; "default_thinking", optional t.default_thinking
     ; "fallback_models", strings t.fallback_models

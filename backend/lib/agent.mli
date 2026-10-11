@@ -60,6 +60,11 @@ module State : sig
     ; resume_at : float option
       (** when a run stopped by a usage limit resumes (seconds since the
           epoch) *)
+    ; approval_mode : Approval_mode.t
+    ; plan_mode : bool
+    ; plan : Plan.t option (** the model's [update_plan] *)
+    ; session_rules : string list
+      (** rules the user allowed for this session ("don't ask again") *)
     }
   [@@deriving sexp_of]
 end
@@ -127,8 +132,33 @@ end
 module Pending_confirm : sig
   type t =
     { call_id : string
+    ; agent_id : string option (** a subagent's call *)
     ; name : string
     ; summary : string
+      (** what the call does; [exit_plan_mode]'s is the plan *)
+    ; rules : string list
+      (** what [Always] adds ({!Approval_rule.suggest}); empty when it is
+          not offered *)
+    }
+  [@@deriving sexp_of]
+end
+
+(** How the user answers a confirmation: run it once, run it and add the
+    confirmation's rules to the session (so calls like it run without
+    asking), or refuse it, optionally saying why (the model sees it). *)
+module Confirm_answer : sig
+  type t =
+    | Allow
+    | Always
+    | Deny of string option
+  [@@deriving sexp_of]
+end
+
+(** An [ask_user] call waiting for [answer_question]. *)
+module Pending_question : sig
+  type t =
+    { call_id : string
+    ; questions : User_question.t list
     }
   [@@deriving sexp_of]
 end
@@ -313,7 +343,8 @@ val set_thinking : t -> Thinking.t -> unit
     creation). *)
 val config : t -> Config.t
 
-(** Writes the configuration and emits [Event.Config_changed]. *)
+(** Writes the configuration and emits [Event.Config_changed]. A changed
+    [approval_mode] also switches this session's mode. *)
 val set_config : t -> Config.t -> unit Or_error.t
 
 (** Saves the current model and thinking level as the defaults for new
@@ -321,9 +352,53 @@ val set_config : t -> Config.t -> unit Or_error.t
     sessions are kept. *)
 val save_as_default : t -> unit Or_error.t
 
+(** {2 Approvals, plan mode and questions}
+
+    Every tool call of the agent and of its subagents is checked by
+    {!Approval.decide} before it runs: with the session's approval mode, plan
+    mode, the config's [permissions] and the session's rules. One that needs
+    the user's approval emits [Tool_confirm] and waits for
+    {!respond_confirm} (or the run's cancellation). The mode and the
+    session's rules are recorded in the session ([approval] and
+    [allow_rule] entries), so a reloaded session keeps them; a new session
+    starts in the config's [approval_mode].
+
+    In plan mode file edits are refused, and every other destructive tool
+    asks (unless a rule allows it). The model is told when plan mode changes
+    ({!System_prompt.plan_mode_note}: with the next user message, or between
+    turns of a running loop), and asks to leave it with [exit_plan_mode],
+    whose confirmation carries the plan: approving it leaves plan mode
+    (keeping the approval mode). *)
+
 (** Answers a pending [Tool_confirm] request. Fails if no confirmation is
-    outstanding for [call_id]. *)
-val respond_confirm : t -> call_id:string -> allow:bool -> unit Or_error.t
+    outstanding for [call_id] (of the subagent [agent_id]): it was answered
+    already or withdrawn. [Always] adds the confirmation's rules to the
+    session; any other pending confirmation they cover is allowed too. *)
+val respond_confirm
+  :  ?agent_id:string
+  -> t
+  -> call_id:string
+  -> Confirm_answer.t
+  -> unit Or_error.t
+
+(** Switches the approval mode and/or plan mode, recording it in the
+    session. Pending confirmations the new mode lets through are allowed;
+    leaving plan mode by hand approves a pending [exit_plan_mode], and, when
+    idle, carries on an active goal (see {!set_goal}). *)
+val set_mode : ?approval:Approval_mode.t -> ?plan:bool -> t -> unit
+
+(** Answers a pending [ask_user] call ([Answered], one list per question, or
+    [Declined]). Fails when there is none for [call_id] (another frontend
+    answered first, or the run was aborted) or the answers do not fit the
+    questions. *)
+val answer_question
+  :  t
+  -> call_id:string
+  -> User_question.Reply.t
+  -> unit Or_error.t
+
+(** Questions still unanswered. *)
+val pending_questions : t -> Pending_question.t list
 
 (** [instructions]: what the summary should focus on (the user's). Runs
     also compact by themselves: after a run whose last request crossed
@@ -344,7 +419,9 @@ val set_budget : t -> float option -> unit Or_error.t
     on it. While it is active the model has [goal_complete], and each run
     that ends normally is followed by a continuation restating it, up to the
     config's [goal_max_continuations]; an abort, a failed run, the budget or
-    the cap stop it (with a [Notice]). *)
+    the cap stop it (with a [Notice]). In plan mode no continuation follows
+    (the model waits for its plan's approval); leaving plan mode resumes
+    them. *)
 val set_goal : t -> string -> unit Or_error.t
 
 val clear_goal : t -> unit Or_error.t

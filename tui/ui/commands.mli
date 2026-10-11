@@ -9,6 +9,8 @@ module Argument : sig
     | Thinking
     | Verbosity
     | Confirm
+    | Mode
+    | Plan
     | Login
     | Logout
     | Sessions

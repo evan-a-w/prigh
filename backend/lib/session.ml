@@ -32,6 +32,11 @@ module Entry = struct
       | System_prompt of { text : string }
       | Goal of { goal : Goal.t option }
       | Budget of { usd : float option }
+      | Approval of
+          { mode : string
+          ; plan : bool
+          }
+      | Allow_rule of { rule : string }
     [@@deriving sexp, jsonaf]
   end
 
@@ -130,7 +135,9 @@ let worth_saving (line : Line.t) =
           | Cwd _
           | System_prompt _
           | Goal _
-          | Budget _ )
+          | Budget _
+          | Approval _
+          | Allow_rule _ )
       ; _
       }
   | Header _ | Head _ -> false
@@ -235,7 +242,9 @@ let add_entry t (entry : Entry.t) =
   | Description _
   | System_prompt _
   | Goal _
-  | Budget _ -> ()
+  | Budget _
+  | Approval _
+  | Allow_rule _ -> ()
 ;;
 
 let read_lines path =
@@ -298,6 +307,8 @@ let set_cwd t ?host ~cwd () = append t (Cwd { cwd; host })
 let set_system_prompt t ~text = append t (System_prompt { text })
 let set_goal t goal = append t (Goal { goal })
 let set_budget t ~usd = append t (Budget { usd })
+let set_approval t ~mode ~plan = append t (Approval { mode; plan })
+let add_allow_rule t ~rule = append t (Allow_rule { rule })
 
 let name t =
   List.find_map t.entries ~f:(fun (e : Entry.t) ->
@@ -310,7 +321,9 @@ let name t =
     | Cwd _
     | System_prompt _
     | Goal _
-    | Budget _ -> None)
+    | Budget _
+    | Approval _
+    | Allow_rule _ -> None)
 ;;
 
 let description t =
@@ -324,7 +337,9 @@ let description t =
     | Cwd _
     | System_prompt _
     | Goal _
-    | Budget _ -> None)
+    | Budget _
+    | Approval _
+    | Allow_rule _ -> None)
 ;;
 
 let append_compaction ?pinned t ~summary ~kept_from =
@@ -338,6 +353,20 @@ let active_path t =
     | Some entry -> go entry.parent (entry :: acc)
   in
   go t.head []
+;;
+
+let approval t =
+  List.fold (active_path t) ~init:None ~f:(fun acc (e : Entry.t) ->
+    match e.payload with
+    | Approval { mode; plan } -> Some (mode, plan)
+    | _ -> acc)
+;;
+
+let allow_rules t =
+  List.filter_map (active_path t) ~f:(fun (e : Entry.t) ->
+    match e.payload with
+    | Allow_rule { rule } -> Some rule
+    | _ -> None)
 ;;
 
 let summary_prefix = "Summary of the conversation so far:\n"
@@ -365,7 +394,9 @@ let context t =
       | Cwd _
       | System_prompt _
       | Goal _
-      | Budget _ -> acc)
+      | Budget _
+      | Approval _
+      | Allow_rule _ -> acc)
   in
   let messages entries =
     List.filter_map entries ~f:(fun (e : Entry.t) ->
@@ -378,7 +409,9 @@ let context t =
       | Cwd _
       | System_prompt _
       | Goal _
-      | Budget _ -> None)
+      | Budget _
+      | Approval _
+      | Allow_rule _ -> None)
   in
   match compaction with
   | None -> messages path
@@ -412,7 +445,9 @@ let system_prompt t =
     | Description _
     | Cwd _
     | Goal _
-    | Budget _ -> acc)
+    | Budget _
+    | Approval _
+    | Allow_rule _ -> acc)
 ;;
 
 let goal t =
@@ -426,7 +461,9 @@ let goal t =
     | Description _
     | Cwd _
     | System_prompt _
-    | Budget _ -> acc)
+    | Budget _
+    | Approval _
+    | Allow_rule _ -> acc)
 ;;
 
 let budget t =
@@ -440,7 +477,9 @@ let budget t =
     | Description _
     | Cwd _
     | System_prompt _
-    | Goal _ -> acc)
+    | Goal _
+    | Approval _
+    | Allow_rule _ -> acc)
 ;;
 
 let model t =
@@ -454,7 +493,9 @@ let model t =
     | Cwd _
     | System_prompt _
     | Goal _
-    | Budget _ -> acc)
+    | Budget _
+    | Approval _
+    | Allow_rule _ -> acc)
 ;;
 
 let rewind t ~to_ =
@@ -719,7 +760,9 @@ let to_markdown t =
     | Cwd _
     | System_prompt _
     | Goal _
-    | Budget _ -> None
+    | Budget _
+    | Approval _
+    | Allow_rule _ -> None
   in
   let blocks = List.filter_map (active_path t) ~f:block in
   String.concat (("# Session " ^ t.id) :: blocks) ~sep:"\n\n" ^ "\n"

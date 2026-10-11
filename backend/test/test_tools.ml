@@ -751,9 +751,10 @@ let%expect_test "apply_patch asks for confirmation naming its files" =
         ; cache_key = None
         }
       ~cwd:t.dir
-      ~confirm:(fun _ ~summary ->
-        summaries := summary :: !summaries;
-        false)
+      ~approve:(fun _ tool args ->
+        summaries
+        := Agent_loop.tool_summary ~name:(Tool.name tool) args :: !summaries;
+        Some (Tool.Result.error "[denied by user]"))
       ~context:[]
       ~prompts:[ Message.user "go" ]
       ()

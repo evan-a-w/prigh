@@ -43,11 +43,13 @@ type t =
       { call : Tool_call.t
       ; result : Message.Tool_result.t
       }
-  | Tool_confirm of
+  | Tool_confirm of Pending.Confirm.t
+  | Tool_confirm_done of
       { call_id : string
-      ; name : string
-      ; summary : string
-      }
+      ; agent_id : string option
+      } (** answered by any frontend, let through or withdrawn: close it *)
+  | Ask_user of Pending.Ask.t
+  | Ask_user_done of string (** call id: answered or withdrawn *)
   | State of State.t
   | Compacted of string
   | Config_changed of Config.t

@@ -217,18 +217,15 @@ let create ?(verbose = false) ?(sessions = "[]") ?(state = state_json ()) () =
   t
 ;;
 
-let node t ?selector () =
+let node ?(inject = fun _ -> Virtual_dom.Vdom.Effect.Ignore) t ?selector () =
   let node =
     Node_helpers.unsafe_convert_exn
-      (View.view
-         t.model
-         ~inject:(fun _ -> Virtual_dom.Vdom.Effect.Ignore)
-         ~terminal:(fun target ->
-           Virtual_dom.Vdom.Node.div
-             ~attrs:[ Virtual_dom.Vdom.Attr.class_ "xterm-widget" ]
-             [ Virtual_dom.Vdom.Node.text
-                 (Sexp.to_string (Terminal.Target.sexp_of_t target))
-             ]))
+      (View.view t.model ~inject ~terminal:(fun target ->
+         Virtual_dom.Vdom.Node.div
+           ~attrs:[ Virtual_dom.Vdom.Attr.class_ "xterm-widget" ]
+           [ Virtual_dom.Vdom.Node.text
+               (Sexp.to_string (Terminal.Target.sexp_of_t target))
+           ]))
   in
   match selector with
   | None -> [ node ]
@@ -330,4 +327,30 @@ let elements ~selector t =
       in
       printf "<%s class=%S>\n" e.tag_name class_
     | Text _ | Widget -> ())
+;;
+
+(* The view's handlers, with [inject] collecting the actions they produce. *)
+let interact ?(nth = 0) t ~selector ~f =
+  let actions = Queue.create () in
+  let inject action =
+    Virtual_dom.Vdom.Effect.of_sync_fun
+      (fun () -> Queue.enqueue actions action)
+      ()
+  in
+  match List.nth (node ~inject t ~selector ()) nth with
+  | None -> raise_s [%message "nothing matches" selector (nth : int)]
+  | Some node ->
+    f node;
+    Queue.iter actions ~f:(fun action ->
+      print_s [%sexp (action : App.Action.t)];
+      act t action)
+;;
+
+let click ?nth t ~selector =
+  interact ?nth t ~selector ~f:Node_helpers.User_actions.click_on
+;;
+
+let input ?nth t ~selector text =
+  interact ?nth t ~selector ~f:(fun node ->
+    Node_helpers.User_actions.input_text node ~text)
 ;;

@@ -293,6 +293,111 @@ scenario_confirm() {
 	capture confirm "denied"
 }
 
+# Approval modes and answers: always allow (the next matching command runs
+# without asking), deny with a reason, Alt+M cycling the mode.
+setup_approvals() {
+	extra_args="-- -faux-script $tmp/script.json"
+	mkdir -p "$tmp/home/.prigh"
+	echo '{"approval_mode": "ask"}' >"$tmp/home/.prigh/config.json"
+	cat >"$tmp/script.json" <<'JSON'
+[
+  {"text": "one", "tool_calls": [{"id": "c1", "name": "bash", "arguments": {"command": "echo first-run"}}]},
+  {"text": "first done"},
+  {"text": "two", "tool_calls": [{"id": "c2", "name": "bash", "arguments": {"command": "echo second-run"}}]},
+  {"text": "second done"},
+  {"text": "three", "tool_calls": [{"id": "c3", "name": "bash", "arguments": {"command": "make deploy"}}]},
+  {"text": "third done"}
+]
+JSON
+}
+
+scenario_approvals() {
+	wait_for "Ctrl+C"
+	type_text "go"
+	keys Enter
+	wait_for "always allow"
+	settle
+	capture approvals "dialog with always"
+	keys a
+	wait_for "first done"
+	type_text "again"
+	keys Enter
+	wait_for "second done"
+	settle
+	capture approvals "the second echo ran without asking"
+	type_text "deploy"
+	keys Enter
+	wait_for "Run bash: make deploy"
+	keys r
+	wait_for "Why not"
+	type_text "not on a Friday"
+	keys Enter
+	wait_for "third done"
+	settle
+	capture approvals "denied with a reason"
+	keys M-m
+	settle
+	capture approvals "Alt+M: auto-edit"
+}
+
+# Plan mode: Alt+M into it, an edit refused, the plan approved, then
+# implemented.
+setup_plan() {
+	extra_args="-- -faux-script $tmp/script.json"
+	cat >"$tmp/script.json" <<'JSON'
+[
+  {"text": "looking", "tool_calls": [{"id": "c1", "name": "write", "arguments": {"path": "a.txt", "content": "x"}}]},
+  {"text": "planned", "tool_calls": [{"id": "c2", "name": "exit_plan_mode", "arguments": {"plan": "1. Write a.txt\n2. Check it"}}]},
+  {"text": "implementing", "tool_calls": [{"id": "c3", "name": "write", "arguments": {"path": "a.txt", "content": "x"}}]},
+  {"text": "all done"}
+]
+JSON
+}
+
+scenario_plan() {
+	wait_for "Ctrl+C"
+	keys M-m
+	wait_for "mode:plan"
+	type_text "add a.txt"
+	keys Enter
+	wait_for "Approve the plan"
+	settle
+	capture plan "the plan to approve"
+	keys y
+	wait_for "all done"
+	settle
+	capture plan "approved and implemented"
+}
+
+# The model asks: a dialog per question, answered with the keys.
+setup_question() {
+	extra_args="-- -faux-script $tmp/script.json"
+	cat >"$tmp/script.json" <<'JSON'
+[
+  {"text": "asking", "tool_calls": [{"id": "q1", "name": "ask_user", "arguments": {"questions": [{"question": "Which database?", "header": "Storage", "options": [{"label": "Postgres", "description": "what prod uses"}, {"label": "SQLite"}]}, {"question": "Anything else?"}]}}]},
+  {"text": "thanks"}
+]
+JSON
+}
+
+scenario_question() {
+	wait_for "Ctrl+C"
+	type_text "go"
+	keys Enter
+	wait_for "Which database"
+	settle
+	capture question "first question"
+	keys Down Enter
+	wait_for "Anything else"
+	type_text "keep it small"
+	settle
+	capture question "second question"
+	keys Enter
+	wait_for "thanks"
+	settle
+	capture question "answered"
+}
+
 scenario_paste() {
 	wait_for "Ctrl+C"
 	# Bracketed paste: Enter inside the paste must not submit.

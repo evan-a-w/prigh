@@ -9,6 +9,7 @@ module Picker_kind = struct
     | Logout
     | Verbosity
     | Confirm_tools
+    | Modes
     | Fork of Entry.t list
     | Rewind of Entry.t list
     | Tree
@@ -53,7 +54,8 @@ type t =
 
 let per_session = function
   | Rename _ | Prompt _ | Rewind_confirm _ | Session _ | Text _ | Mcp_tools _
-  | Picker { kind = Fork _ | Rewind _ | Tree | Hosts | Skills | Mcp _; _ } ->
+  | Picker
+      { kind = Fork _ | Rewind _ | Tree | Hosts | Skills | Mcp _ | Modes; _ } ->
     true
   | Picker
       { kind =
