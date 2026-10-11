@@ -29,7 +29,10 @@ let estimate_tokens messages =
             ~f:(function
               | Text s -> String.length s
               | Thinking th -> String.length th.text
-              | Tool_call c -> String.length c.arguments + String.length c.name))
+              | Tool_call c -> String.length c.arguments + String.length c.name
+              | Server_tool s ->
+                String.length s.input
+                + Option.value_map s.output ~default:0 ~f:String.length))
   in
   (chars / 4) + (images * tokens_per_image)
 ;;

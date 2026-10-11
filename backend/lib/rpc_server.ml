@@ -160,6 +160,9 @@ module Client = struct
       (** [hello]'s [host_id], also while a newer connection holds it *)
     ; mutable name : string
     ; mutable tools : bool
+    ; mutable features : string list
+      (** [hello]'s [features]: what the host supports beyond the basics
+          ([exec_input]: [tool_exec_input]) *)
     ; mutable cwd : string option
     ; mutable agent : Agent.t
     ; mutable placeholder : Agent.t option
@@ -236,6 +239,7 @@ let host_of (client : Client.t) =
   ; cwd = Option.value client.cwd ~default:(Agent.state client.agent).cwd
   ; session_id = Some (session_id client.agent)
   ; session_name = Session.name (Agent.session client.agent)
+  ; exec_input = List.mem client.features "exec_input" ~equal:String.equal
   }
 ;;
 
@@ -268,6 +272,8 @@ let route t agent (event : Agent.Event.t) =
      Option.iter (host_client t host) ~f:(fun c -> c.send json)
    | Tool_exec_cancel { host; exec_id } ->
      Hashtbl.remove t.execs exec_id;
+     Option.iter (host_client t host) ~f:(fun c -> c.send json)
+   | Tool_exec_input { host; _ } ->
      Option.iter (host_client t host) ~f:(fun c -> c.send json)
    | _ -> List.iter (clients_of t agent) ~f:(fun c -> c.send json));
   match event with
@@ -429,6 +435,7 @@ let connect ?signed_in t ~send =
     ; wanted_host_id = None
     ; name = sprintf "client-%d" t.client_seq
     ; tools = false
+    ; features = []
     ; cwd = None
     ; agent
     ; placeholder
@@ -700,6 +707,13 @@ let hello t (client : Client.t) params =
       in
       Or_error.bind claimed ~f:(fun () ->
         client.tools <- tools;
+        client.features
+        <- (match param params "features" with
+            | Some (`Array items) ->
+              List.filter_map items ~f:(function
+                | `String feature -> Some feature
+                | _ -> None)
+            | _ -> []);
         let agent =
           match param params "session" with
           | Some (`String key) -> find_agent t client key

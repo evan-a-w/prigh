@@ -40,9 +40,11 @@ let spec =
          , `Boolean
          , "Start it as a background job and return at once with the job id. \
             You are notified with the exit status and output tail when it \
-            exits; job_output, job_wait and job_kill act on it meanwhile. Use \
-            for anything that may take over a minute or keeps running (builds, \
-            test suites, servers, watchers)." )
+            exits; job_output, job_wait, job_input and job_kill act on it \
+            meanwhile. Use for anything that may take over a minute or keeps \
+            running (builds, test suites, servers, watchers), or that reads \
+            input you send with job_input (its stdin is a pipe, not a \
+            terminal)." )
        ])
 ;;
 
@@ -105,6 +107,7 @@ let run_foreground (context : Tool.Context.t) args =
     Process.run
       ~env:context.env
       ~cwd:context.cwd
+      ?input:context.stdin
       ~timeout
       ~cancel:context.cancel
       ~on_stdout:on_data
@@ -251,16 +254,21 @@ let job_outcome (result : Tool_result.t) ~output =
 ;;
 
 let start_job background ~command ~run =
+  let stdin = Stdin_feed.create () in
   Background_tasks.spawn
     background
     ~kind:Job
     ~label:command
+    ~input:stdin
     ~run:(fun ~id ~cancel ~emit:_ ~on_output ->
       let tail = Output_tail.create ~capacity:65_536 () in
       let result =
-        run ~id ~cancel ~on_output:(fun chunk ->
-          Output_tail.add tail chunk;
-          on_output chunk)
+        Exn.protect
+          ~finally:(fun () -> Stdin_feed.finish stdin)
+          ~f:(fun () ->
+            run ~id ~cancel ~stdin ~on_output:(fun chunk ->
+              Output_tail.add tail chunk;
+              on_output chunk))
       in
       job_outcome result ~output:tail)
 ;;
@@ -281,9 +289,15 @@ let run (context : Tool.Context.t) args =
     ignore (Tool_args.int_opt args "timeout" : int option);
     let arguments = foreground_arguments args in
     let id =
-      start_job background ~command ~run:(fun ~id ~cancel ~on_output ->
+      start_job background ~command ~run:(fun ~id ~cancel ~stdin ~on_output ->
         Tool.execute_via
-          { context with cancel; on_output; call_id = id; background = None }
+          { context with
+            cancel
+          ; on_output
+          ; call_id = id
+          ; background = None
+          ; stdin = Some stdin
+          }
           foreground_tool
           arguments)
     in

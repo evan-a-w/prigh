@@ -406,7 +406,12 @@ let with_test_driver ~client ~(terminal : Test_terminal.t) ~writer ~reader f =
 let connection_hello hello ~host_id =
   match host_id with
   | None -> hello @ [ "tools", `False ]
-  | Some id -> hello @ [ "tools", `True; "host_id", `String id ]
+  | Some id ->
+    hello
+    @ [ "tools", `True
+      ; "host_id", `String id
+      ; "features", `Array [ `String "exec_input" ]
+      ]
 ;;
 
 let run ~connect ~hello ~local_tools =

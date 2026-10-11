@@ -7,6 +7,10 @@ open! Import
 
 val tool : Tool.t
 
+(** Saves a long output in full where the model can read it (under
+    [$TMPDIR/prigh-output/], kept for 7 days) and returns its path. *)
+val save_output : Tool.Context.t -> string -> string
+
 (** [bash] without the [background] parameter, for subagents. *)
 val foreground_tool : Tool.t
 
@@ -15,14 +19,17 @@ val foreground_tool : Tool.t
 val starts_job : Tool.Context.t -> Json.t -> bool
 
 (** Starts a job for [command]. [run] runs it in the foreground (with
-    [foreground_arguments]) and its output goes to [on_output]; the outcome's
-    status is read from the result's trailer ([exited N], [killed], ...). *)
+    [foreground_arguments]), its stdin fed from [stdin] (the task's
+    {!Background_tasks.Task.input}, for [job_input]), and its output goes to
+    [on_output]; the outcome's status is read from the result's trailer
+    ([exited N], [killed], ...). *)
 val start_job
   :  Background_tasks.t
   -> command:string
   -> run:
        (id:string
         -> cancel:Cancellation.t
+        -> stdin:Stdin_feed.t
         -> on_output:(string -> unit)
         -> Tool_result.t)
   -> string

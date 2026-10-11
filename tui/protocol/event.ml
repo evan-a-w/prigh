@@ -96,8 +96,14 @@ type t =
       ; name : string
       ; arguments : Json.t
       ; cwd : string
+      ; stdin : bool (** keep a stdin pipe open: a background job *)
       } (** run this tool on our machine (we are the active host) *)
   | Tool_exec_cancel of string
+  | Tool_exec_input of
+      { exec_id : string
+      ; data : string
+      ; close : bool
+      } (** text for a running exec's stdin, then maybe end it *)
   | Terminal_open of
       { term_id : string
       ; key : string
@@ -200,10 +206,16 @@ let rec of_json j =
     let%bind call_id = Json.string_field j "call_id" in
     let%bind name = Json.string_field j "name" in
     let%bind arguments = Json.object_field j "arguments" in
-    let%map cwd = Json.string_field j "cwd" in
-    Tool_exec { exec_id; call_id; name; arguments; cwd }
+    let%bind cwd = Json.string_field j "cwd" in
+    let%map stdin = Json.bool_default_field j "stdin" ~default:false in
+    Tool_exec { exec_id; call_id; name; arguments; cwd; stdin }
   | "tool_exec_cancel" ->
     Json.string_field j "exec_id" >>| fun id -> Tool_exec_cancel id
+  | "tool_exec_input" ->
+    let%bind exec_id = Json.string_field j "exec_id" in
+    let%bind data = Json.string_field j "data" in
+    let%map close = Json.bool_default_field j "close" ~default:false in
+    Tool_exec_input { exec_id; data; close }
   | "terminal_open" ->
     let%bind term_id = Json.string_field j "term_id" in
     let%bind key = Json.string_field j "key" in

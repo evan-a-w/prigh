@@ -61,8 +61,8 @@ let list_dirs ~cwd prefix =
   |> fun items -> Tool.Result.ok (Json.to_string (`Array items))
 ;;
 
-let read_file ~env ~cancel ~cwd path =
-  Tool_read.read_for_context ~env ~cancel ~cwd path
+let read_file ~env ~cancel ~seen ~cwd path =
+  Tool_read.read_for_context ~env ~cancel ?seen ~cwd path
 ;;
 
 let instructions_op = "$instructions"
@@ -288,7 +288,17 @@ let host_tools () =
   instructions_tool :: List.filter Tools.builtin ~f:(fun t -> t.spec.on_host)
 ;;
 
-let execute ~mcp:hub ~env ~cancel ~on_output ~cwd ~name ~(arguments : Json.t) =
+let execute
+      ~mcp:hub
+      ~env
+      ?stdin
+      ~cancel
+      ~on_output
+      ~cwd
+      ~name
+      ~(arguments : Json.t)
+      ()
+  =
   let string_arg key =
     match arguments with
     | `Object fields ->
@@ -305,7 +315,8 @@ let execute ~mcp:hub ~env ~cancel ~on_output ~cwd ~name ~(arguments : Json.t) =
   else if String.equal name read_file_op
   then (
     match string_arg "path" with
-    | Ok path -> read_file ~env ~cancel ~cwd path
+    | Ok path ->
+      read_file ~env ~cancel ~seen:(Seen_files.of_args arguments) ~cwd path
     | Error e -> Tool.Result.error (Error.to_string_hum e))
   else if String.equal name list_paths_op
   then (
@@ -335,6 +346,8 @@ let execute ~mcp:hub ~env ~cancel ~on_output ~cwd ~name ~(arguments : Json.t) =
     with
     | None -> Tool.Result.error (sprintf "unknown host tool %S" name)
     | Some tool ->
-      let context = Tool.Context.create ~cancel ~on_output ~env ~cwd () in
+      let context =
+        Tool.Context.create ~cancel ~on_output ?stdin ~env ~cwd ()
+      in
       Tool.execute tool context arguments)
 ;;

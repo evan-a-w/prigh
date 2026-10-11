@@ -14,6 +14,7 @@ module Block = struct
         ; name : string
         ; arguments : Buffer.t
         }
+    | Server_tool of Content.Server_tool.t ref
 
   let to_content = function
     | Text b -> Content.Text (Buffer.contents b)
@@ -21,6 +22,7 @@ module Block = struct
       Thinking { text = Buffer.contents text; signature }
     | Tool_call { id; name; arguments; index = _ } ->
       Tool_call { id; name; arguments = Buffer.contents arguments }
+    | Server_tool tool -> Server_tool !tool
   ;;
 end
 
@@ -30,6 +32,12 @@ type t =
   }
 
 let create ~model = { model; blocks = [] }
+
+let server_tool t id =
+  List.find_map t.blocks ~f:(function
+    | Server_tool tool when String.equal !tool.id id -> Some tool
+    | Text _ | Thinking _ | Tool_call _ | Server_tool _ -> None)
+;;
 
 let apply t (event : Assistant_event.t) =
   match event, t.blocks with
@@ -54,10 +62,40 @@ let apply t (event : Assistant_event.t) =
     (match
        List.find t.blocks ~f:(function
          | Tool_call c -> c.index = index
-         | Text _ | Thinking _ -> false)
+         | Text _ | Thinking _ | Server_tool _ -> false)
      with
      | Some (Tool_call c) -> Buffer.add_string c.arguments arguments
-     | Some (Text _ | Thinking _) | None -> ())
+     | Some (Text _ | Thinking _ | Server_tool _) | None -> ())
+  | Server_tool_use { id; name; input }, _ ->
+    (match server_tool t id with
+     | Some tool -> tool := { !tool with name; input }
+     | None ->
+       t.blocks
+       <- Server_tool
+            (ref
+               { Content.Server_tool.id
+               ; name
+               ; input
+               ; output = None
+               ; is_error = false
+               ; raw = None
+               })
+          :: t.blocks)
+  | Server_tool_result { id; output; is_error; raw }, _ ->
+    (match server_tool t id with
+     | Some tool -> tool := { !tool with output = Some output; is_error; raw }
+     | None ->
+       t.blocks
+       <- Server_tool
+            (ref
+               { Content.Server_tool.id
+               ; name = ""
+               ; input = "{}"
+               ; output = Some output
+               ; is_error
+               ; raw
+               })
+          :: t.blocks)
 ;;
 
 let content t = List.rev_map t.blocks ~f:Block.to_content

@@ -765,7 +765,14 @@ let message_first_line (m : P.Message.t) =
          | _ -> None)
      with
      | Some text -> first_line text
-     | None -> "(assistant)")
+     | None ->
+       (match
+          List.find_map content ~f:(function
+            | P.Content.Server_tool s -> Some s
+            | _ -> None)
+        with
+        | Some s -> Tool_summary.server_tool_line s
+        | None -> "(assistant)"))
   | P.Message.Tool_result { tool_name; text; _ } ->
     let line = first_line text in
     if String.is_empty line then tool_name else line
@@ -3099,6 +3106,7 @@ let event m (e : P.Event.t) =
   | Subagent_end _
   | Tool_exec _
   | Tool_exec_cancel _
+  | Tool_exec_input _
   | Terminal_open _
   | Terminal_frame _
   | Terminal_close _ -> m, []

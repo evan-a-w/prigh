@@ -50,6 +50,19 @@ val post
   -> unit
   -> (Response.t * string, Error.t) Result.t
 
+(** A GET whose body goes to [on_chunk] as it arrives; an exception raised
+    by [on_chunk] ends the request and propagates. *)
+val get_stream
+  :  env:Env.t
+  -> ?cancel:Cancellation.t
+  -> ?timeout:Time_ns.Span.t
+  -> ?on_response:(Response.t -> unit)
+  -> url:string
+  -> headers:(string * string) list
+  -> on_chunk:(string -> unit)
+  -> unit
+  -> (Response.t, Error.t) Result.t
+
 val get
   :  env:Env.t
   -> ?cancel:Cancellation.t

@@ -717,7 +717,7 @@ let%expect_test "abort mid-subagent cancels the child and returns" =
       update (Tool_call_delta(index 0)(arguments"{\"task\":\"long\"}"))
     message_end assistant ""
     tool_start subagent {"task":"long"}
-    subagent_start p1/p1 task="long" model=deepseek-flash tools=[bash,read,write,edit,ls,grep,find,subagent]
+    subagent_start p1/p1 task="long" model=deepseek-flash tools=[bash,read,write,edit,ls,grep,find,web_fetch,subagent]
     subagent p1/p1: agent_start
     subagent p1/p1: message_start user "long"
     subagent p1/p1: message_end

@@ -54,7 +54,8 @@ val with_test_driver
 (** The [hello] sent on every connection: [hello] plus [tools], [true] with
     a [host_id] (this machine's, see {!Prigh_client_unix.Host_id}), so that
     the backend knows our tool host again when we reconnect or restart (and
-    resumes its sessions on it). *)
+    resumes its sessions on it), and the [features] our tool host has
+    ([exec_input]: it forwards [Tool_exec_input] to running tools). *)
 val connection_hello
   :  (string * Prigh_protocol.Json.t) list
   -> host_id:string option

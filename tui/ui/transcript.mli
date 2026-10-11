@@ -42,6 +42,8 @@ module Item : sig
         ; live_tail : string option
         ; subagent : Subagent.t option
         }
+    | Server_tool of P.Content.Server_tool.t
+    (** a tool the provider ran (web search), among the reply's text *)
     | Notice of Severity.t * string
     | Block of Content.t
     | Compaction of string

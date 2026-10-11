@@ -77,6 +77,7 @@ module Worker = struct
     ; default_cwd : string
     ; send : Reply.t -> unit
     ; running : Cancellation.t String.Table.t
+    ; inputs : Stdin_feed.t String.Table.t (** execs whose stdin stays open *)
     ; viewers : Terminal_channel.Fed.t String.Table.t
     }
 
@@ -88,6 +89,7 @@ module Worker = struct
     ; default_cwd
     ; send
     ; running = String.Table.create ()
+    ; inputs = String.Table.create ()
     ; viewers = String.Table.create ()
     }
   ;;
@@ -111,23 +113,35 @@ module Worker = struct
       let cwd = Option.value (string_field json "cwd") ~default:t.default_cwd in
       let cancel = Cancellation.create () in
       Hashtbl.set t.running ~key:exec_id ~data:cancel;
+      let stdin =
+        match field json "stdin" with
+        | Some `True ->
+          let feed = Stdin_feed.create () in
+          Hashtbl.set t.inputs ~key:exec_id ~data:feed;
+          Some feed
+        | _ -> None
+      in
       Fiber.fork ~sw:t.sw (fun () ->
         let result =
           match
             Host_ops.execute
               ~mcp:(Some t.mcp)
               ~env:t.env
+              ?stdin
               ~cancel
               ~on_output:(fun chunk -> t.send (Output { exec_id; chunk }))
               ~cwd
               ~name
               ~arguments
+              ()
           with
           | result -> result
           | exception exn ->
             Tool.Result.error (sprintf "%s failed: %s" name (Exn.to_string exn))
         in
         Hashtbl.remove t.running exec_id;
+        Hashtbl.remove t.inputs exec_id;
+        Option.iter stdin ~f:Stdin_feed.finish;
         t.send (Result { exec_id; result }))
     | _ -> ()
   ;;
@@ -184,6 +198,19 @@ module Worker = struct
     | "cancel" ->
       Option.iter (string_field json "exec_id") ~f:(fun exec_id ->
         Option.iter (Hashtbl.find t.running exec_id) ~f:Cancellation.cancel)
+    | "input" ->
+      Option.iter
+        (Option.bind (string_field json "exec_id") ~f:(Hashtbl.find t.inputs))
+        ~f:(fun feed ->
+          ignore
+            (Stdin_feed.write
+               feed
+               (Option.value (string_field json "data") ~default:"")
+               ~close:
+                 (match field json "close" with
+                  | Some `True -> true
+                  | _ -> false)
+             : unit Or_error.t))
     | "terminal_open" -> terminal_open t json
     | "terminal_frame" ->
       Option.iter (viewer t json) ~f:(fun fed ->
@@ -290,6 +317,7 @@ let run ~env ?terminals ~input ~output () =
 let worker_kind = function
   | "tool_exec" -> Some "exec"
   | "tool_exec_cancel" -> Some "cancel"
+  | "tool_exec_input" -> Some "input"
   | ("terminal_open" | "terminal_frame" | "terminal_close") as kind -> Some kind
   | _ -> None
 ;;
@@ -341,6 +369,7 @@ let serve_connection
                  ; Some ("cwd", `String cwd)
                  ; Some ("tools", `True)
                  ; Some ("host_id", `String host_id)
+                 ; Some ("features", `Array [ `String "exec_input" ])
                  ]) )
         ]);
   let worker =

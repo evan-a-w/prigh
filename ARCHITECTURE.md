@@ -109,6 +109,14 @@ When the active host is a client, `Agent.host_exec` emits a
 `tool_exec` event to that client only and waits on a promise; the client
 answers with `tool_exec_output` (streamed chunks, fanned out to everyone as
 `tool_output`) and `tool_exec_result`; an abort sends `tool_exec_cancel`.
+A background job's exec carries `stdin: true` (the host keeps the process's
+stdin open) and `job_input` reaches it as `tool_exec_input {exec_id, data,
+close}` events, to the host only. Hosts announce what they support beyond
+that in `hello`'s `features` (`exec_input`, sent by `prigh tool-host` and
+the TUI with local tools; `Agent.Host.exec_input`): a job on a host without
+it gets a `Stdin_feed` that refuses writes with "runs an older prigh ...
+update it". A tool an older host does not know (`unknown host tool`) gets
+the same advice appended.
 Disconnecting the active host fails its in-flight calls with `[tool host
 disconnected]`, but the session stays on that host: later calls fail with
 "waiting for tool host NAME to reconnect; /host picks another" (the run
@@ -158,9 +166,14 @@ while it is waiting on the browser.
 ### Model layer
 
 - `Content` — assistant content blocks: `Text`, `Thinking {text;
-  signature}`, `Tool_call {id; name; arguments}`. The thinking signature is
-  provider-opaque (Anthropic block signatures, OpenAI encrypted reasoning
-  items) and is echoed back only to the provider that produced it.
+  signature}`, `Tool_call {id; name; arguments}`, `Server_tool {id; name;
+  input; output; is_error; raw}` (a tool the provider ran itself: web
+  search; `output` is a readable summary, `raw` the provider's wire data).
+  The thinking signature and a server tool's `raw` are provider-opaque
+  (Anthropic block signatures, OpenAI encrypted reasoning items, search
+  results with encrypted content) and are echoed back only to the provider
+  that produced them; other providers get a server tool as text
+  (`Server_tool.as_text`).
 - `Message` — `User | Assistant | Tool_result`; assistant messages carry
   usage, stop reason and the `provider/id` key of the model that wrote them.
   User messages and tool results carry `images` (`Image.t`: MIME type and
@@ -173,7 +186,9 @@ while it is waiting on the browser.
   for the model; without one, images within the hard limits go as they are.
 - `Assistant_event` / `Assistant_builder` — the streaming delta vocabulary
   (`Text_delta`, `Thinking_delta`, `Thinking_signature`, `Tool_call_start`,
-  `Tool_call_delta`) and the accumulator that turns deltas into a message.
+  `Tool_call_delta`, `Server_tool_use {id; name; input}` (adds the block or
+  updates its input), `Server_tool_result {id; output; is_error; raw}`) and
+  the accumulator that turns deltas into a message.
   Every provider emits these, so the loop, the session and the UI never see
   provider wire formats.
 - `Provider_id` — `Anthropic | Openai | Openai_codex | Deepseek | Custom of
@@ -221,7 +236,11 @@ becomes a list):
   `reasoning_content` (DeepSeek needs it on tool-call turns).
 - `Deepseek` — `Openai_chat` with DeepSeek's URL and quirks. Its models take
   no images: each becomes a line saying it was omitted.
-- `Anthropic` — Messages API. Consecutive same-role turns are merged, the
+- `Anthropic` — Messages API. The `web_search` tool is sent as the
+  server tool `web_search_20250305` (`max_uses` 5); `server_tool_use` blocks
+  (input from `input_json_delta`s, emitted at `content_block_stop`) and
+  `web_search_tool_result` blocks (results or `error_code`, kept as `raw`)
+  become `Server_tool_*` events; `pause_turn` ends the turn. Consecutive same-role turns are merged, the
   last block and the system blocks carry cache breakpoints, thinking blocks
   are replayed only with a signature. With an OAuth token (Claude Pro/Max) the
   request is shaped like Claude Code's: Bearer auth, `claude-cli` user agent,
@@ -232,7 +251,11 @@ becomes a list):
   the ChatGPT Codex backend (`chatgpt.com/backend-api/codex/responses`, OAuth
   access token plus `chatgpt-account-id`). Requests use `store: false` and
   replay reasoning items through `encrypted_content`, stored verbatim as the
-  thinking signature. Both get `prompt_cache_key` from
+  thinking signature. `web_search` is sent as `{"type":"web_search"}` with
+  `web_search_call.action.sources` included; `web_search_call` items become
+  `Server_tool_*` events (the action without its sources as input, the
+  sources or what was opened as output, the item as `raw`, replayed as an
+  input item). Both get `prompt_cache_key` from
   `Request.cache_key` (the session id; `<session>/<agent id>` for a
   subagent; `btw` reuses the session's); custom servers are not sent it.
 - `Provider_router` — the `Provider.t` the agent actually holds. On every
@@ -354,6 +377,36 @@ two can share one.
   of every run (so tools follow host and cwd changes), adds the tools to the
   run's and its subagents' tool lists, and reports each problem once as a
   `Notice`.
+- `Seen_files` — the guard against clobbering: `write`, and
+  `apply_patch`'s `*** Add File:`/`*** Move to:` over an existing file, are
+  refused unless the file's current contents are what the agent last read
+  or wrote (an MD5 per path; the error says to read it first, or that it
+  changed N seconds ago and must be read again). `edit` and patch updates
+  are not blocked but note a change. The record lives where the files are:
+  a process-wide table on the tool host (the backend's for its own host),
+  keyed by the session id that `Agent.executor` adds to `read`/`write`/
+  `edit`/`apply_patch` calls (and `$read_file` attachments) as the hidden
+  argument `$seen_scope`, so subagents share it; it is bounded (2000 files
+  per scope, 200 scopes, least recently used dropped). A restarted host, a
+  host switch or an evicted entry leave the file unseen: the agent is asked
+  to read it again. Calls without a scope (older backends) are unchecked.
+- `Tool_web_fetch` / `Html_text` — `web_fetch` runs on the active host
+  (`on_host`, so `localhost` is the host's; a host predating it answers
+  `unknown host tool`), through `Http_client.get_stream`: up to 10
+  redirects, a 5 MB body limit, a 30 s default timeout (at most 120). HTML
+  goes through `Html_text` (a hand-written tokenizer and renderer: headings,
+  lists, links resolved against the final URL, `pre` fences, tables,
+  quotes; scripts, styles, `nav` and form controls dropped; only `main`,
+  else `article`, when present; entities decoded), text types pass through
+  (Latin-1 converted), images are attached through `Image.load`, other types
+  are refused with a `curl` hint. The result starts `URL (HTTP 200, type,
+  size)` and a `Title:` line; long text is cut like `bash` output with the
+  full text saved (`Tool_bash.save_output`). HTTP errors keep the start of
+  the body. Not destructive.
+- `Tool_web_search` — `web_search` is a provider-side tool: `Tools.for_model`
+  keeps it only for Anthropic, OpenAI and OpenAI Codex models, whose
+  providers send their native tool for it; its `run` only answers a model
+  that calls it as a function anyway.
 - `Tool_bash` (streamed output, timeout, cancellation; long output keeps
   its beginning and end (`Truncate.head_and_tail`) and the full output is
   saved under `$TMPDIR/prigh-output/` on the host, kept for 7 days, its
@@ -406,8 +459,17 @@ two can share one.
   foreground result's trailer (`[exit code N]`, `[cancelled]`, `[killed by
   ...]`, `[timed out ...]`), its body is the last 40 lines of output.
   `Tool_jobs` has `job_status`, `job_output` (`lines`, `offset` from the
-  end), `job_wait` and `job_kill`; like the subagent controls they and
-  `background` itself are dropped below depth 0.
+  end), `job_wait`, `job_input` and `job_kill`; like the subagent controls
+  they and `background` itself are dropped below depth 0. Every job (the
+  model's and `!&cmd`) has a `Stdin_feed` (`Background_tasks.Task.input`):
+  `Tool_bash.start_job` puts it in the foreground call's context
+  (`Tool.Context.stdin`), so locally `Process.run ~input` keeps the
+  process's stdin open and copies the feed's items into it (a `Close` closes
+  it), and on a client host `Agent` forwards them as `tool_exec_input`
+  events, the host's worker feeding its own `Stdin_feed`. Other processes
+  still get an empty stdin. `job_input` writes (and optionally closes) and
+  returns the output that follows (`Output_tail.since`): until it is quiet
+  for 300 ms after something arrived, the job exits or `wait_ms` pass.
 - `Tools.all` is the fixed built-in set; `Tools.builtin` adds the variants
   (`apply_patch`) that a tool host can also run. `Tools.for_model` gives a
   model the file editor it is trained on: `apply_patch` for OpenAI's GPT-5
@@ -607,7 +669,10 @@ two can share one.
   time it sends them: a `message_end` is sent as its message is appended,
   so it agrees with `get_messages` to within milliseconds. A streaming
   assistant message's `message_start` has its start, its `message_end` its
-  end (the time frontends keep).
+  end (the time frontends keep). A server tool block is `{type:
+  "server_tool", id, name, input (JSON text), output?, is_error}` (no
+  `raw`), streamed as the deltas `server_tool_use {id, name, input}` and
+  `server_tool_result {id, output, is_error}`; pi-web gets it as text.
 - `Rpc_server` — the connection and session manager: a table of live
   agents by session id, a table of clients, and per-connection
   `serve_lines` (`serve_connection` over newline-delimited flows, or one
@@ -901,6 +966,23 @@ copy of the protocol types and the e2e test guards the contract.
     `/budget`'s amount; their argument completion only offers a keyword
     (`off`, `resume`, `now`, `cancel`) the typed text starts, so Enter sends
     a goal as typed.
+  - Provider-side tools, `web_fetch` and `job_input`: `prigh_protocol`
+    decodes the `server_tool` content block (`Content.Server_tool`) and the
+    `server_tool_use`/`server_tool_result` deltas. `Transcript.apply` turns
+    them into a `Server_tool` item placed among the reply's text (a use
+    delta adds it or updates it by id, a result fills it in, `message_end`
+    has the last word), rendered by `Tool_render.server_tool` as a step
+    (`web_search "query"`, running until it has output, `N results` with
+    the first five linked in normal and all in verbose, red when
+    `is_error`). `Tool_summary` (shared with prigh-web) reads search
+    results and `web_fetch`'s `URL (details)` header and words `job_input`
+    calls (`job_input j1 "print(1)\n"`, `close stdin`); `web_fetch` shows its
+    URL as a link, the details as a chip and the page cut like other
+    output. `Event` has `Tool_exec.stdin` and `Tool_exec_input`; the
+    terminal's `Tool_host` forwards them to its `prigh tool-host` worker
+    (`"stdin": true` on `exec`, `{"type":"input",…}`), and
+    `Term_app.connection_hello` with local tools announces `"features":
+    ["exec_input"]`.
   - `Key.t` → `Intent.t` through `Keymap` (the one binding table; `/help`
     prints it). `Mode.t` (`Editing | Picker | Login_prompt | Text_prompt |
     Confirm | Search`) says who owns the keyboard; dialogs never stack, Esc
@@ -1021,7 +1103,11 @@ copy of the protocol types and the e2e test guards the contract.
       `Tool_view` (a card per tool: bash, read with images, write, edit
       with `Line_diff`/`Diff_view`, apply_patch file by file,
       ls/grep/find, subagents (marked with `data-call` and `data-agent`
-      for the agents panel), jobs),
+      for the agents panel), jobs and `job_input`, `web_fetch` with its URL
+      as a link and the page folded, and `server_tool`, the card a
+      `web_search` block gets among the message's text, from the streamed
+      partial message: a spinner while it runs, then a folded list of
+      result links),
       `Delivery_view` (reports of finished background work, parsed by
       `ui/`'s `Delivery`), `Markdown` (a total parser that also renders
       streaming prefixes) and `Markdown_view`, `Image_view`,
@@ -1212,6 +1298,22 @@ job tools, abort, kills that really end the process, id continuity across a
 reload, and jobs on a real `prigh tool-host` connected over TCP (output
 streamed into the job, `kill_job` cancelling the exec on the host, a dropped
 connection failing the job).
+
+`backend/test/test_seen_files.ml` covers the overwrite guard: `write`
+over unseen, changed and touched files, other sessions and unscoped calls,
+`edit`'s and `apply_patch`'s notes, `*** Add File:` and `*** Move to:`
+over unseen files, the bounded record, a session whose subagent writes what
+the parent read, and a real `prigh tool-host` restarted in between (it has
+forgotten). `test_job_input.ml` covers `Process.run ~input`, `job_input`
+driving a local job, the `tool_exec`/`tool_exec_input` protocol with a host
+that announced `exec_input` and with one that did not, and the stdio
+worker's `input` lines. `test_web_fetch.ml` covers `Html_text` and
+`web_fetch` against `Fake_http_server` (HTML, text, JSON, Latin-1, sniffed
+HTML, images, binary types, redirects and loops, 404/500, bad URLs,
+timeouts, refused connections, truncation and the size limit);
+`test_web_search.ml` the providers' server tool streams, replay to the
+same and other providers, pi-web's view, which models get `web_search`,
+and a search saved in a session and streamed to clients.
 
 `backend/test/test_host_reconnect.ml` covers tool hosts going away: a
 session stays on its disconnected host (also when another host attaches),

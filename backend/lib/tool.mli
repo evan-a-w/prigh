@@ -28,6 +28,9 @@ and context =
   ; halt : unit -> string option
     (** why no further turn may start (the session's budget is spent), polled
         by subagents before each of their turns *)
+  ; stdin : Stdin_feed.t option
+    (** input for the process this call starts (a background job's [bash]);
+        without it the process's stdin is empty *)
   }
 
 (** Runs a tool call. [Agent] installs one that forwards [on_host] tools to
@@ -47,6 +50,7 @@ module Context : sig
     -> ?background:Background_tasks.t
     -> ?cache_key:string
     -> ?halt:(unit -> string option)
+    -> ?stdin:Stdin_feed.t
     -> env:Env.t
     -> cwd:string
     -> unit

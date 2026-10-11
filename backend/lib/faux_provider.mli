@@ -37,7 +37,9 @@ module Reply : sig
   val usage_limit : ?resets_at:float -> unit -> t
 
   (** Parses a single scripted reply:
-      [{ text; thinking; tool_calls; stop_reason; usage; chunks }], where
+      [{ text; thinking; searches; tool_calls; stop_reason; usage; chunks }],
+      where [searches] are provider-side web searches ([{query; output;
+      error}], before the text), and
       [stop_reason] is [end_turn], [length], [error] (with [error], the
       message), [context_overflow] or [usage_limit] (with an optional
       [resets_at], seconds since the epoch). *)

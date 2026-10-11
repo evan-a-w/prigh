@@ -44,6 +44,9 @@ module Task : sig
   (** What [run] wrote to its [on_output]. *)
   val output : t -> Output_tail.t
 
+  (** A job's stdin. *)
+  val input : t -> Stdin_feed.t option
+
   (** [[<kind> <id> <status>] <label>] followed by the body. *)
   val report : t -> string
 end
@@ -90,7 +93,8 @@ val connect
     id, the task's own cancellation token, the event sink (whose events also
     update a subagent's last activity) and the output sink. *)
 val spawn
-  :  t
+  :  ?input:Stdin_feed.t
+  -> t
   -> kind:Kind.t
   -> label:string
   -> run:

@@ -515,6 +515,27 @@ summary:focus-visible { outline: 2px solid var(--sodium); outline-offset: 2px; b
 .tool-head .arg.command { color: var(--fg); }
 .tool-head .arg.command::before { content: "$ "; color: var(--faint); }
 .tool-head .arg.task { font-family: var(--sans); font-size: 13.5px; color: var(--fg); }
+.tool-head .arg.query { color: var(--fg); }
+.tool-head a.arg.url {
+  text-decoration: underline;
+  text-decoration-color: var(--sodium-line);
+  text-underline-offset: 3px;
+}
+.tool-head a.arg.url:hover { color: var(--fg); text-decoration-color: var(--sodium); }
+/* A web search's results: a title linking to its page, then the address. */
+ol.results {
+  margin: 6px 0 0;
+  padding-left: 22px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  font-size: 13px;
+}
+ol.results > li::marker { color: var(--faint); font: 12px var(--mono); }
+ol.results > li { min-width: 0; overflow-wrap: anywhere; }
+ol.results .title { color: var(--fg); text-decoration: none; }
+ol.results a.title:hover { text-decoration: underline; text-decoration-color: var(--sodium); text-underline-offset: 3px; }
+ol.results .url { margin-left: 8px; font: 11.5px var(--mono); color: var(--faint); }
 .tool-head > .icon, .tool-head > .spinner {
   width: 16px;
   text-align: center;

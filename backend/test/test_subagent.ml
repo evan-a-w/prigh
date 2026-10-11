@@ -51,7 +51,7 @@ let%expect_test "tools subset is passed to the child; unknown names error" =
      (is_error false))
     ((read))
     ((text
-      "invalid arguments: unknown tool \"nope\"; valid tools: bash, read, write, edit, ls, grep, find, subagent")
+      "invalid arguments: unknown tool \"nope\"; valid tools: bash, read, write, edit, ls, grep, find, web_fetch, subagent")
      (is_error true))
     |}]
 ;;
@@ -120,7 +120,8 @@ let%expect_test
   [%expect
     {|
     ((gpt-5 (read apply_patch)) (claude-opus-4-6 (edit))
-     (gpt-5 (bash read write apply_patch ls grep find subagent)))
+     (gpt-5
+      (bash read write apply_patch ls grep find web_fetch web_search subagent)))
     |}]
 ;;
 
@@ -209,11 +210,11 @@ let%expect_test "a subagent may delegate once; the grandchild cannot" =
   print_s [%sexp (List.rev !ends : (string * Usage.t * int) list)];
   [%expect
     {|
-    ((bash read write edit ls grep find subagent)
-     (bash read write edit ls grep find subagent)
-     (bash read write edit ls grep find)
-     (bash read write edit ls grep find subagent)
-     (bash read write edit ls grep find subagent))
+    ((bash read write edit ls grep find web_fetch web_search subagent)
+     (bash read write edit ls grep find web_fetch subagent)
+     (bash read write edit ls grep find web_fetch)
+     (bash read write edit ls grep find web_fetch subagent)
+     (bash read write edit ls grep find web_fetch web_search subagent))
     4
     ((c1 ((input 40) (output 18) (cache_read 5)) 2))
     |}]
@@ -273,7 +274,7 @@ let%expect_test "Agent.state rolls up subagent usage and cost" =
   [%expect
     {|
     (a1 "look around" deepseek-flash
-     (bash read write edit ls grep find subagent))
+     (bash read write edit ls grep find web_fetch subagent))
     (a1 ((input 10) (output 5) (cache_read 0)) 1 9E-06)
     (((input 50) (output 23) (cache_read 5)) 4.113E-05)
     |}]

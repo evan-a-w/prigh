@@ -530,7 +530,7 @@ let%expect_test "job ids continue after a reload; subagents cannot start jobs" =
          .parameters);
   [%expect
     {|
-    (bash read write edit ls grep find subagent)
+    (bash read write edit ls grep find web_fetch web_search subagent)
     {"type":"object","properties":{"command":{"type":"string","description":"The command to run"},"timeout":{"type":"integer","description":"Timeout in seconds (default 600, none in the background). The command is killed when it expires."}},"required":["command"],"additionalProperties":false}
     |}]
 ;;

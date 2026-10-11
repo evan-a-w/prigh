@@ -125,6 +125,8 @@ let rec summarise (e : Event.t) : string option =
          result.text)
   | Tool_exec { name; _ } -> Some (sprintf "tool_exec %s" name)
   | Tool_exec_cancel id -> Some (sprintf "tool_exec_cancel %s" id)
+  | Tool_exec_input { exec_id; _ } ->
+    Some (sprintf "tool_exec_input %s" exec_id)
   | Terminal_open { term_id; _ } -> Some (sprintf "terminal_open %s" term_id)
   | Terminal_frame _ -> None
   | Terminal_close id -> Some (sprintf "terminal_close %s" id)

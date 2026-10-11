@@ -160,6 +160,24 @@ module Reply = struct
   let context_overflow () = error context_overflow_message
   let usage_limit ?resets_at () = error (usage_limit_message ?resets_at ())
 
+  (* [searches]: [{query, output, error?}], provider-side web searches. *)
+  let json_searches json =
+    match Json.member "searches" json with
+    | Some (`Array items) ->
+      List.map items ~f:(fun item ->
+        let field name =
+          match Json.member name item with
+          | Some (`String s) -> s
+          | _ -> ""
+        in
+        ( field "query"
+        , field "output"
+        , match Json.member "error" item with
+          | Some `True -> true
+          | _ -> false ))
+    | _ -> []
+  ;;
+
   let of_json json =
     Or_error.bind (json_string json "text") ~f:(fun text ->
       Or_error.bind (json_string json "thinking") ~f:(fun thinking ->
@@ -181,6 +199,22 @@ module Reply = struct
                       List.map (split_chunks s chunks) ~f:(fun c ->
                         Assistant_event.Text_delta c))
                   in
+                  let search_events =
+                    List.concat_mapi
+                      (json_searches json)
+                      ~f:(fun i (query, output, is_error) ->
+                        let id = sprintf "srvtoolu_faux_%d" (i + 1) in
+                        [ Assistant_event.Server_tool_use
+                            { id
+                            ; name = Tool_web_search.name
+                            ; input =
+                                Json.to_string
+                                  (`Object [ "query", `String query ])
+                            }
+                        ; Server_tool_result
+                            { id; output; is_error; raw = None }
+                        ])
+                  in
                   let call_events =
                     List.concat_map
                       calls
@@ -189,7 +223,11 @@ module Reply = struct
                         ; Assistant_event.Tool_call_delta { index; arguments }
                         ])
                   in
-                  { events = thinking_events @ text_events @ call_events
+                  { events =
+                      thinking_events
+                      @ search_events
+                      @ text_events
+                      @ call_events
                   ; stop_reason
                   ; usage
                   }))))))

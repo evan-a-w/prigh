@@ -9,6 +9,8 @@ let all =
   ; Tool_ls.tool
   ; Tool_grep.tool
   ; Tool_find.tool
+  ; Tool_web_fetch.tool
+  ; Tool_web_search.tool
   ]
 ;;
 
@@ -43,7 +45,11 @@ let for_model model tools =
   in
   let replaced = ref false in
   List.filter_map tools ~f:(fun t ->
-    if not (is_editor t)
+    if
+      Tool_web_search.is_spec t.Tool.spec
+      && not (Tool_web_search.supported model)
+    then None
+    else if not (is_editor t)
     then Some t
     else if !replaced
     then None
@@ -61,6 +67,7 @@ let background_control =
   ; "job_status"
   ; "job_output"
   ; "job_wait"
+  ; "job_input"
   ; "job_kill"
   ]
 ;;

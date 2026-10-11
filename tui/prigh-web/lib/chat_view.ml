@@ -181,7 +181,8 @@ let rec assistant times chat (message : Message.Assistant.t) ~streaming =
           ~streaming:(streaming && last)
           ~running:(Chat.running chat)
           call
-          (Chat.tool chat call.id))
+          (Chat.tool chat call.id)
+      | Server_tool s -> Tool_view.server_tool ~running:streaming s)
   in
   let blocks = present blocks in
   let pending =
@@ -235,7 +236,7 @@ and entry times chat (entry : Chat.Entry.t) =
     | Assistant { message; _ } ->
       List.filter_map message.content ~f:(function
         | Tool_call call -> Some (Chat.tool chat call.id)
-        | Text _ | Thinking _ -> None)
+        | Text _ | Thinking _ | Server_tool _ -> None)
     | Shell call -> [ Chat.tool chat call.id ]
     | User _ | Notice _ | Compaction _ -> []
   in

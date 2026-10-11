@@ -24,7 +24,15 @@ module H = struct
     }
 end
 
-let make_server ?token ?namespace ?(backend_host = true) t ~sw ~provider =
+let make_server
+      ?token
+      ?namespace
+      ?(backend_host = true)
+      ?(tools = Tools.all)
+      t
+      ~sw
+      ~provider
+  =
   let login = login_manager t ~sw in
   let sessions_dir = Filename.concat t.dir "sessions" in
   let new_agent ?session ~cwd () =
@@ -32,7 +40,7 @@ let make_server ?token ?namespace ?(backend_host = true) t ~sw ~provider =
       ~env:t.env
       ~sw
       ~provider
-      ~tools:Tools.all
+      ~tools
       ~sessions_dir
       ~home:t.dir
       ?session

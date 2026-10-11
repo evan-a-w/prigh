@@ -38,6 +38,16 @@ let content (c : Content.t) =
       ; "name", str call.name
       ; "arguments", str call.arguments
       ]
+  | Server_tool tool ->
+    `Object
+      ([ "type", str "server_tool"
+       ; "id", str tool.id
+       ; "name", str tool.name
+       ; "input", str tool.input
+       ]
+       @ Option.value_map tool.output ~default:[] ~f:(fun output ->
+         [ "output", str output ])
+       @ [ "is_error", bool tool.is_error ])
 ;;
 
 (* Only when there are any. *)
@@ -107,6 +117,20 @@ let delta (d : Assistant_event.t) =
       [ "type", str "tool_call_delta"
       ; "index", int index
       ; "arguments", str arguments
+      ]
+  | Server_tool_use { id; name; input } ->
+    `Object
+      [ "type", str "server_tool_use"
+      ; "id", str id
+      ; "name", str name
+      ; "input", str input
+      ]
+  | Server_tool_result { id; output; is_error; raw = _ } ->
+    `Object
+      [ "type", str "server_tool_result"
+      ; "id", str id
+      ; "output", str output
+      ; "is_error", bool is_error
       ]
 ;;
 
@@ -445,7 +469,7 @@ let rec event ?now (e : Agent.Event.t) =
       ; "steer_texts", `Array (List.map steer ~f:str)
       ; "follow_up_texts", `Array (List.map follow_up ~f:str)
       ]
-    | Tool_exec { host; exec_id; call_id; name; arguments; cwd } ->
+    | Tool_exec { host; exec_id; call_id; name; arguments; cwd; stdin } ->
       [ "event", str "tool_exec"
       ; "host", str host
       ; "exec_id", str exec_id
@@ -453,6 +477,14 @@ let rec event ?now (e : Agent.Event.t) =
       ; "name", str name
       ; "arguments", arguments
       ; "cwd", str cwd
+      ]
+      @ if stdin then [ "stdin", `True ] else []
+    | Tool_exec_input { host; exec_id; data; close } ->
+      [ "event", str "tool_exec_input"
+      ; "host", str host
+      ; "exec_id", str exec_id
+      ; "data", str data
+      ; "close", bool close
       ]
     | Tool_exec_cancel { host; exec_id } ->
       [ "event", str "tool_exec_cancel"

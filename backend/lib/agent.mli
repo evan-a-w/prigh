@@ -16,6 +16,9 @@ module Host : sig
     ; cwd : string
     ; session_id : string option (** the session the client is attached to *)
     ; session_name : string option
+    ; exec_input : bool [@sexp.bool]
+      (** it takes [Tool_exec_input] (its [hello] listed the [exec_input]
+          feature) *)
     }
   [@@deriving sexp_of, equal]
 
@@ -94,10 +97,18 @@ module Event : sig
         ; name : string
         ; arguments : Json.t
         ; cwd : string
+        ; stdin : bool
+          (** the process gets a stdin pipe fed by [Tool_exec_input] *)
         }
     | Tool_exec_cancel of
         { host : string
         ; exec_id : string
+        }
+    | Tool_exec_input of
+        { host : string
+        ; exec_id : string
+        ; data : string
+        ; close : bool (** close stdin after [data] *)
         }
   [@@deriving sexp_of]
 end

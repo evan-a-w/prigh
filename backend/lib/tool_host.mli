@@ -7,6 +7,8 @@ open! Import
     forwards the backend's events as JSON lines:
     - [{"type":"exec","exec_id","name","arguments","cwd"}]
     - [{"type":"cancel","exec_id"}]
+    - [{"type":"input","exec_id","data","close"}] (stdin for an exec that
+      had ["stdin": true])
     - [{"type":"terminal_open","term_id","key","cwd","cols","rows"}]
     - [{"type":"terminal_frame","term_id","kind","data"}]
     - [{"type":"terminal_close","term_id"}]
@@ -34,8 +36,9 @@ val run
   -> unit
 
 (** Connects to a backend's JSON-lines port as an RPC client, says [hello]
-    as a tool host and serves its [tool_exec], [tool_exec_cancel] and
-    [terminal_*] events, reconnecting with exponential backoff (from
+    as a tool host (with the feature [exec_input]) and serves its
+    [tool_exec], [tool_exec_cancel], [tool_exec_input] and [terminal_*]
+    events, reconnecting with exponential backoff (from
     [initial_backoff], default 0.5s, up to [max_backoff], default 10s) when
     the connection fails or drops. Every [hello] carries the same [host_id]
     (default: a random {!Host_id.generate}; [prigh tool-host] passes

@@ -55,13 +55,22 @@ let user_message ~text (images : Image.t list) : Json.t =
   `Object [ "role", `String "user"; "content", content ]
 ;;
 
+(* This API has no server tools: another provider's searches become text. *)
+let text_with_server_tools (a : Message.Assistant.t) =
+  List.filter_map a.content ~f:(function
+    | Content.Text s -> Some s
+    | Server_tool tool -> Some ("\n" ^ Content.Server_tool.as_text tool ^ "\n")
+    | Thinking _ | Tool_call _ -> None)
+  |> String.concat
+;;
+
 let assistant_message ~(quirks : Quirks.t) (a : Message.Assistant.t) : Json.t =
   let thinking = Message.Assistant.thinking a in
   let tool_calls = Message.Assistant.tool_calls a in
   `Object
     (List.concat
        [ [ "role", `String "assistant"
-         ; "content", `String (Message.Assistant.text a)
+         ; "content", `String (text_with_server_tools a)
          ]
        ; (if (not quirks.replay_reasoning) || String.is_empty thinking
           then []

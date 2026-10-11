@@ -31,6 +31,7 @@ let run
       ?cwd
       ?(extra_env = [])
       ?(stdin = "")
+      ?input
       ?timeout
       ?(cancel = Cancellation.never)
       ?(on_stdout = ignore)
@@ -75,10 +76,29 @@ let run
   Eio.Flow.close stdout_w;
   Eio.Flow.close stderr_w;
   (* The child may exit without reading its input; that must not be an error. *)
-  Fiber.fork ~sw (fun () ->
-    (try Eio.Flow.copy_string stdin stdin_w with
-     | Eio.Io _ -> ());
-    Eio.Flow.close stdin_w);
+  (match input with
+   | None ->
+     Fiber.fork ~sw (fun () ->
+       (try Eio.Flow.copy_string stdin stdin_w with
+        | Eio.Io _ -> ());
+       Eio.Flow.close stdin_w)
+   | Some input ->
+     (* A daemon: the process may exit without its input being closed. *)
+     Fiber.fork_daemon ~sw (fun () ->
+       let rec loop ~open_ =
+         match Stdin_feed.take input with
+         | Data data ->
+           if open_
+           then (
+             match Eio.Flow.copy_string data stdin_w with
+             | () -> loop ~open_
+             | exception Eio.Io _ -> loop ~open_:false)
+           else loop ~open_
+         | Close ->
+           if open_ then Eio.Flow.close stdin_w;
+           loop ~open_:false
+       in
+       loop ~open_:true));
   let drain () =
     Fiber.both
       (fun () -> pump stdout_r ~on_data:on_stdout)
@@ -103,6 +123,7 @@ let run
     | Some (Error `Timeout) -> `Timed_out
     | Some (Ok status) -> `Done status
   in
+  Option.iter input ~f:Stdin_feed.finish;
   let kill_and_reap () =
     Signal_unix.send_i Signal.kill (`Group (Pid.of_int (Eio.Process.pid child)));
     drain ();

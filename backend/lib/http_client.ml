@@ -106,7 +106,7 @@ let stream
          | Core_unix.Unix_error _
          | Tls_eio.Tls_alert _
          | Tls_eio.Tls_failure _ ) as exn) ->
-      Error (Error.Connection_failed (Exn.to_string exn))
+      Error (Error.Connection_failed (Net_error.to_string_hum exn))
     | resp, body ->
       let response =
         { Response.status = Http.Status.to_int (Http.Response.status resp)
@@ -137,6 +137,19 @@ let stream
 
 let post_stream ~env ?cancel ?timeout ?on_response ~url ~headers ~body =
   stream ~env ?cancel ?timeout ?on_response ~url ~headers ~body:(Some body)
+;;
+
+let get_stream ~env ?cancel ?timeout ?on_response ~url ~headers ~on_chunk () =
+  stream
+    ~env
+    ?cancel
+    ?timeout
+    ?on_response
+    ~url
+    ~headers
+    ~body:None
+    ~on_chunk
+    ()
 ;;
 
 let collect ~env ?cancel ?timeout ~url ~headers ~body () =

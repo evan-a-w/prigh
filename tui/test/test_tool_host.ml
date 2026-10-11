@@ -137,6 +137,37 @@ let%expect_test
   Client.close client
 ;;
 
+let%expect_test
+    "a background job gets a stdin pipe; its input goes to the worker in order"
+  =
+  let%bind client, _requests = connected_client () in
+  let worker, fake_worker = Transport.In_memory.create () in
+  let host =
+    Tool_host.create ~client ~spawn:(fun () -> Deferred.Or_error.return worker)
+  in
+  let to_worker = Transport.In_memory.Backend.requests fake_worker in
+  List.iter
+    ~f:(fun line -> Tool_host.handle host (event line))
+    [ {|{"type":"event","event":"tool_exec","host":"client-1","exec_id":"e1","call_id":"c1","name":"bash","arguments":{"command":"python3","background":true},"cwd":"/work","stdin":true}|}
+    ; {|{"type":"event","event":"tool_exec_input","host":"client-1","exec_id":"e1","data":"print(1)\n","close":false}|}
+    ; {|{"type":"event","event":"tool_exec_input","host":"client-1","exec_id":"e1","data":"","close":true}|}
+    ; {|{"type":"event","event":"tool_exec","host":"client-1","exec_id":"e2","call_id":"c2","name":"bash","arguments":{"command":"ls"},"cwd":"/work","stdin":false}|}
+    ];
+  let%bind () = print_next to_worker in
+  let%bind () = print_next to_worker in
+  let%bind () = print_next to_worker in
+  let%bind () = print_next to_worker in
+  [%expect
+    {|
+    {"type":"exec","exec_id":"e1","name":"bash","arguments":{"command":"python3","background":true},"cwd":"/work","stdin":true}
+    {"type":"input","exec_id":"e1","data":"print(1)\n","close":false}
+    {"type":"input","exec_id":"e1","data":"","close":true}
+    {"type":"exec","exec_id":"e2","name":"bash","arguments":{"command":"ls"},"cwd":"/work"}
+    |}];
+  Tool_host.close host;
+  Client.close client
+;;
+
 let with_home f = f (Filename_unix.temp_dir "prigh-tui-host-id" "")
 
 let hex_masked id =
@@ -199,9 +230,9 @@ let%expect_test "the hello carries one host id, also when reconnecting" =
   print_endline (hex_masked (Option.value_exn !host_id));
   [%expect
     {|
-    {"id":1,"method":"hello","params":{"name":"laptop","tools":true,"host_id":"<host-id>"}}
+    {"id":1,"method":"hello","params":{"name":"laptop","tools":true,"host_id":"<host-id>","features":["exec_input"]}}
     true
-    {"id":2,"method":"hello","params":{"name":"laptop","tools":true,"host_id":"<host-id>","session":"s1"}}
+    {"id":2,"method":"hello","params":{"name":"laptop","tools":true,"host_id":"<host-id>","features":["exec_input"],"session":"s1"}}
     true
     host-xxxxxxxxxxxxxxxx
     |}];

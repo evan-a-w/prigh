@@ -46,6 +46,7 @@ let with_agent ?tools ?on_request ?auto_describe replies f =
              (List.length follow_up))
       | Tool_exec { name; _ } -> Some ("tool_exec: " ^ name)
       | Tool_exec_cancel _ -> Some "tool_exec_cancel"
+      | Tool_exec_input _ -> Some "tool_exec_input"
     in
     Option.iter line ~f:(fun l -> Queue.enqueue log (mask t l)));
   let dump () =

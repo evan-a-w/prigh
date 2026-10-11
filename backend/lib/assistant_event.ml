@@ -16,4 +16,19 @@ type t =
       { index : int
       ; arguments : string
       }
+  | Server_tool_use of
+      { id : string
+      ; name : string
+      ; input : string
+      }
+  (** A provider-side tool (web search) started, or its input is complete:
+      adds the [Server_tool] block [id] or updates its input. *)
+  | Server_tool_result of
+      { id : string
+      ; output : string
+      ; is_error : bool
+      ; raw : string option [@sexp.option]
+      }
+  (** The result of the server tool [id]; [raw] is what to echo back to the
+      provider. *)
 [@@deriving sexp_of]

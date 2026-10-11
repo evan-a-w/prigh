@@ -15,11 +15,15 @@ module Exit : sig
   val is_success : t -> bool
 end
 
+(** [stdin] is written to the process's stdin, which is then closed; with
+    [input] instead, stdin stays open and gets [input]'s items until its
+    [Close] (or the process exits, which [finish]es [input]). *)
 val run
   :  env:Env.t
   -> ?cwd:string
   -> ?extra_env:(string * string) list
   -> ?stdin:string
+  -> ?input:Stdin_feed.t
   -> ?timeout:Time_ns.Span.t
   -> ?cancel:Cancellation.t
   -> ?on_stdout:(string -> unit)

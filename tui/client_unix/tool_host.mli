@@ -4,9 +4,9 @@ open Prigh_client
 
 (** Runs the session's tools and terminals on this machine: spawns
     [prigh tool-host] lazily and proxies between it and the backend. Feed it the
-    [Tool_exec], [Tool_exec_cancel] and [Terminal_*] events; it answers with
-    [tool_exec_output], [tool_exec_result], [terminal_frame] and
-    [terminal_closed] requests on the client. *)
+    [Tool_exec], [Tool_exec_cancel], [Tool_exec_input] and [Terminal_*]
+    events; it answers with [tool_exec_output], [tool_exec_result],
+    [terminal_frame] and [terminal_closed] requests on the client. *)
 type t
 
 (** Spawns [backend tool-host]. *)

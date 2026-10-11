@@ -111,6 +111,12 @@ let bool_field t name =
   | None -> missing name
 ;;
 
+let bool_default_field t name ~default =
+  match field t name with
+  | None -> Ok default
+  | Some _ -> bool_field t name
+;;
+
 let list_field t name ~f =
   match field t name with
   | Some (`Array items) ->

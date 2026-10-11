@@ -15,5 +15,9 @@ val total_bytes : t -> int
     output was dropped; a trailing unterminated line is included. *)
 val lines : t -> string list
 
+(** The retained output after the first [offset] bytes ever added (all that
+    is retained when older output was dropped). *)
+val since : t -> int -> string
+
 (** The last non-blank line. *)
 val last_line : t -> string option

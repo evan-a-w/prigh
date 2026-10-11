@@ -327,7 +327,8 @@ let%expect_test "tool host events and state hosts" =
       (call_id c1)
       (name    bash)
       (arguments ((command ls)))
-      (cwd /work)))
+      (cwd   /work)
+      (stdin false)))
     (Event (Tool_exec_cancel c1-0))
     (Event (
       State (
