@@ -1207,11 +1207,39 @@ let print_summary (s : Session.Summary.t) =
        String.prefix (String.strip p) 60))
 ;;
 
+(* Archived sessions come last under their own heading, as in the
+   frontends' pickers. Without a server, no session counts as active. *)
 let sessions_list_command =
   Command.basic
-    ~summary:"List saved sessions"
+    ~summary:
+      "List saved sessions, the archived ones (by hand, or idle for the \
+       config's archive_after_days) last"
     (Command.Param.return (fun () ->
-       List.iter (Session.list ~dir:(sessions_dir ())) ~f:print_summary))
+       let archive_after_days =
+         match Config.load ~home:(home ()) with
+         | Ok config -> config.archive_after_days
+         | Error e ->
+           eprintf
+             "%s; using the default archive_after_days\n"
+             (Error.to_string_hum e);
+           Config.default.archive_after_days
+       in
+       let now = Core_unix.gettimeofday () in
+       let archived, current =
+         List.partition_tf
+           (Session.list ~dir:(sessions_dir ()))
+           ~f:(fun s ->
+             Session.Summary.is_archived
+               s
+               ~now
+               ~archive_after_days
+               ~active:false)
+       in
+       List.iter current ~f:print_summary;
+       if not (List.is_empty archived)
+       then (
+         printf "archived:\n";
+         List.iter archived ~f:print_summary)))
 ;;
 
 let delete_sessions summaries =

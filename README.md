@@ -506,7 +506,7 @@ Then:
 tui/_build/default/bin/main.exe                # interactive TUI (PRIGH_BACKEND or the dune build)
 backend/_build/default/bin/main.exe run "explain this repo"    # headless
 backend/_build/default/bin/main.exe run -session ID "go on"     # continue a saved session (id, unique prefix or file)
-backend/_build/default/bin/main.exe sessions list          # saved sessions
+backend/_build/default/bin/main.exe sessions list          # saved sessions, the archived ones last under "archived:"
 backend/_build/default/bin/main.exe sessions delete ID...  # ids may be unique prefixes; nothing is deleted if one matches none or several
 backend/_build/default/bin/main.exe sessions prune -dry-run                        # empty sessions
 backend/_build/default/bin/main.exe sessions prune -max-messages 2 -cwd /tmp       # filters: -older-than DAYS, -prompt TEXT
