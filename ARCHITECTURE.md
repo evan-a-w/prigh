@@ -905,8 +905,8 @@ two can share one.
   "follow_up", index, text?}`, returning `{text, attachments}` like
   `dequeue`), `cancel_subagent`, `list_subagents`,
   `get_subagent`, `get_pending`, `kill_job`, `job_output`, `list_jobs`,
-  `shell`, `get_state`, `get_messages`,
-  `get_entries`, `set_model`, `set_thinking`, `list_models`, `compact`,
+  `shell`, `get_state`, `get_messages`, `get_messages_page`,
+  `get_tool_output`, `get_entries`, `set_model`, `set_thinking`, `list_models`, `compact`,
   `new_session`, `switch_session`, `list_sessions`, `set_session_name`,
   `delete_session`, `delete_sessions`, `delete_archived`, `set_archived`,
   `export`, `import`, `fork`, `clone`, `rewind`,
@@ -928,6 +928,20 @@ two can share one.
   [instructions]`) and `init`, and the file browser's `fs_list`,
   `fs_preview`, `fs_mkdir`, `fs_rename`, `fs_delete`, `fs_download` and
   `fs_upload` (`Files_rpc`, above).
+  `get_messages_page {limit, before?, from?, session?}` (`Message_page`,
+  for frontends that open a session at its end) answers `{messages,
+  older, before}`: the newest `limit` messages (a page never starts with
+  a tool result or a compaction summary, so it may be longer), or those
+  before the entry id `before`, or (with `from`, an entry id: what a
+  frontend has loaded, after reconnecting) everything from that one to
+  the newest; `older` counts the messages before them and `before` is the
+  cursor of the page before. Tool outputs longer than 8 KiB come cut to
+  their first and last 20 lines with `elided: {at, lines, bytes}`;
+  `get_tool_output {call_id, agent_id?}` has one whole, and `get_subagent
+  {elide: true}` cuts its transcript's the same way. `session` (a path or
+  id) reads a session without opening it (the sidebar fetching ahead);
+  sessions read from disk that way or evicted, and subagent logs, are
+  kept (`File_cache`) while their files are unchanged.
   `State` carries `active_host` and `hosts` (the backend first),
   `budget_usd`, `goal` (`{text, status: active|done|stopped,
   continuations, max_continuations, summary?, reason?}` or null) and
@@ -957,7 +971,8 @@ two can share one.
   to `File_http` (authorised by their tickets),
   anything else served from the web root (the built `tui/web-bin/site`,
   found via `-web-root`, `$PRIGH_WEB_ROOT` or next to the executable;
-  no `..`, no dot files). The token check is the same `hello` check as
+  no `..`, no dot files). Upgraded sockets set `TCP_NODELAY`, so that a
+  large reply's last segment does not wait for a delayed ACK. The token check is the same `hello` check as
   for TCP; the static files are public.
 - `Rpc_router` / `Namespace` — `-tokens name=token,...`: one `Rpc_server`
   per namespace, each with its own home (sessions, config, `auth.json`,
@@ -1347,12 +1362,16 @@ copy of the protocol types and the e2e test guards the contract.
       (`Rejoin`): `Backend_closed` → `Reconnect` with backoff behind a
       banner, keeping everything on show (transcript, draft, attachments,
       panels, dialogs and the confirmations and questions waiting). Back,
-      the state, `get_messages` (tagged `Resync`) and `get_pending`
-      (`Resync_pending`) are fetched again: `Chat.reconcile` merges the
-      messages into the transcript, keeping the same entry and call values
-      where nothing changed (so `Chat_view`'s caches, and the DOM and its
-      scroll position, stay), and only what is no longer waited for
-      closes. `Network false` drops the socket (`Drop_connection`);
+      the state, the messages (`get_messages_page` tagged `Resync`: `from`
+      the first one on show when older ones are not loaded, else all of
+      them, or the newest page while the session was still loading) and
+      `get_pending` (`Resync_pending`) are fetched again: `Chat.reconcile`
+      merges the messages into the transcript, keeping the same entry and
+      call values where nothing changed (so `Chat_view`'s caches, and the
+      DOM and its scroll position, stay, and so do the older pages loaded
+      and outputs fetched whole), and only what is no longer waited for
+      closes; when what was on show has gone from the session (rewound
+      meanwhile) its newest page replaces it. `Network false` drops the socket (`Drop_connection`);
       `Network true` and the page shown again reconnect at once with the
       backoff reset, or, while connected, `Probe_connection` (a `get_state`
       that must answer within 5s, else the socket is dropped). A refusal
@@ -1388,7 +1407,22 @@ copy of the protocol types and the e2e test guards the contract.
       from the backend opens `Dialog.Loading` at once; `App.reply` gives the
       replies it waits for (`loads`) to the handler only while it still
       shows, so Esc meanwhile has no side effects.
-    - The transcript: `Chat` (one agent: `get_messages` then events; each
+    - Paging: opening a session asks for its newest page
+      (`get_messages_page`, `Paging.size` messages, tagged `Page`) along
+      with `switch_session`; `Paging` above the transcript says how many
+      older messages there are, with a button, and `Paging_listeners` asks
+      for the page before (`Load_older`) as the user scrolls near the top,
+      then keeps what shows in place while it is added above
+      (`Keep_scroll_position`; `Chat.prepend` numbers entries downwards,
+      so the keyed entries already shown are not redrawn). `Chat_cache`
+      keeps the transcripts of the last 8 sessions shown (by path): going
+      back to one shows it at once, then its newest page refreshes it (kept
+      as it is, views and all, when unchanged); the sidebar fetches a
+      session's newest page ahead when the pointer rests on it, focuses or
+      presses it (`Prefetch_session`, one at a time). Outputs cut by the
+      backend (`elided`) show their first and last lines, and unfolding one
+      fetches it whole (`get_tool_output`, `Load_output`).
+    - The transcript: `Chat` (one agent: a page of messages then events; each
       tool call's streamed output and result; subagents' nested chats,
       fetched with `get_subagent` after a reload since `get_messages` only
       has their reports; `!cmd` runs as `Shell` entries), `Chat_view` (each
@@ -1616,7 +1650,10 @@ copy of the protocol types and the e2e test guards the contract.
     into the sign-in form, keeping `?session=`), keeps the chat's scroll
     position and the draft in sessionStorage (`Tab_memory`:
     `prigh-web.scroll`, `prigh-web.draft`, for the URL's session) and puts
-    them back after a reload, listens to `online`/`offline`, and installs
+    them back after a reload (the position as the distance from the end of
+    the transcript, saved on scrolling and when the page is hidden or left:
+    only the newest page loads at first, and older ones are loaded until
+    it is reached, until the user scrolls), listens to `online`/`offline`, and installs
     document listeners: keys (through `Keys`; a Tab no binding takes goes
     round the open dialog), the folds' buttons,
     pasted and dropped image files become attachments (PNG, JPEG, GIF,
@@ -1858,6 +1895,11 @@ position (within 4px), the draft and image kept, the transcript's DOM
 untouched (a marker attribute survives), no page load and no sign-in
 page; a reload returns to the same session, scroll position and draft,
 also when the backend is out of reach as the page loads (a wrapped
-`WebSocket`), until an `online` event.
+`WebSocket`), until an `online` event. Then `paging.mjs`: a 40-turn
+session written into the backend's `HOME` opens at its newest page (how
+many earlier messages, at the end); scrolling to the top loads the pages
+before, the message that showed staying in place (within 4px), up to the
+first message; a 2000-line output shows cut and loads whole when unfolded;
+a reload scrolled up into an older page comes back to the same place.
 `SHOTS=DIR` saves a screenshot per step, `UPDATE=1` re-records,
 `ENGINES=chromium` runs one browser.
