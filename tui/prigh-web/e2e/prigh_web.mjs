@@ -55,7 +55,7 @@ const script2 = [
   { text: "Noted." },
 ];
 // After another restart: a bash call that asks first, a question, a plan to
-// approve, then a session to archive.
+// approve, a run to queue messages in, then a session to archive.
 const script3 = [
   { text: "building", tool_calls: [{ id: "b1", name: "bash", arguments: { command: "echo built-ok" } }] },
   { text: "Built." },
@@ -77,6 +77,9 @@ const script3 = [
     ],
   },
   { text: "Implementing." },
+  // Long enough to queue messages while it runs.
+  { text: "waiting", tool_calls: [{ id: "w2", name: "bash", arguments: { command: "sleep 4" } }] },
+  { text: "Done waiting." },
   { text: "Noted." },
   { text: "Read the attachments." },
 ];
@@ -642,9 +645,22 @@ try {
   await bodyHas("reconnecting");
   await startServer(`127.0.0.1:${port}`, join(dir, "script3.json"));
   await bodyLacks("Connection lost");
-  await send("/mode ask");
+  // The thinking level and the mode sit beside the model, each a picker.
+  await show("the model, thinking and mode controls", ".controls");
+  await page.locator(".thinking-chip").click();
+  await page.locator(".modal .picker-item", { hasText: "high" }).waitFor();
+  await page.waitForTimeout(300); // its fade in
+  await show("the thinking picker", ".modal");
+  await page.locator(".modal .picker-item", { hasText: "high" }).click();
+  await page.locator(".thinking-chip:not(.awaiting) .chip-label", { hasText: "high" }).waitFor();
+  await page.locator(".mode-chip").click();
+  await page.locator(".modal .picker-item").first().waitFor();
+  await page.waitForTimeout(300); // its fade in
+  await show("the mode picker", ".modal");
+  await page.locator(".modal .picker-item", { hasText: "Asks: edits & commands" }).click();
   await page.locator(".toast", { hasText: "Mode: ask" }).waitFor();
-  await show("mode ask", ".status");
+  await page.locator(".mode-chip:not(.awaiting)", { hasText: "Asks: edits & commands" }).waitFor();
+  await show("mode ask", ".controls");
   await send("build it");
   await page.locator("#confirm").waitFor();
   await show("a confirmation", "#confirm");
@@ -665,22 +681,53 @@ try {
   await page.keyboard.press("Alt+M");
   // Each step is shown at once; the backend's replies settle on the last.
   await page.locator(".toast", { hasText: "Mode: plan" }).waitFor();
-  await page.waitForSelector(".status .mode.plan-mode");
-  await show("plan mode (Alt+M)", ".status");
+  await page.waitForSelector(".mode-chip.plan-mode:not(.awaiting)");
+  await show("plan mode (Alt+M)", ".controls");
+  await show("plan mode: the status line", ".status");
   await send("plan it");
   await page.locator("#confirm.plan-dialog").waitFor();
   await show("a plan to approve", "#confirm");
   await page.keyboard.press("y");
   await bodyHas("Implementing.");
   await idle();
-  await page.waitForFunction(() => !document.querySelector(".status .plan-mode"));
-  await show("the plan approved", ".status");
+  await page.waitForFunction(() => !document.querySelector(".mode-chip.plan-mode"));
+  await show("the plan approved", ".controls");
+  await show("the plan approved: the status line", ".status");
   await showTurn("implementing");
   await send("/permissions");
   await page.locator(".modal").waitFor();
   await show("permissions", ".modal");
   await page.keyboard.press("Escape");
   await page.waitForFunction(() => !document.querySelector(".modal"));
+
+  // 11b. Messages sent while the agent works wait above the composer, each
+  //      saying when it reaches the agent; one is removed, the other is
+  //      delivered (and said to be).
+  await send("wait a bit");
+  await page.locator(".btn.stop").waitFor();
+  await send("also check the docs");
+  await composer().fill("then write the changelog");
+  await composer().press("Alt+Enter");
+  await page.waitForFunction(() => document.querySelectorAll(".queue .queued").length === 2);
+  await page.waitForTimeout(300); // their rise
+  await show("two queued messages", ".queue");
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.waitForFunction(() => document.querySelector(".app.narrow:not(.sidebar-open)"));
+  await page.waitForTimeout(400); // the drawer's slide
+  await screenshot("phone: the controls and the queue");
+  await page.setViewportSize({ width: 1280, height: 800 });
+  await page.waitForFunction(() => document.querySelector(".app:not(.narrow)"));
+  await page.locator(".queued", { hasText: "then write the changelog" }).locator(".queued-remove").click();
+  await page.waitForFunction(() => document.querySelectorAll(".queue .queued").length === 1);
+  await page.locator(".toast", { hasText: "Removed from the queue" }).waitFor();
+  await show("one removed", ".queue");
+  await page.locator(".toast", { hasText: "Steer delivered" }).waitFor();
+  await page.waitForSelector(".queue", { state: "detached" });
+  await bodyHas("Done waiting.");
+  await idle();
+  section("the steer delivered");
+  console.log(clean(await page.locator(".toast", { hasText: "Steer delivered" }).innerText()));
+  await showTurn("the steer in the transcript");
 
   // The layout at phone size.
   await page.setViewportSize({ width: 390, height: 844 });

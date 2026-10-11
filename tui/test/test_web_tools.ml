@@ -523,7 +523,7 @@ let%expect_test "streamed: text, a search running, its results, more text" =
       Eio is an effects-based IO library.
     ──────────────────────────────────────────────────────────────────────
     > ▏
-    /work  deepseek-flash  think:off  view:normal  ctx:0.1%/1.0M  $0.01
+    /work  deepseek-flash  think:off  mode:auto  ctx:0.1%/1.0M  $0.01
     |}]
 ;;
 
@@ -583,7 +583,7 @@ let%expect_test "loaded: searches in place among the text, folded then verbose" 
       Eio is an effects-based IO library.
     ──────────────────────────────────────────────────────────────────────
     > ▏
-    /work  deepseek-flash  think:off  view:normal  ctx:0.1%/1.0M  $0.01
+    /work  deepseek-flash  think:off  mode:auto  ctx:0.1%/1.0M  $0.01
     |}];
   String.iter "/verbosity verbose" ~f:(fun c ->
     H.step ~quiet:true h (Key (Key.char c)));
@@ -613,7 +613,7 @@ let%expect_test "loaded: searches in place among the text, folded then verbose" 
       view: verbose — everything is shown
     ──────────────────────────────────────────────────────────────────────
     > ▏
-    /work  deepseek-flash  think:off  view:verbose  ctx:0.1%/1.0M  $0.01
+    /work  deepseek-flash  think:off  mode:auto  ctx:0.1%/1.0M  $0.01
     |}]
 ;;
 

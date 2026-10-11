@@ -15,6 +15,7 @@ module Picker_kind = struct
     | Tree of Entry.t list
     | Agents
     | Jobs
+    | Queue
     | Modes (** [/mode]: approval modes and plan mode *)
     | Hosts
     | Skills

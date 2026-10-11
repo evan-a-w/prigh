@@ -137,7 +137,7 @@ let%expect_test "/btw: a newer question replaces the box; final reply; errors" =
     └──────────────────────────────────────────────────────────┘
     ────────────────────────────────────────────────────────────
     > ▏
-    …deepseek-flash  ctx:0.1%/1.0M  $0.01  Esc dismisses btw
+    …deepseek-flash  think:off  ctx:0.1%/1.0M  Esc dismisses btw
     |}];
   (* A finished answer needs no cancel. *)
   H.esc h;
@@ -170,7 +170,7 @@ let%expect_test "/btw: a newer question replaces the box; final reply; errors" =
     └──────────────────────────────────────────────────────────┘
     ────────────────────────────────────────────────────────────
     > ▏
-    …deepseek-flash  ctx:0.1%/1.0M  $0.01  Esc dismisses btw
+    …deepseek-flash  think:off  ctx:0.1%/1.0M  Esc dismisses btw
     |}];
   H.esc h;
   H.keys h "/btw";
@@ -185,7 +185,7 @@ let%expect_test "/btw: a newer question replaces the box; final reply; errors" =
       usage: /btw <question>
     ────────────────────────────────────────────────────────────
     > ▏
-    …deepseek-flash  think:off  ctx:0.1%/1.0M  $0.01
+    …deepseek-flash  think:off  mode:auto  ctx:0.1%/1.0M  $0.01
     |}]
 ;;
 
@@ -226,7 +226,7 @@ let%expect_test "/btw: a long answer shows its tail within half the screen" =
     └──────────────────────────────────────────────────────────┘
     ────────────────────────────────────────────────────────────
     > ▏
-    …deepseek-flash  ctx:0.1%/1.0M  $0.01  Esc dismisses btw
+    …deepseek-flash  think:off  ctx:0.1%/1.0M  Esc dismisses btw
     |}]
 ;;
 

@@ -273,8 +273,8 @@ Every action shows at once, before the backend answers: a session clicked
 in the sidebar lights its lamp while the chat shows the shape of a
 transcript (also while connecting, and for a new session), a prompt shows
 as "Sending…" with the send button busy until the transcript has it, a
-model or thinking level chosen shows (disabled, with the lamp) until the
-backend confirms it, and a command that lists something (`/login`, `/fork`,
+model, thinking level or approval mode chosen shows (disabled, with the
+lamp) until the backend confirms it, and a command that lists something (`/login`, `/fork`,
 `/tree`, `/session`, `/skills`, `/mcp`, `/setusr`…) opens its dialog with
 a loading row (Esc closes it, and the late answer then opens nothing).
 While the connection is down the composer is dashed and the status line
@@ -415,9 +415,17 @@ each expandable to the text the model saw, and `/fork` and `/tree` label
 them the same way. `/diff` is a dialog of the changed files (each folds,
 with its line counts); `/notify on|off` and the account menu control
 browser notifications while the tab is hidden, and the title (`(2) prigh`)
-and favicon count what happened meanwhile. The status line's mode chip
-(ask, auto-edit, plan) runs `/mode` and its plan chip (`plan 2/5: step`)
-`/todos`; Alt+M cycles the mode. A tool confirmation is a dialog with a
+and favicon count what happened meanwhile. Beside the model in the top bar
+the thinking level ("Thinking high", "No thinking" for a model without
+levels) and the approval mode ("Asks: edits & commands", "Asks: commands",
+"Auto: never asks", "Plan mode", lit) are always shown, each opening its
+picker (the modes with what each asks first); on a phone they get a row of
+their own under the title, with short labels (`high`, `ask`, `plan`).
+Alt+T and Alt+M cycle them. The status line's plan chip (`plan 2/5: step`)
+runs `/todos`. Steers and follow-ups sent while the agent works wait above
+the composer, each tagged "Steers this turn" or "After this turn", with
+Edit (back into the editor) and remove buttons; one leaving the queue says
+so ("Steer delivered: …") when it reaches the transcript. A tool confirmation is a dialog with a
 button per answer (y, a for always with the rule it adds, n, r for a
 reason typed in the dialog, Esc going back to the buttons), the plan of
 `exit_plan_mode` rendered as markdown; the model's questions are a dialog of
@@ -636,8 +644,12 @@ The status line is quiet gray: cwd, model, `think:`, `view:`, the context
 spent), and then whatever is going on — the goal (`goal:3/20`,
 `goal:done`, `goal:stopped`), a scheduled resume (`resumes 14:05`),
 `queued:N`, agents, jobs, the tool host — with the current mode's keys (`⠋ working · Esc aborts · Enter
-steers`, a picker's keys) in yellow. Queued steers and follow-ups are listed
-above the editor, one per line, until they are delivered. An unknown command
+steers`, a picker's keys) in yellow. `think:` and `mode:` are always there
+(at narrow widths they outlast the cost and the cwd; `view:` gives way to
+the cwd first). Queued steers and follow-ups (whichever frontend queued
+them) are listed above the editor, one per line, until they are delivered:
+Alt+Up takes the last back into the editor, and `/queue` picks any of them
+(Enter edits it, Ctrl+D removes it). An unknown command
 goes back into the editor as typed, the error naming the closest command
 (`/modle gpt`: did you mean `/model`?), and a failed `/switch` or `/cd` puts
 the command back with what to try next.
@@ -905,6 +917,7 @@ it.
 | `/export [path]`, `/import [path]` | markdown or `.jsonl` |
 | `/agents [cancel <n>]` | focus a subagent (Ctrl+D in the picker cancels one), or cancel subagent n |
 | `/jobs [<id>\|kill <id>]` | list background jobs (Enter shows recent output, Ctrl+D kills one), or show/kill one |
+| `/queue` | the queued steers and follow-ups (Enter takes one back into the editor, Ctrl+D removes it) |
 | `/host [name\|backend]` | pick where tools run, and the directory there |
 | `/abort` | abort the current run |
 | `/btw <question>` | ask a side question without interrupting the run |
@@ -988,8 +1001,9 @@ instructions if that seems worthwhile.
 
 ### Approvals, plan mode and questions
 
-Each session has an approval mode, shown in the status line (`mode:ask`,
-`mode:auto-edit`, `mode:plan`; nothing for `auto`) and switched with
+Each session has an approval mode, always shown in the status line
+(`mode:ask`, `mode:auto-edit`, `mode:auto`, `mode:plan`; in prigh-web
+beside the model) and switched with
 `/mode` or Alt+M (ask → auto-edit → auto → plan → ask):
 
 - `ask`: destructive tools (`bash`, `write`, `edit`, `apply_patch`,

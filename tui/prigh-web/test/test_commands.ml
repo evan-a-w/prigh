@@ -67,7 +67,7 @@ let%expect_test "every command does something (none is unknown)" =
     /change_default            rpc change_default
     /verbosity                 picker: Transcript verbosity
     /confirm                   picker: Tool confirmation
-    /mode                      picker: Mode (Alt+M cycles)
+    /mode                      picker: When tools ask first (Alt+M cycles)
     /plan                      rpc set_mode
     /todos                     toast: No plan: the model has not made one (it makes one with update_plan).
     /permissions               text: Permissions
@@ -438,7 +438,7 @@ let%expect_test "/confirm" =
     h
     "set_config"
     {|{"scoped_models":[],"confirm_tools":true,"default_model":null,"default_thinking":null}|};
-  H.text h ~selector:".status";
+  H.text h ~selector:".mode-chip";
   run h "/confirm off";
   run h "/confirm maybe";
   toasts h;
@@ -450,8 +450,7 @@ let%expect_test "/confirm" =
       (Config_saved
        "Tool confirmation on (mode ask, also for new sessions): bash, edits and MCP tools ask first")))
     (Expire_toast (id 0) (after_ms 4000))
-    Ready 0% ↑0 ↓0 $0.0000 (ask)
-    (Notifications not allowed yet: click to ask the browser)
+    (Asks: edits & commands)
     (Save_history ("/confirm off" /confirm))
     (Rpc (method_ set_config) (params ((config ((approval_mode auto)))))
      (tag

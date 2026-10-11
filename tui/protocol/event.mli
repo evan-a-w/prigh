@@ -55,8 +55,8 @@ type t =
   | Config_changed of Config.t
   | Notice of string
   | Queue_update of
-      { steer : int
-      ; follow_up : int
+      { steer : string list (** the queued texts, oldest first *)
+      ; follow_up : string list
       }
   | Subagent_start of
       { call_id : string

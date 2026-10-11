@@ -68,8 +68,8 @@ type t =
   | Config_changed of Config.t
   | Notice of string
   | Queue_update of
-      { steer : int
-      ; follow_up : int
+      { steer : string list
+      ; follow_up : string list
       }
   | Subagent_start of
       { call_id : string
@@ -183,8 +183,9 @@ let rec of_json j =
   | "notice" -> Json.string_field j "text" >>| fun t -> Notice t
   | "sessions_changed" -> Ok Sessions_changed
   | "queue_update" ->
-    let%bind steer = Json.int_field j "steer" in
-    let%map follow_up = Json.int_field j "follow_up" in
+    let texts name = Json.list_field j name ~f:Json.to_string_or_error in
+    let%bind steer = texts "steer_texts" in
+    let%map follow_up = texts "follow_up_texts" in
     Queue_update { steer; follow_up }
   | "subagent_start" ->
     let%bind call_id = Json.string_field j "call_id" in

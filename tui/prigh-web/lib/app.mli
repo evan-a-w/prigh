@@ -72,7 +72,8 @@ module Reply_tag : sig
     | Auth_status of Auth_purpose.t
     | Paths of string (** the completion prefix listed *)
     | Restored (** [abort]: queued prompts back to the editor *)
-    | Dequeued
+    | Dequeued (** [dequeue], or [remove_queued] to edit it *)
+    | Unqueued of string (** [remove_queued]: its text *)
     | Sessions_deleted (** [delete_sessions] or [delete_archived] *)
     | Archived_set of
         { title : string
@@ -279,6 +280,8 @@ module Action : sig
     | Cancel_subagent of string (** agent id *)
     | Kill_job of string (** job id *)
     | Dequeue (** the last queued message back into the editor *)
+    | Edit_queued of Queued.Message.t (** back into the editor *)
+    | Remove_queued of Queued.Message.t
     | Toggle_sidebar
     | Answer_confirm of
         { call_id : string
@@ -354,7 +357,7 @@ module Model : sig
     ; completion : Completion.t option
     ; history : History.t
     ; images : Image.t list (** attached to the next prompt *)
-    ; queue : int * int (** steer, follow-up *)
+    ; queue : Queued.t
     ; confirms : Pending.Confirm.t list
     ; confirm_reason : string option
       (** the oldest confirmation's reason, while typing it ([r]) *)
