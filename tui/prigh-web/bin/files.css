@@ -30,6 +30,7 @@
 .files-tool .icon, .files-close .icon { width: 16px; height: 16px; }
 .files-tool.on { color: var(--sodium); background: var(--sodium-wash); }
 .files-toggle.open { color: var(--sodium); background: var(--sodium-wash); }
+.app.files-open:not(.narrow) .toasts { right: calc(var(--files-width, 400px) + 16px); }
 
 /* The path: breadcrumbs, or the field typing one. */
 .files-crumbs {

@@ -380,7 +380,8 @@ let open_ t path =
 ;;
 
 let close t =
-  { t with open_ = false; ask = None; editing_path = None }, [ Out.Focus_editor ]
+  ( { t with open_ = false; ask = None; editing_path = None; preview = None }
+  , [ Out.Focus_editor ] )
 ;;
 
 let select t name =
@@ -629,7 +630,7 @@ let prompt_attachments t =
     Ok
       (List.filter_map t.attachments ~f:(fun a ->
          match a.status with
-         | Ready path -> Some path
+         | Ready path -> Some (mention t path)
          | Uploading _ | Failed _ -> None))
 ;;
 

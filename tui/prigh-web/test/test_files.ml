@@ -537,8 +537,7 @@ let%expect_test "paths into the composer, files attached from the browser" =
     Send
     (Save_history (@README.md))
     Scroll_to_bottom
-    (Rpc (method_ prompt)
-     (params ((text @README.md) (attachments (/home/me/proj/README.md))))
+    (Rpc (method_ prompt) (params ((text @README.md) (attachments (README.md))))
      (tag
       (Sent_with_files (text @README.md) (images ())
        (attachments
@@ -632,8 +631,7 @@ let%expect_test "files dropped on the composer upload into the chat's uploads" =
     (Save_history (summarise))
     Scroll_to_bottom
     (Rpc (method_ prompt)
-     (params
-      ((text summarise) (attachments (/home/me/proj/.prigh/uploads/report.pdf))))
+     (params ((text summarise) (attachments (.prigh/uploads/report.pdf))))
      (tag
       (Sent_with_files (text summarise) (images ())
        (attachments
