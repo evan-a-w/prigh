@@ -34,7 +34,6 @@ end
 
 type t =
   { open_ : bool
-  ; height : int option (** pixels, once dragged; the CSS default before *)
   ; generation : int
   ; status : (string * Status.t) option
     (** the latest report, for the target with this key *)
@@ -42,7 +41,6 @@ type t =
 [@@deriving sexp_of]
 
 val closed : t
-val min_height : int
 val target : t -> State.t -> hello:Hello_reply.t option -> Target.t
 
 (** The status of [target]'s connection. *)

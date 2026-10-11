@@ -25,6 +25,7 @@ let file ~fold (f : Diff_files.File.t) =
        | hunks ->
          Diff_view.unified
            ~max_rows:400
+           ?lang:(Highlight.Lang.of_path f.path)
            ~fold:(fold, f.path)
            (String.concat ~sep:"\n" hunks))
     ]

@@ -1,0 +1,45 @@
+/* Resize handles (lib/resize_view.ml) on the panels' inner edges: a hairline
+   that shows under the pointer, sodium while dragged or focused (arrow keys
+   move it). The sizes are CSS variables on .app, set from the model; while
+   dragging, the page sets them on the panel itself. */
+
+.resizer {
+  position: absolute;
+  z-index: 6;
+  touch-action: none;
+  outline: none;
+}
+.resizer[aria-orientation="vertical"] { top: 0; bottom: 0; width: 9px; cursor: col-resize; }
+.resizer[aria-orientation="horizontal"] { left: 0; right: 0; height: 9px; cursor: row-resize; }
+.resizer::after {
+  content: "";
+  position: absolute;
+  background: transparent;
+  transition: background-color 0.12s ease-out;
+}
+.resizer[aria-orientation="vertical"]::after { top: 0; bottom: 0; left: 4px; width: 1px; }
+.resizer[aria-orientation="horizontal"]::after { left: 0; right: 0; top: 4px; height: 1px; }
+.resizer:hover::after { background: var(--faint); }
+.resizer[aria-orientation="vertical"]:is(:hover, :focus-visible, .dragging)::after { left: 3px; width: 3px; }
+.resizer[aria-orientation="horizontal"]:is(:hover, :focus-visible, .dragging)::after { top: 3px; height: 3px; }
+.resizer:is(:focus-visible, .dragging)::after { background: var(--sodium); }
+
+/* Where each one sits. The sidebar's is in the flow, between it and the
+   chat; the others on their panel's edge. */
+.resizer-sidebar { position: relative; flex: none; margin: 0 -5px 0 -4px; }
+.resizer-files, .resizer-agents { left: -5px; }
+.resizer-terminal { top: -5px; }
+.resizer-files-split { position: relative; flex: none; margin: -4px 0 -5px; }
+
+/* While dragging: the cursor everywhere, no text selection, and nothing
+   underneath (the terminal, an image) takes the pointer. */
+body.resizing-x, body.resizing-x * { cursor: col-resize !important; user-select: none; }
+body.resizing-y, body.resizing-y * { cursor: row-resize !important; user-select: none; }
+body:is(.resizing-x, .resizing-y) :is(.terminal-body, iframe, img) { pointer-events: none; }
+
+@media (prefers-reduced-motion: reduce) {
+  .resizer::after { transition: none; }
+}
+@media (forced-colors: active) {
+  .resizer:is(:hover, :focus-visible, .dragging)::after { background: Highlight; }
+}

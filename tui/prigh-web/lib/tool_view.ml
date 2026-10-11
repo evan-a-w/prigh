@@ -395,6 +395,7 @@ let present
         `Unified text
       | _ -> `Edits (Tool_args.edits args)
     in
+    let lang = Highlight.Lang.of_path (str "path") in
     let added, removed =
       match diff with
       | `Unified text -> Diff_view.unified_counts text
@@ -411,9 +412,9 @@ let present
     ; body =
         [ error_body
         ; (match diff with
-           | `Unified text -> Diff_view.unified ~fold text
+           | `Unified text -> Diff_view.unified ?lang ~fold text
            | `Edits [] -> Node.none
-           | `Edits edits -> Diff_view.edits ~fold edits)
+           | `Edits edits -> Diff_view.edits ?lang ~fold edits)
         ]
     }
   | "apply_patch" ->
@@ -428,13 +429,15 @@ let present
     let single = List.length files = 1 in
     let added, removed = Patch.counts files in
     let diff (file : Patch.File.t) =
+      let lang = Highlight.Lang.of_path file.path in
       match file.kind, file.diff with
       | Delete, _ | _, Some [] -> Node.none
       | Update, Some lines ->
-        Diff_view.unified ~fold (String.concat ~sep:"\n" lines)
+        Diff_view.unified ?lang ~fold (String.concat ~sep:"\n" lines)
       | Add, _ when Option.is_some result_text ->
         let lines = Patch.File.lines file in
         Diff_view.unified
+          ?lang
           ~fold
           (String.concat
              ~sep:"\n"
@@ -442,7 +445,7 @@ let present
       | (Add | Update), _ ->
         (match file.input with
          | [] -> Node.none
-         | lines -> Diff_view.hunks ~fold lines)
+         | lines -> Diff_view.hunks ?lang ~fold lines)
     in
     let label (file : Patch.File.t) =
       let kind =

@@ -225,7 +225,7 @@ kbd {
 /* Sidebar */
 
 .sidebar {
-  width: 280px;
+  width: var(--sidebar-width, 280px);
   flex-shrink: 0;
   background: var(--slate);
   border-right: 1px solid var(--rule);

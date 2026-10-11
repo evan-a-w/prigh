@@ -237,9 +237,7 @@ let%expect_test
     1
     2
     3
-    # proj
-
-    hello
+    # proj hello
     Showing the first 14 B of 293.0 KB: download it for the rest.
     (Attach) (Download) (Mention) (Copy path) (Rename) (Delete)
     |}];

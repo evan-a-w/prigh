@@ -249,9 +249,14 @@ let%expect_test "fenced code, with and without a language" =
           <button type="button" title="Copy" class="copy"> Copy </button>
         </div>
         <pre class="copy-text">
-          <code class="language-ocaml"> let x = 1
+          <code class="language-ocaml">
+            <span class="hl-kw"> let </span>
+             x =
+            <span class="hl-num"> 1 </span>
 
-      indented </code>
+
+      indented
+          </code>
         </pre>
       </div>
       <div class="code copyable">
