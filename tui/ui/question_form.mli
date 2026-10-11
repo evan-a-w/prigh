@@ -41,6 +41,10 @@ val insert : t -> string -> t
 
 val backspace : t -> t
 
+(** The own answer replaced (a text field's whole value); the cursor goes to
+    its row. *)
+val set_own : t -> string -> t
+
 (** Enter: a single-choice question takes the choice under the cursor (or,
     on the own-answer row, the text instead); then the next question, or
     [`Done] with the answers after the last one. *)

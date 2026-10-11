@@ -119,8 +119,23 @@ let argument_items
       ]
   | Confirm ->
     simple
-      [ "on", "ask before bash, write and edit"
-      ; "off", "run tools without asking"
+      [ "on", "ask before bash, edits and MCP tools (mode ask)"
+      ; "off", "run tools without asking (mode auto)"
+      ]
+  | Mode ->
+    simple
+      (List.map Session_mode.names ~f:(fun name ->
+         ( name
+         , Option.value_map
+             (Session_mode.of_name
+                ~current:{ approval = Ask; plan = false }
+                name)
+             ~default:""
+             ~f:Session_mode.describe )))
+  | Plan ->
+    simple
+      [ "on", "read-only planning until you approve the plan"
+      ; "off", "leave plan mode"
       ]
   | Session ->
     List.map sessions ~f:(fun s ->

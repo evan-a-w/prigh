@@ -1,8 +1,8 @@
 open! Core
 open! Import
 
-(** The modal dialog that owns the keyboard (tool confirmations are separate:
-    they queue up and show above it). *)
+(** The modal dialog that owns the keyboard (tool confirmations and the
+    model's questions are separate: they queue up and show above it). *)
 
 module Picker_kind : sig
   type t =
@@ -12,6 +12,7 @@ module Picker_kind : sig
     | Logout
     | Verbosity
     | Confirm_tools
+    | Modes (** item ids are [Session_mode.label]s *)
     | Fork of Entry.t list (** item ids are entry ids *)
     | Rewind of Entry.t list
     | Tree

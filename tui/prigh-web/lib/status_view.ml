@@ -116,10 +116,10 @@ let user (m : App.Model.t) ~inject =
 
 (* Modes and settings that change what you see or what happens. *)
 let modes (m : App.Model.t) ~inject =
-  let chip ~title ~command text =
+  let chip ?(cls = "") ~title ~command text =
     Node.button
       ~attrs:
-        [ Attr.class_ "status-item link mode"
+        [ Attr.class_ (String.strip ("status-item link mode " ^ cls))
         ; Attr.type_ "button"
         ; Attr.title title
         ; Attr.on_click (fun _ -> inject (Action.Run command))
@@ -133,13 +133,32 @@ let modes (m : App.Model.t) ~inject =
          ~title:"Transcript verbosity (Ctrl+O cycles)"
          ~command:"/verbosity"
          (Prigh_ui.Verbosity.name v))
-  ; (match m.config with
-     | Some { approval_mode = Ask | Auto_edit; _ } ->
+  ; (match m.state with
+     | Some s ->
+       (* [auto], where nothing asks first, shows nothing. *)
+       let mode = Session_mode.of_state s in
+       if (not mode.plan) && Approval_mode.equal mode.approval Auto
+       then Node.none
+       else
+         chip
+           ~cls:(if mode.plan then "plan-mode" else "")
+           ~title:
+             (sprintf
+                "Mode: %s (/mode picks, Alt+M cycles)"
+                (Session_mode.describe mode))
+           ~command:"/mode"
+           (Session_mode.label mode)
+     | None -> Node.none)
+  ; (match
+       Option.bind m.state ~f:(fun s -> Option.bind s.plan ~f:Plan_view.status)
+     with
+     | Some text ->
        chip
-         ~title:"Tools ask before running (/confirm)"
-         ~command:"/confirm"
-         "confirm"
-     | _ -> Node.none)
+         ~cls:"plan"
+         ~title:"The model's plan (/todos)"
+         ~command:"/todos"
+         text
+     | None -> Node.none)
   ]
 ;;
 

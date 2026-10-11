@@ -198,6 +198,40 @@ let cancelled (r : Message.Tool_result.t) =
       || String.is_suffix text ~suffix:"[cancelled]")
 ;;
 
+let parsed_arguments (call : Tool_call.t) =
+  Result.ok (Json.parse call.arguments)
+;;
+
+let plan_of_arguments json = Option.join (Result.ok (Plan.of_arguments json))
+
+let questions_of_call call =
+  Option.bind (parsed_arguments call) ~f:(fun json ->
+    Result.ok (Json.list_field json "questions" ~f:Question.of_json))
+  |> Option.value ~default:[]
+;;
+
+let plan_list (plan : Plan.t) =
+  Node.div
+    ~attrs:[ Attr.class_ "plan" ]
+    [ Option.value_map plan.explanation ~default:Node.none ~f:(fun e ->
+        Node.p ~attrs:[ Attr.class_ "plan-explanation" ] [ Node.text e ])
+    ; Node.ul
+        ~attrs:[ Attr.class_ "plan-steps" ]
+        (List.map plan.steps ~f:(fun step ->
+           let status =
+             match step.status with
+             | Completed -> "step-done"
+             | In_progress -> "step-now"
+             | Pending -> "step-todo"
+           in
+           Node.li
+             ~attrs:[ Attr.class_ ("plan-step " ^ status) ]
+             [ span "mark" (Plan_view.mark step.status)
+             ; Node.text (" " ^ step.step)
+             ]))
+    ]
+;;
+
 type presentation =
   { arg : Node.t option
   ; chips : Node.t list
@@ -457,6 +491,71 @@ let present ~nested ~streaming ~live (call : Tool_call.t) ~result ~subagent =
          | None -> []
          | Some { is_error = true; _ } -> [ error_body ]
          | Some { text; _ } -> reports text)
+    }
+  | "update_plan" ->
+    (match parsed_arguments call |> Option.bind ~f:plan_of_arguments with
+     | None ->
+       { arg = None
+       ; chips = []
+       ; body =
+           [ (match result with
+              | Some r -> output ~error:r.is_error ~head:8 r.text
+              | None -> Node.none)
+           ]
+       }
+     | Some plan ->
+       { arg = None
+       ; chips =
+           [ chip
+               (sprintf
+                  "%d/%d done"
+                  (Plan.completed plan)
+                  (List.length plan.steps))
+           ]
+       ; body = [ error_body; plan_list plan ]
+       })
+  | "ask_user" ->
+    (match result with
+     | Some { is_error = false; text; _ } ->
+       { arg = None
+       ; chips = []
+       ; body =
+           [ output
+               ~head:12
+               (Option.value
+                  (String.chop_prefix text ~prefix:"The user answered:\n")
+                  ~default:text)
+           ]
+       }
+     | Some { is_error = true; _ } ->
+       { arg = None; chips = [ chip "no answer" ]; body = [ error_body ] }
+     | None ->
+       { arg = None
+       ; chips = [ chip ~cls:"waiting" "waiting for your answer" ]
+       ; body =
+           [ Node.ul
+               ~attrs:[ Attr.class_ "questions" ]
+               (List.map (questions_of_call call) ~f:(fun (q : Question.t) ->
+                  Node.li [ Node.text q.question ]))
+           ]
+       })
+  | "exit_plan_mode" ->
+    let plan = str "plan" in
+    { arg = None
+    ; chips =
+        (match result with
+         | Some { is_error = false; _ } -> [ chip ~cls:"ok" "approved" ]
+         | Some { is_error = true; text; _ }
+           when String.is_prefix text ~prefix:"[the user did not approve" ->
+           [ chip ~cls:"bad" "not approved" ]
+         | Some _ -> []
+         | None -> [ chip ~cls:"waiting" "waiting for your approval" ])
+    ; body =
+        [ (if String.is_empty (String.strip plan)
+           then Node.none
+           else div "plan" [ Markdown_view.render ~streaming plan ])
+        ; error_body
+        ]
     }
   | _ ->
     let arg = first_line (summary call) in

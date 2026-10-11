@@ -37,7 +37,7 @@ Shift+Tab: dialog: Done
 Shift+Tab: dialog: Keys
 after Esc: editor
 === chromium: a mistyped command ===
-Unknown command /modle. Did you mean /model? (/help lists them)
+Unknown command /modle. Did you mean /mode? (/help lists them)
 editor: /modle
 === chromium: bash run ===
 count some lines
@@ -249,6 +249,106 @@ back: the first one again
 $ echo still-here
 still-here
 $
+=== chromium: mode ask ===
+Ready
+0%
+↑0 ↓0
+$<COST>
+ask
+token
+=== chromium: a confirmation ===
+Confirm
+Run bash: echo built-ok?
+y
+allow once
+a
+always allow bash(echo:*) this session
+n
+deny
+r
+deny, saying why
+=== chromium: allowed always ===
+build it
+<TIME>
+building
+✓
+bash
+echo built-ok
+built-ok
+Built.
+<TIME>
+=== chromium: a question ===
+Storage
+Which database?
+○
+Postgres
+the one in prod
+○
+SQLite
+Other:
+Space or a click picks · ↑↓ choose · Enter accepts · Esc declines
+Decline
+Send
+=== chromium: answered ===
+ask me
+<TIME>
+one question
+✓
+ask_user
+Q: Which database?
+A: SQLite
+SQLite it is.
+<TIME>
+=== chromium: plan mode (Alt+M) ===
+Ready
+0%
+↑0 ↓0
+$<COST>
+plan
+token
+=== chromium: a plan to approve ===
+Plan
+Approve the plan and start implementing?
+Write the schema
+Test it
+y
+approve: leave plan mode and implement
+n
+keep planning
+r
+keep planning, saying what to change
+=== chromium: the plan approved ===
+Ready
+0%
+↑0 ↓0
+$<COST>
+plan 0/2: Write the schema
+token
+=== chromium: implementing ===
+◇
+plan mode on: the model was told to plan, not change files
+plan it
+<TIME>
+here is the plan
+✓
+update_plan
+0/2 done
+▸ Write the schema
+○ Test it
+✓
+exit_plan_mode
+approved
+Write the schema
+Test it
+Implementing.
+<TIME>
+=== chromium: permissions ===
+Permissions
+Mode: auto — tools run without asking
+Allowed this session: bash(echo:*)
+Rules are permissions in ~/.prigh/config.json, e.g. {"allow": ["bash(git status:*)"], "deny": ["bash(rm:*)"]}.
+/mode or Alt+M switches the mode.
+Done
 === chromium: errors ===
 none
 === chromium: accounts: sessions ===
@@ -374,7 +474,7 @@ Shift+Tab: dialog: Done
 Shift+Tab: dialog: Keys
 after Esc: editor
 === firefox: a mistyped command ===
-Unknown command /modle. Did you mean /model? (/help lists them)
+Unknown command /modle. Did you mean /mode? (/help lists them)
 editor: /modle
 === firefox: bash run ===
 count some lines
@@ -586,6 +686,106 @@ back: the first one again
 $ echo still-here
 still-here
 $
+=== firefox: mode ask ===
+Ready
+0%
+↑0 ↓0
+$<COST>
+ask
+token
+=== firefox: a confirmation ===
+Confirm
+Run bash: echo built-ok?
+y
+allow once
+a
+always allow bash(echo:*) this session
+n
+deny
+r
+deny, saying why
+=== firefox: allowed always ===
+build it
+<TIME>
+building
+✓
+bash
+echo built-ok
+built-ok
+Built.
+<TIME>
+=== firefox: a question ===
+Storage
+Which database?
+○
+Postgres
+the one in prod
+○
+SQLite
+Other:
+Space or a click picks · ↑↓ choose · Enter accepts · Esc declines
+Decline
+Send
+=== firefox: answered ===
+ask me
+<TIME>
+one question
+✓
+ask_user
+Q: Which database?
+A: SQLite
+SQLite it is.
+<TIME>
+=== firefox: plan mode (Alt+M) ===
+Ready
+0%
+↑0 ↓0
+$<COST>
+plan
+token
+=== firefox: a plan to approve ===
+Plan
+Approve the plan and start implementing?
+Write the schema
+Test it
+y
+approve: leave plan mode and implement
+n
+keep planning
+r
+keep planning, saying what to change
+=== firefox: the plan approved ===
+Ready
+0%
+↑0 ↓0
+$<COST>
+plan 0/2: Write the schema
+token
+=== firefox: implementing ===
+◇
+plan mode on: the model was told to plan, not change files
+plan it
+<TIME>
+here is the plan
+✓
+update_plan
+0/2 done
+▸ Write the schema
+○ Test it
+✓
+exit_plan_mode
+approved
+Write the schema
+Test it
+Implementing.
+<TIME>
+=== firefox: permissions ===
+Permissions
+Mode: auto — tools run without asking
+Allowed this session: bash(echo:*)
+Rules are permissions in ~/.prigh/config.json, e.g. {"allow": ["bash(git status:*)"], "deny": ["bash(rm:*)"]}.
+/mode or Alt+M switches the mode.
+Done
 === firefox: errors ===
 none
 === firefox: accounts: sessions ===

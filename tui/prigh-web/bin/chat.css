@@ -307,6 +307,16 @@ summary:focus-visible { outline: 2px solid var(--sodium); outline-offset: 2px; b
   text-align: center;
 }
 
+/* The backend's plan mode note: alone, or above what the user wrote */
+.mode-note {
+  display: flex;
+  gap: 6px;
+  color: var(--muted);
+  font-size: 12.5px;
+}
+.msg > .mode-note:only-child { justify-content: center; }
+.mode-note .icon { color: var(--sodium); }
+
 /* The conversation handed over to the next fallback model */
 .msg.handover {
   display: flex;
@@ -549,6 +559,18 @@ summary:focus-visible { outline: 2px solid var(--sodium); outline-offset: 2px; b
 .chip.bad, .chip.del { color: var(--brick); }
 .chip.ok, .chip.add { color: var(--sage); }
 .chip.job { color: var(--sodium); }
+.chip.waiting { color: var(--sodium); }
+
+/* update_plan's checklist, exit_plan_mode's plan */
+.tool-body .plan { padding: 4px 0; }
+.plan-explanation { margin: 0 0 4px; color: var(--muted); font-size: 12.5px; }
+.plan-steps { list-style: none; margin: 0; padding: 0; font-size: 13px; }
+.plan-step .mark { display: inline-block; width: 1.2em; font-family: var(--mono); }
+.plan-step.step-done { color: var(--muted); }
+.plan-step.step-done .mark { color: var(--sage); }
+.plan-step.step-now .mark { color: var(--sodium); }
+.plan-step.step-todo .mark { color: var(--faint); }
+.tool-body .questions { margin: 2px 0; padding-left: 18px; font-size: 13px; }
 
 .spinner {
   width: 12px;
