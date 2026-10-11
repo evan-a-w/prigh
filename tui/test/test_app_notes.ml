@@ -389,3 +389,103 @@ let%expect_test "/review and /init: sent to the backend; refusals go back to \
     …deepseek-flash  ctx:0.1%/1.0M  ⠋ working · Esc aborts · Enter steers
     |}]
 ;;
+
+let%expect_test "/notify: the setting, and notifications only while the \
+                 terminal is not focused"
+  =
+  let h = Test_app.connected ~width:100 ~height:10 () in
+  H.reply ~quiet:true h Config config_json;
+  let command text =
+    H.keys h text;
+    (* The first Enter takes the command (and offers its arguments). *)
+    if not (String.mem text ' ') then H.step ~quiet:true h (Key (Key.plain Enter));
+    H.enter h
+  in
+  command "/notify";
+  H.show h;
+  [%expect {|
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+
+    ▌ earlier question
+      earlier answer
+      notifications: the bell when a turn ends, a tool waits for you or background work finishes, while
+      this terminal is not focused (it has not reported focus yet: in tmux, set -g focus-events on)
+    ────────────────────────────────────────────────────────────────────────────────────────────────────
+    > ▏
+    /work  deepseek-flash  think:off  view:normal  ctx:0.1%/1.0M  $0.01
+    |}];
+  let finish () =
+    H.event h (Agent_end [ assistant "All tests pass.\nDetails follow." ])
+  in
+  (* The terminal has not said where the focus is, or it is focused: nothing. *)
+  finish ();
+  H.step h (Focus true);
+  finish ();
+  [%expect {| |}];
+  H.step h (Focus false);
+  finish ();
+  H.event
+    h
+    (Tool_confirm { call_id = "c1"; name = "bash"; summary = "rm -rf build" });
+  H.step ~quiet:true h (Key (Key.char 'n'));
+  H.event h (Message_start (delivery "[job j1 exited 0] make test\nok"));
+  (* A subagent's end is not the turn's. *)
+  H.event
+    h
+    (Subagent
+       { call_id = "c2"; agent_id = "a1"; event = Agent_end [ assistant "sub done" ] });
+  [%expect {|
+    (Notify
+      (mode Bell)
+      (notification (
+        (title "prigh: done in work")
+        (body  "All tests pass."))))
+    (Notify
+      (mode Bell)
+      (notification (
+        (title "prigh: waiting for you in work")
+        (body  "Allow bash: rm -rf build?"))))
+    (Notify
+      (mode Bell)
+      (notification (
+        (title "prigh: background work finished in work")
+        (body  Reports))))
+    |}];
+  command "/notify desktop";
+  H.reply ~quiet:true h (Notice_on_success "notifications: desktop") "{}";
+  finish ();
+  command "/notify off";
+  finish ();
+  command "/notify loud";
+  command "/notify";
+  H.show h;
+  [%expect {|
+    (Rpc
+      (method_ set_config)
+      (params ((config ((notify desktop)))))
+      (tag (
+        Notice_on_success
+        "notifications: a desktop notification when a turn ends, a tool waits for you or background work finishes, while this terminal is not focused")))
+    (Notify
+      (mode Desktop)
+      (notification (
+        (title "prigh: done in work")
+        (body  "All tests pass."))))
+    (Rpc
+      (method_ set_config)
+      (params ((config ((notify off)))))
+      (tag (
+        Notice_on_success
+        "notifications off (/notify bell or /notify desktop turns them on)")))
+      this terminal is not focused (it has not reported focus yet: in tmux, set -g focus-events on)
+      denied bash
+    ↩ job j1 "make test"  exited 0
+        ok
+      notifications: desktop
+      usage: /notify [off|bell|desktop]
+      notifications off (/notify bell or /notify desktop turns them on)
+    ────────────────────────────────────────────────────────────────────────────────────────────────────
+    > ▏
+    /work  deepseek-flash  think:off  view:normal  ctx:0.1%/1.0M  $0.01
+    |}]
+;;

@@ -785,6 +785,7 @@ let%expect_test "config round trip and config_changed event" =
          ; fallback_models =
              [ "openai-codex/gpt-6-sol"; "deepseek/deepseek-flash" ]
          ; default_cwd = Some "~/proj"
+         ; notify = "desktop"
          }
        : Json.t)];
   decode
@@ -796,26 +797,30 @@ let%expect_test "config round trip and config_changed event" =
      (default_model    ())
      (default_thinking ())
      (fallback_models  ())
-     (default_cwd      ()))
+     (default_cwd      ())
+     (notify bell))
     ((scoped_models ())
      (confirm_tools false)
      (default_model    ())
      (default_thinking ())
      (fallback_models  ())
-     (default_cwd      ()))
+     (default_cwd      ())
+     (notify bell))
     ((scoped_models ())
      (confirm_tools false)
      (default_model ())
      (default_thinking (low))
      (fallback_models ())
-     (default_cwd     ()))
+     (default_cwd     ())
+     (notify bell))
     (decode (e "default_model must be a string"))
     ((scoped_models ())
      (confirm_tools false)
      (default_model    ())
      (default_thinking ())
      (fallback_models (openai-codex/gpt-6-sol anthropic/claude-opus-5-5))
-     (default_cwd (/srv/work)))
+     (default_cwd (/srv/work))
+     (notify bell))
     (decode (e "fallback_models must be an array of strings"))
     (decode (e "default_cwd must be a string"))
     ((scoped_models (a b))
@@ -823,7 +828,8 @@ let%expect_test "config round trip and config_changed event" =
      (default_model    deepseek/deepseek-flash)
      (default_thinking max)
      (fallback_models (openai-codex/gpt-6-sol deepseek/deepseek-flash))
-     (default_cwd ~/proj))
+     (default_cwd ~/proj)
+     (notify      desktop))
     (Event (
       Config_changed (
         (scoped_models (a))
@@ -831,7 +837,8 @@ let%expect_test "config round trip and config_changed event" =
         (default_model    ())
         (default_thinking ())
         (fallback_models  ())
-        (default_cwd      ()))))
+        (default_cwd      ())
+        (notify bell))))
     |}]
 ;;
 

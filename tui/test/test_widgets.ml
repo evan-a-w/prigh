@@ -667,6 +667,7 @@ let%expect_test "keymap: every binding resolves to its intent and is documented"
     /thinking [off|low|on|high|max]    pick or set the thinking level
     /verbosity [quiet|normal|verbose]  set the transcript verbosity
     /confirm [on|off]                  ask before destructive tools
+    /notify [off|bell|desktop]         how to tell you that a turn ended or something waits for you while the terminal is not focused
     /auth                              show which providers are configured
     /budget [dollars|off]              show or set the session's cost budget: no turn starts once it is spent
     /goal [text|off|resume]            set a goal the agent keeps working toward until it is met; show, clear or resume it

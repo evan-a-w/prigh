@@ -17,6 +17,8 @@ module Platform : sig
     ; load_history : unit -> (P.Json.t, string) Result.t Bonsai.Effect.t
     ; append_history : string -> unit Bonsai.Effect.t
     ; copy_to_clipboard : string -> unit Bonsai.Effect.t
+    ; notify : Notify.Mode.t -> Notify.t -> unit Bonsai.Effect.t
+    (** The bell or a desktop notification; a no-op where there is none. *)
     ; suspend : unit Bonsai.Effect.t
     ; edit_externally : string -> (string, string) Result.t Bonsai.Effect.t
     ; reconnect :

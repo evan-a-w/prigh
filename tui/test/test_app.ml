@@ -743,7 +743,7 @@ let%expect_test "typing / lists commands, Down twice + Tab fills /login " =
       /fallback [off|model...]        show or set the models th…
       /default-dir [off|path]         show or set the directory…
       /login [provider] [api_key|oauth]  log in to a provider
-      ↕ 1–8 of 46
+      ↕ 1–8 of 47
     …deepseek-flash  ctx:0.1%/1.0M  Tab/Enter accept · Esc close
     |}];
   H.key h (Key.plain Down);
@@ -760,7 +760,7 @@ let%expect_test "typing / lists commands, Down twice + Tab fills /login " =
       /fallback [off|model...]        show or set the models th…
       /default-dir [off|path]         show or set the directory…
       /login [provider] [api_key|oauth]  log in to a provider
-      ↕ 1–8 of 46
+      ↕ 1–8 of 47
     …deepseek-flash  ctx:0.1%/1.0M  Tab/Enter accept · Esc close
     |}];
   H.key h (Key.plain Down);
@@ -777,7 +777,7 @@ let%expect_test "typing / lists commands, Down twice + Tab fills /login " =
       /fallback [off|model...]        show or set the models th…
       /default-dir [off|path]         show or set the directory…
       /login [provider] [api_key|oauth]  log in to a provider
-      ↕ 1–8 of 46
+      ↕ 1–8 of 47
     …deepseek-flash  ctx:0.1%/1.0M  Tab/Enter accept · Esc close
     |}];
   H.key h (Key.plain Tab);
@@ -3738,14 +3738,16 @@ let%expect_test "config: get_config at Start installs the reply; \
       (default_model    ())
       (default_thinking ())
       (fallback_models  ())
-      (default_cwd      ())))
+      (default_cwd      ())
+      (notify bell)))
     ((
       (scoped_models (deepseek/deepseek-flash))
       (confirm_tools false)
       (default_model    ())
       (default_thinking ())
       (fallback_models  ())
-      (default_cwd      ())))
+      (default_cwd      ())
+      (notify bell)))
     |}]
 ;;
 
@@ -4694,7 +4696,8 @@ let%expect_test "/change_default saves the model and thinking level" =
       (default_model    (deepseek/deepseek-flash))
       (default_thinking (high))
       (fallback_models ())
-      (default_cwd     ())))
+      (default_cwd     ())
+      (notify bell)))
 
 
 
@@ -6236,7 +6239,7 @@ let%expect_test "Tab on an empty editor opens the command list; the list shows \
       /fallback [off|model...]        show or set the models th…
       /default-dir [off|path]         show or set the directory…
       /login [provider] [api_key|oauth]  log in to a provider
-      ↕ 1–8 of 46
+      ↕ 1–8 of 47
     …deepseek-flash  ctx:0.1%/1.0M  Tab/Enter accept · Esc close
     |}];
   H.key h (Key.plain End);
@@ -6253,7 +6256,7 @@ let%expect_test "Tab on an empty editor opens the command list; the list shows \
       /fallback [off|model...]        show or set the models th…
       /default-dir [off|path]         show or set the directory…
       /login [provider] [api_key|oauth]  log in to a provider
-      ↕ 1–8 of 46
+      ↕ 1–8 of 47
     …deepseek-flash  ctx:0.1%/1.0M  Tab/Enter accept · Esc close
     |}];
   H.keys h "qu";

@@ -7,6 +7,7 @@ module Argument = struct
     | Thinking
     | Verbosity
     | Confirm
+    | Notify
     | Login
     | Logout
     | Sessions
@@ -86,6 +87,12 @@ let all =
       "confirm"
       "[on|off]"
       "ask before destructive tools"
+  ; c
+      ~argument:Argument.Notify
+      "notify"
+      "[off|bell|desktop]"
+      "how to tell you that a turn ended or something waits for you while the \
+       terminal is not focused"
   ; c "auth" "" "show which providers are configured"
   ; c
       ~argument:Argument.Budget
