@@ -2567,6 +2567,26 @@ let set_cwd t ~path =
           state_changed t))
 ;;
 
+let host_call
+      t
+      ?stdin
+      ?(cancel = Cancellation.never)
+      ?(on_output = ignore)
+      ~name
+      arguments
+  =
+  active_host_exec
+    t
+    ?stdin
+    ~cancel
+    ~on_output
+    ~call_id:"files"
+    ~cwd:t.cwd
+    ~name
+    ~arguments
+    ()
+;;
+
 let list_paths t ~prefix =
   match
     host_exec
