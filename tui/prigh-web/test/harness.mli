@@ -45,6 +45,13 @@ val reply : t -> string -> string -> unit
 (** Fails the oldest unanswered [Rpc] command whose method is [method_]. *)
 val fail : t -> string -> string -> unit
 
+(** Clicks the [nth] (default first) element [selector] matches: prints the
+    actions its handler produced, and applies them. *)
+val click : ?nth:int -> t -> selector:string -> unit
+
+(** Types [text] into the [nth] field [selector] matches, as its new value. *)
+val input : ?nth:int -> t -> selector:string -> string -> unit
+
 (** The page as indented HTML; [selector] picks part of it. *)
 val show : ?selector:string -> t -> unit
 
@@ -56,7 +63,7 @@ val text : ?selector:string -> t -> unit
 (** The tag and class of each element [selector] matches. *)
 val elements : selector:string -> t -> unit
 
-(** A state as JSON, with [fields] overriding the defaults. *)
+(** A state as JSON, with [fields] overriding the defaults or added. *)
 val state_json : ?fields:(string * Jsonaf.t) list -> unit -> string
 
 val session_json

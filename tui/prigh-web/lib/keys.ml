@@ -38,6 +38,7 @@ let help =
   ; "Ctrl+L", "switch model"
   ; "Ctrl+P / Alt+P", "next / previous scoped model (/scoped-models)"
   ; "Alt+T", "cycle the thinking level"
+  ; "Alt+M", "cycle the mode: ask → auto-edit → auto → plan (/mode, /plan)"
   ; "Ctrl+O", "cycle the transcript verbosity"
   ; "Ctrl+X", "copy the last reply (when nothing is selected)"
   ; "Ctrl+↑ / Ctrl+↓", "previous / next of your messages in the transcript"
@@ -51,6 +52,12 @@ let help =
     , "open or close the terminal (/terminal); in it, every other key goes to \
        the shell" )
   ; "Tab (in /scoped-models)", "check or uncheck the highlighted model"
+  ; ( "y / a / n / r (confirmation)"
+    , "allow once, always allow (its rules, this session), deny, deny saying \
+       why; Enter allows, Esc denies" )
+  ; ( "↑↓ Space ←→ (question)"
+    , "choose, pick, previous / next question; type for your own answer; Enter \
+       accepts, Esc declines" )
   ]
 ;;
 
@@ -182,20 +189,71 @@ let session_key (m : App.Model.t) t id : App.Action.t option =
   | _ -> None
 ;;
 
+(* y/Enter allow, a always (when offered), n/Esc deny, r a reason; while
+   typing the reason, Enter sends it and Esc goes back. *)
+let confirm_key (m : App.Model.t) (c : Prigh_protocol.Pending.Confirm.t) t
+  : App.Action.t option
+  =
+  let answer answer =
+    Some
+      (App.Action.Answer_confirm
+         { call_id = c.call_id; agent_id = c.agent_id; answer })
+  in
+  let letter = not (t.ctrl || t.meta || t.alt) in
+  let offered answer =
+    List.exists (Prigh_ui.Confirm_prompt.answers c) ~f:(fun (a, _, _) ->
+      Prigh_ui.Confirm_prompt.Answer.equal a answer)
+  in
+  match m.confirm_reason, t.key with
+  | Some _, "Enter" when plain t && not (on_control t) ->
+    Some Send_confirm_reason
+  | Some _, "Escape" -> Some Cancel_confirm_reason
+  | Some _, _ -> None
+  | None, "Enter" when plain t && not (on_control t) -> answer Allow
+  | None, "Escape" -> answer Deny
+  | None, ("y" | "Y") when letter -> answer Allow
+  | None, ("a" | "A") when letter && offered Always -> answer Always
+  | None, ("n" | "N") when letter -> answer Deny
+  | None, ("r" | "R") when letter -> answer Deny_with_reason
+  | None, _ -> None
+;;
+
+(* A character, not a named key like [ArrowUp]. *)
+let typed key = String.length key = 1 || Char.to_int key.[0] >= 0x80
+
+(* ↑↓ rows, ←→ questions, Space picks, typing goes to the own answer (its
+   field, once focused, types itself), Enter accepts, Esc declines. *)
+let question_key t : Question_dialog.Action.t option =
+  let field =
+    match t.target with
+    | Field -> true
+    | Editor _ | Control | Session_search | Session _ | Terminal | Page -> false
+  in
+  match t.key with
+  | "Escape" -> Some Decline
+  | "Enter" when plain t && not (on_control t) -> Some Accept
+  | "ArrowUp" when plain t -> Some Up
+  | "ArrowDown" when plain t -> Some Down
+  | "ArrowLeft" when plain t && not field -> Some Prev
+  | "ArrowRight" when plain t && not field -> Some Next
+  | _ when field || on_control t || t.ctrl || t.meta || t.alt -> None
+  | " " -> Some Toggle
+  | "Backspace" -> Some Backspace
+  | key when typed key -> Some (Insert key)
+  | _ -> None
+;;
+
 let handle (m : App.Model.t) t : App.Action.t option =
-  match t.target, m.confirms, m.dialog with
+  match t.target, m.confirms, m.questions, m.dialog with
   (* Inside the terminal every key but Ctrl+` is the shell's, Esc and Enter
      included, even with a dialog or a confirmation showing. *)
-  | Terminal, _, _ ->
+  | Terminal, _, _, _ ->
     Option.some_if (terminal_toggle t) App.Action.Toggle_terminal
-  | _, c :: _, _ ->
-    (match t.key with
-     | "Enter" when plain t && not (on_control t) ->
-       Some (Respond_confirm { call_id = c.call_id; allow = true })
-     | "Escape" -> Some (Respond_confirm { call_id = c.call_id; allow = false })
-     | _ -> None)
-  | _, [], Some dialog -> dialog_key dialog t
-  | _, [], None ->
+  | _, c :: _, _, _ -> confirm_key m c t
+  | _, [], _ :: _, _ ->
+    Option.map (question_key t) ~f:(fun a -> App.Action.Question a)
+  | _, [], [], Some dialog -> dialog_key dialog t
+  | _, [], [], None ->
     (match t.key with
      | _ when terminal_toggle t -> Some Toggle_terminal
      | ("l" | "L") when command t -> Some Open_model_picker
@@ -205,6 +263,7 @@ let handle (m : App.Model.t) t : App.Action.t option =
      | ("p" | "P") when ctrl_only t -> Some (Cycle_model 1)
      | _ when alt_letter t "p" -> Some (Cycle_model (-1))
      | _ when alt_letter t "t" -> Some Cycle_thinking
+     | _ when alt_letter t "m" -> Some Cycle_mode
      | ("x" | "X") when ctrl_only t && not t.selection -> Some Copy_last
      | ("g" | "G") when ctrl_only t ->
        Some

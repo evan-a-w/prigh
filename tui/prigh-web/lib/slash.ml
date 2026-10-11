@@ -11,6 +11,8 @@ module Argument = struct
     | Backend_directory
     | Verbosity
     | Confirm
+    | Mode
+    | Plan
     | Session
     | Path
     | Host
@@ -66,7 +68,24 @@ let all =
       ~argument:Confirm
       ~args:"[on|off]"
       "confirm"
-      "ask before bash, write and edit run"
+      "ask before bash, edits and MCP tools run (mode ask or auto, also for \
+       new sessions)"
+  ; c
+      ~argument:Mode
+      ~args:"[ask|auto-edit|auto|plan]"
+      "mode"
+      "pick or set the mode: what asks first, or read-only planning (Alt+M \
+       cycles)"
+  ; c
+      ~argument:Plan
+      ~args:"[on|off]"
+      "plan"
+      "toggle plan mode: the model investigates and plans, changing no files, \
+       until you approve its plan"
+  ; c "todos" "show the model's plan (its update_plan steps)"
+  ; c
+      "permissions"
+      "show the mode and the allow/ask/deny rules (config and this session)"
   ; c
       ~args:"[instructions]"
       "compact"

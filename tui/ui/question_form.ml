@@ -107,6 +107,10 @@ let backspace t =
     ~f:(fun a -> { a with own = drop_last_char a.own })
 ;;
 
+let set_own t own =
+  update_answer { t with cursor = rows t - 1 } ~f:(fun a -> { a with own })
+;;
+
 let answers t =
   List.map2_exn t.questions t.answers ~f:(fun q a ->
     List.filter_mapi q.choices ~f:(fun i c ->

@@ -14,20 +14,28 @@ let line text =
   |> Option.value_map ~default:"" ~f:String.strip
 ;;
 
-(* A skill's invocation as it was typed, not its instructions. *)
+(* A skill's invocation as it was typed, not its instructions; without the
+   backend's plan mode note. *)
 let typed text =
+  let text =
+    match Mode_note.split text with
+    | Some (_, rest) -> rest
+    | None -> text
+  in
   Option.value_map
     (Skill_message.parse text)
     ~default:text
     ~f:Skill_message.invocation
 ;;
 
-(* A hand-over as the transcript shows it, with the error. *)
+(* A hand-over as the transcript shows it, with the error; a plan mode note
+   alone as its summary. *)
 let label text =
-  Option.value_map
-    (Handover_message.parse text)
-    ~default:(typed text)
-    ~f:(fun h -> sprintf "%s (%s)" (Handover_message.summary h) h.error)
+  match Handover_message.parse text, Mode_note.split text with
+  | Some h, _ -> sprintf "%s (%s)" (Handover_message.summary h) h.error
+  | None, Some (on, rest) when String.is_empty (String.strip rest) ->
+    Mode_note.summary ~on
+  | None, _ -> typed text
 ;;
 
 let user_line ({ text; images; at = _ } : Message.User.t) =

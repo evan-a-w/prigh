@@ -99,6 +99,7 @@ module Reply_tag : sig
         ; purpose : Skills_purpose.t
         }
     | Mcp of Mcp_purpose.t
+    | Mode_set of string (** [set_mode]: the new state; the notice is shown *)
   [@@deriving sexp_of, equal]
 end
 
@@ -164,15 +165,6 @@ module Toast : sig
 
   (** How long non-error toasts stay. *)
   val lifetime_ms : int
-end
-
-module Confirm : sig
-  type t =
-    { call_id : string
-    ; name : string
-    ; summary : string
-    }
-  [@@deriving sexp_of, equal]
 end
 
 module Action : sig
@@ -247,10 +239,16 @@ module Action : sig
     | Kill_job of string (** job id *)
     | Dequeue (** the last queued message back into the editor *)
     | Toggle_sidebar
-    | Respond_confirm of
+    | Answer_confirm of
         { call_id : string
-        ; allow : bool
-        }
+        ; agent_id : string option
+        ; answer : Confirm_prompt.Answer.t
+        } (** [Deny_with_reason] opens the reason's field *)
+    | Confirm_reason_input of string
+    | Send_confirm_reason (** deny with the reason typed *)
+    | Cancel_confirm_reason (** back to the answers, nothing sent *)
+    | Question of Question_dialog.Action.t (** the oldest [ask_user] dialog *)
+    | Cycle_mode (** Alt+M: ask → auto-edit → auto → plan *)
     | Add_image of Image.t
     | Remove_image of int
     | Show_toast of
@@ -313,7 +311,10 @@ module Model : sig
     ; history : History.t
     ; images : Image.t list (** attached to the next prompt *)
     ; queue : int * int (** steer, follow-up *)
-    ; confirms : Confirm.t list
+    ; confirms : Pending.Confirm.t list
+    ; confirm_reason : string option
+      (** the oldest confirmation's reason, while typing it ([r]) *)
+    ; questions : Question_dialog.t list (** [ask_user] calls, oldest first *)
     ; dialog : Dialog.t option
     ; cancelled_login : string option
       (** the provider whose login we cancelled: its failure is expected *)
@@ -337,6 +338,10 @@ module Model : sig
   [@@deriving sexp_of]
 
   val running : t -> bool
+
+  (** A tool confirmation or an [ask_user] question is showing: it owns the
+      keyboard, above any dialog. *)
+  val waiting : t -> bool
 
   (** The agents panel is open with something running: the page sends
       [Clock] every second. *)

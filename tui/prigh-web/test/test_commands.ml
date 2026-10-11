@@ -59,6 +59,10 @@ let%expect_test "every command does something (none is unknown)" =
     /change_default            rpc change_default
     /verbosity                 picker: Transcript verbosity
     /confirm                   picker: Tool confirmation
+    /mode                      picker: Mode (Alt+M cycles)
+    /plan                      rpc set_mode
+    /todos                     toast: No plan: the model has not made one (it makes one with update_plan).
+    /permissions               text: Permissions
     /compact                   toast: Compacting the conversation…
     /name                      (Rename"")
     /session                   rpc session_stats
@@ -130,6 +134,7 @@ let%expect_test "/help <command> and /hotkeys" =
     Ctrl+L switch model
     Ctrl+P / Alt+P next / previous scoped model (/scoped-models)
     Alt+T cycle the thinking level
+    Alt+M cycle the mode: ask → auto-edit → auto → plan (/mode, /plan)
     Ctrl+O cycle the transcript verbosity
     Ctrl+X copy the last reply (when nothing is selected)
     Ctrl+↑ / Ctrl+↓ previous / next of your messages in the transcript
@@ -141,6 +146,8 @@ let%expect_test "/help <command> and /hotkeys" =
     Alt+0 close the agents panel
     Ctrl+` open or close the terminal (/terminal); in it, every other key goes to the shell
     Tab (in /scoped-models) check or uncheck the highlighted model
+    y / a / n / r (confirmation) allow once, always allow (its rules, this session), deny, deny saying why; Enter allows, Esc denies
+    ↑↓ Space ←→ (question) choose, pick, previous / next question; type for your own answer; Enter accepts, Esc declines
     Left to the browser
     Ctrl+C / Ctrl+V / Ctrl+Z copy, paste, undo: the browser's (Esc stops a run)
     Ctrl+F find in the page, which has the whole transcript
@@ -407,14 +414,18 @@ let%expect_test "/confirm" =
     {|
     (Focus editor)
     (Rpc (method_ set_config) (params ((config ((approval_mode ask)))))
-     (tag (Config_saved "Tool confirmation on: bash, write and edit ask first")))
+     (tag
+      (Config_saved
+       "Tool confirmation on (mode ask, also for new sessions): bash, edits and MCP tools ask first")))
     (Expire_toast (id 0) (after_ms 4000))
-    Ready 0% ↑0 ↓0 $0.0000 (confirm)
+    Ready 0% ↑0 ↓0 $0.0000 (ask)
     (Save_history ("/confirm off" /confirm))
     (Rpc (method_ set_config) (params ((config ((approval_mode auto)))))
-     (tag (Config_saved "Tool confirmation off: tools run without asking")))
+     (tag
+      (Config_saved
+       "Tool confirmation off (mode auto, also for new sessions): tools run without asking")))
     (Save_history ("/confirm maybe" "/confirm off" /confirm))
-    Tool confirmation on: bash, write and edit ask first
+    Tool confirmation on (mode ask, also for new sessions): bash, edits and MCP tools ask first
     Unknown setting "maybe": use on or off.
     |}]
 ;;

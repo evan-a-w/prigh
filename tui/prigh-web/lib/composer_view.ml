@@ -19,6 +19,8 @@ let popup (m : App.Model.t) ~inject =
       | Argument Path | Path -> "Files"
       | Argument Verbosity -> "Verbosity"
       | Argument Confirm -> "Tool confirmation"
+      | Argument Mode -> "Modes"
+      | Argument Plan -> "Plan mode"
       | Argument Session -> "Sessions"
       | Argument Host -> "Hosts"
       | Argument User -> "Users"
