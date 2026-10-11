@@ -178,7 +178,17 @@ while it is waiting on the browser.
   usage, stop reason and the `provider/id` key of the model that wrote them.
   User messages and tool results carry `images` (`Image.t`: MIME type and
   base64), as do `Tool_result.t`s; in sessions and on the wire the field is
-  omitted when empty.
+  omitted when empty. User messages may carry an `origin`
+  (`Injected.t`): what the harness put into the text — environment notes
+  in front (`Note`: host, cwd, editing tool), `@` files behind
+  (`Attachment`: path and length), or a whole message written in the
+  user's place (`Source`: delivery, hand-over, goal start/continuation,
+  resume, `!cmd` output, compaction summary, `/review`, `/init`). The
+  `text` stays exactly what the model sees, so providers and prompt caches
+  are unaffected. `Injected.infer` recognises the same things by their
+  wording in sessions written before `origin` existed, and `Rpc_json`
+  sends `origin` (recorded, else inferred) as `{body, notes: [{kind,
+  title, text}], attachments: [{path}]}` or `{source: {kind, title}}`.
 - `Image` — what models accept: PNG/JPEG/GIF/WebP sniffed from the bytes,
   dimensions from the header, and `load`, which downscales anything over
   2000 px or 4.5 MB of base64 by running ImageMagick or `sips` (PNG, then
@@ -651,6 +661,13 @@ two can share one.
   summariser loses its middle if it would not fit the model.
   `compact_messages` works on a list (subagents), `compact` on a session
   (appending a `Compaction` entry); both return the summary and its usage.
+- `Git_diff` — the pseudo-tool `$git_diff` on the active tool host:
+  `git diff` against `HEAD` (or a base's merge base) plus untracked files
+  as new ones, optionally one path, cut at 1 MB; errors say what to do
+  (not a repository, no git, unknown base). `Review` writes `/review`'s
+  prompt (the diff inlined when small) and `Init_prompt` `/init`'s; both
+  go through `Agent.command_prompt`, which queues them like a prompt, with
+  the long text as `Queued.expanded` and the `Injected.Source` as origin.
 - `Session_description` — after a turn, once the conversation has a second
   user message (or a long first one), asks the model for a one-line
   description and records it (`Agent ~auto_describe`, off under `-faux` and
@@ -718,7 +735,9 @@ two can share one.
   prigh names),
   `tool_exec_result`, `auth_status`, `login`, `auth_respond`, `auth_cancel`,
   `logout`, `set_budget {usd}` (a number, or null for none), `set_goal
-  {text}`, `clear_goal`, `resume_goal`, `cancel_resume`, `resume_now`.
+  {text}`, `clear_goal`, `resume_goal`, `cancel_resume`, `resume_now`, `git_diff {path?}`
+  (`{root, against, diff, truncated}`), `review {args?}` (`[base]
+  [instructions]`) and `init`.
   `State` carries `active_host` and `hosts` (the backend first),
   `budget_usd`, `goal` (`{text, status: active|done|stopped,
   continuations, max_continuations, summary?, reason?}` or null) and
@@ -954,11 +973,24 @@ copy of the protocol types and the e2e test guards the contract.
     suggestions) puts the command back in the editor. `Autocomplete`
     completes `/fallback` word by word (the models not listed yet, `off`
     first) and `/default-dir` with `list_dirs` on the backend's host when
-    it runs tools. `Handover_message` (prigh-web uses it too) parses the
-    user message the backend starts a hand-over run with (`[prigh: A cannot continue (ERROR), so B
-    takes over …]`): `Transcript` renders it as a `Handover` item (`↪
-    handed over from A to B`; the error only in verbose, since the failed
-    reply above it shows it) and `/fork` lists it by that line.
+    it runs tools.
+  - Harness notes: `Message.User`'s `origin` (`P.Origin`) splits a user
+    message into notes, the user's `body` and attachments, or marks it as
+    the harness's (`source`). `Transcript` shows notes and sources as quiet
+    `Note` lines (`Injected_note`'s glyph and title, e.g. `↪ Handed over
+    from A to B`), the raw text only in verbose, and the user's turn with
+    only what they wrote; `/fork` and `/tree` label messages the same way.
+  - `/diff` sends `git_diff` and `Diff_files` (shared with prigh-web)
+    parses the result into files with their counts, which the transcript
+    shows coloured; `/review` and `/init` send `review`/`init` tagged so
+    a refusal goes back to the editor.
+  - Notifications: `Notify` decides what is worth telling (a main-agent
+    turn's end, a tool confirmation, delivered background work) for both
+    frontends. The TUI emits `Command.Notify` only while the terminal has
+    reported losing the focus (`term/`'s `Term_focus` enables focus
+    reporting and filters `CSI I`/`CSI O` out of the input), and
+    `Term_notify` writes the bell or OSC 9/777 (wrapped for tmux) per the
+    config's `notify` (`/notify off|bell|desktop`).
     `Loop_status` (prigh-web uses it too) words the budget, goal and
     scheduled resume for the status line (`$1.20/$5.00`, `goal:3/20`,
     `resumes 14:05` in the frontend's zone, from `Set_utc_offset`) and for
@@ -1185,10 +1217,21 @@ copy of the protocol types and the e2e test guards the contract.
       names resolved to keys). `Completion`'s `Models` argument completes
       the word under the cursor, leaving out the models already listed;
       `Backend_directory` is `list_dirs` with `host: backend`.
-      `Prigh_ui.Handover_message` (shared with the TUI) parses the user
-      message the backend starts the next model's run with, which
-      `Chat_view` renders as a hand-over line with the error and
-      `Session_tree` labels the same way.
+    - Harness notes: `Chat_view` renders `origin`'s notes and sources as
+      margin notes (a `details` with the glyph and title, opening to the
+      text the model saw) and the user's bubble with only their `body`;
+      `Session_tree` labels them like the TUI. `/diff` opens
+      `Git_diff_view` (a dialog of `Diff_files`' files, each a fold with
+      its counts).
+    - Notifications: `Page_notify` (pure) tracks `/notify on|off`, the
+      browser's permission, whether the tab is hidden and how many things
+      happened unseen; events raise `Command.Notify` only while hidden,
+      enabled and granted, and `Set_title` keeps the count in the title.
+      `/notify on` (or the account menu) emits
+      `Request_notification_permission` from the user's action. `app/`'s
+      `Page_notifications` does the browser side: the Notification API,
+      `visibilitychange`, localStorage (`prigh-web.notify`) and the favicon
+      with a sodium dot while something is unseen.
   - `app/` (`prigh_web_app`) — `Web_main.run`: connects a `Ws_transport`
     to `?backend=` or the page's `/ws`, sends `hello` with the active
     account (`prigh.user`/`prigh.token`, `web-app/`'s `Login`) and
@@ -1253,7 +1296,7 @@ copy of the protocol types and the e2e test guards the contract.
 - `~/.prigh/sessions/<stamp>_<id>.jsonl` — session logs.
 - `~/.prigh/sessions/exports/` — default `/export` output.
 - `~/.prigh/history` — prompt history (one JSON string per line, last 500).
-- `~/.prigh/config.json` — `scoped_models`, `confirm_tools`, `providers`
+- `~/.prigh/config.json` — `scoped_models`, `confirm_tools`, `notify`, `providers`
   (custom endpoints; their keys are in `auth.json` under their names).
 - `~/.prigh/AGENTS.md` — global instructions.
 

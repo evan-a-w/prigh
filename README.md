@@ -329,10 +329,15 @@ restarts the failed ones and reports. `/fallback` completes a model for
 each word, in order (or `off`), and shows the backend's error, with the
 closest models, for one it doesn't know; `/default-dir` completes
 directories on the backend's host, where new sessions start, and takes a
-relative path from the backend's directory. When a model's usage runs out
-and the next fallback model takes over, the transcript shows a `↪ handed
-over from A to B (error)` line rather than the message as a prompt, and
-`/fork` and `/tree` label it the same way. Ctrl+P/Alt+P cycle the scoped
+relative path from the backend's directory. Notes the harness added (a
+new tool host, a hand-over to the next fallback model, a goal
+continuation, delivered background work, the compaction summary) are
+margin notes in the transcript (`↪ Handed over from A to B`), each
+expandable to the text the model saw, and `/fork` and `/tree` label them
+the same way. `/diff` is a dialog of the changed files (each folds, with
+its line counts); `/notify on|off` and the account menu control browser
+notifications while the tab is hidden, and the title (`(2) prigh`) and
+favicon count what happened meanwhile. Ctrl+P/Alt+P cycle the scoped
 models, Alt+T the thinking level (Ctrl+T is the browser's), Alt+↑ takes
 back a queued message, Ctrl+↑/↓ jump between your messages; `/help` and
 `/hotkeys` also list the TUI's keys that the browser keeps (Ctrl+C, Ctrl+Z, Ctrl+F, Ctrl+R, $EDITOR's Ctrl+G)
@@ -671,7 +676,8 @@ last 500) and loaded on start; secrets from login prompts are never recorded.
 through; `/scoped-models` edits it), `confirm_tools` (ask before
 destructive `bash`/`write`/`edit`/`apply_patch`; `/confirm on|off`) and
 `default_model`/`default_thinking` (what new sessions start with unless
-`-model`/`-thinking` is given; `/change_default` saves the current ones).
+`-model`/`-thinking` is given; `/change_default` saves the current ones),
+and `notify` (`off`, `bell` or `desktop`; the TUI's `/notify`).
 Without a `default_thinking`, sessions start with thinking `on`; models that
 cannot think ignore it. A fallback model keeps the session's thinking level.
 
@@ -681,7 +687,7 @@ cannot think ignore it. A fallback model keeps the session's thinking level.
 current model's usage allowance or balance is exhausted, or it has no
 credentials, the run does not stop: the session switches to the next model
 of the chain after the current one (the first if the current one is not in
-it), the transcript shows `↪ handed over from A to B`, and B carries on with
+it), the transcript shows `↪ Handed over from A to B`, and B carries on with
 the task. At the end of the chain the run stops with a note saying so
 (`/model` picks another). Without a `default_model`, new sessions start on
 the chain's first model. `/fallback` shows the chain and `/fallback off`
@@ -760,6 +766,10 @@ it.
 | `/verbosity [quiet\|normal\|verbose]` | set the transcript verbosity |
 | `/confirm [on\|off]` | ask before destructive tools |
 | `/compact [instructions]` | summarise older messages to free context, focusing on the instructions |
+| `/diff [path]` | show the uncommitted changes where the tools run (`git diff` against `HEAD`, untracked files as new), optionally of one path |
+| `/review [base] [instructions]` | have the model review the uncommitted changes, or those against `base`'s merge base, for prioritised findings with file and line |
+| `/init` | have the model write `AGENTS.md` for the project, or improve the existing one |
+| `/notify [off\|bell\|desktop]` (TUI), `/notify [on\|off]` (prigh-web) | how to tell you that a turn ended, a tool waits for confirmation or background work finished while you look elsewhere |
 | `/budget [dollars\|off]` | show or set the session's cost budget: no turn starts once it is spent |
 | `/goal [text\|off\|resume]` | set a goal the agent keeps working toward until it is met; show, clear or resume it |
 | `/resume [now\|cancel]` | show, run now or cancel the automatic resume after a usage limit |
@@ -793,6 +803,42 @@ adds the skill's file. A name the backend does not know comes back as an
 error listing the closest ones, with the text back in the editor. `/mcp`
 also shows configuration problems, and says where to configure servers when
 there are none.
+
+`/diff` runs `git` on the active tool host, in the session's directory, and
+shows the changes by file with their line counts (the TUI in the
+transcript, prigh-web in a dialog); a diff over 1 MB is cut short.
+`/review` and `/init` start a run with a prompt the backend writes (the
+review prompt includes the diff when it is small enough, else tells the
+model how to read it); like a prompt they queue while a run is going, and
+an error (nothing to review, an unknown base, not a repository) says what
+to do. The transcript shows them as notes (`⚑ Review of uncommitted
+changes`, `▤ Write or improve AGENTS.md`), not as the long prompt.
+
+Notifications: the TUI's `/notify` sets `notify` in `config.json` (`bell`
+by default; `desktop` sends OSC 9, or OSC 777 to foot and urxvt, wrapped
+for tmux, which needs `set -g allow-passthrough on`). It turns on focus
+reporting and only notifies while the terminal says it is not focused
+(in tmux, `set -g focus-events on`); `/notify` alone says what it does and
+whether the terminal reports focus. prigh-web uses the browser's
+notifications while the tab is hidden: `/notify on` (or the account menu's
+"Turn notifications on") asks the browser for permission, `/notify off`
+turns them off (kept in localStorage, `prigh-web.notify`); the tab's title
+and favicon count what happened while it was hidden, notifications on or
+not. A blocked or unsupported browser (plain http other than localhost) is
+named with what to do.
+
+Text the harness adds to what the model reads is recorded with the message
+(`origin` in the session file and the RPC: environment notes about a new
+tool host, directory or editing tool; attached `@` files; and the messages
+it writes in your place: reports of finished background work, a fallback
+model's hand-over, goal starts and continuations, the resume after a usage
+limit, `!cmd` output, the compaction summary, `/review` and `/init`). The
+model still sees exactly the same text; the frontends show these as quiet
+one-line notes (`⇄ Tools now run on laptop`, `◷ Goal: continuing (3/20)`)
+above or instead of your message, which shows only what you typed. Verbose
+(Ctrl+O) in the TUI, and clicking the note in prigh-web, shows the raw
+text. Sessions written before this are recognised by their wording and
+shown the same way.
 
 `/btw` works while a turn is running: one extra model call (no tools) answers
 from the session's current context, streaming into a box above the editor
