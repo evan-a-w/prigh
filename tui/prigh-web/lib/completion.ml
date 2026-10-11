@@ -119,7 +119,9 @@ let argument_items
       ]
   | Confirm ->
     simple
-      [ "on", "ask before bash, edits and MCP tools (mode ask)"
+      [ ( "on"
+        , Session_mode.describe { approval = Ask; plan = false } ^ " (mode ask)"
+        )
       ; "off", "run tools without asking (mode auto)"
       ]
   | Mode ->

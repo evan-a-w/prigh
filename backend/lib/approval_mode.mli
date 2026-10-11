@@ -18,6 +18,3 @@ val to_string : t -> string
 (** Also accepts ["auto_edit"] and is case-insensitive; the error lists the
     modes. *)
 val of_string : string -> t Or_error.t
-
-(** What it means, for help texts and notices. *)
-val describe : t -> string
