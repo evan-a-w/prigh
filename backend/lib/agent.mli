@@ -348,6 +348,9 @@ val resume_goal : t -> unit Or_error.t
     a new run cancels that. These fail when nothing is scheduled. *)
 val cancel_resume : t -> unit Or_error.t
 
+(** Whether a resume is scheduled (the agent must stay loaded for it). *)
+val resume_pending : t -> bool
+
 val resume_now : t -> unit Or_error.t
 
 (** Answers a side question with one tool-less model call over a snapshot of

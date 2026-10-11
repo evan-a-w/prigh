@@ -1795,6 +1795,8 @@ let cancel_resume t =
     Ok ()
 ;;
 
+let resume_pending t = Option.is_some t.resume
+
 let resume_now t =
   match t.resume with
   | None -> Or_error.error_string no_resume

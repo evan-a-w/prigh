@@ -219,6 +219,7 @@ let maybe_evict t agent =
     (not (Option.exists t.default_agent ~f:(phys_equal agent)))
     && (not (Agent.is_running agent))
     && (not (Agent.has_running_background agent))
+    && (not (Agent.resume_pending agent))
     && List.is_empty (clients_of t agent)
   then Hashtbl.remove t.agents (session_id agent)
 ;;
