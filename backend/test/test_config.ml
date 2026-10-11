@@ -12,7 +12,8 @@ let%expect_test "a missing file yields the default" =
     {|
     (Ok
      ((scoped_models ()) (confirm_tools false) (default_model ())
-      (default_thinking ()) (fallback_models ()) (default_cwd ())))
+      (default_thinking ()) (fallback_models ()) (default_cwd ())
+      (archive_after_days 7)))
     |}]
 ;;
 
@@ -26,6 +27,7 @@ let%expect_test "save then load round trips" =
     ; default_thinking = Some (On (Some High))
     ; fallback_models = []
     ; default_cwd = None
+    ; archive_after_days = 7.
     }
   in
   print_s [%sexp (Config.save ~home:t.dir config : unit Or_error.t)];
@@ -43,12 +45,14 @@ let%expect_test "save then load round trips" =
       "default_model": "anthropic/claude-fable-5",
       "default_thinking": "high",
       "fallback_models": [],
-      "default_cwd": null
+      "default_cwd": null,
+      "archive_after_days": 7
     }
     (Ok
      ((scoped_models (anthropic/claude-fable-5 deepseek-v4-pro))
       (confirm_tools true) (default_model (anthropic/claude-fable-5))
-      (default_thinking ((On (High)))) (fallback_models ()) (default_cwd ())))
+      (default_thinking ((On (High)))) (fallback_models ()) (default_cwd ())
+      (archive_after_days 7)))
     |}]
 ;;
 
@@ -64,7 +68,8 @@ let%expect_test "unknown fields are ignored" =
     {|
     (Ok
      ((scoped_models (x)) (confirm_tools true) (default_model ())
-      (default_thinking ()) (fallback_models ()) (default_cwd ())))
+      (default_thinking ()) (fallback_models ()) (default_cwd ())
+      (archive_after_days 7)))
     |}]
 ;;
 
@@ -117,7 +122,15 @@ let%expect_test
     {|
     config.confirm_tools must be a boolean (in $DIR/.prigh/config.json); prigh ignores the file's settings until it is fixed
     unknown setting "providrs" in $DIR/.prigh/config.json is ignored; did you mean "providers"?
-    unknown setting "colour" in $DIR/.prigh/config.json is ignored (known: providers, scoped_models, confirm_tools, default_model, default_thinking, fallback_models, default_cwd)
+    unknown setting "colour" in $DIR/.prigh/config.json is ignored (known: providers, scoped_models, confirm_tools, default_model, default_thinking, fallback_models, default_cwd, archive_after_days)
+    |}];
+  show {|{"archive_after_days": "a week"}|};
+  show {|{"archive_after_days": -1}|};
+  show {|{"archive_after_days": 2.5}|};
+  [%expect
+    {|
+    config.archive_after_days must be a number of days (0: never) (in $DIR/.prigh/config.json); prigh ignores the file's settings until it is fixed
+    config.archive_after_days must be a number of days (0: never) (in $DIR/.prigh/config.json); prigh ignores the file's settings until it is fixed
     |}];
   (* Unparsable files are [read_fields]' error, reported once elsewhere. *)
   show "{not json";
@@ -141,10 +154,11 @@ let%expect_test "null defaults are unset" =
     {|
     (Ok
      ((scoped_models ()) (confirm_tools false) (default_model ())
-      (default_thinking ()) (fallback_models ()) (default_cwd ())))
+      (default_thinking ()) (fallback_models ()) (default_cwd ())
+      (archive_after_days 7)))
     (Ok
      ((scoped_models ()) (confirm_tools false)
       (default_model (deepseek/deepseek-flash)) (default_thinking ((On ())))
-      (fallback_models ()) (default_cwd ())))
+      (fallback_models ()) (default_cwd ()) (archive_after_days 7)))
     |}]
 ;;

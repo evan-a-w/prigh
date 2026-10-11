@@ -145,6 +145,40 @@ let summary t (e : Entry.t) =
 
 let summaries t = Queue.to_list t.entries |> List.map ~f:(summary t)
 
+let ancestors t (e : Entry.t) =
+  let rec go acc (e : Entry.t) =
+    match Option.bind e.parent ~f:(Hashtbl.find t.by_id) with
+    | None -> List.rev acc
+    | Some parent -> go (parent :: acc) parent
+  in
+  go [] e
+;;
+
+let orphan_ends t ~alive ~why =
+  Queue.to_list t.entries
+  |> List.rev
+  |> List.filter_map ~f:(fun (e : Entry.t) ->
+    let ancestors = ancestors t e in
+    let root = Option.value (List.last ancestors) ~default:e in
+    if Option.is_some e.result || alive root.id
+    then None
+    else (
+      let end_ =
+        Agent_event.Subagent_end
+          { call_id = e.call_id
+          ; agent_id = e.id
+          ; usage = Usage.zero
+          ; turns = e.turns
+          ; cost_usd = 0.
+          ; result = Tool_result.error ("[interrupted] " ^ why root.id)
+          }
+      in
+      Some
+        (List.fold ancestors ~init:end_ ~f:(fun event (parent : Entry.t) ->
+           Agent_event.Subagent
+             { call_id = parent.call_id; agent_id = parent.id; event }))))
+;;
+
 let find t key =
   let entry =
     match Hashtbl.find t.by_id key with

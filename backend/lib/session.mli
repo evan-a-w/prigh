@@ -39,6 +39,9 @@ module Entry : sig
                 before hosts were recorded *)
           }
       | System_prompt of { text : string }
+      | Archived of { archived : bool }
+      (** archived or unarchived by hand (see {!Summary.is_archived}); not
+          copied by [fork] *)
     [@@deriving sexp, jsonaf]
   end
 
@@ -113,6 +116,7 @@ val append_message : t -> ?at:float -> Message.t -> Entry.t
 val set_model : t -> model:string -> thinking:Thinking.t -> Entry.t
 val set_name : t -> name:string -> Entry.t
 val set_description : t -> text:string -> Entry.t
+val set_archived : t -> archived:bool -> Entry.t
 
 (** Records a [cwd] entry; a subsequent [load] restores it. *)
 val set_cwd : t -> ?host:Host.t -> cwd:string -> unit -> Entry.t
@@ -154,12 +158,42 @@ module Summary : sig
     ; first_prompt : string option
     ; message_count : int
     ; parent : string option
+    ; archived : bool option
+      (** the last [Archived] entry, when it comes after the last message *)
+    ; last_activity : float
+      (** seconds since the epoch: the last message's time (else the file's
+          mtime), or a later unarchiving *)
+    ; bytes : int (** {!disk_usage} *)
     }
   [@@deriving sexp_of]
+
+  (** Never while [active] (a run or background work going on); else
+      archived by hand, or automatically when the last activity is more than
+      [archive_after_days] days before [now] (seconds; [0] days: never). *)
+  val is_archived
+    :  t
+    -> now:float
+    -> archive_after_days:float
+    -> active:bool
+    -> bool
 end
 
-(** Most recently updated first. *)
+(** Most recently updated first. Files are only parsed again when their size
+    or mtime changed since the last call. *)
 val list : dir:string -> Summary.t list
+
+(** A session's own directory next to its file, [<stamp>_<id>/] for
+    [<stamp>_<id>.jsonl], for per-session data (it may not exist). *)
+val data_dir : string -> string
+
+(** The session file [path] and its {!data_dir}, those that exist. *)
+val files : string -> string list
+
+(** Bytes used by {!files}. *)
+val disk_usage : string -> int
+
+(** Removes {!files}. *)
+val delete_files : string -> unit
 
 (** The summary whose id is [key], else the only one whose id starts with
     it; errors say whether none or several matched. *)
@@ -179,7 +213,7 @@ module Filter : sig
   val matches : t -> now:Time_float.t -> Summary.t -> bool
 end
 
-(** Removes the session file. *)
+(** Removes the session's files. *)
 val delete : Summary.t -> unit
 
 val default_dir : home:string -> string

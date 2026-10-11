@@ -109,6 +109,9 @@ val find : t -> kind:Kind.t -> string -> Task.t Or_error.t
 (** Of [kind], or of any kind. *)
 val has_running : ?kind:Kind.t -> t -> bool
 
+(** Running tasks of any kind. *)
+val running_count : t -> int
+
 val summaries : t -> kind:Kind.t -> Summary.t list
 
 (** Finished tasks of any kind not delivered yet, oldest first; marks them
@@ -148,6 +151,10 @@ val cancel_and_wait
 (** Cancels every running task. With [discard], every task is marked
     delivered so nothing reaches the agent. *)
 val cancel_all : ?discard:bool -> t -> unit
+
+(** Drops every finished task (for a session replaced in place, so its
+    tasks are not listed in the next one). *)
+val forget_finished : t -> unit
 
 (** Blocks until no task is running. *)
 val wait_all : t -> unit

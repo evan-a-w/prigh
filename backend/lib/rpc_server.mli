@@ -46,6 +46,9 @@ val create
   -> ?namespace:string
   -> ?backend_host:bool
        (** whether [new_agent] makes the backend a tool host (default: true) *)
+  -> ?home:string
+       (** whose [config.json] [list_sessions] reads [archive_after_days]
+           from (default: the calling client's agent's config) *)
   -> login:Login_manager.t
   -> sessions_dir:string
   -> cwd:string
@@ -96,6 +99,14 @@ val unauthorised : string
 val credentials_ok : t -> ?user:string -> string option -> bool
 
 val namespace : t -> string option
+
+(** What [session]'s terminal is keyed by in {!Terminals} and
+    {!Terminal_relay}: the session id, prefixed by the namespace. *)
+val terminal_key : t -> session:string -> string
+
+(** [f] is called with the terminal key of every deleted session (to kill
+    its terminal). *)
+val on_session_deleted : t -> f:(key:string -> unit) -> unit
 
 (** Where [session]'s terminal should run: on its active tool host, in that
     host's cwd for the session. Without a live session, the backend in the

@@ -12,6 +12,9 @@ type t =
         credentials), a run hands over to the next one after it *)
   ; default_cwd : string option
     (** where new sessions start on the backend host *)
+  ; archive_after_days : float
+    (** a session inactive for this long is archived (default 7; 0: never),
+        see {!Session.Summary.is_archived} *)
   }
 [@@deriving sexp_of]
 

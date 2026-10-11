@@ -54,4 +54,16 @@ val summaries : t -> Summary.t list
     transcript (each message at the time its [Message_end] was recorded). *)
 val find : t -> string -> (Summary.t * Timed_message.t list) option
 
+(** A synthetic [Subagent_end] (error result [[interrupted] <why root>], zero
+    usage) for every subagent still running whose top-level ancestor [root]
+    is not [alive], wrapped in its ancestors' [Subagent] envelopes like a
+    real one, so that every reducer of the agent's events (this log
+    included, once they are [record]ed) sees it end. Newest first, so nested
+    ones end before their parents. *)
+val orphan_ends
+  :  t
+  -> alive:(string -> bool)
+  -> why:(string -> string)
+  -> Agent_event.t list
+
 val clear : t -> unit

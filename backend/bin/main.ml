@@ -671,6 +671,7 @@ let serve_command =
            ?token
            ?namespace
            ~backend_host
+           ~home:world.home
            ~login
            ~sessions_dir:world.sessions_dir
            ~cwd
@@ -760,9 +761,10 @@ let serve_command =
          url
        in
        (* Shared, so both UIs on one session see the same shell. *)
-       let terminal =
-         Web_server.serve_terminal router (Terminals.create ~env ~sw ())
-       in
+       let terminals = Terminals.create ~env ~sw () in
+       List.iter (Rpc_router.servers router) ~f:(fun (_, server) ->
+         Rpc_server.on_session_deleted server ~f:(Terminals.kill terminals));
+       let terminal = Web_server.serve_terminal router terminals in
        let opened = ref false in
        let maybe_open url =
          if open_browser && not !opened
