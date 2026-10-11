@@ -106,6 +106,10 @@ type t =
       ; data : string
       }
   | Terminal_close of string
+  | Terminal_kill of string
+  (** a session's key: it was deleted, so its terminal on our worker (if
+      any) is killed; sent because our [hello] has the [terminal_kill]
+      feature *)
   | Btw_delta of
       { btw_id : string
       ; delta : string

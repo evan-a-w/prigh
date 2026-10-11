@@ -134,6 +134,7 @@ let rec summarise (e : Event.t) : string option =
   | Terminal_open { term_id; _ } -> Some (sprintf "terminal_open %s" term_id)
   | Terminal_frame _ -> None
   | Terminal_close id -> Some (sprintf "terminal_close %s" id)
+  | Terminal_kill key -> Some (sprintf "terminal_kill %s" key)
   | Btw_delta { btw_id; delta } -> Some (sprintf "btw_delta %s %S" btw_id delta)
   | Sessions_changed -> Some "sessions_changed"
 ;;

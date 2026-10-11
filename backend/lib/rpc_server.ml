@@ -192,7 +192,8 @@ module Client = struct
     ; mutable tools : bool
     ; mutable features : string list
       (** [hello]'s [features]: what the host supports beyond the basics
-          ([exec_input]: [tool_exec_input]) *)
+          ([exec_input]: [tool_exec_input]; [terminal_kill]: the
+          [terminal_kill] event) *)
     ; mutable cwd : string option
     ; mutable agent : Agent.t
     ; mutable placeholder : Agent.t option
@@ -967,7 +968,10 @@ let delete_saved t client (summary : Session.Summary.t) =
         if Agent.resume_pending agent
         then ignore (Agent.cancel_resume agent : unit Or_error.t));
       let key = terminal_key t ~session:summary.id in
-      Terminal_relay.close_key t.terminals ~key;
+      List.iter (Terminal_relay.close_key t.terminals ~key) ~f:(fun host ->
+        Option.iter (host_client t host) ~f:(fun (c : Client.t) ->
+          if List.mem c.features "terminal_kill" ~equal:String.equal
+          then c.send (Terminal_relay.kill_event ~host ~key)));
       List.iter t.on_session_deleted ~f:(fun f -> f ~key);
       { Deleted.path = summary.path; id = summary.id; bytes })
 ;;
