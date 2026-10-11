@@ -95,41 +95,50 @@ let message ?elide_above ({ message; at } : Timed_message.t) =
   | User _ | Assistant _ -> Rpc_json.timed_message { message; at }
 ;;
 
-let create ?elide_above messages ~limit ~before =
+let create ?elide_above ?from messages ~limit ~before =
   let all = Array.of_list messages in
-  let stop =
+  let index id =
+    match
+      Array.findi all ~f:(fun _ (entry, _) ->
+        Option.equal String.equal entry (Some id))
+    with
+    | Some (i, _) -> Ok i
+    | None ->
+      Or_error.errorf
+        "message %s is not in the session any more: load its latest messages \
+         again"
+        id
+  in
+  let open Or_error.Let_syntax in
+  let%bind stop =
     match before with
     | None -> Ok (Array.length all)
-    | Some id ->
-      (match
-         Array.findi all ~f:(fun _ (entry, _) ->
-           Option.equal String.equal entry (Some id))
-       with
-       | Some (i, _) -> Ok i
-       | None ->
-         Or_error.errorf
-           "message %s is not in the session any more: load its latest \
-            messages again"
-           id)
+    | Some id -> index id
   in
-  Or_error.map stop ~f:(fun stop ->
-    let rec start i =
-      if i <= 0
-      then 0
-      else (
-        match all.(i) with
-        | None, _ | _, { Timed_message.message = Tool_result _; _ } ->
-          start (i - 1)
-        | Some _, { message = User _ | Assistant _; _ } -> i)
-    in
-    let start = start (Int.max 0 (stop - Int.max 1 limit)) in
-    { messages =
-        Array.sub all ~pos:start ~len:(stop - start)
-        |> Array.to_list
-        |> List.map ~f:(fun (_, m) -> message ?elide_above m)
-    ; older = start
-    ; before = (if start > 0 then fst all.(start) else None)
-    })
+  let%map limit =
+    match from with
+    | None -> Ok limit
+    | Some id ->
+      let%map from = index id in
+      stop - from
+  in
+  let rec start i =
+    if i <= 0
+    then 0
+    else (
+      match all.(i) with
+      | None, _ | _, { Timed_message.message = Tool_result _; _ } ->
+        start (i - 1)
+      | Some _, { message = User _ | Assistant _; _ } -> i)
+  in
+  let start = start (Int.max 0 (stop - Int.max 1 limit)) in
+  { messages =
+      Array.sub all ~pos:start ~len:(stop - start)
+      |> Array.to_list
+      |> List.map ~f:(fun (_, m) -> message ?elide_above m)
+  ; older = start
+  ; before = (if start > 0 then fst all.(start) else None)
+  }
 ;;
 
 let to_json { messages; older; before } =

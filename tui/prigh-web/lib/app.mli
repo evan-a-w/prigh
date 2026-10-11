@@ -122,6 +122,22 @@ module Reply_tag : sig
         ; images : Image.t list
         ; attachments : Files.Attachment.t list
         } (** [Sent] with attachments: back to the composer if it fails *)
+    | Resync of
+        { session : string (** its id *)
+        ; from : string option
+        }
+    (** the session's messages after reconnecting, from the first one on show
+        ([from], when older ones are not loaded): merged into the transcript
+        on show *)
+    | Resync_pending
+    (** [get_pending] after reconnecting: what is no longer waited for
+        closes, the rest stays as it was *)
+    | Session_gone of
+        { generation : int
+        ; session : string
+        }
+    (** like [Reconnect generation], but the backend no longer has [session]
+        (it restarted before saving it): we are on another one *)
   [@@deriving sexp_of, equal]
 end
 
@@ -138,7 +154,9 @@ module Command : sig
         ; session : string option
         }
     (** After [delay_ms], connect again and send [hello] (rejoining [session]);
-        answered by [Reply (Reconnect generation, hello reply)]. *)
+        answered by [Reply (Reconnect generation, hello reply)], or by
+        [Reply (Session_gone _, hello reply)]. Without a [session], the one
+        in the page's URL. *)
     | Set_url_session of string
     (** the page's [?session=], so a reload rejoins *)
     | Expire_toast of
@@ -170,6 +188,13 @@ module Command : sig
     | Save_size of Resize.Save.t (** a panel's size, in the browser *)
     | Keep_scroll_position
     (** older messages are being added above: what shows stays in place *)
+    | Probe_connection
+    (** the socket may have died unnoticed (a suspended page, a new network):
+        drop it ([Backend_closed]) unless the backend answers soon *)
+    | Drop_connection (** the network went away: [Backend_closed] follows *)
+    | Auth_failed of string
+    (** the backend refused the saved sign-in: the sign-in page, saying
+        this, keeping the session to return to *)
   [@@deriving sexp_of, equal]
 end
 
@@ -201,7 +226,8 @@ module Action : sig
     | Set_utc_offset of Time_ns.Span.t
     (** the browser's time zone, for messages' times *)
     | Set_narrow of bool (** a phone-sized window: the sidebar is a drawer *)
-    | Page_hidden of bool (** the tab was hidden or shown again *)
+    | Page_hidden of bool
+    (** the tab was hidden or shown again (reconnect now, or check the socket) *)
     | Set_notifications of
         { enabled : bool
         ; permission : string
@@ -341,6 +367,8 @@ module Action : sig
     | Prefetch_session of string
     (** a session's path: the pointer rests on it in the sidebar *)
     | Load_output of string (** a [Fold] key: the whole of an elided output *)
+    | Network of bool
+    (** the browser's [online] (reconnect now) and [offline] events *)
   [@@deriving sexp_of]
 end
 
@@ -399,6 +427,9 @@ module Model : sig
     ; chat_cache : Chat_cache.t
     ; outputs_loading : String.Set.t
     (** [Fold] keys of elided outputs being fetched whole *)
+    ; session_gone : string option
+    (** reconnected to a backend that no longer has this session: its
+        transcript stays on show, read-only, until another is chosen *)
     }
   [@@deriving sexp_of]
 

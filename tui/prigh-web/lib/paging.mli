@@ -19,6 +19,9 @@ val of_page : Message_page.t -> t
 (** How many messages a page has. *)
 val size : int
 
+(** A [limit] for all of a session's messages. *)
+val everything : int
+
 (** The cursor of the page before, when there is one to load and none on its
     way. *)
 val next : t -> string option

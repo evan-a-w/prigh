@@ -72,6 +72,14 @@ val first : t -> int
 (** Adds older messages (a page before those loaded) before the entries. *)
 val prepend : t -> Message.t list -> t
 
+(** [fresh] (the messages from the first one [old] has to the newest, fetched
+    again after reconnecting) with [old]'s entries and tool calls wherever
+    they are the same, so that their views are kept (and [old] itself when
+    nothing changed); numbered as [old]. A message still streaming in [old]
+    stays while [fresh] is running, and an output [old] has whole stays whole
+    where [fresh] has it cut. *)
+val reconcile : old:t -> t -> t
+
 val tool : t -> string -> Tool.t option
 
 (** Whether the agent is working: between its start and end events. A tool

@@ -135,10 +135,11 @@ let append t ?(label = "") message =
   id
 ;;
 
-let page ?before t ~limit =
+let page ?before ?from t ~limit =
   match
     Message_page.create
       ~elide_above:100
+      ?from
       (Session.identified_messages t)
       ~limit
       ~before
@@ -214,4 +215,23 @@ let%expect_test "a compaction's summary starts a page with its pinned message" =
     ((messages ("user: pinned" "user: Summary of the conversat")) (older 0)
      (before null))
     |}]
+;;
+
+let%expect_test "from a message: what a frontend loaded, and what came since" =
+  with_session
+  @@ fun t ->
+  let (_ : string) = append t (user "first") ~label:"first" in
+  let hello = append t (assistant "hello") ~label:"hello" in
+  let (_ : string) = append t (user "run them") ~label:"run them" in
+  let (_ : string) = append t (assistant "done") ~label:"done" in
+  (* [limit] does not cut it short. *)
+  ignore (page t ~limit:1 ~from:hello : string option);
+  [%expect
+    {|
+    ((messages ("assistant: hello" "user: run them" "assistant: done")) (older 1)
+     (before hello))
+    |}];
+  ignore (page t ~limit:1 ~from:"gone" : string option);
+  [%expect
+    {| "message gone is not in the session any more: load its latest messages again" |}]
 ;;

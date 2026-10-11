@@ -36,9 +36,12 @@ type t =
     newest [limit]), from [Session.identified_messages]. A page never starts
     with a tool result (its call comes with it) or a compaction summary (its
     pinned message does), so it may be longer than [limit]. Fails when
-    [before] is not on the session's active path any more. *)
+    [before] is not on the session's active path any more. With [from], an
+    entry id, the page starts with that message instead (whatever [limit]):
+    a frontend fetches again what it has loaded, and what came since. *)
 val create
   :  ?elide_above:int
+  -> ?from:string
   -> (string option * Timed_message.t) list
   -> limit:int
   -> before:string option

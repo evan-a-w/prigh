@@ -185,8 +185,15 @@ let%expect_test "the panel follows the session, the host and the user" =
     (Rpc (method_ list_models) (params ()) (tag Models))
     (Rpc (method_ auth_status) (params ()) (tag (Auth_status Refresh)))
     (Rpc (method_ get_config) (params ()) (tag Config))
-    connecting… (Close (Ctrl+`): the shell keeps running for 10 minutes)
-    Connecting to the backend…
+    (Rpc (method_ get_messages_page)
+     (params ((session /sessions/s2.jsonl) (limit 1000000)))
+     (tag (Resync (session s2) (from ()))))
+    (Rpc (method_ get_pending) (params ()) (tag Resync_pending))
+    (Rpc (method_ list_sessions) (params ()) (tag Sessions))
+    (Rpc (method_ list_subagents) (params ()) (tag Subagents))
+    (Rpc (method_ list_jobs) (params ()) (tag Jobs))
+    laptop ~/proj connecting… (Close (Ctrl+`): the shell keeps running for 10 minutes)
+    ((session s2)(host c7)(online true)(as_user())(generation 0))
     |}]
 ;;
 

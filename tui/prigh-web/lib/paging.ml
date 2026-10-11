@@ -15,6 +15,7 @@ let of_page (page : Message_page.t) =
 ;;
 
 let size = 60
+let everything = 1_000_000
 
 let next t =
   match t.before with
