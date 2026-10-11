@@ -754,7 +754,7 @@ let%expect_test "typing / lists commands, Down twice + Tab fills /login " =
       /fallback [off|model...]        show or set the models th…
       /default-dir [off|path]         show or set the directory…
       /login [provider] [api_key|oauth]  log in to a provider
-      ↕ 1–8 of 51
+      ↕ 1–8 of 55
     …deepseek-flash  ctx:0.1%/1.0M  Tab/Enter accept · Esc close
     |}];
   H.key h (Key.plain Down);
@@ -771,7 +771,7 @@ let%expect_test "typing / lists commands, Down twice + Tab fills /login " =
       /fallback [off|model...]        show or set the models th…
       /default-dir [off|path]         show or set the directory…
       /login [provider] [api_key|oauth]  log in to a provider
-      ↕ 1–8 of 51
+      ↕ 1–8 of 55
     …deepseek-flash  ctx:0.1%/1.0M  Tab/Enter accept · Esc close
     |}];
   H.key h (Key.plain Down);
@@ -788,7 +788,7 @@ let%expect_test "typing / lists commands, Down twice + Tab fills /login " =
       /fallback [off|model...]        show or set the models th…
       /default-dir [off|path]         show or set the directory…
       /login [provider] [api_key|oauth]  log in to a provider
-      ↕ 1–8 of 51
+      ↕ 1–8 of 55
     …deepseek-flash  ctx:0.1%/1.0M  Tab/Enter accept · Esc close
     |}];
   H.key h (Key.plain Tab);
@@ -3507,7 +3507,7 @@ let%expect_test "background subagent: runs while main is idle, survives a \
   H.event h (State (state ~running:true ()));
   H.event
     h
-    (Message_start (user ("[subagent a1 failed] index the repo\n" ^ report)));
+    (Message_start (delivery ("[subagent a1 failed] index the repo\n" ^ report)));
   say h "it was cancelled";
   H.event h (State (state ()));
   H.keys h "/agents cancel 1";
@@ -3569,7 +3569,7 @@ let%expect_test "delivered reports reload compactly; unseen agents still show" =
     ~quiet:true
     h
     Initial_messages
-    {|[{"role":"user","text":"[subagent a1 finished] find auth\nauth lives in src/auth.ml\n[subagent: 2 turns, 1 in / 2 out tokens, $0.0100]\n\n[subagent a2 failed] run tests\nsubagent failed: boom\n[subagent: 1 turns, 1 in / 1 out tokens, $0.0000]"}]|};
+    {|[{"role":"user","text":"[subagent a1 finished] find auth\nauth lives in src/auth.ml\n[subagent: 2 turns, 1 in / 2 out tokens, $0.0100]\n\n[subagent a2 failed] run tests\nsubagent failed: boom\n[subagent: 1 turns, 1 in / 1 out tokens, $0.0000]","origin":{"source":{"kind":"delivery","title":"Reports"}}}]|};
   H.event h (State (state ~subagents:[ "a3", "elsewhere", true ] ()));
   H.show h;
   [%expect
@@ -4559,7 +4559,8 @@ let%expect_test "config: get_config at Start installs the reply; \
       (default_thinking ())
       (fallback_models  ())
       (default_cwd      ())
-      (archive_after_days 7)))
+      (archive_after_days 7)
+      (notify             bell)))
     ((
       (scoped_models (deepseek/deepseek-flash))
       (approval_mode Auto)
@@ -4571,7 +4572,8 @@ let%expect_test "config: get_config at Start installs the reply; \
       (default_thinking ())
       (fallback_models  ())
       (default_cwd      ())
-      (archive_after_days 7)))
+      (archive_after_days 7)
+      (notify             bell)))
     |}]
 ;;
 
@@ -5560,7 +5562,8 @@ let%expect_test "/change_default saves the model and thinking level" =
       (default_thinking (high))
       (fallback_models ())
       (default_cwd     ())
-      (archive_after_days 7)))
+      (archive_after_days 7)
+      (notify             bell)))
 
 
 
@@ -7129,7 +7132,7 @@ let%expect_test "Tab on an empty editor opens the command list; the list shows \
       /fallback [off|model...]        show or set the models th…
       /default-dir [off|path]         show or set the directory…
       /login [provider] [api_key|oauth]  log in to a provider
-      ↕ 1–8 of 51
+      ↕ 1–8 of 55
     …deepseek-flash  ctx:0.1%/1.0M  Tab/Enter accept · Esc close
     |}];
   H.key h (Key.plain End);
@@ -7146,7 +7149,7 @@ let%expect_test "Tab on an empty editor opens the command list; the list shows \
       /fallback [off|model...]        show or set the models th…
       /default-dir [off|path]         show or set the directory…
       /login [provider] [api_key|oauth]  log in to a provider
-      ↕ 1–8 of 51
+      ↕ 1–8 of 55
     …deepseek-flash  ctx:0.1%/1.0M  Tab/Enter accept · Esc close
     |}];
   H.keys h "qu";
@@ -7531,7 +7534,7 @@ let%expect_test "background jobs: !&, status line while idle, /jobs picker, \
   H.event
     h
     (Message_start
-       (user
+       (delivery
           "[job j1 killed] make test\n\
            ok parser\n\
            PASS parser\n\n\
@@ -7568,7 +7571,7 @@ let%expect_test "job reports reload compactly; look-alike text stays a user \
     ~quiet:true
     h
     Initial_messages
-    {|[{"role":"user","text":"[job j4 failed: tool host disconnected] npm run dev\nlistening on :3000"},{"role":"user","text":"[job board] what is on it?"}]|};
+    {|[{"role":"user","text":"[job j4 failed: tool host disconnected] npm run dev\nlistening on :3000","origin":{"source":{"kind":"delivery","title":"Reports"}}},{"role":"user","text":"[job board] what is on it?"}]|};
   H.show h;
   [%expect
     {|

@@ -53,6 +53,8 @@ module Icon : sig
     | Clock
     | Archive
     | Unarchive
+    | Bell
+    | Bell_off
 
   (** An inline SVG; tests show [<icon name>]. *)
   val view : ?cls:string -> t -> Node.t

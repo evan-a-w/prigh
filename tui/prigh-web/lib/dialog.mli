@@ -59,6 +59,7 @@ type t =
   | Mcp_tools of Mcp_server.t (** a ready server's tools *)
   | Loading of string
   (** the title of a dialog waiting for its list from the backend *)
+  | Diff of Git_diff.t (** [/diff] *)
 [@@deriving sexp_of, equal]
 
 (** Belongs to the session (closed when switching). *)

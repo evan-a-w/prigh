@@ -87,7 +87,7 @@ let freeform_input arguments =
 let input_items ~provider ~freeform (messages : Message.t list) =
   List.concat_mapi messages ~f:(fun message_index m ->
     match m with
-    | User { text; images } ->
+    | User { text; images; origin = _ } ->
       [ `Object
           [ "type", `String "message"
           ; "role", `String "user"

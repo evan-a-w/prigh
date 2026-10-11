@@ -51,11 +51,16 @@ module Item : sig
     (** finished background subagents' reports handed to the main agent *)
     | Skill of
         { skill : Skill_message.t
-        ; images : P.Image.t list
+        ; user : P.Message.User.t
         } (** a user message invoking a skill ([/skill:NAME ARGS], expanded) *)
-    | Handover of Handover_message.t
-    (** the backend's message handing the conversation to the next fallback
-        model *)
+    | Note of
+        { kind : P.Origin.Kind.t
+        ; title : string
+        ; text : string (** what the model saw *)
+        }
+    (** a message the harness wrote in the user's place: a hand-over, a goal,
+        [/review], ... (reports of background work are [Delivery], the
+        compaction summary [Compaction]) *)
   [@@deriving sexp_of, equal]
 end
 

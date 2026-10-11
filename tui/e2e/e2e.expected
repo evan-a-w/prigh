@@ -199,14 +199,14 @@ btw backend exited
   (permissions ((allow ()) (ask ()) (deny ()))) (default_model ())
   (default_thinking ())
   (fallback_models (deepseek/deepseek-flash anthropic/claude-fable-5-1))
-  (default_cwd ($TMP)) (archive_after_days 7)))
+  (default_cwd ($TMP)) (archive_after_days 7) (notify bell)))
 <- set_config ERROR: "fallback_models: unknown model \"gpt-9\"; did you mean: openai/gpt-4 (GPT-4), openai/gpt-5 (GPT-5), openai/gpt-4o (GPT-4o)"
 <- set_config: (Ok
  ((scoped_models ()) (approval_mode Auto)
   (permissions ((allow ()) (ask ()) (deny ()))) (default_model ())
   (default_thinking ())
   (fallback_models (deepseek/deepseek-flash anthropic/claude-fable-5-1))
-  (default_cwd ()) (archive_after_days 7)))
+  (default_cwd ()) (archive_after_days 7) (notify bell)))
 <- prompt: ()
   event state running=true model=deepseek/deepseek-flash
   event sessions_changed
@@ -313,6 +313,7 @@ approvals backend exited
   \n</file>")
  (images
   (((mime_type image/gif) (bytes 45)) ((mime_type image/png) (bytes 84))))
+ (origin ((body "what is in @shot.png?") (attachments (shot.png))))
  (at <at>))
 <- tool_result: ((tool_call_id i1) (tool_name read) (text "Read image file [image/png, 3x2]")
  (is_error false) (images (((mime_type image/png) (bytes 84)))) (at <at>))

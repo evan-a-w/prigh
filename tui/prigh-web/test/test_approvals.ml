@@ -1066,31 +1066,39 @@ let%expect_test "update_plan, ask_user and exit_plan_mode in the transcript" =
     |}]
 ;;
 
-let%expect_test "plan mode notes are a line, not the note" =
+let%expect_test "plan mode notes are margin notes, not the user's words" =
   let chat =
     Chat_harness.chat
-      [ {|{"event":"message_start","message":{"role":"user","text":"[Plan mode is on: investigate, do not edit files.]\n\nfix the build"}}|}
-      ; {|{"event":"message_start","message":{"role":"user","text":"[Plan mode is off: you may edit files now.]"}}|}
+      [ {|{"event":"message_start","message":{"role":"user","text":"[Plan mode is on: investigate, do not edit files.]\n\nfix the build","origin":{"body":"fix the build","notes":[{"kind":"plan_mode","title":"Plan mode on: the model was told to plan, not change files","text":"[Plan mode is on: investigate, do not edit files.]"}]}}}|}
+      ; {|{"event":"message_start","message":{"role":"user","text":"[Plan mode is off: you may edit files now.]","origin":{"body":"","notes":[{"kind":"plan_mode","title":"Plan mode off: the model was told it can change files","text":"[Plan mode is off: you may edit files now.]"}]}}}|}
       ]
   in
   Chat_harness.text chat;
   Chat_harness.show ~selector:".entries" chat;
   [%expect
     {|
-    ◇ plan mode on: the model was told to plan, not change files fix the build ◆ plan mode off: the model was told it can change files
+    ◇ Plan mode on: the model was told to plan, not change files [Plan mode is on: investigate, do not edit files.] fix the build ◇ Plan mode off: the model was told it can change files [Plan mode is off: you may edit files now.]
     <div class="entries">
-      <div class="msg user">
-        <div class="mode-note on">
-          <span class="icon"> ◇ </span>
-          plan mode on: the model was told to plan, not change files
+      <div class="msg noted">
+        <details data-kind="plan_mode" class="note">
+          <summary>
+            <span aria-hidden="true" class="glyph"> ◇ </span>
+            <span class="title"> Plan mode on: the model was told to plan, not change files </span>
+          </summary>
+          <pre class="note-text"> [Plan mode is on: investigate, do not edit files.] </pre>
+        </details>
+        <div class="msg user">
+          <div class="bubble"> fix the build </div>
         </div>
-        <div class="bubble"> fix the build </div>
       </div>
-      <div class="msg">
-        <div class="mode-note off">
-          <span class="icon"> ◆ </span>
-          plan mode off: the model was told it can change files
-        </div>
+      <div class="msg noted">
+        <details data-kind="plan_mode" class="note">
+          <summary>
+            <span aria-hidden="true" class="glyph"> ◇ </span>
+            <span class="title"> Plan mode off: the model was told it can change files </span>
+          </summary>
+          <pre class="note-text"> [Plan mode is off: you may edit files now.] </pre>
+        </details>
       </div>
     </div>
     |}];
@@ -1100,8 +1108,8 @@ let%expect_test "plan mode notes are a line, not the note" =
     h
     "get_entries"
     {|{"head":"e2","entries":[
-      {"id":"e1","parent":null,"kind":"message","message":{"role":"user","text":"[Plan mode is on: investigate.]\n\nfix the build"}},
-      {"id":"e2","parent":"e1","kind":"message","message":{"role":"user","text":"[Plan mode is off: go.]"}}]}|};
+      {"id":"e1","parent":null,"kind":"message","message":{"role":"user","text":"[Plan mode is on: investigate.]\n\nfix the build","origin":{"body":"fix the build","notes":[{"kind":"plan_mode","title":"Plan mode on: the model was told to plan, not change files","text":"[Plan mode is on: investigate.]"}]}}},
+      {"id":"e2","parent":"e1","kind":"message","message":{"role":"user","text":"[Plan mode is off: go.]","origin":{"body":"","notes":[{"kind":"plan_mode","title":"Plan mode off: the model was told it can change files","text":"[Plan mode is off: go.]"}]}}}]}|};
   H.text h ~selector:".picker-items";
   H.key h "Enter" ~target:Field;
   print_s [%sexp ((H.model h).draft : string)];
@@ -1112,7 +1120,7 @@ let%expect_test "plan mode notes are a line, not the note" =
     (Rpc (method_ get_entries) (params ()) (tag (Entries Fork)))
     (Focus picker-input)
     fix the build #1
-    plan mode off: the model was told it can change files #2 ✓
+    ◇ Plan mode off: the model was told it can change files #2 ✓
     Dialog_accept
     (Focus editor)
     (Expire_toast (id 0) (after_ms 4000))

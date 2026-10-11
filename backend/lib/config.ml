@@ -1,6 +1,29 @@
 open! Core
 open! Import
 
+module Notify = struct
+  type t =
+    | Off
+    | Bell
+    | Desktop
+  [@@deriving sexp_of, equal, enumerate]
+
+  let to_string = function
+    | Off -> "off"
+    | Bell -> "bell"
+    | Desktop -> "desktop"
+  ;;
+
+  let of_string s =
+    List.find all ~f:(fun t -> String.equal (to_string t) s)
+    |> Result.of_option
+         ~error:
+           (Error.createf
+              "config.notify must be \"off\", \"bell\" or \"desktop\", not %S"
+              s)
+  ;;
+end
+
 type t =
   { scoped_models : string list
   ; approval_mode : Approval_mode.t
@@ -13,6 +36,7 @@ type t =
   ; goal_max_continuations : int
   ; resume_on_limit_reset : bool
   ; archive_after_days : float
+  ; notify : Notify.t
   }
 [@@deriving sexp_of]
 
@@ -28,6 +52,7 @@ let default =
   ; goal_max_continuations = Goal.default_max_continuations
   ; resume_on_limit_reset = true
   ; archive_after_days = 7.
+  ; notify = Bell
   }
 ;;
 
@@ -59,6 +84,7 @@ let to_json t =
     ; ( "resume_on_limit_reset"
       , if t.resume_on_limit_reset then `True else `False )
     ; "archive_after_days", `Number (sprintf "%g" t.archive_after_days)
+    ; "notify", `String (Notify.to_string t.notify)
     ]
 ;;
 
@@ -162,6 +188,14 @@ let of_json json =
       | Some _ ->
         Or_error.error_string "config.resume_on_limit_reset must be a boolean"
     in
+    let%bind notify =
+      match find "notify" with
+      | None | Some `Null -> Ok default.notify
+      | Some (`String s) -> Notify.of_string s
+      | Some _ ->
+        Or_error.error_string
+          "config.notify must be \"off\", \"bell\" or \"desktop\""
+    in
     let%map default_thinking =
       match find "default_thinking" with
       | None | Some `Null -> Ok None
@@ -182,6 +216,7 @@ let of_json json =
     ; goal_max_continuations
     ; resume_on_limit_reset
     ; archive_after_days
+    ; notify
     }
   | _ -> Or_error.error_string "config must be a JSON object"
 ;;

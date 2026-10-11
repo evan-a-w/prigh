@@ -3,8 +3,10 @@ open! Import
 
 module Queued = struct
   type t =
-    { text : string
-    ; skill : string option
+    { text : string (** as typed *)
+    ; expanded : string option
+      (** what the model gets instead: a skill's or a command's prompt *)
+    ; source : Injected.Source.t option
     ; attachments : string list
     ; images : Image.t list
     }
@@ -213,7 +215,7 @@ type t =
   ; mutable host_pinned : bool (** chosen explicitly via [set_active_host] *)
   ; pending_execs : Pending_exec.t String.Table.t
   ; mutable exec_seq : int
-  ; mutable environment_notes : string list
+  ; mutable environment_notes : Injected.Note.t list
     (** cwd/host changes not yet told to the model, oldest first *)
   ; background : Background_tasks.t
   ; subagent_log : Subagent_log.t
@@ -457,7 +459,10 @@ let plan_mode_note t =
   then None
   else (
     t.told_plan_mode <- t.plan_mode;
-    Some (System_prompt.plan_mode_note ~on:t.plan_mode))
+    Some
+      { Injected.Note.kind = Plan_mode { on = t.plan_mode }
+      ; text = System_prompt.plan_mode_note ~on:t.plan_mode
+      })
 ;;
 
 let confirm t (context : Tool.Context.t) ~name ~summary ~rules ~recheck =
@@ -725,9 +730,11 @@ let fail_execs t ~host ~text =
 
 (* Before the first run the system prompt is still to be built from the
    current environment, so there is nothing to report. *)
-let add_environment_note t note =
+let add_environment_note t kind ~text =
   if Option.is_some (Session.system_prompt t.session)
-  then t.environment_notes <- t.environment_notes @ [ note ]
+  then
+    t.environment_notes
+    <- t.environment_notes @ [ { Injected.Note.kind; text } ]
 ;;
 
 let location t =
@@ -780,7 +787,10 @@ let set_host_cwd t (host : Host.t) ~cwd =
   then (
     t.cwd <- cwd;
     t.git_branch <- find_branch t ~cwd;
-    add_environment_note t (System_prompt.cwd_changed_note ~cwd));
+    add_environment_note
+      t
+      (Cwd { dir = cwd })
+      ~text:(System_prompt.cwd_changed_note ~cwd));
   record_location t;
   if String.equal host.id Host.backend_id
   then t.backend_cwd <- cwd
@@ -789,7 +799,11 @@ let set_host_cwd t (host : Host.t) ~cwd =
 
 let activate_host t (host : Host.t) ~cwd ~pinned =
   if not (String.equal t.active_host host.id)
-  then add_environment_note t (System_prompt.host_changed_note ~host:host.name);
+  then
+    add_environment_note
+      t
+      (Host { name = host.name })
+      ~text:(System_prompt.host_changed_note ~host:host.name);
   t.active_host <- host.id;
   t.active_host_name <- host.name;
   t.host_pinned <- pinned;
@@ -1250,11 +1264,11 @@ let set_goal_state t goal =
 ;;
 
 (* Goal messages are not user messages, but carry the plan mode note too. *)
-let goal_message t text =
+let goal_message t ~source text =
+  let notes = Option.to_list (plan_mode_note t) in
   Message.user
-    (match plan_mode_note t with
-     | None -> text
-     | Some note -> note ^ "\n\n" ^ text)
+    ~origin:{ Injected.empty with notes; source = Some source }
+    (Injected.prefix_notes notes text)
 ;;
 
 let stop_goal t ~reason =
@@ -1298,10 +1312,11 @@ let loop_config t =
   }
 ;;
 
-(* The text with the attachments' [<file>] blocks, and their images. *)
+(* The text with the attachments' [<file>] blocks, what they are, and their
+   images. *)
 let with_attachments t text attachments =
   match attachments with
-  | [] -> text, []
+  | [] -> text, [], []
   | _ ->
     let block path =
       let result =
@@ -1329,20 +1344,22 @@ let with_attachments t text attachments =
         sprintf "<file path=%S>\n%s</file>" path content, images
     in
     let blocks, images = List.unzip (List.map attachments ~f:block) in
-    text ^ "\n\n" ^ String.concat blocks ~sep:"\n\n", List.concat images
+    ( text ^ "\n\n" ^ String.concat blocks ~sep:"\n\n"
+    , List.map2_exn attachments blocks ~f:(fun path block ->
+        { Injected.Attachment.path; length = String.length block })
+    , List.concat images )
 ;;
 
 let user_message t (q : Queued.t) =
-  let text = Option.value q.skill ~default:q.text in
-  let text, attached = with_attachments t text q.attachments in
+  let text = Option.value q.expanded ~default:q.text in
+  let text, attachments, attached = with_attachments t text q.attachments in
   let notes = t.environment_notes @ Option.to_list (plan_mode_note t) in
   t.environment_notes <- [];
-  let text =
-    match notes with
-    | [] -> text
-    | notes -> String.concat ~sep:"\n" notes ^ "\n\n" ^ text
-  in
-  Message.user ~images:(q.images @ attached) text
+  let origin = { Injected.notes; attachments; source = q.source } in
+  Message.user
+    ~images:(q.images @ attached)
+    ?origin:(Option.some_if (not (Injected.is_empty origin)) origin)
+    (Injected.prefix_notes notes text)
 ;;
 
 (* What the session file does not record: subagents' responses (as they
@@ -1407,7 +1424,10 @@ let set_model t model =
   t.model <- model;
   (match before, editor () with
    | Some before, Some after when not (String.equal before after) ->
-     add_environment_note t (System_prompt.editor_changed_note ~before ~after)
+     add_environment_note
+       t
+       (Editor { before; after })
+       ~text:(System_prompt.editor_changed_note ~before ~after)
    | _ -> ());
   ignore
     (Session.set_model t.session ~model:(Model.key model) ~thinking:t.thinking
@@ -1447,6 +1467,10 @@ let unavailable_error added =
 
 let handover_message ~from ~(to_ : Model.t) ~error =
   Message.user
+    ~origin:
+      { Injected.empty with
+        source = Some (Handover { from; to_ = Model.key to_; error })
+      }
     (sprintf
        "[prigh: %s cannot continue (%s), so %s takes over this conversation \
         from here. Carry on with the task where it left off.]"
@@ -1474,6 +1498,7 @@ let last_stop added =
 
 let resume_message =
   Message.user
+    ~origin:{ Injected.empty with source = Some Resume }
     "[prigh: the usage limit has reset. Carry on with the interrupted task \
      where it left off.]"
 ;;
@@ -1533,7 +1558,11 @@ let rec start_run ?(tried = String.Set.empty) t prompts =
             let note =
               if List.is_empty queued
               then
-                Option.to_list (Option.map (plan_mode_note t) ~f:Message.user)
+                Option.to_list
+                  (Option.map (plan_mode_note t) ~f:(fun note ->
+                     Message.user
+                       ~origin:{ Injected.empty with notes = [ note ] }
+                       note.text))
               else []
             in
             deliveries t @ note @ queued)
@@ -1692,6 +1721,11 @@ let rec start_run ?(tried = String.Set.empty) t prompts =
                  (`Prompts
                      [ goal_message
                          t
+                         ~source:
+                           (Goal_continuation
+                              { continuation = goal.continuations
+                              ; max = t.config.goal_max_continuations
+                              })
                          (Goal.continuation_message
                             goal
                             ~max_continuations:t.config.goal_max_continuations)
@@ -1834,7 +1868,7 @@ let last_job_number messages =
       match (message : Message.t) with
       | Tool_result r when String.equal r.tool_name "bash" ->
         Option.to_list (number_after r.text ~prefix:"started job j")
-      | User { text; images = _ } ->
+      | User { text; _ } ->
         List.filter_map
           (String.split_lines text)
           ~f:(number_after ~prefix:"[job j")
@@ -1983,7 +2017,21 @@ let prompt ?(attachments = []) ?(images = []) t text =
       if is_running t
       then running ()
       else
-        Ok (start_run t [ user_message t { text; skill; attachments; images } ]))
+        Ok
+          (start_run
+             t
+             [ user_message
+                 t
+                 { text; expanded = skill; source = None; attachments; images }
+             ]))
+;;
+
+let enqueue_queued t queue queued =
+  if is_running t
+  then (
+    Queue.enqueue queue queued;
+    queue_update t)
+  else start_run t [ user_message t queued ]
 ;;
 
 let enqueue t queue ?(attachments = []) ?(images = []) text =
@@ -1991,12 +2039,10 @@ let enqueue t queue ?(attachments = []) ?(images = []) text =
   | Some reason -> Or_error.error_string reason
   | None ->
     Or_error.map (expand_skill t text) ~f:(fun skill ->
-      let queued = { Queued.text; skill; attachments; images } in
-      if is_running t
-      then (
-        Queue.enqueue queue queued;
-        queue_update t)
-      else start_run t [ user_message t queued ])
+      enqueue_queued
+        t
+        queue
+        { Queued.text; expanded = skill; source = None; attachments; images })
 ;;
 
 let steer ?attachments ?images t text =
@@ -2174,7 +2220,11 @@ let shell t ~command ~add_to_context =
             truncated.text
         else truncated.text
       in
-      let message = Message.user (sprintf "$ %s\n%s" command output) in
+      let message =
+        Message.user
+          ~origin:{ Injected.empty with source = Some (Shell { command }) }
+          (sprintf "$ %s\n%s" command output)
+      in
       broadcast t (Loop (Message_start message));
       ignore (Session.append_message t.session message : Session.Entry.t);
       broadcast t (Loop (Message_end message));
@@ -2206,6 +2256,77 @@ let compact ?instructions t =
       outcome.summary)
 ;;
 
+(* ---- /diff, /review, /init ------------------------------------------ *)
+
+let git_diff ?path ?base t =
+  host_exec
+    t
+    ~cancel:Cancellation.never
+    ~on_output:ignore
+    ~call_id:"git_diff"
+    ~cwd:t.cwd
+    ~name:Git_diff.op
+    ~arguments:(Git_diff.args ?path ?base ())
+  |> Git_diff.of_tool_result
+;;
+
+(* A command's prompt: sent now when idle, otherwise after the current run
+   like a follow-up. *)
+let command_prompt t ~text ~expanded ~source =
+  match budget_exhausted t with
+  | Some reason -> Or_error.error_string reason
+  | None ->
+    enqueue_queued
+      t
+      t.follow_up_queue
+      { Queued.text
+      ; expanded = Some expanded
+      ; source = Some source
+      ; attachments = []
+      ; images = []
+      };
+    Ok ()
+;;
+
+let review t ~args =
+  let open Or_error.Let_syntax in
+  let first, rest = Review.split_args args in
+  let%bind target, diff, instructions =
+    let uncommitted ~instructions =
+      let%map diff = git_diff t in
+      Review.Target.Uncommitted, diff, instructions
+    in
+    match first with
+    | None -> uncommitted ~instructions:None
+    | Some base ->
+      (match git_diff t ~base with
+       | Ok diff ->
+         Ok
+           ( Review.Target.Base { base; merge_base = diff.against }
+           , diff
+           , Option.some_if (not (String.is_empty rest)) rest )
+       | Error e when Git_diff.is_unknown_revision (Error.to_string_hum e) ->
+         uncommitted ~instructions:(Some (String.strip args))
+       | Error _ as e -> e)
+  in
+  if String.is_empty (String.strip diff.diff)
+  then Or_error.error_string (Review.nothing_to_review target ~root:diff.root)
+  else
+    command_prompt
+      t
+      ~text:(String.strip ("/review " ^ String.strip args))
+      ~expanded:(Review.prompt ~target ~instructions diff)
+      ~source:(Review { target = Review.Target.describe target })
+;;
+
+let init t =
+  command_prompt
+    t
+    ~text:"/init"
+    ~expanded:(Init_prompt.prompt ~cwd:t.cwd)
+    ~source:Init
+;;
+
 (* ---- budget, goal and resume ----------------------------------------- *)
 
 let set_budget t usd =
@@ -2223,7 +2344,14 @@ let set_budget t usd =
 let goal_prompt t goal =
   if is_running t
   then ()
-  else start_run t [ goal_message t (Goal.start_message goal) ]
+  else
+    start_run
+      t
+      [ goal_message
+          t
+          ~source:(Goal_start { goal = goal.Goal.text })
+          (Goal.start_message goal)
+      ]
 ;;
 
 let set_goal t text =
@@ -2287,6 +2415,11 @@ let set_mode ?approval ?plan t =
       t
       [ goal_message
           t
+          ~source:
+            (Goal_continuation
+               { continuation = goal.continuations
+               ; max = t.config.goal_max_continuations
+               })
           (Goal.continuation_message
              goal
              ~max_continuations:t.config.goal_max_continuations)

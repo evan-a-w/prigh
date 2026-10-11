@@ -9,6 +9,7 @@ module Argument = struct
     | Confirm
     | Mode
     | Plan
+    | Notify
     | Login
     | Logout
     | Sessions
@@ -107,6 +108,12 @@ let all =
       "permissions"
       ""
       "show the mode and the allow/ask/deny rules (config and this session)"
+  ; c
+      ~argument:Argument.Notify
+      "notify"
+      "[off|bell|desktop]"
+      "how to tell you that a turn ended or something waits for you while the \
+       terminal is not focused"
   ; c "auth" "" "show which providers are configured"
   ; c
       ~argument:Argument.Budget
@@ -128,6 +135,18 @@ let all =
       "compact"
       "[instructions]"
       "summarise older messages to free context"
+  ; c
+      ~argument:Argument.Path
+      "diff"
+      "[path]"
+      "show the uncommitted changes where the tools run (git diff, untracked \
+       files too)"
+  ; c
+      "review"
+      "[base] [instructions]"
+      "review the uncommitted changes, or those against a base branch, for \
+       prioritised findings"
+  ; c "init" "" "write or improve the project's AGENTS.md"
   ; c "new" "" "start a new session"
   ; c "name" "[text]" "set the session name"
   ; c "session" "" "show session statistics"

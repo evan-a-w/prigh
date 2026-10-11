@@ -374,8 +374,8 @@ prints the captured panes.
   === the plan to approve
     prigh in $TMP/cwd · /help · Esc aborts · Ctrl+C twice quits
     mode: plan — read-only planning: no file edits, commands ask first
-    plan mode on: the model was told to plan, not change files
   
+  ◇ Plan mode on: the model was told to plan, not change files
   ▌ add a.txt
     looking
   ✕ write a.txt  1 line
@@ -400,8 +400,8 @@ prints the captured panes.
   === approved and implemented
     prigh in $TMP/cwd · /help · Esc aborts · Ctrl+C twice quits
     mode: plan — read-only planning: no file edits, commands ask first
-    plan mode on: the model was told to plan, not change files
   
+  ◇ Plan mode on: the model was told to plan, not change files
   ▌ add a.txt
     looking
   ✕ write a.txt  1 line
@@ -534,7 +534,8 @@ prints the captured panes.
     error: HTTP 429: The usage limit has been reached (usage limit reached)
     deepseek/deepseek-flash: HTTP 429: The usage limit has been reached (usage limit reached); handing
     over to anthropic/claude-fable-5-1
-    ↪ handed over from deepseek/deepseek-flash to anthropic/claude-fable-5-1
+  
+  ↪ Handed over from deepseek/deepseek-flash to anthropic/claude-fable-5-1
     carried on
   ────────────────────────────────────────────────────────────────────────────────────────────────────
   >

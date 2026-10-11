@@ -6,7 +6,7 @@
 // Environment: PLAYWRIGHT_MODULE, PRIGH_BACKEND, SITE (the built site),
 // TEST_DIR (scratch: home/, cwd/, the faux scripts), TOKEN, and optionally
 // SHOTS (a directory for screenshots of each step).
-import { spawn } from "node:child_process";
+import { execFileSync, spawn } from "node:child_process";
 import { mkdirSync, readdirSync, writeFileSync } from "node:fs";
 import { hostname } from "node:os";
 import { join } from "node:path";
@@ -183,9 +183,10 @@ const screenshot = async label => {
   await page.screenshot({ path: join(process.env.SHOTS, name) });
 };
 
-// Tool calls and thinking are collapsible: open them so that their text shows.
+// Tool calls and thinking are collapsible: open them so that their text shows
+// (not the margin notes, which fold away what the model saw).
 const show = async (label, selector) => {
-  await page.evaluate(() => document.querySelectorAll("details:not(.image)").forEach(d => { d.open = true; }));
+  await page.evaluate(() => document.querySelectorAll("details:not(.image):not(.note)").forEach(d => { d.open = true; }));
   section(label);
   console.log(clean(await page.locator(selector).first().innerText()));
   await screenshot(label);
@@ -203,12 +204,15 @@ const showHeader = async label => {
 
 // From the last prompt to the end of the chat.
 const showTurn = async label => {
-  await page.evaluate(() => document.querySelectorAll("details:not(.image)").forEach(d => { d.open = true; }));
+  await page.evaluate(() => document.querySelectorAll("details:not(.image):not(.note)").forEach(d => { d.open = true; }));
   section(label);
   console.log(clean(await page.evaluate(() => {
     const prompts = document.querySelectorAll(".chat .msg.user");
+    const last = prompts[prompts.length - 1];
+    // With its margin notes, if it has any.
+    const start = last && last.parentElement.classList.contains("noted") ? last.parentElement : last;
     const turn = [];
-    for (let e = prompts[prompts.length - 1]; e; e = e.nextElementSibling) turn.push(e.innerText);
+    for (let e = start; e; e = e.nextElementSibling) turn.push(e.innerText);
     return turn.join("\n");
   })));
   await screenshot(label);
@@ -582,7 +586,55 @@ try {
   await page.setViewportSize({ width: 1280, height: 800 });
   await page.waitForFunction(() => document.querySelector(".app:not(.narrow)"));
 
-  // 10. Approvals. In mode ask a bash call asks first: "always" allows its
+  // 10. /diff is a dialog of the changed files; after /cd, the next prompt
+  //     has a margin note above it, unfolding to what the model saw.
+  const showNotes = async label => {
+    section(label);
+    console.log(clean(await page.evaluate(() =>
+      [...document.querySelectorAll(".chat details.note")]
+        .map(d => `${d.dataset.kind} ${d.open ? "open" : "closed"}: ${d.querySelector("summary").innerText}`)
+        .join("\n"))));
+    await screenshot(label);
+  };
+  const git = (...args) => execFileSync("git", ["-c", "user.name=e2e", "-c", "user.email=e2e@example.com", ...args], { cwd, stdio: "ignore" });
+  writeFileSync(join(cwd, "notes.txt"), "one\ntwo\nthree\n");
+  git("init", "-q");
+  git("add", "notes.txt", "flag.png");
+  git("commit", "-q", "-m", "start");
+  writeFileSync(join(cwd, "notes.txt"), "one\n2\nthree\nfour\n");
+  writeFileSync(join(cwd, "todo.md"), "# Todo\n\n- ship it\n");
+  await send("/diff");
+  await page.locator(".diff-dialog").waitFor();
+  await page.waitForTimeout(300); // its fade in
+  await show("/diff", ".diff-dialog");
+  await page.keyboard.press("Escape");
+  await page.waitForSelector(".diff-dialog", { state: "detached" });
+  mkdirSync(join(cwd, "sub"));
+  await send(`/cd ${join(cwd, "sub")}`);
+  await bodyHas("sub");
+  await send("anything new?");
+  // The backend's copy (with its note), not the page's echo while sending.
+  await page.locator(".chat .msg.noted .msg.user", { hasText: "anything new?" }).waitFor();
+  await bodyHas("Noted.");
+  await idle();
+  await page.evaluate(() => document.querySelectorAll(".chat details").forEach(d => { d.open = false; }));
+  await page.locator(".chat .msg.user").last().scrollIntoViewIfNeeded();
+  await showNotes("an environment note above the prompt");
+  section("the prompt shows only what was typed");
+  console.log(clean(await page.locator(".chat .msg.user").last().innerText()));
+  await page.locator(".chat details.note summary").last().click();
+  await page.waitForTimeout(300); // its fade in
+  section("a margin note unfolded");
+  console.log(clean(await page.locator(".chat details.note[open] .note-text").last().innerText()));
+  await screenshot("a margin note unfolded");
+  await page.locator(".chat details.note summary").last().click();
+  {
+    const messages = await backendMessages(sessionId());
+    const user = messages.filter(m => m.role === "user").at(-1);
+    section("the model saw the note");
+    console.log(clean(user.text));
+  }
+  // 11. Approvals. In mode ask a bash call asks first: "always" allows its
   //     rule for the rest of the session. The model's question is answered
   //     with clicks; in plan mode its plan is approved with y.
   await stopServer();
@@ -637,7 +689,7 @@ try {
   await page.setViewportSize({ width: 1280, height: 800 });
   await page.waitForFunction(() => document.querySelector(".app:not(.narrow)"));
 
-  // 10. Sessions: archiving one moves it under a divider, muted; selecting
+  // 12. Sessions: archiving one moves it under a divider, muted; selecting
   //     several (a shift-click takes the range, across the divider) and
   //     deleting them asks first with their count and size, then removes
   //     their files.

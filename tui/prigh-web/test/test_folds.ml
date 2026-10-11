@@ -279,7 +279,7 @@ let%expect_test "a delivered job's output: its last lines, unfolded on demand" =
   H.event
     h
     (sprintf
-       {|{"event":"message_start","message":{"role":"user","text":%s}}|}
+       {|{"event":"message_start","message":{"role":"user","text":%s,"origin":{"source":{"kind":"delivery","title":"Job j1 exited 0"}}}}|}
        (Jsonaf.to_string (`String ("[job j1 exited 0] make\n" ^ lines 12))));
   H.text h ~selector:".delivery-section";
   [%expect

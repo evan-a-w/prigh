@@ -298,8 +298,8 @@ let%expect_test "dequeue pops the most recently queued message" =
   dump ();
   [%expect
     {|
-    (((text "follow up") (skill ()) (attachments ()) (images ())))
-    (((text "steer one") (skill ()) (attachments ()) (images ())))
+    (((text "follow up") (expanded ()) (source ()) (attachments ()) (images ())))
+    (((text "steer one") (expanded ()) (source ()) (attachments ()) (images ())))
     ()
     state: running=true messages=0
     user: go
@@ -419,7 +419,7 @@ let%expect_test "save_as_default applies to new agents, not saved sessions" =
      (default_model (deepseek/deepseek-flash)) (default_thinking ((On (High))))
      (fallback_models ()) (default_cwd ()) (max_budget_usd ())
      (goal_max_continuations 20) (resume_on_limit_reset true)
-     (archive_after_days 7))
+     (archive_after_days 7) (notify Bell))
     {
       "scoped_models": [
         "a"
@@ -432,7 +432,8 @@ let%expect_test "save_as_default applies to new agents, not saved sessions" =
       "max_budget_usd": null,
       "goal_max_continuations": 20,
       "resume_on_limit_reset": true,
-      "archive_after_days": 7
+      "archive_after_days": 7,
+      "notify": "bell"
     }
     (default deepseek/deepseek-flash (On (High)))
     (explicit deepseek/deepseek-v4-pro Off)

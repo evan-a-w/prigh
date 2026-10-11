@@ -157,6 +157,7 @@ let%expect_test "the account menu: who we are, the other accounts, actions" =
     C
     carol prigh.example.com
     Add account… sign in as another user, or to another backend
+    Turn notifications off stop telling you what happens while the tab is hidden
     Sign out forget this account in this browser
     ↑↓ move · Enter choose · Esc close
     |}];
@@ -224,6 +225,7 @@ let%expect_test "a superuser acts as another user from the account menu" =
     signed in
     Act as… see and work in another user's sessions
     Add account… sign in as another user, or to another backend
+    Turn notifications off stop telling you what happens while the tab is hidden
     Sign out forget this account in this browser
     ↑↓ move · Enter choose · Esc close
     |}];
@@ -256,6 +258,7 @@ let%expect_test "a superuser acts as another user from the account menu" =
     Act as… now acting as bob
     Back to alice your own sessions
     Add account… sign in as another user, or to another backend
+    Turn notifications off stop telling you what happens while the tab is hidden
     Sign out forget this account in this browser
     ↑↓ move · Enter choose · Esc close
     |}];
@@ -284,6 +287,7 @@ let%expect_test "a superuser acts as another user from the account menu" =
     (Rpc (method_ list_users) (params ()) (tag (Users Probe)))
     (Focus dialog)
     Add account… sign in as another user, or to another backend
+    Turn notifications off stop telling you what happens while the tab is hidden
     Sign out forget this account in this browser
     |}]
 ;;

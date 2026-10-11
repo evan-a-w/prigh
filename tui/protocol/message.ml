@@ -4,6 +4,7 @@ module User = struct
   type t =
     { text : string
     ; images : Image.t list [@sexp.list]
+    ; origin : Origin.t option [@sexp.option]
     ; at : Time_ns.Alternate_sexp.t option [@sexp.option]
     }
   [@@deriving sexp_of, equal]
@@ -12,8 +13,21 @@ module User = struct
     let open Or_error.Let_syntax in
     let%bind text = Json.string_field j "text" in
     let%bind images = Json.optional_list_field j "images" ~f:Image.of_json in
+    let%bind origin =
+      match Json.field j "origin" with
+      | None -> Ok None
+      | Some o -> Origin.of_json o >>| Option.some
+    in
     let%map at = Json.time_ms_opt_field j "at" in
-    { text; images; at }
+    { text; images; origin; at }
+  ;;
+
+  let source t = Option.bind t.origin ~f:(fun o -> o.source)
+
+  let body t =
+    match t.origin with
+    | Some { body = Some body; _ } -> body
+    | Some { body = None; _ } | None -> t.text
   ;;
 end
 

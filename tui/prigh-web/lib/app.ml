@@ -95,6 +95,8 @@ module Reply_tag = struct
     | Mode_set of string
     | Model_set
     | Thinking_set
+    | Git_diff
+    | Command_prompt of string (** [/review] or [/init] as typed *)
   [@@deriving sexp_of, equal]
 end
 
@@ -129,6 +131,10 @@ module Command = struct
     | Scroll_to_bottom
     | Focus_terminal
     | Remember_terminal of bool
+    | Notify of Prigh_ui.Notify.t
+    | Request_notification_permission
+    | Save_notifications of bool
+    | Set_title of string
   [@@deriving sexp_of, equal]
 end
 
@@ -171,6 +177,12 @@ module Action = struct
     | Tick of Time_ns.t
     | Set_utc_offset of Time_ns.Span.t
     | Set_narrow of bool
+    | Page_hidden of bool
+    | Set_notifications of
+        { enabled : bool
+        ; permission : string
+        }
+    | Notification_permission of string
     | Load_history of string list
     | Set_draft of string
     | Edit of
@@ -332,6 +344,7 @@ module Model = struct
     ; skills : Skills.t
     ; pending : In_flight.t
     ; marks : Session_marks.t
+    ; notifications : Page_notify.t
     }
   [@@deriving sexp_of]
 
@@ -415,6 +428,7 @@ let init =
   ; skills = Skills.empty
   ; pending = In_flight.none
   ; marks = Session_marks.empty
+  ; notifications = Page_notify.init
   }
 ;;
 
@@ -450,6 +464,15 @@ let toast (m : Model.t) ?(error = false) ?replaces text =
 ;;
 
 let error m text = toast m ~error:true text
+
+let drop_toast (m : Model.t) text =
+  { m with
+    toasts = List.filter m.toasts ~f:(fun t -> not (String.equal t.text text))
+  }
+;;
+
+let reading_changes = "Reading the changes…"
+let reading_review = "Reading the changes to review…"
 let focus_editor = Command.Focus "editor"
 
 let startup =
@@ -1831,6 +1854,28 @@ let retry_connection (m : Model.t) =
         ] )
 ;;
 
+(* ---- notifications ----------------------------------------------------- *)
+
+(* [/notify on] from a key press or a click: the browser asks for permission
+   only in response to the user. *)
+let set_notifications (m : Model.t) enabled =
+  let m = { m with notifications = { m.notifications with enabled } } in
+  let save = Command.Save_notifications enabled in
+  if not enabled
+  then (
+    let m, cmds = toast m "Notifications off: /notify on turns them on" in
+    m, save :: cmds)
+  else (
+    match m.notifications.permission with
+    | Default -> m, [ save; Command.Request_notification_permission ]
+    | Granted ->
+      let m, cmds = toast m (Page_notify.describe m.notifications) in
+      m, save :: cmds
+    | Denied | Unsupported ->
+      let m, cmds = error m (Page_notify.describe m.notifications) in
+      m, save :: cmds)
+;;
+
 (* ---- accounts ---------------------------------------------------------- *)
 
 let own_user (m : Model.t) = Option.bind m.hello ~f:(fun h -> h.user)
@@ -1879,6 +1924,17 @@ let account_menu (m : Model.t) =
                  ~id:"add"
                  ~detail:"sign in as another user, or to another backend"
                  "Add account…"
+             ; (if m.notifications.enabled
+                then
+                  Picker.Item.create
+                    ~id:"notify off"
+                    ~detail:"stop telling you what happens while the tab is hidden"
+                    "Turn notifications off"
+                else
+                  Picker.Item.create
+                    ~id:"notify on"
+                    ~detail:"when a turn ends or something waits for you"
+                    "Turn notifications on")
              ; Picker.Item.create
                  ~id:"signout"
                  ~detail:"forget this account in this browser"
@@ -1959,6 +2015,10 @@ let account_chosen (m : Model.t) id =
      | None -> m, [])
   | _, "add" -> m, [ Command.Add_account ]
   | _, "signout" -> m, [ Command.Sign_out ]
+  | _, ("notify on" | "notify off") ->
+    let m, close = close_dialog m in
+    let m, cmds = set_notifications m (String.equal id "notify on") in
+    m, close @ cmds
   | _ -> m, []
 ;;
 
@@ -2185,6 +2245,35 @@ let run_command (m : Model.t) ({ name; rest } : Slash.Parsed.t) =
              else [ "instructions", str instructions ])
             ~tag:(Notice "Compacted the conversation")
         ] )
+  | "diff", path ->
+    let m, cmds = toast m reading_changes in
+    ( m
+    , cmds
+      @ [ rpc
+            "git_diff"
+            (if String.is_empty path then [] else [ "path", str path ])
+            ~tag:Git_diff
+        ] )
+  | "review", args ->
+    let m, cmds = toast m reading_review in
+    ( m
+    , cmds
+      @ [ rpc
+            "review"
+            [ "args", str args ]
+            ~tag:(Command_prompt (String.strip ("/review " ^ args)))
+        ] )
+  | "init", _ -> m, [ rpc "init" [] ~tag:(Command_prompt "/init") ]
+  | "notify", "" -> toast m (Page_notify.describe m.notifications)
+  | "notify", "on" -> set_notifications m true
+  | "notify", "off" -> set_notifications m false
+  | "notify", other ->
+    error
+      m
+      (sprintf
+         "Unknown /notify argument %S: /notify on or /notify off (/notify \
+          alone says what is on)"
+         other)
   | "name", "" -> open_rename m
   | "name", name ->
     m, [ rpc "set_session_name" [ "name", str name ] ~tag:Refresh_sessions ]
@@ -2572,6 +2661,32 @@ let reply_to (m : Model.t) (tag : Reply_tag.t) result =
     (* The mode shown at once was not taken. *)
     let m, cmds = error m (sprintf "Couldn't set the mode: %s" e) in
     m, cmds @ [ rpc "get_state" [] ~tag:State ]
+  | Command_prompt text, Error e ->
+    let m = drop_toast m reading_review in
+    if String.is_empty m.draft && List.is_empty m.images
+    then
+      error
+        (set_draft m text)
+        (sprintf "%s. %s is back in the editor." (String.capitalize e) text)
+    else error m (String.capitalize e)
+  | Command_prompt _, Ok _ ->
+    let m = drop_toast m reading_review in
+    if Model.running m
+    then toast m "Queued: it starts when the current run ends"
+    else m, []
+  | Git_diff, Error e -> error (drop_toast m reading_changes) e
+  | Git_diff, Ok json ->
+    let m = drop_toast m reading_changes in
+    decode m json Git_diff.of_json ~f:(fun diff ->
+      if String.is_empty diff.diff
+      then
+        toast
+          m
+          (sprintf
+             "No changes in %s against %s"
+             diff.root
+             (Prigh_ui.Diff_files.against diff))
+      else open_dialog m (Diff diff))
   | Sent { text; images }, Error e ->
     let m =
       { m with
@@ -3292,7 +3407,7 @@ let dialog_accept (m : Model.t) =
      | None, Some _ -> respond_login m flow
      | Some _, _ -> close_dialog m
      | None, None -> m, [])
-  | Some (Help | Hotkeys | Auth _ | Session _ | Text _ | Mcp_tools _) ->
+  | Some (Help | Hotkeys | Auth _ | Session _ | Text _ | Mcp_tools _ | Diff _) ->
     close_dialog m
   | Some (Loading _) -> m, []
   | Some (Scoped_models { checked; _ }) ->
@@ -3331,7 +3446,42 @@ let update (m : Model.t) (action : Action.t) =
     m, (if m.narrow then [] else [ focus_editor ]) @ startup @ probe
   | Hello hello -> { m with hello = Some hello }, []
   | Saved_login -> { m with saved_login = true }, []
-  | Event e -> event m e
+  | Event e ->
+    let m, cmds = event m e in
+    let notifications, notification =
+      Page_notify.on_event
+        m.notifications
+        e
+        ~where:(Prigh_ui.Notify.where m.state)
+    in
+    ( { m with notifications }
+    , cmds
+      @ (if Page_notify.equal notifications m.notifications
+         then []
+         else [ Command.Set_title (Page_notify.title notifications) ])
+      @ Option.value_map notification ~default:[] ~f:(fun n ->
+        [ Command.Notify n ]) )
+  | Page_hidden hidden ->
+    let notifications = Page_notify.set_hidden m.notifications hidden in
+    ( { m with notifications }
+    , if notifications.unseen = m.notifications.unseen
+      then []
+      else [ Command.Set_title (Page_notify.title notifications) ] )
+  | Set_notifications { enabled; permission } ->
+    ( { m with
+        notifications =
+          { m.notifications with
+            enabled
+          ; permission = Page_notify.Permission.of_string permission
+          }
+      }
+    , [] )
+  | Notification_permission permission ->
+    let permission = Page_notify.Permission.of_string permission in
+    let m = { m with notifications = { m.notifications with permission } } in
+    (match permission with
+     | Granted | Default -> toast m (Page_notify.describe m.notifications)
+     | Denied | Unsupported -> error m (Page_notify.describe m.notifications))
   | Protocol_error e -> error m ("Protocol error: " ^ e)
   | Backend_closed ->
     (match m.connection with
