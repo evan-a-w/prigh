@@ -122,6 +122,11 @@ let argument_items
       [ "on", "ask before bash, write and edit"
       ; "off", "run tools without asking"
       ]
+  | Notify ->
+    simple
+      [ "on", "notify when the tab is hidden"
+      ; "off", "no browser notifications"
+      ]
   | Session ->
     List.map sessions ~f:(fun s ->
       Picker.Item.create

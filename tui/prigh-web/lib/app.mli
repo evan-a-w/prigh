@@ -140,6 +140,11 @@ module Command : sig
     | Focus_terminal (** the terminal panel's shell, once mounted *)
     | Remember_terminal of bool
     (** whether the panel is open, for [Reopen_terminal] after a reload *)
+    | Notify of Prigh_ui.Notify.t (** a browser notification *)
+    | Request_notification_permission
+    (** answered by [Notification_permission] *)
+    | Save_notifications of bool (** [/notify on|off], in the browser *)
+    | Set_title of string (** the tab's, with the count of unseen events *)
   [@@deriving sexp_of, equal]
 end
 
@@ -190,6 +195,14 @@ module Action : sig
     | Set_utc_offset of Time_ns.Span.t
     (** the browser's time zone, for messages' times *)
     | Set_narrow of bool (** a phone-sized window: the sidebar is a drawer *)
+    | Page_hidden of bool (** the tab was hidden or shown again *)
+    | Set_notifications of
+        { enabled : bool
+        ; permission : string
+        }
+    (** at startup: the saved [/notify] and [Notification.permission] *)
+    | Notification_permission of string
+    (** the browser's answer to [Request_notification_permission] *)
     | Load_history of string list
     | Set_draft of string (** the caret at the end *)
     | Edit of
@@ -335,6 +348,7 @@ module Model : sig
       (** the users we may act as: [Some] for superusers *)
     ; terminal : Terminal.t
     ; skills : Skills.t (** for [/skill:]'s completion *)
+    ; notifications : Page_notify.t
     }
   [@@deriving sexp_of]
 

@@ -26,6 +26,7 @@ let popup (m : App.Model.t) ~inject =
       | Argument Budget -> "Budget"
       | Argument Goal -> "Goal"
       | Argument Resume -> "Automatic resume"
+      | Argument Notify -> "Notifications"
     in
     div
       ~cls:"popup"

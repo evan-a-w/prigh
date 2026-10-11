@@ -30,7 +30,11 @@ let act t action =
      | Jump_to_user_message _
      | Scroll_to_bottom
      | Focus_terminal
-     | Remember_terminal _ -> ());
+     | Remember_terminal _
+     | Notify _
+     | Request_notification_permission
+     | Save_notifications _
+     | Set_title _ -> ());
     if not t.quiet then print_s [%sexp (command : App.Command.t)])
 ;;
 
