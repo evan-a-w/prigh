@@ -27,8 +27,10 @@ module Glyph = struct
     | Link ->
       {|<path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/>|}
     | Up -> {|<path d="M12 19V5M5 12l7-7 7 7"/>|}
-    | Upload -> {|<path d="M12 15V3M7 8l5-5 5 5M4 15v4a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-4"/>|}
-    | Download -> {|<path d="M12 3v12M7 10l5 5 5-5M4 15v4a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-4"/>|}
+    | Upload ->
+      {|<path d="M12 15V3M7 8l5-5 5 5M4 15v4a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-4"/>|}
+    | Download ->
+      {|<path d="M12 3v12M7 10l5 5 5-5M4 15v4a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-4"/>|}
     | Attach ->
       {|<path d="m21 11-8.6 8.6a5 5 0 0 1-7-7l8.5-8.6a3.3 3.3 0 0 1 4.7 4.7l-8.6 8.6a1.7 1.7 0 0 1-2.4-2.4l8-8"/>|}
     | Folder_plus ->
@@ -36,7 +38,8 @@ module Glyph = struct
     | Eye ->
       {|<path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/>|}
     | Refresh -> {|<path d="M21 12a9 9 0 1 1-2.6-6.4L21 8M21 3v5h-5"/>|}
-    | At -> {|<circle cx="12" cy="12" r="4"/><path d="M16 8v5a3 3 0 0 0 6 0v-1a10 10 0 1 0-4 8"/>|}
+    | At ->
+      {|<circle cx="12" cy="12" r="4"/><path d="M16 8v5a3 3 0 0 0 6 0v-1a10 10 0 1 0-4 8"/>|}
   ;;
 
   let name t = String.lowercase (Sexp.to_string (sexp_of_t t))
@@ -81,20 +84,25 @@ let crumbs (t : Files.t) (listing : File_listing.t) ~inject =
   let home = listing.home in
   let under_home =
     String.equal listing.path home
-    || ((not (String.equal home "/")) && String.is_prefix listing.path ~prefix:(home ^ "/"))
+    || ((not (String.equal home "/"))
+        && String.is_prefix listing.path ~prefix:(home ^ "/"))
   in
   let root, rest =
     if under_home
     then ("~", home), String.drop_prefix listing.path (String.length home)
     else ("/", "/"), listing.path
   in
-  let parts = String.split rest ~on:'/' |> List.filter ~f:(Fn.non String.is_empty) in
+  let parts =
+    String.split rest ~on:'/' |> List.filter ~f:(Fn.non String.is_empty)
+  in
   let _, links =
     List.fold
       parts
       ~init:(snd root, [])
       ~f:(fun (dir, acc) part ->
-        let path = if String.equal dir "/" then "/" ^ part else dir ^ "/" ^ part in
+        let path =
+          if String.equal dir "/" then "/" ^ part else dir ^ "/" ^ part
+        in
         path, acc @ [ part, path ])
   in
   let crumb ~last (label, path) =
@@ -134,9 +142,10 @@ let path_bar (t : Files.t) ~inject =
         ; Attr.on_input (fun _ text -> inject (files (Edit_path (Some text))))
         ; Attr.on_keydown (fun ev ->
             match Js_of_ocaml.Js.Optdef.to_option ev##.key with
-            | Some key when String.equal (Js_of_ocaml.Js.to_string key) "Enter" ->
-              inject (files Submit_path)
-            | Some key when String.equal (Js_of_ocaml.Js.to_string key) "Escape" ->
+            | Some key when String.equal (Js_of_ocaml.Js.to_string key) "Enter"
+              -> inject (files Submit_path)
+            | Some key when String.equal (Js_of_ocaml.Js.to_string key) "Escape"
+              ->
               Effect.Many
                 [ Effect.Stop_propagation; inject (files (Edit_path None)) ]
             | _ -> Effect.Ignore)
@@ -151,7 +160,8 @@ let path_bar (t : Files.t) ~inject =
              ~cls:"icon ghost files-edit-path"
              ~title:"Type a path"
              ~on_click:
-               (inject (files (Edit_path (Some (Files.display_path t listing.path)))))
+               (inject
+                  (files (Edit_path (Some (Files.display_path t listing.path)))))
              [ icon Pencil ]
          ])
   | None, None ->
@@ -174,10 +184,15 @@ let sort_header (t : Files.t) ~inject =
        Node.button
          ~attrs:
            [ classes
-               [ "files-sort"; "col-" ^ String.lowercase (Files.Sort.Key.label key) ]
+               [ "files-sort"
+               ; "col-" ^ String.lowercase (Files.Sort.Key.label key)
+               ]
                [ "active", active ]
            ; Attr.type_ "button"
-           ; Attr.title (sprintf "Sort by %s" (String.lowercase (Files.Sort.Key.label key)))
+           ; Attr.title
+               (sprintf
+                  "Sort by %s"
+                  (String.lowercase (Files.Sort.Key.label key)))
            ; Attr.create
                "aria-sort"
                (if not active
@@ -189,7 +204,8 @@ let sort_header (t : Files.t) ~inject =
            ]
          [ Node.text (Files.Sort.Key.label key)
          ; (if active
-            then span ~cls:"files-arrow" (if t.sort.descending then "↓" else "↑")
+            then
+              span ~cls:"files-arrow" (if t.sort.descending then "↓" else "↑")
             else Node.none)
          ]))
 ;;
@@ -242,7 +258,8 @@ let row (m : App.Model.t) (t : Files.t) (e : File_listing.Entry.t) ~inject =
         ~cls:"files-mtime"
         ~attrs:
           (match e.mtime with
-           | Some time -> [ Attr.title (Message_time.full (App.Model.message_time m) time) ]
+           | Some time ->
+             [ Attr.title (Message_time.full (App.Model.message_time m) time) ]
            | None -> [])
         (mtime m e.mtime)
     ]
@@ -258,7 +275,8 @@ let actions (t : Files.t) ~inject =
   match
     Option.bind t.selected ~f:(fun name ->
       Option.bind t.listing ~f:(fun l ->
-        List.find l.entries ~f:(fun (e : File_listing.Entry.t) -> String.equal e.name name)))
+        List.find l.entries ~f:(fun (e : File_listing.Entry.t) ->
+          String.equal e.name name)))
   with
   | None -> Node.none
   | Some e ->
@@ -274,32 +292,37 @@ let actions (t : Files.t) ~inject =
     div
       ~cls:"files-actions"
       ~attrs:[ Attr.create "aria-label" (sprintf "Actions for %s" e.name) ]
-      ([ (if dir
-          then act ~title:"Open (Enter)" "Open" (glyph Folder) (Select e.name)
-          else
-            act
-              ~cls:"attach"
-              ~title:"Attach to the next message"
-              "Attach"
-              (glyph Attach)
-              (Attach e.name))
-       ; act
-           ~title:
-             (if dir
-              then "Download as a .tar.gz archive"
-              else "Download to this computer")
-           (if dir then "Download .tar.gz" else "Download")
-           (glyph Download)
-           (Download e.name)
-       ; act
-           ~title:"Insert @path into the message"
-           "Mention"
-           (glyph At)
-           (Insert_path path)
-       ; act ~title:"Copy the path" "Copy path" (icon Copy) (Copy_path path)
-       ; act ~title:"Rename (F2)" "Rename" (icon Pencil) (Rename e.name)
-       ; act ~cls:"danger" ~title:"Delete (Delete)" "Delete" (icon Trash) (Delete e.name)
-       ])
+      [ (if dir
+         then act ~title:"Open (Enter)" "Open" (glyph Folder) (Select e.name)
+         else
+           act
+             ~cls:"attach"
+             ~title:"Attach to the next message"
+             "Attach"
+             (glyph Attach)
+             (Attach e.name))
+      ; act
+          ~title:
+            (if dir
+             then "Download as a .tar.gz archive"
+             else "Download to this computer")
+          (if dir then "Download .tar.gz" else "Download")
+          (glyph Download)
+          (Download e.name)
+      ; act
+          ~title:"Insert @path into the message"
+          "Mention"
+          (glyph At)
+          (Insert_path path)
+      ; act ~title:"Copy the path" "Copy path" (icon Copy) (Copy_path path)
+      ; act ~title:"Rename (F2)" "Rename" (icon Pencil) (Rename e.name)
+      ; act
+          ~cls:"danger"
+          ~title:"Delete (Delete)"
+          "Delete"
+          (icon Trash)
+          (Delete e.name)
+      ]
 ;;
 
 let text_preview (p : File_preview.t) ~text ~truncated =
@@ -308,9 +331,12 @@ let text_preview (p : File_preview.t) ~text ~truncated =
   [ Node.div
       ~attrs:[ Attr.class_ "files-text" ]
       [ Node.pre
-          ~attrs:[ Attr.class_ "files-gutter"; Attr.create "aria-hidden" "true" ]
+          ~attrs:
+            [ Attr.class_ "files-gutter"; Attr.create "aria-hidden" "true" ]
           [ Node.text
-              (String.concat ~sep:"\n" (List.init count ~f:(fun i -> Int.to_string (i + 1))))
+              (String.concat
+                 ~sep:"\n"
+                 (List.init count ~f:(fun i -> Int.to_string (i + 1))))
           ]
       ; Node.pre ~attrs:[ Attr.class_ "files-code" ] [ Node.text text ]
       ]
@@ -339,7 +365,10 @@ let preview (m : App.Model.t) (t : Files.t) ~inject =
   let frame ?(meta = []) ~name body =
     Node.create
       "section"
-      ~attrs:[ Attr.class_ "files-preview"; Attr.create "aria-label" ("Preview of " ^ name) ]
+      ~attrs:
+        [ Attr.class_ "files-preview"
+        ; Attr.create "aria-label" ("Preview of " ^ name)
+        ]
       [ div
           ~cls:"files-preview-head"
           ([ span ~cls:"files-preview-name" name ] @ meta @ [ close ])
@@ -351,7 +380,10 @@ let preview (m : App.Model.t) (t : Files.t) ~inject =
   | Some (Loading path) ->
     frame
       ~name:(Filename.basename path)
-      [ div ~cls:"files-wait" [ span ~cls:"files-lamp" ""; Node.text "Reading…" ] ]
+      [ div
+          ~cls:"files-wait"
+          [ span ~cls:"files-lamp" ""; Node.text "Reading…" ]
+      ]
   | Some (Failed { path; error }) ->
     frame
       ~name:(Filename.basename path)
@@ -409,7 +441,11 @@ let uploads (t : Files.t) =
       ~cls:"files-transfers"
       ~attrs:[ Attr.role "status" ]
       ((match busy with
-        | Some text -> [ div ~cls:"files-transfer" [ span ~cls:"files-lamp" ""; Node.text text ] ]
+        | Some text ->
+          [ div
+              ~cls:"files-transfer"
+              [ span ~cls:"files-lamp" ""; Node.text text ]
+          ]
         | None -> [])
        @ List.map uploads ~f:(fun (u : Files.Upload.t) ->
          let percent =
@@ -426,7 +462,8 @@ let uploads (t : Files.t) =
                ~cls:"files-transfer-meta"
                (match u.sent with
                 | None -> "waiting…"
-                | Some sent -> sprintf "%s of %s" (size sent) (size u.local.size))
+                | Some sent ->
+                  sprintf "%s of %s" (size sent) (size u.local.size))
            ; Node.div
                ~attrs:
                  [ Attr.class_ "files-bar"
@@ -448,12 +485,20 @@ let body (m : App.Model.t) (t : Files.t) ~inject =
           [ Node.text error
           ; div
               ~cls:"files-advice"
-              [ Node.text "Check the path (the pencil types one), go up, or try again." ]
-          ; button ~cls:"small" ~on_click:(inject (files Refresh)) [ Node.text "Try again" ]
+              [ Node.text
+                  "Check the path (the pencil types one), go up, or try again."
+              ]
+          ; button
+              ~cls:"small"
+              ~on_click:(inject (files Refresh))
+              [ Node.text "Try again" ]
           ]
       ]
     | None, None ->
-      [ div ~cls:"files-wait" [ span ~cls:"files-lamp" ""; Node.text "Listing…" ] ]
+      [ div
+          ~cls:"files-wait"
+          [ span ~cls:"files-lamp" ""; Node.text "Listing…" ]
+      ]
     | Some l, None ->
       let entries = Files.entries t in
       [ sort_header t ~inject
@@ -473,8 +518,8 @@ let body (m : App.Model.t) (t : Files.t) ~inject =
                      (if l.hidden > 0
                       then
                         sprintf
-                          "Only hidden files here (%d): the eye shows them. Drop \
-                           files to upload them."
+                          "Only hidden files here (%d): the eye shows them. \
+                           Drop files to upload them."
                           l.hidden
                       else "An empty directory: drop files here or upload them.")
                  ]
@@ -494,7 +539,9 @@ let body (m : App.Model.t) (t : Files.t) ~inject =
                     ; Option.some_if
                         (l.total > List.length l.entries)
                         (sprintf "first %d shown" (List.length l.entries))
-                    ; Option.some_if (l.hidden > 0) (sprintf "%d hidden" l.hidden)
+                    ; Option.some_if
+                        (l.hidden > 0)
+                        (sprintf "%d hidden" l.hidden)
                     ; Option.some_if (Option.is_some t.loading) "listing…"
                     ]))
           ]
@@ -538,7 +585,10 @@ let view (m : App.Model.t) ~inject =
       [ div
           ~cls:"files-head"
           [ glyph ~cls:"files-head-icon" Folder
-          ; span ~cls:"files-machine" ~attrs:[ Attr.title "The tools' host" ] host
+          ; span
+              ~cls:"files-machine"
+              ~attrs:[ Attr.title "The tools' host" ]
+              host
           ; div
               ~cls:"files-tools"
               [ tool
@@ -553,11 +603,16 @@ let view (m : App.Model.t) ~inject =
               ; tool
                   ~inject
                   ~cls:(if t.hidden then "on" else "")
-                  ~title:(if t.hidden then "Hide dot files" else "Show dot files")
+                  ~title:
+                    (if t.hidden then "Hide dot files" else "Show dot files")
                   Toggle_hidden
                   (glyph Eye)
               ; tool ~inject ~title:"New folder" New_folder (glyph Folder_plus)
-              ; tool ~inject ~title:"Upload files here" (Pick Here) (glyph Upload)
+              ; tool
+                  ~inject
+                  ~title:"Upload files here"
+                  (Pick Here)
+                  (glyph Upload)
               ; button
                   ~cls:"icon ghost files-close"
                   ~title:"Close (Ctrl+Shift+F)"
@@ -589,7 +644,11 @@ let dialog (m : App.Model.t) ~inject =
   in
   let error = function
     | None -> Node.none
-    | Some e -> div ~cls:"dialog-error files-ask-error" ~attrs:[ Attr.role "alert" ] [ Node.text e ]
+    | Some e ->
+      div
+        ~cls:"dialog-error files-ask-error"
+        ~attrs:[ Attr.role "alert" ]
+        [ Node.text e ]
   in
   let buttons ?(danger = false) ~busy label =
     [ button ~on_click:close [ Node.text "Cancel" ]
@@ -610,7 +669,9 @@ let dialog (m : App.Model.t) ~inject =
       ~title:"New folder"
       ~on_close:close
       ~footer:(buttons ~busy (if busy then "Creating…" else "Create"))
-      [ div ~cls:"files-ask-where" [ Node.text ("In " ^ Files.display_path t dir) ]
+      [ div
+          ~cls:"files-ask-where"
+          [ Node.text ("In " ^ Files.display_path t dir) ]
       ; input ~value ~placeholder:"Folder name"
       ; error e
       ]
@@ -628,22 +689,25 @@ let dialog (m : App.Model.t) ~inject =
       ~cls:"files-ask"
       ~title:(sprintf "Delete %s?" (Filename.basename path))
       ~on_close:close
-      ~footer:(buttons ~danger:true ~busy (if busy then "Deleting…" else "Delete"))
+      ~footer:
+        (buttons ~danger:true ~busy (if busy then "Deleting…" else "Delete"))
       [ div
           ~cls:"files-ask-text"
           [ Node.text
               (if dir
                then
                  sprintf
-                   "%s and everything in it will be deleted from %s. This cannot \
-                    be undone."
+                   "%s and everything in it will be deleted from %s. This \
+                    cannot be undone."
                    (Files.display_path t path)
-                   (Option.value_map t.where ~default:"the host" ~f:(fun w -> w.host_name))
+                   (Option.value_map t.where ~default:"the host" ~f:(fun w ->
+                      w.host_name))
                else
                  sprintf
                    "%s will be deleted from %s. This cannot be undone."
                    (Files.display_path t path)
-                   (Option.value_map t.where ~default:"the host" ~f:(fun w -> w.host_name)))
+                   (Option.value_map t.where ~default:"the host" ~f:(fun w ->
+                      w.host_name)))
           ]
       ; error e
       ]
@@ -655,13 +719,17 @@ let dialog (m : App.Model.t) ~inject =
       ~on_close:close
       ~footer:
         [ button ~on_click:close [ Node.text "Skip" ]
-        ; button ~cls:"danger" ~on_click:(inject (files Ask_accept)) [ Node.text "Replace" ]
+        ; button
+            ~cls:"danger"
+            ~on_click:(inject (files Ask_accept))
+            [ Node.text "Replace" ]
         ]
       [ div
           ~cls:"files-ask-text"
           [ Node.text
               (sprintf
-                 "%s already has a %s. Replace it with the one you are uploading (%s)?"
+                 "%s already has a %s. Replace it with the one you are \
+                  uploading (%s)?"
                  (Files.display_path t u.dir)
                  u.local.name
                  (size u.local.size))
@@ -671,7 +739,10 @@ let dialog (m : App.Model.t) ~inject =
 
 let toggle (m : App.Model.t) ~inject =
   button
-    ~cls:(if m.files.open_ then "icon ghost files-toggle open" else "icon ghost files-toggle")
+    ~cls:
+      (if m.files.open_
+       then "icon ghost files-toggle open"
+       else "icon ghost files-toggle")
     ~title:"Files (Ctrl+Shift+F)"
     ~on_click:(inject (files Toggle))
     [ glyph Folder ]
@@ -696,7 +767,8 @@ let chips (m : App.Model.t) ~inject =
                | _ -> 0
              in
              "uploading", sprintf "%d%%" percent, Some percent
-           | Ready _ -> "ready", Option.value_map a.size ~default:"" ~f:size, None
+           | Ready _ ->
+             "ready", Option.value_map a.size ~default:"" ~f:size, None
            | Failed e -> "failed", e, None
          in
          Node.div

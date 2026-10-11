@@ -278,8 +278,10 @@ let home t = Option.map t.listing ~f:(fun l -> l.home)
 let display_path t path =
   match home t with
   | Some home when String.equal path home -> "~"
-  | Some home when (not (String.equal home "/")) && String.is_prefix path ~prefix:(home ^ "/")
-    -> "~" ^ String.drop_prefix path (String.length home)
+  | Some home
+    when (not (String.equal home "/"))
+         && String.is_prefix path ~prefix:(home ^ "/") ->
+    "~" ^ String.drop_prefix path (String.length home)
   | _ -> path
 ;;
 
@@ -303,9 +305,12 @@ let http_base backend =
   if String.is_empty scheme
   then ""
   else (
-    let rest = String.chop_prefix rest ~prefix:"//" |> Option.value ~default:rest in
+    let rest =
+      String.chop_prefix rest ~prefix:"//" |> Option.value ~default:rest
+    in
     let authority =
-      String.take_while rest ~f:(fun c -> not (Char.equal c '/' || Char.equal c '?'))
+      String.take_while rest ~f:(fun c ->
+        not (Char.equal c '/' || Char.equal c '?'))
     in
     sprintf "%s://%s" scheme authority)
 ;;
@@ -316,7 +321,8 @@ let link t path = t.base ^ path
 
 let entry_named t name =
   Option.bind t.listing ~f:(fun l ->
-    List.find l.entries ~f:(fun (e : File_listing.Entry.t) -> String.equal e.name name))
+    List.find l.entries ~f:(fun (e : File_listing.Entry.t) ->
+      String.equal e.name name))
 ;;
 
 let entries t =
@@ -347,7 +353,8 @@ let list t path =
   , [ Out.Rpc
         { method_ = "fs_list"
         ; params =
-            Option.value_map path ~default:[] ~f:(fun p -> [ "path", `String p ])
+            Option.value_map path ~default:[] ~f:(fun p ->
+              [ "path", `String p ])
             @ [ "hidden", Json.bool t.hidden ]
         ; reply = Listed key
         }
@@ -411,7 +418,8 @@ let move t by =
     then { t with selected = Some entry.name; preview = None }, []
     else (
       match current_dir t with
-      | Some dir -> preview { t with selected = Some entry.name } (join dir entry.name)
+      | Some dir ->
+        preview { t with selected = Some entry.name } (join dir entry.name)
       | None -> { t with selected = Some entry.name }, [])
 ;;
 
@@ -446,11 +454,11 @@ let upload_link (u : Upload.t) ~overwrite =
   Out.Rpc
     { method_ = "fs_upload"
     ; params =
-        [ "name", `String u.local.name
-        ; "size", Json.int u.local.size
-        ; "dir", `String u.dir
-        ]
-        @ if overwrite then [ "overwrite", Json.bool true ] else []
+        ([ "name", `String u.local.name
+         ; "size", Json.int u.local.size
+         ; "dir", `String u.dir
+         ]
+         @ if overwrite then [ "overwrite", Json.bool true ] else [])
     ; reply = Upload_link { file = u.local.file; overwrite }
     }
 ;;
@@ -478,7 +486,9 @@ let chosen t ~(dest : Dest.t) (files : Local_file.t list) =
     (match current_dir t with
      | None ->
        ( t
-       , toast ~error:true "Open the file browser on a directory first (Ctrl+Shift+F)."
+       , toast
+           ~error:true
+           "Open the file browser on a directory first (Ctrl+Shift+F)."
          :: List.map files ~f:(fun f -> Out.Page (Forget f.file)) )
      | Some dir ->
        let uploads =
@@ -496,7 +506,8 @@ let next_conflict t =
 
 let upload_link_reply t ~file ~overwrite result =
   let attachment =
-    List.find t.attachments ~f:(fun a -> Option.equal Int.equal a.file (Some file))
+    List.find t.attachments ~f:(fun a ->
+      Option.equal Int.equal a.file (Some file))
   in
   let upload = List.find t.uploads ~f:(fun u -> u.local.file = file) in
   match attachment, upload, result with
@@ -519,7 +530,9 @@ let upload_link_reply t ~file ~overwrite result =
        ( replace_upload t file ~f:(fun u -> { u with sent = Some 0 })
        , [ Out.Page (Upload { file; url = link t url }) ] )
      | Error e ->
-       ( { t with uploads = List.filter t.uploads ~f:(fun u -> u.local.file <> file) }
+       ( { t with
+           uploads = List.filter t.uploads ~f:(fun u -> u.local.file <> file)
+         }
        , [ toast ~error:true (Error.to_string_hum e); Out.Page (Forget file) ] ))
   | None, Some u, Error e
     when (not overwrite) && String.is_substring e ~substring:"already exists" ->
@@ -531,7 +544,9 @@ let upload_link_reply t ~file ~overwrite result =
     in
     next_conflict t, [ Out.Page (Focus "files-dialog") ]
   | None, Some u, Error e ->
-    ( { t with uploads = List.filter t.uploads ~f:(fun u -> u.local.file <> file) }
+    ( { t with
+        uploads = List.filter t.uploads ~f:(fun u -> u.local.file <> file)
+      }
     , [ toast ~error:true (sprintf "Could not upload %s: %s" u.local.name e)
       ; Out.Page (Forget file)
       ] )
@@ -547,7 +562,8 @@ let upload_done t ~file result =
     | Error _ -> json_or_text
   in
   match
-    ( List.find t.attachments ~f:(fun a -> Option.equal Int.equal a.file (Some file))
+    ( List.find t.attachments ~f:(fun a ->
+        Option.equal Int.equal a.file (Some file))
     , List.find t.uploads ~f:(fun u -> u.local.file = file) )
   with
   | Some _, _ ->
@@ -555,7 +571,9 @@ let upload_done t ~file result =
      | Ok json ->
        (match Json.string_field json "path" with
         | Ok path ->
-          replace_attachment t file ~f:(fun a -> { a with status = Ready path }), []
+          ( replace_attachment t file ~f:(fun a ->
+              { a with status = Ready path })
+          , [] )
         | Error e ->
           ( replace_attachment t file ~f:(fun a ->
               { a with status = Failed (Error.to_string_hum e) })
@@ -566,7 +584,9 @@ let upload_done t ~file result =
        , [ toast ~error:true (sprintf "Upload failed: %s" e) ] ))
   | None, Some u ->
     let t =
-      { t with uploads = List.filter t.uploads ~f:(fun u -> u.local.file <> file) }
+      { t with
+        uploads = List.filter t.uploads ~f:(fun u -> u.local.file <> file)
+      }
     in
     (match result with
      | Ok _ ->
@@ -595,9 +615,9 @@ let remove_attachment t i =
   | None -> t, []
   | Some a ->
     ( { t with attachments = List.filteri t.attachments ~f:(fun j _ -> j <> i) }
-    , match a.file, a.status with
-      | Some file, Uploading _ -> [ Out.Page (Abort_upload file) ]
-      | _ -> [] )
+    , (match a.file, a.status with
+       | Some file, Uploading _ -> [ Out.Page (Abort_upload file) ]
+       | _ -> []) )
 ;;
 
 let prompt_attachments t =
@@ -617,7 +637,9 @@ let prompt_attachments t =
   then
     Or_error.errorf
       "Wait for %s to upload (or remove %s with ×)."
-      (if uploading = 1 then "the attachment" else sprintf "%d attachments" uploading)
+      (if uploading = 1
+       then "the attachment"
+       else sprintf "%d attachments" uploading)
       (if uploading = 1 then "it" else "them")
   else if not (List.is_empty failed)
   then
@@ -655,20 +677,25 @@ let ask_accept t =
   | Some (New_folder ({ dir; input; _ } as a)) ->
     let name = String.strip input in
     (match check_name name with
-     | Some error -> { t with ask = Some (New_folder { a with error = Some error }) }, []
+     | Some error ->
+       { t with ask = Some (New_folder { a with error = Some error }) }, []
      | None ->
        ( { t with ask = Some (New_folder { a with busy = true; error = None }) }
        , [ Out.Rpc
              { method_ = "fs_mkdir"
              ; params = [ "path", `String (join dir name) ]
-             ; reply = Changed { notice = sprintf "Created %s" name; select = Some name }
+             ; reply =
+                 Changed
+                   { notice = sprintf "Created %s" name; select = Some name }
              }
          ] ))
   | Some (Rename ({ path; input; _ } as a)) ->
     let name = String.strip input in
     (match check_name name with
-     | Some error -> { t with ask = Some (Rename { a with error = Some error }) }, []
-     | None when String.equal name (Filename.basename path) -> { t with ask = None }, []
+     | Some error ->
+       { t with ask = Some (Rename { a with error = Some error }) }, []
+     | None when String.equal name (Filename.basename path) ->
+       { t with ask = None }, []
      | None ->
        ( { t with ask = Some (Rename { a with busy = true; error = None }) }
        , [ Out.Rpc
@@ -679,7 +706,8 @@ let ask_accept t =
                  ]
              ; reply =
                  Changed
-                   { notice = sprintf "Renamed %s to %s" (Filename.basename path) name
+                   { notice =
+                       sprintf "Renamed %s to %s" (Filename.basename path) name
                    ; select = Some name
                    }
              }
@@ -689,7 +717,11 @@ let ask_accept t =
     , [ Out.Rpc
           { method_ = "fs_delete"
           ; params = [ "path", `String path ]
-          ; reply = Changed { notice = sprintf "Deleted %s" (Filename.basename path); select = None }
+          ; reply =
+              Changed
+                { notice = sprintf "Deleted %s" (Filename.basename path)
+                ; select = None
+                }
           }
       ] )
   | Some (Overwrite u) ->
@@ -708,15 +740,22 @@ let ask_cancel t =
 
 let ask_input t input =
   match t.ask with
-  | Some (New_folder a) -> { t with ask = Some (New_folder { a with input; error = None }) }
-  | Some (Rename a) -> { t with ask = Some (Rename { a with input; error = None }) }
+  | Some (New_folder a) ->
+    { t with ask = Some (New_folder { a with input; error = None }) }
+  | Some (Rename a) ->
+    { t with ask = Some (Rename { a with input; error = None }) }
   | Some (Delete _ | Overwrite _) | None -> t
 ;;
 
 let with_entry t name ~f =
   match entry_named t name, current_dir t with
   | Some entry, Some dir -> f entry (join dir name)
-  | _ -> t, [ toast ~error:true (sprintf "%s is not listed here: refresh the list." name) ]
+  | _ ->
+    ( t
+    , [ toast
+          ~error:true
+          (sprintf "%s is not listed here: refresh the list." name)
+      ] )
 ;;
 
 let download t name =
@@ -731,7 +770,9 @@ let download t name =
       }
     , [ Out.Rpc
           { method_ = "fs_download"
-          ; params = [ "path", `String path ] @ if archive then [ "archive", Json.bool true ] else []
+          ; params =
+              ([ "path", `String path ]
+               @ if archive then [ "archive", Json.bool true ] else [])
           ; reply = Download_link
           }
       ] ))
@@ -745,12 +786,14 @@ let attach t name =
       , [ toast
             ~error:true
             (sprintf
-               "%s is a directory: attach its files, or insert its path (@) for \
-                the agent to look at."
+               "%s is a directory: attach its files, or insert its path (@) \
+                for the agent to look at."
                name)
         ] )
     else (
-      let a = { Attachment.file = None; name; size = entry.size; status = Ready path } in
+      let a =
+        { Attachment.file = None; name; size = entry.size; status = Ready path }
+      in
       ( { t with attachments = t.attachments @ [ a ] }
       , [ toast (sprintf "Attached %s to the next message" name) ] )))
 ;;
@@ -766,9 +809,11 @@ let key t ~key ~shift ~ctrl ~alt : Action.t option =
   | None, "ArrowUp" when alt && not (shift || ctrl) -> Some Up
   | None, ("Enter" | "ArrowRight") when plain -> Some Open_selected
   | None, ("Backspace" | "ArrowLeft") when plain -> Some Up
-  | None, "Delete" when plain -> Option.map t.selected ~f:(fun n -> Action.Delete n)
+  | None, "Delete" when plain ->
+    Option.map t.selected ~f:(fun n -> Action.Delete n)
   | None, "F2" when plain -> Option.map t.selected ~f:(fun n -> Action.Rename n)
-  | None, "Escape" -> Some (if Option.is_some t.preview then Close_preview else Close)
+  | None, "Escape" ->
+    Some (if Option.is_some t.preview then Close_preview else Close)
   | _ -> None
 ;;
 
@@ -782,7 +827,8 @@ let update t (action : Action.t) =
   | Toggle -> if t.open_ then close t else open_ t None
   | Open path -> open_ t path
   | Close -> close t
-  | Go path -> list { t with preview = None; selected = None } (Some (resolve t path))
+  | Go path ->
+    list { t with preview = None; selected = None } (Some (resolve t path))
   | Up -> up t
   | Refresh -> refresh t
   | Edit_path editing ->
@@ -828,12 +874,17 @@ let update t (action : Action.t) =
   | New_folder ->
     (match current_dir t with
      | Some dir ->
-       ( { t with ask = Some (New_folder { dir; input = ""; error = None; busy = false }) }
+       ( { t with
+           ask =
+             Some (New_folder { dir; input = ""; error = None; busy = false })
+         }
        , [ Out.Page (Focus "files-ask-input") ] )
      | None -> t, [])
   | Rename name ->
     with_entry t name ~f:(fun _ path ->
-      ( { t with ask = Some (Rename { path; input = name; error = None; busy = false }) }
+      ( { t with
+          ask = Some (Rename { path; input = name; error = None; busy = false })
+        }
       , [ Out.Page (Focus "files-ask-input") ] ))
   | Delete name ->
     with_entry t name ~f:(fun entry path ->
@@ -851,7 +902,8 @@ let update t (action : Action.t) =
   | Ask_input input -> ask_input t input, []
   | Ask_accept -> ask_accept t
   | Ask_cancel -> ask_cancel t
-  | Copy_path path -> t, [ Out.Copy path; toast (sprintf "Copied %s" (display_path t path)) ]
+  | Copy_path path ->
+    t, [ Out.Copy path; toast (sprintf "Copied %s" (display_path t path)) ]
   | Insert_path path -> t, [ Out.Insert ("@" ^ mention t path) ]
   | Attach name -> attach t name
   | Remove_attachment i -> remove_attachment t i
@@ -859,10 +911,12 @@ let update t (action : Action.t) =
 
 let reply t (reply : Reply.t) result =
   match reply, result with
-  | Listed key, _ when not ([%equal: string option] t.loading (Some key)) -> t, []
+  | Listed key, _ when not ([%equal: string option] t.loading (Some key)) ->
+    t, []
   | Listed _, Ok json ->
     (match File_listing.of_json json with
-     | Error e -> { t with loading = None; error = Some (Error.to_string_hum e) }, []
+     | Error e ->
+       { t with loading = None; error = Some (Error.to_string_hum e) }, []
      | Ok listing ->
        let still name =
          List.exists listing.entries ~f:(fun e -> String.equal e.name name)
@@ -882,7 +936,13 @@ let reply t (reply : Reply.t) result =
          | shown -> shown
        in
        let t =
-         { t with listing = Some listing; loading = None; error = None; selected; preview = shown }
+         { t with
+           listing = Some listing
+         ; loading = None
+         ; error = None
+         ; selected
+         ; preview = shown
+         }
        in
        (match listing.select with
         | Some name -> preview t (join listing.path name)
@@ -900,31 +960,42 @@ let reply t (reply : Reply.t) result =
      | Ok p -> { t with preview = Some (Shown p) }, []
      | Error e ->
        ( { t with
-           preview =
-             Some (Failed { path = ""; error = Error.to_string_hum e })
+           preview = Some (Failed { path = ""; error = Error.to_string_hum e })
          }
        , [] ))
-  | Previewed path, Error error -> { t with preview = Some (Failed { path; error }) }, []
+  | Previewed path, Error error ->
+    { t with preview = Some (Failed { path; error }) }, []
   | Upload_link { file; overwrite }, result ->
     upload_link_reply t ~file ~overwrite result
   | Download_link, Ok json ->
     let t = { t with busy = None } in
     (match Json.string_field json "url", Json.string_field json "name" with
      | Ok url, Ok name ->
-       t, [ Out.Page (Download { url = link t url; name }); toast (sprintf "Downloading %s" name) ]
-     | _ -> t, [ toast ~error:true "The backend sent no download link: try again." ])
+       ( t
+       , [ Out.Page (Download { url = link t url; name })
+         ; toast (sprintf "Downloading %s" name)
+         ] )
+     | _ ->
+       t, [ toast ~error:true "The backend sent no download link: try again." ])
   | Download_link, Error e -> { t with busy = None }, [ toast ~error:true e ]
   | Changed { notice; select }, Ok _ ->
-    let t, cmds = refresh { t with ask = None; preview = None; selected = select } in
+    let t, cmds =
+      refresh { t with ask = None; preview = None; selected = select }
+    in
     t, (toast notice :: cmds) @ [ Out.Page (Focus list_id) ]
   | Changed _, Error e ->
     (match t.ask with
      | Some (New_folder a) ->
-       { t with ask = Some (New_folder { a with busy = false; error = Some e }) }, []
+       ( { t with
+           ask = Some (New_folder { a with busy = false; error = Some e })
+         }
+       , [] )
      | Some (Rename a) ->
-       { t with ask = Some (Rename { a with busy = false; error = Some e }) }, []
+       ( { t with ask = Some (Rename { a with busy = false; error = Some e }) }
+       , [] )
      | Some (Delete a) ->
-       { t with ask = Some (Delete { a with busy = false; error = Some e }) }, []
+       ( { t with ask = Some (Delete { a with busy = false; error = Some e }) }
+       , [] )
      | Some (Overwrite _) | None -> t, [ toast ~error:true e ])
 ;;
 

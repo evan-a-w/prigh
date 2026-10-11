@@ -549,7 +549,9 @@ let files_out (m : Model.t) (outs : Files.Out.t list) =
     | Copy text -> m, cmds @ [ Command.Copy text ]
     | Insert text ->
       let draft =
-        if String.is_empty m.draft || Char.is_whitespace (String.get m.draft (String.length m.draft - 1))
+        if
+          String.is_empty m.draft
+          || Char.is_whitespace (String.get m.draft (String.length m.draft - 1))
         then m.draft ^ text ^ " "
         else m.draft ^ " " ^ text ^ " "
       in
