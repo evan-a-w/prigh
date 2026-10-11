@@ -651,6 +651,15 @@ let tool_call_block (call : Content.Tool_call.t) =
   sprintf "### Tool: %s\n\n```json\n%s\n```" call.name (String.strip arguments)
 ;;
 
+let server_tool_block (tool : Content.Server_tool.t) =
+  sprintf
+    "### %s: %s%s"
+    tool.name
+    tool.input
+    (Option.value_map tool.output ~default:"" ~f:(fun output ->
+       "\n\n" ^ blockquote (String.strip output)))
+;;
+
 let heading title (at : float option) =
   match at with
   | None -> "## " ^ title
@@ -689,6 +698,7 @@ let to_markdown t =
             when not (String.is_empty (String.strip th.text)) ->
             Some (blockquote (String.strip th.text))
           | Content.Tool_call call -> Some (tool_call_block call)
+          | Content.Server_tool tool -> Some (server_tool_block tool)
           | Content.Text _ | Content.Thinking _ -> None)
       in
       if List.is_empty segments

@@ -24,6 +24,7 @@ val header
   -> mark:Mark.t
   -> name:string
   -> ?arg:string
+  -> ?arg_style:Style.t
   -> Content.Span.t list
   -> Log_line.t
 
@@ -48,4 +49,12 @@ val render
   -> P.Tool_call.t
   -> P.Message.Tool_result.t option
   -> live_tail:string option
+  -> Log_line.t list
+
+(** A tool the provider ran (web search), as a step like a tool call's: its
+    query, running until it has output, then its results. *)
+val server_tool
+  :  verbosity:Verbosity.t
+  -> width:int
+  -> P.Content.Server_tool.t
   -> Log_line.t list

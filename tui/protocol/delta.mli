@@ -13,6 +13,16 @@ type t =
       { index : int
       ; arguments : string
       }
+  | Server_tool_use of
+      { id : string
+      ; name : string
+      ; input : string
+      }
+  | Server_tool_result of
+      { id : string
+      ; output : string
+      ; is_error : bool
+      }
 [@@deriving sexp_of, equal]
 
 val of_json : Json.t -> t Or_error.t

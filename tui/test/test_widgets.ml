@@ -1837,11 +1837,11 @@ let%expect_test "tools: search flags, other tools, and narrow terminals" =
   [%expect
     {|
     == quiet ==
-    … web_search ocaml eio
+    … web_search "ocaml eio"
     == normal ==
-    … web_search ocaml eio
+    … web_search "ocaml eio"
     == verbose ==
-    … web_search ocaml eio
+    … web_search "ocaml eio"
         {
           limit: 3
           query: "ocaml eio"

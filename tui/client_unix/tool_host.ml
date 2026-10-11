@@ -114,18 +114,28 @@ let send t json =
 
 let handle t (event : Event.t) =
   match event with
-  | Tool_exec { exec_id; call_id = _; name; arguments; cwd } ->
+  | Tool_exec { exec_id; call_id = _; name; arguments; cwd; stdin } ->
     send
       t
       (`Object
-        [ "type", `String "exec"
-        ; "exec_id", `String exec_id
-        ; "name", `String name
-        ; "arguments", arguments
-        ; "cwd", `String cwd
-        ])
+        ([ "type", `String "exec"
+         ; "exec_id", `String exec_id
+         ; "name", `String name
+         ; "arguments", arguments
+         ; "cwd", `String cwd
+         ]
+         @ if stdin then [ "stdin", `True ] else []))
   | Tool_exec_cancel exec_id ->
     send t (`Object [ "type", `String "cancel"; "exec_id", `String exec_id ])
+  | Tool_exec_input { exec_id; data; close } ->
+    send
+      t
+      (`Object
+        [ "type", `String "input"
+        ; "exec_id", `String exec_id
+        ; "data", `String data
+        ; ("close", if close then `True else `False)
+        ])
   | Terminal_open { term_id; key; cwd; cols; rows } ->
     send
       t

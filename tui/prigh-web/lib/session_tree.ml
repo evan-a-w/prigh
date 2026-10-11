@@ -44,6 +44,7 @@ let first_line (message : Message.t) =
       | Text text when not (String.is_empty (String.strip text)) ->
         Some (line text)
       | Tool_call call -> Some (call.name ^ " …")
+      | Server_tool s -> Some (Tool_summary.server_tool_line s)
       | Text _ | Thinking _ -> None)
     |> Option.value ~default:"(assistant)"
   | Tool_result { tool_name; text; _ } ->

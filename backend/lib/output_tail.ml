@@ -45,6 +45,13 @@ let lines t =
     Utf8.sanitize (String.chop_suffix_if_exists line ~suffix:"\r"))
 ;;
 
+let since t offset =
+  let len = Buffer.length t.buffer in
+  let first = t.total_bytes - len in
+  let pos = Int.clamp_exn (offset - first) ~min:0 ~max:len in
+  Buffer.To_string.sub t.buffer ~pos ~len:(len - pos)
+;;
+
 let last_line t =
   List.rev (lines t)
   |> List.find ~f:(fun line -> not (String.is_empty (String.strip line)))

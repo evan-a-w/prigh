@@ -584,7 +584,18 @@ and subagents alike, arrive as one message). Killed jobs report `killed`, a
 host that disconnects fails its jobs (`failed: tool host disconnected`). The
 model also has `job_status`, `job_output` (peek at recent output, paging back
 with `offset`), `job_wait` (block on some or all jobs; returned reports are
-not delivered again) and `job_kill`. Subagents' `bash` has no `background`.
+not delivered again), `job_input` and `job_kill`. Subagents' `bash` has no
+`background`.
+
+A job's stdin is a pipe that stays open (other commands get an empty
+stdin), so the model can drive interactive programs: `job_input {id, input,
+close?, wait_ms?}` writes `input` to it (closing it afterwards with
+`close: true`) and returns what the job printed in response, waiting until
+the output goes quiet, the job exits or `wait_ms` (default 1000, at most
+30000) pass. The stdin is not a terminal, so programs that buffer or behave
+differently need flags (`python3 -u -i`, `stdbuf -oL`). It works on remote
+tool hosts too (`tool_exec_input`); a host running an older prigh refuses
+with a message saying to update it.
 
 The status line shows `jobs:N` with a spinner while jobs run and the agent is
 idle. `/jobs` opens a picker (id, state, elapsed time, command, last output
@@ -611,6 +622,37 @@ shell command through the backend (streamed output shown as a tool item) and
 adds it and its output to the context; `!!cmd` runs it without adding to the
 context; `!&cmd` starts it as a background job (also while a turn is running)
 whose exit is reported to the agent like the agent's own jobs.
+
+`write` does not clobber files the model has not looked at: replacing an
+existing file is refused unless the model has read or written that file in
+this session and it has not changed since (by content), with an error that
+says to read it first, or that it changed since it was last read (and how
+long ago) and must be read again. `apply_patch`'s `*** Add File:` over an
+existing file and `*** Move to:` onto one are refused the same way. Edits
+(`edit`, `apply_patch` updates) match text exactly, so they are not
+blocked, but their result notes when the file changed since the model last
+saw it. The record of what was seen lives on the tool host, per session
+(shared with its subagents); a restarted tool host or a switch to another
+host has none, so the model is asked to read the file again.
+
+The web: `web_fetch {url, timeout?}` fetches an http(s) URL on the session's
+tool host (so `localhost` is that machine) and returns readable text: HTML
+becomes markdown-ish text (headings, lists, `[links](url)`, code blocks,
+tables; scripts, styles and navigation dropped, only `<main>`/`<article>`
+when the page has one), other text types come as they are, images are
+attached like `read`'s. It follows up to 10 redirects, reads at most 5 MB,
+times out after 30 s (`timeout` up to 120), truncates long pages like
+`bash` output (the full text saved to a file under `$TMPDIR/prigh-output/`)
+and says what to do on errors (HTTP status, refused connections, timeouts,
+binary types). `web_search` is the provider's own server-side search:
+Anthropic's `web_search` tool (at most 5 searches per turn) and the OpenAI
+Responses API's `web_search` (OpenAI and ChatGPT/Codex). The provider runs
+the searches; they show in the transcript as `web_search "query"` with the
+results folded underneath, and are replayed to the same provider as it sent
+them (to another provider as text). Models of other providers (DeepSeek,
+custom endpoints) do not get `web_search`; they can still `web_fetch` a
+search page. Neither tool is destructive, so neither asks for confirmation
+under `/confirm on`.
 
 Models see images. The `read` tool returns PNG, JPEG, GIF and WebP files
 (recognised by content, not by name) as images the model can look at, and an

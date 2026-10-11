@@ -193,4 +193,126 @@ let kill_tool =
   { Tool.spec; run }
 ;;
 
-let tools = [ status_tool; output_tool; wait_tool; kill_tool ]
+let default_wait_ms = 1000
+let max_wait_ms = 30_000
+
+(* Output settles when nothing new arrived for this long. *)
+let quiet_ms = 300
+
+(* What the job printed after [offset] bytes: until it exits, [wait_ms]
+   pass, or the output that started arriving goes quiet. *)
+let collect_output (context : Tool.Context.t) task ~offset ~wait_ms =
+  let clock = Eio.Stdenv.clock context.env in
+  let start = Eio.Time.now clock in
+  let output = Background_tasks.Task.output task in
+  let rec go ~last_total ~last_change =
+    let now = Eio.Time.now clock in
+    let total = Output_tail.total_bytes output in
+    let last_change = if total <> last_total then now else last_change in
+    let elapsed_ms = (now -. start) *. 1000. in
+    if
+      (not (Background_tasks.Task.running task))
+      || Float.(elapsed_ms >= of_int wait_ms)
+      || (total > offset
+          && Float.((now -. last_change) *. 1000. >= of_int quiet_ms))
+      || Cancellation.is_cancelled context.cancel
+    then ()
+    else (
+      Eio.Time.sleep clock 0.02;
+      go ~last_total:total ~last_change)
+  in
+  go ~last_total:offset ~last_change:start;
+  Output_tail.since output offset
+;;
+
+let input_tool =
+  let spec =
+    { (spec
+         ~name:"job_input"
+         ~description:
+           "Write text to a running background job's stdin (a pipe, not a \
+            terminal), optionally closing it afterwards, to drive interactive \
+            programs (REPLs, prompts). Include the newline a line needs. \
+            Returns the output the job printed in response: whatever arrives \
+            until it goes quiet, the job exits or wait_ms pass. Programs that \
+            buffer output when stdin is not a terminal may need a flag \
+            (python3 -u -i, stdbuf -oL)."
+         (Tool_args.schema
+            ~required:[ "id"; "input" ]
+            [ "id", `String, "Job id"
+            ; "input", `String, "Text to write (may be empty to only close)"
+            ; ( "close"
+              , `Boolean
+              , "Close stdin after writing (end of input), default false" )
+            ; ( "wait_ms"
+              , `Integer
+              , sprintf
+                  "How long to wait for output, in milliseconds (default %d, \
+                   at most %d)"
+                  default_wait_ms
+                  max_wait_ms )
+            ]))
+      with
+      parallel_safe = false
+    }
+  in
+  let run (context : Tool.Context.t) args =
+    let id = Tool_args.string args "id" in
+    let input = Tool_args.string args "input" in
+    let close = Option.value (Tool_args.bool_opt args "close") ~default:false in
+    let wait_ms =
+      Int.clamp_exn
+        (Option.value
+           (Tool_args.int_opt args "wait_ms")
+           ~default:default_wait_ms)
+        ~min:0
+        ~max:max_wait_ms
+    in
+    let task =
+      ok_or_invalid (Background_tasks.find (background_of context) ~kind:Job id)
+    in
+    let refused reason =
+      Tool.Result.error (sprintf "cannot write to job %s: %s" id reason)
+    in
+    match
+      Background_tasks.Task.input task, Background_tasks.Task.outcome task
+    with
+    | _, Some outcome ->
+      refused
+        (sprintf
+           "it has already exited (%s); start it again with bash and background"
+           outcome.status)
+    | None, None -> refused "it was started without a stdin pipe"
+    | Some feed, None ->
+      let offset =
+        Output_tail.total_bytes (Background_tasks.Task.output task)
+      in
+      (match Stdin_feed.write feed input ~close with
+       | Error e -> refused (Error.to_string_hum e)
+       | Ok () ->
+         let output = collect_output context task ~offset ~wait_ms in
+         let state =
+           match Background_tasks.Task.outcome task with
+           | None -> ""
+           | Some outcome -> sprintf "; it then %s" outcome.status
+         in
+         let header =
+           sprintf
+             "sent %d byte%s to job %s%s%s"
+             (String.length input)
+             (if String.length input = 1 then "" else "s")
+             id
+             (if close then " and closed its stdin" else "")
+             state
+         in
+         let body =
+           if String.is_empty output
+           then "(no output yet; job_output shows what comes later)"
+           else (Truncate.tail (Utf8.sanitize output)).text
+         in
+         Tool.Result.ok (header ^ "\n" ^ body))
+  in
+  { Tool.spec; run }
+;;
+
+let tools = [ status_tool; output_tool; wait_tool; input_tool; kill_tool ]

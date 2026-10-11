@@ -10,7 +10,7 @@ let%expect_test "registry" =
     , (Option.is_some (Tools.find "nope") : bool)];
   [%expect
     {|
-    (bash read write edit ls grep find)
+    (bash read write edit ls grep find web_fetch web_search)
     (true false)
     |}]
 ;;
@@ -35,13 +35,19 @@ let%expect_test "the file editor suits the model" =
         , (names (Tools.for_model model Tools.all) : string list)]);
   [%expect
     {|
-    (openai-codex/gpt-5.5 true (bash read write apply_patch ls grep find))
-    (openai/gpt-5 true (bash read write apply_patch ls grep find))
-    (openai/gpt-6.1-sol true (bash read write apply_patch ls grep find))
-    (openai/gpt-5-chat-latest false (bash read write edit ls grep find))
-    (openai/gpt-4.1 false (bash read write edit ls grep find))
-    (anthropic/claude-opus-4-6 false (bash read write edit ls grep find))
-    (deepseek/deepseek-flash false (bash read write edit ls grep find))
+    (openai-codex/gpt-5.5 true
+     (bash read write apply_patch ls grep find web_fetch web_search))
+    (openai/gpt-5 true
+     (bash read write apply_patch ls grep find web_fetch web_search))
+    (openai/gpt-6.1-sol true
+     (bash read write apply_patch ls grep find web_fetch web_search))
+    (openai/gpt-5-chat-latest false
+     (bash read write edit ls grep find web_fetch web_search))
+    (openai/gpt-4.1 false
+     (bash read write edit ls grep find web_fetch web_search))
+    (anthropic/claude-opus-4-6 false
+     (bash read write edit ls grep find web_fetch web_search))
+    (deepseek/deepseek-flash false (bash read write edit ls grep find web_fetch))
     |}];
   let gpt = Option.value_exn (Model.find "openai/gpt-5") in
   let claude = Option.value_exn (Model.find "anthropic/claude-opus-4-6") in
@@ -55,7 +61,10 @@ let%expect_test "the file editor suits the model" =
        : string option)
     , (Option.map (Tools.find "apply_patch") ~f:Tool.name : string option)];
   [%expect
-    {| ((bash read write edit ls grep find) (bash) (apply_patch) (apply_patch)) |}]
+    {|
+    ((bash read write edit ls grep find web_fetch web_search) (bash)
+     (apply_patch) (apply_patch))
+    |}]
 ;;
 
 let%expect_test "bash: output, exit codes, cwd, streaming" =
@@ -542,6 +551,7 @@ let%expect_test "directory completion keeps the typed notation" =
         ~cwd
         ~name:Host_ops.list_dirs_op
         ~arguments:(`Object [ "prefix", `String prefix ])
+        ()
     in
     printf "%S -> %s\n" (mask t prefix) (mask t result.text)
   in

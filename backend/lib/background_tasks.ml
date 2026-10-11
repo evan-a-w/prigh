@@ -42,6 +42,7 @@ module Task = struct
     ; cancel : Cancellation.t
     ; finished : unit Promise.t
     ; output : Output_tail.t
+    ; input : Stdin_feed.t option
     ; mutable outcome : Outcome.t option
     ; mutable finished_at : float option
     ; mutable activity : string
@@ -56,6 +57,7 @@ module Task = struct
   let started_at t = t.started_at
   let finished_at t = t.finished_at
   let output t = t.output
+  let input t = t.input
   let running t = Option.is_none t.outcome
 
   let report t =
@@ -146,7 +148,7 @@ let next_id t (kind : Kind.t) =
   Kind.id_prefix kind ^ Int.to_string n
 ;;
 
-let spawn t ~kind ~label ~run =
+let spawn ?input t ~kind ~label ~run =
   let id = next_id t kind in
   let finished, resolve = Promise.create () in
   let task =
@@ -157,6 +159,7 @@ let spawn t ~kind ~label ~run =
     ; cancel = Cancellation.create ()
     ; finished
     ; output = Output_tail.create ()
+    ; input
     ; outcome = None
     ; finished_at = None
     ; activity = "starting"

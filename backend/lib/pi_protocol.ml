@@ -120,6 +120,19 @@ let content_block json =
       ; "name", str (string_field "name" json)
       ; "arguments", arguments_object (string_field "arguments" json)
       ]
+  | "server_tool" ->
+    (* pi has no provider-side tools: a search reads as text. *)
+    `Object
+      [ "type", str "text"
+      ; ( "text"
+        , str
+            (String.strip
+               (sprintf
+                  "[%s %s]\n%s"
+                  (string_field "name" json)
+                  (string_field "input" json)
+                  (string_field "output" json))) )
+      ]
   | _ -> `Object [ "type", str "text"; "text", str (string_field "text" json) ]
 ;;
 

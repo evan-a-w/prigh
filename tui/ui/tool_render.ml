@@ -40,7 +40,7 @@ let one_line s =
   | None -> s
 ;;
 
-let header ~width ~mark ~name ?arg chips =
+let header ~width ~mark ~name ?arg ?(arg_style = Style.plain) chips =
   let chips =
     List.concat_mapi chips ~f:(fun i (c : Content.Span.t) ->
       [ { Content.Span.text = (if i = 0 then "  " else " ")
@@ -63,7 +63,7 @@ let header ~width ~mark ~name ?arg chips =
       in
       [ { Content.Span.text =
             " " ^ Text_width.truncate arg ~width:(Int.max 12 budget)
-        ; style = Style.plain
+        ; style = arg_style
         }
       ]
   in
@@ -85,6 +85,10 @@ let arg (call : P.Tool_call.t) =
     match call.name with
     | "bash" -> Option.map (str "command") ~f:(fun c -> "$ " ^ one_line c)
     | "read" | "write" | "edit" -> str "path"
+    | "web_fetch" -> str "url"
+    | "web_search" ->
+      Option.map (str "query") ~f:(Tool_summary.quoted ~width:Int.max_value)
+    | "job_input" -> Tool_summary.job_input args
     | "apply_patch" ->
       (match
          Patch.parse
@@ -265,7 +269,36 @@ let cancelled (r : P.Message.Tool_result.t) =
     String.equal (String.strip line) "[cancelled]")
 ;;
 
-let render
+(* Numbered as in the output, with the URLs as links. *)
+let search_results ~max (results : Tool_summary.Search_result.t list) =
+  let count = List.length results in
+  List.mapi
+    (List.take results max)
+    ~f:(fun i (r : Tool_summary.Search_result.t) ->
+      Log_line.indent
+        ~depth:2
+        ({ Content.Span.text = sprintf "%d. %s" (i + 1) r.title; style = gray }
+         ::
+         (match r.url with
+          | None -> []
+          | Some url ->
+            [ { text = "  "; style = gray }
+            ; { text = url; style = Style.link dim url }
+            ])))
+  @
+  if max > 0 && count > max
+  then
+    [ Log_line.indent
+        ~depth:2
+        (Content.Line.of_string
+           ~style:dim
+           (sprintf "… %s" (plural (count - max) "more result")))
+    ]
+  else []
+;;
+
+let render_step
+      ?(arg = arg)
       ~(verbosity : Verbosity.t)
       ~width
       (call : P.Tool_call.t)
@@ -501,6 +534,41 @@ let render
       in
       let chips, body = generic result in
       flags @ chips, body
+    | "web_search", Some { is_error = false; text; _ } ->
+      (match Tool_summary.Search_result.parse text with
+       | [] -> generic result
+       | results ->
+         let max =
+           match verbosity with
+           | Quiet -> 0
+           | Normal -> 5
+           | Verbose -> all
+         in
+         ( [ chip (plural (List.length results) "result") ]
+         , search_results ~max results ))
+    | "web_fetch", Some ({ is_error = false; text; _ } as r) ->
+      (match Tool_summary.Fetched.parse text with
+       | None -> generic result
+       | Some fetched ->
+         (* Where a redirect ended up is too long for the header. *)
+         let redirected =
+           if quiet || String.equal fetched.url (str "url")
+           then []
+           else
+             [ Log_line.indent
+                 ~depth:2
+                 [ { text = "→ "; style = dim }
+                 ; { text = fetched.url; style = Style.link dim fetched.url }
+                 ]
+             ]
+         in
+         let chips, body = generic (Some { r with text = fetched.body }) in
+         chip fetched.details :: chips, redirected @ body)
+    | "job_input", _ ->
+      let chips, body = generic result in
+      ( (if Tool_summary.closes_stdin args then [ chip "close stdin" ] else [])
+        @ chips
+      , body )
     | _ -> generic result
   in
   let chips =
@@ -519,6 +587,27 @@ let render
     | Verbose when not applied -> arguments call
     | Verbose | Quiet | Normal -> []
   in
-  (header ~width ~mark ~name:call.name ?arg:(arg call) chips :: arguments)
+  let arg_style =
+    match call.name, Tool_args.string args "url" with
+    | "web_fetch", Some url -> Some (Style.link Style.plain url)
+    | _ -> None
+  in
+  (header ~width ~mark ~name:call.name ?arg:(arg call) ?arg_style chips
+   :: arguments)
   @ body
+;;
+
+let render ~verbosity ~width call result ~live_tail =
+  render_step ~verbosity ~width call result ~live_tail
+;;
+
+let server_tool ~verbosity ~width (s : P.Content.Server_tool.t) =
+  let call, result = Tool_summary.as_call s in
+  render_step
+    ~arg:(fun _ -> Tool_summary.server_tool_arg s)
+    ~verbosity
+    ~width
+    call
+    result
+    ~live_tail:None
 ;;

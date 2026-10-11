@@ -102,6 +102,7 @@ let last_activity chat =
       |> List.find_map ~f:(fun (content : Content.t) ->
         match content with
         | Tool_call call -> Some (call.name ^ " " ^ first_line (summary call))
+        | Server_tool s -> Some (Tool_summary.server_tool_line s)
         | Text t when not (String.is_empty (String.strip t)) ->
           List.last (String.split_lines (String.strip t))
         | Thinking t when not (String.is_empty (String.strip t)) ->
@@ -196,6 +197,43 @@ let cancelled (r : Message.Tool_result.t) =
   r.is_error
   && (String.is_prefix text ~prefix:"[cancelled]"
       || String.is_suffix text ~suffix:"[cancelled]")
+;;
+
+let link ~cls url text =
+  Node.a
+    ~attrs:
+      [ Attr.class_ cls
+      ; Attr.href url
+      ; Attr.target "_blank"
+      ; Attr.create "rel" "noopener noreferrer"
+      ]
+    [ Node.text text ]
+;;
+
+let safe_url url =
+  String.is_prefix url ~prefix:"https://"
+  || String.is_prefix url ~prefix:"http://"
+;;
+
+(* A web search's results, folded (verbose opens them), each a link. *)
+let search_results (results : Tool_summary.Search_result.t list) =
+  folded
+    ~cls:"results"
+    ~label:(plural (List.length results) "result")
+    ~preview:
+      (String.concat
+         ~sep:" · "
+         (List.map results ~f:(fun (r : Tool_summary.Search_result.t) ->
+            r.title)))
+    (Node.ol
+       ~attrs:[ Attr.class_ "results" ]
+       (List.map results ~f:(fun (r : Tool_summary.Search_result.t) ->
+          Node.li
+            (match r.url with
+             | Some url when safe_url url ->
+               [ link ~cls:"title" url r.title; span "url" url ]
+             | Some url -> [ span "title" r.title; span "url" url ]
+             | None -> [ span "title" r.title ]))))
 ;;
 
 type presentation =
@@ -445,6 +483,64 @@ let present ~nested ~streaming ~live (call : Tool_call.t) ~result ~subagent =
            [ report (Subagent_report.of_string text).text ]
          | None, _ -> [])
     }
+  | "web_search" ->
+    let results =
+      match result with
+      | Some { is_error = false; text; _ } ->
+        Tool_summary.Search_result.parse text
+      | _ -> []
+    in
+    { arg =
+        Option.map (Tool_args.string args "query") ~f:(fun query ->
+          span "arg query" (Tool_summary.quoted ~width:Int.max_value query))
+    ; chips =
+        (match results with
+         | [] -> []
+         | results -> [ chip (plural (List.length results) "result") ])
+    ; body =
+        (match result, results with
+         | None, _ -> []
+         | Some { is_error = true; _ }, _ -> [ error_body ]
+         | Some { text; _ }, [] -> [ output ~head:8 text ]
+         | Some _, results -> [ search_results results ])
+    }
+  | "web_fetch" ->
+    let url = str "url" in
+    let fetched =
+      match result with
+      | Some { is_error = false; text; _ } -> Tool_summary.Fetched.parse text
+      | _ -> None
+    in
+    { arg =
+        Some
+          (if safe_url url
+           then link ~cls:"arg url" url url
+           else span "arg url" url)
+    ; chips =
+        (match fetched with
+         | None -> []
+         | Some fetched ->
+           (if String.equal fetched.url url
+            then []
+            else [ chip ("→ " ^ fetched.url) ])
+           @ [ chip fetched.details ])
+    ; body =
+        (match result, fetched with
+         | None, _ -> [ output ~head:0 ~tail:6 live ]
+         | Some _, Some fetched -> [ output ~head:6 fetched.body ]
+         | Some r, None -> [ output ~error:r.is_error ~head:8 r.text ])
+    }
+  | "job_input" ->
+    { arg =
+        Option.map (Tool_summary.job_input args) ~f:(fun arg ->
+          span "arg input" arg)
+    ; chips =
+        (if Tool_summary.closes_stdin args then [ chip "close stdin" ] else [])
+    ; body =
+        (match result with
+         | None -> []
+         | Some r -> [ output ~error:r.is_error ~head:8 r.text ])
+    }
   | "job_wait" | "job_kill" | "subagent_wait" | "subagent_cancel" ->
     let ids = Tool_args.strings args "ids" @ Tool_args.strings args "id" in
     { arg =
@@ -472,7 +568,8 @@ let present ~nested ~streaming ~live (call : Tool_call.t) ~result ~subagent =
     }
 ;;
 
-let view
+let card
+      ?arg:arg_override
       ~nested
       ~streaming
       ~running
@@ -511,6 +608,7 @@ let view
   let { arg; chips; body } =
     present ~nested ~streaming ~live call ~result ~subagent
   in
+  let arg = Option.first_some arg_override arg in
   let chips =
     match status with
     | Interrupted when Option.is_none result -> chips @ [ chip "no result" ]
@@ -555,4 +653,26 @@ let view
       ; body
       ]
   else div cls [ div "tool-head" head; body ]
+;;
+
+let view ~nested ~streaming ~running call tool =
+  card ~nested ~streaming ~running call tool
+;;
+
+let server_tool ~running (s : Content.Server_tool.t) =
+  let call, result = Tool_summary.as_call s in
+  let arg =
+    match s.name with
+    | "web_search" -> None
+    | _ ->
+      Option.map (Tool_summary.server_tool_arg s) ~f:(fun input ->
+        span "arg" input)
+  in
+  card
+    ?arg
+    ~nested:(fun _ -> Node.none)
+    ~streaming:false
+    ~running
+    call
+    (Some { call; output = ""; result; subagent = None })
 ;;

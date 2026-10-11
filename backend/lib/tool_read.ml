@@ -47,6 +47,7 @@ let read_image ~env ~cancel ~path content =
 let read_for_context
       ~env
       ?(cancel = Cancellation.never)
+      ?seen
       ?(offset = 1)
       ?limit
       ~cwd
@@ -60,6 +61,7 @@ let read_for_context
      | false -> Tool.Result.error (sprintf "file not found: %s" path)
      | true ->
        let content = In_channel.read_all path in
+       Option.iter seen ~f:(Seen_files.record ~path ~contents:content);
        if Option.is_some (Image.sniff content)
        then read_image ~env ~cancel ~path content
        else if looks_binary content
@@ -98,6 +100,7 @@ let run (context : Tool.Context.t) args =
   read_for_context
     ~env:context.env
     ~cancel:context.cancel
+    ?seen:(Seen_files.of_args args)
     ~offset
     ?limit
     ~cwd:context.cwd

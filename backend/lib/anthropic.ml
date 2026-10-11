@@ -64,46 +64,75 @@ let text_block ?(cached = false) text =
 
 let redacted_prefix = "redacted:"
 
-let assistant_blocks ~oauth ~replay_thinking (a : Message.Assistant.t) =
-  List.filter_map a.content ~f:(function
-    | Content.Text "" -> None
-    | Text text ->
-      Some (`Object [ "type", `String "text"; "text", `String text ])
-    | Thinking { signature = None; _ } -> None
-    | Thinking { text; signature = Some signature } ->
-      if not replay_thinking
-      then None
-      else if String.is_prefix signature ~prefix:redacted_prefix
-      then
-        Some
-          (`Object
-              [ "type", `String "redacted_thinking"
-              ; ( "data"
-                , `String
-                    (String.chop_prefix_exn signature ~prefix:redacted_prefix) )
-              ])
-      else
-        Some
-          (`Object
-              [ "type", `String "thinking"
-              ; "thinking", `String text
-              ; "signature", `String signature
-              ])
-    | Tool_call call ->
-      let input =
-        match Content.Tool_call.parse_arguments call with
-        | Ok json -> json
-        | Error _ -> `Object []
-      in
+let assistant_block ~oauth ~replay_thinking (block : Content.t) =
+  match block with
+  | Content.Text "" | Server_tool _ -> None
+  | Text text -> Some (`Object [ "type", `String "text"; "text", `String text ])
+  | Thinking { signature = None; _ } -> None
+  | Thinking { text; signature = Some signature } ->
+    if not replay_thinking
+    then None
+    else if String.is_prefix signature ~prefix:redacted_prefix
+    then
       Some
         (`Object
-            [ "type", `String "tool_use"
-            ; "id", `String call.id
-            ; ( "name"
+            [ "type", `String "redacted_thinking"
+            ; ( "data"
               , `String
-                  (if oauth then to_claude_code_name call.name else call.name) )
-            ; "input", input
-            ]))
+                  (String.chop_prefix_exn signature ~prefix:redacted_prefix) )
+            ])
+    else
+      Some
+        (`Object
+            [ "type", `String "thinking"
+            ; "thinking", `String text
+            ; "signature", `String signature
+            ])
+  | Tool_call call ->
+    let input =
+      match Content.Tool_call.parse_arguments call with
+      | Ok json -> json
+      | Error _ -> `Object []
+    in
+    Some
+      (`Object
+          [ "type", `String "tool_use"
+          ; "id", `String call.id
+          ; ( "name"
+            , `String
+                (if oauth then to_claude_code_name call.name else call.name) )
+          ; "input", input
+          ])
+;;
+
+(* A search is replayed as the provider sent it (its results carry
+   encrypted content the model needs for citations); another provider's
+   becomes text. *)
+let server_tool_blocks ~same_provider (tool : Content.Server_tool.t) =
+  let as_text () = [ text_block (Content.Server_tool.as_text tool) ] in
+  match tool.raw with
+  | Some raw when same_provider ->
+    (match Json.parse tool.input, Json.parse raw with
+     | Ok input, Ok result ->
+       [ `Object
+           [ "type", `String "server_tool_use"
+           ; "id", `String tool.id
+           ; "name", `String tool.name
+           ; "input", input
+           ]
+       ; result
+       ]
+     | _ -> as_text ())
+  | Some _ | None -> as_text ()
+;;
+
+let assistant_blocks ~oauth ~replay_thinking (a : Message.Assistant.t) =
+  List.concat_map a.content ~f:(fun block ->
+    match block with
+    | Content.Server_tool tool ->
+      server_tool_blocks ~same_provider:replay_thinking tool
+    | Text _ | Thinking _ | Tool_call _ ->
+      Option.to_list (assistant_block ~oauth ~replay_thinking block))
 ;;
 
 let image_block (image : Image.t) =
@@ -188,12 +217,22 @@ let wire_messages ~oauth ~provider (messages : Message.t list) =
     `Object [ "role", `String role; "content", `Array blocks ])
 ;;
 
+let web_search_max_uses = 5
+
 let wire_tool ~oauth (t : Tool_spec.t) =
-  `Object
-    [ "name", `String (if oauth then to_claude_code_name t.name else t.name)
-    ; "description", `String t.description
-    ; "input_schema", t.parameters
-    ]
+  if Tool_web_search.is_spec t
+  then
+    `Object
+      [ "type", `String "web_search_20250305"
+      ; "name", `String Tool_web_search.name
+      ; "max_uses", `Number (Int.to_string web_search_max_uses)
+      ]
+  else
+    `Object
+      [ "name", `String (if oauth then to_claude_code_name t.name else t.name)
+      ; "description", `String t.description
+      ; "input_schema", t.parameters
+      ]
 ;;
 
 let thinking_budget ~max_tokens (thinking : Thinking.t) =
@@ -314,6 +353,8 @@ module Stream_state = struct
     { mutable block_types : (int * [ `Text | `Thinking | `Tool_use ]) list
     ; mutable tool_index : int
     ; mutable tool_indices : (int * int) list (* content index -> tool index *)
+    ; mutable server_tools : (int * (string * string * Buffer.t)) list
+      (* content index -> id, name, input so far *)
     ; mutable stop_reason : string option
     ; mutable input : int
     ; mutable cache_read : int
@@ -325,6 +366,7 @@ module Stream_state = struct
     { block_types = []
     ; tool_index = 0
     ; tool_indices = []
+    ; server_tools = []
     ; stop_reason = None
     ; input = 0
     ; cache_read = 0
@@ -347,6 +389,26 @@ let apply_usage (state : Stream_state.t) usage =
     state.input <- input + cache_read + cache_write;
     state.cache_read <- cache_read);
   Option.iter (int_member "output_tokens" usage) ~f:(fun n -> state.output <- n)
+;;
+
+(* The readable output of a [web_search_tool_result] block's [content]: the
+   results, or the error code. *)
+let search_result (content : Json.t option) =
+  match content with
+  | Some (`Array results) ->
+    ( Tool_web_search.results_text
+        (List.filter_map results ~f:(fun r ->
+           Option.map (member "url" r) ~f:(fun url ->
+             ( Option.value (member "title" r) ~default:""
+             , url
+             , member "page_age" r ))))
+    , false )
+  | Some json ->
+    ( sprintf
+        "search failed: %s"
+        (Option.value (member "error_code" json) ~default:(Json.to_string json))
+    , true )
+  | None -> "search failed: no results in the reply", true
 ;;
 
 (* Returns the assistant events for one SSE event and records usage/stop
@@ -383,6 +445,30 @@ let parse_event ~tools (state : Stream_state.t) (event : Sse.Event.t)
              [ Assistant_event.Thinking_delta ""
              ; Thinking_signature (redacted_prefix ^ data)
              ]
+           | "server_tool_use" ->
+             let input = Buffer.create 64 in
+             (match Json.member "input" block with
+              | Some (`Object (_ :: _) as json) ->
+                Buffer.add_string input (Json.to_string json)
+              | _ -> ());
+             state.server_tools
+             <- ( index
+                , ( Option.value (member "id" block) ~default:""
+                  , Option.value (member "name" block) ~default:""
+                  , input ) )
+                :: state.server_tools;
+             []
+           | "web_search_tool_result" ->
+             let output, is_error =
+               search_result (Json.member "content" block)
+             in
+             [ Server_tool_result
+                 { id = Option.value (member "tool_use_id" block) ~default:""
+                 ; output
+                 ; is_error
+                 ; raw = Some (Json.to_string block)
+                 }
+             ]
            | "tool_use" ->
              let tool_index = state.tool_index in
              state.tool_index <- tool_index + 1;
@@ -415,6 +501,15 @@ let parse_event ~tools (state : Stream_state.t) (event : Sse.Event.t)
                (member "signature" delta)
                ~default:[]
                ~f:(fun s -> [ Assistant_event.Thinking_signature s ])
+           | "input_json_delta"
+             when List.Assoc.mem state.server_tools ~equal:Int.equal index ->
+             let _, _, input =
+               List.Assoc.find_exn state.server_tools ~equal:Int.equal index
+             in
+             Option.iter
+               (member "partial_json" delta)
+               ~f:(Buffer.add_string input);
+             []
            | "input_json_delta" ->
              (match
                 ( List.Assoc.find state.tool_indices ~equal:Int.equal index
@@ -425,6 +520,21 @@ let parse_event ~tools (state : Stream_state.t) (event : Sse.Event.t)
                 [ Tool_call_delta { index = tool_index; arguments } ]
               | _ -> [])
            | _ -> []))
+     | "content_block_stop" ->
+       (match
+          List.Assoc.find state.server_tools ~equal:Int.equal (index ())
+        with
+        | None -> []
+        | Some (id, name, input) ->
+          [ Server_tool_use
+              { id
+              ; name
+              ; input =
+                  (if Buffer.length input = 0
+                   then "{}"
+                   else Buffer.contents input)
+              }
+          ])
      | "message_delta" ->
        Option.iter (Json.member "delta" json) ~f:(fun d ->
          Option.iter (member "stop_reason" d) ~f:(fun r ->
@@ -444,7 +554,7 @@ let parse_event ~tools (state : Stream_state.t) (event : Sse.Event.t)
 let stop_reason_of_string = function
   | Some "tool_use" -> Stop_reason.Tool_use
   | Some "max_tokens" -> Length
-  | Some ("end_turn" | "stop_sequence") | None -> End_turn
+  | Some ("end_turn" | "stop_sequence" | "pause_turn") | None -> End_turn
   | Some "refusal" -> Error "refusal"
   | Some other -> Error ("unexpected stop_reason: " ^ other)
 ;;

@@ -1043,7 +1043,7 @@ let%expect_test "other tools: their main argument and output" =
       <div class="tool-head">
         <span class="icon"> ✓ </span>
         <span class="name"> web_fetch </span>
-        <span class="arg"> https://x </span>
+        <a href="https://x" target="_blank" rel="noopener noreferrer" class="arg url"> https://x </a>
       </div>
       <div class="tool-body">
         <div class="output">

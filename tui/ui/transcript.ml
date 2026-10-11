@@ -40,6 +40,7 @@ module Item = struct
         ; live_tail : string option
         ; subagent : Subagent.t option
         }
+    | Server_tool of P.Content.Server_tool.t
     | Notice of Severity.t * string
     | Block of Content.t
     | Compaction of string
@@ -190,7 +191,8 @@ let add_message t (m : P.Message.t) =
         | Tool_call call ->
           add
             t
-            (Tool { call; result = None; live_tail = None; subagent = None }))
+            (Tool { call; result = None; live_tail = None; subagent = None })
+        | Server_tool s -> add t (Server_tool s))
     in
     (match a.stop_reason with
      | Error e -> add t (Notice (Error, "error: " ^ e))
@@ -211,7 +213,66 @@ let assistant_text (a : P.Message.Assistant.t) =
     ~sep:"\n"
     (List.filter_map a.content ~f:(function
        | P.Content.Text text -> Some text
-       | P.Content.Thinking _ | P.Content.Tool_call _ -> None))
+       | P.Content.Thinking _ | P.Content.Tool_call _ | P.Content.Server_tool _
+         -> None))
+;;
+
+let find_server_tool items_rev id =
+  List.find_map items_rev ~f:(function
+    | Item.Server_tool s when String.equal s.id id -> Some s
+    | _ -> None)
+;;
+
+(* Updates the server tool block [id] in place, or adds it after what has
+   streamed so far. *)
+let update_server_tool t ~id ~f =
+  match find_server_tool t.items_rev id with
+  | Some s ->
+    let items_rev =
+      List.map t.items_rev ~f:(function
+        | Item.Server_tool s' when String.equal s'.id id ->
+          Item.Server_tool (f s)
+        | item -> item)
+    in
+    { t with items_rev }
+  | None ->
+    let created : P.Content.Server_tool.t =
+      { id; name = "server_tool"; input = ""; output = None; is_error = false }
+    in
+    add (flush t) (Server_tool (f created))
+;;
+
+let server_tool_delta t ~(partial : P.Message.Assistant.t) (delta : P.Delta.t) =
+  let in_partial id =
+    List.find_map partial.content ~f:(function
+      | P.Content.Server_tool s when String.equal s.id id -> Some s
+      | _ -> None)
+  in
+  match delta with
+  | Server_tool_use { id; name; input } ->
+    update_server_tool t ~id ~f:(fun s -> { s with name; input })
+  | Server_tool_result { id; output; is_error } ->
+    update_server_tool t ~id ~f:(fun s ->
+      let s =
+        if String.is_empty s.input
+        then Option.value (in_partial id) ~default:s
+        else s
+      in
+      { s with output = Some output; is_error })
+  | Text_delta _
+  | Thinking_delta _
+  | Thinking_signature
+  | Tool_call_start _
+  | Tool_call_delta _ -> t
+;;
+
+(* The final message has the last word on blocks the deltas made. *)
+let settle_server_tools t (a : P.Message.Assistant.t) =
+  List.fold a.content ~init:t ~f:(fun t -> function
+    | P.Content.Server_tool s
+      when Option.is_some (find_server_tool t.items_rev s.id) ->
+      update_server_tool t ~id:s.id ~f:(fun _ -> s)
+    | _ -> t)
 ;;
 
 let update_tool_subagent t ~call_id ~f =
@@ -233,6 +294,18 @@ let rec update_subagent (s : Subagent.t) (event : P.Event.t) =
     { s with last_tool = Some line; nested = s.nested @ [ line ] }
   | P.Event.Turn_start -> { s with turns = s.turns + 1 }
   | P.Event.Message_end (P.Message.Assistant a) ->
+    let searches =
+      List.filter_map a.content ~f:(function
+        | P.Content.Server_tool tool ->
+          Some (Tool_summary.server_tool_line tool)
+        | _ -> None)
+    in
+    let s =
+      match List.last searches with
+      | None -> s
+      | Some last ->
+        { s with last_tool = Some last; nested = s.nested @ searches }
+    in
     let text = assistant_text a in
     if String.is_empty (String.strip text)
     then s
@@ -329,9 +402,12 @@ let apply t (event : P.Event.t) =
     append t Text text
   | P.Event.Message_update { delta = P.Delta.Thinking_delta text; _ } ->
     append t Thinking text
+  | P.Event.Message_update
+      { delta = (Server_tool_use _ | Server_tool_result _) as delta; partial }
+    -> server_tool_delta t ~partial delta
   | P.Event.Message_update _ -> t
   | P.Event.Message_end (P.Message.Assistant a) ->
-    let t = flush t in
+    let t = settle_server_tools (flush t) a in
     let t =
       match a.stop_reason with
       | P.Stop_reason.End_turn -> mark_final t
@@ -368,6 +444,7 @@ let apply t (event : P.Event.t) =
   | P.Event.Auth _
   | P.Event.Tool_exec _
   | P.Event.Tool_exec_cancel _
+  | P.Event.Tool_exec_input _
   | P.Event.Terminal_open _
   | P.Event.Terminal_frame _
   | P.Event.Terminal_close _
@@ -530,6 +607,7 @@ let rows (item : Item.t) ~(verbosity : Verbosity.t) ~width : Log_line.t list =
     (match subagent with
      | Some s -> render_subagent ~verbosity ~width s
      | None -> Tool_render.render ~verbosity ~width call result ~live_tail)
+  | Server_tool s -> Tool_render.server_tool ~verbosity ~width s
   | Notice (severity, text) ->
     (match verbosity, severity with
      | Quiet, (Info | Debug) -> []

@@ -83,8 +83,14 @@ type t =
       ; name : string
       ; arguments : Json.t
       ; cwd : string
+      ; stdin : bool (** keep a stdin pipe open: a background job *)
       } (** run this tool on our machine (we are the active host) *)
   | Tool_exec_cancel of string
+  | Tool_exec_input of
+      { exec_id : string
+      ; data : string
+      ; close : bool
+      } (** text for a running exec's stdin, then maybe end it *)
   | Terminal_open of
       { term_id : string
       ; key : string

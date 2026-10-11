@@ -147,6 +147,25 @@ let input_items ~provider ~freeform (messages : Message.t list) =
         | Thinking { signature = Some item; _ } when replay_reasoning ->
           Result.ok (Json.parse item)
         | Thinking _ -> None
+        | Server_tool { raw = Some item; _ } when replay_reasoning ->
+          Result.ok (Json.parse item)
+        | Server_tool tool ->
+          Some
+            (`Object
+                [ "type", `String "message"
+                ; "role", `String "assistant"
+                ; ( "id"
+                  , `String (sprintf "msg_prigh_%d_%s" message_index tool.id) )
+                ; "status", `String "completed"
+                ; ( "content"
+                  , `Array
+                      [ `Object
+                          [ "type", `String "output_text"
+                          ; "text", `String (Content.Server_tool.as_text tool)
+                          ; "annotations", `Array []
+                          ]
+                      ] )
+                ])
         | Tool_call call when freeform call.name ->
           Some
             (`Object
@@ -166,32 +185,35 @@ let input_items ~provider ~freeform (messages : Message.t list) =
 ;;
 
 let wire_tool (t : Tool_spec.t) =
-  match t.freeform with
-  | Some grammar ->
-    `Object
-      [ "type", `String "custom"
-      ; "name", `String t.name
-      ; ( "description"
-        , `String
-            (t.description
-             ^ "\n\n\
-                This is a FREEFORM tool: send the input as plain text, not \
-                wrapped in JSON.") )
-      ; ( "format"
-        , `Object
-            [ "type", `String "grammar"
-            ; "syntax", `String "lark"
-            ; "definition", `String grammar
-            ] )
-      ]
-  | None ->
-    `Object
-      [ "type", `String "function"
-      ; "name", `String t.name
-      ; "description", `String t.description
-      ; "parameters", t.parameters
-      ; "strict", `False
-      ]
+  if Tool_web_search.is_spec t
+  then `Object [ "type", `String "web_search" ]
+  else (
+    match t.freeform with
+    | Some grammar ->
+      `Object
+        [ "type", `String "custom"
+        ; "name", `String t.name
+        ; ( "description"
+          , `String
+              (t.description
+               ^ "\n\n\
+                  This is a FREEFORM tool: send the input as plain text, not \
+                  wrapped in JSON.") )
+        ; ( "format"
+          , `Object
+              [ "type", `String "grammar"
+              ; "syntax", `String "lark"
+              ; "definition", `String grammar
+              ] )
+        ]
+    | None ->
+      `Object
+        [ "type", `String "function"
+        ; "name", `String t.name
+        ; "description", `String t.description
+        ; "parameters", t.parameters
+        ; "strict", `False
+        ])
 ;;
 
 let request_body ~(endpoint : Endpoint.t) (r : Provider.Request.t) : Json.t =
@@ -222,7 +244,13 @@ let request_body ~(endpoint : Endpoint.t) (r : Provider.Request.t) : Json.t =
            , `String
                (Option.value r.system ~default:"You are a helpful assistant.") )
          ; "input", `Array (input_items ~provider ~freeform r.messages)
-         ; "include", `Array [ `String "reasoning.encrypted_content" ]
+         ; ( "include"
+           , `Array
+               (`String "reasoning.encrypted_content"
+                ::
+                (if List.exists r.tools ~f:Tool_web_search.is_spec
+                 then [ `String "web_search_call.action.sources" ]
+                 else [])) )
          ; "tool_choice", `String "auto"
          ; "parallel_tool_calls", `True
          ]
@@ -295,6 +323,61 @@ let json_string_fragment text =
 let freeform_open = {|{"input":"|}
 let freeform_close = {|"}|}
 
+(* A [web_search_call] item's [action]: [search] (with [query] and, when
+   asked for, [sources]), [open_page] or [find_in_page]. *)
+let web_search_use item : Assistant_event.t option =
+  match Json.member "action" item, member "id" item with
+  | Some (`Object (_ :: _ as fields)), Some id ->
+    let input =
+      `Object
+        (List.filter fields ~f:(fun (key, _) ->
+           not (String.equal key "sources")))
+    in
+    Some
+      (Server_tool_use
+         { id; name = Tool_web_search.name; input = Json.to_string input })
+  | _ -> None
+;;
+
+let web_search_result item : Assistant_event.t =
+  let id = Option.value (member "id" item) ~default:"" in
+  let action = Json.member "action" item in
+  let status = Option.value (member "status" item) ~default:"completed" in
+  let output, is_error =
+    match status with
+    | "failed" | "incomplete" -> sprintf "search %s" status, true
+    | _ ->
+      (match Option.bind action ~f:(member "type") with
+       | Some "open_page" ->
+         ( sprintf
+             "opened %s"
+             (Option.value
+                (Option.bind action ~f:(member "url"))
+                ~default:"a page")
+         , false )
+       | Some "find_in_page" | Some "find" ->
+         ( sprintf
+             "searched %s for %S"
+             (Option.value
+                (Option.bind action ~f:(member "url"))
+                ~default:"a page")
+             (Option.value
+                (Option.bind action ~f:(member "pattern"))
+                ~default:"")
+         , false )
+       | _ ->
+         (match Option.bind action ~f:(Json.member "sources") with
+          | Some (`Array (_ :: _ as sources)) ->
+            ( Tool_web_search.results_text
+                (List.filter_map sources ~f:(fun source ->
+                   Option.map (member "url" source) ~f:(fun url ->
+                     Option.value (member "title" source) ~default:"", url, None)))
+            , false )
+          | _ -> "searched", false))
+  in
+  Server_tool_result { id; output; is_error; raw = Some (Json.to_string item) }
+;;
+
 let parse_event (state : Stream_state.t) (event : Sse.Event.t)
   : Assistant_event.t list
   =
@@ -313,6 +396,8 @@ let parse_event (state : Stream_state.t) (event : Sse.Event.t)
     (match Option.value (member "type" json) ~default:"" with
      | "response.output_item.added" ->
        (match item_type (), item () with
+        | Some "web_search_call", Some item ->
+          Option.to_list (web_search_use item)
         | Some (("function_call" | "custom_tool_call") as type_), Some item ->
           let tool_index = state.tool_count in
           state.tool_count <- tool_index + 1;
@@ -363,6 +448,8 @@ let parse_event (state : Stream_state.t) (event : Sse.Event.t)
         | None -> [])
      | "response.output_item.done" ->
        (match item_type (), item () with
+        | Some "web_search_call", Some item ->
+          Option.to_list (web_search_use item) @ [ web_search_result item ]
         | Some "reasoning", Some item ->
           (match Json.member "encrypted_content" item with
            | Some (`String _) -> [ Thinking_signature (Json.to_string item) ]

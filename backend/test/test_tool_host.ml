@@ -263,7 +263,7 @@ let%expect_test "network tool host: hello, run tools, reconnect, bad token" =
     {"type":"response","id":"r","ok":true,"result":{"client_id":"client-1","host_id":"client-1","namespace":null,"user":null,"superuser":false,"state":{"session_id":"<id>","session_path":"$DIR/sessions/<stamp>_<id>.jsonl","session_name":null,"session_description":null,"cwd":"$DIR","git_branch":null,"model":{"id":"deepseek-flash","provider":"deepseek","key":"deepseek/deepseek-flash","name":"DeepSeek V4.1 Flash","context_window":1000000,"max_output":384000,"supports_thinking":true,"cost":{"input":0.3,"output":1.2,"cache_read":0.006}},"thinking":"on","running":false,"message_count":0,"usage":{"input":0,"output":0,"cache_read":0},"cost_usd":0,"context_tokens":0,"active_host":"backend","hosts":[{"id":"backend","name":"<host>","cwd":"$DIR","session_id":null,"session_name":null}],"subagents":[],"jobs":[],"budget_usd":null,"goal":null,"resume_at_ms":null}}}
     connected to 127.0.0.1:PORT as client-2
     host id: host-xxxxxxxxxxxxxxxx
-    active=backend hosts=(((id backend)(name <host>)(cwd $DIR)(session_id())(session_name()))((id <host-id>)(name box)(cwd $DIR/host)(session_id(<id>))(session_name())))
+    active=backend hosts=(((id backend)(name <host>)(cwd $DIR)(session_id())(session_name()))((id <host-id>)(name box)(cwd $DIR/host)(session_id(<id>))(session_name())(exec_input)))
     |}];
   (* Switching resolves the directory on the host; the bash call runs there. *)
   call t h "set_active_host" (sprintf {|{"host": "%s", "cwd": "sub"}|} host_id);
@@ -275,7 +275,7 @@ let%expect_test "network tool host: hello, run tools, reconnect, bad token" =
     {|
     {"type":"response","id":"r","ok":true,"result":{}}
     {"type":"response","id":"r","ok":true,"result":{}}
-    active=<host-id> hosts=(((id backend)(name <host>)(cwd $DIR)(session_id())(session_name()))((id <host-id>)(name box)(cwd $DIR/host/sub)(session_id(<id>))(session_name())))
+    active=<host-id> hosts=(((id backend)(name <host>)(cwd $DIR)(session_id())(session_name()))((id <host-id>)(name box)(cwd $DIR/host/sub)(session_id(<id>))(session_name())(exec_input)))
     tool_result: "$DIR/host/sub\nfrom-host\n"
     |}];
   (* The server dropping the connection: the host comes back on a new
@@ -293,7 +293,7 @@ let%expect_test "network tool host: hello, run tools, reconnect, bad token" =
     disconnected from 127.0.0.1:PORT
     retrying in 50ms
     connected to 127.0.0.1:PORT as client-3
-    active=<host-id> hosts=(((id backend)(name <host>)(cwd $DIR)(session_id())(session_name()))((id <host-id>)(name box)(cwd $DIR/host/sub)(session_id(<id>))(session_name())))
+    active=<host-id> hosts=(((id backend)(name <host>)(cwd $DIR)(session_id())(session_name()))((id <host-id>)(name box)(cwd $DIR/host/sub)(session_id(<id>))(session_name())(exec_input)))
     {"type":"response","id":"r","ok":true,"result":{}}
     $DIR/host/sub
     |}];

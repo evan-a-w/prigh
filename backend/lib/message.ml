@@ -22,21 +22,21 @@ module Assistant = struct
   let text t =
     List.filter_map t.content ~f:(function
       | Content.Text s -> Some s
-      | Thinking _ | Tool_call _ -> None)
+      | Thinking _ | Tool_call _ | Server_tool _ -> None)
     |> String.concat
   ;;
 
   let thinking t =
     List.filter_map t.content ~f:(function
       | Content.Thinking th -> Some th.text
-      | Text _ | Tool_call _ -> None)
+      | Text _ | Tool_call _ | Server_tool _ -> None)
     |> String.concat
   ;;
 
   let tool_calls t =
     List.filter_map t.content ~f:(function
       | Content.Tool_call c -> Some c
-      | Text _ | Thinking _ -> None)
+      | Text _ | Thinking _ | Server_tool _ -> None)
   ;;
 end
 

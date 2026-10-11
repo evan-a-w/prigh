@@ -18,7 +18,8 @@ val find : string -> Tool.t option
 val uses_apply_patch : Model.t -> bool
 
 (** [tools] with the file editor ([edit] or [apply_patch]) that suits
-    [model], where there is one. *)
+    [model], where there is one, and without [web_search] unless [model]'s
+    provider runs it. *)
 val for_model : Model.t -> Tool.t list -> Tool.t list
 
 (** The file editor among [tools]. *)

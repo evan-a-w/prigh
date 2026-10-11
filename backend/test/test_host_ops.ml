@@ -11,6 +11,7 @@ let instructions t arguments =
     ~cwd:t.dir
     ~name:Host_ops.instructions_op
     ~arguments
+    ()
 ;;
 
 let show t (result : Tool.Result.t) =

@@ -27,6 +27,7 @@ module Host = struct
     ; cwd : string
     ; session_id : string option
     ; session_name : string option
+    ; exec_input : bool [@sexp.bool]
     }
   [@@deriving sexp_of, equal]
 
@@ -93,10 +94,18 @@ module Event = struct
         ; name : string
         ; arguments : Json.t
         ; cwd : string
+        ; stdin : bool
+          (** the process gets a stdin pipe fed by [Tool_exec_input] *)
         }
     | Tool_exec_cancel of
         { host : string
         ; exec_id : string
+        }
+    | Tool_exec_input of
+        { host : string
+        ; exec_id : string
+        ; data : string
+        ; close : bool (** close stdin after [data] *)
         }
   [@@deriving sexp_of]
 end
@@ -192,6 +201,7 @@ let backend_host t =
   ; cwd = t.backend_cwd
   ; session_id = None
   ; session_name = None
+  ; exec_input = false (* runs in this process: no messages *)
   }
 ;;
 
@@ -578,28 +588,47 @@ let tool_exec_result t ~exec_id result =
     Ok ()
 ;;
 
+(* A tool host predating a tool answers that it does not know it. *)
+let older_host_note (host : Host.t) ~name (result : Tool.Result.t) =
+  if
+    result.is_error
+    && String.equal result.text (sprintf "unknown host tool %S" name)
+  then
+    Tool.Result.error
+      (sprintf
+         "%s: tool host %S runs an older prigh without it; update prigh there \
+          and restart its TUI or tool-host"
+         result.text
+         host.name)
+  else result
+;;
+
 (* Runs [name] on [host]: in-process when that is the backend, otherwise
    through a [Tool_exec] round trip with the client. *)
-let host_exec_on
+let host_exec_with_stdin
       t
       (host : Host.t)
+      ?stdin
       ~cancel
       ~on_output
       ~call_id
       ~cwd
       ~name
       ~arguments
+      ()
   =
   if String.equal host.id Host.backend_id && t.backend_host_enabled
   then
     Host_ops.execute
       ~mcp:t.mcp
       ~env:t.env
+      ?stdin
       ~cancel
       ~on_output
       ~cwd
       ~name
       ~arguments
+      ()
   else (
     let exec_id =
       sprintf "%s/%s-%d" (Session.id t.session) call_id t.exec_seq
@@ -610,22 +639,107 @@ let host_exec_on
       t.pending_execs
       ~key:exec_id
       ~data:{ Pending_exec.host = host.id; on_output; resolver };
+    let stdin =
+      match stdin with
+      | Some feed when not host.exec_input ->
+        Stdin_feed.refuse
+          feed
+          (sprintf
+             "tool host %S runs an older prigh that cannot pass input to jobs: \
+              update prigh there and restart its TUI or tool-host, or start \
+              the job again with its input in the command (e.g. a \
+              here-document)"
+             host.name);
+        None
+      | stdin -> stdin
+    in
+    let forward_input sw =
+      Option.iter stdin ~f:(fun feed ->
+        Fiber.fork_daemon ~sw (fun () ->
+          let rec loop () =
+            match Stdin_feed.take feed with
+            | Data data ->
+              broadcast
+                t
+                (Tool_exec_input
+                   { host = host.id; exec_id; data; close = false });
+              loop ()
+            | Close ->
+              broadcast
+                t
+                (Tool_exec_input
+                   { host = host.id; exec_id; data = ""; close = true });
+              `Stop_daemon
+          in
+          loop ()))
+    in
     broadcast
       t
-      (Tool_exec { host = host.id; exec_id; call_id; name; arguments; cwd });
-    match Cancellation.protect cancel ~f:(fun () -> Promise.await promise) with
-    | Some result -> result
+      (Tool_exec
+         { host = host.id
+         ; exec_id
+         ; call_id
+         ; name
+         ; arguments
+         ; cwd
+         ; stdin = Option.is_some stdin
+         });
+    let result =
+      Switch.run (fun sw ->
+        forward_input sw;
+        Cancellation.protect cancel ~f:(fun () -> Promise.await promise))
+    in
+    Option.iter stdin ~f:Stdin_feed.finish;
+    match result with
+    | Some result -> older_host_note host ~name result
     | None ->
       Hashtbl.remove t.pending_execs exec_id;
       broadcast t (Tool_exec_cancel { host = host.id; exec_id });
       Tool.Result.error "[cancelled]")
 ;;
 
-let host_exec t ~cancel ~on_output ~call_id ~cwd ~name ~arguments =
+let host_exec_on t host ~cancel ~on_output ~call_id ~cwd ~name ~arguments =
+  host_exec_with_stdin
+    t
+    host
+    ~cancel
+    ~on_output
+    ~call_id
+    ~cwd
+    ~name
+    ~arguments
+    ()
+;;
+
+let active_host_exec
+      t
+      ?stdin
+      ~cancel
+      ~on_output
+      ~call_id
+      ~cwd
+      ~name
+      ~arguments
+      ()
+  =
   match find_host t t.active_host with
   | None -> Tool.Result.error (host_unavailable_message t)
   | Some host ->
-    host_exec_on t host ~cancel ~on_output ~call_id ~cwd ~name ~arguments
+    host_exec_with_stdin
+      t
+      host
+      ?stdin
+      ~cancel
+      ~on_output
+      ~call_id
+      ~cwd
+      ~name
+      ~arguments
+      ()
+;;
+
+let host_exec t ~cancel ~on_output ~call_id ~cwd ~name ~arguments =
+  active_host_exec t ~cancel ~on_output ~call_id ~cwd ~name ~arguments ()
 ;;
 
 let resolve_dir_on t (host : Host.t) path =
@@ -664,20 +778,27 @@ let set_active_host t id ~cwd =
 
 let executor t : Tool.executor =
   fun context tool arguments ->
+  let arguments =
+    if Seen_files.applies_to (Tool.name tool)
+    then Seen_files.with_scope arguments ~scope:(Session.id t.session)
+    else arguments
+  in
   if
     (not tool.spec.on_host)
     || (String.equal t.active_host Host.backend_id && t.backend_host_enabled)
     || Tool_bash.starts_job context arguments
   then Tool.execute tool context arguments
   else
-    host_exec
+    active_host_exec
       t
+      ?stdin:context.stdin
       ~cancel:context.cancel
       ~on_output:context.on_output
       ~call_id:context.call_id
       ~cwd:context.cwd
       ~name:(Tool.name tool)
       ~arguments
+      ()
 ;;
 
 (* AGENTS.md/CLAUDE.md come from the active host's filesystem. *)
@@ -893,7 +1014,10 @@ let with_attachments t text attachments =
           ~call_id:"attachment"
           ~cwd:t.cwd
           ~name:Host_ops.read_file_op
-          ~arguments:(`Object [ "path", `String path ])
+          ~arguments:
+            (Seen_files.with_scope
+               (`Object [ "path", `String path ])
+               ~scope:(Session.id t.session))
       in
       match result with
       | { is_error = true; text; images = _ } ->
@@ -1588,17 +1712,22 @@ let job_output t ~job_id ~lines =
 ;;
 
 let start_job t ~command =
-  Tool_bash.start_job t.background ~command ~run:(fun ~id ~cancel ~on_output ->
-    host_exec
-      t
-      ~cancel
-      ~on_output
-      ~call_id:id
-      ~cwd:t.cwd
-      ~name:"bash"
-      ~arguments:
-        (Tool_bash.foreground_arguments
-           (`Object [ "command", `String command ])))
+  Tool_bash.start_job
+    t.background
+    ~command
+    ~run:(fun ~id ~cancel ~stdin ~on_output ->
+      active_host_exec
+        t
+        ~stdin
+        ~cancel
+        ~on_output
+        ~call_id:id
+        ~cwd:t.cwd
+        ~name:"bash"
+        ~arguments:
+          (Tool_bash.foreground_arguments
+             (`Object [ "command", `String command ]))
+        ())
 ;;
 
 let subagents t = Subagent_log.summaries t.subagent_log
@@ -1829,7 +1958,9 @@ let btw t ~question ~cancel ~on_delta =
       | Thinking_delta _
       | Thinking_signature _
       | Tool_call_start _
-      | Tool_call_delta _ -> ())
+      | Tool_call_delta _
+      | Server_tool_use _
+      | Server_tool_result _ -> ())
   in
   let cost_usd = Model.cost_usd model reply.usage in
   if phys_equal session t.session

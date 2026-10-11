@@ -90,7 +90,7 @@ let add_call t (call : Tool_call.t) =
 let add_calls t (message : Message.Assistant.t) =
   List.fold message.content ~init:t ~f:(fun t -> function
     | Tool_call call -> add_call t call
-    | Text _ | Thinking _ -> t)
+    | Text _ | Thinking _ | Server_tool _ -> t)
 ;;
 
 let update_tool t id ~f =
@@ -228,6 +228,7 @@ let rec apply t (event : Event.t) =
   | Auth _
   | Tool_exec _
   | Tool_exec_cancel _
+  | Tool_exec_input _
   | Terminal_open _
   | Terminal_frame _
   | Terminal_close _

@@ -20,6 +20,7 @@ and context =
   ; execute : executor
   ; cache_key : string option
   ; halt : unit -> string option
+  ; stdin : Stdin_feed.t option
   }
 
 and executor = context -> t -> Json.t -> Tool_result.t
@@ -55,6 +56,7 @@ module Context = struct
         ?background
         ?cache_key
         ?(halt = fun () -> None)
+        ?stdin
         ~env
         ~cwd
         ()
@@ -72,6 +74,7 @@ module Context = struct
     ; execute
     ; cache_key
     ; halt
+    ; stdin
     }
   ;;
 end
