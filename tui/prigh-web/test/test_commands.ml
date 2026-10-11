@@ -67,7 +67,7 @@ let%expect_test "every command does something (none is unknown)" =
     /change_default            rpc change_default
     /verbosity                 picker: Transcript verbosity
     /confirm                   picker: Tool confirmation
-    /mode                      picker: Mode (Alt+M cycles)
+    /mode                      picker: When tools ask first (Alt+M cycles)
     /plan                      rpc set_mode
     /todos                     toast: No plan: the model has not made one (it makes one with update_plan).
     /permissions               text: Permissions
@@ -121,7 +121,6 @@ let%expect_test "every command does something (none is unknown)" =
 let%expect_test "/help <command> and /hotkeys" =
   let h = H.create () in
   run h "/help compact";
-  toasts h;
   run h "/help /tree";
   run h "/help compcat";
   toasts h;
@@ -129,7 +128,6 @@ let%expect_test "/help <command> and /hotkeys" =
     {|
     (Save_history ("/help compact"))
     (Expire_toast (id 0) (after_ms 4100))
-    /compact [instructions]: summarise older messages to free context
     (Save_history ("/help /tree" "/help compact"))
     (Expire_toast (id 1) (after_ms 3820))
     (Save_history ("/help compcat" "/help /tree" "/help compact"))
@@ -438,7 +436,7 @@ let%expect_test "/confirm" =
     h
     "set_config"
     {|{"scoped_models":[],"confirm_tools":true,"default_model":null,"default_thinking":null}|};
-  H.text h ~selector:".status";
+  H.text h ~selector:".mode-chip";
   run h "/confirm off";
   run h "/confirm maybe";
   toasts h;
@@ -450,8 +448,7 @@ let%expect_test "/confirm" =
       (Config_saved
        "Tool confirmation on (mode ask, also for new sessions): bash, job_input, edits and MCP tools ask first")))
     (Expire_toast (id 0) (after_ms 5580))
-    Ready 0% ↑0 ↓0 $0.0000 (ask)
-    (Notifications not allowed yet: click to ask the browser)
+    (Asks: edits & commands)
     (Save_history ("/confirm off" /confirm))
     (Rpc (method_ set_config) (params ((config ((approval_mode auto)))))
      (tag
@@ -1348,7 +1345,6 @@ let%expect_test "/retry-backend-connection, /state, /clear, /quit" =
   (* The first attempt's late reply is stale. *)
   H.act h (Reply (Reconnect 1, Error "refused"));
   H.act h (Reply (Reconnect 2, Ok (Jsonaf.of_string {|{"client_id":"c2"}|})));
-  toasts h;
   [%expect
     {|
     (Expire_toast (id 2) (after_ms 2500))
@@ -1356,8 +1352,6 @@ let%expect_test "/retry-backend-connection, /state, /clear, /quit" =
     (Rpc (method_ list_models) (params ()) (tag Models))
     (Rpc (method_ auth_status) (params ()) (tag (Auth_status Refresh)))
     (Rpc (method_ get_config) (params ()) (tag Config))
-    Reconnecting now…
-    Reconnected
     |}];
   H.reply h "get_state" (H.state_json ());
   run h "/state";

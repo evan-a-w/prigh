@@ -192,6 +192,10 @@ let mode_hint (m : App.Model.t) : Content.Line.t option =
                 ~style:attention
                 "Enter shows output · Esc closes · Ctrl+D kills"
             ]
+        | Picker { kind = Queue; _ } ->
+          Some
+            [ span ~style:attention "Enter edits · Esc closes · Ctrl+D removes"
+            ]
         | Picker { kind = Skills; _ } ->
           Some
             [ span
@@ -324,15 +328,15 @@ let tools_part (m : App.Model.t) (s : P.State.t) =
   | Some h -> [ 4, [ span ~style:attention ("tools:" ^ h.name) ] ]
 ;;
 
-(* Any mode in which something asks first or is refused; plan mode in
-   yellow. [auto], where nothing is in the way, shows nothing. *)
+(* Always shown, like the thinking level; plan mode in yellow. A mode that
+   asks first or refuses outlasts [auto] at narrow widths. *)
 let mode_part (s : P.State.t) =
   let mode = Session_mode.of_state s in
-  if (not mode.plan) && P.Approval_mode.equal mode.approval Auto
-  then []
-  else (
-    let style = if mode.plan then attention else gray in
-    [ 3, [ span ~style ("mode:" ^ Session_mode.label mode) ] ])
+  let style = if mode.plan then attention else gray in
+  let priority =
+    if (not mode.plan) && P.Approval_mode.equal mode.approval Auto then 4 else 3
+  in
+  [ priority, [ span ~style ("mode:" ^ Session_mode.label mode) ] ]
 ;;
 
 let plan_part (s : P.State.t) =
@@ -450,24 +454,27 @@ let status (m : App.Model.t) : Content.Line.t =
       else 0
     in
     (* Each part after the model carries a priority: at narrow widths the mode
-       hint and context survive before think/view. Display order is fixed. *)
+       hint and context survive before think, the mode and the cost, those
+       before view. Display order is fixed. *)
     let cwd = [ span ~style:base (format_cwd m s) ] in
     let model = [ span ~style:base s.model.id ] in
     let after_model =
-      [ ( 5
+      [ ( 4
         , [ span
               ~style:base
               (sprintf
                  "think:%s"
                  (if s.model.supports_thinking then s.thinking else "n/a"))
           ] )
-      ; 6, [ span ~style:base ("view:" ^ Verbosity.name m.verbosity) ]
-      ; 2, [ span ~style:(context_style context) (context_text s) ]
-      ; ( 4
-        , match Loop_status.budget_part s with
-          | None -> [ span ~style:base (sprintf "$%.2f" s.cost_usd) ]
-          | Some (text, level) -> [ span ~style:(level_style level) text ] )
       ]
+      @ mode_part s
+      @ [ 7, [ span ~style:base ("view:" ^ Verbosity.name m.verbosity) ]
+        ; 2, [ span ~style:(context_style context) (context_text s) ]
+        ; ( 4
+          , match Loop_status.budget_part s with
+            | None -> [ span ~style:base (sprintf "$%.2f" s.cost_usd) ]
+            | Some (text, level) -> [ span ~style:(level_style level) text ] )
+        ]
       @ Option.value_map s.goal ~default:[] ~f:(fun goal ->
         let text, level = Loop_status.goal_part goal in
         [ 3, [ span ~style:(level_style level) text ] ])
@@ -486,9 +493,8 @@ let status (m : App.Model.t) : Content.Line.t =
         in
         [ 6, [ span ~style:base text ] ])
       @ tools_part m s
-      @ mode_part s
       @ plan_part s
-      @ (let queued = Queue_counts.total m.queued in
+      @ (let queued = List.length m.queued_messages in
          if queued > 0
          then [ 3, [ span ~style:base (sprintf "queued:%d" queued) ] ]
          else [])
@@ -510,13 +516,14 @@ let status (m : App.Model.t) : Content.Line.t =
     let model_width = Content.Line.width model in
     (* Keep parts by priority until the width is exhausted, then restore the
        display order. *)
-    let fill used0 =
+    let fill ?(max_prio = Int.max_value) used0 =
       (* A mode hint too wide to fit whole is cut short after the context
          (priority 2) has its place, rather than hidden. *)
       let indexed =
         List.mapi after_model ~f:(fun i (prio, part) ->
           let whole = used0 + 2 + Content.Line.width part <= max_width in
           if prio = 0 && not whole then 2, i, part else prio, i, part)
+        |> List.filter ~f:(fun (prio, _, _) -> prio <= max_prio)
       in
       let by_priority =
         List.sort indexed ~compare:(fun (p1, i1, _) (p2, i2, _) ->
@@ -542,9 +549,15 @@ let status (m : App.Model.t) : Content.Line.t =
           ~f:snd
       , used )
     in
-    let right, used = fill model_width in
-    let cwd_fits = used + 2 + cwd_width <= max_width in
-    let right = if cwd_fits then right else fst (fill (model_width + 1)) in
+    let fits (_, used) = used + 2 + cwd_width <= max_width in
+    (* The view (priority 7) gives way to the directory. *)
+    let right, cwd_fits =
+      match
+        List.find [ fill model_width; fill ~max_prio:6 model_width ] ~f:fits
+      with
+      | Some (right, _) -> right, true
+      | None -> fst (fill (model_width + 1)), false
+    in
     let line =
       (if cwd_fits then cwd @ [ span "  " ] else [ span "…" ])
       @ model
@@ -640,12 +653,17 @@ let max_queued_shown = 3
 
 (** The queued steers and follow-ups above the editor, oldest first. *)
 let queued_block (m : App.Model.t) : Content.t =
-  let total = Queue_counts.total m.queued in
+  let total = List.length m.queued_messages in
   if total = 0
   then []
   else (
     let header =
-      [ span ~style:dim (sprintf "queued (%d) · Alt+Up edits the last" total) ]
+      [ span
+          ~style:dim
+          (sprintf
+             "queued (%d) · Alt+Up: edit the last · /queue: edit or remove"
+             total)
+      ]
     in
     let shown = List.take m.queued_messages max_queued_shown in
     let rows =
@@ -655,7 +673,7 @@ let queued_block (m : App.Model.t) : Content.t =
             (Text_width.pad_right
                ("  " ^ Queued_message.Kind.name q.kind)
                ~width:13)
-        ; span ~style:dim (String.concat ~sep:" " (String.split_lines q.text))
+        ; span ~style:dim (Queued_message.one_line q)
         ])
     in
     let more = total - List.length shown in

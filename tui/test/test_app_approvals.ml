@@ -5,6 +5,8 @@ open Fixtures
 module H = Test_app.H
 module P = Prigh_protocol
 
+let alt_m h = H.key h (Key.alt (Char "m"))
+
 (* Types a command and runs it: the first Enter may only accept the
    completion. *)
 let command (h : H.t) text =
@@ -31,6 +33,86 @@ let confirm ?(rules = []) ?agent_id ?(name = "bash") call_id summary
   : P.Pending.Confirm.t
   =
   { call_id; agent_id; name; summary; rules }
+;;
+
+let%expect_test "Alt+M cycles the mode; the status line shows it at once" =
+  let h = Test_app.connected () in
+  H.event h (State (with_mode Ask));
+  H.show h;
+  [%expect
+    {|
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+
+    ▌ earlier question
+      earlier answer
+    ────────────────────────────────────────────────────────────
+    > ▏
+    …deepseek-flash  think:off  mode:ask  ctx:0.1%/1.0M  $0.01
+    |}];
+  alt_m h;
+  [%expect
+    {|
+    (Rpc
+      (method_ set_mode)
+      (params (
+        (approval_mode auto-edit)
+        (plan_mode     false)))
+      (tag (
+        Mode_set
+        "mode: auto-edit \226\128\148 file edits run; bash, job_input and MCP tools ask first")))
+    |}];
+  H.reply
+    h
+    (Mode_set "mode: auto-edit — file edits run; bash and MCP tools ask first")
+    (state_json ());
+  alt_m h;
+  alt_m h;
+  alt_m h;
+  [%expect
+    {|
+    (Rpc
+      (method_ set_mode)
+      (params (
+        (approval_mode auto)
+        (plan_mode     true)))
+      (tag (
+        Mode_set
+        "mode: plan \226\128\148 read-only planning: no file edits; bash, job_input and MCP tools ask first")))
+    (Rpc
+      (method_ set_mode)
+      (params (
+        (approval_mode ask)
+        (plan_mode     false)))
+      (tag (
+        Mode_set
+        "mode: ask \226\128\148 bash, job_input, edits and MCP tools ask first")))
+    (Rpc
+      (method_ set_mode)
+      (params (
+        (approval_mode auto-edit)
+        (plan_mode     false)))
+      (tag (
+        Mode_set
+        "mode: auto-edit \226\128\148 file edits run; bash, job_input and MCP tools ask first")))
+    |}];
+  (* A refusal puts the backend's mode back. *)
+  H.reply_error h (Mode_set "x") "unknown approval mode";
+  [%expect {| (Rpc (method_ get_state) (params ()) (tag Refresh_state)) |}];
+  H.reply h Refresh_state (state_json ());
+  H.show h;
+  [%expect
+    {|
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+
+    ▌ earlier question
+      earlier answer
+      mode: auto-edit — file edits run; bash and MCP tools ask
+      first
+      unknown approval mode
+    ────────────────────────────────────────────────────────────
+    > ▏
+    …deepseek-flash  think:off  mode:auto  ctx:0.1%/1.0M  $0.01
+    |}]
 ;;
 
 let%expect_test "/mode picks or sets the mode; /plan toggles plan mode" =
@@ -75,7 +157,7 @@ let%expect_test "/mode picks or sets the mode; /plan toggles plan mode" =
       earlier answer
     ────────────────────────────────────────────────────────────
     > ▏
-    …deepseek-flash  think:off  ctx:0.1%/1.0M  $0.01  mode:plan
+    …deepseek-flash  think:off  mode:plan  ctx:0.1%/1.0M  $0.01
     |}];
   command h "/plan";
   command h "/plan on";
@@ -124,7 +206,7 @@ let%expect_test "/mode picks or sets the mode; /plan toggles plan mode" =
       toggle)
     ────────────────────────────────────────────────────────────
     > ▏
-    …deepseek-flash  think:off  ctx:0.1%/1.0M  $0.01  mode:ask
+    …deepseek-flash  think:off  mode:ask  ctx:0.1%/1.0M  $0.01
     |}]
 ;;
 
@@ -165,7 +247,7 @@ let%expect_test "the plan in the status line, /todos and /permissions" =
       "deny": ["bash(rm:*)"]}; /mode or Alt+M switches the mode
     ──────────────────────────────────────────────────────────────────────────────────────────
     > ▏
-    /work  deepseek-flash  think:off  ctx:0.1%/1.0M  $0.01  mode:ask  plan 1/3: change it
+    /work  deepseek-flash  think:off  mode:ask  ctx:0.1%/1.0M  $0.01  plan 1/3: change it
     |}]
 ;;
 
@@ -195,7 +277,7 @@ let%expect_test
     └──────────────────────────────────────────────────────────┘
     ────────────────────────────────────────────────────────────
     ? draft▏
-    …deepseek-flash  ctx:0.1%/1.0M  mode:ask  confirm: y/a/n/r
+    …deepseek-flash  mode:ask  ctx:0.1%/1.0M  confirm: y/a/n/r
     |}];
   H.keys h "a";
   [%expect
@@ -242,7 +324,7 @@ let%expect_test
     └──────────────────────────────────────────────────────────┘
     ────────────────────────────────────────────────────────────
     ? draft▏
-    …deepseek-flash  ctx:0.1%/1.0M  mode:ask  confirm: y/n/r
+    …deepseek-flash  mode:ask  ctx:0.1%/1.0M  confirm: y/n/r
     |}];
   H.keys h "r";
   H.keys h "use dune";
@@ -273,7 +355,7 @@ let%expect_test
       denied bash
     ────────────────────────────────────────────────────────────
     > draft▏
-    …deepseek-flash  think:off  ctx:0.1%/1.0M  $0.01  mode:ask
+    …deepseek-flash  think:off  mode:ask  ctx:0.1%/1.0M  $0.01
     |}]
 ;;
 
@@ -305,7 +387,7 @@ let%expect_test
       confirmation answered elsewhere
     ────────────────────────────────────────────────────────────
     > ▏
-    …deepseek-flash  think:off  ctx:0.1%/1.0M  $0.01
+    …deepseek-flash  think:off  mode:auto  ctx:0.1%/1.0M  $0.01
     |}]
 ;;
 
@@ -337,7 +419,7 @@ let%expect_test "the plan to approve" =
     └──────────────────────────────────────────────────────────┘
     ────────────────────────────────────────────────────────────
     ? ▏
-    …deepseek-flash  ctx:0.1%/1.0M  mode:plan  confirm: y/n/r
+    …deepseek-flash  mode:plan  ctx:0.1%/1.0M  confirm: y/n/r
     |}];
   (* No "always" for a plan. *)
   H.keys h "a";
@@ -591,7 +673,7 @@ let%expect_test "the plan, questions and plan approval in the transcript" =
         ? Ready?
     ──────────────────────────────────────────────────────────────────────
     > ▏
-    /work  deepseek-flash  think:off  view:normal  ctx:0.1%/1.0M  $0.01
+    /work  deepseek-flash  think:off  mode:auto  ctx:0.1%/1.0M  $0.01
     |}]
 ;;
 
@@ -619,7 +701,7 @@ let%expect_test "/confirm shows the mode and sets ask or auto as the default" =
       sets ask or auto; /mode has all)
     ────────────────────────────────────────────────────────────
     > ▏
-    …deepseek-flash  think:off  ctx:0.1%/1.0M  $0.01
+    …deepseek-flash  think:off  mode:auto  ctx:0.1%/1.0M  $0.01
     |}]
 ;;
 
@@ -646,6 +728,6 @@ let%expect_test "job_input's confirmation says which job gets what" =
     └──────────────────────────────────────────────────────────┘
     ────────────────────────────────────────────────────────────
     ? ▏
-    …deepseek-flash  ctx:0.1%/1.0M  mode:ask  confirm: y/a/n/r
+    …deepseek-flash  mode:ask  ctx:0.1%/1.0M  confirm: y/a/n/r
     |}]
 ;;

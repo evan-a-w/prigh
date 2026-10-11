@@ -269,6 +269,16 @@ val abort : t -> string list
     messages. Emits [Queue_update] when a message was removed. *)
 val dequeue : t -> Queued.t option
 
+(** Removes the [index]th (from 0) message of a queue, if it is still there
+    (and its text is [text], when given: the frontend's view may be stale).
+    Emits [Queue_update]. *)
+val remove_queued
+  :  t
+  -> queue:[ `Steer | `Follow_up ]
+  -> index:int
+  -> text:string option
+  -> Queued.t Or_error.t
+
 (** The texts of the queued steer and follow-up messages, in order (what the
     last [Queue_update] said). *)
 val queued_texts : t -> string list * string list

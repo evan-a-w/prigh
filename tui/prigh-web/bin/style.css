@@ -685,12 +685,6 @@ kbd {
 .status-item.link:hover { color: var(--chalk); text-decoration: underline; text-underline-offset: 2px; }
 .status-item.link:focus-visible { outline: 2px solid var(--sodium); outline-offset: 2px; }
 .status-item.queued, .status-item.mode { color: var(--sodium); }
-.status-item.mode.plan-mode {
-  color: var(--sodium-ink);
-  background: var(--sodium);
-  padding: 0 6px;
-  font-weight: 600;
-}
 .status-item.mode.plan { color: var(--muted); max-width: 260px; overflow: hidden; text-overflow: ellipsis; }
 .status-item.background.active { color: var(--sodium); gap: 7px; }
 .status-item.transfers { color: var(--sodium); gap: 7px; min-width: 0; max-width: 32ch; overflow: hidden; text-overflow: ellipsis; display: inline-block; }
@@ -1209,4 +1203,75 @@ kbd {
 .app.offline :is(.banner, .status) .lamp { animation: breathe 2s ease-in-out infinite; opacity: 1; }
 @media (prefers-reduced-motion: reduce) {
   .app.offline :is(.banner, .status) .lamp { animation: none !important; }
+}
+
+/* The thinking level and what asks first, beside the model: always shown,
+   each opening its picker. Plan mode holds the agent back, so it is lit. */
+.panel-toggles { display: flex; align-items: center; gap: 6px; }
+.chip-key { color: var(--muted); font-weight: 400; }
+.thinking-chip.unsupported { color: var(--faint); border-style: dashed; }
+.mode-chip.plan-mode { color: var(--sodium); border-color: var(--sodium-line); background: var(--sodium-wash); }
+.mode-chip.plan-mode .icon { color: var(--sodium); }
+
+/* Queued steers and follow-ups, above the composer while they wait. */
+.queue {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-height: 30vh;
+  overflow-y: auto;
+}
+.queued {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: start;
+  gap: 2px 12px;
+  padding: 5px 5px 5px 12px;
+  background: var(--well);
+  border-left: 2px solid var(--rule-2);
+  border-radius: var(--r-control);
+  animation: rise 0.12s ease-out;
+}
+.queued.steer { border-left-color: var(--sodium); }
+.queued-tag { font-size: 12px; line-height: 26px; color: var(--muted); white-space: nowrap; }
+.queued.steer .queued-tag { color: var(--sodium); }
+.queued-text {
+  padding: 3px 0;
+  font-size: 14px;
+  line-height: 1.45;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  overflow: hidden;
+}
+.queued-actions { display: flex; gap: 2px; }
+.queued-actions .btn { height: 26px; font-size: 12.5px; }
+.queued-edit { padding: 0 8px; }
+.queued-remove.btn.icon { width: 26px; height: 26px; }
+.queued-actions .btn > .icon { width: 13px; height: 13px; }
+.queued-remove:hover { color: var(--brick); }
+
+@media (max-width: 760px) {
+  /* The settings get a row of their own under the title. */
+  .topbar { flex-wrap: wrap; row-gap: 2px; }
+  .topbar .controls { order: 3; flex-basis: 100%; }
+  .topbar .controls .chip-label { max-width: 132px; }
+  .chip-key, .mode-chip .chevron { display: none; }
+  .thinking-chip > .icon:first-child, .mode-chip > .icon:first-child { display: inline-block; }
+  .mode-chip .chip-label { display: none; }
+  .mode-chip::after { content: attr(data-short); }
+  .queued { grid-template-columns: minmax(0, 1fr) auto; padding-left: 10px; }
+  .queued-tag { grid-column: 1; line-height: 1.4; padding-top: 3px; }
+  .queued-text { grid-column: 1; padding-top: 0; }
+  .queued-actions { grid-column: 2; grid-row: 1 / span 2; }
+  .queued-action-label { display: none; }
+  .queued-edit.btn { width: 26px; padding: 0; }
+  /* Under the settings' row of the top bar. */
+  .toasts { top: 96px; }
 }

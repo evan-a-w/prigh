@@ -768,6 +768,51 @@ let%expect_test "dequeue returns queued messages and null when empty" =
     |}]
 ;;
 
+let%expect_test "remove_queued removes a queued message by queue and index" =
+  with_agent
+    [ Reply.tool_call
+        ~id:"c1"
+        ~name:"bash"
+        ~arguments:{|{"command":"sleep 0.2"}|}
+        ()
+    ; Reply.text "done"
+    ; Reply.text "after"
+    ]
+  @@ fun t agent h ->
+  call t h ~params:{|{"text": "go"}|} "prompt";
+  call t h ~params:{|{"text": "steer one"}|} "steer";
+  call t h ~params:{|{"text": "steer two"}|} "steer";
+  call t h ~params:{|{"text": "later"}|} "follow_up";
+  call
+    t
+    h
+    ~params:{|{"queue": "steer", "index": 1, "text": "steer two"}|}
+    "remove_queued";
+  call
+    t
+    h
+    ~params:{|{"queue": "steer", "index": 1, "text": "steer two"}|}
+    "remove_queued";
+  call t h ~params:{|{"queue": "follow_up", "index": 0}|} "remove_queued";
+  call t h ~params:{|{"queue": "later", "index": 0}|} "remove_queued";
+  call t h ~params:{|{"queue": "steer", "index": -1}|} "remove_queued";
+  call t h "get_pending";
+  Agent.wait_idle agent;
+  [%expect
+    {|
+    {"type":"response","id":"r1","ok":true,"result":{}}
+    {"type":"response","id":"r1","ok":true,"result":{}}
+    {"type":"response","id":"r1","ok":true,"result":{}}
+    {"type":"response","id":"r1","ok":true,"result":{}}
+    {"type":"response","id":"r1","ok":true,"result":{"text":"steer two","attachments":[]}}
+    {"type":"response","id":"r1","ok":false,"error":"that message is no longer queued: it was delivered or removed already"}
+    {"type":"response","id":"r1","ok":true,"result":{"text":"later","attachments":[]}}
+    {"type":"response","id":"r1","ok":false,"error":"param \"queue\" is \"later\": use \"steer\" or \"follow_up\""}
+    {"type":"response","id":"r1","ok":false,"error":"param \"index\" must be a natural number"}
+    {"type":"response","id":"r1","ok":true,"result":{"steer_texts":["steer one"],"follow_up_texts":[],"confirms":[],"questions":[]}}
+    |}]
+;;
+
 let is_exec json =
   match Json.member "event" json with
   | Some (`String "tool_exec") -> true

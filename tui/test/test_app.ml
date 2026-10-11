@@ -106,7 +106,7 @@ let%expect_test "startup: requests state, messages and auth; renders history" =
       earlier answer
     ────────────────────────────────────────────────────────────
     > ▏
-    …deepseek-flash  think:off  ctx:0.1%/1.0M  $0.01
+    …deepseek-flash  think:off  mode:auto  ctx:0.1%/1.0M  $0.01
     |}]
 ;;
 
@@ -124,7 +124,7 @@ let%expect_test "prompt, streaming with embedded newlines, tool call, steer \
       earlier answer
     ────────────────────────────────────────────────────────────
     > list the files▏
-    …deepseek-flash  think:off  ctx:0.1%/1.0M  $0.01
+    …deepseek-flash  think:off  mode:auto  ctx:0.1%/1.0M  $0.01
     |}];
   H.enter h;
   [%expect
@@ -199,6 +199,7 @@ let%expect_test "prompt, streaming with embedded newlines, tool call, steer \
            ; at = None
            }
        });
+  H.event h (Queue_update { steer = []; follow_up = [] });
   H.event h (Message_end (assistant "Sure, here they are:\nfirst line done"));
   H.event h (State (state ()));
   H.show h;
@@ -214,7 +215,7 @@ let%expect_test "prompt, streaming with embedded newlines, tool call, steer \
         partial
     ────────────────────────────────────────────────────────────
     > ▏
-    …deepseek-flash  think:off  ctx:0.1%/1.0M  $0.01
+    …deepseek-flash  think:off  mode:auto  ctx:0.1%/1.0M  $0.01
     |}]
 ;;
 
@@ -240,7 +241,7 @@ let%expect_test "error and aborted stop reasons are surfaced once" =
       error: HTTP 401: not logged in; use /login anthropic
     ────────────────────────────────────────────────────────────
     > ▏
-    …deepseek-flash  think:off  ctx:0.1%/1.0M  $0.01
+    …deepseek-flash  think:off  mode:auto  ctx:0.1%/1.0M  $0.01
     |}]
 ;;
 
@@ -312,12 +313,13 @@ let%expect_test "/model opens the picker; typing filters; Enter sets the model" 
       earlier answer
     ────────────────────────────────────────────────────────────
     > ▏
-    /work  claude-fable-5-1  think:off  ctx:0.1%/1.0M  $0.01
+    …claude-fable-5-1  think:off  mode:auto  ctx:0.1%/1.0M
     |}]
 ;;
 
-let%expect_test "/model <display name> switches directly; unknown suggests and \
-                 opens the picker"
+let%expect_test
+    "/model <display name> switches directly; unknown suggests and opens the \
+     picker"
   =
   let h = connected () in
   H.keys h "/model claude fable 5.1";
@@ -367,7 +369,7 @@ let%expect_test "/model <display name> switches directly; unknown suggests and \
       earlier answer
     ────────────────────────────────────────────────────────────
     > ▏
-    …deepseek-flash  think:off  ctx:0.1%/1.0M  $0.01
+    …deepseek-flash  think:off  mode:auto  ctx:0.1%/1.0M  $0.01
     |}];
   H.esc h;
   H.keys h "/model zzz";
@@ -409,8 +411,9 @@ let%expect_test "/model <display name> switches directly; unknown suggests and \
     |}]
 ;;
 
-let%expect_test "Esc closes autocomplete or dialog without aborting; Esc while \
-                 running aborts"
+let%expect_test
+    "Esc closes autocomplete or dialog without aborting; Esc while running \
+     aborts"
   =
   let h = connected () in
   H.event h (State (state ~running:true ()));
@@ -455,7 +458,7 @@ let%expect_test "Esc closes autocomplete or dialog without aborting; Esc while \
     └──────────────────────────────────────────────────────────┘
     ────────────────────────────────────────────────────────────
     ? ▏
-    /work  deepseek-flash  ctx:0.1%/1.0M  $0.01  confirm: y / n
+    …deepseek-flash  think:off  ctx:0.1%/1.0M  confirm: y / n
     |}];
   H.event
     h
@@ -574,7 +577,7 @@ let%expect_test "login: url, masked secret prompt, answer, done switches \
       model set to anthropic/claude-fable-5; /model to change
     ────────────────────────────────────────────────────────────
     > ▏
-    …deepseek-flash  think:off  ctx:0.1%/1.0M  $0.01
+    …deepseek-flash  think:off  mode:auto  ctx:0.1%/1.0M  $0.01
     |}]
 ;;
 
@@ -641,7 +644,7 @@ let%expect_test "login: select prompt is a picker; Esc cancels; backend \
       earlier answer
     ────────────────────────────────────────────────────────────
     > ▏
-    …deepseek-flash  think:off  ctx:0.1%/1.0M  $0.01
+    …deepseek-flash  think:off  mode:auto  ctx:0.1%/1.0M  $0.01
     |}];
   H.event
     h
@@ -670,7 +673,7 @@ let%expect_test "login: select prompt is a picker; Esc cancels; backend \
       login to anthropic failed: denied
     ────────────────────────────────────────────────────────────
     > ▏
-    …deepseek-flash  think:off  ctx:0.1%/1.0M  $0.01
+    …deepseek-flash  think:off  mode:auto  ctx:0.1%/1.0M  $0.01
     |}]
 ;;
 
@@ -689,7 +692,7 @@ let%expect_test "Ctrl+C clears, then warns, then quits; never quits with a \
       earlier answer
     ────────────────────────────────────────────────────────────
     > ▏
-    …deepseek-flash  think:off  ctx:0.1%/1.0M  $0.01
+    …deepseek-flash  think:off  mode:auto  ctx:0.1%/1.0M  $0.01
     |}];
   H.key h (Key.ctrl 'c');
   H.show h;
@@ -754,7 +757,7 @@ let%expect_test "typing / lists commands, Down twice + Tab fills /login " =
       /fallback [off|model...]        show or set the models th…
       /default-dir [off|path]         show or set the directory…
       /login [provider] [api_key|oauth]  log in to a provider
-      ↕ 1–8 of 55
+      ↕ 1–8 of 56
     …deepseek-flash  ctx:0.1%/1.0M  Tab/Enter accept · Esc close
     |}];
   H.key h (Key.plain Down);
@@ -771,7 +774,7 @@ let%expect_test "typing / lists commands, Down twice + Tab fills /login " =
       /fallback [off|model...]        show or set the models th…
       /default-dir [off|path]         show or set the directory…
       /login [provider] [api_key|oauth]  log in to a provider
-      ↕ 1–8 of 55
+      ↕ 1–8 of 56
     …deepseek-flash  ctx:0.1%/1.0M  Tab/Enter accept · Esc close
     |}];
   H.key h (Key.plain Down);
@@ -788,7 +791,7 @@ let%expect_test "typing / lists commands, Down twice + Tab fills /login " =
       /fallback [off|model...]        show or set the models th…
       /default-dir [off|path]         show or set the directory…
       /login [provider] [api_key|oauth]  log in to a provider
-      ↕ 1–8 of 55
+      ↕ 1–8 of 56
     …deepseek-flash  ctx:0.1%/1.0M  Tab/Enter accept · Esc close
     |}];
   H.key h (Key.plain Tab);
@@ -801,12 +804,13 @@ let%expect_test "typing / lists commands, Down twice + Tab fills /login " =
       earlier answer
     ────────────────────────────────────────────────────────────
     > /model ▏
-    …deepseek-flash  think:off  ctx:0.1%/1.0M  $0.01
+    …deepseek-flash  think:off  mode:auto  ctx:0.1%/1.0M  $0.01
     |}]
 ;;
 
-let%expect_test "/mo Enter opens argument completion over models; typing fab \
-                 Enter calls set_model"
+let%expect_test
+    "/mo Enter opens argument completion over models; typing fab Enter calls \
+     set_model"
   =
   let h = connected () in
   H.reply ~quiet:true h (Models_for_picker "") models_json;
@@ -838,11 +842,10 @@ let%expect_test "/mo Enter opens argument completion over models; typing fab \
       earlier answer
     ────────────────────────────────────────────────────────────
     > /mode fab▏
-    …deepseek-flash  think:off  ctx:0.1%/1.0M  $0.01
+    …deepseek-flash  think:off  mode:auto  ctx:0.1%/1.0M  $0.01
     |}];
   H.key h (Key.plain Enter);
-  [%expect
-    {| |}]
+  [%expect {| |}]
 ;;
 
 let%expect_test "Esc closes autocomplete without abort while running" =
@@ -1076,7 +1079,7 @@ let%expect_test "/sessions picker switches and reloads; /logout confirms" =
     ▌ in the other session
     ────────────────────────────────────────────────────────────
     > ▏
-    …deepseek-flash  think:off  ctx:0.1%/1.0M  $0.01
+    …deepseek-flash  think:off  mode:auto  ctx:0.1%/1.0M  $0.01
     |}];
   H.keys h "/logout deepseek";
   H.enter h;
@@ -1089,7 +1092,7 @@ let%expect_test "/sessions picker switches and reloads; /logout confirms" =
     └──────────────────────────────────────────────────────────┘
     ────────────────────────────────────────────────────────────
     ? ▏
-    /work  deepseek-flash  ctx:0.1%/1.0M  $0.01  confirm: y / n
+    …deepseek-flash  think:off  ctx:0.1%/1.0M  confirm: y / n
     |}];
   H.keys h "n";
   H.mode h;
@@ -1146,7 +1149,7 @@ let%expect_test "/name sets the name directly or prompts in a text dialog" =
       session named
     ────────────────────────────────────────────────────────────
     > ▏
-    …deepseek-flash  think:off  ctx:0.1%/1.0M  $0.01
+    …deepseek-flash  think:off  mode:auto  ctx:0.1%/1.0M  $0.01
     |}];
   H.keys h "/name";
   H.enter h;
@@ -1198,7 +1201,7 @@ let%expect_test "/session prints the stats table" =
       duration       12.5s
     ────────────────────────────────────────────────────────────
     > ▏
-    …deepseek-flash  think:off  ctx:0.1%/1.0M  $0.01
+    …deepseek-flash  think:off  mode:auto  ctx:0.1%/1.0M  $0.01
     |}]
 ;;
 
@@ -1254,7 +1257,7 @@ let%expect_test "/sessions Ctrl+N filters named only; Ctrl+D confirms delete" =
     └──────────────────────────────────────────────────────────┘
     ────────────────────────────────────────────────────────────
     ? ▏
-    /work  deepseek-flash  ctx:0.1%/1.0M  $0.01  confirm: y / n
+    …deepseek-flash  think:off  ctx:0.1%/1.0M  confirm: y / n
     |}];
   H.keys h "y";
   [%expect
@@ -1438,7 +1441,7 @@ let%expect_test
     └──────────────────────────────────────────────────────────────────────────────────────────────────┘
     ────────────────────────────────────────────────────────────────────────────────────────────────────
     ? ▏
-    /work  deepseek-flash  think:off  view:normal  ctx:0.1%/1.0M  $0.01  confirm: y / n
+    /work  deepseek-flash  think:off  mode:auto  view:normal  ctx:0.1%/1.0M  $0.01  confirm: y / n
     |}];
   H.esc h;
   H.show h;
@@ -1529,7 +1532,7 @@ let%expect_test
     └──────────────────────────────────────────────────────────────────────────────────────────────────┘
     ────────────────────────────────────────────────────────────────────────────────────────────────────
     ? ▏
-    /work  deepseek-flash  think:off  view:normal  ctx:0.1%/1.0M  $0.01  confirm: y / n
+    /work  deepseek-flash  think:off  mode:auto  view:normal  ctx:0.1%/1.0M  $0.01  confirm: y / n
     |}];
   H.keys h "n";
   H.mode h;
@@ -1664,7 +1667,7 @@ let%expect_test
     └──────────────────────────────────────────────────────────────────────────────────────────────────┘
     ────────────────────────────────────────────────────────────────────────────────────────────────────
     ? ▏
-    /work  deepseek-flash  think:off  view:normal  ctx:0.1%/1.0M  $0.01  confirm: y / n
+    /work  deepseek-flash  think:off  mode:auto  view:normal  ctx:0.1%/1.0M  $0.01  confirm: y / n
     |}];
   H.enter h;
   H.mode h;
@@ -1696,7 +1699,7 @@ let%expect_test
     └──────────────────────────────────────────────────────────────────────────────────────────────────┘
     ────────────────────────────────────────────────────────────────────────────────────────────────────
     ? ▏
-    /work  deepseek-flash  think:off  view:normal  ctx:0.1%/1.0M  $0.01  confirm: y / n
+    /work  deepseek-flash  think:off  mode:auto  view:normal  ctx:0.1%/1.0M  $0.01  confirm: y / n
     |}];
   H.esc h;
   H.mode h;
@@ -1817,7 +1820,7 @@ let%expect_test "/archive and /unarchive: the current session, or one named" =
       "3" matches 2 sessions (3a, 3b): give more of the id
     ────────────────────────────────────────────────────────────
     > /archive 3▏
-    …deepseek-flash  think:off  ctx:0.1%/1.0M  $0.01
+    …deepseek-flash  think:off  mode:auto  ctx:0.1%/1.0M  $0.01
     |}];
   (* The backend's refusal says what to do. *)
   H.key h (Key.ctrl 'u');
@@ -1852,7 +1855,7 @@ let%expect_test "/archive and /unarchive: the current session, or one named" =
       before archiving
     ────────────────────────────────────────────────────────────
     > ▏
-    …deepseek-flash  think:off  ctx:0.1%/1.0M  $0.01
+    …deepseek-flash  think:off  mode:auto  ctx:0.1%/1.0M  $0.01
     |}]
 ;;
 
@@ -1877,7 +1880,7 @@ let%expect_test "/delete: by id, prefix or name, after a confirmation" =
       "3" matches 2 sessions (3a, 3b): give more of the id
     ────────────────────────────────────────────────────────────────────────────────────────────────────
     > /delete 3 deploy▏
-    /work  deepseek-flash  think:off  view:normal  ctx:0.1%/1.0M  $0.01
+    /work  deepseek-flash  think:off  mode:auto  view:normal  ctx:0.1%/1.0M  $0.01
     |}];
   H.key h (Key.ctrl 'u');
   run h "/delete 3b deploy";
@@ -1900,7 +1903,7 @@ let%expect_test "/delete: by id, prefix or name, after a confirmation" =
     └──────────────────────────────────────────────────────────────────────────────────────────────────┘
     ────────────────────────────────────────────────────────────────────────────────────────────────────
     ? ▏
-    /work  deepseek-flash  think:off  view:normal  ctx:0.1%/1.0M  $0.01  confirm: y / n
+    /work  deepseek-flash  think:off  mode:auto  view:normal  ctx:0.1%/1.0M  $0.01  confirm: y / n
     |}];
   H.enter h;
   [%expect
@@ -1927,7 +1930,7 @@ let%expect_test "/delete: by id, prefix or name, after a confirmation" =
       Deleted 2 sessions (1.0 MB)
     ────────────────────────────────────────────────────────────────────────────────────────────────────
     > ▏
-    /work  deepseek-flash  think:off  view:normal  ctx:0.1%/1.0M  $0.01
+    /work  deepseek-flash  think:off  mode:auto  view:normal  ctx:0.1%/1.0M  $0.01
     |}];
   run h "/delete nope";
   H.reply ~quiet:true h (Sessions_to_delete [ "nope" ]) archive_sessions_json;
@@ -1946,7 +1949,7 @@ let%expect_test "/delete: by id, prefix or name, after a confirmation" =
       no session matches "nope": /sessions lists them, or Tab after the command completes them
     ────────────────────────────────────────────────────────────────────────────────────────────────────
     > /delete nope▏
-    /work  deepseek-flash  think:off  view:normal  ctx:0.1%/1.0M  $0.01
+    /work  deepseek-flash  think:off  mode:auto  view:normal  ctx:0.1%/1.0M  $0.01
     |}];
   H.key h (Key.ctrl 'u');
   (* Without arguments it opens the picker, where Tab marks. *)
@@ -1975,7 +1978,7 @@ let%expect_test "/delete completes session after session" =
       deploy it      /work
       another spike  /old
       (empty)        /tmp
-    /work  deepseek-flash  think:off  ctx:0.1%/1.0M  $0.01  Tab accepts · Enter runs as typed · Esc
+    …deepseek-flash  think:off  mode:auto  ctx:0.1%/1.0M  $0.01  Tab accepts · Enter runs as typed · Esc
     |}]
 ;;
 
@@ -2118,7 +2121,7 @@ let%expect_test "/fork picks a user message, forks at it and prefills the \
     ────────────────────────────────────────────────────────────
     > second question
       more▏
-    …deepseek-flash  think:off  ctx:0.1%/1.0M  $0.01
+    …deepseek-flash  think:off  mode:auto  ctx:0.1%/1.0M  $0.01
     |}]
 ;;
 
@@ -2157,7 +2160,7 @@ let%expect_test "/rewind picks a user message, then confirms the rewind" =
     └──────────────────────────────────────────────────────────┘
     ────────────────────────────────────────────────────────────
     ? ▏
-    /work  deepseek-flash  ctx:0.1%/1.0M  $0.01  confirm: y / n
+    …deepseek-flash  think:off  ctx:0.1%/1.0M  confirm: y / n
     |}];
   H.keys h "y";
   [%expect
@@ -2218,7 +2221,7 @@ let%expect_test "/clone reloads and notices" =
       cloned session
     ────────────────────────────────────────────────────────────
     > ▏
-    …deepseek-flash  think:off  ctx:0.1%/1.0M  $0.01
+    …deepseek-flash  think:off  mode:auto  ctx:0.1%/1.0M  $0.01
     |}]
 ;;
 
@@ -2412,7 +2415,7 @@ let%expect_test "/auth, /help, /state, /clear, unknown method errors" =
       /login custom adds an OpenAI-compatible endpoint
     ────────────────────────────────────────────────────────────
     > ▏
-    …deepseek-flash  think:off  ctx:0.1%/1.0M  $0.01
+    …deepseek-flash  think:off  mode:auto  ctx:0.1%/1.0M  $0.01
     |}];
   H.keys h "/clear";
   H.enter h;
@@ -2421,9 +2424,9 @@ let%expect_test "/auth, /help, /state, /clear, unknown method errors" =
   H.show h;
   [%expect
     {|
-      close without changes
       Ctrl+D                   /sessions: delete the marked or
-      highlighted sessions · /agents: cancel · /jobs: kill
+      highlighted sessions · /agents: cancel · /jobs: kill ·
+      /queue: remove
       Tab                      /sessions: mark or unmark the
       highlighted session
       Alt+A                    /sessions: archive or unarchive
@@ -2436,7 +2439,7 @@ let%expect_test "/auth, /help, /state, /clear, unknown method errors" =
       none
     ────────────────────────────────────────────────────────────
     > ▏
-    …deepseek-flash  think:off  ctx:0.1%/1.0M  $0.01
+    …deepseek-flash  think:off  mode:auto  ctx:0.1%/1.0M  $0.01
     |}];
   H.key h (Key.ctrl 'l');
   H.reply_error h Show_error "unknown method \"bogus\"";
@@ -2446,7 +2449,7 @@ let%expect_test "/auth, /help, /state, /clear, unknown method errors" =
   [%expect
     {|
     (Rpc (method_ list_models) (params ()) (tag (Models_for_picker "")))
-      highlighted sessions · /agents: cancel · /jobs: kill
+      /queue: remove
       Tab                      /sessions: mark or unmark the
       highlighted session
       Alt+A                    /sessions: archive or unarchive
@@ -2461,7 +2464,7 @@ let%expect_test "/auth, /help, /state, /clear, unknown method errors" =
       protocol error: bad line
     ────────────────────────────────────────────────────────────
     > ▏
-    …deepseek-flash  think:off  ctx:0.1%/1.0M  $0.01
+    …deepseek-flash  think:off  mode:auto  ctx:0.1%/1.0M  $0.01
     |}]
 ;;
 
@@ -2501,7 +2504,7 @@ let%expect_test "verbosity cycles Normal / Verbose / Quiet; /verbosity sets it" 
       all done
     ────────────────────────────────────────────────────────────
     > ▏
-    …deepseek-flash  think:off  ctx:0.1%/1.0M  $0.01
+    …deepseek-flash  think:off  mode:auto  ctx:0.1%/1.0M  $0.01
     |}];
   H.key h (Key.ctrl 'o');
   H.show h;
@@ -2520,7 +2523,7 @@ let%expect_test "verbosity cycles Normal / Verbose / Quiet; /verbosity sets it" 
       view: verbose — everything is shown
     ────────────────────────────────────────────────────────────
     > ▏
-    /work  deepseek-flash  think:off  ctx:0.1%/1.0M  $0.01
+    …deepseek-flash  think:off  mode:auto  ctx:0.1%/1.0M  $0.01
     |}];
   H.key h (Key.ctrl 'o');
   H.show h;
@@ -2536,7 +2539,7 @@ let%expect_test "verbosity cycles Normal / Verbose / Quiet; /verbosity sets it" 
       all done
     ────────────────────────────────────────────────────────────
     > ▏
-    …deepseek-flash  think:off  view:quiet  ctx:0.1%/1.0M  $0.01
+    …deepseek-flash  think:off  mode:auto  ctx:0.1%/1.0M  $0.01
     |}];
   H.keys h "/verbosity normal";
   H.enter h;
@@ -2556,7 +2559,7 @@ let%expect_test "verbosity cycles Normal / Verbose / Quiet; /verbosity sets it" 
       view: normal — tool output is summarised
     ────────────────────────────────────────────────────────────
     > ▏
-    …deepseek-flash  think:off  ctx:0.1%/1.0M  $0.01
+    …deepseek-flash  think:off  mode:auto  ctx:0.1%/1.0M  $0.01
     |}]
 ;;
 
@@ -2607,7 +2610,7 @@ let%expect_test
       A cat.
     ────────────────────────────────────────────────────────────
     > ▏
-    …deepseek-flash  think:off  ctx:0.1%/1.0M  $0.01
+    …deepseek-flash  think:off  mode:auto  ctx:0.1%/1.0M  $0.01
     |}];
   H.key h (Key.ctrl 'o');
   H.show h;
@@ -2628,7 +2631,7 @@ let%expect_test
       view: verbose — everything is shown
     ────────────────────────────────────────────────────────────
     > ▏
-    /work  deepseek-flash  think:off  ctx:0.1%/1.0M  $0.01
+    …deepseek-flash  think:off  mode:auto  ctx:0.1%/1.0M  $0.01
     |}];
   H.key h (Key.ctrl 'o');
   H.show h;
@@ -2646,7 +2649,7 @@ let%expect_test
       A cat.
     ────────────────────────────────────────────────────────────
     > ▏
-    …deepseek-flash  think:off  view:quiet  ctx:0.1%/1.0M  $0.01
+    …deepseek-flash  think:off  mode:auto  ctx:0.1%/1.0M  $0.01
     |}]
 ;;
 
@@ -2669,7 +2672,7 @@ let%expect_test
         [image: image/webp, 4 B]
     ────────────────────────────────────────────────────────────
     > ▏
-    …deepseek-flash  think:off  ctx:0.1%/1.0M  $0.01
+    …deepseek-flash  think:off  mode:auto  ctx:0.1%/1.0M  $0.01
     |}];
   H.keys h "/verbosity quiet";
   H.enter h;
@@ -2680,7 +2683,7 @@ let%expect_test
     ✓ read a.webp  2 images
     ────────────────────────────────────────────────────────────
     > ▏
-    …deepseek-flash  think:off  view:quiet  ctx:0.1%/1.0M  $0.01
+    …deepseek-flash  think:off  mode:auto  ctx:0.1%/1.0M  $0.01
     |}];
   H.keys h "/rewind";
   H.enter h;
@@ -2738,7 +2741,7 @@ let%expect_test "/verbosity with no argument opens argument completion" =
       view: verbose — everything is shown
     ────────────────────────────────────────────────────────────
     > ▏
-    /work  deepseek-flash  think:off  ctx:0.1%/1.0M  $0.01
+    …deepseek-flash  think:off  mode:auto  ctx:0.1%/1.0M  $0.01
     |}]
 ;;
 
@@ -2775,7 +2778,7 @@ let%expect_test "quiet hides intermediate text and thinking" =
       all done
     ────────────────────────────────────────────────────────────
     > ▏
-    …deepseek-flash  think:off  view:quiet  ctx:0.1%/1.0M  $0.01
+    …deepseek-flash  think:off  mode:auto  ctx:0.1%/1.0M  $0.01
     |}]
 ;;
 
@@ -2809,7 +2812,7 @@ let%expect_test "tool error is always visible in Quiet" =
         … 1 more line
     ────────────────────────────────────────────────────────────
     > ▏
-    …deepseek-flash  think:off  view:quiet  ctx:0.1%/1.0M  $0.01
+    …deepseek-flash  think:off  mode:auto  ctx:0.1%/1.0M  $0.01
     |}]
 ;;
 
@@ -2839,7 +2842,7 @@ let%expect_test "reload pairs tool calls with their results" =
     ✓ bash $ ls  2 lines
     ────────────────────────────────────────────────────────────
     > ▏
-    …deepseek-flash  think:off  view:quiet  ctx:0.1%/1.0M  $0.01
+    …deepseek-flash  think:off  mode:auto  ctx:0.1%/1.0M  $0.01
     |}]
 ;;
 
@@ -2914,7 +2917,7 @@ let%expect_test "multi-line editing: Alt+J, cursor movement, history" =
     ────────────────────────────────────────────────────────────
     > f▏rst line
       second
-    …deepseek-flash  think:off  ctx:0.1%/1.0M  $0.01
+    …deepseek-flash  think:off  mode:auto  ctx:0.1%/1.0M  $0.01
     |}];
   H.key h (Key.plain Down);
   H.key h (Key.plain Down);
@@ -2935,7 +2938,7 @@ let%expect_test "multi-line editing: Alt+J, cursor movement, history" =
     ────────────────────────────────────────────────────────────
     > first line
       second▏
-    …deepseek-flash  think:off  ctx:0.1%/1.0M  $0.01
+    …deepseek-flash  think:off  mode:auto  ctx:0.1%/1.0M  $0.01
     |}];
   H.key h (Key.plain Down);
   H.show h;
@@ -2947,7 +2950,7 @@ let%expect_test "multi-line editing: Alt+J, cursor movement, history" =
       earlier answer
     ────────────────────────────────────────────────────────────
     > ▏
-    …deepseek-flash  think:off  ctx:0.1%/1.0M  $0.01
+    …deepseek-flash  think:off  mode:auto  ctx:0.1%/1.0M  $0.01
     |}];
   (* Pasted text with newlines goes in as one insert. *)
   H.step h (Intent (Insert "a\nb\nc"));
@@ -2962,7 +2965,7 @@ let%expect_test "multi-line editing: Alt+J, cursor movement, history" =
     > a
       b
       c▏
-    …deepseek-flash  think:off  ctx:0.1%/1.0M  $0.01
+    …deepseek-flash  think:off  mode:auto  ctx:0.1%/1.0M  $0.01
     |}]
 ;;
 
@@ -2980,7 +2983,7 @@ let%expect_test "backend crash shows the stderr tail; Ctrl+C quits" =
       earlier answer
     ────────────────────────────────────────────────────────────
     > ▏
-    …deepseek-flash  think:off  ctx:0.1%/1.0M  $0.01
+    …deepseek-flash  think:off  mode:auto  ctx:0.1%/1.0M  $0.01
     |}];
   H.step h Backend_closed;
   H.show h;
@@ -3049,7 +3052,7 @@ let%expect_test "abort restores queued messages" =
     (Rpc (method_ steer) (params ((text second))) (tag Show_error))
     (Append_history second)
     |}];
-  H.event h (Queue_update { steer = 2; follow_up = 0 });
+  H.event h (Queue_update { steer = [ "first"; "second" ]; follow_up = [] });
   H.show h;
   [%expect
     {|
@@ -3058,7 +3061,7 @@ let%expect_test "abort restores queued messages" =
     ▌ earlier question
       earlier answer
     ────────────────────────────────────────────────────────────────────────────────────────────────────
-    queued (2) · Alt+Up edits the last
+    queued (2) · Alt+Up: edit the last · /queue: edit or remove
       steer      first
       steer      second
     > ▏
@@ -3079,9 +3082,9 @@ let%expect_test "abort restores queued messages" =
     > first
 
       second▏
-    …deepseek-flash  think:off  view:normal  ctx:0.1%/1.0M  $0.01  ⠋ working · Esc aborts · Enter steers
+    …deepseek-flash  think:off  mode:auto  ctx:0.1%/1.0M  $0.01  ⠋ working · Esc aborts · Enter steers
     |}];
-  H.event h (Queue_update { steer = 0; follow_up = 0 });
+  H.event h (Queue_update { steer = []; follow_up = [] });
   H.show h;
   [%expect
     {|
@@ -3094,7 +3097,7 @@ let%expect_test "abort restores queued messages" =
     > first
 
       second▏
-    …deepseek-flash  think:off  view:normal  ctx:0.1%/1.0M  $0.01  ⠋ working · Esc aborts · Enter steers
+    …deepseek-flash  think:off  mode:auto  ctx:0.1%/1.0M  $0.01  ⠋ working · Esc aborts · Enter steers
     |}]
 ;;
 
@@ -3127,7 +3130,7 @@ let%expect_test "scroll stays anchored while streaming" =
       line 11
     ────────────────────────────────────────────────────────────────────────────────────────────────────
     > ▏
-    /work  deepseek-flash  think:off  view:normal  ctx:0.1%/1.0M  $0.01
+    /work  deepseek-flash  think:off  mode:auto  view:normal  ctx:0.1%/1.0M  $0.01
     |}];
   H.key h (Key.plain Page_up);
   H.show h;
@@ -3142,7 +3145,7 @@ let%expect_test "scroll stays anchored while streaming" =
       line 6
     ────────────────────────────────────────────────────────────────────────────────────────────────────
     > ▏
-    /work  deepseek-flash  think:off  view:normal  ctx:0.1%/1.0M  $0.01  ↑ scrolled
+    /work  deepseek-flash  think:off  mode:auto  view:normal  ctx:0.1%/1.0M  $0.01  ↑ scrolled
     |}];
   stream 12 10;
   H.show h;
@@ -3157,7 +3160,7 @@ let%expect_test "scroll stays anchored while streaming" =
       line 6
     ────────────────────────────────────────────────────────────────────────────────────────────────────
     > ▏
-    /work  deepseek-flash  think:off  view:normal  ctx:0.1%/1.0M  $0.01  ↓ 10 new
+    /work  deepseek-flash  think:off  mode:auto  view:normal  ctx:0.1%/1.0M  $0.01  ↓ 10 new
     |}];
   H.show h;
   [%expect
@@ -3171,7 +3174,7 @@ let%expect_test "scroll stays anchored while streaming" =
       line 6
     ────────────────────────────────────────────────────────────────────────────────────────────────────
     > ▏
-    /work  deepseek-flash  think:off  view:normal  ctx:0.1%/1.0M  $0.01  ↓ 10 new
+    /work  deepseek-flash  think:off  mode:auto  view:normal  ctx:0.1%/1.0M  $0.01  ↓ 10 new
     |}];
   H.key h (Key.plain End);
   H.show h;
@@ -3186,7 +3189,7 @@ let%expect_test "scroll stays anchored while streaming" =
       line 21
     ────────────────────────────────────────────────────────────────────────────────────────────────────
     > ▏
-    /work  deepseek-flash  think:off  view:normal  ctx:0.1%/1.0M  $0.01
+    /work  deepseek-flash  think:off  mode:auto  view:normal  ctx:0.1%/1.0M  $0.01
     |}]
 ;;
 
@@ -3213,7 +3216,7 @@ let%expect_test "page_down past the bottom returns to follow" =
       line 14
     ────────────────────────────────────────────────────────────────────────────────────────────────────
     > ▏
-    /work  deepseek-flash  think:off  view:normal  ctx:0.1%/1.0M  $0.01  ↑ scrolled
+    /work  deepseek-flash  think:off  mode:auto  view:normal  ctx:0.1%/1.0M  $0.01  ↑ scrolled
     |}];
   H.key h (Key.plain Page_up);
   H.show h;
@@ -3228,7 +3231,7 @@ let%expect_test "page_down past the bottom returns to follow" =
       line 9
     ────────────────────────────────────────────────────────────────────────────────────────────────────
     > ▏
-    /work  deepseek-flash  think:off  view:normal  ctx:0.1%/1.0M  $0.01  ↑ scrolled
+    /work  deepseek-flash  think:off  mode:auto  view:normal  ctx:0.1%/1.0M  $0.01  ↑ scrolled
     |}];
   H.key h (Key.plain Page_down);
   H.show h;
@@ -3243,7 +3246,7 @@ let%expect_test "page_down past the bottom returns to follow" =
       line 14
     ────────────────────────────────────────────────────────────────────────────────────────────────────
     > ▏
-    /work  deepseek-flash  think:off  view:normal  ctx:0.1%/1.0M  $0.01  ↑ scrolled
+    /work  deepseek-flash  think:off  mode:auto  view:normal  ctx:0.1%/1.0M  $0.01  ↑ scrolled
     |}];
   H.key h (Key.plain Page_down);
   H.show h;
@@ -3258,7 +3261,7 @@ let%expect_test "page_down past the bottom returns to follow" =
       line 19
     ────────────────────────────────────────────────────────────────────────────────────────────────────
     > ▏
-    /work  deepseek-flash  think:off  view:normal  ctx:0.1%/1.0M  $0.01
+    /work  deepseek-flash  think:off  mode:auto  view:normal  ctx:0.1%/1.0M  $0.01
     |}]
 ;;
 
@@ -3289,7 +3292,7 @@ let%expect_test "home/end with text in the editor move the cursor, not the \
       line 14
     ────────────────────────────────────────────────────────────────────────────────────────────────────
     > draft▏
-    /work  deepseek-flash  think:off  view:normal  ctx:0.1%/1.0M  $0.01  ↑ scrolled
+    /work  deepseek-flash  think:off  mode:auto  view:normal  ctx:0.1%/1.0M  $0.01  ↑ scrolled
     |}];
   H.key h (Key.plain Home);
   H.show h;
@@ -3304,7 +3307,7 @@ let%expect_test "home/end with text in the editor move the cursor, not the \
       line 14
     ────────────────────────────────────────────────────────────────────────────────────────────────────
     > ▏raft
-    /work  deepseek-flash  think:off  view:normal  ctx:0.1%/1.0M  $0.01  ↑ scrolled
+    /work  deepseek-flash  think:off  mode:auto  view:normal  ctx:0.1%/1.0M  $0.01  ↑ scrolled
     |}]
 ;;
 
@@ -3318,7 +3321,7 @@ let%expect_test "abort restore is singular, prepends, and tolerates no field" =
     (Rpc (method_ steer) (params ((text queued))) (tag Show_error))
     (Append_history queued)
     |}];
-  H.event h (Queue_update { steer = 1; follow_up = 0 });
+  H.event h (Queue_update { steer = [ "queued" ]; follow_up = [] });
   H.keys h "draft";
   H.reply h Abort_done {|{"restored":["queued"]}|};
   H.show h;
@@ -3333,7 +3336,7 @@ let%expect_test "abort restore is singular, prepends, and tolerates no field" =
     > queued
 
       draft▏
-    …deepseek-flash  think:off  view:normal  ctx:0.1%/1.0M  $0.01  ⠋ working · Esc aborts · Enter steers
+    …deepseek-flash  think:off  mode:auto  ctx:0.1%/1.0M  $0.01  ⠋ working · Esc aborts · Enter steers
     |}];
   H.reply h Abort_done {|{}|};
   H.show h;
@@ -3348,7 +3351,7 @@ let%expect_test "abort restore is singular, prepends, and tolerates no field" =
     > queued
 
       draft▏
-    …deepseek-flash  think:off  view:normal  ctx:0.1%/1.0M  $0.01  ⠋ working · Esc aborts · Enter steers
+    …deepseek-flash  think:off  mode:auto  ctx:0.1%/1.0M  $0.01  ⠋ working · Esc aborts · Enter steers
     |}]
 ;;
 
@@ -3423,7 +3426,7 @@ let%expect_test "background subagent: runs while main is idle, survives a \
       started it
     ────────────────────────────────────────────────────────────────────────────────────────────────────
     > ▏
-    /work  deepseek-flash  think:off  view:normal  ctx:0.1%/1.0M  $0.01  agents:[main] 1⠋ bg
+    /work  deepseek-flash  think:off  mode:auto  view:normal  ctx:0.1%/1.0M  $0.01  agents:[main] 1⠋ bg
     |}];
   print_s [%sexp (App.Model.agents_running h.model : bool)];
   [%expect {| true |}];
@@ -3457,7 +3460,7 @@ let%expect_test "background subagent: runs while main is idle, survives a \
     … bash $ ls -R
     ────────────────────────────────────────────────────────────────────────────────────────────────────
     > ▏
-    /work  deepseek-flash  think:off  view:normal  ctx:0.1%/1.0M  $0.01  agents:main [1⠋] bg
+    /work  deepseek-flash  think:off  mode:auto  view:normal  ctx:0.1%/1.0M  $0.01  agents:main [1⠋] bg
     |}];
   H.next_agent h;
   (* Ctrl+D in the picker cancels the highlighted running agent. *)
@@ -3530,7 +3533,7 @@ let%expect_test "background subagent: runs while main is idle, survives a \
       subagent a1 is not running
     ────────────────────────────────────────────────────────────────────────────────────────────────────
     > ▏
-    /work  deepseek-flash  think:off  view:normal  ctx:0.1%/1.0M  $0.01  agents:[main] 1✗
+    /work  deepseek-flash  think:off  mode:auto  view:normal  ctx:0.1%/1.0M  $0.01  agents:[main] 1✗
     |}];
   (* Delivered and finished: the next prompt drops it. *)
   H.keys h "next";
@@ -3559,7 +3562,7 @@ let%expect_test "background subagent: runs while main is idle, survives a \
       no subagents to cancel
     ────────────────────────────────────────────────────────────────────────────────────────────────────
     > ▏
-    /work  deepseek-flash  think:off  view:normal  ctx:0.1%/1.0M  $0.01
+    /work  deepseek-flash  think:off  mode:auto  view:normal  ctx:0.1%/1.0M  $0.01
     |}]
 ;;
 
@@ -3584,7 +3587,7 @@ let%expect_test "delivered reports reload compactly; unseen agents still show" =
         [subagent: 1 turns, 1 in / 1 out tokens, $0.0000]
     ──────────────────────────────────────────────────────────────────────────────────────────
     > ▏
-    /work  deepseek-flash  think:off  view:normal  ctx:0.1%/1.0M  $0.01  agents:1 running
+    /work  deepseek-flash  think:off  mode:auto  ctx:0.1%/1.0M  $0.01  agents:1 running
     |}]
 ;;
 
@@ -3707,7 +3710,7 @@ let%expect_test "two parallel subagents: strip, live tails, focus cycling, Esc" 
         all tests pass
     ────────────────────────────────────────────────────────────────────────────────
     > ▏
-    …deepseek-flash  ctx:0.1%/1.0M  $0.01  ⠋ working · Esc aborts · Enter steers
+    …deepseek-flash  think:off  ctx:0.1%/1.0M  ⠋ working · Esc aborts · Enter steers
     |}];
   H.next_agent h;
   H.show h;
@@ -3730,7 +3733,7 @@ let%expect_test "two parallel subagents: strip, live tails, focus cycling, Esc" 
     … bash $ grep -r auth src
     ────────────────────────────────────────────────────────────────────────────────
     > ▏
-    …deepseek-flash  ctx:0.1%/1.0M  $0.01  ⠋ working · Esc aborts · Enter steers
+    …deepseek-flash  think:off  ctx:0.1%/1.0M  ⠋ working · Esc aborts · Enter steers
     |}];
   H.next_agent h;
   H.show h;
@@ -3753,7 +3756,7 @@ let%expect_test "two parallel subagents: strip, live tails, focus cycling, Esc" 
       all tests pass
     ────────────────────────────────────────────────────────────────────────────────
     > ▏
-    …deepseek-flash  ctx:0.1%/1.0M  $0.01  ⠋ working · Esc aborts · Enter steers
+    …deepseek-flash  think:off  ctx:0.1%/1.0M  ⠋ working · Esc aborts · Enter steers
     |}];
   H.next_agent h;
   H.show h;
@@ -3771,7 +3774,7 @@ let%expect_test "two parallel subagents: strip, live tails, focus cycling, Esc" 
         all tests pass
     ────────────────────────────────────────────────────────────────────────────────
     > ▏
-    …deepseek-flash  ctx:0.1%/1.0M  $0.01  ⠋ working · Esc aborts · Enter steers
+    …deepseek-flash  think:off  ctx:0.1%/1.0M  ⠋ working · Esc aborts · Enter steers
     |}];
   H.focus_agent h 1;
   H.focus_agent h 2;
@@ -3795,7 +3798,7 @@ let%expect_test "two parallel subagents: strip, live tails, focus cycling, Esc" 
       all tests pass
     ────────────────────────────────────────────────────────────────────────────────
     > ▏
-    …deepseek-flash  ctx:0.1%/1.0M  $0.01  ⠋ working · Esc aborts · Enter steers
+    …deepseek-flash  think:off  ctx:0.1%/1.0M  ⠋ working · Esc aborts · Enter steers
     |}];
   H.esc h;
   H.show h;
@@ -3813,7 +3816,7 @@ let%expect_test "two parallel subagents: strip, live tails, focus cycling, Esc" 
         all tests pass
     ────────────────────────────────────────────────────────────────────────────────
     > ▏
-    …deepseek-flash  ctx:0.1%/1.0M  $0.01  ⠋ working · Esc aborts · Enter steers
+    …deepseek-flash  think:off  ctx:0.1%/1.0M  ⠋ working · Esc aborts · Enter steers
     |}]
 ;;
 
@@ -4003,7 +4006,7 @@ let%expect_test "new user prompt clears finished agents" =
       earlier answer
     ──────────────────────────────────────────────────────────────────────
     > ▏
-    …deepseek-flash  think:off  ctx:0.1%/1.0M  $0.01  agents:[main] 1✓
+    …deepseek-flash  think:off  mode:auto  ctx:0.1%/1.0M  agents:[main] 1✓
     |}];
   H.keys h "next task";
   H.enter h;
@@ -4021,7 +4024,7 @@ let%expect_test "new user prompt clears finished agents" =
       earlier answer
     ──────────────────────────────────────────────────────────────────────
     > ▏
-    /work  deepseek-flash  think:off  view:normal  ctx:0.1%/1.0M  $0.01
+    /work  deepseek-flash  think:off  mode:auto  ctx:0.1%/1.0M  $0.01
     |}]
 ;;
 
@@ -4197,7 +4200,7 @@ let%expect_test "Alt+Enter queues a follow-up; queued block and status" =
     (Rpc (method_ follow_up) (params ((text "after this"))) (tag Show_error))
     (Append_history "after this")
     |}];
-  H.event h (Queue_update { steer = 0; follow_up = 1 });
+  H.event h (Queue_update { steer = []; follow_up = [ "after this" ] });
   H.show h;
   [%expect
     {|
@@ -4206,10 +4209,10 @@ let%expect_test "Alt+Enter queues a follow-up; queued block and status" =
     ▌ earlier question
       earlier answer
     ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
-    queued (1) · Alt+Up edits the last
+    queued (1) · Alt+Up: edit the last · /queue: edit or remove
       follow-up  after this
     > ▏
-    /work  deepseek-flash  think:off  view:normal  ctx:0.1%/1.0M  $0.01  queued:1  ⠋ working · Esc aborts · Enter steers
+    /work  deepseek-flash  think:off  mode:auto  view:normal  ctx:0.1%/1.0M  $0.01  queued:1  ⠋ working · Esc aborts · Enter steers
     |}];
   H.keys h "and more";
   H.key h (Key.alt Enter);
@@ -4218,7 +4221,9 @@ let%expect_test "Alt+Enter queues a follow-up; queued block and status" =
     (Rpc (method_ follow_up) (params ((text "and more"))) (tag Show_error))
     (Append_history "and more")
     |}];
-  H.event h (Queue_update { steer = 0; follow_up = 2 });
+  H.event
+    h
+    (Queue_update { steer = []; follow_up = [ "after this"; "and more" ] });
   H.show h;
   [%expect
     {|
@@ -4227,11 +4232,11 @@ let%expect_test "Alt+Enter queues a follow-up; queued block and status" =
     ▌ earlier question
       earlier answer
     ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
-    queued (2) · Alt+Up edits the last
+    queued (2) · Alt+Up: edit the last · /queue: edit or remove
       follow-up  after this
       follow-up  and more
     > ▏
-    /work  deepseek-flash  think:off  view:normal  ctx:0.1%/1.0M  $0.01  queued:2  ⠋ working · Esc aborts · Enter steers
+    /work  deepseek-flash  think:off  mode:auto  view:normal  ctx:0.1%/1.0M  $0.01  queued:2  ⠋ working · Esc aborts · Enter steers
     |}]
 ;;
 
@@ -4245,7 +4250,7 @@ let%expect_test "Alt+Up dequeues the last queued message into the editor" =
     (Rpc (method_ follow_up) (params ((text "queued text"))) (tag Show_error))
     (Append_history "queued text")
     |}];
-  H.event h (Queue_update { steer = 0; follow_up = 1 });
+  H.event h (Queue_update { steer = []; follow_up = [ "queued text" ] });
   H.keys h "draft";
   H.key h (Key.alt Key.Code.Up);
   [%expect {| (Rpc (method_ dequeue) (params ()) (tag Dequeued)) |}];
@@ -4258,13 +4263,14 @@ let%expect_test "Alt+Up dequeues the last queued message into the editor" =
     ▌ earlier question
       earlier answer
     ────────────────────────────────────────────────────────────────────────────────────────────────────
-    queued (1) · Alt+Up edits the last
+    queued (1) · Alt+Up: edit the last · /queue: edit or remove
+      follow-up  queued text
     > queued text
 
       draft▏
     …deepseek-flash  think:off  ctx:0.1%/1.0M  $0.01  queued:1  ⠋ working · Esc aborts · Enter steers
     |}];
-  H.event h (Queue_update { steer = 0; follow_up = 0 });
+  H.event h (Queue_update { steer = []; follow_up = [] });
   H.key h (Key.alt Key.Code.Up);
   [%expect {| (Rpc (method_ dequeue) (params ()) (tag Dequeued)) |}];
   H.reply h Dequeued {|null|};
@@ -4280,7 +4286,7 @@ let%expect_test "Alt+Up dequeues the last queued message into the editor" =
     > queued text
 
       draft▏
-    …deepseek-flash  think:off  view:normal  ctx:0.1%/1.0M  $0.01  ⠋ working · Esc aborts · Enter steers
+    …deepseek-flash  think:off  mode:auto  ctx:0.1%/1.0M  $0.01  ⠋ working · Esc aborts · Enter steers
     |}]
 ;;
 
@@ -4315,7 +4321,7 @@ let%expect_test "inline bash: !cmd adds to context, !!cmd does not" =
         b.ml
     ────────────────────────────────────────────────────────────────────────────────────────────────────
     > ▏
-    /work  deepseek-flash  think:off  view:normal  ctx:0.1%/1.0M  $0.01
+    /work  deepseek-flash  think:off  mode:auto  view:normal  ctx:0.1%/1.0M  $0.01
     |}];
   H.keys h "!!pwd";
   H.enter h;
@@ -4347,7 +4353,7 @@ let%expect_test "inline bash: !cmd adds to context, !!cmd does not" =
       !echo hi waits for the turn to end (kept in the editor); !&echo hi runs it in the background now
     ────────────────────────────────────────────────────────────────────────────────────────────────────
     > !echo hi▏
-    …deepseek-flash  think:off  view:normal  ctx:0.1%/1.0M  $0.01  ⠋ working · Esc aborts · Enter steers
+    …deepseek-flash  think:off  mode:auto  ctx:0.1%/1.0M  $0.01  ⠋ working · Esc aborts · Enter steers
     |}]
 ;;
 
@@ -4363,7 +4369,7 @@ let%expect_test "bracketed paste renders a chip until the cursor enters it" =
       earlier answer
     ────────────────────────────────────────────────────────────────────────────────
     > [4 lines pasted]▏
-    /work  deepseek-flash  think:off  view:normal  ctx:0.1%/1.0M  $0.01
+    /work  deepseek-flash  think:off  mode:auto  view:normal  ctx:0.1%/1.0M  $0.01
     |}];
   H.key h (Key.plain Up);
   H.show h;
@@ -4378,7 +4384,7 @@ let%expect_test "bracketed paste renders a chip until the cursor enters it" =
       two
       thre▏
       four
-    /work  deepseek-flash  think:off  view:normal  ctx:0.1%/1.0M  $0.01
+    /work  deepseek-flash  think:off  mode:auto  view:normal  ctx:0.1%/1.0M  $0.01
     |}]
 ;;
 
@@ -4395,7 +4401,7 @@ let%expect_test "history loads at start and is appended on submit" =
       earlier answer
     ────────────────────────────────────────────────────────────────────────────────────────────────────
     > old two▏
-    /work  deepseek-flash  think:off  view:normal  ctx:0.1%/1.0M  $0.01
+    /work  deepseek-flash  think:off  mode:auto  view:normal  ctx:0.1%/1.0M  $0.01
     |}];
   H.key h (Key.ctrl 'c');
   H.keys h "fresh prompt";
@@ -4422,7 +4428,7 @@ let%expect_test "Ctrl+G edits externally and the reply replaces the prompt" =
       earlier answer
     ────────────────────────────────────────────────────────────
     > from the editor▏
-    …deepseek-flash  think:off  ctx:0.1%/1.0M  $0.01
+    …deepseek-flash  think:off  mode:auto  ctx:0.1%/1.0M  $0.01
     |}]
 ;;
 
@@ -4521,8 +4527,8 @@ let%expect_test "Ctrl+Z suspends; Ctrl+R completes a path; Ctrl+L picks a model"
     |}]
 ;;
 
-let%expect_test "config: get_config at Start installs the reply; \
-                 config_changed updates"
+let%expect_test
+    "config: get_config at Start installs the reply; config_changed updates"
   =
   let h = H.create () in
   H.step h Start;
@@ -4683,7 +4689,7 @@ let%expect_test "/scoped-models: multi-select toggle, Ctrl+A, Ctrl+X, save" =
       scoped models saved (4)
     ────────────────────────────────────────────────────────────
     > ▏
-    …deepseek-flash  think:off  ctx:0.1%/1.0M  $0.01
+    …deepseek-flash  think:off  mode:auto  ctx:0.1%/1.0M  $0.01
     |}]
 ;;
 
@@ -4735,7 +4741,7 @@ let%expect_test "Ctrl+P cycles the scoped models and wraps; Alt+P goes back" =
       model: openai/gpt-5.5 (not logged in; /login openai)
     ────────────────────────────────────────────────────────────
     > ▏
-    /work  gpt-5.5  think:off  view:normal  ctx:0.1%/1.0M  $0.01
+    /work  gpt-5.5  think:off  mode:auto  ctx:0.1%/1.0M  $0.01
     |}]
 ;;
 
@@ -4758,7 +4764,7 @@ let%expect_test "Ctrl+P with one scoped model notices instead of switching" =
       only one model in scope
     ────────────────────────────────────────────────────────────
     > ▏
-    …deepseek-flash  think:off  ctx:0.1%/1.0M  $0.01
+    …deepseek-flash  think:off  mode:auto  ctx:0.1%/1.0M  $0.01
     |}]
 ;;
 
@@ -4788,7 +4794,7 @@ let%expect_test "Ctrl+T cycles off/low/on/high/max and is n/a when unsupported" 
       thinking: off
     ────────────────────────────────────────────────────────────
     > ▏
-    /work  claude-fable-5-1  think:off  ctx:0.1%/1.0M  $0.01
+    …claude-fable-5-1  think:off  mode:auto  ctx:0.1%/1.0M
     |}];
   H.reply
     ~quiet:true
@@ -4812,12 +4818,12 @@ let%expect_test "Ctrl+T cycles off/low/on/high/max and is n/a when unsupported" 
       thinking: n/a for this model
     ────────────────────────────────────────────────────────────
     > ▏
-    /work  gpt-5.5  think:n/a  view:normal  ctx:0.1%/1.0M  $0.01
+    /work  gpt-5.5  think:n/a  mode:auto  ctx:0.1%/1.0M  $0.01
     |}]
 ;;
 
-let%expect_test "status line: width 120 full, width 40 keeps the model and \
-                 drops the cwd"
+let%expect_test
+    "status line: width 120 full, width 40 keeps the model and drops the cwd"
   =
   let model =
     model_json ~context_window:145000 "claude-fable-5-1" "Claude Fable 5.1"
@@ -4837,7 +4843,7 @@ let%expect_test "status line: width 120 full, width 40 keeps the model and \
        ~context_tokens:61000
        ~cost_usd:0.1234
        ());
-  H.event h (Queue_update { steer = 1; follow_up = 0 });
+  H.event h (Queue_update { steer = [ "check the tests" ]; follow_up = [] });
   H.event
     h
     (Subagent_start
@@ -4868,7 +4874,7 @@ let%expect_test "status line: width 120 full, width 40 keeps the model and \
        });
   print_endline (Content.Line.to_plain (Render.status h.model));
   [%expect
-    {| …claude-fable-5-1  think:high  view:normal  ctx:42%/145k  $0.12  queued:1  agents:[main] 1⠋ 2✓ bg |}];
+    {| …claude-fable-5-1  think:high  mode:auto  view:normal  ctx:42%/145k  $0.12  queued:1  agents:[main] 1⠋ 2✓ bg |}];
   H.step ~quiet:true h (Resize { width = 40; height = 20 });
   print_endline (Content.Line.to_plain (Render.status h.model));
   [%expect {| …claude-fable-5-1  ctx:42%/145k  $0.12 |}]
@@ -5021,7 +5027,7 @@ let%expect_test "confirm dialog is a bordered block" =
     └──────────────────────────────────────────────────────────┘
     ────────────────────────────────────────────────────────────
     ? ▏
-    /work  deepseek-flash  ctx:0.1%/1.0M  $0.01  confirm: y / n
+    …deepseek-flash  think:off  ctx:0.1%/1.0M  confirm: y / n
     |}]
 ;;
 
@@ -5115,7 +5121,7 @@ let%expect_test "Ctrl+Up / Ctrl+Down jump between user messages at height 8" =
       third answer
     ────────────────────────────────────────────────────────────
     > ▏
-    …deepseek-flash  think:off  ctx:0.1%/1.0M  $0.01
+    …deepseek-flash  think:off  mode:auto  ctx:0.1%/1.0M  $0.01
     |}];
   let ctrl_up = { (Key.plain Up) with ctrl = true } in
   let ctrl_down = { (Key.plain Down) with ctrl = true } in
@@ -5182,7 +5188,7 @@ let%expect_test "Ctrl+Up / Ctrl+Down jump between user messages at height 8" =
       no earlier message
     ────────────────────────────────────────────────────────────
     > ▏
-    …deepseek-flash  think:off  ctx:0.1%/1.0M  $0.01
+    …deepseek-flash  think:off  mode:auto  ctx:0.1%/1.0M  $0.01
     |}];
   (* Past the last user message the viewport returns to Follow: a new notice is
      visible at the bottom instead of counted as hidden new lines. *)
@@ -5196,7 +5202,7 @@ let%expect_test "Ctrl+Up / Ctrl+Down jump between user messages at height 8" =
       tail notice
     ────────────────────────────────────────────────────────────
     > ▏
-    …deepseek-flash  think:off  ctx:0.1%/1.0M  $0.01
+    …deepseek-flash  think:off  mode:auto  ctx:0.1%/1.0M  $0.01
     |}]
 ;;
 
@@ -5237,7 +5243,7 @@ let%expect_test "bash result at Normal shows the head and tail" =
         line 20
     ────────────────────────────────────────────────────────────
     > ▏
-    …deepseek-flash  think:off  ctx:0.1%/1.0M  $0.01
+    …deepseek-flash  think:off  mode:auto  ctx:0.1%/1.0M  $0.01
     |}]
 ;;
 
@@ -5259,7 +5265,7 @@ let%expect_test "/hotkeys prints the keys half of /help" =
       none
     ────────────────────────────────────────────────────────────
     > ▏
-    …deepseek-flash  think:off  ctx:0.1%/1.0M  $0.01
+    …deepseek-flash  think:off  mode:auto  ctx:0.1%/1.0M  $0.01
     |}]
 ;;
 
@@ -5277,7 +5283,7 @@ let%expect_test "/help model prints one command's usage" =
       /model [name|id|provider/id]  pick or switch the model
     ────────────────────────────────────────────────────────────
     > ▏
-    …deepseek-flash  think:off  ctx:0.1%/1.0M  $0.01
+    …deepseek-flash  think:off  mode:auto  ctx:0.1%/1.0M  $0.01
     |}]
 ;;
 
@@ -5296,7 +5302,7 @@ let%expect_test "/help with an unknown command suggests the closest name" =
       /mode?
     ────────────────────────────────────────────────────────────
     > /help modle▏
-    …deepseek-flash  think:off  ctx:0.1%/1.0M  $0.01
+    …deepseek-flash  think:off  mode:auto  ctx:0.1%/1.0M  $0.01
     |}]
 ;;
 
@@ -5325,7 +5331,7 @@ let%expect_test "tool confirm: allow, deny, queue and Esc-abort" =
     └──────────────────────────────────────────────────────────┘
     ────────────────────────────────────────────────────────────
     ? ▏
-    /work  deepseek-flash  ctx:0.1%/1.0M  $0.01  confirm: y/n/r
+    …deepseek-flash  think:off  ctx:0.1%/1.0M  confirm: y/n/r
     |}];
   H.keys h "y";
   [%expect
@@ -5424,7 +5430,7 @@ let%expect_test "tool confirm: allow, deny, queue and Esc-abort" =
     └──────────────────────────────────────────────────────────┘
     ────────────────────────────────────────────────────────────
     ? ▏
-    /work  deepseek-flash  ctx:0.1%/1.0M  $0.01  confirm: y/n/r
+    …deepseek-flash  think:off  ctx:0.1%/1.0M  confirm: y/n/r
     |}];
   H.keys h "y";
   H.show h;
@@ -5447,7 +5453,7 @@ let%expect_test "tool confirm: allow, deny, queue and Esc-abort" =
     └──────────────────────────────────────────────────────────┘
     ────────────────────────────────────────────────────────────
     ? ▏
-    /work  deepseek-flash  ctx:0.1%/1.0M  $0.01  confirm: y/n/r
+    …deepseek-flash  think:off  ctx:0.1%/1.0M  confirm: y/n/r
     |}];
   H.keys h "y";
   H.show h;
@@ -5470,7 +5476,7 @@ let%expect_test "tool confirm: allow, deny, queue and Esc-abort" =
     └──────────────────────────────────────────────────────────┘
     ────────────────────────────────────────────────────────────
     ? ▏
-    /work  deepseek-flash  ctx:0.1%/1.0M  $0.01  confirm: y/n/r
+    …deepseek-flash  think:off  ctx:0.1%/1.0M  confirm: y/n/r
     |}];
   H.keys h "n";
   [%expect
@@ -5496,7 +5502,7 @@ let%expect_test "tool confirm: allow, deny, queue and Esc-abort" =
     └──────────────────────────────────────────────────────────┘
     ────────────────────────────────────────────────────────────
     ? ▏
-    /work  deepseek-flash  ctx:0.1%/1.0M  $0.01  confirm: y/n/r
+    …deepseek-flash  think:off  ctx:0.1%/1.0M  confirm: y/n/r
     |}];
   H.keys h "y";
   [%expect
@@ -5575,7 +5581,7 @@ let%expect_test "/change_default saves the model and thinking level" =
       default: deepseek/deepseek-flash, thinking high
     ────────────────────────────────────────────────────────────
     > ▏
-    …deepseek-flash  think:off  ctx:0.1%/1.0M  $0.01
+    …deepseek-flash  think:off  mode:auto  ctx:0.1%/1.0M  $0.01
     (Rpc
       (method_ set_config)
       (params ((config ((approval_mode auto)))))
@@ -5614,7 +5620,7 @@ let%expect_test "/confirm on saves confirm_tools through set_config" =
       tool confirmation on
     ────────────────────────────────────────────────────────────
     > ▏
-    …deepseek-flash  think:off  ctx:0.1%/1.0M  $0.01
+    …deepseek-flash  think:off  mode:auto  ctx:0.1%/1.0M  $0.01
     |}];
   H.keys h "/confirm";
   H.esc h;
@@ -5631,7 +5637,7 @@ let%expect_test "/confirm on saves confirm_tools through set_config" =
       sets ask or auto; /mode has all)
     ────────────────────────────────────────────────────────────
     > ▏
-    …deepseek-flash  think:off  ctx:0.1%/1.0M  $0.01
+    …deepseek-flash  think:off  mode:auto  ctx:0.1%/1.0M  $0.01
     |}];
   (* Without the config loaded, only confirm_tools is sent: the backend keeps
      the rest. *)
@@ -5658,7 +5664,7 @@ let%expect_test "/confirm on saves confirm_tools through set_config" =
       tool confirmation off
     ────────────────────────────────────────────────────────────
     > ▏
-    …deepseek-flash  think:off  ctx:0.1%/1.0M  $0.01
+    …deepseek-flash  think:off  mode:auto  ctx:0.1%/1.0M  $0.01
     |}]
 ;;
 
@@ -5692,7 +5698,7 @@ let%expect_test "bash timeout is merged into the tool line" =
         partial output
     ────────────────────────────────────────────────────────────
     > ▏
-    …deepseek-flash  think:off  ctx:0.1%/1.0M  $0.01
+    …deepseek-flash  think:off  mode:auto  ctx:0.1%/1.0M  $0.01
     |}]
 ;;
 
@@ -5723,7 +5729,7 @@ let%expect_test "resize keeps the confirm dialog and picker within the width" =
     └──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┘
     ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
     ? ▏
-    /work  deepseek-flash  think:off  view:normal  ctx:0.1%/1.0M  $0.01  confirm: y/n/r
+    /work  deepseek-flash  think:off  mode:auto  view:normal  ctx:0.1%/1.0M  $0.01  confirm: y/n/r
     |}];
   H.step h (Resize { width = 40; height = 16 });
   H.show h;
@@ -5816,7 +5822,7 @@ let%expect_test "resize 120->40 mid-stream keeps every line" =
       delta 6 with several words that wrap at forty columns
     ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
     > ▏
-    /work  deepseek-flash  think:off  view:normal  ctx:0.1%/1.0M  $0.01  ⠋ working · Esc aborts · Enter steers
+    /work  deepseek-flash  think:off  mode:auto  view:normal  ctx:0.1%/1.0M  $0.01  ⠋ working · Esc aborts · Enter steers
     |}];
   H.step h (Resize { width = 40; height = 12 });
   H.show h;
@@ -5894,7 +5900,7 @@ let%expect_test "login end to end includes a prompt_cancelled" =
       earlier answer
     ────────────────────────────────────────────────────────────
     > ▏
-    …deepseek-flash  think:off  ctx:0.1%/1.0M  $0.01
+    …deepseek-flash  think:off  mode:auto  ctx:0.1%/1.0M  $0.01
     |}];
   H.event h (Auth (Progress "exchanging code"));
   H.event h (Auth (Done { provider = "anthropic"; method_ = "api_key" }));
@@ -5922,7 +5928,7 @@ let%expect_test "login end to end includes a prompt_cancelled" =
       model set to anthropic/claude-fable-5; /model to change
     ────────────────────────────────────────────────────────────
     > ▏
-    …deepseek-flash  think:off  ctx:0.1%/1.0M  $0.01
+    …deepseek-flash  think:off  mode:auto  ctx:0.1%/1.0M  $0.01
     |}]
 ;;
 
@@ -6001,7 +6007,7 @@ let%expect_test "stderr lines are dim notices at Verbose only" =
       earlier answer
     ────────────────────────────────────────────────────────────
     > ▏
-    …deepseek-flash  think:off  ctx:0.1%/1.0M  $0.01
+    …deepseek-flash  think:off  mode:auto  ctx:0.1%/1.0M  $0.01
     |}];
   H.keys h "/verbosity verbose";
   H.enter h;
@@ -6016,7 +6022,7 @@ let%expect_test "stderr lines are dim notices at Verbose only" =
       view: verbose — everything is shown
     ────────────────────────────────────────────────────────────
     > ▏
-    /work  deepseek-flash  think:off  ctx:0.1%/1.0M  $0.01
+    …deepseek-flash  think:off  mode:auto  ctx:0.1%/1.0M  $0.01
     |}]
 ;;
 
@@ -6103,7 +6109,7 @@ let%expect_test "editing intents: cursor, word, kill, yank, undo, delete" =
       earlier answer
     ────────────────────────────────────────────────────────────
     > one two thre▏
-    …deepseek-flash  think:off  ctx:0.1%/1.0M  $0.01
+    …deepseek-flash  think:off  mode:auto  ctx:0.1%/1.0M  $0.01
     |}];
   H.key h (Key.plain Right);
   H.key h (Key.alt (Char "b"));
@@ -6116,7 +6122,7 @@ let%expect_test "editing intents: cursor, word, kill, yank, undo, delete" =
       earlier answer
     ────────────────────────────────────────────────────────────
     > one two ▏hree
-    …deepseek-flash  think:off  ctx:0.1%/1.0M  $0.01
+    …deepseek-flash  think:off  mode:auto  ctx:0.1%/1.0M  $0.01
     |}];
   H.key h (Key.alt (Char "f"));
   H.show h;
@@ -6128,7 +6134,7 @@ let%expect_test "editing intents: cursor, word, kill, yank, undo, delete" =
       earlier answer
     ────────────────────────────────────────────────────────────
     > one two three▏
-    …deepseek-flash  think:off  ctx:0.1%/1.0M  $0.01
+    …deepseek-flash  think:off  mode:auto  ctx:0.1%/1.0M  $0.01
     |}];
   H.key h (Key.alt (Char "d"));
   H.show h;
@@ -6140,7 +6146,7 @@ let%expect_test "editing intents: cursor, word, kill, yank, undo, delete" =
       earlier answer
     ────────────────────────────────────────────────────────────
     > one two three▏
-    …deepseek-flash  think:off  ctx:0.1%/1.0M  $0.01
+    …deepseek-flash  think:off  mode:auto  ctx:0.1%/1.0M  $0.01
     |}];
   H.key h (Key.ctrl 'k');
   H.key h (Key.ctrl 'u');
@@ -6155,7 +6161,7 @@ let%expect_test "editing intents: cursor, word, kill, yank, undo, delete" =
       earlier answer
     ────────────────────────────────────────────────────────────
     > one two three▏
-    …deepseek-flash  think:off  ctx:0.1%/1.0M  $0.01
+    …deepseek-flash  think:off  mode:auto  ctx:0.1%/1.0M  $0.01
     |}];
   H.key h (Key.alt (Char "y"));
   H.key h (Key.ctrl '_');
@@ -6170,7 +6176,7 @@ let%expect_test "editing intents: cursor, word, kill, yank, undo, delete" =
       earlier answer
     ────────────────────────────────────────────────────────────
     > ▏
-    …deepseek-flash  think:off  ctx:0.1%/1.0M  $0.01
+    …deepseek-flash  think:off  mode:auto  ctx:0.1%/1.0M  $0.01
     |}]
 ;;
 
@@ -6186,7 +6192,7 @@ let%expect_test "Alt+M cycles the mode; the status line shows it at once" =
       earlier answer
     ────────────────────────────────────────────────────────────
     > ▏
-    …deepseek-flash  think:off  ctx:0.1%/1.0M  $0.01  mode:ask
+    …deepseek-flash  think:off  mode:ask  ctx:0.1%/1.0M  $0.01
     |}];
   H.key h (Key.alt (Char "m"));
   [%expect
@@ -6250,7 +6256,7 @@ let%expect_test "Alt+M cycles the mode; the status line shows it at once" =
       unknown approval mode
     ────────────────────────────────────────────────────────────
     > ▏
-    …deepseek-flash  think:off  ctx:0.1%/1.0M  $0.01
+    …deepseek-flash  think:off  mode:auto  ctx:0.1%/1.0M  $0.01
     |}]
 ;;
 
@@ -6463,7 +6469,7 @@ let%expect_test "reconnect: backoff doubles to the 60s cap, stale replies are \
   print_s
     [%sexp
       (h.model.connection : App.Connection.t)
-      , (h.model.client_id : string option)];
+    , (h.model.client_id : string option)];
   [%expect {| (Connected (client-7)) |}];
   H.reply h Initial_state (state_json ());
   H.reply h Initial_messages {|[{"role":"user","text":"earlier question"}]|};
@@ -6476,7 +6482,7 @@ let%expect_test "reconnect: backoff doubles to the 60s cap, stale replies are \
     ▌ earlier question
     ──────────────────────────────────────────────────────────────────────
     > ▏
-    /work  deepseek-flash  think:off  view:normal  ctx:0.1%/1.0M  $0.01
+    /work  deepseek-flash  think:off  mode:auto  ctx:0.1%/1.0M  $0.01
     |}];
   H.keys h "/retry-backend-connection";
   H.enter h;
@@ -6490,7 +6496,7 @@ let%expect_test "reconnect: backoff doubles to the 60s cap, stale replies are \
       backend is connected
     ──────────────────────────────────────────────────────────────────────
     > ▏
-    /work  deepseek-flash  think:off  view:normal  ctx:0.1%/1.0M  $0.01
+    /work  deepseek-flash  think:off  mode:auto  ctx:0.1%/1.0M  $0.01
     |}];
   (* A later disconnection starts a fresh backoff. *)
   H.step h Backend_closed;
@@ -6578,7 +6584,7 @@ let%expect_test "reconnect: a session the backend no longer knows (never \
       prigh in /work · /help · Esc aborts · Ctrl+C twice quits
     ──────────────────────────────────────────────────────────────────────
     > ▏
-    /work  deepseek-flash  think:off  view:normal  ctx:0.1%/1.0M  $0.01
+    /work  deepseek-flash  think:off  mode:auto  ctx:0.1%/1.0M  $0.01
     |}];
   (* The next disconnection resumes the new session as usual. *)
   H.step h Backend_closed;
@@ -6611,7 +6617,7 @@ let%expect_test "wheel scrolling moves the transcript a few lines; arrows \
     ▌ message 7
     ────────────────────────────────────────────────────────────
     > ▏
-    …deepseek-flash  think:off  ctx:0.1%/1.0M  $0.01
+    …deepseek-flash  think:off  mode:auto  ctx:0.1%/1.0M  $0.01
     |}];
   H.step h (Intent Scroll_up);
   H.show h;
@@ -6652,7 +6658,7 @@ let%expect_test "wheel scrolling moves the transcript a few lines; arrows \
     ▌ message 7
     ────────────────────────────────────────────────────────────
     > newer prompt▏
-    …deepseek-flash  think:off  ctx:0.1%/1.0M  $0.01
+    …deepseek-flash  think:off  mode:auto  ctx:0.1%/1.0M  $0.01
     |}]
 ;;
 
@@ -6682,7 +6688,7 @@ let%expect_test "switching tool host asks for the directory there, prefilled \
     └────────────────────────────────────────────────────────────────────┘
     ──────────────────────────────────────────────────────────────────────
     ? /work▏
-    /work  m  think:n/a  ctx:0.0%/1.0k  $0.00  Enter submits · Esc cancels
+    …m  think:n/a  mode:auto  ctx:0.0%/1.0k  Enter submits · Esc cancels
     |}];
   (* Directories complete on the host being switched to: Tab asks, Tab again
      accepts and drills down, Enter submits the text. *)
@@ -6709,7 +6715,7 @@ let%expect_test "switching tool host asks for the directory there, prefilled \
     ──────────────────────────────────────────────────────────────────────
     ? /work▏
     ▸ /work/
-    /work  m  ctx:0.0%/1.0k  $0.00  Tab completes · Enter submits · Esc
+    …m  think:n/a  ctx:0.0%/1.0k  Tab completes · Enter submits · Esc
     |}];
   H.key h (Key.plain Tab);
   [%expect
@@ -6736,7 +6742,7 @@ let%expect_test "switching tool host asks for the directory there, prefilled \
     ──────────────────────────────────────────────────────────────────────
     ? /work/s▏
     ▸ /work/src/
-    /work  m  ctx:0.0%/1.0k  $0.00  Tab completes · Enter submits · Esc
+    …m  think:n/a  ctx:0.0%/1.0k  Tab completes · Enter submits · Esc
     |}];
   H.enter h;
   [%expect
@@ -6771,7 +6777,7 @@ let%expect_test "switching tool host asks for the directory there, prefilled \
     └────────────────────────────────────────────────────────────────────┘
     ──────────────────────────────────────────────────────────────────────
     ? /work▏
-    /work  m  think:n/a  ctx:0.0%/1.0k  $0.00  Enter submits · Esc cancels
+    …m  think:n/a  mode:auto  ctx:0.0%/1.0k  Enter submits · Esc cancels
     |}];
   H.esc h;
   H.mode h;
@@ -6792,7 +6798,7 @@ let%expect_test "switching tool host asks for the directory there, prefilled \
       unknown host "nope"; one of: srv, laptop (here)
     ──────────────────────────────────────────────────────────────────────
     > ▏
-    /work  m  think:n/a  view:normal  ctx:0.0%/1.0k  $0.00
+    /work  m  think:n/a  mode:auto  view:normal  ctx:0.0%/1.0k  $0.00
     |}]
 ;;
 
@@ -6836,7 +6842,7 @@ let%expect_test "the hello's host id marks this frontend, also after a \
        desk           /d
     ▸* laptop (here)  /home/me
     ──────────────────────────────────────────────────────────────────────
-    …m  think:n/a  ctx:0.0%/1.0k  $0.00  Enter selects · Esc closes
+    …m  think:n/a  mode:auto  ctx:0.0%/1.0k  Enter selects · Esc closes
     |}];
   H.step h Backend_closed;
   H.reply h (Reconnect 1) {|{"client_id":"client-2","host_id":"host-abc"}|};
@@ -6868,7 +6874,7 @@ let%expect_test "the hello's host id marks this frontend, also after a \
        desk           /d
     ▸* laptop (here)  /home/me
     ──────────────────────────────────────────────────────────────────────
-    …m  think:n/a  ctx:0.0%/1.0k  $0.00  Enter selects · Esc closes
+    …m  think:n/a  mode:auto  ctx:0.0%/1.0k  Enter selects · Esc closes
     |}]
 ;;
 
@@ -6899,7 +6905,7 @@ let%expect_test "the host picker shows which session other frontends are in" =
        desktop (in refactor)  /home/me/other
     ▸* pi (in 9876)           /pi
     ──────────────────────────────────────────────────────────────────────
-    /work  m  ctx:0.0%/1.0k  $0.00  tools:pi  Enter selects · Esc closes
+    …m  think:n/a  mode:auto  ctx:0.0%/1.0k  Enter selects · Esc closes
     |}];
   H.esc h;
   H.keys h "/host desktop";
@@ -6915,14 +6921,15 @@ let%expect_test "the host picker shows which session other frontends are in" =
     └────────────────────────────────────────────────────────────────────┘
     ──────────────────────────────────────────────────────────────────────
     ? /work▏
-    /work  m  ctx:0.0%/1.0k  $0.00  tools:pi  Enter submits · Esc cancels
+    …m  think:n/a  mode:auto  ctx:0.0%/1.0k  Enter submits · Esc cancels
     |}]
 ;;
 
 (* ---- UX guarantees ---------------------------------------------------- *)
 
-let%expect_test "/model Enter Enter opens the picker instead of silently \
-                 picking the first model; a filter or Down makes Enter accept"
+let%expect_test
+    "/model Enter Enter opens the picker instead of silently picking the first \
+     model; a filter or Down makes Enter accept"
   =
   let h = connected () in
   H.reply ~quiet:true h Models_catalog models_json;
@@ -7012,7 +7019,7 @@ let%expect_test "/model Enter Enter opens the picker instead of silently \
       earlier answer
     ────────────────────────────────────────────────────────────
     > /model anthropic/claude-fable-5▏
-    …deepseek-flash  think:off  ctx:0.1%/1.0M  $0.01
+    …deepseek-flash  think:off  mode:auto  ctx:0.1%/1.0M  $0.01
     |}];
   (* The same rule sends /cd to its prompt rather than into the first directory. *)
   H.key h (Key.ctrl 'u');
@@ -7043,8 +7050,8 @@ let%expect_test "/model Enter Enter opens the picker instead of silently \
   [%expect {| text_prompt |}]
 ;;
 
-let%expect_test "picking a model reports it, and flags a provider that is not \
-                 logged in"
+let%expect_test
+    "picking a model reports it, and flags a provider that is not logged in"
   =
   let h = connected () in
   H.reply ~quiet:true h Models_catalog models_json;
@@ -7076,7 +7083,7 @@ let%expect_test "picking a model reports it, and flags a provider that is not \
       model: deepseek/deepseek-flash
     ────────────────────────────────────────────────────────────
     > ▏
-    …deepseek-flash  think:off  ctx:0.1%/1.0M  $0.01
+    …deepseek-flash  think:off  mode:auto  ctx:0.1%/1.0M  $0.01
     |}]
 ;;
 
@@ -7213,7 +7220,7 @@ let%expect_test "Tab on an empty editor opens the command list; the list shows \
       /fallback [off|model...]        show or set the models th…
       /default-dir [off|path]         show or set the directory…
       /login [provider] [api_key|oauth]  log in to a provider
-      ↕ 1–8 of 55
+      ↕ 1–8 of 56
     …deepseek-flash  ctx:0.1%/1.0M  Tab/Enter accept · Esc close
     |}];
   H.key h (Key.plain End);
@@ -7230,7 +7237,7 @@ let%expect_test "Tab on an empty editor opens the command list; the list shows \
       /fallback [off|model...]        show or set the models th…
       /default-dir [off|path]         show or set the directory…
       /login [provider] [api_key|oauth]  log in to a provider
-      ↕ 1–8 of 55
+      ↕ 1–8 of 56
     …deepseek-flash  ctx:0.1%/1.0M  Tab/Enter accept · Esc close
     |}];
   H.keys h "qu";
@@ -7323,7 +7330,7 @@ let%expect_test "scrolled up: the status says so, and Esc returns to the \
     ▌ line 5
     ────────────────────────────────────────────────────────────
     > ▏
-    …deepseek-flash  think:off  ctx:0.1%/1.0M  $0.01
+    …deepseek-flash  think:off  mode:auto  ctx:0.1%/1.0M  $0.01
     |}];
   H.event h (State (state ~running:true ()));
   H.key h (Key.plain Page_up);
@@ -7380,8 +7387,9 @@ let%expect_test "/new and /switch leave the previous session's subagents behind"
   print_s
     [%sexp
       (List.length h.model.agents : int)
-      , (h.model.focus : [ `Main | `Agent of string ])];
-  [%expect {|
+    , (h.model.focus : [ `Main | `Agent of string ])];
+  [%expect
+    {|
     editing
     (1 (Agent c1))
     |}];
@@ -7391,7 +7399,7 @@ let%expect_test "/new and /switch leave the previous session's subagents behind"
   print_s
     [%sexp
       (List.length h.model.agents : int)
-      , (h.model.focus : [ `Main | `Agent of string ])];
+    , (h.model.focus : [ `Main | `Agent of string ])];
   H.next_agent h;
   print_s [%sexp (h.model.focus : [ `Main | `Agent of string ])];
   [%expect
@@ -7422,7 +7430,7 @@ let%expect_test "logged-in user: shown in the status line, kept across \
       earlier answer
     ────────────────────────────────────────────────────────────────────────────────
     > ▏
-    /work  deepseek-flash  think:off  view:normal  ctx:0.1%/1.0M  $0.01  user:lloyd
+    /work  deepseek-flash  think:off  mode:auto  ctx:0.1%/1.0M  $0.01  user:lloyd
     |}];
   (* Narrow screens drop it before the more useful parts. *)
   H.step h (Resize { width = 50; height = 12 });
@@ -7478,7 +7486,7 @@ let%expect_test "logged-in user: shown in the status line, kept across \
       prigh in /work · /help · Esc aborts · Ctrl+C twice quits
     ────────────────────────────────────────────────────────────────────────────────
     > ▏
-    /work  deepseek-flash  think:off  view:normal  ctx:0.1%/1.0M  $0.01
+    /work  deepseek-flash  think:off  mode:auto  view:normal  ctx:0.1%/1.0M  $0.01
     |}];
   H.keys h "/signout";
   H.enter h;
@@ -7523,7 +7531,7 @@ let%expect_test "background jobs: !&, status line while idle, /jobs picker, \
       started job j1; /jobs shows it, and its exit is reported to the agent
     ────────────────────────────────────────────────────────────────────────────────────────────────────
     > ▏
-    /work  deepseek-flash  think:off  view:normal  ctx:0.1%/1.0M  $0.01  jobs:1 ⠋
+    /work  deepseek-flash  think:off  mode:auto  view:normal  ctx:0.1%/1.0M  $0.01  jobs:1 ⠋
     true
     |}];
   (* The picker lists id, state, elapsed time and the last line; Ctrl+D kills
@@ -7552,7 +7560,7 @@ let%expect_test "background jobs: !&, status line while idle, /jobs picker, \
     ▸  make test       j1  running  1m15s  PASS parser
        docker build .  j2  exited 0  3s
     ────────────────────────────────────────────────────────────────────────────────────────────────────
-    …deepseek-flash  ctx:0.1%/1.0M  $0.01  jobs:1 ⠋  Enter shows output · Esc closes · Ctrl+D kills
+    …deepseek-flash  think:off  ctx:0.1%/1.0M  jobs:1 ⠋  Enter shows output · Esc closes · Ctrl+D kills
     (Rpc
       (method_ kill_job)
       (params ((job_id j1)))
@@ -7608,7 +7616,7 @@ let%expect_test "background jobs: !&, status line while idle, /jobs picker, \
       Step 2/2
     ────────────────────────────────────────────────────────────────────────────────────────────────────
     > ▏
-    /work  deepseek-flash  think:off  view:normal  ctx:0.1%/1.0M  $0.01  jobs:1 ⠋
+    /work  deepseek-flash  think:off  mode:auto  view:normal  ctx:0.1%/1.0M  $0.01  jobs:1 ⠋
     |}];
   (* The exit report reaches the idle agent and renders compactly. *)
   H.event h (State (state ~running:true ()));
@@ -7640,7 +7648,7 @@ let%expect_test "background jobs: !&, status line while idle, /jobs picker, \
       the tests were killed
     ────────────────────────────────────────────────────────────────────────────────────────────────────
     > ▏
-    /work  deepseek-flash  think:off  view:normal  ctx:0.1%/1.0M  $0.01
+    /work  deepseek-flash  think:off  mode:auto  view:normal  ctx:0.1%/1.0M  $0.01
     |}]
 ;;
 
@@ -7666,7 +7674,7 @@ let%expect_test "job reports reload compactly; look-alike text stays a user \
     ▌ [job board] what is on it?
     ────────────────────────────────────────────────────────────────────────────────
     > ▏
-    /work  deepseek-flash  think:off  view:normal  ctx:0.1%/1.0M  $0.01
+    /work  deepseek-flash  think:off  mode:auto  view:normal  ctx:0.1%/1.0M  $0.01
     |}]
 ;;
 
@@ -7695,7 +7703,7 @@ let%expect_test "/setusr: lists users, acts as one, reconnects as them" =
       protocol error: expected array, got {"oops":1}
     ────────────────────────────────────────────────────────────────────────────────
     > ▏
-    /work  deepseek-flash  think:off  view:normal  ctx:0.1%/1.0M  $0.01  user:s
+    /work  deepseek-flash  think:off  mode:auto  ctx:0.1%/1.0M  $0.01  user:s
     (Rpc (method_ set_user) (params ((user a))) (tag User_switched))
     |}];
   H.reply
@@ -7721,7 +7729,7 @@ let%expect_test "/setusr: lists users, acts as one, reconnects as them" =
       prigh in /work · /help · Esc aborts · Ctrl+C twice quits
     ────────────────────────────────────────────────────────────────────────────────
     > ▏
-    /work  deepseek-flash  think:off  view:normal  ctx:0.1%/1.0M  $0.01  user:s as a
+    /work  deepseek-flash  think:off  mode:auto  ctx:0.1%/1.0M  $0.01  user:s as a
     (a)
     |}];
   (* A reconnect asks to act as a again. *)
@@ -7763,7 +7771,7 @@ let%expect_test "/setusr: lists users, acts as one, reconnects as them" =
       usage: /setusr [user]
     ────────────────────────────────────────────────────────────────────────────────
     > ▏
-    /work  deepseek-flash  think:off  view:normal  ctx:0.1%/1.0M  $0.01  user:s
+    /work  deepseek-flash  think:off  mode:auto  ctx:0.1%/1.0M  $0.01  user:s
     |}]
 ;;
 
@@ -7960,7 +7968,7 @@ let%expect_test
       model set to aiproxy/gpt-4o; /model to change
     ────────────────────────────────────────────────────────────
     > ▏
-    …deepseek-flash  think:off  ctx:0.1%/1.0M  $0.01
+    …deepseek-flash  think:off  mode:auto  ctx:0.1%/1.0M  $0.01
     |}];
   H.keys h "/model";
   H.esc h;
@@ -8040,7 +8048,7 @@ let%expect_test
       /login custom adds an OpenAI-compatible endpoint
     ──────────────────────────────────────────────────────────────────────────────────────────
     > ▏
-    /work  deepseek-flash  think:off  view:normal  ctx:0.1%/1.0M  $0.01
+    /work  deepseek-flash  think:off  mode:auto  view:normal  ctx:0.1%/1.0M  $0.01
     |}]
 ;;
 
@@ -8065,7 +8073,7 @@ let%expect_test
       || String.is_prefix plain ~prefix:"~/proj"
     then print_endline (Content.to_styled [ line ]));
   [%expect
-    {| [gray]~/proj "refactor"[/]  [gray]deepseek-flash[/]  [gray]think:off[/]  [gray]view:normal[/]  [gray]ctx:0.1%/1.0M[/]  [gray]$0.01[/] |}]
+    {| [gray]~/proj "refactor"[/]  [gray]deepseek-flash[/]  [gray]think:off[/]  [gray]mode:auto[/]  [gray]ctx:0.1%/1.0M[/]  [gray]$0.01[/] |}]
 ;;
 
 let%expect_test
@@ -8098,15 +8106,15 @@ let%expect_test
   status ();
   [%expect
     {|
-    [gray]/work[/]  [gray]m[/]  [gray]think:off[/]  [gray]view:normal[/]  [gray]ctx:0.8%/200k[/]  [gray]$0.01[/]
-    [gray]/work[/]  [gray]m[/]  [gray]think:off[/]  [gray]view:normal[/]  [yellow]ctx:60%/200k[/]  [gray]$0.01[/]
-    [gray]/work[/]  [gray]m[/]  [gray]think:off[/]  [gray]view:normal[/]  [red]ctx:85%/200k[/]  [gray]$0.01[/]
-    [gray]/work[/]  [gray]m[/]  [gray]think:off[/]  [gray]view:normal[/]  [gray]ctx:0.0%/200k[/]  [gray]$0.01[/]  [yellow]⠋ working · Esc aborts · Enter steers[/]
+    [gray]/work[/]  [gray]m[/]  [gray]think:off[/]  [gray]mode:auto[/]  [gray]view:normal[/]  [gray]ctx:0.8%/200k[/]  [gray]$0.01[/]
+    [gray]/work[/]  [gray]m[/]  [gray]think:off[/]  [gray]mode:auto[/]  [gray]view:normal[/]  [yellow]ctx:60%/200k[/]  [gray]$0.01[/]
+    [gray]/work[/]  [gray]m[/]  [gray]think:off[/]  [gray]mode:auto[/]  [gray]view:normal[/]  [red]ctx:85%/200k[/]  [gray]$0.01[/]
+    [gray]/work[/]  [gray]m[/]  [gray]think:off[/]  [gray]mode:auto[/]  [gray]ctx:0.0%/200k[/]  [gray]$0.01[/]  [yellow]⠋ working · Esc aborts · Enter steers[/]
     (Rpc (method_ set_thinking) (params ((thinking low))) (tag Show_error))
     (Rpc (method_ list_models) (params ()) (tag (Models_for_picker "")))
-    [gray]/work[/]  [gray]m[/]  [gray]think:low[/]  [gray]view:normal[/]  [gray]ctx:0.0%/200k[/]  [gray]$0.01[/]  [yellow]⠋ working · Esc aborts · Enter steers[/]
+    [gray]/work[/]  [gray]m[/]  [gray]think:low[/]  [gray]mode:auto[/]  [gray]ctx:0.0%/200k[/]  [gray]$0.01[/]  [yellow]⠋ working · Esc aborts · Enter steers[/]
     (Rpc (method_ abort) (params ()) (tag Abort_done))
-    [gray]/work[/]  [gray]m[/]  [gray]think:low[/]  [gray]view:normal[/]  [gray]ctx:0.0%/200k[/]  [gray]$0.01[/]  [red]backend gone · retry 1 in 0s[/]
+    [gray]/work[/]  [gray]m[/]  [gray]think:low[/]  [gray]mode:auto[/]  [gray]view:normal[/]  [gray]ctx:0.0%/200k[/]  [gray]$0.01[/]  [red]backend gone · retry 1 in 0s[/]
     |}];
   (* Without a known window, the tokens are shown instead. *)
   let model = model_json ~context_window:0 "m" "M" in
@@ -8117,7 +8125,7 @@ let%expect_test
     (state_json ~model ~context_tokens:1500 ());
   print_endline (Content.Line.to_plain (Render.status h.model));
   [%expect
-    {| /work  m  think:off  view:normal  ctx:1.5k  $0.01  backend gone · retry 1 in 0s |}]
+    {| /work  m  think:off  mode:auto  view:normal  ctx:1.5k  $0.01  backend gone · retry 1 in 0s |}]
 ;;
 
 let%expect_test "a mode hint that does not fit is cut short, not hidden" =
@@ -8144,7 +8152,7 @@ let%expect_test
       unknown command /modle (back in the editor); did you mean /mode?
     ────────────────────────────────────────────────────────────────────────────────
     > /modle gpt▏
-    /work  deepseek-flash  think:off  view:normal  ctx:0.1%/1.0M  $0.01
+    /work  deepseek-flash  think:off  mode:auto  view:normal  ctx:0.1%/1.0M  $0.01
     |}];
   H.key h (Key.ctrl 'u');
   (* Nothing close: the text is kept, so a long prompt starting with / is not
@@ -8162,7 +8170,7 @@ let%expect_test
       unknown command /usr/bin/env (back in the editor); Tab or / lists commands
     ────────────────────────────────────────────────────────────────────────────────
     > /usr/bin/env is missing on the box▏
-    /work  deepseek-flash  think:off  view:normal  ctx:0.1%/1.0M  $0.01
+    /work  deepseek-flash  think:off  mode:auto  view:normal  ctx:0.1%/1.0M  $0.01
     |}];
   H.key h (Key.ctrl 'u');
   H.keys h "/help thnking";
@@ -8179,7 +8187,7 @@ let%expect_test
       unknown command /thnking (back in the editor); did you mean /thinking?
     ────────────────────────────────────────────────────────────────────────────────
     > /help thnking▏
-    /work  deepseek-flash  think:off  view:normal  ctx:0.1%/1.0M  $0.01
+    /work  deepseek-flash  think:off  mode:auto  view:normal  ctx:0.1%/1.0M  $0.01
     |}]
 ;;
 
@@ -8225,7 +8233,7 @@ let%expect_test
       no session "nope"; /sessions lists them, or Tab after /switch completes
     ────────────────────────────────────────────────────────────────────────────────
     > /switch nope▏
-    /work  deepseek-flash  think:off  view:normal  ctx:0.1%/1.0M  $0.01
+    /work  deepseek-flash  think:off  mode:auto  view:normal  ctx:0.1%/1.0M  $0.01
     |}];
   H.key h (Key.ctrl 'u');
   H.keys h "/cd /nope";
@@ -8285,7 +8293,7 @@ let%expect_test
       not a directory: /nope; Tab after /cd completes directories
     ────────────────────────────────────────────────────────────────────────────────
     > /cd /nope▏
-    /work  deepseek-flash  think:off  view:normal  ctx:0.1%/1.0M  $0.01
+    /work  deepseek-flash  think:off  mode:auto  view:normal  ctx:0.1%/1.0M  $0.01
     |}];
   (* Success behaves as the wrapped tag. *)
   H.key h (Key.ctrl 'u');
@@ -8309,7 +8317,7 @@ let%expect_test
       cwd changed
     ────────────────────────────────────────────────────────────────────────────────
     > ▏
-    /work  deepseek-flash  think:off  view:normal  ctx:0.1%/1.0M  $0.01
+    /work  deepseek-flash  think:off  mode:auto  view:normal  ctx:0.1%/1.0M  $0.01
     |}]
 ;;
 
@@ -8333,7 +8341,7 @@ let%expect_test "a shell command during a turn stays in the editor" =
       in the background now
     ────────────────────────────────────────────────────────────────────────────────
     > !make test▏
-    …deepseek-flash  ctx:0.1%/1.0M  $0.01  ⠋ working · Esc aborts · Enter steers
+    …deepseek-flash  think:off  ctx:0.1%/1.0M  ⠋ working · Esc aborts · Enter steers
     |}]
 ;;
 
@@ -8358,7 +8366,7 @@ let%expect_test "/agents cancel: errors say what exists" =
       no subagent 3; /agents lists them (1–1), Ctrl+D there cancels
     ────────────────────────────────────────────────────────────────────────────────
     > ▏
-    /work  deepseek-flash  think:off  ctx:0.1%/1.0M  $0.01  agents:[main] 1⠋ bg
+    …deepseek-flash  think:off  mode:auto  ctx:0.1%/1.0M  $0.01  agents:[main] 1⠋ bg
     |}]
 ;;
 
@@ -8373,7 +8381,7 @@ let%expect_test
   List.iter [ "b"; "c"; "d" ] ~f:(fun text ->
     H.keys h text;
     H.key h (Key.alt Enter));
-  H.event h (Queue_update { steer = 1; follow_up = 3 });
+  H.event h (Queue_update { steer = [ "a" ]; follow_up = [ "b"; "c"; "d" ] });
   H.show h;
   [%expect
     {|
@@ -8394,7 +8402,7 @@ let%expect_test
     ▌ earlier question
       earlier answer
     ────────────────────────────────────────────────────────────────────────────────
-    queued (4) · Alt+Up edits the last
+    queued (4) · Alt+Up: edit the last · /queue: edit or remove
       steer      a
       follow-up  b
       follow-up  c
@@ -8404,7 +8412,7 @@ let%expect_test
     |}];
   (* The steer is delivered: it shows in the transcript and leaves the block. *)
   H.event h (Message_start (user "a"));
-  H.event h (Queue_update { steer = 0; follow_up = 3 });
+  H.event h (Queue_update { steer = []; follow_up = [ "b"; "c"; "d" ] });
   H.show h;
   [%expect
     {|
@@ -8415,7 +8423,7 @@ let%expect_test
 
     ▌ a
     ────────────────────────────────────────────────────────────────────────────────
-    queued (3) · Alt+Up edits the last
+    queued (3) · Alt+Up: edit the last · /queue: edit or remove
       follow-up  b
       follow-up  c
       follow-up  d
@@ -8424,7 +8432,7 @@ let%expect_test
     |}];
   (* Alt+Up pops the newest. *)
   H.key h (Key.alt Key.Code.Up);
-  H.event h (Queue_update { steer = 0; follow_up = 2 });
+  H.event h (Queue_update { steer = []; follow_up = [ "b"; "c" ] });
   H.reply h Dequeued {|{"text":"d","attachments":[]}|};
   H.show h;
   [%expect
@@ -8441,7 +8449,7 @@ let%expect_test
 
     ▌ a
     ────────────────────────────────────────────────────────────────────────────────
-    queued (2) · Alt+Up edits the last
+    queued (2) · Alt+Up: edit the last · /queue: edit or remove
       follow-up  b
       follow-up  c
     > d▏
@@ -8449,14 +8457,156 @@ let%expect_test
     |}];
   (* Switching sessions forgets the old session's queue. *)
   H.reply ~quiet:true h Reload_messages "{}";
-  print_s
-    [%sexp
-      (h.model.queued : Queue_counts.t)
-    , (h.model.queued_messages : Queued_message.t list)];
+  print_s [%sexp (h.model.queued_messages : Queued_message.t list)];
+  [%expect {| () |}]
+;;
+
+let%expect_test
+    "/queue: any queued message, Enter edits it, Ctrl+D removes it; queued \
+     elsewhere too"
+  =
+  let h = connected ~width:80 ~height:16 () in
+  run h "/queue";
+  H.show h;
   [%expect
     {|
-    (((steer     0)
-      (follow_up 0))
-     ())
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+
+    ▌ earlier question
+      earlier answer
+      nothing queued
+    ────────────────────────────────────────────────────────────────────────────────
+    > ▏
+    /work  deepseek-flash  think:off  mode:auto  view:normal  ctx:0.1%/1.0M  $0.01
+    |}];
+  H.event h (State (state ~running:true ()));
+  (* Queued by another frontend: listed all the same. *)
+  H.event
+    h
+    (Queue_update
+       { steer = [ "steer me" ]; follow_up = [ "first"; "second\nline" ] });
+  run h "/queue";
+  H.show h;
+  [%expect
+    {|
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+
+    ▌ earlier question
+      earlier answer
+      nothing queued
+    Queued  (3)
+    / ▏
+    ▸  steer me     steers the current turn
+       first        follows up after the turn
+       second line  follows up after the turn
+    ────────────────────────────────────────────────────────────────────────────────
+    queued (3) · Alt+Up: edit the last · /queue: edit or remove
+      steer      steer me
+      follow-up  first
+      follow-up  second line
+    …deepseek-flash  ctx:0.1%/1.0M  $0.01  Enter edits · Esc closes · Ctrl+D removes
+    |}];
+  (* Ctrl+D removes the highlighted one. *)
+  H.key h (Key.plain Down);
+  H.key h (Key.ctrl 'd');
+  [%expect
+    {|
+    (Rpc
+      (method_ remove_queued)
+      (params (
+        (queue follow_up)
+        (index 0)
+        (text  first)))
+      (tag (Notice_on_success "removed from the queue: first")))
+    |}];
+  H.event
+    h
+    (Queue_update { steer = [ "steer me" ]; follow_up = [ "second\nline" ] });
+  H.reply h (Notice_on_success "removed from the queue: first") "{}";
+  H.show h;
+  [%expect
+    {|
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+
+    ▌ earlier question
+      earlier answer
+      nothing queued
+      removed from the queue: first
+    ────────────────────────────────────────────────────────────────────────────────
+    queued (2) · Alt+Up: edit the last · /queue: edit or remove
+      steer      steer me
+      follow-up  second line
+    > ▏
+    …deepseek-flash  ctx:0.1%/1.0M  queued:2  ⠋ working · Esc aborts · Enter steers
+    |}];
+  (* Enter pulls one back into the editor. *)
+  run h "/queue";
+  H.key h (Key.plain Down);
+  H.enter h;
+  [%expect
+    {|
+    (Rpc
+      (method_ remove_queued)
+      (params (
+        (queue follow_up)
+        (index 0)
+        (text  "second\nline")))
+      (tag Dequeued))
+    |}];
+  H.event h (Queue_update { steer = [ "steer me" ]; follow_up = [] });
+  H.reply h Dequeued {|{"text":"second\nline","attachments":[]}|};
+  H.show h;
+  [%expect
+    {|
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+
+    ▌ earlier question
+      earlier answer
+      nothing queued
+      removed from the queue: first
+    ────────────────────────────────────────────────────────────────────────────────
+    queued (1) · Alt+Up: edit the last · /queue: edit or remove
+      steer      steer me
+    > second
+      line▏
+    …deepseek-flash  ctx:0.1%/1.0M  queued:1  ⠋ working · Esc aborts · Enter steers
+    |}];
+  (* Delivered or removed meanwhile: the backend says so. *)
+  let h = connected ~width:80 ~height:16 () in
+  H.event h (State (state ~running:true ()));
+  H.event h (Queue_update { steer = [ "steer me" ]; follow_up = [] });
+  run h "/queue";
+  H.key h (Key.ctrl 'd');
+  H.event h (Queue_update { steer = []; follow_up = [] });
+  H.reply_error
+    h
+    (Notice_on_success "removed from the queue: steer me")
+    "that message is no longer queued: it was delivered or removed already";
+  H.show h;
+  [%expect
+    {|
+    (Rpc
+      (method_ remove_queued)
+      (params (
+        (queue steer)
+        (index 0)
+        (text  "steer me")))
+      (tag (Notice_on_success "removed from the queue: steer me")))
+
+
+
+
+
+
+
+
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+
+    ▌ earlier question
+      earlier answer
+      that message is no longer queued: it was delivered or removed already
+    ────────────────────────────────────────────────────────────────────────────────
+    > ▏
+    …deepseek-flash  think:off  ctx:0.1%/1.0M  ⠋ working · Esc aborts · Enter steers
     |}]
 ;;

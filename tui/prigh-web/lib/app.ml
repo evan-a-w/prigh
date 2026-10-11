@@ -63,6 +63,7 @@ module Reply_tag = struct
     | Paths of string
     | Restored
     | Dequeued
+    | Unqueued of string
     | Sessions_deleted
     | Archived_set of
         { title : string
@@ -248,6 +249,8 @@ module Action = struct
     | Cancel_subagent of string
     | Kill_job of string
     | Dequeue
+    | Edit_queued of Queued.Message.t
+    | Remove_queued of Queued.Message.t
     | Toggle_sidebar
     | Answer_confirm of
         { call_id : string
@@ -320,7 +323,7 @@ module Model = struct
     ; completion : Completion.t option
     ; history : History.t
     ; images : Image.t list
-    ; queue : int * int
+    ; queue : Queued.t
     ; confirms : Pending.Confirm.t list
     ; confirm_reason : string option
     ; questions : Question_dialog.t list
@@ -406,7 +409,7 @@ let init =
   ; completion = None
   ; history = History.empty
   ; images = []
-  ; queue = 0, 0
+  ; queue = Queued.empty
   ; confirms = []
   ; confirm_reason = None
   ; questions = []
@@ -457,6 +460,17 @@ let toast (m : Model.t) ?(error = false) ?replaces text =
 ;;
 
 let error m text = toast m ~error:true text
+
+(* At most [max] bytes, cut at a character. *)
+let clamp ?(max = 60) text =
+  if String.length text <= max
+  then text
+  else (
+    let rec cut i =
+      if i > 0 && Char.to_int text.[i] land 0xC0 = 0x80 then cut (i - 1) else i
+    in
+    String.prefix text (cut (max - 1)) ^ "…")
+;;
 
 let drop_toast (m : Model.t) text =
   { m with
@@ -578,6 +592,10 @@ let set_state_without_files (m : Model.t) (state : State.t) =
         Option.bind m.pending.thinking ~f:(fun level ->
           Option.some_if state.model.supports_thinking level)
         |> confirmed state.thinking
+    ; mode =
+        Option.filter
+          m.pending.mode
+          ~f:(Fn.non (Session_mode.equal (Session_mode.of_state state)))
     }
   in
   let m = { m with state = Some state; pending } in
@@ -590,7 +608,7 @@ let set_state_without_files (m : Model.t) (state : State.t) =
       ; confirms = []
       ; confirm_reason = None
       ; questions = []
-      ; queue = 0, 0
+      ; queue = Queued.empty
       ; dialog = Option.filter m.dialog ~f:(Fn.non Dialog.per_session)
       ; agents = { Agents.empty with open_ = m.agents.open_ && not m.narrow }
       ; btw = None
@@ -800,14 +818,23 @@ let logout (m : Model.t) provider =
   else m, [ rpc "logout" [ "provider", str provider ] ]
 ;;
 
+let no_thinking (m : Model.t) (state : State.t) =
+  error
+    m
+    (sprintf
+       "%s has no thinking levels: switch to a model that thinks with /model"
+       state.model.name)
+;;
+
+let open_thinking_picker (m : Model.t) =
+  match m.state with
+  | Some state when not state.model.supports_thinking -> no_thinking m state
+  | _ -> open_picker m (thinking_picker m)
+;;
+
 let set_thinking (m : Model.t) level =
   match m.state with
-  | Some state when not state.model.supports_thinking ->
-    error
-      m
-      (sprintf
-         "%s has no thinking levels: switch to a model that thinks with /model"
-         state.model.name)
+  | Some state when not state.model.supports_thinking -> no_thinking m state
   | state ->
     let unchanged =
       Option.exists state ~f:(fun s -> String.equal s.thinking level)
@@ -1388,6 +1415,7 @@ let set_mode (m : Model.t) (mode : Session_mode.t) =
       { m with
         state =
           Some { s with approval_mode = mode.approval; plan_mode = mode.plan }
+      ; pending = { m.pending with mode = Some mode }
       }
     in
     ( m
@@ -1412,13 +1440,15 @@ let mode_picker (m : Model.t) =
          { kind = Modes
          ; picker =
              Picker.create
-               ~title:"Mode (Alt+M cycles)"
+               ~title:"When tools ask first (Alt+M cycles)"
                (List.map (Session_mode.choices ~current) ~f:(fun mode ->
                   Picker.Item.create
                     ~id:(Session_mode.label mode)
                     ~detail:(Session_mode.describe mode)
+                    ~search:
+                      (Session_mode.label mode ^ " " ^ Session_mode.title mode)
                     ~marked:(Session_mode.equal mode current)
-                    (Session_mode.label mode)))
+                    (Session_mode.title mode)))
          }))
 ;;
 
@@ -2020,7 +2050,7 @@ let user_switched (m : Model.t) (hello : Hello_reply.t) =
     ; confirms = []
     ; confirm_reason = None
     ; questions = []
-    ; queue = 0, 0
+    ; queue = Queued.empty
     ; dialog = None
     ; completion = None
     ; btw = None
@@ -2183,7 +2213,7 @@ let run_command (m : Model.t) ({ name; rest } : Slash.Parsed.t) =
   | "fallback", "" -> with_config m ~f:(fun c -> toast m (fallback_summary m c))
   | "fallback", "off" -> set_fallback m []
   | "fallback", _ -> set_fallback m words
-  | "thinking", "" -> open_picker m (thinking_picker m)
+  | "thinking", "" -> open_thinking_picker m
   | "thinking", level ->
     if List.mem thinking_levels level ~equal:String.equal
     then set_thinking m level
@@ -2704,9 +2734,17 @@ let rec reply_to (m : Model.t) (tag : Reply_tag.t) result =
      | Some (Login flow) ->
        { m with dialog = Some (Login { flow with failed = Some e }) }, []
      | _ -> error m e)
+  | (Dequeued | Unqueued _), Error e ->
+    (* Shown removed at once: the backend's queue is the truth. *)
+    let m, cmds = error m (String.capitalize e) in
+    m, cmds @ [ rpc "get_pending" [] ~tag:Pending ]
   | Mode_set _, Error e ->
     (* The mode shown at once was not taken. *)
-    let m, cmds = error m (sprintf "Couldn't set the mode: %s" e) in
+    let m, cmds =
+      error
+        { m with pending = { m.pending with mode = None } }
+        (sprintf "Couldn't set the mode: %s" e)
+    in
     m, cmds @ [ rpc "get_state" [] ~tag:State ]
   | Command_prompt text, Error e ->
     let m = drop_toast m reading_review in
@@ -2816,7 +2854,10 @@ let rec reply_to (m : Model.t) (tag : Reply_tag.t) result =
       add_waiting
         { m with
           queue =
-            List.length pending.steer_texts, List.length pending.follow_up_texts
+            Queued.update
+              Queued.empty
+              ~steer:pending.steer_texts
+              ~follow_up:pending.follow_up_texts
         }
         ~confirms:pending.confirms
         ~questions:pending.questions)
@@ -2915,6 +2956,8 @@ let rec reply_to (m : Model.t) (tag : Reply_tag.t) result =
        in
        m, cmds @ [ focus_editor ]
      | _ -> m, [])
+  | Unqueued text, Ok _ ->
+    toast m (sprintf "Removed from the queue: %s" (clamp text))
   | Dequeued, Ok json ->
     (match field json "text" with
      | Some (`String text) ->
@@ -3133,7 +3176,21 @@ let main_event (m : Model.t) (event : Event.t) =
   match event with
   | State state -> set_state m state
   | Notice text -> toast m text
-  | Queue_update { steer; follow_up } -> { m with queue = steer, follow_up }, []
+  | Queue_update { steer; follow_up } ->
+    { m with queue = Queued.update m.queue ~steer ~follow_up }, []
+  | Agent_end _ -> { m with queue = Queued.forget_delivering m.queue }, []
+  | Message_start (User user) ->
+    (match Queued.delivered m.queue ~text:(Injected_note.typed user) with
+     | queue, Some q ->
+       toast
+         { m with queue }
+         (sprintf
+            "%s delivered: %s"
+            (match q.kind with
+             | Steer -> "Steer"
+             | Follow_up -> "Follow-up")
+            (clamp (Queued.Message.one_line q)))
+     | _, None -> m, [])
   | Tool_confirm c -> add_waiting m ~confirms:[ c ] ~questions:[]
   | Tool_confirm_done { call_id; agent_id } ->
     if
@@ -3645,7 +3702,7 @@ let update (m : Model.t) (action : Action.t) =
   | Set_model key -> set_model m key
   | Set_thinking level -> set_thinking m level
   | Open_model_picker -> open_picker m (model_picker m)
-  | Open_thinking_picker -> open_picker m (thinking_picker m)
+  | Open_thinking_picker -> open_thinking_picker m
   | Open_help -> open_dialog m Help
   | Open_rename -> open_rename m
   | Open_subagents arg -> open_agents m arg
@@ -3712,6 +3769,16 @@ let update (m : Model.t) (action : Action.t) =
   | Cancel_subagent id -> stop m (Agent id)
   | Kill_job id -> stop m (Job id)
   | Dequeue -> m, [ rpc "dequeue" [] ~tag:Dequeued ]
+  | Edit_queued q ->
+    ( { m with queue = Queued.remove m.queue q }
+    , [ rpc "remove_queued" (Queued.Message.remove_params q) ~tag:Dequeued ] )
+  | Remove_queued q ->
+    ( { m with queue = Queued.remove m.queue q }
+    , [ rpc
+          "remove_queued"
+          (Queued.Message.remove_params q)
+          ~tag:(Unqueued q.text)
+      ] )
   | Toggle_sidebar -> { m with sidebar_open = not m.sidebar_open }, []
   | Answer_confirm { call_id; agent_id; answer = Deny_with_reason } ->
     (match m.confirms with

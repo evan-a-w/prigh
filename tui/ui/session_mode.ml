@@ -41,6 +41,16 @@ let of_name ~current name =
    mode" lists the tools that ask. *)
 let others_ask = "bash, job_input and MCP tools ask first"
 
+let title t =
+  if t.plan
+  then "Plan mode"
+  else (
+    match t.approval with
+    | Ask -> "Asks: edits & commands"
+    | Auto_edit -> "Asks: commands"
+    | Auto -> "Auto: never asks")
+;;
+
 let describe t =
   if t.plan
   then "read-only planning: no file edits; " ^ others_ask

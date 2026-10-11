@@ -3,8 +3,8 @@ open! Import
 
 (** What we asked the backend for and are waiting on, so that the page shows
     every action at once: the session being opened, its transcript loading,
-    prompts sent but not yet in the transcript, the model or thinking level
-    chosen but not yet confirmed. *)
+    prompts sent but not yet in the transcript, the model, thinking level or
+    mode chosen but not yet confirmed. *)
 
 module Session : sig
   type t =
@@ -29,6 +29,7 @@ type t =
   ; sending : int (** prompts, steers and follow-ups not yet answered *)
   ; model : string option (** a model key, until the backend confirms it *)
   ; thinking : string option
+  ; mode : Session_mode.t option (** approval mode and plan mode *)
   }
 [@@deriving sexp_of]
 

@@ -125,6 +125,7 @@ let view (m : App.Model.t) ~inject =
       [ classes [ "composer" ] [ "offline", not connected; "sending", sending ]
       ]
     [ popup m ~inject
+    ; Queue_view.view m ~inject
     ; div
         ~cls:"composer-box"
         [ images m ~inject

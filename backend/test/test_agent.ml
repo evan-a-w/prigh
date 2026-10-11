@@ -314,6 +314,61 @@ let%expect_test "dequeue pops the most recently queued message" =
     |}]
 ;;
 
+let%expect_test "remove_queued takes out one message, if it is still there" =
+  with_agent
+    [ Reply.tool_call
+        ~id:"c1"
+        ~name:"bash"
+        ~arguments:{|{"command":"sleep 0.2"}|}
+        ()
+    ; Reply.text "done"
+    ; Reply.text "after"
+    ]
+  @@ fun _t agent dump ->
+  Or_error.ok_exn (Agent.prompt agent "go");
+  Or_error.ok_exn (Agent.steer agent "first");
+  Or_error.ok_exn (Agent.steer agent "second");
+  Or_error.ok_exn (Agent.follow_up agent "later");
+  let remove queue ~index ~text =
+    print_s
+      [%sexp
+        (Agent.remove_queued agent ~queue ~index ~text
+         |> Or_error.map ~f:(fun (q : Agent.Queued.t) -> q.text)
+         : string Or_error.t)]
+  in
+  remove `Steer ~index:0 ~text:(Some "first");
+  (* Stale: "first" is gone, "second" is now at 0. *)
+  remove `Steer ~index:0 ~text:(Some "first");
+  remove `Steer ~index:3 ~text:None;
+  print_s [%sexp (Agent.queued_texts agent : string list * string list)];
+  remove `Follow_up ~index:0 ~text:None;
+  Agent.wait_idle agent;
+  dump ();
+  [%expect
+    {|
+    (Ok first)
+    (Error
+     "that message is no longer queued: it was delivered or removed already")
+    (Error
+     "that message is no longer queued: it was delivered or removed already")
+    ((second) (later))
+    (Ok later)
+    state: running=true messages=0
+    user: go
+    queue: steer=1 follow_up=0
+    queue: steer=2 follow_up=0
+    queue: steer=2 follow_up=1
+    queue: steer=1 follow_up=1
+    queue: steer=1 follow_up=0
+    assistant:
+    tool_result:
+    queue: steer=0 follow_up=0
+    user: second
+    assistant: done
+    state: running=false messages=5
+    |}]
+;;
+
 let%expect_test "model and thinking changes persist across session reload" =
   with_agent [ Reply.text "ok" ]
   @@ fun t agent _dump ->

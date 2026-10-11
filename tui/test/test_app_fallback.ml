@@ -98,7 +98,7 @@ let%expect_test
       deepseek/deepseek-flash (now on deepseek/deepseek-flash)
     ────────────────────────────────────────────────────────────
     > ▏
-    …deepseek-flash  think:off  ctx:0.1%/1.0M  $0.01
+    …deepseek-flash  think:off  mode:auto  ctx:0.1%/1.0M  $0.01
     |}]
 ;;
 
@@ -173,7 +173,7 @@ let%expect_test
       deepseek/deepseek-flash (now on deepseek/deepseek-flash)
     ────────────────────────────────────────────────────────────
     > ▏
-    …deepseek-flash  think:off  ctx:0.1%/1.0M  $0.01
+    …deepseek-flash  think:off  mode:auto  ctx:0.1%/1.0M  $0.01
     |}];
   (* Names and prefixes are the backend's to resolve, like /model's. *)
   H.keys h "/fallback gpt-5.5 zzz";
@@ -202,7 +202,7 @@ let%expect_test
       openai/gpt-5.5 (GPT-5.5)
     ────────────────────────────────────────────────────────────
     > /fallback gpt-5.5 zzz▏
-    …deepseek-flash  think:off  ctx:0.1%/1.0M  $0.01
+    …deepseek-flash  think:off  mode:auto  ctx:0.1%/1.0M  $0.01
     |}];
   print_s [%sexp (h.model.config : P.Config.t option)];
   [%expect
@@ -246,7 +246,7 @@ let%expect_test "/fallback off clears the chain" =
       chain that takes over when a model's usage runs out
     ────────────────────────────────────────────────────────────
     > ▏
-    …deepseek-flash  think:off  ctx:0.1%/1.0M  $0.01
+    …deepseek-flash  think:off  mode:auto  ctx:0.1%/1.0M  $0.01
     |}]
 ;;
 
@@ -341,7 +341,7 @@ let%expect_test
       cannot save /home/u/.prigh/config.json: Permission denied
     ────────────────────────────────────────────────────────────
     > /default-dir /no such▏
-    …deepseek-flash  think:off  ctx:0.1%/1.0M  $0.01
+    …deepseek-flash  think:off  mode:auto  ctx:0.1%/1.0M  $0.01
     |}]
 ;;
 
@@ -427,7 +427,7 @@ let%expect_test
       fixed it
     ────────────────────────────────────────────────────────────
     > ▏
-    /work  claude-fable-5-1  think:off  ctx:0.1%/1.0M  $0.01
+    …claude-fable-5-1  think:off  mode:auto  ctx:0.1%/1.0M
     |}];
   (* Verbose adds the error; quiet keeps the line. *)
   H.keys h "/verbosity verbose";
@@ -451,7 +451,7 @@ let%expect_test
       view: verbose — everything is shown
     ────────────────────────────────────────────────────────────
     > ▏
-    /work  claude-fable-5-1  think:off  ctx:0.1%/1.0M  $0.01
+    …claude-fable-5-1  think:off  mode:auto  ctx:0.1%/1.0M
 
     ▌ earlier question
       earlier answer
@@ -465,7 +465,7 @@ let%expect_test
       fixed it
     ────────────────────────────────────────────────────────────
     > ▏
-    /work  claude-fable-5-1  think:off  ctx:0.1%/1.0M  $0.01
+    …claude-fable-5-1  think:off  mode:auto  ctx:0.1%/1.0M
     |}]
 ;;
 
@@ -506,7 +506,7 @@ let%expect_test "a hand-over in the history and in /fork's list" =
       fixed it
     ────────────────────────────────────────────────────────────
     > ▏
-    …deepseek-flash  think:off  ctx:0.1%/1.0M  $0.01
+    …deepseek-flash  think:off  mode:auto  ctx:0.1%/1.0M  $0.01
     (Rpc (method_ get_entries) (params ()) (tag Entries_for_fork))
     ▌ earlier question
       earlier answer

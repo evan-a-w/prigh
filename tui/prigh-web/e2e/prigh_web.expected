@@ -26,7 +26,9 @@ Ctrl+K find a session
 New session
 <CWD>
 DeepSeek V4.1 Flash
+Thinking
 on
+Auto: never asks
 === chromium: a dialog keeps the focus ===
 Tab: dialog: Close (Esc)
 Tab: dialog: Keys
@@ -55,7 +57,9 @@ three lines
 count some lines
 <CWD>
 DeepSeek V4.1 Flash
+Thinking
 on
+Auto: never asks
 === chromium: a budget in the status line ===
 Ready
 0%
@@ -313,13 +317,42 @@ anything new?
 === chromium: the model saw the note ===
 [Environment: the working directory is now <CWD>/sub. Project instructions for it may differ from the ones above. Re-reading AGENTS.md/CLAUDE.md there is at your discretion: they are often unchanged, and missing an update is not serious.]
 anything new?
+=== chromium: the model, thinking and mode controls ===
+DeepSeek V4.1 Flash
+Thinking
+on
+Auto: never asks
+=== chromium: the thinking picker ===
+Thinking level
+off
+answer straight away
+low
+a little
+on
+the provider's default budget
+✓
+high
+more
+max
+as much as the model allows
+↑↓ to move, Enter to choose, Esc to close
+=== chromium: the mode picker ===
+When tools ask first (Alt+M cycles)
+Asks: edits & commands
+bash, edits and MCP tools ask first
+Asks: commands
+file edits run; bash and MCP tools ask first
+Auto: never asks
+tools run without asking
+✓
+Plan mode
+read-only planning: no file edits, commands ask first
+↑↓ to move, Enter to choose, Esc to close
 === chromium: mode ask ===
-Ready
-0%
-↑0 ↓0
-$<COST>
-ask
-token
+DeepSeek V4.1 Flash
+Thinking
+high
+Asks: edits & commands
 === chromium: a confirmation ===
 Confirm
 Run bash: echo built-ok?
@@ -364,11 +397,15 @@ A: SQLite
 SQLite it is.
 <TIME>
 === chromium: plan mode (Alt+M) ===
+DeepSeek V4.1 Flash
+Thinking
+high
+Plan mode
+=== chromium: plan mode: the status line ===
 Ready
 0%
 ↑0 ↓0
 $<COST>
-plan
 token
 === chromium: a plan to approve ===
 Plan
@@ -382,6 +419,11 @@ Keep planning
 r
 Keep planning, saying what to change
 === chromium: the plan approved ===
+DeepSeek V4.1 Flash
+Thinking
+high
+Auto: never asks
+=== chromium: the plan approved: the status line ===
 Ready
 0%
 ↑0 ↓0
@@ -413,6 +455,24 @@ Allowed this session: bash(echo:*)
 Rules are permissions in ~/.prigh/config.json, e.g. {"allow": ["bash(git status:*)"], "deny": ["bash(rm:*)"]}.
 /mode or Alt+M switches the mode.
 Done
+=== chromium: two queued messages ===
+Steers this turn
+also check the docs
+Edit
+After this turn
+then write the changelog
+Edit
+=== chromium: one removed ===
+Steers this turn
+also check the docs
+Edit
+=== chromium: the steer delivered ===
+Steer delivered: also check the docs
+=== chromium: the steer in the transcript ===
+also check the docs
+<TIME>
+Done waiting.
+<TIME>
 === chromium: archived, folded ===
 one more
 <AGE>
@@ -684,7 +744,9 @@ Ctrl+K find a session
 New session
 <CWD>
 DeepSeek V4.1 Flash
+Thinking
 on
+Auto: never asks
 === firefox: a dialog keeps the focus ===
 Tab: dialog: Close (Esc)
 Tab: dialog: Keys
@@ -713,7 +775,9 @@ three lines
 count some lines
 <CWD>
 DeepSeek V4.1 Flash
+Thinking
 on
+Auto: never asks
 === firefox: a budget in the status line ===
 Ready
 0%
@@ -971,13 +1035,42 @@ anything new?
 === firefox: the model saw the note ===
 [Environment: the working directory is now <CWD>/sub. Project instructions for it may differ from the ones above. Re-reading AGENTS.md/CLAUDE.md there is at your discretion: they are often unchanged, and missing an update is not serious.]
 anything new?
+=== firefox: the model, thinking and mode controls ===
+DeepSeek V4.1 Flash
+Thinking
+on
+Auto: never asks
+=== firefox: the thinking picker ===
+Thinking level
+off
+answer straight away
+low
+a little
+on
+the provider's default budget
+✓
+high
+more
+max
+as much as the model allows
+↑↓ to move, Enter to choose, Esc to close
+=== firefox: the mode picker ===
+When tools ask first (Alt+M cycles)
+Asks: edits & commands
+bash, edits and MCP tools ask first
+Asks: commands
+file edits run; bash and MCP tools ask first
+Auto: never asks
+tools run without asking
+✓
+Plan mode
+read-only planning: no file edits, commands ask first
+↑↓ to move, Enter to choose, Esc to close
 === firefox: mode ask ===
-Ready
-0%
-↑0 ↓0
-$<COST>
-ask
-token
+DeepSeek V4.1 Flash
+Thinking
+high
+Asks: edits & commands
 === firefox: a confirmation ===
 Confirm
 Run bash: echo built-ok?
@@ -1022,11 +1115,15 @@ A: SQLite
 SQLite it is.
 <TIME>
 === firefox: plan mode (Alt+M) ===
+DeepSeek V4.1 Flash
+Thinking
+high
+Plan mode
+=== firefox: plan mode: the status line ===
 Ready
 0%
 ↑0 ↓0
 $<COST>
-plan
 token
 === firefox: a plan to approve ===
 Plan
@@ -1040,6 +1137,11 @@ Keep planning
 r
 Keep planning, saying what to change
 === firefox: the plan approved ===
+DeepSeek V4.1 Flash
+Thinking
+high
+Auto: never asks
+=== firefox: the plan approved: the status line ===
 Ready
 0%
 ↑0 ↓0
@@ -1071,6 +1173,24 @@ Allowed this session: bash(echo:*)
 Rules are permissions in ~/.prigh/config.json, e.g. {"allow": ["bash(git status:*)"], "deny": ["bash(rm:*)"]}.
 /mode or Alt+M switches the mode.
 Done
+=== firefox: two queued messages ===
+Steers this turn
+also check the docs
+Edit
+After this turn
+then write the changelog
+Edit
+=== firefox: one removed ===
+Steers this turn
+also check the docs
+Edit
+=== firefox: the steer delivered ===
+Steer delivered: also check the docs
+=== firefox: the steer in the transcript ===
+also check the docs
+<TIME>
+Done waiting.
+<TIME>
 === firefox: archived, folded ===
 one more
 <AGE>
