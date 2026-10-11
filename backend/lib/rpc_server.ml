@@ -74,6 +74,7 @@ let methods =
   ; "auth_cancel"
   ; "logout"
   ]
+  @ Files_rpc.methods
 ;;
 
 let param params name =
@@ -1597,7 +1598,13 @@ let handle t client (request : Json.t) : Json.t =
          else (
            match dispatch_server t client ~meth ~params with
            | Some result -> result
-           | None -> dispatch (agent_of_client t client) t.login ~meth ~params)
+           | None ->
+             (match
+                Files_rpc.dispatch (agent_of_client t client) ~meth ~params
+              with
+              | Some result -> result
+              | None ->
+                dispatch (agent_of_client t client) t.login ~meth ~params))
        with
        | result -> result
        | exception exn ->

@@ -496,6 +496,18 @@ val set_cwd : t -> path:string -> unit Or_error.t
     host (for [@] completion). *)
 val list_paths : t -> prefix:string -> Json.t Or_error.t
 
+(** Runs the host operation [name] (see {!Host_files}) on the active tool
+    host, in the session cwd; [stdin] and [on_output] stream to and from
+    it. *)
+val host_call
+  :  t
+  -> ?stdin:Stdin_feed.t
+  -> ?cancel:Cancellation.t
+  -> ?on_output:(string -> unit)
+  -> name:string
+  -> Json.t
+  -> Tool.Result.t
+
 (** Directory completions for [prefix] (absolute, [~/] or relative to the
     session cwd on that host), listed on [host] (default: the active one),
     in the notation the prefix used. *)

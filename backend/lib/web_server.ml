@@ -198,6 +198,14 @@ let handle ~root ~websockets ~on_lines flow =
          let ws = Websocket.create ~reader ~flow () in
          on_websocket ~query:request.query ws;
          Websocket.close ws)
+    | Some request when File_http.handles ~path:request.path ->
+      File_http.serve
+        ~meth:request.meth
+        ~path:request.path
+        ~query:request.query
+        ~headers:request.headers
+        ~reader
+        flow
     | Some request ->
       (match root with
        | None ->
