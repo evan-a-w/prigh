@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # Runs the browser e2e (prigh_web.mjs, which starts and restarts the backend,
 # then accounts.mjs, the account switcher on a backend with users, then
-# reconnect.mjs, losing the connection on a phone) in each
+# reconnect.mjs, losing the connection on a phone, then paging.mjs, a long
+# session loaded a page at a time) in each
 # browser and diffs the output with prigh_web.expected. Needs node,
 # PLAYWRIGHT_MODULE (the playwright package's index.mjs) and
 # PLAYWRIGHT_BROWSERS_PATH, tmux (on the PATH or $PRIGH_TMUX) for the
@@ -34,6 +35,7 @@ for engine in ${ENGINES:-chromium firefox}; do
 	TEST_DIR="$tmp/$engine" node "$here/prigh_web.mjs" "$engine" >>"$actual"
 	TEST_DIR="$tmp/$engine" node "$here/accounts.mjs" "$engine" >>"$actual"
 	TEST_DIR="$tmp/$engine" node "$here/reconnect.mjs" "$engine" >>"$actual"
+	TEST_DIR="$tmp/$engine" node "$here/paging.mjs" "$engine" >>"$actual"
 done
 
 if [ "${UPDATE:-}" = 1 ]; then

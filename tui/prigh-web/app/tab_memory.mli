@@ -10,8 +10,9 @@ open! Core
 val save_scroll : Js_of_ocaml.Dom_html.element Js_of_ocaml.Js.t -> unit
 
 (** The first time the chat is to go to its end after the page loaded: where
-    it was in the URL's session before the reload, unless that was its end.
-    Later calls give [None]. *)
+    it was in the URL's session before the reload (how far its top was from
+    the end of the transcript), unless that was its end. Later calls give
+    [None]. *)
 val take_scroll : unit -> float option
 
 val save_draft : string -> unit
