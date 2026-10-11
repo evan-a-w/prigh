@@ -3632,7 +3632,8 @@ let event m (e : P.Event.t) =
   | Tool_exec_input _
   | Terminal_open _
   | Terminal_frame _
-  | Terminal_close _ -> m, []
+  | Terminal_close _
+  | Terminal_kill _ -> m, []
   | Sessions_changed ->
     if sessions_picker_shown m || Option.is_some m.sessions
     then m, [ rpc "list_sessions" ~tag:Sessions_refresh ]

@@ -290,3 +290,76 @@ let%expect_test "terminal relay: target, frames both ways, closes, host loss" =
     relay finished: true
     |}]
 ;;
+
+(* Deleting a session ends its terminals on the hosts that ran one: those
+   with the [terminal_kill] feature are told to kill the shell; older hosts
+   only hear that the browser went away (their idle timeout ends it). *)
+let%expect_test "deleting a session kills its terminals on the hosts" =
+  with_sandbox
+  @@ fun t ->
+  Eio.Switch.run
+  @@ fun sw ->
+  let _agent, h =
+    Test_rpc.make_server t ~sw ~provider:(Faux_provider.create [])
+  in
+  let doomed =
+    Session.create ~dir:(Filename.concat t.dir "sessions") ~cwd:t.dir ()
+  in
+  ignore (Session.append_message doomed (Message.user "hi") : Session.Entry.t);
+  let key = Session.id doomed in
+  let connect ~host_id ~features =
+    let sent = Queue.create () in
+    let client = Rpc_server.connect h.server ~send:(Queue.enqueue sent) in
+    ignore
+      (Rpc_server.handle
+         h.server
+         client
+         (`Object
+             [ "id", `Number "1"
+             ; "method", `String "hello"
+             ; ( "params"
+               , `Object
+                   [ "name", `String host_id
+                   ; "tools", `True
+                   ; "host_id", `String host_id
+                   ; ( "features"
+                     , `Array (List.map features ~f:(fun f -> `String f)) )
+                   ] )
+             ])
+       : Json.t);
+    sent
+  in
+  let laptop = connect ~host_id:"host-laptop" ~features:[ "terminal_kill" ] in
+  let old = connect ~host_id:"host-old" ~features:[] in
+  let other = connect ~host_id:"host-other" ~features:[ "terminal_kill" ] in
+  (* The laptop's browser went away earlier (its shell lives on there); the
+     old host's is still attached; the other host never ran one for it. *)
+  let gone = Browser.open_ ~sw h ~host:"host-laptop" ~key ~cwd:"/x" in
+  Terminal_channel.Fed.close gone.fed;
+  let attached = Browser.open_ ~sw h ~host:"host-old" ~key ~cwd:"/x" in
+  settle ();
+  List.iter [ laptop; old; other ] ~f:Queue.clear;
+  request
+    h
+    t
+    h.client
+    "delete_session"
+    (`Object [ "path", `String (Session.path doomed) ]);
+  settle ();
+  List.iter
+    [ "laptop", laptop; "old", old; "other", other ]
+    ~f:(fun (name, sent) ->
+      printf "%s:\n" name;
+      print_terminal_events t sent);
+  Browser.print attached;
+  [%expect
+    {|
+    {"type":"response","id":"delete_session","ok":true,"result":{}}
+    laptop:
+    {"type":"event","event":"terminal_kill","host":"host-laptop","key":"<id>"}
+    old:
+    {"type":"event","event":"terminal_close","host":"host-old","term_id":"term-2"}
+    other:
+    relay finished: true
+    |}]
+;;

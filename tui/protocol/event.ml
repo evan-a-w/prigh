@@ -119,6 +119,7 @@ type t =
       ; data : string
       }
   | Terminal_close of string
+  | Terminal_kill of string
   | Btw_delta of
       { btw_id : string
       ; delta : string
@@ -237,6 +238,7 @@ let rec of_json j =
     Terminal_frame { term_id; kind; data }
   | "terminal_close" ->
     Json.string_field j "term_id" >>| fun id -> Terminal_close id
+  | "terminal_kill" -> Json.string_field j "key" >>| fun key -> Terminal_kill key
   | "btw_delta" ->
     let%bind btw_id = Json.string_field j "btw_id" in
     let%map delta = Json.string_field j "delta" in

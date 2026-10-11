@@ -816,7 +816,10 @@ two can share one.
   other frontends, or unknown; otherwise its files go, it leaves the agents
   table, and its terminal is killed (`on_session_deleted`, wired to
   `Terminals.kill` by `main`, keyed by `terminal_key`; relayed ones are
-  closed with `Terminal_relay.close_key`). Every client of the server (not
+  closed with `Terminal_relay.close_key`, and every connected host that ran
+  a terminal for the key and announced the `terminal_kill` feature gets
+  `{"event":"terminal_kill","key"}` and kills its shell; older hosts end it
+  by their idle timeout). Every client of the server (not
   only the session's) gets `{"type":"event","event":"sessions_changed"}`
   when something `list_sessions` shows changes: a session's `running`,
   `background`, persisted, name or description (compared per live session
@@ -916,7 +919,8 @@ two can share one.
   active host (`Rpc_server.terminal_target`). `Terminals.serve` speaks to an
   abstract frame channel (a WebSocket, or frames fed by a relay). For a
   client host the backend relays the browser socket as `terminal_open` /
-  `terminal_frame` / `terminal_close` events to that host and its
+  `terminal_frame` / `terminal_close` (and, once the session is deleted,
+  `terminal_kill`) events to that host and its
   `terminal_frame` / `terminal_closed` requests back; the host runs the same
   `Terminals` code (`Tool_host`, also behind the TUI's stdio worker, which
   forwards the same messages as lines).
@@ -1151,7 +1155,8 @@ copy of the protocol types and the e2e test guards the contract.
     terminal's `Tool_host` forwards them to its `prigh tool-host` worker
     (`"stdin": true` on `exec`, `{"type":"input",…}`), and
     `Term_app.connection_hello` with local tools announces `"features":
-    ["exec_input"]`.
+    ["exec_input", "terminal_kill"]` (`Terminal_kill` goes to the worker,
+    which kills that session's shell).
   - `Key.t` → `Intent.t` through `Keymap` (the one binding table; `/help`
     prints it). `Mode.t` (`Editing | Picker | Login_prompt | Text_prompt |
     Confirm | Question | Search`) says who owns the keyboard; dialogs never
