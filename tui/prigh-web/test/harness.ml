@@ -36,7 +36,8 @@ let act t action =
      | Save_notifications _
      | Set_title _
      | Files _
-     | Save_size _ -> ());
+     | Save_size _
+     | Keep_scroll_position -> ());
     if not t.quiet then print_s [%sexp (command : App.Command.t)])
 ;;
 
@@ -69,9 +70,15 @@ let event t json =
 ;;
 
 let state_json ?(fields = []) () =
+  (* A session's path goes with its id, unless given. *)
+  let id =
+    match List.Assoc.find fields ~equal:String.equal "session_id" with
+    | Some (`String id) -> id
+    | _ -> "s1"
+  in
   let defaults =
     [ "session_id", `String "s1"
-    ; "session_path", `String "/sessions/s1.jsonl"
+    ; "session_path", `String (sprintf "/sessions/%s.jsonl" id)
     ; "session_name", `Null
     ; "session_description", `Null
     ; "cwd", `String "/work"
@@ -224,6 +231,23 @@ let connecting () =
   t
 ;;
 
+(* A [get_messages_page] answer: [messages] (a JSON array), then how many
+   come before them. *)
+let page ?(older = 0) ?before messages =
+  sprintf
+    {|{"messages":%s,"older":%d,"before":%s}|}
+    messages
+    older
+    (match before with
+     | Some b -> sprintf "%S" b
+     | None -> "null")
+;;
+
+(* The reply tag of the newest page of session [s] ([/sessions/s.jsonl]). *)
+let newest s : App.Reply_tag.t =
+  Page { path = sprintf "/sessions/%s.jsonl" s; before = None }
+;;
+
 let create ?(verbose = false) ?(sessions = "[]") ?(state = state_json ()) () =
   let t = { model = App.init; pending = []; quiet = not verbose } in
   act t Start;
@@ -231,7 +255,7 @@ let create ?(verbose = false) ?(sessions = "[]") ?(state = state_json ()) () =
   reply t "list_models" models_json;
   reply t "auth_status" auth_json;
   reply t "get_config" config_json;
-  reply t "get_messages" "[]";
+  reply t "get_messages_page" (page "[]");
   reply t "list_sessions" sessions;
   act t (Tick now);
   t.quiet <- false;

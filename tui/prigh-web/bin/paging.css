@@ -1,0 +1,52 @@
+/* Earlier messages not loaded yet, above the transcript: a quiet line, like
+   a fold's toggle, that loads them (as does scrolling near the top). */
+
+.older {
+  max-width: 820px;
+  margin: 0 auto 14px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--faint);
+  font: 12px/1.5 var(--sans);
+}
+.older::after {
+  content: "";
+  flex: 1;
+  border-top: 1px solid var(--rule);
+}
+.older .count { font: 11.5px var(--mono); }
+.older.busy { gap: 8px; color: var(--muted); }
+.load-older, .load-output {
+  border: 0;
+  padding: 2px 0;
+  background: none;
+  color: var(--muted);
+  font: inherit;
+  cursor: pointer;
+}
+.load-older:hover, .load-output:hover { color: var(--fg); }
+.load-older:focus-visible, .load-output:focus-visible {
+  outline: 2px solid var(--sodium);
+  outline-offset: 2px;
+  border-radius: 3px;
+}
+
+/* An output cut in the middle: its first lines, how many more there are and
+   a button to load them, its last lines. */
+.output.elided .gap {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 2px 12px;
+  color: var(--faint);
+  font: 12px/1.5 var(--sans);
+}
+.output.elided .gap::before,
+.output.elided .gap::after {
+  content: "";
+  flex: 1;
+  border-top: 1px dashed var(--faint);
+  opacity: 0.4;
+}
+.output.elided .gap::before { flex: 0 0 12px; }

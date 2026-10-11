@@ -46,6 +46,7 @@ let as_call (s : P.Content.Server_tool.t) =
       ; is_error = s.is_error
       ; images = []
       ; at = None
+      ; elided = None
       }) )
 ;;
 

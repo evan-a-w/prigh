@@ -66,6 +66,14 @@ val text : ?selector:string -> t -> unit
 (** The tag and class of each element [selector] matches. *)
 val elements : selector:string -> t -> unit
 
+(** A [get_messages_page] answer: [messages] (a JSON array) and how many
+    messages come before them ([before] asks for those). *)
+val page : ?older:int -> ?before:string -> string -> string
+
+(** The reply tag of the newest page of session [s]
+    ([/sessions/<s>.jsonl]). *)
+val newest : string -> Prigh_web.App.Reply_tag.t
+
 (** A state as JSON, with [fields] overriding the defaults (or added). *)
 val state_json : ?fields:(string * Jsonaf.t) list -> unit -> string
 

@@ -62,6 +62,7 @@ module Tool_result = struct
     ; is_error : bool
     ; images : Image.t list [@sexp.list]
     ; at : Time_ns.Alternate_sexp.t option [@sexp.option]
+    ; elided : Elided.t option [@sexp.option]
     }
   [@@deriving sexp_of, equal]
 
@@ -72,8 +73,13 @@ module Tool_result = struct
     let%bind text = Json.string_field j "text" in
     let%bind is_error = Json.bool_field j "is_error" in
     let%bind images = Json.optional_list_field j "images" ~f:Image.of_json in
-    let%map at = Json.time_ms_opt_field j "at" in
-    { tool_call_id; tool_name; text; is_error; images; at }
+    let%bind at = Json.time_ms_opt_field j "at" in
+    let%map elided =
+      match Json.field j "elided" with
+      | None -> Ok None
+      | Some e -> Or_error.map (Elided.of_json e) ~f:Option.some
+    in
+    { tool_call_id; tool_name; text; is_error; images; at; elided }
   ;;
 end
 

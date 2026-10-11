@@ -40,6 +40,8 @@ module Tool_result : sig
     ; is_error : bool
     ; images : Image.t list [@sexp.list]
     ; at : Time_ns.Alternate_sexp.t option [@sexp.option]
+    ; elided : Elided.t option [@sexp.option]
+    (** [text] is cut short ([get_messages_page]) *)
     }
   [@@deriving sexp_of, equal]
 

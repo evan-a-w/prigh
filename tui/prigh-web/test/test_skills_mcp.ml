@@ -277,7 +277,9 @@ let%expect_test
   [%expect
     {|
     (Set_url_session s2)
-    (Rpc (method_ get_messages) (params ()) (tag (Messages s2)))
+    (Rpc (method_ get_messages_page)
+     (params ((session /sessions/s2.jsonl) (limit 60)))
+     (tag (Page (path /sessions/s2.jsonl) (before ()))))
     (Rpc (method_ get_pending) (params ()) (tag Pending))
     (Rpc (method_ list_sessions) (params ()) (tag Sessions))
     (Rpc (method_ list_subagents) (params ()) (tag Subagents))
@@ -317,7 +319,9 @@ let%expect_test
     (Rpc (method_ get_config) (params ()) (tag Config))
     ()
     (Set_url_session s2)
-    (Rpc (method_ get_messages) (params ()) (tag (Messages s2)))
+    (Rpc (method_ get_messages_page)
+     (params ((session /sessions/s2.jsonl) (limit 60)))
+     (tag (Page (path /sessions/s2.jsonl) (before ()))))
     (Rpc (method_ get_pending) (params ()) (tag Pending))
     (Rpc (method_ list_sessions) (params ()) (tag Sessions))
     (Rpc (method_ list_subagents) (params ()) (tag Subagents))
@@ -414,10 +418,16 @@ let%expect_test "an invoked skill in the page: verbosity classes, /fork" =
   H.act
     h
     (Reply
-       ( Messages "s1"
+       ( H.newest "s1"
        , Ok
-           (`Array
-               [ `Object [ "role", `String "user"; "text", `String skill_text ]
+           (`Object
+               [ ( "messages"
+                 , `Array
+                     [ `Object
+                         [ "role", `String "user"; "text", `String skill_text ]
+                     ] )
+               ; "older", `Number "0"
+               ; "before", `Null
                ]) ));
   H.act h Cycle_verbosity;
   H.act h Cycle_verbosity;
@@ -428,6 +438,7 @@ let%expect_test "an invoked skill in the page: verbosity classes, /fork" =
     (Expire_toast (id 0) (after_ms 3740))
     (Expire_toast (id 1) (after_ms 4660))
     <div id="chat" class="chat verbosity-quiet">
+      <Vdom.Node.none-widget> </Vdom.Node.none-widget>
       <div class="entries">
         <div class="msg skill user">
           <details class="skill-card">
@@ -698,7 +709,9 @@ let%expect_test "/mcp with only problems; the dialog closes with the session" =
   [%expect
     {|
     (Set_url_session s2)
-    (Rpc (method_ get_messages) (params ()) (tag (Messages s2)))
+    (Rpc (method_ get_messages_page)
+     (params ((session /sessions/s2.jsonl) (limit 60)))
+     (tag (Page (path /sessions/s2.jsonl) (before ()))))
     (Rpc (method_ get_pending) (params ()) (tag Pending))
     (Rpc (method_ list_sessions) (params ()) (tag Sessions))
     (Rpc (method_ list_subagents) (params ()) (tag Subagents))

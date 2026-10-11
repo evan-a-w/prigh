@@ -56,7 +56,10 @@ let%expect_test
          data-session="s1"
          title="/sessions/s1.jsonl"
          class="selected session"
-         @on_click>
+         @on_click
+         @on_focus
+         @on_pointerdown
+         @on_pointerenter>
       <Vdom.Node.none-widget> </Vdom.Node.none-widget>
       <div class="session-mark">
         <span title="Open in the backend" class="live">  </span>
@@ -167,6 +170,9 @@ let%expect_test "switching resets what belonged to the old session" =
     {|
     (Rpc (method_ switch_session) (params ((path /sessions/s2.jsonl)))
      (tag Reload_state))
+    (Rpc (method_ get_messages_page)
+     (params ((session /sessions/s2.jsonl) (limit 60)))
+     (tag (Page (path /sessions/s2.jsonl) (before ()))))
     (Focus editor)
     |}];
   H.event
@@ -184,7 +190,6 @@ let%expect_test "switching resets what belonged to the old session" =
     {|
     (Rpc (method_ btw_cancel) (params ((btw_id btw-1))) (tag Ignore))
     (Set_url_session s2)
-    (Rpc (method_ get_messages) (params ()) (tag (Messages s2)))
     (Rpc (method_ get_pending) (params ()) (tag Pending))
     (Rpc (method_ list_sessions) (params ()) (tag Sessions))
     (Rpc (method_ list_subagents) (params ()) (tag Subagents))
@@ -226,7 +231,9 @@ let%expect_test
   [%expect
     {|
     (Set_url_session s2)
-    (Rpc (method_ get_messages) (params ()) (tag (Messages s2)))
+    (Rpc (method_ get_messages_page)
+     (params ((session /sessions/s2.jsonl) (limit 60)))
+     (tag (Page (path /sessions/s2.jsonl) (before ()))))
     (Rpc (method_ get_pending) (params ()) (tag Pending))
     (Rpc (method_ list_sessions) (params ()) (tag Sessions))
     (Rpc (method_ list_subagents) (params ()) (tag Subagents))
@@ -235,8 +242,9 @@ let%expect_test
   H.act
     h
     (Reply
-       ( Messages "s1"
-       , Ok (Jsonaf.of_string {|[{"role":"user","text":"from s1"}]|}) ));
+       ( H.newest "s1"
+       , Ok (Jsonaf.of_string @@ H.page {|[{"role":"user","text":"from s1"}]|})
+       ));
   print_s [%sexp (List.length (Prigh_web.Chat.entries (H.model h).chat) : int)];
   [%expect {| 0 |}];
   H.reply
@@ -256,9 +264,10 @@ let%expect_test
     |}];
   H.reply
     h
-    "get_messages"
-    {|[{"role":"user","text":"clean up"},
-       {"role":"assistant","content":[{"type":"tool_call","id":"c1","name":"bash","arguments":"{\"command\":\"rm -rf build\"}"}],"stop_reason":{"type":"tool_use"},"usage":{"input":0,"output":0,"cache_read":0},"model":"m"}]|};
+    "get_messages_page"
+    (H.page
+       {|[{"role":"user","text":"clean up"},
+       {"role":"assistant","content":[{"type":"tool_call","id":"c1","name":"bash","arguments":"{\"command\":\"rm -rf build\"}"}],"stop_reason":{"type":"tool_use"},"usage":{"input":0,"output":0,"cache_read":0},"model":"m"}]|});
   H.show h ~selector:".tool";
   [%expect
     {|
@@ -443,6 +452,9 @@ let%expect_test
     (Focus session-search)
     (Rpc (method_ switch_session) (params ((path /sessions/s3.jsonl)))
      (tag Reload_state))
+    (Rpc (method_ get_messages_page)
+     (params ((session /sessions/s3.jsonl) (limit 60)))
+     (tag (Page (path /sessions/s3.jsonl) (before ()))))
     (Focus editor)
     false
     |}];
@@ -492,7 +504,9 @@ let%expect_test "new session and switching session reload the state" =
     {|
     (Rpc (method_ get_state) (params ()) (tag State))
     (Set_url_session s2)
-    (Rpc (method_ get_messages) (params ()) (tag (Messages s2)))
+    (Rpc (method_ get_messages_page)
+     (params ((session /sessions/s2.jsonl) (limit 60)))
+     (tag (Page (path /sessions/s2.jsonl) (before ()))))
     (Rpc (method_ get_pending) (params ()) (tag Pending))
     (Rpc (method_ list_sessions) (params ()) (tag Sessions))
     (Rpc (method_ list_subagents) (params ()) (tag Subagents))
@@ -500,7 +514,7 @@ let%expect_test "new session and switching session reload the state" =
     (New session)
     Loading the session…
     |}];
-  Harness.reply h "get_messages" "[]";
+  Harness.reply h "get_messages_page" (Harness.page "[]");
   Harness.text h ~selector:".chat";
   [%expect
     {|
@@ -521,6 +535,9 @@ let%expect_test "new session and switching session reload the state" =
     {|
     (Rpc (method_ switch_session) (params ((path /sessions/s3.jsonl)))
      (tag Reload_state))
+    (Rpc (method_ get_messages_page)
+     (params ((session /sessions/s3.jsonl) (limit 60)))
+     (tag (Page (path /sessions/s3.jsonl) (before ()))))
     (Focus editor)
     <div class="session-mark">
       <span title="Opening…" class="lamp"> </span>
@@ -543,14 +560,16 @@ let%expect_test "new session and switching session reload the state" =
     {|
     (Rpc (method_ get_state) (params ()) (tag State))
     (Set_url_session s3)
-    (Rpc (method_ get_messages) (params ()) (tag (Messages s3)))
     (Rpc (method_ get_pending) (params ()) (tag Pending))
     (Rpc (method_ list_sessions) (params ()) (tag Sessions))
     (Rpc (method_ list_subagents) (params ()) (tag Subagents))
     (Rpc (method_ list_jobs) (params ()) (tag Jobs))
     Loading the session…
     |}];
-  Harness.reply h "get_messages" {|[{"role":"user","text":"older work"}]|};
+  Harness.reply
+    h
+    "get_messages_page"
+    (Harness.page {|[{"role":"user","text":"older work"}]|});
   Harness.text h ~selector:".chat";
   [%expect
     {|
@@ -567,6 +586,9 @@ let%expect_test "new session and switching session reload the state" =
     {|
     (Rpc (method_ switch_session) (params ((path /sessions/s1.jsonl)))
      (tag Reload_state))
+    (Rpc (method_ get_messages_page)
+     (params ((session /sessions/s1.jsonl) (limit 60)))
+     (tag (Page (path /sessions/s1.jsonl) (before ()))))
     (Focus editor)
     older work
     Couldn't open the session: no such session
@@ -576,7 +598,7 @@ let%expect_test "new session and switching session reload the state" =
   Harness.quiet h (fun () ->
     Harness.reply h "switch_session" "{}";
     Harness.reply h "get_state" (Harness.state_json ()));
-  Harness.fail h "get_messages" "disk on fire";
+  Harness.fail h "get_messages_page" "disk on fire";
   Harness.text h ~selector:".chat";
   Harness.text h ~selector:".toast";
   [%expect
@@ -584,13 +606,7 @@ let%expect_test "new session and switching session reload the state" =
     (Rpc (method_ switch_session) (params ((path /sessions/s1.jsonl)))
      (tag Reload_state))
     (Focus editor)
-    What are we building?
-    /work
-    / commands
-    @ mention a file
-    ! run a command
-    Ctrl+L switch model
-    Ctrl+K find a session
+    hello
     Couldn't load the session's messages: disk on fire. Reload the page to try again.
     |}]
 ;;
@@ -636,6 +652,9 @@ let%expect_test
     (Switch_session /sessions/s3.jsonl)
     (Rpc (method_ switch_session) (params ((path /sessions/s3.jsonl)))
      (tag Reload_state))
+    (Rpc (method_ get_messages_page)
+     (params ((session /sessions/s3.jsonl) (limit 60)))
+     (tag (Page (path /sessions/s3.jsonl) (before ()))))
     (Focus editor)
     (Ask_delete /sessions/s3.jsonl)
     (Focus dialog)
@@ -650,6 +669,9 @@ let%expect_test
     Open_first_session
     (Rpc (method_ switch_session) (params ((path /sessions/s2.jsonl)))
      (tag Reload_state))
+    (Rpc (method_ get_messages_page)
+     (params ((session /sessions/s2.jsonl) (limit 60)))
+     (tag (Page (path /sessions/s2.jsonl) (before ()))))
     (Focus editor)
     |}]
 ;;
@@ -671,9 +693,11 @@ let%expect_test "switching: the reply carries the new state, saving a round trip
   [%expect {|
     (Rpc (method_ switch_session) (params ((path /sessions/s3.jsonl)))
      (tag Reload_state))
+    (Rpc (method_ get_messages_page)
+     (params ((session /sessions/s3.jsonl) (limit 60)))
+     (tag (Page (path /sessions/s3.jsonl) (before ()))))
     (Focus editor)
     (Set_url_session s3)
-    (Rpc (method_ get_messages) (params ()) (tag (Messages s3)))
     (Rpc (method_ get_pending) (params ()) (tag Pending))
     (Rpc (method_ list_sessions) (params ()) (tag Sessions))
     (Rpc (method_ list_subagents) (params ()) (tag Subagents))

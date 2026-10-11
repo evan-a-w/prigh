@@ -846,6 +846,7 @@ let%expect_test "bash timeout is merged into the tool line at each verbosity" =
     ; is_error = true
     ; images = []
     ; at = None
+    ; elided = None
     }
   in
   let item =
@@ -1038,6 +1039,7 @@ let edit_result text : Prigh_protocol.Message.Tool_result.t =
   ; is_error = false
   ; images = []
   ; at = None
+  ; elided = None
   }
 ;;
 
@@ -1092,6 +1094,7 @@ let tool_result ?(is_error = false) text : Prigh_protocol.Message.Tool_result.t 
   ; is_error
   ; images = []
   ; at = None
+  ; elided = None
   }
 ;;
 

@@ -142,7 +142,9 @@ let%expect_test "the panel follows the session, the host and the user" =
   [%expect
     {|
     (Set_url_session s2)
-    (Rpc (method_ get_messages) (params ()) (tag (Messages s2)))
+    (Rpc (method_ get_messages_page)
+     (params ((session /sessions/s2.jsonl) (limit 60)))
+     (tag (Page (path /sessions/s2.jsonl) (before ()))))
     (Rpc (method_ get_pending) (params ()) (tag Pending))
     (Rpc (method_ list_sessions) (params ()) (tag Sessions))
     (Rpc (method_ list_subagents) (params ()) (tag Subagents))
@@ -160,7 +162,7 @@ let%expect_test "the panel follows the session, the host and the user" =
     ((session s2)(host c7)(online true)(as_user())(generation 0))
     |}];
   (* A superuser acting as bob gets bob's terminal. *)
-  H.reply h "get_messages" "[]";
+  H.reply h "get_messages_page" (H.page "[]");
   H.act
     h
     (Hello { client_id = "c1"; namespace = Some "bob"; user = Some "alice" });

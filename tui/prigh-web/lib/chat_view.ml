@@ -349,6 +349,14 @@ and entry ~fold times chat (entry : Chat.Entry.t) =
     ~equal:Deps.equal
     ~f:(fun () -> render_entry ~fold times chat entry)
 
+(* Entries keep their keys as older ones are added before them, so that the
+   page moves their nodes rather than redrawing every one. *)
+and keyed key (node : Node.t) : Node.t =
+  match node with
+  | Lazy { t; key = _ } -> Lazy { key = Some key; t }
+  | Element element -> Element (Node.Element.with_key element key)
+  | node -> node
+
 (* Days are marked where they change, not above the first message: its time
    already says which day it is. *)
 and view ?(fold = Fold.default) times chat =
@@ -365,19 +373,21 @@ and entries_view ~fold times chat =
     | Assistant { message; _ } -> message.at
     | Notice _ | Shell _ | Compaction _ -> None
   in
-  let _, rev_nodes =
+  let _, _, rev_nodes =
     List.fold
       (Chat.entries chat)
-      ~init:(None, [])
-      ~f:(fun (last_day, rev_nodes) e ->
+      ~init:(None, Chat.first chat, [])
+      ~f:(fun (last_day, i, rev_nodes) e ->
         let day = Option.map (entry_time e) ~f:(Message_time.date times) in
         let rev_nodes =
           match last_day, day with
           | Some last, Some day when not (Date.equal last day) ->
-            day_separator times day :: rev_nodes
+            keyed (sprintf "day%d" i) (day_separator times day) :: rev_nodes
           | _ -> rev_nodes
         in
-        Option.first_some day last_day, entry ~fold times chat e :: rev_nodes)
+        ( Option.first_some day last_day
+        , i + 1
+        , keyed (Int.to_string i) (entry ~fold times chat e) :: rev_nodes ))
   in
   div "entries" (List.rev rev_nodes)
 ;;

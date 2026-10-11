@@ -30,7 +30,10 @@ let%expect_test "reconnecting after the backend goes away" =
   Harness.act h (Reply (Reconnect 0, Error "stale"));
   Harness.act h (Reply (Reconnect 1, Ok (Jsonaf.of_string "{}")));
   Harness.reply h "get_state" (Harness.state_json ());
-  Harness.reply h "get_messages" {|[{"role":"user","text":"hello"}]|};
+  Harness.reply
+    h
+    "get_messages_page"
+    (Harness.page {|[{"role":"user","text":"hello"}]|});
   Harness.text h ~selector:".chat";
   let m = Harness.model h in
   print_s
@@ -46,7 +49,10 @@ let%expect_test "reconnecting after the backend goes away" =
     (Rpc (method_ auth_status) (params ()) (tag (Auth_status Refresh)))
     (Rpc (method_ get_config) (params ()) (tag Config))
     (Set_url_session s1)
-    (Rpc (method_ get_messages) (params ()) (tag (Messages s1)))
+    (Rpc (method_ get_messages_page)
+     (params ((session /sessions/s1.jsonl) (limit 60)))
+     (tag (Page (path /sessions/s1.jsonl) (before ()))))
+    Scroll_to_bottom
     (Rpc (method_ get_pending) (params ()) (tag Pending))
     (Rpc (method_ list_sessions) (params ()) (tag Sessions))
     (Rpc (method_ list_subagents) (params ()) (tag Subagents))

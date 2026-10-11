@@ -7,10 +7,11 @@ let%expect_test "a reloaded subagent call fetches its transcript" =
   Harness.act
     h
     (Reply
-       ( Messages "s1"
+       ( Harness.newest "s1"
        , Ok
            (Jsonaf.of_string
-              {|[
+            @@ Harness.page
+                 {|[
     {"role":"user","text":"delegate"},
     {"role":"assistant","content":[{"type":"tool_call","id":"s1","name":"subagent","arguments":"{\"task\":\"count files\"}"},{"type":"tool_call","id":"s2","name":"subagent","arguments":"{\"task\":\"old one\"}"}],"stop_reason":{"type":"tool_use"},"usage":{"input":0,"output":0,"cache_read":0},"model":"m"},
     {"role":"tool_result","tool_call_id":"s1","tool_name":"subagent","text":"3 files","is_error":false},
@@ -39,8 +40,10 @@ let%expect_test "a reloaded subagent call fetches its transcript" =
   [%expect
     {|
     Scroll_to_bottom
-    (Rpc (method_ get_subagent) (params ((id s1))) (tag (Subagent s1)))
-    (Rpc (method_ get_subagent) (params ((id s2))) (tag (Subagent s2)))
+    (Rpc (method_ get_subagent) (params ((id s1) (elide true)))
+     (tag (Subagent s1)))
+    (Rpc (method_ get_subagent) (params ((id s2) (elide true)))
+     (tag (Subagent s2)))
     ((s1 ((a1 2))) (s2 ()))
     0
     |}]

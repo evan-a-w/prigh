@@ -301,16 +301,16 @@ let%expect_test
   Chat_harness.show ~selector:".day-sep" chat;
   [%expect
     {|
-    <div role="separator" class="day-sep">
+    <div @key=day1 role="separator" class="day-sep">
       <span> Thu 1 Jan </span>
     </div>
-    <div role="separator" class="day-sep">
+    <div @key=day3 role="separator" class="day-sep">
       <span> Sat 3 Oct </span>
     </div>
-    <div role="separator" class="day-sep">
+    <div @key=day4 role="separator" class="day-sep">
       <span> Yesterday </span>
     </div>
-    <div role="separator" class="day-sep">
+    <div @key=day5 role="separator" class="day-sep">
       <span> Today </span>
     </div>
     |}]

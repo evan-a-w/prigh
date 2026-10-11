@@ -255,6 +255,8 @@ let perform client settings ctx (model : App.Model.t) (command : App.Command.t) 
     | Set_title title -> Effect.of_sync_fun Page_notifications.set_title title
     | Files page -> Effect.of_sync_fun Files_widget.perform page
     | Save_size save -> Effect.of_sync_fun Resize_widget.save save
+    | Keep_scroll_position ->
+      Effect.of_sync_fun Paging_listeners.keep_position ()
   in
   Bonsai.Apply_action_context.schedule_event ctx eff
 ;;
@@ -615,6 +617,7 @@ let install_listeners ~schedule ~current =
         else read_images ~schedule data##.files);
     Js._true);
   Chat_listeners.install ~schedule;
+  Paging_listeners.install ~schedule;
   Agents_listeners.install ~schedule;
   Terminal_widget.install ~schedule;
   (* The chat follows new output unless the user has scrolled up. The page

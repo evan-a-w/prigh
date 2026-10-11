@@ -280,6 +280,7 @@ let tool ?result name arguments =
           ; is_error
           ; images = []
           ; at = None
+          ; elided = None
           })
     ; live_tail = None
     ; subagent = None

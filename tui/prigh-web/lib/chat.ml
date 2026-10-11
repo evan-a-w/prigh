@@ -5,6 +5,7 @@ type t =
   { rev_entries : entry list
   ; tools : tool String.Map.t
   ; running : bool
+  ; first : int
   }
 
 and entry =
@@ -73,7 +74,11 @@ module Entry = struct
   [@@deriving sexp_of]
 end
 
-let empty = { rev_entries = []; tools = String.Map.empty; running = false }
+let empty =
+  { rev_entries = []; tools = String.Map.empty; running = false; first = 0 }
+;;
+
+let first t = t.first
 let running t = t.running
 let entries t = List.rev t.rev_entries
 let tool t id = Map.find t.tools id
@@ -169,6 +174,17 @@ let shell_command (call : Tool_call.t) =
 
 let of_messages ?(running = false) messages =
   List.fold messages ~init:{ empty with running } ~f:add_message
+;;
+
+let prepend t messages =
+  let older = of_messages messages in
+  { t with
+    rev_entries = t.rev_entries @ older.rev_entries
+  ; tools =
+      Map.merge_skewed older.tools t.tools ~combine:(fun ~key:_ _ newer ->
+        newer)
+  ; first = t.first - List.length older.rev_entries
+  }
 ;;
 
 let subagents_to_load t =
@@ -324,4 +340,25 @@ let set_nested_subagent t ~parent ~call_id subagent =
   | Some parent ->
     map_subagent t parent ~f:(fun s ->
       { s with chat = set_subagent s.chat ~call_id subagent })
+;;
+
+let find_tool t ~agent_id ~call_id =
+  match agent_id with
+  | None -> tool t call_id
+  | Some agent_id ->
+    Option.bind (find_subagent t agent_id) ~f:(fun s -> tool s.chat call_id)
+;;
+
+let set_output t ~agent_id ~call_id text =
+  let set chat =
+    update_tool chat call_id ~f:(fun tool ->
+      { tool with
+        result =
+          Option.map tool.result ~f:(fun r -> { r with text; elided = None })
+      })
+  in
+  match agent_id with
+  | None -> set t
+  | Some agent_id ->
+    map_subagent t agent_id ~f:(fun s -> { s with chat = set s.chat })
 ;;

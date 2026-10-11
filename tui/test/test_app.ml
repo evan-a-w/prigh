@@ -197,6 +197,7 @@ let%expect_test "prompt, streaming with embedded newlines, tool call, steer \
            ; is_error = false
            ; images = []
            ; at = None
+           ; elided = None
            }
        });
   H.event h (Queue_update { steer = []; follow_up = [] });
@@ -5227,6 +5228,7 @@ let%expect_test "bash result at Normal shows the head and tail" =
            ; is_error = false
            ; images = []
            ; at = None
+           ; elided = None
            }
        });
   H.show h;
@@ -5685,6 +5687,7 @@ let%expect_test "bash timeout is merged into the tool line" =
            ; is_error = true
            ; images = []
            ; at = None
+           ; elided = None
            }
        });
   H.show h;

@@ -61,7 +61,49 @@ let live ~lines ~tail text =
     ]
 ;;
 
-let view ?(error = false) ?(from_end = error) ~fold:(fold, key) ~lines text =
+let load_attribute = "data-load-output"
+
+(* A cut output: its first lines and its last, the rest fetched when it is
+   shown whole. *)
+let elided ~error ~from_end ~fold:(fold, key) ~lines (e : Elided.t) text =
+  let head, tail = Elided.split e text in
+  let head = trim head
+  and tail = trim tail in
+  let classes, body =
+    if Fold.expanded fold key
+    then (
+      let hidden = Int.max 0 (e.lines - count_lines head - count_lines tail) in
+      ( [ "expanded"; "elided" ]
+      , [ pre head
+        ; Node.div
+            ~attrs:[ Attr.class_ "gap" ]
+            [ Node.text (Chat_html.plural hidden "more line")
+            ; Node.button
+                ~attrs:
+                  [ Attr.class_ "load-output"
+                  ; Attr.type_ "button"
+                  ; Attr.create load_attribute key
+                  ]
+                [ Node.text "Load them" ]
+            ]
+        ; pre tail
+        ; Fold.button fold key ~total:e.lines ~shown:lines
+        ] ))
+    else
+      ( [ "clipped"; (if from_end then "from-end" else "from-start") ]
+      , [ pre
+            (if from_end then tail_lines tail lines else head_lines head lines)
+        ; Fold.button fold key ~total:e.lines ~shown:lines
+        ] )
+  in
+  Chat_html.div
+    (String.concat
+       ~sep:" "
+       ("output" :: ((if error then [ "error" ] else []) @ classes)))
+    body
+;;
+
+let plain ~error ~from_end ~fold:(fold, key) ~lines text =
   let text = trim text in
   let total = count_lines text in
   let classes, body =
@@ -81,4 +123,10 @@ let view ?(error = false) ?(from_end = error) ~fold:(fold, key) ~lines text =
        ~sep:" "
        ("output" :: ((if error then [ "error" ] else []) @ classes)))
     body
+;;
+
+let view ?(error = false) ?(from_end = error) ?elided:cut ~fold ~lines text =
+  match cut with
+  | Some e -> elided ~error ~from_end ~fold ~lines e text
+  | None -> plain ~error ~from_end ~fold ~lines text
 ;;
