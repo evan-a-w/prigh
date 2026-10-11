@@ -726,7 +726,9 @@ two can share one.
   (`timed_messages`: each with its entry's time, as a `Timed_message.t`;
   the summary has none). Nothing is
   written to disk until the first message (or name): an abandoned empty
-  session leaves no file. `list` returns name, description, cwd,
+  session leaves no file. After that, entries are only appended to the
+  existing file (no `O_CREAT`), so a session deleted while something still
+  holds it (its description being written) is not recreated. `list` returns name, description, cwd,
   timestamps, message count, first prompt, parent, the `Archived` value
   after the last message (if any), the last activity (the last message's
   time, else the mtime, or a later unarchiving) and `bytes` (disk usage of

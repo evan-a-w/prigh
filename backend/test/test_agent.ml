@@ -1234,6 +1234,41 @@ let%expect_test
     |}]
 ;;
 
+let%expect_test "auto-describe: a session deleted meanwhile is not recreated" =
+  let agent = ref None in
+  let path () = Session.path (Agent.session (Option.value_exn !agent)) in
+  with_agent
+    ~auto_describe:true
+    ~on_request:(fun (r : Provider.Request.t) ->
+      (* The description is asked for: the session goes meanwhile. *)
+      if Option.exists r.system ~f:(String.is_prefix ~prefix:"Describe")
+      then (
+        Session.delete_files (path ());
+        print_endline "deleted while describing"))
+    [ Reply.text "one"; Reply.text "two"; Reply.text "About deleting" ]
+  @@ fun _t a dump ->
+  agent := Some a;
+  List.iter [ "a"; "b" ] ~f:(fun p ->
+    Or_error.ok_exn (Agent.prompt a p);
+    Agent.wait_idle a);
+  printf "file exists: %b\n" (Sys_unix.file_exists_exn (path ()));
+  dump ();
+  [%expect
+    {|
+    deleted while describing
+    file exists: false
+    state: running=true messages=0
+    user: a
+    assistant: one
+    state: running=false messages=2
+    state: running=true messages=2
+    user: b
+    assistant: two
+    state: running=false messages=4
+    state: running=false messages=4
+    |}]
+;;
+
 let%expect_test "session_description: cleaning replies" =
   List.iter
     [ "Fixing the build"
