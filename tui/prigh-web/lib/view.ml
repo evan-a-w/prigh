@@ -171,6 +171,10 @@ let view (m : Model.t) ~inject ~terminal =
           ; "narrow", m.narrow
           ; "agents-open", m.agents.open_
           ; "terminal-open", m.terminal.open_
+          ; ( "offline"
+            , match m.connection with
+              | Reconnecting _ -> true
+              | Connected -> false )
           ]
       ]
     [ under_sheet (Sidebar_view.view m ~inject)

@@ -201,7 +201,11 @@ let%expect_test
   =
   let h = H.create () in
   H.text h ~selector:".status";
-  [%expect {| Ready 0% ↑0 ↓0 $0.0000 |}];
+  [%expect
+    {|
+    Ready 0% ↑0 ↓0 $0.0000
+    (Notifications not allowed yet: click to ask the browser)
+    |}];
   H.act
     h
     (Hello { client_id = "c1"; namespace = Some "bob"; user = Some "ann" });
@@ -213,7 +217,7 @@ let%expect_test
     (Rpc (method_ list_subagents) (params ()) (tag Subagents))
     (Rpc (method_ list_jobs) (params ()) (tag Jobs))
     Working 75% ↑123k ↓7.9k $1.2345 (3 queued) laptop
-    (ann as bob)
+    (Notifications not allowed yet: click to ask the browser) (ann as bob)
     |}];
   H.show h ~selector:".context";
   [%expect

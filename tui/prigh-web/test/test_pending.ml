@@ -169,7 +169,7 @@ let%expect_test "a model or thinking level chosen shows until confirmed" =
     (Rpc (method_ set_thinking) (params ((thinking max))) (tag Thinking_set))
     (max)
     (Claude Sonnet 5) (on) (Terminal (Ctrl+`))
-    no such level
+    No such level
     |}]
 ;;
 
@@ -211,7 +211,7 @@ let%expect_test "a command that lists something opens its dialog at once" =
     {|
     <div class="loading-dialog modal">
     (Focus editor)
-    no session file yet
+    No session file yet
     |}]
 ;;
 

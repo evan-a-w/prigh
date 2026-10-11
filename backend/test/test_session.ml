@@ -280,6 +280,24 @@ let%expect_test "list" =
   [%expect {| ((/a ("first question") 2)) |}]
 ;;
 
+let%expect_test "a session's first prompt is the user's, without the notes" =
+  with_dir
+  @@ fun dir ->
+  let a = Session.create ~dir ~cwd:"/a" () in
+  List.iter
+    [ "[Plan mode is on: investigate, do not edit files.]"
+    ; "[Plan mode is on: investigate, do not edit files.]\n\nfix the build"
+    ]
+    ~f:(fun text ->
+      let (_ : Session.Entry.t) = Session.append_message a (Message.user text) in
+      ());
+  print_s
+    [%sexp
+      (List.map (Session.list ~dir) ~f:(fun s -> s.first_prompt)
+       : string option list)];
+  [%expect {| (("fix the build")) |}]
+;;
+
 let%expect_test "nothing is written until a message or a name" =
   with_dir
   @@ fun dir ->

@@ -267,7 +267,7 @@ let%expect_test
     (Expire_toast (id 3) (after_ms 4000))
     (Rpc (method_ git_diff) (params ()) (tag Git_diff))
     No changes in /work against HEAD
-    not a git repository: /work (git init starts one, or /cd into one)
+    Not a git repository: /work (git init starts one, or /cd into one)
     |}]
 ;;
 
@@ -290,6 +290,7 @@ let%expect_test
     [/review main look at errors]
     (Send (Enter))
     Ready 0% ↑0 ↓0 $0.0000
+    (Notifications not allowed yet: click to ask the browser)
     |}];
   H.quiet h (fun () -> H.act h (Set_draft ""));
   H.event
@@ -450,5 +451,55 @@ let%expect_test
     (Save_history ("/notify loud" /notify))
     This browser cannot show notifications here (they need https or localhost); the tab's title still counts what happened
     Unknown /notify argument "loud": /notify on or /notify off (/notify alone says what is on)
+    |}]
+;;
+
+let%expect_test
+    "the status line shows whether notifications are on; its bell turns them \
+     on and off"
+  =
+  let h = H.create () in
+  let bell () =
+    H.elements h ~selector:".status .notify";
+    H.text h ~selector:".status .notify"
+  in
+  H.act h (Set_notifications { enabled = true; permission = "granted" });
+  bell ();
+  [%expect
+    {|
+    <button class="link notify on status-item">
+    (Notifications on (/notify off))
+    |}];
+  H.quiet h (fun () -> H.click h ~selector:".status .notify");
+  bell ();
+  [%expect
+    {|
+    (Run "/notify off")
+    <button class="link notify off status-item">
+    (Notifications off (/notify on))
+    |}];
+  H.click h ~selector:".status .notify";
+  bell ();
+  [%expect
+    {|
+    (Run "/notify on")
+    (Save_notifications true)
+    (Expire_toast (id 1) (after_ms 4000))
+    <button class="link notify on status-item">
+    (Notifications on (/notify off))
+    |}];
+  H.act h (Set_notifications { enabled = true; permission = "denied" });
+  bell ();
+  [%expect
+    {|
+    <button class="link notify status-item warm">
+    (Notifications blocked by the browser: click for how to allow them)
+    |}];
+  H.act h (Set_notifications { enabled = true; permission = "unsupported" });
+  bell ();
+  [%expect
+    {|
+    <button class="link notify off status-item">
+    (Notifications need https or localhost)
     |}]
 ;;

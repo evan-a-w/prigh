@@ -396,6 +396,7 @@ let%expect_test "/verbosity and Ctrl+O" =
       <Vdom.Node.none-widget> </Vdom.Node.none-widget>
     </div>
     Ready 0% ↑0 ↓0 $0.0000 (quiet)
+    (Notifications not allowed yet: click to ask the browser)
     |}];
   H.key h "o" ~ctrl:true;
   H.key h "o" ~ctrl:true;
@@ -412,7 +413,11 @@ let%expect_test "/verbosity and Ctrl+O" =
     Unknown verbosity "loud": use quiet, normal or verbose.
     |}];
   H.text h ~selector:".status";
-  [%expect {| Ready 0% ↑0 ↓0 $0.0000 (verbose) |}]
+  [%expect
+    {|
+    Ready 0% ↑0 ↓0 $0.0000 (verbose)
+    (Notifications not allowed yet: click to ask the browser)
+    |}]
 ;;
 
 let%expect_test "/confirm" =
@@ -444,6 +449,7 @@ let%expect_test "/confirm" =
        "Tool confirmation on (mode ask, also for new sessions): bash, edits and MCP tools ask first")))
     (Expire_toast (id 0) (after_ms 4000))
     Ready 0% ↑0 ↓0 $0.0000 (ask)
+    (Notifications not allowed yet: click to ask the browser)
     (Save_history ("/confirm off" /confirm))
     (Rpc (method_ set_config) (params ((config ((approval_mode auto)))))
      (tag
@@ -1321,7 +1327,7 @@ let%expect_test "/setusr: a superuser acts as another user, and back" =
     (Focus editor)
     Acting as bob
     Back to alice
-    unauthorised: bob is not a superuser
+    Unauthorised: bob is not a superuser
     |}]
 ;;
 

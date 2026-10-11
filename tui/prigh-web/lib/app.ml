@@ -1819,7 +1819,7 @@ let prompt_failed (m : Model.t) e =
         dialog = Some (Prompt { prompt with busy = false; error = Some e })
       }
     , [] )
-  | _ -> error m e
+  | _ -> error m (String.capitalize e)
 ;;
 
 let prompt_succeeded (m : Model.t) =
@@ -2681,7 +2681,8 @@ let reply_to (m : Model.t) (tag : Reply_tag.t) result =
     if Model.running m
     then toast m "Queued: it starts when the current run ends"
     else m, []
-  | Git_diff, Error e -> error (drop_toast m reading_changes) e
+  | Git_diff, Error e ->
+    error (drop_toast m reading_changes) (String.capitalize e)
   | Git_diff, Ok json ->
     let m = drop_toast m reading_changes in
     decode m json Git_diff.of_json ~f:(fun diff ->
@@ -2722,10 +2723,14 @@ let reply_to (m : Model.t) (tag : Reply_tag.t) result =
           again."
          e)
   | Model_set, Error e ->
-    error { m with pending = { m.pending with model = None } } e
+    error
+      { m with pending = { m.pending with model = None } }
+      (String.capitalize e)
   | Thinking_set, Error e ->
-    error { m with pending = { m.pending with thinking = None } } e
-  | _, Error e -> error m e
+    error
+      { m with pending = { m.pending with thinking = None } }
+      (String.capitalize e)
+  | _, Error e -> error m (String.capitalize e)
   | Sent _, Ok _ ->
     { m with pending = In_flight.answered m.pending ~failed:None }, []
   | Model_set, Ok _ -> { m with pending = { m.pending with model = None } }, []

@@ -1305,18 +1305,18 @@ copy of the protocol types and the e2e test guards the contract.
       for the agents panel), jobs and `job_input`, `web_fetch` with its URL
       as a link and the page folded, and `server_tool`, the card a
       `web_search` block gets among the message's text, from the streamed
-      partial message: a spinner while it runs, then a folded list of
+      partial message: the work lamp while it runs, then a folded list of
       result links),
       `Delivery_view` (reports of finished background work, parsed by
       `ui/`'s `Delivery`), `Markdown` (a total parser that also renders
       streaming prefixes) and `Markdown_view`, `Image_view`,
-      `Output_view`. Outputs fold as the TUI's `Tool_render` folds them
-      (bash: the first 5 and last 3 lines, other tools 5, errors 8, a read
-      file none, diffs 8 rows), behind `Fold.button`s: a `data-fold` key
+      `Output_view`. Outputs fold to their first 6 lines (an error's last
+      6; a read file none, diffs 8 rows), faded by a CSS mask where they go
+      on, behind `Fold.button`s: a `data-fold` key
       (the call id, scoped by the subagent's id in nested transcripts, or
       `job:<id>` in deliveries) that `Chat_listeners` turns into
       `Toggle_fold`; folded text is not rendered. Running calls show only
-      their last 5 lines (`Output_view.live`, no toggle), and `Chat` keeps
+      their last 6 lines (`Output_view.live`, no toggle), and `Chat` keeps
       only the last 32-64 KB of streamed output with a count of its lines,
       so a long stream costs the same per chunk. While a reply streams,
       `Markdown_view` cuts it at `Markdown.block_starts` (top-level blocks
@@ -1361,13 +1361,15 @@ copy of the protocol types and the e2e test guards the contract.
       showing; only Ctrl+` (by `code`) is ours, toggling the panel.
     - Around it: `Sidebar_view`/`Session_list` (fuzzy search, ages from
       `Rel_time`; active sessions, then a divider with the archived ones'
-      count, size and "Delete all", muted; a session is running while its
+      count that folds them (`Model.archived_open`, `Session_list.shown`,
+      which keyboard navigation follows; a search shows them), muted, and
+      "Delete archived"; a session is running while its
       turn or background work runs (`list_sessions`' `running`, and
       `Model.active` for the current one); the list is refetched on
       `sessions_changed`, never polled; each row's archive/unarchive and
       delete buttons; `Session_marks`, the selection mode: clicks and
       Space mark, shift-click and Shift+Space mark the range from the last
-      one; the `Delete` dialog (`Dialog.Delete_target`: paths or every
+      one, and a bar at the list's foot deletes them; the `Delete` dialog (`Dialog.Delete_target`: paths or every
       archived one) lists them with their sizes and warns about those the
       backend will keep, running, open elsewhere or our own, and the
       `Delete_result` reply is a toast), `Topbar_view`, `Composer_view` with `Completion`
@@ -1384,7 +1386,9 @@ copy of the protocol types and the e2e test guards the contract.
       sidebar's account button and the account menu, a `Picker` of
       accounts and actions) over `Accounts` (the saved sign-ins in
       localStorage, behind a `Storage` record so that tests use a table),
-      `Status_view` (with the mode and plan chips), and `Keys` (which of the
+      `Status_view` (with the mode and plan chips and the notifications
+      bell), `Html.lamp` (the work-in-progress sign everywhere; `View` marks
+      the page `offline` while reconnecting, which stills the others), and `Keys` (which of the
       dialog, the popup or the editor owns a key; `help`, and `browser`:
       the TUI's keys that the browser keeps).
     - Approvals: the confirmation dialog (`Dialog_view`, answers from

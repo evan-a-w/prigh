@@ -33,7 +33,11 @@ let%expect_test "the mode chip, Alt+M, and set_mode's reply or failure" =
   let h = H.create () in
   (* [auto], the default, asks nothing: no chip. *)
   status h;
-  [%expect {| Ready 0% ↑0 ↓0 $0.0000 |}];
+  [%expect
+    {|
+    Ready 0% ↑0 ↓0 $0.0000
+    (Notifications not allowed yet: click to ask the browser)
+    |}];
   H.key h "m" ~alt:true;
   status h;
   [%expect
@@ -44,6 +48,7 @@ let%expect_test "the mode chip, Alt+M, and set_mode's reply or failure" =
       (Mode_set
        "Mode: plan (read-only planning: no file edits, commands ask first)")))
     Ready 0% ↑0 ↓0 $0.0000 (plan)
+    (Notifications not allowed yet: click to ask the browser)
     |}];
   H.show h ~selector:".status .mode";
   [%expect
@@ -70,6 +75,7 @@ let%expect_test "the mode chip, Alt+M, and set_mode's reply or failure" =
     (Rpc (method_ set_mode) (params ((approval_mode ask) (plan_mode false)))
      (tag (Mode_set "Mode: ask (bash, edits and MCP tools ask first)")))
     Ready 0% ↑0 ↓0 $0.0000 (ask)
+    (Notifications not allowed yet: click to ask the browser)
     Mode: plan (read-only planning: no file edits, commands ask first)
     |}];
   (* Not taken: said, and the backend's state shown again. *)
@@ -81,6 +87,7 @@ let%expect_test "the mode chip, Alt+M, and set_mode's reply or failure" =
     {|
     (Rpc (method_ get_state) (params ()) (tag State))
     Ready 0% ↑0 ↓0 $0.0000 (plan)
+    (Notifications not allowed yet: click to ask the browser)
     Mode: plan (read-only planning: no file edits, commands ask first)
     Couldn't set the mode: no session
     |}];
@@ -115,13 +122,18 @@ let%expect_test "the mode chip, Alt+M, and set_mode's reply or failure" =
      (tag
       (Mode_set "Mode: auto-edit (file edits run; bash and MCP tools ask first)")))
     Ready 0% ↑0 ↓0 $0.0000 (auto-edit)
+    (Notifications not allowed yet: click to ask the browser)
     |}]
 ;;
 
 let%expect_test "/mode NAME, /plan, /confirm" =
   let h = H.create ~state:(state ~mode:"ask" ()) () in
   status h;
-  [%expect {| Ready 0% ↑0 ↓0 $0.0000 (ask) |}];
+  [%expect
+    {|
+    Ready 0% ↑0 ↓0 $0.0000 (ask)
+    (Notifications not allowed yet: click to ask the browser)
+    |}];
   run h "/mode bogus";
   toasts h;
   print_s [%sexp ((H.model h).draft : string)];
@@ -139,6 +151,7 @@ let%expect_test "/mode NAME, /plan, /confirm" =
     (Rpc (method_ set_mode) (params ((approval_mode auto) (plan_mode false)))
      (tag (Mode_set "Mode: auto (tools run without asking)")))
     Ready 0% ↑0 ↓0 $0.0000
+    (Notifications not allowed yet: click to ask the browser)
     |}];
   (* /plan toggles, keeping the approval mode to go back to. *)
   run h "/plan";
@@ -157,10 +170,12 @@ let%expect_test "/mode NAME, /plan, /confirm" =
       (Mode_set
        "Mode: plan (read-only planning: no file edits, commands ask first)")))
     Ready 0% ↑0 ↓0 $0.0000 (plan)
+    (Notifications not allowed yet: click to ask the browser)
     (Save_history (/plan "/mode auto" "/mode bogus"))
     (Rpc (method_ set_mode) (params ((approval_mode auto) (plan_mode false)))
      (tag (Mode_set "Mode: auto (tools run without asking)")))
     Ready 0% ↑0 ↓0 $0.0000
+    (Notifications not allowed yet: click to ask the browser)
     (Save_history ("/plan on" /plan "/mode auto" "/mode bogus"))
     (Rpc (method_ set_mode) (params ((approval_mode auto) (plan_mode true)))
      (tag
@@ -186,6 +201,7 @@ let%expect_test "/mode NAME, /plan, /confirm" =
       (Config_saved
        "Tool confirmation on (mode ask, also for new sessions): bash, edits and MCP tools ask first")))
     Ready 0% ↑0 ↓0 $0.0000 (ask)
+    (Notifications not allowed yet: click to ask the browser)
     |}];
   (* The arguments complete. *)
   H.type_ h "/mode ";
@@ -217,7 +233,11 @@ let%expect_test "the plan: its chip, /todos" =
     |}];
   H.event h (sprintf {|{"event":"state","state":%s}|} (state ~plan ()));
   status h;
-  [%expect {| Ready 0% ↑0 ↓0 $0.0000 (plan 1/3: change it) |}];
+  [%expect
+    {|
+    Ready 0% ↑0 ↓0 $0.0000 (plan 1/3: change it)
+    (Notifications not allowed yet: click to ask the browser)
+    |}];
   H.click h ~selector:".status .plan";
   modal h;
   [%expect
@@ -249,6 +269,7 @@ let%expect_test "the plan: its chip, /todos" =
     {|
     (Focus editor)
     Ready 0% ↑0 ↓0 $0.0000
+    (Notifications not allowed yet: click to ask the browser)
     (Save_history (/todos))
     (Focus dialog)
     Plan 2/2
@@ -904,6 +925,7 @@ let%expect_test
     (y Allow once) (a Always allow bash(make:*) this session) (n Deny) (r Deny, saying why)
     1 more waiting
     Ready 0% ↑0 ↓0 $0.0000 (1 queued)
+    (Notifications not allowed yet: click to ask the browser)
     |}];
   (* Already shown ones are not added twice. *)
   H.event h (confirm ~rules:[ "bash(make:*)" ] "c1" "make");

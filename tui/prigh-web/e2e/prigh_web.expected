@@ -11,7 +11,7 @@ Sign in
 prigh
 web
 New session
-No saved sessions yet.
+No sessions yet: send a message to start one.
 T
 token
 === chromium: signed in: chat ===
@@ -71,13 +71,11 @@ seq 1 30
 3
 4
 5
-Show all 30 lines (22 hidden)
-28
-29
-30
+6
+Show all 30 lines
 === chromium: long output, expanded ===
-34 lines, ending: 30 / Fold to 8 lines
-folded again: Show all 30 lines (22 hidden)
+34 lines, ending: 30 / Fold to 6 lines
+folded again: Show all 30 lines
 === chromium: read an image ===
 what does flag.png look like?
 <TIME>
@@ -107,12 +105,11 @@ same session after reload: true
 prigh
 web
 New session
-SESSIONS
+Sessions
 Select
 count some lines
 <AGE>
 <CWD>
-14 msgs
 T
 token
 === chromium: new session ===
@@ -132,16 +129,14 @@ new session in the url: true
 prigh
 web
 New session
-SESSIONS
+Sessions
 Select
 hello again
 <AGE>
 <CWD>
-2 msgs
 count some lines
 <AGE>
 <CWD>
-14 msgs
 T
 token
 === chromium: switching ===
@@ -149,7 +144,6 @@ Loading the session…
 marked in the sidebar: count some lines
 <AGE>
 <CWD>
-14 msgs
 switched back: true
 === chromium: switched back ===
 count some lines
@@ -171,13 +165,13 @@ Subagents
 ✓
 Survey the project
 <T>
-a1 · deepseek-flash · 2 turns · 1 tool call · $<COST>
+a1  deepseek-flash  2 turns  1 tool call  $<COST>
 The survey: 3 files.
 2
 ✓
 Count the files
 <T>
-a1/n1 · deepseek-flash · 1 turn · $<COST>
+a1/n1  deepseek-flash  1 turn  $<COST>
 There are 3 files.
 Jobs
 1
@@ -185,7 +179,7 @@ Jobs
 ✓
 sleep 1; echo built
 <T>
-j1 · exited 0 · 6 B
+j1  exited 0  6 B
 built
 === chromium: a nested subagent ===
 Subagent a1/n1
@@ -194,7 +188,7 @@ Survey the project
 Count the files
 ✓
 Count the files
-complete
+Complete
 <T>
 a1/n1
 deepseek-flash
@@ -220,7 +214,7 @@ built
 Subagent a1
 ✓
 Survey the project
-complete
+Complete
 <T>
 a1
 deepseek-flash
@@ -233,7 +227,7 @@ Its subagents
 ✓
 Count the files
 <T>
-a1/n1 · deepseek-flash · 1 turn · $<COST>
+a1/n1  deepseek-flash  1 turn  $<COST>
 There are 3 files.
 Survey the project
 <TIME>
@@ -330,13 +324,13 @@ token
 Confirm
 Run bash: echo built-ok?
 y
-allow once
+Allow once
 a
-always allow bash(echo:*) this session
+Always allow bash(echo:*) this session
 n
-deny
+Deny
 r
-deny, saying why
+Deny, saying why
 === chromium: allowed always ===
 build it
 <TIME>
@@ -356,7 +350,7 @@ the one in prod
 ○
 SQLite
 Other:
-Space or a click picks · ↑↓ choose · Enter accepts · Esc declines
+Space or a click picks, ↑↓ choose, Enter accepts, Esc declines
 Decline
 Send
 === chromium: answered ===
@@ -382,11 +376,11 @@ Approve the plan and start implementing?
 Write the schema
 Test it
 y
-approve: leave plan mode and implement
+Approve: leave plan mode and implement
 n
-keep planning
+Keep planning
 r
-keep planning, saying what to change
+Keep planning, saying what to change
 === chromium: the plan approved ===
 Ready
 0%
@@ -414,31 +408,37 @@ Implementing.
 <TIME>
 === chromium: permissions ===
 Permissions
-Mode: auto — tools run without asking
+Mode: auto (tools run without asking)
 Allowed this session: bash(echo:*)
 Rules are permissions in ~/.prigh/config.json, e.g. {"allow": ["bash(git status:*)"], "deny": ["bash(rm:*)"]}.
 /mode or Alt+M switches the mode.
 Done
+=== chromium: archived, folded ===
+one more
+<AGE>
+<CWD>/sub
+count some lines
+<AGE>
+<CWD>/sub
+Archived
+1
 === chromium: archived ===
 one more
 <AGE>
 <CWD>/sub
-2 msgs
 count some lines
 <AGE>
 <CWD>/sub
-38 msgs
-ARCHIVED · 1 · <SIZE>
-Delete all
+Archived
+1
 hello again
 <AGE>
 <CWD>
-2 msgs
+Delete archived
 muted: 1
 === chromium: selected ===
-2 selected · <SIZE>
-Delete
-Done
+Cancel
+Delete 2 sessions (<SIZE>)
 === chromium: delete confirmation ===
 Delete 2 sessions?
 They will be deleted, with their subagent logs: <SIZE> on disk. This can't be undone.
@@ -454,7 +454,6 @@ Deleted 2 sessions (<SIZE>)
 one more
 <AGE>
 <CWD>/sub
-2 msgs
 session files after: 1
 === chromium: errors ===
 none
@@ -473,7 +472,7 @@ Turn notifications off
 stop telling you what happens while the tab is hidden
 Sign out
 forget this account in this browser
-↑↓ move · Enter choose · Esc close
+↑↓ to move, Enter to choose, Esc to close
 === chromium: accounts: add an account ===
 prigh
 web
@@ -507,7 +506,7 @@ Turn notifications off
 stop telling you what happens while the tab is hidden
 Sign out
 forget this account in this browser
-↑↓ move · Enter choose · Esc close
+↑↓ to move, Enter to choose, Esc to close
 === chromium: accounts: sessions ===
 I am alice
 === chromium: accounts: act as ===
@@ -559,7 +558,7 @@ Sign in
 prigh
 web
 New session
-No saved sessions yet.
+No sessions yet: send a message to start one.
 T
 token
 === firefox: signed in: chat ===
@@ -619,13 +618,11 @@ seq 1 30
 3
 4
 5
-Show all 30 lines (22 hidden)
-28
-29
-30
+6
+Show all 30 lines
 === firefox: long output, expanded ===
-34 lines, ending: 30 / Fold to 8 lines
-folded again: Show all 30 lines (22 hidden)
+34 lines, ending: 30 / Fold to 6 lines
+folded again: Show all 30 lines
 === firefox: read an image ===
 what does flag.png look like?
 <TIME>
@@ -655,12 +652,11 @@ same session after reload: true
 prigh
 web
 New session
-SESSIONS
+Sessions
 Select
 count some lines
 <AGE>
 <CWD>
-14 msgs
 T
 token
 === firefox: new session ===
@@ -680,16 +676,14 @@ new session in the url: true
 prigh
 web
 New session
-SESSIONS
+Sessions
 Select
 hello again
 <AGE>
 <CWD>
-2 msgs
 count some lines
 <AGE>
 <CWD>
-14 msgs
 T
 token
 === firefox: switching ===
@@ -697,7 +691,6 @@ Loading the session…
 marked in the sidebar: count some lines
 <AGE>
 <CWD>
-14 msgs
 switched back: true
 === firefox: switched back ===
 count some lines
@@ -719,13 +712,13 @@ Subagents
 ✓
 Survey the project
 <T>
-a1 · deepseek-flash · 2 turns · 1 tool call · $<COST>
+a1  deepseek-flash  2 turns  1 tool call  $<COST>
 The survey: 3 files.
 2
 ✓
 Count the files
 <T>
-a1/n1 · deepseek-flash · 1 turn · $<COST>
+a1/n1  deepseek-flash  1 turn  $<COST>
 There are 3 files.
 Jobs
 1
@@ -733,7 +726,7 @@ Jobs
 ✓
 sleep 1; echo built
 <T>
-j1 · exited 0 · 6 B
+j1  exited 0  6 B
 built
 === firefox: a nested subagent ===
 Subagent a1/n1
@@ -742,7 +735,7 @@ Survey the project
 Count the files
 ✓
 Count the files
-complete
+Complete
 <T>
 a1/n1
 deepseek-flash
@@ -768,7 +761,7 @@ built
 Subagent a1
 ✓
 Survey the project
-complete
+Complete
 <T>
 a1
 deepseek-flash
@@ -781,7 +774,7 @@ Its subagents
 ✓
 Count the files
 <T>
-a1/n1 · deepseek-flash · 1 turn · $<COST>
+a1/n1  deepseek-flash  1 turn  $<COST>
 There are 3 files.
 Survey the project
 <TIME>
@@ -878,13 +871,13 @@ token
 Confirm
 Run bash: echo built-ok?
 y
-allow once
+Allow once
 a
-always allow bash(echo:*) this session
+Always allow bash(echo:*) this session
 n
-deny
+Deny
 r
-deny, saying why
+Deny, saying why
 === firefox: allowed always ===
 build it
 <TIME>
@@ -904,7 +897,7 @@ the one in prod
 ○
 SQLite
 Other:
-Space or a click picks · ↑↓ choose · Enter accepts · Esc declines
+Space or a click picks, ↑↓ choose, Enter accepts, Esc declines
 Decline
 Send
 === firefox: answered ===
@@ -930,11 +923,11 @@ Approve the plan and start implementing?
 Write the schema
 Test it
 y
-approve: leave plan mode and implement
+Approve: leave plan mode and implement
 n
-keep planning
+Keep planning
 r
-keep planning, saying what to change
+Keep planning, saying what to change
 === firefox: the plan approved ===
 Ready
 0%
@@ -962,31 +955,37 @@ Implementing.
 <TIME>
 === firefox: permissions ===
 Permissions
-Mode: auto — tools run without asking
+Mode: auto (tools run without asking)
 Allowed this session: bash(echo:*)
 Rules are permissions in ~/.prigh/config.json, e.g. {"allow": ["bash(git status:*)"], "deny": ["bash(rm:*)"]}.
 /mode or Alt+M switches the mode.
 Done
+=== firefox: archived, folded ===
+one more
+<AGE>
+<CWD>/sub
+count some lines
+<AGE>
+<CWD>/sub
+Archived
+1
 === firefox: archived ===
 one more
 <AGE>
 <CWD>/sub
-2 msgs
 count some lines
 <AGE>
 <CWD>/sub
-38 msgs
-ARCHIVED · 1 · <SIZE>
-Delete all
+Archived
+1
 hello again
 <AGE>
 <CWD>
-2 msgs
+Delete archived
 muted: 1
 === firefox: selected ===
-2 selected · <SIZE>
-Delete
-Done
+Cancel
+Delete 2 sessions (<SIZE>)
 === firefox: delete confirmation ===
 Delete 2 sessions?
 They will be deleted, with their subagent logs: <SIZE> on disk. This can't be undone.
@@ -1002,7 +1001,6 @@ Deleted 2 sessions (<SIZE>)
 one more
 <AGE>
 <CWD>/sub
-2 msgs
 session files after: 1
 === firefox: errors ===
 none
@@ -1021,7 +1019,7 @@ Turn notifications off
 stop telling you what happens while the tab is hidden
 Sign out
 forget this account in this browser
-↑↓ move · Enter choose · Esc close
+↑↓ to move, Enter to choose, Esc to close
 === firefox: accounts: add an account ===
 prigh
 web
@@ -1055,7 +1053,7 @@ Turn notifications off
 stop telling you what happens while the tab is hidden
 Sign out
 forget this account in this browser
-↑↓ move · Enter choose · Esc close
+↑↓ to move, Enter to choose, Esc to close
 === firefox: accounts: sessions ===
 I am alice
 === firefox: accounts: act as ===
