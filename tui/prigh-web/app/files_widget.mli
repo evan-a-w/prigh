@@ -9,7 +9,10 @@ open Js_of_ocaml
 (** Remembers [schedule], tells the app the backend's web address (from the
     WebSocket's, [backend]) and listens for the pickers' choices and for
     files dragged over the page. *)
-val install : schedule:(Prigh_web.App.Action.t -> unit) -> backend:string -> unit
+val install
+  :  schedule:(Prigh_web.App.Action.t -> unit)
+  -> backend:string
+  -> unit
 
 val perform : Prigh_web.Files.Page.t -> unit
 

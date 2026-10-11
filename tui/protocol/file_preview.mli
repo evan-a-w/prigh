@@ -11,7 +11,7 @@ module Content : sig
     | Image of
         { mime : string
         ; url : string option
-        (** a link on the backend's web server ([/files/download?...]);
+          (** a link on the backend's web server ([/files/download?...]);
             [None] when the image is too large to preview *)
         }
     | Binary

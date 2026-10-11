@@ -247,10 +247,22 @@ end
 (** The panel's keys (with the focus in its list): ↑↓ select, Enter opens,
     Backspace goes up, Delete deletes, F2 renames, Esc closes the preview or
     the panel. With a dialog open, Enter accepts and Esc cancels. *)
-val key : t -> key:string -> shift:bool -> ctrl:bool -> alt:bool -> Action.t option
+val key
+  :  t
+  -> key:string
+  -> shift:bool
+  -> ctrl:bool
+  -> alt:bool
+  -> Action.t option
 
 (** Ctrl+Shift+F (by the key's position). *)
-val toggle_key : code:string -> shift:bool -> ctrl:bool -> alt:bool -> meta:bool -> bool
+val toggle_key
+  :  code:string
+  -> shift:bool
+  -> ctrl:bool
+  -> alt:bool
+  -> meta:bool
+  -> bool
 
 val update : t -> Action.t -> t * Out.t list
 val reply : t -> Reply.t -> (Json.t, string) Result.t -> t * Out.t list

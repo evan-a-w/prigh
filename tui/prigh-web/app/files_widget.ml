@@ -23,8 +23,9 @@ let choose dest list =
 ;;
 
 let files_of (l : File.fileList Js.t) =
-  List.filter_map (List.init l##.length ~f:Fn.id) ~f:(fun i ->
-    Js.Opt.to_option (l##item i))
+  List.filter_map
+    (List.init l##.length ~f:Fn.id)
+    ~f:(fun i -> Js.Opt.to_option (l##item i))
 ;;
 
 let in_panel (el : Dom_html.element Js.t) =
@@ -41,9 +42,12 @@ let forget id =
 (* The reply's error ([{error}]) or the status line. *)
 let failure xhr =
   let status : int = Js.Unsafe.get xhr "status" in
-  let text = Js.to_string (Js.Unsafe.get xhr "responseText" : Js.js_string Js.t) in
+  let text =
+    Js.to_string (Js.Unsafe.get xhr "responseText" : Js.js_string Js.t)
+  in
   if status = 0
-  then "the connection to the backend failed: check that it is up, then try again"
+  then
+    "the connection to the backend failed: check that it is up, then try again"
   else if String.is_empty (String.strip text)
   then sprintf "the backend answered %d" status
   else String.strip text
@@ -55,9 +59,13 @@ let upload ~file ~url =
     !schedule
       (Files
          (Upload_done
-            { file; result = Error "the file is gone from the page: choose it again" }))
+            { file
+            ; result = Error "the file is gone from the page: choose it again"
+            }))
   | Some blob ->
-    let xhr = Js.Unsafe.new_obj (Js.Unsafe.pure_js_expr "XMLHttpRequest") [||] in
+    let xhr =
+      Js.Unsafe.new_obj (Js.Unsafe.pure_js_expr "XMLHttpRequest") [||]
+    in
     Hashtbl.set uploads ~key:file ~data:xhr;
     let finish result =
       forget file;
@@ -81,7 +89,9 @@ let upload ~file ~url =
          let status : int = Js.Unsafe.get xhr "status" in
          if status = 200
          then (
-           let text = Js.to_string (Js.Unsafe.get xhr "responseText" : Js.js_string Js.t) in
+           let text =
+             Js.to_string (Js.Unsafe.get xhr "responseText" : Js.js_string Js.t)
+           in
            finish
              (match Jsonaf.parse text with
               | Ok json -> Ok json
@@ -91,10 +101,7 @@ let upload ~file ~url =
       xhr
       "onerror"
       (Js.wrap_callback (fun _ -> finish (Error (failure xhr))));
-    Js.Unsafe.set
-      xhr
-      "onabort"
-      (Js.wrap_callback (fun _ -> forget file));
+    Js.Unsafe.set xhr "onabort" (Js.wrap_callback (fun _ -> forget file));
     Js.Unsafe.meth_call xhr "send" [| Js.Unsafe.inject blob |] |> ignore
 ;;
 
@@ -116,7 +123,9 @@ let input_id : Files.Dest.t -> string = function
 let perform (page : Files.Page.t) =
   match page with
   | Pick dest ->
-    Option.iter (Dom_html.getElementById_opt (input_id dest)) ~f:(fun el -> el##click)
+    Option.iter
+      (Dom_html.getElementById_opt (input_id dest))
+      ~f:(fun el -> el##click)
   | Upload { file; url } -> upload ~file ~url
   | Abort_upload file ->
     (match Hashtbl.find uploads file with
@@ -151,7 +160,9 @@ let has_files (ev : Dom_html.dragEvent Js.t) =
        let types = Js.Unsafe.get data "types" in
        let n : int = Js.Unsafe.get types "length" in
        List.exists (List.init n ~f:Fn.id) ~f:(fun i ->
-         String.equal (Js.to_string (Js.Unsafe.get types i : Js.js_string Js.t)) "Files"))
+         String.equal
+           (Js.to_string (Js.Unsafe.get types i : Js.js_string Js.t))
+           "Files"))
 ;;
 
 let install ~schedule:s ~backend =

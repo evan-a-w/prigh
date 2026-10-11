@@ -33,7 +33,9 @@ let of_json j =
     match%bind Json.string_field j "kind" with
     | "text" ->
       let%bind text = Json.string_field j "text" in
-      let%map truncated = Json.bool_default_field j "truncated" ~default:false in
+      let%map truncated =
+        Json.bool_default_field j "truncated" ~default:false
+      in
       Content.Text { text; truncated }
     | "image" ->
       let%bind mime = Json.string_field j "mime" in

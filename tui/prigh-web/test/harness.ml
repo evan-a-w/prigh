@@ -34,7 +34,8 @@ let act t action =
      | Notify _
      | Request_notification_permission
      | Save_notifications _
-     | Set_title _ | Files _ -> ());
+     | Set_title _
+     | Files _ -> ());
     if not t.quiet then print_s [%sexp (command : App.Command.t)])
 ;;
 

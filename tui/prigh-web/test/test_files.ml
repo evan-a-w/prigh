@@ -46,7 +46,9 @@ let opened () =
   h
 ;;
 
-let%expect_test "Ctrl+Shift+F opens the browser at the session's cwd on its host" =
+let%expect_test
+    "Ctrl+Shift+F opens the browser at the session's cwd on its host"
+  =
   let h = H.create ~state:(state ()) () in
   H.key h "F" ~ctrl:true ~shift:true ~code:"KeyF";
   [%expect
@@ -196,7 +198,8 @@ let%expect_test "typing a path; a path that fails says what to do" =
   H.act h (Files (Go "/srv"));
   H.reply h "fs_list" listing;
   H.text h ~selector:".files-crumbs";
-  [%expect {|
+  [%expect
+    {|
     (Rpc (method_ fs_list) (params ((path ~/proj) (hidden false)))
      (tag (Files (Listed ~/proj))))
     (Rpc (method_ fs_list) (params ((path /srv) (hidden false)))
@@ -205,7 +208,9 @@ let%expect_test "typing a path; a path that fails says what to do" =
     |}]
 ;;
 
-let%expect_test "previews: text with line numbers, images by link, binaries named" =
+let%expect_test
+    "previews: text with line numbers, images by link, binaries named"
+  =
   let h = opened () in
   H.click h ~selector:".files-row[data-name='README.md']";
   [%expect
@@ -278,7 +283,10 @@ let%expect_test "downloads: a file, and a directory as .tar.gz" =
   let h = opened () in
   H.act h (Files (Download "README.md"));
   H.text h ~selector:".files-transfers";
-  H.reply h "fs_download" {|{"url":"/files/download?ticket=t1","name":"README.md"}|};
+  H.reply
+    h
+    "fs_download"
+    {|{"url":"/files/download?ticket=t1","name":"README.md"}|};
   [%expect
     {|
     (Rpc (method_ fs_download) (params ((path /home/me/proj/README.md)))
@@ -323,8 +331,15 @@ let%expect_test "uploads into the directory, asking before replacing a file" =
      (params ((name README.md) (size 10) (dir /home/me/proj)))
      (tag (Files (Upload_link (file 2) (overwrite false)))))
     |}];
-  H.reply h "fs_upload" {|{"url":"/files/upload?ticket=u1","path":"/home/me/proj/new.txt"}|};
-  H.fail h "fs_upload" "README.md already exists in /home/me/proj: overwrite it or rename the upload";
+  H.reply
+    h
+    "fs_upload"
+    {|{"url":"/files/upload?ticket=u1","path":"/home/me/proj/new.txt"}|};
+  H.fail
+    h
+    "fs_upload"
+    "README.md already exists in /home/me/proj: overwrite it or rename the \
+     upload";
   [%expect
     {|
     (Files (Upload (file 1) (url http://box:7790/files/upload?ticket=u1)))
@@ -359,7 +374,10 @@ let%expect_test "uploads into the directory, asking before replacing a file" =
     (Files
        (Upload_done
           { file = 1
-          ; result = Ok (Jsonaf.of_string {|{"path":"/home/me/proj/new.txt","bytes":1000}|})
+          ; result =
+              Ok
+                (Jsonaf.of_string
+                   {|{"path":"/home/me/proj/new.txt","bytes":1000}|})
           }));
   [%expect
     {|
@@ -371,17 +389,29 @@ let%expect_test "uploads into the directory, asking before replacing a file" =
     h
     (Files
        (Upload_done
-          { file = 2; result = Error {|{"error":"no space left for /home/me/proj/README.md"}|} }));
+          { file = 2
+          ; result =
+              Error {|{"error":"no space left for /home/me/proj/README.md"}|}
+          }));
   H.text h ~selector:".toasts";
   [%expect
     {|
     Uploaded new.txt
     Could not upload README.md: no space left for /home/me/proj/README.md
     |}];
-  H.reply h "fs_upload" {|{"url":"/files/upload?ticket=u2","path":"/home/me/proj/README.md"}|};
+  H.reply
+    h
+    "fs_upload"
+    {|{"url":"/files/upload?ticket=u2","path":"/home/me/proj/README.md"}|};
   (* Esc skips a conflicting file: nothing is sent. *)
-  H.act h (Files (Chosen { dest = Here; files = [ { file = 3; name = "src"; size = 1 } ] }));
-  H.fail h "fs_upload" "src already exists in /home/me/proj: overwrite it or rename the upload";
+  H.act
+    h
+    (Files
+       (Chosen { dest = Here; files = [ { file = 3; name = "src"; size = 1 } ] }));
+  H.fail
+    h
+    "fs_upload"
+    "src already exists in /home/me/proj: overwrite it or rename the upload";
   H.key h "Escape" ~target:Page;
   H.text h ~selector:".modal";
   [%expect
@@ -395,7 +425,9 @@ let%expect_test "uploads into the directory, asking before replacing a file" =
     |}]
 ;;
 
-let%expect_test "new folder, rename and delete: dialogs that say what went wrong" =
+let%expect_test
+    "new folder, rename and delete: dialogs that say what went wrong"
+  =
   let h = opened () in
   H.click h ~selector:".files-tool:nth-child(4)";
   H.text h ~selector:".modal";
@@ -482,7 +514,8 @@ let%expect_test "new folder, rename and delete: dialogs that say what went wrong
   H.key h "Enter" ~target:Page;
   H.reply h "fs_delete" {|{"path":"/home/me/proj/src"}|};
   H.text h ~selector:".toasts";
-  [%expect {|
+  [%expect
+    {|
     (Rpc (method_ fs_list) (params ((path /home/me/proj/src) (hidden false)))
      (tag (Files (Listed /home/me/proj/src))))
     (Rpc (method_ fs_list) (params ((path /home/me/proj) (hidden false)))
@@ -548,8 +581,7 @@ let%expect_test "paths into the composer, files attached from the browser" =
   H.text h ~selector:".attach-chips";
   H.fail h "prompt" "the backend is busy";
   H.text h ~selector:".attach-chips";
-  [%expect
-    {| README.md 2.0 KB (Remove README.md) |}]
+  [%expect {| README.md 2.0 KB (Remove README.md) |}]
 ;;
 
 let%expect_test "files dropped on the composer upload into the chat's uploads" =
@@ -576,7 +608,11 @@ let%expect_test "files dropped on the composer upload into the chat's uploads" =
     h
     "fs_upload"
     {|{"url":"/files/upload?ticket=a","path":"/home/me/proj/.prigh/uploads/report.pdf"}|};
-  H.fail h "fs_upload" "the file browser needs a newer prigh on tool host laptop: update prigh there and restart its TUI or tool-host";
+  H.fail
+    h
+    "fs_upload"
+    "the file browser needs a newer prigh on tool host laptop: update prigh \
+     there and restart its TUI or tool-host";
   H.act h (Files (Upload_progress { file = 1; sent = 500_000 }));
   H.show h ~selector:".attach-chip.uploading";
   H.text h ~selector:".attach-chips";
@@ -610,8 +646,7 @@ let%expect_test "files dropped on the composer upload into the chat's uploads" =
     Send
     |}];
   H.text h ~selector:".toasts";
-  [%expect
-    {| Wait for the attachment to upload (or remove it with ×). |}];
+  [%expect {| Wait for the attachment to upload (or remove it with ×). |}];
   H.act
     h
     (Files
@@ -640,9 +675,14 @@ let%expect_test "files dropped on the composer upload into the chat's uploads" =
     |}]
 ;;
 
-let%expect_test "another session or host resets the browser and drops the chips" =
+let%expect_test "another session or host resets the browser and drops the chips"
+  =
   let h = opened () in
-  H.act h (Files (Chosen { dest = Chat; files = [ { file = 9; name = "a.txt"; size = 5 } ] }));
+  H.act
+    h
+    (Files
+       (Chosen
+          { dest = Chat; files = [ { file = 9; name = "a.txt"; size = 5 } ] }));
   H.event h (sprintf {|{"event":"state","state":%s}|} (state ~session:"s2" ()));
   [%expect
     {|

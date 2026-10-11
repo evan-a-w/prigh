@@ -16,7 +16,10 @@ val toggle : App.Model.t -> inject:(App.Action.t -> unit Effect.t) -> Node.t
 val chips : App.Model.t -> inject:(App.Action.t -> unit Effect.t) -> Node.t
 
 (** The composer's attach button. *)
-val attach_button : App.Model.t -> inject:(App.Action.t -> unit Effect.t) -> Node.t
+val attach_button
+  :  App.Model.t
+  -> inject:(App.Action.t -> unit Effect.t)
+  -> Node.t
 
 (** The hidden file pickers the page opens (and Playwright fills):
     [#files-upload-input] (to the panel's directory) and
