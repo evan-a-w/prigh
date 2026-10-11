@@ -346,7 +346,8 @@ prints the captured panes.
     error: HTTP 429: The usage limit has been reached (usage limit reached)
     deepseek/deepseek-flash: HTTP 429: The usage limit has been reached (usage limit reached); handing
     over to anthropic/claude-fable-5-1
-    ↪ handed over from deepseek/deepseek-flash to anthropic/claude-fable-5-1
+  
+  ↪ Handed over from deepseek/deepseek-flash to anthropic/claude-fable-5-1
     carried on
   ────────────────────────────────────────────────────────────────────────────────────────────────────
   >
