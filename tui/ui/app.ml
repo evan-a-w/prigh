@@ -842,6 +842,7 @@ let tree_items entries head =
       | P.Entry.Kind.Name _
       | P.Entry.Kind.Description _
       | P.Entry.Kind.Cwd _
+      | P.Entry.Kind.Archived _
       | P.Entry.Kind.System_prompt -> "·"
     in
     let label =
@@ -3047,6 +3048,7 @@ let event m (e : P.Event.t) =
   | Tool_exec_cancel _
   | Terminal_open _
   | Terminal_frame _
+  | Sessions_changed
   | Terminal_close _ -> m, []
 ;;
 

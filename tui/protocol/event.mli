@@ -102,6 +102,8 @@ type t =
       { btw_id : string
       ; delta : string
       } (** streamed answer to our own [btw] request *)
+  | Sessions_changed
+  (** something [list_sessions] shows changed, in any session *)
 [@@deriving sexp_of, equal]
 
 val of_json : Json.t -> t Or_error.t

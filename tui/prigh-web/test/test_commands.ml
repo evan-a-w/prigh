@@ -264,7 +264,7 @@ let%expect_test "/scoped-models, Ctrl+P and Alt+P" =
        (anthropic/claude-opus-5-5 anthropic/claude-sonnet-5
         deepseek/deepseek-chat))
       (confirm_tools false) (default_model ()) (default_thinking ())
-      (fallback_models ()) (default_cwd ())))
+      (fallback_models ()) (default_cwd ()) (archive_after_days 7)))
     |}]
 ;;
 

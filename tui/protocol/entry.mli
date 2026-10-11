@@ -14,6 +14,7 @@ module Kind : sig
     | Name of { name : string }
     | Description of { text : string }
     | Cwd of { cwd : string }
+    | Archived of { archived : bool }
     | System_prompt
   [@@deriving sexp_of, equal]
 end

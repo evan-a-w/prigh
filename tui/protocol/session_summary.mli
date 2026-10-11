@@ -12,8 +12,11 @@ type t =
   ; message_count : int
   ; parent : string option
   ; live : bool (** loaded in the backend *)
-  ; running : bool
+  ; running : bool (** its turn, or background subagents or jobs *)
+  ; background : int (** running background subagents and jobs *)
   ; clients : int (** frontends attached to it *)
+  ; archived : bool
+  ; bytes : int (** on disk *)
   }
 [@@deriving sexp_of, equal]
 
@@ -22,3 +25,8 @@ val of_json : Json.t -> t Or_error.t
 (** One line for lists: the description if there is one, else the first prompt,
     else ["(empty)"]. *)
 val blurb : t -> string
+
+(** ["512 B"], ["3.4 KB"], ["12.0 MB"]: for confirmations. *)
+val size_string : int -> string
+
+val total_bytes : t list -> int

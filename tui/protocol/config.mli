@@ -10,6 +10,8 @@ type t =
   ; fallback_models : string list
     (** model keys that take over, in order, when a model's usage runs out *)
   ; default_cwd : string option (** where new sessions start *)
+  ; archive_after_days : float
+    (** sessions inactive this long show as archived; [0.]: never *)
   }
 [@@deriving sexp_of, equal]
 

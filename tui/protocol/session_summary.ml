@@ -12,8 +12,11 @@ type t =
   ; message_count : int
   ; parent : string option
   ; live : bool (** loaded in the backend *)
-  ; running : bool
+  ; running : bool (** its turn, or background subagents or jobs *)
+  ; background : int (** running background subagents and jobs *)
   ; clients : int (** frontends attached to it *)
+  ; archived : bool
+  ; bytes : int (** on disk *)
   }
 [@@deriving sexp_of, equal]
 
@@ -28,14 +31,12 @@ let of_json j =
   let%bind updated_at = Json.string_opt_field j "updated_at" in
   let%bind first_prompt = Json.string_opt_field j "first_prompt" in
   let%bind message_count = Json.int_field j "message_count" in
-  let%bind parent = Json.string_opt_field j "parent" in
+  let%map parent = Json.string_opt_field j "parent" in
   let opt_bool name =
     Result.ok (Json.bool_field j name) |> Option.value ~default:false
   in
-  let%map clients =
-    match Json.int_field j "clients" with
-    | Ok n -> Ok n
-    | Error _ -> Ok 0
+  let opt_int name =
+    Result.ok (Json.int_field j name) |> Option.value ~default:0
   in
   { id
   ; path
@@ -49,7 +50,10 @@ let of_json j =
   ; parent
   ; live = opt_bool "live"
   ; running = opt_bool "running"
-  ; clients
+  ; background = opt_int "background"
+  ; clients = opt_int "clients"
+  ; archived = opt_bool "archived"
+  ; bytes = opt_int "bytes"
   }
 ;;
 
@@ -59,3 +63,16 @@ let blurb t =
     String.concat ~sep:" " (String.split_lines text)
   | None, None -> "(empty)"
 ;;
+
+let size_string bytes =
+  let b = Float.of_int bytes in
+  if bytes < 1024
+  then sprintf "%d B" bytes
+  else if Float.(b < 1024. * 1024.)
+  then sprintf "%.1f KB" (b /. 1024.)
+  else if Float.(b < 1024. * 1024. * 1024.)
+  then sprintf "%.1f MB" (b /. (1024. *. 1024.))
+  else sprintf "%.1f GB" (b /. (1024. *. 1024. *. 1024.))
+;;
+
+let total_bytes ts = List.sum (module Int) ts ~f:(fun t -> t.bytes)
