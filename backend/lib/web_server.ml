@@ -52,29 +52,14 @@ module Request = struct
   ;;
 end
 
-let content_type path =
-  match
-    String.lowercase
-      (Filename.split_extension path |> snd |> Option.value ~default:"")
-  with
-  | "html" -> "text/html; charset=utf-8"
-  | "js" -> "text/javascript; charset=utf-8"
-  | "css" -> "text/css; charset=utf-8"
-  | "json" -> "application/json"
-  | "svg" -> "image/svg+xml"
-  | "png" -> "image/png"
-  | "ico" -> "image/x-icon"
-  | "woff2" -> "font/woff2"
-  | "map" -> "application/json"
-  | _ -> "application/octet-stream"
-;;
-
-let response ~status ~reason ?(headers = []) body =
+let format_response
+      ({ status; reason; headers; content_length; body } :
+        Static_site.Response.t)
+  =
   let headers =
-    [ "Content-Length", Int.to_string (String.length body)
-    ; "Connection", "close"
-    ; "Cache-Control", "no-cache"
-    ]
+    Option.value_map content_length ~default:[] ~f:(fun n ->
+      [ "Content-Length", Int.to_string n ])
+    @ [ "Connection", "close"; "Cache-Control", "no-cache" ]
     @ headers
   in
   sprintf
@@ -86,40 +71,8 @@ let response ~status ~reason ?(headers = []) body =
     body
 ;;
 
-(* Only plain relative components: no [..], no absolute paths, no hidden
-   files. *)
-let safe_relative path =
-  let parts =
-    List.filter (String.split path ~on:'/') ~f:(Fn.non String.is_empty)
-  in
-  if
-    List.exists parts ~f:(fun part ->
-      String.equal part ".." || String.is_prefix part ~prefix:".")
-  then None
-  else Some (String.concat parts ~sep:"/")
-;;
-
-let static ~root (request : Request.t) =
-  if not (String.equal request.meth "GET" || String.equal request.meth "HEAD")
-  then response ~status:405 ~reason:"Method Not Allowed" "method not allowed\n"
-  else (
-    let path =
-      if String.equal request.path "/" then "/index.html" else request.path
-    in
-    match safe_relative path with
-    | None -> response ~status:404 ~reason:"Not Found" "not found\n"
-    | Some rel ->
-      let file = Filename.concat root rel in
-      (match Sys_unix.is_file file with
-       | `Yes ->
-         let body = In_channel.read_all file in
-         response
-           ~status:200
-           ~reason:"OK"
-           ~headers:[ "Content-Type", content_type file ]
-           (if String.equal request.meth "HEAD" then "" else body)
-       | `No | `Unknown ->
-         response ~status:404 ~reason:"Not Found" "not found\n"))
+let response ~status ~reason body =
+  format_response (Static_site.Response.text ~status ~reason body)
 ;;
 
 let browser_url ~host ~port =
@@ -215,7 +168,15 @@ let handle ~root ~websockets ~on_lines flow =
               ~reason:"Not Found"
               "no web root configured; only WebSockets are served\n")
            flow
-       | Some root -> Eio.Flow.copy_string (static ~root request) flow))
+       | Some root ->
+         Eio.Flow.copy_string
+           (format_response
+              (Static_site.respond
+                 ~root
+                 ~meth:request.meth
+                 ~path:request.path
+                 ~headers:request.headers))
+           flow))
 ;;
 
 (* Replies go out whole at once: with Nagle's algorithm the end of a large
@@ -300,7 +261,5 @@ let listen ~env ~sw ~addr ~port ~root ~websockets ~on_lines =
 ;;
 
 module For_testing = struct
-  let safe_relative = safe_relative
-  let content_type = content_type
   let parse_query = Request.parse_query
 end

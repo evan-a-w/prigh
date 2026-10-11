@@ -970,8 +970,13 @@ two can share one.
   and handed to `Terminals` (below), `/files/download` and `/files/upload`
   to `File_http` (authorised by their tickets),
   anything else served from the web root (the built `tui/web-bin/site`,
-  found via `-web-root`, `$PRIGH_WEB_ROOT` or next to the executable;
-  no `..`, no dot files). Upgraded sockets set `TCP_NODELAY`, so that a
+  found via `-web-root`, `$PRIGH_WEB_ROOT` or next to the executable)
+  by `Static_site`: no `..`, no dot files; `Cache-Control: no-cache` with
+  an `ETag` (content hash, cached per file version) and `Last-Modified` (not for Nix's mtime 1), so reloads revalidate to
+  `304`; a precompressed `file.br`/`file.gz` no older than the file is
+  sent with `Content-Encoding` when `Accept-Encoding` allows it (`Vary:
+  Accept-Encoding`). The Nix build adds those siblings to the installed
+  sites (zopfli, brotli); local dune builds stay uncompressed. Upgraded sockets set `TCP_NODELAY`, so that a
   large reply's last segment does not wait for a delayed ACK. The token check is the same `hello` check as
   for TCP; the static files are public.
 - `Rpc_router` / `Namespace` — `-tokens name=token,...`: one `Rpc_server`
@@ -1703,7 +1708,8 @@ copy of the protocol types and the e2e test guards the contract.
     wrapper exports it as `$PRIGH_PRIGH_WEB_ROOT`). The dev profile links
     separately compiled units with inline source maps (~49 MB, fast to
     relink); release builds (`dune build -p`, so Nix) are whole-program at
-    `--opt 3`, ~1.4 MB (400 KB gzipped; `web-bin` is ~1.65 MB).
+    `--opt 3`, ~2 MB (590 KB as the installed `.gz`, 500 KB `.br`;
+    `web-bin` is ~1.75 MB).
   - `test/` — inline expect tests under node: a `Harness` drives
     `App.update`, answers RPCs and prints the commands and the rendered
     page. `e2e/` — the Playwright e2e (see Testing).
@@ -1827,7 +1833,9 @@ and Firefox through the connect form, a scripted run with tools and a
 subagent, slash commands, the model picker, a reload, a session switch and
 the terminal panel.
 
-The web layer adds two: `backend/test/test_web.ml` (frames, fragmentation,
+The web layer adds three: `backend/test/test_static_site.ml` (validators and
+`304`, precompressed siblings by `Accept-Encoding` and age, `HEAD`),
+`backend/test/test_web.ml` (frames, fragmentation,
 the RFC handshake vector, static serving and traversal, and a masked WebSocket
 RPC conversation over a real loopback socket)
 and `tui/test-web/` (connection selection, `Key_of_dom` and `Dom_of_screen`,

@@ -2,7 +2,7 @@ open! Core
 open! Import
 
 (** The browser frontend's listener: serves the static frontend from [root]
-    (when given) and upgrades WebSocket requests for the paths in
+    (when given; see {!Static_site}) and upgrades WebSocket requests for the paths in
     [websockets] ([/ws] carries the same JSON-lines RPC as stdio and TCP, one
     message per line; [/terminal] a shell). A connection whose first byte is
     [{] is a plain JSON-lines client (the terminal frontend's [-connect]) and
@@ -49,7 +49,5 @@ val listen
   -> int
 
 module For_testing : sig
-  val safe_relative : string -> string option
-  val content_type : string -> string
   val parse_query : string -> (string * string) list
 end

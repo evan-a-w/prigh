@@ -40,8 +40,8 @@ RUN nix build --out-link /out/backend path:/src#backend \
  && nix build --out-link /out/tui path:/src#tui \
  && mkdir -p /opt/prigh/bin /opt/prigh/share \
  && cp -L /out/backend/bin/prigh /out/tui/bin/prigh-tui /opt/prigh/bin/ \
- && cp -rL /out/tui/share/prigh_tui/web /opt/prigh/share/web \
- && cp -rL /out/tui/share/prigh_tui/prigh-web /opt/prigh/share/prigh-web \
+ && cp -rL --preserve=timestamps /out/tui/share/prigh_tui/web /opt/prigh/share/web \
+ && cp -rL --preserve=timestamps /out/tui/share/prigh_tui/prigh-web /opt/prigh/share/prigh-web \
  && chmod -R u+w /opt/prigh \
  && refs=$(grep -raoh '/nix/store/[a-z0-9]\{32\}-[-a-zA-Z0-9+._?=]*' /opt/prigh | sort -u) \
  && echo "runtime store paths: $refs" \

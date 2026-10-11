@@ -116,7 +116,20 @@
           ocaml-base-compiler = "5.3.0";
         };
 
+        # The web sites get precompressed siblings (file.gz, file.br) that
+        # the backend serves to browsers accepting them (Static_site).
         prighTui = frontendScope.prigh_tui.overrideAttrs (oa: {
+          nativeBuildInputs = (oa.nativeBuildInputs or [ ]) ++ [
+            pkgs.zopfli
+            pkgs.brotli
+          ];
+          postInstall = (oa.postInstall or "") + ''
+            for f in "$out"/share/prigh_tui/{web,prigh-web}/*.{js,css,html,svg,map,txt}; do
+              [ -f "$f" ] || continue
+              zopfli "$f"
+              brotli --keep --best "$f"
+            done
+          '';
           meta = (oa.meta or { }) // {
             mainProgram = "prigh-tui";
           };
@@ -221,6 +234,13 @@
           test -f ${prighWebRoot}/addon-fit.js
           # the release build: whole-program, no source map
           test "$(stat -c %s ${prighWebRoot}/main.bc.js)" -lt 5000000
+          # precompressed, decoding to the file itself
+          for f in ${prighWebRoot}/main.bc.js ${prighWebRoot}/index.html \
+                   ${prighWebRoot}/style.css ${prighTui}/share/prigh_tui/web/main.bc.js; do
+            ${pkgs.gzip}/bin/gzip -dc "$f.gz" | cmp - "$f"
+            ${pkgs.brotli}/bin/brotli -dc "$f.br" | cmp - "$f"
+          done
+          test "$(stat -c %s ${prighWebRoot}/main.bc.js.gz)" -lt 1000000
           touch "$out"
         '';
 
