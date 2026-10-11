@@ -158,6 +158,7 @@ let%expect_test "help lists every key and command" =
     Alt+1…9 follow subagent or job N in the agents panel
     Alt+] Alt+[ the next or previous subagent or job
     Alt+0 close the agents panel
+    Ctrl+Shift+F open or close the file browser (/files): ↑↓ select, Enter opens, Backspace goes up, F2 renames, Delete deletes, Esc closes
     Ctrl+` open or close the terminal (/terminal); in it, every other key goes to the shell
     Tab (in /scoped-models) check or uncheck the highlighted model
     y / a / n / r (confirmation) allow once, always allow (its rules, this session), deny, deny saying why; Enter allows, Esc denies
@@ -209,6 +210,7 @@ let%expect_test "help lists every key and command" =
     /btw <question> ask a side question without interrupting the run (not added to the conversation)
     /abort stop the current run
     /terminal open a shell where the tools run, in the session's directory (Ctrl+`)
+    /files [path] browse, preview, upload and download files where the tools run (Ctrl+Shift+F)
     /agents [n|id|cancel <n|id>] follow subagents and background jobs in the agents panel, or cancel one
     /jobs [id|kill <id>] background jobs in the agents panel: list them, show or kill one
     /login [provider] log in to a model provider (or /login custom)

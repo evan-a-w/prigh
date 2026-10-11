@@ -214,6 +214,7 @@
           test -f ${prighWebRoot}/main.bc.js
           test -f ${prighWebRoot}/style.css
           test -f ${prighWebRoot}/terminal.css
+          test -f ${prighWebRoot}/files.css
           test -f ${prighWebRoot}/terminal.js
           test -f ${prighWebRoot}/xterm.js
           test -f ${prighWebRoot}/xterm.css

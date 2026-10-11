@@ -8,6 +8,7 @@ module Target = struct
     | Session_search
     | Session of string
     | Terminal
+    | Files
     | Page
   [@@deriving sexp_of]
 end
@@ -53,6 +54,9 @@ let help =
   ; "Alt+1…9", "follow subagent or job N in the agents panel"
   ; "Alt+] Alt+[", "the next or previous subagent or job"
   ; "Alt+0", "close the agents panel"
+  ; ( "Ctrl+Shift+F"
+    , "open or close the file browser (/files): ↑↓ select, Enter opens, \
+       Backspace goes up, F2 renames, Delete deletes, Esc closes" )
   ; ( "Ctrl+`"
     , "open or close the terminal (/terminal); in it, every other key goes to \
        the shell" )
@@ -90,7 +94,8 @@ let alt_letter t letter =
 let on_control t =
   match t.target with
   | Control -> true
-  | Editor _ | Field | Session_search | Session _ | Terminal | Page -> false
+  | Editor _ | Field | Session_search | Session _ | Terminal | Files | Page ->
+    false
 ;;
 
 (* Ctrl+` by the key's position, whatever the layout types there. *)
@@ -161,7 +166,7 @@ let agents_key (m : App.Model.t) t : App.Action.t option =
          && (m.narrow
              ||
              match t.target with
-             | Editor _ | Terminal -> false
+             | Editor _ | Terminal | Files -> false
              | Field | Control | Session_search | Session _ | Page -> true) ->
     Some Agents_back
   | _ -> None
@@ -237,7 +242,8 @@ let question_key t : Question_dialog.Action.t option =
   let field =
     match t.target with
     | Field -> true
-    | Editor _ | Control | Session_search | Session _ | Terminal | Page -> false
+    | Editor _ | Control | Session_search | Session _ | Terminal | Files | Page
+      -> false
   in
   match t.key with
   | "Escape" -> Some Decline
@@ -263,9 +269,19 @@ let handle (m : App.Model.t) t : App.Action.t option =
   | _, [], _ :: _, _ ->
     Option.map (question_key t) ~f:(fun a -> App.Action.Question a)
   | _, [], [], Some dialog -> dialog_key dialog t
+  | _, [], [], None when Files.asking m.files ->
+    Files.key m.files ~key:t.key ~shift:t.shift ~ctrl:t.ctrl ~alt:t.alt
+    |> Option.map ~f:(fun a -> App.Action.Files a)
   | _, [], [], None ->
     (match t.key with
      | _ when terminal_toggle t -> Some Toggle_terminal
+     | _
+       when Files.toggle_key
+              ~code:t.code
+              ~shift:t.shift
+              ~ctrl:t.ctrl
+              ~alt:t.alt
+              ~meta:t.meta -> Some (Files Toggle)
      | ("l" | "L") when command t -> Some Open_model_picker
      | ("k" | "K") when command t -> Some Open_sessions
      | ("b" | "B") when command t -> Some Toggle_sidebar
@@ -293,5 +309,8 @@ let handle (m : App.Model.t) t : App.Action.t option =
         | None, Editor { cursor } -> editor_key m t ~cursor
         | None, Session_search -> session_search_key t
         | None, Session id -> session_key m t id
+        | None, Files ->
+          Files.key m.files ~key:t.key ~shift:t.shift ~ctrl:t.ctrl ~alt:t.alt
+          |> Option.map ~f:(fun a -> App.Action.Files a)
         | None, (Field | Control | Terminal | Page) -> None))
 ;;
