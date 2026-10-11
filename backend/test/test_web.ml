@@ -130,10 +130,10 @@ let%expect_test "web server: path safety and content types" =
         "%S -> %s\n"
         path
         (Sexp.to_string
-           [%sexp (Web_server.For_testing.safe_relative path : string option)]));
+           [%sexp (Static_site.For_testing.safe_relative path : string option)]));
   List.iter
     [ "index.html"; "main.bc.js"; "style.css"; "a.woff2"; "x.wasm" ]
-    ~f:(fun f -> printf "%s: %s\n" f (Web_server.For_testing.content_type f));
+    ~f:(fun f -> printf "%s: %s\n" f (Static_site.For_testing.content_type f));
   [%expect
     {|
     "/" -> ("")
@@ -190,6 +190,11 @@ let%expect_test "web server: static files, 404s and the RPC over a WebSocket" =
   write t "site/index.html" "<html>hi</html>";
   write t "site/main.bc.js" "console.log(1)";
   write t "site/.secret" "no";
+  List.iter [ "index.html"; "main.bc.js" ] ~f:(fun f ->
+    Core_unix.utimes
+      (Filename.concat root f)
+      ~access:1_700_000_000.
+      ~modif:1_700_000_000.);
   let login =
     Login_manager.create
       ~env:t.env
@@ -248,17 +253,23 @@ let%expect_test "web server: static files, 404s and the RPC over a WebSocket" =
       Connection: close
       Content-Length: 15
       Content-Type: text/html; charset=utf-8
+      ETag: "beb6d42e2e372ff35ff73af2"
+      Last-Modified: Tue, 14 Nov 2023 22:13:20 GMT
       body: "<html>hi</html>"
-    HTTP/1.1 200 OK
-      Cache-Control: no-cache
-      Connection: close
-      Content-Length: 0
-      Content-Type: text/javascript; charset=utf-8
     HTTP/1.1 200 OK
       Cache-Control: no-cache
       Connection: close
       Content-Length: 14
       Content-Type: text/javascript; charset=utf-8
+      ETag: "0a286891c11c056e1ab5bfc2"
+      Last-Modified: Tue, 14 Nov 2023 22:13:20 GMT
+    HTTP/1.1 200 OK
+      Cache-Control: no-cache
+      Connection: close
+      Content-Length: 14
+      Content-Type: text/javascript; charset=utf-8
+      ETag: "0a286891c11c056e1ab5bfc2"
+      Last-Modified: Tue, 14 Nov 2023 22:13:20 GMT
       body: "console.log(1)"
     HTTP/1.1 404 Not Found
       Cache-Control: no-cache

@@ -345,8 +345,10 @@ prigh serve -prigh-web 0.0.0.0:7790 -token sekrit   # remote; the page asks for 
 without it the backend looks next to its dune build and in
 `../share/prigh/prigh-web`. The Nix package (`nix run . -- -prigh-web`)
 installs the release build of the page (whole-program js_of_ocaml, about
-1.8 MB of JavaScript); a dune build in the dev profile makes a ~50 MB one
-with inline source maps, quicker to relink but slow to load. The page keeps `?session=` in the address bar
+2 MB of JavaScript, sent as a 500 KB brotli or 590 KB gzip file it
+ships precompressed); reloads revalidate with `ETag`/`Last-Modified` and
+cost a `304` per file. A dune build in the dev profile makes a ~50 MB one
+with inline source maps, uncompressed, quicker to relink but slow to load. The page keeps `?session=` in the address bar
 and the chat's scroll position and draft in the tab's sessionStorage (a
 reload, or a phone bringing back a discarded tab, returns to the same place,
 waiting for the backend if it is out of reach), reconnects when the
