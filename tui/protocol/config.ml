@@ -7,6 +7,7 @@ type t =
   ; default_thinking : string option
   ; fallback_models : string list
   ; default_cwd : string option
+  ; notify : string
   }
 [@@deriving sexp_of, equal]
 
@@ -17,6 +18,7 @@ let default =
   ; default_thinking = None
   ; fallback_models = []
   ; default_cwd = None
+  ; notify = "bell"
   }
 ;;
 
@@ -46,13 +48,15 @@ let of_json j =
   let%bind default_model = optional_string "default_model" in
   let%bind default_thinking = optional_string "default_thinking" in
   let%bind fallback_models = strings "fallback_models" in
-  let%map default_cwd = optional_string "default_cwd" in
+  let%bind default_cwd = optional_string "default_cwd" in
+  let%map notify = optional_string "notify" in
   { scoped_models
   ; confirm_tools
   ; default_model
   ; default_thinking
   ; fallback_models
   ; default_cwd
+  ; notify = Option.value notify ~default:"bell"
   }
 ;;
 
@@ -66,5 +70,6 @@ let to_json t =
     ; "default_thinking", optional t.default_thinking
     ; "fallback_models", strings t.fallback_models
     ; "default_cwd", optional t.default_cwd
+    ; "notify", `String t.notify
     ]
 ;;

@@ -692,7 +692,8 @@ let%expect_test "/change_default saves the model and thinking level" =
       "default_cwd": null,
       "max_budget_usd": null,
       "goal_max_continuations": 20,
-      "resume_on_limit_reset": true
+      "resume_on_limit_reset": true,
+      "notify": "bell"
     }
     |}]
 ;;

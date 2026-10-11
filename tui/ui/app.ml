@@ -85,6 +85,10 @@ module Command = struct
         ; as_user : string option
         }
     | Sign_out
+    | Notify of
+        { mode : Notify.Mode.t
+        ; notification : Notify.t
+        }
     | Quit
   [@@deriving sexp_of, equal]
 end
@@ -135,6 +139,7 @@ module Action = struct
     | Tick
     | Set_home of string
     | Set_utc_offset of Time_ns.Span.t
+    | Focus of bool
     | Hello of P.Hello_reply.t
     | Resize of
         { width : int
@@ -179,6 +184,7 @@ module Model = struct
     ; height : int
     ; quitting : bool
     ; utc_offset : Time_ns.Span.t
+    ; terminal_focus : Focus.t
     }
   [@@deriving sexp_of]
 
@@ -412,6 +418,7 @@ let init =
   ; height = 24
   ; quitting = false
   ; utc_offset = Time_ns.Span.zero
+  ; terminal_focus = Unknown
   }
 ;;
 
@@ -1497,6 +1504,37 @@ let set_config ~tag fields =
   rpc "set_config" ~params:[ "config", `Object fields ] ~tag
 ;;
 
+let notify_summary_of (mode : Notify.Mode.t) (focus : Focus.t) =
+  match mode with
+  | Off -> "notifications off (/notify bell or /notify desktop turns them on)"
+  | Bell | Desktop ->
+    sprintf
+      "notifications: %s when a turn ends, a tool waits for you or background \
+       work finishes, while this terminal is not focused%s"
+      (match mode with
+       | Desktop -> "a desktop notification"
+       | Bell | Off -> "the bell")
+      (match focus with
+       | Unknown ->
+         " (it has not reported focus yet: in tmux, set -g focus-events on)"
+       | Focused | Unfocused -> "")
+;;
+
+let notify_summary m =
+  notify_summary_of (Notify.Mode.of_config m.config) m.terminal_focus
+;;
+
+(* While the user looks elsewhere: the terminal says so when it reports
+   focus; one that never has is assumed to have it. *)
+let notify m (e : P.Event.t) =
+  match Notify.Mode.of_config m.config, m.terminal_focus with
+  | Off, _ | _, (Unknown | Focused) -> []
+  | ((Bell | Desktop) as mode), Unfocused ->
+    (match Notify.of_event e ~where:(Notify.where m.state) with
+     | Some notification -> [ Command.Notify { mode; notification } ]
+     | None -> [])
+;;
+
 let set_confirm m enabled =
   let label =
     sprintf "tool confirmation %s" (if enabled then "on" else "off")
@@ -1695,6 +1733,19 @@ let run_command m (cmd : Commands.Parsed.t) =
   | "confirm", ("off" | "false") :: _ -> set_confirm m false
   | "confirm", other :: _ ->
     error m (sprintf "unknown argument %S; use on or off" other), []
+  | "notify", [] -> notice m (notify_summary m), []
+  | "notify", [ word ] when Option.is_some (Notify.Mode.of_string word) ->
+    let mode = Option.value_exn (Notify.Mode.of_string word) in
+    ( { m with
+        config =
+          Option.map m.config ~f:(fun config ->
+            { config with P.Config.notify = word })
+      }
+    , [ set_config
+          ~tag:(Notice_on_success (notify_summary_of mode m.terminal_focus))
+          [ "notify", P.Json.str word ]
+      ] )
+  | "notify", _ -> error m "usage: /notify [off|bell|desktop]", []
   | "change_default", _ -> m, [ rpc "change_default" ~tag:Default_saved ]
   | "fallback", [] ->
     show_config m ~tag:Fallback_shown ~summary:(fallback_summary m)
@@ -3560,7 +3611,9 @@ let update m (action : Action.t) =
          | Some i -> intent m i
          | None -> m, [])
       | Intent i -> intent m i
-      | Event e -> event m e
+      | Event e ->
+        let m, cmds = event m e in
+        m, cmds @ notify m e
       | Protocol_error text -> error m ("protocol error: " ^ text), []
       | Stderr line ->
         let all = m.stderr_tail @ [ line ] in
@@ -3586,6 +3639,8 @@ let update m (action : Action.t) =
       | Tick -> { m with spinner = m.spinner + 1 }, []
       | Set_home home -> { m with home = Some home }, []
       | Set_utc_offset utc_offset -> { m with utc_offset }, []
+      | Focus focused ->
+        { m with terminal_focus = (if focused then Focused else Unfocused) }, []
       | Hello { client_id; namespace; user } ->
         { m with client_id = Some client_id; namespace; user }, []
       | Resize { width; height } -> { m with width; height }, []

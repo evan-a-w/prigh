@@ -180,13 +180,13 @@ btw backend exited
  ((scoped_models ()) (confirm_tools false) (default_model ())
   (default_thinking ())
   (fallback_models (deepseek/deepseek-flash anthropic/claude-fable-5-1))
-  (default_cwd ($TMP))))
+  (default_cwd ($TMP)) (notify bell)))
 <- set_config ERROR: "fallback_models: unknown model \"gpt-9\"; did you mean: openai/gpt-4 (GPT-4), openai/gpt-5 (GPT-5), openai/gpt-4o (GPT-4o)"
 <- set_config: (Ok
  ((scoped_models ()) (confirm_tools false) (default_model ())
   (default_thinking ())
   (fallback_models (deepseek/deepseek-flash anthropic/claude-fable-5-1))
-  (default_cwd ())))
+  (default_cwd ()) (notify bell)))
 <- prompt: ()
   event state running=true model=deepseek/deepseek-flash
   event user "fix the bug"

@@ -1,6 +1,20 @@
 open! Core
 open! Import
 
+(** How the terminal frontend tells the user that something needs them while
+    they look elsewhere ([/notify]); prigh-web keeps its own setting in the
+    browser. *)
+module Notify : sig
+  type t =
+    | Off
+    | Bell (** the terminal bell *)
+    | Desktop (** a desktop notification (OSC 9 / OSC 777) *)
+  [@@deriving sexp_of, equal, enumerate]
+
+  val to_string : t -> string
+  val of_string : string -> t Or_error.t
+end
+
 type t =
   { scoped_models : string list
   ; confirm_tools : bool
@@ -19,6 +33,7 @@ type t =
     (** automatic continuations a [/goal] gets before it stops *)
   ; resume_on_limit_reset : bool
     (** resume a run stopped by a usage limit when the limit resets *)
+  ; notify : Notify.t (** default [Bell] *)
   }
 [@@deriving sexp_of]
 

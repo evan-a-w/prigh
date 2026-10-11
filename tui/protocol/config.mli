@@ -10,6 +10,9 @@ type t =
   ; fallback_models : string list
     (** model keys that take over, in order, when a model's usage runs out *)
   ; default_cwd : string option (** where new sessions start *)
+  ; notify : string
+    (** how the terminal frontend notifies: [off], [bell] (default) or
+        [desktop] *)
   }
 [@@deriving sexp_of, equal]
 

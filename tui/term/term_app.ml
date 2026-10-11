@@ -29,6 +29,7 @@ let tty_fd () =
 let write_tty s = ignore (Core_unix.write_substring (tty_fd ()) ~buf:s : int)
 
 let release_terminal () =
+  write_tty Term_focus.disable;
   write_tty "\027[?1049l";
   ignore (Core_unix.system "stty sane </dev/tty" : Core_unix.Exit_or_signal.t)
 ;;
@@ -44,6 +45,7 @@ let reacquire_terminal () =
     (Core_unix.system "stty -icanon -echo -isig -ixon -iexten </dev/tty"
      : Core_unix.Exit_or_signal.t);
   write_tty "\027[?1049h";
+  write_tty Term_focus.enable;
   !repaint ()
 ;;
 
@@ -216,6 +218,17 @@ let platform client ~hello ~exit ~quit_requested : Prigh_ui.Component.Platform.t
   ; load_history = (fun () -> Effect.of_sync_fun load_history ())
   ; append_history = (fun text -> Effect.of_sync_fun append_history text)
   ; copy_to_clipboard = (fun text -> Effect.of_sync_fun copy_to_clipboard text)
+  ; notify =
+      (fun mode notification ->
+        Effect.of_sync_fun
+          (fun () ->
+            write_tty
+              (Term_notify.sequence
+                 mode
+                 ~term:(Sys.getenv "TERM")
+                 ~tmux:(Option.is_some (Sys.getenv "TMUX"))
+                 notification))
+          ())
   ; suspend = Effect.of_sync_fun suspend ()
   ; edit_externally = (fun text -> Effect.of_sync_fun edit_externally text)
   ; reconnect =
@@ -414,6 +427,41 @@ let connection_hello hello ~host_id =
       ]
 ;;
 
+(* Notty drops the terminal's focus reports, so it reads our stdin through a
+   filter that takes them out (and, reading from a pipe, leaves the tty's
+   modes to us: the same raw mode it would set, restored at exit). [None]
+   when stdin is not a terminal. *)
+let focus_reporting_input ~on_focus =
+  if not (Core_unix.isatty Core_unix.stdin)
+  then None
+  else (
+    let tty = Core_unix.stdin in
+    let saved = Core_unix.Terminal_io.tcgetattr tty in
+    Core_unix.Terminal_io.tcsetattr
+      { saved with c_icanon = false; c_echo = false; c_isig = false; c_ixon = false }
+      tty
+      ~mode:TCSANOW;
+    let restore () =
+      write_tty Term_focus.disable;
+      try Core_unix.Terminal_io.tcsetattr saved tty ~mode:TCSANOW with
+      | _ -> ()
+    in
+    at_exit restore;
+    let filtered_r, filtered_w = Pipe.create () in
+    don't_wait_for
+      (let%map.Deferred () =
+         Pipe.iter_without_pushback
+           (Reader.pipe (force Reader.stdin))
+           ~f:(fun chunk ->
+             let input, reports = Term_focus.split chunk in
+             List.iter reports ~f:(fun focused -> !on_focus focused);
+             if not (String.is_empty input)
+             then Pipe.write_without_pushback_if_open filtered_w input)
+       in
+       Pipe.close filtered_w);
+    Some (Reader.of_pipe (Info.of_string "prigh-tui input") filtered_r, restore))
+;;
+
 let run ~connect ~hello ~local_tools =
   let client = Client.create ~connect in
   let host_id_warning = ref None in
@@ -444,11 +492,19 @@ let run ~connect ~hello ~local_tools =
           ~spawn:(Prigh_client_unix.Tool_host.spawn_worker ~backend))
     in
     let quit_requested = Ivar.create () in
+    let on_focus = ref (fun (_ : bool) -> ()) in
+    let%bind.Deferred input = 
+      match focus_reporting_input ~on_focus with
+      | None -> Deferred.return None
+      | Some (reader, restore) ->
+        Deferred.map reader ~f:(fun reader -> Some (reader, restore))
+    in
     let%bind.Deferred driver =
       (* Mouse reporting so the wheel scrolls the transcript (the terminal would
          otherwise turn it into arrow keys, i.e. prompt history); selecting text
          needs Shift. *)
       Bonsai_term.start_with_driver
+        ?reader:(Option.map input ~f:fst)
         ~mouse:All_mouse_events_except_hover
         ~get_view_and_handler:(fun (r : Result_.t) ->
           ~view:r.view, ~handler:r.handler)
@@ -468,6 +524,10 @@ let run ~connect ~hello ~local_tools =
        in
        let had_iexten = Tty.set_iexten tty false in
        install_repaint driver;
+       (on_focus
+        := fun focused ->
+             Driver.send_incoming_event driver (App.Action.Focus focused));
+       if Option.is_some input then write_tty Term_focus.enable;
        Option.iter hello_reply ~f:(fun reply ->
          Driver.send_incoming_event driver (App.Action.Hello reply));
        Option.iter !host_id_warning ~f:(fun warning ->
@@ -491,6 +551,7 @@ let run ~connect ~hello ~local_tools =
        (* Give the driver a frame to release the terminal before we exit. *)
        let%bind.Deferred () = Clock.after (Time_float.Span.of_sec 0.2) in
        ignore (Tty.set_iexten tty had_iexten : bool);
+       Option.iter input ~f:(fun (_, restore) -> restore ());
        Option.iter tool_host ~f:Prigh_client_unix.Tool_host.close;
        let%bind.Deferred () =
          Deferred.any_unit

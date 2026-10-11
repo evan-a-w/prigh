@@ -140,6 +140,7 @@ let platform client ~hello ~history_key ~schedule ~quit ~sign_out
       (fun text -> Effect.of_sync_fun (History.append ~key:history_key) text)
   ; copy_to_clipboard =
       (fun text -> Effect.of_sync_fun Browser.copy_to_clipboard text)
+  ; notify = (fun _ _ -> Effect.Ignore)
   ; suspend = Effect.of_sync_fun (fun () -> unavailable "suspend (Ctrl+Z)") ()
   ; edit_externally =
       (fun _ ->

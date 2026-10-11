@@ -125,6 +125,16 @@ let confirm_items () =
     Picker.Item.create ~id:name (String.capitalize name))
 ;;
 
+let notify_items () =
+  List.map
+    [ "off", "no notifications"
+    ; "bell", "ring the terminal bell"
+    ; "desktop", "a desktop notification (OSC 9 or 777)"
+    ]
+    ~f:(fun (name, detail) ->
+      Picker.Item.create ~id:name ~detail (String.capitalize name))
+;;
+
 let provider_items (auth : P.Auth_status.t list) =
   List.map auth ~f:(fun (s : P.Auth_status.t) ->
     Picker.Item.create
@@ -169,6 +179,7 @@ let argument_items ~kind ~models ~auth ~sessions ~logged_in =
   | Thinking -> Some (thinking_items ())
   | Verbosity -> Some (verbosity_items ())
   | Confirm -> Some (confirm_items ())
+  | Notify -> Some (notify_items ())
   | Login ->
     Some
       (provider_items auth

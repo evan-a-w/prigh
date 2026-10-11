@@ -213,7 +213,8 @@ let%expect_test
       (default_model    ())
       (default_thinking ())
       (fallback_models (anthropic/claude-fable-5-1 deepseek/deepseek-flash))
-      (default_cwd ())))
+      (default_cwd ())
+      (notify bell)))
     |}]
 ;;
 

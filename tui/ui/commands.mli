@@ -9,6 +9,7 @@ module Argument : sig
     | Thinking
     | Verbosity
     | Confirm
+    | Notify (** [off], [bell] or [desktop] *)
     | Login
     | Logout
     | Sessions

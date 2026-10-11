@@ -14,7 +14,7 @@ let%expect_test "a missing file yields the default" =
      ((scoped_models ()) (confirm_tools false) (default_model ())
       (default_thinking ()) (fallback_models ()) (default_cwd ())
       (max_budget_usd ()) (goal_max_continuations 20)
-      (resume_on_limit_reset true)))
+      (resume_on_limit_reset true) (notify Bell)))
     |}]
 ;;
 
@@ -31,6 +31,7 @@ let%expect_test "save then load round trips" =
     ; max_budget_usd = None
     ; goal_max_continuations = 20
     ; resume_on_limit_reset = true
+    ; notify = Bell
     }
   in
   print_s [%sexp (Config.save ~home:t.dir config : unit Or_error.t)];
@@ -51,14 +52,15 @@ let%expect_test "save then load round trips" =
       "default_cwd": null,
       "max_budget_usd": null,
       "goal_max_continuations": 20,
-      "resume_on_limit_reset": true
+      "resume_on_limit_reset": true,
+      "notify": "bell"
     }
     (Ok
      ((scoped_models (anthropic/claude-fable-5 deepseek-v4-pro))
       (confirm_tools true) (default_model (anthropic/claude-fable-5))
       (default_thinking ((On (High)))) (fallback_models ()) (default_cwd ())
       (max_budget_usd ()) (goal_max_continuations 20)
-      (resume_on_limit_reset true)))
+      (resume_on_limit_reset true) (notify Bell)))
     |}]
 ;;
 
@@ -76,7 +78,7 @@ let%expect_test "unknown fields are ignored" =
      ((scoped_models (x)) (confirm_tools true) (default_model ())
       (default_thinking ()) (fallback_models ()) (default_cwd ())
       (max_budget_usd ()) (goal_max_continuations 20)
-      (resume_on_limit_reset true)))
+      (resume_on_limit_reset true) (notify Bell)))
     |}]
 ;;
 
@@ -129,7 +131,7 @@ let%expect_test
     {|
     config.confirm_tools must be a boolean (in $DIR/.prigh/config.json); prigh ignores the file's settings until it is fixed
     unknown setting "providrs" in $DIR/.prigh/config.json is ignored; did you mean "providers"?
-    unknown setting "colour" in $DIR/.prigh/config.json is ignored (known: providers, scoped_models, confirm_tools, default_model, default_thinking, fallback_models, default_cwd, max_budget_usd, goal_max_continuations, resume_on_limit_reset)
+    unknown setting "colour" in $DIR/.prigh/config.json is ignored (known: providers, scoped_models, confirm_tools, default_model, default_thinking, fallback_models, default_cwd, max_budget_usd, goal_max_continuations, resume_on_limit_reset, notify)
     |}];
   (* Unparsable files are [read_fields]' error, reported once elsewhere. *)
   show "{not json";
@@ -155,11 +157,35 @@ let%expect_test "null defaults are unset" =
      ((scoped_models ()) (confirm_tools false) (default_model ())
       (default_thinking ()) (fallback_models ()) (default_cwd ())
       (max_budget_usd ()) (goal_max_continuations 20)
-      (resume_on_limit_reset true)))
+      (resume_on_limit_reset true) (notify Bell)))
     (Ok
      ((scoped_models ()) (confirm_tools false)
       (default_model (deepseek/deepseek-flash)) (default_thinking ((On ())))
       (fallback_models ()) (default_cwd ()) (max_budget_usd ())
-      (goal_max_continuations 20) (resume_on_limit_reset true)))
+      (goal_max_continuations 20) (resume_on_limit_reset true) (notify Bell)))
+    |}]
+;;
+
+let%expect_test "notify: off, bell or desktop" =
+  List.iter
+    [ {|{"notify": "desktop"}|}
+    ; {|{"notify": "off"}|}
+    ; {|{"notify": "loud"}|}
+    ; {|{"notify": 1}|}
+    ]
+    ~f:(fun json ->
+      print_s
+        [%sexp
+          (Or_error.map
+             (Config.of_json (Jsonaf.of_string json))
+             ~f:(fun c -> c.notify)
+           : Config.Notify.t Or_error.t)]);
+  [%expect
+    {|
+    (Ok Desktop)
+    (Ok Off)
+    (Error
+     "config.notify must be \"off\", \"bell\" or \"desktop\", not \"loud\"")
+    (Error "config.notify must be \"off\", \"bell\" or \"desktop\"")
     |}]
 ;;

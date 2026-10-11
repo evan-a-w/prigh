@@ -229,7 +229,9 @@ let%expect_test "goals, shell output and a legacy session line" =
     |}]
 ;;
 
-let%expect_test "hand-overs recorded before origins: the error may contain anything" =
+let%expect_test
+    "hand-overs recorded before origins: the error may contain anything"
+  =
   List.iter
     [ "[prigh: openai-codex/gpt-6-sol cannot continue (HTTP 429: The usage \
        limit has been reached (usage limit reached)), so \
@@ -260,7 +262,8 @@ let%expect_test "hand-overs recorded before origins: the error may contain anyth
         print_s [%sexp (source : Injected.Source.t)];
         print_endline (Injected.Source.title source)
       | Some other -> print_s [%sexp (other : Injected.t)]);
-  [%expect {|
+  [%expect
+    {|
     (Handover (from openai-codex/gpt-6-sol) (to_ anthropic/claude-opus-5-5)
      (error "HTTP 429: The usage limit has been reached (usage limit reached)"))
     Handed over from openai-codex/gpt-6-sol to anthropic/claude-opus-5-5
