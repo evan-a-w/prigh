@@ -294,7 +294,8 @@ let%expect_test
 ;;
 
 let%expect_test
-    "a subagent's spend counts while it runs, and the budget stops it"
+    "a subagent's spend counts while it runs, the budget stops it, and it is \
+     recorded in the session"
   =
   let provider =
     Routed_provider.create
@@ -345,15 +346,37 @@ let%expect_test
   Or_error.ok_exn (Agent.set_budget agent (Some 0.5));
   Or_error.ok_exn (Agent.prompt agent "delegate");
   Agent.wait_idle agent;
-  print_s
-    [%sexp
-      (Float.round_decimal (Agent.state agent).cost_usd ~decimal_digits:4
-       : float)];
+  let cost agent =
+    print_s
+      [%sexp
+        (Float.round_decimal (Agent.state agent).cost_usd ~decimal_digits:4
+         : float)]
+  in
+  cost agent;
+  (* As after a backend restart: the session read back from its file. *)
+  let reloaded =
+    Agent.create
+      ~env:t.env
+      ~sw
+      ~provider
+      ~tools:[]
+      ~sessions_dir:(Filename.concat t.dir "sessions")
+      ~home:t.dir
+      ~session:
+        (Or_error.ok_exn (Session.load (Session.path (Agent.session agent))))
+      ~cwd:t.dir
+      ()
+  in
+  cost reloaded;
+  print_s [%sexp (Agent.prompt reloaded "more" : unit Or_error.t)];
   [%expect
     {|
     [subagent a1 failed] dig
     notice: the session's budget of $0.50 is spent ($0.60 so far): /budget 2 raises it, /budget off removes it
     0.6001
+    0.6001
+    (Error
+     "the session's budget of $0.50 is spent ($0.60 so far): /budget 2 raises it, /budget off removes it")
     |}]
 ;;
 
@@ -687,6 +710,103 @@ let%expect_test "a run stopped by a usage limit resumes when it resets" =
     assistant: carried on
     ((running false) (cost_usd 0.0001) (budget_usd ()) (goal ())
      (resume_scheduled false))
+    |}]
+;;
+
+let%expect_test
+    "a scheduled resume is recorded in the session: loaded again it is \
+     scheduled again, or dropped once its time has passed"
+  =
+  let sleep_until, fire = manual_clock () in
+  let resets_at = Core_unix.gettimeofday () +. 600. in
+  with_agent ~sleep_until [ Reply.usage_limit ~resets_at (); text "carried on" ]
+  @@ fun t agent make ->
+  Or_error.ok_exn (Agent.prompt agent "work");
+  Agent.wait_idle agent;
+  let path = Session.path (Agent.session agent) in
+  let recorded () =
+    List.filter_map
+      (Session.entries (Or_error.ok_exn (Session.load path)))
+      ~f:(fun e ->
+        match e.payload with
+        | Resume_at { at } ->
+          Some (Option.map at ~f:(fun at -> Float.(abs (at - resets_at) < 1.)))
+        | _ -> None)
+  in
+  print_s [%sexp (recorded () : bool option list)];
+  print_s
+    [%sexp
+      (List.map
+         (Session.list ~dir:(Filename.concat t.dir "sessions"))
+         ~f:(fun s -> Option.is_some s.resume_at)
+       : bool list)];
+  (* The backend stops: the file as it was then, without what ending this
+     agent's timer records, is loaded by a new one. *)
+  let snapshot = In_channel.read_all path in
+  Or_error.ok_exn (Agent.cancel_resume agent);
+  Out_channel.write_all path ~data:snapshot;
+  let reloaded = make ~session:(Or_error.ok_exn (Session.load path)) () in
+  show_state reloaded;
+  fire ();
+  Eio.Time.sleep (Eio.Stdenv.clock t.env) 0.05;
+  Agent.wait_idle reloaded;
+  show_state reloaded;
+  print_s [%sexp (recorded () : bool option list)];
+  [%expect
+    {|
+    request: 1 messages, last user "work"
+    assistant:  ERROR HTTP 429: The usage limit has been reached (usage limit reached) (resets at <time>)
+    notice: deepseek/deepseek-flash: the usage limit is reached; the run resumes when it resets at <time> (in 10m): /resume now retries at once, /resume cancel stays stopped
+    ((true))
+    (true)
+    ((running false) (cost_usd 0) (budget_usd ()) (goal ())
+     (resume_scheduled true))
+    request: 3 messages, last user "[prigh: the usage limit has reset. Carry on with the interru"
+    assistant: carried on
+    ((running false) (cost_usd 0) (budget_usd ()) (goal ())
+     (resume_scheduled false))
+    ((true) ())
+    |}];
+  (* A time that passed while nothing ran is dropped. *)
+  let session = Or_error.ok_exn (Session.load path) in
+  Session.set_resume_at session (Some (Core_unix.gettimeofday () -. 60.));
+  let late = make ~session:(Or_error.ok_exn (Session.load path)) () in
+  show_state late;
+  print_s
+    [%sexp
+      (Session.resume_at (Or_error.ok_exn (Session.load path)) : float option)];
+  [%expect
+    {|
+    ((running false) (cost_usd 0) (budget_usd ()) (goal ())
+     (resume_scheduled false))
+    ()
+    |}]
+;;
+
+let%expect_test "a resume whose session was deleted meanwhile does not run" =
+  let sleep_until, fire = manual_clock () in
+  let resets_at = Core_unix.gettimeofday () +. 600. in
+  with_agent ~sleep_until [ Reply.usage_limit ~resets_at (); text "never" ]
+  @@ fun t agent _make ->
+  Or_error.ok_exn (Agent.prompt agent "work");
+  Agent.wait_idle agent;
+  Session.delete_files (Session.path (Agent.session agent));
+  fire ();
+  Eio.Time.sleep (Eio.Stdenv.clock t.env) 0.05;
+  Agent.wait_idle agent;
+  show_state agent;
+  print_s
+    [%sexp
+      (Sys_unix.file_exists_exn (Session.path (Agent.session agent)) : bool)];
+  [%expect
+    {|
+    request: 1 messages, last user "work"
+    assistant:  ERROR HTTP 429: The usage limit has been reached (usage limit reached) (resets at <time>)
+    notice: deepseek/deepseek-flash: the usage limit is reached; the run resumes when it resets at <time> (in 10m): /resume now retries at once, /resume cancel stays stopped
+    notice: the usage limit has reset, but this session was deleted, so its run does not resume
+    ((running false) (cost_usd 0) (budget_usd ()) (goal ())
+     (resume_scheduled false))
+    false
     |}]
 ;;
 

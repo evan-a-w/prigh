@@ -192,8 +192,6 @@ type t =
   ; steer_queue : Queued.t Queue.t
   ; follow_up_queue : Queued.t Queue.t
   ; mutable subscribers : (Event.t -> unit) list
-  ; mutable extra_usage : Usage.t (** subagents and [btw] calls *)
-  ; mutable extra_cost_usd : float
   ; mutable config : Config.t
   ; pending_confirms : Waiting_confirm.t String.Table.t
   ; pending_questions :
@@ -320,11 +318,12 @@ let model_of t (a : Message.Assistant.t) =
 ;;
 
 (* Every response in the session file (all branches, also those a compaction
-   summarised), each at its own model's price. *)
+   summarised), each at its own model's price, and the recorded spend of
+   everything else (subagents, compactions, [btw]). *)
 let session_spend t =
   List.fold
     (Session.entries t.session)
-    ~init:(Usage.zero, 0.)
+    ~init:(Session.spend t.session)
     ~f:(fun ((usage, cost) as acc) (e : Session.Entry.t) ->
       match e.payload with
       | Message (Assistant a) ->
@@ -332,7 +331,7 @@ let session_spend t =
       | _ -> acc)
 ;;
 
-let spent_usd t = snd (session_spend t) +. t.extra_cost_usd
+let spent_usd t = snd (session_spend t)
 
 let budget t =
   match Session.budget t.session with
@@ -368,7 +367,7 @@ let state t =
       | User _ | Tool_result _ -> None)
   in
   let assistant_usage, assistant_cost = session_spend t in
-  let usage = Usage.add assistant_usage t.extra_usage in
+  let usage = assistant_usage in
   let context_tokens =
     Option.value_map (List.last assistant_messages) ~default:0 ~f:(fun a ->
       a.usage.input)
@@ -384,7 +383,7 @@ let state t =
   ; running = is_running t
   ; message_count = List.length messages
   ; usage
-  ; cost_usd = assistant_cost +. t.extra_cost_usd
+  ; cost_usd = assistant_cost
   ; context_tokens
   ; active_host = t.active_host
   ; hosts = hosts t
@@ -1362,12 +1361,12 @@ let user_message t (q : Queued.t) =
     (Injected.prefix_notes notes text)
 ;;
 
-(* What the session file does not record: subagents' responses (as they
-   arrive, so a budget sees a running subagent's spend) and compactions. *)
+(* Spend the session's messages do not record, recorded as [Spend] entries:
+   subagents' responses (as they arrive, so a budget sees a running
+   subagent's spend) and compactions. *)
 let rec account t ?(nested = false) (event : Agent_event.t) =
   let add usage cost_usd =
-    t.extra_usage <- Usage.add t.extra_usage usage;
-    t.extra_cost_usd <- t.extra_cost_usd +. cost_usd
+    ignore (Session.add_spend t.session ~usage ~cost_usd : Session.Entry.t)
   in
   match event with
   | Subagent { event; _ } -> account t ~nested:true event
@@ -1533,6 +1532,7 @@ let resume_message =
 let cancel_resume_timer t =
   Option.iter t.resume ~f:(fun r ->
     t.resume <- None;
+    Session.set_resume_at t.session None;
     Cancellation.cancel r.cancel)
 ;;
 
@@ -1792,10 +1792,7 @@ and schedule_resume t ~error =
               (Model.key t.model)));
       false
     | Some at ->
-      cancel_resume_timer t;
-      let cancel = Cancellation.create () in
-      let resume = { Resume.at; cancel } in
-      t.resume <- Some resume;
+      arm_resume t ~at;
       let now = Eio.Time.now (Eio.Stdenv.clock t.env) in
       broadcast
         t
@@ -1807,17 +1804,36 @@ and schedule_resume t ~error =
               (Model.key t.model)
               (Usage_limit.utc_string at)
               (duration_hum (at -. now))));
-      Fiber.fork ~sw:t.sw (fun () ->
-        match Cancellation.protect cancel ~f:(fun () -> t.sleep_until at) with
-        | None -> ()
-        | Some () ->
-          if Option.exists t.resume ~f:(fun r -> phys_equal r resume)
-          then (
-            t.resume <- None;
-            if is_running t
-            then state_changed t
-            else start_run t [ resume_message ]));
       true)
+
+(* Recorded in the session, so that it is armed again when the session is
+   loaded (see [restore_resume]). *)
+and arm_resume t ~at =
+  cancel_resume_timer t;
+  let cancel = Cancellation.create () in
+  let resume = { Resume.at; cancel } in
+  t.resume <- Some resume;
+  Session.set_resume_at t.session (Some at);
+  Fiber.fork ~sw:t.sw (fun () ->
+    match Cancellation.protect cancel ~f:(fun () -> t.sleep_until at) with
+    | None -> ()
+    | Some () ->
+      if Option.exists t.resume ~f:(fun r -> phys_equal r resume)
+      then (
+        t.resume <- None;
+        if Session.gone t.session
+        then (
+          broadcast
+            t
+            (Notice
+               "the usage limit has reset, but this session was deleted, so \
+                its run does not resume");
+          state_changed t)
+        else (
+          Session.set_resume_at t.session None;
+          if is_running t
+          then state_changed t
+          else start_run t [ resume_message ])))
 
 (* Runs after the turn is over so the user is not kept waiting; [wait_idle]
    still covers it. *)
@@ -1904,6 +1920,17 @@ let last_job_number messages =
     List.fold numbers ~init:acc ~f:Int.max)
 ;;
 
+(* A resume the session recorded (before a backend restart, or eviction)
+   is armed again while its time is still to come. *)
+let restore_resume t =
+  match Session.resume_at t.session with
+  | None -> ()
+  | Some at ->
+    if Float.( > ) at (Eio.Time.now (Eio.Stdenv.clock t.env))
+    then arm_resume t ~at
+    else Session.set_resume_at t.session None
+;;
+
 let create
       ~env
       ~sw
@@ -1982,8 +2009,6 @@ let create
     ; steer_queue = Queue.create ()
     ; follow_up_queue = Queue.create ()
     ; subscribers = []
-    ; extra_usage = Usage.zero
-    ; extra_cost_usd = 0.
     ; config
     ; pending_confirms = String.Table.create ()
     ; pending_questions = String.Table.create ()
@@ -2022,6 +2047,7 @@ let create
   restore_settings t;
   restore_host t;
   load_subagent_log t;
+  restore_resume t;
   Background_tasks.connect
     t.background
     ~emit:(fun event ->
@@ -2507,11 +2533,9 @@ let btw t ~question ~cancel ~on_delta =
       | Server_tool_result _ -> ())
   in
   let cost_usd = Model.cost_usd model reply.usage in
-  if phys_equal session t.session
-  then (
-    t.extra_usage <- Usage.add t.extra_usage reply.usage;
-    t.extra_cost_usd <- t.extra_cost_usd +. cost_usd;
-    state_changed t);
+  ignore
+    (Session.add_spend session ~usage:reply.usage ~cost_usd : Session.Entry.t);
+  if phys_equal session t.session then state_changed t;
   match reply.stop_reason with
   | Error e -> Or_error.error_string e
   | Aborted -> Or_error.error_string "cancelled"
@@ -2536,9 +2560,8 @@ let replace_session t session ~keep_host =
      activate_host t host ~cwd:host.cwd ~pinned:false
    | Some _ | None -> ());
   t.environment_notes <- [];
-  t.extra_usage <- Usage.zero;
-  t.extra_cost_usd <- 0.;
   restore_settings t;
+  restore_resume t;
   state_changed t
 ;;
 
