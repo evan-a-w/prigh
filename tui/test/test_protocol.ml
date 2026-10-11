@@ -638,9 +638,12 @@ let%expect_test "auth status, models, sessions" =
      (first_prompt ())
      (message_count 0)
      (parent ())
-     (live    false)
-     (running false)
-     (clients 0))
+     (live       false)
+     (running    false)
+     (background 0)
+     (clients    0)
+     (archived   false)
+     (bytes      0))
     |}]
 ;;
 
@@ -688,9 +691,12 @@ let%expect_test "entries and session stats" =
      (first_prompt (hi))
      (message_count 3)
      (parent ())
-     (live    false)
-     (running false)
-     (clients 0))
+     (live       false)
+     (running    false)
+     (background 0)
+     (clients    0)
+     (archived   false)
+     (bytes      0))
     ((id e1) (parent ()) (kind (Message (User ((text "first\nsecond"))))))
     ((id e2)
      (parent (e1))
@@ -796,6 +802,7 @@ let%expect_test "config round trip and config_changed event" =
          ; fallback_models =
              [ "openai-codex/gpt-6-sol"; "deepseek/deepseek-flash" ]
          ; default_cwd = Some "~/proj"
+         ; archive_after_days = 7.
          }
        : Json.t)];
   decode
@@ -811,7 +818,8 @@ let%expect_test "config round trip and config_changed event" =
      (default_model    ())
      (default_thinking ())
      (fallback_models  ())
-     (default_cwd      ()))
+     (default_cwd      ())
+     (archive_after_days 7))
     ((scoped_models ())
      (approval_mode Auto)
      (permissions (
@@ -821,7 +829,8 @@ let%expect_test "config round trip and config_changed event" =
      (default_model    ())
      (default_thinking ())
      (fallback_models  ())
-     (default_cwd      ()))
+     (default_cwd      ())
+     (archive_after_days 7))
     ((scoped_models ())
      (approval_mode Auto)
      (permissions (
@@ -831,7 +840,8 @@ let%expect_test "config round trip and config_changed event" =
      (default_model ())
      (default_thinking (low))
      (fallback_models ())
-     (default_cwd     ()))
+     (default_cwd     ())
+     (archive_after_days 7))
     (decode (e "default_model must be a string"))
     ((scoped_models ())
      (approval_mode Auto)
@@ -842,7 +852,8 @@ let%expect_test "config round trip and config_changed event" =
      (default_model    ())
      (default_thinking ())
      (fallback_models (openai-codex/gpt-6-sol anthropic/claude-opus-5-5))
-     (default_cwd (/srv/work)))
+     (default_cwd (/srv/work))
+     (archive_after_days 7))
     (decode (e "fallback_models must be an array of strings"))
     (decode (e "default_cwd must be a string"))
     ((scoped_models (a b))
@@ -854,7 +865,8 @@ let%expect_test "config round trip and config_changed event" =
      (default_model    deepseek/deepseek-flash)
      (default_thinking max)
      (fallback_models (openai-codex/gpt-6-sol deepseek/deepseek-flash))
-     (default_cwd ~/proj))
+     (default_cwd        ~/proj)
+     (archive_after_days 7))
     (Event (
       Config_changed (
         (scoped_models (a))
@@ -866,7 +878,8 @@ let%expect_test "config round trip and config_changed event" =
         (default_model    ())
         (default_thinking ())
         (fallback_models  ())
-        (default_cwd      ()))))
+        (default_cwd      ())
+        (archive_after_days 7))))
     |}]
 ;;
 
@@ -1038,5 +1051,76 @@ let%expect_test "list_skills and list_mcp results" =
       e (
         in servers[0] (
           "field \"status\"" "unknown MCP server status \"sleeping\""))))
+    |}]
+;;
+
+let%expect_test "archived sessions and deleting them" =
+  let parse s = Json.parse s |> Or_error.ok_exn in
+  List.iter
+    [ Request.Method.Set_archived { path = "/s/a.jsonl"; archived = true }
+    ; Delete_sessions [ "/s/a.jsonl"; "/s/b.jsonl" ]
+    ; Delete_archived
+    ]
+    ~f:(fun m -> print_endline (Request.to_line (Request.create ~id:1 m)));
+  print_s
+    [%sexp
+      (Session_summary.of_json
+         (parse
+            {|{"id":"a","path":"/p","cwd":"/c","created_at":"x","message_count":2,"live":true,"running":true,"background":2,"clients":1,"archived":true,"bytes":2048}|})
+       : Session_summary.t Or_error.t)];
+  print_s
+    [%sexp
+      (Entry.of_json
+         (parse {|{"id":"e9","parent":"e8","kind":"archived","archived":true}|})
+       : Entry.t Or_error.t)];
+  decode {|{"type":"event","event":"sessions_changed"}|};
+  let result =
+    Delete_result.of_json
+      (parse
+         {|{"deleted":[{"path":"/s/a.jsonl","id":"a","bytes":1500},{"path":"/s/b.jsonl","id":"b","bytes":2000000}],"refused":[{"path":"/s/c.jsonl","error":"session c is running: wait for it or /abort it first"}]}|})
+    |> Or_error.ok_exn
+  in
+  print_s [%sexp (result : Delete_result.t)];
+  print_endline (Delete_result.summary result);
+  print_endline
+    (Delete_result.summary { deleted = []; refused = [] }
+     ^ " / "
+     ^ String.concat
+         ~sep:", "
+         (List.map
+            [ 0; 1023; 1024; 1_500_000; 3_000_000_000 ]
+            ~f:Session_summary.size_string));
+  [%expect {|
+    {"id":1,"method":"set_archived","params":{"path":"/s/a.jsonl","archived":true}}
+    {"id":1,"method":"delete_sessions","params":{"paths":["/s/a.jsonl","/s/b.jsonl"]}}
+    {"id":1,"method":"delete_archived","params":{}}
+    (Ok (
+      (id   a)
+      (path /p)
+      (name        ())
+      (description ())
+      (cwd        /c)
+      (created_at x)
+      (updated_at   ())
+      (first_prompt ())
+      (message_count 2)
+      (parent ())
+      (live       true)
+      (running    true)
+      (background 2)
+      (clients    1)
+      (archived   true)
+      (bytes      2048)))
+    (Ok ((id e9) (parent (e8)) (kind (Archived (archived true)))))
+    (Event Sessions_changed)
+    ((deleted (
+       ((path /s/a.jsonl) (id a) (bytes 1500))
+       ((path /s/b.jsonl) (id b) (bytes 2000000))))
+     (refused ((
+       (path /s/c.jsonl)
+       (error "session c is running: wait for it or /abort it first")))))
+    Deleted 2 sessions (1.9 MB)
+    Not deleted: session c is running: wait for it or /abort it first
+    Deleted nothing / 0 B, 1023 B, 1.0 KB, 1.4 MB, 2.8 GB
     |}]
 ;;

@@ -2,7 +2,7 @@ open! Core
 open! Import
 open Chat_html
 
-let section (section : Prigh_ui.Delivery.Section.t) =
+let section ~fold ~key (section : Prigh_ui.Delivery.Section.t) =
   let job = String.equal section.kind "job" in
   let report =
     Subagent_report.of_string (String.concat ~sep:"\n" section.body)
@@ -29,11 +29,13 @@ let section (section : Prigh_ui.Delivery.Section.t) =
        then Node.none
        else if job
        then
-         folded
-           ~cls:"delivery-body"
-           ~label:"Output"
-           ~preview:(first_line body)
-           (Output_view.view ~error:(not section.ok) ~head:0 ~tail:20 body)
+         (* A job's last lines say how it went. *)
+         Output_view.view
+           ~fold:(fold, key section)
+           ~error:(not section.ok)
+           ~head:0
+           ~tail:5
+           body
        else
          folded
            ~cls:"delivery-body"
@@ -43,4 +45,8 @@ let section (section : Prigh_ui.Delivery.Section.t) =
     ]
 ;;
 
-let view sections = div "delivery" (List.map sections ~f:section)
+let job_key (section : Prigh_ui.Delivery.Section.t) = "job:" ^ section.id
+
+let view ~fold ?(key = job_key) sections =
+  div "delivery" (List.map sections ~f:(section ~fold ~key))
+;;

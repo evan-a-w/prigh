@@ -344,13 +344,10 @@ let%expect_test "web_fetch: the URL as a link, the page folded" =
     line 4
     line 5
     line 6 </pre>
-          <details class="more">
-            <summary> 4 more lines </summary>
-            <pre> line 7
-    line 8
-    line 9
-    line 10 </pre>
-          </details>
+          <button type="button" data-fold="c1" aria-expanded="false" class="fold">
+            <span class="chev"> </span>
+            Show all 10 lines (4 hidden)
+          </button>
         </div>
       </div>
     </div>

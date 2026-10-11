@@ -133,6 +133,15 @@ let rec activity (event : Agent_event.t) =
   | _ -> None
 ;;
 
+let avoid_subagent_ids t ids =
+  List.iter ids ~f:(fun id ->
+    Option.iter
+      (Option.bind
+         (String.chop_prefix id ~prefix:(Kind.id_prefix Subagent))
+         ~f:Int.of_string_opt)
+      ~f:(fun n -> t.next_subagent_id <- Int.max t.next_subagent_id (n + 1)))
+;;
+
 let next_id t (kind : Kind.t) =
   let n =
     match kind with
@@ -171,6 +180,11 @@ let spawn ?input t ~kind ~label ~run =
     Option.iter (activity event) ~f:(fun a -> task.activity <- a);
     t.emit event
   in
+  let finish outcome =
+    task.outcome <- Some outcome;
+    task.finished_at <- Some (now t);
+    task.activity <- "finished"
+  in
   Fiber.fork ~sw:t.sw (fun () ->
     let outcome =
       match
@@ -181,16 +195,20 @@ let spawn ?input t ~kind ~label ~run =
           ~on_output:(Output_tail.add task.output)
       with
       | outcome -> outcome
-      | exception (Eio.Cancel.Cancelled _ as exn) -> raise exn
+      | exception (Eio.Cancel.Cancelled _ as exn) ->
+        (* The agent's switch is going away: the task is not running any
+           more, whatever happens next. *)
+        finish { Outcome.status = "cancelled"; body = ""; is_error = true };
+        task.delivered <- true;
+        Promise.resolve resolve ();
+        raise exn
       | exception exn ->
         { Outcome.status = "failed"
         ; body = sprintf "%s failed: %s" (Kind.word kind) (Exn.to_string exn)
         ; is_error = true
         }
     in
-    task.outcome <- Some outcome;
-    task.finished_at <- Some (now t);
-    task.activity <- "finished";
+    finish outcome;
     t.on_change ();
     Promise.resolve resolve ());
   t.on_change ();
@@ -200,6 +218,8 @@ let spawn ?input t ~kind ~label ~run =
 let tasks t ~kind =
   List.filter t.tasks ~f:(fun (task : Task.t) -> Kind.equal task.kind kind)
 ;;
+
+let running_count t = List.count t.tasks ~f:Task.running
 
 let has_running ?kind t =
   List.exists t.tasks ~f:(fun task ->
@@ -338,6 +358,8 @@ let cancel_all ?(discard = false) t =
     if Task.running task then Cancellation.cancel task.cancel);
   if discard then mark_delivered t t.tasks
 ;;
+
+let forget_finished t = t.tasks <- List.filter t.tasks ~f:Task.running
 
 let rec wait_all t =
   match List.filter t.tasks ~f:Task.running with

@@ -57,7 +57,8 @@ let%expect_test "/fallback shows the chain, sets only it, and clears it" =
     {|
     (((scoped_models ()) (approval_mode Auto)
       (permissions ((allow ()) (ask ()) (deny ()))) (default_model ())
-      (default_thinking ()) (fallback_models ()) (default_cwd ())))
+      (default_thinking ()) (fallback_models ()) (default_cwd ())
+      (archive_after_days 7)))
     (Save_history (/fallback))
     (Expire_toast (id 0) (after_ms 4000))
     No fallback models: /fallback MODEL [MODEL...] sets the chain that takes over when a model's usage runs out
@@ -82,8 +83,8 @@ let%expect_test "/fallback shows the chain, sets only it, and clears it" =
     (((scoped_models ()) (approval_mode Auto)
       (permissions ((allow ()) (ask ()) (deny ()))) (default_model ())
       (default_thinking ())
-      (fallback_models (openai/gpt-6 anthropic/claude-sonnet-5))
-      (default_cwd ())))
+      (fallback_models (openai/gpt-6 anthropic/claude-sonnet-5)) (default_cwd ())
+      (archive_after_days 7)))
     |}];
   (* After a hand-over the status line's model moves on, and so does
      /fallback's "now on". *)
@@ -124,7 +125,8 @@ let%expect_test "/fallback shows the chain, sets only it, and clears it" =
     Fallback cleared: a model whose usage runs out stops the run (/fallback MODEL... sets a chain)
     (((scoped_models ()) (approval_mode Auto)
       (permissions ((allow ()) (ask ()) (deny ()))) (default_model ())
-      (default_thinking ()) (fallback_models ()) (default_cwd ())))
+      (default_thinking ()) (fallback_models ()) (default_cwd ())
+      (archive_after_days 7)))
     |}]
 ;;
 
@@ -147,7 +149,8 @@ let%expect_test
     Couldn't set the fallback models: fallback_models: unknown model "nope"; did you mean: openai/gpt-6 (GPT-6)
     (((scoped_models ()) (approval_mode Auto)
       (permissions ((allow ()) (ask ()) (deny ()))) (default_model ())
-      (default_thinking ()) (fallback_models ()) (default_cwd ())))
+      (default_thinking ()) (fallback_models ()) (default_cwd ())
+      (archive_after_days 7)))
     |}];
   (* Before the config has arrived there is nothing to show or keep. *)
   let m, cmds = App.update { App.init with draft = "/fallback gpt-6" } Send in
@@ -263,7 +266,8 @@ let%expect_test "/default-dir shows, sets and clears where new sessions start" =
     Default directory: ~/proj (new sessions start there; /default-dir off clears it)
     (((scoped_models ()) (approval_mode Auto)
       (permissions ((allow ()) (ask ()) (deny ()))) (default_model ())
-      (default_thinking ()) (fallback_models ()) (default_cwd (~/proj))))
+      (default_thinking ()) (fallback_models ()) (default_cwd (~/proj))
+      (archive_after_days 7)))
     |}];
   run h "/default-dir";
   H.text h ~selector:".toast:last-child";
@@ -497,6 +501,7 @@ let%expect_test "a hand-over in /fork and /tree" =
   [%expect
     {|
     (Save_history (/fork))
+    (Focus dialog)
     (Rpc (method_ get_entries) (params ()) (tag (Entries Fork)))
     (Focus picker-input)
     fix the build #1
@@ -511,6 +516,7 @@ let%expect_test "a hand-over in /fork and /tree" =
     Close_dialog
     (Focus editor)
     (Save_history (/tree /fork))
+    (Focus dialog)
     (Rpc (method_ get_entries) (params ((all true))) (tag (Entries Tree)))
     (Focus picker-input)
     > fix the build ✓

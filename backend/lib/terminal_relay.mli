@@ -40,3 +40,7 @@ val closed : t -> host:string -> Json.t -> unit Or_error.t
 
 (** Closes the browser side of every terminal relayed to [host]. *)
 val host_gone : t -> host:string -> unit
+
+(** Closes every terminal relayed for [key] (its session is gone): the
+    browser side ends and the host is sent [terminal_close]. *)
+val close_key : t -> key:string -> unit

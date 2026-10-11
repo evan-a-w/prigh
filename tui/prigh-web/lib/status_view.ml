@@ -222,14 +222,22 @@ let modes (m : App.Model.t) ~inject =
   ]
 ;;
 
+let waiting cls text =
+  item ~cls [ Node.span ~attrs:[ Attr.class_ "spinner" ] []; Node.text text ]
+;;
+
 let view (m : App.Model.t) ~inject =
-  match m.state with
-  | None -> div ~cls:"status" []
-  | Some state ->
+  match m.state, m.connection with
+  | None, Connected -> div ~cls:"status" [ waiting "connecting" "Connecting…" ]
+  | _, Reconnecting _ ->
+    div ~cls:"status" [ waiting "connecting offline" "Reconnecting…" ]
+  | Some state, Connected ->
     let steer, follow_up = m.queue in
     div
       ~cls:"status"
-      [ (if state.running
+      [ (if m.pending.sending > 0 && not state.running
+         then waiting "running" "Sending…"
+         else if state.running
          then
            item
              ~cls:"running"

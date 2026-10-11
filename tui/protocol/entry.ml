@@ -14,6 +14,7 @@ module Kind = struct
     | Name of { name : string }
     | Description of { text : string }
     | Cwd of { cwd : string }
+    | Archived of { archived : bool }
     | System_prompt
     | Other of string
     (** a kind this frontend does not show (approval mode changes, session
@@ -52,6 +53,9 @@ let kind_of_json j =
       Kind.Description { text })
   | "cwd" ->
     Or_error.map (Json.string_field j "cwd") ~f:(fun cwd -> Kind.Cwd { cwd })
+  | "archived" ->
+    Or_error.map (Json.bool_field j "archived") ~f:(fun archived ->
+      Kind.Archived { archived })
   | "system_prompt" -> Ok Kind.System_prompt
   | other -> Ok (Kind.Other other)
 ;;

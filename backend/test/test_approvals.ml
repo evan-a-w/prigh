@@ -796,7 +796,8 @@ let%expect_test
       "default_cwd": null,
       "max_budget_usd": null,
       "goal_max_continuations": 20,
-      "resume_on_limit_reset": true
+      "resume_on_limit_reset": true,
+      "archive_after_days": 7
     }
     |}]
 ;;

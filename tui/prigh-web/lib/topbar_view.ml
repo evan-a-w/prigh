@@ -22,6 +22,19 @@ let session_title (m : App.Model.t) (state : State.t) =
        |> Option.value ~default:"New session")
 ;;
 
+(* A choice the backend has still to confirm. *)
+let pending_chip ~cls label =
+  button
+    ~cls:("chip-button awaiting " ^ cls)
+    ~title:(sprintf "Switching to %s…" label)
+    ~disabled:true
+    ~attrs:[ Attr.create "aria-busy" "true" ]
+    ~on_click:Effect.Ignore
+    [ Node.span ~attrs:[ Attr.class_ "spinner" ] []
+    ; span ~cls:"chip-label" label
+    ]
+;;
+
 let view (m : App.Model.t) ~inject =
   let toggle =
     button
@@ -69,16 +82,25 @@ let view (m : App.Model.t) ~inject =
           ]
       ; div
           ~cls:"controls"
-          [ button
-              ~cls:"chip-button model-chip"
-              ~title:"Switch model (Ctrl+L)"
-              ~on_click:(inject Action.Open_model_picker)
-              [ icon Cpu
-              ; span ~cls:"chip-label" state.model.name
-              ; icon ~cls:"chevron" Chevron
-              ]
-          ; (if state.model.supports_thinking
-             then
+          [ (match m.pending.model with
+             | Some key ->
+               let name =
+                 List.find m.models ~f:(fun model -> String.equal model.key key)
+                 |> Option.value_map ~default:key ~f:(fun model -> model.name)
+               in
+               pending_chip ~cls:"model-chip" name
+             | None ->
+               button
+                 ~cls:"chip-button model-chip"
+                 ~title:"Switch model (Ctrl+L)"
+                 ~on_click:(inject Action.Open_model_picker)
+                 [ icon Cpu
+                 ; span ~cls:"chip-label" state.model.name
+                 ; icon ~cls:"chevron" Chevron
+                 ])
+          ; (match m.pending.thinking with
+             | Some level -> pending_chip ~cls:"thinking-chip" level
+             | None when state.model.supports_thinking ->
                button
                  ~cls:"chip-button thinking-chip"
                  ~title:"Thinking level (/thinking)"
@@ -87,7 +109,7 @@ let view (m : App.Model.t) ~inject =
                  ; span ~cls:"chip-label" state.thinking
                  ; icon ~cls:"chevron" Chevron
                  ]
-             else Node.none)
+             | None -> Node.none)
           ; Terminal_view.toggle m ~inject
           ; Agents_view.toggle m ~inject
           ]

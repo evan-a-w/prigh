@@ -207,21 +207,43 @@ let execute
     context.emit (Agent_event.Subagent { call_id; agent_id; event })
   in
   let added =
-    Agent_loop.run
-      ~env:context.env
-      ~provider
-      ~config
-      ~cwd:p.cwd
-      ~cancel:context.cancel
-      ~execute:context.execute
-      ~approve:context.approve
-      ~depth:p.depth
-      ~agent_id
-      ~emit
-      ~halt:context.halt
-      ~context:[]
-      ~prompts:[ Message.user p.task ]
-      ()
+    match
+      Agent_loop.run
+        ~env:context.env
+        ~provider
+        ~config
+        ~cwd:p.cwd
+        ~cancel:context.cancel
+        ~execute:context.execute
+        ~approve:context.approve
+        ~depth:p.depth
+        ~agent_id
+        ~emit
+        ~halt:context.halt
+        ~context:[]
+        ~prompts:[ Message.user p.task ]
+        ()
+    with
+    | added -> added
+    | exception exn ->
+      (* The start always gets an end, or frontends would show the subagent
+         running forever. *)
+      let text =
+        match exn with
+        | Eio.Cancel.Cancelled _ -> "[cancelled]"
+        | exn -> "subagent failed: " ^ Exn.to_string exn
+      in
+      Eio.Cancel.protect (fun () ->
+        context.emit
+          (Agent_event.Subagent_end
+             { call_id
+             ; agent_id
+             ; usage = !nested_usage
+             ; turns = !turns
+             ; cost_usd = !nested_cost_usd
+             ; result = Tool.Result.error text
+             }));
+      raise exn
   in
   let local_usage =
     List.fold added ~init:Usage.zero ~f:(fun acc message ->
@@ -259,6 +281,9 @@ let execute
          if Cancellation.is_cancelled context.cancel
          then Tool.Result.error ("[cancelled]\n" ^ body)
          else Tool.Result.error ("subagent aborted\n" ^ body)
+       | Tool_use when Cancellation.is_cancelled context.cancel ->
+         (* Cancelled between its tool results and its next turn. *)
+         Tool.Result.error ("[cancelled]\n" ^ body)
        | End_turn | Tool_use | Length ->
          let unfinished =
            not (List.is_empty (Message.Assistant.tool_calls assistant))

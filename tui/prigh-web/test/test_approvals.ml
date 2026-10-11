@@ -1108,6 +1108,7 @@ let%expect_test "plan mode notes are a line, not the note" =
   [%expect
     {|
     (Save_history (/fork))
+    (Focus dialog)
     (Rpc (method_ get_entries) (params ()) (tag (Entries Fork)))
     (Focus picker-input)
     fix the build #1

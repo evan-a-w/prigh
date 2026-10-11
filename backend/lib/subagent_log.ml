@@ -54,19 +54,112 @@ module Entry = struct
     }
 end
 
+(* One line of [subagents.jsonl]: what is needed to rebuild the entries, in
+   the order it was recorded. Streaming progress is not written. *)
+module Line = struct
+  module Result = struct
+    type t =
+      { text : string
+      ; is_error : bool
+      ; images : Image.t list [@jsonaf.default []] [@jsonaf_drop_default.equal]
+      }
+    [@@deriving jsonaf]
+
+    let of_tool_result ({ text; is_error; images } : Tool_result.t) =
+      { text; is_error; images }
+    ;;
+
+    let to_tool_result { text; is_error; images } =
+      { Tool_result.text; is_error; images }
+    ;;
+  end
+
+  type t =
+    | Run of { run : int }
+    | Start of
+        { id : string
+        ; call_id : string
+        ; parent : string option [@jsonaf.option]
+        ; task : string
+        ; model : string
+        ; at : float
+        ; run : int
+        }
+    | Message of
+        { id : string
+        ; at : float
+        ; turns : int
+        ; tool_calls : int
+        ; message : Message.t
+        }
+    | End of
+        { id : string
+        ; at : float
+        ; run : int
+        ; turns : int
+        ; tool_calls : int
+        ; result : Result.t
+        }
+  [@@deriving jsonaf]
+end
+
 type t =
   { entries : Entry.t Queue.t (** oldest first *)
   ; by_id : Entry.t String.Table.t
   ; mutable runs : int
+  ; mutable dir : unit -> string option
   }
 
 let create () =
-  { entries = Queue.create (); by_id = String.Table.create (); runs = 0 }
+  { entries = Queue.create ()
+  ; by_id = String.Table.create ()
+  ; runs = 0
+  ; dir = (fun () -> None)
+  }
 ;;
 
-let clear t =
-  Queue.clear t.entries;
-  Hashtbl.clear t.by_id
+let file_name = "subagents.jsonl"
+
+let write t (line : Line.t) =
+  Option.iter (t.dir ()) ~f:(fun dir ->
+    let path = Filename.concat dir file_name in
+    let append () =
+      Out_channel.with_file path ~append:true ~f:(fun oc ->
+        Out_channel.output_string oc (Json.to_string (Line.jsonaf_of_t line));
+        Out_channel.newline oc)
+    in
+    match line with
+    | Run _ -> if Sys_unix.file_exists_exn path then append ()
+    | Start _ | Message _ | End _ ->
+      Core_unix.mkdir_p dir;
+      append ())
+;;
+
+let start t ~id ~call_id ~parent ~task ~model ~at =
+  let entry =
+    { Entry.id
+    ; call_id
+    ; parent
+    ; task
+    ; model
+    ; started_at = at
+    ; updated_at = at
+    ; ended = None
+    ; result = None
+    ; turns = 0
+    ; tool_calls = 0
+    ; current_tool = None
+    ; messages = Queue.create ()
+    }
+  in
+  Hashtbl.set t.by_id ~key:id ~data:entry;
+  Queue.enqueue t.entries entry
+;;
+
+let end_ t (e : Entry.t) ~at ~result =
+  e.result <- Some result;
+  e.ended <- Some (at, t.runs);
+  e.current_tool <- None
 ;;
 
 let rec record_in t ~now ~parent (event : Agent_event.t) =
@@ -76,31 +169,30 @@ let rec record_in t ~now ~parent (event : Agent_event.t) =
       f e)
   in
   match event with
-  | Agent_start -> if Option.is_none parent then t.runs <- t.runs + 1
+  | Agent_start ->
+    if Option.is_none parent
+    then (
+      t.runs <- t.runs + 1;
+      write t (Run { run = t.runs }))
   | Subagent_start { call_id; agent_id; task; model; tools = _ } ->
-    let entry =
-      { Entry.id = agent_id
-      ; call_id
-      ; parent
-      ; task
-      ; model
-      ; started_at = now
-      ; updated_at = now
-      ; ended = None
-      ; result = None
-      ; turns = 0
-      ; tool_calls = 0
-      ; current_tool = None
-      ; messages = Queue.create ()
-      }
-    in
-    Hashtbl.set t.by_id ~key:agent_id ~data:entry;
-    Queue.enqueue t.entries entry
+    start t ~id:agent_id ~call_id ~parent ~task ~model ~at:now;
+    write
+      t
+      (Start
+         { id = agent_id; call_id; parent; task; model; at = now; run = t.runs })
   | Subagent_end { agent_id; result; _ } ->
     touch agent_id (fun e ->
-      e.result <- Some result;
-      e.ended <- Some (now, t.runs);
-      e.current_tool <- None)
+      end_ t e ~at:now ~result;
+      write
+        t
+        (End
+           { id = e.id
+           ; at = now
+           ; run = t.runs
+           ; turns = e.turns
+           ; tool_calls = e.tool_calls
+           ; result = Line.Result.of_tool_result result
+           }))
   | Subagent { agent_id; event = inner; call_id = _ } ->
     (match inner with
      | Subagent_start _ | Subagent_end _ | Subagent _ ->
@@ -113,12 +205,66 @@ let rec record_in t ~now ~parent (event : Agent_event.t) =
      | Tool_end _ -> touch agent_id (fun e -> e.current_tool <- None)
      | Message_end message ->
        touch agent_id (fun e ->
-         Queue.enqueue e.messages { Timed_message.message; at = Some now })
+         Queue.enqueue e.messages { Timed_message.message; at = Some now };
+         write
+           t
+           (Message
+              { id = e.id
+              ; at = now
+              ; turns = e.turns
+              ; tool_calls = e.tool_calls
+              ; message
+              }))
      | _ -> touch agent_id ignore)
   | _ -> ()
 ;;
 
 let record t ~now event = record_in t ~now ~parent:None event
+
+let replay t (line : Line.t) =
+  let with_entry id f = Option.iter (Hashtbl.find t.by_id id) ~f in
+  match line with
+  | Run { run } -> t.runs <- Int.max t.runs run
+  | Start { id; call_id; parent; task; model; at; run } ->
+    t.runs <- Int.max t.runs run;
+    start t ~id ~call_id ~parent ~task ~model ~at
+  | Message { id; at; turns; tool_calls; message } ->
+    with_entry id (fun e ->
+      e.updated_at <- at;
+      e.turns <- turns;
+      e.tool_calls <- tool_calls;
+      Queue.enqueue e.messages { Timed_message.message; at = Some at })
+  | End { id; at; run; turns; tool_calls; result } ->
+    t.runs <- Int.max t.runs run;
+    with_entry id (fun e ->
+      e.updated_at <- at;
+      e.turns <- turns;
+      e.tool_calls <- tool_calls;
+      e.result <- Some (Line.Result.to_tool_result result);
+      e.ended <- Some (at, run))
+;;
+
+let interrupted = "[interrupted] the backend stopped before it finished"
+
+let load t ~dir =
+  Queue.clear t.entries;
+  Hashtbl.clear t.by_id;
+  t.runs <- 0;
+  t.dir <- dir;
+  Option.iter (dir ()) ~f:(fun dir ->
+    let path = Filename.concat dir file_name in
+    if Sys_unix.file_exists_exn path
+    then (
+      List.iter (In_channel.read_lines path) ~f:(fun line ->
+        match Line.t_of_jsonaf (Json.of_string line) with
+        | line -> replay t line
+        | exception _ -> ());
+      Queue.iter t.entries ~f:(fun e ->
+        if Option.is_none e.result
+        then
+          (* Not written, so that a later load finds the same end. *)
+          end_ t e ~at:e.updated_at ~result:(Tool_result.error interrupted))))
+;;
 
 let summary t (e : Entry.t) =
   { Summary.id = e.id
@@ -144,6 +290,40 @@ let summary t (e : Entry.t) =
 ;;
 
 let summaries t = Queue.to_list t.entries |> List.map ~f:(summary t)
+
+let ancestors t (e : Entry.t) =
+  let rec go acc (e : Entry.t) =
+    match Option.bind e.parent ~f:(Hashtbl.find t.by_id) with
+    | None -> List.rev acc
+    | Some parent -> go (parent :: acc) parent
+  in
+  go [] e
+;;
+
+let orphan_ends t ~alive ~why =
+  Queue.to_list t.entries
+  |> List.rev
+  |> List.filter_map ~f:(fun (e : Entry.t) ->
+    let ancestors = ancestors t e in
+    let root = Option.value (List.last ancestors) ~default:e in
+    if Option.is_some e.result || alive root.id
+    then None
+    else (
+      let end_ =
+        Agent_event.Subagent_end
+          { call_id = e.call_id
+          ; agent_id = e.id
+          ; usage = Usage.zero
+          ; turns = e.turns
+          ; cost_usd = 0.
+          ; result = Tool_result.error ("[interrupted] " ^ why root.id)
+          }
+      in
+      Some
+        (List.fold ancestors ~init:end_ ~f:(fun event (parent : Entry.t) ->
+           Agent_event.Subagent
+             { call_id = parent.call_id; agent_id = parent.id; event }))))
+;;
 
 let find t key =
   let entry =

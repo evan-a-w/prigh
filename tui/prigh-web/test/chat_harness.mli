@@ -14,7 +14,7 @@ val apply : Chat.t -> string -> Chat.t
 val times : Message_time.t
 
 (** The rendered transcript as indented HTML; [selector] picks part of it. *)
-val show : ?selector:string -> Chat.t -> unit
+val show : ?fold:Fold.t -> ?selector:string -> Chat.t -> unit
 
 (** Its visible text. *)
-val text : ?selector:string -> Chat.t -> unit
+val text : ?fold:Fold.t -> ?selector:string -> Chat.t -> unit

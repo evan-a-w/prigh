@@ -20,6 +20,7 @@ and entry =
 and tool =
   { call : Tool_call.t
   ; output : string
+  ; lines : int
   ; result : Message.Tool_result.t option
   ; subagent : subagent option
   }
@@ -52,6 +53,7 @@ module Tool = struct
   type t = tool =
     { call : Tool_call.t
     ; output : string
+    ; lines : int
     ; result : Message.Tool_result.t option
     ; subagent : Subagent.t option
     }
@@ -82,7 +84,7 @@ let add_call t (call : Tool_call.t) =
   let tools =
     Map.update t.tools call.id ~f:(function
       | Some tool -> { tool with call }
-      | None -> { call; output = ""; result = None; subagent = None })
+      | None -> { call; output = ""; lines = 0; result = None; subagent = None })
   in
   { t with tools }
 ;;
@@ -118,6 +120,42 @@ let add_message t (message : Message.t) =
   | User u -> add t (User u)
   | Assistant a -> set_assistant t a ~streaming:false
   | Tool_result r -> set_result t r
+;;
+
+let live_limit = 32_768
+
+let newlines s =
+  let rec go pos n =
+    match String.index_from s pos '\n' with
+    | Some i -> go (i + 1) (n + 1)
+    | None -> n
+  in
+  go 0 0
+;;
+
+(* Only the end of a running call's output shows: keeping all of it would
+   copy it all at every chunk. *)
+let append_output (tool : tool) chunk =
+  let output = tool.output ^ chunk in
+  let lines = tool.lines + newlines chunk in
+  let length = String.length output in
+  if length <= 2 * live_limit
+  then { tool with output; lines }
+  else (
+    let from = length - live_limit in
+    let start =
+      match String.index_from output from '\n' with
+      | Some i -> i + 1
+      | None ->
+        (* One long line: cut it at a character's first byte. *)
+        let rec start i =
+          if i < length && Char.to_int output.[i] land 0xC0 = 0x80
+          then start (i + 1)
+          else i
+        in
+        start from
+    in
+    { tool with output = String.drop_prefix output start; lines })
 ;;
 
 let shell_command (call : Tool_call.t) =
@@ -179,8 +217,7 @@ let rec apply t (event : Event.t) =
     let t = add_call t call in
     if String.equal call.name "shell" then add t (Shell call) else t
   | Tool_output { call_id; chunk } ->
-    update_tool t call_id ~f:(fun tool ->
-      { tool with output = tool.output ^ chunk })
+    update_tool t call_id ~f:(fun tool -> append_output tool chunk)
   | Tool_end { call = _; result } -> set_result t result
   | Subagent_start { call_id; agent_id; task; model; tools = _ } ->
     update_tool t call_id ~f:(fun tool ->
@@ -235,7 +272,8 @@ let rec apply t (event : Event.t) =
   | Terminal_open _
   | Terminal_frame _
   | Terminal_close _
-  | Btw_delta _ -> t
+  | Btw_delta _
+  | Sessions_changed -> t
 ;;
 
 let rec received (event : Event.t) ~at : Event.t =

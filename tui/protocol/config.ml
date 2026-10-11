@@ -36,6 +36,7 @@ type t =
   ; default_thinking : string option
   ; fallback_models : string list
   ; default_cwd : string option
+  ; archive_after_days : float
   }
 [@@deriving sexp_of, equal]
 
@@ -47,6 +48,7 @@ let default =
   ; default_thinking = None
   ; fallback_models = []
   ; default_cwd = None
+  ; archive_after_days = 7.
   }
 ;;
 
@@ -82,7 +84,15 @@ let of_json j =
   let%bind default_model = optional_string "default_model" in
   let%bind default_thinking = optional_string "default_thinking" in
   let%bind fallback_models = strings "fallback_models" in
-  let%map default_cwd = optional_string "default_cwd" in
+  let%bind default_cwd = optional_string "default_cwd" in
+  let%map archive_after_days =
+    match Json.field j "archive_after_days" with
+    | None | Some `Null -> Ok default.archive_after_days
+    | Some (`Number n) ->
+      Or_error.try_with (fun () -> Float.of_string n)
+      |> Or_error.tag ~tag:"archive_after_days must be a number"
+    | Some _ -> Or_error.error_string "archive_after_days must be a number"
+  in
   { scoped_models
   ; approval_mode
   ; permissions
@@ -90,6 +100,7 @@ let of_json j =
   ; default_thinking
   ; fallback_models
   ; default_cwd
+  ; archive_after_days
   }
 ;;
 
@@ -104,5 +115,6 @@ let to_json t =
     ; "default_thinking", optional t.default_thinking
     ; "fallback_models", strings t.fallback_models
     ; "default_cwd", optional t.default_cwd
+    ; "archive_after_days", `Number (sprintf "%g" t.archive_after_days)
     ]
 ;;

@@ -63,7 +63,11 @@ module Reply_tag = struct
     | Paths of string
     | Restored
     | Dequeued
-    | Deleted of string
+    | Sessions_deleted
+    | Archived_set of
+        { title : string
+        ; archived : bool
+        }
     | Refresh_sessions
     | Login_started
     | Notice of string
@@ -89,6 +93,8 @@ module Reply_tag = struct
         }
     | Mcp of Mcp_purpose.t
     | Mode_set of string
+    | Model_set
+    | Thinking_set
   [@@deriving sexp_of, equal]
 end
 
@@ -183,6 +189,17 @@ module Action = struct
     | New_session
     | Switch_session of string
     | Ask_delete of string
+    | Select_sessions of bool
+    | Mark_session of
+        { path : string
+        ; range : bool
+        }
+    | Delete_marked
+    | Ask_delete_archived
+    | Set_archived of
+        { path : string
+        ; archived : bool
+        }
     | Set_session_query of string
     | Open_sessions
     | Session_nav of
@@ -245,6 +262,7 @@ module Action = struct
         }
     | Open_accounts
     | Cycle_verbosity
+    | Toggle_fold of string
     | Cycle_model of int
     | Cycle_thinking
     | Copy_last
@@ -303,6 +321,7 @@ module Model = struct
     ; session_query : string
     ; agents : Agents.t
     ; verbosity : Prigh_ui.Verbosity.t
+    ; folds : String.Set.t
     ; config : Config.t option
     ; btw : Btw.t option
     ; btw_seq : int
@@ -311,6 +330,8 @@ module Model = struct
     ; users : string list option
     ; terminal : Terminal.t
     ; skills : Skills.t
+    ; pending : In_flight.t
+    ; marks : Session_marks.t
     }
   [@@deriving sexp_of]
 
@@ -322,6 +343,15 @@ module Model = struct
 
   let waiting t = not (List.is_empty t.confirms && List.is_empty t.questions)
 
+  let active t =
+    match t.state with
+    | Some s ->
+      s.running
+      || List.exists s.subagents ~f:(fun a -> a.running)
+      || List.exists s.jobs ~f:(fun j -> j.running)
+    | None -> false
+  ;;
+
   let popup t =
     Option.filter t.completion ~f:(fun c ->
       not (List.is_empty (Completion.items c)))
@@ -331,6 +361,8 @@ module Model = struct
     t.agents.open_
     && Agents.running_agents t.agents + Agents.running_jobs t.agents > 0
   ;;
+
+  let fold t = Fold.create ~verbosity:t.verbosity ~toggled:t.folds
 
   let message_time t =
     Message_time.create
@@ -372,6 +404,7 @@ let init =
   ; session_query = ""
   ; agents = Agents.empty
   ; verbosity = Normal
+  ; folds = String.Set.empty
   ; config = None
   ; btw = None
   ; btw_seq = 0
@@ -380,6 +413,8 @@ let init =
   ; users = None
   ; terminal = Terminal.closed
   ; skills = Skills.empty
+  ; pending = In_flight.none
+  ; marks = Session_marks.empty
   }
 ;;
 
@@ -483,11 +518,23 @@ let set_state (m : Model.t) (state : State.t) =
       |> List.filter_map ~f:(fun (changed, cmd) -> Option.some_if changed cmd)
     | None -> []
   in
-  let m = { m with state = Some state } in
+  let pending =
+    let confirmed key = Option.filter ~f:(Fn.non (String.equal key)) in
+    { m.pending with
+      model = confirmed state.model.key m.pending.model
+    ; thinking =
+        Option.bind m.pending.thinking ~f:(fun level ->
+          Option.some_if state.model.supports_thinking level)
+        |> confirmed state.thinking
+    }
+  in
+  let m = { m with state = Some state; pending } in
   if changed
   then
     ( { m with
-        chat = Chat.empty
+        pending = { In_flight.none with messages = true }
+      ; chat = Chat.empty
+      ; folds = String.Set.empty
       ; confirms = []
       ; confirm_reason = None
       ; questions = []
@@ -664,6 +711,13 @@ let open_dialog (m : Model.t) ?(focus = "dialog") dialog =
 
 let open_picker m dialog = open_dialog m ~focus:"picker-input" dialog
 
+(* A dialog that needs a list from the backend shows at once, saying that it
+   is loading; the reply replaces it (see [loads]). *)
+let loading (m : Model.t) title cmds =
+  let m, focus = open_dialog m (Loading title) in
+  m, focus @ cmds
+;;
+
 let start_login (m : Model.t) ~provider ~method_ =
   let m, cmds = open_dialog m (Login (Login_flow.start provider)) in
   ( m
@@ -696,11 +750,23 @@ let set_thinking (m : Model.t) level =
       (sprintf
          "%s has no thinking levels: switch to a model that thinks with /model"
          state.model.name)
-  | _ -> m, [ rpc "set_thinking" [ "thinking", str level ] ]
+  | state ->
+    let unchanged =
+      Option.exists state ~f:(fun s -> String.equal s.thinking level)
+    in
+    ( (if unchanged
+       then m
+       else { m with pending = { m.pending with thinking = Some level } })
+    , [ rpc "set_thinking" [ "thinking", str level ] ~tag:Thinking_set ] )
 ;;
 
 let set_model (m : Model.t) key =
-  let set = rpc "set_model" [ "model", str key ] in
+  let set = rpc "set_model" [ "model", str key ] ~tag:Model_set in
+  let m =
+    match m.state with
+    | Some state when String.equal state.model.key key -> m
+    | _ -> { m with pending = { m.pending with model = Some key } }
+  in
   match List.find m.models ~f:(fun model -> String.equal model.key key) with
   | Some model
     when (not (List.is_empty m.auth)) && not (logged_in m model.provider) ->
@@ -781,10 +847,92 @@ let switch_session (m : Model.t) path =
   if Option.equal String.equal current (Some path)
   then m, [ focus_editor ]
   else
-    ( m
+    ( { m with pending = { m.pending with session = Some (Switching path) } }
     , [ rpc "switch_session" [ "path", str path ] ~tag:Reload_state
       ; focus_editor
       ] )
+;;
+
+(* The sidebar's sessions in the order it shows them: active, then archived. *)
+let session_order (m : Model.t) =
+  let active, archived = Session_list.sections m.sessions ~query:m.session_query in
+  List.map (active @ archived) ~f:(fun (s : Session_summary.t) -> s.path)
+;;
+
+let find_session_by_path (m : Model.t) path =
+  List.find m.sessions ~f:(fun s -> String.equal s.path path)
+;;
+
+(* A path, an id, a unique id prefix or a name, as /archive and /delete take. *)
+let find_session (m : Model.t) key =
+  let key = String.strip key in
+  let exactly =
+    List.filter m.sessions ~f:(fun (s : Session_summary.t) ->
+      String.equal s.path key
+      || String.equal s.id key
+      || Option.exists s.name ~f:(String.equal key))
+  in
+  let candidates =
+    match exactly with
+    | [] ->
+      List.filter m.sessions ~f:(fun (s : Session_summary.t) ->
+        String.is_prefix s.id ~prefix:key)
+    | exactly -> exactly
+  in
+  match candidates with
+  | [ s ] -> Ok s
+  | [] ->
+    Error
+      (sprintf
+         "No session %S: give its name, id or path (Ctrl+K searches them)."
+         key)
+  | several ->
+    Error
+      (sprintf
+         "%S matches %d sessions (%s): give more of the id."
+         key
+         (List.length several)
+         (String.concat
+            ~sep:", "
+            (List.map (List.take several 3) ~f:(fun (s : Session_summary.t) ->
+               String.prefix s.id 8))))
+;;
+
+let set_archived (m : Model.t) (s : Session_summary.t) ~archived =
+  if archived && s.running
+  then
+    error
+      m
+      (sprintf
+         "%S is running: wait for it or stop it (Esc in it) before archiving."
+         (Session_list.title s))
+  else
+    ( { m with
+        sessions =
+          List.map m.sessions ~f:(fun (x : Session_summary.t) ->
+            if String.equal x.path s.path then { x with archived } else x)
+      }
+    , [ call
+          (Set_archived { path = s.path; archived })
+          ~tag:(Archived_set { title = Session_list.title s; archived })
+      ] )
+;;
+
+let ask_delete (m : Model.t) paths =
+  match paths with
+  | [] -> toast m "Select the sessions to delete first (click them)."
+  | paths -> open_dialog m (Delete (Sessions paths))
+;;
+
+let ask_delete_archived (m : Model.t) =
+  if List.exists m.sessions ~f:(fun s -> s.archived)
+  then open_dialog m (Delete Archived)
+  else toast m "There are no archived sessions."
+;;
+
+(* A new session (or a clone, a fork) is on its way: the chat says so. *)
+let starting (m : Model.t) =
+  { m with pending = { m.pending with session = Some Starting } }
 ;;
 
 (* The keyboard through the sidebar's (filtered) sessions: down from the
@@ -1082,7 +1230,8 @@ let cycle_model (m : Model.t) step =
       let m, cmds =
         toast m ~replaces:"Model: " (sprintf "Model: %s" next.name)
       in
-      m, cmds @ [ rpc "set_model" [ "model", str next.key ] ])
+      ( { m with pending = { m.pending with model = Some next.key } }
+      , cmds @ [ rpc "set_model" [ "model", str next.key ] ~tag:Model_set ] ))
 ;;
 
 let cycle_thinking (m : Model.t) =
@@ -1107,7 +1256,9 @@ let cycle_thinking (m : Model.t) =
       let m, cmds =
         toast m ~replaces:"Thinking: " (sprintf "Thinking: %s" next)
       in
-      m, cmds @ [ rpc "set_thinking" [ "thinking", str next ] ]))
+      ( { m with pending = { m.pending with thinking = Some next } }
+      , cmds @ [ rpc "set_thinking" [ "thinking", str next ] ~tag:Thinking_set ]
+      )))
 ;;
 
 let verbosity_detail : Prigh_ui.Verbosity.t -> string = function
@@ -1118,7 +1269,7 @@ let verbosity_detail : Prigh_ui.Verbosity.t -> string = function
 
 let set_verbosity (m : Model.t) verbosity =
   toast
-    { m with verbosity }
+    { m with verbosity; folds = String.Set.empty }
     ~replaces:"Transcript: "
     (sprintf
        "Transcript: %s, %s (Ctrl+O cycles)"
@@ -1771,6 +1922,7 @@ let user_switched (m : Model.t) (hello : Hello_reply.t) =
     ; state = None
     ; chat = Chat.empty
     ; sessions = []
+    ; marks = Session_marks.empty
     ; session_query = ""
     ; confirms = []
     ; confirm_reason = None
@@ -1800,7 +1952,7 @@ let account_chosen (m : Model.t) id =
     (match Option.bind (Int.of_string_opt i) ~f:(List.nth m.accounts) with
      | Some account -> m, [ Command.Switch_account account ]
      | None -> m, [])
-  | _, "act" -> m, [ rpc "list_users" [] ~tag:(Users Picker) ]
+  | _, "act" -> loading m "Act as" [ rpc "list_users" [] ~tag:(Users Picker) ]
   | _, "back" ->
     (match own_user m with
      | Some own -> act_as m own
@@ -1851,7 +2003,10 @@ let open_skills (m : Model.t) ~query =
     match Skills.place (Some state) with
     | None -> m, []
     | Some place ->
-      m, [ call List_skills ~tag:(Skills { place; purpose = Picker query }) ])
+      loading
+        m
+        "Skills"
+        [ call List_skills ~tag:(Skills { place; purpose = Picker query }) ])
 ;;
 
 let mcp_chosen (m : Model.t) (l : Mcp_list.t) id =
@@ -1904,7 +2059,7 @@ let run_command (m : Model.t) ({ name; rest } : Slash.Parsed.t) =
   | "help", "" -> open_dialog m Help
   | "help", name -> help_command m name
   | "hotkeys", _ -> open_dialog m Hotkeys
-  | "new", _ -> m, [ rpc "new_session" [] ~tag:Reload_state ]
+  | "new", _ -> starting m, [ rpc "new_session" [] ~tag:Reload_state ]
   | "model", "" -> open_picker m (model_picker m)
   | "model", query ->
     (match Prigh_ui.Model_match.resolve m.models query with
@@ -2033,15 +2188,49 @@ let run_command (m : Model.t) ({ name; rest } : Slash.Parsed.t) =
   | "name", "" -> open_rename m
   | "name", name ->
     m, [ rpc "set_session_name" [ "name", str name ] ~tag:Refresh_sessions ]
-  | "session", _ -> m, [ rpc "session_stats" [] ~tag:Session_stats ]
+  | "session", _ ->
+    loading m "Session" [ rpc "session_stats" [] ~tag:Session_stats ]
   | "sessions", _ | "switch", "" -> open_sessions m
-  | "switch", path ->
-    m, [ rpc "switch_session" [ "path", str path ] ~tag:Reload_state ]
-  | "clone", _ -> m, [ rpc "clone" [] ~tag:Reload_state ]
-  | "fork", _ -> m, [ rpc "get_entries" [] ~tag:(Entries Fork) ]
-  | "rewind", _ -> m, [ rpc "get_entries" [] ~tag:(Entries Rewind) ]
+  | (("archive" | "unarchive") as name), key ->
+    let archived = String.equal name "archive" in
+    let session =
+      if String.is_empty key
+      then (
+        let path = Option.value_map m.state ~default:"" ~f:(fun s -> s.session_path) in
+        match find_session_by_path m path with
+        | Some s -> Ok s
+        | None -> Error "This session isn't saved yet: send a message first.")
+      else find_session m key
+    in
+    (match session with
+     | Ok s -> set_archived m s ~archived
+     | Error e -> prompt_failed m e)
+  | "delete", "" ->
+    let m, cmds =
+      toast m "Click the sessions to delete (Shift+click for a range), then Delete."
+    in
+    { m with sidebar_open = true; marks = { m.marks with selecting = true } }, cmds
+  | "delete", keys ->
+    (match
+       String.split keys ~on:' '
+       |> List.filter ~f:(Fn.non String.is_empty)
+       |> List.map ~f:(find_session m)
+       |> Result.all
+     with
+     | Ok sessions -> ask_delete m (List.map sessions ~f:(fun s -> s.path))
+     | Error e -> prompt_failed m e)
+  | "delete-archived", _ -> ask_delete_archived m
+  | "switch", path -> switch_session m path
+  | "clone", _ -> starting m, [ rpc "clone" [] ~tag:Reload_state ]
+  | "fork", _ ->
+    loading m "Fork from" [ rpc "get_entries" [] ~tag:(Entries Fork) ]
+  | "rewind", _ ->
+    loading m "Rewind to" [ rpc "get_entries" [] ~tag:(Entries Rewind) ]
   | "tree", _ ->
-    m, [ rpc "get_entries" [ "all", Json.bool true ] ~tag:(Entries Tree) ]
+    loading
+      m
+      "Session tree"
+      [ rpc "get_entries" [ "all", Json.bool true ] ~tag:(Entries Tree) ]
   | "cd", "" ->
     open_prompt
       m
@@ -2069,7 +2258,11 @@ let run_command (m : Model.t) ({ name; rest } : Slash.Parsed.t) =
   | "import", "" -> open_prompt m (Prompt.create Import)
   | "import", path -> m, [ rpc "import" [ "path", str path ] ~tag:Imported ]
   | ("skills" | "skill:"), query -> open_skills m ~query
-  | "mcp", "" -> m, [ call (List_mcp { reconnect = false }) ~tag:(Mcp Picker) ]
+  | "mcp", "" ->
+    loading
+      m
+      "MCP servers"
+      [ call (List_mcp { reconnect = false }) ~tag:(Mcp Picker) ]
   | "mcp", "reconnect" ->
     let m, cmds = toast m "Restarting the failed MCP servers…" in
     m, cmds @ [ call (List_mcp { reconnect = true }) ~tag:(Mcp Reconnect) ]
@@ -2100,7 +2293,11 @@ let run_command (m : Model.t) ({ name; rest } : Slash.Parsed.t) =
      | [ "kill"; arg ] -> with_job m arg ~f:stop_command
      | [ arg ] when not (String.equal arg "kill") -> with_job m arg ~f:select
      | _ -> error m "Usage: /jobs [id | kill <id>] (/jobs lists them)")
-  | "login", "" -> m, [ rpc "auth_status" [] ~tag:(Auth_status Login_picker) ]
+  | "login", "" ->
+    loading
+      m
+      "Log in to a provider"
+      [ rpc "auth_status" [] ~tag:(Auth_status Login_picker) ]
   | "login", args ->
     (match
        String.split args ~on:' ' |> List.filter ~f:(Fn.non String.is_empty)
@@ -2108,10 +2305,16 @@ let run_command (m : Model.t) ({ name; rest } : Slash.Parsed.t) =
      | provider :: method_ :: _ ->
        start_login m ~provider ~method_:(Some method_)
      | _ -> start_login m ~provider:args ~method_:None)
-  | "logout", "" -> m, [ rpc "auth_status" [] ~tag:(Auth_status Logout_picker) ]
+  | "logout", "" ->
+    loading
+      m
+      "Log out of a provider"
+      [ rpc "auth_status" [] ~tag:(Auth_status Logout_picker) ]
   | "logout", provider -> logout m provider
-  | "auth", _ -> m, [ rpc "auth_status" [] ~tag:(Auth_status Show) ]
-  | "setusr", "" -> m, [ rpc "list_users" [] ~tag:(Users Picker) ]
+  | "auth", _ ->
+    loading m "Providers" [ rpc "auth_status" [] ~tag:(Auth_status Show) ]
+  | "setusr", "" ->
+    loading m "Act as" [ rpc "list_users" [] ~tag:(Users Picker) ]
   | "setusr", user ->
     (match words with
      | [ user ] -> act_as m user
@@ -2293,7 +2496,7 @@ let subagent_of_json json =
   , `Call call_id )
 ;;
 
-let reply (m : Model.t) (tag : Reply_tag.t) result =
+let reply_to (m : Model.t) (tag : Reply_tag.t) result =
   match tag, result with
   | Reconnect generation, _ when generation <> m.generation -> m, []
   (* The banner says that we are reconnecting: a toast per attempt would
@@ -2347,17 +2550,19 @@ let reply (m : Model.t) (tag : Reply_tag.t) result =
     error m (sprintf "Couldn't set the fallback models: %s" e)
   | Default_dir_saved, Error e ->
     error m (sprintf "Couldn't set the default directory: %s" e)
-  | Deleted title, Error e ->
-    error
-      m
-      (sprintf
-         "Couldn't delete %S: %s%s"
-         title
-         e
-         (if String.is_substring e ~substring:"live"
-          then
-            ". Switch to another session and close other tabs using it first."
-          else ""))
+  | Sessions_deleted, Error e ->
+    error m (sprintf "Couldn't delete: %s" e)
+  | Archived_set { title; archived }, Error e ->
+    let m, cmds =
+      error
+        m
+        (sprintf
+           "Couldn't %s %S: %s"
+           (if archived then "archive" else "unarchive")
+           title
+           e)
+    in
+    m, cmds @ [ rpc "list_sessions" [] ~tag:Sessions ]
   | Login_started, Error e ->
     (match m.dialog with
      | Some (Login flow) ->
@@ -2368,6 +2573,14 @@ let reply (m : Model.t) (tag : Reply_tag.t) result =
     let m, cmds = error m (sprintf "Couldn't set the mode: %s" e) in
     m, cmds @ [ rpc "get_state" [] ~tag:State ]
   | Sent { text; images }, Error e ->
+    let m =
+      { m with
+        pending =
+          In_flight.answered
+            m.pending
+            ~failed:(Some { In_flight.Prompt.text; images })
+      }
+    in
     (* Back in the editor, unless something else is being written there. *)
     if String.is_empty m.draft && List.is_empty m.images
     then
@@ -2375,18 +2588,59 @@ let reply (m : Model.t) (tag : Reply_tag.t) result =
         (set_draft { m with images } text)
         (sprintf "Couldn't send: %s. Your message is back in the editor." e)
     else error m (sprintf "Couldn't send: %s. ↑ brings your message back." e)
+  | Reload_state, Error e ->
+    error
+      { m with pending = { m.pending with session = None } }
+      (sprintf "Couldn't open the session: %s" e)
+  | Messages session, Error e when String.equal session (session_id m) ->
+    error
+      { m with pending = { m.pending with messages = false } }
+      (sprintf
+         "Couldn't load the session's messages: %s. Reload the page to try \
+          again."
+         e)
+  | Model_set, Error e ->
+    error { m with pending = { m.pending with model = None } } e
+  | Thinking_set, Error e ->
+    error { m with pending = { m.pending with thinking = None } } e
   | _, Error e -> error m e
-  | (Ignore | Show_error | Login_started | Sent _), Ok _ -> m, []
+  | Sent _, Ok _ ->
+    { m with pending = In_flight.answered m.pending ~failed:None }, []
+  | Model_set, Ok _ -> { m with pending = { m.pending with model = None } }, []
+  | Thinking_set, Ok _ ->
+    { m with pending = { m.pending with thinking = None } }, []
+  | (Ignore | Show_error | Login_started), Ok _ -> m, []
   | Notice text, Ok _ -> toast m text
-  | State, Ok json -> decode m json State.of_json ~f:(set_state m)
-  | Reload_state, Ok _ -> m, [ rpc "get_state" [] ~tag:State ]
+  (* The state we asked for, also after switching session: what is shown
+     next is up to date. *)
+  | State, Ok json ->
+    decode
+      m
+      json
+      State.of_json
+      ~f:(set_state { m with pending = { m.pending with session = None } })
+  (* The backend answers a change of session with the new state; an older
+     one only with [{}]. *)
+  | Reload_state, Ok json ->
+    (match field json "state" with
+     | Some state ->
+       decode
+         m
+         state
+         State.of_json
+         ~f:(set_state { m with pending = { m.pending with session = None } })
+     | None -> m, [ rpc "get_state" [] ~tag:State ])
   (* Another session's, asked for before switching again. *)
   | Messages session, Ok _ when not (String.equal session (session_id m)) ->
     m, []
   | Messages _, Ok json ->
     decode m json (decode_list Message.of_json) ~f:(fun messages ->
       let chat = Chat.of_messages ~running:(Model.running m) messages in
-      ( { m with chat; scrolled_up = false }
+      ( { m with
+          chat
+        ; scrolled_up = false
+        ; pending = { m.pending with messages = false }
+        }
       , Command.Scroll_to_bottom
         :: List.map (Chat.subagents_to_load chat) ~f:(fun call_id ->
           rpc "get_subagent" [ "id", str call_id ] ~tag:(Subagent call_id)) ))
@@ -2444,7 +2698,14 @@ let reply (m : Model.t) (tag : Reply_tag.t) result =
      | _ -> m, [])
   | Sessions, Ok json ->
     decode m json (decode_list Session_summary.of_json) ~f:(fun sessions ->
-      { m with sessions }, [])
+      ( { m with
+          sessions
+        ; marks =
+            Session_marks.prune
+              m.marks
+              ~paths:(List.map sessions ~f:(fun s -> s.path))
+        }
+      , [] ))
   | Refresh_sessions, Ok _ -> m, [ rpc "list_sessions" [] ~tag:Sessions ]
   | Models, Ok json ->
     decode m json (decode_list Llm.of_json) ~f:(fun models ->
@@ -2495,9 +2756,35 @@ let reply (m : Model.t) (tag : Reply_tag.t) result =
        in
        set_draft m draft, [ focus_editor ]
      | _ -> toast m "Nothing is queued")
-  | Deleted title, Ok _ ->
-    let m, cmds = toast m (sprintf "Deleted %S" title) in
-    m, cmds @ [ rpc "list_sessions" [] ~tag:Sessions ]
+  | Sessions_deleted, Ok json ->
+    decode m json Delete_result.of_json ~f:(fun result ->
+      let gone =
+        String.Set.of_list
+          (List.map result.deleted ~f:(fun (d : Delete_result.Deleted.t) -> d.path))
+      in
+      let m =
+        { m with
+          sessions =
+            List.filter m.sessions ~f:(fun s -> not (Set.mem gone s.path))
+        ; marks =
+            (match result.refused with
+             | [] -> Session_marks.empty
+             | _ -> { m.marks with marked = Set.diff m.marks.marked gone })
+        }
+      in
+      let m, cmds =
+        toast
+          m
+          ~error:(not (List.is_empty result.refused))
+          (Delete_result.summary result)
+      in
+      m, cmds @ [ rpc "list_sessions" [] ~tag:Sessions ])
+  | Archived_set { title; archived }, Ok _ ->
+    toast
+      m
+      (if archived
+       then sprintf "Archived %S (a new message unarchives it)" title
+       else sprintf "Unarchived %S" title)
   | Config, Ok json ->
     decode m json Config.of_json ~f:(fun config ->
       { m with config = Some config }, [])
@@ -2593,6 +2880,29 @@ let reply (m : Model.t) (tag : Reply_tag.t) result =
     decode m json Mcp_list.of_json ~f:(mcp_listed m purpose)
 ;;
 
+(* The replies that a [loading] dialog waits for. *)
+let loads : Reply_tag.t -> bool = function
+  | Auth_status (Login_picker | Logout_picker | Show)
+  | Session_stats | Entries _
+  | Users Picker
+  | Skills { purpose = Picker _; _ }
+  | Mcp Picker -> true
+  | _ -> false
+;;
+
+let reply (m : Model.t) (tag : Reply_tag.t) result =
+  if not (loads tag)
+  then reply_to m tag result
+  else (
+    match m.dialog with
+    | Some (Loading _) ->
+      let m, cmds = reply_to { m with dialog = None } tag result in
+      (* A toast instead, or an error: back to the editor. *)
+      m, if Option.is_none m.dialog then cmds @ [ focus_editor ] else cmds
+    (* Closed while it was loading. *)
+    | _ -> m, [])
+;;
+
 let auth_event (m : Model.t) (e : Auth_event.t) =
   match e, m.dialog with
   | Done { provider; method_ }, dialog ->
@@ -2680,15 +2990,8 @@ let main_event (m : Model.t) (event : Event.t) =
     else m, []
   | Tool_end { call; _ } ->
     (* An older backend's way to say a confirmation is no longer waited for. *)
-    let m, focus = remove_confirm m ~call_id:call.id ~agent_id:None in
-    ( m
-    , focus
-      @
-      (* A [!command] may have just saved the session. *)
-      if String.equal call.name "shell"
-      then [ rpc "list_sessions" [] ~tag:Sessions ]
-      else [] )
-  | Agent_end _ -> m, [ rpc "list_sessions" [] ~tag:Sessions ]
+    remove_confirm m ~call_id:call.id ~agent_id:None
+  | Sessions_changed -> m, [ rpc "list_sessions" [] ~tag:Sessions ]
   (* Another client's /confirm, /scoped-models or defaults. *)
   | Config_changed config -> { m with config = Some config }, []
   | Auth e -> auth_event m e
@@ -2698,10 +3001,17 @@ let main_event (m : Model.t) (event : Event.t) =
 ;;
 
 let event (m : Model.t) (e : Event.t) =
+  let pending =
+    match e with
+    | Message_start (User _) -> In_flight.prompt_shown m.pending
+    | Agent_end _ -> { m.pending with prompts = [] }
+    | _ -> m.pending
+  in
   let m =
     { m with
       chat = Chat.apply m.chat e
     ; agents = Agents.record m.agents ~now:(now_of m) e
+    ; pending
     }
   in
   let m, cmds = main_event m e in
@@ -2808,12 +3118,14 @@ let send (m : Model.t) ~follow_up =
         then { m with completion = None }, []
         else sent m
       in
-      let agents =
-        if String.equal method_ "prompt"
-        then Agents.prompt_sent m.agents
-        else m.agents
+      let prompt = String.equal method_ "prompt" in
+      let agents = if prompt then Agents.prompt_sent m.agents else m.agents in
+      let pending =
+        In_flight.sent
+          m.pending
+          (Option.some_if prompt { In_flight.Prompt.text; images = m.images })
       in
-      ( { m with images = []; agents }
+      ( { m with images = []; agents; pending }
       , save
         @ [ Command.Scroll_to_bottom
           ; rpc
@@ -2885,7 +3197,7 @@ let picker_accept (m : Model.t) ~kind (item : Picker.Item.t) =
       let m, cmds =
         toast m "Forked into a new session: edit the message and send it"
       in
-      m, cmds @ [ rpc "fork" [ "at", str item.id ] ~tag:Reload_state ]
+      starting m, cmds @ [ rpc "fork" [ "at", str item.id ] ~tag:Reload_state ]
     | Rewind entries ->
       open_dialog
         m
@@ -2967,9 +3279,14 @@ let dialog_accept (m : Model.t) =
       , cmds
         @ [ rpc "set_session_name" [ "name", str name ] ~tag:Refresh_sessions ]
       ))
-  | Some (Delete { path; title }) ->
+  | Some (Delete target) ->
     let m, cmds = close_dialog m in
-    m, cmds @ [ rpc "delete_session" [ "path", str path ] ~tag:(Deleted title) ]
+    let method_ : Request.Method.t =
+      match target with
+      | Sessions paths -> Delete_sessions paths
+      | Archived -> Delete_archived
+    in
+    m, cmds @ [ call method_ ~tag:Sessions_deleted ]
   | Some (Login flow) ->
     (match flow.failed, flow.prompt with
      | None, Some _ -> respond_login m flow
@@ -2977,6 +3294,7 @@ let dialog_accept (m : Model.t) =
      | None, None -> m, [])
   | Some (Help | Hotkeys | Auth _ | Session _ | Text _ | Mcp_tools _) ->
     close_dialog m
+  | Some (Loading _) -> m, []
   | Some (Scoped_models { checked; _ }) ->
     let m, cmds = save_scoped m checked in
     m, focus_editor :: cmds
@@ -3035,13 +3353,8 @@ let update (m : Model.t) (action : Action.t) =
              }
          ] ))
   | Reply (tag, result) -> reply m tag result
-  | Tick now ->
-    let refresh =
-      match m.connection, m.now with
-      | Connected, Some _ -> [ rpc "list_sessions" [] ~tag:Sessions ]
-      | _ -> []
-    in
-    { m with now = Some now }, refresh
+  (* The ages in the sidebar; the list itself follows [sessions_changed]. *)
+  | Tick now -> { m with now = Some now }, []
   | Set_utc_offset utc_offset -> { m with utc_offset }, []
   | Set_narrow narrow ->
     if Bool.equal narrow m.narrow
@@ -3076,13 +3389,27 @@ let update (m : Model.t) (action : Action.t) =
        accept_completion { m with completion = Some c } ~run:true)
   | Complete_close -> { m with completion = None }, []
   | New_session ->
-    ( { m with sidebar_open = m.sidebar_open && not m.narrow }
+    ( { (starting m) with sidebar_open = m.sidebar_open && not m.narrow }
     , [ rpc "new_session" [] ~tag:Reload_state; focus_editor ] )
   | Switch_session path -> switch_session m path
   | Ask_delete path ->
-    (match List.find m.sessions ~f:(fun s -> String.equal s.path path) with
-     | None -> m, []
-     | Some s -> open_dialog m (Delete { path; title = Session_list.title s }))
+    if Set.mem m.marks.marked path
+    then ask_delete m (List.map (Session_marks.marked m.marks m.sessions) ~f:(fun s -> s.path))
+    else ask_delete m [ path ]
+  | Select_sessions on ->
+    { m with marks = (if on then Session_marks.start else Session_marks.empty) }, []
+  | Mark_session { path; range } ->
+    ( { m with
+        marks = Session_marks.click m.marks ~path ~range ~order:(session_order m)
+      }
+    , [] )
+  | Delete_marked ->
+    ask_delete m (List.map (Session_marks.marked m.marks m.sessions) ~f:(fun s -> s.path))
+  | Ask_delete_archived -> ask_delete_archived m
+  | Set_archived { path; archived } ->
+    (match find_session_by_path m path with
+     | Some s -> set_archived m s ~archived
+     | None -> m, [])
   | Set_session_query session_query -> { m with session_query }, []
   | Open_sessions -> open_sessions m
   | Session_nav { from; by } -> session_nav m ~from ~by
@@ -3201,6 +3528,13 @@ let update (m : Model.t) (action : Action.t) =
     { m with accounts; account = current }, []
   | Open_accounts -> open_dialog m (account_menu m)
   | Cycle_verbosity -> set_verbosity m (Prigh_ui.Verbosity.next m.verbosity)
+  | Toggle_fold key ->
+    let folds =
+      if Set.mem m.folds key
+      then Set.remove m.folds key
+      else Set.add m.folds key
+    in
+    { m with folds }, []
   | Cycle_model step -> cycle_model m step
   | Cycle_thinking -> cycle_thinking m
   | Copy_last -> copy_last m

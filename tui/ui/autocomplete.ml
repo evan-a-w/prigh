@@ -183,7 +183,8 @@ let argument_items ~kind ~models ~auth ~sessions ~logged_in =
              "custom"
          ])
   | Logout -> Some (provider_items auth)
-  | Sessions -> Some (Option.value_map sessions ~default:[] ~f:session_items)
+  | Sessions | Session_list ->
+    Some (Option.value_map sessions ~default:[] ~f:session_items)
   | Mcp -> Some (mcp_items ())
   | Budget ->
     Some
@@ -226,9 +227,10 @@ let words s =
   |> List.filter ~f:(Fn.non String.is_empty)
 ;;
 
-(* [/fallback]'s models: the word under the cursor, among the models not
-   listed yet ([off] alone clears the list). *)
-let compute_models ~spec ~line ~col ~line_index ~start ~models ~logged_in =
+(* Lists of words ([/fallback]'s models, [/delete]'s sessions): the word under
+   the cursor, among the [candidates] not listed yet ([first], e.g. [off],
+   only as the only word). *)
+let compute_words ~spec ~line ~col ~line_index ~start ~first ~candidates =
   let col = Int.max start (Int.min col (String.length line)) in
   let word_start =
     match
@@ -249,21 +251,11 @@ let compute_models ~spec ~line ~col ~line_index ~start ~models ~logged_in =
     words (String.sub line ~pos:start ~len:(word_start - start))
     @ words (String.drop_prefix line word_end)
   in
-  let off =
-    if List.is_empty others
-    then
-      [ Picker.Item.create
-          ~id:"off"
-          ~search:"off"
-          ~detail:"no fallback: a model whose usage runs out stops the run"
-          "off"
-      ]
-    else []
-  in
+  let first = if List.is_empty others then first else [] in
   let listed key = List.mem others key ~equal:String.equal in
   let items =
-    off
-    @ List.filter (model_items ~logged_in models) ~f:(fun item ->
+    first
+    @ List.filter candidates ~f:(fun (item : Picker.Item.t) ->
       not (listed item.id))
     |> rank ~prefix
   in
@@ -305,14 +297,32 @@ let compute_argument
              let start = argument_start ~line ~name in
              (match kind with
               | Models ->
-                compute_models
+                compute_words
                   ~spec
                   ~line
                   ~col
                   ~line_index
                   ~start
-                  ~models
-                  ~logged_in
+                  ~first:
+                    [ Picker.Item.create
+                        ~id:"off"
+                        ~search:"off"
+                        ~detail:
+                          "no fallback: a model whose usage runs out stops the \
+                           run"
+                        "off"
+                    ]
+                  ~candidates:(model_items ~logged_in models)
+              | Session_list when Option.is_some sessions ->
+                compute_words
+                  ~spec
+                  ~line
+                  ~col
+                  ~line_index
+                  ~start
+                  ~first:[]
+                  ~candidates:
+                    (Option.value_map sessions ~default:[] ~f:session_items)
               | Commands.Argument.Path | Directory | Default_directory ->
                 (* Filled in asynchronously by the platform. *)
                 Some
@@ -329,7 +339,7 @@ let compute_argument
                   ; selected = 0
                   ; navigated = false
                   }
-              | Sessions when Option.is_none sessions ->
+              | (Sessions | Session_list) when Option.is_none sessions ->
                 (* Loading; the app fetches the session list. *)
                 Some
                   { source = Source.Argument spec

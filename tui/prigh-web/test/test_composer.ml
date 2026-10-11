@@ -323,6 +323,10 @@ let%expect_test "slash commands: the popup, arguments, running, unknown ones" =
     /session show the session's details and statistics
     /sessions search the saved sessions
     /switch [path] switch to a saved session
+    /archive [session] archive a session (this one without an argument): it moves under Archived in the sidebar
+    /unarchive [session] unarchive a session (this one without an argument)
+    /delete [session...] delete sessions, after a confirmation (none: select them in the sidebar)
+    /delete-archived delete every archived session, after a confirmation
     /clone copy this session into a new one
     /fork start a new session from an earlier message
     /rewind go back to an earlier message in this session
@@ -350,9 +354,6 @@ let%expect_test "slash commands: the popup, arguments, running, unknown ones" =
     /setusr [user] act as another user (superusers); without a user, pick one
     /signout sign out of this account
     /retry-backend-connection reconnect to the backend now
-    /state show the session state as the backend reports it
-    /clear clear the transcript view (the conversation is kept)
-    /quit how to leave (close the tab; /signout signs out)
     |}];
   H.type_ h "/mod";
   H.key h "Tab";
@@ -374,7 +375,7 @@ let%expect_test "slash commands: the popup, arguments, running, unknown ones" =
     {|
     (Complete_accept (run true))
     (Save_history ("/model openai/gpt-6"))
-    (Rpc (method_ set_model) (params ((model openai/gpt-6))) (tag Show_error))
+    (Rpc (method_ set_model) (params ((model openai/gpt-6))) (tag Model_set))
     (Expire_toast (id 0) (after_ms 4000))
     |}];
   H.type_ h "/comp";

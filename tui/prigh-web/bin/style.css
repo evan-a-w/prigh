@@ -226,11 +226,50 @@ kbd {
 .session-meta { color: var(--faint); font-size: 11.5px; display: flex; gap: 8px; align-items: center; min-width: 0; height: 22px; }
 .session-cwd { flex: 1; min-width: 0; font: 11.5px var(--mono); color: var(--faint); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .session-count { white-space: nowrap; color: var(--faint); font-variant-numeric: tabular-nums; }
-.session .delete { width: 22px; height: 22px; opacity: 0; }
-.session .delete .icon { width: 14px; height: 14px; }
-.session:hover .delete, .session .delete:focus-visible { opacity: 1; }
-.session .delete:hover { color: var(--brick); background: transparent; }
-@media (hover: none) { .session .delete { opacity: 0.7; } }
+.session-actions { display: flex; gap: 0; }
+.session-actions .btn { width: 22px; height: 22px; opacity: 0; }
+.session-actions .icon { width: 14px; height: 14px; }
+.session:hover .session-actions .btn, .session:focus-within .session-actions .btn, .session-actions .btn:focus-visible { opacity: 1; }
+.session-actions .btn:hover { background: transparent; color: var(--chalk); }
+.session-actions .delete:hover { color: var(--brick); }
+@media (hover: none) { .session-actions .btn { opacity: 0.7; } }
+.session-bg { font: 10.5px var(--mono); color: var(--sodium); border: 1px solid var(--sodium-line); border-radius: var(--r-chip); padding: 0 4px; white-space: nowrap; }
+.session-size { white-space: nowrap; color: var(--faint); font-variant-numeric: tabular-nums; }
+
+/* Archived sessions: under a divider, muted until hovered or open. */
+.session.archived .session-title { color: var(--faint); }
+.session.archived:hover .session-title, .session.archived.selected .session-title { color: var(--muted); }
+.sessions-divider {
+  display: flex; align-items: center; gap: 8px;
+  margin: 10px 4px 4px 10px; padding-top: 8px;
+  border-top: 1px solid var(--rule);
+  color: var(--faint); font-size: 11px; letter-spacing: 0.04em; text-transform: uppercase;
+}
+.sessions-divider .divider-label { flex: 1; }
+.sessions-divider .btn { text-transform: none; letter-spacing: 0; font-size: 11.5px; padding: 1px 7px; }
+.btn.danger-text { color: var(--brick); }
+.btn.danger-text:hover { background: var(--brick-wash); color: var(--brick); }
+
+/* Selecting sessions to delete several at once. */
+.sessions-toolbar { display: flex; align-items: center; gap: 6px; min-height: 26px; padding: 0 2px 0 8px; margin: -2px 0 4px; }
+.sessions-toolbar .sessions-label { flex: 1; color: var(--faint); font-size: 11px; letter-spacing: 0.04em; text-transform: uppercase; }
+.sessions-toolbar .selection-count { flex: 1; color: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sessions-toolbar .btn.small { padding: 2px 8px; }
+.sessions-toolbar .btn .icon { width: 13px; height: 13px; }
+.check { width: 14px; height: 14px; flex-shrink: 0; border: 1.5px solid var(--rule-2); border-radius: 3px; display: inline-flex; align-items: center; justify-content: center; }
+.check.on { background: var(--sodium); border-color: var(--sodium); color: var(--sodium-ink); }
+.check .icon { width: 11px; height: 11px; stroke-width: 3; }
+.session.marked { background: var(--sodium-wash); }
+.session[role="checkbox"] { user-select: none; }
+
+/* The delete confirmation's list. */
+.delete-list { list-style: none; margin: 10px 0 0; padding: 0; display: flex; flex-direction: column; gap: 2px; max-height: 220px; overflow-y: auto; }
+.delete-row { display: flex; gap: 10px; padding: 3px 8px; border-radius: var(--r-chip); background: var(--well); }
+.delete-row.kept { opacity: 0.6; }
+.delete-title { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.delete-size, .delete-more { color: var(--faint); font-size: 12px; font-variant-numeric: tabular-nums; }
+.delete-more { padding: 3px 8px; }
+.delete-warnings { margin: 10px 0 0; padding: 8px 10px 8px 26px; border: 1px solid var(--brick-line); background: var(--brick-wash); border-radius: var(--r-control); color: var(--chalk); font-size: 13px; }
 
 .dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
 .dot.live { border: 1.5px solid var(--muted); }
@@ -952,3 +991,19 @@ kbd {
 .jump-to-bottom:focus-visible { outline: 2px solid var(--sodium); outline-offset: 2px; }
 .jump-to-bottom .icon { width: 16px; height: 16px; }
 @keyframes jump-in { from { opacity: 0; transform: translate(-50%, 6px); } }
+
+/* Choices and actions the backend has still to confirm. */
+.chip-button.awaiting { opacity: 1; color: var(--muted); border-style: dashed; }
+.chip-button.awaiting .spinner { width: 10px; height: 10px; }
+.new-session.opening:disabled { opacity: 1; color: var(--muted); }
+.new-session .spinner, .session-top > .spinner { width: 10px; height: 10px; }
+.session.opening { background: var(--slate-2); }
+.session.opening .session-title { color: var(--muted); }
+.composer-buttons .send.busy:disabled { background: var(--sodium-wash); border-color: var(--sodium-line); }
+.composer-buttons .send.busy .spinner { width: 12px; height: 12px; }
+.composer.offline .composer-box { border-style: dashed; }
+.status-item.connecting { color: var(--muted); }
+.status-item.connecting.offline { color: var(--brick); }
+.loading-row { display: flex; align-items: center; gap: 10px; padding: 18px 4px; color: var(--muted); }
+/* Under the reconnecting banner. */
+.app:has(.banner) .toasts { top: 100px; }

@@ -73,7 +73,11 @@ module Reply_tag : sig
     | Paths of string (** the completion prefix listed *)
     | Restored (** [abort]: queued prompts back to the editor *)
     | Dequeued
-    | Deleted of string (** the session's title *)
+    | Sessions_deleted (** [delete_sessions] or [delete_archived] *)
+    | Archived_set of
+        { title : string
+        ; archived : bool
+        }
     | Refresh_sessions (** on success, list the sessions again *)
     | Login_started
     | Notice of string (** shown on success *)
@@ -100,6 +104,8 @@ module Reply_tag : sig
         }
     | Mcp of Mcp_purpose.t
     | Mode_set of string (** [set_mode]: the new state; the notice is shown *)
+    | Model_set (** [set_model]: the choice is no longer pending *)
+    | Thinking_set
   [@@deriving sexp_of, equal]
 end
 
@@ -198,7 +204,19 @@ module Action : sig
     | Complete_close
     | New_session
     | Switch_session of string (** path *)
-    | Ask_delete of string (** path *)
+    | Ask_delete of string
+    (** path; the marked sessions instead when it is one of them *)
+    | Select_sessions of bool (** the sidebar's selection mode, on or off *)
+    | Mark_session of
+        { path : string
+        ; range : bool (** shift-click: from the last one clicked *)
+        }
+    | Delete_marked
+    | Ask_delete_archived
+    | Set_archived of
+        { path : string
+        ; archived : bool
+        }
     | Set_session_query of string
     | Open_sessions (** the sidebar, with its search focused *)
     | Session_nav of
@@ -263,6 +281,8 @@ module Action : sig
         } (** the saved sign-ins, from the page *)
     | Open_accounts (** the account menu *)
     | Cycle_verbosity
+    | Toggle_fold of string
+    (** a tool output's [Fold.key], clicked: shown in full, or folded again *)
     | Cycle_model of int (** through the scoped models, forwards or back *)
     | Cycle_thinking
     | Copy_last (** the last reply, to the clipboard *)
@@ -325,6 +345,8 @@ module Model : sig
     ; session_query : string
     ; agents : Agents.t (** the agents panel, per session *)
     ; verbosity : Prigh_ui.Verbosity.t
+    ; folds : String.Set.t
+      (** tool outputs ([Fold.key]s) toggled from how [verbosity] shows them *)
     ; config : Config.t option
     ; btw : Btw.t option
     ; btw_seq : int
@@ -334,14 +356,19 @@ module Model : sig
       (** the users we may act as: [Some] for superusers *)
     ; terminal : Terminal.t
     ; skills : Skills.t (** for [/skill:]'s completion *)
+    ; pending : In_flight.t (** what we wait on the backend for, on show *)
+    ; marks : Session_marks.t (** the sidebar's selection *)
     }
   [@@deriving sexp_of]
 
+  (** The session's turn runs. *)
   val running : t -> bool
 
   (** A tool confirmation or an [ask_user] question is showing: it owns the
       keyboard, above any dialog. *)
   val waiting : t -> bool
+  (** The turn or background subagents or jobs run: the session is busy. *)
+  val active : t -> bool
 
   (** The agents panel is open with something running: the page sends
       [Clock] every second. *)
@@ -352,6 +379,9 @@ module Model : sig
 
   (** The completion popup when it has something to show. *)
   val popup : t -> Completion.t option
+
+  (** How tool outputs fold in the transcripts. *)
+  val fold : t -> Fold.t
 end
 
 val thinking_levels : string list

@@ -920,6 +920,9 @@ let%expect_test "find_summary: exact id, unique prefix, ambiguous, missing" =
     ; first_prompt = None
     ; message_count = 0
     ; parent = None
+    ; archived = None
+    ; last_activity = 0.
+    ; bytes = 0
     }
   in
   let all = List.map [ "abc1"; "abc12"; "abd"; "f00" ] ~f:summary in

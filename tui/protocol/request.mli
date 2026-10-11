@@ -16,6 +16,12 @@ module Method : sig
         { source : string (** the [.mcp.json] that defines the server *)
         ; server : string
         }
+    | Set_archived of
+        { path : string (** a session's path or id *)
+        ; archived : bool
+        }
+    | Delete_sessions of string list (** paths; see {!Delete_result} *)
+    | Delete_archived (** every session shown as archived *)
   [@@deriving sexp_of, equal]
 
   val name : t -> string

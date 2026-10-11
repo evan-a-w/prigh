@@ -38,10 +38,12 @@ let%expect_test "startup, a prompt and its streamed reply" =
       </div>
       <div class="assistant msg streaming">
         <div class="markdown">
-          <p>
-            Hi
-            <strong> there </strong>
-          </p>
+          <div class="md-part">
+            <p>
+              Hi
+              <strong> there </strong>
+            </p>
+          </div>
         </div>
       </div>
     </div>
@@ -83,7 +85,6 @@ let%expect_test "messages' times: in the browser's zone, relative to its day" =
   show ();
   [%expect
     {|
-    (Rpc (method_ list_sessions) (params ()) (tag Sessions))
     hello
     Yesterday 11:58
     Hi

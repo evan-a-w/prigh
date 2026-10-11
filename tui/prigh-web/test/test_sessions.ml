@@ -38,11 +38,11 @@ let%expect_test
   [%expect
     {|
     fix the parser bug just now
-    /work 1 msg (Delete session)
+    /work 1 msg (Archive (A)) (Delete session (Delete))
     Release notes 3h ago
-    ~/docs 4 msgs (Delete session)
+    ~/docs 4 msgs (Archive (A)) (Delete session (Delete))
     Refactor the lexer 15d ago
-    ~/src/compiler 12 msgs (Delete session)
+    ~/src/compiler 12 msgs (Archive (A)) (Delete session (Delete))
     |}];
   H.show h ~selector:".session.selected";
   [%expect
@@ -57,14 +57,24 @@ let%expect_test
       <div class="session-top">
         <span title="open in the backend" class="dot live">  </span>
         <span class="session-title"> fix the parser bug </span>
+        <Vdom.Node.none-widget> </Vdom.Node.none-widget>
         <span class="session-age"> just now </span>
       </div>
       <div class="session-meta">
         <span class="session-cwd"> /work </span>
         <span class="session-count"> 1 msg </span>
-        <button type="button" title="Delete session" class="btn delete ghost icon" @on_click>
-          <icon class="trash"> </icon>
-        </button>
+        <Vdom.Node.none-widget> </Vdom.Node.none-widget>
+        <span class="session-actions">
+          <button type="button" title="Archive (A)" class="archive btn ghost icon" @on_click>
+            <icon class="archive"> </icon>
+          </button>
+          <button type="button"
+                  title="Delete session (Delete)"
+                  class="btn delete ghost icon"
+                  @on_click>
+            <icon class="trash"> </icon>
+          </button>
+        </span>
       </div>
     </div>
     |}];
@@ -82,7 +92,6 @@ let%expect_test
   H.text h ~selector:".session-age";
   [%expect
     {|
-    (Rpc (method_ list_sessions) (params ()) (tag Sessions))
     5m ago
     3h ago
     15d ago
@@ -281,7 +290,8 @@ let%expect_test
     (Focus dialog)
     Delete session?
     (Close (Esc))
-    “Refactor the lexer” will be deleted. This can't be undone.
+    It will be deleted, with its subagent logs: 0 B on disk. This can't be undone.
+    Refactor the lexer 0 B
     (Cancel) (Delete)
     |}];
   H.key h "Escape" ~target:Page;
@@ -302,27 +312,44 @@ let%expect_test
     (browser default)
     Dialog_accept
     (Focus editor)
-    (Rpc (method_ delete_session) (params ((path /sessions/s2.jsonl)))
-     (tag (Deleted "Release notes")))
+    (Rpc (method_ delete_sessions) (params ((paths (/sessions/s2.jsonl))))
+     (tag Sessions_deleted))
     |}];
-  H.fail h "delete_session" "cannot delete a live session";
+  H.reply
+    h
+    "delete_sessions"
+    {|{"deleted":[],"refused":[{"path":"/sessions/s2.jsonl","error":"session \"Release notes\" is running: wait for it or /abort it first"}]}|};
   H.text h ~selector:".toasts";
   [%expect
-    {| Couldn't delete "Release notes": cannot delete a live session. Switch to another session and close other tabs using it first. |}];
+    {|
+    (Rpc (method_ list_sessions) (params ()) (tag Sessions))
+    Not deleted: session "Release notes" is running: wait for it or /abort it first
+    |}];
   H.act h (Ask_delete "/sessions/s3.jsonl");
   H.act h Dialog_accept;
-  H.reply h "delete_session" "{}";
+  H.reply
+    h
+    "delete_sessions"
+    {|{"deleted":[{"path":"/sessions/s3.jsonl","id":"s3","bytes":2048}],"refused":[]}|};
   [%expect
     {|
     (Focus dialog)
     (Focus editor)
-    (Rpc (method_ delete_session) (params ((path /sessions/s3.jsonl)))
-     (tag (Deleted "Refactor the lexer")))
+    (Rpc (method_ delete_sessions) (params ((paths (/sessions/s3.jsonl))))
+     (tag Sessions_deleted))
     (Expire_toast (id 1) (after_ms 4000))
     (Rpc (method_ list_sessions) (params ()) (tag Sessions))
     |}];
   H.text h ~selector:".toast:not(.error)";
-  [%expect {| Deleted "Refactor the lexer" |}]
+  [%expect {| Deleted 1 session (2.0 KB) |}];
+  (* Gone from the sidebar at once. *)
+  H.text h ~selector:".sessions";
+  [%expect {|
+    fix the parser bug just now
+    /work 1 msg (Archive (A)) (Delete session (Delete))
+    Release notes 3h ago
+    ~/docs 4 msgs (Archive (A)) (Delete session (Delete))
+    |}]
 ;;
 
 let%expect_test "renaming the current session" =
@@ -411,14 +438,30 @@ let%expect_test
 ;;
 
 (* The backend moves the client to the other session without telling it:
-   the page asks for the new state, which resets the transcript. *)
+   the page asks for the new state, which resets the transcript. Until the
+   new session's messages arrive the chat says what it waits for. *)
 let%expect_test "new session and switching session reload the state" =
-  let h = Harness.create () in
+  let sessions =
+    sprintf
+      "[%s,%s]"
+      (Harness.session_json ~first_prompt:"hello" "s1")
+      (Harness.session_json ~first_prompt:"older work" "s3")
+  in
+  let h = Harness.create ~sessions () in
   [%expect {| |}];
   Harness.event
     h
     {|{"event":"message_start","message":{"role":"user","text":"hello"}}|};
   Harness.act h New_session;
+  Harness.text h ~selector:".new-session";
+  Harness.text h ~selector:".chat";
+  [%expect
+    {|
+    (Rpc (method_ new_session) (params ()) (tag Reload_state))
+    (Focus editor)
+    (Starting…)
+    Starting a session…
+    |}];
   Harness.reply h "new_session" "{}";
   Harness.reply
     h
@@ -429,11 +472,10 @@ let%expect_test "new session and switching session reload the state" =
          ; "session_path", `String "/sessions/s2.jsonl"
          ]
        ());
+  Harness.text h ~selector:".new-session";
   Harness.text h ~selector:".chat";
   [%expect
     {|
-    (Rpc (method_ new_session) (params ()) (tag Reload_state))
-    (Focus editor)
     (Rpc (method_ get_state) (params ()) (tag State))
     (Set_url_session s2)
     (Rpc (method_ get_messages) (params ()) (tag (Messages s2)))
@@ -441,6 +483,14 @@ let%expect_test "new session and switching session reload the state" =
     (Rpc (method_ list_sessions) (params ()) (tag Sessions))
     (Rpc (method_ list_subagents) (params ()) (tag Subagents))
     (Rpc (method_ list_jobs) (params ()) (tag Jobs))
+    (New session)
+    Loading the session…
+    |}];
+  Harness.reply h "get_messages" "[]";
+  Harness.text h ~selector:".chat";
+  [%expect
+    {|
+    Scroll_to_bottom
     What are we building?
     /work
     / commands
@@ -449,23 +499,80 @@ let%expect_test "new session and switching session reload the state" =
     Ctrl+L switch model
     Ctrl+K find a session
     |}];
-  Harness.act h (Switch_session "/sessions/s1.jsonl");
-  Harness.reply h "switch_session" "{}";
-  Harness.reply h "get_state" (Harness.state_json ());
-  Harness.reply h "get_messages" {|[{"role":"user","text":"hello"}]|};
+  (* The session clicked is marked until it has loaded. *)
+  Harness.act h (Switch_session "/sessions/s3.jsonl");
+  Harness.show h ~selector:".session.opening .session-top";
   Harness.text h ~selector:".chat";
+  [%expect
+    {|
+    (Rpc (method_ switch_session) (params ((path /sessions/s3.jsonl)))
+     (tag Reload_state))
+    (Focus editor)
+    <div class="session-top">
+      <span title="opening…" class="spinner"> </span>
+      <span class="session-title"> older work </span>
+      <Vdom.Node.none-widget> </Vdom.Node.none-widget>
+      <span class="session-age"> 2m ago </span>
+    </div>
+    Loading the session…
+    |}];
+  Harness.reply h "switch_session" "{}";
+  Harness.reply
+    h
+    "get_state"
+    (Harness.state_json
+       ~fields:
+         [ "session_id", `String "s3"
+         ; "session_path", `String "/sessions/s3.jsonl"
+         ]
+       ());
+  Harness.elements h ~selector:".session.opening";
+  Harness.text h ~selector:".chat";
+  [%expect
+    {|
+    (Rpc (method_ get_state) (params ()) (tag State))
+    (Set_url_session s3)
+    (Rpc (method_ get_messages) (params ()) (tag (Messages s3)))
+    (Rpc (method_ get_pending) (params ()) (tag Pending))
+    (Rpc (method_ list_sessions) (params ()) (tag Sessions))
+    (Rpc (method_ list_subagents) (params ()) (tag Subagents))
+    (Rpc (method_ list_jobs) (params ()) (tag Jobs))
+    Loading the session…
+    |}];
+  Harness.reply h "get_messages" {|[{"role":"user","text":"older work"}]|};
+  Harness.text h ~selector:".chat";
+  [%expect
+    {|
+    Scroll_to_bottom
+    older work
+    |}];
+  (* A switch the backend refuses leaves the session as it was. *)
+  Harness.act h (Switch_session "/sessions/s1.jsonl");
+  Harness.fail h "switch_session" "no such session";
+  Harness.elements h ~selector:".session.opening";
+  Harness.text h ~selector:".chat";
+  Harness.text h ~selector:".toast";
   [%expect
     {|
     (Rpc (method_ switch_session) (params ((path /sessions/s1.jsonl)))
      (tag Reload_state))
     (Focus editor)
-    (Rpc (method_ get_state) (params ()) (tag State))
-    (Set_url_session s1)
-    (Rpc (method_ get_messages) (params ()) (tag (Messages s1)))
-    (Rpc (method_ get_pending) (params ()) (tag Pending))
-    (Rpc (method_ list_sessions) (params ()) (tag Sessions))
-    (Rpc (method_ list_subagents) (params ()) (tag Subagents))
-    (Rpc (method_ list_jobs) (params ()) (tag Jobs))
+    older work
+    Couldn't open the session: no such session
+    |}];
+  (* So does a transcript that fails to load, saying so. *)
+  Harness.act h (Switch_session "/sessions/s1.jsonl");
+  Harness.quiet h (fun () ->
+    Harness.reply h "switch_session" "{}";
+    Harness.reply h "get_state" (Harness.state_json ()));
+  Harness.fail h "get_messages" "disk on fire";
+  Harness.text h ~selector:".chat";
+  Harness.text h ~selector:".toast";
+  [%expect
+    {|
+    (Rpc (method_ switch_session) (params ((path /sessions/s1.jsonl)))
+     (tag Reload_state))
+    (Focus editor)
     What are we building?
     /work
     / commands
@@ -473,6 +580,7 @@ let%expect_test "new session and switching session reload the state" =
     ! run a command
     Ctrl+L switch model
     Ctrl+K find a session
+    Couldn't load the session's messages: disk on fire. Reload the page to try again.
     |}]
 ;;
 
@@ -532,5 +640,32 @@ let%expect_test
     (Rpc (method_ switch_session) (params ((path /sessions/s2.jsonl)))
      (tag Reload_state))
     (Focus editor)
+    |}]
+;;
+
+let%expect_test "switching: the reply carries the new state, saving a round trip" =
+  let h = H.create ~sessions () in
+  H.act h (Switch_session "/sessions/s3.jsonl");
+  H.reply
+    h
+    "switch_session"
+    (sprintf
+       {|{"state":%s}|}
+       (H.state_json
+          ~fields:
+            [ "session_id", `String "s3"
+            ; "session_path", `String "/sessions/s3.jsonl"
+            ]
+          ()));
+  [%expect {|
+    (Rpc (method_ switch_session) (params ((path /sessions/s3.jsonl)))
+     (tag Reload_state))
+    (Focus editor)
+    (Set_url_session s3)
+    (Rpc (method_ get_messages) (params ()) (tag (Messages s3)))
+    (Rpc (method_ get_pending) (params ()) (tag Pending))
+    (Rpc (method_ list_sessions) (params ()) (tag Sessions))
+    (Rpc (method_ list_subagents) (params ()) (tag Subagents))
+    (Rpc (method_ list_jobs) (params ()) (tag Jobs))
     |}]
 ;;

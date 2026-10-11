@@ -82,14 +82,23 @@ let job_started text =
   id
 ;;
 
-let output ?(error = false) ?(head = 6) ?(tail = 0) text =
+(* Folded as the TUI folds them: a few lines of each output. *)
+let output ~fold ?(error = false) ?(head = 5) ?(tail = 0) text =
   if String.is_empty (String.strip text)
   then Node.none
-  else Output_view.view ~error ~head ~tail text
+  else Output_view.view ~fold ~error ~head ~tail text
 ;;
 
-let error_output (r : Message.Tool_result.t) =
-  output ~error:true ~head:12 r.text
+let live_tail = 5
+
+let live ~lines text =
+  if String.is_empty (String.strip text)
+  then Node.none
+  else Output_view.live ~lines ~tail:live_tail text
+;;
+
+let error_output ~fold (r : Message.Tool_result.t) =
+  output ~fold ~error:true ~head:8 r.text
 ;;
 
 (* The subagent's latest step, for a running card. *)
@@ -122,7 +131,7 @@ let report text =
       (Markdown_view.render text)
 ;;
 
-let subagent_body ~nested (s : Chat.Subagent.t) =
+let subagent_body ~nested ~fold (s : Chat.Subagent.t) =
   let transcript =
     match Chat.entries s.chat with
     | [] -> Node.none
@@ -131,7 +140,7 @@ let subagent_body ~nested (s : Chat.Subagent.t) =
         ~cls:"transcript"
         ~label:"Transcript"
         ~preview:(plural (List.length entries) "message")
-        (nested s.chat)
+        (nested s)
   in
   let activity =
     match s.result with
@@ -148,7 +157,7 @@ let subagent_body ~nested (s : Chat.Subagent.t) =
     | Some { text; is_error = false } ->
       report (Subagent_report.of_string text).text
     | Some { text; is_error = true } ->
-      output ~error:true ~head:12 (Subagent_report.of_string text).text
+      output ~fold ~error:true ~head:8 (Subagent_report.of_string text).text
     | None -> Node.none
   in
   [ activity; result; transcript ]
@@ -167,7 +176,7 @@ let task_details task =
 
 (* Reports of finished jobs or subagents ([job_wait], [job_kill],
    [subagent_wait]), then perhaps a note of what is still running. *)
-let reports text =
+let reports ~fold text =
   let text, note =
     match
       String.substr_index_all text ~may_overlap:false ~pattern:"\n\n"
@@ -182,10 +191,14 @@ let reports text =
     | _ -> text, ""
   in
   match Prigh_ui.Delivery.parse text with
-  | Some sections -> [ Delivery_view.view sections; output ~head:8 note ]
+  | Some sections ->
+    (* Toggled with the card. *)
+    [ Delivery_view.view ~fold:(fst fold) ~key:(fun _ -> snd fold) sections
+    ; output ~fold note
+    ]
   | None ->
     [ output
-        ~head:8
+        ~fold
         (String.concat
            ~sep:"\n\n"
            (List.filter [ text; note ] ~f:(Fn.non String.is_empty)))
@@ -276,13 +289,27 @@ type presentation =
   ; body : Node.t list
   }
 
-let present ~nested ~streaming ~live (call : Tool_call.t) ~result ~subagent =
+let present
+      ~nested
+      ~fold
+      ~streaming
+      ~(tool : Chat.Tool.t option)
+      (call : Tool_call.t)
+      ~result
+      ~subagent
+  =
+  let fold = fold, call.id in
+  let running_output () =
+    match tool with
+    | Some t -> live ~lines:t.lines t.output
+    | None -> Node.none
+  in
   let args = Tool_args.of_call call in
   let str key = Option.value (Tool_args.string args key) ~default:"" in
   let error_body =
     match result with
     | Some ({ is_error = true; _ } as r : Message.Tool_result.t) ->
-      error_output r
+      error_output ~fold r
     | _ -> Node.none
   in
   match call.name with
@@ -294,7 +321,7 @@ let present ~nested ~streaming ~live (call : Tool_call.t) ~result ~subagent =
     let outcome, text =
       match result with
       | Some r -> bash_outcome r.text
-      | None -> None, live
+      | None -> None, ""
     in
     let job = Option.bind result ~f:(fun r -> job_started r.text) in
     { arg = Some (span "arg command" (first_line command))
@@ -317,8 +344,8 @@ let present ~nested ~streaming ~live (call : Tool_call.t) ~result ~subagent =
            then Node.none
            else (
              match result with
-             | None -> output ~head:0 ~tail:8 text
-             | Some r -> output ~error:r.is_error ~head:4 ~tail:8 text))
+             | None -> running_output ()
+             | Some r -> output ~fold ~error:r.is_error ~head:5 ~tail:3 text))
         ]
     }
   | "read" ->
@@ -335,14 +362,7 @@ let present ~nested ~streaming ~live (call : Tool_call.t) ~result ~subagent =
       | Some { is_error = true; _ } -> [ error_body ]
       | Some { images = _ :: _ as images; text; _ } ->
         [ Image_view.thumbs images; span "caption" text ]
-      | Some { text; _ } ->
-        [ Node.details
-            ~attrs:[ Attr.class_ "file" ]
-            [ Node.summary
-                [ Node.text (plural (Output_view.line_count text) "line") ]
-            ; Node.pre [ Node.text text ]
-            ]
-        ]
+      | Some { text; _ } -> [ output ~fold ~head:0 text ]
     in
     { arg = Some (span "arg path" (str "path")); chips = range; body }
   | "write" ->
@@ -364,8 +384,8 @@ let present ~nested ~streaming ~live (call : Tool_call.t) ~result ~subagent =
         ; (if String.is_empty content
            then Node.none
            else if streaming
-           then Output_view.view ~head:0 ~tail:8 content
-           else Output_view.view ~head:8 ~tail:0 content)
+           then live ~lines:(Chat.newlines content) content
+           else output ~fold content)
         ]
     }
   | "edit" ->
@@ -391,9 +411,9 @@ let present ~nested ~streaming ~live (call : Tool_call.t) ~result ~subagent =
     ; body =
         [ error_body
         ; (match diff with
-           | `Unified text -> Diff_view.unified text
+           | `Unified text -> Diff_view.unified ~fold text
            | `Edits [] -> Node.none
-           | `Edits edits -> Diff_view.edits edits)
+           | `Edits edits -> Diff_view.edits ~fold edits)
         ]
     }
   | "apply_patch" ->
@@ -410,17 +430,19 @@ let present ~nested ~streaming ~live (call : Tool_call.t) ~result ~subagent =
     let diff (file : Patch.File.t) =
       match file.kind, file.diff with
       | Delete, _ | _, Some [] -> Node.none
-      | Update, Some lines -> Diff_view.unified (String.concat ~sep:"\n" lines)
+      | Update, Some lines ->
+        Diff_view.unified ~fold (String.concat ~sep:"\n" lines)
       | Add, _ when Option.is_some result_text ->
         let lines = Patch.File.lines file in
         Diff_view.unified
+          ~fold
           (String.concat
              ~sep:"\n"
              (sprintf "@@ -0,0 +1,%d @@" (List.length lines) :: lines))
       | (Add | Update), _ ->
         (match file.input with
          | [] -> Node.none
-         | lines -> Diff_view.hunks lines)
+         | lines -> Diff_view.hunks ~fold lines)
     in
     let label (file : Patch.File.t) =
       let kind =
@@ -455,7 +477,7 @@ let present ~nested ~streaming ~live (call : Tool_call.t) ~result ~subagent =
         (match result with
          | Some { is_error = false; text; _ }
            when List.is_empty files || not (Patch.is_success text) ->
-           [ output ~head:8 text ]
+           [ output ~fold text ]
          | _ ->
            error_body
            :: List.concat_map files ~f:(fun file ->
@@ -483,7 +505,7 @@ let present ~nested ~streaming ~live (call : Tool_call.t) ~result ~subagent =
     ; body =
         (match result with
          | None -> []
-         | Some r -> [ output ~error:r.is_error ~head:8 r.text ])
+         | Some r -> [ output ~fold ~error:r.is_error r.text ])
     }
   | "subagent" ->
     let task = str "task" in
@@ -511,7 +533,7 @@ let present ~nested ~streaming ~live (call : Tool_call.t) ~result ~subagent =
         task_details task
         ::
         (match subagent, result with
-         | Some s, _ -> subagent_body ~nested s
+         | Some s, _ -> subagent_body ~nested ~fold s
          | None, Some { is_error = true; _ } -> [ error_body ]
          | None, Some { text; _ } when Option.is_none started ->
            [ report (Subagent_report.of_string text).text ]
@@ -535,7 +557,7 @@ let present ~nested ~streaming ~live (call : Tool_call.t) ~result ~subagent =
         (match result, results with
          | None, _ -> []
          | Some { is_error = true; _ }, _ -> [ error_body ]
-         | Some { text; _ }, [] -> [ output ~head:8 text ]
+         | Some { text; _ }, [] -> [ output ~fold ~head:8 text ]
          | Some _, results -> [ search_results results ])
     }
   | "web_fetch" ->
@@ -560,9 +582,9 @@ let present ~nested ~streaming ~live (call : Tool_call.t) ~result ~subagent =
            @ [ chip fetched.details ])
     ; body =
         (match result, fetched with
-         | None, _ -> [ output ~head:0 ~tail:6 live ]
-         | Some _, Some fetched -> [ output ~head:6 fetched.body ]
-         | Some r, None -> [ output ~error:r.is_error ~head:8 r.text ])
+         | None, _ -> [ running_output () ]
+         | Some _, Some fetched -> [ output ~fold ~head:6 fetched.body ]
+         | Some r, None -> [ output ~fold ~error:r.is_error ~head:8 r.text ])
     }
   | "job_input" ->
     { arg =
@@ -573,7 +595,7 @@ let present ~nested ~streaming ~live (call : Tool_call.t) ~result ~subagent =
     ; body =
         (match result with
          | None -> []
-         | Some r -> [ output ~error:r.is_error ~head:8 r.text ])
+         | Some r -> [ output ~fold ~error:r.is_error ~head:8 r.text ])
     }
   | "job_wait" | "job_kill" | "subagent_wait" | "subagent_cancel" ->
     let ids = Tool_args.strings args "ids" @ Tool_args.strings args "id" in
@@ -586,7 +608,7 @@ let present ~nested ~streaming ~live (call : Tool_call.t) ~result ~subagent =
         (match result with
          | None -> []
          | Some { is_error = true; _ } -> [ error_body ]
-         | Some { text; _ } -> reports text)
+         | Some { text; _ } -> reports ~fold text)
     }
   | "update_plan" ->
     (match parsed_arguments call |> Option.bind ~f:plan_of_arguments with
@@ -595,7 +617,7 @@ let present ~nested ~streaming ~live (call : Tool_call.t) ~result ~subagent =
        ; chips = []
        ; body =
            [ (match result with
-              | Some r -> output ~error:r.is_error ~head:8 r.text
+              | Some r -> output ~fold ~error:r.is_error ~head:8 r.text
               | None -> Node.none)
            ]
        }
@@ -617,6 +639,7 @@ let present ~nested ~streaming ~live (call : Tool_call.t) ~result ~subagent =
        ; chips = []
        ; body =
            [ output
+               ~fold
                ~head:12
                (Option.value
                   (String.chop_prefix text ~prefix:"The user answered:\n")
@@ -659,17 +682,16 @@ let present ~nested ~streaming ~live (call : Tool_call.t) ~result ~subagent =
     ; chips = []
     ; body =
         (match result with
-         | None -> [ output ~head:0 ~tail:6 live ]
+         | None -> [ running_output () ]
          | Some r ->
-           [ output ~error:r.is_error ~head:8 r.text
-           ; Image_view.thumbs r.images
-           ])
+           [ output ~fold ~error:r.is_error r.text; Image_view.thumbs r.images ])
     }
 ;;
 
 let card
       ?arg:arg_override
       ~nested
+      ~fold
       ~streaming
       ~running
       (call : Tool_call.t)
@@ -691,7 +713,6 @@ let card
         }
       else r)
   in
-  let live = Option.value_map tool ~default:"" ~f:(fun t -> t.output) in
   let subagent = Option.bind tool ~f:(fun t -> t.subagent) in
   let status : Status.t =
     match result, subagent with
@@ -705,7 +726,7 @@ let card
       if streaming then Preparing else if running then Running else Interrupted
   in
   let { arg; chips; body } =
-    present ~nested ~streaming ~live call ~result ~subagent
+    present ~nested ~fold ~streaming ~tool call ~result ~subagent
   in
   let arg = Option.first_some arg_override arg in
   let chips =
@@ -754,11 +775,11 @@ let card
   else div cls [ div "tool-head" head; body ]
 ;;
 
-let view ~nested ~streaming ~running call tool =
-  card ~nested ~streaming ~running call tool
+let view ~nested ~fold ~streaming ~running call tool =
+  card ~nested ~fold ~streaming ~running call tool
 ;;
 
-let server_tool ~running (s : Content.Server_tool.t) =
+let server_tool ~fold ~running (s : Content.Server_tool.t) =
   let call, result = Tool_summary.as_call s in
   let arg =
     match s.name with
@@ -770,8 +791,9 @@ let server_tool ~running (s : Content.Server_tool.t) =
   card
     ?arg
     ~nested:(fun _ -> Node.none)
+    ~fold
     ~streaming:false
     ~running
     call
-    (Some { call; output = ""; result; subagent = None })
+    (Some { call; output = ""; lines = 0; result; subagent = None })
 ;;

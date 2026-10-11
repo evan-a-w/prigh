@@ -152,6 +152,8 @@ let%expect_test "help lists every key and command" =
     Ctrl+↑ / Ctrl+↓ previous / next of your messages in the transcript
     PageUp / PageDown scroll the transcript
     Ctrl+K search sessions (↓ ↑ through them, Enter opens, Delete deletes)
+    A (on a session) archive or unarchive it (archived sessions are listed last, muted)
+    Space (selecting) mark a session (Shift: the range from the last one); Delete deletes the marked ones, Esc stops selecting
     Ctrl+B show or hide the sidebar
     Alt+1…9 follow subagent or job N in the agents panel
     Alt+] Alt+[ the next or previous subagent or job
@@ -180,6 +182,10 @@ let%expect_test "help lists every key and command" =
     /session show the session's details and statistics
     /sessions search the saved sessions
     /switch [path] switch to a saved session
+    /archive [session] archive a session (this one without an argument): it moves under Archived in the sidebar
+    /unarchive [session] unarchive a session (this one without an argument)
+    /delete [session...] delete sessions, after a confirmation (none: select them in the sidebar)
+    /delete-archived delete every archived session, after a confirmation
     /clone copy this session into a new one
     /fork start a new session from an earlier message
     /rewind go back to an earlier message in this session
@@ -234,6 +240,7 @@ let%expect_test "logging in: pick a provider, open the URL, answer the prompts" 
   [%expect
     {|
     (Save_history (/login))
+    (Focus dialog)
     (Rpc (method_ auth_status) (params ()) (tag (Auth_status Login_picker)))
     (Focus picker-input)
     Anthropic Claude subscription · logged in via auth.json ✓
@@ -382,6 +389,7 @@ let%expect_test "/auth shows the providers; /logout picks a logged-in one" =
   [%expect
     {|
     (Save_history (/auth))
+    (Focus dialog)
     (Rpc (method_ auth_status) (params ()) (tag (Auth_status Show)))
     (Focus dialog)
     Anthropic logged in with oauth (auth.json)
@@ -411,6 +419,7 @@ let%expect_test "/auth shows the providers; /logout picks a logged-in one" =
     {|
     (Focus editor)
     (Save_history (/logout /auth))
+    (Focus dialog)
     (Rpc (method_ auth_status) (params ()) (tag (Auth_status Logout_picker)))
     (Focus picker-input)
     Anthropic oauth via auth.json
@@ -428,8 +437,10 @@ let%expect_test "/auth shows the providers; /logout picks a logged-in one" =
   [%expect
     {|
     (Save_history (/logout /auth))
+    (Focus dialog)
     (Rpc (method_ auth_status) (params ()) (tag (Auth_status Logout_picker)))
     (Expire_toast (id 1) (after_ms 4000))
+    (Focus editor)
     Logged out of anthropic
     No provider is logged in: /login logs in to one.
     |}]

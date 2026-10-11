@@ -12,6 +12,7 @@ type t =
   ; max_budget_usd : float option
   ; goal_max_continuations : int
   ; resume_on_limit_reset : bool
+  ; archive_after_days : float
   }
 [@@deriving sexp_of]
 
@@ -26,6 +27,7 @@ let default =
   ; max_budget_usd = None
   ; goal_max_continuations = Goal.default_max_continuations
   ; resume_on_limit_reset = true
+  ; archive_after_days = 7.
   }
 ;;
 
@@ -56,6 +58,7 @@ let to_json t =
     ; "goal_max_continuations", `Number (Int.to_string t.goal_max_continuations)
     ; ( "resume_on_limit_reset"
       , if t.resume_on_limit_reset then `True else `False )
+    ; "archive_after_days", `Number (sprintf "%g" t.archive_after_days)
     ]
 ;;
 
@@ -104,6 +107,19 @@ let of_json json =
         (Approval.Rules.of_json
            (Option.value (find "permissions") ~default:`Null))
         ~f:fst
+    in
+    let%bind archive_after_days =
+      let error () =
+        Or_error.error_string
+          "config.archive_after_days must be a number of days (0: never)"
+      in
+      match find "archive_after_days" with
+      | None | Some `Null -> Ok default.archive_after_days
+      | Some (`Number n) ->
+        (match Float.of_string_opt n with
+         | Some days when Float.(days >= 0.) -> Ok days
+         | Some _ | None -> error ())
+      | Some _ -> error ()
     in
     let%bind default_model =
       match find "default_model" with
@@ -165,6 +181,7 @@ let of_json json =
     ; max_budget_usd
     ; goal_max_continuations
     ; resume_on_limit_reset
+    ; archive_after_days
     }
   | _ -> Or_error.error_string "config must be a JSON object"
 ;;

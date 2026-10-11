@@ -241,10 +241,9 @@ let serve_terminal router terminals ~query ws =
   | Some server ->
     let session = Option.filter (param "session") ~f:(Fn.non String.is_empty) in
     let key =
-      let key = Option.value session ~default:"default" in
-      match Rpc_server.namespace server with
-      | None -> key
-      | Some namespace -> namespace ^ ":" ^ key
+      Rpc_server.terminal_key
+        server
+        ~session:(Option.value session ~default:"default")
     in
     let cols = size "cols" ~default:80 in
     let rows = size "rows" ~default:24 in

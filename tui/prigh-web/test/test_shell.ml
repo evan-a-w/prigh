@@ -51,7 +51,6 @@ let%expect_test "!command, !!command and !&command" =
   Harness.text h ~selector:".entries";
   [%expect
     {|
-    (Rpc (method_ list_sessions) (params ()) (tag Sessions))
     ✓ bash echo hi
     hi
     |}];

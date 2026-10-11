@@ -6,9 +6,11 @@ open! Import
     web_fetch, job_input).
     [streaming]: the call's arguments are still arriving. [running]: the agent
     is working, so a call without a result is still to get one. [nested]
-    renders a subagent's transcript. *)
+    renders a subagent's transcript. Outputs fold as [fold] says, under the
+    call's id. *)
 val view
-  :  nested:(Chat.t -> Node.t)
+  :  nested:(Chat.Subagent.t -> Node.t)
+  -> fold:Fold.t
   -> streaming:bool
   -> running:bool
   -> Tool_call.t
@@ -18,7 +20,11 @@ val view
 (** A tool the provider ran (web search) as a card like a tool call's.
     [running]: its message is still streaming, so a missing output is still
     to come. *)
-val server_tool : running:bool -> Content.Server_tool.t -> Node.t
+val server_tool
+  :  fold:Fold.t
+  -> running:bool
+  -> Content.Server_tool.t
+  -> Node.t
 
 (** A subagent's latest step: its current tool call, or the last line of its
     text. *)

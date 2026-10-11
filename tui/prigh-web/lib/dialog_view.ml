@@ -164,12 +164,80 @@ let rename name ~inject =
     [ text_input ~placeholder:"Session name" ~value:name ~inject () ]
 ;;
 
-let delete ~title ~inject =
+(* Why the backend will keep a session, if it will. *)
+let kept (m : App.Model.t) (s : Session_summary.t) =
+  let current =
+    Option.exists m.state ~f:(fun state -> String.equal state.session_id s.id)
+  in
+  if s.running
+  then Some "is running: it will be kept (wait for it or stop it first)"
+  else if current
+  then Some "is the session you are in: it will be kept (switch to another first)"
+  else if s.clients > 0
+  then
+    Some
+      "is open in another tab or terminal: it will be kept (close it there \
+       first)"
+  else None
+;;
+
+let delete (m : App.Model.t) (target : Dialog.Delete_target.t) ~inject =
+  let sessions =
+    match target with
+    | Sessions paths ->
+      List.filter m.sessions ~f:(fun s ->
+        List.mem paths s.path ~equal:String.equal)
+    | Archived -> List.filter m.sessions ~f:(fun s -> s.archived)
+  in
+  let count = List.length sessions in
+  let size = Session_summary.size_string (Session_summary.total_bytes sessions) in
+  let title =
+    match target, sessions with
+    | Archived, _ -> sprintf "Delete all %d archived sessions?" count
+    | Sessions _, [ _ ] -> "Delete session?"
+    | Sessions _, _ -> sprintf "Delete %d sessions?" count
+  in
+  let shown = 6 in
+  let row (s : Session_summary.t) =
+    Node.li
+      ~attrs:[ classes [ "delete-row" ] [ "kept", Option.is_some (kept m s) ] ]
+      [ span ~cls:"delete-title" (Session_list.title s)
+      ; span ~cls:"delete-size" (Session_summary.size_string s.bytes)
+      ]
+  in
+  let warnings =
+    List.filter_map sessions ~f:(fun s ->
+      Option.map (kept m s) ~f:(fun why ->
+        Node.li [ Node.textf "“%s” %s" (Session_list.title s) why ]))
+  in
   Modal.view
-    ~title:"Delete session?"
+    ~cls:"delete-dialog"
+    ~title
     ~on_close:(inject Action.Close_dialog)
-    ~footer:(cancel_accept ~danger:true ~inject "Delete")
-    [ Node.p [ Node.textf "“%s” will be deleted. This can't be undone." title ]
+    ~footer:
+      (cancel_accept
+         ~danger:true
+         ~inject
+         (if count = 1 then "Delete" else sprintf "Delete %d" count))
+    [ Node.p
+        [ Node.textf
+            "%s, with %s subagent logs: %s on disk. This can't be undone."
+            (if count = 1
+             then "It will be deleted"
+             else sprintf "They will be deleted")
+            (if count = 1 then "its" else "their")
+            size
+        ]
+    ; Node.ul
+        ~attrs:[ Attr.class_ "delete-list" ]
+        (List.map (List.take sessions shown) ~f:row
+         @
+         if count > shown
+         then [ Node.li ~attrs:[ Attr.class_ "delete-more" ] [ Node.textf "and %d more" (count - shown) ] ]
+         else [])
+    ; (match warnings with
+       | [] -> Node.none
+       | warnings -> Node.ul ~attrs:[ Attr.class_ "delete-warnings" ] warnings)
     ]
 ;;
 
@@ -358,7 +426,7 @@ let dialog (m : App.Model.t) ~inject =
   | Some (Picker { kind; picker = p }) -> picker ~kind p ~inject
   | Some Help -> help ~inject
   | Some (Rename name) -> rename name ~inject
-  | Some (Delete { title; _ }) -> delete ~title ~inject
+  | Some (Delete target) -> delete m target ~inject
   | Some (Login flow) -> login m flow ~inject
   | Some (Auth statuses) -> auth statuses ~inject
   | Some dialog ->

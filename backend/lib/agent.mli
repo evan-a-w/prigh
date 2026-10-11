@@ -305,6 +305,9 @@ val has_running_subagents : t -> bool
 (** Subagents or jobs. *)
 val has_running_background : t -> bool
 
+(** How many background subagents and jobs are running. *)
+val running_background : t -> int
+
 (** Every subagent run since the agent was created (or its session was
     replaced), with status and activity, oldest first. *)
 val subagents : t -> Subagent_log.Summary.t list

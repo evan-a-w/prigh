@@ -97,6 +97,23 @@ let all =
   ; c "session" "show the session's details and statistics"
   ; c "sessions" "search the saved sessions"
   ; c ~argument:Session ~args:"[path]" "switch" "switch to a saved session"
+  ; c
+      ~argument:Session
+      ~args:"[session]"
+      "archive"
+      "archive a session (this one without an argument): it moves under \
+       Archived in the sidebar"
+  ; c
+      ~argument:Session
+      ~args:"[session]"
+      "unarchive"
+      "unarchive a session (this one without an argument)"
+  ; c
+      ~argument:Session
+      ~args:"[session...]"
+      "delete"
+      "delete sessions, after a confirmation (none: select them in the sidebar)"
+  ; c "delete-archived" "delete every archived session, after a confirmation"
   ; c "clone" "copy this session into a new one"
   ; c "fork" "start a new session from an earlier message"
   ; c "rewind" "go back to an earlier message in this session"
