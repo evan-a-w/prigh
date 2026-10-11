@@ -3178,7 +3178,7 @@ let rec reply_to (m : Model.t) (tag : Reply_tag.t) result =
         outputs_loading =
           Set.remove m.outputs_loading (output_key ~agent_id ~call_id)
       }
-      (sprintf "Couldn't load the whole output: %s" e)
+      (sprintf "Couldn't load the whole output: %s. Load them tries again." e)
   | Model_set, Error e ->
     error
       { m with pending = { m.pending with model = None } }
