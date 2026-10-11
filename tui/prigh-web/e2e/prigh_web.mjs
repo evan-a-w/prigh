@@ -202,7 +202,8 @@ const showHeader = async label => {
   section(label);
   console.log(clean(await page.evaluate(() =>
     [...document.querySelectorAll("header *")]
-      .filter(e => e.tagName === "SELECT" || (e.children.length === 0 && e.tagName !== "OPTION"))
+      .filter(e => e.tagName === "SELECT" || e.matches(".where")
+        || (e.children.length === 0 && e.tagName !== "OPTION" && !e.closest(".where")))
       .map(e => (e.tagName === "SELECT" ? `[${e.selectedOptions[0]?.text ?? ""}]` : e.textContent))
       .join("\n"))));
 };
@@ -242,6 +243,54 @@ const showPanel = async label => {
   await page.waitForTimeout(200); // its slide in
   await screenshot(label);
 };
+
+// Whether everything in [selector] is laid out without overlaps or overflow:
+// each shown element inside its parent, no two siblings over each other, no
+// text cut off without an ellipsis.
+const layoutProblems = selector => page.evaluate(selector => {
+  const root = document.querySelector(selector);
+  const shown = e => {
+    const s = getComputedStyle(e);
+    const r = e.getBoundingClientRect();
+    return s.display !== "none" && s.visibility !== "hidden" && r.width > 0 && r.height > 0 && !e.matches(":popover-open");
+  };
+  const name = e => `${e.tagName.toLowerCase()}.${[...e.classList].join(".")}`;
+  const problems = [];
+  const all = [root, ...root.querySelectorAll("*")].filter(e => (e instanceof HTMLElement || e.tagName === "svg") && shown(e) && !e.closest(":popover-open"));
+  for (const e of all) {
+    const r = e.getBoundingClientRect();
+    if (e !== root) {
+      const p = e.parentElement.getBoundingClientRect();
+      if (r.left < p.left - 0.5 || r.right > p.right + 0.5) problems.push(`${name(e)} sticks out of ${name(e.parentElement)}`);
+    }
+    const kids = [...e.children].filter(k => all.includes(k));
+    for (let i = 0; i < kids.length; i++)
+      for (let j = i + 1; j < kids.length; j++) {
+        const a = kids[i].getBoundingClientRect(), b = kids[j].getBoundingClientRect();
+        const w = Math.min(a.right, b.right) - Math.max(a.left, b.left);
+        const h = Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top);
+        if (w > 0.5 && h > 0.5) problems.push(`${name(kids[i])} overlaps ${name(kids[j])}`);
+      }
+    const s = getComputedStyle(e);
+    const clips = s.overflowX !== "visible" || e === root;
+    if (clips && e.scrollWidth > e.clientWidth + 1 && s.textOverflow !== "ellipsis")
+      problems.push(`${name(e)} cut off (${e.scrollWidth} > ${e.clientWidth})`);
+  }
+  return problems;
+}, selector);
+
+// The top bar's controls as shown: each chip's text, "icon" for an icon
+// alone, or the menu.
+const controlsShown = () => page.evaluate(() => {
+  const more = document.querySelector(".controls-more");
+  if (getComputedStyle(more).display !== "none") return "in a menu";
+  return [...document.querySelectorAll(".controls > .chip-button")].map(chip => {
+    const after = getComputedStyle(chip, "::after");
+    const extra = after.display !== "none" && after.content.startsWith('"') ? after.content.slice(1, -1) : "";
+    const text = (chip.innerText.trim().replace(/\s+/g, " ") + " " + extra).trim();
+    return text || "icon";
+  }).join(", ");
+});
 
 const bodyHas = text => page.waitForFunction(t => document.body.innerText.includes(t), text);
 const bodyLacks = text => page.waitForFunction(t => !document.body.innerText.includes(t), text);
@@ -1042,6 +1091,66 @@ try {
   for (const lang of ["ocaml", "json"]) console.log(await tokens(`.code code.language-${lang}`));
   await page.locator(".code").last().scrollIntoViewIfNeeded();
   await screenshot("resize: highlighted code in a reply");
+
+  // 15. The top bar fits the chat column, however wide the panels around it
+  //     make it: shorter labels, then icons, then one menu; the title and
+  //     the cwd keep their room. Nothing overlaps or is cut off there or in
+  //     the composer and the status line.
+  const chatWidth = () => width(".main");
+  // Drags the file browser's edge until the chat column is [target] wide.
+  const chatAt = async target => {
+    for (let i = 0; i < 3 && (await chatWidth()) !== target; i++) await drag("files", target - (await chatWidth()), 0);
+    await page.waitForTimeout(200);
+  };
+  const showTopBar = async label => {
+    section(label);
+    const where = await page.evaluate(() => {
+      const r = s => document.querySelector(s).getBoundingClientRect();
+      return { title: Math.round(r(".topbar .title").width), more: getComputedStyle(document.querySelector(".controls-more")).display !== "none" };
+    });
+    console.log(`chat ${await chatWidth()}; controls: ${await controlsShown()}; title at least 140px: ${where.title >= 140}`);
+    for (const s of [".topbar", ".composer"]) {
+      const problems = await layoutProblems(s);
+      console.log(`${s}: ${problems.length ? problems.join("; ") : "fits"}`);
+    }
+    await screenshot(label);
+  };
+  await page.keyboard.press("Control+Shift+F");
+  await page.locator(".files-panel").waitFor();
+  for (const target of [700, 520, 400]) {
+    await chatAt(target);
+    await showTopBar(`top bar: a ${target}px chat column`);
+  }
+  section("top bar: the controls' menu");
+  await page.locator(".controls-more").click();
+  await page.waitForSelector(".controls:popover-open");
+  await page.waitForTimeout(200); // its drop
+  console.log(await page.evaluate(() => {
+    const menu = document.querySelector(".controls").getBoundingClientRect();
+    const more = document.querySelector(".controls-more").getBoundingClientRect();
+    return `${[...document.querySelectorAll(".controls > .chip-button")].map(c => c.innerText.replace(/\s+/g, " ").trim()).join(" | ")}\n`
+      + `under its button: ${menu.top >= more.bottom && Math.abs(menu.right - more.right) <= 1}, in the window: ${menu.left >= 0 && menu.right <= innerWidth}`;
+  }));
+  await screenshot("top bar: the controls' menu");
+  await page.locator(".controls .thinking-chip").click();
+  await page.locator(".modal .picker-item").first().waitFor();
+  console.log(`a choice opens its picker, the menu closes: ${await page.evaluate(() => !document.querySelector(":popover-open"))}`);
+  await page.keyboard.press("Escape");
+  await page.waitForSelector(".modal", { state: "detached" });
+  await page.locator(".controls-more").click();
+  await page.waitForSelector(".controls:popover-open");
+  await page.keyboard.press("Escape");
+  console.log(`Esc closes it: ${await page.evaluate(() => !document.querySelector(":popover-open"))}`);
+  // Without the sidebar, its button joins the top bar.
+  await page.keyboard.press("Control+b");
+  await page.waitForFunction(() => !document.querySelector(".app.sidebar-open"));
+  await chatAt(400);
+  await showTopBar("top bar: a 400px chat column without the sidebar");
+  await page.keyboard.press("Control+b");
+  await page.waitForFunction(() => document.querySelector(".app.sidebar-open"));
+  await handle("files").dblclick();
+  await page.keyboard.press("Control+Shift+F");
+  await page.waitForSelector(".files-panel", { state: "detached" });
 
   section("errors");
   console.log(errors.length ? errors.join("\n") : "none");

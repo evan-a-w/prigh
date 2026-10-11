@@ -41,6 +41,8 @@ let%expect_test "the mode chip, Alt+M, and set_mode's reply or failure" =
             title="Tools run without asking (Alt+M cycles, /mode picks)"
             aria-label="Tools run without asking (Alt+M cycles, /mode picks)"
             data-short="auto"
+            popovertarget="topbar-controls"
+            popovertargetaction="hide"
             class="btn chip-button mode-chip"
             @on_click>
       <icon class="shield"> </icon>
@@ -64,6 +66,8 @@ let%expect_test "the mode chip, Alt+M, and set_mode's reply or failure" =
             disabled=""
             aria-busy="true"
             data-short="plan"
+            popovertarget="topbar-controls"
+            popovertargetaction="hide"
             class="awaiting btn chip-button mode-chip"
             @on_click>
       <span class="lamp"> </span>
@@ -80,6 +84,8 @@ let%expect_test "the mode chip, Alt+M, and set_mode's reply or failure" =
             title="Read-only planning: no file edits; bash, job_input and MCP tools ask first (Alt+M cycles, /mode picks)"
             aria-label="Read-only planning: no file edits; bash, job_input and MCP tools ask first (Alt+M cycles, /mode picks)"
             data-short="plan"
+            popovertarget="topbar-controls"
+            popovertargetaction="hide"
             class="btn chip-button mode-chip plan-mode"
             @on_click>
       <icon class="shield"> </icon>

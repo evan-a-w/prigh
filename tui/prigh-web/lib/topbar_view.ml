@@ -24,13 +24,38 @@ let session_title (m : App.Model.t) (state : State.t) =
        |> Option.value ~default:"New session")
 ;;
 
+(* Where the top bar has no room for the controls, they fold into a menu (a
+   popover, see style.css) that a choice closes. *)
+let menu_id = "topbar-controls"
+
+let in_menu =
+  [ Attr.create "popovertarget" menu_id
+  ; Attr.create "popovertargetaction" "hide"
+  ]
+;;
+
+(* The cwd, elided in the middle when narrow: the directory it ends in stays. *)
+let where cwd =
+  let path = Sidebar_view.home_relative cwd in
+  let head, tail =
+    match String.rsplit2 path ~on:'/' with
+    | Some (dir, base) when not (String.is_empty base) -> dir, "/" ^ base
+    | _ -> "", path
+  in
+  Node.span
+    ~attrs:[ Attr.class_ "where"; Attr.title cwd ]
+    [ (if String.is_empty head then Node.none else span ~cls:"where-head" head)
+    ; span ~cls:"where-tail" tail
+    ]
+;;
+
 (* A choice the backend has still to confirm. *)
 let pending_chip ?(attrs = []) ?title ~cls label =
   button
     ~cls:("chip-button awaiting " ^ cls)
     ~title:(Option.value title ~default:(sprintf "Switching to %s…" label))
     ~disabled:true
-    ~attrs:(Attr.create "aria-busy" "true" :: attrs)
+    ~attrs:(Attr.create "aria-busy" "true" :: (attrs @ in_menu))
     ~on_click:Effect.Ignore
     [ Html.lamp (); span ~cls:"chip-label" label ]
 ;;
@@ -50,6 +75,7 @@ let thinking_chip (m : App.Model.t) (state : State.t) ~inject =
            "Thinking %s: how much the model reasons before it answers (Alt+T \
             cycles, /thinking)"
            state.thinking)
+      ~attrs:in_menu
       ~on_click:(inject Action.Open_thinking_picker)
       [ icon Brain
       ; span ~cls:"chip-key" "Thinking"
@@ -60,11 +86,13 @@ let thinking_chip (m : App.Model.t) (state : State.t) ~inject =
     button
       ~cls:"chip-button thinking-chip unsupported"
       ~title:(sprintf "%s has no thinking levels" state.model.name)
+      ~attrs:in_menu
       ~on_click:(inject Action.Open_thinking_picker)
       [ icon Brain; span ~cls:"chip-label" "No thinking" ]
 ;;
 
-(* What asks first: phones show [label] (ask, auto-edit, auto, plan). *)
+(* What asks first: a narrow top bar shows [label] (ask, auto-edit, auto,
+   plan). *)
 let mode_chip (m : App.Model.t) (state : State.t) ~inject =
   let short mode = [ Attr.create "data-short" (Session_mode.label mode) ] in
   match m.pending.mode with
@@ -82,7 +110,7 @@ let mode_chip (m : App.Model.t) (state : State.t) ~inject =
         (sprintf
            "%s (Alt+M cycles, /mode picks)"
            (String.capitalize (Session_mode.describe mode)))
-      ~attrs:(short mode)
+      ~attrs:(short mode @ in_menu)
       ~on_click:(inject (Action.Run "/mode"))
       [ icon Shield
       ; span ~cls:"chip-label" (Session_mode.title mode)
@@ -123,20 +151,34 @@ let view (m : App.Model.t) ~inject =
               ]
           ; div
               ~cls:"session-where"
-              [ span
-                  ~cls:"where"
-                  ~attrs:[ Attr.title state.cwd ]
-                  (Sidebar_view.home_relative state.cwd)
+              [ where state.cwd
               ; (match state.git_branch with
                  | Some branch ->
                    Node.span
-                     ~attrs:[ Attr.class_ "branch" ]
-                     [ icon Branch; Node.text branch ]
+                     ~attrs:[ Attr.class_ "branch"; Attr.title branch ]
+                     [ icon Branch; span ~cls:"branch-name" branch ]
                  | None -> Node.none)
               ]
           ]
+      ; button
+          ~cls:
+            ("icon ghost controls-more"
+             ^ if (Session_mode.of_state state).plan then " plan-mode" else "")
+          ~title:
+            (sprintf
+               "%s, %s, %s"
+               state.model.name
+               (if state.model.supports_thinking
+                then "thinking " ^ state.thinking
+                else "no thinking")
+               (String.uncapitalize
+                  (Session_mode.title (Session_mode.of_state state))))
+          ~attrs:[ Attr.create "popovertarget" menu_id ]
+          ~on_click:Effect.Ignore
+          [ icon Sliders ]
       ; div
           ~cls:"controls"
+          ~attrs:[ Attr.id menu_id; Attr.create "popover" "auto" ]
           [ (match m.pending.model with
              | Some key ->
                let name =
@@ -147,7 +189,8 @@ let view (m : App.Model.t) ~inject =
              | None ->
                button
                  ~cls:"chip-button model-chip"
-                 ~title:"Switch model (Ctrl+L)"
+                 ~title:(sprintf "%s: switch model (Ctrl+L)" state.model.name)
+                 ~attrs:in_menu
                  ~on_click:(inject Action.Open_model_picker)
                  [ icon Cpu
                  ; span ~cls:"chip-label" state.model.name

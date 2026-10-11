@@ -415,7 +415,11 @@ kbd {
 
 /* Top bar */
 
+/* It steps down with the chat column's width, not the window's (the
+   sidebar and the panels take their share): full labels, then short ones,
+   then icons, then one menu. The title and the cwd keep their room. */
 .topbar {
+  container: topbar / inline-size;
   display: flex;
   align-items: center;
   gap: 10px;
@@ -423,8 +427,9 @@ kbd {
   min-height: 54px;
   border-bottom: 1px solid var(--rule);
 }
+.topbar > * { flex-shrink: 0; }
 .app.sidebar-open:not(.narrow) .topbar .toggle-sidebar { display: none; }
-.title { flex: 1; min-width: 0; display: flex; flex-direction: column; align-items: flex-start; gap: 1px; line-height: 1.3; }
+.topbar > .title { flex: 1 1 0; min-width: clamp(140px, 30cqi, 300px); display: flex; flex-direction: column; align-items: flex-start; gap: 1px; line-height: 1.3; }
 .session-name {
   display: inline-flex;
   align-items: center;
@@ -445,15 +450,41 @@ kbd {
 .session-name .edit-hint { width: 13px; height: 13px; color: var(--faint); opacity: 0; transition: opacity 0.15s; }
 .session-name:hover .edit-hint, .session-name:focus-visible .edit-hint { opacity: 1; }
 .session-where { display: flex; gap: 12px; color: var(--faint); font: 11.5px/1.4 var(--mono); min-width: 0; max-width: 100%; }
-.where { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* A long cwd loses its middle: the directory it ends in stays. */
+.where { display: flex; min-width: 6ch; white-space: nowrap; overflow: hidden; }
+.where-head { min-width: 1ch; overflow: hidden; text-overflow: ellipsis; }
+.where-tail { flex-shrink: 0; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+.where-head + .where-tail { max-width: calc(100% - 1ch); }
 /* Long paths lose their start, not the directory they end in (the mark
    keeps the leading "/" in place). */
-.where, .session-cwd { direction: rtl; text-align: left; }
-.where::before, .session-cwd::before { content: "\200E"; }
-.branch { display: inline-flex; align-items: center; gap: 3px; white-space: nowrap; color: var(--muted); }
-.branch .icon { width: 12px; height: 12px; color: var(--faint); }
+.session-cwd { direction: rtl; text-align: left; }
+.session-cwd::before { content: "\200E"; }
+/* A branch keeps its name up to almost half the line; the cwd gives way. */
+.branch { display: inline-flex; align-items: center; gap: 3px; white-space: nowrap; color: var(--muted); flex-shrink: 0; max-width: 45%; }
+.branch .icon { width: 12px; height: 12px; color: var(--faint); flex-shrink: 0; }
+.branch-name { overflow: hidden; text-overflow: ellipsis; }
 
-.controls { display: flex; align-items: center; gap: 6px; }
+/* A popover only when folded into the menu (below). */
+.topbar .controls {
+  position: static;
+  inset: auto;
+  width: auto;
+  height: auto;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  overflow: visible;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 0 1 auto;
+  min-width: 0;
+}
+.controls > .chip-button { flex-shrink: 0; }
+.controls > .model-chip { flex-shrink: 1; min-width: 0; }
+.controls-more { display: none; anchor-name: --topbar-more; }
 .chip-button {
   display: inline-flex;
   align-items: center;
@@ -553,6 +584,7 @@ kbd {
 /* Composer */
 
 .composer {
+  container: composer / inline-size;
   position: relative;
   padding: 8px 16px 10px;
   max-width: 892px;
@@ -907,14 +939,10 @@ kbd {
 @media (max-width: 760px) {
   .topbar { padding: 6px 8px; gap: 6px; min-height: 50px; }
   .session-name { font-size: 14px; }
-  .chip-button { padding: 0 7px; }
-  .chip-label { max-width: 96px; }
-  .model-chip .chevron, .thinking-chip .chevron { display: none; }
   .composer { padding: 6px 8px 8px; }
   .popup { left: 8px; right: 8px; }
   .status { gap: 2px 10px; }
   .status .tokens, .status .account { display: none; }
-  .chip-button > .icon:first-child { display: none; }
   .toasts { left: 8px; right: 8px; align-items: stretch; }
   .modal-backdrop { padding-top: 8vh; }
   .help-table td:first-child { white-space: normal; }
@@ -1258,20 +1286,71 @@ kbd {
 .queued-remove:hover { color: var(--brick); }
 
 @media (max-width: 760px) {
-  /* The settings get a row of their own under the title. */
-  .topbar { flex-wrap: wrap; row-gap: 2px; }
-  .topbar .controls { order: 3; flex-basis: 100%; }
-  .topbar .controls .chip-label { max-width: 132px; }
-  .chip-key, .mode-chip .chevron { display: none; }
-  .thinking-chip > .icon:first-child, .mode-chip > .icon:first-child { display: inline-block; }
-  .mode-chip .chip-label { display: none; }
-  .mode-chip::after { content: attr(data-short); }
   .queued { grid-template-columns: minmax(0, 1fr) auto; padding-left: 10px; }
   .queued-tag { grid-column: 1; line-height: 1.4; padding-top: 3px; }
   .queued-text { grid-column: 1; padding-top: 0; }
   .queued-actions { grid-column: 2; grid-row: 1 / span 2; }
   .queued-action-label { display: none; }
   .queued-edit.btn { width: 26px; padding: 0; }
-  /* Under the settings' row of the top bar. */
-  .toasts { top: 96px; }
 }
+
+/* The top bar's steps (see .topbar), by its content's width (the chat
+   column's less 28px of padding). Short labels: the level alone, the
+   mode's name. */
+@container topbar (532px <= width < 932px) {
+  .controls .chip-key, .controls .chevron { display: none; }
+  .controls .mode-chip .chip-label { display: none; }
+  .controls .mode-chip::after { content: attr(data-short); }
+}
+/* Then the thinking level and the mode as icons (their tooltips and labels
+   say which), the model's name as long as it fits. */
+@container topbar (532px <= width < 732px) {
+  .controls :is(.thinking-chip, .mode-chip) { width: 30px; padding: 0; justify-content: center; }
+  .controls :is(.thinking-chip, .mode-chip) .chip-label,
+  .controls .mode-chip::after { display: none; }
+  .controls .model-chip > .icon:first-child { display: none; }
+}
+/* Then one menu for all three. */
+@container topbar (width < 532px) {
+  .controls-more { display: inline-flex; }
+  .topbar .controls:not(:popover-open) { display: none; }
+}
+/* The status line in a narrow chat column keeps to one line. */
+@container composer (width < 448px) {
+  .status { gap: 2px 12px; }
+  .status .tokens { display: none; }
+}
+.controls-more:has(+ .controls:popover-open) { background: var(--slate-2); color: var(--fg); }
+.controls-more.plan-mode { color: var(--sodium); background: var(--sodium-wash); }
+.topbar .controls:popover-open {
+  position: fixed;
+  inset: auto;
+  top: 56px;
+  right: 8px;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 2px;
+  min-width: 220px;
+  max-width: calc(100vw - 16px);
+  padding: 4px;
+  background: var(--slate);
+  border: 1px solid var(--rule-2);
+  border-radius: var(--r-surface);
+  box-shadow: var(--float-shadow);
+  color: var(--fg);
+  animation: drop 0.12s ease-out;
+}
+@keyframes drop { from { opacity: 0; transform: translateY(-4px); } }
+@supports (anchor-name: --a) {
+  .topbar .controls:popover-open {
+    position-anchor: --topbar-more;
+    top: anchor(bottom);
+    right: anchor(right);
+    margin-top: 6px;
+  }
+}
+.controls:popover-open > .chip-button { justify-content: flex-start; border-color: transparent; height: 32px; }
+.controls:popover-open > .chip-button.awaiting { border-color: var(--rule); }
+.controls:popover-open .chip-label { max-width: none; }
+.controls:popover-open .chevron { display: none; }
+@media (prefers-reduced-motion: reduce) { .topbar .controls:popover-open { animation: none; } }

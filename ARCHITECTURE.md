@@ -1507,8 +1507,10 @@ copy of the protocol types and the e2e test guards the contract.
       archived one) lists them with their sizes and warns about those the
       backend will keep, running, open elsewhere or our own, and the
       `Delete_result` reply is a toast), `Topbar_view` (the title; the
-      model, thinking and approval mode chips, each opening its picker, on
-      a row of their own on a phone; the panel toggles), `Composer_view`
+      cwd with its middle elided and the branch; the model, thinking and
+      approval mode chips, each opening its picker, in a `popover` menu
+      when the chat column is narrow — the steps are container queries on
+      the top bar in `style.css`; the panel toggles), `Composer_view`
       with `Queue_view` (the queued steers and follow-ups from `Queued`:
       the backend's `queue_update` lists, taken out at once by Edit and
       remove via `remove_queued`, re-fetched with `get_pending` if that
@@ -1818,7 +1820,11 @@ Playwright's `download` event (the `.tar.gz` listed with `tar`), a typed
 path, new folder, rename with F2, delete after its dialog, then a file
 attached from the browser, one dropped on the composer and one picked with
 the paperclip, sent with a prompt and checked in what the model saw, and
-the phone sheet), with no console or page errors. Then `accounts.mjs` runs the account switcher against `serve -tokens
+the phone sheet), the panels' resize handles, and the top bar and the
+composer with the chat column 700, 520 and 400px wide (by bounding boxes:
+nothing overlaps, sticks out of its parent or is cut off without an
+ellipsis; the controls' menu under its button, closed by a choice and by
+Esc), with no console or page errors. Then `accounts.mjs` runs the account switcher against `serve -tokens
 alice=a,bob=b -superusers alice`: alice signs in, adds bob (each sees only
 their own sessions), switches back in one click, acts as bob and comes
 back, and signs bob out, leaving alice on the sign-in page.
