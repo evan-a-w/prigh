@@ -1,4 +1,5 @@
 open! Core
+open! Import
 
 module Kind = struct
   type t =
@@ -10,18 +11,43 @@ module Kind = struct
     | Steer -> "steer"
     | Follow_up -> "follow-up"
   ;;
+
+  let describe = function
+    | Steer -> "steers the current turn"
+    | Follow_up -> "follows up after the turn"
+  ;;
+
+  let wire = function
+    | Steer -> "steer"
+    | Follow_up -> "follow_up"
+  ;;
 end
 
 type t =
   { kind : Kind.t
+  ; index : int
   ; text : string
   }
 [@@deriving sexp_of, equal]
 
-let remove_first ts ~text =
-  match List.findi ts ~f:(fun _ q -> String.equal q.text text) with
-  | Some (i, _) -> List.filteri ts ~f:(fun j _ -> j <> i)
-  | None -> ts
+let of_queues ~steer ~follow_up =
+  let of_list kind = List.mapi ~f:(fun index text -> { kind; index; text }) in
+  of_list Steer steer @ of_list Follow_up follow_up
 ;;
 
-let remove_last ts ~text = List.rev (remove_first (List.rev ts) ~text)
+let id t = sprintf "%s:%d" (Kind.wire t.kind) t.index
+let find ts ~id:wanted = List.find ts ~f:(fun t -> String.equal (id t) wanted)
+
+let remove_params t =
+  [ "queue", P.Json.str (Kind.wire t.kind)
+  ; "index", P.Json.int t.index
+  ; "text", P.Json.str t.text
+  ]
+;;
+
+let one_line t =
+  String.split_lines t.text
+  |> List.map ~f:String.strip
+  |> List.filter ~f:(Fn.non String.is_empty)
+  |> String.concat ~sep:" "
+;;

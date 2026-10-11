@@ -544,7 +544,7 @@ let%expect_test "dom_of_screen: a rendered app screen round-trips to plain text"
       prigh in /work · /help · Esc aborts · Ctrl+C twice quits
     ────────────────────────────────────────────────────────────
     > hi
-    …deepseek-flash  think:off  ctx:0.1%/1.0M  $0.01
+    …deepseek-flash  think:off  mode:auto  ctx:0.1%/1.0M  $0.01
     cursor: ((6 4))
     cursor row in DOM: (6)
     DOM text matches the plain screen

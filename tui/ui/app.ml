@@ -176,7 +176,6 @@ module Model = struct
     ; sessions : P.Session_summary.t list option
     ; skills : Skill_cache.t
     ; known_paths : String.Set.t
-    ; queued : Queue_counts.t
     ; queued_messages : Queued_message.t list
     ; login_lines : string list
     ; viewport : Viewport.t
@@ -460,7 +459,6 @@ let init =
   ; sessions = None
   ; skills = Skill_cache.empty
   ; known_paths = String.Set.empty
-  ; queued = Queue_counts.zero
   ; queued_messages = []
   ; login_lines = []
   ; viewport = Viewport.Follow
@@ -1042,6 +1040,41 @@ let jobs_picker m (jobs : P.Job_info.t list) =
           j.command)
     in
     open_picker m Jobs (Picker.create ~title:"Jobs" items), [])
+;;
+
+let queue_picker m =
+  if List.is_empty m.queued_messages
+  then notice m "nothing queued", []
+  else (
+    let items =
+      List.map m.queued_messages ~f:(fun (q : Queued_message.t) ->
+        Picker.Item.create
+          ~id:(Queued_message.id q)
+          ~detail:(Queued_message.Kind.describe q.kind)
+          (Queued_message.one_line q))
+    in
+    open_picker m Queue (Picker.create ~title:"Queued" items), [])
+;;
+
+(* [edit]: back into the editor, as [Dequeue] does. *)
+let unqueue m id ~edit =
+  let m = { m with mode = Editing } in
+  match Queued_message.find m.queued_messages ~id with
+  | None -> notice m "that message is no longer queued", []
+  | Some q ->
+    ( m
+    , [ rpc
+          "remove_queued"
+          ~params:(Queued_message.remove_params q)
+          ~tag:
+            (if edit
+             then Dequeued
+             else
+               Notice_on_success
+                 (sprintf
+                    "removed from the queue: %s"
+                    (Queued_message.one_line q)))
+      ] )
 ;;
 
 let kill_job m id =
@@ -2114,6 +2147,7 @@ let run_command m (cmd : Commands.Parsed.t) =
   | "jobs", [ "kill"; id ] -> kill_job m id
   | "jobs", "kill" :: _ -> error m "usage: /jobs kill <id>", []
   | "jobs", [] -> m, [ rpc "list_jobs" ~tag:Jobs_picker ]
+  | "queue", _ -> queue_picker m
   | "jobs", [ id ] -> job_output m id
   | "host", [] -> hosts_picker m
   | "host", _ -> switch_host m cmd.rest
@@ -2285,15 +2319,22 @@ let prompt_tag text : Reply_tag.t =
   if skill_invocation text then Skill_prompt text else Show_error
 ;;
 
+(* Shown at once; the backend's [queue_update] replaces it. *)
+let shown_queued m (kind : Queued_message.Kind.t) text =
+  let index =
+    List.count m.queued_messages ~f:(fun q ->
+      Queued_message.Kind.equal q.kind kind)
+  in
+  m.queued_messages @ [ { Queued_message.kind; index; text } ]
+;;
+
 let send_prompt m text =
   let m, cmds =
     if String.is_prefix text ~prefix:"!"
     then shell_command m text
     else if Model.running m
     then
-      ( { m with
-          queued_messages = m.queued_messages @ [ { kind = Steer; text } ]
-        }
+      ( { m with queued_messages = shown_queued m Steer text }
       , [ rpc "steer" ~params:(user_params m text) ~tag:(prompt_tag text) ] )
     else
       ( prune_agents m
@@ -2325,11 +2366,7 @@ let queue_follow_up m =
     then m, []
     else (
       let m = follow { m with editor; autocomplete = None } in
-      let m =
-        { m with
-          queued_messages = m.queued_messages @ [ { kind = Follow_up; text } ]
-        }
-      in
+      let m = { m with queued_messages = shown_queued m Follow_up text } in
       ( m
       , [ rpc "follow_up" ~params:(user_params m text) ~tag:(prompt_tag text)
         ; Command.Append_history text
@@ -2901,6 +2938,7 @@ let picker_selected m (kind : Mode.Picker_kind.t) (item : Picker.Item.t) =
     m, [ rpc "rewind" ~params:[ "to", str item.id ] ~tag:Reload_messages ]
   | Agents -> set_focus m (`Agent item.id), []
   | Jobs -> job_output m item.id
+  | Queue -> unqueue m item.id ~edit:true
   | Hosts ->
     (match
        Option.bind m.state ~f:(fun s ->
@@ -2909,8 +2947,7 @@ let picker_selected m (kind : Mode.Picker_kind.t) (item : Picker.Item.t) =
      | Some host -> host_cwd_prompt m host, []
      | None -> error m (sprintf "unknown host %S" item.id), [])
   | Skills ->
-    ( { m with editor = Editor.set_text m.editor ("/skill:" ^ item.id ^ " ") }
-    , [] )
+    { m with editor = Editor.set_text m.editor ("/skill:" ^ item.id ^ " ") }, []
   | Mcp list -> mcp_selected m list item.id
   | Auth_select id ->
     m, [ rpc "auth_respond" ~params:[ "id", str id; "value", str item.id ] ]
@@ -3099,6 +3136,10 @@ let picker m (kind : Mode.Picker_kind.t) picker (intent : Intent.t) =
        (match Picker.selected_item picker with
         | None -> m, []
         | Some item -> kill_job { m with mode = Editing } item.id)
+     | Queue ->
+       (match Picker.selected_item picker with
+        | None -> m, []
+        | Some item -> unqueue m item.id ~edit:false)
      | Sessions selection ->
        confirm_delete m ~back (Session_selection.targets selection picker)
      | _ -> { m with quitting = true }, [ Command.Quit ])
@@ -3460,11 +3501,12 @@ let auth_event m (e : P.Auth_event.t) =
     let lines = [ "Open this URL to log in:"; "  " ^ url; instructions ] in
     { m with login_lines = m.login_lines @ lines }, [ Command.Open_browser url ]
   | Prompt { id; prompt } ->
-    if Mode.is_dialog m.mode
-       && not
-            (match m.mode with
-             | Login_prompt _ -> true
-             | _ -> false)
+    if
+      Mode.is_dialog m.mode
+      && not
+           (match m.mode with
+            | Login_prompt _ -> true
+            | _ -> false)
     then
       ( warn
           m
@@ -3562,18 +3604,7 @@ let event m (e : P.Event.t) =
   match e with
   | State state -> { m with state = Some state }, []
   | Queue_update { steer; follow_up } ->
-    let queued_messages =
-      if steer = 0 && follow_up = 0 then [] else m.queued_messages
-    in
-    { m with queued = { Queue_counts.steer; follow_up }; queued_messages }, []
-  | Message_start (User user) ->
-    ( { m with
-        queued_messages =
-          Queued_message.remove_first
-            m.queued_messages
-            ~text:(Injected_note.typed user)
-      }
-    , [] )
+    { m with queued_messages = Queued_message.of_queues ~steer ~follow_up }, []
   | Config_changed config -> { m with config = Some config }, []
   | Auth a -> auth_event m a
   | Tool_confirm c -> add_pending_confirms m [ c ], []
@@ -3646,7 +3677,10 @@ let decode_skills json = P.Json.list_field json "skills" ~f:P.Skill.of_json
 (* Back in the editor (unless something else is there now) so the name can be
    fixed, and no longer queued. *)
 let skill_prompt_failed m text e =
-  let queued_messages = Queued_message.remove_first m.queued_messages ~text in
+  let queued_messages =
+    List.filter m.queued_messages ~f:(fun (q : Queued_message.t) ->
+      not (String.equal q.text text))
+  in
   let editor =
     if Editor.is_empty m.editor then Editor.set_text m.editor text else m.editor
   in
@@ -3816,7 +3850,6 @@ let rec reply m (tag : Reply_tag.t) (result : (P.Json.t, string) Result.t) =
            let m =
              { m with
                editor = Editor.set_text m.editor text
-             ; queued = Queue_counts.zero
              ; queued_messages = []
              }
            in
@@ -3838,7 +3871,6 @@ let rec reply m (tag : Reply_tag.t) (result : (P.Json.t, string) Result.t) =
            skills = Skill_cache.empty
          ; agents = []
          ; focus = `Main
-         ; queued = Queue_counts.zero
          ; queued_messages = []
          ; transcript = Transcript.clear m.transcript
          }
@@ -3883,7 +3915,6 @@ let rec reply m (tag : Reply_tag.t) (result : (P.Json.t, string) Result.t) =
               ; skills = Skill_cache.empty
               ; agents = []
               ; focus = `Main
-              ; queued = Queue_counts.zero
               ; queued_messages = []
               ; transcript = Transcript.clear m.transcript
               }
@@ -4095,16 +4126,15 @@ let rec reply m (tag : Reply_tag.t) (result : (P.Json.t, string) Result.t) =
             json
             ~f:(fun j -> P.Json.string_field j "text")
             (fun text ->
-              let editor =
-                if Editor.is_empty m.editor
-                then Editor.set_text m.editor text
-                else
-                  Editor.set_text m.editor (text ^ "\n\n" ^ Editor.text m.editor)
-              in
-              let queued_messages =
-                Queued_message.remove_last m.queued_messages ~text
-              in
-              { m with editor; queued_messages }, []))
+               let editor =
+                 if Editor.is_empty m.editor
+                 then Editor.set_text m.editor text
+                 else
+                   Editor.set_text
+                     m.editor
+                     (text ^ "\n\n" ^ Editor.text m.editor)
+               in
+               { m with editor }, []))
      | Paths_for_autocomplete prefix ->
        decode json ~f:(decode_list ~f:P.Json.to_string_or_error) (fun paths ->
          let m =

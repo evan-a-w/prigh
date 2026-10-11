@@ -172,7 +172,7 @@ let%expect_test "component: startup requests, key handling, rpc round trip, \
       quits
     ──────────────────────────────────────────────────
     > ▏
-    …m  think:n/a  view:normal  ctx:0.0%/1.0k  $0.00
+    /w  m  think:n/a  mode:auto  ctx:0.0%/1.0k  $0.00
     |}];
   Bonsai_test.Handle.do_actions
     handle
@@ -192,7 +192,7 @@ let%expect_test "component: startup requests, key handling, rpc round trip, \
       thinking must be one of: off, on, low, high, max
     ──────────────────────────────────────────────────
     > ▏
-    …m  think:n/a  view:normal  ctx:0.0%/1.0k  $0.00
+    /w  m  think:n/a  mode:auto  ctx:0.0%/1.0k  $0.00
     |}];
   (* The spinner ticks only while running. *)
   Bonsai_test.Handle.do_actions
@@ -241,7 +241,7 @@ let%expect_test "component: startup requests, key handling, rpc round trip, \
       quits
     ──────────────────────────────────────────────────
     > ▏
-    …m  think:n/a  view:normal  ctx:0.0%/1.0k  $0.00
+    /w  m  think:n/a  mode:auto  ctx:0.0%/1.0k  $0.00
     |}]
 ;;
 
@@ -289,6 +289,6 @@ let%expect_test "component: /signout runs the platform's sign-out and shows \
       not here
     ──────────────────────────────────────────────────
     > ▏
-    …m  think:n/a  view:normal  ctx:0.0%/1.0k  $0.00
+    /w  m  think:n/a  mode:auto  ctx:0.0%/1.0k  $0.00
     |}]
 ;;

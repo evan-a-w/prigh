@@ -620,7 +620,9 @@ two can share one.
   `follow_up` = after the loop ends; `/skill:NAME ARGS` texts are expanded
   through the host's `$skill` when queued, so an unknown skill fails the
   request, and the queue keeps the typed text, `abort` = cancels and returns the queued
-  texts to restore, `dequeue` = pops the last queued message, `shell` = runs
+  texts to restore, `dequeue` = pops the last queued message,
+  `remove_queued` = takes one message out of a queue by index, if its text
+  still matches (the frontend's view may be stale), `shell` = runs
   a `!cmd` through the bash machinery), automatic compaction at 80% of the
   context window, and a subscriber list receiving `Agent.Event.t` (`Loop of
   Agent_event.t | State_changed | Compacted | Notice | Config_changed |
@@ -876,7 +878,9 @@ two can share one.
   `{job_id}`. `set_model` goes through `Model.resolve` (key, id,
   display name or unique case-insensitive prefix; otherwise "did you mean"
   by edit distance). Methods: `hello`, `ping`, `prompt`, `steer`,
-  `follow_up`, `abort`, `dequeue`, `cancel_subagent`, `list_subagents`,
+  `follow_up`, `abort`, `dequeue`, `remove_queued` (`{queue: "steer" |
+  "follow_up", index, text?}`, returning `{text, attachments}` like
+  `dequeue`), `cancel_subagent`, `list_subagents`,
   `get_subagent`, `get_pending`, `kill_job`, `job_output`, `list_jobs`,
   `shell`, `get_state`, `get_messages`,
   `get_entries`, `set_model`, `set_thinking`, `list_models`, `compact`,
@@ -1205,8 +1209,8 @@ copy of the protocol types and the e2e test guards the contract.
     Confirm | Question | Search`) says who owns the keyboard; dialogs never
     stack, Esc always closes.
   - Approvals, shared with prigh-web: `Session_mode` (the approval mode, or
-    plan mode, as the status lines show it; Alt+M's cycle; `set_mode`'s
-    parameters), `Confirm_prompt` (a confirmation's title and answers with
+    plan mode, as the status line shows it and as prigh-web's chip names it,
+    `title`; Alt+M's cycle; `set_mode`'s parameters), `Confirm_prompt` (a confirmation's title and answers with
     their keys, y/a/n/r, and `tool_confirm_respond`'s parameters),
     `Question_form` (answering an `ask_user` call with keys), `Plan_view`
     (`plan 2/5: step`, the checklist); the backend's plan mode notes are
@@ -1221,14 +1225,18 @@ copy of the protocol types and the e2e test guards the contract.
   - `Render.screen : Model.t -> Screen.t` lays out a frame as `Content.t`
     (styled spans with `Text_width`-aware wrapping) plus the cursor cell. The
     status line keeps the cwd and model, then fills remaining width by
-    priority (mode hint, scroll position, context, queued/agents/jobs, cost,
-    thinking, verbosity; a mode hint too wide to fit whole is cut short after
-    the context) and left-truncates, so the model key stays visible at
-    narrow widths. It is gray; yellow marks modes, running work and warm
+    priority (mode hint, scroll position, context, queued/agents/jobs and an
+    approval mode that asks, then thinking, `mode:auto` and cost, verbosity
+    last; a mode hint too wide to fit whole is cut short after the context)
+    and left-truncates, so the model key stays visible at narrow widths; the
+    verbosity gives way to the cwd before anything else does. It is gray; yellow marks modes, running work and warm
     context, red a full context or a lost backend.
-  - `Queued_message` tracks what this client steered or queued while a turn
-    runs (kind and text), shown above the editor; a delivered user message,
-    `dequeue` or an empty `queue_update` removes them.
+  - `Queued_message` is a queued steer or follow-up (kind, index in its
+    queue, text) as `queue_update` lists them (whichever frontend queued
+    them), shown above the editor; the TUI adds what it sends at once, the
+    next `queue_update` replaces the list. `/queue` is a picker over them:
+    Enter (`remove_queued`, then into the editor), Ctrl+D (`remove_queued`).
+    prigh-web shares the module.
   - Replies tagged `Retry_in_editor` put the command back in the editor
     with a hint when the backend refuses it (`/switch`, `/cd`).
 - `term/` (`prigh_ui_term`) — `Key_of_event` (Bonsai_term events → `Key.t`,
@@ -1333,9 +1341,10 @@ copy of the protocol types and the e2e test guards the contract.
       sidebar marks the session clicked), prompts sent until the
       transcript's next user message (echoed under it as "Sending…") and
       prompts, steers and follow-ups not yet answered (the send button and
-      the status line), and a model or thinking level chosen until a state
+      the status line), a model or thinking level chosen until a state
       has it or `set_model`/`set_thinking` (`Model_set`, `Thinking_set`)
-      answers (the top bar's chip, disabled). A command that needs a list
+      answers, and an approval mode until a state has it or `set_mode`
+      fails (the top bar's chips, disabled). A command that needs a list
       from the backend opens `Dialog.Loading` at once; `App.reply` gives the
       replies it waits for (`loads`) to the handler only while it still
       shows, so Esc meanwhile has no side effects.
@@ -1441,7 +1450,14 @@ copy of the protocol types and the e2e test guards the contract.
       one, and a bar at the list's foot deletes them; the `Delete` dialog (`Dialog.Delete_target`: paths or every
       archived one) lists them with their sizes and warns about those the
       backend will keep, running, open elsewhere or our own, and the
-      `Delete_result` reply is a toast), `Topbar_view`, `Composer_view` with `Completion`
+      `Delete_result` reply is a toast), `Topbar_view` (the title; the
+      model, thinking and approval mode chips, each opening its picker, on
+      a row of their own on a phone; the panel toggles), `Composer_view`
+      with `Queue_view` (the queued steers and follow-ups from `Queued`:
+      the backend's `queue_update` lists, taken out at once by Edit and
+      remove via `remove_queued`, re-fetched with `get_pending` if that
+      fails; what left the queue otherwise is acknowledged when its user
+      message reaches the transcript, until the run ends), `Completion`
       (slash commands from `Slash`, their arguments, `@` paths via
       `list_paths`) and `History`, `Dialog`/`Dialog_view`/`Modal`
       (pickers built on `Picker`, help, rename, delete, the login flow
@@ -1455,7 +1471,7 @@ copy of the protocol types and the e2e test guards the contract.
       sidebar's account button and the account menu, a `Picker` of
       accounts and actions) over `Accounts` (the saved sign-ins in
       localStorage, behind a `Storage` record so that tests use a table),
-      `Status_view` (with the mode and plan chips and the notifications
+      `Status_view` (with the plan chip and the notifications
       bell), `Html.lamp` (the work-in-progress sign everywhere; `View` marks
       the page `offline` while reconnecting, which stills the others), and `Keys` (which of the
       dialog, the popup or the editor owns a key; `help`, and `browser`:

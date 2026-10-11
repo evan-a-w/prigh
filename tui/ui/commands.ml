@@ -181,6 +181,10 @@ let all =
       "list background jobs (Enter shows output, Ctrl+D kills), or show/kill \
        one"
   ; c
+      "queue"
+      ""
+      "the queued steers and follow-ups (Enter edits one, Ctrl+D removes it)"
+  ; c
       "host"
       "[name|backend]"
       "pick where tools run (this frontend, another one, or the backend) and \
