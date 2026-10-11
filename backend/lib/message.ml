@@ -6,8 +6,15 @@ module User = struct
     { text : string
     ; images : Image.t list
           [@sexp.list] [@jsonaf.default []] [@jsonaf_drop_default.equal]
+    ; origin : Injected.t option [@sexp.option] [@jsonaf.option]
     }
   [@@deriving sexp, jsonaf, equal]
+
+  let body t =
+    match Injected.of_message ~origin:t.origin t.text with
+    | None -> t.text
+    | Some origin -> Injected.body origin t.text
+  ;;
 end
 
 module Assistant = struct
@@ -58,7 +65,7 @@ type t =
   | Tool_result of Tool_result.t
 [@@deriving sexp, jsonaf, equal]
 
-let user ?(images = []) text = User { text; images }
+let user ?(images = []) ?origin text = User { text; images; origin }
 
 let with_image_notes text (images : Image.t list) =
   String.concat
@@ -71,8 +78,8 @@ let with_image_notes text (images : Image.t list) =
 ;;
 
 let omit_images = function
-  | User { text; images = _ :: _ as images } ->
-    User { text = with_image_notes text images; images = [] }
+  | User ({ text; images = _ :: _ as images; _ } as u) ->
+    User { u with text = with_image_notes text images; images = [] }
   | Tool_result ({ text; images = _ :: _ as images; _ } as r) ->
     Tool_result { r with text = with_image_notes text images; images = [] }
   | (User _ | Tool_result _ | Assistant _) as m -> m

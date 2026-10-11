@@ -130,7 +130,8 @@ let wire_messages ~quirks (messages : Message.t list) : Json.t list =
           ; "content", `String text
           ]
       ]
-    | User { text; images } -> flush () @ [ user_message ~text images ]
+    | User { text; images; origin = _ } ->
+      flush () @ [ user_message ~text images ]
     | Assistant a -> flush () @ [ assistant_message ~quirks a ]
   in
   let wired = List.concat_map messages ~f:wire in

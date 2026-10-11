@@ -116,7 +116,10 @@ end
 module Queued : sig
   type t =
     { text : string (** as typed, e.g. [/skill:NAME ARGS] *)
-    ; skill : string option (** the expanded skill invocation *)
+    ; expanded : string option
+    (** what the model gets instead: the expanded skill invocation, or a
+        command's prompt *)
+    ; source : Injected.Source.t option
     ; attachments : string list
     ; images : Image.t list
     }
@@ -331,6 +334,22 @@ val respond_confirm : t -> call_id:string -> allow:bool -> unit Or_error.t
     (see {!Agent_loop.run}), and when a request overflows the context
     window. Each emits [Compacted]. *)
 val compact : ?instructions:string -> t -> string Or_error.t
+
+(** {2 Changes: /diff, /review, /init} *)
+
+(** The working tree's changes on the active tool host ({!Git_diff}). *)
+val git_diff : ?path:string -> ?base:string -> t -> Git_diff.Result.t Or_error.t
+
+(** [/review ARGS]: a run reviewing the uncommitted changes, or the changes
+    against a base when the first word of [ARGS] names a revision; the rest
+    (all of [ARGS] otherwise) is extra instructions. The message is
+    [Review.prompt] with the [Review] source; while a run is in progress it
+    waits like a follow-up. Refused when there is nothing to review. *)
+val review : t -> args:string -> unit Or_error.t
+
+(** [/init]: a run asking the model to write or improve [AGENTS.md]
+    ({!Init_prompt}), queued like [review]. *)
+val init : t -> unit Or_error.t
 
 (** {2 Budget, goal and resume} *)
 
