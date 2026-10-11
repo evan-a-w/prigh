@@ -405,11 +405,11 @@ let%expect_test "sessions: list, new, switch, fork, rewind" =
   [%expect
     {|
     {"type":"response","id":"r1","ok":true,"result":{}}
-    {"type":"response","id":"r1","ok":true,"result":{}}
+    {"type":"response","id":"r1","ok":true,"result":{"state":{"session_id":"<id>","session_path":"$DIR/sessions/<stamp>_<id>.jsonl","session_name":null,"session_description":null,"cwd":"$DIR","git_branch":null,"model":{"id":"deepseek-flash","provider":"deepseek","key":"deepseek/deepseek-flash","name":"DeepSeek V4.1 Flash","context_window":1000000,"max_output":384000,"supports_thinking":true,"cost":{"input":0.3,"output":1.2,"cache_read":0.006}},"thinking":"on","running":false,"message_count":0,"usage":{"input":0,"output":0,"cache_read":0},"cost_usd":0,"context_tokens":0,"active_host":"backend","hosts":[{"id":"backend","name":"<host>","cwd":"$DIR","session_id":null,"session_name":null}],"subagents":[],"jobs":[]}}}
     {"type":"response","id":"r1","ok":true,"result":[{"id":"<id>","path":"$DIR/sessions/<stamp>_<id>.jsonl","name":null,"description":null,"cwd":"$DIR","created_at":"<time>","updated_at":"<time>","first_prompt":"first","message_count":2,"parent":null,"bytes":<n>,"live":false,"running":false,"background":0,"archived":false}]}
-    {"type":"response","id":"r1","ok":true,"result":{}}
+    {"type":"response","id":"r1","ok":true,"result":{"state":{"session_id":"<id>","session_path":"$DIR/sessions/<stamp>_<id>.jsonl","session_name":null,"session_description":null,"cwd":"$DIR","git_branch":null,"model":{"id":"deepseek-flash","provider":"deepseek","key":"deepseek/deepseek-flash","name":"DeepSeek V4.1 Flash","context_window":1000000,"max_output":384000,"supports_thinking":true,"cost":{"input":0.3,"output":1.2,"cache_read":0.006}},"thinking":"on","running":false,"message_count":2,"usage":{"input":10,"output":5,"cache_read":0},"cost_usd":9e-06,"context_tokens":10,"active_host":"backend","hosts":[{"id":"backend","name":"<host>","cwd":"$DIR","session_id":null,"session_name":null}],"subagents":[],"jobs":[]}}}
     {"type":"response","id":"r1","ok":false,"error":"no session \"/nowhere.jsonl\""}
-    {"type":"response","id":"r1","ok":true,"result":{}}
+    {"type":"response","id":"r1","ok":true,"result":{"state":{"session_id":"<id>","session_path":"$DIR/sessions/<stamp>_<id>.jsonl","session_name":null,"session_description":null,"cwd":"$DIR","git_branch":null,"model":{"id":"deepseek-flash","provider":"deepseek","key":"deepseek/deepseek-flash","name":"DeepSeek V4.1 Flash","context_window":1000000,"max_output":384000,"supports_thinking":true,"cost":{"input":0.3,"output":1.2,"cache_read":0.006}},"thinking":"on","running":false,"message_count":2,"usage":{"input":10,"output":5,"cache_read":0},"cost_usd":9e-06,"context_tokens":10,"active_host":"backend","hosts":[{"id":"backend","name":"<host>","cwd":"$DIR","session_id":null,"session_name":null}],"subagents":[],"jobs":[]}}}
     {"type":"response","id":"r1","ok":false,"error":"(\"no such entry\" (to_ bogus))"}
     |}]
 ;;
@@ -621,7 +621,7 @@ let%expect_test "import, set_session_name, export, clone, set_cwd" =
     {"type":"response","id":"r1","ok":true,"result":{"path":"$DIR/sessions/exports/<stamp>_<id>.jsonl"}}
     {"type":"response","id":"r1","ok":false,"error":"unknown export format \"html\" (expected markdown or jsonl)"}
     {"type":"response","id":"r1","ok":false,"error":"(Sys_error \"/nowhere.jsonl: No such file or directory\")"}
-    {"type":"response","id":"r1","ok":true,"result":{}}
+    {"type":"response","id":"r1","ok":true,"result":{"state":{"session_id":"<id>","session_path":"$DIR/sessions/<stamp>_<id>.jsonl","session_name":"imported","session_description":null,"cwd":"$DIR","git_branch":null,"model":{"id":"deepseek-flash","provider":"deepseek","key":"deepseek/deepseek-flash","name":"DeepSeek V4.1 Flash","context_window":1000000,"max_output":384000,"supports_thinking":true,"cost":{"input":0.3,"output":1.2,"cache_read":0.006}},"thinking":"on","running":false,"message_count":1,"usage":{"input":0,"output":0,"cache_read":0},"cost_usd":0,"context_tokens":0,"active_host":"backend","hosts":[{"id":"backend","name":"<host>","cwd":"$DIR","session_id":null,"session_name":null}],"subagents":[],"jobs":[]}}}
     {"type":"response","id":"r1","ok":true,"result":{}}
     {"type":"response","id":"r1","ok":true,"result":{"session_id":"<id>","session_path":"$DIR/sessions/<stamp>_<id>.jsonl","session_name":"imported","session_description":null,"cwd":"$DIR/sub","git_branch":null,"model":{"id":"deepseek-flash","provider":"deepseek","key":"deepseek/deepseek-flash","name":"DeepSeek V4.1 Flash","context_window":1000000,"max_output":384000,"supports_thinking":true,"cost":{"input":0.3,"output":1.2,"cache_read":0.006}},"thinking":"on","running":false,"message_count":1,"usage":{"input":0,"output":0,"cache_read":0},"cost_usd":0,"context_tokens":0,"active_host":"backend","hosts":[{"id":"backend","name":"<host>","cwd":"$DIR/sub","session_id":null,"session_name":null}],"subagents":[],"jobs":[]}}
     |}]
@@ -986,7 +986,7 @@ let%expect_test "remote tool host: attached to another session" =
   show_hosts "side" other;
   [%expect
     {|
-    {"type":"response","id":"r2","ok":true,"result":{}}
+    {"type":"response","id":"r2","ok":true,"result":{"state":{"session_id":"<id>","session_path":"$DIR/sessions/<stamp>_<id>.jsonl","session_name":null,"session_description":null,"cwd":"/home/me/proj","git_branch":null,"model":{"id":"deepseek-flash","provider":"deepseek","key":"deepseek/deepseek-flash","name":"DeepSeek V4.1 Flash","context_window":1000000,"max_output":384000,"supports_thinking":true,"cost":{"input":0.3,"output":1.2,"cache_read":0.006}},"thinking":"on","running":false,"message_count":0,"usage":{"input":0,"output":0,"cache_read":0},"cost_usd":0,"context_tokens":0,"active_host":"client-2","hosts":[{"id":"backend","name":"<host>","cwd":"/home/me/proj","session_id":null,"session_name":null},{"id":"client-2","name":"laptop","cwd":"/home/me/proj","session_id":"<id>","session_name":null}],"subagents":[],"jobs":[]}}}
     {"type":"response","id":"r2","ok":true,"result":{}}
     {"type":"response","id":"r2","ok":true,"result":{}}
     main: active=client-2 hosts=(((id backend)(name <host>)(cwd $DIR)(session_id())(session_name()))((id client-2)(name laptop)(cwd /home/me/proj)(session_id(<id>))(session_name(side))))
@@ -1269,7 +1269,7 @@ let%expect_test "change_default saves the current model and thinking level" =
     {"type":"event","event":"config_changed","config":{"scoped_models":[],"confirm_tools":false,"default_model":"deepseek/deepseek-v4-pro","default_thinking":"max","fallback_models":[],"default_cwd":null,"archive_after_days":7}}
     {"type":"response","id":"r1","ok":true,"result":{"scoped_models":[],"confirm_tools":false,"default_model":"deepseek/deepseek-v4-pro","default_thinking":"max","fallback_models":[],"default_cwd":null,"archive_after_days":7}}
     {"type":"response","id":"r1","ok":true,"result":{"scoped_models":[],"confirm_tools":false,"default_model":"deepseek/deepseek-v4-pro","default_thinking":"max","fallback_models":[],"default_cwd":null,"archive_after_days":7}}
-    {"type":"response","id":"r1","ok":true,"result":{}}
+    {"type":"response","id":"r1","ok":true,"result":{"state":{"session_id":"<id>","session_path":"$DIR/sessions/<stamp>_<id>.jsonl","session_name":null,"session_description":null,"cwd":"$DIR","git_branch":null,"model":{"id":"deepseek-v4-pro","provider":"deepseek","key":"deepseek/deepseek-v4-pro","name":"DeepSeek V4 Pro","context_window":1000000,"max_output":384000,"supports_thinking":true,"cost":{"input":1.32,"output":3.96,"cache_read":0.044}},"thinking":"max","running":false,"message_count":0,"usage":{"input":0,"output":0,"cache_read":0},"cost_usd":0,"context_tokens":0,"active_host":"backend","hosts":[{"id":"backend","name":"<host>","cwd":"$DIR","session_id":null,"session_name":null}],"subagents":[],"jobs":[]}}}
     (deepseek/deepseek-v4-pro (On (Max)))
     |}]
 ;;

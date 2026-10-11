@@ -603,7 +603,9 @@ two can share one.
   `list_models` rereads the registry; `auth_status` entries of custom
   providers carry `custom: {base_url, api, api_label}`. The session methods
   (`new_session`, `switch_session` by id or path, `fork`, `clone`, `import`)
-  create or load an agent and move only the calling client; `list_sessions`
+  create or load an agent and move only the calling client (`new_session`,
+  `switch_session`, `fork` and `clone` answer `{state}`, the new session's
+  state, so a frontend needs no `get_state` round trip); `list_sessions`
   items carry `bytes`, `live` (with `clients` when live), `running` (a
   turn or background work), `background` (running background subagents +
   jobs, 0 when not loaded) and `archived` (computed with the namespace's
@@ -999,8 +1001,8 @@ copy of the protocol types and the e2e test guards the contract.
       for `get_state` and `list_models`; a state with a new session id
       resets everything that belongs to the session and fetches its
       messages and the session list, and `new_session`/`switch_session`/
-      `clone` are answered with `Reload_state`, so every way of changing
-      session goes through that one path. Reconnection mirrors `ui/`
+      `clone` are tagged `Reload_state`, whose reply carries the new
+      state, so every way of changing session goes through that one path. Reconnection mirrors `ui/`
       (`Backend_closed` → `Reconnect` with backoff behind a banner; success
       starts over). `!cmd`/`!!cmd`/`!&cmd` go to `shell` like the TUI's.
       `run_command` has every command of `ui/`'s `Commands` (plus `/copy`;

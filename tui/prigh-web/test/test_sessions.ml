@@ -642,3 +642,30 @@ let%expect_test
     (Focus editor)
     |}]
 ;;
+
+let%expect_test "switching: the reply carries the new state, saving a round trip" =
+  let h = H.create ~sessions () in
+  H.act h (Switch_session "/sessions/s3.jsonl");
+  H.reply
+    h
+    "switch_session"
+    (sprintf
+       {|{"state":%s}|}
+       (H.state_json
+          ~fields:
+            [ "session_id", `String "s3"
+            ; "session_path", `String "/sessions/s3.jsonl"
+            ]
+          ()));
+  [%expect {|
+    (Rpc (method_ switch_session) (params ((path /sessions/s3.jsonl)))
+     (tag Reload_state))
+    (Focus editor)
+    (Set_url_session s3)
+    (Rpc (method_ get_messages) (params ()) (tag (Messages s3)))
+    (Rpc (method_ get_pending) (params ()) (tag Pending))
+    (Rpc (method_ list_sessions) (params ()) (tag Sessions))
+    (Rpc (method_ list_subagents) (params ()) (tag Subagents))
+    (Rpc (method_ list_jobs) (params ()) (tag Jobs))
+    |}]
+;;

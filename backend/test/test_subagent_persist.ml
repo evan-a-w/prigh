@@ -121,7 +121,8 @@ let%expect_test "the log is saved with the session and reloaded with it" =
   let agent = create_agent t ~sw ~provider ~session:(reload agent) () in
   print_s [%sexp (List.equal String.equal before (subagents_json agent) : bool)];
   print_subagents t agent ~get:[ "a1"; "n1"; "a1/n1"; "nope" ];
-  [%expect {|
+  [%expect
+    {|
     true
     --- list_subagents
     {"id":"a1","call_id":"c1","parent":null,"task":"outer","model":"deepseek-flash","state":"complete","started_at_ms":<n>,"updated_at_ms":<n>,"ended_at_ms":<n>,"turns":2,"tool_calls":1,"current_tool":null,"current_tool_started_at_ms":null,"message_count":4,"stale":true,"result":{"text":"outer done\n[subagent: 2 turns, 40 in / 18 out tokens, $0.0000]","is_error":false}}
@@ -139,7 +140,8 @@ let%expect_test "the log is saved with the session and reloaded with it" =
   Or_error.ok_exn (Agent.prompt agent "more");
   Agent.wait_idle agent;
   print_subagents t agent ~get:[];
-  [%expect {|
+  [%expect
+    {|
     --- list_subagents
     {"id":"a1","call_id":"c1","parent":null,"task":"outer","model":"deepseek-flash","state":"complete","started_at_ms":<n>,"updated_at_ms":<n>,"ended_at_ms":<n>,"turns":2,"tool_calls":1,"current_tool":null,"current_tool_started_at_ms":null,"message_count":4,"stale":true,"result":{"text":"outer done\n[subagent: 2 turns, 40 in / 18 out tokens, $0.0000]","is_error":false}}
     {"id":"a1/n1","call_id":"n1","parent":"a1","task":"inner","model":"deepseek-flash","state":"complete","started_at_ms":<n>,"updated_at_ms":<n>,"ended_at_ms":<n>,"turns":1,"tool_calls":0,"current_tool":null,"current_tool_started_at_ms":null,"message_count":2,"stale":true,"result":{"text":"inner done\n[subagent: 1 turns, 10 in / 5 out tokens, $0.0000]","is_error":false}}
@@ -151,7 +153,8 @@ let%expect_test "the log is saved with the session and reloaded with it" =
   print_subagents t agent ~get:[];
   Or_error.ok_exn (Agent.switch_session agent ~path);
   print_subagents t agent ~get:[];
-  [%expect {|
+  [%expect
+    {|
     --- list_subagents
     --- list_subagents
     {"id":"a1","call_id":"c1","parent":null,"task":"outer","model":"deepseek-flash","state":"complete","started_at_ms":<n>,"updated_at_ms":<n>,"ended_at_ms":<n>,"turns":2,"tool_calls":1,"current_tool":null,"current_tool_started_at_ms":null,"message_count":4,"stale":true,"result":{"text":"outer done\n[subagent: 2 turns, 40 in / 18 out tokens, $0.0000]","is_error":false}}
@@ -207,7 +210,8 @@ let%expect_test "subagents running when the backend stops load as interrupted" =
   in
   let restarted = create_agent t ~sw ~provider:provider2 ~session () in
   print_subagents t restarted ~get:[ "a1/n1" ];
-  [%expect {|
+  [%expect
+    {|
     --- list_subagents
     {"id":"a1","call_id":"c1","parent":null,"task":"outer","model":"deepseek-flash","state":"failed","started_at_ms":<n>,"updated_at_ms":<n>,"ended_at_ms":<n>,"turns":1,"tool_calls":0,"current_tool":null,"current_tool_started_at_ms":null,"message_count":2,"stale":false,"result":{"text":"[interrupted] the backend stopped before it finished","is_error":true}}
     {"id":"a1/n1","call_id":"n1","parent":"a1","task":"inner","model":"deepseek-flash","state":"failed","started_at_ms":<n>,"updated_at_ms":<n>,"ended_at_ms":<n>,"turns":0,"tool_calls":0,"current_tool":null,"current_tool_started_at_ms":null,"message_count":1,"stale":false,"result":{"text":"[interrupted] the backend stopped before it finished","is_error":true}}
@@ -217,7 +221,8 @@ let%expect_test "subagents running when the backend stops load as interrupted" =
   Or_error.ok_exn (Agent.prompt restarted "again");
   Agent.wait_idle restarted;
   print_subagents t restarted ~get:[];
-  [%expect {|
+  [%expect
+    {|
     --- list_subagents
     {"id":"a1","call_id":"c1","parent":null,"task":"outer","model":"deepseek-flash","state":"failed","started_at_ms":<n>,"updated_at_ms":<n>,"ended_at_ms":<n>,"turns":1,"tool_calls":0,"current_tool":null,"current_tool_started_at_ms":null,"message_count":2,"stale":true,"result":{"text":"[interrupted] the backend stopped before it finished","is_error":true}}
     {"id":"a1/n1","call_id":"n1","parent":"a1","task":"inner","model":"deepseek-flash","state":"failed","started_at_ms":<n>,"updated_at_ms":<n>,"ended_at_ms":<n>,"turns":0,"tool_calls":0,"current_tool":null,"current_tool_started_at_ms":null,"message_count":1,"stale":true,"result":{"text":"[interrupted] the backend stopped before it finished","is_error":true}}
@@ -292,7 +297,8 @@ let%expect_test
     , (not (phys_equal agent (Rpc_server.agent_of_client server client)) : bool)];
   show t (Json.to_string (call "list_subagents" []));
   show t (Json.to_string (call "get_subagent" [ "id", `String "n1" ]));
-  [%expect {|
+  [%expect
+    {|
     ("evicted and loaded again" true)
     [{"id":"a1","call_id":"c1","parent":null,"task":"outer","model":"deepseek-flash","state":"complete","started_at_ms":<n>,"updated_at_ms":<n>,"ended_at_ms":<n>,"turns":2,"tool_calls":1,"current_tool":null,"current_tool_started_at_ms":null,"message_count":4,"stale":true,"result":{"text":"outer done\n[subagent: 2 turns, 40 in / 18 out tokens, $0.0000]","is_error":false}},{"id":"a1/n1","call_id":"n1","parent":"a1","task":"inner","model":"deepseek-flash","state":"complete","started_at_ms":<n>,"updated_at_ms":<n>,"ended_at_ms":<n>,"turns":1,"tool_calls":0,"current_tool":null,"current_tool_started_at_ms":null,"message_count":2,"stale":true,"result":{"text":"inner done\n[subagent: 1 turns, 10 in / 5 out tokens, $0.0000]","is_error":false}}]
     {"subagent":{"id":"a1/n1","call_id":"n1","parent":"a1","task":"inner","model":"deepseek-flash","state":"complete","started_at_ms":<n>,"updated_at_ms":<n>,"ended_at_ms":<n>,"turns":1,"tool_calls":0,"current_tool":null,"current_tool_started_at_ms":null,"message_count":2,"stale":true,"result":{"text":"inner done\n[subagent: 1 turns, 10 in / 5 out tokens, $0.0000]","is_error":false}},"messages":[{"role":"user","text":"inner","at":<n>},{"role":"assistant","content":[{"type":"text","text":"inner done"}],"stop_reason":{"type":"end_turn"},"usage":{"input":10,"output":5,"cache_read":0},"model":"deepseek-flash","at":<n>}]}
@@ -312,7 +318,8 @@ let%expect_test
       "after delete"
     , (Sys_unix.file_exists_exn (Session.path session) : bool)
     , (Sys_unix.file_exists_exn data : bool)];
-  [%expect {|
+  [%expect
+    {|
     ("log saved" true)
     {"deleted":[{"path":"$DIR/sessions/<stamp>_<id>.jsonl","id":"<id>","bytes":<n>}],"refused":[]}
     ("after delete" false false)

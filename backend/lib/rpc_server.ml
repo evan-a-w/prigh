@@ -829,6 +829,11 @@ let listings t client =
     })
 ;;
 
+(* What a client changing session needs first, saving it a [get_state]. *)
+let attached_state (client : Client.t) =
+  `Object [ "state", Rpc_json.state (Agent.state client.agent) ]
+;;
+
 let list_sessions t client =
   let bool b = if b then `True else `False in
   let int n = `Number (Int.to_string n) in
@@ -1106,13 +1111,13 @@ let dispatch_server t (client : Client.t) ~meth ~params
     in
     start_agent t (Session.create ~dir:t.sessions_dir ~cwd ()) start
     |> attach t client;
-    Some empty
+    Some (Ok (attached_state client))
   | "switch_session" ->
     Some
       (Or_error.bind (string_param params "path") ~f:(fun key ->
          Or_error.map (find_agent t client key) ~f:(fun target ->
            attach t client target;
-           `Object [])))
+           attached_state client)))
   | "list_sessions" -> Some (ok (list_sessions t client))
   | "delete_session" ->
     Some
@@ -1184,7 +1189,7 @@ let dispatch_server t (client : Client.t) ~meth ~params
            in
            start_agent t session start |> attach t client;
            if Session.persisted session then sessions_changed t;
-           `Object []))
+           attached_state client))
   | "login" ->
     (* The flow may emit its first event before it is started. *)
     let owned start =
