@@ -72,3 +72,39 @@ let tail ?(max_lines = default_max_lines) ?(max_bytes = default_max_bytes) s =
   ; total_bytes
   }
 ;;
+
+let head_and_tail
+      ?(max_lines = default_max_lines)
+      ?(max_bytes = default_max_bytes)
+      s
+  =
+  let total_lines = count_lines s in
+  let total_bytes = String.length s in
+  if total_lines <= max_lines && total_bytes <= max_bytes
+  then { text = s; truncated = false; total_lines; total_bytes }
+  else (
+    let head = head ~max_lines:(max_lines / 3) ~max_bytes:(max_bytes / 3) s in
+    let head_lines = count_lines head.text in
+    let rest = String.drop_prefix s (String.length head.text) in
+    let tail =
+      tail
+        ~max_lines:(max_lines - head_lines)
+        ~max_bytes:(max_bytes - String.length head.text)
+        rest
+    in
+    let omitted_lines = total_lines - head_lines - count_lines tail.text in
+    let omitted_bytes =
+      total_bytes - String.length head.text - String.length tail.text
+    in
+    { text =
+        sprintf
+          "%s[... %d lines (%d bytes) omitted ...]\n%s"
+          head.text
+          omitted_lines
+          omitted_bytes
+          tail.text
+    ; truncated = true
+    ; total_lines
+    ; total_bytes
+    })
+;;

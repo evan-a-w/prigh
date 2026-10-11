@@ -19,3 +19,8 @@ val head : ?max_lines:int -> ?max_bytes:int -> string -> t
 
 (** Keeps the end; useful for command output where the conclusion matters. *)
 val tail : ?max_lines:int -> ?max_bytes:int -> string -> t
+
+(** Keeps the beginning (a third of the budget) and the end, with a line
+    saying how much was omitted between them: errors often come first and
+    conclusions last. *)
+val head_and_tail : ?max_lines:int -> ?max_bytes:int -> string -> t
