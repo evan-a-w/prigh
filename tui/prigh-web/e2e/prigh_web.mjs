@@ -6,7 +6,7 @@
 // Environment: PLAYWRIGHT_MODULE, PRIGH_BACKEND, SITE (the built site),
 // TEST_DIR (scratch: home/, cwd/, the faux scripts), TOKEN, and optionally
 // SHOTS (a directory for screenshots of each step).
-import { spawn } from "node:child_process";
+import { execFileSync, spawn } from "node:child_process";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { hostname } from "node:os";
 import { join } from "node:path";
@@ -501,6 +501,53 @@ try {
   await page.waitForSelector(".terminal-panel", { state: "detached" });
   await page.setViewportSize({ width: 1280, height: 800 });
   await page.waitForFunction(() => document.querySelector(".app:not(.narrow)"));
+
+  // 10. /diff is a dialog of the changed files; after /cd, the next prompt
+  //     has a margin note above it, unfolding to what the model saw.
+  const showNotes = async label => {
+    section(label);
+    console.log(clean(await page.evaluate(() =>
+      [...document.querySelectorAll(".chat details.note")]
+        .map(d => `${d.dataset.kind} ${d.open ? "open" : "closed"}: ${d.querySelector("summary").innerText}`)
+        .join("\n"))));
+    await screenshot(label);
+  };
+  const git = (...args) => execFileSync("git", ["-c", "user.name=e2e", "-c", "user.email=e2e@example.com", ...args], { cwd, stdio: "ignore" });
+  writeFileSync(join(cwd, "notes.txt"), "one\ntwo\nthree\n");
+  git("init", "-q");
+  git("add", "notes.txt", "flag.png");
+  git("commit", "-q", "-m", "start");
+  writeFileSync(join(cwd, "notes.txt"), "one\n2\nthree\nfour\n");
+  writeFileSync(join(cwd, "todo.md"), "# Todo\n\n- ship it\n");
+  await send("/diff");
+  await page.locator(".diff-dialog").waitFor();
+  await page.waitForTimeout(300); // its fade in
+  await show("/diff", ".diff-dialog");
+  await page.keyboard.press("Escape");
+  await page.waitForSelector(".diff-dialog", { state: "detached" });
+  mkdirSync(join(cwd, "sub"));
+  await send(`/cd ${join(cwd, "sub")}`);
+  await bodyHas("sub");
+  await send("anything new?");
+  await page.locator(".chat .msg.user", { hasText: "anything new?" }).waitFor();
+  await idle();
+  await page.evaluate(() => document.querySelectorAll(".chat details").forEach(d => { d.open = false; }));
+  await page.locator(".chat .msg.user").last().scrollIntoViewIfNeeded();
+  await showNotes("an environment note above the prompt");
+  section("the prompt shows only what was typed");
+  console.log(clean(await page.locator(".chat .msg.user").last().innerText()));
+  await page.locator(".chat details.note summary").last().click();
+  await page.waitForTimeout(300); // its fade in
+  section("a margin note unfolded");
+  console.log(clean(await page.locator(".chat details.note[open] .note-text").last().innerText()));
+  await screenshot("a margin note unfolded");
+  await page.locator(".chat details.note summary").last().click();
+  {
+    const messages = await backendMessages(sessionId());
+    const user = messages.filter(m => m.role === "user").at(-1);
+    section("the model saw the note");
+    console.log(clean(user.text));
+  }
 
   // The layout at phone size.
   await page.setViewportSize({ width: 390, height: 844 });

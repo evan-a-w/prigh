@@ -425,6 +425,15 @@ let toast (m : Model.t) ?(error = false) ?replaces text =
 ;;
 
 let error m text = toast m ~error:true text
+
+let drop_toast (m : Model.t) text =
+  { m with
+    toasts = List.filter m.toasts ~f:(fun t -> not (String.equal t.text text))
+  }
+;;
+
+let reading_changes = "Reading the changes…"
+let reading_review = "Reading the changes to review…"
 let focus_editor = Command.Focus "editor"
 
 let startup =
@@ -1929,7 +1938,7 @@ let run_command (m : Model.t) ({ name; rest } : Slash.Parsed.t) =
             ~tag:(Notice "Compacted the conversation")
         ] )
   | "diff", path ->
-    let m, cmds = toast m "Reading the changes…" in
+    let m, cmds = toast m reading_changes in
     ( m
     , cmds
       @ [ rpc
@@ -1938,7 +1947,7 @@ let run_command (m : Model.t) ({ name; rest } : Slash.Parsed.t) =
             ~tag:Git_diff
         ] )
   | "review", args ->
-    let m, cmds = toast m "Reading the changes to review…" in
+    let m, cmds = toast m reading_review in
     ( m
     , cmds
       @ [ rpc
@@ -2194,6 +2203,7 @@ let reply (m : Model.t) (tag : Reply_tag.t) result =
        { m with dialog = Some (Login { flow with failed = Some e }) }, []
      | _ -> error m e)
   | Command_prompt text, Error e ->
+    let m = drop_toast m reading_review in
     if String.is_empty m.draft && List.is_empty m.images
     then
       error
@@ -2201,10 +2211,13 @@ let reply (m : Model.t) (tag : Reply_tag.t) result =
         (sprintf "%s. %s is back in the editor." (String.capitalize e) text)
     else error m (String.capitalize e)
   | Command_prompt _, Ok _ ->
+    let m = drop_toast m reading_review in
     if Model.running m
     then toast m "Queued: it starts when the current run ends"
     else m, []
+  | Git_diff, Error e -> error (drop_toast m reading_changes) e
   | Git_diff, Ok json ->
+    let m = drop_toast m reading_changes in
     decode m json Git_diff.of_json ~f:(fun diff ->
       if String.is_empty diff.diff
       then
