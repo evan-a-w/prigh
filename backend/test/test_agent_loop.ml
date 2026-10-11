@@ -11,6 +11,7 @@ let config ?(tools = Tools.all) ?max_turns () =
   ; max_turns
   ; max_tokens = None
   ; retries = 2
+  ; cache_key = None
   }
 ;;
 
@@ -51,6 +52,12 @@ let rec show_event (e : Agent_event.t) =
       task
       model
       (String.concat ~sep:"," tools)
+  | Compacted { summary; usage; cost_usd = _ } ->
+    sprintf
+      "compacted %S (summariser in=%d out=%d)"
+      summary
+      usage.input
+      usage.output
   | Subagent { call_id; agent_id; event } ->
     sprintf "subagent %s/%s: %s" call_id agent_id (show_event event)
   | Subagent_end { call_id; agent_id; usage; turns; cost_usd; _ } ->

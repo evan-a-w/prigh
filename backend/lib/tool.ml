@@ -18,6 +18,8 @@ and context =
   ; emit : Agent_event.t -> unit
   ; background : Background_tasks.t option
   ; execute : executor
+  ; cache_key : string option
+  ; halt : unit -> string option
   }
 
 and executor = context -> t -> Json.t -> Tool_result.t
@@ -51,6 +53,8 @@ module Context = struct
         ?(tools = [])
         ?(emit = ignore)
         ?background
+        ?cache_key
+        ?(halt = fun () -> None)
         ~env
         ~cwd
         ()
@@ -66,6 +70,8 @@ module Context = struct
     ; emit
     ; background
     ; execute
+    ; cache_key
+    ; halt
     }
   ;;
 end

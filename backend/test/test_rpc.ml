@@ -111,7 +111,7 @@ let%expect_test "state, models, thinking, errors" =
   [%expect
     {|
     {"type":"response","id":"r1","ok":true,"result":"pong"}
-    {"type":"response","id":"r1","ok":true,"result":{"session_id":"<id>","session_path":"$DIR/sessions/<stamp>_<id>.jsonl","session_name":null,"session_description":null,"cwd":"$DIR","git_branch":null,"model":{"id":"deepseek-flash","provider":"deepseek","key":"deepseek/deepseek-flash","name":"DeepSeek V4.1 Flash","context_window":1000000,"max_output":384000,"supports_thinking":true,"cost":{"input":0.3,"output":1.2,"cache_read":0.006}},"thinking":"on","running":false,"message_count":0,"usage":{"input":0,"output":0,"cache_read":0},"cost_usd":0,"context_tokens":0,"active_host":"backend","hosts":[{"id":"backend","name":"<host>","cwd":"$DIR","session_id":null,"session_name":null}],"subagents":[],"jobs":[]}}
+    {"type":"response","id":"r1","ok":true,"result":{"session_id":"<id>","session_path":"$DIR/sessions/<stamp>_<id>.jsonl","session_name":null,"session_description":null,"cwd":"$DIR","git_branch":null,"model":{"id":"deepseek-flash","provider":"deepseek","key":"deepseek/deepseek-flash","name":"DeepSeek V4.1 Flash","context_window":1000000,"max_output":384000,"supports_thinking":true,"cost":{"input":0.3,"output":1.2,"cache_read":0.006}},"thinking":"on","running":false,"message_count":0,"usage":{"input":0,"output":0,"cache_read":0},"cost_usd":0,"context_tokens":0,"active_host":"backend","hosts":[{"id":"backend","name":"<host>","cwd":"$DIR","session_id":null,"session_name":null}],"subagents":[],"jobs":[],"budget_usd":null,"goal":null,"resume_at_ms":null}}
     {"type":"response","id":"r1","ok":true,"result":{}}
     {"type":"response","id":"r1","ok":false,"error":"thinking must be one of: off, on, low, high, max"}
     {"type":"response","id":"r1","ok":true,"result":{}}
@@ -121,7 +121,7 @@ let%expect_test "state, models, thinking, errors" =
     {"type":"response","id":"r1","ok":false,"error":"model \"claude fabl\" is ambiguous; one of: anthropic/claude-fable-5, anthropic/claude-fable-5-1"}
     {"type":"response","id":"r1","ok":true,"result":{}}
     {"type":"response","id":"r1","ok":true,"result":{}}
-    {"type":"response","id":"r1","ok":true,"result":{"session_id":"<id>","session_path":"$DIR/sessions/<stamp>_<id>.jsonl","session_name":null,"session_description":null,"cwd":"$DIR","git_branch":null,"model":{"id":"deepseek-v4-pro","provider":"deepseek","key":"deepseek/deepseek-v4-pro","name":"DeepSeek V4 Pro","context_window":1000000,"max_output":384000,"supports_thinking":true,"cost":{"input":1.32,"output":3.96,"cache_read":0.044}},"thinking":"high","running":false,"message_count":0,"usage":{"input":0,"output":0,"cache_read":0},"cost_usd":0,"context_tokens":0,"active_host":"backend","hosts":[{"id":"backend","name":"<host>","cwd":"$DIR","session_id":null,"session_name":null}],"subagents":[],"jobs":[]}}
+    {"type":"response","id":"r1","ok":true,"result":{"session_id":"<id>","session_path":"$DIR/sessions/<stamp>_<id>.jsonl","session_name":null,"session_description":null,"cwd":"$DIR","git_branch":null,"model":{"id":"deepseek-v4-pro","provider":"deepseek","key":"deepseek/deepseek-v4-pro","name":"DeepSeek V4 Pro","context_window":1000000,"max_output":384000,"supports_thinking":true,"cost":{"input":1.32,"output":3.96,"cache_read":0.044}},"thinking":"high","running":false,"message_count":0,"usage":{"input":0,"output":0,"cache_read":0},"cost_usd":0,"context_tokens":0,"active_host":"backend","hosts":[{"id":"backend","name":"<host>","cwd":"$DIR","session_id":null,"session_name":null}],"subagents":[],"jobs":[],"budget_usd":null,"goal":null,"resume_at_ms":null}}
     {"type":"response","id":"r1","ok":false,"error":"unknown method \"nope\""}
     {"type":"response","id":"r1","ok":false,"error":"param \"text\" must be a string"}
     {"type":"response","id":7,"ok":false,"error":"request must have a string \"method\""}
@@ -145,7 +145,7 @@ let%expect_test "prompt emits events, get_messages/get_entries reflect the run" 
     {|
     {"type":"response","id":"r1","ok":true,"result":{}}
     {"type":"response","id":"r1","ok":false,"error":"a run is already in progress; use steer or follow_up"}
-    {"type":"event","event":"state","state":{"session_id":"<id>","session_path":"$DIR/sessions/<stamp>_<id>.jsonl","session_name":null,"session_description":null,"cwd":"$DIR","git_branch":null,"model":{"id":"deepseek-flash","provider":"deepseek","key":"deepseek/deepseek-flash","name":"DeepSeek V4.1 Flash","context_window":1000000,"max_output":384000,"supports_thinking":true,"cost":{"input":0.3,"output":1.2,"cache_read":0.006}},"thinking":"on","running":true,"message_count":0,"usage":{"input":0,"output":0,"cache_read":0},"cost_usd":0,"context_tokens":0,"active_host":"backend","hosts":[{"id":"backend","name":"<host>","cwd":"$DIR","session_id":null,"session_name":null}],"subagents":[],"jobs":[]}}
+    {"type":"event","event":"state","state":{"session_id":"<id>","session_path":"$DIR/sessions/<stamp>_<id>.jsonl","session_name":null,"session_description":null,"cwd":"$DIR","git_branch":null,"model":{"id":"deepseek-flash","provider":"deepseek","key":"deepseek/deepseek-flash","name":"DeepSeek V4.1 Flash","context_window":1000000,"max_output":384000,"supports_thinking":true,"cost":{"input":0.3,"output":1.2,"cache_read":0.006}},"thinking":"on","running":true,"message_count":0,"usage":{"input":0,"output":0,"cache_read":0},"cost_usd":0,"context_tokens":0,"active_host":"backend","hosts":[{"id":"backend","name":"<host>","cwd":"$DIR","session_id":null,"session_name":null}],"subagents":[],"jobs":[],"budget_usd":null,"goal":null,"resume_at_ms":null}}
     {"type":"event","event":"agent_start"}
     {"type":"event","event":"message_start","message":{"role":"user","text":"what is here?"}}
     {"type":"event","event":"message_end","message":{"role":"user","text":"what is here?"}}
@@ -166,7 +166,7 @@ let%expect_test "prompt emits events, get_messages/get_entries reflect the run" 
     {"type":"event","event":"message_end","message":{"role":"assistant","content":[{"type":"text","text":"Empty."}],"stop_reason":{"type":"end_turn"},"usage":{"input":10,"output":5,"cache_read":0},"model":"deepseek-flash"}}
     {"type":"event","event":"turn_end","assistant":{"role":"assistant","content":[{"type":"text","text":"Empty."}],"stop_reason":{"type":"end_turn"},"usage":{"input":10,"output":5,"cache_read":0},"model":"deepseek-flash"},"tool_results":[]}
     {"type":"event","event":"agent_end","messages":[{"role":"user","text":"what is here?"},{"role":"assistant","content":[{"type":"text","text":"Looking."},{"type":"tool_call","id":"c1","name":"ls","arguments":"{}"}],"stop_reason":{"type":"tool_use"},"usage":{"input":20,"output":8,"cache_read":5},"model":"deepseek-flash"},{"role":"tool_result","tool_call_id":"c1","tool_name":"ls","text":"sessions/\n","is_error":false},{"role":"assistant","content":[{"type":"text","text":"Empty."}],"stop_reason":{"type":"end_turn"},"usage":{"input":10,"output":5,"cache_read":0},"model":"deepseek-flash"}]}
-    {"type":"event","event":"state","state":{"session_id":"<id>","session_path":"$DIR/sessions/<stamp>_<id>.jsonl","session_name":null,"session_description":null,"cwd":"$DIR","git_branch":null,"model":{"id":"deepseek-flash","provider":"deepseek","key":"deepseek/deepseek-flash","name":"DeepSeek V4.1 Flash","context_window":1000000,"max_output":384000,"supports_thinking":true,"cost":{"input":0.3,"output":1.2,"cache_read":0.006}},"thinking":"on","running":false,"message_count":4,"usage":{"input":30,"output":13,"cache_read":5},"cost_usd":2.313e-05,"context_tokens":10,"active_host":"backend","hosts":[{"id":"backend","name":"<host>","cwd":"$DIR","session_id":null,"session_name":null}],"subagents":[],"jobs":[]}}
+    {"type":"event","event":"state","state":{"session_id":"<id>","session_path":"$DIR/sessions/<stamp>_<id>.jsonl","session_name":null,"session_description":null,"cwd":"$DIR","git_branch":null,"model":{"id":"deepseek-flash","provider":"deepseek","key":"deepseek/deepseek-flash","name":"DeepSeek V4.1 Flash","context_window":1000000,"max_output":384000,"supports_thinking":true,"cost":{"input":0.3,"output":1.2,"cache_read":0.006}},"thinking":"on","running":false,"message_count":4,"usage":{"input":30,"output":13,"cache_read":5},"cost_usd":2.313e-05,"context_tokens":10,"active_host":"backend","hosts":[{"id":"backend","name":"<host>","cwd":"$DIR","session_id":null,"session_name":null}],"subagents":[],"jobs":[],"budget_usd":null,"goal":null,"resume_at_ms":null}}
     |}];
   call t h "get_messages";
   call t h "get_entries";
@@ -519,7 +519,7 @@ let%expect_test "abort returns restored messages and emits queue_update" =
     {"type":"response","id":"r1","ok":true,"result":{}}
     {"type":"response","id":"r1","ok":true,"result":{}}
     {"type":"response","id":"r1","ok":true,"result":{"restored":["first steer","second follow up"]}}
-    {"type":"event","event":"state","state":{"session_id":"<id>","session_path":"$DIR/sessions/<stamp>_<id>.jsonl","session_name":null,"session_description":null,"cwd":"$DIR","git_branch":null,"model":{"id":"deepseek-flash","provider":"deepseek","key":"deepseek/deepseek-flash","name":"DeepSeek V4.1 Flash","context_window":1000000,"max_output":384000,"supports_thinking":true,"cost":{"input":0.3,"output":1.2,"cache_read":0.006}},"thinking":"on","running":true,"message_count":0,"usage":{"input":0,"output":0,"cache_read":0},"cost_usd":0,"context_tokens":0,"active_host":"backend","hosts":[{"id":"backend","name":"<host>","cwd":"$DIR","session_id":null,"session_name":null}],"subagents":[],"jobs":[]}}
+    {"type":"event","event":"state","state":{"session_id":"<id>","session_path":"$DIR/sessions/<stamp>_<id>.jsonl","session_name":null,"session_description":null,"cwd":"$DIR","git_branch":null,"model":{"id":"deepseek-flash","provider":"deepseek","key":"deepseek/deepseek-flash","name":"DeepSeek V4.1 Flash","context_window":1000000,"max_output":384000,"supports_thinking":true,"cost":{"input":0.3,"output":1.2,"cache_read":0.006}},"thinking":"on","running":true,"message_count":0,"usage":{"input":0,"output":0,"cache_read":0},"cost_usd":0,"context_tokens":0,"active_host":"backend","hosts":[{"id":"backend","name":"<host>","cwd":"$DIR","session_id":null,"session_name":null}],"subagents":[],"jobs":[],"budget_usd":null,"goal":null,"resume_at_ms":null}}
     {"type":"event","event":"agent_start"}
     {"type":"event","event":"message_start","message":{"role":"user","text":"go"}}
     {"type":"event","event":"message_end","message":{"role":"user","text":"go"}}
@@ -531,7 +531,7 @@ let%expect_test "abort returns restored messages and emits queue_update" =
     {"type":"event","event":"message_end","message":{"role":"assistant","content":[],"stop_reason":{"type":"aborted"},"usage":{"input":20,"output":8,"cache_read":5},"model":"deepseek-flash"}}
     {"type":"event","event":"turn_end","assistant":{"role":"assistant","content":[],"stop_reason":{"type":"aborted"},"usage":{"input":20,"output":8,"cache_read":5},"model":"deepseek-flash"},"tool_results":[]}
     {"type":"event","event":"agent_end","messages":[{"role":"user","text":"go"},{"role":"assistant","content":[],"stop_reason":{"type":"aborted"},"usage":{"input":20,"output":8,"cache_read":5},"model":"deepseek-flash"}]}
-    {"type":"event","event":"state","state":{"session_id":"<id>","session_path":"$DIR/sessions/<stamp>_<id>.jsonl","session_name":null,"session_description":null,"cwd":"$DIR","git_branch":null,"model":{"id":"deepseek-flash","provider":"deepseek","key":"deepseek/deepseek-flash","name":"DeepSeek V4.1 Flash","context_window":1000000,"max_output":384000,"supports_thinking":true,"cost":{"input":0.3,"output":1.2,"cache_read":0.006}},"thinking":"on","running":false,"message_count":2,"usage":{"input":20,"output":8,"cache_read":5},"cost_usd":1.413e-05,"context_tokens":20,"active_host":"backend","hosts":[{"id":"backend","name":"<host>","cwd":"$DIR","session_id":null,"session_name":null}],"subagents":[],"jobs":[]}}
+    {"type":"event","event":"state","state":{"session_id":"<id>","session_path":"$DIR/sessions/<stamp>_<id>.jsonl","session_name":null,"session_description":null,"cwd":"$DIR","git_branch":null,"model":{"id":"deepseek-flash","provider":"deepseek","key":"deepseek/deepseek-flash","name":"DeepSeek V4.1 Flash","context_window":1000000,"max_output":384000,"supports_thinking":true,"cost":{"input":0.3,"output":1.2,"cache_read":0.006}},"thinking":"on","running":false,"message_count":2,"usage":{"input":20,"output":8,"cache_read":5},"cost_usd":1.413e-05,"context_tokens":20,"active_host":"backend","hosts":[{"id":"backend","name":"<host>","cwd":"$DIR","session_id":null,"session_name":null}],"subagents":[],"jobs":[],"budget_usd":null,"goal":null,"resume_at_ms":null}}
     |}]
 ;;
 
@@ -612,16 +612,16 @@ let%expect_test "import, set_session_name, export, clone, set_cwd" =
   [%expect
     {|
     {"type":"response","id":"r1","ok":true,"result":{"path":"$DIR/sessions/<stamp>_<id>.jsonl"}}
-    {"type":"response","id":"r1","ok":true,"result":{"session_id":"<id>","session_path":"$DIR/sessions/<stamp>_<id>.jsonl","session_name":null,"session_description":null,"cwd":"$DIR","git_branch":null,"model":{"id":"deepseek-flash","provider":"deepseek","key":"deepseek/deepseek-flash","name":"DeepSeek V4.1 Flash","context_window":1000000,"max_output":384000,"supports_thinking":true,"cost":{"input":0.3,"output":1.2,"cache_read":0.006}},"thinking":"on","running":false,"message_count":1,"usage":{"input":0,"output":0,"cache_read":0},"cost_usd":0,"context_tokens":0,"active_host":"backend","hosts":[{"id":"backend","name":"<host>","cwd":"$DIR","session_id":null,"session_name":null}],"subagents":[],"jobs":[]}}
+    {"type":"response","id":"r1","ok":true,"result":{"session_id":"<id>","session_path":"$DIR/sessions/<stamp>_<id>.jsonl","session_name":null,"session_description":null,"cwd":"$DIR","git_branch":null,"model":{"id":"deepseek-flash","provider":"deepseek","key":"deepseek/deepseek-flash","name":"DeepSeek V4.1 Flash","context_window":1000000,"max_output":384000,"supports_thinking":true,"cost":{"input":0.3,"output":1.2,"cache_read":0.006}},"thinking":"on","running":false,"message_count":1,"usage":{"input":0,"output":0,"cache_read":0},"cost_usd":0,"context_tokens":0,"active_host":"backend","hosts":[{"id":"backend","name":"<host>","cwd":"$DIR","session_id":null,"session_name":null}],"subagents":[],"jobs":[],"budget_usd":null,"goal":null,"resume_at_ms":null}}
     {"type":"response","id":"r1","ok":true,"result":{}}
-    {"type":"response","id":"r1","ok":true,"result":{"session_id":"<id>","session_path":"$DIR/sessions/<stamp>_<id>.jsonl","session_name":"imported","session_description":null,"cwd":"$DIR","git_branch":null,"model":{"id":"deepseek-flash","provider":"deepseek","key":"deepseek/deepseek-flash","name":"DeepSeek V4.1 Flash","context_window":1000000,"max_output":384000,"supports_thinking":true,"cost":{"input":0.3,"output":1.2,"cache_read":0.006}},"thinking":"on","running":false,"message_count":1,"usage":{"input":0,"output":0,"cache_read":0},"cost_usd":0,"context_tokens":0,"active_host":"backend","hosts":[{"id":"backend","name":"<host>","cwd":"$DIR","session_id":null,"session_name":null}],"subagents":[],"jobs":[]}}
+    {"type":"response","id":"r1","ok":true,"result":{"session_id":"<id>","session_path":"$DIR/sessions/<stamp>_<id>.jsonl","session_name":"imported","session_description":null,"cwd":"$DIR","git_branch":null,"model":{"id":"deepseek-flash","provider":"deepseek","key":"deepseek/deepseek-flash","name":"DeepSeek V4.1 Flash","context_window":1000000,"max_output":384000,"supports_thinking":true,"cost":{"input":0.3,"output":1.2,"cache_read":0.006}},"thinking":"on","running":false,"message_count":1,"usage":{"input":0,"output":0,"cache_read":0},"cost_usd":0,"context_tokens":0,"active_host":"backend","hosts":[{"id":"backend","name":"<host>","cwd":"$DIR","session_id":null,"session_name":null}],"subagents":[],"jobs":[],"budget_usd":null,"goal":null,"resume_at_ms":null}}
     {"type":"response","id":"r1","ok":true,"result":{"path":"$DIR/sessions/exports/<stamp>_<id>.md"}}
     {"type":"response","id":"r1","ok":true,"result":{"path":"$DIR/sessions/exports/<stamp>_<id>.jsonl"}}
     {"type":"response","id":"r1","ok":false,"error":"unknown export format \"html\" (expected markdown or jsonl)"}
     {"type":"response","id":"r1","ok":false,"error":"(Sys_error \"/nowhere.jsonl: No such file or directory\")"}
     {"type":"response","id":"r1","ok":true,"result":{}}
     {"type":"response","id":"r1","ok":true,"result":{}}
-    {"type":"response","id":"r1","ok":true,"result":{"session_id":"<id>","session_path":"$DIR/sessions/<stamp>_<id>.jsonl","session_name":"imported","session_description":null,"cwd":"$DIR/sub","git_branch":null,"model":{"id":"deepseek-flash","provider":"deepseek","key":"deepseek/deepseek-flash","name":"DeepSeek V4.1 Flash","context_window":1000000,"max_output":384000,"supports_thinking":true,"cost":{"input":0.3,"output":1.2,"cache_read":0.006}},"thinking":"on","running":false,"message_count":1,"usage":{"input":0,"output":0,"cache_read":0},"cost_usd":0,"context_tokens":0,"active_host":"backend","hosts":[{"id":"backend","name":"<host>","cwd":"$DIR/sub","session_id":null,"session_name":null}],"subagents":[],"jobs":[]}}
+    {"type":"response","id":"r1","ok":true,"result":{"session_id":"<id>","session_path":"$DIR/sessions/<stamp>_<id>.jsonl","session_name":"imported","session_description":null,"cwd":"$DIR/sub","git_branch":null,"model":{"id":"deepseek-flash","provider":"deepseek","key":"deepseek/deepseek-flash","name":"DeepSeek V4.1 Flash","context_window":1000000,"max_output":384000,"supports_thinking":true,"cost":{"input":0.3,"output":1.2,"cache_read":0.006}},"thinking":"on","running":false,"message_count":1,"usage":{"input":0,"output":0,"cache_read":0},"cost_usd":0,"context_tokens":0,"active_host":"backend","hosts":[{"id":"backend","name":"<host>","cwd":"$DIR/sub","session_id":null,"session_name":null}],"subagents":[],"jobs":[],"budget_usd":null,"goal":null,"resume_at_ms":null}}
     |}]
 ;;
 
@@ -642,10 +642,10 @@ let%expect_test "config: get, set, invalid, and the config_changed event" =
   call t h ~params:{|{"call_id": "nope", "allow": true}|} "tool_confirm_respond";
   [%expect
     {|
-    {"type":"response","id":"r1","ok":true,"result":{"scoped_models":[],"confirm_tools":false,"default_model":null,"default_thinking":null,"fallback_models":[],"default_cwd":null}}
-    {"type":"event","event":"config_changed","config":{"scoped_models":["a","b"],"confirm_tools":true,"default_model":null,"default_thinking":null,"fallback_models":[],"default_cwd":null}}
-    {"type":"response","id":"r1","ok":true,"result":{"scoped_models":["a","b"],"confirm_tools":true,"default_model":null,"default_thinking":null,"fallback_models":[],"default_cwd":null}}
-    {"type":"response","id":"r1","ok":true,"result":{"scoped_models":["a","b"],"confirm_tools":true,"default_model":null,"default_thinking":null,"fallback_models":[],"default_cwd":null}}
+    {"type":"response","id":"r1","ok":true,"result":{"scoped_models":[],"confirm_tools":false,"default_model":null,"default_thinking":null,"fallback_models":[],"default_cwd":null,"max_budget_usd":null,"goal_max_continuations":20,"resume_on_limit_reset":true}}
+    {"type":"event","event":"config_changed","config":{"scoped_models":["a","b"],"confirm_tools":true,"default_model":null,"default_thinking":null,"fallback_models":[],"default_cwd":null,"max_budget_usd":null,"goal_max_continuations":20,"resume_on_limit_reset":true}}
+    {"type":"response","id":"r1","ok":true,"result":{"scoped_models":["a","b"],"confirm_tools":true,"default_model":null,"default_thinking":null,"fallback_models":[],"default_cwd":null,"max_budget_usd":null,"goal_max_continuations":20,"resume_on_limit_reset":true}}
+    {"type":"response","id":"r1","ok":true,"result":{"scoped_models":["a","b"],"confirm_tools":true,"default_model":null,"default_thinking":null,"fallback_models":[],"default_cwd":null,"max_budget_usd":null,"goal_max_continuations":20,"resume_on_limit_reset":true}}
     {"type":"response","id":"r1","ok":false,"error":"config.scoped_models must be an array of strings"}
     {"type":"response","id":"r1","ok":false,"error":"missing param \"config\""}
     {"type":"response","id":"r1","ok":false,"error":"no pending confirmation for tool call \"nope\""}
@@ -680,7 +680,7 @@ let%expect_test "shell runs a command, streams tool events, and adds to context"
     {"type":"event","event":"tool_end","call":{"id":"shell-0","name":"shell","arguments":"{\"command\":\"printf 'a\\\\nb'\"}"},"result":{"role":"tool_result","tool_call_id":"shell-0","tool_name":"shell","text":"a\nb","is_error":false}}
     {"type":"event","event":"message_start","message":{"role":"user","text":"$ printf 'a\\nb'\na\nb"}}
     {"type":"event","event":"message_end","message":{"role":"user","text":"$ printf 'a\\nb'\na\nb"}}
-    {"type":"event","event":"state","state":{"session_id":"<id>","session_path":"$DIR/sessions/<stamp>_<id>.jsonl","session_name":null,"session_description":null,"cwd":"$DIR","git_branch":null,"model":{"id":"deepseek-flash","provider":"deepseek","key":"deepseek/deepseek-flash","name":"DeepSeek V4.1 Flash","context_window":1000000,"max_output":384000,"supports_thinking":true,"cost":{"input":0.3,"output":1.2,"cache_read":0.006}},"thinking":"on","running":false,"message_count":1,"usage":{"input":0,"output":0,"cache_read":0},"cost_usd":0,"context_tokens":0,"active_host":"backend","hosts":[{"id":"backend","name":"<host>","cwd":"$DIR","session_id":null,"session_name":null}],"subagents":[],"jobs":[]}}
+    {"type":"event","event":"state","state":{"session_id":"<id>","session_path":"$DIR/sessions/<stamp>_<id>.jsonl","session_name":null,"session_description":null,"cwd":"$DIR","git_branch":null,"model":{"id":"deepseek-flash","provider":"deepseek","key":"deepseek/deepseek-flash","name":"DeepSeek V4.1 Flash","context_window":1000000,"max_output":384000,"supports_thinking":true,"cost":{"input":0.3,"output":1.2,"cache_read":0.006}},"thinking":"on","running":false,"message_count":1,"usage":{"input":0,"output":0,"cache_read":0},"cost_usd":0,"context_tokens":0,"active_host":"backend","hosts":[{"id":"backend","name":"<host>","cwd":"$DIR","session_id":null,"session_name":null}],"subagents":[],"jobs":[],"budget_usd":null,"goal":null,"resume_at_ms":null}}
     {"type":"response","id":"r1","ok":true,"result":{"text":"a\nb","is_error":false}}
     {"type":"response","id":"r1","ok":true,"result":[{"role":"user","text":"$ printf 'a\\nb'\na\nb","at":<at>}]}
     |}]
@@ -857,7 +857,7 @@ let%expect_test "remote tool host: exec round trip, switch, disconnect" =
     | _ -> ());
   [%expect
     {|
-    {"type":"response","id":"r2","ok":true,"result":{"client_id":"client-2","host_id":"client-2","namespace":null,"user":null,"superuser":false,"state":{"session_id":"<id>","session_path":"$DIR/sessions/<stamp>_<id>.jsonl","session_name":null,"session_description":null,"cwd":"/home/me/proj","git_branch":null,"model":{"id":"deepseek-flash","provider":"deepseek","key":"deepseek/deepseek-flash","name":"DeepSeek V4.1 Flash","context_window":1000000,"max_output":384000,"supports_thinking":true,"cost":{"input":0.3,"output":1.2,"cache_read":0.006}},"thinking":"on","running":false,"message_count":0,"usage":{"input":0,"output":0,"cache_read":0},"cost_usd":0,"context_tokens":0,"active_host":"client-2","hosts":[{"id":"backend","name":"<host>","cwd":"$DIR","session_id":null,"session_name":null},{"id":"client-2","name":"laptop","cwd":"/home/me/proj","session_id":"<id>","session_name":null}],"subagents":[],"jobs":[]}}}
+    {"type":"response","id":"r2","ok":true,"result":{"client_id":"client-2","host_id":"client-2","namespace":null,"user":null,"superuser":false,"state":{"session_id":"<id>","session_path":"$DIR/sessions/<stamp>_<id>.jsonl","session_name":null,"session_description":null,"cwd":"/home/me/proj","git_branch":null,"model":{"id":"deepseek-flash","provider":"deepseek","key":"deepseek/deepseek-flash","name":"DeepSeek V4.1 Flash","context_window":1000000,"max_output":384000,"supports_thinking":true,"cost":{"input":0.3,"output":1.2,"cache_read":0.006}},"thinking":"on","running":false,"message_count":0,"usage":{"input":0,"output":0,"cache_read":0},"cost_usd":0,"context_tokens":0,"active_host":"client-2","hosts":[{"id":"backend","name":"<host>","cwd":"$DIR","session_id":null,"session_name":null},{"id":"client-2","name":"laptop","cwd":"/home/me/proj","session_id":"<id>","session_name":null}],"subagents":[],"jobs":[],"budget_usd":null,"goal":null,"resume_at_ms":null}}}
     client-2 /home/me/proj
     {"type":"response","id":"r1","ok":true,"result":{}}
     (host answered $instructions)
@@ -1264,9 +1264,9 @@ let%expect_test "change_default saves the current model and thinking level" =
     {|
     {"type":"response","id":"r1","ok":true,"result":{}}
     {"type":"response","id":"r1","ok":true,"result":{}}
-    {"type":"event","event":"config_changed","config":{"scoped_models":[],"confirm_tools":false,"default_model":"deepseek/deepseek-v4-pro","default_thinking":"max","fallback_models":[],"default_cwd":null}}
-    {"type":"response","id":"r1","ok":true,"result":{"scoped_models":[],"confirm_tools":false,"default_model":"deepseek/deepseek-v4-pro","default_thinking":"max","fallback_models":[],"default_cwd":null}}
-    {"type":"response","id":"r1","ok":true,"result":{"scoped_models":[],"confirm_tools":false,"default_model":"deepseek/deepseek-v4-pro","default_thinking":"max","fallback_models":[],"default_cwd":null}}
+    {"type":"event","event":"config_changed","config":{"scoped_models":[],"confirm_tools":false,"default_model":"deepseek/deepseek-v4-pro","default_thinking":"max","fallback_models":[],"default_cwd":null,"max_budget_usd":null,"goal_max_continuations":20,"resume_on_limit_reset":true}}
+    {"type":"response","id":"r1","ok":true,"result":{"scoped_models":[],"confirm_tools":false,"default_model":"deepseek/deepseek-v4-pro","default_thinking":"max","fallback_models":[],"default_cwd":null,"max_budget_usd":null,"goal_max_continuations":20,"resume_on_limit_reset":true}}
+    {"type":"response","id":"r1","ok":true,"result":{"scoped_models":[],"confirm_tools":false,"default_model":"deepseek/deepseek-v4-pro","default_thinking":"max","fallback_models":[],"default_cwd":null,"max_budget_usd":null,"goal_max_continuations":20,"resume_on_limit_reset":true}}
     {"type":"response","id":"r1","ok":true,"result":{}}
     (deepseek/deepseek-v4-pro (On (Max)))
     |}]
@@ -1373,8 +1373,95 @@ let%expect_test "set_config: omitted fields keep their values" =
   Queue.clear h.sent;
   [%expect
     {|
-    {"type":"response","id":"r1","ok":true,"result":{"scoped_models":[],"confirm_tools":false,"default_model":null,"default_thinking":null,"fallback_models":["openai-codex/gpt-6-sol","deepseek/deepseek-flash"],"default_cwd":"/srv"}}
-    {"type":"response","id":"r1","ok":true,"result":{"scoped_models":[],"confirm_tools":true,"default_model":null,"default_thinking":null,"fallback_models":["openai-codex/gpt-6-sol","deepseek/deepseek-flash"],"default_cwd":"/srv"}}
+    {"type":"response","id":"r1","ok":true,"result":{"scoped_models":[],"confirm_tools":false,"default_model":null,"default_thinking":null,"fallback_models":["openai-codex/gpt-6-sol","deepseek/deepseek-flash"],"default_cwd":"/srv","max_budget_usd":null,"goal_max_continuations":20,"resume_on_limit_reset":true}}
+    {"type":"response","id":"r1","ok":true,"result":{"scoped_models":[],"confirm_tools":true,"default_model":null,"default_thinking":null,"fallback_models":["openai-codex/gpt-6-sol","deepseek/deepseek-flash"],"default_cwd":"/srv","max_budget_usd":null,"goal_max_continuations":20,"resume_on_limit_reset":true}}
     {"type":"response","id":"r1","ok":false,"error":"fallback_models: unknown model \"nope\"; did you mean: openai/o1 (o1), openai/o3 (o3), openai/gpt-4 (GPT-4)"}
     |}]
+;;
+
+let%expect_test "budget, goal and resume: methods, state fields and events" =
+  with_agent
+    [ Reply.text "working"
+    ; Reply.tool_call
+        ~id:"g1"
+        ~name:Goal.tool_name
+        ~arguments:{|{"summary":"it works"}|}
+        ()
+    ; Reply.text "done"
+    ]
+  @@ fun t agent h ->
+  let state_fields () =
+    match Rpc_json.state (Agent.state agent) with
+    | `Object fields ->
+      List.iter [ "budget_usd"; "goal"; "resume_at_ms" ] ~f:(fun name ->
+        printf
+          "%s: %s\n"
+          name
+          (Json.to_string (List.Assoc.find_exn fields ~equal:String.equal name)))
+    | _ -> ()
+  in
+  call t h ~params:{|{"usd": 5}|} "set_budget";
+  call t h ~params:{|{"usd": -1}|} "set_budget";
+  call t h ~params:{|{"usd": "lots"}|} "set_budget";
+  state_fields ();
+  call t h ~params:{|{"usd": null}|} "set_budget";
+  call t h "clear_goal";
+  call t h ~params:{|{"text": "make it work"}|} "set_goal";
+  Agent.wait_idle agent;
+  state_fields ();
+  call t h "resume_goal";
+  call t h "clear_goal";
+  call t h "cancel_resume";
+  call t h "resume_now";
+  state_fields ();
+  (* The events a frontend sees for a goal. *)
+  Queue.iter h.sent ~f:(fun json ->
+    match Json.member "event" json with
+    | Some (`String "notice") -> print_endline (mask t (Json.to_string json))
+    | _ -> ());
+  [%expect
+    {|
+    {"type":"response","id":"r1","ok":true,"result":{}}
+    {"type":"response","id":"r1","ok":false,"error":"a budget must be a positive number of dollars, e.g. /budget 5 (or /budget off)"}
+    {"type":"response","id":"r1","ok":false,"error":"param \"usd\" must be a number of dollars or null"}
+    budget_usd: 5
+    goal: null
+    resume_at_ms: null
+    {"type":"response","id":"r1","ok":true,"result":{}}
+    {"type":"response","id":"r1","ok":false,"error":"there is no goal; /goal TEXT sets one"}
+    {"type":"response","id":"r1","ok":true,"result":{}}
+    budget_usd: null
+    goal: {"text":"make it work","status":"done","continuations":1,"max_continuations":20,"summary":"it works"}
+    resume_at_ms: null
+    {"type":"response","id":"r1","ok":true,"result":{}}
+    {"type":"response","id":"r1","ok":true,"result":{}}
+    {"type":"response","id":"r1","ok":false,"error":"no run is waiting for a usage limit to reset (one is scheduled when a run stops at a limit whose reset time the provider gives)"}
+    {"type":"response","id":"r1","ok":false,"error":"no run is waiting for a usage limit to reset (one is scheduled when a run stops at a limit whose reset time the provider gives)"}
+    budget_usd: null
+    goal: null
+    resume_at_ms: null
+    {"type":"event","event":"notice","text":"goal complete: it works"}
+    {"type":"event","event":"notice","text":"goal stopped: the run failed: faux provider: no scripted reply; /goal resume continues it"}
+    |}]
+;;
+
+let%expect_test
+    "a compaction inside a subagent reaches frontends as a nested event"
+  =
+  print_endline
+    (Json.to_string
+       (Rpc_json.event
+          (Loop
+             (Subagent
+                { call_id = "c1"
+                ; agent_id = "a1"
+                ; event =
+                    Compacted
+                      { summary = "S"
+                      ; usage = { input = 10; output = 5; cache_read = 0 }
+                      ; cost_usd = 0.01
+                      }
+                }))));
+  [%expect
+    {| {"type":"event","event":"subagent","call_id":"c1","agent_id":"a1","inner":{"type":"event","event":"compacted","summary":"S","usage":{"input":10,"output":5,"cache_read":0},"cost_usd":0.01}} |}]
 ;;

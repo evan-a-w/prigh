@@ -14,9 +14,12 @@ val sanitize : Message.t list -> Message.t list
     question to answer briefly without tools. *)
 val question_message : string -> Message.t
 
+(** [cache_key]: the session's, so the question reuses its cached prefix. *)
 val request
-  :  model:Model.t
+  :  ?cache_key:string
+  -> model:Model.t
   -> system:string
   -> messages:Message.t list
   -> question:string
+  -> unit
   -> Provider.Request.t

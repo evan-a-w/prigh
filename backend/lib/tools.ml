@@ -72,6 +72,7 @@ let for_context ~parent ~depth ?only () =
       if
         (depth >= 2 && String.equal name "subagent")
         || (depth >= 1 && List.mem background_control name ~equal:String.equal)
+        || (depth >= 1 && String.equal name Goal.tool_name)
       then None
       else if depth >= 1 && String.equal name "bash"
       then Some Tool_bash.foreground_tool

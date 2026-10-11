@@ -52,6 +52,10 @@ module State = struct
     ; hosts : Host.t list
     ; subagents : Background_tasks.Summary.t list
     ; jobs : Background_tasks.Summary.t list
+    ; budget_usd : float option
+    ; goal : Goal.t option
+    ; goal_max_continuations : int
+    ; resume_at : float option
     }
   [@@deriving sexp_of]
 end
@@ -112,6 +116,13 @@ module Run = struct
     }
 end
 
+module Resume = struct
+  type t =
+    { at : float
+    ; cancel : Cancellation.t
+    }
+end
+
 type t =
   { env : Env.t
   ; sw : Switch.t
@@ -157,9 +168,16 @@ type t =
   ; mutable mcp_tools : Tool.t list (** as of the latest run's start *)
   ; mutable mcp_noticed : String.Set.t
     (** MCP problems already reported, so each is told once *)
+  ; max_budget_usd : float option
+    (** the budget of sessions that set none, overriding the config's *)
+  ; mutable goal : Goal.t option
+  ; mutable resume : Resume.t option
+    (** a run stopped by a usage limit, resuming when it resets *)
+  ; sleep_until : float -> unit
   }
 
 let restore_settings t =
+  t.goal <- Session.goal t.session;
   match Session.model t.session with
   | Some (model_id, thinking) ->
     Option.iter (Model_registry.find t.models model_id) ~f:(fun m ->
@@ -209,6 +227,54 @@ let session t = t.session
 let messages t = Session.messages t.session
 let is_running t = Option.is_some t.run
 
+(* The model that wrote [a], for its price. *)
+let model_of t (a : Message.Assistant.t) =
+  if String.equal a.model t.model.id || String.equal a.model (Model.key t.model)
+  then t.model
+  else Option.value (Model_registry.find t.models a.model) ~default:t.model
+;;
+
+(* Every response in the session file (all branches, also those a compaction
+   summarised), each at its own model's price. *)
+let session_spend t =
+  List.fold
+    (Session.entries t.session)
+    ~init:(Usage.zero, 0.)
+    ~f:(fun ((usage, cost) as acc) (e : Session.Entry.t) ->
+      match e.payload with
+      | Message (Assistant a) ->
+        Usage.add usage a.usage, cost +. Model.cost_usd (model_of t a) a.usage
+      | _ -> acc)
+;;
+
+let spent_usd t = snd (session_spend t) +. t.extra_cost_usd
+
+let budget t =
+  match Session.budget t.session with
+  | Some usd -> usd
+  | None -> Option.first_some t.max_budget_usd t.config.max_budget_usd
+;;
+
+let money usd = Float.to_string_hum ~decimals:2 usd
+
+(* Why no further turn may start: the session's budget is spent. *)
+let budget_exhausted t =
+  match budget t with
+  | Some budget ->
+    let spent = spent_usd t in
+    if Float.( >= ) spent budget
+    then
+      Some
+        (sprintf
+           "the session's budget of $%s is spent ($%s so far): /budget %s \
+            raises it, /budget off removes it"
+           (money budget)
+           (money spent)
+           (Int.to_string (Float.iround_up_exn (spent +. budget))))
+    else None
+  | None -> None
+;;
+
 let state t =
   let messages = messages t in
   let assistant_messages =
@@ -216,10 +282,7 @@ let state t =
       | Message.Assistant a -> Some a
       | User _ | Tool_result _ -> None)
   in
-  let assistant_usage =
-    List.fold assistant_messages ~init:Usage.zero ~f:(fun acc a ->
-      Usage.add acc a.usage)
-  in
+  let assistant_usage, assistant_cost = session_spend t in
   let usage = Usage.add assistant_usage t.extra_usage in
   let context_tokens =
     Option.value_map (List.last assistant_messages) ~default:0 ~f:(fun a ->
@@ -236,12 +299,16 @@ let state t =
   ; running = is_running t
   ; message_count = List.length messages
   ; usage
-  ; cost_usd = Model.cost_usd t.model assistant_usage +. t.extra_cost_usd
+  ; cost_usd = assistant_cost +. t.extra_cost_usd
   ; context_tokens
   ; active_host = t.active_host
   ; hosts = hosts t
   ; subagents = Background_tasks.summaries t.background ~kind:Subagent
   ; jobs = Background_tasks.summaries t.background ~kind:Job
+  ; budget_usd = budget t
+  ; goal = t.goal
+  ; goal_max_continuations = t.config.goal_max_continuations
+  ; resume_at = Option.map t.resume ~f:(fun r -> r.at)
   }
 ;;
 
@@ -764,14 +831,51 @@ let system_prompt t =
     text
 ;;
 
+(* ---- goal ------------------------------------------------------------- *)
+
+let set_goal_state t goal =
+  t.goal <- goal;
+  ignore (Session.set_goal t.session goal : Session.Entry.t)
+;;
+
+let stop_goal t ~reason =
+  match t.goal with
+  | Some goal when Goal.is_active goal ->
+    set_goal_state t (Some { goal with status = Stopped { reason } });
+    broadcast
+      t
+      (Notice (sprintf "goal stopped: %s; /goal resume continues it" reason))
+  | Some _ | None -> ()
+;;
+
+let complete_goal t ~summary =
+  match t.goal with
+  | Some goal when Goal.is_active goal ->
+    set_goal_state t (Some { goal with status = Done { summary } });
+    broadcast t (Notice ("goal complete: " ^ summary));
+    state_changed t;
+    Ok ()
+  | Some _ | None ->
+    Or_error.error_string "no goal is active, so there is nothing to complete"
+;;
+
+(* Offered only while a goal is active, and never to subagents. *)
+let goal_tools t =
+  match t.goal with
+  | Some goal when Goal.is_active goal ->
+    [ Tool_goal.create ~complete:(complete_goal t) ]
+  | Some _ | None -> []
+;;
+
 let loop_config t =
   { Agent_loop.Config.model = t.model
   ; thinking = t.thinking
   ; system = Some (system_prompt t)
-  ; tools = tools t
+  ; tools = tools t @ goal_tools t
   ; max_turns = None
   ; max_tokens = None
   ; retries = Agent_loop.Config.default_retries
+  ; cache_key = Some (Session.id t.session)
   }
 ;;
 
@@ -819,11 +923,18 @@ let user_message t (q : Queued.t) =
   Message.user ~images:(q.images @ attached) text
 ;;
 
-let account_subagent t (event : Agent_event.t) =
-  match event with
-  | Subagent_end { usage; cost_usd; _ } ->
+(* What the session file does not record: subagents' responses (as they
+   arrive, so a budget sees a running subagent's spend) and compactions. *)
+let rec account t ?(nested = false) (event : Agent_event.t) =
+  let add usage cost_usd =
     t.extra_usage <- Usage.add t.extra_usage usage;
     t.extra_cost_usd <- t.extra_cost_usd +. cost_usd
+  in
+  match event with
+  | Subagent { event; _ } -> account t ~nested:true event
+  | Message_end (Assistant a) when nested ->
+    add a.usage (Model.cost_usd (model_of t a) a.usage)
+  | Compacted { usage; cost_usd; _ } -> add usage cost_usd
   | _ -> ()
 ;;
 
@@ -888,10 +999,47 @@ let handover_message ~from ~(to_ : Model.t) ~error =
        (Model.key to_))
 ;;
 
+let compacted t (outcome : Compaction.Outcome.t) =
+  account
+    t
+    (Compacted
+       { summary = outcome.summary
+       ; usage = outcome.usage
+       ; cost_usd = Model.cost_usd t.model outcome.usage
+       });
+  broadcast t (Compacted { summary = outcome.summary })
+;;
+
+let last_stop added =
+  List.find_map (List.rev added) ~f:(function
+    | Message.Assistant a -> Some a.stop_reason
+    | User _ | Tool_result _ -> None)
+;;
+
+let resume_message =
+  Message.user
+    "[prigh: the usage limit has reset. Carry on with the interrupted task \
+     where it left off.]"
+;;
+
+let cancel_resume_timer t =
+  Option.iter t.resume ~f:(fun r ->
+    t.resume <- None;
+    Cancellation.cancel r.cancel)
+;;
+
+let duration_hum seconds =
+  let minutes = Float.iround_up_exn (Float.max 0. seconds /. 60.) in
+  if minutes < 60
+  then sprintf "%dm" minutes
+  else sprintf "%dh %02dm" (minutes / 60) (minutes mod 60)
+;;
+
 (* Finished background tasks not delivered yet go first. [tried] are the
    models a hand-over chain has used so far (empty for a user's prompt). *)
 let rec start_run ?(tried = String.Set.empty) t prompts =
   t.git_branch <- find_branch t ~cwd:t.cwd;
+  cancel_resume_timer t;
   let cancel = Cancellation.create () in
   let finished, resolve = Promise.create () in
   t.run <- Some { cancel; finished };
@@ -905,6 +1053,7 @@ let rec start_run ?(tried = String.Set.empty) t prompts =
       if idle then state_changed t
     in
     refresh_mcp t ~cancel;
+    let halted = ref None in
     let added =
       match
         Agent_loop.run
@@ -923,13 +1072,38 @@ let rec start_run ?(tried = String.Set.empty) t prompts =
               Queue.clear t.steer_queue;
               queue_update t);
             deliveries t @ List.map l ~f:(user_message t))
+          ~compact:(fun ~keep_recent_tokens ~cancel _messages ->
+            match
+              Compaction.compact
+                ~env:t.env
+                ~provider:t.provider
+                ~model:t.model
+                ~keep_recent_tokens
+                ~cancel
+                session
+            with
+            | Ok outcome -> Ok (Session.messages session, outcome)
+            | Error e ->
+              broadcast
+                t
+                (Notice ("auto-compaction failed: " ^ Error.to_string_hum e));
+              Error e)
+          ~halt:(fun () ->
+            let reason = budget_exhausted t in
+            Option.iter reason ~f:(fun r -> halted := Some r);
+            reason)
           ~emit:(fun event ->
-            account_subagent t event;
-            (match event with
-             | Message_end m ->
-               ignore (Session.append_message session m : Session.Entry.t)
-             | _ -> ());
-            broadcast t (Loop event))
+            account t event;
+            match event with
+            | Compacted { summary; _ } ->
+              if phys_equal session t.session
+              then (
+                broadcast t (Compacted { summary });
+                state_changed t)
+            | Message_end m ->
+              ignore (Session.append_message session m : Session.Entry.t);
+              broadcast t (Loop event)
+            | _ -> broadcast t (Loop event))
           ~context:(Session.messages session)
           ~prompts
           ()
@@ -939,36 +1113,44 @@ let rec start_run ?(tried = String.Set.empty) t prompts =
         broadcast t (Notice ("run failed: " ^ Exn.to_string exn));
         []
     in
+    Option.iter !halted ~f:(fun reason -> broadcast t (Notice reason));
     let tried = Set.add tried (Model.key t.model) in
+    let cancelled = Cancellation.is_cancelled cancel in
+    let current = phys_equal session t.session in
+    let unavailable =
+      if cancelled || not current then None else unavailable_error added
+    in
     let handover =
-      if Cancellation.is_cancelled cancel || not (phys_equal session t.session)
-      then None
-      else
-        Option.bind (unavailable_error added) ~f:(fun error ->
-          match next_model t ~tried with
-          | None ->
-            if not (List.is_empty t.config.fallback_models)
-            then
-              broadcast
-                t
-                (Notice
-                   (sprintf
-                      "%s cannot continue and no model in fallback_models is \
-                       left to hand over to; /model picks another"
-                      (Model.key t.model)));
-            None
-          | Some next ->
-            let from = Model.key t.model in
+      Option.bind unavailable ~f:(fun error ->
+        match next_model t ~tried with
+        | None ->
+          if not (List.is_empty t.config.fallback_models)
+          then
             broadcast
               t
               (Notice
                  (sprintf
-                    "%s: %s; handing over to %s"
-                    from
-                    error
-                    (Model.key next)));
-            set_model t next;
-            Some [ handover_message ~from ~to_:next ~error ])
+                    "%s cannot continue and no model in fallback_models is \
+                     left to hand over to; /model picks another"
+                    (Model.key t.model)));
+          None
+        | Some next ->
+          let from = Model.key t.model in
+          broadcast
+            t
+            (Notice
+               (sprintf
+                  "%s: %s; handing over to %s"
+                  from
+                  error
+                  (Model.key next)));
+          set_model t next;
+          Some [ handover_message ~from ~to_:next ~error ])
+    in
+    let resuming =
+      match unavailable, handover with
+      | Some error, None -> schedule_resume t ~error
+      | _ -> false
     in
     (* Steering messages that arrived after the last turn boundary go
        first: they were sent before any follow-up still queued. *)
@@ -978,6 +1160,39 @@ let rec start_run ?(tried = String.Set.empty) t prompts =
       Queue.blit_transfer ~src:t.steer_queue ~dst:t.follow_up_queue ();
       queue_update t);
     auto_compact t;
+    (* The goal carries on after a run that ended normally; anything else
+       stops it, except a hand-over or a resume, which carry on the run. *)
+    let goal_continues =
+      match t.goal with
+      | Some goal when current && Goal.is_active goal ->
+        let max = t.config.goal_max_continuations in
+        if cancelled
+        then (
+          stop_goal t ~reason:"the run was aborted";
+          false)
+        else if Option.is_some handover || resuming
+        then false
+        else (
+          match budget_exhausted t, last_stop added with
+          | Some _, _ ->
+            stop_goal t ~reason:"the session's budget is spent";
+            false
+          | None, Some (Error e) ->
+            stop_goal t ~reason:("the run failed: " ^ e);
+            false
+          | None, Some Aborted ->
+            stop_goal t ~reason:"the run was aborted";
+            false
+          | None, (Some (End_turn | Tool_use | Length) | None) ->
+            if goal.continuations >= max
+            then (
+              stop_goal
+                t
+                ~reason:(sprintf "it used all %d automatic continuations" max);
+              false)
+            else true)
+      | Some _ | None -> false
+    in
     (* After an abort, finished tasks wait for the next prompt (or the next
        one to finish) rather than restarting the run at once. *)
     let next =
@@ -993,6 +1208,22 @@ let rec start_run ?(tried = String.Set.empty) t prompts =
              Background_tasks.has_undelivered t.background
              && not (Cancellation.is_cancelled cancel)
            then Some (`Prompts [])
+           else if goal_continues
+           then (
+             match t.goal with
+             | Some goal ->
+               let goal =
+                 { goal with continuations = goal.continuations + 1 }
+               in
+               set_goal_state t (Some goal);
+               Some
+                 (`Prompts
+                     [ Message.user
+                         (Goal.continuation_message
+                            goal
+                            ~max_continuations:t.config.goal_max_continuations)
+                     ])
+             | None -> None)
            else None)
     in
     (* A hand-over carries on the same task: the run's next state says
@@ -1006,6 +1237,53 @@ let rec start_run ?(tried = String.Set.empty) t prompts =
       | `Handover prompts -> start_run ~tried t prompts
       | `Prompts prompts -> start_run t prompts);
     auto_describe t)
+
+(* A usage limit with no fallback left: resume when it resets, if the
+   provider said when. *)
+and schedule_resume t ~error =
+  if
+    (not t.config.resume_on_limit_reset)
+    || Usage_limit.credentials_missing error
+  then false
+  else (
+    match Usage_limit.resets_at error with
+    | None ->
+      broadcast
+        t
+        (Notice
+           (sprintf
+              "%s: the usage limit is reached and the provider did not say \
+               when it resets, so the run will not resume by itself; send a \
+               message to try again, or /model picks another model"
+              (Model.key t.model)));
+      false
+    | Some at ->
+      cancel_resume_timer t;
+      let cancel = Cancellation.create () in
+      let resume = { Resume.at; cancel } in
+      t.resume <- Some resume;
+      let now = Eio.Time.now (Eio.Stdenv.clock t.env) in
+      broadcast
+        t
+        (Notice
+           (sprintf
+              "%s: the usage limit is reached; the run resumes when it resets \
+               at %s (in %s): /resume now retries at once, /resume cancel \
+               stays stopped"
+              (Model.key t.model)
+              (Usage_limit.utc_string at)
+              (duration_hum (at -. now))));
+      Fiber.fork ~sw:t.sw (fun () ->
+        match Cancellation.protect cancel ~f:(fun () -> t.sleep_until at) with
+        | None -> ()
+        | Some () ->
+          if Option.exists t.resume ~f:(fun r -> phys_equal r resume)
+          then (
+            t.resume <- None;
+            if is_running t
+            then state_changed t
+            else start_run t [ resume_message ]));
+      true)
 
 (* Runs after the turn is over so the user is not kept waiting; [wait_idle]
    still covers it. *)
@@ -1044,7 +1322,7 @@ and auto_compact t =
         ~model:t.model
         t.session
     with
-    | Ok summary -> broadcast t (Compacted { summary })
+    | Ok outcome -> compacted t outcome
     | Error e ->
       broadcast t (Notice ("auto-compaction failed: " ^ Error.to_string_hum e)))
 ;;
@@ -1107,9 +1385,18 @@ let create
       ?(backend_host = true)
       ?mcp
       ?(use_default_cwd = true)
+      ?max_budget_usd
+      ?sleep_until
       ~cwd
       ()
   =
+  let sleep_until =
+    match sleep_until with
+    | Some f -> f
+    | None ->
+      (* A little after the reset, so the provider agrees it has passed. *)
+      fun at -> Eio.Time.sleep_until (Eio.Stdenv.clock env) (at +. 5.)
+  in
   let config =
     match Config.load ~home with
     | Ok config -> config
@@ -1185,6 +1472,10 @@ let create
     ; mcp
     ; mcp_tools = []
     ; mcp_noticed = String.Set.empty
+    ; max_budget_usd
+    ; goal = None
+    ; resume = None
+    ; sleep_until
     }
   in
   restore_settings t;
@@ -1192,7 +1483,7 @@ let create
   Background_tasks.connect
     t.background
     ~emit:(fun event ->
-      account_subagent t event;
+      account t event;
       broadcast t (Loop event))
     ~on_change:(fun () -> background_changed t);
   t
@@ -1204,6 +1495,8 @@ let prompt ?(attachments = []) ?(images = []) t text =
   in
   if is_running t
   then running ()
+  else if Option.is_some (budget_exhausted t)
+  then Or_error.error_string (Option.value_exn (budget_exhausted t))
   else
     Or_error.bind (expand_skill t text) ~f:(fun skill ->
       if is_running t
@@ -1213,13 +1506,16 @@ let prompt ?(attachments = []) ?(images = []) t text =
 ;;
 
 let enqueue t queue ?(attachments = []) ?(images = []) text =
-  Or_error.map (expand_skill t text) ~f:(fun skill ->
-    let queued = { Queued.text; skill; attachments; images } in
-    if is_running t
-    then (
-      Queue.enqueue queue queued;
-      queue_update t)
-    else start_run t [ user_message t queued ])
+  match budget_exhausted t with
+  | Some reason -> Or_error.error_string reason
+  | None ->
+    Or_error.map (expand_skill t text) ~f:(fun skill ->
+      let queued = { Queued.text; skill; attachments; images } in
+      if is_running t
+      then (
+        Queue.enqueue queue queued;
+        queue_update t)
+      else start_run t [ user_message t queued ])
 ;;
 
 let steer ?attachments ?images t text =
@@ -1240,6 +1536,11 @@ let abort t =
   Queue.clear t.follow_up_queue;
   queue_update t;
   Option.iter t.run ~f:(fun run -> Cancellation.cancel run.cancel);
+  if Option.is_some t.resume
+  then (
+    cancel_resume_timer t;
+    broadcast t (Notice "the automatic resume is cancelled");
+    state_changed t);
   restored @ follow_ups
 ;;
 
@@ -1405,19 +1706,102 @@ let set_thinking t thinking =
 let compact ?instructions t =
   if is_running t
   then Or_error.error_string "cannot compact while a run is in progress"
+  else
+    Compaction.compact
+      ~env:t.env
+      ~provider:t.provider
+      ~model:t.model
+      ?instructions
+      t.session
+    |> Or_error.map ~f:(fun (outcome : Compaction.Outcome.t) ->
+      compacted t outcome;
+      state_changed t;
+      outcome.summary)
+;;
+
+(* ---- budget, goal and resume ----------------------------------------- *)
+
+let set_budget t usd =
+  match usd with
+  | Some usd when Float.( <= ) usd 0. || Float.is_nan usd ->
+    Or_error.errorf
+      "a budget must be a positive number of dollars, e.g. /budget 5 (or \
+       /budget off)"
+  | _ ->
+    ignore (Session.set_budget t.session ~usd : Session.Entry.t);
+    state_changed t;
+    Ok ()
+;;
+
+let goal_prompt t goal =
+  if is_running t
+  then ()
+  else start_run t [ Message.user (Goal.start_message goal) ]
+;;
+
+let set_goal t text =
+  let text = String.strip text in
+  if String.is_empty text
+  then
+    Or_error.error_string
+      "say what done means, e.g. /goal all tests pass (/goal off clears it)"
   else (
-    let result =
-      Compaction.compact
-        ~env:t.env
-        ~provider:t.provider
-        ~model:t.model
-        ?instructions
-        t.session
-    in
-    Result.iter result ~f:(fun summary ->
-      broadcast t (Compacted { summary });
-      state_changed t);
-    result)
+    match budget_exhausted t with
+    | Some reason -> Or_error.error_string reason
+    | None ->
+      let goal = Goal.create text in
+      set_goal_state t (Some goal);
+      state_changed t;
+      goal_prompt t goal;
+      Ok ())
+;;
+
+let clear_goal t =
+  match t.goal with
+  | None -> Or_error.error_string "there is no goal; /goal TEXT sets one"
+  | Some _ ->
+    set_goal_state t None;
+    state_changed t;
+    Ok ()
+;;
+
+let resume_goal t =
+  match t.goal with
+  | None -> Or_error.error_string "there is no goal; /goal TEXT sets one"
+  | Some goal when Goal.is_active goal ->
+    Or_error.error_string "the goal is already active"
+  | Some goal ->
+    (match budget_exhausted t with
+     | Some reason -> Or_error.error_string reason
+     | None ->
+       let goal = { goal with status = Active; continuations = 0 } in
+       set_goal_state t (Some goal);
+       state_changed t;
+       goal_prompt t goal;
+       Ok ())
+;;
+
+let no_resume =
+  "no run is waiting for a usage limit to reset (one is scheduled when a run \
+   stops at a limit whose reset time the provider gives)"
+;;
+
+let cancel_resume t =
+  match t.resume with
+  | None -> Or_error.error_string no_resume
+  | Some _ ->
+    cancel_resume_timer t;
+    state_changed t;
+    Ok ()
+;;
+
+let resume_now t =
+  match t.resume with
+  | None -> Or_error.error_string no_resume
+  | Some _ ->
+    cancel_resume_timer t;
+    if is_running t then state_changed t else start_run t [ resume_message ];
+    Ok ()
 ;;
 
 let btw t ~question ~cancel ~on_delta =
@@ -1429,7 +1813,13 @@ let btw t ~question ~cancel ~on_delta =
     | None -> build_system_prompt t
   in
   let request =
-    Btw.request ~model ~system ~messages:(Session.messages session) ~question
+    Btw.request
+      ~cache_key:(Session.id session)
+      ~model
+      ~system
+      ~messages:(Session.messages session)
+      ~question
+      ()
   in
   let reply =
     t.provider.stream request ~cancel ~on_event:(function
@@ -1455,6 +1845,7 @@ let btw t ~question ~cancel ~on_delta =
    this one is; otherwise it goes where it last ran. *)
 let replace_session t session ~keep_host =
   ignore (abort t);
+  cancel_resume_timer t;
   Background_tasks.cancel_all ~discard:true t.background;
   wait_idle t;
   Subagent_log.clear t.subagent_log;

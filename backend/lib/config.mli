@@ -12,6 +12,13 @@ type t =
         credentials), a run hands over to the next one after it *)
   ; default_cwd : string option
     (** where new sessions start on the backend host *)
+  ; max_budget_usd : float option
+    (** the cost budget of sessions that set none ([/budget]); the CLI's
+        [-max-budget-usd] overrides it *)
+  ; goal_max_continuations : int
+    (** automatic continuations a [/goal] gets before it stops *)
+  ; resume_on_limit_reset : bool
+    (** resume a run stopped by a usage limit when the limit resets *)
   }
 [@@deriving sexp_of]
 

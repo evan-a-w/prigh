@@ -61,6 +61,7 @@ let describe
     ; tools = []
     ; thinking = Off
     ; max_tokens = Some 60
+    ; cache_key = None
     }
   in
   let reply = provider.stream request ~cancel ~on_event:ignore in

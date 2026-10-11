@@ -91,6 +91,13 @@ let common_params =
       (optional string)
       ~doc:"DIR working directory (default: current)"
   and no_tools = flag "-no-tools" no_arg ~doc:" disable all tools"
+  and max_budget_usd =
+    flag
+      "-max-budget-usd"
+      (optional float)
+      ~doc:
+        "DOLLARS stop starting turns once a session has cost this much \
+         (default: the config's max_budget_usd; /budget changes a session's)"
   and faux =
     flag
       "-faux"
@@ -111,6 +118,11 @@ let common_params =
       | None -> Namespace.World.legacy ~home:(home ()) ~auth_file
     in
     let { Namespace.World.home; sessions_dir; store; getenv } = world in
+    Option.iter max_budget_usd ~f:(fun usd ->
+      if Float.( <= ) usd 0.
+      then (
+        eprintf "-max-budget-usd %g: must be a positive number of dollars\n" usd;
+        exit 2));
     let cwd_given = Option.is_some cwd in
     Option.iter cwd ~f:(fun dir ->
       if backend_host && not (Sys_unix.is_directory_exn dir)
@@ -221,6 +233,7 @@ let common_params =
           ~backend_host
           ?mcp
           ~use_default_cwd:(not cwd_given)
+          ?max_budget_usd
           ~cwd
           ()
       in
@@ -309,12 +322,20 @@ let run_command =
               | Aborted | End_turn | Tool_use | Length -> ());
              if not (String.is_empty (Message.Assistant.text a))
              then print_endline "")
+         | Loop Agent_start -> if not in_subagent then failed := None
+         | Loop (Compacted _) | Compacted _ ->
+           note "[compacted the conversation to fit the context window]"
          | Notice n -> eprintf "%s\n%!" (cli_hints n)
          | _ -> ()
        in
        Agent.subscribe agent ~f:(handle ~in_subagent:false);
        Or_error.ok_exn (Agent.prompt agent prompt);
        Agent.wait_idle agent;
+       (* A run stopped by a usage limit resumes when it resets. *)
+       while Option.is_some (Agent.state agent).resume_at do
+         Eio.Time.sleep (Eio.Stdenv.clock env) 1.;
+         Agent.wait_idle agent
+       done;
        let state = Agent.state agent in
        note
          "[%s] tokens: in=%d (cached %d) out=%d cost=$%.4f session=%s"

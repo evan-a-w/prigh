@@ -190,6 +190,7 @@ let%expect_test "a subagent may delegate once; the grandchild cannot" =
         ; max_turns = None
         ; max_tokens = None
         ; retries = 0
+        ; cache_key = None
         }
       ~cwd:t.dir
       ~emit:(fun event ->
@@ -274,7 +275,7 @@ let%expect_test "Agent.state rolls up subagent usage and cost" =
     (a1 "look around" deepseek-flash
      (bash read write edit ls grep find subagent))
     (a1 ((input 10) (output 5) (cache_read 0)) 1 9E-06)
-    (((input 50) (output 23) (cache_read 5)) 4.1129999999999994E-05)
+    (((input 50) (output 23) (cache_read 5)) 4.113E-05)
     |}]
 ;;
 

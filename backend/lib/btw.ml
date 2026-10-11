@@ -44,12 +44,13 @@ let question_message question =
      ^ question)
 ;;
 
-let request ~model ~system ~messages ~question =
+let request ?cache_key ~model ~system ~messages ~question () =
   { Provider.Request.model
   ; system = Some system
   ; messages = sanitize messages @ [ question_message question ]
   ; tools = []
   ; thinking = Off
   ; max_tokens = None
+  ; cache_key
   }
 ;;

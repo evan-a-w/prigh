@@ -179,6 +179,11 @@ let execute
     ; max_turns = Some p.turn_limit
     ; max_tokens = None
     ; retries = Agent_loop.Config.default_retries
+    ; cache_key =
+        Some
+          (match context.cache_key with
+           | Some parent -> parent ^ "/" ^ agent_id
+           | None -> agent_id)
     }
   in
   context.emit
@@ -195,7 +200,7 @@ let execute
   let emit (event : Agent_event.t) =
     (match event with
      | Turn_start -> incr turns
-     | Subagent_end { usage; cost_usd; _ } ->
+     | Subagent_end { usage; cost_usd; _ } | Compacted { usage; cost_usd; _ } ->
        nested_usage := Usage.add !nested_usage usage;
        nested_cost_usd := !nested_cost_usd +. cost_usd
      | _ -> ());
@@ -212,6 +217,7 @@ let execute
       ~depth:p.depth
       ~agent_id
       ~emit
+      ~halt:context.halt
       ~context:[]
       ~prompts:[ Message.user p.task ]
       ()
@@ -253,16 +259,23 @@ let execute
          then Tool.Result.error ("[cancelled]\n" ^ body)
          else Tool.Result.error ("subagent aborted\n" ^ body)
        | End_turn | Tool_use | Length ->
-         if
-           !turns >= p.turn_limit
-           && not (List.is_empty (Message.Assistant.tool_calls assistant))
-         then
-           Tool.Result.error
-             (sprintf
-                "subagent hit the %d-turn limit without finishing\n%s"
-                p.turn_limit
-                body)
-         else Tool.Result.ok body)
+         let unfinished =
+           not (List.is_empty (Message.Assistant.tool_calls assistant))
+         in
+         (match context.halt () with
+          | Some reason when unfinished ->
+            Tool.Result.error (sprintf "subagent stopped: %s\n%s" reason body)
+          | Some _ | None ->
+            if
+              !turns >= p.turn_limit
+              && not (List.is_empty (Message.Assistant.tool_calls assistant))
+            then
+              Tool.Result.error
+                (sprintf
+                   "subagent hit the %d-turn limit without finishing\n%s"
+                   p.turn_limit
+                   body)
+            else Tool.Result.ok body))
   in
   context.emit
     (Agent_event.Subagent_end

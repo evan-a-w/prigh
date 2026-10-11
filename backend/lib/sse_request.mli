@@ -25,9 +25,11 @@ val run
   -> Outcome.t
 
 (** With [limit_rejected] (default false), or an error code saying the
-    usage allowance is used up, the message ends in {!Usage_limit.marker}. *)
+    usage allowance is used up, the message ends in {!Usage_limit.marker},
+    followed by {!Usage_limit.reset_note} when [resets_at] is known. *)
 val error_message_of_body
   :  ?limit_rejected:bool
+  -> ?resets_at:float
   -> status:int
   -> string
   -> string

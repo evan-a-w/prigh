@@ -14,6 +14,7 @@ let request ?(thinking = Thinking.Off) ?(tools = []) ?system messages =
   ; tools
   ; thinking
   ; max_tokens = None
+  ; cache_key = None
   }
 ;;
 

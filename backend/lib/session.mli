@@ -27,6 +27,10 @@ module Entry : sig
           { summary : string
           ; kept_from : string
             (** id of the first entry retained after the summary *)
+          ; pinned : string option
+            (** a message before [kept_from] kept verbatim ahead of the
+                summary: the user's latest, when the compaction falls in the
+                middle of the work on it *)
           }
       | Name of { name : string }
       | Description of { text : string }
@@ -39,6 +43,9 @@ module Entry : sig
                 before hosts were recorded *)
           }
       | System_prompt of { text : string }
+      | Goal of { goal : Goal.t option } (** [None]: cleared *)
+      | Budget of { usd : float option }
+      (** the session's cost budget; [None]: none, overriding the default *)
     [@@deriving sexp, jsonaf]
   end
 
@@ -94,8 +101,17 @@ val description : t -> string option
 val active_path : t -> Entry.t list
 
 (** Messages for the next model request: those on the active path, with a
-    compaction summary (if any) replacing everything before [kept_from]. *)
+    compaction summary (if any) replacing everything before [kept_from],
+    preceded by the compaction's pinned message. *)
 val messages : t -> Message.t list
+
+(** The entry id of each of [messages] ([None] for a compaction summary). *)
+val context_ids : t -> string option list
+
+(** A compaction summary as it appears in [messages]. *)
+val summary_message : string -> Message.t
+
+val is_summary_message : Message.t -> bool
 
 (** [messages] with the times they were appended (none for the summary). *)
 val timed_messages : t -> Timed_message.t list
@@ -107,6 +123,17 @@ val model : t -> (string * Thinking.t) option
 val system_prompt : t -> string option
 
 val set_system_prompt : t -> text:string -> Entry.t
+
+(** The last [goal] entry on the active path. *)
+val goal : t -> Goal.t option
+
+val set_goal : t -> Goal.t option -> Entry.t
+
+(** The last [budget] entry on the active path: [None] when there is none
+    (the default applies), [Some None] when it was turned off. *)
+val budget : t -> float option option
+
+val set_budget : t -> usd:float option -> Entry.t
 (** [at] defaults to now. *)
 val append_message : t -> ?at:float -> Message.t -> Entry.t
 
@@ -117,7 +144,12 @@ val set_description : t -> text:string -> Entry.t
 (** Records a [cwd] entry; a subsequent [load] restores it. *)
 val set_cwd : t -> ?host:Host.t -> cwd:string -> unit -> Entry.t
 
-val append_compaction : t -> summary:string -> kept_from:string -> Entry.t
+val append_compaction
+  :  ?pinned:string
+  -> t
+  -> summary:string
+  -> kept_from:string
+  -> Entry.t
 val rewind : t -> to_:string -> unit Or_error.t
 
 (** Copy [src_path] into [dir] under a fresh stamp. The session id is kept

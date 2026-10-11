@@ -230,6 +230,11 @@ let request_body ~(endpoint : Endpoint.t) (r : Provider.Request.t) : Json.t =
           then []
           else [ "tools", `Array (List.map r.tools ~f:wire_tool) ])
        ; reasoning
+       ; (* Custom servers may reject fields they do not know. *)
+         (match endpoint, r.cache_key with
+          | (Openai _ | Codex _), Some key ->
+            [ "prompt_cache_key", `String key ]
+          | (Openai _ | Codex _ | Custom _), _ -> [])
        ; (match endpoint with
           | Codex _ -> [ "text", `Object [ "verbosity", `String "low" ] ]
           | Openai _ | Custom _ ->

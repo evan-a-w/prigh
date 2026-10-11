@@ -178,6 +178,22 @@ let state (s : Agent.State.t) =
                ; "running", bool j.running
                ; "exit", Option.value_map j.status ~default:`Null ~f:str
                ])) )
+    ; "budget_usd", Option.value_map s.budget_usd ~default:`Null ~f:float
+    ; ( "goal"
+      , Option.value_map s.goal ~default:`Null ~f:(fun (g : Goal.t) ->
+          `Object
+            ([ "text", str g.text
+             ; "status", str (Goal.Status.to_string g.status)
+             ; "continuations", int g.continuations
+             ; "max_continuations", int s.goal_max_continuations
+             ]
+             @
+             match g.status with
+             | Active -> []
+             | Done { summary } -> [ "summary", str summary ]
+             | Stopped { reason } -> [ "reason", str reason ])) )
+    ; ( "resume_at_ms"
+      , Option.value_map s.resume_at ~default:`Null ~f:(fun at -> ms at) )
     ]
 ;;
 
@@ -239,15 +255,18 @@ let entry (e : Session.Entry.t) =
     | Message m -> [ "kind", str "message"; "message", message m ]
     | Model { model; thinking = t } ->
       [ "kind", str "model"; "model", str model; "thinking", thinking t ]
-    | Compaction { summary; kept_from } ->
+    | Compaction { summary; kept_from; pinned } ->
       [ "kind", str "compaction"
       ; "summary", str summary
       ; "kept_from", str kept_from
       ]
+      @ Option.value_map pinned ~default:[] ~f:(fun id -> [ "pinned", str id ])
     | Name { name } -> [ "kind", str "name"; "name", str name ]
     | Description { text } -> [ "kind", str "description"; "text", str text ]
     | Cwd { cwd; host = _ } -> [ "kind", str "cwd"; "cwd", str cwd ]
     | System_prompt _ -> [ "kind", str "system_prompt" ]
+    | Goal _ -> [ "kind", str "goal" ]
+    | Budget _ -> [ "kind", str "budget" ]
   in
   `Object
     ([ "id", str e.id
@@ -407,6 +426,12 @@ let rec event ?now (e : Agent.Event.t) =
       ; "turns", int turns
       ; "cost_usd", float cost_usd
       ; "result", tool_result_value result
+      ]
+    | Loop (Compacted { summary; usage = u; cost_usd }) ->
+      [ "event", str "compacted"
+      ; "summary", str summary
+      ; "usage", usage u
+      ; "cost_usd", float cost_usd
       ]
     | State_changed s -> [ "event", str "state"; "state", state s ]
     | Compacted { summary } ->
