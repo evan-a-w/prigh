@@ -477,10 +477,24 @@ let fork ?at t ~dir =
       Or_error.error_s [%message "entry not on the active path" (at : string)]
     else (
       let forked = create ~dir ~cwd:t.cwd ~parent:t.id () in
+      (* Copies get new ids, which a compaction's references follow. *)
+      let ids = String.Table.create () in
+      let renamed id = Option.value (Hashtbl.find ids id) ~default:id in
       let rec copy = function
         | [] -> ()
         | (e : Entry.t) :: rest ->
-          ignore (append_at forked ~at:e.at e.payload : Entry.t);
+          let payload : Entry.Payload.t =
+            match e.payload with
+            | Compaction { summary; kept_from; pinned } ->
+              Compaction
+                { summary
+                ; kept_from = renamed kept_from
+                ; pinned = Option.map pinned ~f:renamed
+                }
+            | payload -> payload
+          in
+          let copied = append_at forked ~at:e.at payload in
+          Hashtbl.set ids ~key:e.id ~data:copied.id;
           if not (String.equal e.id at) then copy rest
       in
       copy path;

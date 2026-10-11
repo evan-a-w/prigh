@@ -172,6 +172,48 @@ let%expect_test "fork copies the active path up to a point" =
   [%expect {| true |}]
 ;;
 
+let%expect_test
+    "a compaction's kept and pinned messages survive a fork and a reload"
+  =
+  with_dir
+  @@ fun dir ->
+  let t = Session.create ~dir ~cwd:"/proj" () in
+  let task = Session.append_message t (Message.user "task") in
+  let (_ : Session.Entry.t) = Session.append_message t (assistant "a1") in
+  let kept = Session.append_message t (assistant "a2") in
+  let (_ : Session.Entry.t) =
+    Session.append_compaction t ~pinned:task.id ~summary:"S" ~kept_from:kept.id
+  in
+  let (_ : Session.Entry.t) = Session.append_message t (Message.user "q2") in
+  let forked = Or_error.ok_exn (Session.fork t ~dir) in
+  let reloaded = Or_error.ok_exn (Session.load (Session.path forked)) in
+  print_s
+    [%sexp
+      { original = (kinds t : string list)
+      ; forked = (kinds forked : string list)
+      ; reloaded = (kinds reloaded : string list)
+      ; ids =
+          (List.map (Session.context_ids reloaded) ~f:Option.is_some
+           : bool list)
+      }];
+  [%expect
+    {|
+    ((original
+      (user:task  "user:Summary of the conversation so far:\
+                 \nS"
+       assistant:a2 user:q2))
+     (forked
+      (user:task  "user:Summary of the conversation so far:\
+                 \nS"
+       assistant:a2 user:q2))
+     (reloaded
+      (user:task  "user:Summary of the conversation so far:\
+                 \nS"
+       assistant:a2 user:q2))
+     (ids (true false true true)))
+    |}]
+;;
+
 let%expect_test "session stamps are strictly increasing" =
   with_dir
   @@ fun dir ->
