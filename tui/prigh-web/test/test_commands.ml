@@ -76,6 +76,9 @@ let%expect_test "every command does something (none is unknown)" =
     /skills                    rpc list_skills
     /skill:                    rpc list_skills
     /mcp                       rpc list_mcp
+    /budget                    toast: No budget ($0.00 spent): /budget DOLLARS stops the agent starting turns once the session has cost that much
+    /goal                      toast: No goal: /goal TEXT sets one, and the agent keeps working until it judges it met
+    /resume                    toast: No resume is scheduled: one is when a run stops at a usage limit whose reset time the provider gives
     /copy                      toast: Nothing to copy yet: no reply in this session.
     /btw                       toast: Usage: /btw <question> (asked aside; the run goes on)
     /abort                     rpc abort
@@ -1325,8 +1328,8 @@ let%expect_test "/retry-backend-connection, /state, /clear, /quit" =
        (supports_thinking true) (cost ((input 5) (output 25) (cache_read 0.5)))))
      (thinking on) (running false) (message_count 0)
      (usage ((input 0) (output 0) (cache_read 0))) (cost_usd 0)
-     (context_tokens 0) (active_host backend) (hosts ()) (subagents ())
-     (jobs ()))
+     (context_tokens 0) (active_host backend) (hosts ()) (subagents ()) (jobs ())
+     (budget_usd ()) (goal ()) (resume_at ()))
     (Done)
     |}];
   H.key h "Escape" ~target:Page;

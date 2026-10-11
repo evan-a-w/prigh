@@ -314,6 +314,13 @@ try {
   await showTurn("bash run");
   await showHeader("top bar after a run");
 
+  // A budget shows in the status line as spend against it.
+  await send("/budget 5");
+  await page.locator(".status .budget").waitFor();
+  await show("a budget in the status line", ".status");
+  await send("/budget off");
+  await page.locator(".status .budget").waitFor({ state: "detached" });
+
   // 3. The model reads a real PNG: the tool result shows it.
   await send("what does flag.png look like?");
   await bodyHas("a red flag with a blue stripe");

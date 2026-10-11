@@ -49,6 +49,8 @@ module Icon : sig
     | Check
     | Terminal
     | Restart
+    | Target
+    | Clock
 
   (** An inline SVG; tests show [<icon name>]. *)
   val view : ?cls:string -> t -> Node.t

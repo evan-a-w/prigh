@@ -138,6 +138,14 @@ let argument_items
         h.name)
   | User -> List.map users ~f:(fun u -> Picker.Item.create ~id:u u)
   | Skill -> skill_items skills
+  | Budget -> simple [ "off", "no budget: turns start whatever it costs" ]
+  | Goal ->
+    simple [ "off", "clear the goal"; "resume", "make a stopped goal active" ]
+  | Resume ->
+    simple
+      [ "now", "retry the run at once"
+      ; "cancel", "stay stopped until you send a message"
+      ]
   | Models | Directory | Backend_directory | Path -> []
 ;;
 
@@ -243,6 +251,25 @@ let compute
                 with
                 | [] -> None
                 | items -> Some (make (Argument kind) ~prefix:word ~start items))
+             | Goal | Budget ->
+               (* Free text: only an exact start of a keyword offers it, so
+                  Enter sends what was typed. *)
+               (match
+                  List.filter
+                    (argument_items
+                       kind
+                       ~models
+                       ~auth
+                       ~current_model
+                       ~sessions
+                       ~hosts
+                       ~users
+                       ~skills)
+                    ~f:(fun (i : Picker.Item.t) ->
+                      String.is_prefix i.id ~prefix)
+                with
+                | [] -> None
+                | items -> Some (make (Argument kind) ~prefix ~start items))
              | _ ->
                (match
                   rank

@@ -15,6 +15,9 @@ module Argument = struct
     | Default_directory
     | Skill
     | Mcp
+    | Budget
+    | Goal
+    | Resume
   [@@deriving sexp_of, equal]
 end
 
@@ -84,6 +87,22 @@ let all =
       "[on|off]"
       "ask before destructive tools"
   ; c "auth" "" "show which providers are configured"
+  ; c
+      ~argument:Argument.Budget
+      "budget"
+      "[dollars|off]"
+      "show or set the session's cost budget: no turn starts once it is spent"
+  ; c
+      ~argument:Argument.Goal
+      "goal"
+      "[text|off|resume]"
+      "set a goal the agent keeps working toward until it is met; show, clear \
+       or resume it"
+  ; c
+      ~argument:Argument.Resume
+      "resume"
+      "[now|cancel]"
+      "show, run now or cancel the automatic resume after a usage limit"
   ; c
       "compact"
       "[instructions]"

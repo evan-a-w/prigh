@@ -27,6 +27,7 @@ val state_json
   -> ?subagents:(string * string * bool) list (** id, task, running *)
   -> ?jobs:(string * string * string option) list
        (** id, command, exit status (running when absent) *)
+  -> ?extra:(string * string) list (** more fields: name, JSON *)
   -> unit
   -> string
 
@@ -42,6 +43,7 @@ val state
   -> ?subagents:(string * string * bool) list
   -> ?jobs:(string * string * string option) list
        (** id, command, exit status (running when absent) *)
+  -> ?extra:(string * string) list
   -> unit
   -> P.State.t
 

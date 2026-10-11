@@ -373,7 +373,7 @@ let%expect_test "fuzzy ranking: command names" =
     {|
     "mo" -> model scoped-models import
     "lo" -> login logout clone
-    "s"  -> state switch skills skill: setusr session signout sessions scoped-models jobs host agents hotkeys verbosity
+    "s"  -> state switch skills skill: setusr session signout sessions scoped-models jobs host resume agents hotkeys verbosity
     "sw" -> switch
     "xyz" ->
     |}]
@@ -668,6 +668,9 @@ let%expect_test "keymap: every binding resolves to its intent and is documented"
     /verbosity [quiet|normal|verbose]  set the transcript verbosity
     /confirm [on|off]                  ask before destructive tools
     /auth                              show which providers are configured
+    /budget [dollars|off]              show or set the session's cost budget: no turn starts once it is spent
+    /goal [text|off|resume]            set a goal the agent keeps working toward until it is met; show, clear or resume it
+    /resume [now|cancel]               show, run now or cancel the automatic resume after a usage limit
     /compact [instructions]            summarise older messages to free context
     /new                               start a new session
     /name [text]                       set the session name

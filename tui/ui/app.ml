@@ -132,6 +132,7 @@ module Action = struct
     | Reply of Reply_tag.t * (P.Json.t, string) Result.t
     | Tick
     | Set_home of string
+    | Set_utc_offset of Time_ns.Span.t
     | Hello of P.Hello_reply.t
     | Resize of
         { width : int
@@ -175,6 +176,7 @@ module Model = struct
     ; width : int
     ; height : int
     ; quitting : bool
+    ; utc_offset : Time_ns.Span.t
     }
   [@@deriving sexp_of]
 
@@ -299,6 +301,12 @@ let notice ?severity m text =
 let error m text = notice ~severity:Error m text
 let warn m text = notice ~severity:Warn m text
 
+let with_state m ~f =
+  match m.state with
+  | Some state -> notice m (f state), []
+  | None -> warn m "not connected to the backend yet", []
+;;
+
 let confirm_question ~name ~summary =
   match name with
   | "bash" -> sprintf "Run bash: %s? (y/n)" summary
@@ -401,6 +409,7 @@ let init =
   ; width = 80
   ; height = 24
   ; quitting = false
+  ; utc_offset = Time_ns.Span.zero
   }
 ;;
 
@@ -1701,6 +1710,51 @@ let run_command m (cmd : Commands.Parsed.t) =
     show_config m ~tag:Default_dir_shown ~summary:default_dir_summary
   | "default-dir", _ -> set_default_dir m cmd
   | "auth", _ -> m, [ rpc "auth_status" ~tag:Auth_show ]
+  | "budget", [] -> with_state m ~f:Loop_status.describe_budget
+  | "budget", _ ->
+    (match Loop_status.parse_budget cmd.rest with
+     | Error e -> error m e, []
+     | Ok usd ->
+       ( m
+       , [ rpc
+             "set_budget"
+             ~params:
+               [ "usd", Option.value_map usd ~default:`Null ~f:P.Json.float ]
+             ~tag:
+               (Notice_on_success
+                  (match usd with
+                   | None -> "budget removed"
+                   | Some usd -> sprintf "budget set to $%.2f" usd))
+         ] ))
+  | "goal", [] -> with_state m ~f:Loop_status.describe_goal
+  | "goal", [ "off" ] ->
+    m, [ rpc "clear_goal" ~tag:(Notice_on_success "goal cleared") ]
+  | "goal", [ "resume" ] ->
+    m, [ rpc "resume_goal" ~tag:(Notice_on_success "goal resumed") ]
+  | "goal", _ ->
+    ( m
+    , [ rpc
+          "set_goal"
+          ~params:[ "text", str cmd.rest ]
+          ~tag:
+            (Retry_in_editor
+               { command = "/goal " ^ cmd.rest
+               ; hint = ""
+               ; then_ =
+                   Notice_on_success "goal set: the agent works until it is met"
+               })
+      ] )
+  | "resume", [] ->
+    with_state m ~f:(Loop_status.describe_resume ~utc_offset:m.utc_offset)
+  | "resume", [ "now" ] ->
+    m, [ rpc "resume_now" ~tag:(Notice_on_success "resuming now") ]
+  | "resume", [ "cancel" ] ->
+    ( m
+    , [ rpc
+          "cancel_resume"
+          ~tag:(Notice_on_success "automatic resume cancelled")
+      ] )
+  | "resume", _ -> error m "usage: /resume [now|cancel]", []
   | "login", [] -> m, [ rpc "auth_status" ~tag:Auth_login_picker ]
   | "login", provider :: rest ->
     let params =
@@ -3110,7 +3164,10 @@ let rec reply m (tag : Reply_tag.t) (result : (P.Json.t, string) Result.t) =
          then Editor.set_text m.editor command
          else m.editor
        in
-       error { m with editor } (sprintf "%s; %s" e hint), []
+       ( error
+           { m with editor }
+           (if String.is_empty hint then e else sprintf "%s; %s" e hint)
+       , [] )
      | Ignore -> m, []
      | Btw id -> update_btw m id ~f:(fun box -> Btw_box.fail box e), []
      | Set_model_done _ ->
@@ -3492,6 +3549,7 @@ let update m (action : Action.t) =
       | Reply (tag, result) -> reply m tag result
       | Tick -> { m with spinner = m.spinner + 1 }, []
       | Set_home home -> { m with home = Some home }, []
+      | Set_utc_offset utc_offset -> { m with utc_offset }, []
       | Hello { client_id; namespace; user } ->
         { m with client_id = Some client_id; namespace; user }, []
       | Resize { width; height } -> { m with width; height }, []

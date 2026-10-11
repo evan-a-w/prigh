@@ -33,6 +33,12 @@ let format_cwd (m : App.Model.t) (s : P.State.t) =
   | None -> cwd
 ;;
 
+let level_style : Loop_status.Level.t -> Style.t = function
+  | Normal -> gray
+  | Warn -> attention
+  | Over -> Style.fg Red
+;;
+
 let context_style percent =
   if percent >= 80
   then Style.fg Red
@@ -319,8 +325,21 @@ let status (m : App.Model.t) : Content.Line.t =
           ] )
       ; 6, [ span ~style:base ("view:" ^ Verbosity.name m.verbosity) ]
       ; 2, [ span ~style:(context_style context) (context_text s) ]
-      ; 4, [ span ~style:base (sprintf "$%.2f" s.cost_usd) ]
+      ; ( 4
+        , match Loop_status.budget_part s with
+          | None -> [ span ~style:base (sprintf "$%.2f" s.cost_usd) ]
+          | Some (text, level) -> [ span ~style:(level_style level) text ] )
       ]
+      @ Option.value_map s.goal ~default:[] ~f:(fun goal ->
+        let text, level = Loop_status.goal_part goal in
+        [ 3, [ span ~style:(level_style level) text ] ])
+      @ Option.value_map s.resume_at ~default:[] ~f:(fun at ->
+        [ ( 2
+          , [ span
+                ~style:attention
+                (Loop_status.resume_part at ~utc_offset:m.utc_offset)
+            ] )
+        ])
       @ Option.value_map m.namespace ~default:[] ~f:(fun namespace ->
         let text =
           match App.Model.acting_as m, m.user with

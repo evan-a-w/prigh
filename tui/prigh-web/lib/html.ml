@@ -73,6 +73,8 @@ module Icon = struct
     | Check
     | Terminal
     | Restart
+    | Target
+    | Clock
   [@@deriving sexp_of]
 
   (* Paths in the style of Lucide (24x24, stroked). *)
@@ -125,6 +127,9 @@ module Icon = struct
     | Check -> {|<path d="m5 12 5 5L20 7"/>|}
     | Terminal -> {|<path d="m4 17 6-6-6-6M12 19h8"/>|}
     | Restart -> {|<path d="M3 12a9 9 0 1 0 2.6-6.4L3 8"/><path d="M3 3v5h5"/>|}
+    | Target ->
+      {|<circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1"/>|}
+    | Clock -> {|<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>|}
   ;;
 
   let name t = String.lowercase (Sexp.to_string (sexp_of_t t))

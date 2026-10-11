@@ -232,7 +232,9 @@ becomes a list):
   the ChatGPT Codex backend (`chatgpt.com/backend-api/codex/responses`, OAuth
   access token plus `chatgpt-account-id`). Requests use `store: false` and
   replay reasoning items through `encrypted_content`, stored verbatim as the
-  thinking signature.
+  thinking signature. Both get `prompt_cache_key` from
+  `Request.cache_key` (the session id; `<session>/<agent id>` for a
+  subagent; `btw` reuses the session's); custom servers are not sent it.
 - `Provider_router` — the `Provider.t` the agent actually holds. On every
   request it looks at `request.model.provider`, resolves credentials through
   `Provider_auth` (refreshing OAuth tokens if needed) and delegates to the
@@ -243,7 +245,9 @@ becomes a list):
   or `Anthropic` at its base URL with its headers and optional key (Bearer;
   `x-api-key` too for Anthropic); a `401`/`403` from it names `/login
   <name>` (and the environment variable when no key was sent).
-- `Faux_provider` — a scripted provider for tests and `--faux` runs.
+- `Faux_provider` — a scripted provider for tests and `--faux` runs
+  (`Reply.context_overflow`, `Reply.usage_limit ?resets_at` and their
+  script forms play those errors).
 
 ### Authentication
 
@@ -438,11 +442,24 @@ two can share one.
   order so the context stays deterministic. Destructive tools block on a
   `Tool_confirm` event until `respond_confirm` when `confirm_tools` is set; a
   deny becomes an error result. Stops on `End_turn` without tool calls,
-  `Length`, `Error`, `Aborted`, `max_turns` or cancellation. Every tool call
+  `Length`, `Error`, `Aborted`, `max_turns`, cancellation or `halt` (polled
+  before each turn, and handed to tools so subagents poll it too: the
+  session budget). Every tool call
   always gets a result (a `[cancelled]` one if needed) so the context stays
-  valid.
+  valid. Before each turn after the first, when the latest response's
+  input and output tokens plus an estimate of what was appended since cross
+  `Compaction.should_compact`, the context is compacted through the
+  `compact` hook (default: `Compaction.compact_messages`, in memory; the
+  agent's compacts its session) and the run goes on with the result; a
+  failed compaction is not retried within the run. A request rejected as
+  too long (`Context_overflow.matches`: pi's and opencode's wordings,
+  excluding rate limits and usage limits) is compacted and sent again, the
+  failed reply dropped, with less kept the second time; after two, or when
+  compaction fails, the turn ends with the error plus what to do. Each
+  compaction emits `Compacted {summary; usage; cost_usd}`. The request
+  carries `Config.cache_key`.
 - `Agent_event` — the loop's event vocabulary (`Agent_start/end`, `Turn_*`,
-  `Message_*`, `Tool_start/output/end`, `Tool_confirm`, and the recursive
+  `Message_*`, `Tool_start/output/end`, `Tool_confirm`, `Compacted`, and the recursive
   `Subagent` / `Subagent_start` / `Subagent_end`, whose inner events carry
   `call_id`/`agent_id`), so the UI can build a transcript per agent. A
   background subagent's events keep arriving after its `subagent` call's
@@ -477,12 +494,38 @@ two can share one.
   (paths whose contents are appended to the user message as `<file>` blocks;
   image files are read like `read` does and attached as images) and
   `images`.
-  Subagent and `btw` usage is rolled up into `State.usage`/`cost_usd`
-  (never `context_tokens`), and `State` also carries the session name, cwd
-  and `git_branch`. `respond_confirm` answers a pending `Tool_confirm`.
+  `State.usage`/`cost_usd` count every assistant message in the session file
+  (all branches, also those compacted away), each at its own model's price,
+  plus what the file does not record, counted as it happens: subagents'
+  responses (from their nested `Message_end`s, so a running subagent's spend
+  shows), compactions and `btw` (never `context_tokens`). `State` also
+  carries the session name, cwd and `git_branch`. `respond_confirm` answers
+  a pending `Tool_confirm`.
+- Budget, goal and resume (`Agent`) — the budget is the session's last
+  `Budget` entry (`set_budget`; `None` turns it off), else the agent's
+  `max_budget_usd` (the CLI's `-max-budget-usd`), else the config's;
+  `budget_exhausted` is the run's `halt`, refuses `prompt`/`steer`/
+  `follow_up`/`set_goal`, and is announced in a `Notice` naming `/budget`.
+  The goal (`Goal.t`: text, `Active | Done | Stopped`, continuations) is the
+  session's last `Goal` entry; while it is active the main agent's tools
+  include `Tool_goal` (`goal_complete`, dropped by `Tools.for_context` for
+  subagents), and a run's tail, after hand-over, follow-ups and undelivered
+  reports, starts a run with `Goal.continuation_message` when the run ended
+  normally; an abort, an error, the budget or `goal_max_continuations` stop
+  it (a hand-over or a scheduled resume keep it active). `set_goal` and
+  `resume_goal` start a run with `Goal.start_message` when idle. When a run
+  ends on an unavailable model with no fallback left, `Usage_limit.resets_at`
+  reads the reset time `Sse_request` noted in the error
+  (`Usage_limit.reset_time`: the body's `resets_at`/`resets_in_seconds`,
+  `x-codex-*-reset-at`, `anthropic-ratelimit-unified-*reset`,
+  `retry-after`); with `resume_on_limit_reset`, a fiber sleeps until then
+  (`?sleep_until`, injectable for tests) and starts a run with a message to
+  carry on. `State.resume_at` shows it; `cancel_resume`, `resume_now`,
+  `abort`, any new run and a session switch end it. It is not persisted.
 - `Config` — `~/.prigh/config.json` (`scoped_models : string list`,
   `confirm_tools : bool`, `default_model`/`default_thinking`,
-  `fallback_models` (model keys) and `default_cwd`), loaded at agent
+  `fallback_models` (model keys), `default_cwd`, `max_budget_usd`,
+  `goal_max_continuations` and `resume_on_limit_reset`), loaded at agent
   creation, read/written through `get_config`/`set_config`; unknown fields
   are ignored by `load` but reported by `problems` (with wrong-typed ones),
   which `Model_registry` adds to its problems along with an unknown
@@ -516,7 +559,10 @@ two can share one.
   descriptions, cwds with the tool host they are on (so a reload restores
   where the session runs) and the system prompt;
   `Session.messages` is the message list for the next request with the
-  compaction summary replacing everything before `kept_from`
+  compaction summary replacing everything before `kept_from`, preceded by
+  the compaction's `pinned` message (the user's latest, kept verbatim when
+  the cut falls in the middle of the work on it; `context_ids` gives each
+  message's entry id)
   (`timed_messages`: each with its entry's time, as a `Timed_message.t`;
   the summary has none). Nothing is
   written to disk until the first message (or name): an abandoned empty
@@ -532,6 +578,13 @@ two can share one.
 - `Compaction` — summarises older messages via the model and keeps a tail;
   manual (`/compact [instructions]`: the RPC's `instructions`, pi's
   `customInstructions`, are appended to the summariser's) or automatic.
+  `plan` picks the cut: the earliest user or assistant message (never a
+  tool result, so calls keep their results) such that the rest fits in
+  `keep_recent_tokens`, else the last turn, and pins the user's latest
+  message when it falls before the cut; the transcript sent to the
+  summariser loses its middle if it would not fit the model.
+  `compact_messages` works on a list (subagents), `compact` on a session
+  (appending a `Compaction` entry); both return the summary and its usage.
 - `Session_description` — after a turn, once the conversation has a second
   user message (or a long first one), asks the model for a one-line
   description and records it (`Agent ~auto_describe`, off under `-faux` and
@@ -595,7 +648,13 @@ two can share one.
   error?, tools: [{name, description}]}], problems}`, tools under their
   prigh names),
   `tool_exec_result`, `auth_status`, `login`, `auth_respond`, `auth_cancel`,
-  `logout`. `State` carries `active_host` and `hosts` (the backend first).
+  `logout`, `set_budget {usd}` (a number, or null for none), `set_goal
+  {text}`, `clear_goal`, `resume_goal`, `cancel_resume`, `resume_now`.
+  `State` carries `active_host` and `hosts` (the backend first),
+  `budget_usd`, `goal` (`{text, status: active|done|stopped,
+  continuations, max_continuations, summary?, reason?}` or null) and
+  `resume_at_ms`. A subagent's compaction arrives as a `compacted` event
+  nested in a `subagent` one.
   `btw {question, btw_id?}` (`/btw`) answers a side question with one
   tool-less model call (`Btw`, `Agent.btw`) over the session's recorded
   system prompt and a snapshot of its messages, sanitised because it may be
@@ -831,6 +890,13 @@ copy of the protocol types and the e2e test guards the contract.
     takes over …]`): `Transcript` renders it as a `Handover` item (`↪
     handed over from A to B`; the error only in verbose, since the failed
     reply above it shows it) and `/fork` lists it by that line.
+    `Loop_status` (prigh-web uses it too) words the budget, goal and
+    scheduled resume for the status line (`$1.20/$5.00`, `goal:3/20`,
+    `resumes 14:05` in the frontend's zone, from `Set_utc_offset`) and for
+    `/budget`, `/goal` and `/resume` without arguments, and parses
+    `/budget`'s amount; their argument completion only offers a keyword
+    (`off`, `resume`, `now`, `cancel`) the typed text starts, so Enter sends
+    a goal as typed.
   - `Key.t` → `Intent.t` through `Keymap` (the one binding table; `/help`
     prints it). `Mode.t` (`Editing | Picker | Login_prompt | Text_prompt |
     Confirm | Search`) says who owns the keyboard; dialogs never stack, Esc

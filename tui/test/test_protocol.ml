@@ -70,9 +70,12 @@ let%expect_test "state event and messages" =
         (cost_usd       0.0032)
         (context_tokens 160)
         (active_host    backend)
-        (hosts     ())
-        (subagents ())
-        (jobs      ()))))
+        (hosts      ())
+        (subagents  ())
+        (jobs       ())
+        (budget_usd ())
+        (goal       ())
+        (resume_at  ()))))
     (Event (Message_start (User ((text hi)))))
     (Event (
       Message_end (
@@ -362,8 +365,11 @@ let%expect_test "tool host events and state hosts" =
           (cwd  /work)
           (session_id   ())
           (session_name ()))))
-        (subagents ())
-        (jobs      ()))))
+        (subagents  ())
+        (jobs       ())
+        (budget_usd ())
+        (goal       ())
+        (resume_at  ()))))
     |}]
 ;;
 

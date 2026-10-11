@@ -180,6 +180,29 @@ let argument_items ~kind ~models ~auth ~sessions ~logged_in =
   | Logout -> Some (provider_items auth)
   | Sessions -> Some (Option.value_map sessions ~default:[] ~f:session_items)
   | Mcp -> Some (mcp_items ())
+  | Budget ->
+    Some
+      [ Picker.Item.create
+          ~id:"off"
+          ~detail:"no budget: turns start whatever the session has cost"
+          "off"
+      ]
+  | Goal ->
+    Some
+      [ Picker.Item.create ~id:"off" ~detail:"clear the goal" "off"
+      ; Picker.Item.create
+          ~id:"resume"
+          ~detail:"make a stopped goal active again"
+          "resume"
+      ]
+  | Resume ->
+    Some
+      [ Picker.Item.create ~id:"now" ~detail:"retry the run at once" "now"
+      ; Picker.Item.create
+          ~id:"cancel"
+          ~detail:"stay stopped until you send a message"
+          "cancel"
+      ]
   | Path | Directory | Default_directory | Skill -> None
 ;;
 
@@ -318,7 +341,15 @@ let compute_argument
                     (argument_items ~kind ~models ~auth ~sessions ~logged_in)
                     ~default:[]
                 in
-                let items = rank ~prefix items in
+                let items =
+                  match kind with
+                  | Goal | Budget ->
+                    (* Free text: only an exact start of a keyword offers
+                       it, so Enter sends what was typed. *)
+                    List.filter items ~f:(fun (i : Picker.Item.t) ->
+                      String.is_prefix i.id ~prefix)
+                  | _ -> rank ~prefix items
+                in
                 Option.some_if
                   (not (List.is_empty items))
                   { source = Source.Argument spec

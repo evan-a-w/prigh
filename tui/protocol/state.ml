@@ -55,6 +55,9 @@ type t =
   (** backend first, then connected tool-capable clients *)
   ; subagents : Subagent.t list
   ; jobs : Job.t list
+  ; budget_usd : float option
+  ; goal : Goal.t option
+  ; resume_at : Time_ns.t option
   }
 [@@deriving sexp_of, equal]
 
@@ -90,11 +93,22 @@ let of_json j =
     | Ok subagents -> Ok subagents
     | Error _ -> Ok []
   in
-  let%map jobs =
+  let%bind jobs =
     match Json.list_field j "jobs" ~f:Job.of_json with
     | Ok jobs -> Ok jobs
     | Error _ -> Ok []
   in
+  let%bind budget_usd =
+    match Json.field j "budget_usd" with
+    | None -> Ok None
+    | Some _ -> Json.float_field j "budget_usd" >>| Option.some
+  in
+  let%bind goal =
+    match Json.field j "goal" with
+    | None -> Ok None
+    | Some goal -> Goal.of_json goal >>| Option.some
+  in
+  let%map resume_at = Json.time_ms_opt_field j "resume_at_ms" in
   { session_id
   ; session_path
   ; session_name
@@ -112,5 +126,8 @@ let of_json j =
   ; hosts
   ; subagents
   ; jobs
+  ; budget_usd
+  ; goal
+  ; resume_at
   }
 ;;

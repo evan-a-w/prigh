@@ -89,6 +89,8 @@ let state_json ?(fields = []) () =
   let fields =
     List.map defaults ~f:(fun (k, v) ->
       k, Option.value (List.Assoc.find fields ~equal:String.equal k) ~default:v)
+    @ List.filter fields ~f:(fun (k, _) ->
+      not (List.Assoc.mem defaults ~equal:String.equal k))
   in
   Jsonaf.to_string (`Object fields)
 ;;

@@ -526,8 +526,10 @@ and these keys.
 
 The status line is quiet gray: cwd, model, `think:`, `view:`, the context
 (`ctx:12%/200k`, the share of the model's window; yellow from 50%, red from
-80%), cost, and then whatever is going on — `queued:N`, agents, jobs, the
-tool host — with the current mode's keys (`⠋ working · Esc aborts · Enter
+80%), cost (`$1.20/$5.00` against a budget: yellow from 80%, red once
+spent), and then whatever is going on — the goal (`goal:3/20`,
+`goal:done`, `goal:stopped`), a scheduled resume (`resumes 14:05`),
+`queued:N`, agents, jobs, the tool host — with the current mode's keys (`⠋ working · Esc aborts · Enter
 steers`, a picker's keys) in yellow. Queued steers and follow-ups are listed
 above the editor, one per line, until they are delivered. An unknown command
 goes back into the editor as typed, the error naming the closest command
@@ -652,6 +654,55 @@ than silently ignored: invalid JSON or a setting of the wrong type (prigh
 then ignores the file's settings), an unknown setting (with the closest
 known one), and a `default_model` that names no known model.
 
+### Long runs: compaction, budget, goals, usage limits
+
+Context never runs out mid-task. Between the turns of a run, when the last
+response's tokens (plus the tool results since) cross 80% of the model's
+window, the older part of the conversation is summarised and the run carries
+on with the summary (the transcript shows `Context compacted`); the same
+happens after a run, and on `/compact`. When a provider rejects a request as
+too long anyway (Anthropic's "prompt is too long", OpenAI's
+`context_length_exceeded`, and the wordings of DeepSeek and other
+OpenAI-compatible servers), the conversation is compacted and the request
+sent again, keeping less the second time; only then does the run fail,
+saying what to do. A compaction keeps the end of the conversation from a
+turn boundary, so tool calls keep their results, and when it falls in the
+middle of the work on your latest message, that message is kept verbatim
+ahead of the summary. Subagents compact their own context the same way.
+
+`/budget DOLLARS` sets a cost budget for the session (`/budget off` removes
+it, `/budget` shows it): once the session has cost that much — subagents and
+compactions included, counted as they happen — no further turn starts, the
+run stops between turns with a note saying how to raise it, and prompts are
+refused until you do. `max_budget_usd` in `config.json` (or `prigh run|serve
+-max-budget-usd DOLLARS`, which wins) is the budget of sessions that set
+none; `/budget` is recorded in the session.
+
+`/goal TEXT` sets a goal and starts working on it: the agent keeps going
+across turns until it judges the goal met and calls `goal_complete` with a
+summary. Each run that ends normally while the goal is active is followed by
+a message restating the goal and asking it to continue or declare it done,
+up to `goal_max_continuations` (default 20) automatic continuations; an
+abort, a failed run, the budget or that cap stop the goal (`/goal resume`
+makes it active again, with fresh continuations). `/goal` shows it, `/goal
+off` clears it. Messages you send meanwhile go first; the goal is recorded
+in the session, so it survives restarts and reconnects.
+
+When a run stops at a usage limit and no fallback model is left, prigh reads
+when the limit resets (ChatGPT/Codex error bodies and `x-codex-*-reset-at`
+headers, Anthropic's `anthropic-ratelimit-unified-*reset` headers,
+`retry-after`) and resumes the run then, continuing the interrupted work;
+the status line shows `resumes 14:05`. `/resume now` retries at once,
+`/resume cancel` (or an abort, or a new prompt) cancels it. When the
+provider does not say, a note says so and nothing is scheduled.
+`resume_on_limit_reset: false` in `config.json` turns this off. A scheduled
+resume lives in the backend's memory, not in the session.
+
+Responses API requests (OpenAI and ChatGPT/Codex) carry a `prompt_cache_key`
+(the session id; a subagent's adds its id) so requests that share a prefix
+reach the same prompt cache; custom OpenAI-compatible servers are not sent
+it.
+
 ### Slash commands
 
 | Command | Action |
@@ -667,6 +718,9 @@ known one), and a `default_model` that names no known model.
 | `/verbosity [quiet\|normal\|verbose]` | set the transcript verbosity |
 | `/confirm [on\|off]` | ask before destructive tools |
 | `/compact [instructions]` | summarise older messages to free context, focusing on the instructions |
+| `/budget [dollars\|off]` | show or set the session's cost budget: no turn starts once it is spent |
+| `/goal [text\|off\|resume]` | set a goal the agent keeps working toward until it is met; show, clear or resume it |
+| `/resume [now\|cancel]` | show, run now or cancel the automatic resume after a usage limit |
 | `/new`, `/clear`, `/quit` | new session / clear transcript / exit |
 | `/name [text]` | set the session name |
 | `/session` | show session statistics |

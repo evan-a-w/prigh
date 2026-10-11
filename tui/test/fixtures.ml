@@ -44,11 +44,12 @@ let state_json
   ?(session = "abc123", "/home/u/.prigh/sessions/1.jsonl")
   ?(subagents = [])
   ?(jobs = [])
+  ?(extra = [])
   ()
   =
   let session_id, session_path = session in
   sprintf
-    {|{"session_id":%s,"session_path":%s,"session_name":%s,"cwd":%s,"git_branch":%s,"model":%s,"thinking":%s,"running":%b,"message_count":2,"usage":{"input":1200,"output":300,"cache_read":0},"cost_usd":%g,"context_tokens":%d,"active_host":"backend","hosts":[{"id":"backend","name":"srv","cwd":%s}],"subagents":[%s],"jobs":[%s]}|}
+    {|{"session_id":%s,"session_path":%s,"session_name":%s,"cwd":%s,"git_branch":%s,"model":%s,"thinking":%s,"running":%b,"message_count":2,"usage":{"input":1200,"output":300,"cache_read":0},"cost_usd":%g,"context_tokens":%d,"active_host":"backend","hosts":[{"id":"backend","name":"srv","cwd":%s}],"subagents":[%s],"jobs":[%s]%s}|}
     (P.Json.to_string (P.Json.str session_id))
     (P.Json.to_string (P.Json.str session_path))
     (match session_name with
@@ -83,6 +84,8 @@ let state_json
             (match exit with
              | Some status -> P.Json.to_string (P.Json.str status)
              | None -> "null"))))
+    (String.concat
+       (List.map extra ~f:(fun (name, value) -> sprintf ",%S:%s" name value)))
 ;;
 
 let state
@@ -96,6 +99,7 @@ let state
   ?session_name
   ?subagents
   ?jobs
+  ?extra
   ()
   =
   Or_error.ok_exn
@@ -113,6 +117,7 @@ let state
                 ?session_name
                 ?subagents
                 ?jobs
+                ?extra
                 ()))))
 ;;
 

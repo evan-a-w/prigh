@@ -19,6 +19,9 @@ module Argument : sig
         active tool host *)
     | Skill (** [/skill:NAME]: the name is part of the command *)
     | Mcp
+    | Budget (** [off], or dollars *)
+    | Goal (** [off], [resume], or the goal *)
+    | Resume (** [now] or [cancel] *)
   [@@deriving sexp_of, equal]
 end
 

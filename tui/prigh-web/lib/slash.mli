@@ -19,6 +19,9 @@ module Argument : sig
     | Host
     | User (** the users a superuser can act as *)
     | Skill (** right after [/skill:], from [list_skills] *)
+    | Budget (** [off], or dollars *)
+    | Goal (** [off], [resume], or the goal *)
+    | Resume (** [now] or [cancel] *)
   [@@deriving sexp_of, equal]
 end
 

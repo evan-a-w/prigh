@@ -177,6 +177,9 @@ let%expect_test "help lists every key and command" =
     /skills pick a skill to invoke (/skill:name)
     /skill:<name> [args] send a skill's instructions to the agent, with your arguments
     /mcp [reconnect] MCP servers: their tools, approve a project's, or restart failed ones
+    /budget [dollars|off] show or set the session's cost budget: no turn starts once it is spent
+    /goal [text|off|resume] set a goal the agent keeps working toward until it is met; show, clear or resume it
+    /resume [now|cancel] show, run now or cancel the automatic resume after a usage limit
     /copy copy the last reply to the clipboard
     /btw <question> ask a side question without interrupting the run (not added to the conversation)
     /abort stop the current run
