@@ -16,6 +16,8 @@ let%expect_test "the thinking chip names the level and opens its picker" =
     <button type="button"
             title="Thinking on: how much the model reasons before it answers (Alt+T cycles, /thinking)"
             aria-label="Thinking on: how much the model reasons before it answers (Alt+T cycles, /thinking)"
+            popovertarget="topbar-controls"
+            popovertargetaction="hide"
             class="btn chip-button thinking-chip"
             @on_click>
       <icon class="brain"> </icon>
@@ -130,5 +132,147 @@ let%expect_test "every approval mode, as the chip names it" =
     <button class="btn chip-button mode-chip">
     (Plan mode)
     <button class="btn chip-button mode-chip plan-mode">
+    |}]
+;;
+
+(* A narrow chat column folds the controls into a menu (style.css): the
+   button that opens it names what they are set to, and each control closes
+   it as it opens its picker. *)
+let%expect_test "the top bar: title, cwd and branch, and the controls' menu" =
+  let h =
+    H.create
+      ~state:
+        (H.state_json
+           ~fields:
+             [ "cwd", `String "/home/ada/projects/prigh/tui"
+             ; "git_branch", `String "feature/narrow-top-bar"
+             ; "plan_mode", `True
+             ]
+           ())
+      ()
+  in
+  H.show h ~selector:".topbar";
+  [%expect
+    {|
+    <header class="topbar">
+      <button type="button"
+              title="Sessions (Ctrl+B)"
+              aria-label="Sessions (Ctrl+B)"
+              class="btn ghost icon toggle-sidebar"
+              @on_click>
+        <icon class="menu"> </icon>
+      </button>
+      <div class="title">
+        <button type="button" title="Rename (/name)" class="session-name" @on_click>
+          <span> New session </span>
+          <icon class="pencil"> </icon>
+        </button>
+        <div class="session-where">
+          <span title="/home/ada/projects/prigh/tui" class="where">
+            <span class="where-head"> ~/projects/prigh </span>
+            <span class="where-tail"> /tui </span>
+          </span>
+          <span title="feature/narrow-top-bar" class="branch">
+            <icon class="branch"> </icon>
+            <span class="branch-name"> feature/narrow-top-bar </span>
+          </span>
+        </div>
+      </div>
+      <button type="button"
+              title="Claude Opus 5.5, thinking on, plan mode"
+              aria-label="Claude Opus 5.5, thinking on, plan mode"
+              popovertarget="topbar-controls"
+              class="btn controls-more ghost icon plan-mode"
+              @on_click>
+        <icon class="sliders"> </icon>
+      </button>
+      <div id="topbar-controls" popover="auto" class="controls">
+        <button type="button"
+                title="Claude Opus 5.5: switch model (Ctrl+L)"
+                aria-label="Claude Opus 5.5: switch model (Ctrl+L)"
+                popovertarget="topbar-controls"
+                popovertargetaction="hide"
+                class="btn chip-button model-chip"
+                @on_click>
+          <icon class="cpu"> </icon>
+          <span class="chip-label"> Claude Opus 5.5 </span>
+          <icon class="chevron"> </icon>
+        </button>
+        <button type="button"
+                title="Thinking on: how much the model reasons before it answers (Alt+T cycles, /thinking)"
+                aria-label="Thinking on: how much the model reasons before it answers (Alt+T cycles, /thinking)"
+                popovertarget="topbar-controls"
+                popovertargetaction="hide"
+                class="btn chip-button thinking-chip"
+                @on_click>
+          <icon class="brain"> </icon>
+          <span class="chip-key"> Thinking </span>
+          <span class="chip-label"> on </span>
+          <icon class="chevron"> </icon>
+        </button>
+        <button type="button"
+                title="Read-only planning: no file edits; bash, job_input and MCP tools ask first (Alt+M cycles, /mode picks)"
+                aria-label="Read-only planning: no file edits; bash, job_input and MCP tools ask first (Alt+M cycles, /mode picks)"
+                data-short="plan"
+                popovertarget="topbar-controls"
+                popovertargetaction="hide"
+                class="btn chip-button mode-chip plan-mode"
+                @on_click>
+          <icon class="shield"> </icon>
+          <span class="chip-label"> Plan mode </span>
+          <icon class="chevron"> </icon>
+        </button>
+      </div>
+      <div class="panel-toggles">
+        <button type="button"
+                title="Files (Ctrl+Shift+F)"
+                aria-label="Files (Ctrl+Shift+F)"
+                class="btn files-toggle ghost icon"
+                @on_click>
+          <icon class="folder"> </icon>
+        </button>
+        <button type="button"
+                title="Terminal (Ctrl+`)"
+                aria-label="Terminal (Ctrl+`)"
+                class="btn ghost icon terminal-toggle"
+                @on_click>
+          <icon class="terminal"> </icon>
+        </button>
+        <Vdom.Node.none-widget> </Vdom.Node.none-widget>
+      </div>
+    </header>
+    |}]
+;;
+
+let%expect_test "the cwd's last directory is kept apart: the rest is elided" =
+  List.iter
+    [ "/work"; "/"; "/home/ada"; "/home/ada/src/a/b/c"; "relative/path" ]
+    ~f:(fun cwd ->
+      let h =
+        H.create ~state:(H.state_json ~fields:[ "cwd", `String cwd ] ()) ()
+      in
+      H.show h ~selector:".topbar .where");
+  [%expect
+    {|
+    <span title="/work" class="where">
+      <Vdom.Node.none-widget> </Vdom.Node.none-widget>
+      <span class="where-tail"> /work </span>
+    </span>
+    <span title="/" class="where">
+      <Vdom.Node.none-widget> </Vdom.Node.none-widget>
+      <span class="where-tail"> / </span>
+    </span>
+    <span title="/home/ada" class="where">
+      <Vdom.Node.none-widget> </Vdom.Node.none-widget>
+      <span class="where-tail"> ~ </span>
+    </span>
+    <span title="/home/ada/src/a/b/c" class="where">
+      <span class="where-head"> ~/src/a/b </span>
+      <span class="where-tail"> /c </span>
+    </span>
+    <span title="relative/path" class="where">
+      <span class="where-head"> relative </span>
+      <span class="where-tail"> /path </span>
+    </span>
     |}]
 ;;

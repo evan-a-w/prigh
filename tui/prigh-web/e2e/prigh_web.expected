@@ -339,14 +339,14 @@ as much as the model allows
 === chromium: the mode picker ===
 When tools ask first (Alt+M cycles)
 Asks: edits & commands
-bash, edits and MCP tools ask first
+bash, job_input, edits and MCP tools ask first
 Asks: commands
-file edits run; bash and MCP tools ask first
+file edits run; bash, job_input and MCP tools ask first
 Auto: never asks
 tools run without asking
 ✓
 Plan mode
-read-only planning: no file edits, commands ask first
+read-only planning: no file edits; bash, job_input and MCP tools ask first
 ↑↓ to move, Enter to choose, Esc to close
 === chromium: mode ask ===
 DeepSeek V4.1 Flash
@@ -648,6 +648,27 @@ on a phone: 0 handles
 === chromium: resize: highlighted code in a reply ===
 hl-kw:let hl-kw:rec hl-kw:if hl-num:2 hl-kw:then hl-kw:else hl-num:1 hl-num:2 hl-com:(* slow *)
 hl-prop:"name" hl-str:"prigh" hl-prop:"ok" hl-con:true hl-prop:"n" hl-num:3
+=== chromium: top bar: a 700px chat column ===
+chat 700; controls: DeepSeek V4.1 Flash, icon, icon; title at least 140px: true
+.topbar: fits
+.composer: fits
+=== chromium: top bar: a 520px chat column ===
+chat 520; controls: in a menu; title at least 140px: true
+.topbar: fits
+.composer: fits
+=== chromium: top bar: a 400px chat column ===
+chat 400; controls: in a menu; title at least 140px: true
+.topbar: fits
+.composer: fits
+=== chromium: top bar: the controls' menu ===
+DeepSeek V4.1 Flash | Thinking on | Auto: never asks
+under its button: true, in the window: true
+a choice opens its picker, the menu closes: true
+Esc closes it: true
+=== chromium: top bar: a 400px chat column without the sidebar ===
+chat 400; controls: in a menu; title at least 140px: true
+.topbar: fits
+.composer: fits
 === chromium: errors ===
 none
 === chromium: accounts: sessions ===
@@ -1079,14 +1100,14 @@ as much as the model allows
 === firefox: the mode picker ===
 When tools ask first (Alt+M cycles)
 Asks: edits & commands
-bash, edits and MCP tools ask first
+bash, job_input, edits and MCP tools ask first
 Asks: commands
-file edits run; bash and MCP tools ask first
+file edits run; bash, job_input and MCP tools ask first
 Auto: never asks
 tools run without asking
 ✓
 Plan mode
-read-only planning: no file edits, commands ask first
+read-only planning: no file edits; bash, job_input and MCP tools ask first
 ↑↓ to move, Enter to choose, Esc to close
 === firefox: mode ask ===
 DeepSeek V4.1 Flash
@@ -1388,6 +1409,27 @@ on a phone: 0 handles
 === firefox: resize: highlighted code in a reply ===
 hl-kw:let hl-kw:rec hl-kw:if hl-num:2 hl-kw:then hl-kw:else hl-num:1 hl-num:2 hl-com:(* slow *)
 hl-prop:"name" hl-str:"prigh" hl-prop:"ok" hl-con:true hl-prop:"n" hl-num:3
+=== firefox: top bar: a 700px chat column ===
+chat 700; controls: DeepSeek V4.1 Flash, icon, icon; title at least 140px: true
+.topbar: fits
+.composer: fits
+=== firefox: top bar: a 520px chat column ===
+chat 520; controls: in a menu; title at least 140px: true
+.topbar: fits
+.composer: fits
+=== firefox: top bar: a 400px chat column ===
+chat 400; controls: in a menu; title at least 140px: true
+.topbar: fits
+.composer: fits
+=== firefox: top bar: the controls' menu ===
+DeepSeek V4.1 Flash | Thinking on | Auto: never asks
+under its button: true, in the window: true
+a choice opens its picker, the menu closes: true
+Esc closes it: true
+=== firefox: top bar: a 400px chat column without the sidebar ===
+chat 400; controls: in a menu; title at least 140px: true
+.topbar: fits
+.composer: fits
 === firefox: errors ===
 none
 === firefox: accounts: sessions ===

@@ -447,8 +447,12 @@ and favicon count what happened meanwhile. Beside the model in the top bar
 the thinking level ("Thinking high", "No thinking" for a model without
 levels) and the approval mode ("Asks: edits & commands", "Asks: commands",
 "Auto: never asks", "Plan mode", lit) are always shown, each opening its
-picker (the modes with what each asks first); on a phone they get a row of
-their own under the title, with short labels (`high`, `ask`, `plan`).
+picker (the modes with what each asks first). The top bar fits the chat
+column, however wide the sidebar and the panels leave it: the labels get
+short (`high`, `ask`, `plan`), then the thinking level and the mode become
+icons (their tooltips say which), then all three fold into one menu behind
+a sliders button (lit in plan mode); the session's title and cwd keep their
+room, the cwd losing its middle rather than the directory it ends in.
 Alt+T and Alt+M cycle them. The status line's plan chip (`plan 2/5: step`)
 runs `/todos`. Steers and follow-ups sent while the agent works wait above
 the composer, each tagged "Steers this turn" or "After this turn", with

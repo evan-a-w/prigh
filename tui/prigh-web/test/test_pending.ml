@@ -135,6 +135,8 @@ let%expect_test "a model or thinking level chosen shows until confirmed" =
             aria-label="Switching to Claude Sonnet 5…"
             disabled=""
             aria-busy="true"
+            popovertarget="topbar-controls"
+            popovertargetaction="hide"
             class="awaiting btn chip-button model-chip"
             @on_click>
       <span class="lamp"> </span>
