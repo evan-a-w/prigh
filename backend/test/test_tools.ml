@@ -140,18 +140,37 @@ let%expect_test "bash: timeout, cancellation, truncation" =
   run t Tool_bash.tool {|{"command": "seq 1 3000"}|};
   let output = [%expect.output] in
   let lines = String.split_lines output in
+  let saved =
+    Re.exec (Re.Perl.compile_pat {|in (\S+\.log)|}) (List.hd_exn lines)
+    |> fun groups -> Re.Group.get groups 1
+  in
   print_s
     [%sexp
-      { first = (List.hd_exn lines : string)
+      { first =
+          (Re.replace_string
+             (Re.Perl.compile_pat {|\S+/prigh-output/\S+\.log|})
+             ~by:"<file>"
+             (List.hd_exn lines)
+           : string)
       ; second = (List.nth_exn lines 1 : string)
+      ; around_the_cut =
+          (List.filter lines ~f:(fun l ->
+             String.is_prefix l ~prefix:"[..."
+             || String.equal l "666"
+             || String.equal l "667"
+             || String.equal l "1667")
+           : string list)
       ; last = (List.last_exn lines : string)
       ; count = (List.length lines : int)
+      ; saved_lines = (Truncate.count_lines (In_channel.read_all saved) : int)
       }];
   [%expect
     {|
     ((first
-      "[output truncated: showing the last part of 3000 lines / 13893 bytes]")
-     (second 1001) (last 3000) (count 2001))
+      "[output truncated: 3000 lines / 13893 bytes, showing the beginning and the end; the full output is in <file> (read it with offset/limit, or grep it)]")
+     (second 1)
+     (around_the_cut (666 "[... 1000 lines (4667 bytes) omitted ...]" 1667))
+     (last 3000) (count 2002) (saved_lines 3000))
     |}]
 ;;
 
@@ -798,5 +817,43 @@ let%expect_test
     -x
     +z
     ERROR: edit 1: old_text is not in the file as written, and matches 2 places when whitespace and punctuation are normalised; copy it exactly from the file
+    |}]
+;;
+
+let%expect_test "Truncate.head_and_tail" =
+  let show ?max_lines ?max_bytes s =
+    print_s
+      [%sexp (Truncate.head_and_tail ?max_lines ?max_bytes s : Truncate.t)]
+  in
+  let lines n = String.concat_lines (List.init n ~f:(sprintf "l%d")) in
+  show ~max_lines:6 (lines 6);
+  show ~max_lines:6 (lines 10);
+  show ~max_bytes:12 (lines 10);
+  [%expect
+    {|
+    ((text  "l0\
+           \nl1\
+           \nl2\
+           \nl3\
+           \nl4\
+           \nl5\
+           \n")
+     (truncated false) (total_lines 6) (total_bytes 18))
+    ((text
+       "l0\
+      \nl1\
+      \n[... 4 lines (12 bytes) omitted ...]\
+      \nl6\
+      \nl7\
+      \nl8\
+      \nl9\
+      \n")
+     (truncated true) (total_lines 10) (total_bytes 30))
+    ((text  "l0\
+           \n[... 7 lines (21 bytes) omitted ...]\
+           \nl8\
+           \nl9\
+           \n")
+     (truncated true) (total_lines 10) (total_bytes 30))
     |}]
 ;;

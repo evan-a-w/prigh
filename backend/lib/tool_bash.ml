@@ -9,8 +9,8 @@ let job_timeout_seconds = 30 * 24 * 3600
 let description =
   "Run a shell command with bash in the working directory. Returns combined \
    stdout and stderr (interleaved) and the exit code if non-zero. Long output \
-   is truncated to the last part. Do not use for reading or editing files; use \
-   the dedicated tools."
+   keeps its beginning and end, and the full output is saved to a file you can \
+   read. Do not use for reading or editing files; use the dedicated tools."
 ;;
 
 let command_parameters =
@@ -46,6 +46,45 @@ let spec =
        ])
 ;;
 
+let output_dir () = Filename.concat Filename.temp_dir_name "prigh-output"
+let output_retention = Time_float.Span.of_day 7.
+
+(* Saves a command's full output where the model can read or grep it, and
+   drops files older than [output_retention]. *)
+let save_output (context : Tool.Context.t) output =
+  let dir = output_dir () in
+  Core_unix.mkdir_p dir;
+  let now = Time_float.now () in
+  Array.iter (Sys_unix.readdir dir) ~f:(fun name ->
+    let path = Filename.concat dir name in
+    match Core_unix.stat path with
+    | { st_mtime; _ } ->
+      if
+        Time_float.Span.( > )
+          (Time_float.diff
+             now
+             (Time_float.of_span_since_epoch (Time_float.Span.of_sec st_mtime)))
+          output_retention
+      then Sys_unix.remove path
+    | exception _ -> ());
+  let safe =
+    String.map context.call_id ~f:(fun c ->
+      if Char.is_alphanum c || Char.equal c '-' || Char.equal c '_'
+      then c
+      else '_')
+  in
+  let path =
+    Filename.concat
+      dir
+      (sprintf
+         "%s-%s.log"
+         (Time_float.to_filename_string now ~zone:Time_float.Zone.utc)
+         (if String.is_empty safe then "bash" else safe))
+  in
+  Out_channel.write_all path ~data:output;
+  path
+;;
+
 let run_foreground (context : Tool.Context.t) args =
   let command = Tool_args.string args "command" in
   let timeout =
@@ -76,15 +115,28 @@ let run_foreground (context : Tool.Context.t) args =
   in
   if not (String.is_empty !pending)
   then context.on_output (Utf8.sanitize !pending);
-  let truncated = Truncate.tail (Buffer.contents output) in
+  let full = Buffer.contents output in
+  let truncated = Truncate.head_and_tail full in
   let text =
     if truncated.truncated
-    then
+    then (
+      let saved =
+        match save_output context full with
+        | path ->
+          sprintf
+            "the full output is in %s (read it with offset/limit, or grep it)"
+            path
+        | exception exn ->
+          sprintf "saving the full output failed: %s" (Exn.to_string exn)
+      in
       sprintf
-        "[output truncated: showing the last part of %d lines / %d bytes]\n%s"
+        "[output truncated: %d lines / %d bytes, showing the beginning and the \
+         end; %s]\n\
+         %s"
         truncated.total_lines
         truncated.total_bytes
-        truncated.text
+        saved
+        truncated.text)
     else truncated.text
   in
   let with_suffix suffix =
