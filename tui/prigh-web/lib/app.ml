@@ -88,6 +88,8 @@ module Reply_tag = struct
         ; purpose : Skills_purpose.t
         }
     | Mcp of Mcp_purpose.t
+    | Git_diff
+    | Command_prompt of string (** [/review] or [/init] as typed *)
   [@@deriving sexp_of, equal]
 end
 
@@ -1877,6 +1879,25 @@ let run_command (m : Model.t) ({ name; rest } : Slash.Parsed.t) =
              else [ "instructions", str instructions ])
             ~tag:(Notice "Compacted the conversation")
         ] )
+  | "diff", path ->
+    let m, cmds = toast m "Reading the changes…" in
+    ( m
+    , cmds
+      @ [ rpc
+            "git_diff"
+            (if String.is_empty path then [] else [ "path", str path ])
+            ~tag:Git_diff
+        ] )
+  | "review", args ->
+    let m, cmds = toast m "Reading the changes to review…" in
+    ( m
+    , cmds
+      @ [ rpc
+            "review"
+            [ "args", str args ]
+            ~tag:(Command_prompt (String.strip ("/review " ^ args)))
+        ] )
+  | "init", _ -> m, [ rpc "init" [] ~tag:(Command_prompt "/init") ]
   | "name", "" -> open_rename m
   | "name", name ->
     m, [ rpc "set_session_name" [ "name", str name ] ~tag:Refresh_sessions ]
@@ -2113,6 +2134,28 @@ let reply (m : Model.t) (tag : Reply_tag.t) result =
      | Some (Login flow) ->
        { m with dialog = Some (Login { flow with failed = Some e }) }, []
      | _ -> error m e)
+  | Command_prompt text, Error e ->
+    if String.is_empty m.draft && List.is_empty m.images
+    then
+      error
+        (set_draft m text)
+        (sprintf "%s. %s is back in the editor." (String.capitalize e) text)
+    else error m (String.capitalize e)
+  | Command_prompt _, Ok _ ->
+    if Model.running m
+    then toast m "Queued: it starts when the current run ends"
+    else m, []
+  | Git_diff, Ok json ->
+    decode m json Git_diff.of_json ~f:(fun diff ->
+      if String.is_empty diff.diff
+      then
+        toast
+          m
+          (sprintf
+             "No changes in %s against %s"
+             diff.root
+             (Prigh_ui.Diff_files.against diff))
+      else open_dialog m (Diff diff))
   | Sent { text; images }, Error e ->
     (* Back in the editor, unless something else is being written there. *)
     if String.is_empty m.draft && List.is_empty m.images
@@ -2701,7 +2744,7 @@ let dialog_accept (m : Model.t) =
      | None, Some _ -> respond_login m flow
      | Some _, _ -> close_dialog m
      | None, None -> m, [])
-  | Some (Help | Hotkeys | Auth _ | Session _ | Text _ | Mcp_tools _) ->
+  | Some (Help | Hotkeys | Auth _ | Session _ | Text _ | Mcp_tools _ | Diff _) ->
     close_dialog m
   | Some (Scoped_models { checked; _ }) ->
     let m, cmds = save_scoped m checked in

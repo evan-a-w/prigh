@@ -348,5 +348,6 @@ let view (m : App.Model.t) (dialog : Dialog.t) ~inject =
   | Session stats -> Some (session m stats ~inject)
   | Text { title; text = t } -> Some (text ~title ~text:t ~inject)
   | Mcp_tools server -> Some (mcp_tools server ~inject)
+  | Diff diff -> Some (Git_diff_view.view diff ~inject)
   | Picker _ | Help | Rename _ | Delete _ | Login _ | Auth _ -> None
 ;;

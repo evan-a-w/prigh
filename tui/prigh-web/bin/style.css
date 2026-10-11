@@ -820,6 +820,45 @@ kbd {
   border-radius: var(--r-control); font: 12px/1.5 var(--mono); max-height: 40vh; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere;
 }
 .text-dialog { width: min(720px, 100%); }
+
+/* /diff: the working tree's changes, file by file */
+.diff-dialog { width: min(980px, 100%); }
+.diff-dialog .modal-body { display: flex; flex-direction: column; gap: 14px; }
+.diff-dialog .dialog-note { color: var(--muted); }
+.diff-dialog .dialog-note .root { font-family: var(--mono); color: var(--fg); overflow-wrap: anywhere; }
+.diff-dialog .dialog-note .summary { margin-left: 10px; font: 11.5px var(--mono); color: var(--faint); }
+.diff-dialog .dialog-note.warn { color: var(--sodium); }
+.diff-file > summary {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  min-width: 0;
+  padding: 2px 0 6px;
+  cursor: pointer;
+  list-style: none;
+}
+.diff-file > summary::-webkit-details-marker { display: none; }
+.diff-file > summary::before {
+  content: "›";
+  display: inline-block;
+  width: 0.7em;
+  color: var(--faint);
+  transition: transform 0.15s;
+}
+.diff-file[open] > summary::before { transform: rotate(90deg); }
+.diff-file .path { font: 12.5px var(--mono); color: var(--fg); overflow-wrap: anywhere; min-width: 0; }
+.diff-file .chip {
+  font: 11px var(--mono);
+  color: var(--muted);
+  background: var(--slate-2);
+  border-radius: var(--r-chip);
+  padding: 0 5px;
+}
+.diff-file .count { font: 11.5px var(--mono); font-variant-numeric: tabular-nums; }
+.diff-file .count.add { color: var(--sage); }
+.diff-file .count.del { color: var(--brick); }
+.diff-file .diff-empty { color: var(--faint); font-size: 12.5px; }
+@media (prefers-reduced-motion: reduce) { .diff-file > summary::before { transition: none; } }
 .text-dialog .text-block { max-height: 58vh; }
 
 .status-item.mode { color: var(--sodium); }

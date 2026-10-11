@@ -74,6 +74,17 @@ let all =
       ~args:"[instructions]"
       "compact"
       "summarise older messages to free context"
+  ; c
+      ~argument:Path
+      ~args:"[path]"
+      "diff"
+      "show the uncommitted changes where the tools run, untracked files too"
+  ; c
+      ~args:"[base] [instructions]"
+      "review"
+      "review the uncommitted changes, or those against a base branch, for \
+       prioritised findings"
+  ; c "init" "write or improve the project's AGENTS.md"
   ; c ~args:"[name]" "name" "rename the session"
   ; c "session" "show the session's details and statistics"
   ; c "sessions" "search the saved sessions"

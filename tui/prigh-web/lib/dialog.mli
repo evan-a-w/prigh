@@ -52,6 +52,7 @@ type t =
       ; text : string
       }
   | Mcp_tools of Mcp_server.t (** a ready server's tools *)
+  | Diff of Git_diff.t (** [/diff] *)
 [@@deriving sexp_of, equal]
 
 (** Belongs to the session (closed when switching). *)
