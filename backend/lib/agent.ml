@@ -1419,16 +1419,43 @@ let deliveries t =
 
 (* The system prompt names the tools of the model it was built for. *)
 let set_model t model =
-  let editor () = Option.map (Tools.editor (tools t)) ~f:Tool.name in
-  let before = editor () in
+  let names () = String.Set.of_list (List.map (tools t) ~f:Tool.name) in
+  let before = names () in
   t.model <- model;
-  (match before, editor () with
-   | Some before, Some after when not (String.equal before after) ->
-     add_environment_note
-       t
-       (Editor { before; after })
-       ~text:(System_prompt.editor_changed_note ~before ~after)
-   | _ -> ());
+  let after = names () in
+  let added = Set.diff after before
+  and removed = Set.diff before after in
+  if not (Set.is_empty added && Set.is_empty removed)
+  then (
+    (* Against what the model was last told: a pending note's change. *)
+    let pending, others =
+      List.partition_map t.environment_notes ~f:(fun (note : Injected.Note.t) ->
+        match note.kind with
+        | Tools { added; removed } ->
+          First (String.Set.of_list added, String.Set.of_list removed)
+        | _ -> Second note)
+    in
+    let added, removed =
+      List.fold
+        pending
+        ~init:(added, removed)
+        ~f:(fun (added, removed) (pending_added, pending_removed) ->
+          ( Set.union
+              (Set.diff pending_added removed)
+              (Set.diff added pending_removed)
+          , Set.union
+              (Set.diff pending_removed added)
+              (Set.diff removed pending_added) ))
+    in
+    t.environment_notes <- others;
+    if not (Set.is_empty added && Set.is_empty removed)
+    then (
+      let added = Set.to_list added
+      and removed = Set.to_list removed in
+      add_environment_note
+        t
+        (Tools { added; removed })
+        ~text:(System_prompt.tools_changed_note ~added ~removed)));
   ignore
     (Session.set_model t.session ~model:(Model.key model) ~thinking:t.thinking
      : Session.Entry.t);

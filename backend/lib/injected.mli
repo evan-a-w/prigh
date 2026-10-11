@@ -13,10 +13,16 @@ module Note : sig
     type t =
       | Host of { name : string }
       | Cwd of { dir : string }
+      | Tools of
+          { added : string list
+          ; removed : string list
+          }
+      (** a model change changed the tools ([System_prompt.tools_changed_note]) *)
       | Editor of
           { before : string
           ; after : string
           }
+      (** sessions from before [Tools]: the file editor changed (wire [tools]) *)
       | Plan_mode of { on : bool }
       (** plan mode turned on or off ([System_prompt.plan_mode_note]), also
           as a message of its own between turns *)

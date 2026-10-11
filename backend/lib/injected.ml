@@ -13,6 +13,10 @@ module Note = struct
     type t =
       | Host of { name : string }
       | Cwd of { dir : string }
+      | Tools of
+          { added : string list
+          ; removed : string list
+          }
       | Editor of
           { before : string
           ; after : string
@@ -23,7 +27,7 @@ module Note = struct
     let wire = function
       | Host _ -> "host"
       | Cwd _ -> "cwd"
-      | Editor _ -> "editor"
+      | Tools _ | Editor _ -> "tools"
       | Plan_mode _ -> "plan_mode"
     ;;
   end
@@ -38,6 +42,15 @@ module Note = struct
     match t.kind with
     | Host { name } -> sprintf "Tools now run on %s" name
     | Cwd { dir } -> sprintf "Working directory is now %s" dir
+    | Tools { added; removed } ->
+      let names verb = function
+        | [] -> None
+        | tools -> Some (String.concat ~sep:", " tools ^ " " ^ verb)
+      in
+      "Tools changed: "
+      ^ String.concat
+          ~sep:"; "
+          (List.filter_opt [ names "added" added; names "removed" removed ])
     | Editor { before; after } ->
       sprintf "File edits now use %s instead of %s" after before
     | Plan_mode { on = true } ->
@@ -78,6 +91,26 @@ module Note = struct
                ~suffix:". Project instructions"
            with
            | Some dir -> Some (Cwd { dir })
+           | None
+             when String.is_prefix
+                    line
+                    ~prefix:"[Tools: the tools changed with the model." ->
+             let names label =
+               match String.substr_index line ~pattern:label with
+               | None -> []
+               | Some i ->
+                 let rest = String.drop_prefix line (i + String.length label) in
+                 String.prefix
+                   rest
+                   (String.index rest '.' |> Option.value ~default:0)
+                 |> String.split ~on:','
+                 |> List.map ~f:String.strip
+             in
+             Some
+               (Tools
+                  { added = names "Now available: "
+                  ; removed = names "No longer available: "
+                  })
            | None ->
              let%bind.Option replaces =
                between line ~prefix:"[Tools: " ~suffix:" for editing files"

@@ -4,7 +4,7 @@ module Kind = struct
   type t =
     | Host
     | Cwd
-    | Editor
+    | Tools
     | Plan_mode
     | Delivery
     | Handover
@@ -21,7 +21,7 @@ module Kind = struct
   let of_string = function
     | "host" -> Host
     | "cwd" -> Cwd
-    | "editor" -> Editor
+    | "tools" | "editor" -> Tools
     | "plan_mode" -> Plan_mode
     | "delivery" -> Delivery
     | "handover" -> Handover
