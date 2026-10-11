@@ -14,8 +14,15 @@ let show text =
 let%expect_test "environment notes in front of a message, also several" =
   let host = System_prompt.host_changed_note ~host:"laptop" in
   let cwd = System_prompt.cwd_changed_note ~cwd:"/home/me/proj" in
+  (* The note sessions from before the tools note have. *)
   let editor =
-    System_prompt.editor_changed_note ~before:"apply_patch" ~after:"edit"
+    "[Tools: edit replaces apply_patch for editing files; apply_patch is no \
+     longer available.]"
+  in
+  let tools =
+    System_prompt.tools_changed_note
+      ~added:[ "edit" ]
+      ~removed:[ "apply_patch"; "web_search" ]
   in
   show (host ^ "\n\n" ^ "fix the build");
   [%expect
@@ -39,7 +46,32 @@ let%expect_test "environment notes in front of a message, also several" =
        ((kind (Editor (before apply_patch) (after edit)))
         (text
          "[Tools: edit replaces apply_patch for editing files; apply_patch is no longer available.]")))))
-    {"body":"and now?\n\nmore","notes":[{"kind":"host","title":"Tools now run on laptop","text":"[Environment: the tool host is now laptop, so tools run there and its filesystem may differ from the one described above. Re-reading AGENTS.md/CLAUDE.md there is at your discretion: they are often unchanged, and missing an update is not serious.]"},{"kind":"cwd","title":"Working directory is now /home/me/proj","text":"[Environment: the working directory is now /home/me/proj. Project instructions for it may differ from the ones above. Re-reading AGENTS.md/CLAUDE.md there is at your discretion: they are often unchanged, and missing an update is not serious.]"},{"kind":"editor","title":"File edits now use edit instead of apply_patch","text":"[Tools: edit replaces apply_patch for editing files; apply_patch is no longer available.]"}]}
+    {"body":"and now?\n\nmore","notes":[{"kind":"host","title":"Tools now run on laptop","text":"[Environment: the tool host is now laptop, so tools run there and its filesystem may differ from the one described above. Re-reading AGENTS.md/CLAUDE.md there is at your discretion: they are often unchanged, and missing an update is not serious.]"},{"kind":"cwd","title":"Working directory is now /home/me/proj","text":"[Environment: the working directory is now /home/me/proj. Project instructions for it may differ from the ones above. Re-reading AGENTS.md/CLAUDE.md there is at your discretion: they are often unchanged, and missing an update is not serious.]"},{"kind":"tools","title":"File edits now use edit instead of apply_patch","text":"[Tools: edit replaces apply_patch for editing files; apply_patch is no longer available.]"}]}
+    |}];
+  show (tools ^ "\n\nnext");
+  show
+    (System_prompt.tools_changed_note ~added:[] ~removed:[ "web_search" ]
+     ^ "\n\nnext");
+  show
+    (System_prompt.tools_changed_note ~added:[ "web_search" ] ~removed:[]
+     ^ "\n\nnext");
+  [%expect
+    {|
+    ((notes
+      (((kind (Tools (added (edit)) (removed (apply_patch web_search))))
+        (text
+         "[Tools: the tools changed with the model. Now available: edit. No longer available: apply_patch, web_search.]")))))
+    {"body":"next","notes":[{"kind":"tools","title":"Tools changed: edit added; apply_patch, web_search removed","text":"[Tools: the tools changed with the model. Now available: edit. No longer available: apply_patch, web_search.]"}]}
+    ((notes
+      (((kind (Tools (added ()) (removed (web_search))))
+        (text
+         "[Tools: the tools changed with the model. No longer available: web_search.]")))))
+    {"body":"next","notes":[{"kind":"tools","title":"Tools changed: web_search removed","text":"[Tools: the tools changed with the model. No longer available: web_search.]"}]}
+    ((notes
+      (((kind (Tools (added (web_search)) (removed ())))
+        (text
+         "[Tools: the tools changed with the model. Now available: web_search.]")))))
+    {"body":"next","notes":[{"kind":"tools","title":"Tools changed: web_search added","text":"[Tools: the tools changed with the model. Now available: web_search.]"}]}
     |}];
   (* What a user writes that only looks like it stays theirs. *)
   show "[Environment: mine]\n\ntext";

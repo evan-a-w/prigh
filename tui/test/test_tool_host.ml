@@ -43,8 +43,10 @@ let%expect_test "terminal events go to the worker, its lines become requests" =
     ; {|{"type":"event","event":"terminal_frame","host":"client-1","term_id":"t1","kind":"binary","data":"bHMK"}|}
     ; {|{"type":"event","event":"terminal_frame","host":"client-1","term_id":"t1","kind":"text","data":"{\"type\":\"resize\"}"}|}
     ; {|{"type":"event","event":"terminal_close","host":"client-1","term_id":"t1"}|}
+    ; {|{"type":"event","event":"terminal_kill","host":"client-1","key":"sess-1"}|}
     ; {|{"type":"event","event":"notice","text":"ignored"}|}
     ];
+  let%bind () = print_next to_worker in
   let%bind () = print_next to_worker in
   let%bind () = print_next to_worker in
   let%bind () = print_next to_worker in
@@ -55,6 +57,7 @@ let%expect_test "terminal events go to the worker, its lines become requests" =
     {"type":"terminal_frame","term_id":"t1","kind":"binary","data":"bHMK"}
     {"type":"terminal_frame","term_id":"t1","kind":"text","data":"{\"type\":\"resize\"}"}
     {"type":"terminal_close","term_id":"t1"}
+    {"type":"terminal_kill","key":"sess-1"}
     |}];
   print_s [%message (!spawns : int)];
   [%expect {| (!spawns 1) |}];
@@ -230,9 +233,9 @@ let%expect_test "the hello carries one host id, also when reconnecting" =
   print_endline (hex_masked (Option.value_exn !host_id));
   [%expect
     {|
-    {"id":1,"method":"hello","params":{"name":"laptop","tools":true,"host_id":"<host-id>","features":["exec_input"]}}
+    {"id":1,"method":"hello","params":{"name":"laptop","tools":true,"host_id":"<host-id>","features":["exec_input","terminal_kill"]}}
     true
-    {"id":2,"method":"hello","params":{"name":"laptop","tools":true,"host_id":"<host-id>","features":["exec_input"],"session":"s1"}}
+    {"id":2,"method":"hello","params":{"name":"laptop","tools":true,"host_id":"<host-id>","features":["exec_input","terminal_kill"],"session":"s1"}}
     true
     host-xxxxxxxxxxxxxxxx
     |}];

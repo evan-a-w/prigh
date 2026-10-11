@@ -423,7 +423,7 @@ let connection_hello hello ~host_id =
     hello
     @ [ "tools", `True
       ; "host_id", `String id
-      ; "features", `Array [ `String "exec_input" ]
+      ; "features", `Array [ `String "exec_input"; `String "terminal_kill" ]
       ]
 ;;
 

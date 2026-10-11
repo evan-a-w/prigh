@@ -160,6 +160,8 @@ let handle t (event : Event.t) =
     send
       t
       (`Object [ "type", `String "terminal_close"; "term_id", `String term_id ])
+  | Terminal_kill key ->
+    send t (`Object [ "type", `String "terminal_kill"; "key", `String key ])
   | _ -> ()
 ;;
 

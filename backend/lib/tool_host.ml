@@ -220,6 +220,11 @@ module Worker = struct
       Option.iter (viewer t json) ~f:(fun fed ->
         Option.iter (string_field json "term_id") ~f:(Hashtbl.remove t.viewers);
         Terminal_channel.Fed.close fed)
+    | "terminal_kill" ->
+      if Lazy.is_val t.terminals
+      then
+        Option.iter (string_field json "key") ~f:(fun key ->
+          Terminals.kill (Lazy.force t.terminals) ~key)
     | _ -> ()
   ;;
 
@@ -318,7 +323,8 @@ let worker_kind = function
   | "tool_exec" -> Some "exec"
   | "tool_exec_cancel" -> Some "cancel"
   | "tool_exec_input" -> Some "input"
-  | ("terminal_open" | "terminal_frame" | "terminal_close") as kind -> Some kind
+  | ("terminal_open" | "terminal_frame" | "terminal_close" | "terminal_kill") as
+    kind -> Some kind
   | _ -> None
 ;;
 
@@ -369,7 +375,10 @@ let serve_connection
                  ; Some ("cwd", `String cwd)
                  ; Some ("tools", `True)
                  ; Some ("host_id", `String host_id)
-                 ; Some ("features", `Array [ `String "exec_input" ])
+                 ; Some
+                     ( "features"
+                     , `Array [ `String "exec_input"; `String "terminal_kill" ]
+                     )
                  ]) )
         ]);
   let worker =

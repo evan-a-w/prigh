@@ -177,7 +177,7 @@ let%expect_test "help lists every key and command" =
     /thinking [off|low|on|high|max] pick or set the thinking level
     /change_default save the model and thinking level as the default for new sessions
     /verbosity [quiet|normal|verbose] how much of tool calls and thinking the transcript shows
-    /confirm [on|off] ask before bash, edits and MCP tools run (mode ask or auto, also for new sessions)
+    /confirm [on|off] ask before bash, job_input, edits and MCP tools run (mode ask or auto, also for new sessions)
     /mode [ask|auto-edit|auto|plan] pick or set the mode: what asks first, or read-only planning (Alt+M cycles)
     /plan [on|off] toggle plan mode: the model investigates and plans, changing no files, until you approve its plan
     /todos show the model's plan (its update_plan steps)

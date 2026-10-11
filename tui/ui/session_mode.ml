@@ -37,13 +37,17 @@ let of_name ~current name =
       { approval; plan = false })
 ;;
 
+(* The backend's classification: its test "which built-in tools ask in each
+   mode" lists the tools that ask. *)
+let others_ask = "bash, job_input and MCP tools ask first"
+
 let describe t =
   if t.plan
-  then "read-only planning: no file edits, commands ask first"
+  then "read-only planning: no file edits; " ^ others_ask
   else (
     match t.approval with
-    | Ask -> "bash, edits and MCP tools ask first"
-    | Auto_edit -> "file edits run; bash and MCP tools ask first"
+    | Ask -> "bash, job_input, edits and MCP tools ask first"
+    | Auto_edit -> "file edits run; " ^ others_ask
     | Auto -> "tools run without asking")
 ;;
 

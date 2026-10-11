@@ -553,7 +553,7 @@ Then:
 tui/_build/default/bin/main.exe                # interactive TUI (PRIGH_BACKEND or the dune build)
 backend/_build/default/bin/main.exe run "explain this repo"    # headless
 backend/_build/default/bin/main.exe run -session ID "go on"     # continue a saved session (id, unique prefix or file)
-backend/_build/default/bin/main.exe sessions list          # saved sessions
+backend/_build/default/bin/main.exe sessions list          # saved sessions, the archived ones last under "archived:"
 backend/_build/default/bin/main.exe sessions delete ID...  # ids may be unique prefixes; nothing is deleted if one matches none or several
 backend/_build/default/bin/main.exe sessions prune -dry-run                        # empty sessions
 backend/_build/default/bin/main.exe sessions prune -max-messages 2 -cwd /tmp       # filters: -older-than DAYS, -prompt TEXT
@@ -861,7 +861,10 @@ the status line shows `resumes 14:05`. `/resume now` retries at once,
 `/resume cancel` (or an abort, or a new prompt) cancels it. When the
 provider does not say, a note says so and nothing is scheduled.
 `resume_on_limit_reset: false` in `config.json` turns this off. A scheduled
-resume lives in the backend's memory, not in the session.
+resume is recorded in the session: a backend that restarts before the reset
+loads the session and resumes it on time (one whose reset passed while the
+backend was down is dropped; send a message to carry on), and a session
+deleted meanwhile is not resumed.
 
 Responses API requests (OpenAI and ChatGPT/Codex) carry a `prompt_cache_key`
 (the session id; a subagent's adds its id) so requests that share a prefix
@@ -954,7 +957,7 @@ are on (struck through when off or blocked) and turns them on or off.
 
 Text the harness adds to what the model reads is recorded with the message
 (`origin` in the session file and the RPC: environment notes about a new
-tool host, directory or editing tool; attached `@` files; and the messages
+tool host or directory, or tools a model change added or removed; attached `@` files; and the messages
 it writes in your place: reports of finished background work, a fallback
 model's hand-over, goal starts and continuations, the resume after a usage
 limit, `!cmd` output, the compaction summary, `/review` and `/init`). The

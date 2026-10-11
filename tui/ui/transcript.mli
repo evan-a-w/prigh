@@ -42,7 +42,11 @@ module Item : sig
         ; live_tail : string option
         ; subagent : Subagent.t option
         }
-    | Server_tool of P.Content.Server_tool.t
+    | Server_tool of
+        { tool : P.Content.Server_tool.t
+        ; ended : bool
+          (** its message ended: without output, it was interrupted *)
+        }
     (** a tool the provider ran (web search), among the reply's text *)
     | Notice of Severity.t * string
     | Block of Content.t
@@ -57,6 +61,10 @@ module Item : sig
         { kind : P.Origin.Kind.t
         ; title : string
         ; text : string (** what the model saw *)
+        ; joined : bool
+          (** follows another note directly, without the blank line that
+              starts a turn: a message's notes and the note of a message
+              of the harness's read as one group *)
         }
     (** a message the harness wrote in the user's place: a hand-over, a goal,
         [/review], ... (reports of background work are [Delivery], the

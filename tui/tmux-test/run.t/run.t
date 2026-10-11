@@ -366,14 +366,14 @@ prints the captured panes.
       [denied by user] Their reason: not on a Friday
     denied bash
     third done
-    mode: auto-edit — file edits run; bash and MCP tools ask first
+    mode: auto-edit — file edits run; bash, job_input and MCP tools ask first
   ────────────────────────────────────────────────────────────────────────────────────────────────────
   >
   …deepseek-flash  think:on  view:normal  ctx:0.0%/1.0M  $0.00  mode:auto-edit
   $ bash ./harness.sh plan
   === the plan to approve
     prigh in $TMP/cwd · /help · Esc aborts · Ctrl+C twice quits
-    mode: plan — read-only planning: no file edits, commands ask first
+    mode: plan — read-only planning: no file edits; bash, job_input and MCP tools ask first
   
   ◇ Plan mode on: the model was told to plan, not change files
   ▌ add a.txt
@@ -399,7 +399,7 @@ prints the captured panes.
   …deepseek-flash  think:on  view:normal  ctx:0.0%/1.0M  $0.00  mode:plan  confirm: y/n/r
   === approved and implemented
     prigh in $TMP/cwd · /help · Esc aborts · Ctrl+C twice quits
-    mode: plan — read-only planning: no file edits, commands ask first
+    mode: plan — read-only planning: no file edits; bash, job_input and MCP tools ask first
   
   ◇ Plan mode on: the model was told to plan, not change files
   ▌ add a.txt

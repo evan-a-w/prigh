@@ -180,7 +180,9 @@ while it is waiting on the browser.
   base64), as do `Tool_result.t`s; in sessions and on the wire the field is
   omitted when empty. User messages may carry an `origin`
   (`Injected.t`): what the harness put into the text — environment notes
-  in front (`Note`: host, cwd, editing tool, plan mode; a plan mode note
+  in front (`Note`: host, cwd, tools added/removed by a model change
+  (`Tools`; the older editor note is recognised as one too), plan mode; a
+  plan mode note
   sent between turns is a message of notes only, with an empty body), `@`
   files behind
   (`Attachment`: path and length), or a whole message written in the
@@ -558,8 +560,11 @@ two can share one.
   model the file editor it is trained on: `apply_patch` for OpenAI's GPT-5
   and later (Codex's tool, sent freeform), `edit` for the rest. `Agent`
   applies it to every run and to the system prompt; when a model change
-  swaps the editor, the next user message carries a note saying so (the
-  prompt stays fixed). `Tools.for_context` builds the per-agent tool list
+  changes the tool list (another editor, or `web_search` that only some
+  providers run), the next user message carries a note naming the tools
+  now available and no longer available (the prompt stays fixed). Several
+  switches before that message give one note with the net change, none if
+  the tools end up as they were. `Tools.for_context` builds the per-agent tool list
   (`parent`, `depth`, optional `only`), so the subagent's tool set can be
   restricted and the `subagent` tool is dropped at depth 2; unknown names
   are an argument error, and either editor's name means the child model's
@@ -668,9 +673,10 @@ two can share one.
   `images`.
   `State.usage`/`cost_usd` count every assistant message in the session file
   (all branches, also those compacted away), each at its own model's price,
-  plus what the file does not record, counted as it happens: subagents'
-  responses (from their nested `Message_end`s, so a running subagent's spend
-  shows), compactions and `btw` (never `context_tokens`). `State` also
+  plus the `Spend` entries recorded as it happens for what the messages do
+  not hold: subagents' responses (from their nested `Message_end`s, so a
+  running subagent's spend shows), compactions and `btw` (never
+  `context_tokens`); being in the file, they survive a restart. `State` also
   carries the session name, cwd and `git_branch`.
   Approvals: the agent's approver (`approve`, given to
   every run and through it to subagents) runs `Approval.decide` with the
@@ -717,7 +723,13 @@ two can share one.
   `retry-after`); with `resume_on_limit_reset`, a fiber sleeps until then
   (`?sleep_until`, injectable for tests) and starts a run with a message to
   carry on. `State.resume_at` shows it; `cancel_resume`, `resume_now`,
-  `abort`, any new run and a session switch end it. It is not persisted;
+  `abort`, any new run and a session switch end it. It is recorded in the
+  session (`Resume_at`; `None` when it runs or ends): an agent created for
+  (or switched to) the session arms it again while its time is still to
+  come, and drops it otherwise; `Rpc_server.restore_resumes` (called by
+  `main` for each server at startup) loads every session whose recorded
+  resume is to come. When the timer fires on a session whose file was
+  deleted meanwhile (`Session.gone`), a notice says so and nothing runs.
   `Rpc_server` keeps the agent loaded while one is scheduled.
 - `Config` — `~/.prigh/config.json` (`scoped_models : string list`,
   `approval_mode` (new sessions' mode; read from `confirm_tools` when
@@ -759,9 +771,13 @@ two can share one.
   Entries are messages, model/thinking changes, compaction summaries, names,
   descriptions, cwds with the tool host they are on (so a reload restores
   where the session runs), the system prompt, the approval mode with plan
-  mode (`approval`), rules the user allowed for the session (`allow_rule`)
-  and `Archived {archived}` (archived or unarchived by hand; ignored by
-  `messages`, not copied by `fork`);
+  mode (`approval`), rules the user allowed for the session (`allow_rule`),
+  `Archived {archived}` (archived or unarchived by hand), `Spend {usage,
+  cost_usd}` (what the messages do not record: subagents' responses,
+  compactions, `btw`; `spend` totals them on all branches) and `Resume_at
+  {at}` (a scheduled resume after a usage limit, `None` once it ran or was
+  cancelled; `resume_at`, also in `Summary`) — these three are ignored by
+  `messages` and not copied by `fork`;
   `Session.messages` is the message list for the next request with the
   compaction summary replacing everything before `kept_from`, preceded by
   the compaction's `pinned` message (the user's latest, kept verbatim when
@@ -770,7 +786,9 @@ two can share one.
   (`timed_messages`: each with its entry's time, as a `Timed_message.t`;
   the summary has none). Nothing is
   written to disk until the first message (or name): an abandoned empty
-  session leaves no file. `list` returns name, description, cwd,
+  session leaves no file. After that, entries are only appended to the
+  existing file (no `O_CREAT`), so a session deleted while something still
+  holds it (its description being written) is not recreated. `list` returns name, description, cwd,
   timestamps, message count, first prompt, parent, the `Archived` value
   after the last message (if any), the last activity (the last message's
   time, else the mtime, or a later unarchiving) and `bytes` (disk usage of
@@ -787,7 +805,9 @@ two can share one.
   name, tokens, cost, model changes and compactions. Under the RPC,
   `get_entries` returns `{head, entries}` (`all: true` includes abandoned
   branches for the tree view; entries carry `at` in milliseconds when
-  known; an `Archived` entry is `{kind: "archived", archived}`).
+  known; an `Archived` entry is `{kind: "archived", archived}`, a `Spend`
+  `{kind: "spend", usage, cost_usd}`, a `Resume_at` `{kind: "resume_at",
+  at}` (ms or null); the frontends ignore the last two).
 - `Compaction` — summarises older messages via the model and keeps a tail;
   manual (`/compact [instructions]`: the RPC's `instructions`, pi's
   `customInstructions`, are appended to the summariser's) or automatic.
@@ -860,7 +880,10 @@ two can share one.
   other frontends, or unknown; otherwise its files go, it leaves the agents
   table, and its terminal is killed (`on_session_deleted`, wired to
   `Terminals.kill` by `main`, keyed by `terminal_key`; relayed ones are
-  closed with `Terminal_relay.close_key`). Every client of the server (not
+  closed with `Terminal_relay.close_key`, and every connected host that ran
+  a terminal for the key and announced the `terminal_kill` feature gets
+  `{"event":"terminal_kill","key"}` and kills its shell; older hosts end it
+  by their idle timeout). Every client of the server (not
   only the session's) gets `{"type":"event","event":"sessions_changed"}`
   when something `list_sessions` shows changes: a session's `running`,
   `background`, persisted, name or description (compared per live session
@@ -963,7 +986,8 @@ two can share one.
   active host (`Rpc_server.terminal_target`). `Terminals.serve` speaks to an
   abstract frame channel (a WebSocket, or frames fed by a relay). For a
   client host the backend relays the browser socket as `terminal_open` /
-  `terminal_frame` / `terminal_close` events to that host and its
+  `terminal_frame` / `terminal_close` (and, once the session is deleted,
+  `terminal_kill`) events to that host and its
   `terminal_frame` / `terminal_closed` requests back; the host runs the same
   `Terminals` code (`Tool_host`, also behind the TUI's stdio worker, which
   forwards the same messages as lines).
@@ -1199,7 +1223,8 @@ copy of the protocol types and the e2e test guards the contract.
     terminal's `Tool_host` forwards them to its `prigh tool-host` worker
     (`"stdin": true` on `exec`, `{"type":"input",…}`), and
     `Term_app.connection_hello` with local tools announces `"features":
-    ["exec_input"]`.
+    ["exec_input", "terminal_kill"]` (`Terminal_kill` goes to the worker,
+    which kills that session's shell).
   - `Key.t` → `Intent.t` through `Keymap` (the one binding table; `/help`
     prints it). `Mode.t` (`Editing | Picker | Login_prompt | Text_prompt |
     Confirm | Question | Search`) says who owns the keyboard; dialogs never

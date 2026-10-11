@@ -150,6 +150,8 @@ let server_tool
   { id; name; input; output; is_error }
 ;;
 
+let ended tool : Transcript.Item.t = Server_tool { tool; ended = true }
+
 let show_item ?(styled = false) item =
   List.iter Verbosity.all ~f:(fun verbosity ->
     printf "== %s ==\n" (Verbosity.name verbosity);
@@ -160,7 +162,8 @@ let show_item ?(styled = false) item =
 
 let%expect_test "web search: running, its results folded, failed, unknown tools"
   =
-  show_item (Server_tool (server_tool "s1"));
+  show_item (Server_tool { tool = server_tool "s1"; ended = false });
+  show_item (Server_tool { tool = server_tool "s1"; ended = true });
   [%expect
     {|
     == quiet ==
@@ -172,8 +175,17 @@ let%expect_test "web search: running, its results folded, failed, unknown tools"
         {
           query: "ocaml eio"
         }
+    == quiet ==
+    ■ web_search "ocaml eio"  no result
+    == normal ==
+    ■ web_search "ocaml eio"  no result
+    == verbose ==
+    ■ web_search "ocaml eio"  no result
+        {
+          query: "ocaml eio"
+        }
     |}];
-  show_item ~styled:true (Server_tool (server_tool ~output:results "s1"));
+  show_item ~styled:true (ended (server_tool ~output:results "s1"));
   [%expect
     {|
     == quiet ==
@@ -198,7 +210,7 @@ let%expect_test "web search: running, its results folded, failed, unknown tools"
         [gray]5. Eio and Domains[/][gray]  [/][dim][link=https://example.com/domains]https://example.com/domains[/]
         [gray]6. Structured concurrency[/][gray]  [/][dim][link=https://example.com/sc]https://example.com/sc[/]
     |}];
-  show_item (Server_tool (server_tool ~output:"searched" "s1"));
+  show_item (ended (server_tool ~output:"searched" "s1"));
   [%expect
     {|
     == quiet ==
@@ -214,7 +226,7 @@ let%expect_test "web search: running, its results folded, failed, unknown tools"
         searched
     |}];
   show_item
-    (Server_tool
+    (ended
        (server_tool
           ~output:"web search failed: too many requests"
           ~is_error:true
@@ -235,7 +247,7 @@ let%expect_test "web search: running, its results folded, failed, unknown tools"
         web search failed: too many requests
     |}];
   show_item
-    (Server_tool
+    (ended
        (server_tool
           ~name:"code_execution"
           ~input:{|{"code":"print(1)"}|}
@@ -524,6 +536,27 @@ let%expect_test "streamed: text, a search running, its results, more text" =
     ──────────────────────────────────────────────────────────────────────
     > ▏
     /work  deepseek-flash  think:off  view:normal  ctx:0.1%/1.0M  $0.01
+    |}]
+;;
+
+let%expect_test "streamed: a search whose message ended without a result" =
+  let h = Test_app.connected ~width:70 ~height:12 () in
+  H.event h (State (state ~running:true ()));
+  H.event h (Message_start (user "what is eio?"));
+  H.event h search_use;
+  H.event h (Message_end (assistant ""));
+  H.show h;
+  [%expect {|
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+
+    ▌ earlier question
+      earlier answer
+
+    ▌ what is eio?
+    ■ web_search "ocaml eio"  no result
+    ──────────────────────────────────────────────────────────────────────
+    > ▏
+    …deepseek-flash  ctx:0.1%/1.0M  ⠋ working · Esc aborts · Enter steers
     |}]
 ;;
 

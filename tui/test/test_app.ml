@@ -6174,8 +6174,89 @@ let%expect_test "editing intents: cursor, word, kill, yank, undo, delete" =
     |}]
 ;;
 
-(* Runs last in this file, after every scenario below has populated
-   [Coverage.hit]. Every keymap binding must have been reached by a scenario. *)
+let%expect_test "Alt+M cycles the mode; the status line shows it at once" =
+  let h = connected () in
+  H.event h (State { (state ()) with approval_mode = Ask });
+  H.show h;
+  [%expect
+    {|
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+
+    ▌ earlier question
+      earlier answer
+    ────────────────────────────────────────────────────────────
+    > ▏
+    …deepseek-flash  think:off  ctx:0.1%/1.0M  $0.01  mode:ask
+    |}];
+  H.key h (Key.alt (Char "m"));
+  [%expect
+    {|
+    (Rpc
+      (method_ set_mode)
+      (params (
+        (approval_mode auto-edit)
+        (plan_mode     false)))
+      (tag (
+        Mode_set
+        "mode: auto-edit \226\128\148 file edits run; bash, job_input and MCP tools ask first")))
+    |}];
+  H.reply
+    h
+    (Mode_set "mode: auto-edit — file edits run; bash and MCP tools ask first")
+    (state_json ());
+  H.key h (Key.alt (Char "m"));
+  H.key h (Key.alt (Char "m"));
+  H.key h (Key.alt (Char "m"));
+  [%expect
+    {|
+    (Rpc
+      (method_ set_mode)
+      (params (
+        (approval_mode auto)
+        (plan_mode     true)))
+      (tag (
+        Mode_set
+        "mode: plan \226\128\148 read-only planning: no file edits; bash, job_input and MCP tools ask first")))
+    (Rpc
+      (method_ set_mode)
+      (params (
+        (approval_mode ask)
+        (plan_mode     false)))
+      (tag (
+        Mode_set
+        "mode: ask \226\128\148 bash, job_input, edits and MCP tools ask first")))
+    (Rpc
+      (method_ set_mode)
+      (params (
+        (approval_mode auto-edit)
+        (plan_mode     false)))
+      (tag (
+        Mode_set
+        "mode: auto-edit \226\128\148 file edits run; bash, job_input and MCP tools ask first")))
+    |}];
+  (* A refusal puts the backend's mode back. *)
+  H.reply_error h (Mode_set "x") "unknown approval mode";
+  [%expect {| (Rpc (method_ get_state) (params ()) (tag Refresh_state)) |}];
+  H.reply h Refresh_state (state_json ());
+  H.show h;
+  [%expect
+    {|
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+
+    ▌ earlier question
+      earlier answer
+      mode: auto-edit — file edits run; bash and MCP tools ask
+      first
+      unknown approval mode
+    ────────────────────────────────────────────────────────────
+    > ▏
+    …deepseek-flash  think:off  ctx:0.1%/1.0M  $0.01
+    |}]
+;;
+
+(* Every keymap binding must have been reached by a scenario of this file:
+   dune runs each file's inline tests in a separate process, so the other
+   test_app_*.ml files' keys do not count here. *)
 let%expect_test "keymap: every binding is covered by a scenario" =
   List.iter Keymap.bindings ~f:(fun b ->
     let keys = List.map b.keys ~f:Key.to_string |> String.concat ~sep:"/" in
@@ -6221,7 +6302,7 @@ let%expect_test "keymap: every binding is covered by a scenario" =
     Ctrl+P           Next_model               covered
     Alt+P            Prev_model               covered
     Ctrl+T           Next_thinking            covered
-    Alt+M            Cycle_mode               MISSING
+    Alt+M            Cycle_mode               covered
     Ctrl+N           Picker_toggle_filter     covered
     Alt+A            Toggle_archived          covered
     Ctrl+X           Copy_last                covered

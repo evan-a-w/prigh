@@ -290,7 +290,6 @@ let%expect_test "plan mode notes: before a prompt, alone, before a goal" =
       editing
 
     ◇ Plan mode on: the model was told to plan, not change files
-
     ◎ Goal: ship it
       planning the goal
     ────────────────────────────────────────────────────────────────────────
@@ -313,6 +312,7 @@ let%expect_test "plan mode notes: before a prompt, alone, before a goal" =
   H.show h;
   [%expect {|
     (Rpc (method_ get_entries) (params ()) (tag Entries_for_fork))
+
     ▌ earlier question
       earlier answer
 
@@ -324,7 +324,6 @@ let%expect_test "plan mode notes: before a prompt, alone, before a goal" =
       editing
 
     ◇ Plan mode on: the model was told to plan, not change files
-
     ◎ Goal: ship it
       planning the goal
     Fork at  (2)
@@ -333,6 +332,87 @@ let%expect_test "plan mode notes: before a prompt, alone, before a goal" =
     ▸* ◇ Plan mode off: the model was told it can change files  #2
     ────────────────────────────────────────────────────────────────────────
     /work  deepseek-flash  ctx:0.1%/1.0M  $0.01  Enter selects · Esc closes
+    |}]
+;;
+
+let note_json kind title =
+  sprintf
+    {|{"kind":"%s","title":"%s","text":%s}|}
+    kind
+    title
+    (P.Json.to_string (P.Json.str ("[" ^ title ^ "]")))
+;;
+
+(* Notes alone between turns (two messages in a row), a hand-over and a
+   resume carrying notes, then a prompt with notes: each group starts with
+   one blank line, and its lines follow each other without gaps. *)
+let%expect_test "every kind of note: groups read as one block" =
+  let h = Test_app.connected ~width:72 ~height:28 () in
+  let notes_only notes =
+    sprintf
+      {|{"role":"user","text":"x","origin":{"body":"","notes":[%s]}}|}
+      (String.concat ~sep:"," notes)
+  in
+  let with_source ~kind ~title notes =
+    sprintf
+      {|{"role":"user","text":"x","origin":{"source":{"kind":"%s","title":"%s"},"notes":[%s]}}|}
+      kind
+      title
+      (String.concat ~sep:"," notes)
+  in
+  let history =
+    sprintf
+      "[%s]"
+      (String.concat
+         ~sep:","
+         [ notes_only
+             [ note_json "host" "Tools now run on laptop"
+             ; note_json "cwd" "Working directory is now /work/sub"
+             ]
+         ; notes_only [ note_json "tools" "Tools changed: web_search removed" ]
+         ; with_source
+             ~kind:"handover"
+             ~title:"Hand-over from deepseek-flash"
+             [ note_json "plan_mode" "Plan mode off" ]
+         ; reply "taking over"
+         ; with_source
+             ~kind:"resume"
+             ~title:"Resumed after the usage limit"
+             [ note_json "shell" "Shell output: make" ]
+         ; reply "resumed"
+         ; sprintf
+             {|{"role":"user","text":"x","origin":{"body":"go on","notes":[%s,%s]}}|}
+             (note_json "plan_mode" "Plan mode on")
+             (note_json "goal_continuation" "Goal: continuing (2/20)")
+         ; reply "going"
+         ])
+  in
+  H.reply ~quiet:true h Initial_messages history;
+  H.show h;
+  [%expect {|
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+
+    ▌ earlier question
+      earlier answer
+
+    ⇄ Tools now run on laptop
+    ⌂ Working directory is now /work/sub
+    ± Tools changed: web_search removed
+    ◇ Plan mode off
+    ↪ Hand-over from deepseek-flash
+      taking over
+
+    $ Shell output: make
+    ↻ Resumed after the usage limit
+      resumed
+
+    ◇ Plan mode on
+    ◷ Goal: continuing (2/20)
+    ▌ go on
+      going
+    ────────────────────────────────────────────────────────────────────────
+    > ▏
+    /work  deepseek-flash  think:off  view:normal  ctx:0.1%/1.0M  $0.01
     |}]
 ;;
 

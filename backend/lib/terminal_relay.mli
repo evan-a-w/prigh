@@ -9,6 +9,10 @@ open! Import
       "data"}]
     - [{"type":"event","event":"terminal_close","host","term_id"}] when the
       browser went away;
+    - [{"type":"event","event":"terminal_kill","host","key"}] when the
+      session is gone (sent by the server to hosts with the
+      [terminal_kill] feature: older ones end the shell by their idle
+      timeout);
 
     and the host answers with [terminal_frame] ([term_id], [kind], [data])
     and [terminal_closed] ([term_id]) requests. Frames carry [kind] ["binary"]
@@ -42,5 +46,10 @@ val closed : t -> host:string -> Json.t -> unit Or_error.t
 val host_gone : t -> host:string -> unit
 
 (** Closes every terminal relayed for [key] (its session is gone): the
-    browser side ends and the host is sent [terminal_close]. *)
-val close_key : t -> key:string -> unit
+    browser side ends and the host is sent [terminal_close]. Returns the
+    hosts that ran a terminal for [key] (relayed now or earlier), which
+    still keep its shell, and forgets them. *)
+val close_key : t -> key:string -> string list
+
+(** The [terminal_kill] event for [host]. *)
+val kill_event : host:string -> key:string -> Json.t

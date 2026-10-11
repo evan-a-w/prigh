@@ -24,9 +24,3 @@ let of_string s =
       s
       (String.concat ~sep:", " (List.map all ~f:to_string))
 ;;
-
-let describe = function
-  | Ask -> "destructive tools ask first"
-  | Auto_edit -> "file edits run without asking; bash and MCP tools ask"
-  | Auto -> "tools run without asking"
-;;

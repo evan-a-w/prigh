@@ -79,6 +79,47 @@ let%expect_test "flags: bad values name the flag and the fix" =
     |}]
 ;;
 
+let%expect_test "sessions list: archived sessions last, under their heading" =
+  with_sandbox
+  @@ fun t ->
+  let dir = Filename.concat t.dir ".prigh/sessions" in
+  let session ~days_ago text =
+    let s = Session.create ~dir ~cwd:"/proj" () in
+    ignore
+      (Session.append_message
+         s
+         ~at:(Core_unix.gettimeofday () -. (days_ago *. 86400.))
+         (Message.user text)
+       : Session.Entry.t);
+    s
+  in
+  let recent = session ~days_ago:0. "recent work" in
+  let by_hand = session ~days_ago:1. "archived by hand" in
+  ignore (Session.set_archived by_hand ~archived:true : Session.Entry.t);
+  let idle = session ~days_ago:30. "idle for a month" in
+  (* Listed newest file first: make the order not depend on timing. *)
+  List.iteri [ idle; by_hand; recent ] ~f:(fun i s ->
+    let at = Core_unix.gettimeofday () -. Float.of_int (10 - i) in
+    Core_unix.utimes (Session.path s) ~access:at ~modif:at);
+  let hide = List.map (Session.list ~dir) ~f:(fun s -> s.id, "<id>") in
+  prigh ~hide t [ "sessions"; "list" ];
+  write t ".prigh/config.json" {|{"archive_after_days": 0}|};
+  prigh ~hide t [ "sessions"; "list" ];
+  [%expect
+    {|
+    $ prigh sessions list
+    <time>  <id>    1 msgs  /proj  recent work
+    archived:
+    <time>  <id>    1 msgs  /proj  archived by hand
+    <time>  <id>    1 msgs  /proj  idle for a month
+    $ prigh sessions list
+    <time>  <id>    1 msgs  /proj  recent work
+    <time>  <id>    1 msgs  /proj  idle for a month
+    archived:
+    <time>  <id>    1 msgs  /proj  archived by hand
+    |}]
+;;
+
 let%expect_test "run without a login says how to log in, as a command" =
   with_sandbox
   @@ fun t ->
