@@ -115,6 +115,7 @@ type t =
       { btw_id : string
       ; delta : string
       } (** streamed answer to our own [btw] request *)
+  | Sessions_changed
 [@@deriving sexp_of, equal]
 
 let rec of_json j =
@@ -169,6 +170,7 @@ let rec of_json j =
     >>= Config.of_json
     >>| fun c -> Config_changed c
   | "notice" -> Json.string_field j "text" >>| fun t -> Notice t
+  | "sessions_changed" -> Ok Sessions_changed
   | "queue_update" ->
     let%bind steer = Json.int_field j "steer" in
     let%map follow_up = Json.int_field j "follow_up" in

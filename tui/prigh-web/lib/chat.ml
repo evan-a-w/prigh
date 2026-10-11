@@ -268,7 +268,8 @@ let rec apply t (event : Event.t) =
   | Terminal_open _
   | Terminal_frame _
   | Terminal_close _
-  | Btw_delta _ -> t
+  | Btw_delta _
+  | Sessions_changed -> t
 ;;
 
 let rec received (event : Event.t) ~at : Event.t =

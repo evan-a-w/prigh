@@ -3738,14 +3738,16 @@ let%expect_test "config: get_config at Start installs the reply; \
       (default_model    ())
       (default_thinking ())
       (fallback_models  ())
-      (default_cwd      ())))
+      (default_cwd      ())
+      (archive_after_days 7)))
     ((
       (scoped_models (deepseek/deepseek-flash))
       (confirm_tools false)
       (default_model    ())
       (default_thinking ())
       (fallback_models  ())
-      (default_cwd      ())))
+      (default_cwd      ())
+      (archive_after_days 7)))
     |}]
 ;;
 
@@ -4694,7 +4696,8 @@ let%expect_test "/change_default saves the model and thinking level" =
       (default_model    (deepseek/deepseek-flash))
       (default_thinking (high))
       (fallback_models ())
-      (default_cwd     ())))
+      (default_cwd     ())
+      (archive_after_days 7)))
 
 
 
