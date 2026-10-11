@@ -375,6 +375,8 @@ try {
   await page.locator("form button[type=submit]").click();
   await composer().waitFor();
   await page.waitForSelector(".sidebar");
+  // The composer shows while the new session still loads.
+  await page.locator(".chat .empty").waitFor();
   await show("signed in: sidebar", ".sidebar");
   await show("signed in: chat", ".chat");
   await showHeader("signed in: top bar");
