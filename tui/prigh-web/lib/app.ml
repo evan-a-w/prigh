@@ -1811,6 +1811,61 @@ let run_command (m : Model.t) ({ name; rest } : Slash.Parsed.t) =
   | "confirm", ("off" | "false") -> set_confirm m false
   | "confirm", other ->
     error m (sprintf "Unknown setting %S: use on or off." other)
+  | "budget", "" ->
+    current_state m ~f:(fun s ->
+      toast m (String.capitalize (Prigh_ui.Loop_status.describe_budget s)))
+  | "budget", arg ->
+    (match Prigh_ui.Loop_status.parse_budget arg with
+     | Error e -> error m (String.capitalize e)
+     | Ok usd ->
+       ( m
+       , [ rpc
+             "set_budget"
+             [ "usd", Option.value_map usd ~default:`Null ~f:Json.float ]
+             ~tag:
+               (Notice
+                  (match usd with
+                   | None -> "Budget removed: turns start whatever it costs"
+                   | Some usd ->
+                     sprintf
+                       "Budget set to $%.2f: no turn starts once the session \
+                        has cost that"
+                       usd))
+         ] ))
+  | "goal", "" ->
+    current_state m ~f:(fun s ->
+      toast m (String.capitalize (Prigh_ui.Loop_status.describe_goal s)))
+  | "goal", "off" -> m, [ rpc "clear_goal" [] ~tag:(Notice "Goal cleared") ]
+  | "goal", "resume" -> m, [ rpc "resume_goal" [] ~tag:(Notice "Goal resumed") ]
+  | "goal", text ->
+    (* Refused (the budget is spent), it goes back into the editor. *)
+    ( m
+    , [ rpc
+          "set_goal"
+          [ "text", str text ]
+          ~tag:(Sent { text = "/goal " ^ text; images = [] })
+      ] )
+  | "resume", "" ->
+    current_state m ~f:(fun s ->
+      toast
+        m
+        (String.capitalize
+           (Prigh_ui.Loop_status.describe_resume s ~utc_offset:m.utc_offset)))
+  | "resume", "now" -> m, [ rpc "resume_now" [] ~tag:(Notice "Resuming now") ]
+  | "resume", "cancel" ->
+    ( m
+    , [ rpc
+          "cancel_resume"
+          []
+          ~tag:(Notice "Automatic resume cancelled: send a message to retry")
+      ] )
+  | "resume", other ->
+    error
+      m
+      (sprintf
+         "Unknown /resume argument %S: /resume now retries at once, /resume \
+          cancel stays stopped."
+         other)
   | "compact", instructions ->
     let m, cmds = toast m "Compacting the conversation…" in
     ( m

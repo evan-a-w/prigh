@@ -56,7 +56,7 @@ val text : ?selector:string -> t -> unit
 (** The tag and class of each element [selector] matches. *)
 val elements : selector:string -> t -> unit
 
-(** A state as JSON, with [fields] overriding the defaults. *)
+(** A state as JSON, with [fields] overriding the defaults (or added). *)
 val state_json : ?fields:(string * Jsonaf.t) list -> unit -> string
 
 val session_json

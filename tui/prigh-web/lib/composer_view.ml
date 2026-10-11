@@ -23,6 +23,9 @@ let popup (m : App.Model.t) ~inject =
       | Argument Host -> "Hosts"
       | Argument User -> "Users"
       | Argument Skill -> "Skills"
+      | Argument Budget -> "Budget"
+      | Argument Goal -> "Goal"
+      | Argument Resume -> "Automatic resume"
     in
     div
       ~cls:"popup"

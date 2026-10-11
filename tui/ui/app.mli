@@ -127,6 +127,8 @@ module Action : sig
     | Reply of Reply_tag.t * (P.Json.t, string) Result.t
     | Tick
     | Set_home of string
+    | Set_utc_offset of Time_ns.Span.t
+    (** the local time zone's, for times shown *)
     | Hello of P.Hello_reply.t (** the [hello] reply *)
     | Resize of
         { width : int
@@ -170,6 +172,7 @@ module Model : sig
     ; width : int
     ; height : int
     ; quitting : bool
+    ; utc_offset : Time_ns.Span.t
     }
   [@@deriving sexp_of]
 

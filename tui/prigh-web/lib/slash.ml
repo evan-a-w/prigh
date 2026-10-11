@@ -16,6 +16,9 @@ module Argument = struct
     | Host
     | User
     | Skill
+    | Budget
+    | Goal
+    | Resume
   [@@deriving sexp_of, equal]
 end
 
@@ -110,6 +113,22 @@ let all =
       ~args:"[reconnect]"
       "mcp"
       "MCP servers: their tools, approve a project's, or restart failed ones"
+  ; c
+      ~argument:Budget
+      ~args:"[dollars|off]"
+      "budget"
+      "show or set the session's cost budget: no turn starts once it is spent"
+  ; c
+      ~argument:Goal
+      ~args:"[text|off|resume]"
+      "goal"
+      "set a goal the agent keeps working toward until it is met; show, clear \
+       or resume it"
+  ; c
+      ~argument:Resume
+      ~args:"[now|cancel]"
+      "resume"
+      "show, run now or cancel the automatic resume after a usage limit"
   ; c "copy" "copy the last reply to the clipboard"
   ; c
       ~args:"<question>"

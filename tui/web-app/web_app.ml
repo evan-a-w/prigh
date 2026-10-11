@@ -210,6 +210,15 @@ let app platform ~terminal_url ~signed_in ~sign_out (local_ graph) =
   let model, inject =
     Prigh_ui.Component.create ~start_on_activate:false platform graph
   in
+  (* [getTimezoneOffset] is UTC minus local time, in minutes. *)
+  Bonsai.Edge.lifecycle
+    ~on_activate:
+      (let%arr inject in
+       let minutes = (new%js Js.date_now)##getTimezoneOffset in
+       inject
+         (Prigh_ui.App.Action.Set_utc_offset
+            (Time_ns.Span.of_min (Float.of_int (-minutes)))))
+    graph;
   let session =
     let%arr model in
     Option.map model.Prigh_ui.App.Model.state ~f:(fun s ->

@@ -259,10 +259,25 @@ let app
   let platform = Bonsai.return (platform client ~hello ~exit ~quit_requested) in
   let model, inject = Prigh_ui.Component.create platform graph in
   let home = Option.value (Sys.getenv "HOME") ~default:"." in
+  (* The local zone's offset: [mktime] reads UTC's broken-down time as
+     local. *)
+  let utc_offset =
+    let now = Core_unix.time () in
+    let as_local, _ =
+      Core_unix.mktime
+        { (Core_unix.gmtime now) with
+          tm_isdst = (Core_unix.localtime now).tm_isdst
+        }
+    in
+    Time_ns.Span.of_sec (now -. as_local)
+  in
   Bonsai.Edge.lifecycle
     ~on_activate:
       (let%arr inject in
-       inject (App.Action.Set_home home))
+       Effect.Many
+         [ inject (App.Action.Set_home home)
+         ; inject (App.Action.Set_utc_offset utc_offset)
+         ])
     graph;
   let paste = ref Paste.Idle in
   Bonsai.Edge.on_change

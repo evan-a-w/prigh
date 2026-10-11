@@ -483,6 +483,9 @@ kbd {
 .status-item.background.active { color: var(--sodium); }
 .status-item.background.active .icon { animation: pulse 1.2s infinite; }
 .status-item.host { color: var(--sodium); }
+.status-item.cost.budget { font: 11.5px var(--mono); }
+.status-item.warm { color: var(--sodium); }
+.status-item.hot { color: var(--brick); }
 
 /* Dialogs */
 

@@ -60,6 +60,66 @@ let context (state : State.t) =
       ])
 ;;
 
+let level_class : Prigh_ui.Loop_status.Level.t -> string = function
+  | Normal -> ""
+  | Warn -> "warm"
+  | Over -> "hot"
+;;
+
+let chip ~cls ~title ~command ~inject children =
+  Node.button
+    ~attrs:
+      [ Attr.class_ ("status-item link " ^ cls)
+      ; Attr.type_ "button"
+      ; Attr.title title
+      ; Attr.on_click (fun _ -> inject (Action.Run command))
+      ]
+    children
+;;
+
+(* With a budget: spent / budget, warm from 80%, hot once spent. *)
+let cost (state : State.t) ~inject =
+  match Prigh_ui.Loop_status.budget_part state with
+  | None ->
+    item ~cls:"cost" ~title:"Session cost" [ Node.textf "$%.4f" state.cost_usd ]
+  | Some (text, level) ->
+    chip
+      ~cls:("cost budget " ^ level_class level)
+      ~title:
+        "Session cost and budget: no turn starts once it is spent (/budget)"
+      ~command:"/budget"
+      ~inject
+      [ Node.text text ]
+;;
+
+let goal (state : State.t) ~inject =
+  match state.goal with
+  | None -> Node.none
+  | Some g ->
+    let text, level = Prigh_ui.Loop_status.goal_part g in
+    chip
+      ~cls:("goal " ^ level_class level)
+      ~title:("Goal: " ^ g.text ^ " (/goal)")
+      ~command:"/goal"
+      ~inject
+      [ icon Target; Node.text text ]
+;;
+
+let resume (m : App.Model.t) (state : State.t) ~inject =
+  match state.resume_at with
+  | None -> Node.none
+  | Some at ->
+    chip
+      ~cls:"resume warm"
+      ~title:
+        "Stopped at a usage limit: resumes then (/resume now, /resume cancel)"
+      ~command:"/resume"
+      ~inject
+      [ icon Clock
+      ; Node.text (Prigh_ui.Loop_status.resume_part at ~utc_offset:m.utc_offset)
+      ]
+;;
+
 let background (m : App.Model.t) ~inject =
   match Agents_view.summary m.agents with
   | None -> Node.none
@@ -177,10 +237,9 @@ let view (m : App.Model.t) ~inject =
               (tokens state.usage.input)
               (tokens state.usage.output)
           ]
-      ; item
-          ~cls:"cost"
-          ~title:"Session cost"
-          [ Node.textf "$%.4f" state.cost_usd ]
+      ; cost state ~inject
+      ; goal state ~inject
+      ; resume m state ~inject
       ; (if steer + follow_up > 0
          then
            Node.button

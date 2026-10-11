@@ -42,6 +42,10 @@ type t =
   (** backend first, then connected tool-capable clients *)
   ; subagents : Subagent.t list
   ; jobs : Job.t list
+  ; budget_usd : float option (** no turn starts once [cost_usd] reaches it *)
+  ; goal : Goal.t option
+  ; resume_at : Time_ns.t option
+    (** when a run stopped by a usage limit resumes by itself *)
   }
 [@@deriving sexp_of, equal]
 

@@ -56,6 +56,12 @@ count some lines
 <CWD>
 DeepSeek V4.1 Flash
 on
+=== chromium: a budget in the status line ===
+Ready
+0%
+↑0 ↓0
+$<COST>/$<COST>
+token
 === chromium: read an image ===
 what does flag.png look like?
 <TIME>
@@ -393,6 +399,12 @@ count some lines
 <CWD>
 DeepSeek V4.1 Flash
 on
+=== firefox: a budget in the status line ===
+Ready
+0%
+↑0 ↓0
+$<COST>/$<COST>
+token
 === firefox: read an image ===
 what does flag.png look like?
 <TIME>
