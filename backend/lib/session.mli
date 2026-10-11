@@ -49,8 +49,7 @@ module Entry : sig
       | Approval of
           { mode : string (** an [Approval_mode] *)
           ; plan : bool
-          }
-      (** the session's approval mode and whether it is in plan mode *)
+          } (** the session's approval mode and whether it is in plan mode *)
       | Allow_rule of { rule : string }
       (** an [Approval_rule] the user allowed for the session *)
       | Archived of { archived : bool }
@@ -154,6 +153,7 @@ val set_approval : t -> mode:string -> plan:bool -> Entry.t
 val allow_rules : t -> string list
 
 val add_allow_rule : t -> rule:string -> Entry.t
+
 (** [at] defaults to now. *)
 val append_message : t -> ?at:float -> Message.t -> Entry.t
 
@@ -171,6 +171,7 @@ val append_compaction
   -> summary:string
   -> kept_from:string
   -> Entry.t
+
 val rewind : t -> to_:string -> unit Or_error.t
 
 (** Copy [src_path] into [dir] under a fresh stamp. The session id is kept
