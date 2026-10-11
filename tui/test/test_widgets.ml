@@ -596,6 +596,7 @@ let%expect_test "keymap: every binding resolves to its intent and is documented"
     Ctrl+T           Next_thinking
     Alt+M            Cycle_mode
     Ctrl+N           Picker_toggle_filter
+    Alt+A            Toggle_archived
     Ctrl+X           Copy_last
     Ctrl+Z           Suspend
     Shift+Tab        Next_agent
@@ -651,6 +652,7 @@ let%expect_test "keymap: every binding resolves to its intent and is documented"
     Ctrl+T                  cycle the thinking level
     Alt+M                   cycle the mode: ask → auto-edit → auto → plan (read-only)
     Ctrl+N                  picker: toggle the named-only / logged-in-only filter
+    Alt+A                   /sessions: archive or unarchive the highlighted session
     Ctrl+X                  copy the last assistant message
     Ctrl+Z                  suspend to the shell
     Shift+Tab               cycle focus: main → agent 1 → … → main
@@ -681,7 +683,11 @@ let%expect_test "keymap: every binding resolves to its intent and is documented"
     /new                               start a new session
     /name [text]                       set the session name
     /session                           show session statistics
-    /sessions                          pick a saved session (Ctrl+N named, Ctrl+D delete)
+    /sessions                          pick a saved session (Tab marks, Ctrl+D deletes, Alt+A archives, Alt+D deletes all archived, Ctrl+N named)
+    /archive [session]                 archive a session (the current one without an argument)
+    /unarchive [session]               unarchive a session (the current one without an argument)
+    /delete [session...]               delete sessions, after a confirmation (none: pick them in /sessions)
+    /delete-archived                   delete every archived session, after a confirmation
     /agents [cancel <n>]               focus a subagent (Ctrl+D cancels one), or cancel subagent n
     /jobs [id|kill <id>]               list background jobs (Enter shows output, Ctrl+D kills), or show/kill one
     /host [name|backend]               pick where tools run (this frontend, another one, or the backend) and the directory there
@@ -710,7 +716,10 @@ let%expect_test "keymap: every binding resolves to its intent and is documented"
     @path      attach a file (Ctrl+R completes paths)
     type                     filter the list (fuzzy)
     Enter / Esc              accept the highlighted item / close without changes
-    Ctrl+D                   /sessions: delete · /agents: cancel · /jobs: kill
+    Ctrl+D                   /sessions: delete the marked or highlighted sessions · /agents: cancel · /jobs: kill
+    Tab                      /sessions: mark or unmark the highlighted session
+    Alt+A                    /sessions: archive or unarchive the highlighted session
+    Alt+D                    /sessions: delete every archived session
     Ctrl+N                   /sessions: named only · /model: logged-in only
     Space / Ctrl+A / Ctrl+X  /scoped-models: toggle / all / none
     |}]

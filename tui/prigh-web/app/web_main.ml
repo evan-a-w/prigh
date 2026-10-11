@@ -308,11 +308,21 @@ let component client settings ~current (local_ graph) =
           || (List.is_empty model.confirms
               && not (List.is_empty model'.confirms))
         then confirm_shown := Time_ns.now ();
+        (* The text, the placeholder or the editor's width changed. *)
+        let layout (m : App.Model.t) =
+          ( App.Model.running m
+          , m.narrow
+          , m.agents.open_
+          , m.sidebar_open
+          , Option.is_some m.state )
+        in
         if
           not
             (String.equal model.draft model'.draft
-             && Bool.equal (App.Model.running model) (App.Model.running model')
-             && Bool.equal model.narrow model'.narrow)
+             && [%equal: bool * bool * bool * bool * bool]
+                  (layout model)
+                  (layout model')
+             && App.Connection.equal model.connection model'.connection)
         then autosize ();
         List.iter commands ~f:(perform client settings ctx model');
         model')
@@ -562,6 +572,7 @@ let install_listeners ~schedule ~current =
         reveal_selected ();
         Js._false));
   Browser.on_viewport_change (fun () ->
+    autosize ();
     schedule (App.Action.Set_narrow (narrow ())));
   listen Dom_html.Event.paste (fun (ev : Dom_html.clipboardEvent Js.t) ->
     Js.Opt.iter ev##.clipboardData (fun data ->
@@ -580,7 +591,7 @@ let install_listeners ~schedule ~current =
       Js.Opt.iter ev##.dataTransfer (fun data ->
         read_images ~schedule data##.files);
     Js._true);
-  Chat_listeners.install ();
+  Chat_listeners.install ~schedule;
   Agents_listeners.install ~schedule;
   Terminal_widget.install ~schedule;
   (* The chat follows new output unless the user has scrolled up. The page

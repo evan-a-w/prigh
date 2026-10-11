@@ -9,10 +9,7 @@ module Picker_kind = struct
     | Verbosity
     | Login
     | Logout
-    | Sessions of
-        { named_only : bool
-        ; sessions : Session_summary.t list
-        }
+    | Sessions of Session_selection.t
     | Fork of Entry.t list
     | Rewind of Entry.t list
     | Tree of Entry.t list
@@ -40,11 +37,23 @@ module Text_prompt_action = struct
   [@@deriving sexp_of, equal]
 end
 
+module Open_picker = struct
+  type t =
+    { kind : Picker_kind.t
+    ; picker : Picker.t
+    }
+  [@@deriving sexp_of, equal]
+end
+
 module Confirm_action = struct
   type t =
     | Logout of string
     | Rewind of string
-    | Delete_session of string
+    | Delete_sessions of
+        { paths : string list
+        ; back : Open_picker.t option
+        }
+    | Delete_archived of { back : Open_picker.t option }
     | Tool_confirm of Pending.Confirm.t
   [@@deriving sexp_of, equal]
 end

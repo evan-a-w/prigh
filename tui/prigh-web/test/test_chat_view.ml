@@ -128,13 +128,15 @@ let%expect_test
         </div>
       </details>
       <div class="markdown">
-        <p>
-          Here
-          <strong>
-            is the
-            <code> pla </code>
-          </strong>
-        </p>
+        <div class="md-part">
+          <p>
+            Here
+            <strong>
+              is the
+              <code> pla </code>
+            </strong>
+          </p>
+        </div>
       </div>
     </div>
     |}];
@@ -381,15 +383,9 @@ let%expect_test "deliveries of background work: compact cards" =
               <span class="chip ok"> exited 0 </span>
               <span class="task"> sleep 0.5; echo second </span>
             </div>
-            <details class="delivery-body">
-              <summary>
-                <span class="label"> Output </span>
-                <span class="preview"> second </span>
-              </summary>
-              <div class="output">
-                <pre> second </pre>
-              </div>
-            </details>
+            <div class="output">
+              <pre> second </pre>
+            </div>
           </div>
           <div class="bad delivery-section">
             <div class="delivery-head">
@@ -398,15 +394,9 @@ let%expect_test "deliveries of background work: compact cards" =
               <span class="bad chip"> exited 2 </span>
               <span class="task"> make </span>
             </div>
-            <details class="delivery-body">
-              <summary>
-                <span class="label"> Output </span>
-                <span class="preview"> Error: no rule </span>
-              </summary>
-              <div class="error output">
-                <pre> Error: no rule </pre>
-              </div>
-            </details>
+            <div class="error output">
+              <pre> Error: no rule </pre>
+            </div>
           </div>
           <div class="bad delivery-section">
             <div class="delivery-head">

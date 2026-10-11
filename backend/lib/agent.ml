@@ -1360,6 +1360,40 @@ let rec account t ?(nested = false) (event : Agent_event.t) =
   | _ -> ()
 ;;
 
+(* A subagent whose top-level ancestor is gone (a background subagent's
+   task, or the main run for its synchronous ones) can never end on its
+   own: it is ended here, through the normal event path. *)
+let sweep_orphans t ~main_running =
+  let background root =
+    Result.ok (Background_tasks.find t.background ~kind:Subagent root)
+  in
+  let alive root =
+    match background root with
+    | Some task -> Background_tasks.Task.running task
+    | None -> main_running
+  in
+  let why root =
+    match background root with
+    | Some _ -> sprintf "background subagent %s ended" root
+    | None -> "the run ended"
+  in
+  List.iter
+    (Subagent_log.orphan_ends t.subagent_log ~alive ~why)
+    ~f:(fun event -> broadcast t (Loop event))
+;;
+
+(* The log follows the session, saved in its data directory once the
+   session file exists. *)
+let load_subagent_log t =
+  Subagent_log.load t.subagent_log ~dir:(fun () ->
+    if Session.persisted t.session
+    then Some (Session.data_dir (Session.path t.session))
+    else None);
+  Background_tasks.avoid_subagent_ids
+    t.background
+    (List.map (Subagent_log.summaries t.subagent_log) ~f:(fun s -> s.id))
+;;
+
 let deliveries t =
   match Background_tasks.take_undelivered t.background with
   | [] -> []
@@ -1546,6 +1580,7 @@ let rec start_run ?(tried = String.Set.empty) t prompts =
         []
     in
     Option.iter !halted ~f:(fun reason -> broadcast t (Notice reason));
+    sweep_orphans t ~main_running:false;
     let tried = Set.add tried (Model.key t.model) in
     let cancelled = Cancellation.is_cancelled cancel in
     let current = phys_equal session t.session in
@@ -1768,6 +1803,7 @@ and auto_compact t =
 (* A background task finished (or was delivered): an idle agent starts a
    turn to receive it; a running one picks it up at its next turn boundary. *)
 let background_changed t =
+  sweep_orphans t ~main_running:(is_running t);
   if (not (is_running t)) && Background_tasks.has_undelivered t.background
   then start_run t [];
   state_changed t
@@ -1924,6 +1960,7 @@ let create
   in
   restore_settings t;
   restore_host t;
+  load_subagent_log t;
   Background_tasks.connect
     t.background
     ~emit:(fun event ->
@@ -2008,6 +2045,7 @@ let has_running_subagents t =
 ;;
 
 let has_running_background t = Background_tasks.has_running t.background
+let running_background t = Background_tasks.running_count t.background
 
 let cancel_subagent t ~agent_id =
   Background_tasks.cancel t.background ~kind:Subagent agent_id
@@ -2327,8 +2365,9 @@ let replace_session t session ~keep_host =
   cancel_resume_timer t;
   Background_tasks.cancel_all ~discard:true t.background;
   wait_idle t;
-  Subagent_log.clear t.subagent_log;
+  Background_tasks.forget_finished t.background;
   t.session <- session;
+  load_subagent_log t;
   if keep_host then record_location t else t.cwd <- Session.cwd session;
   t.git_branch <- find_branch t ~cwd:t.cwd;
   restore_host t;
@@ -2443,7 +2482,7 @@ let list_dirs ?host t ~prefix =
 let delete_session t ~path =
   if String.equal path (Session.path t.session)
   then Or_error.error_string "cannot delete the active session"
-  else Or_error.try_with (fun () -> Core_unix.unlink path)
+  else Or_error.try_with (fun () -> Session.delete_files path)
 ;;
 
 let export t ~format ?path () =

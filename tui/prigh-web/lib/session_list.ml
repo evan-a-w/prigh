@@ -15,3 +15,8 @@ let filter sessions ~query =
 ;;
 
 let dom_id id = "session-" ^ id
+
+let sections sessions ~query =
+  List.partition_tf (filter sessions ~query) ~f:(fun (s : Session_summary.t) ->
+    not s.archived)
+;;

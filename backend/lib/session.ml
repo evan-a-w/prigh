@@ -37,6 +37,7 @@ module Entry = struct
           ; plan : bool
           }
       | Allow_rule of { rule : string }
+      | Archived of { archived : bool }
     [@@deriving sexp, jsonaf]
   end
 
@@ -137,7 +138,8 @@ let worth_saving (line : Line.t) =
           | Goal _
           | Budget _
           | Approval _
-          | Allow_rule _ )
+          | Allow_rule _
+          | Archived _ )
       ; _
       }
   | Header _ | Head _ -> false
@@ -244,7 +246,8 @@ let add_entry t (entry : Entry.t) =
   | Goal _
   | Budget _
   | Approval _
-  | Allow_rule _ -> ()
+  | Allow_rule _
+  | Archived _ -> ()
 ;;
 
 let read_lines path =
@@ -309,6 +312,7 @@ let set_goal t goal = append t (Goal { goal })
 let set_budget t ~usd = append t (Budget { usd })
 let set_approval t ~mode ~plan = append t (Approval { mode; plan })
 let add_allow_rule t ~rule = append t (Allow_rule { rule })
+let set_archived t ~archived = append t (Archived { archived })
 
 let name t =
   List.find_map t.entries ~f:(fun (e : Entry.t) ->
@@ -323,7 +327,8 @@ let name t =
     | Goal _
     | Budget _
     | Approval _
-    | Allow_rule _ -> None)
+    | Allow_rule _
+    | Archived _ -> None)
 ;;
 
 let description t =
@@ -339,7 +344,8 @@ let description t =
     | Goal _
     | Budget _
     | Approval _
-    | Allow_rule _ -> None)
+    | Allow_rule _
+    | Archived _ -> None)
 ;;
 
 let append_compaction ?pinned t ~summary ~kept_from =
@@ -396,7 +402,8 @@ let context t =
       | Goal _
       | Budget _
       | Approval _
-      | Allow_rule _ -> acc)
+      | Allow_rule _
+      | Archived _ -> acc)
   in
   let messages entries =
     List.filter_map entries ~f:(fun (e : Entry.t) ->
@@ -411,7 +418,8 @@ let context t =
       | Goal _
       | Budget _
       | Approval _
-      | Allow_rule _ -> None)
+      | Allow_rule _
+      | Archived _ -> None)
   in
   match compaction with
   | None -> messages path
@@ -447,7 +455,8 @@ let system_prompt t =
     | Goal _
     | Budget _
     | Approval _
-    | Allow_rule _ -> acc)
+    | Allow_rule _
+    | Archived _ -> acc)
 ;;
 
 let goal t =
@@ -463,7 +472,8 @@ let goal t =
     | System_prompt _
     | Budget _
     | Approval _
-    | Allow_rule _ -> acc)
+    | Allow_rule _
+    | Archived _ -> acc)
 ;;
 
 let budget t =
@@ -479,7 +489,8 @@ let budget t =
     | System_prompt _
     | Goal _
     | Approval _
-    | Allow_rule _ -> acc)
+    | Allow_rule _
+    | Archived _ -> acc)
 ;;
 
 let model t =
@@ -495,7 +506,8 @@ let model t =
     | Goal _
     | Budget _
     | Approval _
-    | Allow_rule _ -> acc)
+    | Allow_rule _
+    | Archived _ -> acc)
 ;;
 
 let rewind t ~to_ =
@@ -524,18 +536,21 @@ let fork ?at t ~dir =
       let rec copy = function
         | [] -> ()
         | (e : Entry.t) :: rest ->
-          let payload : Entry.Payload.t =
+          let payload : Entry.Payload.t option =
             match e.payload with
             | Compaction { summary; kept_from; pinned } ->
-              Compaction
-                { summary
-                ; kept_from = renamed kept_from
-                ; pinned = Option.map pinned ~f:renamed
-                }
-            | payload -> payload
+              Some
+                (Compaction
+                   { summary
+                   ; kept_from = renamed kept_from
+                   ; pinned = Option.map pinned ~f:renamed
+                   })
+            | Archived _ -> None
+            | payload -> Some payload
           in
-          let copied = append_at forked ~at:e.at payload in
-          Hashtbl.set ids ~key:e.id ~data:copied.id;
+          Option.iter payload ~f:(fun payload ->
+            let copied = append_at forked ~at:e.at payload in
+            Hashtbl.set ids ~key:e.id ~data:copied.id);
           if not (String.equal e.id at) then copy rest
       in
       copy path;
@@ -554,40 +569,163 @@ module Summary = struct
     ; first_prompt : string option
     ; message_count : int
     ; parent : string option
+    ; archived : bool option
+    ; last_activity : float
+    ; bytes : int
     }
   [@@deriving sexp_of]
+
+  let seconds_per_day = 86400.
+
+  let is_archived t ~now ~archive_after_days ~active =
+    (not active)
+    &&
+    match t.archived with
+    | Some true -> true
+    | Some false | None ->
+      Float.(archive_after_days > 0.)
+      && Float.(now - t.last_activity > archive_after_days * seconds_per_day)
+  ;;
 end
+
+let data_dir path = String.chop_suffix_if_exists path ~suffix:".jsonl"
+
+let is_directory path =
+  match Core_unix.lstat path with
+  | { st_kind = S_DIR; _ } -> true
+  | _ | (exception _) -> false
+;;
+
+let files path =
+  List.filter [ path; data_dir path ] ~f:(fun p -> Sys_unix.file_exists_exn p)
+;;
+
+let rec usage path =
+  match Core_unix.lstat path with
+  | exception _ -> 0
+  | { st_kind = S_DIR; _ } ->
+    List.sum
+      (module Int)
+      (Sys_unix.ls_dir path)
+      ~f:(fun name -> usage (Filename.concat path name))
+  | { st_size; _ } -> Int64.to_int_exn st_size
+;;
+
+let disk_usage path = List.sum (module Int) (files path) ~f:usage
+
+let rec remove path =
+  if is_directory path
+  then (
+    List.iter (Sys_unix.ls_dir path) ~f:(fun name ->
+      remove (Filename.concat path name));
+    Core_unix.rmdir path)
+  else Core_unix.unlink path
+;;
+
+let delete_files path = List.iter (files path) ~f:remove
+
+(* An [Archived] entry after the last message is a manual (un)archive; an
+   unarchive also counts as activity. *)
+let archived_and_activity t ~mtime =
+  let last_message_at, marker =
+    List.fold
+      (List.rev t.entries)
+      ~init:(None, None)
+      ~f:(fun (last_message, marker) (e : Entry.t) ->
+        match e.payload with
+        | Message _ -> Some e.at, None
+        | Archived { archived } -> last_message, Some (archived, e.at)
+        | Model _
+        | Compaction _
+        | Name _
+        | Description _
+        | Cwd _
+        | System_prompt _
+        | Goal _
+        | Budget _
+        | Approval _
+        | Allow_rule _ -> last_message, marker)
+  in
+  let activity = Option.value (Option.join last_message_at) ~default:mtime in
+  let activity =
+    match marker with
+    | Some (false, Some at) -> Float.max activity at
+    | Some _ | None -> activity
+  in
+  Option.map marker ~f:fst, activity
+;;
+
+let summarise t ~path ~mtime =
+  let messages = messages t in
+  let archived, last_activity = archived_and_activity t ~mtime in
+  { Summary.id = t.id
+  ; path
+  ; name = name t
+  ; description = description t
+  ; cwd = t.cwd
+  ; created_at = created_at t
+  ; updated_at =
+      Time_float.to_string_utc
+        (Time_float.of_span_since_epoch (Time_float.Span.of_sec mtime))
+  ; first_prompt =
+      List.find_map messages ~f:(function
+        | Message.User u -> Some (Skill.as_typed u.text)
+        | _ -> None)
+  ; message_count = List.length messages
+  ; parent = t.parent
+  ; archived
+  ; last_activity
+  ; bytes = 0
+  }
+;;
+
+(* Summaries by path, valid while the file's size and mtime are unchanged,
+   so listing does not parse every session again. *)
+module Cache_entry = struct
+  type t =
+    { size : int64
+    ; mtime : float
+    ; summary : Summary.t option
+    }
+end
+
+let summary_cache : Cache_entry.t String.Table.t = String.Table.create ()
+
+let cached_summary path =
+  match Core_unix.stat path with
+  | exception _ -> None
+  | { st_size = size; st_mtime = mtime; _ } ->
+    let summary =
+      match Hashtbl.find summary_cache path with
+      | Some entry
+        when Int64.equal entry.size size && Float.equal entry.mtime mtime ->
+        entry.summary
+      | Some _ | None ->
+        let summary =
+          Result.ok (load path)
+          |> Option.map ~f:(fun t -> summarise t ~path ~mtime)
+        in
+        Hashtbl.set summary_cache ~key:path ~data:{ size; mtime; summary };
+        summary
+    in
+    Option.map summary ~f:(fun s -> mtime, { s with bytes = disk_usage path })
+;;
 
 let list ~dir =
   match Sys_unix.is_directory dir with
   | `No | `Unknown -> []
   | `Yes ->
-    Sys_unix.ls_dir dir
-    |> List.filter ~f:(String.is_suffix ~suffix:".jsonl")
-    |> List.sort ~compare:String.compare
-    |> List.filter_map ~f:(fun file ->
-      let path = Filename.concat dir file in
-      match load path with
-      | Error _ -> None
-      | Ok t ->
-        let messages = messages t in
-        Some
-          ( mtime t
-          , { Summary.id = t.id
-            ; path
-            ; name = name t
-            ; description = description t
-            ; cwd = t.cwd
-            ; created_at = created_at t
-            ; updated_at = updated_at t
-            ; first_prompt =
-                List.find_map messages ~f:(function
-                  | Message.User u -> Some (Skill.as_typed u.text)
-                  | _ -> None)
-            ; message_count = List.length messages
-            ; parent = t.parent
-            } ))
-    |> List.stable_sort ~compare:(fun (a, _) (b, _) -> Time_float.compare b a)
+    let paths =
+      Sys_unix.ls_dir dir
+      |> List.filter ~f:(String.is_suffix ~suffix:".jsonl")
+      |> List.sort ~compare:String.compare
+      |> List.map ~f:(Filename.concat dir)
+    in
+    let present = String.Set.of_list paths in
+    Hashtbl.filter_keys_inplace summary_cache ~f:(fun path ->
+      (not (String.equal (Filename.dirname path) dir)) || Set.mem present path);
+    List.filter_map paths ~f:cached_summary
+    |> List.stable_sort ~compare:(fun (a, _) (b, _) -> Float.compare b a)
     |> List.map ~f:snd
 ;;
 
@@ -762,7 +900,8 @@ let to_markdown t =
     | Goal _
     | Budget _
     | Approval _
-    | Allow_rule _ -> None
+    | Allow_rule _
+    | Archived _ -> None
   in
   let blocks = List.filter_map (active_path t) ~f:block in
   String.concat (("# Session " ^ t.id) :: blocks) ~sep:"\n\n" ^ "\n"
@@ -790,4 +929,4 @@ module Filter = struct
   ;;
 end
 
-let delete (s : Summary.t) = Core_unix.unlink s.path
+let delete (s : Summary.t) = delete_files s.path

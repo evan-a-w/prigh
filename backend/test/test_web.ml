@@ -573,12 +573,15 @@ let%expect_test
   [%expect
     {|
     terminal: event state active_host=client-2 hosts=<host>,laptop
+    terminal: event sessions_changed
     terminal: event tool_exec
     browser: event state active_host=client-2 hosts=<host>,laptop
+    browser: event sessions_changed
     browser: response b2 ok=true
     browser: event agent_start
     browser: event message_start
     browser: event message_end
+    browser: event sessions_changed
     browser: event turn_start
     browser: event message_start
     browser: event message_update
@@ -589,6 +592,7 @@ let%expect_test
     terminal: event agent_start
     terminal: event message_start
     terminal: event message_end
+    terminal: event sessions_changed
     terminal: event turn_start
     terminal: event message_start
     terminal: event message_update
@@ -613,10 +617,12 @@ let%expect_test
   [%expect
     {|
     browser: event state active_host=client-2 hosts=<host>,laptop
+    browser: event sessions_changed
     browser: event notice
     browser: event state active_host=backend hosts=<host>,laptop
     browser: response b3 ok=true
     terminal: event state active_host=client-2 hosts=<host>,laptop
+    terminal: event sessions_changed
     terminal: event notice
     terminal: event state active_host=backend hosts=<host>,laptop
     terminal: event notice

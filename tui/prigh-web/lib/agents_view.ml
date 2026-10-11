@@ -314,7 +314,10 @@ let agent_detail (m : App.Model.t) ~inject (a : Agent.t) =
   let transcript =
     match sub with
     | Some s when not (List.is_empty (Chat.entries s.chat)) ->
-      Chat_view.view (App.Model.message_time m) s.chat
+      Chat_view.view
+        ~fold:(Fold.scoped (App.Model.fold m) s.agent_id)
+        (App.Model.message_time m)
+        s.chat
     | Some _ -> div ~cls:"agents-note" [ Node.text "Starting…" ]
     | None ->
       div

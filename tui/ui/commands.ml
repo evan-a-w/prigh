@@ -12,6 +12,7 @@ module Argument = struct
     | Login
     | Logout
     | Sessions
+    | Session_list (** several, completed word by word *)
     | Path
     | Directory
     | Default_directory
@@ -130,7 +131,27 @@ let all =
   ; c "new" "" "start a new session"
   ; c "name" "[text]" "set the session name"
   ; c "session" "" "show session statistics"
-  ; c "sessions" "" "pick a saved session (Ctrl+N named, Ctrl+D delete)"
+  ; c
+      "sessions"
+      ""
+      "pick a saved session (Tab marks, Ctrl+D deletes, Alt+A archives, Alt+D \
+       deletes all archived, Ctrl+N named)"
+  ; c
+      ~argument:Argument.Sessions
+      "archive"
+      "[session]"
+      "archive a session (the current one without an argument)"
+  ; c
+      ~argument:Argument.Sessions
+      "unarchive"
+      "[session]"
+      "unarchive a session (the current one without an argument)"
+  ; c
+      ~argument:Argument.Session_list
+      "delete"
+      "[session...]"
+      "delete sessions, after a confirmation (none: pick them in /sessions)"
+  ; c "delete-archived" "" "delete every archived session, after a confirmation"
   ; c
       "agents"
       "[cancel <n>]"

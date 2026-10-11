@@ -26,7 +26,18 @@ module Reply_tag : sig
     | Entries_for_rewind
     | Entries_for_tree
     | Export_done
-    | Deleted_session
+    | Sessions_refresh (** the open sessions picker and the cache *)
+    | Sessions_deleted
+    | Sessions_to_delete of string list (** [/delete]'s arguments *)
+    | Archived_to_delete
+    | Archive_done of
+        { name : string
+        ; archived : bool
+        }
+    | Session_to_archive of
+        { arg : string (** [/archive]'s argument *)
+        ; archived : bool
+        }
     | Paths_for_autocomplete of string
     | Dirs_for_autocomplete of string
     | Set_model_done of string

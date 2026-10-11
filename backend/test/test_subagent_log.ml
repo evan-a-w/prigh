@@ -113,7 +113,69 @@ let%expect_test "statuses, activity and transcripts of nested subagents" =
     (a1/c2 (((message (User ((text dig)))) (at (7)))))
     none
     |}];
-  Subagent_log.clear log;
+  Subagent_log.load log ~dir:(fun () -> None);
   show log;
   [%expect {| |}]
+;;
+
+(* A subagent whose top-level ancestor is gone is ended, nested ones first
+   and inside their ancestors' envelopes; finished ones and those under a
+   live ancestor are left alone. *)
+let%expect_test "orphan_ends: subagents whose top-level ancestor is gone" =
+  let log = Subagent_log.create () in
+  let record event = Subagent_log.record log ~now:1. event in
+  record (start "a1" "background");
+  record (inside "a1" (start ~call_id:"c2" "a1/c2" "nested"));
+  record (inside "a1" (inside "a1/c2" (start ~call_id:"c3" "a1/c2/c3" "deep")));
+  record (start "a2" "alive");
+  record (inside "a2" (start ~call_id:"c4" "a2/c4" "nested, alive"));
+  record (start ~call_id:"c5" "c5" "synchronous, finished");
+  record (finish "c5" "done");
+  let ends =
+    Subagent_log.orphan_ends
+      log
+      ~alive:(String.equal "a2")
+      ~why:(sprintf "%s ended")
+  in
+  List.iter ends ~f:(fun event -> print_s [%sexp (event : Agent_event.t)]);
+  [%expect
+    {|
+    (Subagent (call_id p1) (agent_id a1)
+     (event
+      (Subagent (call_id c2) (agent_id a1/c2)
+       (event
+        (Subagent_end (call_id c3) (agent_id a1/c2/c3)
+         (usage ((input 0) (output 0) (cache_read 0))) (turns 0) (cost_usd 0)
+         (result ((text "[interrupted] a1 ended") (is_error true))))))))
+    (Subagent (call_id p1) (agent_id a1)
+     (event
+      (Subagent_end (call_id c2) (agent_id a1/c2)
+       (usage ((input 0) (output 0) (cache_read 0))) (turns 0) (cost_usd 0)
+       (result ((text "[interrupted] a1 ended") (is_error true))))))
+    (Subagent_end (call_id p1) (agent_id a1)
+     (usage ((input 0) (output 0) (cache_read 0))) (turns 0) (cost_usd 0)
+     (result ((text "[interrupted] a1 ended") (is_error true))))
+    |}];
+  List.iter ends ~f:record;
+  List.iter (Subagent_log.summaries log) ~f:(fun s ->
+    printf
+      "%s %s %s\n"
+      s.id
+      (Subagent_log.State.to_string s.state)
+      (Option.value_map s.result ~default:"" ~f:(fun r -> r.text)));
+  [%expect
+    {|
+    a1 failed [interrupted] a1 ended
+    a1/c2 failed [interrupted] a1 ended
+    a1/c2/c3 failed [interrupted] a1 ended
+    a2 running
+    a2/c4 running
+    c5 complete done
+    |}];
+  print_s
+    [%sexp
+      (Subagent_log.orphan_ends log ~alive:(fun _ -> false) ~why:Fn.id
+       |> List.length
+       : int)];
+  [%expect {| 2 |}]
 ;;

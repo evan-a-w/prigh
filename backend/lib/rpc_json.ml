@@ -258,6 +258,7 @@ let session_summary (s : Session.Summary.t) =
     ; "first_prompt", Option.value_map s.first_prompt ~default:`Null ~f:str
     ; "message_count", int s.message_count
     ; "parent", Option.value_map s.parent ~default:`Null ~f:str
+    ; "bytes", int s.bytes
     ]
 ;;
 
@@ -298,6 +299,10 @@ let entry (e : Session.Entry.t) =
     | Approval { mode; plan } ->
       [ "kind", str "approval"; "mode", str mode; "plan", bool plan ]
     | Allow_rule { rule } -> [ "kind", str "allow_rule"; "rule", str rule ]
+    | Archived { archived } ->
+      [ "kind", str "archived"
+      ; ("archived", if archived then `True else `False)
+      ]
   in
   `Object
     ([ "id", str e.id

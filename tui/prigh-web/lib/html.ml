@@ -75,6 +75,8 @@ module Icon = struct
     | Restart
     | Target
     | Clock
+    | Archive
+    | Unarchive
   [@@deriving sexp_of]
 
   (* Paths in the style of Lucide (24x24, stroked). *)
@@ -126,6 +128,10 @@ module Icon = struct
       {|<rect x="8" y="8" width="13" height="13" rx="2"/><path d="M16 8V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h3"/>|}
     | Check -> {|<path d="m5 12 5 5L20 7"/>|}
     | Terminal -> {|<path d="m4 17 6-6-6-6M12 19h8"/>|}
+    | Archive ->
+      {|<rect x="2" y="3" width="20" height="5" rx="1"/><path d="M4 8v11a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8M10 12h4"/>|}
+    | Unarchive ->
+      {|<rect x="2" y="3" width="20" height="5" rx="1"/><path d="M4 8v11a2 2 0 0 0 2 2h2M20 8v11a2 2 0 0 1-2 2h-2M9 15l3-3 3 3M12 12v9"/>|}
     | Restart -> {|<path d="M3 12a9 9 0 1 0 2.6-6.4L3 8"/><path d="M3 3v5h5"/>|}
     | Target ->
       {|<circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1"/>|}

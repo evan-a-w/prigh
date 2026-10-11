@@ -255,6 +255,39 @@ footer, with a separator where the day changes. It speaks
 prigh's own RPC (the same `/ws` protocol as `-web`), so it gets every
 backend feature without a translation layer like pi-web's.
 
+Tool output folds to a few lines, as in the TUI: a running command's last
+lines (under how many came before), then a finished one's first and last
+lines, a file read or written, a listing or a diff cut short, each with a
+"Show all N lines" toggle that unfolds it in place (and "Fold to N lines",
+kept in view at its bottom, to fold it again). `/verbosity verbose`
+unfolds them all and `quiet` hides them; changing it, or the session,
+starts the toggles afresh.
+
+Every action shows at once, before the backend answers: a session clicked
+in the sidebar spins there while the chat shows what it is loading (also
+while connecting, and for a new session), a prompt shows as "Sending…"
+with the send button busy until the transcript has it, a model or
+thinking level chosen shows (disabled, with a spinner) until the backend
+confirms it, and a command that lists something (`/login`, `/fork`,
+`/tree`, `/session`, `/skills`, `/mcp`, `/setusr`…) opens its dialog with
+a loading row (Esc closes it, and the late answer then opens nothing).
+While the connection is down the composer is dashed and the status line
+says "Reconnecting…": what you write stays until it is back.
+
+The sidebar lists the active sessions first (a session is running, with a
+dot, while its turn or its background subagents and jobs run: "2 bg"),
+then, under an "Archived" divider with their count and size, the archived
+ones, muted. Hovering a session shows its archive (or unarchive) and delete
+buttons; on a focused session A archives or unarchives it and Delete
+deletes it. "Select" (or `/delete` with no argument) turns the list into
+checkboxes: click or Space marks a session, Shift+click or Shift+Space the
+range from the last one (across the divider), and Delete asks to delete the
+marked ones; the divider's "Delete all" (`/delete-archived`) every archived
+one. The confirmation says how many sessions and how much disk they use, and
+which ones the backend will keep (running, open in another tab or terminal,
+or the one you are in). `/archive`, `/unarchive` and `/delete` also take
+sessions by name, id or path. The list follows the backend as it changes.
+
 Subagents and background jobs have their own panel, a resizable column
 right of the chat (drag its left edge; a full-screen sheet on a phone):
 the session's subagents as a tree (nested ones under the background agent
@@ -510,6 +543,7 @@ backend/_build/default/bin/main.exe serve      # JSON-lines RPC on stdio
 | Ctrl+T | cycle the thinking level |
 | Alt+M | cycle the mode: ask → auto-edit → auto → plan (read-only) |
 | Ctrl+N | picker: toggle the named-only / logged-in-only filter |
+| Tab / Alt+A / Alt+D | `/sessions`: mark a session / archive or unarchive it / delete every archived one |
 | Ctrl+X | copy the last assistant message |
 | Ctrl+Z | suspend to the shell |
 | Shift+Tab | cycle subagent focus: main → agent 1 → … → main |
@@ -527,10 +561,24 @@ src/retry.ml`, `bash $ make test`, `subagent <task>`) and chips: `5 lines`,
 under it.
 
 In lists (pickers) typing filters fuzzily, Enter accepts and Esc closes
-without changes; Ctrl+D deletes a session, cancels a subagent or kills a job,
+without changes; Ctrl+D deletes sessions, cancels a subagent or kills a job,
 and `/scoped-models` toggles with Space (Ctrl+A all, Ctrl+X none). `/help`
 lists the commands, the prompt prefixes (`!cmd`, `!!cmd`, `!&cmd`, `@path`)
 and these keys.
+
+`/sessions` lists the active sessions first and then, after an `── archived
+──` divider and dimmed, the archived ones. `▶` marks a running session (its
+turn, or background subagents and jobs: `2 in background`), `●` one loaded
+in the backend and `*` the one you are in; the list follows changes made
+anywhere (other frontends, other sessions). In it Tab marks or unmarks a
+session (`✓`; the status line shows how many and their size), Ctrl+D
+deletes the marked sessions (or the highlighted one), Alt+A archives or
+unarchives the highlighted one, Alt+D deletes every archived session, and
+Ctrl+N shows only named ones. Deleting always asks first, with the count and
+the disk space (`Delete 3 sessions (1.2 MB)? Enter deletes, Esc keeps
+them`); Esc goes back to the list unchanged. Afterwards a notice says what
+was deleted and why any session was not (it is running, open in another
+frontend, or the one you are in).
 
 The status line is quiet gray: cwd, model, `think:`, `view:`, the context
 (`ctx:12%/200k`, the share of the model's window; yellow from 50%, red from
@@ -699,8 +747,19 @@ the chain's first model. `/fallback` shows the chain and `/fallback off`
 clears it. `default_cwd` (`/default-dir PATH`, `/default-dir off`) is the
 directory, on the backend's host (`~` allowed), that a session starts in
 when the backend starts one for a frontend, instead of the backend's
-working directory; it is ignored if it is not a directory there. Like the
-rest of `config.json`, both are per namespace
+working directory; it is ignored if it is not a directory there.
+`archive_after_days` (default 7, `0` = never) archives a session
+automatically once its last message is that many days old: the session
+lists show it as archived (frontends put archived ones apart). Archiving
+or unarchiving by hand is recorded in the session file; a new message
+unarchives it, an unarchived one stays active for another
+`archive_after_days`, and a session is never archived while a run or a
+background subagent or job of it is going on. Deleting a session (one, a
+selection, or every archived one) removes its file and its directory
+(`~/.prigh/sessions/<stamp>_<id>/`, where per-session data is kept) and
+kills its terminal; it is refused for a session that is running, open in
+another frontend, the one you are in or the backend's `-session`. Like the
+rest of `config.json`, these settings are per namespace
 (`~/.prigh/namespaces/<name>/config.json` under `-tokens`). Mistakes in the
 file are reported (at `prigh run`'s start and as notices in the UIs) rather
 than silently ignored: invalid JSON or a setting of the wrong type (prigh
@@ -781,7 +840,10 @@ it.
 | `/new`, `/clear`, `/quit` | new session / clear transcript / exit |
 | `/name [text]` | set the session name |
 | `/session` | show session statistics |
-| `/sessions` | pick a saved session (Ctrl+N named-only, Ctrl+D delete) |
+| `/sessions` | pick a saved session (Tab marks, Ctrl+D deletes, Alt+A archives/unarchives, Alt+D deletes all archived, Ctrl+N named-only) |
+| `/archive [session]`, `/unarchive [session]` | archive or unarchive a session (id, unique id prefix, name or path; the current one without an argument) |
+| `/delete [session...]` | delete sessions after a confirmation (without arguments: pick them in `/sessions`) |
+| `/delete-archived` | delete every archived session after a confirmation |
 | `/switch [path]` | switch to a saved session |
 | `/cd [path]` | change the working directory |
 | `/fork`, `/rewind`, `/tree`, `/clone` | branch the session tree |

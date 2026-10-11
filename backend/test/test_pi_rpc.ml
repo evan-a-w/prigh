@@ -508,7 +508,7 @@ let%expect_test "sessions: list, switch, /sessions dialog, /switch" =
     {"type":"extension_ui_request","id":"status-host","method":"setStatus","statusKey":"host","statusText":null}
     {"type":"extension_ui_request","id":"status-branch","method":"setStatus","statusKey":"branch","statusText":null}
     {"id":"q","type":"response","command":"new_session","success":true,"data":{}}
-    {"id":"q","type":"response","command":"list_sessions","success":true,"data":{"sessions":[{"id":"<id>","path":"$DIR/sessions/<stamp>_<id>.jsonl","name":null,"description":null,"cwd":"$DIR","created_at":"<time>","updated_at":"<time>","first_prompt":"first","message_count":2,"parent":null,"live":false}],"current":"<id>"}}
+    {"id":"q","type":"response","command":"list_sessions","success":true,"data":{"sessions":[{"id":"<id>","path":"$DIR/sessions/<stamp>_<id>.jsonl","name":null,"description":null,"cwd":"$DIR","created_at":"<time>","updated_at":"<time>","first_prompt":"first","message_count":2,"parent":null,"bytes":<n>,"live":false,"running":false,"background":0,"archived":false}],"current":"<id>"}}
     {"type":"session_reloaded"}
     {"id":"q","type":"response","command":"switch_session","success":true,"data":{}}
     {"id":"q","type":"response","command":"get_messages","success":true,"data":{"messages":[{"role":"user","content":"first","timestamp":0},{"role":"assistant","content":[{"type":"text","text":"hi"}],"provider":"prigh","model":"deepseek-flash","stopReason":"stop","timestamp":1}]}}
@@ -692,7 +692,8 @@ let%expect_test "/change_default saves the model and thinking level" =
       "default_cwd": null,
       "max_budget_usd": null,
       "goal_max_continuations": 20,
-      "resume_on_limit_reset": true
+      "resume_on_limit_reset": true,
+      "archive_after_days": 7
     }
     |}]
 ;;

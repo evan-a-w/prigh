@@ -80,6 +80,10 @@ val create
   -> unit
   -> t
 
+(** New subagents get ids other than [ids] (those of a reloaded
+    [Subagent_log]). *)
+val avoid_subagent_ids : t -> string list -> unit
+
 (** [emit] receives the tasks' events (the agent broadcasts them and rolls up
     their usage); [on_change] is called whenever a task starts, finishes or is
     delivered, after its state is updated. *)
@@ -112,6 +116,9 @@ val find : t -> kind:Kind.t -> string -> Task.t Or_error.t
 
 (** Of [kind], or of any kind. *)
 val has_running : ?kind:Kind.t -> t -> bool
+
+(** Running tasks of any kind. *)
+val running_count : t -> int
 
 val summaries : t -> kind:Kind.t -> Summary.t list
 
@@ -152,6 +159,10 @@ val cancel_and_wait
 (** Cancels every running task. With [discard], every task is marked
     delivered so nothing reaches the agent. *)
 val cancel_all : ?discard:bool -> t -> unit
+
+(** Drops every finished task (for a session replaced in place, so its
+    tasks are not listed in the next one). *)
+val forget_finished : t -> unit
 
 (** Blocks until no task is running. *)
 val wait_all : t -> unit

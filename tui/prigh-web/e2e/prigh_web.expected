@@ -62,6 +62,22 @@ Ready
 ↑0 ↓0
 $<COST>/$<COST>
 token
+=== chromium: long output, folded ===
+✓
+bash
+seq 1 30
+1
+2
+3
+4
+5
+Show all 30 lines (22 hidden)
+28
+29
+30
+=== chromium: long output, expanded ===
+34 lines, ending: 30 / Fold to 8 lines
+folded again: Show all 30 lines (22 hidden)
 === chromium: read an image ===
 what does flag.png look like?
 <TIME>
@@ -91,10 +107,12 @@ same session after reload: true
 prigh
 web
 New session
+SESSIONS
+Select
 count some lines
 <AGE>
 <CWD>
-10 msgs
+14 msgs
 T
 token
 === chromium: new session ===
@@ -105,11 +123,17 @@ What are we building?
 ! run a command
 Ctrl+L switch model
 Ctrl+K find a session
+=== chromium: sending ===
+hello again
+Sending…
+send button: Sending…
 new session in the url: true
 === chromium: two sessions ===
 prigh
 web
 New session
+SESSIONS
+Select
 hello again
 <AGE>
 <CWD>
@@ -117,15 +141,22 @@ hello again
 count some lines
 <AGE>
 <CWD>
-10 msgs
+14 msgs
 T
 token
+=== chromium: switching ===
+Loading the session…
+marked in the sidebar: count some lines
+<AGE>
+<CWD>
+14 msgs
 switched back: true
 === chromium: switched back ===
 count some lines
 <TIME>
 === chromium: backend gone ===
 Connection lost: reconnecting…
+Reconnecting…
 same session after reconnecting: true
 === chromium: after reconnecting ===
 still there?
@@ -260,6 +291,7 @@ Ready
 0%
 ↑0 ↓0
 $<COST>
+2 agents
 ask
 token
 === chromium: a confirmation ===
@@ -355,6 +387,43 @@ Allowed this session: bash(echo:*)
 Rules are permissions in ~/.prigh/config.json, e.g. {"allow": ["bash(git status:*)"], "deny": ["bash(rm:*)"]}.
 /mode or Alt+M switches the mode.
 Done
+=== chromium: archived ===
+one more
+<AGE>
+<CWD>
+2 msgs
+count some lines
+<AGE>
+<CWD>
+36 msgs
+ARCHIVED · 1 · <SIZE>
+Delete all
+hello again
+<AGE>
+<CWD>
+2 msgs
+muted: 1
+=== chromium: selected ===
+2 selected · <SIZE>
+Delete
+Done
+=== chromium: delete confirmation ===
+Delete 2 sessions?
+They will be deleted, with their subagent logs: <SIZE> on disk. This can't be undone.
+hello again
+<SIZE>
+count some lines
+<SIZE>
+Cancel
+Delete 2
+session files before: 3
+=== chromium: deleted ===
+Deleted 2 sessions (<SIZE>)
+one more
+<AGE>
+<CWD>
+2 msgs
+session files after: 1
 === chromium: errors ===
 none
 === chromium: accounts: sessions ===
@@ -505,6 +574,22 @@ Ready
 ↑0 ↓0
 $<COST>/$<COST>
 token
+=== firefox: long output, folded ===
+✓
+bash
+seq 1 30
+1
+2
+3
+4
+5
+Show all 30 lines (22 hidden)
+28
+29
+30
+=== firefox: long output, expanded ===
+34 lines, ending: 30 / Fold to 8 lines
+folded again: Show all 30 lines (22 hidden)
 === firefox: read an image ===
 what does flag.png look like?
 <TIME>
@@ -534,10 +619,12 @@ same session after reload: true
 prigh
 web
 New session
+SESSIONS
+Select
 count some lines
 <AGE>
 <CWD>
-10 msgs
+14 msgs
 T
 token
 === firefox: new session ===
@@ -548,11 +635,17 @@ What are we building?
 ! run a command
 Ctrl+L switch model
 Ctrl+K find a session
+=== firefox: sending ===
+hello again
+Sending…
+send button: Sending…
 new session in the url: true
 === firefox: two sessions ===
 prigh
 web
 New session
+SESSIONS
+Select
 hello again
 <AGE>
 <CWD>
@@ -560,15 +653,22 @@ hello again
 count some lines
 <AGE>
 <CWD>
-10 msgs
+14 msgs
 T
 token
+=== firefox: switching ===
+Loading the session…
+marked in the sidebar: count some lines
+<AGE>
+<CWD>
+14 msgs
 switched back: true
 === firefox: switched back ===
 count some lines
 <TIME>
 === firefox: backend gone ===
 Connection lost: reconnecting…
+Reconnecting…
 same session after reconnecting: true
 === firefox: after reconnecting ===
 still there?
@@ -703,6 +803,7 @@ Ready
 0%
 ↑0 ↓0
 $<COST>
+2 agents
 ask
 token
 === firefox: a confirmation ===
@@ -798,6 +899,43 @@ Allowed this session: bash(echo:*)
 Rules are permissions in ~/.prigh/config.json, e.g. {"allow": ["bash(git status:*)"], "deny": ["bash(rm:*)"]}.
 /mode or Alt+M switches the mode.
 Done
+=== firefox: archived ===
+one more
+<AGE>
+<CWD>
+2 msgs
+count some lines
+<AGE>
+<CWD>
+36 msgs
+ARCHIVED · 1 · <SIZE>
+Delete all
+hello again
+<AGE>
+<CWD>
+2 msgs
+muted: 1
+=== firefox: selected ===
+2 selected · <SIZE>
+Delete
+Done
+=== firefox: delete confirmation ===
+Delete 2 sessions?
+They will be deleted, with their subagent logs: <SIZE> on disk. This can't be undone.
+hello again
+<SIZE>
+count some lines
+<SIZE>
+Cancel
+Delete 2
+session files before: 3
+=== firefox: deleted ===
+Deleted 2 sessions (<SIZE>)
+one more
+<AGE>
+<CWD>
+2 msgs
+session files after: 1
 === firefox: errors ===
 none
 === firefox: accounts: sessions ===

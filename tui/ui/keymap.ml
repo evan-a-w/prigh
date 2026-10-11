@@ -88,6 +88,10 @@ let bindings =
       [ Key.ctrl 'n' ]
       Picker_toggle_filter
       "picker: toggle the named-only / logged-in-only filter"
+  ; b
+      [ Key.alt (Char "a") ]
+      Toggle_archived
+      "/sessions: archive or unarchive the highlighted session"
   ; b [ Key.ctrl 'x' ] Copy_last "copy the last assistant message"
   ; b [ Key.ctrl 'z' ] Suspend "suspend to the shell"
   ; b
@@ -131,7 +135,12 @@ let list_help =
   Help_table.render
     [ "type", "filter the list (fuzzy)"
     ; "Enter / Esc", "accept the highlighted item / close without changes"
-    ; "Ctrl+D", "/sessions: delete · /agents: cancel · /jobs: kill"
+    ; ( "Ctrl+D"
+      , "/sessions: delete the marked or highlighted sessions · /agents: \
+         cancel · /jobs: kill" )
+    ; "Tab", "/sessions: mark or unmark the highlighted session"
+    ; "Alt+A", "/sessions: archive or unarchive the highlighted session"
+    ; "Alt+D", "/sessions: delete every archived session"
     ; "Ctrl+N", "/sessions: named only · /model: logged-in only"
     ; "Space / Ctrl+A / Ctrl+X", "/scoped-models: toggle / all / none"
     ]

@@ -16,13 +16,16 @@
  (approval_mode auto) (plan_mode false) (plan null) (session_rules ()))
 <- prompt: ()
   event state running=true model=deepseek/deepseek-flash
+  event sessions_changed
   event user "hello there"
   event message_end
+  event sessions_changed
   event message_start
   event text_delta "faux reply"
   event assistant_end End_turn
   event state running=false model=deepseek/deepseek-flash
 <- set_model: ()
+  event sessions_changed
   event state running=false model=anthropic/claude-fable-5-1
 <- set_model ERROR: "unknown model \"gpt-9\"; did you mean: openai/gpt-4 (GPT-4), openai/gpt-5 (GPT-5), openai/gpt-4o (GPT-4o)"
 <- set_thinking: ()
@@ -104,18 +107,24 @@
 backend exited
 <- ping: pong
 <- prompt: ()
+  event sessions_changed
   event user "delegate something"
   event message_end
+  event sessions_changed
   event message_start
   event text_delta "delegating"
   event assistant_end Tool_use
   event tool_start subagent
+  event sessions_changed
   event tool_end subagent
   event message_start
   event message_end
   event message_start
+  event sessions_changed
   event text_delta "parent done"
   event assistant_end End_turn
+  event sessions_changed
+  event sessions_changed
   event user "[subagent a1 finished] say hi\nchild says hi\n[subagent: 1 turns, 0 in / 0 out tokens, $0.0000]"
   event message_end
   event message_start
@@ -133,13 +142,16 @@ backend exited
 subagent backend exited
 <- prompt: ()
   event state running=true jobs=[]
+  event sessions_changed
   event user "build it"
   event message_end
+  event sessions_changed
   event message_start
   event text_delta "building"
   event assistant_end Tool_use
   event tool_start bash
   event state running=true jobs=[j1:running]
+  event sessions_changed
   event tool_end bash
   event message_start
   event message_end
@@ -147,7 +159,9 @@ subagent backend exited
   event text_delta "started the build"
   event assistant_end End_turn
   event state running=false jobs=[j1:running]
+  event sessions_changed
   event state running=true jobs=[]
+  event sessions_changed
   event user "[job j1 exited 0] sleep 0.5; echo built\nbuilt"
   event message_end
   event message_start
@@ -158,8 +172,10 @@ subagent backend exited
 jobs backend exited
 <- prompt: ()
   event state running=true model=deepseek/deepseek-flash
+  event sessions_changed
   event user "sleep a bit"
   event message_end
+  event sessions_changed
   event message_start
   event text_delta "sleeping"
   event assistant_end Tool_use
@@ -183,18 +199,20 @@ btw backend exited
   (permissions ((allow ()) (ask ()) (deny ()))) (default_model ())
   (default_thinking ())
   (fallback_models (deepseek/deepseek-flash anthropic/claude-fable-5-1))
-  (default_cwd ($TMP))))
+  (default_cwd ($TMP)) (archive_after_days 7)))
 <- set_config ERROR: "fallback_models: unknown model \"gpt-9\"; did you mean: openai/gpt-4 (GPT-4), openai/gpt-5 (GPT-5), openai/gpt-4o (GPT-4o)"
 <- set_config: (Ok
  ((scoped_models ()) (approval_mode Auto)
   (permissions ((allow ()) (ask ()) (deny ()))) (default_model ())
   (default_thinking ())
   (fallback_models (deepseek/deepseek-flash anthropic/claude-fable-5-1))
-  (default_cwd ())))
+  (default_cwd ()) (archive_after_days 7)))
 <- prompt: ()
   event state running=true model=deepseek/deepseek-flash
+  event sessions_changed
   event user "fix the bug"
   event message_end
+  event sessions_changed
   event message_start
   event text_delta ""
   event assistant_end (Error"HTTP 429: The usage limit has been reached (usage limit reached)")
@@ -212,8 +230,10 @@ fallback backend exited
 <- prompt: ()
   event state running=false model=deepseek/deepseek-flash
   event state running=true model=deepseek/deepseek-flash
+  event sessions_changed
   event user "go"
   event message_end
+  event sessions_changed
   event message_start
   event text_delta "planning"
   event assistant_end Tool_use
@@ -270,8 +290,10 @@ fallback backend exited
 approvals backend exited
 <- prompt: ()
   event state running=true model=deepseek/deepseek-flash
+  event sessions_changed
   event user "what is in @shot.png?\n\n<file path=\"shot.png\">\nRead image file [image/png, 3x2]\n</file>"
   event message_end
+  event sessions_changed
   event message_start
   event text_delta "reading"
   event assistant_end Tool_use

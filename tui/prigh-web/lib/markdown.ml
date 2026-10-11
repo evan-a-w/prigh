@@ -808,3 +808,57 @@ let preview text =
     match List.split_while l ~f:(fun i -> not (Inline.equal i Break)) with
     | line, _ -> String.strip (Inline.to_plain line))
 ;;
+
+(* A list item (perhaps still being typed: a lone [-] or [1]) or a quote. *)
+let item_or_quote line =
+  let n = String.length line in
+  let digits =
+    Option.value
+      (String.lfindi line ~f:(fun _ c -> not (Char.is_digit c)))
+      ~default:n
+  in
+  (digits > 0
+   && (digits = n
+       || ((Char.equal line.[digits] '.' || Char.equal line.[digits] ')')
+           && (digits + 1 = n || Char.equal line.[digits + 1] ' '))))
+  || (n > 0
+      &&
+      match line.[0] with
+      | '-' | '*' | '+' -> n = 1 || Char.equal line.[1] ' '
+      | '>' -> true
+      | _ -> false)
+;;
+
+(* After a blank line, what may go on a list or quote. *)
+let may_continue line =
+  String.is_empty line || Char.is_whitespace line.[0] || item_or_quote line
+;;
+
+let block_starts text =
+  let n = String.length text in
+  (* [listy]: the block has a list or quote, which a blank line may not end. *)
+  let rec go pos ~fence ~after_blank ~listy acc =
+    if pos >= n
+    then List.rev acc
+    else (
+      let stop = Option.value (String.index_from text pos '\n') ~default:n in
+      let line = String.sub text ~pos ~len:(stop - pos) in
+      let next = stop + 1 in
+      match fence with
+      | Some f ->
+        let fence = if Fence.closes f line then None else Some f in
+        go next ~fence ~after_blank:false ~listy acc
+      | None when is_blank line -> go next ~fence ~after_blank:true ~listy acc
+      | None ->
+        let start =
+          after_blank && pos > 0 && not (listy && may_continue line)
+        in
+        go
+          next
+          ~fence:(Fence.opening line)
+          ~after_blank:false
+          ~listy:(item_or_quote line || (listy && not start))
+          (if start then pos :: acc else acc))
+  in
+  go 0 ~fence:None ~after_blank:false ~listy:false []
+;;

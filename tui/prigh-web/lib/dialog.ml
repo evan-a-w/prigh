@@ -21,6 +21,13 @@ module Picker_kind = struct
   [@@deriving sexp_of, equal]
 end
 
+module Delete_target = struct
+  type t =
+    | Sessions of string list
+    | Archived
+  [@@deriving sexp_of, equal]
+end
+
 type t =
   | Picker of
       { kind : Picker_kind.t
@@ -28,10 +35,7 @@ type t =
       }
   | Help
   | Rename of string
-  | Delete of
-      { path : string
-      ; title : string
-      }
+  | Delete of Delete_target.t
   | Login of Login_flow.t
   | Auth of Auth_status.t list
   | Hotkeys
@@ -50,10 +54,17 @@ type t =
       ; text : string
       }
   | Mcp_tools of Mcp_server.t
+  | Loading of string
 [@@deriving sexp_of, equal]
 
 let per_session = function
-  | Rename _ | Prompt _ | Rewind_confirm _ | Session _ | Text _ | Mcp_tools _
+  | Rename _
+  | Prompt _
+  | Rewind_confirm _
+  | Session _
+  | Text _
+  | Mcp_tools _
+  | Loading _
   | Picker
       { kind = Fork _ | Rewind _ | Tree | Hosts | Skills | Mcp _ | Modes; _ } ->
     true

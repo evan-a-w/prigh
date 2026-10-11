@@ -23,6 +23,9 @@ type t =
     (** automatic continuations a [/goal] gets before it stops *)
   ; resume_on_limit_reset : bool
     (** resume a run stopped by a usage limit when the limit resets *)
+  ; archive_after_days : float
+    (** a session inactive for this long is archived (default 7; 0: never),
+        see {!Session.Summary.is_archived} *)
   }
 [@@deriving sexp_of]
 

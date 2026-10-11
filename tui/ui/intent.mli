@@ -51,4 +51,5 @@ type t =
   | Search (** Ctrl+F: search the transcript *)
   | Prev_user_message (** Ctrl+Up: jump to the previous user message *)
   | Next_user_message (** Ctrl+Down: jump to the next user message *)
+  | Toggle_archived (** Alt+A in the sessions picker *)
 [@@deriving sexp_of, equal, compare]

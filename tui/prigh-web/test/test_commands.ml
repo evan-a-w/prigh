@@ -34,6 +34,14 @@ let%expect_test "every command does something (none is unknown)" =
          | Scoped_models _ -> "scoped models dialog"
          | Prompt _ -> "path prompt"
          | Text { title; _ } -> "text: " ^ title
+         | Loading title ->
+           sprintf
+             "loading %s: %s"
+             title
+             (List.filter_map commands ~f:(function
+                | Rpc { method_; _ } -> Some ("rpc " ^ method_)
+                | _ -> None)
+              |> String.concat ~sep:", ")
          | d -> String.prefix (Sexp.to_string (Dialog.sexp_of_t d)) 30)
       | None, _, _ when m'.agents.open_ -> "agents panel"
       | None, (_ :: _ as toasts), _ -> "toast: " ^ (List.last_exn toasts).text
@@ -65,21 +73,25 @@ let%expect_test "every command does something (none is unknown)" =
     /permissions               text: Permissions
     /compact                   toast: Compacting the conversation…
     /name                      (Rename"")
-    /session                   rpc session_stats
+    /session                   loading Session: rpc session_stats
     /sessions                  sidebar
     /switch                    sidebar
+    /archive                   toast: This session isn't saved yet: send a message first.
+    /unarchive                 toast: This session isn't saved yet: send a message first.
+    /delete                    toast: Click the sessions to delete (Shift+click for a range), then Delete.
+    /delete-archived           toast: There are no archived sessions.
     /clone                     rpc clone
-    /fork                      rpc get_entries
-    /rewind                    rpc get_entries
-    /tree                      rpc get_entries
+    /fork                      loading Fork from: rpc get_entries
+    /rewind                    loading Rewind to: rpc get_entries
+    /tree                      loading Session tree: rpc get_entries
     /cd                        path prompt
     /default-dir               toast: No default directory: new sessions start in the backend's working directory; /default-dir PATH sets one
     /host                      picker: Where tools run
     /export                    path prompt
     /import                    path prompt
-    /skills                    rpc list_skills
-    /skill:                    rpc list_skills
-    /mcp                       rpc list_mcp
+    /skills                    loading Skills: rpc list_skills
+    /skill:                    loading Skills: rpc list_skills
+    /mcp                       loading MCP servers: rpc list_mcp
     /budget                    toast: No budget ($0.00 spent): /budget DOLLARS stops the agent starting turns once the session has cost that much
     /goal                      toast: No goal: /goal TEXT sets one, and the agent keeps working until it judges it met
     /resume                    toast: No resume is scheduled: one is when a run stops at a usage limit whose reset time the provider gives
@@ -89,10 +101,10 @@ let%expect_test "every command does something (none is unknown)" =
     /terminal                  (Remember_terminal true), Focus_terminal
     /agents                    agents panel
     /jobs                      agents panel
-    /login                     rpc auth_status
-    /logout                    rpc auth_status
-    /auth                      rpc auth_status
-    /setusr                    rpc list_users
+    /login                     loading Log in to a provider: rpc auth_status
+    /logout                    loading Log out of a provider: rpc auth_status
+    /auth                      loading Providers: rpc auth_status
+    /setusr                    loading Act as: rpc list_users
     /signout                   Sign_out
     /retry-backend-connection  toast: The backend is connected.
     /state                     text: Session state
@@ -143,6 +155,8 @@ let%expect_test "/help <command> and /hotkeys" =
     Ctrl+↑ / Ctrl+↓ previous / next of your messages in the transcript
     PageUp / PageDown scroll the transcript
     Ctrl+K search sessions (↓ ↑ through them, Enter opens, Delete deletes)
+    A (on a session) archive or unarchive it (archived sessions are listed last, muted)
+    Space (selecting) mark a session (Shift: the range from the last one); Delete deletes the marked ones, Esc stops selecting
     Ctrl+B show or hide the sidebar
     Alt+1…9 follow subagent or job N in the agents panel
     Alt+] Alt+[ the next or previous subagent or job
@@ -178,11 +192,11 @@ let%expect_test "/scoped-models, Ctrl+P and Alt+P" =
     (Cycle_model 1)
     (Expire_toast (id 0) (after_ms 4000))
     (Rpc (method_ set_model) (params ((model anthropic/claude-sonnet-5)))
-     (tag Show_error))
+     (tag Model_set))
     (Cycle_model 1)
     (Expire_toast (id 1) (after_ms 4000))
     (Rpc (method_ set_model) (params ((model anthropic/claude-opus-5-5)))
-     (tag Show_error))
+     (tag Model_set))
     Model: Claude Opus 5.5
     |}];
   run h "/scoped-models";
@@ -241,11 +255,11 @@ let%expect_test "/scoped-models, Ctrl+P and Alt+P" =
     (Cycle_model -1)
     (Expire_toast (id 3) (after_ms 4000))
     (Rpc (method_ set_model) (params ((model deepseek/deepseek-chat)))
-     (tag Show_error))
+     (tag Model_set))
     (Cycle_model 1)
     (Expire_toast (id 4) (after_ms 4000))
     (Rpc (method_ set_model) (params ((model anthropic/claude-opus-5-5)))
-     (tag Show_error))
+     (tag Model_set))
     |}];
   (* A dialog owns the keyboard: Ctrl+P does not cycle under it. *)
   run h "/scoped-models";
@@ -267,7 +281,7 @@ let%expect_test "/scoped-models, Ctrl+P and Alt+P" =
         deepseek/deepseek-chat))
       (approval_mode Auto) (permissions ((allow ()) (ask ()) (deny ())))
       (default_model ()) (default_thinking ()) (fallback_models ())
-      (default_cwd ())))
+      (default_cwd ()) (archive_after_days 7)))
     |}]
 ;;
 
@@ -279,10 +293,10 @@ let%expect_test "/thinking and Alt+T" =
     {|
     Cycle_thinking
     (Expire_toast (id 0) (after_ms 4000))
-    (Rpc (method_ set_thinking) (params ((thinking high))) (tag Show_error))
+    (Rpc (method_ set_thinking) (params ((thinking high))) (tag Thinking_set))
     Cycle_thinking
     (Expire_toast (id 1) (after_ms 4000))
-    (Rpc (method_ set_thinking) (params ((thinking max))) (tag Show_error))
+    (Rpc (method_ set_thinking) (params ((thinking max))) (tag Thinking_set))
     |}];
   let state = (H.model h).state |> Option.value_exn in
   print_endline state.thinking;
@@ -305,7 +319,7 @@ let%expect_test "/thinking and Alt+T" =
   [%expect
     {|
     (Rpc (method_ set_model) (params ((model deepseek/deepseek-chat)))
-     (tag Show_error))
+     (tag Model_set))
     (Expire_toast (id 2) (after_ms 4000))
     Cycle_thinking
     Thinking: max
@@ -466,6 +480,7 @@ let%expect_test "/session" =
   [%expect
     {|
     (Save_history (/session))
+    (Focus dialog)
     (Rpc (method_ session_stats) (params ()) (tag Session_stats))
     (Focus dialog)
     Session
@@ -506,6 +521,7 @@ let%expect_test "/switch" =
     (Save_history ("/switch /sessions/s2.jsonl"))
     (Rpc (method_ switch_session) (params ((path /sessions/s2.jsonl)))
      (tag Reload_state))
+    (Focus editor)
     |}];
   H.act h Toggle_sidebar;
   run h "/switch";
@@ -558,6 +574,7 @@ let%expect_test "/fork: pick a message, edit it in a new session" =
   [%expect
     {|
     (Save_history (/fork))
+    (Focus dialog)
     (Rpc (method_ get_entries) (params ()) (tag (Entries Fork)))
     (Focus picker-input)
     Fork from (edit and resend)
@@ -586,8 +603,10 @@ let%expect_test "/fork: pick a message, edit it in a new session" =
   [%expect
     {|
     (Save_history (/fork))
+    (Focus dialog)
     (Rpc (method_ get_entries) (params ()) (tag (Entries Fork)))
     (Expire_toast (id 1) (after_ms 4000))
+    (Focus editor)
     Forked into a new session: edit the message and send it
     No messages yet: there is nothing to go back to.
     |}]
@@ -603,6 +622,7 @@ let%expect_test "/rewind: pick, confirm, reload the messages" =
   [%expect
     {|
     (Save_history (/rewind))
+    (Focus dialog)
     (Rpc (method_ get_entries) (params ()) (tag (Entries Rewind)))
     (Focus picker-input)
     (Dialog_move -1)
@@ -634,6 +654,7 @@ let%expect_test "/rewind: pick, confirm, reload the messages" =
   [%expect
     {|
     (Save_history (/rewind))
+    (Focus dialog)
     (Rpc (method_ get_entries) (params ()) (tag (Entries Rewind)))
     (Focus picker-input)
     Dialog_accept
@@ -666,6 +687,7 @@ let%expect_test "/tree shows branches and moves the head" =
   [%expect
     {|
     (Save_history (/tree))
+    (Focus dialog)
     (Rpc (method_ get_entries) (params ((all true))) (tag (Entries Tree)))
     (Focus picker-input)
     <div role="listbox" class="picker-items">
@@ -1227,6 +1249,7 @@ let%expect_test "/setusr: a superuser acts as another user, and back" =
   [%expect
     {|
     (Save_history (/setusr))
+    (Focus dialog)
     (Rpc (method_ list_users) (params ()) (tag (Users Picker)))
     (Focus picker-input)
     alice you ✓
@@ -1285,7 +1308,9 @@ let%expect_test "/setusr: a superuser acts as another user, and back" =
   [%expect
     {|
     (Save_history (/setusr "/setusr alice" /setusr))
+    (Focus dialog)
     (Rpc (method_ list_users) (params ()) (tag (Users Picker)))
+    (Focus editor)
     Acting as bob
     Back to alice
     unauthorised: bob is not a superuser

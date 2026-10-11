@@ -754,7 +754,7 @@ let%expect_test "typing / lists commands, Down twice + Tab fills /login " =
       /fallback [off|model...]        show or set the models th…
       /default-dir [off|path]         show or set the directory…
       /login [provider] [api_key|oauth]  log in to a provider
-      ↕ 1–8 of 47
+      ↕ 1–8 of 51
     …deepseek-flash  ctx:0.1%/1.0M  Tab/Enter accept · Esc close
     |}];
   H.key h (Key.plain Down);
@@ -771,7 +771,7 @@ let%expect_test "typing / lists commands, Down twice + Tab fills /login " =
       /fallback [off|model...]        show or set the models th…
       /default-dir [off|path]         show or set the directory…
       /login [provider] [api_key|oauth]  log in to a provider
-      ↕ 1–8 of 47
+      ↕ 1–8 of 51
     …deepseek-flash  ctx:0.1%/1.0M  Tab/Enter accept · Esc close
     |}];
   H.key h (Key.plain Down);
@@ -788,7 +788,7 @@ let%expect_test "typing / lists commands, Down twice + Tab fills /login " =
       /fallback [off|model...]        show or set the models th…
       /default-dir [off|path]         show or set the directory…
       /login [provider] [api_key|oauth]  log in to a provider
-      ↕ 1–8 of 47
+      ↕ 1–8 of 51
     …deepseek-flash  ctx:0.1%/1.0M  Tab/Enter accept · Esc close
     |}];
   H.key h (Key.plain Tab);
@@ -1048,7 +1048,7 @@ let%expect_test "/sessions picker switches and reloads; /logout confirms" =
     ▸* build fix ∣ 2025-06-01T10:00 ∣ 12 msgs ∣ fix the build p…
        (unnamed) ∣ 2025-06-02T11:30 ∣ 0 msgs ∣ (empty)  /other
     ────────────────────────────────────────────────────────────
-    …deepseek-flash  ctx:0.1%/1.0M  Enter selects · Esc closes …
+    …deepseek-flash  ctx:0.1%/1.0M  Enter switches · Tab marks …
     |}];
   H.key h (Key.plain Down);
   H.enter h;
@@ -1238,7 +1238,7 @@ let%expect_test "/sessions Ctrl+N filters named only; Ctrl+D confirms delete" =
     / ▏
     ▸* build fix ∣ 2025-06-01T10:00 ∣ 12 msgs ∣ fix the build p…
     ────────────────────────────────────────────────────────────
-    …deepseek-flash  ctx:0.1%/1.0M  Enter selects · Esc closes …
+    …deepseek-flash  ctx:0.1%/1.0M  Enter switches · Tab marks …
     |}];
   H.key h (Key.ctrl 'n');
   H.key h (Key.ctrl 'd');
@@ -1250,7 +1250,7 @@ let%expect_test "/sessions Ctrl+N filters named only; Ctrl+D confirms delete" =
     ▌ earlier question
       earlier answer
     ┌─ Confirm ────────────────────────────────────────────────┐
-    │ Delete session build fix? (y/n)                          │
+    │ Delete session "build fix" (0 B)? Enter deletes, Esc ke… │
     └──────────────────────────────────────────────────────────┘
     ────────────────────────────────────────────────────────────
     ? ▏
@@ -1260,19 +1260,828 @@ let%expect_test "/sessions Ctrl+N filters named only; Ctrl+D confirms delete" =
   [%expect
     {|
     (Rpc
-      (method_ delete_session)
-      (params ((path /home/u/.prigh/sessions/1.jsonl)))
-      (tag Deleted_session))
+      (method_ delete_sessions)
+      (params ((paths (/home/u/.prigh/sessions/1.jsonl))))
+      (tag Sessions_deleted))
     |}];
-  H.reply h Deleted_session {|{}|};
-  [%expect
-    {| (Rpc (method_ list_sessions) (params ()) (tag Sessions_picker)) |}];
-  H.reply h Sessions_picker sessions_json;
   H.mode h;
   [%expect {| picker |}];
+  H.reply
+    h
+    Sessions_deleted
+    {|{"deleted":[{"path":"/home/u/.prigh/sessions/1.jsonl","id":"1","bytes":0}],"refused":[]}|};
+  H.show h;
+  [%expect
+    {|
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+
+    ▌ earlier question
+      earlier answer
+      Deleted 1 session (0 B)
+    Sessions  (1)
+    / ▏
+    ▸  (unnamed) ∣ 2025-06-02T11:30 ∣ 0 msgs ∣ (empty)  /other
+    ────────────────────────────────────────────────────────────
+    …deepseek-flash  ctx:0.1%/1.0M  Enter switches · Tab marks …
+    |}];
   H.esc h;
   H.mode h;
   [%expect {| editing |}]
+;;
+
+(* Sessions as [list_sessions] sends them (most recent first): two archived
+   ones among the active, one running only through background work. *)
+let archive_sessions_json =
+  {|[
+  {"id":"1","path":"/home/u/.prigh/sessions/1.jsonl","name":"build fix","cwd":"/work","created_at":"2025-06-05T10:00:00Z","updated_at":"2025-06-05T10:00:00Z","first_prompt":"fix the build","message_count":12,"live":true,"bytes":2048},
+  {"id":"3a","path":"/s/3a.jsonl","name":null,"cwd":"/old","created_at":"2025-05-01T10:00:00Z","updated_at":"2025-06-04T10:00:00Z","first_prompt":"try a spike","message_count":4,"archived":true,"bytes":1500000},
+  {"id":"2","path":"/s/2.jsonl","name":"deploy","cwd":"/work","created_at":"2025-06-03T10:00:00Z","updated_at":"2025-06-03T10:00:00Z","first_prompt":"deploy it","message_count":6,"live":true,"running":true,"background":2,"bytes":4096},
+  {"id":"3b","path":"/s/3b.jsonl","name":"old spike","cwd":"/old","created_at":"2025-04-01T10:00:00Z","updated_at":"2025-04-02T10:00:00Z","first_prompt":"another spike","message_count":2,"archived":true,"bytes":1048576},
+  {"id":"5","path":"/s/5.jsonl","name":null,"cwd":"/tmp","created_at":"2025-06-01T10:00:00Z","updated_at":"2025-06-01T10:00:00Z","first_prompt":null,"message_count":0,"bytes":100}
+  ]|}
+;;
+
+let sessions_open ?(width = 100) ?(height = 16) () =
+  let h = connected ~width ~height () in
+  H.keys h "/sessions";
+  H.enter h;
+  H.reply h Sessions_picker archive_sessions_json;
+  h
+;;
+
+let picker_rows h =
+  List.iter (Render.screen h.H.model).lines ~f:(fun line ->
+    let plain = Content.Line.to_plain line in
+    if String.is_prefix plain ~prefix:" " || String.is_prefix plain ~prefix:"▸"
+    then print_endline (Content.to_styled [ line ]))
+;;
+
+let%expect_test
+    "sessions picker: active first, archived after a divider and dimmed; \
+     background work shows as running"
+  =
+  let h = sessions_open () in
+  H.show h;
+  [%expect
+    {|
+    (Rpc (method_ list_sessions) (params ()) (tag Sessions_picker))
+
+
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+
+    ▌ earlier question
+      earlier answer
+    Sessions  (5)
+    / ▏
+    ▸* ● build fix ∣ 2025-06-05T10:00 ∣ 12 msgs ∣ fix the build  /work
+       ▶ deploy ∣ 2025-06-03T10:00 ∣ 6 msgs ∣ 2 in background ∣ deploy it  /work
+       (unnamed) ∣ 2025-06-01T10:00 ∣ 0 msgs ∣ (empty)     /tmp
+      ── archived ──
+       (unnamed) ∣ 2025-06-04T10:00 ∣ 4 msgs ∣ try a spike  /old
+       old spike ∣ 2025-04-02T10:00 ∣ 2 msgs ∣ another spike  /old
+    ────────────────────────────────────────────────────────────────────────────────────────────────────
+    …deepseek-flash  ctx:0.1%/1.0M  Enter switches · Tab marks · Ctrl+D deletes · Alt+A (un)archives · …
+    |}];
+  picker_rows h;
+  [%expect
+    {|
+      [gray]prigh in /work · /help · Esc aborts · Ctrl+C twice quits[/]
+      earlier [bold]answer[/]
+    [bold][invert]▸* ● build fix ∣ 2025-06-05T10:00 ∣ 12 msgs ∣ fix the build[/][dim][invert]  /work[/]
+       ▶ deploy ∣ 2025-06-03T10:00 ∣ 6 msgs ∣ 2 in background ∣ deploy it[dim]  /work[/]
+       (unnamed) ∣ 2025-06-01T10:00 ∣ 0 msgs ∣ (empty)   [dim]  /tmp[/]
+    [dim]  ── archived ──[/]
+    [dim]   (unnamed) ∣ 2025-06-04T10:00 ∣ 4 msgs ∣ try a spike[/][dim]  /old[/]
+    [dim]   old spike ∣ 2025-04-02T10:00 ∣ 2 msgs ∣ another spike[/][dim]  /old[/]
+    |}];
+  (* Filtering keeps the sections apart. *)
+  H.keys h "spike";
+  H.show h;
+  [%expect
+    {|
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+
+    ▌ earlier question
+      earlier answer
+    Sessions  (2)
+    / spike▏
+      ── archived ──
+    ▸  (unnamed) ∣ 2025-06-04T10:00 ∣ 4 msgs ∣ try a spike  /old
+       old spike ∣ 2025-04-02T10:00 ∣ 2 msgs ∣ another spike  /old
+    ────────────────────────────────────────────────────────────────────────────────────────────────────
+    …deepseek-flash  ctx:0.1%/1.0M  Enter switches · Tab marks · Ctrl+D deletes · Alt+A (un)archives · …
+    |}]
+;;
+
+let%expect_test
+    "sessions picker: Tab marks, Ctrl+D confirms with the count and size, Esc \
+     goes back, Enter deletes and reports refusals"
+  =
+  let h = sessions_open () in
+  H.key h (Key.plain Tab);
+  H.key h (Key.plain Tab);
+  H.show h;
+  [%expect
+    {|
+    (Rpc (method_ list_sessions) (params ()) (tag Sessions_picker))
+
+
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+
+    ▌ earlier question
+      earlier answer
+    Sessions  (5)
+    / ▏
+     ✓ ● build fix ∣ 2025-06-05T10:00 ∣ 12 msgs ∣ fix the build  /work
+     ✓ ▶ deploy ∣ 2025-06-03T10:00 ∣ 6 msgs ∣ 2 in background ∣ deploy it  /work
+    ▸  (unnamed) ∣ 2025-06-01T10:00 ∣ 0 msgs ∣ (empty)     /tmp
+      ── archived ──
+       (unnamed) ∣ 2025-06-04T10:00 ∣ 4 msgs ∣ try a spike  /old
+       old spike ∣ 2025-04-02T10:00 ∣ 2 msgs ∣ another spike  /old
+    ────────────────────────────────────────────────────────────────────────────────────────────────────
+    …deepseek-flash  ctx:0.1%/1.0M  2 marked (6.0 KB) · Enter switches · Tab marks · Ctrl+D deletes · A…
+    |}];
+  (* Tab again unmarks. *)
+  H.key h (Key.plain Up);
+  H.key h (Key.plain Tab);
+  H.key h (Key.plain Down);
+  H.key h (Key.plain Down);
+  H.key h (Key.plain Tab);
+  H.show h;
+  [%expect
+    {|
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+
+    ▌ earlier question
+      earlier answer
+    Sessions  (5)
+    / ▏
+     ✓ ● build fix ∣ 2025-06-05T10:00 ∣ 12 msgs ∣ fix the build  /work
+       ▶ deploy ∣ 2025-06-03T10:00 ∣ 6 msgs ∣ 2 in background ∣ deploy it  /work
+       (unnamed) ∣ 2025-06-01T10:00 ∣ 0 msgs ∣ (empty)     /tmp
+      ── archived ──
+       (unnamed) ∣ 2025-06-04T10:00 ∣ 4 msgs ∣ try a spike  /old
+    ▸✓ old spike ∣ 2025-04-02T10:00 ∣ 2 msgs ∣ another spike  /old
+    ────────────────────────────────────────────────────────────────────────────────────────────────────
+    …deepseek-flash  ctx:0.1%/1.0M  2 marked (1.0 MB) · Enter switches · Tab marks · Ctrl+D deletes · A…
+    |}];
+  H.key h (Key.ctrl 'd');
+  H.show h;
+  [%expect
+    {|
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+
+    ▌ earlier question
+      earlier answer
+    ┌─ Confirm ────────────────────────────────────────────────────────────────────────────────────────┐
+    │ Delete 2 sessions (1.0 MB)? Enter deletes, Esc keeps them                                        │
+    └──────────────────────────────────────────────────────────────────────────────────────────────────┘
+    ────────────────────────────────────────────────────────────────────────────────────────────────────
+    ? ▏
+    /work  deepseek-flash  think:off  view:normal  ctx:0.1%/1.0M  $0.01  confirm: y / n
+    |}];
+  H.esc h;
+  H.show h;
+  [%expect
+    {|
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+
+    ▌ earlier question
+      earlier answer
+    Sessions  (5)
+    / ▏
+     ✓ ● build fix ∣ 2025-06-05T10:00 ∣ 12 msgs ∣ fix the build  /work
+       ▶ deploy ∣ 2025-06-03T10:00 ∣ 6 msgs ∣ 2 in background ∣ deploy it  /work
+       (unnamed) ∣ 2025-06-01T10:00 ∣ 0 msgs ∣ (empty)     /tmp
+      ── archived ──
+       (unnamed) ∣ 2025-06-04T10:00 ∣ 4 msgs ∣ try a spike  /old
+    ▸✓ old spike ∣ 2025-04-02T10:00 ∣ 2 msgs ∣ another spike  /old
+    ────────────────────────────────────────────────────────────────────────────────────────────────────
+    …deepseek-flash  ctx:0.1%/1.0M  2 marked (1.0 MB) · Enter switches · Tab marks · Ctrl+D deletes · A…
+    |}];
+  H.key h (Key.ctrl 'd');
+  H.enter h;
+  [%expect
+    {|
+    (Rpc
+      (method_ delete_sessions)
+      (params ((paths (/home/u/.prigh/sessions/1.jsonl /s/3b.jsonl))))
+      (tag Sessions_deleted))
+    |}];
+  H.show h;
+  [%expect
+    {|
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+
+    ▌ earlier question
+      earlier answer
+    Sessions  (5)
+    / ▏
+     ✓ ● build fix ∣ 2025-06-05T10:00 ∣ 12 msgs ∣ fix the build  /work
+       ▶ deploy ∣ 2025-06-03T10:00 ∣ 6 msgs ∣ 2 in background ∣ deploy it  /work
+       (unnamed) ∣ 2025-06-01T10:00 ∣ 0 msgs ∣ (empty)     /tmp
+      ── archived ──
+       (unnamed) ∣ 2025-06-04T10:00 ∣ 4 msgs ∣ try a spike  /old
+    ▸✓ old spike ∣ 2025-04-02T10:00 ∣ 2 msgs ∣ another spike  /old
+    ────────────────────────────────────────────────────────────────────────────────────────────────────
+    …deepseek-flash  ctx:0.1%/1.0M  2 marked (1.0 MB) · Enter switches · Tab marks · Ctrl+D deletes · A…
+    |}];
+  H.reply
+    h
+    Sessions_deleted
+    {|{"deleted":[{"path":"/s/3a.jsonl","id":"3a","bytes":1500000}],"refused":[{"path":"/home/u/.prigh/sessions/1.jsonl","error":"session \"build fix\" is the session you are in: switch to another one first"}]}|};
+  H.show h;
+  [%expect
+    {|
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+
+    ▌ earlier question
+      earlier answer
+      Deleted 1 session (1.4 MB)
+      Not deleted: session "build fix" is the session you are in: switch to another one first
+    Sessions  (4)
+    / ▏
+     ✓ ● build fix ∣ 2025-06-05T10:00 ∣ 12 msgs ∣ fix the build  /work
+       ▶ deploy ∣ 2025-06-03T10:00 ∣ 6 msgs ∣ 2 in background ∣ deploy it  /work
+       (unnamed) ∣ 2025-06-01T10:00 ∣ 0 msgs ∣ (empty)     /tmp
+      ── archived ──
+    ▸✓ old spike ∣ 2025-04-02T10:00 ∣ 2 msgs ∣ another spike  /old
+    ────────────────────────────────────────────────────────────────────────────────────────────────────
+    …deepseek-flash  ctx:0.1%/1.0M  2 marked (1.0 MB) · Enter switches · Tab marks · Ctrl+D deletes · A…
+    |}];
+  (* Without marks Ctrl+D deletes the highlighted session. *)
+  H.key h (Key.plain Tab);
+  H.key h (Key.plain Home);
+  H.key h (Key.plain Tab);
+  H.key h (Key.plain Down);
+  H.key h (Key.ctrl 'd');
+  H.show h;
+  [%expect
+    {|
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+
+    ▌ earlier question
+      earlier answer
+      Deleted 1 session (1.4 MB)
+      Not deleted: session "build fix" is the session you are in: switch to another one first
+    ┌─ Confirm ────────────────────────────────────────────────────────────────────────────────────────┐
+    │ Delete session 5 (100 B)? Enter deletes, Esc keeps it                                            │
+    └──────────────────────────────────────────────────────────────────────────────────────────────────┘
+    ────────────────────────────────────────────────────────────────────────────────────────────────────
+    ? ▏
+    /work  deepseek-flash  think:off  view:normal  ctx:0.1%/1.0M  $0.01  confirm: y / n
+    |}];
+  H.keys h "n";
+  H.mode h;
+  [%expect {| picker |}]
+;;
+
+let%expect_test
+    "sessions picker: Alt+A archives and unarchives at once; a refusal puts it \
+     back"
+  =
+  let h = sessions_open () in
+  (* A running session (here through background work) is never archived. *)
+  H.key h (Key.plain Down);
+  H.key h (Key.alt (Char "a"));
+  H.key h (Key.plain Down);
+  H.key h (Key.alt (Char "a"));
+  H.show h;
+  [%expect
+    {|
+    (Rpc (method_ list_sessions) (params ()) (tag Sessions_picker))
+    (Rpc
+      (method_ set_archived)
+      (params (
+        (path     /s/5.jsonl)
+        (archived true)))
+      (tag (
+        Archive_done
+        (name     "session 5")
+        (archived true))))
+
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+
+    ▌ earlier question
+      earlier answer
+      session "deploy" is running: wait for it, or switch to it and /abort, before archiving
+    Sessions  (5)
+    / ▏
+     * ● build fix ∣ 2025-06-05T10:00 ∣ 12 msgs ∣ fix the build  /work
+       ▶ deploy ∣ 2025-06-03T10:00 ∣ 6 msgs ∣ 2 in background ∣ deploy it  /work
+      ── archived ──
+    ▸  (unnamed) ∣ 2025-06-04T10:00 ∣ 4 msgs ∣ try a spike  /old
+       old spike ∣ 2025-04-02T10:00 ∣ 2 msgs ∣ another spike  /old
+       (unnamed) ∣ 2025-06-01T10:00 ∣ 0 msgs ∣ (empty)     /tmp
+    ────────────────────────────────────────────────────────────────────────────────────────────────────
+    …deepseek-flash  ctx:0.1%/1.0M  Enter switches · Tab marks · Ctrl+D deletes · Alt+A (un)archives · …
+    |}];
+  H.reply_error
+    h
+    (Archive_done { name = "session 5"; archived = true })
+    "no such session \"/s/5.jsonl\"";
+  H.reply h Sessions_refresh archive_sessions_json;
+  H.show h;
+  [%expect
+    {|
+    (Rpc (method_ list_sessions) (params ()) (tag Sessions_refresh))
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+
+    ▌ earlier question
+      earlier answer
+      session "deploy" is running: wait for it, or switch to it and /abort, before archiving
+      no such session "/s/5.jsonl"
+    Sessions  (5)
+    / ▏
+     * ● build fix ∣ 2025-06-05T10:00 ∣ 12 msgs ∣ fix the build  /work
+       ▶ deploy ∣ 2025-06-03T10:00 ∣ 6 msgs ∣ 2 in background ∣ deploy it  /work
+       (unnamed) ∣ 2025-06-01T10:00 ∣ 0 msgs ∣ (empty)     /tmp
+      ── archived ──
+    ▸  (unnamed) ∣ 2025-06-04T10:00 ∣ 4 msgs ∣ try a spike  /old
+       old spike ∣ 2025-04-02T10:00 ∣ 2 msgs ∣ another spike  /old
+    ────────────────────────────────────────────────────────────────────────────────────────────────────
+    …deepseek-flash  ctx:0.1%/1.0M  Enter switches · Tab marks · Ctrl+D deletes · Alt+A (un)archives · …
+    |}];
+  (* An archived one comes back among the active. *)
+  H.key h (Key.plain End);
+  H.key h (Key.alt (Char "a"));
+  H.reply
+    h
+    (Archive_done { name = "session \"old spike\""; archived = false })
+    "{}";
+  H.show h;
+  [%expect
+    {|
+    (Rpc
+      (method_ set_archived)
+      (params (
+        (path     /s/3b.jsonl)
+        (archived false)))
+      (tag (
+        Archive_done
+        (name     "session \"old spike\"")
+        (archived false))))
+
+    ▌ earlier question
+      earlier answer
+      session "deploy" is running: wait for it, or switch to it and /abort, before archiving
+      no such session "/s/5.jsonl"
+      unarchived session "old spike"
+    Sessions  (5)
+    / ▏
+     * ● build fix ∣ 2025-06-05T10:00 ∣ 12 msgs ∣ fix the build  /work
+       ▶ deploy ∣ 2025-06-03T10:00 ∣ 6 msgs ∣ 2 in background ∣ deploy it  /work
+       old spike ∣ 2025-04-02T10:00 ∣ 2 msgs ∣ another spike  /old
+       (unnamed) ∣ 2025-06-01T10:00 ∣ 0 msgs ∣ (empty)     /tmp
+      ── archived ──
+    ▸  (unnamed) ∣ 2025-06-04T10:00 ∣ 4 msgs ∣ try a spike  /old
+    ────────────────────────────────────────────────────────────────────────────────────────────────────
+    …deepseek-flash  ctx:0.1%/1.0M  Enter switches · Tab marks · Ctrl+D deletes · Alt+A (un)archives · …
+    |}]
+;;
+
+let%expect_test
+    "Alt+D and /delete-archived confirm deleting every archived session"
+  =
+  let h = sessions_open () in
+  H.key h (Key.alt (Char "d"));
+  H.show h;
+  [%expect
+    {|
+    (Rpc (method_ list_sessions) (params ()) (tag Sessions_picker))
+
+
+
+
+
+
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+
+    ▌ earlier question
+      earlier answer
+    ┌─ Confirm ────────────────────────────────────────────────────────────────────────────────────────┐
+    │ Delete all 2 archived sessions (2.4 MB)? Enter deletes, Esc keeps them                           │
+    └──────────────────────────────────────────────────────────────────────────────────────────────────┘
+    ────────────────────────────────────────────────────────────────────────────────────────────────────
+    ? ▏
+    /work  deepseek-flash  think:off  view:normal  ctx:0.1%/1.0M  $0.01  confirm: y / n
+    |}];
+  H.enter h;
+  H.mode h;
+  [%expect
+    {|
+    (Rpc (method_ delete_archived) (params ()) (tag Sessions_deleted))
+    picker
+    |}];
+  H.esc h;
+  H.keys h "/delete-archived";
+  H.enter h;
+  H.reply h Archived_to_delete archive_sessions_json;
+  H.show h;
+  [%expect
+    {|
+    (Rpc (method_ list_sessions) (params ()) (tag Archived_to_delete))
+
+
+
+
+
+
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+
+    ▌ earlier question
+      earlier answer
+    ┌─ Confirm ────────────────────────────────────────────────────────────────────────────────────────┐
+    │ Delete all 2 archived sessions (2.4 MB)? Enter deletes, Esc keeps them                           │
+    └──────────────────────────────────────────────────────────────────────────────────────────────────┘
+    ────────────────────────────────────────────────────────────────────────────────────────────────────
+    ? ▏
+    /work  deepseek-flash  think:off  view:normal  ctx:0.1%/1.0M  $0.01  confirm: y / n
+    |}];
+  H.esc h;
+  H.mode h;
+  [%expect {| editing |}];
+  H.keys h "/delete-archived";
+  H.enter h;
+  H.reply h Archived_to_delete sessions_json;
+  H.mode h;
+  [%expect
+    {|
+    (Rpc (method_ list_sessions) (params ()) (tag Archived_to_delete))
+    editing
+    |}]
+;;
+
+let run h command =
+  H.step ~quiet:true h (Intent (Insert command));
+  H.step ~quiet:true h (Intent Cancel);
+  H.enter h
+;;
+
+let%expect_test "/archive and /unarchive: the current session, or one named" =
+  let h = connected () in
+  run h "/archive";
+  [%expect
+    {|
+    (Rpc
+      (method_ set_archived)
+      (params (
+        (path     /home/u/.prigh/sessions/1.jsonl)
+        (archived true)))
+      (tag (
+        Notice_on_success
+        "archived this session (your next message unarchives it)")))
+    |}];
+  H.reply
+    h
+    (Notice_on_success "archived this session (your next message unarchives it)")
+    "{}";
+  run h "/unarchive";
+  [%expect
+    {|
+    (Rpc
+      (method_ set_archived)
+      (params (
+        (path     /home/u/.prigh/sessions/1.jsonl)
+        (archived false)))
+      (tag (Notice_on_success "unarchived this session")))
+    |}];
+  (* Completion lists the sessions; a name resolves through that list. *)
+  H.keys h "/unarchive ";
+  [%expect {| (Rpc (method_ list_sessions) (params ()) (tag Sessions_cache)) |}];
+  H.reply h Sessions_cache archive_sessions_json;
+  H.show h;
+  [%expect
+    {|
+    ▌ earlier question
+      earlier answer
+      archived this session (your next message unarchives it)
+    ────────────────────────────────────────────────────────────
+    > /unarchive ▏
+    ▸ fix the build  /work
+      try a spike    /old
+      deploy it      /work
+      another spike  /old
+      (empty)        /tmp
+    …deepseek-flash  Tab accepts · Enter runs as typed · Esc
+    |}];
+  H.key h (Key.ctrl 'u');
+  run h "/unarchive old spike";
+  [%expect
+    {|
+    (Rpc
+      (method_ list_sessions)
+      (params ())
+      (tag (
+        Session_to_archive
+        (arg      "old spike")
+        (archived false))))
+    |}];
+  H.reply
+    h
+    (Session_to_archive { arg = "old spike"; archived = false })
+    archive_sessions_json;
+  [%expect
+    {|
+    (Rpc
+      (method_ set_archived)
+      (params (
+        (path     /s/3b.jsonl)
+        (archived false)))
+      (tag (Notice_on_success "unarchived session \"old spike\"")))
+    |}];
+  H.reply h (Notice_on_success "unarchived session \"old spike\"") "{}";
+  run h "/archive 3";
+  H.reply
+    h
+    (Session_to_archive { arg = "3"; archived = true })
+    archive_sessions_json;
+  H.show h;
+  [%expect
+    {|
+    (Rpc
+      (method_ list_sessions)
+      (params ())
+      (tag (
+        Session_to_archive
+        (arg      3)
+        (archived true))))
+
+
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+
+    ▌ earlier question
+      earlier answer
+      archived this session (your next message unarchives it)
+      unarchived session "old spike"
+      "3" matches 2 sessions (3a, 3b): give more of the id
+    ────────────────────────────────────────────────────────────
+    > /archive 3▏
+    …deepseek-flash  think:off  ctx:0.1%/1.0M  $0.01
+    |}];
+  (* The backend's refusal says what to do. *)
+  H.key h (Key.ctrl 'u');
+  run h "/archive deploy";
+  H.reply
+    ~quiet:true
+    h
+    (Session_to_archive { arg = "deploy"; archived = true })
+    archive_sessions_json;
+  H.reply_error
+    h
+    (Notice_on_success "archived session \"deploy\"")
+    "session \"deploy\" is running: wait for it or /abort it before archiving";
+  H.show h;
+  [%expect
+    {|
+    (Rpc
+      (method_ list_sessions)
+      (params ())
+      (tag (
+        Session_to_archive
+        (arg      deploy)
+        (archived true))))
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+
+    ▌ earlier question
+      earlier answer
+      archived this session (your next message unarchives it)
+      unarchived session "old spike"
+      "3" matches 2 sessions (3a, 3b): give more of the id
+      session "deploy" is running: wait for it or /abort it
+      before archiving
+    ────────────────────────────────────────────────────────────
+    > ▏
+    …deepseek-flash  think:off  ctx:0.1%/1.0M  $0.01
+    |}]
+;;
+
+let%expect_test "/delete: by id, prefix or name, after a confirmation" =
+  let h = connected ~width:100 () in
+  run h "/delete 3 deploy";
+  [%expect
+    {|
+    (Rpc
+      (method_ list_sessions)
+      (params ())
+      (tag (Sessions_to_delete (3 deploy))))
+    |}];
+  H.reply h (Sessions_to_delete [ "3"; "deploy" ]) archive_sessions_json;
+  H.show h;
+  [%expect
+    {|
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+
+    ▌ earlier question
+      earlier answer
+      "3" matches 2 sessions (3a, 3b): give more of the id
+    ────────────────────────────────────────────────────────────────────────────────────────────────────
+    > /delete 3 deploy▏
+    /work  deepseek-flash  think:off  view:normal  ctx:0.1%/1.0M  $0.01
+    |}];
+  H.key h (Key.ctrl 'u');
+  run h "/delete 3b deploy";
+  H.reply h (Sessions_to_delete [ "3b"; "deploy" ]) archive_sessions_json;
+  H.show h;
+  [%expect
+    {|
+    (Rpc
+      (method_ list_sessions)
+      (params ())
+      (tag (Sessions_to_delete (3b deploy))))
+
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+
+    ▌ earlier question
+      earlier answer
+      "3" matches 2 sessions (3a, 3b): give more of the id
+    ┌─ Confirm ────────────────────────────────────────────────────────────────────────────────────────┐
+    │ Delete 2 sessions (1.0 MB)? Enter deletes, Esc keeps them                                        │
+    └──────────────────────────────────────────────────────────────────────────────────────────────────┘
+    ────────────────────────────────────────────────────────────────────────────────────────────────────
+    ? ▏
+    /work  deepseek-flash  think:off  view:normal  ctx:0.1%/1.0M  $0.01  confirm: y / n
+    |}];
+  H.enter h;
+  [%expect
+    {|
+    (Rpc
+      (method_ delete_sessions)
+      (params ((paths (/s/3b.jsonl /s/2.jsonl))))
+      (tag Sessions_deleted))
+    |}];
+  H.mode h;
+  [%expect {| editing |}];
+  H.reply
+    h
+    Sessions_deleted
+    {|{"deleted":[{"path":"/s/3b.jsonl","id":"3b","bytes":1048576},{"path":"/s/2.jsonl","id":"2","bytes":4096}],"refused":[]}|};
+  H.show h;
+  [%expect
+    {|
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+
+    ▌ earlier question
+      earlier answer
+      "3" matches 2 sessions (3a, 3b): give more of the id
+      Deleted 2 sessions (1.0 MB)
+    ────────────────────────────────────────────────────────────────────────────────────────────────────
+    > ▏
+    /work  deepseek-flash  think:off  view:normal  ctx:0.1%/1.0M  $0.01
+    |}];
+  run h "/delete nope";
+  H.reply ~quiet:true h (Sessions_to_delete [ "nope" ]) archive_sessions_json;
+  H.show h;
+  [%expect
+    {|
+    (Rpc (method_ list_sessions) (params ()) (tag (Sessions_to_delete (nope))))
+
+
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+
+    ▌ earlier question
+      earlier answer
+      "3" matches 2 sessions (3a, 3b): give more of the id
+      Deleted 2 sessions (1.0 MB)
+      no session matches "nope": /sessions lists them, or Tab after the command completes them
+    ────────────────────────────────────────────────────────────────────────────────────────────────────
+    > /delete nope▏
+    /work  deepseek-flash  think:off  view:normal  ctx:0.1%/1.0M  $0.01
+    |}];
+  H.key h (Key.ctrl 'u');
+  (* Without arguments it opens the picker, where Tab marks. *)
+  run h "/delete";
+  [%expect
+    {| (Rpc (method_ list_sessions) (params ()) (tag Sessions_picker)) |}]
+;;
+
+let%expect_test "/delete completes session after session" =
+  let h = connected ~width:100 () in
+  H.keys h "/delete ";
+  [%expect {| (Rpc (method_ list_sessions) (params ()) (tag Sessions_cache)) |}];
+  H.reply h Sessions_cache archive_sessions_json;
+  H.key h (Key.plain Tab);
+  H.keys h " ";
+  H.show h;
+  [%expect
+    {|
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+
+    ▌ earlier question
+      earlier answer
+    ────────────────────────────────────────────────────────────────────────────────────────────────────
+    > /delete /home/u/.prigh/sessions/1.jsonl ▏
+    ▸ try a spike    /old
+      deploy it      /work
+      another spike  /old
+      (empty)        /tmp
+    /work  deepseek-flash  think:off  ctx:0.1%/1.0M  $0.01  Tab accepts · Enter runs as typed · Esc
+    |}]
+;;
+
+let%expect_test
+    "sessions_changed refetches the open picker and the cached list, keeping \
+     the query, marks and highlight"
+  =
+  (* Nothing shows sessions: nothing to fetch. *)
+  let h = connected () in
+  H.event h Sessions_changed;
+  [%expect {| |}];
+  (* The completion's list is kept current. *)
+  H.keys h "/switch ";
+  H.reply ~quiet:true h Sessions_cache sessions_json;
+  H.key h (Key.ctrl 'u');
+  H.event h Sessions_changed;
+  [%expect
+    {|
+    (Rpc (method_ list_sessions) (params ()) (tag Sessions_cache))
+    (Rpc (method_ list_sessions) (params ()) (tag Sessions_refresh))
+    |}];
+  let h = sessions_open () in
+  H.keys h "d";
+  H.key h (Key.plain Tab);
+  H.show h;
+  [%expect
+    {|
+    (Rpc (method_ list_sessions) (params ()) (tag Sessions_picker))
+
+
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+
+    ▌ earlier question
+      earlier answer
+    Sessions  (5)
+    / d▏
+     ✓ ▶ deploy ∣ 2025-06-03T10:00 ∣ 6 msgs ∣ 2 in background ∣ deploy it  /work
+    ▸  (unnamed) ∣ 2025-06-01T10:00 ∣ 0 msgs ∣ (empty)     /tmp
+     * ● build fix ∣ 2025-06-05T10:00 ∣ 12 msgs ∣ fix the build  /work
+      ── archived ──
+       (unnamed) ∣ 2025-06-04T10:00 ∣ 4 msgs ∣ try a spike  /old
+       old spike ∣ 2025-04-02T10:00 ∣ 2 msgs ∣ another spike  /old
+    ────────────────────────────────────────────────────────────────────────────────────────────────────
+    …deepseek-flash  ctx:0.1%/1.0M  1 marked (4.0 KB) · Enter switches · Tab marks · Ctrl+D deletes · A…
+    |}];
+  H.event h Sessions_changed;
+  [%expect
+    {| (Rpc (method_ list_sessions) (params ()) (tag Sessions_refresh)) |}];
+  (* 3a is gone, deploy finished its background work and a new one came
+     along. *)
+  H.reply
+    h
+    Sessions_refresh
+    {|[
+  {"id":"6","path":"/s/6.jsonl","name":"dev","cwd":"/work","created_at":"2025-06-06T10:00:00Z","updated_at":"2025-06-06T10:00:00Z","first_prompt":"something new","message_count":1,"bytes":10},
+  {"id":"1","path":"/home/u/.prigh/sessions/1.jsonl","name":"build fix","cwd":"/work","created_at":"2025-06-05T10:00:00Z","updated_at":"2025-06-05T10:00:00Z","first_prompt":"fix the build","message_count":12,"live":true,"bytes":2048},
+  {"id":"2","path":"/s/2.jsonl","name":"deploy","cwd":"/work","created_at":"2025-06-03T10:00:00Z","updated_at":"2025-06-03T10:00:00Z","first_prompt":"deploy it","message_count":6,"live":true,"bytes":4096},
+  {"id":"3b","path":"/s/3b.jsonl","name":"old spike","cwd":"/old","created_at":"2025-04-01T10:00:00Z","updated_at":"2025-04-02T10:00:00Z","first_prompt":"another spike","message_count":2,"archived":true,"bytes":1048576},
+  {"id":"5","path":"/s/5.jsonl","name":null,"cwd":"/tmp","created_at":"2025-06-01T10:00:00Z","updated_at":"2025-06-01T10:00:00Z","first_prompt":null,"message_count":0,"bytes":100}
+  ]|};
+  H.show h;
+  [%expect
+    {|
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+
+    ▌ earlier question
+      earlier answer
+    Sessions  (5)
+    / d▏
+     ✓ ● deploy ∣ 2025-06-03T10:00 ∣ 6 msgs ∣ deploy it    /work
+       dev ∣ 2025-06-06T10:00 ∣ 1 msgs ∣ something new     /work
+    ▸  (unnamed) ∣ 2025-06-01T10:00 ∣ 0 msgs ∣ (empty)     /tmp
+     * ● build fix ∣ 2025-06-05T10:00 ∣ 12 msgs ∣ fix the build  /work
+      ── archived ──
+       old spike ∣ 2025-04-02T10:00 ∣ 2 msgs ∣ another spike  /old
+    ────────────────────────────────────────────────────────────────────────────────────────────────────
+    …deepseek-flash  ctx:0.1%/1.0M  1 marked (4.0 KB) · Enter switches · Tab marks · Ctrl+D deletes · A…
+    |}]
+;;
+
+let%expect_test "/tree skips archived and other settings entries" =
+  let h = connected () in
+  H.keys h "/tree";
+  H.enter h;
+  H.reply
+    ~quiet:true
+    h
+    Entries_for_tree
+    {|{"head":"ar2","entries":[{"id":"u1","parent":null,"kind":"message","message":{"role":"user","text":"root question"}},{"id":"ar1","parent":"u1","kind":"archived","archived":true},{"id":"c1","parent":"ar1","kind":"cwd","cwd":"/x"},{"id":"u2","parent":"c1","kind":"message","message":{"role":"user","text":"back again"}},{"id":"ar2","parent":"u2","kind":"archived","archived":true}]}|};
+  H.show h;
+  [%expect
+    {|
+    (Rpc (method_ get_entries) (params ((all true))) (tag Entries_for_tree))
+
+
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+
+    ▌ earlier question
+      earlier answer
+    Session tree  (2)
+    / ▏
+    ▸* > root question
+     *   > back again
+    ────────────────────────────────────────────────────────────
+    …deepseek-flash  ctx:0.1%/1.0M  Enter selects · Esc closes
+    |}]
 ;;
 
 let%expect_test "/fork picks a user message, forks at it and prefills the \
@@ -1612,15 +2421,15 @@ let%expect_test "/auth, /help, /state, /clear, unknown method errors" =
   H.show h;
   [%expect
     {|
-      turn, then (again) quit
-      Ctrl+D                  quit
-
-      In lists
-      type                     filter the list (fuzzy)
-      Enter / Esc              accept the highlighted item /
       close without changes
-      Ctrl+D                   /sessions: delete · /agents:
-      cancel · /jobs: kill
+      Ctrl+D                   /sessions: delete the marked or
+      highlighted sessions · /agents: cancel · /jobs: kill
+      Tab                      /sessions: mark or unmark the
+      highlighted session
+      Alt+A                    /sessions: archive or unarchive
+      the highlighted session
+      Alt+D                    /sessions: delete every archived
+      session
       Ctrl+N                   /sessions: named only · /model:
       logged-in only
       Space / Ctrl+A / Ctrl+X  /scoped-models: toggle / all /
@@ -1637,13 +2446,13 @@ let%expect_test "/auth, /help, /state, /clear, unknown method errors" =
   [%expect
     {|
     (Rpc (method_ list_models) (params ()) (tag (Models_for_picker "")))
-
-      In lists
-      type                     filter the list (fuzzy)
-      Enter / Esc              accept the highlighted item /
-      close without changes
-      Ctrl+D                   /sessions: delete · /agents:
-      cancel · /jobs: kill
+      highlighted sessions · /agents: cancel · /jobs: kill
+      Tab                      /sessions: mark or unmark the
+      highlighted session
+      Alt+A                    /sessions: archive or unarchive
+      the highlighted session
+      Alt+D                    /sessions: delete every archived
+      session
       Ctrl+N                   /sessions: named only · /model:
       logged-in only
       Space / Ctrl+A / Ctrl+X  /scoped-models: toggle / all /
@@ -3749,7 +4558,8 @@ let%expect_test "config: get_config at Start installs the reply; \
       (default_model    ())
       (default_thinking ())
       (fallback_models  ())
-      (default_cwd      ())))
+      (default_cwd      ())
+      (archive_after_days 7)))
     ((
       (scoped_models (deepseek/deepseek-flash))
       (approval_mode Auto)
@@ -3760,7 +4570,8 @@ let%expect_test "config: get_config at Start installs the reply; \
       (default_model    ())
       (default_thinking ())
       (fallback_models  ())
-      (default_cwd      ())))
+      (default_cwd      ())
+      (archive_after_days 7)))
     |}]
 ;;
 
@@ -4435,11 +5246,11 @@ let%expect_test "/hotkeys prints the keys half of /help" =
   H.show h;
   [%expect
     {|
-      type                     filter the list (fuzzy)
-      Enter / Esc              accept the highlighted item /
-      close without changes
-      Ctrl+D                   /sessions: delete · /agents:
-      cancel · /jobs: kill
+      highlighted session
+      Alt+A                    /sessions: archive or unarchive
+      the highlighted session
+      Alt+D                    /sessions: delete every archived
+      session
       Ctrl+N                   /sessions: named only · /model:
       logged-in only
       Space / Ctrl+A / Ctrl+X  /scoped-models: toggle / all /
@@ -4748,7 +5559,8 @@ let%expect_test "/change_default saves the model and thinking level" =
       (default_model    (deepseek/deepseek-flash))
       (default_thinking (high))
       (fallback_models ())
-      (default_cwd     ())))
+      (default_cwd     ())
+      (archive_after_days 7)))
 
 
 
@@ -4952,7 +5764,7 @@ let%expect_test "resize keeps the confirm dialog and picker within the width" =
     ▸* build fix ∣ 2025-06-01T10:00 ∣ 12 msgs ∣ fix the build please  /work
        (unnamed) ∣ 2025-06-02T11:30 ∣ 0 msgs ∣ (empty)               /other
     ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
-    …deepseek-flash  think:off  view:normal  ctx:0.1%/1.0M  $0.01  Enter selects · Esc closes · Ctrl+N named · Ctrl+D delete
+    …deepseek-flash  ctx:0.1%/1.0M  Enter switches · Tab marks · Ctrl+D deletes · Alt+A (un)archives · Alt+D deletes archiv…
     |}];
   H.step h (Resize { width = 40; height = 16 });
   H.show h;
@@ -5408,6 +6220,7 @@ let%expect_test "keymap: every binding is covered by a scenario" =
     Ctrl+T           Next_thinking            covered
     Alt+M            Cycle_mode               MISSING
     Ctrl+N           Picker_toggle_filter     covered
+    Alt+A            Toggle_archived          covered
     Ctrl+X           Copy_last                covered
     Ctrl+Z           Suspend                  covered
     Shift+Tab        Next_agent               covered
@@ -6316,7 +7129,7 @@ let%expect_test "Tab on an empty editor opens the command list; the list shows \
       /fallback [off|model...]        show or set the models th…
       /default-dir [off|path]         show or set the directory…
       /login [provider] [api_key|oauth]  log in to a provider
-      ↕ 1–8 of 47
+      ↕ 1–8 of 51
     …deepseek-flash  ctx:0.1%/1.0M  Tab/Enter accept · Esc close
     |}];
   H.key h (Key.plain End);
@@ -6333,7 +7146,7 @@ let%expect_test "Tab on an empty editor opens the command list; the list shows \
       /fallback [off|model...]        show or set the models th…
       /default-dir [off|path]         show or set the directory…
       /login [provider] [api_key|oauth]  log in to a provider
-      ↕ 1–8 of 47
+      ↕ 1–8 of 51
     …deepseek-flash  ctx:0.1%/1.0M  Tab/Enter accept · Esc close
     |}];
   H.keys h "qu";

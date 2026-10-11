@@ -167,11 +167,18 @@ let mode_hint (m : App.Model.t) : Content.Line.t option =
                 ~style:attention
                 "Enter selects · Esc closes · Ctrl+N logged-in only"
             ]
-        | Picker { kind = Sessions _; _ } ->
+        | Picker { kind = Sessions selection; picker } ->
+          let marked =
+            match Session_selection.marked_summary selection picker with
+            | Some marked -> marked ^ " · "
+            | None -> ""
+          in
           Some
             [ span
                 ~style:attention
-                "Enter selects · Esc closes · Ctrl+N named · Ctrl+D delete"
+                (marked
+                 ^ "Enter switches · Tab marks · Ctrl+D deletes · Alt+A \
+                    (un)archives · Alt+D deletes archived · Ctrl+N named")
             ]
         | Picker { kind = Agents; _ } ->
           Some
@@ -703,6 +710,8 @@ let picker_block (p : Picker.t) ~width ~height : Content.t * int =
         ^
         if Picker.multi p
         then if Set.mem (Picker.checked p) item.id then "[x] " else "[ ] "
+        else if Set.mem (Picker.checked p) item.id
+        then "✓ "
         else if item.marked
         then "* "
         else "  "
@@ -719,7 +728,20 @@ let picker_block (p : Picker.t) ~width ~height : Content.t * int =
             (if String.is_empty item.detail then "" else "  " ^ item.detail)
         ]
       in
-      Content.Line.truncate line ~width)
+      let divider =
+        let previous =
+          if i = 0
+          then if start = 0 then None else List.nth visible (start - 1)
+          else List.nth shown (i - 1)
+        in
+        match previous with
+        | _ when String.is_empty item.section -> []
+        | Some (previous : Picker.Item.t)
+          when String.equal previous.section item.section -> []
+        | _ -> [ [ span ~style:dim ("  ── " ^ item.section ^ " ──") ] ]
+      in
+      divider @ [ Content.Line.truncate line ~width ])
+    |> List.concat
   in
   let rows =
     if List.is_empty rows then [ [ span ~style:dim "  no matches" ] ] else rows
