@@ -175,17 +175,7 @@ module Connection : sig
   val delay_ms : attempt:int -> int
 end
 
-module Toast : sig
-  type t =
-    { id : int
-    ; text : string
-    ; error : bool
-    }
-  [@@deriving sexp_of, equal]
-
-  (** How long non-error toasts stay. *)
-  val lifetime_ms : int
-end
+module Toast = Toast
 
 module Action : sig
   type t =

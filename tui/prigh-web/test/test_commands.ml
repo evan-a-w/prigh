@@ -121,17 +121,18 @@ let%expect_test "every command does something (none is unknown)" =
 let%expect_test "/help <command> and /hotkeys" =
   let h = H.create () in
   run h "/help compact";
+  toasts h;
   run h "/help /tree";
   run h "/help compcat";
   toasts h;
   [%expect
     {|
     (Save_history ("/help compact"))
-    (Expire_toast (id 0) (after_ms 4000))
-    (Save_history ("/help /tree" "/help compact"))
-    (Expire_toast (id 1) (after_ms 4000))
-    (Save_history ("/help compcat" "/help /tree" "/help compact"))
+    (Expire_toast (id 0) (after_ms 4100))
     /compact [instructions]: summarise older messages to free context
+    (Save_history ("/help /tree" "/help compact"))
+    (Expire_toast (id 1) (after_ms 3820))
+    (Save_history ("/help compcat" "/help /tree" "/help compact"))
     /tree: show the session tree and move to any message in it
     No command /compcat. Did you mean /compact?
     |}];
@@ -196,11 +197,11 @@ let%expect_test "/scoped-models, Ctrl+P and Alt+P" =
   [%expect
     {|
     (Cycle_model 1)
-    (Expire_toast (id 0) (after_ms 4000))
+    (Expire_toast (id 0) (after_ms 2500))
     (Rpc (method_ set_model) (params ((model anthropic/claude-sonnet-5)))
      (tag Model_set))
     (Cycle_model 1)
-    (Expire_toast (id 1) (after_ms 4000))
+    (Expire_toast (id 1) (after_ms 2500))
     (Rpc (method_ set_model) (params ((model anthropic/claude-opus-5-5)))
      (tag Model_set))
     Model: Claude Opus 5.5
@@ -249,7 +250,7 @@ let%expect_test "/scoped-models, Ctrl+P and Alt+P" =
           (anthropic/claude-opus-5-5 anthropic/claude-sonnet-5
            deepseek/deepseek-chat))))))
      (tag (Config_saved "3 scoped models: Ctrl+P and Alt+P cycle through them")))
-    (Expire_toast (id 2) (after_ms 4000))
+    (Expire_toast (id 2) (after_ms 3580))
     Model: Claude Opus 5.5
     3 scoped models: Ctrl+P and Alt+P cycle through them
     |}];
@@ -259,11 +260,11 @@ let%expect_test "/scoped-models, Ctrl+P and Alt+P" =
   [%expect
     {|
     (Cycle_model -1)
-    (Expire_toast (id 3) (after_ms 4000))
+    (Expire_toast (id 3) (after_ms 2500))
     (Rpc (method_ set_model) (params ((model deepseek/deepseek-chat)))
      (tag Model_set))
     (Cycle_model 1)
-    (Expire_toast (id 4) (after_ms 4000))
+    (Expire_toast (id 4) (after_ms 2500))
     (Rpc (method_ set_model) (params ((model anthropic/claude-opus-5-5)))
      (tag Model_set))
     |}];
@@ -298,10 +299,10 @@ let%expect_test "/thinking and Alt+T" =
   [%expect
     {|
     Cycle_thinking
-    (Expire_toast (id 0) (after_ms 4000))
+    (Expire_toast (id 0) (after_ms 2500))
     (Rpc (method_ set_thinking) (params ((thinking high))) (tag Thinking_set))
     Cycle_thinking
-    (Expire_toast (id 1) (after_ms 4000))
+    (Expire_toast (id 1) (after_ms 2500))
     (Rpc (method_ set_thinking) (params ((thinking max))) (tag Thinking_set))
     |}];
   let state = (H.model h).state |> Option.value_exn in
@@ -326,9 +327,8 @@ let%expect_test "/thinking and Alt+T" =
     {|
     (Rpc (method_ set_model) (params ((model deepseek/deepseek-chat)))
      (tag Model_set))
-    (Expire_toast (id 2) (after_ms 4000))
+    (Expire_toast (id 2) (after_ms 4620))
     Cycle_thinking
-    Thinking: max
     DeepSeek Chat needs deepseek, which is not logged in: /login deepseek logs in.
     DeepSeek Chat has no thinking levels: switch to a model that thinks with /model
     |}]
@@ -346,7 +346,7 @@ let%expect_test "/change_default" =
     {|
     (Save_history (/change_default))
     (Rpc (method_ change_default) (params ()) (tag Default_saved))
-    (Expire_toast (id 0) (after_ms 4000))
+    (Expire_toast (id 0) (after_ms 3980))
     New sessions start with anthropic/claude-opus-5-5, thinking on
     |}]
 ;;
@@ -374,7 +374,7 @@ let%expect_test "/verbosity and Ctrl+O" =
     (Dialog_move -1)
     Dialog_accept
     (Focus editor)
-    (Expire_toast (id 0) (after_ms 4000))
+    (Expire_toast (id 0) (after_ms 4660))
     <div id="chat" class="chat verbosity-quiet">
       <div class="entries">
         <div class="msg user">
@@ -407,9 +407,9 @@ let%expect_test "/verbosity and Ctrl+O" =
   [%expect
     {|
     Cycle_verbosity
-    (Expire_toast (id 1) (after_ms 4000))
+    (Expire_toast (id 1) (after_ms 4180))
     Cycle_verbosity
-    (Expire_toast (id 2) (after_ms 4000))
+    (Expire_toast (id 2) (after_ms 3740))
     (Save_history ("/verbosity loud" /verbosity))
     Transcript: verbose, everything unfolded (Ctrl+O cycles)
     Unknown verbosity "loud": use quiet, normal or verbose.
@@ -449,7 +449,7 @@ let%expect_test "/confirm" =
      (tag
       (Config_saved
        "Tool confirmation on (mode ask, also for new sessions): bash, edits and MCP tools ask first")))
-    (Expire_toast (id 0) (after_ms 4000))
+    (Expire_toast (id 0) (after_ms 5140))
     Ready 0% ↑0 ↓0 $0.0000 (ask)
     (Notifications not allowed yet: click to ask the browser)
     (Save_history ("/confirm off" /confirm))
@@ -469,7 +469,7 @@ let%expect_test "/compact with instructions" =
   [%expect
     {|
     (Save_history ("/compact keep the file names"))
-    (Expire_toast (id 0) (after_ms 4000))
+    (Expire_toast (id 0) (after_ms 2700))
     (Rpc (method_ compact) (params ((instructions "keep the file names")))
      (tag (Notice "Compacted the conversation")))
     |}];
@@ -479,7 +479,7 @@ let%expect_test "/compact with instructions" =
     {|
     (Complete_accept (run true))
     (Save_history (/compact "/compact keep the file names"))
-    (Expire_toast (id 1) (after_ms 4000))
+    (Expire_toast (id 1) (after_ms 2700))
     (Rpc (method_ compact) (params ())
      (tag (Notice "Compacted the conversation")))
     |}]
@@ -608,7 +608,7 @@ let%expect_test "/fork: pick a message, edit it in a new session" =
     (Dialog_move -1)
     Dialog_accept
     (Focus editor)
-    (Expire_toast (id 0) (after_ms 4000))
+    (Expire_toast (id 0) (after_ms 3700))
     (Rpc (method_ fork) (params ((at e1))) (tag Reload_state))
     "first question"
     |}];
@@ -621,7 +621,7 @@ let%expect_test "/fork: pick a message, edit it in a new session" =
     (Save_history (/fork))
     (Focus dialog)
     (Rpc (method_ get_entries) (params ()) (tag (Entries Fork)))
-    (Expire_toast (id 1) (after_ms 4000))
+    (Expire_toast (id 1) (after_ms 3420))
     (Focus editor)
     Forked into a new session: edit the message and send it
     No messages yet: there is nothing to go back to.
@@ -657,7 +657,7 @@ let%expect_test "/rewind: pick, confirm, reload the messages" =
     {|
     Dialog_accept
     (Focus editor)
-    (Expire_toast (id 0) (after_ms 4000))
+    (Expire_toast (id 0) (after_ms 2980))
     (Rpc (method_ rewind) (params ((to e1))) (tag Reload_messages))
     (Rpc (method_ get_state) (params ()) (tag State))
     (Rpc (method_ get_messages) (params ()) (tag (Messages s1)))
@@ -834,7 +834,7 @@ let%expect_test "/cd: a prompt with directory completion, failures stay in it" =
     (Rpc (method_ set_cwd) (params ((path /work/src)))
      (tag (Prompt_done "Working directory: /work/src")))
     (Focus editor)
-    (Expire_toast (id 0) (after_ms 4000))
+    (Expire_toast (id 0) (after_ms 2620))
     Working directory: /work/src
     |}];
   (* An empty answer says what to do. *)
@@ -915,7 +915,7 @@ let%expect_test "/host: pick a host, then the directory there" =
     (Rpc (method_ set_active_host) (params ((host c7) (cwd /home/me/proj)))
      (tag (Prompt_done "Tools run on laptop (this browser), in /home/me/proj")))
     (Focus editor)
-    (Expire_toast (id 0) (after_ms 4000))
+    (Expire_toast (id 0) (after_ms 3580))
     Tools run on laptop (this browser), in /home/me/proj
     |}];
   run h "/host ci";
@@ -953,13 +953,13 @@ let%expect_test "/export and /import" =
     Dialog_accept
     (Rpc (method_ export) (params ((format markdown))) (tag Exported))
     (Focus editor)
-    (Expire_toast (id 0) (after_ms 4000))
+    (Expire_toast (id 0) (after_ms 3500))
     (Rpc (method_ list_paths) (params ((prefix /tmp/s1.jsonl)))
      (tag (Paths /tmp/s1.jsonl)))
     (Save_history ("/export /tmp/s1.jsonl" /export))
     (Rpc (method_ export) (params ((format jsonl) (path /tmp/s1.jsonl)))
      (tag Exported))
-    (Expire_toast (id 1) (after_ms 4000))
+    (Expire_toast (id 1) (after_ms 2500))
     Exported to /home/me/.prigh/sessions/exports/s1.md
     Exported to /tmp/s1.jsonl
     |}];
@@ -992,9 +992,8 @@ let%expect_test "/export and /import" =
     (Save_history
      ("/import /tmp/s1.jsonl" /import "/export /tmp/s1.jsonl" /export))
     (Rpc (method_ import) (params ((path /tmp/s1.jsonl))) (tag Imported))
-    (Expire_toast (id 2) (after_ms 4000))
+    (Expire_toast (id 2) (after_ms 2700))
     (Rpc (method_ get_state) (params ()) (tag State))
-    Exported to /home/me/.prigh/sessions/exports/s1.md
     Exported to /tmp/s1.jsonl
     Imported as /sessions/s9.jsonl
     |}]
@@ -1016,14 +1015,14 @@ let%expect_test "/copy and Ctrl+X copy the last reply" =
     Scroll_to_bottom
     (Save_history (/copy))
     (Copy "Fixed: the **flag** was wrong.")
-    (Expire_toast (id 1) (after_ms 4000))
+    (Expire_toast (id 1) (after_ms 3020))
     |}];
   H.key h "x" ~ctrl:true;
   [%expect
     {|
     Copy_last
     (Copy "Fixed: the **flag** was wrong.")
-    (Expire_toast (id 2) (after_ms 4000))
+    (Expire_toast (id 2) (after_ms 3020))
     |}];
   (* With text selected Ctrl+X is the browser's cut. *)
   H.key h "x" ~ctrl:true ~selection:true;
@@ -1281,7 +1280,7 @@ let%expect_test "/setusr: a superuser acts as another user, and back" =
     Dialog_accept
     (Focus editor)
     (Rpc (method_ set_user) (params ((user bob))) (tag User_switched))
-    (Expire_toast (id 0) (after_ms 4000))
+    (Expire_toast (id 0) (after_ms 2500))
     (Focus editor)
     (Rpc (method_ get_state) (params ()) (tag State))
     (Rpc (method_ list_models) (params ()) (tag Models))
@@ -1309,7 +1308,7 @@ let%expect_test "/setusr: a superuser acts as another user, and back" =
     {|
     (Save_history ("/setusr alice" /setusr))
     (Rpc (method_ set_user) (params ((user alice))) (tag User_switched))
-    (Expire_toast (id 1) (after_ms 4000))
+    (Expire_toast (id 1) (after_ms 2500))
     (Focus editor)
     (Rpc (method_ get_state) (params ()) (tag State))
     (Rpc (method_ list_models) (params ()) (tag Models))
@@ -1327,7 +1326,6 @@ let%expect_test "/setusr: a superuser acts as another user, and back" =
     (Focus dialog)
     (Rpc (method_ list_users) (params ()) (tag (Users Picker)))
     (Focus editor)
-    Acting as bob
     Back to alice
     Unauthorised: bob is not a superuser
     |}]
@@ -1341,22 +1339,25 @@ let%expect_test "/retry-backend-connection, /state, /clear, /quit" =
   [%expect
     {|
     (Save_history (/retry-backend-connection))
-    (Expire_toast (id 0) (after_ms 4000))
+    (Expire_toast (id 0) (after_ms 2500))
     (Reconnect (generation 1) (delay_ms 0) (session (s1)))
     (Save_history (/retry-backend-connection))
-    (Expire_toast (id 1) (after_ms 4000))
+    (Expire_toast (id 1) (after_ms 2500))
     (Reconnect (generation 2) (delay_ms 0) (session (s1)))
     |}];
   (* The first attempt's late reply is stale. *)
   H.act h (Reply (Reconnect 1, Error "refused"));
   H.act h (Reply (Reconnect 2, Ok (Jsonaf.of_string {|{"client_id":"c2"}|})));
+  toasts h;
   [%expect
     {|
-    (Expire_toast (id 2) (after_ms 4000))
+    (Expire_toast (id 2) (after_ms 2500))
     (Rpc (method_ get_state) (params ()) (tag State))
     (Rpc (method_ list_models) (params ()) (tag Models))
     (Rpc (method_ auth_status) (params ()) (tag (Auth_status Refresh)))
     (Rpc (method_ get_config) (params ()) (tag Config))
+    Reconnecting now…
+    Reconnected
     |}];
   H.reply h "get_state" (H.state_json ());
   run h "/state";
@@ -1398,7 +1399,7 @@ let%expect_test "/retry-backend-connection, /state, /clear, /quit" =
     (Focus editor)
     Scroll_to_bottom
     (Save_history (/clear /state /retry-backend-connection))
-    (Expire_toast (id 3) (after_ms 4000))
+    (Expire_toast (id 3) (after_ms 4780))
     What are we building?
     /work
     / commands
@@ -1407,9 +1408,7 @@ let%expect_test "/retry-backend-connection, /state, /clear, /quit" =
     Ctrl+L switch model
     Ctrl+K find a session
     (Save_history (/quit /clear /state /retry-backend-connection))
-    (Expire_toast (id 4) (after_ms 4000))
-    Reconnecting now…
-    Reconnected
+    (Expire_toast (id 4) (after_ms 4620))
     Cleared the view; the conversation is kept (a reload shows it, /new starts afresh)
     Close the tab to leave: the session stays in the backend (/signout signs out).
     |}]
@@ -1439,7 +1438,7 @@ let%expect_test "keys: Alt+Up, Ctrl+Up/Down, PageUp/PageDown, Ctrl+G" =
      (text
       "There is no $EDITOR in a browser: edit here (Shift+Enter for new lines).")
      (error false))
-    (Expire_toast (id 0) (after_ms 4000))
+    (Expire_toast (id 0) (after_ms 4380))
     |}];
   (* Keys the browser keeps. *)
   H.key h "z" ~ctrl:true;

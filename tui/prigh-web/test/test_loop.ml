@@ -71,7 +71,7 @@ let%expect_test
   toasts h;
   [%expect
     {|
-    (Expire_toast (id 0) (after_ms 4000))
+    (Expire_toast (id 0) (after_ms 5100))
     Goal: all tests pass — active, 3 of 20 automatic continuations used; /goal off clears it
     |}]
 ;;
@@ -79,8 +79,10 @@ let%expect_test
 let%expect_test "/budget shows, sets and clears the budget" =
   let h = H.create () in
   run h "/budget";
+  toasts h;
   run h "/budget $2.50";
   H.reply h "set_budget" "{}";
+  toasts h;
   run h "/budget off";
   H.reply h "set_budget" "{}";
   run h "/budget lots";
@@ -88,20 +90,21 @@ let%expect_test "/budget shows, sets and clears the budget" =
   [%expect
     {|
     (Save_history (/budget))
-    (Expire_toast (id 0) (after_ms 4000))
+    (Expire_toast (id 0) (after_ms 5780))
+    No budget ($0.00 spent): /budget DOLLARS stops the agent starting turns once the session has cost that much
     (Save_history ("/budget $2.50" /budget))
     (Rpc (method_ set_budget) (params ((usd 2.5)))
      (tag
       (Notice
        "Budget set to $2.50: no turn starts once the session has cost that")))
-    (Expire_toast (id 1) (after_ms 4000))
+    (Expire_toast (id 1) (after_ms 4140))
+    No budget ($0.00 spent): /budget DOLLARS stops the agent starting turns once the session has cost that much
+    Budget set to $2.50: no turn starts once the session has cost that
     (Save_history ("/budget off" "/budget $2.50" /budget))
     (Rpc (method_ set_budget) (params ((usd null)))
      (tag (Notice "Budget removed: turns start whatever it costs")))
-    (Expire_toast (id 2) (after_ms 4000))
+    (Expire_toast (id 2) (after_ms 3300))
     (Save_history ("/budget lots" "/budget off" "/budget $2.50" /budget))
-    No budget ($0.00 spent): /budget DOLLARS stops the agent starting turns once the session has cost that much
-    Budget set to $2.50: no turn starts once the session has cost that
     Budget removed: turns start whatever it costs
     "lots" is not a budget: /budget DOLLARS (e.g. /budget 5) or /budget off
     |}]
@@ -113,6 +116,7 @@ let%expect_test
   =
   let h = H.create () in
   run h "/goal";
+  toasts h;
   run h "/goal all tests pass";
   H.fail
     h
@@ -123,6 +127,7 @@ let%expect_test
   H.quiet h (fun () -> H.act h (Set_draft ""));
   run h "/goal off";
   H.reply h "clear_goal" "{}";
+  toasts h;
   H.event
     h
     (state
@@ -139,22 +144,23 @@ let%expect_test
   [%expect
     {|
     (Save_history (/goal))
-    (Expire_toast (id 0) (after_ms 4000))
+    (Expire_toast (id 0) (after_ms 4700))
+    No goal: /goal TEXT sets one, and the agent keeps working until it judges it met
     (Save_history ("/goal all tests pass" /goal))
     (Rpc (method_ set_goal) (params ((text "all tests pass")))
      (tag (Sent (text "/goal all tests pass") (images ()))))
     "/goal all tests pass"
     (Save_history ("/goal off" "/goal all tests pass" /goal))
     (Rpc (method_ clear_goal) (params ()) (tag (Notice "Goal cleared")))
-    (Expire_toast (id 2) (after_ms 4000))
+    (Expire_toast (id 2) (after_ms 2500))
+    No goal: /goal TEXT sets one, and the agent keeps working until it judges it met
+    Goal cleared
     (Save_history (/goal "/goal off" "/goal all tests pass" /goal))
-    (Expire_toast (id 3) (after_ms 4000))
+    (Expire_toast (id 3) (after_ms 6000))
     (Save_history
      ("/goal resume" /goal "/goal off" "/goal all tests pass" /goal))
     (Rpc (method_ resume_goal) (params ()) (tag (Notice "Goal resumed")))
-    (Expire_toast (id 4) (after_ms 4000))
-    No goal: /goal TEXT sets one, and the agent keeps working until it judges it met
-    Goal cleared
+    (Expire_toast (id 4) (after_ms 2500))
     Goal: all tests pass — stopped (it used all 20 automatic continuations); /goal resume continues it, /goal off clears it
     Goal resumed
     |}]
@@ -165,8 +171,10 @@ let%expect_test "/resume shows, runs now or cancels the automatic resume" =
   run h "/resume";
   H.event h (state [ "resume_at_ms", `Number "1791295500000" ]);
   run h "/resume";
+  toasts h;
   run h "/resume now";
   H.reply h "resume_now" "{}";
+  toasts h;
   run h "/resume cancel";
   H.reply h "cancel_resume" "{}";
   run h "/resume later";
@@ -174,19 +182,21 @@ let%expect_test "/resume shows, runs now or cancels the automatic resume" =
   [%expect
     {|
     (Save_history (/resume))
-    (Expire_toast (id 0) (after_ms 4000))
+    (Expire_toast (id 0) (after_ms 5500))
     (Save_history (/resume))
-    (Expire_toast (id 1) (after_ms 4000))
+    (Expire_toast (id 1) (after_ms 5980))
+    No resume is scheduled: one is when a run stops at a usage limit whose reset time the provider gives
+    The run stopped at a usage limit and resumes at 14:05: /resume now retries at once, /resume cancel stays stopped
     (Save_history ("/resume now" /resume))
     (Rpc (method_ resume_now) (params ()) (tag (Notice "Resuming now")))
-    (Expire_toast (id 2) (after_ms 4000))
+    (Expire_toast (id 2) (after_ms 2500))
+    The run stopped at a usage limit and resumes at 14:05: /resume now retries at once, /resume cancel stays stopped
+    Resuming now
     (Save_history ("/resume cancel" "/resume now" /resume))
     (Rpc (method_ cancel_resume) (params ())
      (tag (Notice "Automatic resume cancelled: send a message to retry")))
-    (Expire_toast (id 3) (after_ms 4000))
+    (Expire_toast (id 3) (after_ms 3540))
     (Save_history ("/resume later" "/resume cancel" "/resume now" /resume))
-    The run stopped at a usage limit and resumes at 14:05: /resume now retries at once, /resume cancel stays stopped
-    Resuming now
     Automatic resume cancelled: send a message to retry
     Unknown /resume argument "later": /resume now retries at once, /resume cancel stays stopped.
     |}]

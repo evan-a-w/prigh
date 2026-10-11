@@ -234,7 +234,7 @@ let%expect_test "/login custom: name, base URL, API style, key; then /model" =
   H.text h ~selector:".toast";
   [%expect
     {|
-    (Expire_toast (id 0) (after_ms 4000))
+    (Expire_toast (id 0) (after_ms 3660))
     (Rpc (method_ auth_status) (params ()) (tag (Auth_status Refresh)))
     (Rpc (method_ list_models) (params ()) (tag Models))
     Saved aiproxy: /model lists its models as aiproxy/<id>
@@ -448,7 +448,7 @@ let%expect_test "custom providers in /auth, /login and /logout: edit and remove"
     {|
     (Focus editor)
     (Rpc (method_ auth_respond) (params ((id p2) (value all))) (tag Show_error))
-    (Expire_toast (id 0) (after_ms 4000))
+    (Expire_toast (id 0) (after_ms 2500))
     (Rpc (method_ auth_status) (params ()) (tag (Auth_status Refresh)))
     (Rpc (method_ list_models) (params ()) (tag Models))
     Logged out of aiproxy

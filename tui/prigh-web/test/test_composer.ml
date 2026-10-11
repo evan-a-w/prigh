@@ -52,7 +52,7 @@ let%expect_test
   [%expect
     {|
     <textarea id="editor"
-              placeholder="Steer the agent (Enter) or queue a follow-up (Alt+Enter)…"
+              placeholder="Steer (Enter) or queue a follow-up (Alt+Enter)…"
               rows="1"
               autocomplete="off"
               enterkeyhint="send"
@@ -376,7 +376,7 @@ let%expect_test "slash commands: the popup, arguments, running, unknown ones" =
     (Complete_accept (run true))
     (Save_history ("/model openai/gpt-6"))
     (Rpc (method_ set_model) (params ((model openai/gpt-6))) (tag Model_set))
-    (Expire_toast (id 0) (after_ms 4000))
+    (Expire_toast (id 0) (after_ms 4140))
     |}];
   H.type_ h "/comp";
   H.key h "Enter";
@@ -385,7 +385,7 @@ let%expect_test "slash commands: the popup, arguments, running, unknown ones" =
     {|
     (Complete_accept (run true))
     (Save_history (/compact "/model openai/gpt-6"))
-    (Expire_toast (id 1) (after_ms 4000))
+    (Expire_toast (id 1) (after_ms 2700))
     (Rpc (method_ compact) (params ())
      (tag (Notice "Compacted the conversation")))
     GPT-6 needs openai, which is not logged in: /login openai logs in.
@@ -395,8 +395,7 @@ let%expect_test "slash commands: the popup, arguments, running, unknown ones" =
   H.text h ~selector:".toast";
   [%expect
     {|
-    (Expire_toast (id 2) (after_ms 4000))
-    GPT-6 needs openai, which is not logged in: /login openai logs in.
+    (Expire_toast (id 2) (after_ms 2540))
     Compacting the conversation…
     Compacted the conversation
     |}];

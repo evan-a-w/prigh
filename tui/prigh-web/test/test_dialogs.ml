@@ -31,7 +31,7 @@ let%expect_test "tool confirmations own the keyboard: Enter allows, Esc denies" 
     (Rpc (method_ tool_confirm_respond) (params ((call_id c1) (allow true)))
      (tag Show_error))
     (Focus confirm)
-    (Expire_toast (id 0) (after_ms 4000))
+    (Expire_toast (id 0) (after_ms 2500))
     |}];
   H.key h "ArrowDown";
   H.key h "Escape";
@@ -42,7 +42,7 @@ let%expect_test "tool confirmations own the keyboard: Enter allows, Esc denies" 
     (Rpc (method_ tool_confirm_respond) (params ((call_id c2) (allow false)))
      (tag Show_error))
     (Focus editor)
-    (Expire_toast (id 1) (after_ms 4000))
+    (Expire_toast (id 1) (after_ms 2500))
     |}];
   H.text h ~selector:".modal";
   [%expect {| |}];
@@ -70,7 +70,9 @@ let%expect_test "a dialog makes the page behind it inert: Tab stays in it" =
     {|
     (Focus dialog)
     <aside class="sidebar">
-    <main class="main">
+    <header class="topbar">
+    <div class="chat verbosity-normal">
+    <footer class="composer">
     |}];
   H.key h "Escape" ~target:Page;
   inert ();
@@ -89,7 +91,9 @@ let%expect_test "a dialog makes the page behind it inert: Tab stays in it" =
     (Rpc (method_ list_jobs) (params ()) (tag Jobs))
     (Focus confirm)
     <aside class="sidebar">
-    <main class="main">
+    <header class="topbar">
+    <div class="chat verbosity-normal">
+    <footer class="composer">
     <aside class="agents-panel">
     |}];
   H.key h "Escape" ~target:Page;
@@ -100,7 +104,7 @@ let%expect_test "a dialog makes the page behind it inert: Tab stays in it" =
     (Rpc (method_ tool_confirm_respond) (params ((call_id c1) (allow false)))
      (tag Show_error))
     (Focus editor)
-    (Expire_toast (id 0) (after_ms 4000))
+    (Expire_toast (id 0) (after_ms 2500))
     |}]
 ;;
 
@@ -123,7 +127,7 @@ let%expect_test "Enter on a focused button of a confirmation is that button's" =
     (Rpc (method_ tool_confirm_respond) (params ((call_id c1) (allow true)))
      (tag Show_error))
     (Focus editor)
-    (Expire_toast (id 0) (after_ms 4000))
+    (Expire_toast (id 0) (after_ms 2500))
     |}]
 ;;
 
@@ -343,7 +347,7 @@ let%expect_test "logging in: pick a provider, open the URL, answer the prompts" 
   H.text h ~selector:".toast";
   [%expect
     {|
-    (Expire_toast (id 0) (after_ms 4000))
+    (Expire_toast (id 0) (after_ms 2660))
     (Rpc (method_ auth_status) (params ()) (tag (Auth_status Refresh)))
     (Rpc (method_ list_models) (params ()) (tag Models))
     Logged in to openai (api_key)
@@ -411,7 +415,7 @@ let%expect_test "/auth shows the providers; /logout picks a logged-in one" =
   H.event h {|{"event":"auth","kind":"logged_out","provider":"anthropic"}|};
   [%expect
     {|
-    (Expire_toast (id 0) (after_ms 4000))
+    (Expire_toast (id 0) (after_ms 2500))
     (Rpc (method_ auth_status) (params ()) (tag (Auth_status Refresh)))
     (Rpc (method_ list_models) (params ()) (tag Models))
     |}];
@@ -445,7 +449,7 @@ let%expect_test "/auth shows the providers; /logout picks a logged-in one" =
     (Save_history (/logout /auth))
     (Focus dialog)
     (Rpc (method_ auth_status) (params ()) (tag (Auth_status Logout_picker)))
-    (Expire_toast (id 1) (after_ms 4000))
+    (Expire_toast (id 1) (after_ms 3420))
     (Focus editor)
     Logged out of anthropic
     No provider is logged in: /login logs in to one.
@@ -453,7 +457,7 @@ let%expect_test "/auth shows the providers; /logout picks a logged-in one" =
 ;;
 
 let%expect_test
-    "toasts: notices expire, errors stay until dismissed, at most four"
+    "toasts: notices expire, errors stay until dismissed, at most two"
   =
   let h = H.create () in
   H.event h {|{"event":"notice","text":"Compacted"}|};
@@ -461,7 +465,7 @@ let%expect_test
   H.text h ~selector:".toasts";
   [%expect
     {|
-    (Expire_toast (id 0) (after_ms 4000))
+    (Expire_toast (id 0) (after_ms 2500))
     Compacted
     Upload failed
     |}];
@@ -473,8 +477,6 @@ let%expect_test
   H.text h ~selector:".toasts";
   [%expect
     {|
-    a
-    b
     c
     d
     |}]
@@ -509,7 +511,7 @@ let%expect_test
   H.act h (Reply (Reconnect 1, Ok (Jsonaf.of_string {|{"client_id":"c9"}|})));
   [%expect
     {|
-    (Expire_toast (id 0) (after_ms 4000))
+    (Expire_toast (id 0) (after_ms 2500))
     (Rpc (method_ get_state) (params ()) (tag State))
     (Rpc (method_ list_models) (params ()) (tag Models))
     (Rpc (method_ auth_status) (params ()) (tag (Auth_status Refresh)))
@@ -586,7 +588,9 @@ let%expect_test "on a phone the agents panel is a sheet with the keyboard" =
     (Rpc (method_ list_jobs) (params ()) (tag Jobs))
     (Focus agents-panel)
     <aside class="sidebar">
-    <main class="main">
+    <header class="topbar">
+    <div class="chat verbosity-normal">
+    <footer class="composer">
     |}];
   H.act h Toggle_subagents;
   inert ();

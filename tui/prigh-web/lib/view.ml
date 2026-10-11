@@ -47,21 +47,33 @@ let banner (m : Model.t) ~inject =
       ]
 ;;
 
+(* Over the bottom of the chat, above the composer: not over the transcript's
+   top, the side panels or a dialog. *)
 let toasts (m : Model.t) ~inject =
   div
-    ~cls:"toasts"
-    ~attrs:[ Attr.create "aria-live" "polite" ]
-    (List.map m.toasts ~f:(fun (t : App.Toast.t) ->
-       Node.div
-         ~attrs:
-           [ classes [ "toast" ] [ "error", t.error ]
-           ; Attr.role (if t.error then "alert" else "status")
-           ; Attr.title "Dismiss"
-           ; Attr.on_click (fun _ -> inject (Action.Dismiss_toast t.id))
-           ]
-         [ Node.span [ Node.text t.text ]
-         ; (if t.error then icon ~cls:"toast-close" Close else Node.none)
-         ]))
+    ~cls:"toast-anchor"
+    [ div
+        ~cls:"toasts"
+        ~attrs:[ Attr.create "aria-live" "polite" ]
+        (List.map m.toasts ~f:(fun (t : App.Toast.t) ->
+           let shown = Toast.short t.text in
+           Node.div
+             ~attrs:
+               [ classes [ "toast" ] [ "error", t.error ]
+               ; Attr.role (if t.error then "alert" else "status")
+               ; Attr.title
+                   (if String.equal shown t.text
+                    then "Dismiss"
+                    else t.text ^ " (click to dismiss)")
+               ; Attr.on_click (fun _ -> inject (Action.Dismiss_toast t.id))
+               ]
+             [ Node.span [ Node.text shown ]
+             ; (if t.repeats > 0
+                then span ~cls:"toast-repeats" (sprintf "×%d" (t.repeats + 1))
+                else Node.none)
+             ; (if t.error then icon ~cls:"toast-close" Close else Node.none)
+             ]))
+    ]
 ;;
 
 let empty (m : Model.t) =
@@ -192,9 +204,10 @@ let view (m : Model.t) ~inject ~terminal =
              ]
            []
        else Node.none)
-    ; under_sheet
-      @@ Node.main
-           ~attrs:[ Attr.class_ "main" ]
+    ; Node.main
+        ~attrs:[ Attr.class_ "main" ]
+        (List.map
+           ~f:under_sheet
            [ Topbar_view.view m ~inject
            ; banner m ~inject
            ; Node.div
@@ -206,15 +219,18 @@ let view (m : Model.t) ~inject ~terminal =
                  ; Attr.id "chat"
                  ]
                [ chat; jump_to_bottom m ~inject ]
-           ; Btw_view.view m ~inject
-           ; Composer_view.view m ~inject
-           ; Terminal_view.view m ~inject ~widget:terminal
            ]
+         @ [ toasts m ~inject ]
+         @ List.map
+             ~f:under_sheet
+             [ Btw_view.view m ~inject
+             ; Composer_view.view m ~inject
+             ; Terminal_view.view m ~inject ~widget:terminal
+             ])
     ; behind (Files_view.view m ~inject)
     ; behind (Agents_view.view m ~inject)
     ; Dialog_view.view m ~inject
     ; Files_view.dialog m ~inject
     ; Files_view.pickers
-    ; toasts m ~inject
     ]
 ;;

@@ -142,6 +142,13 @@ let background (m : App.Model.t) ~inject =
       [ (if running then Html.lamp () else icon Bot); Node.text text ]
 ;;
 
+let transfers (m : App.Model.t) =
+  match Files.transfers m.files with
+  | None -> Node.none
+  | Some text ->
+    item ~cls:"transfers" ~title:text [ Html.lamp (); Node.text text ]
+;;
+
 let host (state : State.t) =
   if String.equal state.active_host Host.backend_id
   then Node.none
@@ -309,6 +316,7 @@ let view (m : App.Model.t) ~inject =
              [ icon Undo; Node.text (sprintf "%d queued" (steer + follow_up)) ]
          else Node.none)
       ; background m ~inject
+      ; transfers m
       ; host state
       ; Node.fragment (modes m ~inject)
       ; div ~cls:"status-spacer" []

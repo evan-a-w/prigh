@@ -123,7 +123,7 @@ let%expect_test "/skills with none, and when listing fails" =
      (tag (Skills (place  "s1\
                          \nbackend\
                          \n/work") (purpose (Picker "")))))
-    (Expire_toast (id 0) (after_ms 4000))
+    (Expire_toast (id 0) (after_ms 6000))
     (Focus editor)
     (Save_history (/skill: /skills))
     (Focus dialog)
@@ -309,7 +309,7 @@ let%expect_test
   H.type_ h "/skill:";
   [%expect
     {|
-    (Expire_toast (id 0) (after_ms 4000))
+    (Expire_toast (id 0) (after_ms 2500))
     (Focus editor)
     (Rpc (method_ get_state) (params ()) (tag State))
     (Rpc (method_ list_models) (params ()) (tag Models))
@@ -425,8 +425,8 @@ let%expect_test "an invoked skill in the page: verbosity classes, /fork" =
   [%expect
     {|
     Scroll_to_bottom
-    (Expire_toast (id 0) (after_ms 4000))
-    (Expire_toast (id 1) (after_ms 4000))
+    (Expire_toast (id 0) (after_ms 3740))
+    (Expire_toast (id 1) (after_ms 4660))
     <div id="chat" class="chat verbosity-quiet">
       <div class="entries">
         <div class="msg skill user">
@@ -474,7 +474,7 @@ let%expect_test "an invoked skill in the page: verbosity classes, /fork" =
     /skill:frontend-design the pricing page #1 ✓
     Dialog_accept
     (Focus editor)
-    (Expire_toast (id 2) (after_ms 4000))
+    (Expire_toast (id 2) (after_ms 3700))
     (Rpc (method_ fork) (params ((at e1))) (tag Reload_state))
     ((m.draft "/skill:frontend-design the pricing page") (m.cursor 39))
     |}]
@@ -536,7 +536,7 @@ let%expect_test "/mcp: servers to act on first, problems below; Enter approves" 
     {|
     Dialog_accept
     (Focus editor)
-    (Expire_toast (id 0) (after_ms 4000))
+    (Expire_toast (id 0) (after_ms 2580))
     (Rpc (method_ mcp_approve) (params ((source /work/.mcp.json) (server db)))
      (tag (Mcp (Refreshed /work/.mcp.json#db))))
     |}];
@@ -545,7 +545,7 @@ let%expect_test "/mcp: servers to act on first, problems below; Enter approves" 
   H.text h ~selector:".picker-items";
   [%expect
     {|
-    (Expire_toast (id 1) (after_ms 4000))
+    (Expire_toast (id 1) (after_ms 3140))
     (Focus picker-input)
     Approved db: starting it…
     db is ready with 1 tool: Enter lists them
@@ -590,7 +590,7 @@ let%expect_test "/mcp: Enter restarts a failed server; failures say what next" =
     (Focus picker-input)
     Dialog_accept
     (Focus editor)
-    (Expire_toast (id 0) (after_ms 4000))
+    (Expire_toast (id 0) (after_ms 2940))
     (Rpc (method_ list_mcp) (params ((reconnect true)))
      (tag (Mcp (Refreshed /home/u/.prigh/mcp.json#web))))
     |}];
@@ -622,7 +622,7 @@ let%expect_test "/mcp: Enter restarts a failed server; failures say what next" =
     (Focus picker-input)
     Dialog_accept
     (Focus editor)
-    (Expire_toast (id 2) (after_ms 4000))
+    (Expire_toast (id 2) (after_ms 2580))
     (Rpc (method_ mcp_approve) (params ((source /work/.mcp.json) (server db)))
      (tag (Mcp (Refreshed /work/.mcp.json#db))))
     Couldn't start the MCP server: no server "db" in /work/.mcp.json. /mcp reconnect retries.
@@ -637,7 +637,7 @@ let%expect_test "/mcp reconnect reports; no servers says where to add them" =
   [%expect
     {|
     (Save_history ("/mcp reconnect"))
-    (Expire_toast (id 0) (after_ms 4000))
+    (Expire_toast (id 0) (after_ms 2940))
     (Rpc (method_ list_mcp) (params ((reconnect true))) (tag (Mcp Reconnect)))
     Restarting the failed MCP servers…
     MCP servers: 1 ready (2 tools), 1 failed (web: spawn uvx: not found), 1 awaiting approval, 1 configuration problem: /mcp shows them
@@ -715,9 +715,9 @@ let%expect_test "/help /skill: and /help mcp" =
   [%expect
     {|
     (Save_history ("/help skill:"))
-    (Expire_toast (id 0) (after_ms 4000))
+    (Expire_toast (id 0) (after_ms 4820))
     (Save_history ("/help mcp" "/help skill:"))
-    (Expire_toast (id 1) (after_ms 4000))
+    (Expire_toast (id 1) (after_ms 4980))
     /skill:<name> [args]: send a skill's instructions to the agent, with your arguments
     /mcp [reconnect]: MCP servers: their tools, approve a project's, or restart failed ones
     |}]

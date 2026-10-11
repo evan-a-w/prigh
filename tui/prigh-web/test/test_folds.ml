@@ -174,7 +174,7 @@ let%expect_test "verbosity: verbose unfolds everything, quiet hides it" =
   H.text h ~selector:"button.fold";
   [%expect
     {|
-    (Expire_toast (id 0) (after_ms 4000))
+    (Expire_toast (id 0) (after_ms 3740))
     <div class="chat verbosity-verbose">
     (Fold to 6 lines)
     |}];
@@ -189,7 +189,7 @@ let%expect_test "verbosity: verbose unfolds everything, quiet hides it" =
   print_s [%sexp (Set.to_list (H.model h).folds : string list)];
   [%expect
     {|
-    (Expire_toast (id 1) (after_ms 4000))
+    (Expire_toast (id 1) (after_ms 4660))
     <div class="chat verbosity-quiet">
     (Show all 20 lines)
     ()
@@ -199,7 +199,7 @@ let%expect_test "verbosity: verbose unfolds everything, quiet hides it" =
   H.text h ~selector:"button.fold";
   [%expect
     {|
-    (Expire_toast (id 2) (after_ms 4000))
+    (Expire_toast (id 2) (after_ms 4180))
     <div class="chat verbosity-normal">
     (Show all 20 lines)
     |}]

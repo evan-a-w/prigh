@@ -60,7 +60,7 @@ let%expect_test "/fallback shows the chain, sets only it, and clears it" =
       (default_thinking ()) (fallback_models ()) (default_cwd ())
       (archive_after_days 7) (notify bell)))
     (Save_history (/fallback))
-    (Expire_toast (id 0) (after_ms 4000))
+    (Expire_toast (id 0) (after_ms 5780))
     No fallback models: /fallback MODEL [MODEL...] sets the chain that takes over when a model's usage runs out
     |}];
   (* The backend resolves names and prefixes; the toast shows its keys. *)
@@ -77,7 +77,7 @@ let%expect_test "/fallback shows the chain, sets only it, and clears it" =
     (Rpc (method_ set_config)
      (params ((config ((fallback_models (gpt-6 Claude-Sonnet))))))
      (tag Fallback_saved))
-    (Expire_toast (id 1) (after_ms 4000))
+    (Expire_toast (id 1) (after_ms 4980))
     No fallback models: /fallback MODEL [MODEL...] sets the chain that takes over when a model's usage runs out
     Fallback: openai/gpt-6 → anthropic/claude-sonnet-5 (now on anthropic/claude-opus-5-5)
     (((scoped_models ()) (approval_mode Auto)
@@ -94,7 +94,7 @@ let%expect_test "/fallback shows the chain, sets only it, and clears it" =
   [%expect
     {|
     (Save_history (/fallback "/fallback  gpt-6 Claude-Sonnet" /fallback))
-    (Expire_toast (id 2) (after_ms 4000))
+    (Expire_toast (id 2) (after_ms 4460))
     Fallback: openai/gpt-6 → anthropic/claude-sonnet-5 (now on openai/gpt-6)
     |}];
   (* Another client's change shows up. *)
@@ -108,7 +108,7 @@ let%expect_test "/fallback shows the chain, sets only it, and clears it" =
   [%expect
     {|
     (Save_history (/fallback "/fallback  gpt-6 Claude-Sonnet" /fallback))
-    (Expire_toast (id 3) (after_ms 4000))
+    (Expire_toast (id 3) (after_ms 3660))
     Fallback: deepseek/deepseek-chat (now on openai/gpt-6)
     |}];
   run h "/fallback off";
@@ -121,7 +121,7 @@ let%expect_test "/fallback shows the chain, sets only it, and clears it" =
      ("/fallback off" /fallback "/fallback  gpt-6 Claude-Sonnet" /fallback))
     (Rpc (method_ set_config) (params ((config ((fallback_models ())))))
      (tag Fallback_saved))
-    (Expire_toast (id 4) (after_ms 4000))
+    (Expire_toast (id 4) (after_ms 5260))
     Fallback cleared: a model whose usage runs out stops the run (/fallback MODEL... sets a chain)
     (((scoped_models ()) (approval_mode Auto)
       (permissions ((allow ()) (ask ()) (deny ()))) (default_model ())
@@ -248,7 +248,7 @@ let%expect_test "/default-dir shows, sets and clears where new sessions start" =
   [%expect
     {|
     (Save_history (/default-dir))
-    (Expire_toast (id 0) (after_ms 4000))
+    (Expire_toast (id 0) (after_ms 5620))
     No default directory: new sessions start in the backend's working directory; /default-dir PATH sets one
     |}];
   run h "/default-dir ~/proj";
@@ -262,7 +262,7 @@ let%expect_test "/default-dir shows, sets and clears where new sessions start" =
     (Save_history ("/default-dir ~/proj" /default-dir))
     (Rpc (method_ set_config) (params ((config ((default_cwd ~/proj)))))
      (tag Default_dir_saved))
-    (Expire_toast (id 1) (after_ms 4000))
+    (Expire_toast (id 1) (after_ms 4700))
     Default directory: ~/proj (new sessions start there; /default-dir off clears it)
     (((scoped_models ()) (approval_mode Auto)
       (permissions ((allow ()) (ask ()) (deny ()))) (default_model ())
@@ -274,8 +274,8 @@ let%expect_test "/default-dir shows, sets and clears where new sessions start" =
   [%expect
     {|
     (Save_history (/default-dir "/default-dir ~/proj" /default-dir))
-    (Expire_toast (id 2) (after_ms 4000))
-    Default directory: ~/proj (new sessions start there; /default-dir off clears it)
+    (Expire_toast (id 2) (after_ms 4700))
+    Default directory: ~/proj (new sessions start there; /default-dir off clears it) ×2
     |}];
   run h "/default-dir off";
   H.reply h "set_config" (config ());
@@ -288,7 +288,7 @@ let%expect_test "/default-dir shows, sets and clears where new sessions start" =
      ("/default-dir off" /default-dir "/default-dir ~/proj" /default-dir))
     (Rpc (method_ set_config) (params ((config ((default_cwd null)))))
      (tag Default_dir_saved))
-    (Expire_toast (id 3) (after_ms 4000))
+    (Expire_toast (id 3) (after_ms 4700))
     Default directory cleared: new sessions start in the backend's working directory
     |}];
   run h "/default-dir /etc/passwd";
@@ -472,7 +472,7 @@ let%expect_test "a hand-over as it happens: notice, model, line" =
   [%expect
     {|
     (GPT-6) (on) (Files (Ctrl+Shift+F)) (Terminal (Ctrl+`))
-    (Expire_toast (id 0) (after_ms 4000))
+    (Expire_toast (id 0) (after_ms 5260))
     fix the build
     ↪ Handed over from openai/gpt-6 to anthropic/claude-opus-5-5
     [prigh: openai/gpt-6 cannot continue (HTTP 429: {"error": "usage limit reached (plan: pro), try later"} (usage limit reached)), so anthropic/claude-opus-5-5 takes over this conversation from here. Carry on with the task where it left off.]
@@ -484,7 +484,7 @@ let%expect_test "a hand-over as it happens: notice, model, line" =
   [%expect
     {|
     (Save_history (/fallback))
-    (Expire_toast (id 1) (after_ms 4000))
+    (Expire_toast (id 1) (after_ms 4980))
     Fallback: openai/gpt-6 → anthropic/claude-opus-5-5 (now on anthropic/claude-opus-5-5)
     |}]
 ;;
@@ -536,9 +536,9 @@ let%expect_test "/help fallback and default-dir" =
   [%expect
     {|
     (Save_history ("/help fallback"))
-    (Expire_toast (id 0) (after_ms 4000))
+    (Expire_toast (id 0) (after_ms 5500))
     (Save_history ("/help /default-dir" "/help fallback"))
-    (Expire_toast (id 1) (after_ms 4000))
+    (Expire_toast (id 1) (after_ms 4380))
     /fallback [model...|off]: show or set the models that take over, in order, when one's usage runs out
     /default-dir [path|off]: show or set the directory new sessions start in
     |}]

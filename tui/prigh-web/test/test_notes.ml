@@ -154,7 +154,7 @@ let%expect_test
   [%expect
     {|
     (Save_history (/diff))
-    (Expire_toast (id 0) (after_ms 4000))
+    (Expire_toast (id 0) (after_ms 2500))
     (Rpc (method_ git_diff) (params ()) (tag Git_diff))
     (Focus dialog)
     <div id="dialog"
@@ -260,11 +260,11 @@ let%expect_test
     (Focus editor)
     (Rpc (method_ list_paths) (params ((prefix src))) (tag (Paths src)))
     (Save_history ("/diff src" /diff))
-    (Expire_toast (id 1) (after_ms 4000))
+    (Expire_toast (id 1) (after_ms 2500))
     (Rpc (method_ git_diff) (params ((path src))) (tag Git_diff))
-    (Expire_toast (id 2) (after_ms 4000))
+    (Expire_toast (id 2) (after_ms 2780))
     (Save_history (/diff "/diff src" /diff))
-    (Expire_toast (id 3) (after_ms 4000))
+    (Expire_toast (id 3) (after_ms 2500))
     (Rpc (method_ git_diff) (params ()) (tag Git_diff))
     No changes in /work against HEAD
     Not a git repository: /work (git init starts one, or /cd into one)
@@ -283,7 +283,7 @@ let%expect_test
   [%expect
     {|
     (Save_history ("/review main look at errors"))
-    (Expire_toast (id 0) (after_ms 4000))
+    (Expire_toast (id 0) (after_ms 2780))
     (Rpc (method_ review) (params ((args "main look at errors")))
      (tag (Command_prompt "/review main look at errors")))
     Nothing to review: no changes against main in /work. /review main look at errors is back in the editor.
@@ -305,7 +305,7 @@ let%expect_test
     {|
     (Save_history (/init "/review main look at errors"))
     (Rpc (method_ init) (params ()) (tag (Command_prompt /init)))
-    (Expire_toast (id 2) (after_ms 4000))
+    (Expire_toast (id 2) (after_ms 3220))
     Queued: it starts when the current run ends
     |}]
 ;;
@@ -363,7 +363,7 @@ let%expect_test
   [%expect
     {|
     (Save_history (/notify))
-    (Expire_toast (id 0) (after_ms 4000))
+    (Expire_toast (id 0) (after_ms 4700))
     Notifications are on, but the browser has not been asked yet: /notify on asks it
     |}];
   run h "/notify on";
@@ -374,7 +374,7 @@ let%expect_test
     (Save_history ("/notify on" /notify))
     (Save_notifications true)
     Request_notification_permission
-    (Expire_toast (id 1) (after_ms 4000))
+    (Expire_toast (id 1) (after_ms 6000))
     Notifications are on, but the browser has not been asked yet: /notify on asks it
     Notifications are on: the browser tells you when a turn ends, a tool waits for you or background work finishes while this tab is hidden
     |}];
@@ -418,7 +418,7 @@ let%expect_test
     {|
     (Save_history ("/notify off" "/notify on" /notify))
     (Save_notifications false)
-    (Expire_toast (id 2) (after_ms 4000))
+    (Expire_toast (id 2) (after_ms 3220))
     (Set_title "(1) prigh")
     (Set_title prigh)
     |}]
@@ -448,7 +448,7 @@ let%expect_test
   [%expect
     {|
     (Save_history (/notify))
-    (Expire_toast (id 1) (after_ms 4000))
+    (Expire_toast (id 1) (after_ms 6000))
     (Save_history ("/notify loud" /notify))
     This browser cannot show notifications here (they need https or localhost); the tab's title still counts what happened
     Unknown /notify argument "loud": /notify on or /notify off (/notify alone says what is on)
@@ -485,7 +485,7 @@ let%expect_test
     {|
     (Run "/notify on")
     (Save_notifications true)
-    (Expire_toast (id 1) (after_ms 4000))
+    (Expire_toast (id 1) (after_ms 6000))
     <button class="link notify on status-item">
     (Notifications on (/notify off))
     |}];

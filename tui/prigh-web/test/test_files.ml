@@ -283,6 +283,7 @@ let%expect_test "downloads: a file, and a directory as .tar.gz" =
   let h = opened () in
   H.act h (Files (Download "README.md"));
   H.text h ~selector:".files-transfers";
+  H.text h ~selector:".status .transfers";
   H.reply
     h
     "fs_download"
@@ -292,9 +293,10 @@ let%expect_test "downloads: a file, and a directory as .tar.gz" =
     (Rpc (method_ fs_download) (params ((path /home/me/proj/README.md)))
      (tag (Files Download_link)))
     Preparing README.md…
+    Preparing README.md…
     (Files
      (Download (url http://box:7790/files/download?ticket=t1) (name README.md)))
-    (Expire_toast (id 0) (after_ms 4000))
+    (Expire_toast (id 0) (after_ms 2500))
     |}];
   H.act h (Files (Download "src"));
   H.text h ~selector:".files-transfers";
@@ -305,7 +307,7 @@ let%expect_test "downloads: a file, and a directory as .tar.gz" =
     (Rpc (method_ fs_download) (params ((path /home/me/proj/src) (archive true)))
      (tag (Files Download_link)))
     Packing src as .tar.gz…
-    Downloading README.md
+    Downloading "README.md"
     tar exited with 2
     |}]
 ;;
@@ -364,10 +366,13 @@ let%expect_test "uploads into the directory, asking before replacing a file" =
     |}];
   H.act h (Files (Upload_progress { file = 1; sent = 400 }));
   H.text h ~selector:".files-transfers";
+  (* Visible outside the panel too: in the status line. *)
+  H.text h ~selector:".status .transfers";
   [%expect
     {|
     new.txt 400 B of 1000 B
     README.md waiting…
+    Uploading 2 files 39%
     |}];
   H.act
     h
@@ -381,7 +386,7 @@ let%expect_test "uploads into the directory, asking before replacing a file" =
           }));
   [%expect
     {|
-    (Expire_toast (id 0) (after_ms 4000))
+    (Expire_toast (id 0) (after_ms 2500))
     (Rpc (method_ fs_list) (params ((path /home/me/proj) (hidden false)))
      (tag (Files (Listed /home/me/proj))))
     |}];
@@ -394,9 +399,10 @@ let%expect_test "uploads into the directory, asking before replacing a file" =
               Error {|{"error":"no space left for /home/me/proj/README.md"}|}
           }));
   H.text h ~selector:".toasts";
+  H.elements h ~selector:".status .transfers";
   [%expect
     {|
-    Uploaded new.txt
+    Uploaded "new.txt"
     Could not upload README.md: no space left for /home/me/proj/README.md
     |}];
   H.reply
@@ -464,7 +470,7 @@ let%expect_test
     (Files (Ask_input notes))
     (Files Ask_accept)
     (Rpc (method_ fs_mkdir) (params ((path /home/me/proj/notes)))
-     (tag (Files (Changed (notice "Created notes") (select (notes))))))
+     (tag (Files (Changed (notice "Created folder \"notes\"") (select (notes))))))
     (Cancel) (Creating…)
     New folder
     (Close (Esc))
@@ -499,8 +505,9 @@ let%expect_test
      (params ((from /home/me/proj/README.md) (to /home/me/proj/READ.md)))
      (tag
       (Files
-       (Changed (notice "Renamed README.md to READ.md") (select (READ.md))))))
-    (Expire_toast (id 0) (after_ms 4000))
+       (Changed (notice "Renamed \"README.md\" to \"READ.md\"")
+        (select (READ.md))))))
+    (Expire_toast (id 0) (after_ms 2780))
     (Rpc (method_ fs_list) (params ((path /home/me/proj) (hidden false)))
      (tag (Files (Listed /home/me/proj))))
     (Files (Focus files-list))
@@ -528,13 +535,13 @@ let%expect_test
     (Cancel) (Delete)
     (Files Ask_accept)
     (Rpc (method_ fs_delete) (params ((path /home/me/proj/src)))
-     (tag (Files (Changed (notice "Deleted src") (select ())))))
-    (Expire_toast (id 1) (after_ms 4000))
+     (tag (Files (Changed (notice "Deleted \"src\"") (select ())))))
+    (Expire_toast (id 1) (after_ms 2500))
     (Rpc (method_ fs_list) (params ((path /home/me/proj) (hidden false)))
      (tag (Files (Listed /home/me/proj))))
     (Files (Focus files-list))
-    Renamed README.md to READ.md
-    Deleted src
+    Renamed "README.md" to "READ.md"
+    Deleted "src"
     |}]
 ;;
 
@@ -554,11 +561,11 @@ let%expect_test "paths into the composer, files attached from the browser" =
     (Files (Insert_path /home/me/proj/README.md))
     (Files (Copy_path /home/me/proj/README.md))
     (Files (Attach README.md))
-    (Expire_toast (id 1) (after_ms 4000))
+    (Expire_toast (id 1) (after_ms 3100))
     @README.md
     README.md 2.0 KB (Remove README.md)
-    Copied ~/proj/README.md
-    Attached README.md to the next message
+    Copied the path ~/proj/README.md
+    Attached "README.md" to the next message
     |}];
   H.act h (Files (Attach "src"));
   H.text h ~selector:".toasts .error";
@@ -614,12 +621,14 @@ let%expect_test "files dropped on the composer upload into the chat's uploads" =
     "the file browser needs a newer prigh on tool host laptop: update prigh \
      there and restart its TUI or tool-host";
   H.act h (Files (Upload_progress { file = 1; sent = 500_000 }));
+  H.text h ~selector:".status .transfers";
   H.show h ~selector:".attach-chip.uploading";
   H.text h ~selector:".attach-chips";
   [%expect
     {|
     (Files (Upload (file 1) (url http://box:7790/files/upload?ticket=a)))
     (Files (Forget 2))
+    Uploading report.pdf 25%
     <div title="Uploading report.pdf…" class="attach-chip uploading" custom-css-vars=((--done 25%))>
       <span class="files-lamp">  </span>
       <span class="attach-chip-name"> report.pdf </span>
@@ -707,7 +716,8 @@ let%expect_test "on a phone the browser is a sheet that Esc closes" =
   H.quiet h (fun () -> H.act h (Set_narrow true));
   H.elements h ~selector:".app";
   H.key h "Escape" ~target:Control;
-  [%expect {|
+  [%expect
+    {|
     <div class="app files-open narrow">
     (Files Close)
     (Focus editor)

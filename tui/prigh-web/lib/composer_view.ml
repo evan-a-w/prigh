@@ -92,18 +92,22 @@ let connected (m : App.Model.t) =
   | Reconnecting _, _ | _, None -> false
 ;;
 
+(* One line at any width (CSS cuts it with an ellipsis, never wraps it). *)
 let placeholder (m : App.Model.t) =
-  (* A phone, or the chat beside the agents panel. *)
-  let cramped = m.narrow || m.agents.open_ in
+  (* A phone, or the chat beside a side panel. *)
+  let cramped = m.narrow || m.agents.open_ || m.files.open_ in
   if not (connected m)
-  then "Not connected yet: you can write, and send once it is back"
+  then
+    if cramped
+    then "Offline: send once back"
+    else "Offline: write now, send once it is back"
   else if App.Model.running m && cramped
   then "Steer the agent…"
   else if App.Model.running m
-  then "Steer the agent (Enter) or queue a follow-up (Alt+Enter)…"
+  then "Steer (Enter) or queue a follow-up (Alt+Enter)…"
   else if cramped
-  then "Ask prigh…  / for commands"
-  else "Ask prigh anything…  / for commands, @ for files, paste images"
+  then "Ask prigh…  / commands"
+  else "Ask prigh anything…  / commands, @ files"
 ;;
 
 let view (m : App.Model.t) ~inject =
