@@ -137,6 +137,10 @@ val is_summary_message : Message.t -> bool
 (** [messages] with the times they were appended (none for the summary). *)
 val timed_messages : t -> Timed_message.t list
 
+(** [timed_messages], each with the id of its entry ([None] for the
+    summary). *)
+val identified_messages : t -> (string option * Timed_message.t) list
+
 val model : t -> (string * Thinking.t) option
 
 (** The system prompt fixed for this conversation, if one was recorded on the

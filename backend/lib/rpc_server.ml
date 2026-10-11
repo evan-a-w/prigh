@@ -30,6 +30,8 @@ let methods =
   ; "shell"
   ; "get_state"
   ; "get_messages"
+  ; "get_messages_page"
+  ; "get_tool_output"
   ; "get_entries"
   ; "set_model"
   ; "set_thinking"
@@ -242,6 +244,9 @@ type t =
   ; listed : Listed.t String.Table.t
     (** what [list_sessions] last showed of each live session *)
   ; mutable on_session_deleted : (key:string -> unit) list
+  ; loaded : Session.t File_cache.t
+    (** sessions read from disk and not live: evicted ones, and those read
+        for [get_messages_page] without opening them *)
   }
 
 let agent_of_client _t (client : Client.t) = client.agent
@@ -271,7 +276,10 @@ let maybe_evict t agent =
     && List.is_empty (clients_of t agent)
   then (
     Hashtbl.remove t.agents (session_id agent);
-    Hashtbl.remove t.listed (session_id agent))
+    Hashtbl.remove t.listed (session_id agent);
+    let session = Agent.session agent in
+    if Session.persisted session && not (Session.gone session)
+    then File_cache.set t.loaded (Session.path session) session)
 ;;
 
 (* Every client of the server, whichever session it is in: they refetch
@@ -398,6 +406,7 @@ let create
     ; execs = String.Table.create ()
     ; login_owner = None
     ; terminals = Terminal_relay.create ()
+    ; loaded = File_cache.create ~max_bytes:(128 * 1024 * 1024) ()
     ; home
     ; now = (fun () -> Eio.Time.now (Eio.Stdenv.clock env))
     ; listed = String.Table.create ()
@@ -614,33 +623,74 @@ let session_file t path =
     else Or_error.errorf "%S is not in the sessions directory" path)
 ;;
 
-(* Finds a live session by id or path, or loads it from disk for [client]. *)
+let find_live t key =
+  match Hashtbl.find t.agents key with
+  | Some agent -> Some agent
+  | None ->
+    Hashtbl.data t.agents
+    |> List.find ~f:(fun agent ->
+      String.equal (Session.path (Agent.session agent)) key)
+;;
+
+(* The file of a saved session, by path or id. *)
+let saved_path t key =
+  if Sys_unix.file_exists_exn key
+  then session_file t key
+  else (
+    match
+      List.find (Session.list ~dir:t.sessions_dir) ~f:(fun s ->
+        String.equal s.id key)
+    with
+    | Some summary -> Ok summary.path
+    | None -> Or_error.errorf "no session %S" key)
+;;
+
+(* Finds a live session by id or path, or loads it from disk for [client]
+   (taking it out of [t.loaded]: its agent owns it now). *)
 let find_agent t (client : Client.t) key =
-  let live =
-    match Hashtbl.find t.agents key with
-    | Some agent -> Some agent
-    | None ->
-      Hashtbl.data t.agents
-      |> List.find ~f:(fun agent ->
-        String.equal (Session.path (Agent.session agent)) key)
-  in
-  match live with
+  match find_live t key with
   | Some agent -> Ok agent
   | None ->
-    let path =
-      if Sys_unix.file_exists_exn key
-      then session_file t key
-      else (
-        match
-          List.find (Session.list ~dir:t.sessions_dir) ~f:(fun s ->
-            String.equal s.id key)
-        with
-        | Some summary -> Ok summary.path
-        | None -> Or_error.errorf "no session %S" key)
-    in
-    Or_error.bind path ~f:(fun path ->
-      Or_error.map (Session.load path) ~f:(fun session ->
+    Or_error.bind (saved_path t key) ~f:(fun path ->
+      let session = File_cache.find_or_read t.loaded path ~read:Session.load in
+      File_cache.remove t.loaded path;
+      Or_error.map session ~f:(fun session ->
         start_agent t session (loaded_start t client session)))
+;;
+
+(* A session's messages to read: the live session's, else from disk without
+   opening it (kept in [t.loaded] for when it is opened). *)
+let session_to_read t key =
+  match find_live t key with
+  | Some agent -> Ok (Agent.session agent)
+  | None ->
+    Or_error.bind (saved_path t key) ~f:(fun path ->
+      File_cache.find_or_read t.loaded path ~read:Session.load)
+;;
+
+let int_param params name ~default =
+  match param params name with
+  | None | Some `Null -> Ok default
+  | Some (`Number n) ->
+    (match Int.of_string_opt n with
+     | Some n -> Ok n
+     | None -> Or_error.errorf "param %S must be an integer" name)
+  | Some _ -> Or_error.errorf "param %S must be an integer" name
+;;
+
+let messages_page t (client : Client.t) params =
+  let open Or_error.Let_syntax in
+  let%bind limit = int_param params "limit" ~default:100 in
+  let%bind before = string_param_opt params "before" in
+  let%bind session =
+    match%bind string_param_opt params "session" with
+    | None -> Ok (Agent.session client.agent)
+    | Some key -> session_to_read t key
+  in
+  let%map page =
+    Message_page.create (Session.identified_messages session) ~limit ~before
+  in
+  Message_page.to_json page
 ;;
 
 (* Without the backend host, the session [connect] gave a tool host may have
@@ -1180,6 +1230,7 @@ let dispatch_server t (client : Client.t) ~meth ~params
            attach t client target;
            attached_state client)))
   | "list_sessions" -> Some (ok (list_sessions t client))
+  | "get_messages_page" -> Some (messages_page t client params)
   | "delete_session" ->
     Some
       (Or_error.bind (string_param params "path") ~f:(fun key ->
@@ -1410,9 +1461,35 @@ let dispatch agent login ~meth ~params : Json.t Or_error.t =
     ok (`Array (List.map (Agent.subagents agent) ~f:Rpc_json.subagent_summary))
   | "get_subagent" ->
     Or_error.bind (string_param params "id") ~f:(fun id ->
-      match Agent.subagent agent id with
-      | Some found -> ok (Rpc_json.subagent found)
-      | None -> Or_error.errorf "unknown subagent %S" id)
+      match Agent.subagent agent id, param params "elide" with
+      | Some (summary, messages), Some `True ->
+        ok
+          (`Object
+              [ "subagent", Rpc_json.subagent_summary summary
+              ; "messages", `Array (List.map messages ~f:Message_page.message)
+              ])
+      | Some found, _ -> ok (Rpc_json.subagent found)
+      | None, _ -> Or_error.errorf "unknown subagent %S" id)
+  | "get_tool_output" ->
+    let open Or_error.Let_syntax in
+    let%bind call_id = string_param params "call_id" in
+    let%bind agent_id = string_param_opt params "agent_id" in
+    let%bind messages =
+      match agent_id with
+      | None -> Ok (Session.timed_messages (Agent.session agent))
+      | Some id ->
+        (match Agent.subagent agent id with
+         | Some (_, messages) -> Ok messages
+         | None -> Or_error.errorf "unknown subagent %S" id)
+    in
+    (match Message_page.find_output messages ~call_id with
+     | Some r ->
+       ok
+         (`Object
+             [ "text", `String r.text
+             ; ("is_error", if r.is_error then `True else `False)
+             ])
+     | None -> Or_error.errorf "no output of tool call %S" call_id)
   | "get_messages" ->
     ok
       (`Array

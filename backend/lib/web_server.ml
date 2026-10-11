@@ -218,6 +218,15 @@ let handle ~root ~websockets ~on_lines flow =
        | Some root -> Eio.Flow.copy_string (static ~root request) flow))
 ;;
 
+(* Replies go out whole at once: with Nagle's algorithm the end of a large
+   one waits for the browser's delayed ACK (40 ms). *)
+let no_delay flow =
+  Option.iter (Eio_unix.Resource.fd_opt flow) ~f:(fun fd ->
+    Eio_unix.Fd.use_exn "no_delay" fd (fun fd ->
+      try Core_unix.setsockopt fd TCP_NODELAY true with
+      | _ -> ()))
+;;
+
 let serve_rpc router ~query:_ ws =
   Rpc_router.serve_lines
     router
@@ -283,7 +292,9 @@ let listen ~env ~sw ~addr ~port ~root ~websockets ~on_lines =
         socket
         ~on_error:(fun exn ->
           eprintf "prigh: web connection failed: %s\n%!" (Exn.to_string exn))
-        (fun flow _addr -> handle ~root ~websockets ~on_lines flow)
+        (fun flow _addr ->
+           no_delay flow;
+           handle ~root ~websockets ~on_lines flow)
     done);
   port
 ;;
