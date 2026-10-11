@@ -107,6 +107,18 @@ let all =
       "compact"
       "[instructions]"
       "summarise older messages to free context"
+  ; c
+      ~argument:Argument.Path
+      "diff"
+      "[path]"
+      "show the uncommitted changes where the tools run (git diff, untracked \
+       files too)"
+  ; c
+      "review"
+      "[base] [instructions]"
+      "review the uncommitted changes, or those against a base branch, for \
+       prioritised findings"
+  ; c "init" "" "write or improve the project's AGENTS.md"
   ; c "new" "" "start a new session"
   ; c "name" "[text]" "set the session name"
   ; c "session" "" "show session statistics"

@@ -227,6 +227,7 @@ fallback backend exited
   \n</file>")
  (images
   (((mime_type image/gif) (bytes 45)) ((mime_type image/png) (bytes 84))))
+ (origin ((body "what is in @shot.png?") (attachments (shot.png))))
  (at <at>))
 <- tool_result: ((tool_call_id i1) (tool_name read) (text "Read image file [image/png, 3x2]")
  (is_error false) (images (((mime_type image/png) (bytes 84)))) (at <at>))

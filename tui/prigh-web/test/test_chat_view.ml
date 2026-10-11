@@ -340,8 +340,8 @@ let%expect_test
 let%expect_test "deliveries of background work: compact cards" =
   Chat_harness.show
     (Chat_harness.chat
-       [ {|{"type":"event","event":"message_start","message":{"role":"user","text":"[subagent a1 finished] Count the lines in src/app.ml and report back.\nsrc/app.ml has **5 lines**.\n[subagent: 2 turns, 0 in / 0 out tokens, $0.0000]"}}|}
-       ; {|{"type":"event","event":"message_start","message":{"role":"user","text":"[job j2 exited 0] sleep 0.5; echo second\nsecond\n\n[job j3 exited 2] make\nError: no rule\n\n[subagent a2 failed] Fix the tests\nsubagent failed: 529 overloaded\n[subagent: 1 turns, 10 in / 0 out tokens, $0.0001]"}}|}
+       [ {|{"type":"event","event":"message_start","message":{"role":"user","text":"[subagent a1 finished] Count the lines in src/app.ml and report back.\nsrc/app.ml has **5 lines**.\n[subagent: 2 turns, 0 in / 0 out tokens, $0.0000]","origin":{"source":{"kind":"delivery","title":"Reports"}}}}|}
+       ; {|{"type":"event","event":"message_start","message":{"role":"user","text":"[job j2 exited 0] sleep 0.5; echo second\nsecond\n\n[job j3 exited 2] make\nError: no rule\n\n[subagent a2 failed] Fix the tests\nsubagent failed: 529 overloaded\n[subagent: 1 turns, 10 in / 0 out tokens, $0.0001]","origin":{"source":{"kind":"delivery","title":"Reports"}}}}|}
        ]);
   [%expect
     {|

@@ -481,7 +481,7 @@ let%expect_test "styled frame: markdown link, diff and autocomplete" =
         [bold]/fallback[/][gray] [off|model...]           show or set the models that take over, in …[/]
         [bold]/default-dir[/][gray] [off|path]            show or set the directory new sessions sta…[/]
         [bold]/login[/][gray] [provider] [api_key|oauth]  log in to a provider[/]
-      [gray]  ↕ 1–8 of 43[/]
+      [gray]  ↕ 1–8 of 46[/]
       …[gray]deepseek-flash[/]  [gray]think:off[/]  [gray]ctx:0.1%/1.0M[/]  [gray]$0.01[/]  [yellow]Tab/Enter accept · Esc close[/]
       |}];
     return ())

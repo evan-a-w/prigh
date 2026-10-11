@@ -14,27 +14,7 @@ let line text =
   |> Option.value_map ~default:"" ~f:String.strip
 ;;
 
-(* A skill's invocation as it was typed, not its instructions. *)
-let typed text =
-  Option.value_map
-    (Skill_message.parse text)
-    ~default:text
-    ~f:Skill_message.invocation
-;;
-
-(* A hand-over as the transcript shows it, with the error. *)
-let label text =
-  Option.value_map
-    (Handover_message.parse text)
-    ~default:(typed text)
-    ~f:(fun h -> sprintf "%s (%s)" (Handover_message.summary h) h.error)
-;;
-
-let user_line ({ text; images; at = _ } : Message.User.t) =
-  match line (label text), images with
-  | "", image :: _ -> Image.to_string_hum image
-  | line, _ -> line
-;;
+let user_line = Injected_note.label
 
 let first_line (message : Message.t) =
   match message with
@@ -67,14 +47,14 @@ let user_items entries =
     Picker.Item.create
       ~id:entry.id
       ~detail:(sprintf "#%d" (i + 1))
-      ~search:user.text
+      ~search:(Message.User.body user)
       ~marked:(i = count - 1)
       (user_line user))
 ;;
 
 let user_text entries id =
   List.find_map (users entries) ~f:(fun ((entry : Entry.t), user) ->
-    Option.some_if (String.equal entry.id id) (typed user.text))
+    Option.some_if (String.equal entry.id id) (Injected_note.typed user))
 ;;
 
 let tree_items entries ~head =

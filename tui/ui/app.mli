@@ -41,6 +41,8 @@ module Reply_tag : sig
     | Models_catalog
     | Models_for_scoped
     | Compact_done
+    | Git_diff
+    | Review_started
     | Abort_done
     | Notice_on_success of string
     | History
