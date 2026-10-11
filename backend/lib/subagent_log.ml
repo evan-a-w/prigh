@@ -246,6 +246,20 @@ let replay t (line : Line.t) =
 
 let interrupted = "[interrupted] the backend stopped before it finished"
 
+(* Parsed logs: a session opened again after its agent was evicted need not
+   parse its log again. *)
+let lines : Line.t list File_cache.t =
+  File_cache.create ~max_bytes:(64 * 1024 * 1024) ()
+;;
+
+let read_lines path =
+  Or_error.try_with (fun () ->
+    List.filter_map (In_channel.read_lines path) ~f:(fun line ->
+      match Line.t_of_jsonaf (Json.of_string line) with
+      | line -> Some line
+      | exception _ -> None))
+;;
+
 let load t ~dir =
   Queue.clear t.entries;
   Hashtbl.clear t.by_id;
@@ -255,10 +269,9 @@ let load t ~dir =
     let path = Filename.concat dir file_name in
     if Sys_unix.file_exists_exn path
     then (
-      List.iter (In_channel.read_lines path) ~f:(fun line ->
-        match Line.t_of_jsonaf (Json.of_string line) with
-        | line -> replay t line
-        | exception _ -> ());
+      (match File_cache.find_or_read lines path ~read:read_lines with
+       | Ok lines -> List.iter lines ~f:(replay t)
+       | Error _ -> ());
       Queue.iter t.entries ~f:(fun e ->
         if Option.is_none e.result
         then

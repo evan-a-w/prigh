@@ -55,11 +55,14 @@ let sequence_length s i =
 let is_valid s =
   let n = String.length s in
   let rec go i =
-    i >= n
-    ||
-    match sequence_length s i with
-    | Some len -> go (i + len)
-    | None -> false
+    if i >= n
+    then true
+    else if Char.to_int (String.unsafe_get s i) < 0x80
+    then go (i + 1)
+    else (
+      match sequence_length s i with
+      | Some len -> go (i + len)
+      | None -> false)
   in
   go 0
 ;;

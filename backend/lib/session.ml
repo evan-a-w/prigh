@@ -270,9 +270,9 @@ let add_entry t (entry : Entry.t) =
 ;;
 
 let read_lines path =
-  In_channel.read_lines path
+  Utf8.sanitize (In_channel.read_all path)
+  |> String.split_lines
   |> List.filter ~f:(fun l -> not (String.is_empty (String.strip l)))
-  |> List.map ~f:Utf8.sanitize
 ;;
 
 let load path =
@@ -493,6 +493,7 @@ let context t =
 
 let timed_messages t = List.map (context t) ~f:snd
 let context_ids t = List.map (context t) ~f:fst
+let identified_messages = context
 
 let messages t =
   List.map (timed_messages t) ~f:(fun (m : Timed_message.t) -> m.message)
