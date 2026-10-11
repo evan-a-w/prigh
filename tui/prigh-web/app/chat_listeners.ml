@@ -49,7 +49,19 @@ let close_image (ev : Dom_html.keyboardEvent Js.t) =
          Dom_html.stopPropagation ev)
 ;;
 
-let install () =
+let toggle_fold ~schedule (ev : Dom_html.mouseEvent Js.t) =
+  Option.iter
+    (Option.bind
+       (Js.Opt.to_option ev##.target)
+       ~f:(fun el -> closest el (sprintf "[%s]" Prigh_web.Fold.attribute)))
+    ~f:(fun el ->
+      Js.Opt.iter
+        (el##getAttribute (Js.string Prigh_web.Fold.attribute))
+        (fun key ->
+           schedule (Prigh_web.App.Action.Toggle_fold (Js.to_string key))))
+;;
+
+let install ~schedule =
   let listen event handler =
     ignore
       (Dom_html.addEventListener
@@ -62,5 +74,6 @@ let install () =
        : Dom_html.event_listener_id)
   in
   listen Dom_html.Event.click copy;
+  listen Dom_html.Event.click (toggle_fold ~schedule);
   listen Dom_html.Event.keydown close_image
 ;;

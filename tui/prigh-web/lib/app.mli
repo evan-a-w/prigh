@@ -99,6 +99,8 @@ module Reply_tag : sig
         ; purpose : Skills_purpose.t
         }
     | Mcp of Mcp_purpose.t
+    | Model_set (** [set_model]: the choice is no longer pending *)
+    | Thinking_set
   [@@deriving sexp_of, equal]
 end
 
@@ -265,6 +267,8 @@ module Action : sig
         } (** the saved sign-ins, from the page *)
     | Open_accounts (** the account menu *)
     | Cycle_verbosity
+    | Toggle_fold of string
+    (** a tool output's [Fold.key], clicked: shown in full, or folded again *)
     | Cycle_model of int (** through the scoped models, forwards or back *)
     | Cycle_thinking
     | Copy_last (** the last reply, to the clipboard *)
@@ -324,6 +328,8 @@ module Model : sig
     ; session_query : string
     ; agents : Agents.t (** the agents panel, per session *)
     ; verbosity : Prigh_ui.Verbosity.t
+    ; folds : String.Set.t
+      (** tool outputs ([Fold.key]s) toggled from how [verbosity] shows them *)
     ; config : Config.t option
     ; btw : Btw.t option
     ; btw_seq : int
@@ -333,6 +339,7 @@ module Model : sig
       (** the users we may act as: [Some] for superusers *)
     ; terminal : Terminal.t
     ; skills : Skills.t (** for [/skill:]'s completion *)
+    ; pending : Pending.t (** what we wait on the backend for, on show *)
     }
   [@@deriving sexp_of]
 
@@ -347,6 +354,9 @@ module Model : sig
 
   (** The completion popup when it has something to show. *)
   val popup : t -> Completion.t option
+
+  (** How tool outputs fold in the transcripts. *)
+  val fold : t -> Fold.t
 end
 
 val thinking_levels : string list

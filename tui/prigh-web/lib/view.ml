@@ -86,6 +86,50 @@ let empty (m : Model.t) =
     ]
 ;;
 
+(* Until the backend has answered: what we wait for, over the shape of a
+   transcript. *)
+let placeholder text =
+  Node.div
+    ~attrs:[ Attr.class_ "chat-loading"; Attr.role "status" ]
+    [ div
+        ~cls:"loading-label"
+        [ Node.span ~attrs:[ Attr.class_ "spinner" ] []; Node.text text ]
+    ; div
+        ~cls:"skeleton"
+        (List.map
+           [ "user"; "line"; "line short"; "line"; "user"; "line" ]
+           ~f:(fun cls -> div ~cls:("bone " ^ cls) []))
+    ]
+;;
+
+let loading (m : Model.t) =
+  match m.state, m.connection, m.pending with
+  | None, Connected, _ -> Some "Connecting to the backend…"
+  | None, Reconnecting _, _ -> Some "Reconnecting…"
+  | Some _, _, { session = Some Starting; _ } -> Some "Starting a session…"
+  | Some _, _, { session = Some (Switching _); _ }
+  | Some _, _, { messages = true; _ } -> Some "Loading the session…"
+  | Some _, _, { session = None; messages = false; _ } -> None
+;;
+
+(* Prompts sent that the transcript does not show yet. *)
+let echoes (m : Model.t) =
+  match m.pending.prompts with
+  | [] -> Node.none
+  | prompts ->
+    div
+      ~cls:"entries echoes"
+      (List.map prompts ~f:(fun (p : Pending.Prompt.t) ->
+         div
+           ~cls:"msg user sending"
+           [ Image_view.thumbs p.images
+           ; (if String.is_empty (String.strip p.text)
+              then Node.none
+              else div ~cls:"bubble" [ Node.text p.text ])
+           ; span ~cls:"time" "Sending…"
+           ]))
+;;
+
 (* Under a dialog the page is inert: Tab and clicks cannot reach it, so the
    dialog owns the keyboard until it closes. *)
 let rec inert (node : Node.t) : Node.t =
@@ -111,9 +155,17 @@ let view (m : Model.t) ~inject ~terminal =
     if m.narrow && m.agents.open_ then Fn.compose inert behind else behind
   in
   let chat =
-    match Chat.entries m.chat with
-    | [] -> empty m
-    | _ -> Chat_view.view (Model.message_time m) m.chat
+    match loading m, Chat.entries m.chat, m.pending.prompts with
+    | Some text, _, _ -> placeholder text
+    | None, [], [] -> empty m
+    | None, [], _ -> echoes m
+    | None, _, [] ->
+      Chat_view.view ~fold:(Model.fold m) (Model.message_time m) m.chat
+    | None, _, _ ->
+      Node.fragment
+        [ Chat_view.view ~fold:(Model.fold m) (Model.message_time m) m.chat
+        ; echoes m
+        ]
   in
   Node.div
     ~attrs:

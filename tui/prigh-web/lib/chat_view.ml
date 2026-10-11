@@ -153,19 +153,34 @@ module Deps = struct
     { running : bool
     ; tools : Chat.Tool.t option list
     ; times : Message_time.t
+    ; expanded : bool list (** the entry's folds *)
+    ; nested : Fold.t option (** all of them, with subagents' transcripts *)
     }
 
   let equal a b =
     Bool.equal a.running b.running
     && List.equal (Option.equal phys_equal) a.tools b.tools
     && Message_time.equal a.times b.times
+    && List.equal Bool.equal a.expanded b.expanded
+    && Option.equal Fold.equal a.nested b.nested
+  ;;
+end
+
+module Chat_deps = struct
+  type t = Message_time.t * Fold.t
+
+  let equal (times, fold) (times', fold') =
+    Message_time.equal times times' && Fold.equal fold fold'
   ;;
 end
 
 let entries : (Chat.Entry.t, Deps.t) View_cache.t = View_cache.create ()
-let chats : (Chat.t, Message_time.t) View_cache.t = View_cache.create ()
+let chats : (Chat.t, Chat_deps.t) View_cache.t = View_cache.create ()
 
-let rec assistant times chat (message : Message.Assistant.t) ~streaming =
+let rec nested ~fold times (s : Chat.Subagent.t) =
+  view ~fold:(Fold.scoped fold s.agent_id) times s.chat
+
+and assistant ~fold times chat (message : Message.Assistant.t) ~streaming =
   let count = List.length message.content in
   let blocks =
     List.mapi message.content ~f:(fun i content ->
@@ -177,7 +192,8 @@ let rec assistant times chat (message : Message.Assistant.t) ~streaming =
       | Thinking text -> thinking ~live:(streaming && last) text
       | Tool_call call ->
         Tool_view.view
-          ~nested:(view times)
+          ~nested:(nested ~fold times)
+          ~fold
           ~streaming:(streaming && last)
           ~running:(Chat.running chat)
           call
@@ -198,12 +214,12 @@ let rec assistant times chat (message : Message.Assistant.t) ~streaming =
       ((pending :: blocks)
        @ [ stopped; (if streaming then Node.none else footer times message) ])
 
-and render_entry times chat (entry : Chat.Entry.t) =
+and render_entry ~fold times chat (entry : Chat.Entry.t) =
   match entry with
   | User u ->
     (match Handover_message.parse u.text, Prigh_ui.Delivery.parse u.text with
      | Some h, _ -> handover times h u.at
-     | None, Some sections -> div "msg" [ Delivery_view.view sections ]
+     | None, Some sections -> div "msg" [ Delivery_view.view ~fold sections ]
      | None, None -> user ?skill:(Skill_message.parse u.text) times u)
   | Notice text -> div "msg notice" [ Node.text text ]
   | Shell call ->
@@ -211,7 +227,8 @@ and render_entry times chat (entry : Chat.Entry.t) =
     div
       "msg shell"
       [ Tool_view.view
-          ~nested:(view times)
+          ~nested:(nested ~fold times)
+          ~fold
           ~streaming:false
           ~running:
             (Option.value_map tool ~default:true ~f:(fun t ->
@@ -225,18 +242,29 @@ and render_entry times chat (entry : Chat.Entry.t) =
       ~label:"Context compacted"
       ~preview:(Markdown.preview summary)
       (Markdown_view.render summary)
-  | Assistant { message; streaming } -> assistant times chat message ~streaming
+  | Assistant { message; streaming } ->
+    assistant ~fold times chat message ~streaming
 
 (* An entry's card depends on the state of its tool calls, and on whether the
    agent is still running while one of them has no result. *)
-and entry times chat (entry : Chat.Entry.t) =
-  let tools =
+and entry ~fold times chat (entry : Chat.Entry.t) =
+  let ids =
     match entry with
     | Assistant { message; _ } ->
       List.filter_map message.content ~f:(function
-        | Tool_call call -> Some (Chat.tool chat call.id)
+        | Tool_call call -> Some call.id
         | Text _ | Thinking _ -> None)
-    | Shell call -> [ Chat.tool chat call.id ]
+    | Shell call -> [ call.id ]
+    | User u when String.is_prefix u.text ~prefix:"[" ->
+      (* A delivery's jobs fold. *)
+      (match Prigh_ui.Delivery.parse u.text with
+       | Some sections -> List.map sections ~f:Delivery_view.job_key
+       | None -> [])
+    | User _ | Notice _ | Compaction _ -> []
+  in
+  let tools =
+    match entry with
+    | Assistant _ | Shell _ -> List.map ids ~f:(Chat.tool chat)
     | User _ | Notice _ | Compaction _ -> []
   in
   let running =
@@ -247,17 +275,31 @@ and entry times chat (entry : Chat.Entry.t) =
   View_cache.find
     entries
     entry
-    ~deps:{ Deps.running; tools; times }
+    ~deps:
+      { Deps.running
+      ; tools
+      ; times
+      ; expanded = List.map ids ~f:(Fold.expanded fold)
+      ; nested =
+          Option.some_if
+            (List.exists tools ~f:(fun tool ->
+               Option.exists tool ~f:(fun t -> Option.is_some t.subagent)))
+            fold
+      }
     ~equal:Deps.equal
-    ~f:(fun () -> render_entry times chat entry)
+    ~f:(fun () -> render_entry ~fold times chat entry)
 
 (* Days are marked where they change, not above the first message: its time
    already says which day it is. *)
-and view times chat =
-  View_cache.find chats chat ~deps:times ~equal:Message_time.equal ~f:(fun () ->
-    entries_view times chat)
+and view ?(fold = Fold.default) times chat =
+  View_cache.find
+    chats
+    chat
+    ~deps:(times, fold)
+    ~equal:Chat_deps.equal
+    ~f:(fun () -> entries_view ~fold times chat)
 
-and entries_view times chat =
+and entries_view ~fold times chat =
   let entry_time : Chat.Entry.t -> Time_ns.t option = function
     | User u -> u.at
     | Assistant { message; _ } -> message.at
@@ -275,7 +317,7 @@ and entries_view times chat =
             day_separator times day :: rev_nodes
           | _ -> rev_nodes
         in
-        Option.first_some day last_day, entry times chat e :: rev_nodes)
+        Option.first_some day last_day, entry ~fold times chat e :: rev_nodes)
   in
   div "entries" (List.rev rev_nodes)
 ;;

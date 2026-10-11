@@ -121,33 +121,23 @@ let table ~numbers rows =
     ]
 ;;
 
-let view ~numbers ~max_rows rows =
+let max_rows = 8
+
+let view ~fold:(fold, key) ~numbers rows =
   let count = List.length rows in
-  let shown, rest =
+  let shown, toggle =
     if count <= max_rows + 1
-    then rows, []
-    else List.take rows max_rows, List.drop rows max_rows
+    then rows, Node.none
+    else
+      ( (if Fold.expanded fold key then rows else List.take rows max_rows)
+      , Fold.button fold key ~total:count ~shown:max_rows )
   in
-  Chat_html.div
-    "diff-view"
-    [ table ~numbers shown
-    ; (match rest with
-       | [] -> Node.none
-       | rest ->
-         Node.details
-           ~attrs:[ Attr.class_ "more" ]
-           [ Node.summary
-               [ Node.text (Chat_html.plural (List.length rest) "more line") ]
-           ; table ~numbers rest
-           ])
-    ]
+  Chat_html.div "diff-view" [ table ~numbers shown; toggle ]
 ;;
 
-let unified ?(max_rows = 40) text =
-  view ~numbers:true ~max_rows (unified_rows text)
-;;
+let unified ~fold text = view ~fold ~numbers:true (unified_rows text)
 
-let hunks ?(max_rows = 40) lines =
+let hunks ~fold lines =
   let rows =
     List.map
       (unified_rows (String.concat ~sep:"\n" lines))
@@ -156,9 +146,7 @@ let hunks ?(max_rows = 40) lines =
         | Hunk _ -> row
         | Line l -> Line { l with old_line = None; new_line = None })
   in
-  view ~numbers:false ~max_rows rows
+  view ~fold ~numbers:false rows
 ;;
 
-let edits ?(max_rows = 40) edits =
-  view ~numbers:false ~max_rows (edit_rows edits)
-;;
+let edits ~fold edits = view ~fold ~numbers:false (edit_rows edits)

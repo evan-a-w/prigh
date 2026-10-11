@@ -45,7 +45,7 @@ let%expect_test
     {|
     Dialog_accept
     (Focus editor)
-    (Rpc (method_ set_model) (params ((model openai/gpt-6))) (tag Show_error))
+    (Rpc (method_ set_model) (params ((model openai/gpt-6))) (tag Model_set))
     (Expire_toast (id 0) (after_ms 4000))
     GPT-6 needs openai, which is not logged in: /login openai logs in.
     |}];
@@ -68,7 +68,7 @@ let%expect_test
     (Focus picker-input)
     (Focus editor)
     (Rpc (method_ set_model) (params ((model deepseek/deepseek-chat)))
-     (tag Show_error))
+     (tag Model_set))
     (Expire_toast (id 1) (after_ms 4000))
     |}];
   H.act h Open_model_picker;
@@ -89,7 +89,7 @@ let%expect_test "/model with a name switches, or says what matches" =
     {|
     (Save_history ("/model sonnet"))
     (Rpc (method_ set_model) (params ((model anthropic/claude-sonnet-5)))
-     (tag Show_error))
+     (tag Model_set))
     |}];
   H.type_ h "/model claude";
   H.act h Send;
@@ -130,14 +130,14 @@ let%expect_test "thinking: a picker and /thinking, when the model supports it" =
   [%expect
     {|
     (Focus editor)
-    (Rpc (method_ set_thinking) (params ((thinking high))) (tag Show_error))
+    (Rpc (method_ set_thinking) (params ((thinking high))) (tag Thinking_set))
     |}];
   H.type_ h "/thinking max";
   H.act h Send;
   [%expect
     {|
     (Save_history ("/thinking max"))
-    (Rpc (method_ set_thinking) (params ((thinking max))) (tag Show_error))
+    (Rpc (method_ set_thinking) (params ((thinking max))) (tag Thinking_set))
     |}];
   H.type_ h "/thinking lots";
   H.act h Send;

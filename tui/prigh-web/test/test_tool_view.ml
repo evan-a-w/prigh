@@ -42,18 +42,9 @@ let%expect_test "bash: arguments streaming, then running with live output" =
         <span class="arg command"> ls && echo done </span>
       </div>
       <div class="tool-body">
-        <div class="output">
-          <details class="more">
-            <summary> 4 more lines </summary>
-            <pre> app.ml.orig
-    home
-    notes.md
-    pic.png </pre>
-          </details>
-          <pre> pw
-    script.json
-    script-stream.json
-    server.log
+        <div class="live output">
+          <div class="earlier"> 7 earlier lines </div>
+          <pre> server.log
     serve.sh
     shoot.sh
     shots
@@ -77,21 +68,18 @@ let%expect_test "bash: arguments streaming, then running with live output" =
       </div>
       <div class="tool-body">
         <div class="output">
-          <pre>
-            app.ml.orig
+          <pre> app.ml.orig
     home
     notes.md
     pic.png
-    pw
-    script.json
-    script-stream.json
-    server.log
-    serve.sh
-    shoot.sh
-    shots
+    pw </pre>
+          <button type="button" data-fold="c1" aria-expanded="false" class="fold">
+            <span class="chev"> </span>
+            Show all 13 lines (5 hidden)
+          </button>
+          <pre> shots
     src
-    done
-          </pre>
+    done </pre>
         </div>
       </div>
     </div>
@@ -190,36 +178,13 @@ let%expect_test "long output: the middle folds behind \"N more lines\"" =
           <pre> line 0
     line 1
     line 2
-    line 3 </pre>
-          <details class="more">
-            <summary> 18 more lines </summary>
-            <pre>
-              line 4
-    line 5
-    line 6
-    line 7
-    line 8
-    line 9
-    line 10
-    line 11
-    line 12
-    line 13
-    line 14
-    line 15
-    line 16
-    line 17
-    line 18
-    line 19
-    line 20
-    line 21
-            </pre>
-          </details>
-          <pre> line 22
-    line 23
-    line 24
-    line 25
-    line 26
-    line 27
+    line 3
+    line 4 </pre>
+          <button type="button" data-fold="c1" aria-expanded="false" class="fold">
+            <span class="chev"> </span>
+            Show all 30 lines (22 hidden)
+          </button>
+          <pre> line 27
     line 28
     line 29 </pre>
         </div>
@@ -244,12 +209,12 @@ let%expect_test "read: text folded, images as thumbnails, ranges, errors" =
         <span class="arg path"> notes.md </span>
       </div>
       <div class="tool-body">
-        <details class="file">
-          <summary> 2 lines </summary>
-          <pre> # Notes
-    Some notes about the project.
-     </pre>
-        </details>
+        <div class="output">
+          <button type="button" data-fold="c2" aria-expanded="false" class="fold">
+            <span class="chev"> </span>
+            Show 2 lines
+          </button>
+        </div>
       </div>
     </div>
     <div class="ok tool tool-read">
@@ -282,10 +247,9 @@ let%expect_test "read: text folded, images as thumbnails, ranges, errors" =
         <span class="chip"> lines 10–29 </span>
       </div>
       <div class="tool-body">
-        <details class="file">
-          <summary> 1 line </summary>
+        <div class="output">
           <pre> x </pre>
-        </details>
+        </div>
       </div>
     </div>
     <div class="error tool tool-read">
@@ -357,7 +321,7 @@ let%expect_test "write: content shown as it streams" =
         <span class="chip"> 3 lines </span>
       </div>
       <div class="tool-body">
-        <div class="output">
+        <div class="live output">
           <pre> one
     two
     thr </pre>
@@ -921,15 +885,9 @@ let%expect_test
               <span class="chip ok"> exited 0 </span>
               <span class="task"> sleep 1; echo bg finished </span>
             </div>
-            <details class="delivery-body">
-              <summary>
-                <span class="label"> Output </span>
-                <span class="preview"> bg finished </span>
-              </summary>
-              <div class="output">
-                <pre> bg finished </pre>
-              </div>
-            </details>
+            <div class="output">
+              <pre> bg finished </pre>
+            </div>
           </div>
         </div>
         <div class="output">

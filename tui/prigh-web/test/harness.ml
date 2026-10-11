@@ -201,6 +201,13 @@ let key
 
 let type_ t text = act t (Edit { text; cursor = String.length text })
 
+let connecting () =
+  let t = { model = App.init; pending = []; quiet = true } in
+  act t Start;
+  t.quiet <- false;
+  t
+;;
+
 let create ?(verbose = false) ?(sessions = "[]") ?(state = state_json ()) () =
   let t = { model = App.init; pending = []; quiet = not verbose } in
   act t Start;

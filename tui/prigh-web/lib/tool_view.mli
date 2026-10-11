@@ -5,9 +5,11 @@ open! Import
     presented per tool (bash, read, write, edit, ls/grep/find, subagent, jobs).
     [streaming]: the call's arguments are still arriving. [running]: the agent
     is working, so a call without a result is still to get one. [nested]
-    renders a subagent's transcript. *)
+    renders a subagent's transcript. Outputs fold as [fold] says, under the
+    call's id. *)
 val view
-  :  nested:(Chat.t -> Node.t)
+  :  nested:(Chat.Subagent.t -> Node.t)
+  -> fold:Fold.t
   -> streaming:bool
   -> running:bool
   -> Tool_call.t

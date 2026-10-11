@@ -471,8 +471,17 @@ two can share one.
   records every subagent's status, activity and transcript (nested ones as
   `<parent>/<call id>`) from the agent's own events, for `subagents`/
   `subagent` (`list_subagents`, `get_subagent {id}` by agent or tool call
-  id); `queued_texts` and `pending_confirms` back `get_pending`; the in-place
-  `new_session`/`switch_session` cancel them and drop their reports.
+  id). No subagent stays "running" once nothing runs it: `Tool_subagent`
+  emits a `Subagent_end` even when its loop raises (`subagent failed: …`,
+  or `[cancelled]`), and when the main run ends and whenever a background
+  task finishes `Agent` sweeps the log (`Subagent_log.orphan_ends`): a
+  subagent still running whose top-level ancestor is gone (a finished
+  background task with its id, or the main run for its synchronous ones)
+  gets a synthetic `Subagent_end` (`[interrupted] <why>`, zero usage),
+  broadcast inside its ancestors' `Subagent` envelopes like a real one.
+  `queued_texts` and `pending_confirms` back `get_pending`; the in-place
+  `new_session`/`switch_session` cancel them, drop their reports and
+  forget the finished tasks (`list_jobs` starts empty).
   `prompt`/`steer`/`follow_up` accept optional `attachments`
   (paths whose contents are appended to the user message as `<file>` blocks;
   image files are read like `read` does and attached as images) and
@@ -487,7 +496,9 @@ two can share one.
   are ignored by `load` but reported by `problems` (with wrong-typed ones),
   which `Model_registry` adds to its problems along with an unknown
   `default_model`. Each namespace has its own file, so each has its own
-  defaults. `set_config` merges the given fields over the current ones and
+  defaults; `archive_after_days` (default 7, 0 = never) is when an
+  inactive session counts as archived (`Session.Summary.is_archived`).
+  `set_config` merges the given fields over the current ones and
   resolves `fallback_models` like `set_model` (stored as keys). A new
   session starts in `default_cwd` (on the backend host) and on
   `default_model`, else the first of `fallback_models`.
@@ -514,21 +525,32 @@ two can share one.
   Rewinding moves `head`; forking copies the active path to a new file.
   Entries are messages, model/thinking changes, compaction summaries, names,
   descriptions, cwds with the tool host they are on (so a reload restores
-  where the session runs) and the system prompt;
+  where the session runs), the system prompt and `Archived {archived}`
+  (archived or unarchived by hand; ignored by `messages`, not copied by
+  `fork`);
   `Session.messages` is the message list for the next request with the
   compaction summary replacing everything before `kept_from`
   (`timed_messages`: each with its entry's time, as a `Timed_message.t`;
   the summary has none). Nothing is
   written to disk until the first message (or name): an abandoned empty
   session leaves no file. `list` returns name, description, cwd,
-  timestamps, message count, first prompt and parent, most recently
-  modified first; `export` writes markdown or copies the JSONL,
+  timestamps, message count, first prompt, parent, the `Archived` value
+  after the last message (if any), the last activity (the last message's
+  time, else the mtime, or a later unarchiving) and `bytes` (disk usage of
+  `files`: the JSONL and the session's directory `<stamp>_<id>/` next to
+  it, `data_dir`, for per-session data; `delete_files` removes both),
+  most recently modified first; it caches each file's summary by (path,
+  size, mtime), so only changed files are parsed again (300 sessions of
+  50 messages: `list_sessions` 170 ms → 3.5 ms). `Summary.is_archived`:
+  never while a run or background work is going on, else archived by hand,
+  else when the last activity is older than `archive_after_days`.
+  `export` writes markdown or copies the JSONL,
   `import` copies a file in (the markdown has each message's time, in UTC,
   in its heading), and `session_stats` counts turns, tool calls by
   name, tokens, cost, model changes and compactions. Under the RPC,
   `get_entries` returns `{head, entries}` (`all: true` includes abandoned
   branches for the tree view; entries carry `at` in milliseconds when
-  known).
+  known; an `Archived` entry is `{kind: "archived", archived}`).
 - `Compaction` — summarises older messages via the model and keeps a tail;
   manual (`/compact [instructions]`: the RPC's `instructions`, pi's
   `customInstructions`, are appended to the summariser's) or automatic.
@@ -569,8 +591,26 @@ two can share one.
   providers carry `custom: {base_url, api, api_label}`. The session methods
   (`new_session`, `switch_session` by id or path, `fork`, `clone`, `import`)
   create or load an agent and move only the calling client; `list_sessions`
-  marks live sessions with `live`, `running` and `clients`; `delete_session`
-  refuses live ones. A session with running background subagents or jobs
+  items carry `bytes`, `live` (with `clients` when live), `running` (a
+  turn or background work), `background` (running background subagents +
+  jobs, 0 when not loaded) and `archived` (computed with the namespace's
+  current `config.json`, reread per call). `set_archived {path, archived}`
+  (`path`: a session file or id) appends an `Archived` entry, through the
+  live agent's session if loaded; archiving an active session is refused.
+  `delete_sessions {paths}` and `delete_archived {}` answer `{deleted:
+  [{path, id, bytes}], refused: [{path, error}]}`; `delete_session {path}`
+  is the single form (its error the refusal's). A session is refused when
+  it is the caller's own, the default (`-session`) one, running, open in
+  other frontends, or unknown; otherwise its files go, it leaves the agents
+  table, and its terminal is killed (`on_session_deleted`, wired to
+  `Terminals.kill` by `main`, keyed by `terminal_key`; relayed ones are
+  closed with `Terminal_relay.close_key`). Every client of the server (not
+  only the session's) gets `{"type":"event","event":"sessions_changed"}`
+  when something `list_sessions` shows changes: a session's `running`,
+  `background`, persisted, name or description (compared per live session
+  on its state changes and message ends, so never per delta), and after
+  archiving, deleting, importing, forking and cloning; frontends refetch
+  the list. A session with running background subagents or jobs
   is not evicted (it delivers their reports into its own session even with
   no client attached); `shutdown` cancels them (killing the jobs).
   `kill_job {job_id}`, `job_output {job_id, lines}` (`{text}`: a header line
@@ -585,7 +625,8 @@ two can share one.
   `shell`, `get_state`, `get_messages`,
   `get_entries`, `set_model`, `set_thinking`, `list_models`, `compact`,
   `new_session`, `switch_session`, `list_sessions`, `set_session_name`,
-  `delete_session`, `export`, `import`, `fork`, `clone`, `rewind`,
+  `delete_session`, `delete_sessions`, `delete_archived`, `set_archived`,
+  `export`, `import`, `fork`, `clone`, `rewind`,
   `session_stats`, `set_cwd`, `list_paths`, `list_dirs`, `get_config`, `set_config`,
   `change_default`, `btw`, `btw_cancel`,
   `tool_confirm_respond`, `set_active_host`, `tool_exec_output`,
@@ -934,12 +975,28 @@ copy of the protocol types and the e2e test guards the contract.
       `/agents` and `/jobs` open, select and stop items in the agents
       panel); `Model` also holds the transcript `verbosity` (a class on
       `#chat`: the CSS hides tool output in quiet and opens every
-      `<details>` in verbose), the `Config` (`get_config` at startup: the scope Ctrl+P
+      `<details>` in verbose) and `folds`, the outputs toggled from what it
+      shows (`Fold`), what we wait on the backend for (`Pending`, below),
+      the `Config` (`get_config` at startup: the scope Ctrl+P
       cycles, `/confirm`), the side question (`Btw`, streamed by
       `btw_delta`), the saved accounts and whether we may act as others
       (`list_users` at startup succeeds only for superusers). `set_user`'s
       reply resets everything that belonged to the old user like a new
       session does, then starts over.
+    - Loading states: `Pending` is what the page waits on the backend for,
+      so that every action shows within a frame: the session being opened
+      (`Switching` a path, `Starting` a new one, a clone or fork: until the
+      `get_state` we asked for answers) and its `get_messages` (`View` shows
+      a placeholder instead of the chat, also before the first state; the
+      sidebar marks the session clicked), prompts sent until the
+      transcript's next user message (echoed under it as "Sending…") and
+      prompts, steers and follow-ups not yet answered (the send button and
+      the status line), and a model or thinking level chosen until a state
+      has it or `set_model`/`set_thinking` (`Model_set`, `Thinking_set`)
+      answers (the top bar's chip, disabled). A command that needs a list
+      from the backend opens `Dialog.Loading` at once; `App.reply` gives the
+      replies it waits for (`loads`) to the handler only while it still
+      shows, so Esc meanwhile has no side effects.
     - The transcript: `Chat` (one agent: `get_messages` then events; each
       tool call's streamed output and result; subagents' nested chats,
       fetched with `get_subagent` after a reload since `get_messages` only
@@ -947,7 +1004,7 @@ copy of the protocol types and the e2e test guards the contract.
       entry, and the whole transcript, a `Node.lazy_` cached by `View_cache`
       on the value: virtual_dom skips what did not change, so a streamed
       delta or a key press costs the same in a long session as in a short
-      one),
+      one; the cache's deps include the entry's folds),
       `Tool_view` (a card per tool: bash, read with images, write, edit
       with `Line_diff`/`Diff_view`, apply_patch file by file,
       ls/grep/find, subagents (marked with `data-call` and `data-agent`
@@ -955,7 +1012,19 @@ copy of the protocol types and the e2e test guards the contract.
       `Delivery_view` (reports of finished background work, parsed by
       `ui/`'s `Delivery`), `Markdown` (a total parser that also renders
       streaming prefixes) and `Markdown_view`, `Image_view`,
-      `Output_view`. Messages' times (`at`; the page stamps live events
+      `Output_view`. Outputs fold as the TUI's `Tool_render` folds them
+      (bash: the first 5 and last 3 lines, other tools 5, errors 8, a read
+      file none, diffs 8 rows), behind `Fold.button`s: a `data-fold` key
+      (the call id, scoped by the subagent's id in nested transcripts, or
+      `job:<id>` in deliveries) that `Chat_listeners` turns into
+      `Toggle_fold`; folded text is not rendered. Running calls show only
+      their last 5 lines (`Output_view.live`, no toggle), and `Chat` keeps
+      only the last 32-64 KB of streamed output with a count of its lines,
+      so a long stream costs the same per chunk. While a reply streams,
+      `Markdown_view` cuts it at `Markdown.block_starts` (top-level blocks
+      after a blank line that cannot continue a list or quote): the
+      complete parts are parsed once and reused as lazy nodes, and only the
+      last is parsed again per delta. Messages' times (`at`; the page stamps live events
       without one, from an older backend, with when it received them,
       `Chat.received`) show under user messages and in a reply's footer, as
       `Message_time` formats them: in the browser's time zone
@@ -1046,7 +1115,7 @@ copy of the protocol types and the e2e test guards the contract.
     and loads the page for its backend and session; adding one, which
     shows the sign-in form on the next load; scrolling), and installs
     document listeners: keys (through `Keys`; a Tab no binding takes goes
-    round the open dialog),
+    round the open dialog), the folds' buttons,
     pasted and dropped image files become attachments (PNG, JPEG, GIF,
     WebP, sent with the prompt as base64; others get a toast), the narrow
     (phone) layout, a clock for ages and toasts, and the chat following new
@@ -1095,6 +1164,8 @@ copy of the protocol types and the e2e test guards the contract.
 
 - `~/.config/prigh/auth.json` — credentials (pi-compatible).
 - `~/.prigh/sessions/<stamp>_<id>.jsonl` — session logs.
+- `~/.prigh/sessions/<stamp>_<id>/` — per-session data (`Session.data_dir`),
+  deleted with the session and counted in its `bytes`.
 - `~/.prigh/sessions/exports/` — default `/export` output.
 - `~/.prigh/history` — prompt history (one JSON string per line, last 500).
 - `~/.prigh/config.json` — `scoped_models`, `confirm_tools`, `providers`
@@ -1193,13 +1264,16 @@ prigh-web's e2e, `tui/prigh-web/e2e/prigh_web.sh` (the flake's Linux
 and cwd) so that it can restart it, and prints normalised text snapshots
 (ids, cwd, cost, context and messages' times replaced) diffed against `prigh_web.expected`:
 the sign-in form and signing in with the token, the top bar, a scripted
-bash call and its output, the model `read`ing a real PNG (`png.mjs` writes
+bash call and its output, a long output folded, unfolded and folded again,
+the model `read`ing a real PNG (`png.mjs` writes
 it; the tool result's `img` must be a loaded `data:image/png` of the right
 natural size), an image pasted and one dropped into the composer (shown,
 sent, cleared, rendered in the prompt, and present with the right sizes in
 the backend's copy of the message via a second WebSocket's
 `get_messages`), a reload rejoining the session from `?session=`, a new
-session and switching back from the sidebar, the backend dying (the
+session and switching back from the sidebar (with the backend's messages
+held back by a wrapped `WebSocket`, so that the prompt being sent and the
+session loading show), the backend dying (the
 banner) and restarting on the same port (the page reconnects to the same
 session and runs another prompt), and the agents panel (a background
 subagent running a synchronous one and a background job: the list, the

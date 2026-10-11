@@ -411,14 +411,30 @@ let%expect_test
 ;;
 
 (* The backend moves the client to the other session without telling it:
-   the page asks for the new state, which resets the transcript. *)
+   the page asks for the new state, which resets the transcript. Until the
+   new session's messages arrive the chat says what it waits for. *)
 let%expect_test "new session and switching session reload the state" =
-  let h = Harness.create () in
+  let sessions =
+    sprintf
+      "[%s,%s]"
+      (Harness.session_json ~first_prompt:"hello" "s1")
+      (Harness.session_json ~first_prompt:"older work" "s3")
+  in
+  let h = Harness.create ~sessions () in
   [%expect {| |}];
   Harness.event
     h
     {|{"event":"message_start","message":{"role":"user","text":"hello"}}|};
   Harness.act h New_session;
+  Harness.text h ~selector:".new-session";
+  Harness.text h ~selector:".chat";
+  [%expect
+    {|
+    (Rpc (method_ new_session) (params ()) (tag Reload_state))
+    (Focus editor)
+    (Starting…)
+    Starting a session…
+    |}];
   Harness.reply h "new_session" "{}";
   Harness.reply
     h
@@ -429,11 +445,10 @@ let%expect_test "new session and switching session reload the state" =
          ; "session_path", `String "/sessions/s2.jsonl"
          ]
        ());
+  Harness.text h ~selector:".new-session";
   Harness.text h ~selector:".chat";
   [%expect
     {|
-    (Rpc (method_ new_session) (params ()) (tag Reload_state))
-    (Focus editor)
     (Rpc (method_ get_state) (params ()) (tag State))
     (Set_url_session s2)
     (Rpc (method_ get_messages) (params ()) (tag (Messages s2)))
@@ -441,6 +456,14 @@ let%expect_test "new session and switching session reload the state" =
     (Rpc (method_ list_sessions) (params ()) (tag Sessions))
     (Rpc (method_ list_subagents) (params ()) (tag Subagents))
     (Rpc (method_ list_jobs) (params ()) (tag Jobs))
+    (New session)
+    Loading the session…
+    |}];
+  Harness.reply h "get_messages" "[]";
+  Harness.text h ~selector:".chat";
+  [%expect
+    {|
+    Scroll_to_bottom
     What are we building?
     /work
     / commands
@@ -449,23 +472,79 @@ let%expect_test "new session and switching session reload the state" =
     Ctrl+L switch model
     Ctrl+K find a session
     |}];
-  Harness.act h (Switch_session "/sessions/s1.jsonl");
-  Harness.reply h "switch_session" "{}";
-  Harness.reply h "get_state" (Harness.state_json ());
-  Harness.reply h "get_messages" {|[{"role":"user","text":"hello"}]|};
+  (* The session clicked is marked until it has loaded. *)
+  Harness.act h (Switch_session "/sessions/s3.jsonl");
+  Harness.show h ~selector:".session.opening .session-top";
   Harness.text h ~selector:".chat";
+  [%expect
+    {|
+    (Rpc (method_ switch_session) (params ((path /sessions/s3.jsonl)))
+     (tag Reload_state))
+    (Focus editor)
+    <div class="session-top">
+      <span title="opening…" class="spinner"> </span>
+      <span class="session-title"> older work </span>
+      <span class="session-age"> 2m ago </span>
+    </div>
+    Loading the session…
+    |}];
+  Harness.reply h "switch_session" "{}";
+  Harness.reply
+    h
+    "get_state"
+    (Harness.state_json
+       ~fields:
+         [ "session_id", `String "s3"
+         ; "session_path", `String "/sessions/s3.jsonl"
+         ]
+       ());
+  Harness.elements h ~selector:".session.opening";
+  Harness.text h ~selector:".chat";
+  [%expect
+    {|
+    (Rpc (method_ get_state) (params ()) (tag State))
+    (Set_url_session s3)
+    (Rpc (method_ get_messages) (params ()) (tag (Messages s3)))
+    (Rpc (method_ get_pending) (params ()) (tag Pending))
+    (Rpc (method_ list_sessions) (params ()) (tag Sessions))
+    (Rpc (method_ list_subagents) (params ()) (tag Subagents))
+    (Rpc (method_ list_jobs) (params ()) (tag Jobs))
+    Loading the session…
+    |}];
+  Harness.reply h "get_messages" {|[{"role":"user","text":"older work"}]|};
+  Harness.text h ~selector:".chat";
+  [%expect
+    {|
+    Scroll_to_bottom
+    older work
+    |}];
+  (* A switch the backend refuses leaves the session as it was. *)
+  Harness.act h (Switch_session "/sessions/s1.jsonl");
+  Harness.fail h "switch_session" "no such session";
+  Harness.elements h ~selector:".session.opening";
+  Harness.text h ~selector:".chat";
+  Harness.text h ~selector:".toast";
   [%expect
     {|
     (Rpc (method_ switch_session) (params ((path /sessions/s1.jsonl)))
      (tag Reload_state))
     (Focus editor)
-    (Rpc (method_ get_state) (params ()) (tag State))
-    (Set_url_session s1)
-    (Rpc (method_ get_messages) (params ()) (tag (Messages s1)))
-    (Rpc (method_ get_pending) (params ()) (tag Pending))
-    (Rpc (method_ list_sessions) (params ()) (tag Sessions))
-    (Rpc (method_ list_subagents) (params ()) (tag Subagents))
-    (Rpc (method_ list_jobs) (params ()) (tag Jobs))
+    older work
+    Couldn't open the session: no such session
+    |}];
+  (* So does a transcript that fails to load, saying so. *)
+  Harness.act h (Switch_session "/sessions/s1.jsonl");
+  Harness.quiet h (fun () ->
+    Harness.reply h "switch_session" "{}";
+    Harness.reply h "get_state" (Harness.state_json ()));
+  Harness.fail h "get_messages" "disk on fire";
+  Harness.text h ~selector:".chat";
+  Harness.text h ~selector:".toast";
+  [%expect
+    {|
+    (Rpc (method_ switch_session) (params ((path /sessions/s1.jsonl)))
+     (tag Reload_state))
+    (Focus editor)
     What are we building?
     /work
     / commands
@@ -473,6 +552,7 @@ let%expect_test "new session and switching session reload the state" =
     ! run a command
     Ctrl+L switch model
     Ctrl+K find a session
+    Couldn't load the session's messages: disk on fire. Reload the page to try again.
     |}]
 ;;
 

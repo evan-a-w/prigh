@@ -216,6 +216,7 @@ let%expect_test "logging in: pick a provider, open the URL, answer the prompts" 
   [%expect
     {|
     (Save_history (/login))
+    (Focus dialog)
     (Rpc (method_ auth_status) (params ()) (tag (Auth_status Login_picker)))
     (Focus picker-input)
     Anthropic Claude subscription · logged in via auth.json ✓
@@ -364,6 +365,7 @@ let%expect_test "/auth shows the providers; /logout picks a logged-in one" =
   [%expect
     {|
     (Save_history (/auth))
+    (Focus dialog)
     (Rpc (method_ auth_status) (params ()) (tag (Auth_status Show)))
     (Focus dialog)
     Anthropic logged in with oauth (auth.json)
@@ -393,6 +395,7 @@ let%expect_test "/auth shows the providers; /logout picks a logged-in one" =
     {|
     (Focus editor)
     (Save_history (/logout /auth))
+    (Focus dialog)
     (Rpc (method_ auth_status) (params ()) (tag (Auth_status Logout_picker)))
     (Focus picker-input)
     Anthropic oauth via auth.json
@@ -410,8 +413,10 @@ let%expect_test "/auth shows the providers; /logout picks a logged-in one" =
   [%expect
     {|
     (Save_history (/logout /auth))
+    (Focus dialog)
     (Rpc (method_ auth_status) (params ()) (tag (Auth_status Logout_picker)))
     (Expire_toast (id 1) (after_ms 4000))
+    (Focus editor)
     Logged out of anthropic
     No provider is logged in: /login logs in to one.
     |}]

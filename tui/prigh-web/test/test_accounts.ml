@@ -233,7 +233,7 @@ let%expect_test "a superuser acts as another user from the account menu" =
   H.reply h "set_user" {|{"client_id":"c1","namespace":"bob","user":"alice"}|};
   [%expect
     {|
-    (Focus editor)
+    (Focus dialog)
     (Rpc (method_ list_users) (params ()) (tag (Users Picker)))
     (Focus picker-input)
     (Focus editor)
