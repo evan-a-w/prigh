@@ -129,7 +129,7 @@ let menu (m : App.Model.t) (picker : Picker.t) ~inject =
             (List.map actions ~f:(fun (i, item) -> row i item))
         ; div
             ~cls:"menu-keys"
-            [ Node.text "↑↓ move · Enter choose · Esc close" ]
+            [ Node.text "↑↓ to move, Enter to choose, Esc to close" ]
         ]
     ]
 ;;

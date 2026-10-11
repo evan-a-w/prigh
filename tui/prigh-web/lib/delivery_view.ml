@@ -33,8 +33,8 @@ let section ~fold ~key (section : Prigh_ui.Delivery.Section.t) =
          Output_view.view
            ~fold:(fold, key section)
            ~error:(not section.ok)
-           ~head:0
-           ~tail:5
+           ~from_end:true
+           ~lines:5
            body
        else
          folded

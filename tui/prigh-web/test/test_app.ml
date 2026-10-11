@@ -67,7 +67,7 @@ let%expect_test "messages' times: in the browser's zone, relative to its day" =
     hello
     11:58
     Hi
-    m · 10 in · 5 out · 11:59
+    m 10 in 5 out 11:59
     |}];
   (* Ten hours behind UTC, it has just turned midnight: they were yesterday. *)
   Harness.act h (Set_utc_offset (Time_ns.Span.of_hr (-10.)));
@@ -77,7 +77,7 @@ let%expect_test "messages' times: in the browser's zone, relative to its day" =
     hello
     Yesterday 23:58
     Hi
-    m · 10 in · 5 out · Yesterday 23:59
+    m 10 in 5 out Yesterday 23:59
     |}];
   (* A day later in Paris. *)
   Harness.act h (Set_utc_offset (Time_ns.Span.of_hr 2.));
@@ -88,7 +88,7 @@ let%expect_test "messages' times: in the browser's zone, relative to its day" =
     hello
     Yesterday 11:58
     Hi
-    m · 10 in · 5 out · Yesterday 11:59
+    m 10 in 5 out Yesterday 11:59
     |}];
   Harness.show h ~selector:".msg.user time";
   [%expect

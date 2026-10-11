@@ -159,7 +159,7 @@ let%expect_test "the account menu: who we are, the other accounts, actions" =
     Add account… sign in as another user, or to another backend
     Turn notifications off stop telling you what happens while the tab is hidden
     Sign out forget this account in this browser
-    ↑↓ move · Enter choose · Esc close
+    ↑↓ to move, Enter to choose, Esc to close
     |}];
   (* Enter on the highlighted account switches to it (the page reloads). *)
   H.key h "Enter" ~target:Page;
@@ -227,7 +227,7 @@ let%expect_test "a superuser acts as another user from the account menu" =
     Add account… sign in as another user, or to another backend
     Turn notifications off stop telling you what happens while the tab is hidden
     Sign out forget this account in this browser
-    ↑↓ move · Enter choose · Esc close
+    ↑↓ to move, Enter to choose, Esc to close
     |}];
   H.act h (Picker_choose "act");
   H.reply h "list_users" {|["alice","bob"]|};
@@ -260,7 +260,7 @@ let%expect_test "a superuser acts as another user from the account menu" =
     Add account… sign in as another user, or to another backend
     Turn notifications off stop telling you what happens while the tab is hidden
     Sign out forget this account in this browser
-    ↑↓ move · Enter choose · Esc close
+    ↑↓ to move, Enter to choose, Esc to close
     |}];
   H.act h (Picker_choose "back");
   [%expect

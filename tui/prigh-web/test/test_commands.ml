@@ -130,8 +130,8 @@ let%expect_test "/help <command> and /hotkeys" =
     (Save_history ("/help /tree" "/help compact"))
     (Expire_toast (id 1) (after_ms 4000))
     (Save_history ("/help compcat" "/help /tree" "/help compact"))
-    /compact [instructions] — summarise older messages to free context
-    /tree — show the session tree and move to any message in it
+    /compact [instructions]: summarise older messages to free context
+    /tree: show the session tree and move to any message in it
     No command /compcat. Did you mean /compact?
     |}];
   run h "/hotkeys";
@@ -217,7 +217,7 @@ let%expect_test "/scoped-models, Ctrl+P and Alt+P" =
     ✓ Claude Opus 5.5 anthropic
     ✓ Claude Sonnet 5 anthropic
     DeepSeek Chat deepseek
-    2 checked · Tab toggles · Enter saves (Cancel) (Save)
+    2 checked. Tab toggles, Enter saves (Cancel) (Save)
     |}];
   H.key h "Tab" ~target:Field;
   H.act h (Toggle_scoped "openai/gpt-6");
@@ -228,7 +228,7 @@ let%expect_test "/scoped-models, Ctrl+P and Alt+P" =
     {|
     Dialog_toggle
     Dialog_toggle
-    3 checked · Tab toggles · Enter saves (Cancel) (Save)
+    3 checked. Tab toggles, Enter saves (Cancel) (Save)
     |}];
   H.key h "Enter" ~target:Field;
   H.reply
@@ -386,7 +386,11 @@ let%expect_test "/verbosity and Ctrl+O" =
                was wrong.
             </p>
           </div>
-          <div class="meta"> m · 10 in · 5 out </div>
+          <div class="meta">
+            <span> m </span>
+            <span> 10 in </span>
+            <span> 5 out </span>
+          </div>
         </div>
       </div>
       <Vdom.Node.none-widget> </Vdom.Node.none-widget>
@@ -586,7 +590,7 @@ let%expect_test "/fork: pick a message, edit it in a new session" =
     []
     first question #1
     second question #2 ✓
-    ↑↓ move · Enter choose · Esc close
+    ↑↓ to move, Enter to choose, Esc to close
     |}];
   H.key h "ArrowUp" ~target:Field;
   H.key h "Enter" ~target:Field;
@@ -774,7 +778,7 @@ let%expect_test "/cd: a prompt with directory completion, failures stay in it" =
     The session's working directory [/work]
     /work/src/
     /work/test/
-    Tab completes · ↑↓ choose (Cancel) (Change)
+    Tab completes, ↑↓ choose (Cancel) (Change)
     |}];
   H.act h (Dialog_input "/work/s");
   H.reply h "list_dirs" {|["/work/src/"]|};
@@ -807,7 +811,7 @@ let%expect_test "/cd: a prompt with directory completion, failures stay in it" =
     (Close (Esc))
     The session's working directory [/nowhere]
     no such directory: /nowhere
-    Tab completes · ↑↓ choose (Cancel) (Change)
+    Tab completes, ↑↓ choose (Cancel) (Change)
     |}];
   H.act h (Dialog_input "/work/src");
   H.key h "Enter" ~target:Field;
@@ -882,7 +886,7 @@ let%expect_test "/host: pick a host, then the directory there" =
     Run tools on laptop (this browser)
     (Close (Esc))
     Working directory there [/work]
-    Tab completes · ↑↓ choose (Cancel) (Switch)
+    Tab completes, ↑↓ choose (Cancel) (Switch)
     |}];
   H.key h "Enter" ~target:Field;
   H.fail h "set_active_host" "laptop: /work: no such directory";
@@ -1121,7 +1125,7 @@ let%expect_test "/agents [n|id|cancel <n|id>]: the agents panel" =
     (Rpc (method_ list_jobs) (params ()) (tag Jobs))
     Agents 2 agents running (Close (Alt+0))
     Subagents 2 running
-    (1 read the tests 30s a1 · m · 1 turn thinking…) (2 lint 30s a2 · m · 1 turn thinking…) (3 ✓ count 10s a3 · m · 1 turn 42)
+    (1 read the tests 30s a1  m  1 turn thinking…) (2 lint 30s a2  m  1 turn thinking…) (3 ✓ count 10s a3  m  1 turn 42)
     |}];
   run h "/agents cancel 2";
   H.text h ~selector:".agents-panel";
@@ -1141,7 +1145,7 @@ let%expect_test "/agents [n|id|cancel <n|id>]: the agents panel" =
     (Rpc (method_ cancel_subagent) (params ((agent_id a2))) (tag Show_error))
     (All agents (Esc)) Subagent a2 2 agents running (Close (Alt+0))
     lint
-    running 30s a2 m 1 turn
+    Running 30s a2 m 1 turn
     (Stopping…) (Show in chat)
     Loading the transcript…
     (Save_history
@@ -1192,8 +1196,8 @@ let%expect_test "/jobs [id|kill <id>]: jobs in the agents panel" =
     (Rpc (method_ list_jobs) (params ()) (tag Jobs))
     Agents 1 job running (Close (Alt+0))
     Jobs 1 running
-    (1 make test 1m 15s j1 · 120 B ok 12 tests)
-    (2 ✓ sleep 1 1s j2 · exited 0)
+    (1 make test 1m 15s j1  120 B ok 12 tests)
+    (2 ✓ sleep 1 1s j2  exited 0)
     |}];
   run h "/jobs j2";
   H.reply h "job_output" {|{"text":""}|};

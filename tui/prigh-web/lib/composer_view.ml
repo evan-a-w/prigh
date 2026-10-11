@@ -159,7 +159,7 @@ let view (m : App.Model.t) ~inject =
                        ~disabled:true
                        ~attrs:[ Attr.create "aria-busy" "true" ]
                        ~on_click:Effect.Ignore
-                       [ Node.span ~attrs:[ Attr.class_ "spinner" ] [] ]
+                       [ Html.lamp () ]
                    else
                      button
                        ~cls:"primary send"

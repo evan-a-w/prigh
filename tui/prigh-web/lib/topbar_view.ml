@@ -32,9 +32,7 @@ let pending_chip ~cls label =
     ~disabled:true
     ~attrs:[ Attr.create "aria-busy" "true" ]
     ~on_click:Effect.Ignore
-    [ Node.span ~attrs:[ Attr.class_ "spinner" ] []
-    ; span ~cls:"chip-label" label
-    ]
+    [ Html.lamp (); span ~cls:"chip-label" label ]
 ;;
 
 let view (m : App.Model.t) ~inject =

@@ -20,7 +20,7 @@ let status_cls (status : Agents.Status.t) = Agents.Status.to_string status
 
 let status_icon (status : Agents.Status.t) =
   match status with
-  | Running -> Node.span ~attrs:[ Attr.class_ "spinner" ] []
+  | Running -> Html.lamp ()
   | Complete -> span ~cls:"state-icon" "✓"
   | Failed -> span ~cls:"state-icon" "✕"
 ;;
@@ -49,7 +49,7 @@ let activity (m : App.Model.t) (a : Agent.t) =
     (match a.current_tool, latest with
      | Some (name, since), latest ->
        sprintf
-         "%s · %s"
+         "%s (%s)"
          (Option.value latest ~default:name)
          (Agents.format_span (Time_ns.diff (now m) since))
      | None, Some latest -> latest
@@ -93,7 +93,7 @@ let row
         [ div
             ~cls:"row-top"
             [ span ~cls:"row-title" title; span ~cls:"row-elapsed" elapsed ]
-        ; span ~cls:"row-meta" (String.concat ~sep:" · " meta)
+        ; span ~cls:"row-meta" (String.concat ~sep:"  " meta)
         ; (if String.is_empty line then Node.none else span ~cls:"row-line" line)
         ]
     ]
@@ -322,9 +322,7 @@ let agent_detail (m : App.Model.t) ~inject (a : Agent.t) =
     | None ->
       div
         ~cls:"agents-note"
-        [ Node.span ~attrs:[ Attr.class_ "spinner" ] []
-        ; Node.text "Loading the transcript…"
-        ]
+        [ Html.lamp (); Node.text "Loading the transcript…" ]
   in
   (* The transcript ends with the report. *)
   let result =
@@ -365,7 +363,9 @@ let agent_detail (m : App.Model.t) ~inject (a : Agent.t) =
             ]
         ; div
             ~cls:"detail-meta"
-            ([ pill a.status (Agents.Status.to_string a.status)
+            ([ pill
+                 a.status
+                 (String.capitalize (Agents.Status.to_string a.status))
              ; span
                  ~cls:"detail-elapsed"
                  (Agents.format_span (Agents.agent_elapsed a ~now:(now m)))
@@ -447,9 +447,7 @@ let job_detail (m : App.Model.t) ~inject (j : Agents.Job.t) =
        | None ->
          div
            ~cls:"agents-note"
-           [ Node.span ~attrs:[ Attr.class_ "spinner" ] []
-           ; Node.text "Loading the output…"
-           ]
+           [ Html.lamp (); Node.text "Loading the output…" ]
        | Some (_, text) when String.is_empty (String.strip text) ->
          div ~cls:"agents-note" [ Node.text "No output yet." ]
        | Some (lines, text) ->
@@ -477,7 +475,7 @@ let summary (a : Agents.t) =
       [ Option.some_if (agents > 0) (plural agents "agent")
       ; Option.some_if (jobs > 0) (plural jobs "job")
       ]
-    |> String.concat ~sep:" · "
+    |> String.concat ~sep:", "
   in
   if running_agents + running_jobs > 0
   then Some (parts ~agents:running_agents ~jobs:running_jobs ^ " running", true)

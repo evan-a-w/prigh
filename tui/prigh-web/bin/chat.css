@@ -19,6 +19,7 @@
 .chat {
   flex: 1;
   overflow-y: auto;
+  scrollbar-gutter: stable;
   padding: 28px 20px 8px;
 }
 .entries, .empty {
@@ -84,13 +85,18 @@
 }
 summary > .label { flex-shrink: 0; font-weight: 500; }
 summary > .label::before {
-  content: "›";
+  content: "";
   display: inline-block;
-  width: 0.9em;
+  width: 5px;
+  height: 5px;
+  margin: 0 7px 0 2px;
+  vertical-align: 0.2em;
+  border-right: 1.5px solid var(--faint);
+  border-bottom: 1.5px solid var(--faint);
+  transform: rotate(-45deg);
   transition: transform 0.15s;
-  color: var(--faint);
 }
-details[open] > summary > .label::before { transform: rotate(90deg); }
+details[open] > summary > .label::before { transform: translateY(-1px) rotate(45deg); }
 summary > .preview {
   flex: 1;
   min-width: 0;
@@ -250,21 +256,21 @@ summary:focus-visible { outline: 2px solid var(--sodium); outline-offset: 2px; b
 
 .msg.assistant { display: flex; flex-direction: column; gap: 12px; }
 .meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px 12px;
   color: var(--faint);
   font: 11.5px var(--mono);
   font-variant-numeric: tabular-nums;
   margin-top: -2px;
 }
-.pending { display: flex; gap: 5px; padding: 8px 0; }
-.pending span {
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: var(--sodium);
-  animation: bounce 1.2s infinite;
+/* Waiting for the model's first words: the lamp on the spine. */
+.pending { position: relative; display: flex; align-items: center; min-height: 26px; color: var(--muted); font-size: 13px; }
+.msg.assistant > .pending > .lamp {
+  --lamp-ring: 0 0 0 3px var(--graphite);
+  position: absolute;
+  left: calc(-1 * var(--gutter) - 3.5px + var(--spine) / 2);
 }
-.pending span:nth-child(2) { animation-delay: 0.15s; }
-.pending span:nth-child(3) { animation-delay: 0.3s; }
 
 .msg.assistant.streaming > .markdown:last-child > .md-part:last-child > :is(p, h1, h2, h3, h4, h5, h6):last-child::after,
 .msg.assistant.streaming > .markdown:last-child > .md-part:last-child > :is(ul, ol):last-child > li:last-child::after {
@@ -354,8 +360,6 @@ summary:focus-visible { outline: 2px solid var(--sodium); outline-offset: 2px; b
   color: var(--faint);
   white-space: pre-wrap;
   overflow-wrap: anywhere;
-  max-height: 40vh;
-  overflow: auto;
 }
 .note[open] .note-text { animation: note-open 0.15s ease-out; }
 @keyframes note-open { from { opacity: 0; transform: translateY(-2px); } }
@@ -511,6 +515,7 @@ summary:focus-visible { outline: 2px solid var(--sodium); outline-offset: 2px; b
 .thinking .thinking-text .markdown { font-size: 14px; }
 .thinking.live { display: flex; flex-direction: column; }
 .thinking-head {
+  position: relative;
   display: flex;
   align-items: center;
   gap: 8px;
@@ -584,7 +589,7 @@ ol.results > li { min-width: 0; overflow-wrap: anywhere; }
 ol.results .title { color: var(--fg); text-decoration: none; }
 ol.results a.title:hover { text-decoration: underline; text-decoration-color: var(--sodium); text-underline-offset: 3px; }
 ol.results .url { margin-left: 8px; font: 11.5px var(--mono); color: var(--faint); }
-.tool-head > .icon, .tool-head > .spinner {
+.tool-head > .icon {
   width: 16px;
   text-align: center;
   flex-shrink: 0;
@@ -592,17 +597,27 @@ ol.results .url { margin-left: 8px; font: 11.5px var(--mono); color: var(--faint
   line-height: 18px;
 }
 /* On the spine: the outcome of each call. */
-:is(.msg.assistant, .msg.shell) > .tool > .tool-head > :is(.icon, .spinner) {
+:is(.msg.assistant, .msg.shell) > .tool > .tool-head > .icon {
   position: absolute;
   left: calc(-1 * var(--gutter) - 8px + var(--spine) / 2);
   top: 4px;
   background: var(--graphite);
   box-shadow: 0 0 0 3px var(--graphite);
 }
-:is(.msg.assistant, .msg.shell) > .tool > .tool-head > .spinner {
-  left: calc(-1 * var(--gutter) - 6px + var(--spine) / 2);
-  top: 7px;
-  width: 12px;
+/* A running call's lamp, on the spine where its outcome will be; a
+   subagent's nested log has its own. */
+.tool-head > .lamp { margin: 0 4.5px; }
+:is(.msg.assistant, .msg.shell) > .tool > .tool-head > .lamp {
+  --lamp-ring: 0 0 0 3px var(--graphite);
+  position: absolute;
+  left: calc(-1 * var(--gutter) - 3.5px + var(--spine) / 2);
+  top: 9.5px;
+  margin: 0;
+}
+.msg.assistant > .thinking.live > .thinking-head > .lamp {
+  --lamp-ring: 0 0 0 3px var(--graphite);
+  position: absolute;
+  left: calc(-1 * var(--gutter) - 3.5px + var(--spine) / 2);
 }
 .tool.ok .tool-head .icon { color: var(--sage); }
 .tool.error .tool-head .icon { color: var(--brick); }
@@ -617,7 +632,7 @@ ol.results .url { margin-left: 8px; font: 11.5px var(--mono); color: var(--faint
 }
 .chip.bad, .chip.del { color: var(--brick); }
 .chip.ok, .chip.add { color: var(--sage); }
-.chip.job { color: var(--sodium); }
+.chip.job { color: var(--muted); }
 .chip.waiting { color: var(--sodium); }
 
 /* update_plan's checklist, exit_plan_mode's plan */
@@ -631,16 +646,6 @@ ol.results .url { margin-left: 8px; font: 11.5px var(--mono); color: var(--faint
 .plan-step.step-todo .mark { color: var(--faint); }
 .tool-body .questions { margin: 2px 0; padding-left: 18px; font-size: 13px; }
 
-.spinner {
-  width: 12px;
-  height: 12px;
-  margin: 0 1px;
-  flex-shrink: 0;
-  border-radius: 50%;
-  border: 2px solid var(--sodium-wash);
-  border-top-color: var(--sodium);
-  animation: spin 0.8s linear infinite;
-}
 
 .tool-body {
   padding: 6px 0 2px;
@@ -677,7 +682,6 @@ ol.results .url { margin-left: 8px; font: 11.5px var(--mono); color: var(--faint
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  animation: pulse 1.6s infinite;
 }
 /* A subagent's own log, nested: the same spine, tighter. */
 .transcript > .entries {
@@ -689,7 +693,8 @@ ol.results .url { margin-left: 8px; font: 11.5px var(--mono); color: var(--faint
 .transcript > .entries > .msg.user:first-child { margin-top: 0; }
 .transcript .markdown { font-size: 14px; }
 
-/* Output: monospace, with the middle folded away when long */
+/* Output: monospace, clipped to a few lines when long, faded where it goes
+   on, with a control to show it all. */
 
 .output {
   background: var(--well);
@@ -704,18 +709,28 @@ ol.results .url { margin-left: 8px; font: 11.5px var(--mono); color: var(--faint
   overflow-wrap: anywhere;
   font: inherit;
 }
-.output pre + pre, .output .fold + pre, .output .earlier + pre { padding-top: 0; }
-.output pre:has(+ .fold) { padding-bottom: 0; }
+.output.clipped.from-start pre {
+  -webkit-mask-image: linear-gradient(to bottom, #000 calc(100% - 3.4em), transparent calc(100% - 0.4em));
+  mask-image: linear-gradient(to bottom, #000 calc(100% - 3.4em), transparent calc(100% - 0.4em));
+}
+.output.clipped.from-end pre {
+  -webkit-mask-image: linear-gradient(to top, #000 calc(100% - 3.4em), transparent calc(100% - 0.4em));
+  mask-image: linear-gradient(to top, #000 calc(100% - 3.4em), transparent calc(100% - 0.4em));
+}
+.output .earlier + pre { padding-top: 0; }
+.output pre:has(+ .fold) { padding-bottom: 2px; }
 .output.error { background: var(--err-bg); box-shadow: inset 2px 0 0 var(--brick); border-radius: 0 var(--r-control) var(--r-control) 0; }
 .output.error pre { color: var(--del-fg); }
-/* A folded output's toggle: between the lines it shows, or under all of
-   them (kept in view while scrolling through them) to fold them again. */
+/* Unfolding grows the well once, from the lines it showed. */
+.output.expanded > pre { overflow: hidden; animation: unfold 0.24s ease-out; }
+@keyframes unfold { from { max-height: 10em; } to { max-height: 100vh; } }
+/* The toggle: under the lines (kept in view while scrolling through all of
+   them, to fold them again). */
 .fold, .output .earlier {
   display: flex;
   align-items: center;
-  gap: 4px;
   width: 100%;
-  padding: 3px 12px;
+  padding: 3px 12px 6px;
   border: 0;
   background: none;
   color: var(--faint);
@@ -723,18 +738,9 @@ ol.results .url { margin-left: 8px; font: 11.5px var(--mono); color: var(--faint
   text-align: left;
 }
 .fold { cursor: pointer; border-radius: var(--r-control); }
-.fold:hover { color: var(--fg); background: var(--rule); }
+.fold .count { font: 11.5px var(--mono); }
+.fold:hover { color: var(--fg); }
 .fold:focus-visible { outline: 2px solid var(--sodium); outline-offset: -2px; }
-/* The same chevron as a folded part's summary. */
-.fold .chev::before {
-  content: "›";
-  display: inline-block;
-  width: 0.9em;
-  text-align: center;
-  font-size: 13px;
-  transition: transform 0.15s;
-}
-.fold[aria-expanded="true"] .chev::before { transform: rotate(90deg); }
 .fold[aria-expanded="true"] {
   position: sticky;
   bottom: 0;
@@ -742,9 +748,7 @@ ol.results .url { margin-left: 8px; font: 11.5px var(--mono); color: var(--faint
   border-radius: 0 0 var(--r-control) var(--r-control);
 }
 .output.error .fold[aria-expanded="true"] { background: var(--err-bg); }
-.output .earlier { padding-top: 6px; }
-.output .earlier::before { content: "⋯"; }
-.output > .fold:first-child { padding-top: 6px; }
+.output .earlier { padding: 6px 12px 0; gap: 6px; }
 
 /* Diffs */
 
@@ -829,13 +833,11 @@ details.image[open] .lightbox {
   border-radius: var(--r-control);
 }
 
-@keyframes spin { to { transform: rotate(360deg); } }
 @keyframes blink { 50% { opacity: 0; } }
-@keyframes bounce { 0%, 60%, 100% { transform: none; opacity: 0.5; } 30% { transform: translateY(-4px); opacity: 1; } }
 @keyframes fade { from { opacity: 0; } }
 
 @media (prefers-reduced-motion: reduce) {
-  .pending span, .activity .text, .msg.assistant.streaming > .markdown *::after { animation: none; }
+  .msg.assistant.streaming > .markdown *::after, .output.expanded > pre { animation: none; }
   summary > .label::before { transition: none; }
 }
 
@@ -872,7 +874,6 @@ details.image[open] .lightbox {
   height: 12px;
   border-radius: var(--r-chip);
   background: var(--slate);
-  animation: pulse 1.6s infinite;
 }
 .bone.user { height: 42px; margin-top: 16px; border-left: 2px solid var(--sodium-line); border-radius: 0 var(--r-control) var(--r-control) 0; }
 .bone.user:first-child { margin-top: 0; }
@@ -880,4 +881,4 @@ details.image[open] .lightbox {
 .bone.line.short { width: 40%; }
 .entries + .entries.echoes { margin-top: 34px; }
 .msg.user.sending { opacity: 0.7; border-left-color: var(--sodium-line); }
-.msg.user.sending .time { animation: pulse 1.6s infinite; }
+

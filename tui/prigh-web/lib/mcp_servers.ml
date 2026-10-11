@@ -17,14 +17,14 @@ let tools n = Chat_html.plural n "tool"
 let detail (s : Mcp_server.t) =
   let status =
     match s.status with
-    | Ready -> sprintf "ready · %s" (tools (List.length s.tools))
+    | Ready -> sprintf "ready, %s" (tools (List.length s.tools))
     | Failed ->
       sprintf
-        "failed: %s · Enter restarts it"
+        "failed: %s. Enter restarts it"
         (Option.value s.error ~default:"no reason given")
-    | Needs_approval -> "needs your approval · Enter starts it"
+    | Needs_approval -> "needs your approval: Enter starts it"
   in
-  sprintf "%s · %s" status s.source
+  sprintf "%s, %s" status s.source
 ;;
 
 let rank : Mcp_server.Status.t -> int = function
@@ -106,7 +106,7 @@ let summary (l : Mcp_list.t) =
         "MCP servers: %s%s"
         (String.concat ~sep:", " parts)
         (if wrong || not (List.is_empty waiting)
-         then " — /mcp shows them"
+         then ": /mcp shows them"
          else "")
     , `Error wrong )
 ;;

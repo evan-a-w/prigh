@@ -137,7 +137,7 @@ let thinking ~live text =
       "thinking live"
       [ div
           "thinking-head"
-          [ Node.span ~attrs:[ Attr.class_ "spinner" ] []
+          [ Html.lamp ()
           ; span "label" "Thinking…"
           ]
       ; div "thinking-text" [ Node.text (String.strip text) ]
@@ -163,7 +163,7 @@ let stopped (message : Message.Assistant.t) =
   | Length ->
     div
       "stop length"
-      [ Node.text "Stopped at the output token limit — ask it to continue." ]
+      [ Node.text "Stopped at the output token limit: ask it to continue." ]
   | End_turn | Tool_use -> Node.none
 ;;
 
@@ -185,13 +185,11 @@ let footer times (message : Message.Assistant.t) =
     | End_turn | Length | Aborted | Error _ -> message.at
   in
   match
-    (if List.is_empty usage
-     then []
-     else [ Node.text (String.concat ~sep:" · " usage) ])
+    List.map usage ~f:(fun part -> Node.span [ Node.text part ])
     @ Option.to_list (Option.map at ~f:(time times))
   with
   | [] -> Node.none
-  | parts -> div "meta" (List.intersperse parts ~sep:(Node.text " · "))
+  | parts -> div "meta" parts
 ;;
 
 module Deps = struct
@@ -249,7 +247,7 @@ and assistant ~fold times chat (message : Message.Assistant.t) ~streaming =
   let blocks = present blocks in
   let pending =
     if streaming && count = 0
-    then div "pending" (List.init 3 ~f:(fun _ -> Node.span []))
+    then div "pending" [ Html.lamp (); span "label" "Waiting for the model…" ]
     else Node.none
   in
   let stopped = stopped message in

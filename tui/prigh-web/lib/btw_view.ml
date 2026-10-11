@@ -10,11 +10,7 @@ let view (m : App.Model.t) ~inject =
     let status =
       match btw.status with
       | Streaming ->
-        div
-          ~cls:"btw-status"
-          [ Node.span ~attrs:[ Attr.class_ "spinner" ] []
-          ; Node.text "Answering…"
-          ]
+        div ~cls:"btw-status" [ Html.lamp (); Node.text "Answering…" ]
       | Done -> Node.none
       | Failed e -> div ~cls:"btw-error" [ Node.textf "Failed: %s" e ]
     in

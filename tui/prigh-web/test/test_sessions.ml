@@ -37,12 +37,15 @@ let%expect_test
   H.text h ~selector:".sessions";
   [%expect
     {|
-    fix the parser bug just now
-    /work 1 msg (Archive (A)) (Delete session (Delete))
-    Release notes 3h ago
-    ~/docs 4 msgs (Archive (A)) (Delete session (Delete))
-    Refactor the lexer 15d ago
-    ~/src/compiler 12 msgs (Archive (A)) (Delete session (Delete))
+    fix the parser bug
+    just now /work
+    (Archive (A)) (Delete session (Delete))
+    Release notes
+    3h ago ~/docs
+    (Archive (A)) (Delete session (Delete))
+    Refactor the lexer
+    15d ago ~/src/compiler
+    (Archive (A)) (Delete session (Delete))
     |}];
   H.show h ~selector:".session.selected";
   [%expect
@@ -54,32 +57,38 @@ let%expect_test
          title="/sessions/s1.jsonl"
          class="selected session"
          @on_click>
-      <div class="session-top">
-        <span title="open in the backend" class="dot live">  </span>
+      <Vdom.Node.none-widget> </Vdom.Node.none-widget>
+      <div class="session-mark">
+        <span title="Open in the backend" class="live">  </span>
+      </div>
+      <div class="session-main">
         <span class="session-title"> fix the parser bug </span>
-        <Vdom.Node.none-widget> </Vdom.Node.none-widget>
-        <span class="session-age"> just now </span>
+        <div class="session-meta">
+          <span class="session-age"> just now </span>
+          <span class="session-cwd"> /work </span>
+          <Vdom.Node.none-widget> </Vdom.Node.none-widget>
+        </div>
       </div>
-      <div class="session-meta">
-        <span class="session-cwd"> /work </span>
-        <span class="session-count"> 1 msg </span>
-        <Vdom.Node.none-widget> </Vdom.Node.none-widget>
-        <span class="session-actions">
-          <button type="button" title="Archive (A)" class="archive btn ghost icon" @on_click>
-            <icon class="archive"> </icon>
-          </button>
-          <button type="button"
-                  title="Delete session (Delete)"
-                  class="btn delete ghost icon"
-                  @on_click>
-            <icon class="trash"> </icon>
-          </button>
-        </span>
-      </div>
+      <span class="session-actions">
+        <button type="button"
+                title="Archive (A)"
+                aria-label="Archive (A)"
+                class="archive btn ghost icon"
+                @on_click>
+          <icon class="archive"> </icon>
+        </button>
+        <button type="button"
+                title="Delete session (Delete)"
+                aria-label="Delete session (Delete)"
+                class="btn delete ghost icon"
+                @on_click>
+          <icon class="trash"> </icon>
+        </button>
+      </span>
     </div>
     |}];
-  H.show h ~selector:".session.running .dot";
-  [%expect {| <span title="running" class="dot running">  </span> |}];
+  H.show h ~selector:".session.running .lamp";
+  [%expect {| <span title="Running" class="lamp"> </span> |}];
   (* The topbar names the session after its first prompt until it has a name. *)
   H.text h ~selector:".topbar .title";
   [%expect
@@ -128,7 +137,7 @@ let%expect_test "fuzzy search over titles, prompts and directories" =
 let%expect_test "no sessions yet" =
   let h = H.create () in
   H.text h ~selector:".sessions";
-  [%expect {| No saved sessions yet. |}]
+  [%expect {| No sessions yet: send a message to start one. |}]
 ;;
 
 let%expect_test "switching resets what belonged to the old session" =
@@ -239,7 +248,7 @@ let%expect_test
     Confirm
     (Close (Esc))
     Run bash: rm -rf build?
-    (y allow once) (n deny) (r deny, saying why)
+    (y Allow once) (n Deny) (r Deny, saying why)
     (3 queued)
     |}];
   H.reply
@@ -253,7 +262,7 @@ let%expect_test
     Scroll_to_bottom
     <div class="running tool tool-bash">
       <div class="tool-head">
-        <span class="spinner"> </span>
+        <span class="lamp"> </span>
         <span class="name"> bash </span>
         <span class="arg command"> rm -rf build </span>
       </div>
@@ -345,10 +354,12 @@ let%expect_test
   (* Gone from the sidebar at once. *)
   H.text h ~selector:".sessions";
   [%expect {|
-    fix the parser bug just now
-    /work 1 msg (Archive (A)) (Delete session (Delete))
-    Release notes 3h ago
-    ~/docs 4 msgs (Archive (A)) (Delete session (Delete))
+    fix the parser bug
+    just now /work
+    (Archive (A)) (Delete session (Delete))
+    Release notes
+    3h ago ~/docs
+    (Archive (A)) (Delete session (Delete))
     |}]
 ;;
 
@@ -501,18 +512,15 @@ let%expect_test "new session and switching session reload the state" =
     |}];
   (* The session clicked is marked until it has loaded. *)
   Harness.act h (Switch_session "/sessions/s3.jsonl");
-  Harness.show h ~selector:".session.opening .session-top";
+  Harness.show h ~selector:".session.opening .session-mark";
   Harness.text h ~selector:".chat";
   [%expect
     {|
     (Rpc (method_ switch_session) (params ((path /sessions/s3.jsonl)))
      (tag Reload_state))
     (Focus editor)
-    <div class="session-top">
-      <span title="opening…" class="spinner"> </span>
-      <span class="session-title"> older work </span>
-      <Vdom.Node.none-widget> </Vdom.Node.none-widget>
-      <span class="session-age"> 2m ago </span>
+    <div class="session-mark">
+      <span title="Opening…" class="lamp"> </span>
     </div>
     Loading the session…
     |}];

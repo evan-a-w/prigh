@@ -17,7 +17,7 @@ let%expect_test "bash: arguments streaming, then running with live output" =
     {|
     <div class="running tool tool-bash">
       <div class="tool-head">
-        <span class="spinner"> </span>
+        <span class="lamp"> </span>
         <span class="name"> bash </span>
         <span class="arg command"> ls && ec </span>
       </div>
@@ -37,14 +37,15 @@ let%expect_test "bash: arguments streaming, then running with live output" =
     {|
     <div class="running tool tool-bash">
       <div class="tool-head">
-        <span class="spinner"> </span>
+        <span class="lamp"> </span>
         <span class="name"> bash </span>
         <span class="arg command"> ls && echo done </span>
       </div>
       <div class="tool-body">
-        <div class="live output">
-          <div class="earlier"> 7 earlier lines </div>
-          <pre> server.log
+        <div class="clipped from-end live output">
+          <div class="earlier"> 6 earlier lines </div>
+          <pre> script-stream.json
+    server.log
     serve.sh
     shoot.sh
     shots
@@ -67,19 +68,21 @@ let%expect_test "bash: arguments streaming, then running with live output" =
         <span class="arg command"> ls && echo done </span>
       </div>
       <div class="tool-body">
-        <div class="output">
+        <div class="clipped from-start output">
           <pre> app.ml.orig
     home
     notes.md
     pic.png
-    pw </pre>
+    pw
+    script.json </pre>
           <button type="button" data-fold="c1" aria-expanded="false" class="fold">
             <span class="chev"> </span>
-            Show all 13 lines (5 hidden)
+            <span>
+              Show all
+              <span class="count"> 13 </span>
+               lines
+            </span>
           </button>
-          <pre> shots
-    src
-    done </pre>
         </div>
       </div>
     </div>
@@ -135,7 +138,7 @@ let%expect_test "bash in the background: the job it started" =
     {|
     <div class="running tool tool-bash">
       <div class="tool-head">
-        <span class="spinner"> </span>
+        <span class="lamp"> </span>
         <span class="name"> bash </span>
         <span class="arg command"> sleep 1; echo bg finished </span>
         <span class="chip"> background </span>
@@ -174,19 +177,21 @@ let%expect_test "long output: the middle folds behind \"N more lines\"" =
         <span class="arg command"> seq </span>
       </div>
       <div class="tool-body">
-        <div class="output">
+        <div class="clipped from-start output">
           <pre> line 0
     line 1
     line 2
     line 3
-    line 4 </pre>
+    line 4
+    line 5 </pre>
           <button type="button" data-fold="c1" aria-expanded="false" class="fold">
             <span class="chev"> </span>
-            Show all 30 lines (22 hidden)
+            <span>
+              Show all
+              <span class="count"> 30 </span>
+               lines
+            </span>
           </button>
-          <pre> line 27
-    line 28
-    line 29 </pre>
         </div>
       </div>
     </div>
@@ -209,10 +214,14 @@ let%expect_test "read: text folded, images as thumbnails, ranges, errors" =
         <span class="arg path"> notes.md </span>
       </div>
       <div class="tool-body">
-        <div class="output">
+        <div class="clipped from-start output">
           <button type="button" data-fold="c2" aria-expanded="false" class="fold">
             <span class="chev"> </span>
-            Show 2 lines
+            <span>
+              Show
+              <span class="count"> 2 </span>
+               lines
+            </span>
           </button>
         </div>
       </div>
@@ -315,7 +324,7 @@ let%expect_test "write: content shown as it streams" =
     {|
     <div class="running tool tool-write">
       <div class="tool-head">
-        <span class="spinner"> </span>
+        <span class="lamp"> </span>
         <span class="name"> write </span>
         <span class="arg path"> notes.txt </span>
         <span class="chip"> 3 lines </span>
@@ -340,7 +349,7 @@ let%expect_test "edit: the diff it returned, or its edits before it has run" =
     {|
     <div class="running tool tool-edit">
       <div class="tool-head">
-        <span class="spinner"> </span>
+        <span class="lamp"> </span>
         <span class="name"> edit </span>
         <span class="arg path"> src/app.ml </span>
         <span class="add chip"> +2 </span>
@@ -606,7 +615,7 @@ let%expect_test "subagent: running shows its latest step" =
     {|
     <div data-call="c12" class="running tool tool-subagent">
       <div data-agent="a1" title="Follow it in the agents panel" class="tool-head">
-        <span class="spinner"> </span>
+        <span class="lamp"> </span>
         <span class="name"> subagent </span>
         <span class="arg task"> Count the lines in src/app.ml and report back. … </span>
         <span class="chip model"> deepseek-flash </span>
@@ -642,7 +651,7 @@ let%expect_test "subagent: running shows its latest step" =
               </div>
               <div class="running tool tool-bash">
                 <div class="tool-head">
-                  <span class="spinner"> </span>
+                  <span class="lamp"> </span>
                   <span class="name"> bash </span>
                   <span class="arg command"> wc -l src/app.ml </span>
                 </div>
@@ -703,7 +712,7 @@ let%expect_test
     {|
     <div data-call="c12" class="running tool tool-subagent">
       <div data-agent="a1" title="Follow it in the agents panel" class="tool-head">
-        <span class="spinner"> </span>
+        <span class="lamp"> </span>
         <span class="name"> subagent </span>
         <span class="arg task"> Count the lines in src/app.ml and report back. … </span>
         <span class="chip job"> agent a1 </span>
@@ -740,7 +749,7 @@ let%expect_test
               </div>
               <div class="running tool tool-bash">
                 <div class="tool-head">
-                  <span class="spinner"> </span>
+                  <span class="lamp"> </span>
                   <span class="name"> bash </span>
                   <span class="arg command"> wc -l src/app.ml </span>
                 </div>
@@ -1287,7 +1296,7 @@ let%expect_test "apply_patch: the files streamed so far" =
     {|
     <div class="running tool tool-apply_patch">
       <div class="tool-head">
-        <span class="spinner"> </span>
+        <span class="lamp"> </span>
         <span class="name"> apply_patch </span>
         <span class="arg path"> src/new.ml </span>
         <span class="chip"> 2 files </span>

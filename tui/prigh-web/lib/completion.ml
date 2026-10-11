@@ -90,7 +90,7 @@ let argument_items
         ~id:s.provider
         ~detail:
           (match s.custom, s.configured with
-           | Some c, _ -> "custom · " ^ c.base_url
+           | Some c, _ -> "custom, " ^ c.base_url
            | None, Some _ -> "logged in"
            | None, None -> "")
         ~search:(s.name ^ " " ^ s.provider)
@@ -107,7 +107,7 @@ let argument_items
           ~id:s.provider
           ~detail:
             (match s.custom with
-             | Some custom -> "custom · " ^ custom.base_url
+             | Some custom -> "custom, " ^ custom.base_url
              | None -> sprintf "%s via %s" c.method_ c.source)
           ~search:(s.name ^ " " ^ s.provider)
           s.name))

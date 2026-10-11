@@ -30,7 +30,7 @@ let banner (m : Model.t) ~inject =
     div
       ~cls:"banner"
       ~attrs:[ Attr.role "status" ]
-      [ Node.span ~attrs:[ Attr.class_ "spinner" ] []
+      [ Html.lamp ()
       ; Node.text
           (if attempt = 0
            then "Connection lost: reconnecting…"
@@ -91,9 +91,7 @@ let empty (m : Model.t) =
 let placeholder text =
   Node.div
     ~attrs:[ Attr.class_ "chat-loading"; Attr.role "status" ]
-    [ div
-        ~cls:"loading-label"
-        [ Node.span ~attrs:[ Attr.class_ "spinner" ] []; Node.text text ]
+    [ div ~cls:"loading-label" [ Html.lamp (); Node.text text ]
     ; div
         ~cls:"skeleton"
         (List.map

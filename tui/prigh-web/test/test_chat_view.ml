@@ -70,9 +70,8 @@ let%expect_test
     <div class="entries">
       <div class="assistant msg streaming">
         <div class="pending">
-          <span> </span>
-          <span> </span>
-          <span> </span>
+          <span class="lamp"> </span>
+          <span class="label"> Waiting for the model… </span>
         </div>
       </div>
     </div>
@@ -89,7 +88,7 @@ let%expect_test
       <div class="assistant msg streaming">
         <div class="live thinking">
           <div class="thinking-head">
-            <span class="spinner"> </span>
+            <span class="lamp"> </span>
             <span class="label"> Thinking… </span>
           </div>
           <div class="thinking-text"> Let me look.
@@ -179,7 +178,12 @@ let%expect_test
           .
         </p>
       </div>
-      <div class="meta"> claude-opus-5-5 · 57.2k in · 56.0k cached · 345 out </div>
+      <div class="meta">
+        <span> claude-opus-5-5 </span>
+        <span> 57.2k in </span>
+        <span> 56.0k cached </span>
+        <span> 345 out </span>
+      </div>
     </div>
     |}]
 ;;
@@ -214,7 +218,7 @@ let%expect_test "how a reply stopped: error, interrupted, length" =
         <div class="markdown">
           <p> A long </p>
         </div>
-        <div class="length stop"> Stopped at the output token limit — ask it to continue. </div>
+        <div class="length stop"> Stopped at the output token limit: ask it to continue. </div>
       </div>
     </div>
     |}]
@@ -259,7 +263,7 @@ let%expect_test
   in
   Chat_harness.text chat;
   [%expect
-    {| New year's eve 31 Dec 2025 23:59 Thu 1 Jan Happy new year m · 1.2k in · 40 out · 1 Jan 02:01 Written before sessions kept times Sat 3 Oct Saturday 3 Oct 12:00 Yesterday Working late Today Past midnight m · 1.2k in · 40 out · 00:30 Stopped Interrupted 14:59 |}];
+    {| New year's eve 31 Dec 2025 23:59 Thu 1 Jan Happy new year m 1.2k in 40 out 1 Jan 02:01 Written before sessions kept times Sat 3 Oct Saturday 3 Oct 12:00 Yesterday Working late Today Past midnight m 1.2k in 40 out 00:30 Stopped Interrupted 14:59 |}];
   Chat_harness.show ~selector:".msg.user" chat;
   [%expect
     {|
@@ -279,13 +283,15 @@ let%expect_test
   [%expect
     {|
     <div class="meta">
-      m · 1.2k in · 40 out
-       ·
+      <span> m </span>
+      <span> 1.2k in </span>
+      <span> 40 out </span>
       <time title="Thursday 1 January 2026, 02:01:00" datetime="2026-01-01T00:01:00Z" class="time"> 1 Jan 02:01 </time>
     </div>
     <div class="meta">
-      m · 1.2k in · 40 out
-       ·
+      <span> m </span>
+      <span> 1.2k in </span>
+      <span> 40 out </span>
       <time title="Monday 5 October 2026, 00:30:00" datetime="2026-10-04T22:30:00Z" class="time"> 00:30 </time>
     </div>
     <div class="meta">

@@ -45,7 +45,7 @@ let scoped_models (picker : Picker.t) checked ~inject =
     ~footer:
       [ keys_hint
           (sprintf
-             "%d checked · Tab toggles · Enter saves"
+             "%d checked. Tab toggles, Enter saves"
              (Set.length checked))
       ; button ~on_click:(inject Action.Close_dialog) [ Node.text "Cancel" ]
       ; button
@@ -143,7 +143,7 @@ let prompt (m : App.Model.t) (p : Prompt.t) ~inject =
     ~title
     ~on_close:(inject Action.Close_dialog)
     ~footer:
-      [ keys_hint "Tab completes · ↑↓ choose"
+      [ keys_hint "Tab completes, ↑↓ choose"
       ; button ~on_click:(inject Action.Close_dialog) [ Node.text "Cancel" ]
       ; button
           ~cls:"primary"
@@ -348,7 +348,7 @@ let loading ~title ~inject =
     [ div
         ~cls:"loading-row"
         ~attrs:[ Attr.role "status" ]
-        [ Node.span ~attrs:[ Attr.class_ "spinner" ] []; Node.text "Loading…" ]
+        [ Html.lamp (); Node.text "Loading…" ]
     ]
 ;;
 

@@ -20,3 +20,12 @@ let sections sessions ~query =
   List.partition_tf (filter sessions ~query) ~f:(fun (s : Session_summary.t) ->
     not s.archived)
 ;;
+
+let archived_shown ~query ~archived_open =
+  archived_open || not (String.is_empty (String.strip query))
+;;
+
+let shown sessions ~query ~archived_open =
+  let active, archived = sections sessions ~query in
+  if archived_shown ~query ~archived_open then active @ archived else active
+;;

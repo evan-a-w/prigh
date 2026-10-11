@@ -34,25 +34,25 @@ let attribute = "data-fold"
 let toggle_attr t id = Attr.create attribute (key t id)
 
 (* What a fold's button says: how to show all [total] lines, [shown] of which
-   show while folded, or how to fold them again. *)
+   show while folded (the count is data, in the mono face), or how to fold
+   them again. *)
 let label t id ~total ~shown =
+  let count n =
+    Node.span ~attrs:[ Attr.class_ "count" ] [ Node.text (Int.to_string n) ]
+  in
+  let lines n = Node.text (if n = 1 then " line" else " lines") in
   if expanded t id
   then
     if shown = 0
-    then "Fold"
-    else sprintf "Fold to %s" (Chat_html.plural shown "line")
+    then [ Node.text "Fold" ]
+    else [ Node.text "Fold to "; count shown; lines shown ]
   else if shown = 0
-  then sprintf "Show %s" (Chat_html.plural total "line")
-  else
-    sprintf
-      "Show all %s (%d hidden)"
-      (Chat_html.plural total "line")
-      (total - shown)
+  then [ Node.text "Show "; count total; lines total ]
+  else [ Node.text "Show all "; count total; lines total ]
 ;;
 
 let button t id ~total ~shown =
   let expanded = expanded t id in
-  let label = label t id ~total ~shown in
   Node.button
     ~attrs:
       [ Attr.class_ "fold"
@@ -60,5 +60,7 @@ let button t id ~total ~shown =
       ; toggle_attr t id
       ; Attr.create "aria-expanded" (Bool.to_string expanded)
       ]
-    [ Node.span ~attrs:[ Attr.class_ "chev" ] []; Node.text label ]
+    [ Node.span ~attrs:[ Attr.class_ "chev" ] []
+    ; Node.span (label t id ~total ~shown)
+    ]
 ;;

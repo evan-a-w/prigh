@@ -101,7 +101,7 @@ let%expect_test "web search streamed between text: running, then its results" =
       </div>
       <div class="running tool tool-web_search">
         <div class="tool-head">
-          <span class="spinner"> </span>
+          <span class="lamp"> </span>
           <span class="name"> web_search </span>
           <span class="arg query"> "ocaml eio" </span>
         </div>
@@ -138,7 +138,7 @@ let%expect_test "web search streamed between text: running, then its results" =
           <details class="results">
             <summary>
               <span class="label"> 3 results </span>
-              <span class="preview"> Eio docs · Eio on GitHub · Effects tutorial </span>
+              <span class="preview"> Eio docs   Eio on GitHub   Effects tutorial </span>
             </summary>
             <ol class="results">
               <li>
@@ -305,7 +305,7 @@ let%expect_test "web_fetch: the URL as a link, the page folded" =
     {|
     <div class="running tool tool-web_fetch">
       <div class="tool-head">
-        <span class="spinner"> </span>
+        <span class="lamp"> </span>
         <span class="name"> web_fetch </span>
         <a href="https://ocaml.org/p/eio" target="_blank" rel="noopener noreferrer" class="arg url"> https://ocaml.org/p/eio </a>
       </div>
@@ -337,7 +337,7 @@ let%expect_test "web_fetch: the URL as a link, the page folded" =
         <span class="chip"> HTTP 200, text/html, 12.3 KB </span>
       </div>
       <div class="tool-body">
-        <div class="output">
+        <div class="clipped from-start output">
           <pre> # Eio
 
     Effects-based direct-style IO.
@@ -346,7 +346,11 @@ let%expect_test "web_fetch: the URL as a link, the page folded" =
     line 6 </pre>
           <button type="button" data-fold="c1" aria-expanded="false" class="fold">
             <span class="chev"> </span>
-            Show all 10 lines (4 hidden)
+            <span>
+              Show all
+              <span class="count"> 10 </span>
+               lines
+            </span>
           </button>
         </div>
       </div>
@@ -389,7 +393,7 @@ let%expect_test "job_input: the job and what it was sent, escaped" =
     {|
     <div class="running tool tool-job_input">
       <div class="tool-head">
-        <span class="spinner"> </span>
+        <span class="lamp"> </span>
         <span class="name"> job_input </span>
         <span class="arg input"> j1 "print(1)\n" </span>
         <span class="chip"> close stdin </span>

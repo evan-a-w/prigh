@@ -18,3 +18,15 @@ val sections
   :  Session_summary.t list
   -> query:string
   -> Session_summary.t list * Session_summary.t list
+
+(** Whether the archived sessions show: when the user unfolded them, or while
+    searching. *)
+val archived_shown : query:string -> archived_open:bool -> bool
+
+(** The rows the sidebar shows, in its order: the active sessions, then the
+    archived ones when [archived_shown]. *)
+val shown
+  :  Session_summary.t list
+  -> query:string
+  -> archived_open:bool
+  -> Session_summary.t list
