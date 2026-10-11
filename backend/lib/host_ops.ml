@@ -61,8 +61,48 @@ let list_dirs ~cwd prefix =
   |> fun items -> Tool.Result.ok (Json.to_string (`Array items))
 ;;
 
+(* [In_channel.input] until [len] bytes or the end. *)
+let input_at_most ic ~buf ~pos ~len =
+  let rec go got =
+    if got = len
+    then got
+    else (
+      match In_channel.input ic ~buf ~pos:(pos + got) ~len:(len - got) with
+      | 0 -> got
+      | n -> go (got + n))
+  in
+  go 0
+;;
+
+(* A binary file (an upload, say) is named, not inlined: the model gets its
+   path and size and can look at it with tools. *)
+let binary_note path =
+  match
+    In_channel.with_file path ~binary:true ~f:(fun ic ->
+      let buf = Bytes.create 8192 in
+      let n = input_at_most ic ~buf ~pos:0 ~len:8192 in
+      Bytes.To_string.sub buf ~pos:0 ~len:n, In_channel.length ic)
+  with
+  | exception _ -> None
+  | head, size ->
+    if Option.is_none (Image.sniff head) && Tool_read.looks_binary head
+    then
+      Some
+        (sprintf
+           "[binary file, %Ld bytes: not shown; inspect it with tools]"
+           size)
+    else None
+;;
+
 let read_file ~env ~cancel ~seen ~cwd path =
-  Tool_read.read_for_context ~env ~cancel ?seen ~cwd path
+  let resolved = Tool.resolve ~cwd path in
+  match
+    match Sys_unix.is_file resolved with
+    | `Yes -> binary_note resolved
+    | `No | `Unknown -> None
+  with
+  | Some note -> Tool.Result.ok note
+  | None -> Tool_read.read_for_context ~env ~cancel ?seen ~cwd path
 ;;
 
 let instructions_op = "$instructions"
@@ -342,6 +382,9 @@ let execute
     | Error e -> Tool.Result.error (Error.to_string_hum e))
   else if String.equal name Git_diff.op
   then Git_diff.run ~env ~cancel ~cwd ~arguments
+  else if Host_files.is_op name
+  then
+    Host_files.execute ~env ?stdin ~cancel ~on_output ~cwd ~name ~arguments ()
   else (
     match
       List.find (host_tools ()) ~f:(fun t -> String.equal (Tool.name t) name)

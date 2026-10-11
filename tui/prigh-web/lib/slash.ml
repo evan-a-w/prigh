@@ -194,6 +194,12 @@ let all =
       "terminal"
       "open a shell where the tools run, in the session's directory (Ctrl+`)"
   ; c
+      ~argument:Directory
+      ~args:"[path]"
+      "files"
+      "browse, preview, upload and download files where the tools run \
+       (Ctrl+Shift+F)"
+  ; c
       ~args:"[n|id|cancel <n|id>]"
       "agents"
       "follow subagents and background jobs in the agents panel, or cancel one"

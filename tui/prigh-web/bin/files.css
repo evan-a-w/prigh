@@ -1,0 +1,312 @@
+/* The file browser: a drawer beside the chat (a sheet on phones) listing a
+   directory on the tools' host, and the composer's attachment chips. File
+   names, sizes and times are machine data: mono. The selection is the one
+   sodium thing in the list; transfers carry the work lamp. */
+
+.files-panel {
+  position: relative;
+  width: var(--files-width, 400px);
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  background: var(--slate);
+  border-left: 1px solid var(--rule);
+  animation: files-in 0.16s ease-out;
+}
+@keyframes files-in { from { opacity: 0; transform: translateX(12px); } }
+
+.files-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 54px;
+  padding: 8px 8px 8px 14px;
+  border-bottom: 1px solid var(--rule);
+}
+.files-head-icon { width: 16px; height: 16px; color: var(--muted); flex-shrink: 0; }
+.files-machine { font-weight: 600; font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.files-tools { margin-left: auto; display: flex; gap: 2px; }
+.files-tool .icon, .files-close .icon { width: 16px; height: 16px; }
+.files-tool.on { color: var(--sodium); background: var(--sodium-wash); }
+.files-toggle.open { color: var(--sodium); background: var(--sodium-wash); }
+.app.files-open:not(.narrow) .toasts { right: calc(var(--files-width, 400px) + 16px); }
+
+/* The path: breadcrumbs, or the field typing one. */
+.files-crumbs {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0 2px;
+  padding: 8px 8px 8px 14px;
+  font: 12.5px/1.6 var(--mono);
+  color: var(--muted);
+  border-bottom: 1px solid var(--rule);
+}
+.files-crumb {
+  background: none;
+  border: 0;
+  padding: 0 3px;
+  border-radius: var(--r-chip);
+  font: inherit;
+  color: var(--muted);
+  cursor: pointer;
+}
+.files-crumb:hover { color: var(--chalk); background: var(--slate-2); }
+.files-crumb:focus-visible { outline: 2px solid var(--sodium); outline-offset: 1px; }
+.files-crumb.current { color: var(--chalk); cursor: default; }
+.files-sep { color: var(--faint); }
+.files-edit-path { margin-left: auto; width: 24px; height: 24px; }
+.files-edit-path .icon { width: 13px; height: 13px; }
+.files-path-input {
+  margin: 6px 8px;
+  padding: 6px 8px;
+  font: 12.5px var(--mono);
+  color: var(--chalk);
+  background: var(--well);
+  border: 1px solid var(--sodium);
+  border-radius: var(--r-control);
+  outline: 0;
+}
+
+.files-body { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+.files-browse { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+.files-body.previewing .files-browse { flex: 0 1 45%; }
+
+.files-columns, .files-row {
+  display: grid;
+  grid-template-columns: 18px minmax(0, 1fr) auto 72px 96px;
+  align-items: center;
+  column-gap: 8px;
+}
+.files-columns { grid-template-columns: minmax(0, 1fr) 72px 96px; padding: 6px 14px 4px 40px; }
+.files-sort {
+  background: none;
+  border: 0;
+  padding: 0;
+  font: 12px var(--sans);
+  color: var(--faint);
+  text-align: left;
+  cursor: pointer;
+}
+.files-sort.col-size, .files-sort.col-modified { text-align: right; }
+.files-sort:hover, .files-sort.active { color: var(--muted); }
+.files-sort:focus-visible { outline: 2px solid var(--sodium); outline-offset: 2px; }
+.files-arrow { margin-left: 3px; color: var(--sodium); }
+
+.files-list {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 0 6px 6px;
+  outline: 0;
+  scrollbar-width: thin;
+  scrollbar-color: var(--rule-2) transparent;
+}
+.files-list:focus-visible { box-shadow: inset 0 0 0 1px var(--sodium-line); }
+.files-row {
+  padding: 4px 8px;
+  border-radius: var(--r-control);
+  cursor: pointer;
+  font: 13px/1.5 var(--mono);
+  color: var(--chalk);
+}
+.files-row:hover { background: var(--slate-2); }
+.files-row.selected { background: var(--sodium-wash); box-shadow: inset 2px 0 0 var(--sodium); }
+.files-row.dot .files-name { color: var(--muted); }
+.files-row.missing .files-name { color: var(--faint); text-decoration: line-through; }
+.files-kind { width: 15px; height: 15px; color: var(--faint); }
+.files-kind.dir { color: var(--muted); }
+.files-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.files-size, .files-mtime { font-size: 12px; color: var(--faint); text-align: right; white-space: nowrap; }
+.files-row .files-size { grid-column: 4; }
+.files-row .files-mtime { grid-column: 5; }
+
+.files-count { padding: 4px 14px 6px; font: 11.5px var(--mono); color: var(--faint); white-space: pre; }
+.files-empty, .files-wait, .files-error {
+  padding: 18px 14px;
+  font-size: 13.5px;
+  color: var(--muted);
+}
+.files-wait { display: flex; align-items: center; gap: 8px; }
+.files-error { color: var(--brick); display: flex; flex-direction: column; align-items: flex-start; gap: 8px; overflow-wrap: anywhere; }
+.files-advice { color: var(--chalk); }
+
+/* The selected entry's actions: plain verbs, under the list. */
+.files-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px 4px;
+  padding: 6px 8px;
+  border-top: 1px solid var(--rule);
+}
+.files-act { gap: 5px; }
+.files-act .icon { width: 13px; height: 13px; }
+.files-act.attach { color: var(--chalk); }
+.files-act.danger { background: transparent; border-color: transparent; color: var(--brick); font-weight: 400; }
+.files-act.danger:hover { background: var(--brick-wash); }
+
+/* The preview: a well, like tool output. */
+.files-preview {
+  flex: 1 1 55%;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  border-top: 1px solid var(--rule);
+  background: var(--well);
+  animation: files-open 0.14s ease-out;
+}
+@keyframes files-open { from { opacity: 0; } }
+.files-preview-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 4px 6px 4px 14px;
+  border-bottom: 1px solid var(--rule);
+  min-height: 36px;
+}
+.files-preview-name { font: 600 13px var(--mono); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.files-preview-meta { font: 11.5px var(--mono); color: var(--faint); white-space: nowrap; }
+.files-close-preview { margin-left: auto; width: 26px; height: 26px; flex-shrink: 0; }
+.files-preview-body { flex: 1; min-height: 0; overflow: auto; scrollbar-width: thin; scrollbar-color: var(--rule-2) transparent; }
+.files-text { display: flex; align-items: flex-start; min-width: max-content; }
+.files-gutter, .files-code { margin: 0; padding: 8px 10px; font: 12.5px/1.55 var(--mono); }
+.files-gutter { color: var(--faint); text-align: right; user-select: none; border-right: 1px solid var(--rule); position: sticky; left: 0; background: var(--well); }
+.files-code { color: var(--chalk); white-space: pre; }
+.files-image { padding: 12px; display: flex; justify-content: center; }
+.files-image img {
+  max-width: 100%;
+  max-height: 60vh;
+  object-fit: contain;
+  border-radius: var(--r-control);
+  /* Transparency shows as a checkerboard. */
+  background: repeating-conic-gradient(var(--slate) 0 25%, var(--slate-2) 0 50%) 0 0 / 16px 16px;
+}
+.files-note { padding: 10px 14px; color: var(--muted); font-size: 13px; }
+
+/* Transfers: the work lamp and a thin bar. */
+.files-transfers { border-top: 1px solid var(--rule); padding: 6px 14px 8px; display: flex; flex-direction: column; gap: 6px; }
+.files-transfer {
+  display: grid;
+  grid-template-columns: 8px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 3px 8px;
+  font-size: 12.5px;
+  color: var(--muted);
+}
+.files-transfer-name { font-family: var(--mono); color: var(--chalk); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.files-transfer-meta { font: 11.5px var(--mono); color: var(--faint); }
+.files-bar { grid-column: 2 / 4; height: 2px; background: var(--rule); border-radius: 1px; overflow: hidden; }
+.files-bar::after { content: ""; display: block; height: 100%; width: var(--done, 0%); background: var(--sodium); transition: width 0.2s linear; }
+
+.files-lamp {
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--sodium);
+  box-shadow: 0 0 6px var(--sodium-line);
+  animation: files-breathe 2s ease-in-out infinite;
+  flex-shrink: 0;
+}
+@keyframes files-breathe { 50% { opacity: 0.45; box-shadow: none; } }
+
+.hidden-file-input { display: none; }
+
+/* Files dragged over the page: where they would land. */
+body.dropping-files .files-panel::after,
+body.dropping-chat .composer-box::after {
+  content: attr(data-drop);
+  position: absolute;
+  inset: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1.5px dashed var(--sodium);
+  border-radius: var(--r-surface);
+  background: color-mix(in srgb, var(--graphite) 88%, transparent);
+  color: var(--chalk);
+  font-size: 14px;
+  z-index: 5;
+  pointer-events: none;
+}
+body.dropping-chat .composer-box { position: relative; }
+body.dropping-chat .composer-box::after { content: "Drop to attach to your message"; inset: -1px; }
+
+/* The dialogs. */
+.files-ask-where { font: 12.5px var(--mono); color: var(--muted); margin-bottom: 8px; }
+.files-ask .text-input { width: 100%; font-family: var(--mono); }
+.files-ask-text { color: var(--chalk); line-height: 1.5; overflow-wrap: anywhere; }
+.files-ask-error { margin-top: 8px; color: var(--brick); font-size: 13px; }
+
+/* The composer's chips: a file, its size, its upload. */
+.attach-chips { display: flex; gap: 6px; flex-wrap: wrap; padding: 2px 2px 0; }
+.attach-chip {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 280px;
+  padding: 3px 3px 3px 8px;
+  background: var(--slate-2);
+  border: 1px solid var(--rule);
+  border-radius: var(--r-chip);
+  font: 12.5px var(--mono);
+  overflow: hidden;
+  animation: files-open 0.14s ease-out;
+}
+.attach-chip.uploading::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  height: 2px;
+  width: var(--done, 0%);
+  background: var(--sodium);
+  transition: width 0.2s linear;
+}
+.attach-chip.failed { border-color: var(--brick-line); background: var(--brick-wash); }
+.attach-chip-icon { width: 13px; height: 13px; color: var(--muted); flex-shrink: 0; }
+.attach-chip-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.attach-chip-detail { color: var(--faint); font-size: 11.5px; white-space: nowrap; }
+.attach-chip.failed .attach-chip-detail { color: var(--brick); overflow: hidden; text-overflow: ellipsis; max-width: 140px; }
+.attach-chip-remove { width: 20px; height: 20px; flex-shrink: 0; }
+.attach-chip-remove .icon { width: 11px; height: 11px; }
+.composer-buttons .attach .icon { width: 17px; height: 17px; }
+
+/* Narrower windows: the drawer floats over the chat. */
+@media (max-width: 1100px) {
+  .app:not(.narrow) .files-panel {
+    position: fixed;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 20;
+    max-width: 86vw;
+    box-shadow: var(--float-shadow);
+  }
+}
+
+/* Phones: a full-screen sheet; the preview takes it over. */
+.app.narrow .files-panel {
+  position: fixed;
+  inset: 0;
+  width: auto;
+  z-index: 40;
+  border-left: 0;
+  animation: files-up 0.2s ease-out;
+}
+.app.narrow .files-head { min-height: 50px; padding-left: 12px; }
+.app.narrow .files-body.previewing .files-browse { display: none; }
+.app.narrow .files-columns, .app.narrow .files-row { grid-template-columns: 18px minmax(0, 1fr) auto 64px; }
+.app.narrow .files-columns { grid-template-columns: minmax(0, 1fr) 64px; }
+.app.narrow .files-sort.col-modified, .app.narrow .files-mtime { display: none; }
+.app.narrow .files-row { padding: 8px; }
+.app.narrow .files-act { padding: 6px 10px; }
+@keyframes files-up { from { opacity: 0; transform: translateY(24px); } }
+
+@media (prefers-reduced-motion: reduce) {
+  .files-panel, .app.narrow .files-panel, .files-preview, .attach-chip { animation: none; }
+  .files-lamp { animation: none; }
+  .files-bar::after, .attach-chip.uploading::after { transition: none; }
+}

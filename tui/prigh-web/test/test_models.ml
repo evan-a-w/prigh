@@ -6,7 +6,7 @@ let%expect_test
   =
   let h = H.create () in
   H.text h ~selector:".controls";
-  [%expect {| (Claude Opus 5.5) (on) (Terminal (Ctrl+`)) |}];
+  [%expect {| (Claude Opus 5.5) (on) (Files (Ctrl+Shift+F)) (Terminal (Ctrl+`)) |}];
   H.key h "l" ~ctrl:true;
   H.text h ~selector:".modal";
   [%expect
@@ -159,7 +159,7 @@ let%expect_test "thinking: a picker and /thinking, when the model supports it" =
           ~fields:[ "model", deepseek; "thinking", `String "off" ]
           ()));
   H.text h ~selector:".controls";
-  [%expect {| (DeepSeek Chat) (Terminal (Ctrl+`)) |}];
+  [%expect {| (DeepSeek Chat) (Files (Ctrl+Shift+F)) (Terminal (Ctrl+`)) |}];
   H.type_ h "/thinking high";
   H.act h Send;
   H.text h ~selector:".toast.error";
@@ -261,7 +261,7 @@ let%expect_test "aborting brings the queued prompts back into the editor" =
     {|
     (Rpc (method_ list_subagents) (params ()) (tag Subagents))
     (Rpc (method_ list_jobs) (params ()) (tag Jobs))
-    (Stop (Esc)) (Steer (Enter))
+    (Attach files (or drop them here)) (Stop (Esc)) (Steer (Enter))
     |}];
   H.type_ h "half-written";
   H.key h "Escape";

@@ -371,6 +371,50 @@ two can share one.
   in, `output`/`result` out, one fiber per exec), strips it so a remote host
   uses its own home. A tool host predating an op answers "unknown host tool",
   which the backend treats as having nothing (no skills, no MCP servers).
+  A binary file asked for with `$read_file` (an upload attached to a
+  prompt) is named with its size instead of inlined.
+- The file browser, in layers. `Host_files` is the host's side: the
+  pseudo-tools `$fs_list` (one directory's entries with kind, size, mtime,
+  a symlink's target kind; at most 5000, dot files on request; a file lists
+  its directory with it selected), `$fs_stat`, `$fs_read` (a base64 slice,
+  at most 1 MB), `$fs_mkdir` (optionally with parents and a `.gitignore` of
+  `*`), `$fs_rename`, `$fs_delete` (recursive, never following symlinks;
+  not `/` or the home), `$fs_download` and `$fs_upload`. Paths resolve
+  against the exec's cwd (the session's) and may be anywhere the host's
+  user can reach, like `bash`. The transfers stream through the exec's
+  output and its `Stdin_feed` (so they reach a client host through
+  `tool_exec_output`/`tool_exec_input`, which need the `exec_input`
+  feature): a download sends base64 chunks of 192 KiB raw (a file, or `tar
+  -czf - -C parent name` of a directory), at most `window` ahead of the
+  credits the backend grants with one `+` per chunk it has passed on;
+  an upload takes base64 chunks from stdin into a temporary file next to
+  the target, acknowledges each with an output `+`, checks the announced
+  size and renames it into place at the end of input (`conflict`: `fail`,
+  `overwrite` or `rename` to a free `name-N.ext`); cancelled, the
+  temporary file goes. `File_ops` drives them on a session's active host
+  through `Agent.host_call`: `preview` (the first 256 KiB: text as valid
+  UTF-8, an image by `Image.sniff` with a link, else binary), `download`
+  (writes each chunk to the caller's sink before granting the next
+  credit, so memory stays at a window's worth whatever the size) and
+  `upload` (at most 8 chunks ahead of the host's acknowledgements; at most
+  2 GiB), and turns "unknown host tool" into "update prigh on tool host
+  NAME". `File_tickets` issues short-lived capabilities (128 random bits,
+  5 minutes, single use except image previews) bound to the agent, i.e.
+  the session and so its namespace and host, and `Files_rpc` is the RPC
+  face: `fs_list {path?, hidden?}`, `fs_preview {path}`, `fs_mkdir`,
+  `fs_rename {from, to}`, `fs_delete`, `fs_download {path, archive?}`
+  (`{url, name}`) and `fs_upload {name, size, dir?, overwrite?}` (`{url,
+  path}`; without `dir` into the session cwd's `.prigh/uploads`, renamed
+  when the name is taken), all on the calling client's session. `File_http`
+  serves the tickets on the web server: `GET /files/download?ticket=` (a
+  file with its length, a directory as `NAME.tar.gz`, an image preview
+  inline; `Content-Security-Policy: sandbox`, `nosniff`) and `PUT
+  /files/upload?ticket=` (a `Content-Length` body read in chunks; 409 when
+  the file appeared meanwhile, 410 for a used or expired ticket), with CORS
+  open since the ticket, not a cookie, is the authority. So a client never
+  reaches files except through its own session's active host: in a
+  multi-user server without the backend host (Docker) that is the user's
+  own tool host, running as that user.
 - `Frontmatter`, `Skill` — a `SKILL.md`'s YAML frontmatter (the scalar forms
   skill files use), discovery (`.prigh/skills`, `.claude/skills`,
   `.agents/skills` in the cwd, its ancestors, then the home directory;
@@ -854,7 +898,9 @@ two can share one.
   `logout`, `set_budget {usd}` (a number, or null for none), `set_goal
   {text}`, `clear_goal`, `resume_goal`, `cancel_resume`, `resume_now`, `git_diff {path?}`
   (`{root, against, diff, truncated}`), `review {args?}` (`[base]
-  [instructions]`) and `init`.
+  [instructions]`) and `init`, and the file browser's `fs_list`,
+  `fs_preview`, `fs_mkdir`, `fs_rename`, `fs_delete`, `fs_download` and
+  `fs_upload` (`Files_rpc`, above).
   `State` carries `active_host` and `hosts` (the backend first),
   `budget_usd`, `goal` (`{text, status: active|done|stopped,
   continuations, max_continuations, summary?, reason?}` or null) and
@@ -880,7 +926,8 @@ two can share one.
   straight to `Rpc_server.serve_lines`, so one port serves terminals and
   browsers alike; otherwise one HTTP/1.1 request per connection, `GET /ws`
   upgraded and handed to `Rpc_server.serve_lines`, `GET /terminal` upgraded
-  and handed to `Terminals` (below),
+  and handed to `Terminals` (below), `/files/download` and `/files/upload`
+  to `File_http` (authorised by their tickets),
   anything else served from the web root (the built `tui/web-bin/site`,
   found via `-web-root`, `$PRIGH_WEB_ROOT` or next to the executable;
   no `..`, no dot files). The token check is the same `hello` check as
@@ -1011,7 +1058,8 @@ copy of the protocol types and the e2e test guards the contract.
 - `protocol/` (`prigh_protocol`) — `Jsonaf` decoders for everything
   `Rpc_json` emits (`Message`, `Delta`, `State`, `Model`, `Session_summary`,
   `Auth_status`, `Auth_event`, `Event`, `Server_message`, `Skill`,
-  `Mcp_server`, `Mcp_list`, `Delete_result`) and the `Request` encoder
+  `Mcp_server`, `Mcp_list`, `Delete_result`, the file browser's
+  `File_listing` and `File_preview`) and the `Request` encoder
   (`Request.Method` has typed constructors for `list_skills`, `list_mcp`,
   `mcp_approve`, `set_archived`, `delete_sessions` and `delete_archived`).
 - `client/` (`prigh_client`, `Async_kernel` only so it links under
@@ -1359,6 +1407,27 @@ copy of the protocol types and the e2e test guards the contract.
       Keys inside the panel (`Keys.Target.Terminal`) are the shell's, Esc
       and Enter included, even with a dialog or a tool confirmation
       showing; only Ctrl+` (by `code`) is ours, toggling the panel.
+    - The file browser: `Files` (the panel's state: where it belongs —
+      session, host, cwd, with `set_where` resetting it and dropping the
+      attachments when the session or host changes —, the listing and the
+      path being listed, so stale replies are ignored, sort, dot files, the
+      selection, the preview, uploads into the directory with the
+      conflicts waiting to be confirmed, its dialog, and the composer's
+      attachments with their upload state). Its `update`/`reply` return
+      `Out.t`s that `App` turns into `fs_*` requests (`Reply_tag.Files`),
+      toasts, the clipboard, text for the composer and `Command.Files`
+      page commands (`Pick`, `Upload {file, url}`, `Abort_upload`,
+      `Forget`, `Download`, `Focus`); the page's files are ints, so the
+      model stays pure. `send` adds the ready attachments' paths
+      (relative to the cwd) as `attachments` and refuses while one
+      uploads or after one failed; `Sent_with_files` puts them back if
+      the prompt fails. `Files_view` draws the drawer (breadcrumbs or the
+      path field, sortable columns, rows, the selected entry's actions,
+      the preview, the transfers with the work lamp), its dialogs, the top
+      bar's toggle, the composer's chips and paperclip, and the hidden
+      file pickers. Keys: Ctrl+Shift+F everywhere; in the list
+      (`Keys.Target.Files`) ↑↓, Enter, Backspace, F2, Delete, Esc; with
+      its dialog open, Enter and Esc.
     - Around it: `Sidebar_view`/`Session_list` (fuzzy search, ages from
       `Rel_time`; active sessions, then a divider with the archived ones'
       count that folds them (`Model.archived_open`, `Session_list.shown`,
@@ -1469,9 +1538,16 @@ copy of the protocol types and the e2e test guards the contract.
     `Focus_terminal`. The document listeners leave keys (a capture
     listener takes only Ctrl+`, before xterm.js), pastes and drops inside
     the panel to it, and the chat's and agents panel's mutation observers
-    ignore xterm.js redrawing.
+    ignore xterm.js redrawing. `Files_widget` keeps the browser's `File`s
+    by id, `PUT`s one to its upload link with `XMLHttpRequest` (its upload
+    progress becomes `Upload_progress`), saves a download through a link
+    with `download`, opens the pickers, and sends files dropped on the
+    drawer to its directory and other dropped or pasted files that are not
+    PNG/JPEG/GIF/WebP images to the attachments (marking where a drag
+    would land); transfer links go to the backend's web address, from the
+    WebSocket's (`Files.http_base`).
   - `bin/` — `main.bc.js` plus `index.html`, `style.css`, `chat.css`,
-    `agents.css` and `terminal.css` (design tokens in `style.css`'s
+    `agents.css`, `terminal.css` and `files.css` (design tokens in `style.css`'s
     `:root`), the Recursive font cut to two woff2 instances (sans and mono;
     `recursive-OFL.txt`), and `web-bin`'s `terminal.js` and
     vendored xterm.js (copied by dune rules, not duplicated), assembled under
@@ -1649,7 +1725,14 @@ real shell through tmux, on a private tmux server via `TMUX_TMPDIR` with
 `stty size` matching xterm.js's rows before and after dragging the panel
 taller, Ctrl+` closing it with the focus back in the editor, the replay
 after reopening and after a reload, another session's shell and back, the
-phone sheet), with no console or page errors. Then `accounts.mjs` runs the account switcher against `serve -tokens
+phone sheet), and the file browser (Ctrl+Shift+F at the session's cwd, a
+text and an image preview, uploads through `setInputFiles` and replacing
+one after its dialog, a file and a directory downloaded through
+Playwright's `download` event (the `.tar.gz` listed with `tar`), a typed
+path, new folder, rename with F2, delete after its dialog, then a file
+attached from the browser, one dropped on the composer and one picked with
+the paperclip, sent with a prompt and checked in what the model saw, and
+the phone sheet), with no console or page errors. Then `accounts.mjs` runs the account switcher against `serve -tokens
 alice=a,bob=b -superusers alice`: alice signs in, adds bob (each sees only
 their own sessions), switches back in one click, acts as bob and comes
 back, and signs bob out, leaving alice on the sign-in page.

@@ -339,6 +339,43 @@ the user you act as; when the shell exits, "New shell" starts another,
 and when there is none (no tmux on the host, a host that has gone) the
 panel says why and what to do.
 
+The folder button in the top bar (or `/files [path]`, or Ctrl+Shift+F)
+opens the file browser, a drawer right of the chat (a full-screen sheet on
+a phone) on the machine where the session's tools run (the backend, the
+Docker container, or a laptop connected as a tool host), in the session's
+directory. The breadcrumbs (or the pencil, to type a path: absolute, `~/…`
+or relative to the directory shown), the up arrow and Backspace move
+around; the eye shows dot files; the columns sort by name, size or age
+(directories first). A file clicked (or reached with ↑↓) is previewed:
+text with line numbers (the first 256 KB), images (up to 20 MB), binaries
+only named. The selected entry's actions: Attach (to your next message),
+Download (a directory as a `.tar.gz` archive: `tar -czf` of it, paths
+starting with its name), Mention (`@path` into the composer), Copy path,
+Rename (F2) and Delete (Delete; it asks first, and refuses `/` and the
+home directory). The upload button (or files dropped on the drawer)
+uploads into the directory shown, with progress, asking before it
+replaces a file; New folder makes one. Every error says what to do next,
+dialogs own the keyboard (Enter accepts, Esc cancels without doing
+anything), and switching session or host starts the browser afresh.
+
+Files go into a message too: drop them on the composer, paste them, or
+pick them with its paperclip. Images (PNG, JPEG, GIF, WebP) go as images,
+as before; any other file is uploaded to `.prigh/uploads/` in the
+session's directory on its tool host (created with a `.gitignore` of `*`,
+so git ignores it; a name in use gets `-2`, `-3`…) and attached by path,
+like an `@file`: the model gets text files in `<file>` blocks and a
+binary file's path and size, to inspect with its tools. Each shows as a
+chip with its name, size and upload progress (× removes it) until it is
+sent, and in the transcript as an `@path` chip. A message waits for its
+uploads; one that failed says to remove it or attach it again.
+
+Transfers go through the backend, so they work on any tool host: the page
+asks over its signed-in connection for a one-time link (a random ticket,
+valid 5 minutes, for that session's host only), then `GET
+/files/download?ticket=…` or `PUT /files/upload?ticket=…` on the same port
+streams the bytes, in chunks, to or from the host (uploads up to 2 GB). A
+tool host running an older prigh says to update prigh there.
+
 prigh-web has every slash command of the table below, as pickers and
 dialogs rather than lines in a transcript (a dialog keeps the keyboard
 until Esc closes it: Tab goes round it, the page behind is inert). A

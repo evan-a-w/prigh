@@ -34,7 +34,8 @@ let act t action =
      | Notify _
      | Request_notification_permission
      | Save_notifications _
-     | Set_title _ -> ());
+     | Set_title _
+     | Files _ -> ());
     if not t.quiet then print_s [%sexp (command : App.Command.t)])
 ;;
 
@@ -305,6 +306,10 @@ let render node =
     | Text s -> add s
     | Widget -> ()
     | Element { tag_name = "icon"; _ } -> ()
+    (* Hidden file pickers: the page opens them from buttons. *)
+    | Element ({ tag_name = "input"; _ } as e)
+      when List.exists e.attributes ~f:(fun (k, v) ->
+             String.equal k "type" && String.equal v "file") -> ()
     | Element ({ tag_name = "input" | "textarea"; _ } as e) ->
       let value =
         List.Assoc.find e.string_properties ~equal:String.equal "value"

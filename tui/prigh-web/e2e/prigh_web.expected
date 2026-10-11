@@ -455,6 +455,115 @@ one more
 <AGE>
 <CWD>/sub
 session files after: 1
+=== chromium: files: the session's directory ===
+<HOSTNAME>
+cwd
+=== chromium: files: listed ===
+sub/
+<TIME>
+flag.png
+88 B
+<TIME>
+notes.txt
+17 B
+<TIME>
+todo.md
+18 B
+<TIME>
+=== chromium: files: a text preview ===
+notes.txt
+17 B
+<TIME>
+1
+2
+3
+4
+one
+2
+three
+four
+=== chromium: files: an image preview ===
+ 24x16
+toast: Uploaded hello.txt
+on the host: "hello\n"
+=== chromium: files: replace? ===
+Replace hello.txt?
+<CWD> already has a hello.txt. Replace it with the one you are uploading (12 B)?
+Skip
+Replace
+replaced: "hello again\n"
+=== chromium: files: a downloaded file ===
+notes.txt
+"one\n2\nthree\nfour\n"
+=== chromium: files: a typed path ===
+sub
+inner.txt
+7 B
+<TIME>
+=== chromium: files: a directory downloaded ===
+sub.tar.gz
+sub/
+sub/inner.txt
+toast: Created made
+toast: Renamed made to renamed
+=== chromium: files: delete? ===
+Delete renamed?
+<CWD>/renamed and everything in it will be deleted from <HOSTNAME>. This cannot be undone.
+Cancel
+Delete
+toast: Deleted renamed
+renamed on the host: false
+=== chromium: files: after the changes ===
+sub/
+<TIME>
+flag.png
+88 B
+<TIME>
+hello.txt
+12 B
+<TIME>
+notes.txt
+17 B
+<TIME>
+todo.md
+18 B
+<TIME>
+=== chromium: files: attachments in the composer ===
+hello.txt
+12 B
+dropped.txt
+13 B
+data.bin
+7 B
+uploads on the host: .gitignore data.bin dropped.txt
+=== chromium: files: sent with the prompt ===
+⌂
+Working directory is now <CWD>
+read these
+@hello.txt
+@.prigh/uploads/dropped.txt
+@.prigh/uploads/data.bin
+<TIME>
+Read the attachments.
+<TIME>
+=== chromium: files: what the model saw ===
+read these
+<file path="hello.txt">
+hello again
+<file path=".prigh/uploads/dropped.txt">
+dropped text
+<file path=".prigh/uploads/data.bin">
+[binary file, 7 bytes: not shown; inspect it with tools]
+=== chromium: files on a phone ===
+sub/
+flag.png
+88 B
+hello.txt
+12 B
+notes.txt
+17 B
+todo.md
+18 B
 === chromium: errors ===
 none
 === chromium: accounts: sessions ===
@@ -1002,6 +1111,115 @@ one more
 <AGE>
 <CWD>/sub
 session files after: 1
+=== firefox: files: the session's directory ===
+<HOSTNAME>
+cwd
+=== firefox: files: listed ===
+sub/
+<TIME>
+flag.png
+88 B
+<TIME>
+notes.txt
+17 B
+<TIME>
+todo.md
+18 B
+<TIME>
+=== firefox: files: a text preview ===
+notes.txt
+17 B
+<TIME>
+1
+2
+3
+4
+one
+2
+three
+four
+=== firefox: files: an image preview ===
+ 24x16
+toast: Uploaded hello.txt
+on the host: "hello\n"
+=== firefox: files: replace? ===
+Replace hello.txt?
+<CWD> already has a hello.txt. Replace it with the one you are uploading (12 B)?
+Skip
+Replace
+replaced: "hello again\n"
+=== firefox: files: a downloaded file ===
+notes.txt
+"one\n2\nthree\nfour\n"
+=== firefox: files: a typed path ===
+sub
+inner.txt
+7 B
+<TIME>
+=== firefox: files: a directory downloaded ===
+sub.tar.gz
+sub/
+sub/inner.txt
+toast: Created made
+toast: Renamed made to renamed
+=== firefox: files: delete? ===
+Delete renamed?
+<CWD>/renamed and everything in it will be deleted from <HOSTNAME>. This cannot be undone.
+Cancel
+Delete
+toast: Deleted renamed
+renamed on the host: false
+=== firefox: files: after the changes ===
+sub/
+<TIME>
+flag.png
+88 B
+<TIME>
+hello.txt
+12 B
+<TIME>
+notes.txt
+17 B
+<TIME>
+todo.md
+18 B
+<TIME>
+=== firefox: files: attachments in the composer ===
+hello.txt
+12 B
+dropped.txt
+13 B
+data.bin
+7 B
+uploads on the host: .gitignore data.bin dropped.txt
+=== firefox: files: sent with the prompt ===
+⌂
+Working directory is now <CWD>
+read these
+@hello.txt
+@.prigh/uploads/dropped.txt
+@.prigh/uploads/data.bin
+<TIME>
+Read the attachments.
+<TIME>
+=== firefox: files: what the model saw ===
+read these
+<file path="hello.txt">
+hello again
+<file path=".prigh/uploads/dropped.txt">
+dropped text
+<file path=".prigh/uploads/data.bin">
+[binary file, 7 bytes: not shown; inspect it with tools]
+=== firefox: files on a phone ===
+sub/
+flag.png
+88 B
+hello.txt
+12 B
+notes.txt
+17 B
+todo.md
+18 B
 === firefox: errors ===
 none
 === firefox: accounts: sessions ===
