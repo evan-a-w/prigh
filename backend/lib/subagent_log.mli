@@ -5,7 +5,13 @@ open! Import
     synchronous subagents nested in them), built from the agent's events:
     status, activity and transcript, so a frontend that joins late (or comes
     back to the session) can show them. Nested subagents' ids are
-    [<parent id>/<call id>]. *)
+    [<parent id>/<call id>].
+
+    Once {!load}ed for a session, it is also appended to that session's
+    [subagents.jsonl] (one JSON line per subagent start, message and end,
+    and per run once the file exists; nothing per streamed delta), so that
+    a later {!load} (the session coming back after eviction or a restart)
+    restores it. Reads always come from memory. *)
 
 module State : sig
   type t =
@@ -66,4 +72,11 @@ val orphan_ends
   -> why:(string -> string)
   -> Agent_event.t list
 
-val clear : t -> unit
+(** Replaces the contents with the log saved in [dir ()] (none if [None] or
+    if it has no log; lines that do not parse are skipped) and from now on
+    appends to it, creating the directory on the first subagent; [dir] is
+    asked on every write, [None] meaning not to write. Subagents saved as
+    running are not running any more (whatever ran them is gone): they load
+    as failed with an [[interrupted]] result, ended at their last recorded
+    activity. *)
+val load : t -> dir:(unit -> string option) -> unit
