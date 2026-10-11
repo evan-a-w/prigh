@@ -142,6 +142,7 @@ module Command = struct
     | Save_notifications of bool
     | Set_title of string
     | Files of Files.Page.t
+    | Save_size of Resize.Save.t
   [@@deriving sexp_of, equal]
 end
 
@@ -305,8 +306,8 @@ module Action = struct
         { key : string
         ; status : Terminal.Status.t
         }
-    | Set_terminal_height of int
     | Files of Files.Action.t
+    | Resize of Resize.Action.t
   [@@deriving sexp_of]
 end
 
@@ -356,8 +357,17 @@ module Model = struct
     ; marks : Session_marks.t
     ; notifications : Page_notify.t
     ; files : Files.t
+    ; layout : Resize.t
     }
   [@@deriving sexp_of]
+
+  let shown t =
+    { Resize.Shown.sidebar = t.sidebar_open
+    ; files = t.files.open_
+    ; agents = t.agents.open_
+    ; narrow = t.narrow
+    }
+  ;;
 
   let running t =
     match t.state with
@@ -442,6 +452,7 @@ let init =
   ; marks = Session_marks.empty
   ; notifications = Page_notify.init
   ; files = Files.closed
+  ; layout = Resize.empty
   }
 ;;
 
@@ -3812,9 +3823,8 @@ let update (m : Model.t) (action : Action.t) =
   | New_shell -> new_shell m
   | Terminal_status { key; status } ->
     with_terminal m ~f:(fun t -> { t with status = Some (key, status) }), []
-  | Set_terminal_height px ->
-    ( with_terminal m ~f:(fun t ->
-        { t with height = Some (Int.max Terminal.min_height px) })
-    , [] )
   | Files action -> with_files m (Files.update m.files action)
+  | Resize action ->
+    let layout, saves = Resize.update m.layout (Model.shown m) action in
+    { m with layout }, List.map saves ~f:(fun s -> Command.Save_size s)
 ;;

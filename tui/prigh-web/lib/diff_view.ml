@@ -89,13 +89,46 @@ let counts rows =
 let unified_counts text = counts (unified_rows text)
 let edits_counts edits = counts (edit_rows edits)
 
-let table ~numbers rows =
+(* Each line's tokens, the old and the new side each carrying its state
+   from line to line (and starting afresh at each hunk). *)
+let highlighted lang rows =
+  let initial = Highlight.State.initial in
+  let _, _, rev =
+    List.fold
+      rows
+      ~init:(initial, initial, [])
+      ~f:(fun (old, new_, acc) (row : Row.t) ->
+        match row with
+        | Hunk _ -> initial, initial, None :: acc
+        | Line { kind; text; _ } ->
+          let tokens state = Highlight.line lang state text in
+          (match kind with
+           | `Same ->
+             let _, old = tokens old in
+             let t, new_ = tokens new_ in
+             old, new_, Some t :: acc
+           | `Added ->
+             let t, new_ = tokens new_ in
+             old, new_, Some t :: acc
+           | `Removed ->
+             let t, old = tokens old in
+             old, new_, Some t :: acc))
+  in
+  List.rev rev
+;;
+
+let table ?lang ~numbers rows =
   let td cls text = Node.td ~attrs:[ Attr.class_ cls ] [ Node.text text ] in
+  let tokens =
+    match lang with
+    | Some lang -> highlighted lang rows
+    | None -> List.map rows ~f:(fun _ -> None)
+  in
   let num = Option.value_map ~default:"" ~f:Int.to_string in
   Node.table
     ~attrs:[ Attr.class_ "diff" ]
     [ Node.tbody
-        (List.map rows ~f:(fun (row : Row.t) ->
+        (List.map2_exn rows tokens ~f:(fun (row : Row.t) tokens ->
            match row with
            | Hunk text ->
              Node.tr
@@ -117,13 +150,20 @@ let table ~numbers rows =
                ((if numbers
                  then [ td "ln" (num old_line); td "ln" (num new_line) ]
                  else [])
-                @ [ td "sign" sign; td "text" text ])))
+                @ [ td "sign" sign
+                  ; (match tokens with
+                     | Some tokens ->
+                       Node.td
+                         ~attrs:[ Attr.class_ "text" ]
+                         (Highlight_view.spans tokens)
+                     | None -> td "text" text)
+                  ])))
     ]
 ;;
 
 let default_max_rows = 8
 
-let view ?(max_rows = default_max_rows) ~fold:(fold, key) ~numbers rows =
+let view ?(max_rows = default_max_rows) ?lang ~fold:(fold, key) ~numbers rows =
   let count = List.length rows in
   let shown, toggle =
     if count <= max_rows + 1
@@ -132,14 +172,14 @@ let view ?(max_rows = default_max_rows) ~fold:(fold, key) ~numbers rows =
       ( (if Fold.expanded fold key then rows else List.take rows max_rows)
       , Fold.button fold key ~total:count ~shown:max_rows )
   in
-  Chat_html.div "diff-view" [ table ~numbers shown; toggle ]
+  Chat_html.div "diff-view" [ table ?lang ~numbers shown; toggle ]
 ;;
 
-let unified ?max_rows ~fold text =
-  view ?max_rows ~fold ~numbers:true (unified_rows text)
+let unified ?max_rows ?lang ~fold text =
+  view ?max_rows ?lang ~fold ~numbers:true (unified_rows text)
 ;;
 
-let hunks ~fold lines =
+let hunks ?lang ~fold lines =
   let rows =
     List.map
       (unified_rows (String.concat ~sep:"\n" lines))
@@ -148,7 +188,7 @@ let hunks ~fold lines =
         | Hunk _ -> row
         | Line l -> Line { l with old_line = None; new_line = None })
   in
-  view ~fold ~numbers:false rows
+  view ?lang ~fold ~numbers:false rows
 ;;
 
-let edits ~fold edits = view ~fold ~numbers:false (edit_rows edits)
+let edits ?lang ~fold edits = view ?lang ~fold ~numbers:false (edit_rows edits)

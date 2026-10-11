@@ -564,6 +564,28 @@ notes.txt
 17 B
 todo.md
 18 B
+=== chromium: resize: a highlighted preview ===
+hl-kw:import hl-meta:@cache hl-kw:def hl-ty:str hl-str:"world" hl-ty:str hl-com:# say hello hl-kw:return hl-str:f"hello {name}" hl-num:2
+=== chromium: resize: the file browser's edge ===
+handles: sidebar 280, files 400, files-split 45
+while dragging: resizing-x; no text selected: true
+dragged 160px left: 400 -> 560 (aria 560), kept 560
+as wide as it goes: 600, the chat keeps 400
+double-clicked: 400, kept null
+arrow keys: 480
+=== chromium: resize: the list over the preview ===
+dragged down: the list taller, over 45%: true
+=== chromium: resize: the sidebar's edge ===
+dragged 80px right: 280 -> 360
+=== chromium: resize: kept after a reload ===
+sidebar 360, files 480
+=== chromium: resize: a narrower window ===
+sidebar 306, files 413, chat 401
+wide again: sidebar 360, files 480
+on a phone: 0 handles
+=== chromium: resize: highlighted code in a reply ===
+hl-kw:let hl-kw:rec hl-kw:if hl-num:2 hl-kw:then hl-kw:else hl-num:1 hl-num:2 hl-com:(* slow *)
+hl-prop:"name" hl-str:"prigh" hl-prop:"ok" hl-con:true hl-prop:"n" hl-num:3
 === chromium: errors ===
 none
 === chromium: accounts: sessions ===
@@ -1220,6 +1242,28 @@ notes.txt
 17 B
 todo.md
 18 B
+=== firefox: resize: a highlighted preview ===
+hl-kw:import hl-meta:@cache hl-kw:def hl-ty:str hl-str:"world" hl-ty:str hl-com:# say hello hl-kw:return hl-str:f"hello {name}" hl-num:2
+=== firefox: resize: the file browser's edge ===
+handles: sidebar 280, files 400, files-split 45
+while dragging: resizing-x; no text selected: true
+dragged 160px left: 400 -> 560 (aria 560), kept 560
+as wide as it goes: 600, the chat keeps 400
+double-clicked: 400, kept null
+arrow keys: 480
+=== firefox: resize: the list over the preview ===
+dragged down: the list taller, over 45%: true
+=== firefox: resize: the sidebar's edge ===
+dragged 80px right: 280 -> 360
+=== firefox: resize: kept after a reload ===
+sidebar 360, files 480
+=== firefox: resize: a narrower window ===
+sidebar 306, files 413, chat 401
+wide again: sidebar 360, files 480
+on a phone: 0 handles
+=== firefox: resize: highlighted code in a reply ===
+hl-kw:let hl-kw:rec hl-kw:if hl-num:2 hl-kw:then hl-kw:else hl-num:1 hl-num:2 hl-com:(* slow *)
+hl-prop:"name" hl-str:"prigh" hl-prop:"ok" hl-con:true hl-prop:"n" hl-num:3
 === firefox: errors ===
 none
 === firefox: accounts: sessions ===

@@ -376,6 +376,32 @@ valid 5 minutes, for that session's host only), then `GET
 streams the bytes, in chunks, to or from the host (uploads up to 2 GB). A
 tool host running an older prigh says to update prigh there.
 
+Every panel resizes from a handle on its inner edge: the sessions
+sidebar's right edge, the file browser's and the agents panel's left
+edge, the terminal's top edge, and the line between the file list and
+its preview. The handle shows as a faint line under the pointer and turns
+sodium while it is dragged or focused; double-click it (or press Enter on
+it) for the default size. It is a focusable separator: Tab to it, then
+the arrow keys move it (Shift: four times as far), Home and End make the
+panel as small or as large as it goes. The chat always keeps 400px: when
+the window narrows, the side panels beside it shrink in proportion (down
+to their minimums) and grow back to the sizes you chose when it widens
+again. The sizes are kept in the browser (`prigh-web.sidebar-width`,
+`files-width`, `files-split`, `agents-width`, `terminal-height` in
+localStorage). On a phone the panels are sheets, without handles.
+
+Code is highlighted: fenced code blocks in replies (by the fence's
+language, also while the reply streams), the file browser's text preview
+(by the file's extension or name) and diffs (edits, patches, `/diff`: the
+code on each line, old and new side each in its own context). It covers
+OCaml, JavaScript/TypeScript, Python, Rust, Go, C/C++ (and Java, C#),
+shell, JSON, YAML, TOML, Markdown (with its fenced code), HTML/XML (with
+script and style), CSS, Nix, SQL, dune/s-expressions and diff, in the
+theme's quiet colours: muted keywords, sage strings, faded comments, a
+little sodium in types and numbers. A preview past 64 KiB is highlighted
+up to there (the rest plain, with a note), so a large file opens without
+a pause.
+
 prigh-web has every slash command of the table below, as pickers and
 dialogs rather than lines in a transcript (a dialog keeps the keyboard
 until Esc closes it: Tab goes round it, the page behind is inert). A
