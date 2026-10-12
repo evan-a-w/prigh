@@ -86,6 +86,11 @@ val tool : t -> string -> Tool.t option
     call without a result while it is not will never get one. *)
 val running : t -> bool
 
+(** As the backend says (its state's [running]): a transcript fetched or
+    cached while the agent was not known to be working. [t] itself when that
+    is what it says. *)
+val set_running : t -> bool -> t
+
 val apply : t -> Event.t -> t
 
 (** Gives the messages of [message_start] and [message_end] events (also a

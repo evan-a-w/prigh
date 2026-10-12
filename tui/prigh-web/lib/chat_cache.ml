@@ -35,17 +35,19 @@ let set t path entry =
 ;;
 
 let add_page t path (page : Message_page.t) ~running =
-  let entry =
-    match find t path with
-    | Some cached when List.equal Message.equal cached.newest page.messages ->
-      cached
-    | Some _ | None ->
+  match find t path with
+  | Some cached when List.equal Message.equal cached.newest page.messages ->
+    set t path cached, cached, `Unchanged
+  | cached ->
+    let entry =
       { Entry.chat = Chat.of_messages ~running page.messages
       ; paging = Paging.of_page page
       ; newest = page.messages
       }
-  in
-  set t path entry, entry
+    in
+    ( set t path entry
+    , entry
+    , if Option.is_some cached then `Changed else `New )
 ;;
 
 let loading t path = Set.mem t.loading path

@@ -27,10 +27,16 @@ val find : t -> string -> Entry.t option
 (** Most recently used first; the least recent goes beyond [capacity]. *)
 val set : t -> string -> Entry.t -> t
 
-(** A newest page from the backend: [Some] the entry to show (the cached one
-    when the page is the same as last time, else a new one), and the cache
-    keeping it. *)
-val add_page : t -> string -> Message_page.t -> running:bool -> t * Entry.t
+(** A newest page from the backend: the cache keeping it, and the entry to
+    show: the cached one when the page is the same as last time
+    ([`Unchanged]), else a new one, of a session that was cached
+    ([`Changed]) or not ([`New]). *)
+val add_page
+  :  t
+  -> string
+  -> Message_page.t
+  -> running:bool
+  -> t * Entry.t * [ `Unchanged | `Changed | `New ]
 
 val remove : t -> string -> t
 

@@ -178,3 +178,37 @@ let%expect_test "browser carets (UTF-16) as byte offsets" =
     20 -> 14 |日本 é😀x|
     |}]
 ;;
+
+(* A retry scheduled before the network came back must not connect again
+   once a newer attempt has (and the user moved on to another session). *)
+let%expect_test "stale reconnect attempts stay put" =
+  let gate = Reconnect_gate.create () in
+  let due generation ~connected =
+    printf
+      "generation %d (%s): %b\n"
+      generation
+      (if connected then "connected" else "closed")
+      (Reconnect_gate.due gate ~generation ~connected)
+  in
+  Reconnect_gate.schedule gate ~generation:1;
+  due 1 ~connected:false;
+  (* Retry now, while generation 1 waits out its backoff. *)
+  Reconnect_gate.schedule gate ~generation:2;
+  due 2 ~connected:false;
+  due 1 ~connected:true;
+  due 1 ~connected:false;
+  Reconnect_gate.schedule gate ~generation:3;
+  due 2 ~connected:false;
+  due 3 ~connected:true;
+  due 3 ~connected:false;
+  [%expect
+    {|
+    generation 1 (closed): true
+    generation 2 (closed): true
+    generation 1 (connected): false
+    generation 1 (closed): false
+    generation 2 (closed): false
+    generation 3 (connected): false
+    generation 3 (closed): true
+    |}]
+;;
