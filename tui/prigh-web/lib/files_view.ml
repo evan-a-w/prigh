@@ -68,10 +68,11 @@ let glyph = Glyph.view
 let files action = Action.Files action
 let size = Session_summary.size_string
 
-let tool ~inject ?(cls = "") ~title ?disabled action icon =
+let tool ~inject ?(cls = "") ~title ?label ?disabled action icon =
   button
     ~cls:("icon ghost files-tool " ^ cls)
     ~title
+    ~label:(Option.value label ~default:title)
     ?disabled
     ~on_click:(inject (files action))
     [ icon ]
@@ -615,6 +616,7 @@ let view (m : App.Model.t) ~inject =
               [ tool
                   ~inject
                   ~title:"Up (Backspace)"
+                  ~label:"Up"
                   ~disabled:
                     (Option.value_map t.listing ~default:true ~f:(fun l ->
                        Option.is_none l.parent))
@@ -637,6 +639,7 @@ let view (m : App.Model.t) ~inject =
               ; button
                   ~cls:"icon ghost files-close"
                   ~title:"Close (Ctrl+Shift+F)"
+                  ~label:"Close files"
                   ~on_click:(inject (files Close))
                   [ icon Close ]
               ]
@@ -657,6 +660,7 @@ let dialog (m : App.Model.t) ~inject =
         ; Attr.class_ "text-input"
         ; Attr.value value
         ; Attr.placeholder placeholder
+        ; Attr.create "aria-label" placeholder
         ; Attr.create "autocomplete" "off"
         ; Attr.create "spellcheck" "false"
         ; Attr.on_input (fun _ text -> inject (files (Ask_input text)))
@@ -765,6 +769,8 @@ let toggle (m : App.Model.t) ~inject =
        then "icon ghost files-toggle open"
        else "icon ghost files-toggle")
     ~title:"Files (Ctrl+Shift+F)"
+    ~label:"Files"
+    ~attrs:[ Attr.create "aria-expanded" (Bool.to_string m.files.open_) ]
     ~on_click:(inject (files Toggle))
     [ glyph Folder ]
 ;;
@@ -813,6 +819,7 @@ let chips (m : App.Model.t) ~inject =
            ; button
                ~cls:"icon ghost attach-chip-remove"
                ~title:(sprintf "Remove %s" a.name)
+               ~label:(sprintf "Remove %s" a.name)
                ~on_click:(inject (files (Remove_attachment i)))
                [ icon Close ]
            ]))
@@ -822,6 +829,7 @@ let attach_button (_ : App.Model.t) ~inject =
   button
     ~cls:"icon ghost attach"
     ~title:"Attach files (or drop them here)"
+    ~label:"Attach files"
     ~on_click:(inject (files (Pick Chat)))
     [ glyph Attach ]
 ;;

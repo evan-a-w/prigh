@@ -469,18 +469,18 @@ let%expect_test
     {|
     (Expire_toast (id 0) (after_ms 2500))
     Compacted
-    Upload failed
+    Upload failed (Dismiss)
     |}];
   H.act h (Dismiss_toast 0);
   H.text h ~selector:".toasts";
-  [%expect {| Upload failed |}];
+  [%expect {| Upload failed (Dismiss) |}];
   List.iter [ "a"; "b"; "c"; "d" ] ~f:(fun text ->
     H.act h (Show_toast { text; error = true }));
   H.text h ~selector:".toasts";
   [%expect
     {|
-    c
-    d
+    c (Dismiss)
+    d (Dismiss)
     |}]
 ;;
 
@@ -596,5 +596,5 @@ let%expect_test "on a phone the agents panel is a sheet with the keyboard" =
     |}];
   H.act h Toggle_subagents;
   inert ();
-  [%expect {| |}]
+  [%expect {| <aside class="sidebar"> |}]
 ;;

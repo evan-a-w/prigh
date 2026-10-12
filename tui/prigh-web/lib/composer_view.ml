@@ -32,14 +32,18 @@ let popup (m : App.Model.t) ~inject =
     in
     div
       ~cls:"popup"
-      ~attrs:[ Attr.role "listbox" ]
       [ div
           ~cls:"popup-title"
           [ Node.text title
-          ; span ~cls:"popup-keys" "↑↓ Tab Enter Esc · Ctrl+Enter as typed"
+          ; span ~cls:"popup-keys" "↑↓ Tab Enter Esc   Ctrl+Enter as typed"
           ]
       ; div
           ~cls:"popup-items"
+          ~attrs:
+            [ Attr.role "listbox"
+            ; Attr.id "completion-list"
+            ; Attr.create "aria-label" title
+            ]
           (List.mapi
              (List.take (Completion.items c) 50)
              ~f:(fun i (item : Picker.Item.t) ->
@@ -52,6 +56,10 @@ let popup (m : App.Model.t) ~inject =
                        ; "marked", item.marked
                        ]
                    ; Attr.role "option"
+                   ; Attr.id (sprintf "completion-option-%d" i)
+                   ; Attr.create
+                       "aria-selected"
+                       (Bool.to_string (i = Completion.selected c))
                    ; Attr.on_mousedown (fun ev ->
                        Js_of_ocaml.Dom.preventDefault ev;
                        inject (Action.Complete_choose i))
@@ -83,6 +91,7 @@ let images (m : App.Model.t) ~inject =
            ; button
                ~cls:"remove-image"
                ~title:"Remove image"
+               ~label:"Remove image"
                ~on_click:(inject (Action.Remove_image i))
                [ icon Close ]
            ]))
@@ -141,6 +150,20 @@ let view (m : App.Model.t) ~inject =
                   [ Attr.class_ "editor"
                   ; Attr.id "editor"
                   ; Attr.placeholder (placeholder m)
+                  ; Attr.create "aria-label" "Message"
+                  ; Attr.create "dir" "auto"
+                  ; (match App.Model.popup m with
+                     | None -> Attr.empty
+                     | Some c ->
+                       Attr.many
+                         [ Attr.role "combobox"
+                         ; Attr.create "aria-controls" "completion-list"
+                         ; Attr.create "aria-expanded" "true"
+                         ; Attr.create "aria-autocomplete" "list"
+                         ; Attr.create
+                             "aria-activedescendant"
+                             (sprintf "completion-option-%d" (Completion.selected c))
+                         ])
                   ; Attr.value m.draft
                   ; Attr.rows 1
                   ; Attr.create "autocomplete" "off"
@@ -162,6 +185,7 @@ let view (m : App.Model.t) ~inject =
                      button
                        ~cls:"stop"
                        ~title:"Stop (Esc)"
+                       ~label:"Stop"
                        ~on_click:(inject Action.Abort)
                        [ icon Stop ]
                    else Node.none)
@@ -170,6 +194,7 @@ let view (m : App.Model.t) ~inject =
                      button
                        ~cls:"primary send busy"
                        ~title:"Sending…"
+                       ~label:"Sending"
                        ~disabled:true
                        ~attrs:[ Attr.create "aria-busy" "true" ]
                        ~on_click:Effect.Ignore
@@ -183,6 +208,7 @@ let view (m : App.Model.t) ~inject =
                           else if running
                           then "Steer (Enter)"
                           else "Send (Enter)")
+                       ~label:(if running then "Steer" else "Send")
                        ~disabled:((not has_input) || not connected)
                        ~on_click:(inject Action.Send)
                        [ icon Send ])

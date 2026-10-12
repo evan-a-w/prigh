@@ -15,7 +15,6 @@ let%expect_test "the thinking chip names the level and opens its picker" =
     (Claude Opus 5.5) (Thinking on) (Auto: never asks)
     <button type="button"
             title="Thinking on: how much the model reasons before it answers (Alt+T cycles, /thinking)"
-            aria-label="Thinking on: how much the model reasons before it answers (Alt+T cycles, /thinking)"
             popovertarget="topbar-controls"
             popovertargetaction="hide"
             class="btn chip-button thinking-chip"
@@ -101,7 +100,7 @@ let%expect_test "a model without thinking says so, and the chip tells why" =
   [%expect
     {|
     Open_thinking_picker
-    DeepSeek Chat has no thinking levels: switch to a model that thinks with /model
+    DeepSeek Chat has no thinking levels: switch to a model that thinks with /model (Dismiss)
     |}]
 ;;
 
@@ -157,7 +156,7 @@ let%expect_test "the top bar: title, cwd and branch, and the controls' menu" =
     <header class="topbar">
       <button type="button"
               title="Sessions (Ctrl+B)"
-              aria-label="Sessions (Ctrl+B)"
+              aria-label="Sessions"
               class="btn ghost icon toggle-sidebar"
               @on_click>
         <icon class="menu"> </icon>
@@ -180,7 +179,7 @@ let%expect_test "the top bar: title, cwd and branch, and the controls' menu" =
       </div>
       <button type="button"
               title="Claude Opus 5.5, thinking on, plan mode"
-              aria-label="Claude Opus 5.5, thinking on, plan mode"
+              aria-label="Model, thinking and approvals"
               popovertarget="topbar-controls"
               class="btn controls-more ghost icon plan-mode"
               @on_click>
@@ -189,7 +188,6 @@ let%expect_test "the top bar: title, cwd and branch, and the controls' menu" =
       <div id="topbar-controls" popover="auto" class="controls">
         <button type="button"
                 title="Claude Opus 5.5: switch model (Ctrl+L)"
-                aria-label="Claude Opus 5.5: switch model (Ctrl+L)"
                 popovertarget="topbar-controls"
                 popovertargetaction="hide"
                 class="btn chip-button model-chip"
@@ -200,7 +198,6 @@ let%expect_test "the top bar: title, cwd and branch, and the controls' menu" =
         </button>
         <button type="button"
                 title="Thinking on: how much the model reasons before it answers (Alt+T cycles, /thinking)"
-                aria-label="Thinking on: how much the model reasons before it answers (Alt+T cycles, /thinking)"
                 popovertarget="topbar-controls"
                 popovertargetaction="hide"
                 class="btn chip-button thinking-chip"
@@ -212,7 +209,6 @@ let%expect_test "the top bar: title, cwd and branch, and the controls' menu" =
         </button>
         <button type="button"
                 title="Read-only planning: no file edits; bash, job_input and MCP tools ask first (Alt+M cycles, /mode picks)"
-                aria-label="Read-only planning: no file edits; bash, job_input and MCP tools ask first (Alt+M cycles, /mode picks)"
                 data-short="plan"
                 popovertarget="topbar-controls"
                 popovertargetaction="hide"
@@ -226,14 +222,16 @@ let%expect_test "the top bar: title, cwd and branch, and the controls' menu" =
       <div class="panel-toggles">
         <button type="button"
                 title="Files (Ctrl+Shift+F)"
-                aria-label="Files (Ctrl+Shift+F)"
+                aria-label="Files"
+                aria-expanded="false"
                 class="btn files-toggle ghost icon"
                 @on_click>
           <icon class="folder"> </icon>
         </button>
         <button type="button"
                 title="Terminal (Ctrl+`)"
-                aria-label="Terminal (Ctrl+`)"
+                aria-label="Terminal"
+                aria-expanded="false"
                 class="btn ghost icon terminal-toggle"
                 @on_click>
           <icon class="terminal"> </icon>

@@ -80,7 +80,7 @@ let%expect_test "/skills: a fuzzy picker; Enter puts /skill:name in the editor" 
   H.text h ~selector:".popup";
   [%expect
     {|
-    Skills ↑↓ Tab Enter Esc · Ctrl+Enter as typed
+    Skills ↑↓ Tab Enter Esc   Ctrl+Enter as typed
     frontend-design Distinctive, production-grade web pages
     release Cut a release: changelog, tag, publish
     |}];
@@ -133,7 +133,7 @@ let%expect_test "/skills with none, and when listing fails" =
                          \n/work") (purpose (Picker "")))))
     (Focus editor)
     No skills here: put one in .prigh/skills/<name>/SKILL.md (or .claude/skills/, .agents/skills/) in the project, or in ~/.prigh/skills/.
-    Couldn't list the skills: unknown method list_skills
+    Couldn't list the skills: unknown method list_skills (Dismiss)
     false
     |}]
 ;;
@@ -144,7 +144,7 @@ let%expect_test "/skill: completes skill names, fetched once" =
   H.text h ~selector:".popup";
   [%expect
     {|
-    Commands ↑↓ Tab Enter Esc · Ctrl+Enter as typed
+    Commands ↑↓ Tab Enter Esc   Ctrl+Enter as typed
     /skills pick a skill to invoke (/skill:name)
     /skill:<name> [args] send a skill's instructions to the agent, with your arguments
     |}];
@@ -167,7 +167,7 @@ let%expect_test "/skill: completes skill names, fetched once" =
   H.text h ~selector:".popup";
   [%expect
     {|
-    Skills ↑↓ Tab Enter Esc · Ctrl+Enter as typed
+    Skills ↑↓ Tab Enter Esc   Ctrl+Enter as typed
     frontend-design Distinctive, production-grade web pages
     |}];
   H.type_ h "/skill:rel";
@@ -238,7 +238,7 @@ let%expect_test "/skill:name while running steers; an unknown skill fails back" 
     (Rpc (method_ prompt) (params ((text "/skill:fronted the pricing page")))
      (tag (Sent (text "/skill:fronted the pricing page") (images ()))))
     ((m.draft "/skill:fronted the pricing page") (m.cursor 31))
-    Couldn't send: unknown skill "fronted"; did you mean: frontend-design (/skills lists them all). Your message is back in the editor.
+    Couldn't send: unknown skill "fronted"; did you mean: frontend-design (/skills lists them all). Your message is back in the editor. (Dismiss)
     |}]
 ;;
 
@@ -536,7 +536,7 @@ let%expect_test "/mcp: servers to act on first, problems below; Enter approves" 
   H.show h ~selector:".picker-item.dimmed";
   [%expect
     {|
-    <div role="option" class="dimmed picker-item" @on_click>
+    <div role="option" id="picker-option-1" aria-selected="false" class="dimmed picker-item" @on_click>
       <span class="picker-label"> web </span>
       <span class="picker-detail"> failed: spawn uvx: not found. Enter restarts it, /home/u/.prigh/mcp.json </span>
       <Vdom.Node.none-widget> </Vdom.Node.none-widget>
@@ -615,7 +615,7 @@ let%expect_test "/mcp: Enter restarts a failed server; failures say what next" =
     (Save_history (/hotkeys /mcp))
     (Focus dialog)
     Restarting the failed MCP servers…
-    web failed: spawn uvx: not found. Fix it in /home/u/.prigh/mcp.json, then /mcp reconnect.
+    web failed: spawn uvx: not found. Fix it in /home/u/.prigh/mcp.json, then /mcp reconnect. (Dismiss)
     (Hotkeys)
     |}];
   H.act h Close_dialog;
@@ -636,7 +636,7 @@ let%expect_test "/mcp: Enter restarts a failed server; failures say what next" =
     (Expire_toast (id 2) (after_ms 2580))
     (Rpc (method_ mcp_approve) (params ((source /work/.mcp.json) (server db)))
      (tag (Mcp (Refreshed /work/.mcp.json#db))))
-    Couldn't start the MCP server: no server "db" in /work/.mcp.json. /mcp reconnect retries.
+    Couldn't start the MCP server: no server "db" in /work/.mcp.json. /mcp reconnect retries. (Dismiss)
     |}]
 ;;
 
@@ -651,7 +651,7 @@ let%expect_test "/mcp reconnect reports; no servers says where to add them" =
     (Expire_toast (id 0) (after_ms 2940))
     (Rpc (method_ list_mcp) (params ((reconnect true))) (tag (Mcp Reconnect)))
     Restarting the failed MCP servers…
-    MCP servers: 1 ready (2 tools), 1 failed (web: spawn uvx: not found), 1 awaiting approval, 1 configuration problem: /mcp shows them
+    MCP servers: 1 ready (2 tools), 1 failed (web: spawn uvx: not found), 1 awaiting approval, 1 configuration problem: /mcp shows them (Dismiss)
     |}];
   let last_toast () = print_endline (List.last_exn (H.model h).toasts).text in
   H.quiet h (fun () ->

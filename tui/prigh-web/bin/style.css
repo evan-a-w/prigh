@@ -10,7 +10,10 @@
   --rule-2: #464d59;
   --chalk: #e3e5e1;
   --muted: #9aa1ab;
-  --faint: #6b727d;
+  /* Quiet text (meta lines, counts, hints): still 4.5:1 on the ground. */
+  --faint: #8a919c;
+  /* Quieter, for what is not read: rules, scrollbars, dots. */
+  --faint-line: #6b727d;
   --sodium: #f0b44c;
   --sodium-ink: #1b1608;
   --sodium-wash: #f0b44c1f;
@@ -79,12 +82,12 @@
   border: 3px solid transparent;
   border-radius: 10px;
 }
-:hover::-webkit-scrollbar-thumb { background-color: var(--faint); }
+:hover::-webkit-scrollbar-thumb { background-color: var(--faint-line); }
 ::-webkit-scrollbar-thumb:hover { background-color: var(--muted); border-width: 2px; }
 ::-webkit-scrollbar-thumb:active { background-color: var(--chalk); border-width: 2px; }
 @supports not selector(::-webkit-scrollbar) {
   * { scrollbar-width: thin; scrollbar-color: var(--rule-2) transparent; }
-  :hover { scrollbar-color: var(--faint) transparent; }
+  :hover { scrollbar-color: var(--faint-line) transparent; }
 }
 @media (forced-colors: active) {
   ::-webkit-scrollbar-thumb { background-color: CanvasText; }
@@ -264,19 +267,35 @@ kbd {
   position: relative;
   display: flex;
   align-items: flex-start;
-  padding: 5px 8px 5px 0;
   border-radius: var(--r-control);
+}
+/* The row's button: all of it but archive and delete. */
+.session-open {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: flex-start;
+  padding: 5px 8px 5px 0;
+  margin: 0;
+  border: 0;
+  border-radius: inherit;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: start;
   cursor: pointer;
 }
 .session:hover { background: var(--slate-2); }
 .session.selected { background: var(--slate-2); box-shadow: inset 2px 0 0 var(--sodium); border-radius: 0 var(--r-control) var(--r-control) 0; }
-.session:focus-visible { outline: 2px solid var(--sodium); outline-offset: -2px; }
+.session-open:focus-visible { outline: 2px solid var(--sodium); outline-offset: -2px; }
 /* The lamp's column, left of the title. */
 .session-mark { width: 20px; height: 21px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; }
-.session .live { width: 5px; height: 5px; border-radius: 50%; border: 1px solid var(--faint); }
+.session .live { width: 5px; height: 5px; border-radius: 50%; border: 1px solid var(--faint-line); }
 .session-main { flex: 1; min-width: 0; display: flex; flex-direction: column; }
 .session-title { min-width: 0; line-height: 21px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .session.selected .session-title { font-weight: 600; }
+/* On the lighter row the faint meta would fall under 4.5:1. */
+.session.selected .session-meta { color: var(--muted); }
 .session-meta { display: flex; gap: 10px; min-width: 0; font: 11.5px/18px var(--mono); color: var(--faint); font-variant-numeric: tabular-nums; }
 .session-age { flex-shrink: 0; white-space: nowrap; }
 .session-cwd { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -361,10 +380,10 @@ kbd {
 .check { width: 14px; height: 14px; flex-shrink: 0; border: 1.5px solid var(--rule-2); border-radius: 3px; display: inline-flex; align-items: center; justify-content: center; }
 .check.on { background: var(--sodium); border-color: var(--sodium); color: var(--sodium-ink); }
 .check .icon { width: 11px; height: 11px; stroke-width: 3; }
-.session > .check { margin: 4px 0 0 8px; animation: check-in 0.16s ease-out; }
+.session-open > .check { margin: 4px 0 0 8px; animation: check-in 0.16s ease-out; }
 @keyframes check-in { from { margin-left: -14px; opacity: 0; } }
 .session.marked { background: var(--sodium-wash); }
-.session[role="checkbox"] { user-select: none; }
+.session-open[role="checkbox"] { user-select: none; }
 .selection-bar {
   display: flex;
   align-items: center;
@@ -716,7 +735,7 @@ kbd {
 .status-item .icon { width: 13px; height: 13px; }
 .status-item.running { color: var(--sodium); gap: 7px; }
 .status-item.idle { color: var(--muted); }
-.idle-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--faint); }
+.idle-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--faint-line); }
 .status-spacer { flex: 1; }
 .meter { width: 40px; height: 3px; border-radius: 0; background: var(--rule); overflow: hidden; }
 .meter-fill { display: block; height: 100%; background: var(--muted); }
@@ -847,8 +866,9 @@ kbd {
   gap: 8px;
 }
 .toast-repeats { font: 11.5px/1.7 var(--mono); color: var(--faint); }
-.toast-close { width: 13px; height: 13px; margin-top: 3px; flex-shrink: 0; color: var(--faint); }
-.toast:hover .toast-close { color: var(--chalk); }
+.toast .btn.icon.toast-close { width: 22px; height: 22px; margin: -1px -6px -1px 0; flex-shrink: 0; color: var(--faint); }
+.toast-close .icon { width: 13px; height: 13px; }
+.toast:hover .toast-close, .toast-close:focus-visible { color: var(--chalk); }
 .toast.error { border-color: var(--brick-line); box-shadow: inset 2px 0 0 var(--brick), var(--float-shadow); color: var(--brick); }
 /* Above the jump-to-the-end button; under the composer's popup. */
 .main:has(.jump-to-bottom) .toasts { bottom: 56px; }

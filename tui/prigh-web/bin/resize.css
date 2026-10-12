@@ -19,7 +19,7 @@
 }
 .resizer[aria-orientation="vertical"]::after { top: 0; bottom: 0; left: 4px; width: 1px; }
 .resizer[aria-orientation="horizontal"]::after { left: 0; right: 0; top: 4px; height: 1px; }
-.resizer:hover::after { background: var(--faint); }
+.resizer:hover::after { background: var(--faint-line); }
 .resizer[aria-orientation="vertical"]:is(:hover, :focus-visible, .dragging)::after { left: 3px; width: 3px; }
 .resizer[aria-orientation="horizontal"]:is(:hover, :focus-visible, .dragging)::after { top: 3px; height: 3px; }
 .resizer:is(:focus-visible, .dragging)::after { background: var(--sodium); }

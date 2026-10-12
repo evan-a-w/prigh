@@ -39,7 +39,6 @@ let%expect_test "the mode chip, Alt+M, and set_mode's reply or failure" =
     {|
     <button type="button"
             title="Tools run without asking (Alt+M cycles, /mode picks)"
-            aria-label="Tools run without asking (Alt+M cycles, /mode picks)"
             data-short="auto"
             popovertarget="topbar-controls"
             popovertargetaction="hide"
@@ -62,7 +61,6 @@ let%expect_test "the mode chip, Alt+M, and set_mode's reply or failure" =
        "Mode: plan (read-only planning: no file edits; bash, job_input and MCP tools ask first)")))
     <button type="button"
             title="Switching to plan…"
-            aria-label="Switching to plan…"
             disabled=""
             aria-busy="true"
             data-short="plan"
@@ -82,7 +80,6 @@ let%expect_test "the mode chip, Alt+M, and set_mode's reply or failure" =
     (Expire_toast (id 0) (after_ms 4980))
     <button type="button"
             title="Read-only planning: no file edits; bash, job_input and MCP tools ask first (Alt+M cycles, /mode picks)"
-            aria-label="Read-only planning: no file edits; bash, job_input and MCP tools ask first (Alt+M cycles, /mode picks)"
             data-short="plan"
             popovertarget="topbar-controls"
             popovertargetaction="hide"
@@ -117,7 +114,7 @@ let%expect_test "the mode chip, Alt+M, and set_mode's reply or failure" =
     (Rpc (method_ get_state) (params ()) (tag State))
     (Plan mode)
     Mode: plan (read-only planning: no file edits; bash, job_input and MCP tools ask first)
-    Couldn't set the mode: no session
+    Couldn't set the mode: no session (Dismiss)
     |}];
   (* Clicking the chip picks the mode: what each asks first. *)
   H.click h ~selector:".mode-chip";
@@ -171,7 +168,7 @@ let%expect_test "/mode NAME, /plan, /confirm" =
   [%expect
     {|
     (Save_history ("/mode bogus"))
-    Unknown mode "bogus": use ask, auto-edit, auto, plan (/mode picks one).
+    Unknown mode "bogus": use ask, auto-edit, auto, plan (/mode picks one). (Dismiss)
     "/mode bogus"
     |}];
   run h "/mode auto";
@@ -214,7 +211,7 @@ let%expect_test "/mode NAME, /plan, /confirm" =
      (tag (Mode_set "Mode: auto (tools run without asking)")))
     (Save_history
      ("/plan maybe" "/plan off" "/plan on" /plan "/mode auto" "/mode bogus"))
-    Unknown argument "maybe": use /plan on, /plan off, or /plan to toggle.
+    Unknown argument "maybe": use /plan on, /plan off, or /plan to toggle. (Dismiss)
     |}];
   (* /confirm sets the default for new sessions, which is this one's too. *)
   run h "/confirm on";
@@ -237,12 +234,12 @@ let%expect_test "/mode NAME, /plan, /confirm" =
   H.text h ~selector:".popup";
   [%expect
     {|
-    Modes ↑↓ Tab Enter Esc · Ctrl+Enter as typed
+    Modes ↑↓ Tab Enter Esc   Ctrl+Enter as typed
     ask bash, job_input, edits and MCP tools ask first
     auto-edit file edits run; bash, job_input and MCP tools ask first
     auto tools run without asking
     plan read-only planning: no file edits; bash, job_input and MCP tools ask first
-    Plan mode ↑↓ Tab Enter Esc · Ctrl+Enter as typed
+    Plan mode ↑↓ Tab Enter Esc   Ctrl+Enter as typed
     on read-only planning until you approve the plan
     off leave plan mode
     |}]
@@ -388,25 +385,37 @@ let%expect_test "a confirmation: allow once, always, deny, deny with a reason" =
     <div class="confirm-answers">
       <button type="button"
               title="y or Enter"
-              aria-label="y or Enter"
+              aria-label="Allow once"
+              aria-keyshortcuts="y"
               class="allow btn confirm-answer primary"
               @on_click>
         <kbd> y </kbd>
         Allow once
       </button>
-      <button type="button" title="a" aria-label="a" class="always btn confirm-answer" @on_click>
+      <button type="button"
+              title="a"
+              aria-label="Always allow bash(make:*) this session"
+              aria-keyshortcuts="a"
+              class="always btn confirm-answer"
+              @on_click>
         <kbd> a </kbd>
         Always allow bash(make:*) this session
       </button>
       <button type="button"
               title="n or Esc"
-              aria-label="n or Esc"
+              aria-label="Deny"
+              aria-keyshortcuts="n"
               class="btn confirm-answer deny"
               @on_click>
         <kbd> n </kbd>
         Deny
       </button>
-      <button type="button" title="r" aria-label="r" class="btn confirm-answer reason" @on_click>
+      <button type="button"
+              title="r"
+              aria-label="Deny, saying why"
+              aria-keyshortcuts="r"
+              class="btn confirm-answer reason"
+              @on_click>
         <kbd> r </kbd>
         Deny, saying why
       </button>
@@ -1204,7 +1213,7 @@ let%expect_test "an answer that fails is asked again" =
     (Rpc (method_ get_pending) (params ()) (tag Pending))
     (Focus confirm)
     Allowed bash
-    Couldn't send your answer: no such confirmation pending yet. It is asked again.
+    Couldn't send your answer: no such confirmation pending yet. It is asked again. (Dismiss)
     Confirm
     (Close (Esc))
     Run bash: make test?

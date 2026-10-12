@@ -132,7 +132,7 @@ let%expect_test "/help <command> and /hotkeys" =
     (Expire_toast (id 1) (after_ms 3820))
     (Save_history ("/help compcat" "/help /tree" "/help compact"))
     /tree: show the session tree and move to any message in it
-    No command /compcat. Did you mean /compact?
+    No command /compcat. Did you mean /compact? (Dismiss)
     |}];
   run h "/hotkeys";
   H.text h ~selector:".modal";
@@ -330,7 +330,7 @@ let%expect_test "/thinking and Alt+T" =
     (Expire_toast (id 2) (after_ms 4620))
     Cycle_thinking
     DeepSeek Chat needs deepseek, which is not logged in: /login deepseek logs in.
-    DeepSeek Chat has no thinking levels: switch to a model that thinks with /model
+    DeepSeek Chat has no thinking levels: switch to a model that thinks with /model (Dismiss)
     |}]
 ;;
 
@@ -413,7 +413,7 @@ let%expect_test "/verbosity and Ctrl+O" =
     (Expire_toast (id 2) (after_ms 3740))
     (Save_history ("/verbosity loud" /verbosity))
     Transcript: verbose, everything unfolded (Ctrl+O cycles)
-    Unknown verbosity "loud": use quiet, normal or verbose.
+    Unknown verbosity "loud": use quiet, normal or verbose. (Dismiss)
     |}];
   H.text h ~selector:".status";
   [%expect
@@ -459,7 +459,7 @@ let%expect_test "/confirm" =
        "Tool confirmation off (mode auto, also for new sessions): tools run without asking")))
     (Save_history ("/confirm maybe" "/confirm off" /confirm))
     Tool confirmation on (mode ask, also for new sessions): bash, job_input, edits and MCP tools ask first
-    Unknown setting "maybe": use on or off.
+    Unknown setting "maybe": use on or off. (Dismiss)
     |}]
 ;;
 
@@ -527,7 +527,7 @@ let%expect_test "/switch" =
   H.text h ~selector:".popup";
   [%expect
     {|
-    Sessions ↑↓ Tab Enter Esc · Ctrl+Enter as typed
+    Sessions ↑↓ Tab Enter Esc   Ctrl+Enter as typed
     Release notes /work
     |}];
   H.key h "Enter";
@@ -711,33 +711,53 @@ let%expect_test "/tree shows branches and moves the head" =
     (Focus dialog)
     (Rpc (method_ get_entries) (params ((all true))) (tag (Entries Tree)))
     (Focus picker-input)
-    <div role="listbox" class="picker-items">
-      <div role="option" class="marked picker-item" @on_click>
+    <div role="listbox" id="picker-list" aria-label="Session tree" class="picker-items">
+      <div role="option"
+           id="picker-option-0"
+           aria-selected="false"
+           aria-checked="true"
+           class="marked picker-item"
+           @on_click>
         <span class="picker-label"> > first question </span>
         <Vdom.Node.none-widget> </Vdom.Node.none-widget>
         <span class="picker-check"> ✓ </span>
       </div>
-      <div role="option" class="marked picker-item" @on_click>
+      <div role="option"
+           id="picker-option-1"
+           aria-selected="false"
+           aria-checked="true"
+           class="marked picker-item"
+           @on_click>
         <span class="picker-label"> · first answer </span>
         <Vdom.Node.none-widget> </Vdom.Node.none-widget>
         <span class="picker-check"> ✓ </span>
       </div>
-      <div role="option" class="picker-item" @on_click>
+      <div role="option" id="picker-option-2" aria-selected="false" class="picker-item" @on_click>
         <span class="picker-label">   > abandoned idea </span>
         <Vdom.Node.none-widget> </Vdom.Node.none-widget>
         <Vdom.Node.none-widget> </Vdom.Node.none-widget>
       </div>
-      <div role="option" class="picker-item" @on_click>
+      <div role="option" id="picker-option-3" aria-selected="false" class="picker-item" @on_click>
         <span class="picker-label">   · abandoned answer </span>
         <Vdom.Node.none-widget> </Vdom.Node.none-widget>
         <Vdom.Node.none-widget> </Vdom.Node.none-widget>
       </div>
-      <div role="option" class="marked picker-item" @on_click>
+      <div role="option"
+           id="picker-option-4"
+           aria-selected="false"
+           aria-checked="true"
+           class="marked picker-item"
+           @on_click>
         <span class="picker-label">   > better idea </span>
         <Vdom.Node.none-widget> </Vdom.Node.none-widget>
         <span class="picker-check"> ✓ </span>
       </div>
-      <div role="option" class="marked picker-item selected" @on_click>
+      <div role="option"
+           id="picker-option-5"
+           aria-selected="true"
+           aria-checked="true"
+           class="marked picker-item selected"
+           @on_click>
         <span class="picker-label">   · better answer </span>
         <Vdom.Node.none-widget> </Vdom.Node.none-widget>
         <span class="picker-check"> ✓ </span>
@@ -938,7 +958,7 @@ let%expect_test "/host: pick a host, then the directory there" =
        (suggestions ()) (selected ()) (error ()) (busy false))))
     (Save_history ("/host mainframe" "/host ci" /host))
     Tools run on laptop (this browser), in /home/me/proj
-    No tool host "mainframe": one of backend, laptop, ci (/host picks one).
+    No tool host "mainframe": one of backend, laptop, ci (/host picks one). (Dismiss)
     |}]
 ;;
 
@@ -1011,7 +1031,7 @@ let%expect_test "/copy and Ctrl+X copy the last reply" =
   [%expect
     {|
     (Save_history (/copy))
-    Nothing to copy yet: no reply in this session.
+    Nothing to copy yet: no reply in this session. (Dismiss)
     |}];
   with_messages h;
   run h "/copy";
@@ -1131,7 +1151,7 @@ let%expect_test "/agents [n|id|cancel <n|id>]: the agents panel" =
   [%expect
     {|
     (Save_history ("/agents cancel 1"))
-    No subagent or job 1: none has run in this session.
+    No subagent or job 1: none has run in this session. (Dismiss)
     (Save_history (/agents "/agents cancel 1"))
     (Rpc (method_ list_subagents) (params ()) (tag Subagents))
     (Rpc (method_ list_jobs) (params ()) (tag Jobs))
@@ -1171,15 +1191,15 @@ let%expect_test "/agents [n|id|cancel <n|id>]: the agents panel" =
       "/agents cancel 1"))
     (Rpc (method_ get_subagent) (params ((id a3) (elide true)))
      (tag (Subagent a3)))
-    Subagent a3 has already finished.
+    Subagent a3 has already finished. (Dismiss)
     (Save_history
      ("/agents cancel 7" "/agents cancel a3" "/agents cancel a1"
       "/agents cancel 2" /agents "/agents cancel 1"))
-    No subagent or job 7: give its number (1-3) or id; /agents lists them.
+    No subagent or job 7: give its number (1-3) or id; /agents lists them. (Dismiss)
     (Save_history
      ("/agents cancel" "/agents cancel 7" "/agents cancel a3" "/agents cancel a1"
       "/agents cancel 2" /agents "/agents cancel 1"))
-    Usage: /agents cancel <n|id> (/agents lists them)
+    Usage: /agents cancel <n|id> (/agents lists them) (Dismiss)
     (Save_history
      ("/agents 2" "/agents cancel" "/agents cancel 7" "/agents cancel a3"
       "/agents cancel a1" "/agents cancel 2" /agents "/agents cancel 1"))
@@ -1206,7 +1226,7 @@ let%expect_test "/jobs [id|kill <id>]: jobs in the agents panel" =
   [%expect
     {|
     (Save_history ("/jobs j1"))
-    No job j1: none has run in this session (!&command starts one).
+    No job j1: none has run in this session (!&command starts one). (Dismiss)
     (Save_history (/jobs "/jobs j1"))
     (Rpc (method_ list_subagents) (params ()) (tag Subagents))
     (Rpc (method_ list_jobs) (params ()) (tag Jobs))
@@ -1247,18 +1267,18 @@ let%expect_test "/jobs [id|kill <id>]: jobs in the agents panel" =
     {|
     (Save_history ("/jobs kill j2" "/jobs kill j1" "/jobs j2" /jobs "/jobs j1"))
     (Rpc (method_ job_output) (params ((job_id j2))) (tag (Job_output j2)))
-    Job j2 has already finished.
+    Job j2 has already finished. (Dismiss)
     (Save_history
      ("/jobs j9" "/jobs kill j2" "/jobs kill j1" "/jobs j2" /jobs "/jobs j1"))
-    No job j9: give its id (j1, j2); /jobs lists them.
+    No job j9: give its id (j1, j2); /jobs lists them. (Dismiss)
     (Save_history
      ("/jobs kill" "/jobs j9" "/jobs kill j2" "/jobs kill j1" "/jobs j2" /jobs
       "/jobs j1"))
-    Usage: /jobs [id | kill <id>] (/jobs lists them)
+    Usage: /jobs [id | kill <id>] (/jobs lists them) (Dismiss)
     (Save_history
      ("/jobs a b" "/jobs kill" "/jobs j9" "/jobs kill j2" "/jobs kill j1"
       "/jobs j2" /jobs "/jobs j1"))
-    Usage: /jobs [id | kill <id>] (/jobs lists them)
+    Usage: /jobs [id | kill <id>] (/jobs lists them) (Dismiss)
     |}]
 ;;
 
@@ -1338,7 +1358,7 @@ let%expect_test "/setusr: a superuser acts as another user, and back" =
     (Rpc (method_ list_users) (params ()) (tag (Users Picker)))
     (Focus editor)
     Back to alice
-    Unauthorised: bob is not a superuser
+    Unauthorised: bob is not a superuser (Dismiss)
     |}]
 ;;
 

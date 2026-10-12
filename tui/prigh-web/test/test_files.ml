@@ -306,7 +306,7 @@ let%expect_test "downloads: a file, and a directory as .tar.gz" =
      (tag (Files Download_link)))
     Packing src as .tar.gz…
     Downloading "README.md"
-    tar exited with 2
+    tar exited with 2 (Dismiss)
     |}]
 ;;
 
@@ -401,7 +401,7 @@ let%expect_test "uploads into the directory, asking before replacing a file" =
   [%expect
     {|
     Uploaded "new.txt"
-    Could not upload README.md: no space left for /home/me/proj/README.md
+    Could not upload README.md: no space left for /home/me/proj/README.md (Dismiss)
     |}];
   H.reply
     h
@@ -568,7 +568,7 @@ let%expect_test "paths into the composer, files attached from the browser" =
   H.act h (Files (Attach "src"));
   H.text h ~selector:".toasts .error";
   [%expect
-    {| src is a directory: attach its files, or insert its path (@) for the agent to look at. |}];
+    {| src is a directory: attach its files, or insert its path (@) for the agent to look at. (Dismiss) |}];
   H.key h "Enter";
   [%expect
     {|
@@ -653,7 +653,7 @@ let%expect_test "files dropped on the composer upload into the chat's uploads" =
     Send
     |}];
   H.text h ~selector:".toasts";
-  [%expect {| Wait for the attachment to upload (or remove it with ×). |}];
+  [%expect {| Wait for the attachment to upload (or remove it with ×). (Dismiss) |}];
   H.act
     h
     (Files

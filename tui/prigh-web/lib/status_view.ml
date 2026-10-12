@@ -197,20 +197,24 @@ let notifications (m : App.Model.t) ~inject =
     then "warm"
     else "off"
   in
-  let label =
+  let label, hint =
     match n.enabled, n.permission with
-    | false, _ -> "Notifications off (/notify on)"
-    | true, Granted -> "Notifications on (/notify off)"
-    | true, Default -> "Notifications not allowed yet: click to ask the browser"
+    | false, _ -> "Notifications off", "Notifications off (/notify on)"
+    | true, Granted -> "Notifications on", "Notifications on (/notify off)"
+    | true, Default ->
+      ( "Notifications not allowed yet"
+      , "Notifications not allowed yet: click to ask the browser" )
     | true, Denied ->
-      "Notifications blocked by the browser: click for how to allow them"
-    | true, Unsupported -> "Notifications need https or localhost"
+      ( "Notifications blocked"
+      , "Notifications blocked by the browser: click for how to allow them" )
+    | true, Unsupported ->
+      "Notifications unavailable", "Notifications need https or localhost"
   in
   Node.button
     ~attrs:
       [ Attr.class_ ("status-item link notify " ^ cls)
       ; Attr.type_ "button"
-      ; Attr.title label
+      ; Attr.title hint
       ; Attr.create "aria-label" label
       ; Attr.on_click (fun _ ->
           inject (Action.Run (if on then "/notify off" else "/notify on")))

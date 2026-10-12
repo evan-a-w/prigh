@@ -221,9 +221,10 @@ let session_key (m : App.Model.t) t id : App.Action.t option =
   match t.key with
   | "ArrowDown" when plain t -> Some (Session_nav { from = Some id; by = 1 })
   | "ArrowUp" when plain t -> Some (Session_nav { from = Some id; by = -1 })
-  | ("Enter" | " ") when m.marks.selecting && not (t.ctrl || t.alt || t.meta) ->
+  (* Space clicks the row's button, as Enter would. *)
+  | "Enter" when m.marks.selecting && not (t.ctrl || t.alt || t.meta) ->
     session (fun s -> App.Action.Mark_session { path = s.path; range = t.shift })
-  | ("Enter" | " ") when plain t ->
+  | "Enter" when plain t ->
     session (fun s -> App.Action.Switch_session s.path)
   | ("Delete" | "Backspace") when plain t ->
     session (fun s -> App.Action.Ask_delete s.path)

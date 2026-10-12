@@ -280,6 +280,8 @@ let%expect_test "a session the backend lost stays on show, read-only" =
     two
     <textarea id="editor"
               placeholder="Session gone: /new starts one"
+              aria-label="Message"
+              dir="auto"
               rows="1"
               autocomplete="off"
               enterkeyhint="send"
@@ -301,7 +303,7 @@ let%expect_test "a session the backend lost stays on show, read-only" =
     one
     second
     two
-    This session is no longer on the backend: start a new one (/new) or pick another in the sidebar. Your message stays here.
+    This session is no longer on the backend: start a new one (/new) or pick another in the sidebar. Your message stays here. (Dismiss)
     still here
     |}];
   (* A new session: the draft goes with it. *)
@@ -434,13 +436,15 @@ let%expect_test "sending while offline keeps the draft" =
     (Reconnect (generation 1) (delay_ms 0) (session (s1)))
     <textarea id="editor"
               placeholder="Offline: write now, send once it is back"
+              aria-label="Message"
+              dir="auto"
               rows="1"
               autocomplete="off"
               enterkeyhint="send"
               class="editor"
               #value="hold on"
               @on_input> </textarea>
-    Not connected to the backend: your message stays here until it is back (/retry-backend-connection tries now).
+    Not connected to the backend: your message stays here until it is back (/retry-backend-connection tries now). (Dismiss)
     hold on
     |}]
 ;;
@@ -668,7 +672,57 @@ let%expect_test "a message sent as the connection went" =
     second
     two
     Reconnected
-    The connection went before your message reached the agent: it is back in the editor.
+    The connection went before your message reached the agent: it is back in the editor. (Dismiss)
     (draft third)
+    |}]
+;;
+
+(* What only the page shows (a [!!command]'s card, which is not in the
+   context) stays where it was when the transcript is merged after
+   reconnecting, and so do the views of the messages after it. *)
+let%expect_test "reconnecting keeps a shell card the backend does not have" =
+  let h = session () in
+  Harness.quiet h (fun () ->
+    Harness.event
+      h
+      {|{"event":"tool_start","call":{"id":"shell-0","name":"shell","arguments":"{\"command\":\"ls\"}"}}|};
+    Harness.event
+      h
+      {|{"event":"message_start","message":{"role":"user","text":"third"}}|});
+  let before = Chat.entries (Harness.model h).chat in
+  Harness.quiet h (fun () ->
+    Harness.act h Backend_closed;
+    Harness.act h (Reply (Reconnect 1, Ok (Jsonaf.of_string "{}")));
+    Harness.reply h "get_state" (Harness.state_json ());
+    Harness.reply
+      h
+      "get_messages_page"
+      (Harness.page
+         (messages
+            [ user "first"
+            ; assistant "one"
+            ; user "second"
+            ; assistant "two"
+            ; user "third"
+            ; assistant "three"
+            ])));
+  let after = Chat.entries (Harness.model h).chat in
+  Harness.text h ~selector:".chat .entries";
+  print_s
+    [%message
+      ""
+        ~same_entries:
+          (List.count (List.zip_exn before (List.take after 6)) ~f:(fun (a, b) ->
+             phys_equal a b)
+           : int)];
+  [%expect {|
+    first
+    one
+    second
+    two
+    bash ls
+    third
+    three
+    (same_entries 6)
     |}]
 ;;

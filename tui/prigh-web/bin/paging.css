@@ -46,7 +46,7 @@
 .output.elided .gap::after {
   content: "";
   flex: 1;
-  border-top: 1px dashed var(--faint);
+  border-top: 1px dashed var(--faint-line);
   opacity: 0.4;
 }
 .output.elided .gap::before { flex: 0 0 12px; }

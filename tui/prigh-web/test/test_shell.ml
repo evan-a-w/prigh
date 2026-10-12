@@ -59,7 +59,7 @@ let%expect_test "!command, !!command and !&command" =
   [%expect
     {|
     (Expire_toast (id 1) (after_ms 3860))
-    Type a command after ! to run it.
+    Type a command after ! to run it. (Dismiss)
     Started job j1: its result reaches the agent when it exits.
     |}];
   (* While the agent works, only a background job can start. *)
@@ -75,6 +75,6 @@ let%expect_test "!command, !!command and !&command" =
     (Save_history (!ls ! "!&make test" !!ls "!echo hi"))
     Scroll_to_bottom
     Started job j1: its result reaches the agent when it exits.
-    Wait for the agent to finish (or Esc to stop it) before running !commands; !&command starts a background job now.
+    Wait for the agent to finish (or Esc to stop it) before running !commands; !&command starts a background job now. (Dismiss)
     |}]
 ;;

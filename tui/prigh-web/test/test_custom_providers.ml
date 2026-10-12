@@ -120,6 +120,7 @@ let%expect_test "/login custom: name, base URL, API style, key; then /model" =
     []
     (Cancel) (Continue)
     <input id="dialog-input"
+           aria-label="Name of the provider (models are then <name>/<model id>; an existing custom provider's name edits it)"
            type="text"
            placeholder="aiproxy"
            autocomplete="off"
@@ -202,6 +203,7 @@ let%expect_test "/login custom: name, base URL, API style, key; then /model" =
     API key for aiproxy (leave empty if the server needs none)
     []
     <input id="dialog-input"
+           aria-label="Secret"
            type="password"
            placeholder=""
            autocomplete="off"
@@ -396,7 +398,7 @@ let%expect_test "custom providers in /auth, /login and /logout: edit and remove"
   [%expect
     {|
     (Focus editor)
-    Providers ↑↓ Tab Enter Esc · Ctrl+Enter as typed
+    Providers ↑↓ Tab Enter Esc   Ctrl+Enter as typed
     Anthropic logged in
     OpenAI
     DeepSeek

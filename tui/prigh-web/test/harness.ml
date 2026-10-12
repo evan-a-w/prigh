@@ -374,6 +374,40 @@ let render node =
 
 let text ?selector t = List.iter (node t ?selector ()) ~f:render
 
+let names ~selector t =
+  let rec inline (node : Node_helpers.t) =
+    match node with
+    | Text s -> [ String.strip s ]
+    | Widget | Element { tag_name = "icon"; _ } -> []
+    | Element e -> List.concat_map e.children ~f:inline
+  in
+  List.iter (node t ~selector ()) ~f:(function
+    | Element e
+      when List.exists e.attributes ~f:(fun (k, v) ->
+             String.equal k "aria-hidden" && String.equal v "true") -> ()
+    | Element e ->
+      let attr name = List.Assoc.find e.attributes ~equal:String.equal name in
+      let text =
+        List.filter (List.concat_map e.children ~f:inline) ~f:(Fn.non String.is_empty)
+        |> String.concat ~sep:" "
+      in
+      let name =
+        match attr "aria-label", text with
+        | Some label, _ -> label
+        | None, "" ->
+          Option.value_map (attr "title") ~default:"(no name)" ~f:(sprintf "(title) %s")
+        | None, text -> text
+      in
+      let title =
+        match attr "title" with
+        | Some title when not (String.equal title name) -> sprintf " -- %s" title
+        | _ -> ""
+      in
+      let role = Option.value_map (attr "role") ~default:"" ~f:(sprintf "[%s] ") in
+      printf "%s%s%s%s\n" role e.tag_name (sprintf " %S" name) title
+    | Text _ | Widget -> ())
+;;
+
 let elements ~selector t =
   List.iter (node t ~selector ()) ~f:(function
     | Element e ->
