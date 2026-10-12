@@ -1062,7 +1062,10 @@ rather than apt or sudo. The system prompt is built once, at a session's
 first run, and recorded in the session so the cached prompt prefix survives
 `/cd`, `/host` and backend restarts; later directory or host changes reach
 the model as a short note on the next message, leaving it to re-read the
-instructions if that seems worthwhile.
+instructions if that seems worthwhile. The session records what the model
+was last told, so the note still comes if you switch to another session,
+reconnect or restart the backend first, and none comes when you changed
+things back.
 
 ### Approvals, plan mode and questions
 
