@@ -49,10 +49,7 @@ val deletable
   -> (P.Session_summary.t list, string) Result.t
 
 (** The archived sessions but the [current] one. *)
-val archived_to_delete
-  :  t
-  -> current:string option
-  -> P.Session_summary.t list
+val archived_to_delete : t -> current:string option -> P.Session_summary.t list
 
 (** [None] when nothing but the [current] session is archived. *)
 val delete_archived_question : t -> current:string option -> string option

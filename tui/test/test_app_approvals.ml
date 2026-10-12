@@ -791,7 +791,8 @@ let%expect_test "long choice descriptions and answers wrap in the question box" 
   H.show h;
   H.keys h "neither: a flat file is enough for this small tool";
   H.show h;
-  [%expect {|
+  [%expect
+    {|
       prigh in /work · /help · Esc aborts · Ctrl+C
       twice quits
 

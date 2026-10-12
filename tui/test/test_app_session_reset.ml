@@ -30,7 +30,11 @@ let question call_id : P.Event.t =
   Ask_user
     { call_id
     ; questions =
-        [ { question = "Proceed?"; header = None; choices = []; multiple = false }
+        [ { question = "Proceed?"
+          ; header = None
+          ; choices = []
+          ; multiple = false
+          }
         ]
     }
 ;;
@@ -276,7 +280,8 @@ let%expect_test
   H.event h (confirm "a1" "make");
   H.event h (question "q1");
   H.show h;
-  [%expect {|
+  [%expect
+    {|
     (Rpc (method_ list_sessions) (params ()) (tag Sessions_picker))
 
 
