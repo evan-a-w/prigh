@@ -1552,7 +1552,8 @@ let duration_hum seconds =
 
 (* Finished background tasks not delivered yet go first. [tried] are the
    models a hand-over chain has used so far (empty for a user's prompt). *)
-let rec start_run ?(tried = String.Set.empty) t prompts =
+let rec start_run ?(tried = String.Set.empty) ?(then_ = fun () -> []) t prompts
+  =
   t.git_branch <- find_branch t ~cwd:t.cwd;
   cancel_resume_timer t;
   let cancel = Cancellation.create () in
@@ -1561,6 +1562,9 @@ let rec start_run ?(tried = String.Set.empty) t prompts =
   let prompts = deliveries t @ prompts in
   state_changed t;
   Fiber.fork ~sw:t.sw (fun () ->
+    (* [then_] may wait for the host (attachments): the run is already
+       marked as started, so no other can start meanwhile. *)
+    let prompts = prompts @ then_ () in
     let session = t.session in
     let finish ~idle =
       t.run <- None;
@@ -2078,12 +2082,11 @@ let prompt ?(attachments = []) ?(images = []) t text =
       then running ()
       else
         Ok
-          (start_run
-             t
+          (start_run t [] ~then_:(fun () ->
              [ user_message
                  t
                  { text; expanded = skill; source = None; attachments; images }
-             ]))
+             ])))
 ;;
 
 let enqueue_queued t queue queued =
@@ -2091,7 +2094,7 @@ let enqueue_queued t queue queued =
   then (
     Queue.enqueue queue queued;
     queue_update t)
-  else start_run t [ user_message t queued ]
+  else start_run t [] ~then_:(fun () -> [ user_message t queued ])
 ;;
 
 let enqueue t queue ?(attachments = []) ?(images = []) text =
