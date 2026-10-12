@@ -1478,8 +1478,10 @@ copy of the protocol types and the e2e test guards the contract.
       at any depth and by the state's `subagents`/`jobs` changing; nested
       ids `<parent>/<call>` make a tree; finished items fold under
       "earlier" at the next prompt; the selection, cancels and kills in
-      flight, a job's polled `job_output`) and `Agents_view` (the list, a
-      subagent in full — its transcript is the one in `Chat`, found by
+      flight, a job's polled `job_output`) and `Agents_view` (the list as
+      a tree of buttons, `aria-keyshortcuts` for Alt+N; outcomes from the
+      report's prefix: `[cancelled]`/`[interrupted]`/a killed job are
+      "stopped", not failed; a subagent in full — its transcript is the one in `Chat`, found by
       agent id at any depth, fetched with `get_subagent` when nested ones
       are missing after a reload — or a job's output; the status line's
       summary and the top bar's toggle). Elapsed times tick with `Clock`,
