@@ -1153,7 +1153,7 @@ With `ask_user` the model asks you one or more questions, each with
 optional choices (one, or several to pick) and room for your own answer. A
 dialog takes the keyboard: ↑/↓ choose, Space picks, typing writes your own
 answer, ←/→ move between questions, Enter answers (the last one sends), Esc
-declines. The first frontend to answer wins and the others' dialogs close;
+declines (the model is told you declined); the box lists these keys. The first frontend to answer wins and the others' dialogs close;
 an unanswered question comes back after a reconnect, and aborting the run
 withdraws it. Subagents cannot ask (nor plan, nor leave plan mode): they
 put open questions in their report for the main agent to ask. Headless

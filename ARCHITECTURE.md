@@ -1300,7 +1300,10 @@ copy of the protocol types and the e2e test guards the contract.
     status line keeps the cwd and model, then fills remaining width by
     priority (mode hint, scroll position, context, queued/agents/jobs and an
     approval mode that asks, then thinking, `mode:auto` and cost, verbosity
-    last; a mode hint too wide to fit whole is cut short after the context)
+    last; a mode hint too wide to fit whole drops its last keys, the least
+    important, after the context has its place; dialogs list the rest of
+    their keys in the box: the sessions picker on its title row, a question
+    under its answer, the reason prompt is typed in its box under the call)
     and left-truncates, so the model key stays visible at narrow widths; the
     verbosity gives way to the cwd before anything else does. It is gray; yellow marks modes, running work and warm
     context, red a full context or a lost backend.

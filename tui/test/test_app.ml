@@ -269,7 +269,7 @@ let%expect_test "/model opens the picker; typing filters; Enter sets the model" 
        GPT-5.5              openai/gpt-5.5  ctx 1.0M  $10/$50 p…
     ▸* DeepSeek V4.1 Flash  deepseek/deepseek-flash ◆  ctx 1.0M…
     ────────────────────────────────────────────────────────────
-    …deepseek-flash  ctx:0.1%/1.0M  Enter selects · Esc closes …
+    …deepseek-flash  ctx:0.1%/1.0M  Enter selects · Esc closes
     |}];
   H.keys h "fable";
   H.show h;
@@ -284,7 +284,7 @@ let%expect_test "/model opens the picker; typing filters; Enter sets the model" 
     ▸  Claude Fable 5    anthropic/claude-fable-5  ctx 1.0M  $1…
        Claude Fable 5.1  anthropic/claude-fable-5-1  ctx 1.0M  …
     ────────────────────────────────────────────────────────────
-    …deepseek-flash  ctx:0.1%/1.0M  Enter selects · Esc closes …
+    …deepseek-flash  ctx:0.1%/1.0M  Enter selects · Esc closes
     |}];
   H.key h (Key.plain Down);
   H.enter h;
@@ -388,7 +388,7 @@ let%expect_test
        GPT-5.5              openai/gpt-5.5  ctx 1.0M  $10/$50 p…
     ▸* DeepSeek V4.1 Flash  deepseek/deepseek-flash ◆  ctx 1.0M…
     ────────────────────────────────────────────────────────────
-    …deepseek-flash  ctx:0.1%/1.0M  Enter selects · Esc closes …
+    …deepseek-flash  ctx:0.1%/1.0M  Enter selects · Esc closes
     |}];
   H.esc h;
   (* A backend rejection (e.g. from another client's catalog) also recovers via
@@ -408,7 +408,7 @@ let%expect_test
        GPT-5.5              openai/gpt-5.5  ctx 1.0M  $10/$50 p…
     ▸* DeepSeek V4.1 Flash  deepseek/deepseek-flash ◆  ctx 1.0M…
     ────────────────────────────────────────────────────────────
-    …deepseek-flash  ctx:0.1%/1.0M  Enter selects · Esc closes …
+    …deepseek-flash  ctx:0.1%/1.0M  Enter selects · Esc closes
     |}]
 ;;
 
@@ -434,7 +434,7 @@ let%expect_test
       on
       high
       max
-    …deepseek-flash  Tab accepts · Enter runs as typed · Esc
+    …deepseek-flash  Tab accepts · Enter as typed · Esc hides
     |}];
   H.esc h;
   H.mode h;
@@ -831,7 +831,7 @@ let%expect_test
       auto-edit
       auto
       plan
-    …deepseek-flash  Tab accepts · Enter runs as typed · Esc
+    …deepseek-flash  Tab accepts · Enter as typed · Esc hides
     |}];
   H.keys h "fab";
   H.show h;
@@ -988,7 +988,7 @@ let%expect_test "/switch fetches sessions then reopens completion" =
     > /switch ▏
     ▸ fix the build please  /work
       (empty)               /other
-    …deepseek-flash  Tab accepts · Enter runs as typed · Esc
+    …deepseek-flash  Tab accepts · Enter as typed · Esc hides
     |}]
 ;;
 
@@ -1132,12 +1132,12 @@ let%expect_test "/sessions picker switches and reloads; /logout confirms" =
 
     ▌ earlier question
       earlier answer
-    Sessions  (2)
+    Sessions  (2)  Alt+A (un)archives · Alt+D deletes archived
     / ▏
     ▸* build fix ∣ 2025-06-01T10:00 ∣ 12 msgs ∣ fix the build p…
        (unnamed) ∣ 2025-06-02T11:30 ∣ 0 msgs ∣ (empty)  /other
     ────────────────────────────────────────────────────────────
-    …deepseek-flash  ctx:0.1%/1.0M  Enter switches · Tab marks …
+    …deepseek-flash  ctx:0.1%/1.0M  Enter switches · Tab marks
     |}];
   H.key h (Key.plain Down);
   H.enter h;
@@ -1324,11 +1324,11 @@ let%expect_test "/sessions Ctrl+N filters named only; Ctrl+D confirms delete" =
 
     ▌ earlier question
       earlier answer
-    Sessions (named)  (1)
+    Sessions (named)  (1)  Alt+A (un)archives
     / ▏
     ▸* build fix ∣ 2025-06-01T10:00 ∣ 12 msgs ∣ fix the build p…
     ────────────────────────────────────────────────────────────
-    …deepseek-flash  ctx:0.1%/1.0M  Enter switches · Tab marks …
+    …deepseek-flash  ctx:0.1%/1.0M  Enter switches · Tab marks
     |}];
   H.key h (Key.ctrl 'n');
   (* Not the session we are in. *)
@@ -1375,11 +1375,11 @@ let%expect_test "/sessions Ctrl+N filters named only; Ctrl+D confirms delete" =
       session "build fix" is the session you are in: switch to
       another one first, or leave it out
       Deleted 1 session (0 B)
-    Sessions  (1)
+    Sessions  (1)  Alt+A (un)archives · Alt+D deletes archived
     / ▏
     ▸* build fix ∣ 2025-06-01T10:00 ∣ 12 msgs ∣ fix the build p…
     ────────────────────────────────────────────────────────────
-    …deepseek-flash  ctx:0.1%/1.0M  Enter switches · Tab marks …
+    …deepseek-flash  ctx:0.1%/1.0M  Enter switches · Tab marks
     |}];
   H.esc h;
   H.mode h;
@@ -1428,7 +1428,7 @@ let%expect_test
 
     ▌ earlier question
       earlier answer
-    Sessions  (5)
+    Sessions  (5)  Alt+A (un)archives · Alt+D deletes archived · Ctrl+N named
     / ▏
     ▸* ● build fix ∣ 2025-06-05T10:00 ∣ 12 msgs ∣ fix the build  /work
        ▶ deploy ∣ 2025-06-03T10:00 ∣ 6 msgs ∣ 2 in background ∣ deploy it  /work
@@ -1437,7 +1437,7 @@ let%expect_test
        (unnamed) ∣ 2025-06-04T10:00 ∣ 4 msgs ∣ try a spike  /old
        old spike ∣ 2025-04-02T10:00 ∣ 2 msgs ∣ another spike  /old
     ────────────────────────────────────────────────────────────────────────────────────────────────────
-    …deepseek-flash  ctx:0.1%/1.0M  Enter switches · Tab marks · Ctrl+D deletes · Alt+A (un)archives · …
+    …deepseek-flash  think:off  ctx:0.1%/1.0M  Enter switches · Tab marks · Ctrl+D deletes · Esc closes
     |}];
   picker_rows h;
   [%expect
@@ -1460,13 +1460,13 @@ let%expect_test
 
     ▌ earlier question
       earlier answer
-    Sessions  (2)
+    Sessions  (2)  Alt+A (un)archives · Alt+D deletes archived · Ctrl+N named
     / spike▏
       ── archived ──
     ▸  (unnamed) ∣ 2025-06-04T10:00 ∣ 4 msgs ∣ try a spike  /old
        old spike ∣ 2025-04-02T10:00 ∣ 2 msgs ∣ another spike  /old
     ────────────────────────────────────────────────────────────────────────────────────────────────────
-    …deepseek-flash  ctx:0.1%/1.0M  Enter switches · Tab marks · Ctrl+D deletes · Alt+A (un)archives · …
+    …deepseek-flash  think:off  ctx:0.1%/1.0M  Enter switches · Tab marks · Ctrl+D deletes · Esc closes
     |}]
 ;;
 
@@ -1487,7 +1487,7 @@ let%expect_test
 
     ▌ earlier question
       earlier answer
-    Sessions  (5)
+    Sessions  (5)  Alt+A (un)archives · Alt+D deletes archived · Ctrl+N named
     / ▏
      ✓ ● build fix ∣ 2025-06-05T10:00 ∣ 12 msgs ∣ fix the build  /work
      ✓ ▶ deploy ∣ 2025-06-03T10:00 ∣ 6 msgs ∣ 2 in background ∣ deploy it  /work
@@ -1496,7 +1496,7 @@ let%expect_test
        (unnamed) ∣ 2025-06-04T10:00 ∣ 4 msgs ∣ try a spike  /old
        old spike ∣ 2025-04-02T10:00 ∣ 2 msgs ∣ another spike  /old
     ────────────────────────────────────────────────────────────────────────────────────────────────────
-    …deepseek-flash  ctx:0.1%/1.0M  2 marked (6.0 KB) · Enter switches · Tab marks · Ctrl+D deletes · A…
+    …deepseek-flash  $0.01  2 marked (6.0 KB) · Enter switches · Tab marks · Ctrl+D deletes · Esc closes
     |}];
   (* Tab again unmarks. *)
   H.key h (Key.plain Up);
@@ -1511,7 +1511,7 @@ let%expect_test
 
     ▌ earlier question
       earlier answer
-    Sessions  (5)
+    Sessions  (5)  Alt+A (un)archives · Alt+D deletes archived · Ctrl+N named
     / ▏
      ✓ ● build fix ∣ 2025-06-05T10:00 ∣ 12 msgs ∣ fix the build  /work
        ▶ deploy ∣ 2025-06-03T10:00 ∣ 6 msgs ∣ 2 in background ∣ deploy it  /work
@@ -1520,7 +1520,7 @@ let%expect_test
        (unnamed) ∣ 2025-06-04T10:00 ∣ 4 msgs ∣ try a spike  /old
     ▸✓ old spike ∣ 2025-04-02T10:00 ∣ 2 msgs ∣ another spike  /old
     ────────────────────────────────────────────────────────────────────────────────────────────────────
-    …deepseek-flash  ctx:0.1%/1.0M  2 marked (1.0 MB) · Enter switches · Tab marks · Ctrl+D deletes · A…
+    …deepseek-flash  $0.01  2 marked (1.0 MB) · Enter switches · Tab marks · Ctrl+D deletes · Esc closes
     |}];
   (* Not the session we are in: it says so, the picker stays, Tab unmarks
      it. *)
@@ -1538,7 +1538,7 @@ let%expect_test
     ▌ earlier question
       earlier answer
       session "build fix" is the session you are in: switch to another one first, or leave it out
-    Sessions  (5)
+    Sessions  (5)  Alt+A (un)archives · Alt+D deletes archived · Ctrl+N named
     / ▏
      ✓ ● build fix ∣ 2025-06-05T10:00 ∣ 12 msgs ∣ fix the build  /work
        ▶ deploy ∣ 2025-06-03T10:00 ∣ 6 msgs ∣ 2 in background ∣ deploy it  /work
@@ -1547,7 +1547,7 @@ let%expect_test
        (unnamed) ∣ 2025-06-04T10:00 ∣ 4 msgs ∣ try a spike  /old
     ▸✓ old spike ∣ 2025-04-02T10:00 ∣ 2 msgs ∣ another spike  /old
     ────────────────────────────────────────────────────────────────────────────────────────────────────
-    …deepseek-flash  ctx:0.1%/1.0M  2 marked (1.0 MB) · Enter switches · Tab marks · Ctrl+D deletes · A…
+    …deepseek-flash  $0.01  2 marked (1.0 MB) · Enter switches · Tab marks · Ctrl+D deletes · Esc closes
 
 
 
@@ -1574,7 +1574,7 @@ let%expect_test
     ▌ earlier question
       earlier answer
       session "build fix" is the session you are in: switch to another one first, or leave it out
-    Sessions  (5)
+    Sessions  (5)  Alt+A (un)archives · Alt+D deletes archived · Ctrl+N named
     / ▏
      * ● build fix ∣ 2025-06-05T10:00 ∣ 12 msgs ∣ fix the build  /work
      ✓ ▶ deploy ∣ 2025-06-03T10:00 ∣ 6 msgs ∣ 2 in background ∣ deploy it  /work
@@ -1583,7 +1583,7 @@ let%expect_test
        (unnamed) ∣ 2025-06-04T10:00 ∣ 4 msgs ∣ try a spike  /old
      ✓ old spike ∣ 2025-04-02T10:00 ∣ 2 msgs ∣ another spike  /old
     ────────────────────────────────────────────────────────────────────────────────────────────────────
-    …deepseek-flash  ctx:0.1%/1.0M  2 marked (1.0 MB) · Enter switches · Tab marks · Ctrl+D deletes · A…
+    …deepseek-flash  $0.01  2 marked (1.0 MB) · Enter switches · Tab marks · Ctrl+D deletes · Esc closes
     |}];
   H.key h (Key.ctrl 'd');
   H.enter h;
@@ -1602,7 +1602,7 @@ let%expect_test
     ▌ earlier question
       earlier answer
       session "build fix" is the session you are in: switch to another one first, or leave it out
-    Sessions  (5)
+    Sessions  (5)  Alt+A (un)archives · Alt+D deletes archived · Ctrl+N named
     / ▏
      * ● build fix ∣ 2025-06-05T10:00 ∣ 12 msgs ∣ fix the build  /work
      ✓ ▶ deploy ∣ 2025-06-03T10:00 ∣ 6 msgs ∣ 2 in background ∣ deploy it  /work
@@ -1611,7 +1611,7 @@ let%expect_test
        (unnamed) ∣ 2025-06-04T10:00 ∣ 4 msgs ∣ try a spike  /old
      ✓ old spike ∣ 2025-04-02T10:00 ∣ 2 msgs ∣ another spike  /old
     ────────────────────────────────────────────────────────────────────────────────────────────────────
-    …deepseek-flash  ctx:0.1%/1.0M  2 marked (1.0 MB) · Enter switches · Tab marks · Ctrl+D deletes · A…
+    …deepseek-flash  $0.01  2 marked (1.0 MB) · Enter switches · Tab marks · Ctrl+D deletes · Esc closes
     |}];
   H.reply
     h
@@ -1627,7 +1627,7 @@ let%expect_test
       session "build fix" is the session you are in: switch to another one first, or leave it out
       Deleted 1 session (1.0 MB)
       Not deleted: session "deploy" is running: wait for it, or switch to it and /abort
-    Sessions  (4)
+    Sessions  (4)  Alt+A (un)archives · Alt+D deletes archived · Ctrl+N named
     / ▏
      * ● build fix ∣ 2025-06-05T10:00 ∣ 12 msgs ∣ fix the build  /work
      ✓ ▶ deploy ∣ 2025-06-03T10:00 ∣ 6 msgs ∣ 2 in background ∣ deploy it  /work
@@ -1635,7 +1635,7 @@ let%expect_test
       ── archived ──
        (unnamed) ∣ 2025-06-04T10:00 ∣ 4 msgs ∣ try a spike  /old
     ────────────────────────────────────────────────────────────────────────────────────────────────────
-    …deepseek-flash  ctx:0.1%/1.0M  1 marked (4.0 KB) · Enter switches · Tab marks · Ctrl+D deletes · A…
+    …deepseek-flash  $0.01  1 marked (4.0 KB) · Enter switches · Tab marks · Ctrl+D deletes · Esc closes
     |}];
   (* Without marks Ctrl+D deletes the highlighted session. *)
   H.key h (Key.plain Up);
@@ -1692,7 +1692,7 @@ let%expect_test
     ▌ earlier question
       earlier answer
       session "deploy" is running: wait for it, or switch to it and /abort, before archiving
-    Sessions  (5)
+    Sessions  (5)  Alt+A (un)archives · Alt+D deletes archived · Ctrl+N named
     / ▏
      * ● build fix ∣ 2025-06-05T10:00 ∣ 12 msgs ∣ fix the build  /work
        ▶ deploy ∣ 2025-06-03T10:00 ∣ 6 msgs ∣ 2 in background ∣ deploy it  /work
@@ -1701,7 +1701,7 @@ let%expect_test
        old spike ∣ 2025-04-02T10:00 ∣ 2 msgs ∣ another spike  /old
        (unnamed) ∣ 2025-06-01T10:00 ∣ 0 msgs ∣ (empty)     /tmp
     ────────────────────────────────────────────────────────────────────────────────────────────────────
-    …deepseek-flash  ctx:0.1%/1.0M  Enter switches · Tab marks · Ctrl+D deletes · Alt+A (un)archives · …
+    …deepseek-flash  think:off  ctx:0.1%/1.0M  Enter switches · Tab marks · Ctrl+D deletes · Esc closes
     |}];
   H.reply_error
     h
@@ -1718,7 +1718,7 @@ let%expect_test
       earlier answer
       session "deploy" is running: wait for it, or switch to it and /abort, before archiving
       no such session "/s/5.jsonl"
-    Sessions  (5)
+    Sessions  (5)  Alt+A (un)archives · Alt+D deletes archived · Ctrl+N named
     / ▏
      * ● build fix ∣ 2025-06-05T10:00 ∣ 12 msgs ∣ fix the build  /work
        ▶ deploy ∣ 2025-06-03T10:00 ∣ 6 msgs ∣ 2 in background ∣ deploy it  /work
@@ -1727,7 +1727,7 @@ let%expect_test
     ▸  (unnamed) ∣ 2025-06-04T10:00 ∣ 4 msgs ∣ try a spike  /old
        old spike ∣ 2025-04-02T10:00 ∣ 2 msgs ∣ another spike  /old
     ────────────────────────────────────────────────────────────────────────────────────────────────────
-    …deepseek-flash  ctx:0.1%/1.0M  Enter switches · Tab marks · Ctrl+D deletes · Alt+A (un)archives · …
+    …deepseek-flash  think:off  ctx:0.1%/1.0M  Enter switches · Tab marks · Ctrl+D deletes · Esc closes
     |}];
   (* An archived one comes back among the active. *)
   H.key h (Key.plain End);
@@ -1754,7 +1754,7 @@ let%expect_test
       session "deploy" is running: wait for it, or switch to it and /abort, before archiving
       no such session "/s/5.jsonl"
       unarchived session "old spike"
-    Sessions  (5)
+    Sessions  (5)  Alt+A (un)archives · Alt+D deletes archived · Ctrl+N named
     / ▏
      * ● build fix ∣ 2025-06-05T10:00 ∣ 12 msgs ∣ fix the build  /work
        ▶ deploy ∣ 2025-06-03T10:00 ∣ 6 msgs ∣ 2 in background ∣ deploy it  /work
@@ -1763,7 +1763,7 @@ let%expect_test
       ── archived ──
     ▸  (unnamed) ∣ 2025-06-04T10:00 ∣ 4 msgs ∣ try a spike  /old
     ────────────────────────────────────────────────────────────────────────────────────────────────────
-    …deepseek-flash  ctx:0.1%/1.0M  Enter switches · Tab marks · Ctrl+D deletes · Alt+A (un)archives · …
+    …deepseek-flash  think:off  ctx:0.1%/1.0M  Enter switches · Tab marks · Ctrl+D deletes · Esc closes
     |}]
 ;;
 
@@ -1892,7 +1892,7 @@ let%expect_test "/archive and /unarchive: the current session, or one named" =
     > /unarchive ▏
     ▸ try a spike  archived · /old
       old spike    archived · another spike · /old
-    …deepseek-flash  Tab accepts · Enter runs as typed · Esc
+    …deepseek-flash  Tab accepts · Enter as typed · Esc hides
     |}];
   H.key h (Key.ctrl 'u');
   run h "/unarchive old spike";
@@ -2103,7 +2103,7 @@ let%expect_test "/delete completes session after session" =
     ▸ (empty)      /tmp
       try a spike  archived · /old
       old spike    archived · another spike · /old
-    …deepseek-flash  think:off  mode:auto  ctx:0.1%/1.0M  $0.01  Tab accepts · Enter runs as typed · Esc
+    …deepseek-flash  think:off  mode:auto  ctx:0.1%/1.0M  Tab accepts · Enter as typed · Esc hides
     |}]
 ;;
 
@@ -2138,7 +2138,7 @@ let%expect_test
 
     ▌ earlier question
       earlier answer
-    Sessions  (5)
+    Sessions  (5)  Alt+A (un)archives · Alt+D deletes archived · Ctrl+N named
     / d▏
      ✓ ▶ deploy ∣ 2025-06-03T10:00 ∣ 6 msgs ∣ 2 in background ∣ deploy it  /work
     ▸  (unnamed) ∣ 2025-06-01T10:00 ∣ 0 msgs ∣ (empty)     /tmp
@@ -2147,7 +2147,7 @@ let%expect_test
        (unnamed) ∣ 2025-06-04T10:00 ∣ 4 msgs ∣ try a spike  /old
        old spike ∣ 2025-04-02T10:00 ∣ 2 msgs ∣ another spike  /old
     ────────────────────────────────────────────────────────────────────────────────────────────────────
-    …deepseek-flash  ctx:0.1%/1.0M  1 marked (4.0 KB) · Enter switches · Tab marks · Ctrl+D deletes · A…
+    …deepseek-flash  $0.01  1 marked (4.0 KB) · Enter switches · Tab marks · Ctrl+D deletes · Esc closes
     |}];
   H.event h Sessions_changed;
   [%expect
@@ -2171,7 +2171,7 @@ let%expect_test
 
     ▌ earlier question
       earlier answer
-    Sessions  (5)
+    Sessions  (5)  Alt+A (un)archives · Alt+D deletes archived · Ctrl+N named
     / d▏
      ✓ ● deploy ∣ 2025-06-03T10:00 ∣ 6 msgs ∣ deploy it    /work
        dev ∣ 2025-06-06T10:00 ∣ 1 msgs ∣ something new     /work
@@ -2180,7 +2180,7 @@ let%expect_test
       ── archived ──
        old spike ∣ 2025-04-02T10:00 ∣ 2 msgs ∣ another spike  /old
     ────────────────────────────────────────────────────────────────────────────────────────────────────
-    …deepseek-flash  ctx:0.1%/1.0M  1 marked (4.0 KB) · Enter switches · Tab marks · Ctrl+D deletes · A…
+    …deepseek-flash  $0.01  1 marked (4.0 KB) · Enter switches · Tab marks · Ctrl+D deletes · Esc closes
     |}]
 ;;
 
@@ -2852,7 +2852,7 @@ let%expect_test "/verbosity with no argument opens argument completion" =
     ▸ Quiet
       Normal
       Verbose
-    …deepseek-flash  Tab accepts · Enter runs as typed · Esc
+    …deepseek-flash  Tab accepts · Enter as typed · Esc hides
     |}];
   H.key h (Key.plain Down);
   H.key h (Key.plain Down);
@@ -4651,7 +4651,7 @@ let%expect_test "Ctrl+Z suspends; Ctrl+R completes a path; Ctrl+L picks a model"
        GPT-5.5              openai/gpt-5.5  ctx 1.0M  $10/$50 p…
     ▸* DeepSeek V4.1 Flash  deepseek/deepseek-flash ◆  ctx 1.0M…
     ────────────────────────────────────────────────────────────
-    …deepseek-flash  ctx:0.1%/1.0M  Enter selects · Esc closes …
+    …deepseek-flash  ctx:0.1%/1.0M  Enter selects · Esc closes
     |}]
 ;;
 
@@ -4735,7 +4735,7 @@ let%expect_test "/scoped-models: multi-select toggle, Ctrl+A, Ctrl+X, save" =
      [ ] GPT-5.5              GPT-5.5
      [x] DeepSeek V4.1 Flash  DeepSeek V4.1 Flash
     ────────────────────────────────────────────────────────────
-    …deepseek-flash  ctx:0.1%/1.0M  Space toggle · Ctrl+A all ·…
+    …deepseek-flash  ctx:0.1%/1.0M  Space toggle · Ctrl+A all
     |}];
   H.keys h " ";
   H.show h;
@@ -4752,7 +4752,7 @@ let%expect_test "/scoped-models: multi-select toggle, Ctrl+A, Ctrl+X, save" =
      [ ] GPT-5.5              GPT-5.5
      [x] DeepSeek V4.1 Flash  DeepSeek V4.1 Flash
     ────────────────────────────────────────────────────────────
-    …deepseek-flash  ctx:0.1%/1.0M  Space toggle · Ctrl+A all ·…
+    …deepseek-flash  ctx:0.1%/1.0M  Space toggle · Ctrl+A all
     |}];
   H.key h (Key.ctrl 'a');
   H.show h;
@@ -4769,7 +4769,7 @@ let%expect_test "/scoped-models: multi-select toggle, Ctrl+A, Ctrl+X, save" =
      [x] GPT-5.5              GPT-5.5
      [x] DeepSeek V4.1 Flash  DeepSeek V4.1 Flash
     ────────────────────────────────────────────────────────────
-    …deepseek-flash  ctx:0.1%/1.0M  Space toggle · Ctrl+A all ·…
+    …deepseek-flash  ctx:0.1%/1.0M  Space toggle · Ctrl+A all
     |}];
   H.key h (Key.ctrl 'x');
   H.show h;
@@ -4786,7 +4786,7 @@ let%expect_test "/scoped-models: multi-select toggle, Ctrl+A, Ctrl+X, save" =
      [ ] GPT-5.5              GPT-5.5
      [ ] DeepSeek V4.1 Flash  DeepSeek V4.1 Flash
     ────────────────────────────────────────────────────────────
-    …deepseek-flash  ctx:0.1%/1.0M  Space toggle · Ctrl+A all ·…
+    …deepseek-flash  ctx:0.1%/1.0M  Space toggle · Ctrl+A all
     |}];
   H.key h (Key.ctrl 'a');
   H.enter h;
@@ -5082,7 +5082,7 @@ let%expect_test "/model Ctrl+N filters to logged-in models; scoped mark" =
        GPT-5.5              openai/gpt-5.5  ctx 1.0M  $10/$50 p…
     ▸* DeepSeek V4.1 Flash  deepseek/deepseek-flash  ctx 1.0M  …
     ────────────────────────────────────────────────────────────
-    …deepseek-flash  ctx:0.1%/1.0M  Enter selects · Esc closes …
+    …deepseek-flash  ctx:0.1%/1.0M  Enter selects · Esc closes
     |}];
   H.key h (Key.ctrl 'n');
   H.show h;
@@ -5096,7 +5096,7 @@ let%expect_test "/model Ctrl+N filters to logged-in models; scoped mark" =
     / ▏
     ▸* DeepSeek V4.1 Flash  deepseek/deepseek-flash  ctx 1.0M  …
     ────────────────────────────────────────────────────────────
-    …deepseek-flash  ctx:0.1%/1.0M  Enter selects · Esc closes …
+    …deepseek-flash  ctx:0.1%/1.0M  Enter selects · Esc closes
     |}]
 ;;
 
@@ -5898,12 +5898,12 @@ let%expect_test "resize keeps the confirm dialog and picker within the width" =
 
     ▌ earlier question
       earlier answer
-    Sessions  (2)
+    Sessions  (2)  Alt+A (un)archives · Alt+D deletes archived · Ctrl+N named
     / ▏
     ▸* build fix ∣ 2025-06-01T10:00 ∣ 12 msgs ∣ fix the build please  /work
        (unnamed) ∣ 2025-06-02T11:30 ∣ 0 msgs ∣ (empty)               /other
     ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
-    …deepseek-flash  ctx:0.1%/1.0M  Enter switches · Tab marks · Ctrl+D deletes · Alt+A (un)archives · Alt+D deletes archiv…
+    …deepseek-flash  think:off  mode:auto  ctx:0.1%/1.0M  $0.01  Enter switches · Tab marks · Ctrl+D deletes · Esc closes
     |}];
   H.step h (Resize { width = 40; height = 16 });
   H.show h;
@@ -5914,7 +5914,7 @@ let%expect_test "resize keeps the confirm dialog and picker within the width" =
 
     ▌ earlier question
       earlier answer
-    Sessions  (2)
+    Sessions  (2)  Alt+A (un)archives
     / ▏
     ▸* build fix ∣ 2025-06-01T10:00 ∣ 12 ms…
        (unnamed) ∣ 2025-06-02T11:30 ∣ 0 msg…
@@ -7082,7 +7082,7 @@ let%expect_test
       Claude Fable 5.1     anthropic/claude-fable-5-1
       GPT-5.5              openai/gpt-5.5
       DeepSeek V4.1 Flash  deepseek/deepseek-flash
-    …deepseek-flash  Tab accepts · Enter runs as typed · Esc
+    …deepseek-flash  Tab accepts · Enter as typed · Esc hides
     |}];
   (* Nothing typed, nothing chosen: Enter runs /model, which is the picker. *)
   H.enter h;
@@ -7102,7 +7102,7 @@ let%expect_test
        GPT-5.5              openai/gpt-5.5  ctx 1.0M  $10/$50 p…
     ▸* DeepSeek V4.1 Flash  deepseek/deepseek-flash ◆  ctx 1.0M…
     ────────────────────────────────────────────────────────────
-    …deepseek-flash  ctx:0.1%/1.0M  Enter selects · Esc closes …
+    …deepseek-flash  ctx:0.1%/1.0M  Enter selects · Esc closes
     |}];
   H.esc h;
   (* Down means the highlight was chosen on purpose. *)
@@ -7177,7 +7177,7 @@ let%expect_test
     ────────────────────────────────────────────────────────────
     > /cd ▏
     ▸ src/
-    …deepseek-flash  Tab accepts · Enter runs as typed · Esc
+    …deepseek-flash  Tab accepts · Enter as typed · Esc hides
     |}];
   H.enter h;
   H.mode h;
@@ -7241,7 +7241,7 @@ let%expect_test "the scoped mark only appears when the scope is a real subset" =
        GPT-5.5              openai/gpt-5.5  ctx 1.0M  $10/$50 p…
     ▸* DeepSeek V4.1 Flash  deepseek/deepseek-flash ◆  ctx 1.0M…
     ────────────────────────────────────────────────────────────
-    …deepseek-flash  ctx:0.1%/1.0M  Enter selects · Esc closes …
+    …deepseek-flash  ctx:0.1%/1.0M  Enter selects · Esc closes
     |}];
   H.esc h;
   (* Nobody logged in: every model is in scope, so no row is marked. *)
@@ -7261,7 +7261,7 @@ let%expect_test "the scoped mark only appears when the scope is a real subset" =
        GPT-5.5              openai/gpt-5.5  ctx 1.0M  $10/$50 p…
     ▸* DeepSeek V4.1 Flash  deepseek/deepseek-flash  ctx 1.0M  …
     ────────────────────────────────────────────────────────────
-    …deepseek-flash  ctx:0.1%/1.0M  Enter selects · Esc closes …
+    …deepseek-flash  ctx:0.1%/1.0M  Enter selects · Esc closes
     |}]
 ;;
 
@@ -8122,7 +8122,7 @@ let%expect_test
     / ▏
     ▸  gpt-4o  aiproxy/gpt-4o  ctx 128k  price unknown
     ────────────────────────────────────────────────────────────
-    …deepseek-flash  ctx:0.1%/1.0M  Enter selects · Esc closes …
+    …deepseek-flash  ctx:0.1%/1.0M  Enter selects · Esc closes
     |}]
 ;;
 
@@ -8268,7 +8268,7 @@ let%expect_test "a mode hint that does not fit is cut short, not hidden" =
   let h = connected ~width:50 () in
   H.event h (State (state ~running:true ()));
   print_endline (Content.Line.to_plain (Render.status h.model));
-  [%expect {| …deepseek-flash  ctx:0.1%/1.0M  ⠋ working · Esc a… |}]
+  [%expect {| …deepseek-flash  ctx:0.1%/1.0M  ⠋ working |}]
 ;;
 
 let%expect_test
