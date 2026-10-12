@@ -266,7 +266,7 @@ let%expect_test "completion offers the keywords, but not over a goal's text" =
     ────────────────────────────────────────────────────────────────────────────────────────────────────
     > /goal re▏
     ▸ resume  make a stopped goal active again
-    /work  deepseek-flash  think:off  mode:auto  ctx:0.1%/1.0M  $0.01  Tab/Enter accept · Esc close
+    /work  deepseek-flash  think:off  mode:auto  ctx:0.1%/1.0M  $0.01  Tab/Enter accept · Alt+S as typed
 
 
 
@@ -296,6 +296,6 @@ let%expect_test "completion offers the keywords, but not over a goal's text" =
     ────────────────────────────────────────────────────────────────────────────────────────────────────
     > /budget o▏
     ▸ off  no budget: turns start whatever the session has cost
-    /work  deepseek-flash  think:off  mode:auto  ctx:0.1%/1.0M  $0.01  Tab/Enter accept · Esc close
+    /work  deepseek-flash  think:off  mode:auto  ctx:0.1%/1.0M  $0.01  Tab/Enter accept · Alt+S as typed
     |}]
 ;;

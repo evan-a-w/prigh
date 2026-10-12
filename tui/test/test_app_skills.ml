@@ -196,7 +196,7 @@ let%expect_test "/skill: completes skill names, fetched once per session" =
     > /sk▏
     ▸ /skills             pick a skill to run (Enter puts /skil…
       /skill:NAME [args]  run a skill, with what follows as its…
-    …deepseek-flash  ctx:0.1%/1.0M  Tab/Enter accept · Esc close
+    …deepseek-flash  $0.01  Tab/Enter accept · Alt+S as typed
     |}];
   (* Accepting [/skill:] goes straight on to the skill names. *)
   H.key h (Key.plain Down);
@@ -246,7 +246,7 @@ let%expect_test "/skill: completes skill names, fetched once per session" =
     ────────────────────────────────────────────────────────────
     > /skill:fr▏
     ▸ frontend-design  Build distinctive, production-grade UIs
-    …deepseek-flash  ctx:0.1%/1.0M  Tab/Enter accept · Esc close
+    …deepseek-flash  $0.01  Tab/Enter accept · Alt+S as typed
     |}];
   H.key h (Key.plain Tab);
   H.keys h "make it bold";

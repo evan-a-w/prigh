@@ -540,3 +540,16 @@ prints the captured panes.
   ────────────────────────────────────────────────────────────────────────────────────────────────────
   >
   $TMP/cwd  claude-fable-5-1  think:on  mode:auto  view:normal  ctx:0.0%/1.0M  $0.00
+  $ bash ./harness.sh send_raw
+  === the popup highlights a directory
+    prigh in $TMP/cwd · /help · Esc aborts · Ctrl+C twice quits
+  ────────────────────────────────────────────────────────────────────────────────────────────────────
+  > /cd $TMP/cwd/sub/
+  ▸ $TMP/cwd/sub/deeper/
+  …deepseek-flash  think:on  mode:auto  ctx:0.0%/1.0M  $0.00  Tab/Enter accept · Alt+S as typed
+  === Alt+S: /cd to what was typed
+    prigh in $TMP/cwd · /help · Esc aborts · Ctrl+C twice quits
+    cwd changed
+  ────────────────────────────────────────────────────────────────────────────────────────────────────
+  >
+  $TMP/cwd/sub  deepseek-flash  think:on  mode:auto  ctx:0.0%/1.0M  $0.00

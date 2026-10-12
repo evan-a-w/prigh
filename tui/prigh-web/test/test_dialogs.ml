@@ -140,6 +140,7 @@ let%expect_test "help lists every key and command" =
     (Focus dialog)
     Keys
     Enter send; while running, steer the agent
+    Ctrl+Enter / ⌘+Enter send exactly what is typed, ignoring the completion popup
     Alt+Enter queue a follow-up for after the run
     Shift+Enter new line
     Esc stop the run; close a dialog, popup or side answer
