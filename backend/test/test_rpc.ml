@@ -181,7 +181,7 @@ let%expect_test "prompt emits events, get_messages/get_entries reflect the run" 
   [%expect
     {|
     {"type":"response","id":"r1","ok":true,"result":[{"role":"user","text":"what is here?","at":<at>},{"role":"assistant","content":[{"type":"text","text":"Looking."},{"type":"tool_call","id":"c1","name":"ls","arguments":"{}"}],"stop_reason":{"type":"tool_use"},"usage":{"input":20,"output":8,"cache_read":5},"model":"deepseek-flash","at":<at>},{"role":"tool_result","tool_call_id":"c1","tool_name":"ls","text":"sessions/\n","is_error":false,"at":<at>},{"role":"assistant","content":[{"type":"text","text":"Empty."}],"stop_reason":{"type":"end_turn"},"usage":{"input":10,"output":5,"cache_read":0},"model":"deepseek-flash","at":<at>}]}
-    {"type":"response","id":"r1","ok":true,"result":{"head":"<id>","entries":[{"id":"<id>","parent":null,"at":<at>,"kind":"system_prompt"},{"id":"<id>","parent":"<id>","at":<at>,"kind":"message","message":{"role":"user","text":"what is here?"}},{"id":"<id>","parent":"<id>","at":<at>,"kind":"message","message":{"role":"assistant","content":[{"type":"text","text":"Looking."},{"type":"tool_call","id":"c1","name":"ls","arguments":"{}"}],"stop_reason":{"type":"tool_use"},"usage":{"input":20,"output":8,"cache_read":5},"model":"deepseek-flash"}},{"id":"<id>","parent":"<id>","at":<at>,"kind":"message","message":{"role":"tool_result","tool_call_id":"c1","tool_name":"ls","text":"sessions/\n","is_error":false}},{"id":"<id>","parent":"<id>","at":<at>,"kind":"message","message":{"role":"assistant","content":[{"type":"text","text":"Empty."}],"stop_reason":{"type":"end_turn"},"usage":{"input":10,"output":5,"cache_read":0},"model":"deepseek-flash"}}]}}
+    {"type":"response","id":"r1","ok":true,"result":{"head":"<id>","entries":[{"id":"<id>","parent":null,"at":<at>,"kind":"system_prompt"},{"id":"<id>","parent":"<id>","at":<at>,"kind":"told_environment"},{"id":"<id>","parent":"<id>","at":<at>,"kind":"message","message":{"role":"user","text":"what is here?"}},{"id":"<id>","parent":"<id>","at":<at>,"kind":"message","message":{"role":"assistant","content":[{"type":"text","text":"Looking."},{"type":"tool_call","id":"c1","name":"ls","arguments":"{}"}],"stop_reason":{"type":"tool_use"},"usage":{"input":20,"output":8,"cache_read":5},"model":"deepseek-flash"}},{"id":"<id>","parent":"<id>","at":<at>,"kind":"message","message":{"role":"tool_result","tool_call_id":"c1","tool_name":"ls","text":"sessions/\n","is_error":false}},{"id":"<id>","parent":"<id>","at":<at>,"kind":"message","message":{"role":"assistant","content":[{"type":"text","text":"Empty."}],"stop_reason":{"type":"end_turn"},"usage":{"input":10,"output":5,"cache_read":0},"model":"deepseek-flash"}}]}}
     |}]
 ;;
 
@@ -275,6 +275,7 @@ let%expect_test "message times: in message events, get_messages and get_entries"
   [%expect
     {|
     entry system_prompt: at true
+    entry told_environment: at true
     entry message: at true
     entry message: at true
     |}]

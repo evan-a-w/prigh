@@ -8,7 +8,7 @@ open! Core
 
 module Note : sig
   (** Prefixed to the next user message when something changed between turns
-      ([Agent.add_environment_note]). *)
+      ([Told_environment.notes]). *)
   module Kind : sig
     type t =
       | Host of { name : string }

@@ -43,6 +43,7 @@ module Entry = struct
           ; cost_usd : float
           }
       | Resume_at of { at : float option }
+      | Told_environment of Told_environment.t
     [@@deriving sexp, jsonaf]
   end
 
@@ -146,7 +147,8 @@ let worth_saving (line : Line.t) =
           | Allow_rule _
           | Archived _
           | Spend _
-          | Resume_at _ )
+          | Resume_at _
+          | Told_environment _ )
       ; _
       }
   | Header _ | Head _ -> false
@@ -266,7 +268,8 @@ let add_entry t (entry : Entry.t) =
   | Allow_rule _
   | Archived _
   | Spend _
-  | Resume_at _ -> ()
+  | Resume_at _
+  | Told_environment _ -> ()
 ;;
 
 let read_lines path =
@@ -333,6 +336,7 @@ let set_approval t ~mode ~plan = append t (Approval { mode; plan })
 let add_allow_rule t ~rule = append t (Allow_rule { rule })
 let set_archived t ~archived = append t (Archived { archived })
 let add_spend t ~usage ~cost_usd = append t (Spend { usage; cost_usd })
+let set_told_environment t told = append t (Told_environment told)
 
 let spend t =
   List.fold
@@ -373,7 +377,8 @@ let name t =
     | Allow_rule _
     | Archived _
     | Spend _
-    | Resume_at _ -> None)
+    | Resume_at _
+    | Told_environment _ -> None)
 ;;
 
 let description t =
@@ -392,7 +397,8 @@ let description t =
     | Allow_rule _
     | Archived _
     | Spend _
-    | Resume_at _ -> None)
+    | Resume_at _
+    | Told_environment _ -> None)
 ;;
 
 let append_compaction ?pinned t ~summary ~kept_from =
@@ -412,6 +418,13 @@ let approval t =
   List.fold (active_path t) ~init:None ~f:(fun acc (e : Entry.t) ->
     match e.payload with
     | Approval { mode; plan } -> Some (mode, plan)
+    | _ -> acc)
+;;
+
+let told_environment t =
+  List.fold (active_path t) ~init:None ~f:(fun acc (e : Entry.t) ->
+    match e.payload with
+    | Told_environment told -> Some told
     | _ -> acc)
 ;;
 
@@ -457,7 +470,8 @@ let context t =
       | Allow_rule _
       | Archived _
       | Spend _
-      | Resume_at _ -> acc)
+      | Resume_at _
+      | Told_environment _ -> acc)
   in
   let messages entries =
     List.filter_map entries ~f:(fun (e : Entry.t) ->
@@ -475,7 +489,8 @@ let context t =
       | Allow_rule _
       | Archived _
       | Spend _
-      | Resume_at _ -> None)
+      | Resume_at _
+      | Told_environment _ -> None)
   in
   match compaction with
   | None -> messages path
@@ -515,7 +530,8 @@ let system_prompt t =
     | Allow_rule _
     | Archived _
     | Spend _
-    | Resume_at _ -> acc)
+    | Resume_at _
+    | Told_environment _ -> acc)
 ;;
 
 let goal t =
@@ -534,7 +550,8 @@ let goal t =
     | Allow_rule _
     | Archived _
     | Spend _
-    | Resume_at _ -> acc)
+    | Resume_at _
+    | Told_environment _ -> acc)
 ;;
 
 let budget t =
@@ -553,7 +570,8 @@ let budget t =
     | Allow_rule _
     | Archived _
     | Spend _
-    | Resume_at _ -> acc)
+    | Resume_at _
+    | Told_environment _ -> acc)
 ;;
 
 let model t =
@@ -572,7 +590,8 @@ let model t =
     | Allow_rule _
     | Archived _
     | Spend _
-    | Resume_at _ -> acc)
+    | Resume_at _
+    | Told_environment _ -> acc)
 ;;
 
 let rewind t ~to_ =
@@ -712,7 +731,8 @@ let archived_and_activity t ~mtime =
         | Approval _
         | Allow_rule _
         | Spend _
-        | Resume_at _ -> last_message, marker)
+        | Resume_at _
+        | Told_environment _ -> last_message, marker)
   in
   let activity = Option.value (Option.join last_message_at) ~default:mtime in
   let activity =
@@ -977,7 +997,8 @@ let to_markdown t =
     | Allow_rule _
     | Archived _
     | Spend _
-    | Resume_at _ -> None
+    | Resume_at _
+    | Told_environment _ -> None
   in
   let blocks = List.filter_map (active_path t) ~f:block in
   String.concat (("# Session " ^ t.id) :: blocks) ~sep:"\n\n" ^ "\n"

@@ -160,6 +160,7 @@ let%expect_test
     messages before: 2
     ["Header",{"id":"<id>","cwd":"$DIR","created_at":"<time>"}]
     ["Entry",{"id":"<id>","parent":null,"at":<at>,"payload":["System_promp
+    ["Entry",{"id":"<id>","parent":"<id>","at":<at>,"payload":["Told_envir
     ["Entry",{"id":"<id>","parent":"<id>","at":<at>,"payload":["Message",[
     ["Entry",{"id":"<id>","parent":"<id>","at":<at>,"payload":["Message",[
     {"type":"response","id":"r1","ok":true,"result":{"btw_id":"btw-1","text":"It said hello.","usage":{"input":100,"output":10,"cache_read":0},"cost_usd":4.2e-05}}
