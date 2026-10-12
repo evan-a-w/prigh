@@ -118,6 +118,9 @@ module Reply_tag = struct
     (** the session's messages after reconnecting, [from] the first one on
         show *)
     | Resync_pending
+    | Answer
+    (** to a confirmation or a question: asked again when it does not
+        reach the agent *)
     | Session_gone of
         { generation : int
         ; session : string
@@ -2726,7 +2729,11 @@ let answer_confirm (m : Model.t) ~call_id ~agent_id answer ~reason =
       toast m (String.capitalize (Confirm_prompt.acknowledgement c answer))
     in
     ( m
-    , [ rpc "tool_confirm_respond" (Confirm_prompt.params c answer ~reason) ]
+    , [ rpc
+          "tool_confirm_respond"
+          (Confirm_prompt.params c answer ~reason)
+          ~tag:Answer
+      ]
       @ focus
       @ toast_cmds )
 ;;
@@ -2746,7 +2753,10 @@ let question (m : Model.t) (action : Question_dialog.Action.t) =
        let m = { m with questions = rest } in
        let m, toast_cmds = toast m "Answered" in
        ( m
-       , [ rpc "ask_user_respond" (Question_dialog.answer_params q answers)
+       , [ rpc
+             "ask_user_respond"
+             (Question_dialog.answer_params q answers)
+             ~tag:Answer
          ; focus_waiting m
          ]
          @ toast_cmds )
@@ -2756,7 +2766,10 @@ let question (m : Model.t) (action : Question_dialog.Action.t) =
          toast m "Declined to answer: the model goes on without one"
        in
        ( m
-       , [ rpc "ask_user_respond" (Question_dialog.decline_params q)
+       , [ rpc
+             "ask_user_respond"
+             (Question_dialog.decline_params q)
+             ~tag:Answer
          ; focus_waiting m
          ]
          @ toast_cmds ))
@@ -2910,6 +2923,47 @@ let start_commands (m : Model.t) =
   (if m.narrow then [] else [ focus_editor ]) @ startup @ probe
 ;;
 
+(* The state of a session clicked before the one being opened (A, then B
+   and C at once: B's arrives first). *)
+let superseded (m : Model.t) (state : State.t) =
+  match m.pending.session with
+  | Some (Switching path) ->
+    not (String.equal path state.session_path || is_current m state.session_path)
+  | Some Starting | None -> false
+;;
+
+(* The user's messages on show that start with [text] (the backend adds
+   the attached files after it). *)
+let user_messages chat text =
+  List.count (Chat.entries chat) ~f:(function
+    | User u -> String.is_prefix u.text ~prefix:text
+    | Assistant _ | Notice _ | Shell _ | Compaction _ -> false)
+;;
+
+(* Back after the connection went while sending: what did not reach the
+   agent comes back to the editor. *)
+let restore_unsure (m : Model.t) ~delivered =
+  let lost =
+    List.filter m.pending.unsure ~f:(fun u -> not (delivered u))
+    |> List.map ~f:(fun (u : In_flight.Unsure.t) -> u.prompt)
+  in
+  let m = { m with pending = { m.pending with unsure = [] } } in
+  match lost with
+  | [] -> m, []
+  | { text; images } :: _ ->
+    if String.is_empty m.draft && List.is_empty m.images
+    then
+      error
+        (set_draft { m with images } text)
+        "The connection went before your message reached the agent: it is \
+         back in the editor."
+    else
+      error
+        m
+        "The connection went before your message reached the agent: ↑ brings \
+         it back."
+;;
+
 (* Back in touch with the backend. Nothing on show is rebuilt: the session's
    messages are fetched again and merged into the transcript (which keeps its
    place), the rest is asked for again. *)
@@ -2950,15 +3004,32 @@ module Rejoin = struct
      as well. *)
   let gone (m : Model.t) json ~session =
     let m = connected m json in
+    let m, restored = restore_unsure m ~delivered:(fun _ -> false) in
     if List.is_empty (Chat.entries m.chat)
-    then { m with state = None }, start_commands m
+    then { m with state = None }, restored @ start_commands m
     else
-      ( { m with session_gone = Some session }
-      , [ rpc "list_models" [] ~tag:Models
-        ; rpc "auth_status" [] ~tag:(Auth_status Refresh)
-        ; rpc "get_config" [] ~tag:Config
-        ; rpc "list_sessions" [] ~tag:Sessions
-        ] )
+      (* Nothing of it is live any more: what it waited for, queued, ran. *)
+      ( { m with
+          session_gone = Some session
+        ; state =
+            Option.map m.state ~f:(fun s ->
+              { s with running = false; subagents = []; jobs = [] })
+        ; chat = Chat.set_running m.chat false
+        ; confirms = []
+        ; confirm_reason = None
+        ; questions = []
+        ; queue = Queued.empty
+        ; dialog = Option.filter m.dialog ~f:(Fn.non Dialog.per_session)
+        ; btw = None
+        ; agents = { Agents.empty with open_ = m.agents.open_ }
+        ; pending = { m.pending with prompts = []; sending = 0 }
+        }
+      , restored
+        @ [ rpc "list_models" [] ~tag:Models
+          ; rpc "auth_status" [] ~tag:(Auth_status Refresh)
+          ; rpc "get_config" [] ~tag:Config
+          ; rpc "list_sessions" [] ~tag:Sessions
+          ] )
   ;;
 
   (* The network is back or the page is on show again: try now (the backoff
@@ -2980,6 +3051,9 @@ module Rejoin = struct
         ] )
   ;;
 end
+
+(* The backend's word for a page cursor no longer in the session. *)
+let gone_from_session = "is not in the session any more"
 
 let rec reply_to (m : Model.t) (tag : Reply_tag.t) result =
   match tag, result with
@@ -3039,6 +3113,12 @@ let rec reply_to (m : Model.t) (tag : Reply_tag.t) result =
          { m with chat_cache = Chat_cache.remove m.chat_cache path }
          path
      | None -> m, [])
+  (* It is still waiting: shown again, from what the backend waits for. *)
+  | Answer, Error e when not (String.equal e "backend closed") ->
+    let m, cmds =
+      error m (sprintf "Couldn't send your answer: %s. It is asked again." e)
+    in
+    m, cmds @ [ rpc "get_pending" [] ~tag:Pending ]
   | Resync_pending, Ok json ->
     decode m json Pending.of_json ~f:(fun pending ->
       (* The backend's word on each confirmation (e.g. the rules to always
@@ -3058,19 +3138,30 @@ let rec reply_to (m : Model.t) (tag : Reply_tag.t) result =
           m.confirm_reason
         | _ -> None
       in
-      add_waiting
-        { m with
-          confirms
-        ; questions
-        ; confirm_reason
-        ; queue =
-            Queued.update
-              Queued.empty
-              ~steer:pending.steer_texts
-              ~follow_up:pending.follow_up_texts
-        }
-        ~confirms:pending.confirms
-        ~questions:pending.questions)
+      let m, restored =
+        restore_unsure m ~delivered:(fun u ->
+          user_messages m.chat u.prompt.text > u.seen
+          || List.mem
+               (pending.steer_texts @ pending.follow_up_texts)
+               u.prompt.text
+               ~equal:String.equal)
+      in
+      let m, cmds =
+        add_waiting
+          { m with
+            confirms
+          ; questions
+          ; confirm_reason
+          ; queue =
+              Queued.update
+                Queued.empty
+                ~steer:pending.steer_texts
+                ~follow_up:pending.follow_up_texts
+          }
+          ~confirms:pending.confirms
+          ~questions:pending.questions
+      in
+      m, restored @ cmds)
   (* Subagents from before the backend restarted are gone: the report stays. *)
   | ( ( Ignore | Paths _
       | Auth_status Refresh
@@ -3153,6 +3244,17 @@ let rec reply_to (m : Model.t) (tag : Reply_tag.t) result =
              diff.root
              (Prigh_ui.Diff_files.against diff))
       else open_dialog m (Diff diff))
+  | Sent { text; images }, Error "backend closed" ->
+    let prompt = { In_flight.Prompt.text; images } in
+    let pending = In_flight.answered m.pending ~failed:(Some prompt) in
+    ( { m with
+        pending =
+          { pending with
+            unsure =
+              pending.unsure @ [ { prompt; seen = user_messages m.chat text } ]
+          }
+      }
+    , [] )
   | Sent { text; images }, Error e ->
     let m =
       { m with
@@ -3169,10 +3271,14 @@ let rec reply_to (m : Model.t) (tag : Reply_tag.t) result =
         (set_draft { m with images } text)
         (sprintf "Couldn't send: %s. Your message is back in the editor." e)
     else error m (sprintf "Couldn't send: %s. ↑ brings your message back." e)
+  (* The backend may be on a session clicked before: its state says. *)
   | Reload_state, Error e ->
-    error
-      { m with pending = { m.pending with session = None } }
-      (sprintf "Couldn't open the session: %s" e)
+    let m, cmds =
+      error
+        { m with pending = { m.pending with session = None } }
+        (sprintf "Couldn't open the session: %s" e)
+    in
+    m, cmds @ [ rpc "get_state" [] ~tag:State ]
   (* Lost with the connection: the reconnect's [Resync] brings the messages
      (and older pages are asked for again on scrolling up). *)
   | Page { path; before = None }, Error "backend closed" ->
@@ -3193,6 +3299,23 @@ let rec reply_to (m : Model.t) (tag : Reply_tag.t) result =
             again."
            e)
     else prefetch_next m
+  (* Compacted since: what is on show is not in the session any more, its
+     newest page (after the summary) replaces it. *)
+  | Page { path; before = Some _ }, Error e
+    when is_current m path && String.is_substring e ~substring:gone_from_session
+    ->
+    let m, fetch =
+      fetch_newest
+        { m with
+          paging = { m.paging with loading = false }
+        ; chat_cache = Chat_cache.remove m.chat_cache path
+        }
+        path
+    in
+    let m, toast_cmds =
+      toast m "Earlier messages were compacted: showing the session from its summary"
+    in
+    m, fetch @ toast_cmds
   | Page { path; before = Some _ }, Error e when is_current m path ->
     error
       { m with paging = { m.paging with loading = false } }
@@ -3220,16 +3343,15 @@ let rec reply_to (m : Model.t) (tag : Reply_tag.t) result =
   | Model_set, Ok _ -> { m with pending = { m.pending with model = None } }, []
   | Thinking_set, Ok _ ->
     { m with pending = { m.pending with thinking = None } }, []
-  | (Ignore | Show_error | Login_started), Ok _ -> m, []
+  | (Ignore | Show_error | Login_started | Answer), Ok _ -> m, []
   | Notice text, Ok _ -> toast m text
   (* The state we asked for, also after switching session: what is shown
      next is up to date. *)
   | State, Ok json ->
-    decode
-      m
-      json
-      State.of_json
-      ~f:(set_state { m with pending = { m.pending with session = None } })
+    decode m json State.of_json ~f:(fun state ->
+      if superseded m state
+      then m, []
+      else set_state { m with pending = { m.pending with session = None } } state)
   (* The backend answers a change of session with the new state; an older
      one only with [{}]. *)
   | Reload_state, Ok json ->
@@ -3239,7 +3361,11 @@ let rec reply_to (m : Model.t) (tag : Reply_tag.t) result =
          m
          state
          State.of_json
-         ~f:(set_state { m with pending = { m.pending with session = None } })
+         ~f:(fun state ->
+           if superseded m state
+           then m, []
+           else
+             set_state { m with pending = { m.pending with session = None } } state)
      | None -> m, [ rpc "get_state" [] ~tag:State ])
   | Page { path; before = None }, Ok json ->
     decode m json Message_page.of_json ~f:(newest_page m path)
@@ -3586,6 +3712,7 @@ let auth_event (m : Model.t) (e : Auth_event.t) =
 
 let main_event (m : Model.t) (event : Event.t) =
   match event with
+  | State state when superseded m state -> m, []
   | State state -> set_state m state
   | Notice text -> toast m text
   | Queue_update { steer; follow_up } ->

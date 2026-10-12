@@ -14,6 +14,9 @@ val keep_position : unit -> unit
 (** Whether older messages are left to load. *)
 val more : unit -> bool
 
+(** Whether older messages (or the session's first page) are on their way. *)
+val loading : unit -> bool
+
 (** Asks for the page before those loaded (nothing while one is on its
     way). *)
 val load_older : unit -> unit

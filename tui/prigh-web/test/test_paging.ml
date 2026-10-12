@@ -163,7 +163,7 @@ let%expect_test "an older page that fails, or is no longer wanted" =
       "get_messages_page"
       (Harness.page ~older:2 ~before:"e3" (exchanges [ 2 ])));
   Harness.quiet h (fun () -> Harness.act h Load_older);
-  Harness.fail h "get_messages_page" "message e3 is not in the session any more";
+  Harness.fail h "get_messages_page" "the disk is full";
   paging h;
   Harness.text h ~selector:".toasts";
   [%expect
@@ -172,7 +172,7 @@ let%expect_test "an older page that fails, or is no longer wanted" =
     (Show earlier messages) 2 more
     question 2
     answer 2
-    Couldn't load earlier messages: message e3 is not in the session any more. Scroll up to try again.
+    Couldn't load earlier messages: the disk is full. Scroll up to try again.
     |}];
   (* A page for a session left meanwhile is dropped. *)
   Harness.quiet h (fun () -> Harness.act h Load_older);
@@ -560,5 +560,49 @@ let%expect_test "reconnecting when what was on show has gone from the session" =
     ((older 0) (before ()) (loading false))
     question 1
     answer 1
+    |}]
+;;
+
+(* Compacted while older pages were left to load: their cursor is gone. The
+   session's newest page (from its summary) replaces the transcript, once,
+   rather than an error at every scroll. *)
+let%expect_test "scrolling up after the session was compacted" =
+  let h = Harness.create () in
+  open_session h "s2";
+  Harness.quiet h (fun () ->
+    Harness.reply
+      h
+      "get_messages_page"
+      (Harness.page ~older:40 ~before:"e41" (exchanges [ 21; 22 ])));
+  Harness.event h {|{"event":"compacted","summary":"Worked on the parser."}|};
+  Harness.act h Load_older;
+  Harness.fail
+    h
+    "get_messages_page"
+    "message e41 is not in the session any more: load its latest messages \
+     again";
+  Harness.reply
+    h
+    "get_messages_page"
+    (Harness.page
+       (messages
+          [ user "Worked on the parser."; user "question 22"; assistant "answer 22" ]));
+  paging h;
+  Harness.text h ~selector:".toasts";
+  [%expect
+    {|
+    (Rpc (method_ get_messages_page)
+     (params ((session /sessions/s2.jsonl) (before e41) (limit 60)))
+     (tag (Page (path /sessions/s2.jsonl) (before (e41)))))
+    (Rpc (method_ get_messages_page)
+     (params ((session /sessions/s2.jsonl) (limit 60)))
+     (tag (Page (path /sessions/s2.jsonl) (before ()))))
+    (Expire_toast (id 0) (after_ms 4260))
+    Scroll_to_bottom
+    ((older 0) (before ()) (loading false))
+    Worked on the parser.
+    question 22
+    answer 22
+    Earlier messages were compacted: showing the session from its summary
     |}]
 ;;

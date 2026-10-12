@@ -420,7 +420,7 @@ let%expect_test "a confirmation: allow once, always, deny, deny with a reason" =
     {|
     (Answer_confirm (call_id c1) (agent_id ()) (answer Always))
     (Rpc (method_ tool_confirm_respond)
-     (params ((call_id c1) (allow true) (always true))) (tag Show_error))
+     (params ((call_id c1) (allow true) (always true))) (tag Answer))
     (Focus confirm)
     (Expire_toast (id 0) (after_ms 2860))
     Allowed bash; always: bash(make:*)
@@ -474,7 +474,7 @@ let%expect_test "a confirmation: allow once, always, deny, deny with a reason" =
     Send_confirm_reason
     (Rpc (method_ tool_confirm_respond)
      (params ((call_id c2) (allow false) (reason "it deletes the cache")))
-     (tag Show_error))
+     (tag Answer))
     (Focus confirm)
     (Expire_toast (id 1) (after_ms 2500))
     Allowed bash; always: bash(make:*)
@@ -491,7 +491,7 @@ let%expect_test "a confirmation: allow once, always, deny, deny with a reason" =
     {|
     (Answer_confirm (call_id c3) (agent_id (a1)) (answer Allow))
     (Rpc (method_ tool_confirm_respond)
-     (params ((call_id c3) (allow true) (agent_id a1))) (tag Show_error))
+     (params ((call_id c3) (allow true) (agent_id a1))) (tag Answer))
     (Focus editor)
     (Expire_toast (id 2) (after_ms 2500))
     |}]
@@ -551,7 +551,7 @@ let%expect_test "approving the plan" =
     (Back) (Keep planning)
     Send_confirm_reason
     (Rpc (method_ tool_confirm_respond)
-     (params ((call_id p1) (allow false) (reason "add docs"))) (tag Show_error))
+     (params ((call_id p1) (allow false) (reason "add docs"))) (tag Answer))
     (Focus editor)
     (Expire_toast (id 0) (after_ms 2820))
     Plan not approved: still planning
@@ -564,7 +564,7 @@ let%expect_test "approving the plan" =
     (Focus confirm)
     (Answer_confirm (call_id p2) (agent_id ()) (answer Allow))
     (Rpc (method_ tool_confirm_respond) (params ((call_id p2) (allow true)))
-     (tag Show_error))
+     (tag Answer))
     (Focus editor)
     (Expire_toast (id 1) (after_ms 2500))
     Plan not approved: still planning
@@ -614,7 +614,7 @@ let%expect_test "a confirmation answered elsewhere, or withdrawn, closes" =
     (Focus confirm)
     (Answer_confirm (call_id c2) (agent_id ()) (answer Allow))
     (Rpc (method_ tool_confirm_respond) (params ((call_id c2) (allow true)))
-     (tag Show_error))
+     (tag Answer))
     (Focus editor)
     (Expire_toast (id 2) (after_ms 2500))
     Confirmation answered elsewhere ×2
@@ -765,7 +765,7 @@ let%expect_test "a question dialog: keys" =
     (Question Accept)
     (Rpc (method_ ask_user_respond)
      (params ((call_id q1) (answers ((SQLite) (lint bench fuzz) (no)))))
-     (tag Show_error))
+     (tag Answer))
     (Focus editor)
     (Expire_toast (id 0) (after_ms 2500))
     Answered
@@ -839,7 +839,7 @@ let%expect_test "a question dialog: clicks" =
     (Question Accept)
     (Rpc (method_ ask_user_respond)
      (params ((call_id q1) (answers ((SQLite) (bench) ("ship it")))))
-     (tag Show_error))
+     (tag Answer))
     (Focus editor)
     (Expire_toast (id 0) (after_ms 2500))
     |}]
@@ -869,7 +869,7 @@ let%expect_test
     {|
     (Answer_confirm (call_id c1) (agent_id ()) (answer Allow))
     (Rpc (method_ tool_confirm_respond) (params ((call_id c1) (allow true)))
-     (tag Show_error))
+     (tag Answer))
     (Focus question-own)
     (Expire_toast (id 0) (after_ms 2500))
     Question
@@ -885,7 +885,7 @@ let%expect_test
     {|
     (Question Decline)
     (Rpc (method_ ask_user_respond) (params ((call_id q1) (decline true)))
-     (tag Show_error))
+     (tag Answer))
     (Focus question-own)
     (Expire_toast (id 1) (after_ms 3460))
     Question
@@ -977,17 +977,17 @@ let%expect_test
     {|
     (Answer_confirm (call_id c1) (agent_id ()) (answer Always))
     (Rpc (method_ tool_confirm_respond)
-     (params ((call_id c1) (allow true) (always true))) (tag Show_error))
+     (params ((call_id c1) (allow true) (always true))) (tag Answer))
     (Focus confirm)
     (Expire_toast (id 1) (after_ms 2860))
     (Answer_confirm (call_id c2) (agent_id (a1)) (answer Deny))
     (Rpc (method_ tool_confirm_respond)
-     (params ((call_id c2) (allow false) (agent_id a1))) (tag Show_error))
+     (params ((call_id c2) (allow false) (agent_id a1))) (tag Answer))
     (Focus question)
     (Expire_toast (id 2) (after_ms 2500))
     (Question Accept)
     (Rpc (method_ ask_user_respond) (params ((call_id q3) (answers ((yes)))))
-     (tag Show_error))
+     (tag Answer))
     (Focus editor)
     (Expire_toast (id 3) (after_ms 2500))
     |}]
@@ -1181,5 +1181,33 @@ let%expect_test "plan mode notes are margin notes, not the user's words" =
     (Expire_toast (id 0) (after_ms 3700))
     (Rpc (method_ fork) (params ((at e2))) (tag Reload_state))
     ""
+    |}]
+;;
+
+(* An answer the backend did not take (e.g. the run was busy elsewhere):
+   what is still waiting is shown again, rather than lost. *)
+let%expect_test "an answer that fails is asked again" =
+  let h = H.create () in
+  H.quiet h (fun () -> H.event h (confirm "c1" "make test"));
+  H.quiet h (fun () -> H.key h "y");
+  H.fail h "tool_confirm_respond" "no such confirmation pending yet";
+  H.reply
+    h
+    "get_pending"
+    (sprintf
+       {|{"confirms":[%s],"questions":[],"steer_texts":[],"follow_up_texts":[]}|}
+       {|{"call_id":"c1","agent_id":null,"name":"bash","summary":"make test","rules":[]}|});
+  toasts h;
+  modal h;
+  [%expect {|
+    (Answer_confirm (call_id c1) (agent_id ()) (answer Allow))
+    (Rpc (method_ get_pending) (params ()) (tag Pending))
+    (Focus confirm)
+    Allowed bash
+    Couldn't send your answer: no such confirmation pending yet. It is asked again.
+    Confirm
+    (Close (Esc))
+    Run bash: make test?
+    (y Allow once) (n Deny) (r Deny, saying why)
     |}]
 ;;

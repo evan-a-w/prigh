@@ -229,6 +229,8 @@ let restore_scroll from_end =
             chat##.scrollTop := Js.float 0.;
             Paging_listeners.load_older ();
             tries)
+          else if Float.(target < 0.) && Paging_listeners.loading ()
+          then tries
           else (
             if Float.(abs (Js.to_float chat##.scrollTop -. target) > 2.)
             then chat##.scrollTop := Js.float (Float.max 0. target);

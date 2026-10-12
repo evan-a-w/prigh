@@ -21,6 +21,16 @@ module Prompt : sig
   [@@deriving sexp_of, equal]
 end
 
+(** A prompt sent as the connection went: whether it reached the agent, the
+    transcript (or the queue) says once we are back. *)
+module Unsure : sig
+  type t =
+    { prompt : Prompt.t
+    ; seen : int (** user messages with its text on show when it went *)
+    }
+  [@@deriving sexp_of]
+end
+
 type t =
   { session : Session.t option (** until its state arrives *)
   ; messages : bool (** the session's transcript, until it arrives *)
@@ -29,6 +39,7 @@ type t =
   ; prompts : Prompt.t list
     (** sent, oldest first, until the transcript has them *)
   ; sending : int (** prompts, steers and follow-ups not yet answered *)
+  ; unsure : Unsure.t list
   ; model : string option (** a model key, until the backend confirms it *)
   ; thinking : string option
   ; mode : Session_mode.t option (** approval mode and plan mode *)

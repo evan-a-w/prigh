@@ -130,6 +130,9 @@ module Reply_tag : sig
         ([from], when older ones are not loaded): merged into the transcript
         on show *)
     | Resync_pending
+    | Answer
+    (** to a confirmation or a question: asked again when it does not
+        reach the agent *)
     (** [get_pending] after reconnecting: what is no longer waited for
         closes, the rest stays as it was *)
     | Session_gone of

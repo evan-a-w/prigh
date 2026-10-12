@@ -29,7 +29,7 @@ let%expect_test "tool confirmations own the keyboard: Enter allows, Esc denies" 
     {|
     (Answer_confirm (call_id c1) (agent_id ()) (answer Allow))
     (Rpc (method_ tool_confirm_respond) (params ((call_id c1) (allow true)))
-     (tag Show_error))
+     (tag Answer))
     (Focus confirm)
     (Expire_toast (id 0) (after_ms 2500))
     |}];
@@ -40,7 +40,7 @@ let%expect_test "tool confirmations own the keyboard: Enter allows, Esc denies" 
     (browser default)
     (Answer_confirm (call_id c2) (agent_id ()) (answer Deny))
     (Rpc (method_ tool_confirm_respond) (params ((call_id c2) (allow false)))
-     (tag Show_error))
+     (tag Answer))
     (Focus editor)
     (Expire_toast (id 1) (after_ms 2500))
     |}];
@@ -102,7 +102,7 @@ let%expect_test "a dialog makes the page behind it inert: Tab stays in it" =
     {|
     (Answer_confirm (call_id c1) (agent_id ()) (answer Deny))
     (Rpc (method_ tool_confirm_respond) (params ((call_id c1) (allow false)))
-     (tag Show_error))
+     (tag Answer))
     (Focus editor)
     (Expire_toast (id 0) (after_ms 2500))
     |}]
@@ -125,7 +125,7 @@ let%expect_test "Enter on a focused button of a confirmation is that button's" =
     {|
     (Answer_confirm (call_id c1) (agent_id ()) (answer Allow))
     (Rpc (method_ tool_confirm_respond) (params ((call_id c1) (allow true)))
-     (tag Show_error))
+     (tag Answer))
     (Focus editor)
     (Expire_toast (id 0) (after_ms 2500))
     |}]
