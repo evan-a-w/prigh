@@ -16,12 +16,21 @@ module Prompt = struct
   [@@deriving sexp_of, equal]
 end
 
+module Unsure = struct
+  type t =
+    { prompt : Prompt.t
+    ; seen : int
+    }
+  [@@deriving sexp_of]
+end
+
 type t =
   { session : Session.t option
   ; messages : bool
   ; refreshing : bool
   ; prompts : Prompt.t list
   ; sending : int
+  ; unsure : Unsure.t list
   ; model : string option
   ; thinking : string option
   ; mode : Session_mode.t option
@@ -34,6 +43,7 @@ let none =
   ; refreshing = false
   ; prompts = []
   ; sending = 0
+  ; unsure = []
   ; model = None
   ; thinking = None
   ; mode = None

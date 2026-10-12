@@ -578,3 +578,97 @@ let%expect_test "losing the connection while a session loads" =
     hello
     |}]
 ;;
+
+(* Lost with the backend, the session's live state goes too: what its agent
+   waited for, its queue, its run. *)
+let%expect_test "a session the backend lost leaves nothing waiting" =
+  let h = session () in
+  Harness.quiet h (fun () ->
+    Harness.event
+      h
+      (Harness.state_json ~fields:[ "running", `True ] ()
+       |> sprintf {|{"event":"state","state":%s}|});
+    Harness.event
+      h
+      {|{"event":"tool_confirm","call_id":"c1","agent_id":null,"name":"bash","summary":"rm -rf build","rules":[]}|};
+    Harness.event
+      h
+      {|{"event":"queue_update","steer":0,"follow_up":1,"steer_texts":[],"follow_up_texts":["and then this"]}|});
+  let show () =
+    let m = Harness.model h in
+    print_s
+      [%message
+        ""
+          ~running:(App.Model.running m : bool)
+          ~confirms:(List.length m.confirms : int)
+          ~queued:(Queued.count m.queue : int)];
+    Harness.elements h ~selector:".app .lamp"
+  in
+  show ();
+  Harness.act h Backend_closed;
+  Harness.act
+    h
+    (Reply
+       ( Session_gone { generation = 1; session = "s1" }
+       , Ok (Jsonaf.of_string {|{"client_id":"c2"}|}) ));
+  show ();
+  [%expect {|
+    ((running true) (confirms 1) (queued 1))
+    <span class="lamp">
+    (Reconnect (generation 1) (delay_ms 0) (session (s1)))
+    (Rpc (method_ list_models) (params ()) (tag Models))
+    (Rpc (method_ auth_status) (params ()) (tag (Auth_status Refresh)))
+    (Rpc (method_ get_config) (params ()) (tag Config))
+    (Rpc (method_ list_sessions) (params ()) (tag Sessions))
+    ((running false) (confirms 0) (queued 0))
+    |}]
+;;
+
+(* The connection went while a message was being sent: it may or may not
+   have reached the agent. Once back, the transcript says: there, it is not
+   put back (sending it again would send it twice); not there, it is back in
+   the editor. *)
+let%expect_test "a message sent as the connection went" =
+  let pending = {|{"confirms":[],"questions":[],"steer_texts":[],"follow_up_texts":[]}|} in
+  let lost_while_sending ~arrived =
+    let h = session () in
+    Harness.type_ h "third";
+    Harness.quiet h (fun () ->
+      Harness.act h Send;
+      Harness.fail h "prompt" "backend closed";
+      Harness.act h Backend_closed;
+      Harness.act h (Reply (Reconnect 1, Ok (Jsonaf.of_string "{}")));
+      Harness.reply h "get_state" (Harness.state_json ());
+      Harness.reply
+        h
+        "get_messages_page"
+        (Harness.page
+           (messages
+              ([ user "first"; assistant "one"; user "second"; assistant "two" ]
+               @ if arrived then [ user "third" ] else [])));
+      Harness.reply h "get_pending" pending);
+    Harness.text h ~selector:".chat .entries";
+    Harness.text h ~selector:".toasts";
+    print_s [%message "" ~draft:(Harness.model h).draft]
+  in
+  lost_while_sending ~arrived:true;
+  [%expect {|
+    first
+    one
+    second
+    two
+    third
+    Reconnected
+    (draft "")
+    |}];
+  lost_while_sending ~arrived:false;
+  [%expect {|
+    first
+    one
+    second
+    two
+    Reconnected
+    The connection went before your message reached the agent: it is back in the editor.
+    (draft third)
+    |}]
+;;

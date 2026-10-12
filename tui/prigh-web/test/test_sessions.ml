@@ -590,6 +590,7 @@ let%expect_test "new session and switching session reload the state" =
      (params ((session /sessions/s1.jsonl) (limit 60)))
      (tag (Page (path /sessions/s1.jsonl) (before ()))))
     (Focus editor)
+    (Rpc (method_ get_state) (params ()) (tag State))
     older work
     Couldn't open the session: no such session
     |}];
@@ -702,5 +703,39 @@ let%expect_test "switching: the reply carries the new state, saving a round trip
     (Rpc (method_ list_sessions) (params ()) (tag Sessions))
     (Rpc (method_ list_subagents) (params ()) (tag Subagents))
     (Rpc (method_ list_jobs) (params ()) (tag Jobs))
+    |}]
+;;
+
+(* Clicking B, then C before B opened: B's state (its reply, its event) is
+   not shown on the way to C; a switch that fails asks the backend where it
+   is. *)
+let%expect_test "sessions clicked in quick succession" =
+  let h = H.create () in
+  let state s = H.state_json ~fields:[ "session_id", `String s ] () in
+  let where () =
+    let m = H.model h in
+    print_s
+      [%message
+        ""
+          ~session:(Option.map m.state ~f:(fun s -> s.session_id) : string option)
+          ~opening:(m.pending.session : Prigh_web.In_flight.Session.t option)]
+  in
+  H.quiet h (fun () ->
+    H.act h (Switch_session "/sessions/s2.jsonl");
+    H.act h (Switch_session "/sessions/s3.jsonl"));
+  H.event h (sprintf {|{"event":"state","state":%s}|} (state "s2"));
+  H.reply h "switch_session" (sprintf {|{"state":%s}|} (state "s2"));
+  where ();
+  H.quiet h (fun () ->
+    H.reply h "switch_session" (sprintf {|{"state":%s}|} (state "s3")));
+  where ();
+  H.quiet h (fun () -> H.act h (Switch_session "/sessions/s4.jsonl"));
+  H.fail h "switch_session" "no session /sessions/s4.jsonl";
+  where ();
+  [%expect {|
+    ((session (s1)) (opening ((Switching /sessions/s3.jsonl))))
+    ((session (s3)) (opening ()))
+    (Rpc (method_ get_state) (params ()) (tag State))
+    ((session (s3)) (opening ()))
     |}]
 ;;
