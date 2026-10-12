@@ -270,7 +270,9 @@ let clients_of t agent =
 
 let maybe_evict t agent =
   if
-    (not (Option.exists t.default_agent ~f:(phys_equal agent)))
+    (* a stale agent of a session reopened since is not the live one *)
+    Option.exists (Hashtbl.find t.agents (session_id agent)) ~f:(phys_equal agent)
+    && (not (Option.exists t.default_agent ~f:(phys_equal agent)))
     && (not (Agent.is_running agent))
     && (not (Agent.has_running_background agent))
     && (not (Agent.resume_pending agent))

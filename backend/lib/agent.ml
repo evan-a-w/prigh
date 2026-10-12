@@ -1771,13 +1771,11 @@ let rec start_run ?(tried = String.Set.empty) ?(then_ = fun () -> []) t prompts
              | None -> None)
            else None)
     in
-    (* A hand-over carries on the same task: the run's next state says
-       [running] again, with no idle moment in between. *)
-    finish
-      ~idle:
-        (match next with
-         | Some (`Handover _) -> false
-         | Some (`Prompts _) | None -> true);
+    (* A hand-over, a queued message or a goal's continuation carries on:
+       the run's next state says [running] again, with no idle moment in
+       between (in which the server would evict a session without
+       clients). *)
+    finish ~idle:(Option.is_none next);
     Option.iter next ~f:(function
       | `Handover prompts -> start_run ~tried t prompts
       | `Prompts prompts -> start_run t prompts);

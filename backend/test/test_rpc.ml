@@ -1564,3 +1564,66 @@ let%expect_test "git_diff, review and init" =
     {"type":"response","id":"r1","ok":true,"result":{}}
     |}]
 ;;
+
+let%expect_test "a session left to run a queued follow-up stays live" =
+  with_agent [ Reply.text "one"; Reply.text "two" ]
+  @@ fun t agent h ->
+  let id = Session.id (Agent.session agent) in
+  let running_in_list () =
+    let reply =
+      Rpc_server.handle
+        h.server
+        h.client
+        (Json.of_string {|{"id": "l", "method": "list_sessions"}|})
+    in
+    match Json.member "result" reply with
+    | Some (`Array sessions) ->
+      List.find_map sessions ~f:(fun s ->
+        match Json.member "id" s with
+        | Some (`String i) when String.equal i id -> Json.member "running" s
+        | _ -> None)
+      |> Option.value_map ~default:"not listed" ~f:Json.to_string
+    | _ -> Json.to_string reply
+  in
+  Agent.subscribe agent ~f:(function
+    | Loop (Message_end (User u)) ->
+      printf "%s: running in list_sessions: %s\n" u.text (running_in_list ())
+    | _ -> ());
+  call t h ~params:{|{"text": "go"}|} "prompt";
+  call t h ~params:{|{"text": "next"}|} "follow_up";
+  call t h "new_session";
+  Agent.wait_idle agent;
+  (* The stale agent of a session reopened since does not evict the new
+     one. *)
+  call t h ~params:(sprintf {|{"path": "%s"}|} id) "switch_session";
+  let reopened = current h in
+  print_s [%sexp "reopened anew", (not (phys_equal reopened agent) : bool)];
+  (* e.g. a describe or compaction of the stale agent finishing *)
+  Agent.set_mode agent ~approval:Ask;
+  let other = Rpc_server.connect h.server ~send:ignore in
+  let request meth params =
+    ignore
+      (Rpc_server.handle
+         h.server
+         other
+         (Json.of_string
+            (sprintf {|{"id": "o", "method": "%s", "params": %s}|} meth params))
+       : Json.t)
+  in
+  request "hello" "{}";
+  request "switch_session" (sprintf {|{"path": "%s"}|} id);
+  print_s
+    [%sexp
+      "another client joins the live agent"
+    , (phys_equal (Rpc_server.agent_of_client h.server other) reopened : bool)];
+  [%expect {|
+    go: running in list_sessions: true
+    {"type":"response","id":"r1","ok":true,"result":{}}
+    {"type":"response","id":"r1","ok":true,"result":{}}
+    {"type":"response","id":"r1","ok":true,"result":{"state":{"session_id":"<id>","session_path":"$DIR/sessions/<stamp>_<id>.jsonl","session_name":null,"session_description":null,"cwd":"$DIR","git_branch":null,"model":{"id":"deepseek-flash","provider":"deepseek","key":"deepseek/deepseek-flash","name":"DeepSeek V4.1 Flash","context_window":1000000,"max_output":384000,"supports_thinking":true,"cost":{"input":0.3,"output":1.2,"cache_read":0.006}},"thinking":"on","running":false,"message_count":0,"usage":{"input":0,"output":0,"cache_read":0},"cost_usd":0,"context_tokens":0,"active_host":"backend","hosts":[{"id":"backend","name":"<host>","cwd":"$DIR","session_id":null,"session_name":null}],"subagents":[],"jobs":[],"budget_usd":null,"goal":null,"resume_at_ms":null,"approval_mode":"auto","plan_mode":false,"plan":null,"session_rules":[]}}}
+    next: running in list_sessions: true
+    {"type":"response","id":"r1","ok":true,"result":{"state":{"session_id":"<id>","session_path":"$DIR/sessions/<stamp>_<id>.jsonl","session_name":null,"session_description":null,"cwd":"$DIR","git_branch":null,"model":{"id":"deepseek-flash","provider":"deepseek","key":"deepseek/deepseek-flash","name":"DeepSeek V4.1 Flash","context_window":1000000,"max_output":384000,"supports_thinking":true,"cost":{"input":0.3,"output":1.2,"cache_read":0.006}},"thinking":"on","running":false,"message_count":4,"usage":{"input":20,"output":10,"cache_read":0},"cost_usd":1.8e-05,"context_tokens":10,"active_host":"backend","hosts":[{"id":"backend","name":"<host>","cwd":"$DIR","session_id":null,"session_name":null}],"subagents":[],"jobs":[],"budget_usd":null,"goal":null,"resume_at_ms":null,"approval_mode":"auto","plan_mode":false,"plan":null,"session_rules":[]}}}
+    ("reopened anew" true)
+    ("another client joins the live agent" true)
+    |}]
+;;
