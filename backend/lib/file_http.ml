@@ -103,10 +103,10 @@ let expired =
    the file browser"
 ;;
 
-let ticket query =
-  Option.bind
-    (List.Assoc.find query ~equal:String.equal "ticket")
-    ~f:File_tickets.take
+let ticket query ~upload =
+  match List.Assoc.find query ~equal:String.equal "ticket" with
+  | None -> Error `Expired
+  | Some id -> File_tickets.take ~upload id
 ;;
 
 let int_member json key =
@@ -132,10 +132,15 @@ let download flow (ticket : File_tickets.Ticket.t) =
         (File_ops.call agent Host_files.stat_op [ "path", `String path ])
         ~f:(fun stat -> int_member stat "size")
   in
+  (* Files such as /proc's announce no size: send them as they come. *)
+  let length = Or_error.map length ~f:(Option.filter ~f:(fun n -> n > 0)) in
   match length with
   | Error e ->
     respond flow ~status:404 ~reason:"Not Found" (Error.to_string_hum e ^ "\n")
   | Ok length ->
+    (* Without a length the body is chunked, so that a transfer that fails
+       midway (no last chunk) does not look complete. *)
+    let chunked = Option.is_none length in
     let started = ref false in
     let left = ref (Option.value length ~default:Int.max_value) in
     let start () =
@@ -154,19 +159,32 @@ let download flow (ticket : File_tickets.Ticket.t) =
                 )
               ; "Content-Security-Policy", "sandbox; default-src 'none'"
               ]
-              @ Option.value_map length ~default:[] ~f:(fun n ->
-                [ "Content-Length", Int.to_string n ])))
+              @
+              match length with
+              | Some n -> [ "Content-Length", Int.to_string n ]
+              | None -> [ "Transfer-Encoding", "chunked" ]))
           flow)
     in
     let write raw =
       start ();
-      (* A file that grew meanwhile is cut at the length announced. *)
+      (* A file that grew meanwhile is cut at the length announced, and the
+         transfer stopped there. *)
+      let cut = String.length raw > !left in
       let raw = String.prefix raw !left in
       left := !left - String.length raw;
-      if not (String.is_empty raw) then Eio.Flow.copy_string raw flow
+      if not (String.is_empty raw)
+      then
+        Eio.Flow.copy_string
+          (if chunked
+           then sprintf "%x\r\n%s\r\n" (String.length raw) raw
+           else raw)
+          flow;
+      if cut then raise Exit
     in
     (match File_ops.download agent ~path ~archive ~write with
-     | Ok _ -> start ()
+     | Ok _ ->
+       start ();
+       if chunked then Eio.Flow.copy_string "0\r\n\r\n" flow
      | Error e when not !started ->
        respond
          flow
@@ -192,6 +210,7 @@ let drain reader ~left =
 let upload flow ~headers ~reader (ticket : File_tickets.Ticket.t) =
   match ticket.kind with
   | Download _ | Inline _ | Archive _ ->
+    (* [File_tickets.take ~upload:true] returns only upload tickets *)
     error_json flow ~status:400 ~reason:"Bad Request" "this is a download link"
   | Upload { path; conflict; size; make_dir } ->
     (match
@@ -263,19 +282,26 @@ let serve ~meth ~path ~query ~headers ~reader flow =
   | _ ->
     (match path, meth with
      | "/files/download", "GET" ->
-       (match ticket query with
-        | None -> respond flow ~status:410 ~reason:"Gone" (expired ^ "\n")
-        | Some { kind = Upload _; _ } ->
+       (match ticket query ~upload:false with
+        | Error `Expired ->
+          respond flow ~status:410 ~reason:"Gone" (expired ^ "\n")
+        | Error `Wrong_endpoint ->
           respond
             flow
             ~status:400
             ~reason:"Bad Request"
             "this is an upload link\n"
-        | Some ticket -> download flow ticket)
+        | Ok ticket -> download flow ticket)
      | "/files/upload", ("PUT" | "POST") ->
-       (match ticket query with
-        | None -> error_json flow ~status:410 ~reason:"Gone" expired
-        | Some ticket -> upload flow ~headers ~reader ticket)
+       (match ticket query ~upload:true with
+        | Error `Expired -> error_json flow ~status:410 ~reason:"Gone" expired
+        | Error `Wrong_endpoint ->
+          error_json
+            flow
+            ~status:400
+            ~reason:"Bad Request"
+            "this is a download link"
+        | Ok ticket -> upload flow ~headers ~reader ticket)
      | _ ->
        respond
          flow

@@ -39,9 +39,14 @@ val lifetime : float
 (** A new ticket; [now] defaults to the clock. *)
 val issue : ?now:float -> Agent.t -> Kind.t -> string
 
-(** The ticket, removed unless it is [Inline]; [None] when unknown or
-    expired. *)
-val take : ?now:float -> string -> Ticket.t option
+(** The ticket, removed unless it is [Inline]; [`Expired] when unknown or
+    expired, [`Wrong_endpoint] (keeping it) when it is an upload ticket and
+    [upload] is false or the other way round. *)
+val take
+  :  ?now:float
+  -> upload:bool
+  -> string
+  -> (Ticket.t, [ `Expired | `Wrong_endpoint ]) Result.t
 
 (** The URL path of a ticket: [/files/download?ticket=...] or
     [/files/upload?ticket=...]. *)

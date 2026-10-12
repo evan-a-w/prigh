@@ -47,11 +47,37 @@ let check_name name =
 
 let home () = Option.value (Sys.getenv "HOME") ~default:"/"
 
+(* Absolute, without [.], [..], empty segments or a trailing [/]: a
+   trailing [/] would make [link/] mean the directory [link] points to. *)
+let normalize path =
+  let parts =
+    List.fold (String.split path ~on:'/') ~init:[] ~f:(fun acc part ->
+      match part with
+      | "" | "." -> acc
+      | ".." -> List.tl acc |> Option.value ~default:[]
+      | p -> p :: acc)
+  in
+  "/" ^ String.concat ~sep:"/" (List.rev parts)
+;;
+
 let path_arg ~cwd args key =
   let path = Tool_args.string args key in
   if String.is_empty (String.strip path) then fail "%s is empty" key;
   if String.mem path '\000' then fail "%s contains NUL" key;
-  Tool.resolve ~cwd path
+  normalize (Tool.resolve ~cwd path)
+;;
+
+(* A path whose last segment, as written, names something to create. *)
+let target_arg ~cwd args key =
+  let path = path_arg ~cwd args key in
+  let written =
+    Filename.basename
+      (String.rstrip (Tool_args.string args key) ~drop:(Char.equal '/'))
+  in
+  (match check_name written with
+   | Ok () -> ()
+   | Error e -> fail "%s" (Error.to_string_hum e));
+  path
 ;;
 
 let errno_text path exn =
@@ -189,6 +215,15 @@ let input_at_most ic ~buf ~pos ~len =
   go 0
 ;;
 
+(* Opening a FIFO blocks and a device may never end. *)
+let check_readable path (st : Core_unix.stats) =
+  match st.st_kind with
+  | S_REG -> ()
+  | S_DIR -> fail "%s is a directory" path
+  | S_CHR | S_BLK | S_FIFO | S_SOCK | S_LNK ->
+    fail "%s is not a regular file: read it with a command instead" path
+;;
+
 let read ~cwd args =
   let path = path_arg ~cwd args "path" in
   let offset = Option.value (Tool_args.int_opt args "offset") ~default:0 in
@@ -200,7 +235,7 @@ let read ~cwd args =
   in
   if offset < 0 then fail "offset must be >= 0";
   let st = unix path (fun () -> Core_unix.stat path) in
-  if Poly.equal st.st_kind S_DIR then fail "%s is a directory" path;
+  check_readable path st;
   let data =
     unix path (fun () ->
       In_channel.with_file path ~binary:true ~f:(fun ic ->
@@ -219,16 +254,13 @@ let read ~cwd args =
 ;;
 
 let mkdir ~cwd args =
-  let path = path_arg ~cwd args "path" in
+  let path = target_arg ~cwd args "path" in
   let parents =
     Option.value (Tool_args.bool_opt args "parents") ~default:false
   in
   let ignore_all =
     Option.value (Tool_args.bool_opt args "ignore_all") ~default:false
   in
-  (match check_name (Filename.basename path) with
-   | Ok () -> ()
-   | Error e -> fail "%s" (Error.to_string_hum e));
   let existed = is_dir path in
   if parents
   then unix path (fun () -> Core_unix.mkdir_p path)
@@ -248,13 +280,10 @@ let exists path =
 
 let rename ~cwd args =
   let from = path_arg ~cwd args "from" in
-  let to_ = path_arg ~cwd args "to" in
+  let to_ = target_arg ~cwd args "to" in
   let overwrite =
     Option.value (Tool_args.bool_opt args "overwrite") ~default:false
   in
-  (match check_name (Filename.basename to_) with
-   | Ok () -> ()
-   | Error e -> fail "%s" (Error.to_string_hum e));
   if not (exists from) then fail "%s does not exist" from;
   if (not overwrite) && exists to_ && not (String.equal from to_)
   then fail "%s already exists" to_;
@@ -271,13 +300,30 @@ let rec remove path =
   | _ -> Core_unix.unlink path
 ;;
 
+(* [path] with its directory's symlinks resolved; itself if that fails. *)
+let real_parent path =
+  if String.equal path "/"
+  then path
+  else (
+    match Filename_unix.realpath (Filename.dirname path) with
+    | dir -> Filename.concat dir (Filename.basename path)
+    | exception _ -> path)
+;;
+
 let delete ~cwd args =
   let path = path_arg ~cwd args "path" in
-  let home = home () in
-  if
-    String.equal path "/"
-    || String.equal path home
-    || String.is_prefix home ~prefix:(path ^ "/")
+  let home = normalize (home ()) in
+  let real_home =
+    match Filename_unix.realpath home with
+    | real -> real
+    | exception _ -> home
+  in
+  let holds_home p =
+    String.equal p "/"
+    || List.exists [ home; real_home ] ~f:(fun home ->
+      String.equal p home || String.is_prefix home ~prefix:(p ^ "/"))
+  in
+  if holds_home path || holds_home (real_parent path)
   then fail "refusing to delete %s" path;
   if not (exists path) then fail "%s does not exist" path;
   unix path (fun () -> remove path);
@@ -358,7 +404,7 @@ let download ~env ~stdin ~cancel ~on_output ~cwd args =
    | true, S_DIR -> ()
    | true, _ -> fail "not a directory: %s" path
    | false, S_DIR -> fail "%s is a directory: download it as an archive" path
-   | false, _ -> ());
+   | false, _ -> check_readable path st);
   if archive
   then (
     let stopped = Cancellation.create () in
@@ -389,10 +435,10 @@ let download ~env ~stdin ~cancel ~on_output ~cwd args =
     in
     match exit with
     | Exited 0 -> ()
-    | Cancelled -> fail "[cancelled]"
-    | Exited _ when credits.bytes > 0 ->
-      (* Some files could not be read; the archive has the rest. *)
+    | Exited 1 ->
+      (* GNU tar: some files changed while they were read *)
       ()
+    | Cancelled -> fail "[cancelled]"
     | Exited n ->
       fail "tar exited with %d: %s" n (String.strip (Buffer.contents stderr))
     | Signaled _ | Timed_out -> fail "tar was killed")
@@ -436,14 +482,11 @@ let next_temp () =
 ;;
 
 let upload ~stdin ~cancel ~on_output ~cwd args =
-  let path = path_arg ~cwd args "path" in
+  let path = target_arg ~cwd args "path" in
   let conflict =
     Option.value (Tool_args.string_opt args "conflict") ~default:"fail"
   in
   let size = Tool_args.int_opt args "size" in
-  (match check_name (Filename.basename path) with
-   | Ok () -> ()
-   | Error e -> fail "%s" (Error.to_string_hum e));
   (match conflict with
    | "fail" | "overwrite" | "rename" -> ()
    | other -> fail "unknown conflict %S: fail, overwrite or rename" other);
@@ -461,7 +504,8 @@ let upload ~stdin ~cancel ~on_output ~cwd args =
       dir
       (sprintf
          ".%s.prigh-upload-%d-%d"
-         (Filename.basename path)
+         (* within NAME_MAX (255 bytes) *)
+         (String.prefix (Filename.basename path) 200)
          (Core_unix.getpid () |> Pid.to_int)
          (next_temp ()))
   in

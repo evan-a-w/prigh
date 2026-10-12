@@ -42,15 +42,22 @@ let issue ?(now = clock ()) agent kind =
   id
 ;;
 
-let take ?(now = clock ()) id =
+let is_upload : Kind.t -> bool = function
+  | Upload _ -> true
+  | Download _ | Inline _ | Archive _ -> false
+;;
+
+let take ?(now = clock ()) ~upload id =
   expire now;
   match Hashtbl.find tickets id with
-  | None -> None
+  | None -> Error `Expired
+  | Some ticket when Bool.( <> ) (is_upload ticket.kind) upload ->
+    Error `Wrong_endpoint
   | Some ticket ->
     (match ticket.kind with
      | Inline _ -> ()
      | Download _ | Archive _ | Upload _ -> Hashtbl.remove tickets id);
-    Some ticket
+    Ok ticket
 ;;
 
 let url (kind : Kind.t) id =

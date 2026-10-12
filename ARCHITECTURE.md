@@ -382,9 +382,12 @@ two can share one.
   its directory with it selected), `$fs_stat`, `$fs_read` (a base64 slice,
   at most 1 MB), `$fs_mkdir` (optionally with parents and a `.gitignore` of
   `*`), `$fs_rename`, `$fs_delete` (recursive, never following symlinks;
-  not `/` or the home), `$fs_download` and `$fs_upload`. Paths resolve
-  against the exec's cwd (the session's) and may be anywhere the host's
-  user can reach, like `bash`. The transfers stream through the exec's
+  not `/`, the home or a directory holding it, however written),
+  `$fs_download` and `$fs_upload`. Paths resolve against the exec's cwd
+  (the session's), are normalised lexically (no `.`, `..`, `//` or
+  trailing `/`, so `link/` is the link) and may be anywhere the host's
+  user can reach, like `bash`; reads and downloads take only regular
+  files (a FIFO would block, a device never end). The transfers stream through the exec's
   output and its `Stdin_feed` (so they reach a client host through
   `tool_exec_output`/`tool_exec_input`, which need the `exec_input`
   feature): a download sends base64 chunks of 192 KiB raw (a file, or `tar
@@ -411,7 +414,9 @@ two can share one.
   when the name is taken), all on the calling client's session. `File_http`
   serves the tickets on the web server: `GET /files/download?ticket=` (a
   file with its length, a directory as `NAME.tar.gz`, an image preview
-  inline; `Content-Security-Policy: sandbox`, `nosniff`) and `PUT
+  inline; `Content-Security-Policy: sandbox`, `nosniff`; archives and
+  files of unknown size chunked, so that one cut short by an error lacks
+  the last chunk) and `PUT
   /files/upload?ticket=` (a `Content-Length` body read in chunks; 409 when
   the file appeared meanwhile, 410 for a used or expired ticket), with CORS
   open since the ticket, not a cookie, is the authority. So a client never

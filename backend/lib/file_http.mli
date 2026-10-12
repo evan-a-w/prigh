@@ -5,7 +5,10 @@ open! Import
 
     - [GET /files/download?ticket=T]: the file (with its length; [Inline]
       tickets as their image type, inline), or the directory as a .tar.gz,
-      streamed from the tool host chunk by chunk.
+      streamed from the tool host chunk by chunk. Archives and files that
+      announce no size (/proc's) are sent chunked, so a transfer that fails
+      midway lacks the last chunk and does not look complete. A ticket used
+      at the wrong endpoint is refused and kept.
     - [PUT /files/upload?ticket=T] (or [POST]) with a [Content-Length]
       body: streamed to the tool host; answers [{path, bytes}], or
       [{error}] with 409 when the file exists, 413 when too large, 410 for

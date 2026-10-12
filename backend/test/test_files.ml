@@ -157,6 +157,55 @@ let%expect_test "host ops: mkdir, rename and delete, and what they refuse" =
     |}]
 ;;
 
+let%expect_test "host ops: delete refuses home and / however written" =
+  with_sandbox
+  @@ fun t ->
+  let real_home = Sys.getenv "HOME" in
+  let home = Filename.concat t.dir "home" in
+  write t "home/keep.txt" "k";
+  write t "home/sub/x" "x";
+  write t "target/precious" "p";
+  Core_unix.symlink
+    ~target:(Filename.concat t.dir "target")
+    ~link_name:(Filename.concat t.dir "link");
+  Core_unix.symlink ~target:t.dir ~link_name:(Filename.concat t.dir "dirlink");
+  Core_unix.putenv ~key:"HOME" ~data:home;
+  Exn.protect
+    ~finally:(fun () ->
+      match real_home with
+      | Some h -> Core_unix.putenv ~key:"HOME" ~data:h
+      | None -> Core_unix.unsetenv "HOME")
+    ~f:(fun () ->
+      List.iter
+        [ "~/"
+        ; "home/sub/.."
+        ; "home//"
+        ; "home/."
+        ; "./home"
+        ; "dirlink/home"
+        ; "//"
+        ; "link/"
+        ]
+        ~f:(fun path ->
+          op t Host_files.delete_op (sprintf {|{"path": %S}|} path)));
+  print_s
+    [%sexp
+      (List.map [ "home/keep.txt"; "target/precious"; "link" ] ~f:(fun p ->
+         p, Sys_unix.file_exists_exn (Filename.concat t.dir p))
+       : (string * bool) list)];
+  [%expect {|
+    ERROR: refusing to delete $DIR/home
+    ERROR: refusing to delete $DIR/home
+    ERROR: refusing to delete $DIR/home
+    ERROR: refusing to delete $DIR/home
+    ERROR: refusing to delete $DIR/home
+    ERROR: refusing to delete $DIR/dirlink/home
+    ERROR: refusing to delete /
+    {"path":"$DIR/link"}
+    ((home/keep.txt true) (target/precious true) (link false))
+    |}]
+;;
+
 let%expect_test "host ops: downloads stream within the credits granted" =
   with_sandbox
   @@ fun t ->
@@ -257,11 +306,19 @@ let%expect_test "host ops: a directory downloads as a .tar.gz" =
     Host_files.download_op
     {|{"path": "proj/a.txt", "archive": true}|};
   op ~stdin:feed t Host_files.download_op {|{"path": "/", "archive": true}|};
+  op ~stdin:feed t Host_files.download_op {|{"path": "//", "archive": true}|};
+  op
+    ~stdin:feed
+    t
+    Host_files.download_op
+    {|{"path": "/tmp/../", "archive": true}|};
   [%expect
     {|
     false
     (proj/ proj/a.txt proj/src/ proj/src/b.ml)
     ERROR: not a directory: $DIR/proj/a.txt
+    ERROR: refusing to archive /
+    ERROR: refusing to archive /
     ERROR: refusing to archive /
     |}]
 ;;
@@ -333,6 +390,10 @@ let%expect_test "host ops: uploads, their conflicts and cancelling" =
       settle t;
       Cancellation.cancel cancel);
     upload t ~chunks:[ "part" ] ~close:false ~cancel {|{"path": "in/cut.txt"}|});
+  upload
+    t
+    ~chunks:[ "long" ]
+    (sprintf {|{"path": "in/%s.txt"}|} (String.make 246 'n'));
   upload t {|{"path": "missing/x.txt"}|};
   upload t {|{"path": "in/x", "conflict": "sometimes"}|};
   ls t "in";
@@ -340,9 +401,12 @@ let%expect_test "host ops: uploads, their conflicts and cancelling" =
     {|
     acks: 1  ERROR: $DIR/in/short.txt: got 3 of 10 bytes
     acks: 1  ERROR: [cancelled]
+    acks: 1  {"path":"$DIR/in/nnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnn.txt","bytes":4}
     acks: 0  ERROR: not a directory: $DIR/missing
     acks: 0  ERROR: unknown conflict "sometimes": fail, overwrite or rename
-    (.env .env-2 new.txt notes-2.txt notes-3.txt notes.txt)
+    (.env .env-2 new.txt
+     nnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnn.txt
+     notes-2.txt notes-3.txt notes.txt)
     |}]
 ;;
 
