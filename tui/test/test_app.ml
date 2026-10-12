@@ -1331,6 +1331,9 @@ let%expect_test "/sessions Ctrl+N filters named only; Ctrl+D confirms delete" =
     …deepseek-flash  ctx:0.1%/1.0M  Enter switches · Tab marks …
     |}];
   H.key h (Key.ctrl 'n');
+  (* Not the session we are in. *)
+  H.key h (Key.ctrl 'd');
+  H.key h (Key.plain Down);
   H.key h (Key.ctrl 'd');
   H.show h;
   [%expect
@@ -1339,8 +1342,10 @@ let%expect_test "/sessions Ctrl+N filters named only; Ctrl+D confirms delete" =
 
     ▌ earlier question
       earlier answer
+      session "build fix" is the session you are in: switch to
+      another one first, or leave it out
     ┌─ Confirm ────────────────────────────────────────────────┐
-    │ Delete session "build fix" (0 B)? Enter deletes, Esc ke… │
+    │ Delete session 2 (0 B)? Enter deletes, Esc keeps it      │
     └──────────────────────────────────────────────────────────┘
     ────────────────────────────────────────────────────────────
     ? ▏
@@ -1351,7 +1356,7 @@ let%expect_test "/sessions Ctrl+N filters named only; Ctrl+D confirms delete" =
     {|
     (Rpc
       (method_ delete_sessions)
-      (params ((paths (/home/u/.prigh/sessions/1.jsonl))))
+      (params ((paths (/home/u/.prigh/sessions/2.jsonl))))
       (tag Sessions_deleted))
     |}];
   H.mode h;
@@ -1359,7 +1364,7 @@ let%expect_test "/sessions Ctrl+N filters named only; Ctrl+D confirms delete" =
   H.reply
     h
     Sessions_deleted
-    {|{"deleted":[{"path":"/home/u/.prigh/sessions/1.jsonl","id":"1","bytes":0}],"refused":[]}|};
+    {|{"deleted":[{"path":"/home/u/.prigh/sessions/2.jsonl","id":"2","bytes":0}],"refused":[]}|};
   H.show h;
   [%expect
     {|
@@ -1367,10 +1372,12 @@ let%expect_test "/sessions Ctrl+N filters named only; Ctrl+D confirms delete" =
 
     ▌ earlier question
       earlier answer
+      session "build fix" is the session you are in: switch to
+      another one first, or leave it out
       Deleted 1 session (0 B)
     Sessions  (1)
     / ▏
-    ▸  (unnamed) ∣ 2025-06-02T11:30 ∣ 0 msgs ∣ (empty)  /other
+    ▸* build fix ∣ 2025-06-01T10:00 ∣ 12 msgs ∣ fix the build p…
     ────────────────────────────────────────────────────────────
     …deepseek-flash  ctx:0.1%/1.0M  Enter switches · Tab marks …
     |}];
@@ -1515,6 +1522,13 @@ let%expect_test
     ────────────────────────────────────────────────────────────────────────────────────────────────────
     …deepseek-flash  ctx:0.1%/1.0M  2 marked (1.0 MB) · Enter switches · Tab marks · Ctrl+D deletes · A…
     |}];
+  (* Not the session we are in: it says so, the picker stays, Tab unmarks
+     it. *)
+  H.key h (Key.ctrl 'd');
+  H.show h;
+  H.key h (Key.plain Home);
+  H.key h (Key.plain Tab);
+  H.key h (Key.plain Tab);
   H.key h (Key.ctrl 'd');
   H.show h;
   [%expect
@@ -1523,6 +1537,27 @@ let%expect_test
 
     ▌ earlier question
       earlier answer
+      session "build fix" is the session you are in: switch to another one first, or leave it out
+    Sessions  (5)
+    / ▏
+     ✓ ● build fix ∣ 2025-06-05T10:00 ∣ 12 msgs ∣ fix the build  /work
+       ▶ deploy ∣ 2025-06-03T10:00 ∣ 6 msgs ∣ 2 in background ∣ deploy it  /work
+       (unnamed) ∣ 2025-06-01T10:00 ∣ 0 msgs ∣ (empty)     /tmp
+      ── archived ──
+       (unnamed) ∣ 2025-06-04T10:00 ∣ 4 msgs ∣ try a spike  /old
+    ▸✓ old spike ∣ 2025-04-02T10:00 ∣ 2 msgs ∣ another spike  /old
+    ────────────────────────────────────────────────────────────────────────────────────────────────────
+    …deepseek-flash  ctx:0.1%/1.0M  2 marked (1.0 MB) · Enter switches · Tab marks · Ctrl+D deletes · A…
+
+
+
+
+
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+
+    ▌ earlier question
+      earlier answer
+      session "build fix" is the session you are in: switch to another one first, or leave it out
     ┌─ Confirm ────────────────────────────────────────────────────────────────────────────────────────┐
     │ Delete 2 sessions (1.0 MB)? Enter deletes, Esc keeps them                                        │
     └──────────────────────────────────────────────────────────────────────────────────────────────────┘
@@ -1538,14 +1573,15 @@ let%expect_test
 
     ▌ earlier question
       earlier answer
+      session "build fix" is the session you are in: switch to another one first, or leave it out
     Sessions  (5)
     / ▏
-     ✓ ● build fix ∣ 2025-06-05T10:00 ∣ 12 msgs ∣ fix the build  /work
-       ▶ deploy ∣ 2025-06-03T10:00 ∣ 6 msgs ∣ 2 in background ∣ deploy it  /work
-       (unnamed) ∣ 2025-06-01T10:00 ∣ 0 msgs ∣ (empty)     /tmp
+     * ● build fix ∣ 2025-06-05T10:00 ∣ 12 msgs ∣ fix the build  /work
+     ✓ ▶ deploy ∣ 2025-06-03T10:00 ∣ 6 msgs ∣ 2 in background ∣ deploy it  /work
+    ▸  (unnamed) ∣ 2025-06-01T10:00 ∣ 0 msgs ∣ (empty)     /tmp
       ── archived ──
        (unnamed) ∣ 2025-06-04T10:00 ∣ 4 msgs ∣ try a spike  /old
-    ▸✓ old spike ∣ 2025-04-02T10:00 ∣ 2 msgs ∣ another spike  /old
+     ✓ old spike ∣ 2025-04-02T10:00 ∣ 2 msgs ∣ another spike  /old
     ────────────────────────────────────────────────────────────────────────────────────────────────────
     …deepseek-flash  ctx:0.1%/1.0M  2 marked (1.0 MB) · Enter switches · Tab marks · Ctrl+D deletes · A…
     |}];
@@ -1555,7 +1591,7 @@ let%expect_test
     {|
     (Rpc
       (method_ delete_sessions)
-      (params ((paths (/home/u/.prigh/sessions/1.jsonl /s/3b.jsonl))))
+      (params ((paths (/s/2.jsonl /s/3b.jsonl))))
       (tag Sessions_deleted))
     |}];
   H.show h;
@@ -1565,21 +1601,22 @@ let%expect_test
 
     ▌ earlier question
       earlier answer
+      session "build fix" is the session you are in: switch to another one first, or leave it out
     Sessions  (5)
     / ▏
-     ✓ ● build fix ∣ 2025-06-05T10:00 ∣ 12 msgs ∣ fix the build  /work
-       ▶ deploy ∣ 2025-06-03T10:00 ∣ 6 msgs ∣ 2 in background ∣ deploy it  /work
-       (unnamed) ∣ 2025-06-01T10:00 ∣ 0 msgs ∣ (empty)     /tmp
+     * ● build fix ∣ 2025-06-05T10:00 ∣ 12 msgs ∣ fix the build  /work
+     ✓ ▶ deploy ∣ 2025-06-03T10:00 ∣ 6 msgs ∣ 2 in background ∣ deploy it  /work
+    ▸  (unnamed) ∣ 2025-06-01T10:00 ∣ 0 msgs ∣ (empty)     /tmp
       ── archived ──
        (unnamed) ∣ 2025-06-04T10:00 ∣ 4 msgs ∣ try a spike  /old
-    ▸✓ old spike ∣ 2025-04-02T10:00 ∣ 2 msgs ∣ another spike  /old
+     ✓ old spike ∣ 2025-04-02T10:00 ∣ 2 msgs ∣ another spike  /old
     ────────────────────────────────────────────────────────────────────────────────────────────────────
     …deepseek-flash  ctx:0.1%/1.0M  2 marked (1.0 MB) · Enter switches · Tab marks · Ctrl+D deletes · A…
     |}];
   H.reply
     h
     Sessions_deleted
-    {|{"deleted":[{"path":"/s/3a.jsonl","id":"3a","bytes":1500000}],"refused":[{"path":"/home/u/.prigh/sessions/1.jsonl","error":"session \"build fix\" is the session you are in: switch to another one first"}]}|};
+    {|{"deleted":[{"path":"/s/3b.jsonl","id":"3b","bytes":1048576}],"refused":[{"path":"/s/2.jsonl","error":"session \"deploy\" is running: wait for it, or switch to it and /abort"}]}|};
   H.show h;
   [%expect
     {|
@@ -1587,23 +1624,22 @@ let%expect_test
 
     ▌ earlier question
       earlier answer
-      Deleted 1 session (1.4 MB)
-      Not deleted: session "build fix" is the session you are in: switch to another one first
+      session "build fix" is the session you are in: switch to another one first, or leave it out
+      Deleted 1 session (1.0 MB)
+      Not deleted: session "deploy" is running: wait for it, or switch to it and /abort
     Sessions  (4)
     / ▏
-     ✓ ● build fix ∣ 2025-06-05T10:00 ∣ 12 msgs ∣ fix the build  /work
-       ▶ deploy ∣ 2025-06-03T10:00 ∣ 6 msgs ∣ 2 in background ∣ deploy it  /work
-       (unnamed) ∣ 2025-06-01T10:00 ∣ 0 msgs ∣ (empty)     /tmp
+     * ● build fix ∣ 2025-06-05T10:00 ∣ 12 msgs ∣ fix the build  /work
+     ✓ ▶ deploy ∣ 2025-06-03T10:00 ∣ 6 msgs ∣ 2 in background ∣ deploy it  /work
+    ▸  (unnamed) ∣ 2025-06-01T10:00 ∣ 0 msgs ∣ (empty)     /tmp
       ── archived ──
-    ▸✓ old spike ∣ 2025-04-02T10:00 ∣ 2 msgs ∣ another spike  /old
+       (unnamed) ∣ 2025-06-04T10:00 ∣ 4 msgs ∣ try a spike  /old
     ────────────────────────────────────────────────────────────────────────────────────────────────────
-    …deepseek-flash  ctx:0.1%/1.0M  2 marked (1.0 MB) · Enter switches · Tab marks · Ctrl+D deletes · A…
+    …deepseek-flash  ctx:0.1%/1.0M  1 marked (4.0 KB) · Enter switches · Tab marks · Ctrl+D deletes · A…
     |}];
   (* Without marks Ctrl+D deletes the highlighted session. *)
+  H.key h (Key.plain Up);
   H.key h (Key.plain Tab);
-  H.key h (Key.plain Home);
-  H.key h (Key.plain Tab);
-  H.key h (Key.plain Down);
   H.key h (Key.ctrl 'd');
   H.show h;
   [%expect
@@ -1612,8 +1648,9 @@ let%expect_test
 
     ▌ earlier question
       earlier answer
-      Deleted 1 session (1.4 MB)
-      Not deleted: session "build fix" is the session you are in: switch to another one first
+      session "build fix" is the session you are in: switch to another one first, or leave it out
+      Deleted 1 session (1.0 MB)
+      Not deleted: session "deploy" is running: wait for it, or switch to it and /abort
     ┌─ Confirm ────────────────────────────────────────────────────────────────────────────────────────┐
     │ Delete session 5 (100 B)? Enter deletes, Esc keeps it                                            │
     └──────────────────────────────────────────────────────────────────────────────────────────────────┘
@@ -1760,7 +1797,10 @@ let%expect_test
   H.mode h;
   [%expect
     {|
-    (Rpc (method_ delete_archived) (params ()) (tag Sessions_deleted))
+    (Rpc
+      (method_ delete_sessions)
+      (params ((paths (/s/3a.jsonl /s/3b.jsonl))))
+      (tag Sessions_deleted))
     picker
     |}];
   H.esc h;
@@ -1843,16 +1883,15 @@ let%expect_test "/archive and /unarchive: the current session, or one named" =
   H.show h;
   [%expect
     {|
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+
     ▌ earlier question
       earlier answer
       archived this session (your next message unarchives it)
     ────────────────────────────────────────────────────────────
     > /unarchive ▏
-    ▸ fix the build  /work
-      try a spike    /old
-      deploy it      /work
-      another spike  /old
-      (empty)        /tmp
+    ▸ try a spike  archived · /old
+      old spike    archived · another spike · /old
     …deepseek-flash  Tab accepts · Enter runs as typed · Esc
     |}];
   H.key h (Key.ctrl 'u');
@@ -2060,11 +2099,10 @@ let%expect_test "/delete completes session after session" =
     ▌ earlier question
       earlier answer
     ────────────────────────────────────────────────────────────────────────────────────────────────────
-    > /delete /home/u/.prigh/sessions/1.jsonl ▏
-    ▸ try a spike    /old
-      deploy it      /work
-      another spike  /old
-      (empty)        /tmp
+    > /delete 2 ▏
+    ▸ (empty)      /tmp
+      try a spike  archived · /old
+      old spike    archived · another spike · /old
     …deepseek-flash  think:off  mode:auto  ctx:0.1%/1.0M  $0.01  Tab accepts · Enter runs as typed · Esc
     |}]
 ;;

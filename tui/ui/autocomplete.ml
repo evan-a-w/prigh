@@ -158,14 +158,41 @@ let model_items ~logged_in (models : P.Model.t list) =
       model.name)
 ;;
 
+(* By name (else the first prompt), active ones first; accepting inserts the
+   id, which every session command takes. *)
 let session_items (sessions : P.Session_summary.t list) =
-  List.map sessions ~f:(fun (s : P.Session_summary.t) ->
+  let active, archived =
+    List.partition_tf sessions ~f:(fun (s : P.Session_summary.t) ->
+      not s.archived)
+  in
+  List.map (active @ archived) ~f:(fun (s : P.Session_summary.t) ->
     let first = Text_width.truncate (P.Session_summary.blurb s) ~width:60 in
+    let label = Option.value s.name ~default:first in
+    let detail =
+      String.concat
+        ~sep:" · "
+        ((if s.archived then [ "archived" ] else [])
+         @ Option.value_map s.name ~default:[] ~f:(fun _ -> [ first ])
+         @ [ s.cwd ])
+    in
     Picker.Item.create
-      ~id:s.path
-      ~detail:s.cwd
-      ~search:(first ^ " " ^ s.path ^ " " ^ s.cwd ^ " " ^ s.created_at)
-      first)
+      ~id:s.id
+      ~detail
+      ~dimmed:s.archived
+      ~search:(String.concat ~sep:" " [ label; first; s.id; s.cwd; s.created_at ])
+      label)
+;;
+
+(* The sessions a command can act on: [/archive] the active ones,
+   [/unarchive] the archived ones, [/delete] all but the current one. *)
+let sessions_for (spec : Commands.Spec.t) ~current_session sessions =
+  List.filter sessions ~f:(fun (s : P.Session_summary.t) ->
+    match spec.name with
+    | "archive" -> not s.archived
+    | "unarchive" -> s.archived
+    | "delete" ->
+      not (Option.exists current_session ~f:(String.equal s.path))
+    | _ -> true)
 ;;
 
 let mcp_items () =
@@ -289,6 +316,7 @@ let compute_argument
       ~models
       ~auth
       ~sessions
+      ~current_session
       ~logged_in
       ~default_dir_host
   =
@@ -301,6 +329,9 @@ let compute_argument
        (match Commands.find name with
         | None -> None
         | Some spec ->
+          let sessions =
+            Option.map sessions ~f:(sessions_for spec ~current_session)
+          in
           (match spec.argument with
            | None -> None
            | Some kind ->
@@ -425,6 +456,7 @@ let directory ~host ~text =
 ;;
 
 let compute
+      ~current_session
       ~line
       ~col
       ~line_index
@@ -450,6 +482,7 @@ let compute
          ~models
          ~auth
          ~sessions
+         ~current_session
          ~logged_in
          ~default_dir_host
      with

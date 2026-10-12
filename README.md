@@ -698,7 +698,11 @@ anywhere (other frontends, other sessions). In it Tab marks or unmarks a
 session (`✓`; the status line shows how many and their size), Ctrl+D
 deletes the marked sessions (or the highlighted one), Alt+A archives or
 unarchives the highlighted one, Alt+D deletes every archived session, and
-Ctrl+N shows only named ones. Deleting always asks first, with the count and
+Ctrl+N shows only named ones (marks on the hidden ones stay). The session
+you are in cannot be deleted, so Ctrl+D and `/delete` say so at once and
+Alt+D leaves it out. Tab after `/switch`, `/archive`, `/unarchive` or
+`/delete` completes sessions by name (or first prompt), the active ones
+first, and inserts the id. Deleting always asks first, with the count and
 the disk space (`Delete 3 sessions (1.2 MB)? Enter deletes, Esc keeps
 them`); Esc goes back to the list unchanged. Afterwards a notice says what
 was deleted and why any session was not (it is running, open in another

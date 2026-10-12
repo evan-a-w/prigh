@@ -1200,17 +1200,24 @@ copy of the protocol types and the e2e test guards the contract.
     dimmed: `Picker.Item.section` keeps sections apart, also when filtering,
     and `Render` draws a divider naming each). Tab marks rows
     (`Picker.toggle_check`); Ctrl+D asks to delete the marked (or the
-    highlighted) sessions and Alt+D every archived one, with the count and
-    `bytes` (`Confirm_action.Delete_sessions`/`Delete_archived` carry the
-    picker as `Open_picker`, so Esc and Enter go back to it); the
-    `delete_sessions`/`delete_archived` reply (`Delete_result`) is the
-    notice, refusals included. Alt+A flips `archived` in the picker at once
+    highlighted) sessions and Alt+D every archived one but the current, with
+    the count and `bytes` (`Confirm_action.Delete_sessions` carries the paths
+    confirmed and the picker as `Open_picker`, so Esc and Enter go back to
+    it); the session you are in is refused up front
+    (`Session_selection.deletable`), and the `delete_sessions` reply
+    (`Delete_result`) is the notice, refusals included. Alt+A flips `archived` in the picker at once
     and sends `set_archived` (a refusal refetches the list). `/archive`,
     `/unarchive` and `/delete` look their arguments up in a fresh list
     (`Session_selection.resolve`: path, id, unique id prefix or name).
     `sessions_changed` refetches `list_sessions` (`Sessions_refresh`) while
     the picker is open (or behind its confirmation) or the completion's
-    list is cached; `Picker.set_items` keeps the query, marks and highlight.
+    list is cached; `Picker.set_items` keeps the query, marks and highlight
+    (Ctrl+N keeps marks on the sessions it hides and moves a hidden
+    highlight to its neighbour). Their completions (`Autocomplete`) show
+    names, active sessions first, archived ones marked, match on name,
+    first prompt, id and directory, and insert the id; `/archive` offers
+    the active ones, `/unarchive` the archived ones, `/delete` all but the
+    current one.
     `/tree` hangs each message under the nearest message above it, skipping
     settings entries (model, name, cwd, archived).
   - Model hand-over and default directory: `/fallback` and `/default-dir`

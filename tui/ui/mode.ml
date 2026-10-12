@@ -54,7 +54,6 @@ module Confirm_action = struct
         { paths : string list
         ; back : Open_picker.t option
         }
-    | Delete_archived of { back : Open_picker.t option }
     | Tool_confirm of Pending.Confirm.t
   [@@deriving sexp_of, equal]
 end

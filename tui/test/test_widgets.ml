@@ -2076,6 +2076,7 @@ let%expect_test
   in
   let compute ?skills line =
     Autocomplete.compute
+      ~current_session:None
       ~line
       ~col:(String.length line)
       ~line_index:0
@@ -2149,6 +2150,7 @@ let%expect_test "autocomplete: /skill: completes skill names" =
   in
   let compute ?skills line =
     Autocomplete.compute
+      ~current_session:None
       ~line
       ~col:(String.length line)
       ~line_index:0
@@ -2295,6 +2297,7 @@ let%expect_test
   let show ?col ?default_dir_host line =
     match
       Autocomplete.compute
+        ~current_session:None
         ~line
         ~col:(Option.value col ~default:(String.length line))
         ~line_index:0

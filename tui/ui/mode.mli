@@ -57,7 +57,6 @@ module Confirm_action : sig
         { paths : string list
         ; back : Open_picker.t option (** where Esc and Enter return *)
         }
-    | Delete_archived of { back : Open_picker.t option }
     | Tool_confirm of Pending.Confirm.t
   [@@deriving sexp_of, equal]
 end
