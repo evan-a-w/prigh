@@ -764,3 +764,70 @@ let%expect_test
     …deepseek-flash  Enter denies · Esc goes back
     |}]
 ;;
+
+let%expect_test "long choice descriptions and answers wrap in the question box" =
+  let h = Test_app.connected ~width:50 ~height:20 () in
+  H.event
+    h
+    (Ask_user
+       { call_id = "q1"
+       ; questions =
+           [ { question = "Which database?"
+             ; header = None
+             ; choices =
+                 [ { label = "Postgres"
+                   ; description =
+                       Some
+                         "what production uses, with the extensions we rely \
+                          on for search"
+                   }
+                 ; { label = "SQLite"; description = Some "embedded" }
+                 ]
+             ; multiple = false
+             }
+           ]
+       });
+  H.key h (Key.plain Down);
+  H.show h;
+  H.keys h "neither: a flat file is enough for this small tool";
+  H.show h;
+  [%expect {|
+      prigh in /work · /help · Esc aborts · Ctrl+C
+      twice quits
+
+    ▌ earlier question
+      earlier answer
+    ┌─ Question ─────────────────────────────────────┐
+    │ Which database?                                │
+    │   ( ) Postgres                                 │
+    │       what production uses, with the           │
+    │       extensions we rely on for search         │
+    │ › ( ) SQLite▏ embedded                         │
+    │   Other:                                       │
+    │ ↑↓ choose · type your own · Enter picks        │
+    │ Esc declines (the model is told)               │
+    └────────────────────────────────────────────────┘
+    ──────────────────────────────────────────────────
+    …deepseek-flash  Enter accepts · Esc declines
+
+
+      prigh in /work · /help · Esc aborts · Ctrl+C
+      twice quits
+
+    ▌ earlier question
+      earlier answer
+    ┌─ Question ─────────────────────────────────────┐
+    │ Which database?                                │
+    │   ( ) Postgres                                 │
+    │       what production uses, with the           │
+    │       extensions we rely on for search         │
+    │   ( ) SQLite  embedded                         │
+    │ › Other: neither: a flat file is enough for th │
+    │          is small tool▏                        │
+    │ ↑↓ choose · type your own · Enter picks        │
+    │ Esc declines (the model is told)               │
+    └────────────────────────────────────────────────┘
+    ──────────────────────────────────────────────────
+    …deepseek-flash  Enter accepts · Esc declines
+    |}]
+;;

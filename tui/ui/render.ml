@@ -439,6 +439,17 @@ let question_dialog ~width form =
       ~width:inner
   in
   let pointer row = if Question_form.cursor form = row then "› " else "  " in
+  (* Long descriptions and answers wrap, indented under the label. *)
+  let chunks text ~width =
+    let rec go text acc =
+      let head, rest = Text_width.take text ~width:(Int.max 1 width) in
+      if String.is_empty rest
+      then List.rev (head :: acc)
+      else go rest (head :: acc)
+    in
+    go text []
+  in
+  let indent = "      " in
   let choices =
     List.mapi q.choices ~f:(fun i (c : P.Question.Choice.t) ->
       let picked = Question_form.is_picked form ~question:index ~choice:i in
@@ -449,21 +460,42 @@ let question_dialog ~width form =
         | false, true -> "(•) "
         | false, false -> "( ) "
       in
-      [ span ~style:attention (pointer i)
-      ; span mark
-      ; span
-          ~style:(if picked then Style.bold Style.plain else Style.plain)
-          c.label
-      ]
-      @ Option.value_map c.description ~default:[] ~f:(fun d ->
-        [ span ~style:gray ("  " ^ d) ]))
+      let line =
+        [ span ~style:attention (pointer i)
+        ; span mark
+        ; span
+            ~style:(if picked then Style.bold Style.plain else Style.plain)
+            c.label
+        ]
+      in
+      match c.description with
+      | None -> [ line ]
+      | Some d
+        when Content.Line.width line + 2 + Text_width.string d <= inner ->
+        [ line @ [ span ~style:gray ("  " ^ d) ] ]
+      | Some d ->
+        line
+        :: List.map
+             (Content.wrap
+                [ [ span ~style:gray d ] ]
+                ~width:(inner - String.length indent))
+             ~f:(fun row -> span indent :: row))
   in
+  let choice_rows = List.concat choices in
   let own_row = List.length q.choices in
   let own_prefix =
     pointer own_row ^ if List.is_empty q.choices then "" else "Other: "
   in
   let own = Question_form.own_answer form ~question:index in
-  let own_line = [ span ~style:attention own_prefix; span own ] in
+  let own_indent = String.make (Text_width.string own_prefix) ' ' in
+  let own_lines =
+    List.mapi
+      (chunks own ~width:(inner - Text_width.string own_prefix))
+      ~f:(fun i chunk ->
+        [ span ~style:attention (if i = 0 then own_prefix else own_indent)
+        ; span chunk
+        ])
+  in
   let hint =
     (* Whole keys to a row. *)
     List.fold (question_keys ~q ~total) ~init:[] ~f:(fun rows key ->
@@ -473,17 +505,21 @@ let question_dialog ~width form =
       | rows -> key :: rows)
     |> List.rev_map ~f:(fun row -> [ span ~style:gray row ])
   in
-  let body = wrapped @ choices @ [ own_line ] @ hint in
+  let body = wrapped @ choice_rows @ own_lines @ hint in
   let cursor =
     if Question_form.on_own_answer form
-    then
-      ( 1 + List.length wrapped + List.length choices
-      , 2 + Text_width.string own_prefix + Text_width.string own )
+    then (
+      let last = List.last_exn own_lines in
+      ( List.length wrapped + List.length choice_rows + List.length own_lines
+      , 2 + Content.Line.width last ))
     else (
       (* after the label, not over the pointer *)
       let row = Question_form.cursor form in
       let label = (List.nth_exn q.choices row).label in
-      1 + List.length wrapped + row, 2 + 2 + 4 + Text_width.string label)
+      let above =
+        List.sum (module Int) (List.take choices row) ~f:List.length
+      in
+      1 + List.length wrapped + above, 2 + 2 + 4 + Text_width.string label)
   in
   Boxed.render ~title ~width body, cursor
 ;;
