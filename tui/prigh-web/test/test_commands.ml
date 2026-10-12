@@ -1305,9 +1305,12 @@ let%expect_test "/agents [n|id|cancel <n|id>]: the agents panel" =
     (Save_history (/agents "/agents cancel 1"))
     (Rpc (method_ list_subagents) (params ()) (tag Subagents))
     (Rpc (method_ list_jobs) (params ()) (tag Jobs))
-    Agents 2 agents running (Close (Alt+0))
+    Agents
+    2 agents running (Close (Alt+0))
     Subagents 2 running
-    (1 read the tests 30s a1  m  1 turn thinking…) (2 lint 30s a2  m  1 turn thinking…) (3 ✓ count 10s a3  m  1 turn 42)
+    (Running read the tests 30s Thinking… a1  m  1 turn)
+    (Running lint 30s Thinking… a2  m  1 turn)
+    (✓ Done count 10s 42)
     |}];
   run h "/agents cancel 2";
   H.text h ~selector:".agents-panel";
@@ -1326,10 +1329,11 @@ let%expect_test "/agents [n|id|cancel <n|id>]: the agents panel" =
     (Rpc (method_ get_subagent) (params ((id a2) (elide true)))
      (tag (Subagent a2)))
     (Rpc (method_ cancel_subagent) (params ((agent_id a2))) (tag Show_error))
-    (All agents (Esc)) Subagent a2 2 agents running (Close (Alt+0))
+    (All agents (Esc))
+    Subagent a2
+    (Show in chat) (Close (Alt+0))
     lint
-    Running 30s a2 m 1 turn
-    (Stopping…) (Show in chat)
+    (Stopping…) Running 30s m  1 turn
     Loading the transcript…
     (Save_history
      ("/agents cancel a1" "/agents cancel 2" /agents "/agents cancel 1"))
@@ -1380,10 +1384,11 @@ let%expect_test "/jobs [id|kill <id>]: jobs in the agents panel" =
     (Save_history (/jobs "/jobs j1"))
     (Rpc (method_ list_subagents) (params ()) (tag Subagents))
     (Rpc (method_ list_jobs) (params ()) (tag Jobs))
-    Agents 1 job running (Close (Alt+0))
+    Agents
+    1 job running (Close (Alt+0))
     Jobs 1 running
-    (1 make test 1m 15s j1  120 B ok 12 tests)
-    (2 ✓ sleep 1 1s j2  exited 0)
+    (Running make test 1m 15s ok 12 tests j1  120 B)
+    (✓ Done sleep 1 1s)
     |}];
   run h "/jobs j2";
   H.reply h "job_output" {|{"text":""}|};
@@ -1394,19 +1399,21 @@ let%expect_test "/jobs [id|kill <id>]: jobs in the agents panel" =
     {|
     (Save_history ("/jobs j2" /jobs "/jobs j1"))
     (Rpc (method_ job_output) (params ((job_id j2))) (tag (Job_output j2)))
-    (All agents (Esc)) Job j2 1 job running (Close (Alt+0))
+    (All agents (Esc))
+    Job j2
+    (Close (Alt+0))
     ✓ sleep 1
-    exited 0 1s j2
+    Done 1s
     No output yet.
     (Save_history ("/jobs kill j1" "/jobs j2" /jobs "/jobs j1"))
     (Rpc (method_ job_output) (params ((job_id j1))) (tag (Job_output j1)))
     (Rpc (method_ kill_job) (params ((job_id j1))) (tag Show_error))
-    (All agents (Esc)) Job j1 1 job running (Close (Alt+0))
+    (All agents (Esc))
+    Job j1
+    (Close (Alt+0))
     make test
-    running 1m 15s j1 120 B
-    (Stopping…)
+    (Stopping…) Running 1m 15s 120 B
     Loading the output…
-    Its output refreshes while it runs.
     |}];
   List.iter
     [ "/jobs kill j2"; "/jobs j9"; "/jobs kill"; "/jobs a b" ]

@@ -322,10 +322,13 @@ sessions by name, id or path. The list follows the backend as it changes.
 Subagents and background jobs have their own panel, a resizable column
 right of the chat (drag its left edge; a full-screen sheet on a phone):
 the session's subagents as a tree (nested ones under the background agent
-that started them), running first, with their task, model, elapsed time,
-turns and current tool, and the background jobs with their last line.
-Selecting one shows a subagent's live transcript and report (with Cancel
-and "Show in chat", which scrolls to its card) or a job's output (with
+that started them), running first: each row is its task, the lamp while it
+runs (with its live elapsed time, current tool, model and turns) or how it
+ended (done, failed with the error, or cancelled, interrupted by a restart
+or killed, shown quietly), and the background jobs the same way with their
+last line. Selecting one shows a subagent's live transcript at the panel's
+width and how it ended (with Cancel while it runs, and "Show in chat" in
+the panel's header, which scrolls to its card) or a job's output (with
 Kill). It opens from the status line ("2 agents running"), the top bar's
 robot button, a subagent's card in the chat, `/agents [n|id]` and `/jobs
 [id]`, and Alt+1…9 (the Nth listed; Alt+] and Alt+[ step through them, Alt+0 closes

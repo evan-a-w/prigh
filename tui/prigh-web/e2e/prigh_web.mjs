@@ -544,7 +544,7 @@ try {
   await page.keyboard.press("Alt+2");
   await page.waitForSelector(".agents-detail .agents-transcript .entries");
   await showPanel("a nested subagent");
-  await page.locator(".detail-actions .btn", { hasText: "Show in chat" }).click();
+  await page.locator(".agents-head .btn", { hasText: "Show in chat" }).click();
   await page.waitForFunction(() => {
     const card = document.querySelector("#chat [data-call=s1] [data-call=n1]");
     const chat = document.getElementById("chat").getBoundingClientRect();
