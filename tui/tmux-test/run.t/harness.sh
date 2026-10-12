@@ -25,6 +25,12 @@ for f in "$exe" "$backend"; do
 	[ -x "$f" ] || { echo "tmux-test: missing $f (build both projects first)"; exit 1; }
 done
 
+# A private tmux server: the scenarios never see (or kill) the user's
+# sessions, even when run from inside tmux.
+socket="prigh-test-$$"
+unset TMUX
+tmux() { command tmux -L "$socket" "$@"; }
+
 W=100
 H=30
 session=""
@@ -51,7 +57,7 @@ start() {
 }
 
 stop() {
-	tmux kill-session -t "$session" 2>/dev/null || true
+	tmux kill-server 2>/dev/null || true
 	rm -rf "$tmp"
 }
 
@@ -90,6 +96,7 @@ normalise() {
 		-e 's/[⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏]/<spin>/g' \
 		-e 's/session [0-9a-f]{16}/session <id>/g' \
 		-e 's/[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9:.]+Z?/<time>/g' \
+		-e 's/[0-9]{4}-[0-9]{2}-[0-9]{2} [0-9]{2}:[0-9]{2}/<time>/g' \
 		-e 's/^(\[[0-9]+\]\+ +Stopped) +/\1 /' \
 		-e 's/^bash-[0-9.]+\$/bash$/' \
 		-e 's/[[:space:]]+$//'
@@ -476,6 +483,89 @@ scenario_send_raw() {
 	wait_for "cwd changed"
 	settle
 	capture send_raw "Alt+S: /cd to what was typed"
+}
+
+# A confirmation that arrives while the sessions picker is open belongs to
+# that session: switching away drops it, switching back brings it back
+# (get_pending).
+setup_switch_pending() {
+	extra_args="-- -faux-script $tmp/script.json"
+	mkdir -p "$tmp/home/.prigh"
+	echo '{"approval_mode": "ask", "permissions": {"allow": ["bash(sleep:*)"]}}' >"$tmp/home/.prigh/config.json"
+	cat >"$tmp/script.json" <<'JSON'
+[
+  {"text": "in the first session"},
+  {"text": "waiting", "tool_calls": [{"id": "c1", "name": "bash", "arguments": {"command": "sleep 2"}}]},
+  {"text": "now", "tool_calls": [{"id": "c2", "name": "bash", "arguments": {"command": "rm -rf build"}}]},
+  {"text": "all done"}
+]
+JSON
+}
+
+scenario_switch_pending() {
+	wait_for "Ctrl+C"
+	type_text "hello"
+	keys Enter
+	wait_for "in the first session"
+	type_text "/new"
+	keys Enter
+	wait_for "new session"
+	type_text "go"
+	keys Enter
+	wait_for "sleep 2"
+	type_text "/sessions"
+	keys Enter
+	wait_for "Sessions"
+	# The confirmation arrives behind the picker.
+	sleep 3
+	keys Down
+	settle
+	capture switch_pending "the picker, a confirmation waiting behind it"
+	keys Enter
+	wait_for "▌ hello"
+	settle
+	capture switch_pending "switched: no dialog from the other session"
+	type_text "/sessions"
+	keys Enter
+	wait_for "Sessions"
+	keys Up Enter
+	wait_for "Run bash: rm -rf build"
+	settle
+	capture switch_pending "back: its confirmation again"
+	keys y
+	wait_for "all done"
+	settle
+	capture switch_pending "answered"
+}
+
+# A dialog open when the backend dies closes (the reason's draft comes
+# back); the respawned backend has no run waiting, so none reopens.
+setup_reconnect_dialog() {
+	extra_args="-- -faux-script $tmp/script.json"
+	mkdir -p "$tmp/home/.prigh"
+	echo '{"approval_mode": "ask"}' >"$tmp/home/.prigh/config.json"
+	cat >"$tmp/script.json" <<'JSON'
+[
+  {"text": "asking", "tool_calls": [{"id": "c1", "name": "bash", "arguments": {"command": "make deploy"}}]},
+  {"text": "never"}
+]
+JSON
+}
+
+scenario_reconnect_dialog() {
+	wait_for "Ctrl+C"
+	type_text "go"
+	keys Enter
+	wait_for "Run bash: make deploy"
+	keys r
+	wait_for "Why not"
+	type_text "not on a Fri"
+	settle
+	capture reconnect_dialog "typing the reason"
+	pkill -f "serve -faux -cwd $tmp/cwd"
+	wait_for "reconnected to the backend"
+	settle
+	capture reconnect_dialog "reconnected: the dialog closed"
 }
 
 run_scenario "$1"

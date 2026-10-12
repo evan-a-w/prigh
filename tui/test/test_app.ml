@@ -5559,7 +5559,7 @@ let%expect_test "tool confirm: allow, deny, queue and Esc-abort" =
     └──────────────────────────────────────────────────────────┘
     ────────────────────────────────────────────────────────────
     ? ▏
-    …deepseek-flash  think:off  ctx:0.1%/1.0M  confirm: y/n/r
+    …deepseek-flash  ctx:0.1%/1.0M  to answer:3  confirm: y/n/r
     |}];
   H.keys h "y";
   H.show h;
@@ -5582,7 +5582,7 @@ let%expect_test "tool confirm: allow, deny, queue and Esc-abort" =
     └──────────────────────────────────────────────────────────┘
     ────────────────────────────────────────────────────────────
     ? ▏
-    …deepseek-flash  think:off  ctx:0.1%/1.0M  confirm: y/n/r
+    …deepseek-flash  ctx:0.1%/1.0M  to answer:2  confirm: y/n/r
     |}];
   H.keys h "y";
   H.show h;
@@ -5605,7 +5605,7 @@ let%expect_test "tool confirm: allow, deny, queue and Esc-abort" =
     └──────────────────────────────────────────────────────────┘
     ────────────────────────────────────────────────────────────
     ? ▏
-    …deepseek-flash  think:off  ctx:0.1%/1.0M  confirm: y/n/r
+    …deepseek-flash  ctx:0.1%/1.0M  to answer:1  confirm: y/n/r
     |}];
   H.keys h "n";
   [%expect

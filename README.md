@@ -713,7 +713,9 @@ The status line is quiet gray: cwd, model, `think:`, `view:`, the context
 80%), cost (`$1.20/$5.00` against a budget: yellow from 80%, red once
 spent), and then whatever is going on — the goal (`goal:3/20`,
 `goal:done`, `goal:stopped`), a scheduled resume (`resumes 14:05`),
-`queued:N`, agents, jobs, the tool host — with the current mode's keys (`⠋ working · Esc aborts · Enter
+`queued:N`, `to answer:N` (confirmations and questions waiting behind an
+open dialog, in yellow), agents, jobs, the tool host — with the current
+mode's keys (`⠋ working · Esc aborts · Enter
 steers`, a picker's keys) in yellow. `think:` and `mode:` are always there
 (at narrow widths they outlast the cost and the cwd; `view:` gives way to
 the cwd first). Queued steers and follow-ups (whichever frontend queued
