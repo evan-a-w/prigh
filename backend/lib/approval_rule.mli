@@ -49,9 +49,11 @@ end
     pattern covers every call of its tools; otherwise every part must match
     some rule. For [bash], the parts are the command's segments, so [cd x &&
     rm y] is not covered by [cd:*] alone, but is by [cd:*] and [rm:*];
-    commands with substitutions ([$(...)], backquotes, [<(...)]) or output
-    redirections ([>]) are never covered by patterns, so allow rules cannot
-    let one through. For file tools, the parts are the paths. *)
+    comments are left out. Commands with substitutions ([$(...)],
+    backquotes, [<(...)]), ANSI-C quotes ([$'...']), here-documents,
+    parentheses (subshells, function definitions) or output redirections to
+    files ([>], [>&FILE]) are never covered by patterns, so allow rules
+    cannot let one through. For file tools, the parts are the paths. *)
 val covers : t list -> cwd:string -> home:string -> Call.t -> bool
 
 (** Whether the rule matches any part of the call: for [bash], any part of

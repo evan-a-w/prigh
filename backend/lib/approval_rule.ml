@@ -127,85 +127,109 @@ let segments command =
     then skip_blanks (i + 1)
     else i
   in
-  (* [i] is just after [>] or [>>]: [>&N] duplicates a descriptor and
-     [/dev/null] discards; any other target writes a file. *)
-  let redirect start i =
-    if i < n && Char.equal command.[i] '&'
-    then (
-      add_range start (i + 1);
-      i + 1)
-    else (
-      let i' = skip_blanks i in
-      let rec word j =
-        if
-          j < n
-          && (not (Char.is_whitespace command.[j]))
-          && not (String.mem ";&|<>()" command.[j])
-        then word (j + 1)
-        else j
-      in
-      let j = word i' in
+  let word_end j =
+    let rec word j =
       if
-        not
-          (String.equal (String.sub command ~pos:i' ~len:(j - i')) "/dev/null")
-      then complex := true;
-      add_range start j;
-      j)
+        j < n
+        && (not (Char.is_whitespace command.[j]))
+        && not (String.mem ";&|<>()" command.[j])
+      then word (j + 1)
+      else j
+    in
+    word j
   in
-  let rec go i quote =
+  (* [i] is just after [>] or [>>]: [>&N] and [>&-] duplicate or close a
+     descriptor and [/dev/null] discards; any other target writes a file. *)
+  let redirect start i =
+    let dup = i < n && Char.equal command.[i] '&' in
+    let i' = skip_blanks (if dup then i + 1 else i) in
+    let j = word_end i' in
+    let target = String.sub command ~pos:i' ~len:(j - i') in
+    let is_fd =
+      match String.chop_suffix target ~suffix:"-" with
+      | Some digits -> String.for_all digits ~f:Char.is_digit
+      | None -> (not (String.is_empty target)) && String.for_all target ~f:Char.is_digit
+    in
+    if not ((dup && is_fd) || String.equal target "/dev/null")
+    then complex := true;
+    add_range start j;
+    j
+  in
+  let rec skip_comment i =
+    if i < n && not (Char.equal command.[i] '\n') then skip_comment (i + 1) else i
+  in
+  (* [word_start]: whether an unquoted [#] here starts a comment. *)
+  let rec go i quote ~word_start =
     if i < n
     then (
       let c = command.[i] in
       match quote with
       | `Single ->
         Buffer.add_char buf c;
-        go (i + 1) (if Char.equal c '\'' then `None else `Single)
+        go (i + 1) (if Char.equal c '\'' then `None else `Single) ~word_start:false
       | `Double ->
         if Char.equal c '\\' && i + 1 < n
         then (
           add_range i (i + 2);
-          go (i + 2) `Double)
+          go (i + 2) `Double ~word_start:false)
         else (
           if
             Char.equal c '`'
             || (Char.equal c '$' && Option.equal Char.equal (next i) (Some '('))
           then complex := true;
           Buffer.add_char buf c;
-          go (i + 1) (if Char.equal c '"' then `None else `Double))
+          go (i + 1) (if Char.equal c '"' then `None else `Double) ~word_start:false)
       | `None ->
+        let after = String.mem " \t\n;&|()<>" c in
         (match c, next i with
+         | '#', _ when word_start -> go (skip_comment i) `None ~word_start:true
          | '\\', Some _ ->
            add_range i (i + 2);
-           go (i + 2) `None
+           go (i + 2) `None ~word_start:false
          | '\'', _ ->
            Buffer.add_char buf c;
-           go (i + 1) `Single
+           go (i + 1) `Single ~word_start:false
          | '"', _ ->
            Buffer.add_char buf c;
-           go (i + 1) `Double
-         | '`', _ | '$', Some '(' | '<', Some '(' | '>', Some '(' ->
+           go (i + 1) `Double ~word_start:false
+         | '`', _
+         | '$', Some ('(' | '\'')
+         | ('<' | '>'), Some '('
+         | ('(' | ')'), _ ->
+           (* substitutions, ANSI-C quotes ([\'] does not end them),
+              subshells and function definitions *)
            complex := true;
            Buffer.add_char buf c;
-           go (i + 1) `None
-         | '>', Some '>' -> go (redirect i (i + 2)) `None
-         | '>', _ -> go (redirect i (i + 1)) `None
+           go (i + 1) `None ~word_start:after
+         | '<', Some '<' ->
+           if i + 2 < n && Char.equal command.[i + 2] '<'
+           then (
+             add_range i (i + 3);
+             go (i + 3) `None ~word_start:true)
+           else (
+             (* a here-document's body is not commands *)
+             complex := true;
+             add_range i (i + 2);
+             go (i + 2) `None ~word_start:true)
+         | '>', Some '>' -> go (redirect i (i + 2)) `None ~word_start:true
+         | '>', _ -> go (redirect i (i + 1)) `None ~word_start:true
          | '&', Some '>' ->
            Buffer.add_char buf c;
-           go (i + 1) `None
+           go (i + 1) `None ~word_start:true
          | (';' | '\n'), _ ->
            flush ();
-           go (i + 1) `None
+           go (i + 1) `None ~word_start:true
          | '&', Some '&' | '|', Some ('|' | '&') ->
            flush ();
-           go (i + 2) `None
+           go (i + 2) `None ~word_start:true
          | ('&' | '|'), _ ->
            flush ();
-           go (i + 1) `None
+           go (i + 1) `None ~word_start:true
          | _ ->
            Buffer.add_char buf c;
-           go (i + 1) `None))
+           go (i + 1) `None ~word_start:after))
   in
-  go 0 `None;
+  go 0 `None ~word_start:true;
   flush ();
   List.rev !parts, if !complex then `Complex else `Simple
 ;;

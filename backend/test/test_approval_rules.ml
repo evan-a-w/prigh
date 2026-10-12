@@ -362,3 +362,80 @@ let%expect_test "which built-in tools ask in each mode" =
     plan       bash, write (denied), edit (denied), apply_patch (denied), job_input
     |}]
 ;;
+
+let rule s = Or_error.ok_exn (Approval_rule.of_string s)
+
+let bash command =
+  call "bash" (Jsonaf.to_string (`Object [ "command", `String command ]))
+;;
+
+let%expect_test "allow rules do not let other commands through" =
+  List.iter
+    [ "bash(git status:*)", "git status #'\nrm -rf ~\n#'"
+    ; "bash(git status:*)", "git status # just a comment"
+    ; "bash(echo:*)", "echo \\ #x a#b $# ; rm -rf ~"
+    ; "bash(git status:*)", "git status $'\\'' ; rm -rf ~ #'"
+    ; "bash(git status:*)", "git status <<X\ngit status '\nX\nrm -rf ~ #'"
+    ; "bash(git status:*)", "git status <<-X\nrm\nX"
+    ; "bash(grep:*)", "grep x <<< 'a; rm -rf ~'"
+    ; "bash(echo:*)", "echo x >& ~/.bashrc"
+    ; "bash(echo:*)", "echo x >&2"
+    ; "bash(echo:*)", "echo x 2>&1 >&-"
+    ; "bash(echo:*)", "echo x >& /dev/null"
+    ; "bash(git:*)", "git () (rm -rf ~); git status"
+    ; "bash(git:*)", "(git status)"
+    ]
+    ~f:(fun (r, command) ->
+      let parts, kind = Approval_rule.segments command in
+      print_s
+        [%message
+          command
+            (parts : string list)
+            ~_:
+              ((match kind with
+                | `Simple -> "simple"
+                | `Complex -> "complex")
+               : string)
+            ~covered_by:
+              (if Approval_rule.covers
+                    [ rule r ]
+                    ~cwd:"/work"
+                    ~home:"/home/u"
+                    (bash command)
+               then r
+               else "-"
+               : string)]);
+  [%expect {|
+    ( "git status #'\
+     \nrm -rf ~\
+     \n#'" (parts ("git status" "rm -rf ~")) simple (covered_by -))
+    ("git status # just a comment" (parts ("git status")) simple
+     (covered_by "bash(git status:*)"))
+    ("echo \\ #x a#b $# ; rm -rf ~" (parts ("echo \\ #x a#b $#" "rm -rf ~"))
+     simple (covered_by -))
+    ("git status $'\\'' ; rm -rf ~ #'"
+     (parts ("git status $'\\'' ; rm -rf ~ #'")) complex (covered_by -))
+    ( "git status <<X\
+     \ngit status '\
+     \nX\
+     \nrm -rf ~ #'" (parts ("git status <<X"  "git status '\
+                                             \nX\
+                                             \nrm -rf ~ #'"))
+     complex (covered_by -))
+    ( "git status <<-X\
+     \nrm\
+     \nX" (parts ("git status <<-X" rm X)) complex (covered_by -))
+    ("grep x <<< 'a; rm -rf ~'" (parts ("grep x <<< 'a; rm -rf ~'")) simple
+     (covered_by "bash(grep:*)"))
+    ("echo x >& ~/.bashrc" (parts ("echo x >& ~/.bashrc")) complex
+     (covered_by -))
+    ("echo x >&2" (parts ("echo x >&2")) simple (covered_by "bash(echo:*)"))
+    ("echo x 2>&1 >&-" (parts ("echo x 2>&1 >&-")) simple
+     (covered_by "bash(echo:*)"))
+    ("echo x >& /dev/null" (parts ("echo x >& /dev/null")) simple
+     (covered_by "bash(echo:*)"))
+    ("git () (rm -rf ~); git status" (parts ("git () (rm -rf ~)" "git status"))
+     complex (covered_by -))
+    ("(git status)" (parts ("(git status)")) complex (covered_by -))
+    |}]
+;;
