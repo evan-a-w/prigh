@@ -1444,19 +1444,40 @@ let schedule_reconnect m ~attempt ~delay_ms ~session =
     ] )
 ;;
 
+(* Closes the dialogs answering the session's agent and drops what is waiting
+   to be shown; [get_pending] brings back what is still open. *)
+let drop_pending m =
+  let m = { m with pending_confirms = []; pending_questions = [] } in
+  match m.mode with
+  | Confirm { action = Tool_confirm _; _ }
+  | Question _
+  | Picker { kind = Agents | Queue; _ } -> { m with mode = Editing }
+  | Text_prompt { action = Deny_reason { draft; _ }; _ } ->
+    { m with mode = Editing; editor = Editor.set_text m.editor draft }
+  | _ -> m
+;;
+
+(* Everything that belongs to the session shown, reset when it is replaced
+   (a switch, another user, a reconnect), and the requests that refill it. *)
+let reset_session m =
+  ( follow
+      { (drop_pending m) with
+        skills = Skill_cache.empty
+      ; agents = []
+      ; focus = `Main
+      ; queued_messages = []
+      ; transcript = Transcript.clear m.transcript
+      }
+  , [ rpc "get_state" ~tag:Initial_state
+    ; rpc "get_messages" ~tag:Initial_messages
+    ; rpc "get_pending" ~tag:Pending
+    ] )
+;;
+
 let backend_closed m =
   let m =
-    { m with
-      pending_confirms = []
-    ; pending_questions = []
-    ; state = Option.map m.state ~f:(fun s -> { s with running = false })
-    ; mode =
-        (* They come back with [get_pending] once reconnected. *)
-        (match m.mode with
-         | Confirm { action = Tool_confirm _; _ }
-         | Question _
-         | Text_prompt { action = Deny_reason _; _ } -> Editing
-         | mode -> mode)
+    { (drop_pending m) with
+      state = Option.map m.state ~f:(fun s -> { s with running = false })
     }
   in
   let m =
@@ -1525,17 +1546,9 @@ let reconnect_reply m ~generation result =
          | Ok { client_id; namespace; user } -> Some client_id, namespace, user
          | Error _ -> m.client_id, m.namespace, m.user
        in
-       let m =
-         { m with
-           connection = Connected
-         ; client_id
-         ; namespace
-         ; user
-         ; skills = Skill_cache.empty
-         ; agents = []
-         ; focus = `Main
-         ; transcript = Transcript.clear m.transcript
-         }
+       let m, session_commands =
+         reset_session
+           { m with connection = Connected; client_id; namespace; user }
        in
        let m =
          match session, m.state with
@@ -1549,12 +1562,11 @@ let reconnect_reply m ~generation result =
          | _ -> notice m "reconnected to the backend"
        in
        ( follow m
-       , [ rpc "get_state" ~tag:Initial_state
-         ; rpc "get_messages" ~tag:Initial_messages
-         ; rpc "auth_status" ~tag:Auth_refresh
-         ; rpc "get_config" ~tag:Config
-         ; rpc "list_models" ~tag:Models_catalog
-         ] ))
+       , session_commands
+         @ [ rpc "auth_status" ~tag:Auth_refresh
+           ; rpc "get_config" ~tag:Config
+           ; rpc "list_models" ~tag:Models_catalog
+           ] ))
   | Connected | Reconnecting _ -> m, []
 ;;
 
@@ -3790,6 +3802,14 @@ let rec reply m (tag : Reply_tag.t) (result : (P.Json.t, string) Result.t) =
        decode json ~f:P.Mcp_list.of_json (mcp_approved m server)
      | Pending ->
        decode json ~f:P.Pending.of_json (fun pending ->
+         let m =
+           { m with
+             queued_messages =
+               Queued_message.of_queues
+                 ~steer:pending.steer_texts
+                 ~follow_up:pending.follow_up_texts
+           }
+         in
          ( add_pending_questions
              (add_pending_confirms m pending.confirms)
              pending.questions
@@ -3870,24 +3890,13 @@ let rec reply m (tag : Reply_tag.t) (result : (P.Json.t, string) Result.t) =
          in
          follow { m with transcript }, [])
      | Reload_messages | Reload_messages_notice _ ->
-       let m =
-         { m with
-           skills = Skill_cache.empty
-         ; agents = []
-         ; focus = `Main
-         ; queued_messages = []
-         ; transcript = Transcript.clear m.transcript
-         }
-       in
+       let m, commands = reset_session m in
        let m =
          match tag with
          | Reload_messages_notice text -> notice m text
          | _ -> m
        in
-       ( follow m
-       , [ rpc "get_messages" ~tag:Initial_messages
-         ; rpc "get_state" ~tag:Initial_state
-         ] )
+       follow m, commands
      | Users_list ->
        decode
          json
@@ -3910,18 +3919,14 @@ let rec reply m (tag : Reply_tag.t) (result : (P.Json.t, string) Result.t) =
          json
          ~f:P.Hello_reply.of_json
          (fun { client_id; namespace; user } ->
-            let m =
-              { m with
-                client_id = Some client_id
-              ; namespace
-              ; user
-              ; sessions = None
-              ; skills = Skill_cache.empty
-              ; agents = []
-              ; focus = `Main
-              ; queued_messages = []
-              ; transcript = Transcript.clear m.transcript
-              }
+            let m, session_commands =
+              reset_session
+                { m with
+                  client_id = Some client_id
+                ; namespace
+                ; user
+                ; sessions = None
+                }
             in
             let m =
               notice
@@ -3932,11 +3937,10 @@ let rec reply m (tag : Reply_tag.t) (result : (P.Json.t, string) Result.t) =
                  | None, None -> "switched user")
             in
             ( follow m
-            , [ rpc "get_state" ~tag:Initial_state
-              ; rpc "get_messages" ~tag:Initial_messages
-              ; rpc "auth_status" ~tag:Auth_refresh
-              ; rpc "get_config" ~tag:Config
-              ] ))
+            , session_commands
+              @ [ rpc "auth_status" ~tag:Auth_refresh
+                ; rpc "get_config" ~tag:Config
+                ] ))
      | Session_stats ->
        decode json ~f:P.Session_stats.of_json (fun stats ->
          block m (format_stats stats), [])

@@ -1151,8 +1151,9 @@ let%expect_test "/sessions picker switches and reloads; /logout confirms" =
   H.reply h Reload_messages {|{}|};
   [%expect
     {|
-    (Rpc (method_ get_messages) (params ()) (tag Initial_messages))
     (Rpc (method_ get_state) (params ()) (tag Initial_state))
+    (Rpc (method_ get_messages) (params ()) (tag Initial_messages))
+    (Rpc (method_ get_pending) (params ()) (tag Pending))
     |}];
   H.reply
     ~quiet:true
@@ -2297,8 +2298,9 @@ let%expect_test "/clone reloads and notices" =
   H.reply h (Reload_messages_notice "cloned session") {|{}|};
   [%expect
     {|
-    (Rpc (method_ get_messages) (params ()) (tag Initial_messages))
     (Rpc (method_ get_state) (params ()) (tag Initial_state))
+    (Rpc (method_ get_messages) (params ()) (tag Initial_messages))
+    (Rpc (method_ get_pending) (params ()) (tag Pending))
     |}];
   H.reply ~quiet:true h Initial_messages {|[]|};
   H.show h;
@@ -2915,8 +2917,9 @@ let%expect_test "reload pairs tool calls with their results" =
   H.show h;
   [%expect
     {|
-    (Rpc (method_ get_messages) (params ()) (tag Initial_messages))
     (Rpc (method_ get_state) (params ()) (tag Initial_state))
+    (Rpc (method_ get_messages) (params ()) (tag Initial_messages))
+    (Rpc (method_ get_pending) (params ()) (tag Pending))
 
 
 
@@ -4163,8 +4166,9 @@ let%expect_test "session reload drops subagent transcripts and focus" =
     {|[{"role":"user","text":"go"},{"role":"assistant","content":[{"type":"tool_call","id":"c1","name":"subagent","arguments":"{\"task\":\"look\"}"}],"stop_reason":{"type":"tool_use"},"usage":{"input":1,"output":2,"cache_read":0},"model":"m"},{"role":"tool_result","tool_call_id":"c1","tool_name":"subagent","text":"report","is_error":false}]|};
   [%expect
     {|
-    (Rpc (method_ get_messages) (params ()) (tag Initial_messages))
     (Rpc (method_ get_state) (params ()) (tag Initial_state))
+    (Rpc (method_ get_messages) (params ()) (tag Initial_messages))
+    (Rpc (method_ get_pending) (params ()) (tag Pending))
     |}];
   H.show h;
   [%expect
@@ -6551,6 +6555,7 @@ let%expect_test "reconnect: backoff doubles to the 60s cap, stale replies are \
     {|
     (Rpc (method_ get_state) (params ()) (tag Initial_state))
     (Rpc (method_ get_messages) (params ()) (tag Initial_messages))
+    (Rpc (method_ get_pending) (params ()) (tag Pending))
     (Rpc (method_ auth_status) (params ()) (tag Auth_refresh))
     (Rpc (method_ get_config) (params ()) (tag Config))
     (Rpc (method_ list_models) (params ()) (tag Models_catalog))
@@ -6655,6 +6660,7 @@ let%expect_test "reconnect: a session the backend no longer knows (never \
     {|
     (Rpc (method_ get_state) (params ()) (tag Initial_state))
     (Rpc (method_ get_messages) (params ()) (tag Initial_messages))
+    (Rpc (method_ get_pending) (params ()) (tag Pending))
     (Rpc (method_ auth_status) (params ()) (tag Auth_refresh))
     (Rpc (method_ get_config) (params ()) (tag Config))
     (Rpc (method_ list_models) (params ()) (tag Models_catalog))
@@ -6948,6 +6954,7 @@ let%expect_test "the hello's host id marks this frontend, also after a \
       (as_user ()))
     (Rpc (method_ get_state) (params ()) (tag Initial_state))
     (Rpc (method_ get_messages) (params ()) (tag Initial_messages))
+    (Rpc (method_ get_pending) (params ()) (tag Pending))
     (Rpc (method_ auth_status) (params ()) (tag Auth_refresh))
     (Rpc (method_ get_config) (params ()) (tag Config))
     (Rpc (method_ list_models) (params ()) (tag Models_catalog))
@@ -7497,8 +7504,9 @@ let%expect_test "/new and /switch leave the previous session's subagents behind"
       (method_ new_session)
       (params ())
       (tag (Reload_messages_notice "new session")))
-    (Rpc (method_ get_messages) (params ()) (tag Initial_messages))
     (Rpc (method_ get_state) (params ()) (tag Initial_state))
+    (Rpc (method_ get_messages) (params ()) (tag Initial_messages))
+    (Rpc (method_ get_pending) (params ()) (tag Pending))
     (0 Main)
     Main
     |}]
@@ -7805,6 +7813,7 @@ let%expect_test "/setusr: lists users, acts as one, reconnects as them" =
   [%expect {|
     (Rpc (method_ get_state) (params ()) (tag Initial_state))
     (Rpc (method_ get_messages) (params ()) (tag Initial_messages))
+    (Rpc (method_ get_pending) (params ()) (tag Pending))
     (Rpc (method_ auth_status) (params ()) (tag Auth_refresh))
     (Rpc (method_ get_config) (params ()) (tag Config))
 

@@ -1278,8 +1278,13 @@ copy of the protocol types and the e2e test guards the contract.
     harness notes (`◇ Plan mode on: ...`). Confirmations and questions queue in the
     model (`pending_confirms`, `pending_questions`) and open one at a time
     when the editor has the keyboard; `tool_confirm_done`/`ask_user_done`
-    close one answered elsewhere, `get_pending` at startup (and after a
-    reconnect) brings back what is still waiting. Deny with a reason is a
+    close one answered elsewhere, `get_pending` at startup brings back what
+    is still waiting. Replacing the session shown (a reload, `/setusr`, a
+    reconnect) goes through `reset_session`: it closes the dialogs that
+    answer the old session's agent (the reason prompt gives the draft back),
+    drops the waiting confirmations, questions, queue, agents, focus and
+    transcript, and fetches `get_state`, `get_messages` and `get_pending`,
+    whose reply also sets the queue. Deny with a reason is a
     `Text_prompt` (`Deny_reason`, keeping the editor's draft; Esc goes back
     to the confirmation). `Tool_render` draws `update_plan`, `ask_user` and
     `exit_plan_mode` calls.
