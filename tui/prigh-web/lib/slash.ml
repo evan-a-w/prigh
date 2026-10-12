@@ -136,7 +136,16 @@ let all =
   ; c "fork" "start a new session from an earlier message"
   ; c "rewind" "go back to an earlier message in this session"
   ; c "tree" "show the session tree and move to any message in it"
-  ; c ~argument:Directory ~args:"[path]" "cd" "change the working directory"
+  ; c
+      ~argument:Directory
+      ~args:"[path]"
+      "cd"
+      "change the working directory (asks to create a missing one)"
+  ; c
+      ~argument:Directory
+      ~args:"[path]"
+      "mkdir"
+      "create a directory (and its parents) and change to it"
   ; c
       ~argument:Backend_directory
       ~args:"[path|off]"
