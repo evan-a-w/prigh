@@ -139,6 +139,32 @@ let jobs_part (m : App.Model.t) : Content.Line.t option =
        else []))
 ;;
 
+(* A hint of keys ("A · B · C") cut to [width] by dropping whole keys from
+   the end, the least important; cut short only when the first does not
+   fit. *)
+let fit_keys text ~width =
+  let keys =
+    String.Search_pattern.split_on (String.Search_pattern.create " · ") text
+  in
+  let rec take acc = function
+    | [] -> acc
+    | key :: rest ->
+      let next = if String.is_empty acc then key else acc ^ " · " ^ key in
+      if Text_width.string next <= width then take next rest else acc
+  in
+  match take "" keys with
+  | "" -> Text_width.truncate text ~width
+  | fitted -> fitted
+;;
+
+(* Picker keys beyond the status line's, on the title row. *)
+let picker_keys (kind : Mode.Picker_kind.t) =
+  match kind with
+  | Sessions _ ->
+    Some "Alt+A (un)archives · Alt+D deletes archived · Ctrl+N named"
+  | _ -> None
+;;
+
 let mode_hint (m : App.Model.t) : Content.Line.t option =
   match m.connection with
   | Reconnecting { attempt; delay_ms; _ } ->
@@ -177,8 +203,7 @@ let mode_hint (m : App.Model.t) : Content.Line.t option =
             [ span
                 ~style:attention
                 (marked
-                 ^ "Enter switches · Tab marks · Ctrl+D deletes · Alt+A \
-                    (un)archives · Alt+D deletes archived · Ctrl+N named")
+                 ^ "Enter switches · Tab marks · Ctrl+D deletes · Esc closes")
             ]
         | Picker { kind = Agents; _ } ->
           Some
@@ -212,13 +237,18 @@ let mode_hint (m : App.Model.t) : Content.Line.t option =
           Some [ span ~style:attention "Enter selects · Esc closes" ]
         | Login_prompt _ ->
           Some [ span ~style:attention "login: Enter answers · Esc cancels" ]
+        | Text_prompt { action = Deny_reason _; _ } ->
+          Some [ span ~style:attention "Enter denies · Esc goes back" ]
         | Text_prompt _ ->
           (match m.autocomplete with
            | Some ac when Autocomplete.accepts_on_enter ac ->
              Some [ span ~style:attention "Tab/Enter accept · Alt+S as typed" ]
            | Some _ ->
              Some
-               [ span ~style:attention "Tab completes · Enter submits · Esc" ]
+               [ span
+                   ~style:attention
+                   "Tab completes · Enter submits · Esc hides"
+               ]
            | None ->
              Some [ span ~style:attention "Enter submits · Esc cancels" ])
         | Confirm { action = Tool_confirm c; _ } ->
@@ -233,12 +263,7 @@ let mode_hint (m : App.Model.t) : Content.Line.t option =
             ]
         | Confirm _ -> Some [ span ~style:attention "confirm: y / n" ]
         | Question _ ->
-          Some
-            [ span
-                ~style:attention
-                "↑↓ choose · Space picks · type to answer · ←→ questions · \
-                 Enter accepts · Esc declines"
-            ]
+          Some [ span ~style:attention "Enter accepts · Esc declines" ]
         | Search { query = _; matches; current } ->
           if List.is_empty matches
           then
@@ -258,7 +283,9 @@ let mode_hint (m : App.Model.t) : Content.Line.t option =
              Some [ span ~style:attention "Tab/Enter accept · Alt+S as typed" ]
            | Some _ ->
              Some
-               [ span ~style:attention "Tab accepts · Enter runs as typed · Esc"
+               [ span
+                   ~style:attention
+                   "Tab accepts · Enter as typed · Esc hides"
                ]
            | None ->
              if m.pending_quit
@@ -373,6 +400,24 @@ let confirm_dialog ~width (c : P.Pending.Confirm.t) =
     (Content.wrap [ [ question ] ] ~width:inner @ plan @ answers)
 ;;
 
+(* The keys of a question, most important first, wrapped in the box. *)
+let question_keys ~(q : P.Question.t) ~total =
+  let has_choices = not (List.is_empty q.choices) in
+  List.filter_opt
+    [ Option.some_if has_choices "↑↓ choose"
+    ; Option.some_if q.multiple "Space toggles"
+    ; Some (if has_choices then "type your own" else "type an answer")
+    ; Some
+        (if q.multiple
+         then "Enter accepts"
+         else if has_choices
+         then "Enter picks"
+         else "Enter answers")
+    ; Option.some_if (total > 1) "←→ questions"
+    ; Some "Esc declines (the model is told)"
+    ]
+;;
+
 (* The dialog and where the cursor goes in it (the own answer's end). *)
 let question_dialog ~width form =
   let inner = Boxed.inner_width ~width in
@@ -420,16 +465,15 @@ let question_dialog ~width form =
   let own = Question_form.own_answer form ~question:index in
   let own_line = [ span ~style:attention own_prefix; span own ] in
   let hint =
-    [ span
-        ~style:gray
-        (if q.multiple
-         then "Space toggles · Enter: next"
-         else if List.is_empty q.choices
-         then "Enter answers"
-         else "Enter picks")
-    ]
+    (* Whole keys to a row. *)
+    List.fold (question_keys ~q ~total) ~init:[] ~f:(fun rows key ->
+      match rows with
+      | row :: rest when Text_width.string (row ^ " · " ^ key) <= inner ->
+        (row ^ " · " ^ key) :: rest
+      | rows -> key :: rows)
+    |> List.rev_map ~f:(fun row -> [ span ~style:gray row ])
   in
-  let body = wrapped @ choices @ [ own_line; hint ] in
+  let body = wrapped @ choices @ [ own_line ] @ hint in
   let cursor =
     if Question_form.on_own_answer form
     then
@@ -543,7 +587,14 @@ let status (m : App.Model.t) : Content.Line.t =
             if w <= room
             then (i, part) :: kept, used + 2 + w
             else if i = hint_index && room >= 12
-            then (i, Content.Line.truncate part ~width:room) :: kept, max_width
+            then (
+              let part =
+                match part with
+                | [ (hint : Content.Span.t) ] ->
+                  [ { hint with text = fit_keys hint.text ~width:room } ]
+                | part -> Content.Line.truncate part ~width:room
+              in
+              (i, part) :: kept, max_width)
             else kept, used)
       in
       ( List.map
@@ -571,10 +622,11 @@ let status (m : App.Model.t) : Content.Line.t =
 (* Editor lines hard-wrapped after a two-column marker, returning the rows and
    the cursor position relative to the first row. Collapsed paste chips render
    as a single dim line while the cursor is elsewhere. *)
-let editor_rows (m : App.Model.t) ~marker ~marker_style ~mask
+let editor_rows ?(width = 0) (m : App.Model.t) ~marker ~marker_style ~mask
   : Content.t * (int * int)
   =
-  let inner = Int.max 1 (m.width - 2) in
+  let width = if width > 0 then width else m.width in
+  let inner = Int.max 1 (width - 2) in
   let pos = Editor.position m.editor in
   let lines = Editor.lines m.editor in
   let chips = Editor.chips m.editor in
@@ -651,6 +703,28 @@ let editor_rows (m : App.Model.t) ~marker ~marker_style ~mask
   List.rev !rows, !cursor
 ;;
 
+(* The reason for denying a tool call, typed in the box under the call it
+   is about; the cursor is in the box. *)
+let deny_reason_dialog (m : App.Model.t) ~width ~question c =
+  let inner = Boxed.inner_width ~width in
+  let call =
+    Content.wrap
+      [ [ span ~style:(Style.bold (Style.fg Yellow)) (Confirm_prompt.title c) ]
+      ]
+      ~width:inner
+  in
+  let rows, (row, col) =
+    editor_rows
+      m
+      ~width:inner
+      ~marker:"› "
+      ~marker_style:(Style.bold (Style.fg Yellow))
+      ~mask:false
+  in
+  ( Boxed.render ~title:question ~width (call @ rows)
+  , (1 + List.length call + row, 2 + col) )
+;;
+
 let max_queued_shown = 3
 
 (** The queued steers and follow-ups above the editor, oldest first. *)
@@ -687,7 +761,7 @@ let queued_block (m : App.Model.t) : Content.t =
     List.map ((header :: rows) @ more) ~f:(Content.Line.truncate ~width:m.width))
 ;;
 
-let picker_block (p : Picker.t) ~width ~height : Content.t * int =
+let picker_block ?keys (p : Picker.t) ~width ~height : Content.t * int =
   let picker_rows = App.picker_rows ~height in
   let visible = Picker.visible p in
   let selected = Picker.selected p in
@@ -713,6 +787,15 @@ let picker_block (p : Picker.t) ~width ~height : Content.t * int =
              (start + List.length shown)
              total)
     ]
+  in
+  let title =
+    match keys with
+    | None -> title
+    | Some keys ->
+      let room = width - Content.Line.width title - 2 in
+      if room < 12
+      then title
+      else title @ [ span ~style:dim ("  " ^ fit_keys keys ~width:room) ]
   in
   let filter =
     [ span ~style:(Style.bold (Style.fg Yellow)) "/ "; span (Picker.query p) ]
@@ -887,8 +970,10 @@ let screen (m : App.Model.t) : Screen.t =
   let status_line = status m in
   let dialog, editor, cursor =
     match m.mode with
-    | Picker { picker; _ } ->
-      let block, cursor_row = picker_block picker ~width ~height in
+    | Picker { picker; kind } ->
+      let block, cursor_row =
+        picker_block ?keys:(picker_keys kind) picker ~width ~height
+      in
       let query_width = Text_width.string (Picker.query picker) in
       block, [], (cursor_row, 2 + query_width)
     | Confirm { action = Tool_confirm c; _ } ->
@@ -938,6 +1023,9 @@ let screen (m : App.Model.t) : Screen.t =
              ~width:(Boxed.inner_width ~width))
       , rows
       , cursor )
+    | Text_prompt { question; action = Deny_reason { confirm; _ } } ->
+      let dialog, cursor = deny_reason_dialog m ~width ~question confirm in
+      dialog, [], cursor
     | Text_prompt { question; _ } ->
       let rows, cursor =
         editor_rows
@@ -1035,7 +1123,8 @@ let screen (m : App.Model.t) : Screen.t =
     let row, col = cursor in
     let base =
       match m.mode with
-      | Picker _ | Question _ -> transcript_area_rows
+      | Picker _ | Question _ | Text_prompt { action = Deny_reason _; _ } ->
+        transcript_area_rows
       | _ -> transcript_area_rows + dialog_rows + 1 + queued_rows
     in
     Some (base + row, Int.min col (width - 1))
