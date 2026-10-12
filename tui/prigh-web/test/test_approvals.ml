@@ -237,12 +237,12 @@ let%expect_test "/mode NAME, /plan, /confirm" =
   H.text h ~selector:".popup";
   [%expect
     {|
-    Modes ↑↓ Tab Enter Esc
+    Modes ↑↓ Tab Enter Esc · Ctrl+Enter as typed
     ask bash, job_input, edits and MCP tools ask first
     auto-edit file edits run; bash, job_input and MCP tools ask first
     auto tools run without asking
     plan read-only planning: no file edits; bash, job_input and MCP tools ask first
-    Plan mode ↑↓ Tab Enter Esc
+    Plan mode ↑↓ Tab Enter Esc · Ctrl+Enter as typed
     on read-only planning until you approve the plan
     off leave plan mode
     |}]

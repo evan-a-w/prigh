@@ -396,7 +396,7 @@ let%expect_test "custom providers in /auth, /login and /logout: edit and remove"
   [%expect
     {|
     (Focus editor)
-    Providers ↑↓ Tab Enter Esc
+    Providers ↑↓ Tab Enter Esc · Ctrl+Enter as typed
     Anthropic logged in
     OpenAI
     DeepSeek

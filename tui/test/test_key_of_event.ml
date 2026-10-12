@@ -165,6 +165,7 @@ let%expect_test "keymap: every bound key is reachable from a terminal event" =
     {|
     Enter            (Key_press (key Enter))          ok
     Alt+Enter        (Key_press (key Enter) (mods (Meta))) ok
+    Alt+S            (Key_press (key (ASCII s)) (mods (Meta))) ok
     Ctrl+J           (Key_press (key (ASCII j)) (mods (Ctrl))) ok
     Alt+J            (Key_press (key (ASCII j)) (mods (Meta))) ok
     Esc              (Key_press (key Escape))         ok

@@ -554,6 +554,7 @@ let%expect_test "keymap: every binding resolves to its intent and is documented"
     {|
     Enter            Submit
     Alt+Enter        Queue_follow_up
+    Alt+S            Submit_as_typed
     Ctrl+J           Newline
     Alt+J            Newline
     Esc              Cancel
@@ -617,6 +618,7 @@ let%expect_test "keymap: every binding resolves to its intent and is documented"
     {|
     Enter                   send the prompt / accept the highlighted item
     Alt+Enter               queue a follow-up to run after the current turn
+    Alt+S                   send exactly what is typed, ignoring the completion popup
     Ctrl+J / Alt+J          insert a newline
     Esc                     close the dialog, or abort the running turn
     Tab                     complete a slash command / open the command picker

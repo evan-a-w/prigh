@@ -759,7 +759,7 @@ let%expect_test "typing / lists commands, Down twice + Tab fills /login " =
       /default-dir [off|path]         show or set the directory…
       /login [provider] [api_key|oauth]  log in to a provider
       ↕ 1–8 of 56
-    …deepseek-flash  ctx:0.1%/1.0M  Tab/Enter accept · Esc close
+    …deepseek-flash  $0.01  Tab/Enter accept · Alt+S as typed
     |}];
   H.key h (Key.plain Down);
   H.show h;
@@ -776,7 +776,7 @@ let%expect_test "typing / lists commands, Down twice + Tab fills /login " =
       /default-dir [off|path]         show or set the directory…
       /login [provider] [api_key|oauth]  log in to a provider
       ↕ 1–8 of 56
-    …deepseek-flash  ctx:0.1%/1.0M  Tab/Enter accept · Esc close
+    …deepseek-flash  $0.01  Tab/Enter accept · Alt+S as typed
     |}];
   H.key h (Key.plain Down);
   H.show h;
@@ -793,7 +793,7 @@ let%expect_test "typing / lists commands, Down twice + Tab fills /login " =
       /default-dir [off|path]         show or set the directory…
       /login [provider] [api_key|oauth]  log in to a provider
       ↕ 1–8 of 56
-    …deepseek-flash  ctx:0.1%/1.0M  Tab/Enter accept · Esc close
+    …deepseek-flash  $0.01  Tab/Enter accept · Alt+S as typed
     |}];
   H.key h (Key.plain Tab);
   H.show h;
@@ -867,7 +867,7 @@ let%expect_test "Esc closes autocomplete without abort while running" =
       /scoped-models                  pick the models Ctrl+P cy…
       /import [path]                  import a session from a J…
       /permissions                    show the mode and the all…
-    …deepseek-flash  ctx:0.1%/1.0M  Tab/Enter accept · Esc close
+    …deepseek-flash  $0.01  Tab/Enter accept · Alt+S as typed
     |}];
   H.esc h;
   H.show h;
@@ -921,7 +921,7 @@ let%expect_test "@ completion is asynchronous and drops stale replies" =
       earlier answer
     ────────────────────────────────────────────────────────────
     > @src▏
-    …deepseek-flash  ctx:0.1%/1.0M  Tab/Enter accept · Esc close
+    …deepseek-flash  $0.01  Tab/Enter accept · Alt+S as typed
     |}];
   H.reply h (Paths_for_autocomplete "src") {|["src/","src/app.ml"]|};
   H.show h;
@@ -935,7 +935,7 @@ let%expect_test "@ completion is asynchronous and drops stale replies" =
     > @src▏
     ▸ src/
       src/app.ml
-    …deepseek-flash  ctx:0.1%/1.0M  Tab/Enter accept · Esc close
+    …deepseek-flash  $0.01  Tab/Enter accept · Alt+S as typed
     |}]
 ;;
 
@@ -1013,7 +1013,7 @@ let%expect_test "/cd completes paths and submits the selected one" =
     ────────────────────────────────────────────────────────────
     > /cd sr▏
     ▸ src/
-    …deepseek-flash  ctx:0.1%/1.0M  Tab/Enter accept · Esc close
+    …deepseek-flash  $0.01  Tab/Enter accept · Alt+S as typed
     |}];
   H.key h (Key.plain Down);
   H.key h (Key.plain Enter);
@@ -1030,7 +1030,9 @@ let%expect_test "/cd completes paths and submits the selected one" =
     |}]
 ;;
 
-let%expect_test "Alt+S and Esc then Enter send what is typed, not the highlight" =
+let%expect_test
+    "Alt+S and Esc then Enter send what is typed, not the highlight"
+  =
   let h = connected () in
   let popup text =
     H.step ~quiet:true h (Intent (Insert text));
@@ -1047,7 +1049,7 @@ let%expect_test "Alt+S and Esc then Enter send what is typed, not the highlight"
     ────────────────────────────────────────────────────────────
     > /cd new▏
     ▸ newer/
-    …deepseek-flash  ctx:0.1%/1.0M  Tab/Enter accept · Alt+S as typed · Esc
+    …deepseek-flash  $0.01  Tab/Enter accept · Alt+S as typed
     |}];
   H.key h (Key.alt (Char "s"));
   H.show h;
@@ -1061,13 +1063,18 @@ let%expect_test "Alt+S and Esc then Enter send what is typed, not the highlight"
         (command "/cd new")
         (hint    "Tab after /cd completes directories")
         (then_ (Notice_on_success "cwd changed")))))
+
+
+
+
+
       prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
     ▌ earlier question
       earlier answer
     ────────────────────────────────────────────────────────────
     > ▏
-    …deepseek-flash  ctx:0.1%/1.0M
+    …deepseek-flash  think:off  mode:auto  ctx:0.1%/1.0M  $0.01
     |}];
   popup "/cd new";
   H.esc h;
@@ -1091,10 +1098,20 @@ let%expect_test "Alt+S and Esc then Enter send what is typed, not the highlight"
   H.key h (Key.alt (Char "s"));
   [%expect
     {|
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+
+    ▌ earlier question
+      earlier answer
+    ┌─ Change directory to ────────────────────────────────────┐
+    └──────────────────────────────────────────────────────────┘
+    ────────────────────────────────────────────────────────────
+    ? new▏
+    ▸ newer/
+    …deepseek-flash  $0.01  Tab/Enter accept · Alt+S as typed
     (Rpc
-      (method_ list_dirs)
-      (params ((prefix "")))
-      (tag (Dirs_for_autocomplete "")))
+      (method_ set_cwd)
+      (params ((path new)))
+      (tag (Notice_on_success "cwd changed")))
     |}]
 ;;
 
@@ -4572,7 +4589,7 @@ let%expect_test "Ctrl+Z suspends; Ctrl+R completes a path; Ctrl+L picks a model"
     > @sr▏
     ▸ src/
       src/app.ml
-    …deepseek-flash  ctx:0.1%/1.0M  Tab/Enter accept · Esc close
+    …deepseek-flash  $0.01  Tab/Enter accept · Alt+S as typed
     |}];
   H.key h (Key.ctrl 'l');
   [%expect
@@ -6346,6 +6363,7 @@ let%expect_test "keymap: every binding is covered by a scenario" =
     {|
     Enter            Submit                   covered
     Alt+Enter        Queue_follow_up          covered
+    Alt+S            Submit_as_typed          covered
     Ctrl+J/Alt+J     Newline                  covered
     Esc              Cancel                   covered
     Tab              Complete                 covered
@@ -6786,7 +6804,7 @@ let%expect_test "switching tool host asks for the directory there, prefilled \
     ──────────────────────────────────────────────────────────────────────
     ? /work▏
     ▸ /work/
-    …m  think:n/a  ctx:0.0%/1.0k  Tab completes · Enter submits · Esc
+    …m  think:n/a  ctx:0.0%/1.0k  $0.00  Tab/Enter accept · Alt+S as typed
     |}];
   H.key h (Key.plain Tab);
   [%expect
@@ -6813,7 +6831,7 @@ let%expect_test "switching tool host asks for the directory there, prefilled \
     ──────────────────────────────────────────────────────────────────────
     ? /work/s▏
     ▸ /work/src/
-    …m  think:n/a  ctx:0.0%/1.0k  Tab completes · Enter submits · Esc
+    …m  think:n/a  ctx:0.0%/1.0k  $0.00  Tab/Enter accept · Alt+S as typed
     |}];
   H.enter h;
   [%expect
@@ -7058,7 +7076,7 @@ let%expect_test
     ▸ Claude Fable 5.1     anthropic/claude-fable-5-1
       GPT-5.5              openai/gpt-5.5
       DeepSeek V4.1 Flash  deepseek/deepseek-flash
-    …deepseek-flash  ctx:0.1%/1.0M  Tab/Enter accept · Esc close
+    …deepseek-flash  $0.01  Tab/Enter accept · Alt+S as typed
     |}];
   H.enter h;
   [%expect
@@ -7292,7 +7310,7 @@ let%expect_test "Tab on an empty editor opens the command list; the list shows \
       /default-dir [off|path]         show or set the directory…
       /login [provider] [api_key|oauth]  log in to a provider
       ↕ 1–8 of 56
-    …deepseek-flash  ctx:0.1%/1.0M  Tab/Enter accept · Esc close
+    …deepseek-flash  $0.01  Tab/Enter accept · Alt+S as typed
     |}];
   H.key h (Key.plain End);
   H.show h;
@@ -7309,7 +7327,7 @@ let%expect_test "Tab on an empty editor opens the command list; the list shows \
       /default-dir [off|path]         show or set the directory…
       /login [provider] [api_key|oauth]  log in to a provider
       ↕ 1–8 of 56
-    …deepseek-flash  ctx:0.1%/1.0M  Tab/Enter accept · Esc close
+    …deepseek-flash  $0.01  Tab/Enter accept · Alt+S as typed
     |}];
   H.keys h "qu";
   H.enter h;
