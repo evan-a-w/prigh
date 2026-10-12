@@ -67,6 +67,17 @@ let scoped_models (picker : Picker.t) checked ~inject =
               [ Attr.id "picker-input"
               ; Attr.type_ "text"
               ; Attr.placeholder "Filter models…"
+              ; Attr.create "aria-label" "Filter models"
+              ; Attr.role "combobox"
+              ; Attr.create "aria-controls" "picker-list"
+              ; Attr.create "aria-expanded" "true"
+              ; Attr.create "aria-autocomplete" "list"
+              ; (if List.is_empty visible
+                 then Attr.empty
+                 else
+                   Attr.create
+                     "aria-activedescendant"
+                     (sprintf "picker-option-%d" (Picker.selected picker)))
               ; Attr.value (Picker.query picker)
               ; Attr.create "autocomplete" "off"
               ; Attr.create "spellcheck" "false"
@@ -77,7 +88,11 @@ let scoped_models (picker : Picker.t) checked ~inject =
     ; div
         ~cls:"picker-items"
         ~attrs:
-          [ Attr.role "listbox"; Attr.create "aria-multiselectable" "true" ]
+          [ Attr.role "listbox"
+          ; Attr.id "picker-list"
+          ; Attr.create "aria-label" "Models"
+          ; Attr.create "aria-multiselectable" "true"
+          ]
         (List.mapi visible ~f:(fun i (item : Picker.Item.t) ->
            let on = Set.mem checked item.id in
            Node.div
@@ -89,6 +104,7 @@ let scoped_models (picker : Picker.t) checked ~inject =
                    ; "dimmed", item.dimmed
                    ]
                ; Attr.role "option"
+               ; Attr.id (sprintf "picker-option-%d" i)
                ; Attr.create "aria-selected" (Bool.to_string on)
                ; Attr.on_click (fun _ -> inject (Action.Toggle_scoped item.id))
                ]

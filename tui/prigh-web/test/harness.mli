@@ -63,6 +63,11 @@ val show : ?selector:string -> t -> unit
     [\[value\]]. *)
 val text : ?selector:string -> t -> unit
 
+(** The accessible name of each element [selector] matches (its
+    [aria-label], else its text, else its [title]), with its role and its
+    tooltip when that says more. *)
+val names : selector:string -> t -> unit
+
 (** The tag and class of each element [selector] matches. *)
 val elements : selector:string -> t -> unit
 

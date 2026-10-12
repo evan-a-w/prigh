@@ -106,7 +106,7 @@ let%expect_test "/budget shows, sets and clears the budget" =
     (Expire_toast (id 2) (after_ms 3300))
     (Save_history ("/budget lots" "/budget off" "/budget $2.50" /budget))
     Budget removed: turns start whatever it costs
-    "lots" is not a budget: /budget DOLLARS (e.g. /budget 5) or /budget off
+    "lots" is not a budget: /budget DOLLARS (e.g. /budget 5) or /budget off (Dismiss)
     |}]
 ;;
 
@@ -198,7 +198,7 @@ let%expect_test "/resume shows, runs now or cancels the automatic resume" =
     (Expire_toast (id 3) (after_ms 3540))
     (Save_history ("/resume later" "/resume cancel" "/resume now" /resume))
     Automatic resume cancelled: send a message to retry
-    Unknown /resume argument "later": /resume now retries at once, /resume cancel stays stopped.
+    Unknown /resume argument "later": /resume now retries at once, /resume cancel stays stopped. (Dismiss)
     |}]
 ;;
 
@@ -215,15 +215,15 @@ let%expect_test "completion offers the keywords, but not over a goal's text" =
   complete "/budget ";
   [%expect
     {|
-    Goal ↑↓ Tab Enter Esc · Ctrl+Enter as typed
+    Goal ↑↓ Tab Enter Esc   Ctrl+Enter as typed
     off clear the goal
     resume make a stopped goal active
-    Goal ↑↓ Tab Enter Esc · Ctrl+Enter as typed
+    Goal ↑↓ Tab Enter Esc   Ctrl+Enter as typed
     resume make a stopped goal active
-    Automatic resume ↑↓ Tab Enter Esc · Ctrl+Enter as typed
+    Automatic resume ↑↓ Tab Enter Esc   Ctrl+Enter as typed
     now retry the run at once
     cancel stay stopped until you send a message
-    Budget ↑↓ Tab Enter Esc · Ctrl+Enter as typed
+    Budget ↑↓ Tab Enter Esc   Ctrl+Enter as typed
     off no budget: turns start whatever it costs
     |}]
 ;;

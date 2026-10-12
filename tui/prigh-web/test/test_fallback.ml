@@ -146,7 +146,7 @@ let%expect_test
     (Save_history ("/fallback gpt-6 nope"))
     (Rpc (method_ set_config)
      (params ((config ((fallback_models (gpt-6 nope)))))) (tag Fallback_saved))
-    Couldn't set the fallback models: fallback_models: unknown model "nope"; did you mean: openai/gpt-6 (GPT-6)
+    Couldn't set the fallback models: fallback_models: unknown model "nope"; did you mean: openai/gpt-6 (GPT-6) (Dismiss)
     (((scoped_models ()) (approval_mode Auto)
       (permissions ((allow ()) (ask ()) (deny ()))) (default_model ())
       (default_thinking ()) (fallback_models ()) (default_cwd ())
@@ -169,7 +169,7 @@ let%expect_test "/fallback completes a model key per word" =
   H.text h ~selector:".popup";
   [%expect
     {|
-    Fallback models, in order ↑↓ Tab Enter Esc · Ctrl+Enter as typed
+    Fallback models, in order ↑↓ Tab Enter Esc   Ctrl+Enter as typed
     Claude Opus 5.5 anthropic
     Claude Sonnet 5 anthropic
     GPT-6 openai
@@ -185,7 +185,7 @@ let%expect_test "/fallback completes a model key per word" =
     {|
     (Complete_accept (run false))
     ((m.draft "/fallback openai/gpt-6 ") (m.cursor 23))
-    Fallback models, in order ↑↓ Tab Enter Esc · Ctrl+Enter as typed
+    Fallback models, in order ↑↓ Tab Enter Esc   Ctrl+Enter as typed
     Claude Opus 5.5 anthropic
     Claude Sonnet 5 anthropic
     DeepSeek Chat deepseek
@@ -221,7 +221,7 @@ let%expect_test "/fallback completes a model key per word" =
   draft h;
   [%expect
     {|
-    Fallback models, in order ↑↓ Tab Enter Esc · Ctrl+Enter as typed
+    Fallback models, in order ↑↓ Tab Enter Esc   Ctrl+Enter as typed
     DeepSeek Chat deepseek
     Claude Opus 5.5 anthropic
     Claude Sonnet 5 anthropic
@@ -303,7 +303,7 @@ let%expect_test "/default-dir shows, sets and clears where new sessions start" =
       "/default-dir ~/proj" /default-dir))
     (Rpc (method_ set_config) (params ((config ((default_cwd /etc/passwd)))))
      (tag Default_dir_saved))
-    Couldn't set the default directory: config.default_cwd must be a directory
+    Couldn't set the default directory: config.default_cwd must be a directory (Dismiss)
     |}]
 ;;
 
@@ -319,7 +319,7 @@ let%expect_test "/default-dir completes directories on the backend's host" =
     {|
     (Rpc (method_ list_dirs) (params ((prefix /wo) (host backend)))
      (tag (Paths /wo)))
-    Directories on the backend ↑↓ Tab Enter Esc · Ctrl+Enter as typed
+    Directories on the backend ↑↓ Tab Enter Esc   Ctrl+Enter as typed
     /work/
     /world/
     |}];
@@ -397,7 +397,7 @@ let%expect_test "/default-dir: a relative path is the backend host's" =
     (Rpc (method_ list_dirs) (params ((prefix repos) (host backend)))
      (tag (Paths repos)))
     (Save_history ("/default-dir repos"))
-    Relative to what? The backend's directory isn't known yet: give an absolute path (/default-dir /path/to/repos)
+    Relative to what? The backend's directory isn't known yet: give an absolute path (/default-dir /path/to/repos) (Dismiss)
     |}]
 ;;
 

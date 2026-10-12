@@ -77,7 +77,7 @@ let%expect_test
         <span class="terminal-state"> connecting… </span>
         <button type="button"
                 title="Close (Ctrl+`): the shell keeps running for 10 minutes"
-                aria-label="Close (Ctrl+`): the shell keeps running for 10 minutes"
+                aria-label="Close terminal"
                 class="btn ghost icon terminal-close"
                 @on_click>
           <icon class="close"> </icon>
@@ -266,14 +266,15 @@ let%expect_test "/terminal, the top bar's button and the height" =
     (Save_history (/terminal))
     Focus_terminal
     (Save_history ("/terminal now" /terminal))
-    Usage: /terminal (Ctrl+` opens and closes it; × in its header too)
+    Usage: /terminal (Ctrl+` opens and closes it; × in its header too) (Dismiss)
     |}];
   H.show h ~selector:".terminal-toggle";
   [%expect
     {|
     <button type="button"
             title="Terminal (Ctrl+`)"
-            aria-label="Terminal (Ctrl+`)"
+            aria-label="Terminal"
+            aria-expanded="true"
             class="btn ghost icon open terminal-toggle"
             @on_click>
       <icon class="terminal"> </icon>
@@ -326,7 +327,7 @@ let%expect_test "/terminal, the top bar's button and the height" =
         <span class="terminal-state"> connecting… </span>
         <button type="button"
                 title="Close (Ctrl+`): the shell keeps running for 10 minutes"
-                aria-label="Close (Ctrl+`): the shell keeps running for 10 minutes"
+                aria-label="Close terminal"
                 class="btn ghost icon terminal-close"
                 @on_click>
           <icon class="close"> </icon>

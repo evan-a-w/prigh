@@ -123,6 +123,7 @@ let view (m : App.Model.t) ~inject =
     button
       ~cls:"icon ghost toggle-sidebar"
       ~title:"Sessions (Ctrl+B)"
+      ~label:"Sessions"
       ~on_click:(inject Action.Toggle_sidebar)
       [ icon Menu ]
   in
@@ -173,6 +174,7 @@ let view (m : App.Model.t) ~inject =
                 else "no thinking")
                (String.uncapitalize
                   (Session_mode.title (Session_mode.of_state state))))
+          ~label:"Model, thinking and approvals"
           ~attrs:[ Attr.create "popovertarget" menu_id ]
           ~on_click:Effect.Ignore
           [ icon Sliders ]

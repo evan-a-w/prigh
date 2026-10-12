@@ -172,7 +172,7 @@ let%expect_test "an older page that fails, or is no longer wanted" =
     (Show earlier messages) 2 more
     question 2
     answer 2
-    Couldn't load earlier messages: the disk is full. Scroll up to try again.
+    Couldn't load earlier messages: the disk is full. Scroll up to try again. (Dismiss)
     |}];
   (* A page for a session left meanwhile is dropped. *)
   Harness.quiet h (fun () -> Harness.act h Load_older);
@@ -289,7 +289,7 @@ let%expect_test "an output that fails to load" =
   Harness.act h (Load_output "c1");
   [%expect
     {|
-    Couldn't load the whole output: no tool call c1. Load them tries again.
+    Couldn't load the whole output: no tool call c1. Load them tries again. (Dismiss)
     (Rpc (method_ get_tool_output) (params ((call_id c1)))
      (tag (Tool_output (agent_id ()) (call_id c1))))
     |}]

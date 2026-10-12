@@ -26,6 +26,7 @@ let view ?(cls = "") ?(id = "dialog") ?(footer = []) ~title ~on_close body =
             ; button
                 ~cls:"icon ghost"
                 ~title:"Close (Esc)"
+                ~label:"Close"
                 ~on_click:on_close
                 [ icon Close ]
             ]

@@ -202,11 +202,7 @@ let%expect_test
          class="diff-dialog modal">
       <header class="modal-head">
         <h2> Changes </h2>
-        <button type="button"
-                title="Close (Esc)"
-                aria-label="Close (Esc)"
-                class="btn ghost icon"
-                @on_click>
+        <button type="button" title="Close (Esc)" aria-label="Close" class="btn ghost icon" @on_click>
           <icon class="close"> </icon>
         </button>
       </header>
@@ -316,7 +312,7 @@ let%expect_test
     (Expire_toast (id 3) (after_ms 2500))
     (Rpc (method_ git_diff) (params ()) (tag Git_diff))
     No changes in /work against HEAD
-    Not a git repository: /work (git init starts one, or /cd into one)
+    Not a git repository: /work (git init starts one, or /cd into one) (Dismiss)
     |}]
 ;;
 
@@ -335,7 +331,7 @@ let%expect_test
     (Expire_toast (id 0) (after_ms 2780))
     (Rpc (method_ review) (params ((args "main look at errors")))
      (tag (Command_prompt "/review main look at errors")))
-    Nothing to review: no changes against main in /work. /review main look at errors is back in the editor.
+    Nothing to review: no changes against main in /work. /review main look at errors is back in the editor. (Dismiss)
     [/review main look at errors]
     (Attach files (or drop them here)) (Send (Enter))
     Ready 0% ↑0 ↓0 $0.0000
@@ -367,12 +363,12 @@ let%expect_test "/diff, /review and /init are in the completions and /help" =
   H.text h ~selector:".popup";
   [%expect
     {|
-    Commands ↑↓ Tab Enter Esc · Ctrl+Enter as typed
+    Commands ↑↓ Tab Enter Esc   Ctrl+Enter as typed
     /diff [path] show the uncommitted changes where the tools run, untracked files too
     /default-dir [path|off] show or set the directory new sessions start in
     /delete-archived delete every archived session, after a confirmation
     /retry-backend-connection reconnect to the backend now
-    Commands ↑↓ Tab Enter Esc · Ctrl+Enter as typed
+    Commands ↑↓ Tab Enter Esc   Ctrl+Enter as typed
     /init write or improve the project's AGENTS.md
     /import [path] import a session from a JSONL file on the backend
     /diff [path] show the uncommitted changes where the tools run, untracked files too
@@ -492,7 +488,7 @@ let%expect_test
     (Focus editor)
     (Focus editor)
     (Save_notifications true)
-    The browser blocks notifications for this page: allow them in its site settings (the icon left of the address), then /notify on
+    The browser blocks notifications for this page: allow them in its site settings (the icon left of the address), then /notify on (Dismiss)
     |}];
   H.act h (Set_notifications { enabled = true; permission = "unsupported" });
   run h "/notify";
@@ -504,7 +500,7 @@ let%expect_test
     (Expire_toast (id 1) (after_ms 6000))
     (Save_history ("/notify loud" /notify))
     This browser cannot show notifications here (they need https or localhost); the tab's title still counts what happened
-    Unknown /notify argument "loud": /notify on or /notify off (/notify alone says what is on)
+    Unknown /notify argument "loud": /notify on or /notify off (/notify alone says what is on) (Dismiss)
     |}]
 ;;
 

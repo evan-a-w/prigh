@@ -22,6 +22,7 @@ let classes always optional =
 let button
       ?(cls = "")
       ?title
+      ?label
       ?(disabled = false)
       ?(attrs = [])
       ~on_click
@@ -33,8 +34,9 @@ let button
        ; Attr.type_ "button"
        ; Attr.on_click (fun _ -> on_click)
        ]
-       @ Option.value_map title ~default:[] ~f:(fun t ->
-         [ Attr.title t; Attr.create "aria-label" t ])
+       @ Option.value_map title ~default:[] ~f:(fun t -> [ Attr.title t ])
+       @ Option.value_map label ~default:[] ~f:(fun l ->
+         [ Attr.create "aria-label" l ])
        @ (if disabled then [ Attr.disabled ] else [])
        @ attrs)
     children

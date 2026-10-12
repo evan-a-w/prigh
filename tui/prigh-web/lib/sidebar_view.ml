@@ -22,23 +22,34 @@ let age (m : App.Model.t) (s : Session_summary.t) =
 
 let shift_click ev = Js_of_ocaml.Js.to_bool ev##.shiftKey
 
-let session (m : App.Model.t) ~inject ~current (s : Session_summary.t) =
-  let selected = Option.equal String.equal current (Some s.id) in
-  let running = s.running || (selected && App.Model.active m) in
-  let selecting = m.marks.selecting in
-  let marked = Set.mem m.marks.marked s.path in
-  let loading =
-    match m.pending.session with
-    | Some (Switching path) -> String.equal path s.path
-    | Some Starting | None -> false
+(* What a row shows besides its session: rebuilt only when one changes
+   (the list is drawn again at every event otherwise). *)
+module Row = struct
+  type t =
+    { selected : bool
+    ; running : bool
+    ; background : bool (** only its subagents or jobs run *)
+    ; selecting : bool
+    ; marked : bool
+    ; loading : bool
+    ; age : string
+    }
+  [@@deriving equal]
+end
+
+let rows : (Session_summary.t, Row.t) View_cache.t = View_cache.create ()
+
+let row ~inject (s : Session_summary.t) (row : Row.t) =
+  let { Row.selected; running; background; selecting; marked; loading; age } =
+    row
   in
-  let action ~cls ~title ~icon:i effect =
+  let action ~cls ~title ~label ~icon:i effect =
     Node.button
       ~attrs:
         [ Attr.class_ ("btn icon ghost " ^ cls)
         ; Attr.type_ "button"
         ; Attr.title title
-        ; Attr.create "aria-label" title
+        ; Attr.create "aria-label" label
         ; Attr.on_click (fun ev ->
             Js_of_ocaml.Dom_html.stopPropagation ev;
             effect)
@@ -54,7 +65,7 @@ let session (m : App.Model.t) ~inject ~current (s : Session_summary.t) =
     then
       lamp
         ~title:
-          (if s.background > 0 && not (selected && App.Model.running m)
+          (if background
            then
              sprintf
                "Running: %d subagent%s or job%s in the background"
@@ -67,6 +78,7 @@ let session (m : App.Model.t) ~inject ~current (s : Session_summary.t) =
     then span ~cls:"live" ~attrs:[ Attr.title "Open in the backend" ] ""
     else Node.none
   in
+  let title = Session_list.title s in
   Node.div
     ~attrs:
       [ classes
@@ -77,43 +89,51 @@ let session (m : App.Model.t) ~inject ~current (s : Session_summary.t) =
           ; "archived", s.archived
           ; "marked", marked
           ]
-      ; (if loading then Attr.create "aria-busy" "true" else Attr.empty)
-      ; (if selecting
-         then Attr.create "aria-checked" (Bool.to_string marked)
-         else Attr.empty)
-      ; Attr.id (Session_list.dom_id s.id)
-      ; Attr.tabindex 0
-      ; Attr.role (if selecting then "checkbox" else "button")
-      ; Attr.create "data-session" s.id
-      ; Attr.on_click (fun ev ->
-          if selecting
-          then inject (Action.Mark_session { path = s.path; range = shift_click ev })
-          else inject (Action.Switch_session s.path))
-      (* Its transcript is fetched ahead while the pointer rests on it (or a
-         finger or the keyboard is on it), so that the click shows it at
-         once. *)
+        (* Its transcript is fetched ahead while the pointer rests on it (or
+           a finger or the keyboard is on it), so that the click shows it at
+           once. *)
       ; Attr.on_pointerenter (fun _ -> inject (Action.Prefetch_session s.path))
-      ; Attr.on_pointerdown (fun _ -> inject (Action.Prefetch_session s.path))
-      ; Attr.on_focus (fun _ -> inject (Action.Prefetch_session s.path))
-      ; Attr.title s.path
       ]
-    [ (if selecting
-       then
-         Node.span
-           ~attrs:[ classes [ "check" ] [ "on", marked ] ]
-           [ (if marked then icon Check else Node.none) ]
-       else Node.none)
-    ; div ~cls:"session-mark" [ mark ]
-    ; div
-        ~cls:"session-main"
-        [ span ~cls:"session-title" (Session_list.title s)
+    [ Node.button
+        ~attrs:
+          [ Attr.class_ "session-open"
+          ; Attr.type_ "button"
+          ; Attr.id (Session_list.dom_id s.id)
+          ; Attr.create "data-session" s.id
+          ; Attr.title s.path
+          ; (if selecting
+             then Attr.many [ Attr.role "checkbox"; Attr.create "aria-checked" (Bool.to_string marked) ]
+             else if selected
+             then Attr.create "aria-current" "true"
+             else Attr.empty)
+          ; (if loading then Attr.create "aria-busy" "true" else Attr.empty)
+          ; Attr.on_click (fun ev ->
+              if selecting
+              then
+                inject (Action.Mark_session { path = s.path; range = shift_click ev })
+              else inject (Action.Switch_session s.path))
+          ; Attr.on_pointerdown (fun _ -> inject (Action.Prefetch_session s.path))
+          ; Attr.on_focus (fun _ -> inject (Action.Prefetch_session s.path))
+          ]
+        [ (if selecting
+           then
+             Node.span
+               ~attrs:[ classes [ "check" ] [ "on", marked ] ]
+               [ (if marked then icon Check else Node.none) ]
+           else Node.none)
+        ; div ~cls:"session-mark" [ mark ]
         ; div
-            ~cls:"session-meta"
-            [ span ~cls:"session-age" (age m s)
-            ; span ~cls:"session-cwd" (home_relative s.cwd)
-            ; (if selecting
-               then span ~cls:"session-size" (Session_summary.size_string s.bytes)
-               else Node.none)
+            ~cls:"session-main"
+            [ span ~cls:"session-title" ~attrs:[ Attr.create "dir" "auto" ] title
+            ; div
+                ~cls:"session-meta"
+                [ span ~cls:"session-age" age
+                ; span ~cls:"session-cwd" (home_relative s.cwd)
+                ; (if selecting
+                   then
+                     span ~cls:"session-size" (Session_summary.size_string s.bytes)
+                   else Node.none)
+                ]
             ]
         ]
     ; (if selecting
@@ -126,21 +146,42 @@ let session (m : App.Model.t) ~inject ~current (s : Session_summary.t) =
                 action
                   ~cls:"unarchive"
                   ~title:"Unarchive (A)"
+                  ~label:("Unarchive " ^ title)
                   ~icon:Unarchive
                   (inject (Action.Set_archived { path = s.path; archived = false }))
               else
                 action
                   ~cls:"archive"
                   ~title:"Archive (A)"
+                  ~label:("Archive " ^ title)
                   ~icon:Archive
                   (inject (Action.Set_archived { path = s.path; archived = true })))
            ; action
                ~cls:"delete"
                ~title:"Delete session (Delete)"
+               ~label:("Delete " ^ title)
                ~icon:Trash
                (inject (Action.Ask_delete s.path))
            ])
     ]
+;;
+
+let session (m : App.Model.t) ~inject ~current (s : Session_summary.t) =
+  let selected = Option.equal String.equal current (Some s.id) in
+  let deps =
+    { Row.selected
+    ; running = s.running || (selected && App.Model.active m)
+    ; background = s.background > 0 && not (selected && App.Model.running m)
+    ; selecting = m.marks.selecting
+    ; marked = Set.mem m.marks.marked s.path
+    ; loading =
+        (match m.pending.session with
+         | Some (Switching path) -> String.equal path s.path
+         | Some Starting | None -> false)
+    ; age = age m s
+    }
+  in
+  View_cache.find rows s ~deps ~equal:Row.equal ~f:(fun () -> row ~inject s deps)
 ;;
 
 (* Above the list: its name and how to select several sessions, or how
@@ -269,6 +310,7 @@ let view (m : App.Model.t) ~inject =
         ; button
             ~cls:"icon ghost"
             ~title:"Hide sidebar (Ctrl+B)"
+            ~label:"Hide sidebar"
             ~on_click:(inject Action.Toggle_sidebar)
             [ icon Sidebar ]
         ]
@@ -294,6 +336,7 @@ let view (m : App.Model.t) ~inject =
               [ Attr.id "session-search"
               ; Attr.type_ "search"
               ; Attr.placeholder "Search sessions (Ctrl+K)"
+              ; Attr.create "aria-label" "Search sessions"
               ; Attr.value m.session_query
               ; Attr.create "autocomplete" "off"
               ; Attr.on_input (fun _ text ->

@@ -130,7 +130,13 @@ let%expect_test "two at most, the newest; a repeat is counted, not stacked" =
              @on_click>
           <span> Working directory: /tmp/…/chromium/cwd </span>
           <Vdom.Node.none-widget> </Vdom.Node.none-widget>
-          <icon class="close"> </icon>
+          <button type="button"
+                  title="Dismiss"
+                  aria-label="Dismiss"
+                  class="btn ghost icon toast-close"
+                  @on_click>
+            <icon class="close"> </icon>
+          </button>
         </div>
       </div>
     </div>

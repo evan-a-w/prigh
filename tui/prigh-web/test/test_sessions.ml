@@ -37,52 +37,47 @@ let%expect_test
   H.text h ~selector:".sessions";
   [%expect
     {|
-    fix the parser bug
-    just now /work
-    (Archive (A)) (Delete session (Delete))
-    Release notes
-    3h ago ~/docs
-    (Archive (A)) (Delete session (Delete))
-    Refactor the lexer
-    15d ago ~/src/compiler
-    (Archive (A)) (Delete session (Delete))
+    (fix the parser bug just now /work) (Archive (A)) (Delete session (Delete))
+    (Release notes 3h ago ~/docs) (Archive (A)) (Delete session (Delete))
+    (Refactor the lexer 15d ago ~/src/compiler) (Archive (A)) (Delete session (Delete))
     |}];
   H.show h ~selector:".session.selected";
   [%expect
     {|
-    <div id="session-s1"
-         tabindex="0"
-         role="button"
-         data-session="s1"
-         title="/sessions/s1.jsonl"
-         class="selected session"
-         @on_click
-         @on_focus
-         @on_pointerdown
-         @on_pointerenter>
-      <Vdom.Node.none-widget> </Vdom.Node.none-widget>
-      <div class="session-mark">
-        <span title="Open in the backend" class="live">  </span>
-      </div>
-      <div class="session-main">
-        <span class="session-title"> fix the parser bug </span>
-        <div class="session-meta">
-          <span class="session-age"> just now </span>
-          <span class="session-cwd"> /work </span>
-          <Vdom.Node.none-widget> </Vdom.Node.none-widget>
+    <div class="selected session" @on_pointerenter>
+      <button type="button"
+              id="session-s1"
+              data-session="s1"
+              title="/sessions/s1.jsonl"
+              aria-current="true"
+              class="session-open"
+              @on_click
+              @on_focus
+              @on_pointerdown>
+        <Vdom.Node.none-widget> </Vdom.Node.none-widget>
+        <div class="session-mark">
+          <span title="Open in the backend" class="live">  </span>
         </div>
-      </div>
+        <div class="session-main">
+          <span dir="auto" class="session-title"> fix the parser bug </span>
+          <div class="session-meta">
+            <span class="session-age"> just now </span>
+            <span class="session-cwd"> /work </span>
+            <Vdom.Node.none-widget> </Vdom.Node.none-widget>
+          </div>
+        </div>
+      </button>
       <span class="session-actions">
         <button type="button"
                 title="Archive (A)"
-                aria-label="Archive (A)"
+                aria-label="Archive fix the parser bug"
                 class="archive btn ghost icon"
                 @on_click>
           <icon class="archive"> </icon>
         </button>
         <button type="button"
                 title="Delete session (Delete)"
-                aria-label="Delete session (Delete)"
+                aria-label="Delete fix the parser bug"
                 class="btn delete ghost icon"
                 @on_click>
           <icon class="trash"> </icon>
@@ -344,7 +339,7 @@ let%expect_test
   [%expect
     {|
     (Rpc (method_ list_sessions) (params ()) (tag Sessions))
-    Not deleted: session "Release notes" is running: wait for it or /abort it first
+    Not deleted: session "Release notes" is running: wait for it or /abort it first (Dismiss)
     |}];
   H.act h (Ask_delete "/sessions/s3.jsonl");
   H.act h Dialog_accept;
@@ -366,12 +361,8 @@ let%expect_test
   (* Gone from the sidebar at once. *)
   H.text h ~selector:".sessions";
   [%expect {|
-    fix the parser bug
-    just now /work
-    (Archive (A)) (Delete session (Delete))
-    Release notes
-    3h ago ~/docs
-    (Archive (A)) (Delete session (Delete))
+    (fix the parser bug just now /work) (Archive (A)) (Delete session (Delete))
+    (Release notes 3h ago ~/docs) (Archive (A)) (Delete session (Delete))
     |}]
 ;;
 
@@ -383,6 +374,7 @@ let%expect_test "renaming the current session" =
     {|
     (Focus dialog-input)
     <input id="dialog-input"
+           aria-label="Session name"
            type="text"
            placeholder="Session name"
            autocomplete="off"
@@ -396,7 +388,7 @@ let%expect_test "renaming the current session" =
   [%expect
     {|
     Dialog_accept
-    Type a name for the session (Esc keeps the current one).
+    Type a name for the session (Esc keeps the current one). (Dismiss)
     |}];
   H.act h (Dialog_input "Parser work");
   H.key h "Enter" ~target:Field;
@@ -592,7 +584,7 @@ let%expect_test "new session and switching session reload the state" =
     (Focus editor)
     (Rpc (method_ get_state) (params ()) (tag State))
     older work
-    Couldn't open the session: no such session
+    Couldn't open the session: no such session (Dismiss)
     |}];
   (* So does a transcript that fails to load, saying so. *)
   Harness.act h (Switch_session "/sessions/s1.jsonl");
@@ -608,7 +600,7 @@ let%expect_test "new session and switching session reload the state" =
      (tag Reload_state))
     (Focus editor)
     hello
-    Couldn't load the session's messages: disk on fire. Reload the page to try again.
+    Couldn't load the session's messages: disk on fire. Reload the page to try again. (Dismiss)
     |}]
 ;;
 

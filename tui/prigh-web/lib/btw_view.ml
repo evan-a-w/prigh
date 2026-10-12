@@ -28,6 +28,7 @@ let view (m : App.Model.t) ~inject =
           ; button
               ~cls:"icon ghost"
               ~title:"Close (Esc)"
+              ~label:"Close the side question"
               ~on_click:(inject Action.Close_btw)
               [ icon Close ]
           ]

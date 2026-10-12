@@ -40,15 +40,9 @@ let%expect_test "active sessions first, then the archived ones under a divider" 
   [%expect
     {|
     Sessions (Select)
-    fix the parser bug
-    2m ago /work
-    (Archive (A)) (Delete session (Delete))
-    Release notes
-    2m ago /work
-    (Archive (A)) (Delete session (Delete))
-    Open elsewhere
-    2m ago /work
-    (Archive (A)) (Delete session (Delete))
+    (fix the parser bug 2m ago /work) (Archive (A)) (Delete session (Delete))
+    (Release notes 2m ago /work) (Archive (A)) (Delete session (Delete))
+    (Open elsewhere 2m ago /work) (Archive (A)) (Delete session (Delete))
     (Archived 2)
     |}];
   H.elements h ~selector:".session";
@@ -87,22 +81,12 @@ let%expect_test "active sessions first, then the archived ones under a divider" 
       <span class="chev"> </span>
     </button>
     Sessions (Select)
-    fix the parser bug
-    2m ago /work
-    (Archive (A)) (Delete session (Delete))
-    Release notes
-    2m ago /work
-    (Archive (A)) (Delete session (Delete))
-    Open elsewhere
-    2m ago /work
-    (Archive (A)) (Delete session (Delete))
+    (fix the parser bug 2m ago /work) (Archive (A)) (Delete session (Delete))
+    (Release notes 2m ago /work) (Archive (A)) (Delete session (Delete))
+    (Open elsewhere 2m ago /work) (Archive (A)) (Delete session (Delete))
     (Archived 2)
-    Old lexer
-    2m ago /work
-    (Unarchive (A)) (Delete session (Delete))
-    Older docs
-    2m ago /work
-    (Unarchive (A)) (Delete session (Delete))
+    (Old lexer 2m ago /work) (Unarchive (A)) (Delete session (Delete))
+    (Older docs 2m ago /work) (Unarchive (A)) (Delete session (Delete))
     (Delete archived)
     <button class="sessions-divider">
     |}];
@@ -115,15 +99,9 @@ let%expect_test "active sessions first, then the archived ones under a divider" 
     (Focus session-s4)
     (Session_nav (from (s3)) (by 1))
     (Focus session-s3)
-    fix the parser bug
-    2m ago /work
-    (Archive (A)) (Delete session (Delete))
-    Release notes
-    2m ago /work
-    (Archive (A)) (Delete session (Delete))
-    Open elsewhere
-    2m ago /work
-    (Archive (A)) (Delete session (Delete))
+    (fix the parser bug 2m ago /work) (Archive (A)) (Delete session (Delete))
+    (Release notes 2m ago /work) (Archive (A)) (Delete session (Delete))
+    (Open elsewhere 2m ago /work) (Archive (A)) (Delete session (Delete))
     (Archived 2)
     |}];
   (* A search shows the archived sessions that match, folded or not. *)
@@ -131,12 +109,8 @@ let%expect_test "active sessions first, then the archived ones under a divider" 
   H.text h ~selector:".sessions";
   [%expect {|
     (Archived 2)
-    Old lexer
-    2m ago /work
-    (Unarchive (A)) (Delete session (Delete))
-    Older docs
-    2m ago /work
-    (Unarchive (A)) (Delete session (Delete))
+    (Old lexer 2m ago /work) (Unarchive (A)) (Delete session (Delete))
+    (Older docs 2m ago /work) (Unarchive (A)) (Delete session (Delete))
     (Delete archived)
     |}]
 ;;
@@ -203,12 +177,8 @@ let%expect_test "archiving and unarchiving: at once, and back if refused" =
   [%expect
     {|
     Sessions (Select)
-    Release notes
-    2m ago /work
-    (Archive (A)) (Delete session (Delete))
-    Open elsewhere
-    2m ago /work
-    (Archive (A)) (Delete session (Delete))
+    (Release notes 2m ago /work) (Archive (A)) (Delete session (Delete))
+    (Open elsewhere 2m ago /work) (Archive (A)) (Delete session (Delete))
     (Archived 3)
     |}];
   H.reply h "set_archived" "{}";
@@ -222,7 +192,7 @@ let%expect_test "archiving and unarchiving: at once, and back if refused" =
   H.act h (Set_archived { path = "/sessions/s2.jsonl"; archived = true });
   H.text h ~selector:".toast.error";
   [%expect
-    {| "Release notes" is running: wait for it or stop it (Esc in it) before archiving. |}];
+    {| "Release notes" is running: wait for it or stop it (Esc in it) before archiving. (Dismiss) |}];
   (* The backend refusing puts it back: the list is fetched again. *)
   H.act h (Set_archived { path = "/sessions/s4.jsonl"; archived = false });
   H.fail h "set_archived" "no such session";
@@ -236,8 +206,8 @@ let%expect_test "archiving and unarchiving: at once, and back if refused" =
   H.text h ~selector:".toast.error";
   [%expect
     {|
-    "Release notes" is running: wait for it or stop it (Esc in it) before archiving.
-    Couldn't unarchive "Old lexer": no such session
+    "Release notes" is running: wait for it or stop it (Esc in it) before archiving. (Dismiss)
+    Couldn't unarchive "Old lexer": no such session (Dismiss)
     |}]
 ;;
 
@@ -287,7 +257,7 @@ let%expect_test "/archive and /unarchive: this session, or one by name or id" =
   [%expect
     {|
     (Save_history ("/archive s" "/unarchive Old lexer" /archive))
-    "s" matches 5 sessions (s1, s2, s3): give more of the id.
+    "s" matches 5 sessions (s1, s2, s3): give more of the id. (Dismiss)
     [/archive s]
     |}]
 ;;
@@ -300,17 +270,12 @@ let%expect_test "selecting sessions: click, shift-click a range, delete them" =
   [%expect
     {|
     Select sessions Shift for a range
-    fix the parser bug
-    2m ago /work 3.9 KB
-    Release notes
-    2m ago /work 11.7 KB
-    Open elsewhere
-    2m ago /work 2.9 KB
+    (fix the parser bug 2m ago /work 3.9 KB)
+    (Release notes 2m ago /work 11.7 KB)
+    (Open elsewhere 2m ago /work 2.9 KB)
     (Archived 2)
-    Old lexer
-    2m ago /work 195.3 KB
-    Older docs
-    2m ago /work 1.2 MB
+    (Old lexer 2m ago /work 195.3 KB)
+    (Older docs 2m ago /work 1.2 MB)
     (Cancel) (Delete sessions)
     |}];
   H.elements h ~selector:".selection-bar button[disabled]";
@@ -328,27 +293,28 @@ let%expect_test "selecting sessions: click, shift-click a range, delete them" =
     <div class="archived marked session">
     (Cancel) (Delete 3 sessions (210.0 KB))
     |}];
-  (* Space does what a click does (unmarking s3), Shift+Space what a
-     shift-click does (marking from s3, the last one, to s5). *)
-  H.key h " " ~target:(Session "s3");
-  H.key h " " ~shift:true ~target:(Session "s5");
+  (* Enter does what a click does (unmarking s3), Shift+Enter what a
+     shift-click does (marking from s3, the last one, to s5); Space clicks
+     the row's button itself. *)
+  H.key h "Enter" ~target:(Session "s3");
+  H.key h "Enter" ~shift:true ~target:(Session "s5");
+  H.key h " " ~target:(Session "s5");
   H.elements h ~selector:".session.marked";
-  [%expect
-    {|
+  [%expect {|
     (Mark_session (path /sessions/s3.jsonl) (range false))
     (Mark_session (path /sessions/s5.jsonl) (range true))
+    (browser default)
     <div class="marked running session">
     <div class="marked session">
     <div class="archived marked session">
     <div class="archived marked session">
     |}];
-  H.elements h ~selector:".session[aria-checked=true]";
-  [%expect
-    {|
-    <div class="marked running session">
-    <div class="marked session">
-    <div class="archived marked session">
-    <div class="archived marked session">
+  H.elements h ~selector:".session-open[aria-checked=true]";
+  [%expect {|
+    <button class="session-open">
+    <button class="session-open">
+    <button class="session-open">
+    <button class="session-open">
     |}];
   (* The confirmation says how many, how much disk, and which will be kept. *)
   H.act h Delete_marked;
@@ -388,19 +354,16 @@ let%expect_test "selecting sessions: click, shift-click a range, delete them" =
     {|
     (Rpc (method_ list_sessions) (params ()) (tag Sessions))
     Deleted 2 sessions (1.4 MB)
-    Not deleted: session "Release notes" is running: wait for it or /abort it first
+    Not deleted: session "Release notes" is running: wait for it or /abort it first (Dismiss)
     |}];
   (* What was refused stays selected. *)
   sidebar h;
   [%expect
     {|
     Select sessions Shift for a range
-    fix the parser bug
-    2m ago /work 3.9 KB
-    Release notes
-    2m ago /work 11.7 KB
-    Open elsewhere
-    2m ago /work 2.9 KB
+    (fix the parser bug 2m ago /work 3.9 KB)
+    (Release notes 2m ago /work 11.7 KB)
+    (Open elsewhere 2m ago /work 2.9 KB)
     (Cancel) (Delete 2 sessions (14.6 KB))
     |}];
   H.key h "Escape" ~target:(Session "s2");
@@ -409,15 +372,9 @@ let%expect_test "selecting sessions: click, shift-click a range, delete them" =
     {|
     (Select_sessions false)
     Sessions (Select)
-    fix the parser bug
-    2m ago /work
-    (Archive (A)) (Delete session (Delete))
-    Release notes
-    2m ago /work
-    (Archive (A)) (Delete session (Delete))
-    Open elsewhere
-    2m ago /work
-    (Archive (A)) (Delete session (Delete))
+    (fix the parser bug 2m ago /work) (Archive (A)) (Delete session (Delete))
+    (Release notes 2m ago /work) (Archive (A)) (Delete session (Delete))
+    (Open elsewhere 2m ago /work) (Archive (A)) (Delete session (Delete))
     |}]
 ;;
 
@@ -500,7 +457,7 @@ let%expect_test "/delete: by name or id with a confirmation, or select them" =
   [%expect
     {|
     (Save_history ("/delete s4 Older docs"))
-    No session "Older": give its name, id or path (Ctrl+K searches them).
+    No session "Older": give its name, id or path (Ctrl+K searches them). (Dismiss)
     |}];
   H.type_ h "/delete s4 s5";
   H.act h Send;

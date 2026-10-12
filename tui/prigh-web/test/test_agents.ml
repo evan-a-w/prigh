@@ -137,7 +137,6 @@ let%expect_test "subagents start, nest and show in the panel, live" =
     (2 agents running)
     <button type="button"
             title="Subagents and jobs (/agents)"
-            aria-label="Subagents and jobs (/agents)"
             class="agents-toggle btn ghost icon"
             @on_click>
       <icon class="bot"> </icon>
@@ -349,7 +348,7 @@ let%expect_test "/agents and its argument" =
   [%expect
     {|
     (Save_history ("/agents 9"))
-    No subagent or job 9: none has run in this session.
+    No subagent or job 9: none has run in this session. (Dismiss)
     (Rpc (method_ list_subagents) (params ()) (tag Subagents))
     (Rpc (method_ list_subagents) (params ()) (tag Subagents))
     (Save_history ("/agents 2" "/agents 9"))
@@ -358,7 +357,7 @@ let%expect_test "/agents and its argument" =
     ((Agent a1/n1))
     (Save_history
      ("/agents nope" "/agents n1" "/agents a1" "/agents 2" "/agents 9"))
-    No subagent or job nope: give its number (1-2) or id; /agents lists them.
+    No subagent or job nope: give its number (1-2) or id; /agents lists them. (Dismiss)
     |}]
 ;;
 

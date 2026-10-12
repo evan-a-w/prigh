@@ -67,7 +67,6 @@ let%expect_test
       <div class="queued-actions">
         <button type="button"
                 title="Edit: take it back into the editor"
-                aria-label="Edit: take it back into the editor"
                 class="btn ghost queued-edit"
                 @on_click>
           <icon class="pencil"> </icon>
@@ -75,7 +74,6 @@ let%expect_test
         </button>
         <button type="button"
                 title="Remove from the queue"
-                aria-label="Remove from the queue"
                 class="btn ghost icon queued-remove"
                 @on_click>
           <icon class="close"> </icon>
@@ -167,7 +165,7 @@ let%expect_test
   [%expect
     {|
     (Rpc (method_ get_pending) (params ()) (tag Pending))
-    That message is no longer queued: it was delivered or removed already
+    That message is no longer queued: it was delivered or removed already (Dismiss)
     Steers this turn b
     (Edit) (Remove from the queue)
     |}]

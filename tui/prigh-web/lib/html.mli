@@ -7,9 +7,13 @@ val div : ?cls:string -> ?attrs:Attr.t list -> Node.t list -> Node.t
 val span : ?cls:string -> ?attrs:Attr.t list -> string -> Node.t
 val classes : string list -> (string * bool) list -> Attr.t
 
+(** [title] is the tooltip: the hint (its key, its command, more words).
+    The accessible name is its text, or [label] (what it does) for a button
+    with only an icon. *)
 val button
   :  ?cls:string
   -> ?title:string
+  -> ?label:string
   -> ?disabled:bool
   -> ?attrs:Attr.t list
   -> on_click:unit Effect.t

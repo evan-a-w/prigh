@@ -93,7 +93,15 @@ let toasts (m : Model.t) ~inject =
              ; (if t.repeats > 0
                 then span ~cls:"toast-repeats" (sprintf "×%d" (t.repeats + 1))
                 else Node.none)
-             ; (if t.error then icon ~cls:"toast-close" Close else Node.none)
+             ; (if t.error
+                then
+                  Html.button
+                    ~cls:"icon ghost toast-close"
+                    ~title:"Dismiss"
+                    ~label:"Dismiss"
+                    ~on_click:(inject (Action.Dismiss_toast t.id))
+                    [ icon Close ]
+                else Node.none)
              ]))
     ]
 ;;
@@ -191,10 +199,11 @@ let view (m : Model.t) ~inject ~terminal =
   in
   (* On a phone the agents panel is a sheet over the page: it has the
      keyboard while open. *)
-  let under_sheet =
-    if m.narrow && (m.agents.open_ || m.files.open_)
-    then Fn.compose inert behind
-    else behind
+  let sheet = m.narrow && (m.agents.open_ || m.files.open_) in
+  let under_sheet = if sheet then Fn.compose inert behind else behind in
+  (* So is the drawer, over the page. *)
+  let under_drawer =
+    if m.narrow && m.sidebar_open then Fn.compose inert under_sheet else under_sheet
   in
   let chat =
     match loading m, Chat.entries m.chat, m.pending.prompts with
@@ -220,7 +229,9 @@ let view (m : Model.t) ~inject ~terminal =
           ]
       ; Resize_view.vars m
       ]
-    [ under_sheet (Sidebar_view.view m ~inject)
+    [ (* A phone's closed drawer is only out of sight. *)
+      (if m.narrow && not m.sidebar_open then inert else under_sheet)
+        (Sidebar_view.view m ~inject)
     ; (if m.sidebar_open
        then Resize_view.handle m ~inject Sidebar
        else Node.none)
@@ -236,7 +247,7 @@ let view (m : Model.t) ~inject ~terminal =
     ; Node.main
         ~attrs:[ Attr.class_ "main" ]
         (List.map
-           ~f:under_sheet
+           ~f:under_drawer
            [ Topbar_view.view m ~inject
            ; banner m ~inject
            ; Node.div
@@ -251,7 +262,7 @@ let view (m : Model.t) ~inject ~terminal =
            ]
          @ [ toasts m ~inject ]
          @ List.map
-             ~f:under_sheet
+             ~f:under_drawer
              [ Btw_view.view m ~inject
              ; Composer_view.view m ~inject
              ; Terminal_view.view m ~inject ~widget:terminal

@@ -14,7 +14,7 @@ let%expect_test "connecting: the chat, the composer and the status say so" =
     Connecting…
     <button type="button"
             title="Not connected to the backend"
-            aria-label="Not connected to the backend"
+            aria-label="Send"
             disabled=""
             class="btn primary send"
             @on_click>
@@ -53,7 +53,7 @@ let%expect_test "reconnecting: the composer is marked and does not send" =
     (Reconnect (generation 1) (delay_ms 0) (session (s1)))
     Reconnecting…
     <footer class="composer offline">
-    Not connected to the backend: your message stays here until it is back (/retry-backend-connection tries now).
+    Not connected to the backend: your message stays here until it is back (/retry-backend-connection tries now). (Dismiss)
     [still here]
     |}]
 ;;
@@ -75,7 +75,7 @@ let%expect_test "a prompt shows at once, until the transcript has it" =
     Sending…
     <button type="button"
             title="Sending…"
-            aria-label="Sending…"
+            aria-label="Sending"
             disabled=""
             aria-busy="true"
             class="btn busy primary send"
@@ -118,7 +118,7 @@ let%expect_test "a prompt the backend refuses goes back to the editor" =
     Ctrl+L switch model
     Ctrl+K find a session
     [hello]
-    Couldn't send: a run is already in progress. Your message is back in the editor.
+    Couldn't send: a run is already in progress. Your message is back in the editor. (Dismiss)
     |}]
 ;;
 
@@ -132,7 +132,6 @@ let%expect_test "a model or thinking level chosen shows until confirmed" =
      (tag Model_set))
     <button type="button"
             title="Switching to Claude Sonnet 5…"
-            aria-label="Switching to Claude Sonnet 5…"
             disabled=""
             aria-busy="true"
             popovertarget="topbar-controls"
@@ -171,7 +170,7 @@ let%expect_test "a model or thinking level chosen shows until confirmed" =
     (Rpc (method_ set_thinking) (params ((thinking max))) (tag Thinking_set))
     (Thinking max)
     (Claude Sonnet 5) (Thinking on) (Auto: never asks)
-    No such level
+    No such level (Dismiss)
     |}]
 ;;
 
@@ -213,7 +212,7 @@ let%expect_test "a command that lists something opens its dialog at once" =
     {|
     <div class="loading-dialog modal">
     (Focus editor)
-    No session file yet
+    No session file yet (Dismiss)
     |}]
 ;;
 

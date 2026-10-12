@@ -18,7 +18,7 @@ let%expect_test
     {|
     <button type="button"
             title="Send (Enter)"
-            aria-label="Send (Enter)"
+            aria-label="Send"
             disabled=""
             class="btn primary send"
             @on_click>
@@ -53,6 +53,8 @@ let%expect_test
     {|
     <textarea id="editor"
               placeholder="Steer (Enter) or queue a follow-up (Alt+Enter)…"
+              aria-label="Message"
+              dir="auto"
               rows="1"
               autocomplete="off"
               enterkeyhint="send"
@@ -244,7 +246,7 @@ let%expect_test "@ completes paths from the backend" =
   H.text h ~selector:".popup";
   [%expect
     {|
-    Files ↑↓ Tab Enter Esc · Ctrl+Enter as typed
+    Files ↑↓ Tab Enter Esc   Ctrl+Enter as typed
     src/main.ml
     src/macros/
     src/main.mli
@@ -306,7 +308,7 @@ let%expect_test
   H.text h ~selector:".popup";
   [%expect {|
     (Rpc (method_ list_dirs) (params ((prefix new))) (tag (Paths new)))
-    Directories ↑↓ Tab Enter Esc · Ctrl+Enter as typed
+    Directories ↑↓ Tab Enter Esc   Ctrl+Enter as typed
     newer/
     |}];
   H.key h "Enter" ~ctrl:true;
@@ -348,7 +350,7 @@ let%expect_test "slash commands: the popup, arguments, running, unknown ones" =
   H.text h ~selector:".popup";
   [%expect
     {|
-    Commands ↑↓ Tab Enter Esc · Ctrl+Enter as typed
+    Commands ↑↓ Tab Enter Esc   Ctrl+Enter as typed
     /help [command] show commands and keys, or a command's usage
     /hotkeys show the keyboard shortcuts
     /new start a new session
@@ -408,7 +410,7 @@ let%expect_test "slash commands: the popup, arguments, running, unknown ones" =
     {|
     (Complete_accept (run false))
     "/mode "
-    Modes ↑↓ Tab Enter Esc · Ctrl+Enter as typed
+    Modes ↑↓ Tab Enter Esc   Ctrl+Enter as typed
     ask bash, job_input, edits and MCP tools ask first
     auto-edit file edits run; bash, job_input and MCP tools ask first
     auto tools run without asking
@@ -462,10 +464,10 @@ let%expect_test "slash commands: the popup, arguments, running, unknown ones" =
     {|
     (Save_history (/compcat /compact "/model openai/gpt-6"))
     /compcat
-    Unknown command /compcat. Did you mean /compact? (/help lists them)
+    Unknown command /compcat. Did you mean /compact? (/help lists them) (Dismiss)
     (Save_history (/frobnicate /compcat /compact "/model openai/gpt-6"))
     /frobnicate
-    Unknown command /frobnicate: /help lists the commands.
+    Unknown command /frobnicate: /help lists the commands. (Dismiss)
     |}];
   (* A path with a question is a prompt, not a command. *)
   H.type_ h "/etc/hosts has a typo?";
@@ -551,7 +553,7 @@ let%expect_test "a message that cannot be sent comes back to the editor" =
      (tag
       (Sent (text "look at this") (images (((mime_type image/png) (bytes 8)))))))
     ("look at this" 1)
-    Couldn't send: a run is already in progress. Your message is back in the editor.
+    Couldn't send: a run is already in progress. Your message is back in the editor. (Dismiss)
     |}];
   (* Without a connection nothing is sent, and the draft stays. *)
   H.act h Backend_closed;
@@ -563,6 +565,6 @@ let%expect_test "a message that cannot be sent comes back to the editor" =
     (Reconnect (generation 1) (delay_ms 0) (session (s1)))
     Send
     "look at this"
-    Not connected to the backend: your message stays here until it is back (/retry-backend-connection tries now).
+    Not connected to the backend: your message stays here until it is back (/retry-backend-connection tries now). (Dismiss)
     |}]
 ;;

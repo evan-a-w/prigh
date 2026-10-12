@@ -394,8 +394,16 @@ let same_tool (old : tool) (fresh : tool) =
 let reconcile ~old fresh =
   let rec entries old fresh_entries =
     match old, fresh_entries with
-    | o :: old, f :: rest ->
-      (if same_entry o f then o else f) :: entries old rest
+    | o :: old, f :: rest when same_entry o f -> o :: entries old rest
+    (* What only the page shows: a [!command]'s card (in the context as the
+       user message with its output, or not at all for [!!command]), a
+       compaction's summary. *)
+    | (Shell call as o) :: old, User u :: rest
+      when String.is_prefix u.text ~prefix:(sprintf "$ %s\n" (shell_command call))
+      -> o :: entries old rest
+    | ((Shell _ | Compaction _ | Notice _) as o) :: old, fresh_entries ->
+      o :: entries old fresh_entries
+    | _ :: old, f :: rest -> f :: entries old rest
     (* The message being streamed is only in [get_messages] once it ends. *)
     | [ (Assistant { streaming = true; _ } as o) ], [] when fresh.running ->
       [ o ]

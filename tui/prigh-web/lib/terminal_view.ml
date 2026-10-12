@@ -7,6 +7,7 @@ let close ~inject =
   button
     ~cls:"icon ghost terminal-close"
     ~title:"Close (Ctrl+`): the shell keeps running for 10 minutes"
+    ~label:"Close terminal"
     ~on_click:(inject Action.Close_terminal)
     [ icon Close ]
 ;;
@@ -108,6 +109,8 @@ let toggle (m : App.Model.t) ~inject =
        then "icon ghost terminal-toggle open"
        else "icon ghost terminal-toggle")
     ~title:"Terminal (Ctrl+`)"
+    ~label:"Terminal"
+    ~attrs:[ Attr.create "aria-expanded" (Bool.to_string m.terminal.open_) ]
     ~on_click:(inject Action.Toggle_terminal)
     [ icon Terminal ]
 ;;

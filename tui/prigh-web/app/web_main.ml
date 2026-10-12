@@ -526,6 +526,12 @@ let key_target (ev : Dom_html.keyboardEvent Js.t) : Prigh_web.Keys.Target.t =
          match Dom_html.tagged el with
          | Input _ | Textarea _ | Select _ | Button _ | A _ -> false
          | _ -> true -> Files
+  | Some el
+    when Js.Opt.test (el##getAttribute (Js.string "data-session")) ->
+    Session
+      (Js.to_string
+         (Js.Opt.get (el##getAttribute (Js.string "data-session")) (fun () ->
+            Js.string "")))
   | Some el ->
     (match Dom_html.tagged el with
      | Textarea t when String.equal (Js.to_string t##.id) "editor" ->
@@ -540,17 +546,9 @@ let key_target (ev : Dom_html.keyboardEvent Js.t) : Prigh_web.Keys.Target.t =
      | Textarea _ | Input _ | Select _ -> Field
      | Button _ | A _ -> Control
      | _ ->
-       (match
-          Js.Opt.to_option (el##getAttribute (Js.string "data-session"))
-        with
-        | Some id -> Session (Js.to_string id)
-        | None ->
-          if
-            String.equal
-              (String.lowercase (Js.to_string el##.tagName))
-              "summary"
-          then Control
-          else Page))
+       if String.equal (String.lowercase (Js.to_string el##.tagName)) "summary"
+       then Control
+       else Page)
 ;;
 
 (* Selected text in a field or the page (so Ctrl+X cuts or does nothing). *)

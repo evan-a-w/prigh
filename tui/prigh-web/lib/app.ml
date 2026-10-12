@@ -2194,6 +2194,11 @@ let user_switched (m : Model.t) (hello : Hello_reply.t) =
     ; btw = None
     ; images = []
     ; skills = Skills.empty
+    ; pending = In_flight.none
+    ; session_gone = None
+    ; outputs_loading = String.Set.empty
+    ; folds = String.Set.empty
+    ; agents = { Agents.empty with open_ = m.agents.open_ }
     }
   in
   let m, cmds =

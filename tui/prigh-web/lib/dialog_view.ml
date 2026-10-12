@@ -51,6 +51,17 @@ let picker ~kind (p : Picker.t) ~inject =
             ~attrs:
               [ Attr.id "picker-input"
               ; Attr.type_ "text"
+              ; Attr.create "aria-label" ("Filter " ^ String.lowercase (picker_title kind))
+              ; Attr.role "combobox"
+              ; Attr.create "aria-controls" "picker-list"
+              ; Attr.create "aria-expanded" "true"
+              ; Attr.create "aria-autocomplete" "list"
+              ; (if List.is_empty visible
+                 then Attr.empty
+                 else
+                   Attr.create
+                     "aria-activedescendant"
+                     (sprintf "picker-option-%d" (Picker.selected p)))
               ; Attr.placeholder
                   ("Filter " ^ String.lowercase (picker_title kind) ^ "…")
               ; Attr.value (Picker.query p)
@@ -73,7 +84,11 @@ let picker ~kind (p : Picker.t) ~inject =
        | visible, _ ->
          div
            ~cls:"picker-items"
-           ~attrs:[ Attr.role "listbox" ]
+           ~attrs:
+             [ Attr.role "listbox"
+             ; Attr.id "picker-list"
+             ; Attr.create "aria-label" (Picker.title p)
+             ]
            (List.mapi visible ~f:(fun i (item : Picker.Item.t) ->
               Node.div
                 ~attrs:
@@ -84,6 +99,9 @@ let picker ~kind (p : Picker.t) ~inject =
                       ; "dimmed", item.dimmed
                       ]
                   ; Attr.role "option"
+                  ; Attr.id (sprintf "picker-option-%d" i)
+                  ; Attr.create "aria-selected" (Bool.to_string (i = Picker.selected p))
+                  ; (if item.marked then Attr.create "aria-checked" "true" else Attr.empty)
                   ; Attr.on_click (fun _ ->
                       inject (Action.Picker_choose item.id))
                   ]
@@ -132,10 +150,11 @@ let help ~inject =
     ]
 ;;
 
-let text_input ?(kind = "text") ?(placeholder = "") ~value ~inject () =
+let text_input ?(kind = "text") ?(placeholder = "") ~label ~value ~inject () =
   Node.input
     ~attrs:
       [ Attr.id "dialog-input"
+      ; Attr.create "aria-label" label
       ; Attr.class_ "text-input"
       ; Attr.type_ kind
       ; Attr.placeholder placeholder
@@ -161,7 +180,13 @@ let rename name ~inject =
     ~title:"Rename session"
     ~on_close:(inject Action.Close_dialog)
     ~footer:(cancel_accept ~inject "Rename")
-    [ text_input ~placeholder:"Session name" ~value:name ~inject () ]
+    [ text_input
+        ~placeholder:"Session name"
+        ~label:"Session name"
+        ~value:name
+        ~inject
+        ()
+    ]
 ;;
 
 (* Why the backend will keep a session, if it will. *)
@@ -297,9 +322,21 @@ let login (m : App.Model.t) (flow : Login_flow.t) ~inject =
                ~f:(fun line -> Node.p [ Node.text line ]))
         ; (match prompt with
            | Secret _ ->
-             text_input ~kind:"password" ~value:flow.input ~inject ()
+             text_input
+               ~kind:"password"
+               ~label:"Secret"
+               ~value:flow.input
+               ~inject
+               ()
            | Manual_code { placeholder; _ } | Text { placeholder; _ } ->
-             text_input ~placeholder ~value:flow.input ~inject ()
+             text_input
+               ~placeholder
+               ~label:
+                 (List.hd (String.split_lines (Auth_event.Prompt.message prompt))
+                  |> Option.value ~default:"Answer")
+               ~value:flow.input
+               ~inject
+               ()
            | Select { options; _ } ->
              div
                ~cls:"picker-items"
@@ -474,6 +511,8 @@ let confirm (m : App.Model.t) ~inject =
                       | Allow -> key ^ " or Enter"
                       | Deny -> key ^ " or Esc"
                       | Always | Deny_with_reason -> key)
+                   ~label:(String.capitalize label)
+                   ~attrs:[ Attr.create "aria-keyshortcuts" key ]
                    ~on_click:(answer a)
                    [ Node.kbd [ Node.text key ]
                    ; Node.text (String.capitalize label)
