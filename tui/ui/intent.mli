@@ -7,6 +7,8 @@ type t =
   | Insert of string
   | Paste of string (** a bracketed paste of a whole block at once *)
   | Submit
+  | Submit_as_typed
+  (** Alt+S: send the editor's text as typed, ignoring the completion popup *)
   | Newline
   | Backspace
   | Delete

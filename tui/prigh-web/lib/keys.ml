@@ -28,6 +28,8 @@ type t =
 
 let help =
   [ "Enter", "send; while running, steer the agent"
+  ; ( "Ctrl+Enter / ⌘+Enter"
+    , "send exactly what is typed, ignoring the completion popup" )
   ; "Alt+Enter", "queue a follow-up for after the run"
   ; "Shift+Enter", "new line"
   ; "Esc", "stop the run; close a dialog, popup or side answer"
@@ -140,6 +142,7 @@ let editor_key (m : App.Model.t) t ~cursor : App.Action.t option =
   | "Tab", Some _ when plain t -> Some (Complete_accept { run = false })
   | "Enter", Some _ when plain t -> Some (Complete_accept { run = true })
   | "Escape", Some _ -> Some Complete_close
+  | "Enter", _ when command t -> Some Send
   | "Enter", _ when t.shift || t.ctrl || t.meta -> None
   | "Enter", _ when t.alt -> Some Send_follow_up
   | "Enter", _ -> Some Send

@@ -297,6 +297,27 @@ let%expect_test "@ completes paths from the backend" =
     {| (Rpc (method_ list_paths) (params ((prefix zz))) (tag (Paths zz))) |}]
 ;;
 
+let%expect_test "Ctrl+Enter or Cmd+Enter sends what is typed, not the highlight" =
+  let h = H.create () in
+  H.type_ h "/cd new";
+  H.reply h "list_dirs" {|["newer/"]|};
+  H.text h ~selector:".popup";
+  [%expect {| |}];
+  H.key h "Enter" ~ctrl:true;
+  print_s
+    [%sexp
+      ((H.model h).draft : string), (Option.is_some (Prigh_web.App.Model.popup (H.model h)) : bool)];
+  [%expect {| |}];
+  H.type_ h "look at @src/ma";
+  H.reply h "list_paths" {|["src/main.ml"]|};
+  H.key h "Enter" ~meta:true;
+  [%expect {| |}];
+  (* Without a popup it is Enter. *)
+  H.type_ h "hello";
+  H.key h "Enter" ~ctrl:true;
+  [%expect {| |}]
+;;
+
 let%expect_test "slash commands: the popup, arguments, running, unknown ones" =
   let h = H.create () in
   H.type_ h "/";

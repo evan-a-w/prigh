@@ -214,6 +214,12 @@ let mode_hint (m : App.Model.t) : Content.Line.t option =
           Some [ span ~style:attention "login: Enter answers · Esc cancels" ]
         | Text_prompt _ ->
           (match m.autocomplete with
+           | Some ac when Autocomplete.accepts_on_enter ac ->
+             Some
+               [ span
+                   ~style:attention
+                   "Tab completes · Enter accepts · Alt+S as typed · Esc"
+               ]
            | Some _ ->
              Some
                [ span ~style:attention "Tab completes · Enter submits · Esc" ]
@@ -253,7 +259,11 @@ let mode_hint (m : App.Model.t) : Content.Line.t option =
         | Editing ->
           (match m.autocomplete with
            | Some ac when Autocomplete.accepts_on_enter ac ->
-             Some [ span ~style:attention "Tab/Enter accept · Esc close" ]
+             Some
+               [ span
+                   ~style:attention
+                   "Tab/Enter accept · Alt+S as typed · Esc"
+               ]
            | Some _ ->
              Some
                [ span ~style:attention "Tab accepts · Enter runs as typed · Esc"

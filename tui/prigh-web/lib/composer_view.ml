@@ -35,7 +35,9 @@ let popup (m : App.Model.t) ~inject =
       ~attrs:[ Attr.role "listbox" ]
       [ div
           ~cls:"popup-title"
-          [ Node.text title; span ~cls:"popup-keys" "↑↓ Tab Enter Esc" ]
+          [ Node.text title
+          ; span ~cls:"popup-keys" "↑↓ Tab Enter Esc · Ctrl+Enter as typed"
+          ]
       ; div
           ~cls:"popup-items"
           (List.mapi
