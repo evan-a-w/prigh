@@ -376,6 +376,50 @@ let touches t ~cwd ~home (call : Call.t) =
       | None -> false)
 ;;
 
+(* Programs that run their arguments as a command: a rule for them would
+   allow anything. *)
+let wrappers =
+  [ "env"
+  ; "sudo"
+  ; "doas"
+  ; "su"
+  ; "xargs"
+  ; "exec"
+  ; "command"
+  ; "builtin"
+  ; "eval"
+  ; "source"
+  ; "."
+  ; "nohup"
+  ; "time"
+  ; "nice"
+  ; "ionice"
+  ; "timeout"
+  ; "stdbuf"
+  ; "setsid"
+  ; "watch"
+  ; "chroot"
+  ; "unshare"
+  ; "nsenter"
+  ; "flock"
+  ; "parallel"
+  ; "bash"
+  ; "sh"
+  ; "zsh"
+  ; "dash"
+  ; "ksh"
+  ; "fish"
+  ]
+;;
+
+(* A program name worth a [PREFIX:*] rule: not a wrapper, an assignment
+   ([CI=1 make]), or a name written so that it can mean something else
+   ([\rm], ['rm'], [$CMD]). *)
+let suggestable_program first =
+  (not (List.mem wrappers first ~equal:String.equal))
+  && not (String.exists first ~f:(fun c -> String.mem "=\\'\"$*?[{~" c))
+;;
+
 (* Programs whose first argument is a subcommand worth keeping apart:
    [git status] is not [git push]. *)
 let with_subcommands =
@@ -409,8 +453,14 @@ let with_subcommands =
 let suggest (call : Call.t) =
   match call.command with
   | Some command ->
+    let program part = List.hd (String.split (squash_blanks part) ~on:' ') in
     (match segments command with
      | _, `Complex -> []
+     | parts, `Simple
+       when List.exists parts ~f:(fun part ->
+              match program part with
+              | None -> false
+              | Some first -> not (suggestable_program first)) -> []
      | parts, `Simple ->
        List.filter_map parts ~f:(fun part ->
          match String.split (squash_blanks part) ~on:' ' with
