@@ -215,6 +215,12 @@ let%expect_test "suggested session rules" =
   suggest "bash" {|{"command": "cd src && make -j4 && ./run.sh --fast"}|};
   suggest "bash" {|{"command": "ls; ls -la"}|};
   suggest "bash" {|{"command": "echo $(date)"}|};
+  suggest "bash" {|{"command": "CI=1 make test"}|};
+  suggest "bash" {|{"command": "env make"}|};
+  suggest "bash" {|{"command": "make && sudo make install"}|};
+  suggest "bash" {|{"command": "ls | xargs rm"}|};
+  suggest "bash" {|{"command": "bash script.sh"}|};
+  suggest "bash" {|{"command": "\\rm x"}|};
   suggest "write" {|{"path": "a"}|};
   suggest "apply_patch" {|{"input": ""}|};
   suggest "mcp__github__create_issue" {|{}|};
@@ -224,6 +230,12 @@ let%expect_test "suggested session rules" =
     ("bash(git:*)")
     ("bash(cd:*)" "bash(make:*)" "bash(./run.sh:*)")
     ("bash(ls:*)")
+    ()
+    ()
+    ()
+    ()
+    ()
+    ()
     ()
     (edit)
     (edit)

@@ -65,8 +65,10 @@ val touches : t -> cwd:string -> home:string -> Call.t -> bool
     others like it: for [bash], [PREFIX:*] for each part of the command, the
     prefix being the program, plus its subcommand for programs such as
     [git], [npm] and [cargo]; for file edits, [edit]; for other tools, the
-    tool's name. Empty when nothing sensible covers it (a command with
-    substitutions or redirections). *)
+    tool's name. Empty when nothing sensible covers it: a command with
+    substitutions or redirections, or one whose program runs other commands
+    ([env], [sudo], [xargs], [bash], ...) or is written oddly ([CI=1 make],
+    [\rm], [$CMD]). *)
 val suggest : Call.t -> t list
 
 (** The parts of a shell command as [covers] and [touches] see them, and
