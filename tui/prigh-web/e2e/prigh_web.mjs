@@ -862,9 +862,9 @@ try {
   };
   writeFileSync(join(cwd, "sub", "inner.txt"), "inside\n");
   // Ctrl+Enter sends what was typed, whatever the popup highlights.
-  mkdirSync(join(dir, "cwd-elsewhere"));
-  await composer().fill(`/cd ${cwd}`);
-  await page.locator(".popup-item", { hasText: "cwd-elsewhere" }).waitFor();
+  await composer().fill(`/cd ${cwd}/`);
+  await page.locator(".popup-item.selected", { hasText: "sub/" }).waitFor();
+  await page.waitForTimeout(300); // its fade in
   await show("/cd: the directory popup", ".popup");
   await composer().press("Control+Enter");
   await page.waitForFunction(c => document.querySelector(".topbar .where")?.title === c, cwd);
