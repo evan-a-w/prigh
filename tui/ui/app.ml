@@ -71,6 +71,8 @@ module Reply_tag = struct
     | Pending
     | Mode_set of string (** the notice *)
     | Refresh_state
+    | Dir_changed of P.Dir_change.Target.t
+    (** [Missing]: confirm creating it; otherwise acknowledge *)
     | Retry_in_editor of
         { command : string
         ; hint : string
@@ -1280,11 +1282,25 @@ let host_cwd_prompt m (host : P.Host.t) =
   }
 ;;
 
-let set_host_command ~host ~cwd =
-  rpc
-    "set_active_host"
-    ~params:[ "host", str host; "cwd", str cwd ]
-    ~tag:(Notice_on_success "tool host switched")
+let change_dir ?(if_missing = P.Dir_change.If_missing.Ask) ~target path =
+  call (Change_dir { target; path; if_missing }) ~tag:(Dir_changed target)
+;;
+
+let host_target m id : P.Dir_change.Target.t =
+  let name =
+    Option.bind m.state ~f:(fun (s : P.State.t) ->
+      List.find s.hosts ~f:(fun h -> String.equal h.id id))
+    |> Option.value_map ~default:id ~f:(fun (h : P.Host.t) -> h.name)
+  in
+  Host { id; name }
+;;
+
+let set_host_command m ~host ~cwd = change_dir ~target:(host_target m host) cwd
+
+let create_dir_question (target : P.Dir_change.Target.t) path =
+  match target with
+  | Cwd -> sprintf "Create %s? (y/n)" path
+  | Host { name; _ } -> sprintf "Create %s on %s? (y/n)" path name
 ;;
 
 let switch_host m arg =
@@ -2177,14 +2193,32 @@ let run_command m (cmd : Commands.Parsed.t) =
     , [] )
   | "cd", _ ->
     ( m
-    , [ rpc
-          "set_cwd"
-          ~params:[ "path", str cmd.rest ]
+    , [ call
+          (Change_dir { target = Cwd; path = cmd.rest; if_missing = Ask })
           ~tag:
             (Retry_in_editor
                { command = "/cd " ^ cmd.rest
                ; hint = "Tab after /cd completes directories"
-               ; then_ = Notice_on_success "cwd changed"
+               ; then_ = Dir_changed Cwd
+               })
+      ] )
+  | "mkdir", [] ->
+    ( { m with
+        mode =
+          Text_prompt
+            { question = "Create and change to directory"; action = Mkdir }
+      ; editor = Editor.clear m.editor
+      }
+    , [] )
+  | "mkdir", _ ->
+    ( m
+    , [ call
+          (Change_dir { target = Cwd; path = cmd.rest; if_missing = Create })
+          ~tag:
+            (Retry_in_editor
+               { command = "/mkdir " ^ cmd.rest
+               ; hint = ""
+               ; then_ = Dir_changed Cwd
                })
       ] )
   | "fork", _ -> m, [ rpc "get_entries" ~tag:Entries_for_fork ]
@@ -3256,15 +3290,11 @@ let text_prompt m ~(action : Mode.Text_prompt_action.t) (intent : Intent.t) =
               ~tag:(Notice_on_success "session named")
           ] )
     | Cd ->
+      if String.is_empty text then m, [] else m, [ change_dir ~target:Cwd text ]
+    | Mkdir ->
       if String.is_empty text
       then m, []
-      else
-        ( m
-        , [ rpc
-              "set_cwd"
-              ~params:[ "path", str text ]
-              ~tag:(Notice_on_success "cwd changed")
-          ] )
+      else m, [ change_dir ~if_missing:Create ~target:Cwd text ]
     | Export_path ->
       let command =
         if String.is_empty text
@@ -3279,7 +3309,7 @@ let text_prompt m ~(action : Mode.Text_prompt_action.t) (intent : Intent.t) =
     | Host_cwd host ->
       if String.is_empty text
       then m, []
-      else m, [ set_host_command ~host ~cwd:text ]
+      else m, [ set_host_command m ~host ~cwd:text ]
     | Deny_reason { confirm; draft } ->
       answer_confirm
         { m with editor = Editor.set_text m.editor draft }
@@ -3294,7 +3324,7 @@ let text_prompt m ~(action : Mode.Text_prompt_action.t) (intent : Intent.t) =
   (* Directory answers complete on the host they are for. *)
   let directory_host =
     match action with
-    | Cd ->
+    | Cd | Mkdir ->
       Some
         (Option.value_map m.state ~default:"backend" ~f:(fun s -> s.active_host))
     | Host_cwd host -> Some host
@@ -3344,7 +3374,7 @@ let text_prompt m ~(action : Mode.Text_prompt_action.t) (intent : Intent.t) =
            editor = Editor.set_text m.editor draft
          }
        , [] )
-     | Name | Cd | Export_path | Import_path | Host_cwd _ ->
+     | Name | Cd | Mkdir | Export_path | Import_path | Host_cwd _ ->
        ( { m with
            editor = Editor.clear m.editor
          ; mode = Editing
@@ -3417,12 +3447,15 @@ let confirm m ~(action : Mode.Confirm_action.t) (intent : Intent.t) =
     | Delete_archived { back } ->
       back_to m back, [ call Delete_archived ~tag:Sessions_deleted ]
     | Tool_confirm c -> answer_confirm m c Allow
+    | Create_dir { target; path } ->
+      m, [ change_dir ~if_missing:Create ~target path ]
   in
   let no m =
     match action with
     | Tool_confirm c -> answer_confirm m c Deny
     | Delete_sessions { back = Some _ as back; _ }
     | Delete_archived { back = Some _ as back } -> back_to m back, []
+    | Create_dir { path; _ } -> notice m (sprintf "not created: %s" path), []
     | Logout _ | Rewind _ | Delete_sessions _ | Delete_archived _ ->
       notice m "cancelled", []
   in
@@ -3719,6 +3752,42 @@ let mcp_approved m server (list : P.Mcp_list.t) =
   else mcp_picker ~problems:false m list, []
 ;;
 
+(* A missing directory is created only once confirmed; when another dialog
+   has opened meanwhile, the notice says how to create it instead. *)
+let dir_changed
+      m
+      (target : P.Dir_change.Target.t)
+      (outcome : P.Dir_change.Outcome.t)
+  =
+  match outcome, target with
+  | Missing path, Cwd when Mode.is_dialog m.mode ->
+    warn m (sprintf "%s does not exist; /mkdir %s creates it" path path), []
+  | Missing path, Host { name; _ } when Mode.is_dialog m.mode ->
+    ( warn
+        m
+        (sprintf "%s does not exist on %s; /host %s asks again" path name name)
+    , [] )
+  | Missing path, _ ->
+    ( { m with
+        mode =
+          Confirm
+            { question = create_dir_question target path
+            ; action = Create_dir { target; path }
+            }
+      ; autocomplete = None
+      }
+    , [] )
+  | Changed { created; cwd }, _ ->
+    let created =
+      if created
+      then sprintf "created %s; " (Option.value cwd ~default:"the directory")
+      else ""
+    in
+    (match target with
+     | Cwd -> notice m (created ^ "cwd changed"), []
+     | Host _ -> notice m (created ^ "tool host switched"), [])
+;;
+
 let rec reply m (tag : Reply_tag.t) (result : (P.Json.t, string) Result.t) =
   let decode json ~f k =
     match f json with
@@ -3803,6 +3872,9 @@ let rec reply m (tag : Reply_tag.t) (result : (P.Json.t, string) Result.t) =
          ~f:(fun json -> P.Json.string_field json "text")
          (fun text -> update_btw m id ~f:(Btw_box.finish ~text), [])
      | Notice_on_success text -> notice m text, []
+     | Dir_changed target ->
+       decode json ~f:P.Dir_change.Outcome.of_json (fun outcome ->
+         dir_changed m target outcome)
      | Set_model_done key ->
        (match
           List.find m.models ~f:(fun model -> String.equal model.key key)

@@ -89,6 +89,7 @@ let%expect_test "every command does something (none is unknown)" =
     /rewind                    loading Rewind to: rpc get_entries
     /tree                      loading Session tree: rpc get_entries
     /cd                        path prompt
+    /mkdir                     path prompt
     /default-dir               toast: No default directory: new sessions start in the backend's working directory; /default-dir PATH sets one
     /host                      picker: Where tools run
     /export                    path prompt
@@ -817,8 +818,8 @@ let%expect_test "/cd: a prompt with directory completion, failures stay in it" =
     (Rpc (method_ list_dirs) (params ((prefix /nowhere) (host backend)))
      (tag (Prompt_paths /nowhere)))
     Dialog_accept
-    (Rpc (method_ set_cwd) (params ((path /nowhere)))
-     (tag (Prompt_done "Working directory: /nowhere")))
+    (Rpc (method_ set_cwd) (params ((path /nowhere) (if_missing ask)))
+     (tag (Dir_changed Cwd)))
     Change directory
     (Close (Esc))
     The session's working directory [/nowhere]
@@ -827,7 +828,7 @@ let%expect_test "/cd: a prompt with directory completion, failures stay in it" =
     |}];
   H.act h (Dialog_input "/work/src");
   H.key h "Enter" ~target:Field;
-  H.reply h "set_cwd" "{}";
+  H.reply h "set_cwd" {|{"cwd":"/work/src","created":false}|};
   H.text h ~selector:".modal";
   toasts h;
   [%expect
@@ -835,8 +836,8 @@ let%expect_test "/cd: a prompt with directory completion, failures stay in it" =
     (Rpc (method_ list_dirs) (params ((prefix /work/src) (host backend)))
      (tag (Prompt_paths /work/src)))
     Dialog_accept
-    (Rpc (method_ set_cwd) (params ((path /work/src)))
-     (tag (Prompt_done "Working directory: /work/src")))
+    (Rpc (method_ set_cwd) (params ((path /work/src) (if_missing ask)))
+     (tag (Dir_changed Cwd)))
     (Focus editor)
     (Expire_toast (id 0) (after_ms 2620))
     Working directory: /work/src
@@ -905,19 +906,21 @@ let%expect_test "/host: pick a host, then the directory there" =
   H.text h ~selector:".dialog-error";
   H.act h (Dialog_input "/home/me/proj");
   H.key h "Enter" ~target:Field;
-  H.reply h "set_active_host" "{}";
+  H.reply h "set_active_host" {|{"cwd":"/home/me/proj","created":false}|};
   toasts h;
   [%expect
     {|
     Dialog_accept
-    (Rpc (method_ set_active_host) (params ((host c7) (cwd /work)))
-     (tag (Prompt_done "Tools run on laptop (this browser), in /work")))
+    (Rpc (method_ set_active_host)
+     (params ((host c7) (cwd /work) (if_missing ask)))
+     (tag (Dir_changed (Host (id c7) (name "laptop (this browser)")))))
     laptop: /work: no such directory
     (Rpc (method_ list_dirs) (params ((prefix /home/me/proj) (host c7)))
      (tag (Prompt_paths /home/me/proj)))
     Dialog_accept
-    (Rpc (method_ set_active_host) (params ((host c7) (cwd /home/me/proj)))
-     (tag (Prompt_done "Tools run on laptop (this browser), in /home/me/proj")))
+    (Rpc (method_ set_active_host)
+     (params ((host c7) (cwd /home/me/proj) (if_missing ask)))
+     (tag (Dir_changed (Host (id c7) (name "laptop (this browser)")))))
     (Focus editor)
     (Expire_toast (id 0) (after_ms 3580))
     Tools run on laptop (this browser), in /home/me/proj
@@ -938,6 +941,174 @@ let%expect_test "/host: pick a host, then the directory there" =
     (Save_history ("/host mainframe" "/host ci" /host))
     Tools run on laptop (this browser), in /home/me/proj
     No tool host "mainframe": one of backend, laptop, ci (/host picks one).
+    |}]
+;;
+
+let%expect_test "/cd and /host to a missing directory ask to create it" =
+  let h = H.create ~state:hosts_state () in
+  H.act h (Hello { client_id = "c7"; namespace = None; user = None });
+  run h "/cd /work/new";
+  H.reply h "set_cwd" {|{"missing":"/work/new"}|};
+  H.text h ~selector:".modal";
+  [%expect
+    {|
+    (Rpc (method_ list_dirs) (params ((prefix /work/new)))
+     (tag (Paths /work/new)))
+    (Save_history ("/cd /work/new"))
+    (Rpc (method_ set_cwd) (params ((path /work/new) (if_missing ask)))
+     (tag (Dir_changed Cwd)))
+    (Focus dialog)
+    Create folder?
+    (Close (Esc))
+    This folder doesn't exist on backend:
+    /work/new
+    Missing parent folders are created too.
+    Enter creates, Esc cancels (Cancel) (Create folder and switch)
+    |}];
+  (* Esc: nothing is created. *)
+  H.key h "Escape" ~target:Page;
+  print_s [%sexp ((H.model h).dialog : Dialog.t option)];
+  [%expect
+    {|
+    Close_dialog
+    (Focus editor)
+    ()
+    |}];
+  run h "/cd /work/new";
+  H.reply h "set_cwd" {|{"missing":"/work/new"}|};
+  H.key h "Enter" ~target:Page;
+  H.text h ~selector:".modal footer";
+  H.fail h "set_cwd" "/work: permission denied";
+  H.text h ~selector:".modal";
+  [%expect
+    {|
+    (Rpc (method_ list_dirs) (params ((prefix /work/new)))
+     (tag (Paths /work/new)))
+    (Save_history ("/cd /work/new"))
+    (Rpc (method_ set_cwd) (params ((path /work/new) (if_missing ask)))
+     (tag (Dir_changed Cwd)))
+    (Focus dialog)
+    Dialog_accept
+    (Rpc (method_ set_cwd) (params ((path /work/new) (if_missing create)))
+     (tag (Dir_changed Cwd)))
+    Enter creates, Esc cancels (Cancel) (Creating…)
+    Create folder?
+    (Close (Esc))
+    This folder doesn't exist on backend:
+    /work/new
+    Missing parent folders are created too.
+    /work: permission denied
+    Enter creates, Esc cancels (Cancel) (Create folder and switch)
+    |}];
+  H.click h ~selector:".modal .primary";
+  H.reply h "set_cwd" {|{"cwd":"/work/new","created":true}|};
+  print_s [%sexp ((H.model h).dialog : Dialog.t option)];
+  toasts h;
+  [%expect
+    {|
+    Dialog_accept
+    (Rpc (method_ set_cwd) (params ((path /work/new) (if_missing create)))
+     (tag (Dir_changed Cwd)))
+    (Focus editor)
+    (Expire_toast (id 0) (after_ms 2940))
+    ()
+    Created /work/new and switched to it
+    |}];
+  (* On another host, from /host's directory prompt. *)
+  run h "/host ci";
+  H.act h (Dialog_input "/build/x");
+  H.key h "Enter" ~target:Field;
+  H.reply h "set_active_host" {|{"missing":"/build/x"}|};
+  H.text h ~selector:".modal";
+  H.key h "Enter" ~target:Page;
+  H.reply h "set_active_host" {|{"cwd":"/build/x","created":true}|};
+  toasts h;
+  [%expect
+    {|
+    (Save_history ("/host ci" "/cd /work/new"))
+    (Focus dialog-input)
+    (Rpc (method_ list_dirs) (params ((prefix /work) (host c9)))
+     (tag (Prompt_paths /work)))
+    (Rpc (method_ list_dirs) (params ((prefix /build/x) (host c9)))
+     (tag (Prompt_paths /build/x)))
+    Dialog_accept
+    (Rpc (method_ set_active_host)
+     (params ((host c9) (cwd /build/x) (if_missing ask)))
+     (tag (Dir_changed (Host (id c9) (name "ci (in nightly)")))))
+    (Focus dialog)
+    Create folder?
+    (Close (Esc))
+    This folder doesn't exist on ci (in nightly):
+    /build/x
+    Missing parent folders are created too, then tools run on ci (in nightly) in it.
+    Enter creates, Esc cancels (Cancel) (Create folder and switch)
+    Dialog_accept
+    (Rpc (method_ set_active_host)
+     (params ((host c9) (cwd /build/x) (if_missing create)))
+     (tag (Dir_changed (Host (id c9) (name "ci (in nightly)")))))
+    (Focus editor)
+    (Expire_toast (id 1) (after_ms 3620))
+    Created /work/new and switched to it
+    Created /build/x: tools run on ci (in nightly), in it
+    |}];
+  (* Another dialog opened meanwhile: the answer says how to create it. *)
+  run h "/cd /elsewhere";
+  run h "/name";
+  H.reply h "set_cwd" {|{"missing":"/elsewhere"}|};
+  toasts h;
+  [%expect
+    {|
+    (Rpc (method_ list_dirs) (params ((prefix /elsewhere)))
+     (tag (Paths /elsewhere)))
+    (Save_history ("/cd /elsewhere" "/host ci" "/cd /work/new"))
+    (Rpc (method_ set_cwd) (params ((path /elsewhere) (if_missing ask)))
+     (tag (Dir_changed Cwd)))
+    (Save_history (/name "/cd /elsewhere" "/host ci" "/cd /work/new"))
+    (Focus dialog-input)
+    Created /build/x: tools run on ci (in nightly), in it
+    /elsewhere doesn't exist: /mkdir /elsewhere creates it.
+    |}]
+;;
+
+let%expect_test "/mkdir creates a directory and changes to it" =
+  let h = H.create () in
+  run h "/mkdir /work/a/b";
+  H.reply h "set_cwd" {|{"cwd":"/work/a/b","created":true}|};
+  toasts h;
+  run h "/mkdir";
+  H.text h ~selector:".modal";
+  H.act h (Dialog_input "/work/c");
+  H.key h "Enter" ~target:Field;
+  H.reply h "set_cwd" {|{"cwd":"/work/c","created":false}|};
+  print_s [%sexp ((H.model h).dialog : Dialog.t option)];
+  toasts h;
+  [%expect
+    {|
+    (Rpc (method_ list_dirs) (params ((prefix /work/a/b)))
+     (tag (Paths /work/a/b)))
+    (Save_history ("/mkdir /work/a/b"))
+    (Rpc (method_ set_cwd) (params ((path /work/a/b) (if_missing create)))
+     (tag (Dir_changed Cwd)))
+    (Expire_toast (id 0) (after_ms 2940))
+    Created /work/a/b and switched to it
+    (Save_history (/mkdir "/mkdir /work/a/b"))
+    (Focus dialog-input)
+    (Rpc (method_ list_dirs) (params ((prefix /work) (host backend)))
+     (tag (Prompt_paths /work)))
+    Create directory
+    (Close (Esc))
+    Created with any missing parents, then made the working directory [/work]
+    Tab completes, ↑↓ choose (Cancel) (Create and switch)
+    (Rpc (method_ list_dirs) (params ((prefix /work/c) (host backend)))
+     (tag (Prompt_paths /work/c)))
+    Dialog_accept
+    (Rpc (method_ set_cwd) (params ((path /work/c) (if_missing create)))
+     (tag (Dir_changed Cwd)))
+    (Focus editor)
+    (Expire_toast (id 1) (after_ms 2540))
+    ()
+    Created /work/a/b and switched to it
+    Working directory: /work/c
     |}]
 ;;
 

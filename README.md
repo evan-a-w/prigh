@@ -445,9 +445,10 @@ model whose provider is not logged in says which `/login` to run.
 session's details and statistics; `/fork`, `/rewind` (with a confirmation)
 and `/tree` (the whole tree, branches indented) pick a message;
 `/scoped-models` is a checklist (Tab or a click checks a model, Enter
-saves); `/cd`, `/host`'s directory, `/export` and `/import` ask for a path
+saves); `/cd`, `/mkdir`, `/host`'s directory, `/export` and `/import` ask for a path
 with completions from the backend and keep the dialog open, with the error,
-when the backend refuses it; `/agents` and `/jobs` open the agents panel
+when the backend refuses it (a directory that doesn't exist yet opens a
+"Create folder?" dialog instead); `/agents` and `/jobs` open the agents panel
 (above); `/btw` answers in a panel above the composer (Esc closes it);
 `/verbosity` (Ctrl+O cycles) hides tool output and thinking (quiet) or
 unfolds everything (verbose); `/copy` (Ctrl+X with nothing selected) copies
@@ -977,7 +978,8 @@ it.
 | `/delete [session...]` | delete sessions after a confirmation (without arguments: pick them in `/sessions`) |
 | `/delete-archived` | delete every archived session after a confirmation |
 | `/switch [path]` | switch to a saved session |
-| `/cd [path]` | change the working directory |
+| `/cd [path]` | change the working directory; a missing one is created once you confirm (`Create /x? (y/n)`; in prigh-web a "Create folder?" dialog); `/host`'s directory asks the same |
+| `/mkdir [path]` | create a directory (with its parents) on the tool host and change to it |
 | `/fork`, `/rewind`, `/tree`, `/clone` | branch the session tree |
 | `/export [path]`, `/import [path]` | markdown or `.jsonl` |
 | `/agents [cancel <n>]` | focus a subagent (Ctrl+D in the picker cancels one), or cancel subagent n |
