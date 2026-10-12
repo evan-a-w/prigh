@@ -580,6 +580,14 @@ let status (m : App.Model.t) : Content.Line.t =
          if queued > 0
          then [ 3, [ span ~style:base (sprintf "queued:%d" queued) ] ]
          else [])
+      @ (* Confirmations and questions waiting behind a dialog: before
+           anything but the model. *)
+      (let waiting =
+         List.length m.pending_confirms + List.length m.pending_questions
+       in
+       if waiting > 0
+       then [ 0, [ span ~style:attention (sprintf "to answer:%d" waiting) ] ]
+       else [])
       @ Option.to_list (Option.map (agents_part m) ~f:(fun p -> 3, p))
       @ Option.to_list (Option.map (jobs_part m) ~f:(fun p -> 3, p))
       @ (match m.viewport with

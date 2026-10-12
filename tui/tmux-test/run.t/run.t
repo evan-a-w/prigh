@@ -553,3 +553,5 @@ prints the captured panes.
   ────────────────────────────────────────────────────────────────────────────────────────────────────
   >
   $TMP/cwd/sub  deepseek-flash  think:on  mode:auto  ctx:0.0%/1.0M  $0.00
+  $ bash ./harness.sh switch_pending
+  $ bash ./harness.sh reconnect_dialog
