@@ -169,7 +169,7 @@ let%expect_test "/fallback completes a model key per word" =
   H.text h ~selector:".popup";
   [%expect
     {|
-    Fallback models, in order ↑↓ Tab Enter Esc
+    Fallback models, in order ↑↓ Tab Enter Esc · Ctrl+Enter as typed
     Claude Opus 5.5 anthropic
     Claude Sonnet 5 anthropic
     GPT-6 openai
@@ -185,7 +185,7 @@ let%expect_test "/fallback completes a model key per word" =
     {|
     (Complete_accept (run false))
     ((m.draft "/fallback openai/gpt-6 ") (m.cursor 23))
-    Fallback models, in order ↑↓ Tab Enter Esc
+    Fallback models, in order ↑↓ Tab Enter Esc · Ctrl+Enter as typed
     Claude Opus 5.5 anthropic
     Claude Sonnet 5 anthropic
     DeepSeek Chat deepseek
@@ -221,7 +221,7 @@ let%expect_test "/fallback completes a model key per word" =
   draft h;
   [%expect
     {|
-    Fallback models, in order ↑↓ Tab Enter Esc
+    Fallback models, in order ↑↓ Tab Enter Esc · Ctrl+Enter as typed
     DeepSeek Chat deepseek
     Claude Opus 5.5 anthropic
     Claude Sonnet 5 anthropic
@@ -319,7 +319,7 @@ let%expect_test "/default-dir completes directories on the backend's host" =
     {|
     (Rpc (method_ list_dirs) (params ((prefix /wo) (host backend)))
      (tag (Paths /wo)))
-    Directories on the backend ↑↓ Tab Enter Esc
+    Directories on the backend ↑↓ Tab Enter Esc · Ctrl+Enter as typed
     /work/
     /world/
     |}];

@@ -143,6 +143,7 @@ let%expect_test "/help <command> and /hotkeys" =
     Keyboard shortcuts
     (Close (Esc))
     Enter send; while running, steer the agent
+    Ctrl+Enter / ⌘+Enter send exactly what is typed, ignoring the completion popup
     Alt+Enter queue a follow-up for after the run
     Shift+Enter new line
     Esc stop the run; close a dialog, popup or side answer
@@ -526,7 +527,7 @@ let%expect_test "/switch" =
   H.text h ~selector:".popup";
   [%expect
     {|
-    Sessions ↑↓ Tab Enter Esc
+    Sessions ↑↓ Tab Enter Esc · Ctrl+Enter as typed
     Release notes /work
     |}];
   H.key h "Enter";

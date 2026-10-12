@@ -282,7 +282,7 @@ let%expect_test
     > /default-dir ~/p▏
     ▸ ~/proj/
       ~/play/
-    …deepseek-flash  ctx:0.1%/1.0M  Tab/Enter accept · Esc close
+    …deepseek-flash  $0.01  Tab/Enter accept · Alt+S as typed
     |}];
   H.enter h;
   [%expect

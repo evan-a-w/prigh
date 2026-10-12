@@ -80,7 +80,7 @@ let%expect_test "/skills: a fuzzy picker; Enter puts /skill:name in the editor" 
   H.text h ~selector:".popup";
   [%expect
     {|
-    Skills ↑↓ Tab Enter Esc
+    Skills ↑↓ Tab Enter Esc · Ctrl+Enter as typed
     frontend-design Distinctive, production-grade web pages
     release Cut a release: changelog, tag, publish
     |}];
@@ -144,7 +144,7 @@ let%expect_test "/skill: completes skill names, fetched once" =
   H.text h ~selector:".popup";
   [%expect
     {|
-    Commands ↑↓ Tab Enter Esc
+    Commands ↑↓ Tab Enter Esc · Ctrl+Enter as typed
     /skills pick a skill to invoke (/skill:name)
     /skill:<name> [args] send a skill's instructions to the agent, with your arguments
     |}];
@@ -167,7 +167,7 @@ let%expect_test "/skill: completes skill names, fetched once" =
   H.text h ~selector:".popup";
   [%expect
     {|
-    Skills ↑↓ Tab Enter Esc
+    Skills ↑↓ Tab Enter Esc · Ctrl+Enter as typed
     frontend-design Distinctive, production-grade web pages
     |}];
   H.type_ h "/skill:rel";
