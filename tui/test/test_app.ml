@@ -1030,6 +1030,74 @@ let%expect_test "/cd completes paths and submits the selected one" =
     |}]
 ;;
 
+let%expect_test "Alt+S and Esc then Enter send what is typed, not the highlight" =
+  let h = connected () in
+  let popup text =
+    H.step ~quiet:true h (Intent (Insert text));
+    H.reply ~quiet:true h (Dirs_for_autocomplete "new") {|["newer/"]|}
+  in
+  popup "/cd new";
+  H.show h;
+  [%expect
+    {|
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+
+    ▌ earlier question
+      earlier answer
+    ────────────────────────────────────────────────────────────
+    > /cd new▏
+    ▸ newer/
+    …deepseek-flash  ctx:0.1%/1.0M  Tab/Enter accept · Alt+S as typed · Esc
+    |}];
+  H.key h (Key.alt (Char "s"));
+  H.show h;
+  [%expect
+    {|
+    (Rpc
+      (method_ set_cwd)
+      (params ((path new)))
+      (tag (
+        Retry_in_editor
+        (command "/cd new")
+        (hint    "Tab after /cd completes directories")
+        (then_ (Notice_on_success "cwd changed")))))
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+
+    ▌ earlier question
+      earlier answer
+    ────────────────────────────────────────────────────────────
+    > ▏
+    …deepseek-flash  ctx:0.1%/1.0M
+    |}];
+  popup "/cd new";
+  H.esc h;
+  H.enter h;
+  [%expect
+    {|
+    (Rpc
+      (method_ set_cwd)
+      (params ((path new)))
+      (tag (
+        Retry_in_editor
+        (command "/cd new")
+        (hint    "Tab after /cd completes directories")
+        (then_ (Notice_on_success "cwd changed")))))
+    |}];
+  (* The /cd prompt's popup too. *)
+  H.step ~quiet:true h (Intent (Insert "/cd "));
+  H.enter h;
+  popup "new";
+  H.show h;
+  H.key h (Key.alt (Char "s"));
+  [%expect
+    {|
+    (Rpc
+      (method_ list_dirs)
+      (params ((prefix "")))
+      (tag (Dirs_for_autocomplete "")))
+    |}]
+;;
+
 let%expect_test "/sessions picker switches and reloads; /logout confirms" =
   let h = connected () in
   H.keys h "/sessions";

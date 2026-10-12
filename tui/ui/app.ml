@@ -2711,6 +2711,7 @@ let editing_intent m (intent : Intent.t) =
   | Insert s -> ed (fun e -> Editor.insert e s)
   | Paste s -> ed (fun e -> Editor.insert_paste e s)
   | Submit -> submit m
+  | Submit_as_typed -> submit { m with autocomplete = None }
   | Newline -> ed Editor.newline
   | Backspace -> ed Editor.backspace
   | Delete -> ed Editor.delete
@@ -2807,6 +2808,7 @@ let editing m (intent : Intent.t) =
              Option.value
                (accept_autocomplete m ~submit_now:true)
                ~default:(submit m))
+        | Submit_as_typed -> submit { m with autocomplete = None }
         | Up ->
           ( { m with
               autocomplete = Option.map m.autocomplete ~f:Autocomplete.up
@@ -3170,7 +3172,7 @@ let login_prompt m ~id ~(prompt : P.Auth_event.Prompt.t) (intent : Intent.t) =
     | Select _ -> false, false
   in
   match intent with
-  | Submit ->
+  | Submit | Submit_as_typed ->
     (* Answers are never prompt history. *)
     let value, editor = Editor.submit ~secret:true m.editor in
     let value = String.strip value in
@@ -3326,6 +3328,7 @@ let text_prompt m ~(action : Mode.Text_prompt_action.t) (intent : Intent.t) =
      | Some ac when Autocomplete.accepts_on_enter ac ->
        Option.value (accept ~submit_now:true) ~default:(submit_text m)
      | _ -> submit_text m)
+  | Submit_as_typed -> submit_text { m with autocomplete = None }
   | Complete ->
     (match m.autocomplete with
      | Some _ -> Option.value (accept ~submit_now:false) ~default:(m, [])

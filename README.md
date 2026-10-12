@@ -441,6 +441,9 @@ command it refuses (a typo, an unknown model) stays in the editor for you
 to correct, its error saying what to do; errors stay until dismissed (×),
 the next message or command you send, or switching session. Choosing a
 model whose provider is not logged in says which `/login` to run.
+Enter accepts the completion popup's highlighted item; Ctrl+Enter (⌘+Enter
+on a Mac) sends the composer's text exactly as typed instead, and Esc
+closes the popup.
 `/session` is a dialog of the
 session's details and statistics; `/fork`, `/rewind` (with a confirmation)
 and `/tree` (the whole tree, branches indented) pick a message;
@@ -634,6 +637,7 @@ backend/_build/default/bin/main.exe serve      # JSON-lines RPC on stdio
 |---|---|
 | Enter | send the prompt; accept the highlighted item (for command arguments only once you have typed a filter or moved the highlight — `/model` Enter Enter opens the picker) |
 | Alt+Enter | queue a follow-up to run after the current turn |
+| Alt+S | send exactly what is typed, ignoring the completion popup (`/cd newdir` while it highlights an existing directory); Esc then Enter does the same |
 | Ctrl+J / Alt+J | insert a newline |
 | Esc | close the dialog, abort the running turn, or scroll back to the bottom |
 | Tab | accept the highlighted completion; on an empty prompt, list the commands |
