@@ -9,6 +9,7 @@ module Reply = Faux_provider.Reply
 let with_agent
       ?config
       ?(sub_replies = [])
+      ?sub_script
       ?(answer =
         fun (_ : Agent.Pending_confirm.t) -> Agent.Confirm_answer.Allow)
       ?(reply = fun (_ : User_question.t list) -> User_question.Reply.Declined)
@@ -33,7 +34,11 @@ let with_agent
   in
   let subagent =
     Tool_subagent.create
-      ~provider:(Faux_provider.create sub_replies)
+      ~provider:
+        (Faux_provider.create
+           (match sub_script with
+            | Some script -> script ~dir:t.dir
+            | None -> sub_replies))
       ~current_model:(fun () -> Model.default)
       ~current_thinking:(fun () -> Off)
       ~home:t.dir
@@ -306,6 +311,53 @@ let%expect_test "a subagent's calls are checked too, under its agent id" =
     confirm a1/s1 bash: rm -rf build [bash(rm:*)]
       -> (Deny())
       [a1] bash -> ERROR [denied by user]
+    |}]
+;;
+
+let%expect_test
+    "rules resolve against the session's cwd, not a subagent's chosen one"
+  =
+  with_agent
+    ~config:
+      {|{"approval_mode": "auto", "permissions": {"deny": ["edit(secrets/**)"]}}|}
+    ~sub_script:(fun ~dir ->
+      [ Reply.tool_call
+          ~id:"s1"
+          ~name:"write"
+          ~arguments:
+            (sprintf {|{"path":"%s/secrets/k","content":"x"}|} dir)
+          ()
+      ; Reply.text "done"
+      ; Reply.tool_call ~id:"s2" ~name:"bash" ~arguments:{|{"command":"pwd"}|} ()
+      ; Reply.text "done"
+      ])
+    [ Reply.tool_call
+        ~id:"c1"
+        ~name:"subagent"
+        ~arguments:{|{"task":"write","cwd":"/"}|}
+        ()
+    ; Reply.text "started"
+    ; Reply.text "noted"
+    ; Reply.tool_call
+        ~id:"c2"
+        ~name:"subagent"
+        ~arguments:{|{"task":"pwd","cwd":"secrets"}|}
+        ()
+    ; Reply.text "started"
+    ; Reply.text "noted"
+    ]
+  @@ fun t agent _requests ->
+  Core_unix.mkdir_p (Filename.concat t.dir "secrets");
+  Or_error.ok_exn (Agent.prompt agent "go");
+  Agent.wait_idle agent;
+  Or_error.ok_exn (Agent.prompt agent "again");
+  Agent.wait_idle agent;
+  [%expect {|
+    mode=auto plan=none rules=[]
+    subagent {"task":"write","cwd":"/"} -> started agent a1 (write); its result will be delivered to you when it finishes; use subagent_wait to block on it
+      [a1] write -> ERROR [denied by the rule edit(secrets/**) in permissions.deny; do not try to get around it: ask the user]
+    subagent {"task":"pwd","cwd":"secrets"} -> started agent a2 (pwd); its result will be delivered to you when it finishes; use subagent_wait to block on it
+      [a2] bash -> $DIR/secrets
     |}]
 ;;
 

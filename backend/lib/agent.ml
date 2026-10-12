@@ -615,7 +615,7 @@ let approve t : Tool.approver =
         ~plan:t.plan_mode
         ~rules:t.config.permissions
         ~session:t.session_rules
-        ~cwd:context.cwd
+        ~cwd:t.cwd
         ~home:(Tool.expand_home "~")
         ~destructive:tool.spec.destructive
         call
