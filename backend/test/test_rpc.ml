@@ -630,7 +630,7 @@ let%expect_test "import, set_session_name, export, clone, set_cwd" =
     {"type":"response","id":"r1","ok":false,"error":"unknown export format \"html\" (expected markdown or jsonl)"}
     {"type":"response","id":"r1","ok":false,"error":"(Sys_error \"/nowhere.jsonl: No such file or directory\")"}
     {"type":"response","id":"r1","ok":true,"result":{"state":{"session_id":"<id>","session_path":"$DIR/sessions/<stamp>_<id>.jsonl","session_name":"imported","session_description":null,"cwd":"$DIR","git_branch":null,"model":{"id":"deepseek-flash","provider":"deepseek","key":"deepseek/deepseek-flash","name":"DeepSeek V4.1 Flash","context_window":1000000,"max_output":384000,"supports_thinking":true,"cost":{"input":0.3,"output":1.2,"cache_read":0.006}},"thinking":"on","running":false,"message_count":1,"usage":{"input":0,"output":0,"cache_read":0},"cost_usd":0,"context_tokens":0,"active_host":"backend","hosts":[{"id":"backend","name":"<host>","cwd":"$DIR","session_id":null,"session_name":null}],"subagents":[],"jobs":[],"budget_usd":null,"goal":null,"resume_at_ms":null,"approval_mode":"auto","plan_mode":false,"plan":null,"session_rules":[]}}}
-    {"type":"response","id":"r1","ok":true,"result":{}}
+    {"type":"response","id":"r1","ok":true,"result":{"cwd":"$DIR/sub","created":false}}
     {"type":"response","id":"r1","ok":true,"result":{"session_id":"<id>","session_path":"$DIR/sessions/<stamp>_<id>.jsonl","session_name":"imported","session_description":null,"cwd":"$DIR/sub","git_branch":null,"model":{"id":"deepseek-flash","provider":"deepseek","key":"deepseek/deepseek-flash","name":"DeepSeek V4.1 Flash","context_window":1000000,"max_output":384000,"supports_thinking":true,"cost":{"input":0.3,"output":1.2,"cache_read":0.006}},"thinking":"on","running":false,"message_count":1,"usage":{"input":0,"output":0,"cache_read":0},"cost_usd":0,"context_tokens":0,"active_host":"backend","hosts":[{"id":"backend","name":"<host>","cwd":"$DIR/sub","session_id":null,"session_name":null}],"subagents":[],"jobs":[],"budget_usd":null,"goal":null,"resume_at_ms":null,"approval_mode":"auto","plan_mode":false,"plan":null,"session_rules":[]}}
     |}]
 ;;
@@ -946,7 +946,7 @@ let%expect_test "remote tool host: exec round trip, switch, disconnect" =
   [%expect
     {|
     {"type":"response","id":"r1","ok":false,"error":"unknown tool host \"nobody\""}
-    {"type":"response","id":"r1","ok":true,"result":{}}
+    {"type":"response","id":"r1","ok":true,"result":{"cwd":"$DIR","created":false}}
     (((id backend)(name <host>)(cwd $DIR)(session_id())(session_name())))
     {"type":"response","id":"r1","ok":true,"result":{}}
     tool_result: "sessions/\n"
@@ -1047,7 +1047,7 @@ let%expect_test "remote tool host: attached to another session" =
     {|
     {"type":"response","id":"r2","ok":true,"result":{"state":{"session_id":"<id>","session_path":"$DIR/sessions/<stamp>_<id>.jsonl","session_name":null,"session_description":null,"cwd":"/home/me/proj","git_branch":null,"model":{"id":"deepseek-flash","provider":"deepseek","key":"deepseek/deepseek-flash","name":"DeepSeek V4.1 Flash","context_window":1000000,"max_output":384000,"supports_thinking":true,"cost":{"input":0.3,"output":1.2,"cache_read":0.006}},"thinking":"on","running":false,"message_count":0,"usage":{"input":0,"output":0,"cache_read":0},"cost_usd":0,"context_tokens":0,"active_host":"client-2","hosts":[{"id":"backend","name":"<host>","cwd":"/home/me/proj","session_id":null,"session_name":null},{"id":"client-2","name":"laptop","cwd":"/home/me/proj","session_id":"<id>","session_name":null}],"subagents":[],"jobs":[],"budget_usd":null,"goal":null,"resume_at_ms":null,"approval_mode":"auto","plan_mode":false,"plan":null,"session_rules":[]}}}
     {"type":"response","id":"r2","ok":true,"result":{}}
-    {"type":"response","id":"r2","ok":true,"result":{}}
+    {"type":"response","id":"r2","ok":true,"result":{"cwd":"/home/me/proj","created":false}}
     main: active=client-2 hosts=(((id backend)(name <host>)(cwd $DIR)(session_id())(session_name()))((id client-2)(name laptop)(cwd /home/me/proj)(session_id(<id>))(session_name(side))))
     side: active=client-2 hosts=(((id backend)(name <host>)(cwd /home/me/proj)(session_id())(session_name()))((id client-2)(name laptop)(cwd /home/me/proj)(session_id(<id>))(session_name(side))))
     |}];

@@ -138,6 +138,13 @@ let tool_images_param params =
 
 let ok json = Ok json
 let empty = ok (`Object [])
+
+let if_missing_param params =
+  Or_error.bind
+    (string_param_opt params "if_missing")
+    ~f:Dir_change.If_missing.of_param
+;;
+
 let unit_result r = Or_error.map r ~f:(fun () -> `Object [])
 
 let queued_json (queued : Agent.Queued.t) =
@@ -1184,7 +1191,10 @@ let dispatch_server t (client : Client.t) ~meth ~params
     Some
       (Or_error.bind (string_param params "host") ~f:(fun host ->
          Or_error.bind (string_param_opt params "cwd") ~f:(fun cwd ->
-           unit_result (Agent.set_active_host agent host ~cwd))))
+           Or_error.bind (if_missing_param params) ~f:(fun if_missing ->
+             Or_error.map
+               (Agent.set_active_host agent host ~cwd ~if_missing)
+               ~f:Dir_change.Outcome.to_json))))
   | "tool_exec_output" ->
     Some
       (Or_error.bind (exec_param t params) ~f:(fun (exec_id, agent) ->
@@ -1586,7 +1596,10 @@ let dispatch agent login ~meth ~params : Json.t Or_error.t =
   | "session_stats" -> ok (Rpc_json.session_stats (Agent.session_stats agent))
   | "set_cwd" ->
     Or_error.bind (string_param params "path") ~f:(fun path ->
-      unit_result (Agent.set_cwd agent ~path))
+      Or_error.bind (if_missing_param params) ~f:(fun if_missing ->
+        Or_error.map
+          (Agent.set_cwd agent ~path ~if_missing)
+          ~f:Dir_change.Outcome.to_json))
   | "list_paths" ->
     let prefix =
       match param params "prefix" with

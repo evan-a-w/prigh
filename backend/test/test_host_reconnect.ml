@@ -15,7 +15,8 @@ let member_string json name =
 
 (* A tool-host client played by hand: it answers its [tool_exec]s from a
    daemon fiber while [live] ([$resolve_dir] resolves against the exec's cwd,
-   [$instructions] has no files, anything else prints where it ran). *)
+   and paths with "missing" do not exist; [$instructions] has no files; it
+   predates [$make_dir]; anything else prints where it ran). *)
 module Fake_host = struct
   type t =
     { client : Rpc_server.Client.t
@@ -27,9 +28,9 @@ module Fake_host = struct
 
   let answer_exec (h : Test_rpc.H.t) t ~name json =
     let cwd = member_string json "cwd" in
-    let text =
+    let is_error, text =
       match member_string json "name" with
-      | "$instructions" -> "[]"
+      | "$instructions" -> false, "[]"
       | "$resolve_dir" ->
         let path =
           Option.value_map
@@ -37,10 +38,16 @@ module Fake_host = struct
             ~default:""
             ~f:(fun a -> member_string a "path")
         in
-        if Filename.is_absolute path then path else Filename.concat cwd path
+        let path =
+          if Filename.is_absolute path then path else Filename.concat cwd path
+        in
+        if String.is_substring path ~substring:"missing"
+        then true, "not a directory: " ^ path
+        else false, path
+      | "$make_dir" as op -> true, sprintf "unknown host tool %S" op
       | tool ->
         printf "%s ran %s in %s\n" name tool cwd;
-        sprintf "ran on %s in %s" name cwd
+        false, sprintf "ran on %s in %s" name cwd
     in
     ignore
       (Rpc_server.handle
@@ -53,6 +60,7 @@ module Fake_host = struct
                , `Object
                    [ "exec_id", `String (member_string json "exec_id")
                    ; "text", `String text
+                   ; ("is_error", if is_error then `True else `False)
                    ] )
              ])
        : Json.t)
@@ -228,16 +236,39 @@ let%expect_test "a session waits for its disconnected host and resumes on it" =
   show_state t agent;
   notices t h;
   prompt t h agent "run it";
+  (* A host predating [$make_dir] cannot create a missing directory: it is
+     reported as such, asking or creating. *)
+  List.iter [ "fail"; "ask"; "create" ] ~f:(fun if_missing ->
+    call
+      t
+      h
+      ~params:
+        (sprintf {|{"path": "missing/dir", "if_missing": "%s"}|} if_missing)
+      "set_cwd");
+  call
+    t
+    h
+    ~params:{|{"host": "host-laptop", "cwd": "/missing", "if_missing": "ask"}|}
+    "set_active_host";
+  call t h ~params:{|{"path": "proj", "if_missing": "maybe"}|} "set_cwd";
+  show_state t agent;
   [%expect
     {|
     laptop hello: client_id=client-2 host_id=host-laptop
-    {"type":"response","id":"r1","ok":true,"result":{}}
+    {"type":"response","id":"r1","ok":true,"result":{"cwd":"/home/me/proj","created":false}}
     ((active_host host-laptop) (cwd /home/me/proj)
      (hosts (backend=$DIR host-laptop=/home/me/proj)))
     notice: tools now run on laptop in /home/me
     {"type":"response","id":"r1","ok":true,"result":{}}
     laptop ran bash in /home/me/proj
     tool_result: ran on laptop in /home/me/proj
+    {"type":"response","id":"r1","ok":false,"error":"laptop: not a directory: /home/me/proj/missing/dir"}
+    {"type":"response","id":"r1","ok":false,"error":"tool host laptop runs an older prigh that cannot create directories: update prigh there (and restart its TUI or tool-host), or create /home/me/proj/missing/dir yourself"}
+    {"type":"response","id":"r1","ok":false,"error":"tool host laptop runs an older prigh that cannot create directories: update prigh there (and restart its TUI or tool-host), or create /home/me/proj/missing/dir yourself"}
+    {"type":"response","id":"r1","ok":false,"error":"tool host laptop runs an older prigh that cannot create directories: update prigh there (and restart its TUI or tool-host), or create /missing yourself"}
+    {"type":"response","id":"r1","ok":false,"error":"if_missing must be fail, ask or create, got \"maybe\""}
+    ((active_host host-laptop) (cwd /home/me/proj)
+     (hosts (backend=$DIR host-laptop=/home/me/proj)))
     |}];
   (* The host goes away: the session stays on it, even when another host
      attaches to the session. *)
@@ -315,7 +346,7 @@ let%expect_test "a session waits for its disconnected host and resumes on it" =
   ignore desk;
   [%expect
     {|
-    {"type":"response","id":"r1","ok":true,"result":{}}
+    {"type":"response","id":"r1","ok":true,"result":{"cwd":"/srv","created":false}}
     ((active_host host-desk) (cwd /srv) (hosts (backend=$DIR host-desk=/srv)))
     notice: waiting for tool host "laptop" to reconnect; /host picks another
     notice: tools now run on desk in /srv
@@ -377,7 +408,7 @@ let%expect_test
   [%expect
     {|
     tui hello: client_id=client-2 host_id=host-tui
-    {"type":"response","id":"r","ok":true,"result":{}}
+    {"type":"response","id":"r","ok":true,"result":{"cwd":"/home/me/proj","created":false}}
     {"type":"response","id":"r","ok":true,"result":{}}
     ((active_host host-tui) (cwd /home/me/proj)
      (hosts (backend=$DIR host-tui=/home/me/proj)))
@@ -546,7 +577,7 @@ let%expect_test
     desk hello: client_id=client-3 host_id=host-desk
     ((active_host host-desk) (cwd /home/me)
      (hosts (container-me=/workspace/me host-desk=/home/me)))
-    {"type":"response","id":"r","ok":true,"result":{}}
+    {"type":"response","id":"r","ok":true,"result":{"cwd":"/home/me/proj","created":false}}
     {"type":"response","id":"r","ok":true,"result":{}}
     desk ran bash in /home/me/proj
     tool_result: ran on desk in /home/me/proj
@@ -693,7 +724,7 @@ let%expect_test
     container hello: client_id=client-2 host_id=container-me
     notice: tools now run on container in /workspace/me
     desk hello: client_id=client-3 host_id=host-desk
-    {"type":"response","id":"r","ok":true,"result":{}}
+    {"type":"response","id":"r","ok":true,"result":{"cwd":"/home/me","created":false}}
     {"type":"response","id":"r","ok":true,"result":{}}
     {"type":"response","id":"r1","ok":true,"result":{"state":{"session_id":"<id>","session_path":"$DIR/sessions/<stamp>_<id>.jsonl","session_name":null,"session_description":null,"cwd":"/home/me","git_branch":null,"model":{"id":"deepseek-flash","provider":"deepseek","key":"deepseek/deepseek-flash","name":"DeepSeek V4.1 Flash","context_window":1000000,"max_output":384000,"supports_thinking":true,"cost":{"input":0.3,"output":1.2,"cache_read":0.006}},"thinking":"on","running":false,"message_count":2,"usage":{"input":10,"output":5,"cache_read":0},"cost_usd":9e-06,"context_tokens":10,"active_host":"host-desk","hosts":[{"id":"container-me","name":"container","cwd":"/workspace/me","session_id":"<id>","session_name":null}],"subagents":[],"jobs":[],"budget_usd":null,"goal":null,"resume_at_ms":null,"approval_mode":"auto","plan_mode":false,"plan":null,"session_rules":[]}}}
     ((active_host host-desk) (cwd /home/me) (hosts (container-me=/workspace/me)))
@@ -709,7 +740,7 @@ let%expect_test
   ignore laptop;
   [%expect
     {|
-    {"type":"response","id":"r1","ok":true,"result":{}}
+    {"type":"response","id":"r1","ok":true,"result":{"cwd":"/workspace/me","created":false}}
     {"type":"response","id":"r1","ok":true,"result":{}}
     container ran bash in /workspace/me
     model told: [Environment: the tool host is now container, so tools run there and its filesystem may differ from the one described above. Re-reading AGENTS.md/CLAUDE.md there is at your discretion: they are often unchanged, and missing an update is not serious.]
@@ -754,9 +785,9 @@ let%expect_test "a backend restart keeps each session's host" =
   [%expect
     {|
     desk hello: client_id=client-2 host_id=host-desk
+    {"type":"response","id":"r","ok":true,"result":{"cwd":"/home/me/proj","created":false}}
     {"type":"response","id":"r","ok":true,"result":{}}
-    {"type":"response","id":"r","ok":true,"result":{}}
-    {"type":"response","id":"r1","ok":true,"result":{}}
+    {"type":"response","id":"r1","ok":true,"result":{"cwd":"$DIR","created":false}}
     {"type":"response","id":"r1","ok":true,"result":{}}
     |}];
   (* After: another host connects first; the desktop comes back to its
@@ -921,7 +952,7 @@ let%expect_test
     {|
     container hello: client_id=client-2 host_id=container-me
     desk hello: client_id=client-3 host_id=host-desk
-    {"type":"response","id":"r","ok":true,"result":{}}
+    {"type":"response","id":"r","ok":true,"result":{"cwd":"/home/me/proj","created":false}}
     {"type":"response","id":"r","ok":true,"result":{}}
     container hello: client_id=client-2 host_id=container-me
     desk hello: client_id=client-3 host_id=host-desk
@@ -1018,7 +1049,7 @@ let%expect_test
     container hello: client_id=client-2 host_id=container-me
     desk hello: client_id=client-3 host_id=host-desk
     first: host-desk in /home/me
-    {"type":"response","id":"r","ok":true,"result":{}}
+    {"type":"response","id":"r","ok":true,"result":{"cwd":"/home/me/proj","created":false}}
     {"type":"response","id":"r","ok":true,"result":{"state":{"session_id":"<id>","session_path":"$DIR/sessions/<stamp>_<id>.jsonl","session_name":null,"session_description":null,"cwd":"/home/me/proj","git_branch":null,"model":{"id":"deepseek-flash","provider":"deepseek","key":"deepseek/deepseek-flash","name":"DeepSeek V4.1 Flash","context_window":1000000,"max_output":384000,"supports_thinking":true,"cost":{"input":0.3,"output":1.2,"cache_read":0.006}},"thinking":"on","running":false,"message_count":0,"usage":{"input":0,"output":0,"cache_read":0},"cost_usd":0,"context_tokens":0,"active_host":"host-desk","hosts":[{"id":"container-me","name":"container","cwd":"/workspace/me","session_id":"<id>","session_name":null},{"id":"host-desk","name":"desk","cwd":"/home/me/proj","session_id":"<id>","session_name":null}],"subagents":[],"jobs":[],"budget_usd":null,"goal":null,"resume_at_ms":null,"approval_mode":"auto","plan_mode":false,"plan":null,"session_rules":[]}}}
     new: host-desk in /home/me/proj
     {"type":"response","id":"r","ok":true,"result":{}}
@@ -1086,7 +1117,7 @@ let%expect_test
   [%expect
     {|
     {"type":"response","id":"r","ok":true,"result":{"state":{"session_id":"<id>","session_path":"$DIR/sessions/<stamp>_<id>.jsonl","session_name":"web","session_description":null,"cwd":"/workspace/me","git_branch":null,"model":{"id":"deepseek-flash","provider":"deepseek","key":"deepseek/deepseek-flash","name":"DeepSeek V4.1 Flash","context_window":1000000,"max_output":384000,"supports_thinking":true,"cost":{"input":0.3,"output":1.2,"cache_read":0.006}},"thinking":"on","running":false,"message_count":0,"usage":{"input":0,"output":0,"cache_read":0},"cost_usd":0,"context_tokens":0,"active_host":"container-me","hosts":[{"id":"container-me","name":"container","cwd":"/workspace/me","session_id":"<id>","session_name":null},{"id":"host-desk","name":"desk","cwd":"/home/me","session_id":"<id>","session_name":"web"}],"subagents":[],"jobs":[],"budget_usd":null,"goal":null,"resume_at_ms":null,"approval_mode":"auto","plan_mode":false,"plan":null,"session_rules":[]}}}
-    {"type":"response","id":"r","ok":true,"result":{}}
+    {"type":"response","id":"r","ok":true,"result":{"cwd":"/workspace/me/x","created":false}}
     desk notice: tools now run on container in /workspace/me/x
     {"type":"response","id":"r","ok":true,"result":{"state":{"session_id":"<id>","session_path":"$DIR/sessions/<stamp>_<id>.jsonl","session_name":"web","session_description":null,"cwd":"/workspace/me/x","git_branch":null,"model":{"id":"deepseek-flash","provider":"deepseek","key":"deepseek/deepseek-flash","name":"DeepSeek V4.1 Flash","context_window":1000000,"max_output":384000,"supports_thinking":true,"cost":{"input":0.3,"output":1.2,"cache_read":0.006}},"thinking":"on","running":false,"message_count":0,"usage":{"input":0,"output":0,"cache_read":0},"cost_usd":0,"context_tokens":0,"active_host":"container-me","hosts":[{"id":"container-me","name":"container","cwd":"/workspace/me/x","session_id":"<id>","session_name":null},{"id":"host-desk","name":"desk","cwd":"/home/me","session_id":"<id>","session_name":"web"}],"subagents":[],"jobs":[],"budget_usd":null,"goal":null,"resume_at_ms":null,"approval_mode":"auto","plan_mode":false,"plan":null,"session_rules":[]}}}
     fork: container-me (pinned) in /workspace/me/x
@@ -1159,7 +1190,7 @@ let%expect_test
     {|
     container hello: client_id=client-2 host_id=container-me
     desk hello: client_id=client-3 host_id=host-desk
-    {"type":"response","id":"r","ok":true,"result":{}}
+    {"type":"response","id":"r","ok":true,"result":{"cwd":"/home/me/proj","created":false}}
     web hello: client_id=client-4 host_id=client-4
     {"type":"response","id":"r","ok":true,"result":{"state":{"session_id":"<id>","session_path":"$DIR/sessions/<stamp>_<id>.jsonl","session_name":null,"session_description":null,"cwd":"/home/me/proj","git_branch":null,"model":{"id":"deepseek-flash","provider":"deepseek","key":"deepseek/deepseek-flash","name":"DeepSeek V4.1 Flash","context_window":1000000,"max_output":384000,"supports_thinking":true,"cost":{"input":0.3,"output":1.2,"cache_read":0.006}},"thinking":"on","running":false,"message_count":0,"usage":{"input":0,"output":0,"cache_read":0},"cost_usd":0,"context_tokens":0,"active_host":"host-desk","hosts":[{"id":"container-me","name":"container","cwd":"/workspace/me","session_id":"<id>","session_name":null},{"id":"host-desk","name":"desk","cwd":"/home/me/proj","session_id":"<id>","session_name":null}],"subagents":[],"jobs":[],"budget_usd":null,"goal":null,"resume_at_ms":null,"approval_mode":"auto","plan_mode":false,"plan":null,"session_rules":[]}}}
     new: host-desk in /home/me/proj
@@ -1277,7 +1308,7 @@ let%expect_test "backend host: new sessions start where they did" =
     tui hello: client_id=client-2 host_id=host-tui
     first: host-tui in /home/me
     tui notice: tools now run on tui in /home/me
-    {"type":"response","id":"r","ok":true,"result":{}}
+    {"type":"response","id":"r","ok":true,"result":{"cwd":"/home/me/proj","created":false}}
     {"type":"response","id":"r","ok":true,"result":{"state":{"session_id":"<id>","session_path":"$DIR/sessions/<stamp>_<id>.jsonl","session_name":null,"session_description":null,"cwd":"/home/me/proj","git_branch":null,"model":{"id":"deepseek-flash","provider":"deepseek","key":"deepseek/deepseek-flash","name":"DeepSeek V4.1 Flash","context_window":1000000,"max_output":384000,"supports_thinking":true,"cost":{"input":0.3,"output":1.2,"cache_read":0.006}},"thinking":"on","running":false,"message_count":0,"usage":{"input":0,"output":0,"cache_read":0},"cost_usd":0,"context_tokens":0,"active_host":"host-tui","hosts":[{"id":"backend","name":"<host>","cwd":"/home/me/proj","session_id":null,"session_name":null},{"id":"host-tui","name":"tui","cwd":"/home/me/proj","session_id":"<id>","session_name":null}],"subagents":[],"jobs":[],"budget_usd":null,"goal":null,"resume_at_ms":null,"approval_mode":"auto","plan_mode":false,"plan":null,"session_rules":[]}}}
     new: host-tui in /home/me/proj
     {"type":"response","id":"r","ok":true,"result":{"state":{"session_id":"<id>","session_path":"$DIR/sessions/<stamp>_<id>.jsonl","session_name":null,"session_description":null,"cwd":"/home/me/proj","git_branch":null,"model":{"id":"deepseek-flash","provider":"deepseek","key":"deepseek/deepseek-flash","name":"DeepSeek V4.1 Flash","context_window":1000000,"max_output":384000,"supports_thinking":true,"cost":{"input":0.3,"output":1.2,"cache_read":0.006}},"thinking":"on","running":false,"message_count":0,"usage":{"input":0,"output":0,"cache_read":0},"cost_usd":0,"context_tokens":0,"active_host":"host-tui","hosts":[{"id":"backend","name":"<host>","cwd":"/home/me/proj","session_id":null,"session_name":null},{"id":"host-tui","name":"tui","cwd":"/home/me/proj","session_id":"<id>","session_name":null}],"subagents":[],"jobs":[],"budget_usd":null,"goal":null,"resume_at_ms":null,"approval_mode":"auto","plan_mode":false,"plan":null,"session_rules":[]}}}
@@ -1309,7 +1340,7 @@ let%expect_test "backend host: new sessions start where they did" =
   where t "main's hostless" (Test_rpc.current h);
   [%expect
     {|
-    {"type":"response","id":"r1","ok":true,"result":{}}
+    {"type":"response","id":"r1","ok":true,"result":{"cwd":"$DIR","created":false}}
     {"type":"response","id":"r","ok":true,"result":{"state":{"session_id":"<id>","session_path":"$DIR/sessions/<stamp>_<id>.jsonl","session_name":null,"session_description":null,"cwd":"$DIR","git_branch":null,"model":{"id":"deepseek-flash","provider":"deepseek","key":"deepseek/deepseek-flash","name":"DeepSeek V4.1 Flash","context_window":1000000,"max_output":384000,"supports_thinking":true,"cost":{"input":0.3,"output":1.2,"cache_read":0.006}},"thinking":"on","running":false,"message_count":0,"usage":{"input":0,"output":0,"cache_read":0},"cost_usd":0,"context_tokens":0,"active_host":"backend","hosts":[{"id":"backend","name":"<host>","cwd":"$DIR","session_id":null,"session_name":null},{"id":"host-tui","name":"tui","cwd":"/home/me","session_id":"<id>","session_name":null}],"subagents":[],"jobs":[],"budget_usd":null,"goal":null,"resume_at_ms":null,"approval_mode":"auto","plan_mode":false,"plan":null,"session_rules":[]}}}
     switched: backend (pinned) in $DIR
     {"type":"response","id":"r","ok":true,"result":{"state":{"session_id":"<id>","session_path":"$DIR/sessions/<stamp>_<id>.jsonl","session_name":null,"session_description":null,"cwd":"$DIR","git_branch":null,"model":{"id":"deepseek-flash","provider":"deepseek","key":"deepseek/deepseek-flash","name":"DeepSeek V4.1 Flash","context_window":1000000,"max_output":384000,"supports_thinking":true,"cost":{"input":0.3,"output":1.2,"cache_read":0.006}},"thinking":"on","running":false,"message_count":0,"usage":{"input":0,"output":0,"cache_read":0},"cost_usd":0,"context_tokens":0,"active_host":"backend","hosts":[{"id":"backend","name":"<host>","cwd":"$DIR","session_id":null,"session_name":null},{"id":"host-tui","name":"tui","cwd":"/home/me","session_id":"<id>","session_name":null}],"subagents":[],"jobs":[],"budget_usd":null,"goal":null,"resume_at_ms":null,"approval_mode":"auto","plan_mode":false,"plan":null,"session_rules":[]}}}
