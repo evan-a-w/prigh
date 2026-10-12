@@ -721,8 +721,17 @@ let set_state_without_files (m : Model.t) (state : State.t) =
     let cached = Chat_cache.find chat_cache state.session_path in
     let m, fetch = fetch_newest { m with chat_cache } state.session_path in
     ( { m with
-        pending = { In_flight.none with messages = Option.is_none cached }
-      ; chat = Option.value_map cached ~default:Chat.empty ~f:(fun c -> c.chat)
+        pending =
+          { In_flight.none with
+            messages = Option.is_none cached
+          ; refreshing =
+              Option.is_some cached
+              && Chat_cache.loading m.chat_cache state.session_path
+          }
+      ; chat =
+          Chat.set_running
+            (Option.value_map cached ~default:Chat.empty ~f:(fun c -> c.chat))
+            state.running
       ; paging =
           Option.value_map cached ~default:Paging.all ~f:(fun c -> c.paging)
       ; outputs_loading = String.Set.empty
@@ -749,7 +758,7 @@ let set_state_without_files (m : Model.t) (state : State.t) =
         ; list_subagents
         ; list_jobs
         ] ))
-  else m, background_changed
+  else { m with chat = Chat.set_running m.chat state.running }, background_changed
 ;;
 
 let set_state (m : Model.t) (state : State.t) =
@@ -2791,30 +2800,46 @@ let prefetch_next (m : Model.t) =
   )
 ;;
 
+(* A cached transcript on show stays (with the older pages loaded and what
+   events added since): a newer page than the cached one is merged into it
+   like after reconnecting. *)
 let newest_page (m : Model.t) path (page : Message_page.t) =
   let current = is_current m path in
-  let chat_cache, entry =
-    Chat_cache.add_page
-      (Chat_cache.set_loading m.chat_cache path false)
-      path
-      page
-      ~running:(current && Model.running m)
-  in
-  let m, prefetch = prefetch_next { m with chat_cache } in
-  if not current
-  then m, prefetch
-  else if phys_equal entry.chat m.chat && not m.pending.messages
-  then m, prefetch
-  else
-    ( { m with
-        chat = entry.chat
-      ; paging = entry.paging
-      ; scrolled_up = false
-      ; pending = { m.pending with messages = false }
-      }
-    , (Command.Scroll_to_bottom
-       :: List.map (Chat.subagents_to_load entry.chat) ~f:subagent_rpc)
-      @ prefetch )
+  (* Not asked for by this page any more (e.g. by the user we were). *)
+  if not (current || Chat_cache.loading m.chat_cache path)
+  then m, []
+  else (
+    let chat_cache, entry, cached =
+      Chat_cache.add_page
+        (Chat_cache.set_loading m.chat_cache path false)
+        path
+        page
+        ~running:(current && Model.running m)
+    in
+    let m, prefetch = prefetch_next { m with chat_cache } in
+    let refreshing = m.pending.refreshing in
+    let m =
+      if current
+      then { m with pending = { m.pending with refreshing = false } }
+      else m
+    in
+    match current, m.state, cached with
+    | false, _, _ | true, None, _ -> m, prefetch
+    | true, Some _, `Unchanged when refreshing -> m, prefetch
+    | true, Some state, `Changed when refreshing ->
+      m, resync_rpc m state :: prefetch
+    | true, Some _, _ when phys_equal entry.chat m.chat && not m.pending.messages
+      -> m, prefetch
+    | true, Some _, (`Unchanged | `Changed | `New) ->
+      ( { m with
+          chat = entry.chat
+        ; paging = entry.paging
+        ; scrolled_up = false
+        ; pending = { m.pending with messages = false }
+        }
+      , (Command.Scroll_to_bottom
+         :: List.map (Chat.subagents_to_load entry.chat) ~f:subagent_rpc)
+        @ prefetch ))
 ;;
 
 let older_page (m : Model.t) path ~before (page : Message_page.t) =

@@ -24,6 +24,8 @@ end
 type t =
   { session : Session.t option (** until its state arrives *)
   ; messages : bool (** the session's transcript, until it arrives *)
+  ; refreshing : bool
+    (** a cached transcript is on show, its newest page on the way *)
   ; prompts : Prompt.t list
     (** sent, oldest first, until the transcript has them *)
   ; sending : int (** prompts, steers and follow-ups not yet answered *)

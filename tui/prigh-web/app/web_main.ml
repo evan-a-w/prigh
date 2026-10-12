@@ -8,6 +8,7 @@ module Browser = Prigh_ui_web_app.Browser
 module Login = Prigh_ui_web_app.Login
 module Ws_transport = Prigh_ui_web_app.Ws_transport
 module Accounts = Prigh_web.Accounts
+module Reconnect_gate = Prigh_web.Reconnect_gate
 
 let storage =
   { Accounts.Storage.get = Browser.get_item
@@ -65,6 +66,9 @@ let url_session () =
 (* A socket on a flaky network can take minutes to fail: give up sooner and
    try again. *)
 let connect_timeout = Time_ns.Span.of_sec 10.
+
+(* Attempts made stale by a newer one stay put when they are due. *)
+let reconnect_gate = Reconnect_gate.create ()
 
 let reconnect client settings ~generation ~session =
   let session = Option.first_some session (url_session ()) in
@@ -289,16 +293,28 @@ let perform client settings ctx (model : App.Model.t) (command : App.Command.t) 
       in
       inject (App.Action.Reply (tag, result))
     | Reconnect { generation; delay_ms; session } ->
-      let%bind.Effect tag, result =
+      let%bind.Effect reply =
         Effect.of_deferred_fun
           (fun () ->
+             Reconnect_gate.schedule reconnect_gate ~generation;
              let%bind.Deferred () =
                Clock_ns.after (Time_ns.Span.of_int_ms delay_ms)
              in
-             reconnect client settings ~generation ~session)
+             if
+               Reconnect_gate.due
+                 reconnect_gate
+                 ~generation
+                 ~connected:(Client.is_connected client)
+             then
+               Deferred.map
+                 (reconnect client settings ~generation ~session)
+                 ~f:Option.some
+             else Deferred.return None)
           ()
       in
-      inject (App.Action.Reply (tag, result))
+      (match reply with
+       | Some (tag, result) -> inject (App.Action.Reply (tag, result))
+       | None -> Effect.Ignore)
     | Probe_connection -> Effect.of_deferred_fun probe client
     | Drop_connection -> Effect.of_sync_fun Client.disconnect client
     | Auth_failed message -> Effect.of_sync_fun auth_failed message

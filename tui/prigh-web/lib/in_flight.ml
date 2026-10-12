@@ -19,6 +19,7 @@ end
 type t =
   { session : Session.t option
   ; messages : bool
+  ; refreshing : bool
   ; prompts : Prompt.t list
   ; sending : int
   ; model : string option
@@ -30,6 +31,7 @@ type t =
 let none =
   { session = None
   ; messages = false
+  ; refreshing = false
   ; prompts = []
   ; sending = 0
   ; model = None

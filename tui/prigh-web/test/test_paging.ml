@@ -331,21 +331,78 @@ let%expect_test "switching back shows the transcript at once, then refreshes it"
   Harness.reply h "get_messages_page" (Harness.page (exchanges [ 1 ]));
   print_s [%sexp (phys_equal before (Harness.model h).chat : bool)];
   [%expect {| true |}];
-  (* Changed meanwhile: the new page replaces it. *)
+  (* Changed meanwhile: merged into what is on show, which keeps its place
+     (and its views) and what events added before the page came. *)
   open_session h "s3";
   Harness.quiet h (fun () ->
     Harness.reply h "get_messages_page" (Harness.page (exchanges [ 5 ])));
   open_session h "s2";
+  let before = Chat.entries (Harness.model h).chat in
+  Harness.event
+    h
+    {|{"event":"message_start","message":{"role":"user","text":"question 3"}}|};
   Harness.reply h "get_messages_page" (Harness.page (exchanges [ 1; 2 ]));
+  Harness.text h ~selector:".chat";
+  Harness.reply h "get_messages_page" (Harness.page (exchanges [ 1; 2; 3 ]));
   paging h;
+  let after = Chat.entries (Harness.model h).chat in
+  print_s
+    [%message
+      ""
+        ~same_entries:
+          (List.count (List.zip_exn before (List.take after 2)) ~f:(fun (a, b) ->
+             phys_equal a b)
+           : int)];
   [%expect
     {|
-    Scroll_to_bottom
+    (Rpc (method_ get_messages_page)
+     (params ((session /sessions/s2.jsonl) (limit 1000000)))
+     (tag (Resync (session s2) (from ()))))
+    question 1
+    answer 1
+    question 3
     ((older 0) (before ()) (loading false))
     question 1
     answer 1
     question 2
     answer 2
+    question 3
+    answer 3
+    (same_entries 2)
+    |}]
+;;
+
+(* Seen from elsewhere, a cached session's run goes on: switching to it, its
+   tool calls without a result are running, not interrupted. *)
+let%expect_test "a cached transcript of a running session" =
+  let h = Harness.create () in
+  open_session h "s2";
+  let running_call =
+    {|[{"role":"user","text":"build it"},
+       {"role":"assistant","content":[{"type":"tool_call","id":"c1","name":"bash","arguments":"{}"}],"stop_reason":{"type":"tool_use"},"usage":{"input":0,"output":0,"cache_read":0},"model":"faux"}]|}
+  in
+  Harness.quiet h (fun () ->
+    Harness.reply h "get_messages_page" (Harness.page running_call));
+  open_session h "s3";
+  Harness.quiet h (fun () ->
+    Harness.reply h "get_messages_page" (Harness.page (exchanges [ 5 ])));
+  List.iter [ "s2" ] ~f:(fun s ->
+    Harness.quiet h (fun () ->
+      Harness.act h (Switch_session (sprintf "/sessions/%s.jsonl" s));
+      Harness.reply h "switch_session" "{}";
+      Harness.reply
+        h
+        "get_state"
+        (Harness.state_json
+           ~fields:[ "session_id", `String s; "running", `True ]
+           ()));
+    Harness.text h ~selector:".chat";
+    Harness.elements h ~selector:".chat .tool");
+  [%expect
+    {|
+    build it
+    bash
+    <div class="running tool tool-bash">
     |}]
 ;;
 
