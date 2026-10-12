@@ -56,9 +56,23 @@ end
     cannot let one through. For file tools, the parts are the paths. *)
 val covers : t list -> cwd:string -> home:string -> Call.t -> bool
 
-(** Whether the rule matches any part of the call: for [bash], any part of
-    the command (with substitutions too); for file tools, any path. Deny and
-    ask rules use this, so [cd x && rm y] is caught by [rm:*]. *)
+(** Whether the rule matches any part of the call. Deny and ask rules use
+    this, so [cd x && rm y] is caught by [rm:*].
+
+    For [bash]: the whole command, each part, and every command it may run
+    as far as the text shows: those in substitutions ([$(rm x)], backquotes),
+    subshells and braces, after keywords ([if], [then], [!], ...),
+    assignments ([A=1 rm x]) and quotes or escapes ([\rm], ['rm']), under
+    their base name ([/bin/rm]), behind wrappers ([sudo], [env], [xargs],
+    [nice -n 5], ...: any later word that is not an option), and in the
+    arguments of shells and [eval] ([bash -c 'rm x']). It cannot see
+    commands built at run time ([$CMD x], [eval "$(...)"]), aliases or
+    functions, scripts that are run, or files a command reads: a file rule
+    such as a [read] rule for [~/.ssh] does not stop [bash] reading them.
+
+    For file tools: any path (lexically, so a symlink to a protected file is
+    not caught), and what directory tools show: an entry of [ls]'s
+    directory, anything under [grep]'s and [find]'s. *)
 val touches : t -> cwd:string -> home:string -> Call.t -> bool
 
 (** The rules a "don't ask again" answer would add to cover this call and

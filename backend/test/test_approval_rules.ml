@@ -451,3 +451,86 @@ let%expect_test "allow rules do not let other commands through" =
     ("(git status)" (parts ("(git status)")) complex (covered_by -))
     |}]
 ;;
+
+let%expect_test "deny rules see through wrappers and substitutions" =
+  let touches r call =
+    Approval_rule.touches (rule r) ~cwd:"/work" ~home:"/home/u" call
+  in
+  List.iter
+    [ "echo $(rm -rf x)"
+    ; "echo \"$(rm -rf x)\""
+    ; "echo `rm -rf x`"
+    ; "(rm x)"
+    ; "{ rm x; }"
+    ; "if true; then rm x; fi"
+    ; "! rm x"
+    ; "VAR=1 rm x"
+    ; "\\rm x"
+    ; "'rm' x"
+    ; "/bin/rm x"
+    ; "command rm x"
+    ; "env A=1 rm x"
+    ; "sudo -u root rm x"
+    ; "ls | xargs -0 rm"
+    ; "nice -n 5 rm x"
+    ; "bash -c 'rm -rf x'"
+    ; "eval \"rm x\""
+    ; "echo rm"
+    ; "grep rm file"
+    ; "git rm x"
+    ; "echo 'a; rm x'"
+    ]
+    ~f:(fun command ->
+      printf "%-28s %b\n" command (touches "bash(rm:*)" (bash command)));
+  [%expect {|
+    echo $(rm -rf x)             true
+    echo "$(rm -rf x)"           true
+    echo `rm -rf x`              true
+    (rm x)                       true
+    { rm x; }                    true
+    if true; then rm x; fi       true
+    ! rm x                       true
+    VAR=1 rm x                   true
+    \rm x                        true
+    'rm' x                       true
+    /bin/rm x                    true
+    command rm x                 true
+    env A=1 rm x                 true
+    sudo -u root rm x            true
+    ls | xargs -0 rm             true
+    nice -n 5 rm x               true
+    bash -c 'rm -rf x'           true
+    eval "rm x"                  true
+    echo rm                      false
+    grep rm file                 false
+    git rm x                     false
+    echo 'a; rm x'               false
+    |}];
+  List.iter
+    [ "read", {|{"path": "~/.ssh/id_rsa"}|}
+    ; "ls", {|{"path": "~/.ssh"}|}
+    ; "ls", {|{"path": "~"}|}
+    ; "ls", {|{"path": "/home"}|}
+    ; "grep", {|{"pattern": "x", "path": "~"}|}
+    ; "find", {|{"pattern": "*", "path": "/"}|}
+    ; "grep", {|{"pattern": "x", "path": "/work"}|}
+    ; "read", {|{"path": "~/.ssh"}|}
+    ]
+    ~f:(fun (tool, args) ->
+      let args = String.substr_replace_all args ~pattern:"~" ~with_:"/home/u" in
+      printf
+        "%-6s %-36s %b\n"
+        tool
+        args
+        (touches "read(~/.ssh/**)" (call tool args)));
+  [%expect {|
+    read   {"path": "/home/u/.ssh/id_rsa"}      true
+    ls     {"path": "/home/u/.ssh"}             true
+    ls     {"path": "/home/u"}                  false
+    ls     {"path": "/home"}                    false
+    grep   {"pattern": "x", "path": "/home/u"}  true
+    find   {"pattern": "*", "path": "/"}        true
+    grep   {"pattern": "x", "path": "/work"}    false
+    read   {"path": "/home/u/.ssh"}             false
+    |}]
+;;

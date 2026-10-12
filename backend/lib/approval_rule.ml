@@ -106,6 +106,57 @@ let glob ~paths ~pattern s =
 
 let glob_matches ~pattern s = glob ~paths:true ~pattern s
 
+(* Whether [pattern] matches some path under the directory [dir]: any
+   descendant, or (with [~children_only]) an entry of [dir] itself. *)
+let glob_under ~children_only ~pattern dir =
+  let toks = tokens ~paths:true pattern in
+  let m = Array.length toks in
+  let s = if String.is_suffix dir ~suffix:"/" then dir else dir ^ "/" in
+  let n = String.length s in
+  (* Whether some non-empty rest of a path (without [/] for an entry)
+     matches [toks.(i..)]. *)
+  let rest_matches i =
+    let rest = Array.sub toks ~pos:i ~len:(m - i) in
+    if children_only
+    then
+      (not
+         (Array.exists rest ~f:(function
+            | Token.Lit '/' -> true
+            | _ -> false)))
+      && Array.exists rest ~f:(function
+        | Token.Globstar_dir -> false
+        | _ -> true)
+    else i < m
+  in
+  let memo = Array.make_matrix ~dimx:(m + 1) ~dimy:(n + 1) None in
+  let rec matches i j =
+    match memo.(i).(j) with
+    | Some r -> r
+    | None ->
+      let r =
+        if j = n
+        then rest_matches i
+        else if i = m
+        then false
+        else (
+          match toks.(i) with
+          | Lit c -> Char.equal s.[j] c && matches (i + 1) (j + 1)
+          | One -> (not (Char.equal s.[j] '/')) && matches (i + 1) (j + 1)
+          | Star ->
+            matches (i + 1) j
+            || ((not (Char.equal s.[j] '/')) && matches i (j + 1))
+          | Globstar -> matches (i + 1) j || matches i (j + 1)
+          | Globstar_dir ->
+            matches (i + 1) j
+            || List.exists (List.range j n) ~f:(fun k ->
+              Char.equal s.[k] '/' && matches (i + 1) (k + 1)))
+      in
+      memo.(i).(j) <- Some r;
+      r
+  in
+  matches 0 0
+;;
+
 (* ---- shell commands ------------------------------------------------------ *)
 
 let segments command =
@@ -250,6 +301,239 @@ let command_matches ~pattern segment =
   | None -> glob ~paths:false ~pattern:(squash_blanks pattern) segment
 ;;
 
+(* Programs that run their arguments as a command: a rule for them would
+   allow anything. *)
+let wrappers =
+  [ "env"
+  ; "sudo"
+  ; "doas"
+  ; "su"
+  ; "xargs"
+  ; "exec"
+  ; "command"
+  ; "builtin"
+  ; "eval"
+  ; "source"
+  ; "."
+  ; "nohup"
+  ; "time"
+  ; "nice"
+  ; "ionice"
+  ; "timeout"
+  ; "stdbuf"
+  ; "setsid"
+  ; "watch"
+  ; "chroot"
+  ; "unshare"
+  ; "nsenter"
+  ; "flock"
+  ; "parallel"
+  ; "bash"
+  ; "sh"
+  ; "zsh"
+  ; "dash"
+  ; "ksh"
+  ; "fish"
+  ]
+;;
+
+(* ---- the commands deny rules look for ------------------------------------ *)
+
+(* The simple commands of [command] as words with quotes removed, including
+   those in substitutions, subshells and here-documents' bodies. *)
+let command_words command =
+  let n = String.length command in
+  let commands = ref [] in
+  let words = ref [] in
+  let word = Buffer.create 16 in
+  let in_word = ref false in
+  let drop_word = ref false in
+  let end_word () =
+    if !in_word && not !drop_word then words := Buffer.contents word :: !words;
+    if !in_word then drop_word := false;
+    Buffer.clear word;
+    in_word := false
+  in
+  let end_command () =
+    end_word ();
+    drop_word := false;
+    if not (List.is_empty !words) then commands := List.rev !words :: !commands;
+    words := []
+  in
+  let add c =
+    Buffer.add_char word c;
+    in_word := true
+  in
+  let rec go i stack =
+    if i < n
+    then (
+      let c = command.[i] in
+      let next = if i + 1 < n then Some command.[i + 1] else None in
+      match stack with
+      | `Dq :: rest ->
+        (match c, next with
+         | '"', _ -> go (i + 1) rest
+         | '\\', Some d when String.mem "$`\"\\" d ->
+           add d;
+           go (i + 2) stack
+         | '$', Some '(' ->
+           end_command ();
+           go (i + 2) (`Paren :: stack)
+         | '`', _ ->
+           end_command ();
+           go (i + 1) (`Bq :: stack)
+         | _ ->
+           add c;
+           go (i + 1) stack)
+      | _ ->
+        (match c, next with
+         | (' ' | '\t'), _ -> 
+           end_word ();
+           go (i + 1) stack
+         | ('\n' | ';' | '&' | '|'), _ ->
+           end_command ();
+           go (i + 1) stack
+         | ('$' | '<' | '>'), Some '(' ->
+           end_command ();
+           go (i + 2) (`Paren :: stack)
+         | '(', _ ->
+           end_command ();
+           go (i + 1) (`Paren :: stack)
+         | ')', _ ->
+           end_command ();
+           go
+             (i + 1)
+             (match stack with
+              | `Paren :: rest -> rest
+              | _ -> stack)
+         | '`', _ ->
+           end_command ();
+           go
+             (i + 1)
+             (match stack with
+              | `Bq :: rest -> rest
+              | _ -> `Bq :: stack)
+         | '\'', _ ->
+           in_word := true;
+           let rec quoted j =
+             if j >= n
+             then j
+             else if Char.equal command.[j] '\''
+             then j + 1
+             else (
+               add command.[j];
+               quoted (j + 1))
+           in
+           go (quoted (i + 1)) stack
+         | '$', Some '\'' ->
+           in_word := true;
+           let rec quoted j =
+             if j >= n
+             then j
+             else (
+               match command.[j] with
+               | '\'' -> j + 1
+               | '\\' when j + 1 < n ->
+                 add command.[j + 1];
+                 quoted (j + 2)
+               | d ->
+                 add d;
+                 quoted (j + 1))
+           in
+           go (quoted (i + 2)) stack
+         | '"', _ ->
+           in_word := true;
+           go (i + 1) (`Dq :: stack)
+         | '\\', Some '\n' -> go (i + 2) stack
+         | '\\', Some d ->
+           add d;
+           go (i + 2) stack
+         | '#', _ when not !in_word ->
+           let rec eol j =
+             if j < n && not (Char.equal command.[j] '\n') then eol (j + 1) else j
+           in
+           go (eol i) stack
+         | ('<' | '>'), _ ->
+           (* a redirection: its target is not an argument *)
+           end_word ();
+           let rec operator j =
+             if j < n && String.mem "<>&|-" command.[j] then operator (j + 1) else j
+           in
+           drop_word := true;
+           go (operator (i + 1)) stack
+         | _ ->
+           add c;
+           go (i + 1) stack))
+  in
+  go 0 [];
+  end_command ();
+  List.rev !commands
+;;
+
+let is_assignment word =
+  match String.lsplit2 word ~on:'=' with
+  | None -> false
+  | Some (name, _) ->
+    let name = String.chop_suffix_if_exists name ~suffix:"+" in
+    (not (String.is_empty name))
+    && (not (Char.is_digit name.[0]))
+    && String.for_all name ~f:(fun c -> Char.is_alphanum c || Char.equal c '_')
+;;
+
+let keywords =
+  [ "{"; "}"; "!"; "if"; "then"; "else"; "elif"; "fi"; "do"; "done"; "while"
+  ; "until"; "time"
+  ]
+;;
+
+let shells = [ "bash"; "sh"; "zsh"; "dash"; "ksh"; "fish"; "eval"; "su" ]
+
+(* What a simple command may run, as commands to match deny rules against:
+   itself without keywords, assignments and the program's directory, and for
+   wrappers ([sudo], [xargs], ...) each later word that is not an option and
+   what follows it; the arguments of shells and [eval] are commands too. *)
+let rec commands_run ~depth words =
+  let rec strip = function
+    | w :: rest when List.mem keywords w ~equal:String.equal || is_assignment w
+      -> strip rest
+    | words -> words
+  in
+  match strip words with
+  | [] -> []
+  | program :: args ->
+    let base =
+      if String.mem program '/'
+      then Filename.basename program
+      else program
+    in
+    let own = [ program :: args; base :: args ] in
+    let wrapped =
+      if List.mem wrappers base ~equal:String.equal
+      then
+        List.concat_mapi args ~f:(fun k word ->
+          let suffix = List.drop args k in
+          let as_command =
+            if String.is_prefix word ~prefix:"-"
+            then []
+            else (
+              match strip suffix with
+              | [] -> []
+              | p :: rest -> [ p :: rest; Filename.basename p :: rest ])
+          in
+          let as_script =
+            if depth < 3 && List.mem shells base ~equal:String.equal
+            then commands_of ~depth:(depth + 1) word
+            else []
+          in
+          as_command @ as_script)
+      else []
+    in
+    own @ wrapped
+
+and commands_of ~depth command =
+  List.concat_map (command_words command) ~f:(commands_run ~depth)
+;;
+
 (* ---- calls ---------------------------------------------------------------- *)
 
 let edit_tools = [ "edit"; "write"; "apply_patch" ]
@@ -371,45 +655,25 @@ let touches t ~cwd ~home (call : Call.t) =
     List.exists parts ~f:(fun part ->
       pattern_matches ~cwd ~home call pattern ~part)
     ||
-      (match call.command with
-      | Some command -> command_matches ~pattern command
-      | None -> false)
-;;
-
-(* Programs that run their arguments as a command: a rule for them would
-   allow anything. *)
-let wrappers =
-  [ "env"
-  ; "sudo"
-  ; "doas"
-  ; "su"
-  ; "xargs"
-  ; "exec"
-  ; "command"
-  ; "builtin"
-  ; "eval"
-  ; "source"
-  ; "."
-  ; "nohup"
-  ; "time"
-  ; "nice"
-  ; "ionice"
-  ; "timeout"
-  ; "stdbuf"
-  ; "setsid"
-  ; "watch"
-  ; "chroot"
-  ; "unshare"
-  ; "nsenter"
-  ; "flock"
-  ; "parallel"
-  ; "bash"
-  ; "sh"
-  ; "zsh"
-  ; "dash"
-  ; "ksh"
-  ; "fish"
-  ]
+    (match call.command with
+     | Some command ->
+       command_matches ~pattern command
+       || List.exists (commands_of ~depth:0 command) ~f:(fun words ->
+         command_matches ~pattern (String.concat ~sep:" " words))
+     | None ->
+       (* directory tools show what is under their path *)
+       let under ~children_only =
+         List.mem file_tools call.tool ~equal:String.equal
+         && List.exists call.paths ~f:(fun dir ->
+           glob_under
+             ~children_only
+             ~pattern:(path_pattern ~cwd ~home pattern)
+             dir)
+       in
+       (match call.tool with
+        | "ls" -> under ~children_only:true
+        | "grep" | "find" -> under ~children_only:false
+        | _ -> false))
 ;;
 
 (* A program name worth a [PREFIX:*] rule: not a wrapper, an assignment
