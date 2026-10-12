@@ -16,6 +16,10 @@ let bindings =
       [ Key.alt Enter ]
       Queue_follow_up
       "queue a follow-up to run after the current turn"
+  ; b
+      [ Key.alt (Char "s") ]
+      Submit_as_typed
+      "send exactly what is typed, ignoring the completion popup"
   ; b [ Key.ctrl 'j'; Key.alt (Char "j") ] Newline "insert a newline"
   ; b [ Key.plain Escape ] Cancel "close the dialog, or abort the running turn"
   ; b

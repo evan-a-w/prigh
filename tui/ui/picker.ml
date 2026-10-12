@@ -223,5 +223,6 @@ let handle t (intent : Intent.t) ~page : Outcome.t =
   | Search
   | Prev_user_message
   | Next_user_message
-  | Toggle_archived -> Continue t
+  | Toggle_archived
+  | Submit_as_typed -> Continue t
 ;;

@@ -215,15 +215,15 @@ let%expect_test "completion offers the keywords, but not over a goal's text" =
   complete "/budget ";
   [%expect
     {|
-    Goal ↑↓ Tab Enter Esc
+    Goal ↑↓ Tab Enter Esc · Ctrl+Enter as typed
     off clear the goal
     resume make a stopped goal active
-    Goal ↑↓ Tab Enter Esc
+    Goal ↑↓ Tab Enter Esc · Ctrl+Enter as typed
     resume make a stopped goal active
-    Automatic resume ↑↓ Tab Enter Esc
+    Automatic resume ↑↓ Tab Enter Esc · Ctrl+Enter as typed
     now retry the run at once
     cancel stay stopped until you send a message
-    Budget ↑↓ Tab Enter Esc
+    Budget ↑↓ Tab Enter Esc · Ctrl+Enter as typed
     off no budget: turns start whatever it costs
     |}]
 ;;

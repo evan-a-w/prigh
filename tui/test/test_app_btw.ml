@@ -247,6 +247,6 @@ let%expect_test "/bt autocompletes to /btw" =
       /abort                          abort the current run
       /verbosity [quiet|normal|verbose]  set the transcript ver…
       /retry-backend-connection       reconnect to the backend …
-    …deepseek-flash  ctx:0.1%/1.0M  Tab/Enter accept · Esc close
+    …deepseek-flash  $0.01  Tab/Enter accept · Alt+S as typed
     |}]
 ;;

@@ -4,6 +4,7 @@ type t =
   | Insert of string
   | Paste of string
   | Submit
+  | Submit_as_typed
   | Newline
   | Backspace
   | Delete

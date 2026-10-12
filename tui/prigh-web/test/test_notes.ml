@@ -367,12 +367,12 @@ let%expect_test "/diff, /review and /init are in the completions and /help" =
   H.text h ~selector:".popup";
   [%expect
     {|
-    Commands ↑↓ Tab Enter Esc
+    Commands ↑↓ Tab Enter Esc · Ctrl+Enter as typed
     /diff [path] show the uncommitted changes where the tools run, untracked files too
     /default-dir [path|off] show or set the directory new sessions start in
     /delete-archived delete every archived session, after a confirmation
     /retry-backend-connection reconnect to the backend now
-    Commands ↑↓ Tab Enter Esc
+    Commands ↑↓ Tab Enter Esc · Ctrl+Enter as typed
     /init write or improve the project's AGENTS.md
     /import [path] import a session from a JSONL file on the backend
     /diff [path] show the uncommitted changes where the tools run, untracked files too

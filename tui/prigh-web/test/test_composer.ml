@@ -244,7 +244,7 @@ let%expect_test "@ completes paths from the backend" =
   H.text h ~selector:".popup";
   [%expect
     {|
-    Files ↑↓ Tab Enter Esc
+    Files ↑↓ Tab Enter Esc · Ctrl+Enter as typed
     src/main.ml
     src/macros/
     src/main.mli
@@ -297,13 +297,58 @@ let%expect_test "@ completes paths from the backend" =
     {| (Rpc (method_ list_paths) (params ((prefix zz))) (tag (Paths zz))) |}]
 ;;
 
+let%expect_test
+    "Ctrl+Enter or Cmd+Enter sends what is typed, not the highlight"
+  =
+  let h = H.create () in
+  H.type_ h "/cd new";
+  H.reply h "list_dirs" {|["newer/"]|};
+  H.text h ~selector:".popup";
+  [%expect {|
+    (Rpc (method_ list_dirs) (params ((prefix new))) (tag (Paths new)))
+    Directories ↑↓ Tab Enter Esc · Ctrl+Enter as typed
+    newer/
+    |}];
+  H.key h "Enter" ~ctrl:true;
+  let popup = Option.is_some (Prigh_web.App.Model.popup (H.model h)) in
+  print_s [%sexp ((H.model h).draft : string), (popup : bool)];
+  [%expect {|
+    Send
+    (Save_history ("/cd new"))
+    (Rpc (method_ set_cwd) (params ((path new)))
+     (tag (Notice "Working directory: new")))
+    ("" false)
+    |}];
+  H.type_ h "look at @src/ma";
+  H.reply h "list_paths" {|["src/main.ml"]|};
+  H.key h "Enter" ~meta:true;
+  [%expect {|
+    (Rpc (method_ list_paths) (params ((prefix src/ma))) (tag (Paths src/ma)))
+    Send
+    (Save_history ("look at @src/ma" "/cd new"))
+    Scroll_to_bottom
+    (Rpc (method_ prompt) (params ((text "look at @src/ma")))
+     (tag (Sent (text "look at @src/ma") (images ()))))
+    |}];
+  (* Without a popup it is Enter. *)
+  H.type_ h "hello";
+  H.key h "Enter" ~ctrl:true;
+  [%expect {|
+    Send
+    (Save_history (hello "look at @src/ma" "/cd new"))
+    Scroll_to_bottom
+    (Rpc (method_ prompt) (params ((text hello)))
+     (tag (Sent (text hello) (images ()))))
+    |}]
+;;
+
 let%expect_test "slash commands: the popup, arguments, running, unknown ones" =
   let h = H.create () in
   H.type_ h "/";
   H.text h ~selector:".popup";
   [%expect
     {|
-    Commands ↑↓ Tab Enter Esc
+    Commands ↑↓ Tab Enter Esc · Ctrl+Enter as typed
     /help [command] show commands and keys, or a command's usage
     /hotkeys show the keyboard shortcuts
     /new start a new session
@@ -363,7 +408,7 @@ let%expect_test "slash commands: the popup, arguments, running, unknown ones" =
     {|
     (Complete_accept (run false))
     "/mode "
-    Modes ↑↓ Tab Enter Esc
+    Modes ↑↓ Tab Enter Esc · Ctrl+Enter as typed
     ask bash, job_input, edits and MCP tools ask first
     auto-edit file edits run; bash, job_input and MCP tools ask first
     auto tools run without asking
