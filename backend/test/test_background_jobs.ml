@@ -749,7 +749,7 @@ let%expect_test "jobs on a client tool host: output, list, kill, disconnect" =
     {|
     {"type":"response","id":"r","ok":true,"result":{"client_id":"client-1","host_id":"client-1","namespace":null,"user":null,"superuser":false,"state":{"session_id":"<id>","session_path":"$DIR/sessions/<stamp>_<id>.jsonl","session_name":null,"session_description":null,"cwd":"$DIR","git_branch":null,"model":{"id":"deepseek-flash","provider":"deepseek","key":"deepseek/deepseek-flash","name":"DeepSeek V4.1 Flash","context_window":1000000,"max_output":384000,"supports_thinking":true,"cost":{"input":0.3,"output":1.2,"cache_read":0.006}},"thinking":"on","running":false,"message_count":0,"usage":{"input":0,"output":0,"cache_read":0},"cost_usd":0,"context_tokens":0,"active_host":"backend","hosts":[{"id":"backend","name":"<host>","cwd":"$DIR","session_id":null,"session_name":null}],"subagents":[],"jobs":[],"budget_usd":null,"goal":null,"resume_at_ms":null,"approval_mode":"auto","plan_mode":false,"plan":null,"session_rules":[]}}}
     connected to 127.0.0.1:PORT as client-2
-    {"type":"response","id":"r","ok":true,"result":{}}
+    {"type":"response","id":"r","ok":true,"result":{"cwd":"$DIR/host","created":false}}
     {"type":"response","id":"r","ok":true,"result":{}}
     {"type":"response","id":"r","ok":true,"result":{"text":"[job j1 running after Ns, 15 bytes; lines 1-2 of 2] basename $PWD; echo from-host; while [ ! -f gate ]; do slee…\nhost\nfrom-host"}}
     {"type":"response","id":"r","ok":true,"result":[{"id":"j1","command":"basename $PWD; echo from-host; while [ ! -f gate ]; do sleep 0.02; done; echo after-gate","running":true,"exit":null,"delivered":false,"elapsed":<t>,"bytes":15,"last_line":"from-host"}]}
