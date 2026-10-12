@@ -515,6 +515,10 @@ one more
 <AGE>
 <CWD>/sub
 session files after: 1
+=== chromium: /cd: the directory popup ===
+Directories
+↑↓ Tab Enter Esc · Ctrl+Enter as typed
+<CWD>/sub/
 === chromium: files: the session's directory ===
 <HOSTNAME>
 cwd
@@ -1337,6 +1341,10 @@ one more
 <AGE>
 <CWD>/sub
 session files after: 1
+=== firefox: /cd: the directory popup ===
+Directories
+↑↓ Tab Enter Esc · Ctrl+Enter as typed
+<CWD>/sub/
 === firefox: files: the session's directory ===
 <HOSTNAME>
 cwd
