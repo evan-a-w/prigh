@@ -15,8 +15,9 @@ val create : ?named_only:bool -> P.Session_summary.t list -> t
 val title : t -> string
 
 (** The rows ([current]: the path of the session we are in, marked [*]),
-    keeping the query, marks and highlight of [previous] (or highlighting
-    [select]). *)
+    keeping the query, marks (also on sessions the filter hides) and highlight
+    of [previous] (a hidden one moves to its nearest neighbour shown), or
+    highlighting [select]. *)
 val picker
   :  ?previous:Picker.t
   -> ?select:string
@@ -33,7 +34,6 @@ val targets : t -> Picker.t -> P.Session_summary.t list
 val set_archived : t -> path:string -> archived:bool -> t
 
 val remove : t -> paths:string list -> t
-val archived : t -> P.Session_summary.t list
 
 (** ["session \"build fix\""], or by id when unnamed. *)
 val describe : P.Session_summary.t -> string
@@ -41,8 +41,21 @@ val describe : P.Session_summary.t -> string
 (** ["Delete 3 sessions (1.2 MB)? Enter deletes, Esc keeps them"]. *)
 val delete_question : P.Session_summary.t list -> string
 
-(** [None] when nothing is archived. *)
-val delete_archived_question : t -> string option
+(** [Error] says what to do when they include the [current] session (its
+    path), which cannot be deleted. *)
+val deletable
+  :  P.Session_summary.t list
+  -> current:string option
+  -> (P.Session_summary.t list, string) Result.t
+
+(** The archived sessions but the [current] one. *)
+val archived_to_delete
+  :  t
+  -> current:string option
+  -> P.Session_summary.t list
+
+(** [None] when nothing but the [current] session is archived. *)
+val delete_archived_question : t -> current:string option -> string option
 
 (** ["2 marked (1.2 MB)"] while sessions are marked. *)
 val marked_summary : t -> Picker.t -> string option

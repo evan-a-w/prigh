@@ -2485,6 +2485,7 @@ let refresh_autocomplete m =
   let line_index = (Editor.position m.editor).line in
   match
     Autocomplete.compute
+      ~current_session:(current_session m)
       ~line
       ~col
       ~line_index
@@ -2983,9 +2984,10 @@ let save_scoped_models m picker =
 (* ---- sessions picker --------------------------------------------------- *)
 
 let confirm_delete m ~back (sessions : P.Session_summary.t list) =
-  match sessions with
-  | [] -> m, []
-  | sessions ->
+  match Session_selection.deletable sessions ~current:(current_session m) with
+  | Error e -> error m e, []
+  | Ok [] -> m, []
+  | Ok sessions ->
     ( { m with
         mode =
           Confirm
@@ -3003,10 +3005,18 @@ let confirm_delete m ~back (sessions : P.Session_summary.t list) =
 ;;
 
 let confirm_delete_archived m ~back selection =
-  match Session_selection.delete_archived_question selection with
+  let current = current_session m in
+  match Session_selection.delete_archived_question selection ~current with
   | None -> notice m "no archived sessions to delete", []
   | Some question ->
-    ( { m with mode = Confirm { question; action = Delete_archived { back } } }
+    let paths =
+      List.map
+        (Session_selection.archived_to_delete selection ~current)
+        ~f:(fun (s : P.Session_summary.t) -> s.path)
+    in
+    ( { m with
+        mode = Confirm { question; action = Delete_sessions { paths; back } }
+      }
     , [] )
 ;;
 
@@ -3072,19 +3082,14 @@ let map_sessions_picker m ~f =
   | Confirm
       { question
       ; action =
-          ( Delete_sessions
-              { back = Some { kind = Sessions selection; picker }; _ }
-          | Delete_archived
-              { back = Some { kind = Sessions selection; picker } } ) as action
+          Delete_sessions
+            { paths; back = Some { kind = Sessions selection; picker } }
       } ->
     let kind, picker = update selection picker in
     let back = Some { Mode.Open_picker.kind; picker } in
-    let action : Mode.Confirm_action.t =
-      match action with
-      | Delete_sessions { paths; _ } -> Delete_sessions { paths; back }
-      | _ -> Delete_archived { back }
-    in
-    { m with mode = Confirm { question; action } }
+    { m with
+      mode = Confirm { question; action = Delete_sessions { paths; back } }
+    }
   | _ -> m
 ;;
 
@@ -3092,9 +3097,7 @@ let sessions_picker_shown m =
   match m.mode with
   | Picker { kind = Sessions _; _ }
   | Confirm
-      { action =
-          ( Delete_sessions { back = Some { kind = Sessions _; _ }; _ }
-          | Delete_archived { back = Some { kind = Sessions _; _ } } )
+      { action = Delete_sessions { back = Some { kind = Sessions _; _ }; _ }
       ; _
       } -> true
   | _ -> false
@@ -3429,16 +3432,13 @@ let confirm m ~(action : Mode.Confirm_action.t) (intent : Intent.t) =
       m, [ rpc "rewind" ~params:[ "to", str id ] ~tag:Reload_messages ]
     | Delete_sessions { paths; back } ->
       back_to m back, [ call (Delete_sessions paths) ~tag:Sessions_deleted ]
-    | Delete_archived { back } ->
-      back_to m back, [ call Delete_archived ~tag:Sessions_deleted ]
     | Tool_confirm c -> answer_confirm m c Allow
   in
   let no m =
     match action with
     | Tool_confirm c -> answer_confirm m c Deny
-    | Delete_sessions { back = Some _ as back; _ }
-    | Delete_archived { back = Some _ as back } -> back_to m back, []
-    | Logout _ | Rewind _ | Delete_sessions _ | Delete_archived _ ->
+    | Delete_sessions { back = Some _ as back; _ } -> back_to m back, []
+    | Logout _ | Rewind _ | Delete_sessions _ ->
       notice m "cancelled", []
   in
   match intent, action with
@@ -3987,7 +3987,11 @@ let rec reply m (tag : Reply_tag.t) (result : (P.Json.t, string) Result.t) =
          json
          ~f:(decode_list ~f:P.Session_summary.of_json)
          (fun sessions ->
-            match Session_selection.resolve sessions args with
+            match
+              Result.bind
+                (Session_selection.resolve sessions args)
+                ~f:(Session_selection.deletable ~current:(current_session m))
+            with
             | Error e ->
               ( error
                   (restore_command m ("/delete " ^ String.concat ~sep:" " args))
