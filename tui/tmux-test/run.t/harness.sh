@@ -58,6 +58,7 @@ start() {
 
 stop() {
 	tmux kill-server 2>/dev/null || true
+	rm -f "${TMUX_TMPDIR:-/tmp}/tmux-$(id -u)/$socket"
 	rm -rf "$tmp"
 }
 
