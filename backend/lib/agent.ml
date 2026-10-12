@@ -198,7 +198,6 @@ type t =
       (Pending_question.t * User_question.Reply.t Promise.u) String.Table.t
   ; mutable approval_mode : Approval_mode.t
   ; mutable plan_mode : bool
-  ; mutable told_plan_mode : bool (** what the model was last told *)
   ; mutable session_rules : Approval_rule.t list
   ; mutable plan : Plan.t option
   ; mutable shell_seq : int
@@ -213,8 +212,9 @@ type t =
   ; mutable host_pinned : bool (** chosen explicitly via [set_active_host] *)
   ; pending_execs : Pending_exec.t String.Table.t
   ; mutable exec_seq : int
-  ; mutable environment_notes : Injected.Note.t list
-    (** cwd/host changes not yet told to the model, oldest first *)
+  ; mutable told : Told_environment.t
+    (** what the model was last told, as [Session.told_environment] records
+        it; the difference to now is told with the next user message *)
   ; background : Background_tasks.t
   ; subagent_log : Subagent_log.t
   ; mcp : Mcp_hub.t option
@@ -250,7 +250,6 @@ let restore_approvals t =
    | None ->
      t.approval_mode <- t.config.approval_mode;
      t.plan_mode <- false);
-  t.told_plan_mode <- t.plan_mode;
   t.session_rules
   <- List.filter_map (Session.allow_rules t.session) ~f:(fun rule ->
        Result.ok (Approval_rule.of_string rule));
@@ -435,6 +434,51 @@ let recheck_confirms t =
     Promise.resolve w.resolver Confirm_answer.Allow)
 ;;
 
+let environment t =
+  { Told_environment.host = t.active_host
+  ; cwd = t.cwd
+  ; tools =
+      List.map (Tools.for_model t.model t.tools) ~f:Tool.name
+      |> List.dedup_and_sort ~compare:String.compare
+  ; plan_mode = t.plan_mode
+  }
+;;
+
+let record_told t =
+  if
+    not
+      (Option.equal
+         Told_environment.equal
+         (Session.told_environment t.session)
+         (Some t.told))
+  then ignore (Session.set_told_environment t.session t.told : Session.Entry.t)
+;;
+
+(* A session from before [told] was recorded starts from its environment as
+   loaded: whatever it was not told then is lost. *)
+let restore_told t =
+  t.told
+  <- (match Session.told_environment t.session with
+      | Some told -> told
+      | None -> environment t)
+;;
+
+(* Before a change, so that a session that has not recorded what the model
+   was told yet (a new or an old one) still tells it after being loaded
+   again. Before the system prompt is built only plan mode can need telling:
+   the prompt describes the rest. *)
+let environment_changed t =
+  if
+    Option.is_some (Session.system_prompt t.session)
+    || not (Bool.equal t.plan_mode t.told.plan_mode)
+  then record_told t
+;;
+
+let tell t told =
+  t.told <- told;
+  record_told t
+;;
+
 let switch_mode ?approval ?plan t =
   let approval = Option.value approval ~default:t.approval_mode in
   let plan = Option.value plan ~default:t.plan_mode in
@@ -445,6 +489,7 @@ let switch_mode ?approval ?plan t =
   then (
     t.approval_mode <- approval;
     t.plan_mode <- plan;
+    environment_changed t;
     record_approval t;
     recheck_confirms t;
     state_changed t)
@@ -454,10 +499,10 @@ let set_approval_mode t mode = switch_mode t ~approval:mode
 
 (* The note for the model when plan mode changed since it was last told. *)
 let plan_mode_note t =
-  if Bool.equal t.plan_mode t.told_plan_mode
+  if Bool.equal t.plan_mode t.told.plan_mode
   then None
   else (
-    t.told_plan_mode <- t.plan_mode;
+    tell t { t.told with plan_mode = t.plan_mode };
     Some
       { Injected.Note.kind = Plan_mode { on = t.plan_mode }
       ; text = System_prompt.plan_mode_note ~on:t.plan_mode
@@ -540,7 +585,7 @@ let exit_plan_mode t context args =
     with
     | None -> Tool.Result.error "[cancelled]"
     | Some (Allow | Always) ->
-      t.told_plan_mode <- false;
+      tell t { t.told with plan_mode = false };
       switch_mode t ~plan:false;
       Tool.Result.ok
         (sprintf
@@ -727,15 +772,6 @@ let fail_execs t ~host ~text =
     Promise.resolve e.resolver (Tool.Result.error text))
 ;;
 
-(* Before the first run the system prompt is still to be built from the
-   current environment, so there is nothing to report. *)
-let add_environment_note t kind ~text =
-  if Option.is_some (Session.system_prompt t.session)
-  then
-    t.environment_notes
-    <- t.environment_notes @ [ { Injected.Note.kind; text } ]
-;;
-
 let location t =
   if String.is_empty t.active_host
   then None
@@ -786,10 +822,7 @@ let set_host_cwd t (host : Host.t) ~cwd =
   then (
     t.cwd <- cwd;
     t.git_branch <- find_branch t ~cwd;
-    add_environment_note
-      t
-      (Cwd { dir = cwd })
-      ~text:(System_prompt.cwd_changed_note ~cwd));
+    environment_changed t);
   record_location t;
   if String.equal host.id Host.backend_id
   then t.backend_cwd <- cwd
@@ -797,12 +830,7 @@ let set_host_cwd t (host : Host.t) ~cwd =
 ;;
 
 let activate_host t (host : Host.t) ~cwd ~pinned =
-  if not (String.equal t.active_host host.id)
-  then
-    add_environment_note
-      t
-      (Host { name = host.name })
-      ~text:(System_prompt.host_changed_note ~host:host.name);
+  if not (String.equal t.active_host host.id) then environment_changed t;
   t.active_host <- host.id;
   t.active_host_name <- host.name;
   t.host_pinned <- pinned;
@@ -1252,6 +1280,7 @@ let system_prompt t =
   | None ->
     let text = build_system_prompt t in
     ignore (Session.set_system_prompt t.session ~text : Session.Entry.t);
+    tell t { (environment t) with plan_mode = t.told.plan_mode };
     text
 ;;
 
@@ -1349,11 +1378,24 @@ let with_attachments t text attachments =
     , List.concat images )
 ;;
 
+(* Without a system prompt yet, it is to be built from the current
+   environment: only plan mode, which it does not describe, is told. *)
+let take_notes t =
+  let now = environment t in
+  let told =
+    if Option.is_some (Session.system_prompt t.session)
+    then t.told
+    else { now with plan_mode = t.told.plan_mode }
+  in
+  let notes = Told_environment.notes ~told now ~host_name:t.active_host_name in
+  if not (List.is_empty notes) then tell t now;
+  notes
+;;
+
 let user_message t (q : Queued.t) =
   let text = Option.value q.expanded ~default:q.text in
   let text, attachments, attached = with_attachments t text q.attachments in
-  let notes = t.environment_notes @ Option.to_list (plan_mode_note t) in
-  t.environment_notes <- [];
+  let notes = take_notes t in
   let origin = { Injected.notes; attachments; source = q.source } in
   Message.user
     ~images:(q.images @ attached)
@@ -1418,43 +1460,8 @@ let deliveries t =
 
 (* The system prompt names the tools of the model it was built for. *)
 let set_model t model =
-  let names () = String.Set.of_list (List.map (tools t) ~f:Tool.name) in
-  let before = names () in
   t.model <- model;
-  let after = names () in
-  let added = Set.diff after before
-  and removed = Set.diff before after in
-  if not (Set.is_empty added && Set.is_empty removed)
-  then (
-    (* Against what the model was last told: a pending note's change. *)
-    let pending, others =
-      List.partition_map t.environment_notes ~f:(fun (note : Injected.Note.t) ->
-        match note.kind with
-        | Tools { added; removed } ->
-          First (String.Set.of_list added, String.Set.of_list removed)
-        | _ -> Second note)
-    in
-    let added, removed =
-      List.fold
-        pending
-        ~init:(added, removed)
-        ~f:(fun (added, removed) (pending_added, pending_removed) ->
-          ( Set.union
-              (Set.diff pending_added removed)
-              (Set.diff added pending_removed)
-          , Set.union
-              (Set.diff pending_removed added)
-              (Set.diff removed pending_added) ))
-    in
-    t.environment_notes <- others;
-    if not (Set.is_empty added && Set.is_empty removed)
-    then (
-      let added = Set.to_list added
-      and removed = Set.to_list removed in
-      add_environment_note
-        t
-        (Tools { added; removed })
-        ~text:(System_prompt.tools_changed_note ~added ~removed)));
+  environment_changed t;
   ignore
     (Session.set_model t.session ~model:(Model.key model) ~thinking:t.thinking
      : Session.Entry.t);
@@ -2014,7 +2021,6 @@ let create
     ; pending_questions = String.Table.create ()
     ; approval_mode = config.approval_mode
     ; plan_mode = false
-    ; told_plan_mode = false
     ; session_rules = []
     ; plan = None
     ; shell_seq = 0
@@ -2026,7 +2032,7 @@ let create
     ; host_pinned = false
     ; pending_execs = String.Table.create ()
     ; exec_seq = 0
-    ; environment_notes = []
+    ; told = { host = ""; cwd; tools = []; plan_mode = false }
     ; background =
         Background_tasks.create
           ~env
@@ -2046,6 +2052,7 @@ let create
   in
   restore_settings t;
   restore_host t;
+  restore_told t;
   load_subagent_log t;
   restore_resume t;
   Background_tasks.connect
@@ -2574,12 +2581,12 @@ let replace_session t session ~keep_host =
   if keep_host then record_location t else t.cwd <- Session.cwd session;
   t.git_branch <- find_branch t ~cwd:t.cwd;
   restore_host t;
+  restore_settings t;
+  restore_told t;
   (match List.hd (hosts t) with
    | Some host when String.is_empty t.active_host ->
      activate_host t host ~cwd:host.cwd ~pinned:false
    | Some _ | None -> ());
-  t.environment_notes <- [];
-  restore_settings t;
   restore_resume t;
   state_changed t
 ;;
@@ -2608,6 +2615,7 @@ let rewind t ~to_ =
   else
     Or_error.map (Session.rewind t.session ~to_) ~f:(fun () ->
       t.plan <- Plan.latest (path_messages t.session);
+      restore_told t;
       state_changed t)
 ;;
 

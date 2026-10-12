@@ -315,6 +315,7 @@ let entry (e : Session.Entry.t) =
       [ "kind", str "resume_at"
       ; "at", Option.value_map at ~default:`Null ~f:ms
       ]
+    | Told_environment _ -> [ "kind", str "told_environment" ]
   in
   `Object
     ([ "id", str e.id

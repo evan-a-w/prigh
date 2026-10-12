@@ -64,6 +64,9 @@ module Entry : sig
       | Resume_at of { at : float option }
       (** a run scheduled to resume when a usage limit resets (seconds since
           the epoch); [None]: no longer *)
+      | Told_environment of Told_environment.t
+      (** what the model was last told about its environment, see
+          {!told_environment} *)
     [@@deriving sexp, jsonaf]
   end
 
@@ -164,6 +167,13 @@ val set_budget : t -> usd:float option -> Entry.t
 val approval : t -> (string * bool) option
 
 val set_approval : t -> mode:string -> plan:bool -> Entry.t
+
+(** The last [told_environment] entry on the active path: what the model
+    was last told about its environment. [None] in sessions from before it
+    was recorded. *)
+val told_environment : t -> Told_environment.t option
+
+val set_told_environment : t -> Told_environment.t -> Entry.t
 
 (** The [allow_rule] entries on the active path, oldest first. *)
 val allow_rules : t -> string list

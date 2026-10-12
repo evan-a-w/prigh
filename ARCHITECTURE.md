@@ -190,8 +190,9 @@ while it is waiting on the browser.
   resume, `!cmd` output, compaction summary, `/review`, `/init`; a goal's
   message may carry a plan mode note too). The
   `text` stays exactly what the model sees, so providers and prompt caches
-  are unaffected. `Injected.infer` recognises the same things by their
-  wording in sessions written before `origin` existed, and `Rpc_json`
+  are unaffected (the notes are derived by `Told_environment`).
+  `Injected.infer` recognises the same things by their wording in sessions
+  written before `origin` existed, and `Rpc_json`
   sends `origin` (recorded, else inferred) as `{body, notes: [{kind,
   title, text}], attachments: [{path}]}` or `{source: {kind, title}}`.
 - `Image` — what models accept: PNG/JPEG/GIF/WebP sniffed from the bytes,
@@ -582,9 +583,23 @@ two can share one.
   `System_prompt` session entry so every later request (and every reload)
   sends the same prefix, which is what provider prompt caches key on. When
   the cwd or the active host changes afterwards, `host_changed_note` /
-  `cwd_changed_note` are queued and prepended to the next user message: they
-  say what changed and leave re-reading the instructions to the model's
-  discretion, since they are often unchanged.
+  `cwd_changed_note` are prepended to the next user message: they say what
+  changed and leave re-reading the instructions to the model's discretion,
+  since they are often unchanged.
+- `Told_environment` — what the model was last told about its environment
+  (host id, cwd, the tool names `Tools.for_model` gives it, plan mode):
+  set from the current environment when the system prompt is built (plan
+  mode excepted: the prompt does not describe it) and whenever notes are
+  delivered, and recorded as a `Told_environment` session entry on the
+  active path. The environment notes (host, cwd, tools, plan mode) are not
+  queued but derived when a user message is built, by `notes ~told now`, so
+  a change made before the session is evicted, switched away from (in
+  place, as the TUI does, or by another frontend), reloaded after a backend
+  restart or reconnected to is still told, exactly once, and changes that
+  cancel out tell nothing. Rewinding past the message that delivered a note
+  tells it again on the new branch; a fork carries the pending changes.
+  Sessions from before the entry start from their environment as loaded
+  (what was pending then is lost) and record it at their first change.
 - `Agent_loop` — the core loop. Per turn: build the request from the context,
   stream the assistant message (emitting `Message_start/update/end`), retry
   with exponential backoff on retryable errors, execute the tool calls
@@ -779,7 +794,8 @@ two can share one.
   compactions, `btw`; `spend` totals them on all branches) and `Resume_at
   {at}` (a scheduled resume after a usage limit, `None` once it ran or was
   cancelled; `resume_at`, also in `Summary`) — these three are ignored by
-  `messages` and not copied by `fork`;
+  `messages` and not copied by `fork` — and `Told_environment` (what the
+  model was last told about its environment, see the harness);
   `Session.messages` is the message list for the next request with the
   compaction summary replacing everything before `kept_from`, preceded by
   the compaction's `pinned` message (the user's latest, kept verbatim when
