@@ -463,13 +463,13 @@ scenario_fallback() {
 	capture fallback "handed over"
 }
 
-# Alt+S sends the line as typed while the completion highlights another
-# directory.
+# Alt+S sends the line as typed while the completion highlights a
+# subdirectory.
 scenario_send_raw() {
-	mkdir -p "$tmp/cwd/sub" "$tmp/cwd/subway"
+	mkdir -p "$tmp/cwd/sub/deeper"
 	wait_for "Ctrl+C"
-	type_text "/cd $tmp/cwd/sub"
-	wait_for "subway/"
+	type_text "/cd $tmp/cwd/sub/"
+	wait_for "deeper/"
 	settle
 	capture send_raw "the popup highlights a directory"
 	keys M-s
