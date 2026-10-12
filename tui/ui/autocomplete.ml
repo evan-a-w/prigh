@@ -179,7 +179,8 @@ let session_items (sessions : P.Session_summary.t list) =
       ~id:s.id
       ~detail
       ~dimmed:s.archived
-      ~search:(String.concat ~sep:" " [ label; first; s.id; s.cwd; s.created_at ])
+      ~search:
+        (String.concat ~sep:" " [ label; first; s.id; s.cwd; s.created_at ])
       label)
 ;;
 
@@ -190,8 +191,7 @@ let sessions_for (spec : Commands.Spec.t) ~current_session sessions =
     match spec.name with
     | "archive" -> not s.archived
     | "unarchive" -> s.archived
-    | "delete" ->
-      not (Option.exists current_session ~f:(String.equal s.path))
+    | "delete" -> not (Option.exists current_session ~f:(String.equal s.path))
     | _ -> true)
 ;;
 
