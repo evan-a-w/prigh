@@ -83,6 +83,11 @@ type t =
   ; mutable persisted : bool
     (** whether the file exists: it is only written once the session has
         something worth keeping (a message or a name) *)
+  ; unreadable : string option String.Table.t
+    (** the parents of entries [load] could not read, by id, so that the
+        entries after them stay on the path *)
+  ; mutable skipped : string list
+  ; mutable torn : bool (** the file does not end with a newline *)
   }
 
 let id t = t.id
@@ -93,6 +98,7 @@ let host_cwds t = String.Map.of_hashtbl_exn t.host_cwds
 let parent t = t.parent
 let head t = t.head
 let entries t = List.rev t.entries
+let skipped t = t.skipped
 let created_at t = Time_float.to_string_utc t.created_at
 
 let mtime t =
@@ -170,7 +176,10 @@ let write_line t (line : Line.t) =
     | fd ->
       let oc = Core_unix.out_channel_of_descr fd in
       Exn.protect
-        ~f:(fun () -> output_line oc line)
+        ~f:(fun () ->
+          if t.torn then Out_channel.newline oc;
+          t.torn <- false;
+          output_line oc line)
         ~finally:(fun () -> Out_channel.close oc))
   else if worth_saving line
   then (
@@ -241,6 +250,9 @@ let create ~dir ~cwd ?parent () =
     ; head = None
     ; by_id = String.Table.create ()
     ; persisted = false
+    ; unreadable = String.Table.create ()
+    ; skipped = []
+    ; torn = false
     }
   in
   t
@@ -278,39 +290,108 @@ let read_lines path =
   |> List.filter ~f:(fun l -> not (String.is_empty (String.strip l)))
 ;;
 
+(* What can be known of an entry this version cannot read (e.g. one a newer
+   prigh wrote): its id, its parent and the name of its kind. *)
+let unreadable_entry (json : Json.t) =
+  match json with
+  | `Array [ `String "Entry"; (`Object _ as entry) ] ->
+    (match Jsonaf.member "id" entry, Jsonaf.member "parent" entry with
+     | Some (`String id), parent ->
+       let parent =
+         match parent with
+         | Some (`String parent) -> Some parent
+         | _ -> None
+       in
+       let kind =
+         match Jsonaf.member "payload" entry with
+         | Some (`Array (`String kind :: _)) -> kind
+         | _ -> "unknown"
+       in
+       Some (id, parent, kind)
+     | _ -> None)
+  | _ -> None
+;;
+
+(* A line that cannot be read is skipped with a warning rather than making
+   the whole session unreadable: a torn last line (prigh stopped while
+   writing it) or a kind of line from a newer prigh. *)
 let load path =
   Or_error.try_with (fun () ->
-    let lines = read_lines path in
-    let parsed =
-      List.map lines ~f:(fun l -> Line.t_of_jsonaf (Json.of_string l))
+    let contents = Utf8.sanitize (In_channel.read_all path) in
+    let lines =
+      String.split_lines contents
+      |> List.mapi ~f:(fun i l -> i + 1, l)
+      |> List.filter ~f:(fun (_, l) -> not (String.is_empty (String.strip l)))
     in
-    match parsed with
-    | Header { id; cwd; created_at; parent } :: rest ->
-      let created_at =
-        match Time_float.of_string_with_utc_offset created_at with
-        | t -> t
-        | exception _ -> Time_float.epoch
-      in
-      let t =
-        { id
-        ; path
-        ; cwd
-        ; host = None
-        ; host_cwds = String.Table.create ()
-        ; created_at
-        ; parent
-        ; entries = []
-        ; head = None
-        ; by_id = String.Table.create ()
-        ; persisted = true
-        }
-      in
-      List.iter rest ~f:(function
-        | Line.Header _ -> failwith "duplicate header"
-        | Entry e -> add_entry t e
-        | Head id -> t.head <- Some id);
-      t
-    | _ -> failwith "session file does not start with a header")
+    let last = Option.value_map (List.last lines) ~default:0 ~f:fst in
+    match lines with
+    | [] -> failwith "session file is empty"
+    | (_, first) :: rest ->
+      (match Line.t_of_jsonaf (Json.of_string first) with
+       | exception _ -> failwith "session file does not start with a header"
+       | Entry _ | Head _ ->
+         failwith "session file does not start with a header"
+       | Header { id; cwd; created_at; parent } ->
+         let created_at =
+           match Time_float.of_string_with_utc_offset created_at with
+           | t -> t
+           | exception _ -> Time_float.epoch
+         in
+         let t =
+           { id
+           ; path
+           ; cwd
+           ; host = None
+           ; host_cwds = String.Table.create ()
+           ; created_at
+           ; parent
+           ; entries = []
+           ; head = None
+           ; by_id = String.Table.create ()
+           ; persisted = true
+           ; unreadable = String.Table.create ()
+           ; skipped = []
+           ; torn =
+               (not (String.is_empty contents))
+               && not (String.is_suffix contents ~suffix:"\n")
+           }
+         in
+         let skip n reason =
+           t.skipped <- sprintf "line %d: %s" n reason :: t.skipped
+         in
+         List.iter rest ~f:(fun (n, l) ->
+           match Json.of_string l with
+           | exception _ ->
+             skip
+               n
+               (if n = last
+                then
+                  "skipped an incomplete last line (prigh probably stopped \
+                   while writing it)"
+                else "skipped a line that is not JSON")
+           | json ->
+             (match Line.t_of_jsonaf json with
+              | Header _ -> skip n "skipped a second header"
+              | Entry e -> add_entry t e
+              | Head id -> t.head <- Some id
+              | exception _ ->
+                (match unreadable_entry json with
+                 | Some (id, parent, kind) ->
+                   Hashtbl.set t.unreadable ~key:id ~data:parent;
+                   t.head <- Some id;
+                   skip
+                     n
+                     (sprintf
+                        "skipped a %S entry this version of prigh cannot read \
+                         (written by a newer one?)"
+                        kind)
+                 | None ->
+                   skip
+                     n
+                     "skipped a line this version of prigh cannot read \
+                      (written by a newer one?)")));
+         t.skipped <- List.rev t.skipped;
+         t))
 ;;
 
 let append_at t ~at payload =
@@ -407,9 +488,15 @@ let append_compaction ?pinned t ~summary ~kept_from =
 
 let active_path t =
   let rec go id acc =
-    match Option.bind id ~f:(Hashtbl.find t.by_id) with
+    match id with
     | None -> acc
-    | Some entry -> go entry.parent (entry :: acc)
+    | Some id ->
+      (match Hashtbl.find t.by_id id with
+       | Some entry -> go entry.parent (entry :: acc)
+       | None ->
+         (match Hashtbl.find t.unreadable id with
+          | Some parent -> go parent acc
+          | None -> acc))
   in
   go t.head []
 ;;
@@ -604,8 +691,12 @@ let rewind t ~to_ =
 ;;
 
 let fork ?at t ~dir =
-  let at = Option.first_some at t.head in
   let path = active_path t in
+  let at =
+    Option.first_some
+      at
+      (Option.map (List.last path) ~f:(fun (e : Entry.t) -> e.id))
+  in
   match at with
   | None -> Ok (create ~dir ~cwd:t.cwd ~parent:t.id ())
   | Some at ->

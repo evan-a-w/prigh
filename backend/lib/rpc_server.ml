@@ -270,6 +270,20 @@ let tell_problems (client : Client.t) problems =
 
 let session_id agent = Session.id (Agent.session agent)
 
+(* After the response that opened the session, so that the client's reset
+   for the new session does not clear it. *)
+let tell_skipped (client : Client.t) =
+  match Session.skipped (Agent.session client.agent) with
+  | [] -> ()
+  | skipped ->
+    client.send
+      (Rpc_json.event
+         (Notice
+            (sprintf
+               "parts of this session could not be read and are left out:\n%s"
+               (String.concat ~sep:"\n" skipped))))
+;;
+
 let clients_of t agent =
   Hashtbl.data t.clients
   |> List.filter ~f:(fun (c : Client.t) -> phys_equal c.agent agent)
@@ -278,7 +292,9 @@ let clients_of t agent =
 let maybe_evict t agent =
   if
     (* a stale agent of a session reopened since is not the live one *)
-    Option.exists (Hashtbl.find t.agents (session_id agent)) ~f:(phys_equal agent)
+    Option.exists
+      (Hashtbl.find t.agents (session_id agent))
+      ~f:(phys_equal agent)
     && (not (Option.exists t.default_agent ~f:(phys_equal agent)))
     && (not (Agent.is_running agent))
     && (not (Agent.has_running_background agent))
@@ -1769,6 +1785,12 @@ let handle t client (request : Json.t) : Json.t =
       ]
 ;;
 
+let respond t (client : Client.t) request =
+  let before = client.agent in
+  client.send (handle t client request);
+  if not (phys_equal before client.agent) then tell_skipped client
+;;
+
 let serve_lines ?signed_in t ~read_line ~write_line =
   Switch.run
   @@ fun sw ->
@@ -1818,7 +1840,7 @@ let serve_lines ?signed_in t ~read_line ~write_line =
              (* Each request in its own fiber: a blocking method (shell,
                 compact, a remote tool round trip) must not stall the
                 reader. *)
-             Fiber.fork ~sw (fun () -> send (handle t client request));
+             Fiber.fork ~sw (fun () -> respond t client request);
              loop ()))
   in
   let switch_to = loop () in
