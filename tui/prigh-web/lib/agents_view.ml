@@ -658,6 +658,7 @@ let view (m : App.Model.t) ~inject =
                button
                  ~cls:"icon ghost"
                  ~title:"All agents (Esc)"
+                 ~label:"All agents"
                  ~on_click:(inject Action.Agents_back)
                  [ icon Back ]
              | None -> icon ~cls:"agents-head-icon" Bot)
@@ -675,6 +676,7 @@ let view (m : App.Model.t) ~inject =
           ; button
               ~cls:"icon ghost agents-close"
               ~title:"Close (Alt+0)"
+              ~label:"Close subagents and jobs"
               ~on_click:(inject Action.Toggle_subagents)
               [ icon Close ]
           ]
@@ -694,6 +696,11 @@ let toggle (m : App.Model.t) ~inject =
          then "icon ghost agents-toggle open"
          else "icon ghost agents-toggle")
       ~title:"Subagents and jobs (/agents)"
+      ~label:
+        (if running > 0
+         then sprintf "Subagents and jobs: %d running" running
+         else "Subagents and jobs")
+      ~attrs:[ Attr.create "aria-expanded" (Bool.to_string a.open_) ]
       ~on_click:(inject Action.Toggle_subagents)
       [ icon Bot
       ; (if running > 0
