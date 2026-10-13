@@ -711,6 +711,84 @@ let%expect_test "apply_patch: writes every file, or none" =
     |}]
 ;;
 
+let%expect_test
+    "apply_patch: one file however written; a failed write is reported"
+  =
+  with_sandbox
+  @@ fun t ->
+  let patch lines =
+    Jsonaf.to_string (`Object [ "input", `String (String.concat_lines lines) ])
+  in
+  write t "a.txt" "one\ntwo\n";
+  run
+    t
+    Tool_apply_patch.tool
+    (patch
+       [ "*** Begin Patch"
+       ; "*** Update File: a.txt"
+       ; "-one"
+       ; "+ONE"
+       ; "*** Update File: ./a.txt"
+       ; "-two"
+       ; "+TWO"
+       ; "*** End Patch"
+       ]);
+  print_string (read t "a.txt");
+  [%expect
+    {|
+    Success. Updated the following files:
+    M a.txt
+    M a.txt
+
+    --- a/a.txt
+    +++ b/a.txt
+    @@ -1,2 +1,2 @@
+    -one
+    +ONE
+     two
+    --- a/a.txt
+    +++ b/a.txt
+    @@ -1,2 +1,2 @@
+     ONE
+    -two
+    +TWO
+    ONE
+    TWO
+    |}];
+  Core_unix.mkdir (Filename.concat t.dir "ro") ~perm:0o555;
+  run
+    t
+    Tool_apply_patch.tool
+    (patch
+       [ "*** Begin Patch"
+       ; "*** Update File: a.txt"
+       ; "-ONE"
+       ; "+1"
+       ; "*** Add File: ro/x.txt"
+       ; "+x"
+       ; "*** Add File: b.txt"
+       ; "+b"
+       ; "*** End Patch"
+       ]);
+  print_string (read t "a.txt");
+  print_s
+    [%sexp (Sys_unix.file_exists_exn (Filename.concat t.dir "b.txt") : bool)];
+  Core_unix.chmod (Filename.concat t.dir "ro") ~perm:0o755;
+  [%expect
+    {|
+    ERROR: The patch was only partly applied: writing failed at A ro/x.txt: $DIR/ro/x.txt: Permission denied
+    Changed:
+    M a.txt
+    Not changed:
+    A ro/x.txt
+    A b.txt
+    Fix the cause, then patch only the files not changed (the changed ones have their edits already).
+    1
+    TWO
+    false
+    |}]
+;;
+
 let%expect_test "apply_patch asks for confirmation naming its files" =
   with_sandbox
   @@ fun t ->

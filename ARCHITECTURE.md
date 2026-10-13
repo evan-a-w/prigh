@@ -499,7 +499,8 @@ two can share one.
   `Tool_apply_patch` (Codex's patch format, parsed and matched by
   `Apply_patch` with Codex's whitespace and punctuation leniency; adds,
   deletes, moves and updates several files, writing nothing unless all of
-  it applies; returns Codex's `Success. Updated the following files:` list
+  it applies (a write that fails anyway is reported with what was and was
+  not changed; `a.txt` and `./a.txt` are one file); returns Codex's `Success. Updated the following files:` list
   plus the updated files' diffs), `Tool_ls`, `Tool_grep`/`Tool_find` (via
   `rg`).
 - `Tool_subagent` — one tool, no roles: the model passes `task` (required)
