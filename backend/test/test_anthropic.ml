@@ -627,3 +627,106 @@ let%expect_test "images: in prompts and tool results" =
     ]
     |}]
 ;;
+
+let%expect_test "pause_turn: the paused turn is sent back and continues" =
+  Eio_main.run
+  @@ fun env ->
+  Switch.run
+  @@ fun sw ->
+  let responses =
+    ref
+      [ sse
+          [ {|{"type":"message_start","message":{"usage":{"input_tokens":10}}}|}
+          ; {|{"type":"content_block_start","index":0,"content_block":{"type":"text","text":""}}|}
+          ; {|{"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"Searching."}}|}
+          ; {|{"type":"content_block_start","index":1,"content_block":{"type":"server_tool_use","id":"srvtoolu_1","name":"web_search","input":{"query":"eio"}}}|}
+          ; {|{"type":"content_block_stop","index":1}|}
+          ; {|{"type":"message_delta","delta":{"stop_reason":"pause_turn"},"usage":{"output_tokens":5}}|}
+          ]
+      ; sse
+          [ {|{"type":"message_start","message":{"usage":{"input_tokens":20}}}|}
+          ; {|{"type":"content_block_start","index":0,"content_block":{"type":"web_search_tool_result","tool_use_id":"srvtoolu_1","content":[{"type":"web_search_result","title":"Eio","url":"https://e.io","encrypted_content":"ENC"}]}}|}
+          ; {|{"type":"content_block_start","index":1,"content_block":{"type":"text","text":""}}|}
+          ; {|{"type":"content_block_delta","index":1,"delta":{"type":"text_delta","text":"Found it."}}|}
+          ; {|{"type":"message_delta","delta":{"stop_reason":"end_turn"},"usage":{"output_tokens":7}}|}
+          ]
+      ]
+  in
+  let server =
+    Server.start ~sw ~env ~handler:(fun _ ->
+      let body =
+        match !responses with
+        | body :: rest ->
+          responses := rest;
+          body
+        | [] -> sse []
+      in
+      { status = 200
+      ; headers = [ "Content-Type", "text/event-stream" ]
+      ; chunks = [ 0., body ]
+      })
+  in
+  let provider =
+    Anthropic.create
+      ~env
+      ~base_url:(Server.url server "")
+      ~auth:(Api_key "sk")
+      ()
+  in
+  let message =
+    provider.stream
+      (request ~tools:[ Tool_web_search.tool.spec ] [ Message.user "eio?" ])
+      ~cancel:Cancellation.never
+      ~on_event:ignore
+  in
+  print_s [%sexp (message : Message.Assistant.t)];
+  List.iter (Server.requests server) ~f:(fun r ->
+    print_endline
+      (Json.to_string
+         (Option.value_exn (Json.member "messages" (Json.of_string r.body)))));
+  [%expect
+    {|
+    ((content
+      ((Text Searching.)
+       (Server_tool
+        ((id srvtoolu_1) (name web_search) (input "{\"query\":\"eio\"}")
+         (output ("1. Eio \226\128\148 https://e.io")) (is_error false)
+         (raw
+          ("{\"type\":\"web_search_tool_result\",\"tool_use_id\":\"srvtoolu_1\",\"content\":[{\"type\":\"web_search_result\",\"title\":\"Eio\",\"url\":\"https://e.io\",\"encrypted_content\":\"ENC\"}]}"))))
+       (Text "Found it.")))
+     (stop_reason End_turn) (usage ((input 30) (output 12) (cache_read 0)))
+     (model anthropic/claude-opus-4-6))
+    [{"role":"user","content":[{"type":"text","text":"eio?","cache_control":{"type":"ephemeral"}}]}]
+    [{"role":"user","content":[{"type":"text","text":"eio?"}]},{"role":"assistant","content":[{"type":"text","text":"Searching.","cache_control":{"type":"ephemeral"}},{"type":"server_tool_use","id":"srvtoolu_1","name":"web_search","input":{"query":"eio"}}]}]
+    |}]
+;;
+
+let%expect_test "an unresolved server_tool_use in history is dropped, not text" =
+  let assistant =
+    Message.Assistant
+      { content =
+          [ Text "Searching."
+          ; Server_tool
+              { id = "srvtoolu_1"
+              ; name = "web_search"
+              ; input = {|{"query":"eio"}|}
+              ; output = None
+              ; is_error = false
+              ; raw = None
+              }
+          ]
+      ; stop_reason = Aborted
+      ; usage = Usage.zero
+      ; model = Model.key model
+      }
+  in
+  let body =
+    T.request_body
+      ~oauth:false
+      (request [ Message.user "eio?"; assistant; Message.user "go on" ])
+  in
+  print_endline
+    (Json.to_string (Option.value_exn (Json.member "messages" body)));
+  [%expect
+    {| [{"role":"user","content":[{"type":"text","text":"eio?"}]},{"role":"assistant","content":[{"type":"text","text":"Searching."}]},{"role":"user","content":[{"type":"text","text":"go on","cache_control":{"type":"ephemeral"}}]}] |}]
+;;

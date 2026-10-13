@@ -262,8 +262,13 @@ becomes a list):
   server tool `web_search_20250305` (`max_uses` 5); `server_tool_use` blocks
   (input from `input_json_delta`s, emitted at `content_block_stop`) and
   `web_search_tool_result` blocks (results or `error_code`, kept as `raw`)
-  become `Server_tool_*` events; `pause_turn` ends the turn. Consecutive same-role turns are merged, the
-  last block and the system blocks carry cache breakpoints, thinking blocks
+  become `Server_tool_*` events. A `pause_turn` (a long server-side search)
+  is continued (up to 10 times): what the turn has so far is sent back as
+  the last, assistant message, its unresolved `server_tool_use` included,
+  and the reply goes on in the same message; elsewhere an unresolved
+  `server_tool_use` is dropped. Consecutive same-role turns are merged, the
+  last cacheable block (not thinking or `server_tool_use`) and the system
+  blocks carry cache breakpoints, thinking blocks
   are replayed only with a signature. With an OAuth token (Claude Pro/Max) the
   request is shaped like Claude Code's: Bearer auth, `claude-cli` user agent,
   `claude-code-20250219`/`oauth-2025-04-20` betas, the Claude Code identity
