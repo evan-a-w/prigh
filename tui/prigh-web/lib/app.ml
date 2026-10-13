@@ -437,6 +437,23 @@ module Model = struct
       ~now:(Option.value t.now ~default:Time_ns.epoch)
       ~utc_offset:t.utc_offset
   ;;
+
+  let kept_from_deletion t (s : Session_summary.t) =
+    let current =
+      Option.exists t.state ~f:(fun state -> String.equal state.session_id s.id)
+    in
+    if s.running
+    then Some "is running: it will be kept (wait for it or stop it first)"
+    else if current
+    then
+      Some "is the session you are in: it will be kept (switch to another first)"
+    else if s.clients > 0
+    then
+      Some
+        "is open in another tab or terminal: it will be kept (close it there \
+         first)"
+    else None
+  ;;
 end
 
 let thinking_levels = Prigh_ui.Commands.thinking_levels
@@ -3567,9 +3584,11 @@ let rec reply_to (m : Model.t) (tag : Reply_tag.t) result =
           sessions =
             List.filter m.sessions ~f:(fun s -> not (Set.mem gone s.path))
         ; marks =
-            (match result.refused with
-             | [] -> Session_marks.empty
-             | _ -> { m.marks with marked = Set.diff m.marks.marked gone })
+            (* What was kept (refused, or not asked for) stays selected. *)
+            (let kept = Set.diff m.marks.marked gone in
+             if Set.is_empty kept
+             then Session_marks.empty
+             else { m.marks with marked = kept })
         }
       in
       let m, cmds =
@@ -4153,12 +4172,20 @@ let dialog_accept (m : Model.t) =
       ))
   | Some (Delete target) ->
     let m, cmds = close_dialog m in
-    let method_ : Request.Method.t =
-      match target with
-      | Sessions paths -> Delete_sessions paths
-      | Archived -> Delete_archived
+    (* What the backend would keep is not asked for. *)
+    let deletable paths =
+      List.filter paths ~f:(fun path ->
+        not
+          (List.exists m.sessions ~f:(fun s ->
+             String.equal s.path path
+             && Option.is_some (Model.kept_from_deletion m s))))
     in
-    m, cmds @ [ call method_ ~tag:Sessions_deleted ]
+    (match target with
+     | Sessions paths ->
+       (match deletable paths with
+        | [] -> m, cmds
+        | paths -> m, cmds @ [ call (Delete_sessions paths) ~tag:Sessions_deleted ])
+     | Archived -> m, cmds @ [ call Delete_archived ~tag:Sessions_deleted ])
   | Some (Login flow) ->
     (match flow.failed, flow.prompt with
      | None, Some _ -> respond_login m flow

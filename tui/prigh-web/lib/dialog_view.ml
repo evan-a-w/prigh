@@ -190,21 +190,7 @@ let rename name ~inject =
 ;;
 
 (* Why the backend will keep a session, if it will. *)
-let kept (m : App.Model.t) (s : Session_summary.t) =
-  let current =
-    Option.exists m.state ~f:(fun state -> String.equal state.session_id s.id)
-  in
-  if s.running
-  then Some "is running: it will be kept (wait for it or stop it first)"
-  else if current
-  then Some "is the session you are in: it will be kept (switch to another first)"
-  else if s.clients > 0
-  then
-    Some
-      "is open in another tab or terminal: it will be kept (close it there \
-       first)"
-  else None
-;;
+let kept = App.Model.kept_from_deletion
 
 let delete (m : App.Model.t) (target : Dialog.Delete_target.t) ~inject =
   let sessions =
@@ -214,10 +200,13 @@ let delete (m : App.Model.t) (target : Dialog.Delete_target.t) ~inject =
         List.mem paths s.path ~equal:String.equal)
     | Archived -> List.filter m.sessions ~f:(fun s -> s.archived)
   in
-  let count = List.length sessions in
-  let size = Session_summary.size_string (Session_summary.total_bytes sessions) in
+  let deleted = List.filter sessions ~f:(fun s -> Option.is_none (kept m s)) in
+  let count = List.length deleted in
+  let size = Session_summary.size_string (Session_summary.total_bytes deleted) in
   let title =
     match target, sessions with
+    | _, _ when count = 0 && List.length sessions = 1 -> "Can't delete this session"
+    | _, _ when count = 0 -> "Can't delete these sessions"
     | Archived, _ -> sprintf "Delete all %d archived sessions?" count
     | Sessions _, [ _ ] -> "Delete session?"
     | Sessions _, _ -> sprintf "Delete %d sessions?" count
@@ -240,19 +229,30 @@ let delete (m : App.Model.t) (target : Dialog.Delete_target.t) ~inject =
     ~title
     ~on_close:(inject Action.Close_dialog)
     ~footer:
-      (cancel_accept
-         ~danger:true
-         ~inject
-         (if count = 1 then "Delete" else sprintf "Delete %d" count))
-    [ Node.p
-        [ Node.textf
-            "%s, with %s subagent logs: %s on disk. This can't be undone."
-            (if count = 1
-             then "It will be deleted"
-             else sprintf "They will be deleted")
-            (if count = 1 then "its" else "their")
-            size
-        ]
+      (if count = 0
+       then
+         [ button
+             ~cls:"primary"
+             ~on_click:(inject Action.Close_dialog)
+             [ Node.text "Close" ]
+         ]
+       else
+         cancel_accept
+           ~danger:true
+           ~inject
+           (if count = 1 then "Delete" else sprintf "Delete %d" count))
+    [ (if count = 0
+       then Node.none
+       else
+         Node.p
+           [ Node.textf
+               "%s, with %s subagent logs: %s on disk. This can't be undone."
+               (if count = 1
+                then "It will be deleted"
+                else sprintf "They will be deleted")
+               (if count = 1 then "its" else "their")
+               size
+           ])
     ; Node.ul
         ~attrs:[ Attr.class_ "delete-list" ]
         (List.map (List.take sessions shown) ~f:row
