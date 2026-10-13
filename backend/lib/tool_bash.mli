@@ -8,7 +8,9 @@ open! Import
 val tool : Tool.t
 
 (** Saves a long output in full where the model can read it (under
-    [$TMPDIR/prigh-output/], kept for 7 days) and returns its path. *)
+    [$TMPDIR/prigh-output-<uid>/], a directory only this user can enter, in
+    a file only they can read; kept for 7 days) and returns its path. Raises
+    if that directory is a symlink or another user's. *)
 val save_output : Tool.Context.t -> string -> string
 
 (** [bash] without the [background] parameter, for subagents. *)
@@ -45,3 +47,8 @@ val job_outcome
   :  Tool_result.t
   -> output:Output_tail.t
   -> Background_tasks.Outcome.t
+
+module For_testing : sig
+  (** [save_output] in [tmp] rather than [$TMPDIR]. *)
+  val save_output : tmp:string -> call_id:string -> string -> string
+end

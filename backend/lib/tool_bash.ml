@@ -48,18 +48,33 @@ let spec =
        ])
 ;;
 
-let output_dir () = Filename.concat Filename.temp_dir_name "prigh-output"
 let output_retention = Time_float.Span.of_day 7.
+
+(* Outputs can hold secrets: they go in a directory of this user's only,
+   which must not be a symlink or someone else's (another user could have
+   made it first in a shared [/tmp]). *)
+let output_dir ~tmp =
+  let uid = Core_unix.getuid () in
+  let dir = Filename.concat tmp (sprintf "prigh-output-%d" uid) in
+  (try Core_unix.mkdir dir ~perm:0o700 with
+   | Core_unix.Unix_error (EEXIST, _, _) -> ());
+  match Core_unix.lstat dir with
+  | { st_kind = S_DIR; st_uid; st_perm; _ } when st_uid = uid ->
+    if st_perm land 0o077 <> 0 then Core_unix.chmod dir ~perm:0o700;
+    dir
+  | { st_kind = S_DIR; _ } ->
+    failwithf "%s belongs to another user: remove it or set TMPDIR" dir ()
+  | _ -> failwithf "%s is not a directory: remove it or set TMPDIR" dir ()
+;;
 
 (* Saves a command's full output where the model can read or grep it, and
    drops files older than [output_retention]. *)
-let save_output (context : Tool.Context.t) output =
-  let dir = output_dir () in
-  Core_unix.mkdir_p dir;
+let save_output_in ~tmp ~call_id output =
+  let dir = output_dir ~tmp in
   let now = Time_float.now () in
   Array.iter (Sys_unix.readdir dir) ~f:(fun name ->
     let path = Filename.concat dir name in
-    match Core_unix.stat path with
+    match Core_unix.lstat path with
     | { st_mtime; _ } ->
       if
         Time_float.Span.( > )
@@ -70,22 +85,44 @@ let save_output (context : Tool.Context.t) output =
       then Sys_unix.remove path
     | exception _ -> ());
   let safe =
-    String.map context.call_id ~f:(fun c ->
+    String.map call_id ~f:(fun c ->
       if Char.is_alphanum c || Char.equal c '-' || Char.equal c '_'
       then c
       else '_')
   in
-  let path =
-    Filename.concat
-      dir
-      (sprintf
-         "%s-%s.log"
-         (Time_float.to_filename_string now ~zone:Time_float.Zone.utc)
-         (if String.is_empty safe then "bash" else safe))
+  let base =
+    sprintf
+      "%s-%s"
+      (Time_float.to_filename_string now ~zone:Time_float.Zone.utc)
+      (if String.is_empty safe then "bash" else safe)
   in
-  Out_channel.write_all path ~data:output;
+  let rec create n =
+    let path =
+      Filename.concat
+        dir
+        (if n = 0 then base ^ ".log" else sprintf "%s-%d.log" base n)
+    in
+    match
+      Core_unix.openfile path ~mode:[ O_WRONLY; O_CREAT; O_EXCL ] ~perm:0o600
+    with
+    | fd -> path, fd
+    | exception Core_unix.Unix_error (EEXIST, _, _) -> create (n + 1)
+  in
+  let path, fd = create 0 in
+  let oc = Core_unix.out_channel_of_descr fd in
+  Exn.protect
+    ~f:(fun () -> Out_channel.output_string oc output)
+    ~finally:(fun () -> Out_channel.close oc);
   path
 ;;
+
+let save_output (context : Tool.Context.t) output =
+  save_output_in ~tmp:Filename.temp_dir_name ~call_id:context.call_id output
+;;
+
+module For_testing = struct
+  let save_output = save_output_in
+end
 
 let run_foreground (context : Tool.Context.t) args =
   let command = Tool_args.string args "command" in

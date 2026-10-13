@@ -178,7 +178,7 @@ let with_server f =
     in
     let text =
       Re.replace_string
-        (Re.compile (Re.Perl.re {|prigh-output/[^ ]*\.log|}))
+        (Re.compile (Re.Perl.re {|prigh-output-[0-9]+/[^ ]*\.log|}))
         ~by:"prigh-output/<file>.log"
         text
       |> String.split_lines

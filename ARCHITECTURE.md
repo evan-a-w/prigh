@@ -490,7 +490,7 @@ two can share one.
   that calls it as a function anyway.
 - `Tool_bash` (streamed output, timeout, cancellation; long output keeps
   its beginning and end (`Truncate.head_and_tail`) and the full output is
-  saved under `$TMPDIR/prigh-output/` on the host, kept for 7 days, its
+  saved under `$TMPDIR/prigh-output-<uid>/` (private to the user) on the host, kept for 7 days, its
   path in the result; with `background` at depth 0 it starts a job instead,
   see below), `Tool_read` (images
   through `Image.load`, as an image result),
