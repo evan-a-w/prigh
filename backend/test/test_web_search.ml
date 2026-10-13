@@ -322,11 +322,24 @@ let%expect_test "openai responses: web_search_call items" =
 
 let%expect_test "only models whose provider searches get web_search" =
   List.iter
-    [ anthropic_model
-    ; codex_model
-    ; Option.value_exn (Model.default_for Openai)
-    ; deepseek_model
-    ]
+    ([ anthropic_model
+     ; codex_model
+     ; Option.value_exn (Model.default_for Openai)
+     ; deepseek_model
+     ]
+     @ List.map
+         [ "gpt-4"
+         ; "gpt-4-turbo"
+         ; "gpt-4.1"
+         ; "gpt-4.1-nano"
+         ; "gpt-4o"
+         ; "o1"
+         ; "o1-pro"
+         ; "o3"
+         ; "o3-mini"
+         ; "o4-mini"
+         ]
+         ~f:(fun id -> Option.value_exn (Model.find ("openai/" ^ id))))
     ~f:(fun model ->
       printf
         "%s: %s\n"
@@ -340,6 +353,16 @@ let%expect_test "only models whose provider searches get web_search" =
     openai-codex/gpt-5.5: bash read write apply_patch ls grep find web_fetch web_search
     openai/gpt-5.5: bash read write apply_patch ls grep find web_fetch web_search
     deepseek/deepseek-flash: bash read write edit ls grep find web_fetch
+    openai/gpt-4: bash read write edit ls grep find web_fetch
+    openai/gpt-4-turbo: bash read write edit ls grep find web_fetch
+    openai/gpt-4.1: bash read write edit ls grep find web_fetch web_search
+    openai/gpt-4.1-nano: bash read write edit ls grep find web_fetch
+    openai/gpt-4o: bash read write edit ls grep find web_fetch web_search
+    openai/o1: bash read write edit ls grep find web_fetch
+    openai/o1-pro: bash read write edit ls grep find web_fetch
+    openai/o3: bash read write edit ls grep find web_fetch web_search
+    openai/o3-mini: bash read write edit ls grep find web_fetch
+    openai/o4-mini: bash read write edit ls grep find web_fetch web_search
     |}]
 ;;
 
