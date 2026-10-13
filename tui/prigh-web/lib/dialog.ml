@@ -48,6 +48,12 @@ type t =
       { id : string
       ; text : string
       }
+  | Create_dir of
+      { target : Dir_change.Target.t
+      ; path : string
+      ; busy : bool
+      ; error : string option
+      }
   | Session of Session_stats.t
   | Text of
       { title : string
@@ -62,6 +68,7 @@ let per_session = function
   | Rename _
   | Prompt _
   | Rewind_confirm _
+  | Create_dir _
   | Session _
   | Text _
   | Mcp_tools _

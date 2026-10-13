@@ -301,10 +301,11 @@ let%expect_test
       earlier answer
       allowed bash; always: bash(git status:*)
     ┌─ Why not? (the model sees it) ───────────────────────────┐
+    │ [a1] Run bash: make?                                     │
+    │ › ▏                                                      │
     └──────────────────────────────────────────────────────────┘
     ────────────────────────────────────────────────────────────
-    ? ▏
-    …deepseek-flash  ctx:0.1%/1.0M  Enter submits · Esc cancels
+    …deepseek-flash  ctx:0.1%/1.0M  Enter denies · Esc goes back
     |}];
   (* Esc goes back to the question, the draft kept. *)
   H.esc h;
@@ -480,10 +481,11 @@ let%expect_test "ask_user: a dialog per question; Enter answers, Esc declines" =
     │ › ( ) Postgres▏ what prod uses                           │
     │   ( ) SQLite                                             │
     │   Other:                                                 │
-    │ Enter picks                                              │
+    │ ↑↓ choose · type your own · Enter picks · ←→ questions   │
+    │ Esc declines (the model is told)                         │
     └──────────────────────────────────────────────────────────┘
     ────────────────────────────────────────────────────────────
-    …deepseek-flash  ctx:0.1%/1.0M  ↑↓ choose · Space picks · t…
+    …deepseek-flash  ctx:0.1%/1.0M  Enter accepts · Esc declines
     |}];
   H.key h (Key.plain Down);
   H.enter h;
@@ -504,10 +506,12 @@ let%expect_test "ask_user: a dialog per question; Enter answers, Esc declines" =
     │   [x] auth                                               │
     │   [x] billing                                            │
     │ › Other: and sso▏                                        │
-    │ Space toggles · Enter: next                              │
+    │ ↑↓ choose · Space toggles · type your own                │
+    │ Enter accepts · ←→ questions                             │
+    │ Esc declines (the model is told)                         │
     └──────────────────────────────────────────────────────────┘
     ────────────────────────────────────────────────────────────
-    …deepseek-flash  ctx:0.1%/1.0M  ↑↓ choose · Space picks · t…
+    …deepseek-flash  ctx:0.1%/1.0M  Enter accepts · Esc declines
     |}];
   (* Back to the first: its answer is kept. *)
   H.key h (Key.plain Left);
@@ -527,10 +531,11 @@ let%expect_test "ask_user: a dialog per question; Enter answers, Esc declines" =
     │   ( ) Postgres  what prod uses                           │
     │ › (•) SQLite▏                                            │
     │   Other:                                                 │
-    │ Enter picks                                              │
+    │ ↑↓ choose · type your own · Enter picks · ←→ questions   │
+    │ Esc declines (the model is told)                         │
     └──────────────────────────────────────────────────────────┘
     ────────────────────────────────────────────────────────────
-    …deepseek-flash  ctx:0.1%/1.0M  ↑↓ choose · Space picks · t…
+    …deepseek-flash  ctx:0.1%/1.0M  Enter accepts · Esc declines
     (Rpc
       (method_ ask_user_respond)
       (params (
@@ -729,5 +734,101 @@ let%expect_test "job_input's confirmation says which job gets what" =
     ────────────────────────────────────────────────────────────
     ? ▏
     …deepseek-flash  mode:ask  ctx:0.1%/1.0M  confirm: y/a/n/r
+    |}]
+;;
+
+let%expect_test
+    "the reason is typed in its box, under the call it denies; long ones wrap \
+     there"
+  =
+  let h = Test_app.connected ~width:50 ~height:16 () in
+  H.event h (State (with_mode Ask));
+  H.event h (Tool_confirm (confirm "c1" "rm -rf _build && dune build @runtest"));
+  H.keys h "r";
+  H.keys h "use dune clean instead, it knows what the build owns";
+  H.show h;
+  [%expect
+    {|
+      prigh in /work · /help · Esc aborts · Ctrl+C
+      twice quits
+
+    ▌ earlier question
+      earlier answer
+    ┌─ Why not? (the model sees it) ─────────────────┐
+    │ Run bash: rm -rf _build && dune build          │
+    │ @runtest?                                      │
+    │ › use dune clean instead, it knows what the bu │
+    │   ild owns▏                                    │
+    └────────────────────────────────────────────────┘
+    ──────────────────────────────────────────────────
+    …deepseek-flash  Enter denies · Esc goes back
+    |}]
+;;
+
+let%expect_test "long choice descriptions and answers wrap in the question box" =
+  let h = Test_app.connected ~width:50 ~height:20 () in
+  H.event
+    h
+    (Ask_user
+       { call_id = "q1"
+       ; questions =
+           [ { question = "Which database?"
+             ; header = None
+             ; choices =
+                 [ { label = "Postgres"
+                   ; description =
+                       Some
+                         "what production uses, with the extensions we rely \
+                          on for search"
+                   }
+                 ; { label = "SQLite"; description = Some "embedded" }
+                 ]
+             ; multiple = false
+             }
+           ]
+       });
+  H.key h (Key.plain Down);
+  H.show h;
+  H.keys h "neither: a flat file is enough for this small tool";
+  H.show h;
+  [%expect
+    {|
+      prigh in /work · /help · Esc aborts · Ctrl+C
+      twice quits
+
+    ▌ earlier question
+      earlier answer
+    ┌─ Question ─────────────────────────────────────┐
+    │ Which database?                                │
+    │   ( ) Postgres                                 │
+    │       what production uses, with the           │
+    │       extensions we rely on for search         │
+    │ › ( ) SQLite▏ embedded                         │
+    │   Other:                                       │
+    │ ↑↓ choose · type your own · Enter picks        │
+    │ Esc declines (the model is told)               │
+    └────────────────────────────────────────────────┘
+    ──────────────────────────────────────────────────
+    …deepseek-flash  Enter accepts · Esc declines
+
+
+      prigh in /work · /help · Esc aborts · Ctrl+C
+      twice quits
+
+    ▌ earlier question
+      earlier answer
+    ┌─ Question ─────────────────────────────────────┐
+    │ Which database?                                │
+    │   ( ) Postgres                                 │
+    │       what production uses, with the           │
+    │       extensions we rely on for search         │
+    │   ( ) SQLite  embedded                         │
+    │ › Other: neither: a flat file is enough for th │
+    │          is small tool▏                        │
+    │ ↑↓ choose · type your own · Enter picks        │
+    │ Esc declines (the model is told)               │
+    └────────────────────────────────────────────────┘
+    ──────────────────────────────────────────────────
+    …deepseek-flash  Enter accepts · Esc declines
     |}]
 ;;

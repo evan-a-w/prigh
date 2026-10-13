@@ -256,7 +256,7 @@ let%expect_test "completion offers the keywords, but not over a goal's text" =
     > /goal ▏
     ▸ off     clear the goal
       resume  make a stopped goal active again
-    …deepseek-flash  think:off  mode:auto  ctx:0.1%/1.0M  $0.01  Tab accepts · Enter runs as typed · Esc
+    …deepseek-flash  think:off  mode:auto  ctx:0.1%/1.0M  Tab accepts · Enter as typed · Esc hides
 
 
       prigh in /work · /help · Esc aborts · Ctrl+C twice quits
@@ -286,7 +286,7 @@ let%expect_test "completion offers the keywords, but not over a goal's text" =
     > /resume ▏
     ▸ now     retry the run at once
       cancel  stay stopped until you send a message
-    …deepseek-flash  think:off  mode:auto  ctx:0.1%/1.0M  $0.01  Tab accepts · Enter runs as typed · Esc
+    …deepseek-flash  think:off  mode:auto  ctx:0.1%/1.0M  Tab accepts · Enter as typed · Esc hides
 
 
       prigh in /work · /help · Esc aborts · Ctrl+C twice quits

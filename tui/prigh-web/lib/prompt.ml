@@ -4,6 +4,7 @@ open! Import
 module Action = struct
   type t =
     | Cd
+    | Mkdir
     | Host_cwd of
         { host : string
         ; name : string
@@ -40,7 +41,7 @@ let set_input t input =
 let listing t ~active_host =
   let prefix = "prefix", `String t.input in
   match t.action with
-  | Cd -> "list_dirs", [ prefix; "host", `String active_host ]
+  | Cd | Mkdir -> "list_dirs", [ prefix; "host", `String active_host ]
   | Host_cwd { host; _ } -> "list_dirs", [ prefix; "host", `String host ]
   | Export | Import -> "list_paths", [ prefix ]
 ;;

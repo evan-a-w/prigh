@@ -90,7 +90,8 @@ module Reply_tag = struct
     | Reload_messages
     | Exported
     | Imported
-    | Prompt_done of string
+    | Dir_changed of Dir_change.Target.t
+    (** [Missing] asks to create it; the prompt or dialog closes once changed *)
     | Prompt_paths of string
     | Btw of string
     | Users of Users_purpose.t
@@ -1948,6 +1949,10 @@ let export (m : Model.t) path =
   |> fun cmd -> m, [ cmd ]
 ;;
 
+let change_dir ?(if_missing = Dir_change.If_missing.Ask) ~target path =
+  call (Change_dir { target; path; if_missing }) ~tag:(Dir_changed target)
+;;
+
 let submit_prompt (m : Model.t) (prompt : Prompt.t) =
   let path = String.strip prompt.input in
   let busy = { m with dialog = Some (Prompt { prompt with busy = true }) } in
@@ -1955,27 +1960,17 @@ let submit_prompt (m : Model.t) (prompt : Prompt.t) =
   | Export, path ->
     let m, cmds = export busy path in
     m, cmds
-  | (Cd | Host_cwd _ | Import), "" ->
+  | (Cd | Mkdir | Host_cwd _ | Import), "" ->
     ( { m with
         dialog =
           Some
             (Prompt { prompt with error = Some "Type a path (Esc cancels)." })
       }
     , [] )
-  | Cd, path ->
-    ( busy
-    , [ rpc
-          "set_cwd"
-          [ "path", str path ]
-          ~tag:(Prompt_done ("Working directory: " ^ path))
-      ] )
+  | Cd, path -> busy, [ change_dir ~target:Cwd path ]
+  | Mkdir, path -> busy, [ change_dir ~if_missing:Create ~target:Cwd path ]
   | Host_cwd { host; name }, path ->
-    ( busy
-    , [ rpc
-          "set_active_host"
-          [ "host", str host; "cwd", str path ]
-          ~tag:(Prompt_done (sprintf "Tools run on %s, in %s" name path))
-      ] )
+    busy, [ change_dir ~target:(Host { id = host; name }) path ]
   | Import, path -> busy, [ rpc "import" [ "path", str path ] ~tag:Imported ]
 ;;
 
@@ -2006,6 +2001,56 @@ let prompt_failed (m : Model.t) e =
       }
     , [] )
   | _ -> error m (String.capitalize e)
+;;
+
+(* Answering a prompt or the create dialog, or [/cd PATH] typed. *)
+let dir_change_failed (m : Model.t) e =
+  match m.dialog with
+  | Some (Create_dir ({ busy = true; _ } as d)) ->
+    ( { m with
+        dialog = Some (Create_dir { d with busy = false; error = Some e })
+      }
+    , [] )
+  | _ -> prompt_failed m e
+;;
+
+let dir_changed (m : Model.t) (target : Dir_change.Target.t) outcome =
+  let ours =
+    match m.dialog with
+    | None | Some (Prompt { busy = true; _ } | Create_dir { busy = true; _ }) ->
+      true
+    | Some _ -> false
+  in
+  match (outcome : Dir_change.Outcome.t) with
+  | Missing path when ours ->
+    open_dialog m (Create_dir { target; path; busy = false; error = None })
+  | Missing path ->
+    error
+      m
+      (match target with
+       | Cwd -> sprintf "%s doesn't exist: /mkdir %s creates it." path path
+       | Host { name; _ } ->
+         sprintf "%s doesn't exist on %s: /host %s asks again." path name name)
+  | Changed { cwd; created } ->
+    let m, close =
+      match m.dialog with
+      | Some (Prompt { busy = true; _ } | Create_dir { busy = true; _ }) ->
+        close_dialog m
+      | _ -> m, []
+    in
+    let notice =
+      match target, created, cwd with
+      | Cwd, false, Some cwd -> "Working directory: " ^ cwd
+      | Cwd, _, None -> "Working directory changed"
+      | Cwd, true, Some cwd -> sprintf "Created %s and switched to it" cwd
+      | Host { name; _ }, false, Some cwd ->
+        sprintf "Tools run on %s, in %s" name cwd
+      | Host { name; _ }, _, None -> "Tools run on " ^ name
+      | Host { name; _ }, true, Some cwd ->
+        sprintf "Created %s: tools run on %s, in it" cwd name
+    in
+    let m, cmds = toast m notice in
+    m, close @ cmds
 ;;
 
 let prompt_succeeded (m : Model.t) =
@@ -2519,13 +2564,14 @@ let run_command (m : Model.t) ({ name; rest } : Slash.Parsed.t) =
       (Prompt.create
          ~input:(Option.value_map m.state ~default:"" ~f:(fun s -> s.cwd))
          Cd)
-  | "cd", path ->
-    ( m
-    , [ rpc
-          "set_cwd"
-          [ "path", str path ]
-          ~tag:(Notice ("Working directory: " ^ path))
-      ] )
+  | "cd", path -> m, [ change_dir ~target:Cwd path ]
+  | "mkdir", "" ->
+    open_prompt
+      m
+      (Prompt.create
+         ~input:(Option.value_map m.state ~default:"" ~f:(fun s -> s.cwd))
+         Mkdir)
+  | "mkdir", path -> m, [ change_dir ~if_missing:Create ~target:Cwd path ]
   | "default-dir", "" ->
     with_config m ~f:(fun c -> toast m (default_dir_summary c))
   | "default-dir", "off" -> set_default_dir m None
@@ -3066,7 +3112,8 @@ let rec reply_to (m : Model.t) (tag : Reply_tag.t) result =
       (sprintf "Couldn't start the MCP server: %s. /mcp reconnect retries." e)
   | Mcp (Picker | Reconnect), Error e ->
     error m (sprintf "Couldn't list the MCP servers: %s" e)
-  | (Prompt_done _ | Exported | Imported), Error e -> prompt_failed m e
+  | (Exported | Imported), Error e -> prompt_failed m e
+  | Dir_changed _, Error e -> dir_change_failed m e
   | Fallback_saved, Error e ->
     error m (sprintf "Couldn't set the fallback models: %s" e)
   | Default_dir_saved, Error e ->
@@ -3433,10 +3480,10 @@ let rec reply_to (m : Model.t) (tag : Reply_tag.t) result =
       | Error _ -> m, []
     in
     m, close @ cmds @ [ rpc "get_state" [] ~tag:State ]
-  | Prompt_done notice, Ok _ ->
-    let m, close = prompt_succeeded m in
-    let m, cmds = toast m notice in
-    m, close @ cmds
+  | Dir_changed target, Ok json ->
+    (match Dir_change.Outcome.of_json json with
+     | Ok outcome -> dir_changed m target outcome
+     | Error e -> error m (Error.to_string_hum e))
   | Prompt_paths prefix, Ok json ->
     (match m.dialog, strings json with
      | Some (Prompt prompt), Ok paths ->
@@ -3935,6 +3982,10 @@ let dialog_accept (m : Model.t) =
     let m, cmds = save_scoped m checked in
     m, focus_editor :: cmds
   | Some (Prompt prompt) -> submit_prompt m prompt
+  | Some (Create_dir { busy = true; _ }) -> m, []
+  | Some (Create_dir ({ target; path; _ } as d)) ->
+    ( { m with dialog = Some (Create_dir { d with busy = true; error = None }) }
+    , [ change_dir ~if_missing:Create ~target path ] )
   | Some (Rewind_confirm { id; _ }) ->
     let m, cmds = close_dialog m in
     let m, toast_cmds = toast m "Rewound: later messages stay in /tree" in

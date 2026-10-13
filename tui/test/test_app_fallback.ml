@@ -122,7 +122,7 @@ let%expect_test
       Claude Fable 5.1     anthropic/claude-fable-5-1
       GPT-5.5              openai/gpt-5.5
       DeepSeek V4.1 Flash  deepseek/deepseek-flash
-    …deepseek-flash  Tab accepts · Enter runs as typed · Esc
+    …deepseek-flash  Tab accepts · Enter as typed · Esc hides
     |}];
   H.keys h "fable5.1";
   H.key h (Key.plain Tab);
@@ -139,7 +139,7 @@ let%expect_test
     ▸ Claude Fable 5       anthropic/claude-fable-5
       GPT-5.5              openai/gpt-5.5
       DeepSeek V4.1 Flash  deepseek/deepseek-flash
-    …deepseek-flash  Tab accepts · Enter runs as typed · Esc
+    …deepseek-flash  Tab accepts · Enter as typed · Esc hides
     |}];
   (* Enter accepts the filtered model and runs the command. *)
   H.keys h "flash";
