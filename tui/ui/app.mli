@@ -77,6 +77,8 @@ module Reply_tag : sig
     | Pending (** [get_pending]: confirmations and questions to show *)
     | Mode_set of string (** the notice *)
     | Refresh_state
+    | Dir_changed of P.Dir_change.Target.t
+    (** [Missing]: confirm creating it; otherwise acknowledge *)
     | Retry_in_editor of
         { command : string
         ; hint : string

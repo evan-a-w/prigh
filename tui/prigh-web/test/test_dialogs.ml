@@ -201,7 +201,8 @@ let%expect_test "help lists every key and command" =
     /fork start a new session from an earlier message
     /rewind go back to an earlier message in this session
     /tree show the session tree and move to any message in it
-    /cd [path] change the working directory
+    /cd [path] change the working directory (asks to create a missing one)
+    /mkdir [path] create a directory (and its parents) and change to it
     /default-dir [path|off] show or set the directory new sessions start in
     /host [name|backend] pick where tools run, and the directory there
     /export [path] export the transcript on the backend (markdown, or .jsonl)

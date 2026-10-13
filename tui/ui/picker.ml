@@ -100,7 +100,7 @@ let select_id t id =
   | None -> t
 ;;
 
-let set_items ?title ?select t items =
+let set_items ?title ?select ?checked t items =
   let ids = String.Set.of_list (List.map items ~f:(fun (i : Item.t) -> i.id)) in
   let select =
     match select with
@@ -113,7 +113,7 @@ let set_items ?title ?select t items =
       { t with
         title = Option.value title ~default:t.title
       ; items
-      ; checked = Set.inter t.checked ids
+      ; checked = Option.value checked ~default:(Set.inter t.checked ids)
       }
   in
   match select with

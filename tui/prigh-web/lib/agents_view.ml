@@ -9,69 +9,125 @@ let plural = Chat_html.plural
 let now (m : App.Model.t) = Option.value m.now ~default:Time_ns.epoch
 let first_line = Chat_html.first_line
 
-let job_status (j : Agents.Job.t) : Agents.Status.t =
+(* How an agent or job stands: running, or how it ended. Cancelled,
+   interrupted and killed work stopped without failing: it is shown quietly,
+   not in brick. *)
+module Outcome = struct
+  type t =
+    | Running
+    | Done
+    | Failed
+    | Stopped of string
+
+  let cls = function
+    | Running -> "running"
+    | Done -> "complete"
+    | Failed -> "failed"
+    | Stopped _ -> "stopped"
+  ;;
+
+  let word = function
+    | Running -> "Running"
+    | Done -> "Done"
+    | Failed -> "Failed"
+    | Stopped word -> word
+  ;;
+
+  let mark t =
+    match t with
+    | Running ->
+      (* The row says it in words for screen readers. *)
+      Node.span
+        ~attrs:
+          [ Attr.class_ "lamp"
+          ; Attr.title "Running"
+          ; Attr.create "aria-hidden" "true"
+          ]
+        []
+    | Done | Failed | Stopped _ ->
+      Node.span
+        ~attrs:[ Attr.class_ "agent-mark"; Attr.create "aria-hidden" "true" ]
+        [ Node.text
+            (match t with
+             | Running | Done -> "✓"
+             | Failed -> "✕"
+             | Stopped _ -> "–")
+        ]
+  ;;
+end
+
+let report_text (r : Event.Subagent_result.t) =
+  (Subagent_report.of_string r.text).text
+;;
+
+(* A failed report's prefix ("[cancelled]", "subagent failed: ") says how it
+   ended: that is the outcome, the rest is what to show. *)
+let ending (a : Agent.t) : Outcome.t * string =
+  match a.result with
+  | None -> Running, ""
+  | Some ({ is_error = false; _ } as r) -> Done, report_text r
+  | Some ({ is_error = true; _ } as r) ->
+    let text = String.strip (report_text r) in
+    let rest prefix =
+      Option.map (String.chop_prefix text ~prefix) ~f:String.strip
+    in
+    (match rest "[cancelled]", rest "[interrupted]" with
+     | Some rest, _ -> Stopped "Cancelled", rest
+     | None, Some rest -> Stopped "Interrupted", rest
+     | None, None ->
+       Failed, Option.value (rest "subagent failed:") ~default:text)
+;;
+
+let job_outcome (j : Agents.Job.t) : Outcome.t =
   match j.info.running, j.info.exit with
   | true, _ -> Running
-  | false, (None | Some "exited 0") -> Complete
+  | false, (None | Some "exited 0") -> Done
+  | false, Some "killed" -> Stopped "Killed"
   | false, Some _ -> Failed
 ;;
 
-let status_cls (status : Agents.Status.t) = Agents.Status.to_string status
-
-let status_icon (status : Agents.Status.t) =
-  match status with
-  | Running -> Html.lamp ()
-  | Complete -> span ~cls:"state-icon" "✓"
-  | Failed -> span ~cls:"state-icon" "✕"
-;;
-
-let pill (status : Agents.Status.t) label =
-  span ~cls:("pill " ^ status_cls status) label
+let is_failed : Outcome.t -> bool = function
+  | Failed -> true
+  | Running | Done | Stopped _ -> false
 ;;
 
 let selected (m : App.Model.t) item =
   Option.equal Item.equal m.agents.selected (Some item)
 ;;
 
-let report_text (r : Event.Subagent_result.t) =
-  (Subagent_report.of_string r.text).text
+(* Finished in under a second: no time worth showing. *)
+let elapsed_label (outcome : Outcome.t) span =
+  match outcome with
+  | Running -> Some (Agents.format_span span)
+  | Done | Failed | Stopped _ ->
+    Option.some_if Time_ns.Span.(span >= second) (Agents.format_span span)
 ;;
 
 (* What it is doing, or how it ended. *)
 let activity (m : App.Model.t) (a : Agent.t) =
-  match a.result with
-  | Some r -> Markdown.preview (report_text r)
-  | None ->
+  match ending a with
+  | Running, _ ->
     let latest =
       Option.bind (Chat.find_subagent m.chat a.id) ~f:(fun s ->
         Tool_view.last_activity s.chat)
     in
     (match a.current_tool, latest with
-     | Some (name, since), latest ->
-       sprintf
-         "%s (%s)"
-         (Option.value latest ~default:name)
-         (Agents.format_span (Time_ns.diff (now m) since))
+     | Some (name, _), latest -> Option.value latest ~default:name
      | None, Some latest -> latest
-     | None, None -> if a.turns = 0 then "starting…" else "thinking…")
-;;
-
-let number_badge n =
-  if n >= 1 && n <= 9
-  then
-    Node.kbd
-      ~attrs:[ Attr.class_ "row-num"; Attr.title (sprintf "Alt+%d" n) ]
-      [ Node.text (Int.to_string n) ]
-  else Node.span ~attrs:[ Attr.class_ "row-num none" ] []
+     | None, None -> if a.turns = 0 then "Starting…" else "Thinking…")
+  | Done, text -> Markdown.preview text
+  | Failed, text -> first_line text
+  | Stopped "Interrupted", text when not (String.is_empty text) ->
+    "Interrupted: " ^ first_line text
+  | Stopped word, _ -> word
 ;;
 
 let row
       ~inject
       ~item
-      ~status
+      ~(outcome : Outcome.t)
       ~selected
-      ~depth
-      ~number
+      ~shortcut
       ~title
       ~elapsed
       ~meta
@@ -79,24 +135,32 @@ let row
   =
   Node.button
     ~attrs:
-      [ classes
-          [ "agents-row"; status_cls status ]
-          [ "selected", selected; "nested", depth > 0 ]
-      ; Attr.type_ "button"
-      ; Attr.create "style" (sprintf "--depth: %d" depth)
-      ; Attr.on_click (fun _ -> inject (Action.Select_item item))
-      ]
-    [ number_badge number
-    ; status_icon status
-    ; div
-        ~cls:"row-main"
-        [ div
-            ~cls:"row-top"
-            [ span ~cls:"row-title" title; span ~cls:"row-elapsed" elapsed ]
-        ; span ~cls:"row-meta" (String.concat ~sep:"  " meta)
-        ; (if String.is_empty line then Node.none else span ~cls:"row-line" line)
-        ]
-    ]
+      ([ classes [ "agents-row"; Outcome.cls outcome ] [ "selected", selected ]
+       ; Attr.type_ "button"
+       ; Attr.on_click (fun _ -> inject (Action.Select_item item))
+       ]
+       @ (if selected then [ Attr.create "aria-current" "true" ] else [])
+       @ Option.value_map shortcut ~default:[] ~f:(fun n ->
+         [ Attr.create "aria-keyshortcuts" (sprintf "Alt+%d" n)
+         ; Attr.title (sprintf "Alt+%d" n)
+         ]))
+    (List.filter_opt
+       [ Some
+           (Node.span
+              ~attrs:[ Attr.class_ "row-mark" ]
+              [ Outcome.mark outcome ])
+       ; (* Stopped work's line says so. *)
+         (match outcome with
+          | Running | Done | Failed ->
+            Some (span ~cls:"sr-only" (Outcome.word outcome))
+          | Stopped _ -> None)
+       ; Some (span ~cls:"row-title" title)
+       ; Option.map elapsed ~f:(span ~cls:"row-time")
+       ; Option.some_if (not (String.is_empty line)) (span ~cls:"row-line" line)
+       ; (match List.filter meta ~f:(Fn.non String.is_empty) with
+          | [] -> None
+          | meta -> Some (span ~cls:"row-meta" (String.concat ~sep:"  " meta)))
+       ])
 ;;
 
 let agent_meta (m : App.Model.t) (a : Agent.t) =
@@ -119,14 +183,20 @@ let bytes n =
   else sprintf "%.1f MB" (Float.of_int n /. 1048576.)
 ;;
 
-let job_meta ?(exit = true) (j : Agents.Job.t) =
+let job_meta (j : Agents.Job.t) =
   List.filter_opt
-    [ Some j.info.id
-    ; Option.some_if
-        (exit && not j.info.running)
-        (Option.value j.info.exit ~default:"finished")
-    ; Option.some_if (j.info.bytes > 0) (bytes j.info.bytes)
-    ]
+    [ Some j.info.id; Option.some_if (j.info.bytes > 0) (bytes j.info.bytes) ]
+;;
+
+(* Its last line; how it ended when that was not a success. *)
+let job_line (j : Agents.Job.t) (outcome : Outcome.t) =
+  let last = Option.value j.info.last_line ~default:"" in
+  match outcome, j.info.exit with
+  | Failed, Some exit when not (String.is_empty last) ->
+    sprintf "%s: %s" exit last
+  | Failed, Some exit -> exit
+  | Stopped word, _ -> word
+  | _ -> last
 ;;
 
 (* [job_output]'s text starts with a line about the job (shown above) and
@@ -144,39 +214,46 @@ let split_output text =
   | _ -> None, text
 ;;
 
-let item_row (m : App.Model.t) ~inject ~number (item, depth) =
+let item_row (m : App.Model.t) ~inject ~shortcut (item : Item.t) =
   let a = m.agents in
-  match (item : Item.t) with
+  match item with
   | Agent id ->
     (match Agents.find_agent a id with
      | None -> Node.none
      | Some agent ->
+       let outcome, _ = ending agent in
        row
          ~inject
          ~item
-         ~status:agent.status
+         ~outcome
          ~selected:(selected m item)
-         ~depth
-         ~number
+         ~shortcut
          ~title:(first_line agent.task)
-         ~elapsed:(Agents.format_span (Agents.agent_elapsed agent ~now:(now m)))
-         ~meta:(agent.id :: agent_meta m agent)
+         ~elapsed:
+           (elapsed_label outcome (Agents.agent_elapsed agent ~now:(now m)))
+         ~meta:
+           (match outcome with
+            | Running -> agent.id :: agent_meta m agent
+            | Done | Failed | Stopped _ -> [])
          ~line:(activity m agent))
   | Job id ->
     (match Agents.find_job a id with
      | None -> Node.none
      | Some job ->
+       let outcome = job_outcome job in
        row
          ~inject
          ~item
-         ~status:(job_status job)
+         ~outcome
          ~selected:(selected m item)
-         ~depth
-         ~number
+         ~shortcut
          ~title:(first_line job.info.command)
-         ~elapsed:(Agents.format_span (Agents.job_elapsed job ~now:(now m)))
-         ~meta:(job_meta job)
-         ~line:(Option.value job.info.last_line ~default:"")
+         ~elapsed:(elapsed_label outcome (Agents.job_elapsed job ~now:(now m)))
+         ~meta:
+           (match outcome with
+            | Running -> job_meta job
+            | Done | Failed | Stopped _ -> [])
+         ~line:(job_line job outcome)
        |> fun node -> Node.div ~attrs:[ Attr.class_ "job" ] [ node ])
 ;;
 
@@ -186,18 +263,48 @@ let is_agent ((item : Item.t), _) =
   | Job _ -> false
 ;;
 
-let section ~title ~count rows =
-  match rows with
-  | [] -> Node.none
-  | rows ->
-    Node.section
-      ~attrs:[ Attr.class_ "agents-section" ]
-      (div
-         ~cls:"agents-section-head"
-         [ span ~cls:"agents-section-title" title
-         ; span ~cls:"agents-section-count" count
-         ]
-       :: rows)
+module Branch = struct
+  type t =
+    { item : Item.t
+    ; children : t list
+    }
+
+  (* The flat (item, depth) list as a tree: each item with what follows it
+     deeper, until one at its depth or shallower. *)
+  let rec nest = function
+    | [] -> []
+    | (item, depth) :: rest ->
+      let inside, after = List.split_while rest ~f:(fun (_, d) -> d > depth) in
+      { item; children = nest inside } :: nest after
+  ;;
+end
+
+let tree_view (m : App.Model.t) ~inject ~shortcut entries =
+  let rec branch ({ item; children } : Branch.t) =
+    let row = item_row m ~inject ~shortcut:(shortcut item) item in
+    match children with
+    | [] -> Node.li [ row ]
+    | children ->
+      Node.li
+        [ row
+        ; Node.ul
+            ~attrs:[ Attr.class_ "agents-tree nested" ]
+            (List.map children ~f:branch)
+        ]
+  in
+  Node.ul
+    ~attrs:[ Attr.class_ "agents-tree" ]
+    (List.map (Branch.nest entries) ~f:branch)
+;;
+
+let section ?(cls = "") ~title ~count body =
+  Node.section
+    ~attrs:[ Attr.class_ (String.strip ("agents-section " ^ cls)) ]
+    [ Node.h3
+        ~attrs:[ Attr.class_ "agents-section-head" ]
+        [ Node.text title; span ~cls:"agents-section-count" count ]
+    ; body
+    ]
 ;;
 
 let counts ~running ~total =
@@ -207,13 +314,27 @@ let counts ~running ~total =
 let list_view (m : App.Model.t) ~inject =
   let a = m.agents in
   let listed = Agents.listed a in
-  let numbered = List.mapi listed ~f:(fun i entry -> i + 1, entry) in
-  let rows ~f =
-    List.filter_map numbered ~f:(fun (number, entry) ->
-      Option.some_if (f entry) (item_row m ~inject ~number entry))
+  let numbers =
+    List.mapi listed ~f:(fun i (item, _) -> item, i + 1)
+    |> Item.Map.of_alist_reduce ~f:Fn.const
   in
-  let agents = rows ~f:is_agent in
-  let jobs = rows ~f:(Fn.non is_agent) in
+  let shortcut item =
+    Option.bind (Map.find numbers item) ~f:(fun n -> Option.some_if (n <= 9) n)
+  in
+  let agents = List.filter listed ~f:is_agent in
+  let jobs = List.filter listed ~f:(Fn.non is_agent) in
+  let running entries =
+    List.count entries ~f:(fun (item, _) -> Agents.running a item)
+  in
+  let group ~title entries =
+    match entries with
+    | [] -> Node.none
+    | entries ->
+      section
+        ~title
+        ~count:(counts ~running:(running entries) ~total:(List.length entries))
+        (tree_view m ~inject ~shortcut entries)
+  in
   let earlier = Agents.earlier a in
   if List.is_empty listed && List.is_empty earlier
   then
@@ -231,24 +352,8 @@ let list_view (m : App.Model.t) ~inject =
       ]
   else
     Node.fragment
-      [ section
-          ~title:"Subagents"
-          ~count:
-            (counts
-               ~running:
-                 (List.count listed ~f:(fun (item, _) ->
-                    is_agent (item, 0) && Agents.running a item))
-               ~total:(List.length agents))
-          agents
-      ; section
-          ~title:"Jobs"
-          ~count:
-            (counts
-               ~running:
-                 (List.count listed ~f:(fun (item, _) ->
-                    (not (is_agent (item, 0))) && Agents.running a item))
-               ~total:(List.length jobs))
-          jobs
+      [ group ~title:"Subagents" agents
+      ; group ~title:"Jobs" jobs
       ; (if List.is_empty listed
          then
            div
@@ -260,8 +365,18 @@ let list_view (m : App.Model.t) ~inject =
          | earlier ->
            Node.details
              ~attrs:[ Attr.class_ "agents-earlier" ]
-             (Node.summary [ Node.textf "Earlier (%d)" (List.length earlier) ]
-              :: List.map earlier ~f:(item_row m ~inject ~number:0)))
+             [ Node.summary [ Node.textf "Earlier %d" (List.length earlier) ]
+             ; tree_view
+                 m
+                 ~inject
+                 ~shortcut:(fun _ -> None)
+                 (List.filter earlier ~f:is_agent)
+             ; tree_view
+                 m
+                 ~inject
+                 ~shortcut:(fun _ -> None)
+                 (List.filter earlier ~f:(Fn.non is_agent))
+             ])
       ]
 ;;
 
@@ -281,129 +396,150 @@ let stop_button (m : App.Model.t) ~inject item ~label ~action ~title =
       [ icon Stop; Node.text label ]
 ;;
 
+(* Who started it, outermost first: each opens that agent. *)
 let crumbs (m : App.Model.t) ~inject (a : Agent.t) =
-  match Agents.lineage m.agents a.id with
-  | [] | [ _ ] -> Node.none
-  | lineage ->
+  match List.drop_last (Agents.lineage m.agents a.id) with
+  | None | Some [] -> Node.none
+  | Some ancestors ->
     Node.nav
-      ~attrs:[ Attr.class_ "agents-crumbs" ]
-      (List.concat_map lineage ~f:(fun (b : Agent.t) ->
-         if String.equal b.id a.id
-         then [ span ~cls:"crumb current" (first_line b.task) ]
-         else
-           [ Node.button
-               ~attrs:
-                 [ Attr.class_ "crumb"
-                 ; Attr.type_ "button"
-                 ; Attr.title b.id
-                 ; Attr.on_click (fun _ ->
-                     inject (Action.Select_item (Agent b.id)))
-                 ]
-               [ Node.text (first_line b.task) ]
-           ; span ~cls:"crumb-sep" "›"
-           ]))
+      ~attrs:
+        [ Attr.class_ "agents-crumbs"; Attr.create "aria-label" "Started by" ]
+      (List.concat_map ancestors ~f:(fun (b : Agent.t) ->
+         [ Node.button
+             ~attrs:
+               [ Attr.class_ "crumb"
+               ; Attr.type_ "button"
+               ; Attr.title b.id
+               ; Attr.on_click (fun _ ->
+                   inject (Action.Select_item (Agent b.id)))
+               ]
+             [ Node.text (first_line b.task) ]
+         ; Node.span
+             ~attrs:
+               [ Attr.class_ "crumb-sep"; Attr.create "aria-hidden" "true" ]
+             [ Node.text "›" ]
+         ]))
+;;
+
+(* The title, then one quiet line: how it stands (in its colour), for how
+   long, and the rest; the action that stops it at the line's end. *)
+let detail_head ~(outcome : Outcome.t) ~title ~elapsed ~meta ~action =
+  div
+    ~cls:("detail-head " ^ Outcome.cls outcome)
+    [ Node.h2
+        ~attrs:[ Attr.class_ "detail-title" ]
+        [ Node.span ~attrs:[ Attr.class_ "row-mark" ] [ Outcome.mark outcome ]
+        ; title
+        ]
+    ; div
+        ~cls:"detail-meta"
+        (action
+         :: List.intersperse
+              ~sep:(Node.text " ")
+              (List.filter_opt
+                 [ Some (span ~cls:"detail-state" (Outcome.word outcome))
+                 ; Option.map elapsed ~f:(span ~cls:"detail-elapsed")
+                 ; (match meta with
+                    | [] -> None
+                    | meta ->
+                      Some
+                        (span ~cls:"detail-more" (String.concat ~sep:"  " meta)))
+                 ]))
+    ]
 ;;
 
 let agent_detail (m : App.Model.t) ~inject (a : Agent.t) =
   let sub = Chat.find_subagent m.chat a.id in
+  let outcome, ended = ending a in
   let children =
-    Agents.children m.agents (Some a.id)
-    |> List.map ~f:(fun (c : Agent.t) ->
-      item_row m ~inject ~number:0 (Item.Agent c.id, 0))
+    match Agents.children m.agents (Some a.id) with
+    | [] -> Node.none
+    | children ->
+      section
+        ~cls:"agents-children"
+        ~title:"Its subagents"
+        ~count:(Int.to_string (List.length children))
+        (tree_view
+           m
+           ~inject
+           ~shortcut:(fun _ -> None)
+           (List.map children ~f:(fun (c : Agent.t) -> Item.Agent c.id, 0)))
   in
+  (* The task is the title: its prompt opens the transcript only when it
+     says more than the title does. *)
+  let task_in_title = not (String.mem (String.strip a.task) '\n') in
   let transcript =
     match sub with
     | Some s when not (List.is_empty (Chat.entries s.chat)) ->
-      Chat_view.view
-        ~fold:(Fold.scoped (App.Model.fold m) s.agent_id)
-        (App.Model.message_time m)
-        s.chat
-    | Some _ -> div ~cls:"agents-note" [ Node.text "Starting…" ]
+      div
+        ~cls:
+          (if task_in_title
+           then "agents-transcript task-in-title"
+           else "agents-transcript")
+        [ Chat_view.view
+            ~fold:(Fold.scoped (App.Model.fold m) s.agent_id)
+            (App.Model.message_time m)
+            s.chat
+        ]
+    | Some _ -> div ~cls:"agents-note" [ Html.lamp (); Node.text "Starting…" ]
     | None ->
       div
         ~cls:"agents-note"
         [ Html.lamp (); Node.text "Loading the transcript…" ]
   in
-  (* The transcript ends with the report. *)
-  let result =
-    match a.result with
-    | None -> Node.none
-    | Some { is_error = false; _ } when Option.is_some sub -> Node.none
-    | Some ({ is_error = false; _ } as r) ->
+  (* The transcript ends with the report; how it stopped or failed is said
+     below it. *)
+  let ending_note =
+    match outcome, sub with
+    | Running, _ -> Node.none
+    | Done, Some _ -> Node.none
+    | Done, None ->
       div
-        ~cls:"agents-result"
-        [ div ~cls:"agents-result-head" [ Node.text "Report" ]
-        ; Markdown_view.render (report_text r)
+        ~cls:"agents-ending complete"
+        [ div ~cls:"agents-ending-head" [ Node.text "Report" ]
+        ; Markdown_view.render ended
         ]
-    | Some ({ is_error = true; _ } as r) ->
-      let text = String.strip (report_text r) in
-      let head, text =
-        match String.chop_prefix text ~prefix:"[cancelled]" with
-        | Some rest -> "Cancelled", String.strip rest
-        | None -> "Failed", text
-      in
+    | (Failed | Stopped _), _ ->
+      (* The transcript, once loaded, shows what it had got to. *)
       div
-        ~cls:"agents-result failed"
-        [ div ~cls:"agents-result-head" [ Node.text head ]
-        ; (if String.is_empty text
+        ~cls:("agents-ending " ^ Outcome.cls outcome)
+        [ Node.span ~attrs:[ Attr.class_ "row-mark" ] [ Outcome.mark outcome ]
+        ; span ~cls:"agents-ending-head" (Outcome.word outcome)
+        ; (if
+             String.is_empty ended
+             || (Option.is_some sub && not (is_failed outcome))
            then Node.none
-           else Node.pre [ Node.text text ])
+           else Node.pre [ Node.text ended ])
         ]
   in
   div
     ~cls:"agents-detail"
     ~attrs:[ Attr.create "data-shown" ("agent " ^ a.id) ]
     [ crumbs m ~inject a
-    ; div
-        ~cls:"detail-head"
-        [ div
-            ~cls:("detail-title " ^ status_cls a.status)
-            [ status_icon a.status
-            ; span ~cls:"detail-task" (first_line a.task)
-            ]
-        ; div
-            ~cls:"detail-meta"
-            ([ pill
-                 a.status
-                 (String.capitalize (Agents.Status.to_string a.status))
-             ; span
-                 ~cls:"detail-elapsed"
-                 (Agents.format_span (Agents.agent_elapsed a ~now:(now m)))
-             ]
-             @ List.map (a.id :: agent_meta m a) ~f:(span ~cls:"detail-chip"))
-        ; div
-            ~cls:"detail-actions"
-            [ (match a.status with
-               | Running ->
-                 stop_button
-                   m
-                   ~inject
-                   (Agent a.id)
-                   ~label:"Cancel"
-                   ~title:"Cancel this subagent (/agents lists the others)"
-                   ~action:(Action.Cancel_subagent a.id)
-               | Complete | Failed -> Node.none)
-            ; button
-                ~cls:"ghost small"
-                ~title:"Show its card in the chat"
-                ~on_click:(inject (Action.Show_in_chat a.id))
-                [ icon Locate; Node.text "Show in chat" ]
-            ]
-        ]
-    ; (match children with
-       | [] -> Node.none
-       | rows ->
-         section
-           ~title:"Its subagents"
-           ~count:(Int.to_string (List.length rows))
-           rows)
-    ; div ~cls:"agents-transcript" [ transcript ]
-    ; result
+    ; detail_head
+        ~outcome
+        ~title:(span ~cls:"detail-task" (first_line a.task))
+        ~elapsed:(elapsed_label outcome (Agents.agent_elapsed a ~now:(now m)))
+        ~meta:(agent_meta m a)
+        ~action:
+          (match outcome with
+           | Running ->
+             stop_button
+               m
+               ~inject
+               (Agent a.id)
+               ~label:"Cancel"
+               ~title:"Cancel this subagent (/agents lists the others)"
+               ~action:(Action.Cancel_subagent a.id)
+           | Done | Failed | Stopped _ -> Node.none)
+    ; children
+    ; transcript
+    ; ending_note
     ]
 ;;
 
 let job_detail (m : App.Model.t) ~inject (j : Agents.Job.t) =
-  let status = job_status j in
+  let outcome = job_outcome j in
   let output =
     match m.agents.output with
     | Some (id, text) when String.equal id j.info.id -> Some (split_output text)
@@ -412,37 +548,28 @@ let job_detail (m : App.Model.t) ~inject (j : Agents.Job.t) =
   div
     ~cls:"agents-detail"
     ~attrs:[ Attr.create "data-shown" ("job " ^ j.info.id) ]
-    [ div
-        ~cls:"detail-head"
-        [ div
-            ~cls:("detail-title " ^ status_cls status)
-            [ status_icon status; span ~cls:"detail-command" j.info.command ]
-        ; div
-            ~cls:"detail-meta"
-            ([ pill
-                 status
-                 (if j.info.running
-                  then "running"
-                  else Option.value j.info.exit ~default:"finished")
-             ; span
-                 ~cls:"detail-elapsed"
-                 (Agents.format_span (Agents.job_elapsed j ~now:(now m)))
-             ]
-             @ List.map (job_meta ~exit:false j) ~f:(span ~cls:"detail-chip"))
-        ; (if j.info.running
+    [ detail_head
+        ~outcome
+        ~title:(span ~cls:"detail-command" j.info.command)
+        ~elapsed:(elapsed_label outcome (Agents.job_elapsed j ~now:(now m)))
+        ~meta:
+          (List.filter_opt
+             [ (match outcome, j.info.exit with
+                | Failed, Some exit -> Some exit
+                | _ -> None)
+             ; Option.some_if (j.info.bytes > 0) (bytes j.info.bytes)
+             ])
+        ~action:
+          (if j.info.running
            then
-             div
-               ~cls:"detail-actions"
-               [ stop_button
-                   m
-                   ~inject
-                   (Job j.info.id)
-                   ~label:"Kill"
-                   ~title:"Kill this job"
-                   ~action:(Action.Kill_job j.info.id)
-               ]
+             stop_button
+               m
+               ~inject
+               (Job j.info.id)
+               ~label:"Kill"
+               ~title:"Kill this job"
+               ~action:(Action.Kill_job j.info.id)
            else Node.none)
-        ]
     ; (match output with
        | None ->
          div
@@ -451,19 +578,22 @@ let job_detail (m : App.Model.t) ~inject (j : Agents.Job.t) =
        | Some (_, text) when String.is_empty (String.strip text) ->
          div ~cls:"agents-note" [ Node.text "No output yet." ]
        | Some (lines, text) ->
-         Node.fragment
-           [ (match lines with
-              | Some lines ->
-                div ~cls:"agents-note small" [ Node.text ("Output, " ^ lines) ]
-              | None -> Node.none)
-           ; Node.pre ~attrs:[ Attr.class_ "job-output" ] [ Node.text text ]
-           ])
-    ; (if j.info.running
-       then
          div
-           ~cls:"agents-note small"
-           [ Node.text "Its output refreshes while it runs." ]
-       else Node.none)
+           ~cls:"job-output-block"
+           [ Node.pre ~attrs:[ Attr.class_ "job-output" ] [ Node.text text ]
+           ; div
+               ~cls:"agents-note small"
+               [ Node.text
+                   (String.concat
+                      ~sep:"  "
+                      (List.filter_opt
+                         [ Option.map lines ~f:(fun l -> "Output, " ^ l)
+                         ; Option.some_if
+                             j.info.running
+                             "refreshes while it runs"
+                         ]))
+               ]
+           ])
     ]
 ;;
 
@@ -488,9 +618,9 @@ let summary (a : Agents.t) =
 
 let title (m : App.Model.t) =
   match m.agents.selected with
-  | None -> "Agents"
-  | Some (Agent id) -> "Subagent " ^ id
-  | Some (Job id) -> "Job " ^ id
+  | None -> [ Node.text "Agents" ]
+  | Some (Agent id) -> [ Node.text "Subagent "; span ~cls:"agents-id" id ]
+  | Some (Job id) -> [ Node.text "Job "; span ~cls:"agents-id" id ]
 ;;
 
 let view (m : App.Model.t) ~inject =
@@ -498,17 +628,19 @@ let view (m : App.Model.t) ~inject =
   if not a.open_
   then Node.none
   else (
-    let body =
+    let shown =
       match a.selected with
-      | None -> list_view m ~inject
+      | None -> None
       | Some (Agent id) ->
-        (match Agents.find_agent a id with
-         | Some agent -> agent_detail m ~inject agent
-         | None -> list_view m ~inject)
+        Option.map (Agents.find_agent a id) ~f:(fun agent -> `Agent agent)
       | Some (Job id) ->
-        (match Agents.find_job a id with
-         | Some job -> job_detail m ~inject job
-         | None -> list_view m ~inject)
+        Option.map (Agents.find_job a id) ~f:(fun job -> `Job job)
+    in
+    let body =
+      match shown with
+      | None -> list_view m ~inject
+      | Some (`Agent agent) -> agent_detail m ~inject agent
+      | Some (`Job job) -> job_detail m ~inject job
     in
     Node.create
       "aside"
@@ -521,7 +653,7 @@ let view (m : App.Model.t) ~inject =
       [ Resize_view.handle m ~inject Agents
       ; div
           ~cls:"agents-head"
-          [ (match a.selected with
+          [ (match shown with
              | Some _ ->
                button
                  ~cls:"icon ghost"
@@ -529,10 +661,17 @@ let view (m : App.Model.t) ~inject =
                  ~on_click:(inject Action.Agents_back)
                  [ icon Back ]
              | None -> icon ~cls:"agents-head-icon" Bot)
-          ; span ~cls:"agents-title" (title m)
-          ; (match summary a with
-             | Some (text, true) -> span ~cls:"agents-running" text
+          ; Node.h2 ~attrs:[ Attr.class_ "agents-title" ] (title m)
+          ; (match shown, summary a with
+             | None, Some (text, true) -> span ~cls:"agents-running" text
              | _ -> Node.none)
+          ; (match shown with
+             | Some (`Agent agent) ->
+               button
+                 ~cls:"ghost small agents-locate"
+                 ~on_click:(inject (Action.Show_in_chat agent.id))
+                 [ icon Locate; Node.text "Show in chat" ]
+             | Some (`Job _) | None -> Node.none)
           ; button
               ~cls:"icon ghost agents-close"
               ~title:"Close (Alt+0)"

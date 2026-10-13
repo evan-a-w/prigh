@@ -31,6 +31,11 @@ module Method = struct
         { call_id : string
         ; agent_id : string option
         }
+    | Change_dir of
+        { target : Dir_change.Target.t
+        ; path : string
+        ; if_missing : Dir_change.If_missing.t
+        }
   [@@deriving sexp_of, equal]
 
   let name = function
@@ -42,6 +47,8 @@ module Method = struct
     | Delete_archived -> "delete_archived"
     | Get_messages_page _ -> "get_messages_page"
     | Get_tool_output _ -> "get_tool_output"
+    | Change_dir { target = Cwd; _ } -> "set_cwd"
+    | Change_dir { target = Host _; _ } -> "set_active_host"
   ;;
 
   let params = function
@@ -62,6 +69,17 @@ module Method = struct
       [ "call_id", Json.str call_id ]
       @ Option.value_map agent_id ~default:[] ~f:(fun a ->
         [ "agent_id", Json.str a ])
+    | Change_dir { target; path; if_missing } ->
+      let if_missing =
+        match if_missing with
+        | Fail -> []
+        | Ask | Create ->
+          [ "if_missing", Dir_change.If_missing.to_json if_missing ]
+      in
+      (match target with
+       | Cwd -> [ "path", Json.str path ]
+       | Host { id; name = _ } -> [ "host", Json.str id; "cwd", Json.str path ])
+      @ if_missing
   ;;
 end
 

@@ -282,7 +282,7 @@ let row (m : App.Model.t) (t : Files.t) (e : File_listing.Entry.t) ~inject =
         Option.map e.mtime ~f:(Message_time.full (App.Model.message_time m))
     }
   in
-  View_cache.find rows e ~deps ~equal:Row.equal ~f:(fun () -> row_view e deps ~inject)
+  View_cache.find ~inject rows e ~deps ~equal:Row.equal ~f:(fun () -> row_view e deps ~inject)
 ;;
 
 let entry_path (t : Files.t) name =

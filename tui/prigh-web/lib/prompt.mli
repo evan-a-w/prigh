@@ -1,7 +1,7 @@
 open! Core
 open! Import
 
-(** A dialog asking for a path ([/cd], [/host]'s directory, [/export],
+(** A dialog asking for a path ([/cd], [/mkdir], [/host]'s directory, [/export],
     [/import]): the backend lists completions as you type, Tab takes the
     highlighted one, and a failure (e.g. no such directory) is shown in the
     dialog, which stays open so that the answer can be fixed. *)
@@ -9,6 +9,7 @@ open! Import
 module Action : sig
   type t =
     | Cd
+    | Mkdir (** [/mkdir]: created, then changed to *)
     | Host_cwd of
         { host : string (** its id *)
         ; name : string

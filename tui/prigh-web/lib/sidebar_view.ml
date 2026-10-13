@@ -181,7 +181,7 @@ let session (m : App.Model.t) ~inject ~current (s : Session_summary.t) =
     ; age = age m s
     }
   in
-  View_cache.find rows s ~deps ~equal:Row.equal ~f:(fun () -> row ~inject s deps)
+  View_cache.find ~inject rows s ~deps ~equal:Row.equal ~f:(fun () -> row ~inject s deps)
 ;;
 
 (* Above the list: its name and how to select several sessions, or how

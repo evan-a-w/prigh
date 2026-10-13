@@ -145,23 +145,60 @@ let%expect_test "subagents start, nest and show in the panel, live" =
     |}];
   H.act h (Open_subagents None);
   H.text h ~selector:".agents-panel";
+  (* A tree of buttons, the nested one in its parent's item; Alt+N opens
+     the Nth. *)
+  H.show h ~selector:".agents-section > .agents-tree";
   [%expect
     {|
     (Rpc (method_ list_subagents) (params ()) (tag Subagents))
     (Rpc (method_ list_jobs) (params ()) (tag Jobs))
-    Agents 2 agents running (Close (Alt+0))
+    Agents
+    2 agents running (Close (Alt+0))
     Subagents 2 running
-    (1 Survey the repository 0s a1  deepseek-flash  1 turn  1 tool call subagent Count the modules (0s)) (2 Count the modules 0s a1/n1  deepseek-flash  1 turn  1 tool call bash ls lib | wc -l (0s))
+    (Running Survey the repository 0s subagent Count the modules a1  deepseek-flash  1 turn  1 tool call)
+    (Running Count the modules 0s bash ls lib | wc -l a1/n1  deepseek-flash  1 turn  1 tool call)
+    <ul class="agents-tree">
+      <li>
+        <button type="button"
+                aria-keyshortcuts="Alt+1"
+                title="Alt+1"
+                class="agents-row running"
+                @on_click>
+          <span class="row-mark">
+            <span title="Running" aria-hidden="true" class="lamp"> </span>
+          </span>
+          <span class="sr-only"> Running </span>
+          <span class="row-title"> Survey the repository </span>
+          <span class="row-time"> 0s </span>
+          <span class="row-line"> subagent Count the modules </span>
+          <span class="row-meta"> a1  deepseek-flash  1 turn  1 tool call </span>
+        </button>
+        <ul class="agents-tree nested">
+          <li>
+            <button type="button"
+                    aria-keyshortcuts="Alt+2"
+                    title="Alt+2"
+                    class="agents-row running"
+                    @on_click>
+              <span class="row-mark">
+                <span title="Running" aria-hidden="true" class="lamp"> </span>
+              </span>
+              <span class="sr-only"> Running </span>
+              <span class="row-title"> Count the modules </span>
+              <span class="row-time"> 0s </span>
+              <span class="row-line"> bash ls lib | wc -l </span>
+              <span class="row-meta"> a1/n1  deepseek-flash  1 turn  1 tool call </span>
+            </button>
+          </li>
+        </ul>
+      </li>
+    </ul>
     |}];
   (* The clock ticks while something runs. *)
   print_s [%sexp (App.Model.ticking (H.model h) : bool)];
   H.act h (Clock (at 75.));
   H.text h ~selector:".agents-row.nested";
-  [%expect
-    {|
-    true
-    (2 Count the modules 1m 15s a1/n1  deepseek-flash  1 turn  1 tool call bash ls lib | wc -l (1m 15s))
-    |}];
+  [%expect {| true |}];
   (* The backend's record has the real start times. *)
   H.reply
     h
@@ -177,7 +214,8 @@ let%expect_test "subagents start, nest and show in the panel, live" =
   [%expect
     {|
     Subagents 2 running
-    (1 Survey the repository 1m 45s a1  deepseek-flash  1 turn  1 tool call subagent Count the modules (1m 15s)) (2 Count the modules 1m 14s a1/n1  deepseek-flash  1 turn  1 tool call bash ls lib | wc -l (1m 13s))
+    (Running Survey the repository 1m 45s subagent Count the modules a1  deepseek-flash  1 turn  1 tool call)
+    (Running Count the modules 1m 14s bash ls lib | wc -l a1/n1  deepseek-flash  1 turn  1 tool call)
     |}];
   (* The nested one finishes, then a1 (whose report is delivered), and a
      second one fails. *)
@@ -224,9 +262,12 @@ let%expect_test "subagents start, nest and show in the panel, live" =
     (Rpc (method_ list_subagents) (params ()) (tag Subagents))
     (Rpc (method_ list_subagents) (params ()) (tag Subagents))
     (Rpc (method_ list_subagents) (params ()) (tag Subagents))
-    Agents (Close (Alt+0))
+    Agents
+    (Close (Alt+0))
     Subagents 3
-    (1 ✓ Survey the repository 1m 45s a1  deepseek-flash  2 turns  1 tool call  $0.01 Survey) (2 ✓ Count the modules 1m 14s a1/n1  deepseek-flash  2 turns  1 tool call  $0.01 There are 42 modules.) (3 ✕ Draft the docs 0s a2  deepseek-flash  1 turn  $0.01 subagent failed: rate limited (429))
+    (✓ Done Survey the repository 1m 45s Survey)
+    (✓ Done Count the modules 1m 14s There are 42 modules.)
+    (✕ Failed Draft the docs rate limited (429))
     (3 agents)
     false
     |}]
@@ -243,11 +284,12 @@ let%expect_test "a subagent in full: its transcript, cancelling it, its card" =
     (Rpc (method_ list_subagents) (params ()) (tag Subagents))
     (Rpc (method_ list_subagents) (params ()) (tag Subagents))
     (Focus_agent 2)
-    (All agents (Esc)) Subagent a1/n1 2 agents running (Close (Alt+0))
-    (Survey the repository) › Count the modules
+    (All agents (Esc))
+    Subagent a1/n1
+    (Show in chat) (Close (Alt+0))
+    (Survey the repository) ›
     Count the modules
-    Running 0s a1/n1 deepseek-flash 1 turn 1 tool call
-    (Cancel) (Show in chat)
+    (Cancel) Running 0s deepseek-flash  1 turn  1 tool call
     Count the modules
     bash ls lib | wc -l
     |}];
@@ -259,11 +301,11 @@ let%expect_test "a subagent in full: its transcript, cancelling it, its card" =
     (browser default)
     |}];
   H.act h (Cancel_subagent "a1/n1");
-  H.text h ~selector:".detail-actions";
+  H.text h ~selector:".detail-meta";
   [%expect
     {|
     (Rpc (method_ cancel_subagent) (params ((agent_id a1/n1))) (tag Show_error))
-    (Stopping…) (Show in chat)
+    (Stopping…) Running 0s deepseek-flash  1 turn  1 tool call
     |}];
   H.act h (Show_in_chat "a1/n1");
   [%expect {| (Reveal (s1 n1)) |}];
@@ -286,7 +328,7 @@ let%expect_test "a subagent in full: its transcript, cancelling it, its card" =
   [%expect
     {|
     Its subagents 1
-    (Count the modules 0s a1/n1  deepseek-flash  1 turn  1 tool call bash ls lib | wc -l (0s))
+    (Running Count the modules 0s bash ls lib | wc -l a1/n1  deepseek-flash  1 turn  1 tool call)
     Agents_back
     ()
     (Cycle_agent 1)
@@ -319,13 +361,128 @@ let%expect_test "a subagent in full: its transcript, cancelling it, its card" =
   [%expect
     {|
     (Rpc (method_ list_subagents) (params ()) (tag Subagents))
-    (Survey the repository) › Count the modules
-    ✕ Count the modules
-    Failed 0s a1/n1 deepseek-flash 1 turn 1 tool call $0.01
-    (Show in chat)
+    (Survey the repository) ›
+    – Count the modules
+    Cancelled deepseek-flash  1 turn  1 tool call  $0.01
     Count the modules
     ✓ bash ls lib | wc -l cancelled
-    Cancelled
+    – Cancelled
+    |}]
+;;
+
+let%expect_test
+    "how agents and jobs ended: failed, cancelled, interrupted, killed"
+  =
+  let h = H.create () in
+  let agent ?(parent = "null") ~id ~started ~ended result =
+    sprintf
+      {|{"id":"%s","call_id":"c-%s","parent":%s,"task":"Task %s","model":"m","state":"x","started_at_ms":%.0f,"updated_at_ms":0,"ended_at_ms":%.0f,"turns":1,"tool_calls":0,"current_tool":null,"current_tool_started_at_ms":null,"message_count":1,"stale":false,"result":%s}|}
+      id
+      id
+      parent
+      id
+      (Time_ns.to_span_since_epoch (at started) |> Time_ns.Span.to_ms)
+      (Time_ns.to_span_since_epoch (at ended) |> Time_ns.Span.to_ms)
+      result
+  in
+  H.act h (Open_subagents None);
+  H.reply
+    h
+    "list_subagents"
+    (sprintf
+       "[%s]"
+       (String.concat
+          ~sep:","
+          [ agent
+              ~id:"a1"
+              ~started:0.
+              ~ended:0.4
+              {|{"text":"quick","is_error":false}|}
+          ; agent
+              ~id:"a2"
+              ~started:0.
+              ~ended:65.
+              {|{"text":"subagent failed: HTTP 529: overloaded","is_error":true}|}
+          ; agent
+              ~id:"a3"
+              ~started:0.
+              ~ended:3.
+              {|{"text":"[cancelled]\nhalf a thought","is_error":true}|}
+          ; agent
+              ~id:"a4"
+              ~started:0.
+              ~ended:3.
+              {|{"text":"[interrupted] the backend stopped before it finished","is_error":true}|}
+          ]));
+  H.reply
+    h
+    "list_jobs"
+    (sprintf
+       "[%s,%s]"
+       (job
+          "j1"
+          "make"
+          ~running:false
+          ~exit:"exited 2"
+          ~elapsed:4.
+          ~last_line:"error: no rule")
+       (job "j2" "sleep 99" ~running:false ~exit:"killed" ~elapsed:0.2));
+  (* Under a second is not worth a time; stopped work is not a failure. *)
+  H.text h ~selector:".agents-body";
+  H.elements h ~selector:".agents-row";
+  [%expect
+    {|
+    (Rpc (method_ list_subagents) (params ()) (tag Subagents))
+    (Rpc (method_ list_jobs) (params ()) (tag Jobs))
+    Subagents 4
+    (✓ Done Task a1 quick)
+    (✕ Failed Task a2 1m 05s HTTP 529: overloaded)
+    (– Task a3 3s Cancelled)
+    (– Task a4 3s Interrupted: the backend stopped before it finished)
+    Jobs 2
+    (✕ Failed make 4s exited 2: error: no rule)
+    (– sleep 99 Killed)
+    <button class="agents-row complete">
+    <button class="agents-row failed">
+    <button class="agents-row stopped">
+    <button class="agents-row stopped">
+    <button class="agents-row failed">
+    <button class="agents-row stopped">
+    |}];
+  H.act h (Select_item (Agent "a3"));
+  H.text h ~selector:".agents-detail";
+  H.act h (Select_item (Agent "a4"));
+  H.text h ~selector:".agents-detail";
+  H.act h (Select_item (Agent "a2"));
+  H.text h ~selector:".agents-detail";
+  H.act h (Select_item (Job "j1"));
+  H.text h ~selector:".detail-head";
+  [%expect
+    {|
+    (Rpc (method_ get_subagent) (params ((id a3) (elide true)))
+     (tag (Subagent a3)))
+    – Task a3
+    Cancelled 3s m  1 turn
+    Loading the transcript…
+    – Cancelled
+    half a thought
+    (Rpc (method_ get_subagent) (params ((id a4) (elide true)))
+     (tag (Subagent a4)))
+    – Task a4
+    Interrupted 3s m  1 turn
+    Loading the transcript…
+    – Interrupted
+    the backend stopped before it finished
+    (Rpc (method_ get_subagent) (params ((id a2) (elide true)))
+     (tag (Subagent a2)))
+    ✕ Task a2
+    Failed 1m 05s m  1 turn
+    Loading the transcript…
+    ✕ Failed
+    HTTP 529: overloaded
+    (Rpc (method_ job_output) (params ((job_id j1))) (tag (Job_output j1)))
+    ✕ make
+    Failed 4s exited 2  14 B
     |}]
 ;;
 
@@ -392,14 +549,14 @@ let%expect_test "jobs: listed, their output polled, killed" =
   H.text h ~selector:".agents-panel";
   [%expect
     {|
-    (All agents (Esc)) Job j1 1 job running (Close (Alt+0))
+    (All agents (Esc))
+    Job j1
+    (Close (Alt+0))
     make test
-    running 3s j1 11 B
-    (Kill)
-    Output, lines 1-2 of 2
+    (Kill) Running 3s 11 B
     ok 11 tests
     ok 12 tests
-    Its output refreshes while it runs.
+    Output, lines 1-2 of 2  refreshes while it runs
     |}];
   (* Polled every 2 seconds while the panel is open and it runs. *)
   H.act h (Clock (at 1.));
@@ -415,10 +572,10 @@ let%expect_test "jobs: listed, their output polled, killed" =
     (Rpc (method_ job_output) (params ((job_id j1))) (tag (Job_output j1)))
     (Rpc (method_ list_jobs) (params ()) (tag Jobs))
     (Rpc (method_ job_output) (params ((job_id j1))) (tag (Job_output j1)))
-    running 8s j1 11 B
+    (Kill) Running 8s 11 B
     |}];
   H.act h (Kill_job "j1");
-  H.text h ~selector:".detail-actions";
+  H.text h ~selector:".detail-meta";
   H.event
     h
     (state
@@ -436,11 +593,11 @@ let%expect_test "jobs: listed, their output polled, killed" =
   [%expect
     {|
     (Rpc (method_ kill_job) (params ((job_id j1))) (tag Show_error))
-    (Stopping…)
+    (Stopping…) Running 8s 11 B
     (Rpc (method_ list_jobs) (params ()) (tag Jobs))
     (Rpc (method_ job_output) (params ((job_id j1))) (tag (Job_output j1)))
-    ✕ make test
-    killed 6s j1
+    – make test
+    Killed 6s
     false
     |}]
 ;;
@@ -491,11 +648,13 @@ let%expect_test
     (Rpc (method_ list_subagents) (params ()) (tag Subagents))
     (Rpc (method_ list_jobs) (params ()) (tag Jobs))
     Subagents 1 running
-    (1 Draft the docs 0s a2  deepseek-flash starting…) (2 ✓ Survey the repository 0s a1  deepseek-flash  2 turns  1 tool call  $0.01 done) (3 ✓ Count the modules 0s a1/n1  deepseek-flash  1 turn  1 tool call  $0.01 42)
+    (Running Draft the docs 0s Starting… a2  deepseek-flash)
+    (✓ Done Survey the repository done)
+    (✓ Done Count the modules 42)
     Jobs 1
-    (4 ✓ sleep 1 1s j1  exited 0)
-    Earlier (1)
-    (✓ old 1s j0  exited 0)
+    (✓ Done sleep 1 1s)
+    Earlier 1
+    (✓ Done old 1s)
     |}];
   (* a2 still runs: it stays. *)
   H.type_ h "next";
@@ -508,11 +667,12 @@ let%expect_test
     (Rpc (method_ prompt) (params ((text next)))
      (tag (Sent (text next) (images ()))))
     Subagents 1 running
-    (1 Draft the docs 0s a2  deepseek-flash starting…)
-    Earlier (4)
-    (✓ Survey the repository 0s a1  deepseek-flash  2 turns  1 tool call  $0.01 done) (✓ Count the modules 0s a1/n1  deepseek-flash  1 turn  1 tool call  $0.01 42)
-    (✓ sleep 1 1s j1  exited 0)
-    (✓ old 1s j0  exited 0)
+    (Running Draft the docs 0s Starting… a2  deepseek-flash)
+    Earlier 4
+    (✓ Done Survey the repository done)
+    (✓ Done Count the modules 42)
+    (✓ Done sleep 1 1s)
+    (✓ Done old 1s)
     |}];
   H.act h (Select_item (Agent "a2"));
   H.event
@@ -565,7 +725,7 @@ let%expect_test "after a reload, a nested subagent's transcript is fetched" =
     {|[{"id":"a1","call_id":"s1","parent":null,"task":"Survey the repository","model":"deepseek-flash","state":"running","started_at_ms":1791187200000,"updated_at_ms":0,"ended_at_ms":null,"turns":1,"tool_calls":1,"current_tool":"subagent","current_tool_started_at_ms":1791187200000,"message_count":2,"stale":false,"result":null},
        {"id":"a1/n1","call_id":"n1","parent":"a1","task":"Count the modules","model":"deepseek-flash","state":"complete","started_at_ms":1791187201000,"updated_at_ms":0,"ended_at_ms":1791187231000,"turns":2,"tool_calls":1,"current_tool":null,"current_tool_started_at_ms":null,"message_count":3,"stale":false,"result":{"text":"42 modules","is_error":false}}]|};
   H.act h (Select_item (Agent "a1/n1"));
-  H.text h ~selector:".agents-transcript";
+  H.text h ~selector:".agents-note";
   H.reply
     h
     "get_subagent"
@@ -581,10 +741,9 @@ let%expect_test "after a reload, a nested subagent's transcript is fetched" =
     (Rpc (method_ get_subagent) (params ((id a1/n1) (elide true)))
      (tag (Subagent a1/n1)))
     Loading the transcript…
-    (Survey the repository) › Count the modules
+    (Survey the repository) ›
     ✓ Count the modules
-    Complete 30s a1/n1 deepseek-flash 2 turns 1 tool call
-    (Show in chat)
+    Done 30s deepseek-flash  2 turns  1 tool call
     Count the modules
     42 modules
     |}]

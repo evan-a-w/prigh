@@ -544,7 +544,7 @@ try {
   await page.keyboard.press("Alt+2");
   await page.waitForSelector(".agents-detail .agents-transcript .entries");
   await showPanel("a nested subagent");
-  await page.locator(".detail-actions .btn", { hasText: "Show in chat" }).click();
+  await page.locator(".agents-head .btn", { hasText: "Show in chat" }).click();
   await page.waitForFunction(() => {
     const card = document.querySelector("#chat [data-call=s1] [data-call=n1]");
     const chat = document.getElementById("chat").getBoundingClientRect();
@@ -666,9 +666,15 @@ try {
   await show("/diff", ".diff-dialog");
   await page.keyboard.press("Escape");
   await page.waitForSelector(".diff-dialog", { state: "detached" });
-  mkdirSync(join(cwd, "sub"));
+  // A missing directory: the dialog asks before creating it.
   await send(`/cd ${join(cwd, "sub")}`);
-  await bodyHas("sub");
+  await page.locator(".create-dir-dialog").waitFor();
+  await page.waitForTimeout(300); // its fade in
+  await show("a missing directory", ".create-dir-dialog");
+  await page.getByRole("button", { name: "Create folder and switch" }).click();
+  await page.waitForSelector(".create-dir-dialog", { state: "detached" });
+  await bodyHas("switched to it");
+  console.log(`created on the host: ${existsSync(join(cwd, "sub"))}`);
   await send("anything new?");
   // The backend's copy (with its note), not the page's echo while sending.
   await page.locator(".chat .msg.noted .msg.user", { hasText: "anything new?" }).waitFor();

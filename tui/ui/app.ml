@@ -71,6 +71,8 @@ module Reply_tag = struct
     | Pending
     | Mode_set of string (** the notice *)
     | Refresh_state
+    | Dir_changed of P.Dir_change.Target.t
+    (** [Missing]: confirm creating it; otherwise acknowledge *)
     | Retry_in_editor of
         { command : string
         ; hint : string
@@ -1280,11 +1282,25 @@ let host_cwd_prompt m (host : P.Host.t) =
   }
 ;;
 
-let set_host_command ~host ~cwd =
-  rpc
-    "set_active_host"
-    ~params:[ "host", str host; "cwd", str cwd ]
-    ~tag:(Notice_on_success "tool host switched")
+let change_dir ?(if_missing = P.Dir_change.If_missing.Ask) ~target path =
+  call (Change_dir { target; path; if_missing }) ~tag:(Dir_changed target)
+;;
+
+let host_target m id : P.Dir_change.Target.t =
+  let name =
+    Option.bind m.state ~f:(fun (s : P.State.t) ->
+      List.find s.hosts ~f:(fun h -> String.equal h.id id))
+    |> Option.value_map ~default:id ~f:(fun (h : P.Host.t) -> h.name)
+  in
+  Host { id; name }
+;;
+
+let set_host_command m ~host ~cwd = change_dir ~target:(host_target m host) cwd
+
+let create_dir_question (target : P.Dir_change.Target.t) path =
+  match target with
+  | Cwd -> sprintf "Create %s? (y/n)" path
+  | Host { name; _ } -> sprintf "Create %s on %s? (y/n)" path name
 ;;
 
 let switch_host m arg =
@@ -1444,19 +1460,40 @@ let schedule_reconnect m ~attempt ~delay_ms ~session =
     ] )
 ;;
 
+(* Closes the dialogs answering the session's agent and drops what is waiting
+   to be shown; [get_pending] brings back what is still open. *)
+let drop_pending m =
+  let m = { m with pending_confirms = []; pending_questions = [] } in
+  match m.mode with
+  | Confirm { action = Tool_confirm _; _ }
+  | Question _
+  | Picker { kind = Agents | Queue; _ } -> { m with mode = Editing }
+  | Text_prompt { action = Deny_reason { draft; _ }; _ } ->
+    { m with mode = Editing; editor = Editor.set_text m.editor draft }
+  | _ -> m
+;;
+
+(* Everything that belongs to the session shown, reset when it is replaced
+   (a switch, another user, a reconnect), and the requests that refill it. *)
+let reset_session m =
+  ( follow
+      { (drop_pending m) with
+        skills = Skill_cache.empty
+      ; agents = []
+      ; focus = `Main
+      ; queued_messages = []
+      ; transcript = Transcript.clear m.transcript
+      }
+  , [ rpc "get_state" ~tag:Initial_state
+    ; rpc "get_messages" ~tag:Initial_messages
+    ; rpc "get_pending" ~tag:Pending
+    ] )
+;;
+
 let backend_closed m =
   let m =
-    { m with
-      pending_confirms = []
-    ; pending_questions = []
-    ; state = Option.map m.state ~f:(fun s -> { s with running = false })
-    ; mode =
-        (* They come back with [get_pending] once reconnected. *)
-        (match m.mode with
-         | Confirm { action = Tool_confirm _; _ }
-         | Question _
-         | Text_prompt { action = Deny_reason _; _ } -> Editing
-         | mode -> mode)
+    { (drop_pending m) with
+      state = Option.map m.state ~f:(fun s -> { s with running = false })
     }
   in
   let m =
@@ -1525,17 +1562,9 @@ let reconnect_reply m ~generation result =
          | Ok { client_id; namespace; user } -> Some client_id, namespace, user
          | Error _ -> m.client_id, m.namespace, m.user
        in
-       let m =
-         { m with
-           connection = Connected
-         ; client_id
-         ; namespace
-         ; user
-         ; skills = Skill_cache.empty
-         ; agents = []
-         ; focus = `Main
-         ; transcript = Transcript.clear m.transcript
-         }
+       let m, session_commands =
+         reset_session
+           { m with connection = Connected; client_id; namespace; user }
        in
        let m =
          match session, m.state with
@@ -1549,12 +1578,11 @@ let reconnect_reply m ~generation result =
          | _ -> notice m "reconnected to the backend"
        in
        ( follow m
-       , [ rpc "get_state" ~tag:Initial_state
-         ; rpc "get_messages" ~tag:Initial_messages
-         ; rpc "auth_status" ~tag:Auth_refresh
-         ; rpc "get_config" ~tag:Config
-         ; rpc "list_models" ~tag:Models_catalog
-         ] ))
+       , session_commands
+         @ [ rpc "auth_status" ~tag:Auth_refresh
+           ; rpc "get_config" ~tag:Config
+           ; rpc "list_models" ~tag:Models_catalog
+           ] ))
   | Connected | Reconnecting _ -> m, []
 ;;
 
@@ -2177,14 +2205,32 @@ let run_command m (cmd : Commands.Parsed.t) =
     , [] )
   | "cd", _ ->
     ( m
-    , [ rpc
-          "set_cwd"
-          ~params:[ "path", str cmd.rest ]
+    , [ call
+          (Change_dir { target = Cwd; path = cmd.rest; if_missing = Ask })
           ~tag:
             (Retry_in_editor
                { command = "/cd " ^ cmd.rest
                ; hint = "Tab after /cd completes directories"
-               ; then_ = Notice_on_success "cwd changed"
+               ; then_ = Dir_changed Cwd
+               })
+      ] )
+  | "mkdir", [] ->
+    ( { m with
+        mode =
+          Text_prompt
+            { question = "Create and change to directory"; action = Mkdir }
+      ; editor = Editor.clear m.editor
+      }
+    , [] )
+  | "mkdir", _ ->
+    ( m
+    , [ call
+          (Change_dir { target = Cwd; path = cmd.rest; if_missing = Create })
+          ~tag:
+            (Retry_in_editor
+               { command = "/mkdir " ^ cmd.rest
+               ; hint = ""
+               ; then_ = Dir_changed Cwd
                })
       ] )
   | "fork", _ -> m, [ rpc "get_entries" ~tag:Entries_for_fork ]
@@ -2473,6 +2519,7 @@ let refresh_autocomplete m =
   let line_index = (Editor.position m.editor).line in
   match
     Autocomplete.compute
+      ~current_session:(current_session m)
       ~line
       ~col
       ~line_index
@@ -2971,9 +3018,10 @@ let save_scoped_models m picker =
 (* ---- sessions picker --------------------------------------------------- *)
 
 let confirm_delete m ~back (sessions : P.Session_summary.t list) =
-  match sessions with
-  | [] -> m, []
-  | sessions ->
+  match Session_selection.deletable sessions ~current:(current_session m) with
+  | Error e -> error m e, []
+  | Ok [] -> m, []
+  | Ok sessions ->
     ( { m with
         mode =
           Confirm
@@ -2991,10 +3039,18 @@ let confirm_delete m ~back (sessions : P.Session_summary.t list) =
 ;;
 
 let confirm_delete_archived m ~back selection =
-  match Session_selection.delete_archived_question selection with
+  let current = current_session m in
+  match Session_selection.delete_archived_question selection ~current with
   | None -> notice m "no archived sessions to delete", []
   | Some question ->
-    ( { m with mode = Confirm { question; action = Delete_archived { back } } }
+    let paths =
+      List.map
+        (Session_selection.archived_to_delete selection ~current)
+        ~f:(fun (s : P.Session_summary.t) -> s.path)
+    in
+    ( { m with
+        mode = Confirm { question; action = Delete_sessions { paths; back } }
+      }
     , [] )
 ;;
 
@@ -3060,19 +3116,14 @@ let map_sessions_picker m ~f =
   | Confirm
       { question
       ; action =
-          ( Delete_sessions
-              { back = Some { kind = Sessions selection; picker }; _ }
-          | Delete_archived
-              { back = Some { kind = Sessions selection; picker } } ) as action
+          Delete_sessions
+            { paths; back = Some { kind = Sessions selection; picker } }
       } ->
     let kind, picker = update selection picker in
     let back = Some { Mode.Open_picker.kind; picker } in
-    let action : Mode.Confirm_action.t =
-      match action with
-      | Delete_sessions { paths; _ } -> Delete_sessions { paths; back }
-      | _ -> Delete_archived { back }
-    in
-    { m with mode = Confirm { question; action } }
+    { m with
+      mode = Confirm { question; action = Delete_sessions { paths; back } }
+    }
   | _ -> m
 ;;
 
@@ -3080,9 +3131,7 @@ let sessions_picker_shown m =
   match m.mode with
   | Picker { kind = Sessions _; _ }
   | Confirm
-      { action =
-          ( Delete_sessions { back = Some { kind = Sessions _; _ }; _ }
-          | Delete_archived { back = Some { kind = Sessions _; _ } } )
+      { action = Delete_sessions { back = Some { kind = Sessions _; _ }; _ }
       ; _
       } -> true
   | _ -> false
@@ -3258,15 +3307,11 @@ let text_prompt m ~(action : Mode.Text_prompt_action.t) (intent : Intent.t) =
               ~tag:(Notice_on_success "session named")
           ] )
     | Cd ->
+      if String.is_empty text then m, [] else m, [ change_dir ~target:Cwd text ]
+    | Mkdir ->
       if String.is_empty text
       then m, []
-      else
-        ( m
-        , [ rpc
-              "set_cwd"
-              ~params:[ "path", str text ]
-              ~tag:(Notice_on_success "cwd changed")
-          ] )
+      else m, [ change_dir ~if_missing:Create ~target:Cwd text ]
     | Export_path ->
       let command =
         if String.is_empty text
@@ -3281,7 +3326,7 @@ let text_prompt m ~(action : Mode.Text_prompt_action.t) (intent : Intent.t) =
     | Host_cwd host ->
       if String.is_empty text
       then m, []
-      else m, [ set_host_command ~host ~cwd:text ]
+      else m, [ set_host_command m ~host ~cwd:text ]
     | Deny_reason { confirm; draft } ->
       answer_confirm
         { m with editor = Editor.set_text m.editor draft }
@@ -3296,7 +3341,7 @@ let text_prompt m ~(action : Mode.Text_prompt_action.t) (intent : Intent.t) =
   (* Directory answers complete on the host they are for. *)
   let directory_host =
     match action with
-    | Cd ->
+    | Cd | Mkdir ->
       Some
         (Option.value_map m.state ~default:"backend" ~f:(fun s -> s.active_host))
     | Host_cwd host -> Some host
@@ -3347,7 +3392,7 @@ let text_prompt m ~(action : Mode.Text_prompt_action.t) (intent : Intent.t) =
            editor = Editor.set_text m.editor draft
          }
        , [] )
-     | Name | Cd | Export_path | Import_path | Host_cwd _ ->
+     | Name | Cd | Mkdir | Export_path | Import_path | Host_cwd _ ->
        ( { m with
            editor = Editor.clear m.editor
          ; mode = Editing
@@ -3417,16 +3462,16 @@ let confirm m ~(action : Mode.Confirm_action.t) (intent : Intent.t) =
       m, [ rpc "rewind" ~params:[ "to", str id ] ~tag:Reload_messages ]
     | Delete_sessions { paths; back } ->
       back_to m back, [ call (Delete_sessions paths) ~tag:Sessions_deleted ]
-    | Delete_archived { back } ->
-      back_to m back, [ call Delete_archived ~tag:Sessions_deleted ]
     | Tool_confirm c -> answer_confirm m c Allow
+    | Create_dir { target; path } ->
+      m, [ change_dir ~if_missing:Create ~target path ]
   in
   let no m =
     match action with
     | Tool_confirm c -> answer_confirm m c Deny
-    | Delete_sessions { back = Some _ as back; _ }
-    | Delete_archived { back = Some _ as back } -> back_to m back, []
-    | Logout _ | Rewind _ | Delete_sessions _ | Delete_archived _ ->
+    | Delete_sessions { back = Some _ as back; _ } -> back_to m back, []
+    | Create_dir { path; _ } -> notice m (sprintf "not created: %s" path), []
+    | Logout _ | Rewind _ | Delete_sessions _ ->
       notice m "cancelled", []
   in
   match intent, action with
@@ -3722,6 +3767,42 @@ let mcp_approved m server (list : P.Mcp_list.t) =
   else mcp_picker ~problems:false m list, []
 ;;
 
+(* A missing directory is created only once confirmed; when another dialog
+   has opened meanwhile, the notice says how to create it instead. *)
+let dir_changed
+      m
+      (target : P.Dir_change.Target.t)
+      (outcome : P.Dir_change.Outcome.t)
+  =
+  match outcome, target with
+  | Missing path, Cwd when Mode.is_dialog m.mode ->
+    warn m (sprintf "%s does not exist; /mkdir %s creates it" path path), []
+  | Missing path, Host { name; _ } when Mode.is_dialog m.mode ->
+    ( warn
+        m
+        (sprintf "%s does not exist on %s; /host %s asks again" path name name)
+    , [] )
+  | Missing path, _ ->
+    ( { m with
+        mode =
+          Confirm
+            { question = create_dir_question target path
+            ; action = Create_dir { target; path }
+            }
+      ; autocomplete = None
+      }
+    , [] )
+  | Changed { created; cwd }, _ ->
+    let created =
+      if created
+      then sprintf "created %s; " (Option.value cwd ~default:"the directory")
+      else ""
+    in
+    (match target with
+     | Cwd -> notice m (created ^ "cwd changed"), []
+     | Host _ -> notice m (created ^ "tool host switched"), [])
+;;
+
 let rec reply m (tag : Reply_tag.t) (result : (P.Json.t, string) Result.t) =
   let decode json ~f k =
     match f json with
@@ -3790,6 +3871,14 @@ let rec reply m (tag : Reply_tag.t) (result : (P.Json.t, string) Result.t) =
        decode json ~f:P.Mcp_list.of_json (mcp_approved m server)
      | Pending ->
        decode json ~f:P.Pending.of_json (fun pending ->
+         let m =
+           { m with
+             queued_messages =
+               Queued_message.of_queues
+                 ~steer:pending.steer_texts
+                 ~follow_up:pending.follow_up_texts
+           }
+         in
          ( add_pending_questions
              (add_pending_confirms m pending.confirms)
              pending.questions
@@ -3806,6 +3895,9 @@ let rec reply m (tag : Reply_tag.t) (result : (P.Json.t, string) Result.t) =
          ~f:(fun json -> P.Json.string_field json "text")
          (fun text -> update_btw m id ~f:(Btw_box.finish ~text), [])
      | Notice_on_success text -> notice m text, []
+     | Dir_changed target ->
+       decode json ~f:P.Dir_change.Outcome.of_json (fun outcome ->
+         dir_changed m target outcome)
      | Set_model_done key ->
        (match
           List.find m.models ~f:(fun model -> String.equal model.key key)
@@ -3870,24 +3962,13 @@ let rec reply m (tag : Reply_tag.t) (result : (P.Json.t, string) Result.t) =
          in
          follow { m with transcript }, [])
      | Reload_messages | Reload_messages_notice _ ->
-       let m =
-         { m with
-           skills = Skill_cache.empty
-         ; agents = []
-         ; focus = `Main
-         ; queued_messages = []
-         ; transcript = Transcript.clear m.transcript
-         }
-       in
+       let m, commands = reset_session m in
        let m =
          match tag with
          | Reload_messages_notice text -> notice m text
          | _ -> m
        in
-       ( follow m
-       , [ rpc "get_messages" ~tag:Initial_messages
-         ; rpc "get_state" ~tag:Initial_state
-         ] )
+       follow m, commands
      | Users_list ->
        decode
          json
@@ -3910,18 +3991,14 @@ let rec reply m (tag : Reply_tag.t) (result : (P.Json.t, string) Result.t) =
          json
          ~f:P.Hello_reply.of_json
          (fun { client_id; namespace; user } ->
-            let m =
-              { m with
-                client_id = Some client_id
-              ; namespace
-              ; user
-              ; sessions = None
-              ; skills = Skill_cache.empty
-              ; agents = []
-              ; focus = `Main
-              ; queued_messages = []
-              ; transcript = Transcript.clear m.transcript
-              }
+            let m, session_commands =
+              reset_session
+                { m with
+                  client_id = Some client_id
+                ; namespace
+                ; user
+                ; sessions = None
+                }
             in
             let m =
               notice
@@ -3932,11 +4009,10 @@ let rec reply m (tag : Reply_tag.t) (result : (P.Json.t, string) Result.t) =
                  | None, None -> "switched user")
             in
             ( follow m
-            , [ rpc "get_state" ~tag:Initial_state
-              ; rpc "get_messages" ~tag:Initial_messages
-              ; rpc "auth_status" ~tag:Auth_refresh
-              ; rpc "get_config" ~tag:Config
-              ] ))
+            , session_commands
+              @ [ rpc "auth_status" ~tag:Auth_refresh
+                ; rpc "get_config" ~tag:Config
+                ] ))
      | Session_stats ->
        decode json ~f:P.Session_stats.of_json (fun stats ->
          block m (format_stats stats), [])
@@ -3983,7 +4059,11 @@ let rec reply m (tag : Reply_tag.t) (result : (P.Json.t, string) Result.t) =
          json
          ~f:(decode_list ~f:P.Session_summary.of_json)
          (fun sessions ->
-            match Session_selection.resolve sessions args with
+            match
+              Result.bind
+                (Session_selection.resolve sessions args)
+                ~f:(Session_selection.deletable ~current:(current_session m))
+            with
             | Error e ->
               ( error
                   (restore_command m ("/delete " ^ String.concat ~sep:" " args))

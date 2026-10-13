@@ -699,7 +699,8 @@ let%expect_test "keymap: every binding resolves to its intent and is documented"
     /queue                             the queued steers and follow-ups (Enter edits one, Ctrl+D removes it)
     /host [name|backend]               pick where tools run (this frontend, another one, or the backend) and the directory there
     /switch [path]                     switch to a saved session
-    /cd [path]                         change the working directory
+    /cd [path]                         change the working directory (asks to create a missing one)
+    /mkdir [path]                      create a directory (and its parents) and change to it
     /fork                              fork at a previous user message
     /rewind                            rewind the head to a previous user message
     /tree                              show the session tree and switch head
@@ -2076,6 +2077,7 @@ let%expect_test
   in
   let compute ?skills line =
     Autocomplete.compute
+      ~current_session:None
       ~line
       ~col:(String.length line)
       ~line_index:0
@@ -2149,6 +2151,7 @@ let%expect_test "autocomplete: /skill: completes skill names" =
   in
   let compute ?skills line =
     Autocomplete.compute
+      ~current_session:None
       ~line
       ~col:(String.length line)
       ~line_index:0
@@ -2295,6 +2298,7 @@ let%expect_test
   let show ?col ?default_dir_host line =
     match
       Autocomplete.compute
+        ~current_session:None
         ~line
         ~col:(Option.value col ~default:(String.length line))
         ~line_index:0

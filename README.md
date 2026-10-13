@@ -322,10 +322,13 @@ sessions by name, id or path. The list follows the backend as it changes.
 Subagents and background jobs have their own panel, a resizable column
 right of the chat (drag its left edge; a full-screen sheet on a phone):
 the session's subagents as a tree (nested ones under the background agent
-that started them), running first, with their task, model, elapsed time,
-turns and current tool, and the background jobs with their last line.
-Selecting one shows a subagent's live transcript and report (with Cancel
-and "Show in chat", which scrolls to its card) or a job's output (with
+that started them), running first: each row is its task, the lamp while it
+runs (with its live elapsed time, current tool, model and turns) or how it
+ended (done, failed with the error, or cancelled, interrupted by a restart
+or killed, shown quietly), and the background jobs the same way with their
+last line. Selecting one shows a subagent's live transcript at the panel's
+width and how it ended (with Cancel while it runs, and "Show in chat" in
+the panel's header, which scrolls to its card) or a job's output (with
 Kill). It opens from the status line ("2 agents running"), the top bar's
 robot button, a subagent's card in the chat, `/agents [n|id]` and `/jobs
 [id]`, and Alt+1…9 (the Nth listed; Alt+] and Alt+[ step through them, Alt+0 closes
@@ -448,9 +451,10 @@ closes the popup.
 session's details and statistics; `/fork`, `/rewind` (with a confirmation)
 and `/tree` (the whole tree, branches indented) pick a message;
 `/scoped-models` is a checklist (Tab or a click checks a model, Enter
-saves); `/cd`, `/host`'s directory, `/export` and `/import` ask for a path
+saves); `/cd`, `/mkdir`, `/host`'s directory, `/export` and `/import` ask for a path
 with completions from the backend and keep the dialog open, with the error,
-when the backend refuses it; `/agents` and `/jobs` open the agents panel
+when the backend refuses it (a directory that doesn't exist yet opens a
+"Create folder?" dialog instead); `/agents` and `/jobs` open the agents panel
 (above); `/btw` answers in a panel above the composer (Esc closes it);
 `/verbosity` (Ctrl+O cycles) hides tool output and thinking (quiet) or
 unfolds everything (verbose); `/copy` (Ctrl+X with nothing selected) copies
@@ -698,7 +702,11 @@ anywhere (other frontends, other sessions). In it Tab marks or unmarks a
 session (`✓`; the status line shows how many and their size), Ctrl+D
 deletes the marked sessions (or the highlighted one), Alt+A archives or
 unarchives the highlighted one, Alt+D deletes every archived session, and
-Ctrl+N shows only named ones. Deleting always asks first, with the count and
+Ctrl+N shows only named ones (marks on the hidden ones stay). The session
+you are in cannot be deleted, so Ctrl+D and `/delete` say so at once and
+Alt+D leaves it out. Tab after `/switch`, `/archive`, `/unarchive` or
+`/delete` completes sessions by name (or first prompt), the active ones
+first, and inserts the id. Deleting always asks first, with the count and
 the disk space (`Delete 3 sessions (1.2 MB)? Enter deletes, Esc keeps
 them`); Esc goes back to the list unchanged. Afterwards a notice says what
 was deleted and why any session was not (it is running, open in another
@@ -709,7 +717,9 @@ The status line is quiet gray: cwd, model, `think:`, `view:`, the context
 80%), cost (`$1.20/$5.00` against a budget: yellow from 80%, red once
 spent), and then whatever is going on — the goal (`goal:3/20`,
 `goal:done`, `goal:stopped`), a scheduled resume (`resumes 14:05`),
-`queued:N`, agents, jobs, the tool host — with the current mode's keys (`⠋ working · Esc aborts · Enter
+`queued:N`, `to answer:N` (confirmations and questions waiting behind an
+open dialog, in yellow), agents, jobs, the tool host — with the current
+mode's keys (`⠋ working · Esc aborts · Enter
 steers`, a picker's keys) in yellow. `think:` and `mode:` are always there
 (at narrow widths they outlast the cost and the cwd; `view:` gives way to
 the cwd first). Queued steers and follow-ups (whichever frontend queued
@@ -981,7 +991,8 @@ it.
 | `/delete [session...]` | delete sessions after a confirmation (without arguments: pick them in `/sessions`) |
 | `/delete-archived` | delete every archived session after a confirmation |
 | `/switch [path]` | switch to a saved session |
-| `/cd [path]` | change the working directory |
+| `/cd [path]` | change the working directory; a missing one is created once you confirm (`Create /x? (y/n)`; in prigh-web a "Create folder?" dialog); `/host`'s directory asks the same |
+| `/mkdir [path]` | create a directory (with its parents) on the tool host and change to it |
 | `/fork`, `/rewind`, `/tree`, `/clone` | branch the session tree |
 | `/export [path]`, `/import [path]` | markdown or `.jsonl` |
 | `/agents [cancel <n>]` | focus a subagent (Ctrl+D in the picker cancels one), or cancel subagent n |
@@ -1149,7 +1160,7 @@ With `ask_user` the model asks you one or more questions, each with
 optional choices (one, or several to pick) and room for your own answer. A
 dialog takes the keyboard: ↑/↓ choose, Space picks, typing writes your own
 answer, ←/→ move between questions, Enter answers (the last one sends), Esc
-declines. The first frontend to answer wins and the others' dialogs close;
+declines (the model is told you declined); the box lists these keys. The first frontend to answer wins and the others' dialogs close;
 an unanswered question comes back after a reconnect, and aborting the run
 withdraws it. Subagents cannot ask (nor plan, nor leave plan mode): they
 put open questions in their report for the main agent to ask. Headless

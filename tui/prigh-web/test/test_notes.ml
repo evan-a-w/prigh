@@ -366,6 +366,7 @@ let%expect_test "/diff, /review and /init are in the completions and /help" =
     Commands ↑↓ Tab Enter Esc   Ctrl+Enter as typed
     /diff [path] show the uncommitted changes where the tools run, untracked files too
     /default-dir [path|off] show or set the directory new sessions start in
+    /mkdir [path] create a directory (and its parents) and change to it
     /delete-archived delete every archived session, after a confirmation
     /retry-backend-connection reconnect to the backend now
     Commands ↑↓ Tab Enter Esc   Ctrl+Enter as typed
@@ -373,6 +374,7 @@ let%expect_test "/diff, /review and /init are in the completions and /help" =
     /import [path] import a session from a JSONL file on the backend
     /diff [path] show the uncommitted changes where the tools run, untracked files too
     /quit how to leave (close the tab; /signout signs out)
+    /mkdir [path] create a directory (and its parents) and change to it
     /files [path] browse, preview, upload and download files where the tools run (Ctrl+Shift+F)
     /login [provider] log in to a model provider (or /login custom)
     /notify [on|off] tell you when a turn ends or something waits for you while the tab is hidden

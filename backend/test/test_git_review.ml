@@ -111,7 +111,9 @@ let%expect_test "/diff: tracked changes, untracked files, a path, no repository"
     |}];
   (* A path, relative to the session's directory; paths stay relative to the
      repository. *)
-  Or_error.ok_exn (Agent.set_cwd agent ~path:(Filename.concat t.dir "sub"));
+  ignore
+    (Or_error.ok_exn (Agent.set_cwd agent ~path:(Filename.concat t.dir "sub"))
+     : Dir_change.Outcome.t);
   print_diff t (Agent.git_diff agent ~path:".");
   [%expect
     {|

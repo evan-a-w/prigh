@@ -352,6 +352,19 @@ let execute
     match string_arg "path" with
     | Ok path -> resolve_dir ~cwd path
     | Error e -> Tool.Result.error (Error.to_string_hum e))
+  else if String.equal name Dir_change.op
+  then (
+    let check =
+      match arguments with
+      | `Object fields ->
+        (match List.Assoc.find fields ~equal:String.equal "check" with
+         | Some `True -> true
+         | _ -> false)
+      | _ -> false
+    in
+    match string_arg "path" with
+    | Ok path -> Dir_change.run ~cwd ~check path
+    | Error e -> Tool.Result.error (Error.to_string_hum e))
   else if String.equal name read_file_op
   then (
     match string_arg "path" with
