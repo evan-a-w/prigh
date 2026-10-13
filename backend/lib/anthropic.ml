@@ -107,30 +107,42 @@ let assistant_block ~oauth ~replay_thinking (block : Content.t) =
 
 (* A search is replayed as the provider sent it (its results carry
    encrypted content the model needs for citations); another provider's
-   becomes text. *)
-let server_tool_blocks ~same_provider (tool : Content.Server_tool.t) =
+   becomes text. One without a result yet is only replayed to continue the
+   turn it is in ([continuing], after a [pause_turn]); otherwise it is
+   dropped: a [server_tool_use] needs its result. *)
+let server_tool_blocks ~same_provider ~continuing (tool : Content.Server_tool.t)
+  =
   let as_text () = [ text_block (Content.Server_tool.as_text tool) ] in
-  match tool.raw with
-  | Some raw when same_provider ->
+  let use input =
+    `Object
+      [ "type", `String "server_tool_use"
+      ; "id", `String tool.id
+      ; "name", `String tool.name
+      ; "input", input
+      ]
+  in
+  match tool.raw, tool.output with
+  | Some raw, _ when same_provider ->
     (match Json.parse tool.input, Json.parse raw with
-     | Ok input, Ok result ->
-       [ `Object
-           [ "type", `String "server_tool_use"
-           ; "id", `String tool.id
-           ; "name", `String tool.name
-           ; "input", input
-           ]
-       ; result
-       ]
+     | Ok input, Ok result -> [ use input; result ]
      | _ -> as_text ())
-  | Some _ | None -> as_text ()
+  | None, None when same_provider ->
+    (match Json.parse tool.input with
+     | Ok input when continuing -> [ use input ]
+     | Ok _ | Error _ -> [])
+  | Some _, _ | None, _ -> as_text ()
 ;;
 
-let assistant_blocks ~oauth ~replay_thinking (a : Message.Assistant.t) =
+let assistant_blocks
+      ~oauth
+      ~replay_thinking
+      ?(continuing = false)
+      (a : Message.Assistant.t)
+  =
   List.concat_map a.content ~f:(fun block ->
     match block with
     | Content.Server_tool tool ->
-      server_tool_blocks ~same_provider:replay_thinking tool
+      server_tool_blocks ~same_provider:replay_thinking ~continuing tool
     | Text _ | Thinking _ | Tool_call _ ->
       Option.to_list (assistant_block ~oauth ~replay_thinking block))
 ;;
@@ -176,8 +188,9 @@ let same_provider ~provider (a : Message.Assistant.t) =
 (* Consecutive same-role turns are merged; the last block of the last message
    carries the cache breakpoint. *)
 let wire_messages ~oauth ~provider (messages : Message.t list) =
+  let last = List.length messages - 1 in
   let turns =
-    List.filter_map messages ~f:(fun m ->
+    List.filter_mapi messages ~f:(fun i m ->
       match m with
       | User u -> Some ("user", user_blocks u)
       | Tool_result r -> Some ("user", [ tool_result_block r ])
@@ -186,6 +199,7 @@ let wire_messages ~oauth ~provider (messages : Message.t list) =
            assistant_blocks
              ~oauth
              ~replay_thinking:(same_provider ~provider a)
+             ~continuing:(i = last)
              a
          with
          | [] -> None
@@ -205,11 +219,22 @@ let wire_messages ~oauth ~provider (messages : Message.t list) =
   let merged =
     match merged with
     | (role, blocks) :: rest ->
-      let blocks =
-        match List.rev blocks with
-        | last :: before -> List.rev (add_cache_control last :: before)
-        | [] -> []
+      (* Not on thinking or a [server_tool_use], which a continued turn
+         (after a [pause_turn]) may end with. *)
+      let cacheable = function
+        | `Object fields ->
+          (match List.Assoc.find fields ~equal:String.equal "type" with
+           | Some (`String ("text" | "image" | "tool_use" | "tool_result")) ->
+             true
+           | _ -> false)
+        | _ -> false
       in
+      let rec mark = function
+        | [] -> []
+        | last :: before when cacheable last -> add_cache_control last :: before
+        | other :: before -> other :: mark before
+      in
+      let blocks = List.rev (mark (List.rev blocks)) in
       (role, blocks) :: rest
     | [] -> []
   in
@@ -559,6 +584,10 @@ let stop_reason_of_string = function
   | Some other -> Error ("unexpected stop_reason: " ^ other)
 ;;
 
+(* How many times a turn the API paused ([pause_turn], e.g. during long
+   server-side searches) is sent back to continue. *)
+let max_continuations = 10
+
 let stream
       ~env
       ~url
@@ -575,39 +604,60 @@ let stream
     | Api_key _ | Gateway _ -> false
   in
   let builder = Assistant_builder.create ~model:(Model.key request.model) in
-  let state = Stream_state.create () in
   let thinking_on = thinking_on request.model request.thinking in
-  let outcome =
-    Sse_request.run
-      ~env
-      ?timeout
-      ~cancel
-      ~url
-      ~headers:(headers ~auth ~thinking_on @ extra_headers)
-      ~body:(Json.to_string (request_body ~oauth request))
-      ~on_event:(fun event ->
-        List.iter (parse_event ~tools:request.tools state event) ~f:(fun e ->
-          Assistant_builder.apply builder e;
-          on_event e))
-      ()
+  let usage = ref Usage.zero in
+  let tool_index = ref 0 in
+  let original = request.messages in
+  (* A paused turn is continued by sending what it has so far back as the
+     last (assistant) message; its blocks go on in the same message. *)
+  let rec go (request : Provider.Request.t) ~continuations =
+    let state = Stream_state.create () in
+    state.tool_index <- !tool_index;
+    let outcome =
+      Sse_request.run
+        ~env
+        ?timeout
+        ~cancel
+        ~url
+        ~headers:(headers ~auth ~thinking_on @ extra_headers)
+        ~body:(Json.to_string (request_body ~oauth request))
+        ~on_event:(fun event ->
+          List.iter (parse_event ~tools:request.tools state event) ~f:(fun e ->
+            Assistant_builder.apply builder e;
+            on_event e))
+        ()
+    in
+    tool_index := state.tool_index;
+    usage
+    := Usage.add
+         !usage
+         { input = state.input
+         ; output = state.output
+         ; cache_read = state.cache_read
+         };
+    let stop_reason : Stop_reason.t =
+      match outcome with
+      | Aborted -> Aborted
+      | Failed e -> Error e
+      | Completed ->
+        (match state.error with
+         | Some e -> Error e
+         | None -> stop_reason_of_string state.stop_reason)
+    in
+    match stop_reason, state.stop_reason with
+    | End_turn, Some "pause_turn"
+      when continuations < max_continuations
+           && not (Cancellation.is_cancelled cancel) ->
+      go
+        { request with
+          messages =
+            original @ [ Assistant (Assistant_builder.snapshot builder) ]
+        }
+        ~continuations:(continuations + 1)
+    | _ -> stop_reason
   in
-  let stop_reason : Stop_reason.t =
-    match outcome with
-    | Aborted -> Aborted
-    | Failed e -> Error e
-    | Completed ->
-      (match state.error with
-       | Some e -> Error e
-       | None -> stop_reason_of_string state.stop_reason)
-  in
-  Assistant_builder.finish
-    builder
-    ~stop_reason
-    ~usage:
-      { input = state.input
-      ; output = state.output
-      ; cache_read = state.cache_read
-      }
+  let stop_reason = go request ~continuations:0 in
+  Assistant_builder.finish builder ~stop_reason ~usage:!usage
 ;;
 
 let auth_of_token ~(method_ : Provider_auth.Method.t) token : Auth.t =
