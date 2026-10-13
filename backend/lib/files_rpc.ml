@@ -73,6 +73,10 @@ let download agent params =
     match Json.member "kind" stat, archive with
     | Some (`String "dir"), false ->
       Or_error.errorf "%s is a directory: download it as an archive" path
+    | Some (`String "other"), false ->
+      Or_error.errorf
+        "%s is not a regular file: read it with a command instead"
+        path
     | Some (`String "dir"), true | _, false -> Ok ()
     | _, true -> Or_error.errorf "not a directory: %s" path
   in

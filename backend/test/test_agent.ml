@@ -118,7 +118,6 @@ let%expect_test
     tool_result:
     assistant: first done
     queue: steer=0 follow_up=0
-    state: running=false messages=4
     state: running=true messages=4
     user: two
     assistant: second done
@@ -154,12 +153,10 @@ let%expect_test
     assistant: first done
     queue: steer=0 follow_up=2
     queue: steer=0 follow_up=1
-    state: running=false messages=2
     state: running=true messages=2
     user: be brief
     assistant: second done
     queue: steer=0 follow_up=0
-    state: running=false messages=4
     state: running=true messages=4
     user: then summarise
     assistant: third done
@@ -1253,7 +1250,6 @@ let%expect_test
     [cancelled]
     queue: steer=0 follow_up=1
     queue: steer=0 follow_up=0
-    state: running=false messages=3
     state: running=true messages=3
     user: queued again
     assistant: second run
@@ -1495,5 +1491,95 @@ let%expect_test "switch_session: the session's recorded host comes with it" =
     ((active_host host-desk) (cwd /home/me/proj) (connected false))
     ((active_host backend) (cwd $DIR) (connected true))
     ((active_host backend) (cwd $DIR) (connected true))
+    |}]
+;;
+
+(* An agent whose tools run on a network host that answers a moment later,
+   as a real one does. *)
+let with_remote_agent replies f =
+  with_sandbox
+  @@ fun t ->
+  Eio.Switch.run
+  @@ fun sw ->
+  let agent =
+    Agent.create
+      ~env:t.env
+      ~sw
+      ~provider:(Faux_provider.create replies)
+      ~tools:Tools.all
+      ~sessions_dir:(Filename.concat t.dir "sessions")
+      ~home:t.dir
+      ~backend_host:false
+      ~cwd:t.dir
+      ()
+  in
+  Agent.subscribe agent ~f:(fun e ->
+    match e with
+    | Tool_exec { exec_id; name; arguments; cwd; _ } ->
+      Eio.Fiber.fork ~sw (fun () ->
+        Eio.Fiber.yield ();
+        let result =
+          Host_ops.execute
+            ~mcp:None
+            ~env:t.env
+            ~cancel:Cancellation.never
+            ~on_output:ignore
+            ~cwd
+            ~name
+            ~arguments
+            ()
+        in
+        Or_error.ok_exn (Agent.tool_exec_result agent ~exec_id result))
+    | Loop (Message_end (User u)) ->
+      printf "user: %s\n" (List.hd_exn (String.split_lines u.text))
+    | Loop (Message_end (Assistant a)) ->
+      printf "assistant: %s\n" (Message.Assistant.text a)
+    | _ -> ());
+  Agent.set_hosts
+    agent
+    [ { id = "h"
+      ; name = "h"
+      ; cwd = t.dir
+      ; session_id = None
+      ; session_name = None
+      ; exec_input = false
+      }
+    ];
+  f t agent
+;;
+
+let%expect_test "two prompts while attachments are read start one run" =
+  with_remote_agent [ Reply.text "one"; Reply.text "two"; Reply.text "three" ]
+  @@ fun t agent ->
+  write t "notes.txt" "some notes\n";
+  Eio.Fiber.both
+    (fun () ->
+       print_s
+         [%sexp
+           (Agent.prompt agent "a @notes.txt" ~attachments:[ "notes.txt" ]
+            : unit Or_error.t)])
+    (fun () ->
+       print_s
+         [%sexp
+           (Agent.prompt agent "b @notes.txt" ~attachments:[ "notes.txt" ]
+            : unit Or_error.t)]);
+  Agent.wait_idle agent;
+  (* A follow-up while a prompt reads its attachments waits its turn. *)
+  Eio.Fiber.both
+    (fun () ->
+       Or_error.ok_exn
+         (Agent.follow_up agent "c @notes.txt" ~attachments:[ "notes.txt" ]))
+    (fun () -> Or_error.ok_exn (Agent.follow_up agent "d"));
+  Agent.wait_idle agent;
+  [%expect
+    {|
+    (Ok ())
+    (Error "a run is already in progress; use steer or follow_up")
+    user: a @notes.txt
+    assistant: one
+    user: c @notes.txt
+    assistant: two
+    user: d
+    assistant: three
     |}]
 ;;

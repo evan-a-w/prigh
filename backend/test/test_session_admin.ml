@@ -485,3 +485,52 @@ let%expect_test "deleting sessions: refusals, files, delete_archived" =
     default    live background=0 clients=1
     |}]
 ;;
+
+let%expect_test "opening a session with unreadable lines tells the client" =
+  with_sandbox
+  @@ fun t ->
+  Eio.Switch.run
+  @@ fun sw ->
+  let damaged = saved t "damaged" in
+  Out_channel.with_file (Session.path damaged) ~append:true ~f:(fun oc ->
+    Out_channel.output_string oc {|["Entry",{"id":"torn","par|});
+  let fine = saved t "fine" in
+  let server = Server.create t ~sw ~provider:(Faux_provider.create []) in
+  let a = Client.connect server "a" in
+  print_sessions a;
+  let open_ session =
+    Rpc_server.respond
+      server.server
+      a.client
+      (`Object
+          [ "id", `String "r"
+          ; "method", `String "switch_session"
+          ; "params", `Object (path session)
+          ]);
+    Queue.iter a.sent ~f:(fun json ->
+      match Json.member "type" json with
+      | Some (`String "response") ->
+        print_endline
+          (match Client.result json with
+           | Ok _ -> "response: ok"
+           | Error e -> "response: " ^ e)
+      | _ ->
+        (match Json.member "event" json with
+         | Some (`String "notice") -> Client.show t json
+         | _ -> ()));
+    Queue.clear a.sent
+  in
+  open_ damaged;
+  open_ fine;
+  open_ damaged;
+  [%expect
+    {|
+    fine        background=0 clients=-
+    damaged     background=0 clients=-
+    response: ok
+    {"type":"event","event":"notice","text":"parts of this session could not be read and are left out:\nline 4: skipped an incomplete last line (prigh probably stopped while writing it)"}
+    response: ok
+    response: ok
+    {"type":"event","event":"notice","text":"parts of this session could not be read and are left out:\nline 4: skipped an incomplete last line (prigh probably stopped while writing it)"}
+    |}]
+;;

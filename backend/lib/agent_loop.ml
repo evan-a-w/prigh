@@ -125,8 +125,8 @@ let overflow_keep ~attempt =
 let unrecoverable_overflow message ~reason =
   Stop_reason.Error
     (sprintf
-       "%s (%s; /compact with instructions, /model a model with a larger \
-        context window, or /new)"
+       "%s (%s; a message too big to compact may be what does not fit: /rewind \
+        to before it, /new, or /model a model with a larger context window)"
        message
        reason)
 ;;

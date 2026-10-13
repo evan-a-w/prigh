@@ -77,6 +77,7 @@ let%expect_test "job_input drives a job on this machine" =
     ~main:
       [ Test_background_jobs.background
           ~id:"c1"
+          ~stdin:true
           {|while read line; do echo "got $line"; done; echo bye|}
       ; input ~id:"i1" ~wait_ms:10_000 "j1" "one\n"
       ; input ~id:"i2" ~wait_ms:10_000 ~close:true "j1" "two\n"
@@ -95,7 +96,7 @@ let%expect_test "job_input drives a job on this machine" =
     state: running=true subagents=[] jobs=[]
     agent_start
     user: go
-    assistant:  bash{"command":"while read line; do echo \"got $line\"; done; echo bye","background":true}
+    assistant:  bash{"command":"while read line; do echo \"got $line\"; done; echo bye","background":true,"stdin":true}
     state: running=true subagents=[] jobs=[j1 running]
     tool_result bash: started job j1: while read line; do echo "got $line"; done; echo bye; its output is being recorded; you will be notified when it exits. Use job_output to peek, job_wait to block, job_kill to stop it.
     assistant:  job_input{"id":"j1","input":"one\n","wait_ms":10000}
@@ -109,6 +110,44 @@ let%expect_test "job_input drives a job on this machine" =
     tool_result job_input: cannot write to job j1: it has already exited (exited 0); start it again with bash and background
     assistant:  job_input{"id":"j9","input":"x"}
     tool_result job_input: invalid arguments: unknown job "j9"; known: j1
+    assistant: done
+    agent_end
+    state: running=false subagents=[] jobs=[]
+    |}]
+;;
+
+let%expect_test "without stdin: true a job reads end of input at once" =
+  Test_background_jobs.with_agent
+    ~main:
+      [ Test_background_jobs.background
+          ~id:"c1"
+          (Test_background_jobs.gated "cat; echo read to the end")
+      ; input ~id:"i1" "j1" "x"
+      ; Reply.text "noted"
+      ; Reply.text "done"
+      ]
+    []
+  @@ fun t agent ->
+  Or_error.ok_exn (Agent.prompt agent "go");
+  Test_background_subagents.wait_turn agent;
+  Test_background_jobs.open_gate t;
+  Agent.wait_idle agent;
+  [%expect
+    {|
+    state: running=true subagents=[] jobs=[]
+    agent_start
+    user: go
+    assistant:  bash{"command":"while [ ! -f gate ]; do sleep 0.02; done; cat; echo read to the end","background":true}
+    state: running=true subagents=[] jobs=[j1 running]
+    tool_result bash: started job j1: while [ ! -f gate ]; do sleep 0.02; done; cat; echo read to…; its output is being recorded; you will be notified when it exits. Use job_output to peek, job_wait to block, job_kill to stop it.
+    assistant:  job_input{"id":"j1","input":"x"}
+    tool_result job_input: cannot write to job j1: it was started without stdin: true, so its stdin is closed; start it again with bash, background: true and stdin: true to send it input
+    assistant: noted
+    agent_end
+    state: running=false subagents=[] jobs=[j1 running]
+    state: running=true subagents=[] jobs=[]
+    agent_start
+    user: [job j1 exited 0] while [ ! -f gate ]; do sleep 0.02; done; cat; echo read to… | read to the end
     assistant: done
     agent_end
     state: running=false subagents=[] jobs=[]
@@ -144,7 +183,7 @@ let host_scenario ~features =
       ~tools:(Tools.all @ Tool_jobs.tools)
       ~provider:
         (Faux_provider.create
-           [ Test_background_jobs.background ~id:"c1" "cat"
+           [ Test_background_jobs.background ~id:"c1" ~stdin:true "cat"
            ; input ~id:"i1" ~wait_ms:10_000 "j1" "one\n"
            ; input ~id:"i2" ~wait_ms:10_000 ~close:true "j1" ""
            ; Reply.text "done"
@@ -224,7 +263,7 @@ let%expect_test "job_input on a client tool host" =
     {"type":"event","event":"tool_exec_input","host":"client-2","exec_id":"<id>/j1-1","data":"","close":true}
     {"type":"response","id":"r2","ok":true,"result":{}}
     user: go
-    assistant:  bash{"command":"cat","background":true}
+    assistant:  bash{"command":"cat","background":true,"stdin":true}
     tool_result bash: started job j1: cat; its output is being recorded; you will be notified when it exits. Use job_output to peek, job_wait to block, job_kill to stop it.
     assistant:  job_input{"id":"j1","input":"one\n","wait_ms":10000}
     tool_result job_input: sent 4 bytes to job j1 | one
@@ -245,7 +284,7 @@ let%expect_test "job_input on a tool host that predates it" =
     (no input reached the host)
     {"type":"response","id":"r2","ok":true,"result":{}}
     user: go
-    assistant:  bash{"command":"cat","background":true}
+    assistant:  bash{"command":"cat","background":true,"stdin":true}
     tool_result bash: started job j1: cat; its output is being recorded; you will be notified when it exits. Use job_output to peek, job_wait to block, job_kill to stop it.
     assistant:  job_input{"id":"j1","input":"one\n","wait_ms":10000}
     tool_result job_input: cannot write to job j1: tool host "laptop" runs an older prigh that cannot pass input to jobs: update prigh there and restart its TUI or tool-host, or start the job again with its input in the command (e.g. a here-document)

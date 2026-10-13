@@ -134,6 +134,7 @@ module Token = struct
     | Open of
         { name : string
         ; attrs : (string * string) list
+        ; self_closing : bool (** written [<name ... />] *)
         }
     | Close of string
 end
@@ -166,6 +167,7 @@ let tokenize s =
      after the tag. *)
   let attributes i =
     let attrs = Queue.create () in
+    let self_closing = ref false in
     let rec skip_ws i =
       if i < len && Char.is_whitespace s.[i] then skip_ws (i + 1) else i
     in
@@ -176,7 +178,10 @@ let tokenize s =
       else if Char.equal s.[i] '>'
       then i + 1
       else if Char.equal s.[i] '/'
-      then go (i + 1)
+      then (
+        let next = skip_ws (i + 1) in
+        if next < len && Char.equal s.[next] '>' then self_closing := true;
+        go (i + 1))
       else (
         let name_end =
           let rec f j =
@@ -228,8 +233,11 @@ let tokenize s =
           go j))
     in
     let next = go i in
-    Queue.to_list attrs, next
+    Queue.to_list attrs, !self_closing, next
   in
+  (* Lowercased once, for finding raw text elements' close tags: a
+     document with many of them must not be lowercased for each. *)
+  let lower = lazy (String.lowercase s) in
   let rec go i =
     if i >= len
     then flush_text len
@@ -270,14 +278,15 @@ let tokenize s =
       let name =
         String.lowercase (String.sub s ~pos:(i + 1) ~len:(stop - i - 1))
       in
-      let attrs, next = attributes stop in
-      Queue.enqueue tokens (Open { name; attrs });
-      if mem raw_text name
+      let attrs, self_closing, next = attributes stop in
+      Queue.enqueue tokens (Open { name; attrs; self_closing });
+      if mem raw_text name && not self_closing
       then (
         (* Up to the matching close tag, case-insensitively. *)
-        let lower = String.lowercase s in
         let close =
-          match String.substr_index lower ~pos:next ~pattern:("</" ^ name) with
+          match
+            String.substr_index (force lower) ~pos:next ~pattern:("</" ^ name)
+          with
           | Some k -> k
           | None -> len
         in
@@ -391,7 +400,8 @@ module Renderer = struct
   type t =
     { out : Buffer.t
     ; base : Uri.t option
-    ; mutable skip : int
+    ; mutable skip : string list
+      (** the skipped elements open, innermost first *)
     ; mutable pre : int
     ; mutable lists : List_state.t list
     ; mutable links : (int * string) list (* start offset, url *)
@@ -403,7 +413,7 @@ module Renderer = struct
   let create ~base =
     { out = Buffer.create 4096
     ; base
-    ; skip = 0
+    ; skip = []
     ; pre = 0
     ; lists = []
     ; links = []
@@ -460,7 +470,7 @@ module Renderer = struct
   ;;
 
   let text t s =
-    if t.skip > 0
+    if not (List.is_empty t.skip)
     then ()
     else if t.pre > 0
     then Buffer.add_string t.out (decode_entities s)
@@ -481,10 +491,26 @@ module Renderer = struct
       if ends_space && not (List.is_empty words) then t.pending_space <- true)
   ;;
 
-  let open_ t name attrs =
+  (* What may be in a [head]: anything else ends it, closed or not. *)
+  let in_head =
+    [ "title"
+    ; "meta"
+    ; "link"
+    ; "style"
+    ; "script"
+    ; "base"
+    ; "noscript"
+    ; "template"
+    ]
+  ;;
+
+  let open_ t name attrs ~self_closing =
+    (match List.drop_while t.skip ~f:(Fn.non (String.equal "head")) with
+     | "head" :: outside when not (mem in_head name) -> t.skip <- outside
+     | _ -> ());
     if mem skipped name
-    then t.skip <- t.skip + 1
-    else if t.skip > 0
+    then (if not self_closing then t.skip <- name :: t.skip)
+    else if not (List.is_empty t.skip)
     then ()
     else if t.pre > 0
     then (if String.equal name "br" then Buffer.add_char t.out '\n')
@@ -604,8 +630,12 @@ module Renderer = struct
 
   let close t name =
     if mem skipped name
-    then t.skip <- Int.max 0 (t.skip - 1)
-    else if t.skip > 0
+    then (
+      (* A close tag without its open one is ignored. *)
+      match List.drop_while t.skip ~f:(Fn.non (String.equal name)) with
+      | _ :: outside -> t.skip <- outside
+      | [] -> ())
+    else if not (List.is_empty t.skip)
     then ()
     else if t.pre > 0 && not (String.equal name "pre")
     then ()
@@ -684,9 +714,10 @@ let convert ?base html =
   List.iter tokens ~f:(fun token ->
     let inside = Option.is_none focus || !depth > 0 in
     match token with
-    | Open { name; attrs } ->
+    | Open { name; attrs; self_closing } ->
       if Option.equal String.equal focus (Some name) then incr depth;
-      if Option.is_none focus || !depth > 0 then Renderer.open_ r name attrs
+      if Option.is_none focus || !depth > 0
+      then Renderer.open_ r name attrs ~self_closing
     | Close name ->
       if inside then Renderer.close r name;
       if Option.equal String.equal focus (Some name)

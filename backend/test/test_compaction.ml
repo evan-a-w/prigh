@@ -236,7 +236,7 @@ let%expect_test
     summarise: USER: | USER: | Summary of the conversation so far: | ASSISTANT: | TOOL RESULT (filler):
     compacted: S2 (summariser in=10)
     request: U(the task) S(S2) A[c3] T(c3,12000)
-    turn failed: HTTP 400: prompt is too long: 213462 tokens > 200000 maximum (still too long after compacting 2 times; /compact with instructions, /model a model with a larger context window, or /new)
+    turn failed: HTTP 400: prompt is too long: 213462 tokens > 200000 maximum (still too long after compacting 2 times; a message too big to compact may be what does not fit: /rewind to before it, /new, or /model a model with a larger context window)
     added: U(the task) A[c1] T(c1,40000) A[c2] T(c2,12000) A[c3] T(c3,12000) A()
     |}]
 ;;
@@ -246,7 +246,7 @@ let%expect_test "an overflow that cannot be compacted fails with what to do" =
   [%expect
     {|
     request: U(the task)
-    turn failed: HTTP 400: prompt is too long: 213462 tokens > 200000 maximum (compacting to make it fit failed: nothing to compact: conversation is short; /compact with instructions, /model a model with a larger context window, or /new)
+    turn failed: HTTP 400: prompt is too long: 213462 tokens > 200000 maximum (compacting to make it fit failed: nothing to compact: conversation is short; a message too big to compact may be what does not fit: /rewind to before it, /new, or /model a model with a larger context window)
     added: U(the task) A()
     |}]
 ;;

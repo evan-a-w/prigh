@@ -262,8 +262,13 @@ becomes a list):
   server tool `web_search_20250305` (`max_uses` 5); `server_tool_use` blocks
   (input from `input_json_delta`s, emitted at `content_block_stop`) and
   `web_search_tool_result` blocks (results or `error_code`, kept as `raw`)
-  become `Server_tool_*` events; `pause_turn` ends the turn. Consecutive same-role turns are merged, the
-  last block and the system blocks carry cache breakpoints, thinking blocks
+  become `Server_tool_*` events. A `pause_turn` (a long server-side search)
+  is continued (up to 10 times): what the turn has so far is sent back as
+  the last, assistant message, its unresolved `server_tool_use` included,
+  and the reply goes on in the same message; elsewhere an unresolved
+  `server_tool_use` is dropped. Consecutive same-role turns are merged, the
+  last cacheable block (not thinking or `server_tool_use`) and the system
+  blocks carry cache breakpoints, thinking blocks
   are replayed only with a signature. With an OAuth token (Claude Pro/Max) the
   request is shaped like Claude Code's: Bearer auth, `claude-cli` user agent,
   `claude-code-20250219`/`oauth-2025-04-20` betas, the Claude Code identity
@@ -388,9 +393,12 @@ two can share one.
   its directory with it selected), `$fs_stat`, `$fs_read` (a base64 slice,
   at most 1 MB), `$fs_mkdir` (optionally with parents and a `.gitignore` of
   `*`), `$fs_rename`, `$fs_delete` (recursive, never following symlinks;
-  not `/` or the home), `$fs_download` and `$fs_upload`. Paths resolve
-  against the exec's cwd (the session's) and may be anywhere the host's
-  user can reach, like `bash`. The transfers stream through the exec's
+  not `/`, the home or a directory holding it, however written),
+  `$fs_download` and `$fs_upload`. Paths resolve against the exec's cwd
+  (the session's), are normalised lexically (no `.`, `..`, `//` or
+  trailing `/`, so `link/` is the link) and may be anywhere the host's
+  user can reach, like `bash`; reads and downloads take only regular
+  files (a FIFO would block, a device never end). The transfers stream through the exec's
   output and its `Stdin_feed` (so they reach a client host through
   `tool_exec_output`/`tool_exec_input`, which need the `exec_input`
   feature): a download sends base64 chunks of 192 KiB raw (a file, or `tar
@@ -417,7 +425,9 @@ two can share one.
   when the name is taken), all on the calling client's session. `File_http`
   serves the tickets on the web server: `GET /files/download?ticket=` (a
   file with its length, a directory as `NAME.tar.gz`, an image preview
-  inline; `Content-Security-Policy: sandbox`, `nosniff`) and `PUT
+  inline; `Content-Security-Policy: sandbox`, `nosniff`; archives and
+  files of unknown size chunked, so that one cut short by an error lacks
+  the last chunk) and `PUT
   /files/upload?ticket=` (a `Content-Length` body read in chunks; 409 when
   the file appeared meanwhile, 410 for a used or expired ticket), with CORS
   open since the ticket, not a cookie, is the authority. So a client never
@@ -480,7 +490,7 @@ two can share one.
   that calls it as a function anyway.
 - `Tool_bash` (streamed output, timeout, cancellation; long output keeps
   its beginning and end (`Truncate.head_and_tail`) and the full output is
-  saved under `$TMPDIR/prigh-output/` on the host, kept for 7 days, its
+  saved under `$TMPDIR/prigh-output-<uid>/` (private to the user) on the host, kept for 7 days, its
   path in the result; with `background` at depth 0 it starts a job instead,
   see below), `Tool_read` (images
   through `Image.load`, as an image result),
@@ -489,7 +499,8 @@ two can share one.
   `Tool_apply_patch` (Codex's patch format, parsed and matched by
   `Apply_patch` with Codex's whitespace and punctuation leniency; adds,
   deletes, moves and updates several files, writing nothing unless all of
-  it applies; returns Codex's `Success. Updated the following files:` list
+  it applies (a write that fails anyway is reported with what was and was
+  not changed; `a.txt` and `./a.txt` are one file); returns Codex's `Success. Updated the following files:` list
   plus the updated files' diffs), `Tool_ls`, `Tool_grep`/`Tool_find` (via
   `rg`).
 - `Tool_subagent` — one tool, no roles: the model passes `task` (required)
@@ -537,8 +548,11 @@ two can share one.
   (`Tool.Context.stdin`), so locally `Process.run ~input` keeps the
   process's stdin open and copies the feed's items into it (a `Close` closes
   it), and on a client host `Agent` forwards them as `tool_exec_input`
-  events, the host's worker feeding its own `Stdin_feed`. Other processes
-  still get an empty stdin. `job_input` writes (and optionally closes) and
+  events, the host's worker feeding its own `Stdin_feed`. Unless the job
+  was started with `stdin: true` (`?keep_stdin`), the feed is closed at
+  once and refuses `job_input` with a message saying so (so a job that
+  reads stdin sees end of input instead of waiting forever). Other
+  processes still get an empty stdin. `job_input` writes (and optionally closes) and
   returns the output that follows (`Output_tail.since`): until it is quiet
   for 300 ms after something arrived, the job exits or `wait_ms` pass.
 - Approvals — `Approval_mode` (`Ask | Auto_edit | Auto`), `Approval_rule`
@@ -743,7 +757,9 @@ two can share one.
   reads the reset time `Sse_request` noted in the error
   (`Usage_limit.reset_time`: the body's `resets_at`/`resets_in_seconds`,
   `x-codex-*-reset-at`, `anthropic-ratelimit-unified-*reset`,
-  `retry-after`); with `resume_on_limit_reset`, a fiber sleeps until then
+  `retry-after`; one already past backs off from a minute, doubling to an
+  hour, `past_resets` counting them); with `resume_on_limit_reset`, a fiber
+  sleeps until then
   (`?sleep_until`, injectable for tests) and starts a run with a message to
   carry on. `State.resume_at` shows it; `cancel_resume`, `resume_now`,
   `abort`, any new run and a session switch end it. It is recorded in the
@@ -959,7 +975,8 @@ two can share one.
   the newest; `older` counts the messages before them and `before` is the
   cursor of the page before. Tool outputs longer than 8 KiB come cut to
   their first and last 20 lines with `elided: {at, lines, bytes}`;
-  `get_tool_output {call_id, agent_id?}` has one whole, and `get_subagent
+  `get_tool_output {call_id, agent_id?, session?}` has one whole (from
+  anywhere in the session file, also before a compaction), and `get_subagent
   {elide: true}` cuts its transcript's the same way. `session` (a path or
   id) reads a session without opening it (the sidebar fetching ahead);
   sessions read from disk that way or evicted, and subagent logs, are

@@ -97,7 +97,7 @@ let with_agent ?(extra_tools = []) ?before ?session ~main children f =
   f t agent
 ;;
 
-let background ?timeout ~id command =
+let background ?timeout ?(stdin = false) ~id command =
   Reply.tool_call
     ~id
     ~name:"bash"
@@ -105,6 +105,7 @@ let background ?timeout ~id command =
       (Json.to_string
          (`Object
              ([ "command", `String command; "background", `True ]
+              @ (if stdin then [ "stdin", `True ] else [])
               @ Option.value_map timeout ~default:[] ~f:(fun s ->
                 [ "timeout", `Number (Int.to_string s) ]))))
     ()

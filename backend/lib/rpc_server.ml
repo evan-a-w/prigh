@@ -270,6 +270,20 @@ let tell_problems (client : Client.t) problems =
 
 let session_id agent = Session.id (Agent.session agent)
 
+(* After the response that opened the session, so that the client's reset
+   for the new session does not clear it. *)
+let tell_skipped (client : Client.t) =
+  match Session.skipped (Agent.session client.agent) with
+  | [] -> ()
+  | skipped ->
+    client.send
+      (Rpc_json.event
+         (Notice
+            (sprintf
+               "parts of this session could not be read and are left out:\n%s"
+               (String.concat ~sep:"\n" skipped))))
+;;
+
 let clients_of t agent =
   Hashtbl.data t.clients
   |> List.filter ~f:(fun (c : Client.t) -> phys_equal c.agent agent)
@@ -277,7 +291,11 @@ let clients_of t agent =
 
 let maybe_evict t agent =
   if
-    (not (Option.exists t.default_agent ~f:(phys_equal agent)))
+    (* a stale agent of a session reopened since is not the live one *)
+    Option.exists
+      (Hashtbl.find t.agents (session_id agent))
+      ~f:(phys_equal agent)
+    && (not (Option.exists t.default_agent ~f:(phys_equal agent)))
     && (not (Agent.is_running agent))
     && (not (Agent.has_running_background agent))
     && (not (Agent.resume_pending agent))
@@ -704,6 +722,62 @@ let messages_page t (client : Client.t) params =
       ~before
   in
   Message_page.to_json page
+;;
+
+(* Searches the whole session file, so that outputs from before a
+   compaction or on an abandoned branch are found too. *)
+let tool_output t (client : Client.t) params =
+  let open Or_error.Let_syntax in
+  let%bind call_id = string_param params "call_id" in
+  let%bind agent_id = string_param_opt params "agent_id" in
+  let%bind key = string_param_opt params "session" in
+  let%bind messages =
+    match agent_id with
+    | None ->
+      let%map session =
+        match key with
+        | None -> Ok (Agent.session client.agent)
+        | Some key -> session_to_read t key
+      in
+      List.filter_map (Session.entries session) ~f:(fun (e : Session.Entry.t) ->
+        match e.payload with
+        | Message message -> Some { Timed_message.message; at = e.at }
+        | _ -> None)
+    | Some id ->
+      let%bind agent =
+        match key with
+        | None -> Ok client.agent
+        | Some key ->
+          (match find_live t key with
+           | Some agent -> Ok agent
+           | None ->
+             Or_error.errorf
+               "session %S is not open: switch to it to read its subagents' \
+                outputs"
+               key)
+      in
+      (match Agent.subagent agent id with
+       | Some (_, messages) -> Ok messages
+       | None ->
+         Or_error.errorf
+           "unknown subagent %S: list_subagents shows this session's"
+           id)
+  in
+  match Message_page.find_output messages ~call_id with
+  | Some r ->
+    Ok
+      (`Object
+          [ "text", `String r.text
+          ; ("is_error", if r.is_error then `True else `False)
+          ])
+  | None ->
+    Or_error.errorf
+      "no output of tool call %S in %s: pass the \"session\" (and, for a \
+       subagent's call, \"agent_id\") it belongs to"
+      call_id
+      (match agent_id with
+       | None -> "this session"
+       | Some id -> sprintf "subagent %S" id)
 ;;
 
 (* Without the backend host, the session [connect] gave a tool host may have
@@ -1247,6 +1321,7 @@ let dispatch_server t (client : Client.t) ~meth ~params
            attached_state client)))
   | "list_sessions" -> Some (ok (list_sessions t client))
   | "get_messages_page" -> Some (messages_page t client params)
+  | "get_tool_output" -> Some (tool_output t client params)
   | "delete_session" ->
     Some
       (Or_error.bind (string_param params "path") ~f:(fun key ->
@@ -1485,26 +1560,6 @@ let dispatch agent login ~meth ~params : Json.t Or_error.t =
               ])
       | Some found, _ -> ok (Rpc_json.subagent found)
       | None, _ -> Or_error.errorf "unknown subagent %S" id)
-  | "get_tool_output" ->
-    let open Or_error.Let_syntax in
-    let%bind call_id = string_param params "call_id" in
-    let%bind agent_id = string_param_opt params "agent_id" in
-    let%bind messages =
-      match agent_id with
-      | None -> Ok (Session.timed_messages (Agent.session agent))
-      | Some id ->
-        (match Agent.subagent agent id with
-         | Some (_, messages) -> Ok messages
-         | None -> Or_error.errorf "unknown subagent %S" id)
-    in
-    (match Message_page.find_output messages ~call_id with
-     | Some r ->
-       ok
-         (`Object
-             [ "text", `String r.text
-             ; ("is_error", if r.is_error then `True else `False)
-             ])
-     | None -> Or_error.errorf "no output of tool call %S" call_id)
   | "get_messages" ->
     ok
       (`Array
@@ -1767,6 +1822,12 @@ let handle t client (request : Json.t) : Json.t =
       ]
 ;;
 
+let respond t (client : Client.t) request =
+  let before = client.agent in
+  client.send (handle t client request);
+  if not (phys_equal before client.agent) then tell_skipped client
+;;
+
 let serve_lines ?signed_in t ~read_line ~write_line =
   Switch.run
   @@ fun sw ->
@@ -1816,7 +1877,7 @@ let serve_lines ?signed_in t ~read_line ~write_line =
              (* Each request in its own fiber: a blocking method (shell,
                 compact, a remote tool round trip) must not stall the
                 reader. *)
-             Fiber.fork ~sw (fun () -> send (handle t client request));
+             Fiber.fork ~sw (fun () -> respond t client request);
              loop ()))
   in
   let switch_to = loop () in

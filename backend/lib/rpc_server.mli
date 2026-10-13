@@ -76,6 +76,11 @@ val connect
     methods block the caller. *)
 val handle : t -> Client.t -> Json.t -> Json.t
 
+(** [handle], sending the response to the client, then (when the request
+    opened another session) a notice of the lines its file had that could
+    not be read. *)
+val respond : t -> Client.t -> Json.t -> unit
+
 (** Forgets a client (its sessions keep running). *)
 val disconnect : t -> Client.t -> unit
 

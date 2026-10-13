@@ -227,6 +227,8 @@ type t =
   ; mutable goal : Goal.t option
   ; mutable resume : Resume.t option
     (** a run stopped by a usage limit, resuming when it resets *)
+  ; mutable past_resets : int
+    (** usage limits in a row whose reset time had already passed *)
   ; sleep_until : float -> unit
   }
 
@@ -584,6 +586,15 @@ let exit_plan_mode t context args =
         ~recheck:(fun () -> not t.plan_mode)
     with
     | None -> Tool.Result.error "[cancelled]"
+    | Some (Allow | Always) when not t.plan_mode ->
+      (* Released by the user switching plan mode off, not by an answer. *)
+      tell t { t.told with plan_mode = false };
+      Tool.Result.ok
+        (sprintf
+           "The user turned plan mode off without answering about this plan \
+            (approval mode: %s): you can change files now. Implement the plan \
+            unless they said otherwise."
+           (Approval_mode.to_string t.approval_mode))
     | Some (Allow | Always) ->
       tell t { t.told with plan_mode = false };
       switch_mode t ~plan:false;
@@ -615,7 +626,7 @@ let approve t : Tool.approver =
         ~plan:t.plan_mode
         ~rules:t.config.permissions
         ~session:t.session_rules
-        ~cwd:context.cwd
+        ~cwd:t.cwd
         ~home:(Tool.expand_home "~")
         ~destructive:tool.spec.destructive
         call
@@ -1598,7 +1609,7 @@ let duration_hum seconds =
 
 (* Finished background tasks not delivered yet go first. [tried] are the
    models a hand-over chain has used so far (empty for a user's prompt). *)
-let rec start_run ?(tried = String.Set.empty) t prompts =
+let rec start_run ?(tried = String.Set.empty) ?(then_ = fun () -> []) t prompts =
   t.git_branch <- find_branch t ~cwd:t.cwd;
   cancel_resume_timer t;
   let cancel = Cancellation.create () in
@@ -1607,6 +1618,9 @@ let rec start_run ?(tried = String.Set.empty) t prompts =
   let prompts = deliveries t @ prompts in
   state_changed t;
   Fiber.fork ~sw:t.sw (fun () ->
+    (* [then_] may wait for the host (attachments): the run is already
+       marked as started, so no other can start meanwhile. *)
+    let prompts = prompts @ then_ () in
     let session = t.session in
     let finish ~idle =
       t.run <- None;
@@ -1726,7 +1740,10 @@ let rec start_run ?(tried = String.Set.empty) t prompts =
     let resuming =
       match unavailable, handover with
       | Some error, None -> schedule_resume t ~error
-      | _ -> false
+      | None, _ ->
+        t.past_resets <- 0;
+        false
+      | Some _, Some _ -> false
     in
     (* Steering messages that arrived after the last turn boundary go
        first: they were sent before any follow-up still queued. *)
@@ -1813,13 +1830,11 @@ let rec start_run ?(tried = String.Set.empty) t prompts =
              | None -> None)
            else None)
     in
-    (* A hand-over carries on the same task: the run's next state says
-       [running] again, with no idle moment in between. *)
-    finish
-      ~idle:
-        (match next with
-         | Some (`Handover _) -> false
-         | Some (`Prompts _) | None -> true);
+    (* A hand-over, a queued message or a goal's continuation carries on:
+       the run's next state says [running] again, with no idle moment in
+       between (in which the server would evict a session without
+       clients). *)
+    finish ~idle:(Option.is_none next);
     Option.iter next ~f:(function
       | `Handover prompts -> start_run ~tried t prompts
       | `Prompts prompts -> start_run t prompts);
@@ -1844,19 +1859,40 @@ and schedule_resume t ~error =
                message to try again, or /model picks another model"
               (Model.key t.model)));
       false
-    | Some at ->
-      arm_resume t ~at;
+    | Some reset ->
       let now = Eio.Time.now (Eio.Stdenv.clock t.env) in
+      (* A reset time already past (a stale header, a skewed clock) would
+         retry at once, again and again: back off instead, from a minute
+         up to an hour. *)
+      let at, when_ =
+        if Float.( > ) reset now
+        then (
+          t.past_resets <- 0;
+          ( reset
+          , sprintf
+              "when it resets at %s (in %s)"
+              (Usage_limit.utc_string reset)
+              (duration_hum (reset -. now)) ))
+        else (
+          let backoff =
+            Float.min 3600. (60. *. (2. **. Float.of_int t.past_resets))
+          in
+          t.past_resets <- t.past_resets + 1;
+          ( now +. backoff
+          , sprintf
+              "in %s (the provider says it reset at %s, which has passed)"
+              (duration_hum backoff)
+              (Usage_limit.utc_string reset) ))
+      in
+      arm_resume t ~at;
       broadcast
         t
         (Notice
            (sprintf
-              "%s: the usage limit is reached; the run resumes when it resets \
-               at %s (in %s): /resume now retries at once, /resume cancel \
-               stays stopped"
+              "%s: the usage limit is reached; the run resumes %s: /resume now \
+               retries at once, /resume cancel stays stopped"
               (Model.key t.model)
-              (Usage_limit.utc_string at)
-              (duration_hum (at -. now))));
+              when_));
       true)
 
 (* Recorded in the session, so that it is armed again when the session is
@@ -2093,6 +2129,7 @@ let create
     ; max_budget_usd
     ; goal = None
     ; resume = None
+    ; past_resets = 0
     ; sleep_until
     }
   in
@@ -2124,12 +2161,11 @@ let prompt ?(attachments = []) ?(images = []) t text =
       then running ()
       else
         Ok
-          (start_run
-             t
+          (start_run t [] ~then_:(fun () ->
              [ user_message
                  t
                  { text; expanded = skill; source = None; attachments; images }
-             ]))
+             ])))
 ;;
 
 let enqueue_queued t queue queued =
@@ -2137,7 +2173,7 @@ let enqueue_queued t queue queued =
   then (
     Queue.enqueue queue queued;
     queue_update t)
-  else start_run t [ user_message t queued ]
+  else start_run t [] ~then_:(fun () -> [ user_message t queued ])
 ;;
 
 let enqueue t queue ?(attachments = []) ?(images = []) text =

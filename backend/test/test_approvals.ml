@@ -9,6 +9,7 @@ module Reply = Faux_provider.Reply
 let with_agent
       ?config
       ?(sub_replies = [])
+      ?sub_script
       ?(answer =
         fun (_ : Agent.Pending_confirm.t) -> Agent.Confirm_answer.Allow)
       ?(reply = fun (_ : User_question.t list) -> User_question.Reply.Declined)
@@ -33,7 +34,11 @@ let with_agent
   in
   let subagent =
     Tool_subagent.create
-      ~provider:(Faux_provider.create sub_replies)
+      ~provider:
+        (Faux_provider.create
+           (match sub_script with
+            | Some script -> script ~dir:t.dir
+            | None -> sub_replies))
       ~current_model:(fun () -> Model.default)
       ~current_thinking:(fun () -> Off)
       ~home:t.dir
@@ -309,6 +314,57 @@ let%expect_test "a subagent's calls are checked too, under its agent id" =
     |}]
 ;;
 
+let%expect_test
+    "rules resolve against the session's cwd, not a subagent's chosen one"
+  =
+  with_agent
+    ~config:
+      {|{"approval_mode": "auto", "permissions": {"deny": ["edit(secrets/**)"]}}|}
+    ~sub_script:(fun ~dir ->
+      [ Reply.tool_call
+          ~id:"s1"
+          ~name:"write"
+          ~arguments:(sprintf {|{"path":"%s/secrets/k","content":"x"}|} dir)
+          ()
+      ; Reply.text "done"
+      ; Reply.tool_call
+          ~id:"s2"
+          ~name:"bash"
+          ~arguments:{|{"command":"pwd"}|}
+          ()
+      ; Reply.text "done"
+      ])
+    [ Reply.tool_call
+        ~id:"c1"
+        ~name:"subagent"
+        ~arguments:{|{"task":"write","cwd":"/"}|}
+        ()
+    ; Reply.text "started"
+    ; Reply.text "noted"
+    ; Reply.tool_call
+        ~id:"c2"
+        ~name:"subagent"
+        ~arguments:{|{"task":"pwd","cwd":"secrets"}|}
+        ()
+    ; Reply.text "started"
+    ; Reply.text "noted"
+    ]
+  @@ fun t agent _requests ->
+  Core_unix.mkdir_p (Filename.concat t.dir "secrets");
+  Or_error.ok_exn (Agent.prompt agent "go");
+  Agent.wait_idle agent;
+  Or_error.ok_exn (Agent.prompt agent "again");
+  Agent.wait_idle agent;
+  [%expect
+    {|
+    mode=auto plan=none rules=[]
+    subagent {"task":"write","cwd":"/"} -> started agent a1 (write); its result will be delivered to you when it finishes; use subagent_wait to block on it
+      [a1] write -> ERROR [denied by the rule edit(secrets/**) in permissions.deny; do not try to get around it: ask the user]
+    subagent {"task":"pwd","cwd":"secrets"} -> started agent a2 (pwd); its result will be delivered to you when it finishes; use subagent_wait to block on it
+      [a2] bash -> $DIR/secrets
+    |}]
+;;
+
 let%expect_test "switching to auto lets a pending confirmation through" =
   with_sandbox
   @@ fun t ->
@@ -443,6 +499,48 @@ let%expect_test
     confirm c1 exit_plan_mode: change a.txt []
       -> (Deny("also update the docs"))
     exit_plan_mode {"plan":"change a.txt"} -> ERROR [the user did not approve the plan; their feedback: also update the docs] Stay in plan mode: revise the plan and call exit_plan_mode again when it is ready.
+    |}]
+;;
+
+let%expect_test
+    "plan mode turned off while exit_plan_mode waits: not called approved"
+  =
+  with_sandbox
+  @@ fun t ->
+  Eio.Switch.run
+  @@ fun sw ->
+  let agent =
+    Agent.create
+      ~env:t.env
+      ~sw
+      ~provider:
+        (Faux_provider.create
+           [ Reply.tool_call
+               ~id:"c1"
+               ~name:"exit_plan_mode"
+               ~arguments:{|{"plan":"change a.txt"}|}
+               ()
+           ; Reply.text "done"
+           ])
+      ~tools:(Tools.all @ Tools.interaction)
+      ~sessions_dir:(Filename.concat t.dir "sessions")
+      ~home:t.dir
+      ~cwd:t.dir
+      ()
+  in
+  Agent.set_mode agent ~plan:true;
+  Agent.subscribe agent ~f:(function
+    | Loop (Tool_confirm { call_id; _ }) ->
+      printf "confirm %s; turning plan mode off\n" call_id;
+      Agent.set_mode agent ~plan:false
+    | Loop (Tool_end { result; _ }) -> printf "result: %s\n" result.text
+    | _ -> ());
+  Or_error.ok_exn (Agent.prompt agent "go");
+  Agent.wait_idle agent;
+  [%expect
+    {|
+    confirm c1; turning plan mode off
+    result: The user turned plan mode off without answering about this plan (approval mode: auto): you can change files now. Implement the plan unless they said otherwise.
     |}]
 ;;
 
@@ -811,7 +909,7 @@ let%expect_test
     [ Reply.tool_call
         ~id:"c1"
         ~name:"bash"
-        ~arguments:{|{"command":"cat","background":true}|}
+        ~arguments:{|{"command":"cat","background":true,"stdin":true}|}
         ()
     ; Reply.tool_call
         ~id:"c2"
@@ -836,7 +934,7 @@ let%expect_test
     mode=ask plan=none rules=[]
     confirm c1 bash: cat [bash(cat:*)]
       -> Allow
-    bash {"command":"cat","background":true} -> started job j1: cat; its output is being recorded; you will be notified when it exits. Use job_output to peek, job_wait to block, job_kill to stop it.
+    bash {"command":"cat","background":true,"stdin":true} -> started job j1: cat; its output is being recorded; you will be notified when it exits. Use job_output to peek, job_wait to block, job_kill to stop it.
     confirm c2 job_input: j1: "hi\n" [job_input]
       -> Allow
     job_input {"id":"j1","input":"hi\n","close":true,"wait_ms":10000} -> sent 3 bytes to job j1 and closed its stdin; it then exited 0
