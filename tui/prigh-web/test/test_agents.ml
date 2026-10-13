@@ -137,6 +137,8 @@ let%expect_test "subagents start, nest and show in the panel, live" =
     (2 agents running)
     <button type="button"
             title="Subagents and jobs (/agents)"
+            aria-label="Subagents and jobs: 2 running"
+            aria-expanded="false"
             class="agents-toggle btn ghost icon"
             @on_click>
       <icon class="bot"> </icon>

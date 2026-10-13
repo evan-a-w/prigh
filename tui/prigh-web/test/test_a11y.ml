@@ -90,7 +90,7 @@ let%expect_test "the names of the panels' controls" =
     [listbox] div "Files"
     [option] div "src/ 1 Jan 1970 00:00"
     [option] div "README.md 2.0 KB 1 Jan 1970 00:00"
-    button "(title) Close (Alt+0)" -- Close (Alt+0)
+    button "Close subagents and jobs" -- Close (Alt+0)
     [separator] div "Resize the agents panel" -- Drag to resize, double-click for the default size
     button "Close terminal" -- Close (Ctrl+`): the shell keeps running for 10 minutes
     [separator] div "Resize the terminal" -- Drag to resize, double-click for the default size
