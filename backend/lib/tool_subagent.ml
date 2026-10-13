@@ -105,7 +105,9 @@ let prepare
        | Error e -> raise (Tool_args.Invalid (Error.to_string_hum e)))
   in
   let cwd =
-    Option.value (Tool_args.string_opt args "cwd") ~default:context.cwd
+    match Tool_args.string_opt args "cwd" with
+    | None -> context.cwd
+    | Some cwd -> Tool.resolve_path context cwd
   in
   let turn_limit =
     Option.value (Tool_args.int_opt args "max_turns") ~default:max_turns

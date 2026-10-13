@@ -28,9 +28,20 @@ let run _context _args =
 
 let tool = { Tool.spec; run }
 
+(* OpenAI models without the Responses API's [web_search] tool (their
+   snapshots too, e.g. [o1-2024-12-17]). *)
+let openai_without_search =
+  [ "gpt-3.5-turbo"; "gpt-4"; "gpt-4.1-nano"; "o1"; "o3-mini"; "gpt-realtime" ]
+;;
+
 let supported (model : Model.t) =
   match model.provider with
-  | Anthropic | Openai | Openai_codex -> true
+  | Anthropic | Openai_codex -> true
+  | Openai ->
+    not
+      (List.exists openai_without_search ~f:(fun base ->
+         String.equal model.id base
+         || String.is_prefix model.id ~prefix:(base ^ "-")))
   | Deepseek | Custom _ -> false
 ;;
 

@@ -787,15 +787,18 @@ with `offset`), `job_wait` (block on some or all jobs; returned reports are
 not delivered again), `job_input` and `job_kill`. Subagents' `bash` has no
 `background`.
 
-A job's stdin is a pipe that stays open (other commands get an empty
-stdin), so the model can drive interactive programs: `job_input {id, input,
+A job started with `stdin: true` gets a pipe for its stdin that stays
+open, so the model can drive interactive programs: `job_input {id, input,
 close?, wait_ms?}` writes `input` to it (closing it afterwards with
 `close: true`) and returns what the job printed in response, waiting until
 the output goes quiet, the job exits or `wait_ms` (default 1000, at most
 30000) pass. The stdin is not a terminal, so programs that buffer or behave
 differently need flags (`python3 -u -i`, `stdbuf -oL`). It works on remote
 tool hosts too (`tool_exec_input`); a host running an older prigh refuses
-with a message saying to update it.
+with a message saying to update it. Other jobs (and `!&cmd`) read end of
+input at once, like foreground commands, so one that reads stdin
+unexpectedly does not wait forever; `job_input` to them says to start the
+job again with `stdin: true`.
 
 The status line shows `jobs:N` with a spinner while jobs run and the agent is
 idle. `/jobs` opens a picker (id, state, elapsed time, command, last output
@@ -842,7 +845,7 @@ tables; scripts, styles and navigation dropped, only `<main>`/`<article>`
 when the page has one), other text types come as they are, images are
 attached like `read`'s. It follows up to 10 redirects, reads at most 5 MB,
 times out after 30 s (`timeout` up to 120), truncates long pages like
-`bash` output (the full text saved to a file under `$TMPDIR/prigh-output/`)
+`bash` output (the full text saved to a file under `$TMPDIR/prigh-output-<uid>/`, private to the user)
 and says what to do on errors (HTTP status, refused connections, timeouts,
 binary types). `web_search` is the provider's own server-side search:
 Anthropic's `web_search` tool (at most 5 searches per turn) and the OpenAI
@@ -850,7 +853,8 @@ Responses API's `web_search` (OpenAI and ChatGPT/Codex). The provider runs
 the searches; they show in the transcript as `web_search "query"` with the
 results folded underneath, and are replayed to the same provider as it sent
 them (to another provider as text). Models of other providers (DeepSeek,
-custom endpoints) do not get `web_search`; they can still `web_fetch` a
+custom endpoints) and OpenAI's models without it (`gpt-4`, `gpt-4.1-nano`,
+`o1`, `o3-mini`, ...) do not get `web_search`; they can still `web_fetch` a
 search page. Neither tool is destructive, so neither asks for confirmation
 in the `ask` approval mode.
 
@@ -951,7 +955,9 @@ headers, Anthropic's `anthropic-ratelimit-unified-*reset` headers,
 `retry-after`) and resumes the run then, continuing the interrupted work;
 the status line shows `resumes 14:05`. `/resume now` retries at once,
 `/resume cancel` (or an abort, or a new prompt) cancels it. When the
-provider does not say, a note says so and nothing is scheduled.
+provider does not say, a note says so and nothing is scheduled; when the
+time it gives has already passed, the retry backs off (1 minute, doubling up
+to an hour) instead of retrying at once.
 `resume_on_limit_reset: false` in `config.json` turns this off. A scheduled
 resume is recorded in the session: a backend that restarts before the reset
 loads the session and resumes it on time (one whose reset passed while the

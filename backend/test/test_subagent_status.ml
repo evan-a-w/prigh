@@ -37,7 +37,6 @@ let%expect_test "a background subagent whose loop raises still ends" =
     state: running=true subagents=[a1 done]
     assistant: started
     agent_end
-    state: running=false subagents=[a1 done]
     state: running=true subagents=[]
     agent_start
     user: [subagent a1 failed] explode | subagent failed: ("no script for agent" (key explode))

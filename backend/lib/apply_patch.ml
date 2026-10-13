@@ -556,11 +556,11 @@ let update_contents ~path ~before chunks =
   String.concat ~sep:"\n" output
 ;;
 
-let apply operations ~read =
+let apply ?(file = Fn.id) operations ~read =
   let open Or_error.Let_syntax in
   let overlay = String.Table.create () in
   let read path =
-    match Hashtbl.find overlay path with
+    match Hashtbl.find overlay (file path) with
     | Some contents -> contents
     | None -> read path
   in
@@ -572,14 +572,14 @@ let apply operations ~read =
         | Some before ->
           Updated { path; move_to = None; before; after = contents }
       in
-      Hashtbl.set overlay ~key:path ~data:(Some contents);
+      Hashtbl.set overlay ~key:(file path) ~data:(Some contents);
       Ok change
     | Delete { path } ->
       (match read path with
        | None ->
          Or_error.errorf "Failed to delete %s: the file does not exist" path
        | Some before ->
-         Hashtbl.set overlay ~key:path ~data:None;
+         Hashtbl.set overlay ~key:(file path) ~data:None;
          Ok (Change.Deleted { path; before }))
     | Update { path; move_to; chunks } ->
       (match read path with
@@ -591,10 +591,10 @@ let apply operations ~read =
            path
        | Some before ->
          let%map after = update_contents ~path ~before chunks in
-         Hashtbl.set overlay ~key:path ~data:None;
+         Hashtbl.set overlay ~key:(file path) ~data:None;
          Hashtbl.set
            overlay
-           ~key:(Option.value move_to ~default:path)
+           ~key:(file (Option.value move_to ~default:path))
            ~data:(Some after);
          Change.Updated { path; move_to; before; after })
   in

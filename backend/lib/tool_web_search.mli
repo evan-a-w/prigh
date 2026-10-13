@@ -10,7 +10,8 @@ open! Import
 val name : string
 val tool : Tool.t
 
-(** Whether [model]'s provider runs web searches itself. *)
+(** Whether [model]'s provider runs web searches itself for it (not
+    OpenAI's older models: [gpt-4], [gpt-4.1-nano], [o1], ...). *)
 val supported : Model.t -> bool
 
 val is_spec : Tool_spec.t -> bool

@@ -87,7 +87,14 @@ type t
     abandoned empty session leaves no file. *)
 val create : dir:string -> cwd:string -> ?parent:string -> unit -> t
 
+(** Lines it cannot read (a torn last line, kinds of entries from a newer
+    prigh) are skipped, with a warning each in {!skipped}; the entries after
+    an unreadable entry stay on the path through it, and the next append
+    starts on a new line. Fails only without a readable header. *)
 val load : string -> t Or_error.t
+
+(** Why [load] skipped lines, one warning each. *)
+val skipped : t -> string list
 
 (** Whether its file was written and has been deleted since. *)
 val gone : t -> bool

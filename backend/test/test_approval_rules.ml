@@ -215,6 +215,12 @@ let%expect_test "suggested session rules" =
   suggest "bash" {|{"command": "cd src && make -j4 && ./run.sh --fast"}|};
   suggest "bash" {|{"command": "ls; ls -la"}|};
   suggest "bash" {|{"command": "echo $(date)"}|};
+  suggest "bash" {|{"command": "CI=1 make test"}|};
+  suggest "bash" {|{"command": "env make"}|};
+  suggest "bash" {|{"command": "make && sudo make install"}|};
+  suggest "bash" {|{"command": "ls | xargs rm"}|};
+  suggest "bash" {|{"command": "bash script.sh"}|};
+  suggest "bash" {|{"command": "\\rm x"}|};
   suggest "write" {|{"path": "a"}|};
   suggest "apply_patch" {|{"input": ""}|};
   suggest "mcp__github__create_issue" {|{}|};
@@ -224,6 +230,12 @@ let%expect_test "suggested session rules" =
     ("bash(git:*)")
     ("bash(cd:*)" "bash(make:*)" "bash(./run.sh:*)")
     ("bash(ls:*)")
+    ()
+    ()
+    ()
+    ()
+    ()
+    ()
     ()
     (edit)
     (edit)
@@ -360,5 +372,169 @@ let%expect_test "which built-in tools ask in each mode" =
     auto-edit  bash, job_input
     auto
     plan       bash, write (denied), edit (denied), apply_patch (denied), job_input
+    |}]
+;;
+
+let rule s = Or_error.ok_exn (Approval_rule.of_string s)
+
+let bash command =
+  call "bash" (Jsonaf.to_string (`Object [ "command", `String command ]))
+;;
+
+let%expect_test "allow rules do not let other commands through" =
+  List.iter
+    [ "bash(git status:*)", "git status #'\nrm -rf ~\n#'"
+    ; "bash(git status:*)", "git status # just a comment"
+    ; "bash(echo:*)", "echo \\ #x a#b $# ; rm -rf ~"
+    ; "bash(git status:*)", "git status $'\\'' ; rm -rf ~ #'"
+    ; "bash(git status:*)", "git status <<X\ngit status '\nX\nrm -rf ~ #'"
+    ; "bash(git status:*)", "git status <<-X\nrm\nX"
+    ; "bash(grep:*)", "grep x <<< 'a; rm -rf ~'"
+    ; "bash(echo:*)", "echo x >& ~/.bashrc"
+    ; "bash(echo:*)", "echo x >&2"
+    ; "bash(echo:*)", "echo x 2>&1 >&-"
+    ; "bash(echo:*)", "echo x >& /dev/null"
+    ; "bash(git:*)", "git () (rm -rf ~); git status"
+    ; "bash(git:*)", "(git status)"
+    ]
+    ~f:(fun (r, command) ->
+      let parts, kind = Approval_rule.segments command in
+      print_s
+        [%message
+          command
+            (parts : string list)
+            ~_:
+              ((match kind with
+                | `Simple -> "simple"
+                | `Complex -> "complex")
+               : string)
+            ~covered_by:
+              (if
+                 Approval_rule.covers
+                   [ rule r ]
+                   ~cwd:"/work"
+                   ~home:"/home/u"
+                   (bash command)
+               then r
+               else "-"
+               : string)]);
+  [%expect
+    {|
+    ( "git status #'\
+     \nrm -rf ~\
+     \n#'" (parts ("git status" "rm -rf ~")) simple (covered_by -))
+    ("git status # just a comment" (parts ("git status")) simple
+     (covered_by "bash(git status:*)"))
+    ("echo \\ #x a#b $# ; rm -rf ~" (parts ("echo \\ #x a#b $#" "rm -rf ~"))
+     simple (covered_by -))
+    ("git status $'\\'' ; rm -rf ~ #'"
+     (parts ("git status $'\\'' ; rm -rf ~ #'")) complex (covered_by -))
+    ( "git status <<X\
+     \ngit status '\
+     \nX\
+     \nrm -rf ~ #'" (parts ("git status <<X"  "git status '\
+                                             \nX\
+                                             \nrm -rf ~ #'"))
+     complex (covered_by -))
+    ( "git status <<-X\
+     \nrm\
+     \nX" (parts ("git status <<-X" rm X)) complex (covered_by -))
+    ("grep x <<< 'a; rm -rf ~'" (parts ("grep x <<< 'a; rm -rf ~'")) simple
+     (covered_by "bash(grep:*)"))
+    ("echo x >& ~/.bashrc" (parts ("echo x >& ~/.bashrc")) complex
+     (covered_by -))
+    ("echo x >&2" (parts ("echo x >&2")) simple (covered_by "bash(echo:*)"))
+    ("echo x 2>&1 >&-" (parts ("echo x 2>&1 >&-")) simple
+     (covered_by "bash(echo:*)"))
+    ("echo x >& /dev/null" (parts ("echo x >& /dev/null")) simple
+     (covered_by "bash(echo:*)"))
+    ("git () (rm -rf ~); git status" (parts ("git () (rm -rf ~)" "git status"))
+     complex (covered_by -))
+    ("(git status)" (parts ("(git status)")) complex (covered_by -))
+    |}]
+;;
+
+let%expect_test "deny rules see through wrappers and substitutions" =
+  let touches r call =
+    Approval_rule.touches (rule r) ~cwd:"/work" ~home:"/home/u" call
+  in
+  List.iter
+    [ "echo $(rm -rf x)"
+    ; "echo \"$(rm -rf x)\""
+    ; "echo `rm -rf x`"
+    ; "(rm x)"
+    ; "{ rm x; }"
+    ; "if true; then rm x; fi"
+    ; "! rm x"
+    ; "VAR=1 rm x"
+    ; "\\rm x"
+    ; "'rm' x"
+    ; "/bin/rm x"
+    ; "command rm x"
+    ; "env A=1 rm x"
+    ; "sudo -u root rm x"
+    ; "ls | xargs -0 rm"
+    ; "nice -n 5 rm x"
+    ; "bash -c 'rm -rf x'"
+    ; "eval \"rm x\""
+    ; "echo rm"
+    ; "grep rm file"
+    ; "git rm x"
+    ; "echo 'a; rm x'"
+    ]
+    ~f:(fun command ->
+      printf "%-28s %b\n" command (touches "bash(rm:*)" (bash command)));
+  [%expect
+    {|
+    echo $(rm -rf x)             true
+    echo "$(rm -rf x)"           true
+    echo `rm -rf x`              true
+    (rm x)                       true
+    { rm x; }                    true
+    if true; then rm x; fi       true
+    ! rm x                       true
+    VAR=1 rm x                   true
+    \rm x                        true
+    'rm' x                       true
+    /bin/rm x                    true
+    command rm x                 true
+    env A=1 rm x                 true
+    sudo -u root rm x            true
+    ls | xargs -0 rm             true
+    nice -n 5 rm x               true
+    bash -c 'rm -rf x'           true
+    eval "rm x"                  true
+    echo rm                      false
+    grep rm file                 false
+    git rm x                     false
+    echo 'a; rm x'               false
+    |}];
+  List.iter
+    [ "read", {|{"path": "~/.ssh/id_rsa"}|}
+    ; "ls", {|{"path": "~/.ssh"}|}
+    ; "ls", {|{"path": "~"}|}
+    ; "ls", {|{"path": "/home"}|}
+    ; "grep", {|{"pattern": "x", "path": "~"}|}
+    ; "find", {|{"pattern": "*", "path": "/"}|}
+    ; "grep", {|{"pattern": "x", "path": "/work"}|}
+    ; "read", {|{"path": "~/.ssh"}|}
+    ]
+    ~f:(fun (tool, args) ->
+      let args = String.substr_replace_all args ~pattern:"~" ~with_:"/home/u" in
+      printf
+        "%-6s %-36s %b\n"
+        tool
+        args
+        (touches "read(~/.ssh/**)" (call tool args)));
+  [%expect
+    {|
+    read   {"path": "/home/u/.ssh/id_rsa"}      true
+    ls     {"path": "/home/u/.ssh"}             true
+    ls     {"path": "/home/u"}                  false
+    ls     {"path": "/home"}                    false
+    grep   {"pattern": "x", "path": "/home/u"}  true
+    find   {"pattern": "*", "path": "/"}        true
+    grep   {"pattern": "x", "path": "/work"}    false
+    read   {"path": "/home/u/.ssh"}             false
     |}]
 ;;

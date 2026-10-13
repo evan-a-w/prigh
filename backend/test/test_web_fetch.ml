@@ -87,6 +87,42 @@ let%expect_test "html: main or article only, unclosed tags, stray <" =
     |}]
 ;;
 
+let%expect_test "html: a head never closed, self-closing svg and iframe" =
+  convert
+    {|<html><head><title>T</title><meta charset="utf-8"><body><p>Body kept</p></body>|};
+  convert
+    {|<p>Before <svg viewBox="0 0 1 1"/> after</p><iframe src="x"/><p>Still here</p>
+<svg><path d="M0"/></svg><p>And here</p></svg></nav><p>Stray closes ignored</p>|};
+  [%expect
+    {|
+    title: T
+    Body kept
+    Before after
+
+    Still here
+
+    And here
+
+    Stray closes ignored
+    |}]
+;;
+
+let%expect_test "html: many scripts convert in linear time" =
+  let html =
+    String.concat
+      (List.init 20_000 ~f:(fun i ->
+         sprintf "<p>para %d</p><script>var x = %d;</script>" i i))
+  in
+  let start = Time_ns.now () in
+  let page = Html_text.convert html in
+  let elapsed = Time_ns.diff (Time_ns.now ()) start in
+  print_s
+    [%sexp
+      (List.length (String.split_lines page.text) : int)
+    , (Time_ns.Span.( < ) elapsed (Time_ns.Span.of_sec 2.) : bool)];
+  [%expect {| (39999 true) |}]
+;;
+
 let with_server f =
   Eio_main.run
   @@ fun env ->
@@ -142,7 +178,7 @@ let with_server f =
     in
     let text =
       Re.replace_string
-        (Re.compile (Re.Perl.re {|prigh-output/[^ ]*\.log|}))
+        (Re.compile (Re.Perl.re {|prigh-output-[0-9]+/[^ ]*\.log|}))
         ~by:"prigh-output/<file>.log"
         text
       |> String.split_lines

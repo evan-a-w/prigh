@@ -113,6 +113,27 @@ let put t ~sw ~port ?length url body =
 
 let binary n = String.init n ~f:(fun i -> Char.of_int_exn (i * 7 % 256))
 
+(* A chunked body's data, and whether it ended with the last chunk. *)
+let dechunk body =
+  let buf = Buffer.create (String.length body) in
+  let rec go pos =
+    match String.substr_index body ~pos ~pattern:"\r\n" with
+    | None -> false
+    | Some eol ->
+      (match
+         Int.of_string_opt ("0x" ^ String.sub body ~pos ~len:(eol - pos))
+       with
+       | None -> false
+       | Some 0 -> true
+       | Some n when eol + 2 + n <= String.length body ->
+         Buffer.add_string buf (String.sub body ~pos:(eol + 2) ~len:n);
+         go (eol + 2 + n + 2)
+       | Some _ -> false)
+  in
+  let complete = go 0 in
+  Buffer.contents buf, complete
+;;
+
 let%expect_test "file browser over RPC and HTTP on the backend host" =
   with_sandbox
   @@ fun t ->
@@ -211,7 +232,7 @@ let%expect_test "file browser over RPC and HTTP on the backend host" =
   let r = get t ~sw ~port (result_string link "url") in
   show ~body:false t r;
   let archive = Filename.concat t.dir "got.tar.gz" in
-  Out_channel.write_all archive ~data:r.body;
+  Out_channel.write_all archive ~data:(fst (dechunk r.body));
   print_s
     [%sexp
       (Core_unix.open_process_in
@@ -228,6 +249,7 @@ let%expect_test "file browser over RPC and HTTP on the backend host" =
       Content-Disposition: attachment; filename="src.tar.gz"; filename*=UTF-8''src.tar.gz
       Content-Security-Policy: sandbox; default-src 'none'
       Content-Type: application/gzip
+      Transfer-Encoding: chunked
       X-Content-Type-Options: nosniff
     (src/ src/a.ml)
     |}];
@@ -511,4 +533,118 @@ let%expect_test "file browser on a tool host that predates it" =
   ignore (call t h "fs_list" "{}" : Json.t);
   [%expect
     {| {"type":"response","id":"r","ok":false,"error":"the file browser needs a newer prigh on tool host laptop: update prigh there and restart its TUI or tool-host"} |}]
+;;
+
+let%expect_test "downloads of what is not a plain file, and failing ones" =
+  with_sandbox
+  @@ fun t ->
+  Eio.Switch.run
+  @@ fun sw ->
+  let _agent, h =
+    Test_rpc.make_server
+      ~token:"sekrit"
+      t
+      ~sw
+      ~provider:(Faux_provider.create [])
+  in
+  ignore (call t h "hello" {|{"token": "sekrit"}|} : Json.t);
+  let port = http_port t ~sw h in
+  let (_ : string) = [%expect.output] in
+  (* A FIFO would block the host; a device may never end. *)
+  Core_unix.mkfifo (Filename.concat t.dir "pipe") ~perm:0o600;
+  ignore (call t h "fs_preview" {|{"path": "pipe"}|} : Json.t);
+  ignore (call t h "fs_download" {|{"path": "pipe"}|} : Json.t);
+  ignore (call t h "fs_download" {|{"path": "/dev/zero"}|} : Json.t);
+  [%expect
+    {|
+    {"type":"response","id":"r","ok":false,"error":"$DIR/pipe is not a regular file: read it with a command instead"}
+    {"type":"response","id":"r","ok":false,"error":"$DIR/pipe is not a regular file: read it with a command instead"}
+    {"type":"response","id":"r","ok":false,"error":"/dev/zero is not a regular file: read it with a command instead"}
+    |}];
+  (* /proc's files say they are empty. *)
+  let link = call t h "fs_download" {|{"path": "/proc/self/status"}|} in
+  let r = get t ~sw ~port (result_string link "url") in
+  show ~body:false t r;
+  let data, complete = dechunk r.body in
+  print_s
+    [%sexp
+      (String.is_substring data ~substring:"Pid:" : bool), (complete : bool)];
+  [%expect
+    {|
+    {"type":"response","id":"r","ok":true,"result":{"url":"/files/download?ticket=<ticket>","name":"status"}}
+    HTTP/1.1 200 OK
+      Access-Control-Allow-Origin: *
+      Cache-Control: no-store
+      Connection: close
+      Content-Disposition: attachment; filename="status"; filename*=UTF-8''status
+      Content-Security-Policy: sandbox; default-src 'none'
+      Content-Type: application/octet-stream
+      Transfer-Encoding: chunked
+      X-Content-Type-Options: nosniff
+    (true true)
+    |}];
+  (* An archive that tar cannot finish is cut short, visibly. *)
+  write t "proj/a.txt" "a";
+  write t "proj/locked/b.txt" "b";
+  Core_unix.chmod (Filename.concat t.dir "proj/locked") ~perm:0;
+  let link = call t h "fs_download" {|{"path": "proj", "archive": true}|} in
+  let r = get t ~sw ~port (result_string link "url") in
+  Core_unix.chmod (Filename.concat t.dir "proj/locked") ~perm:0o755;
+  show ~body:false t r;
+  print_s [%sexp "complete", (snd (dechunk r.body) : bool)];
+  write t "proj/locked/b.txt" "b";
+  let link = call t h "fs_download" {|{"path": "proj", "archive": true}|} in
+  let r = get t ~sw ~port (result_string link "url") in
+  print_s [%sexp "complete", (snd (dechunk r.body) : bool)];
+  [%expect
+    {|
+    {"type":"response","id":"r","ok":true,"result":{"url":"/files/download?ticket=<ticket>","name":"proj.tar.gz"}}
+    HTTP/1.1 200 OK
+      Access-Control-Allow-Origin: *
+      Cache-Control: no-store
+      Connection: close
+      Content-Disposition: attachment; filename="proj.tar.gz"; filename*=UTF-8''proj.tar.gz
+      Content-Security-Policy: sandbox; default-src 'none'
+      Content-Type: application/gzip
+      Transfer-Encoding: chunked
+      X-Content-Type-Options: nosniff
+    (complete false)
+    {"type":"response","id":"r","ok":true,"result":{"url":"/files/download?ticket=<ticket>","name":"proj.tar.gz"}}
+    (complete true)
+    |}];
+  (* A ticket used at the wrong endpoint still works at the right one. *)
+  write t "notes.txt" "hi";
+  let link = call t h "fs_download" {|{"path": "notes.txt"}|} in
+  let url = result_string link "url" in
+  show
+    t
+    (put
+       t
+       ~sw
+       ~port
+       (String.substr_replace_first url ~pattern:"download" ~with_:"upload")
+       "x");
+  show t (get t ~sw ~port url);
+  [%expect
+    {|
+    {"type":"response","id":"r","ok":true,"result":{"url":"/files/download?ticket=<ticket>","name":"notes.txt"}}
+    HTTP/1.1 400 Bad Request
+      Access-Control-Allow-Origin: *
+      Cache-Control: no-store
+      Connection: close
+      Content-Length: 35
+      Content-Type: application/json
+      X-Content-Type-Options: nosniff
+      body: {\"error\":\"this is a download link\"}
+    HTTP/1.1 200 OK
+      Access-Control-Allow-Origin: *
+      Cache-Control: no-store
+      Connection: close
+      Content-Disposition: attachment; filename="notes.txt"; filename*=UTF-8''notes.txt
+      Content-Length: 2
+      Content-Security-Policy: sandbox; default-src 'none'
+      Content-Type: text/plain; charset=utf-8
+      X-Content-Type-Options: nosniff
+      body: hi
+    |}]
 ;;

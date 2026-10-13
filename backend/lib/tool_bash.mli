@@ -8,7 +8,9 @@ open! Import
 val tool : Tool.t
 
 (** Saves a long output in full where the model can read it (under
-    [$TMPDIR/prigh-output/], kept for 7 days) and returns its path. *)
+    [$TMPDIR/prigh-output-<uid>/], a directory only this user can enter, in
+    a file only they can read; kept for 7 days) and returns its path. Raises
+    if that directory is a symlink or another user's. *)
 val save_output : Tool.Context.t -> string -> string
 
 (** [bash] without the [background] parameter, for subagents. *)
@@ -20,11 +22,13 @@ val starts_job : Tool.Context.t -> Json.t -> bool
 
 (** Starts a job for [command]. [run] runs it in the foreground (with
     [foreground_arguments]), its stdin fed from [stdin] (the task's
-    {!Background_tasks.Task.input}, for [job_input]), and its output goes to
+    {!Background_tasks.Task.input}, for [job_input]; closed at once, and
+    [job_input] refused, unless [keep_stdin]), and its output goes to
     [on_output]; the outcome's status is read from the result's trailer
     ([exited N], [killed], ...). *)
 val start_job
-  :  Background_tasks.t
+  :  ?keep_stdin:bool
+  -> Background_tasks.t
   -> command:string
   -> run:
        (id:string
@@ -34,8 +38,8 @@ val start_job
         -> Tool_result.t)
   -> string
 
-(** The arguments of a background job's foreground run: [background]
-    dropped, and no timeout unless one was given. *)
+(** The arguments of a background job's foreground run: [background] and
+    [stdin] dropped, and no timeout unless one was given. *)
 val foreground_arguments : Json.t -> Json.t
 
 val started_message : id:string -> command:string -> string
@@ -45,3 +49,8 @@ val job_outcome
   :  Tool_result.t
   -> output:Output_tail.t
   -> Background_tasks.Outcome.t
+
+module For_testing : sig
+  (** [save_output] in [tmp] rather than [$TMPDIR]. *)
+  val save_output : tmp:string -> call_id:string -> string -> string
+end

@@ -157,7 +157,7 @@ let%expect_test "bash: timeout, cancellation, truncation" =
     [%sexp
       { first =
           (Re.replace_string
-             (Re.Perl.compile_pat {|\S+/prigh-output/\S+\.log|})
+             (Re.Perl.compile_pat {|\S+/prigh-output-[0-9]+/\S+\.log|})
              ~by:"<file>"
              (List.hd_exn lines)
            : string)
@@ -711,6 +711,84 @@ let%expect_test "apply_patch: writes every file, or none" =
     |}]
 ;;
 
+let%expect_test
+    "apply_patch: one file however written; a failed write is reported"
+  =
+  with_sandbox
+  @@ fun t ->
+  let patch lines =
+    Jsonaf.to_string (`Object [ "input", `String (String.concat_lines lines) ])
+  in
+  write t "a.txt" "one\ntwo\n";
+  run
+    t
+    Tool_apply_patch.tool
+    (patch
+       [ "*** Begin Patch"
+       ; "*** Update File: a.txt"
+       ; "-one"
+       ; "+ONE"
+       ; "*** Update File: ./a.txt"
+       ; "-two"
+       ; "+TWO"
+       ; "*** End Patch"
+       ]);
+  print_string (read t "a.txt");
+  [%expect
+    {|
+    Success. Updated the following files:
+    M a.txt
+    M a.txt
+
+    --- a/a.txt
+    +++ b/a.txt
+    @@ -1,2 +1,2 @@
+    -one
+    +ONE
+     two
+    --- a/a.txt
+    +++ b/a.txt
+    @@ -1,2 +1,2 @@
+     ONE
+    -two
+    +TWO
+    ONE
+    TWO
+    |}];
+  Core_unix.mkdir (Filename.concat t.dir "ro") ~perm:0o555;
+  run
+    t
+    Tool_apply_patch.tool
+    (patch
+       [ "*** Begin Patch"
+       ; "*** Update File: a.txt"
+       ; "-ONE"
+       ; "+1"
+       ; "*** Add File: ro/x.txt"
+       ; "+x"
+       ; "*** Add File: b.txt"
+       ; "+b"
+       ; "*** End Patch"
+       ]);
+  print_string (read t "a.txt");
+  print_s
+    [%sexp (Sys_unix.file_exists_exn (Filename.concat t.dir "b.txt") : bool)];
+  Core_unix.chmod (Filename.concat t.dir "ro") ~perm:0o755;
+  [%expect
+    {|
+    ERROR: The patch was only partly applied: writing failed at A ro/x.txt: $DIR/ro/x.txt: Permission denied
+    Changed:
+    M a.txt
+    Not changed:
+    A ro/x.txt
+    A b.txt
+    Fix the cause, then patch only the files not changed (the changed ones have their edits already).
+    1
+    TWO
+    false
+    |}]
+;;
+
 let%expect_test "apply_patch asks for confirmation naming its files" =
   with_sandbox
   @@ fun t ->
@@ -867,5 +945,47 @@ let%expect_test "Truncate.head_and_tail" =
            \nl9\
            \n")
      (truncated true) (total_lines 10) (total_bytes 30))
+    |}]
+;;
+
+let%expect_test "bash outputs are saved in a private per-user directory" =
+  let tmp = Filename_unix.realpath (Filename_unix.temp_dir "prigh-tmp" "") in
+  let uid = Core_unix.getuid () in
+  let dir = Filename.concat tmp (sprintf "prigh-output-%d" uid) in
+  let perm path = sprintf "%o" (Core_unix.lstat path).st_perm in
+  let save () =
+    match Tool_bash.For_testing.save_output ~tmp ~call_id:"c/1" "secret" with
+    | path ->
+      printf
+        "in dir: %b, dir %s, file %s, %S\n"
+        (String.equal (Filename.dirname path) dir)
+        (perm dir)
+        (perm path)
+        (In_channel.read_all path)
+    | exception exn ->
+      print_endline
+        (String.substr_replace_all
+           (Exn.to_string exn)
+           ~pattern:dir
+           ~with_:"$TMP/prigh-output-<uid>")
+  in
+  save ();
+  (* Made by us with lax permissions: tightened. *)
+  Core_unix.chmod dir ~perm:0o755;
+  save ();
+  printf "%d files\n" (Array.length (Sys_unix.readdir dir));
+  (* A symlink in its place (someone else's trap) is refused. *)
+  Array.iter (Sys_unix.readdir dir) ~f:(fun f ->
+    Core_unix.unlink (Filename.concat dir f));
+  Core_unix.rmdir dir;
+  Core_unix.symlink ~target:tmp ~link_name:dir;
+  save ();
+  [%expect
+    {|
+    in dir: true, dir 700, file 600, "secret"
+    in dir: true, dir 700, file 600, "secret"
+    2 files
+    (Failure
+      "$TMP/prigh-output-<uid> is not a directory: remove it or set TMPDIR")
     |}]
 ;;
