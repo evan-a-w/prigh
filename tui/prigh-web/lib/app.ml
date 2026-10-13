@@ -3878,6 +3878,11 @@ let event (m : Model.t) (e : Event.t) =
       chat = Chat.apply m.chat e
     ; agents = Agents.record m.agents ~now:(now_of m) e
     ; pending
+    ; paging =
+        (match e with
+         (* The session starts at the summary now: nothing older to load. *)
+         | Compacted _ -> Paging.all
+         | _ -> m.paging)
     }
   in
   let m, cmds = main_event m e in

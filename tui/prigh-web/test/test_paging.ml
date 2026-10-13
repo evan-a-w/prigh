@@ -601,7 +601,9 @@ let%expect_test "reconnecting when what was on show has gone from the session" =
 (* Compacted while older pages were left to load: their cursor is gone. The
    session's newest page (from its summary) replaces the transcript, once,
    rather than an error at every scroll. *)
-let%expect_test "scrolling up after the session was compacted" =
+(* Seen compacting: what is on show stays, with nothing older to load (the
+   session starts at the summary now). *)
+let%expect_test "compacted while on show" =
   let h = Harness.create () in
   open_session h "s2";
   Harness.quiet h (fun () ->
@@ -610,6 +612,29 @@ let%expect_test "scrolling up after the session was compacted" =
       "get_messages_page"
       (Harness.page ~older:40 ~before:"e41" (exchanges [ 21; 22 ])));
   Harness.event h {|{"event":"compacted","summary":"Worked on the parser."}|};
+  Harness.act h Load_older;
+  paging h;
+  [%expect {|
+    ((older 0) (before ()) (loading false))
+    question 21
+    answer 21
+    question 22
+    answer 22
+    Context compacted Worked on the parser.
+    Worked on the parser.
+    |}]
+;;
+
+(* Compacted unseen (from another tab while this one was away): the older
+   page is gone, the newest replaces what is on show. *)
+let%expect_test "scrolling up after the session was compacted" =
+  let h = Harness.create () in
+  open_session h "s2";
+  Harness.quiet h (fun () ->
+    Harness.reply
+      h
+      "get_messages_page"
+      (Harness.page ~older:40 ~before:"e41" (exchanges [ 21; 22 ])));
   Harness.act h Load_older;
   Harness.fail
     h
