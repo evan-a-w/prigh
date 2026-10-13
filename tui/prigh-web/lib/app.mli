@@ -461,6 +461,9 @@ module Model : sig
 
   (** What the panels' sizes depend on. *)
   val shown : t -> Resize.Shown.t
+
+  (** Why the backend keeps a session asked to be deleted, if it does. *)
+  val kept_from_deletion : t -> Session_summary.t -> string option
 end
 
 val thinking_levels : string list

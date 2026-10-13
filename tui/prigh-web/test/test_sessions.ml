@@ -323,28 +323,40 @@ let%expect_test
     |}];
   H.text h ~selector:".modal";
   [%expect {| |}];
+  (* Running: nothing to delete, so nothing is asked of the backend. Enter
+     on a focused button (Tab to Close) is the button's. *)
   H.act h (Ask_delete "/sessions/s2.jsonl");
-  (* Enter on a focused button (Tab to Cancel) is the button's. *)
+  H.text h ~selector:".modal";
   H.key h "Enter" ~target:Control;
   H.key h "Enter" ~target:Page;
   [%expect
     {|
     (Focus dialog)
+    Can't delete this session
+    (Close (Esc))
+    Release notes 0 B
+    “Release notes” is running: it will be kept (wait for it or stop it first)
+    (Close)
     (browser default)
     Dialog_accept
     (Focus editor)
-    (Rpc (method_ delete_sessions) (params ((paths (/sessions/s2.jsonl))))
-     (tag Sessions_deleted))
     |}];
+  (* Refused all the same (opened elsewhere since): the backend says why. *)
+  H.act h (Ask_delete "/sessions/s3.jsonl");
+  H.act h Dialog_accept;
   H.reply
     h
     "delete_sessions"
-    {|{"deleted":[],"refused":[{"path":"/sessions/s2.jsonl","error":"session \"Release notes\" is running: wait for it or /abort it first"}]}|};
+    {|{"deleted":[],"refused":[{"path":"/sessions/s3.jsonl","error":"session s3 is open in 1 other frontend(s): close it there first"}]}|};
   H.text h ~selector:".toasts";
   [%expect
     {|
+    (Focus dialog)
+    (Focus editor)
+    (Rpc (method_ delete_sessions) (params ((paths (/sessions/s3.jsonl))))
+     (tag Sessions_deleted))
     (Rpc (method_ list_sessions) (params ()) (tag Sessions))
-    Not deleted: session "Release notes" is running: wait for it or /abort it first (Dismiss)
+    Not deleted: session s3 is open in 1 other frontend(s): close it there first (Dismiss)
     |}];
   H.act h (Ask_delete "/sessions/s3.jsonl");
   H.act h Dialog_accept;

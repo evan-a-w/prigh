@@ -316,13 +316,14 @@ let%expect_test "selecting sessions: click, shift-click a range, delete them" =
     <button class="session-open">
     <button class="session-open">
     |}];
-  (* The confirmation says how many, how much disk, and which will be kept. *)
+  (* The confirmation says how many, how much disk, and which will be kept
+     (those are not asked for). *)
   H.act h Delete_marked;
   H.text h ~selector:".modal";
   [%expect
     {|
     (Focus dialog)
-    Delete 4 sessions?
+    Delete 2 sessions?
     (Close (Esc))
     They will be deleted, with their subagent logs: 1.4 MB on disk. This can't be undone.
     Release notes 11.7 KB
@@ -331,32 +332,29 @@ let%expect_test "selecting sessions: click, shift-click a range, delete them" =
     Older docs 1.2 MB
     “Release notes” is running: it will be kept (wait for it or stop it first)
     “Open elsewhere” is open in another tab or terminal: it will be kept (close it there first)
-    (Cancel) (Delete 4)
+    (Cancel) (Delete 2)
     |}];
   H.act h Dialog_accept;
   [%expect
     {|
     (Focus editor)
     (Rpc (method_ delete_sessions)
-     (params
-      ((paths
-        (/sessions/s2.jsonl /sessions/s3.jsonl /sessions/s4.jsonl
-         /sessions/s5.jsonl))))
+     (params ((paths (/sessions/s4.jsonl /sessions/s5.jsonl))))
      (tag Sessions_deleted))
     |}];
   H.reply
     h
     "delete_sessions"
     {|{"deleted":[{"path":"/sessions/s4.jsonl","id":"s4","bytes":200000},{"path":"/sessions/s5.jsonl","id":"s5","bytes":1300000}],
-       "refused":[{"path":"/sessions/s2.jsonl","error":"session \"Release notes\" is running: wait for it or /abort it first"}]}|};
+       "refused":[]}|};
   H.text h ~selector:".toast";
   [%expect
     {|
+    (Expire_toast (id 0) (after_ms 2580))
     (Rpc (method_ list_sessions) (params ()) (tag Sessions))
     Deleted 2 sessions (1.4 MB)
-    Not deleted: session "Release notes" is running: wait for it or /abort it first (Dismiss)
     |}];
-  (* What was refused stays selected. *)
+  (* What was kept stays selected. *)
   sidebar h;
   [%expect
     {|
@@ -386,7 +384,6 @@ let%expect_test "deleting one: the current and open sessions are warned about" =
   [%expect
     {|
     (Focus dialog)
-    It will be deleted, with its subagent logs: 3.9 KB on disk. This can't be undone.
     “fix the parser bug” is the session you are in: it will be kept (switch to another first)
     |}];
   H.act h Close_dialog;
@@ -404,6 +401,20 @@ let%expect_test "deleting one: the current and open sessions are warned about" =
   [%expect
     {|
     Close_dialog
+    (Focus editor)
+    |}];
+  (* Nothing it could delete: it only closes. *)
+  H.act h (Ask_delete "/sessions/s3.jsonl");
+  H.text h ~selector:".modal";
+  H.key h "Enter" ~target:Page;
+  [%expect {|
+    (Focus dialog)
+    Can't delete this session
+    (Close (Esc))
+    Open elsewhere 2.9 KB
+    “Open elsewhere” is open in another tab or terminal: it will be kept (close it there first)
+    (Close)
+    Dialog_accept
     (Focus editor)
     |}]
 ;;
