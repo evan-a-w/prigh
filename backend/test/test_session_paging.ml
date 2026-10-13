@@ -329,8 +329,8 @@ let%expect_test
     {|
     test 0001 ... ok ... test 1000 ... ok (1000 lines), is_error false
     test 0001 ... ok ... test 2000 ... ok (2000 lines), is_error false
-    no output of tool call "g1"
-    unknown subagent "a2"
+    no output of tool call "g1" in this session: pass the "session" (and, for a subagent's call, "agent_id") it belongs to
+    unknown subagent "a2": list_subagents shows this session's
     |}];
   (* A subagent's transcript, its outputs cut too. *)
   Client.call c "get_subagent" [ "id", `String "s1"; "elide", `True ]
@@ -353,6 +353,47 @@ let%expect_test
    | Ok _ -> ()
    | Error e -> print_endline e);
   [%expect {| no session "nope" |}]
+;;
+
+let%expect_test "get_tool_output: before a compaction, of another session" =
+  with_sandbox
+  @@ fun t ->
+  Eio.Switch.run
+  @@ fun sw ->
+  let session = saved t in
+  let path = Session.path session in
+  let c = server t ~sw in
+  let output params =
+    match Client.result (Client.request c "get_tool_output" params) with
+    | Ok json -> print_endline (summary (text json))
+    | Error e -> print_endline e
+  in
+  (* Read without opening it; c's own session has no such call. *)
+  output [ "call_id", `String "c2"; "session", `String path ];
+  output [ "call_id", `String "c2" ];
+  [%expect
+    {|
+    test 0001 ... ok ... test 0003 ... ok (3 lines)
+    no output of tool call "c2" in this session: pass the "session" (and, for a subagent's call, "agent_id") it belongs to
+    |}];
+  (* Compacted down to the last turn: the earlier outputs are still there. *)
+  let kept_from =
+    List.find_map_exn (Session.entries session) ~f:(fun (e : Session.Entry.t) ->
+      match e.payload with
+      | Message (User { text = "turn 10"; _ }) -> Some e.id
+      | _ -> None)
+  in
+  ignore
+    (Session.append_compaction session ~summary:"earlier turns" ~kept_from
+     : Session.Entry.t);
+  ignore (Client.call c "switch_session" [ "path", `String path ] : Json.t);
+  output [ "call_id", `String "c2" ];
+  output [ "call_id", `String "nope" ];
+  [%expect
+    {|
+    test 0001 ... ok ... test 0003 ... ok (3 lines)
+    no output of tool call "nope" in this session: pass the "session" (and, for a subagent's call, "agent_id") it belongs to
+    |}]
 ;;
 
 let%expect_test "sessions read again are cached until their file changes" =
