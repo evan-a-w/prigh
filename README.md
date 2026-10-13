@@ -781,15 +781,18 @@ with `offset`), `job_wait` (block on some or all jobs; returned reports are
 not delivered again), `job_input` and `job_kill`. Subagents' `bash` has no
 `background`.
 
-A job's stdin is a pipe that stays open (other commands get an empty
-stdin), so the model can drive interactive programs: `job_input {id, input,
+A job started with `stdin: true` gets a pipe for its stdin that stays
+open, so the model can drive interactive programs: `job_input {id, input,
 close?, wait_ms?}` writes `input` to it (closing it afterwards with
 `close: true`) and returns what the job printed in response, waiting until
 the output goes quiet, the job exits or `wait_ms` (default 1000, at most
 30000) pass. The stdin is not a terminal, so programs that buffer or behave
 differently need flags (`python3 -u -i`, `stdbuf -oL`). It works on remote
 tool hosts too (`tool_exec_input`); a host running an older prigh refuses
-with a message saying to update it.
+with a message saying to update it. Other jobs (and `!&cmd`) read end of
+input at once, like foreground commands, so one that reads stdin
+unexpectedly does not wait forever; `job_input` to them says to start the
+job again with `stdin: true`.
 
 The status line shows `jobs:N` with a spinner while jobs run and the agent is
 idle. `/jobs` opens a picker (id, state, elapsed time, command, last output

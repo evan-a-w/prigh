@@ -909,7 +909,7 @@ let%expect_test
     [ Reply.tool_call
         ~id:"c1"
         ~name:"bash"
-        ~arguments:{|{"command":"cat","background":true}|}
+        ~arguments:{|{"command":"cat","background":true,"stdin":true}|}
         ()
     ; Reply.tool_call
         ~id:"c2"
@@ -934,7 +934,7 @@ let%expect_test
     mode=ask plan=none rules=[]
     confirm c1 bash: cat [bash(cat:*)]
       -> Allow
-    bash {"command":"cat","background":true} -> started job j1: cat; its output is being recorded; you will be notified when it exits. Use job_output to peek, job_wait to block, job_kill to stop it.
+    bash {"command":"cat","background":true,"stdin":true} -> started job j1: cat; its output is being recorded; you will be notified when it exits. Use job_output to peek, job_wait to block, job_kill to stop it.
     confirm c2 job_input: j1: "hi\n" [job_input]
       -> Allow
     job_input {"id":"j1","input":"hi\n","close":true,"wait_ms":10000} -> sent 3 bytes to job j1 and closed its stdin; it then exited 0

@@ -42,9 +42,12 @@ let spec =
             You are notified with the exit status and output tail when it \
             exits; job_output, job_wait, job_input and job_kill act on it \
             meanwhile. Use for anything that may take over a minute or keeps \
-            running (builds, test suites, servers, watchers), or that reads \
-            input you send with job_input (its stdin is a pipe, not a \
-            terminal)." )
+            running (builds, test suites, servers, watchers)." )
+       ; ( "stdin"
+         , `Boolean
+         , "With background: keep its stdin open (a pipe, not a terminal) for \
+            input you send with job_input. Otherwise it reads end of input at \
+            once, like a foreground command." )
        ])
 ;;
 
@@ -217,7 +220,7 @@ let starts_job (context : Tool.Context.t) args =
 let foreground_arguments args =
   let fields =
     List.filter (fields args) ~f:(fun (name, _) ->
-      not (String.equal name "background"))
+      not (List.mem [ "background"; "stdin" ] name ~equal:String.equal))
   in
   if List.Assoc.mem fields ~equal:String.equal "timeout"
   then `Object fields
@@ -290,8 +293,15 @@ let job_outcome (result : Tool_result.t) ~output =
   }
 ;;
 
-let start_job background ~command ~run =
+let start_job ?(keep_stdin = false) background ~command ~run =
   let stdin = Stdin_feed.create () in
+  if not keep_stdin
+  then (
+    ignore (Stdin_feed.write stdin "" ~close:true : unit Or_error.t);
+    Stdin_feed.refuse
+      stdin
+      "it was started without stdin: true, so its stdin is closed; start it \
+       again with bash, background: true and stdin: true to send it input");
   Background_tasks.spawn
     background
     ~kind:Job
@@ -325,18 +335,25 @@ let run (context : Tool.Context.t) args =
     let command = Tool_args.string args "command" in
     ignore (Tool_args.int_opt args "timeout" : int option);
     let arguments = foreground_arguments args in
+    let keep_stdin =
+      Option.value (Tool_args.bool_opt args "stdin") ~default:false
+    in
     let id =
-      start_job background ~command ~run:(fun ~id ~cancel ~stdin ~on_output ->
-        Tool.execute_via
-          { context with
-            cancel
-          ; on_output
-          ; call_id = id
-          ; background = None
-          ; stdin = Some stdin
-          }
-          foreground_tool
-          arguments)
+      start_job
+        background
+        ~keep_stdin
+        ~command
+        ~run:(fun ~id ~cancel ~stdin ~on_output ->
+          Tool.execute_via
+            { context with
+              cancel
+            ; on_output
+            ; call_id = id
+            ; background = None
+            ; stdin = Some stdin
+            }
+            foreground_tool
+            arguments)
     in
     Tool.Result.ok (started_message ~id ~command)
   | _ -> run_foreground context args
