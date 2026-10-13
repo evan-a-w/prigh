@@ -51,6 +51,12 @@ type t =
       { id : string
       ; text : string
       }
+  | Create_dir of
+      { target : Dir_change.Target.t
+      ; path : string (** absolute, on the target's host *)
+      ; busy : bool (** creating: waiting for the backend *)
+      ; error : string option
+      } (** a missing directory given to [/cd] or [/host]: create it? *)
   | Session of Session_stats.t
   | Text of
       { title : string

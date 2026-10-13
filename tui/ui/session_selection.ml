@@ -10,10 +10,20 @@ type t =
 let create ?(named_only = false) sessions = { named_only; sessions }
 let title t = if t.named_only then "Sessions (named)" else "Sessions"
 
+(* Active first: [Picker] orders sections as they first appear. *)
+let active_first sessions =
+  let active, archived =
+    List.partition_tf sessions ~f:(fun (s : P.Session_summary.t) ->
+      not s.archived)
+  in
+  active @ archived
+;;
+
 let shown t =
-  if t.named_only
-  then List.filter t.sessions ~f:(fun s -> Option.is_some s.name)
-  else t.sessions
+  active_first
+    (if t.named_only
+     then List.filter t.sessions ~f:(fun s -> Option.is_some s.name)
+     else t.sessions)
 ;;
 
 let item ~current (s : P.Session_summary.t) =
@@ -40,11 +50,44 @@ let item ~current (s : P.Session_summary.t) =
        first)
 ;;
 
+(* A highlighted session that the filter hides gives way to the next one
+   shown after it, else the one before. *)
+let nearest_shown t id =
+  let shown = shown t in
+  if List.exists shown ~f:(fun s -> String.equal s.path id)
+  then Some id
+  else (
+    let all = active_first t.sessions in
+    match List.findi all ~f:(fun _ s -> String.equal s.path id) with
+    | None -> None
+    | Some (index, _) ->
+      let is_shown (s : P.Session_summary.t) =
+        List.exists shown ~f:(fun o -> String.equal o.path s.path)
+      in
+      Option.first_some
+        (List.find (List.drop all index) ~f:is_shown)
+        (List.find (List.rev (List.take all index)) ~f:is_shown)
+      |> Option.map ~f:(fun (s : P.Session_summary.t) -> s.path))
+;;
+
 let picker ?previous ?select t ~current =
   let items = List.map (shown t) ~f:(item ~current) in
   match previous with
   | None -> Picker.create ~title:(title t) items
-  | Some previous -> Picker.set_items ~title:(title t) ?select previous items
+  | Some previous ->
+    let select =
+      match select with
+      | Some _ -> select
+      | None ->
+        Option.bind (Picker.selected_item previous) ~f:(fun item ->
+          nearest_shown t item.id)
+    in
+    (* Marks on sessions the filter hides stay, as long as they exist. *)
+    let checked =
+      Set.filter (Picker.checked previous) ~f:(fun path ->
+        List.exists t.sessions ~f:(fun s -> String.equal s.path path))
+    in
+    Picker.set_items ~title:(title t) ?select ~checked previous items
 ;;
 
 let find t path =
@@ -103,8 +146,27 @@ let delete_question = function
       (size sessions)
 ;;
 
-let delete_archived_question t =
-  match archived t with
+let is_current (s : P.Session_summary.t) ~current =
+  Option.exists current ~f:(String.equal s.path)
+;;
+
+let deletable sessions ~current =
+  match List.find sessions ~f:(is_current ~current) with
+  | None -> Ok sessions
+  | Some s ->
+    Error
+      (sprintf
+         "%s is the session you are in: switch to another one first, or leave \
+          it out"
+         (describe s))
+;;
+
+let archived_to_delete t ~current =
+  List.filter (archived t) ~f:(Fn.non (is_current ~current))
+;;
+
+let delete_archived_question t ~current =
+  match archived_to_delete t ~current with
   | [] -> None
   | [ s ] ->
     Some

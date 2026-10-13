@@ -432,10 +432,10 @@ prints the captured panes.
   │ › ( ) Postgres  what prod uses                                                                   │
   │   ( ) SQLite                                                                                     │
   │   Other:                                                                                         │
-  │ Enter picks                                                                                      │
+  │ ↑↓ choose · type your own · Enter picks · ←→ questions · Esc declines (the model is told)        │
   └──────────────────────────────────────────────────────────────────────────────────────────────────┘
   ────────────────────────────────────────────────────────────────────────────────────────────────────
-  …deepseek-flash  ctx:0.0%/1.0M  ↑↓ choose · Space picks · type to answer · ←→ questions · Enter acc…
+  …deepseek-flash  think:on  mode:auto  ctx:0.0%/1.0M  $0.00  Enter accepts · Esc declines
   === second question
     prigh in $TMP/cwd · /help · Esc aborts · Ctrl+C twice quits
   
@@ -447,10 +447,10 @@ prints the captured panes.
   ┌─ Question 2/2 ───────────────────────────────────────────────────────────────────────────────────┐
   │ Anything else?                                                                                   │
   │ › keep it small                                                                                  │
-  │ Enter answers                                                                                    │
+  │ type an answer · Enter answers · ←→ questions · Esc declines (the model is told)                 │
   └──────────────────────────────────────────────────────────────────────────────────────────────────┘
   ────────────────────────────────────────────────────────────────────────────────────────────────────
-  …deepseek-flash  ctx:0.0%/1.0M  ↑↓ choose · Space picks · type to answer · ←→ questions · Enter acc…
+  …deepseek-flash  think:on  mode:auto  ctx:0.0%/1.0M  $0.00  Enter accepts · Esc declines
   === answered
     prigh in $TMP/cwd · /help · Esc aborts · Ctrl+C twice quits
   
@@ -553,3 +553,81 @@ prints the captured panes.
   ────────────────────────────────────────────────────────────────────────────────────────────────────
   >
   $TMP/cwd/sub  deepseek-flash  think:on  mode:auto  ctx:0.0%/1.0M  $0.00
+  $ bash ./harness.sh switch_pending
+  === the picker, a confirmation waiting behind it
+    new session
+    prigh in $TMP/cwd · /help · Esc aborts · Ctrl+C twice quits
+  
+  ▌ go
+    waiting
+  ✓ bash $ sleep 2
+    now
+  … bash $ rm -rf build
+  Sessions  (2)  Alt+A (un)archives · Alt+D deletes archived · Ctrl+N named
+  /
+   * ▶ (unnamed) ∣ <time> ∣ 2 msgs ∣ go   $TMP/cwd
+  ▸  (unnamed) ∣ <time> ∣ 2 msgs ∣ hello  $TMP/cwd
+  ────────────────────────────────────────────────────────────────────────────────────────────────────
+  …deepseek-flash  mode:ask  to answer:1  Enter switches · Tab marks · Ctrl+D deletes · Esc closes
+  === switched: no dialog from the other session
+    prigh in $TMP/cwd · /help · Esc aborts · Ctrl+C twice quits
+  
+  ▌ hello
+    in the first session
+  ────────────────────────────────────────────────────────────────────────────────────────────────────
+  >
+  $TMP/cwd  deepseek-flash  think:on  mode:ask  view:normal  ctx:0.0%/1.0M  $0.00
+  === back: its confirmation again
+    prigh in $TMP/cwd · /help · Esc aborts · Ctrl+C twice quits
+  
+  ▌ go
+    waiting
+  ✓ bash $ sleep 2
+    now
+  … bash $ rm -rf build
+  ┌─ Confirm ────────────────────────────────────────────────────────────────────────────────────────┐
+  │ Run bash: rm -rf build?                                                                          │
+  │ y  allow once                                                                                    │
+  │ a  always allow bash(rm:*) this session                                                          │
+  │ n  deny                                                                                          │
+  │ r  deny, saying why                                                                              │
+  └──────────────────────────────────────────────────────────────────────────────────────────────────┘
+  ────────────────────────────────────────────────────────────────────────────────────────────────────
+  ?
+  …deepseek-flash  think:on  mode:ask  view:normal  ctx:0.0%/1.0M  $0.00  confirm: y/a/n/r
+  === answered
+    prigh in $TMP/cwd · /help · Esc aborts · Ctrl+C twice quits
+  
+  ▌ go
+    waiting
+  ✓ bash $ sleep 2
+    now
+  ✓ bash $ rm -rf build
+    allowed bash
+    all done
+  ────────────────────────────────────────────────────────────────────────────────────────────────────
+  >
+  $TMP/cwd  deepseek-flash  think:on  mode:ask  view:normal  ctx:0.0%/1.0M  $0.00
+  $ bash ./harness.sh reconnect_dialog
+  === typing the reason
+    prigh in $TMP/cwd · /help · Esc aborts · Ctrl+C twice quits
+  
+  ▌ go
+    asking
+  … bash $ make deploy
+  ┌─ Why not? (the model sees it) ───────────────────────────────────────────────────────────────────┐
+  │ Run bash: make deploy?                                                                           │
+  │ › not on a Fri                                                                                   │
+  └──────────────────────────────────────────────────────────────────────────────────────────────────┘
+  ────────────────────────────────────────────────────────────────────────────────────────────────────
+  …deepseek-flash  think:on  mode:ask  view:normal  ctx:0.0%/1.0M  $0.00  Enter denies · Esc goes back
+  === reconnected: the dialog closed
+    reconnected to the backend
+    prigh in $TMP/cwd · /help · Esc aborts · Ctrl+C twice quits
+  
+  ▌ go
+    asking
+  … bash $ make deploy
+  ────────────────────────────────────────────────────────────────────────────────────────────────────
+  >
+  $TMP/cwd  deepseek-flash  think:on  mode:ask  view:normal  ctx:0.0%/1.0M  $0.00

@@ -86,7 +86,8 @@ let%expect_test
   let agent = make () in
   send agent "one";
   let first = (Agent.state agent).session_path in
-  Or_error.ok_exn (Agent.set_cwd agent ~path:"sub");
+  ignore
+    (Or_error.ok_exn (Agent.set_cwd agent ~path:"sub") : Dir_change.Outcome.t);
   Agent.set_model agent gpt;
   Agent.set_mode agent ~plan:true;
   Agent.new_session agent;
@@ -102,7 +103,8 @@ let%expect_test
     three: nothing told
     |}];
   (* Changed, then the backend restarts before the next message. *)
-  Or_error.ok_exn (Agent.set_cwd agent ~path:t.dir);
+  ignore
+    (Or_error.ok_exn (Agent.set_cwd agent ~path:t.dir) : Dir_change.Outcome.t);
   Agent.set_mode agent ~plan:false;
   let agent = restart agent in
   send agent "four";
@@ -121,11 +123,13 @@ let%expect_test "changes that cancel out tell nothing, across a restart too" =
   let agent = make () in
   send agent "one";
   let model = (Agent.state agent).model in
-  Or_error.ok_exn (Agent.set_cwd agent ~path:"sub");
+  ignore
+    (Or_error.ok_exn (Agent.set_cwd agent ~path:"sub") : Dir_change.Outcome.t);
   Agent.set_model agent gpt;
   Agent.set_mode agent ~plan:true;
   let agent = restart agent in
-  Or_error.ok_exn (Agent.set_cwd agent ~path:"..");
+  ignore
+    (Or_error.ok_exn (Agent.set_cwd agent ~path:"..") : Dir_change.Outcome.t);
   Agent.set_model agent model;
   Agent.set_mode agent ~plan:false;
   send agent "two";
@@ -163,7 +167,8 @@ let%expect_test
     make ~session:(Or_error.ok_exn (Session.load (Session.path old))) ()
   in
   send agent "two";
-  Or_error.ok_exn (Agent.set_cwd agent ~path:"sub");
+  ignore
+    (Or_error.ok_exn (Agent.set_cwd agent ~path:"sub") : Dir_change.Outcome.t);
   let agent = restart agent in
   send agent "three";
   [%expect
@@ -182,7 +187,8 @@ let%expect_test
   let agent = make () in
   send agent "one";
   let rewind_to = List.last_exn (Session.active_path (Agent.session agent)) in
-  Or_error.ok_exn (Agent.set_cwd agent ~path:"sub");
+  ignore
+    (Or_error.ok_exn (Agent.set_cwd agent ~path:"sub") : Dir_change.Outcome.t);
   send agent "two";
   Or_error.ok_exn (Agent.rewind agent ~to_:rewind_to.id);
   send agent "two again";

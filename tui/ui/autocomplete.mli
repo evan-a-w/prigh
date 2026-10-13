@@ -35,9 +35,11 @@ val down : t -> t
 val selected_item : t -> Picker.Item.t option
 
 (** [compute ~line ~col ...] where [line] is the editor line under the cursor,
-    [col] is the cursor's byte offset within it and [line_index] its index. *)
+    [col] is the cursor's byte offset within it and [line_index] its index.
+    [current_session] (its path) is not offered to [/delete]. *)
 val compute
-  :  line:string
+  :  current_session:string option
+  -> line:string
   -> col:int
   -> line_index:int
   -> models:P.Model.t list

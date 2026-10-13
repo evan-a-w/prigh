@@ -35,6 +35,11 @@ module Method : sig
         { call_id : string
         ; agent_id : string option (** in this subagent's transcript *)
         } (** a whole output ([{text, is_error}]) that was {!Elided} *)
+    | Change_dir of
+        { target : Dir_change.Target.t
+        ; path : string
+        ; if_missing : Dir_change.If_missing.t
+        } (** [set_cwd] or [set_active_host]; see {!Dir_change.Outcome} *)
   [@@deriving sexp_of, equal]
 
   val name : t -> string

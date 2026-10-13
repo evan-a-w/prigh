@@ -28,6 +28,7 @@ module Text_prompt_action = struct
   type t =
     | Name
     | Cd
+    | Mkdir (** [/mkdir]: created, then changed to *)
     | Export_path
     | Import_path
     | Deny_reason of
@@ -54,8 +55,11 @@ module Confirm_action = struct
         { paths : string list
         ; back : Open_picker.t option
         }
-    | Delete_archived of { back : Open_picker.t option }
     | Tool_confirm of Pending.Confirm.t
+    | Create_dir of
+        { target : Dir_change.Target.t
+        ; path : string (** absolute, on the target's host *)
+        } (** a missing directory given to [/cd] or [/host] *)
   [@@deriving sexp_of, equal]
 end
 

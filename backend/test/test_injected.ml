@@ -204,7 +204,9 @@ let%expect_test
   write t "sub/notes.txt" "some notes\n";
   Or_error.ok_exn (Agent.prompt agent "first");
   Agent.wait_idle agent;
-  Or_error.ok_exn (Agent.set_cwd agent ~path:(Filename.concat t.dir "sub"));
+  ignore
+    (Or_error.ok_exn (Agent.set_cwd agent ~path:(Filename.concat t.dir "sub"))
+     : Dir_change.Outcome.t);
   Or_error.ok_exn
     (Agent.prompt agent "read @notes.txt please" ~attachments:[ "notes.txt" ]);
   Agent.wait_idle agent;

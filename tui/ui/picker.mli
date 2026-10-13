@@ -50,10 +50,16 @@ val multi : t -> bool
     [toggle_check]. *)
 val checked : t -> String.Set.t
 
-(** Replaces the items, keeping the query, the checks of items still there and
-    the highlight on [select] (default: the highlighted item), else at the same
-    row. *)
-val set_items : ?title:string -> ?select:string -> t -> Item.t list -> t
+(** Replaces the items, keeping the query, the checks of items still there
+    (or setting [checked]) and the highlight on [select] (default: the
+    highlighted item), else at the same row. *)
+val set_items
+  :  ?title:string
+  -> ?select:string
+  -> ?checked:String.Set.t
+  -> t
+  -> Item.t list
+  -> t
 
 (** Checks or unchecks the highlighted item and moves to the next one. *)
 val toggle_check : t -> t

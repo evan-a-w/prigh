@@ -1089,9 +1089,51 @@ let resolve_dir_on t (host : Host.t) path =
   | { is_error = false; text; _ } -> Ok text
 ;;
 
+let make_dir_on t (host : Host.t) path ~check =
+  let result =
+    host_exec_on
+      t
+      host
+      ~cancel:Cancellation.never
+      ~on_output:ignore
+      ~call_id:"cd"
+      ~cwd:host.cwd
+      ~name:Dir_change.op
+      ~arguments:(Dir_change.args ~path ~check)
+  in
+  match Dir_change.older_host result ~host:host.name ~path, result with
+  | Some message, _ -> Or_error.error_string message
+  | None, { is_error = true; text; _ } ->
+    Or_error.errorf "%s: %s" host.name text
+  | None, { is_error = false; text; _ } -> Ok text
+;;
+
+(* Where [path] would take the session on [host], creating it or asking
+   first as [if_missing] says. *)
+let change_dir_on t host path ~(if_missing : Dir_change.If_missing.t)
+  : Dir_change.Outcome.t Or_error.t
+  =
+  match resolve_dir_on t host path, if_missing with
+  | Ok cwd, _ -> Ok (Changed { cwd; created = false })
+  | (Error _ as error), Fail -> error
+  | Error _, Ask ->
+    Or_error.map (make_dir_on t host path ~check:true) ~f:(fun path ->
+      Dir_change.Outcome.Missing path)
+  | Error _, Create ->
+    Or_error.map (make_dir_on t host path ~check:false) ~f:(fun cwd ->
+      Dir_change.Outcome.Changed { cwd; created = true })
+;;
+
+let apply_dir_change (outcome : Dir_change.Outcome.t) ~f =
+  (match outcome with
+   | Changed { cwd; created = _ } -> f cwd
+   | Missing _ -> ());
+  outcome
+;;
+
 (* The session cwd is a property of the host, so switching hosts means
    choosing a directory there; without [cwd] the host's own is used. *)
-let set_active_host t id ~cwd =
+let set_active_host ?(if_missing = Dir_change.If_missing.Fail) t id ~cwd =
   match find_host t id with
   | None when String.equal id Host.backend_id && not t.backend_host_enabled ->
     Or_error.error_string "the backend tool host is disabled"
@@ -1099,12 +1141,16 @@ let set_active_host t id ~cwd =
     Or_error.error_string (host_unavailable_message t)
   | None -> Or_error.errorf "unknown tool host %S" id
   | Some host ->
-    let cwd =
+    let outcome =
       match cwd with
-      | None -> Ok host.cwd
-      | Some path -> resolve_dir_on t host (Tool.expand_home path)
+      | None ->
+        Ok (Dir_change.Outcome.Changed { cwd = host.cwd; created = false })
+      | Some path -> change_dir_on t host (Tool.expand_home path) ~if_missing
     in
-    Or_error.map cwd ~f:(fun cwd -> activate_host t host ~cwd ~pinned:true)
+    Or_error.map
+      outcome
+      ~f:
+        (apply_dir_change ~f:(fun cwd -> activate_host t host ~cwd ~pinned:true))
 ;;
 
 let executor t : Tool.executor =
@@ -2233,8 +2279,8 @@ let remove_queued t ~queue ~index ~text =
   in
   let items = Queue.to_list q in
   match List.nth items index with
-  | Some (item : Queued.t)
-    when Option.for_all text ~f:(String.equal item.text) ->
+  | Some (item : Queued.t) when Option.for_all text ~f:(String.equal item.text)
+    ->
     Queue.clear q;
     List.iteri items ~f:(fun i item -> if i <> index then Queue.enqueue q item);
     queue_update t;
@@ -2630,7 +2676,7 @@ let resolve_path t path =
   if Filename.is_absolute path then path else Filename.concat t.cwd path
 ;;
 
-let set_cwd t ~path =
+let set_cwd ?(if_missing = Dir_change.If_missing.Fail) t ~path =
   if is_running t
   then
     Or_error.error_string "cannot change directory while a run is in progress"
@@ -2639,10 +2685,11 @@ let set_cwd t ~path =
     | None -> Or_error.error_string (host_unavailable_message t)
     | Some host ->
       Or_error.map
-        (resolve_dir_on t host (resolve_path t path))
-        ~f:(fun cwd ->
-          set_host_cwd t host ~cwd;
-          state_changed t))
+        (change_dir_on t host (resolve_path t path) ~if_missing)
+        ~f:
+          (apply_dir_change ~f:(fun cwd ->
+             set_host_cwd t host ~cwd;
+             state_changed t)))
 ;;
 
 let host_call

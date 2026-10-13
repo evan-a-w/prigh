@@ -217,7 +217,7 @@ let%expect_test "/skill: completes skill names, fetched once per session" =
       earlier answer
     ────────────────────────────────────────────────────────────
     > /skill:▏
-    …deepseek-flash  Tab accepts · Enter runs as typed · Esc
+    …deepseek-flash  Tab accepts · Enter as typed · Esc hides
     |}];
   H.reply h (Skills_for_autocomplete key) skills_json;
   H.show h;
@@ -232,7 +232,7 @@ let%expect_test "/skill: completes skill names, fetched once per session" =
     ▸ frontend-design  Build distinctive, production-grade UIs
       release          Cut a release
       review           Review a diff
-    …deepseek-flash  Tab accepts · Enter runs as typed · Esc
+    …deepseek-flash  Tab accepts · Enter as typed · Esc hides
     |}];
   (* Typing filters without asking again. *)
   H.keys h "fr";
@@ -302,7 +302,7 @@ let%expect_test "/skill: completes skill names, fetched once per session" =
       earlier answer
     ────────────────────────────────────────────────────────────
     > /skill:▏
-    …deepseek-flash  Tab accepts · Enter runs as typed · Esc
+    …deepseek-flash  Tab accepts · Enter as typed · Esc hides
     |}];
   H.reply h (Skills_for_autocomplete "s2 backend:/work") {|{"skills":[]}|};
   H.show h;
@@ -314,7 +314,7 @@ let%expect_test "/skill: completes skill names, fetched once per session" =
       earlier answer
     ────────────────────────────────────────────────────────────
     > /skill:▏
-    …deepseek-flash  Tab accepts · Enter runs as typed · Esc
+    …deepseek-flash  Tab accepts · Enter as typed · Esc hides
     |}];
   (* None here: Enter is the picker, which says where to add them. *)
   H.enter h;
