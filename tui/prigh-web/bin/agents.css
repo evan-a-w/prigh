@@ -25,9 +25,21 @@
 }
 .agents-head > .btn.icon:first-child { margin-left: -8px; }
 .agents-head-icon { color: var(--muted); }
-.agents-title { font-weight: 600; font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.agents-title { margin: 0; font-weight: 600; font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.agents-id { font: 500 12.5px var(--mono); color: var(--muted); }
 .agents-running { color: var(--sodium); font-size: 12.5px; white-space: nowrap; }
 .agents-close { margin-left: auto; }
+.agents-locate { margin-left: auto; display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
+.agents-locate .icon { width: 13px; height: 13px; }
+.agents-locate ~ .agents-close { margin-left: 0; }
+.agents-panel .sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
 
 .agents-body {
   flex: 1;
@@ -36,116 +48,113 @@
   padding: 12px 8px 16px;
   display: flex;
   flex-direction: column;
-  gap: 18px;
+  gap: 20px;
 }
 
-.agents-section { display: flex; flex-direction: column; }
+/* Sections: a quiet sentence-case heading with the count beside it. */
+.agents-section { display: flex; flex-direction: column; gap: 2px; }
 .agents-section-head {
   display: flex;
   align-items: baseline;
-  justify-content: space-between;
-  padding: 0 8px 6px;
+  gap: 8px;
+  margin: 0;
+  padding: 0 10px 4px;
   color: var(--muted);
   font-size: 12.5px;
   font-weight: 600;
 }
-.agents-section-count { font: 11.5px var(--mono); color: var(--faint); }
+.agents-section-count { font: 400 11.5px var(--mono); color: var(--faint); }
 
-/* The tree: the shortcut digit (Alt+N) sits in a fixed column on the left;
-   the state icon and the text indent by depth. Guides run under each
-   ancestor's state icon: ::before draws the outer levels, ::after the
-   parent's (├, or └ when no nested row follows). */
+/* A row: the lamp or outcome mark in a narrow column, the task, how long;
+   below, what it is doing or how it ended, then one faint line of data. */
+.agents-tree { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 2px; }
+.agents-tree > li { position: relative; min-width: 0; }
 .agents-row {
-  --indent: 18px;
   display: grid;
-  grid-template-columns: 14px minmax(0, 1fr);
-  align-items: start;
-  gap: 1px 8px;
+  grid-template-columns: 14px minmax(0, 1fr) auto;
+  column-gap: 10px;
+  align-items: baseline;
   width: 100%;
-  padding: 7px 10px 7px calc(30px + var(--depth, 0) * var(--indent));
+  padding: 8px 10px;
   border: 0;
   border-radius: var(--r-control);
   background: none;
+  color: var(--chalk);
+  font: inherit;
   text-align: left;
   cursor: pointer;
   position: relative;
 }
+.agents-row > * { display: block; min-width: 0; }
 .agents-row:hover { background: var(--slate-2); }
 .agents-row:focus-visible { outline: 2px solid var(--sodium); outline-offset: -2px; }
 .agents-row.selected { background: var(--sodium-wash); box-shadow: inset 2px 0 var(--sodium); }
-.agents-row.nested::before, .agents-row.nested::after {
-  content: "";
-  position: absolute;
-  top: 0;
-  bottom: 0;
-  pointer-events: none;
-}
-.agents-row.nested::before {
-  left: 36px;
-  width: calc((var(--depth) - 1) * var(--indent));
-  background: repeating-linear-gradient(to right, var(--rule-2) 0 1px, transparent 1px var(--indent));
-}
-.agents-row.nested::after {
-  left: calc(36px + (var(--depth) - 1) * var(--indent));
-  width: 10px;
-  background:
-    linear-gradient(var(--rule-2), var(--rule-2)) 0 0 / 1px 100% no-repeat,
-    linear-gradient(var(--rule-2), var(--rule-2)) 0 16px / 10px 1px no-repeat;
-}
-.agents-row.nested:not(:has(+ .agents-row.nested))::after { background-size: 1px 17px, 10px 1px; }
-.agents-row:not(.nested):has(+ .agents-row.nested)::before {
-  content: "";
-  position: absolute;
-  left: 36px;
-  top: 26px;
-  bottom: 0;
-  width: 1px;
-  background: var(--rule-2);
-  pointer-events: none;
-}
-.agents-row > .lamp { margin-top: 6px; justify-self: center; }
-.agents-row > .state-icon { margin-top: 2px; }
-.agents-row .state-icon, .detail-title .state-icon { font-size: 12px; width: 14px; text-align: center; line-height: 14px; }
-.agents-row.complete .state-icon, .detail-title.complete .state-icon { color: var(--sage); }
-.agents-row.failed .state-icon, .detail-title.failed .state-icon { color: var(--brick); }
-.row-num {
-  position: absolute;
-  left: 8px;
-  top: 7px;
-  width: 14px;
-  padding: 0;
-  font: 11.5px/18px var(--mono);
-  text-align: center;
-  color: var(--faint);
-  background: none;
-  border: 0;
-}
-.agents-row:hover .row-num, .agents-row.selected .row-num { color: var(--muted); }
-.row-num.none { visibility: hidden; }
-.row-main { display: flex; flex-direction: column; min-width: 0; gap: 1px; }
-.row-top { display: flex; align-items: baseline; gap: 8px; min-width: 0; line-height: 18px; }
-.row-title { flex: 1; min-width: 0; font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.job .row-title { font: 12.5px var(--mono); }
-.row-elapsed { font: 11.5px var(--mono); color: var(--faint); white-space: nowrap; font-variant-numeric: tabular-nums; }
-.agents-row.running .row-elapsed { color: var(--sodium); }
-.row-meta, .row-line { font-size: 12.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.row-meta { font: 11.5px/17px var(--mono); color: var(--faint); white-space: pre; }
-.row-line { color: var(--muted); }
-.agents-row.running .row-line::before { content: "↳ "; color: var(--faint); }
+.row-mark { grid-column: 1; grid-row: 1; align-self: center; display: flex; justify-content: center; line-height: 20px; }
+.row-title { grid-column: 2; grid-row: 1; font-size: 14px; line-height: 20px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.job .row-title { font: 13px/20px var(--mono); }
+.job .row-title::before { content: "$ "; color: var(--faint); }
+.row-time { grid-column: 3; grid-row: 1; font: 11.5px var(--mono); color: var(--faint); white-space: nowrap; font-variant-numeric: tabular-nums; }
+.agents-row.running .row-time { color: var(--sodium); }
+.row-line, .row-meta { grid-column: 2 / -1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.row-line { margin-top: 2px; font-size: 12.5px; line-height: 18px; color: var(--muted); }
+.agents-row.running .row-line, .job .row-line { font: 12px/18px var(--mono); }
 .agents-row.failed .row-line { color: var(--brick); }
-.job .row-line { font: 11.5px var(--mono); }
+.row-meta { font: 11.5px/17px var(--mono); color: var(--faint); white-space: pre; }
 
-.agents-empty { color: var(--muted); font-size: 14px; padding: 18px 8px; }
+/* Outcome marks: sage done, brick failed, faint for work stopped on
+   purpose (cancelled, killed) or by a restart. */
+.agent-mark { font-size: 12px; line-height: 1; }
+.agents-panel .complete .agent-mark { color: var(--sage); }
+.agents-panel .failed .agent-mark { color: var(--brick); }
+.agents-panel .stopped .agent-mark { color: var(--faint); }
+.agents-row.stopped .row-title { color: var(--muted); }
+
+/* The tree: a nested agent hangs off a guide under its parent's mark (the
+   row's padding plus half the mark column), with a rounded elbow to its
+   own mark. */
+.agents-tree.nested { --elbow: 18px; margin-left: 17px; padding-left: 12px; gap: 2px; }
+.agents-tree > li:has(> .agents-tree.nested) > .agents-row::after {
+  content: "";
+  position: absolute;
+  left: 17px;
+  top: 28px;
+  bottom: -2px;
+  border-left: 1px solid var(--rule-2);
+  pointer-events: none;
+}
+.agents-tree.nested > li::before {
+  content: "";
+  position: absolute;
+  left: -12px;
+  top: -2px;
+  width: 17px;
+  height: calc(var(--elbow) + 2px);
+  border-left: 1px solid var(--rule-2);
+  border-bottom: 1px solid var(--rule-2);
+  border-bottom-left-radius: 6px;
+  pointer-events: none;
+}
+.agents-tree.nested > li:not(:last-child)::after {
+  content: "";
+  position: absolute;
+  left: -12px;
+  top: 0;
+  bottom: -2px;
+  border-left: 1px solid var(--rule-2);
+  pointer-events: none;
+}
+
+.agents-empty { color: var(--muted); font-size: 14px; padding: 8px 10px; }
 .agents-empty p { margin: 0 0 8px; }
 .agents-empty .hint { color: var(--faint); font-size: 12.5px; }
 
+.agents-earlier { display: flex; flex-direction: column; gap: 2px; }
 .agents-earlier > summary {
   cursor: pointer;
-  padding: 4px 8px;
+  padding: 4px 10px;
   border-radius: var(--r-control);
-  color: var(--muted);
+  color: var(--faint);
   font-size: 12.5px;
-  font-weight: 600;
   list-style: none;
 }
 .agents-earlier > summary::-webkit-details-marker { display: none; }
@@ -156,73 +165,80 @@
   display: inline-block;
   width: 5px;
   height: 5px;
-  margin: 0 8px 0 2px;
+  margin: 0 9px 0 3px;
   vertical-align: 0.2em;
   border-right: 1.5px solid var(--faint);
   border-bottom: 1.5px solid var(--faint);
   transform: rotate(-45deg);
 }
 .agents-earlier[open] > summary::before { transform: translateY(-1px) rotate(45deg); }
-.agents-earlier .agents-row { opacity: 0.7; }
+.agents-earlier .agents-row:not(:hover):not(.selected) .row-title { color: var(--muted); }
 
-/* One agent or job in full */
+/* One agent or job in full: aligned with the list's columns (mark, then
+   text 24px in), the transcript's spine running down the mark column. */
 
-.agents-detail { display: flex; flex-direction: column; gap: 14px; min-width: 0; padding: 0 4px; }
-.agents-crumbs { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; font-size: 12.5px; color: var(--faint); }
-.crumb { background: none; border: 0; padding: 0; color: var(--muted); cursor: pointer; max-width: 180px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 12.5px; text-decoration: underline; text-decoration-color: var(--rule-2); text-underline-offset: 3px; }
+.agents-detail { display: flex; flex-direction: column; gap: 16px; min-width: 0; padding: 0 10px; }
+.agents-crumbs { margin-bottom: -8px; display: flex; flex-wrap: wrap; align-items: center; gap: 6px; padding-left: 24px; font-size: 12.5px; color: var(--faint); }
+.crumb { background: none; border: 0; padding: 0; color: var(--muted); cursor: pointer; max-width: 90%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 12.5px; text-decoration: underline; text-decoration-color: var(--rule-2); text-underline-offset: 3px; }
 .crumb:hover { color: var(--chalk); text-decoration-color: currentColor; }
 .crumb:focus-visible { outline: 2px solid var(--sodium); outline-offset: 1px; border-radius: var(--r-chip); }
-.crumb.current { color: var(--chalk); text-decoration: none; cursor: default; }
 
-.detail-head {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  padding: 2px 0 14px;
-  border-bottom: 1px solid var(--rule);
+.detail-head { display: flex; flex-direction: column; gap: 6px; padding-bottom: 14px; border-bottom: 1px solid var(--rule); }
+.detail-title {
+  display: grid;
+  grid-template-columns: 14px minmax(0, 1fr);
+  column-gap: 10px;
+  align-items: baseline;
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 22px;
 }
-.detail-title { display: flex; align-items: flex-start; gap: 8px; font-weight: 600; font-size: 15px; line-height: 1.4; }
-.detail-title > .lamp { margin: 8px 3.5px 0; }
-.detail-title > .state-icon { margin-top: 4px; }
+.detail-title .row-mark { line-height: 22px; align-self: start; height: 22px; align-items: center; }
 .detail-task { overflow-wrap: anywhere; }
-.detail-command { font: 500 14px var(--mono); overflow-wrap: anywhere; }
+.detail-command { font: 500 14px/22px var(--mono); overflow-wrap: anywhere; }
 .detail-command::before { content: "$ "; color: var(--faint); }
-.detail-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; font-size: 12.5px; color: var(--muted); }
-.detail-elapsed { font: 11.5px var(--mono); font-variant-numeric: tabular-nums; }
-.detail-chip { font: 11.5px/18px var(--mono); padding: 0 6px; border: 1px solid var(--rule); border-radius: var(--r-chip); white-space: nowrap; }
-.pill { font-size: 11.5px; font-weight: 600; padding: 0 6px; line-height: 18px; border: 1px solid transparent; border-radius: var(--r-chip); }
-.pill.running { color: var(--sodium); background: var(--sodium-wash); border-color: var(--sodium-line); }
-.pill.complete { color: var(--sage); border-color: var(--sage-line); }
-.pill.failed { color: var(--brick); background: var(--brick-wash); border-color: var(--brick-line); }
-.detail-actions { display: flex; gap: 6px; flex-wrap: wrap; }
-.detail-actions .btn { display: inline-flex; align-items: center; gap: 6px; }
-.detail-actions .icon { width: 13px; height: 13px; }
-.detail-actions .stop .icon { width: 10px; height: 10px; }
+.detail-meta { padding-left: 24px; line-height: 20px; }
+.detail-meta > span { margin-right: 8px; }
+.detail-state { font-size: 12.5px; font-weight: 600; color: var(--muted); }
+.running > .detail-meta .detail-state { color: var(--sodium); }
+.complete > .detail-meta .detail-state { color: var(--sage); }
+.failed > .detail-meta .detail-state { color: var(--brick); }
+.detail-elapsed, .detail-more { font: 11.5px var(--mono); color: var(--faint); font-variant-numeric: tabular-nums; white-space: pre-wrap; }
+.running > .detail-meta .detail-elapsed { color: var(--sodium); }
+.detail-meta > .btn { float: right; margin: -3px 0 0 12px; display: inline-flex; align-items: center; gap: 6px; }
+.detail-meta .stop .icon { width: 10px; height: 10px; }
 
-.agents-note { display: flex; align-items: center; gap: 8px; color: var(--muted); font-size: 14px; padding: 4px 0; }
-.agents-note.small { font-size: 12.5px; color: var(--faint); }
+.agents-children { margin: 0 -10px; }
 
+.agents-note { display: flex; align-items: center; gap: 8px; color: var(--muted); font-size: 14px; padding: 4px 0 4px 24px; }
+.agents-note.small { font-size: 12px; color: var(--faint); padding: 0; }
 
-.agents-transcript .entries { max-width: none; gap: 12px; font-size: 14px; }
+/* The main chat's transcript at the panel's width: the spine under the
+   mark column, the steps where the title's text starts. */
+.agents-transcript { --gutter: 17.5px; --graphite: var(--slate); margin-left: 6.5px; }
+.agents-transcript .tool-head { gap: 7px; }
+.agents-transcript .tool-head .chip:not(.bad):not(.add):not(.del):not(.job),
+.agents-transcript .delivery-head .stats { display: none; }
+.agents-transcript .entries { max-width: none; font-size: 14px; }
 .agents-transcript .empty { display: none; }
+.agents-transcript.task-in-title .entries > .msg.user:first-child { display: none; }
+.agents-transcript.task-in-title .entries > .msg.user:first-child + .msg { margin-top: 0; }
+.agents-transcript.task-in-title .entries > .msg.user:first-child + .msg::before { top: 0; }
 
-.agents-result {
-  border: 1px solid var(--rule);
-  border-left: 2px solid var(--sage);
-  border-radius: var(--r-control);
-  padding: 10px 12px;
-  background: var(--well);
-}
-.agents-result.failed { border-color: var(--brick-line); border-left-color: var(--brick); background: var(--brick-wash); }
-.agents-result-head { font-size: 12.5px; font-weight: 600; color: var(--muted); margin-bottom: 4px; }
-.agents-result.failed .agents-result-head { color: var(--brick); }
-.agents-result pre { margin: 0; white-space: pre-wrap; font: 12.5px var(--mono); color: var(--chalk); }
+/* How it ended, when the transcript does not say: on the same columns. */
+.agents-ending { display: grid; grid-template-columns: 14px minmax(0, 1fr); column-gap: 10px; row-gap: 4px; align-items: baseline; }
+.agents-ending-head { grid-column: 2; font-size: 12.5px; font-weight: 600; color: var(--muted); }
+.agents-ending.failed .agents-ending-head { color: var(--brick); }
+.agents-ending > pre, .agents-ending > .markdown { grid-column: 2; margin: 0; }
+.agents-ending > pre { white-space: pre-wrap; overflow-wrap: anywhere; font: 12.5px/1.5 var(--mono); color: var(--muted); }
+.agents-ending.complete > .agents-ending-head { grid-column: 2; }
 
+.job-output-block { display: flex; flex-direction: column; gap: 6px; padding-left: 24px; }
 .job-output {
   margin: 0;
   padding: 10px 12px;
   background: var(--well);
-  border: 1px solid var(--rule);
   border-radius: var(--r-control);
   font: 12.5px/1.5 var(--mono);
   white-space: pre-wrap;
@@ -276,7 +292,6 @@
   animation: agents-up 0.2s ease-out;
 }
 .app.narrow .agents-head { min-height: 50px; padding-left: 12px; }
-.app.narrow .crumb { max-width: 40vw; }
 @keyframes agents-up { from { opacity: 0; transform: translateY(24px); } }
 
 @media (prefers-reduced-motion: reduce) {

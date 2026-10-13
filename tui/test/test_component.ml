@@ -230,6 +230,7 @@ let%expect_test "component: startup requests, key handling, rpc round trip, \
     reconnect after 0ms session=/s
     rpc get_state ()
     rpc get_messages ()
+    rpc get_pending ()
     rpc auth_status ()
     rpc get_config ()
     rpc list_models ()

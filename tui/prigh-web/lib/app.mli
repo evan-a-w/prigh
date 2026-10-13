@@ -100,7 +100,8 @@ module Reply_tag : sig
     | Reload_messages (** the head moved: fetch state and messages *)
     | Exported
     | Imported
-    | Prompt_done of string
+    | Dir_changed of Dir_change.Target.t
+    (** [Missing] asks to create it; the prompt or dialog closes once changed *)
     (** closes the prompt dialog with this notice; failures show in it *)
     | Prompt_paths of string (** the prompt's input listed *)
     | Btw of string (** the side question's id *)

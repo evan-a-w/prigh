@@ -11,10 +11,12 @@ type ('key, 'deps) t
 
 val create : unit -> ('key, 'deps) t
 
-(** The node last made for [key], if it was made with [deps] equal to these,
-    otherwise a new one made by [f] (lazily: only when rendered). *)
+(** The node last made for [key], if it was made with [deps] equal to these
+    (and the same [inject], for nodes whose handlers capture it), otherwise a
+    new one made by [f] (lazily: only when rendered). *)
 val find
-  :  ('key, 'deps) t
+  :  ?inject:('action -> unit Effect.t)
+  -> ('key, 'deps) t
   -> 'key
   -> deps:'deps
   -> equal:('deps -> 'deps -> bool)

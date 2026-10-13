@@ -498,8 +498,15 @@ val rewind : t -> to_:string -> unit Or_error.t
 val set_session_name : t -> string -> unit
 
 (** Changes the working directory used by tools and the system prompt, and
-    records it in the session. Fails while a run is in progress. *)
-val set_cwd : t -> path:string -> unit Or_error.t
+    records it in the session. Fails while a run is in progress. A missing
+    directory fails, is created on the active tool host, or (when it could
+    be) is answered [Missing] without changing anything, as [if_missing]
+    (default [Fail]) says. *)
+val set_cwd
+  :  ?if_missing:Dir_change.If_missing.t
+  -> t
+  -> path:string
+  -> Dir_change.Outcome.t Or_error.t
 
 (** Paths under the session cwd matching [prefix], listed on the active tool
     host (for [@] completion). *)
@@ -578,9 +585,14 @@ val location : t -> (Session.Host.t * string) option
 
 (** Switches where tools run from the next call on. The session cwd becomes
     [cwd], which must be a directory on that host (resolved there; [~/] is
-    expanded), or the host's own cwd when omitted. Fails for an unknown host or
-    a missing directory without switching. *)
-val set_active_host : t -> string -> cwd:string option -> unit Or_error.t
+    expanded), or the host's own cwd when omitted. Fails for an unknown host
+    without switching; a missing directory is handled as by {!set_cwd}. *)
+val set_active_host
+  :  ?if_missing:Dir_change.If_missing.t
+  -> t
+  -> string
+  -> cwd:string option
+  -> Dir_change.Outcome.t Or_error.t
 
 (** Streamed output of a remote execution, relayed by the host. *)
 val tool_exec_output : t -> exec_id:string -> chunk:string -> unit Or_error.t

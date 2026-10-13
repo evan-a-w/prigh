@@ -664,20 +664,24 @@ let%expect_test "set_cwd changes state, persists, and is refused while running" 
   @@ fun t agent _dump ->
   let sub = Filename.concat t.dir "sub" in
   Core_unix.mkdir_p sub;
-  print_s [%sexp (Agent.set_cwd agent ~path:sub : unit Or_error.t)];
+  print_endline
+    (mask_sexp
+       t
+       [%sexp (Agent.set_cwd agent ~path:sub : Dir_change.Outcome.t Or_error.t)]);
   let state = Agent.state agent in
   print_s
     [%sexp
       (mask t state.cwd : string)
     , (mask t (Session.cwd (Agent.session agent)) : string)];
   Or_error.ok_exn (Agent.prompt agent "go");
-  print_s [%sexp (Agent.set_cwd agent ~path:t.dir : unit Or_error.t)];
+  print_s
+    [%sexp (Agent.set_cwd agent ~path:t.dir : Dir_change.Outcome.t Or_error.t)];
   Agent.wait_idle agent;
   let reloaded = Or_error.ok_exn (Session.load state.session_path) in
   print_s [%sexp (mask t (Session.cwd reloaded) : string)];
   [%expect
     {|
-    (Ok ())
+    (Ok (Changed (cwd $DIR/sub) (created false)))
     ($DIR/sub $DIR/sub)
     (Error "cannot change directory while a run is in progress")
     $DIR/sub
@@ -695,7 +699,9 @@ let%expect_test "git_branch is read from .git/HEAD and refreshed" =
   Out_channel.write_all
     (Filename.concat git "HEAD")
     ~data:"ref: refs/heads/feature\n";
-  Or_error.ok_exn (Agent.set_cwd agent ~path:(Filename.concat repo "sub"));
+  ignore
+    (Or_error.ok_exn (Agent.set_cwd agent ~path:(Filename.concat repo "sub"))
+     : Dir_change.Outcome.t);
   print_s [%sexp ((Agent.state agent).git_branch : string option)];
   Out_channel.write_all
     (Filename.concat git "HEAD")
@@ -972,7 +978,8 @@ let%expect_test
   Out_channel.write_all (Filename.concat sub "AGENTS.md") ~data:"sub rules";
   Or_error.ok_exn (Agent.prompt agent "first");
   Agent.wait_idle agent;
-  Or_error.ok_exn (Agent.set_cwd agent ~path:sub);
+  ignore
+    (Or_error.ok_exn (Agent.set_cwd agent ~path:sub) : Dir_change.Outcome.t);
   Or_error.ok_exn (Agent.prompt agent "second");
   Agent.wait_idle agent;
   let systems = Queue.to_list systems in
@@ -1107,7 +1114,9 @@ let%expect_test "set_active_host with a cwd validates it on the new host" =
     print_endline
       (mask_sexp
          t
-         [%sexp (Agent.set_active_host agent "backend" ~cwd : unit Or_error.t)]);
+         [%sexp
+           (Agent.set_active_host agent "backend" ~cwd
+            : Dir_change.Outcome.t Or_error.t)]);
     printf
       "cwd=%s hosts=%s\n"
       (mask t (Agent.state agent).cwd)
@@ -1127,14 +1136,85 @@ let%expect_test "set_active_host with a cwd validates it on the new host" =
     state: running=false messages=2
     (Error "<host>: not a directory: /no/such/dir")
     cwd=$DIR hosts=$DIR
-    (Ok ())
+    (Ok (Changed (cwd $DIR/sub) (created false)))
     cwd=$DIR/sub hosts=$DIR/sub
-    (Ok ())
+    (Ok (Changed (cwd $DIR/sub) (created false)))
     cwd=$DIR/sub hosts=$DIR/sub
     notice: tools now run on <host> in $DIR/sub
     state: running=false messages=2
     notice: tools now run on <host> in $DIR/sub
     state: running=false messages=2
+    |}]
+;;
+
+let%expect_test
+    "set_cwd and set_active_host: a missing directory fails, asks or is created"
+  =
+  with_agent [ Reply.text "ok" ]
+  @@ fun t agent dump ->
+  write t "file" "x";
+  let show what result =
+    print_endline
+      (mask_sexp
+         t
+         [%sexp (what : string), (result : Dir_change.Outcome.t Or_error.t)]);
+    printf
+      "  cwd=%s new/a exists=%b\n"
+      (mask t (Agent.state agent).cwd)
+      (Sys_unix.is_directory_exn (Filename.concat t.dir "new/a"))
+  in
+  let cd ?if_missing path =
+    show
+      (sprintf
+         "cd %s %s"
+         path
+         (Sexp.to_string [%sexp (if_missing : Dir_change.If_missing.t option)]))
+      (Agent.set_cwd ?if_missing agent ~path)
+  in
+  cd "new/a/b";
+  cd "new/a/b" ~if_missing:Ask;
+  cd "file/x" ~if_missing:Ask;
+  cd "file" ~if_missing:Create;
+  cd "new/a/b" ~if_missing:Create;
+  (* Existing directories are just changed to, whatever [if_missing]. *)
+  cd ".." ~if_missing:Ask;
+  cd "/" ~if_missing:Create;
+  let host ?if_missing path =
+    show
+      (sprintf "host %s" path)
+      (Agent.set_active_host ?if_missing agent "backend" ~cwd:(Some path))
+  in
+  host (Filename.concat t.dir "two/c") ~if_missing:Ask;
+  host (Filename.concat t.dir "two/c") ~if_missing:Create;
+  dump ();
+  [%expect
+    {|
+    ("cd new/a/b ()" (Error "<host>: not a directory: $DIR/new/a/b"))
+      cwd=$DIR new/a exists=false
+    ("cd new/a/b (Ask)" (Ok (Missing $DIR/new/a/b)))
+      cwd=$DIR new/a exists=false
+    ("cd file/x (Ask)"
+     (Error
+      "<host>: $DIR/file is a file, so $DIR/file/x cannot be created: choose another path"))
+      cwd=$DIR new/a exists=false
+    ("cd file (Create)"
+     (Error "<host>: $DIR/file is a file, not a directory: choose another path"))
+      cwd=$DIR new/a exists=false
+    ("cd new/a/b (Create)" (Ok (Changed (cwd $DIR/new/a/b) (created true))))
+      cwd=$DIR/new/a/b new/a exists=true
+    ("cd .. (Ask)" (Ok (Changed (cwd $DIR/new/a) (created false))))
+      cwd=$DIR/new/a new/a exists=true
+    ("cd / (Create)" (Ok (Changed (cwd /) (created false))))
+      cwd=/ new/a exists=true
+    ("host $DIR/two/c" (Ok (Missing $DIR/two/c)))
+      cwd=/ new/a exists=true
+    ("host $DIR/two/c" (Ok (Changed (cwd $DIR/two/c) (created true))))
+      cwd=$DIR/two/c new/a exists=true
+    state: running=false messages=0
+    state: running=false messages=0
+    state: running=false messages=0
+    notice: tools now run on <host> in $DIR/two/c
+    state: running=false messages=0
     |}]
 ;;
 
