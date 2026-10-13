@@ -847,9 +847,11 @@ let summarise t ~path ~mtime =
       Time_float.to_string_utc
         (Time_float.of_span_since_epoch (Time_float.Span.of_sec mtime))
   ; first_prompt =
-      (* The user's words, not the notes the harness put before them. *)
-      List.find_map messages ~f:(function
-        | Message.User u ->
+      (* The user's words, not the notes the harness put before them; from
+         the whole path, not what a compaction left (its summary first). *)
+      List.find_map (active_path t) ~f:(fun (e : Entry.t) ->
+        match e.payload with
+        | Message (User u) when not (is_summary_message (User u)) ->
           let body = Message.User.body u in
           Option.some_if
             (not (String.is_empty (String.strip body)))
