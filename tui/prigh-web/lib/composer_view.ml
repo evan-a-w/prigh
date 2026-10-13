@@ -162,7 +162,9 @@ let view (m : App.Model.t) ~inject =
                          ; Attr.create "aria-autocomplete" "list"
                          ; Attr.create
                              "aria-activedescendant"
-                             (sprintf "completion-option-%d" (Completion.selected c))
+                             (sprintf
+                                "completion-option-%d"
+                                (Completion.selected c))
                          ])
                   ; Attr.value m.draft
                   ; Attr.rows 1

@@ -62,7 +62,10 @@ let live ~lines ~missed ~tail text =
        then note "earlier" (Chat_html.plural hidden "earlier line")
        else Node.none)
     ; (if missed
-       then note "missed" "Output from while this page was away shows when it ends."
+       then
+         note
+           "missed"
+           "Output from while this page was away shows when it ends."
        else Node.none)
     ; pre shown
     ]

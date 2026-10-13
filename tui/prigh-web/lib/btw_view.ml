@@ -18,9 +18,7 @@ let view (m : App.Model.t) ~inject =
         ]
     in
     (* Said once when it starts, ends or fails; not at every chunk. *)
-    let status =
-      div ~cls:"btw-status" ~attrs:[ Attr.role "status" ] status
-    in
+    let status = div ~cls:"btw-status" ~attrs:[ Attr.role "status" ] status in
     Node.section
       ~attrs:
         [ Attr.class_ "btw-panel"
@@ -30,7 +28,10 @@ let view (m : App.Model.t) ~inject =
       [ div
           ~cls:"btw-head"
           [ span ~cls:"btw-tag" "btw"
-          ; span ~cls:"btw-question" ~attrs:[ Attr.create "dir" "auto" ] btw.question
+          ; span
+              ~cls:"btw-question"
+              ~attrs:[ Attr.create "dir" "auto" ]
+              btw.question
           ; button
               ~cls:"icon ghost"
               ~title:"Close (Esc)"

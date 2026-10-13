@@ -177,7 +177,8 @@ let%expect_test "toasts quote non-ASCII text as it is" =
     H.act h (Run "/model 日本語 é 😀");
     H.act h (Run "/thinking שלום"));
   H.text h ~selector:".toasts";
-  [%expect {|
+  [%expect
+    {|
     No model matches “日本語 é 😀”. Ctrl+L lists them all. (Dismiss)
     Unknown thinking level “שלום”: use off, low, on, high, max. (Dismiss)
     |}]

@@ -653,7 +653,8 @@ let%expect_test "files dropped on the composer upload into the chat's uploads" =
     Send
     |}];
   H.text h ~selector:".toasts";
-  [%expect {| Wait for the attachment to upload (or remove it with ×). (Dismiss) |}];
+  [%expect
+    {| Wait for the attachment to upload (or remove it with ×). (Dismiss) |}];
   H.act
     h
     (Files

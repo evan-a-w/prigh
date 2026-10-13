@@ -3,8 +3,9 @@ open! Prigh_web
 module H = Harness
 
 let names ?(within = "") h =
-  List.iter [ "button"; "a"; "input"; "textarea"; "select"; "[role]" ] ~f:(fun selector ->
-    H.names ~selector:(within ^ selector) h)
+  List.iter
+    [ "button"; "a"; "input"; "textarea"; "select"; "[role]" ]
+    ~f:(fun selector -> H.names ~selector:(within ^ selector) h)
 ;;
 
 let sessions =
@@ -19,7 +20,8 @@ let sessions =
 let%expect_test "the names of the controls" =
   let h = H.create ~sessions () in
   names h;
-  [%expect {|
+  [%expect
+    {|
     button "Hide sidebar" -- Hide sidebar (Ctrl+B)
     button "New session" -- Start a new session (/new)
     button "Select" -- Select sessions to delete (/delete)
@@ -47,7 +49,8 @@ let%expect_test "the names of the controls" =
     |}];
   H.quiet h (fun () -> H.act h (Select_sessions true));
   names ~within:".sidebar " h;
-  [%expect {|
+  [%expect
+    {|
     button "Hide sidebar" -- Hide sidebar (Ctrl+B)
     button "New session" -- Start a new session (/new)
     [checkbox] button "Fix the build 2m ago /work 0 B" -- /sessions/s1.jsonl
@@ -74,7 +77,8 @@ let%expect_test "the names of the panels' controls" =
   names ~within:".files-panel " h;
   names ~within:".agents-panel " h;
   names ~within:".terminal-panel " h;
-  [%expect {|
+  [%expect
+    {|
     button "Up" -- Up (Backspace)
     button "Refresh"
     button "Show dot files"
@@ -118,12 +122,17 @@ let%expect_test "the names in dialogs, pickers and the transcript" =
          (String.concat (List.init 30 ~f:(sprintf "%d\n"))));
     H.act
       h
-      (Add_image { Prigh_protocol.Image.mime_type = "image/png"; data = "iVBORw0KGgo="; bytes = 8 });
+      (Add_image
+         { Prigh_protocol.Image.mime_type = "image/png"
+         ; data = "iVBORw0KGgo="
+         ; bytes = 8
+         });
     H.act h (Show_toast { text = "Couldn't do that"; error = true }));
   names ~within:"#chat " h;
   names ~within:".composer " h;
   names ~within:".toasts " h;
-  [%expect {|
+  [%expect
+    {|
     button "Show all 30 lines"
     button "Remove image"
     button "Attach files" -- Attach files (or drop them here)
@@ -139,7 +148,8 @@ let%expect_test "the names in dialogs, pickers and the transcript" =
       h
       {|{"event":"tool_confirm","call_id":"c2","agent_id":null,"name":"bash","summary":"rm -rf build","rules":[]}|});
   names ~within:".modal " h;
-  [%expect {|
+  [%expect
+    {|
     button "Close" -- Close (Esc)
     button "Allow once" -- y or Enter
     button "Deny" -- n or Esc
@@ -147,7 +157,8 @@ let%expect_test "the names in dialogs, pickers and the transcript" =
     |}];
   H.quiet h (fun () -> H.act h Open_model_picker);
   names ~within:".modal " h;
-  [%expect {|
+  [%expect
+    {|
     button "Close" -- Close (Esc)
     button "Close" -- Close (Esc)
     button "Allow once" -- y or Enter
@@ -172,7 +183,8 @@ let%expect_test "the closed drawer on a phone is inert" =
   H.quiet h (fun () -> H.act h Toggle_sidebar);
   H.elements h ~selector:".sidebar[inert]";
   H.elements h ~selector:".main > [inert]";
-  [%expect {|
+  [%expect
+    {|
     <aside class="sidebar">
     <header class="topbar">
     <div class="chat verbosity-normal">

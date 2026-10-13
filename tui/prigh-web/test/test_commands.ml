@@ -1145,9 +1145,7 @@ let%expect_test "creating a folder while disconnected" =
     H.act h (Reply (Dir_changed Cwd, Error "not connected")));
   H.text h ~selector:".dialog-error";
   H.quiet h (fun () ->
-    H.act
-      h
-      (Reply (Reconnect 1, Ok (Jsonaf.of_string {|{"client_id":"c2"}|}))));
+    H.act h (Reply (Reconnect 1, Ok (Jsonaf.of_string {|{"client_id":"c2"}|}))));
   H.text h ~selector:".modal";
   [%expect
     {|
@@ -1164,7 +1162,8 @@ let%expect_test "creating a folder while disconnected" =
   H.act h Close_dialog;
   H.quiet h (fun () -> run h "/mkdir");
   print_s [%sexp ((H.model h).dialog : Dialog.t option)];
-  [%expect {|
+  [%expect
+    {|
     (Focus editor)
     ((Prompt
       ((action Mkdir) (input /work/) (suggestions ()) (selected ()) (error ())

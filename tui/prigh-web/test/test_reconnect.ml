@@ -616,7 +616,8 @@ let%expect_test "a session the backend lost leaves nothing waiting" =
        ( Session_gone { generation = 1; session = "s1" }
        , Ok (Jsonaf.of_string {|{"client_id":"c2"}|}) ));
   show ();
-  [%expect {|
+  [%expect
+    {|
     ((running true) (confirms 1) (queued 1))
     <span class="lamp">
     (Reconnect (generation 1) (delay_ms 0) (session (s1)))
@@ -633,7 +634,9 @@ let%expect_test "a session the backend lost leaves nothing waiting" =
    put back (sending it again would send it twice); not there, it is back in
    the editor. *)
 let%expect_test "a message sent as the connection went" =
-  let pending = {|{"confirms":[],"questions":[],"steer_texts":[],"follow_up_texts":[]}|} in
+  let pending =
+    {|{"confirms":[],"questions":[],"steer_texts":[],"follow_up_texts":[]}|}
+  in
   let lost_while_sending ~arrived =
     let h = session () in
     Harness.type_ h "third";
@@ -656,7 +659,8 @@ let%expect_test "a message sent as the connection went" =
     print_s [%message "" ~draft:(Harness.model h).draft]
   in
   lost_while_sending ~arrived:true;
-  [%expect {|
+  [%expect
+    {|
     first
     one
     second
@@ -666,7 +670,8 @@ let%expect_test "a message sent as the connection went" =
     (draft "")
     |}];
   lost_while_sending ~arrived:false;
-  [%expect {|
+  [%expect
+    {|
     first
     one
     second
@@ -712,10 +717,12 @@ let%expect_test "reconnecting keeps a shell card the backend does not have" =
     [%message
       ""
         ~same_entries:
-          (List.count (List.zip_exn before (List.take after 6)) ~f:(fun (a, b) ->
-             phys_equal a b)
+          (List.count
+             (List.zip_exn before (List.take after 6))
+             ~f:(fun (a, b) -> phys_equal a b)
            : int)];
-  [%expect {|
+  [%expect
+    {|
     first
     one
     second
@@ -738,14 +745,19 @@ let%expect_test "output streamed while disconnected" =
     Harness.event
       h
       {|{"event":"tool_start","call":{"id":"c1","name":"bash","arguments":"{\"command\":\"make\"}"}}|};
-    Harness.event h {|{"event":"tool_output","call_id":"c1","chunk":"step 1\n"}|};
+    Harness.event
+      h
+      {|{"event":"tool_output","call_id":"c1","chunk":"step 1\n"}|};
     Harness.act h Backend_closed;
     Harness.act
       h
       (Reply (Reconnect 1, Ok (Jsonaf.of_string {|{"client_id":"c2"}|})));
-    Harness.event h {|{"event":"tool_output","call_id":"c1","chunk":"step 3\n"}|});
+    Harness.event
+      h
+      {|{"event":"tool_output","call_id":"c1","chunk":"step 3\n"}|});
   Harness.text h ~selector:".chat .tool";
-  [%expect {|
+  [%expect
+    {|
     bash make
     Output from while this page was away shows when it ends.
     step 1
@@ -755,7 +767,8 @@ let%expect_test "output streamed while disconnected" =
     h
     {|{"event":"tool_end","call":{"id":"c1","name":"bash","arguments":"{\"command\":\"make\"}"},"result":{"role":"tool_result","tool_call_id":"c1","tool_name":"bash","text":"step 1\nstep 2\nstep 3\n","is_error":false}}|};
   Harness.text h ~selector:".chat .tool";
-  [%expect {|
+  [%expect
+    {|
     ✓ bash make
     step 1
     step 2

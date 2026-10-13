@@ -260,7 +260,9 @@ let modes (m : App.Model.t) ~inject =
   ]
 ;;
 
-let waiting cls text = item ~cls ~attrs:activity [ Html.lamp (); Node.text text ]
+let waiting cls text =
+  item ~cls ~attrs:activity [ Html.lamp (); Node.text text ]
+;;
 
 let view (m : App.Model.t) ~inject =
   match m.state, m.connection with
@@ -274,7 +276,11 @@ let view (m : App.Model.t) ~inject =
       [ (if m.pending.sending > 0 && not state.running
          then waiting "running" "Sending…"
          else if state.running
-         then item ~cls:"running" ~attrs:activity [ Html.lamp (); Node.text "Working" ]
+         then
+           item
+             ~cls:"running"
+             ~attrs:activity
+             [ Html.lamp (); Node.text "Working" ]
          else
            item
              ~cls:"idle"

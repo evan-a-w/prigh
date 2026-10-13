@@ -48,7 +48,8 @@ let lamp ?title () =
       (Attr.class_ "lamp"
        ::
        (match title with
-        | Some t -> [ Attr.title t; Attr.role "img"; Attr.create "aria-label" t ]
+        | Some t ->
+          [ Attr.title t; Attr.role "img"; Attr.create "aria-label" t ]
         | None -> [ Attr.create "aria-hidden" "true" ]))
     []
 ;;
