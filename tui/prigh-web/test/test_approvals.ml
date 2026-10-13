@@ -667,12 +667,12 @@ let%expect_test "a question dialog: keys" =
     {|
     <div role="radiogroup" class="question-choices">
       <div role="radio" aria-checked="false" class="question-choice selected" @on_click>
-        <span class="question-mark"> ○ </span>
+        <span aria-hidden="true" class="check radio"> </span>
         <span class="question-label"> Postgres </span>
         <span class="question-detail"> the one in prod </span>
       </div>
       <div role="radio" aria-checked="false" class="question-choice" @on_click>
-        <span class="question-mark"> ○ </span>
+        <span aria-hidden="true" class="check radio"> </span>
         <span class="question-label"> SQLite </span>
         <Vdom.Node.none-widget> </Vdom.Node.none-widget>
       </div>
@@ -802,17 +802,19 @@ let%expect_test "a question dialog: clicks" =
     (Question (Choose 0))
     <div role="group" class="question-choices">
       <div role="checkbox" aria-checked="false" class="question-choice selected" @on_click>
-        <span class="question-mark"> ☐ </span>
+        <span aria-hidden="true" class="check"> </span>
         <span class="question-label"> lint </span>
         <Vdom.Node.none-widget> </Vdom.Node.none-widget>
       </div>
       <div role="checkbox" aria-checked="false" class="question-choice" @on_click>
-        <span class="question-mark"> ☐ </span>
+        <span aria-hidden="true" class="check"> </span>
         <span class="question-label"> tests </span>
         <Vdom.Node.none-widget> </Vdom.Node.none-widget>
       </div>
       <div role="checkbox" aria-checked="true" class="picked question-choice" @on_click>
-        <span class="question-mark"> ☑ </span>
+        <span aria-hidden="true" class="check on">
+          <icon class="check"> </icon>
+        </span>
         <span class="question-label"> bench </span>
         <Vdom.Node.none-widget> </Vdom.Node.none-widget>
       </div>

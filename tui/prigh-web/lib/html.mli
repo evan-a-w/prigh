@@ -24,6 +24,10 @@ val button
     session, tool, agent or request); [title] says what works. *)
 val lamp : ?title:string -> unit -> Node.t
 
+(** A checkbox's box (a radio button's circle with [radio]), for rows that
+    say their state with [aria-checked] or [aria-selected]. *)
+val check : ?radio:bool -> bool -> Node.t
+
 module Icon : sig
   type t =
     | Menu

@@ -450,6 +450,30 @@ let%expect_test "resting on a session in the sidebar fetches its newest page" =
     |}]
 ;;
 
+(* A session deleted (here or in another tab) leaves the cache with the
+   list that no longer has it: nothing of it is kept or shown again. *)
+let%expect_test "deleted sessions leave the cache" =
+  let h = Harness.create () in
+  Harness.quiet h (fun () ->
+    Harness.act h (Prefetch_session "/sessions/s2.jsonl");
+    Harness.reply h "get_messages_page" (Harness.page (exchanges [ 2 ])));
+  Harness.act h (Prefetch_session "/sessions/s2.jsonl");
+  [%expect {| |}];
+  Harness.event h {|{"event":"sessions_changed"}|};
+  Harness.reply
+    h
+    "list_sessions"
+    ("[" ^ Harness.session_json "s1" ^ "," ^ Harness.session_json "s3" ^ "]");
+  Harness.act h (Prefetch_session "/sessions/s2.jsonl");
+  [%expect
+    {|
+    (Rpc (method_ list_sessions) (params ()) (tag Sessions))
+    (Rpc (method_ get_messages_page)
+     (params ((session /sessions/s2.jsonl) (limit 60)))
+     (tag (Page (path /sessions/s2.jsonl) (before ()))))
+    |}]
+;;
+
 (* Reconnecting fetches again what is on show, from its first message (the
    older pages loaded stay), and what came since; they are merged into the
    transcript. *)

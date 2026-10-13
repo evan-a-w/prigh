@@ -187,6 +187,15 @@ end
 
 let icon = Icon.view
 
+let check ?(radio = false) on =
+  Node.span
+    ~attrs:
+      [ classes [ "check" ] [ "on", on; "radio", radio ]
+      ; Attr.create "aria-hidden" "true"
+      ]
+    (if on && not radio then [ icon Check ] else [])
+;;
+
 let caret (ev : Dom_html.event Js.t) =
   Js.Opt.case
     ev##.target

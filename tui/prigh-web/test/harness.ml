@@ -338,6 +338,19 @@ let render node =
     | Text s -> add s
     | Widget -> ()
     | Element { tag_name = "icon"; _ } -> ()
+    (* Checkboxes and radio buttons, drawn by CSS. *)
+    | Element e
+      when List.exists e.attributes ~f:(fun (k, v) ->
+             String.equal k "class"
+             && List.mem (String.split v ~on:' ') "check" ~equal:String.equal) ->
+      let class_ = List.Assoc.find_exn e.attributes ~equal:String.equal "class" in
+      let has c = List.mem (String.split class_ ~on:' ') c ~equal:String.equal in
+      add
+        (match has "radio", has "on" with
+         | true, true -> "◉"
+         | true, false -> "○"
+         | false, true -> "☑"
+         | false, false -> "☐")
     (* Hidden file pickers: the page opens them from buttons. *)
     | Element ({ tag_name = "input"; _ } as e)
       when List.exists e.attributes ~f:(fun (k, v) ->

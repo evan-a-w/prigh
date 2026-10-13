@@ -40,6 +40,9 @@ val add_page
 
 val remove : t -> string -> t
 
+(** Only the sessions the backend still has (deleted ones go). *)
+val retain : t -> paths:String.Set.t -> t
+
 (** Newest pages being fetched, by path, and whether one is. *)
 val loading : t -> string -> bool
 
@@ -50,5 +53,3 @@ val prefetch : t -> string -> t * string option
 
 (** After a page arrived: the session to fetch ahead next, if any. *)
 val next_prefetch : t -> t * string option
-
-val paths : t -> string list

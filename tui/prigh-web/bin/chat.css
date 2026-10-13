@@ -308,14 +308,6 @@ summary:focus-visible { outline: 2px solid var(--sodium); outline-offset: 2px; b
 .stop.aborted::before { content: "■ "; color: var(--brick); }
 .stop.length::before { content: "⚠ "; color: var(--sodium); }
 
-.msg.notice {
-  align-self: center;
-  color: var(--muted);
-  font-size: 12.5px;
-  white-space: pre-wrap;
-  text-align: center;
-}
-
 /* The harness's notes (tools moved, another directory, plan mode, a
    hand-over, a goal's continuation, /review, ...): a glyph on the spine and a quiet line,
    unfolding to exactly what the model saw. Not the user's words, so no

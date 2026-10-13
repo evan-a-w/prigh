@@ -42,7 +42,6 @@ module Entry : sig
         { message : Message.Assistant.t
         ; streaming : bool
         }
-    | Notice of string
     | Shell of Tool_call.t (** a [!command] the user ran *)
     | Compaction of string (** the summary that replaced older messages *)
   [@@deriving sexp_of]
@@ -116,8 +115,6 @@ val set_nested_subagent
   -> call_id:string
   -> Subagent.t
   -> t
-
-val add_notice : t -> string -> t
 
 (** A tool call of the transcript, or of the transcript of the subagent
     [agent_id] (at any depth). *)

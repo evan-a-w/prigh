@@ -48,9 +48,6 @@ type t =
 
 val none : t
 
-(** The chat shows a placeholder rather than a transcript. *)
-val loading : t -> bool
-
 (** A prompt has been sent: it is shown until [prompt_shown]. *)
 val sent : t -> Prompt.t option -> t
 

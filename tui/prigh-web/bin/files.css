@@ -198,17 +198,6 @@
 .files-bar { grid-column: 2 / 4; height: 2px; background: var(--rule); border-radius: 1px; overflow: hidden; }
 .files-bar::after { content: ""; display: block; height: 100%; width: var(--done, 0%); background: var(--sodium); transition: width 0.2s linear; }
 
-.files-lamp {
-  display: inline-block;
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  background: var(--sodium);
-  box-shadow: 0 0 6px var(--sodium-line);
-  animation: files-breathe 2s ease-in-out infinite;
-  flex-shrink: 0;
-}
-@keyframes files-breathe { 50% { opacity: 0.45; box-shadow: none; } }
 
 .hidden-file-input { display: none; }
 
@@ -306,6 +295,5 @@ body.dropping-chat .composer-box::after { content: "Drop to attach to your messa
 
 @media (prefers-reduced-motion: reduce) {
   .files-panel, .app.narrow .files-panel, .files-preview, .attach-chip { animation: none; }
-  .files-lamp { animation: none; }
   .files-bar::after, .attach-chip.uploading::after { transition: none; }
 }

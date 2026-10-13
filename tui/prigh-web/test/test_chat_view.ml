@@ -428,13 +428,13 @@ let%expect_test "deliveries of background work: compact cards" =
     |}]
 ;;
 
-let%expect_test "notices and compaction" =
+let%expect_test "compaction" =
   let chat =
     Chat_harness.chat
       [ {|{"event":"compacted","summary":"## Goal\nShip the **web** UI.\n\nDone so far: chat view."}|}
       ]
   in
-  Chat_harness.show (Chat.add_notice chat "Switched to Claude Opus 5.5");
+  Chat_harness.show chat;
   [%expect
     {|
     <div class="entries">
@@ -453,7 +453,6 @@ let%expect_test "notices and compaction" =
           <p dir="auto"> Done so far: chat view. </p>
         </div>
       </details>
-      <div class="msg notice"> Switched to Claude Opus 5.5 </div>
     </div>
     |}]
 ;;

@@ -167,9 +167,7 @@ let view (m : App.Model.t) ~inject =
                   ; Attr.value m.draft
                   ; Attr.rows 1
                   ; Attr.create "autocomplete" "off"
-                  ; Attr.create
-                      "enterkeyhint"
-                      (if running then "send" else "send")
+                  ; Attr.create "enterkeyhint" "send"
                   ; Attr.on_input (fun ev text ->
                       let cursor =
                         Option.value (caret ev) ~default:(String.length text)

@@ -25,6 +25,10 @@ let remove t path =
   { t with entries = List.Assoc.remove t.entries ~equal:String.equal path }
 ;;
 
+let retain t ~paths =
+  { t with entries = List.filter t.entries ~f:(fun (path, _) -> Set.mem paths path) }
+;;
+
 let set t path entry =
   { t with
     entries =
@@ -72,5 +76,3 @@ let next_prefetch t =
   | None -> t, None
   | Some path -> prefetch { t with queued = None } path
 ;;
-
-let paths t = List.map t.entries ~f:fst

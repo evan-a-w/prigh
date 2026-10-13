@@ -14,7 +14,6 @@ and entry =
       { message : Message.Assistant.t
       ; streaming : bool
       }
-  | Notice of string
   | Shell of Tool_call.t
   | Compaction of string
 
@@ -68,7 +67,6 @@ module Entry = struct
         { message : Message.Assistant.t
         ; streaming : bool
         }
-    | Notice of string
     | Shell of Tool_call.t
     | Compaction of string
   [@@deriving sexp_of]
@@ -84,7 +82,6 @@ let set_running t running = if Bool.equal t.running running then t else { t with
 let entries t = List.rev t.rev_entries
 let tool t id = Map.find t.tools id
 let add t entry = { t with rev_entries = entry :: t.rev_entries }
-let add_notice t text = add t (Notice text)
 
 let add_call t (call : Tool_call.t) =
   let tools =
@@ -370,9 +367,9 @@ let same_entry (a : entry) (b : entry) =
   | Assistant a, Assistant b ->
     Bool.equal a.streaming b.streaming
     && Message.Assistant.equal a.message b.message
-  | Notice a, Notice b | Compaction a, Compaction b -> String.equal a b
+  | Compaction a, Compaction b -> String.equal a b
   | Shell a, Shell b -> Tool_call.equal a b
-  | (User _ | Assistant _ | Notice _ | Shell _ | Compaction _), _ -> false
+  | (User _ | Assistant _ | Shell _ | Compaction _), _ -> false
 ;;
 
 (* A call's card stays as it was (with the output it streamed) while the
@@ -401,7 +398,7 @@ let reconcile ~old fresh =
     | (Shell call as o) :: old, User u :: rest
       when String.is_prefix u.text ~prefix:(sprintf "$ %s\n" (shell_command call))
       -> o :: entries old rest
-    | ((Shell _ | Compaction _ | Notice _) as o) :: old, fresh_entries ->
+    | ((Shell _ | Compaction _) as o) :: old, fresh_entries ->
       o :: entries old fresh_entries
     | _ :: old, f :: rest -> f :: entries old rest
     (* The message being streamed is only in [get_messages] once it ends. *)

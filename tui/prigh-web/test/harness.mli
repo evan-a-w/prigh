@@ -60,7 +60,7 @@ val show : ?selector:string -> t -> unit
 
 (** The page's visible text: a line per block element, buttons and links in
     (parentheses; their title when they only have an icon), fields as
-    [\[value\]]. *)
+    [\[value\]], checkboxes as ☐/☑ and radio buttons as ○/◉. *)
 val text : ?selector:string -> t -> unit
 
 (** The accessible name of each element [selector] matches (its
