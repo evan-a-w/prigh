@@ -120,7 +120,9 @@ let dechunk body =
     match String.substr_index body ~pos ~pattern:"\r\n" with
     | None -> false
     | Some eol ->
-      (match Int.of_string_opt ("0x" ^ String.sub body ~pos ~len:(eol - pos)) with
+      (match
+         Int.of_string_opt ("0x" ^ String.sub body ~pos ~len:(eol - pos))
+       with
        | None -> false
        | Some 0 -> true
        | Some n when eol + 2 + n <= String.length body ->
@@ -553,7 +555,8 @@ let%expect_test "downloads of what is not a plain file, and failing ones" =
   ignore (call t h "fs_preview" {|{"path": "pipe"}|} : Json.t);
   ignore (call t h "fs_download" {|{"path": "pipe"}|} : Json.t);
   ignore (call t h "fs_download" {|{"path": "/dev/zero"}|} : Json.t);
-  [%expect {|
+  [%expect
+    {|
     {"type":"response","id":"r","ok":false,"error":"$DIR/pipe is not a regular file: read it with a command instead"}
     {"type":"response","id":"r","ok":false,"error":"$DIR/pipe is not a regular file: read it with a command instead"}
     {"type":"response","id":"r","ok":false,"error":"/dev/zero is not a regular file: read it with a command instead"}
@@ -566,7 +569,8 @@ let%expect_test "downloads of what is not a plain file, and failing ones" =
   print_s
     [%sexp
       (String.is_substring data ~substring:"Pid:" : bool), (complete : bool)];
-  [%expect {|
+  [%expect
+    {|
     {"type":"response","id":"r","ok":true,"result":{"url":"/files/download?ticket=<ticket>","name":"status"}}
     HTTP/1.1 200 OK
       Access-Control-Allow-Origin: *
@@ -592,7 +596,8 @@ let%expect_test "downloads of what is not a plain file, and failing ones" =
   let link = call t h "fs_download" {|{"path": "proj", "archive": true}|} in
   let r = get t ~sw ~port (result_string link "url") in
   print_s [%sexp "complete", (snd (dechunk r.body) : bool)];
-  [%expect {|
+  [%expect
+    {|
     {"type":"response","id":"r","ok":true,"result":{"url":"/files/download?ticket=<ticket>","name":"proj.tar.gz"}}
     HTTP/1.1 200 OK
       Access-Control-Allow-Origin: *
@@ -620,7 +625,8 @@ let%expect_test "downloads of what is not a plain file, and failing ones" =
        (String.substr_replace_first url ~pattern:"download" ~with_:"upload")
        "x");
   show t (get t ~sw ~port url);
-  [%expect {|
+  [%expect
+    {|
     {"type":"response","id":"r","ok":true,"result":{"url":"/files/download?ticket=<ticket>","name":"notes.txt"}}
     HTTP/1.1 400 Bad Request
       Access-Control-Allow-Origin: *

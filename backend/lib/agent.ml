@@ -1598,8 +1598,7 @@ let duration_hum seconds =
 
 (* Finished background tasks not delivered yet go first. [tried] are the
    models a hand-over chain has used so far (empty for a user's prompt). *)
-let rec start_run ?(tried = String.Set.empty) ?(then_ = fun () -> []) t prompts
-  =
+let rec start_run ?(tried = String.Set.empty) ?(then_ = fun () -> []) t prompts =
   t.git_branch <- find_branch t ~cwd:t.cwd;
   cancel_resume_timer t;
   let cancel = Cancellation.create () in

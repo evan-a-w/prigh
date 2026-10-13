@@ -409,15 +409,17 @@ let%expect_test "allow rules do not let other commands through" =
                 | `Complex -> "complex")
                : string)
             ~covered_by:
-              (if Approval_rule.covers
-                    [ rule r ]
-                    ~cwd:"/work"
-                    ~home:"/home/u"
-                    (bash command)
+              (if
+                 Approval_rule.covers
+                   [ rule r ]
+                   ~cwd:"/work"
+                   ~home:"/home/u"
+                   (bash command)
                then r
                else "-"
                : string)]);
-  [%expect {|
+  [%expect
+    {|
     ( "git status #'\
      \nrm -rf ~\
      \n#'" (parts ("git status" "rm -rf ~")) simple (covered_by -))
@@ -482,7 +484,8 @@ let%expect_test "deny rules see through wrappers and substitutions" =
     ]
     ~f:(fun command ->
       printf "%-28s %b\n" command (touches "bash(rm:*)" (bash command)));
-  [%expect {|
+  [%expect
+    {|
     echo $(rm -rf x)             true
     echo "$(rm -rf x)"           true
     echo `rm -rf x`              true
@@ -523,7 +526,8 @@ let%expect_test "deny rules see through wrappers and substitutions" =
         tool
         args
         (touches "read(~/.ssh/**)" (call tool args)));
-  [%expect {|
+  [%expect
+    {|
     read   {"path": "/home/u/.ssh/id_rsa"}      true
     ls     {"path": "/home/u/.ssh"}             true
     ls     {"path": "/home/u"}                  false

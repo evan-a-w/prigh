@@ -1616,7 +1616,8 @@ let%expect_test "a session left to run a queued follow-up stays live" =
     [%sexp
       "another client joins the live agent"
     , (phys_equal (Rpc_server.agent_of_client h.server other) reopened : bool)];
-  [%expect {|
+  [%expect
+    {|
     go: running in list_sessions: true
     {"type":"response","id":"r1","ok":true,"result":{}}
     {"type":"response","id":"r1","ok":true,"result":{}}
