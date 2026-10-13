@@ -2584,11 +2584,14 @@ let run_command (m : Model.t) ({ name; rest } : Slash.Parsed.t) =
          ~input:(Option.value_map m.state ~default:"" ~f:(fun s -> s.cwd))
          Cd)
   | "cd", path -> m, [ change_dir ~target:Cwd path ]
+  (* Typing names a folder in the working directory. *)
   | "mkdir", "" ->
     open_prompt
       m
       (Prompt.create
-         ~input:(Option.value_map m.state ~default:"" ~f:(fun s -> s.cwd))
+         ~input:
+           (Option.value_map m.state ~default:"" ~f:(fun s ->
+              if String.is_suffix s.cwd ~suffix:"/" then s.cwd else s.cwd ^ "/"))
          Mkdir)
   | "mkdir", path -> m, [ change_dir ~if_missing:Create ~target:Cwd path ]
   | "default-dir", "" ->
@@ -3692,7 +3695,34 @@ let loads : Reply_tag.t -> bool = function
   | _ -> false
 ;;
 
+(* What a call made while the connection is down says. *)
+let not_connected =
+  "Not connected to the backend: try again once it reconnects."
+;;
+
+(* Back: a dialog's error from while it was down no longer applies. *)
+let clear_not_connected (m : Model.t) =
+  let stale = Option.equal String.equal (Some not_connected) in
+  match m.dialog with
+  | Some (Prompt p) when stale p.error ->
+    { m with dialog = Some (Prompt { p with error = None }) }
+  | Some (Create_dir d) when stale d.error ->
+    { m with dialog = Some (Create_dir { d with error = None }) }
+  | _ -> m
+;;
+
 let reply (m : Model.t) (tag : Reply_tag.t) result =
+  let result =
+    match result with
+    | Error "not connected" -> Error not_connected
+    | result -> result
+  in
+  let m =
+    match tag, result with
+    | Reconnect generation, Ok _ when generation = m.generation ->
+      clear_not_connected m
+    | _ -> m
+  in
   if not (loads tag)
   then reply_to m tag result
   else (
