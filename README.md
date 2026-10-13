@@ -844,7 +844,8 @@ Responses API's `web_search` (OpenAI and ChatGPT/Codex). The provider runs
 the searches; they show in the transcript as `web_search "query"` with the
 results folded underneath, and are replayed to the same provider as it sent
 them (to another provider as text). Models of other providers (DeepSeek,
-custom endpoints) do not get `web_search`; they can still `web_fetch` a
+custom endpoints) and OpenAI's models without it (`gpt-4`, `gpt-4.1-nano`,
+`o1`, `o3-mini`, ...) do not get `web_search`; they can still `web_fetch` a
 search page. Neither tool is destructive, so neither asks for confirmation
 in the `ask` approval mode.
 
