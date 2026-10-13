@@ -273,6 +273,11 @@ let%expect_test
         <span class="name"> bash </span>
         <span class="arg command"> rm -rf build </span>
       </div>
+      <div class="tool-body">
+        <div class="live output">
+          <div class="missed"> Output from while this page was away shows when it ends. </div>
+        </div>
+      </div>
     </div>
     |}]
 ;;

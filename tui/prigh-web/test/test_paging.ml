@@ -382,7 +382,8 @@ let%expect_test "a cached transcript of a running session" =
        {"role":"assistant","content":[{"type":"tool_call","id":"c1","name":"bash","arguments":"{}"}],"stop_reason":{"type":"tool_use"},"usage":{"input":0,"output":0,"cache_read":0},"model":"faux"}]|}
   in
   Harness.quiet h (fun () ->
-    Harness.reply h "get_messages_page" (Harness.page running_call));
+    Harness.reply h "get_messages_page" (Harness.page running_call);
+    Harness.event h {|{"event":"tool_output","call_id":"c1","chunk":"step 1\n"}|});
   open_session h "s3";
   Harness.quiet h (fun () ->
     Harness.reply h "get_messages_page" (Harness.page (exchanges [ 5 ])));
@@ -398,11 +399,21 @@ let%expect_test "a cached transcript of a running session" =
            ()));
     Harness.text h ~selector:".chat";
     Harness.elements h ~selector:".chat .tool");
+  (* What it streams once back follows what it streamed before it left; what
+     came between shows with the result. *)
+  Harness.event h {|{"event":"tool_output","call_id":"c1","chunk":"step 3\n"}|};
+  Harness.text h ~selector:".chat .tool";
   [%expect
     {|
     build it
     bash
+    Output from while this page was away shows when it ends.
+    step 1
     <div class="running tool tool-bash">
+    bash
+    Output from while this page was away shows when it ends.
+    step 1
+    step 3
     |}]
 ;;
 

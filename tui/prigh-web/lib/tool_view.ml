@@ -91,10 +91,10 @@ let output ~fold ?(error = false) ?(lines = 6) ?elided text =
 
 let live_tail = 6
 
-let live ~lines text =
-  if String.is_empty (String.strip text)
+let live ~lines ~missed text =
+  if String.is_empty (String.strip text) && not missed
   then Node.none
-  else Output_view.live ~lines ~tail:live_tail text
+  else Output_view.live ~lines ~missed ~tail:live_tail text
 ;;
 
 let error_output ~fold (r : Message.Tool_result.t) =
@@ -301,7 +301,7 @@ let present
   let fold = fold, call.id in
   let running_output () =
     match tool with
-    | Some t -> live ~lines:t.lines t.output
+    | Some t -> live ~lines:t.lines ~missed:t.missed t.output
     | None -> Node.none
   in
   let args = Tool_args.of_call call in
@@ -384,7 +384,7 @@ let present
         ; (if String.is_empty content
            then Node.none
            else if streaming
-           then live ~lines:(Chat.newlines content) content
+           then live ~lines:(Chat.newlines content) ~missed:false content
            else output ~fold content)
         ]
     }
@@ -813,5 +813,6 @@ let server_tool ~fold ~running (s : Content.Server_tool.t) =
     ~streaming:false
     ~running
     call
-    (Some { call; output = ""; lines = 0; result; subagent = None })
+    (Some
+       { call; output = ""; lines = 0; missed = false; result; subagent = None })
 ;;

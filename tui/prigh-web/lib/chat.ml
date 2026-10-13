@@ -21,6 +21,7 @@ and tool =
   { call : Tool_call.t
   ; output : string
   ; lines : int
+  ; missed : bool
   ; result : Message.Tool_result.t option
   ; subagent : subagent option
   }
@@ -54,6 +55,7 @@ module Tool = struct
     { call : Tool_call.t
     ; output : string
     ; lines : int
+    ; missed : bool
     ; result : Message.Tool_result.t option
     ; subagent : Subagent.t option
     }
@@ -87,7 +89,14 @@ let add_call t (call : Tool_call.t) =
   let tools =
     Map.update t.tools call.id ~f:(function
       | Some tool -> { tool with call }
-      | None -> { call; output = ""; lines = 0; result = None; subagent = None })
+      | None ->
+        { call
+        ; output = ""
+        ; lines = 0
+        ; missed = false
+        ; result = None
+        ; subagent = None
+        })
   in
   { t with tools }
 ;;
@@ -170,8 +179,20 @@ let shell_command (call : Tool_call.t) =
   | Error _ -> ""
 ;;
 
+let missed_output t =
+  { t with
+    tools =
+      Map.map t.tools ~f:(fun tool ->
+        if Option.is_some tool.result || tool.missed
+        then tool
+        else { tool with missed = true })
+  }
+;;
+
+(* A running session's calls without a result streamed before the page came. *)
 let of_messages ?(running = false) messages =
-  List.fold messages ~init:{ empty with running } ~f:add_message
+  let t = List.fold messages ~init:{ empty with running } ~f:add_message in
+  if running then missed_output t else t
 ;;
 
 let prepend t messages =

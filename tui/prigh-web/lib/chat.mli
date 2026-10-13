@@ -29,6 +29,9 @@ module Tool : sig
       (** streamed so far: the last [live_limit] bytes or so, from a line
               start *)
     ; lines : int (** the newlines in all the output streamed *)
+    ; missed : bool
+      (** some of its output streamed while the page did not follow (another
+          session on show, the connection lost, opened as it ran) *)
     ; result : Message.Tool_result.t option
     ; subagent : Subagent.t option
     }
@@ -59,6 +62,10 @@ val empty : t
 (** [running]: the agent is still working, so tool calls without a result
     are still to get one. *)
 val of_messages : ?running:bool -> Message.t list -> t
+
+(** The calls still running stream output that this page does not see
+    (until it follows the session again): [Tool.missed]. *)
+val missed_output : t -> t
 
 (** Oldest first. *)
 val entries : t -> Entry.t list

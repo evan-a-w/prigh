@@ -712,7 +712,7 @@ ol.results .url { margin-left: 8px; font: 11.5px var(--mono); color: var(--faint
   -webkit-mask-image: linear-gradient(to top, #000 calc(100% - 3.4em), transparent calc(100% - 0.4em));
   mask-image: linear-gradient(to top, #000 calc(100% - 3.4em), transparent calc(100% - 0.4em));
 }
-.output .earlier + pre { padding-top: 0; }
+.output :is(.earlier, .missed) + pre { padding-top: 0; }
 .output pre:has(+ .fold) { padding-bottom: 2px; }
 .output.error { background: var(--err-bg); box-shadow: inset 2px 0 0 var(--brick); border-radius: 0 var(--r-control) var(--r-control) 0; }
 .output.error pre { color: var(--del-fg); }
@@ -721,7 +721,7 @@ ol.results .url { margin-left: 8px; font: 11.5px var(--mono); color: var(--faint
 @keyframes unfold { from { max-height: 10em; } to { max-height: 100vh; } }
 /* The toggle: under the lines (kept in view while scrolling through all of
    them, to fold them again). */
-.fold, .output .earlier {
+.fold, .output :is(.earlier, .missed) {
   display: flex;
   align-items: center;
   width: 100%;
@@ -743,7 +743,8 @@ ol.results .url { margin-left: 8px; font: 11.5px var(--mono); color: var(--faint
   border-radius: 0 0 var(--r-control) var(--r-control);
 }
 .output.error .fold[aria-expanded="true"] { background: var(--err-bg); }
-.output .earlier { padding: 6px 12px 0; gap: 6px; }
+.output :is(.earlier, .missed) { padding: 6px 12px 0; gap: 6px; }
+.output .earlier + .missed { padding-top: 0; }
 
 /* Diffs */
 

@@ -19,8 +19,8 @@ val view
 
 (** Output still streaming: its last [tail] lines, under how many came
     before. [lines]: the newlines in all of it, of which [text] may be only
-    the end. *)
-val live : lines:int -> tail:int -> string -> Node.t
+    the end. [missed]: some of it streamed while the page did not follow. *)
+val live : lines:int -> missed:bool -> tail:int -> string -> Node.t
 
 (** The number of lines of [text], ignoring a trailing newline. *)
 val line_count : string -> int

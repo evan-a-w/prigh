@@ -726,3 +726,39 @@ let%expect_test "reconnecting keeps a shell card the backend does not have" =
     (same_entries 6)
     |}]
 ;;
+
+(* A command's output streamed while the connection was down is not on show:
+   the card says so until its result comes. *)
+let%expect_test "output streamed while disconnected" =
+  let h = session () in
+  Harness.quiet h (fun () ->
+    Harness.event
+      h
+      {|{"event":"message_end","message":{"role":"assistant","content":[{"type":"tool_call","id":"c1","name":"bash","arguments":"{\"command\":\"make\"}"}],"stop_reason":{"type":"tool_use"},"usage":{"input":0,"output":0,"cache_read":0},"model":"m"}}|};
+    Harness.event
+      h
+      {|{"event":"tool_start","call":{"id":"c1","name":"bash","arguments":"{\"command\":\"make\"}"}}|};
+    Harness.event h {|{"event":"tool_output","call_id":"c1","chunk":"step 1\n"}|};
+    Harness.act h Backend_closed;
+    Harness.act
+      h
+      (Reply (Reconnect 1, Ok (Jsonaf.of_string {|{"client_id":"c2"}|})));
+    Harness.event h {|{"event":"tool_output","call_id":"c1","chunk":"step 3\n"}|});
+  Harness.text h ~selector:".chat .tool";
+  [%expect {|
+    bash make
+    Output from while this page was away shows when it ends.
+    step 1
+    step 3
+    |}];
+  Harness.event
+    h
+    {|{"event":"tool_end","call":{"id":"c1","name":"bash","arguments":"{\"command\":\"make\"}"},"result":{"role":"tool_result","tool_call_id":"c1","tool_name":"bash","text":"step 1\nstep 2\nstep 3\n","is_error":false}}|};
+  Harness.text h ~selector:".chat .tool";
+  [%expect {|
+    ✓ bash make
+    step 1
+    step 2
+    step 3
+    |}]
+;;
