@@ -358,10 +358,8 @@ Built.
 === chromium: a question ===
 Storage
 Which database?
-○
 Postgres
 the one in prod
-○
 SQLite
 Other:
 Space or a click picks, ↑↓ choose, Enter accepts, Esc declines
@@ -498,7 +496,7 @@ one more
 session files after: 1
 === chromium: /cd: the directory popup ===
 Directories
-↑↓ Tab Enter Esc · Ctrl+Enter as typed
+↑↓ Tab Enter Esc Ctrl+Enter as typed
 <CWD>/sub/
 === chromium: files: the session's directory ===
 <HOSTNAME>
@@ -1165,10 +1163,8 @@ Built.
 === firefox: a question ===
 Storage
 Which database?
-○
 Postgres
 the one in prod
-○
 SQLite
 Other:
 Space or a click picks, ↑↓ choose, Enter accepts, Esc declines
@@ -1305,7 +1301,7 @@ one more
 session files after: 1
 === firefox: /cd: the directory popup ===
 Directories
-↑↓ Tab Enter Esc · Ctrl+Enter as typed
+↑↓ Tab Enter Esc Ctrl+Enter as typed
 <CWD>/sub/
 === firefox: files: the session's directory ===
 <HOSTNAME>
