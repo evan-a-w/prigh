@@ -97,8 +97,11 @@ end
     cannot be applied (an updated or deleted file that does not exist, a
     hunk that does not match). Adding a file that exists replaces it (an
     [Updated] change, as Codex overwrites it). Several operations on the
-    same path are applied in sequence. *)
+    same file are applied in sequence: [file path] names the file a path
+    means (default: the path itself), so that e.g. [a.txt] and [./a.txt]
+    are one file. *)
 val apply
-  :  Operation.t list
+  :  ?file:(string -> string)
+  -> Operation.t list
   -> read:(string -> string option)
   -> Change.t list Or_error.t
