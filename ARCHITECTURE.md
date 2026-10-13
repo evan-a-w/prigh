@@ -753,7 +753,9 @@ two can share one.
   reads the reset time `Sse_request` noted in the error
   (`Usage_limit.reset_time`: the body's `resets_at`/`resets_in_seconds`,
   `x-codex-*-reset-at`, `anthropic-ratelimit-unified-*reset`,
-  `retry-after`); with `resume_on_limit_reset`, a fiber sleeps until then
+  `retry-after`; one already past backs off from a minute, doubling to an
+  hour, `past_resets` counting them); with `resume_on_limit_reset`, a fiber
+  sleeps until then
   (`?sleep_until`, injectable for tests) and starts a run with a message to
   carry on. `State.resume_at` shows it; `cancel_resume`, `resume_now`,
   `abort`, any new run and a session switch end it. It is recorded in the
