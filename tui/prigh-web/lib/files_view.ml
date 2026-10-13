@@ -239,7 +239,11 @@ end
 let rows : (File_listing.Entry.t, Row.t) View_cache.t = View_cache.create ()
 let row_id name = "files-row-" ^ name
 
-let row_view (e : File_listing.Entry.t) ({ selected; uploading; mtime; mtime_full } : Row.t) ~inject =
+let row_view
+      (e : File_listing.Entry.t)
+      ({ selected; uploading; mtime; mtime_full } : Row.t)
+      ~inject
+  =
   let dir = File_listing.Kind.is_dir e.kind in
   Node.div
     ~attrs:
@@ -260,12 +264,17 @@ let row_view (e : File_listing.Entry.t) ({ selected; uploading; mtime; mtime_ful
       ; Attr.on_click (fun _ -> inject (files (Select e.name)))
       ]
     [ kind_glyph e.kind
-    ; span ~cls:"files-name" ~attrs:[ Attr.create "dir" "auto" ] (if dir then e.name ^ "/" else e.name)
+    ; span
+        ~cls:"files-name"
+        ~attrs:[ Attr.create "dir" "auto" ]
+        (if dir then e.name ^ "/" else e.name)
     ; (if uploading then lamp () else Node.none)
     ; span ~cls:"files-size" (Option.value_map e.size ~default:"" ~f:size)
     ; span
         ~cls:"files-mtime"
-        ~attrs:(Option.value_map mtime_full ~default:[] ~f:(fun t -> [ Attr.title t ]))
+        ~attrs:
+          (Option.value_map mtime_full ~default:[] ~f:(fun t ->
+             [ Attr.title t ]))
         mtime
     ]
 ;;
@@ -282,7 +291,8 @@ let row (m : App.Model.t) (t : Files.t) (e : File_listing.Entry.t) ~inject =
         Option.map e.mtime ~f:(Message_time.full (App.Model.message_time m))
     }
   in
-  View_cache.find ~inject rows e ~deps ~equal:Row.equal ~f:(fun () -> row_view e deps ~inject)
+  View_cache.find ~inject rows e ~deps ~equal:Row.equal ~f:(fun () ->
+    row_view e deps ~inject)
 ;;
 
 let entry_path (t : Files.t) name =
@@ -417,10 +427,7 @@ let preview (m : App.Model.t) (t : Files.t) ~inject =
   | Some (Loading path) ->
     frame
       ~name:(Filename.basename path)
-      [ div
-          ~cls:"files-wait"
-          [ lamp (); Node.text "Reading…" ]
-      ]
+      [ div ~cls:"files-wait" [ lamp (); Node.text "Reading…" ] ]
   | Some (Failed { path; error }) ->
     frame
       ~name:(Filename.basename path)
@@ -483,11 +490,7 @@ let uploads (t : Files.t) =
       ~cls:"files-transfers"
       ~attrs:[ Attr.role "status" ]
       ((match busy with
-        | Some text ->
-          [ div
-              ~cls:"files-transfer"
-              [ lamp (); Node.text text ]
-          ]
+        | Some text -> [ div ~cls:"files-transfer" [ lamp (); Node.text text ] ]
         | None -> [])
        @ List.map uploads ~f:(fun (u : Files.Upload.t) ->
          let percent =
@@ -536,11 +539,7 @@ let body (m : App.Model.t) (t : Files.t) ~inject =
               [ Node.text "Try again" ]
           ]
       ]
-    | None, None ->
-      [ div
-          ~cls:"files-wait"
-          [ lamp (); Node.text "Listing…" ]
-      ]
+    | None, None -> [ div ~cls:"files-wait" [ lamp (); Node.text "Listing…" ] ]
     | Some l, None ->
       let entries = Files.entries t in
       [ sort_header t ~inject
@@ -832,7 +831,8 @@ let chips (m : App.Model.t) ~inject =
                   (match a.status with
                    | Ready path -> path
                    | Uploading _ -> sprintf "Uploading %s…" a.name
-                   | Failed e -> sprintf "%s: %s. Remove it and attach it again." a.name e)
+                   | Failed e ->
+                     sprintf "%s: %s. Remove it and attach it again." a.name e)
               ]
               @
               match percent with

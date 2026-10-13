@@ -80,7 +80,11 @@ let empty =
 
 let first t = t.first
 let running t = t.running
-let set_running t running = if Bool.equal t.running running then t else { t with running }
+
+let set_running t running =
+  if Bool.equal t.running running then t else { t with running }
+;;
+
 let entries t = List.rev t.rev_entries
 let tool t id = Map.find t.tools id
 let add t entry = { t with rev_entries = entry :: t.rev_entries }
@@ -417,8 +421,10 @@ let reconcile ~old fresh =
        user message with its output, or not at all for [!!command]), a
        compaction's summary. *)
     | (Shell call as o) :: old, User u :: rest
-      when String.is_prefix u.text ~prefix:(sprintf "$ %s\n" (shell_command call))
-      -> o :: entries old rest
+      when String.is_prefix
+             u.text
+             ~prefix:(sprintf "$ %s\n" (shell_command call)) ->
+      o :: entries old rest
     | ((Shell _ | Compaction _) as o) :: old, fresh_entries ->
       o :: entries old fresh_entries
     | _ :: old, f :: rest -> f :: entries old rest

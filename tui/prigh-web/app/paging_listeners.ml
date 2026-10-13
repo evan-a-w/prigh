@@ -46,7 +46,8 @@ let more () =
 
 let loading () =
   Js.Opt.test
-    (Dom_html.document##querySelector (Js.string "#chat .older.busy, #chat .skeleton"))
+    (Dom_html.document##querySelector
+       (Js.string "#chat .older.busy, #chat .skeleton"))
 ;;
 
 let scheduler = ref (fun (_ : Prigh_web.App.Action.t) -> ())

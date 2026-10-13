@@ -342,9 +342,14 @@ let render node =
     | Element e
       when List.exists e.attributes ~f:(fun (k, v) ->
              String.equal k "class"
-             && List.mem (String.split v ~on:' ') "check" ~equal:String.equal) ->
-      let class_ = List.Assoc.find_exn e.attributes ~equal:String.equal "class" in
-      let has c = List.mem (String.split class_ ~on:' ') c ~equal:String.equal in
+             && List.mem (String.split v ~on:' ') "check" ~equal:String.equal)
+      ->
+      let class_ =
+        List.Assoc.find_exn e.attributes ~equal:String.equal "class"
+      in
+      let has c =
+        List.mem (String.split class_ ~on:' ') c ~equal:String.equal
+      in
       add
         (match has "radio", has "on" with
          | true, true -> "◉"
@@ -401,22 +406,30 @@ let names ~selector t =
     | Element e ->
       let attr name = List.Assoc.find e.attributes ~equal:String.equal name in
       let text =
-        List.filter (List.concat_map e.children ~f:inline) ~f:(Fn.non String.is_empty)
+        List.filter
+          (List.concat_map e.children ~f:inline)
+          ~f:(Fn.non String.is_empty)
         |> String.concat ~sep:" "
       in
       let name =
         match attr "aria-label", text with
         | Some label, _ -> label
         | None, "" ->
-          Option.value_map (attr "title") ~default:"(no name)" ~f:(sprintf "(title) %s")
+          Option.value_map
+            (attr "title")
+            ~default:"(no name)"
+            ~f:(sprintf "(title) %s")
         | None, text -> text
       in
       let title =
         match attr "title" with
-        | Some title when not (String.equal title name) -> sprintf " -- %s" title
+        | Some title when not (String.equal title name) ->
+          sprintf " -- %s" title
         | _ -> ""
       in
-      let role = Option.value_map (attr "role") ~default:"" ~f:(sprintf "[%s] ") in
+      let role =
+        Option.value_map (attr "role") ~default:"" ~f:(sprintf "[%s] ")
+      in
       printf "%s%s%s%s\n" role e.tag_name (sprintf " %S" name) title
     | Text _ | Widget -> ())
 ;;

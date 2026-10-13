@@ -207,7 +207,9 @@ let view (m : Model.t) ~inject ~terminal =
   let under_sheet = if sheet then Fn.compose inert behind else behind in
   (* So is the drawer, over the page. *)
   let under_drawer =
-    if m.narrow && m.sidebar_open then Fn.compose inert under_sheet else under_sheet
+    if m.narrow && m.sidebar_open
+    then Fn.compose inert under_sheet
+    else under_sheet
   in
   let chat =
     match loading m, Chat.entries m.chat, m.pending.prompts with

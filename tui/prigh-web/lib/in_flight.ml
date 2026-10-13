@@ -50,7 +50,6 @@ let none =
   }
 ;;
 
-
 let sent t prompt =
   { t with
     sending = t.sending + 1

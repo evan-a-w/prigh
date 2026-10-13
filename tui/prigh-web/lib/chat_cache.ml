@@ -26,7 +26,9 @@ let remove t path =
 ;;
 
 let retain t ~paths =
-  { t with entries = List.filter t.entries ~f:(fun (path, _) -> Set.mem paths path) }
+  { t with
+    entries = List.filter t.entries ~f:(fun (path, _) -> Set.mem paths path)
+  }
 ;;
 
 let set t path entry =
@@ -49,9 +51,7 @@ let add_page t path (page : Message_page.t) ~running =
       ; newest = page.messages
       }
     in
-    ( set t path entry
-    , entry
-    , if Option.is_some cached then `Changed else `New )
+    set t path entry, entry, if Option.is_some cached then `Changed else `New
 ;;
 
 let loading t path = Set.mem t.loading path

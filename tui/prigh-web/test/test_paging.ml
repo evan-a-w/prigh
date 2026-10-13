@@ -350,8 +350,9 @@ let%expect_test "switching back shows the transcript at once, then refreshes it"
     [%message
       ""
         ~same_entries:
-          (List.count (List.zip_exn before (List.take after 2)) ~f:(fun (a, b) ->
-             phys_equal a b)
+          (List.count
+             (List.zip_exn before (List.take after 2))
+             ~f:(fun (a, b) -> phys_equal a b)
            : int)];
   [%expect
     {|
@@ -383,7 +384,9 @@ let%expect_test "a cached transcript of a running session" =
   in
   Harness.quiet h (fun () ->
     Harness.reply h "get_messages_page" (Harness.page running_call);
-    Harness.event h {|{"event":"tool_output","call_id":"c1","chunk":"step 1\n"}|});
+    Harness.event
+      h
+      {|{"event":"tool_output","call_id":"c1","chunk":"step 1\n"}|});
   open_session h "s3";
   Harness.quiet h (fun () ->
     Harness.reply h "get_messages_page" (Harness.page (exchanges [ 5 ])));
@@ -614,7 +617,8 @@ let%expect_test "compacted while on show" =
   Harness.event h {|{"event":"compacted","summary":"Worked on the parser."}|};
   Harness.act h Load_older;
   paging h;
-  [%expect {|
+  [%expect
+    {|
     ((older 0) (before ()) (loading false))
     question 21
     answer 21
@@ -639,14 +643,16 @@ let%expect_test "scrolling up after the session was compacted" =
   Harness.fail
     h
     "get_messages_page"
-    "message e41 is not in the session any more: load its latest messages \
-     again";
+    "message e41 is not in the session any more: load its latest messages again";
   Harness.reply
     h
     "get_messages_page"
     (Harness.page
        (messages
-          [ user "Worked on the parser."; user "question 22"; assistant "answer 22" ]));
+          [ user "Worked on the parser."
+          ; user "question 22"
+          ; assistant "answer 22"
+          ]));
   paging h;
   Harness.text h ~selector:".toasts";
   [%expect

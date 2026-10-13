@@ -43,7 +43,9 @@ let own form (q : Question.t) ~question ~inject =
     ; Node.input
         ~attrs:
           [ Attr.id "question-own"
-          ; Attr.create "aria-label" (if List.is_empty q.choices then "Your answer" else "Other")
+          ; Attr.create
+              "aria-label"
+              (if List.is_empty q.choices then "Your answer" else "Other")
           ; Attr.class_ "text-input"
           ; Attr.type_ "text"
           ; Attr.placeholder
