@@ -974,8 +974,7 @@ let%expect_test "a torn last line and unknown entries are skipped, not fatal" =
   let lines = In_channel.read_lines (Session.path t) in
   let last_id =
     match Jsonaf.of_string (List.last_exn lines) with
-    | `Array [ _; entry ] ->
-      Jsonaf.member_exn "id" entry |> Jsonaf.string_exn
+    | `Array [ _; entry ] -> Jsonaf.member_exn "id" entry |> Jsonaf.string_exn
     | _ -> assert false
   in
   (* A newer prigh's entry in the chain, then a crash mid-line. *)
@@ -1002,11 +1001,22 @@ let%expect_test "a torn last line and unknown entries are skipped, not fatal" =
   show loaded;
   print_s
     [%sexp
-      (List.map (Session.list ~dir) ~f:(fun s -> s.id = Session.id t) : bool list)];
+      (List.map (Session.list ~dir) ~f:(fun s ->
+         String.equal s.id (Session.id t))
+       : bool list)];
   (* Appending starts a fresh line, so the next load gets it. *)
   let (_ : Session.Entry.t) =
     Session.append_message loaded (assistant "hello")
   in
   show (Or_error.ok_exn (Session.load (Session.path t)));
-  [%expect {| |}]
+  [%expect
+    {|
+    ((user:hi) (kept)
+     ("line 3: skipped a \"Hologram\" entry this version of prigh cannot read (written by a newer one?)"
+      "line 5: skipped an incomplete last line (prigh probably stopped while writing it)"))
+    (true)
+    ((user:hi assistant:hello) (kept)
+     ("line 3: skipped a \"Hologram\" entry this version of prigh cannot read (written by a newer one?)"
+      "line 5: skipped a line that is not JSON"))
+    |}]
 ;;
