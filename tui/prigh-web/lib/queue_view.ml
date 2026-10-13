@@ -22,7 +22,9 @@ let item (q : Message.t) ~inject =
   Node.li
     ~attrs:[ classes [ "queued" ] [ "steer", Message.Kind.equal q.kind Steer ] ]
     [ tag q.kind
-    ; Node.span ~attrs:[ Attr.class_ "queued-text" ] [ Node.text q.text ]
+    ; Node.span
+        ~attrs:[ Attr.class_ "queued-text"; Attr.create "dir" "auto" ]
+        [ Node.text q.text ]
     ; div
         ~cls:"queued-actions"
         [ button

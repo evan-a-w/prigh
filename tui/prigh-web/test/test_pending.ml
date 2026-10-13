@@ -80,7 +80,7 @@ let%expect_test "a prompt shows at once, until the transcript has it" =
             aria-busy="true"
             class="btn busy primary send"
             @on_click>
-      <span class="lamp"> </span>
+      <span aria-hidden="true" class="lamp"> </span>
     </button>
     Sending…
     |}];
@@ -138,7 +138,7 @@ let%expect_test "a model or thinking level chosen shows until confirmed" =
             popovertargetaction="hide"
             class="awaiting btn chip-button model-chip"
             @on_click>
-      <span class="lamp"> </span>
+      <span aria-hidden="true" class="lamp"> </span>
       <span class="chip-label"> Claude Sonnet 5 </span>
     </button>
     |}];

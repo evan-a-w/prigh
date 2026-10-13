@@ -60,10 +60,13 @@ let align_attr (align : Markdown.Align.t) =
   | Right -> cls "right"
 ;;
 
+(* Each block takes its direction from its text (Hebrew, Arabic...). *)
+let auto = [ Attr.create "dir" "auto" ]
+
 let rec block ?(tight = false) (b : Block.t) =
   match b with
   | Paragraph l when tight -> Node.fragment (inlines l)
-  | Paragraph l -> Node.p (inlines l)
+  | Paragraph l -> Node.p ~attrs:auto (inlines l)
   | Heading (level, l) ->
     let h =
       match level with
@@ -74,18 +77,18 @@ let rec block ?(tight = false) (b : Block.t) =
       | 5 -> Node.h5
       | _ -> Node.h6
     in
-    h (inlines l)
+    h ~attrs:auto (inlines l)
   | Code { lang; text; closed } -> code_block ~lang ~text ~closed
-  | Quote blocks -> Node.blockquote (List.map blocks ~f:block)
+  | Quote blocks -> Node.blockquote ~attrs:auto (List.map blocks ~f:block)
   | Rule -> Node.hr ()
   | List { start; tight; items } ->
     let item ({ checked; blocks } : Block.item) =
       let content = List.map blocks ~f:(block ~tight) in
       match checked with
-      | None -> Node.li content
+      | None -> Node.li ~attrs:auto content
       | Some checked ->
         Node.li
-          ~attrs:(cls "task")
+          ~attrs:(auto @ cls "task")
           (Node.input
              ~attrs:
                ([ Attr.type_ "checkbox"; Attr.disabled ]

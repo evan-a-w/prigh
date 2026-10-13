@@ -92,12 +92,12 @@ let%expect_test "two at most, the newest; a repeat is counted, not stacked" =
     <div class="toast-anchor">
       <div aria-live="polite" class="toasts">
         <div role="status" title="Dismiss" class="toast" @on_click>
-          <span> Answered </span>
+          <span dir="auto"> Answered </span>
           <Vdom.Node.none-widget> </Vdom.Node.none-widget>
           <Vdom.Node.none-widget> </Vdom.Node.none-widget>
         </div>
         <div role="status" title="Dismiss" class="toast" @on_click>
-          <span> Copied the last reply to the clipboard </span>
+          <span dir="auto"> Copied the last reply to the clipboard </span>
           <span class="toast-repeats"> ×3 </span>
           <Vdom.Node.none-widget> </Vdom.Node.none-widget>
         </div>
@@ -120,7 +120,7 @@ let%expect_test "two at most, the newest; a repeat is counted, not stacked" =
     <div class="toast-anchor">
       <div aria-live="polite" class="toasts">
         <div role="status" title="Dismiss" class="toast" @on_click>
-          <span> Copied the last reply to the clipboard </span>
+          <span dir="auto"> Copied the last reply to the clipboard </span>
           <span class="toast-repeats"> ×3 </span>
           <Vdom.Node.none-widget> </Vdom.Node.none-widget>
         </div>
@@ -128,7 +128,7 @@ let%expect_test "two at most, the newest; a repeat is counted, not stacked" =
              title="Working directory: /tmp/nix-shell.MOI5Ul/nix-shell.cHNpd9/tmp.bHrKSDsr6i/chromium/cwd (click to dismiss)"
              class="error toast"
              @on_click>
-          <span> Working directory: /tmp/…/chromium/cwd </span>
+          <span dir="auto"> Working directory: /tmp/…/chromium/cwd </span>
           <Vdom.Node.none-widget> </Vdom.Node.none-widget>
           <button type="button"
                   title="Dismiss"
@@ -166,5 +166,19 @@ let%expect_test "toasts are not under a dialog's inert page" =
     <div class="chat verbosity-normal">
     <footer class="composer">
     <div class="toast">
+    |}]
+;;
+
+(* What the user typed comes back as they typed it: no OCaml escapes for
+   accents, scripts or emoji. *)
+let%expect_test "toasts quote non-ASCII text as it is" =
+  let h = H.create () in
+  H.quiet h (fun () ->
+    H.act h (Run "/model 日本語 é 😀");
+    H.act h (Run "/thinking שלום"));
+  H.text h ~selector:".toasts";
+  [%expect {|
+    No model matches “日本語 é 😀”. Ctrl+L lists them all. (Dismiss)
+    Unknown thinking level “שלום”: use off, low, on, high, max. (Dismiss)
     |}]
 ;;

@@ -224,14 +224,23 @@ let mtime (m : App.Model.t) = function
   | Some time -> Message_time.short (App.Model.message_time m) time
 ;;
 
-let row (m : App.Model.t) (t : Files.t) (e : File_listing.Entry.t) ~inject =
-  let selected = Option.exists t.selected ~f:(String.equal e.name) in
+(* What a row shows besides its entry: rows are rebuilt only when one
+   changes, not at every event of the page. *)
+module Row = struct
+  type t =
+    { selected : bool
+    ; uploading : bool
+    ; mtime : string
+    ; mtime_full : string option
+    }
+  [@@deriving equal]
+end
+
+let rows : (File_listing.Entry.t, Row.t) View_cache.t = View_cache.create ()
+let row_id name = "files-row-" ^ name
+
+let row_view (e : File_listing.Entry.t) ({ selected; uploading; mtime; mtime_full } : Row.t) ~inject =
   let dir = File_listing.Kind.is_dir e.kind in
-  let uploading =
-    List.find t.uploads ~f:(fun u ->
-      Option.exists t.listing ~f:(fun l -> String.equal u.dir l.path)
-      && String.equal u.local.name e.name)
-  in
   Node.div
     ~attrs:
       [ classes
@@ -245,25 +254,35 @@ let row (m : App.Model.t) (t : Files.t) (e : File_listing.Entry.t) ~inject =
               | _ -> false )
           ]
       ; Attr.role "option"
+      ; Attr.id (row_id e.name)
       ; Attr.create "aria-selected" (Bool.to_string selected)
       ; Attr.create "data-name" e.name
       ; Attr.on_click (fun _ -> inject (files (Select e.name)))
       ]
     [ kind_glyph e.kind
-    ; span ~cls:"files-name" (if dir then e.name ^ "/" else e.name)
-    ; (match uploading with
-       | Some _ -> span ~cls:"files-lamp" ""
-       | None -> Node.none)
+    ; span ~cls:"files-name" ~attrs:[ Attr.create "dir" "auto" ] (if dir then e.name ^ "/" else e.name)
+    ; (if uploading then span ~cls:"files-lamp" "" else Node.none)
     ; span ~cls:"files-size" (Option.value_map e.size ~default:"" ~f:size)
     ; span
         ~cls:"files-mtime"
-        ~attrs:
-          (match e.mtime with
-           | Some time ->
-             [ Attr.title (Message_time.full (App.Model.message_time m) time) ]
-           | None -> [])
-        (mtime m e.mtime)
+        ~attrs:(Option.value_map mtime_full ~default:[] ~f:(fun t -> [ Attr.title t ]))
+        mtime
     ]
+;;
+
+let row (m : App.Model.t) (t : Files.t) (e : File_listing.Entry.t) ~inject =
+  let deps =
+    { Row.selected = Option.exists t.selected ~f:(String.equal e.name)
+    ; uploading =
+        List.exists t.uploads ~f:(fun u ->
+          Option.exists t.listing ~f:(fun l -> String.equal u.dir l.path)
+          && String.equal u.local.name e.name)
+    ; mtime = mtime m e.mtime
+    ; mtime_full =
+        Option.map e.mtime ~f:(Message_time.full (App.Model.message_time m))
+    }
+  in
+  View_cache.find rows e ~deps ~equal:Row.equal ~f:(fun () -> row_view e deps ~inject)
 ;;
 
 let entry_path (t : Files.t) name =
@@ -527,6 +546,9 @@ let body (m : App.Model.t) (t : Files.t) ~inject =
             ; Attr.role "listbox"
             ; Attr.tabindex 0
             ; Attr.create "aria-label" "Files"
+            ; (match t.selected with
+               | Some name -> Attr.create "aria-activedescendant" (row_id name)
+               | None -> Attr.empty)
             ]
           (match entries with
            | [] ->

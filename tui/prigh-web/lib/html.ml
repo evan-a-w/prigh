@@ -46,7 +46,10 @@ let lamp ?title () =
   Node.span
     ~attrs:
       (Attr.class_ "lamp"
-       :: Option.value_map title ~default:[] ~f:(fun t -> [ Attr.title t ]))
+       ::
+       (match title with
+        | Some t -> [ Attr.title t; Attr.role "img"; Attr.create "aria-label" t ]
+        | None -> [ Attr.create "aria-hidden" "true" ]))
     []
 ;;
 

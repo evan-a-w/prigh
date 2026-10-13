@@ -9,22 +9,28 @@ let view (m : App.Model.t) ~inject =
   | Some btw ->
     let status =
       match btw.status with
-      | Streaming ->
-        div ~cls:"btw-status" [ Html.lamp (); Node.text "Answering…" ]
-      | Done -> Node.none
-      | Failed e -> div ~cls:"btw-error" [ Node.textf "Failed: %s" e ]
+      | Streaming -> [ Html.lamp (); Node.text "Answering…" ]
+      | Done -> [ span ~cls:"sr-only" "Answered" ]
+      | Failed e ->
+        [ span
+            ~cls:"btw-error"
+            (sprintf "Couldn't answer: %s. /btw asks again." e)
+        ]
+    in
+    (* Said once when it starts, ends or fails; not at every chunk. *)
+    let status =
+      div ~cls:"btw-status" ~attrs:[ Attr.role "status" ] status
     in
     Node.section
       ~attrs:
         [ Attr.class_ "btw-panel"
         ; Attr.id "btw"
         ; Attr.create "aria-label" "Side question"
-        ; Attr.create "aria-live" "polite"
         ]
       [ div
           ~cls:"btw-head"
           [ span ~cls:"btw-tag" "btw"
-          ; span ~cls:"btw-question" btw.question
+          ; span ~cls:"btw-question" ~attrs:[ Attr.create "dir" "auto" ] btw.question
           ; button
               ~cls:"icon ghost"
               ~title:"Close (Esc)"
@@ -34,6 +40,11 @@ let view (m : App.Model.t) ~inject =
           ]
       ; div
           ~cls:"btw-answer"
+          ~attrs:
+            [ (if Btw.Status.equal btw.status Streaming
+               then Attr.create "aria-busy" "true"
+               else Attr.empty)
+            ]
           [ (if String.is_empty btw.answer
              then Node.none
              else

@@ -13,13 +13,18 @@ let tokens n =
   else Int.to_string n
 ;;
 
-let item ?(cls = "") ?title children =
+let item ?(cls = "") ?title ?(attrs = []) children =
   Node.span
     ~attrs:
       ([ Attr.class_ (String.strip ("status-item " ^ cls)) ]
-       @ Option.value_map title ~default:[] ~f:(fun t -> [ Attr.title t ]))
+       @ Option.value_map title ~default:[] ~f:(fun t -> [ Attr.title t ])
+       @ attrs)
     children
 ;;
+
+(* What the agent is doing, said (politely) when it changes: Working,
+   Ready, Reconnecting… Not the counters, which change all the time. *)
+let activity = [ Attr.role "status"; Attr.create "aria-atomic" "true" ]
 
 let context (state : State.t) =
   if state.model.context_window <= 0
@@ -255,7 +260,7 @@ let modes (m : App.Model.t) ~inject =
   ]
 ;;
 
-let waiting cls text = item ~cls [ Html.lamp (); Node.text text ]
+let waiting cls text = item ~cls ~attrs:activity [ Html.lamp (); Node.text text ]
 
 let view (m : App.Model.t) ~inject =
   match m.state, m.connection with
@@ -269,10 +274,11 @@ let view (m : App.Model.t) ~inject =
       [ (if m.pending.sending > 0 && not state.running
          then waiting "running" "Sending…"
          else if state.running
-         then item ~cls:"running" [ Html.lamp (); Node.text "Working" ]
+         then item ~cls:"running" ~attrs:activity [ Html.lamp (); Node.text "Working" ]
          else
            item
              ~cls:"idle"
+             ~attrs:activity
              [ Node.span ~attrs:[ Attr.class_ "idle-dot" ] []
              ; Node.text "Ready"
              ])

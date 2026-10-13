@@ -147,7 +147,9 @@ let view (m : App.Model.t) ~inject =
                 ; Attr.title "Rename (/name)"
                 ; Attr.on_click (fun _ -> inject Action.Open_rename)
                 ]
-              [ Node.span [ Node.text (session_title m state) ]
+              [ Node.span
+                  ~attrs:[ Attr.create "dir" "auto" ]
+                  [ Node.text (session_title m state) ]
               ; icon ~cls:"edit-hint" Pencil
               ]
           ; div

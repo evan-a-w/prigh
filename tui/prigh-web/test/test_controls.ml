@@ -163,7 +163,7 @@ let%expect_test "the top bar: title, cwd and branch, and the controls' menu" =
       </button>
       <div class="title">
         <button type="button" title="Rename (/name)" class="session-name" @on_click>
-          <span> New session </span>
+          <span dir="auto"> New session </span>
           <icon class="pencil"> </icon>
         </button>
         <div class="session-where">

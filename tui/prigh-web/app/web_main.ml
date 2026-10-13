@@ -763,6 +763,21 @@ let install_listeners ~schedule ~current =
   let save_scroll () =
     Option.iter (chat_element ()) ~f:Tab_memory.save_scroll
   in
+  (* Following the output scrolls at every chunk: sessionStorage is written
+     at most every 300ms (and when the page goes). *)
+  let save_pending = ref false in
+  let save_scroll_soon () =
+    if not !save_pending
+    then (
+      save_pending := true;
+      ignore
+        (Dom_html.setTimeout
+           (fun () ->
+              save_pending := false;
+              save_scroll ())
+           300.
+         : Dom_html.timeout_id_safe))
+  in
   ignore
     (Dom_html.addEventListener
        Dom_html.window
@@ -811,7 +826,7 @@ let install_listeners ~schedule ~current =
   listen ~capture:true (Dom_html.Event.make "scroll") (fun ev ->
     (match chat_element () with
      | Some el when phys_equal (Dom_html.eventTarget ev :> Dom.node Js.t) (el :> Dom.node Js.t) ->
-       Tab_memory.save_scroll el;
+       save_scroll_soon ();
        let top = Js.to_float el##.scrollTop in
        let ours =
          Option.value_map !last_set ~default:false ~f:(fun s ->

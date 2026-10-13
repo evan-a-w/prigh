@@ -17,7 +17,7 @@ let%expect_test "bash: arguments streaming, then running with live output" =
     {|
     <div class="running tool tool-bash">
       <div class="tool-head">
-        <span class="lamp"> </span>
+        <span aria-hidden="true" class="lamp"> </span>
         <span class="name"> bash </span>
         <span class="arg command"> ls && ec </span>
       </div>
@@ -37,7 +37,7 @@ let%expect_test "bash: arguments streaming, then running with live output" =
     {|
     <div class="running tool tool-bash">
       <div class="tool-head">
-        <span class="lamp"> </span>
+        <span aria-hidden="true" class="lamp"> </span>
         <span class="name"> bash </span>
         <span class="arg command"> ls && echo done </span>
       </div>
@@ -138,7 +138,7 @@ let%expect_test "bash in the background: the job it started" =
     {|
     <div class="running tool tool-bash">
       <div class="tool-head">
-        <span class="lamp"> </span>
+        <span aria-hidden="true" class="lamp"> </span>
         <span class="name"> bash </span>
         <span class="arg command"> sleep 1; echo bg finished </span>
         <span class="chip"> background </span>
@@ -324,7 +324,7 @@ let%expect_test "write: content shown as it streams" =
     {|
     <div class="running tool tool-write">
       <div class="tool-head">
-        <span class="lamp"> </span>
+        <span aria-hidden="true" class="lamp"> </span>
         <span class="name"> write </span>
         <span class="arg path"> notes.txt </span>
         <span class="chip"> 3 lines </span>
@@ -349,7 +349,7 @@ let%expect_test "edit: the diff it returned, or its edits before it has run" =
     {|
     <div class="running tool tool-edit">
       <div class="tool-head">
-        <span class="lamp"> </span>
+        <span aria-hidden="true" class="lamp"> </span>
         <span class="name"> edit </span>
         <span class="arg path"> src/app.ml </span>
         <span class="add chip"> +2 </span>
@@ -675,12 +675,12 @@ let%expect_test "subagent: running shows its latest step" =
     {|
     <div data-call="c12" class="running tool tool-subagent">
       <div data-agent="a1" title="Follow it in the agents panel" class="tool-head">
-        <span class="lamp"> </span>
+        <span aria-hidden="true" class="lamp"> </span>
         <span class="name"> subagent </span>
         <span class="arg task"> Count the lines in src/app.ml and report back. … </span>
         <span class="chip model"> deepseek-flash </span>
         <span class="chip"> 1 turn </span>
-        <span class="open-agent"> Open › </span>
+        <button type="button" aria-label="Open in the agents panel" class="open-agent"> Open › </button>
       </div>
       <div class="tool-body">
         <details class="task">
@@ -702,16 +702,16 @@ let%expect_test "subagent: running shows its latest step" =
           </summary>
           <div class="entries">
             <div class="msg user">
-              <div class="bubble"> Count the lines in src/app.ml and report back.
+              <div dir="auto" class="bubble"> Count the lines in src/app.ml and report back.
     Be brief. </div>
             </div>
             <div class="assistant msg">
               <div class="markdown">
-                <p> Counting. </p>
+                <p dir="auto"> Counting. </p>
               </div>
               <div class="running tool tool-bash">
                 <div class="tool-head">
-                  <span class="lamp"> </span>
+                  <span aria-hidden="true" class="lamp"> </span>
                   <span class="name"> bash </span>
                   <span class="arg command"> wc -l src/app.ml </span>
                 </div>
@@ -738,7 +738,7 @@ let%expect_test "subagent: done, with its report and its transcript folded" =
       <span class="chip model"> deepseek-flash </span>
       <span class="chip"> 2 turns </span>
       <span class="chip"> $0.01 </span>
-      <span class="open-agent"> Open › </span>
+      <button type="button" aria-label="Open in the agents panel" class="open-agent"> Open › </button>
     </div>
     <details class="report">
       <summary>
@@ -746,7 +746,7 @@ let%expect_test "subagent: done, with its report and its transcript folded" =
         <span class="preview"> src/app.ml has 5 lines. </span>
       </summary>
       <div class="markdown">
-        <p>
+        <p dir="auto">
           src/app.ml has
           <strong> 5 lines </strong>
           .
@@ -772,13 +772,13 @@ let%expect_test
     {|
     <div data-call="c12" class="running tool tool-subagent">
       <div data-agent="a1" title="Follow it in the agents panel" class="tool-head">
-        <span class="lamp"> </span>
+        <span aria-hidden="true" class="lamp"> </span>
         <span class="name"> subagent </span>
         <span class="arg task"> Count the lines in src/app.ml and report back. … </span>
         <span class="chip job"> agent a1 </span>
         <span class="chip model"> deepseek-flash </span>
         <span class="chip"> 1 turn </span>
-        <span class="open-agent"> Open › </span>
+        <button type="button" aria-label="Open in the agents panel" class="open-agent"> Open › </button>
       </div>
       <div class="tool-body">
         <details class="task">
@@ -800,16 +800,16 @@ let%expect_test
           </summary>
           <div class="entries">
             <div class="msg user">
-              <div class="bubble"> Count the lines in src/app.ml and report back.
+              <div dir="auto" class="bubble"> Count the lines in src/app.ml and report back.
     Be brief. </div>
             </div>
             <div class="assistant msg">
               <div class="markdown">
-                <p> Counting. </p>
+                <p dir="auto"> Counting. </p>
               </div>
               <div class="running tool tool-bash">
                 <div class="tool-head">
-                  <span class="lamp"> </span>
+                  <span aria-hidden="true" class="lamp"> </span>
                   <span class="name"> bash </span>
                   <span class="arg command"> wc -l src/app.ml </span>
                 </div>
@@ -838,7 +838,7 @@ let%expect_test "subagent: failed" =
         <span class="chip model"> deepseek-flash </span>
         <span class="chip"> 1 turn </span>
         <span class="chip"> $0.00 </span>
-        <span class="open-agent"> Open › </span>
+        <button type="button" aria-label="Open in the agents panel" class="open-agent"> Open › </button>
       </div>
       <div class="tool-body">
         <details class="task">
@@ -909,7 +909,7 @@ let%expect_test "subagent from a reloaded session: no events, only its result" =
             <span class="preview"> There are 5 lines. </span>
           </summary>
           <div class="markdown">
-            <p> There are 5 lines. </p>
+            <p dir="auto"> There are 5 lines. </p>
           </div>
         </details>
       </div>
@@ -1399,7 +1399,7 @@ let%expect_test "apply_patch: the files streamed so far" =
     {|
     <div class="running tool tool-apply_patch">
       <div class="tool-head">
-        <span class="lamp"> </span>
+        <span aria-hidden="true" class="lamp"> </span>
         <span class="name"> apply_patch </span>
         <span class="arg path"> src/new.ml </span>
         <span class="chip"> 2 files </span>

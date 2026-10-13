@@ -89,7 +89,7 @@ let toasts (m : Model.t) ~inject =
                     else t.text ^ " (click to dismiss)")
                ; Attr.on_click (fun _ -> inject (Action.Dismiss_toast t.id))
                ]
-             [ Node.span [ Node.text shown ]
+             [ Node.span ~attrs:[ Attr.create "dir" "auto" ] [ Node.text shown ]
              ; (if t.repeats > 0
                 then span ~cls:"toast-repeats" (sprintf "×%d" (t.repeats + 1))
                 else Node.none)
@@ -165,7 +165,11 @@ let echoes (m : Model.t) =
            [ Image_view.thumbs p.images
            ; (if String.is_empty (String.strip p.text)
               then Node.none
-              else div ~cls:"bubble" [ Node.text p.text ])
+              else
+                div
+                  ~cls:"bubble"
+                  ~attrs:[ Attr.create "dir" "auto" ]
+                  [ Node.text p.text ])
            ; span ~cls:"time" "Sending…"
            ]))
 ;;
@@ -257,6 +261,12 @@ let view (m : Model.t) ~inject ~terminal =
                      ; "verbosity-" ^ Prigh_ui.Verbosity.name m.verbosity
                      ]
                  ; Attr.id "chat"
+                 ; Attr.role "region"
+                 ; Attr.create "aria-label" "Transcript"
+                 ; Attr.tabindex 0
+                 ; (if Option.is_some (loading m)
+                    then Attr.create "aria-busy" "true"
+                    else Attr.empty)
                  ]
                [ chat; jump_to_bottom m ~inject ]
            ]

@@ -36,12 +36,12 @@ let%expect_test "startup, a prompt and its streamed reply" =
      (tag (Sent (text hello) (images ()))))
     <div class="entries">
       <div class="msg user">
-        <div class="bubble"> hello </div>
+        <div dir="auto" class="bubble"> hello </div>
       </div>
       <div class="assistant msg streaming">
         <div class="markdown">
           <div class="md-part">
-            <p>
+            <p dir="auto">
               Hi
               <strong> there </strong>
             </p>

@@ -14,7 +14,7 @@ let%expect_test "inline spans" =
   [%expect
     {|
     <div class="markdown">
-      <p>
+      <p dir="auto">
         Some
         <strong> bold </strong>
         ,
@@ -54,7 +54,7 @@ let%expect_test "links: safe ones open in a new tab, others are text" =
   [%expect
     {|
     <div class="markdown">
-      <p>
+      <p dir="auto">
         <a href="https://example.com/a_(b)" target="_blank" rel="noopener noreferrer"> docs </a>
 
         <a href="https://x.org" target="_blank" rel="noopener noreferrer"> https://x.org </a>
@@ -86,20 +86,20 @@ let%expect_test "headings, rules, quotes" =
   [%expect
     {|
     <div class="markdown">
-      <h1> Title </h1>
-      <h2> Sub </h2>
-      <h6> Six </h6>
-      <p> #hashtag </p>
+      <h1 dir="auto"> Title </h1>
+      <h2 dir="auto"> Sub </h2>
+      <h6 dir="auto"> Six </h6>
+      <p dir="auto"> #hashtag </p>
       <hr/>
-      <blockquote>
-        <p>
+      <blockquote dir="auto">
+        <p dir="auto">
           quoted
           <em> text </em>
           <br/>
           lazy line
         </p>
-        <blockquote>
-          <p> nested </p>
+        <blockquote dir="auto">
+          <p dir="auto"> nested </p>
         </blockquote>
       </blockquote>
     </div>
@@ -127,26 +127,26 @@ let%expect_test "lists: nested, ordered, tasks, loose" =
     {|
     <div class="markdown">
       <ul>
-        <li>
+        <li dir="auto">
           one
           <ul>
-            <li>
+            <li dir="auto">
               nested
               <ul>
-                <li> deeper </li>
+                <li dir="auto"> deeper </li>
               </ul>
             </li>
           </ul>
         </li>
-        <li>
+        <li dir="auto">
           two
           <br/>
           continued
         </li>
       </ul>
       <ol start="3">
-        <li> three </li>
-        <li>
+        <li dir="auto"> three </li>
+        <li dir="auto">
           four
           <div class="code copyable">
             <div class="code-head">
@@ -160,22 +160,22 @@ let%expect_test "lists: nested, ordered, tasks, loose" =
         </li>
       </ol>
       <ul>
-        <li class="task">
+        <li dir="auto" class="task">
           <input type="checkbox" disabled=""/>
           todo
         </li>
-        <li class="task">
+        <li dir="auto" class="task">
           <input type="checkbox" disabled="" checked=""/>
           done
         </li>
       </ul>
-      <p> Loose: </p>
+      <p dir="auto"> Loose: </p>
       <ul>
-        <li>
-          <p> loose </p>
+        <li dir="auto">
+          <p dir="auto"> loose </p>
         </li>
-        <li>
-          <p> items </p>
+        <li dir="auto">
+          <p dir="auto"> items </p>
         </li>
       </ul>
     </div>
@@ -233,7 +233,7 @@ let%expect_test "tables" =
           </tbody>
         </table>
       </div>
-      <p> after </p>
+      <p dir="auto"> after </p>
     </div>
     |}]
 ;;
@@ -298,7 +298,7 @@ let%expect_test "html is text" =
   [%expect
     {|
     <div class="markdown">
-      <p> <script>alert(1)</script> & <b>x</b> </p>
+      <p dir="auto"> <script>alert(1)</script> & <b>x</b> </p>
     </div>
     |}]
 ;;
@@ -398,13 +398,13 @@ let%expect_test "streaming: a part per complete block, then the rest" =
     {|
     <div class="markdown">
       <div class="md-part">
-        <p> Para one. </p>
+        <p dir="auto"> Para one. </p>
       </div>
       <div class="md-part">
-        <p> Para two. </p>
+        <p dir="auto"> Para two. </p>
       </div>
       <div class="md-part">
-        <p> Para th </p>
+        <p dir="auto"> Para th </p>
       </div>
     </div>
     |}]

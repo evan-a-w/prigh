@@ -55,7 +55,7 @@ let%expect_test
           </pre>
         </details>
         <div class="msg user">
-          <div class="bubble"> fix the build </div>
+          <div dir="auto" class="bubble"> fix the build </div>
           <div class="attachments">
             <span title="Attached file" class="attachment"> @Makefile </span>
           </div>
@@ -500,7 +500,7 @@ let%expect_test
     (Expire_toast (id 1) (after_ms 6000))
     (Save_history ("/notify loud" /notify))
     This browser cannot show notifications here (they need https or localhost); the tab's title still counts what happened
-    Unknown /notify argument "loud": /notify on or /notify off (/notify alone says what is on) (Dismiss)
+    Unknown /notify argument “loud”: /notify on or /notify off (/notify alone says what is on) (Dismiss)
     |}]
 ;;
 

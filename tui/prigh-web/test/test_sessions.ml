@@ -86,7 +86,7 @@ let%expect_test
     </div>
     |}];
   H.show h ~selector:".session.running .lamp";
-  [%expect {| <span title="Running" class="lamp"> </span> |}];
+  [%expect {| <span title="Running" role="img" aria-label="Running" class="lamp"> </span> |}];
   (* The topbar names the session after its first prompt until it has a name. *)
   H.text h ~selector:".topbar .title";
   [%expect
@@ -269,7 +269,7 @@ let%expect_test
     Scroll_to_bottom
     <div class="running tool tool-bash">
       <div class="tool-head">
-        <span class="lamp"> </span>
+        <span aria-hidden="true" class="lamp"> </span>
         <span class="name"> bash </span>
         <span class="arg command"> rm -rf build </span>
       </div>
@@ -532,7 +532,7 @@ let%expect_test "new session and switching session reload the state" =
      (tag (Page (path /sessions/s3.jsonl) (before ()))))
     (Focus editor)
     <div class="session-mark">
-      <span title="Opening…" class="lamp"> </span>
+      <span title="Opening…" role="img" aria-label="Opening…" class="lamp"> </span>
     </div>
     Loading the session…
     |}];

@@ -50,10 +50,10 @@ let%expect_test "user messages: text, pasted images" =
             </summary>
           </details>
         </div>
-        <div class="bubble"> Give me a tour of the project. </div>
+        <div dir="auto" class="bubble"> Give me a tour of the project. </div>
       </div>
       <div class="msg user">
-        <div class="bubble"> line one
+        <div dir="auto" class="bubble"> line one
     line two </div>
       </div>
     </div>
@@ -70,7 +70,7 @@ let%expect_test
     <div class="entries">
       <div class="assistant msg streaming">
         <div class="pending">
-          <span class="lamp"> </span>
+          <span aria-hidden="true" class="lamp"> </span>
           <span class="label"> Waiting for the model… </span>
         </div>
       </div>
@@ -88,7 +88,7 @@ let%expect_test
       <div class="assistant msg streaming">
         <div class="live thinking">
           <div class="thinking-head">
-            <span class="lamp"> </span>
+            <span aria-hidden="true" class="lamp"> </span>
             <span class="label"> Thinking… </span>
           </div>
           <div class="thinking-text"> Let me look.
@@ -116,7 +116,7 @@ let%expect_test
         </summary>
         <div class="thinking-text">
           <div class="markdown">
-            <p>
+            <p dir="auto">
               Let me look.
               <br/>
               First the
@@ -128,7 +128,7 @@ let%expect_test
       </details>
       <div class="markdown">
         <div class="md-part">
-          <p>
+          <p dir="auto">
             Here
             <strong>
               is the
@@ -158,7 +158,7 @@ let%expect_test
         </summary>
         <div class="thinking-text">
           <div class="markdown">
-            <p>
+            <p dir="auto">
               Let me look.
               <br/>
               First the
@@ -169,7 +169,7 @@ let%expect_test
         </div>
       </details>
       <div class="markdown">
-        <p>
+        <p dir="auto">
           Here
           <strong>
             is the
@@ -210,13 +210,13 @@ let%expect_test "how a reply stopped: error, interrupted, length" =
       </div>
       <div class="assistant msg">
         <div class="markdown">
-          <p> I was saying </p>
+          <p dir="auto"> I was saying </p>
         </div>
         <div class="aborted stop"> Interrupted </div>
       </div>
       <div class="assistant msg">
         <div class="markdown">
-          <p> A long </p>
+          <p dir="auto"> A long </p>
         </div>
         <div class="length stop"> Stopped at the output token limit: ask it to continue. </div>
       </div>
@@ -268,14 +268,14 @@ let%expect_test
   [%expect
     {|
     <div class="msg user">
-      <div class="bubble"> New year's eve </div>
+      <div dir="auto" class="bubble"> New year's eve </div>
       <time title="Wednesday 31 December 2025, 23:59:00" datetime="2025-12-31T21:59:00Z" class="time"> 31 Dec 2025 23:59 </time>
     </div>
     <div class="msg user">
-      <div class="bubble"> Written before sessions kept times </div>
+      <div dir="auto" class="bubble"> Written before sessions kept times </div>
     </div>
     <div class="msg user">
-      <div class="bubble"> Saturday </div>
+      <div dir="auto" class="bubble"> Saturday </div>
       <time title="Saturday 3 October 2026, 12:00:00" datetime="2026-10-03T10:00:00Z" class="time"> 3 Oct 12:00 </time>
     </div>
     |}];
@@ -370,7 +370,7 @@ let%expect_test "deliveries of background work: compact cards" =
                 <span class="preview"> src/app.ml has 5 lines. </span>
               </summary>
               <div class="markdown">
-                <p>
+                <p dir="auto">
                   src/app.ml has
                   <strong> 5 lines </strong>
                   .
@@ -418,7 +418,7 @@ let%expect_test "deliveries of background work: compact cards" =
                 <span class="preview"> subagent failed: 529 overloaded </span>
               </summary>
               <div class="markdown">
-                <p> subagent failed: 529 overloaded </p>
+                <p dir="auto"> subagent failed: 529 overloaded </p>
               </div>
             </details>
           </div>
@@ -444,13 +444,13 @@ let%expect_test "notices and compaction" =
           <span class="preview"> Goal </span>
         </summary>
         <div class="markdown">
-          <h2> Goal </h2>
-          <p>
+          <h2 dir="auto"> Goal </h2>
+          <p dir="auto">
             Ship the
             <strong> web </strong>
              UI.
           </p>
-          <p> Done so far: chat view. </p>
+          <p dir="auto"> Done so far: chat view. </p>
         </div>
       </details>
       <div class="msg notice"> Switched to Claude Opus 5.5 </div>

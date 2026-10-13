@@ -702,7 +702,7 @@ let check_name name =
   if String.is_empty name
   then Some "Type a name."
   else if String.equal name "." || String.equal name ".."
-  then Some (sprintf "%S is not a name: type another." name)
+  then Some (sprintf "“%s” is not a name: type another." name)
   else if String.mem name '/'
   then Some "A name cannot contain /: type it without."
   else None

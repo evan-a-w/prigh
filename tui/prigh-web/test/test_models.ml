@@ -109,7 +109,7 @@ let%expect_test "/model with a name switches, or says what matches" =
     {|
     (Focus editor)
     (Save_history ("/model gemini" "/model claude" "/model sonnet"))
-    No model matches "gemini". Ctrl+L lists them all. (Dismiss)
+    No model matches “gemini”. Ctrl+L lists them all. (Dismiss)
     |}]
 ;;
 
@@ -145,7 +145,7 @@ let%expect_test "thinking: a picker and /thinking, when the model supports it" =
   [%expect
     {|
     (Save_history ("/thinking lots" "/thinking max"))
-    Unknown thinking level "lots": use off, low, on, high, max. (Dismiss)
+    Unknown thinking level “lots”: use off, low, on, high, max. (Dismiss)
     |}];
   let deepseek =
     Jsonaf.of_string

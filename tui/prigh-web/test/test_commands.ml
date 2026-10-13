@@ -375,15 +375,15 @@ let%expect_test "/verbosity and Ctrl+O" =
     Dialog_accept
     (Focus editor)
     (Expire_toast (id 0) (after_ms 4660))
-    <div id="chat" class="chat verbosity-quiet">
+    <div id="chat" role="region" aria-label="Transcript" tabindex="0" class="chat verbosity-quiet">
       <Vdom.Node.none-widget> </Vdom.Node.none-widget>
       <div class="entries">
         <div class="msg user">
-          <div class="bubble"> fix the build </div>
+          <div dir="auto" class="bubble"> fix the build </div>
         </div>
         <div class="assistant msg">
           <div class="markdown">
-            <p>
+            <p dir="auto">
               Fixed: the
               <strong> flag </strong>
                was wrong.
@@ -413,7 +413,7 @@ let%expect_test "/verbosity and Ctrl+O" =
     (Expire_toast (id 2) (after_ms 3740))
     (Save_history ("/verbosity loud" /verbosity))
     Transcript: verbose, everything unfolded (Ctrl+O cycles)
-    Unknown verbosity "loud": use quiet, normal or verbose. (Dismiss)
+    Unknown verbosity “loud”: use quiet, normal or verbose. (Dismiss)
     |}];
   H.text h ~selector:".status";
   [%expect
@@ -459,7 +459,7 @@ let%expect_test "/confirm" =
        "Tool confirmation off (mode auto, also for new sessions): tools run without asking")))
     (Save_history ("/confirm maybe" "/confirm off" /confirm))
     Tool confirmation on (mode ask, also for new sessions): bash, job_input, edits and MCP tools ask first
-    Unknown setting "maybe": use on or off. (Dismiss)
+    Unknown setting “maybe”: use on or off. (Dismiss)
     |}]
 ;;
 
@@ -958,7 +958,7 @@ let%expect_test "/host: pick a host, then the directory there" =
        (suggestions ()) (selected ()) (error ()) (busy false))))
     (Save_history ("/host mainframe" "/host ci" /host))
     Tools run on laptop (this browser), in /home/me/proj
-    No tool host "mainframe": one of backend, laptop, ci (/host picks one). (Dismiss)
+    No tool host “mainframe”: one of backend, laptop, ci (/host picks one). (Dismiss)
     |}]
 ;;
 
@@ -1082,6 +1082,7 @@ let%expect_test "/btw: a side answer streams into a panel" =
     {|
     btw what does make check run? (Close (Esc))
     It runs dune build @runtest .
+    Answered
     Not added to the conversation.
     |}];
   (* A new question replaces the answer; Esc cancels and closes it. *)
@@ -1109,7 +1110,7 @@ let%expect_test "/btw: a side answer streams into a panel" =
     (Rpc (method_ btw) (params ((question again?) (btw_id btw-3)))
      (tag (Btw btw-3)))
     btw again? (Close (Esc))
-    Failed: the model is unavailable
+    Couldn't answer: the model is unavailable. /btw asks again.
     Not added to the conversation.
     |}]
 ;;
