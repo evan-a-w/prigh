@@ -227,6 +227,8 @@ type t =
   ; mutable goal : Goal.t option
   ; mutable resume : Resume.t option
     (** a run stopped by a usage limit, resuming when it resets *)
+  ; mutable past_resets : int
+    (** usage limits in a row whose reset time had already passed *)
   ; sleep_until : float -> unit
   }
 
@@ -1729,7 +1731,10 @@ let rec start_run ?(tried = String.Set.empty) ?(then_ = fun () -> []) t prompts 
     let resuming =
       match unavailable, handover with
       | Some error, None -> schedule_resume t ~error
-      | _ -> false
+      | None, _ ->
+        t.past_resets <- 0;
+        false
+      | Some _, Some _ -> false
     in
     (* Steering messages that arrived after the last turn boundary go
        first: they were sent before any follow-up still queued. *)
@@ -1845,19 +1850,40 @@ and schedule_resume t ~error =
                message to try again, or /model picks another model"
               (Model.key t.model)));
       false
-    | Some at ->
-      arm_resume t ~at;
+    | Some reset ->
       let now = Eio.Time.now (Eio.Stdenv.clock t.env) in
+      (* A reset time already past (a stale header, a skewed clock) would
+         retry at once, again and again: back off instead, from a minute
+         up to an hour. *)
+      let at, when_ =
+        if Float.( > ) reset now
+        then (
+          t.past_resets <- 0;
+          ( reset
+          , sprintf
+              "when it resets at %s (in %s)"
+              (Usage_limit.utc_string reset)
+              (duration_hum (reset -. now)) ))
+        else (
+          let backoff =
+            Float.min 3600. (60. *. (2. **. Float.of_int t.past_resets))
+          in
+          t.past_resets <- t.past_resets + 1;
+          ( now +. backoff
+          , sprintf
+              "in %s (the provider says it reset at %s, which has passed)"
+              (duration_hum backoff)
+              (Usage_limit.utc_string reset) ))
+      in
+      arm_resume t ~at;
       broadcast
         t
         (Notice
            (sprintf
-              "%s: the usage limit is reached; the run resumes when it resets \
-               at %s (in %s): /resume now retries at once, /resume cancel \
-               stays stopped"
+              "%s: the usage limit is reached; the run resumes %s: /resume now \
+               retries at once, /resume cancel stays stopped"
               (Model.key t.model)
-              (Usage_limit.utc_string at)
-              (duration_hum (at -. now))));
+              when_));
       true)
 
 (* Recorded in the session, so that it is armed again when the session is
@@ -2094,6 +2120,7 @@ let create
     ; max_budget_usd
     ; goal = None
     ; resume = None
+    ; past_resets = 0
     ; sleep_until
     }
   in

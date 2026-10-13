@@ -714,6 +714,50 @@ let%expect_test "a run stopped by a usage limit resumes when it resets" =
 ;;
 
 let%expect_test
+    "a reset time already past backs off rather than retrying at once"
+  =
+  let sleep_until, fire = manual_clock () in
+  let resets_at = Core_unix.gettimeofday () -. 10. in
+  with_agent
+    ~sleep_until
+    [ Reply.usage_limit ~resets_at ()
+    ; Reply.usage_limit ~resets_at ()
+    ; text "carried on"
+    ]
+  @@ fun t agent _make ->
+  let wait () =
+    let at = Option.value_exn (Agent.state agent).resume_at in
+    printf "resume in %.0fs\n" (at -. Core_unix.gettimeofday ())
+  in
+  Or_error.ok_exn (Agent.prompt agent "work");
+  Agent.wait_idle agent;
+  wait ();
+  fire ();
+  Eio.Time.sleep (Eio.Stdenv.clock t.env) 0.05;
+  Agent.wait_idle agent;
+  wait ();
+  fire ();
+  Eio.Time.sleep (Eio.Stdenv.clock t.env) 0.05;
+  Agent.wait_idle agent;
+  show_state agent;
+  [%expect
+    {|
+    request: 1 messages, last user "work"
+    assistant:  ERROR HTTP 429: The usage limit has been reached (usage limit reached) (resets at <time>)
+    notice: deepseek/deepseek-flash: the usage limit is reached; the run resumes in 1m (the provider says it reset at <time>, which has passed): /resume now retries at once, /resume cancel stays stopped
+    resume in 60s
+    request: 3 messages, last user "[prigh: the usage limit has reset. Carry on with the interru"
+    assistant:  ERROR HTTP 429: The usage limit has been reached (usage limit reached) (resets at <time>)
+    notice: deepseek/deepseek-flash: the usage limit is reached; the run resumes in 2m (the provider says it reset at <time>, which has passed): /resume now retries at once, /resume cancel stays stopped
+    resume in 120s
+    request: 5 messages, last user "[prigh: the usage limit has reset. Carry on with the interru"
+    assistant: carried on
+    ((running false) (cost_usd 0) (budget_usd ()) (goal ())
+     (resume_scheduled false))
+    |}]
+;;
+
+let%expect_test
     "a scheduled resume is recorded in the session: loaded again it is \
      scheduled again, or dropped once its time has passed"
   =

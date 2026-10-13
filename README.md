@@ -945,7 +945,9 @@ headers, Anthropic's `anthropic-ratelimit-unified-*reset` headers,
 `retry-after`) and resumes the run then, continuing the interrupted work;
 the status line shows `resumes 14:05`. `/resume now` retries at once,
 `/resume cancel` (or an abort, or a new prompt) cancels it. When the
-provider does not say, a note says so and nothing is scheduled.
+provider does not say, a note says so and nothing is scheduled; when the
+time it gives has already passed, the retry backs off (1 minute, doubling up
+to an hour) instead of retrying at once.
 `resume_on_limit_reset: false` in `config.json` turns this off. A scheduled
 resume is recorded in the session: a backend that restarts before the reset
 loads the session and resumes it on time (one whose reset passed while the
