@@ -193,7 +193,8 @@ let%expect_test "host ops: delete refuses home and / however written" =
       (List.map [ "home/keep.txt"; "target/precious"; "link" ] ~f:(fun p ->
          p, Sys_unix.file_exists_exn (Filename.concat t.dir p))
        : (string * bool) list)];
-  [%expect {|
+  [%expect
+    {|
     ERROR: refusing to delete $DIR/home
     ERROR: refusing to delete $DIR/home
     ERROR: refusing to delete $DIR/home

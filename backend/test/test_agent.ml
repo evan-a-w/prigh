@@ -1554,24 +1554,25 @@ let%expect_test "two prompts while attachments are read start one run" =
   write t "notes.txt" "some notes\n";
   Eio.Fiber.both
     (fun () ->
-      print_s
-        [%sexp
-          (Agent.prompt agent "a @notes.txt" ~attachments:[ "notes.txt" ]
-           : unit Or_error.t)])
+       print_s
+         [%sexp
+           (Agent.prompt agent "a @notes.txt" ~attachments:[ "notes.txt" ]
+            : unit Or_error.t)])
     (fun () ->
-      print_s
-        [%sexp
-          (Agent.prompt agent "b @notes.txt" ~attachments:[ "notes.txt" ]
-           : unit Or_error.t)]);
+       print_s
+         [%sexp
+           (Agent.prompt agent "b @notes.txt" ~attachments:[ "notes.txt" ]
+            : unit Or_error.t)]);
   Agent.wait_idle agent;
   (* A follow-up while a prompt reads its attachments waits its turn. *)
   Eio.Fiber.both
     (fun () ->
-      Or_error.ok_exn
-        (Agent.follow_up agent "c @notes.txt" ~attachments:[ "notes.txt" ]))
+       Or_error.ok_exn
+         (Agent.follow_up agent "c @notes.txt" ~attachments:[ "notes.txt" ]))
     (fun () -> Or_error.ok_exn (Agent.follow_up agent "d"));
   Agent.wait_idle agent;
-  [%expect {|
+  [%expect
+    {|
     (Ok ())
     (Error "a run is already in progress; use steer or follow_up")
     user: a @notes.txt

@@ -324,11 +324,14 @@ let%expect_test
       [ Reply.tool_call
           ~id:"s1"
           ~name:"write"
-          ~arguments:
-            (sprintf {|{"path":"%s/secrets/k","content":"x"}|} dir)
+          ~arguments:(sprintf {|{"path":"%s/secrets/k","content":"x"}|} dir)
           ()
       ; Reply.text "done"
-      ; Reply.tool_call ~id:"s2" ~name:"bash" ~arguments:{|{"command":"pwd"}|} ()
+      ; Reply.tool_call
+          ~id:"s2"
+          ~name:"bash"
+          ~arguments:{|{"command":"pwd"}|}
+          ()
       ; Reply.text "done"
       ])
     [ Reply.tool_call
@@ -352,7 +355,8 @@ let%expect_test
   Agent.wait_idle agent;
   Or_error.ok_exn (Agent.prompt agent "again");
   Agent.wait_idle agent;
-  [%expect {|
+  [%expect
+    {|
     mode=auto plan=none rules=[]
     subagent {"task":"write","cwd":"/"} -> started agent a1 (write); its result will be delivered to you when it finishes; use subagent_wait to block on it
       [a1] write -> ERROR [denied by the rule edit(secrets/**) in permissions.deny; do not try to get around it: ask the user]

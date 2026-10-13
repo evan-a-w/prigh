@@ -199,7 +199,8 @@ let segments command =
     let is_fd =
       match String.chop_suffix target ~suffix:"-" with
       | Some digits -> String.for_all digits ~f:Char.is_digit
-      | None -> (not (String.is_empty target)) && String.for_all target ~f:Char.is_digit
+      | None ->
+        (not (String.is_empty target)) && String.for_all target ~f:Char.is_digit
     in
     if not ((dup && is_fd) || String.equal target "/dev/null")
     then complex := true;
@@ -207,7 +208,9 @@ let segments command =
     j
   in
   let rec skip_comment i =
-    if i < n && not (Char.equal command.[i] '\n') then skip_comment (i + 1) else i
+    if i < n && not (Char.equal command.[i] '\n')
+    then skip_comment (i + 1)
+    else i
   in
   (* [word_start]: whether an unquoted [#] here starts a comment. *)
   let rec go i quote ~word_start =
@@ -217,7 +220,10 @@ let segments command =
       match quote with
       | `Single ->
         Buffer.add_char buf c;
-        go (i + 1) (if Char.equal c '\'' then `None else `Single) ~word_start:false
+        go
+          (i + 1)
+          (if Char.equal c '\'' then `None else `Single)
+          ~word_start:false
       | `Double ->
         if Char.equal c '\\' && i + 1 < n
         then (
@@ -229,7 +235,10 @@ let segments command =
             || (Char.equal c '$' && Option.equal Char.equal (next i) (Some '('))
           then complex := true;
           Buffer.add_char buf c;
-          go (i + 1) (if Char.equal c '"' then `None else `Double) ~word_start:false)
+          go
+            (i + 1)
+            (if Char.equal c '"' then `None else `Double)
+            ~word_start:false)
       | `None ->
         let after = String.mem " \t\n;&|()<>" c in
         (match c, next i with
@@ -387,7 +396,7 @@ let command_words command =
            go (i + 1) stack)
       | _ ->
         (match c, next with
-         | (' ' | '\t'), _ -> 
+         | (' ' | '\t'), _ ->
            end_word ();
            go (i + 1) stack
          | ('\n' | ';' | '&' | '|'), _ ->
@@ -450,14 +459,18 @@ let command_words command =
            go (i + 2) stack
          | '#', _ when not !in_word ->
            let rec eol j =
-             if j < n && not (Char.equal command.[j] '\n') then eol (j + 1) else j
+             if j < n && not (Char.equal command.[j] '\n')
+             then eol (j + 1)
+             else j
            in
            go (eol i) stack
          | ('<' | '>'), _ ->
            (* a redirection: its target is not an argument *)
            end_word ();
            let rec operator j =
-             if j < n && String.mem "<>&|-" command.[j] then operator (j + 1) else j
+             if j < n && String.mem "<>&|-" command.[j]
+             then operator (j + 1)
+             else j
            in
            drop_word := true;
            go (operator (i + 1)) stack
@@ -481,8 +494,19 @@ let is_assignment word =
 ;;
 
 let keywords =
-  [ "{"; "}"; "!"; "if"; "then"; "else"; "elif"; "fi"; "do"; "done"; "while"
-  ; "until"; "time"
+  [ "{"
+  ; "}"
+  ; "!"
+  ; "if"
+  ; "then"
+  ; "else"
+  ; "elif"
+  ; "fi"
+  ; "do"
+  ; "done"
+  ; "while"
+  ; "until"
+  ; "time"
   ]
 ;;
 
@@ -502,9 +526,7 @@ let rec commands_run ~depth words =
   | [] -> []
   | program :: args ->
     let base =
-      if String.mem program '/'
-      then Filename.basename program
-      else program
+      if String.mem program '/' then Filename.basename program else program
     in
     let own = [ program :: args; base :: args ] in
     let wrapped =
@@ -655,25 +677,25 @@ let touches t ~cwd ~home (call : Call.t) =
     List.exists parts ~f:(fun part ->
       pattern_matches ~cwd ~home call pattern ~part)
     ||
-    (match call.command with
-     | Some command ->
-       command_matches ~pattern command
-       || List.exists (commands_of ~depth:0 command) ~f:(fun words ->
-         command_matches ~pattern (String.concat ~sep:" " words))
-     | None ->
-       (* directory tools show what is under their path *)
-       let under ~children_only =
-         List.mem file_tools call.tool ~equal:String.equal
-         && List.exists call.paths ~f:(fun dir ->
-           glob_under
-             ~children_only
-             ~pattern:(path_pattern ~cwd ~home pattern)
-             dir)
-       in
-       (match call.tool with
-        | "ls" -> under ~children_only:true
-        | "grep" | "find" -> under ~children_only:false
-        | _ -> false))
+      (match call.command with
+      | Some command ->
+        command_matches ~pattern command
+        || List.exists (commands_of ~depth:0 command) ~f:(fun words ->
+          command_matches ~pattern (String.concat ~sep:" " words))
+      | None ->
+        (* directory tools show what is under their path *)
+        let under ~children_only =
+          List.mem file_tools call.tool ~equal:String.equal
+          && List.exists call.paths ~f:(fun dir ->
+            glob_under
+              ~children_only
+              ~pattern:(path_pattern ~cwd ~home pattern)
+              dir)
+        in
+        (match call.tool with
+         | "ls" -> under ~children_only:true
+         | "grep" | "find" -> under ~children_only:false
+         | _ -> false))
 ;;
 
 (* A program name worth a [PREFIX:*] rule: not a wrapper, an assignment
