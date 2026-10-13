@@ -502,6 +502,48 @@ let%expect_test
     |}]
 ;;
 
+let%expect_test
+    "plan mode turned off while exit_plan_mode waits: not called approved"
+  =
+  with_sandbox
+  @@ fun t ->
+  Eio.Switch.run
+  @@ fun sw ->
+  let agent =
+    Agent.create
+      ~env:t.env
+      ~sw
+      ~provider:
+        (Faux_provider.create
+           [ Reply.tool_call
+               ~id:"c1"
+               ~name:"exit_plan_mode"
+               ~arguments:{|{"plan":"change a.txt"}|}
+               ()
+           ; Reply.text "done"
+           ])
+      ~tools:(Tools.all @ Tools.interaction)
+      ~sessions_dir:(Filename.concat t.dir "sessions")
+      ~home:t.dir
+      ~cwd:t.dir
+      ()
+  in
+  Agent.set_mode agent ~plan:true;
+  Agent.subscribe agent ~f:(function
+    | Loop (Tool_confirm { call_id; _ }) ->
+      printf "confirm %s; turning plan mode off\n" call_id;
+      Agent.set_mode agent ~plan:false
+    | Loop (Tool_end { result; _ }) -> printf "result: %s\n" result.text
+    | _ -> ());
+  Or_error.ok_exn (Agent.prompt agent "go");
+  Agent.wait_idle agent;
+  [%expect
+    {|
+    confirm c1; turning plan mode off
+    result: The user turned plan mode off without answering about this plan (approval mode: auto): you can change files now. Implement the plan unless they said otherwise.
+    |}]
+;;
+
 let%expect_test "exit_plan_mode outside plan mode does not ask" =
   with_agent
     [ Reply.tool_call

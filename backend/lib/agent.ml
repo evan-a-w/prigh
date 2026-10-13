@@ -586,6 +586,15 @@ let exit_plan_mode t context args =
         ~recheck:(fun () -> not t.plan_mode)
     with
     | None -> Tool.Result.error "[cancelled]"
+    | Some (Allow | Always) when not t.plan_mode ->
+      (* Released by the user switching plan mode off, not by an answer. *)
+      tell t { t.told with plan_mode = false };
+      Tool.Result.ok
+        (sprintf
+           "The user turned plan mode off without answering about this plan \
+            (approval mode: %s): you can change files now. Implement the plan \
+            unless they said otherwise."
+           (Approval_mode.to_string t.approval_mode))
     | Some (Allow | Always) ->
       tell t { t.told with plan_mode = false };
       switch_mode t ~plan:false;
