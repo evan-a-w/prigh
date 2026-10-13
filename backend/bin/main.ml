@@ -127,7 +127,7 @@ let common_params =
     Option.iter cwd ~f:(fun dir ->
       if backend_host && not (Sys_unix.is_directory_exn dir)
       then (
-        eprintf "-cwd %s: no such directory\n" dir;
+        eprintf "-cwd %s: no such directory (mkdir -p it first)\n" dir;
         exit 2));
     let cwd = Option.value cwd ~default:(Core_unix.getcwd ()) in
     let models = Model_registry.create ~env ~sw ~home ~store ~getenv () in

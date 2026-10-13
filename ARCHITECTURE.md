@@ -75,7 +75,12 @@ tool-capable client takes over a session that runs on the backend by
 default or has no host when it attaches, never one the user pinned with
 `set_active_host` (`/host` in the TUI) or whose host is only disconnected.
 The session cwd is a property of the host, so switching hosts switches the
-cwd (and `/cd` validates the directory on the host); a session remembers
+cwd (and `/cd` validates the directory on the host: `set_cwd` and
+`set_active_host` take `if_missing` (`fail`, the default; `ask`, answered
+`{missing: path}` when the directory could be created; `create`, which
+creates it with its parents through the host op `$make_dir`) and answer
+`{cwd, created}`; `Dir_change` in the backend and in `tui/protocol`, so
+the frontends confirm before creating anything); a session remembers
 its cwd on each host, also while the host is away. The session file records
 where it runs: every change of cwd, host or pinning appends a `cwd` entry
 carrying the host (id, name, whether pinned), so a session loaded again
@@ -127,7 +132,8 @@ and no environment note for the model). Only `set_active_host` moves a
 session off a disconnected host. The frontend does not implement any tools: it proxies
 `tool_exec` to a local `prigh tool-host` process (`Tool_host` in the backend
 runs `Host_ops.execute`, the same code path the backend uses for itself,
-plus five pseudo-tools: `$resolve_dir` for `/cd` and `/host`, `$read_file`
+plus six pseudo-tools: `$resolve_dir` for `/cd` and `/host`, `$make_dir`
+to create a missing one once confirmed (or `/mkdir`), `$read_file`
 for prompt attachments, `$list_paths` for `@` completion (`Path_listing`:
 `fd` or a bounded `readdir` under the session cwd, so completion always
 reflects the machine the tools run on), `$list_dirs` for the directory
@@ -1503,8 +1509,10 @@ copy of the protocol types and the e2e test guards the contract.
       at any depth and by the state's `subagents`/`jobs` changing; nested
       ids `<parent>/<call>` make a tree; finished items fold under
       "earlier" at the next prompt; the selection, cancels and kills in
-      flight, a job's polled `job_output`) and `Agents_view` (the list, a
-      subagent in full — its transcript is the one in `Chat`, found by
+      flight, a job's polled `job_output`) and `Agents_view` (the list as
+      a tree of buttons, `aria-keyshortcuts` for Alt+N; outcomes from the
+      report's prefix: `[cancelled]`/`[interrupted]`/a killed job are
+      "stopped", not failed; a subagent in full — its transcript is the one in `Chat`, found by
       agent id at any depth, fetched with `get_subagent` when nested ones
       are missing after a reload — or a job's output; the status line's
       summary and the top bar's toggle). Elapsed times tick with `Clock`,
@@ -1608,7 +1616,8 @@ copy of the protocol types and the e2e test guards the contract.
       confirmations; while one shows, `View` makes the page behind it
       `inert`), `Command_dialog_view` (`/hotkeys`, `/scoped-models`,
       `Prompt` — a path with the backend's completions whose failures stay
-      in the dialog, for `/cd`, `/host`, `/export`, `/import` — `/rewind`'s
+      in the dialog, for `/cd`, `/mkdir`, `/host`, `/export`, `/import` —
+      the "Create folder?" confirmation of a missing directory, `/rewind`'s
       confirmation, `/session`, text), `Session_tree` (`get_entries`
       as `/fork`/`/rewind`/`/tree` pickers), `Btw_view`, `Account_view` (the
       sidebar's account button and the account menu, a `Picker` of

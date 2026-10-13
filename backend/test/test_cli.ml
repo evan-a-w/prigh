@@ -59,7 +59,7 @@ let%expect_test "flags: bad values name the flag and the fix" =
     -thinking medium: thinking must be one of: off, on, low, high, max
     [exit 2]
     $ prigh run -cwd /nonexistent -faux hi
-    -cwd /nonexistent: no such directory
+    -cwd /nonexistent: no such directory (mkdir -p it first)
     [exit 2]
     $ prigh models -provider anthropc
     unknown provider anthropc; one of: anthropic, openai, openai-codex, deepseek (or custom, to add an OpenAI-compatible endpoint)

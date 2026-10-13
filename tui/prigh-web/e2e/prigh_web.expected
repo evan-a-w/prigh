@@ -165,42 +165,29 @@ back again
 Agents
 Subagents
 2
-1
 ✓
+Done
 Survey the project
-<T>
-a1  deepseek-flash  2 turns  1 tool call  $<COST>
 The survey: 3 files.
-2
 ✓
+Done
 Count the files
-<T>
-a1/n1  deepseek-flash  1 turn  $<COST>
 There are 3 files.
 Jobs
 1
-3
 ✓
+Done
 sleep 1; echo built
 <T>
-j1  exited 0  6 B
 built
 === chromium: a nested subagent ===
 Subagent a1/n1
+Show in chat
 Survey the project
 ›
-Count the files
 ✓
 Count the files
-Complete
-<T>
-a1/n1
-deepseek-flash
-1 turn
-$<COST>
-Show in chat
-Count the files
-<TIME>
+Done deepseek-flash  1 turn  $<COST>
 There are 3 files.
 <TIME>
 the nested card is in view in the chat
@@ -208,40 +195,25 @@ the nested card is in view in the chat
 Job j1
 ✓
 sleep 1; echo built
-exited 0
-<T>
-j1
-6 B
-Output, lines 1-1 of 1
+Done <T> 6 B
 built
+Output, lines 1-1 of 1
 === chromium: a card opens its agent ===
 Subagent a1
+Show in chat
 ✓
 Survey the project
-Complete
-<T>
-a1
-deepseek-flash
-2 turns
-1 tool call
-$<COST>
-Show in chat
+Done deepseek-flash  2 turns  1 tool call  $<COST>
 Its subagents
 1
 ✓
+Done
 Count the files
-<T>
-a1/n1  deepseek-flash  1 turn  $<COST>
 There are 3 files.
-Survey the project
-<TIME>
 asking a helper
 ✓
 subagent
 Count the files
-deepseek-flash
-1 turn
-$<COST>
 Open ›
 Report
 There are 3 files.
@@ -306,6 +278,15 @@ new
 3	+	- ship it
 /diff PATH shows one file or directory
 Done
+=== chromium: a missing directory ===
+Create folder?
+This folder doesn't exist on <HOSTNAME>:
+<CWD>/sub
+Missing parent folders are created too.
+Enter creates, Esc cancels
+Cancel
+Create folder and switch
+created on the host: true
 === chromium: an environment note above the prompt ===
 cwd closed: ⌂
 Working directory is now <CWD>/sub
@@ -991,42 +972,29 @@ back again
 Agents
 Subagents
 2
-1
 ✓
+Done
 Survey the project
-<T>
-a1  deepseek-flash  2 turns  1 tool call  $<COST>
 The survey: 3 files.
-2
 ✓
+Done
 Count the files
-<T>
-a1/n1  deepseek-flash  1 turn  $<COST>
 There are 3 files.
 Jobs
 1
-3
 ✓
+Done
 sleep 1; echo built
 <T>
-j1  exited 0  6 B
 built
 === firefox: a nested subagent ===
 Subagent a1/n1
+Show in chat
 Survey the project
 ›
-Count the files
 ✓
 Count the files
-Complete
-<T>
-a1/n1
-deepseek-flash
-1 turn
-$<COST>
-Show in chat
-Count the files
-<TIME>
+Done deepseek-flash  1 turn  $<COST>
 There are 3 files.
 <TIME>
 the nested card is in view in the chat
@@ -1034,40 +1002,25 @@ the nested card is in view in the chat
 Job j1
 ✓
 sleep 1; echo built
-exited 0
-<T>
-j1
-6 B
-Output, lines 1-1 of 1
+Done <T> 6 B
 built
+Output, lines 1-1 of 1
 === firefox: a card opens its agent ===
 Subagent a1
+Show in chat
 ✓
 Survey the project
-Complete
-<T>
-a1
-deepseek-flash
-2 turns
-1 tool call
-$<COST>
-Show in chat
+Done deepseek-flash  2 turns  1 tool call  $<COST>
 Its subagents
 1
 ✓
+Done
 Count the files
-<T>
-a1/n1  deepseek-flash  1 turn  $<COST>
 There are 3 files.
-Survey the project
-<TIME>
 asking a helper
 ✓
 subagent
 Count the files
-deepseek-flash
-1 turn
-$<COST>
 Open ›
 Report
 There are 3 files.
@@ -1132,6 +1085,15 @@ new
 3	+	- ship it
 /diff PATH shows one file or directory
 Done
+=== firefox: a missing directory ===
+Create folder?
+This folder doesn't exist on <HOSTNAME>:
+<CWD>/sub
+Missing parent folders are created too.
+Enter creates, Esc cancels
+Cancel
+Create folder and switch
+created on the host: true
 === firefox: an environment note above the prompt ===
 cwd closed: ⌂
 Working directory is now <CWD>/sub

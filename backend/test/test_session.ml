@@ -289,7 +289,9 @@ let%expect_test "a session's first prompt is the user's, without the notes" =
     ; "[Plan mode is on: investigate, do not edit files.]\n\nfix the build"
     ]
     ~f:(fun text ->
-      let (_ : Session.Entry.t) = Session.append_message a (Message.user text) in
+      let (_ : Session.Entry.t) =
+        Session.append_message a (Message.user text)
+      in
       ());
   print_s
     [%sexp
