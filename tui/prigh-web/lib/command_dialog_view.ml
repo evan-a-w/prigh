@@ -107,6 +107,11 @@ let prompt (m : App.Model.t) (p : Prompt.t) ~inject =
       , "The session's working directory"
       , "/path/to/project"
       , "Change" )
+    | Mkdir ->
+      ( "Create directory"
+      , "Created with any missing parents, then made the working directory"
+      , "/path/to/new/project"
+      , "Create and switch" )
     | Host_cwd { name; _ } ->
       ( "Run tools on " ^ name
       , "Working directory there"
@@ -125,8 +130,8 @@ let prompt (m : App.Model.t) (p : Prompt.t) ~inject =
   in
   let host_note =
     match p.action, m.state with
-    | Cd, Some state when not (String.equal state.active_host Host.backend_id)
-      ->
+    | (Cd | Mkdir), Some state
+      when not (String.equal state.active_host Host.backend_id) ->
       Node.p
         ~attrs:[ Attr.class_ "dialog-note" ]
         [ Node.textf
@@ -191,6 +196,58 @@ let prompt (m : App.Model.t) (p : Prompt.t) ~inject =
                       inject (Action.Choose_suggestion i))
                   ]
                 [ icon Folder; span ~cls:"picker-label" path ])))
+    ]
+;;
+
+let active_host_name (m : App.Model.t) =
+  Option.bind m.state ~f:(fun state ->
+    List.find state.hosts ~f:(fun h -> String.equal h.id state.active_host))
+  |> Option.map ~f:(fun h -> h.name)
+;;
+
+let create_dir (m : App.Model.t) ~target ~path ~busy ~error ~inject =
+  let where =
+    match (target : Dir_change.Target.t) with
+    | Host { name; _ } -> Some name
+    | Cwd -> active_host_name m
+  in
+  Modal.view
+    ~cls:"create-dir-dialog"
+    ~title:"Create folder?"
+    ~on_close:(inject Action.Close_dialog)
+    ~footer:
+      [ keys_hint "Enter creates, Esc cancels"
+      ; button ~on_click:(inject Action.Close_dialog) [ Node.text "Cancel" ]
+      ; button
+          ~cls:"primary"
+          ~disabled:busy
+          ~on_click:(inject Action.Dialog_accept)
+          [ Node.text (if busy then "Creating…" else "Create folder and switch")
+          ]
+      ]
+    [ Node.p
+        [ Node.text "This folder doesn't exist"
+        ; Node.text
+            (match where with
+             | Some host -> sprintf " on %s:" host
+             | None -> ":")
+        ]
+    ; Node.p ~attrs:[ Attr.class_ "create-dir-path" ] [ Node.text path ]
+    ; Node.p
+        ~attrs:[ Attr.class_ "dialog-note" ]
+        [ Node.text
+            (match target with
+             | Cwd -> "Missing parent folders are created too."
+             | Host { name; _ } ->
+               sprintf
+                 "Missing parent folders are created too, then tools run on %s \
+                  in it."
+                 name)
+        ]
+    ; (match error with
+       | Some e ->
+         div ~cls:"dialog-error" ~attrs:[ Attr.role "alert" ] [ Node.text e ]
+       | None -> Node.none)
     ]
 ;;
 
@@ -359,6 +416,8 @@ let view (m : App.Model.t) (dialog : Dialog.t) ~inject =
     Some (scoped_models picker checked ~inject)
   | Prompt p -> Some (prompt m p ~inject)
   | Rewind_confirm { text = t; _ } -> Some (rewind_confirm ~text:t ~inject)
+  | Create_dir { target; path; busy; error } ->
+    Some (create_dir m ~target ~path ~busy ~error ~inject)
   | Session stats -> Some (session m stats ~inject)
   | Text { title; text = t } -> Some (text ~title ~text:t ~inject)
   | Mcp_tools server -> Some (mcp_tools server ~inject)

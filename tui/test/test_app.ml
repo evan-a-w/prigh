@@ -758,7 +758,7 @@ let%expect_test "typing / lists commands, Down twice + Tab fills /login " =
       /fallback [off|model...]        show or set the models th…
       /default-dir [off|path]         show or set the directory…
       /login [provider] [api_key|oauth]  log in to a provider
-      ↕ 1–8 of 56
+      ↕ 1–8 of 57
     …deepseek-flash  $0.01  Tab/Enter accept · Alt+S as typed
     |}];
   H.key h (Key.plain Down);
@@ -775,7 +775,7 @@ let%expect_test "typing / lists commands, Down twice + Tab fills /login " =
       /fallback [off|model...]        show or set the models th…
       /default-dir [off|path]         show or set the directory…
       /login [provider] [api_key|oauth]  log in to a provider
-      ↕ 1–8 of 56
+      ↕ 1–8 of 57
     …deepseek-flash  $0.01  Tab/Enter accept · Alt+S as typed
     |}];
   H.key h (Key.plain Down);
@@ -792,7 +792,7 @@ let%expect_test "typing / lists commands, Down twice + Tab fills /login " =
       /fallback [off|model...]        show or set the models th…
       /default-dir [off|path]         show or set the directory…
       /login [provider] [api_key|oauth]  log in to a provider
-      ↕ 1–8 of 56
+      ↕ 1–8 of 57
     …deepseek-flash  $0.01  Tab/Enter accept · Alt+S as typed
     |}];
   H.key h (Key.plain Tab);
@@ -1021,12 +1021,14 @@ let%expect_test "/cd completes paths and submits the selected one" =
     {|
     (Rpc
       (method_ set_cwd)
-      (params ((path src/)))
+      (params (
+        (path       src/)
+        (if_missing ask)))
       (tag (
         Retry_in_editor
         (command "/cd src/")
         (hint    "Tab after /cd completes directories")
-        (then_ (Notice_on_success "cwd changed")))))
+        (then_ (Dir_changed Cwd)))))
     |}]
 ;;
 
@@ -1057,12 +1059,14 @@ let%expect_test
     {|
     (Rpc
       (method_ set_cwd)
-      (params ((path new)))
+      (params (
+        (path       new)
+        (if_missing ask)))
       (tag (
         Retry_in_editor
         (command "/cd new")
         (hint    "Tab after /cd completes directories")
-        (then_ (Notice_on_success "cwd changed")))))
+        (then_ (Dir_changed Cwd)))))
 
 
 
@@ -1083,12 +1087,14 @@ let%expect_test
     {|
     (Rpc
       (method_ set_cwd)
-      (params ((path new)))
+      (params (
+        (path       new)
+        (if_missing ask)))
       (tag (
         Retry_in_editor
         (command "/cd new")
         (hint    "Tab after /cd completes directories")
-        (then_ (Notice_on_success "cwd changed")))))
+        (then_ (Dir_changed Cwd)))))
     |}];
   (* The /cd prompt's popup too. *)
   H.step ~quiet:true h (Intent (Insert "/cd "));
@@ -1110,8 +1116,10 @@ let%expect_test
     …deepseek-flash  $0.01  Tab/Enter accept · Alt+S as typed
     (Rpc
       (method_ set_cwd)
-      (params ((path new)))
-      (tag (Notice_on_success "cwd changed")))
+      (params (
+        (path       new)
+        (if_missing ask)))
+      (tag (Dir_changed Cwd)))
     |}]
 ;;
 
@@ -2471,12 +2479,14 @@ let%expect_test "/cd changes the directory or prompts for a path" =
       (tag (Dirs_for_autocomplete /var)))
     (Rpc
       (method_ set_cwd)
-      (params ((path /var)))
+      (params (
+        (path       /var)
+        (if_missing ask)))
       (tag (
         Retry_in_editor
         (command "/cd /var")
         (hint    "Tab after /cd completes directories")
-        (then_ (Notice_on_success "cwd changed")))))
+        (then_ (Dir_changed Cwd)))))
     |}];
   H.step h (Intent (Insert "/cd "));
   H.enter h;
@@ -2512,8 +2522,232 @@ let%expect_test "/cd changes the directory or prompts for a path" =
       (tag (Dirs_for_autocomplete /tmp)))
     (Rpc
       (method_ set_cwd)
-      (params ((path /tmp)))
-      (tag (Notice_on_success "cwd changed")))
+      (params (
+        (path       /tmp)
+        (if_missing ask)))
+      (tag (Dir_changed Cwd)))
+    |}]
+;;
+
+let%expect_test "/cd to a missing directory asks to create it; /mkdir creates" =
+  let h = connected () in
+  let cd path : Prigh_ui.App.Reply_tag.t =
+    Retry_in_editor
+      { command = "/cd " ^ path
+      ; hint = "Tab after /cd completes directories"
+      ; then_ = Dir_changed Cwd
+      }
+  in
+  H.step h (Intent (Insert "/cd /work/new"));
+  H.enter h;
+  H.reply h (cd "/work/new") {|{"missing":"/work/new"}|};
+  H.show h;
+  [%expect
+    {|
+    (Rpc
+      (method_ list_dirs)
+      (params ((prefix /work/new)))
+      (tag (Dirs_for_autocomplete /work/new)))
+    (Rpc
+      (method_ set_cwd)
+      (params (
+        (path       /work/new)
+        (if_missing ask)))
+      (tag (
+        Retry_in_editor
+        (command "/cd /work/new")
+        (hint    "Tab after /cd completes directories")
+        (then_ (Dir_changed Cwd)))))
+
+
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+
+    ▌ earlier question
+      earlier answer
+    ┌─ Confirm ────────────────────────────────────────────────┐
+    │ Create /work/new? (y/n)                                  │
+    └──────────────────────────────────────────────────────────┘
+    ────────────────────────────────────────────────────────────
+    ? ▏
+    …deepseek-flash  think:off  ctx:0.1%/1.0M  confirm: y / n
+    |}];
+  (* Esc, like n, creates nothing. *)
+  H.esc h;
+  H.show h;
+  [%expect
+    {|
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+
+    ▌ earlier question
+      earlier answer
+      not created: /work/new
+    ────────────────────────────────────────────────────────────
+    > ▏
+    …deepseek-flash  think:off  mode:auto  ctx:0.1%/1.0M  $0.01
+    |}];
+  H.step h (Intent (Insert "/cd /work/new"));
+  H.enter h;
+  H.reply h (cd "/work/new") {|{"missing":"/work/new"}|};
+  H.key h (Key.char 'n');
+  H.show h;
+  [%expect
+    {|
+    (Rpc
+      (method_ list_dirs)
+      (params ((prefix /work/new)))
+      (tag (Dirs_for_autocomplete /work/new)))
+    (Rpc
+      (method_ set_cwd)
+      (params (
+        (path       /work/new)
+        (if_missing ask)))
+      (tag (
+        Retry_in_editor
+        (command "/cd /work/new")
+        (hint    "Tab after /cd completes directories")
+        (then_ (Dir_changed Cwd)))))
+
+
+
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+
+    ▌ earlier question
+      earlier answer
+      not created: /work/new
+      not created: /work/new
+    ────────────────────────────────────────────────────────────
+    > ▏
+    …deepseek-flash  think:off  mode:auto  ctx:0.1%/1.0M  $0.01
+    |}];
+  H.step h (Intent (Insert "/cd /work/new"));
+  H.enter h;
+  H.reply h (cd "/work/new") {|{"missing":"/work/new"}|};
+  H.key h (Key.char 'y');
+  H.reply h (Dir_changed Cwd) {|{"cwd":"/work/new","created":true}|};
+  H.show h;
+  [%expect
+    {|
+    (Rpc
+      (method_ list_dirs)
+      (params ((prefix /work/new)))
+      (tag (Dirs_for_autocomplete /work/new)))
+    (Rpc
+      (method_ set_cwd)
+      (params (
+        (path       /work/new)
+        (if_missing ask)))
+      (tag (
+        Retry_in_editor
+        (command "/cd /work/new")
+        (hint    "Tab after /cd completes directories")
+        (then_ (Dir_changed Cwd)))))
+    (Rpc
+      (method_ set_cwd)
+      (params (
+        (path       /work/new)
+        (if_missing create)))
+      (tag (Dir_changed Cwd)))
+
+
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+
+    ▌ earlier question
+      earlier answer
+      not created: /work/new
+      not created: /work/new
+      created /work/new; cwd changed
+    ────────────────────────────────────────────────────────────
+    > ▏
+    …deepseek-flash  think:off  mode:auto  ctx:0.1%/1.0M  $0.01
+    |}];
+  (* /mkdir creates without asking; without a path it prompts for one. *)
+  H.step h (Intent (Insert "/mkdir /work/a/b"));
+  H.enter h;
+  let mkdir : Prigh_ui.App.Reply_tag.t =
+    Retry_in_editor
+      { command = "/mkdir /work/a/b"; hint = ""; then_ = Dir_changed Cwd }
+  in
+  H.reply_error h mkdir "/work/a: permission denied";
+  H.show h;
+  [%expect
+    {|
+    (Rpc
+      (method_ list_dirs)
+      (params ((prefix /work/a/b)))
+      (tag (Dirs_for_autocomplete /work/a/b)))
+    (Rpc
+      (method_ set_cwd)
+      (params (
+        (path       /work/a/b)
+        (if_missing create)))
+      (tag (
+        Retry_in_editor
+        (command "/mkdir /work/a/b")
+        (hint    "")
+        (then_ (Dir_changed Cwd)))))
+
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+
+    ▌ earlier question
+      earlier answer
+      not created: /work/new
+      not created: /work/new
+      created /work/new; cwd changed
+      /work/a: permission denied
+    ────────────────────────────────────────────────────────────
+    > /mkdir /work/a/b▏
+    …deepseek-flash  think:off  mode:auto  ctx:0.1%/1.0M  $0.01
+    |}];
+  H.step h (Intent Kill_to_start);
+  H.step h (Intent (Insert "/mkdir "));
+  H.enter h;
+  H.show h;
+  H.step h (Intent (Insert "/work/c"));
+  H.enter h;
+  H.reply h (Dir_changed Cwd) {|{"cwd":"/work/c","created":true}|};
+  H.show h;
+  [%expect
+    {|
+    (Rpc
+      (method_ list_dirs)
+      (params ((prefix "")))
+      (tag (Dirs_for_autocomplete "")))
+
+    ▌ earlier question
+      earlier answer
+      not created: /work/new
+      not created: /work/new
+      created /work/new; cwd changed
+      /work/a: permission denied
+    ┌─ Create and change to directory ─────────────────────────┐
+    └──────────────────────────────────────────────────────────┘
+    ────────────────────────────────────────────────────────────
+    ? ▏
+    …deepseek-flash  ctx:0.1%/1.0M  Enter submits · Esc cancels
+    (Rpc
+      (method_ list_dirs)
+      (params (
+        (prefix /work/c)
+        (host   backend)))
+      (tag (Dirs_for_autocomplete /work/c)))
+    (Rpc
+      (method_ set_cwd)
+      (params (
+        (path       /work/c)
+        (if_missing create)))
+      (tag (Dir_changed Cwd)))
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+
+    ▌ earlier question
+      earlier answer
+      not created: /work/new
+      not created: /work/new
+      created /work/new; cwd changed
+      /work/a: permission denied
+      created /work/c; cwd changed
+    ────────────────────────────────────────────────────────────
+    > ▏
+    …deepseek-flash  think:off  mode:auto  ctx:0.1%/1.0M  $0.01
     |}]
 ;;
 
@@ -6883,12 +7117,60 @@ let%expect_test "switching tool host asks for the directory there, prefilled \
     (Rpc
       (method_ set_active_host)
       (params (
-        (host client-1)
-        (cwd  /work/src/)))
-      (tag (Notice_on_success "tool host switched")))
+        (host       client-1)
+        (cwd        /work/src/)
+        (if_missing ask)))
+      (tag (
+        Dir_changed (
+          Host
+          (id   client-1)
+          (name laptop)))))
     |}];
   H.mode h;
   [%expect {| editing |}];
+  (* A missing directory there is created once confirmed. *)
+  let host : P.Dir_change.Target.t = Host { id = "client-1"; name = "laptop" } in
+  H.reply h (Dir_changed host) {|{"missing":"/work/src"}|};
+  H.show h;
+  H.key h (Key.char 'y');
+  H.reply h (Dir_changed host) {|{"cwd":"/work/src","created":true}|};
+  H.show h;
+  [%expect
+    {|
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+
+    ▌ earlier question
+      earlier answer
+    ┌─ Confirm ──────────────────────────────────────────────────────────┐
+    │ Create /work/src on laptop? (y/n)                                  │
+    └────────────────────────────────────────────────────────────────────┘
+    ──────────────────────────────────────────────────────────────────────
+    ? ▏
+    /work  m  think:n/a  mode:auto  ctx:0.0%/1.0k  $0.00  confirm: y / n
+    (Rpc
+      (method_ set_active_host)
+      (params (
+        (host       client-1)
+        (cwd        /work/src)
+        (if_missing create)))
+      (tag (
+        Dir_changed (
+          Host
+          (id   client-1)
+          (name laptop)))))
+
+
+
+
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+
+    ▌ earlier question
+      earlier answer
+      created /work/src; tool host switched
+    ──────────────────────────────────────────────────────────────────────
+    > ▏
+    /work  m  think:n/a  mode:auto  view:normal  ctx:0.0%/1.0k  $0.00
+    |}];
   (* The picker route ends in the same prompt; Esc abandons it. *)
   H.keys h "/host";
   H.enter h;
@@ -6901,11 +7183,11 @@ let%expect_test "switching tool host asks for the directory there, prefilled \
     picker
 
 
-
       prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
     ▌ earlier question
       earlier answer
+      created /work/src; tool host switched
     ┌─ Working directory on laptop (here) ───────────────────────────────┐
     └────────────────────────────────────────────────────────────────────┘
     ──────────────────────────────────────────────────────────────────────
@@ -6923,11 +7205,11 @@ let%expect_test "switching tool host asks for the directory there, prefilled \
 
 
 
-
       prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
     ▌ earlier question
       earlier answer
+      created /work/src; tool host switched
       unknown host "nope"; one of: srv, laptop (here)
     ──────────────────────────────────────────────────────────────────────
     > ▏
@@ -7354,7 +7636,7 @@ let%expect_test "Tab on an empty editor opens the command list; the list shows \
       /fallback [off|model...]        show or set the models th…
       /default-dir [off|path]         show or set the directory…
       /login [provider] [api_key|oauth]  log in to a provider
-      ↕ 1–8 of 56
+      ↕ 1–8 of 57
     …deepseek-flash  $0.01  Tab/Enter accept · Alt+S as typed
     |}];
   H.key h (Key.plain End);
@@ -7371,7 +7653,7 @@ let%expect_test "Tab on an empty editor opens the command list; the list shows \
       /fallback [off|model...]        show or set the models th…
       /default-dir [off|path]         show or set the directory…
       /login [provider] [api_key|oauth]  log in to a provider
-      ↕ 1–8 of 56
+      ↕ 1–8 of 57
     …deepseek-flash  $0.01  Tab/Enter accept · Alt+S as typed
     |}];
   H.keys h "qu";
@@ -8412,12 +8694,14 @@ let%expect_test
       (tag (Dirs_for_autocomplete /nope)))
     (Rpc
       (method_ set_cwd)
-      (params ((path /nope)))
+      (params (
+        (path       /nope)
+        (if_missing ask)))
       (tag (
         Retry_in_editor
         (command "/cd /nope")
         (hint    "Tab after /cd completes directories")
-        (then_ (Notice_on_success "cwd changed")))))
+        (then_ (Dir_changed Cwd)))))
 
 
 

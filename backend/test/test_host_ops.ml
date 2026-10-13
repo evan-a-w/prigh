@@ -103,3 +103,112 @@ let%expect_test "instructions_of_result: old and new hosts, errors" =
     ((files ()) (nix false) (skills ()))
     |}]
 ;;
+
+let%expect_test "$make_dir: checks, creates with parents, says why not" =
+  with_sandbox
+  @@ fun t ->
+  let make ?(check = false) path =
+    let result =
+      Host_ops.execute
+        ~mcp:None
+        ~env:t.env
+        ~cancel:Cancellation.never
+        ~on_output:ignore
+        ~cwd:t.dir
+        ~name:Dir_change.op
+        ~arguments:(Dir_change.args ~path ~check)
+        ()
+    in
+    printf
+      "%s %s -> %s%s\n"
+      (if check then "check" else "make ")
+      (mask t path)
+      (if result.is_error then "error: " else "")
+      (mask t result.text)
+  in
+  let exists path =
+    printf
+      "  %s exists: %b\n"
+      path
+      (Sys_unix.is_directory_exn (Filename.concat t.dir path))
+  in
+  write t "file" "x";
+  make ~check:true "a/b/../c";
+  exists "a";
+  make "a/b/../c";
+  exists "a/c";
+  make (Filename.concat t.dir "a/c");
+  make ~check:true ".";
+  make ~check:true "file";
+  make "file/sub";
+  make ~check:true "file/sub/deeper";
+  let locked = Filename.concat t.dir "locked" in
+  Core_unix.mkdir locked ~perm:0o555;
+  make ~check:true "locked/new";
+  make "locked/new/deeper";
+  Core_unix.chmod locked ~perm:0o755;
+  make "locked/new/deeper";
+  make "";
+  [%expect
+    {|
+    check a/b/../c -> $DIR/a/c
+      a exists: false
+    make  a/b/../c -> $DIR/a/c
+      a/c exists: true
+    make  $DIR/a/c -> $DIR/a/c
+    check . -> $DIR
+    check file -> error: $DIR/file is a file, not a directory: choose another path
+    make  file/sub -> error: $DIR/file is a file, so $DIR/file/sub cannot be created: choose another path
+    check file/sub/deeper -> error: $DIR/file is a file, so $DIR/file/sub/deeper cannot be created: choose another path
+    check locked/new -> error: permission denied: cannot create $DIR/locked/new in $DIR/locked; choose a directory you can write
+    make  locked/new/deeper -> error: permission denied: cannot create $DIR/locked/new/deeper in $DIR/locked; choose a directory you can write
+    make  locked/new/deeper -> $DIR/locked/new/deeper
+    make   -> $DIR
+    |}]
+;;
+
+let%expect_test "Dir_change: parameters, outcomes, an older host's answer" =
+  List.iter
+    [ None; Some "fail"; Some "ask"; Some "create"; Some "yes" ]
+    ~f:(fun p ->
+      print_s
+        [%sexp
+          (p : string option)
+        , (Dir_change.If_missing.of_param p
+           : Dir_change.If_missing.t Or_error.t)]);
+  List.iter
+    [ Dir_change.Outcome.Changed { cwd = "/a"; created = true }
+    ; Changed { cwd = "/a"; created = false }
+    ; Missing "/b"
+    ]
+    ~f:(fun o ->
+      print_endline (Jsonaf.to_string (Dir_change.Outcome.to_json o)));
+  let older text ~is_error =
+    print_s
+      [%sexp
+        (Dir_change.older_host
+           (if is_error then Tool.Result.error text else Tool.Result.ok text)
+           ~host:"laptop"
+           ~path:"/x"
+         : string option)]
+  in
+  older
+    ~is_error:true
+    {|unknown host tool "$make_dir": tool host "laptop" runs an older prigh|};
+  older ~is_error:true "permission denied";
+  older ~is_error:false {|unknown host tool "$make_dir"|};
+  [%expect
+    {|
+    (() (Ok Fail))
+    ((fail) (Ok Fail))
+    ((ask) (Ok Ask))
+    ((create) (Ok Create))
+    ((yes) (Error "if_missing must be fail, ask or create, got \"yes\""))
+    {"cwd":"/a","created":true}
+    {"cwd":"/a","created":false}
+    {"missing":"/b"}
+    ("tool host laptop runs an older prigh that cannot create directories: update prigh there (and restart its TUI or tool-host), or create /x yourself")
+    ()
+    ()
+    |}]
+;;

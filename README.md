@@ -322,10 +322,13 @@ sessions by name, id or path. The list follows the backend as it changes.
 Subagents and background jobs have their own panel, a resizable column
 right of the chat (drag its left edge; a full-screen sheet on a phone):
 the session's subagents as a tree (nested ones under the background agent
-that started them), running first, with their task, model, elapsed time,
-turns and current tool, and the background jobs with their last line.
-Selecting one shows a subagent's live transcript and report (with Cancel
-and "Show in chat", which scrolls to its card) or a job's output (with
+that started them), running first: each row is its task, the lamp while it
+runs (with its live elapsed time, current tool, model and turns) or how it
+ended (done, failed with the error, or cancelled, interrupted by a restart
+or killed, shown quietly), and the background jobs the same way with their
+last line. Selecting one shows a subagent's live transcript at the panel's
+width and how it ended (with Cancel while it runs, and "Show in chat" in
+the panel's header, which scrolls to its card) or a job's output (with
 Kill). It opens from the status line ("2 agents running"), the top bar's
 robot button, a subagent's card in the chat, `/agents [n|id]` and `/jobs
 [id]`, and Alt+1…9 (the Nth listed; Alt+] and Alt+[ step through them, Alt+0 closes
@@ -448,9 +451,10 @@ closes the popup.
 session's details and statistics; `/fork`, `/rewind` (with a confirmation)
 and `/tree` (the whole tree, branches indented) pick a message;
 `/scoped-models` is a checklist (Tab or a click checks a model, Enter
-saves); `/cd`, `/host`'s directory, `/export` and `/import` ask for a path
+saves); `/cd`, `/mkdir`, `/host`'s directory, `/export` and `/import` ask for a path
 with completions from the backend and keep the dialog open, with the error,
-when the backend refuses it; `/agents` and `/jobs` open the agents panel
+when the backend refuses it (a directory that doesn't exist yet opens a
+"Create folder?" dialog instead); `/agents` and `/jobs` open the agents panel
 (above); `/btw` answers in a panel above the composer (Esc closes it);
 `/verbosity` (Ctrl+O cycles) hides tool output and thinking (quiet) or
 unfolds everything (verbose); `/copy` (Ctrl+X with nothing selected) copies
@@ -987,7 +991,8 @@ it.
 | `/delete [session...]` | delete sessions after a confirmation (without arguments: pick them in `/sessions`) |
 | `/delete-archived` | delete every archived session after a confirmation |
 | `/switch [path]` | switch to a saved session |
-| `/cd [path]` | change the working directory |
+| `/cd [path]` | change the working directory; a missing one is created once you confirm (`Create /x? (y/n)`; in prigh-web a "Create folder?" dialog); `/host`'s directory asks the same |
+| `/mkdir [path]` | create a directory (with its parents) on the tool host and change to it |
 | `/fork`, `/rewind`, `/tree`, `/clone` | branch the session tree |
 | `/export [path]`, `/import [path]` | markdown or `.jsonl` |
 | `/agents [cancel <n>]` | focus a subagent (Ctrl+D in the picker cancels one), or cancel subagent n |

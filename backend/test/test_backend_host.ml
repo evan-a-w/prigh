@@ -318,7 +318,7 @@ let%expect_test "backend host enabled: git branch and terminal targets" =
     (Backend $DIR)
     (Backend $DIR)
     (Host client-2 /home/me)
-    {"type":"response","id":"r","ok":true,"result":{}}
+    {"type":"response","id":"r","ok":true,"result":{"cwd":"$DIR","created":false}}
     (Backend $DIR)
     |}]
 ;;
