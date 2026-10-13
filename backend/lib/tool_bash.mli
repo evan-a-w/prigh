@@ -22,11 +22,13 @@ val starts_job : Tool.Context.t -> Json.t -> bool
 
 (** Starts a job for [command]. [run] runs it in the foreground (with
     [foreground_arguments]), its stdin fed from [stdin] (the task's
-    {!Background_tasks.Task.input}, for [job_input]), and its output goes to
+    {!Background_tasks.Task.input}, for [job_input]; closed at once, and
+    [job_input] refused, unless [keep_stdin]), and its output goes to
     [on_output]; the outcome's status is read from the result's trailer
     ([exited N], [killed], ...). *)
 val start_job
-  :  Background_tasks.t
+  :  ?keep_stdin:bool
+  -> Background_tasks.t
   -> command:string
   -> run:
        (id:string
@@ -36,8 +38,8 @@ val start_job
         -> Tool_result.t)
   -> string
 
-(** The arguments of a background job's foreground run: [background]
-    dropped, and no timeout unless one was given. *)
+(** The arguments of a background job's foreground run: [background] and
+    [stdin] dropped, and no timeout unless one was given. *)
 val foreground_arguments : Json.t -> Json.t
 
 val started_message : id:string -> command:string -> string

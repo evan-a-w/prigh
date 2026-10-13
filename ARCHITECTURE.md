@@ -548,8 +548,11 @@ two can share one.
   (`Tool.Context.stdin`), so locally `Process.run ~input` keeps the
   process's stdin open and copies the feed's items into it (a `Close` closes
   it), and on a client host `Agent` forwards them as `tool_exec_input`
-  events, the host's worker feeding its own `Stdin_feed`. Other processes
-  still get an empty stdin. `job_input` writes (and optionally closes) and
+  events, the host's worker feeding its own `Stdin_feed`. Unless the job
+  was started with `stdin: true` (`?keep_stdin`), the feed is closed at
+  once and refuses `job_input` with a message saying so (so a job that
+  reads stdin sees end of input instead of waiting forever). Other
+  processes still get an empty stdin. `job_input` writes (and optionally closes) and
   returns the output that follows (`Output_tail.since`): until it is quiet
   for 300 ms after something arrived, the job exits or `wait_ms` pass.
 - Approvals — `Approval_mode` (`Ask | Auto_edit | Auto`), `Approval_rule`
