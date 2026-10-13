@@ -117,9 +117,7 @@ let row ~inject (s : Session_summary.t) (row : Row.t) =
           ]
         [ (if selecting
            then
-             Node.span
-               ~attrs:[ classes [ "check" ] [ "on", marked ] ]
-               [ (if marked then icon Check else Node.none) ]
+             check marked
            else Node.none)
         ; div ~cls:"session-mark" [ mark ]
         ; div

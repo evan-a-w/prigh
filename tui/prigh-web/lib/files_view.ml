@@ -261,7 +261,7 @@ let row_view (e : File_listing.Entry.t) ({ selected; uploading; mtime; mtime_ful
       ]
     [ kind_glyph e.kind
     ; span ~cls:"files-name" ~attrs:[ Attr.create "dir" "auto" ] (if dir then e.name ^ "/" else e.name)
-    ; (if uploading then span ~cls:"files-lamp" "" else Node.none)
+    ; (if uploading then lamp () else Node.none)
     ; span ~cls:"files-size" (Option.value_map e.size ~default:"" ~f:size)
     ; span
         ~cls:"files-mtime"
@@ -419,7 +419,7 @@ let preview (m : App.Model.t) (t : Files.t) ~inject =
       ~name:(Filename.basename path)
       [ div
           ~cls:"files-wait"
-          [ span ~cls:"files-lamp" ""; Node.text "Reading…" ]
+          [ lamp (); Node.text "Reading…" ]
       ]
   | Some (Failed { path; error }) ->
     frame
@@ -427,7 +427,12 @@ let preview (m : App.Model.t) (t : Files.t) ~inject =
       [ div
           ~cls:"files-error"
           ~attrs:[ Attr.role "alert" ]
-          [ Node.text (sprintf "Cannot show it: %s" error) ]
+          [ Node.text
+              (sprintf
+                 "Cannot show it: %s. Refresh the list if it moved, or \
+                  download it."
+                 error)
+          ]
       ]
   | Some (Shown p) ->
     let meta =
@@ -481,7 +486,7 @@ let uploads (t : Files.t) =
         | Some text ->
           [ div
               ~cls:"files-transfer"
-              [ span ~cls:"files-lamp" ""; Node.text text ]
+              [ lamp (); Node.text text ]
           ]
         | None -> [])
        @ List.map uploads ~f:(fun (u : Files.Upload.t) ->
@@ -493,7 +498,7 @@ let uploads (t : Files.t) =
          in
          div
            ~cls:"files-transfer"
-           [ span ~cls:"files-lamp" ""
+           [ lamp ()
            ; span ~cls:"files-transfer-name" u.local.name
            ; span
                ~cls:"files-transfer-meta"
@@ -534,7 +539,7 @@ let body (m : App.Model.t) (t : Files.t) ~inject =
     | None, None ->
       [ div
           ~cls:"files-wait"
-          [ span ~cls:"files-lamp" ""; Node.text "Listing…" ]
+          [ lamp (); Node.text "Listing…" ]
       ]
     | Some l, None ->
       let entries = Files.entries t in
@@ -827,14 +832,14 @@ let chips (m : App.Model.t) ~inject =
                   (match a.status with
                    | Ready path -> path
                    | Uploading _ -> sprintf "Uploading %s…" a.name
-                   | Failed e -> sprintf "%s: %s" a.name e)
+                   | Failed e -> sprintf "%s: %s. Remove it and attach it again." a.name e)
               ]
               @
               match percent with
               | Some p -> [ Attr.css_var ~name:"done" (sprintf "%d%%" p) ]
               | None -> [])
            [ (match a.status with
-              | Uploading _ -> span ~cls:"files-lamp" ""
+              | Uploading _ -> lamp ()
               | Ready _ | Failed _ -> glyph ~cls:"attach-chip-icon" File)
            ; span ~cls:"attach-chip-name" a.name
            ; span ~cls:"attach-chip-detail" detail

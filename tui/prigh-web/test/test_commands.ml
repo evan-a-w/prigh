@@ -217,10 +217,10 @@ let%expect_test "/scoped-models, Ctrl+P and Alt+P" =
     (Close (Esc))
     Ctrl+P and Alt+P cycle through the checked models. With none checked they cycle through the logged-in ones.
     []
-    GPT-6 openai
-    ✓ Claude Opus 5.5 anthropic
-    ✓ Claude Sonnet 5 anthropic
-    DeepSeek Chat deepseek
+    ☐ GPT-6 openai
+    ☑ Claude Opus 5.5 anthropic
+    ☑ Claude Sonnet 5 anthropic
+    ☐ DeepSeek Chat deepseek
     2 checked. Tab toggles, Enter saves (Cancel) (Save)
     |}];
   H.key h "Tab" ~target:Field;

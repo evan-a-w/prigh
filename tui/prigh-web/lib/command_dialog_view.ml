@@ -108,7 +108,7 @@ let scoped_models (picker : Picker.t) checked ~inject =
                ; Attr.create "aria-selected" (Bool.to_string on)
                ; Attr.on_click (fun _ -> inject (Action.Toggle_scoped item.id))
                ]
-             [ span ~cls:"checkbox" (if on then "✓" else "")
+             [ Html.check on
              ; span ~cls:"picker-label" item.label
              ; span ~cls:"picker-detail" item.detail
              ]))

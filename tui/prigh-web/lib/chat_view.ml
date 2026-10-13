@@ -289,7 +289,6 @@ and render_entry ~fold times chat (entry : Chat.Entry.t) =
             ~default:u.text)
      | Some { kind; title } -> noted (note ?at:u.at times ~kind ~title u.text)
      | None -> user ?skill:(Skill_message.parse (Message.User.body u)) times u)
-  | Notice text -> div "msg notice" [ Node.text text ]
   | Shell call ->
     let tool = Chat.tool chat call.id in
     div
@@ -323,12 +322,12 @@ and entry ~fold times chat (entry : Chat.Entry.t) =
       (match Prigh_ui.Delivery.parse u.text with
        | Some sections -> List.map sections ~f:Delivery_view.job_key
        | None -> [])
-    | User _ | Notice _ | Compaction _ -> []
+    | User _ | Compaction _ -> []
   in
   let tools =
     match entry with
     | Assistant _ | Shell _ -> List.map ids ~f:(Chat.tool chat)
-    | User _ | Notice _ | Compaction _ -> []
+    | User _ | Compaction _ -> []
   in
   let running =
     Chat.running chat
@@ -374,7 +373,7 @@ and entries_view ~fold times chat =
   let entry_time : Chat.Entry.t -> Time_ns.t option = function
     | User u -> u.at
     | Assistant { message; _ } -> message.at
-    | Notice _ | Shell _ | Compaction _ -> None
+    | Shell _ | Compaction _ -> None
   in
   let _, _, rev_nodes =
     List.fold

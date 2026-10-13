@@ -50,7 +50,6 @@ let none =
   }
 ;;
 
-let loading t = Option.is_some t.session || t.messages
 
 let sent t prompt =
   { t with

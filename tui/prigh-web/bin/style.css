@@ -27,25 +27,12 @@
   /* Older names, kept as aliases. */
   --bg: var(--graphite);
   --panel: var(--slate);
-  --panel-2: var(--slate-2);
   --panel-3: #333943;
-  --border: var(--rule);
-  --border-2: var(--rule-2);
   --fg: var(--chalk);
-  --accent: var(--sodium);
-  --accent-2: var(--sodium);
-  --accent-bg: var(--sodium-wash);
-  --green: var(--sage);
-  --red: var(--brick);
-  --red-bg: var(--brick-wash);
-  --red-border: var(--brick-line);
-  --yellow: var(--sodium);
-  --user: var(--slate);
 
   --r-chip: 3px;
   --r-control: 6px;
   --r-surface: 10px;
-  --radius: var(--r-surface);
   --float-shadow: 0 18px 48px #00000080, 0 0 0 1px #00000033;
 
   /* Recursive, one family: sans for prose and the interface, mono for
@@ -204,7 +191,6 @@ kbd {
 .search input::-webkit-search-cancel-button { filter: invert(0.6); }
 
 @keyframes rise { from { opacity: 0; transform: translateY(8px); } }
-@keyframes drop { from { opacity: 0; transform: translateY(-8px); } }
 @keyframes appear { from { opacity: 0; transform: translateY(-6px) scale(0.98); } }
 
 @media (prefers-reduced-motion: reduce) {
@@ -366,8 +352,6 @@ kbd {
 }
 .delete-archived:hover { color: var(--brick); }
 .delete-archived:focus-visible { outline: 2px solid var(--sodium); outline-offset: 1px; }
-.btn.danger-text { color: var(--brick); }
-.btn.danger-text:hover { background: var(--brick-wash); color: var(--brick); }
 
 /* Selecting sessions to delete several at once: checkboxes slide in at the
    rows' left edge, the action sits at the foot of the list. */
@@ -377,9 +361,14 @@ kbd {
 .sessions-hint { color: var(--faint); font-size: 11.5px; white-space: nowrap; }
 .sessions-hint kbd { font-size: 10.5px; }
 .sessions-toolbar .btn.small { padding: 2px 8px; }
-.check { width: 14px; height: 14px; flex-shrink: 0; border: 1.5px solid var(--rule-2); border-radius: 3px; display: inline-flex; align-items: center; justify-content: center; }
+/* Every checkbox (and radio button) of the page. */
+.check { width: 14px; height: 14px; flex-shrink: 0; border: 1.5px solid var(--rule-2); border-radius: var(--r-chip); display: inline-flex; align-items: center; justify-content: center; }
 .check.on { background: var(--sodium); border-color: var(--sodium); color: var(--sodium-ink); }
 .check .icon { width: 11px; height: 11px; stroke-width: 3; }
+.check.radio { border-radius: 50%; }
+.check-item .check, .question-choice .check { align-self: center; }
+.check.radio.on { background: none; }
+.check.radio.on::after { content: ""; width: 6px; height: 6px; border-radius: 50%; background: var(--sodium); }
 .session-open > .check { margin: 4px 0 0 8px; animation: check-in 0.16s ease-out; }
 @keyframes check-in { from { margin-left: -14px; opacity: 0; } }
 .session.marked { background: var(--sodium-wash); }
@@ -417,8 +406,8 @@ kbd {
   width: 28px;
   height: 28px;
   border-radius: 50%;
-  background: var(--sodium);
-  color: var(--sodium-ink);
+  background: var(--slate-2);
+  color: var(--chalk);
   display: grid;
   place-items: center;
   font-weight: 600;
@@ -589,27 +578,12 @@ kbd {
 }
 .question-choice:hover { background: var(--slate-2); }
 .question-choice.selected { background: var(--slate-2); box-shadow: inset 2px 0 0 var(--sodium); }
-.question-mark { color: var(--faint); font-family: var(--mono); }
-.question-choice.picked .question-mark { color: var(--sodium); }
 .question-choice.picked .question-label { font-weight: 600; }
 .question-detail { color: var(--muted); font-size: 12.5px; }
 .question-own { display: flex; align-items: center; gap: 8px; padding: 4px 10px; border-radius: var(--r-control); }
 .question-own.selected { box-shadow: inset 2px 0 0 var(--sodium); }
 .question-own label { color: var(--muted); font-size: 12.5px; flex-shrink: 0; }
 .question-own .text-input { flex: 1; min-width: 0; }
-
-/* A confirmation's summary of what will run */
-
-.confirm-summary {
-  font: 12.5px var(--mono);
-  background: var(--well);
-  border-radius: var(--r-control);
-  padding: 10px 12px;
-  overflow: auto;
-  max-height: 50vh;
-  margin: 0;
-  white-space: pre;
-}
 
 /* Composer */
 
@@ -751,7 +725,7 @@ kbd {
 .status-item.background.active { color: var(--sodium); gap: 7px; }
 .status-item.transfers { color: var(--sodium); gap: 7px; min-width: 0; max-width: 32ch; overflow: hidden; text-overflow: ellipsis; display: inline-block; }
 .status-item.transfers .lamp { margin-right: 7px; vertical-align: 1px; }
-.status-item.host { color: var(--sodium); }
+.status-item.host { color: var(--chalk); }
 .status-item.cost.budget { font: 11.5px var(--mono); }
 .status-item.warm { color: var(--sodium); }
 .status-item.hot { color: var(--brick); }
@@ -1054,7 +1028,7 @@ kbd {
 }
 .btw-head { display: flex; align-items: center; gap: 8px; }
 .btw-head .btn.icon { width: 26px; height: 26px; margin-left: auto; }
-.btw-tag { font: 600 11.5px var(--mono); color: var(--sodium); background: var(--sodium-wash); border-radius: var(--r-chip); padding: 0 6px; }
+.btw-tag { font: 600 11.5px var(--mono); color: var(--muted); background: var(--slate-2); border-radius: var(--r-chip); padding: 0 6px; }
 .btw-question { font-weight: 600; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .btw-answer { margin-top: 4px; }
 .btw-answer .markdown > :first-child { margin-top: 0; }
@@ -1088,12 +1062,6 @@ kbd {
 .suggestion .icon { width: 14px; height: 14px; color: var(--faint); }
 .suggestion .picker-label { font: 12.5px var(--mono); overflow: hidden; text-overflow: ellipsis; }
 
-.check-item .checkbox {
-  width: 14px; height: 14px; border-radius: var(--r-chip); flex-shrink: 0; align-self: center;
-  border: 1.5px solid var(--rule-2); display: grid; place-items: center;
-  font-size: 10px; font-weight: 700; line-height: 1; color: var(--sodium-ink);
-}
-.check-item.checked .checkbox { background: var(--sodium); border-color: var(--sodium); }
 
 .tree-dialog { width: min(720px, 100%); }
 .tree-dialog .picker-label { white-space: pre; font: 12.5px var(--mono); overflow: hidden; text-overflow: ellipsis; }
@@ -1179,8 +1147,6 @@ kbd {
 @media (prefers-reduced-motion: reduce) { .diff-file > summary::before { transition: none; } }
 .text-dialog .text-block { max-height: none; overflow: visible; }
 
-.status-item.mode { color: var(--sodium); }
-
 /* Quiet: tool calls without their output, no thinking. Verbose: every fold
    open (but not images, which open a lightbox). */
 .chat.verbosity-quiet .tool-body,
@@ -1220,7 +1186,6 @@ kbd {
   .account-menu { left: 8px; right: 8px; bottom: 8px; width: auto; }
   .stats-grid { grid-template-columns: repeat(2, 1fr); }
   .btw-panel { width: calc(100% - 16px); }
-  .job-item { flex-wrap: wrap; }
 }
 
 /* Jump back to the end of the chat while it is scrolled up */

@@ -628,7 +628,7 @@ let%expect_test "files dropped on the composer upload into the chat's uploads" =
     (Files (Forget 2))
     Uploading report.pdf 25%
     <div title="Uploading report.pdf…" class="attach-chip uploading" custom-css-vars=((--done 25%))>
-      <span class="files-lamp">  </span>
+      <span aria-hidden="true" class="lamp"> </span>
       <span class="attach-chip-name"> report.pdf </span>
       <span class="attach-chip-detail"> 25% </span>
       <button type="button"

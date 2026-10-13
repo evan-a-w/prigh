@@ -2988,7 +2988,7 @@ let superseded (m : Model.t) (state : State.t) =
 let user_messages chat text =
   List.count (Chat.entries chat) ~f:(function
     | User u -> String.is_prefix u.text ~prefix:text
-    | Assistant _ | Notice _ | Shell _ | Compaction _ -> false)
+    | Assistant _ | Shell _ | Compaction _ -> false)
 ;;
 
 (* Back after the connection went while sending: what did not reach the
@@ -3491,12 +3491,12 @@ let rec reply_to (m : Model.t) (tag : Reply_tag.t) result =
      | _ -> m, [])
   | Sessions, Ok json ->
     decode m json (decode_list Session_summary.of_json) ~f:(fun sessions ->
+      let paths = List.map sessions ~f:(fun s -> s.path) in
       ( { m with
           sessions
-        ; marks =
-            Session_marks.prune
-              m.marks
-              ~paths:(List.map sessions ~f:(fun s -> s.path))
+        ; marks = Session_marks.prune m.marks ~paths
+        ; chat_cache =
+            Chat_cache.retain m.chat_cache ~paths:(String.Set.of_list paths)
         }
       , [] ))
   | Refresh_sessions, Ok _ -> m, [ rpc "list_sessions" [] ~tag:Sessions ]

@@ -24,13 +24,7 @@ let choice form (q : Question.t) ~question ~inject i (c : Question.Choice.t) =
       ; Attr.create "aria-checked" (Bool.to_string picked)
       ; Attr.on_click (fun _ -> inject (Question_dialog.Action.Choose i))
       ]
-    [ span
-        ~cls:"question-mark"
-        (match q.multiple, picked with
-         | true, true -> "☑"
-         | true, false -> "☐"
-         | false, true -> "◉"
-         | false, false -> "○")
+    [ Html.check ~radio:(not q.multiple) picked
     ; span ~cls:"question-label" c.label
     ; Option.value_map c.description ~default:Node.none ~f:(fun d ->
         span ~cls:"question-detail" d)
