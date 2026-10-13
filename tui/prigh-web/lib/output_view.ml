@@ -48,14 +48,21 @@ let pre text =
 
 let note cls text = Node.div ~attrs:[ Attr.class_ cls ] [ Node.text text ]
 
-let live ~lines ~tail text =
-  let total = if String.is_suffix text ~suffix:"\n" then lines else lines + 1 in
+let live ~lines ~missed ~tail text =
+  let total =
+    if String.is_empty text || String.is_suffix text ~suffix:"\n"
+    then lines
+    else lines + 1
+  in
   let shown = tail_lines (trim text) tail in
   let hidden = Int.max 0 (total - count_lines shown) in
   Chat_html.div
     (if hidden > 0 then "output live clipped from-end" else "output live")
     [ (if hidden > 0
        then note "earlier" (Chat_html.plural hidden "earlier line")
+       else Node.none)
+    ; (if missed
+       then note "missed" "Output from while this page was away shows when it ends."
        else Node.none)
     ; pre shown
     ]

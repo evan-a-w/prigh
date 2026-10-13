@@ -733,9 +733,11 @@ let set_state_without_files (m : Model.t) (state : State.t) =
               && Chat_cache.loading m.chat_cache state.session_path
           }
       ; chat =
-          Chat.set_running
-            (Option.value_map cached ~default:Chat.empty ~f:(fun c -> c.chat))
-            state.running
+          (match cached with
+           | Some c when state.running ->
+             Chat.set_running (Chat.missed_output c.chat) true
+           | Some c -> Chat.set_running c.chat false
+           | None -> Chat.set_running Chat.empty state.running)
       ; paging =
           Option.value_map cached ~default:Paging.all ~f:(fun c -> c.paging)
       ; outputs_loading = String.Set.empty
@@ -4231,6 +4233,7 @@ let update (m : Model.t) (action : Action.t) =
        ( { m with
            connection = Reconnecting { attempt = 0; generation }
          ; generation
+         ; chat = Chat.missed_output m.chat
          }
        , [ Command.Reconnect
              { generation
