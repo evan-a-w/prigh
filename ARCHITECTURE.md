@@ -964,7 +964,8 @@ two can share one.
   the newest; `older` counts the messages before them and `before` is the
   cursor of the page before. Tool outputs longer than 8 KiB come cut to
   their first and last 20 lines with `elided: {at, lines, bytes}`;
-  `get_tool_output {call_id, agent_id?}` has one whole, and `get_subagent
+  `get_tool_output {call_id, agent_id?, session?}` has one whole (from
+  anywhere in the session file, also before a compaction), and `get_subagent
   {elide: true}` cuts its transcript's the same way. `session` (a path or
   id) reads a session without opening it (the sidebar fetching ahead);
   sessions read from disk that way or evicted, and subagent logs, are
