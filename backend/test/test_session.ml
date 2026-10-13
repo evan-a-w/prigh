@@ -963,3 +963,48 @@ let%expect_test "find_summary: exact id, unique prefix, ambiguous, missing" =
     ("" (Error "no session id given"))
     |}]
 ;;
+
+let%expect_test "a torn last line and unknown entries are skipped, not fatal" =
+  with_dir
+  @@ fun dir ->
+  let t = Session.create ~dir ~cwd:"/proj" () in
+  let (_ : Session.Entry.t) = Session.append_message t (Message.user "hi") in
+  let lines = In_channel.read_lines (Session.path t) in
+  let last_id =
+    match Jsonaf.of_string (List.last_exn lines) with
+    | `Array [ _; entry ] ->
+      Jsonaf.member_exn "id" entry |> Jsonaf.string_exn
+    | _ -> assert false
+  in
+  (* A newer prigh's entry in the chain, then a crash mid-line. *)
+  Out_channel.with_file (Session.path t) ~append:true ~f:(fun oc ->
+    Out_channel.output_string
+      oc
+      (sprintf
+         {|["Entry",{"id":"future1","parent":"%s","payload":["Hologram",{"x":1}]}]|}
+         last_id
+       ^ "\n");
+    Out_channel.output_string
+      oc
+      {|["Entry",{"id":"after1","parent":"future1","payload":["Name",{"name":"kept"}]}]|};
+    Out_channel.output_string oc "\n";
+    Out_channel.output_string oc {|["Entry",{"id":"torn","par|});
+  let show t =
+    print_s
+      [%sexp
+        (kinds t : string list)
+      , (Session.name t : string option)
+      , (Session.skipped t : string list)]
+  in
+  let loaded = Or_error.ok_exn (Session.load (Session.path t)) in
+  show loaded;
+  print_s
+    [%sexp
+      (List.map (Session.list ~dir) ~f:(fun s -> s.id = Session.id t) : bool list)];
+  (* Appending starts a fresh line, so the next load gets it. *)
+  let (_ : Session.Entry.t) =
+    Session.append_message loaded (assistant "hello")
+  in
+  show (Or_error.ok_exn (Session.load (Session.path t)));
+  [%expect {| |}]
+;;
