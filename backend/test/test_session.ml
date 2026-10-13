@@ -300,6 +300,24 @@ let%expect_test "a session's first prompt is the user's, without the notes" =
   [%expect {| (("fix the build")) |}]
 ;;
 
+let%expect_test "first_prompt: the first prompt, also after a compaction" =
+  with_dir
+  @@ fun dir ->
+  let a = Session.create ~dir ~cwd:"/a" () in
+  let append m = Session.append_message a m in
+  let (_ : Session.Entry.t) = append (Message.user "the task") in
+  let (_ : Session.Entry.t) = append (assistant "working") in
+  let kept = append (Message.user "and then this") in
+  let (_ : Session.Entry.t) =
+    Session.append_compaction a ~summary:"did things" ~kept_from:kept.id
+  in
+  print_s
+    [%sexp
+      (List.map (Session.list ~dir) ~f:(fun s -> s.first_prompt)
+       : string option list)];
+  [%expect {| (("the task")) |}]
+;;
+
 let%expect_test "nothing is written until a message or a name" =
   with_dir
   @@ fun dir ->
