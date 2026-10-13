@@ -1114,11 +1114,11 @@ let%expect_test "/mkdir creates a directory and changes to it" =
     Created /work/a/b and switched to it
     (Save_history (/mkdir "/mkdir /work/a/b"))
     (Focus dialog-input)
-    (Rpc (method_ list_dirs) (params ((prefix /work) (host backend)))
-     (tag (Prompt_paths /work)))
+    (Rpc (method_ list_dirs) (params ((prefix /work/) (host backend)))
+     (tag (Prompt_paths /work/)))
     Create directory
     (Close (Esc))
-    Created with any missing parents, then made the working directory [/work]
+    Created with any missing parents, then made the working directory [/work/]
     Tab completes, ↑↓ choose (Cancel) (Create and switch)
     (Rpc (method_ list_dirs) (params ((prefix /work/c) (host backend)))
      (tag (Prompt_paths /work/c)))
@@ -1130,6 +1130,45 @@ let%expect_test "/mkdir creates a directory and changes to it" =
     ()
     Created /work/a/b and switched to it
     Working directory: /work/c
+    |}]
+;;
+
+(* Accepted while the connection is down: the dialog says so, and stops
+   saying it once back. *)
+let%expect_test "creating a folder while disconnected" =
+  let h = H.create () in
+  H.quiet h (fun () ->
+    run h "/cd /work/new";
+    H.reply h "set_cwd" {|{"missing":"/work/new"}|};
+    H.key h "Enter" ~target:Page;
+    H.act h Backend_closed;
+    H.act h (Reply (Dir_changed Cwd, Error "not connected")));
+  H.text h ~selector:".dialog-error";
+  H.quiet h (fun () ->
+    H.act
+      h
+      (Reply (Reconnect 1, Ok (Jsonaf.of_string {|{"client_id":"c2"}|}))));
+  H.text h ~selector:".modal";
+  [%expect
+    {|
+    Dialog_accept
+    Not connected to the backend: try again once it reconnects.
+    Create folder?
+    (Close (Esc))
+    This folder doesn't exist:
+    /work/new
+    Missing parent folders are created too.
+    Enter creates, Esc cancels (Cancel) (Create folder and switch)
+    |}];
+  (* /mkdir offers the working directory to name a folder in. *)
+  H.act h Close_dialog;
+  H.quiet h (fun () -> run h "/mkdir");
+  print_s [%sexp ((H.model h).dialog : Dialog.t option)];
+  [%expect {|
+    (Focus editor)
+    ((Prompt
+      ((action Mkdir) (input /work/) (suggestions ()) (selected ()) (error ())
+       (busy false))))
     |}]
 ;;
 

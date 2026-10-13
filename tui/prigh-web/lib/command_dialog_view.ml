@@ -242,11 +242,10 @@ let create_dir (m : App.Model.t) ~target ~path ~busy ~error ~inject =
           ]
       ]
     [ Node.p
-        [ Node.text "This folder doesn't exist"
-        ; Node.text
+        [ Node.text
             (match where with
-             | Some host -> sprintf " on %s:" host
-             | None -> ":")
+             | Some host -> sprintf "This folder doesn't exist on %s:" host
+             | None -> "This folder doesn't exist:")
         ]
     ; Node.p ~attrs:[ Attr.class_ "create-dir-path" ] [ Node.text path ]
     ; Node.p
