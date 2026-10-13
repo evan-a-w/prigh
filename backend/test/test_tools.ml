@@ -157,7 +157,7 @@ let%expect_test "bash: timeout, cancellation, truncation" =
     [%sexp
       { first =
           (Re.replace_string
-             (Re.Perl.compile_pat {|\S+/prigh-output/\S+\.log|})
+             (Re.Perl.compile_pat {|\S+/prigh-output-[0-9]+/\S+\.log|})
              ~by:"<file>"
              (List.hd_exn lines)
            : string)
@@ -867,5 +867,47 @@ let%expect_test "Truncate.head_and_tail" =
            \nl9\
            \n")
      (truncated true) (total_lines 10) (total_bytes 30))
+    |}]
+;;
+
+let%expect_test "bash outputs are saved in a private per-user directory" =
+  let tmp = Filename_unix.realpath (Filename_unix.temp_dir "prigh-tmp" "") in
+  let uid = Core_unix.getuid () in
+  let dir = Filename.concat tmp (sprintf "prigh-output-%d" uid) in
+  let perm path = sprintf "%o" (Core_unix.lstat path).st_perm in
+  let save () =
+    match Tool_bash.For_testing.save_output ~tmp ~call_id:"c/1" "secret" with
+    | path ->
+      printf
+        "in dir: %b, dir %s, file %s, %S\n"
+        (String.equal (Filename.dirname path) dir)
+        (perm dir)
+        (perm path)
+        (In_channel.read_all path)
+    | exception exn ->
+      print_endline
+        (String.substr_replace_all
+           (Exn.to_string exn)
+           ~pattern:dir
+           ~with_:"$TMP/prigh-output-<uid>")
+  in
+  save ();
+  (* Made by us with lax permissions: tightened. *)
+  Core_unix.chmod dir ~perm:0o755;
+  save ();
+  printf "%d files\n" (Array.length (Sys_unix.readdir dir));
+  (* A symlink in its place (someone else's trap) is refused. *)
+  Array.iter (Sys_unix.readdir dir) ~f:(fun f ->
+    Core_unix.unlink (Filename.concat dir f));
+  Core_unix.rmdir dir;
+  Core_unix.symlink ~target:tmp ~link_name:dir;
+  save ();
+  [%expect
+    {|
+    in dir: true, dir 700, file 600, "secret"
+    in dir: true, dir 700, file 600, "secret"
+    2 files
+    (Failure
+      "$TMP/prigh-output-<uid> is not a directory: remove it or set TMPDIR")
     |}]
 ;;
