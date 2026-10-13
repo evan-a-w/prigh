@@ -1461,7 +1461,12 @@ copy of the protocol types and the e2e test guards the contract.
       back to one shows it at once, then its newest page refreshes it (kept
       as it is, views and all, when unchanged); the sidebar fetches a
       session's newest page ahead when the pointer rests on it, focuses or
-      presses it (`Prefetch_session`, one at a time). Outputs cut by the
+      presses it (`Prefetch_session`, one at a time); a session gone from
+      `list_sessions` leaves it (`Chat_cache.retain`). A `compacted` event
+      leaves nothing older to load (`Paging.all`). Calls running while the
+      page did not follow (a cached chat of a running session, a page of
+      one, a lost connection) are `Tool.missed` (`Chat.missed_output`): the
+      card says the output from meanwhile shows with the result. Outputs cut by the
       backend (`elided`) show their first and last lines, and unfolding one
       fetches it whole (`get_tool_output`, `Load_output`).
     - The transcript: `Chat` (one agent: a page of messages then events; each
@@ -1471,7 +1476,9 @@ copy of the protocol types and the e2e test guards the contract.
       entry, and the whole transcript, a `Node.lazy_` cached by `View_cache`
       on the value: virtual_dom skips what did not change, so a streamed
       delta or a key press costs the same in a long session as in a short
-      one; the cache's deps include the entry's folds),
+      one; the cache's deps include the entry's folds; sidebar and file
+      rows are cached the same way, also keyed on the `inject` their
+      handlers capture),
       `Tool_view` (a card per tool: bash, read with images, write, edit
       with `Line_diff`/`Diff_view`, apply_patch file by file,
       ls/grep/find, subagents (marked with `data-call` and `data-agent`

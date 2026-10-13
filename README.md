@@ -289,6 +289,11 @@ their first and last 20 lines; unfolding one loads the rest. The last
 eight sessions you looked at stay in the page, so going back to one shows
 it at once (then brings it up to date), and resting the pointer on a
 session in the sidebar fetches its newest messages ahead of the click.
+After `/compact` the session starts at the summary: what was on show
+stays, with nothing older to load. A command still running in a session
+you come back to (or that ran while the connection was down) keeps what it
+streamed before and goes on from where it is now; its card says the output
+from meanwhile shows with its result.
 
 Losing the connection (a flaky mobile network, the phone locked, the
 backend restarting) changes nothing on the page: the banner sits over the
@@ -316,7 +321,8 @@ the foot of the list, "Delete 3 sessions (12.4 MB)") asks to delete the
 marked ones; "Delete archived" under the archived ones
 (`/delete-archived`) every archived one. The confirmation says how many sessions and how much disk they use, and
 which ones the backend will keep (running, open in another tab or terminal,
-or the one you are in). `/archive`, `/unarchive` and `/delete` also take
+or the one you are in): those are not asked for, and with nothing left to
+delete the dialog only says why (Close). `/archive`, `/unarchive` and `/delete` also take
 sessions by name, id or path. The list follows the backend as it changes.
 
 Subagents and background jobs have their own panel, a resizable column
