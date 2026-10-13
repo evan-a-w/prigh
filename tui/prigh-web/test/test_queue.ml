@@ -63,7 +63,7 @@ let%expect_test
     (Edit) (Remove from the queue)
     <li class="queued steer">
       <span title="Reaches the agent after its current tool calls, in this turn" class="queued-tag"> Steers this turn </span>
-      <span class="queued-text"> also check the docs </span>
+      <span dir="auto" class="queued-text"> also check the docs </span>
       <div class="queued-actions">
         <button type="button"
                 title="Edit: take it back into the editor"

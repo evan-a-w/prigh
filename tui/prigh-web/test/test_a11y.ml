@@ -42,6 +42,8 @@ let%expect_test "the names of the controls" =
     input "Search sessions"
     textarea "Message"
     [separator] div "Resize the sessions sidebar" -- Drag to resize, double-click for the default size
+    [region] div "Transcript"
+    [status] span "Ready"
     |}];
   H.quiet h (fun () -> H.act h (Select_sessions true));
   names ~within:".sidebar " h;
@@ -128,6 +130,7 @@ let%expect_test "the names in dialogs, pickers and the transcript" =
     button "Send" -- Send (Enter)
     button "Notifications not allowed yet" -- Notifications not allowed yet: click to ask the browser
     textarea "Message"
+    [status] span "Ready"
     button "Dismiss"
     [alert] div "Couldn't do that" -- Dismiss
     |}];

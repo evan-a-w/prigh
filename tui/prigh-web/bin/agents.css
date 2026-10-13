@@ -247,7 +247,8 @@
 }
 .tool-subagent > .tool-head[data-agent] { cursor: pointer; border-radius: var(--r-control); }
 .tool-subagent > .tool-head[data-agent]:hover { background: var(--slate-2); }
-.tool-head .open-agent { margin-left: auto; color: var(--muted); font-size: 12.5px; white-space: nowrap; }
+.tool-head .open-agent { margin-left: auto; padding: 0 4px; border: 0; border-radius: var(--r-chip); background: none; color: var(--muted); font: inherit; font-size: 12.5px; white-space: nowrap; cursor: pointer; }
+.tool-head .open-agent:focus-visible { outline: 2px solid var(--sodium); outline-offset: 1px; }
 .tool-head[data-agent]:hover .open-agent { color: var(--chalk); }
 .tool.flash { animation: flash 1.6s ease-out; }
 @keyframes flash { 0%, 40% { box-shadow: 0 0 0 2px var(--sodium); } 100% { box-shadow: 0 0 0 2px transparent; } }

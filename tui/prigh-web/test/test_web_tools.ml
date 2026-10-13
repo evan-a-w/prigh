@@ -97,11 +97,11 @@ let%expect_test "web search streamed between text: running, then its results" =
     {|
     <div class="assistant msg streaming">
       <div class="markdown">
-        <p> Let me look that up. </p>
+        <p dir="auto"> Let me look that up. </p>
       </div>
       <div class="running tool tool-web_search">
         <div class="tool-head">
-          <span class="lamp"> </span>
+          <span aria-hidden="true" class="lamp"> </span>
           <span class="name"> web_search </span>
           <span class="arg query"> "ocaml eio" </span>
         </div>
@@ -125,7 +125,7 @@ let%expect_test "web search streamed between text: running, then its results" =
     {|
     <div class="assistant msg">
       <div class="markdown">
-        <p> Let me look that up. </p>
+        <p dir="auto"> Let me look that up. </p>
       </div>
       <div class="ok tool tool-web_search">
         <div class="tool-head">
@@ -167,7 +167,7 @@ let%expect_test "web search streamed between text: running, then its results" =
         </div>
       </div>
       <div class="markdown">
-        <p> Eio is an effects-based IO library. </p>
+        <p dir="auto"> Eio is an effects-based IO library. </p>
       </div>
     </div>
     |}]
@@ -305,7 +305,7 @@ let%expect_test "web_fetch: the URL as a link, the page folded" =
     {|
     <div class="running tool tool-web_fetch">
       <div class="tool-head">
-        <span class="lamp"> </span>
+        <span aria-hidden="true" class="lamp"> </span>
         <span class="name"> web_fetch </span>
         <a href="https://ocaml.org/p/eio" target="_blank" rel="noopener noreferrer" class="arg url"> https://ocaml.org/p/eio </a>
       </div>
@@ -393,7 +393,7 @@ let%expect_test "job_input: the job and what it was sent, escaped" =
     {|
     <div class="running tool tool-job_input">
       <div class="tool-head">
-        <span class="lamp"> </span>
+        <span aria-hidden="true" class="lamp"> </span>
         <span class="name"> job_input </span>
         <span class="arg input"> j1 "print(1)\n" </span>
         <span class="chip"> close stdin </span>

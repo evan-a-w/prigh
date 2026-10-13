@@ -379,9 +379,9 @@ let%expect_test "an invoked skill: a folded card and the user's arguments" =
           <div class="skill-body">
             <div class="skill-location"> /work/.claude/skills/frontend-design/SKILL.md </div>
             <div class="markdown">
-              <p> References are relative to /work/.claude/skills/frontend-design. </p>
-              <h1> Frontend design </h1>
-              <p>
+              <p dir="auto"> References are relative to /work/.claude/skills/frontend-design. </p>
+              <h1 dir="auto"> Frontend design </h1>
+              <p dir="auto">
                 Use
                 <strong> bold </strong>
                  typography.
@@ -389,7 +389,7 @@ let%expect_test "an invoked skill: a folded card and the user's arguments" =
             </div>
           </div>
         </details>
-        <div class="bubble"> the pricing page </div>
+        <div dir="auto" class="bubble"> the pricing page </div>
       </div>
       <div class="msg skill user">
         <details class="skill-card">
@@ -400,8 +400,8 @@ let%expect_test "an invoked skill: a folded card and the user's arguments" =
           <div class="skill-body">
             <div class="skill-location"> /home/u/.prigh/skills/release/SKILL.md </div>
             <div class="markdown">
-              <p> References are relative to /home/u/.prigh/skills/release. </p>
-              <p> Tag it. </p>
+              <p dir="auto"> References are relative to /home/u/.prigh/skills/release. </p>
+              <p dir="auto"> Tag it. </p>
             </div>
           </div>
         </details>
@@ -437,7 +437,7 @@ let%expect_test "an invoked skill in the page: verbosity classes, /fork" =
     Scroll_to_bottom
     (Expire_toast (id 0) (after_ms 3740))
     (Expire_toast (id 1) (after_ms 4660))
-    <div id="chat" class="chat verbosity-quiet">
+    <div id="chat" role="region" aria-label="Transcript" tabindex="0" class="chat verbosity-quiet">
       <Vdom.Node.none-widget> </Vdom.Node.none-widget>
       <div class="entries">
         <div class="msg skill user">
@@ -449,9 +449,9 @@ let%expect_test "an invoked skill in the page: verbosity classes, /fork" =
             <div class="skill-body">
               <div class="skill-location"> /work/.claude/skills/frontend-design/SKILL.md </div>
               <div class="markdown">
-                <p> References are relative to /work/.claude/skills/frontend-design. </p>
-                <h1> Frontend design </h1>
-                <p>
+                <p dir="auto"> References are relative to /work/.claude/skills/frontend-design. </p>
+                <h1 dir="auto"> Frontend design </h1>
+                <p dir="auto">
                   Use
                   <strong> bold </strong>
                    typography.
@@ -459,7 +459,7 @@ let%expect_test "an invoked skill in the page: verbosity classes, /fork" =
               </div>
             </div>
           </details>
-          <div class="bubble"> the pricing page </div>
+          <div dir="auto" class="bubble"> the pricing page </div>
         </div>
       </div>
       <Vdom.Node.none-widget> </Vdom.Node.none-widget>
@@ -677,7 +677,7 @@ let%expect_test "/mcp reconnect reports; no servers says where to add them" =
     MCP servers: 1 ready (1 tool)
     No MCP servers: configure them under "mcpServers" in ~/.prigh/mcp.json, or in a project's .mcp.json.
     No MCP servers: configure them under "mcpServers" in ~/.prigh/mcp.json, or in a project's .mcp.json.
-    Unknown /mcp argument "restart": /mcp lists the servers, /mcp reconnect restarts the failed ones.
+    Unknown /mcp argument “restart”: /mcp lists the servers, /mcp reconnect restarts the failed ones.
     Couldn't list the MCP servers: unknown method list_mcp
     |}]
 ;;

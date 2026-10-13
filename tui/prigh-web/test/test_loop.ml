@@ -198,7 +198,7 @@ let%expect_test "/resume shows, runs now or cancels the automatic resume" =
     (Expire_toast (id 3) (after_ms 3540))
     (Save_history ("/resume later" "/resume cancel" "/resume now" /resume))
     Automatic resume cancelled: send a message to retry
-    Unknown /resume argument "later": /resume now retries at once, /resume cancel stays stopped. (Dismiss)
+    Unknown /resume argument “later”: /resume now retries at once, /resume cancel stays stopped. (Dismiss)
     |}]
 ;;
 

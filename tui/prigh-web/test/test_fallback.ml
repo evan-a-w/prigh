@@ -427,7 +427,7 @@ let%expect_test "a hand-over: a line, not a prompt bubble" =
     {|
     <div class="entries">
       <div class="msg user">
-        <div class="bubble"> fix the build </div>
+        <div dir="auto" class="bubble"> fix the build </div>
       </div>
       <details data-kind="handover" class="note">
         <summary>

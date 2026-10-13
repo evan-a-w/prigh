@@ -577,7 +577,7 @@ kbd {
 
 /* The model's questions (ask_user) */
 
-.question-text { font-weight: 600; margin: 0 0 10px; white-space: pre-wrap; }
+.question-text { font-weight: 600; margin: 0 0 10px; white-space: pre-wrap; overflow-wrap: anywhere; }
 .question-choices { display: flex; flex-direction: column; gap: 2px; margin-bottom: 8px; }
 .question-choice {
   display: flex;
@@ -797,7 +797,7 @@ kbd {
 
 .picker-items { display: flex; flex-direction: column; gap: 1px; margin-top: 8px; }
 .picker-dialog .modal-body { padding-bottom: 8px; }
-.picker-label { white-space: nowrap; }
+.picker-label { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .picker-detail { margin-left: auto; }
 .picker-check { color: var(--sodium); }
 .picker-empty { color: var(--muted); padding: 14px 4px; font-size: 12.5px; }
@@ -1059,11 +1059,24 @@ kbd {
 .btw-answer { margin-top: 4px; }
 .btw-answer .markdown > :first-child { margin-top: 0; }
 .btw-status { display: flex; align-items: center; gap: 8px; color: var(--muted); font-size: 12.5px; }
+.btw-status:empty { display: none; }
+/* Said to screen readers, not shown. */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
 .btw-error { color: var(--brick); font-size: 12.5px; }
 .btw-note { color: var(--faint); font-size: 11.5px; margin-top: 4px; }
 
 .dialog-note { color: var(--muted); font-size: 12.5px; margin: 0 0 8px; }
-.dialog-error { color: var(--brick); background: var(--brick-wash); border: 1px solid var(--brick-line); border-radius: var(--r-control); padding: 7px 11px; margin-top: 10px; font-size: 12.5px; }
+.dialog-error { color: var(--brick); background: var(--brick-wash); border: 1px solid var(--brick-line); border-radius: var(--r-control); padding: 7px 11px; margin-top: 10px; font-size: 12.5px; overflow-wrap: anywhere; }
 .field { display: flex; flex-direction: column; gap: 6px; }
 .field-label { color: var(--muted); font-size: 12.5px; font-weight: 500; }
 .modal .text-input { background: var(--well); border-radius: var(--r-control); }
@@ -1385,3 +1398,23 @@ kbd {
 .controls:popover-open .chip-label { max-width: none; }
 .controls:popover-open .chevron { display: none; }
 @media (prefers-reduced-motion: reduce) { .topbar .controls:popover-open { animation: none; } }
+
+/* Fingers: every control takes at least 32px (44 where the row has room).
+   The small round ones keep their look and grow an invisible margin. */
+@media (pointer: coarse) {
+  .remove-image::after,
+  .attach-chip-remove::after,
+  .status-item.notify::after,
+  .toast .btn.icon.toast-close::after {
+    content: "";
+    position: absolute;
+    inset: -8px;
+  }
+  .attach-chip-remove, .status-item.notify, .toast .btn.icon.toast-close { position: relative; }
+  .status-item.link { padding: 8px 6px; margin: -8px -6px; }
+  .copy { min-height: 32px; padding: 6px 12px; }
+  .fold { min-height: 40px; }
+  .tool-head .open-agent { min-height: 32px; padding: 0 10px; }
+  .queued-remove.btn.icon, .queued-edit.btn { min-width: 40px; min-height: 40px; }
+  .btn.icon { min-width: 36px; min-height: 36px; }
+}

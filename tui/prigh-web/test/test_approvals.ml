@@ -68,7 +68,7 @@ let%expect_test "the mode chip, Alt+M, and set_mode's reply or failure" =
             popovertargetaction="hide"
             class="awaiting btn chip-button mode-chip"
             @on_click>
-      <span class="lamp"> </span>
+      <span aria-hidden="true" class="lamp"> </span>
       <span class="chip-label"> Plan mode </span>
     </button>
     |}];
@@ -168,7 +168,7 @@ let%expect_test "/mode NAME, /plan, /confirm" =
   [%expect
     {|
     (Save_history ("/mode bogus"))
-    Unknown mode "bogus": use ask, auto-edit, auto, plan (/mode picks one). (Dismiss)
+    Unknown mode “bogus”: use ask, auto-edit, auto, plan (/mode picks one). (Dismiss)
     "/mode bogus"
     |}];
   run h "/mode auto";
@@ -211,7 +211,7 @@ let%expect_test "/mode NAME, /plan, /confirm" =
      (tag (Mode_set "Mode: auto (tools run without asking)")))
     (Save_history
      ("/plan maybe" "/plan off" "/plan on" /plan "/mode auto" "/mode bogus"))
-    Unknown argument "maybe": use /plan on, /plan off, or /plan to toggle. (Dismiss)
+    Unknown argument “maybe”: use /plan on, /plan off, or /plan to toggle. (Dismiss)
     |}];
   (* /confirm sets the default for new sessions, which is this one's too. *)
   run h "/confirm on";
@@ -529,13 +529,13 @@ let%expect_test "approving the plan" =
     (y Approve: leave plan mode and implement) (n Keep planning) (r Keep planning, saying what to change)
     <div class="confirm-plan">
       <div class="markdown">
-        <h2> Plan </h2>
+        <h2 dir="auto"> Plan </h2>
         <ol>
-          <li>
+          <li dir="auto">
             Change
             <code> main.ml </code>
           </li>
-          <li> Test </li>
+          <li dir="auto"> Test </li>
         </ol>
       </div>
     </div>
@@ -1152,7 +1152,7 @@ let%expect_test "plan mode notes are margin notes, not the user's words" =
           <pre class="note-text"> [Plan mode is on: investigate, do not edit files.] </pre>
         </details>
         <div class="msg user">
-          <div class="bubble"> fix the build </div>
+          <div dir="auto" class="bubble"> fix the build </div>
         </div>
       </div>
       <div class="msg noted">

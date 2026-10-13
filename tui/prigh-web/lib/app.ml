@@ -1112,12 +1112,12 @@ let find_session (m : Model.t) key =
   | [] ->
     Error
       (sprintf
-         "No session %S: give its name, id or path (Ctrl+K searches them)."
+         "No session “%s”: give its name, id or path (Ctrl+K searches them)."
          key)
   | several ->
     Error
       (sprintf
-         "%S matches %d sessions (%s): give more of the id."
+         "“%s” matches %d sessions (%s): give more of the id."
          key
          (List.length several)
          (String.concat
@@ -1132,7 +1132,7 @@ let set_archived (m : Model.t) (s : Session_summary.t) ~archived =
     error
       m
       (sprintf
-         "%S is running: wait for it or stop it (Esc in it) before archiving."
+         "“%s” is running: wait for it or stop it (Esc in it) before archiving."
          (Session_list.title s))
   else
     ( { m with
@@ -1596,7 +1596,7 @@ let mode_by_name (m : Model.t) name =
       error
         m
         (sprintf
-           "Unknown mode %S: use %s (/mode picks one)."
+           "Unknown mode “%s”: use %s (/mode picks one)."
            name
            (String.concat ~sep:", " Session_mode.names)))
 ;;
@@ -1612,7 +1612,7 @@ let plan_mode (m : Model.t) arg =
       error
         m
         (sprintf
-           "Unknown argument %S: use /plan on, /plan off, or /plan to toggle."
+           "Unknown argument “%s”: use /plan on, /plan off, or /plan to toggle."
            other))
 ;;
 
@@ -1942,7 +1942,7 @@ let switch_host (m : Model.t) arg =
       error
         m
         (sprintf
-           "No tool host %S: one of %s (/host picks one)."
+           "No tool host “%s”: one of %s (/host picks one)."
            arg
            (String.concat ~sep:", " (List.map state.hosts ~f:(fun h -> h.name))))
     | _ -> hosts_picker m)
@@ -2339,7 +2339,7 @@ let run_command (m : Model.t) ({ name; rest } : Slash.Parsed.t) =
        error
          m
          (sprintf
-            "No model matches %S.%s Ctrl+L lists them all."
+            "No model matches “%s”.%s Ctrl+L lists them all."
             query
             (match suggestions with
              | [] -> none
@@ -2364,7 +2364,7 @@ let run_command (m : Model.t) ({ name; rest } : Slash.Parsed.t) =
       error
         m
         (sprintf
-           "Unknown thinking level %S: use %s."
+           "Unknown thinking level “%s”: use %s."
            level
            (String.concat ~sep:", " thinking_levels))
   | "change_default", _ -> m, [ rpc "change_default" [] ~tag:Default_saved ]
@@ -2378,7 +2378,7 @@ let run_command (m : Model.t) ({ name; rest } : Slash.Parsed.t) =
      | None ->
        error
          m
-         (sprintf "Unknown verbosity %S: use quiet, normal or verbose." name))
+         (sprintf "Unknown verbosity “%s”: use quiet, normal or verbose." name))
   | "confirm", "" -> open_picker m (confirm_picker m)
   | "mode", "" -> mode_picker m
   | "mode", name -> mode_by_name m name
@@ -2388,7 +2388,7 @@ let run_command (m : Model.t) ({ name; rest } : Slash.Parsed.t) =
   | "confirm", ("on" | "true") -> set_confirm m true
   | "confirm", ("off" | "false") -> set_confirm m false
   | "confirm", other ->
-    error m (sprintf "Unknown setting %S: use on or off." other)
+    error m (sprintf "Unknown setting “%s”: use on or off." other)
   | "budget", "" ->
     current_state m ~f:(fun s ->
       toast m (String.capitalize (Prigh_ui.Loop_status.describe_budget s)))
@@ -2441,7 +2441,7 @@ let run_command (m : Model.t) ({ name; rest } : Slash.Parsed.t) =
     error
       m
       (sprintf
-         "Unknown /resume argument %S: /resume now retries at once, /resume \
+         "Unknown /resume argument “%s”: /resume now retries at once, /resume \
           cancel stays stopped."
          other)
   | "compact", instructions ->
@@ -2481,7 +2481,7 @@ let run_command (m : Model.t) ({ name; rest } : Slash.Parsed.t) =
     error
       m
       (sprintf
-         "Unknown /notify argument %S: /notify on or /notify off (/notify \
+         "Unknown /notify argument “%s”: /notify on or /notify off (/notify \
           alone says what is on)"
          other)
   | "name", "" -> open_rename m
@@ -2569,7 +2569,7 @@ let run_command (m : Model.t) ({ name; rest } : Slash.Parsed.t) =
     error
       m
       (sprintf
-         "Unknown /mcp argument %S: /mcp lists the servers, /mcp reconnect \
+         "Unknown /mcp argument “%s”: /mcp lists the servers, /mcp reconnect \
           restarts the failed ones."
          other)
   | "copy", _ -> copy_last m
@@ -2619,7 +2619,7 @@ let run_command (m : Model.t) ({ name; rest } : Slash.Parsed.t) =
   | "setusr", user ->
     (match words with
      | [ user ] -> act_as m user
-     | _ -> error m (sprintf "Usage: /setusr [user] (not %S)" user))
+     | _ -> error m (sprintf "Usage: /setusr [user] (not “%s”)" user))
   | "signout", _ -> m, [ Command.Sign_out ]
   | "retry-backend-connection", _ -> retry_connection m
   | "state", _ ->
@@ -3199,7 +3199,7 @@ let rec reply_to (m : Model.t) (tag : Reply_tag.t) result =
       error
         m
         (sprintf
-           "Couldn't %s %S: %s"
+           "Couldn't %s “%s”: %s"
            (if archived then "archive" else "unarchive")
            title
            e)
@@ -3531,8 +3531,8 @@ let rec reply_to (m : Model.t) (tag : Reply_tag.t) result =
     toast
       m
       (if archived
-       then sprintf "Archived %S (a new message unarchives it)" title
-       else sprintf "Unarchived %S" title)
+       then sprintf "Archived “%s” (a new message unarchives it)" title
+       else sprintf "Unarchived “%s”" title)
   | Config, Ok json ->
     decode m json Config.of_json ~f:(fun config ->
       { m with config = Some config }, [])

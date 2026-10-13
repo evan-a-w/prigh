@@ -90,7 +90,10 @@ let user ?skill times (u : Message.User.t) =
       ; Image_view.thumbs u.images
       ; (if String.is_empty (String.strip text)
          then Node.none
-         else div "bubble" [ Node.text text ])
+         else
+           Node.div
+             ~attrs:[ Attr.class_ "bubble"; Attr.create "dir" "auto" ]
+             [ Node.text text ])
       ; (match attachments with
          | [] -> Node.none
          | paths ->

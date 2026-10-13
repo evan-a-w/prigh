@@ -776,7 +776,17 @@ let card
                ; Attr.create "data-agent" id
                ; Attr.title "Follow it in the agents panel"
                ]
-             (head @ [ span "open-agent" "Open ›" ])
+             (head
+              @ [ (* The page opens the agent from a click on [data-agent]:
+                     this button is the head's way in from the keyboard. *)
+                  Node.button
+                    ~attrs:
+                      [ Attr.class_ "open-agent"
+                      ; Attr.type_ "button"
+                      ; Attr.create "aria-label" "Open in the agents panel"
+                      ]
+                    [ Node.text "Open ›" ]
+                ])
          | None -> div "tool-head" head)
       ; body
       ]

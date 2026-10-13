@@ -185,14 +185,14 @@ let%expect_test "archiving and unarchiving: at once, and back if refused" =
   H.text h ~selector:".toast";
   [%expect
     {|
-    (Expire_toast (id 0) (after_ms 3860))
-    Archived "fix the parser bug" (a new message unarchives it)
+    (Expire_toast (id 0) (after_ms 4020))
+    Archived “fix the parser bug” (a new message unarchives it)
     |}];
   (* Running sessions are refused here, before asking the backend. *)
   H.act h (Set_archived { path = "/sessions/s2.jsonl"; archived = true });
   H.text h ~selector:".toast.error";
   [%expect
-    {| "Release notes" is running: wait for it or stop it (Esc in it) before archiving. (Dismiss) |}];
+    {| “Release notes” is running: wait for it or stop it (Esc in it) before archiving. (Dismiss) |}];
   (* The backend refusing puts it back: the list is fetched again. *)
   H.act h (Set_archived { path = "/sessions/s4.jsonl"; archived = false });
   H.fail h "set_archived" "no such session";
@@ -206,8 +206,8 @@ let%expect_test "archiving and unarchiving: at once, and back if refused" =
   H.text h ~selector:".toast.error";
   [%expect
     {|
-    "Release notes" is running: wait for it or stop it (Esc in it) before archiving. (Dismiss)
-    Couldn't unarchive "Old lexer": no such session (Dismiss)
+    “Release notes” is running: wait for it or stop it (Esc in it) before archiving. (Dismiss)
+    Couldn't unarchive “Old lexer”: no such session (Dismiss)
     |}]
 ;;
 
@@ -257,7 +257,7 @@ let%expect_test "/archive and /unarchive: this session, or one by name or id" =
   [%expect
     {|
     (Save_history ("/archive s" "/unarchive Old lexer" /archive))
-    "s" matches 5 sessions (s1, s2, s3): give more of the id. (Dismiss)
+    “s” matches 5 sessions (s1, s2, s3): give more of the id. (Dismiss)
     [/archive s]
     |}]
 ;;
@@ -457,7 +457,7 @@ let%expect_test "/delete: by name or id with a confirmation, or select them" =
   [%expect
     {|
     (Save_history ("/delete s4 Older docs"))
-    No session "Older": give its name, id or path (Ctrl+K searches them). (Dismiss)
+    No session “Older”: give its name, id or path (Ctrl+K searches them). (Dismiss)
     |}];
   H.type_ h "/delete s4 s5";
   H.act h Send;
