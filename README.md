@@ -836,7 +836,7 @@ tables; scripts, styles and navigation dropped, only `<main>`/`<article>`
 when the page has one), other text types come as they are, images are
 attached like `read`'s. It follows up to 10 redirects, reads at most 5 MB,
 times out after 30 s (`timeout` up to 120), truncates long pages like
-`bash` output (the full text saved to a file under `$TMPDIR/prigh-output-<uid>/` (private to the user))
+`bash` output (the full text saved to a file under `$TMPDIR/prigh-output-<uid>/`, private to the user)
 and says what to do on errors (HTTP status, refused connections, timeouts,
 binary types). `web_search` is the provider's own server-side search:
 Anthropic's `web_search` tool (at most 5 searches per turn) and the OpenAI
