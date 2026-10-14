@@ -176,7 +176,9 @@ let%expect_test "a foreground bash moved to the background: its job and output" 
   [%expect {|
     <div class="ok tool tool-bash">
       <div class="tool-head">
-        <span class="icon"> ✓ </span>
+        <span title="Done" role="img" aria-label="Done" class="done mark">
+          <icon class="check"> </icon>
+        </span>
         <span class="name"> bash </span>
         <span class="arg command"> make all </span>
         <span class="chip job"> job j3 </span>
