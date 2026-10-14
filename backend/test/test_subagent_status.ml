@@ -32,7 +32,7 @@ let%expect_test "a background subagent whose loop raises still ends" =
     assistant:  subagent{"task":"explode"}
     subagent_start a1: explode
     state: running=true subagents=[a1 running]
-    tool_result subagent: started agent a1 (explode); its result will be delivered to you when it finishes; use subagent_wait to block on it
+    tool_result subagent: started agent a1 (explode); its result will be delivered to you when it finishes: keep working or end your turn meanwhile
     subagent_end a1: error subagent failed: ("no script for agent" (key explode))
     state: running=true subagents=[a1 done]
     assistant: started
@@ -64,7 +64,7 @@ let%expect_test "a nested synchronous subagent whose loop raises still ends" =
     assistant:  subagent{"task":"outer"}
     subagent_start a1: outer
     state: running=true subagents=[a1 running]
-    tool_result subagent: started agent a1 (outer); its result will be delivered to you when it finishes; use subagent_wait to block on it
+    tool_result subagent: started agent a1 (outer); its result will be delivered to you when it finishes: keep working or end your turn meanwhile
     assistant: started
     agent_end
     state: running=false subagents=[a1 running]
@@ -115,7 +115,7 @@ let%expect_test "cancelling a background subagent ends its nested one" =
     assistant:  subagent{"task":"outer"}
     subagent_start a1: outer
     state: running=true subagents=[a1 running]
-    tool_result subagent: started agent a1 (outer); its result will be delivered to you when it finishes; use subagent_wait to block on it
+    tool_result subagent: started agent a1 (outer); its result will be delivered to you when it finishes: keep working or end your turn meanwhile
     assistant: started
     agent_end
     state: running=false subagents=[a1 running]

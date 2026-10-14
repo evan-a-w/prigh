@@ -100,6 +100,7 @@ type t =
   ; mutable next_job_id : int
   ; mutable emit : Agent_event.t -> unit
   ; mutable on_change : unit -> unit
+  ; mutable auto_background : unit -> float option
   }
 
 let create ~env ~sw ~first_subagent_id ~first_job_id () =
@@ -110,12 +111,20 @@ let create ~env ~sw ~first_subagent_id ~first_job_id () =
   ; next_job_id = first_job_id
   ; emit = ignore
   ; on_change = ignore
+  ; auto_background = (fun () -> None)
   }
 ;;
 
-let connect t ~emit ~on_change =
+let connect ?(auto_background = fun () -> None) t ~emit ~on_change =
   t.emit <- emit;
-  t.on_change <- on_change
+  t.on_change <- on_change;
+  t.auto_background <- auto_background
+;;
+
+let auto_background t = t.auto_background ()
+
+let seconds_text s =
+  if Float.is_integer s then sprintf "%.0fs" s else sprintf "%gs" s
 ;;
 
 let now t = Eio.Time.now (Eio.Stdenv.clock t.env)
@@ -157,17 +166,16 @@ let next_id t (kind : Kind.t) =
   Kind.id_prefix kind ^ Int.to_string n
 ;;
 
-let spawn ?input t ~kind ~label ~run =
-  let id = next_id t kind in
+let make_task ?input ?output t ~kind ~label ~started_at ~cancel =
   let finished, resolve = Promise.create () in
   let task =
-    { Task.id
+    { Task.id = next_id t kind
     ; kind
     ; label
-    ; started_at = now t
-    ; cancel = Cancellation.create ()
+    ; started_at
+    ; cancel
     ; finished
-    ; output = Output_tail.create ()
+    ; output = Option.value_or_thunk output ~default:Output_tail.create
     ; input
     ; outcome = None
     ; finished_at = None
@@ -176,43 +184,140 @@ let spawn ?input t ~kind ~label ~run =
     }
   in
   t.tasks <- t.tasks @ [ task ];
+  task, resolve
+;;
+
+let finish t (task : Task.t) outcome =
+  task.outcome <- Some outcome;
+  task.finished_at <- Some (now t);
+  task.activity <- "finished"
+;;
+
+let failed_outcome kind exn =
+  { Outcome.status = "failed"
+  ; body = sprintf "%s failed: %s" (Kind.word kind) (Exn.to_string exn)
+  ; is_error = true
+  }
+;;
+
+(* The agent's switch is going away: the task is not running any more,
+   whatever happens next. *)
+let finish_on_switch_exit t task resolve =
+  finish t task { Outcome.status = "cancelled"; body = ""; is_error = true };
+  task.delivered <- true;
+  Promise.resolve resolve ()
+;;
+
+let spawn ?input t ~kind ~label ~run =
+  let task, resolve =
+    make_task
+      ?input
+      t
+      ~kind
+      ~label
+      ~started_at:(now t)
+      ~cancel:(Cancellation.create ())
+  in
   let emit event =
     Option.iter (activity event) ~f:(fun a -> task.activity <- a);
     t.emit event
-  in
-  let finish outcome =
-    task.outcome <- Some outcome;
-    task.finished_at <- Some (now t);
-    task.activity <- "finished"
   in
   Fiber.fork ~sw:t.sw (fun () ->
     let outcome =
       match
         run
-          ~id
+          ~id:task.id
           ~cancel:task.cancel
           ~emit
           ~on_output:(Output_tail.add task.output)
       with
       | outcome -> outcome
       | exception (Eio.Cancel.Cancelled _ as exn) ->
-        (* The agent's switch is going away: the task is not running any
-           more, whatever happens next. *)
-        finish { Outcome.status = "cancelled"; body = ""; is_error = true };
-        task.delivered <- true;
-        Promise.resolve resolve ();
+        finish_on_switch_exit t task resolve;
         raise exn
-      | exception exn ->
-        { Outcome.status = "failed"
-        ; body = sprintf "%s failed: %s" (Kind.word kind) (Exn.to_string exn)
-        ; is_error = true
-        }
+      | exception exn -> failed_outcome kind exn
     in
-    finish outcome;
+    finish t task outcome;
     t.on_change ();
     Promise.resolve resolve ());
   t.on_change ();
-  id
+  task.id
+;;
+
+module Foreground = struct
+  type 'a t =
+    | Finished of 'a
+    | Moved of Task.t
+end
+
+let run_foreground ?input t ~kind ~label ~after ~cancel ~on_output ~run ~outcome
+  =
+  let started_at = now t in
+  let work_cancel = Cancellation.create () in
+  let output = Output_tail.create () in
+  let moved = ref None in
+  let result, resolve_result = Promise.create () in
+  let sink chunk =
+    Output_tail.add output chunk;
+    if Option.is_none !moved then on_output chunk
+  in
+  (* The work runs in the tasks' switch, not the caller's fiber, so that it
+     can outlive the call once it is moved. *)
+  Fiber.fork ~sw:t.sw (fun () ->
+    let ran =
+      match run ~cancel:work_cancel ~on_output:sink with
+      | value -> Ok value
+      | exception exn -> Error exn
+    in
+    match !moved, ran with
+    | None, _ -> Promise.resolve resolve_result ran
+    | Some (task, resolve), Error (Eio.Cancel.Cancelled _ as exn) ->
+      finish_on_switch_exit t task resolve;
+      raise exn
+    | Some ((task : Task.t), resolve), ran ->
+      let outcome =
+        match ran with
+        | Ok value ->
+          (try outcome value ~output with
+           | exn -> failed_outcome kind exn)
+        | Error exn -> failed_outcome kind exn
+      in
+      finish t task outcome;
+      t.on_change ();
+      Promise.resolve resolve ());
+  let finished = function
+    | Ok value -> Foreground.Finished value
+    | Error exn -> raise exn
+  in
+  let waited =
+    try
+      Cancellation.protect cancel ~f:(fun () ->
+        Fiber.first
+          (fun () -> `Done (Promise.await result))
+          (fun () ->
+             Eio.Time.sleep (Eio.Stdenv.clock t.env) after;
+             `Timeout))
+    with
+    | Eio.Cancel.Cancelled _ as exn ->
+      Cancellation.cancel work_cancel;
+      raise exn
+  in
+  match waited with
+  | Some (`Done ran) -> finished ran
+  | None ->
+    Cancellation.cancel work_cancel;
+    finished (Promise.await result)
+  | Some `Timeout ->
+    (match Promise.peek result with
+     | Some ran -> finished ran
+     | None ->
+       let task, resolve =
+         make_task ?input ~output t ~kind ~label ~started_at ~cancel:work_cancel
+       in
+       task.activity <- "running";
+       moved := Some (task, resolve);
+       t.on_change ();
+       Moved task)
 ;;
 
 let tasks t ~kind =
@@ -343,6 +448,54 @@ let wait t ~kind ~ids ~all ~timeout ~cancel =
         | Some () -> loop ())
     in
     loop ())
+;;
+
+let wait_text t ~kind ~ids ~all ~timeout ~cancel =
+  let own = Option.map timeout ~f:Float.of_int in
+  let cap = auto_background t in
+  let capped =
+    match own, cap with
+    | _, None -> false
+    | None, Some _ -> true
+    | Some own, Some cap -> Float.( > ) own cap
+  in
+  let timeout = if capped then cap else own in
+  Or_error.map
+    (wait t ~kind ~ids ~all ~timeout ~cancel)
+    ~f:(fun { Wait_result.finished; running; timed_out } ->
+      let reports = List.map finished ~f:Task.report in
+      let still =
+        match running with
+        | [] -> []
+        | running ->
+          let tasks =
+            String.concat
+              ~sep:", "
+              (List.map running ~f:(fun task ->
+                 sprintf "%s (%s)" task.id (short_task task.label)))
+          in
+          [ (if timed_out && capped
+             then
+               sprintf
+                 "still running after %s (the longest a wait lasts): %s. \
+                  Nothing is lost: each report is delivered to you when it \
+                  finishes. Keep working on something that does not need it, \
+                  or end your turn; do not wait again just to pass the time."
+                 (seconds_text (Option.value_exn cap))
+                 tasks
+             else
+               sprintf
+                 "%sstill running: %s"
+                 (if timed_out then "timed out; " else "")
+                 tasks)
+          ]
+      in
+      match reports @ still with
+      | [] ->
+        (match kind with
+         | Subagent -> "no subagents to wait for"
+         | Job -> "no jobs to wait for")
+      | parts -> String.concat ~sep:"\n\n" parts)
 ;;
 
 let cancel t ~kind id =

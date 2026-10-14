@@ -3,7 +3,10 @@ open! Import
 
 (** The [bash] tool. With [background] (at depth 0, when the context has
     background tasks) it starts a job that runs the command through the
-    context's executor, i.e. on the active tool host, and returns at once. *)
+    context's executor, i.e. on the active tool host, and returns at once.
+    Without it, at depth 0, a command still running after
+    {!Background_tasks.auto_background} seconds becomes such a job (its
+    output so far kept, its process left running) and the call returns. *)
 
 val tool : Tool.t
 
@@ -16,9 +19,18 @@ val save_output : Tool.Context.t -> string -> string
 (** [bash] without the [background] parameter, for subagents. *)
 val foreground_tool : Tool.t
 
-(** Whether this call starts a job rather than running the command. The
-    executor must then run it in the backend, not forward it to a host. *)
+(** Whether this call starts a job rather than running the command. *)
 val starts_job : Tool.Context.t -> Json.t -> bool
+
+(** Whether this call must run in the backend rather than be forwarded to
+    the tool host: it starts a job, or it is a foreground call at depth 0
+    that is moved to the background (a job) if it is still running after
+    {!Background_tasks.auto_background} seconds. Either way the command
+    itself then runs through the context's executor, on the host. *)
+val runs_in_backend : Tool.Context.t -> Json.t -> bool
+
+(** The job id in the result of a call that was moved to the background. *)
+val moved_job_id : string -> string option
 
 (** Starts a job for [command]. [run] runs it in the foreground (with
     [foreground_arguments]), its stdin fed from [stdin] (the task's

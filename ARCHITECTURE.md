@@ -540,6 +540,28 @@ two can share one.
   host disconnecting fails it. The outcome's status is read from the
   foreground result's trailer (`[exit code N]`, `[cancelled]`, `[killed by
   ...]`, `[timed out ...]`), its body is the last 40 lines of output.
+  A foreground `bash` call at depth 0 also runs through the backend
+  (`Tool_bash.runs_in_backend`) when `Background_tasks.auto_background`
+  (the config's `auto_background_seconds`, read through the closure
+  `Agent` passes to `connect`) is set: `Background_tasks.run_foreground`
+  runs the same foreground call in a fiber of the agent's switch with its
+  own cancellation (cancelled by the run's until then) and waits up to
+  that long (from when the command starts, so after any approval); its
+  output streams as the call's `Tool_output` and into an `Output_tail`.
+  Still running then, it is moved without being restarted: a `Job` task is
+  made around the running fiber (next `j<n>`, that output, that
+  cancellation, a refusing `Stdin_feed`), the fiber's result becomes its
+  outcome (`job_outcome`) and it is delivered like any job, while the call
+  returns `still running after Ns, so it was moved to the background as
+  job j<n> ...` with the last 10 lines (`Tool_bash.moved_job_id` reads the
+  id back, for the session's job numbering; `Moved_job` in `tui/protocol`
+  for the frontends). On a client host the pending `Tool_exec` simply
+  keeps going in that fiber. Without an explicit `timeout` (and a limit
+  under the default 600 s) the call is sent with the jobs' "no timeout",
+  since the limit always comes first. A call finishing in time leaves no
+  task and uses no id. `job_wait`/`subagent_wait` go through
+  `Background_tasks.wait_text`, which caps their `timeout` at the same
+  limit and then says the reports still come later.
   `Tool_jobs` has `job_status`, `job_output` (`lines`, `offset` from the
   end), `job_wait`, `job_input` and `job_kill`; like the subagent controls
   they and `background` itself are dropped below depth 0. Every job (the
@@ -596,9 +618,12 @@ two can share one.
 - `System_prompt` — built-in guidance plus environment facts plus
   `AGENTS.md`/`CLAUDE.md` files from `/` down to the cwd and
   `~/.prigh/AGENTS.md`; `read_instructions` scans the local filesystem and
-  `build ?instructions ?nix ?skills` accepts files fetched elsewhere (the
-  tool host), whether that host has Nix, which adds how to get missing tools
-  from nixpkgs, and the host's skills, listed when the model has `read`.
+  `build ?instructions ?nix ?skills ?auto_background` accepts files fetched
+  elsewhere (the tool host), whether that host has Nix, which adds how to
+  get missing tools from nixpkgs, the host's skills, listed when the model
+  has `read`, and the auto-background limit, which the guidance on
+  background work (given to agents with `job_wait`/`subagent_wait`: almost
+  never block, keep working or end the turn) names.
   `Agent` builds it once, at the session's first run, and records it as a
   `System_prompt` session entry so every later request (and every reload)
   sends the same prefix, which is what provider prompt caches key on. When
@@ -770,7 +795,8 @@ two can share one.
   resume is to come. When the timer fires on a session whose file was
   deleted meanwhile (`Session.gone`), a notice says so and nothing runs.
   `Rpc_server` keeps the agent loaded while one is scheduled.
-- `Config` — `~/.prigh/config.json` (`scoped_models : string list`,
+- `Config` — `~/.prigh/config.json` (`auto_background_seconds` (default
+  30, 0 = off: see background jobs), `scoped_models : string list`,
   `approval_mode` (new sessions' mode; read from `confirm_tools` when
   absent, which saving replaces), `permissions` (allow/ask/deny rules;
   saving keeps the file's as written), `default_model`/`default_thinking`,

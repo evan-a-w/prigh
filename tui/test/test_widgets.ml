@@ -1793,6 +1793,29 @@ let%expect_test "tools: bash shows the command, its outcome as a chip" =
           background: true
         }
     |}];
+  (* A foreground call still running after the backend's limit became a job:
+     its id, and the output it had then. *)
+  show_tool
+    "bash"
+    {|{"command":"make all"}|}
+    ~result:
+      (tool_result
+         "still running after 30s, so it was moved to the background as job j3 (not restarted: it keeps running). Output so far (last 2 of 40 lines):\nbuilding 39\nbuilding 40\nIts report ([job j3 exited ...] and its last lines) is delivered to you when it exits: keep working on something else or end your turn. job_output shows more output, job_kill stops it; do not job_wait on it unless you truly cannot do anything else.");
+  [%expect {|
+    == quiet ==
+    ✓ bash $ make all  job j3 moved to the background after 30s 2 lines
+    == normal ==
+    ✓ bash $ make all  job j3 moved to the background after 30s
+        building 39
+        building 40
+    == verbose ==
+    ✓ bash $ make all  job j3 moved to the background after 30s
+        {
+          command: "make all"
+        }
+        building 39
+        building 40
+    |}];
   (* Aborting cancels the call: what it printed is kept, but it did not fail. *)
   show_tool
     ~styled:true

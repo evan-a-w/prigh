@@ -169,6 +169,29 @@ let%expect_test "bash in the background: the job it started" =
     |}]
 ;;
 
+let%expect_test "a foreground bash moved to the background: its job and output" =
+  show
+    [ {|{"type":"event","event":"tool_end","call":{"id":"c11","name":"bash","arguments":"{\"command\":\"make all\"}"},"result":{"role":"tool_result","tool_call_id":"c11","tool_name":"bash","text":"still running after 30s, so it was moved to the background as job j3 (not restarted: it keeps running). Output so far (last 2 of 40 lines):\nbuilding 39\nbuilding 40\nIts report ([job j3 exited ...] and its last lines) is delivered to you when it exits: keep working on something else or end your turn. job_output shows more output, job_kill stops it; do not job_wait on it unless you truly cannot do anything else.","is_error":false}}|}
+    ];
+  [%expect {|
+    <div class="ok tool tool-bash">
+      <div class="tool-head">
+        <span class="icon"> ✓ </span>
+        <span class="name"> bash </span>
+        <span class="arg command"> make all </span>
+        <span class="chip job"> job j3 </span>
+        <span class="chip moved"> moved to the background after 30s </span>
+      </div>
+      <div class="tool-body">
+        <div class="output">
+          <pre> building 39
+    building 40 </pre>
+        </div>
+      </div>
+    </div>
+    |}]
+;;
+
 let%expect_test "long output: the middle folds behind \"N more lines\"" =
   let text = List.init 30 ~f:(sprintf "line %d") |> String.concat ~sep:"\\n" in
   show

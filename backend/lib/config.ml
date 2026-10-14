@@ -37,6 +37,7 @@ type t =
   ; resume_on_limit_reset : bool
   ; archive_after_days : float
   ; notify : Notify.t
+  ; auto_background_seconds : float
   }
 [@@deriving sexp_of]
 
@@ -53,7 +54,14 @@ let default =
   ; resume_on_limit_reset = true
   ; archive_after_days = 7.
   ; notify = Bell
+  ; auto_background_seconds = 30.
   }
+;;
+
+let auto_background t =
+  Option.some_if
+    Float.(t.auto_background_seconds > 0.)
+    t.auto_background_seconds
 ;;
 
 let start_model t =
@@ -85,6 +93,8 @@ let to_json t =
       , if t.resume_on_limit_reset then `True else `False )
     ; "archive_after_days", `Number (sprintf "%g" t.archive_after_days)
     ; "notify", `String (Notify.to_string t.notify)
+    ; ( "auto_background_seconds"
+      , `Number (sprintf "%g" t.auto_background_seconds) )
     ]
 ;;
 
@@ -144,6 +154,20 @@ let of_json json =
       | Some (`Number n) ->
         (match Float.of_string_opt n with
          | Some days when Float.(days >= 0.) -> Ok days
+         | Some _ | None -> error ())
+      | Some _ -> error ()
+    in
+    let%bind auto_background_seconds =
+      let error () =
+        Or_error.error_string
+          "config.auto_background_seconds must be a number of seconds (0: \
+           never)"
+      in
+      match find "auto_background_seconds" with
+      | None | Some `Null -> Ok default.auto_background_seconds
+      | Some (`Number n) ->
+        (match Float.of_string_opt n with
+         | Some s when Float.(s >= 0.) -> Ok s
          | Some _ | None -> error ())
       | Some _ -> error ()
     in
@@ -217,6 +241,7 @@ let of_json json =
     ; resume_on_limit_reset
     ; archive_after_days
     ; notify
+    ; auto_background_seconds
     }
   | _ -> Or_error.error_string "config must be a JSON object"
 ;;

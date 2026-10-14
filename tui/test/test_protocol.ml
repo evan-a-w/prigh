@@ -1132,3 +1132,34 @@ let%expect_test "archived sessions and deleting them" =
     Deleted nothing / 0 B, 1023 B, 1.0 KB, 1.4 MB, 2.8 GB
     |}]
 ;;
+
+let%expect_test "Moved_job: a foreground bash call that became a job" =
+  List.iter
+    [ "still running after 30s, so it was moved to the background as job j3 \
+       (not restarted: it keeps running). Output so far (last 2 of 9 \
+       lines):\n\
+       eight\n\
+       nine\n\
+       Its report ([job j3 exited ...] and its last lines) is delivered to \
+       you when it exits."
+    ; "still running after 0.5s, so it was moved to the background as job j12 \
+       (not restarted: it keeps running). No output so far.\n\
+       Its report ([job j12 exited ...]) is delivered to you when it exits."
+    ; "started job j1: make"
+    ; "still running after 30s"
+    ]
+    ~f:(fun text ->
+      print_s [%sexp (Moved_job.parse text : Moved_job.t option)]);
+  [%expect {|
+    ((
+      (id     j3)
+      (after  30s)
+      (output "eight\nnine")))
+    ((
+      (id     j12)
+      (after  0.5s)
+      (output "")))
+    ()
+    ()
+    |}]
+;;

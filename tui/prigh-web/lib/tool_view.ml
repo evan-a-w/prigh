@@ -323,7 +323,15 @@ let present
       | Some r -> bash_outcome r.text
       | None -> None, ""
     in
-    let job = Option.bind result ~f:(fun r -> job_started r.text) in
+    let moved =
+      Option.bind result ~f:(fun (r : Message.Tool_result.t) ->
+        Moved_job.parse r.text)
+    in
+    let job =
+      match moved with
+      | Some m -> Some m.id
+      | None -> Option.bind result ~f:(fun r -> job_started r.text)
+    in
     { arg = Some (span "arg command" (first_line command))
     ; chips =
         List.filter_opt
@@ -331,6 +339,10 @@ let present
               (background && Option.is_none job)
               (chip "background")
           ; Option.map job ~f:(fun id -> chip ~cls:"job" ("job " ^ id))
+          ; Option.map moved ~f:(fun m ->
+              chip
+                ~cls:"moved"
+                (sprintf "moved to the background after %s" m.after))
           ; Option.map outcome ~f:(fun outcome ->
               chip
                 ~cls:(if String.equal outcome "cancelled" then "" else "bad")
@@ -340,6 +352,9 @@ let present
         [ (if String.mem (String.strip command) '\n'
            then Node.pre ~attrs:[ Attr.class_ "command" ] [ Node.text command ]
            else Node.none)
+        ; (match moved with
+           | Some m -> output ~fold m.output
+           | None -> Node.none)
         ; (if Option.is_some job
            then Node.none
            else (
