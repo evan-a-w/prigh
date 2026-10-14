@@ -1655,7 +1655,11 @@ copy of the protocol types and the e2e test guards the contract.
       elided in the middle with the whole text as the title; with a dialog
       or a phone's sheet open, the newest one at the bottom of the page,
       under the dialog and outside its `inert` page), `Html.lamp` (the work-in-progress sign everywhere; `View` marks
-      the page `offline` while reconnecting, which stills the others), and `Keys` (which of the
+      the page `offline` while reconnecting, which stills the others),
+      `Html.mark` (how something ended or stands: an SVG icon from
+      `Html.Icon`, never a text glyph a font may lack, in a box as tall as
+      the line it marks, coloured by its class: tool cards, the agents
+      panel, plan steps, pickers' current item), and `Keys` (which of the
       dialog, the popup or the editor owns a key; `help`, and `browser`:
       the TUI's keys that the browser keeps).
     - Approvals: the confirmation dialog (`Dialog_view`, answers from
@@ -1776,7 +1780,8 @@ copy of the protocol types and the e2e test guards the contract.
     `web-bin` is ~1.75 MB).
   - `test/` — inline expect tests under node: a `Harness` drives
     `App.update`, answers RPCs and prints the commands and the rendered
-    page. `e2e/` — the Playwright e2e (see Testing).
+    page (as text, `Html.mark`s print as the glyphs they draw: ✓ ✕ – ■).
+    `e2e/` — the Playwright e2e (see Testing).
 - `bin/` — `prigh-tui` (`-faux`, `-session`, `-model`, `-cwd`, `-auth-file`,
   `-backend`; `PRIGH_BACKEND` overrides the backend path). `-connect
   HOST:PORT` (`$PRIGH_CONNECT`) joins a running backend instead of spawning

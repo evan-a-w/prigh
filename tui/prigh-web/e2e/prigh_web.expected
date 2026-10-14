@@ -45,7 +45,6 @@ editor: /modle
 count some lines
 <TIME>
 let me look
-✓
 bash
 printf 'one\ntwo\nthree\n'
 one
@@ -67,7 +66,6 @@ Ready
 $<COST>/$<COST>
 token
 === chromium: long output, folded ===
-✓
 bash
 seq 1 30
 1
@@ -78,13 +76,12 @@ seq 1 30
 6
 Show all 30 lines
 === chromium: long output, expanded ===
-34 lines, ending: 30 / Fold to 6 lines
+33 lines, ending: 30 / Fold to 6 lines
 folded again: Show all 30 lines
 === chromium: read an image ===
 what does flag.png look like?
 <TIME>
 opening it
-✓
 read
 flag.png
 Read image file [image/png, 24x16]
@@ -165,17 +162,14 @@ back again
 Agents
 Subagents
 2
-✓
 Done
 Survey the project
 The survey: 3 files.
-✓
 Done
 Count the files
 There are 3 files.
 Jobs
 1
-✓
 Done
 sleep 1; echo built
 <T>
@@ -185,7 +179,6 @@ Subagent a1/n1
 Show in chat
 Survey the project
 ›
-✓
 Count the files
 Done deepseek-flash  1 turn  $<COST>
 There are 3 files.
@@ -193,7 +186,6 @@ There are 3 files.
 the nested card is in view in the chat
 === chromium: a background job ===
 Job j1
-✓
 sleep 1; echo built
 Done <T> 6 B
 built
@@ -201,17 +193,14 @@ Output, lines 1-1 of 1
 === chromium: a card opens its agent ===
 Subagent a1
 Show in chat
-✓
 Survey the project
 Done deepseek-flash  2 turns  1 tool call  $<COST>
 Its subagents
 1
-✓
 Done
 Count the files
 There are 3 files.
 asking a helper
-✓
 subagent
 Count the files
 Open ›
@@ -311,7 +300,6 @@ low
 a little
 on
 the provider's default budget
-✓
 high
 more
 max
@@ -325,7 +313,6 @@ Asks: commands
 file edits run; bash, job_input and MCP tools ask first
 Auto: never asks
 tools run without asking
-✓
 Plan mode
 read-only planning: no file edits; bash, job_input and MCP tools ask first
 ↑↓ to move, Enter to choose, Esc to close
@@ -349,7 +336,6 @@ Deny, saying why
 build it
 <TIME>
 building
-✓
 bash
 echo built-ok
 built-ok
@@ -369,7 +355,6 @@ Send
 ask me
 <TIME>
 one question
-✓
 ask_user
 Q: Which database?
 A: SQLite
@@ -415,12 +400,10 @@ Plan mode on: the model was told to plan, not change files
 plan it
 <TIME>
 here is the plan
-✓
 update_plan
 0/2 done
-▸ Write the schema
-○ Test it
-✓
+Write the schema
+Test it
 exit_plan_mode
 approved
 Write the schema
@@ -709,7 +692,6 @@ I am alice
 === chromium: accounts: act as ===
 alice
 you
-✓
 bob
 === chromium: accounts: sessions ===
 I am bob
@@ -850,7 +832,6 @@ editor: /modle
 count some lines
 <TIME>
 let me look
-✓
 bash
 printf 'one\ntwo\nthree\n'
 one
@@ -872,7 +853,6 @@ Ready
 $<COST>/$<COST>
 token
 === firefox: long output, folded ===
-✓
 bash
 seq 1 30
 1
@@ -883,13 +863,12 @@ seq 1 30
 6
 Show all 30 lines
 === firefox: long output, expanded ===
-34 lines, ending: 30 / Fold to 6 lines
+33 lines, ending: 30 / Fold to 6 lines
 folded again: Show all 30 lines
 === firefox: read an image ===
 what does flag.png look like?
 <TIME>
 opening it
-✓
 read
 flag.png
 Read image file [image/png, 24x16]
@@ -970,17 +949,14 @@ back again
 Agents
 Subagents
 2
-✓
 Done
 Survey the project
 The survey: 3 files.
-✓
 Done
 Count the files
 There are 3 files.
 Jobs
 1
-✓
 Done
 sleep 1; echo built
 <T>
@@ -990,7 +966,6 @@ Subagent a1/n1
 Show in chat
 Survey the project
 ›
-✓
 Count the files
 Done deepseek-flash  1 turn  $<COST>
 There are 3 files.
@@ -998,7 +973,6 @@ There are 3 files.
 the nested card is in view in the chat
 === firefox: a background job ===
 Job j1
-✓
 sleep 1; echo built
 Done <T> 6 B
 built
@@ -1006,17 +980,14 @@ Output, lines 1-1 of 1
 === firefox: a card opens its agent ===
 Subagent a1
 Show in chat
-✓
 Survey the project
 Done deepseek-flash  2 turns  1 tool call  $<COST>
 Its subagents
 1
-✓
 Done
 Count the files
 There are 3 files.
 asking a helper
-✓
 subagent
 Count the files
 Open ›
@@ -1116,7 +1087,6 @@ low
 a little
 on
 the provider's default budget
-✓
 high
 more
 max
@@ -1130,7 +1100,6 @@ Asks: commands
 file edits run; bash, job_input and MCP tools ask first
 Auto: never asks
 tools run without asking
-✓
 Plan mode
 read-only planning: no file edits; bash, job_input and MCP tools ask first
 ↑↓ to move, Enter to choose, Esc to close
@@ -1154,7 +1123,6 @@ Deny, saying why
 build it
 <TIME>
 building
-✓
 bash
 echo built-ok
 built-ok
@@ -1174,7 +1142,6 @@ Send
 ask me
 <TIME>
 one question
-✓
 ask_user
 Q: Which database?
 A: SQLite
@@ -1220,12 +1187,10 @@ Plan mode on: the model was told to plan, not change files
 plan it
 <TIME>
 here is the plan
-✓
 update_plan
 0/2 done
-▸ Write the schema
-○ Test it
-✓
+Write the schema
+Test it
 exit_plan_mode
 approved
 Write the schema
@@ -1514,7 +1479,6 @@ I am alice
 === firefox: accounts: act as ===
 alice
 you
-✓
 bob
 === firefox: accounts: sessions ===
 I am bob
