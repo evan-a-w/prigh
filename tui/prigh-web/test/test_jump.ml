@@ -469,3 +469,44 @@ let%expect_test "targets as picker ids" =
     ("" ())
     |}]
 ;;
+
+let%expect_test "a message's entry: tool results join their calls'" =
+  let page =
+    Prigh_protocol.Message_page.of_json
+      (Jsonaf.of_string
+         (H.page
+            ~older:10
+            ~before:"e11"
+            (messages
+               [ user "one"
+               ; {|{"role":"assistant","content":[{"type":"tool_call","id":"c1","name":"bash","arguments":"{}"}],"stop_reason":{"type":"tool_use"},"usage":{"input":0,"output":0,"cache_read":0},"model":"m"}|}
+               ; {|{"role":"tool_result","tool_call_id":"c1","tool_name":"bash","text":"ok","is_error":false}|}
+               ; assistant "done"
+               ; user "two"
+               ])))
+    |> Or_error.ok_exn
+  in
+  List.iter [ 9; 10; 13; 14; 15 ] ~f:(fun index ->
+    print_s
+      [%sexp
+        (index : int)
+      , (Jump.entry_of_index ~page ~first:(-4) index : int option)]);
+  [%expect
+    {|
+    (9 ())
+    (10 (-4))
+    (13 (-2))
+    (14 (-1))
+    (15 ())
+    |}]
+;;
+
+let%expect_test "a message sent adds its mark" =
+  let h = long_session () in
+  H.quiet h (fun () ->
+    H.event
+      h
+      {|{"event":"message_start","message":{"role":"user","text":"and now?"}}|});
+  H.names h ~selector:".rail .tick:last-child";
+  [%expect {| button "Your message 7, and now?" |}]
+;;
