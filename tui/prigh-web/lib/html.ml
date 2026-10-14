@@ -95,6 +95,12 @@ module Icon = struct
     | Bell_off
     | Shield
     | Sliders
+    | Cross
+    | Dash
+    | Square
+    | Warning
+    | Next
+    | Ring
   [@@deriving sexp_of]
 
   (* Paths in the style of Lucide (24x24, stroked). *)
@@ -162,6 +168,15 @@ module Icon = struct
       {|<path d="M12 21s7-3.5 7-9V5.5L12 3 5 5.5V12c0 5.5 7 9 7 9z"/>|}
     | Sliders ->
       {|<path d="M21 5h-7M10 5H3M21 12h-9M8 12H3M21 19h-5M12 19H3M14 3v4M8 10v4M16 17v4"/>|}
+    (* For [mark]: as heavy as [Check] beside them at 13-14px. *)
+    | Cross -> {|<path d="M6.5 6.5l11 11M17.5 6.5l-11 11"/>|}
+    | Dash -> {|<path d="M6.5 12h11"/>|}
+    | Square ->
+      {|<rect x="7" y="7" width="10" height="10" rx="1.5" fill="currentColor"/>|}
+    | Warning ->
+      {|<path d="M10.3 4.2 2.6 17.5A2 2 0 0 0 4.3 20.5h15.4a2 2 0 0 0 1.7-3L13.7 4.2a2 2 0 0 0-3.4 0zM12 10v4M12 17.5h.01"/>|}
+    | Next -> {|<path d="m10 7 5 5-5 5"/>|}
+    | Ring -> {|<circle cx="12" cy="12" r="4.5"/>|}
   ;;
 
   let name t = String.lowercase (Sexp.to_string (sexp_of_t t))
@@ -187,6 +202,17 @@ module Icon = struct
 end
 
 let icon = Icon.view
+
+let mark ?(cls = "") ?label t =
+  Node.span
+    ~attrs:
+      (Attr.class_ (String.strip ("mark " ^ cls))
+       ::
+       (match label with
+        | Some l -> [ Attr.title l; Attr.role "img"; Attr.create "aria-label" l ]
+        | None -> [ Attr.create "aria-hidden" "true" ]))
+    [ icon t ]
+;;
 
 let check ?(radio = false) on =
   Node.span

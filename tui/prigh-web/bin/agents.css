@@ -89,7 +89,9 @@
 .agents-row:hover { background: var(--slate-2); }
 .agents-row:focus-visible { outline: 2px solid var(--sodium); outline-offset: -2px; }
 .agents-row.selected { background: var(--sodium-wash); box-shadow: inset 2px 0 var(--sodium); }
-.row-mark { grid-column: 1; grid-row: 1; align-self: center; display: flex; justify-content: center; line-height: 20px; }
+/* The mark is centred on the title's line (the row's first), whatever
+   wraps or follows below it. */
+.row-mark { grid-column: 1; grid-row: 1; align-self: start; display: flex; align-items: center; justify-content: center; height: 20px; --mark-line: 20px; }
 .row-title { grid-column: 2; grid-row: 1; font-size: 14px; line-height: 20px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .job .row-title { font: 13px/20px var(--mono); }
 .job .row-title::before { content: "$ "; color: var(--faint); }
@@ -101,23 +103,27 @@
 .agents-row.failed .row-line { color: var(--brick); }
 .row-meta { font: 11.5px/17px var(--mono); color: var(--faint); white-space: pre; }
 
-/* Outcome marks: sage done, brick failed, faint for work stopped on
-   purpose (cancelled, killed) or by a restart. */
-.agent-mark { font-size: 12px; line-height: 1; }
-.agents-panel .complete .agent-mark { color: var(--sage); }
-.agents-panel .failed .agent-mark { color: var(--brick); }
-.agents-panel .stopped .agent-mark { color: var(--faint); }
+/* Outcome marks (Html.mark: sage done, brick failed, faint for work
+   stopped on purpose or by a restart), a little smaller than the title. */
+.agents-panel .row-mark { --mark-size: 13px; }
 .agents-row.stopped .row-title { color: var(--muted); }
 
-/* The tree: a nested agent hangs off a guide under its parent's mark (the
-   row's padding plus half the mark column), with a rounded elbow to its
-   own mark. */
-.agents-tree.nested { --elbow: 18px; margin-left: 17px; padding-left: 12px; gap: 2px; }
+/* The tree: a nested agent hangs off a guide down its parent's mark column
+   (the row's padding plus half the column: --axis), which starts a gap
+   below the parent's mark; a rounded elbow at the height of the child's
+   mark stops a gap short of it. Every depth repeats the same geometry. */
+.agents-tree {
+  --axis: 17px; /* the row's padding, 10px, plus half the 14px column */
+  --mark-mid: 18px; /* the row's top padding, 8px, plus half its first line */
+  --indent: 12px; /* from a parent's axis to its children's rows */
+  --gap: 4px;
+}
+.agents-tree.nested { margin-left: var(--axis); padding-left: var(--indent); gap: 2px; }
 .agents-tree > li:has(> .agents-tree.nested) > .agents-row::after {
   content: "";
   position: absolute;
-  left: 17px;
-  top: 28px;
+  left: var(--axis);
+  top: calc(var(--mark-mid) + 7px + var(--gap));
   bottom: -2px;
   border-left: 1px solid var(--rule-2);
   pointer-events: none;
@@ -125,19 +131,21 @@
 .agents-tree.nested > li::before {
   content: "";
   position: absolute;
-  left: -12px;
+  left: calc(-1 * var(--indent));
   top: -2px;
-  width: 17px;
-  height: calc(var(--elbow) + 2px);
+  /* to the child's mark column (its padding), less the gap */
+  width: calc(var(--indent) + 10px - var(--gap));
+  height: calc(var(--mark-mid) + 2.5px);
   border-left: 1px solid var(--rule-2);
   border-bottom: 1px solid var(--rule-2);
   border-bottom-left-radius: 6px;
+  box-sizing: border-box;
   pointer-events: none;
 }
 .agents-tree.nested > li:not(:last-child)::after {
   content: "";
   position: absolute;
-  left: -12px;
+  left: calc(-1 * var(--indent));
   top: 0;
   bottom: -2px;
   border-left: 1px solid var(--rule-2);
@@ -194,7 +202,7 @@
   font-weight: 600;
   line-height: 22px;
 }
-.detail-title .row-mark { line-height: 22px; align-self: start; height: 22px; align-items: center; }
+.detail-title .row-mark { height: 22px; --mark-line: 22px; }
 .detail-task { overflow-wrap: anywhere; }
 .detail-command { font: 500 14px/22px var(--mono); overflow-wrap: anywhere; }
 .detail-command::before { content: "$ "; color: var(--faint); }
@@ -227,8 +235,9 @@
 .agents-transcript.task-in-title .entries > .msg.user:first-child + .msg::before { top: 0; }
 
 /* How it ended, when the transcript does not say: on the same columns. */
-.agents-ending { display: grid; grid-template-columns: 14px minmax(0, 1fr); column-gap: 10px; row-gap: 4px; align-items: baseline; }
-.agents-ending-head { grid-column: 2; font-size: 12.5px; font-weight: 600; color: var(--muted); }
+.agents-ending { display: grid; grid-template-columns: 14px minmax(0, 1fr); column-gap: 10px; row-gap: 4px; align-items: start; }
+.agents-ending > .row-mark { height: 18px; --mark-line: 18px; }
+.agents-ending-head { grid-column: 2; font-size: 12.5px; line-height: 18px; font-weight: 600; color: var(--muted); }
 .agents-ending.failed .agents-ending-head { color: var(--brick); }
 .agents-ending > pre, .agents-ending > .markdown { grid-column: 2; margin: 0; }
 .agents-ending > pre { white-space: pre-wrap; overflow-wrap: anywhere; font: 12.5px/1.5 var(--mono); color: var(--muted); }

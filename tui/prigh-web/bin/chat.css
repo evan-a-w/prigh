@@ -304,9 +304,8 @@ summary:focus-visible { outline: 2px solid var(--sodium); outline-offset: 2px; b
   overflow-wrap: anywhere;
 }
 .stop.error .hint { color: var(--muted); font-size: 12.5px; }
-.stop.aborted, .stop.length { color: var(--muted); font-size: 12.5px; }
-.stop.aborted::before { content: "■ "; color: var(--brick); }
-.stop.length::before { content: "⚠ "; color: var(--sodium); }
+.stop.aborted, .stop.length { display: flex; align-items: flex-start; gap: 6px; color: var(--muted); font-size: 12.5px; line-height: 18px; }
+.stop.aborted > .mark, .stop.length > .mark { --mark-line: 18px; }
 
 /* The harness's notes (tools moved, another directory, plan mode, a
    hand-over, a goal's continuation, /review, ...): a glyph on the spine and a quiet line,
@@ -584,18 +583,13 @@ ol.results > li { min-width: 0; overflow-wrap: anywhere; }
 ol.results .title { color: var(--fg); text-decoration: none; }
 ol.results a.title:hover { text-decoration: underline; text-decoration-color: var(--sodium); text-underline-offset: 3px; }
 ol.results .url { margin-left: 8px; font: 11.5px var(--mono); color: var(--faint); }
-.tool-head > .icon {
-  width: 16px;
-  text-align: center;
-  flex-shrink: 0;
-  font-size: 12px;
-  line-height: 18px;
-}
-/* On the spine: the outcome of each call. */
-:is(.msg.assistant, .msg.shell) > .tool > .tool-head > .icon {
+.tool-head > .mark { margin: 0 1px; }
+/* On the spine: the outcome of each call, centred on the head's line. */
+:is(.msg.assistant, .msg.shell) > .tool > .tool-head > .mark {
   position: absolute;
-  left: calc(-1 * var(--gutter) - 8px + var(--spine) / 2);
-  top: 4px;
+  left: calc(-1 * var(--gutter) - 7px + var(--spine) / 2);
+  top: 6px;
+  margin: 0;
   background: var(--graphite);
   box-shadow: 0 0 0 3px var(--graphite);
 }
@@ -614,10 +608,7 @@ ol.results .url { margin-left: 8px; font: 11.5px var(--mono); color: var(--faint
   position: absolute;
   left: calc(-1 * var(--gutter) - 3.5px + var(--spine) / 2);
 }
-.tool.ok .tool-head .icon { color: var(--sage); }
-.tool.error .tool-head .icon { color: var(--brick); }
 .tool.error .tool-head .name { color: var(--brick); }
-.tool.interrupted .tool-head .icon { color: var(--faint); }
 .tool .chip {
   font: 11.5px var(--mono);
   color: var(--muted);
@@ -634,10 +625,9 @@ ol.results .url { margin-left: 8px; font: 11.5px var(--mono); color: var(--faint
 .tool-body .plan { padding: 4px 0; }
 .plan-explanation { margin: 0 0 4px; color: var(--muted); font-size: 12.5px; }
 .plan-steps { list-style: none; margin: 0; padding: 0; font-size: 13px; }
-.plan-step .mark { display: inline-block; width: 1.2em; font-family: var(--mono); }
+.plan-step { display: flex; align-items: flex-start; gap: 6px; line-height: 20px; }
+.plan-step > .mark { --mark-line: 20px; }
 .plan-step.step-done { color: var(--muted); }
-.plan-step.step-done .mark { color: var(--sage); }
-.plan-step.step-now .mark { color: var(--sodium); }
 .plan-step.step-todo .mark { color: var(--faint); }
 .tool-body .questions { margin: 2px 0; padding-left: 18px; font-size: 13px; }
 

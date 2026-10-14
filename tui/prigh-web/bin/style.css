@@ -146,6 +146,22 @@ kbd {
 
 .icon { width: 16px; height: 16px; flex-shrink: 0; }
 
+/* How something stands or ended: an icon of --mark-size centred in a box
+   as tall as the line it marks (--mark-line), coloured by the outcome. */
+.mark {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: var(--mark-size, 14px);
+  height: var(--mark-line, var(--mark-size, 14px));
+}
+.mark > .icon { width: var(--mark-size, 14px); height: var(--mark-size, 14px); stroke-width: 2.5; }
+.mark.done { color: var(--sage); }
+.mark.failed { color: var(--brick); }
+.mark.stopped, .mark.todo { color: var(--faint); }
+.mark.now, .mark.warn, .mark.picked { color: var(--sodium); }
+
 .btn {
   display: inline-flex;
   align-items: center;
@@ -689,7 +705,7 @@ kbd {
 .popup-label { font-family: var(--mono); font-size: 13px; white-space: nowrap; }
 .popup-detail, .picker-detail { color: var(--muted); font-size: 12.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
 .popup-item.dimmed, .picker-item.dimmed { opacity: 0.5; }
-.popup-item.marked .popup-label::after { content: " ✓"; color: var(--sodium); }
+.popup-item > .mark.picked { --mark-size: 13px; align-self: center; margin-left: -6px; }
 
 /* Status line */
 
@@ -773,7 +789,7 @@ kbd {
 .picker-dialog .modal-body { padding-bottom: 8px; }
 .picker-label { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .picker-detail { margin-left: auto; }
-.picker-check { color: var(--sodium); }
+.picker-check { color: var(--sodium); align-self: center; }
 .picker-empty { color: var(--muted); padding: 14px 4px; font-size: 12.5px; }
 .modal .picker-item { border-radius: var(--r-control); }
 .modal .picker-item:hover { background: var(--slate-2); }

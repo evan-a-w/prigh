@@ -44,15 +44,9 @@ module Outcome = struct
           ; Attr.create "aria-hidden" "true"
           ]
         []
-    | Done | Failed | Stopped _ ->
-      Node.span
-        ~attrs:[ Attr.class_ "agent-mark"; Attr.create "aria-hidden" "true" ]
-        [ Node.text
-            (match t with
-             | Running | Done -> "✓"
-             | Failed -> "✕"
-             | Stopped _ -> "–")
-        ]
+    | Done -> Html.mark ~cls:"done" Check
+    | Failed -> Html.mark ~cls:"failed" Cross
+    | Stopped _ -> Html.mark ~cls:"stopped" Dash
   ;;
 end
 
