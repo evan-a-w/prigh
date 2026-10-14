@@ -396,6 +396,99 @@ let%expect_test "get_tool_output: before a compaction, of another session" =
     |}]
 ;;
 
+let%expect_test "get_outline: the user's messages, compactions and errors" =
+  with_sandbox
+  @@ fun t ->
+  Eio.Switch.run
+  @@ fun sw ->
+  let session = saved t in
+  let path = Session.path session in
+  let append ?(at = 3.) m =
+    ignore (Session.append_message session ~at m : Session.Entry.t)
+  in
+  append
+    ~at:2.5
+    (Message.user
+       ~origin:
+         { Injected.empty with source = Some (Goal_start { goal = "ship it" }) }
+       "Your goal: ship it");
+  append
+    (Message.Assistant
+       { content = []
+       ; stop_reason = Error "overloaded"
+       ; usage = Usage.zero
+       ; model = "m"
+       });
+  (* Notes alone, nothing of the user's: not a landmark. *)
+  append
+    (Message.user
+       ~origin:
+         { Injected.empty with
+           notes = [ { kind = Cwd { dir = "/x" }; text = "[cwd is now /x]" } ]
+         }
+       "[cwd is now /x]");
+  append (Message.user (String.make 300 'x' ^ "\nsecond line"));
+  let c = server t ~sw in
+  let outline () =
+    Client.call c "get_outline" [ "session", `String path ]
+    |> Json.member_exn "points"
+    |> Json.list_exn
+    |> List.iter ~f:(fun p ->
+      let field name = Json.to_string (Json.member_exn name p) in
+      printf
+        "%s %s %s%s\n"
+        (field "index")
+        (field "kind")
+        (let text = Json.string_exn (Json.member_exn "text" p) in
+         if String.length text > 20
+         then
+           sprintf
+             "%S... (%d bytes)"
+             (String.prefix text 20)
+             (String.length text)
+         else sprintf "%S" text)
+        (match Json.member "at" p with
+         | Some at -> " at " ^ Json.to_string at
+         | None -> ""))
+  in
+  outline ();
+  [%expect
+    {|
+    0 "user" "turn 1" at 1000
+    4 "user" "turn 2" at 1000
+    8 "user" "turn 3" at 1000
+    12 "user" "turn 4" at 1000
+    16 "user" "turn 5" at 1000
+    20 "user" "turn 6" at 1000
+    24 "user" "turn 7" at 1000
+    28 "user" "turn 8" at 1000
+    32 "user" "turn 9" at 1000
+    36 "user" "turn 10" at 1000
+    41 "user" "Goal: ship it" at 2500
+    42 "error" "overloaded" at 3000
+    44 "user" "xxxxxxxxxxxxxxxxxxxx"... (240 bytes) at 3000
+    |}];
+  (* Compacted down to the last turn: what is before it is not there. *)
+  let kept_from =
+    List.find_map_exn (Session.entries session) ~f:(fun (e : Session.Entry.t) ->
+      match e.payload with
+      | Message (User { text = "turn 10"; _ }) -> Some e.id
+      | _ -> None)
+  in
+  ignore
+    (Session.append_compaction session ~summary:"earlier turns" ~kept_from
+     : Session.Entry.t);
+  outline ();
+  [%expect
+    {|
+    0 "compaction" ""
+    1 "user" "turn 10" at 1000
+    6 "user" "Goal: ship it" at 2500
+    7 "error" "overloaded" at 3000
+    9 "user" "xxxxxxxxxxxxxxxxxxxx"... (240 bytes) at 3000
+    |}]
+;;
+
 let%expect_test "sessions read again are cached until their file changes" =
   with_sandbox
   @@ fun t ->

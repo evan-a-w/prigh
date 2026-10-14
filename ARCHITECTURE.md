@@ -944,7 +944,7 @@ two can share one.
   `dequeue`), `cancel_subagent`, `list_subagents`,
   `get_subagent`, `get_pending`, `kill_job`, `job_output`, `list_jobs`,
   `shell`, `get_state`, `get_messages`, `get_messages_page`,
-  `get_tool_output`, `get_entries`, `set_model`, `set_thinking`, `list_models`, `compact`,
+  `get_outline`, `get_tool_output`, `get_entries`, `set_model`, `set_thinking`, `list_models`, `compact`,
   `new_session`, `switch_session`, `list_sessions`, `set_session_name`,
   `delete_session`, `delete_sessions`, `delete_archived`, `set_archived`,
   `export`, `import`, `fork`, `clone`, `rewind`,
@@ -981,6 +981,14 @@ two can share one.
   id) reads a session without opening it (the sidebar fetching ahead);
   sessions read from disk that way or evicted, and subagent logs, are
   kept (`File_cache`) while their files are unchanged.
+  `get_outline {session?}` (`Outline`) answers `{points: [{index, kind,
+  text, at?}]}`, the transcript's landmarks for a frontend that has only
+  some pages loaded: the user's messages (what they wrote, or the title of
+  their `/goal`, `/review`, `/init`; not notes alone or other messages of
+  the harness's), the compaction summary and replies that ended with an
+  error, `index` counting messages as a page's `older` does (so `limit:
+  older - index` before the first page loaded reaches one) and `text` cut
+  to 240 bytes.
   `State` carries `active_host` and `hosts` (the backend first),
   `budget_usd`, `goal` (`{text, status: active|done|stopped,
   continuations, max_continuations, summary?, reason?}` or null) and
