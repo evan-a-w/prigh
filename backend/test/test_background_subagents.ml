@@ -155,7 +155,7 @@ let%expect_test "spawning returns at once; a finished agent starts a turn" =
     assistant:  subagent{"task":"look around"}
     subagent_start a1: look around
     state: running=true subagents=[a1 running]
-    tool_result subagent: started agent a1 (look around); its result will be delivered to you when it finishes; use subagent_wait to block on it
+    tool_result subagent: started agent a1 (look around); its result will be delivered to you when it finishes: keep working or end your turn meanwhile
     assistant: started it
     agent_end
     state: running=false subagents=[a1 running]
@@ -171,7 +171,7 @@ let%expect_test "spawning returns at once; a finished agent starts a turn" =
     --- messages
     user: go
     assistant:  subagent{"task":"look around"}
-    tool_result subagent: started agent a1 (look around); its result will be delivered to you when it finishes; use subagent_wait to block on it
+    tool_result subagent: started agent a1 (look around); its result will be delivered to you when it finishes: keep working or end your turn meanwhile
     assistant: started it
     user: [subagent a1 finished] look around | child report | [subagent: 1 turns, 10 in / 5 out tokens, $0.0000]
     assistant: thanks for the report
@@ -226,8 +226,8 @@ let%expect_test "a report arriving mid-run is injected after the tool results" =
     state: running=true subagents=[a1 running]
     subagent_start a2: two
     state: running=true subagents=[a1 running; a2 running]
-    tool_result subagent: started agent a1 (one); its result will be delivered to you when it finishes; use subagent_wait to block on it
-    tool_result subagent: started agent a2 (two); its result will be delivered to you when it finishes; use subagent_wait to block on it
+    tool_result subagent: started agent a1 (one); its result will be delivered to you when it finishes: keep working or end your turn meanwhile
+    tool_result subagent: started agent a2 (two); its result will be delivered to you when it finishes: keep working or end your turn meanwhile
     subagent_end a1: ok report one | [subagent: 1 turns, 10 in / 5 out tokens, $0.0000]
     state: running=true subagents=[a1 done; a2 running]
     subagent_end a2: ok report two | [subagent: 1 turns, 10 in / 5 out tokens, $0.0000]
@@ -242,8 +242,8 @@ let%expect_test "a report arriving mid-run is injected after the tool results" =
     --- last request
     user: go
     assistant:  subagent{"task":"one"} subagent{"task":"two"}
-    tool_result subagent: started agent a1 (one); its result will be delivered to you when it finishes; use subagent_wait to block on it
-    tool_result subagent: started agent a2 (two); its result will be delivered to you when it finishes; use subagent_wait to block on it
+    tool_result subagent: started agent a1 (one); its result will be delivered to you when it finishes: keep working or end your turn meanwhile
+    tool_result subagent: started agent a2 (two); its result will be delivered to you when it finishes: keep working or end your turn meanwhile
     assistant:  hold{}
     tool_result hold: held
     user: [subagent a1 finished] one | report one | [subagent: 1 turns, 10 in / 5 out tokens, $0.0000] |  | [subagent a2 finished] two | report two | [subagent: 1 turns, 10 in / 5 out tokens, $0.0000]
@@ -301,8 +301,8 @@ let%expect_test "subagent_status, subagent_wait and subagent_cancel" =
     state: running=true subagents=[a1 running]
     subagent_start a2: slow
     state: running=true subagents=[a1 running; a2 running]
-    tool_result subagent: started agent a1 (quick); its result will be delivered to you when it finishes; use subagent_wait to block on it
-    tool_result subagent: started agent a2 (slow); its result will be delivered to you when it finishes; use subagent_wait to block on it
+    tool_result subagent: started agent a1 (quick); its result will be delivered to you when it finishes: keep working or end your turn meanwhile
+    tool_result subagent: started agent a2 (slow); its result will be delivered to you when it finishes: keep working or end your turn meanwhile
     subagent_end a1: ok quick report | [subagent: 1 turns, 10 in / 5 out tokens, $0.0000]
     state: running=true subagents=[a1 done; a2 running]
     assistant:  subagent_wait{"ids":["a1"]}
@@ -329,8 +329,8 @@ let%expect_test "subagent_status, subagent_wait and subagent_cancel" =
     --- messages
     user: go
     assistant:  subagent{"task":"quick"} subagent{"task":"slow"}
-    tool_result subagent: started agent a1 (quick); its result will be delivered to you when it finishes; use subagent_wait to block on it
-    tool_result subagent: started agent a2 (slow); its result will be delivered to you when it finishes; use subagent_wait to block on it
+    tool_result subagent: started agent a1 (quick); its result will be delivered to you when it finishes: keep working or end your turn meanwhile
+    tool_result subagent: started agent a2 (slow); its result will be delivered to you when it finishes: keep working or end your turn meanwhile
     assistant:  subagent_wait{"ids":["a1"]}
     tool_result subagent_wait: [subagent a1 finished] quick | quick report | [subagent: 1 turns, 10 in / 5 out tokens, $0.0000]
     assistant:  subagent_status{}
@@ -391,7 +391,7 @@ let%expect_test "aborting the main turn leaves subagents running" =
     assistant:  subagent{"task":"background"}
     subagent_start a1: background
     state: running=true subagents=[a1 running]
-    tool_result subagent: started agent a1 (background); its result will be delivered to you when it finishes; use subagent_wait to block on it
+    tool_result subagent: started agent a1 (background); its result will be delivered to you when it finishes: keep working or end your turn meanwhile
     ()
     assistant:
     agent_end
@@ -407,7 +407,7 @@ let%expect_test "aborting the main turn leaves subagents running" =
     --- messages
     user: go
     assistant:  subagent{"task":"background"}
-    tool_result subagent: started agent a1 (background); its result will be delivered to you when it finishes; use subagent_wait to block on it
+    tool_result subagent: started agent a1 (background); its result will be delivered to you when it finishes: keep working or end your turn meanwhile
     assistant:
     user: [subagent a1 finished] background | background report | [subagent: 1 turns, 10 in / 5 out tokens, $0.0000]
     assistant: got it after all
@@ -445,7 +445,7 @@ let%expect_test "reports ready at an abort wait for the next prompt" =
     assistant:  subagent{"task":"quick"}
     subagent_start a1: quick
     state: running=true subagents=[a1 running]
-    tool_result subagent: started agent a1 (quick); its result will be delivered to you when it finishes; use subagent_wait to block on it
+    tool_result subagent: started agent a1 (quick); its result will be delivered to you when it finishes: keep working or end your turn meanwhile
     subagent_end a1: ok quick report | [subagent: 1 turns, 10 in / 5 out tokens, $0.0000]
     state: running=true subagents=[a1 done]
     ()
@@ -488,7 +488,7 @@ let%expect_test "cancel_subagent delivers the partial report; usage rolls up" =
     assistant:  subagent{"task":"stuck"}
     subagent_start a1: stuck
     state: running=true subagents=[a1 running]
-    tool_result subagent: started agent a1 (stuck); its result will be delivered to you when it finishes; use subagent_wait to block on it
+    tool_result subagent: started agent a1 (stuck); its result will be delivered to you when it finishes: keep working or end your turn meanwhile
     assistant: waiting
     agent_end
     state: running=false subagents=[a1 running]
@@ -560,7 +560,7 @@ let%expect_test "nested subagents stay synchronous; ids continue after reload" =
     assistant:  subagent{"task":"outer"}
     subagent_start a1: outer
     state: running=true subagents=[a1 running]
-    tool_result subagent: started agent a1 (outer); its result will be delivered to you when it finishes; use subagent_wait to block on it
+    tool_result subagent: started agent a1 (outer); its result will be delivered to you when it finishes: keep working or end your turn meanwhile
     assistant: spawned
     agent_end
     state: running=false subagents=[a1 running]
@@ -576,7 +576,7 @@ let%expect_test "nested subagents stay synchronous; ids continue after reload" =
     --- messages
     user: more
     assistant:  subagent{"task":"again"}
-    tool_result subagent: started agent a2 (again); its result will be delivered to you when it finishes; use subagent_wait to block on it
+    tool_result subagent: started agent a2 (again); its result will be delivered to you when it finishes: keep working or end your turn meanwhile
     assistant: ok
     user: [subagent a2 finished] again | again report | [subagent: 1 turns, 10 in / 5 out tokens, $0.0000]
     assistant: ok
@@ -606,7 +606,7 @@ let%expect_test "new_session in a single-agent embedding drops running agents" =
     assistant:  subagent{"task":"doomed"}
     subagent_start a1: doomed
     state: running=true subagents=[a1 running]
-    tool_result subagent: started agent a1 (doomed); its result will be delivered to you when it finishes; use subagent_wait to block on it
+    tool_result subagent: started agent a1 (doomed); its result will be delivered to you when it finishes: keep working or end your turn meanwhile
     assistant: spawned
     agent_end
     state: running=false subagents=[a1 running]

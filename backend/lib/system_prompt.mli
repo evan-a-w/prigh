@@ -13,12 +13,15 @@ val read_instructions : cwd:string -> home:string -> (string * string) list
     machine; [Agent] fetches them from the session's tool host instead. [nix]
     (default false), when the tool host has Nix, adds how to get missing tools
     from nixpkgs. [skills] that the model may use are listed when it has the
-    [read] tool. *)
+    [read] tool. [auto_background] (seconds) says when a foreground command
+    is moved to the background, in the guidance on background work (given
+    when the tools include [job_wait] or [subagent_wait]). *)
 val build
   :  ?date:string
   -> ?instructions:(string * string) list
   -> ?nix:bool
   -> ?skills:Skill.t list
+  -> ?auto_background:float
   -> cwd:string
   -> home:string
   -> tools:Tool_spec.t list
