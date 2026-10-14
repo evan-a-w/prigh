@@ -279,7 +279,7 @@ let%expect_test "an agent's reads let it write; its subagents share what it saw"
     tool_result read: the user's
     assistant:  subagent{"task":"rewrite the plan"}
     state: running=true subagents=[a1 running] jobs=[]
-    tool_result subagent: started agent a1 (rewrite the plan); its result will be delivered to you when it finishes; use subagent_wait to block on it
+    tool_result subagent: started agent a1 (rewrite the plan); its result will be delivered to you when it finishes: keep working or end your turn meanwhile
     assistant:  subagent_wait{}
     state: running=true subagents=[a1 finished] jobs=[]
     state: running=true subagents=[] jobs=[]

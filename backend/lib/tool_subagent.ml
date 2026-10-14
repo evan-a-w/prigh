@@ -17,8 +17,9 @@ let background_description =
    it a subset of your tools, a different model, a working directory or extra \
    context as needed. Returns at once with the agent id; its final report \
    arrives later as a message starting with [subagent <id> finished]. Keep \
-   working or end your turn meanwhile; use subagent_wait only when you need \
-   the result before you can continue."
+   working on what does not depend on it, or end your turn: you are woken by \
+   the report. Do not block on it with subagent_wait unless you truly cannot \
+   do anything else."
 ;;
 
 let sync_description =
@@ -348,7 +349,7 @@ let create
       Tool.Result.ok
         (sprintf
            "started agent %s (%s); its result will be delivered to you when it \
-            finishes; use subagent_wait to block on it"
+            finishes: keep working or end your turn meanwhile"
            id
            (Background_tasks.short_task prepared.task))
     | _ ->
@@ -390,10 +391,15 @@ let wait_tool =
     control_spec
       ~name:"subagent_wait"
       ~description:
-        "Block until background subagents finish and return their reports \
-         (they are then not delivered again). By default waits for all of \
-         them; pass ids to pick some, all=false to return as soon as one \
-         finishes, timeout to give up after some seconds."
+        "Rarely needed: a subagent's report is delivered to you automatically \
+         when it finishes, so keep working or end your turn instead. Only when \
+         you cannot do anything useful without a result, block until \
+         background subagents finish and return their reports (they are then \
+         not delivered again). A wait returns after a limit (about 30 seconds \
+         by default) with what is still running, whose reports still arrive \
+         later. By default waits for all of them; pass ids to pick some, \
+         all=false to return as soon as one finishes, timeout to give up \
+         sooner."
       (Tool_args.schema
          [ ( "ids"
            , `Array (`Object [ "type", `String "string" ])
@@ -401,47 +407,24 @@ let wait_tool =
          ; ( "all"
            , `Boolean
            , "Wait for all of them (default) or only the first to finish" )
-         ; "timeout", `Integer, "Give up after this many seconds"
+         ; ( "timeout"
+           , `Integer
+           , "Give up after this many seconds (at most the wait limit)" )
          ])
   in
   let run (context : Tool.Context.t) args =
     let background = background_of context in
     let ids = Tool_args.string_list_opt args "ids" in
     let all = Option.value (Tool_args.bool_opt args "all") ~default:true in
-    let timeout =
-      Option.map (Tool_args.int_opt args "timeout") ~f:Float.of_int
-    in
-    let { Background_tasks.Wait_result.finished; running; timed_out } =
-      ok_or_invalid
-        (Background_tasks.wait
-           background
-           ~kind:Subagent
-           ~ids
-           ~all
-           ~timeout
-           ~cancel:context.cancel)
-    in
-    let reports = List.map finished ~f:Background_tasks.Task.report in
-    let still =
-      match running with
-      | [] -> []
-      | running ->
-        [ sprintf
-            "%sstill running: %s"
-            (if timed_out then "timed out; " else "")
-            (String.concat
-               ~sep:", "
-               (List.map running ~f:(fun job ->
-                  sprintf
-                    "%s (%s)"
-                    (Background_tasks.Task.id job)
-                    (Background_tasks.short_task
-                       (Background_tasks.Task.label job)))))
-        ]
-    in
-    match reports @ still with
-    | [] -> Tool.Result.ok "no subagents to wait for"
-    | parts -> Tool.Result.ok (String.concat ~sep:"\n\n" parts)
+    Tool.Result.ok
+      (ok_or_invalid
+         (Background_tasks.wait_text
+            background
+            ~kind:Subagent
+            ~ids
+            ~all
+            ~timeout:(Tool_args.int_opt args "timeout")
+            ~cancel:context.cancel))
   in
   { Tool.spec; run }
 ;;

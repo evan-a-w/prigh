@@ -41,10 +41,18 @@ type t =
     (** a session inactive for this long is archived (default 7; 0: never),
         see {!Session.Summary.is_archived} *)
   ; notify : Notify.t (** default [Bell] *)
+  ; auto_background_seconds : float
+    (** a foreground [bash] call of the main agent still running after this
+        long is moved to the background as a job, and [job_wait]/
+        [subagent_wait] return after at most this long (default 30; 0:
+        never, waits unbounded) *)
   }
 [@@deriving sexp_of]
 
 val default : t
+
+(** [auto_background_seconds], [None] when off. *)
+val auto_background : t -> float option
 
 (** The model for new sessions: [default_model], else the first of
     [fallback_models]. *)

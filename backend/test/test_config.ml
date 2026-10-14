@@ -15,7 +15,8 @@ let%expect_test "a missing file yields the default" =
       (permissions ((allow ()) (ask ()) (deny ()))) (default_model ())
       (default_thinking ()) (fallback_models ()) (default_cwd ())
       (max_budget_usd ()) (goal_max_continuations 20)
-      (resume_on_limit_reset true) (archive_after_days 7) (notify Bell)))
+      (resume_on_limit_reset true) (archive_after_days 7) (notify Bell)
+      (auto_background_seconds 30)))
     |}]
 ;;
 
@@ -35,6 +36,7 @@ let%expect_test "save then load round trips" =
     ; resume_on_limit_reset = true
     ; archive_after_days = 7.
     ; notify = Bell
+    ; auto_background_seconds = 30.
     }
   in
   print_s [%sexp (Config.save ~home:t.dir config : unit Or_error.t)];
@@ -57,7 +59,8 @@ let%expect_test "save then load round trips" =
       "goal_max_continuations": 20,
       "resume_on_limit_reset": true,
       "archive_after_days": 7,
-      "notify": "bell"
+      "notify": "bell",
+      "auto_background_seconds": 30
     }
     (Ok
      ((scoped_models (anthropic/claude-fable-5 deepseek-v4-pro))
@@ -65,7 +68,7 @@ let%expect_test "save then load round trips" =
       (default_model (anthropic/claude-fable-5)) (default_thinking ((On (High))))
       (fallback_models ()) (default_cwd ()) (max_budget_usd ())
       (goal_max_continuations 20) (resume_on_limit_reset true)
-      (archive_after_days 7) (notify Bell)))
+      (archive_after_days 7) (notify Bell) (auto_background_seconds 30)))
     |}]
 ;;
 
@@ -84,7 +87,8 @@ let%expect_test "unknown fields are ignored" =
       (permissions ((allow ()) (ask ()) (deny ()))) (default_model ())
       (default_thinking ()) (fallback_models ()) (default_cwd ())
       (max_budget_usd ()) (goal_max_continuations 20)
-      (resume_on_limit_reset true) (archive_after_days 7) (notify Bell)))
+      (resume_on_limit_reset true) (archive_after_days 7) (notify Bell)
+      (auto_background_seconds 30)))
     |}]
 ;;
 
@@ -137,7 +141,7 @@ let%expect_test
     {|
     config.confirm_tools must be a boolean (in $DIR/.prigh/config.json); prigh ignores the file's settings until it is fixed
     unknown setting "providrs" in $DIR/.prigh/config.json is ignored; did you mean "providers"?
-    unknown setting "colour" in $DIR/.prigh/config.json is ignored (known: providers, confirm_tools, scoped_models, approval_mode, permissions, default_model, default_thinking, fallback_models, default_cwd, max_budget_usd, goal_max_continuations, resume_on_limit_reset, archive_after_days, notify)
+    unknown setting "colour" in $DIR/.prigh/config.json is ignored (known: providers, confirm_tools, scoped_models, approval_mode, permissions, default_model, default_thinking, fallback_models, default_cwd, max_budget_usd, goal_max_continuations, resume_on_limit_reset, archive_after_days, notify, auto_background_seconds)
     |}];
   show {|{"archive_after_days": "a week"}|};
   show {|{"archive_after_days": -1}|};
@@ -172,14 +176,15 @@ let%expect_test "null defaults are unset" =
       (permissions ((allow ()) (ask ()) (deny ()))) (default_model ())
       (default_thinking ()) (fallback_models ()) (default_cwd ())
       (max_budget_usd ()) (goal_max_continuations 20)
-      (resume_on_limit_reset true) (archive_after_days 7) (notify Bell)))
+      (resume_on_limit_reset true) (archive_after_days 7) (notify Bell)
+      (auto_background_seconds 30)))
     (Ok
      ((scoped_models ()) (approval_mode Auto)
       (permissions ((allow ()) (ask ()) (deny ())))
       (default_model (deepseek/deepseek-flash)) (default_thinking ((On ())))
       (fallback_models ()) (default_cwd ()) (max_budget_usd ())
       (goal_max_continuations 20) (resume_on_limit_reset true)
-      (archive_after_days 7) (notify Bell)))
+      (archive_after_days 7) (notify Bell) (auto_background_seconds 30)))
     |}]
 ;;
 

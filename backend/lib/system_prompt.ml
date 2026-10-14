@@ -24,7 +24,7 @@ let instruction_files ~cwd ~home =
   Option.to_list global @ project
 ;;
 
-let base ~nix ~tools =
+let base ~nix ~auto_background ~tools =
   let tool_list =
     String.concat
       ~sep:"\n"
@@ -52,33 +52,51 @@ let base ~nix ~tools =
      ; "- Ask before destructive or irreversible actions."
      ; ""
      ]
-     @ (if has "subagent_wait"
+     @ (if has "subagent_wait" || has "job_wait"
         then
-          [ "Subagents run in the background: subagent returns at once, and \
-             each one's final report arrives later as a message starting with \
-             \"[subagent <id> finished]\" (or failed), sent automatically, not \
-             typed by the user. While they run, keep working on whatever does \
-             not depend on them, or end your turn: you are woken by each \
-             report, so never call subagent_wait (or job_wait) just to pass \
-             the time or to collect results you could take as they arrive. \
-             Wait only when you cannot do anything useful without a result, \
-             and then wait for that one (ids, all=false), not all of them."
-          ; ""
-          ]
-        else [])
-     @ (if has "job_wait"
-        then
-          [ "Commands that may take more than about a minute (builds, test \
-             suites, image builds, deployments, servers, watchers) belong in \
-             the background: run them with bash background: true, then \
-             continue with other useful work or end your turn. When one exits, \
-             its status and output tail arrive automatically in a message \
-             starting with \"[job <id> exited <code>]\" (or killed, failed). \
-             Never poll with sleep loops; if you truly need the result before \
-             continuing, use job_wait. Run long-running servers as background \
-             jobs and stop them with job_kill when done."
-          ; ""
-          ]
+          [ "Background work: almost never block on it." ]
+          @ (if has "job_wait"
+             then
+               [ "- Commands that may take long (builds, test suites, \
+                  installs, image builds, deployments) or that keep running \
+                  (servers, watchers) go in the background: bash with \
+                  background: true, then continue with other useful work or \
+                  end your turn. Stop servers with job_kill when done."
+               ]
+               @ Option.value_map auto_background ~default:[] ~f:(fun s ->
+                 [ sprintf
+                     "- A foreground bash command still running after %s is \
+                      moved to the background automatically (it keeps running \
+                      as a job, not restarted), so a long command never stalls \
+                      you: you get its job id and output so far at once."
+                     (Background_tasks.seconds_text s)
+                 ])
+             else [])
+          @ (if has "subagent_wait"
+             then
+               [ "- Subagents always run in the background: subagent returns \
+                  at once with the agent id."
+               ]
+             else [])
+          @ [ "- Each finished job or subagent reports automatically, in a \
+               message starting with \"[job <id> exited <code>]\" (or killed, \
+               failed) or \"[subagent <id> finished]\" (or failed), sent by \
+               prigh, not typed by the user. You are woken by it even after \
+               you end your turn."
+            ; sprintf
+                "- So while they run, keep working on whatever does not depend \
+                 on them, or end your turn. Do not call job_wait or \
+                 subagent_wait to pass the time, to collect results you could \
+                 take as they arrive, or to poll; never poll with sleep \
+                 loops.%s Wait only when you truly cannot do anything useful \
+                 without one result, and then wait for that one (ids, \
+                 all=false)."
+                (Option.value_map auto_background ~default:"" ~f:(fun s ->
+                   sprintf
+                     " A wait returns after %s anyway."
+                     (Background_tasks.seconds_text s)))
+            ; ""
+            ]
         else [])
      @ (if nix
         then
@@ -104,7 +122,16 @@ let read_instructions ~cwd ~home =
     path, String.strip (In_channel.read_all path))
 ;;
 
-let build ?date ?instructions ?(nix = false) ?(skills = []) ~cwd ~home ~tools ()
+let build
+      ?date
+      ?instructions
+      ?(nix = false)
+      ?(skills = [])
+      ?auto_background
+      ~cwd
+      ~home
+      ~tools
+      ()
   =
   let date =
     match date with
@@ -135,7 +162,10 @@ let build ?date ?instructions ?(nix = false) ?(skills = []) ~cwd ~home ~tools ()
   in
   String.concat
     ~sep:"\n\n"
-    ([ base ~nix ~tools ] @ skills @ [ environment ] @ instructions)
+    ([ base ~nix ~auto_background ~tools ]
+     @ skills
+     @ [ environment ]
+     @ instructions)
 ;;
 
 let discretion =
