@@ -182,28 +182,27 @@ sleep 1; echo built
 built
 === chromium: a nested subagent ===
 Subagent a1/n1
-Show in chat
+There are 3 files.
+<TIME>
 Survey the project
 ›
 ✓
 Count the files
-Done deepseek-flash  1 turn  $<COST>
-There are 3 files.
-<TIME>
+Show in chat
+Done
+deepseek-flash  1 turn  $<COST>
 the nested card is in view in the chat
 === chromium: a background job ===
 Job j1
-✓
-sleep 1; echo built
-Done <T> 6 B
 built
 Output, lines 1-1 of 1
+✓
+sleep 1; echo built
+Done
+<T>
+6 B
 === chromium: a card opens its agent ===
 Subagent a1
-Show in chat
-✓
-Survey the project
-Done deepseek-flash  2 turns  1 tool call  $<COST>
 Its subagents
 1
 ✓
@@ -221,6 +220,19 @@ Transcript
 2 messages
 The survey: 3 files.
 <TIME>
+✓
+Survey the project
+Show in chat
+Done
+deepseek-flash  2 turns  1 tool call  $<COST>
+=== chromium: the agent's footer stays in sight ===
+at the top: scrolls true, footer at the panel's foot true, under the transcript true
+at the end: scrolls true, footer at the panel's foot true, under the transcript true
+✓
+Survey the project
+Show in chat
+Done
+deepseek-flash  2 turns  1 tool call  $<COST>
 === chromium: a shell in the terminal panel ===
 <HOSTNAME>
 <CWD>
@@ -801,6 +813,28 @@ loaded whole: 2000 lines
 === chromium: paging: reloaded ===
 steps 1 to 40 (40)
 step 5 at the same place: true
+=== chromium: paging: jump: the rail ===
+steps 26 to 40 (15)
+marks: 40, not loaded: 25
+button: Jump to a message
+the one in view: Step 39
+along the chat's right edge: true
+=== chromium: paging: jump: a mark's tooltip ===
+Step 30: look at module 30. | <TIME>
+=== chromium: paging: jump: to a loaded message ===
+step 30 at the top, marked: true
+the one in view: Step 30
+=== chromium: paging: jump: to a message not loaded ===
+steps 1 to 40 (40)
+not loaded: 0
+the one in view: Step 3
+=== chromium: paging: jump: the list ===
+Step 40: look at module 40. | 40 of 40 <TIME>
+Step 17: look at module 17. | 17 of 40 <TIME>
+step 17 at the top
+=== chromium: paging: jump: on a phone ===
+marks: 0
+the list: 40 messages
 === chromium: paging: errors ===
 none
 === firefox: sign-in page ===
@@ -987,28 +1021,27 @@ sleep 1; echo built
 built
 === firefox: a nested subagent ===
 Subagent a1/n1
-Show in chat
+There are 3 files.
+<TIME>
 Survey the project
 ›
 ✓
 Count the files
-Done deepseek-flash  1 turn  $<COST>
-There are 3 files.
-<TIME>
+Show in chat
+Done
+deepseek-flash  1 turn  $<COST>
 the nested card is in view in the chat
 === firefox: a background job ===
 Job j1
-✓
-sleep 1; echo built
-Done <T> 6 B
 built
 Output, lines 1-1 of 1
+✓
+sleep 1; echo built
+Done
+<T>
+6 B
 === firefox: a card opens its agent ===
 Subagent a1
-Show in chat
-✓
-Survey the project
-Done deepseek-flash  2 turns  1 tool call  $<COST>
 Its subagents
 1
 ✓
@@ -1026,6 +1059,19 @@ Transcript
 2 messages
 The survey: 3 files.
 <TIME>
+✓
+Survey the project
+Show in chat
+Done
+deepseek-flash  2 turns  1 tool call  $<COST>
+=== firefox: the agent's footer stays in sight ===
+at the top: scrolls true, footer at the panel's foot true, under the transcript true
+at the end: scrolls true, footer at the panel's foot true, under the transcript true
+✓
+Survey the project
+Show in chat
+Done
+deepseek-flash  2 turns  1 tool call  $<COST>
 === firefox: a shell in the terminal panel ===
 <HOSTNAME>
 <CWD>
@@ -1606,5 +1652,27 @@ loaded whole: 2000 lines
 === firefox: paging: reloaded ===
 steps 1 to 40 (40)
 step 5 at the same place: true
+=== firefox: paging: jump: the rail ===
+steps 26 to 40 (15)
+marks: 40, not loaded: 25
+button: Jump to a message
+the one in view: Step 39
+along the chat's right edge: true
+=== firefox: paging: jump: a mark's tooltip ===
+Step 30: look at module 30. | <TIME>
+=== firefox: paging: jump: to a loaded message ===
+step 30 at the top, marked: true
+the one in view: Step 30
+=== firefox: paging: jump: to a message not loaded ===
+steps 1 to 40 (40)
+not loaded: 0
+the one in view: Step 3
+=== firefox: paging: jump: the list ===
+Step 40: look at module 40. | 40 of 40 <TIME>
+Step 17: look at module 17. | 17 of 40 <TIME>
+step 17 at the top
+=== firefox: paging: jump: on a phone ===
+marks: 0
+the list: 40 messages
 === firefox: paging: errors ===
 none
