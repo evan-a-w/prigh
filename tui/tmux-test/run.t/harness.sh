@@ -230,6 +230,35 @@ scenario_tools() {
 	capture tools "main again"
 }
 
+# A foreground bash call outlasting auto_background_seconds becomes a job:
+# the card shows it, the turn goes on, and the exit report starts a turn.
+setup_auto_background() {
+	extra_args="-- -faux-script $tmp/script.json"
+	mkdir -p "$tmp/home/.prigh"
+	echo '{"auto_background_seconds": 1}' >"$tmp/home/.prigh/config.json"
+	cat >"$tmp/script.json" <<'JSON'
+[
+  {"text": "building", "tool_calls": [{"id": "c1", "name": "bash", "arguments": {"command": "echo compiling; while [ ! -f gate ]; do sleep 0.05; done; echo linked"}}]},
+  {"text": "carrying on meanwhile"},
+  {"text": "the build finished"}
+]
+JSON
+}
+
+scenario_auto_background() {
+	wait_for "Ctrl+C"
+	type_text "build it"
+	keys Enter
+	wait_for "carrying on meanwhile"
+	# The jobs spinner never settles.
+	sleep 1
+	capture auto_background "moved to the background"
+	touch "$tmp/cwd/gate"
+	wait_for "the build finished"
+	settle
+	capture auto_background "its report"
+}
+
 setup_suspend() { interactive=1; }
 
 scenario_suspend() {

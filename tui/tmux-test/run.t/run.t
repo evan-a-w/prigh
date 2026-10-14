@@ -631,3 +631,30 @@ prints the captured panes.
   ────────────────────────────────────────────────────────────────────────────────────────────────────
   >
   $TMP/cwd  deepseek-flash  think:on  mode:ask  view:normal  ctx:0.0%/1.0M  $0.00
+  $ bash ./harness.sh auto_background
+  === moved to the background
+    prigh in $TMP/cwd · /help · Esc aborts · Ctrl+C twice quits
+  
+  ▌ build it
+    building
+  ✓ bash $ echo compiling; while [ ! -f gate ]; do sleep 0.0…  job j1 moved to the background after 1s
+      compiling
+    carrying on meanwhile
+  ────────────────────────────────────────────────────────────────────────────────────────────────────
+  >
+  $TMP/cwd  deepseek-flash  think:on  mode:auto  ctx:0.0%/1.0M  $0.00  jobs:1 <spin>
+  === its report
+    prigh in $TMP/cwd · /help · Esc aborts · Ctrl+C twice quits
+  
+  ▌ build it
+    building
+  ✓ bash $ echo compiling; while [ ! -f gate ]; do sleep 0.0…  job j1 moved to the background after 1s
+      compiling
+    carrying on meanwhile
+  ↩ job j1 "echo compiling; while [ ! -f gate ]; do sleep 0.05; done; e…"  exited 0
+      compiling
+      linked
+    the build finished
+  ────────────────────────────────────────────────────────────────────────────────────────────────────
+  >
+  $TMP/cwd  deepseek-flash  think:on  mode:auto  view:normal  ctx:0.0%/1.0M  $0.00
