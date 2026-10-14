@@ -31,6 +31,7 @@ let methods =
   ; "get_state"
   ; "get_messages"
   ; "get_messages_page"
+  ; "get_outline"
   ; "get_tool_output"
   ; "get_entries"
   ; "set_model"
@@ -724,6 +725,16 @@ let messages_page t (client : Client.t) params =
   Message_page.to_json page
 ;;
 
+let outline t (client : Client.t) params =
+  let open Or_error.Let_syntax in
+  let%map session =
+    match%bind string_param_opt params "session" with
+    | None -> Ok (Agent.session client.agent)
+    | Some key -> session_to_read t key
+  in
+  Outline.to_json (Outline.create (Session.identified_messages session))
+;;
+
 (* Searches the whole session file, so that outputs from before a
    compaction or on an abandoned branch are found too. *)
 let tool_output t (client : Client.t) params =
@@ -1321,6 +1332,7 @@ let dispatch_server t (client : Client.t) ~meth ~params
            attached_state client)))
   | "list_sessions" -> Some (ok (list_sessions t client))
   | "get_messages_page" -> Some (messages_page t client params)
+  | "get_outline" -> Some (outline t client params)
   | "get_tool_output" -> Some (tool_output t client params)
   | "delete_session" ->
     Some
