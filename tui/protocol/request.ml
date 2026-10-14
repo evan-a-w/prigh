@@ -27,6 +27,7 @@ module Method = struct
         ; from : string option
         ; limit : int
         }
+    | Get_outline of { session : string }
     | Get_tool_output of
         { call_id : string
         ; agent_id : string option
@@ -46,6 +47,7 @@ module Method = struct
     | Delete_sessions _ -> "delete_sessions"
     | Delete_archived -> "delete_archived"
     | Get_messages_page _ -> "get_messages_page"
+    | Get_outline _ -> "get_outline"
     | Get_tool_output _ -> "get_tool_output"
     | Change_dir { target = Cwd; _ } -> "set_cwd"
     | Change_dir { target = Host _; _ } -> "set_active_host"
@@ -65,6 +67,7 @@ module Method = struct
         [ "before", Json.str b ])
       @ Option.value_map from ~default:[] ~f:(fun f -> [ "from", Json.str f ])
       @ [ "limit", Json.int limit ]
+    | Get_outline { session } -> [ "session", Json.str session ]
     | Get_tool_output { call_id; agent_id } ->
       [ "call_id", Json.str call_id ]
       @ Option.value_map agent_id ~default:[] ~f:(fun a ->

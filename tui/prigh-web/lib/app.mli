@@ -62,6 +62,7 @@ module Reply_tag : sig
         { agent_id : string option
         ; call_id : string
         }
+    | Outline of string (** [get_outline] of this session's path *)
     | Pending
     | Sent of
         { text : string
@@ -179,6 +180,9 @@ module Command : sig
     | Scroll_chat of int (** by pages *)
     | Jump_to_user_message of int
     (** the previous ([-1]) or next ([1]) user message in view *)
+    | Scroll_to_entry of int
+    (** the main chat to this entry ([Jump.Target.Entry]), once rendered,
+        marking it for a moment *)
     | Scroll_to_bottom (** and follow new output again *)
     | Focus_terminal (** the terminal panel's shell, once mounted *)
     | Remember_terminal of bool
@@ -350,6 +354,13 @@ module Action : sig
     | Retry_connection
     | Scroll_chat of int
     | Jump_to_user_message of int
+    | Jump_to of Jump.Target.t
+    (** a landmark of the transcript (the rail or the jump list), loading the
+        pages down to it first when it is not loaded *)
+    | Jump_older
+    (** from the page: Ctrl+↑ found none of the user's messages above, the
+        previous one is not loaded *)
+    | Open_jump_list (** Ctrl+J: the user's messages, a picker *)
     | Chat_scrolled of { at_bottom : bool }
     (** from the page: the user scrolled the chat away from (or back to) its
         end *)
@@ -429,6 +440,7 @@ module Model : sig
     ; layout : Resize.t (** the panels' sizes *)
     ; paging : Paging.t (** how much of the transcript is loaded *)
     ; chat_cache : Chat_cache.t
+    ; jump : Jump.t
     ; outputs_loading : String.Set.t
     (** [Fold] keys of elided outputs being fetched whole *)
     ; session_gone : string option

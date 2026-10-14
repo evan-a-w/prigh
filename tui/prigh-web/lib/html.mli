@@ -75,6 +75,7 @@ module Icon : sig
     | Warning
     | Next
     | Ring
+    | Toc
 
   (** An inline SVG; tests show [<icon name>]. *)
   val view : ?cls:string -> t -> Node.t

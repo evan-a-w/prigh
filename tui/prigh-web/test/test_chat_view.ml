@@ -37,7 +37,7 @@ let%expect_test "user messages: text, pasted images" =
   [%expect
     {|
     <div class="entries">
-      <div class="msg user">
+      <div data-entry="0" class="msg user">
         <div class="images">
           <details class="image">
             <summary title="[image: image/png, 8 B]">
@@ -52,7 +52,7 @@ let%expect_test "user messages: text, pasted images" =
         </div>
         <div dir="auto" class="bubble"> Give me a tour of the project. </div>
       </div>
-      <div class="msg user">
+      <div data-entry="1" class="msg user">
         <div dir="auto" class="bubble"> line one
     line two </div>
       </div>
@@ -201,7 +201,7 @@ let%expect_test "how a reply stopped: error, interrupted, length" =
   [%expect
     {|
     <div class="entries">
-      <div class="assistant msg">
+      <div data-entry="0" class="assistant msg">
         <div class="error stop">
           <span class="title"> The model returned an error </span>
           <div class="detail"> 429 rate limited: try again in 20s </div>
@@ -277,14 +277,14 @@ let%expect_test
   Chat_harness.show ~selector:".msg.user" chat;
   [%expect
     {|
-    <div class="msg user">
+    <div data-entry="0" class="msg user">
       <div dir="auto" class="bubble"> New year's eve </div>
       <time title="Wednesday 31 December 2025, 23:59:00" datetime="2025-12-31T21:59:00Z" class="time"> 31 Dec 2025 23:59 </time>
     </div>
-    <div class="msg user">
+    <div data-entry="2" class="msg user">
       <div dir="auto" class="bubble"> Written before sessions kept times </div>
     </div>
-    <div class="msg user">
+    <div data-entry="3" class="msg user">
       <div dir="auto" class="bubble"> Saturday </div>
       <time title="Saturday 3 October 2026, 12:00:00" datetime="2026-10-03T10:00:00Z" class="time"> 3 Oct 12:00 </time>
     </div>
@@ -448,7 +448,7 @@ let%expect_test "compaction" =
   [%expect
     {|
     <div class="entries">
-      <details class="compaction msg">
+      <details data-entry="0" class="compaction msg">
         <summary>
           <span class="label"> Context compacted </span>
           <span class="preview"> Goal </span>

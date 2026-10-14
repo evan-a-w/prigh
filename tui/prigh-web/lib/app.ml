@@ -53,6 +53,7 @@ module Reply_tag = struct
         { agent_id : string option
         ; call_id : string
         }
+    | Outline of string
     | Pending
     | Sent of
         { text : string
@@ -157,6 +158,7 @@ module Command = struct
     | Add_account
     | Scroll_chat of int
     | Jump_to_user_message of int
+    | Scroll_to_entry of int
     | Scroll_to_bottom
     | Focus_terminal
     | Remember_terminal of bool
@@ -319,6 +321,9 @@ module Action = struct
     | Retry_connection
     | Scroll_chat of int
     | Jump_to_user_message of int
+    | Jump_to of Jump.Target.t
+    | Jump_older
+    | Open_jump_list
     | Chat_scrolled of { at_bottom : bool }
     | Jump_to_bottom
     | Run of string
@@ -388,6 +393,7 @@ module Model = struct
     ; layout : Resize.t
     ; paging : Paging.t
     ; chat_cache : Chat_cache.t
+    ; jump : Jump.t
     ; outputs_loading : String.Set.t (** [Fold] keys *)
     ; session_gone : string option
       (** reconnected to a backend that no longer has this session: its
@@ -506,6 +512,7 @@ let init =
   ; layout = Resize.empty
   ; paging = Paging.all
   ; chat_cache = Chat_cache.empty
+  ; jump = Jump.empty
   ; outputs_loading = String.Set.empty
   ; session_gone = None
   }
@@ -757,6 +764,7 @@ let set_state_without_files (m : Model.t) (state : State.t) =
            | None -> Chat.set_running Chat.empty state.running)
       ; paging =
           Option.value_map cached ~default:Paging.all ~f:(fun c -> c.paging)
+      ; jump = Jump.empty
       ; outputs_loading = String.Set.empty
       ; folds = String.Set.empty
       ; confirms = []
@@ -2246,6 +2254,7 @@ let user_switched (m : Model.t) (hello : Hello_reply.t) =
     ; chat = Chat.empty
     ; paging = Paging.all
     ; chat_cache = Chat_cache.empty
+    ; jump = Jump.empty
     ; sessions = []
     ; marks = Session_marks.empty
     ; session_query = ""
@@ -2928,6 +2937,61 @@ let newest_page (m : Model.t) path (page : Message_page.t) =
         @ prefetch ))
 ;;
 
+(* ---- jumping around the transcript *)
+
+(* For the pages not loaded, whenever some are not. *)
+let fetch_outline (m : Model.t) =
+  match session_path m with
+  | Some path
+    when m.paging.older > 0
+         && (not (Option.equal String.equal m.jump.fetching (Some path)))
+         && not
+              (Option.exists m.jump.outline ~f:(fun (of_, _) ->
+                 String.equal of_ path)) ->
+    ( { m with jump = { m.jump with fetching = Some path } }
+    , [ call (Get_outline { session = path }) ~tag:(Outline path) ] )
+  | _ -> m, []
+;;
+
+let jump_points (m : Model.t) =
+  Jump.points m.jump ~path:(session_path m) ~paging:m.paging m.chat
+;;
+
+let no_jump (m : Model.t) = { m with jump = { m.jump with pending = None } }
+
+(* A message not loaded: the pages from it down to those loaded, in one go,
+   then there. While a page is on its way, once it is in. *)
+let jump_to (m : Model.t) (target : Jump.Target.t) =
+  match target, session_path m, m.paging.before with
+  | Entry n, _, _ -> no_jump m, [ Command.Scroll_to_entry n ]
+  | Message index, Some path, Some before when index < m.paging.older ->
+    let m = { m with jump = { m.jump with pending = Some index } } in
+    if m.paging.loading
+    then m, []
+    else
+      ( { m with paging = { m.paging with loading = true } }
+      , [ call
+            (Get_messages_page
+               { session = path
+               ; before = Some before
+               ; from = None
+               ; limit = m.paging.older - index
+               })
+            ~tag:(Page { path; before = Some before })
+        ] )
+  | Message _, _, _ -> no_jump m, []
+;;
+
+(* An older page is in: there, if it was what a jump waited for. *)
+let continue_jump (m : Model.t) (page : Message_page.t) =
+  match m.jump.pending with
+  | None -> m, []
+  | Some index ->
+    (match Jump.entry_of_index ~page ~first:(Chat.first m.chat) index with
+     | Some n -> no_jump m, [ Command.Scroll_to_entry n ]
+     | None -> jump_to m (Message index))
+;;
+
 let older_page (m : Model.t) path ~before (page : Message_page.t) =
   if
     is_current m path
@@ -2936,10 +3000,14 @@ let older_page (m : Model.t) path ~before (page : Message_page.t) =
   then (
     let loaded = String.Set.of_list (Chat.subagents_to_load m.chat) in
     let chat = Chat.prepend m.chat page.messages in
-    ( { m with chat; paging = Paging.of_page page }
-    , Command.Keep_scroll_position
-      :: List.filter_map (Chat.subagents_to_load chat) ~f:(fun call_id ->
-        Option.some_if (not (Set.mem loaded call_id)) (subagent_rpc call_id)) ))
+    let m, jump =
+      continue_jump { m with chat; paging = Paging.of_page page } page
+    in
+    ( m
+    , (Command.Keep_scroll_position
+       :: List.filter_map (Chat.subagents_to_load chat) ~f:(fun call_id ->
+         Option.some_if (not (Set.mem loaded call_id)) (subagent_rpc call_id)))
+      @ jump ))
   else m, []
 ;;
 
@@ -2949,6 +3017,20 @@ let load_older (m : Model.t) =
     ( { m with paging = { m.paging with loading = true } }
     , [ page_rpc path ~before:(Some before) ] )
   | _ -> m, []
+;;
+
+(* Ctrl+↑ above the first of the user's messages loaded: the one before it,
+   loading it; without the outline, the page before. *)
+let jump_older (m : Model.t) =
+  match
+    List.rev (jump_points m)
+    |> List.find ~f:(fun (p : Jump.Point.t) ->
+      match p.target, p.kind with
+      | Message _, User -> true
+      | _ -> false)
+  with
+  | Some p -> jump_to m p.target
+  | None -> load_older m
 ;;
 
 let prefetch_session (m : Model.t) path =
@@ -3169,13 +3251,19 @@ let rec reply_to (m : Model.t) (tag : Reply_tag.t) result =
       in
       (* The session was still loading when the connection went. *)
       let loading = m.pending.messages in
-      ( { m with
-          chat
-        ; paging = Paging.of_page page
-        ; pending = { m.pending with messages = false }
-        }
+      let m, outline =
+        fetch_outline
+          { m with
+            chat
+          ; paging = Paging.of_page page
+          ; pending = { m.pending with messages = false }
+          ; jump = Jump.empty
+          }
+      in
+      ( m
       , (if loading then [ Command.Scroll_to_bottom ] else [])
-        @ List.map (Chat.subagents_to_load chat) ~f:subagent_rpc ))
+        @ List.map (Chat.subagents_to_load chat) ~f:subagent_rpc
+        @ outline ))
   | Resync _, Error "backend closed" -> m, []
   (* What was on show is not in the session any more (rewound meanwhile):
      its newest page instead. *)
@@ -3359,7 +3447,7 @@ let rec reply_to (m : Model.t) (tag : Reply_tag.t) result =
     { m with chat_cache = Chat_cache.set_loading m.chat_cache path false }, []
   | Page { path; before = Some _ }, Error "backend closed"
     when is_current m path ->
-    { m with paging = { m.paging with loading = false } }, []
+    no_jump { m with paging = { m.paging with loading = false } }, []
   | Page { path; before = None }, Error e ->
     let m =
       { m with chat_cache = Chat_cache.set_loading m.chat_cache path false }
@@ -3380,10 +3468,11 @@ let rec reply_to (m : Model.t) (tag : Reply_tag.t) result =
     ->
     let m, fetch =
       fetch_newest
-        { m with
-          paging = { m.paging with loading = false }
-        ; chat_cache = Chat_cache.remove m.chat_cache path
-        }
+        (no_jump
+           { m with
+             paging = { m.paging with loading = false }
+           ; chat_cache = Chat_cache.remove m.chat_cache path
+           })
         path
     in
     let m, toast_cmds =
@@ -3392,7 +3481,7 @@ let rec reply_to (m : Model.t) (tag : Reply_tag.t) result =
     m, fetch @ toast_cmds
   | Page { path; before = Some _ }, Error e when is_current m path ->
     error
-      { m with paging = { m.paging with loading = false } }
+      (no_jump { m with paging = { m.paging with loading = false } })
       (sprintf "Couldn't load earlier messages: %s. Scroll up to try again." e)
   | Tool_output { agent_id; call_id }, Error e ->
     error
@@ -3410,6 +3499,13 @@ let rec reply_to (m : Model.t) (tag : Reply_tag.t) result =
       { m with pending = { m.pending with thinking = None } }
       (String.capitalize e)
   (* The connection went with the call: the banner says so. *)
+  (* Only the older pages' landmarks are missing (from an older backend
+     too). *)
+  | Outline path, Error _ ->
+    ( (if Option.equal String.equal m.jump.fetching (Some path)
+       then { m with jump = { m.jump with fetching = None } }
+       else m)
+    , [] )
   | _, Error "backend closed" -> m, []
   | _, Error e -> error m (String.capitalize e)
   | Sent _, Ok _ ->
@@ -3431,18 +3527,30 @@ let rec reply_to (m : Model.t) (tag : Reply_tag.t) result =
   | Reload_state, Ok json ->
     (match field json "state" with
      | Some state ->
-       decode
-         m
-         state
-         State.of_json
-         ~f:(fun state ->
-           if superseded m state
-           then m, []
-           else
-             set_state { m with pending = { m.pending with session = None } } state)
+       decode m state State.of_json ~f:(fun state ->
+         if superseded m state
+         then m, []
+         else
+           set_state
+             { m with pending = { m.pending with session = None } }
+             state)
      | None -> m, [ rpc "get_state" [] ~tag:State ])
   | Page { path; before = None }, Ok json ->
-    decode m json Message_page.of_json ~f:(newest_page m path)
+    decode m json Message_page.of_json ~f:(fun page ->
+      let m, cmds = newest_page m path page in
+      let m, outline = if is_current m path then fetch_outline m else m, [] in
+      m, cmds @ outline)
+  | Outline path, Ok json ->
+    let m =
+      if Option.equal String.equal m.jump.fetching (Some path)
+      then { m with jump = { m.jump with fetching = None } }
+      else m
+    in
+    if is_current m path
+    then
+      decode m json Outline.of_json ~f:(fun outline ->
+        { m with jump = { m.jump with outline = Some (path, outline) } }, [])
+    else m, []
   | Page { path; before = Some before }, Ok json ->
     decode m json Message_page.of_json ~f:(older_page m path ~before)
   | Tool_output { agent_id; call_id }, Ok json ->
@@ -3883,6 +3991,10 @@ let event (m : Model.t) (e : Event.t) =
          (* The session starts at the summary now: nothing older to load. *)
          | Compacted _ -> Paging.all
          | _ -> m.paging)
+    ; jump =
+        (match e with
+         | Compacted _ -> Jump.empty
+         | _ -> m.jump)
     }
   in
   let m, cmds = main_event m e in
@@ -4117,6 +4229,10 @@ let picker_accept (m : Model.t) ~kind (item : Picker.Item.t) =
     | Accounts -> account_chosen m item.id
     | Skills -> edit m ("/skill:" ^ item.id ^ " ")
     | Mcp l -> mcp_chosen m l item.id
+    | Jump ->
+      (match Jump.Target.of_string item.id with
+       | Some target -> jump_to m target
+       | None -> m, [])
   in
   m, (if Option.is_none m.dialog then [ focus_editor ] else []) @ cmds
 ;;
@@ -4524,6 +4640,20 @@ let update (m : Model.t) (action : Action.t) =
   | Chat_scrolled { at_bottom } -> { m with scrolled_up = not at_bottom }, []
   | Jump_to_bottom -> to_bottom m
   | Jump_to_user_message dir -> m, [ Command.Jump_to_user_message dir ]
+  | Jump_to target -> jump_to m target
+  | Jump_older -> jump_older m
+  | Open_jump_list ->
+    (match jump_points m with
+     | points
+       when List.exists points ~f:(fun (p : Jump.Point.t) ->
+              Outline.Kind.equal p.kind User) ->
+       open_picker
+         m
+         (Picker
+            { kind = Jump
+            ; picker = Jump.picker points ~times:(Model.message_time m)
+            })
+     | _ -> toast m "No messages of yours to jump to yet: send one first")
   | Run command ->
     (match Slash.parse command with
      | Some parsed -> run_command { m with dialog = None } parsed

@@ -71,7 +71,7 @@ let%expect_test "a dialog makes the page behind it inert: Tab stays in it" =
     (Focus dialog)
     <aside class="sidebar">
     <header class="topbar">
-    <div class="chat verbosity-normal">
+    <div class="chat-frame">
     <footer class="composer">
     |}];
   H.key h "Escape" ~target:Page;
@@ -92,7 +92,7 @@ let%expect_test "a dialog makes the page behind it inert: Tab stays in it" =
     (Focus confirm)
     <aside class="sidebar">
     <header class="topbar">
-    <div class="chat verbosity-normal">
+    <div class="chat-frame">
     <footer class="composer">
     <aside class="agents-panel">
     |}];
@@ -154,7 +154,8 @@ let%expect_test "help lists every key and command" =
     Alt+M cycle the mode: ask → auto-edit → auto → plan (/mode, /plan)
     Ctrl+O cycle the transcript verbosity
     Ctrl+X copy the last reply (when nothing is selected)
-    Ctrl+↑ / Ctrl+↓ previous / next of your messages in the transcript
+    Ctrl+↑ / Ctrl+↓ previous / next of your messages in the transcript (loading earlier ones)
+    Ctrl+J jump to one of your messages: a list to filter (or the marks at the transcript's right edge)
     PageUp / PageDown scroll the transcript
     Ctrl+K search sessions (↓ ↑ through them, Enter opens, Delete deletes)
     A (on a session) archive or unarchive it (archived sessions are listed last, muted)
@@ -592,7 +593,7 @@ let%expect_test "on a phone the agents panel is a sheet with the keyboard" =
     (Focus agents-panel)
     <aside class="sidebar">
     <header class="topbar">
-    <div class="chat verbosity-normal">
+    <div class="chat-frame">
     <footer class="composer">
     |}];
   H.act h Toggle_subagents;

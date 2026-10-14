@@ -2,6 +2,10 @@
 // ones, keeping what shows in place, until the first message; a long output
 // comes cut and loads whole when unfolded; a reload scrolled up into an
 // older page comes back to the same place (loading the pages above it).
+// Jumping around it: the rail of the user's messages along the chat's edge
+// (those not loaded too), a mark's tooltip, a jump to a loaded message and
+// to one not loaded (loading the pages down to it), the jump list (Ctrl+J)
+// and, on a phone, its button.
 // Run by prigh_web.sh; prints normalised results (the expected output is in
 // prigh_web.expected).
 //
@@ -101,13 +105,17 @@ const browser = await engine.launch({
 });
 const context = await browser.newContext({ viewport: { width: 1280, height: 800 } });
 context.setDefaultTimeout(20000);
-const page = await context.newPage();
 const errors = [];
-page.on("console", message => {
-  if (message.type() === "error" && !/favicon\.ico/.test(message.text()))
-    errors.push(`console: ${message.text()}`);
-});
-page.on("pageerror", error => errors.push(`page: ${error.message}`));
+const newPage = async () => {
+  const page = await context.newPage();
+  page.on("console", message => {
+    if (message.type() === "error" && !/favicon\.ico/.test(message.text()))
+      errors.push(`console: ${message.text()}`);
+  });
+  page.on("pageerror", error => errors.push(`page: ${error.message}`));
+  return page;
+};
+let page = await newPage();
 
 const section = label => console.log(`=== ${engineName}: paging: ${label} ===`);
 let shot = 0;
@@ -118,6 +126,8 @@ const screenshot = async label => {
     path: join(process.env.SHOTS, `${engineName}-paging-${String(shot).padStart(2, "0")}-${label.replace(/\W+/g, "-")}.png`),
   });
 };
+
+const clean = text => text.replace(/(Yesterday )?\b\d\d:\d\d\b/g, "<TIME>").replace(/\n+/g, " | ");
 
 const steps = () => page.evaluate(() =>
   [...document.querySelectorAll("#chat .msg.user")].map(el => Number(el.innerText.match(/Step (\d+)/)?.[1])));
@@ -219,6 +229,93 @@ try {
   console.log(await loaded());
   console.log(`step 5 at the same place: ${kept(before, await offset(5))}`);
   await screenshot("reloaded");
+
+  // 6. A fresh tab: only the newest page, and a mark for every message of
+  //    the user's along the chat's edge, those not loaded faint.
+  await page.close();
+  page = await newPage();
+  await page.goto(`${url}?session=${id}`);
+  await page.waitForFunction(() => document.querySelector("#chat")?.innerText.includes("Module 40 is fixed."));
+  await page.waitForFunction(() => document.querySelectorAll(".rail .tick").length === 40);
+  await page.waitForTimeout(300);
+  const tick = n => page.locator(`.rail .tick[aria-label*="Step ${n}:"]`);
+  const atTop = n => page.waitForFunction(n => {
+    const chat = document.getElementById("chat");
+    const el = [...chat.querySelectorAll(".msg.user")].find(el => el.innerText.includes(`Step ${n}:`));
+    if (!el) return false;
+    const top = el.getBoundingClientRect().top - chat.getBoundingClientRect().top;
+    return top > 0 && top < 40;
+  }, n);
+  const current = () => page.evaluate(() =>
+    document.querySelector(".rail .tick[aria-current]")?.getAttribute("aria-label").match(/Step \d+/)?.[0] ?? "none");
+  section("jump: the rail");
+  console.log(await loaded());
+  console.log(`marks: ${await page.locator(".rail .tick").count()}, not loaded: ${await page.locator(".rail .tick.unloaded").count()}`);
+  console.log(`button: ${await page.locator(".jump-list").getAttribute("aria-label")}`);
+  console.log(`the one in view: ${await current()}`);
+  const box = await page.locator(".rail").boundingBox();
+  const chatBox = await page.locator("#chat").boundingBox();
+  console.log(`along the chat's right edge: ${box.x > chatBox.x + chatBox.width - 60 && box.y >= chatBox.y}`);
+  await screenshot("jump rail");
+
+  // 7. A mark names its message on hover; a click goes there, marked.
+  await tick(30).hover();
+  await page.waitForFunction(() => [...document.querySelectorAll(".rail .tip")]
+    .some(tip => getComputedStyle(tip).display !== "none"));
+  section("jump: a mark's tooltip");
+  console.log(clean(await page.evaluate(() => [...document.querySelectorAll(".rail .tip")]
+    .find(tip => getComputedStyle(tip).display !== "none").innerText)));
+  await screenshot("jump tooltip");
+  await tick(30).click();
+  await atTop(30);
+  await page.waitForTimeout(100);
+  section("jump: to a loaded message");
+  console.log(`step 30 at the top, marked: ${await page.evaluate(() =>
+    !!document.querySelector("#chat .msg.user.jumped")?.innerText.includes("Step 30:"))}`);
+  await page.waitForTimeout(300);
+  console.log(`the one in view: ${await current()}`);
+  await screenshot("jump to a loaded message");
+
+  // 8. One not loaded: the pages down to it, then there.
+  await tick(3).click();
+  await atTop(3);
+  await page.waitForTimeout(300);
+  section("jump: to a message not loaded");
+  console.log(await loaded());
+  console.log(`not loaded: ${await page.locator(".rail .tick.unloaded").count()}`);
+  console.log(`the one in view: ${await current()}`);
+  await screenshot("jump to a message not loaded");
+
+  // 9. Ctrl+J: the list, newest first, filtered as typed; Enter goes there.
+  await page.locator(".composer textarea").focus();
+  await page.keyboard.press("Control+j");
+  await page.locator(".picker-dialog").waitFor();
+  await page.waitForFunction(() => document.activeElement?.id === "picker-input");
+  section("jump: the list");
+  console.log(clean(await page.locator(".picker-dialog .picker-item").first().innerText()));
+  await page.keyboard.type("Step 17:");
+  await page.waitForFunction(() => document.querySelectorAll(".picker-dialog .picker-item").length < 40);
+  console.log(clean(await page.locator(".picker-dialog .picker-item").first().innerText()));
+  await screenshot("jump list");
+  await page.keyboard.press("Enter");
+  await page.locator(".picker-dialog").waitFor({ state: "detached" });
+  await atTop(17);
+  console.log("step 17 at the top");
+
+  // 10. On a phone: no rail, the button opens the list.
+  await page.setViewportSize({ width: 390, height: 800 });
+  await page.waitForSelector(".app.narrow");
+  await page.waitForTimeout(300);
+  section("jump: on a phone");
+  console.log(`marks: ${await page.locator(".rail .tick").count()}`);
+  await screenshot("jump phone");
+  await page.locator(".jump-list").click();
+  await page.locator(".picker-dialog").waitFor();
+  console.log(`the list: ${await page.locator(".picker-dialog .picker-item").count()} messages`);
+  await page.waitForTimeout(300);
+  await screenshot("jump phone list");
+  await page.keyboard.press("Escape");
+  await page.locator(".picker-dialog").waitFor({ state: "detached" });
 
   section("errors");
   console.log(errors.length ? errors.join("\n") : "none");

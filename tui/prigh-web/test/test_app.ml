@@ -35,7 +35,7 @@ let%expect_test "startup, a prompt and its streamed reply" =
     (Rpc (method_ prompt) (params ((text hello)))
      (tag (Sent (text hello) (images ()))))
     <div class="entries">
-      <div class="msg user">
+      <div data-entry="0" class="msg user">
         <div dir="auto" class="bubble"> hello </div>
       </div>
       <div class="assistant msg streaming">

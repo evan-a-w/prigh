@@ -659,7 +659,7 @@ let%expect_test "a question dialog: keys" =
     Space or a click picks, ↑↓ choose, Enter accepts, Esc declines (Decline) (Next)
     <aside class="sidebar">
     <header class="topbar">
-    <div class="chat verbosity-normal">
+    <div class="chat-frame">
     <footer class="composer">
     |}];
   H.show h ~selector:".question-choices";
@@ -1153,7 +1153,7 @@ let%expect_test "plan mode notes are margin notes, not the user's words" =
     {|
     ◇ Plan mode on: the model was told to plan, not change files [Plan mode is on: investigate, do not edit files.] fix the build ◇ Plan mode off: the model was told it can change files [Plan mode is off: you may edit files now.]
     <div class="entries">
-      <div class="msg noted">
+      <div data-entry="0" class="msg noted">
         <details data-kind="plan_mode" class="note">
           <summary>
             <span aria-hidden="true" class="glyph"> ◇ </span>
