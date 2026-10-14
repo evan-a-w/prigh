@@ -331,13 +331,18 @@ let render node =
     | Text s -> [ String.strip s ]
     | Widget -> []
     | Element { tag_name = "icon"; _ } -> []
-    | Element e -> List.concat_map e.children ~f:inline
+    | Element e ->
+      (match Render.mark_glyph node with
+       | Some glyph -> [ glyph ]
+       | None -> List.concat_map e.children ~f:inline)
   in
   let rec walk (node : Node_helpers.t) =
     match node with
     | Text s -> add s
     | Widget -> ()
     | Element { tag_name = "icon"; _ } -> ()
+    | Element _ when Node_helpers.has_class ~cls:"mark" node ->
+      Option.iter (Render.mark_glyph node) ~f:add
     (* Checkboxes and radio buttons, drawn by CSS. *)
     | Element e
       when List.exists e.attributes ~f:(fun (k, v) ->

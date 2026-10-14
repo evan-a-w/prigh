@@ -134,6 +134,7 @@ let%expect_test "the names in dialogs, pickers and the transcript" =
   [%expect
     {|
     button "Show all 30 lines"
+    [img] span "Done"
     button "Remove image"
     button "Attach files" -- Attach files (or drop them here)
     button "Send" -- Send (Enter)
@@ -167,7 +168,7 @@ let%expect_test "the names in dialogs, pickers and the transcript" =
     [combobox] input "Filter models"
     [combobox] input "Filter models"
     [listbox] div "Switch model"
-    [option] div "Claude Opus 5.5 anthropic, 200k ctx \226\156\147"
+    [option] div "Claude Opus 5.5 anthropic, 200k ctx"
     [option] div "Claude Sonnet 5 anthropic, 200k ctx"
     [option] div "GPT-6 openai, 200k ctx, not logged in"
     [option] div "DeepSeek Chat deepseek, 200k ctx, not logged in"

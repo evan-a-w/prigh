@@ -163,7 +163,9 @@ let stopped (message : Message.Assistant.t) =
       ; span "hint" "Send a message to retry, or switch model."
       ]
   | Aborted ->
-    div "stop aborted" [ Html.mark ~cls:"stopped" Square; Node.text "Interrupted" ]
+    div
+      "stop aborted"
+      [ Html.mark ~cls:"stopped" Square; Node.text "Interrupted" ]
   | Length ->
     div
       "stop length"

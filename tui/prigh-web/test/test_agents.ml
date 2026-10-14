@@ -451,6 +451,42 @@ let%expect_test
     <button class="agents-row failed">
     <button class="agents-row stopped">
     |}];
+  (* The marks are icons (not glyphs a font may lack), coloured by their
+     class and hidden from screen readers: the row says it in words. *)
+  H.show h ~selector:".agents-row .row-mark";
+  [%expect
+    {|
+    <span class="row-mark">
+      <span aria-hidden="true" class="done mark">
+        <icon class="check"> </icon>
+      </span>
+    </span>
+    <span class="row-mark">
+      <span aria-hidden="true" class="failed mark">
+        <icon class="cross"> </icon>
+      </span>
+    </span>
+    <span class="row-mark">
+      <span aria-hidden="true" class="mark stopped">
+        <icon class="dash"> </icon>
+      </span>
+    </span>
+    <span class="row-mark">
+      <span aria-hidden="true" class="mark stopped">
+        <icon class="dash"> </icon>
+      </span>
+    </span>
+    <span class="row-mark">
+      <span aria-hidden="true" class="failed mark">
+        <icon class="cross"> </icon>
+      </span>
+    </span>
+    <span class="row-mark">
+      <span aria-hidden="true" class="mark stopped">
+        <icon class="dash"> </icon>
+      </span>
+    </span>
+    |}];
   H.act h (Select_item (Agent "a3"));
   H.text h ~selector:".agents-detail";
   H.act h (Select_item (Agent "a4"));

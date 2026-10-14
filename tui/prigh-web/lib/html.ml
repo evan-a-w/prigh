@@ -209,7 +209,8 @@ let mark ?(cls = "") ?label t =
       (Attr.class_ (String.strip ("mark " ^ cls))
        ::
        (match label with
-        | Some l -> [ Attr.title l; Attr.role "img"; Attr.create "aria-label" l ]
+        | Some l ->
+          [ Attr.title l; Attr.role "img"; Attr.create "aria-label" l ]
         | None -> [ Attr.create "aria-hidden" "true" ]))
     [ icon t ]
 ;;

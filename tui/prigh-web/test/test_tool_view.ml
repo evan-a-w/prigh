@@ -63,7 +63,9 @@ let%expect_test "bash: arguments streaming, then running with live output" =
     {|
     <div class="ok tool tool-bash">
       <div class="tool-head">
-        <span class="icon"> ✓ </span>
+        <span title="Done" role="img" aria-label="Done" class="done mark">
+          <icon class="check"> </icon>
+        </span>
         <span class="name"> bash </span>
         <span class="arg command"> ls && echo done </span>
       </div>
@@ -100,7 +102,9 @@ let%expect_test
     {|
     <div class="error tool tool-bash">
       <div class="tool-head">
-        <span class="icon"> ✕ </span>
+        <span title="Failed" role="img" aria-label="Failed" class="failed mark">
+          <icon class="cross"> </icon>
+        </span>
         <span class="name"> bash </span>
         <span class="arg command"> cat missing.txt </span>
         <span class="bad chip"> exit code 1 </span>
@@ -113,7 +117,9 @@ let%expect_test
     </div>
     <div class="error tool tool-bash">
       <div class="tool-head">
-        <span class="icon"> ✕ </span>
+        <span title="Failed" role="img" aria-label="Failed" class="failed mark">
+          <icon class="cross"> </icon>
+        </span>
         <span class="name"> bash </span>
         <span class="arg command"> cd src … </span>
         <span class="bad chip"> timed out after 5s </span>
@@ -152,7 +158,9 @@ let%expect_test "bash in the background: the job it started" =
     {|
     <div class="ok tool tool-bash">
       <div class="tool-head">
-        <span class="icon"> ✓ </span>
+        <span title="Done" role="img" aria-label="Done" class="done mark">
+          <icon class="check"> </icon>
+        </span>
         <span class="name"> bash </span>
         <span class="arg command"> sleep 1; echo bg finished </span>
         <span class="chip job"> job j1 </span>
@@ -172,7 +180,9 @@ let%expect_test "long output: the middle folds behind \"N more lines\"" =
     {|
     <div class="ok tool tool-bash">
       <div class="tool-head">
-        <span class="icon"> ✓ </span>
+        <span title="Done" role="img" aria-label="Done" class="done mark">
+          <icon class="check"> </icon>
+        </span>
         <span class="name"> bash </span>
         <span class="arg command"> seq </span>
       </div>
@@ -209,7 +219,9 @@ let%expect_test "read: text folded, images as thumbnails, ranges, errors" =
     {|
     <div class="ok tool tool-read">
       <div class="tool-head">
-        <span class="icon"> ✓ </span>
+        <span title="Done" role="img" aria-label="Done" class="done mark">
+          <icon class="check"> </icon>
+        </span>
         <span class="name"> read </span>
         <span class="arg path"> notes.md </span>
       </div>
@@ -228,7 +240,9 @@ let%expect_test "read: text folded, images as thumbnails, ranges, errors" =
     </div>
     <div class="ok tool tool-read">
       <div class="tool-head">
-        <span class="icon"> ✓ </span>
+        <span title="Done" role="img" aria-label="Done" class="done mark">
+          <icon class="check"> </icon>
+        </span>
         <span class="name"> read </span>
         <span class="arg path"> pic.png </span>
       </div>
@@ -250,7 +264,9 @@ let%expect_test "read: text folded, images as thumbnails, ranges, errors" =
     </div>
     <div class="ok tool tool-read">
       <div class="tool-head">
-        <span class="icon"> ✓ </span>
+        <span title="Done" role="img" aria-label="Done" class="done mark">
+          <icon class="check"> </icon>
+        </span>
         <span class="name"> read </span>
         <span class="arg path"> big.ml </span>
         <span class="chip"> lines 10–29 </span>
@@ -263,7 +279,9 @@ let%expect_test "read: text folded, images as thumbnails, ranges, errors" =
     </div>
     <div class="error tool tool-read">
       <div class="tool-head">
-        <span class="icon"> ✕ </span>
+        <span title="Failed" role="img" aria-label="Failed" class="failed mark">
+          <icon class="cross"> </icon>
+        </span>
         <span class="name"> read </span>
         <span class="arg path"> nope.txt </span>
       </div>
@@ -285,7 +303,9 @@ let%expect_test "write: the path, a preview, whether it replaced a file" =
     {|
     <div class="ok tool tool-write">
       <div class="tool-head">
-        <span class="icon"> ✓ </span>
+        <span title="Done" role="img" aria-label="Done" class="done mark">
+          <icon class="check"> </icon>
+        </span>
         <span class="name"> write </span>
         <span class="arg path"> hello.py </span>
         <span class="chip"> 3 lines </span>
@@ -300,7 +320,9 @@ let%expect_test "write: the path, a preview, whether it replaced a file" =
     </div>
     <div class="ok tool tool-write">
       <div class="tool-head">
-        <span class="icon"> ✓ </span>
+        <span title="Done" role="img" aria-label="Done" class="done mark">
+          <icon class="check"> </icon>
+        </span>
         <span class="name"> write </span>
         <span class="arg path"> a.txt </span>
         <span class="chip"> 1 line </span>
@@ -414,7 +436,9 @@ let%expect_test "edit: the diff it returned, or its edits before it has run" =
     {|
     <div class="ok tool tool-edit">
       <div class="tool-head">
-        <span class="icon"> ✓ </span>
+        <span title="Done" role="img" aria-label="Done" class="done mark">
+          <icon class="check"> </icon>
+        </span>
         <span class="name"> edit </span>
         <span class="arg path"> src/app.ml </span>
         <span class="add chip"> +2 </span>
@@ -508,7 +532,9 @@ let%expect_test "edit: the diff it returned, or its edits before it has run" =
     {|
     <div class="error tool tool-edit">
       <div class="tool-head">
-        <span class="icon"> ✕ </span>
+        <span title="Failed" role="img" aria-label="Failed" class="failed mark">
+          <icon class="cross"> </icon>
+        </span>
         <span class="name"> edit </span>
         <span class="arg path"> src/app.ml </span>
         <span class="add chip"> +2 </span>
@@ -579,7 +605,9 @@ let%expect_test "ls, grep, find" =
     {|
     <div class="ok tool tool-ls">
       <div class="tool-head">
-        <span class="icon"> ✓ </span>
+        <span title="Done" role="img" aria-label="Done" class="done mark">
+          <icon class="check"> </icon>
+        </span>
         <span class="name"> ls </span>
         <span class="arg path"> . </span>
       </div>
@@ -592,7 +620,9 @@ let%expect_test "ls, grep, find" =
     </div>
     <div class="ok tool tool-grep">
       <div class="tool-head">
-        <span class="icon"> ✓ </span>
+        <span title="Done" role="img" aria-label="Done" class="done mark">
+          <icon class="check"> </icon>
+        </span>
         <span class="name"> grep </span>
         <span class="arg pattern"> salute </span>
         <span class="chip"> in src </span>
@@ -610,7 +640,9 @@ let%expect_test "ls, grep, find" =
     </div>
     <div class="ok tool tool-find">
       <div class="tool-head">
-        <span class="icon"> ✓ </span>
+        <span title="Done" role="img" aria-label="Done" class="done mark">
+          <icon class="check"> </icon>
+        </span>
         <span class="name"> find </span>
         <span class="arg pattern"> *.ml </span>
       </div>
@@ -732,7 +764,9 @@ let%expect_test "subagent: done, with its report and its transcript folded" =
   [%expect
     {|
     <div data-agent="a1" title="Follow it in the agents panel" class="tool-head">
-      <span class="icon"> ✓ </span>
+      <span title="Done" role="img" aria-label="Done" class="done mark">
+        <icon class="check"> </icon>
+      </span>
       <span class="name"> subagent </span>
       <span class="arg task"> Count the lines in src/app.ml and report back. … </span>
       <span class="chip model"> deepseek-flash </span>
@@ -832,7 +866,9 @@ let%expect_test "subagent: failed" =
     {|
     <div data-call="c12" class="error tool tool-subagent">
       <div data-agent="a1" title="Follow it in the agents panel" class="tool-head">
-        <span class="icon"> ✕ </span>
+        <span title="Failed" role="img" aria-label="Failed" class="failed mark">
+          <icon class="cross"> </icon>
+        </span>
         <span class="name"> subagent </span>
         <span class="arg task"> Count the lines in src/app.ml and report back. … </span>
         <span class="chip model"> deepseek-flash </span>
@@ -890,7 +926,9 @@ let%expect_test "subagent from a reloaded session: no events, only its result" =
     {|
     <div data-call="c12" class="ok tool tool-subagent">
       <div class="tool-head">
-        <span class="icon"> ✓ </span>
+        <span title="Done" role="img" aria-label="Done" class="done mark">
+          <icon class="check"> </icon>
+        </span>
         <span class="name"> subagent </span>
         <span class="arg task"> Count the lines in src/app.ml and report back. … </span>
       </div>
@@ -931,7 +969,9 @@ let%expect_test
     {|
     <div class="ok tool tool-job_status">
       <div class="tool-head">
-        <span class="icon"> ✓ </span>
+        <span title="Done" role="img" aria-label="Done" class="done mark">
+          <icon class="check"> </icon>
+        </span>
         <span class="name"> job_status </span>
       </div>
       <div class="tool-body">
@@ -942,7 +982,9 @@ let%expect_test
     </div>
     <div class="ok tool tool-job_wait">
       <div class="tool-head">
-        <span class="icon"> ✓ </span>
+        <span title="Done" role="img" aria-label="Done" class="done mark">
+          <icon class="check"> </icon>
+        </span>
         <span class="name"> job_wait </span>
         <span class="arg"> j1 j2 </span>
       </div>
@@ -967,7 +1009,9 @@ let%expect_test
     </div>
     <div class="ok tool tool-job_kill">
       <div class="tool-head">
-        <span class="icon"> ✓ </span>
+        <span title="Done" role="img" aria-label="Done" class="done mark">
+          <icon class="check"> </icon>
+        </span>
         <span class="name"> job_kill </span>
         <span class="arg"> j2 </span>
       </div>
@@ -986,7 +1030,9 @@ let%expect_test
     </div>
     <div class="ok tool tool-job_output">
       <div class="tool-head">
-        <span class="icon"> ✓ </span>
+        <span title="Done" role="img" aria-label="Done" class="done mark">
+          <icon class="check"> </icon>
+        </span>
         <span class="name"> job_output </span>
         <span class="arg"> j3 </span>
       </div>
@@ -1000,7 +1046,9 @@ let%expect_test
     </div>
     <div class="ok tool tool-job_wait">
       <div class="tool-head">
-        <span class="icon"> ✓ </span>
+        <span title="Done" role="img" aria-label="Done" class="done mark">
+          <icon class="check"> </icon>
+        </span>
         <span class="name"> job_wait </span>
       </div>
       <div class="tool-body">
@@ -1020,7 +1068,9 @@ let%expect_test "a call that never got a result: the agent stopped" =
     {|
     <div class="interrupted tool tool-bash">
       <div class="tool-head">
-        <span class="icon"> ■ </span>
+        <span title="Interrupted" role="img" aria-label="Interrupted" class="mark stopped">
+          <icon class="square"> </icon>
+        </span>
         <span class="name"> bash </span>
         <span class="arg command"> sleep 100 </span>
         <span class="chip"> no result </span>
@@ -1038,7 +1088,9 @@ let%expect_test "cancelled calls: what they did, not as errors" =
     {|
     <div class="interrupted tool tool-bash">
       <div class="tool-head">
-        <span class="icon"> ■ </span>
+        <span title="Interrupted" role="img" aria-label="Interrupted" class="mark stopped">
+          <icon class="square"> </icon>
+        </span>
         <span class="name"> bash </span>
         <span class="arg command"> for i in 1 2 3 4 5 6; do echo step $i; sleep 0.6; done </span>
         <span class="chip"> cancelled </span>
@@ -1052,7 +1104,9 @@ let%expect_test "cancelled calls: what they did, not as errors" =
     </div>
     <div class="interrupted tool tool-grep">
       <div class="tool-head">
-        <span class="icon"> ■ </span>
+        <span title="Interrupted" role="img" aria-label="Interrupted" class="mark stopped">
+          <icon class="square"> </icon>
+        </span>
         <span class="name"> grep </span>
         <span class="arg pattern"> x </span>
         <span class="chip"> cancelled </span>
@@ -1069,7 +1123,9 @@ let%expect_test "other tools: their main argument and output" =
     {|
     <div class="ok tool tool-web_fetch">
       <div class="tool-head">
-        <span class="icon"> ✓ </span>
+        <span title="Done" role="img" aria-label="Done" class="done mark">
+          <icon class="check"> </icon>
+        </span>
         <span class="name"> web_fetch </span>
         <a href="https://x" target="_blank" rel="noopener noreferrer" class="arg url"> https://x </a>
       </div>
@@ -1141,7 +1197,9 @@ let%expect_test "apply_patch: one file's diff, like edit" =
     {|
     <div class="ok tool tool-apply_patch">
       <div class="tool-head">
-        <span class="icon"> ✓ </span>
+        <span title="Done" role="img" aria-label="Done" class="done mark">
+          <icon class="check"> </icon>
+        </span>
         <span class="name"> apply_patch </span>
         <span class="arg path"> src/retry.ml </span>
         <span class="add chip"> +1 </span>
@@ -1216,7 +1274,9 @@ let%expect_test "apply_patch: several files, each named above its diff" =
     {|
     <div class="ok tool tool-apply_patch">
       <div class="tool-head">
-        <span class="icon"> ✓ </span>
+        <span title="Done" role="img" aria-label="Done" class="done mark">
+          <icon class="check"> </icon>
+        </span>
         <span class="name"> apply_patch </span>
         <span class="arg path"> src/new.ml </span>
         <span class="chip"> 3 files </span>
@@ -1314,7 +1374,9 @@ let%expect_test "apply_patch: an error, with the patch it tried" =
     {|
     <div class="error tool tool-apply_patch">
       <div class="tool-head">
-        <span class="icon"> ✕ </span>
+        <span title="Failed" role="img" aria-label="Failed" class="failed mark">
+          <icon class="cross"> </icon>
+        </span>
         <span class="name"> apply_patch </span>
         <span class="arg path"> src/new.ml </span>
         <span class="chip"> 3 files </span>
