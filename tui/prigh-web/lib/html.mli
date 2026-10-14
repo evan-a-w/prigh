@@ -69,12 +69,25 @@ module Icon : sig
     | Bell_off
     | Shield
     | Sliders
+    | Cross
+    | Dash
+    | Square
+    | Warning
+    | Next
+    | Ring
 
   (** An inline SVG; tests show [<icon name>]. *)
   val view : ?cls:string -> t -> Node.t
 end
 
 val icon : ?cls:string -> Icon.t -> Node.t
+
+(** How something stands or ended (done, failed, stopped, ...), in front of
+    its line: [icon] in a square box to centre on the line's first row,
+    coloured by [cls] ([done], [failed], [stopped], [now]). [label] says it
+    in words (to screen readers, and as its tooltip); without one it is
+    hidden from screen readers, for lines that say it themselves. *)
+val mark : ?cls:string -> ?label:string -> Icon.t -> Node.t
 
 (** The caret of the [<textarea>] or [<input>] an input event came from. *)
 val caret : Js_of_ocaml.Dom_html.event Js_of_ocaml.Js.t -> int option

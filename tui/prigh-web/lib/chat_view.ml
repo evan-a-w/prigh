@@ -162,11 +162,14 @@ let stopped (message : Message.Assistant.t) =
       ; div "detail" [ Node.text e ]
       ; span "hint" "Send a message to retry, or switch model."
       ]
-  | Aborted -> div "stop aborted" [ Node.text "Interrupted" ]
+  | Aborted ->
+    div "stop aborted" [ Html.mark ~cls:"stopped" Square; Node.text "Interrupted" ]
   | Length ->
     div
       "stop length"
-      [ Node.text "Stopped at the output token limit: ask it to continue." ]
+      [ Html.mark ~cls:"warn" Warning
+      ; Node.text "Stopped at the output token limit: ask it to continue."
+      ]
   | End_turn | Tool_use -> Node.none
 ;;
 

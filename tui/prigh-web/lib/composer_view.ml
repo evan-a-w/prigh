@@ -65,6 +65,9 @@ let popup (m : App.Model.t) ~inject =
                        inject (Action.Complete_choose i))
                    ]
                  [ span ~cls:"popup-label" item.label
+                 ; (if item.marked
+                    then Html.mark ~cls:"picked" ~label:"current" Check
+                    else Node.none)
                  ; (if String.is_empty item.detail
                     then Node.none
                     else span ~cls:"popup-detail" item.detail)

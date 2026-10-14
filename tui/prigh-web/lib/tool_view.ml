@@ -50,9 +50,9 @@ module Status = struct
   let icon t =
     match t with
     | Preparing | Running -> Html.lamp ()
-    | Done -> span "icon" "✓"
-    | Failed -> span "icon" "✕"
-    | Interrupted -> span "icon" "■"
+    | Done -> Html.mark ~cls:"done" ~label:"Done" Check
+    | Failed -> Html.mark ~cls:"failed" ~label:"Failed" Cross
+    | Interrupted -> Html.mark ~cls:"stopped" ~label:"Interrupted" Square
   ;;
 end
 
@@ -269,17 +269,16 @@ let plan_list (plan : Plan.t) =
     ; Node.ul
         ~attrs:[ Attr.class_ "plan-steps" ]
         (List.map plan.steps ~f:(fun step ->
-           let status =
+           let status, mark =
              match step.status with
-             | Completed -> "step-done"
-             | In_progress -> "step-now"
-             | Pending -> "step-todo"
+             | Completed -> "step-done", Html.mark ~cls:"done" ~label:"Done" Check
+             | In_progress ->
+               "step-now", Html.mark ~cls:"now" ~label:"In progress" Next
+             | Pending -> "step-todo", Html.mark ~cls:"todo" ~label:"To do" Ring
            in
            Node.li
              ~attrs:[ Attr.class_ ("plan-step " ^ status) ]
-             [ span "mark" (Plan_view.mark step.status)
-             ; Node.text (" " ^ step.step)
-             ]))
+             [ mark; Node.text step.step ]))
     ]
 ;;
 

@@ -110,7 +110,7 @@ let picker ~kind (p : Picker.t) ~inject =
                    then Node.none
                    else span ~cls:"picker-detail" item.detail)
                 ; (if item.marked
-                   then span ~cls:"picker-check" "✓"
+                   then Html.mark ~cls:"picker-check" Check
                    else Node.none)
                 ])))
     ; mcp_problems kind
