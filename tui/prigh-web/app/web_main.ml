@@ -256,11 +256,11 @@ let scroll_chat pages =
 ;;
 
 (* The previous (or next) of the user's messages above (or below) the top of
-   the transcript's view. *)
+   the transcript's view; [false] when there is none loaded. *)
 let jump_to_user_message direction =
   user_scrolled := true;
   if direction < 0 then following := false;
-  Option.iter (chat_element ()) ~f:(fun chat ->
+  Option.value_map (chat_element ()) ~default:false ~f:(fun chat ->
     let top = Js.to_float chat##getBoundingClientRect##.top in
     let offsets =
       Dom.list_of_nodeList (chat##querySelectorAll (Js.string ".msg.user"))
@@ -277,7 +277,24 @@ let jump_to_user_message direction =
         |> List.min_elt ~compare:Float.compare
     in
     Option.iter target ~f:(fun offset ->
-      chat##.scrollTop := Js.float (Js.to_float chat##.scrollTop +. offset -. 8.)))
+      chat##.scrollTop := Js.float (Js.to_float chat##.scrollTop +. offset -. 8.));
+    Option.is_some target)
+;;
+
+(* A landmark jumped to ([Jump]): at the top of the view, marked for a
+   moment. *)
+let scroll_to_entry n =
+  Browser.after_render (fun () ->
+    Option.iter (chat_element ()) ~f:(fun chat ->
+      Option.iter (Jump_listeners.entry chat n) ~f:(fun el ->
+        user_scrolled := true;
+        following := false;
+        let offset =
+          Js.to_float el##getBoundingClientRect##.top
+          -. Js.to_float chat##getBoundingClientRect##.top
+        in
+        chat##.scrollTop := Js.float (Js.to_float chat##.scrollTop +. offset -. 12.);
+        Jump_listeners.arrived el)))
 ;;
 
 let perform client settings ctx (model : App.Model.t) (command : App.Command.t) =
@@ -356,7 +373,14 @@ let perform client settings ctx (model : App.Model.t) (command : App.Command.t) 
              | None -> scroll_to_bottom ()))
         ()
     | Jump_to_user_message direction ->
-      Effect.of_sync_fun jump_to_user_message direction
+      let%bind.Effect found = Effect.of_sync_fun jump_to_user_message direction in
+      (* None above: the previous one is not loaded. *)
+      if found
+         || direction > 0
+         || not (Paging_listeners.more () || Paging_listeners.loading ())
+      then Effect.Ignore
+      else inject App.Action.Jump_older
+    | Scroll_to_entry n -> Effect.of_sync_fun scroll_to_entry n
     | Focus_terminal -> Effect.of_sync_fun Terminal_widget.focus ()
     | Remember_terminal open_ -> Effect.of_sync_fun Terminal_widget.remember open_
     | Notify notification ->
@@ -735,6 +759,7 @@ let install_listeners ~schedule ~current =
   Chat_listeners.install ~schedule;
   Paging_listeners.install ~schedule;
   Agents_listeners.install ~schedule;
+  Jump_listeners.install ();
   Terminal_widget.install ~schedule;
   (* The chat follows new output unless the user has scrolled up. The page
      hears of a change of mind ([Chat_scrolled]) to show the jump button. *)

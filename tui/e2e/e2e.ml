@@ -136,7 +136,8 @@ let rec summarise (e : Event.t) : string option =
   | Terminal_close id -> Some (sprintf "terminal_close %s" id)
   | Terminal_kill key -> Some (sprintf "terminal_kill %s" key)
   | Btw_delta { btw_id; delta } -> Some (sprintf "btw_delta %s %S" btw_id delta)
-  | Sessions_changed -> Some "sessions_changed"
+  (* A hint to refresh session lists: how many arrive depends on timing. *)
+  | Sessions_changed -> None
 ;;
 
 let rec drain client ~stop =

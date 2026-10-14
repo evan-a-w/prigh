@@ -31,6 +31,8 @@ module Method : sig
               from that one to the newest, whatever [limit] *)
         ; limit : int
         } (** see {!Message_page} *)
+    | Get_outline of { session : string (** a path or id *) }
+    (** see {!Outline} *)
     | Get_tool_output of
         { call_id : string
         ; agent_id : string option (** in this subagent's transcript *)

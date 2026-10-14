@@ -370,7 +370,7 @@ let%expect_test "an invoked skill: a folded card and the user's arguments" =
   [%expect
     {|
     <div class="entries">
-      <div class="msg skill user">
+      <div data-entry="0" class="msg skill user">
         <details class="skill-card">
           <summary>
             <span class="label"> skill frontend-design </span>
@@ -391,7 +391,7 @@ let%expect_test "an invoked skill: a folded card and the user's arguments" =
         </details>
         <div dir="auto" class="bubble"> the pricing page </div>
       </div>
-      <div class="msg skill user">
+      <div data-entry="1" class="msg skill user">
         <details class="skill-card">
           <summary>
             <span class="label"> skill release </span>
@@ -440,7 +440,7 @@ let%expect_test "an invoked skill in the page: verbosity classes, /fork" =
     <div id="chat" role="region" aria-label="Transcript" tabindex="0" class="chat verbosity-quiet">
       <Vdom.Node.none-widget> </Vdom.Node.none-widget>
       <div class="entries">
-        <div class="msg skill user">
+        <div data-entry="0" class="msg skill user">
           <details class="skill-card">
             <summary>
               <span class="label"> skill frontend-design </span>

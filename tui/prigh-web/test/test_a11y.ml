@@ -188,7 +188,7 @@ let%expect_test "the closed drawer on a phone is inert" =
     {|
     <aside class="sidebar">
     <header class="topbar">
-    <div class="chat verbosity-normal">
+    <div class="chat-frame">
     <footer class="composer">
     |}]
 ;;
