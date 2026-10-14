@@ -163,7 +163,7 @@ let%expect_test "toasts are not under a dialog's inert page" =
     (Focus picker-input)
     <aside class="sidebar">
     <header class="topbar">
-    <div class="chat verbosity-normal">
+    <div class="chat-frame">
     <footer class="composer">
     <div class="toast">
     |}]

@@ -45,7 +45,12 @@ let help =
   ; "Alt+M", "cycle the mode: ask → auto-edit → auto → plan (/mode, /plan)"
   ; "Ctrl+O", "cycle the transcript verbosity"
   ; "Ctrl+X", "copy the last reply (when nothing is selected)"
-  ; "Ctrl+↑ / Ctrl+↓", "previous / next of your messages in the transcript"
+  ; ( "Ctrl+↑ / Ctrl+↓"
+    , "previous / next of your messages in the transcript (loading earlier \
+       ones)" )
+  ; ( "Ctrl+J"
+    , "jump to one of your messages: a list to filter (or the marks at the \
+       transcript's right edge)" )
   ; "PageUp / PageDown", "scroll the transcript"
   ; "Ctrl+K", "search sessions (↓ ↑ through them, Enter opens, Delete deletes)"
   ; ( "A (on a session)"
@@ -323,6 +328,7 @@ let handle (m : App.Model.t) t : App.Action.t option =
      | ("l" | "L") when command t -> Some Open_model_picker
      | ("k" | "K") when command t -> Some Open_sessions
      | ("b" | "B") when command t -> Some Toggle_sidebar
+     | ("j" | "J") when ctrl_only t -> Some Open_jump_list
      | ("o" | "O") when ctrl_only t -> Some Cycle_verbosity
      | ("p" | "P") when ctrl_only t -> Some (Cycle_model 1)
      | _ when alt_letter t "p" -> Some (Cycle_model (-1))

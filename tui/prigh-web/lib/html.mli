@@ -69,6 +69,7 @@ module Icon : sig
     | Bell_off
     | Shield
     | Sliders
+    | Toc
 
   (** An inline SVG; tests show [<icon name>]. *)
   val view : ?cls:string -> t -> Node.t

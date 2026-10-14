@@ -95,6 +95,7 @@ module Icon = struct
     | Bell_off
     | Shield
     | Sliders
+    | Toc
   [@@deriving sexp_of]
 
   (* Paths in the style of Lucide (24x24, stroked). *)
@@ -162,6 +163,7 @@ module Icon = struct
       {|<path d="M12 21s7-3.5 7-9V5.5L12 3 5 5.5V12c0 5.5 7 9 7 9z"/>|}
     | Sliders ->
       {|<path d="M21 5h-7M10 5H3M21 12h-9M8 12H3M21 19h-5M12 19H3M14 3v4M8 10v4M16 17v4"/>|}
+    | Toc -> {|<path d="M10 6h10M10 12h10M10 18h10M4 6h2M4 12h2M4 18h2"/>|}
   ;;
 
   let name t = String.lowercase (Sexp.to_string (sexp_of_t t))

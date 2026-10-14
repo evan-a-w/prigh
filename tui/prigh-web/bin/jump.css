@@ -1,0 +1,129 @@
+/* Jumping around a long transcript (Jump_view): along the chat's right edge
+   a rail of marks, one per landmark, evenly spaced like the turns of a log
+   rather than by height, so every one is as easy to hit. The user's turns
+   are short sodium strokes (sodium is their colour in the transcript), the
+   one in view drawn out in full sodium; a reply that failed a brick dot; a
+   compaction a longer faint rule; turns not loaded yet are faint. Above
+   them, the jump list's button. On a phone only the button, floating. */
+
+.chat-frame {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.chat-frame:has(.rail) > .chat { padding-right: 52px; }
+
+.jump-nav {
+  position: absolute;
+  top: 10px;
+  right: 14px;
+  bottom: 60px;
+  width: 28px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 6px;
+  z-index: 3;
+  pointer-events: none;
+}
+.jump-nav > * { pointer-events: auto; }
+.jump-nav .jump-list { width: 28px; height: 28px; color: var(--faint); flex-shrink: 0; }
+.jump-nav .jump-list .icon { width: 16px; height: 16px; }
+.jump-nav .jump-list:hover { color: var(--chalk); }
+
+.rail {
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  padding: 2px 0;
+}
+.tick {
+  position: relative;
+  flex: 0 1 12px;
+  min-height: 3px;
+  width: 28px;
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+}
+.tick::before {
+  content: "";
+  width: 10px;
+  height: 2px;
+  border-radius: 1px;
+  background: var(--sodium-line);
+  transition: width 0.12s ease-out, background-color 0.12s ease-out;
+}
+.tick.unloaded::before { background: var(--faint-line); opacity: 0.55; }
+.tick.compaction::before { width: 20px; height: 1px; background: var(--faint-line); }
+.tick.error::before { width: 5px; height: 5px; border-radius: 50%; background: var(--brick); margin-right: 2px; }
+.tick.user[aria-current]::before { width: 16px; background: var(--sodium); opacity: 1; }
+.tick.user:hover::before,
+.tick.user:focus-visible::before { width: 20px; background: var(--sodium); opacity: 1; }
+.tick.compaction:hover::before { background: var(--muted); }
+.tick:focus-visible { outline: none; }
+
+/* What the mark stands for, beside it. */
+.tick .tip {
+  display: none;
+  position: absolute;
+  right: calc(100% + 4px);
+  top: 50%;
+  transform: translateY(-50%);
+  width: max-content;
+  max-width: 300px;
+  flex-direction: column;
+  gap: 2px;
+  padding: 7px 11px 8px;
+  background: var(--slate-2);
+  border: 1px solid var(--rule-2);
+  border-radius: var(--r-control);
+  box-shadow: var(--float-shadow);
+  text-align: left;
+  pointer-events: none;
+}
+.tick:hover .tip, .tick:focus-visible .tip { display: flex; }
+.tip-text {
+  font: 13px/1.4 var(--sans);
+  color: var(--chalk);
+  overflow-wrap: anywhere;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  overflow: hidden;
+}
+.tip-what { font-size: 12px; font-weight: 600; color: var(--muted); }
+.tick.error .tip-what { color: var(--brick); }
+.tip-time { font: 11.5px var(--mono); color: var(--faint); }
+
+/* Phones: no rail, the button over the chat's corner. */
+.app.narrow .chat-frame > .jump-nav { top: 8px; right: 10px; bottom: auto; width: auto; }
+.app.narrow .jump-nav .jump-list {
+  width: 36px;
+  height: 36px;
+  border: 1px solid var(--rule-2);
+  border-radius: var(--r-control);
+  background: var(--slate-2);
+  color: var(--muted);
+  box-shadow: var(--float-shadow);
+}
+
+/* Where a jump landed, for a moment. */
+#chat .jumped { animation: jumped 1.6s ease-out; }
+@keyframes jumped {
+  0%, 35% { box-shadow: 0 0 0 2px var(--sodium); background-color: color-mix(in srgb, var(--sodium) 14%, var(--slate)); }
+  100% { box-shadow: 0 0 0 2px transparent; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .tick::before { transition: none; }
+  /* Still marked, without the fade: the page takes the mark off. */
+  #chat .jumped { animation: none; box-shadow: 0 0 0 2px var(--sodium); }
+}

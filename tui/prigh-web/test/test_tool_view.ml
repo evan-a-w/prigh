@@ -701,7 +701,7 @@ let%expect_test "subagent: running shows its latest step" =
             <span class="preview"> 2 messages </span>
           </summary>
           <div class="entries">
-            <div class="msg user">
+            <div data-entry="0" class="msg user">
               <div dir="auto" class="bubble"> Count the lines in src/app.ml and report back.
     Be brief. </div>
             </div>
@@ -799,7 +799,7 @@ let%expect_test
             <span class="preview"> 2 messages </span>
           </summary>
           <div class="entries">
-            <div class="msg user">
+            <div data-entry="0" class="msg user">
               <div dir="auto" class="bubble"> Count the lines in src/app.ml and report back.
     Be brief. </div>
             </div>
