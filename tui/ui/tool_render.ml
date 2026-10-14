@@ -403,7 +403,15 @@ let render_step
       let background =
         Option.value (Tool_args.bool args "background") ~default:false
       in
-      let job = Option.bind result ~f:(fun r -> job_started r.text) in
+      let moved =
+        Option.bind result ~f:(fun (r : P.Message.Tool_result.t) ->
+          P.Moved_job.parse r.text)
+      in
+      let job =
+        match moved with
+        | Some m -> Some m.id
+        | None -> Option.bind result ~f:(fun r -> job_started r.text)
+      in
       let outcome, result =
         match result with
         | Some r ->
@@ -412,15 +420,20 @@ let render_step
         | None -> None, None
       in
       let chips, body =
-        match job with
-        | Some _ -> [], []
-        | None -> generic ~head:5 ~tail:3 result
+        match moved, job, result with
+        | Some m, _, Some r ->
+          (* The output it had when it moved; its report comes later. *)
+          generic ~head:0 ~tail:5 (Some { r with text = m.output })
+        | _, Some _, _ -> [], []
+        | _, None, _ -> generic ~head:5 ~tail:3 result
       in
       ( List.filter_opt
           [ Option.some_if
               (background && Option.is_none job)
               (chip "background")
           ; Option.map job ~f:(fun id -> chip ("job " ^ id))
+          ; Option.map moved ~f:(fun m ->
+              chip (sprintf "moved to the background after %s" m.after))
           ; Option.map outcome ~f:(chip ~style:red)
           ]
         @ chips
