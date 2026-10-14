@@ -271,7 +271,8 @@ let plan_list (plan : Plan.t) =
         (List.map plan.steps ~f:(fun step ->
            let status, mark =
              match step.status with
-             | Completed -> "step-done", Html.mark ~cls:"done" ~label:"Done" Check
+             | Completed ->
+               "step-done", Html.mark ~cls:"done" ~label:"Done" Check
              | In_progress ->
                "step-now", Html.mark ~cls:"now" ~label:"In progress" Next
              | Pending -> "step-todo", Html.mark ~cls:"todo" ~label:"To do" Ring

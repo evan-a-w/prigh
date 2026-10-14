@@ -1105,7 +1105,9 @@ let%expect_test "update_plan, ask_user and exit_plan_mode in the transcript" =
     {|
     <div class="ok tool tool-update_plan">
       <div class="tool-head">
-        <span class="icon"> ✓ </span>
+        <span title="Done" role="img" aria-label="Done" class="done mark">
+          <icon class="check"> </icon>
+        </span>
         <span class="name"> update_plan </span>
         <span class="chip"> 1/3 done </span>
       </div>
@@ -1114,16 +1116,22 @@ let%expect_test "update_plan, ask_user and exit_plan_mode in the transcript" =
           <p class="plan-explanation"> first pass </p>
           <ul class="plan-steps">
             <li class="plan-step step-done">
-              <span class="mark"> ✓ </span>
-               read the code
+              <span title="Done" role="img" aria-label="Done" class="done mark">
+                <icon class="check"> </icon>
+              </span>
+              read the code
             </li>
             <li class="plan-step step-now">
-              <span class="mark"> ▸ </span>
-               change it
+              <span title="In progress" role="img" aria-label="In progress" class="mark now">
+                <icon class="next"> </icon>
+              </span>
+              change it
             </li>
             <li class="plan-step step-todo">
-              <span class="mark"> ○ </span>
-               test
+              <span title="To do" role="img" aria-label="To do" class="mark todo">
+                <icon class="ring"> </icon>
+              </span>
+              test
             </li>
           </ul>
         </div>

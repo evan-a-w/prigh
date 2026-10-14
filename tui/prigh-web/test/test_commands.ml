@@ -721,7 +721,9 @@ let%expect_test "/tree shows branches and moves the head" =
            @on_click>
         <span class="picker-label"> > first question </span>
         <Vdom.Node.none-widget> </Vdom.Node.none-widget>
-        <span class="picker-check"> ✓ </span>
+        <span aria-hidden="true" class="mark picker-check">
+          <icon class="check"> </icon>
+        </span>
       </div>
       <div role="option"
            id="picker-option-1"
@@ -731,7 +733,9 @@ let%expect_test "/tree shows branches and moves the head" =
            @on_click>
         <span class="picker-label"> · first answer </span>
         <Vdom.Node.none-widget> </Vdom.Node.none-widget>
-        <span class="picker-check"> ✓ </span>
+        <span aria-hidden="true" class="mark picker-check">
+          <icon class="check"> </icon>
+        </span>
       </div>
       <div role="option" id="picker-option-2" aria-selected="false" class="picker-item" @on_click>
         <span class="picker-label">   > abandoned idea </span>
@@ -751,7 +755,9 @@ let%expect_test "/tree shows branches and moves the head" =
            @on_click>
         <span class="picker-label">   > better idea </span>
         <Vdom.Node.none-widget> </Vdom.Node.none-widget>
-        <span class="picker-check"> ✓ </span>
+        <span aria-hidden="true" class="mark picker-check">
+          <icon class="check"> </icon>
+        </span>
       </div>
       <div role="option"
            id="picker-option-5"
@@ -761,7 +767,9 @@ let%expect_test "/tree shows branches and moves the head" =
            @on_click>
         <span class="picker-label">   · better answer </span>
         <Vdom.Node.none-widget> </Vdom.Node.none-widget>
-        <span class="picker-check"> ✓ </span>
+        <span aria-hidden="true" class="mark picker-check">
+          <icon class="check"> </icon>
+        </span>
       </div>
     </div>
     |}];

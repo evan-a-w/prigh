@@ -212,13 +212,23 @@ let%expect_test "how a reply stopped: error, interrupted, length" =
         <div class="markdown">
           <p dir="auto"> I was saying </p>
         </div>
-        <div class="aborted stop"> Interrupted </div>
+        <div class="aborted stop">
+          <span aria-hidden="true" class="mark stopped">
+            <icon class="square"> </icon>
+          </span>
+          Interrupted
+        </div>
       </div>
       <div class="assistant msg">
         <div class="markdown">
           <p dir="auto"> A long </p>
         </div>
-        <div class="length stop"> Stopped at the output token limit: ask it to continue. </div>
+        <div class="length stop">
+          <span aria-hidden="true" class="mark warn">
+            <icon class="warning"> </icon>
+          </span>
+          Stopped at the output token limit: ask it to continue.
+        </div>
       </div>
     </div>
     |}]
@@ -263,7 +273,7 @@ let%expect_test
   in
   Chat_harness.text chat;
   [%expect
-    {| New year's eve 31 Dec 2025 23:59 Thu 1 Jan Happy new year m 1.2k in 40 out 1 Jan 02:01 Written before sessions kept times Sat 3 Oct Saturday 3 Oct 12:00 Yesterday Working late Today Past midnight m 1.2k in 40 out 00:30 Stopped Interrupted 14:59 |}];
+    {| New year's eve 31 Dec 2025 23:59 Thu 1 Jan Happy new year m 1.2k in 40 out 1 Jan 02:01 Written before sessions kept times Sat 3 Oct Saturday 3 Oct 12:00 Yesterday Working late Today Past midnight m 1.2k in 40 out 00:30 Stopped ■ Interrupted 14:59 |}];
   Chat_harness.show ~selector:".msg.user" chat;
   [%expect
     {|

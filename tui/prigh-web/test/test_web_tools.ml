@@ -129,7 +129,9 @@ let%expect_test "web search streamed between text: running, then its results" =
       </div>
       <div class="ok tool tool-web_search">
         <div class="tool-head">
-          <span class="icon"> ✓ </span>
+          <span title="Done" role="img" aria-label="Done" class="done mark">
+            <icon class="check"> </icon>
+          </span>
           <span class="name"> web_search </span>
           <span class="arg query"> "ocaml eio" </span>
           <span class="chip"> 3 results </span>
@@ -202,7 +204,9 @@ let%expect_test
     {|
     <div class="ok tool tool-web_search">
       <div class="tool-head">
-        <span class="icon"> ✓ </span>
+        <span title="Done" role="img" aria-label="Done" class="done mark">
+          <icon class="check"> </icon>
+        </span>
         <span class="name"> web_search </span>
         <span class="arg query"> "ocaml eio" </span>
       </div>
@@ -214,7 +218,9 @@ let%expect_test
     </div>
     <div class="error tool tool-web_search">
       <div class="tool-head">
-        <span class="icon"> ✕ </span>
+        <span title="Failed" role="img" aria-label="Failed" class="failed mark">
+          <icon class="cross"> </icon>
+        </span>
         <span class="name"> web_search </span>
         <span class="arg query"> "rate me" </span>
       </div>
@@ -226,7 +232,9 @@ let%expect_test
     </div>
     <div class="interrupted tool tool-web_search">
       <div class="tool-head">
-        <span class="icon"> ■ </span>
+        <span title="Interrupted" role="img" aria-label="Interrupted" class="mark stopped">
+          <icon class="square"> </icon>
+        </span>
         <span class="name"> web_search </span>
         <span class="arg query"> "never answered" </span>
         <span class="chip"> no result </span>
@@ -234,7 +242,9 @@ let%expect_test
     </div>
     <div class="ok tool tool-code_execution">
       <div class="tool-head">
-        <span class="icon"> ✓ </span>
+        <span title="Done" role="img" aria-label="Done" class="done mark">
+          <icon class="check"> </icon>
+        </span>
         <span class="name"> code_execution </span>
         <span class="arg"> {"code":"print(1)"} </span>
       </div>
@@ -330,7 +340,9 @@ let%expect_test "web_fetch: the URL as a link, the page folded" =
     {|
     <div class="ok tool tool-web_fetch">
       <div class="tool-head">
-        <span class="icon"> ✓ </span>
+        <span title="Done" role="img" aria-label="Done" class="done mark">
+          <icon class="check"> </icon>
+        </span>
         <span class="name"> web_fetch </span>
         <a href="https://ocaml.org/p/eio" target="_blank" rel="noopener noreferrer" class="arg url"> https://ocaml.org/p/eio </a>
         <span class="chip"> → https://ocaml.org/p/eio/latest </span>
@@ -369,7 +381,9 @@ let%expect_test "web_fetch: the URL as a link, the page folded" =
     {|
     <div class="error tool tool-web_fetch">
       <div class="tool-head">
-        <span class="icon"> ✕ </span>
+        <span title="Failed" role="img" aria-label="Failed" class="failed mark">
+          <icon class="cross"> </icon>
+        </span>
         <span class="name"> web_fetch </span>
         <a href="https://ocaml.org/p/eio" target="_blank" rel="noopener noreferrer" class="arg url"> https://ocaml.org/p/eio </a>
       </div>
@@ -408,7 +422,9 @@ let%expect_test "job_input: the job and what it was sent, escaped" =
     {|
     <div class="ok tool tool-job_input">
       <div class="tool-head">
-        <span class="icon"> ✓ </span>
+        <span title="Done" role="img" aria-label="Done" class="done mark">
+          <icon class="check"> </icon>
+        </span>
         <span class="name"> job_input </span>
         <span class="arg input"> j1 "print(1)\n" </span>
         <span class="chip"> close stdin </span>

@@ -170,7 +170,7 @@ let%expect_test "/fallback completes a model key per word" =
   [%expect
     {|
     Fallback models, in order ↑↓ Tab Enter Esc   Ctrl+Enter as typed
-    Claude Opus 5.5 anthropic
+    Claude Opus 5.5 ✓ anthropic
     Claude Sonnet 5 anthropic
     GPT-6 openai
     DeepSeek Chat deepseek
@@ -186,7 +186,7 @@ let%expect_test "/fallback completes a model key per word" =
     (Complete_accept (run false))
     ((m.draft "/fallback openai/gpt-6 ") (m.cursor 23))
     Fallback models, in order ↑↓ Tab Enter Esc   Ctrl+Enter as typed
-    Claude Opus 5.5 anthropic
+    Claude Opus 5.5 ✓ anthropic
     Claude Sonnet 5 anthropic
     DeepSeek Chat deepseek
     |}];
@@ -223,7 +223,7 @@ let%expect_test "/fallback completes a model key per word" =
     {|
     Fallback models, in order ↑↓ Tab Enter Esc   Ctrl+Enter as typed
     DeepSeek Chat deepseek
-    Claude Opus 5.5 anthropic
+    Claude Opus 5.5 ✓ anthropic
     Claude Sonnet 5 anthropic
     (Complete_accept (run false))
     ((m.draft "/fallback deepseek/deepseek-chat openai/gpt-6") (m.cursor 32))
