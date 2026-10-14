@@ -38,6 +38,7 @@ let act t action =
      | Files _
      | Save_size _
      | Keep_scroll_position
+     | Scroll_to_entry _
      | Probe_connection
      | Drop_connection
      | Auth_failed _ -> ());

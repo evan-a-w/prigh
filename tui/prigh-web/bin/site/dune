@@ -58,6 +58,12 @@
  (action
   (copy ../paging.css paging.css)))
 
+(rule
+ (target jump.css)
+ (deps ../jump.css)
+ (action
+  (copy ../jump.css jump.css)))
+
 ; Recursive (SIL OFL 1.1, recursive-OFL.txt), cut down by
 ; fontTools to Latin and two instances: sans (casual axis kept, for
 ; thinking) and mono.
@@ -120,6 +126,7 @@
   (highlight.css as prigh-web/highlight.css)
   (resize.css as prigh-web/resize.css)
   (paging.css as prigh-web/paging.css)
+  (jump.css as prigh-web/jump.css)
   (recursive-sans.woff2 as prigh-web/recursive-sans.woff2)
   (recursive-mono.woff2 as prigh-web/recursive-mono.woff2)
   (recursive-OFL.txt as prigh-web/recursive-OFL.txt)

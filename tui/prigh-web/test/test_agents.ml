@@ -275,6 +275,61 @@ let%expect_test "subagents start, nest and show in the panel, live" =
     |}]
 ;;
 
+let%expect_test "what is shown in full stays pinned under what scrolls" =
+  let h = H.create () in
+  H.quiet h (fun () ->
+    survey h;
+    H.key h ~alt:true "2");
+  (* The panel's own head (back, close), the transcript that scrolls, then
+     the footer with the task, how it stands and the actions. *)
+  H.elements h ~selector:".agents-panel > *";
+  H.show h ~selector:".agents-foot";
+  [%expect
+    {|
+    (Focus_agent 2)
+    <div class="resizer resizer-agents">
+    <div class="agents-head">
+    <div class="agents-body">
+    <footer class="agents-foot">
+    <footer aria-label="This subagent" class="agents-foot">
+      <nav aria-label="Started by" class="agents-crumbs">
+        <button type="button" title="a1" class="crumb" @on_click> Survey the repository </button>
+        <span aria-hidden="true" class="crumb-sep"> › </span>
+      </nav>
+      <div class="detail-head running">
+        <h2 class="detail-title">
+          <span class="row-mark">
+            <span title="Running" aria-hidden="true" class="lamp"> </span>
+          </span>
+          <span title="Count the modules" class="detail-task"> Count the modules </span>
+        </h2>
+        <div class="detail-meta">
+          <button type="button"
+                  title="Cancel this subagent (/agents lists the others)"
+                  class="btn small stop"
+                  @on_click>
+            <icon class="stop"> </icon>
+            Cancel
+          </button>
+          <button type="button" class="agents-locate btn ghost small" @on_click>
+            <icon class="locate"> </icon>
+            Show in chat
+          </button>
+          <span class="detail-state"> Running </span>
+
+          <span class="detail-elapsed"> 0s </span>
+
+          <span class="detail-more"> deepseek-flash  1 turn  1 tool call </span>
+        </div>
+      </div>
+    </footer>
+    |}];
+  (* The list has none. *)
+  H.quiet h (fun () -> H.act h Agents_back);
+  H.elements h ~selector:".agents-foot";
+  [%expect {| |}]
+;;
+
 let%expect_test "a subagent in full: its transcript, cancelling it, its card" =
   let h = H.create () in
   survey h;
@@ -288,12 +343,12 @@ let%expect_test "a subagent in full: its transcript, cancelling it, its card" =
     (Focus_agent 2)
     (All agents (Esc))
     Subagent a1/n1
-    (Show in chat) (Close (Alt+0))
-    (Survey the repository) ›
-    Count the modules
-    (Cancel) Running 0s deepseek-flash  1 turn  1 tool call
+    (Close (Alt+0))
     Count the modules
     bash ls lib | wc -l
+    (Survey the repository) ›
+    Count the modules
+    (Cancel) (Show in chat) Running 0s deepseek-flash  1 turn  1 tool call
     |}];
   H.key h ~alt:true "3";
   H.key h ~alt:true ~ctrl:true "1";
@@ -307,7 +362,7 @@ let%expect_test "a subagent in full: its transcript, cancelling it, its card" =
   [%expect
     {|
     (Rpc (method_ cancel_subagent) (params ((agent_id a1/n1))) (tag Show_error))
-    (Stopping…) Running 0s deepseek-flash  1 turn  1 tool call
+    (Stopping…) (Show in chat) Running 0s deepseek-flash  1 turn  1 tool call
     |}];
   H.act h (Show_in_chat "a1/n1");
   [%expect {| (Reveal (s1 n1)) |}];
@@ -360,15 +415,16 @@ let%expect_test "a subagent in full: its transcript, cancelling it, its card" =
            "[cancelled]\n[subagent: 1 turns, 0 in / 0 out tokens, $0.0000]")
     ];
   H.text h ~selector:".agents-detail";
+  H.text h ~selector:".agents-foot";
   [%expect
     {|
     (Rpc (method_ list_subagents) (params ()) (tag Subagents))
-    (Survey the repository) ›
-    – Count the modules
-    Cancelled deepseek-flash  1 turn  1 tool call  $0.01
     Count the modules
     ✓ bash ls lib | wc -l cancelled
     – Cancelled
+    (Survey the repository) ›
+    – Count the modules
+    (Show in chat) Cancelled deepseek-flash  1 turn  1 tool call  $0.01
     |}]
 ;;
 
@@ -453,35 +509,38 @@ let%expect_test
     |}];
   H.act h (Select_item (Agent "a3"));
   H.text h ~selector:".agents-detail";
+  H.text h ~selector:".agents-foot";
   H.act h (Select_item (Agent "a4"));
   H.text h ~selector:".agents-detail";
+  H.text h ~selector:".agents-foot";
   H.act h (Select_item (Agent "a2"));
   H.text h ~selector:".agents-detail";
+  H.text h ~selector:".agents-foot";
   H.act h (Select_item (Job "j1"));
   H.text h ~selector:".detail-head";
   [%expect
     {|
     (Rpc (method_ get_subagent) (params ((id a3) (elide true)))
      (tag (Subagent a3)))
-    – Task a3
-    Cancelled 3s m  1 turn
     Loading the transcript…
     – Cancelled
     half a thought
+    – Task a3
+    (Show in chat) Cancelled 3s m  1 turn
     (Rpc (method_ get_subagent) (params ((id a4) (elide true)))
      (tag (Subagent a4)))
-    – Task a4
-    Interrupted 3s m  1 turn
     Loading the transcript…
     – Interrupted
     the backend stopped before it finished
+    – Task a4
+    (Show in chat) Interrupted 3s m  1 turn
     (Rpc (method_ get_subagent) (params ((id a2) (elide true)))
      (tag (Subagent a2)))
-    ✕ Task a2
-    Failed 1m 05s m  1 turn
     Loading the transcript…
     ✕ Failed
     HTTP 529: overloaded
+    ✕ Task a2
+    (Show in chat) Failed 1m 05s m  1 turn
     (Rpc (method_ job_output) (params ((job_id j1))) (tag (Job_output j1)))
     ✕ make
     Failed 4s exited 2  14 B
@@ -554,11 +613,11 @@ let%expect_test "jobs: listed, their output polled, killed" =
     (All agents (Esc))
     Job j1
     (Close (Alt+0))
-    make test
-    (Kill) Running 3s 11 B
     ok 11 tests
     ok 12 tests
     Output, lines 1-2 of 2  refreshes while it runs
+    make test
+    (Kill) Running 3s 11 B
     |}];
   (* Polled every 2 seconds while the panel is open and it runs. *)
   H.act h (Clock (at 1.));
@@ -735,6 +794,7 @@ let%expect_test "after a reload, a nested subagent's transcript is fetched" =
        "messages":[{"role":"user","text":"Count the modules"},
                    {"role":"assistant","content":[{"type":"text","text":"42 modules"}],"stop_reason":{"type":"end_turn"},"usage":{"input":0,"output":0,"cache_read":0},"model":"deepseek-flash"}]}|};
   H.text h ~selector:".agents-detail";
+  H.text h ~selector:".agents-foot";
   [%expect
     {|
     Scroll_to_bottom
@@ -743,10 +803,10 @@ let%expect_test "after a reload, a nested subagent's transcript is fetched" =
     (Rpc (method_ get_subagent) (params ((id a1/n1) (elide true)))
      (tag (Subagent a1/n1)))
     Loading the transcript…
-    (Survey the repository) ›
-    ✓ Count the modules
-    Done 30s deepseek-flash  2 turns  1 tool call
     Count the modules
     42 modules
+    (Survey the repository) ›
+    ✓ Count the modules
+    (Show in chat) Done 30s deepseek-flash  2 turns  1 tool call
     |}]
 ;;

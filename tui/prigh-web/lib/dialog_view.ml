@@ -20,6 +20,7 @@ let picker_title : Dialog.Picker_kind.t -> string = function
   | Accounts -> "Accounts"
   | Skills -> "Skills"
   | Mcp _ -> "Servers"
+  | Jump -> "Messages"
 ;;
 
 (* What is wrong with the MCP configuration, under its servers. *)

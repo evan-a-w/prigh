@@ -18,6 +18,7 @@ module Picker_kind = struct
     | Accounts
     | Skills
     | Mcp of Mcp_list.t
+    | Jump
   [@@deriving sexp_of, equal]
 end
 
@@ -75,8 +76,9 @@ let per_session = function
   | Loading _
   | Diff _
   | Picker
-      { kind = Fork _ | Rewind _ | Tree | Hosts | Skills | Mcp _ | Modes; _ } ->
-    true
+      { kind = Fork _ | Rewind _ | Tree | Hosts | Skills | Mcp _ | Modes | Jump
+      ; _
+      } -> true
   | Picker
       { kind =
           ( Models

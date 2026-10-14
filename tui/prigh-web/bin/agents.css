@@ -29,9 +29,8 @@
 .agents-id { font: 500 12.5px var(--mono); color: var(--muted); }
 .agents-running { color: var(--sodium); font-size: 12.5px; white-space: nowrap; }
 .agents-close { margin-left: auto; }
-.agents-locate { margin-left: auto; display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
+.agents-locate { white-space: nowrap; }
 .agents-locate .icon { width: 13px; height: 13px; }
-.agents-locate ~ .agents-close { margin-left: 0; }
 .agents-panel .sr-only {
   position: absolute;
   width: 1px;
@@ -208,6 +207,40 @@
 .running > .detail-meta .detail-elapsed { color: var(--sodium); }
 .detail-meta > .btn { float: right; margin: -3px 0 0 12px; display: inline-flex; align-items: center; gap: 6px; }
 .detail-meta .stop .icon { width: 10px; height: 10px; }
+
+/* Pinned under what scrolls (the transcript, the output), so a long one
+   never hides what it is, how it stands and what can be done to it: the
+   title (two lines at most, all of it in the tooltip), then one line of
+   state and data with the actions at its end. */
+.agents-foot {
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 40%;
+  overflow-y: auto;
+  padding: 10px 16px 12px 18px;
+  border-top: 1px solid var(--rule);
+  background: var(--slate);
+  box-shadow: 0 -12px 16px -14px #0000008c;
+}
+.agents-foot .agents-crumbs { margin: 0; }
+.agents-foot .detail-head { padding: 0; border: 0; gap: 4px; }
+.agents-foot .detail-title { font-size: 14px; line-height: 20px; }
+.agents-foot .detail-title .row-mark { line-height: 20px; height: 20px; }
+.agents-foot .detail-task {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  overflow: hidden;
+}
+.agents-foot .detail-command { font-size: 13px; line-height: 20px; }
+.agents-foot .detail-meta { display: flex; flex-wrap: wrap; align-items: center; column-gap: 8px; row-gap: 4px; }
+.agents-foot .detail-meta > span { margin-right: 0; }
+.agents-foot .detail-meta > .btn { float: none; order: 1; margin: 0; }
+.agents-foot .detail-meta > .btn:first-of-type { margin-left: auto; }
+.app.narrow .agents-foot { padding-bottom: max(12px, env(safe-area-inset-bottom)); }
 
 .agents-children { margin: 0 -10px; }
 

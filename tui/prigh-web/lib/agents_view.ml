@@ -512,30 +512,38 @@ let agent_detail (m : App.Model.t) ~inject (a : Agent.t) =
            else Node.pre [ Node.text ended ])
         ]
   in
-  div
-    ~cls:"agents-detail"
-    ~attrs:[ Attr.create "data-shown" ("agent " ^ a.id) ]
-    [ crumbs m ~inject a
+  ( div
+      ~cls:"agents-detail"
+      ~attrs:[ Attr.create "data-shown" ("agent " ^ a.id) ]
+      [ children; transcript; ending_note ]
+  , [ crumbs m ~inject a
     ; detail_head
         ~outcome
-        ~title:(span ~cls:"detail-task" (first_line a.task))
+        ~title:
+          (Node.span
+             ~attrs:
+               [ Attr.class_ "detail-task"; Attr.title (String.strip a.task) ]
+             [ Node.text (first_line a.task) ])
         ~elapsed:(elapsed_label outcome (Agents.agent_elapsed a ~now:(now m)))
         ~meta:(agent_meta m a)
         ~action:
-          (match outcome with
-           | Running ->
-             stop_button
-               m
-               ~inject
-               (Agent a.id)
-               ~label:"Cancel"
-               ~title:"Cancel this subagent (/agents lists the others)"
-               ~action:(Action.Cancel_subagent a.id)
-           | Done | Failed | Stopped _ -> Node.none)
-    ; children
-    ; transcript
-    ; ending_note
-    ]
+          (Node.fragment
+             [ (match outcome with
+                | Running ->
+                  stop_button
+                    m
+                    ~inject
+                    (Agent a.id)
+                    ~label:"Cancel"
+                    ~title:"Cancel this subagent (/agents lists the others)"
+                    ~action:(Action.Cancel_subagent a.id)
+                | Done | Failed | Stopped _ -> Node.none)
+             ; button
+                 ~cls:"ghost small agents-locate"
+                 ~on_click:(inject (Action.Show_in_chat a.id))
+                 [ icon Locate; Node.text "Show in chat" ]
+             ])
+    ] )
 ;;
 
 let job_detail (m : App.Model.t) ~inject (j : Agents.Job.t) =
@@ -545,10 +553,35 @@ let job_detail (m : App.Model.t) ~inject (j : Agents.Job.t) =
     | Some (id, text) when String.equal id j.info.id -> Some (split_output text)
     | _ -> None
   in
-  div
-    ~cls:"agents-detail"
-    ~attrs:[ Attr.create "data-shown" ("job " ^ j.info.id) ]
-    [ detail_head
+  ( div
+      ~cls:"agents-detail"
+      ~attrs:[ Attr.create "data-shown" ("job " ^ j.info.id) ]
+      [ (match output with
+         | None ->
+           div
+             ~cls:"agents-note"
+             [ Html.lamp (); Node.text "Loading the output…" ]
+         | Some (_, text) when String.is_empty (String.strip text) ->
+           div ~cls:"agents-note" [ Node.text "No output yet." ]
+         | Some (lines, text) ->
+           div
+             ~cls:"job-output-block"
+             [ Node.pre ~attrs:[ Attr.class_ "job-output" ] [ Node.text text ]
+             ; div
+                 ~cls:"agents-note small"
+                 [ Node.text
+                     (String.concat
+                        ~sep:"  "
+                        (List.filter_opt
+                           [ Option.map lines ~f:(fun l -> "Output, " ^ l)
+                           ; Option.some_if
+                               j.info.running
+                               "refreshes while it runs"
+                           ]))
+                 ]
+             ])
+      ]
+  , [ detail_head
         ~outcome
         ~title:(span ~cls:"detail-command" j.info.command)
         ~elapsed:(elapsed_label outcome (Agents.job_elapsed j ~now:(now m)))
@@ -570,31 +603,7 @@ let job_detail (m : App.Model.t) ~inject (j : Agents.Job.t) =
                ~title:"Kill this job"
                ~action:(Action.Kill_job j.info.id)
            else Node.none)
-    ; (match output with
-       | None ->
-         div
-           ~cls:"agents-note"
-           [ Html.lamp (); Node.text "Loading the output…" ]
-       | Some (_, text) when String.is_empty (String.strip text) ->
-         div ~cls:"agents-note" [ Node.text "No output yet." ]
-       | Some (lines, text) ->
-         div
-           ~cls:"job-output-block"
-           [ Node.pre ~attrs:[ Attr.class_ "job-output" ] [ Node.text text ]
-           ; div
-               ~cls:"agents-note small"
-               [ Node.text
-                   (String.concat
-                      ~sep:"  "
-                      (List.filter_opt
-                         [ Option.map lines ~f:(fun l -> "Output, " ^ l)
-                         ; Option.some_if
-                             j.info.running
-                             "refreshes while it runs"
-                         ]))
-               ]
-           ])
-    ]
+    ] )
 ;;
 
 let summary (a : Agents.t) =
@@ -636,9 +645,11 @@ let view (m : App.Model.t) ~inject =
       | Some (Job id) ->
         Option.map (Agents.find_job a id) ~f:(fun job -> `Job job)
     in
-    let body =
+    (* What is shown in full: the transcript or output scrolls, what it is
+       and its actions stay in sight below it. *)
+    let body, foot =
       match shown with
-      | None -> list_view m ~inject
+      | None -> list_view m ~inject, []
       | Some (`Agent agent) -> agent_detail m ~inject agent
       | Some (`Job job) -> job_detail m ~inject job
     in
@@ -666,13 +677,6 @@ let view (m : App.Model.t) ~inject =
           ; (match shown, summary a with
              | None, Some (text, true) -> span ~cls:"agents-running" text
              | _ -> Node.none)
-          ; (match shown with
-             | Some (`Agent agent) ->
-               button
-                 ~cls:"ghost small agents-locate"
-                 ~on_click:(inject (Action.Show_in_chat agent.id))
-                 [ icon Locate; Node.text "Show in chat" ]
-             | Some (`Job _) | None -> Node.none)
           ; button
               ~cls:"icon ghost agents-close"
               ~title:"Close (Alt+0)"
@@ -681,6 +685,19 @@ let view (m : App.Model.t) ~inject =
               [ icon Close ]
           ]
       ; div ~cls:"agents-body" ~attrs:[ Attr.id "agents-body" ] [ body ]
+      ; (match foot with
+         | [] -> Node.none
+         | foot ->
+           Node.footer
+             ~attrs:
+               [ Attr.class_ "agents-foot"
+               ; Attr.create
+                   "aria-label"
+                   (match shown with
+                    | Some (`Job _) -> "This job"
+                    | Some (`Agent _) | None -> "This subagent")
+               ]
+             foot)
       ])
 ;;
 

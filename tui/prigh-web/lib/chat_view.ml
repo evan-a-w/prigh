@@ -197,7 +197,8 @@ let footer times (message : Message.Assistant.t) =
 
 module Deps = struct
   type t =
-    { running : bool
+    { n : int
+    ; running : bool
     ; tools : Chat.Tool.t option list
     ; times : Message_time.t
     ; expanded : bool list (** the entry's folds *)
@@ -205,7 +206,8 @@ module Deps = struct
     }
 
   let equal a b =
-    Bool.equal a.running b.running
+    a.n = b.n
+    && Bool.equal a.running b.running
     && List.equal (Option.equal phys_equal) a.tools b.tools
     && Message_time.equal a.times b.times
     && List.equal Bool.equal a.expanded b.expanded
@@ -309,7 +311,7 @@ and render_entry ~fold times chat (entry : Chat.Entry.t) =
 
 (* An entry's card depends on the state of its tool calls, and on whether the
    agent is still running while one of them has no result. *)
-and entry ~fold times chat (entry : Chat.Entry.t) =
+and entry ~fold times chat ~n (entry : Chat.Entry.t) =
   let ids =
     match entry with
     | Assistant { message; _ } ->
@@ -338,7 +340,8 @@ and entry ~fold times chat (entry : Chat.Entry.t) =
     entries
     entry
     ~deps:
-      { Deps.running
+      { Deps.n
+      ; running
       ; tools
       ; times
       ; expanded = List.map ids ~f:(Fold.expanded fold)
@@ -349,7 +352,14 @@ and entry ~fold times chat (entry : Chat.Entry.t) =
             fold
       }
     ~equal:Deps.equal
-    ~f:(fun () -> render_entry ~fold times chat entry)
+    ~f:(fun () ->
+      let node = render_entry ~fold times chat entry in
+      match node with
+      | Element e when Jump.landmark entry ->
+        Element
+          (Node.Element.map_attrs e ~f:(fun a ->
+             Attr.many [ a; Attr.create "data-entry" (Int.to_string n) ]))
+      | node -> node)
 
 (* Entries keep their keys as older ones are added before them, so that the
    page moves their nodes rather than redrawing every one. *)
@@ -389,7 +399,7 @@ and entries_view ~fold times chat =
         in
         ( Option.first_some day last_day
         , i + 1
-        , keyed (Int.to_string i) (entry ~fold times chat e) :: rev_nodes ))
+        , keyed (Int.to_string i) (entry ~fold times chat ~n:i e) :: rev_nodes ))
   in
   div "entries" (List.rev rev_nodes)
 ;;

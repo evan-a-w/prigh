@@ -158,7 +158,8 @@ let%expect_test "/help <command> and /hotkeys" =
     Alt+M cycle the mode: ask → auto-edit → auto → plan (/mode, /plan)
     Ctrl+O cycle the transcript verbosity
     Ctrl+X copy the last reply (when nothing is selected)
-    Ctrl+↑ / Ctrl+↓ previous / next of your messages in the transcript
+    Ctrl+↑ / Ctrl+↓ previous / next of your messages in the transcript (loading earlier ones)
+    Ctrl+J jump to one of your messages: a list to filter (or the marks at the transcript's right edge)
     PageUp / PageDown scroll the transcript
     Ctrl+K search sessions (↓ ↑ through them, Enter opens, Delete deletes)
     A (on a session) archive or unarchive it (archived sessions are listed last, muted)
@@ -379,7 +380,7 @@ let%expect_test "/verbosity and Ctrl+O" =
     <div id="chat" role="region" aria-label="Transcript" tabindex="0" class="chat verbosity-quiet">
       <Vdom.Node.none-widget> </Vdom.Node.none-widget>
       <div class="entries">
-        <div class="msg user">
+        <div data-entry="0" class="msg user">
           <div dir="auto" class="bubble"> fix the build </div>
         </div>
         <div class="assistant msg">
@@ -1391,10 +1392,10 @@ let%expect_test "/agents [n|id|cancel <n|id>]: the agents panel" =
     (Rpc (method_ cancel_subagent) (params ((agent_id a2))) (tag Show_error))
     (All agents (Esc))
     Subagent a2
-    (Show in chat) (Close (Alt+0))
-    lint
-    (Stopping…) Running 30s m  1 turn
+    (Close (Alt+0))
     Loading the transcript…
+    lint
+    (Stopping…) (Show in chat) Running 30s m  1 turn
     (Save_history
      ("/agents cancel a1" "/agents cancel 2" /agents "/agents cancel 1"))
     (Rpc (method_ get_subagent) (params ((id a1) (elide true)))
@@ -1462,18 +1463,18 @@ let%expect_test "/jobs [id|kill <id>]: jobs in the agents panel" =
     (All agents (Esc))
     Job j2
     (Close (Alt+0))
+    No output yet.
     ✓ sleep 1
     Done 1s
-    No output yet.
     (Save_history ("/jobs kill j1" "/jobs j2" /jobs "/jobs j1"))
     (Rpc (method_ job_output) (params ((job_id j1))) (tag (Job_output j1)))
     (Rpc (method_ kill_job) (params ((job_id j1))) (tag Show_error))
     (All agents (Esc))
     Job j1
     (Close (Alt+0))
+    Loading the output…
     make test
     (Stopping…) Running 1m 15s 120 B
-    Loading the output…
     |}];
   List.iter
     [ "/jobs kill j2"; "/jobs j9"; "/jobs kill"; "/jobs a b" ]

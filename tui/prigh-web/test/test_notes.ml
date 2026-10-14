@@ -44,7 +44,7 @@ let%expect_test
   [%expect
     {|
     <div class="entries">
-      <div class="msg noted">
+      <div data-entry="0" class="msg noted">
         <details data-kind="host" class="note">
           <summary>
             <span aria-hidden="true" class="glyph"> ⇄ </span>

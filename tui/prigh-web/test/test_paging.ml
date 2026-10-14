@@ -62,6 +62,8 @@ let%expect_test "the newest page first, older pages on scrolling up" =
   [%expect
     {|
     Scroll_to_bottom
+    (Rpc (method_ get_outline) (params ((session /sessions/s2.jsonl)))
+     (tag (Outline /sessions/s2.jsonl)))
     ((older 4) (before (e5)) (loading false))
     (Show earlier messages) 4 more
     question 3
@@ -541,6 +543,8 @@ let%expect_test "reconnecting with older pages loaded" =
   print_s [%message (kept : int)];
   [%expect
     {|
+    (Rpc (method_ get_outline) (params ((session /sessions/s2.jsonl)))
+     (tag (Outline /sessions/s2.jsonl)))
     ((older 2) (before (e3)) (loading false))
     (Show earlier messages) 2 more
     question 2

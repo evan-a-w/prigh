@@ -256,21 +256,27 @@ let view (m : Model.t) ~inject ~terminal =
            ~f:under_drawer
            [ Topbar_view.view m ~inject
            ; banner m ~inject
-           ; Node.div
-               ~attrs:
-                 [ Attr.classes
-                     [ "chat"
-                     ; "verbosity-" ^ Prigh_ui.Verbosity.name m.verbosity
+           ; div
+               ~cls:"chat-frame"
+               [ Node.div
+                   ~attrs:
+                     [ Attr.classes
+                         [ "chat"
+                         ; "verbosity-" ^ Prigh_ui.Verbosity.name m.verbosity
+                         ]
+                     ; Attr.id "chat"
+                     ; Attr.role "region"
+                     ; Attr.create "aria-label" "Transcript"
+                     ; Attr.tabindex 0
+                     ; (if Option.is_some (loading m)
+                        then Attr.create "aria-busy" "true"
+                        else Attr.empty)
                      ]
-                 ; Attr.id "chat"
-                 ; Attr.role "region"
-                 ; Attr.create "aria-label" "Transcript"
-                 ; Attr.tabindex 0
-                 ; (if Option.is_some (loading m)
-                    then Attr.create "aria-busy" "true"
-                    else Attr.empty)
-                 ]
-               [ chat; jump_to_bottom m ~inject ]
+                   [ chat; jump_to_bottom m ~inject ]
+               ; (match loading m with
+                  | Some _ -> Node.none
+                  | None -> Jump_view.view m ~inject)
+               ]
            ]
          @ [ toasts m ~inject ]
          @ List.map
