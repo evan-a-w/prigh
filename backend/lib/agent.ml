@@ -1174,7 +1174,8 @@ let executor t : Tool.executor =
   if
     (not tool.spec.on_host)
     || (String.equal t.active_host Host.backend_id && t.backend_host_enabled)
-    || Tool_bash.starts_job context arguments
+    || (String.equal (Tool.name tool) (Tool.name Tool_bash.tool)
+        && Tool_bash.runs_in_backend context arguments)
   then Tool.execute tool context arguments
   else
     active_host_exec
@@ -1215,6 +1216,7 @@ let build_system_prompt t =
     ~instructions:files
     ~nix
     ~skills
+    ?auto_background:(Config.auto_background t.config)
     ~cwd:t.cwd
     ~home:t.home
     ~tools:(Tools.specs (tools t))
@@ -1988,8 +1990,8 @@ let subagent_calls messages =
       | User _ | Tool_result _ -> 0)
 ;;
 
-(* Jobs appear as [started job j<n>: ...] results and [[job j<n> ...]]
-   report lines. *)
+(* Jobs appear as [started job j<n>: ...] results, results of calls moved to
+   the background and [[job j<n> ...]] report lines. *)
 let last_job_number messages =
   let number_after s ~prefix =
     Option.bind (String.chop_prefix s ~prefix) ~f:(fun rest ->
@@ -1999,7 +2001,11 @@ let last_job_number messages =
     let numbers =
       match (message : Message.t) with
       | Tool_result r when String.equal r.tool_name "bash" ->
-        Option.to_list (number_after r.text ~prefix:"started job j")
+        Option.to_list
+          (Option.first_some
+             (number_after r.text ~prefix:"started job j")
+             (Option.bind (Tool_bash.moved_job_id r.text) ~f:(fun id ->
+                number_after id ~prefix:"j")))
       | User { text; _ } ->
         List.filter_map
           (String.split_lines text)
@@ -2140,6 +2146,7 @@ let create
   restore_resume t;
   Background_tasks.connect
     t.background
+    ~auto_background:(fun () -> Config.auto_background t.config)
     ~emit:(fun event ->
       account t event;
       broadcast t (Loop event))

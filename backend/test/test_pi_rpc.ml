@@ -622,7 +622,7 @@ let%expect_test "subagents feed the agents rail widget; the parent sees a tool" 
     {"type":"tool_execution_start","toolCallId":"p1","toolName":"subagent","args":{"task":"look around\nin detail"}}
     {"type":"extension_ui_request","id":"widget-subagents","method":"setWidget","widgetKey":"subagents","widgetLines":["PI_SUBAGENT_ASYNC_JSON:{\"generatedAt\":2000,\"omitted\":{\"runs\":0,\"children\":0,\"byteLimitExceeded\":false},\"runs\":[{\"id\":\"a1\",\"kind\":\"subagent\",\"label\":\"look around\",\"state\":\"running\",\"startedAt\":<ms>,\"updatedAt\":<ms>,\"activity\":{\"turnCount\":0,\"toolCount\":0}}]}"]}
     {"type":"extension_ui_request","id":"widget-subagents","method":"setWidget","widgetKey":"subagents","widgetLines":["PI_SUBAGENT_ASYNC_JSON:{\"generatedAt\":3000,\"omitted\":{\"runs\":0,\"children\":0,\"byteLimitExceeded\":false},\"runs\":[{\"id\":\"a1\",\"kind\":\"subagent\",\"label\":\"look around\",\"state\":\"running\",\"startedAt\":<ms>,\"updatedAt\":<ms>,\"activity\":{\"turnCount\":1,\"toolCount\":0}}]}"]}
-    {"type":"tool_execution_end","toolCallId":"p1","toolName":"subagent","args":{"task":"look around\nin detail"},"result":{"content":[{"type":"text","text":"started agent a1 (look around); its result will be delivered to you when it finishes; use subagent_wait to block on it"}]},"isError":false}
+    {"type":"tool_execution_end","toolCallId":"p1","toolName":"subagent","args":{"task":"look around\nin detail"},"result":{"content":[{"type":"text","text":"started agent a1 (look around); its result will be delivered to you when it finishes: keep working or end your turn meanwhile"}]},"isError":false}
     {"type":"extension_ui_request","id":"widget-subagents","method":"setWidget","widgetKey":"subagents","widgetLines":["PI_SUBAGENT_ASYNC_JSON:{\"generatedAt\":4000,\"omitted\":{\"runs\":0,\"children\":0,\"byteLimitExceeded\":false},\"runs\":[{\"id\":\"a1\",\"kind\":\"subagent\",\"label\":\"look around\",\"state\":\"running\",\"startedAt\":<ms>,\"updatedAt\":<ms>,\"activity\":{\"turnCount\":1,\"toolCount\":1,\"currentTool\":\"ls\",\"currentToolStartedAt\":<ms>}}]}"]}
     {"type":"extension_ui_request","id":"widget-subagents","method":"setWidget","widgetKey":"subagents","widgetLines":["PI_SUBAGENT_ASYNC_JSON:{\"generatedAt\":5000,\"omitted\":{\"runs\":0,\"children\":0,\"byteLimitExceeded\":false},\"runs\":[{\"id\":\"a1\",\"kind\":\"subagent\",\"label\":\"look around\",\"state\":\"running\",\"startedAt\":<ms>,\"updatedAt\":<ms>,\"activity\":{\"turnCount\":1,\"toolCount\":1}}]}"]}
     {"type":"extension_ui_request","id":"widget-subagents","method":"setWidget","widgetKey":"subagents","widgetLines":["PI_SUBAGENT_ASYNC_JSON:{\"generatedAt\":6000,\"omitted\":{\"runs\":0,\"children\":0,\"byteLimitExceeded\":false},\"runs\":[{\"id\":\"a1\",\"kind\":\"subagent\",\"label\":\"look around\",\"state\":\"running\",\"startedAt\":<ms>,\"updatedAt\":<ms>,\"activity\":{\"turnCount\":2,\"toolCount\":1}}]}"]}
@@ -694,7 +694,8 @@ let%expect_test "/change_default saves the model and thinking level" =
       "goal_max_continuations": 20,
       "resume_on_limit_reset": true,
       "archive_after_days": 7,
-      "notify": "bell"
+      "notify": "bell",
+      "auto_background_seconds": 30
     }
     |}]
 ;;

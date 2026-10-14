@@ -13,6 +13,14 @@ let description =
    read. Do not use for reading or editing files; use the dedicated tools."
 ;;
 
+let auto_description =
+  description
+  ^ " A command still running after a while (about 30 seconds by default) is \
+     moved to the background as a job, without being restarted: the call \
+     returns with its job id and output so far, and its report arrives when it \
+     exits."
+;;
+
 let command_parameters =
   [ "command", `String, "The command to run"
   ; ( "timeout"
@@ -22,7 +30,7 @@ let command_parameters =
   ]
 ;;
 
-let spec_with parameters =
+let spec_with ?(description = description) parameters =
   { Tool_spec.name = "bash"
   ; parallel_safe = false
   ; on_host = true
@@ -35,14 +43,16 @@ let spec_with parameters =
 
 let spec =
   spec_with
+    ~description:auto_description
     (command_parameters
      @ [ ( "background"
          , `Boolean
          , "Start it as a background job and return at once with the job id. \
             You are notified with the exit status and output tail when it \
             exits; job_output, job_wait, job_input and job_kill act on it \
-            meanwhile. Use for anything that may take over a minute or keeps \
-            running (builds, test suites, servers, watchers)." )
+            meanwhile. Use it for anything that may take long or keeps running \
+            (builds, test suites, installs, servers, watchers), then carry on \
+            with other work or end your turn." )
        ; ( "stdin"
          , `Boolean
          , "With background: keep its stdin open (a pipe, not a terminal) for \
@@ -217,6 +227,16 @@ let starts_job (context : Tool.Context.t) args =
   | _ -> false
 ;;
 
+let auto_background (context : Tool.Context.t) args =
+  if context.depth = 0 && not (starts_job context args)
+  then Option.bind context.background ~f:Background_tasks.auto_background
+  else None
+;;
+
+let runs_in_backend context args =
+  starts_job context args || Option.is_some (auto_background context args)
+;;
+
 let foreground_arguments args =
   let fields =
     List.filter (fields args) ~f:(fun (name, _) ->
@@ -329,8 +349,114 @@ let started_message ~id ~command =
     (Background_tasks.short_task command)
 ;;
 
+let moved_prefix = "moved to the background as job "
+let moved_tail_lines = 10
+
+let moved_message ~id ~after ~output =
+  let lines = Output_tail.lines output in
+  let shown = List.drop lines (List.length lines - moved_tail_lines) in
+  let so_far =
+    match shown with
+    | [] -> "No output so far."
+    | shown ->
+      sprintf
+        "Output so far%s:\n%s"
+        (if List.length shown < List.length lines
+         then
+           sprintf
+             " (last %d of %d lines)"
+             (List.length shown)
+             (List.length lines)
+         else "")
+        (Truncate.tail
+           ~max_lines:moved_tail_lines
+           ~max_bytes:4096
+           (String.concat ~sep:"\n" shown))
+          .text
+  in
+  sprintf
+    "still running after %s, so it was %s%s (not restarted: it keeps running). \
+     %s\n\
+     Its report ([job %s exited ...] and its last lines) is delivered to you \
+     when it exits: keep working on something else or end your turn. \
+     job_output shows more output, job_kill stops it; do not job_wait on it \
+     unless you truly cannot do anything else."
+    (Background_tasks.seconds_text after)
+    moved_prefix
+    id
+    so_far
+    id
+;;
+
+let moved_job_id text =
+  let open Option.Let_syntax in
+  let%bind rest = String.chop_prefix text ~prefix:"still running after " in
+  let%bind index = String.substr_index rest ~pattern:moved_prefix in
+  let rest = String.drop_prefix rest (index + String.length moved_prefix) in
+  let id = String.take_while rest ~f:Char.is_alphanum in
+  Option.some_if (not (String.is_empty id)) id
+;;
+
+(* Without its own timeout a command is not killed after [default_timeout]
+   once it has moved to the background, like a job. *)
+let auto_arguments args ~after =
+  if
+    List.Assoc.mem (fields args) ~equal:String.equal "timeout"
+    || Float.( >= ) after (Time_ns.Span.to_sec default_timeout)
+  then args
+  else
+    `Object
+      (fields args @ [ "timeout", `Number (Int.to_string job_timeout_seconds) ])
+;;
+
+let refused_stdin () =
+  let feed = Stdin_feed.create () in
+  ignore (Stdin_feed.write feed "" ~close:true : unit Or_error.t);
+  Stdin_feed.refuse
+    feed
+    "it was moved to the background from a foreground call, whose stdin is \
+     closed; start it again with bash, background: true and stdin: true to \
+     send it input";
+  feed
+;;
+
+let run_auto (context : Tool.Context.t) background args ~after =
+  let command = Tool_args.string args "command" in
+  ignore (Tool_args.int_opt args "timeout" : int option);
+  let arguments = auto_arguments args ~after in
+  match
+    Background_tasks.run_foreground
+      background
+      ~kind:Job
+      ~label:command
+      ~input:(refused_stdin ())
+      ~after
+      ~cancel:context.cancel
+      ~on_output:context.on_output
+      ~run:(fun ~cancel ~on_output ->
+        Tool.execute_via
+          { context with cancel; on_output; background = None }
+          foreground_tool
+          arguments)
+      ~outcome:(fun result ~output -> job_outcome result ~output)
+  with
+  | Finished result -> result
+  | Moved task ->
+    Tool.Result.ok
+      (moved_message
+         ~id:(Background_tasks.Task.id task)
+         ~after
+         ~output:(Background_tasks.Task.output task))
+;;
+
 let run (context : Tool.Context.t) args =
   match context.background with
+  | Some background when Option.is_some (auto_background context args) ->
+    run_auto
+      context
+      background
+      args
+      ~after:(Option.value_exn (auto_background context args))
   | Some background when starts_job context args ->
     let command = Tool_args.string args "command" in
     ignore (Tool_args.int_opt args "timeout" : int option);

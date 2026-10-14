@@ -772,7 +772,8 @@ cancelled) its report is handed to the main agent as a message starting
 `[subagent a1 finished]`: an idle agent starts a turn for it, a running one
 gets it after its current tool calls (several finishing together arrive as one
 message). The model also has `subagent_wait` (block on some or all of them,
-optionally with a timeout; what it returns is not delivered again),
+optionally with a timeout; what it returns is not delivered again; it
+returns after `auto_background_seconds`, below, with what is still running),
 `subagent_status` and `subagent_cancel`. Subagents started by a subagent stay
 synchronous (and cannot delegate further).
 
@@ -787,8 +788,8 @@ first lines.
 
 Long commands run as background jobs: the model calls `bash` with
 `background: true` (the system prompt tells it to for anything that may take
-more than about a minute: builds, test suites, deployments, servers,
-watchers) and gets `started job j1: ...` back at once. The job runs on the
+long: builds, test suites, installs, deployments, servers, watchers) and
+gets `started job j1: ...` back at once. The job runs on the
 session's active tool host like any `bash` call (the backend, or a frontend's
 `prigh tool-host`), with no default timeout; its output is kept in memory
 (the last 1 MB). When it exits, a message like `[job j1 exited 0] make test`
@@ -800,6 +801,25 @@ model also has `job_status`, `job_output` (peek at recent output, paging back
 with `offset`), `job_wait` (block on some or all jobs; returned reports are
 not delivered again), `job_input` and `job_kill`. Subagents' `bash` has no
 `background`.
+
+The main agent never stalls on a long command or a wait.
+`auto_background_seconds` in `config.json` (default 30; `0` turns it off)
+is how long a foreground `bash` call of the main agent may run: one still
+running then is moved to the background without being restarted. It
+becomes the next job (`j3`), keeping its output so far, its process and
+the tool host it runs on, and the call returns at once with `still
+running after 30s, so it was moved to the background as job j3 ...` and
+the last lines of output; from then on it is a job like any other
+(`job_output`, `job_kill`; `job_input` says its stdin is closed), and its
+report arrives when it exits. A command given no `timeout` then has none,
+like a job; one with a `timeout` keeps it. The time counts from when the
+command starts, not while a confirmation waits for you. `job_wait` and
+`subagent_wait` return after the same limit (their `timeout` can be
+shorter, not longer) with what is still running, whose reports are still
+delivered later, once. The system prompt and the tool descriptions tell
+the model to keep working or end its turn rather than wait. Subagents'
+own `bash` calls stay in the foreground. The tool card shows `job j3` and
+`moved to the background after 30s` with the output it had then.
 
 A job started with `stdin: true` gets a pipe for its stdin that stays
 open, so the model can drive interactive programs: `job_input {id, input,
@@ -822,14 +842,17 @@ report shows as `↩ job j1 exited 0 "make test"` with its output tail.
 
 Esc/abort stops the main turn only; background subagents and jobs keep
 running (reports that are ready when you abort wait for your next message).
+A foreground command is killed by an abort until it has moved to the
+background; after that it is a job and keeps running.
 They belong to their session: `/new` or switching sessions leaves them running
 in the old session (which stays live until they finish and deliver there).
 Stopping the backend kills running jobs and loses running subagents; nothing
 is resumed, and the session simply has no report for them. Job ids continue
 after a restart (`j3` after a session that already had `j1` and `j2`).
 Headless `prigh run` waits for running subagents and jobs, and the turns that
-their reports start, before it exits (a server started in the background
-keeps it running until the model kills it, or you interrupt it).
+their reports start, before it exits (a server started in the background,
+or run in the foreground and moved there, keeps it running until the model
+kills it, or you interrupt it).
 
 Typing `/` opens inline autocomplete (commands, then per-command arguments
 such as models, sessions and directories). Typing `@` completes file paths
@@ -893,7 +916,9 @@ it is replaced by `approval_mode` when prigh saves the file),
 `permissions` (allow/ask/deny rules, below; edited by hand) and
 `default_model`/`default_thinking` (what new sessions start with unless
 `-model`/`-thinking` is given; `/change_default` saves the current ones),
-and `notify` (`off`, `bell` or `desktop`; the TUI's `/notify`).
+`notify` (`off`, `bell` or `desktop`; the TUI's `/notify`) and
+`auto_background_seconds` (default 30, `0` = never: when a foreground
+command moves to the background and how long a wait lasts, above).
 Without a `default_thinking`, sessions start with thinking `on`; models that
 cannot think ignore it. A fallback model keeps the session's thinking level.
 

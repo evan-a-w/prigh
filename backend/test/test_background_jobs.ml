@@ -338,7 +338,7 @@ let%expect_test
     user: go
     assistant:  subagent{"task":"look"} bash{"command":"while [ ! -f gate ]; do sleep 0.02; done; echo built","background":true}
     state: running=true subagents=[a1 running] jobs=[]
-    tool_result subagent: started agent a1 (look); its result will be delivered to you when it finishes; use subagent_wait to block on it
+    tool_result subagent: started agent a1 (look); its result will be delivered to you when it finishes: keep working or end your turn meanwhile
     state: running=true subagents=[a1 running] jobs=[j1 running]
     tool_result bash: started job j1: while [ ! -f gate ]; do sleep 0.02; done; echo built; its output is being recorded; you will be notified when it exits. Use job_output to peek, job_wait to block, job_kill to stop it.
     assistant:  hold{}
@@ -354,7 +354,7 @@ let%expect_test
     --- messages
     user: go
     assistant:  subagent{"task":"look"} bash{"command":"while [ ! -f gate ]; do sleep 0.02; done; echo built","background":true}
-    tool_result subagent: started agent a1 (look); its result will be delivered to you when it finishes; use subagent_wait to block on it
+    tool_result subagent: started agent a1 (look); its result will be delivered to you when it finishes: keep working or end your turn meanwhile
     tool_result bash: started job j1: while [ ! -f gate ]; do sleep 0.02; done; echo built; its output is being recorded; you will be notified when it exits. Use job_output to peek, job_wait to block, job_kill to stop it.
     assistant:  hold{}
     tool_result hold: held

@@ -307,7 +307,7 @@ let%expect_test "a subagent's calls are checked too, under its agent id" =
   [%expect
     {|
     mode=ask plan=none rules=[]
-    subagent {"task":"clean up"} -> started agent a1 (clean up); its result will be delivered to you when it finishes; use subagent_wait to block on it
+    subagent {"task":"clean up"} -> started agent a1 (clean up); its result will be delivered to you when it finishes: keep working or end your turn meanwhile
     confirm a1/s1 bash: rm -rf build [bash(rm:*)]
       -> (Deny())
       [a1] bash -> ERROR [denied by user]
@@ -358,9 +358,9 @@ let%expect_test
   [%expect
     {|
     mode=auto plan=none rules=[]
-    subagent {"task":"write","cwd":"/"} -> started agent a1 (write); its result will be delivered to you when it finishes; use subagent_wait to block on it
+    subagent {"task":"write","cwd":"/"} -> started agent a1 (write); its result will be delivered to you when it finishes: keep working or end your turn meanwhile
       [a1] write -> ERROR [denied by the rule edit(secrets/**) in permissions.deny; do not try to get around it: ask the user]
-    subagent {"task":"pwd","cwd":"secrets"} -> started agent a2 (pwd); its result will be delivered to you when it finishes; use subagent_wait to block on it
+    subagent {"task":"pwd","cwd":"secrets"} -> started agent a2 (pwd); its result will be delivered to you when it finishes: keep working or end your turn meanwhile
       [a2] bash -> $DIR/secrets
     |}]
 ;;
@@ -896,7 +896,8 @@ let%expect_test
       "goal_max_continuations": 20,
       "resume_on_limit_reset": true,
       "archive_after_days": 7,
-      "notify": "bell"
+      "notify": "bell",
+      "auto_background_seconds": 30
     }
     |}]
 ;;

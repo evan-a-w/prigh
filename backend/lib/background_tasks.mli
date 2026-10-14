@@ -10,6 +10,9 @@ open! Import
 (** The first line of a task or command, at most 60 characters. *)
 val short_task : string -> string
 
+(** [30s], [0.5s]. *)
+val seconds_text : float -> string
+
 module Kind : sig
   type t =
     | Subagent (** ids [a<n>] *)
@@ -86,12 +89,18 @@ val avoid_subagent_ids : t -> string list -> unit
 
 (** [emit] receives the tasks' events (the agent broadcasts them and rolls up
     their usage); [on_change] is called whenever a task starts, finishes or is
-    delivered, after its state is updated. *)
+    delivered, after its state is updated. [auto_background] (default: never)
+    is how many seconds a foreground command may run before it is moved to
+    the background ({!run_foreground}), which also caps waits ([wait]'s
+    callers); it is asked each time, so it follows the configuration. *)
 val connect
-  :  t
+  :  ?auto_background:(unit -> float option)
+  -> t
   -> emit:(Agent_event.t -> unit)
   -> on_change:(unit -> unit)
   -> unit
+
+val auto_background : t -> float option
 
 (** Starts [run] in a fiber of its own and returns the task id. [run] gets the
     id, the task's own cancellation token, the event sink (whose events also
@@ -108,6 +117,35 @@ val spawn
         -> on_output:(string -> unit)
         -> Outcome.t)
   -> string
+
+module Foreground : sig
+  type 'a t =
+    | Finished of 'a
+    | Moved of Task.t
+    (** still running after [after] seconds: it became this task (with the
+        next id of its kind), which keeps running and is delivered like a
+        spawned one *)
+end
+
+(** Runs [run] for the calling fiber, in a fiber of the tasks' switch, and
+    waits for it up to [after] seconds. Until then its output goes to
+    [on_output] (and is kept), and [cancel] cancels it (the call then waits
+    for it to end). If it is still running then, it is moved to the
+    background without being restarted: a task whose output so far is
+    [run]'s, whose outcome is [outcome] of [run]'s result, and whose
+    cancellation (for [cancel]/[job_kill]) is [run]'s. Exceptions [run]
+    raises before that are raised here. *)
+val run_foreground
+  :  ?input:Stdin_feed.t
+  -> t
+  -> kind:Kind.t
+  -> label:string
+  -> after:float
+  -> cancel:Cancellation.t
+  -> on_output:(string -> unit)
+  -> run:(cancel:Cancellation.t -> on_output:(string -> unit) -> 'a)
+  -> outcome:('a -> output:Output_tail.t -> Outcome.t)
+  -> 'a Foreground.t
 
 (** Every task of [kind], oldest first. *)
 val tasks : t -> kind:Kind.t -> Task.t list
@@ -143,6 +181,19 @@ val wait
   -> timeout:float option
   -> cancel:Cancellation.t
   -> Wait_result.t Or_error.t
+
+(** [job_wait] and [subagent_wait]: [wait] for at most [timeout] seconds and
+    at most {!auto_background} (so a wait never blocks the agent for long),
+    as the tool's result text: the reports of the tasks that finished, then
+    those still running and what to do about them. *)
+val wait_text
+  :  t
+  -> kind:Kind.t
+  -> ids:string list option
+  -> all:bool
+  -> timeout:int option
+  -> cancel:Cancellation.t
+  -> string Or_error.t
 
 (** Requests cancellation; the task still finishes and is delivered as
     usual. *)
