@@ -1494,6 +1494,34 @@ copy of the protocol types and the e2e test guards the contract.
       card says the output from meanwhile shows with the result. Outputs cut by the
       backend (`elided`) show their first and last lines, and unfolding one
       fetches it whole (`get_tool_output`, `Load_output`).
+    - Jumping around: `Jump` (pure) gives the transcript's landmarks
+      (`Point`s: the user's messages — what they wrote, a skill as
+      `/skill:NAME`, their `/goal`/`/review`/`/init` — compactions and
+      replies that ended with an error), oldest first: those before the
+      first message loaded from the session's `get_outline` (`Model.jump`,
+      asked for with each newest page while older messages are not loaded,
+      dropped on switching session and on `compacted`; an older backend
+      without it only loses those), then those of `Chat`. A `Target` is a
+      loaded entry (`Entry n`, which `Chat_view` marks `data-entry=n`) or a
+      message not loaded (`Message index`): `Jump_to` the latter asks for the
+      page from it to the first loaded in one request (`limit: older -
+      index`, tagged `Page` like `Load_older`; while another page is on its
+      way, once it is in) and `Jump.entry_of_index` finds its entry in the
+      page added, for `Command.Scroll_to_entry`. `Jump_view` (beside the
+      chat, in `.chat-frame`, once the user has sent two messages) is the
+      jump list's button and, but on a phone, the rail: a mark per landmark
+      (at most ~120, picked evenly), evenly spaced rather than by height so
+      that each is as easy to hit and the marks not loaded have a place,
+      each a button with the message's first line and time as its label and
+      tooltip (`tabindex=-1`: the list is the keyboard's way); made again
+      only when the landmarks change, so not per streamed delta or key.
+      Ctrl+J (`Open_jump_list`) is a `Picker` of the user's messages, newest
+      first. Ctrl+↑/↓ stay the page's (`Jump_to_user_message`), which sends
+      `Jump_older` when none is above the first loaded. `app/`'s
+      `Jump_listeners` marks the rail's mark of the landmark at the upper
+      third of the view (`aria-current`, as the chat scrolls) and the entry
+      jumped to (`.jumped`, a fading sodium ring; still, under reduced
+      motion, until taken off).
     - The transcript: `Chat` (one agent: a page of messages then events; each
       tool call's streamed output and result; subagents' nested chats,
       fetched with `get_subagent` after a reload since `get_messages` only
@@ -1546,7 +1574,9 @@ copy of the protocol types and the e2e test guards the contract.
       report's prefix: `[cancelled]`/`[interrupted]`/a killed job are
       "stopped", not failed; a subagent in full — its transcript is the one in `Chat`, found by
       agent id at any depth, fetched with `get_subagent` when nested ones
-      are missing after a reload — or a job's output; the status line's
+      are missing after a reload — or a job's output, with what it is
+      (crumbs, task, state, data, Cancel/Kill, "Show in chat") in a footer
+      pinned under the scrolling body; the status line's
       summary and the top bar's toggle). Elapsed times tick with `Clock`,
       which the page sends every second only while the panel is open with
       something running (`Model.ticking`); running jobs are then polled
@@ -1947,7 +1977,8 @@ banner) and restarting on the same port (the page reconnects to the same
 session and runs another prompt), and the agents panel (a background
 subagent running a synchronous one and a background job: the list, the
 nested one in full via Alt+2 and its card revealed in the chat, the job's
-output, a card in the chat opening its agent), and the terminal panel (a
+output, a card in the chat opening its agent, its footer staying at the
+panel's foot as a short window's transcript scrolls), and the terminal panel (a
 real shell through tmux, on a private tmux server via `TMUX_TMPDIR` with
 `SHELL=/bin/sh` and a fixed prompt: typed output, Esc reaching `cat -v`,
 `stty size` matching xterm.js's rows before and after dragging the panel
@@ -1980,6 +2011,10 @@ session written into the backend's `HOME` opens at its newest page (how
 many earlier messages, at the end); scrolling to the top loads the pages
 before, the message that showed staying in place (within 4px), up to the
 first message; a 2000-line output shows cut and loads whole when unfolded;
-a reload scrolled up into an older page comes back to the same place.
+a reload scrolled up into an older page comes back to the same place; in
+a fresh tab the rail has a mark per message (those not loaded faint), a
+mark's tooltip names its message, a click goes there (marked, and marked
+in view on the rail), one not loaded loads the pages down to it, Ctrl+J's
+list filters and goes there, and on a phone only its button shows.
 `SHOTS=DIR` saves a screenshot per step, `UPDATE=1` re-records,
 `ENGINES=chromium` runs one browser.

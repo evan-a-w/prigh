@@ -295,6 +295,18 @@ you come back to (or that ran while the connection was down) keeps what it
 streamed before and goes on from where it is now; its card says the output
 from meanwhile shows with its result.
 
+To get around a long session without scrolling, a rail along the chat's
+right edge has a mark for each of your messages (and a brick dot for a
+reply that failed, a longer rule where the context was compacted): the
+one you are reading is drawn out in sodium, hovering a mark shows the
+message's first line and time, and a click goes there, marking it for a
+moment. Messages not loaded yet have faint marks, and jumping to one loads
+the pages down to it first. The button above the rail, Ctrl+J, opens the
+same messages as a list to filter (newest first; on a phone, where there
+is no rail, the button floats over the chat's corner), and Ctrl+↑/↓ step
+to your previous or next message, loading earlier ones past the first
+loaded.
+
 Losing the connection (a flaky mobile network, the phone locked, the
 backend restarting) changes nothing on the page: the banner sits over the
 top of the chat, and once back the session's new messages are merged into
@@ -333,9 +345,10 @@ runs (with its live elapsed time, current tool, model and turns) or how it
 ended (done, failed with the error, or cancelled, interrupted by a restart
 or killed, shown quietly), and the background jobs the same way with their
 last line. Selecting one shows a subagent's live transcript at the panel's
-width and how it ended (with Cancel while it runs, and "Show in chat" in
-the panel's header, which scrolls to its card) or a job's output (with
-Kill). It opens from the status line ("2 agents running"), the top bar's
+width or a job's output, with what it is pinned under it however far you
+scroll: its task (and who started it), how it stands or ended, its model,
+turns and time, Cancel while it runs (Kill for a job) and "Show in chat",
+which scrolls to its card. It opens from the status line ("2 agents running"), the top bar's
 robot button, a subagent's card in the chat, `/agents [n|id]` and `/jobs
 [id]`, and Alt+1…9 (the Nth listed; Alt+] and Alt+[ step through them, Alt+0 closes
 it, Esc goes back from outside the editor). Unlike the TUI, Shift+Tab is
@@ -507,7 +520,8 @@ reason typed in the dialog, Esc going back to the buttons), the plan of
 radio buttons or checkboxes with an "Other" field (keys as in the TUI, or
 clicks). Ctrl+P/Alt+P cycle the scoped
 models, Alt+T the thinking level (Ctrl+T is the browser's), Alt+↑ takes
-back a queued message, Ctrl+↑/↓ jump between your messages; `/help` and
+back a queued message, Ctrl+↑/↓ jump between your messages and Ctrl+J
+lists them; `/help` and
 `/hotkeys` also list the TUI's keys that the browser keeps (Ctrl+C, Ctrl+Z, Ctrl+F, Ctrl+R, $EDITOR's Ctrl+G)
 and what to use instead, and `/quit` says to close the tab.
 
