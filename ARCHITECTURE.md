@@ -862,7 +862,12 @@ two can share one.
   it, `data_dir`, for per-session data; `delete_files` removes both),
   most recently modified first; it caches each file's summary by (path,
   size, mtime), so only changed files are parsed again (300 sessions of
-  50 messages: `list_sessions` 170 ms → 3.5 ms). `Summary.is_archived`:
+  50 messages: `list_sessions` 170 ms → 3.5 ms). `list_with` (what
+  `Rpc_server` uses) sums up the live sessions (whose files grow with every
+  message) from memory instead of parsing them again (an 80 MB session
+  being worked on: `list_sessions` 950 ms → 3 ms), and parses the others
+  with the given `load`. `load ~yield` calls `yield` every 256 KB parsed
+  (the server passes `Fiber.yield`). `Summary.is_archived`:
   never while a run or background work is going on, else archived by hand,
   else when the last activity is older than `archive_after_days`.
   `export` writes markdown or copies the JSONL,
@@ -919,7 +924,33 @@ two can share one.
   WebSocket text message per line: reader loop, one outbox fiber, and one fiber per
   request so a blocking method such as `shell` or a remote tool round trip
   never stalls the reader that must deliver the client's own
-  `tool_exec_result`). Agent events are routed to the clients attached to
+  `tool_exec_result`). Nothing waits for a peer: what a connection sends
+  goes into its `Outbox`, a queue that never blocks the sender (an agent's
+  events, the broadcasts to every client such as `sessions_changed`, other
+  clients' requests). Before, a page that stopped reading (a suspended
+  laptop, a phone gone behind a proxy that keeps its socket) filled a
+  bounded queue, and then the agent emitting events to it, and every
+  request broadcasting to all clients, waited forever: every session of the
+  backend stopped until a restart. A peer more than 10000 messages (or
+  256 MiB) behind, a failed write (`write_line` raising; a WebSocket that
+  closed) or `Client.close` fail the outbox, which ends the connection: the
+  reader stops, the write stuck on the peer is given up, and the requests
+  still running are cancelled. Requests are also cancelled when the peer
+  closes, unless `finish_requests` (stdio, which a script may close before
+  reading the answers); one that raises is logged and answered with
+  nothing, without ending the connection. `hello`'s optional `tab` names
+  the page instance (prigh-web sends a random id per page load): a newer
+  connection with the same `tab` ends the older one (`a newer connection
+  from the same page took over` on stderr), whose network may have gone
+  without a word. Every connection the backend ends says why on stderr
+  (`prigh: closing the connection of NAME: …`). Session files are read by
+  `load_session`: one parse per file at a time (others wanting it wait for
+  it, and it finishes for the cache when its requester goes), yielding to
+  the other fibers as it goes (an 80 MB file: other clients' pings waited
+  920 ms, now 240 ms at most; parsing on another domain is not possible,
+  as Jsonaf's parser is not domain-safe: a request parsed meanwhile was
+  lost); a session opened by two clients at once is checked again after
+  the parse, so it gets one agent. Agent events are routed to the clients attached to
   that agent, except `tool_exec`/`tool_exec_cancel`, which go to the named
   host only. A login's URL, prompts and progress go only to the client that
   started it (another frontend, perhaps on another machine, must not open a
@@ -1035,7 +1066,12 @@ two can share one.
   for `prigh serve`'s listeners and `prigh tool-host -connect`.
 - `Websocket` — a minimal RFC 6455 server side (handshake key, frame
   encode/decode with client masking, fragment reassembly, ping/pong and
-  close) and `Web_server` — the `-web` listener: a connection whose first
+  close; `keepalive` pings every 15s while nothing is being written and
+  shuts the socket down when the peer sent nothing for 45s since the last
+  long write, or one write has been stuck for 5 minutes: a dead peer behind
+  a proxy that keeps the socket open is noticed, and the read and write
+  stuck on it end) and `Web_server` — the `-web` listener (every upgraded
+  socket runs with `keepalive`, which cancels its handler): a connection whose first
   byte is `{` is a plain JSON-lines client (the TUI's `-connect`) and goes
   straight to `Rpc_server.serve_lines`, so one port serves terminals and
   browsers alike; otherwise one HTTP/1.1 request per connection, `GET /ws`
@@ -1188,7 +1224,8 @@ copy of the protocol types and the e2e test guards the contract.
   tests) and `Client` (created with a `connect` thunk and
   reconnectable: correlates responses by id, fans out events, stderr and
   `Closed` on one `Incoming.t` pipe that outlives the transport, fails calls
-  with "not connected" in between). `client_unix/` (`prigh_client_unix`)
+  with "not connected" in between; `received` and `waiting` count the lines
+  received and the calls waiting, for prigh-web's probe). `client_unix/` (`prigh_client_unix`)
   has the transports that need a process or a socket — `Stdio_transport`
   spawns the backend, `Tcp_transport` connects to `-listen` — and
   `Tool_host` (spawns `prigh tool-host` lazily and proxies
@@ -1467,7 +1504,31 @@ copy of the protocol types and the e2e test guards the contract.
       meanwhile) its newest page replaces it. `Network false` drops the socket (`Drop_connection`);
       `Network true` and the page shown again reconnect at once with the
       backoff reset, or, while connected, `Probe_connection` (a `get_state`
-      that must answer within 5s, else the socket is dropped). A refusal
+      that must answer within 8s, else the socket is dropped; a minute at
+      most while other answers are still on their way or anything keeps
+      arriving, since on a slow network ours queues behind them: dropping
+      such a working connection, then fetching everything again over it,
+      was a loop). `Drops` counts the connections lost before they brought
+      the session back (state, and the messages fetched again): each such
+      loss starts the next attempt further into the backoff (250 ms
+      doubling, 30s at most; the page adds ±20% jitter), and after
+      `Drops.give_up_after` (6) in a row the page stops (`Connection` stays
+      `Reconnecting` with nothing scheduled; the network or the page shown
+      again do not restart it) and the banner says "The backend keeps
+      dropping the connection while loading this session: open another
+      session, or reload" with Retry now (one more attempt), Another
+      session and Reload (`Reload_page`, without or with `?session=`); the
+      status line says "Stopped reconnecting". Before, a connection lost
+      after its `hello` was answered was retried at once, without backoff,
+      with a "Reconnected" toast each time ("Reconnected ×86" in
+      production). A connection that brings the session back starts the
+      count over, and only then says "Reconnected" (`settle`, after every
+      update). Failing to connect at all (the backend restarting) never
+      gives up. The socket must open within 10s and `hello` answer within
+      30s more (the backend may be reading a large session for it), and
+      `Reconnect_gate` lets the newest attempt say hello also on a socket
+      an older attempt opened (whose late answer no longer counts: the page
+      stayed "reconnecting" on an open socket). A refusal
       (`unauthorised…`) is `Auth_failed`, the only way back to the sign-in
       page; a session the backend no longer has (`Session_gone`, from the
       page's `hello` falling back to no session) stays on show read-only
@@ -1942,6 +2003,18 @@ TUI's `test_app_approvals.ml`, prigh-web's `test_approvals.ml`, the e2e's
 approvals block and the tmux scenarios `approvals`, `plan` and `question`
 cover the frontends.
 
+`backend/test/test_connection.ml` covers peers that do not keep up: a
+connection that never reads while its session streams thousands of events
+(the run finishes, everyone is served, a rename and prompts in other
+sessions too, and the connection ends once 10000 messages behind), a
+failed write ending its connection, a closed connection's running
+request cancelled (stdio's finishing), a slow request not holding up the
+others, a newer connection from the same page taking over, two pages
+opening a saved session at once getting one agent, live sessions listed
+from memory, the outbox, and `Websocket.keepalive` over a socket pair (a
+peer answering pings stays, a silent one and a write stuck on a peer that
+does not read are shut down).
+
 `backend/test/test_host_reconnect.ml` covers tool hosts going away: a
 session stays on its disconnected host (also when another host attaches),
 tool calls say it waits for the host, the host reconnecting with the same
@@ -2046,6 +2119,13 @@ a reload scrolled up into an older page comes back to the same place; in
 a fresh tab the rail has a mark per message (those not loaded faint), a
 mark's tooltip names its message, a click goes there (marked, and marked
 in view on the rail), one not loaded loads the pages down to it, Ctrl+J's
-list filters and goes there, and on a phone only its button shows.
+list filters and goes there, and on a phone only its button shows. Then
+`resilience.mjs`: a 400-turn session (a large outline) behind a wrapped
+`WebSocket` that delivers messages at 8 kB/s while the page is shown again
+every 2.5s (one reconnect, after which the session comes back; the old page
+dropped the working connection again and again), then closes each socket
+as the session's messages arrive (the page gives up after six, with the
+banner, never saying "Reconnected", and opens no more sockets; the old page
+opened 900 in 30s), then "Retry now" once the connection holds.
 `SHOTS=DIR` saves a screenshot per step, `UPDATE=1` re-records,
 `ENGINES=chromium` runs one browser.
