@@ -548,7 +548,7 @@ kbd {
   right: 0;
   background: linear-gradient(var(--sodium-wash), var(--sodium-wash)), var(--graphite);
 }
-.banner.gone { flex-wrap: wrap; text-align: center; }
+.banner:is(.gone, .gave-up) { flex-wrap: wrap; text-align: center; }
 
 /* A tool confirmation: what will run, then an answer per key */
 

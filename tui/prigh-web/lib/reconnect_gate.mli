@@ -15,5 +15,7 @@ val create : unit -> t
 val schedule : t -> generation:int -> unit
 
 (** An attempt of [generation] is due: whether it goes ahead, i.e. no newer
-    one was scheduled since and the socket is not open. *)
-val due : t -> generation:int -> connected:bool -> bool
+    one was scheduled since. It goes ahead also when the socket is open: an
+    older attempt may have opened it and had its [hello] answered too late
+    to count, and only a [hello] of this generation brings the page back. *)
+val due : t -> generation:int -> bool

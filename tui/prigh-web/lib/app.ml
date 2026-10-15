@@ -174,6 +174,9 @@ module Command = struct
     (** the socket may have died unnoticed (a suspended page, a new network):
         drop it unless the backend answers soon *)
     | Drop_connection
+    | Reload_page of { keep_session : bool }
+    (** the connection keeps dropping: load the page again, in this
+        session or not *)
     | Auth_failed of string
     (** the backend refused the saved sign-in: the sign-in page, saying this *)
   [@@deriving sexp_of, equal]
@@ -191,11 +194,12 @@ module Connection = struct
   let delay_ms ~attempt =
     if attempt <= 0
     then 0
-    else Int.min 10_000 (250 * (1 lsl Int.min 10 (attempt - 1)))
+    else Int.min 30_000 (250 * (1 lsl Int.min 10 (attempt - 1)))
   ;;
 end
 
 module Toast = Toast
+module Drops = Drops
 
 module Action = struct
   type t =
@@ -319,6 +323,7 @@ module Action = struct
     | Dialog_complete
     | Choose_suggestion of int
     | Retry_connection
+    | Reload_page of { keep_session : bool }
     | Scroll_chat of int
     | Jump_to_user_message of int
     | Jump_to of Jump.Target.t
@@ -348,6 +353,7 @@ module Model = struct
   type t =
     { connection : Connection.t
     ; generation : int
+    ; drops : Drops.t
     ; hello : Hello_reply.t option
     ; saved_login : bool
     ; state : State.t option
@@ -466,6 +472,7 @@ let thinking_levels = Prigh_ui.Commands.thinking_levels
 
 let init =
   { Model.connection = Connected
+  ; drops = Drops.initial
   ; generation = 0
   ; hello = None
   ; saved_login = false
@@ -2116,7 +2123,11 @@ let retry_connection (m : Model.t) =
   | Reconnecting { attempt; _ } ->
     let generation = m.generation + 1 in
     let m =
-      { m with connection = Reconnecting { attempt; generation }; generation }
+      { m with
+        connection = Reconnecting { attempt; generation }
+      ; generation
+      ; drops = Drops.retry m.drops
+      }
     in
     let m, cmds = toast m "Reconnecting now…" in
     ( m
@@ -3139,14 +3150,19 @@ module Rejoin = struct
     | Error _ -> m
   ;;
 
+  (* "Reconnected" waits for the session to be back ([settle]). *)
   let rejoined (m : Model.t) json =
-    let m, toast_cmds = toast (connected m json) "Reconnected" in
+    let m = connected m json in
+    let m =
+      { m with
+        drops = Drops.rejoined m.drops ~resyncing:(Option.is_some m.state)
+      }
+    in
     match m.state with
-    | None -> m, toast_cmds @ start_commands m
+    | None -> m, start_commands m
     | Some state ->
       ( m
-      , toast_cmds
-        @ startup
+      , startup
         @ [ resync_rpc m state
           ; rpc "get_pending" [] ~tag:Resync_pending
           ; rpc "list_sessions" [] ~tag:Sessions
@@ -3159,6 +3175,12 @@ module Rejoin = struct
      as well. *)
   let gone (m : Model.t) json ~session =
     let m = connected m json in
+    (* The banner says what became of the session: no "Reconnected". *)
+    let m =
+      { m with
+        drops = { (Drops.rejoined m.drops ~resyncing:false) with rejoined = false }
+      }
+    in
     let m, restored = restore_unsure m ~delivered:(fun _ -> false) in
     if List.is_empty (Chat.entries m.chat)
     then { m with state = None }, restored @ start_commands m
@@ -3192,10 +3214,12 @@ module Rejoin = struct
   let now (m : Model.t) =
     match m.connection with
     | Connected -> m, [ Command.Probe_connection ]
+    (* It said that it stopped: the user chooses. *)
+    | Reconnecting _ when Drops.gave_up m.drops -> m, []
     | Reconnecting _ ->
       let generation = m.generation + 1 in
       ( { m with
-          connection = Reconnecting { attempt = 0; generation }
+          connection = Reconnecting { attempt = m.drops.lost; generation }
         ; generation
         }
       , [ Command.Reconnect
@@ -4343,7 +4367,7 @@ let sent_to_bottom ((m : Model.t), cmds) =
   else m, cmds
 ;;
 
-let update (m : Model.t) (action : Action.t) =
+let update_connected (m : Model.t) (action : Action.t) =
   match action with
   | Start -> m, start_commands m
   | Hello hello -> { m with hello = Some hello }, []
@@ -4406,19 +4430,32 @@ let update (m : Model.t) (action : Action.t) =
      | Reconnecting _ -> m, []
      | Connected ->
        let generation = m.generation + 1 in
+       (* Lost before the session came back: waiting longer each time, then
+          stopping, rather than reconnecting at once over and over. *)
+       let drops = Drops.lost m.drops in
+       let attempt = drops.lost in
        (* Everything on show stays, also what the agent waits for: once back,
           [get_pending] says what still does. *)
-       ( { m with
-           connection = Reconnecting { attempt = 0; generation }
+       let m =
+         { m with
+           connection = Reconnecting { attempt; generation }
          ; generation
+         ; drops
          ; chat = Chat.missed_output m.chat
          }
-       , [ Command.Reconnect
-             { generation
-             ; delay_ms = 0
-             ; session = Option.map m.state ~f:(fun s -> s.session_id)
-             }
-         ] ))
+       in
+       if Drops.gave_up drops
+       then m, []
+       else
+         ( m
+         , [ Command.Reconnect
+               { generation
+               ; delay_ms = Connection.delay_ms ~attempt
+               ; session = Option.map m.state ~f:(fun s -> s.session_id)
+               }
+           ] ))
+  | Reply ((Resync _ as tag), result) ->
+    reply { m with drops = Drops.resynced m.drops } tag result
   | Reply (tag, result) -> reply m tag result
   (* The ages in the sidebar; the list itself follows [sessions_changed]. *)
   | Tick now -> { m with now = Some now }, []
@@ -4636,6 +4673,7 @@ let update (m : Model.t) (action : Action.t) =
       let prompt = { prompt with selected = Some i } in
       prompt_input m (Prompt.complete prompt))
   | Retry_connection -> retry_connection m
+  | Reload_page { keep_session } -> m, [ Command.Reload_page { keep_session } ]
   | Scroll_chat pages -> m, [ Command.Scroll_chat pages ]
   | Chat_scrolled { at_bottom } -> { m with scrolled_up = not at_bottom }, []
   | Jump_to_bottom -> to_bottom m
@@ -4669,4 +4707,26 @@ let update (m : Model.t) (action : Action.t) =
   | Resize action ->
     let layout, saves = Resize.update m.layout (Model.shown m) action in
     { m with layout }, List.map saves ~f:(fun s -> Command.Save_size s)
+;;
+
+(* Once a connection has brought the session back (its state and messages),
+   it counts as working again. *)
+let settle (m : Model.t) cmds =
+  match m.connection, m.state with
+  | Connected, Some _
+    when m.drops.settling && (not m.drops.resyncing) && not m.pending.messages
+    ->
+    let rejoined = m.drops.rejoined in
+    let m = { m with drops = Drops.settled m.drops } in
+    if rejoined
+    then (
+      let m, toast_cmds = toast m "Reconnected" in
+      m, cmds @ toast_cmds)
+    else m, cmds
+  | _ -> m, cmds
+;;
+
+let update (m : Model.t) (action : Action.t) =
+  let m, cmds = update_connected m action in
+  settle m cmds
 ;;

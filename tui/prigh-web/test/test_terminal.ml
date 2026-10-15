@@ -180,7 +180,6 @@ let%expect_test "the panel follows the session, the host and the user" =
   [%expect
     {|
     (Reconnect (generation 1) (delay_ms 0) (session (s2)))
-    (Expire_toast (id 0) (after_ms 2500))
     (Rpc (method_ get_state) (params ()) (tag State))
     (Rpc (method_ list_models) (params ()) (tag Models))
     (Rpc (method_ auth_status) (params ()) (tag (Auth_status Refresh)))

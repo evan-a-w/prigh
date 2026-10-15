@@ -1607,7 +1607,6 @@ let%expect_test "/retry-backend-connection, /state, /clear, /quit" =
   H.act h (Reply (Reconnect 2, Ok (Jsonaf.of_string {|{"client_id":"c2"}|})));
   [%expect
     {|
-    (Expire_toast (id 2) (after_ms 2500))
     (Rpc (method_ get_state) (params ()) (tag State))
     (Rpc (method_ list_models) (params ()) (tag Models))
     (Rpc (method_ auth_status) (params ()) (tag (Auth_status Refresh)))
@@ -1654,7 +1653,7 @@ let%expect_test "/retry-backend-connection, /state, /clear, /quit" =
     (Focus editor)
     Scroll_to_bottom
     (Save_history (/clear /state /retry-backend-connection))
-    (Expire_toast (id 3) (after_ms 4780))
+    (Expire_toast (id 2) (after_ms 4780))
     What are we building?
     /work
     / commands
@@ -1663,7 +1662,7 @@ let%expect_test "/retry-backend-connection, /state, /clear, /quit" =
     Ctrl+L switch model
     Ctrl+K find a session
     (Save_history (/quit /clear /state /retry-backend-connection))
-    (Expire_toast (id 4) (after_ms 4620))
+    (Expire_toast (id 3) (after_ms 4620))
     Cleared the view; the conversation is kept (a reload shows it, /new starts afresh)
     Close the tab to leave: the session stays in the backend (/signout signs out).
     |}]

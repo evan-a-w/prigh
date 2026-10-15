@@ -517,7 +517,6 @@ let%expect_test "reconnecting with older pages loaded" =
   [%expect
     {|
     (Reconnect (generation 1) (delay_ms 0) (session (s2)))
-    (Expire_toast (id 0) (after_ms 2500))
     (Rpc (method_ get_state) (params ()) (tag State))
     (Rpc (method_ list_models) (params ()) (tag Models))
     (Rpc (method_ auth_status) (params ()) (tag (Auth_status Refresh)))
@@ -545,6 +544,7 @@ let%expect_test "reconnecting with older pages loaded" =
     {|
     (Rpc (method_ get_outline) (params ((session /sessions/s2.jsonl)))
      (tag (Outline /sessions/s2.jsonl)))
+    (Expire_toast (id 0) (after_ms 2500))
     ((older 2) (before (e3)) (loading false))
     (Show earlier messages) 2 more
     question 2
@@ -583,7 +583,6 @@ let%expect_test "reconnecting when what was on show has gone from the session" =
   [%expect
     {|
     (Reconnect (generation 1) (delay_ms 0) (session (s2)))
-    (Expire_toast (id 0) (after_ms 2500))
     (Rpc (method_ get_state) (params ()) (tag State))
     (Rpc (method_ list_models) (params ()) (tag Models))
     (Rpc (method_ auth_status) (params ()) (tag (Auth_status Refresh)))
@@ -598,6 +597,7 @@ let%expect_test "reconnecting when what was on show has gone from the session" =
     (Rpc (method_ get_messages_page)
      (params ((session /sessions/s2.jsonl) (limit 60)))
      (tag (Page (path /sessions/s2.jsonl) (before ()))))
+    (Expire_toast (id 0) (after_ms 2500))
     Scroll_to_bottom
     ((older 0) (before ()) (loading false))
     question 1

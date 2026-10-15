@@ -17,6 +17,7 @@ type t =
   ; mutable connecting : unit Deferred.Or_error.t option
   ; pending : Json.t Or_error.t Ivar.t Int.Table.t
   ; mutable next_id : int
+  ; mutable received : int
   ; incoming_w : Incoming.t Pipe.Writer.t
   ; incoming_r : Incoming.t Pipe.Reader.t
   }
@@ -30,6 +31,7 @@ let fail_pending t message =
 let push t incoming = Pipe.write_without_pushback_if_open t.incoming_w incoming
 
 let handle_line t line =
+  t.received <- t.received + 1;
   if String.is_empty (String.strip line)
   then ()
   else (
@@ -97,6 +99,7 @@ let create ~connect =
   ; connecting = None
   ; pending = Int.Table.create ()
   ; next_id = 1
+  ; received = 0
   ; incoming_w
   ; incoming_r
   }
@@ -115,6 +118,7 @@ let call t method_ params =
 ;;
 
 let is_connected t = Option.is_some t.transport
+let received t = t.received
 
 let disconnect t =
   Option.iter t.transport ~f:(fun transport -> transport.close ())

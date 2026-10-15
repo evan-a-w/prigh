@@ -41,6 +41,7 @@ let act t action =
      | Scroll_to_entry _
      | Probe_connection
      | Drop_connection
+     | Reload_page _
      | Auth_failed _ -> ());
     if not t.quiet then print_s [%sexp (command : App.Command.t)])
 ;;

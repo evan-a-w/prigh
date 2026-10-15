@@ -200,6 +200,9 @@ module Command : sig
     (** the socket may have died unnoticed (a suspended page, a new network):
         drop it ([Backend_closed]) unless the backend answers soon *)
     | Drop_connection (** the network went away: [Backend_closed] follows *)
+    | Reload_page of { keep_session : bool }
+    (** the connection keeps dropping: load the page again, in this session
+        or without one *)
     | Auth_failed of string
     (** the backend refused the saved sign-in: the sign-in page, saying
         this, keeping the session to return to *)
@@ -220,6 +223,7 @@ module Connection : sig
 end
 
 module Toast = Toast
+module Drops = Drops
 
 module Action : sig
   type t =
@@ -352,6 +356,7 @@ module Action : sig
     | Dialog_complete (** a prompt's highlighted completion *)
     | Choose_suggestion of int (** a prompt's completion, clicked *)
     | Retry_connection
+    | Reload_page of { keep_session : bool }
     | Scroll_chat of int
     | Jump_to_user_message of int
     | Jump_to of Jump.Target.t
@@ -391,6 +396,7 @@ module Model : sig
   type t =
     { connection : Connection.t
     ; generation : int
+    ; drops : Drops.t
     ; hello : Hello_reply.t option
     ; saved_login : bool (** so signing out means something *)
     ; state : State.t option

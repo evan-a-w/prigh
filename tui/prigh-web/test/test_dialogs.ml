@@ -515,7 +515,6 @@ let%expect_test
   H.act h (Reply (Reconnect 1, Ok (Jsonaf.of_string {|{"client_id":"c9"}|})));
   [%expect
     {|
-    (Expire_toast (id 0) (after_ms 2500))
     (Rpc (method_ get_state) (params ()) (tag State))
     (Rpc (method_ list_models) (params ()) (tag Models))
     (Rpc (method_ auth_status) (params ()) (tag (Auth_status Refresh)))
@@ -530,7 +529,7 @@ let%expect_test
     |}];
   H.text h ~selector:".banner";
   H.text h ~selector:".toast";
-  [%expect {| Reconnected |}];
+  [%expect {| |}];
   H.reply h "get_state" (H.state_json ());
   [%expect
     {| |}];
@@ -551,9 +550,9 @@ let%expect_test "the reconnect delay doubles up to ten seconds" =
     2: 500ms
     3: 1000ms
     6: 8000ms
-    7: 10000ms
-    8: 10000ms
-    20: 10000ms
+    7: 16000ms
+    8: 30000ms
+    20: 30000ms
     |}]
 ;;
 

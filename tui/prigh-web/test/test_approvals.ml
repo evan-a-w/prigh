@@ -951,7 +951,6 @@ let%expect_test
     (Close (Esc))
     Run bash: make?
     (y Allow once) (n Deny) (r Deny, saying why)
-    (Expire_toast (id 0) (after_ms 2500))
     (Rpc (method_ get_state) (params ()) (tag State))
     (Rpc (method_ list_models) (params ()) (tag Models))
     (Rpc (method_ auth_status) (params ()) (tag (Auth_status Refresh)))
@@ -990,17 +989,17 @@ let%expect_test
     (Rpc (method_ tool_confirm_respond)
      (params ((call_id c1) (allow true) (always true))) (tag Answer))
     (Focus confirm)
-    (Expire_toast (id 1) (after_ms 2860))
+    (Expire_toast (id 0) (after_ms 2860))
     (Answer_confirm (call_id c2) (agent_id (a1)) (answer Deny))
     (Rpc (method_ tool_confirm_respond)
      (params ((call_id c2) (allow false) (agent_id a1))) (tag Answer))
     (Focus question)
-    (Expire_toast (id 2) (after_ms 2500))
+    (Expire_toast (id 1) (after_ms 2500))
     (Question Accept)
     (Rpc (method_ ask_user_respond) (params ((call_id q3) (answers ((yes)))))
      (tag Answer))
     (Focus editor)
-    (Expire_toast (id 3) (after_ms 2500))
+    (Expire_toast (id 2) (after_ms 2500))
     |}]
 ;;
 
