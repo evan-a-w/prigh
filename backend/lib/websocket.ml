@@ -196,7 +196,7 @@ type t =
   ; write_mutex : Eio.Mutex.t
   ; mutable closed : bool
   ; mask : unit -> string option
-  ; mutable heard : float (** when a frame last came, or a write ended *)
+  ; mutable heard : float (** when a frame last came, or a long write ended *)
   ; mutable writing_since : float option
   }
 
@@ -206,12 +206,15 @@ let write t frame =
   Eio.Mutex.use_rw ~protect:true t.write_mutex (fun () ->
     if not t.closed
     then (
-      t.writing_since <- Some (now ());
+      let started = now () in
+      t.writing_since <- Some started;
       (match Eio.Flow.copy_string (encode ?mask:(t.mask ()) frame) t.flow with
        | () -> ()
        | exception _ -> t.closed <- true);
       t.writing_since <- None;
-      t.heard <- Float.max t.heard (now ())))
+      (* The peer could not answer pings while a long write went on. *)
+      if Float.(now () - started > 1.)
+      then t.heard <- Float.max t.heard (now ())))
 ;;
 
 let create ?(role = `Server) ~reader ~flow () =
