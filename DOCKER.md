@@ -419,6 +419,28 @@ docker compose run --rm prigh bash                           # likewise, in a ne
 Plain `docker compose exec prigh CMD` (e.g. a root shell) is for
 administration, like the `mv`/`chown` above.
 
+## Logs
+
+The backend writes its log to the container's output: `docker compose logs
+--timestamps --since 2h prigh` (or **Containers → prigh → Logs** in
+Portainer, with timestamps on). Save it before restarting a stuck
+container: `docker compose logs --timestamps prigh > prigh.log`
+(recreating the container, e.g. redeploying, discards its log). Lines worth
+looking for when the browser keeps reconnecting:
+
+- `prigh: closing the connection of prigh-web: …` — the backend ended a
+  connection: `the peer is not reading what is sent to it` (a page that
+  went away without closing its socket fell too far behind), `cannot
+  write: …`, or `a newer connection from the same page took over` (the
+  page reconnected before the backend noticed the old one had gone).
+- `prigh: request from … failed: …` — a request failed with an exception
+  (the connection stays).
+- `prigh: web connection failed: …` — a connection ended with an error.
+
+A WebSocket whose peer answers nothing (not even pings) for 45 seconds, or
+whose writes have been stuck for 5 minutes, is closed by the backend, so a
+proxy that keeps dead sockets open does not keep their work alive.
+
 ## Binary cache
 
 When `flake.lock`, `nix/` or the `*.opam`/`dune-project` files change, the

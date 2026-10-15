@@ -314,7 +314,13 @@ the transcript in place (keeping the older messages you had loaded),
 without moving it, with the draft, attachments,
 open panels and dialogs as they were. The page reconnects at once when the
 network comes back or the tab is shown again (and checks a socket that
-may have died while it was hidden), with backoff otherwise. Only the
+may have died while it was hidden, giving it up to a minute while answers
+are still arriving on a slow network), with backoff otherwise. A
+connection that keeps dropping before the session is back waits longer
+each time, and after six in a row the page stops and says so ("The backend
+keeps dropping the connection while loading this session"), offering
+Retry now, Another session and Reload; "Reconnected" shows once the
+session is back. Only the
 backend refusing the saved sign-in leads to the sign-in page, saying so;
 a session the backend no longer has (it restarted before saving it)
 stays on show, read-only, with a banner offering a new session or the
