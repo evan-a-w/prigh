@@ -47,6 +47,30 @@ let banner (m : Model.t) ~inject =
              ~on_click:(inject Action.Open_sessions)
              [ Node.text "Sessions" ]
          ]
+  | Reconnecting _, _ when App.Drops.gave_up m.drops ->
+    over
+    @@ div
+         ~cls:"banner gave-up"
+         ~attrs:[ Attr.role "alert" ]
+         [ Node.text
+             "The backend keeps dropping the connection while loading this \
+              session: open another session, or reload."
+         ; button
+             ~cls:"small"
+             ~title:"/retry-backend-connection"
+             ~on_click:(inject Action.Retry_connection)
+             [ Node.text "Retry now" ]
+         ; button
+             ~cls:"small"
+             ~title:"Reload the page without this session"
+             ~on_click:(inject (Action.Reload_page { keep_session = false }))
+             [ Node.text "Another session" ]
+         ; button
+             ~cls:"small"
+             ~title:"Reload the page"
+             ~on_click:(inject (Action.Reload_page { keep_session = true }))
+             [ Node.text "Reload" ]
+         ]
   | Reconnecting { attempt; _ }, _ ->
     over
     @@ div

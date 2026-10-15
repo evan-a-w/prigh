@@ -267,6 +267,10 @@ let waiting cls text =
 let view (m : App.Model.t) ~inject =
   match m.state, m.connection with
   | None, Connected -> div ~cls:"status" [ waiting "connecting" "Connecting…" ]
+  | _, Reconnecting _ when App.Drops.gave_up m.drops ->
+    div
+      ~cls:"status"
+      [ item ~cls:"offline" [ Node.text "Stopped reconnecting" ] ]
   | _, Reconnecting _ ->
     div ~cls:"status" [ waiting "connecting offline" "Reconnecting…" ]
   | Some state, Connected ->

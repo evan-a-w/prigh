@@ -43,7 +43,6 @@ let%expect_test "reconnecting after the backend goes away" =
         ~toasts:(List.length m.toasts : int)];
   [%expect
     {|
-    (Expire_toast (id 0) (after_ms 2500))
     (Rpc (method_ get_state) (params ()) (tag State))
     (Rpc (method_ list_models) (params ()) (tag Models))
     (Rpc (method_ auth_status) (params ()) (tag (Auth_status Refresh)))
@@ -55,6 +54,7 @@ let%expect_test "reconnecting after the backend goes away" =
     (Rpc (method_ list_sessions) (params ()) (tag Sessions))
     (Rpc (method_ list_subagents) (params ()) (tag Subagents))
     (Rpc (method_ list_jobs) (params ()) (tag Jobs))
+    (Expire_toast (id 0) (after_ms 2500))
     hello
     ((connection Connected) (toasts 1))
     |}]
@@ -186,7 +186,6 @@ let%expect_test "a reconnect keeps the page as it was and merges what is new" =
   Harness.reply h "get_state" (state ());
   [%expect
     {|
-    (Expire_toast (id 1) (after_ms 2500))
     (Rpc (method_ get_state) (params ()) (tag State))
     (Rpc (method_ list_models) (params ()) (tag Models))
     (Rpc (method_ auth_status) (params ()) (tag (Auth_status Refresh)))
@@ -220,6 +219,7 @@ let%expect_test "a reconnect keeps the page as it was and merges what is new" =
   show ();
   [%expect
     {|
+    (Expire_toast (id 1) (after_ms 2500))
     first
     one
     second
@@ -404,7 +404,6 @@ let%expect_test "the network and the page's visibility drive reconnecting" =
   Harness.act h (Network true);
   [%expect
     {|
-    (Expire_toast (id 0) (after_ms 2500))
     (Rpc (method_ get_state) (params ()) (tag State))
     (Rpc (method_ list_models) (params ()) (tag Models))
     (Rpc (method_ auth_status) (params ()) (tag (Auth_status Refresh)))
@@ -565,7 +564,6 @@ let%expect_test "losing the connection while a session loads" =
   Harness.text h ~selector:".chat";
   [%expect
     {|
-    (Expire_toast (id 0) (after_ms 2500))
     (Rpc (method_ get_state) (params ()) (tag State))
     (Rpc (method_ list_models) (params ()) (tag Models))
     (Rpc (method_ auth_status) (params ()) (tag (Auth_status Refresh)))
@@ -578,6 +576,7 @@ let%expect_test "losing the connection while a session loads" =
     (Rpc (method_ list_subagents) (params ()) (tag Subagents))
     (Rpc (method_ list_jobs) (params ()) (tag Jobs))
     Scroll_to_bottom
+    (Expire_toast (id 0) (after_ms 2500))
     hi
     hello
     |}]

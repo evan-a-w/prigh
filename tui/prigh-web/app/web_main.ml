@@ -35,8 +35,15 @@ module Settings = struct
     }
   ;;
 
+  (* This page, for as long as it is loaded: its newer connections take
+     over from its older ones on the backend. *)
+  let tab =
+    String.init 16 ~f:(fun _ ->
+      "0123456789abcdef".[Float.iround_down_exn (Js.math##random *. 16.)])
+  ;;
+
   let hello t ~session =
-    [ "name", `String "prigh-web"; "tools", `False ]
+    [ "name", `String "prigh-web"; "tools", `False; "tab", `String tab ]
     @ Login.hello_fields t.login
     @ Option.value_map session ~default:[] ~f:(fun s ->
       [ "session", `String s ])
@@ -64,44 +71,65 @@ let url_session () =
 ;;
 
 (* A socket on a flaky network can take minutes to fail: give up sooner and
-   try again. *)
+   try again. The [hello] may take longer: the backend may be reading a large
+   session for it. *)
 let connect_timeout = Time_ns.Span.of_sec 10.
+
+let hello_timeout = Time_ns.Span.of_sec 30.
+
+(* Connects, then says hello, each within its time. *)
+let connect_and_hello client settings ~session =
+  match%bind.Deferred
+    Clock_ns.with_timeout connect_timeout (Client.connect client)
+  with
+  | `Timeout -> Deferred.return (Error "timed out")
+  | `Result (Error e) -> Deferred.return (Error (Error.to_string_hum e))
+  | `Result (Ok ()) ->
+    (match%map.Deferred
+       Clock_ns.with_timeout hello_timeout (send_hello client settings ~session)
+     with
+     | `Timeout -> Error "timed out"
+     | `Result result -> result)
+;;
 
 (* Attempts made stale by a newer one stay put when they are due. *)
 let reconnect_gate = Reconnect_gate.create ()
 
 let reconnect client settings ~generation ~session =
   let session = Option.first_some session (url_session ()) in
-  match%map.Deferred
-    Clock_ns.with_timeout
-      connect_timeout
-      (match%bind.Deferred Client.connect client with
-       | Error e -> Deferred.return (Error (Error.to_string_hum e))
-       | Ok () -> send_hello client settings ~session)
-  with
-  | `Timeout ->
+  match%map.Deferred connect_and_hello client settings ~session with
+  | Error "timed out" ->
     Client.disconnect client;
     App.Reply_tag.Reconnect generation, Error "timed out"
-  | `Result (Error e) -> Reconnect generation, Error e
-  | `Result (Ok (reply, None)) -> Reconnect generation, Ok reply
-  | `Result (Ok (reply, Some session)) ->
-    Session_gone { generation; session }, Ok reply
+  | Error e -> Reconnect generation, Error e
+  | Ok (reply, None) -> Reconnect generation, Ok reply
+  | Ok (reply, Some session) -> Session_gone { generation; session }, Ok reply
 ;;
 
 (* After a suspension or a change of network, a socket can look open but
-   carry nothing: one that does not answer soon is dropped (and so
-   reconnected). *)
+   carry nothing: one that does not answer is dropped (and so reconnected).
+   One that is slow but alive is not: as long as something keeps coming in
+   (replies queued before ours, on a slow network or from a busy backend),
+   it gets more time, up to a minute. *)
 let probe client =
   if not (Client.is_connected client)
   then Deferred.unit
   else (
-    match%map.Deferred
-      Clock_ns.with_timeout
-        (Time_ns.Span.of_sec 5.)
-        (Client.call client "get_state" [])
-    with
-    | `Timeout -> Client.disconnect client
-    | `Result _ -> ())
+    let answered = Client.call client "get_state" [] in
+    let rec wait ~waited ~received =
+      match%bind.Deferred
+        Clock_ns.with_timeout (Time_ns.Span.of_sec 8.) answered
+      with
+      | `Result _ -> Deferred.unit
+      | `Timeout ->
+        let now_received = Client.received client in
+        if now_received > received && waited < 7
+        then wait ~waited:(waited + 1) ~received:now_received
+        else (
+          Client.disconnect client;
+          Deferred.unit)
+    in
+    wait ~waited:0 ~received:(Client.received client))
 ;;
 
 (* The page that loads next shows the sign-in form with this. *)
@@ -316,14 +344,15 @@ let perform client settings ctx (model : App.Model.t) (command : App.Command.t) 
         Effect.of_deferred_fun
           (fun () ->
              Reconnect_gate.schedule reconnect_gate ~generation;
-             let%bind.Deferred () =
-               Clock_ns.after (Time_ns.Span.of_int_ms delay_ms)
+             (* Pages that lost the backend together do not all come back
+                at the same moment. *)
+             let jittered =
+               Float.of_int delay_ms *. (0.8 +. (0.4 *. Js.math##random))
              in
-             if
-               Reconnect_gate.due
-                 reconnect_gate
-                 ~generation
-                 ~connected:(Client.is_connected client)
+             let%bind.Deferred () =
+               Clock_ns.after (Time_ns.Span.of_ms jittered)
+             in
+             if Reconnect_gate.due reconnect_gate ~generation
              then
                Deferred.map
                  (reconnect client settings ~generation ~session)
@@ -336,6 +365,13 @@ let perform client settings ctx (model : App.Model.t) (command : App.Command.t) 
        | None -> Effect.Ignore)
     | Probe_connection -> Effect.of_deferred_fun probe client
     | Drop_connection -> Effect.of_sync_fun Client.disconnect client
+    | Reload_page { keep_session } ->
+      Effect.of_sync_fun
+        (fun () ->
+           if keep_session
+           then Dom_html.window##.location##reload
+           else Browser.reload_without_query_param "session")
+        ()
     | Auth_failed message -> Effect.of_sync_fun auth_failed message
     | Set_url_session session ->
       Effect.of_sync_fun
@@ -1032,16 +1068,12 @@ let run_app (settings : Settings.t) =
   don't_wait_for
     (match%bind.Deferred
        match%map.Deferred
-         Clock_ns.with_timeout
-           connect_timeout
-           (match%bind.Deferred Client.connect client with
-            | Error e -> Deferred.return (Error (Error.to_string_hum e))
-            | Ok () -> send_hello client settings ~session:settings.session)
+         connect_and_hello client settings ~session:settings.session
        with
-       | `Timeout ->
+       | Error "timed out" ->
          Client.disconnect client;
          Error "timed out"
-       | `Result result -> result
+       | result -> result
      with
      | Error error when refused error || not (known ()) ->
        let%map.Deferred () = Client.close client in

@@ -26,6 +26,10 @@ val connect : t -> unit Deferred.Or_error.t
 
 val is_connected : t -> bool
 
+(** Lines received so far, on every transport: whether anything came in
+    meanwhile (a slow reply on its way is not a dead connection). *)
+val received : t -> int
+
 (** Closes the transport (if any) as if the backend had: pending calls fail
     and [Closed] is delivered; [connect] opens a new one. *)
 val disconnect : t -> unit
