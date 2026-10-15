@@ -30,6 +30,9 @@ val is_connected : t -> bool
     meanwhile (a slow reply on its way is not a dead connection). *)
 val received : t -> int
 
+(** Calls waiting for their answers. *)
+val waiting : t -> int
+
 (** Closes the transport (if any) as if the backend had: pending calls fail
     and [Closed] is delivered; [connect] opens a new one. *)
 val disconnect : t -> unit

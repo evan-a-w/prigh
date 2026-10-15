@@ -119,6 +119,7 @@ let call t method_ params =
 
 let is_connected t = Option.is_some t.transport
 let received t = t.received
+let waiting t = Hashtbl.length t.pending
 
 let disconnect t =
   Option.iter t.transport ~f:(fun transport -> transport.close ())

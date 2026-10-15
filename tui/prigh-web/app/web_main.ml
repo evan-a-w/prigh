@@ -39,7 +39,7 @@ module Settings = struct
      over from its older ones on the backend. *)
   let tab =
     String.init 16 ~f:(fun _ ->
-      "0123456789abcdef".[Float.iround_down_exn (Js.math##random *. 16.)])
+      "0123456789abcdef".[Float.iround_down_exn (Js.to_float Js.math##random *. 16.)])
   ;;
 
   let hello t ~session =
@@ -108,13 +108,14 @@ let reconnect client settings ~generation ~session =
 
 (* After a suspension or a change of network, a socket can look open but
    carry nothing: one that does not answer is dropped (and so reconnected).
-   One that is slow but alive is not: as long as something keeps coming in
-   (replies queued before ours, on a slow network or from a busy backend),
-   it gets more time, up to a minute. *)
+   One that is slow but alive is not: while something comes in or other
+   answers are still on their way (a large reply on a slow network, a busy
+   backend: ours queues behind them), it gets more time, up to a minute. *)
 let probe client =
   if not (Client.is_connected client)
   then Deferred.unit
   else (
+    let others = Client.waiting client in
     let answered = Client.call client "get_state" [] in
     let rec wait ~waited ~received =
       match%bind.Deferred
@@ -123,7 +124,7 @@ let probe client =
       | `Result _ -> Deferred.unit
       | `Timeout ->
         let now_received = Client.received client in
-        if now_received > received && waited < 7
+        if (now_received > received || others > 0) && waited < 7
         then wait ~waited:(waited + 1) ~received:now_received
         else (
           Client.disconnect client;
@@ -347,7 +348,7 @@ let perform client settings ctx (model : App.Model.t) (command : App.Command.t) 
              (* Pages that lost the backend together do not all come back
                 at the same moment. *)
              let jittered =
-               Float.of_int delay_ms *. (0.8 +. (0.4 *. Js.math##random))
+               Float.of_int delay_ms *. (0.8 +. (0.4 *. Js.to_float Js.math##random))
              in
              let%bind.Deferred () =
                Clock_ns.after (Time_ns.Span.of_ms jittered)
