@@ -315,9 +315,12 @@ let unreadable_entry (json : Json.t) =
 (* A line that cannot be read is skipped with a warning rather than making
    the whole session unreadable: a torn last line (prigh stopped while
    writing it) or a kind of line from a newer prigh. *)
-let load path =
+let load ?(yield = fun () -> ()) path =
   Or_error.try_with (fun () ->
-    let contents = Utf8.sanitize (In_channel.read_all path) in
+    let raw = In_channel.read_all path in
+    yield ();
+    let contents = Utf8.sanitize raw in
+    yield ();
     let lines =
       String.split_lines contents
       |> List.mapi ~f:(fun i l -> i + 1, l)
@@ -359,7 +362,13 @@ let load path =
          let skip n reason =
            t.skipped <- sprintf "line %d: %s" n reason :: t.skipped
          in
+         let parsed = ref 0 in
          List.iter rest ~f:(fun (n, l) ->
+           parsed := !parsed + String.length l;
+           if !parsed > 256 * 1024
+           then (
+             parsed := 0;
+             yield ());
            match Json.of_string l with
            | exception _ ->
              skip
@@ -878,7 +887,7 @@ end
 
 let summary_cache : Cache_entry.t String.Table.t = String.Table.create ()
 
-let cached_summary path =
+let cached_summary ~live ~load path =
   match Core_unix.stat path with
   | exception _ -> None
   | { st_size = size; st_mtime = mtime; _ } ->
@@ -889,7 +898,11 @@ let cached_summary path =
         entry.summary
       | Some _ | None ->
         let summary =
-          Result.ok (load path)
+          (* A live session's file grows with every message: summing up
+             what is in memory spares parsing it all again. *)
+          (match live path with
+           | Some t -> Some t
+           | None -> Result.ok (load path))
           |> Option.map ~f:(fun t -> summarise t ~path ~mtime)
         in
         Hashtbl.set summary_cache ~key:path ~data:{ size; mtime; summary };
@@ -898,7 +911,7 @@ let cached_summary path =
     Option.map summary ~f:(fun s -> mtime, { s with bytes = disk_usage path })
 ;;
 
-let list ~dir =
+let list_with ~live ~load ~dir =
   match Sys_unix.is_directory dir with
   | `No | `Unknown -> []
   | `Yes ->
@@ -911,10 +924,12 @@ let list ~dir =
     let present = String.Set.of_list paths in
     Hashtbl.filter_keys_inplace summary_cache ~f:(fun path ->
       (not (String.equal (Filename.dirname path) dir)) || Set.mem present path);
-    List.filter_map paths ~f:cached_summary
+    List.filter_map paths ~f:(cached_summary ~live ~load)
     |> List.stable_sort ~compare:(fun (a, _) (b, _) -> Float.compare b a)
     |> List.map ~f:snd
 ;;
+
+let list ~dir = list_with ~live:(fun _ -> None) ~load ~dir
 
 let find_summary summaries key =
   let key = String.strip key in

@@ -119,7 +119,7 @@ let is_json_lines reader =
   | exception (End_of_file | Eio.Io _) -> false
 ;;
 
-let handle ~root ~websockets ~on_lines flow =
+let handle ?clock ~root ~websockets ~on_lines flow =
   let reader = Eio.Buf_read.of_flow flow ~max_size:(64 * 1024 * 1024) in
   if is_json_lines reader
   then serve_json_lines ~on_lines ~reader flow
@@ -149,7 +149,19 @@ let handle ~root ~websockets ~on_lines flow =
               (Websocket.accept_key (String.strip key)))
            flow;
          let ws = Websocket.create ~reader ~flow () in
-         on_websocket ~query:request.query ws;
+         (match clock with
+          | None -> on_websocket ~query:request.query ws
+          | Some clock ->
+            Fiber.first
+              (fun () -> on_websocket ~query:request.query ws)
+              (fun () ->
+                 Websocket.keepalive
+                   ws
+                   ~clock
+                   ~shutdown:(fun () ->
+                     try Eio.Flow.shutdown flow `All with
+                     | _ -> ())
+                   ()));
          Websocket.close ws)
     | Some request when File_http.handles ~path:request.path ->
       File_http.serve
@@ -192,7 +204,9 @@ let serve_rpc router ~query:_ ws =
   Rpc_router.serve_lines
     router
     ~read_line:(fun () -> Websocket.read_text ws)
-    ~write_line:(Websocket.send_text ws)
+    ~write_line:(fun line ->
+      Websocket.send_text ws line;
+      if Websocket.is_closed ws then failwith "the WebSocket is closed")
 ;;
 
 let serve_terminal router terminals ~query ws =
@@ -255,7 +269,7 @@ let listen ~env ~sw ~addr ~port ~root ~websockets ~on_lines =
           eprintf "prigh: web connection failed: %s\n%!" (Exn.to_string exn))
         (fun flow _addr ->
            no_delay flow;
-           handle ~root ~websockets ~on_lines flow)
+           handle ~clock:(Eio.Stdenv.clock env) ~root ~websockets ~on_lines flow)
     done);
   port
 ;;

@@ -15,9 +15,12 @@ type on_websocket = query:(string * string) list -> Websocket.t -> unit
 
 (** Handles one connection: JSON lines until EOF, or one HTTP/1.1 request,
     then close (or the WebSocket until it ends). The [websockets] handler for
-    the request's path gets the decoded query string of the upgrade request. *)
+    the request's path gets the decoded query string of the upgrade request.
+    With [clock], a WebSocket whose peer looks gone ({!Websocket.keepalive})
+    is shut down and its handler cancelled. *)
 val handle
-  :  root:string option
+  :  ?clock:_ Eio.Time.clock
+  -> root:string option
   -> websockets:(string * on_websocket) list
   -> on_lines:on_lines
   -> _ Eio.Flow.two_way

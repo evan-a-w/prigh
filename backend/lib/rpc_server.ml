@@ -223,6 +223,10 @@ module Client = struct
     ; signed_in : User_access.Signed_in.t option
       (** set when the router checked the credentials *)
     ; send : Json.t -> unit
+    ; close : string -> unit
+      (** ends the connection (the reason goes to stderr) *)
+    ; mutable tab : string option
+      (** [hello]'s [tab]: the page instance it comes from *)
     ; btws : Cancellation.t String.Table.t (** in-flight [btw] calls by id *)
     ; mutable told : String.Set.t (** model registry problems already sent *)
     }
@@ -256,6 +260,8 @@ type t =
   ; loaded : Session.t File_cache.t
     (** sessions read from disk and not live: evicted ones, and those read
         for [get_messages_page] without opening them *)
+  ; loading : Session.t Or_error.t Promise.t String.Table.t
+    (** session files being parsed, by path *)
   }
 
 let agent_of_client _t (client : Client.t) = client.agent
@@ -438,6 +444,7 @@ let create
     ; now = (fun () -> Eio.Time.now (Eio.Stdenv.clock env))
     ; listed = String.Table.create ()
     ; on_session_deleted = []
+    ; loading = String.Table.create ()
     }
   in
   Option.iter default_agent ~f:(fun agent ->
@@ -534,11 +541,47 @@ let loaded_start t (client : Client.t) session =
 
 let fresh_agent t = register t (t.new_agent ~cwd:t.cwd ())
 
+(* Parsing a large session file takes a while (a second for 80 MB): it
+   yields as it goes, so that every other client is served meanwhile, and
+   those who want the same file meanwhile wait for the same parse, which
+   finishes even if whoever started it goes (the next one finds it
+   cached). *)
+let load_session t path =
+  match Hashtbl.find t.loading path with
+  | Some loading -> Promise.await loading
+  | None ->
+    let loading, resolve = Promise.create () in
+    Hashtbl.set t.loading ~key:path ~data:loading;
+    let result =
+      match
+        Eio.Cancel.protect (fun () -> Session.load ~yield:Fiber.yield path)
+      with
+      | result -> result
+      | exception exn -> Or_error.of_exn exn
+    in
+    Hashtbl.remove t.loading path;
+    Promise.resolve resolve result;
+    result
+;;
+
+(* The saved sessions; the live ones' files are summed up from memory, as
+   they grow with every message. *)
+let saved_sessions t =
+  Session.list_with
+    ~live:(fun path ->
+      Hashtbl.data t.agents
+      |> List.find_map ~f:(fun agent ->
+        let session = Agent.session agent in
+        Option.some_if (String.equal (Session.path session) path) session))
+    ~load:(load_session t)
+    ~dir:t.sessions_dir
+;;
+
 (* Sessions waiting for a usage limit to reset when the backend last ran are
    loaded again, so that they resume on time with nobody attached. *)
 let restore_resumes t =
   let now = t.now () in
-  List.iter (Session.list ~dir:t.sessions_dir) ~f:(fun summary ->
+  List.iter (saved_sessions t) ~f:(fun summary ->
     match summary.resume_at with
     | Some at when Float.( > ) at now && not (Hashtbl.mem t.agents summary.id)
       ->
@@ -552,7 +595,7 @@ let restore_resumes t =
     | Some _ | None -> ())
 ;;
 
-let connect ?signed_in t ~send =
+let connect ?signed_in ?(close = fun _ -> ()) t ~send =
   t.client_seq <- t.client_seq + 1;
   let agent, placeholder =
     match t.default_agent with
@@ -575,6 +618,8 @@ let connect ?signed_in t ~send =
     ; authed = Option.is_none t.token || Option.is_some signed_in
     ; signed_in
     ; send
+    ; close
+    ; tab = None
     ; btws = String.Table.create ()
     ; told = String.Set.empty
     }
@@ -664,10 +709,7 @@ let saved_path t key =
   if Sys_unix.file_exists_exn key
   then session_file t key
   else (
-    match
-      List.find (Session.list ~dir:t.sessions_dir) ~f:(fun s ->
-        String.equal s.id key)
-    with
+    match List.find (saved_sessions t) ~f:(fun s -> String.equal s.id key) with
     | Some summary -> Ok summary.path
     | None -> Or_error.errorf "no session %S" key)
 ;;
@@ -679,10 +721,16 @@ let find_agent t (client : Client.t) key =
   | Some agent -> Ok agent
   | None ->
     Or_error.bind (saved_path t key) ~f:(fun path ->
-      let session = File_cache.find_or_read t.loaded path ~read:Session.load in
-      File_cache.remove t.loaded path;
-      Or_error.map session ~f:(fun session ->
-        start_agent t session (loaded_start t client session)))
+      let session =
+        File_cache.find_or_read t.loaded path ~read:(load_session t)
+      in
+      (* Another client may have opened it while it was being read. *)
+      match find_live t path with
+      | Some agent -> Ok agent
+      | None ->
+        File_cache.remove t.loaded path;
+        Or_error.map session ~f:(fun session ->
+          start_agent t session (loaded_start t client session)))
 ;;
 
 (* A session's messages to read: the live session's, else from disk without
@@ -692,7 +740,7 @@ let session_to_read t key =
   | Some agent -> Ok (Agent.session agent)
   | None ->
     Or_error.bind (saved_path t key) ~f:(fun path ->
-      File_cache.find_or_read t.loaded path ~read:Session.load)
+      File_cache.find_or_read t.loaded path ~read:(load_session t))
 ;;
 
 let int_param params name ~default =
@@ -924,6 +972,19 @@ let claim_host_id t (client : Client.t) host_id =
     Ok ())
 ;;
 
+(* A page that reconnects (its network changed, it was suspended) may leave
+   its older connection open here: what that one still waits for is for
+   nobody, so it ends. *)
+let take_over_tab t (client : Client.t) tab =
+  Hashtbl.data t.clients
+  |> List.iter ~f:(fun (c : Client.t) ->
+    if (not (phys_equal c client)) && Option.equal String.equal c.tab (Some tab)
+    then (
+      c.tab <- None;
+      c.close "a newer connection from the same page took over"));
+  client.tab <- Some tab
+;;
+
 let hello t (client : Client.t) params =
   let string name =
     match param params name with
@@ -946,6 +1007,7 @@ let hello t (client : Client.t) params =
         Ok ())
   in
   Or_error.bind authorised ~f:(fun () ->
+    Option.iter (string "tab") ~f:(take_over_tab t client);
     Option.iter (param params "name") ~f:(function
       | `String name -> client.name <- name
       | _ -> ());
@@ -1016,7 +1078,7 @@ end
 let listings t client =
   let now = t.now () in
   let archive_after_days = archive_after_days t client in
-  List.map (Session.list ~dir:t.sessions_dir) ~f:(fun summary ->
+  List.map (saved_sessions t) ~f:(fun summary ->
     let agent = Hashtbl.find t.agents summary.id in
     let background =
       Option.value_map agent ~default:0 ~f:Agent.running_background
@@ -1065,7 +1127,7 @@ let find_saved t key =
     (if String.mem key '/' then session_file t key else Ok key)
     ~f:(fun key ->
       match
-        List.find (Session.list ~dir:t.sessions_dir) ~f:(fun s ->
+        List.find (saved_sessions t) ~f:(fun s ->
           String.equal s.path key || String.equal s.id key)
       with
       | Some summary -> Ok summary
@@ -1840,28 +1902,33 @@ let respond t (client : Client.t) request =
   if not (phys_equal before client.agent) then tell_skipped client
 ;;
 
-let serve_lines ?signed_in t ~read_line ~write_line =
+exception Connection_closed
+
+(* An exception in one request must not end the connection. *)
+let respond_or_log t (client : Client.t) request =
+  match respond t client request with
+  | () -> ()
+  | exception (Eio.Cancel.Cancelled _ as exn) -> raise exn
+  | exception exn ->
+    eprintf
+      "prigh: request from %s failed: %s\n%!"
+      client.name
+      (Exn.to_string exn)
+;;
+
+let serve_lines ?signed_in ?(finish_requests = false) t ~read_line ~write_line =
   Switch.run
   @@ fun sw ->
-  let outbox : string option Eio.Stream.t = Eio.Stream.create 1024 in
-  let send json = Eio.Stream.add outbox (Some (Json.to_string json)) in
-  Fiber.fork ~sw (fun () ->
-    let rec loop () =
-      match Eio.Stream.take outbox with
-      | None -> ()
-      | Some line ->
-        (match write_line line with
-         | () -> loop ()
-         | exception _ -> ())
-    in
-    loop ());
-  let client = connect ?signed_in t ~send in
-  let rec loop () =
+  let outbox = Outbox.create () in
+  let send json = Outbox.send outbox (Json.to_string json) in
+  Fiber.fork ~sw (fun () -> Outbox.run outbox ~write:write_line);
+  let client = connect ?signed_in t ~send ~close:(Outbox.fail outbox) in
+  let rec loop requests =
     match read_line () with
     | None -> None
     | Some line ->
       if String.is_empty (String.strip line)
-      then loop ()
+      then loop requests
       else (
         match Json.parse line with
         | Error e ->
@@ -1872,7 +1939,7 @@ let serve_lines ?signed_in t ~read_line ~write_line =
                 ; "ok", `False
                 ; "error", `String ("invalid JSON: " ^ Error.to_string_hum e)
                 ]);
-          loop ()
+          loop requests
         | Ok request ->
           let switch =
             match param request "method" with
@@ -1889,11 +1956,37 @@ let serve_lines ?signed_in t ~read_line ~write_line =
              (* Each request in its own fiber: a blocking method (shell,
                 compact, a remote tool round trip) must not stall the
                 reader. *)
-             Fiber.fork ~sw (fun () -> respond t client request);
-             loop ()))
+             Fiber.fork ~sw:requests (fun () -> respond_or_log t client request);
+             loop requests))
   in
-  let switch_to = loop () in
-  disconnect t client;
-  Eio.Stream.add outbox None;
+  (* Requests still running when the peer has gone are cancelled: nobody
+     is left to answer (a [set_user] lets them finish, its answers still
+     go out on this connection). *)
+  let read () =
+    let result = ref None in
+    (match
+       Switch.run (fun requests ->
+         result := loop requests;
+         if Option.is_none !result && not finish_requests
+         then Switch.fail requests Connection_closed)
+     with
+     | () | (exception Connection_closed) -> ());
+    !result
+  in
+  let switch_to =
+    Fun.protect
+      ~finally:(fun () ->
+        Eio.Cancel.protect (fun () ->
+          disconnect t client;
+          Outbox.finish outbox))
+      (fun () ->
+         Fiber.first read (fun () ->
+           let reason = Promise.await (Outbox.failed outbox) in
+           eprintf
+             "prigh: closing the connection of %s: %s\n%!"
+             client.name
+             reason;
+           None))
+  in
   switch_to
 ;;
