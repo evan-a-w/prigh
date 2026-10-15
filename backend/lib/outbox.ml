@@ -50,14 +50,19 @@ let send t line =
     Queue.enqueue t.queue line;
     t.bytes <- t.bytes + String.length line;
     let lines = Queue.length t.queue in
-    if lines > t.max_lines || (t.bytes > t.max_bytes && lines > 1)
+    if lines > t.max_lines
     then
       fail
         t
         (sprintf
-           "the peer is not reading what is sent to it (%d messages, %d bytes \
-            waiting)"
-           lines
+           "the peer is not reading what is sent to it (%d messages waiting)"
+           lines)
+    else if t.bytes > t.max_bytes && lines > 1
+    then
+      fail
+        t
+        (sprintf
+           "the peer is not reading what is sent to it (%d bytes waiting)"
            t.bytes)
     else Eio.Condition.broadcast t.ready
 ;;

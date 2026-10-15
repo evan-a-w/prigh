@@ -1921,7 +1921,11 @@ let serve_lines ?signed_in ?(finish_requests = false) t ~read_line ~write_line =
   @@ fun sw ->
   let outbox = Outbox.create () in
   let send json = Outbox.send outbox (Json.to_string json) in
-  Fiber.fork ~sw (fun () -> Outbox.run outbox ~write:write_line);
+  (* A failed outbox also gives up on a write stuck on the peer. *)
+  Fiber.fork ~sw (fun () ->
+    Fiber.first
+      (fun () -> Outbox.run outbox ~write:write_line)
+      (fun () -> ignore (Promise.await (Outbox.failed outbox) : string)));
   let client = connect ?signed_in t ~send ~close:(Outbox.fail outbox) in
   let rec loop requests =
     match read_line () with
