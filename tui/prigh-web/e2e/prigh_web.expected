@@ -818,6 +818,26 @@ marks: 0
 the list: 40 messages
 === chromium: paging: errors ===
 none
+=== chromium: resilience: a long chat ===
+newest answer on show: true
+=== chromium: resilience: a slow network, the page shown again and again ===
+sockets opened: 1
+banner: none
+newest answer on show: true
+"Reconnected" said: 1
+=== chromium: resilience: a connection that drops while the session loads ===
+sockets opened: 6
+banner: The backend keeps dropping the connection while loading this session: open another session, or reload. Retry now Another session Reload
+status: Stopped reconnecting
+"Reconnected" said: 0
+transcript still on show: true
+sockets opened since: 6
+=== chromium: resilience: retry now ===
+banner: none
+newest answer on show: true
+"Reconnected" said: 1
+=== chromium: resilience: errors ===
+none
 === firefox: sign-in page ===
 prigh
 web
@@ -1637,4 +1657,24 @@ step 17 at the top
 marks: 0
 the list: 40 messages
 === firefox: paging: errors ===
+none
+=== firefox: resilience: a long chat ===
+newest answer on show: true
+=== firefox: resilience: a slow network, the page shown again and again ===
+sockets opened: 1
+banner: none
+newest answer on show: true
+"Reconnected" said: 1
+=== firefox: resilience: a connection that drops while the session loads ===
+sockets opened: 6
+banner: The backend keeps dropping the connection while loading this session: open another session, or reload. Retry now Another session Reload
+status: Stopped reconnecting
+"Reconnected" said: 0
+transcript still on show: true
+sockets opened since: 6
+=== firefox: resilience: retry now ===
+banner: none
+newest answer on show: true
+"Reconnected" said: 1
+=== firefox: resilience: errors ===
 none
