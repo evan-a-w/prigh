@@ -947,9 +947,9 @@ two can share one.
   `load_session`: one parse per file at a time (others wanting it wait for
   it, and it finishes for the cache when its requester goes), yielding to
   the other fibers as it goes (an 80 MB file: other clients' pings waited
-  920 ms, now 240 ms at most; parsing on another domain is not possible,
-  as Jsonaf's parser is not domain-safe: a request parsed meanwhile was
-  lost); a session opened by two clients at once is checked again after
+  920 ms, now 240 ms at most; parsing on another domain was tried, and
+  requests the server's domain parsed meanwhile went missing: the JSON
+  parsing is not safe across domains); a session opened by two clients at once is checked again after
   the parse, so it gets one agent. Agent events are routed to the clients attached to
   that agent, except `tool_exec`/`tool_exec_cancel`, which go to the named
   host only. A login's URL, prompts and progress go only to the client that
