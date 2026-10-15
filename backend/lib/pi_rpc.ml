@@ -1286,22 +1286,17 @@ let serve_lines
   =
   Switch.run
   @@ fun sw ->
-  let outbox : string option Eio.Stream.t = Eio.Stream.create 1024 in
-  let write json = Eio.Stream.add outbox (Some (Json.to_string json)) in
-  Fiber.fork ~sw (fun () ->
-    let rec loop () =
-      match Eio.Stream.take outbox with
-      | None -> ()
-      | Some line ->
-        (match write_line line with
-         | () -> loop ()
-         | exception _ -> ())
-    in
-    loop ());
+  (* Never waits for a peer that stopped reading (see [Outbox]). *)
+  let outbox = Outbox.create () in
+  let write json = Outbox.send outbox (Json.to_string json) in
+  Fiber.fork ~sw (fun () -> Outbox.run outbox ~write:write_line);
   let t_ref = ref None in
   let client =
-    Rpc_server.connect ?signed_in server ~send:(fun json ->
-      Option.iter !t_ref ~f:(fun t -> on_event t json))
+    Rpc_server.connect
+      ?signed_in
+      ~close:(Outbox.fail outbox)
+      server
+      ~send:(fun json -> Option.iter !t_ref ~f:(fun t -> on_event t json))
   in
   let t =
     { server
@@ -1356,9 +1351,10 @@ let serve_lines
            | Ok json -> Fiber.fork ~sw (fun () -> handle t json));
          loop ()
      in
-     loop ());
+     Fiber.first loop (fun () ->
+       ignore (Promise.await (Outbox.failed outbox) : string)));
   Rpc_server.disconnect server client;
-  Eio.Stream.add outbox None
+  Outbox.finish outbox
 ;;
 
 let serve_websocket router ~query ws =

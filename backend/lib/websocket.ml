@@ -196,15 +196,22 @@ type t =
   ; write_mutex : Eio.Mutex.t
   ; mutable closed : bool
   ; mask : unit -> string option
+  ; mutable heard : float (** when a frame last came, or a write ended *)
+  ; mutable writing_since : float option
   }
+
+let now () = Core_unix.gettimeofday ()
 
 let write t frame =
   Eio.Mutex.use_rw ~protect:true t.write_mutex (fun () ->
     if not t.closed
     then (
-      match Eio.Flow.copy_string (encode ?mask:(t.mask ()) frame) t.flow with
-      | () -> ()
-      | exception _ -> t.closed <- true))
+      t.writing_since <- Some (now ());
+      (match Eio.Flow.copy_string (encode ?mask:(t.mask ()) frame) t.flow with
+       | () -> ()
+       | exception _ -> t.closed <- true);
+      t.writing_since <- None;
+      t.heard <- Float.max t.heard (now ())))
 ;;
 
 let create ?(role = `Server) ~reader ~flow () =
@@ -220,6 +227,8 @@ let create ?(role = `Server) ~reader ~flow () =
   ; write_mutex = Eio.Mutex.create ()
   ; closed = false
   ; mask
+  ; heard = now ()
+  ; writing_since = None
   }
 ;;
 
@@ -244,15 +253,18 @@ let rec read t =
     | exception Protocol_error _ ->
       close ~code:1002 t;
       None
-    | Text text -> Some (`Text text)
-    | Binary data -> Some (`Binary data)
-    | Ping payload ->
-      write t { fin = true; opcode = Pong; payload };
-      read t
-    | Pong _ -> read t
-    | Close code ->
-      close ?code t;
-      None)
+    | message ->
+      t.heard <- now ();
+      (match message with
+       | Text text -> Some (`Text text)
+       | Binary data -> Some (`Binary data)
+       | Ping payload ->
+         write t { fin = true; opcode = Pong; payload };
+         read t
+       | Pong _ -> read t
+       | Close code ->
+         close ?code t;
+         None))
 ;;
 
 let rec read_text t =
@@ -263,3 +275,41 @@ let rec read_text t =
 ;;
 
 let is_closed t = t.closed
+
+let keepalive
+      t
+      ~clock
+      ~shutdown
+      ?(interval = 15.)
+      ?(timeout = 45.)
+      ?(write_timeout = 300.)
+      ()
+  =
+  let gone () =
+    let now = now () in
+    match t.writing_since with
+    | Some since -> Float.(now - since > write_timeout)
+    | None -> Float.(now - t.heard > timeout)
+  in
+  Switch.run
+  @@ fun sw ->
+  Fiber.fork_daemon ~sw (fun () ->
+    while true do
+      Eio.Time.sleep clock interval;
+      if Option.is_none t.writing_since
+      then write t { fin = true; opcode = Ping; payload = "" }
+    done;
+    `Stop_daemon);
+  let rec watch () =
+    Eio.Time.sleep clock (Float.min interval 5.);
+    if t.closed
+    then Fiber.await_cancel ()
+    else if gone ()
+    then (
+      t.closed <- true;
+      (* Also ends a write stuck on a peer that is not reading. *)
+      shutdown ())
+    else watch ()
+  in
+  watch ()
+;;

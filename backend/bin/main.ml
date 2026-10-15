@@ -875,6 +875,7 @@ let serve_command =
        if stdio
        then (
          Rpc_router.serve_connection
+           ~finish_requests:true
            router
            ~input:(Eio.Stdenv.stdin env)
            ~output:(Eio.Stdenv.stdout env);

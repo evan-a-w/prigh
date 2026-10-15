@@ -90,8 +90,11 @@ val create : dir:string -> cwd:string -> ?parent:string -> unit -> t
 (** Lines it cannot read (a torn last line, kinds of entries from a newer
     prigh) are skipped, with a warning each in {!skipped}; the entries after
     an unreadable entry stay on the path through it, and the next append
-    starts on a new line. Fails only without a readable header. *)
-val load : string -> t Or_error.t
+    starts on a new line. Fails only without a readable header. [yield] is
+    called every few hundred kilobytes parsed: a server passes
+    [Fiber.yield], so that a large file does not keep its other fibers
+    waiting. *)
+val load : ?yield:(unit -> unit) -> string -> t Or_error.t
 
 (** Why [load] skipped lines, one warning each. *)
 val skipped : t -> string list
@@ -275,6 +278,15 @@ end
 (** Most recently updated first. Files are only parsed again when their size
     or mtime changed since the last call. *)
 val list : dir:string -> Summary.t list
+
+(** [list], parsing with [load], except the files of [live] sessions (by
+    path: the sessions open in memory, which write them), summed up from
+    memory instead. *)
+val list_with
+  :  live:(string -> t option)
+  -> load:(string -> t Or_error.t)
+  -> dir:string
+  -> Summary.t list
 
 (** A session's own directory next to its file, [<stamp>_<id>/] for
     [<stamp>_<id>.jsonl], for per-session data (it may not exist). *)

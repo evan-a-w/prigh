@@ -84,6 +84,7 @@ let switch_hello ~first_hello ~id =
 ;;
 
 let rec serve_as
+          ?finish_requests
           servers
           ~signed_in
           ~first_hello
@@ -96,6 +97,7 @@ let rec serve_as
   match
     Rpc_server.serve_lines
       server
+      ?finish_requests
       ~signed_in
       ~read_line:(fun () ->
         match !pending with
@@ -108,6 +110,7 @@ let rec serve_as
   | None -> ()
   | Some (id, user) ->
     serve_as
+      ?finish_requests
       servers
       ~signed_in
       ~first_hello
@@ -127,12 +130,12 @@ let error_response id message =
         ])
 ;;
 
-let serve_lines t ~read_line ~write_line =
+let serve_lines ?finish_requests t ~read_line ~write_line =
   match t with
   | Single server ->
     (* No user to switch to: [set_user] fails before it can end this. *)
     ignore
-      (Rpc_server.serve_lines server ~read_line ~write_line
+      (Rpc_server.serve_lines server ?finish_requests ~read_line ~write_line
        : (Json.t * string) option)
   | Namespaced { servers; _ } ->
     Option.iter (first_line read_line) ~f:(fun line ->
@@ -170,6 +173,7 @@ let serve_lines t ~read_line ~write_line =
          | Error e -> write_line (error_response id (Error.to_string_hum e))
          | Ok (server, signed_in) ->
            serve_as
+             ?finish_requests
              servers
              ~signed_in:(Option.value_exn signed_in)
              ~first_hello:hello
@@ -179,9 +183,10 @@ let serve_lines t ~read_line ~write_line =
              server))
 ;;
 
-let serve_connection t ~input ~output =
+let serve_connection ?finish_requests t ~input ~output =
   let reader = Eio.Buf_read.of_flow input ~max_size:(64 * 1024 * 1024) in
   serve_lines
+    ?finish_requests
     t
     ~read_line:(fun () ->
       match Eio.Buf_read.line reader with

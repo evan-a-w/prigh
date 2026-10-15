@@ -68,6 +68,9 @@ val restore_resumes : t -> unit
     [list_users] and [set_user] as [signed_in] allows. *)
 val connect
   :  ?signed_in:User_access.Signed_in.t
+  -> ?close:(string -> unit)
+       (** ends the client's connection, with the reason (e.g. a newer
+           connection from the same page, [hello]'s [tab], took over) *)
   -> t
   -> send:(Json.t -> unit)
   -> Client.t
@@ -85,11 +88,18 @@ val respond : t -> Client.t -> Json.t -> unit
 val disconnect : t -> Client.t -> unit
 
 (** Serves one connection until [read_line] returns [None]; each request is
-    handled in its own fiber. An allowed [set_user] request ends it too,
-    unanswered: the result is its id and the user to serve the rest of the
-    connection as. *)
+    handled in its own fiber, and the requests still running then are
+    cancelled, unless [finish_requests] (stdio, which a script may close
+    before the answers come). An allowed [set_user] request ends it too,
+    unanswered, once its requests are answered: the result is its id and
+    the user to serve the rest of the connection as. What goes out waits in
+    an {!Outbox}, so nothing waits for a peer that stopped reading: when
+    that outbox fails (too much waiting, or a write failed) or [close] is
+    called (a newer connection from the same page), the connection ends
+    and its requests are cancelled. *)
 val serve_lines
   :  ?signed_in:User_access.Signed_in.t
+  -> ?finish_requests:bool
   -> t
   -> read_line:(unit -> string option)
   -> write_line:(string -> unit)

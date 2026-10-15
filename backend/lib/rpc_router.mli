@@ -49,13 +49,15 @@ val servers : t -> (string * Rpc_server.t) list
     [hello] whose credentials [authenticate] accepts, or it is answered with
     an error and the connection closed. *)
 val serve_lines
-  :  t
+  :  ?finish_requests:bool
+  -> t
   -> read_line:(unit -> string option)
   -> write_line:(string -> unit)
   -> unit
 
 val serve_connection
-  :  t
+  :  ?finish_requests:bool
+  -> t
   -> input:_ Eio.Flow.source
   -> output:_ Eio.Flow.sink
   -> unit
