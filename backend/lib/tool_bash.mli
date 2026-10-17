@@ -1,8 +1,8 @@
 open! Core
 open! Import
 
-(** The [bash] tool. With [background] (at depth 0, when the context has
-    background tasks) it starts a job that runs the command through the
+(** The [bash] tool. With [background] (when the context has background
+    tasks: a subagent's are its own) it starts a job that runs the command through the
     context's executor, i.e. on the active tool host, and returns at once.
     Without it, at depth 0, a command still running after
     {!Background_tasks.auto_background} seconds becomes such a job (its
@@ -16,8 +16,9 @@ val tool : Tool.t
     if that directory is a symlink or another user's. *)
 val save_output : Tool.Context.t -> string -> string
 
-(** [bash] without the [background] parameter, for subagents. *)
-val foreground_tool : Tool.t
+(** [bash] for subagents: never moved to the background by itself, and its
+    [background] parameter says that they wait for their jobs. *)
+val subagent_tool : Tool.t
 
 (** Whether this call starts a job rather than running the command. *)
 val starts_job : Tool.Context.t -> Json.t -> bool
@@ -53,8 +54,6 @@ val start_job
 (** The arguments of a background job's foreground run: [background] and
     [stdin] dropped, and no timeout unless one was given. *)
 val foreground_arguments : Json.t -> Json.t
-
-val started_message : id:string -> command:string -> string
 
 (** The outcome of a finished job from its foreground result and output. *)
 val job_outcome

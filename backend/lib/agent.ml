@@ -1257,7 +1257,6 @@ let build_system_prompt t =
     ~nix
     ~skills
     ?auto_background:(Config.auto_background t.config)
-    ~orchestrator:true
     ~cwd:t.cwd
     ~home:t.home
     ~tools:(Tools.specs (tools t))
