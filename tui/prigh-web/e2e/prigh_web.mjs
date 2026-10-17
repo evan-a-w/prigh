@@ -87,6 +87,13 @@ const script3 = [
   { text: "Like this:\n\n```ocaml\nlet rec fib n = if n < 2 then n else fib (n - 1) + fib (n - 2) (* slow *)\n```\n\n```json\n{\"name\": \"prigh\", \"ok\": true, \"n\": 3}\n```" },
 ];
 writeFileSync(join(dir, "script.json"), JSON.stringify(script));
+// Snippets for the composer (/snippet, Alt+N, #name).
+const configFile = join(home, ".prigh", "config.json");
+mkdirSync(join(home, ".prigh"), { recursive: true });
+writeFileSync(configFile, JSON.stringify({ snippets: [
+  { name: "review", text: "Review the diff for bugs.\nList them by severity." },
+  { name: "tests", text: "Run the tests and fix failures." },
+] }));
 writeFileSync(join(dir, "script2.json"), JSON.stringify(script2));
 writeFileSync(join(dir, "script3.json"), JSON.stringify(script3));
 
@@ -412,6 +419,98 @@ try {
   await screenshot("a mistyped command");
   await composer().fill("");
   await page.locator(".toast.error").click();
+
+  // Snippets: the picker (Alt+N, /snippet) and #name completion insert at
+  // the caret and leave it after the text; /snippet add and rm save them.
+  const caret = () => page.evaluate(() => {
+    const t = document.querySelector(".composer textarea");
+    return `value ${JSON.stringify(t.value)}, caret ${t.selectionStart}-${t.selectionEnd}, focused ${document.activeElement === t}`;
+  });
+  const putCaret = n => composer().evaluate((t, n) => t.setSelectionRange(n, n), n);
+  const popupShown = async () => (await page.locator(".popup").count()) ? clean(await page.locator(".popup").innerText()) : "no popup";
+  const savedSnippets = () => JSON.parse(readFileSync(configFile, "utf8")).snippets?.map(s => s.name).join(", ");
+  await composer().fill("Please  now");
+  await putCaret(7);
+  await page.keyboard.press("Alt+N");
+  await page.locator(".modal .picker-item").first().waitFor();
+  await page.waitForFunction(() => document.activeElement?.closest(".modal"));
+  await page.keyboard.type("tst");
+  await page.waitForFunction(() => document.querySelector(".modal .picker-item")?.innerText.startsWith("tests"));
+  await page.waitForTimeout(200); // its rise
+  await show("snippets: Alt+N, filtered", ".modal");
+  await page.keyboard.press("Enter");
+  await page.waitForSelector(".modal", { state: "detached" });
+  await page.waitForFunction(() => document.activeElement?.closest(".composer"));
+  section("snippets: inserted at the caret");
+  console.log(await caret());
+  await page.keyboard.type("!");
+  console.log(`typing goes after it: ${JSON.stringify(await composer().inputValue())}`);
+  await page.waitForTimeout(200); // the editor's new height
+  await screenshot("snippets: inserted at the caret");
+  await composer().fill("/snippet");
+  await composer().press("Control+Enter");
+  await page.locator(".modal .picker-item").first().waitFor();
+  await page.waitForFunction(() => document.activeElement?.closest(".modal"));
+  await page.keyboard.type("bugs");
+  await page.waitForFunction(() => document.querySelectorAll(".modal .picker-item").length === 1);
+  await page.waitForTimeout(200);
+  await show("snippets: /snippet, filtered by the text", ".modal");
+  await page.keyboard.press("Enter");
+  await page.waitForSelector(".modal", { state: "detached" });
+  await page.waitForFunction(() => document.activeElement?.closest(".composer"));
+  section("snippets: /snippet inserted");
+  console.log(await caret());
+  await composer().fill("/snippet tests");
+  await composer().press("Control+Enter");
+  await page.waitForFunction(() => document.querySelector(".composer textarea").value.startsWith("Run"));
+  section("snippets: /snippet tests");
+  console.log(await caret());
+  // #name at a word start completes; Tab puts the text in its place.
+  await composer().fill("a  b");
+  await putCaret(2);
+  await page.keyboard.type("#rev");
+  await page.locator(".popup").waitFor();
+  await page.waitForTimeout(200); // its fade in
+  await show("snippets: #rev completes", ".popup");
+  await page.keyboard.press("Tab");
+  await page.waitForSelector(".popup", { state: "detached" });
+  section("snippets: #rev replaced");
+  console.log(await caret());
+  await page.keyboard.type("!");
+  console.log(`typing goes after it: ${JSON.stringify(await composer().inputValue())}`);
+  await page.waitForTimeout(200);
+  await screenshot("snippets: #rev replaced");
+  section("snippets: # that is not a snippet");
+  await composer().fill("");
+  await page.keyboard.type("# Title #123 x#rev");
+  await page.waitForTimeout(100);
+  console.log(`${JSON.stringify(await composer().inputValue())}: ${await popupShown()}`);
+  // Saved and removed through the config.
+  await composer().fill("/snippet add fix Fix the failing test.");
+  await composer().press("Control+Enter");
+  await page.locator(".toast", { hasText: "snippet fix saved" }).waitFor();
+  section("snippets: /snippet add");
+  console.log(clean(await page.locator(".toast", { hasText: "snippet fix saved" }).innerText()));
+  console.log(`config: ${savedSnippets()}`);
+  await composer().fill("");
+  await page.keyboard.type("#fi");
+  await page.locator(".popup").waitFor();
+  console.log(await popupShown());
+  await page.keyboard.press("Enter");
+  await page.waitForSelector(".popup", { state: "detached" });
+  console.log(await caret());
+  await composer().fill("/snippet rm fix");
+  await composer().press("Control+Enter");
+  await page.locator(".toast", { hasText: "snippet fix removed" }).waitFor();
+  section("snippets: /snippet rm");
+  console.log(clean(await page.locator(".toast", { hasText: "snippet fix removed" }).innerText()));
+  console.log(`config: ${savedSnippets()}`);
+  await composer().fill("");
+  await page.keyboard.type("#fi");
+  await page.waitForTimeout(100);
+  console.log(`#fi: ${await popupShown()}`);
+  await composer().fill("");
+  for (const toast of await page.locator(".toast").all()) await toast.click().catch(() => {});
 
   // 2. A scripted run with a bash tool call and its output.
   await send("count some lines");

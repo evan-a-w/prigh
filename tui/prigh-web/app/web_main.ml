@@ -166,15 +166,25 @@ let focus id =
     Option.iter (Dom_html.getElementById_opt id) ~f:(fun el -> el##focus))
 ;;
 
-let set_caret byte =
-  Browser.after_render (fun () ->
+(* At once, so that a key typed before the next frame lands after the
+   insert, and again once the page has rendered the draft, unless the text has
+   changed since. *)
+let set_caret ~draft byte =
+  let apply ~put_value =
     Option.iter (Dom_html.getElementById_opt "editor") ~f:(fun el ->
       match Dom_html.tagged el with
       | Textarea t ->
-        let n = Prigh_web.Utf16.units (Js.to_string t##.value) ~byte in
-        t##focus;
-        t##setSelectionRange n n
-      | _ -> ()))
+        let same = String.equal (Js.to_string t##.value) draft in
+        if put_value && not same then t##.value := Js.string draft;
+        if same || put_value
+        then (
+          let n = Prigh_web.Utf16.units draft ~byte in
+          t##focus;
+          t##setSelectionRange n n)
+      | _ -> ())
+  in
+  apply ~put_value:true;
+  Browser.after_render (fun () -> apply ~put_value:false)
 ;;
 
 (* Loads the page for [backend] (and rejoins [session]). *)
@@ -405,7 +415,7 @@ let perform client settings ctx (model : App.Model.t) (command : App.Command.t) 
       in
       inject (App.Action.Dismiss_toast id)
     | Focus id -> Effect.of_sync_fun focus id
-    | Set_caret byte -> Effect.of_sync_fun set_caret byte
+    | Set_caret byte -> Effect.of_sync_fun (set_caret ~draft:model.draft) byte
     | Save_history entries -> Effect.of_sync_fun save_history entries
     | Sign_out -> Effect.of_sync_fun sign_out settings
     | Reveal path -> Effect.of_sync_fun Agents_listeners.reveal path

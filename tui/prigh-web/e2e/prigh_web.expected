@@ -41,6 +41,47 @@ after Esc: editor
 === chromium: a mistyped command ===
 Unknown command /modle. Did you mean /mode? (/help lists them)
 editor: /modle
+=== chromium: snippets: Alt+N, filtered ===
+Snippets
+tests
+Run the tests and fix failures.
+review
+Review the diff for bugs.
+↑↓ to move, Enter to choose, Esc to close
+=== chromium: snippets: inserted at the caret ===
+value "Please Run the tests and fix failures. now", caret 38-38, focused true
+typing goes after it: "Please Run the tests and fix failures.! now"
+=== chromium: snippets: /snippet, filtered by the text ===
+Snippets
+review
+Review the diff for bugs.
+↑↓ to move, Enter to choose, Esc to close
+=== chromium: snippets: /snippet inserted ===
+value "Review the diff for bugs.\nList them by severity.", caret 48-48, focused true
+=== chromium: snippets: /snippet tests ===
+value "Run the tests and fix failures.", caret 31-31, focused true
+=== chromium: snippets: #rev completes ===
+Snippets
+↑↓ Tab Enter Esc Ctrl+Enter as typed
+#review
+Review the diff for bugs.
+=== chromium: snippets: #rev replaced ===
+value "a Review the diff for bugs.\nList them by severity. b", caret 50-50, focused true
+typing goes after it: "a Review the diff for bugs.\nList them by severity.! b"
+=== chromium: snippets: # that is not a snippet ===
+"# Title #123 x#rev": no popup
+=== chromium: snippets: /snippet add ===
+snippet fix saved: Fix the failing test. (/snippet fix inserts it)
+config: review, tests, fix
+Snippets
+↑↓ Tab Enter Esc Ctrl+Enter as typed
+#fix
+Fix the failing test.
+value "Fix the failing test.", caret 21-21, focused true
+=== chromium: snippets: /snippet rm ===
+snippet fix removed
+config: review, tests
+#fi: no popup
 === chromium: bash run ===
 count some lines
 <TIME>
@@ -881,6 +922,47 @@ after Esc: editor
 === firefox: a mistyped command ===
 Unknown command /modle. Did you mean /mode? (/help lists them)
 editor: /modle
+=== firefox: snippets: Alt+N, filtered ===
+Snippets
+tests
+Run the tests and fix failures.
+review
+Review the diff for bugs.
+↑↓ to move, Enter to choose, Esc to close
+=== firefox: snippets: inserted at the caret ===
+value "Please Run the tests and fix failures. now", caret 38-38, focused true
+typing goes after it: "Please Run the tests and fix failures.! now"
+=== firefox: snippets: /snippet, filtered by the text ===
+Snippets
+review
+Review the diff for bugs.
+↑↓ to move, Enter to choose, Esc to close
+=== firefox: snippets: /snippet inserted ===
+value "Review the diff for bugs.\nList them by severity.", caret 48-48, focused true
+=== firefox: snippets: /snippet tests ===
+value "Run the tests and fix failures.", caret 31-31, focused true
+=== firefox: snippets: #rev completes ===
+Snippets
+↑↓ Tab Enter Esc Ctrl+Enter as typed
+#review
+Review the diff for bugs.
+=== firefox: snippets: #rev replaced ===
+value "a Review the diff for bugs.\nList them by severity. b", caret 50-50, focused true
+typing goes after it: "a Review the diff for bugs.\nList them by severity.! b"
+=== firefox: snippets: # that is not a snippet ===
+"# Title #123 x#rev": no popup
+=== firefox: snippets: /snippet add ===
+snippet fix saved: Fix the failing test. (/snippet fix inserts it)
+config: review, tests, fix
+Snippets
+↑↓ Tab Enter Esc Ctrl+Enter as typed
+#fix
+Fix the failing test.
+value "Fix the failing test.", caret 21-21, focused true
+=== firefox: snippets: /snippet rm ===
+snippet fix removed
+config: review, tests
+#fi: no popup
 === firefox: bash run ===
 count some lines
 <TIME>
