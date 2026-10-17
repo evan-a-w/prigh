@@ -121,6 +121,15 @@ change; its description says what changed and why, how it was tested
 up to date with `main` (rebase or merge) and the suites passing; only
 merge when asked.
 
+## Shared machine
+
+You run on the user's own machine, next to their work. Never kill, stop or
+reset anything you did not start: no `tmux kill-server` or `kill-session`
+on the default socket (tests use a private one: `tmux -L <name>`), no
+`pkill`/`killall` by name, no killing prigh backends, tool hosts or editors
+you did not launch. Kill only processes you started, by their pid or
+private socket.
+
 ## General
 
 Eagerly remove dead code, unless it has a good chance of being useful in
