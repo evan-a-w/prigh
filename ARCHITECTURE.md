@@ -758,7 +758,16 @@ two can share one.
   of its own at the next turn boundary, recorded as an `Injected` note of
   kind `Plan_mode`. `ask_user` emits `Ask_user` and waits for
   `answer_question` (the first answer wins; abort withdraws it;
-  `Ask_user_done` follows). `pending_confirms`/`pending_questions` back
+  `Ask_user_done` follows). Its timeout (`User_question.timeout`: the
+  config's `ask_user_timeout_seconds`, replaced by the call's
+  `timeout_seconds` unless the config's is off) gives the question a
+  `deadline` (in `Ask_user`, `Pending_question` and so `deadline_ms` over
+  RPC); a fiber racing the answer sleeps until it through the agent's
+  `sleep_until` (injectable, as for the automatic resume), then resolves the
+  call with `Timed_out`, which the tool turns into a reply telling the model
+  to carry on; `Ask_user_done` then says `timed_out` and a `Notice`
+  follows. Subagents cannot ask, so only the main agent's questions time
+  out. `pending_confirms`/`pending_questions` back
   `get_pending`, so a reconnecting frontend shows them again. `State`
   carries `approval_mode`, `plan_mode`, `plan` (`Plan.latest` of the active
   path, updated on each successful `update_plan`) and `session_rules`.
@@ -801,7 +810,8 @@ two can share one.
   absent, which saving replaces), `permissions` (allow/ask/deny rules;
   saving keeps the file's as written), `default_model`/`default_thinking`,
   `fallback_models` (model keys), `default_cwd`, `max_budget_usd`,
-  `goal_max_continuations` and `resume_on_limit_reset`), loaded at agent
+  `goal_max_continuations`, `resume_on_limit_reset` and
+  `ask_user_timeout_seconds` (default 600, 0 = never)), loaded at agent
   creation, read/written through `get_config`/`set_config`; unknown fields
   are ignored by `load` but reported by `problems` (with wrong-typed ones),
   which `Model_registry` adds to its problems along with an unknown
@@ -1010,7 +1020,9 @@ two can share one.
   `tool_confirm_respond` (`{call_id, agent_id?, allow, always?, reason?}`),
   `set_mode` (`{approval_mode?, plan_mode?}`, answered with the state),
   `ask_user_respond` (`{call_id, answers: [[string]]}` or `{call_id,
-  decline: true}`), `set_active_host`, `tool_exec_output`,
+  decline: true}`; the `ask_user` event and `get_pending`'s questions carry
+  `deadline_ms`, null when it never times out, and `ask_user_done` says
+  `timed_out`), `set_active_host`, `tool_exec_output`,
   `list_skills` (`{skills: [{name, description, path, model_invocable}]}`),
   `list_mcp {reconnect?}` and `mcp_approve {source, server}` (both
   `{servers: [{name, source, project, status: ready|failed|needs_approval,
@@ -1378,8 +1390,10 @@ copy of the protocol types and the e2e test guards the contract.
     (`plan 2/5: step`, the checklist); the backend's plan mode notes are
     harness notes (`◇ Plan mode on: ...`). Confirmations and questions queue in the
     model (`pending_confirms`, `pending_questions`) and open one at a time
-    when the editor has the keyboard; `tool_confirm_done`/`ask_user_done`
-    close one answered elsewhere, `get_pending` at startup brings back what
+    when the editor has the keyboard (a question's box says when its
+    deadline is, `Question_form.deadline_note`); `tool_confirm_done`/`ask_user_done`
+    close one answered elsewhere (or timed out: quietly, the backend's
+    notice explains), `get_pending` at startup brings back what
     is still waiting. Replacing the session shown (a reload, `/setusr`, a
     reconnect) goes through `reset_session`: it closes the dialogs that
     answer the old session's agent (the reason prompt gives the draft back),
@@ -1791,7 +1805,8 @@ copy of the protocol types and the e2e test guards the contract.
       `Prigh_ui.Confirm_prompt` as buttons, a reason field, the plan of
       `exit_plan_mode` as markdown) and `Question_dialog`/`Question_view`
       (the model's `ask_user`, over `Prigh_ui.Question_form`: radio buttons
-      or checkboxes and an own answer, keys and clicks); both queue
+      or checkboxes and an own answer, keys and clicks, and the deadline's
+      note); both queue
       (`Model.confirms`, `questions`), close on `tool_confirm_done` /
       `ask_user_done` and come back from `get_pending` (`Pending`).
       `/mode`, `/plan`, `/todos`, `/permissions` and Alt+M as in the TUI.
