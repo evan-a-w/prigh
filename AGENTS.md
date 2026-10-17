@@ -109,6 +109,27 @@ The UX reference is pi (https://github.com/evan-a-w/pi). In every frontend:
 - Every action is acknowledged within one frame.
 - Switching sessions or users resets everything that belongs to the old one.
 
+## Pull requests
+
+All changes go through pull requests on GitHub (`evan-a-w/prigh`): never
+commit or push to `main` directly. Work on a branch (`feat/...`,
+`fix/...`, `docs/...`), ideally in its own `git worktree` so parallel work
+does not collide, push it and open a PR with `gh pr create` (`nix run
+nixpkgs#gh -- pr create` if `gh` is not installed). One PR per coherent
+change; its description says what changed and why, how it was tested
+(which suites ran and passed), and anything left for later. Keep PRs
+up to date with `main` (rebase or merge) and the suites passing; only
+merge when asked.
+
+## Shared machine
+
+You run on the user's own machine, next to their work. Never kill, stop or
+reset anything you did not start: no `tmux kill-server` or `kill-session`
+on the default socket (tests use a private one: `tmux -L <name>`), no
+`pkill`/`killall` by name, no killing prigh backends, tool hosts or editors
+you did not launch. Kill only processes you started, by their pid or
+private socket.
+
 ## General
 
 Eagerly remove dead code, unless it has a good chance of being useful in

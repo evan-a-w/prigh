@@ -1,0 +1,77 @@
+
+== open: resumes the last session of this directory
+┌ chat
+│ ## You
+│ earlier question
+│ 
+│ ## prigh
+│ earlier answer
+│ 
+│ ✓ ls · execute · completed
+│ 
+└
+winbar: prigh · claude-sonnet · thinking medium · mode Default
+input bar: <CR> send · <C-c> cancel · @ file · / command · g? keys
+
+== :PrighModel
+select: Model
+  ● claude-sonnet
+    claude-opus
+  ->   claude-opus
+winbar: prigh · claude-opus · thinking medium · mode Default
+input bar: <CR> send · <C-c> cancel · @ file · / command · g? keys
+
+== :PrighMode (modes, no mode config option)
+select: prigh mode
+  ● Default
+    Plan — read-only planning
+  ->   Plan — read-only planning
+winbar: prigh · claude-opus · thinking medium · mode Plan
+input bar: <CR> send · <C-c> cancel · @ file · / command · g? keys
+
+== :PrighConfig
+select: prigh config
+  Model: claude-opus
+  Thinking: medium
+  -> Thinking: medium
+select: Thinking
+    low
+  ● medium
+    high
+  ->   high
+
+== :PrighSessions loads another session (all pages)
+select: prigh sessions in <tmp>
+  + new session
+  ● Earlier work · 2026-10-01T10:00:00Z · old
+    Older work · 2026-09-01T10:00:00Z · older
+    (untitled) · 2026-08-01T10:00:00Z · oldest
+  ->   Older work · 2026-09-01T10:00:00Z · older
+┌ chat
+│ ## You
+│ older question
+│ 
+└
+winbar: prigh
+input bar: <CR> send · <C-c> cancel · @ file · / command · g? keys
+
+== :PrighSessions → new
+select: prigh sessions in <tmp>
+  + new session
+  -> + new session
+┌ chat
+│ 
+└
+winbar: prigh
+input bar: <CR> send · <C-c> cancel · @ file · / command · g? keys
+last session: fresh
+agent got: {"id":0,"method":"initialize","params":{"clientCapabilities":{"_meta":{"prigh":{"state":true}},"elicitation":{"form":{}},"fs":{"readTextFile":true,"writeTextFile":true},"session":{"configOptions":{"boolean":{}},"notices":{}},"terminal":false},"clientInfo":{"name":"prigh.nvim","title":"prigh.nvim","version":"0.1.0"},"protocolVersion":1}}
+agent got: {"id":1,"method":"session/load","params":{"cwd":"<tmp>","mcpServers":[],"sessionId":"old"}}
+agent got: {"id":2,"method":"session/set_config_option","params":{"configId":"model","sessionId":"old","value":"opus"}}
+agent got: {"id":3,"method":"session/set_mode","params":{"modeId":"plan","sessionId":"old"}}
+agent got: {"id":4,"method":"session/set_config_option","params":{"configId":"thinking","sessionId":"old","value":"high"}}
+agent got: {"id":5,"method":"session/list","params":{"cwd":"<tmp>"}}
+agent got: {"id":6,"method":"session/list","params":{"cursor":"p2","cwd":"<tmp>"}}
+agent got: {"id":7,"method":"session/load","params":{"cwd":"<tmp>","mcpServers":[],"sessionId":"older"}}
+agent got: {"id":8,"method":"session/list","params":{"cwd":"<tmp>"}}
+agent got: {"id":9,"method":"session/new","params":{"cwd":"<tmp>","mcpServers":[]}}

@@ -1,0 +1,59 @@
+
+== queue two prompts during a turn
+┌ chat
+│ ## You
+│ first
+│ 
+│ ## prigh
+│ first answer
+│ 
+│ ⏸ queued: second
+│ ⏸ queued: third
+└
+winbar: prigh · claude-sonnet · thinking medium · mode Default · ● running · queued 2
+input bar: <CR> send · <C-c> cancel · @ file · / command · g? keys · 2 queued
+
+== <C-c>: cancel, queued prompts back in the input
+notify: prigh: 2 queued prompts moved back to the input
+┌ chat
+│ ## You
+│ first
+│ 
+│ ## prigh
+│ first answer
+│ 
+│ ℹ cancelled
+│ 
+└
+input: { "second", "third", "with two lines" }
+winbar: prigh · claude-sonnet · thinking medium · mode Default
+input bar: <CR> send · <C-c> cancel · @ file · / command · g? keys
+
+== a queued prompt is sent when the turn ends
+┌ chat
+│ ## You
+│ first
+│ 
+│ ## prigh
+│ first answer
+│ 
+│ ℹ cancelled
+│ 
+│ ## You
+│ second
+│ 
+│ ## prigh
+│ second answer
+│ 
+│ ## You
+│ third
+│ 
+│ ⚠ stopped: reached the token limit
+│ 
+└
+agent got: {"id":0,"method":"initialize","params":{"clientCapabilities":{"_meta":{"prigh":{"state":true}},"elicitation":{"form":{}},"fs":{"readTextFile":true,"writeTextFile":true},"session":{"configOptions":{"boolean":{}},"notices":{}},"terminal":false},"clientInfo":{"name":"prigh.nvim","title":"prigh.nvim","version":"0.1.0"},"protocolVersion":1}}
+agent got: {"id":1,"method":"session/new","params":{"cwd":"<tmp>","mcpServers":[]}}
+agent got: {"id":2,"method":"session/prompt","params":{"prompt":[{"text":"first","type":"text"}],"sessionId":"s1"}}
+agent got: {"method":"session/cancel","params":{"sessionId":"s1"}}
+agent got: {"id":3,"method":"session/prompt","params":{"prompt":[{"text":"second","type":"text"}],"sessionId":"s1"}}
+agent got: {"id":4,"method":"session/prompt","params":{"prompt":[{"text":"third","type":"text"}],"sessionId":"s1"}}
