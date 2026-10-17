@@ -759,8 +759,8 @@ two can share one.
   kind `Plan_mode`. `ask_user` emits `Ask_user` and waits for
   `answer_question` (the first answer wins; abort withdraws it;
   `Ask_user_done` follows). Its timeout (`User_question.timeout`: the
-  config's `ask_user_timeout_seconds`, replaced by the call's
-  `timeout_seconds` unless the config's is off) gives the question a
+  config's `ask_user_timeout_seconds`, or the call's `timeout_seconds`,
+  clamped to 30-300, when shorter: the model can only shorten it) gives the question a
   `deadline` (in `Ask_user`, `Pending_question` and so `deadline_ms` over
   RPC); a fiber racing the answer sleeps until it through the agent's
   `sleep_until` (injectable, as for the automatic resume), then resolves the
@@ -825,7 +825,7 @@ two can share one.
   `fallback_models` (model keys), `default_cwd`, `max_budget_usd`,
   `goal_max_continuations`, `reminders` (saving keeps the file's as
   written), `resume_on_limit_reset`, `ask_user_timeout_seconds` (default
-  600, 0 = never) and `snippets`, the frontends' `/snippet` texts,
+  300, 0 = never) and `snippets`, the frontends' `/snippet` texts,
   validated by `Snippet`), loaded at agent
   creation, read/written through `get_config`/`set_config`; unknown fields
   are ignored by `load` but reported by `problems` (with wrong-typed ones),

@@ -233,8 +233,8 @@ let%expect_test
   show (field "questions" (field "result" (call a "get_pending")));
   [%expect
     {|
-    {"type":"event","event":"ask_user","call_id":"q1","questions":[{"question":"Which?","header":null,"options":[{"label":"x","description":null},{"label":"y","description":"the other"}],"multiple":false},{"question":"Why?","header":null,"options":[],"multiple":false}],"deadline_ms":<now+600s>}
-    [{"call_id":"q1","questions":[{"question":"Which?","header":null,"options":[{"label":"x","description":null},{"label":"y","description":"the other"}],"multiple":false},{"question":"Why?","header":null,"options":[],"multiple":false}],"deadline_ms":<now+600s>}]
+    {"type":"event","event":"ask_user","call_id":"q1","questions":[{"question":"Which?","header":null,"options":[{"label":"x","description":null},{"label":"y","description":"the other"}],"multiple":false},{"question":"Why?","header":null,"options":[],"multiple":false}],"deadline_ms":<now+300s>}
+    [{"call_id":"q1","questions":[{"question":"Which?","header":null,"options":[{"label":"x","description":null},{"label":"y","description":"the other"}],"multiple":false},{"question":"Why?","header":null,"options":[],"multiple":false}],"deadline_ms":<now+300s>}]
     {"type":"response","id":"r","ok":false,"error":"missing param \"answers\" (or \"decline\": true)"}
     {"type":"response","id":"r","ok":false,"error":"expected 2 answers (one list per question), got 1"}
     {"type":"response","id":"r","ok":true,"result":{}}

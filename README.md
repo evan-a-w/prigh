@@ -928,7 +928,7 @@ Long runs; edited by hand) and
 `default_model`/`default_thinking` (what new sessions start with unless
 `-model`/`-thinking` is given; `/change_default` saves the current ones),
 `notify` (`off`, `bell` or `desktop`; the TUI's `/notify`),
-`ask_user_timeout_seconds` (default 600, `0` = never: how long a question
+`ask_user_timeout_seconds` (default 300, `0` = never: how long a question
 from the model waits for you, above), `snippets` (texts to insert into the
 editor, `/snippet` below) and
 `auto_background_seconds` (default 30, `0` = never: when a foreground
@@ -1269,13 +1269,13 @@ answer, ←/→ move between questions, Enter answers (the last one sends), Esc
 declines (the model is told you declined); the box lists these keys. The first frontend to answer wins and the others' dialogs close;
 an unanswered question comes back after a reconnect, and aborting the run
 withdraws it. A question nobody answers times out, after
-`ask_user_timeout_seconds` in `config.json` (default 600; `0` = never): the
+`ask_user_timeout_seconds` in `config.json` (default 300; `0` = never): the
 model is told you did not answer and carries on with its best judgement,
 saying what it assumed, the dialog closes and a notice says so. The dialog
 shows when that happens (`unanswered, the agent carries on by itself at
-14:05`). The model can give one question a `timeout_seconds` of its own
-(30 to 86400, or `0` to wait until you answer) unless you turned timeouts
-off. Subagents cannot ask (nor plan, nor leave plan mode): they
+14:05`). The model can give one question a shorter `timeout_seconds` of
+its own (30 to 300), but never a longer one than yours, and only you can
+turn the timeout off. Subagents cannot ask (nor plan, nor leave plan mode): they
 put open questions in their report for the main agent to ask. Headless
 `prigh run` has nobody to answer, so it refuses confirmations (the model is
 told to have them allowed in the config) and questions (the model decides
