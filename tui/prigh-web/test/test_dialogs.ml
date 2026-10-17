@@ -169,6 +169,7 @@ let%expect_test "help lists every key and command" =
     Ctrl+Shift+F open or close the file browser (/files): ↑↓ select, Enter opens, Backspace goes up, F2 renames, Delete deletes, Esc closes
     Ctrl+` open or close the terminal (/terminal); in it, every other key goes to the shell
     Tab (in /scoped-models) check or uncheck the highlighted model
+    Delete (in /remind's list) remove the highlighted reminder
     y / a / n / r (confirmation) allow once, always allow (its rules, this session), deny, deny saying why; Enter allows, Esc denies
     ↑↓ Space ←→ (question) choose, pick, previous / next question; type for your own answer; Enter accepts, Esc declines
     Commands
@@ -215,6 +216,7 @@ let%expect_test "help lists every key and command" =
     /mcp [reconnect] MCP servers: their tools, approve a project's, or restart failed ones
     /budget [dollars|off] show or set the session's cost budget: no turn starts once it is spent
     /goal [text|off|resume] set a goal the agent keeps working toward until it is met; show, clear or resume it
+    /remind [stop|every|rm|off ...] stop [N] TEXT: remind the agent when it ends its turn (at most N times in a row, default 3); every N TEXT: every N turns; rm NAME, off: remove one or all; none: list the session's (Delete removes one)
     /resume [now|cancel] show, run now or cancel the automatic resume after a usage limit
     /copy copy the last reply to the clipboard
     /btw <question> ask a side question without interrupting the run (not added to the conversation)

@@ -758,7 +758,7 @@ let%expect_test "typing / lists commands, Down twice + Tab fills /login " =
       /fallback [off|model...]        show or set the models th…
       /default-dir [off|path]         show or set the directory…
       /login [provider] [api_key|oauth]  log in to a provider
-      ↕ 1–8 of 58
+      ↕ 1–8 of 59
     …deepseek-flash  $0.01  Tab/Enter accept · Alt+S as typed
     |}];
   H.key h (Key.plain Down);
@@ -775,7 +775,7 @@ let%expect_test "typing / lists commands, Down twice + Tab fills /login " =
       /fallback [off|model...]        show or set the models th…
       /default-dir [off|path]         show or set the directory…
       /login [provider] [api_key|oauth]  log in to a provider
-      ↕ 1–8 of 58
+      ↕ 1–8 of 59
     …deepseek-flash  $0.01  Tab/Enter accept · Alt+S as typed
     |}];
   H.key h (Key.plain Down);
@@ -792,7 +792,7 @@ let%expect_test "typing / lists commands, Down twice + Tab fills /login " =
       /fallback [off|model...]        show or set the models th…
       /default-dir [off|path]         show or set the directory…
       /login [provider] [api_key|oauth]  log in to a provider
-      ↕ 1–8 of 58
+      ↕ 1–8 of 59
     …deepseek-flash  $0.01  Tab/Enter accept · Alt+S as typed
     |}];
   H.key h (Key.plain Tab);
@@ -2786,7 +2786,7 @@ let%expect_test "/auth, /help, /state, /clear, unknown method errors" =
     {|
       Ctrl+D                   /sessions: delete the marked or
       highlighted sessions · /agents: cancel · /jobs: kill ·
-      /queue: remove
+      /queue, /remind: remove
       Tab                      /sessions: mark or unmark the
       highlighted session
       Alt+A                    /sessions: archive or unarchive
@@ -2809,7 +2809,7 @@ let%expect_test "/auth, /help, /state, /clear, unknown method errors" =
   [%expect
     {|
     (Rpc (method_ list_models) (params ()) (tag (Models_for_picker "")))
-      /queue: remove
+      /queue, /remind: remove
       Tab                      /sessions: mark or unmark the
       highlighted session
       Alt+A                    /sessions: archive or unarchive
@@ -7685,7 +7685,7 @@ let%expect_test "Tab on an empty editor opens the command list; the list shows \
       /fallback [off|model...]        show or set the models th…
       /default-dir [off|path]         show or set the directory…
       /login [provider] [api_key|oauth]  log in to a provider
-      ↕ 1–8 of 58
+      ↕ 1–8 of 59
     …deepseek-flash  $0.01  Tab/Enter accept · Alt+S as typed
     |}];
   H.key h (Key.plain End);
@@ -7702,7 +7702,7 @@ let%expect_test "Tab on an empty editor opens the command list; the list shows \
       /fallback [off|model...]        show or set the models th…
       /default-dir [off|path]         show or set the directory…
       /login [provider] [api_key|oauth]  log in to a provider
-      ↕ 1–8 of 58
+      ↕ 1–8 of 59
     …deepseek-flash  $0.01  Tab/Enter accept · Alt+S as typed
     |}];
   H.keys h "qu";

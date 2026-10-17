@@ -23,6 +23,7 @@ module Argument = struct
     | Goal
     | Resume
     | Snippet
+    | Remind
   [@@deriving sexp_of, equal]
 end
 
@@ -195,6 +196,13 @@ let all =
       "set a goal the agent keeps working toward until it is met; show, clear \
        or resume it"
   ; c
+      ~argument:Remind
+      ~args:"[stop|every|rm|off ...]"
+      "remind"
+      "stop [N] TEXT: remind the agent when it ends its turn (at most N times \
+       in a row, default 3); every N TEXT: every N turns; rm NAME, off: remove \
+       one or all; none: list the session's (Delete removes one)"
+  ; c
       ~argument:Resume
       ~args:"[now|cancel]"
       "resume"
@@ -269,7 +277,9 @@ let parse text =
   match String.chop_prefix text ~prefix:"/" with
   | Some body
     when (not (String.mem body '\n'))
-         || String.is_prefix body ~prefix:"snippet add " ->
+         || String.is_prefix body ~prefix:"snippet add "
+         || String.is_prefix body ~prefix:"remind stop "
+         || String.is_prefix body ~prefix:"remind every " ->
     let name, rest =
       match String.lsplit2 body ~on:' ' with
       | Some (name, rest) -> name, String.strip rest

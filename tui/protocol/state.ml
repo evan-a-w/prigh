@@ -57,6 +57,7 @@ type t =
   ; jobs : Job.t list
   ; budget_usd : float option
   ; goal : Goal.t option
+  ; reminders : Reminder.t list
   ; resume_at : Time_ns.t option
   ; approval_mode : Approval_mode.t
   ; plan_mode : bool
@@ -112,6 +113,9 @@ let of_json j =
     | None -> Ok None
     | Some goal -> Goal.of_json goal >>| Option.some
   in
+  let%bind reminders =
+    Json.optional_list_field j "reminders" ~f:Reminder.of_json
+  in
   let%bind resume_at = Json.time_ms_opt_field j "resume_at_ms" in
   (* Older backends have none of these. *)
   let%bind approval_mode =
@@ -151,6 +155,7 @@ let of_json j =
   ; jobs
   ; budget_usd
   ; goal
+  ; reminders
   ; resume_at
   ; approval_mode
   ; plan_mode

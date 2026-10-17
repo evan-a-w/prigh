@@ -155,10 +155,11 @@ let%expect_test "messages of the harness's" =
 
 let%expect_test "reminders: recorded, never inferred" =
   List.iter
-    [ Injected.Source.Reminder { name = "disk"; repeat = None; max = None }
-    ; Reminder { name = "keep-going"; repeat = Some 1; max = Some 5 }
+    [ Injected.Source.Reminder
+        { name = "r1: Check disk."; repeat = None; max = None }
+    ; Reminder { name = "r2: Keep going."; repeat = Some 1; max = Some 5 }
     ; Reminder
-        { name = "Check disk usage.\nThen clean up."
+        { name = "r3: Check disk usage.\nThen clean up."
         ; repeat = None
         ; max = None
         }
@@ -174,19 +175,19 @@ let%expect_test "reminders: recorded, never inferred" =
            : bool)]);
   print_s
     [%sexp
-      (Injected.infer "[prigh reminder: disk, every 40 turns] Check disk."
+      (Injected.infer "[prigh reminder: r1, every 40 turns] Check disk."
        : Injected.t option)];
   [%expect
     {|
-    ((source (Reminder (name disk))))
-    {"source":{"kind":"reminder","title":"Reminder: disk"}}
+    ((source (Reminder (name "r1: Check disk."))))
+    {"source":{"kind":"reminder","title":"Reminder r1: Check disk."}}
     true
-    ((source (Reminder (name keep-going) (repeat 1) (max 5))))
-    {"source":{"kind":"reminder","title":"Reminder: keep-going (1/5)"}}
+    ((source (Reminder (name "r2: Keep going.") (repeat 1) (max 5))))
+    {"source":{"kind":"reminder","title":"Reminder r2: Keep going. (1/5)"}}
     true
-    ((source (Reminder (name  "Check disk usage.\
+    ((source (Reminder (name  "r3: Check disk usage.\
                              \nThen clean up."))))
-    {"source":{"kind":"reminder","title":"Reminder: Check disk usage. …"}}
+    {"source":{"kind":"reminder","title":"Reminder r3: Check disk usage. …"}}
     true
     ()
     |}]

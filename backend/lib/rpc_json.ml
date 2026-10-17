@@ -163,6 +163,19 @@ let model (m : Model.t) =
 
 let config (c : Config.t) = Config.to_json c
 
+let reminder ~stops (r : Reminder.t) =
+  `Object
+    ([ "name", str r.name; "text", str r.text ]
+     @
+     match r.trigger with
+     | On_stop { max_repeats } ->
+       [ "on", str "stop"
+       ; "max_repeats", int max_repeats
+       ; "repeats", int (Int.min stops max_repeats)
+       ]
+     | Every_turns n -> [ "every_turns", int n ])
+;;
+
 let state (s : Agent.State.t) =
   `Object
     [ "session_id", str s.session_id
@@ -222,6 +235,8 @@ let state (s : Agent.State.t) =
              | Active -> []
              | Done { summary } -> [ "summary", str summary ]
              | Stopped { reason } -> [ "reason", str reason ])) )
+    ; ( "reminders"
+      , `Array (List.map s.reminders ~f:(reminder ~stops:s.reminder_stops)) )
     ; ( "resume_at_ms"
       , Option.value_map s.resume_at ~default:`Null ~f:(fun at -> ms at) )
     ; "approval_mode", str (Approval_mode.to_string s.approval_mode)
@@ -301,6 +316,7 @@ let entry (e : Session.Entry.t) =
     | Cwd { cwd; host = _ } -> [ "kind", str "cwd"; "cwd", str cwd ]
     | System_prompt _ -> [ "kind", str "system_prompt" ]
     | Goal _ -> [ "kind", str "goal" ]
+    | Reminders _ -> [ "kind", str "reminders" ]
     | Budget _ -> [ "kind", str "budget" ]
     | Approval { mode; plan } ->
       [ "kind", str "approval"; "mode", str mode; "plan", bool plan ]

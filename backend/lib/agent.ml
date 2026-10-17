@@ -93,6 +93,8 @@ module State = struct
     ; budget_usd : float option
     ; goal : Goal.t option
     ; goal_max_continuations : int
+    ; reminders : Reminder.t list
+    ; reminder_stops : int
     ; resume_at : float option
     ; approval_mode : Approval_mode.t
     ; plan_mode : bool
@@ -226,7 +228,8 @@ type t =
   ; max_budget_usd : float option
     (** the budget of sessions that set none, overriding the config's *)
   ; mutable goal : Goal.t option
-  ; reminders : Reminder.Tracker.t
+  ; mutable reminders : Reminder.t list
+  ; reminder_tracker : Reminder.Tracker.t
   ; mutable resume : Resume.t option
     (** a run stopped by a usage limit, resuming when it resets *)
   ; mutable past_resets : int
@@ -262,6 +265,7 @@ let restore_approvals t =
 
 let restore_settings t =
   t.goal <- Session.goal t.session;
+  t.reminders <- Session.reminders t.session;
   (match Session.model t.session with
    | Some (model_id, thinking) ->
      Option.iter (Model_registry.find t.models model_id) ~f:(fun m ->
@@ -395,6 +399,8 @@ let state t =
   ; budget_usd = budget t
   ; goal = t.goal
   ; goal_max_continuations = t.config.goal_max_continuations
+  ; reminders = t.reminders
+  ; reminder_stops = Reminder.Tracker.stops t.reminder_tracker
   ; resume_at = Option.map t.resume ~f:(fun r -> r.at)
   ; approval_mode = t.approval_mode
   ; plan_mode = t.plan_mode
@@ -1415,7 +1421,7 @@ let reminder_message t (reminder : Reminder.t) ~repeat =
 
 let due_reminders t =
   List.map
-    (Reminder.Tracker.due t.reminders t.config.reminders)
+    (Reminder.Tracker.due t.reminder_tracker t.reminders)
     ~f:(reminder_message t ~repeat:None)
 ;;
 
@@ -1513,7 +1519,7 @@ let take_notes t =
 ;;
 
 let user_message t (q : Queued.t) =
-  Reminder.Tracker.user_spoke t.reminders;
+  Reminder.Tracker.user_spoke t.reminder_tracker;
   let text = Option.value q.expanded ~default:q.text in
   let text, attachments, attached = with_attachments t text q.attachments in
   let notes = take_notes t in
@@ -1674,7 +1680,7 @@ let duration_hum seconds =
 (* When the agent ended its turn with nothing left to wait for. *)
 let stop_reminders t =
   let { Reminder.Tracker.Stop.fire; used_up } =
-    Reminder.Tracker.stopped t.reminders t.config.reminders
+    Reminder.Tracker.stopped t.reminder_tracker t.reminders
   in
   List.iter used_up ~f:(fun r ->
     match r.trigger with
@@ -1684,7 +1690,7 @@ let stop_reminders t =
         (Notice
            (sprintf
               "reminder %s fired %s; it fires again after your next message"
-              (Reminder.label r)
+              r.name
               (if max_repeats = 1
                then "once"
                else sprintf "%d times in a row" max_repeats)))
@@ -1773,7 +1779,7 @@ let rec start_run ?(tried = String.Set.empty) ?(then_ = fun () -> []) t prompts 
             match event with
             | Turn_end _ ->
               if phys_equal session t.session
-              then Reminder.Tracker.turn_ended t.reminders;
+              then Reminder.Tracker.turn_ended t.reminder_tracker;
               broadcast t (Loop event)
             | Compacted { summary; _ } ->
               if phys_equal session t.session
@@ -2240,7 +2246,8 @@ let create
     ; mcp_noticed = String.Set.empty
     ; max_budget_usd
     ; goal = None
-    ; reminders = Reminder.Tracker.create ()
+    ; reminders = []
+    ; reminder_tracker = Reminder.Tracker.create ()
     ; resume = None
     ; past_resets = 0
     ; sleep_until
@@ -2671,6 +2678,53 @@ let resume_goal t =
        Ok ())
 ;;
 
+(* ---- reminders --------------------------------------------------------- *)
+
+let set_reminders t reminders =
+  t.reminders <- reminders;
+  ignore (Session.set_reminders t.session reminders : Session.Entry.t);
+  state_changed t
+;;
+
+let reminders t = t.reminders
+
+let add_reminder t ~text trigger =
+  Or_error.map
+    (Reminder.create ~taken:(Session.reminder_names t.session) ~text trigger)
+    ~f:(fun reminder ->
+      set_reminders t (t.reminders @ [ reminder ]);
+      reminder)
+;;
+
+let no_reminders = "there are no reminders; /remind stop TEXT adds one"
+
+let remove_reminder t name =
+  let name = String.strip name in
+  match
+    List.partition_tf t.reminders ~f:(fun (r : Reminder.t) ->
+      String.equal r.name name)
+  with
+  | _ :: _, rest ->
+    set_reminders t rest;
+    Ok ()
+  | [], [] -> Or_error.errorf "no reminder %S: %s" name no_reminders
+  | [], rest ->
+    Or_error.errorf
+      "no reminder %S; the session's are %s (/remind lists them)"
+      name
+      (String.concat
+         ~sep:", "
+         (List.map rest ~f:(fun (r : Reminder.t) -> r.name)))
+;;
+
+let clear_reminders t =
+  match t.reminders with
+  | [] -> Or_error.error_string no_reminders
+  | _ :: _ ->
+    set_reminders t [];
+    Ok ()
+;;
+
 (* Leaving plan mode while idle carries on an active goal, which waited for
    the plan's approval. *)
 let set_mode ?approval ?plan t =
@@ -2773,7 +2827,7 @@ let replace_session t session ~keep_host =
   wait_idle t;
   Background_tasks.forget_finished t.background;
   t.session <- session;
-  Reminder.Tracker.reset t.reminders;
+  Reminder.Tracker.reset t.reminder_tracker;
   load_subagent_log t;
   if keep_host then record_location t else t.cwd <- Session.cwd session;
   t.git_branch <- find_branch t ~cwd:t.cwd;

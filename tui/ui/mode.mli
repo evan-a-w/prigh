@@ -22,6 +22,7 @@ module Picker_kind : sig
     | Hosts
     | Skills
     | Snippets (** [/snippet]: Enter inserts the text *)
+    | Reminders (** [/remind]: the session's; Ctrl+D removes one *)
     | Mcp of Mcp_list.t
     | Auth_select of string (** login prompt id *)
   [@@deriving sexp_of, equal]

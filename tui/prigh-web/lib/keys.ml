@@ -73,6 +73,7 @@ let help =
     , "open or close the terminal (/terminal); in it, every other key goes to \
        the shell" )
   ; "Tab (in /scoped-models)", "check or uncheck the highlighted model"
+  ; "Delete (in /remind's list)", "remove the highlighted reminder"
   ; ( "y / a / n / r (confirmation)"
     , "allow once, always allow (its rules, this session), deny, deny saying \
        why; Enter allows, Esc denies" )
@@ -128,6 +129,9 @@ let dialog_key (dialog : Dialog.t) t : App.Action.t option =
     Some (Dialog_move 1)
   | "PageUp", (Picker _ | Scoped_models _) -> Some (Dialog_move (-8))
   | "PageDown", (Picker _ | Scoped_models _) -> Some (Dialog_move 8)
+  | "Delete", Picker { kind = Reminders; picker } when plain t ->
+    Option.map (Picker.selected_item picker) ~f:(fun (item : Picker.Item.t) ->
+      App.Action.Remove_reminder item.id)
   | "Tab", Scoped_models _ when not t.shift -> Some Dialog_toggle
   | "Tab", Prompt { suggestions = _ :: _; _ } when not t.shift ->
     Some Dialog_complete

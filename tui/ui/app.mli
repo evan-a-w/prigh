@@ -69,6 +69,7 @@ module Reply_tag : sig
     | Job_started
     | Skills_picker
     | Snippets_saved of string (** the notice once [set_config] succeeds *)
+    | Reminder_added (** acknowledged with the name the backend gave it *)
     | Skills_for_autocomplete of string (** the [Skill_cache] key *)
     | Skill_prompt of string
     (** a [/skill:] prompt, steer or follow-up; failing puts it back *)
