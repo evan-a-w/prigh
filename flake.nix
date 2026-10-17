@@ -246,6 +246,17 @@
 
         # tui/prigh-web/e2e: Chromium and Firefox against the built backend
         # and the installed prigh-web site.
+        # prigh.nvim's headless tests (a fake ACP agent, no network).
+        checks.nvim-plugin =
+          pkgs.runCommand "prigh-nvim-test" { nativeBuildInputs = [ pkgs.neovim-unwrapped pkgs.git ]; } ''
+            cp -r ${./editors/nvim} nvim
+            chmod -R u+w nvim
+            export HOME="$PWD/home"
+            mkdir -p "$HOME"
+            NVIM=nvim ${pkgs.runtimeShell} nvim/test/run.sh
+            mkdir "$out"
+          '';
+
         checks.prigh-web-e2e =
           if pkgs.stdenv.hostPlatform.isLinux then
             pkgs.runCommand "prigh-web-e2e"

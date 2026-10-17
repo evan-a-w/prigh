@@ -249,7 +249,9 @@ end
 
 function A:_reset_session(id)
   self:_cancel_permissions()
-  fs.reset()
+  if id ~= self.session.id then
+    fs.reset()
+  end
   self.session:reset(id)
 end
 
