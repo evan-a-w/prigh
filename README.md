@@ -718,7 +718,8 @@ src/retry.ml`, `bash $ make test`, `subagent <task>`) and chips: `5 lines`,
 under it.
 
 In lists (pickers) typing filters fuzzily, Enter accepts and Esc closes
-without changes; Ctrl+D deletes sessions, cancels a subagent or kills a job,
+without changes; Ctrl+D deletes sessions, cancels a subagent, kills a job or
+removes a reminder,
 and `/scoped-models` toggles with Space (Ctrl+A all, Ctrl+X none). `/help`
 lists the commands, the prompt prefixes (`!cmd`, `!!cmd`, `!&cmd`, `@path`, `#name`)
 and these keys.
@@ -745,7 +746,8 @@ The status line is quiet gray: cwd, model, `think:`, `view:`, the context
 (`ctx:12%/200k`, the share of the model's window; yellow from 50%, red from
 80%), cost (`$1.20/$5.00` against a budget: yellow from 80%, red once
 spent), and then whatever is going on — the goal (`goal:3/20`,
-`goal:done`, `goal:stopped`), a scheduled resume (`resumes 14:05`),
+`goal:done`, `goal:stopped`), the session's reminders (`remind:2`), a
+scheduled resume (`resumes 14:05`),
 `queued:N`, `to answer:N` (confirmations and questions waiting behind an
 open dialog, in yellow), agents, jobs, the tool host — with the current
 mode's keys (`⠋ working · Esc aborts · Enter
@@ -936,9 +938,7 @@ through; `/scoped-models` edits it), `approval_mode` (`ask`, `auto-edit`
 or `auto`: the mode new sessions start in, see below; `/confirm on|off`
 sets `ask` or `auto`; files with the older `confirm_tools` still work, and
 it is replaced by `approval_mode` when prigh saves the file),
-`permissions` (allow/ask/deny rules, below; edited by hand), `reminders`
-(messages sent to the main agent when it stops or every so many turns, see
-Long runs; edited by hand) and
+`permissions` (allow/ask/deny rules, below; edited by hand) and
 `default_model`/`default_thinking` (what new sessions start with unless
 `-model`/`-thinking` is given; `/change_default` saves the current ones),
 `notify` (`off`, `bell` or `desktop`; the TUI's `/notify`),
@@ -1016,31 +1016,35 @@ makes it active again, with fresh continuations). `/goal` shows it, `/goal
 off` clears it. Messages you send meanwhile go first; the goal is recorded
 in the session, so it survives restarts and reconnects.
 
-`reminders` in `~/.prigh/config.json` are messages prigh sends the main
-agent (never a subagent) on its own, e.g. not to stop before the work is
-done, or to clean up disk space now and then:
+Reminders are messages prigh sends the main agent (never a subagent) on its
+own, e.g. not to stop before the work is done, or to clean up disk space now
+and then. They belong to the session, recorded in it like the goal: they
+survive restarts and reconnects, a fork keeps them, a new session starts
+with none, and switching sessions switches to that session's.
 
-```json
-"reminders": [
-  {"name": "keep-going", "text": "Don't stop until the tests pass.",
-   "on": "stop", "max_repeats": 5},
-  {"name": "disk", "text": "Delete build artifacts you no longer need.",
-   "every_turns": 40}
-]
-```
+- `/remind stop TEXT` reminds the agent when it ends its turn;
+  `/remind stop N TEXT` at most N times in a row (default 3).
+- `/remind every N TEXT` reminds it every N turns.
+- `/remind` lists them in a picker (type to filter; Enter shows one in
+  full, Ctrl+D in the TUI or Delete and the Remove buttons in prigh-web
+  remove one); `/remind rm NAME` removes one (Tab completes the names) and
+  `/remind off` all of them.
 
-Each has a `text` and exactly one of `"on": "stop"` or `"every_turns": N`;
-`name` (optional) is how the chat shows it (`※ Reminder: disk`), else its
-first line. An `every_turns` reminder is added after every N turns of the
-main agent, between turns of a run or at the next run's start. An `on:
-stop` one starts a new run when a run ends normally with nothing left to
-wait for: no message queued, no running or undelivered background jobs or
-subagents, no goal continuing, not aborted, failed, in plan mode or past the
-budget. It fires at most `max_repeats` times in a row (default 3), then a
-note says so and it waits for your next message. The model sees e.g.
-`[prigh reminder: keep-going, as you ended your turn (1 of 5)] ...`. A new
-session starts the counts over; a mistake in the list is reported with the
-reminder's index (`config.reminders[1]: ...`).
+The status line counts them (`remind:2`; in prigh-web a "Remind 2" item that
+opens the list).
+
+Each gets a name, `r1`, `r2`, ... (never reused in the session), which the
+chat shows (`※ Reminder r1: Don't stop until the tests pass. (1/3)`). An
+`every` reminder is added after every N turns of the main agent, between
+turns of a run or at the next run's start. A `stop` one starts a new run
+when a run ends normally with nothing left to wait for: no message queued,
+no running or undelivered background jobs or subagents, no goal continuing,
+not aborted, failed, in plan mode or past the budget. It fires at most N
+times in a row, then a note says so and it waits for your next message. The
+model sees e.g. `[prigh reminder: r1, as you ended your turn (1 of 3)]
+...`. Switching sessions starts the counts over. (A `reminders` list left
+in `~/.prigh/config.json` from before is ignored, with a warning saying
+so.)
 
 When a run stops at a usage limit and no fallback model is left, prigh reads
 when the limit resets (ChatGPT/Codex error bodies and `x-codex-*-reset-at`
@@ -1087,6 +1091,7 @@ it.
 | `/notify [off\|bell\|desktop]` (TUI), `/notify [on\|off]` (prigh-web) | how to tell you that a turn ended, a tool waits for confirmation or background work finished while you look elsewhere |
 | `/budget [dollars\|off]` | show or set the session's cost budget: no turn starts once it is spent |
 | `/goal [text\|off\|resume]` | set a goal the agent keeps working toward until it is met; show, clear or resume it |
+| `/remind [stop [N] TEXT\|every N TEXT\|rm NAME\|off]` | remind the agent when it ends its turn (at most N times in a row, default 3) or every N turns; without arguments, pick among the session's (Ctrl+D / Delete removes one); `rm` removes one, `off` all |
 | `/resume [now\|cancel]` | show, run now or cancel the automatic resume after a usage limit |
 | `/new`, `/clear`, `/quit` | new session / clear transcript / exit |
 | `/name [text]` | set the session name |

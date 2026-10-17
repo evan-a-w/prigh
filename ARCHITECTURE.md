@@ -819,31 +819,39 @@ two can share one.
   resume is to come. When the timer fires on a session whose file was
   deleted meanwhile (`Session.gone`), a notice says so and nothing runs.
   `Rpc_server` keeps the agent loaded while one is scheduled.
-- Reminders (`Reminder`, `Agent`) — the config's `reminders`, each `On_stop
-  {max_repeats}` or `Every_turns n`, for the main agent only. A
+- Reminders (`Reminder`, `Agent`) — the session's (`/remind`), each named
+  (`r1`, `r2`, ...: `Reminder.create` numbers after every name the file
+  ever held, `Session.reminder_names`, so none is reused) with `On_stop
+  {max_repeats}` or `Every_turns n`, for the main agent only. The whole list
+  is a `Reminders` session entry (the last on the active path counts, like
+  the goal; `fork` copies it, a new session has none), cached in the agent
+  and changed by `add_reminder`, `remove_reminder` and `clear_reminders`
+  (RPC methods of the same names), each followed by a state event. A
   `Reminder.Tracker` in the agent counts the main loop's `Turn_end`s
   (subagents' events never reach it), the turn each periodic reminder last
-  fired and the eligible stops since the user spoke (`user_message` clears
-  it, `replace_session` resets everything). Due periodic reminders follow
+  fired (by name; one not seen yet counts from then) and the eligible stops
+  since the user spoke (`user_message` clears it, `replace_session` resets
+  everything). Due periodic reminders follow
   the queued messages in the loop's `steer` and the prompts of a run's
   start; on-stop ones are the last choice of a run's tail, after hand-over,
   follow-ups, undelivered reports and the goal's continuation, under the
   goal's conditions plus no running background task; `Tracker.stopped`
   numbers the repeats and reports, once, the ones that used theirs up (a
   `Notice`). Both are user messages with `Source.Reminder`, carrying the
-  plan mode note like goal messages.
+  plan mode note like goal messages. The frontends parse `/remind` with
+  the shared `Remind_command` (`tui/ui`).
 - `Config` — `~/.prigh/config.json` (`auto_background_seconds` (default
   30, 0 = off: see background jobs), `scoped_models : string list`,
   `approval_mode` (new sessions' mode; read from `confirm_tools` when
   absent, which saving replaces), `permissions` (allow/ask/deny rules;
   saving keeps the file's as written), `default_model`/`default_thinking`,
   `fallback_models` (model keys), `default_cwd`, `max_budget_usd`,
-  `goal_max_continuations`, `reminders` (saving keeps the file's as
-  written), `resume_on_limit_reset`, `ask_user_timeout_seconds` (default
+  `goal_max_continuations`, `resume_on_limit_reset`, `ask_user_timeout_seconds` (default
   300, 0 = never) and `snippets`, the frontends' `/snippet` texts,
   validated by `Snippet`), loaded at agent
   creation, read/written through `get_config`/`set_config`; unknown fields
-  are ignored by `load` but reported by `problems` (with wrong-typed ones),
+  are ignored by `load` but reported by `problems` (with wrong-typed ones;
+  a leftover `reminders` says reminders are per session now),
   which `Model_registry` adds to its problems along with an unknown
   `default_model`. Each namespace has its own file, so each has its own
   defaults; `archive_after_days` (default 7, 0 = never) is when an
@@ -875,7 +883,8 @@ two can share one.
   Rewinding moves `head`; forking copies the active path to a new file.
   Entries are messages, model/thinking changes, compaction summaries, names,
   descriptions, cwds with the tool host they are on (so a reload restores
-  where the session runs), the system prompt, the approval mode with plan
+  where the session runs), the system prompt, the goal, the reminders
+  (`Reminders`, the whole list), the approval mode with plan
   mode (`approval`), rules the user allowed for the session (`allow_rule`),
   `Archived {archived}` (archived or unarchived by hand), `Spend {usage,
   cost_usd}` (what the messages do not record: subagents' responses,
@@ -918,7 +927,8 @@ two can share one.
   branches for the tree view; entries carry `at` in milliseconds when
   known; an `Archived` entry is `{kind: "archived", archived}`, a `Spend`
   `{kind: "spend", usage, cost_usd}`, a `Resume_at` `{kind: "resume_at",
-  at}` (ms or null); the frontends ignore the last two).
+  at}` (ms or null), a `Reminders` `{kind: "reminders"}`; the frontends
+  ignore the last three).
 - `Compaction` — summarises older messages via the model and keeps a tail;
   manual (`/compact [instructions]`: the RPC's `instructions`, pi's
   `customInstructions`, are appended to the summariser's) or automatic.
@@ -1060,7 +1070,10 @@ two can share one.
   prigh names),
   `tool_exec_result`, `auth_status`, `login`, `auth_respond`, `auth_cancel`,
   `logout`, `set_budget {usd}` (a number, or null for none), `set_goal
-  {text}`, `clear_goal`, `resume_goal`, `cancel_resume`, `resume_now`, `git_diff {path?}`
+  {text}`, `clear_goal`, `resume_goal`, `add_reminder {text, on: "stop",
+  max_repeats?}` or `{text, every_turns}` (answers the reminder),
+  `remove_reminder {name}`, `clear_reminders`, `cancel_resume`,
+  `resume_now`, `git_diff {path?}`
   (`{root, against, diff, truncated}`), `review {args?}` (`[base]
   [instructions]`) and `init`, and the file browser's `fs_list`,
   `fs_preview`, `fs_mkdir`, `fs_rename`, `fs_delete`, `fs_download` and
@@ -1090,8 +1103,10 @@ two can share one.
   to 240 bytes.
   `State` carries `active_host` and `hosts` (the backend first),
   `budget_usd`, `goal` (`{text, status: active|done|stopped,
-  continuations, max_continuations, summary?, reason?}` or null) and
-  `resume_at_ms`. A subagent's compaction arrives as a `compacted` event
+  continuations, max_continuations, summary?, reason?}` or null),
+  `reminders` (`[{name, text, on: "stop", max_repeats, repeats}` or
+  `{name, text, every_turns}]`, `repeats` counting the on-stop fires in a
+  row since the user spoke) and `resume_at_ms`. A subagent's compaction arrives as a `compacted` event
   nested in a `subagent` one.
   `btw {question, btw_id?}` (`/btw`) answers a side question with one
   tool-less model call (`Btw`, `Agent.btw`) over the session's recorded
