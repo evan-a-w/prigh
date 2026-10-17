@@ -12,8 +12,8 @@ let host_note =
 ;;
 
 let cwd_note =
-  "[Environment: the working directory is now /work/sub. Project \
-   instructions for it may differ from the ones above.]"
+  "[Environment: the working directory is now /work/sub. Project instructions \
+   for it may differ from the ones above.]"
 ;;
 
 (* What the backend sends: the text the model saw, and how it is made up. *)
@@ -48,6 +48,14 @@ let goal_json =
      </goal>"
 ;;
 
+let reminder_json =
+  source_json
+    ~kind:"reminder"
+    ~title:"Reminder: keep-going (1/5)"
+    "[prigh reminder: keep-going, as you ended your turn (1 of 5)] Don't stop \
+     until the tests pass."
+;;
+
 let review_json =
   source_json
     ~kind:"review"
@@ -79,6 +87,8 @@ let history =
        ; reply "done"
        ; goal_json
        ; reply "still going"
+       ; reminder_json
+       ; reply "carrying on"
        ; review_json
        ; reply "**[P1] Fix the count** `a.ml:2`"
        ])
@@ -88,7 +98,7 @@ let%expect_test
     "notes, attachments and the harness's messages: quiet lines, not the \
      user's words; verbose shows what the model saw"
   =
-  let h = Test_app.connected ~width:72 ~height:30 () in
+  let h = Test_app.connected ~width:72 ~height:35 () in
   H.reply ~quiet:true h Initial_messages history;
   H.show h;
   [%expect
@@ -107,6 +117,9 @@ let%expect_test
 
     ◷ Goal: continuing (3/20)
       still going
+
+    ※ Reminder: keep-going (1/5)
+      carrying on
 
     ⚑ Review of uncommitted changes
       [P1] Fix the count a.ml:2
@@ -140,6 +153,11 @@ let%expect_test
       all tests pass
       </goal>
       still going
+
+    ※ Reminder: keep-going (1/5)
+      [prigh reminder: keep-going, as you ended your turn (1 of 5)] Don't
+      stop until the tests pass.
+      carrying on
 
     ⚑ Review of uncommitted changes
       [prigh review] Review the uncommitted changes in /work and give
@@ -177,8 +195,9 @@ let%expect_test "a note arriving live, before the user's text" =
     |}]
 ;;
 
-let%expect_test "/fork lists the harness's messages by their notes and \
-                 restores only what the user typed"
+let%expect_test
+    "/fork lists the harness's messages by their notes and restores only what \
+     the user typed"
   =
   let h = Test_app.connected ~width:72 ~height:12 () in
   H.keys h "/fork";
@@ -276,7 +295,8 @@ let%expect_test "plan mode notes: before a prompt, alone, before a goal" =
   let h = Test_app.connected ~width:72 ~height:20 () in
   H.reply ~quiet:true h Initial_messages plan_history;
   H.show h;
-  [%expect {|
+  [%expect
+    {|
       prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
     ▌ earlier question
@@ -310,7 +330,8 @@ let%expect_test "plan mode notes: before a prompt, alone, before a goal" =
           {|{"role":"user","text":"x","origin":{"body":"","notes":[%s]}}|}
           (plan_note_json ~on:false)));
   H.show h;
-  [%expect {|
+  [%expect
+    {|
     (Rpc (method_ get_entries) (params ()) (tag Entries_for_fork))
 
     ▌ earlier question
@@ -389,7 +410,8 @@ let%expect_test "every kind of note: groups read as one block" =
   in
   H.reply ~quiet:true h Initial_messages history;
   H.show h;
-  [%expect {|
+  [%expect
+    {|
       prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
     ▌ earlier question
@@ -518,8 +540,9 @@ let%expect_test "/diff: the changes in colour, a path, none, not a repository" =
     |}]
 ;;
 
-let%expect_test "/review and /init: sent to the backend; refusals go back to \
-                 the editor; a busy agent queues them"
+let%expect_test
+    "/review and /init: sent to the backend; refusals go back to the editor; a \
+     busy agent queues them"
   =
   let h = Test_app.connected ~width:72 ~height:10 () in
   H.keys h "/review main look at errors";
@@ -576,20 +599,23 @@ let%expect_test "/review and /init: sent to the backend; refusals go back to \
     |}]
 ;;
 
-let%expect_test "/notify: the setting, and notifications only while the \
-                 terminal is not focused"
+let%expect_test
+    "/notify: the setting, and notifications only while the terminal is not \
+     focused"
   =
   let h = Test_app.connected ~width:100 ~height:10 () in
   H.reply ~quiet:true h Config config_json;
   let command text =
     H.keys h text;
     (* The first Enter takes the command (and offers its arguments). *)
-    if not (String.mem text ' ') then H.step ~quiet:true h (Key (Key.plain Enter));
+    if not (String.mem text ' ')
+    then H.step ~quiet:true h (Key (Key.plain Enter));
     H.enter h
   in
   command "/notify";
   H.show h;
-  [%expect {|
+  [%expect
+    {|
       prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
     ▌ earlier question
@@ -625,7 +651,10 @@ let%expect_test "/notify: the setting, and notifications only while the \
   H.event
     h
     (Subagent
-       { call_id = "c2"; agent_id = "a1"; event = Agent_end [ assistant "sub done" ] });
+       { call_id = "c2"
+       ; agent_id = "a1"
+       ; event = Agent_end [ assistant "sub done" ]
+       });
   (* The model's questions and its plan wait for the user too. *)
   H.event
     h
@@ -650,7 +679,8 @@ let%expect_test "/notify: the setting, and notifications only while the \
        ; rules = []
        });
   H.step ~quiet:true h (Key (Key.char 'n'));
-  [%expect {|
+  [%expect
+    {|
     (Notify
       (mode Bell)
       (notification (
@@ -685,7 +715,8 @@ let%expect_test "/notify: the setting, and notifications only while the \
   command "/notify loud";
   command "/notify";
   H.show h;
-  [%expect {|
+  [%expect
+    {|
     (Rpc
       (method_ set_config)
       (params ((config ((notify desktop)))))

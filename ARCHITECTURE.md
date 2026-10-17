@@ -193,8 +193,8 @@ while it is waiting on the browser.
   files behind
   (`Attachment`: path and length), or a whole message written in the
   user's place (`Source`: delivery, hand-over, goal start/continuation,
-  resume, `!cmd` output, compaction summary, `/review`, `/init`; a goal's
-  message may carry a plan mode note too). The
+  reminder, resume, `!cmd` output, compaction summary, `/review`, `/init`; a goal's
+  or a reminder's message may carry a plan mode note too). The
   `text` stays exactly what the model sees, so providers and prompt caches
   are unaffected (the notes are derived by `Told_environment`).
   `Injected.infer` recognises the same things by their wording in sessions
@@ -795,13 +795,27 @@ two can share one.
   resume is to come. When the timer fires on a session whose file was
   deleted meanwhile (`Session.gone`), a notice says so and nothing runs.
   `Rpc_server` keeps the agent loaded while one is scheduled.
+- Reminders (`Reminder`, `Agent`) — the config's `reminders`, each `On_stop
+  {max_repeats}` or `Every_turns n`, for the main agent only. A
+  `Reminder.Tracker` in the agent counts the main loop's `Turn_end`s
+  (subagents' events never reach it), the turn each periodic reminder last
+  fired and the eligible stops since the user spoke (`user_message` clears
+  it, `replace_session` resets everything). Due periodic reminders follow
+  the queued messages in the loop's `steer` and the prompts of a run's
+  start; on-stop ones are the last choice of a run's tail, after hand-over,
+  follow-ups, undelivered reports and the goal's continuation, under the
+  goal's conditions plus no running background task; `Tracker.stopped`
+  numbers the repeats and reports, once, the ones that used theirs up (a
+  `Notice`). Both are user messages with `Source.Reminder`, carrying the
+  plan mode note like goal messages.
 - `Config` — `~/.prigh/config.json` (`auto_background_seconds` (default
   30, 0 = off: see background jobs), `scoped_models : string list`,
   `approval_mode` (new sessions' mode; read from `confirm_tools` when
   absent, which saving replaces), `permissions` (allow/ask/deny rules;
   saving keeps the file's as written), `default_model`/`default_thinking`,
   `fallback_models` (model keys), `default_cwd`, `max_budget_usd`,
-  `goal_max_continuations` and `resume_on_limit_reset`), loaded at agent
+  `goal_max_continuations`, `reminders` (saving keeps the file's as
+  written) and `resume_on_limit_reset`), loaded at agent
   creation, read/written through `get_config`/`set_config`; unknown fields
   are ignored by `load` but reported by `problems` (with wrong-typed ones),
   which `Model_registry` adds to its problems along with an unknown
