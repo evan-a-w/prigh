@@ -10,6 +10,7 @@ let glyph : P.Origin.Kind.t -> string = function
   | Handover -> "↪"
   | Goal -> "◎"
   | Goal_continuation -> "◷"
+  | Reminder -> "※"
   | Resume -> "↻"
   | Shell -> "$"
   | Summary -> "≡"

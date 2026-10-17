@@ -72,8 +72,8 @@ val problems : home:string -> string list
 
 (** Writes [~/.prigh/config.json], creating parent directories, as pretty
     JSON. Fields it does not own (such as [providers]) are kept, and so are
-    [permissions] and [reminders], which are edited by hand; [confirm_tools] is dropped in
-    favour of [approval_mode]. *)
+    [permissions] and [reminders], which are edited by hand; [confirm_tools]
+    is dropped in favour of [approval_mode]. *)
 val save : home:string -> t -> unit Or_error.t
 
 (** The file's top-level fields ([[]] when it is missing), for the parts of
