@@ -871,7 +871,11 @@ background; after that it is a job and keeps running.
 They belong to their session: `/new` or switching sessions leaves them running
 in the old session (which stays live until they finish and deliver there).
 Stopping the backend kills running jobs and loses running subagents; nothing
-is resumed, and the session simply has no report for them. Job ids continue
+is resumed, and the session simply has no report for them. A tool call that
+was running then gets an `[interrupted: ...]` result when the session next
+runs, telling the model to check what it did, so the conversation stays
+valid for every provider (old sessions broken this way are repaired the
+same way when they are sent). Job ids continue
 after a restart (`j3` after a session that already had `j1` and `j2`).
 Headless `prigh run` waits for running subagents and jobs, and the turns that
 their reports start, before it exits (a server started in the background,
