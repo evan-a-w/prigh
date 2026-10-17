@@ -29,6 +29,7 @@ type t =
   ; notify : string
     (** how the terminal frontend notifies: [off], [bell] (default) or
         [desktop] *)
+  ; snippets : Snippet.t list (** [/snippet]'s, shared by every frontend *)
   }
 [@@deriving sexp_of, equal]
 

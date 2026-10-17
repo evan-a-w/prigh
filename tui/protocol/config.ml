@@ -38,6 +38,7 @@ type t =
   ; default_cwd : string option
   ; archive_after_days : float
   ; notify : string
+  ; snippets : Snippet.t list
   }
 [@@deriving sexp_of, equal]
 
@@ -51,6 +52,7 @@ let default =
   ; default_cwd = None
   ; archive_after_days = 7.
   ; notify = "bell"
+  ; snippets = []
   }
 ;;
 
@@ -95,7 +97,8 @@ let of_json j =
       |> Or_error.tag ~tag:"archive_after_days must be a number"
     | Some _ -> Or_error.error_string "archive_after_days must be a number"
   in
-  let%map notify = optional_string "notify" in
+  let%bind notify = optional_string "notify" in
+  let%map snippets = Json.optional_list_field j "snippets" ~f:Snippet.of_json in
   { scoped_models
   ; approval_mode
   ; permissions
@@ -105,6 +108,7 @@ let of_json j =
   ; default_cwd
   ; archive_after_days
   ; notify = Option.value notify ~default:"bell"
+  ; snippets
   }
 ;;
 
@@ -121,5 +125,6 @@ let to_json t =
     ; "default_cwd", optional t.default_cwd
     ; "archive_after_days", `Number (sprintf "%g" t.archive_after_days)
     ; "notify", `String t.notify
+    ; "snippets", Snippet.list_to_json t.snippets
     ]
 ;;
