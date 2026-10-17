@@ -12,8 +12,9 @@
  (hosts
   (((id backend) (name <host>) (cwd $TMP) (session_id null)
     (session_name null))))
- (subagents ()) (jobs ()) (budget_usd null) (goal null) (resume_at_ms null)
- (approval_mode auto) (plan_mode false) (plan null) (session_rules ()))
+ (subagents ()) (jobs ()) (budget_usd null) (goal null) (reminders ())
+ (resume_at_ms null) (approval_mode auto) (plan_mode false) (plan null)
+ (session_rules ()))
 <- prompt: ()
   event state running=true model=deepseek/deepseek-flash
   event user "hello there"
@@ -79,8 +80,9 @@
  (hosts
   (((id backend) (name <host>) (cwd $TMP) (session_id null)
     (session_name null))))
- (subagents ()) (jobs ()) (budget_usd null) (goal null) (resume_at_ms null)
- (approval_mode auto) (plan_mode false) (plan null) (session_rules ()))
+ (subagents ()) (jobs ()) (budget_usd null) (goal null) (reminders ())
+ (resume_at_ms null) (approval_mode auto) (plan_mode false) (plan null)
+ (session_rules ()))
 <- session_stats: ((message_count 2) (turns 1) (tool_calls ())
  (usage ((input 10) (output 5) (cache_read 0))) (cost_usd 9e-06)
  (context_percent 0.001) (model_changes 2) (compactions 0)
