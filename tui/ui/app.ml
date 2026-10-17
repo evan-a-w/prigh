@@ -2310,7 +2310,10 @@ let run_command m (cmd : Commands.Parsed.t) =
   | "snippet", _ ->
     snippet_action
       m
-      (Snippet_command.run ~snippets:(snippets m) ~last_prompt:(last_prompt m) cmd.rest)
+      (Snippet_command.run
+         ~snippets:(snippets m)
+         ~last_prompt:(last_prompt m)
+         cmd.rest)
   | "mcp", [] -> m, [ call (List_mcp { reconnect = false }) ~tag:Mcp_picker ]
   | "mcp", [ "reconnect" ] ->
     ( notice m "reconnecting MCP servers…"
@@ -3053,7 +3056,11 @@ let picker_selected m (kind : Mode.Picker_kind.t) (item : Picker.Item.t) =
   | Snippets ->
     (match P.Snippet.find (Option.value (snippets m) ~default:[]) item.id with
      | Some snippet -> insert_snippet m snippet, []
-     | None -> error m (sprintf "snippet %S is gone; /snippet lists the others" item.id), [])
+     | None ->
+       ( error
+           m
+           (sprintf "snippet %S is gone; /snippet lists the others" item.id)
+       , [] ))
   | Mcp list -> mcp_selected m list item.id
   | Auth_select id ->
     m, [ rpc "auth_respond" ~params:[ "id", str id; "value", str item.id ] ]

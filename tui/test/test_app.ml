@@ -6646,7 +6646,8 @@ let%expect_test "Alt+N: the snippet picker inserts at the cursor" =
   H.show h;
   H.enter h;
   H.show h;
-  [%expect {|
+  [%expect
+    {|
       prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
     ▌ earlier question

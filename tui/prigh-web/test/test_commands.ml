@@ -94,6 +94,7 @@ let%expect_test "every command does something (none is unknown)" =
     /host                      picker: Where tools run
     /export                    path prompt
     /import                    path prompt
+    /snippet                   toast: no snippets yet: /snippet add NAME TEXT saves one
     /skills                    loading Skills: rpc list_skills
     /skill:                    loading Skills: rpc list_skills
     /mcp                       loading MCP servers: rpc list_mcp
@@ -156,6 +157,7 @@ let%expect_test "/help <command> and /hotkeys" =
     Ctrl+P / Alt+P next / previous scoped model (/scoped-models)
     Alt+T cycle the thinking level
     Alt+M cycle the mode: ask → auto-edit → auto → plan (/mode, /plan)
+    Alt+N insert a snippet at the caret: a list to filter (/snippet)
     Ctrl+O cycle the transcript verbosity
     Ctrl+X copy the last reply (when nothing is selected)
     Ctrl+↑ / Ctrl+↓ previous / next of your messages in the transcript (loading earlier ones)
@@ -290,7 +292,7 @@ let%expect_test "/scoped-models, Ctrl+P and Alt+P" =
         deepseek/deepseek-chat))
       (approval_mode Auto) (permissions ((allow ()) (ask ()) (deny ())))
       (default_model ()) (default_thinking ()) (fallback_models ())
-      (default_cwd ()) (archive_after_days 7) (notify bell)))
+      (default_cwd ()) (archive_after_days 7) (notify bell) (snippets ())))
     |}]
 ;;
 

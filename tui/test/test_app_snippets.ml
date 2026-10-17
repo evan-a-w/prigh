@@ -19,15 +19,16 @@ let command h text =
   H.key h (Key.alt (Char "s"))
 ;;
 
-let%expect_test "/snippet: a fuzzy picker; Esc closes, Enter inserts without \
-                 sending"
+let%expect_test
+    "/snippet: a fuzzy picker; Esc closes, Enter inserts without sending"
   =
   let h = connected () in
   H.keys h "/snippet";
   H.enter h;
   H.enter h;
   H.show h;
-  [%expect {|
+  [%expect
+    {|
       prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
     ▌ earlier question
@@ -42,7 +43,8 @@ let%expect_test "/snippet: a fuzzy picker; Esc closes, Enter inserts without \
     |}];
   H.keys h "tst";
   H.show h;
-  [%expect {|
+  [%expect
+    {|
       prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
     ▌ earlier question
@@ -56,7 +58,8 @@ let%expect_test "/snippet: a fuzzy picker; Esc closes, Enter inserts without \
     |}];
   H.esc h;
   H.show h;
-  [%expect {|
+  [%expect
+    {|
       prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
     ▌ earlier question
@@ -71,7 +74,8 @@ let%expect_test "/snippet: a fuzzy picker; Esc closes, Enter inserts without \
   H.keys h "bugs";
   H.enter h;
   H.show h;
-  [%expect {|
+  [%expect
+    {|
       prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
     ▌ earlier question
@@ -87,7 +91,8 @@ let%expect_test "/snippet NAME inserts; an unknown name says the closest" =
   let h = connected () in
   command h "/snippet tests";
   H.show h;
-  [%expect {|
+  [%expect
+    {|
       prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
     ▌ earlier question
@@ -101,7 +106,8 @@ let%expect_test "/snippet NAME inserts; an unknown name says the closest" =
   command h "/snippet zzz";
   command h "/snippet review extra words";
   H.show h;
-  [%expect {|
+  [%expect
+    {|
       prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
     ▌ earlier question
@@ -125,7 +131,8 @@ let%expect_test "/snippet with none saved, or before the config loads" =
   command h "/snippet";
   command h "/snippet foo";
   H.show h;
-  [%expect {|
+  [%expect
+    {|
       prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
     ▌ earlier question
@@ -144,7 +151,8 @@ let%expect_test "/snippet with none saved, or before the config loads" =
 let%expect_test "/snippet add and rm save through set_config, acknowledged" =
   let h = connected () in
   command h "/snippet add fix Fix the failing test.";
-  [%expect {|
+  [%expect
+    {|
     (Rpc
       (method_ set_config)
       (params ((
@@ -165,7 +173,8 @@ let%expect_test "/snippet add and rm save through set_config, acknowledged" =
        "snippet fix saved: Fix the failing test. (/snippet fix inserts it)")
     {|{"snippets":[{"name":"fix","text":"Fix the failing test."}]}|};
   H.show h;
-  [%expect {|
+  [%expect
+    {|
       prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
     ▌ earlier question
@@ -178,7 +187,8 @@ let%expect_test "/snippet add and rm save through set_config, acknowledged" =
     |}];
   (* Without TEXT: the last prompt sent. *)
   command h "/snippet add ask";
-  [%expect {|
+  [%expect
+    {|
     (Rpc
       (method_ set_config)
       (params ((
@@ -191,7 +201,8 @@ let%expect_test "/snippet add and rm save through set_config, acknowledged" =
         "snippet ask saved: earlier question (/snippet ask inserts it)")))
     |}];
   command h "/snippet add fix Fix it.";
-  [%expect {|
+  [%expect
+    {|
     (Rpc
       (method_ set_config)
       (params ((
@@ -206,9 +217,20 @@ let%expect_test "/snippet add and rm save through set_config, acknowledged" =
   H.keys h "/snippet add two first";
   H.key h (Key.ctrl 'j');
   command h "second";
-  [%expect {| |}];
+  [%expect
+    {|
+    (Rpc
+      (method_ set_config)
+      (params ((
+        config ((
+          snippets (
+            ((name fix) (text "Fix the failing test."))
+            ((name two) (text "first\nsecond"))))))))
+      (tag (Snippets_saved "snippet two saved: first (/snippet two inserts it)")))
+    |}];
   command h "/snippet rm fix";
-  [%expect {|
+  [%expect
+    {|
     (Rpc
       (method_ set_config)
       (params ((config ((snippets ())))))
@@ -219,7 +241,8 @@ let%expect_test "/snippet add and rm save through set_config, acknowledged" =
     (Snippets_saved "snippet fix removed")
     {|config.snippets[0] ("fix") has an empty text|};
   H.show h;
-  [%expect {|
+  [%expect
+    {|
       prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
     ▌ earlier question
@@ -244,7 +267,8 @@ let%expect_test "/snippet add and rm: errors say what to do" =
     ]
     ~f:(command h);
   H.show h;
-  [%expect {|
+  [%expect
+    {|
       prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
     ▌ earlier question
@@ -266,7 +290,8 @@ let%expect_test "/snippet completes names, add and rm" =
   let h = connected () in
   H.keys h "/snippet ";
   H.show h;
-  [%expect {|
+  [%expect
+    {|
       prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
     ▌ earlier question
@@ -282,7 +307,8 @@ let%expect_test "/snippet completes names, add and rm" =
     |}];
   H.keys h "re";
   H.show h;
-  [%expect {|
+  [%expect
+    {|
       prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
     ▌ earlier question
@@ -297,7 +323,8 @@ let%expect_test "/snippet completes names, add and rm" =
     |}];
   H.keys h "view more";
   H.show h;
-  [%expect {|
+  [%expect
+    {|
       prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
     ▌ earlier question

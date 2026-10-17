@@ -20,6 +20,7 @@ module Picker_kind : sig
     | Users (** act as one ([/setusr]) *)
     | Accounts (** the account menu: see [App] for the item ids *)
     | Skills (** item ids are skill names *)
+    | Snippets (** item ids are snippet names *)
     | Mcp of Mcp_list.t (** item ids are [Mcp_servers.id]s *)
     | Jump (** item ids are [Jump.Target.to_string]s *)
   [@@deriving sexp_of, equal]

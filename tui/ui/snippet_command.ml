@@ -54,11 +54,14 @@ let unknown snippets name : Action.t =
     (match closest snippets name with
      | [] ->
        Error
-         (sprintf "unknown snippet %S; /snippet lists the %d saved" name
+         (sprintf
+            "unknown snippet %S; /snippet lists the %d saved"
+            name
             (List.length snippets))
      | names ->
        Error
-         (sprintf "unknown snippet %S; did you mean %s? (/snippet lists them)"
+         (sprintf
+            "unknown snippet %S; did you mean %s? (/snippet lists them)"
             name
             (String.concat ~sep:", " names)))
 ;;
@@ -77,13 +80,12 @@ let add snippets ~last_prompt rest : Action.t =
   | None, _ when List.mem [ "add"; "rm" ] name ~equal:String.equal ->
     Error (sprintf "%S is a /snippet subcommand; pick another name" name)
   | None, (None | Some "") ->
-    Error
-      (sprintf
-         "no TEXT and no prompt sent yet: /snippet add %s TEXT"
-         name)
+    Error (sprintf "no TEXT and no prompt sent yet: /snippet add %s TEXT" name)
   | None, Some text ->
     let verb =
-      if Option.is_some (P.Snippet.find snippets name) then "replaced" else "saved"
+      if Option.is_some (P.Snippet.find snippets name)
+      then "replaced"
+      else "saved"
     in
     Save
       { snippets = P.Snippet.add snippets { name; text }
