@@ -42,7 +42,8 @@ type t =
     (** resume a run stopped by a usage limit when the limit resets *)
   ; ask_user_timeout_seconds : float
     (** how long an [ask_user] question waits for an answer before the
-        agent carries on by itself (default 600; 0: never) *)
+        agent carries on by itself (default 300; 0: never); the model can
+        only shorten it *)
   ; archive_after_days : float
     (** a session inactive for this long is archived (default 7; 0: never),
         see {!Session.Summary.is_archived} *)

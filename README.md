@@ -808,8 +808,20 @@ and subagents alike, arrive as one message). Killed jobs report `killed`, a
 host that disconnects fails its jobs (`failed: tool host disconnected`). The
 model also has `job_status`, `job_output` (peek at recent output, paging back
 with `offset`), `job_wait` (block on some or all jobs; returned reports are
-not delivered again), `job_input` and `job_kill`. Subagents' `bash` has no
-`background`.
+not delivered again), `job_input` and `job_kill`.
+
+Subagents have jobs too, their own (`j1`, ... per subagent): `bash` with
+`background` and the job tools work the same, but since a subagent is not
+woken after it ends its turn, its `job_wait` blocks as long as the jobs
+take (its `timeout` only bounds it), finished jobs' reports reach it
+between its turns, and jobs still running when it finishes are killed,
+which its report says (`[killed when the subagent finished, still
+running: job j2 (sleep 60)]`). Its system prompt and tool descriptions tell
+it to block, never sleep: foreground commands for results it needs (one
+blocking command to wait for something to become ready), jobs plus
+`job_wait` for commands side by side, and to wait for what it needs before
+its final report. The main agent's prompt tells it never to sleep to pass
+the time either.
 
 The main agent never stalls on a long command or a wait.
 `auto_background_seconds` in `config.json` (default 30; `0` turns it off)
@@ -827,7 +839,8 @@ command starts, not while a confirmation waits for you. `job_wait` and
 shorter, not longer) with what is still running, whose reports are still
 delivered later, once. The system prompt and the tool descriptions tell
 the model to keep working or end its turn rather than wait. Subagents'
-own `bash` calls stay in the foreground. The tool card shows `job j3` and
+own foreground `bash` calls are never moved, and their `job_wait` has no
+such limit. The tool card shows `job j3` and
 `moved to the background after 30s` with the output it had then.
 
 A job started with `stdin: true` gets a pipe for its stdin that stays
@@ -929,7 +942,7 @@ Long runs; edited by hand) and
 `default_model`/`default_thinking` (what new sessions start with unless
 `-model`/`-thinking` is given; `/change_default` saves the current ones),
 `notify` (`off`, `bell` or `desktop`; the TUI's `/notify`),
-`ask_user_timeout_seconds` (default 600, `0` = never: how long a question
+`ask_user_timeout_seconds` (default 300, `0` = never: how long a question
 from the model waits for you, above), `snippets` (texts to insert into the
 editor, `/snippet` below) and
 `auto_background_seconds` (default 30, `0` = never: when a foreground
@@ -1187,7 +1200,12 @@ read from `AGENTS.md`/`CLAUDE.md` files between `/` and the working
 directory, plus `~/.prigh/AGENTS.md`. When the tool host has `nix` on its
 PATH (as in the Docker image), the system prompt also tells the model to get
 missing tools from nixpkgs (`nix shell`, `nix run`, `nix profile install`)
-rather than apt or sudo. The system prompt is built once, at a session's
+rather than apt or sudo. It tells the main agent that it is the
+orchestrator: substantial work (a feature, a multi-file change, a long
+investigation) goes to subagents with self-contained tasks, independent
+ones in parallel, while it plans, coordinates, reviews their reports and
+talks to you, doing small things itself; subagents are not told this. The
+system prompt is built once, at a session's
 first run, and recorded in the session so the cached prompt prefix survives
 `/cd`, `/host` and backend restarts; later directory or host changes reach
 the model as a short note on the next message, leaving it to re-read the
@@ -1277,13 +1295,13 @@ answer, ←/→ move between questions, Enter answers (the last one sends), Esc
 declines (the model is told you declined); the box lists these keys. The first frontend to answer wins and the others' dialogs close;
 an unanswered question comes back after a reconnect, and aborting the run
 withdraws it. A question nobody answers times out, after
-`ask_user_timeout_seconds` in `config.json` (default 600; `0` = never): the
+`ask_user_timeout_seconds` in `config.json` (default 300; `0` = never): the
 model is told you did not answer and carries on with its best judgement,
 saying what it assumed, the dialog closes and a notice says so. The dialog
 shows when that happens (`unanswered, the agent carries on by itself at
-14:05`). The model can give one question a `timeout_seconds` of its own
-(30 to 86400, or `0` to wait until you answer) unless you turned timeouts
-off. Subagents cannot ask (nor plan, nor leave plan mode): they
+14:05`). The model can give one question a shorter `timeout_seconds` of
+its own (30 to 300), but never a longer one than yours, and only you can
+turn the timeout off. Subagents cannot ask (nor plan, nor leave plan mode): they
 put open questions in their report for the main agent to ask. Headless
 `prigh run` has nobody to answer, so it refuses confirmations (the model is
 told to have them allowed in the config) and questions (the model decides

@@ -9,6 +9,10 @@ open! Import
 
 val tools : Tool.t list
 
+(** [tools] for subagents, whose [job_wait] says to block on jobs: they are
+    not woken after their turn, and their jobs end with it. *)
+val subagent_tools : Tool.t list
+
 (** Lines [offset + lines] to [offset] from the end of a job's retained
     output, under a one-line header. *)
 val output_text

@@ -456,7 +456,10 @@ let%expect_test
     |}]
 ;;
 
-let%expect_test "job ids continue after a reload; subagents cannot start jobs" =
+let%expect_test
+    "job ids continue after a reload; subagents get their own bash and job \
+     tools"
+  =
   with_sandbox
   @@ fun t ->
   Eio.Switch.run
@@ -515,7 +518,8 @@ let%expect_test "job ids continue after a reload; subagents cannot start jobs" =
     user: [job j3 exited 0] while [ ! -f gate ]; do sleep 0.02; done; echo three | three
     assistant: in
     |}];
-  (* Below depth 0, bash has no [background] and the job tools are gone. *)
+  (* Below depth 0, bash and job_wait say that a subagent waits for its
+     jobs (see test_subagent.ml). *)
   let sub =
     Or_error.ok_exn
       (Tools.for_context
@@ -531,8 +535,9 @@ let%expect_test "job ids continue after a reload; subagents cannot start jobs" =
          .parameters);
   [%expect
     {|
-    (bash read write edit ls grep find web_fetch web_search subagent)
-    {"type":"object","properties":{"command":{"type":"string","description":"The command to run"},"timeout":{"type":"integer","description":"Timeout in seconds (default 600, none in the background). The command is killed when it expires."}},"required":["command"],"additionalProperties":false}
+    (bash read write edit ls grep find web_fetch web_search subagent job_status
+     job_output job_wait job_input job_kill)
+    {"type":"object","properties":{"command":{"type":"string","description":"The command to run"},"timeout":{"type":"integer","description":"Timeout in seconds (default 600, none in the background). The command is killed when it expires."},"background":{"type":"boolean","description":"Start it as a background job and return at once with the job id, to run commands side by side or keep a server running while you work. job_wait blocks until it exits and returns its report; job_output, job_input and job_kill act on it meanwhile. Your jobs are killed when you end your turn, so wait for the ones you need first."},"stdin":{"type":"boolean","description":"With background: keep its stdin open (a pipe, not a terminal) for input you send with job_input. Otherwise it reads end of input at once, like a foreground command."}},"required":["command"],"additionalProperties":false}
     |}]
 ;;
 

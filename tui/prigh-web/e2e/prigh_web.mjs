@@ -22,6 +22,9 @@ const home = join(dir, "home");
 const cwd = join(dir, "cwd");
 mkdirSync(home, { recursive: true });
 mkdirSync(cwd, { recursive: true });
+// Questions without a deadline: its time would differ between runs.
+mkdirSync(join(home, ".prigh"), { recursive: true });
+writeFileSync(join(home, ".prigh", "config.json"), JSON.stringify({ ask_user_timeout_seconds: 0 }));
 
 // The model's replies, in order, across every session of one backend run.
 const script = [
@@ -64,9 +67,7 @@ const script3 = [
     tool_calls: [{
       id: "q1", name: "ask_user",
       arguments: { questions: [{ question: "Which database?", header: "Storage",
-        options: [{ label: "Postgres", description: "the one in prod" }, { label: "SQLite" }] }],
-        // No deadline: its time would differ between runs.
-        timeout_seconds: 0 },
+        options: [{ label: "Postgres", description: "the one in prod" }, { label: "SQLite" }] }] },
     }],
   },
   { text: "SQLite it is." },

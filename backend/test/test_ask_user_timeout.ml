@@ -3,13 +3,13 @@ open! Prigh
 open Tool_test_helpers
 module Reply = Faux_provider.Reply
 
-let%expect_test "timeout: the config's, the call's override, bounds, 0" =
+let%expect_test "timeout: the config's; the call's only shortens it" =
   List.iter
     [ Some 600., None
     ; Some 600., Some 120
     ; Some 600., Some 5
     ; Some 600., Some 1_000_000
-    ; Some 600., Some 0
+    ; Some 60., Some 200
     ; None, None
     ; None, Some 60
     ]
@@ -25,10 +25,10 @@ let%expect_test "timeout: the config's, the call's override, bounds, 0" =
     ((600) () -> (600))
     ((600) (120) -> (120))
     ((600) (5) -> (30))
-    ((600) (1000000) -> (86400))
-    ((600) (0) -> ())
+    ((600) (1000000) -> (300))
+    ((60) (200) -> (60))
     (() () -> ())
-    (() (60) -> ())
+    (() (60) -> (60))
     |}];
   List.iter [ 0.; 45.; 60.; 570.; 600.; 3600.; 3900.; 86400. ] ~f:(fun s ->
     print_endline (User_question.duration_hum s));
@@ -154,13 +154,13 @@ let%expect_test "unanswered, the question times out and the model carries on" =
        : unit Or_error.t)];
   [%expect
     {|
-    ask_user q1, deadline in 600s
-    ((q1 (600)))
-    timer: due in 600s
+    ask_user q1, deadline in 300s
+    ((q1 (300)))
+    timer: due in 300s
     timer: fires
     ask_user_done q1, timed_out=true
-    notice: the question was not answered within 10m; the agent carries on without it
-    model reads: ERROR [the user did not answer within 10m; carry on with your best judgement and say what you assumed]
+    notice: the question was not answered within 5m; the agent carries on without it
+    model reads: ERROR [the user did not answer within 5m; carry on with your best judgement and say what you assumed]
     (Error
      "no pending question for tool call \"q1\": it was answered or withdrawn")
     |}]
@@ -179,9 +179,9 @@ let%expect_test "answered before the timeout: the timer is cancelled" =
   fire ();
   [%expect
     {|
-    ask_user q1, deadline in 600s
-    ((q1 (600)))
-    timer: due in 600s
+    ask_user q1, deadline in 300s
+    ((q1 (300)))
+    timer: due in 300s
     (Ok ())
     timer: cancelled
     ask_user_done q1, timed_out=false
@@ -204,9 +204,9 @@ let%expect_test "declining is not timing out" =
   Agent.wait_idle agent;
   [%expect
     {|
-    ask_user q1, deadline in 600s
-    ((q1 (600)))
-    timer: due in 600s
+    ask_user q1, deadline in 300s
+    ((q1 (300)))
+    timer: due in 300s
     (Ok ())
     timer: cancelled
     ask_user_done q1, timed_out=false
@@ -224,24 +224,28 @@ let%expect_test "aborting withdraws the question and stops the timer" =
   fire ();
   [%expect
     {|
-    ask_user q1, deadline in 600s
-    ((q1 (600)))
-    timer: due in 600s
+    ask_user q1, deadline in 300s
+    ((q1 (300)))
+    timer: due in 300s
     timer: cancelled
     ask_user_done q1, timed_out=false
     timer: nothing waiting
     |}]
 ;;
 
-let%expect_test "the call's timeout_seconds replaces the config's" =
+let%expect_test "the call's timeout_seconds can only shorten the wait" =
   with_agent
     [ ask ~timeout_seconds:120 "q1"
     ; ask ~timeout_seconds:1 "q2"
-    ; ask ~timeout_seconds:(-5) "q3"
+    ; ask ~timeout_seconds:1000 "q3"
+    ; ask ~timeout_seconds:0 "q4"
+    ; ask ~timeout_seconds:(-5) "q5"
     ; Reply.text "ok"
     ]
   @@ fun agent ~fire ~settle ->
   Or_error.ok_exn (Agent.prompt agent "go");
+  settle ();
+  fire ();
   settle ();
   fire ();
   settle ();
@@ -263,11 +267,19 @@ let%expect_test "the call's timeout_seconds replaces the config's" =
     ask_user_done q2, timed_out=true
     notice: the question was not answered within 30s; the agent carries on without it
     model reads: ERROR [the user did not answer within 30s; carry on with your best judgement and say what you assumed]
-    model reads: ERROR timeout_seconds must be 0 (wait until answered) or a number of seconds
+    ask_user q3, deadline in 300s
+    ((q3 (300)))
+    timer: due in 300s
+    timer: fires
+    ask_user_done q3, timed_out=true
+    notice: the question was not answered within 5m; the agent carries on without it
+    model reads: ERROR [the user did not answer within 5m; carry on with your best judgement and say what you assumed]
+    model reads: ERROR timeout_seconds must be a number of seconds from 30 to 300; only the user can turn the timeout off (leave timeout_seconds out to use their setting)
+    model reads: ERROR timeout_seconds must be a number of seconds from 30 to 300; only the user can turn the timeout off (leave timeout_seconds out to use their setting)
     |}]
 ;;
 
-let%expect_test "0 waits until answered: in the config, or for one call" =
+let%expect_test "0 in the config waits until answered; only the user sets it" =
   let run ?config ?timeout_seconds () =
     with_agent ?config [ ask ?timeout_seconds "q1"; Reply.text "ok" ]
     @@ fun agent ~fire ~settle ->
@@ -291,28 +303,30 @@ let%expect_test "0 waits until answered: in the config, or for one call" =
     Q: Which database?
     A: Postgres
     |}];
-  (* The user turned timeouts off: the model cannot turn them on. *)
+  (* The model can still give one question a deadline: that only shortens
+     the wait. *)
   run ~config:{|{"ask_user_timeout_seconds": 0}|} ~timeout_seconds:60 ();
   [%expect
     {|
-    ask_user q1, no deadline
-    ((q1 ()))
-    timer: nothing waiting
-    ask_user_done q1, timed_out=false
-    model reads: The user answered:
-    Q: Which database?
-    A: Postgres
+    ask_user q1, deadline in 60s
+    ((q1 (60)))
+    timer: due in 60s
+    timer: fires
+    ask_user_done q1, timed_out=true
+    notice: the question was not answered within 1m; the agent carries on without it
+    model reads: ERROR [the user did not answer within 1m; carry on with your best judgement and say what you assumed]
     |}];
-  run ~timeout_seconds:0 ();
+  (* Nor can it wait longer than the user's setting. *)
+  run ~config:{|{"ask_user_timeout_seconds": 60}|} ~timeout_seconds:200 ();
   [%expect
     {|
-    ask_user q1, no deadline
-    ((q1 ()))
-    timer: nothing waiting
-    ask_user_done q1, timed_out=false
-    model reads: The user answered:
-    Q: Which database?
-    A: Postgres
+    ask_user q1, deadline in 60s
+    ((q1 (60)))
+    timer: due in 60s
+    timer: fires
+    ask_user_done q1, timed_out=true
+    notice: the question was not answered within 1m; the agent carries on without it
+    model reads: ERROR [the user did not answer within 1m; carry on with your best judgement and say what you assumed]
     |}];
   run ~config:{|{"ask_user_timeout_seconds": 90}|} ();
   [%expect
@@ -340,9 +354,9 @@ let%expect_test "an answer that comes in as the timer fires still counts" =
   Agent.wait_idle agent;
   [%expect
     {|
-    ask_user q1, deadline in 600s
-    ((q1 (600)))
-    timer: due in 600s
+    ask_user q1, deadline in 300s
+    ((q1 (300)))
+    timer: due in 300s
     timer: fires
     (Ok ())
     ask_user_done q1, timed_out=false

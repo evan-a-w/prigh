@@ -34,10 +34,12 @@ val specs : Tool.t list -> Tool_spec.t list
 
 (** The tools available to an agent at [depth]: the parent's [parent] tools,
     restricted to [only] if given. The [subagent] tool is dropped at depth 2
-    and beyond so that delegation cannot recurse further, and the background
-    controls ([subagent_wait], [job_wait], ...), {!interaction} and [goal_complete] at depth 1
-    and beyond, where subagents and [bash] run synchronously ([bash] loses
-    [background]) and nobody can be asked. *)
+    and beyond so that delegation cannot recurse further, and the subagent
+    controls ([subagent_wait], ...), {!interaction} and [goal_complete] at
+    depth 1 and beyond, where subagents run synchronously and nobody can be
+    asked. There [bash] and the job tools are their subagent versions
+    ({!Tool_bash.subagent_tool}, {!Tool_jobs.subagent_tools}): a subagent
+    waits for its own jobs, which end with it. *)
 val for_context
   :  parent:Tool.t list
   -> depth:int

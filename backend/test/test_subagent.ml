@@ -358,3 +358,142 @@ let%expect_test
     [{"role":"user","text":"go","at":1791210730250}]
     |}]
 ;;
+
+(* What the child sees after its previous turn: the tool results and any
+   delivered reports. *)
+let print_since_last_turn (r : Provider.Request.t) =
+  let rec after_last_assistant acc = function
+    | [] -> acc
+    | Message.Assistant _ :: _ -> acc
+    | m :: rest -> after_last_assistant (m :: acc) rest
+  in
+  List.iter
+    (after_last_assistant [] (List.rev r.messages))
+    ~f:(function
+      | Message.Tool_result { tool_name; text; _ } ->
+        printf "  %s -> %s\n" tool_name (String.prefix text 200)
+      | User u -> printf "  user: %s\n" (String.prefix u.text 200)
+      | Assistant _ -> ());
+  print_endline "--"
+;;
+
+let%expect_test "a subagent runs background jobs and blocks on them" =
+  with_sandbox
+  @@ fun t ->
+  let first_tools = ref None in
+  let provider =
+    Faux_provider.create
+      ~on_request:(fun r ->
+        if Option.is_none !first_tools
+        then
+          first_tools
+          := Some
+               (List.map r.tools ~f:(fun (s : Tool_spec.t) ->
+                  ( s.name
+                  , if String.equal s.name "job_wait"
+                    then String.prefix s.description 60
+                    else "" )));
+        print_since_last_turn r)
+      [ Reply.tool_call
+          ~id:"c1"
+          ~name:"bash"
+          ~arguments:{|{"command":"sleep 0.2; echo built","background":true}|}
+          ()
+      ; Reply.tool_call ~id:"c2" ~name:"job_wait" ~arguments:"{}" ()
+      ; Reply.text "built it"
+      ]
+  in
+  let subagent = subagent ~provider in
+  let result =
+    run_tool
+      t
+      ~tools:(Tools.all @ Tool_jobs.tools @ [ subagent ])
+      ~emit:ignore
+      subagent
+      {|{"task":"build"}|}
+  in
+  print_s [%sexp (!first_tools : (string * string) list option)];
+  print_s [%sexp (result : Tool.Result.t)];
+  [%expect
+    {|
+      user: build
+    --
+      bash -> started job j1: sleep 0.2; echo built; its output is being recorded. job_wait blocks until it exits (wait for it before you finish: your jobs are killed when you end your turn); job_output peeks, job_
+    --
+      job_wait -> [job j1 exited 0] sleep 0.2; echo built
+    built
+    --
+    (((bash "") (read "") (write "") (edit "") (ls "") (grep "") (find "")
+      (web_fetch "") (job_status "") (job_output "")
+      (job_wait "Block until background jobs exit and return their reports. U")
+      (job_input "") (job_kill "") (subagent "")))
+    ((text  "built it\
+           \n[subagent: 3 turns, 50 in / 21 out tokens, $0.0000]")
+     (is_error false))
+    |}]
+;;
+
+let%expect_test
+    "a job's report reaches the subagent between turns; jobs left running are \
+     killed when it finishes"
+  =
+  with_sandbox
+  @@ fun t ->
+  let provider =
+    Faux_provider.create
+      ~on_request:print_since_last_turn
+      [ Reply.tool_call
+          ~id:"c1"
+          ~name:"bash"
+          ~arguments:{|{"command":"echo quick","background":true}|}
+          ()
+      ; Reply.tool_call
+          ~id:"c2"
+          ~name:"bash"
+          ~arguments:{|{"command":"sleep 0.3","background":false}|}
+          ()
+      ; Reply.tool_call
+          ~id:"c3"
+          ~name:"bash"
+          ~arguments:{|{"command":"sleep 60","background":true}|}
+          ()
+      ; Reply.text "done early"
+      ]
+  in
+  let subagent = subagent ~provider in
+  let start = Time_float.now () in
+  let result =
+    run_tool
+      t
+      ~tools:(Tools.all @ Tool_jobs.tools @ [ subagent ])
+      ~emit:ignore
+      subagent
+      {|{"task":"x"}|}
+  in
+  print_s [%sexp (result : Tool.Result.t)];
+  print_s
+    [%sexp
+      (Time_float.Span.( < )
+         (Time_float.diff (Time_float.now ()) start)
+         (Time_float.Span.of_sec 20.)
+       : bool)];
+  [%expect
+    {|
+      user: x
+    --
+      bash -> started job j1: echo quick; its output is being recorded. job_wait blocks until it exits (wait for it before you finish: your jobs are killed when you end your turn); job_output peeks, job_kill stops
+    --
+      bash ->
+      user: [job j1 exited 0] echo quick
+    quick
+    --
+      bash -> started job j2: sleep 60; its output is being recorded. job_wait blocks until it exits (wait for it before you finish: your jobs are killed when you end your turn); job_output peeks, job_kill stops it
+    --
+    ((text
+       "done early\
+      \n[killed when the subagent finished, still running: job j2 (sleep 60)]\
+      \n[subagent: 4 turns, 70 in / 29 out tokens, $0.0001]")
+     (is_error false))
+    true
+    |}]
+;;

@@ -141,6 +141,32 @@ let prepare
   }
 ;;
 
+(* A subagent's jobs are its own: their reports arrive between its turns
+   (or through job_wait), and they end with it. Returns those still running
+   then, which are killed. *)
+let with_jobs (context : Tool.Context.t) ~emit f =
+  Eio.Switch.run
+  @@ fun sw ->
+  let jobs =
+    Background_tasks.create
+      ~env:context.env
+      ~sw
+      ~first_subagent_id:1
+      ~first_job_id:1
+      ()
+  in
+  Background_tasks.connect jobs ~emit ~on_change:ignore;
+  let result = f jobs in
+  let left =
+    List.filter
+      (Background_tasks.tasks jobs ~kind:Job)
+      ~f:Background_tasks.Task.running
+  in
+  Background_tasks.cancel_all ~discard:true jobs;
+  Background_tasks.wait_all jobs;
+  result, left
+;;
+
 let execute
       ~provider
       ~home
@@ -169,6 +195,7 @@ let execute
            ~instructions:files
            ~nix
            ~skills
+           ~role:Subagent
            ~cwd:p.cwd
            ~home
            ~tools:(Tools.specs p.tools)
@@ -209,10 +236,17 @@ let execute
      | _ -> ());
     context.emit (Agent_event.Subagent { call_id; agent_id; event })
   in
-  let added =
+  let added, left =
+    with_jobs context ~emit
+    @@ fun jobs ->
     match
       Agent_loop.run
         ~env:context.env
+        ~background:jobs
+        ~steer:(fun () ->
+          match Background_tasks.take_undelivered jobs with
+          | [] -> []
+          | tasks -> [ Background_tasks.delivery_message tasks ])
         ~provider
         ~config
         ~cwd:p.cwd
@@ -263,12 +297,25 @@ let execute
       | User _ | Tool_result _ -> None)
   in
   let trailer =
-    sprintf
-      "[subagent: %d turns, %d in / %d out tokens, $%.4f]"
-      !turns
-      usage.input
-      usage.output
-      cost_usd
+    (match left with
+     | [] -> ""
+     | left ->
+       sprintf
+         "[killed when the subagent finished, still running: %s]\n"
+         (String.concat
+            ~sep:", "
+            (List.map left ~f:(fun task ->
+               sprintf
+                 "job %s (%s)"
+                 (Background_tasks.Task.id task)
+                 (Background_tasks.short_task
+                    (Background_tasks.Task.label task))))))
+    ^ sprintf
+        "[subagent: %d turns, %d in / %d out tokens, $%.4f]"
+        !turns
+        usage.input
+        usage.output
+        cost_usd
   in
   let result =
     match last_assistant with

@@ -41,6 +41,14 @@ let spec_with ?(description = description) parameters =
   }
 ;;
 
+let stdin_parameter =
+  ( "stdin"
+  , `Boolean
+  , "With background: keep its stdin open (a pipe, not a terminal) for input \
+     you send with job_input. Otherwise it reads end of input at once, like a \
+     foreground command." )
+;;
+
 let spec =
   spec_with
     ~description:auto_description
@@ -53,11 +61,23 @@ let spec =
             meanwhile. Use it for anything that may take long or keeps running \
             (builds, test suites, installs, servers, watchers), then carry on \
             with other work or end your turn." )
-       ; ( "stdin"
+       ; stdin_parameter
+       ])
+;;
+
+(* A subagent is not woken after its turn: it waits for its jobs. *)
+let subagent_spec =
+  spec_with
+    (command_parameters
+     @ [ ( "background"
          , `Boolean
-         , "With background: keep its stdin open (a pipe, not a terminal) for \
-            input you send with job_input. Otherwise it reads end of input at \
-            once, like a foreground command." )
+         , "Start it as a background job and return at once with the job id, \
+            to run commands side by side or keep a server running while you \
+            work. job_wait blocks until it exits and returns its report; \
+            job_output, job_input and job_kill act on it meanwhile. Your jobs \
+            are killed when you end your turn, so wait for the ones you need \
+            first." )
+       ; stdin_parameter
        ])
 ;;
 
@@ -219,8 +239,7 @@ let fields = function
 ;;
 
 let starts_job (context : Tool.Context.t) args =
-  context.depth = 0
-  && Option.is_some context.background
+  Option.is_some context.background
   &&
   match List.Assoc.find (fields args) ~equal:String.equal "background" with
   | Some `True -> true
@@ -340,13 +359,22 @@ let start_job ?(keep_stdin = false) background ~command ~run =
       job_outcome result ~output:tail)
 ;;
 
-let started_message ~id ~command =
-  sprintf
-    "started job %s: %s; its output is being recorded; you will be notified \
-     when it exits. Use job_output to peek, job_wait to block, job_kill to \
-     stop it."
-    id
-    (Background_tasks.short_task command)
+let started_message ?(subagent = false) ~id ~command () =
+  if subagent
+  then
+    sprintf
+      "started job %s: %s; its output is being recorded. job_wait blocks until \
+       it exits (wait for it before you finish: your jobs are killed when you \
+       end your turn); job_output peeks, job_kill stops it."
+      id
+      (Background_tasks.short_task command)
+  else
+    sprintf
+      "started job %s: %s; its output is being recorded; you will be notified \
+       when it exits. Use job_output to peek, job_wait to block, job_kill to \
+       stop it."
+      id
+      (Background_tasks.short_task command)
 ;;
 
 let moved_prefix = "moved to the background as job "
@@ -481,8 +509,10 @@ let run (context : Tool.Context.t) args =
             foreground_tool
             arguments)
     in
-    Tool.Result.ok (started_message ~id ~command)
+    Tool.Result.ok
+      (started_message ~subagent:(context.depth > 0) ~id ~command ())
   | _ -> run_foreground context args
 ;;
 
 let tool = { Tool.spec; run }
+let subagent_tool = { Tool.spec = subagent_spec; run }

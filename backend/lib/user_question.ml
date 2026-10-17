@@ -29,19 +29,20 @@ end
 
 let max_questions = 4
 let min_timeout_seconds = 30
-let max_timeout_seconds = 86_400
+let max_timeout_seconds = 300
 
 let timeout ~config ~requested =
-  match config, requested with
-  | None, _ | Some _, Some 0 -> None
-  | Some seconds, None -> Some seconds
-  | Some _, Some seconds ->
-    Some
-      (Float.of_int
-         (Int.clamp_exn
-            seconds
-            ~min:min_timeout_seconds
-            ~max:max_timeout_seconds))
+  match requested with
+  | None -> config
+  | Some seconds ->
+    let seconds =
+      Float.of_int
+        (Int.clamp_exn
+           seconds
+           ~min:min_timeout_seconds
+           ~max:max_timeout_seconds)
+    in
+    Some (Option.value_map config ~default:seconds ~f:(Float.min seconds))
 ;;
 
 let duration_hum seconds =
