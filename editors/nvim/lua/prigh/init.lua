@@ -111,8 +111,7 @@ end
 --- buffer, or with a range the lines, or the diagnostics (of the range).
 function M.add(opts)
   opts = opts or {}
-  local agent, chat = M.get()
-  local _ = agent
+  local _, chat = M.get()
   local buf = vim.api.nvim_get_current_buf()
   if buf == chat.buf or buf == chat.input then
     return vim.notify("prigh: :PrighAdd attaches a file buffer: run it from the buffer to attach", vim.log.levels.WARN)
@@ -137,7 +136,10 @@ function M.add(opts)
     end
   else
     return vim.notify(
-      string.format("prigh: unknown :PrighAdd argument %q: use :PrighAdd, :PrighAdd diagnostics or :PrighAdd clear", what),
+      string.format(
+        "prigh: unknown :PrighAdd argument %q: use :PrighAdd, :PrighAdd diagnostics or :PrighAdd clear",
+        what
+      ),
       vim.log.levels.ERROR
     )
   end

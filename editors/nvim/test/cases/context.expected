@@ -1,0 +1,41 @@
+
+== attach
+notify: prigh: attached code.lua (sent with the next prompt)
+notify: prigh: attached code.lua:2-3 (sent with the next prompt)
+notify: prigh: attached diagnostics code.lua (2) (sent with the next prompt)
+notify: prigh: attached diagnostics code.lua (1) (sent with the next prompt)
+notify (warn): prigh: no diagnostics in code.lua:1-1
+notify (warn): prigh: unknown :PrighAdd argument "bogus": use :PrighAdd, :PrighAdd diagnostics or :PrighAdd clear
+winbar: prigh · claude-sonnet · thinking medium · mode Default
+input bar: <CR> send · <C-c> cancel · @ file · / command · g? keys · 📎 code.lua · 📎 code.lua:2-3 · 📎 diagnostics code.lua (2) · 📎 diagnostics code.lua (1)
+
+== from the chat buffer
+notify (warn): prigh: :PrighAdd attaches a file buffer: run it from the buffer to attach
+
+== send
+agent got: {"id":0,"method":"initialize","params":{"clientCapabilities":{"_meta":{"prigh":{"state":true}},"elicitation":{"form":{}},"fs":{"readTextFile":true,"writeTextFile":true},"session":{"configOptions":{"boolean":{}},"notices":{}},"terminal":false},"clientInfo":{"name":"prigh.nvim","title":"prigh.nvim","version":"0.1.0"},"protocolVersion":1}}
+agent got: {"id":1,"method":"session/new","params":{"cwd":"<tmp>","mcpServers":[]}}
+agent got: {"id":2,"method":"session/prompt","params":{"prompt":[{"text":"review these","type":"text"},{"resource":{"mimeType":"text/plain","text":"local a = 'unsaved'\nlocal b = 2\nlocal c = 3\n","uri":"file://<tmp>/code.lua"},"type":"resource"},{"resource":{"mimeType":"text/plain","text":"local b = 2\nlocal c = 3\n","uri":"file://<tmp>/code.lua#L2-L3"},"type":"resource"},{"text":"Diagnostics:\ncode.lua:2:7: warning: unused variable b [lua_ls]\ncode.lua:3:1: error: syntax error","type":"text"},{"text":"Diagnostics:\ncode.lua:3:1: error: syntax error","type":"text"}],"sessionId":"s1"}}
+┌ chat
+│ ⚠ MCP server unavailable — Continuing without it.
+│ 
+│ ## You
+│ review these
+│ 📎 code.lua
+│ 📎 code.lua:2-3
+│ 📎 diagnostics code.lua (2)
+│ 📎 diagnostics code.lua (1)
+│ 
+└
+winbar: prigh · claude-sonnet · thinking medium · mode Default
+input bar: <CR> send · <C-c> cancel · @ file · / command · g? keys
+
+== :PrighAdd clear
+notify: prigh: attached code.lua (sent with the next prompt)
+notify: prigh: attachments cleared
+winbar: prigh · claude-sonnet · thinking medium · mode Default
+input bar: <CR> send · <C-c> cancel · @ file · / command · g? keys
+
+== without embeddedContext: text blocks
+{"block":{"text":"code.lua:\n```\nlocal a = 'unsaved'\nlocal b = 2\nlocal c = 3\n```","type":"text"},"label":"code.lua"}
+{"block":{"text":"code.lua:2-2:\n```\nlocal b = 2\n```","type":"text"},"label":"code.lua:2-2"}

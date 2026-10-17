@@ -86,7 +86,10 @@ local function ask(field, current, done)
       if s.type == "number" or s.type == "integer" then
         local n = tonumber(text)
         if not n or (s.type == "integer" and n ~= math.floor(n)) then
-          vim.notify(string.format("prigh: %s must be a%s %s", field.name, s.type == "integer" and "n" or "", s.type), vim.log.levels.WARN)
+          vim.notify(
+            string.format("prigh: %s must be a%s %s", field.name, s.type == "integer" and "n" or "", s.type),
+            vim.log.levels.WARN
+          )
           return ask(field, current, done)
         end
         return done(n)

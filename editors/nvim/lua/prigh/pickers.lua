@@ -4,6 +4,10 @@ local fs = require("prigh.fs")
 
 local M = {}
 
+local function rel(path, chat)
+  return require("prigh.render").rel(path, chat.agent.cwd)
+end
+
 local function notify(msg, level)
   vim.notify("prigh: " .. msg, level or vim.log.levels.INFO)
 end
@@ -97,7 +101,10 @@ function M.config(agent, category)
     if category then
       local opt = s:config_option(category)
       if not opt then
-        return notify(string.format("the agent has no %s option; :PrighConfig lists what it has", category), vim.log.levels.WARN)
+        return notify(
+          string.format("the agent has no %s option; :PrighConfig lists what it has", category),
+          vim.log.levels.WARN
+        )
       end
       return select_value(agent, opt)
     end
@@ -158,14 +165,22 @@ function M.review_file(c, chat, on_done)
   require("prigh.review").open({
     buf = buf,
     before = c.before or {},
-    title = c.path,
+    title = rel(c.path, chat),
     on_done = function(res)
       if res.status == "applied" then
         if res.rejected > 0 and require("prigh.config").options.fs.save_after_write then
           fs.save(buf)
         end
         fs.forget(c.path)
-        notify(string.format("%s: kept %d hunk%s, reverted %d", vim.fn.fnamemodify(c.path, ":~:."), res.accepted, res.accepted == 1 and "" or "s", res.rejected))
+        notify(
+          string.format(
+            "%s: kept %d hunk%s, reverted %d",
+            rel(c.path, chat),
+            res.accepted,
+            res.accepted == 1 and "" or "s",
+            res.rejected
+          )
+        )
       end
       if on_done then
         on_done(res)
@@ -194,7 +209,7 @@ function M.review(chat)
     prompt = "prigh: review changes",
     format_item = function(c)
       local add, del = stats(c)
-      return string.format("%s  +%d −%d%s", vim.fn.fnamemodify(c.path, ":~:."), add, del, c.before == nil and " (new)" or "")
+      return string.format("%s  +%d −%d%s", rel(c.path, chat), add, del, c.before == nil and " (new)" or "")
     end,
   }, function(choice)
     if choice then

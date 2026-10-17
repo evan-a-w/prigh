@@ -174,7 +174,10 @@ local function thought(out, e, opts)
     if #first > 60 then
       first = vim.fn.strcharpart(first, 0, 60) .. "…"
     end
-    out:line(string.format("▸ Thinking: %s (%d line%s · <Tab> expand)", first, #lines, #lines == 1 and "" or "s"), "PrighThought")
+    out:line(
+      string.format("▸ Thinking: %s (%d line%s · <Tab> expand)", first, #lines, #lines == 1 and "" or "s"),
+      "PrighThought"
+    )
   else
     out:line("▾ Thinking", "PrighThought")
     for _, l in ipairs(lines) do
@@ -209,7 +212,8 @@ local function permission(out, e, opts)
   if e.diff_lines and #e.diff_lines > 0 then
     diff_block(out, e.diff_lines, opts.inline_diff_max, false, "  ")
     if #e.diff_lines > opts.inline_diff_max then
-      out.lines[#out.lines] = string.format("  ▸ %d more diff lines · d full diff", #e.diff_lines - opts.inline_diff_max)
+      out.lines[#out.lines] =
+        string.format("  ▸ %d more diff lines · d full diff", #e.diff_lines - opts.inline_diff_max)
     end
   end
   e.option_rows = {}

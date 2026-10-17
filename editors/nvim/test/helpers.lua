@@ -7,6 +7,7 @@ T.test_dir = T.root .. "/test"
 T.tmp = vim.fs.normalize(vim.fn.tempname())
 vim.fn.mkdir(T.tmp, "p")
 T.tmp = vim.uv.fs_realpath(T.tmp)
+vim.cmd.cd(T.tmp)
 
 local function scrub(s)
   s = s:gsub(vim.pesc(T.tmp), "<tmp>")
@@ -135,7 +136,19 @@ function T.start(script, opts)
   f:close()
   local nvim = vim.v.progpath
   require("prigh").setup(vim.tbl_deep_extend("force", {
-    cmd = { nvim, "--headless", "-u", "NONE", "-i", "NONE", "-n", "-l", T.test_dir .. "/fake_agent.lua", script_path, log_path },
+    cmd = {
+      nvim,
+      "--headless",
+      "-u",
+      "NONE",
+      "-i",
+      "NONE",
+      "-n",
+      "-l",
+      T.test_dir .. "/fake_agent.lua",
+      script_path,
+      log_path,
+    },
     cwd = T.tmp,
     resume_last = false,
   }, opts or {}))
@@ -320,7 +333,14 @@ end
 
 vim.ui.input = function(opts, cb)
   local a = table.remove(answers, 1)
-  T.out(string.format("input: %s [default %q] -> %s", opts.prompt or "", opts.default or "", a and a.v and ("%q"):format(a.v) or "cancel"))
+  T.out(
+    string.format(
+      "input: %s [default %q] -> %s",
+      opts.prompt or "",
+      opts.default or "",
+      a and a.v and ("%q"):format(a.v) or "cancel"
+    )
+  )
   cb(a and a.v or nil)
 end
 

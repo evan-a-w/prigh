@@ -542,7 +542,12 @@ function C:_action(name)
       self:send()
     end,
     complete_file = function()
-      return "@<C-x><C-u>"
+      local col = vim.api.nvim_win_get_cursor(0)[2]
+      local prev = vim.api.nvim_get_current_line():sub(col, col)
+      if col == 0 or prev:match("%s") then
+        return "@<C-x><C-u>"
+      end
+      return "@"
     end,
     complete_command = function()
       local col = vim.api.nvim_win_get_cursor(0)[2]
@@ -560,7 +565,12 @@ function C:_keymaps()
   local function set(buf, keys)
     for _, k in ipairs(keys) do
       local expr = k[3] == "complete_file" or k[3] == "complete_command"
-      vim.keymap.set(k[1], k[2], self:_action(k[3]), { buffer = buf, nowait = true, expr = expr, desc = "prigh: " .. k[4] })
+      vim.keymap.set(
+        k[1],
+        k[2],
+        self:_action(k[3]),
+        { buffer = buf, nowait = true, expr = expr, desc = "prigh: " .. k[4] }
+      )
     end
   end
   set(self.buf, M.chat_keys)

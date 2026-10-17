@@ -35,7 +35,10 @@ function M.segments(agent)
   end
   local s = agent and agent.session
   if not agent or agent.conn_state ~= "ready" then
-    add(agent and agent.conn_state or "stopped", agent and agent.conn_state == "exited" and "PrighError" or "PrighMuted")
+    add(
+      agent and agent.conn_state or "stopped",
+      agent and agent.conn_state == "exited" and "PrighError" or "PrighMuted"
+    )
   end
   if not s then
     return segs

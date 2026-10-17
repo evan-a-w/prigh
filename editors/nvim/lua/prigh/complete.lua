@@ -13,7 +13,8 @@ function M.files(cwd)
   end
   local files = {}
   local ok, res = pcall(function()
-    return vim.system({ "git", "ls-files", "--cached", "--others", "--exclude-standard" }, { cwd = cwd, text = true })
+    return vim
+      .system({ "git", "ls-files", "--cached", "--others", "--exclude-standard" }, { cwd = cwd, text = true })
       :wait(3000)
   end)
   if ok and res.code == 0 then
@@ -79,7 +80,10 @@ function M.items(kind, base, ctx)
       if c.input and c.input.hint then
         info = info .. "\n\nargument: " .. c.input.hint
       end
-      table.insert(out, { word = n .. (c.input and " " or ""), abbr = "/" .. n, menu = oneline(c.description, 50), info = info })
+      table.insert(
+        out,
+        { word = n .. (c.input and " " or ""), abbr = "/" .. n, menu = oneline(c.description, 50), info = info }
+      )
     end
   end
   return out
@@ -90,7 +94,7 @@ end
 function M.context(line, col, lnum)
   local before = line:sub(1, col)
   local s = before:match("()@[^%s@]*$")
-  if s then
+  if s and (s == 1 or before:sub(s - 1, s - 1):match("%s")) then
     return "file", s, before:sub(s + 1)
   end
   if lnum == 1 then
