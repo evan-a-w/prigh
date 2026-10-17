@@ -1899,9 +1899,8 @@ let rec start_run ?(tried = String.Set.empty) ?(then_ = fun () -> []) t prompts 
            else None)
     in
     (* A hand-over, a queued message, a goal's continuation or a reminder
-       carries on:
-       the run's next state says [running] again, with no idle moment in
-       between (in which the server would evict a session without
+       carries on: the run's next state says [running] again, with no idle
+       moment in between (in which the server would evict a session without
        clients). *)
     finish ~idle:(Option.is_none next);
     Option.iter next ~f:(function
