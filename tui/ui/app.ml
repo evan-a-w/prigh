@@ -389,7 +389,9 @@ let maybe_open_pending m =
       { m with
         mode =
           Question
-            { call_id = q.call_id; form = Question_form.create q.questions }
+            { call_id = q.call_id
+            ; form = Question_form.create ?deadline:q.deadline q.questions
+            }
       ; autocomplete = None
       ; pending_questions = rest
       }
@@ -3677,7 +3679,7 @@ let event m (e : P.Event.t) =
        , [] )
      | _ -> m, [])
   | Ask_user a -> add_pending_questions m [ a ], []
-  | Ask_user_done call_id ->
+  | Ask_user_done { call_id; timed_out } ->
     let m =
       { m with
         pending_questions =
@@ -3687,7 +3689,10 @@ let event m (e : P.Event.t) =
     in
     (match m.mode with
      | Question { call_id = shown; _ } when String.equal shown call_id ->
-       notice { m with mode = Editing } "question answered elsewhere", []
+       (* On a timeout the backend's notice says so. *)
+       if timed_out
+       then { m with mode = Editing }, []
+       else notice { m with mode = Editing } "question answered elsewhere", []
      | _ -> m, [])
   | Btw_delta { btw_id; delta } ->
     update_btw m btw_id ~f:(fun box -> Btw_box.add_delta box delta), []

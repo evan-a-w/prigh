@@ -62,7 +62,7 @@ let own form (q : Question.t) ~question ~inject =
     ]
 ;;
 
-let view (questions : Question_dialog.t list) ~inject =
+let view (questions : Question_dialog.t list) ~utc_offset ~inject =
   let inject (a : Question_dialog.Action.t) = inject a in
   match questions with
   | [] -> Node.none
@@ -112,5 +112,9 @@ let view (questions : Question_dialog.t list) ~inject =
              ~attrs:[ Attr.role (if q.multiple then "group" else "radiogroup") ]
              (List.mapi choices ~f:(choice form q ~question ~inject)))
       ; own form q ~question ~inject
+      ; (match Form.deadline_note form ~utc_offset with
+         | None -> Node.none
+         | Some note ->
+           Node.p ~attrs:[ Attr.class_ "question-deadline" ] [ Node.text note ])
       ]
 ;;

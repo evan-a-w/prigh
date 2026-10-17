@@ -77,7 +77,7 @@ let with_agent
         "  -> %s\n"
         (Sexp.to_string [%sexp (answer : Agent.Confirm_answer.t)]);
       Or_error.ok_exn (Agent.respond_confirm ?agent_id agent ~call_id answer)
-    | Loop (Ask_user { call_id; questions }) ->
+    | Loop (Ask_user { call_id; questions; deadline = _ }) ->
       printf "ask_user %s:\n" call_id;
       List.iter questions ~f:(fun q -> print_s [%sexp (q : User_question.t)]);
       print_s
@@ -895,6 +895,7 @@ let%expect_test
       "max_budget_usd": null,
       "goal_max_continuations": 20,
       "resume_on_limit_reset": true,
+      "ask_user_timeout_seconds": 600,
       "archive_after_days": 7,
       "notify": "bell",
       "auto_background_seconds": 30

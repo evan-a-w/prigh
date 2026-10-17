@@ -229,11 +229,12 @@ fallback backend exited
   event tool_start bash
   event tool_confirm bash echo e2e-ran
 <- get_pending: (Ok
- ((steer_texts ()) (follow_up_texts ())
-  (confirms
-   (((call_id c1) (agent_id ()) (name bash) (summary "echo e2e-ran")
-     (rules ("bash(echo:*)")))))
-  (questions ())))
+ (((steer_texts ()) (follow_up_texts ())
+   (confirms
+    (((call_id c1) (agent_id ()) (name bash) (summary "echo e2e-ran")
+      (rules ("bash(echo:*)")))))
+   (questions ()))
+  ()))
 <- tool_confirm_respond: ()
   event state running=true model=deepseek/deepseek-flash
   event tool_confirm_done c1
@@ -246,13 +247,16 @@ fallback backend exited
   event tool_start ask_user
   event ask_user q1 (1 questions)
 <- get_pending: (Ok
- ((steer_texts ()) (follow_up_texts ()) (confirms ())
-  (questions
-   (((call_id q1)
-     (questions
-      (((question Which?) (header ())
-        (choices (((label x) (description ())) ((label y) (description ()))))
-        (multiple false)))))))))
+ (((steer_texts ()) (follow_up_texts ()) (confirms ())
+   (questions
+    (((call_id q1)
+      (questions
+       (((question Which?) (header ())
+         (choices
+          (((label x) (description ())) ((label y) (description ()))))
+         (multiple false))))
+      (deadline ())))))
+  ((q1 ("in 10m")))))
 <- ask_user_respond: ()
   event ask_user_done q1
   event tool_end ask_user

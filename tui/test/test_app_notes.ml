@@ -667,6 +667,7 @@ let%expect_test
              ; multiple = false
              }
            ]
+       ; deadline = None
        });
   H.step ~quiet:true h (Key (Key.plain Escape));
   H.event

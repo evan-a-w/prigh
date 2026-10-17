@@ -406,12 +406,13 @@ scenario_plan() {
 	capture plan "approved and implemented"
 }
 
-# The model asks: a dialog per question, answered with the keys.
+# The model asks: a dialog per question, answered with the keys. Without a
+# deadline (timeout_seconds 0): its time would differ between runs.
 setup_question() {
 	extra_args="-- -faux-script $tmp/script.json"
 	cat >"$tmp/script.json" <<'JSON'
 [
-  {"text": "asking", "tool_calls": [{"id": "q1", "name": "ask_user", "arguments": {"questions": [{"question": "Which database?", "header": "Storage", "options": [{"label": "Postgres", "description": "what prod uses"}, {"label": "SQLite"}]}, {"question": "Anything else?"}]}}]},
+  {"text": "asking", "tool_calls": [{"id": "q1", "name": "ask_user", "arguments": {"questions": [{"question": "Which database?", "header": "Storage", "options": [{"label": "Postgres", "description": "what prod uses"}, {"label": "SQLite"}]}, {"question": "Anything else?"}], "timeout_seconds": 0}}]},
   {"text": "thanks"}
 ]
 JSON

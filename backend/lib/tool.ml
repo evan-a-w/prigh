@@ -22,7 +22,11 @@ and context =
   ; halt : unit -> string option
   ; stdin : Stdin_feed.t option
   ; approve : approver
-  ; ask_user : call_id:string -> User_question.t list -> User_question.Reply.t
+  ; ask_user :
+      call_id:string
+      -> timeout_seconds:int option
+      -> User_question.t list
+      -> User_question.Reply.t
   }
 
 and executor = context -> t -> Json.t -> Tool_result.t
@@ -62,7 +66,8 @@ module Context = struct
         ?stdin
         ?(approve = fun _ _ _ -> None)
         ?(ask_user =
-          fun ~call_id:_ _ -> User_question.Reply.Unavailable "no user to ask")
+          fun ~call_id:_ ~timeout_seconds:_ _ ->
+            User_question.Reply.Unavailable "no user to ask")
         ~env
         ~cwd
         ()
