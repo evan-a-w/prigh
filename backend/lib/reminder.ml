@@ -5,118 +5,48 @@ module Trigger = struct
   type t =
     | On_stop of { max_repeats : int }
     | Every_turns of int
-  [@@deriving sexp_of, equal]
+  [@@deriving sexp, jsonaf, equal]
 end
 
 type t =
-  { name : string option
+  { name : string
   ; text : string
   ; trigger : Trigger.t
   }
-[@@deriving sexp_of, equal]
+[@@deriving sexp, jsonaf, equal]
 
 let default_max_repeats = 3
-let keys = [ "name"; "text"; "on"; "every_turns"; "max_repeats" ]
 
-let of_json (json : Json.t) =
-  let open Or_error.Let_syntax in
-  match json with
-  | `Object fields ->
-    let find name = List.Assoc.find fields ~equal:String.equal name in
-    let%bind () =
-      match
-        List.find fields ~f:(fun (key, _) ->
-          not (List.mem keys key ~equal:String.equal))
-      with
-      | None -> Ok ()
-      | Some (key, _) ->
-        (match Edit_distance.closest ~n:1 keys key with
-         | [ close ] when Edit_distance.caseless close key <= 3 ->
-           Or_error.errorf "unknown key %S; did you mean %S?" key close
-         | _ ->
-           Or_error.errorf
-             "unknown key %S (known: %s)"
-             key
-             (String.concat ~sep:", " keys))
-    in
-    let positive name =
-      match find name with
-      | None | Some `Null -> Ok None
-      | Some (`Number n) ->
-        (match Int.of_string_opt n with
-         | Some n when n >= 1 -> Ok (Some n)
-         | Some _ | None ->
-           Or_error.errorf "%S must be a whole number, 1 or more" name)
-      | Some _ -> Or_error.errorf "%S must be a whole number, 1 or more" name
-    in
-    let%bind name =
-      match find "name" with
-      | None | Some `Null | Some (`String "") -> Ok None
-      | Some (`String s) -> Ok (Some s)
-      | Some _ -> Or_error.error_string "\"name\" must be a string"
-    in
-    let%bind text =
-      match find "text" with
-      | Some (`String s) when not (String.is_empty (String.strip s)) -> Ok s
-      | _ ->
-        Or_error.error_string
-          "\"text\" must be a non-empty string: what to remind the agent of"
-    in
-    let%bind every_turns = positive "every_turns" in
-    let%bind max_repeats = positive "max_repeats" in
-    let%bind on_stop =
-      match find "on" with
-      | None | Some `Null -> Ok false
-      | Some (`String "stop") -> Ok true
-      | Some _ -> Or_error.error_string "\"on\" must be \"stop\""
-    in
-    let%map trigger =
-      match on_stop, every_turns, max_repeats with
-      | true, None, max_repeats ->
-        Ok
-          (Trigger.On_stop
-             { max_repeats =
-                 Option.value max_repeats ~default:default_max_repeats
-             })
-      | false, Some n, None -> Ok (Trigger.Every_turns n)
-      | false, Some _, Some _ ->
-        Or_error.error_string
-          "\"max_repeats\" only goes with \"on\": \"stop\", not with \
-           \"every_turns\""
-      | true, Some _, _ ->
-        Or_error.error_string
-          "has both \"on\": \"stop\" and \"every_turns\"; keep one"
-      | false, None, _ ->
-        Or_error.error_string
-          "needs \"on\": \"stop\" (when the agent ends its turn) or \
-           \"every_turns\": N"
-    in
-    { name; text; trigger }
-  | _ ->
-    Or_error.error_string
-      "must be an object such as {\"text\": \"...\", \"on\": \"stop\"}"
+let number name =
+  match String.chop_prefix name ~prefix:"r" with
+  | Some n -> Option.value (Int.of_string_opt n) ~default:0
+  | None -> 0
 ;;
 
-let to_json t : Json.t =
-  let number n = `Number (Int.to_string n) in
-  `Object
-    (List.concat
-       [ Option.value_map t.name ~default:[] ~f:(fun n -> [ "name", `String n ])
-       ; [ "text", `String t.text ]
-       ; (match t.trigger with
-          | On_stop { max_repeats } ->
-            [ "on", `String "stop"; "max_repeats", number max_repeats ]
-          | Every_turns n -> [ "every_turns", number n ])
-       ])
+let create ~taken ~text (trigger : Trigger.t) =
+  let text = String.strip text in
+  match trigger with
+  | _ when String.is_empty text ->
+    Or_error.error_string
+      "say what to remind the agent of, e.g. /remind stop run the tests before \
+       you stop"
+  | On_stop { max_repeats } when max_repeats < 1 ->
+    Or_error.error_string
+      "the number of repeats must be 1 or more, e.g. /remind stop 5 TEXT"
+  | Every_turns n when n < 1 ->
+    Or_error.error_string
+      "the number of turns must be 1 or more, e.g. /remind every 20 TEXT"
+  | On_stop _ | Every_turns _ ->
+    let last =
+      List.fold taken ~init:0 ~f:(fun acc name -> Int.max acc (number name))
+    in
+    Ok { name = sprintf "r%d" (last + 1); text; trigger }
 ;;
 
 let label t =
-  match t.name with
-  | Some name -> name
-  | None ->
-    (match String.split_lines (String.strip t.text) with
-     | line :: _ -> line
-     | [] -> "")
+  match String.split_lines t.text with
+  | line :: _ -> sprintf "%s: %s" t.name line
+  | [] -> t.name
 ;;
 
 let message_text t ~repeat =
@@ -130,8 +60,7 @@ let message_text t ~repeat =
         (Option.value repeat ~default:1)
         max_repeats
   in
-  let name = Option.value_map t.name ~default:"" ~f:(fun n -> ": " ^ n) in
-  sprintf "[prigh reminder%s, %s] %s" name when_ t.text
+  sprintf "[prigh reminder: %s, %s] %s" t.name when_ t.text
 ;;
 
 module Tracker = struct
@@ -139,12 +68,12 @@ module Tracker = struct
 
   type t =
     { mutable turns : int
-    ; last_fired : int Int.Table.t
-      (** the turn each periodic reminder, by its index, last fired at *)
+    ; last_fired : int String.Table.t
+      (** the turn each periodic reminder, by name, last fired at *)
     ; mutable stops : int (** eligible stops since the user last spoke *)
     }
 
-  let create () = { turns = 0; last_fired = Int.Table.create (); stops = 0 }
+  let create () = { turns = 0; last_fired = String.Table.create (); stops = 0 }
 
   let reset t =
     t.turns <- 0;
@@ -154,18 +83,21 @@ module Tracker = struct
 
   let user_spoke t = t.stops <- 0
   let turn_ended t = t.turns <- t.turns + 1
+  let stops t = t.stops
 
   let due t (reminders : reminder list) =
-    List.filter_mapi reminders ~f:(fun i r ->
+    List.filter reminders ~f:(fun r ->
       match r.trigger with
-      | On_stop _ -> None
+      | On_stop _ -> false
       | Every_turns n ->
-        let last = Option.value (Hashtbl.find t.last_fired i) ~default:0 in
-        if t.turns - last >= n
-        then (
-          Hashtbl.set t.last_fired ~key:i ~data:t.turns;
-          Some r)
-        else None)
+        (match Hashtbl.find t.last_fired r.name with
+         | None ->
+           Hashtbl.set t.last_fired ~key:r.name ~data:t.turns;
+           false
+         | Some last when t.turns - last >= n ->
+           Hashtbl.set t.last_fired ~key:r.name ~data:t.turns;
+           true
+         | Some _ -> false))
   ;;
 
   module Stop = struct

@@ -44,6 +44,8 @@ module Entry : sig
           }
       | System_prompt of { text : string }
       | Goal of { goal : Goal.t option } (** [None]: cleared *)
+      | Reminders of { reminders : Reminder.t list }
+      (** the session's reminders from here on, all of them *)
       | Budget of { usd : float option }
       (** the session's cost budget; [None]: none, overriding the default *)
       | Approval of
@@ -166,6 +168,14 @@ val set_system_prompt : t -> text:string -> Entry.t
 val goal : t -> Goal.t option
 
 val set_goal : t -> Goal.t option -> Entry.t
+
+(** The last [reminders] entry on the active path. *)
+val reminders : t -> Reminder.t list
+
+val set_reminders : t -> Reminder.t list -> Entry.t
+
+(** Every reminder name in the file, on any branch, also those removed. *)
+val reminder_names : t -> string list
 
 (** The last [budget] entry on the active path: [None] when there is none
     (the default applies), [Some None] when it was turned off. *)

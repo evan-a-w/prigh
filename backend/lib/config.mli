@@ -35,9 +35,6 @@ type t =
         [-max-budget-usd] overrides it *)
   ; goal_max_continuations : int
     (** automatic continuations a [/goal] gets before it stops *)
-  ; reminders : Reminder.t list
-    (** [reminders]: sent to the main agent when it stops or every so many
-        turns; edited by hand *)
   ; resume_on_limit_reset : bool
     (** resume a run stopped by a usage limit when the limit resets *)
   ; ask_user_timeout_seconds : float
@@ -80,9 +77,9 @@ val load : home:string -> t Or_error.t
 val problems : home:string -> string list
 
 (** Writes [~/.prigh/config.json], creating parent directories, as pretty
-    JSON. Fields it does not own (such as [providers]) are kept, and so are
-    [permissions] and [reminders], which are edited by hand; [confirm_tools]
-    is dropped in favour of [approval_mode]. *)
+    JSON. Fields it does not own (such as [providers]) are kept, and so is
+    [permissions], which is edited by hand; [confirm_tools] is dropped in
+    favour of [approval_mode]. *)
 val save : home:string -> t -> unit Or_error.t
 
 (** The file's top-level fields ([[]] when it is missing), for the parts of
