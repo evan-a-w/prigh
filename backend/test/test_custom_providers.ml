@@ -322,6 +322,7 @@ let%expect_test
       "resume_on_limit_reset": true,
       "archive_after_days": 7,
       "notify": "bell",
+      "snippets": [],
       "auto_background_seconds": 30
     }
     (((name aiproxy) (base_url http://localhost:11434/v1) (api Responses)

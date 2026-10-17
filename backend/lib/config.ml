@@ -37,6 +37,7 @@ type t =
   ; resume_on_limit_reset : bool
   ; archive_after_days : float
   ; notify : Notify.t
+  ; snippets : Snippet.t list
   ; auto_background_seconds : float
   }
 [@@deriving sexp_of]
@@ -54,6 +55,7 @@ let default =
   ; resume_on_limit_reset = true
   ; archive_after_days = 7.
   ; notify = Bell
+  ; snippets = []
   ; auto_background_seconds = 30.
   }
 ;;
@@ -93,6 +95,7 @@ let to_json t =
       , if t.resume_on_limit_reset then `True else `False )
     ; "archive_after_days", `Number (sprintf "%g" t.archive_after_days)
     ; "notify", `String (Notify.to_string t.notify)
+    ; "snippets", `Array (List.map t.snippets ~f:Snippet.to_json)
     ; ( "auto_background_seconds"
       , `Number (sprintf "%g" t.auto_background_seconds) )
     ]
@@ -212,6 +215,9 @@ let of_json json =
       | Some _ ->
         Or_error.error_string "config.resume_on_limit_reset must be a boolean"
     in
+    let%bind snippets =
+      Snippet.list_of_json (Option.value (find "snippets") ~default:`Null)
+    in
     let%bind notify =
       match find "notify" with
       | None | Some `Null -> Ok default.notify
@@ -241,6 +247,7 @@ let of_json json =
     ; resume_on_limit_reset
     ; archive_after_days
     ; notify
+    ; snippets
     ; auto_background_seconds
     }
   | _ -> Or_error.error_string "config must be a JSON object"
