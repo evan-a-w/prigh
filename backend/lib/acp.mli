@@ -16,7 +16,7 @@ open! Import
     calls (kind, title, locations, text output, diffs of edits), [plan],
     [available_commands_update], [current_mode_update],
     [config_option_update], [usage_update], [session_info_update] and, when
-    the client has [session.notices], [notice]. Requests to the client:
+    the client has [session.notices] (and not [_prigh/notice]), [notice]. Requests to the client:
     [session/request_permission] for tool confirmations (and single-choice
     questions), [elicitation/create] forms for [ask_user] when the client
     has [elicitation.form], [fs/read_text_file] and [fs/write_text_file] for
@@ -27,7 +27,7 @@ open! Import
     (and the result's [_meta.prigh]) as [{"version": 1, "extensions":
     ["_prigh/state", "_prigh/notice"]}]: the notifications [_prigh/state]
     (prigh's status line, sent when it changes) and [_prigh/notice] (prigh's
-    notices). *)
+    notices), both only to clients with [clientCapabilities._meta.prigh.state]. *)
 
 module Tool_host_config : sig
   type t =
