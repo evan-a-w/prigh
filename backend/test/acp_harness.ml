@@ -17,6 +17,7 @@ end
 
 type t =
   { sandbox : Tool_test_helpers.t
+  ; server : Rpc_server.t
   ; input : string option Eio.Stream.t
   ; log : string Queue.t
   ; responses : Json.t Int.Table.t
@@ -307,7 +308,13 @@ let run ?(initialized = true) ?caps ?config replies f =
         Faux_provider.create
           ~on_request:(fun r ->
             match List.last r.messages with
-            | Some (Message.User u) -> Queue.enqueue prompts u.text
+            | Some (Message.User u) ->
+              Queue.enqueue
+                prompts
+                (match u.images with
+                 | [] -> u.text
+                 | images ->
+                   sprintf "%s\n(%d image(s))" u.text (List.length images))
             | _ -> ())
           (List.map replies ~f:reply_of_json)
       in
@@ -347,6 +354,7 @@ let run ?(initialized = true) ?caps ?config replies f =
       in
       let t =
         { sandbox
+        ; server
         ; input = Eio.Stream.create 1000
         ; log = Queue.create ()
         ; responses = Int.Table.create ()
@@ -360,6 +368,7 @@ let run ?(initialized = true) ?caps ?config replies f =
       let finished, resolve = Eio.Promise.create () in
       Eio.Fiber.fork ~sw (fun () ->
         Acp.serve
+          ~log:(fun line -> Queue.enqueue t.log (mask_line t ("log: " ^ line)))
           ~env:sandbox.env
           { connector = Rpc_client.Connector.in_process server
           ; token = None
@@ -387,4 +396,20 @@ let print_prompts t =
   Queue.iter t.prompts ~f:(fun p ->
     print_endline (mask t.sandbox ("model got: " ^ p)));
   Queue.clear t.prompts
+;;
+
+(* Another prigh client (a TUI, say) attached to the current session. *)
+let other_client t =
+  let client = Rpc_server.connect t.server ~send:ignore in
+  let call method_ params =
+    ignore
+      (Rpc_server.handle
+         t.server
+         client
+         (Json.of_string
+            (sprintf {|{"id": "o", "method": %S, "params": %s}|} method_ params))
+       : Json.t)
+  in
+  call "hello" (sprintf {|{"session": %S, "name": "tui"}|} t.session);
+  call
 ;;

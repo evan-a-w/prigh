@@ -48,9 +48,11 @@ module Config : sig
     }
 end
 
-(** Serves until [read_line] returns [None]. *)
+(** Serves until [read_line] returns [None]. [log] gets what goes wrong
+    that the client is not told (default: stderr). *)
 val serve
-  :  env:Env.t
+  :  ?log:(string -> unit)
+  -> env:Env.t
   -> Config.t
   -> read_line:(unit -> string option)
   -> write_line:(string -> unit)

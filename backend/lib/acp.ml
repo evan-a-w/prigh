@@ -157,6 +157,8 @@ module Session = struct
     ; open_requests : Json.t String.Table.t
       (** our permission and question requests not answered yet *)
     ; mutable closed : bool
+    ; mutable own_prompt : bool
+      (** the prompt we sent has not started yet: its message is not echoed *)
     }
 
   let running t = is_true "running" t.state
@@ -181,9 +183,10 @@ type t =
   ; mutable host : Host.t option
   ; mutable control : Rpc_client.t option
   ; mutable models : Json.t list option
+  ; log : string -> unit
   }
 
-let log fmt = ksprintf (fun s -> eprintf "prigh acp: %s\n%!" s) fmt
+let log t fmt = ksprintf t.log fmt
 
 let update t (s : Session.t) fields =
   if not s.closed
@@ -257,6 +260,7 @@ let diff_files t (s : Session.t) ~call_id =
         | Ok result -> string_field "content" result
         | Error e ->
           log
+            t
             "fs/read_text_file %s failed (%s): reading the disk"
             path
             e.message;
@@ -315,7 +319,8 @@ let host t =
          ~on_event:(fun json ->
            Option.iter !worker ~f:(fun w ->
              Tool_host.Worker.handle_event w json))
-         ~on_close:(fun reason -> log "tool host connection closed: %s" reason)
+         ~on_close:(fun reason ->
+           log t "tool host connection closed: %s" reason)
          [ "name", str config.name
          ; "cwd", str config.cwd
          ; "tools", `True
@@ -345,7 +350,8 @@ let host t =
                 if
                   not
                     (String.is_substring message ~substring:"no tool execution")
-                then log "%s failed: %s" (Tool_host.Reply.method_ reply) message)
+                then
+                  log t "%s failed: %s" (Tool_host.Reply.method_ reply) message)
             ()
         in
         worker := Some w;
@@ -773,9 +779,9 @@ let selected_option = function
   | Error (_ : Error.t) -> None
 ;;
 
-let report_failure what = function
+let report_failure t what = function
   | Ok (_ : Json.t) -> ()
-  | Error e -> log "%s failed: %s" what (Core.Error.to_string_hum e)
+  | Error e -> log t "%s failed: %s" what (Core.Error.to_string_hum e)
 ;;
 
 let confirm t (s : Session.t) json =
@@ -847,7 +853,7 @@ let confirm t (s : Session.t) json =
       ([ "call_id", str call_id; "allow", bool allow; "always", bool always ]
        @ Option.value_map agent_id ~default:[] ~f:(fun id ->
          [ "agent_id", str id ]))
-    |> report_failure "tool_confirm_respond"
+    |> report_failure t "tool_confirm_respond"
 ;;
 
 let question t (s : Session.t) json =
@@ -855,7 +861,7 @@ let question t (s : Session.t) json =
   let key = "ask:" ^ call_id in
   let respond params =
     call s "ask_user_respond" (("call_id", str call_id) :: params)
-    |> report_failure "ask_user_respond"
+    |> report_failure t "ask_user_respond"
   in
   let decline = [ "decline", `True ] in
   match Acp_question.of_event (field "questions" json) with
@@ -959,6 +965,25 @@ let question t (s : Session.t) json =
 (* ---------------------------------------------------------------------- *)
 (* Session events                                                          *)
 
+let is_injected message =
+  match field "source" (field "origin" message) with
+  | `Object _ -> true
+  | _ -> false
+;;
+
+(* What a user message shows: what was typed (without the attachments), or
+   what prigh injected. *)
+let user_text message =
+  let origin = field "origin" message in
+  match field "source" origin, opt_string "body" origin with
+  | (`Object _ as source), _ -> Some (string_field "title" source)
+  | _, Some body -> Some body
+  | _, None ->
+    (match origin with
+     | `Object _ -> None
+     | _ -> Some (string_field "text" message))
+;;
+
 let finish_turn (s : Session.t) = Option.iter s.turn ~f:Turn.finish
 
 let handle_event t (s : Session.t) json =
@@ -978,6 +1003,18 @@ let handle_event t (s : Session.t) json =
             ~name:(string_field "name" delta)
           : Tool_view.t)
      | _ -> ())
+  | "message_start" ->
+    let message = field "message" json in
+    if String.equal (string_field "role" message) "user"
+    then
+      if s.own_prompt && not (is_injected message)
+      then s.own_prompt <- false
+      else
+        (* From another frontend, or prigh's (a reminder, a goal's
+           continuation). *)
+        Option.iter
+          (user_text message)
+          ~f:(message_chunk t s ~kind:"user_message_chunk")
   | "message_end" ->
     let message = field "message" json in
     if String.equal (string_field "role" message) "assistant"
@@ -1049,7 +1086,7 @@ let handle_event t (s : Session.t) json =
         ; "severity", str "info"
         ; "title", str text
         ]
-    else log "notice: %s" text
+    else log t "notice: %s" text
   | "$started" ->
     Option.iter s.turn ~f:(fun turn ->
       if not turn.running_seen then Turn.finish turn)
@@ -1070,6 +1107,7 @@ let run_events t (s : Session.t) =
          | Eio.Cancel.Cancelled _ as exn -> raise exn
          | exn ->
            log
+             t
              "handling %s failed: %s"
              (Json.to_string json)
              (Exn.to_string exn));
@@ -1084,17 +1122,9 @@ let replay t (s : Session.t) messages =
   List.iter messages ~f:(fun message ->
     match string_field "role" message with
     | "user" ->
-      let origin = field "origin" message in
-      let text =
-        match field "source" origin, opt_string "body" origin with
-        | (`Object _ as source), _ -> Some (string_field "title" source)
-        | _, Some body -> Some body
-        | _, None ->
-          (match origin with
-           | `Object _ -> None
-           | _ -> Some (string_field "text" message))
-      in
-      Option.iter text ~f:(message_chunk t s ~kind:"user_message_chunk")
+      Option.iter
+        (user_text message)
+        ~f:(message_chunk t s ~kind:"user_message_chunk")
     | "assistant" ->
       List.iter (list_field "content" message) ~f:(fun block ->
         match string_field "type" block with
@@ -1185,7 +1215,7 @@ let attach t ?id ~cwd () =
        t
        ~on_event:push
        ~on_close:(fun reason ->
-         log "connection closed: %s" reason;
+         log t "connection closed: %s" reason;
          push (`Object [ "event", str "$closed"; "reason", str reason ]))
        ([ "name", str (client_label t); "cwd", str cwd ]
         @ Option.value_map id ~default:[] ~f:(fun id -> [ "session", str id ])))
@@ -1214,6 +1244,7 @@ let attach t ?id ~cwd () =
         ; turn = None
         ; open_requests = String.Table.create ()
         ; closed = false
+        ; own_prompt = false
         }
       in
       Hashtbl.set t.sessions ~key:id ~data:s;
@@ -1290,10 +1321,11 @@ let cwd_param params =
   | _ -> Error (Error.invalid_params "missing cwd (an absolute path)")
 ;;
 
-let warn_mcp params =
+let warn_mcp t params =
   match Json.member "mcpServers" params with
   | Some (`Array (_ :: _ as servers)) ->
     log
+      t
       "ignoring %d MCP server(s) from the client: prigh reads them from its \
        own config (see prigh's README, MCP servers)"
       (List.length servers)
@@ -1309,7 +1341,7 @@ let or_internal = function
 
 let new_session t params =
   let* cwd = cwd_param params in
-  warn_mcp params;
+  warn_mcp t params;
   refresh_models t;
   let* s =
     or_internal
@@ -1356,7 +1388,7 @@ let open_session t params ~replay:with_history =
     | _ -> Error (Error.invalid_params "missing sessionId (a string)")
   in
   let* cwd = cwd_param params in
-  warn_mcp params;
+  warn_mcp t params;
   refresh_models t;
   let not_found e =
     let message = Core.Error.to_string_hum e in
@@ -1386,7 +1418,7 @@ let open_session t params ~replay:with_history =
     match call s "get_messages" [] with
     | Ok (`Array messages) -> replay t s messages
     | Ok _ -> ()
-    | Error e -> log "get_messages failed: %s" (Core.Error.to_string_hum e));
+    | Error e -> log t "get_messages failed: %s" (Core.Error.to_string_hum e));
   Ok (Reply.Result_then (session_result t s [], fun () -> start_session t s))
 ;;
 
@@ -1477,6 +1509,7 @@ let run_turn (s : Session.t) start =
 ;;
 
 let send_prompt (s : Session.t) (p : Acp_prompt.t) =
+  s.own_prompt <- true;
   let params =
     [ "text", str p.text ]
     @ (if List.is_empty p.attachments
@@ -1484,14 +1517,18 @@ let send_prompt (s : Session.t) (p : Acp_prompt.t) =
        else [ "attachments", `Array (List.map p.attachments ~f:str) ])
     @ if List.is_empty p.images then [] else [ "images", `Array p.images ]
   in
-  match call s "prompt" params with
-  | Error e
-    when String.is_substring
-           (Core.Error.to_string_hum e)
-           ~substring:"a run is already in progress" ->
-    (* Started from elsewhere (the TUI): ours runs after it. *)
-    call s "follow_up" params
-  | result -> result
+  let result =
+    match call s "prompt" params with
+    | Error e
+      when String.is_substring
+             (Core.Error.to_string_hum e)
+             ~substring:"a run is already in progress" ->
+      (* Started from elsewhere (the TUI): ours runs after it. *)
+      call s "follow_up" params
+    | result -> result
+  in
+  if Result.is_error result then s.own_prompt <- false;
+  result
 ;;
 
 let prompt t params =
@@ -1537,10 +1574,10 @@ let prompt t params =
 
 let cancel t params =
   match session_param t params with
-  | Error e -> log "session/cancel: %s" e.message
+  | Error e -> log t "session/cancel: %s" e.message
   | Ok s ->
     Option.iter s.turn ~f:(fun turn -> turn.cancelled <- true);
-    call s "abort" [] |> report_failure "abort"
+    call s "abort" [] |> report_failure t "abort"
 ;;
 
 (* ---------------------------------------------------------------------- *)
@@ -1759,7 +1796,7 @@ let on_notification t ~method_ ~params =
   match method_ with
   | "session/cancel" -> cancel t params
   | "$/cancel_request" -> ()
-  | method_ -> log "ignoring the notification %s" method_
+  | method_ -> log t "ignoring the notification %s" method_
 ;;
 
 let shutdown t =
@@ -1773,7 +1810,13 @@ let shutdown t =
   t.control <- None
 ;;
 
-let serve ~env config ~read_line ~write_line =
+let serve
+      ?(log = fun s -> eprintf "prigh acp: %s\n%!" s)
+      ~env
+      config
+      ~read_line
+      ~write_line
+  =
   try
     Switch.run (fun sw ->
       let rpc = Json_rpc.create ~sw ~write_line in
@@ -1788,6 +1831,7 @@ let serve ~env config ~read_line ~write_line =
         ; host = None
         ; control = None
         ; models = None
+        ; log
         }
       in
       Json_rpc.serve
