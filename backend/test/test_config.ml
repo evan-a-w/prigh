@@ -16,7 +16,7 @@ let%expect_test "a missing file yields the default" =
       (default_thinking ()) (fallback_models ()) (default_cwd ())
       (max_budget_usd ()) (goal_max_continuations 20)
       (resume_on_limit_reset true) (archive_after_days 7) (notify Bell)
-      (auto_background_seconds 30)))
+      (snippets ()) (auto_background_seconds 30)))
     |}]
 ;;
 
@@ -36,6 +36,8 @@ let%expect_test "save then load round trips" =
     ; resume_on_limit_reset = true
     ; archive_after_days = 7.
     ; notify = Bell
+    ; snippets =
+        [ { name = "review"; text = "Review the diff for bugs.\nBe brief." } ]
     ; auto_background_seconds = 30.
     }
   in
@@ -60,6 +62,12 @@ let%expect_test "save then load round trips" =
       "resume_on_limit_reset": true,
       "archive_after_days": 7,
       "notify": "bell",
+      "snippets": [
+        {
+          "name": "review",
+          "text": "Review the diff for bugs.\nBe brief."
+        }
+      ],
       "auto_background_seconds": 30
     }
     (Ok
@@ -68,7 +76,11 @@ let%expect_test "save then load round trips" =
       (default_model (anthropic/claude-fable-5)) (default_thinking ((On (High))))
       (fallback_models ()) (default_cwd ()) (max_budget_usd ())
       (goal_max_continuations 20) (resume_on_limit_reset true)
-      (archive_after_days 7) (notify Bell) (auto_background_seconds 30)))
+      (archive_after_days 7) (notify Bell)
+      (snippets
+       (((name review) (text  "Review the diff for bugs.\
+                             \nBe brief."))))
+      (auto_background_seconds 30)))
     |}]
 ;;
 
@@ -88,7 +100,7 @@ let%expect_test "unknown fields are ignored" =
       (default_thinking ()) (fallback_models ()) (default_cwd ())
       (max_budget_usd ()) (goal_max_continuations 20)
       (resume_on_limit_reset true) (archive_after_days 7) (notify Bell)
-      (auto_background_seconds 30)))
+      (snippets ()) (auto_background_seconds 30)))
     |}]
 ;;
 
@@ -141,7 +153,7 @@ let%expect_test
     {|
     config.confirm_tools must be a boolean (in $DIR/.prigh/config.json); prigh ignores the file's settings until it is fixed
     unknown setting "providrs" in $DIR/.prigh/config.json is ignored; did you mean "providers"?
-    unknown setting "colour" in $DIR/.prigh/config.json is ignored (known: providers, confirm_tools, scoped_models, approval_mode, permissions, default_model, default_thinking, fallback_models, default_cwd, max_budget_usd, goal_max_continuations, resume_on_limit_reset, archive_after_days, notify, auto_background_seconds)
+    unknown setting "colour" in $DIR/.prigh/config.json is ignored (known: providers, confirm_tools, scoped_models, approval_mode, permissions, default_model, default_thinking, fallback_models, default_cwd, max_budget_usd, goal_max_continuations, resume_on_limit_reset, archive_after_days, notify, snippets, auto_background_seconds)
     |}];
   show {|{"archive_after_days": "a week"}|};
   show {|{"archive_after_days": -1}|};
@@ -177,14 +189,15 @@ let%expect_test "null defaults are unset" =
       (default_thinking ()) (fallback_models ()) (default_cwd ())
       (max_budget_usd ()) (goal_max_continuations 20)
       (resume_on_limit_reset true) (archive_after_days 7) (notify Bell)
-      (auto_background_seconds 30)))
+      (snippets ()) (auto_background_seconds 30)))
     (Ok
      ((scoped_models ()) (approval_mode Auto)
       (permissions ((allow ()) (ask ()) (deny ())))
       (default_model (deepseek/deepseek-flash)) (default_thinking ((On ())))
       (fallback_models ()) (default_cwd ()) (max_budget_usd ())
       (goal_max_continuations 20) (resume_on_limit_reset true)
-      (archive_after_days 7) (notify Bell) (auto_background_seconds 30)))
+      (archive_after_days 7) (notify Bell) (snippets ())
+      (auto_background_seconds 30)))
     |}]
 ;;
 
@@ -209,5 +222,49 @@ let%expect_test "notify: off, bell or desktop" =
     (Error
      "config.notify must be \"off\", \"bell\" or \"desktop\", not \"loud\"")
     (Error "config.notify must be \"off\", \"bell\" or \"desktop\"")
+    |}]
+;;
+
+let%expect_test "snippets: parsed, validated with where and what to do" =
+  List.iter
+    [ {|{"snippets": [{"name": "review", "text": "Review it.\nBriefly."}, {"name": "t", "text": "run the tests"}]}|}
+    ; {|{"snippets": null}|}
+    ; {|{"snippets": {"review": "x"}}|}
+    ; {|{"snippets": ["review"]}|}
+    ; {|{"snippets": [{"text": "x"}]}|}
+    ; {|{"snippets": [{"name": "my review", "text": "x"}]}|}
+    ; {|{"snippets": [{"name": "", "text": "x"}]}|}
+    ; {|{"snippets": [{"name": "ok", "text": "x"}, {"name": "review"}]}|}
+    ; {|{"snippets": [{"name": "review", "text": "  \n"}]}|}
+    ; {|{"snippets": [{"name": "a", "text": "x"}, {"name": "a", "text": "y"}]}|}
+    ]
+    ~f:(fun json ->
+      print_s
+        [%sexp
+          (Or_error.map
+             (Config.of_json (Jsonaf.of_string json))
+             ~f:(fun c -> c.snippets)
+           : Snippet.t list Or_error.t)]);
+  [%expect
+    {|
+    (Ok
+     (((name review) (text  "Review it.\
+                           \nBriefly."))
+      ((name t) (text "run the tests"))))
+    (Ok ())
+    (Error
+     "config.snippets must be an array of {\"name\": ..., \"text\": ...} objects")
+    (Error
+     "config.snippets[0] must be an object like {\"name\": \"review\", \"text\": \"...\"}")
+    (Error "config.snippets[0] needs a \"name\" string")
+    (Error
+     "config.snippets[0].name \"my review\" must be one word: non-empty, without spaces")
+    (Error
+     "config.snippets[0].name \"\" must be one word: non-empty, without spaces")
+    (Error "config.snippets[1] (\"review\") needs a \"text\" string")
+    (Error
+     "config.snippets[0] (\"review\") has an empty text; give it some or remove it")
+    (Error
+     "config.snippets has more than one snippet named \"a\"; rename or remove all but one")
     |}]
 ;;

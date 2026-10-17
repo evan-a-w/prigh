@@ -695,6 +695,7 @@ let%expect_test "/change_default saves the model and thinking level" =
       "resume_on_limit_reset": true,
       "archive_after_days": 7,
       "notify": "bell",
+      "snippets": [],
       "auto_background_seconds": 30
     }
     |}]
