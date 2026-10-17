@@ -20,6 +20,10 @@ module Request = struct
     then t
     else { t with messages = List.map t.messages ~f:Message.omit_images }
   ;;
+
+  let prepare t =
+    omit_unsupported_images { t with messages = Tool_pairing.repair t.messages }
+  ;;
 end
 
 (** [stream] never raises for network/API failures; those are reported through
