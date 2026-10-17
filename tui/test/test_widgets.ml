@@ -622,7 +622,7 @@ let%expect_test "keymap: every binding resolves to its intent and is documented"
     Alt+S                   send exactly what is typed, ignoring the completion popup
     Ctrl+J / Alt+J          insert a newline
     Esc                     close the dialog, or abort the running turn
-    Tab                     complete a slash command / open the command picker
+    Tab                     complete a slash command, @path or #snippet / open the command picker
     Up                      move up (editor line, history, or list row)
     Down                    move down (editor line, history, or list row)
     Alt+Up                  pop the last queued steer/follow-up back into the editor
@@ -725,6 +725,7 @@ let%expect_test "keymap: every binding resolves to its intent and is documented"
     !!command  run a shell command without adding it to the context
     !&command  run a shell command as a background job (/jobs)
     @path      attach a file (Ctrl+R completes paths)
+    #name      insert a snippet: Tab or Enter on its completion (/snippet)
     type                     filter the list (fuzzy)
     Enter / Esc              accept the highlighted item / close without changes
     Ctrl+D                   /sessions: delete the marked or highlighted sessions · /agents: cancel · /jobs: kill · /queue: remove
@@ -2125,7 +2126,8 @@ let%expect_test
        | Path -> "path"
        | Directory { host } ->
          "dir" ^ Option.value_map host ~default:"" ~f:(fun h -> "@" ^ h)
-       | Skill -> "skill")
+       | Skill -> "skill"
+       | Snippet -> "snippet")
       (Autocomplete.prefix ac)
       (Autocomplete.navigated ac)
       (Autocomplete.accepts_on_enter ac)

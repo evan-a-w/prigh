@@ -210,6 +210,15 @@ let insert t s =
   insert_raw t s
 ;;
 
+let replace t ~at ~len s =
+  let line = List.nth_exn t.lines at.Position.line in
+  let t = dissolve_chip t at in
+  let t = push_undo t ~coalesce:false in
+  let before, rest = split_at line at.col in
+  let _, after = split_at rest len in
+  insert_raw { (set_line t at.line (before ^ after)) with cursor = at } s
+;;
+
 let newline t = insert t "\n"
 
 let join_with_previous t =

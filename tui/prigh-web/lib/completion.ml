@@ -6,6 +6,7 @@ module Source = struct
     | Command
     | Argument of Slash.Argument.t
     | Path
+    | Snippet
   [@@deriving sexp_of, equal]
 end
 
@@ -330,7 +331,32 @@ let compute
     let start, word = word_at text ~cursor in
     (match String.chop_prefix word ~prefix:"@" with
      | Some prefix -> Some (make Path ~prefix ~start:(start + 1) [])
-     | None -> None)
+     | None ->
+       (* [#name] where the name starts with a letter or digit, so that
+          [# Title] and [##] stay text; nothing when no snippet matches (e.g.
+          [#123]). *)
+       (match String.chop_prefix word ~prefix:"#" with
+        | Some name when String.length name > 0 && Char.is_alphanum name.[0] ->
+          (match
+             Prigh_ui.Fuzzy.rank
+               ~query:name
+               snippets
+               ~key:(fun (s : Snippet.t) -> s.name)
+           with
+           | [] -> None
+           | matches ->
+             Some
+               (make
+                  Snippet
+                  ~prefix:name
+                  ~start:(start + 1)
+                  (List.map matches ~f:(fun (s : Snippet.t) ->
+                     Picker.Item.create
+                       ~id:s.name
+                       ~detail:(Snippet.first_line s)
+                       ~search:s.name
+                       ("#" ^ s.name)))))
+        | _ -> None))
 ;;
 
 let same a b = Source.equal a.source b.source && String.equal a.prefix b.prefix
@@ -342,7 +368,7 @@ let request t =
   | Argument Directory -> Some ("list_dirs", [ prefix ])
   | Argument Backend_directory ->
     Some ("list_dirs", [ prefix; "host", `String Host.backend_id ])
-  | Command | Argument _ -> None
+  | Command | Argument _ | Snippet -> None
 ;;
 
 let set_results t ~prefix results =
@@ -378,8 +404,15 @@ let accept t ~text =
       | Path when not (String.is_suffix item.id ~suffix:"/") -> item.id ^ " "
       | Argument (Skill | Models) when not (String.is_prefix after ~prefix:" ")
         -> item.id ^ " "
-      | Path | Argument _ -> item.id
+      | Path | Argument _ | Snippet -> item.id
     in
     ( before ^ replacement ^ after
     , String.length before + String.length replacement )
+;;
+
+let insert_snippet t ~text (snippet : Snippet.t) =
+  let before = String.prefix text (t.start - 1) in
+  let after = String.drop_prefix text (t.start + String.length t.prefix) in
+  ( before ^ snippet.text ^ after
+  , String.length before + String.length snippet.text )
 ;;

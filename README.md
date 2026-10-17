@@ -672,7 +672,7 @@ backend/_build/default/bin/main.exe serve      # JSON-lines RPC on stdio
 | Alt+S | send exactly what is typed, ignoring the completion popup (`/cd newdir` while it highlights an existing directory); Esc then Enter does the same |
 | Ctrl+J / Alt+J | insert a newline |
 | Esc | close the dialog, abort the running turn, or scroll back to the bottom |
-| Tab | accept the highlighted completion; on an empty prompt, list the commands |
+| Tab | accept the highlighted completion (a command, argument, `@path` or `#snippet`); on an empty prompt, list the commands |
 | Up / Down | move up/down (editor line, history, or list row) |
 | Alt+Up | pop the last queued steer/follow-up back into the editor |
 | Left / Right | move the cursor |
@@ -720,7 +720,7 @@ under it.
 In lists (pickers) typing filters fuzzily, Enter accepts and Esc closes
 without changes; Ctrl+D deletes sessions, cancels a subagent or kills a job,
 and `/scoped-models` toggles with Space (Ctrl+A all, Ctrl+X none). `/help`
-lists the commands, the prompt prefixes (`!cmd`, `!!cmd`, `!&cmd`, `@path`)
+lists the commands, the prompt prefixes (`!cmd`, `!!cmd`, `!&cmd`, `@path`, `#name`)
 and these keys.
 
 `/sessions` lists the active sessions first and then, after an `── archived
@@ -864,7 +864,8 @@ or run in the foreground and moved there, keeps it running until the model
 kills it, or you interrupt it).
 
 Typing `/` opens inline autocomplete (commands, then per-command arguments
-such as models, sessions and directories). Typing `@` completes file paths
+such as models, sessions and directories), and `#name` completes snippets
+(see Snippets). Typing `@` completes file paths
 under the session's working directory; on submit the referenced files are sent as attachments and the
 backend appends them to the user message as `<file>` blocks. `!cmd` runs a
 shell command through the backend (streamed output shown as a tool item) and
@@ -1134,6 +1135,13 @@ is everything after the name, new lines included (Ctrl+J in the TUI,
 Shift+Enter in prigh-web), and without it the last prompt you sent is
 saved. `/snippet rm NAME` deletes one. Both save through `set_config` with
 only `snippets`, and say what they did.
+
+In the editor, `#` at the start of a word followed by a letter or digit
+completes snippet names (fuzzily, each with its text's first line), like `@`
+completes paths: Tab or Enter replaces `#name` with the snippet's text (new
+lines included), the cursor after it, without sending. Nothing pops up for
+a `#` inside a word, `# Title` or `##`, or a `#123` that names no snippet,
+so they type and send as written.
 
 Notifications: the TUI's `/notify` sets `notify` in `config.json` (`bell`
 by default; `desktop` sends OSC 9, or OSC 777 to foot and urxvt, wrapped

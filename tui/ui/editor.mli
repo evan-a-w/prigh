@@ -36,6 +36,11 @@ val set_text : t -> string -> t
 val set_history : t -> string list -> t
 val clear : t -> t
 val insert : t -> string -> t
+
+(** Replaces the [len] characters at [at] (on one line) with the string, the
+    cursor after it; one undo step. *)
+val replace : t -> at:Position.t -> len:int -> string -> t
+
 val newline : t -> t
 val backspace : t -> t
 val delete : t -> t

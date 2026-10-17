@@ -166,6 +166,17 @@ let focus id =
     Option.iter (Dom_html.getElementById_opt id) ~f:(fun el -> el##focus))
 ;;
 
+let set_caret byte =
+  Browser.after_render (fun () ->
+    Option.iter (Dom_html.getElementById_opt "editor") ~f:(fun el ->
+      match Dom_html.tagged el with
+      | Textarea t ->
+        let n = Prigh_web.Utf16.units (Js.to_string t##.value) ~byte in
+        t##focus;
+        t##setSelectionRange n n
+      | _ -> ()))
+;;
+
 (* Loads the page for [backend] (and rejoins [session]). *)
 let navigate ~backend ~session =
   let location = Dom_html.window##.location in
@@ -394,6 +405,7 @@ let perform client settings ctx (model : App.Model.t) (command : App.Command.t) 
       in
       inject (App.Action.Dismiss_toast id)
     | Focus id -> Effect.of_sync_fun focus id
+    | Set_caret byte -> Effect.of_sync_fun set_caret byte
     | Save_history entries -> Effect.of_sync_fun save_history entries
     | Sign_out -> Effect.of_sync_fun sign_out settings
     | Reveal path -> Effect.of_sync_fun Agents_listeners.reveal path

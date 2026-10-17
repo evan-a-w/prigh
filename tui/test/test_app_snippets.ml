@@ -334,3 +334,181 @@ let%expect_test "/snippet completes names, add and rm" =
     …deepseek-flash  think:off  mode:auto  ctx:0.1%/1.0M  $0.01
     |}]
 ;;
+
+let%expect_test "#name: completes snippets fuzzily; Tab inserts their text" =
+  let h = connected () in
+  H.keys h "please #e";
+  H.show h;
+  [%expect
+    {|
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+
+    ▌ earlier question
+      earlier answer
+    ────────────────────────────────────────────────────────────
+    > please #e▏
+    ▸ #tests   Run the tests and fix failures.
+      #review  Review the diff for bugs.
+    …deepseek-flash  $0.01  Tab/Enter accept · Alt+S as typed
+    |}];
+  H.keys h "s";
+  H.show h;
+  [%expect
+    {|
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+
+    ▌ earlier question
+      earlier answer
+    ────────────────────────────────────────────────────────────
+    > please #es▏
+    ▸ #tests  Run the tests and fix failures.
+    …deepseek-flash  $0.01  Tab/Enter accept · Alt+S as typed
+    |}];
+  H.key h (Key.plain Tab);
+  H.show h;
+  [%expect
+    {|
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+
+    ▌ earlier question
+      earlier answer
+    ────────────────────────────────────────────────────────────
+    > please Run the tests and fix failures.▏
+    …deepseek-flash  think:off  mode:auto  ctx:0.1%/1.0M  $0.01
+    |}]
+;;
+
+let%expect_test "#name: Enter inserts multi-line text mid-line, cursor after it"
+  =
+  let h = connected () in
+  H.keys h "a #rev b";
+  H.key h (Key.plain Left);
+  H.key h (Key.plain Left);
+  H.show h;
+  [%expect
+    {|
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+
+    ▌ earlier question
+      earlier answer
+    ────────────────────────────────────────────────────────────
+    > a #rev▏b
+    ▸ #review  Review the diff for bugs.
+    …deepseek-flash  $0.01  Tab/Enter accept · Alt+S as typed
+    |}];
+  H.enter h;
+  H.show h;
+  [%expect
+    {|
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+
+    ▌ earlier question
+      earlier answer
+    ────────────────────────────────────────────────────────────
+    > a Review the diff for bugs.
+      List them by severity.▏b
+    …deepseek-flash  think:off  mode:auto  ctx:0.1%/1.0M  $0.01
+    |}];
+  H.keys h "!";
+  H.show h;
+  [%expect
+    {|
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+
+    ▌ earlier question
+      earlier answer
+    ────────────────────────────────────────────────────────────
+    > a Review the diff for bugs.
+      List them by severity.!▏b
+    …deepseek-flash  think:off  mode:auto  ctx:0.1%/1.0M  $0.01
+    |}];
+  (* On a later line too. *)
+  H.key h (Key.ctrl 'j');
+  H.keys h "#pl";
+  H.key h (Key.plain Tab);
+  H.show h;
+  [%expect
+    {|
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+
+    ▌ earlier question
+      earlier answer
+    ────────────────────────────────────────────────────────────
+    > a Review the diff for bugs.
+      List them by severity.!
+      Plan first; change nothing yet.▏b
+    …deepseek-flash  think:off  mode:auto  ctx:0.1%/1.0M  $0.01
+    |}];
+  (* One undo step takes the insertion back. *)
+  H.key h (Key.ctrl '_');
+  H.show h;
+  [%expect
+    {|
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+
+    ▌ earlier question
+      earlier answer
+    ────────────────────────────────────────────────────────────
+    > a Review the diff for bugs.
+      List them by severity.!
+      #pl▏b
+    ▸ #plan  Plan first; change nothing yet.
+    …deepseek-flash  $0.01  Tab/Enter accept · Alt+S as typed
+    |}]
+;;
+
+let%expect_test "#: headings, issue refs and words with # type and send as is" =
+  let h = connected () in
+  H.keys h "#";
+  H.show h;
+  [%expect
+    {|
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+
+    ▌ earlier question
+      earlier answer
+    ────────────────────────────────────────────────────────────
+    > #▏
+    …deepseek-flash  think:off  mode:auto  ctx:0.1%/1.0M  $0.01
+    |}];
+  H.keys h " Title #123 x#rev ##rev";
+  H.show h;
+  [%expect
+    {|
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+
+    ▌ earlier question
+      earlier answer
+    ────────────────────────────────────────────────────────────
+    > # Title #123 x#rev ##rev▏
+    …deepseek-flash  think:off  mode:auto  ctx:0.1%/1.0M  $0.01
+    |}];
+  H.enter h;
+  [%expect
+    {|
+    (Rpc
+      (method_ prompt)
+      (params ((text "# Title #123 x#rev ##rev")))
+      (tag Show_error))
+    (Append_history "# Title #123 x#rev ##rev")
+    |}];
+  let h = connected ~config:{|{"snippets":[]}|} () in
+  H.keys h "#rev";
+  H.show h;
+  [%expect
+    {|
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+
+    ▌ earlier question
+      earlier answer
+    ────────────────────────────────────────────────────────────
+    > #rev▏
+    …deepseek-flash  think:off  mode:auto  ctx:0.1%/1.0M  $0.01
+    |}];
+  H.enter h;
+  [%expect
+    {|
+    (Rpc (method_ prompt) (params ((text #rev))) (tag Show_error))
+    (Append_history #rev)
+    |}]
+;;

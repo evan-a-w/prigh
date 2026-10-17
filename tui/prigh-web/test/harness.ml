@@ -20,6 +20,7 @@ let act t action =
      | Set_url_session _
      | Expire_toast _
      | Focus _
+     | Set_caret _
      | Save_history _
      | Sign_out
      | Reveal _

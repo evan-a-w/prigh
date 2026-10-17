@@ -184,6 +184,7 @@ let%expect_test "/fallback completes a model key per word" =
   [%expect
     {|
     (Complete_accept (run false))
+    (Set_caret 23)
     ((m.draft "/fallback openai/gpt-6 ") (m.cursor 23))
     Fallback models, in order ↑↓ Tab Enter Esc   Ctrl+Enter as typed
     Claude Opus 5.5 ✓ anthropic
@@ -226,6 +227,7 @@ let%expect_test "/fallback completes a model key per word" =
     Claude Opus 5.5 ✓ anthropic
     Claude Sonnet 5 anthropic
     (Complete_accept (run false))
+    (Set_caret 32)
     ((m.draft "/fallback deepseek/deepseek-chat openai/gpt-6") (m.cursor 32))
     |}];
   H.type_ h "/fallback of";
@@ -331,6 +333,7 @@ let%expect_test "/default-dir completes directories on the backend's host" =
     (Complete_accept (run true))
     (Rpc (method_ list_dirs) (params ((prefix /work/) (host backend)))
      (tag (Paths /work/)))
+    (Set_caret 19)
     ((m.draft "/default-dir /work/") (m.cursor 19))
     |}]
 ;;

@@ -10,6 +10,7 @@ module Source : sig
     (** [/cd] and the [/host] directory prompt: listed by the backend on [host]
         (the active one when [None]) *)
     | Skill (** the name after [/skill:] *)
+    | Snippet (** [#name] at the start of a word: a snippet to insert *)
   [@@deriving sexp_of, equal]
 end
 
@@ -59,3 +60,7 @@ val directory : host:string -> text:string -> t
 (** Replaces [prefix] (at its original offset in [editor_text]) with the
     selected item, or leaves the text unchanged when nothing is selected. *)
 val accept : t -> editor_text:string -> string
+
+(** Replaces a [Snippet] completion's [#name] with the snippet's text, the
+    cursor after it. *)
+val insert_snippet : t -> Editor.t -> P.Snippet.t -> Editor.t

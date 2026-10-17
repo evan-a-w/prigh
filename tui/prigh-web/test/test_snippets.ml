@@ -65,6 +65,7 @@ let%expect_test "/snippet: a fuzzy picker; Enter inserts, Esc changes nothing" =
     (Focus picker-input)
     Dialog_accept
     (Focus editor)
+    (Set_caret 38)
     ((m.draft "Please Run the tests and fix failures. now") (m.cursor 38))
     |}]
 ;;
@@ -76,6 +77,7 @@ let%expect_test "/snippet NAME inserts; unknown names say the closest" =
   [%expect
     {|
     (Save_history ("/snippet tests"))
+    (Set_caret 31)
     ((m.draft "Run the tests and fix failures.") (m.cursor 31))
     |}];
   H.type_ h "";
@@ -196,5 +198,95 @@ let%expect_test "/snippet completes names, add and rm" =
     review Review the diff for bugs.
     tests Run the tests and fix failures.
     rm rm NAME: delete a snippet
+    |}]
+;;
+
+let%expect_test "#name: completes snippets fuzzily; Tab inserts their text" =
+  let h = with_snippets () in
+  H.type_ h "please #e";
+  H.text h ~selector:".popup";
+  [%expect
+    {|
+    Snippets ↑↓ Tab Enter Esc   Ctrl+Enter as typed
+    #tests Run the tests and fix failures.
+    #review Review the diff for bugs.
+    |}];
+  H.type_ h "please #es";
+  H.text h ~selector:".popup";
+  H.key h "Tab";
+  draft h;
+  H.text h ~selector:".popup";
+  [%expect
+    {|
+    Snippets ↑↓ Tab Enter Esc   Ctrl+Enter as typed
+    #tests Run the tests and fix failures.
+    (Complete_accept (run false))
+    (Set_caret 38)
+    ((m.draft "please Run the tests and fix failures.") (m.cursor 38))
+    |}]
+;;
+
+let%expect_test "#name: Enter inserts multi-line text mid-text, caret after it" =
+  let h = with_snippets () in
+  H.act h (Edit { text = "a #rev b\nmore"; cursor = 6 });
+  H.text h ~selector:".popup";
+  H.key h "Enter" ~target:(Editor { cursor = 6 });
+  draft h;
+  [%expect
+    {|
+    Snippets ↑↓ Tab Enter Esc   Ctrl+Enter as typed
+    #review Review the diff for bugs.
+    (Complete_accept (run true))
+    (Set_caret 50)
+    ((m.draft  "a Review the diff for bugs.\
+              \nList them by severity. b\
+              \nmore")
+     (m.cursor 50))
+    |}];
+  (* On a later line, at its start. *)
+  H.act h (Edit { text = "first\n#tes"; cursor = 10 });
+  H.key h "Tab" ~target:(Editor { cursor = 10 });
+  draft h;
+  [%expect
+    {|
+    (Complete_accept (run false))
+    (Set_caret 37)
+    ((m.draft  "first\
+              \nRun the tests and fix failures.") (m.cursor 37))
+    |}]
+;;
+
+let%expect_test "#: headings, issue refs and words with # type and send as is" =
+  let h = with_snippets () in
+  H.type_ h "#";
+  H.text h ~selector:".popup";
+  H.type_ h "# Title";
+  H.text h ~selector:".popup";
+  H.type_ h "# Title #123";
+  H.text h ~selector:".popup";
+  H.type_ h "# Title #123 x#rev";
+  H.text h ~selector:".popup";
+  H.type_ h "# Title #123 x#rev ##rev";
+  H.text h ~selector:".popup";
+  H.key h "Enter";
+  [%expect
+    {|
+    Send
+    (Save_history ("# Title #123 x#rev ##rev"))
+    Scroll_to_bottom
+    (Rpc (method_ prompt) (params ((text "# Title #123 x#rev ##rev")))
+     (tag (Sent (text "# Title #123 x#rev ##rev") (images ()))))
+    |}];
+  let h = H.create () in
+  H.type_ h "#rev";
+  H.text h ~selector:".popup";
+  H.key h "Enter";
+  [%expect
+    {|
+    Send
+    (Save_history (#rev))
+    Scroll_to_bottom
+    (Rpc (method_ prompt) (params ((text #rev)))
+     (tag (Sent (text #rev) (images ()))))
     |}]
 ;;

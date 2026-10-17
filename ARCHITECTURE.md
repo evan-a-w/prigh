@@ -1346,7 +1346,10 @@ copy of the protocol types and the e2e test guards the contract.
     inserting at the cursor, or the whole new `Config.snippets` list to save
     with `set_config` (only that field; `Snippets_saved` acknowledges with
     the config the backend replies). `Autocomplete`'s `Snippet` argument
-    completes names, `add` and `rm`.
+    completes names, `add` and `rm`; its `Snippet` source completes `#name`
+    at a word start (a letter or digit first, only when a snippet matches),
+    and `Autocomplete.insert_snippet` swaps `#name` for the text with
+    `Editor.replace` (one undo step, the cursor after it).
   - Model hand-over and default directory: `/fallback` and `/default-dir`
     show `Config`'s `fallback_models`/`default_cwd`, or send `set_config`
     with only that field. The backend keeps the fields a `set_config`
@@ -1794,7 +1797,7 @@ copy of the protocol types and the e2e test guards the contract.
       fails; what left the queue otherwise is acknowledged when its user
       message reaches the transcript, until the run ends), `Completion`
       (slash commands from `Slash`, their arguments, `@` paths via
-      `list_paths`) and `History`, `Dialog`/`Dialog_view`/`Modal`
+      `list_paths`, `#` snippets) and `History`, `Dialog`/`Dialog_view`/`Modal`
       (pickers built on `Picker`, help, rename, delete, the login flow
       `Login_flow` — also a custom provider's logout question — tool
       confirmations; while one shows, `View` makes the page behind it
@@ -1845,7 +1848,12 @@ copy of the protocol types and the e2e test guards the contract.
       `/mcp reconnect`'s report and what became of an approved or restarted
       server; a ready one's tools are the `Mcp_tools` dialog.
     - Snippets: `/snippet` runs `Prigh_ui.Snippet_command`; the picker
-      (Alt+N, which passes the editor's caret) inserts at the caret.
+      (Alt+N, which passes the editor's caret) inserts at the caret, as do
+      `/snippet NAME` and `#name` completion (`Completion.insert_snippet`).
+      The textarea's value follows `Model.draft`, which puts the browser's
+      caret at its end: inserts and accepted completions return
+      `Command.Set_caret` (a byte offset, made UTF-16 by `Utf16.units`)
+      so the caret lands after what went in.
       `Slash.parse` lets `/snippet add` span lines. Saving sends
       `set_config` with only `snippets`, shown at once; a refused
       `Config_saved` refetches the config so the page shows the backend's.
