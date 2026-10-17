@@ -52,7 +52,11 @@ val run
   -> ?steer:(unit -> Message.t list)
   -> ?emit:(Agent_event.t -> unit)
   -> ?approve:Tool.approver
-  -> ?ask_user:(call_id:string -> User_question.t list -> User_question.Reply.t)
+  -> ?ask_user:
+       (call_id:string
+        -> timeout_seconds:int option
+        -> User_question.t list
+        -> User_question.Reply.t)
   -> ?execute:Tool.executor
   -> ?background:Background_tasks.t
   -> ?retry_delay:(attempt:int -> unit)

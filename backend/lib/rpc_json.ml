@@ -453,12 +453,16 @@ let rec event ?now (e : Agent.Event.t) =
       ; "call_id", str call_id
       ; "agent_id", Option.value_map agent_id ~default:`Null ~f:str
       ]
-    | Loop (Ask_user_done { call_id }) ->
-      [ "event", str "ask_user_done"; "call_id", str call_id ]
-    | Loop (Ask_user { call_id; questions }) ->
+    | Loop (Ask_user_done { call_id; timed_out }) ->
+      [ "event", str "ask_user_done"
+      ; "call_id", str call_id
+      ; "timed_out", bool timed_out
+      ]
+    | Loop (Ask_user { call_id; questions; deadline }) ->
       [ "event", str "ask_user"
       ; "call_id", str call_id
       ; "questions", `Array (List.map questions ~f:User_question.to_json)
+      ; "deadline_ms", Option.value_map deadline ~default:`Null ~f:ms
       ]
     | Loop (Tool_end { call; result }) ->
       [ "event", str "tool_end"
@@ -585,6 +589,7 @@ let pending ~steer ~follow_up ~confirms ~questions =
                [ "call_id", str q.call_id
                ; ( "questions"
                  , `Array (List.map q.questions ~f:User_question.to_json) )
+               ; "deadline_ms", Option.value_map q.deadline ~default:`Null ~f:ms
                ])) )
     ]
 ;;

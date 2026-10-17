@@ -77,7 +77,7 @@ let with_agent
         "  -> %s\n"
         (Sexp.to_string [%sexp (answer : Agent.Confirm_answer.t)]);
       Or_error.ok_exn (Agent.respond_confirm ?agent_id agent ~call_id answer)
-    | Loop (Ask_user { call_id; questions }) ->
+    | Loop (Ask_user { call_id; questions; deadline = _ }) ->
       printf "ask_user %s:\n" call_id;
       List.iter questions ~f:(fun q -> print_s [%sexp (q : User_question.t)]);
       print_s

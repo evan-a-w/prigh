@@ -42,6 +42,7 @@ module Pending_question = struct
   type t =
     { call_id : string
     ; questions : User_question.t list
+    ; deadline : float option
     }
   [@@deriving sexp_of]
 end
@@ -658,20 +659,48 @@ let approve t : Tool.approver =
           | Allow | Ask _ -> None)))
 ;;
 
-let ask_user t ~cancel ~call_id questions =
+let ask_user t ~cancel ~call_id ~timeout_seconds questions =
+  let timeout =
+    User_question.timeout
+      ~config:(Config.ask_user_timeout t.config)
+      ~requested:timeout_seconds
+  in
+  let deadline =
+    Option.map timeout ~f:(fun after ->
+      Eio.Time.now (Eio.Stdenv.clock t.env) +. after)
+  in
   let promise, resolver = Promise.create () in
   Hashtbl.set
     t.pending_questions
     ~key:call_id
-    ~data:({ Pending_question.call_id; questions }, resolver);
-  broadcast t (Loop (Ask_user { call_id; questions }));
+    ~data:({ Pending_question.call_id; questions; deadline }, resolver);
+  broadcast t (Loop (Ask_user { call_id; questions; deadline }));
+  let answered () = Promise.await promise in
+  let wait =
+    match timeout, deadline with
+    | Some after, Some at ->
+      fun () ->
+        Fiber.first answered (fun () ->
+          t.sleep_until at;
+          (* An answer that came in meanwhile still counts. *)
+          match Hashtbl.find t.pending_questions call_id with
+          | Some (_, r) when phys_equal r resolver ->
+            User_question.Reply.Timed_out after
+          | Some _ | None -> answered ())
+    | _ -> answered
+  in
   let reply =
-    match Cancellation.protect cancel ~f:(fun () -> Promise.await promise) with
+    match Cancellation.protect cancel ~f:wait with
     | None -> User_question.Reply.Cancelled
     | Some reply -> reply
   in
   Hashtbl.remove t.pending_questions call_id;
-  broadcast t (Loop (Ask_user_done { call_id }));
+  let timed_out =
+    match reply with
+    | Timed_out _ -> true
+    | Answered _ | Declined | Cancelled | Unavailable _ -> false
+  in
+  broadcast t (Loop (Ask_user_done { call_id; timed_out }));
   reply
 ;;
 
@@ -685,7 +714,7 @@ let answer_question t ~call_id (reply : User_question.Reply.t) =
     let checked =
       match reply with
       | Answered answers -> User_question.check_answers questions answers
-      | Declined | Cancelled | Unavailable _ -> Ok ()
+      | Declined | Cancelled | Timed_out _ | Unavailable _ -> Ok ()
     in
     Or_error.map checked ~f:(fun () ->
       Hashtbl.remove t.pending_questions call_id;
@@ -1906,7 +1935,10 @@ and arm_resume t ~at =
   t.resume <- Some resume;
   Session.set_resume_at t.session (Some at);
   Fiber.fork ~sw:t.sw (fun () ->
-    match Cancellation.protect cancel ~f:(fun () -> t.sleep_until at) with
+    (* A little after the reset, so the provider agrees it has passed. *)
+    match
+      Cancellation.protect cancel ~f:(fun () -> t.sleep_until (at +. 5.))
+    with
     | None -> ()
     | Some () ->
       if Option.exists t.resume ~f:(fun r -> phys_equal r resume)
@@ -2050,9 +2082,7 @@ let create
   let sleep_until =
     match sleep_until with
     | Some f -> f
-    | None ->
-      (* A little after the reset, so the provider agrees it has passed. *)
-      fun at -> Eio.Time.sleep_until (Eio.Stdenv.clock env) (at +. 5.)
+    | None -> Eio.Time.sleep_until (Eio.Stdenv.clock env)
   in
   let config =
     match Config.load ~home with

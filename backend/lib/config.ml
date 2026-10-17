@@ -35,6 +35,7 @@ type t =
   ; max_budget_usd : float option
   ; goal_max_continuations : int
   ; resume_on_limit_reset : bool
+  ; ask_user_timeout_seconds : float
   ; archive_after_days : float
   ; notify : Notify.t
   ; auto_background_seconds : float
@@ -52,6 +53,7 @@ let default =
   ; max_budget_usd = None
   ; goal_max_continuations = Goal.default_max_continuations
   ; resume_on_limit_reset = true
+  ; ask_user_timeout_seconds = 600.
   ; archive_after_days = 7.
   ; notify = Bell
   ; auto_background_seconds = 30.
@@ -62,6 +64,12 @@ let auto_background t =
   Option.some_if
     Float.(t.auto_background_seconds > 0.)
     t.auto_background_seconds
+;;
+
+let ask_user_timeout t =
+  Option.some_if
+    Float.(t.ask_user_timeout_seconds > 0.)
+    t.ask_user_timeout_seconds
 ;;
 
 let start_model t =
@@ -91,6 +99,8 @@ let to_json t =
     ; "goal_max_continuations", `Number (Int.to_string t.goal_max_continuations)
     ; ( "resume_on_limit_reset"
       , if t.resume_on_limit_reset then `True else `False )
+    ; ( "ask_user_timeout_seconds"
+      , `Number (sprintf "%g" t.ask_user_timeout_seconds) )
     ; "archive_after_days", `Number (sprintf "%g" t.archive_after_days)
     ; "notify", `String (Notify.to_string t.notify)
     ; ( "auto_background_seconds"
@@ -171,6 +181,20 @@ let of_json json =
          | Some _ | None -> error ())
       | Some _ -> error ()
     in
+    let%bind ask_user_timeout_seconds =
+      let error () =
+        Or_error.error_string
+          "config.ask_user_timeout_seconds must be a number of seconds (0: \
+           never time out)"
+      in
+      match find "ask_user_timeout_seconds" with
+      | None | Some `Null -> Ok default.ask_user_timeout_seconds
+      | Some (`Number n) ->
+        (match Float.of_string_opt n with
+         | Some s when Float.(s >= 0.) && Float.is_finite s -> Ok s
+         | Some _ | None -> error ())
+      | Some _ -> error ()
+    in
     let%bind default_model =
       match find "default_model" with
       | None | Some `Null -> Ok None
@@ -239,6 +263,7 @@ let of_json json =
     ; max_budget_usd
     ; goal_max_continuations
     ; resume_on_limit_reset
+    ; ask_user_timeout_seconds
     ; archive_after_days
     ; notify
     ; auto_background_seconds

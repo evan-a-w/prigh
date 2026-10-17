@@ -35,8 +35,13 @@ type t =
   | Ask_user of
       { call_id : string
       ; questions : User_question.t list
+      ; deadline : float option
+        (** when it times out (seconds since the epoch), if it does *)
       }
-  | Ask_user_done of { call_id : string }
+  | Ask_user_done of
+      { call_id : string
+      ; timed_out : bool
+      } (** answered (by any frontend), timed out or withdrawn *)
   | Tool_end of
       { call : Content.Tool_call.t
       ; result : Message.Tool_result.t
