@@ -52,9 +52,7 @@ let manual_clock t =
   let sleep_until at =
     let p, u = Eio.Promise.create () in
     waiting := Some u;
-    printf
-      "timer: due in %.0fs\n"
-      (at -. Eio.Time.now (Eio.Stdenv.clock t.env));
+    printf "timer: due in %.0fs\n" (at -. Eio.Time.now (Eio.Stdenv.clock t.env));
     match Eio.Promise.await p with
     | () -> ()
     | exception (Eio.Cancel.Cancelled _ as exn) ->
@@ -136,6 +134,7 @@ let with_agent ?config replies f =
            : (string * float option) list)]
     | Loop (Ask_user_done { call_id; timed_out }) ->
       printf "ask_user_done %s, timed_out=%b\n" call_id timed_out
+    | Notice text -> printf "notice: %s\n" text
     | _ -> ());
   (* Lets the run reach the next wait (the timer, or the run's end). *)
   let settle () = Eio.Time.sleep (Eio.Stdenv.clock t.env) 0.05 in
@@ -160,6 +159,7 @@ let%expect_test "unanswered, the question times out and the model carries on" =
     timer: due in 600s
     timer: fires
     ask_user_done q1, timed_out=true
+    notice: the question was not answered within 10m; the agent carries on without it
     model reads: ERROR [the user did not answer within 10m; carry on with your best judgement and say what you assumed]
     (Error
      "no pending question for tool call \"q1\": it was answered or withdrawn")
@@ -188,6 +188,7 @@ let%expect_test "answered before the timeout: the timer is cancelled" =
     model reads: The user answered:
     Q: Which database?
     A: SQLite
+
     timer: nothing waiting
     |}]
 ;;
@@ -253,12 +254,14 @@ let%expect_test "the call's timeout_seconds replaces the config's" =
     timer: due in 120s
     timer: fires
     ask_user_done q1, timed_out=true
+    notice: the question was not answered within 2m; the agent carries on without it
     model reads: ERROR [the user did not answer within 2m; carry on with your best judgement and say what you assumed]
     ask_user q2, deadline in 30s
     ((q2 (30)))
     timer: due in 30s
     timer: fires
     ask_user_done q2, timed_out=true
+    notice: the question was not answered within 30s; the agent carries on without it
     model reads: ERROR [the user did not answer within 30s; carry on with your best judgement and say what you assumed]
     model reads: ERROR timeout_seconds must be 0 (wait until answered) or a number of seconds
     |}]
@@ -319,6 +322,7 @@ let%expect_test "0 waits until answered: in the config, or for one call" =
     timer: due in 90s
     timer: fires
     ask_user_done q1, timed_out=true
+    notice: the question was not answered within 1m 30s; the agent carries on without it
     model reads: ERROR [the user did not answer within 1m 30s; carry on with your best judgement and say what you assumed]
     |}]
 ;;
@@ -334,5 +338,16 @@ let%expect_test "an answer that comes in as the timer fires still counts" =
       (Agent.answer_question agent ~call_id:"q1" (Answered [ [ "SQLite" ] ])
        : unit Or_error.t)];
   Agent.wait_idle agent;
-  [%expect {| |}]
+  [%expect
+    {|
+    ask_user q1, deadline in 600s
+    ((q1 (600)))
+    timer: due in 600s
+    timer: fires
+    (Ok ())
+    ask_user_done q1, timed_out=false
+    model reads: The user answered:
+    Q: Which database?
+    A: SQLite
+    |}]
 ;;
