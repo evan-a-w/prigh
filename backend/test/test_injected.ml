@@ -153,6 +153,45 @@ let%expect_test "messages of the harness's" =
     |}]
 ;;
 
+let%expect_test "reminders: recorded, never inferred" =
+  List.iter
+    [ Injected.Source.Reminder { name = "disk"; repeat = None; max = None }
+    ; Reminder { name = "keep-going"; repeat = Some 1; max = Some 5 }
+    ; Reminder
+        { name = "Check disk usage.\nThen clean up."
+        ; repeat = None
+        ; max = None
+        }
+    ]
+    ~f:(fun source ->
+      let origin = { Injected.empty with source = Some source } in
+      print_s [%sexp (origin : Injected.t)];
+      print_endline (Jsonaf.to_string (Injected.to_json origin ~text:"x"));
+      print_s
+        [%sexp
+          (Injected.t_of_jsonaf (Injected.jsonaf_of_t origin)
+           |> Injected.equal origin
+           : bool)]);
+  print_s
+    [%sexp
+      (Injected.infer "[prigh reminder: disk, every 40 turns] Check disk."
+       : Injected.t option)];
+  [%expect
+    {|
+    ((source (Reminder (name disk))))
+    {"source":{"kind":"reminder","title":"Reminder: disk"}}
+    true
+    ((source (Reminder (name keep-going) (repeat 1) (max 5))))
+    {"source":{"kind":"reminder","title":"Reminder: keep-going (1/5)"}}
+    true
+    ((source (Reminder (name  "Check disk usage.\
+                             \nThen clean up."))))
+    {"source":{"kind":"reminder","title":"Reminder: Check disk usage. …"}}
+    true
+    ()
+    |}]
+;;
+
 (* ---- the agent records what it adds ----------------------------------- *)
 
 let with_agent ?on_request replies f =
