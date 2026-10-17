@@ -1179,7 +1179,12 @@ read from `AGENTS.md`/`CLAUDE.md` files between `/` and the working
 directory, plus `~/.prigh/AGENTS.md`. When the tool host has `nix` on its
 PATH (as in the Docker image), the system prompt also tells the model to get
 missing tools from nixpkgs (`nix shell`, `nix run`, `nix profile install`)
-rather than apt or sudo. The system prompt is built once, at a session's
+rather than apt or sudo. It tells the main agent that it is the
+orchestrator: substantial work (a feature, a multi-file change, a long
+investigation) goes to subagents with self-contained tasks, independent
+ones in parallel, while it plans, coordinates, reviews their reports and
+talks to you, doing small things itself; subagents are not told this. The
+system prompt is built once, at a session's
 first run, and recorded in the session so the cached prompt prefix survives
 `/cd`, `/host` and backend restarts; later directory or host changes reach
 the model as a short note on the next message, leaving it to re-read the

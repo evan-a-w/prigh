@@ -618,12 +618,17 @@ two can share one.
 - `System_prompt` — built-in guidance plus environment facts plus
   `AGENTS.md`/`CLAUDE.md` files from `/` down to the cwd and
   `~/.prigh/AGENTS.md`; `read_instructions` scans the local filesystem and
-  `build ?instructions ?nix ?skills ?auto_background` accepts files fetched
+  `build ?instructions ?nix ?skills ?auto_background ?orchestrator` accepts
+  files fetched
   elsewhere (the tool host), whether that host has Nix, which adds how to
   get missing tools from nixpkgs, the host's skills, listed when the model
   has `read`, and the auto-background limit, which the guidance on
   background work (given to agents with `job_wait`/`subagent_wait`: almost
-  never block, keep working or end the turn) names.
+  never block, keep working or end the turn) names; `orchestrator` (the
+  main agent's prompt, given the `subagent` tool) tells the model to
+  delegate substantial work to subagents and keep its own context for
+  planning, coordinating and reviewing, while subagents' prompts (nested
+  ones keep `subagent`) leave it out.
   `Agent` builds it once, at the session's first run, and records it as a
   `System_prompt` session entry so every later request (and every reload)
   sends the same prefix, which is what provider prompt caches key on. When

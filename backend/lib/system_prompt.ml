@@ -24,7 +24,7 @@ let instruction_files ~cwd ~home =
   Option.to_list global @ project
 ;;
 
-let base ~nix ~auto_background ~tools =
+let base ~nix ~auto_background ~orchestrator ~tools =
   let tool_list =
     String.concat
       ~sep:"\n"
@@ -50,8 +50,18 @@ let base ~nix ~auto_background ~tools =
         exists."
      ; "- Be concise. Explain non-trivial decisions briefly. No filler."
      ; "- Ask before destructive or irreversible actions."
-     ; ""
      ]
+     @ (if orchestrator && has "subagent"
+        then
+          [ "- You are the orchestrator: for substantial work (implementing a \
+             feature, a multi-file change, a long investigation), spawn \
+             subagents with self-contained tasks rather than doing it all \
+             yourself, and run independent tasks in parallel. Keep your own \
+             context for planning, coordinating, reviewing their reports and \
+             talking to the user; do small, quick things directly."
+          ]
+        else [])
+     @ [ "" ]
      @ (if has "subagent_wait" || has "job_wait"
         then
           [ "Background work: almost never block on it." ]
@@ -128,6 +138,7 @@ let build
       ?(nix = false)
       ?(skills = [])
       ?auto_background
+      ?(orchestrator = false)
       ~cwd
       ~home
       ~tools
@@ -162,7 +173,7 @@ let build
   in
   String.concat
     ~sep:"\n\n"
-    ([ base ~nix ~auto_background ~tools ]
+    ([ base ~nix ~auto_background ~orchestrator ~tools ]
      @ skills
      @ [ environment ]
      @ instructions)

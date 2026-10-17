@@ -221,3 +221,40 @@ let%expect_test "the guidelines name the model's file editor" =
     - Prefer apply_patch over write for existing files. Keep changes minimal and focused.
     |}]
 ;;
+
+let%expect_test "the main agent is told to orchestrate, subagents are not" =
+  let subagent =
+    Tool_subagent.create
+      ~provider:(Faux_provider.create [])
+      ~current_model:(fun () -> Model.default)
+      ~current_thinking:(fun () -> Off)
+      ~home:"/home"
+      ()
+  in
+  let show ~orchestrator tools =
+    System_prompt.build
+      ~date:"2026-01-02"
+      ~instructions:[]
+      ~orchestrator
+      ~cwd:"/proj"
+      ~home:"/home"
+      ~tools:(Tools.specs tools)
+      ()
+    |> String.split_lines
+    |> List.filter ~f:(String.is_substring ~substring:"orchestrator")
+    |> function
+    | [] -> print_endline "(no orchestrator guidance)"
+    | lines -> List.iter lines ~f:print_endline
+  in
+  show ~orchestrator:true (Tools.all @ [ subagent ]);
+  (* Without the subagent tool there is nobody to delegate to. *)
+  show ~orchestrator:true Tools.all;
+  (* A subagent (nested ones keep the subagent tool) does the work itself. *)
+  show ~orchestrator:false (Tools.all @ [ subagent ]);
+  [%expect
+    {|
+    - You are the orchestrator: for substantial work (implementing a feature, a multi-file change, a long investigation), spawn subagents with self-contained tasks rather than doing it all yourself, and run independent tasks in parallel. Keep your own context for planning, coordinating, reviewing their reports and talking to the user; do small, quick things directly.
+    (no orchestrator guidance)
+    (no orchestrator guidance)
+    |}]
+;;
