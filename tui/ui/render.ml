@@ -227,6 +227,12 @@ let mode_hint (m : App.Model.t) : Content.Line.t option =
                 ~style:attention
                 "Enter puts /skill:NAME in the editor · Esc closes"
             ]
+        | Picker { kind = Reminders; _ } ->
+          Some
+            [ span
+                ~style:attention
+                "Enter shows it · Esc closes · Ctrl+D removes"
+            ]
         | Picker { kind = Snippets; _ } ->
           Some
             [ span
@@ -571,6 +577,10 @@ let status (m : App.Model.t) : Content.Line.t =
       @ Option.value_map s.goal ~default:[] ~f:(fun goal ->
         let text, level = Loop_status.goal_part goal in
         [ 3, [ span ~style:(level_style level) text ] ])
+      @ Option.value_map
+          (Remind_command.status_part s.reminders)
+          ~default:[]
+          ~f:(fun text -> [ 3, [ span ~style:base text ] ])
       @ Option.value_map s.resume_at ~default:[] ~f:(fun at ->
         [ ( 2
           , [ span

@@ -511,6 +511,41 @@ try {
   await composer().fill("");
   for (const toast of await page.locator(".toast").all()) await toast.click().catch(() => {});
 
+  // Reminders (/remind): added, counted on the status line, listed in a
+  // picker where Delete removes one, and removed by name; none is left to
+  // fire in the scripted runs below.
+  const remindToast = async text => {
+    const toast = page.locator(".toast", { hasText: text });
+    await toast.waitFor();
+    console.log(clean(await toast.innerText()));
+  };
+  await composer().fill("/remind stop Keep going until the tests pass.");
+  await composer().press("Control+Enter");
+  section("reminders: added");
+  await remindToast("Reminder r1 added");
+  await composer().fill("/remind every 5 Check the disk space.");
+  await composer().press("Control+Enter");
+  await remindToast("Reminder r2 added");
+  await page.locator(".status .reminders").waitFor();
+  console.log(`status: ${clean(await page.locator(".status .reminders").innerText())}`);
+  await composer().fill("/remind");
+  await composer().press("Control+Enter");
+  await page.locator(".modal .picker-item").first().waitFor();
+  await page.waitForFunction(() => document.activeElement?.closest(".modal"));
+  await page.waitForTimeout(200); // its rise
+  await show("reminders: /remind", ".modal");
+  await page.keyboard.press("Delete");
+  await page.waitForSelector(".modal", { state: "detached" });
+  section("reminders: Delete removes the highlighted one");
+  await remindToast("Reminder r1 removed");
+  await composer().fill("/remind rm r2");
+  await composer().press("Control+Enter");
+  await remindToast("Reminder r2 removed");
+  await page.waitForSelector(".status .reminders", { state: "detached" });
+  console.log("status: no reminders");
+  await composer().fill("");
+  for (const toast of await page.locator(".toast").all()) await toast.click().catch(() => {});
+
   // 2. A scripted run with a bash tool call and its output.
   await send("count some lines");
   await bodyHas("three lines");

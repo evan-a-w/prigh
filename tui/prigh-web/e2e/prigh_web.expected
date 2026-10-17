@@ -82,6 +82,23 @@ value "Fix the failing test.", caret 21-21, focused true
 snippet fix removed
 config: review, tests
 #fi: no popup
+=== chromium: reminders: added ===
+Reminder r1 added (when the agent ends its turn, up to 3 in a row): Keep going until the tests pass. · /remind rm r1 removes it
+Reminder r2 added (every 5 turns): Check the disk space. · /remind rm r2 removes it
+status: Remind 2
+=== chromium: reminders: /remind ===
+Reminders
+r1
+on stop 0/3 · Keep going until the tests pass.
+Remove
+r2
+every 5 turns · Check the disk space.
+Remove
+↑↓ to move, Enter to show, Delete to remove, Esc to close
+=== chromium: reminders: Delete removes the highlighted one ===
+Reminder r1 removed
+Reminder r2 removed
+status: no reminders
 === chromium: bash run ===
 count some lines
 <TIME>
@@ -963,6 +980,23 @@ value "Fix the failing test.", caret 21-21, focused true
 snippet fix removed
 config: review, tests
 #fi: no popup
+=== firefox: reminders: added ===
+Reminder r1 added (when the agent ends its turn, up to 3 in a row): Keep going until the tests pass. · /remind rm r1 removes it
+Reminder r2 added (every 5 turns): Check the disk space. · /remind rm r2 removes it
+status: Remind 2
+=== firefox: reminders: /remind ===
+Reminders
+r1
+on stop 0/3 · Keep going until the tests pass.
+Remove
+r2
+every 5 turns · Check the disk space.
+Remove
+↑↓ to move, Enter to show, Delete to remove, Esc to close
+=== firefox: reminders: Delete removes the highlighted one ===
+Reminder r1 removed
+Reminder r2 removed
+status: no reminders
 === firefox: bash run ===
 count some lines
 <TIME>

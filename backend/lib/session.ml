@@ -31,6 +31,7 @@ module Entry = struct
           }
       | System_prompt of { text : string }
       | Goal of { goal : Goal.t option }
+      | Reminders of { reminders : Reminder.t list }
       | Budget of { usd : float option }
       | Approval of
           { mode : string
@@ -148,6 +149,7 @@ let worth_saving (line : Line.t) =
           | Cwd _
           | System_prompt _
           | Goal _
+          | Reminders _
           | Budget _
           | Approval _
           | Allow_rule _
@@ -275,6 +277,7 @@ let add_entry t (entry : Entry.t) =
   | Description _
   | System_prompt _
   | Goal _
+  | Reminders _
   | Budget _
   | Approval _
   | Allow_rule _
@@ -421,6 +424,7 @@ let set_description t ~text = append t (Description { text })
 let set_cwd t ?host ~cwd () = append t (Cwd { cwd; host })
 let set_system_prompt t ~text = append t (System_prompt { text })
 let set_goal t goal = append t (Goal { goal })
+let set_reminders t reminders = append t (Reminders { reminders })
 let set_budget t ~usd = append t (Budget { usd })
 let set_approval t ~mode ~plan = append t (Approval { mode; plan })
 let add_allow_rule t ~rule = append t (Allow_rule { rule })
@@ -462,6 +466,7 @@ let name t =
     | Cwd _
     | System_prompt _
     | Goal _
+    | Reminders _
     | Budget _
     | Approval _
     | Allow_rule _
@@ -482,6 +487,7 @@ let description t =
     | Cwd _
     | System_prompt _
     | Goal _
+    | Reminders _
     | Budget _
     | Approval _
     | Allow_rule _
@@ -561,6 +567,7 @@ let context t =
       | Cwd _
       | System_prompt _
       | Goal _
+      | Reminders _
       | Budget _
       | Approval _
       | Allow_rule _
@@ -580,6 +587,7 @@ let context t =
       | Cwd _
       | System_prompt _
       | Goal _
+      | Reminders _
       | Budget _
       | Approval _
       | Allow_rule _
@@ -621,6 +629,7 @@ let system_prompt t =
     | Description _
     | Cwd _
     | Goal _
+    | Reminders _
     | Budget _
     | Approval _
     | Allow_rule _
@@ -641,6 +650,7 @@ let goal t =
     | Description _
     | Cwd _
     | System_prompt _
+    | Reminders _
     | Budget _
     | Approval _
     | Allow_rule _
@@ -648,6 +658,21 @@ let goal t =
     | Spend _
     | Resume_at _
     | Told_environment _ -> acc)
+;;
+
+let reminders t =
+  List.fold (active_path t) ~init:[] ~f:(fun acc (e : Entry.t) ->
+    match e.payload with
+    | Reminders { reminders } -> reminders
+    | _ -> acc)
+;;
+
+let reminder_names t =
+  List.concat_map t.entries ~f:(fun (e : Entry.t) ->
+    match e.payload with
+    | Reminders { reminders } ->
+      List.map reminders ~f:(fun (r : Reminder.t) -> r.name)
+    | _ -> [])
 ;;
 
 let budget t =
@@ -662,6 +687,7 @@ let budget t =
     | Cwd _
     | System_prompt _
     | Goal _
+    | Reminders _
     | Approval _
     | Allow_rule _
     | Archived _
@@ -681,6 +707,7 @@ let model t =
     | Cwd _
     | System_prompt _
     | Goal _
+    | Reminders _
     | Budget _
     | Approval _
     | Allow_rule _
@@ -827,6 +854,7 @@ let archived_and_activity t ~mtime =
         | Cwd _
         | System_prompt _
         | Goal _
+        | Reminders _
         | Budget _
         | Approval _
         | Allow_rule _
@@ -1100,6 +1128,7 @@ let to_markdown t =
     | Cwd _
     | System_prompt _
     | Goal _
+    | Reminders _
     | Budget _
     | Approval _
     | Allow_rule _

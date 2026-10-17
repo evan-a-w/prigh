@@ -396,13 +396,13 @@ let%expect_test "slash commands: the popup, arguments, running, unknown ones" =
     /mcp [reconnect] MCP servers: their tools, approve a project's, or restart failed ones
     /budget [dollars|off] show or set the session's cost budget: no turn starts once it is spent
     /goal [text|off|resume] set a goal the agent keeps working toward until it is met; show, clear or resume it
+    /remind [stop|every|rm|off ...] stop [N] TEXT: remind the agent when it ends its turn (at most N times in a row, default 3); every N TEXT: every N turns; rm NAME, off: remove one or all; none: list the session's (Delete removes one)
     /resume [now|cancel] show, run now or cancel the automatic resume after a usage limit
     /copy copy the last reply to the clipboard
     /btw <question> ask a side question without interrupting the run (not added to the conversation)
     /abort stop the current run
     /terminal open a shell where the tools run, in the session's directory (Ctrl+`)
     /files [path] browse, preview, upload and download files where the tools run (Ctrl+Shift+F)
-    /agents [n|id|cancel <n|id>] follow subagents and background jobs in the agents panel, or cancel one
     |}];
   H.type_ h "/mod";
   H.key h "Tab";

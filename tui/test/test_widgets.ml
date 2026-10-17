@@ -683,6 +683,7 @@ let%expect_test "keymap: every binding resolves to its intent and is documented"
     /auth                              show which providers are configured
     /budget [dollars|off]              show or set the session's cost budget: no turn starts once it is spent
     /goal [text|off|resume]            set a goal the agent keeps working toward until it is met; show, clear or resume it
+    /remind [stop|every|rm|off ...]    stop [N] TEXT: remind the agent when it ends its turn (at most N times in a row, default 3); every N TEXT: every N turns; rm NAME, off: remove one or all; none: list the session's (Ctrl+D removes one)
     /resume [now|cancel]               show, run now or cancel the automatic resume after a usage limit
     /compact [instructions]            summarise older messages to free context
     /diff [path]                       show the uncommitted changes where the tools run (git diff, untracked files too)
@@ -728,7 +729,7 @@ let%expect_test "keymap: every binding resolves to its intent and is documented"
     #name      insert a snippet: Tab or Enter on its completion (/snippet)
     type                     filter the list (fuzzy)
     Enter / Esc              accept the highlighted item / close without changes
-    Ctrl+D                   /sessions: delete the marked or highlighted sessions · /agents: cancel · /jobs: kill · /queue: remove
+    Ctrl+D                   /sessions: delete the marked or highlighted sessions · /agents: cancel · /jobs: kill · /queue, /remind: remove
     Tab                      /sessions: mark or unmark the highlighted session
     Alt+A                    /sessions: archive or unarchive the highlighted session
     Alt+D                    /sessions: delete every archived session
@@ -2113,6 +2114,7 @@ let%expect_test
       ~sessions:None
       ~skills
       ~snippets:[]
+      ~reminders:[]
       ~logged_in:(fun _ -> true)
       ~default_dir_host:None
   in
@@ -2189,6 +2191,7 @@ let%expect_test "autocomplete: /skill: completes skill names" =
       ~sessions:None
       ~skills
       ~snippets:[]
+      ~reminders:[]
       ~logged_in:(fun _ -> true)
       ~default_dir_host:None
   in
@@ -2337,6 +2340,7 @@ let%expect_test
         ~sessions:None
         ~skills:None
         ~snippets:[]
+        ~reminders:[]
         ~logged_in:(fun _ -> true)
         ~default_dir_host
     with

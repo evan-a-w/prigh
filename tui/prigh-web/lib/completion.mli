@@ -29,6 +29,7 @@ val compute
   -> ?users:string list
   -> ?skills:Skill.t list
   -> ?snippets:Snippet.t list
+  -> ?reminders:Reminder.t list (** the session's, for [/remind rm] *)
   -> text:string
   -> cursor:int
   -> models:Llm.t list

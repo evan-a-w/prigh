@@ -64,6 +64,7 @@ module Reply_tag = struct
     | Job_started
     | Skills_picker
     | Snippets_saved of string (** the notice *)
+    | Reminder_added
     | Skills_for_autocomplete of string (** the [Skill_cache] key *)
     | Skill_prompt of string (** the [/skill:] text sent *)
     | Mcp_picker
@@ -1470,7 +1471,7 @@ let drop_pending m =
   match m.mode with
   | Confirm { action = Tool_confirm _; _ }
   | Question _
-  | Picker { kind = Agents | Queue; _ } -> { m with mode = Editing }
+  | Picker { kind = Agents | Queue | Reminders; _ } -> { m with mode = Editing }
   | Text_prompt { action = Deny_reason { draft; _ }; _ } ->
     { m with mode = Editing; editor = Editor.set_text m.editor draft }
   | _ -> m
@@ -1945,6 +1946,49 @@ let snippet_action m (action : Snippet_command.Action.t) =
   | Error text -> error m text, []
 ;;
 
+(* ---- reminders --------------------------------------------------------- *)
+
+let reminders m = Option.map m.state ~f:(fun (s : P.State.t) -> s.reminders)
+
+let reminder_picker m (reminders : P.Reminder.t list) =
+  let items =
+    List.map reminders ~f:(fun (r : P.Reminder.t) ->
+      Picker.Item.create
+        ~id:r.name
+        ~detail:
+          (sprintf
+             "%s · %s"
+             (P.Reminder.Trigger.describe r.trigger)
+             (P.Reminder.first_line r))
+        ~search:(r.name ^ " " ^ r.text)
+        r.name)
+  in
+  open_picker m Reminders (Picker.create ~title:"Reminders" items)
+;;
+
+let remind_action m ~command (action : Remind_command.Action.t) =
+  match action with
+  | Pick reminders -> reminder_picker m reminders, []
+  | Info text -> notice m text, []
+  | Error text -> error (restore_command m command) text, []
+  | Add _ | Remove _ | Clear _ ->
+    (match Remind_command.rpc action with
+     | None -> m, []
+     | Some (method_, params) ->
+       let then_ : Reply_tag.t =
+         match action with
+         | Remove name -> Notice_on_success (Remind_command.removed name)
+         | Clear n -> Notice_on_success (Remind_command.cleared n)
+         | _ -> Reminder_added
+       in
+       ( { m with mode = Editing }
+       , [ rpc
+             method_
+             ~params
+             ~tag:(Retry_in_editor { command; hint = ""; then_ })
+         ] ))
+;;
+
 let cancel_btw m =
   match m.btw with
   | Some box when Btw_box.is_streaming box ->
@@ -2316,6 +2360,11 @@ let run_command m (cmd : Commands.Parsed.t) =
          ~snippets:(snippets m)
          ~last_prompt:(last_prompt m)
          cmd.rest)
+  | "remind", _ ->
+    remind_action
+      m
+      ~command:(String.strip ("/remind " ^ cmd.rest))
+      (Remind_command.run ~reminders:(reminders m) cmd.rest)
   | "mcp", [] -> m, [ call (List_mcp { reconnect = false }) ~tag:Mcp_picker ]
   | "mcp", [ "reconnect" ] ->
     ( notice m "reconnecting MCP servers…"
@@ -2583,6 +2632,7 @@ let refresh_autocomplete m =
       ~sessions:m.sessions
       ~skills:(Skill_cache.find m.skills ~key:(Skill_cache.key m.state))
       ~snippets:(Option.value (snippets m) ~default:[])
+      ~reminders:(Option.value (reminders m) ~default:[])
       ~logged_in:(logged_in m)
       ~default_dir_host:(default_dir_host m)
   with
@@ -3074,6 +3124,23 @@ let picker_selected m (kind : Mode.Picker_kind.t) (item : Picker.Item.t) =
            m
            (sprintf "snippet %S is gone; /snippet lists the others" item.id)
        , [] ))
+  | Reminders ->
+    (match P.Reminder.find (Option.value (reminders m) ~default:[]) item.id with
+     | Some r ->
+       ( notice
+           m
+           (sprintf
+              "%s (%s): %s · /remind rm %s removes it"
+              r.name
+              (P.Reminder.Trigger.describe r.trigger)
+              r.text
+              r.name)
+       , [] )
+     | None ->
+       ( error
+           m
+           (sprintf "reminder %s is gone; /remind lists the others" item.id)
+       , [] ))
   | Mcp list -> mcp_selected m list item.id
   | Auth_select id ->
     m, [ rpc "auth_respond" ~params:[ "id", str id; "value", str item.id ] ]
@@ -3268,6 +3335,14 @@ let picker m (kind : Mode.Picker_kind.t) picker (intent : Intent.t) =
        (match Picker.selected_item picker with
         | None -> m, []
         | Some item -> unqueue m item.id ~edit:false)
+     | Reminders ->
+       (match Picker.selected_item picker with
+        | None -> m, []
+        | Some item ->
+          remind_action
+            m
+            ~command:("/remind rm " ^ item.id)
+            (Remind_command.Action.Remove item.id))
      | Sessions selection ->
        confirm_delete m ~back (Session_selection.targets selection picker)
      | _ -> { m with quitting = true }, [ Command.Quit ])
@@ -3977,6 +4052,7 @@ let rec reply m (tag : Reply_tag.t) (result : (P.Json.t, string) Result.t) =
          ~f:(fun json -> P.Json.string_field json "text")
          (fun text -> update_btw m id ~f:(Btw_box.finish ~text), [])
      | Notice_on_success text -> notice m text, []
+     | Reminder_added -> notice m (Remind_command.added json), []
      | Dir_changed target ->
        decode json ~f:P.Dir_change.Outcome.of_json (fun outcome ->
          dir_changed m target outcome)

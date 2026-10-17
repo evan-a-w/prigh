@@ -76,6 +76,7 @@ let%expect_test "state event and messages" =
         (jobs       ())
         (budget_usd ())
         (goal       ())
+        (reminders  ())
         (resume_at  ())
         (approval_mode Auto)
         (plan_mode     false)
@@ -417,6 +418,7 @@ let%expect_test "tool host events and state hosts" =
         (jobs       ())
         (budget_usd ())
         (goal       ())
+        (reminders  ())
         (resume_at  ())
         (approval_mode Auto)
         (plan_mode     false)
@@ -1233,5 +1235,39 @@ let%expect_test "Moved_job: a foreground bash call that became a job" =
       (output "")))
     ()
     ()
+    |}]
+;;
+
+let%expect_test "reminders in the state, as the backend sends them" =
+  List.iter
+    [ {|{"name":"r1","text":"Keep going.\nReally.","on":"stop","max_repeats":3,"repeats":2}|}
+    ; {|{"name":"r2","text":"Check disk.","every_turns":1}|}
+    ; {|{"name":"r3","text":"x","every_turns":40}|}
+    ; {|{"name":"r4","text":"x","on":"stop"}|}
+    ]
+    ~f:(fun json ->
+      match Reminder.of_json (Or_error.ok_exn (Json.parse json)) with
+      | Ok r ->
+        print_s [%sexp (r : Reminder.t)];
+        print_endline (Reminder.Trigger.describe r.trigger)
+      | Error e -> print_s [%message "error" (e : Error.t)]);
+  [%expect
+    {|
+    ((name r1)
+     (text "Keep going.\nReally.")
+     (trigger (
+       On_stop
+       (max_repeats 3)
+       (repeats     2))))
+    on stop 2/3
+    ((name r2)
+     (text "Check disk.")
+     (trigger (Every_turns 1)))
+    every turn
+    ((name r3)
+     (text x)
+     (trigger (Every_turns 40)))
+    every 40 turns
+    (error (e "missing field \"max_repeats\""))
     |}]
 ;;

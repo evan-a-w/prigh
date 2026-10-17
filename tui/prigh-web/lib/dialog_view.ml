@@ -20,6 +20,7 @@ let picker_title : Dialog.Picker_kind.t -> string = function
   | Accounts -> "Accounts"
   | Skills -> "Skills"
   | Snippets -> "Snippets"
+  | Reminders -> "Reminders"
   | Mcp _ -> "Servers"
   | Jump -> "Messages"
 ;;
@@ -45,7 +46,13 @@ let picker ~kind (p : Picker.t) ~inject =
        | _ -> "picker-dialog")
     ~title:(Picker.title p)
     ~on_close:(inject Action.Close_dialog)
-    ~footer:[ keys_hint "↑↓ to move, Enter to choose, Esc to close" ]
+    ~footer:
+      [ keys_hint
+          (match kind with
+           | Reminders ->
+             "↑↓ to move, Enter to show, Delete to remove, Esc to close"
+           | _ -> "↑↓ to move, Enter to choose, Esc to close")
+      ]
     [ div
         ~cls:"search"
         [ icon Search
@@ -107,14 +114,29 @@ let picker ~kind (p : Picker.t) ~inject =
                   ; Attr.on_click (fun _ ->
                       inject (Action.Picker_choose item.id))
                   ]
-                [ span ~cls:"picker-label" item.label
-                ; (if String.is_empty item.detail
-                   then Node.none
-                   else span ~cls:"picker-detail" item.detail)
-                ; (if item.marked
-                   then Html.mark ~cls:"picker-check" Check
-                   else Node.none)
-                ])))
+                ([ span ~cls:"picker-label" item.label
+                 ; (if String.is_empty item.detail
+                    then Node.none
+                    else span ~cls:"picker-detail" item.detail)
+                 ; (if item.marked
+                    then Html.mark ~cls:"picker-check" Check
+                    else Node.none)
+                 ]
+                 @
+                 match kind with
+                 | Reminders ->
+                   [ button
+                       ~cls:"small picker-remove"
+                       ~title:"Delete"
+                       ~label:("Remove reminder " ^ item.id)
+                       ~on_click:
+                         (Effect.Many
+                            [ Effect.Stop_propagation
+                            ; inject (Action.Remove_reminder item.id)
+                            ])
+                       [ Node.text "Remove" ]
+                   ]
+                 | _ -> []))))
     ; mcp_problems kind
     ]
 ;;

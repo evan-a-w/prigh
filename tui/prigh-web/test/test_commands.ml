@@ -100,6 +100,7 @@ let%expect_test "every command does something (none is unknown)" =
     /mcp                       loading MCP servers: rpc list_mcp
     /budget                    toast: No budget ($0.00 spent): /budget DOLLARS stops the agent starting turns once the session has cost that much
     /goal                      toast: No goal: /goal TEXT sets one, and the agent keeps working until it judges it met
+    /remind                    toast: No reminders yet: /remind stop TEXT or /remind every N TEXT adds one
     /resume                    toast: No resume is scheduled: one is when a run stops at a usage limit whose reset time the provider gives
     /copy                      toast: Nothing to copy yet: no reply in this session.
     /btw                       toast: Usage: /btw <question> (asked aside; the run goes on)
@@ -174,6 +175,7 @@ let%expect_test "/help <command> and /hotkeys" =
     Ctrl+Shift+F open or close the file browser (/files): ↑↓ select, Enter opens, Backspace goes up, F2 renames, Delete deletes, Esc closes
     Ctrl+` open or close the terminal (/terminal); in it, every other key goes to the shell
     Tab (in /scoped-models) check or uncheck the highlighted model
+    Delete (in /remind's list) remove the highlighted reminder
     y / a / n / r (confirmation) allow once, always allow (its rules, this session), deny, deny saying why; Enter allows, Esc denies
     ↑↓ Space ←→ (question) choose, pick, previous / next question; type for your own answer; Enter accepts, Esc declines
     Left to the browser
@@ -1639,7 +1641,7 @@ let%expect_test "/retry-backend-connection, /state, /clear, /quit" =
      (thinking on) (running false) (message_count 0)
      (usage ((input 0) (output 0) (cache_read 0))) (cost_usd 0)
      (context_tokens 0) (active_host backend) (hosts ()) (subagents ()) (jobs ())
-     (budget_usd ()) (goal ()) (resume_at ()) (approval_mode Auto)
+     (budget_usd ()) (goal ()) (reminders ()) (resume_at ()) (approval_mode Auto)
      (plan_mode false) (plan ()) (session_rules ()))
     (Done)
     |}];

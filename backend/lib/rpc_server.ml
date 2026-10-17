@@ -45,6 +45,9 @@ let methods =
   ; "set_goal"
   ; "clear_goal"
   ; "resume_goal"
+  ; "add_reminder"
+  ; "remove_reminder"
+  ; "clear_reminders"
   ; "cancel_resume"
   ; "resume_now"
   ; "new_session"
@@ -1703,6 +1706,30 @@ let dispatch agent login ~meth ~params : Json.t Or_error.t =
       unit_result (Agent.set_goal agent text))
   | "clear_goal" -> unit_result (Agent.clear_goal agent)
   | "resume_goal" -> unit_result (Agent.resume_goal agent)
+  | "add_reminder" ->
+    let open Or_error.Let_syntax in
+    let%bind text = string_param params "text" in
+    let%bind trigger =
+      match string_param_opt params "on", param params "every_turns" with
+      | Ok (Some "stop"), None ->
+        let%map max_repeats =
+          int_param params "max_repeats" ~default:Reminder.default_max_repeats
+        in
+        Reminder.Trigger.On_stop { max_repeats }
+      | Ok None, Some _ ->
+        let%map n = int_param params "every_turns" ~default:0 in
+        Reminder.Trigger.Every_turns n
+      | _ ->
+        Or_error.error_string
+          "add_reminder needs \"on\": \"stop\" (with an optional \
+           \"max_repeats\") or \"every_turns\": N"
+    in
+    let%map reminder = Agent.add_reminder agent ~text trigger in
+    Rpc_json.reminder reminder ~stops:0
+  | "remove_reminder" ->
+    Or_error.bind (string_param params "name") ~f:(fun name ->
+      unit_result (Agent.remove_reminder agent name))
+  | "clear_reminders" -> unit_result (Agent.clear_reminders agent)
   | "cancel_resume" -> unit_result (Agent.cancel_resume agent)
   | "resume_now" -> unit_result (Agent.resume_now agent)
   | "set_session_name" ->
