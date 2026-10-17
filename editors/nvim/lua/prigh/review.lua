@@ -123,7 +123,7 @@ function M.open(opts)
     self:_close("applied")
     return self
   end
-  self:goto(1)
+  self:jump(1)
   return self
 end
 
@@ -227,7 +227,7 @@ function R:current()
   return #self.hunks > 0 and #self.hunks or nil
 end
 
-function R:goto(i)
+function R:jump(i)
   local h = self.hunks[i]
   local win = vim.fn.bufwinid(self.buf)
   if not h or win == -1 then
@@ -246,17 +246,17 @@ function R:move(delta)
   if delta > 0 then
     for i, h in ipairs(self.hunks) do
       if h.b_start > row then
-        return self:goto(i)
+        return self:jump(i)
       end
     end
-    self:goto(1)
+    self:jump(1)
   else
     for i = #self.hunks, 1, -1 do
       if self.hunks[i].b_start < row then
-        return self:goto(i)
+        return self:jump(i)
       end
     end
-    self:goto(#self.hunks)
+    self:jump(#self.hunks)
   end
 end
 
@@ -276,7 +276,7 @@ function R:decide(i, decision)
   for k = 1, #self.hunks do
     local j = (i + k - 1) % #self.hunks + 1
     if not self.hunks[j].decision then
-      return self:goto(j)
+      return self:jump(j)
     end
   end
 end
