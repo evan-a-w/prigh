@@ -758,7 +758,7 @@ let%expect_test "typing / lists commands, Down twice + Tab fills /login " =
       /fallback [off|model...]        show or set the models th…
       /default-dir [off|path]         show or set the directory…
       /login [provider] [api_key|oauth]  log in to a provider
-      ↕ 1–8 of 57
+      ↕ 1–8 of 58
     …deepseek-flash  $0.01  Tab/Enter accept · Alt+S as typed
     |}];
   H.key h (Key.plain Down);
@@ -775,7 +775,7 @@ let%expect_test "typing / lists commands, Down twice + Tab fills /login " =
       /fallback [off|model...]        show or set the models th…
       /default-dir [off|path]         show or set the directory…
       /login [provider] [api_key|oauth]  log in to a provider
-      ↕ 1–8 of 57
+      ↕ 1–8 of 58
     …deepseek-flash  $0.01  Tab/Enter accept · Alt+S as typed
     |}];
   H.key h (Key.plain Down);
@@ -792,7 +792,7 @@ let%expect_test "typing / lists commands, Down twice + Tab fills /login " =
       /fallback [off|model...]        show or set the models th…
       /default-dir [off|path]         show or set the directory…
       /login [provider] [api_key|oauth]  log in to a provider
-      ↕ 1–8 of 57
+      ↕ 1–8 of 58
     …deepseek-flash  $0.01  Tab/Enter accept · Alt+S as typed
     |}];
   H.key h (Key.plain Tab);
@@ -4928,7 +4928,8 @@ let%expect_test
       (fallback_models  ())
       (default_cwd      ())
       (archive_after_days 7)
-      (notify             bell)))
+      (notify             bell)
+      (snippets ())))
     ((
       (scoped_models (deepseek/deepseek-flash))
       (approval_mode Auto)
@@ -4941,7 +4942,8 @@ let%expect_test
       (fallback_models  ())
       (default_cwd      ())
       (archive_after_days 7)
-      (notify             bell)))
+      (notify             bell)
+      (snippets ())))
     |}]
 ;;
 
@@ -5932,7 +5934,8 @@ let%expect_test "/change_default saves the model and thinking level" =
       (fallback_models ())
       (default_cwd     ())
       (archive_after_days 7)
-      (notify             bell)))
+      (notify             bell)
+      (snippets ())))
 
 
 
@@ -6627,6 +6630,50 @@ let%expect_test "Alt+M cycles the mode; the status line shows it at once" =
 (* Every keymap binding must have been reached by a scenario of this file:
    dune runs each file's inline tests in a separate process, so the other
    test_app_*.ml files' keys do not count here. *)
+let%expect_test "Alt+N: the snippet picker inserts at the cursor" =
+  let h = connected () in
+  let alt_n () = H.key h (Key.alt (Char "n")) in
+  alt_n ();
+  H.reply ~quiet:true h Config {|{"snippets":[]}|};
+  alt_n ();
+  H.keys h "Please ";
+  H.reply
+    ~quiet:true
+    h
+    Config
+    {|{"snippets":[{"name":"review","text":"review the diff"},{"name":"tests","text":"run the tests"}]}|};
+  alt_n ();
+  H.show h;
+  H.enter h;
+  H.show h;
+  [%expect {|
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+
+    ▌ earlier question
+      earlier answer
+      the config has not loaded yet; try again in a moment
+      no snippets yet: /snippet add NAME TEXT saves one
+    Snippets  (2)
+    / ▏
+    ▸  review  review the diff
+       tests   run the tests
+    ────────────────────────────────────────────────────────────
+    …deepseek-flash  ctx:0.1%/1.0M  Enter inserts the text at t…
+
+
+
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+
+    ▌ earlier question
+      earlier answer
+      the config has not loaded yet; try again in a moment
+      no snippets yet: /snippet add NAME TEXT saves one
+    ────────────────────────────────────────────────────────────
+    > Please review the diff▏
+    …deepseek-flash  think:off  mode:auto  ctx:0.1%/1.0M  $0.01
+    |}]
+;;
+
 let%expect_test "keymap: every binding is covered by a scenario" =
   List.iter Keymap.bindings ~f:(fun b ->
     let keys = List.map b.keys ~f:Key.to_string |> String.concat ~sep:"/" in
@@ -6670,6 +6717,7 @@ let%expect_test "keymap: every binding is covered by a scenario" =
     Ctrl+F           Search                   covered
     Ctrl+G           Edit_externally          covered
     Ctrl+L           Model_picker             covered
+    Alt+N            Snippet_picker           covered
     Ctrl+P           Next_model               covered
     Alt+P            Prev_model               covered
     Ctrl+T           Next_thinking            covered
@@ -7636,7 +7684,7 @@ let%expect_test "Tab on an empty editor opens the command list; the list shows \
       /fallback [off|model...]        show or set the models th…
       /default-dir [off|path]         show or set the directory…
       /login [provider] [api_key|oauth]  log in to a provider
-      ↕ 1–8 of 57
+      ↕ 1–8 of 58
     …deepseek-flash  $0.01  Tab/Enter accept · Alt+S as typed
     |}];
   H.key h (Key.plain End);
@@ -7653,7 +7701,7 @@ let%expect_test "Tab on an empty editor opens the command list; the list shows \
       /fallback [off|model...]        show or set the models th…
       /default-dir [off|path]         show or set the directory…
       /login [provider] [api_key|oauth]  log in to a provider
-      ↕ 1–8 of 57
+      ↕ 1–8 of 58
     …deepseek-flash  $0.01  Tab/Enter accept · Alt+S as typed
     |}];
   H.keys h "qu";

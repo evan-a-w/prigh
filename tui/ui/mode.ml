@@ -19,6 +19,7 @@ module Picker_kind = struct
     | Modes (** [/mode]: approval modes and plan mode *)
     | Hosts
     | Skills
+    | Snippets
     | Mcp of Mcp_list.t
     | Auth_select of string
   [@@deriving sexp_of, equal]

@@ -49,6 +49,7 @@ type t =
   | Path_complete
   | Edit_externally
   | Model_picker
+  | Snippet_picker (** Alt+N: pick a snippet to insert *)
   | Picker_toggle_filter (** Ctrl+N in the sessions picker *)
   | Search (** Ctrl+F: search the transcript *)
   | Prev_user_message (** Ctrl+Up: jump to the previous user message *)
