@@ -548,6 +548,20 @@ backoff capped at 10s — rejoining the same session and respawning the
 backend when it was spawned; `/retry-backend-connection` retries at once and
 Ctrl+C quits meanwhile.
 
+## In Neovim
+
+[`editors/nvim`](editors/nvim/README.md) is prigh.nvim, a Neovim client
+speaking the Agent Client Protocol to `prigh acp` (locally, or `prigh acp
+-connect HOST:PORT -token T` for a remote backend): a chat split with
+streamed answers, tool cards and permission cards, the agent reading and
+editing your buffers (unsaved text included), and `:PrighReview` to accept or
+reject its changes hunk by hunk.
+
+```lua
+vim.opt.rtp:append("~/src/prigh/editors/nvim")
+require("prigh").setup({ cmd = { "prigh", "acp" } })   -- then :Prigh
+```
+
 ## Use
 
 Log in to at least one provider (credentials go to
@@ -1408,5 +1422,7 @@ Firefox against the real backend; the flake runs them as checks.
   (DOM rendering, key mapping, WebSocket transport, the js_of_ocaml page),
   `prigh-web/` (the DOM-native browser frontend), `test/`, `test-web/`,
   `e2e/`.
+- `editors/nvim/` — prigh.nvim, the Neovim ACP client (Lua; headless tests
+  against a scripted fake agent: `editors/nvim/test/run.sh`).
 - `ARCHITECTURE.md` — how the pieces fit together; `DOCKER.md` — the
   container; `AGENTS.md` — conventions for working on the code.
