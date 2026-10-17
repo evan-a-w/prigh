@@ -1,0 +1,104 @@
+
+== open: three hunks
+      ┆ review x.txt: 3 hunks, 0 accepted, 0 rejected, 3 left · ]h/[h move · ga/gr accept/reject · gA/gR all · q discard  [PrighReviewHeader]
+  1   a
+      ┆ b  [PrighReviewDelete]
+  2 + B  [PrighReviewAdd]  ⟨hunk 1/3: ga accept · gr reject⟩
+  3   c
+  4   d
+      ┆ e  [PrighReviewDelete]
+  5 - f  ⟨hunk 2/3: ga accept · gr reject⟩
+  6   g
+  7   h
+  8 + i  [PrighReviewAdd]  ⟨hunk 3/3: ga accept · gr reject⟩
+cursor: 2 b:prigh_review = true
+
+== ]h ]h [h
+cursor: 5
+cursor: 8
+cursor: 5
+
+== ga on hunk 1, gr on hunk 2 (cursor moves on)
+cursor: 5
+      ┆ review x.txt: 3 hunks, 1 accepted, 1 rejected, 1 left · ]h/[h move · ga/gr accept/reject · gA/gR all · q discard  [PrighReviewHeader]
+  1   a
+      ┆ b  [PrighReviewAccepted]
+  2 ✓ B  ⟨hunk 1/3: accepted⟩
+  3   c
+  4   d
+      ┆ e  [PrighReviewAdd]
+  5 - f  ⟨hunk 2/3: rejected⟩
+  6   g
+  7   h
+  8 + i  [PrighReviewAdd]  ⟨hunk 3/3: ga accept · gr reject⟩
+
+== ga on the last hunk applies everything
+on_done: {"accepted":2,"rejected":1,"status":"applied"}
+  1   a
+  2   B
+  3   c
+  4   d
+  5   e
+  6   f
+  7   g
+  8   h
+  9   i
+ga mapped: false b:prigh_review = nil
+after one undo: a B c d f g h i
+
+== gR rejects all: back to the old text, one undo step
+on_done: {"accepted":0,"rejected":3,"status":"applied"}
+buffer: a b c d e f g h
+after one undo: a B c d f g h i
+
+== gA accepts all
+on_done: {"accepted":3,"rejected":0,"status":"applied"}
+buffer: a B c d f g h i
+
+== q discards: no change, marks and keys gone
+on_done: {"accepted":0,"rejected":0,"status":"discarded"}
+buffer: a B c d f g h i marks: 0
+user's q restored: user q
+
+== edits during the review re-anchor the hunks
+      ┆ review [No Name]: 4 hunks, 0 accepted, 1 rejected, 3 left · ]h/[h move · ga/gr accept/reject · gA/gR all · q discard  [PrighReviewHeader]
+  1 + inserted by the user  [PrighReviewAdd]  ⟨hunk 1/4: ga accept · gr reject⟩
+  2   a
+      ┆ b  [PrighReviewAdd]
+  3 ✗ B  [PrighReviewRejected]  ⟨hunk 2/4: rejected⟩
+  4   c
+  5   d
+      ┆ e  [PrighReviewDelete]
+  6 - f  ⟨hunk 3/4: ga accept · gr reject⟩
+  7   g
+  8   h
+  9 + i  [PrighReviewAdd]  ⟨hunk 4/4: ga accept · gr reject⟩
+
+== insert mode pauses
+review [No Name]: 4 hunks, 0 accepted, 1 rejected, 3 left · ]h/[h move · ga/gr accept/reject · gA/gR all · q discard · paused while inserting
+review [No Name]: 4 hunks, 0 accepted, 1 rejected, 3 left · ]h/[h move · ga/gr accept/reject · gA/gR all · q discard
+on_done: {"accepted":3,"rejected":1,"status":"applied"}
+buffer: inserted by the user a b c d f g h i
+
+== proposed text: buffer has the old text, review shows the new
+      ┆ review [No Name]: 3 hunks, 0 accepted, 0 rejected, 3 left · ]h/[h move · ga/gr accept/reject · gA/gR all · q discard  [PrighReviewHeader]
+  1   a
+      ┆ b  [PrighReviewDelete]
+  2 + B  [PrighReviewAdd]  ⟨hunk 1/3: ga accept · gr reject⟩
+  3   c
+  4   d
+      ┆ e  [PrighReviewDelete]
+  5 - f  ⟨hunk 2/3: ga accept · gr reject⟩
+  6   g
+  7   h
+  8 + i  [PrighReviewAdd]  ⟨hunk 3/3: ga accept · gr reject⟩
+on_done: {"accepted":2,"rejected":1,"status":"applied"}
+buffer: a B c d e f g h i
+after one undo: a b c d e f g h
+
+== proposed text discarded
+on_done: {"accepted":0,"rejected":0,"status":"discarded"}
+buffer: a b c d e f g h
+
+== no changes
+on_done: {"accepted":0,"rejected":0,"status":"applied"}
