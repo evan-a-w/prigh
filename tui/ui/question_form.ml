@@ -16,7 +16,7 @@ type t =
   ; answers : Answer.t list
   ; current : int
   ; cursor : int
-  ; deadline : Time_ns.t option
+  ; deadline : Time_ns.Alternate_sexp.t option
   }
 [@@deriving sexp_of, equal]
 

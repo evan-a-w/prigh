@@ -36,6 +36,7 @@ let question call_id : P.Event.t =
           ; multiple = false
           }
         ]
+    ; deadline = None
     }
 ;;
 

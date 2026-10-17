@@ -1229,3 +1229,41 @@ let%expect_test "an answer that fails is asked again" =
     (y Allow once) (n Deny) (r Deny, saying why)
     |}]
 ;;
+
+let%expect_test
+    "a question dialog says when the agent carries on; a timeout closes it \
+     quietly, the backend's notice says why"
+  =
+  let h = H.create () in
+  H.act h (Set_utc_offset (Time_ns.Span.of_hr 2.));
+  H.event
+    h
+    {|{"event":"ask_user","call_id":"q1","questions":[{"question":"Sure?"}],"deadline_ms":1760191500000}|};
+  modal h;
+  H.show h ~selector:".question-deadline";
+  [%expect {|
+    (Focus question-own)
+    Question
+    (Close (Esc))
+    Sure?
+    []
+    unanswered, the agent carries on by itself at 16:05
+    type your answer, ↑↓ choose, Enter accepts, Esc declines (Decline) (Send)
+    <p class="question-deadline"> unanswered, the agent carries on by itself at 16:05 </p>
+    |}];
+  H.event h {|{"event":"ask_user_done","call_id":"q1","timed_out":true}|};
+  H.event
+    h
+    {|{"event":"notice","text":"the question was not answered within 10m; the agent carries on without it"}|};
+  modal h;
+  toasts h;
+  [%expect {|
+    (Focus editor)
+    (Expire_toast (id 0) (after_ms 4420))
+    the question was not answered within 10m; the agent carries on without it
+    |}];
+  (* Without a deadline, no note. *)
+  H.event h (ask "q2" {|[{"question":"Sure?"}]|});
+  H.show h ~selector:".question-deadline";
+  [%expect {| (Focus question-own) |}]
+;;

@@ -468,7 +468,7 @@ let questions : P.Question.t list =
 
 let%expect_test "ask_user: a dialog per question; Enter answers, Esc declines" =
   let h = Test_app.connected ~height:16 () in
-  H.event h (Ask_user { call_id = "q1"; questions });
+  H.event h (Ask_user { call_id = "q1"; questions; deadline = None });
   H.show h;
   [%expect
     {|
@@ -546,7 +546,8 @@ let%expect_test "ask_user: a dialog per question; Enter answers, Esc declines" =
   H.mode h;
   H.event
     h
-    (Ask_user { call_id = "q2"; questions = [ List.last_exn questions ] });
+    (Ask_user
+       { call_id = "q2"; questions = [ List.last_exn questions ]; deadline = None });
   H.esc h;
   H.mode h;
   [%expect
@@ -567,8 +568,8 @@ let%expect_test
      waiting"
   =
   let h = Test_app.connected () in
-  H.event h (Ask_user { call_id = "q1"; questions });
-  H.event h (Ask_user_done "q1");
+  H.event h (Ask_user { call_id = "q1"; questions; deadline = None });
+  H.event h (Ask_user_done { call_id = "q1"; timed_out = false });
   H.mode h;
   [%expect {| editing |}];
   (* After a reconnect: what the backend still waits for, without
@@ -765,6 +766,65 @@ let%expect_test
     |}]
 ;;
 
+let%expect_test
+    "ask_user: the dialog says when the agent carries on; a timeout closes \
+     it"
+  =
+  let h = Test_app.connected ~height:14 () in
+  H.step h (Set_utc_offset (Time_ns.Span.of_hr 2.));
+  let deadline =
+    Time_ns.of_span_since_epoch (Time_ns.Span.of_int_sec 1760191500)
+  in
+  H.event
+    h
+    (Ask_user
+       { call_id = "q1"
+       ; questions = [ List.last_exn questions ]
+       ; deadline = Some deadline
+       });
+  H.show h;
+  [%expect {|
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+
+    ▌ earlier question
+      earlier answer
+    ┌─ Question ───────────────────────────────────────────────┐
+    │ Anything else?                                           │
+    │ › ▏                                                      │
+    │ type an answer · Enter answers                           │
+    │ Esc declines (the model is told)                         │
+    │ unanswered, the agent carries on by itself at 16:05      │
+    └──────────────────────────────────────────────────────────┘
+    ────────────────────────────────────────────────────────────
+    …deepseek-flash  ctx:0.1%/1.0M  Enter accepts · Esc declines
+    |}];
+  H.event h (Ask_user_done { call_id = "q1"; timed_out = true });
+  H.event
+    h
+    (Notice
+       "the question was not answered within 10m; the agent carries on \
+        without it");
+  H.mode h;
+  H.show h;
+  [%expect {|
+    editing
+
+
+
+
+
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+
+    ▌ earlier question
+      earlier answer
+      the question was not answered within 10m; the agent
+      carries on without it
+    ────────────────────────────────────────────────────────────
+    > ▏
+    …deepseek-flash  think:off  mode:auto  ctx:0.1%/1.0M  $0.01
+    |}]
+;;
+
 let%expect_test "long choice descriptions and answers wrap in the question box" =
   let h = Test_app.connected ~width:50 ~height:20 () in
   H.event
@@ -786,6 +846,7 @@ let%expect_test "long choice descriptions and answers wrap in the question box" 
              ; multiple = false
              }
            ]
+       ; deadline = None
        });
   H.key h (Key.plain Down);
   H.show h;
