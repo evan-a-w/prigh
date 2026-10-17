@@ -808,8 +808,20 @@ and subagents alike, arrive as one message). Killed jobs report `killed`, a
 host that disconnects fails its jobs (`failed: tool host disconnected`). The
 model also has `job_status`, `job_output` (peek at recent output, paging back
 with `offset`), `job_wait` (block on some or all jobs; returned reports are
-not delivered again), `job_input` and `job_kill`. Subagents' `bash` has no
-`background`.
+not delivered again), `job_input` and `job_kill`.
+
+Subagents have jobs too, their own (`j1`, ... per subagent): `bash` with
+`background` and the job tools work the same, but since a subagent is not
+woken after it ends its turn, its `job_wait` blocks as long as the jobs
+take (its `timeout` only bounds it), finished jobs' reports reach it
+between its turns, and jobs still running when it finishes are killed,
+which its report says (`[killed when the subagent finished, still
+running: job j2 (sleep 60)]`). Its system prompt and tool descriptions tell
+it to block, never sleep: foreground commands for results it needs (one
+blocking command to wait for something to become ready), jobs plus
+`job_wait` for commands side by side, and to wait for what it needs before
+its final report. The main agent's prompt tells it never to sleep to pass
+the time either.
 
 The main agent never stalls on a long command or a wait.
 `auto_background_seconds` in `config.json` (default 30; `0` turns it off)
@@ -827,7 +839,8 @@ command starts, not while a confirmation waits for you. `job_wait` and
 shorter, not longer) with what is still running, whose reports are still
 delivered later, once. The system prompt and the tool descriptions tell
 the model to keep working or end its turn rather than wait. Subagents'
-own `bash` calls stay in the foreground. The tool card shows `job j3` and
+own foreground `bash` calls are never moved, and their `job_wait` has no
+such limit. The tool card shows `job j3` and
 `moved to the background after 30s` with the output it had then.
 
 A job started with `stdin: true` gets a pipe for its stdin that stays

@@ -9,22 +9,31 @@ val instruction_files : cwd:string -> home:string -> string list
 (** The instruction files with their (stripped) contents. *)
 val read_instructions : cwd:string -> home:string -> (string * string) list
 
+module Role : sig
+  type t =
+    | Main
+    | Subagent
+  [@@deriving sexp_of, equal]
+end
+
 (** [instructions] (path, text) default to [read_instructions] on this
     machine; [Agent] fetches them from the session's tool host instead. [nix]
     (default false), when the tool host has Nix, adds how to get missing tools
     from nixpkgs. [skills] that the model may use are listed when it has the
     [read] tool. [auto_background] (seconds) says when a foreground command
     is moved to the background, in the guidance on background work (given
-    when the tools include [job_wait] or [subagent_wait]). [orchestrator]
-    (default false; the main agent's) tells a model with the [subagent] tool
-    to delegate substantial work to subagents. *)
+    when the tools include [job_wait] or [subagent_wait]). [role] (default
+    [Main]) is whose prompt it is: the main agent's tells a model with the
+    [subagent] tool to delegate substantial work to subagents; a subagent's
+    tells it to block on commands and jobs rather than sleep, since it is
+    not woken after its turn. *)
 val build
   :  ?date:string
   -> ?instructions:(string * string) list
   -> ?nix:bool
   -> ?skills:Skill.t list
   -> ?auto_background:float
-  -> ?orchestrator:bool
+  -> ?role:Role.t
   -> cwd:string
   -> home:string
   -> tools:Tool_spec.t list

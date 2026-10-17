@@ -154,7 +154,7 @@ let%expect_test "without stdin: true a job reads end of input at once" =
     |}]
 ;;
 
-let%expect_test "a model without jobs, and subagents, do not get job_input" =
+let%expect_test "a model without jobs does not get job_input; subagents do" =
   let names tools = List.map tools ~f:Tool.name in
   let all = Tools.all @ Tool_jobs.tools in
   print_s
@@ -164,7 +164,11 @@ let%expect_test "a model without jobs, and subagents, do not get job_input" =
     , (Result.map (Tools.for_context ~parent:all ~depth:1 ()) ~f:(fun tools ->
          List.filter (names tools) ~f:(String.is_prefix ~prefix:"job_"))
        : string list Or_error.t)];
-  [%expect {| ((job_status job_output job_wait job_input job_kill) (Ok ())) |}]
+  [%expect
+    {|
+    ((job_status job_output job_wait job_input job_kill)
+     (Ok (job_status job_output job_wait job_input job_kill)))
+    |}]
 ;;
 
 (* The host protocol, played by a test client: a host that announced
