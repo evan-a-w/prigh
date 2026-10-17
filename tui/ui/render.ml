@@ -419,7 +419,7 @@ let question_keys ~(q : P.Question.t) ~total =
 ;;
 
 (* The dialog and where the cursor goes in it (the own answer's end). *)
-let question_dialog ~width form =
+let question_dialog ~width ~utc_offset form =
   let inner = Boxed.inner_width ~width in
   let questions = Question_form.questions form in
   let index = Question_form.current form in
@@ -505,7 +505,12 @@ let question_dialog ~width form =
       | rows -> key :: rows)
     |> List.rev_map ~f:(fun row -> [ span ~style:gray row ])
   in
-  let body = wrapped @ choice_rows @ own_lines @ hint in
+  let deadline =
+    match Question_form.deadline_note form ~utc_offset with
+    | None -> []
+    | Some note -> Content.wrap [ [ span ~style:gray note ] ] ~width:inner
+  in
+  let body = wrapped @ choice_rows @ own_lines @ hint @ deadline in
   let cursor =
     if Question_form.on_own_answer form
     then (
@@ -1030,7 +1035,7 @@ let screen (m : App.Model.t) : Screen.t =
       in
       confirm_dialog ~width c, rows, cursor
     | Question { form; _ } ->
-      let dialog, cursor = question_dialog ~width form in
+      let dialog, cursor = question_dialog ~width ~utc_offset:m.utc_offset form in
       dialog, [], cursor
     | Confirm { question; _ } ->
       let rows, cursor =

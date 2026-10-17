@@ -7,8 +7,15 @@ open! Import
 
 type t [@@deriving sexp_of, equal]
 
-val create : P.Question.t list -> t
+(** [deadline]: when the agent stops waiting for the answers. *)
+val create : ?deadline:Time_ns.t -> P.Question.t list -> t
+
 val questions : t -> P.Question.t list
+val deadline : t -> Time_ns.t option
+
+(** When the agent carries on without the answers, in local time: the
+    dialog shows it. *)
+val deadline_note : t -> utc_offset:Time_ns.Span.t -> string option
 
 (** The question shown, from 0. *)
 val current : t -> int

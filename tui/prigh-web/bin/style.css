@@ -583,6 +583,7 @@ kbd {
 /* The model's questions (ask_user) */
 
 .question-text { font-weight: 600; margin: 0 0 10px; white-space: pre-wrap; overflow-wrap: anywhere; }
+.question-deadline { color: var(--muted); font-size: 12.5px; margin: 8px 0 0; }
 .question-choices { display: flex; flex-direction: column; gap: 2px; margin-bottom: 8px; }
 .question-choice {
   display: flex;

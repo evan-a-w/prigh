@@ -21,6 +21,8 @@ module Ask : sig
   type t =
     { call_id : string
     ; questions : Question.t list
+    ; deadline : Time_ns.t option
+      (** when the agent stops waiting and carries on by itself *)
     }
   [@@deriving sexp_of, equal]
 
