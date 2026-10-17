@@ -22,9 +22,6 @@ const home = join(dir, "home");
 const cwd = join(dir, "cwd");
 mkdirSync(home, { recursive: true });
 mkdirSync(cwd, { recursive: true });
-// Questions without a deadline: its time would differ between runs.
-mkdirSync(join(home, ".prigh"), { recursive: true });
-writeFileSync(join(home, ".prigh", "config.json"), JSON.stringify({ ask_user_timeout_seconds: 0 }));
 
 // The model's replies, in order, across every session of one backend run.
 const script = [
@@ -88,10 +85,11 @@ const script3 = [
   { text: "Like this:\n\n```ocaml\nlet rec fib n = if n < 2 then n else fib (n - 1) + fib (n - 2) (* slow *)\n```\n\n```json\n{\"name\": \"prigh\", \"ok\": true, \"n\": 3}\n```" },
 ];
 writeFileSync(join(dir, "script.json"), JSON.stringify(script));
-// Snippets for the composer (/snippet, Alt+N, #name).
+// Snippets for the composer (/snippet, Alt+N, #name), and questions
+// without a deadline: its time would differ between runs.
 const configFile = join(home, ".prigh", "config.json");
 mkdirSync(join(home, ".prigh"), { recursive: true });
-writeFileSync(configFile, JSON.stringify({ snippets: [
+writeFileSync(configFile, JSON.stringify({ ask_user_timeout_seconds: 0, snippets: [
   { name: "review", text: "Review the diff for bugs.\nList them by severity." },
   { name: "tests", text: "Run the tests and fix failures." },
 ] }));
