@@ -10,6 +10,7 @@ module Kind = struct
     | Handover
     | Goal
     | Goal_continuation
+    | Reminder
     | Resume
     | Shell
     | Summary
@@ -27,6 +28,7 @@ module Kind = struct
     | "handover" -> Handover
     | "goal" -> Goal
     | "goal_continuation" -> Goal_continuation
+    | "reminder" -> Reminder
     | "resume" -> Resume
     | "shell" -> Shell
     | "summary" -> Summary

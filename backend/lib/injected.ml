@@ -149,6 +149,11 @@ module Source = struct
         { continuation : int
         ; max : int
         }
+    | Reminder of
+        { name : string
+        ; repeat : int option [@sexp.option] [@jsonaf.option]
+        ; max : int option [@sexp.option] [@jsonaf.option]
+        }
     | Resume
     | Shell of { command : string }
     | Summary
@@ -161,6 +166,7 @@ module Source = struct
     | Handover _ -> "handover"
     | Goal_start _ -> "goal"
     | Goal_continuation _ -> "goal_continuation"
+    | Reminder _ -> "reminder"
     | Resume -> "resume"
     | Shell _ -> "shell"
     | Summary -> "summary"
@@ -176,6 +182,9 @@ module Source = struct
     | Goal_start { goal } -> "Goal: " ^ first_line goal
     | Goal_continuation { continuation; max } ->
       sprintf "Goal: continuing (%d/%d)" continuation max
+    | Reminder { name; repeat = Some repeat; max = Some max } ->
+      sprintf "Reminder: %s (%d/%d)" (first_line name) repeat max
+    | Reminder { name; repeat = _; max = _ } -> "Reminder: " ^ first_line name
     | Resume -> "Usage limit reset: carrying on"
     | Shell { command } ->
       sprintf "Output of $ %s added to the context" (first_line command)
