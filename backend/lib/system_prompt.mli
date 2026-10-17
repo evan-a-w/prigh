@@ -15,13 +15,16 @@ val read_instructions : cwd:string -> home:string -> (string * string) list
     from nixpkgs. [skills] that the model may use are listed when it has the
     [read] tool. [auto_background] (seconds) says when a foreground command
     is moved to the background, in the guidance on background work (given
-    when the tools include [job_wait] or [subagent_wait]). *)
+    when the tools include [job_wait] or [subagent_wait]). [orchestrator]
+    (default false; the main agent's) tells a model with the [subagent] tool
+    to delegate substantial work to subagents. *)
 val build
   :  ?date:string
   -> ?instructions:(string * string) list
   -> ?nix:bool
   -> ?skills:Skill.t list
   -> ?auto_background:float
+  -> ?orchestrator:bool
   -> cwd:string
   -> home:string
   -> tools:Tool_spec.t list

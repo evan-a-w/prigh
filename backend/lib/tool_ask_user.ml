@@ -88,8 +88,8 @@ let spec =
           , sprintf
               "Optional: wait less than the user's setting before carrying on \
                without the answers (%d-%d seconds). It can only shorten the \
-               wait: never past the user's setting or %d seconds, and only \
-               the user can turn the timeout off."
+               wait: never past the user's setting or %d seconds, and only the \
+               user can turn the timeout off."
               User_question.min_timeout_seconds
               User_question.max_timeout_seconds
               User_question.max_timeout_seconds )
