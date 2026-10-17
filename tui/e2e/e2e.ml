@@ -537,6 +537,22 @@ let main () =
           set_config [ "fallback_models", `Array [ Json.str "gpt-9" ] ]
         in
         let%bind () = set_config [ "default_cwd", `Null ] in
+        (* Only snippets: the protocol's encoding, then a refused name. *)
+        let%bind () =
+          set_config
+            [ ( "snippets"
+              , Snippet.list_to_json
+                  [ { name = "review"; text = "Review the diff.\nBe brief." } ]
+              )
+            ]
+        in
+        let%bind () =
+          set_config
+            [ ( "snippets"
+              , Snippet.list_to_json [ { name = "two words"; text = "x" } ] )
+            ]
+        in
+        let%bind () = set_config [ "snippets", Snippet.list_to_json [] ] in
         let%bind () = call client "prompt" [ "text", Json.str "fix the bug" ] in
         (* A hand-over goes straight into the next run: the first idle
            state is the end. *)
