@@ -80,6 +80,10 @@ module Reply_tag = struct
     | Refresh_sessions
     | Login_started
     | Notice of string
+    | Reminder of
+        { command : string
+        ; notice : string option
+        }
     | Reconnect of int
     | Config
     | Config_saved of string
@@ -292,6 +296,7 @@ module Action = struct
     | Dequeue
     | Edit_queued of Queued.Message.t
     | Remove_queued of Queued.Message.t
+    | Remove_reminder of string
     | Toggle_sidebar
     | Answer_confirm of
         { call_id : string
@@ -1052,6 +1057,8 @@ let complete_draft (m : Model.t) ~skills =
     Completion.compute
       ~skills
       ~snippets:(Option.value_map m.config ~default:[] ~f:(fun c -> c.snippets))
+      ~reminders:
+        (Option.value_map m.state ~default:[] ~f:(fun s -> s.reminders))
       ~sessions:m.sessions
       ~hosts:(Option.value_map m.state ~default:[] ~f:(fun s -> s.hosts))
       ~users:(Option.value m.users ~default:[])
@@ -2464,6 +2471,60 @@ let snippet_action (m : Model.t) (action : Prigh_ui.Snippet_command.Action.t) =
   | Error text -> error m text
 ;;
 
+(* ---- reminders *)
+
+let reminders (m : Model.t) = Option.map m.state ~f:(fun s -> s.reminders)
+
+let remind_action
+      (m : Model.t)
+      ~command
+      (action : Prigh_ui.Remind_command.Action.t)
+  =
+  match action with
+  | Pick reminders ->
+    open_picker
+      m
+      (Picker
+         { kind = Reminders
+         ; picker =
+             Picker.create
+               ~title:"Reminders"
+               (List.map reminders ~f:(fun (r : Reminder.t) ->
+                  Picker.Item.create
+                    ~id:r.name
+                    ~detail:
+                      (sprintf
+                         "%s · %s"
+                         (Reminder.Trigger.describe r.trigger)
+                         (Reminder.first_line r))
+                    ~search:(r.name ^ " " ^ r.text)
+                    r.name))
+         })
+  | Info text -> toast m (String.capitalize text)
+  | Error text ->
+    (* Back in the editor, to correct rather than retype. *)
+    let m =
+      if String.is_empty m.draft && List.is_empty m.images
+      then set_draft m command
+      else m
+    in
+    error m (String.capitalize text)
+  | Add _ | Remove _ | Clear _ ->
+    (match Prigh_ui.Remind_command.rpc action with
+     | None -> m, []
+     | Some (method_, params) ->
+       let notice =
+         match action with
+         | Remove name -> Some (Prigh_ui.Remind_command.removed name)
+         | Clear n -> Some (Prigh_ui.Remind_command.cleared n)
+         | _ -> None
+       in
+       let m, focus =
+         if Option.is_some m.dialog then close_dialog m else m, []
+       in
+       m, focus @ [ rpc method_ params ~tag:(Reminder { command; notice }) ])
+;;
+
 let open_snippets (m : Model.t) ~cursor =
   let m =
     Option.value_map cursor ~default:m ~f:(fun cursor -> { m with cursor })
@@ -2712,6 +2773,11 @@ let run_command (m : Model.t) ({ name; rest } : Slash.Parsed.t) =
   | "import", "" -> open_prompt m (Prompt.create Import)
   | "import", path -> m, [ rpc "import" [ "path", str path ] ~tag:Imported ]
   | ("skills" | "skill:"), query -> open_skills m ~query
+  | "remind", rest ->
+    remind_action
+      m
+      ~command:(String.strip ("/remind " ^ rest))
+      (Prigh_ui.Remind_command.run ~reminders:(reminders m) rest)
   | "snippet", rest ->
     snippet_action
       m
@@ -3481,6 +3547,20 @@ let rec reply_to (m : Model.t) (tag : Reply_tag.t) result =
         (sprintf "Couldn't set the mode: %s" e)
     in
     m, cmds @ [ rpc "get_state" [] ~tag:State ]
+  | Reminder { command; _ }, Error e ->
+    if String.is_empty m.draft && List.is_empty m.images
+    then
+      error
+        (set_draft m command)
+        (sprintf "%s. %s is back in the editor." (String.capitalize e) command)
+    else error m (String.capitalize e)
+  | Reminder { notice; _ }, Ok json ->
+    toast
+      m
+      (String.capitalize
+         (match notice with
+          | Some notice -> notice
+          | None -> Prigh_ui.Remind_command.added json))
   | Command_prompt text, Error e ->
     let m = drop_toast m reading_review in
     if String.is_empty m.draft && List.is_empty m.images
@@ -4351,6 +4431,21 @@ let picker_accept (m : Model.t) ~kind (item : Picker.Item.t) =
          error
            m
            (sprintf "Snippet %s has gone: /snippet lists the others." item.id))
+    | Reminders ->
+      (match Reminder.find (Option.value (reminders m) ~default:[]) item.id with
+       | Some r ->
+         toast
+           m
+           (sprintf
+              "%s (%s): %s · /remind rm %s removes it"
+              r.name
+              (Reminder.Trigger.describe r.trigger)
+              r.text
+              r.name)
+       | None ->
+         error
+           m
+           (sprintf "Reminder %s has gone: /remind lists the others." item.id))
     | Mcp l -> mcp_chosen m l item.id
     | Jump ->
       (match Jump.Target.of_string item.id with
@@ -4697,6 +4792,11 @@ let update_connected (m : Model.t) (action : Action.t) =
   | Edit_queued q ->
     ( { m with queue = Queued.remove m.queue q }
     , [ rpc "remove_queued" (Queued.Message.remove_params q) ~tag:Dequeued ] )
+  | Remove_reminder name ->
+    remind_action
+      m
+      ~command:("/remind rm " ^ name)
+      (Prigh_ui.Remind_command.Action.Remove name)
   | Remove_queued q ->
     ( { m with queue = Queued.remove m.queue q }
     , [ rpc

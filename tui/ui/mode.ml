@@ -20,6 +20,7 @@ module Picker_kind = struct
     | Hosts
     | Skills
     | Snippets
+    | Reminders
     | Mcp of Mcp_list.t
     | Auth_select of string
   [@@deriving sexp_of, equal]

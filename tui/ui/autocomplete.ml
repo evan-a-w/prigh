@@ -237,6 +237,7 @@ let argument_items ~kind ~models ~auth ~sessions ~snippets ~logged_in =
     Some (Option.value_map sessions ~default:[] ~f:session_items)
   | Mcp -> Some (mcp_items ())
   | Snippet -> Some (snippet_items snippets)
+  | Remind -> None
   | Budget ->
     Some
       [ Picker.Item.create
@@ -330,6 +331,7 @@ let compute_argument
       ~auth
       ~sessions
       ~snippets
+      ~reminders
       ~current_session
       ~logged_in
       ~default_dir_host
@@ -395,6 +397,27 @@ let compute_argument
                   ; selected = 0
                   ; navigated = false
                   }
+              | Remind ->
+                let rest = String.drop_prefix line start in
+                Option.bind
+                  (Remind_command.complete ~reminders rest)
+                  ~f:(fun (offset, candidates) ->
+                    let prefix = String.drop_prefix rest offset in
+                    let items =
+                      List.map candidates ~f:(fun (id, detail) ->
+                        Picker.Item.create ~id ~search:id ~detail id)
+                      |> rank ~prefix
+                    in
+                    Option.some_if
+                      (not (List.is_empty items))
+                      { source = Source.Argument spec
+                      ; prefix
+                      ; line = line_index
+                      ; start = start + offset
+                      ; items
+                      ; selected = 0
+                      ; navigated = false
+                      })
               | (Sessions | Session_list) when Option.is_none sessions ->
                 (* Loading; the app fetches the session list. *)
                 Some
@@ -529,6 +552,7 @@ let compute
       ~sessions
       ~skills
       ~snippets
+      ~reminders
       ~logged_in
       ~default_dir_host
   =
@@ -548,6 +572,7 @@ let compute
          ~auth
          ~sessions
          ~snippets
+         ~reminders
          ~current_session
          ~logged_in
          ~default_dir_host
