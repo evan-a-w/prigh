@@ -605,8 +605,23 @@ let main () =
               }]
           | Error e -> [%sexp (e : Error.t)]
         in
+        (* Deadlines as minutes from now: the times are real. *)
         let pending json =
-          [%sexp (Pending.of_json json : Pending.t Or_error.t)]
+          let in_minutes (q : Pending.Ask.t) =
+            ( q.call_id
+            , Option.map q.deadline ~f:(fun at ->
+                sprintf
+                  "in %.0fm"
+                  (Time_ns.Span.to_min (Time_ns.diff at (Time_ns.now ())))) )
+          in
+          [%sexp
+            (Or_error.map (Pending.of_json json) ~f:(fun p ->
+               ( { p with
+                   questions =
+                     List.map p.questions ~f:(fun q -> { q with deadline = None })
+                 }
+               , List.map p.questions ~f:in_minutes ))
+             : (Pending.t * (string * string option) list) Or_error.t)]
         in
         let%bind () =
           decoded "set_mode" state [ "approval_mode", Json.str "ask" ]
