@@ -75,6 +75,7 @@ let argument_items
       ~(hosts : Host.t list)
       ~users
       ~(skills : Skill.t list)
+      ~(snippets : Snippet.t list)
   =
   let simple items =
     List.map items ~f:(fun (id, detail) -> Picker.Item.create ~id ~detail id)
@@ -160,6 +161,13 @@ let argument_items
         h.name)
   | User -> List.map users ~f:(fun u -> Picker.Item.create ~id:u u)
   | Skill -> skill_items skills
+  | Snippet ->
+    List.map snippets ~f:(fun (s : Snippet.t) ->
+      Picker.Item.create ~id:s.name ~detail:(Snippet.first_line s) s.name)
+    @ simple
+        [ "add", "add NAME [TEXT]: save a snippet"
+        ; "rm", "rm NAME: delete a snippet"
+        ]
   | Budget -> simple [ "off", "no budget: turns start whatever it costs" ]
   | Goal ->
     simple [ "off", "clear the goal"; "resume", "make a stopped goal active" ]
@@ -200,6 +208,7 @@ let compute
       ?(hosts = [])
       ?(users = [])
       ?(skills = [])
+      ?(snippets = [])
       ~text
       ~cursor
       ~models
@@ -273,6 +282,7 @@ let compute
                 with
                 | [] -> None
                 | items -> Some (make (Argument kind) ~prefix:word ~start items))
+             | Snippet when String.exists prefix ~f:Char.is_whitespace -> None
              | Goal | Budget ->
                (* Free text: only an exact start of a keyword offers it, so
                   Enter sends what was typed. *)
@@ -286,7 +296,8 @@ let compute
                        ~sessions
                        ~hosts
                        ~users
-                       ~skills)
+                       ~skills
+                       ~snippets)
                     ~f:(fun (i : Picker.Item.t) ->
                       String.is_prefix i.id ~prefix)
                 with
@@ -304,7 +315,8 @@ let compute
                        ~sessions
                        ~hosts
                        ~users
-                       ~skills)
+                       ~skills
+                       ~snippets)
                 with
                 | [] -> None
                 | items -> Some (make (Argument kind) ~prefix ~start items)))

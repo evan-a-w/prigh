@@ -260,6 +260,7 @@ module Action = struct
     | Set_model of string
     | Set_thinking of string
     | Open_model_picker
+    | Open_snippets of int option
     | Open_thinking_picker
     | Open_help
     | Open_rename
@@ -1047,6 +1048,7 @@ let complete_draft (m : Model.t) ~skills =
   match
     Completion.compute
       ~skills
+      ~snippets:(Option.value_map m.config ~default:[] ~f:(fun c -> c.snippets))
       ~sessions:m.sessions
       ~hosts:(Option.value_map m.state ~default:[] ~f:(fun s -> s.hosts))
       ~users:(Option.value m.users ~default:[])
@@ -2404,6 +2406,62 @@ let mcp_listed (m : Model.t) (purpose : Mcp_purpose.t) (l : Mcp_list.t) =
       m, toast_cmds @ cmds)
 ;;
 
+(* ---- snippets *)
+
+let snippets (m : Model.t) = Option.map m.config ~f:(fun c -> c.snippets)
+
+let last_prompt (m : Model.t) =
+  List.rev (Chat.entries m.chat)
+  |> List.find_map ~f:(function
+    | Chat.Entry.User u ->
+      let typed = Injected_note.typed u in
+      Option.some_if (not (String.is_empty (String.strip typed))) typed
+    | Assistant _ | Shell _ | Compaction _ -> None)
+;;
+
+(* At the caret: the editor's, or where the last edit left it. *)
+let insert_snippet (m : Model.t) (snippet : Snippet.t) =
+  let cursor = Int.clamp_exn m.cursor ~min:0 ~max:(String.length m.draft) in
+  edit
+    m
+    ~cursor:(cursor + String.length snippet.text)
+    (String.prefix m.draft cursor
+     ^ snippet.text
+     ^ String.drop_prefix m.draft cursor)
+;;
+
+let snippet_action (m : Model.t) (action : Prigh_ui.Snippet_command.Action.t) =
+  match action with
+  | Pick snippets ->
+    open_picker
+      m
+      (Picker
+         { kind = Snippets
+         ; picker =
+             Picker.create
+               ~title:"Snippets"
+               (List.map snippets ~f:(fun (s : Snippet.t) ->
+                  Picker.Item.create
+                    ~id:s.name
+                    ~detail:(Snippet.first_line s)
+                    ~search:(s.name ^ " " ^ s.text)
+                    s.name))
+         })
+  | Insert snippet -> insert_snippet m snippet
+  | Save { snippets; notice } ->
+    with_config m ~f:(fun config ->
+      save_config m { config with snippets } ~fields:[ "snippets" ] ~notice)
+  | Info text -> toast m text
+  | Error text -> error m text
+;;
+
+let open_snippets (m : Model.t) ~cursor =
+  let m =
+    Option.value_map cursor ~default:m ~f:(fun cursor -> { m with cursor })
+  in
+  snippet_action m (Prigh_ui.Snippet_command.pick (snippets m))
+;;
+
 let run_command (m : Model.t) ({ name; rest } : Slash.Parsed.t) =
   let none = "" in
   let words =
@@ -2645,6 +2703,13 @@ let run_command (m : Model.t) ({ name; rest } : Slash.Parsed.t) =
   | "import", "" -> open_prompt m (Prompt.create Import)
   | "import", path -> m, [ rpc "import" [ "path", str path ] ~tag:Imported ]
   | ("skills" | "skill:"), query -> open_skills m ~query
+  | "snippet", rest ->
+    snippet_action
+      m
+      (Prigh_ui.Snippet_command.run
+         ~snippets:(snippets m)
+         ~last_prompt:(last_prompt m)
+         rest)
   | "mcp", "" ->
     loading
       m
@@ -3369,6 +3434,10 @@ let rec reply_to (m : Model.t) (tag : Reply_tag.t) result =
     error m (sprintf "Couldn't list the MCP servers: %s" e)
   | (Exported | Imported), Error e -> prompt_failed m e
   | Dir_changed _, Error e -> dir_change_failed m e
+  | Config_saved _, Error e ->
+    (* The change shown at once did not happen: show the backend's. *)
+    let m, cmds = error m (sprintf "Couldn't save the settings: %s" e) in
+    m, cmds @ [ rpc "get_config" [] ~tag:Config ]
   | Fallback_saved, Error e ->
     error m (sprintf "Couldn't set the fallback models: %s" e)
   | Default_dir_saved, Error e ->
@@ -4256,6 +4325,13 @@ let picker_accept (m : Model.t) ~kind (item : Picker.Item.t) =
     | Users -> act_as m item.id
     | Accounts -> account_chosen m item.id
     | Skills -> edit m ("/skill:" ^ item.id ^ " ")
+    | Snippets ->
+      (match Snippet.find (Option.value (snippets m) ~default:[]) item.id with
+       | Some snippet -> insert_snippet m snippet
+       | None ->
+         error
+           m
+           (sprintf "Snippet %s has gone: /snippet lists the others." item.id))
     | Mcp l -> mcp_chosen m l item.id
     | Jump ->
       (match Jump.Target.of_string item.id with
@@ -4531,6 +4607,7 @@ let update_connected (m : Model.t) (action : Action.t) =
   | Set_model key -> set_model m key
   | Set_thinking level -> set_thinking m level
   | Open_model_picker -> open_picker m (model_picker m)
+  | Open_snippets cursor -> open_snippets m ~cursor
   | Open_thinking_picker -> open_thinking_picker m
   | Open_help -> open_dialog m Help
   | Open_rename -> open_rename m

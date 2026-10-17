@@ -26,6 +26,7 @@ module Argument : sig
     | Budget (** [off], or dollars *)
     | Goal (** [off], [resume], or the goal *)
     | Resume (** [now] or [cancel] *)
+    | Snippet (** a snippet name, [add] or [rm] *)
   [@@deriving sexp_of, equal]
 end
 

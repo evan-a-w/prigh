@@ -27,6 +27,7 @@ val compute
   -> ?hosts:Host.t list
   -> ?users:string list
   -> ?skills:Skill.t list
+  -> ?snippets:Snippet.t list
   -> text:string
   -> cursor:int
   -> models:Llm.t list

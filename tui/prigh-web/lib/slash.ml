@@ -22,6 +22,7 @@ module Argument = struct
     | Budget
     | Goal
     | Resume
+    | Snippet
   [@@deriving sexp_of, equal]
 end
 
@@ -166,6 +167,12 @@ let all =
       ~args:"[path]"
       "import"
       "import a session from a JSONL file on the backend"
+  ; c
+      ~argument:Snippet
+      ~args:"[NAME|add|rm]"
+      "snippet"
+      "insert a saved text at the caret (none: pick one, Alt+N); add NAME \
+       [TEXT] saves one (no TEXT: your last prompt), rm NAME deletes it"
   ; c "skills" "pick a skill to invoke (/skill:name)"
   ; c
       ~argument:Skill
@@ -260,7 +267,9 @@ end
 let parse text =
   let text = String.strip text in
   match String.chop_prefix text ~prefix:"/" with
-  | Some body when not (String.mem body '\n') ->
+  | Some body
+    when (not (String.mem body '\n'))
+         || String.is_prefix body ~prefix:"snippet add " ->
     let name, rest =
       match String.lsplit2 body ~on:' ' with
       | Some (name, rest) -> name, String.strip rest

@@ -21,6 +21,7 @@ module Picker_kind : sig
     | Modes (** [/mode]: approval modes and plan mode *)
     | Hosts
     | Skills
+    | Snippets (** [/snippet]: Enter inserts the text *)
     | Mcp of Mcp_list.t
     | Auth_select of string (** login prompt id *)
   [@@deriving sexp_of, equal]

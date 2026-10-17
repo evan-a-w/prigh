@@ -19,6 +19,7 @@ let picker_title : Dialog.Picker_kind.t -> string = function
   | Users -> "Users"
   | Accounts -> "Accounts"
   | Skills -> "Skills"
+  | Snippets -> "Snippets"
   | Mcp _ -> "Servers"
   | Jump -> "Messages"
 ;;

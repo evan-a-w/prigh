@@ -47,6 +47,8 @@ type t =
     (** a session inactive for this long is archived (default 7; 0: never),
         see {!Session.Summary.is_archived} *)
   ; notify : Notify.t (** default [Bell] *)
+  ; snippets : Snippet.t list
+    (** text the frontends insert into the prompt editor ([/snippet]) *)
   ; auto_background_seconds : float
     (** a foreground [bash] call of the main agent still running after this
         long is moved to the background as a job, and [job_wait]/
