@@ -15,7 +15,7 @@ let%expect_test "a missing file yields the default" =
       (permissions ((allow ()) (ask ()) (deny ()))) (default_model ())
       (default_thinking ()) (fallback_models ()) (default_cwd ())
       (max_budget_usd ()) (goal_max_continuations 20) (reminders ())
-      (resume_on_limit_reset true) (ask_user_timeout_seconds 600)
+      (resume_on_limit_reset true) (ask_user_timeout_seconds 300)
       (archive_after_days 7) (notify Bell) (snippets ())
       (auto_background_seconds 30)))
     |}]
@@ -103,7 +103,7 @@ let%expect_test "unknown fields are ignored" =
       (permissions ((allow ()) (ask ()) (deny ()))) (default_model ())
       (default_thinking ()) (fallback_models ()) (default_cwd ())
       (max_budget_usd ()) (goal_max_continuations 20) (reminders ())
-      (resume_on_limit_reset true) (ask_user_timeout_seconds 600)
+      (resume_on_limit_reset true) (ask_user_timeout_seconds 300)
       (archive_after_days 7) (notify Bell) (snippets ())
       (auto_background_seconds 30)))
     |}]
@@ -193,7 +193,7 @@ let%expect_test "null defaults are unset" =
       (permissions ((allow ()) (ask ()) (deny ()))) (default_model ())
       (default_thinking ()) (fallback_models ()) (default_cwd ())
       (max_budget_usd ()) (goal_max_continuations 20) (reminders ())
-      (resume_on_limit_reset true) (ask_user_timeout_seconds 600)
+      (resume_on_limit_reset true) (ask_user_timeout_seconds 300)
       (archive_after_days 7) (notify Bell) (snippets ())
       (auto_background_seconds 30)))
     (Ok
@@ -202,7 +202,7 @@ let%expect_test "null defaults are unset" =
       (default_model (deepseek/deepseek-flash)) (default_thinking ((On ())))
       (fallback_models ()) (default_cwd ()) (max_budget_usd ())
       (goal_max_continuations 20) (reminders ()) (resume_on_limit_reset true)
-      (ask_user_timeout_seconds 600) (archive_after_days 7) (notify Bell)
+      (ask_user_timeout_seconds 300) (archive_after_days 7) (notify Bell)
       (snippets ()) (auto_background_seconds 30)))
     |}]
 ;;
@@ -361,7 +361,7 @@ let%expect_test "ask_user_timeout_seconds: seconds, 0 never times out" =
            : (float * float option) Or_error.t)]);
   [%expect
     {|
-    (Ok (600 (600)))
+    (Ok (300 (300)))
     (Ok (120 (120)))
     (Ok (0 ()))
     (Ok (90.5 (90.5)))

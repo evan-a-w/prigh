@@ -271,7 +271,7 @@ fallback backend exited
           (((label x) (description ())) ((label y) (description ()))))
          (multiple false))))
       (deadline ())))))
-  ((q1 ("in 10m")))))
+  ((q1 ("in 5m")))))
 <- ask_user_respond: ()
   event ask_user_done q1
   event tool_end ask_user

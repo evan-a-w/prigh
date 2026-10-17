@@ -76,7 +76,7 @@ let spec =
          choice between approaches, missing requirements), not for things you \
          can find out yourself. Ask 1-%d short questions at once, with choices \
          where they help. If the user does not answer in time (the user's \
-         setting, 10 minutes unless they changed it), you get a reply saying \
+         setting, 5 minutes unless they changed it), you get a reply saying \
          so: then carry on with your best judgement."
         User_question.max_questions
   ; parameters =
@@ -86,11 +86,12 @@ let spec =
         ; ( "timeout_seconds"
           , `Integer
           , sprintf
-              "Optional: how long to wait for the answers before carrying on \
-               without them (%d-%d seconds), instead of the user's setting. 0 \
-               waits until they answer: only when you cannot go on without it. \
-               Ignored if the user turned timeouts off."
+              "Optional: wait less than the user's setting before carrying on \
+               without the answers (%d-%d seconds). It can only shorten the \
+               wait: never past the user's setting or %d seconds, and only \
+               the user can turn the timeout off."
               User_question.min_timeout_seconds
+              User_question.max_timeout_seconds
               User_question.max_timeout_seconds )
         ]
   }
@@ -98,9 +99,14 @@ let spec =
 
 let timeout_seconds args =
   match Tool_args.int_opt args "timeout_seconds" with
-  | Some n when n < 0 ->
+  | Some n when n <= 0 ->
     Error
-      "timeout_seconds must be 0 (wait until answered) or a number of seconds"
+      (sprintf
+         "timeout_seconds must be a number of seconds from %d to %d; only the \
+          user can turn the timeout off (leave timeout_seconds out to use \
+          their setting)"
+         User_question.min_timeout_seconds
+         User_question.max_timeout_seconds)
   | requested -> Ok requested
 ;;
 
