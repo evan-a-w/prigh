@@ -207,7 +207,10 @@ let mcp_items () =
 let snippet_items (snippets : P.Snippet.t list) =
   List.map snippets ~f:(fun (s : P.Snippet.t) ->
     Picker.Item.create ~id:s.name ~detail:(P.Snippet.first_line s) s.name)
-  @ [ Picker.Item.create ~id:"add" ~detail:"add NAME [TEXT]: save a snippet" "add"
+  @ [ Picker.Item.create
+        ~id:"add"
+        ~detail:"add NAME [TEXT]: save a snippet"
+        "add"
     ; Picker.Item.create ~id:"rm" ~detail:"rm NAME: delete a snippet" "rm"
     ]
 ;;

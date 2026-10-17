@@ -25,6 +25,7 @@ module Argument : sig
     | Budget (** [off], or dollars *)
     | Goal (** [off], [resume], or the goal *)
     | Resume (** [now] or [cancel] *)
+    | Snippet (** a snippet's name, [add] or [rm] *)
   [@@deriving sexp_of, equal]
 end
 
@@ -57,5 +58,6 @@ module Parsed : sig
 end
 
 (** [None] unless [text] is one line starting with [/] (so pasting a path
-    like [/etc/hosts] with a question still sends a prompt). *)
+    like [/etc/hosts] with a question still sends a prompt), or
+    [/snippet add], whose text may span lines. *)
 val parse : string -> Parsed.t option

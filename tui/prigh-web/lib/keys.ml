@@ -43,6 +43,7 @@ let help =
   ; "Ctrl+P / Alt+P", "next / previous scoped model (/scoped-models)"
   ; "Alt+T", "cycle the thinking level"
   ; "Alt+M", "cycle the mode: ask → auto-edit → auto → plan (/mode, /plan)"
+  ; "Alt+N", "insert a snippet at the caret: a list to filter (/snippet)"
   ; "Ctrl+O", "cycle the transcript verbosity"
   ; "Ctrl+X", "copy the last reply (when nothing is selected)"
   ; ( "Ctrl+↑ / Ctrl+↓"
@@ -334,6 +335,12 @@ let handle (m : App.Model.t) t : App.Action.t option =
      | _ when alt_letter t "p" -> Some (Cycle_model (-1))
      | _ when alt_letter t "t" -> Some Cycle_thinking
      | _ when alt_letter t "m" -> Some Cycle_mode
+     | _ when alt_letter t "n" ->
+       Some
+         (Open_snippets
+            (match t.target with
+             | Editor { cursor } -> Some cursor
+             | _ -> None))
      | ("x" | "X") when ctrl_only t && not t.selection -> Some Copy_last
      | ("g" | "G") when ctrl_only t ->
        Some

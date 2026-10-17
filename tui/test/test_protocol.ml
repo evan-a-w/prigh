@@ -811,7 +811,8 @@ let%expect_test "config round trip and config_changed event" =
          ; default_cwd = Some "~/proj"
          ; archive_after_days = 7.
          ; notify = "desktop"
-         ; snippets = [ { name = "review"; text = "Review the diff.\nBe brief." } ]
+         ; snippets =
+             [ { name = "review"; text = "Review the diff.\nBe brief." } ]
          }
        : Json.t)];
   decode
