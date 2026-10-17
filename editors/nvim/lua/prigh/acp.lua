@@ -10,6 +10,8 @@ M.errors = {
   method_not_found = -32601,
   invalid_params = -32602,
   internal = -32603,
+  -- The answer to a request withdrawn with $/cancel_request.
+  request_cancelled = -32800,
   -- Ours: the request never got an answer because the agent went away.
   disconnected = -32099,
 }
@@ -32,7 +34,7 @@ local function traffic(dir, line)
 end
 
 --- Start the agent.
---- opts: cmd (list), cwd, env, on_request(method, params, respond),
+--- opts: cmd (list), cwd, env, on_request(method, params, respond, id),
 ---   on_notification(method, params), on_exit(code, signal)
 --- Returns the connection, or nil and an error message saying what to do.
 function M.start(opts)
@@ -160,7 +162,7 @@ function Conn:_handle_request(msg)
   if not self.opts.on_request then
     return respond(nil, { code = M.errors.method_not_found, message = "method not found: " .. msg.method })
   end
-  local ok, err = pcall(self.opts.on_request, msg.method, msg.params or {}, respond)
+  local ok, err = pcall(self.opts.on_request, msg.method, msg.params or {}, respond, msg.id)
   if not ok then
     log.error(string.format("handling %s: %s", msg.method, err))
     respond(nil, { code = M.errors.internal, message = tostring(err) })

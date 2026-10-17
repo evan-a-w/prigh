@@ -12,6 +12,12 @@ local function notify(msg, level)
   vim.notify("prigh: " .. msg, level or vim.log.levels.INFO)
 end
 
+--- An ISO 8601 time as shown: "2026-10-17 14:53" (as sent: UTC for prigh).
+function M.time(iso)
+  local date, hm = (iso or ""):match("^(%d+%-%d+%-%d+)T(%d+:%d+)")
+  return date and (date .. " " .. hm) or (iso or "?")
+end
+
 function M.sessions(agent, chat)
   agent:ensure(function()
     if not agent:can_list() then
@@ -34,7 +40,7 @@ function M.sessions(agent, chat)
             return "+ new session"
           end
           local mark = s.sessionId == agent.session.id and "● " or "  "
-          return string.format("%s%s · %s · %s", mark, s.title or "(untitled)", s.updatedAt or "?", s.sessionId)
+          return string.format("%s%s · %s · %s", mark, s.title or "(untitled)", M.time(s.updatedAt), s.sessionId)
         end,
       }, function(choice)
         if not choice then
@@ -167,7 +173,15 @@ function M.review_file(c, chat, on_done)
     before = c.before or {},
     title = rel(c.path, chat),
     on_done = function(res)
-      if res.status == "applied" then
+      if res.status == "applied" and c.before == nil and res.accepted == 0 then
+        -- A file the agent created, rejected: it goes again.
+        fs.forget(c.path)
+        os.remove(c.path)
+        if vim.api.nvim_buf_is_valid(buf) then
+          vim.api.nvim_buf_delete(buf, { force = true })
+        end
+        notify(string.format("%s: rejected the new file, deleted it", rel(c.path, chat)))
+      elseif res.status == "applied" then
         if res.rejected > 0 and require("prigh.config").options.fs.save_after_write then
           fs.save(buf)
         end

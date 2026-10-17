@@ -8,6 +8,8 @@
 --   { notify = "method", params = {...} }    send a notification
 --   { update = {...} }                       session/update for session "s1"
 --   { request = "method", params = {...} }   send a request, wait for the answer
+--       (with id = N: that id; with nowait = true: go on, see await)
+--   { await = N }                            wait for the answer to request N
 --   { stderr = "text" }                      write to stderr
 --   { exit = code }                          exit now
 -- Every message received is appended to LOG; after the script, messages are
@@ -70,11 +72,14 @@ for _, step in ipairs(script) do
     send({ method = step.notify, params = step.params or vim.empty_dict() })
   elseif step.update then
     send({ method = "session/update", params = { sessionId = step.session or "s1", update = step.update } })
-  elseif step.request then
-    local id = next_id
-    next_id = next_id + 1
-    send({ id = id, method = step.request, params = step.params or vim.empty_dict() })
-    while true do
+  elseif step.request or step.await then
+    local id = step.await
+    if step.request then
+      id = step.id or next_id
+      next_id = next_id + 1
+      send({ id = id, method = step.request, params = step.params or vim.empty_dict() })
+    end
+    while not step.nowait do
       local msg = read()
       if not msg then
         os.exit(0)
