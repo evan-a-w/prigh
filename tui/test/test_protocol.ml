@@ -285,7 +285,8 @@ let%expect_test "ask_user events: the deadline, and whether it timed out" =
     {|{"type":"event","event":"ask_user_done","call_id":"q1","timed_out":true}|};
   (* An older backend's, without [timed_out]. *)
   decode {|{"type":"event","event":"ask_user_done","call_id":"q2"}|};
-  [%expect {|
+  [%expect
+    {|
     (Event (
       Ask_user (
         (call_id q1)

@@ -38,6 +38,7 @@ let deadline_note t ~utc_offset =
       "unanswered, the agent carries on by itself at %s"
       (Loop_status.clock at ~utc_offset))
 ;;
+
 let current t = t.current
 let cursor t = t.cursor
 let question t = List.nth_exn t.questions t.current

@@ -568,8 +568,10 @@ let view m ~inject =
     [ dialog m ~inject
     ; (if List.is_empty m.confirms
        then
-         Question_view.view m.questions ~utc_offset:m.utc_offset ~inject:(fun a ->
-           inject (Action.Question a))
+         Question_view.view
+           m.questions
+           ~utc_offset:m.utc_offset
+           ~inject:(fun a -> inject (Action.Question a))
        else Node.none)
     ; confirm m ~inject
     ]

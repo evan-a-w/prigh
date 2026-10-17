@@ -1241,7 +1241,8 @@ let%expect_test
     {|{"event":"ask_user","call_id":"q1","questions":[{"question":"Sure?"}],"deadline_ms":1760191500000}|};
   modal h;
   H.show h ~selector:".question-deadline";
-  [%expect {|
+  [%expect
+    {|
     (Focus question-own)
     Question
     (Close (Esc))
@@ -1257,7 +1258,8 @@ let%expect_test
     {|{"event":"notice","text":"the question was not answered within 10m; the agent carries on without it"}|};
   modal h;
   toasts h;
-  [%expect {|
+  [%expect
+    {|
     (Focus editor)
     (Expire_toast (id 0) (after_ms 4420))
     the question was not answered within 10m; the agent carries on without it
