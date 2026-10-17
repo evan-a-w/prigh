@@ -108,12 +108,13 @@ let%expect_test "background guidance follows the tools" =
     - After making changes, verify them (build, tests) when a way to do so exists.
     - Be concise. Explain non-trivial decisions briefly. No filler.
     - Ask before destructive or irreversible actions.
+    - You are the orchestrator: for substantial work (implementing a feature, a multi-file change, a long investigation), spawn subagents with self-contained tasks rather than doing it all yourself, and run independent tasks in parallel. Keep your own context for planning, coordinating, reviewing their reports and talking to the user; do small, quick things directly.
 
     Background work: almost never block on it.
     - Commands that may take long (builds, test suites, installs, image builds, deployments) or that keep running (servers, watchers) go in the background: bash with background: true, then continue with other useful work or end your turn. Stop servers with job_kill when done.
     - Subagents always run in the background: subagent returns at once with the agent id.
     - Each finished job or subagent reports automatically, in a message starting with "[job <id> exited <code>]" (or killed, failed) or "[subagent <id> finished]" (or failed), sent by prigh, not typed by the user. You are woken by it even after you end your turn.
-    - So while they run, keep working on whatever does not depend on them, or end your turn. Do not call job_wait or subagent_wait to pass the time, to collect results you could take as they arrive, or to poll; never poll with sleep loops. Wait only when you truly cannot do anything useful without one result, and then wait for that one (ids, all=false).
+    - So while they run, keep working on whatever does not depend on them, or end your turn. Do not call job_wait or subagent_wait to pass the time, to collect results you could take as they arrive, or to poll; never sleep to pass the time or poll with sleep loops. Wait only when you truly cannot do anything useful without one result, and then wait for that one (ids, all=false).
     |}];
   (* The main agent's prompt, with the default threshold; a subagent's
      tools have no background controls. *)
@@ -135,7 +136,7 @@ let%expect_test "background guidance follows the tools" =
     {|
     - A foreground bash command still running after 30s is moved to the background automatically (it keeps running as a job, not restarted), so a long command never stalls you: you get its job id and output so far at once.
     - A foreground bash command still running after 0.5s is moved to the background automatically (it keeps running as a job, not restarted), so a long command never stalls you: you get its job id and output so far at once.
-    - So while they run, keep working on whatever does not depend on them, or end your turn. Do not call job_wait or subagent_wait to pass the time, to collect results you could take as they arrive, or to poll; never poll with sleep loops. A wait returns after 0.5s anyway. Wait only when you truly cannot do anything useful without one result, and then wait for that one (ids, all=false).
+    - So while they run, keep working on whatever does not depend on them, or end your turn. Do not call job_wait or subagent_wait to pass the time, to collect results you could take as they arrive, or to poll; never sleep to pass the time or poll with sleep loops. A wait returns after 0.5s anyway. Wait only when you truly cannot do anything useful without one result, and then wait for that one (ids, all=false).
     |}];
   print_endline (base ~auto_background:30. Tools.all);
   [%expect
@@ -220,4 +221,84 @@ let%expect_test "the guidelines name the model's file editor" =
     - Prefer edit over write for existing files. Keep changes minimal and focused.
     - Prefer apply_patch over write for existing files. Keep changes minimal and focused.
     |}]
+;;
+
+let%expect_test "the main agent is told to orchestrate, subagents are not" =
+  let subagent =
+    Tool_subagent.create
+      ~provider:(Faux_provider.create [])
+      ~current_model:(fun () -> Model.default)
+      ~current_thinking:(fun () -> Off)
+      ~home:"/home"
+      ()
+  in
+  let show ~role tools =
+    System_prompt.build
+      ~date:"2026-01-02"
+      ~instructions:[]
+      ~role
+      ~cwd:"/proj"
+      ~home:"/home"
+      ~tools:(Tools.specs tools)
+      ()
+    |> String.split_lines
+    |> List.filter ~f:(String.is_substring ~substring:"orchestrator")
+    |> function
+    | [] -> print_endline "(no orchestrator guidance)"
+    | lines -> List.iter lines ~f:print_endline
+  in
+  show ~role:Main (Tools.all @ [ subagent ]);
+  (* Without the subagent tool there is nobody to delegate to. *)
+  show ~role:Main Tools.all;
+  (* A subagent (nested ones keep the subagent tool) does the work itself. *)
+  show ~role:Subagent (Tools.all @ [ subagent ]);
+  [%expect
+    {|
+    - You are the orchestrator: for substantial work (implementing a feature, a multi-file change, a long investigation), spawn subagents with self-contained tasks rather than doing it all yourself, and run independent tasks in parallel. Keep your own context for planning, coordinating, reviewing their reports and talking to the user; do small, quick things directly.
+    (no orchestrator guidance)
+    (no orchestrator guidance)
+    |}]
+;;
+
+let%expect_test "a subagent is told to block on commands and jobs, not sleep" =
+  let section tools =
+    System_prompt.build
+      ~date:"2026-01-02"
+      ~instructions:[]
+      ~role:Subagent
+      ~cwd:"/proj"
+      ~home:"/home"
+      ~tools:(Tools.specs tools)
+      ()
+    |> String.split_lines
+    |> List.drop_while ~f:(fun l -> not (String.is_prefix l ~prefix:"Waiting"))
+    |> List.take_while ~f:(fun l -> not (String.is_empty l))
+    |> String.concat ~sep:"\n"
+    |> print_endline
+  in
+  let sub =
+    Or_error.ok_exn
+      (Tools.for_context ~parent:(Tools.all @ Tool_jobs.tools) ~depth:1 ())
+  in
+  section sub;
+  [%expect
+    {|
+    Waiting: block, never sleep.
+    - Never run sleep to pass the time or to poll in separate calls (sleep, then check again).
+    - When you need a command's result, run it in the foreground: the call blocks until it finishes (give it a timeout long enough; the default is 10 minutes). To wait for something to become ready (a server, a file), use one foreground command that blocks until it is, with a timeout.
+    - To run commands side by side or keep a server running while you work, start them with bash background: true and block on them with job_wait, which waits as long as it takes and returns their reports; job_output peeks at one, job_kill stops it.
+    - Ending your turn ends your task: you are not woken again, and your jobs still running are killed. Wait for what you need before your final report.
+    |}];
+  (* Without job tools, blocking means foreground commands. *)
+  section (Or_error.ok_exn (Tools.for_context ~parent:Tools.all ~depth:1 ()));
+  [%expect
+    {|
+    Waiting: block, never sleep.
+    - Never run sleep to pass the time or to poll in separate calls (sleep, then check again).
+    - When you need a command's result, run it in the foreground: the call blocks until it finishes (give it a timeout long enough; the default is 10 minutes). To wait for something to become ready (a server, a file), use one foreground command that blocks until it is, with a timeout.
+    - Ending your turn ends your task: you are not woken again. Wait for what you need before your final report.
+    |}];
+  (* Nothing to wait on without bash. *)
+  section [];
+  [%expect {||}]
 ;;

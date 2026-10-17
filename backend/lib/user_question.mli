@@ -37,16 +37,17 @@ end
 
 val max_questions : int
 
-(** Bounds of a per-call [timeout_seconds]. *)
+(** Bounds of a per-call [timeout_seconds]: the model can shorten the wait,
+    never lengthen it past [max_timeout_seconds] or turn it off. *)
 val min_timeout_seconds : int
 
 val max_timeout_seconds : int
 
 (** How long a question waits, in seconds ([None]: until answered). [config]
-    is the config's {!Config.ask_user_timeout}: off, the model cannot turn it
-    on. Otherwise the call's [timeout_seconds] ([requested]) replaces it: 0
-    waits until answered, anything else is clamped to
-    [min_timeout_seconds, max_timeout_seconds]. *)
+    is the config's {!Config.ask_user_timeout} (only the user turns it off).
+    The call's [timeout_seconds] ([requested], positive), clamped to
+    [min_timeout_seconds, max_timeout_seconds], applies when shorter than
+    [config]. *)
 val timeout : config:float option -> requested:int option -> float option
 
 (** [45s], [9m 30s], [10m], [1h 05m]. *)

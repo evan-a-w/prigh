@@ -828,7 +828,11 @@ let%expect_test "subagents do not get the interaction tools" =
        |> Or_error.ok_exn
        |> List.map ~f:Tool.name
        : string list)];
-  [%expect {| (bash read write edit ls grep find web_fetch web_search) |}]
+  [%expect
+    {|
+    (bash read write edit ls grep find web_fetch web_search job_status job_output
+     job_wait job_input job_kill)
+    |}]
 ;;
 
 let%expect_test
@@ -895,7 +899,7 @@ let%expect_test
       "max_budget_usd": null,
       "goal_max_continuations": 20,
       "resume_on_limit_reset": true,
-      "ask_user_timeout_seconds": 600,
+      "ask_user_timeout_seconds": 300,
       "archive_after_days": 7,
       "notify": "bell",
       "snippets": [],

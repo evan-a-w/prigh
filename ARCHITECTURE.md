@@ -563,8 +563,15 @@ two can share one.
   `Background_tasks.wait_text`, which caps their `timeout` at the same
   limit and then says the reports still come later.
   `Tool_jobs` has `job_status`, `job_output` (`lines`, `offset` from the
-  end), `job_wait`, `job_input` and `job_kill`; like the subagent controls
-  they and `background` itself are dropped below depth 0. Every job (the
+  end), `job_wait`, `job_input` and `job_kill`. Below depth 0 the subagent
+  controls are dropped, but `bash` and the job tools are replaced by their
+  subagent versions (`Tool_bash.subagent_tool`, `Tool_jobs.subagent_tools`,
+  whose descriptions say to block on jobs): `Tool_subagent.execute` gives
+  each subagent run a `Background_tasks` of its own (`with_jobs`, no
+  auto-background, so its foreground calls and `job_wait` block as long as
+  they take), delivers finished jobs' reports through the loop's `steer`,
+  and when the run ends kills (and discards) jobs still running, naming
+  them in the report. Every job (the
   model's and `!&cmd`) has a `Stdin_feed` (`Background_tasks.Task.input`):
   `Tool_bash.start_job` puts it in the foreground call's context
   (`Tool.Context.stdin`), so locally `Process.run ~input` keeps the
@@ -618,12 +625,20 @@ two can share one.
 - `System_prompt` — built-in guidance plus environment facts plus
   `AGENTS.md`/`CLAUDE.md` files from `/` down to the cwd and
   `~/.prigh/AGENTS.md`; `read_instructions` scans the local filesystem and
-  `build ?instructions ?nix ?skills ?auto_background` accepts files fetched
+  `build ?instructions ?nix ?skills ?auto_background ?role` accepts files
+  fetched
   elsewhere (the tool host), whether that host has Nix, which adds how to
   get missing tools from nixpkgs, the host's skills, listed when the model
   has `read`, and the auto-background limit, which the guidance on
   background work (given to agents with `job_wait`/`subagent_wait`: almost
-  never block, keep working or end the turn) names.
+  never block, keep working or end the turn, never sleep) names. `role`
+  (`Main` by default; `Tool_subagent` passes `Subagent`) picks whose prompt
+  it is: the main agent's, given the `subagent` tool, tells the model it is
+  the orchestrator, delegating substantial work to subagents and keeping
+  its own context for planning, coordinating and reviewing; a subagent's
+  (nested ones keep `subagent`) leaves that out and says instead to block
+  rather than sleep — foreground commands, jobs with `job_wait` — since
+  ending its turn ends its task and kills its jobs.
   `Agent` builds it once, at the session's first run, and records it as a
   `System_prompt` session entry so every later request (and every reload)
   sends the same prefix, which is what provider prompt caches key on. When
@@ -759,8 +774,8 @@ two can share one.
   kind `Plan_mode`. `ask_user` emits `Ask_user` and waits for
   `answer_question` (the first answer wins; abort withdraws it;
   `Ask_user_done` follows). Its timeout (`User_question.timeout`: the
-  config's `ask_user_timeout_seconds`, replaced by the call's
-  `timeout_seconds` unless the config's is off) gives the question a
+  config's `ask_user_timeout_seconds`, or the call's `timeout_seconds`,
+  clamped to 30-300, when shorter: the model can only shorten it) gives the question a
   `deadline` (in `Ask_user`, `Pending_question` and so `deadline_ms` over
   RPC); a fiber racing the answer sleeps until it through the agent's
   `sleep_until` (injectable, as for the automatic resume), then resolves the
@@ -825,7 +840,7 @@ two can share one.
   `fallback_models` (model keys), `default_cwd`, `max_budget_usd`,
   `goal_max_continuations`, `reminders` (saving keeps the file's as
   written), `resume_on_limit_reset`, `ask_user_timeout_seconds` (default
-  600, 0 = never) and `snippets`, the frontends' `/snippet` texts,
+  300, 0 = never) and `snippets`, the frontends' `/snippet` texts,
   validated by `Snippet`), loaded at agent
   creation, read/written through `get_config`/`set_config`; unknown fields
   are ignored by `load` but reported by `problems` (with wrong-typed ones),

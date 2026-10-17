@@ -693,7 +693,7 @@ let%expect_test "/change_default saves the model and thinking level" =
       "max_budget_usd": null,
       "goal_max_continuations": 20,
       "resume_on_limit_reset": true,
-      "ask_user_timeout_seconds": 600,
+      "ask_user_timeout_seconds": 300,
       "archive_after_days": 7,
       "notify": "bell",
       "snippets": [],

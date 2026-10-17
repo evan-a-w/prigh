@@ -24,7 +24,44 @@ let instruction_files ~cwd ~home =
   Option.to_list global @ project
 ;;
 
-let base ~nix ~auto_background ~tools =
+module Role = struct
+  type t =
+    | Main
+    | Subagent
+  [@@deriving sexp_of, equal]
+end
+
+let subagent_waiting ~has =
+  if not (has "bash")
+  then []
+  else
+    [ "Waiting: block, never sleep."
+    ; "- Never run sleep to pass the time or to poll in separate calls (sleep, \
+       then check again)."
+    ; "- When you need a command's result, run it in the foreground: the call \
+       blocks until it finishes (give it a timeout long enough; the default is \
+       10 minutes). To wait for something to become ready (a server, a file), \
+       use one foreground command that blocks until it is, with a timeout."
+    ]
+    @ (if has "job_wait"
+       then
+         [ "- To run commands side by side or keep a server running while you \
+            work, start them with bash background: true and block on them with \
+            job_wait, which waits as long as it takes and returns their \
+            reports; job_output peeks at one, job_kill stops it."
+         ]
+       else [])
+    @ [ sprintf
+          "- Ending your turn ends your task: you are not woken again%s. Wait \
+           for what you need before your final report."
+          (if has "job_wait"
+           then ", and your jobs still running are killed"
+           else "")
+      ; ""
+      ]
+;;
+
+let base ~nix ~auto_background ~(role : Role.t) ~tools =
   let tool_list =
     String.concat
       ~sep:"\n"
@@ -50,10 +87,21 @@ let base ~nix ~auto_background ~tools =
         exists."
      ; "- Be concise. Explain non-trivial decisions briefly. No filler."
      ; "- Ask before destructive or irreversible actions."
-     ; ""
      ]
-     @ (if has "subagent_wait" || has "job_wait"
+     @ (if Role.equal role Main && has "subagent"
         then
+          [ "- You are the orchestrator: for substantial work (implementing a \
+             feature, a multi-file change, a long investigation), spawn \
+             subagents with self-contained tasks rather than doing it all \
+             yourself, and run independent tasks in parallel. Keep your own \
+             context for planning, coordinating, reviewing their reports and \
+             talking to the user; do small, quick things directly."
+          ]
+        else [])
+     @ [ "" ]
+     @ (match role with
+        | Subagent -> subagent_waiting ~has
+        | Main when has "subagent_wait" || has "job_wait" ->
           [ "Background work: almost never block on it." ]
           @ (if has "job_wait"
              then
@@ -87,17 +135,17 @@ let base ~nix ~auto_background ~tools =
                 "- So while they run, keep working on whatever does not depend \
                  on them, or end your turn. Do not call job_wait or \
                  subagent_wait to pass the time, to collect results you could \
-                 take as they arrive, or to poll; never poll with sleep \
-                 loops.%s Wait only when you truly cannot do anything useful \
-                 without one result, and then wait for that one (ids, \
-                 all=false)."
+                 take as they arrive, or to poll; never sleep to pass the time \
+                 or poll with sleep loops.%s Wait only when you truly cannot \
+                 do anything useful without one result, and then wait for that \
+                 one (ids, all=false)."
                 (Option.value_map auto_background ~default:"" ~f:(fun s ->
                    sprintf
                      " A wait returns after %s anyway."
                      (Background_tasks.seconds_text s)))
             ; ""
             ]
-        else [])
+        | Main -> [])
      @ (if nix
         then
           [ "Get tools that are not installed from nixpkgs, not with apt or \
@@ -128,6 +176,7 @@ let build
       ?(nix = false)
       ?(skills = [])
       ?auto_background
+      ?(role = Role.Main)
       ~cwd
       ~home
       ~tools
@@ -162,7 +211,7 @@ let build
   in
   String.concat
     ~sep:"\n\n"
-    ([ base ~nix ~auto_background ~tools ]
+    ([ base ~nix ~auto_background ~role ~tools ]
      @ skills
      @ [ environment ]
      @ instructions)
