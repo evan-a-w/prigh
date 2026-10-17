@@ -61,6 +61,7 @@ chat:send()
 T.wait(function()
   return agent.pending_permission and agent.pending_permission.title == "second"
 end, "second card")
+T.wait_agent('"id":7', "the withdrawn card's answer")
 T.agent_log()
 T.chat()
 T.winbar()
