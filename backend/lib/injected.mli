@@ -64,6 +64,13 @@ module Source : sig
         { continuation : int
         ; max : int
         }
+    | Reminder of
+        { name : string
+        ; repeat : int option
+        ; max : int option
+        }
+    (** one of the config's [reminders], by its {!Reminder.label}; an
+        on-stop one with how often it fired in a row and may *)
     | Resume (** after a usage limit reset *)
     | Shell of { command : string } (** [!cmd]'s output *)
     | Summary (** the compaction summary standing for older messages *)
@@ -72,7 +79,7 @@ module Source : sig
   [@@deriving sexp, jsonaf, equal]
 
   (** The wire name: [delivery], [handover], [goal], [goal_continuation],
-      [resume], [shell], [summary], [review], [init]. *)
+      [reminder], [resume], [shell], [summary], [review], [init]. *)
   val kind : t -> string
 
   val title : t -> string

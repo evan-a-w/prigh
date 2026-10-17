@@ -14,7 +14,7 @@ let%expect_test "a missing file yields the default" =
      ((scoped_models ()) (approval_mode Auto)
       (permissions ((allow ()) (ask ()) (deny ()))) (default_model ())
       (default_thinking ()) (fallback_models ()) (default_cwd ())
-      (max_budget_usd ()) (goal_max_continuations 20)
+      (max_budget_usd ()) (goal_max_continuations 20) (reminders ())
       (resume_on_limit_reset true) (archive_after_days 7) (notify Bell)
       (auto_background_seconds 30)))
     |}]
@@ -33,6 +33,7 @@ let%expect_test "save then load round trips" =
     ; default_cwd = None
     ; max_budget_usd = None
     ; goal_max_continuations = 20
+    ; reminders = []
     ; resume_on_limit_reset = true
     ; archive_after_days = 7.
     ; notify = Bell
@@ -67,7 +68,7 @@ let%expect_test "save then load round trips" =
       (approval_mode Ask) (permissions ((allow ()) (ask ()) (deny ())))
       (default_model (anthropic/claude-fable-5)) (default_thinking ((On (High))))
       (fallback_models ()) (default_cwd ()) (max_budget_usd ())
-      (goal_max_continuations 20) (resume_on_limit_reset true)
+      (goal_max_continuations 20) (reminders ()) (resume_on_limit_reset true)
       (archive_after_days 7) (notify Bell) (auto_background_seconds 30)))
     |}]
 ;;
@@ -86,7 +87,7 @@ let%expect_test "unknown fields are ignored" =
      ((scoped_models (x)) (approval_mode Ask)
       (permissions ((allow ()) (ask ()) (deny ()))) (default_model ())
       (default_thinking ()) (fallback_models ()) (default_cwd ())
-      (max_budget_usd ()) (goal_max_continuations 20)
+      (max_budget_usd ()) (goal_max_continuations 20) (reminders ())
       (resume_on_limit_reset true) (archive_after_days 7) (notify Bell)
       (auto_background_seconds 30)))
     |}]
@@ -141,7 +142,7 @@ let%expect_test
     {|
     config.confirm_tools must be a boolean (in $DIR/.prigh/config.json); prigh ignores the file's settings until it is fixed
     unknown setting "providrs" in $DIR/.prigh/config.json is ignored; did you mean "providers"?
-    unknown setting "colour" in $DIR/.prigh/config.json is ignored (known: providers, confirm_tools, scoped_models, approval_mode, permissions, default_model, default_thinking, fallback_models, default_cwd, max_budget_usd, goal_max_continuations, resume_on_limit_reset, archive_after_days, notify, auto_background_seconds)
+    unknown setting "colour" in $DIR/.prigh/config.json is ignored (known: providers, confirm_tools, scoped_models, approval_mode, permissions, default_model, default_thinking, fallback_models, default_cwd, max_budget_usd, goal_max_continuations, reminders, resume_on_limit_reset, archive_after_days, notify, auto_background_seconds)
     |}];
   show {|{"archive_after_days": "a week"}|};
   show {|{"archive_after_days": -1}|};
@@ -175,7 +176,7 @@ let%expect_test "null defaults are unset" =
      ((scoped_models ()) (approval_mode Auto)
       (permissions ((allow ()) (ask ()) (deny ()))) (default_model ())
       (default_thinking ()) (fallback_models ()) (default_cwd ())
-      (max_budget_usd ()) (goal_max_continuations 20)
+      (max_budget_usd ()) (goal_max_continuations 20) (reminders ())
       (resume_on_limit_reset true) (archive_after_days 7) (notify Bell)
       (auto_background_seconds 30)))
     (Ok
@@ -183,7 +184,7 @@ let%expect_test "null defaults are unset" =
       (permissions ((allow ()) (ask ()) (deny ())))
       (default_model (deepseek/deepseek-flash)) (default_thinking ((On ())))
       (fallback_models ()) (default_cwd ()) (max_budget_usd ())
-      (goal_max_continuations 20) (resume_on_limit_reset true)
+      (goal_max_continuations 20) (reminders ()) (resume_on_limit_reset true)
       (archive_after_days 7) (notify Bell) (auto_background_seconds 30)))
     |}]
 ;;
@@ -209,5 +210,117 @@ let%expect_test "notify: off, bell or desktop" =
     (Error
      "config.notify must be \"off\", \"bell\" or \"desktop\", not \"loud\"")
     (Error "config.notify must be \"off\", \"bell\" or \"desktop\"")
+    |}]
+;;
+
+let%expect_test "reminders: parsed, round-tripped, kept by save as written" =
+  with_sandbox
+  @@ fun t ->
+  write
+    t
+    ".prigh/config.json"
+    {|{"reminders": [
+        {"name": "keep-going", "text": "Don't stop until every test passes.", "on": "stop", "max_repeats": 5},
+        {"text": "Check disk usage (df -h).\nThen clean up.", "every_turns": 40},
+        {"text": "x", "on": "stop"}
+      ]}|};
+  let config = Or_error.ok_exn (Config.load ~home:t.dir) in
+  print_s [%sexp (config.reminders : Reminder.t list)];
+  List.iter config.reminders ~f:(fun r ->
+    print_endline (Reminder.label r);
+    print_endline (Reminder.message_text r ~repeat:(Some 1)));
+  let json = Config.to_json config in
+  print_endline
+    (Jsonaf.to_string (Option.value_exn (Jsonaf.member "reminders" json)));
+  print_s
+    [%sexp
+      (Or_error.map (Config.of_json json) ~f:(fun c ->
+         List.equal Reminder.equal c.reminders config.reminders)
+       : bool Or_error.t)];
+  (* Saving another setting leaves them as the user wrote them. *)
+  let before = In_channel.read_all (config_path t) in
+  Or_error.ok_exn
+    (Config.save ~home:t.dir { config with reminders = []; notify = Off });
+  let fields = Or_error.ok_exn (Config.read_fields ~home:t.dir) in
+  print_s
+    [%sexp
+      (Jsonaf.exactly_equal
+         (List.Assoc.find_exn fields ~equal:String.equal "reminders")
+         (Option.value_exn
+            (Jsonaf.member "reminders" (Jsonaf.of_string before)))
+       : bool)];
+  [%expect
+    {|
+    (((name (keep-going)) (text "Don't stop until every test passes.")
+      (trigger (On_stop (max_repeats 5))))
+     ((name ()) (text  "Check disk usage (df -h).\
+                      \nThen clean up.")
+      (trigger (Every_turns 40)))
+     ((name ()) (text x) (trigger (On_stop (max_repeats 3)))))
+    keep-going
+    [prigh reminder: keep-going, as you ended your turn (1 of 5)] Don't stop until every test passes.
+    Check disk usage (df -h).
+    [prigh reminder, every 40 turns] Check disk usage (df -h).
+    Then clean up.
+    x
+    [prigh reminder, as you ended your turn (1 of 3)] x
+    [{"name":"keep-going","text":"Don't stop until every test passes.","on":"stop","max_repeats":5},{"text":"Check disk usage (df -h).\nThen clean up.","every_turns":40},{"text":"x","on":"stop","max_repeats":3}]
+    (Ok true)
+    true
+    |}]
+;;
+
+let%expect_test "reminders: errors say which one and what is wrong" =
+  List.iter
+    [ {|{"reminders": {"text": "x"}}|}
+    ; {|{"reminders": ["x"]}|}
+    ; {|{"reminders": [{"text": "x", "on": "stop"}, {"text": "y"}]}|}
+    ; {|{"reminders": [{"text": "  ", "on": "stop"}]}|}
+    ; {|{"reminders": [{"on": "stop"}]}|}
+    ; {|{"reminders": [{"text": "x", "on": "start"}]}|}
+    ; {|{"reminders": [{"text": "x", "on": "stop", "every_turns": 3}]}|}
+    ; {|{"reminders": [{"text": "x", "every_turns": 0}]}|}
+    ; {|{"reminders": [{"text": "x", "every_turns": 2.5}]}|}
+    ; {|{"reminders": [{"text": "x", "every_turns": 3, "max_repeats": 2}]}|}
+    ; {|{"reminders": [{"text": "x", "on": "stop", "max_repeats": 0}]}|}
+    ; {|{"reminders": [{"text": "x", "on": "stop", "evry_turns": 3}]}|}
+    ; {|{"reminders": [{"text": "x", "on": "stop", "colour": "red"}]}|}
+    ; {|{"reminders": [{"name": 1, "text": "x", "on": "stop"}]}|}
+    ]
+    ~f:(fun json ->
+      print_s
+        [%sexp
+          (Or_error.map
+             (Config.of_json (Jsonaf.of_string json))
+             ~f:(fun c -> c.reminders)
+           : Reminder.t list Or_error.t)]);
+  [%expect
+    {|
+    (Error
+     "config.reminders must be an array of reminders, e.g. [{\"text\": \"...\", \"on\": \"stop\"}]")
+    (Error
+     "config.reminders[0]: must be an object such as {\"text\": \"...\", \"on\": \"stop\"}")
+    (Error
+     "config.reminders[1]: needs \"on\": \"stop\" (when the agent ends its turn) or \"every_turns\": N")
+    (Error
+     "config.reminders[0]: \"text\" must be a non-empty string: what to remind the agent of")
+    (Error
+     "config.reminders[0]: \"text\" must be a non-empty string: what to remind the agent of")
+    (Error "config.reminders[0]: \"on\" must be \"stop\"")
+    (Error
+     "config.reminders[0]: has both \"on\": \"stop\" and \"every_turns\"; keep one")
+    (Error
+     "config.reminders[0]: \"every_turns\" must be a whole number, 1 or more")
+    (Error
+     "config.reminders[0]: \"every_turns\" must be a whole number, 1 or more")
+    (Error
+     "config.reminders[0]: \"max_repeats\" only goes with \"on\": \"stop\", not with \"every_turns\"")
+    (Error
+     "config.reminders[0]: \"max_repeats\" must be a whole number, 1 or more")
+    (Error
+     "config.reminders[0]: unknown key \"evry_turns\"; did you mean \"every_turns\"?")
+    (Error
+     "config.reminders[0]: unknown key \"colour\" (known: name, text, on, every_turns, max_repeats)")
+    (Error "config.reminders[0]: \"name\" must be a string")
     |}]
 ;;

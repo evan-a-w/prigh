@@ -91,7 +91,8 @@ let%expect_test "tools a model change added or removed, also an older backend's"
       ]
   in
   Chat_harness.show ~selector:"details.note summary" chat;
-  [%expect {|
+  [%expect
+    {|
     <summary>
       <span aria-hidden="true" class="glyph"> ± </span>
       <span class="title"> Tools changed: web_search removed </span>
@@ -112,6 +113,10 @@ let%expect_test
           ~kind:"goal_continuation"
           ~title:"Goal: continuing (3/20)"
           "[prigh goal: continuation 3 of 20] Continue working toward the goal"
+      ; source
+          ~kind:"reminder"
+          ~title:"Reminder: disk"
+          "[prigh reminder: disk, every 40 turns] Clean up disk space."
       ; source
           ~kind:"resume"
           ~title:"Usage limit reset: carrying on"
@@ -137,7 +142,7 @@ let%expect_test
   Chat_harness.text chat;
   [%expect
     {|
-    ◷ Goal: continuing (3/20) [prigh goal: continuation 3 of 20] Continue working toward the goal ↻ Usage limit reset: carrying on [prigh: the usage limit has reset.] ⚑ Review of changes against main [prigh review] Review the changes ▤ Write or improve AGENTS.md [prigh init] Write an AGENTS.md $ Output of $ ls added to the context $ ls
+    ◷ Goal: continuing (3/20) [prigh goal: continuation 3 of 20] Continue working toward the goal ※ Reminder: disk [prigh reminder: disk, every 40 turns] Clean up disk space. ↻ Usage limit reset: carrying on [prigh: the usage limit has reset.] ⚑ Review of changes against main [prigh review] Review the changes ▤ Write or improve AGENTS.md [prigh init] Write an AGENTS.md $ Output of $ ls added to the context $ ls
     a.ml Context compacted We fixed the parser. We fixed the parser .
     |}]
 ;;
@@ -455,7 +460,8 @@ let%expect_test
      ((title "prigh: a question for you in work") (body "Which database?")))
     |}];
   H.act h (Page_hidden false);
-  [%expect {|
+  [%expect
+    {|
     (Set_title prigh)
     Probe_connection
     |}];

@@ -34,6 +34,7 @@ type t =
   ; default_cwd : string option
   ; max_budget_usd : float option
   ; goal_max_continuations : int
+  ; reminders : Reminder.t list
   ; resume_on_limit_reset : bool
   ; archive_after_days : float
   ; notify : Notify.t
@@ -51,6 +52,7 @@ let default =
   ; default_cwd = None
   ; max_budget_usd = None
   ; goal_max_continuations = Goal.default_max_continuations
+  ; reminders = []
   ; resume_on_limit_reset = true
   ; archive_after_days = 7.
   ; notify = Bell
@@ -89,6 +91,7 @@ let to_json t =
           (fun usd -> `Number (Float.to_string_hum ~strip_zero:true usd))
           t.max_budget_usd )
     ; "goal_max_continuations", `Number (Int.to_string t.goal_max_continuations)
+    ; "reminders", `Array (List.map t.reminders ~f:Reminder.to_json)
     ; ( "resume_on_limit_reset"
       , if t.resume_on_limit_reset then `True else `False )
     ; "archive_after_days", `Number (sprintf "%g" t.archive_after_days)
@@ -204,6 +207,22 @@ let of_json json =
         Or_error.error_string
           "config.goal_max_continuations must be a whole number"
     in
+    let%bind reminders =
+      match find "reminders" with
+      | None | Some `Null -> Ok []
+      | Some (`Array items) ->
+        Or_error.all
+          (List.mapi items ~f:(fun i json ->
+             Result.map_error (Reminder.of_json json) ~f:(fun e ->
+               Error.createf
+                 "config.reminders[%d]: %s"
+                 i
+                 (Error.to_string_hum e))))
+      | Some _ ->
+        Or_error.error_string
+          "config.reminders must be an array of reminders, e.g. [{\"text\": \
+           \"...\", \"on\": \"stop\"}]"
+    in
     let%bind resume_on_limit_reset =
       match find "resume_on_limit_reset" with
       | None | Some `Null -> Ok true
@@ -238,6 +257,7 @@ let of_json json =
     ; default_cwd
     ; max_budget_usd
     ; goal_max_continuations
+    ; reminders
     ; resume_on_limit_reset
     ; archive_after_days
     ; notify
@@ -335,13 +355,13 @@ let problems ~home =
    kept, in place. *)
 let save ~home t =
   Or_error.bind (read_fields ~home) ~f:(fun existing ->
-    (* [permissions] is the user's to edit by hand: it is written as they
-       wrote it, invalid rules included. *)
+    (* [permissions] and [reminders] are the user's to edit by hand:
+       [permissions] is written as they wrote it, invalid rules included. *)
     let ours =
       match to_json t with
       | `Object fields ->
         List.filter fields ~f:(fun (name, _) ->
-          not (String.equal name "permissions"))
+          not (List.mem [ "permissions"; "reminders" ] name ~equal:String.equal))
       | _ -> assert false
     in
     (* [approval_mode] replaces it. *)

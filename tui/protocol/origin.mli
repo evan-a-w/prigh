@@ -16,6 +16,7 @@ module Kind : sig
     | Handover (** another model takes over *)
     | Goal (** [/goal] starts *)
     | Goal_continuation
+    | Reminder (** one of the config's [reminders] *)
     | Resume (** after a usage limit reset *)
     | Shell (** [!cmd]'s output added to the context *)
     | Summary (** the compaction summary *)

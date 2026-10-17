@@ -919,7 +919,9 @@ through; `/scoped-models` edits it), `approval_mode` (`ask`, `auto-edit`
 or `auto`: the mode new sessions start in, see below; `/confirm on|off`
 sets `ask` or `auto`; files with the older `confirm_tools` still work, and
 it is replaced by `approval_mode` when prigh saves the file),
-`permissions` (allow/ask/deny rules, below; edited by hand) and
+`permissions` (allow/ask/deny rules, below; edited by hand), `reminders`
+(messages sent to the main agent when it stops or every so many turns, see
+Long runs; edited by hand) and
 `default_model`/`default_thinking` (what new sessions start with unless
 `-model`/`-thinking` is given; `/change_default` saves the current ones),
 `notify` (`off`, `bell` or `desktop`; the TUI's `/notify`) and
@@ -993,6 +995,32 @@ abort, a failed run, the budget or that cap stop the goal (`/goal resume`
 makes it active again, with fresh continuations). `/goal` shows it, `/goal
 off` clears it. Messages you send meanwhile go first; the goal is recorded
 in the session, so it survives restarts and reconnects.
+
+`reminders` in `~/.prigh/config.json` are messages prigh sends the main
+agent (never a subagent) on its own, e.g. not to stop before the work is
+done, or to clean up disk space now and then:
+
+```json
+"reminders": [
+  {"name": "keep-going", "text": "Don't stop until the tests pass.",
+   "on": "stop", "max_repeats": 5},
+  {"name": "disk", "text": "Delete build artifacts you no longer need.",
+   "every_turns": 40}
+]
+```
+
+Each has a `text` and exactly one of `"on": "stop"` or `"every_turns": N`;
+`name` (optional) is how the chat shows it (`※ Reminder: disk`), else its
+first line. An `every_turns` reminder is added after every N turns of the
+main agent, between turns of a run or at the next run's start. An `on:
+stop` one starts a new run when a run ends normally with nothing left to
+wait for: no message queued, no running or undelivered background jobs or
+subagents, no goal continuing, not aborted, failed, in plan mode or past the
+budget. It fires at most `max_repeats` times in a row (default 3), then a
+note says so and it waits for your next message. The model sees e.g.
+`[prigh reminder: keep-going, as you ended your turn (1 of 5)] ...`. A new
+session starts the counts over; a mistake in the list is reported with the
+reminder's index (`config.reminders[1]: ...`).
 
 When a run stops at a usage limit and no fallback model is left, prigh reads
 when the limit resets (ChatGPT/Codex error bodies and `x-codex-*-reset-at`

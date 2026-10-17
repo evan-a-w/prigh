@@ -225,6 +225,7 @@ type t =
   ; max_budget_usd : float option
     (** the budget of sessions that set none, overriding the config's *)
   ; mutable goal : Goal.t option
+  ; reminders : Reminder.Tracker.t
   ; mutable resume : Resume.t option
     (** a run stopped by a usage limit, resuming when it resets *)
   ; mutable past_resets : int
@@ -1358,6 +1359,27 @@ let goal_message t ~source text =
     (Injected.prefix_notes notes text)
 ;;
 
+let reminder_message t (reminder : Reminder.t) ~repeat =
+  goal_message
+    t
+    ~source:
+      (Reminder
+         { name = Reminder.label reminder
+         ; repeat
+         ; max =
+             (match reminder.trigger with
+              | On_stop { max_repeats } -> Some max_repeats
+              | Every_turns _ -> None)
+         })
+    (Reminder.message_text reminder ~repeat)
+;;
+
+let due_reminders t =
+  List.map
+    (Reminder.Tracker.due t.reminders t.config.reminders)
+    ~f:(reminder_message t ~repeat:None)
+;;
+
 let stop_goal t ~reason =
   match t.goal with
   | Some goal when Goal.is_active goal ->
@@ -1452,6 +1474,7 @@ let take_notes t =
 ;;
 
 let user_message t (q : Queued.t) =
+  Reminder.Tracker.user_spoke t.reminders;
   let text = Option.value q.expanded ~default:q.text in
   let text, attachments, attached = with_attachments t text q.attachments in
   let notes = take_notes t in
@@ -1609,6 +1632,28 @@ let duration_hum seconds =
   else sprintf "%dh %02dm" (minutes / 60) (minutes mod 60)
 ;;
 
+(* When the agent ended its turn with nothing left to wait for. *)
+let stop_reminders t =
+  let { Reminder.Tracker.Stop.fire; used_up } =
+    Reminder.Tracker.stopped t.reminders t.config.reminders
+  in
+  List.iter used_up ~f:(fun r ->
+    match r.trigger with
+    | On_stop { max_repeats } ->
+      broadcast
+        t
+        (Notice
+           (sprintf
+              "reminder %s fired %s; it fires again after your next message"
+              (Reminder.label r)
+              (if max_repeats = 1
+               then "once"
+               else sprintf "%d times in a row" max_repeats)))
+    | Every_turns _ -> ());
+  List.map fire ~f:(fun (r, repeat) ->
+    reminder_message t r ~repeat:(Some repeat))
+;;
+
 (* Finished background tasks not delivered yet go first. [tried] are the
    models a hand-over chain has used so far (empty for a user's prompt). *)
 let rec start_run ?(tried = String.Set.empty) ?(then_ = fun () -> []) t prompts =
@@ -1623,6 +1668,7 @@ let rec start_run ?(tried = String.Set.empty) ?(then_ = fun () -> []) t prompts 
     (* [then_] may wait for the host (attachments): the run is already
        marked as started, so no other can start meanwhile. *)
     let prompts = prompts @ then_ () in
+    let prompts = prompts @ due_reminders t in
     let session = t.session in
     let finish ~idle =
       t.run <- None;
@@ -1661,7 +1707,7 @@ let rec start_run ?(tried = String.Set.empty) ?(then_ = fun () -> []) t prompts 
                        note.text))
               else []
             in
-            deliveries t @ note @ queued)
+            deliveries t @ note @ queued @ due_reminders t)
           ~compact:(fun ~keep_recent_tokens ~cancel _messages ->
             match
               Compaction.compact
@@ -1686,6 +1732,10 @@ let rec start_run ?(tried = String.Set.empty) ?(then_ = fun () -> []) t prompts 
             account t event;
             track_plan t event;
             match event with
+            | Turn_end _ ->
+              if phys_equal session t.session
+              then Reminder.Tracker.turn_ended t.reminders;
+              broadcast t (Loop event)
             | Compacted { summary; _ } ->
               if phys_equal session t.session
               then (
@@ -1830,11 +1880,27 @@ let rec start_run ?(tried = String.Set.empty) ?(then_ = fun () -> []) t prompts 
                             ~max_continuations:t.config.goal_max_continuations)
                      ])
              | None -> None)
+           else if
+             current
+             && (not cancelled)
+             && Option.is_none handover
+             && (not resuming)
+             && (not t.plan_mode)
+             && Option.is_none (budget_exhausted t)
+             && (not (Background_tasks.has_running t.background))
+             &&
+             match last_stop added with
+             | Some (End_turn | Tool_use | Length) -> true
+             | Some (Error _ | Aborted) | None -> false
+           then (
+             match stop_reminders t with
+             | [] -> None
+             | prompts -> Some (`Prompts prompts))
            else None)
     in
-    (* A hand-over, a queued message or a goal's continuation carries on:
-       the run's next state says [running] again, with no idle moment in
-       between (in which the server would evict a session without
+    (* A hand-over, a queued message, a goal's continuation or a reminder
+       carries on: the run's next state says [running] again, with no idle
+       moment in between (in which the server would evict a session without
        clients). *)
     finish ~idle:(Option.is_none next);
     Option.iter next ~f:(function
@@ -2134,6 +2200,7 @@ let create
     ; mcp_noticed = String.Set.empty
     ; max_budget_usd
     ; goal = None
+    ; reminders = Reminder.Tracker.create ()
     ; resume = None
     ; past_resets = 0
     ; sleep_until
@@ -2666,6 +2733,7 @@ let replace_session t session ~keep_host =
   wait_idle t;
   Background_tasks.forget_finished t.background;
   t.session <- session;
+  Reminder.Tracker.reset t.reminders;
   load_subagent_log t;
   if keep_host then record_location t else t.cwd <- Session.cwd session;
   t.git_branch <- find_branch t ~cwd:t.cwd;
