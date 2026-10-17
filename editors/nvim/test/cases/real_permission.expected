@@ -204,3 +204,77 @@ select: 1. Storage
 │ Thanks.
 │ 
 └
+
+== a write in Ask: the card shows the diff, allowed
+select: Mode
+    Ask — ask before every tool that changes something
+    Auto-edit — edit files without asking; ask before commands
+  ● Auto — run every tool without asking
+    Plan — investigate and plan, changing no files, until you approve the plan
+  ->   Ask — ask before every tool that changes something
+← {"id":6,"method":"session/request_permission","params":{"options":[{"kind":"allow_once","name":"Allow","optionId":"allow"},{"kind":"allow_always","name":"Always allow edit","optionId":"always"},{"kind":"reject_once","name":"Reject","optionId":"reject"}],"sessionId":"<session 5>","toolCall":{"content":[{"newText":"one\nTWO\n","oldText":"one\ntwo\n","path":"<tmp>/notes.txt","type":"diff"}],"kind":"edit","locations":[{"path":"<tmp>/notes.txt"}],"rawInput":{"content":"one\nTWO\n","path":"notes.txt"},"status":"pending","title":"Write notes.txt","toolCallId":"w1"}}}
+┌ chat
+│ ## You
+│ rewrite notes
+│ 
+│ ## prigh
+│ Reading.
+│ 
+│ ✓ Read notes.txt · read · completed
+│   ↳ notes.txt
+│   ▸ 2 lines of output · <Tab> expand
+│ 
+│ Rewriting.
+│ 
+│ ◐ Write notes.txt · edit · in progress
+│   ↳ notes.txt
+│ 
+│ 🔐 Permission needed: Write notes.txt
+│   ↳ notes.txt
+│   ```diff
+│   +++ notes.txt
+│   @@ -1,2 +1,2 @@
+│    one
+│   -two
+│   +TWO
+│   ```
+│   [a] Allow
+│   [A] Always allow edit
+│   [r] Reject
+│   [Esc] cancel · <CR> option under cursor · j/k move
+│ 
+└
+winbar: prigh · deepseek/deepseek-flash · thinking on · mode Ask · ctx 0/1.0M (0%) · $0.00 · ● running · permission needed
+input bar: <CR> send · <C-c> cancel · @ file · / command · g? keys
+→ {"id":6,"result":{"outcome":{"optionId":"allow","outcome":"selected"}}}
+┌ chat
+│ ## You
+│ rewrite notes
+│ 
+│ ## prigh
+│ Reading.
+│ 
+│ ✓ Read notes.txt · read · completed
+│   ↳ notes.txt
+│   ▸ 2 lines of output · <Tab> expand
+│ 
+│ Rewriting.
+│ 
+│ ✓ Write notes.txt · edit · completed
+│   ↳ notes.txt
+│   ```diff
+│   +++ notes.txt
+│   @@ -1,2 +1,2 @@
+│    one
+│   -two
+│   +TWO
+│   ```
+│ 
+│ 🔐 Permission: Write notes.txt → Allow
+│ 
+│ Rewritten.
+│ 
+│ ℹ 1 file changed: notes.txt — :PrighReview (<leader>pr) reviews the changes hunk by hunk
+│ 
+└
+notes.txt: "one\nTWO\n"

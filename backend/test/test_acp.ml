@@ -212,6 +212,35 @@ let%expect_test "permissions: allow, always, reject, and cancelled denies" =
     |}]
 ;;
 
+let%expect_test
+    "permission requests for file changes show the files and the diff"
+  =
+  H.run
+    ~config:{|{"approval_mode": "ask"}|}
+    [ {|{"tool_calls": [{"id": "w1", "name": "write", "arguments": {"path": "a.txt", "content": "new\n"}}]}|}
+    ; {|{"tool_calls": [{"id": "e1", "name": "edit", "arguments": {"path": "a.txt", "edits": [{"old_text": "old", "new_text": "OLD"}]}}]}|}
+    ; {|{"text": "both rejected"}|}
+    ]
+  @@ fun h ->
+  Out_channel.write_all (Filename.concat h.sandbox.dir "a.txt") ~data:"old\n";
+  h.answer
+  <- (fun ~method_ ~params:_ ->
+       match method_ with
+       | "session/request_permission" ->
+         H.Answer.Result
+           {|{"outcome": {"outcome": "selected", "optionId": "reject"}}|}
+       | _ -> H.default_answer ~method_ ~params:());
+  ignore (H.prompt h "change a.txt" : Jsonaf.t);
+  Queue.filter_inplace h.log ~f:(fun line ->
+    String.is_substring line ~substring:"request_permission");
+  H.dump h;
+  [%expect
+    {|
+    < request 0 session/request_permission {"sessionId":"<id>","toolCall":{"toolCallId":"w1","title":"Write a.txt","kind":"edit","status":"pending","rawInput":{"path":"a.txt","content":"new\n"},"content":[{"type":"diff","path":"$DIR/a.txt","oldText":"old\n","newText":"new\n"}],"locations":[{"path":"$DIR/a.txt"}]},"options":[{"optionId":"allow","name":"Allow","kind":"allow_once"},{"optionId":"always","name":"Always allow edit","kind":"allow_always"},{"optionId":"reject","name":"Reject","kind":"reject_once"}]}
+    < request 1 session/request_permission {"sessionId":"<id>","toolCall":{"toolCallId":"e1","title":"Edit a.txt","kind":"edit","status":"pending","rawInput":{"path":"a.txt","edits":[{"old_text":"old","new_text":"OLD"}]},"content":[{"type":"diff","path":"$DIR/a.txt","oldText":"old","newText":"OLD"}],"locations":[{"path":"$DIR/a.txt"}]},"options":[{"optionId":"allow","name":"Allow","kind":"allow_once"},{"optionId":"always","name":"Always allow edit","kind":"allow_always"},{"optionId":"reject","name":"Reject","kind":"reject_once"}]}
+    |}]
+;;
+
 let%expect_test "session/cancel mid-turn: the pending permission is withdrawn" =
   H.run
     [ {|{"tool_calls": [{"id": "c1", "name": "write", "arguments": {"path": "new.txt", "content": "x"}}]}|}
@@ -250,7 +279,7 @@ let%expect_test "session/cancel mid-turn: the pending permission is withdrawn" =
     < _prigh/state {"sessionId":"<id>","model":"deepseek/deepseek-flash","thinking":"on","running":true,"context_tokens":0,"context_window":1000000,"cost_usd":0,"budget_usd":null,"approval_mode":"ask","plan_mode":false,"queued":{"steer":0,"follow_up":0},"subagents":[],"jobs":0,"goal":null,"reminders":0,"active_host":"testhost"}
     < update tool_call {"toolCallId":"c1","title":"Write","kind":"edit","status":"pending"}
     < update tool_call_update {"toolCallId":"c1","title":"Write new.txt","kind":"edit","status":"in_progress","rawInput":{"path":"new.txt","content":"x"},"locations":[{"path":"$DIR/new.txt"}]}
-    < request 0 session/request_permission {"sessionId":"<id>","toolCall":{"toolCallId":"c1","title":"Write new.txt","kind":"edit","status":"pending","rawInput":{"path":"new.txt","content":"x"}},"options":[{"optionId":"allow","name":"Allow","kind":"allow_once"},{"optionId":"always","name":"Always allow edit","kind":"allow_always"},{"optionId":"reject","name":"Reject","kind":"reject_once"}]}
+    < request 0 session/request_permission {"sessionId":"<id>","toolCall":{"toolCallId":"c1","title":"Write new.txt","kind":"edit","status":"pending","rawInput":{"path":"new.txt","content":"x"},"content":[{"type":"diff","path":"$DIR/new.txt","oldText":null,"newText":"x"}],"locations":[{"path":"$DIR/new.txt"}]},"options":[{"optionId":"allow","name":"Allow","kind":"allow_once"},{"optionId":"always","name":"Always allow edit","kind":"allow_always"},{"optionId":"reject","name":"Reject","kind":"reject_once"}]}
     > session/cancel {"sessionId":"<id>"}
     < $/cancel_request {"requestId":0}
     < update tool_call_update {"toolCallId":"c1","status":"failed","content":[{"type":"content","content":{"type":"text","text":"[cancelled]"}}]}

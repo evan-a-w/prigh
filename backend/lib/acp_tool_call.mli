@@ -23,9 +23,17 @@ val edits_files : string -> bool
 val diff : path:string -> old_text:string option -> new_text:string -> Json.t
 
 (** The diffs a call's arguments describe, when the files themselves were
-    not seen (the call ran on another host, or is replayed): an [edit]'s
-    replaced texts, a [write]'s new contents, an [apply_patch]'s hunks. *)
-val diffs_of_args : name:string -> args:Json.t -> cwd:string -> Json.t list
+    not seen (the call ran on another host, is replayed, or waits for
+    permission): an [edit]'s replaced texts, a [write]'s new contents
+    (replacing [current path], default [None]: a new file), an
+    [apply_patch]'s hunks. *)
+val diffs_of_args
+  :  ?current:(string -> string option)
+  -> name:string
+  -> args:Json.t
+  -> cwd:string
+  -> unit
+  -> Json.t list
 
 (** A [content] block of text; [execute] and [search] output is fenced. *)
 val text : ?kind:string -> string -> Json.t

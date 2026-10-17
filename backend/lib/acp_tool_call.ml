@@ -117,13 +117,14 @@ let diff ~path ~old_text ~new_text =
     ]
 ;;
 
-let diffs_of_args ~name ~args ~cwd =
+let diffs_of_args ?(current = fun _ -> None) ~name ~args ~cwd () =
   let resolve path = Tool.resolve ~cwd path in
   match name with
   | "write" ->
     (match string_arg args "path", string_arg args "content" with
      | Some path, Some content ->
-       [ diff ~path:(resolve path) ~old_text:None ~new_text:content ]
+       let path = resolve path in
+       [ diff ~path ~old_text:(current path) ~new_text:content ]
      | _ -> [])
   | "edit" ->
     (match

@@ -715,7 +715,9 @@ let tool_end t (s : Session.t) ~call ~result =
       match recorded with
       | _ :: _ -> recorded
       | [] ->
-        (match Acp_tool_call.diffs_of_args ~name ~args ~cwd:(Session.cwd s) with
+        (match
+           Acp_tool_call.diffs_of_args ~name ~args ~cwd:(Session.cwd s) ()
+         with
          | [] -> [ Acp_tool_call.text text ]
          | diffs -> diffs))
     else [ Acp_tool_call.text ~kind text ]
@@ -784,6 +786,34 @@ let report_failure t what = function
   | Error e -> log t "%s failed: %s" what (Core.Error.to_string_hum e)
 ;;
 
+(* What a permission request for a file change shows: the files, and the
+   change as its arguments describe it (a [write] against the file here, when
+   the tools run here). *)
+let change_preview t (s : Session.t) (view : Tool_view.t) =
+  let cwd = Session.cwd s in
+  let current path =
+    if Option.is_some t.host && Sys_unix.file_exists_exn path
+    then Option.try_with (fun () -> In_channel.read_all path)
+    else None
+  in
+  let diffs =
+    if Acp_tool_call.edits_files view.name
+    then
+      Acp_tool_call.diffs_of_args
+        ~current
+        ~name:view.name
+        ~args:view.args
+        ~cwd
+        ()
+    else []
+  in
+  let locations =
+    Acp_tool_call.locations ~name:view.name ~args:view.args ~cwd
+  in
+  (if List.is_empty diffs then [] else [ "content", `Array diffs ])
+  @ if List.is_empty locations then [] else [ "locations", `Array locations ]
+;;
+
 let confirm t (s : Session.t) json =
   let call_id = string_field "call_id" json in
   let agent_id = opt_string "agent_id" json in
@@ -796,6 +826,7 @@ let confirm t (s : Session.t) json =
     | Some view ->
       tool_fields s view ~call_id
       @ [ "status", str "pending"; "rawInput", view.args ]
+      @ change_preview t s view
     | None ->
       [ "toolCallId", str call_id
       ; "title", str summary

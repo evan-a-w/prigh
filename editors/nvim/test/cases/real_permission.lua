@@ -1,7 +1,7 @@
 -- Against the real prigh in approval mode ask: permission cards answered
 -- with a (allow), r (reject) and A (always); a card withdrawn by prigh
 -- ($/cancel_request) when switching to Auto answers it; an ask_user form
--- (elicitation/create).
+-- (elicitation/create); a write's card previews the diff.
 local T = require("helpers")
 local function bash(id, command, text)
   return { text = text, tool_calls = { { id = id, name = "bash", arguments = { command = command } } } }
@@ -35,6 +35,9 @@ local agent, chat = T.start_prigh({
     },
   },
   { text = "Thanks." },
+  { text = "Reading.", tool_calls = { { id = "r1", name = "read", arguments = { path = "notes.txt" } } } },
+  { text = "Rewriting.", tool_calls = { { id = "w1", name = "write", arguments = { path = "notes.txt", content = "one\nTWO\n" } } } },
+  { text = "Rewritten." },
 }, { prigh_config = { approval_mode = "ask", ask_user_timeout_seconds = 0 } })
 
 local function send(text)
@@ -114,4 +117,23 @@ T.traffic(function(_, msg)
   return msg.method == "elicitation/create" or (msg.result and msg.result.action)
 end)
 T.chat()
+
+T.section("a write in Ask: the card shows the diff, allowed")
+local f = assert(io.open(T.tmp .. "/notes.txt", "w"))
+f:write("one\ntwo\n")
+f:close()
+T.answer("Ask")
+vim.cmd("PrighMode")
+T.wait(function()
+  return agent.session.prigh.approval_mode == "ask"
+end, "ask mode")
+vim.cmd("PrighNew")
+T.wait(function()
+  return #agent.session.entries == 0 and agent.session.prigh
+end, "new session")
+send("rewrite notes")
+card()
+T.feed("a")
+answered()
+T.out("notes.txt: " .. vim.inspect(io.open(T.tmp .. "/notes.txt"):read("*a")))
 T.finish()
