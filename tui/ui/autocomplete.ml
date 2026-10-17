@@ -204,7 +204,15 @@ let mcp_items () =
   ]
 ;;
 
-let argument_items ~kind ~models ~auth ~sessions ~logged_in =
+let snippet_items (snippets : P.Snippet.t list) =
+  List.map snippets ~f:(fun (s : P.Snippet.t) ->
+    Picker.Item.create ~id:s.name ~detail:(P.Snippet.first_line s) s.name)
+  @ [ Picker.Item.create ~id:"add" ~detail:"add NAME [TEXT]: save a snippet" "add"
+    ; Picker.Item.create ~id:"rm" ~detail:"rm NAME: delete a snippet" "rm"
+    ]
+;;
+
+let argument_items ~kind ~models ~auth ~sessions ~snippets ~logged_in =
   match (kind : Commands.Argument.t) with
   | Model | Models -> Some (model_items ~logged_in models)
   | Thinking -> Some (thinking_items ())
@@ -224,6 +232,7 @@ let argument_items ~kind ~models ~auth ~sessions ~logged_in =
   | Sessions | Session_list ->
     Some (Option.value_map sessions ~default:[] ~f:session_items)
   | Mcp -> Some (mcp_items ())
+  | Snippet -> Some (snippet_items snippets)
   | Budget ->
     Some
       [ Picker.Item.create
@@ -316,6 +325,7 @@ let compute_argument
       ~models
       ~auth
       ~sessions
+      ~snippets
       ~current_session
       ~logged_in
       ~default_dir_host
@@ -395,11 +405,19 @@ let compute_argument
               | _ ->
                 let items =
                   Option.value
-                    (argument_items ~kind ~models ~auth ~sessions ~logged_in)
+                    (argument_items
+                       ~kind
+                       ~models
+                       ~auth
+                       ~sessions
+                       ~snippets
+                       ~logged_in)
                     ~default:[]
                 in
                 let items =
                   match kind with
+                  | Snippet when String.exists prefix ~f:Char.is_whitespace ->
+                    []
                   | Goal | Budget ->
                     (* Free text: only an exact start of a keyword offers
                        it, so Enter sends what was typed. *)
@@ -464,6 +482,7 @@ let compute
       ~auth
       ~sessions
       ~skills
+      ~snippets
       ~logged_in
       ~default_dir_host
   =
@@ -482,6 +501,7 @@ let compute
          ~models
          ~auth
          ~sessions
+         ~snippets
          ~current_session
          ~logged_in
          ~default_dir_host

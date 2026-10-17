@@ -219,6 +219,7 @@ let handle t (intent : Intent.t) ~page : Outcome.t =
   | Path_complete
   | Edit_externally
   | Model_picker
+  | Snippet_picker
   | Picker_toggle_filter
   | Search
   | Prev_user_message
