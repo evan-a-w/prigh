@@ -87,9 +87,9 @@ let spec =
           , `Integer
           , sprintf
               "Optional: how long to wait for the answers before carrying on \
-               without them (%d-%d seconds), instead of the user's setting. \
-               0 waits until they answer: only when you cannot go on without \
-               it. Ignored if the user turned timeouts off."
+               without them (%d-%d seconds), instead of the user's setting. 0 \
+               waits until they answer: only when you cannot go on without it. \
+               Ignored if the user turned timeouts off."
               User_question.min_timeout_seconds
               User_question.max_timeout_seconds )
         ]
@@ -109,7 +109,9 @@ let run (context : Tool.Context.t) args =
   | Error e, _ -> Tool.Result.error (Error.to_string_hum e)
   | _, Error e -> Tool.Result.error e
   | Ok questions, Ok timeout_seconds ->
-    (match context.ask_user ~call_id:context.call_id ~timeout_seconds questions with
+    (match
+       context.ask_user ~call_id:context.call_id ~timeout_seconds questions
+     with
      | Answered answers ->
        Tool.Result.ok (User_question.result_text questions answers)
      | Declined ->

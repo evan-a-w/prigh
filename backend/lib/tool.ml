@@ -66,7 +66,8 @@ module Context = struct
         ?stdin
         ?(approve = fun _ _ _ -> None)
         ?(ask_user =
-          fun ~call_id:_ ~timeout_seconds:_ _ -> User_question.Reply.Unavailable "no user to ask")
+          fun ~call_id:_ ~timeout_seconds:_ _ ->
+            User_question.Reply.Unavailable "no user to ask")
         ~env
         ~cwd
         ()

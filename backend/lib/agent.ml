@@ -701,6 +701,16 @@ let ask_user t ~cancel ~call_id ~timeout_seconds questions =
     | Answered _ | Declined | Cancelled | Unavailable _ -> false
   in
   broadcast t (Loop (Ask_user_done { call_id; timed_out }));
+  (match reply with
+   | Timed_out after ->
+     broadcast
+       t
+       (Notice
+          (sprintf
+             "the question was not answered within %s; the agent carries on \
+              without it"
+             (User_question.duration_hum after)))
+   | Answered _ | Declined | Cancelled | Unavailable _ -> ());
   reply
 ;;
 

@@ -409,9 +409,9 @@ val set_mode : ?approval:Approval_mode.t -> ?plan:bool -> t -> unit
 
 (** Answers a pending [ask_user] call ([Answered], one list per question, or
     [Declined]). Unanswered, it times out at its deadline: the model gets
-    [Timed_out] and [Ask_user_done] says [timed_out]. Fails when there is none for [call_id] (another frontend
-    answered first, or the run was aborted) or the answers do not fit the
-    questions. *)
+    [Timed_out] and [Ask_user_done] says [timed_out]. Fails when there is
+    none for [call_id] (another frontend answered first, the run was aborted
+    or it timed out) or the answers do not fit the questions. *)
 val answer_question
   :  t
   -> call_id:string

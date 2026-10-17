@@ -895,6 +895,7 @@ let%expect_test
       "max_budget_usd": null,
       "goal_max_continuations": 20,
       "resume_on_limit_reset": true,
+      "ask_user_timeout_seconds": 600,
       "archive_after_days": 7,
       "notify": "bell",
       "auto_background_seconds": 30
