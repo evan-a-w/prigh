@@ -290,6 +290,8 @@ module Action : sig
     | Set_model of string (** [provider/id] *)
     | Set_thinking of string
     | Open_model_picker
+    | Open_snippets of int option
+    (** Alt+N: pick a snippet to insert at this caret (else the last edit's) *)
     | Open_thinking_picker
     | Open_help
     | Open_rename

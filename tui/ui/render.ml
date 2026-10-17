@@ -227,6 +227,12 @@ let mode_hint (m : App.Model.t) : Content.Line.t option =
                 ~style:attention
                 "Enter puts /skill:NAME in the editor · Esc closes"
             ]
+        | Picker { kind = Snippets; _ } ->
+          Some
+            [ span
+                ~style:attention
+                "Enter inserts the text at the cursor · Esc closes"
+            ]
         | Picker { kind = Mcp _; _ } ->
           Some
             [ span

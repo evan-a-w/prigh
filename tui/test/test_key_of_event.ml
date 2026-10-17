@@ -203,6 +203,7 @@ let%expect_test "keymap: every bound key is reachable from a terminal event" =
     Ctrl+F           (Key_press (key (ASCII f)) (mods (Ctrl))) ok
     Ctrl+G           (Key_press (key (ASCII g)) (mods (Ctrl))) ok
     Ctrl+L           (Key_press (key (ASCII l)) (mods (Ctrl))) ok
+    Alt+N            (Key_press (key (ASCII n)) (mods (Meta))) ok
     Ctrl+P           (Key_press (key (ASCII p)) (mods (Ctrl))) ok
     Alt+P            (Key_press (key (ASCII p)) (mods (Meta))) ok
     Ctrl+T           (Key_press (key (ASCII t)) (mods (Ctrl))) ok

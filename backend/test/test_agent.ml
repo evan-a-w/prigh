@@ -472,7 +472,7 @@ let%expect_test "save_as_default applies to new agents, not saved sessions" =
      (fallback_models ()) (default_cwd ()) (max_budget_usd ())
      (goal_max_continuations 20) (reminders ()) (resume_on_limit_reset true)
      (ask_user_timeout_seconds 600) (archive_after_days 7) (notify Bell)
-     (auto_background_seconds 30))
+     (snippets ()) (auto_background_seconds 30))
     {
       "scoped_models": [
         "a"
@@ -488,6 +488,7 @@ let%expect_test "save_as_default applies to new agents, not saved sessions" =
       "ask_user_timeout_seconds": 600,
       "archive_after_days": 7,
       "notify": "bell",
+      "snippets": [],
       "auto_background_seconds": 30
     }
     (default deepseek/deepseek-flash (On (High)))

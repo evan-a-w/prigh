@@ -63,6 +63,7 @@ module Reply_tag = struct
     | Job_output
     | Job_started
     | Skills_picker
+    | Snippets_saved of string (** the notice *)
     | Skills_for_autocomplete of string (** the [Skill_cache] key *)
     | Skill_prompt of string (** the [/skill:] text sent *)
     | Mcp_picker
@@ -1899,6 +1900,51 @@ let set_default_dir m (cmd : Commands.Parsed.t) =
     ] )
 ;;
 
+(* ---- snippets ---------------------------------------------------------- *)
+
+let snippets m = Option.map m.config ~f:(fun (c : P.Config.t) -> c.snippets)
+
+let last_prompt m =
+  Transcript.items m.transcript
+  |> List.rev
+  |> List.find_map ~f:(function
+    | Transcript.Item.User user ->
+      Option.some_if
+        (not (String.is_empty (String.strip (Injected_note.typed user))))
+        (Injected_note.typed user)
+    | _ -> None)
+;;
+
+let snippet_picker m (snippets : P.Snippet.t list) =
+  let items =
+    List.map snippets ~f:(fun (s : P.Snippet.t) ->
+      Picker.Item.create
+        ~id:s.name
+        ~detail:(P.Snippet.first_line s)
+        ~search:(s.name ^ " " ^ s.text)
+        s.name)
+  in
+  open_picker m Snippets (Picker.create ~title:"Snippets" items)
+;;
+
+let insert_snippet m (snippet : P.Snippet.t) =
+  { m with mode = Editing; editor = Editor.insert m.editor snippet.text }
+;;
+
+let snippet_action m (action : Snippet_command.Action.t) =
+  match action with
+  | Pick snippets -> snippet_picker m snippets, []
+  | Insert snippet -> insert_snippet m snippet, []
+  | Save { snippets; notice } ->
+    ( m
+    , [ set_config
+          ~tag:(Snippets_saved notice)
+          (Snippet_command.config_fields snippets)
+      ] )
+  | Info text -> notice m text, []
+  | Error text -> error m text, []
+;;
+
 let cancel_btw m =
   match m.btw with
   | Some box when Btw_box.is_streaming box ->
@@ -2263,6 +2309,13 @@ let run_command m (cmd : Commands.Parsed.t) =
     m, [ rpc "import" ~params:[ "path", str cmd.rest ] ~tag:Reload_messages ]
   | "abort", _ -> m, [ rpc "abort" ]
   | "skills", _ -> open_skills m
+  | "snippet", _ ->
+    snippet_action
+      m
+      (Snippet_command.run
+         ~snippets:(snippets m)
+         ~last_prompt:(last_prompt m)
+         cmd.rest)
   | "mcp", [] -> m, [ call (List_mcp { reconnect = false }) ~tag:Mcp_picker ]
   | "mcp", [ "reconnect" ] ->
     ( notice m "reconnecting MCP servers…"
@@ -2529,6 +2582,7 @@ let refresh_autocomplete m =
       ~auth:m.auth
       ~sessions:m.sessions
       ~skills:(Skill_cache.find m.skills ~key:(Skill_cache.key m.state))
+      ~snippets:(Option.value (snippets m) ~default:[])
       ~logged_in:(logged_in m)
       ~default_dir_host:(default_dir_host m)
   with
@@ -2828,6 +2882,7 @@ let editing_intent m (intent : Intent.t) =
     if List.is_empty m.models
     then m, [ rpc "list_models" ~tag:(Models_for_picker "") ]
     else model_picker m ~query:"", []
+  | Snippet_picker -> snippet_action m (Snippet_command.pick (snippets m))
   | Picker_toggle_filter -> m, []
   | Search -> open_search m, []
   | Prev_user_message -> jump_user_message m ~direction:`Prev
@@ -2907,6 +2962,7 @@ let editing m (intent : Intent.t) =
         | Path_complete
         | Edit_externally
         | Model_picker
+        | Snippet_picker
         | Picker_toggle_filter
         | Prev_user_message
         | Next_user_message
@@ -2999,6 +3055,14 @@ let picker_selected m (kind : Mode.Picker_kind.t) (item : Picker.Item.t) =
      | None -> error m (sprintf "unknown host %S" item.id), [])
   | Skills ->
     { m with editor = Editor.set_text m.editor ("/skill:" ^ item.id ^ " ") }, []
+  | Snippets ->
+    (match P.Snippet.find (Option.value (snippets m) ~default:[]) item.id with
+     | Some snippet -> insert_snippet m snippet, []
+     | None ->
+       ( error
+           m
+           (sprintf "snippet %S is gone; /snippet lists the others" item.id)
+       , [] ))
   | Mcp list -> mcp_selected m list item.id
   | Auth_select id ->
     m, [ rpc "auth_respond" ~params:[ "id", str id; "value", str item.id ] ]
@@ -3261,6 +3325,7 @@ let login_prompt m ~id ~(prompt : P.Auth_event.Prompt.t) (intent : Intent.t) =
   | Path_complete
   | Edit_externally
   | Model_picker
+  | Snippet_picker
   | Picker_toggle_filter
   | Search
   | Prev_user_message
@@ -3440,6 +3505,7 @@ let text_prompt m ~(action : Mode.Text_prompt_action.t) (intent : Intent.t) =
   | Path_complete
   | Edit_externally
   | Model_picker
+  | Snippet_picker
   | Picker_toggle_filter
   | Search
   | Prev_user_message
@@ -4145,6 +4211,9 @@ let rec reply m (tag : Reply_tag.t) (result : (P.Json.t, string) Result.t) =
        decode json ~f:P.Config.of_json (fun config ->
          let m = { m with config = Some config } in
          notice m (fallback_summary m config), [])
+     | Snippets_saved text ->
+       decode json ~f:P.Config.of_json (fun config ->
+         notice { m with config = Some config } text, [])
      | Default_dir_shown | Default_dir_saved _ ->
        decode json ~f:P.Config.of_json (fun config ->
          notice { m with config = Some config } (default_dir_summary config), [])

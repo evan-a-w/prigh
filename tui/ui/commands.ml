@@ -22,6 +22,7 @@ module Argument = struct
     | Budget
     | Goal
     | Resume
+    | Snippet
   [@@deriving sexp_of, equal]
 end
 
@@ -226,6 +227,12 @@ let all =
       "skill:"
       "NAME [args]"
       "run a skill, with what follows as its arguments"
+  ; c
+      ~argument:Argument.Snippet
+      "snippet"
+      "[NAME|add|rm]"
+      "insert a saved text at the cursor (none: pick one, Alt+N); add NAME \
+       [TEXT] saves one (no TEXT: your last prompt), rm NAME deletes it"
   ; c
       ~argument:Argument.Mcp
       "mcp"

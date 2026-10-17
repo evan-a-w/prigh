@@ -373,7 +373,7 @@ let%expect_test "fuzzy ranking: command names" =
     {|
     "mo" -> mode model scoped-models import permissions
     "lo" -> login logout clone
-    "s"  -> state switch skills skill: setusr session signout sessions scoped-models jobs host todos resume agents hotkeys verbosity permissions
+    "s"  -> state switch skills skill: setusr session snippet signout sessions scoped-models jobs host todos resume agents hotkeys verbosity permissions
     "sw" -> switch
     "xyz" ->
     |}]
@@ -592,6 +592,7 @@ let%expect_test "keymap: every binding resolves to its intent and is documented"
     Ctrl+F           Search
     Ctrl+G           Edit_externally
     Ctrl+L           Model_picker
+    Alt+N            Snippet_picker
     Ctrl+P           Next_model
     Alt+P            Prev_model
     Ctrl+T           Next_thinking
@@ -649,6 +650,7 @@ let%expect_test "keymap: every binding resolves to its intent and is documented"
     Ctrl+F                  search the transcript
     Ctrl+G                  edit the prompt in $EDITOR
     Ctrl+L                  pick a model
+    Alt+N                   pick a snippet to insert (/snippet)
     Ctrl+P                  cycle to the next scoped model (Shift+Ctrl+P is unavailable; Alt+P goes back)
     Alt+P                   cycle to the previous scoped model
     Ctrl+T                  cycle the thinking level
@@ -711,6 +713,7 @@ let%expect_test "keymap: every binding resolves to its intent and is documented"
     /btw <question>                    ask a side question without interrupting the turn (not added to the conversation)
     /skills                            pick a skill to run (Enter puts /skill:NAME in the editor)
     /skill:NAME [args]                 run a skill, with what follows as its arguments
+    /snippet [NAME|add|rm]             insert a saved text at the cursor (none: pick one, Alt+N); add NAME [TEXT] saves one (no TEXT: your last prompt), rm NAME deletes it
     /mcp [reconnect]                   list MCP servers (Enter approves one or lists its tools); reconnect restarts failed ones
     /retry-backend-connection          reconnect to the backend now instead of waiting for the next retry
     /state                             show session state
@@ -2108,6 +2111,7 @@ let%expect_test
       ~auth:[]
       ~sessions:None
       ~skills
+      ~snippets:[]
       ~logged_in:(fun _ -> true)
       ~default_dir_host:None
   in
@@ -2182,6 +2186,7 @@ let%expect_test "autocomplete: /skill: completes skill names" =
       ~auth:[]
       ~sessions:None
       ~skills
+      ~snippets:[]
       ~logged_in:(fun _ -> true)
       ~default_dir_host:None
   in
@@ -2329,6 +2334,7 @@ let%expect_test
         ~auth:[]
         ~sessions:None
         ~skills:None
+        ~snippets:[]
         ~logged_in:(fun _ -> true)
         ~default_dir_host
     with

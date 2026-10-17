@@ -391,6 +391,7 @@ let%expect_test "/diff, /review and /init are in the completions and /help" =
     /confirm [on|off] ask before bash, job_input, edits and MCP tools run (mode ask or auto, also for new sessions)
     /session show the session's details and statistics
     /archive [session] archive a session (this one without an argument): it moves under Archived in the sidebar
+    /snippet [NAME|add|rm] insert a saved text at the caret (none: pick one, Alt+N); add NAME [TEXT] saves one (no TEXT: your last prompt), rm NAME deletes it
     /signout sign out of this account
     /thinking [off|low|on|high|max] pick or set the thinking level
     /sessions search the saved sessions

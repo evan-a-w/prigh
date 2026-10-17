@@ -696,6 +696,7 @@ let%expect_test "/change_default saves the model and thinking level" =
       "ask_user_timeout_seconds": 600,
       "archive_after_days": 7,
       "notify": "bell",
+      "snippets": [],
       "auto_background_seconds": 30
     }
     |}]

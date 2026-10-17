@@ -898,6 +898,7 @@ let%expect_test
       "ask_user_timeout_seconds": 600,
       "archive_after_days": 7,
       "notify": "bell",
+      "snippets": [],
       "auto_background_seconds": 30
     }
     |}]

@@ -832,6 +832,12 @@ let%expect_test "config round trip and config_changed event" =
   show
     (fun j -> Or_error.map (Config.of_json j) ~f:Config.sexp_of_t)
     {|{"default_cwd":["/srv"]}|};
+  show
+    (fun j -> Or_error.map (Config.of_json j) ~f:Config.sexp_of_t)
+    {|{"snippets":[{"name":"review","text":"Review it.\nBriefly."}]}|};
+  show
+    (fun j -> Or_error.map (Config.of_json j) ~f:Config.sexp_of_t)
+    {|{"snippets":[{"name":"review"}]}|};
   print_s
     [%sexp
       (Config.to_json
@@ -845,6 +851,8 @@ let%expect_test "config round trip and config_changed event" =
          ; default_cwd = Some "~/proj"
          ; archive_after_days = 7.
          ; notify = "desktop"
+         ; snippets =
+             [ { name = "review"; text = "Review the diff.\nBe brief." } ]
          }
        : Json.t)];
   decode
@@ -862,7 +870,8 @@ let%expect_test "config round trip and config_changed event" =
      (fallback_models  ())
      (default_cwd      ())
      (archive_after_days 7)
-     (notify             bell))
+     (notify             bell)
+     (snippets ()))
     ((scoped_models ())
      (approval_mode Auto)
      (permissions (
@@ -874,7 +883,8 @@ let%expect_test "config round trip and config_changed event" =
      (fallback_models  ())
      (default_cwd      ())
      (archive_after_days 7)
-     (notify             bell))
+     (notify             bell)
+     (snippets ()))
     ((scoped_models ())
      (approval_mode Auto)
      (permissions (
@@ -886,7 +896,8 @@ let%expect_test "config round trip and config_changed event" =
      (fallback_models ())
      (default_cwd     ())
      (archive_after_days 7)
-     (notify             bell))
+     (notify             bell)
+     (snippets ()))
     (decode (e "default_model must be a string"))
     ((scoped_models ())
      (approval_mode Auto)
@@ -899,9 +910,26 @@ let%expect_test "config round trip and config_changed event" =
      (fallback_models (openai-codex/gpt-6-sol anthropic/claude-opus-5-5))
      (default_cwd (/srv/work))
      (archive_after_days 7)
-     (notify             bell))
+     (notify             bell)
+     (snippets ()))
     (decode (e "fallback_models must be an array of strings"))
     (decode (e "default_cwd must be a string"))
+    ((scoped_models ())
+     (approval_mode Auto)
+     (permissions (
+       (allow ())
+       (ask   ())
+       (deny  ())))
+     (default_model    ())
+     (default_thinking ())
+     (fallback_models  ())
+     (default_cwd      ())
+     (archive_after_days 7)
+     (notify             bell)
+     (snippets ((
+       (name review)
+       (text "Review it.\nBriefly.")))))
+    (decode (e (in snippets[0] "missing field \"text\"")))
     ((scoped_models (a b))
      (approval_mode ask)
      (permissions (
@@ -913,7 +941,10 @@ let%expect_test "config round trip and config_changed event" =
      (fallback_models (openai-codex/gpt-6-sol deepseek/deepseek-flash))
      (default_cwd        ~/proj)
      (archive_after_days 7)
-     (notify             desktop))
+     (notify             desktop)
+     (snippets ((
+       (name review)
+       (text "Review the diff.\nBe brief.")))))
     (Event (
       Config_changed (
         (scoped_models (a))
@@ -927,7 +958,8 @@ let%expect_test "config round trip and config_changed event" =
         (fallback_models  ())
         (default_cwd      ())
         (archive_after_days 7)
-        (notify             bell))))
+        (notify             bell)
+        (snippets ()))))
     |}]
 ;;
 

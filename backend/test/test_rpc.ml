@@ -658,11 +658,11 @@ let%expect_test "config: get, set, invalid, and the config_changed event" =
   call t h ~params:{|{"call_id": "nope", "allow": true}|} "tool_confirm_respond";
   [%expect
     {|
-    {"type":"response","id":"r1","ok":true,"result":{"scoped_models":[],"approval_mode":"auto","permissions":{"allow":[],"ask":[],"deny":[]},"default_model":null,"default_thinking":null,"fallback_models":[],"default_cwd":null,"max_budget_usd":null,"goal_max_continuations":20,"reminders":[],"resume_on_limit_reset":true,"ask_user_timeout_seconds":600,"archive_after_days":7,"notify":"bell","auto_background_seconds":30}}
-    {"type":"event","event":"config_changed","config":{"scoped_models":["a","b"],"approval_mode":"ask","permissions":{"allow":[],"ask":[],"deny":[]},"default_model":null,"default_thinking":null,"fallback_models":[],"default_cwd":null,"max_budget_usd":null,"goal_max_continuations":20,"reminders":[],"resume_on_limit_reset":true,"ask_user_timeout_seconds":600,"archive_after_days":7,"notify":"bell","auto_background_seconds":30}}
+    {"type":"response","id":"r1","ok":true,"result":{"scoped_models":[],"approval_mode":"auto","permissions":{"allow":[],"ask":[],"deny":[]},"default_model":null,"default_thinking":null,"fallback_models":[],"default_cwd":null,"max_budget_usd":null,"goal_max_continuations":20,"reminders":[],"resume_on_limit_reset":true,"ask_user_timeout_seconds":600,"archive_after_days":7,"notify":"bell","snippets":[],"auto_background_seconds":30}}
+    {"type":"event","event":"config_changed","config":{"scoped_models":["a","b"],"approval_mode":"ask","permissions":{"allow":[],"ask":[],"deny":[]},"default_model":null,"default_thinking":null,"fallback_models":[],"default_cwd":null,"max_budget_usd":null,"goal_max_continuations":20,"reminders":[],"resume_on_limit_reset":true,"ask_user_timeout_seconds":600,"archive_after_days":7,"notify":"bell","snippets":[],"auto_background_seconds":30}}
     state: approval_mode=ask
-    {"type":"response","id":"r1","ok":true,"result":{"scoped_models":["a","b"],"approval_mode":"ask","permissions":{"allow":[],"ask":[],"deny":[]},"default_model":null,"default_thinking":null,"fallback_models":[],"default_cwd":null,"max_budget_usd":null,"goal_max_continuations":20,"reminders":[],"resume_on_limit_reset":true,"ask_user_timeout_seconds":600,"archive_after_days":7,"notify":"bell","auto_background_seconds":30}}
-    {"type":"response","id":"r1","ok":true,"result":{"scoped_models":["a","b"],"approval_mode":"ask","permissions":{"allow":[],"ask":[],"deny":[]},"default_model":null,"default_thinking":null,"fallback_models":[],"default_cwd":null,"max_budget_usd":null,"goal_max_continuations":20,"reminders":[],"resume_on_limit_reset":true,"ask_user_timeout_seconds":600,"archive_after_days":7,"notify":"bell","auto_background_seconds":30}}
+    {"type":"response","id":"r1","ok":true,"result":{"scoped_models":["a","b"],"approval_mode":"ask","permissions":{"allow":[],"ask":[],"deny":[]},"default_model":null,"default_thinking":null,"fallback_models":[],"default_cwd":null,"max_budget_usd":null,"goal_max_continuations":20,"reminders":[],"resume_on_limit_reset":true,"ask_user_timeout_seconds":600,"archive_after_days":7,"notify":"bell","snippets":[],"auto_background_seconds":30}}
+    {"type":"response","id":"r1","ok":true,"result":{"scoped_models":["a","b"],"approval_mode":"ask","permissions":{"allow":[],"ask":[],"deny":[]},"default_model":null,"default_thinking":null,"fallback_models":[],"default_cwd":null,"max_budget_usd":null,"goal_max_continuations":20,"reminders":[],"resume_on_limit_reset":true,"ask_user_timeout_seconds":600,"archive_after_days":7,"notify":"bell","snippets":[],"auto_background_seconds":30}}
     {"type":"response","id":"r1","ok":false,"error":"config.scoped_models must be an array of strings"}
     {"type":"response","id":"r1","ok":false,"error":"missing param \"config\""}
     {"type":"response","id":"r1","ok":false,"error":"no pending confirmation for tool call \"nope\""}
@@ -1326,9 +1326,9 @@ let%expect_test "change_default saves the current model and thinking level" =
     {|
     {"type":"response","id":"r1","ok":true,"result":{}}
     {"type":"response","id":"r1","ok":true,"result":{}}
-    {"type":"event","event":"config_changed","config":{"scoped_models":[],"approval_mode":"auto","permissions":{"allow":[],"ask":[],"deny":[]},"default_model":"deepseek/deepseek-v4-pro","default_thinking":"max","fallback_models":[],"default_cwd":null,"max_budget_usd":null,"goal_max_continuations":20,"reminders":[],"resume_on_limit_reset":true,"ask_user_timeout_seconds":600,"archive_after_days":7,"notify":"bell","auto_background_seconds":30}}
-    {"type":"response","id":"r1","ok":true,"result":{"scoped_models":[],"approval_mode":"auto","permissions":{"allow":[],"ask":[],"deny":[]},"default_model":"deepseek/deepseek-v4-pro","default_thinking":"max","fallback_models":[],"default_cwd":null,"max_budget_usd":null,"goal_max_continuations":20,"reminders":[],"resume_on_limit_reset":true,"ask_user_timeout_seconds":600,"archive_after_days":7,"notify":"bell","auto_background_seconds":30}}
-    {"type":"response","id":"r1","ok":true,"result":{"scoped_models":[],"approval_mode":"auto","permissions":{"allow":[],"ask":[],"deny":[]},"default_model":"deepseek/deepseek-v4-pro","default_thinking":"max","fallback_models":[],"default_cwd":null,"max_budget_usd":null,"goal_max_continuations":20,"reminders":[],"resume_on_limit_reset":true,"ask_user_timeout_seconds":600,"archive_after_days":7,"notify":"bell","auto_background_seconds":30}}
+    {"type":"event","event":"config_changed","config":{"scoped_models":[],"approval_mode":"auto","permissions":{"allow":[],"ask":[],"deny":[]},"default_model":"deepseek/deepseek-v4-pro","default_thinking":"max","fallback_models":[],"default_cwd":null,"max_budget_usd":null,"goal_max_continuations":20,"reminders":[],"resume_on_limit_reset":true,"ask_user_timeout_seconds":600,"archive_after_days":7,"notify":"bell","snippets":[],"auto_background_seconds":30}}
+    {"type":"response","id":"r1","ok":true,"result":{"scoped_models":[],"approval_mode":"auto","permissions":{"allow":[],"ask":[],"deny":[]},"default_model":"deepseek/deepseek-v4-pro","default_thinking":"max","fallback_models":[],"default_cwd":null,"max_budget_usd":null,"goal_max_continuations":20,"reminders":[],"resume_on_limit_reset":true,"ask_user_timeout_seconds":600,"archive_after_days":7,"notify":"bell","snippets":[],"auto_background_seconds":30}}
+    {"type":"response","id":"r1","ok":true,"result":{"scoped_models":[],"approval_mode":"auto","permissions":{"allow":[],"ask":[],"deny":[]},"default_model":"deepseek/deepseek-v4-pro","default_thinking":"max","fallback_models":[],"default_cwd":null,"max_budget_usd":null,"goal_max_continuations":20,"reminders":[],"resume_on_limit_reset":true,"ask_user_timeout_seconds":600,"archive_after_days":7,"notify":"bell","snippets":[],"auto_background_seconds":30}}
     {"type":"response","id":"r1","ok":true,"result":{"state":{"session_id":"<id>","session_path":"$DIR/sessions/<stamp>_<id>.jsonl","session_name":null,"session_description":null,"cwd":"$DIR","git_branch":null,"model":{"id":"deepseek-v4-pro","provider":"deepseek","key":"deepseek/deepseek-v4-pro","name":"DeepSeek V4 Pro","context_window":1000000,"max_output":384000,"supports_thinking":true,"cost":{"input":1.32,"output":3.96,"cache_read":0.044}},"thinking":"max","running":false,"message_count":0,"usage":{"input":0,"output":0,"cache_read":0},"cost_usd":0,"context_tokens":0,"active_host":"backend","hosts":[{"id":"backend","name":"<host>","cwd":"$DIR","session_id":null,"session_name":null}],"subagents":[],"jobs":[],"budget_usd":null,"goal":null,"resume_at_ms":null,"approval_mode":"auto","plan_mode":false,"plan":null,"session_rules":[]}}}
     (deepseek/deepseek-v4-pro (On (Max)))
     |}]
@@ -1435,9 +1435,59 @@ let%expect_test "set_config: omitted fields keep their values" =
   Queue.clear h.sent;
   [%expect
     {|
-    {"type":"response","id":"r1","ok":true,"result":{"scoped_models":[],"approval_mode":"auto","permissions":{"allow":[],"ask":[],"deny":[]},"default_model":null,"default_thinking":null,"fallback_models":["openai-codex/gpt-6-sol","deepseek/deepseek-flash"],"default_cwd":"/srv","max_budget_usd":null,"goal_max_continuations":20,"reminders":[],"resume_on_limit_reset":true,"ask_user_timeout_seconds":600,"archive_after_days":7,"notify":"bell","auto_background_seconds":30}}
-    {"type":"response","id":"r1","ok":true,"result":{"scoped_models":[],"approval_mode":"ask","permissions":{"allow":[],"ask":[],"deny":[]},"default_model":null,"default_thinking":null,"fallback_models":["openai-codex/gpt-6-sol","deepseek/deepseek-flash"],"default_cwd":"/srv","max_budget_usd":null,"goal_max_continuations":20,"reminders":[],"resume_on_limit_reset":true,"ask_user_timeout_seconds":600,"archive_after_days":7,"notify":"bell","auto_background_seconds":30}}
+    {"type":"response","id":"r1","ok":true,"result":{"scoped_models":[],"approval_mode":"auto","permissions":{"allow":[],"ask":[],"deny":[]},"default_model":null,"default_thinking":null,"fallback_models":["openai-codex/gpt-6-sol","deepseek/deepseek-flash"],"default_cwd":"/srv","max_budget_usd":null,"goal_max_continuations":20,"reminders":[],"resume_on_limit_reset":true,"ask_user_timeout_seconds":600,"archive_after_days":7,"notify":"bell","snippets":[],"auto_background_seconds":30}}
+    {"type":"response","id":"r1","ok":true,"result":{"scoped_models":[],"approval_mode":"ask","permissions":{"allow":[],"ask":[],"deny":[]},"default_model":null,"default_thinking":null,"fallback_models":["openai-codex/gpt-6-sol","deepseek/deepseek-flash"],"default_cwd":"/srv","max_budget_usd":null,"goal_max_continuations":20,"reminders":[],"resume_on_limit_reset":true,"ask_user_timeout_seconds":600,"archive_after_days":7,"notify":"bell","snippets":[],"auto_background_seconds":30}}
     {"type":"response","id":"r1","ok":false,"error":"fallback_models: unknown model \"nope\"; did you mean: openai/o1 (o1), openai/o3 (o3), openai/gpt-4 (GPT-4)"}
+    |}]
+;;
+
+let%expect_test
+    "set_config: only snippets, saved and broadcast; invalid ones refused"
+  =
+  with_agent []
+  @@ fun t agent h ->
+  call
+    t
+    h
+    "set_config"
+    ~params:{|{"config": {"fallback_models": ["deepseek-flash"]}}|};
+  Queue.clear h.sent;
+  Agent.subscribe agent ~f:(function
+    | Config_changed c ->
+      print_s
+        [%message "config_changed" ~snippets:(c.snippets : Snippet.t list)]
+    | _ -> ());
+  call
+    t
+    h
+    "set_config"
+    ~params:
+      {|{"config": {"snippets": [{"name": "review", "text": "Review the diff.\nBe brief."}]}}|};
+  call
+    t
+    h
+    "set_config"
+    ~params:{|{"config": {"snippets": [{"name": "two words", "text": "x"}]}}|};
+  call t h "get_config";
+  print_s
+    [%sexp
+      (Or_error.map (Config.load ~home:t.dir) ~f:(fun c ->
+         c.snippets, c.fallback_models)
+       : (Snippet.t list * string list) Or_error.t)];
+  Queue.clear h.sent;
+  [%expect
+    {|
+    {"type":"response","id":"r1","ok":true,"result":{"scoped_models":[],"approval_mode":"auto","permissions":{"allow":[],"ask":[],"deny":[]},"default_model":null,"default_thinking":null,"fallback_models":["deepseek/deepseek-flash"],"default_cwd":null,"max_budget_usd":null,"goal_max_continuations":20,"reminders":[],"resume_on_limit_reset":true,"ask_user_timeout_seconds":600,"archive_after_days":7,"notify":"bell","snippets":[],"auto_background_seconds":30}}
+    (config_changed
+     (snippets (((name review) (text  "Review the diff.\
+                                     \nBe brief.")))))
+    {"type":"response","id":"r1","ok":true,"result":{"scoped_models":[],"approval_mode":"auto","permissions":{"allow":[],"ask":[],"deny":[]},"default_model":null,"default_thinking":null,"fallback_models":["deepseek/deepseek-flash"],"default_cwd":null,"max_budget_usd":null,"goal_max_continuations":20,"reminders":[],"resume_on_limit_reset":true,"ask_user_timeout_seconds":600,"archive_after_days":7,"notify":"bell","snippets":[{"name":"review","text":"Review the diff.\nBe brief."}],"auto_background_seconds":30}}
+    {"type":"response","id":"r1","ok":false,"error":"config.snippets[0].name \"two words\" must be one word: non-empty, without spaces"}
+    {"type":"response","id":"r1","ok":true,"result":{"scoped_models":[],"approval_mode":"auto","permissions":{"allow":[],"ask":[],"deny":[]},"default_model":null,"default_thinking":null,"fallback_models":["deepseek/deepseek-flash"],"default_cwd":null,"max_budget_usd":null,"goal_max_continuations":20,"reminders":[],"resume_on_limit_reset":true,"ask_user_timeout_seconds":600,"archive_after_days":7,"notify":"bell","snippets":[{"name":"review","text":"Review the diff.\nBe brief."}],"auto_background_seconds":30}}
+    (Ok
+     ((((name review) (text  "Review the diff.\
+                            \nBe brief.")))
+      (deepseek/deepseek-flash)))
     |}]
 ;;
 

@@ -46,6 +46,7 @@ val compute
   -> auth:P.Auth_status.t list
   -> sessions:P.Session_summary.t list option
   -> skills:P.Skill.t list option (** [None]: not fetched yet *)
+  -> snippets:P.Snippet.t list
   -> logged_in:(string -> bool)
   -> default_dir_host:string option
        (** where [/default-dir] lists directories ([None]: the active host) *)

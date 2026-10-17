@@ -388,6 +388,7 @@ let%expect_test "slash commands: the popup, arguments, running, unknown ones" =
     /host [name|backend] pick where tools run, and the directory there
     /export [path] export the transcript on the backend (markdown, or .jsonl)
     /import [path] import a session from a JSONL file on the backend
+    /snippet [NAME|add|rm] insert a saved text at the caret (none: pick one, Alt+N); add NAME [TEXT] saves one (no TEXT: your last prompt), rm NAME deletes it
     /skills pick a skill to invoke (/skill:name)
     /skill:<name> [args] send a skill's instructions to the agent, with your arguments
     /mcp [reconnect] MCP servers: their tools, approve a project's, or restart failed ones
@@ -400,7 +401,6 @@ let%expect_test "slash commands: the popup, arguments, running, unknown ones" =
     /terminal open a shell where the tools run, in the session's directory (Ctrl+`)
     /files [path] browse, preview, upload and download files where the tools run (Ctrl+Shift+F)
     /agents [n|id|cancel <n|id>] follow subagents and background jobs in the agents panel, or cancel one
-    /jobs [id|kill <id>] background jobs in the agents panel: list them, show or kill one
     |}];
   H.type_ h "/mod";
   H.key h "Tab";

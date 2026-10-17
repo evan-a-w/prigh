@@ -78,6 +78,10 @@ let bindings =
   ; b [ Key.ctrl 'g' ] Edit_externally "edit the prompt in $EDITOR"
   ; b [ Key.ctrl 'l' ] Model_picker "pick a model"
   ; b
+      [ Key.alt (Char "n") ]
+      Snippet_picker
+      "pick a snippet to insert (/snippet)"
+  ; b
       [ Key.ctrl 'p' ]
       Next_model
       "cycle to the next scoped model (Shift+Ctrl+P is unavailable; Alt+P goes \
