@@ -172,7 +172,7 @@ let thinking_fields ~(quirks : Quirks.t) (r : Provider.Request.t) =
 ;;
 
 let request_body ~quirks (r : Provider.Request.t) : Json.t =
-  let r = Provider.Request.omit_unsupported_images r in
+  let r = Provider.Request.prepare r in
   let system =
     match r.system with
     | None -> []
