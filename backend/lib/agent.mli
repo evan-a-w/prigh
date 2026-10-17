@@ -161,6 +161,10 @@ module Pending_question : sig
   type t =
     { call_id : string
     ; questions : User_question.t list
+    ; deadline : float option
+      (** when it times out (seconds since the epoch): the config's
+          [ask_user_timeout_seconds] or the call's [timeout_seconds] after it
+          was asked, see {!User_question.timeout} *)
     }
   [@@deriving sexp_of]
 end
@@ -200,8 +204,9 @@ val create
        (** the budget of sessions that set none (the CLI's
            [-max-budget-usd]), instead of the config's [max_budget_usd] *)
   -> ?sleep_until:(float -> unit)
-       (** waits until a time (seconds since the epoch) for {!resume_now}'s
-           automatic counterpart; default: the clock, plus a few seconds *)
+       (** waits until a time (seconds since the epoch): for {!resume_now}'s
+           automatic counterpart and for an [ask_user] question's timeout;
+           default: the clock *)
   -> cwd:string
   -> unit
   -> t
@@ -403,7 +408,8 @@ val respond_confirm
 val set_mode : ?approval:Approval_mode.t -> ?plan:bool -> t -> unit
 
 (** Answers a pending [ask_user] call ([Answered], one list per question, or
-    [Declined]). Fails when there is none for [call_id] (another frontend
+    [Declined]). Unanswered, it times out at its deadline: the model gets
+    [Timed_out] and [Ask_user_done] says [timed_out]. Fails when there is none for [call_id] (another frontend
     answered first, or the run was aborted) or the answers do not fit the
     questions. *)
 val answer_question

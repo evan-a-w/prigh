@@ -34,6 +34,7 @@ let%expect_test "save then load round trips" =
     ; max_budget_usd = None
     ; goal_max_continuations = 20
     ; resume_on_limit_reset = true
+    ; ask_user_timeout_seconds = 600.
     ; archive_after_days = 7.
     ; notify = Bell
     ; auto_background_seconds = 30.
@@ -210,4 +211,22 @@ let%expect_test "notify: off, bell or desktop" =
      "config.notify must be \"off\", \"bell\" or \"desktop\", not \"loud\"")
     (Error "config.notify must be \"off\", \"bell\" or \"desktop\"")
     |}]
+;;
+
+let%expect_test "ask_user_timeout_seconds: seconds, 0 never times out" =
+  List.iter
+    [ {|{}|}
+    ; {|{"ask_user_timeout_seconds": 120}|}
+    ; {|{"ask_user_timeout_seconds": 0}|}
+    ; {|{"ask_user_timeout_seconds": 90.5}|}
+    ; {|{"ask_user_timeout_seconds": -1}|}
+    ; {|{"ask_user_timeout_seconds": "10m"}|}
+    ]
+    ~f:(fun json ->
+      print_s
+        [%sexp
+          (Or_error.map (Config.of_json (Jsonaf.of_string json)) ~f:(fun c ->
+             c.ask_user_timeout_seconds, Config.ask_user_timeout c)
+           : (float * float option) Or_error.t)]);
+  [%expect {| |}]
 ;;
