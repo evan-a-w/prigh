@@ -4,8 +4,19 @@ open Tool_test_helpers
 module Reply = Faux_provider.Reply
 module Json = Jsonaf
 
+(* ["deadline_ms"] relative to now, in seconds. *)
+let deadline_re = Re.compile (Re.Perl.re {|"deadline_ms":([0-9]+)|})
+
+let mask_deadline t s =
+  Re.replace deadline_re s ~f:(fun g ->
+    sprintf
+      {|"deadline_ms":<now+%.0fs>|}
+      ((Float.of_string (Re.Group.get g 1) /. 1000.)
+       -. Eio.Time.now (Eio.Stdenv.clock t.env)))
+;;
+
 (* Two clients in one session, as two frontends would be. *)
-let with_server replies f =
+let with_server ?sleep_until replies f =
   with_sandbox
   @@ fun t ->
   Eio.Switch.run
@@ -28,6 +39,7 @@ let with_server replies f =
       ~sessions_dir:(Filename.concat t.dir "sessions")
       ~home:t.dir
       ?session
+      ?sleep_until
       ~cwd
       ()
   in
@@ -64,7 +76,9 @@ let with_server replies f =
     in
     Rpc_server.handle server client request
   in
-  let show json = print_endline (mask t (Json.to_string json)) in
+  let show json =
+    print_endline (mask_deadline t (mask t (Json.to_string json)))
+  in
   f ~agent ~call ~show ~a:(a, a_sent) ~b:(b, b_sent)
 ;;
 
@@ -219,13 +233,13 @@ let%expect_test
   show (field "questions" (field "result" (call a "get_pending")));
   [%expect
     {|
-    {"type":"event","event":"ask_user","call_id":"q1","questions":[{"question":"Which?","header":null,"options":[{"label":"x","description":null},{"label":"y","description":"the other"}],"multiple":false},{"question":"Why?","header":null,"options":[],"multiple":false}]}
-    [{"call_id":"q1","questions":[{"question":"Which?","header":null,"options":[{"label":"x","description":null},{"label":"y","description":"the other"}],"multiple":false},{"question":"Why?","header":null,"options":[],"multiple":false}]}]
+    {"type":"event","event":"ask_user","call_id":"q1","questions":[{"question":"Which?","header":null,"options":[{"label":"x","description":null},{"label":"y","description":"the other"}],"multiple":false},{"question":"Why?","header":null,"options":[],"multiple":false}],"deadline_ms":<now+600s>}
+    [{"call_id":"q1","questions":[{"question":"Which?","header":null,"options":[{"label":"x","description":null},{"label":"y","description":"the other"}],"multiple":false},{"question":"Why?","header":null,"options":[],"multiple":false}],"deadline_ms":<now+600s>}]
     {"type":"response","id":"r","ok":false,"error":"missing param \"answers\" (or \"decline\": true)"}
     {"type":"response","id":"r","ok":false,"error":"expected 2 answers (one list per question), got 1"}
     {"type":"response","id":"r","ok":true,"result":{}}
     {"type":"response","id":"r","ok":false,"error":"no pending question for tool call \"q1\": it was answered or withdrawn"}
-    {"type":"event","event":"ask_user_done","call_id":"q1"}
+    {"type":"event","event":"ask_user_done","call_id":"q1","timed_out":false}
     The user answered:
     Q: Which?
     A: x
@@ -260,5 +274,52 @@ let%expect_test
     ask
     auto-edit
     auto
+    |}]
+;;
+
+let%expect_test
+    "ask_user: unanswered, it times out; every client is told, nothing is left \
+     pending"
+  =
+  let fire, fire_r = Eio.Promise.create () in
+  with_server
+    ~sleep_until:(fun _ -> Eio.Promise.await fire)
+    [ Reply.tool_call
+        ~id:"q1"
+        ~name:"ask_user"
+        ~arguments:
+          {|{"questions":[{"question":"Which?"}],"timeout_seconds":90}|}
+        ()
+    ; Reply.text "carried on"
+    ]
+  @@ fun ~agent ~call ~show ~a:(a, a_sent) ~b:(_, b_sent) ->
+  ignore (call a ~params:{|{"text": "go"}|} "prompt" : Json.t);
+  wait_for "ask_user" a_sent;
+  List.iter (events "ask_user" a_sent) ~f:show;
+  show (field "questions" (field "result" (call a "get_pending")));
+  Eio.Promise.resolve fire_r ();
+  wait_for "ask_user_done" a_sent;
+  wait_for "ask_user_done" b_sent;
+  List.iter
+    (events "ask_user_done" a_sent
+     @ events "ask_user_done" b_sent
+     @ events "notice" b_sent)
+    ~f:show;
+  Agent.wait_idle agent;
+  show (field "questions" (field "result" (call a "get_pending")));
+  show
+    (call
+       a
+       ~params:{|{"call_id": "q1", "answers": [["late"]]}|}
+       "ask_user_respond");
+  [%expect
+    {|
+    {"type":"event","event":"ask_user","call_id":"q1","questions":[{"question":"Which?","header":null,"options":[],"multiple":false}],"deadline_ms":<now+90s>}
+    [{"call_id":"q1","questions":[{"question":"Which?","header":null,"options":[],"multiple":false}],"deadline_ms":<now+90s>}]
+    {"type":"event","event":"ask_user_done","call_id":"q1","timed_out":true}
+    {"type":"event","event":"ask_user_done","call_id":"q1","timed_out":true}
+    {"type":"event","event":"notice","text":"the question was not answered within 1m 30s; the agent carries on without it"}
+    []
+    {"type":"response","id":"r","ok":false,"error":"no pending question for tool call \"q1\": it was answered or withdrawn"}
     |}]
 ;;

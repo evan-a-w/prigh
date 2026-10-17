@@ -34,8 +34,13 @@ and context =
   ; approve : approver
     (** checks a model's tool call before it runs (the session's approval
         mode and rules, see [Approval]); subagents inherit it *)
-  ; ask_user : call_id:string -> User_question.t list -> User_question.Reply.t
-    (** asks the user (the [ask_user] tool); only the main agent can *)
+  ; ask_user :
+      call_id:string
+      -> timeout_seconds:int option
+      -> User_question.t list
+      -> User_question.Reply.t
+    (** asks the user (the [ask_user] tool, which passes its
+        [timeout_seconds]); only the main agent can *)
   }
 
 (** Runs a tool call. [Agent] installs one that forwards [on_host] tools to
@@ -62,7 +67,10 @@ module Context : sig
     -> ?stdin:Stdin_feed.t
     -> ?approve:approver
     -> ?ask_user:
-         (call_id:string -> User_question.t list -> User_question.Reply.t)
+         (call_id:string
+          -> timeout_seconds:int option
+          -> User_question.t list
+          -> User_question.Reply.t)
     -> env:Env.t
     -> cwd:string
     -> unit

@@ -101,9 +101,9 @@ let rec summarise (e : Event.t) : string option =
   | Tool_end { result; _ } -> Some (sprintf "tool_end %s" result.tool_name)
   | Tool_confirm c -> Some (sprintf "tool_confirm %s %s" c.name c.summary)
   | Tool_confirm_done { call_id; _ } -> Some ("tool_confirm_done " ^ call_id)
-  | Ask_user { call_id; questions } ->
+  | Ask_user { call_id; questions; deadline = _ } ->
     Some (sprintf "ask_user %s (%d questions)" call_id (List.length questions))
-  | Ask_user_done call_id -> Some ("ask_user_done " ^ call_id)
+  | Ask_user_done { call_id; timed_out = _ } -> Some ("ask_user_done " ^ call_id)
   | Compacted _ -> Some "compacted"
   | Config_changed _ -> None
   | Queue_update _ -> None
@@ -604,8 +604,24 @@ let main () =
               }]
           | Error e -> [%sexp (e : Error.t)]
         in
+        (* Deadlines as minutes from now: the times are real. *)
         let pending json =
-          [%sexp (Pending.of_json json : Pending.t Or_error.t)]
+          let in_minutes (q : Pending.Ask.t) =
+            ( q.call_id
+            , Option.map q.deadline ~f:(fun at ->
+                sprintf
+                  "in %.0fm"
+                  (Time_ns.Span.to_min (Time_ns.diff at (Time_ns.now ())))) )
+          in
+          [%sexp
+            (Or_error.map (Pending.of_json json) ~f:(fun p ->
+               ( { p with
+                   questions =
+                     List.map p.questions ~f:(fun q ->
+                       { q with deadline = None })
+                 }
+               , List.map p.questions ~f:in_minutes ))
+             : (Pending.t * (string * string option) list) Or_error.t)]
         in
         let%bind () =
           decoded "set_mode" state [ "approval_mode", Json.str "ask" ]

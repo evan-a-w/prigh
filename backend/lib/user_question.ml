@@ -22,11 +22,39 @@ module Reply = struct
     | Answered of string list list
     | Declined
     | Cancelled
+    | Timed_out of float
     | Unavailable of string
   [@@deriving sexp_of]
 end
 
 let max_questions = 4
+let min_timeout_seconds = 30
+let max_timeout_seconds = 86_400
+
+let timeout ~config ~requested =
+  match config, requested with
+  | None, _ | Some _, Some 0 -> None
+  | Some seconds, None -> Some seconds
+  | Some _, Some seconds ->
+    Some
+      (Float.of_int
+         (Int.clamp_exn
+            seconds
+            ~min:min_timeout_seconds
+            ~max:max_timeout_seconds))
+;;
+
+let duration_hum seconds =
+  let s = Float.iround_nearest_exn (Float.max 0. seconds) in
+  let m = s / 60 in
+  if s < 60
+  then sprintf "%ds" s
+  else if s < 3600
+  then if s % 60 = 0 then sprintf "%dm" m else sprintf "%dm %02ds" m (s % 60)
+  else if m % 60 = 0
+  then sprintf "%dh" (m / 60)
+  else sprintf "%dh %02dm" (m / 60) (m % 60)
+;;
 
 let nonempty s =
   Option.bind s ~f:(fun s ->

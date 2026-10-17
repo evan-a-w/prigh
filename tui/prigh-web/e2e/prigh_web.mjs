@@ -64,7 +64,9 @@ const script3 = [
     tool_calls: [{
       id: "q1", name: "ask_user",
       arguments: { questions: [{ question: "Which database?", header: "Storage",
-        options: [{ label: "Postgres", description: "the one in prod" }, { label: "SQLite" }] }] },
+        options: [{ label: "Postgres", description: "the one in prod" }, { label: "SQLite" }] }],
+        // No deadline: its time would differ between runs.
+        timeout_seconds: 0 },
     }],
   },
   { text: "SQLite it is." },

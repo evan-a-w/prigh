@@ -40,6 +40,9 @@ type t =
         turns; edited by hand *)
   ; resume_on_limit_reset : bool
     (** resume a run stopped by a usage limit when the limit resets *)
+  ; ask_user_timeout_seconds : float
+    (** how long an [ask_user] question waits for an answer before the
+        agent carries on by itself (default 600; 0: never) *)
   ; archive_after_days : float
     (** a session inactive for this long is archived (default 7; 0: never),
         see {!Session.Summary.is_archived} *)
@@ -56,6 +59,9 @@ val default : t
 
 (** [auto_background_seconds], [None] when off. *)
 val auto_background : t -> float option
+
+(** [ask_user_timeout_seconds], [None] when off. *)
+val ask_user_timeout : t -> float option
 
 (** The model for new sessions: [default_model], else the first of
     [fallback_models]. *)

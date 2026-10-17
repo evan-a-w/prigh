@@ -49,7 +49,12 @@ type t =
       ; agent_id : string option
       } (** answered by any frontend, let through or withdrawn: close it *)
   | Ask_user of Pending.Ask.t
-  | Ask_user_done of string (** call id: answered or withdrawn *)
+  | Ask_user_done of
+      { call_id : string
+      ; timed_out : bool
+        (** nobody answered in time: the agent carries on (a [Notice] says
+            so) *)
+      } (** answered (by any frontend), timed out or withdrawn *)
   | State of State.t
   | Compacted of string
   | Config_changed of Config.t

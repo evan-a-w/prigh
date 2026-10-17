@@ -276,6 +276,46 @@ let%expect_test "tool_confirm event" =
     |}]
 ;;
 
+let%expect_test "ask_user events: the deadline, and whether it timed out" =
+  decode
+    {|{"type":"event","event":"ask_user","call_id":"q1","questions":[{"question":"Sure?"}],"deadline_ms":1760191500000}|};
+  decode
+    {|{"type":"event","event":"ask_user","call_id":"q2","questions":[{"question":"Sure?"}],"deadline_ms":null}|};
+  decode
+    {|{"type":"event","event":"ask_user_done","call_id":"q1","timed_out":true}|};
+  (* An older backend's, without [timed_out]. *)
+  decode {|{"type":"event","event":"ask_user_done","call_id":"q2"}|};
+  [%expect
+    {|
+    (Event (
+      Ask_user (
+        (call_id q1)
+        (questions ((
+          (question Sure?)
+          (header  ())
+          (choices ())
+          (multiple false))))
+        (deadline ("2025-10-11 14:05:00Z")))))
+    (Event (
+      Ask_user (
+        (call_id q2)
+        (questions ((
+          (question Sure?)
+          (header  ())
+          (choices ())
+          (multiple false))))
+        (deadline ()))))
+    (Event (
+      Ask_user_done
+      (call_id   q1)
+      (timed_out true)))
+    (Event (
+      Ask_user_done
+      (call_id   q2)
+      (timed_out false)))
+    |}]
+;;
+
 let%expect_test "terminal relay events" =
   decode
     {|{"type":"event","event":"terminal_open","host":"client-2","term_id":"t1","key":"sess-1","cwd":"/work","cols":120,"rows":40}|};

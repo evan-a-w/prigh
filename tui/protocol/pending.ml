@@ -27,14 +27,17 @@ module Ask = struct
   type t =
     { call_id : string
     ; questions : Question.t list
+    ; deadline : Time_ns.Alternate_sexp.t option
+      (** when the agent stops waiting and carries on by itself *)
     }
   [@@deriving sexp_of, equal]
 
   let of_json j =
     let open Or_error.Let_syntax in
     let%bind call_id = Json.string_field j "call_id" in
-    let%map questions = Json.list_field j "questions" ~f:Question.of_json in
-    { call_id; questions }
+    let%bind questions = Json.list_field j "questions" ~f:Question.of_json in
+    let%map deadline = Json.time_ms_opt_field j "deadline_ms" in
+    { call_id; questions; deadline }
   ;;
 end
 
