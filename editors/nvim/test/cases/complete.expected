@@ -1,0 +1,49 @@
+
+== @ completion
+"look at @": file from column 9, base ""
+  README.md              [file]
+  agent.log              [file]
+  script.json            [file]
+  src/main.ml            [file]
+  src/util.ml            [file]
+  test/test_main.ml      [file]
+"look at @mn": file from column 9, base "mn"
+  src/main.ml            [file]
+  test/test_main.ml      [file]
+"look at @src/u": file from column 9, base "src/u"
+  src/util.ml            [file]
+"email me@": no completion
+
+== / completion
+"/": command from column 1, base ""
+  /compact               Compact the context
+  /goal                  Set a goal for the session
+  /model                 Switch the model
+"/go": command from column 1, base "go"
+  /goal                  Set a goal for the session
+"x /go": no completion
+
+== trigger mappings
+@ at start -> "@<C-x><C-u>"
+/ at start -> "/<C-x><C-u>"
+/ after text -> "/"
+@ after a letter -> "@"
+@ after a space -> "@<C-x><C-u>"
+
+== unknown command
+notify (warn): prigh: unknown command /gaol (type / for the list)
+input kept: { "/gaol make it work" }
+
+== send a command and a prompt with mentions
+agent got: {"id":0,"method":"initialize","params":{"clientCapabilities":{"_meta":{"prigh":{"state":true}},"elicitation":{"form":{}},"fs":{"readTextFile":true,"writeTextFile":true},"session":{"configOptions":{"boolean":{}},"notices":{}},"terminal":false},"clientInfo":{"name":"prigh.nvim","title":"prigh.nvim","version":"0.1.0"},"protocolVersion":1}}
+agent got: {"id":1,"method":"session/new","params":{"cwd":"<tmp>","mcpServers":[]}}
+agent got: {"id":2,"method":"session/prompt","params":{"prompt":[{"text":"/goal make it work","type":"text"}],"sessionId":"s1"}}
+agent got: {"id":3,"method":"session/prompt","params":{"prompt":[{"text":"compare @src/main.ml with @README.md, not @missing.ml","type":"text"},{"name":"src/main.ml","type":"resource_link","uri":"file://<tmp>/src/main.ml"},{"name":"README.md","type":"resource_link","uri":"file://<tmp>/README.md"}],"sessionId":"s1"}}
+┌ chat
+│ ## You
+│ /goal make it work
+│ 
+│ ## You
+│ compare @src/main.ml with @README.md, not @missing.ml
+│ 
+└
