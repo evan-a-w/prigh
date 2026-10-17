@@ -638,6 +638,7 @@ let%expect_test "/notify: the setting, and notifications only while the \
              ; multiple = false
              }
            ]
+       ; deadline = None
        });
   H.step ~quiet:true h (Key (Key.plain Escape));
   H.event
