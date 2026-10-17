@@ -1699,11 +1699,24 @@ let stop_reminders t =
     reminder_message t r ~repeat:(Some repeat))
 ;;
 
+(* Calls left without results by a backend that stopped while they ran get
+   them now, before anything else is added after them. *)
+let close_interrupted t =
+  List.iter
+    (Tool_pairing.unanswered (Session.messages t.session))
+    ~f:(fun call ->
+      let m = Message.Tool_result (Tool_pairing.interrupted call) in
+      ignore (Session.append_message t.session m : Session.Entry.t);
+      broadcast t (Loop (Message_start m));
+      broadcast t (Loop (Message_end m)))
+;;
+
 (* Finished background tasks not delivered yet go first. [tried] are the
    models a hand-over chain has used so far (empty for a user's prompt). *)
 let rec start_run ?(tried = String.Set.empty) ?(then_ = fun () -> []) t prompts =
   t.git_branch <- find_branch t ~cwd:t.cwd;
   cancel_resume_timer t;
+  close_interrupted t;
   let cancel = Cancellation.create () in
   let finished, resolve = Promise.create () in
   t.run <- Some { cancel; finished };

@@ -1193,6 +1193,7 @@ let%expect_test
     {"role":"user","content":[{"type":"text","text":"what is this?"},{"type":"image_url","image_url":{"url":"data:image/png;base64,SHOT"}}]}
     {"role":"assistant","content":"Reading.","tool_calls":[{"id":"call_1","type":"function","function":{"name":"read","arguments":"{\"path\":\"a.png\"}"}},{"id":"call_2","type":"function","function":{"name":"read","arguments":"{\"path\":\"b.txt\"}"}}]}
     {"role":"tool","tool_call_id":"call_1","content":"[2 images attached in the next message]"}
+    {"role":"tool","tool_call_id":"call_2","content":"[interrupted: prigh stopped before this tool call returned (e.g. the backend restarted), so whether it ran, and what it did, is unknown: check before relying on it]"}
     {"role":"user","content":[{"type":"text","text":"[2 images from the read result call_1]"},{"type":"image_url","image_url":{"url":"data:image/png;base64,SHOT"}},{"type":"image_url","image_url":{"url":"data:image/png;base64,SHOT"}}]}
     ("\"medium\"")
     |}]

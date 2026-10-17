@@ -320,7 +320,7 @@ let thinking_on (model : Model.t) (thinking : Thinking.t) =
 ;;
 
 let request_body ~oauth (r : Provider.Request.t) : Json.t =
-  let r = Provider.Request.omit_unsupported_images r in
+  let r = Provider.Request.prepare r in
   let max_tokens = Option.value r.max_tokens ~default:r.model.max_output in
   let system =
     List.concat
