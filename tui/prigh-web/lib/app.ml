@@ -3977,14 +3977,18 @@ let main_event (m : Model.t) (event : Event.t) =
       m, cmds @ toast_cmds)
     else m, []
   | Ask_user ask -> add_waiting m ~confirms:[] ~questions:[ ask ]
-  | Ask_user_done call_id ->
+  | Ask_user_done { call_id; timed_out } ->
     if List.exists m.questions ~f:(fun q -> String.equal q.call_id call_id)
     then (
       let m, cmds = remove_question m call_id in
-      let m, toast_cmds =
-        toast m "Question answered elsewhere, or the run stopped"
-      in
-      m, cmds @ toast_cmds)
+      (* On a timeout the backend's notice says so. *)
+      if timed_out
+      then m, cmds
+      else (
+        let m, toast_cmds =
+          toast m "Question answered elsewhere, or the run stopped"
+        in
+        m, cmds @ toast_cmds))
     else m, []
   | Tool_end { call; _ } ->
     (* An older backend's way to say a confirmation is no longer waited for. *)

@@ -26,7 +26,9 @@ type t =
 [@@deriving sexp_of, equal]
 
 let create (ask : Pending.Ask.t) =
-  { call_id = ask.call_id; form = Form.create ask.questions }
+  { call_id = ask.call_id
+  ; form = Form.create ?deadline:ask.deadline ask.questions
+  }
 ;;
 
 let update t (action : Action.t) =

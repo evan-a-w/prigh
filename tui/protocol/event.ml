@@ -62,7 +62,12 @@ type t =
       ; agent_id : string option
       } (** answered by any frontend, let through or withdrawn: close it *)
   | Ask_user of Pending.Ask.t
-  | Ask_user_done of string (** call id: answered or withdrawn *)
+  | Ask_user_done of
+      { call_id : string
+      ; timed_out : bool
+        (** nobody answered in time: the agent carries on (a [Notice] says
+            so) *)
+      } (** answered (by any frontend), timed out or withdrawn *)
   | State of State.t
   | Compacted of string
   | Config_changed of Config.t
@@ -172,7 +177,11 @@ let rec of_json j =
     let%map agent_id = Json.string_opt_field j "agent_id" in
     Tool_confirm_done { call_id; agent_id }
   | "ask_user_done" ->
-    Json.string_field j "call_id" >>| fun call_id -> Ask_user_done call_id
+    let%bind call_id = Json.string_field j "call_id" in
+    let%map timed_out =
+      Json.bool_default_field j "timed_out" ~default:false
+    in
+    Ask_user_done { call_id; timed_out }
   | "ask_user" -> Pending.Ask.of_json j >>| fun a -> Ask_user a
   | "state" ->
     Json.object_field j "state" >>= State.of_json >>| fun s -> State s

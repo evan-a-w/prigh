@@ -101,9 +101,10 @@ let rec summarise (e : Event.t) : string option =
   | Tool_end { result; _ } -> Some (sprintf "tool_end %s" result.tool_name)
   | Tool_confirm c -> Some (sprintf "tool_confirm %s %s" c.name c.summary)
   | Tool_confirm_done { call_id; _ } -> Some ("tool_confirm_done " ^ call_id)
-  | Ask_user { call_id; questions } ->
+  | Ask_user { call_id; questions; deadline = _ } ->
     Some (sprintf "ask_user %s (%d questions)" call_id (List.length questions))
-  | Ask_user_done call_id -> Some ("ask_user_done " ^ call_id)
+  | Ask_user_done { call_id; timed_out = _ } ->
+    Some ("ask_user_done " ^ call_id)
   | Compacted _ -> Some "compacted"
   | Config_changed _ -> None
   | Queue_update _ -> None

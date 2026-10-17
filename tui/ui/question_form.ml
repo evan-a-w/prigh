@@ -16,18 +16,28 @@ type t =
   ; answers : Answer.t list
   ; current : int
   ; cursor : int
+  ; deadline : Time_ns.t option
   }
 [@@deriving sexp_of, equal]
 
-let create questions =
+let create ?deadline questions =
   { questions
   ; answers = List.map questions ~f:(fun _ -> Answer.empty)
   ; current = 0
   ; cursor = 0
+  ; deadline
   }
 ;;
 
 let questions t = t.questions
+let deadline t = t.deadline
+
+let deadline_note t ~utc_offset =
+  Option.map t.deadline ~f:(fun at ->
+    sprintf
+      "unanswered, the agent carries on by itself at %s"
+      (Loop_status.clock at ~utc_offset))
+;;
 let current t = t.current
 let cursor t = t.cursor
 let question t = List.nth_exn t.questions t.current
