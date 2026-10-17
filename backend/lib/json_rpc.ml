@@ -24,7 +24,9 @@ module Error = struct
 
   let of_json json =
     { code =
-        Option.value (Option.bind (Json.member "code" json) ~f:Json.int) ~default:0
+        Option.value
+          (Option.bind (Json.member "code" json) ~f:Json.int)
+          ~default:0
     ; message =
         Option.value
           (Option.bind (Json.member "message" json) ~f:Json.string)
@@ -46,6 +48,9 @@ type t =
   ; pending : (Json.t, Error.t) Result.t Promise.u Int.Table.t
   ; mutable next_id : int
   ; mutable closed : bool
+  ; mutable unwritten : int
+  ; mutable handling : int
+  ; idle : Eio.Condition.t
   }
 
 let create ~sw ~write_line =
@@ -55,18 +60,33 @@ let create ~sw ~write_line =
     ; pending = Int.Table.create ()
     ; next_id = 0
     ; closed = false
+    ; unwritten = 0
+    ; handling = 0
+    ; idle = Eio.Condition.create ()
     }
   in
   Fiber.fork_daemon ~sw (fun () ->
     let rec loop () =
       write_line (Json.to_string (Eio.Stream.take t.out));
+      t.unwritten <- t.unwritten - 1;
+      Eio.Condition.broadcast t.idle;
       loop ()
     in
     loop ());
   t
 ;;
 
-let send t fields = Eio.Stream.add t.out (`Object (("jsonrpc", `String "2.0") :: fields))
+let send t fields =
+  t.unwritten <- t.unwritten + 1;
+  Eio.Stream.add t.out (`Object (("jsonrpc", `String "2.0") :: fields))
+;;
+
+let rec flush t =
+  if t.unwritten > 0 || t.handling > 0
+  then (
+    Eio.Condition.await_no_mutex t.idle;
+    flush t)
+;;
 
 let respond t ~id = function
   | Ok result -> send t [ "id", id; "result", result ]
@@ -77,7 +97,9 @@ let notify t method_ params =
   send t [ "method", `String method_; "params", params ]
 ;;
 
-let cancel_request t id = notify t "$/cancel_request" (`Object [ "requestId", id ])
+let cancel_request t id =
+  notify t "$/cancel_request" (`Object [ "requestId", id ])
+;;
 
 let request ?(on_id = ignore) t method_ params =
   if t.closed
@@ -117,32 +139,49 @@ let serve t ~read_line ~on_request ~on_notification =
          respond
            t
            ~id:`Null
-           (Error (Error.parse_error ("invalid JSON: " ^ Core.Error.to_string_hum e)))
+           (Error
+              (Error.parse_error
+                 ("invalid JSON: " ^ Core.Error.to_string_hum e)))
        | Ok json ->
          let id = Json.member "id" json in
          let method_ = Option.bind (Json.member "method" json) ~f:Json.string in
-         let params = Option.value (Json.member "params" json) ~default:(`Object []) in
+         let params =
+           Option.value (Json.member "params" json) ~default:(`Object [])
+         in
          (match method_, id with
           | Some method_, Some id ->
+            t.handling <- t.handling + 1;
             Fiber.fork ~sw:t.sw (fun () ->
-              handle_request t ~id ~method_ ~params ~on_request)
+              Exn.protect
+                ~f:(fun () -> handle_request t ~id ~method_ ~params ~on_request)
+                ~finally:(fun () ->
+                  t.handling <- t.handling - 1;
+                  Eio.Condition.broadcast t.idle))
           | Some method_, None ->
             Fiber.fork ~sw:t.sw (fun () ->
               match on_notification ~method_ ~params with
               | () -> ()
               | exception (Eio.Cancel.Cancelled _ as exn) -> raise exn
               | exception exn ->
-                eprintf "prigh acp: %s failed: %s\n%!" method_ (Exn.to_string exn))
+                eprintf
+                  "prigh acp: %s failed: %s\n%!"
+                  method_
+                  (Exn.to_string exn))
           | None, Some id ->
             (match Option.bind (Some id) ~f:Json.int with
              | Some n ->
-               Option.iter (Hashtbl.find_and_remove t.pending n) ~f:(fun resolver ->
-                 Promise.resolve
-                   resolver
-                   (match Json.member "error" json with
-                    | Some (`Object _ as error) -> Error (Error.of_json error)
-                    | _ ->
-                      Ok (Option.value (Json.member "result" json) ~default:`Null)))
+               Option.iter
+                 (Hashtbl.find_and_remove t.pending n)
+                 ~f:(fun resolver ->
+                   Promise.resolve
+                     resolver
+                     (match Json.member "error" json with
+                      | Some (`Object _ as error) -> Error (Error.of_json error)
+                      | _ ->
+                        Ok
+                          (Option.value
+                             (Json.member "result" json)
+                             ~default:`Null)))
              | None -> ())
           | None, None ->
             respond
@@ -154,6 +193,8 @@ let serve t ~read_line ~on_request ~on_notification =
   loop ();
   t.closed <- true;
   Hashtbl.iter t.pending ~f:(fun resolver ->
-    Promise.resolve resolver (Error (Error.internal "the client has disconnected")));
+    Promise.resolve
+      resolver
+      (Error (Error.internal "the client has disconnected")));
   Hashtbl.clear t.pending
 ;;

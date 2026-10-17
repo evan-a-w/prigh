@@ -236,7 +236,7 @@ let%expect_test "backend host disabled" =
      (hosts (client-2)))
     (Host client-2 /home/me/proj)
     {"type":"response","id":"r","ok":true,"result":{}}
-    exec: {"type":"event","event":"tool_exec","host":"client-2","exec_id":"<id>/c2-0","call_id":"c2","name":"bash","arguments":{"command":"pwd","timeout":2592000},"cwd":"/home/me/proj"}
+    exec: {"type":"event","event":"tool_exec","host":"client-2","session_id":"<id>","exec_id":"<id>/c2-0","call_id":"c2","name":"bash","arguments":{"command":"pwd","timeout":2592000},"cwd":"/home/me/proj"}
     tool_result bash: "bash ran on laptop"
     |}];
   (* The subagent's tools (and its instructions lookup) also go to the host,
@@ -252,8 +252,8 @@ let%expect_test "backend host disabled" =
   [%expect
     {|
     {"type":"response","id":"r","ok":true,"result":{}}
-    exec: {"type":"event","event":"tool_exec","host":"client-2","exec_id":"<id>/c3-1","call_id":"c3","name":"$instructions","arguments":{"home":"$DIR","with_nix":true},"cwd":"/home/me/proj"}
-    exec: {"type":"event","event":"tool_exec","host":"client-2","exec_id":"<id>/s1-2","call_id":"s1","name":"ls","arguments":{},"cwd":"/home/me/proj"}
+    exec: {"type":"event","event":"tool_exec","host":"client-2","session_id":"<id>","exec_id":"<id>/c3-1","call_id":"c3","name":"$instructions","arguments":{"home":"$DIR","with_nix":true},"cwd":"/home/me/proj"}
+    exec: {"type":"event","event":"tool_exec","host":"client-2","session_id":"<id>","exec_id":"<id>/s1-2","call_id":"s1","name":"ls","arguments":{},"cwd":"/home/me/proj"}
     tool_result subagent: "started agent a1 (look around); its result will be delivered to you when it finishes: keep working or end your turn meanwhile"
     delivered: "[subagent a1 finished] look around\nsub done\n[subagent: 2 turns, 30 in / 13 out tokens, $0.0000]"
     |}];

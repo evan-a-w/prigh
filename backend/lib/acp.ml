@@ -24,9 +24,17 @@ let str s = `String s
 let int i = `Number (Int.to_string i)
 let bool b = if b then `True else `False
 let field name json = Option.value (Json.member name json) ~default:`Null
-let string_field name json = Option.value (Json.string (field name json)) ~default:""
+
+let string_field name json =
+  Option.value (Json.string (field name json)) ~default:""
+;;
+
 let opt_string name json = Json.string (field name json)
-let list_field name json = Option.value (Json.list (field name json)) ~default:[]
+
+let list_field name json =
+  Option.value (Json.list (field name json)) ~default:[]
+;;
+
 let is_true name json = Json.exactly_equal (field name json) `True
 
 (* What the client said it can do in [initialize]. *)
@@ -36,6 +44,7 @@ module Caps = struct
     ; write_text_file : bool
     ; elicitation_form : bool
     ; notices : bool
+    ; prigh_state : bool (** [_meta.prigh.state]: it reads [_prigh/state] *)
     }
 
   let none =
@@ -43,6 +52,7 @@ module Caps = struct
     ; write_text_file = false
     ; elicitation_form = false
     ; notices = false
+    ; prigh_state = false
     }
   ;;
 
@@ -57,6 +67,7 @@ module Caps = struct
     ; write_text_file = is_true "writeTextFile" (field "fs" caps)
     ; elicitation_form = present [ "elicitation"; "form" ] caps
     ; notices = present [ "session"; "notices" ] caps
+    ; prigh_state = present [ "_meta"; "prigh"; "state" ] caps
     }
   ;;
 end
@@ -67,7 +78,8 @@ module Tool_view = struct
     { name : string
     ; mutable args : Json.t
     ; output : Buffer.t
-    ; mutable progress : string list (** a subagent's tool calls, newest first *)
+    ; mutable progress : string list
+      (** a subagent's tool calls, newest first *)
     }
 
   let create name =
@@ -104,10 +116,17 @@ module Turn = struct
 
   let create ~running =
     let finished, finish = Promise.create () in
-    { running_seen = running; cancelled = false; stop = End_turn; finished; finish }
+    { running_seen = running
+    ; cancelled = false
+    ; stop = End_turn
+    ; finished
+    ; finish
+    }
   ;;
 
-  let finish t = if not (Promise.is_resolved t.finished) then Promise.resolve t.finish ()
+  let finish t =
+    if not (Promise.is_resolved t.finished) then Promise.resolve t.finish ()
+  ;;
 end
 
 (* What the client was last told, so that only changes are sent. *)
@@ -185,12 +204,14 @@ let message_chunk t s ?(kind = "agent_message_chunk") text =
 (* Errors from prigh name the TUI's slash commands; in an editor the CLI
    (or the TUI) is where one logs in. *)
 let login_hint message =
-  String.substr_replace_all
-    message
-    ~pattern:"/login "
-    ~with_:"`prigh login` in a terminal (or /login in the prigh TUI): prigh login "
+  if String.is_substring message ~substring:"/login "
+  then
+    String.substr_replace_all message ~pattern:"/login " ~with_:"prigh login "
+    ^ " (in a terminal; or /login in the prigh TUI)"
+  else message
 ;;
 
+let needs_login message = String.is_substring message ~substring:"/login "
 let rpc_error ?(code = Error.internal) e = code (Core.Error.to_string_hum e)
 
 (* ---------------------------------------------------------------------- *)
@@ -216,8 +237,8 @@ let open_link t ~on_event ~on_close hello =
          then
            Core.Error.of_string
              (Core.Error.to_string_hum e
-              ^ ": check prigh acp's -token (or $PRIGH_TOKEN) and -user against \
-                 the backend's")
+              ^ ": check prigh acp's -token (or $PRIGH_TOKEN) and -user \
+                 against the backend's")
          else e))
 ;;
 
@@ -235,7 +256,10 @@ let diff_files t (s : Session.t) ~call_id =
         with
         | Ok result -> string_field "content" result
         | Error e ->
-          log "fs/read_text_file %s failed (%s): reading the disk" path e.message;
+          log
+            "fs/read_text_file %s failed (%s): reading the disk"
+            path
+            e.message;
           In_channel.read_all path)
       else In_channel.read_all path
     in
@@ -257,7 +281,8 @@ let diff_files t (s : Session.t) ~call_id =
         Json_rpc.request
           t.rpc
           "fs/write_text_file"
-          (`Object [ "sessionId", str s.id; "path", str path; "content", str data ])
+          (`Object
+              [ "sessionId", str s.id; "path", str path; "content", str data ])
       with
       | Ok _ -> ()
       | Error e -> failwithf "the editor did not write %s: %s" path e.message ())
@@ -288,7 +313,8 @@ let host t =
       (open_link
          t
          ~on_event:(fun json ->
-           Option.iter !worker ~f:(fun w -> Tool_host.Worker.handle_event w json))
+           Option.iter !worker ~f:(fun w ->
+             Tool_host.Worker.handle_event w json))
          ~on_close:(fun reason -> log "tool host connection closed: %s" reason)
          [ "name", str config.name
          ; "cwd", str config.cwd
@@ -314,10 +340,12 @@ let host t =
               with
               | Ok _ -> ()
               | Error e ->
-                log
-                  "%s failed: %s"
-                  (Tool_host.Reply.method_ reply)
-                  (Core.Error.to_string_hum e))
+                let message = Core.Error.to_string_hum e in
+                (* The result of an exec the backend gave up on (aborted). *)
+                if
+                  not
+                    (String.is_substring message ~substring:"no tool execution")
+                then log "%s failed: %s" (Tool_host.Reply.method_ reply) message)
             ()
         in
         worker := Some w;
@@ -362,7 +390,9 @@ let modes =
 ;;
 
 let mode_id state =
-  if is_true "plan_mode" state then "plan" else string_field "approval_mode" state
+  if is_true "plan_mode" state
+  then "plan"
+  else string_field "approval_mode" state
 ;;
 
 let mode_state state =
@@ -372,7 +402,10 @@ let mode_state state =
       , `Array
           (List.map modes ~f:(fun (id, name, description) ->
              `Object
-               [ "id", str id; "name", str name; "description", str description ])) )
+               [ "id", str id
+               ; "name", str name
+               ; "description", str description
+               ])) )
     ]
 ;;
 
@@ -383,7 +416,10 @@ let refresh_models t =
   match control t with
   | Error _ -> ()
   | Ok link ->
-    (match Rpc_client.call link "list_models" [], Rpc_client.call link "auth_status" [] with
+    (match
+       ( Rpc_client.call link "list_models" []
+       , Rpc_client.call link "auth_status" [] )
+     with
      | Ok (`Array models), Ok (`Array statuses) ->
        let configured =
          List.filter_map statuses ~f:(fun s ->
@@ -394,7 +430,10 @@ let refresh_models t =
        t.models
        <- Some
             (List.filter models ~f:(fun m ->
-               List.mem configured (string_field "provider" m) ~equal:String.equal))
+               List.mem
+                 configured
+                 (string_field "provider" m)
+                 ~equal:String.equal))
      | _ -> ())
 ;;
 
@@ -412,7 +451,8 @@ let select ~id ~name ~category ~current options =
 let option ?description ~value name =
   `Object
     ([ "value", str value; "name", str name ]
-     @ Option.value_map description ~default:[] ~f:(fun d -> [ "description", str d ]))
+     @ Option.value_map description ~default:[] ~f:(fun d ->
+       [ "description", str d ]))
 ;;
 
 let config_options t state =
@@ -438,7 +478,9 @@ let config_options t state =
         ~category:"model"
         ~current:(string_field "key" current_model)
         (List.map models ~f:(fun m ->
-           option ~value:(string_field "key" m) ~description:(string_field "key" m)
+           option
+             ~value:(string_field "key" m)
+             ~description:(string_field "key" m)
              (string_field "name" m)))
     ; select
         ~id:"thinking"
@@ -461,7 +503,8 @@ let plan_entries state =
         ; "priority", str "medium"
         ; "status", str (string_field "status" step)
         ])
-  | _, (`Object _ as goal) when String.equal (string_field "status" goal) "active" ->
+  | _, (`Object _ as goal)
+    when String.equal (string_field "status" goal) "active" ->
     [ `Object
         [ "content", str ("Goal: " ^ string_field "text" goal)
         ; "priority", str "high"
@@ -475,7 +518,8 @@ let usage state =
   `Object
     [ "used", field "context_tokens" state
     ; "size", field "context_window" (field "model" state)
-    ; "cost", `Object [ "amount", field "cost_usd" state; "currency", str "USD" ]
+    ; ( "cost"
+      , `Object [ "amount", field "cost_usd" state; "currency", str "USD" ] )
     ]
 ;;
 
@@ -485,16 +529,15 @@ let prigh_state (s : Session.t) =
   let active = string_field "active_host" st in
   let host_name =
     List.find_map (list_field "hosts" st) ~f:(fun h ->
-      if String.equal (string_field "id" h) active then opt_string "name" h else None)
+      if String.equal (string_field "id" h) active
+      then opt_string "name" h
+      else None)
   in
   let steer, follow_up = s.queued in
+  let count name = int (List.length (list_field name st)) in
   `Object
-    [ "session_id", str s.id
-    ; "session_name", field "session_name" st
-    ; "cwd", field "cwd" st
-    ; "git_branch", field "git_branch" st
+    [ "sessionId", str s.id
     ; "model", field "key" model
-    ; "model_name", field "name" model
     ; "thinking", field "thinking" st
     ; "running", field "running" st
     ; "context_tokens", field "context_tokens" st
@@ -508,10 +551,18 @@ let prigh_state (s : Session.t) =
       , `Array
           (List.map (list_field "subagents" st) ~f:(fun a ->
              `Object
-               [ "id", field "id" a; "label", field "task" a; "running", field "running" a ])) )
-    ; "jobs", field "jobs" st
-    ; "goal", field "goal" st
-    ; "reminders", field "reminders" st
+               [ "id", field "id" a
+               ; "label", field "task" a
+               ; "running", field "running" a
+               ])) )
+    ; "jobs", count "jobs"
+    ; ( "goal"
+      , match field "goal" st with
+        | `Object _ as goal
+          when String.equal (string_field "status" goal) "active" ->
+          field "text" goal
+        | _ -> `Null )
+    ; "reminders", count "reminders"
     ; "active_host", Option.value_map host_name ~default:(str active) ~f:str
     ]
 ;;
@@ -521,7 +572,8 @@ let send_prigh_state t (s : Session.t) =
   if not (Json.exactly_equal state s.sent.prigh_state)
   then (
     s.sent.prigh_state <- state;
-    if not s.closed then Json_rpc.notify t.rpc "_prigh/state" state)
+    if t.caps.prigh_state && not s.closed
+    then Json_rpc.notify t.rpc "_prigh/state" state)
 ;;
 
 let send_derived t (s : Session.t) =
@@ -530,12 +582,18 @@ let send_derived t (s : Session.t) =
   if not (String.equal mode s.sent.mode)
   then (
     s.sent.mode <- mode;
-    update t s [ "sessionUpdate", str "current_mode_update"; "currentModeId", str mode ]);
+    update
+      t
+      s
+      [ "sessionUpdate", str "current_mode_update"; "currentModeId", str mode ]);
   let config = config_options t state in
   if not (Json.exactly_equal config s.sent.config)
   then (
     s.sent.config <- config;
-    update t s [ "sessionUpdate", str "config_option_update"; "configOptions", config ]);
+    update
+      t
+      s
+      [ "sessionUpdate", str "config_option_update"; "configOptions", config ]);
   let plan = `Array (plan_entries state) in
   if not (Json.exactly_equal plan s.sent.plan)
   then (
@@ -545,9 +603,14 @@ let send_derived t (s : Session.t) =
   if not (Json.exactly_equal usage s.sent.usage)
   then (
     s.sent.usage <- usage;
-    update t s (("sessionUpdate", str "usage_update") :: (match usage with
-      | `Object fields -> fields
-      | _ -> [])));
+    update
+      t
+      s
+      (("sessionUpdate", str "usage_update")
+       ::
+       (match usage with
+        | `Object fields -> fields
+        | _ -> [])));
   let title = field "session_name" state in
   if not (Json.exactly_equal title s.sent.title)
   then (
@@ -600,7 +663,8 @@ let tool_start t (s : Session.t) call =
     s
     ((("sessionUpdate", str kind) :: tool_fields s view ~call_id)
      @ [ "status", str "in_progress"; "rawInput", args ]
-     @ if List.is_empty locations then [] else [ "locations", `Array locations ])
+     @ if List.is_empty locations then [] else [ "locations", `Array locations ]
+    )
 ;;
 
 let output_tail = 8192
@@ -620,7 +684,8 @@ let tool_output t (s : Session.t) ~call_id chunk =
       [ "sessionUpdate", str "tool_call_update"
       ; "toolCallId", str call_id
       ; ( "content"
-        , `Array [ Acp_tool_call.text ~kind:(Acp_tool_call.kind view.name) output ] )
+        , `Array
+            [ Acp_tool_call.text ~kind:(Acp_tool_call.kind view.name) output ] )
       ])
 ;;
 
@@ -631,7 +696,10 @@ let tool_end t (s : Session.t) ~call ~result =
   Hashtbl.remove s.tools call_id;
   let is_error = is_true "is_error" result in
   let text = string_field "text" result in
-  let recorded = List.rev (Option.value (Hashtbl.find_and_remove s.diffs call_id) ~default:[]) in
+  let recorded =
+    List.rev
+      (Option.value (Hashtbl.find_and_remove s.diffs call_id) ~default:[])
+  in
   let kind = Acp_tool_call.kind name in
   let content =
     if is_error
@@ -665,7 +733,9 @@ let subagent_progress t (s : Session.t) ~call_id ~line =
       [ "sessionUpdate", str "tool_call_update"
       ; "toolCallId", str call_id
       ; ( "content"
-        , `Array [ Acp_tool_call.text (String.concat_lines (List.rev view.progress)) ] )
+        , `Array
+            [ Acp_tool_call.text (String.concat_lines (List.rev view.progress))
+            ] )
       ])
 ;;
 
@@ -718,7 +788,8 @@ let confirm t (s : Session.t) json =
   let tool_call =
     match view with
     | Some view ->
-      tool_fields s view ~call_id @ [ "status", str "pending"; "rawInput", view.args ]
+      tool_fields s view ~call_id
+      @ [ "status", str "pending"; "rawInput", view.args ]
     | None ->
       [ "toolCallId", str call_id
       ; "title", str summary
@@ -729,7 +800,10 @@ let confirm t (s : Session.t) json =
   let options =
     [ Some
         (`Object
-            [ "optionId", str "allow"; "name", str "Allow"; "kind", str "allow_once" ])
+            [ "optionId", str "allow"
+            ; "name", str "Allow"
+            ; "kind", str "allow_once"
+            ])
     ; (if List.is_empty rules
        then None
        else
@@ -741,7 +815,10 @@ let confirm t (s : Session.t) json =
                ]))
     ; Some
         (`Object
-            [ "optionId", str "reject"; "name", str "Reject"; "kind", str "reject_once" ])
+            [ "optionId", str "reject"
+            ; "name", str "Reject"
+            ; "kind", str "reject_once"
+            ])
     ]
   in
   match
@@ -768,7 +845,8 @@ let confirm t (s : Session.t) json =
       s
       "tool_confirm_respond"
       ([ "call_id", str call_id; "allow", bool allow; "always", bool always ]
-       @ Option.value_map agent_id ~default:[] ~f:(fun id -> [ "agent_id", str id ]))
+       @ Option.value_map agent_id ~default:[] ~f:(fun id ->
+         [ "agent_id", str id ]))
     |> report_failure "tool_confirm_respond"
 ;;
 
@@ -782,7 +860,10 @@ let question t (s : Session.t) json =
   let decline = [ "decline", `True ] in
   match Acp_question.of_event (field "questions" json) with
   | Error e ->
-    respond [ "unavailable", str ("unreadable questions: " ^ Core.Error.to_string_hum e) ]
+    respond
+      [ ( "unavailable"
+        , str ("unreadable questions: " ^ Core.Error.to_string_hum e) )
+      ]
   | Ok questions ->
     if t.caps.elicitation_form
     then (
@@ -801,7 +882,8 @@ let question t (s : Session.t) json =
               ])
       with
       | None -> ()
-      | Some (Ok result) when String.equal (string_field "action" result) "accept" ->
+      | Some (Ok result)
+        when String.equal (string_field "action" result) "accept" ->
         respond
           [ ( "answers"
             , `Array
@@ -853,7 +935,9 @@ let question t (s : Session.t) json =
          | Some result ->
            (match
               Option.bind (selected_option result) ~f:(fun id ->
-                Option.bind (String.chop_prefix id ~prefix:"choice-") ~f:Int.of_string_opt)
+                Option.bind
+                  (String.chop_prefix id ~prefix:"choice-")
+                  ~f:Int.of_string_opt)
             with
             | Some i when i >= 0 && i < List.length choices ->
               respond
@@ -875,9 +959,7 @@ let question t (s : Session.t) json =
 (* ---------------------------------------------------------------------- *)
 (* Session events                                                          *)
 
-let finish_turn (s : Session.t) =
-  Option.iter s.turn ~f:Turn.finish
-;;
+let finish_turn (s : Session.t) = Option.iter s.turn ~f:Turn.finish
 
 let handle_event t (s : Session.t) json =
   match string_field "event" json with
@@ -889,19 +971,30 @@ let handle_event t (s : Session.t) json =
        message_chunk t s ~kind:"agent_thought_chunk" (string_field "text" delta)
      | "tool_call_start" ->
        ignore
-         (announce t s ~call_id:(string_field "id" delta) ~name:(string_field "name" delta)
+         (announce
+            t
+            s
+            ~call_id:(string_field "id" delta)
+            ~name:(string_field "name" delta)
           : Tool_view.t)
      | _ -> ())
   | "message_end" ->
     let message = field "message" json in
     if String.equal (string_field "role" message) "assistant"
-    then Option.iter s.turn ~f:(fun turn -> turn.stop <- Stop.of_message message)
+    then
+      Option.iter s.turn ~f:(fun turn -> turn.stop <- Stop.of_message message)
   | "tool_start" -> tool_start t s (field "call" json)
   | "tool_output" ->
-    tool_output t s ~call_id:(string_field "call_id" json) (string_field "chunk" json)
-  | "tool_end" -> tool_end t s ~call:(field "call" json) ~result:(field "result" json)
+    tool_output
+      t
+      s
+      ~call_id:(string_field "call_id" json)
+      (string_field "chunk" json)
+  | "tool_end" ->
+    tool_end t s ~call:(field "call" json) ~result:(field "result" json)
   | "tool_confirm" -> Fiber.fork ~sw:t.sw (fun () -> confirm t s json)
-  | "tool_confirm_done" -> withdraw t s ~key:("confirm:" ^ string_field "call_id" json)
+  | "tool_confirm_done" ->
+    withdraw t s ~key:("confirm:" ^ string_field "call_id" json)
   | "ask_user" -> Fiber.fork ~sw:t.sw (fun () -> question t s json)
   | "ask_user_done" -> withdraw t s ~key:("ask:" ^ string_field "call_id" json)
   | "subagent_start" ->
@@ -941,13 +1034,25 @@ let handle_event t (s : Session.t) json =
     send_prigh_state t s
   | "notice" ->
     let text = string_field "text" json in
-    Json_rpc.notify
-      t.rpc
-      "_prigh/notice"
-      (`Object [ "session_id", str s.id; "text", str text ]);
-    if t.caps.notices
+    if t.caps.prigh_state
     then
-      update t s [ "sessionUpdate", str "notice"; "severity", str "info"; "title", str text ]
+      Json_rpc.notify
+        t.rpc
+        "_prigh/notice"
+        (`Object [ "sessionId", str s.id; "text", str text ])
+    else if t.caps.notices
+    then
+      update
+        t
+        s
+        [ "sessionUpdate", str "notice"
+        ; "severity", str "info"
+        ; "title", str text
+        ]
+    else log "notice: %s" text
+  | "$started" ->
+    Option.iter s.turn ~f:(fun turn ->
+      if not turn.running_seen then Turn.finish turn)
   | "$closed" ->
     Option.iter s.turn ~f:(fun turn ->
       turn.stop <- Failed (string_field "reason" json);
@@ -963,7 +1068,11 @@ let run_events t (s : Session.t) =
       | Some json ->
         (try handle_event t s json with
          | Eio.Cancel.Cancelled _ as exn -> raise exn
-         | exn -> log "handling %s failed: %s" (Json.to_string json) (Exn.to_string exn));
+         | exn ->
+           log
+             "handling %s failed: %s"
+             (Json.to_string json)
+             (Exn.to_string exn));
         loop ()
     in
     loop ())
@@ -990,32 +1099,49 @@ let replay t (s : Session.t) messages =
       List.iter (list_field "content" message) ~f:(fun block ->
         match string_field "type" block with
         | "text" -> message_chunk t s (string_field "text" block)
-        | "thinking" -> message_chunk t s ~kind:"agent_thought_chunk" (string_field "text" block)
+        | "thinking" ->
+          message_chunk
+            t
+            s
+            ~kind:"agent_thought_chunk"
+            (string_field "text" block)
         | "tool_call" ->
           let call_id = string_field "id" block in
           let name = string_field "name" block in
-          let args = Acp_tool_call.parse_args (string_field "arguments" block) in
+          let args =
+            Acp_tool_call.parse_args (string_field "arguments" block)
+          in
           Hashtbl.set calls ~key:call_id ~data:(name, args);
           let view = { (Tool_view.create name) with args } in
-          let locations = Acp_tool_call.locations ~name ~args ~cwd:(Session.cwd s) in
+          let locations =
+            Acp_tool_call.locations ~name ~args ~cwd:(Session.cwd s)
+          in
           update
             t
             s
             ((("sessionUpdate", str "tool_call") :: tool_fields s view ~call_id)
              @ [ "status", str "in_progress"; "rawInput", args ]
-             @ if List.is_empty locations then [] else [ "locations", `Array locations ])
+             @
+             if List.is_empty locations
+             then []
+             else [ "locations", `Array locations ])
         | _ -> ())
     | "tool_result" ->
       let call_id = string_field "tool_call_id" message in
       let name, args =
-        Option.value (Hashtbl.find calls call_id) ~default:(string_field "tool_name" message, `Object [])
+        Option.value
+          (Hashtbl.find calls call_id)
+          ~default:(string_field "tool_name" message, `Object [])
       in
       tool_end
         t
         s
         ~call:
           (`Object
-              [ "id", str call_id; "name", str name; "arguments", str (Json.to_string args) ])
+              [ "id", str call_id
+              ; "name", str name
+              ; "arguments", str (Json.to_string args)
+              ])
         ~result:message
     | _ -> ())
 ;;
@@ -1026,8 +1152,8 @@ let replay t (s : Session.t) messages =
 let unknown_session id =
   Error.resource_not_found
     (sprintf
-       "unknown session %S: open one with session/new or session/load (session/list \
-        lists them)"
+       "unknown session %S: open one with session/new or session/load \
+        (session/list lists them)"
        id)
 ;;
 
@@ -1097,7 +1223,9 @@ let attach t ?id ~cwd () =
 let session_result t (s : Session.t) extra =
   `Object
     (extra
-     @ [ "modes", mode_state s.state; "configOptions", config_options t s.state ])
+     @ [ "modes", mode_state s.state
+       ; "configOptions", config_options t s.state
+       ])
 ;;
 
 let available_commands t (s : Session.t) =
@@ -1116,7 +1244,10 @@ let available_commands t (s : Session.t) =
     s
     [ "sessionUpdate", str "available_commands_update"
     ; ( "availableCommands"
-      , `Array (List.map (Acp_commands.builtin @ skills) ~f:Acp_commands.Command.to_json) )
+      , `Array
+          (List.map
+             (Acp_commands.builtin @ skills)
+             ~f:Acp_commands.Command.to_json) )
     ]
 ;;
 
@@ -1134,18 +1265,20 @@ let start_session t (s : Session.t) =
         (Some
            (`Object
                (("event", str "tool_confirm")
-                :: (match confirm with
-                  | `Object fields -> fields
-                  | _ -> [])))));
+                ::
+                (match confirm with
+                 | `Object fields -> fields
+                 | _ -> [])))));
     List.iter (list_field "questions" pending) ~f:(fun q ->
       Eio.Stream.add
         s.events
         (Some
            (`Object
                (("event", str "ask_user")
-                :: (match q with
-                  | `Object fields -> fields
-                  | _ -> [])))))
+                ::
+                (match q with
+                 | `Object fields -> fields
+                 | _ -> [])))))
   | Error _ -> ()
 ;;
 
@@ -1161,8 +1294,8 @@ let warn_mcp params =
   match Json.member "mcpServers" params with
   | Some (`Array (_ :: _ as servers)) ->
     log
-      "ignoring %d MCP server(s) from the client: prigh reads them from its own \
-       config (see prigh's README, MCP servers)"
+      "ignoring %d MCP server(s) from the client: prigh reads them from its \
+       own config (see prigh's README, MCP servers)"
       (List.length servers)
   | _ -> ()
 ;;
@@ -1182,14 +1315,16 @@ let new_session t params =
     or_internal
       (Or_error.bind (host t) ~f:(function
          | Some host ->
-           Or_error.bind (Rpc_client.call host.link "new_session" []) ~f:(fun result ->
-             let state = field "state" result in
-             let id = string_field "session_id" state in
-             Or_error.bind
-               (if String.equal (string_field "cwd" state) cwd
-                then Ok `Null
-                else Rpc_client.call host.link "set_cwd" [ "path", str cwd ])
-               ~f:(fun (_ : Json.t) -> attach t ~id ~cwd ()))
+           Or_error.bind
+             (Rpc_client.call host.link "new_session" [])
+             ~f:(fun result ->
+               let state = field "state" result in
+               let id = string_field "session_id" state in
+               Or_error.bind
+                 (if String.equal (string_field "cwd" state) cwd
+                  then Ok `Null
+                  else Rpc_client.call host.link "set_cwd" [ "path", str cwd ])
+                 ~f:(fun (_ : Json.t) -> attach t ~id ~cwd ()))
          | None ->
            Or_error.bind (attach t ~cwd ()) ~f:(fun s ->
              if String.equal (Session.cwd s) cwd
@@ -1225,9 +1360,10 @@ let open_session t params ~replay:with_history =
   refresh_models t;
   let not_found e =
     let message = Core.Error.to_string_hum e in
-    if String.is_substring message ~substring:"no session"
-       || String.is_substring message ~substring:"unknown session"
-       || String.is_substring message ~substring:"not found"
+    if
+      String.is_substring message ~substring:"no session"
+      || String.is_substring message ~substring:"unknown session"
+      || String.is_substring message ~substring:"not found"
     then unknown_session id
     else Error.internal message
   in
@@ -1284,4 +1420,389 @@ let list_sessions t params =
          @ [ "updatedAt", str (iso_time (string_field "updated_at" s)) ]))
   in
   Ok (Reply.Result (`Object [ "sessions", `Array sessions ]))
+;;
+
+let close_session_request t params =
+  let* s = session_param t params in
+  close_session s;
+  Hashtbl.remove t.sessions s.id;
+  Ok (Reply.Result (`Object []))
+;;
+
+(* ---------------------------------------------------------------------- *)
+(* Prompts                                                                 *)
+
+let stop_reason = function
+  | `End_turn -> str "end_turn"
+  | `Max_tokens -> str "max_tokens"
+  | `Cancelled -> str "cancelled"
+;;
+
+let stopped reason =
+  Ok (Reply.Result (`Object [ "stopReason", stop_reason reason ]))
+;;
+
+let turn_error message =
+  if needs_login message
+  then Error.auth_required (login_hint message)
+  else Error.internal message
+;;
+
+(* Starts a run with [start] and waits for the session to stop running. *)
+let run_turn (s : Session.t) start =
+  let turn = Turn.create ~running:false in
+  s.turn <- Some turn;
+  let clear () =
+    match s.turn with
+    | Some current when phys_equal current turn -> s.turn <- None
+    | Some _ | None -> ()
+  in
+  match start () with
+  | Error e ->
+    clear ();
+    Error (turn_error (Core.Error.to_string_hum e))
+  | Ok (_ : Json.t) ->
+    (* Behind the events of the run it started, if it started one. *)
+    Eio.Stream.add s.events (Some (`Object [ "event", str "$started" ]));
+    Promise.await turn.finished;
+    clear ();
+    if turn.cancelled
+    then stopped `Cancelled
+    else (
+      match turn.stop with
+      | End_turn -> stopped `End_turn
+      | Max_tokens -> stopped `Max_tokens
+      | Aborted -> stopped `Cancelled
+      | Failed message -> Error (turn_error message))
+;;
+
+let send_prompt (s : Session.t) (p : Acp_prompt.t) =
+  let params =
+    [ "text", str p.text ]
+    @ (if List.is_empty p.attachments
+       then []
+       else [ "attachments", `Array (List.map p.attachments ~f:str) ])
+    @ if List.is_empty p.images then [] else [ "images", `Array p.images ]
+  in
+  match call s "prompt" params with
+  | Error e
+    when String.is_substring
+           (Core.Error.to_string_hum e)
+           ~substring:"a run is already in progress" ->
+    (* Started from elsewhere (the TUI): ours runs after it. *)
+    call s "follow_up" params
+  | result -> result
+;;
+
+let prompt t params =
+  let* s = session_param t params in
+  let* blocks =
+    match Json.member "prompt" params with
+    | Some (`Array blocks) -> Ok blocks
+    | _ ->
+      Error (Error.invalid_params "missing prompt (an array of content blocks)")
+  in
+  let* p =
+    Result.map_error (Acp_prompt.of_blocks blocks) ~f:(fun e ->
+      Error.invalid_params (Core.Error.to_string_hum e))
+  in
+  let* () =
+    match s.turn with
+    | Some turn when not (Promise.is_resolved turn.finished) ->
+      Error
+        (Error.invalid_request
+           "this session is already answering a prompt: wait for it to end, or \
+            cancel it (session/cancel)")
+    | Some _ | None -> Ok ()
+  in
+  let action =
+    if List.is_empty p.attachments && List.is_empty p.images
+    then Acp_commands.parse ~state:s.state p.text
+    else Prompt
+  in
+  match action with
+  | Prompt -> run_turn s (fun () -> send_prompt s p)
+  | Reply text ->
+    message_chunk t s text;
+    stopped `End_turn
+  | Call { method_; params; turn = true; ack = _ } ->
+    run_turn s (fun () -> call s method_ params)
+  | Call { method_; params; turn = false; ack } ->
+    (match call s method_ params with
+     | Ok result ->
+       message_chunk t s (ack result);
+       stopped `End_turn
+     | Error e -> Error (turn_error (Core.Error.to_string_hum e)))
+;;
+
+let cancel t params =
+  match session_param t params with
+  | Error e -> log "session/cancel: %s" e.message
+  | Ok s ->
+    Option.iter s.turn ~f:(fun turn -> turn.cancelled <- true);
+    call s "abort" [] |> report_failure "abort"
+;;
+
+(* ---------------------------------------------------------------------- *)
+(* Modes and config options                                                *)
+
+let mode_ids = List.map modes ~f:(fun (id, _, _) -> id)
+
+let set_mode_params mode =
+  match mode with
+  | "plan" -> Ok [ "plan_mode", `True ]
+  | mode when List.mem mode_ids mode ~equal:String.equal ->
+    Ok [ "approval_mode", str mode; "plan_mode", `False ]
+  | mode ->
+    Error
+      (Error.invalid_params
+         (sprintf
+            "unknown mode %S: the modes are %s"
+            mode
+            (String.concat ~sep:", " mode_ids)))
+;;
+
+let string_param name params =
+  match Json.member name params with
+  | Some (`String value) -> Ok value
+  | _ -> Error (Error.invalid_params (sprintf "missing %s (a string)" name))
+;;
+
+let set_mode t params =
+  let* s = session_param t params in
+  let* mode = string_param "modeId" params in
+  let* mode_params = set_mode_params mode in
+  let* (_ : Json.t) = or_internal (call s "set_mode" mode_params) in
+  Ok (Reply.Result (`Object []))
+;;
+
+let config_ids = [ "mode"; "model"; "thinking" ]
+
+let set_config_option t params =
+  let* s = session_param t params in
+  let* id = string_param "configId" params in
+  let* value = string_param "value" params in
+  let* method_, method_params =
+    match id with
+    | "mode" -> Result.map (set_mode_params value) ~f:(fun p -> "set_mode", p)
+    | "model" -> Ok ("set_model", [ "model", str value ])
+    | "thinking" ->
+      if List.mem thinking_levels value ~equal:String.equal
+      then Ok ("set_thinking", [ "thinking", str value ])
+      else
+        Error
+          (Error.invalid_params
+             (sprintf
+                "unknown thinking level %S: the levels are %s"
+                value
+                (String.concat ~sep:", " thinking_levels)))
+    | id ->
+      Error
+        (Error.invalid_params
+           (sprintf
+              "unknown config option %S: prigh's are %s"
+              id
+              (String.concat ~sep:", " config_ids)))
+  in
+  let* (_ : Json.t) =
+    Result.map_error (call s method_ method_params) ~f:(fun e ->
+      Error.invalid_params (Core.Error.to_string_hum e))
+  in
+  let* state = or_internal (call s "get_state" []) in
+  let config = config_options t state in
+  (* The client has them now: they are not sent again when the state comes. *)
+  s.sent.config <- config;
+  Ok (Reply.Result (`Object [ "configOptions", config ]))
+;;
+
+(* ---------------------------------------------------------------------- *)
+(* Initialization                                                          *)
+
+let extensions = [ "_prigh/state"; "_prigh/notice" ]
+
+let prigh_meta =
+  `Object
+    [ ( "prigh"
+      , `Object
+          [ "version", int 1
+          ; "extensions", `Array (List.map extensions ~f:str)
+          ] )
+    ]
+;;
+
+let login_method_id = "prigh-login"
+
+let login_advice =
+  "run `prigh login` in a terminal (or /login in the prigh TUI), then try again"
+;;
+
+let initialize t params =
+  let caps = field "clientCapabilities" params in
+  t.caps <- Caps.of_json caps;
+  let info = field "clientInfo" params in
+  Option.iter
+    (Option.first_some (opt_string "title" info) (opt_string "name" info))
+    ~f:(fun name -> t.client_name <- name);
+  Reply.Result
+    (`Object
+        [ "protocolVersion", int 1
+        ; ( "agentCapabilities"
+          , `Object
+              [ "loadSession", `True
+              ; ( "promptCapabilities"
+                , `Object
+                    [ "image", `True
+                    ; "audio", `False
+                    ; "embeddedContext", `True
+                    ] )
+              ; "mcpCapabilities", `Object [ "http", `False; "sse", `False ]
+              ; ( "sessionCapabilities"
+                , `Object
+                    [ "list", `Object []
+                    ; "resume", `Object []
+                    ; "close", `Object []
+                    ] )
+              ; "_meta", prigh_meta
+              ] )
+        ; ( "authMethods"
+          , `Array
+              [ `Object
+                  [ "id", str login_method_id
+                  ; "name", str "prigh login"
+                  ; ( "description"
+                    , str ("Log in to a model provider: " ^ login_advice) )
+                  ]
+              ] )
+        ; ( "agentInfo"
+          , `Object
+              [ "name", str "prigh"
+              ; "title", str "prigh"
+              ; "version", str Version.to_string
+              ] )
+        ; "_meta", prigh_meta
+        ])
+;;
+
+let authenticate t params =
+  let* method_id = string_param "methodId" params in
+  let* () =
+    if String.equal method_id login_method_id
+    then Ok ()
+    else
+      Error
+        (Error.invalid_params
+           (sprintf
+              "unknown auth method %S: prigh's is %S"
+              method_id
+              login_method_id))
+  in
+  let* link = or_internal (control t) in
+  let* statuses = or_internal (Rpc_client.call link "auth_status" []) in
+  if
+    List.exists
+      (Option.value (Json.list statuses) ~default:[])
+      ~f:(fun s -> not (Json.exactly_equal (field "configured" s) `Null))
+  then Ok (Reply.Result (`Object []))
+  else
+    Error
+      (Error.auth_required
+         ("prigh is not logged in to any provider: " ^ login_advice))
+;;
+
+(* ---------------------------------------------------------------------- *)
+(* Dispatch                                                                *)
+
+let methods =
+  [ "initialize"
+  ; "authenticate"
+  ; "session/new"
+  ; "session/load"
+  ; "session/resume"
+  ; "session/list"
+  ; "session/close"
+  ; "session/prompt"
+  ; "session/set_mode"
+  ; "session/set_config_option"
+  ]
+;;
+
+let dispatch t ~method_ ~params =
+  let reply = function
+    | Ok reply -> reply
+    | Error e -> Reply.Error e
+  in
+  match params with
+  | `Object _ ->
+    (match method_ with
+     | "initialize" -> initialize t params
+     | "authenticate" -> reply (authenticate t params)
+     | "session/new" -> reply (new_session t params)
+     | "session/load" -> reply (open_session t params ~replay:true)
+     | "session/resume" -> reply (open_session t params ~replay:false)
+     | "session/list" -> reply (list_sessions t params)
+     | "session/close" -> reply (close_session_request t params)
+     | "session/prompt" -> reply (prompt t params)
+     | "session/set_mode" -> reply (set_mode t params)
+     | "session/set_config_option" -> reply (set_config_option t params)
+     | method_ ->
+       Reply.Error
+         (Error.method_not_found
+            (sprintf
+               "prigh does not implement %S; its methods are %s"
+               method_
+               (String.concat ~sep:", " methods))))
+  | _ ->
+    Reply.Error (Error.invalid_params (method_ ^ ": params must be an object"))
+;;
+
+let on_notification t ~method_ ~params =
+  match method_ with
+  | "session/cancel" -> cancel t params
+  | "$/cancel_request" -> ()
+  | method_ -> log "ignoring the notification %s" method_
+;;
+
+let shutdown t =
+  Hashtbl.iter t.sessions ~f:close_session;
+  Hashtbl.clear t.sessions;
+  Option.iter t.host ~f:(fun host ->
+    Tool_host.Worker.stop host.worker;
+    Rpc_client.close host.link);
+  t.host <- None;
+  Option.iter t.control ~f:Rpc_client.close;
+  t.control <- None
+;;
+
+let serve ~env config ~read_line ~write_line =
+  try
+    Switch.run (fun sw ->
+      let rpc = Json_rpc.create ~sw ~write_line in
+      let t =
+        { env
+        ; sw
+        ; rpc
+        ; config
+        ; caps = Caps.none
+        ; client_name = "editor"
+        ; sessions = String.Table.create ()
+        ; host = None
+        ; control = None
+        ; models = None
+        }
+      in
+      Json_rpc.serve
+        rpc
+        ~read_line
+        ~on_request:(dispatch t)
+        ~on_notification:(on_notification t);
+      shutdown t;
+      (* The answers to what was still being handled, if they come soon. *)
+      ignore
+        (Eio.Time.with_timeout (Eio.Stdenv.clock env) 5. (fun () ->
+           Json_rpc.flush rpc;
+           Ok ())
+         : (unit, [ `Timeout ]) Result.t);
+      Switch.fail sw Exit)
+  with
+  | Exit -> ()
 ;;

@@ -923,7 +923,7 @@ let%expect_test "remote tool host: exec round trip, switch, disconnect" =
     client-2 /home/me/proj
     {"type":"response","id":"r1","ok":true,"result":{}}
     (host answered $instructions)
-    {"type":"event","event":"tool_exec","host":"client-2","exec_id":"<id>/c1-1","call_id":"c1","name":"bash","arguments":{"command":"x","timeout":2592000},"cwd":"/home/me/proj"}
+    {"type":"event","event":"tool_exec","host":"client-2","session_id":"<id>","exec_id":"<id>/c1-1","call_id":"c1","name":"bash","arguments":{"command":"x","timeout":2592000},"cwd":"/home/me/proj"}
     default client saw tool_exec: false
     {"type":"response","id":"r2","ok":true,"result":{}}
     {"type":"response","id":"r2","ok":true,"result":{}}
@@ -1091,11 +1091,11 @@ let%expect_test "remote tool host: attached to another session" =
     {|
     {"type":"response","id":"r1","ok":true,"result":{}}
     (host answered $instructions)
-    {"type":"event","event":"tool_exec","host":"client-2","exec_id":"<id>/c1-1","call_id":"c1","name":"bash","arguments":{"command":"x","timeout":2592000},"cwd":"/home/me/proj"}
+    {"type":"event","event":"tool_exec","host":"client-2","session_id":"<id>","exec_id":"<id>/c1-1","call_id":"c1","name":"bash","arguments":{"command":"x","timeout":2592000},"cwd":"/home/me/proj"}
     {"type":"response","id":"r2","ok":true,"result":{}}
     {"type":"response","id":"r2","ok":true,"result":{}}
     (host answered $instructions)
-    {"type":"event","event":"tool_exec","host":"client-2","exec_id":"<id>/c2-1","call_id":"c2","name":"bash","arguments":{"command":"y","timeout":2592000},"cwd":"/home/me/proj"}
+    {"type":"event","event":"tool_exec","host":"client-2","session_id":"<id>","exec_id":"<id>/c2-1","call_id":"c2","name":"bash","arguments":{"command":"y","timeout":2592000},"cwd":"/home/me/proj"}
     {"type":"response","id":"r2","ok":true,"result":{}}
     ((main ("ran bash")) (side ("ran bash")))
     |}];
@@ -1182,7 +1182,7 @@ let%expect_test "list_paths: on the backend, then routed to a remote host" =
           : Json.t));
   [%expect
     {|
-    {"type":"event","event":"tool_exec","host":"client-2","exec_id":"<id>/list_paths-0","call_id":"list_paths","name":"$list_paths","arguments":{"prefix":"ma"},"cwd":"/home/me/proj"}
+    {"type":"event","event":"tool_exec","host":"client-2","session_id":"<id>","exec_id":"<id>/list_paths-0","call_id":"list_paths","name":"$list_paths","arguments":{"prefix":"ma"},"cwd":"/home/me/proj"}
     {"type":"response","id":"r1","ok":true,"result":["main.ml","src/main.ml"]}
     |}]
 ;;
@@ -1304,7 +1304,7 @@ let%expect_test "list_dirs: on the active host, or a named one" =
   [%expect
     {|
     {"type":"response","id":"r1","ok":true,"result":["beta/"]}
-    {"type":"event","event":"tool_exec","host":"client-2","exec_id":"<id>/list_dirs-0","call_id":"list_dirs","name":"$list_dirs","arguments":{"prefix":"~/de"},"cwd":"/home/me/proj"}
+    {"type":"event","event":"tool_exec","host":"client-2","session_id":"<id>","exec_id":"<id>/list_dirs-0","call_id":"list_dirs","name":"$list_dirs","arguments":{"prefix":"~/de"},"cwd":"/home/me/proj"}
     {"type":"response","id":"r1","ok":true,"result":["~/dev/"]}
     |}]
 ;;

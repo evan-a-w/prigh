@@ -22,8 +22,7 @@ let of_response response =
 ;;
 
 let request_json ~id method_ params =
-  `Object
-    [ "id", id; "method", `String method_; "params", `Object params ]
+  `Object [ "id", id; "method", `String method_; "params", `Object params ]
 ;;
 
 module Connector = struct
@@ -69,9 +68,7 @@ module Connector = struct
 
   let tcp ~env ~sw ~host ~port ~on_event ~on_close =
     let net = Eio.Stdenv.net env in
-    match
-      Eio.Net.getaddrinfo_stream net host ~service:(Int.to_string port)
-    with
+    match Eio.Net.getaddrinfo_stream net host ~service:(Int.to_string port) with
     | exception exn ->
       Or_error.errorf "cannot resolve %s: %s" host (Net_error.to_string_hum exn)
     | [] -> Or_error.errorf "cannot resolve %s" host

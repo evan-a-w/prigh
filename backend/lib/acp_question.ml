@@ -45,7 +45,11 @@ let schema questions =
               ; "items", `Object [ "anyOf", `Array options ]
               ]
           else
-            `Object [ "type", `String "string"; "title", title; "oneOf", `Array options ]
+            `Object
+              [ "type", `String "string"
+              ; "title", title
+              ; "oneOf", `Array options
+              ]
         in
         [ key i, main
         ; ( other_key i
@@ -79,7 +83,7 @@ let answers questions content =
 ;;
 
 let single_choice = function
-  | [ ({ choices = _ :: _; multiple = false; _ } : User_question.t) as q ] ->
+  | [ (({ choices = _ :: _; multiple = false; _ } : User_question.t) as q) ] ->
     Some q.choices
   | _ -> None
 ;;

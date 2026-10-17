@@ -1852,22 +1852,22 @@ let dispatch agent login ~meth ~params : Json.t Or_error.t =
       | None when decline -> Ok User_question.Reply.Declined
       | None ->
         (match param params "answers" with
-        | Some (`Array answers) ->
-          Or_error.all
-            (List.map answers ~f:(function
-               | `Array items ->
-                 Or_error.all
-                   (List.map items ~f:(function
-                      | `String s -> Ok s
-                      | _ ->
-                        Or_error.error_string
-                          "param \"answers\" must be an array of arrays of \
-                           strings"))
-               | _ ->
-                 Or_error.error_string
-                   "param \"answers\" must be an array of arrays of strings"))
-          |> Or_error.map ~f:(fun answers ->
-            User_question.Reply.Answered answers)
+         | Some (`Array answers) ->
+           Or_error.all
+             (List.map answers ~f:(function
+                | `Array items ->
+                  Or_error.all
+                    (List.map items ~f:(function
+                       | `String s -> Ok s
+                       | _ ->
+                         Or_error.error_string
+                           "param \"answers\" must be an array of arrays of \
+                            strings"))
+                | _ ->
+                  Or_error.error_string
+                    "param \"answers\" must be an array of arrays of strings"))
+           |> Or_error.map ~f:(fun answers ->
+             User_question.Reply.Answered answers)
          | _ ->
            Or_error.error_string
              "missing param \"answers\" (or \"decline\": true)")

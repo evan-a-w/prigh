@@ -401,7 +401,9 @@ let serve_connection
                  ; Some ("cwd", `String cwd)
                  ; Some ("tools", `True)
                  ; Some ("host_id", `String host_id)
-                 ; Some ("features", `Array (List.map features ~f:(fun f -> `String f)))
+                 ; Some
+                     ( "features"
+                     , `Array (List.map features ~f:(fun f -> `String f)) )
                  ]) )
         ]);
   let worker =

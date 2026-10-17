@@ -12,7 +12,10 @@ type t
 (** [In_channel.read_all] and [Out_channel.write_all]. *)
 val local : t
 
-val create : read:(string -> string) -> write:(string -> data:string -> unit) -> t
+val create
+  :  read:(string -> string)
+  -> write:(string -> data:string -> unit)
+  -> t
 
 val is_local : t -> bool
 

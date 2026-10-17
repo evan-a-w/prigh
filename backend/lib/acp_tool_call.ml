@@ -54,7 +54,8 @@ let title ~name ~args ~cwd =
     | None -> verb
   in
   match name with
-  | "bash" -> Option.value_map (string_arg args "command") ~default:"bash" ~f:first_line
+  | "bash" ->
+    Option.value_map (string_arg args "command") ~default:"bash" ~f:first_line
   | "read" -> with_ "Read" (path "path")
   | "write" -> with_ "Write" (path "path")
   | "edit" -> with_ "Edit" (path "path")
@@ -62,17 +63,23 @@ let title ~name ~args ~cwd =
   | "apply_patch" ->
     (match patch_paths args with
      | [] -> "Patch"
-     | paths -> "Patch " ^ String.concat ~sep:", " (List.map paths ~f:(shown ~cwd)))
+     | paths ->
+       "Patch " ^ String.concat ~sep:", " (List.map paths ~f:(shown ~cwd)))
   | "grep" | "find" ->
     sprintf
       "%s %s%s"
       name
-      (Option.value_map (string_arg args "pattern") ~default:"" ~f:(sprintf "%S"))
+      (Option.value_map
+         (string_arg args "pattern")
+         ~default:""
+         ~f:(sprintf "%S"))
       (Option.value_map (path "path") ~default:"" ~f:(sprintf " in %s"))
   | "web_fetch" -> with_ "Fetch" (string_arg args "url")
   | "web_search" -> with_ "Search the web for" (string_arg args "query")
   | "subagent" ->
-    with_ "Subagent:" (Option.map (string_arg args "task") ~f:(first_line ~max:70))
+    with_
+      "Subagent:"
+      (Option.map (string_arg args "task") ~f:(first_line ~max:70))
   | "ask_user" -> "Question for you"
   | "update_plan" -> "Update the plan"
   | "exit_plan_mode" -> "Leave plan mode"
@@ -95,7 +102,8 @@ let locations ~name ~args ~cwd =
   | "edit" | "write" | "ls" ->
     Option.value_map (string_arg args "path") ~default:[] ~f:(fun p ->
       [ location (resolve p) ])
-  | "apply_patch" -> List.map (patch_paths args) ~f:(fun p -> location (resolve p))
+  | "apply_patch" ->
+    List.map (patch_paths args) ~f:(fun p -> location (resolve p))
   | _ -> []
 ;;
 
@@ -103,7 +111,8 @@ let diff ~path ~old_text ~new_text =
   `Object
     [ "type", `String "diff"
     ; "path", `String path
-    ; "oldText", Option.value_map old_text ~default:`Null ~f:(fun s -> `String s)
+    ; ( "oldText"
+      , Option.value_map old_text ~default:`Null ~f:(fun s -> `String s) )
     ; "newText", `String new_text
     ]
 ;;
@@ -117,7 +126,10 @@ let diffs_of_args ~name ~args ~cwd =
        [ diff ~path:(resolve path) ~old_text:None ~new_text:content ]
      | _ -> [])
   | "edit" ->
-    (match string_arg args "path", Option.bind (Json.member "edits" args) ~f:Json.list with
+    (match
+       ( string_arg args "path"
+       , Option.bind (Json.member "edits" args) ~f:Json.list )
+     with
      | Some path, Some edits ->
        List.filter_map edits ~f:(fun edit ->
          match string_arg edit "old_text", string_arg edit "new_text" with

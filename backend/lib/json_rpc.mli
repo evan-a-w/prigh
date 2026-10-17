@@ -65,6 +65,10 @@ val request
 
 val notify : t -> string -> Json.t -> unit
 
+(** Waits until the requests being handled are answered and everything sent
+    is written. *)
+val flush : t -> unit
+
 (** [$/cancel_request] for a request of ours the peer has not answered: it
     should answer it at once (as cancelled). *)
 val cancel_request : t -> Json.t -> unit

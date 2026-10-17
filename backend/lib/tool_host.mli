@@ -49,7 +49,8 @@ module Worker : sig
     -> terminals:Terminals.t Lazy.t
     -> mcp:Mcp_hub.t
     -> default_cwd:string
-    -> ?files:(session_id:string option -> call_id:string option -> File_access.t)
+    -> ?files:
+         (session_id:string option -> call_id:string option -> File_access.t)
     -> send:(Reply.t -> unit)
     -> unit
     -> t
