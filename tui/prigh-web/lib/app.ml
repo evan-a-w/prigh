@@ -148,6 +148,9 @@ module Command = struct
         ; after_ms : int
         }
     | Focus of string
+    | Set_caret of int
+    (** the editor's caret, at this byte offset of the draft, once rendered
+        (and focused): after text was put in at the caret *)
     | Save_history of string list
     | Sign_out
     | Reveal of string list
@@ -1094,6 +1097,12 @@ let refresh_completion (m : Model.t) =
 ;;
 
 let edit m ?cursor text = refresh_completion (set_draft m ?cursor text)
+
+(* A programmatic edit: the browser would put the caret at the end. *)
+let edit_at_caret m ~cursor text =
+  let m, cmds = edit m ~cursor text in
+  m, cmds @ [ Command.Set_caret cursor ]
+;;
 
 let open_sessions (m : Model.t) =
   { m with sidebar_open = true }, [ Command.Focus "session-search" ]
@@ -2422,7 +2431,7 @@ let last_prompt (m : Model.t) =
 (* At the caret: the editor's, or where the last edit left it. *)
 let insert_snippet (m : Model.t) (snippet : Snippet.t) =
   let cursor = Int.clamp_exn m.cursor ~min:0 ~max:(String.length m.draft) in
-  edit
+  edit_at_caret
     m
     ~cursor:(cursor + String.length snippet.text)
     (String.prefix m.draft cursor
@@ -4250,6 +4259,16 @@ let accept_completion (m : Model.t) ~run =
          && Completion.Source.equal (Completion.source c) (Argument Models)
          && String.is_empty (Completion.prefix c)
          && Completion.selected c = 0 -> send m ~follow_up:false
+  | Some c
+    when Completion.Source.equal (Completion.source c) Snippet ->
+    (match
+       Option.bind (Completion.selected_item c) ~f:(fun item ->
+         Snippet.find (Option.value (snippets m) ~default:[]) item.id)
+     with
+     | Some snippet ->
+       let draft, cursor = Completion.insert_snippet c ~text:m.draft snippet in
+       edit_at_caret m ~cursor draft
+     | None -> m, [])
   | Some c ->
     let draft, cursor = Completion.accept c ~text:m.draft in
     let runs =
@@ -4265,11 +4284,11 @@ let accept_completion (m : Model.t) ~run =
          | Some { argument = Some _; _ } | None -> false)
       | Argument (Directory | Backend_directory | Path | Skill), _ -> false
       | Argument _, _ -> true
-      | (Command | Path), _ -> false
+      | (Command | Path | Snippet), _ -> false
     in
     if runs
     then send (set_draft m (String.strip draft)) ~follow_up:false
-    else edit m ~cursor draft
+    else edit_at_caret m ~cursor draft
 ;;
 
 let picker_accept (m : Model.t) ~kind (item : Picker.Item.t) =

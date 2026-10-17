@@ -6,3 +6,6 @@ open! Core
 (** The byte offset in [text] of the [utf16]th code unit (clamped to the
     text). *)
 val byte_offset : string -> utf16:int -> int
+
+(** The UTF-16 code units in the first [byte] bytes of [text]: the inverse. *)
+val units : string -> byte:int -> int

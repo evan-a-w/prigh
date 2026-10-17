@@ -260,6 +260,7 @@ let%expect_test "@ completes paths from the backend" =
     (Complete_move 1)
     (Complete_move 1)
     (Complete_accept (run false))
+    (Set_caret 22)
     "look at @src/main.mli "
     |}];
   (* Directories keep completing; a stale answer is ignored. *)
@@ -284,6 +285,7 @@ let%expect_test "@ completes paths from the backend" =
     (Complete_accept (run true))
     (Rpc (method_ list_paths) (params ((prefix src/macros/y/)))
      (tag (Paths src/macros/y/)))
+    (Set_caret 22)
     "look at @src/macros/y/"
     |}];
   (* Esc closes the popup; it does not stop anything. *)
@@ -409,6 +411,7 @@ let%expect_test "slash commands: the popup, arguments, running, unknown ones" =
   [%expect
     {|
     (Complete_accept (run false))
+    (Set_caret 6)
     "/mode "
     Modes ↑↓ Tab Enter Esc   Ctrl+Enter as typed
     ask bash, job_input, edits and MCP tools ask first
@@ -507,6 +510,7 @@ let%expect_test "/cd completes directories" =
     {|
     (Complete_accept (run true))
     (Rpc (method_ list_dirs) (params ((prefix src/))) (tag (Paths src/)))
+    (Set_caret 8)
     "/cd src/"
     |}];
   H.reply h "list_dirs" "[]";

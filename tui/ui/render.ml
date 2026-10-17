@@ -962,7 +962,7 @@ let autocomplete_block (ac : Autocomplete.t) ~width : Content.t =
          ; span ~style:(style dim) ("  " ^ help)
          ]
          ~width)
-   | Autocomplete.Source.Argument _ | Path | Directory _ | Skill ->
+   | Autocomplete.Source.Argument _ | Path | Directory _ | Skill | Snippet ->
      let label_width =
        List.fold shown ~init:0 ~f:(fun acc (item : Picker.Item.t) ->
          Int.max acc (Text_width.string item.label))

@@ -1,14 +1,15 @@
 open! Core
 open! Import
 
-(** The popup under the editor: slash commands, their arguments, and [@] paths.
-*)
+(** The popup under the editor: slash commands, their arguments, [@] paths and
+    [#] snippets. *)
 
 module Source : sig
   type t =
     | Command
     | Argument of Slash.Argument.t
     | Path (** [@path], listed by the backend ([list_paths]) *)
+    | Snippet (** [#name] at the start of a word: a snippet to insert *)
   [@@deriving sexp_of, equal]
 end
 
@@ -53,3 +54,7 @@ val move : t -> int -> t
     after it. Commands get a trailing space (but [skill:], whose skill name
     follows), and files and skills a space (directories keep completing). *)
 val accept : t -> text:string -> string * int
+
+(** The text with a [Snippet] completion's [#name] replaced by the snippet's
+    text, and the caret after it. *)
+val insert_snippet : t -> text:string -> Snippet.t -> string * int

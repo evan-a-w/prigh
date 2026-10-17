@@ -179,6 +179,24 @@ let%expect_test "browser carets (UTF-16) as byte offsets" =
     |}]
 ;;
 
+let%expect_test "byte offsets as browser carets (UTF-16), the round trip" =
+  let text = "日本 é😀x" in
+  List.iter [ 0; 3; 6; 7; 9; 13; 14; 20 ] ~f:(fun byte ->
+    let utf16 = Utf16.units text ~byte in
+    printf "%d -> %d -> %d\n" byte utf16 (Utf16.byte_offset text ~utf16));
+  [%expect
+    {|
+    0 -> 0 -> 0
+    3 -> 1 -> 3
+    6 -> 2 -> 6
+    7 -> 3 -> 7
+    9 -> 4 -> 9
+    13 -> 6 -> 13
+    14 -> 7 -> 14
+    20 -> 7 -> 14
+    |}]
+;;
+
 (* A retry scheduled before the network came back must not connect again
    once a newer attempt has (and the user moved on to another session). The
    newest goes ahead even with the socket open: an older attempt may have

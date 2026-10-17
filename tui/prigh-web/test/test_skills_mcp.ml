@@ -159,6 +159,7 @@ let%expect_test "/skill: completes skill names, fetched once" =
      (tag (Skills (place  "s1\
                          \nbackend\
                          \n/work") (purpose Complete))))
+    (Set_caret 7)
     ((m.draft /skill:) (m.cursor 7))
     |}];
   (* Typing on while it is being listed asks nothing more. *)
@@ -177,6 +178,7 @@ let%expect_test "/skill: completes skill names, fetched once" =
   [%expect
     {|
     (Complete_accept (run true))
+    (Set_caret 15)
     ((m.draft "/skill:release ") (m.cursor 15))
     |}];
   (* The arguments are not completed; Enter sends the prompt as typed, for
@@ -200,6 +202,7 @@ let%expect_test "/skill: completes skill names, fetched once" =
   [%expect
     {|
     (Complete_accept (run false))
+    (Set_caret 22)
     ((m.draft "/skill:frontend-design  the landing page") (m.cursor 22))
     |}]
 ;;

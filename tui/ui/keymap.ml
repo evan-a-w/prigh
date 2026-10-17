@@ -25,7 +25,7 @@ let bindings =
   ; b
       [ Key.plain Tab ]
       Complete
-      "complete a slash command / open the command picker"
+      "complete a slash command, @path or #snippet / open the command picker"
   ; b [ Key.plain Up ] Up "move up (editor line, history, or list row)"
   ; b [ Key.plain Down ] Down "move down (editor line, history, or list row)"
   ; b

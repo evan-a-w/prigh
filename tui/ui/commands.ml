@@ -300,5 +300,6 @@ let input_help =
     ; "!!command", "run a shell command without adding it to the context"
     ; "!&command", "run a shell command as a background job (/jobs)"
     ; "@path", "attach a file (Ctrl+R completes paths)"
+    ; "#name", "insert a snippet: Tab or Enter on its completion (/snippet)"
     ]
 ;;

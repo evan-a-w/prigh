@@ -8,6 +8,7 @@ module Source = struct
     | Path
     | Directory of { host : string option }
     | Skill
+    | Snippet
   [@@deriving sexp_of, equal]
 end
 
@@ -32,7 +33,7 @@ let set_items t items = { t with items; selected = 0 }
 let accepts_on_enter t =
   match t.source with
   | Source.Command -> true
-  | Argument _ | Path | Directory _ | Skill ->
+  | Argument _ | Path | Directory _ | Skill | Snippet ->
     t.navigated || not (String.is_empty t.prefix)
 ;;
 
@@ -465,6 +466,48 @@ let compute_at ~line ~col ~line_index =
   | None -> None
 ;;
 
+(* [#name] at the start of a word, the name starting with a letter or digit
+   so that [# Title] and [##] stay plain text; nothing when no snippet
+   matches (e.g. [#123]). *)
+let compute_hash ~line ~col ~line_index ~snippets =
+  let start =
+    match
+      String.rfindi (String.prefix line col) ~f:(fun _ c ->
+        Char.is_whitespace c)
+    with
+    | Some i -> i + 1
+    | None -> 0
+  in
+  let word =
+    let after = String.drop_prefix line start in
+    match String.lfindi after ~f:(fun _ c -> Char.is_whitespace c) with
+    | Some j -> String.prefix after j
+    | None -> after
+  in
+  match String.chop_prefix word ~prefix:"#" with
+  | Some name when String.length name > 0 && Char.is_alphanum name.[0] ->
+    let items =
+      Fuzzy.rank ~query:name snippets ~key:(fun (s : P.Snippet.t) -> s.name)
+      |> List.map ~f:(fun (s : P.Snippet.t) ->
+        Picker.Item.create
+          ~id:s.name
+          ~detail:(P.Snippet.first_line s)
+          ~search:s.name
+          ("#" ^ s.name))
+    in
+    Option.some_if
+      (not (List.is_empty items))
+      { source = Source.Snippet
+      ; prefix = name
+      ; line = line_index
+      ; start = start + 1
+      ; items
+      ; selected = 0
+      ; navigated = false
+      }
+  | _ -> None
+;;
+
 let directory ~host ~text =
   { source = Source.Directory { host = Some host }
   ; prefix = text
@@ -510,7 +553,10 @@ let compute
          ~default_dir_host
      with
      | Some _ as t -> t
-     | None -> compute_at ~line ~col ~line_index)
+     | None ->
+       Option.first_some
+         (compute_at ~line ~col ~line_index)
+         (compute_hash ~line ~col ~line_index ~snippets))
 ;;
 
 let accept t ~editor_text =
@@ -525,7 +571,7 @@ let accept t ~editor_text =
          (* [skill:] continues with the skill's name *)
          if String.is_suffix item.id ~suffix:":" then item.id else item.id ^ " "
        | Skill -> item.id ^ " "
-       | Argument _ | Path | Directory _ -> item.id)
+       | Argument _ | Path | Directory _ | Snippet -> item.id)
   in
   let before = String.prefix line t.start in
   let after = String.drop_prefix line (t.start + String.length t.prefix) in
@@ -533,4 +579,14 @@ let accept t ~editor_text =
   String.concat
     ~sep:"\n"
     (List.mapi lines ~f:(fun i text -> if i = t.line then line else text))
+;;
+
+let insert_snippet t editor (snippet : P.Snippet.t) =
+  let line = Option.value (List.nth (Editor.lines editor) t.line) ~default:"" in
+  let chars s = List.length (Text_width.uchars s) in
+  Editor.replace
+    editor
+    ~at:{ line = t.line; col = chars (String.prefix line (t.start - 1)) }
+    ~len:(1 + chars t.prefix)
+    snippet.text
 ;;

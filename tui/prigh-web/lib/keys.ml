@@ -35,7 +35,7 @@ let help =
   ; "Esc", "stop the run; close a dialog, popup or side answer"
   ; "↑ ↓", "earlier prompts (in an empty editor or its first line)"
   ; "Alt+↑", "take the last queued message back into the editor"
-  ; "Tab", "complete a /command, its argument or an @path"
+  ; "Tab", "complete a /command, its argument, an @path or a #snippet"
   ; ( "!cmd"
     , "run a shell command (!!cmd: not added to the context; !&cmd: as a \
        background job)" )

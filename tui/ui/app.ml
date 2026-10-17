@@ -2623,12 +2623,23 @@ let accept_autocomplete m ~submit_now =
     (match Autocomplete.selected_item ac with
      | None -> None
      | Some item ->
-       let text = Autocomplete.accept ac ~editor_text:(Editor.text m.editor) in
-       let m =
-         { m with editor = Editor.set_text m.editor text; autocomplete = None }
+       let editor =
+         match Autocomplete.source ac with
+         | Snippet ->
+           (match
+              P.Snippet.find (Option.value (snippets m) ~default:[]) item.id
+            with
+            | Some snippet -> Autocomplete.insert_snippet ac m.editor snippet
+            | None -> m.editor)
+         | _ ->
+           Editor.set_text
+             m.editor
+             (Autocomplete.accept ac ~editor_text:(Editor.text m.editor))
        in
+       let m = { m with editor; autocomplete = None } in
        let m, cmds =
          match Autocomplete.source ac, submit_now with
+         | Autocomplete.Source.Snippet, _ -> m, []
          | Autocomplete.Source.Command, true ->
            (match Commands.find item.id with
             | Some spec when Option.is_some spec.argument ->
