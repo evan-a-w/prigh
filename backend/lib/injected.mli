@@ -69,7 +69,7 @@ module Source : sig
         ; repeat : int option
         ; max : int option
         }
-    (** one of the config's [reminders], by its {!Reminder.label}; an
+    (** one of the session's reminders, by its {!Reminder.label}; an
         on-stop one with how often it fired in a row and may *)
     | Resume (** after a usage limit reset *)
     | Shell of { command : string } (** [!cmd]'s output *)

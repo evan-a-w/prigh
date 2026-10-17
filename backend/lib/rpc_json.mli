@@ -11,6 +11,12 @@ val timed_message : Timed_message.t -> Json.t
 
 val delta : Assistant_event.t -> Json.t
 val state : Agent.State.t -> Json.t
+
+(** [{"name", "text", "on": "stop", "max_repeats", "repeats"}] or [{"name",
+    "text", "every_turns"}]; [repeats]: the times it fired in a row, from
+    [stops] (see [Agent.State.reminder_stops]). *)
+val reminder : stops:int -> Reminder.t -> Json.t
+
 val config : Config.t -> Json.t
 val model : Model.t -> Json.t
 

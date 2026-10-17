@@ -183,8 +183,8 @@ module Source = struct
     | Goal_continuation { continuation; max } ->
       sprintf "Goal: continuing (%d/%d)" continuation max
     | Reminder { name; repeat = Some repeat; max = Some max } ->
-      sprintf "Reminder: %s (%d/%d)" (first_line name) repeat max
-    | Reminder { name; repeat = _; max = _ } -> "Reminder: " ^ first_line name
+      sprintf "Reminder %s (%d/%d)" (first_line name) repeat max
+    | Reminder { name; repeat = _; max = _ } -> "Reminder " ^ first_line name
     | Resume -> "Usage limit reset: carrying on"
     | Shell { command } ->
       sprintf "Output of $ %s added to the context" (first_line command)

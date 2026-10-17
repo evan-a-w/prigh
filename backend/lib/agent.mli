@@ -57,6 +57,9 @@ module State : sig
       (** no turn starts once [cost_usd] reaches it, see {!set_budget} *)
     ; goal : Goal.t option
     ; goal_max_continuations : int
+    ; reminders : Reminder.t list (** see {!add_reminder} *)
+    ; reminder_stops : int
+      (** the times on-stop reminders fired in a row since the user spoke *)
     ; resume_at : float option
       (** when a run stopped by a usage limit resumes (seconds since the
           epoch) *)
@@ -466,6 +469,27 @@ val clear_goal : t -> unit Or_error.t
 (** Makes a stopped or completed goal active again, with its continuations
     reset, and starts working on it when idle. *)
 val resume_goal : t -> unit Or_error.t
+
+(** {2 Reminders} *)
+
+(** The session's reminders (recorded in it), sent to the main agent, never
+    to a subagent: an on-stop one when the agent ends its turn with nothing
+    to wait for (after a goal's continuation, which takes precedence), up to
+    its [max_repeats] in a row until the user speaks; a periodic one at the
+    start of a run or between steps once its turns have passed. *)
+val reminders : t -> Reminder.t list
+
+(** Adds a reminder named [r1], [r2], ... (never reused in the session). *)
+val add_reminder
+  :  t
+  -> text:string
+  -> Reminder.Trigger.t
+  -> Reminder.t Or_error.t
+
+(** Fails with the session's reminder names when there is none by [name]. *)
+val remove_reminder : t -> string -> unit Or_error.t
+
+val clear_reminders : t -> unit Or_error.t
 
 (** When a run stops at a usage limit with no fallback model left, and the
     config's [resume_on_limit_reset] is on, it resumes by itself once the
