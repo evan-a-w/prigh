@@ -493,7 +493,9 @@ instructions; verbose unfolds it) above the arguments you typed, and
 their status, tool count or error and config file, the configuration's
 problems under them: Enter approves (and starts) a project's server,
 restarts a failed one, or lists a ready one's tools; `/mcp reconnect`
-restarts the failed ones and reports. `/fallback` completes a model for
+restarts the failed ones and reports. `/snippet` (Alt+N) is a picker of
+your snippets whose Enter inserts the text at the caret (see Snippets
+below). `/fallback` completes a model for
 each word, in order (or `off`), and shows the backend's error, with the
 closest models, for one it doesn't know; `/default-dir` completes
 directories on the backend's host, where new sessions start, and takes a
@@ -696,6 +698,7 @@ backend/_build/default/bin/main.exe serve      # JSON-lines RPC on stdio
 | Ctrl+P / Alt+P | cycle to the next / previous scoped model |
 | Ctrl+T | cycle the thinking level |
 | Alt+M | cycle the mode: ask → auto-edit → auto → plan (read-only) |
+| Alt+N | pick a snippet to insert at the cursor (`/snippet`) |
 | Ctrl+N | picker: toggle the named-only / logged-in-only filter |
 | Tab / Alt+A / Alt+D | `/sessions`: mark a session / archive or unarchive it / delete every archived one |
 | Ctrl+X | copy the last assistant message |
@@ -922,7 +925,8 @@ it is replaced by `approval_mode` when prigh saves the file),
 `permissions` (allow/ask/deny rules, below; edited by hand) and
 `default_model`/`default_thinking` (what new sessions start with unless
 `-model`/`-thinking` is given; `/change_default` saves the current ones),
-`notify` (`off`, `bell` or `desktop`; the TUI's `/notify`) and
+`notify` (`off`, `bell` or `desktop`; the TUI's `/notify`), `snippets`
+(texts to insert into the editor, `/snippet` below) and
 `auto_background_seconds` (default 30, `0` = never: when a foreground
 command moves to the background and how long a wait lasts, above).
 Without a `default_thinking`, sessions start with thinking `on`; models that
@@ -1058,6 +1062,7 @@ it.
 | `/host [name\|backend]` | pick where tools run, and the directory there |
 | `/abort` | abort the current run |
 | `/btw <question>` | ask a side question without interrupting the run |
+| `/snippet [NAME\|add NAME [TEXT]\|rm NAME]` | insert a snippet at the cursor without sending it (alone: a picker, also Alt+N); `add` saves one (TEXT is the rest of the prompt, new lines included; without it, your last prompt), `rm` deletes one |
 | `/skills`, `/skill:NAME [args]` | pick a skill (Enter puts `/skill:NAME ` in the editor for its arguments) / run one |
 | `/mcp [reconnect]` | MCP servers and their state: Enter approves a project's server or lists a ready one's tools; `reconnect` restarts failed ones |
 | `/retry-backend-connection` | reconnect to the backend now |
@@ -1085,6 +1090,20 @@ model how to read it); like a prompt they queue while a run is going, and
 an error (nothing to review, an unknown base, not a repository) says what
 to do. The transcript shows them as notes (`⚑ Review of uncommitted
 changes`, `▤ Write or improve AGENTS.md`), not as the long prompt.
+
+Snippets are texts you insert into the editor often, kept in `config.json`
+and shared by every frontend:
+`"snippets": [{"name": "review", "text": "Review the diff for bugs..."}]`
+(names are one word and unique, texts non-empty and may span lines; a bad
+entry is reported with where it is and what to fix). `/snippet` or Alt+N
+opens a picker filtering names and texts; Enter inserts the text at the
+cursor, without sending it, and Esc changes nothing. `/snippet NAME`
+inserts one directly (Tab completes names; an unknown one is refused with
+the closest names). `/snippet add NAME TEXT` saves (or replaces) one: TEXT
+is everything after the name, new lines included (Ctrl+J in the TUI,
+Shift+Enter in prigh-web), and without it the last prompt you sent is
+saved. `/snippet rm NAME` deletes one. Both save through `set_config` with
+only `snippets`, and say what they did.
 
 Notifications: the TUI's `/notify` sets `notify` in `config.json` (`bell`
 by default; `desktop` sends OSC 9, or OSC 777 to foot and urxvt, wrapped

@@ -801,7 +801,8 @@ two can share one.
   absent, which saving replaces), `permissions` (allow/ask/deny rules;
   saving keeps the file's as written), `default_model`/`default_thinking`,
   `fallback_models` (model keys), `default_cwd`, `max_budget_usd`,
-  `goal_max_continuations` and `resume_on_limit_reset`), loaded at agent
+  `goal_max_continuations`, `resume_on_limit_reset` and `snippets`, the
+  frontends' `/snippet` texts, validated by `Snippet`), loaded at agent
   creation, read/written through `get_config`/`set_config`; unknown fields
   are ignored by `load` but reported by `problems` (with wrong-typed ones),
   which `Model_registry` adds to its problems along with an unknown
@@ -1314,6 +1315,12 @@ copy of the protocol types and the e2e test guards the contract.
     current one.
     `/tree` hangs each message under the nearest message above it, skipping
     settings entries (model, name, cwd, archived).
+  - Snippets: `Snippet_command` (shared with prigh-web) turns `/snippet`'s
+    arguments into an action: the picker (also Alt+N, `Snippet_picker`),
+    inserting at the cursor, or the whole new `Config.snippets` list to save
+    with `set_config` (only that field; `Snippets_saved` acknowledges with
+    the config the backend replies). `Autocomplete`'s `Snippet` argument
+    completes names, `add` and `rm`.
   - Model hand-over and default directory: `/fallback` and `/default-dir`
     show `Config`'s `fallback_models`/`default_cwd`, or send `set_config`
     with only that field. The backend keeps the fields a `set_config`
@@ -1808,6 +1815,11 @@ copy of the protocol types and the e2e test guards the contract.
       (servers to act on first; the problems under it, in `Dialog_view`),
       `/mcp reconnect`'s report and what became of an approved or restarted
       server; a ready one's tools are the `Mcp_tools` dialog.
+    - Snippets: `/snippet` runs `Prigh_ui.Snippet_command`; the picker
+      (Alt+N, which passes the editor's caret) inserts at the caret.
+      `Slash.parse` lets `/snippet add` span lines. Saving sends
+      `set_config` with only `snippets`, shown at once; a refused
+      `Config_saved` refetches the config so the page shows the backend's.
     - Model hand-over: `/fallback` and `/default-dir` send `set_config`
       with only the field they change (as `/confirm` and `/scoped-models`
       do), and show the config the backend replies with (`/fallback`'s
@@ -1926,7 +1938,7 @@ copy of the protocol types and the e2e test guards the contract.
   `["End",{id,at,run,turns,tool_calls,result}]`, `["Run",{run}]`).
 - `~/.prigh/sessions/exports/` — default `/export` output.
 - `~/.prigh/history` — prompt history (one JSON string per line, last 500).
-- `~/.prigh/config.json` — `scoped_models`, `approval_mode`, `permissions`, `notify`, `providers`
+- `~/.prigh/config.json` — `scoped_models`, `approval_mode`, `permissions`, `notify`, `snippets`, `providers`
   (custom endpoints; their keys are in `auth.json` under their names).
 - `~/.prigh/AGENTS.md` — global instructions.
 
