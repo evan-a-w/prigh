@@ -125,7 +125,8 @@ end
 
 function A:_start(on_ready)
   self:_set_conn_state("starting")
-  local conn, err = acp.start({
+  local conn, err
+  conn, err = acp.start({
     cmd = config.options.cmd,
     cwd = self.cwd,
     env = config.options.env,
@@ -164,7 +165,11 @@ function A:_start(on_ready)
     if result.protocolVersion ~= M.protocol_version then
       self:_notice(
         "error",
-        string.format("the agent speaks ACP version %s; prigh.nvim speaks %d", tostring(result.protocolVersion), M.protocol_version),
+        string.format(
+          "the agent speaks ACP version %s; prigh.nvim speaks %d",
+          tostring(result.protocolVersion),
+          M.protocol_version
+        ),
         "update prigh and prigh.nvim to matching versions"
       )
       self:stop()
@@ -198,7 +203,7 @@ function A:_on_exit(code, signal, stopping)
     "error",
     string.format(
       "%s exited unexpectedly (%s)%s",
-      config.options.cmd[1],
+      vim.fs.basename(config.options.cmd[1]),
       signal and signal ~= 0 and ("signal " .. signal) or ("code " .. tostring(code)),
       was_running and " during a turn" or ""
     ),
@@ -254,7 +259,8 @@ function A:new_session(cb)
   end
   self.conn:request("session/new", { cwd = self.cwd, mcpServers = {} }, function(err, result)
     if err then
-      local hint = err.code == -32000 and "the agent needs authentication: log in with prigh in a terminal, then :PrighRestart"
+      local hint = err.code == -32000
+          and "the agent needs authentication: log in with prigh in a terminal, then :PrighRestart"
         or ":PrighLog shows the agent's output"
       self:_notice("error", "session/new failed: " .. tostring(err.message), hint)
       return
@@ -281,7 +287,11 @@ function A:load_session(id, cb)
     self.session:close_streams()
     if err then
       self.session.id = nil
-      self:_notice("error", string.format("could not load session %s: %s", id, tostring(err.message)), "starting a new session instead")
+      self:_notice(
+        "error",
+        string.format("could not load session %s: %s", id, tostring(err.message)),
+        "starting a new session instead"
+      )
       return cb and cb(err)
     end
     self:_session_result(result or {})
@@ -376,7 +386,7 @@ function A:_turn_changes()
   local changed = {}
   for _, c in ipairs(fs.changed_files()) do
     if not (self.turn_start and self.turn_start[c.path]) then
-      table.insert(changed, vim.fn.fnamemodify(c.path, ":~:."))
+      table.insert(changed, render.rel(c.path, self.cwd))
     end
   end
   if #changed > 0 then

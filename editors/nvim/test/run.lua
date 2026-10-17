@@ -19,11 +19,19 @@ local jobs = {}
 for _, name in ipairs(cases) do
   local home = vim.fn.tempname()
   vim.fn.mkdir(home, "p")
-  jobs[name] = vim.system({ vim.v.progpath, "--headless", "-u", "NONE", "-i", "NONE", "-n", "-l", dir .. "/run_case.lua", name }, {
-    text = true,
-    cwd = home,
-    env = { XDG_DATA_HOME = home .. "/data", XDG_STATE_HOME = home .. "/state", XDG_CONFIG_HOME = home .. "/config", XDG_CACHE_HOME = home .. "/cache" },
-  })
+  jobs[name] = vim.system(
+    { vim.v.progpath, "--headless", "-u", "NONE", "-i", "NONE", "-n", "-l", dir .. "/run_case.lua", name },
+    {
+      text = true,
+      cwd = home,
+      env = {
+        XDG_DATA_HOME = home .. "/data",
+        XDG_STATE_HOME = home .. "/state",
+        XDG_CONFIG_HOME = home .. "/config",
+        XDG_CACHE_HOME = home .. "/cache",
+      },
+    }
+  )
 end
 for _, name in ipairs(cases) do
   local res = jobs[name]:wait(60000)
@@ -35,10 +43,10 @@ for _, name in ipairs(cases) do
     f:close()
   end
   if got == want and res.code == 0 then
-    print("ok   " .. name)
+    io.stdout:write("ok   " .. name .. "\n")
   else
     table.insert(failed, name)
-    print("FAIL " .. name .. (res.code ~= 0 and (" (exit " .. res.code .. ")") or ""))
+    io.stdout:write("FAIL " .. name .. (res.code ~= 0 and (" (exit " .. res.code .. ")") or "") .. "\n")
     if got ~= want then
       io.stdout:write(vim.text.diff(want, got, { ctxlen = 2 }) or "")
     end
@@ -46,12 +54,12 @@ for _, name in ipairs(cases) do
       local o = assert(io.open(path, "w"))
       o:write(got)
       o:close()
-      print("     promoted " .. path)
+      io.stdout:write("     promoted " .. path .. "\n")
     end
   end
 end
 if #failed > 0 then
-  print(string.format("%d/%d failed: %s", #failed, #cases, table.concat(failed, " ")))
+  io.stdout:write(string.format("%d/%d failed: %s", #failed, #cases, table.concat(failed, " ")) .. "\n")
   os.exit(1)
 end
-print(string.format("all %d passed", #cases))
+io.stdout:write(string.format("all %d passed", #cases) .. "\n")

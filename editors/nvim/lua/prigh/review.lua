@@ -154,7 +154,7 @@ function R:summary()
   local acc, rej, und = self:counts()
   local s = string.format(
     "review %s: %d hunk%s, %d accepted, %d rejected, %d left · ]h/[h move · ga/gr accept/reject · gA/gR all · q discard",
-    vim.fn.fnamemodify(self.title, ":~:."),
+    self.title ~= "" and vim.fn.fnamemodify(self.title, ":~:.") or "[No Name]",
     #self.hunks,
     #self.hunks == 1 and "" or "s",
     acc,

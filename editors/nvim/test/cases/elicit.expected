@@ -1,0 +1,99 @@
+notify: prigh asks: How should I proceed?
+select: Strategy
+  conservative
+  aggressive
+  -> aggressive
+input: name: Branch name:  [default "fix"] -> "my-branch"
+select: push (optional)
+  yes
+  no
+  -> yes
+input: tries (optional):  [default ""] -> "x"
+notify (warn): prigh: tries must be an integer
+input: tries (optional):  [default ""] -> "3"
+select: How should I proceed?
+          strategy: aggressive
+          name: my-branch
+          push: true
+          tries: 3
+  Submit
+  Edit again
+  Decline
+  Cancel
+  -> Submit
+notify: prigh asks: How should I proceed?
+select: Strategy
+  conservative
+  aggressive
+  -> conservative
+input: name: Branch name:  [default "fix"] -> ""
+notify (warn): prigh: name is required
+input: name: Branch name:  [default "fix"] -> "fix-2"
+select: push (optional)
+  yes
+  no
+  -> no
+input: tries (optional):  [default ""] -> ""
+select: How should I proceed?
+          strategy: conservative
+          name: fix-2
+          push: false
+          tries: (empty)
+  Submit
+  Edit again
+  Decline
+  Cancel
+  -> Edit again
+select: Strategy
+  conservative
+  aggressive
+  -> aggressive
+input: name: Branch name:  [default "fix-2"] -> "b"
+select: push (optional)
+  yes
+  no
+  -> no
+input: tries (optional):  [default ""] -> "1"
+select: How should I proceed?
+          strategy: aggressive
+          name: b
+          push: false
+          tries: 1
+  Submit
+  Edit again
+  Decline
+  Cancel
+  -> Submit
+notify: prigh asks: How should I proceed?
+select: Strategy
+  conservative
+  aggressive
+  -> conservative
+input: name: Branch name:  [default "fix"] -> "n"
+select: push (optional)
+  yes
+  no
+  -> no
+input: tries (optional):  [default ""] -> ""
+select: How should I proceed?
+          strategy: conservative
+          name: n
+          push: false
+          tries: (empty)
+  Submit
+  Edit again
+  Decline
+  Cancel
+  -> Decline
+notify: prigh asks: How should I proceed?
+select: Strategy
+  conservative
+  aggressive
+  -> cancel
+agent got: {"id":0,"method":"initialize","params":{"clientCapabilities":{"_meta":{"prigh":{"state":true}},"elicitation":{"form":{}},"fs":{"readTextFile":true,"writeTextFile":true},"session":{"configOptions":{"boolean":{}},"notices":{}},"terminal":false},"clientInfo":{"name":"prigh.nvim","title":"prigh.nvim","version":"0.1.0"},"protocolVersion":1}}
+agent got: {"id":1,"method":"session/new","params":{"cwd":"<tmp>","mcpServers":[]}}
+agent got: {"id":1000,"result":{"action":"accept","content":{"name":"my-branch","push":true,"strategy":"aggressive","tries":3}}}
+agent got: {"id":1001,"result":{"action":"accept","content":{"name":"b","push":false,"strategy":"aggressive","tries":1}}}
+agent got: {"id":1002,"result":{"action":"decline"}}
+agent got: {"id":1003,"result":{"action":"cancel"}}
+agent got: {"error":{"code":-32602,"message":"prigh.nvim only supports form elicitation"},"id":1004}
