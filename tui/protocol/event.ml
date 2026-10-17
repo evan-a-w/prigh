@@ -178,9 +178,7 @@ let rec of_json j =
     Tool_confirm_done { call_id; agent_id }
   | "ask_user_done" ->
     let%bind call_id = Json.string_field j "call_id" in
-    let%map timed_out =
-      Json.bool_default_field j "timed_out" ~default:false
-    in
+    let%map timed_out = Json.bool_default_field j "timed_out" ~default:false in
     Ask_user_done { call_id; timed_out }
   | "ask_user" -> Pending.Ask.of_json j >>| fun a -> Ask_user a
   | "state" ->

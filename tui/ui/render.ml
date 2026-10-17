@@ -1035,7 +1035,9 @@ let screen (m : App.Model.t) : Screen.t =
       in
       confirm_dialog ~width c, rows, cursor
     | Question { form; _ } ->
-      let dialog, cursor = question_dialog ~width ~utc_offset:m.utc_offset form in
+      let dialog, cursor =
+        question_dialog ~width ~utc_offset:m.utc_offset form
+      in
       dialog, [], cursor
     | Confirm { question; _ } ->
       let rows, cursor =

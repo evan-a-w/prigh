@@ -547,7 +547,10 @@ let%expect_test "ask_user: a dialog per question; Enter answers, Esc declines" =
   H.event
     h
     (Ask_user
-       { call_id = "q2"; questions = [ List.last_exn questions ]; deadline = None });
+       { call_id = "q2"
+       ; questions = [ List.last_exn questions ]
+       ; deadline = None
+       });
   H.esc h;
   H.mode h;
   [%expect
@@ -767,8 +770,7 @@ let%expect_test
 ;;
 
 let%expect_test
-    "ask_user: the dialog says when the agent carries on; a timeout closes \
-     it"
+    "ask_user: the dialog says when the agent carries on; a timeout closes it"
   =
   let h = Test_app.connected ~height:14 () in
   H.step h (Set_utc_offset (Time_ns.Span.of_hr 2.));
@@ -783,7 +785,8 @@ let%expect_test
        ; deadline = Some deadline
        });
   H.show h;
-  [%expect {|
+  [%expect
+    {|
       prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
     ▌ earlier question
@@ -802,11 +805,12 @@ let%expect_test
   H.event
     h
     (Notice
-       "the question was not answered within 10m; the agent carries on \
-        without it");
+       "the question was not answered within 10m; the agent carries on without \
+        it");
   H.mode h;
   H.show h;
-  [%expect {|
+  [%expect
+    {|
     editing
 
 
