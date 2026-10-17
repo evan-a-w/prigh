@@ -217,7 +217,7 @@ let wire_tool (t : Tool_spec.t) =
 ;;
 
 let request_body ~(endpoint : Endpoint.t) (r : Provider.Request.t) : Json.t =
-  let r = Provider.Request.omit_unsupported_images r in
+  let r = Provider.Request.prepare r in
   let provider = Endpoint.provider_id endpoint in
   let freeform name =
     List.exists r.tools ~f:(fun (t : Tool_spec.t) ->

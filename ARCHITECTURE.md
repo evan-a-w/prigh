@@ -236,6 +236,14 @@ while it is waiting on the browser.
 - `Provider` — the provider interface: `stream : Request.t -> cancel ->
   on_event -> Message.Assistant.t`. Providers never raise for network or API
   failures; those come back as an `Error`/`Aborted` stop reason.
+  `Request.prepare` (every provider's first step) applies
+  `Tool_pairing.repair`, so every tool call is answered right after its
+  message (a call left without a result, e.g. by a backend that stopped
+  while it ran, gets an `[interrupted: ...]` error result; stray results
+  are dropped), then omits images the model cannot see. `Agent.start_run`
+  also records those interrupted results in the session
+  (`Tool_pairing.unanswered`) before anything else is appended, so the
+  transcript shows them.
 
 ### Providers
 
