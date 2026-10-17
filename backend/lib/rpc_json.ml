@@ -528,9 +528,11 @@ let rec event ?now (e : Agent.Event.t) =
       ; "steer_texts", `Array (List.map steer ~f:str)
       ; "follow_up_texts", `Array (List.map follow_up ~f:str)
       ]
-    | Tool_exec { host; exec_id; call_id; name; arguments; cwd; stdin } ->
+    | Tool_exec
+        { host; session_id; exec_id; call_id; name; arguments; cwd; stdin } ->
       [ "event", str "tool_exec"
       ; "host", str host
+      ; "session_id", str session_id
       ; "exec_id", str exec_id
       ; "call_id", str call_id
       ; "name", str name

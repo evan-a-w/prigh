@@ -94,7 +94,7 @@ let binary_note path =
     else None
 ;;
 
-let read_file ~env ~cancel ~seen ~cwd path =
+let read_file ~env ~cancel ~seen ~files ~cwd path =
   let resolved = Tool.resolve ~cwd path in
   match
     match Sys_unix.is_file resolved with
@@ -102,7 +102,7 @@ let read_file ~env ~cancel ~seen ~cwd path =
     | `No | `Unknown -> None
   with
   | Some note -> Tool.Result.ok note
-  | None -> Tool_read.read_for_context ~env ~cancel ?seen ~cwd path
+  | None -> Tool_read.read_for_context ~env ~cancel ?seen ~files ~cwd path
 ;;
 
 let instructions_op = "$instructions"
@@ -332,6 +332,7 @@ let execute
       ~mcp:hub
       ~env
       ?stdin
+      ?(files = File_access.local)
       ~cancel
       ~on_output
       ~cwd
@@ -369,7 +370,13 @@ let execute
   then (
     match string_arg "path" with
     | Ok path ->
-      read_file ~env ~cancel ~seen:(Seen_files.of_args arguments) ~cwd path
+      read_file
+        ~env
+        ~cancel
+        ~seen:(Seen_files.of_args arguments)
+        ~files
+        ~cwd
+        path
     | Error e -> Tool.Result.error (Error.to_string_hum e))
   else if String.equal name list_paths_op
   then (
@@ -405,7 +412,7 @@ let execute
     | None -> Tool.Result.error (sprintf "unknown host tool %S" name)
     | Some tool ->
       let context =
-        Tool.Context.create ~cancel ~on_output ?stdin ~env ~cwd ()
+        Tool.Context.create ~cancel ~on_output ?stdin ~files ~env ~cwd ()
       in
       Tool.execute tool context arguments)
 ;;

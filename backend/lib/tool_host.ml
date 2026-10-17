@@ -67,6 +67,15 @@ module Reply = struct
   ;;
 end
 
+let worker_kind = function
+  | "tool_exec" -> Some "exec"
+  | "tool_exec_cancel" -> Some "cancel"
+  | "tool_exec_input" -> Some "input"
+  | ("terminal_open" | "terminal_frame" | "terminal_close" | "terminal_kill") as
+    kind -> Some kind
+  | _ -> None
+;;
+
 (* The execs and terminal viewers of one frontend or connection. *)
 module Worker = struct
   type t =
@@ -75,18 +84,29 @@ module Worker = struct
     ; terminals : Terminals.t Lazy.t
     ; mcp : Mcp_hub.t
     ; default_cwd : string
+    ; files : session_id:string option -> call_id:string option -> File_access.t
     ; send : Reply.t -> unit
     ; running : Cancellation.t String.Table.t
     ; inputs : Stdin_feed.t String.Table.t (** execs whose stdin stays open *)
     ; viewers : Terminal_channel.Fed.t String.Table.t
     }
 
-  let create ~env ~sw ~terminals ~mcp ~default_cwd ~send =
+  let create
+        ~env
+        ~sw
+        ~terminals
+        ~mcp
+        ~default_cwd
+        ?(files = fun ~session_id:_ ~call_id:_ -> File_access.local)
+        ~send
+        ()
+    =
     { env
     ; sw
     ; terminals
     ; mcp
     ; default_cwd
+    ; files
     ; send
     ; running = String.Table.create ()
     ; inputs = String.Table.create ()
@@ -111,6 +131,11 @@ module Worker = struct
         | arguments -> arguments
       in
       let cwd = Option.value (string_field json "cwd") ~default:t.default_cwd in
+      let files =
+        t.files
+          ~session_id:(string_field json "session_id")
+          ~call_id:(string_field json "call_id")
+      in
       let cancel = Cancellation.create () in
       Hashtbl.set t.running ~key:exec_id ~data:cancel;
       let stdin =
@@ -128,6 +153,7 @@ module Worker = struct
               ~mcp:(Some t.mcp)
               ~env:t.env
               ?stdin
+              ~files
               ~cancel
               ~on_output:(fun chunk -> t.send (Output { exec_id; chunk }))
               ~cwd
@@ -228,6 +254,12 @@ module Worker = struct
     | _ -> ()
   ;;
 
+  let handle_event t json =
+    Option.iter
+      (Option.bind (string_field json "event") ~f:worker_kind)
+      ~f:(fun kind -> handle t ~kind json)
+  ;;
+
   let stop t =
     Hashtbl.iter t.running ~f:Cancellation.cancel;
     Hashtbl.iter t.viewers ~f:Terminal_channel.Fed.close;
@@ -308,6 +340,7 @@ let run ~env ?terminals ~input ~output () =
           outbox
           (`Object
               (("type", `String (Reply.worker_type reply)) :: Reply.fields reply)))
+      ()
   in
   read_lines input ~f:(fun json ->
     Option.iter (string_field json "type") ~f:(fun kind ->
@@ -319,14 +352,7 @@ let run ~env ?terminals ~input ~output () =
   Outbox.close outbox
 ;;
 
-let worker_kind = function
-  | "tool_exec" -> Some "exec"
-  | "tool_exec_cancel" -> Some "cancel"
-  | "tool_exec_input" -> Some "input"
-  | ("terminal_open" | "terminal_frame" | "terminal_close" | "terminal_kill") as
-    kind -> Some kind
-  | _ -> None
-;;
+let features = [ "exec_input"; "terminal_kill" ]
 
 (* One connection: [`Served] once [hello] succeeded, [`Refused] when the
    backend rejected the credentials, else why it did not. *)
@@ -375,15 +401,19 @@ let serve_connection
                  ; Some ("cwd", `String cwd)
                  ; Some ("tools", `True)
                  ; Some ("host_id", `String host_id)
-                 ; Some
-                     ( "features"
-                     , `Array [ `String "exec_input"; `String "terminal_kill" ]
-                     )
+                 ; Some ("features", `Array (List.map features ~f:(fun f -> `String f)))
                  ]) )
         ]);
   let worker =
-    Worker.create ~env ~sw ~terminals ~mcp ~default_cwd:cwd ~send:(fun reply ->
-      request (Reply.method_ reply) (`Object (Reply.fields reply)))
+    Worker.create
+      ~env
+      ~sw
+      ~terminals
+      ~mcp
+      ~default_cwd:cwd
+      ~send:(fun reply ->
+        request (Reply.method_ reply) (`Object (Reply.fields reply)))
+      ()
   in
   let outcome = ref (`Failed (sprintf "disconnected from %s" address)) in
   let reader = Eio.Buf_read.of_flow flow ~max_size:(64 * 1024 * 1024) in
@@ -436,9 +466,7 @@ let serve_connection
                 true
               | _ -> true)
            | Some "event", _ ->
-             Option.iter
-               (Option.bind (string_field json "event") ~f:worker_kind)
-               ~f:(fun kind -> Worker.handle worker ~kind json);
+             Worker.handle_event worker json;
              true
            | _ -> true)
       in

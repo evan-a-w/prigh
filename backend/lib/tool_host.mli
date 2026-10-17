@@ -25,6 +25,47 @@ open! Import
     content is the {!Terminals} protocol. Each exec and terminal runs in its
     own fiber. *)
 
+(** What a backend sends a tool host and what it answers with, for a client
+    that is a tool host besides other things (the ACP adapter). *)
+module Reply : sig
+  type t
+
+  (** [tool_exec_output], [tool_exec_result], [terminal_frame] or
+      [terminal_closed]: the RPC method relaying it to the backend. *)
+  val method_ : t -> string
+
+  val fields : t -> (string * Json.t) list
+end
+
+module Worker : sig
+  type t
+
+  (** [files] is where an exec's file tools read and write contents, given
+      the session ([tool_exec]'s [session_id]) and the tool call it runs
+      for (default: the disk). *)
+  val create
+    :  env:Env.t
+    -> sw:Switch.t
+    -> terminals:Terminals.t Lazy.t
+    -> mcp:Mcp_hub.t
+    -> default_cwd:string
+    -> ?files:(session_id:string option -> call_id:string option -> File_access.t)
+    -> send:(Reply.t -> unit)
+    -> unit
+    -> t
+
+  (** Handles a backend event meant for tool hosts ([tool_exec],
+      [tool_exec_cancel], [tool_exec_input], [terminal_*]); ignores the
+      others. *)
+  val handle_event : t -> Json.t -> unit
+
+  (** Cancels the running execs and closes the terminal viewers. *)
+  val stop : t -> unit
+end
+
+(** What a tool host announces in [hello]'s [features]. *)
+val features : string list
+
 (** Serves JSON lines until [input] ends. [terminals] defaults to
     {!Terminals.create}'s defaults, created on first use. *)
 val run

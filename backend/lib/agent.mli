@@ -100,6 +100,7 @@ module Event : sig
         }
     | Tool_exec of
         { host : string (** only delivered to this host *)
+        ; session_id : string (** the session whose tool call it is *)
         ; exec_id : string
         ; call_id : string
         ; name : string

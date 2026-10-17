@@ -31,6 +31,9 @@ and context =
   ; stdin : Stdin_feed.t option
     (** input for the process this call starts (a background job's [bash]);
         without it the process's stdin is empty *)
+  ; files : File_access.t
+    (** where [read], [edit], [write] and [apply_patch] read and write file
+        contents (default: the disk) *)
   ; approve : approver
     (** checks a model's tool call before it runs (the session's approval
         mode and rules, see [Approval]); subagents inherit it *)
@@ -65,6 +68,7 @@ module Context : sig
     -> ?cache_key:string
     -> ?halt:(unit -> string option)
     -> ?stdin:Stdin_feed.t
+    -> ?files:File_access.t
     -> ?approve:approver
     -> ?ask_user:
          (call_id:string

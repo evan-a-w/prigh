@@ -40,7 +40,7 @@ let run (context : Tool.Context.t) args =
       Seen_files.check_overwrite
         seen
         ~path
-        ~current:(In_channel.read_all path)
+        ~current:(File_access.read context.files path)
         ~what:("overwrite " ^ path)
         ~retry:"write it again (or edit it to change parts of it)"
     else Ok ()
@@ -48,7 +48,7 @@ let run (context : Tool.Context.t) args =
   | Error message -> Tool.Result.error message
   | Ok () ->
     mkdir_p (Filename.dirname path);
-    Out_channel.write_all path ~data:content;
+    File_access.write context.files path ~data:content;
     Option.iter seen ~f:(Seen_files.record ~path ~contents:content);
     let n = Truncate.count_lines content in
     Tool.Result.ok

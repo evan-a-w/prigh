@@ -21,6 +21,7 @@ and context =
   ; cache_key : string option
   ; halt : unit -> string option
   ; stdin : Stdin_feed.t option
+  ; files : File_access.t
   ; approve : approver
   ; ask_user :
       call_id:string
@@ -64,6 +65,7 @@ module Context = struct
         ?cache_key
         ?(halt = fun () -> None)
         ?stdin
+        ?(files = File_access.local)
         ?(approve = fun _ _ _ -> None)
         ?(ask_user =
           fun ~call_id:_ ~timeout_seconds:_ _ ->
@@ -86,6 +88,7 @@ module Context = struct
     ; cache_key
     ; halt
     ; stdin
+    ; files
     ; approve
     ; ask_user
     }
