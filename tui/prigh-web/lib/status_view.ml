@@ -116,6 +116,23 @@ let goal (state : State.t) ~inject =
       [ icon Target; Node.text text ]
 ;;
 
+let reminders (state : State.t) ~inject =
+  match state.reminders with
+  | [] -> Node.none
+  | reminders ->
+    chip
+      ~cls:"reminders"
+      ~title:
+        (String.concat
+           ~sep:"\n"
+           (sprintf
+              "Reminders (/remind lists them, /remind rm NAME removes one):"
+            :: List.map reminders ~f:Prigh_ui.Remind_command.describe))
+      ~command:"/remind"
+      ~inject
+      [ icon Restart; Node.textf "Remind %d" (List.length reminders) ]
+;;
+
 let resume (m : App.Model.t) (state : State.t) ~inject =
   match state.resume_at with
   | None -> Node.none
@@ -308,6 +325,7 @@ let view (m : App.Model.t) ~inject =
           ]
       ; cost state ~inject
       ; goal state ~inject
+      ; reminders state ~inject
       ; resume m state ~inject
       ; (if queued > 0
          then

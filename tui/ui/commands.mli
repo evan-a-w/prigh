@@ -27,6 +27,7 @@ module Argument : sig
     | Goal (** [off], [resume], or the goal *)
     | Resume (** [now] or [cancel] *)
     | Snippet (** a snippet name, [add] or [rm] *)
+    | Remind (** a [/remind] subcommand, or a reminder name after [rm] *)
   [@@deriving sexp_of, equal]
 end
 

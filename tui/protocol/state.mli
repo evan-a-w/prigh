@@ -44,6 +44,7 @@ type t =
   ; jobs : Job.t list
   ; budget_usd : float option (** no turn starts once [cost_usd] reaches it *)
   ; goal : Goal.t option
+  ; reminders : Reminder.t list (** [/remind] *)
   ; resume_at : Time_ns.t option
     (** when a run stopped by a usage limit resumes by itself *)
   ; approval_mode : Approval_mode.t

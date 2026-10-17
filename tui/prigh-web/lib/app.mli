@@ -90,6 +90,11 @@ module Reply_tag : sig
     | Refresh_sessions (** on success, list the sessions again *)
     | Login_started
     | Notice of string (** shown on success *)
+    | Reminder of
+        { command : string (** back into the editor if refused *)
+        ; notice : string option
+          (** shown on success; [None]: the reminder added, by its name *)
+        }
     | Reconnect of int (** generation; stale replies are ignored *)
     | Config (** [get_config] *)
     | Config_saved of string (** the new config; the notice is shown *)
@@ -325,6 +330,7 @@ module Action : sig
     | Dequeue (** the last queued message back into the editor *)
     | Edit_queued of Queued.Message.t (** back into the editor *)
     | Remove_queued of Queued.Message.t
+    | Remove_reminder of string (** by name, from the [/remind] picker *)
     | Toggle_sidebar
     | Answer_confirm of
         { call_id : string

@@ -23,6 +23,7 @@ module Argument = struct
     | Goal
     | Resume
     | Snippet
+    | Remind
   [@@deriving sexp_of, equal]
 end
 
@@ -127,6 +128,13 @@ let all =
       "[text|off|resume]"
       "set a goal the agent keeps working toward until it is met; show, clear \
        or resume it"
+  ; c
+      ~argument:Argument.Remind
+      "remind"
+      "[stop|every|rm|off ...]"
+      "stop [N] TEXT: remind the agent when it ends its turn (at most N times \
+       in a row, default 3); every N TEXT: every N turns; rm NAME, off: remove \
+       one or all; none: list the session's (Ctrl+D removes one)"
   ; c
       ~argument:Argument.Resume
       "resume"

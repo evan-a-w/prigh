@@ -177,7 +177,7 @@ let argument_items
       [ "now", "retry the run at once"
       ; "cancel", "stay stopped until you send a message"
       ]
-  | Models | Directory | Backend_directory | Path -> []
+  | Models | Directory | Backend_directory | Path | Remind -> []
 ;;
 
 let word_at text ~cursor =
@@ -210,6 +210,7 @@ let compute
       ?(users = [])
       ?(skills = [])
       ?(snippets = [])
+      ?(reminders = [])
       ~text
       ~cursor
       ~models
@@ -283,6 +284,26 @@ let compute
                 with
                 | [] -> None
                 | items -> Some (make (Argument kind) ~prefix:word ~start items))
+             | Remind ->
+               let rest = String.lstrip rest in
+               Option.bind
+                 (Prigh_ui.Remind_command.complete ~reminders rest)
+                 ~f:(fun (offset, candidates) ->
+                   let prefix = String.drop_prefix rest offset in
+                   match
+                     rank
+                       ~prefix
+                       (List.map candidates ~f:(fun (id, detail) ->
+                          Picker.Item.create ~id ~search:id ~detail id))
+                   with
+                   | [] -> None
+                   | items ->
+                     Some
+                       (make
+                          (Argument kind)
+                          ~prefix
+                          ~start:(start + offset)
+                          items))
              | Snippet when String.exists prefix ~f:Char.is_whitespace -> None
              | Goal | Budget ->
                (* Free text: only an exact start of a keyword offers it, so
@@ -359,7 +380,11 @@ let compute
         | _ -> None))
 ;;
 
-let same a b = Source.equal a.source b.source && String.equal a.prefix b.prefix
+let same a b =
+  Source.equal a.source b.source
+  && String.equal a.prefix b.prefix
+  && a.start = b.start
+;;
 
 let request t =
   let prefix = "prefix", `String t.prefix in
