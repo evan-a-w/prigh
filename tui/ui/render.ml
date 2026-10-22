@@ -18,6 +18,10 @@ let agent_symbol (m : App.Model.t) (a : Agent_view.t) =
   | Agent_view.Status.Failed _ -> "✗"
 ;;
 
+let doing m =
+  Option.value (Activity.brief (App.Model.activity m)) ~default:"working"
+;;
+
 (* The status line is quiet gray; yellow marks what wants attention (the mode
    you are in, running work, warm context) and red what is wrong. *)
 let attention = Style.fg Yellow
@@ -310,7 +314,9 @@ let mode_hint (m : App.Model.t) : Content.Line.t option =
                      (if s.running
                       then
                         spinner_frames.(m.spinner % Array.length spinner_frames)
-                        ^ " working · Esc closes btw · Enter steers"
+                        ^ sprintf
+                            " %s · Esc closes btw · Enter steers"
+                            (doing m)
                       else "Esc dismisses btw")
                  ]
              else if s.running
@@ -319,7 +325,7 @@ let mode_hint (m : App.Model.t) : Content.Line.t option =
                  [ span
                      ~style:attention
                      (spinner_frames.(m.spinner % Array.length spinner_frames)
-                      ^ " working · Esc aborts · Enter steers")
+                      ^ sprintf " %s · Esc aborts · Enter steers" (doing m))
                  ]
              else None)))
 ;;
@@ -597,6 +603,17 @@ let status (m : App.Model.t) : Content.Line.t =
         [ 6, [ span ~style:base text ] ])
       @ tools_part m s
       @ plan_part s
+      (* A model that keeps failing: shown even with a dialog over the
+         hint. *)
+      @ (match Activity.retry (App.Model.activity m) with
+         | Some { attempt; max_attempts; _ } ->
+           [ ( 1
+             , [ span
+                   ~style:attention
+                   (sprintf "retry:%d/%d" attempt max_attempts)
+               ] )
+           ]
+         | None -> [])
       @ (let queued = List.length m.queued_messages in
          if queued > 0
          then [ 3, [ span ~style:base (sprintf "queued:%d" queued) ] ]

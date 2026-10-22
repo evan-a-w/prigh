@@ -1685,3 +1685,22 @@ let%expect_test "a session left to run a queued follow-up stays live" =
     ("another client joins the live agent" true)
     |}]
 ;;
+
+let%expect_test "a transient provider error: the retry event, then the reply" =
+  with_agent [ Reply.error "HTTP 529: Overloaded"; Reply.text "ok" ]
+  @@ fun _t agent _h ->
+  Agent.subscribe agent ~f:(fun e ->
+    match e with
+    | Loop (Retry _ | Message_start (Assistant _) | Message_end (Assistant _))
+      -> print_endline (Json.to_string (Rpc_json.event e))
+    | _ -> ());
+  Or_error.ok_exn (Agent.prompt agent "hi");
+  Agent.wait_idle agent;
+  [%expect
+    {|
+    {"type":"event","event":"message_start","message":{"role":"assistant","content":[],"stop_reason":{"type":"end_turn"},"usage":{"input":0,"output":0,"cache_read":0},"model":"deepseek-flash"}}
+    {"type":"event","event":"retry","attempt":2,"max_attempts":6,"error":"HTTP 529: Overloaded","delay_ms":1000}
+    {"type":"event","event":"message_start","message":{"role":"assistant","content":[],"stop_reason":{"type":"end_turn"},"usage":{"input":0,"output":0,"cache_read":0},"model":"deepseek-flash"}}
+    {"type":"event","event":"message_end","message":{"role":"assistant","content":[{"type":"text","text":"ok"}],"stop_reason":{"type":"end_turn"},"usage":{"input":10,"output":5,"cache_read":0},"model":"deepseek-flash"}}
+    |}]
+;;

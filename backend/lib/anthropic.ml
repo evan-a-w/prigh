@@ -185,61 +185,74 @@ let same_provider ~provider (a : Message.Assistant.t) =
   Model.written_by a.model provider
 ;;
 
-(* Consecutive same-role turns are merged; the last block of the last message
-   carries the cache breakpoint. *)
+(* Not on thinking or a [server_tool_use], which a continued turn (after a
+   [pause_turn]) may end with. *)
+let cacheable = function
+  | `Object fields ->
+    (match List.Assoc.find fields ~equal:String.equal "type" with
+     | Some (`String ("text" | "image" | "tool_use" | "tool_result")) -> true
+     | _ -> false)
+  | _ -> false
+;;
+
+let add_cache_control = function
+  | `Object fields -> `Object (fields @ [ cache_control ])
+  | other -> other
+;;
+
+(* Consecutive same-role turns are merged. Two cache breakpoints: the end of
+   the conversation, and the end of the request before this one (what comes
+   before the last assistant reply), whose prefix the provider has cached.
+   The provider only looks about 20 blocks back from a breakpoint for a
+   cached prefix, so with the end alone a turn that adds more blocks (many
+   parallel tool calls and their results) would miss the cache and process
+   the whole context again. *)
 let wire_messages ~oauth ~provider (messages : Message.t list) =
   let last = List.length messages - 1 in
-  let turns =
-    List.filter_mapi messages ~f:(fun i m ->
+  let previous_end =
+    List.foldi messages ~init:(-1) ~f:(fun i acc m ->
       match m with
-      | User u -> Some ("user", user_blocks u)
-      | Tool_result r -> Some ("user", [ tool_result_block r ])
-      | Assistant a ->
-        (match
-           assistant_blocks
-             ~oauth
-             ~replay_thinking:(same_provider ~provider a)
-             ~continuing:(i = last)
-             a
-         with
-         | [] -> None
-         | blocks -> Some ("assistant", blocks)))
+      | Assistant _ -> i - 1
+      | User _ | Tool_result _ -> acc)
+  in
+  let blocks =
+    List.concat_mapi messages ~f:(fun i m ->
+      let role, blocks =
+        match m with
+        | User u -> "user", user_blocks u
+        | Tool_result r -> "user", [ tool_result_block r ]
+        | Assistant a ->
+          ( "assistant"
+          , assistant_blocks
+              ~oauth
+              ~replay_thinking:(same_provider ~provider a)
+              ~continuing:(i = last)
+              a )
+      in
+      List.map blocks ~f:(fun block -> i, role, block))
+  in
+  let last_cacheable ~upto =
+    List.foldi blocks ~init:None ~f:(fun pos acc (i, _, block) ->
+      if i <= upto && cacheable block then Some pos else acc)
+  in
+  let breakpoints =
+    List.filter_opt
+      [ last_cacheable ~upto:previous_end; last_cacheable ~upto:last ]
   in
   let merged =
-    List.fold turns ~init:[] ~f:(fun acc (role, blocks) ->
+    List.foldi blocks ~init:[] ~f:(fun pos acc (_, role, block) ->
+      let block =
+        if List.mem breakpoints pos ~equal:Int.equal
+        then add_cache_control block
+        else block
+      in
       match acc with
       | (prev_role, prev_blocks) :: rest when String.equal prev_role role ->
-        (role, prev_blocks @ blocks) :: rest
-      | _ -> (role, blocks) :: acc)
-  in
-  let add_cache_control = function
-    | `Object fields -> `Object (fields @ [ cache_control ])
-    | other -> other
-  in
-  let merged =
-    match merged with
-    | (role, blocks) :: rest ->
-      (* Not on thinking or a [server_tool_use], which a continued turn
-         (after a [pause_turn]) may end with. *)
-      let cacheable = function
-        | `Object fields ->
-          (match List.Assoc.find fields ~equal:String.equal "type" with
-           | Some (`String ("text" | "image" | "tool_use" | "tool_result")) ->
-             true
-           | _ -> false)
-        | _ -> false
-      in
-      let rec mark = function
-        | [] -> []
-        | last :: before when cacheable last -> add_cache_control last :: before
-        | other :: before -> other :: mark before
-      in
-      let blocks = List.rev (mark (List.rev blocks)) in
-      (role, blocks) :: rest
-    | [] -> []
+        (role, block :: prev_blocks) :: rest
+      | _ -> (role, [ block ]) :: acc)
   in
   List.rev_map merged ~f:(fun (role, blocks) ->
-    `Object [ "role", `String role; "content", `Array blocks ])
+    `Object [ "role", `String role; "content", `Array (List.rev blocks) ])
 ;;
 
 let web_search_max_uses = 5
@@ -283,7 +296,9 @@ let effort_of_thinking : Thinking.t -> string option = function
 (* The thinking-related fields of the request. Budget models get
    [thinking.enabled] with a token budget (pi's older Claude path); adaptive
    models get [thinking.adaptive] and the effort in [output_config], or
-   [thinking.disabled] when off (omitted for models that are always on). *)
+   [thinking.disabled] when off (omitted for models that are always on).
+   Adaptive thinking asks for the summarized text: newer models omit it by
+   default, which leaves minutes of thought with nothing to show. *)
 let thinking_fields ~max_tokens (model : Model.t) (thinking : Thinking.t) =
   if not model.supports_thinking
   then []
@@ -306,7 +321,9 @@ let thinking_fields ~max_tokens (model : Model.t) (thinking : Thinking.t) =
          then [ "thinking", `Object [ "type", `String "disabled" ] ]
          else []
        | Some effort ->
-         [ "thinking", `Object [ "type", `String "adaptive" ]
+         [ ( "thinking"
+           , `Object
+               [ "type", `String "adaptive"; "display", `String "summarized" ] )
          ; "output_config", `Object [ "effort", `String effort ]
          ]))
 ;;
@@ -322,12 +339,15 @@ let thinking_on (model : Model.t) (thinking : Thinking.t) =
 let request_body ~oauth (r : Provider.Request.t) : Json.t =
   let r = Provider.Request.prepare r in
   let max_tokens = Option.value r.max_tokens ~default:r.model.max_output in
+  (* One breakpoint at the end of the system prompt (tools come before
+     it); the identity alone would gain nothing from another. *)
   let system =
-    List.concat
-      [ (if oauth then [ text_block ~cached:true claude_code_identity ] else [])
-      ; Option.value_map r.system ~default:[] ~f:(fun s ->
-          [ text_block ~cached:true s ])
-      ]
+    match oauth, r.system with
+    | false, None -> []
+    | false, Some s -> [ text_block ~cached:true s ]
+    | true, None -> [ text_block ~cached:true claude_code_identity ]
+    | true, Some s ->
+      [ text_block claude_code_identity; text_block ~cached:true s ]
   in
   let thinking = thinking_fields ~max_tokens r.model r.thinking in
   `Object
@@ -463,8 +483,11 @@ let parse_event ~tools (state : Stream_state.t) (event : Sse.Event.t)
              state.block_types <- (index, `Text) :: state.block_types;
              []
            | "thinking" ->
+             (* Shown as soon as it starts: with [display] omitted (the
+                default of newer models) its text stays empty, and nothing
+                else arrives until it ends. *)
              state.block_types <- (index, `Thinking) :: state.block_types;
-             []
+             [ Assistant_event.Thinking_delta "" ]
            | "redacted_thinking" ->
              let data = Option.value (member "data" block) ~default:"" in
              [ Assistant_event.Thinking_delta ""
@@ -567,11 +590,18 @@ let parse_event ~tools (state : Stream_state.t) (event : Sse.Event.t)
        Option.iter (Json.member "usage" json) ~f:(apply_usage state);
        []
      | "error" ->
+       (* Typed, so that a transient one (overloaded_error, api_error) is
+          retried. *)
+       let error = Json.member "error" json in
        let message =
-         Option.bind (Json.member "error" json) ~f:(member "message")
+         Option.bind error ~f:(member "message")
          |> Option.value ~default:event.data
        in
-       state.error <- Some message;
+       state.error
+       <- Some
+            (match Option.bind error ~f:(member "type") with
+             | Some type_ -> sprintf "%s: %s" type_ message
+             | None -> message);
        []
      | _ -> [])
 ;;

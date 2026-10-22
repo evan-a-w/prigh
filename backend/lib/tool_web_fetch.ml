@@ -317,7 +317,7 @@ let run (context : Tool.Context.t) args =
          url
      with
      | Error (`Http Cancelled) -> Tool.Result.error "[cancelled]"
-     | Error (`Http Timed_out) ->
+     | Error (`Http (Timed_out | Stalled _)) ->
        Tool.Result.error
          (sprintf
             "fetching %s timed out after %ds; try again with a larger timeout \
@@ -325,7 +325,7 @@ let run (context : Tool.Context.t) args =
             url
             timeout
             max_timeout_seconds)
-     | Error (`Http (Connection_failed message)) ->
+     | Error (`Http (Connection_failed message | Connection_lost message)) ->
        Tool.Result.error
          (sprintf
             "cannot fetch %s: %s; check the URL, and that its host is \

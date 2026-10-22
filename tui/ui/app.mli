@@ -183,6 +183,9 @@ module Model : sig
     ; viewport : Viewport.t
     ; pending_quit : bool
     ; spinner : int
+    ; activity : Activity.t
+      (** the main agent's, from its events; {!activity} squares it with the
+          state *)
     ; verbosity : Verbosity.t
     ; config : P.Config.t option
     ; home : string option
@@ -205,6 +208,9 @@ module Model : sig
   [@@deriving sexp_of]
 
   val running : t -> bool
+
+  (** What the main agent is doing: [Idle] unless the state says it runs. *)
+  val activity : t -> Activity.t
 
   (** Whether any subagent is running, including background ones the main agent
       is no longer waiting for. *)

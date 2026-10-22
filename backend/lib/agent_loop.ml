@@ -13,17 +13,23 @@ module Config = struct
     ; cache_key : string option
     }
 
-  let default_retries = 3
+  let default_retries = 5
 end
 
 let is_retryable_error message =
   List.exists
-    [ "HTTP 429"
+    [ "HTTP 408"
+    ; "HTTP 429"
     ; "HTTP 500"
     ; "HTTP 502"
     ; "HTTP 503"
     ; "HTTP 504"
+    ; "HTTP 529"
+    ; "overloaded_error"
+    ; "api_error"
+    ; "rate_limit_error"
     ; "connection failed"
+    ; "connection lost"
     ; "timed out"
     ]
     ~f:(fun prefix -> String.is_prefix message ~prefix)
@@ -113,6 +119,8 @@ let execute_tool
   }
 ;;
 
+(* Seconds before attempt [attempt + 1]: 1, 2, 4, 8, 16, at most 30. *)
+let backoff ~attempt = Float.min 30. (2. ** Float.of_int (attempt - 1))
 let overflow_attempts = 2
 
 (* A repeated overflow keeps less of the conversation's end. *)
@@ -145,7 +153,7 @@ let run
       ?ask_user
       ?execute
       ?background
-      ?retry_delay
+      ?sleep
       ?compact
       ?(halt = fun () -> None)
       ~context
@@ -164,14 +172,10 @@ let run
   List.iter prompts ~f:(fun m ->
     emit (Message_start m);
     emit (Message_end m));
-  let retry_delay =
-    match retry_delay with
+  let sleep =
+    match sleep with
     | Some f -> f
-    | None ->
-      fun ~attempt ->
-        Eio.Time.sleep
-          (Eio.Stdenv.clock env)
-          (Float.of_int (1 lsl (attempt - 1)))
+    | None -> Eio.Time.sleep (Eio.Stdenv.clock env)
   in
   let compact =
     match compact with
@@ -284,8 +288,17 @@ let run
           when n <= config.retries
                && is_retryable_error message
                && not (Cancellation.is_cancelled cancel) ->
-          retry_delay ~attempt:n;
-          attempt (n + 1) ~overflows
+          let delay = backoff ~attempt:n in
+          emit
+            (Retry
+               { attempt = n + 1
+               ; max_attempts = config.retries + 1
+               ; error = message
+               ; delay
+               });
+          (match Cancellation.protect cancel ~f:(fun () -> sleep delay) with
+           | Some () -> attempt (n + 1) ~overflows
+           | None -> { assistant with stop_reason = Aborted })
         | _ -> assistant
       in
       let assistant = attempt 1 ~overflows:0 in

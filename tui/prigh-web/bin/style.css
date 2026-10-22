@@ -725,6 +725,8 @@ kbd {
 .status-item { display: inline-flex; align-items: center; gap: 5px; white-space: nowrap; }
 .status-item .icon { width: 13px; height: 13px; }
 .status-item.running { color: var(--sodium); gap: 7px; }
+.status-item.running > .label { overflow: hidden; text-overflow: ellipsis; max-width: 56ch; }
+.status-item.retrying { color: var(--brick); }
 .status-item.idle { color: var(--muted); }
 .idle-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--faint-line); }
 .status-spacer { flex: 1; }

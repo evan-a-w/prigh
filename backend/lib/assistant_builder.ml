@@ -46,7 +46,8 @@ let apply t (event : Assistant_event.t) =
     let b = Buffer.create 256 in
     Buffer.add_string b s;
     t.blocks <- Text b :: t.blocks
-  | Thinking_delta s, Thinking b :: _ -> Buffer.add_string b.text s
+  | Thinking_delta s, Thinking ({ signature = None; _ } as b) :: _ ->
+    Buffer.add_string b.text s
   | Thinking_delta s, _ ->
     let b = Buffer.create 256 in
     Buffer.add_string b s;
