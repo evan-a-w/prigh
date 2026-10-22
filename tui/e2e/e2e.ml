@@ -94,7 +94,12 @@ let rec summarise (e : Event.t) : string option =
   | Message_end _ -> Some "message_end"
   | Retry { attempt; max_attempts; error; delay_ms } ->
     Some
-      (sprintf "retry %d/%d in %dms after %S" attempt max_attempts delay_ms error)
+      (sprintf
+         "retry %d/%d in %dms after %S"
+         attempt
+         max_attempts
+         delay_ms
+         error)
   | State s -> Some (sprintf "state running=%b model=%s" s.running s.model.key)
   | Notice t -> Some (sprintf "notice %S" t)
   | Auth a ->

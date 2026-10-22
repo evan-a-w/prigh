@@ -138,11 +138,7 @@ let thinking ~live text =
   then
     div
       "thinking live"
-      [ div
-          "thinking-head"
-          [ Html.lamp ()
-          ; span "label" "Thinking…"
-          ]
+      [ div "thinking-head" [ Html.lamp (); span "label" "Thinking…" ]
       ; (if String.is_empty (String.strip text)
          then Node.none
          else div "thinking-text" [ Node.text (String.strip text) ])

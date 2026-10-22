@@ -39,7 +39,7 @@ let%expect_test "/btw while running: streamed box, Esc dismisses without \
     └──────────────────────────────────────────────────────────┘
     ────────────────────────────────────────────────────────────
     > ▏
-    …deepseek-flash  ⠋ working · Esc closes btw · Enter steers
+    …deepseek-flash  ⠋ writing · Esc closes btw · Enter steers
     |}];
   H.event h (Btw_delta { btw_id = "btw-1"; delta = "It is `app.ml`, " });
   H.event h (Btw_delta { btw_id = "btw-1"; delta = "around **line 40**." });
@@ -59,7 +59,7 @@ let%expect_test "/btw while running: streamed box, Esc dismisses without \
     └──────────────────────────────────────────────────────────┘
     ────────────────────────────────────────────────────────────
     > ▏
-    …deepseek-flash  ⠋ working · Esc closes btw · Enter steers
+    …deepseek-flash  ⠋ writing · Esc closes btw · Enter steers
     |}];
   (* Esc cancels the in-flight call and closes the box; no abort. *)
   H.esc h;
@@ -82,7 +82,7 @@ let%expect_test "/btw while running: streamed box, Esc dismisses without \
       Working on it
     ────────────────────────────────────────────────────────────
     > ▏
-    …deepseek-flash  ⠋ working · Esc aborts · Enter steers
+    …deepseek-flash  ⠋ writing · Esc aborts · Enter steers
     |}];
   H.reply_error h (Btw "btw-1") "cancelled";
   printf "transcript unchanged: %b\n" (Sexp.equal before (transcript_sexp h));

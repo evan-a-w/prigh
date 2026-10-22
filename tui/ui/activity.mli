@@ -30,6 +30,10 @@ val set_running : t -> bool -> t
     [None] when idle. Lower case, one line. *)
 val label : t -> string option
 
+(** [label] without the error: ["retrying in 4s"], ["waiting for the model
+    (attempt 2/6)"]. *)
+val brief : t -> string option
+
 (** ["800ms"], ["4s"]. *)
 val seconds : int -> string
 

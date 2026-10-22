@@ -19,7 +19,7 @@ let agent_symbol (m : App.Model.t) (a : Agent_view.t) =
 ;;
 
 let doing m =
-  Option.value (Activity.label (App.Model.activity m)) ~default:"working"
+  Option.value (Activity.brief (App.Model.activity m)) ~default:"working"
 ;;
 
 (* The status line is quiet gray; yellow marks what wants attention (the mode
@@ -314,7 +314,9 @@ let mode_hint (m : App.Model.t) : Content.Line.t option =
                      (if s.running
                       then
                         spinner_frames.(m.spinner % Array.length spinner_frames)
-                        ^ sprintf " %s · Esc closes btw · Enter steers" (doing m)
+                        ^ sprintf
+                            " %s · Esc closes btw · Enter steers"
+                            (doing m)
                       else "Esc dismisses btw")
                  ]
              else if s.running

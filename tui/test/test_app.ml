@@ -153,7 +153,7 @@ let%expect_test "prompt, streaming with embedded newlines, tool call, steer \
       first li
     ────────────────────────────────────────────────────────────
     > ▏
-    …deepseek-flash  ⠋ working · Esc aborts · Enter steers
+    …deepseek-flash  ⠋ writing · Esc aborts · Enter steers
     |}];
   H.event h (Message_update { partial; delta = Text_delta "ne done" });
   H.event
@@ -175,7 +175,7 @@ let%expect_test "prompt, streaming with embedded newlines, tool call, steer \
         part
     ────────────────────────────────────────────────────────────
     > ▏
-    …deepseek-flash  ⠋ working · Esc aborts · Enter steers
+    …deepseek-flash  ⠋ running tools · Esc aborts · Enter steers
     |}];
   (* Steering while running is queued, not sent as a prompt. *)
   H.keys h "also count them";
@@ -3229,7 +3229,7 @@ let%expect_test "resize mid-stream re-wraps without losing lines" =
       second
     ────────────────────────────────────────────────────────────
     > ▏
-    …deepseek-flash  ⠋ working · Esc aborts · Enter steers
+    …deepseek-flash  ⠋ writing · Esc aborts · Enter steers
     |}];
   H.step h (Resize { width = 30; height = 8 });
   H.show h;
@@ -3256,7 +3256,7 @@ let%expect_test "resize mid-stream re-wraps without losing lines" =
       second part
     ────────────────────────────────────────────────────────────
     > ▏
-    …deepseek-flash  ⠋ working · Esc aborts · Enter steers
+    …deepseek-flash  ⠋ writing · Esc aborts · Enter steers
     |}]
 ;;
 
@@ -4071,7 +4071,7 @@ let%expect_test "two parallel subagents: strip, live tails, focus cycling, Esc" 
         all tests pass
     ────────────────────────────────────────────────────────────────────────────────
     > ▏
-    …deepseek-flash  think:off  ctx:0.1%/1.0M  ⠋ working · Esc aborts · Enter steers
+    …deepseek-flash  ctx:0.1%/1.0M  ⠋ running tools · Esc aborts · Enter steers
     |}];
   H.next_agent h;
   H.show h;
@@ -4094,7 +4094,7 @@ let%expect_test "two parallel subagents: strip, live tails, focus cycling, Esc" 
     … bash $ grep -r auth src
     ────────────────────────────────────────────────────────────────────────────────
     > ▏
-    …deepseek-flash  think:off  ctx:0.1%/1.0M  ⠋ working · Esc aborts · Enter steers
+    …deepseek-flash  ctx:0.1%/1.0M  ⠋ running tools · Esc aborts · Enter steers
     |}];
   H.next_agent h;
   H.show h;
@@ -4117,7 +4117,7 @@ let%expect_test "two parallel subagents: strip, live tails, focus cycling, Esc" 
       all tests pass
     ────────────────────────────────────────────────────────────────────────────────
     > ▏
-    …deepseek-flash  think:off  ctx:0.1%/1.0M  ⠋ working · Esc aborts · Enter steers
+    …deepseek-flash  ctx:0.1%/1.0M  ⠋ running tools · Esc aborts · Enter steers
     |}];
   H.next_agent h;
   H.show h;
@@ -4135,7 +4135,7 @@ let%expect_test "two parallel subagents: strip, live tails, focus cycling, Esc" 
         all tests pass
     ────────────────────────────────────────────────────────────────────────────────
     > ▏
-    …deepseek-flash  think:off  ctx:0.1%/1.0M  ⠋ working · Esc aborts · Enter steers
+    …deepseek-flash  ctx:0.1%/1.0M  ⠋ running tools · Esc aborts · Enter steers
     |}];
   H.focus_agent h 1;
   H.focus_agent h 2;
@@ -4159,7 +4159,7 @@ let%expect_test "two parallel subagents: strip, live tails, focus cycling, Esc" 
       all tests pass
     ────────────────────────────────────────────────────────────────────────────────
     > ▏
-    …deepseek-flash  think:off  ctx:0.1%/1.0M  ⠋ working · Esc aborts · Enter steers
+    …deepseek-flash  ctx:0.1%/1.0M  ⠋ running tools · Esc aborts · Enter steers
     |}];
   H.esc h;
   H.show h;
@@ -4177,7 +4177,7 @@ let%expect_test "two parallel subagents: strip, live tails, focus cycling, Esc" 
         all tests pass
     ────────────────────────────────────────────────────────────────────────────────
     > ▏
-    …deepseek-flash  think:off  ctx:0.1%/1.0M  ⠋ working · Esc aborts · Enter steers
+    …deepseek-flash  ctx:0.1%/1.0M  ⠋ running tools · Esc aborts · Enter steers
     |}]
 ;;
 
@@ -4240,7 +4240,7 @@ let%expect_test "verbosity applies inside an agent view" =
         line 7
     ──────────────────────────────────────────────────────────────────────
     > ▏
-    …deepseek-flash  ctx:0.1%/1.0M  ⠋ working · Esc aborts · Enter steers
+    …deepseek-flash  $0.01  ⠋ running tools · Esc aborts · Enter steers
     |}];
   H.key h (Key.ctrl 'o');
   H.show h;
@@ -4261,7 +4261,7 @@ let%expect_test "verbosity applies inside an agent view" =
         line 7
     ──────────────────────────────────────────────────────────────────────
     > ▏
-    …deepseek-flash  ctx:0.1%/1.0M  ⠋ working · Esc aborts · Enter steers
+    …deepseek-flash  $0.01  ⠋ running tools · Esc aborts · Enter steers
     |}]
 ;;
 
@@ -4715,7 +4715,7 @@ let%expect_test "inline bash: !cmd adds to context, !!cmd does not" =
       !echo hi waits for the turn to end (kept in the editor); !&echo hi runs it in the background now
     ────────────────────────────────────────────────────────────────────────────────────────────────────
     > !echo hi▏
-    …deepseek-flash  think:off  mode:auto  ctx:0.1%/1.0M  $0.01  ⠋ working · Esc aborts · Enter steers
+    …deepseek-flash  think:off  mode:auto  ctx:0.1%/1.0M  ⠋ running tools · Esc aborts · Enter steers
     |}]
 ;;
 
@@ -6189,7 +6189,7 @@ let%expect_test "resize 120->40 mid-stream keeps every line" =
       delta 6 with several words that wrap at forty columns
     ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
     > ▏
-    /work  deepseek-flash  think:off  mode:auto  view:normal  ctx:0.1%/1.0M  $0.01  ⠋ working · Esc aborts · Enter steers
+    /work  deepseek-flash  think:off  mode:auto  view:normal  ctx:0.1%/1.0M  $0.01  ⠋ writing · Esc aborts · Enter steers
     |}];
   H.step h (Resize { width = 40; height = 12 });
   H.show h;
@@ -9077,5 +9077,101 @@ let%expect_test
     ────────────────────────────────────────────────────────────────────────────────
     > ▏
     …deepseek-flash  think:off  ctx:0.1%/1.0M  ⠋ working · Esc aborts · Enter steers
+    |}]
+;;
+
+let%expect_test
+    "what the agent is doing: waiting, thinking without text, a retry and its \
+     attempt, writing, tools"
+  =
+  let h = connected ~width:100 ~height:8 () in
+  let retry : P.Retry.t =
+    { attempt = 2
+    ; max_attempts = 6
+    ; error = "overloaded_error: Overloaded"
+    ; delay_ms = 2000
+    }
+  in
+  H.event h (State (state ~running:true ()));
+  H.event h Agent_start;
+  H.event h (Message_start (user "go"));
+  H.event h Turn_start;
+  H.event h (Message_start (Assistant partial));
+  H.show h;
+  (* Newer models' thinking has no text to show: a block starts, nothing
+     more comes until it ends. *)
+  H.event h (Message_update { partial; delta = Thinking_delta "" });
+  H.show h;
+  (* What the failed attempt streamed is dropped for the retry's notice. *)
+  H.event h (Message_update { partial; delta = Text_delta "half a rep" });
+  H.event h (Retry retry);
+  H.show h;
+  H.event h (Message_start (Assistant partial));
+  H.show h;
+  H.event h (Message_update { partial; delta = Text_delta "A reply." });
+  H.show h;
+  H.event h (Tool_start (tool_call "c1"));
+  H.show h;
+  (* Seen running after a reconnect: nothing known but that. *)
+  H.event h (State (state ()));
+  H.event h (State (state ~running:true ()));
+  H.show h;
+  [%expect
+    {|
+    ▌ earlier question
+      earlier answer
+
+    ▌ go
+    ────────────────────────────────────────────────────────────────────────────────────────────────────
+    > ▏
+    …deepseek-flash  think:off  ctx:0.1%/1.0M  ⠋ waiting for the model · Esc aborts · Enter steers
+
+    ▌ earlier question
+      earlier answer
+
+    ▌ go
+    ────────────────────────────────────────────────────────────────────────────────────────────────────
+    > ▏
+    …deepseek-flash  think:off  mode:auto  ctx:0.1%/1.0M  $0.01  ⠋ thinking · Esc aborts · Enter steers
+    ▌ earlier question
+      earlier answer
+
+    ▌ go
+      retrying in 2s (attempt 2/6): overloaded_error: Overloaded
+    ────────────────────────────────────────────────────────────────────────────────────────────────────
+    > ▏
+    …deepseek-flash  think:off  ctx:0.1%/1.0M  retry:2/6  ⠋ retrying in 2s · Esc aborts · Enter steers
+    ▌ earlier question
+      earlier answer
+
+    ▌ go
+      retrying in 2s (attempt 2/6): overloaded_error: Overloaded
+    ────────────────────────────────────────────────────────────────────────────────────────────────────
+    > ▏
+    …deepseek-flash  $0.01  retry:2/6  ⠋ waiting for the model (attempt 2/6) · Esc aborts · Enter steers
+      earlier answer
+
+    ▌ go
+      retrying in 2s (attempt 2/6): overloaded_error: Overloaded
+      A reply.
+    ────────────────────────────────────────────────────────────────────────────────────────────────────
+    > ▏
+    …deepseek-flash  think:off  mode:auto  ctx:0.1%/1.0M  $0.01  ⠋ writing · Esc aborts · Enter steers
+
+    ▌ go
+      retrying in 2s (attempt 2/6): overloaded_error: Overloaded
+      A reply.
+    … bash
+    ────────────────────────────────────────────────────────────────────────────────────────────────────
+    > ▏
+    …deepseek-flash  think:off  mode:auto  ctx:0.1%/1.0M  ⠋ running tools · Esc aborts · Enter steers
+
+    ▌ go
+      retrying in 2s (attempt 2/6): overloaded_error: Overloaded
+      A reply.
+    … bash
+    ────────────────────────────────────────────────────────────────────────────────────────────────────
+    > ▏
+    …deepseek-flash  think:off  mode:auto  ctx:0.1%/1.0M  $0.01  ⠋ working · Esc aborts · Enter steers
     |}]
 ;;

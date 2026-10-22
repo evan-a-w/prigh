@@ -38,9 +38,10 @@ let apply t (event : P.Event.t) =
      | Server_tool_result _ -> Writing
      | Server_tool_use _ -> Running_tools)
   | Message_end (Assistant a) ->
-    if List.exists a.content ~f:(function
-         | Tool_call _ -> true
-         | Text _ | Thinking _ | Server_tool _ -> false)
+    if
+      List.exists a.content ~f:(function
+        | Tool_call _ -> true
+        | Text _ | Thinking _ | Server_tool _ -> false)
     then Running_tools
     else Working
   | Tool_start _ -> Running_tools
@@ -84,6 +85,14 @@ let label = function
   | Thinking -> Some "thinking"
   | Writing -> Some "writing"
   | Running_tools -> Some "running tools"
+;;
+
+let brief = function
+  | Waiting (Some { attempt; max_attempts; _ }) ->
+    Some (sprintf "waiting for the model (attempt %d/%d)" attempt max_attempts)
+  | Retrying { delay_ms; _ } ->
+    Some (sprintf "retrying in %s" (seconds delay_ms))
+  | t -> label t
 ;;
 
 let retry = function
