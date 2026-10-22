@@ -152,7 +152,7 @@ let%expect_test "bash in the background: the job it started" =
     </div>
     |}];
   show
-    [ {|{"type":"event","event":"tool_end","call":{"id":"c10","name":"bash","arguments":"{\"command\":\"sleep 1; echo bg finished\",\"background\":true}"},"result":{"role":"tool_result","tool_call_id":"c10","tool_name":"bash","text":"started job j1: sleep 1; echo bg finished; its output is being recorded; you will be notified when it exits. Use job_output to peek, job_wait to block, job_kill to stop it.","is_error":false}}|}
+    [ {|{"type":"event","event":"tool_end","call":{"id":"c10","name":"bash","arguments":"{\"command\":\"sleep 1; echo bg finished\",\"background\":true}"},"result":{"role":"tool_result","tool_call_id":"c10","tool_name":"bash","text":"started job j1: sleep 1; echo bg finished; its output is being recorded; you will be notified when it exits. Use job_output to peek, job_kill to stop it.","is_error":false}}|}
     ];
   [%expect
     {|
@@ -171,7 +171,7 @@ let%expect_test "bash in the background: the job it started" =
 
 let%expect_test "a foreground bash moved to the background: its job and output" =
   show
-    [ {|{"type":"event","event":"tool_end","call":{"id":"c11","name":"bash","arguments":"{\"command\":\"make all\"}"},"result":{"role":"tool_result","tool_call_id":"c11","tool_name":"bash","text":"still running after 30s, so it was moved to the background as job j3 (not restarted: it keeps running). Output so far (last 2 of 40 lines):\nbuilding 39\nbuilding 40\nIts report ([job j3 exited ...] and its last lines) is delivered to you when it exits: keep working on something else or end your turn. job_output shows more output, job_kill stops it; do not job_wait on it unless you truly cannot do anything else.","is_error":false}}|}
+    [ {|{"type":"event","event":"tool_end","call":{"id":"c11","name":"bash","arguments":"{\"command\":\"make all\"}"},"result":{"role":"tool_result","tool_call_id":"c11","tool_name":"bash","text":"still running after 30s, so it was moved to the background as job j3 (not restarted: it keeps running). Output so far (last 2 of 40 lines):\nbuilding 39\nbuilding 40\nIts report ([job j3 exited ...] and its last lines) is delivered to you when it exits: keep working on something else or end your turn. job_output shows more output, job_kill stops it.","is_error":false}}|}
     ];
   [%expect {|
     <div class="ok tool tool-bash">
@@ -824,7 +824,7 @@ let%expect_test
   show_subagent
     (subagent_running
      @ [ sprintf
-           {|{"type":"event","event":"tool_end","call":%s,"result":{"role":"tool_result","tool_call_id":"c12","tool_name":"subagent","text":"started agent a1 (Count the lines in src/app.ml and report back.); its result will be delivered to you when it finishes; use subagent_wait to block on it","is_error":false}}|}
+           {|{"type":"event","event":"tool_end","call":%s,"result":{"role":"tool_result","tool_call_id":"c12","tool_name":"subagent","text":"started agent a1 (Count the lines in src/app.ml and report back.); its result will be delivered to you when it finishes: keep working or end your turn meanwhile","is_error":false}}|}
            subagent_call
        ]);
   [%expect
@@ -981,7 +981,8 @@ let%expect_test "subagent from a reloaded session: no events, only its result" =
 ;;
 
 let%expect_test
-    "jobs: status, waiting (reports as cards), a note of what still runs"
+    "jobs: status, kill (its report as a card), output; an old session's \
+     job_wait renders like any tool"
   =
   show
     [ {|{"type":"event","event":"tool_end","call":{"id":"c11","name":"job_status","arguments":"{}"},"result":{"role":"tool_result","tool_call_id":"c11","tool_name":"job_status","text":"j1  running  0s  sleep 1; echo bg finished  (last: 0 B, no output)","is_error":false}}|}
