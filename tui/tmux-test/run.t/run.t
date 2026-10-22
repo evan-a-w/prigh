@@ -75,18 +75,20 @@ prints the captured panes.
       child reporting: done
       [subagent: 1 turns, 0 in / 0 out tokens, $0.0000]
     waiting for both
-  ✓ subagent_wait
-      [subagent a1 finished] count files
+  ↩ subagent a1 "count files"  finished
       child reporting: done
       [subagent: 1 turns, 0 in / 0 out tokens, $0.0000]
-  
-      [subagent a2 finished] say hello
-      … 2 more lines
+  ↩ subagent a2 "say hello"  finished
+      child reporting: done
+      [subagent: 1 turns, 0 in / 0 out tokens, $0.0000]
     all done
   ────────────────────────────────────────────────────────────────────────────────────────────────────
   >
   …deepseek-flash  think:on  mode:auto  view:normal  ctx:0.0%/1.0M  $0.00  agents:[main] 1✓ 2✓
   === verbose
+    prigh in $TMP/cwd · /help · Esc aborts · Ctrl+C twice quits
+  
+  ▌ go
     let me look
   ✓ bash $ printf 'one\ntwo\nthree\n'
       {
@@ -103,13 +105,10 @@ prints the captured panes.
       child reporting: done
       [subagent: 1 turns, 0 in / 0 out tokens, $0.0000]
     waiting for both
-  ✓ subagent_wait
-      {}
-      [subagent a1 finished] count files
+  ↩ subagent a1 "count files"  finished
       child reporting: done
       [subagent: 1 turns, 0 in / 0 out tokens, $0.0000]
-  
-      [subagent a2 finished] say hello
+  ↩ subagent a2 "say hello"  finished
       child reporting: done
       [subagent: 1 turns, 0 in / 0 out tokens, $0.0000]
     all done
@@ -127,7 +126,8 @@ prints the captured panes.
   ✓ subagent count files  1 turn $0.00
   ✓ subagent say hello  1 turn $0.00
     waiting for both
-  ✓ subagent_wait  7 lines
+  ↩ subagent a1 "count files"  finished
+  ↩ subagent a2 "say hello"  finished
     all done
   ────────────────────────────────────────────────────────────────────────────────────────────────────
   >
@@ -204,7 +204,8 @@ prints the captured panes.
   ✓ subagent count files  1 turn $0.00
   ✓ subagent say hello  1 turn $0.00
     waiting for both
-  ✓ subagent_wait  7 lines
+  ↩ subagent a1 "count files"  finished
+  ↩ subagent a2 "say hello"  finished
     all done
   ────────────────────────────────────────────────────────────────────────────────────────────────────
   >
