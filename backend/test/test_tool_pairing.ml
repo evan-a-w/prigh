@@ -120,7 +120,10 @@ let%expect_test "the Anthropic request is repaired" =
         "content": [
           {
             "type": "text",
-            "text": "go"
+            "text": "go",
+            "cache_control": {
+              "type": "ephemeral"
+            }
           }
         ]
       },

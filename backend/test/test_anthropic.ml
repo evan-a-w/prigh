@@ -167,7 +167,10 @@ let%expect_test
               "type": "tool_result",
               "tool_use_id": "toolu_2",
               "content": "(no output)",
-              "is_error": true
+              "is_error": true,
+              "cache_control": {
+                "type": "ephemeral"
+              }
             }
           ]
         },
@@ -267,10 +270,7 @@ let%expect_test
     [
       {
         "type": "text",
-        "text": "You are Claude Code, Anthropic's official CLI for Claude.",
-        "cache_control": {
-          "type": "ephemeral"
-        }
+        "text": "You are Claude Code, Anthropic's official CLI for Claude."
       },
       {
         "type": "text",
@@ -360,8 +360,8 @@ let%expect_test
     [%sexp (stop : string option), (usage : Usage.t), (error : string option)];
   [%expect
     {|
-    ((Thinking_delta "Let me ") (Thinking_delta look.) (Thinking_signature SIG==)
-     (Text_delta Running) (Text_delta " ls.")
+    ((Thinking_delta "") (Thinking_delta "Let me ") (Thinking_delta look.)
+     (Thinking_signature SIG==) (Text_delta Running) (Text_delta " ls.")
      (Tool_call_start (index 0) (id toolu_9) (name bash))
      (Tool_call_delta (index 0) (arguments "{\"cmd\":"))
      (Tool_call_delta (index 0) (arguments "\"ls\"}")))
@@ -580,6 +580,9 @@ let%expect_test "images: in prompts and tool results" =
               "type": "base64",
               "media_type": "image/jpeg",
               "data": "PHOTO"
+            },
+            "cache_control": {
+              "type": "ephemeral"
             }
           }
         ]
@@ -697,7 +700,7 @@ let%expect_test "pause_turn: the paused turn is sent back and continues" =
      (stop_reason End_turn) (usage ((input 30) (output 12) (cache_read 0)))
      (model anthropic/claude-opus-4-6))
     [{"role":"user","content":[{"type":"text","text":"eio?","cache_control":{"type":"ephemeral"}}]}]
-    [{"role":"user","content":[{"type":"text","text":"eio?"}]},{"role":"assistant","content":[{"type":"text","text":"Searching.","cache_control":{"type":"ephemeral"}},{"type":"server_tool_use","id":"srvtoolu_1","name":"web_search","input":{"query":"eio"}}]}]
+    [{"role":"user","content":[{"type":"text","text":"eio?","cache_control":{"type":"ephemeral"}}]},{"role":"assistant","content":[{"type":"text","text":"Searching.","cache_control":{"type":"ephemeral"}},{"type":"server_tool_use","id":"srvtoolu_1","name":"web_search","input":{"query":"eio"}}]}]
     |}]
 ;;
 
@@ -728,5 +731,5 @@ let%expect_test "an unresolved server_tool_use in history is dropped, not text" 
   print_endline
     (Json.to_string (Option.value_exn (Json.member "messages" body)));
   [%expect
-    {| [{"role":"user","content":[{"type":"text","text":"eio?"}]},{"role":"assistant","content":[{"type":"text","text":"Searching."}]},{"role":"user","content":[{"type":"text","text":"go on","cache_control":{"type":"ephemeral"}}]}] |}]
+    {| [{"role":"user","content":[{"type":"text","text":"eio?","cache_control":{"type":"ephemeral"}}]},{"role":"assistant","content":[{"type":"text","text":"Searching."}]},{"role":"user","content":[{"type":"text","text":"go on","cache_control":{"type":"ephemeral"}}]}] |}]
 ;;

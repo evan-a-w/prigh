@@ -15,6 +15,14 @@ type t =
       ; delta : Assistant_event.t
       }
   | Message_end of Message.t
+  | Retry of
+      { attempt : int (** the attempt about to be made, from 2 *)
+      ; max_attempts : int
+      ; error : string (** what failed the attempt before *)
+      ; delay : float (** seconds until it is made *)
+      }
+  (** The provider failed transiently: the reply is requested again after
+      [delay]; a [Message_start] begins the new attempt. *)
   | Tool_start of Content.Tool_call.t
   | Tool_output of
       { call_id : string
