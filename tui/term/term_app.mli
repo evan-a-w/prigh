@@ -16,7 +16,8 @@ end
 (** The reusable Bonsai app construction. [run] mounts it against a spawned
     backend; tests mount it against an in-memory transport. *)
 val app
-  :  Prigh_client.Client.t
+  :  ?tool_host:Prigh_client_unix.Tool_host.t
+  -> Prigh_client.Client.t
   -> hello:(string * Prigh_protocol.Json.t) list
   -> exit:(unit -> unit Bonsai.Effect.t)
   -> quit_requested:unit Ivar.t
@@ -62,9 +63,13 @@ val connection_hello
   -> (string * Prigh_protocol.Json.t) list
 
 (** Connects [client] again after [delay_ms] and sends [hello], with
-    [session] and [as_user] replacing those fields; the [hello] reply. *)
+    [session] and [as_user] replacing those fields; the [hello] reply. With
+    [tool_host], [hello] names the executions it still runs
+    ([running_execs]), so that the backend keeps them, and once it is
+    answered, what the tool host held while offline goes out. *)
 val reconnect
-  :  Prigh_client.Client.t
+  :  ?tool_host:Prigh_client_unix.Tool_host.t
+  -> Prigh_client.Client.t
   -> hello:(string * Prigh_protocol.Json.t) list
   -> delay_ms:int
   -> session:string option
