@@ -244,7 +244,7 @@ let%expect_test "an agent's reads let it write; its subagents share what it saw"
           [ "path", `String "plan.md"; "content", `String "mine\n" ]
       ; call ~id:"r1" "read" [ "path", `String "plan.md" ]
       ; call ~id:"s1" "subagent" [ "task", `String "rewrite the plan" ]
-      ; call ~id:"s2" "subagent_wait" []
+      ; Reply.text "waiting for a1"
       ; call ~id:"w2" "bash" [ "command", `String "echo theirs > plan.md" ]
       ; call
           ~id:"w3"
@@ -280,10 +280,12 @@ let%expect_test "an agent's reads let it write; its subagents share what it saw"
     assistant:  subagent{"task":"rewrite the plan"}
     state: running=true subagents=[a1 running] jobs=[]
     tool_result subagent: started agent a1 (rewrite the plan); its result will be delivered to you when it finishes: keep working or end your turn meanwhile
-    assistant:  subagent_wait{}
-    state: running=true subagents=[a1 finished] jobs=[]
+    assistant: waiting for a1
+    agent_end
+    state: running=false subagents=[a1 running] jobs=[]
     state: running=true subagents=[] jobs=[]
-    tool_result subagent_wait: [subagent a1 finished] rewrite the plan | rewrote it | [subagent: 2 turns, 30 in / 13 out tokens, $0.0000]
+    agent_start
+    user: [subagent a1 finished] rewrite the plan | rewrote it | [subagent: 2 turns, 30 in / 13 out tokens, $0.0000]
     assistant:  bash{"command":"echo theirs > plan.md"}
     tool_result bash:
     assistant:  write{"path":"plan.md","content":"mine again\n"}
