@@ -222,7 +222,8 @@ let%expect_test
         }
       ],
       "thinking": {
-        "type": "adaptive"
+        "type": "adaptive",
+        "display": "summarized"
       },
       "output_config": {
         "effort": "high"
@@ -462,7 +463,7 @@ let%expect_test "stream end to end: request shape, headers, assembled message" =
     user-agent: claude-cli/2.1.280
     accept: text/event-stream
     [{"type":"text","text":"You are Claude Code, Anthropic's official CLI for Claude.","cache_control":{"type":"ephemeral"}}]
-    {"type":"adaptive"}
+    {"type":"adaptive","display":"summarized"}
     |}];
   let (_ : Server.t) =
     stream_with_server
@@ -536,16 +537,16 @@ let%expect_test "thinking: budget models vs adaptive models (effort)" =
       (On(Max))    thinking={"type":"enabled","budget_tokens":32000} output_config=- interleaved-beta=true
     claude-opus-5-5: (Adaptive(can_disable false))
       Off          thinking=- output_config=- interleaved-beta=false
-      (On())       thinking={"type":"adaptive"} output_config={"effort":"medium"} interleaved-beta=false
-      (On(Low))    thinking={"type":"adaptive"} output_config={"effort":"low"} interleaved-beta=false
-      (On(High))   thinking={"type":"adaptive"} output_config={"effort":"high"} interleaved-beta=false
-      (On(Max))    thinking={"type":"adaptive"} output_config={"effort":"max"} interleaved-beta=false
+      (On())       thinking={"type":"adaptive","display":"summarized"} output_config={"effort":"medium"} interleaved-beta=false
+      (On(Low))    thinking={"type":"adaptive","display":"summarized"} output_config={"effort":"low"} interleaved-beta=false
+      (On(High))   thinking={"type":"adaptive","display":"summarized"} output_config={"effort":"high"} interleaved-beta=false
+      (On(Max))    thinking={"type":"adaptive","display":"summarized"} output_config={"effort":"max"} interleaved-beta=false
     claude-opus-5: (Adaptive(can_disable false))
       Off          thinking=- output_config=- interleaved-beta=false
-      (On())       thinking={"type":"adaptive"} output_config={"effort":"medium"} interleaved-beta=false
-      (On(Low))    thinking={"type":"adaptive"} output_config={"effort":"low"} interleaved-beta=false
-      (On(High))   thinking={"type":"adaptive"} output_config={"effort":"high"} interleaved-beta=false
-      (On(Max))    thinking={"type":"adaptive"} output_config={"effort":"max"} interleaved-beta=false
+      (On())       thinking={"type":"adaptive","display":"summarized"} output_config={"effort":"medium"} interleaved-beta=false
+      (On(Low))    thinking={"type":"adaptive","display":"summarized"} output_config={"effort":"low"} interleaved-beta=false
+      (On(High))   thinking={"type":"adaptive","display":"summarized"} output_config={"effort":"high"} interleaved-beta=false
+      (On(Max))    thinking={"type":"adaptive","display":"summarized"} output_config={"effort":"max"} interleaved-beta=false
     |}]
 ;;
 
