@@ -8,8 +8,14 @@ module State = struct
     | Failed
 end
 
+module Entry = struct
+  type t =
+    | Line of string
+    | Rendered_late of (unit -> string)
+end
+
 type t =
-  { queue : string Queue.t
+  { queue : Entry.t Queue.t
   ; mutable bytes : int
   ; max_lines : int
   ; max_bytes : int
@@ -43,12 +49,14 @@ let fail t reason =
     Eio.Condition.broadcast t.ready
 ;;
 
-let send t line =
+let enqueue t (entry : Entry.t) =
   match t.state with
   | Failed | Finishing -> ()
   | Open ->
-    Queue.enqueue t.queue line;
-    t.bytes <- t.bytes + String.length line;
+    Queue.enqueue t.queue entry;
+    (match entry with
+     | Line line -> t.bytes <- t.bytes + String.length line
+     | Rendered_late _ -> ());
     let lines = Queue.length t.queue in
     if lines > t.max_lines
     then
@@ -67,6 +75,9 @@ let send t line =
     else Eio.Condition.broadcast t.ready
 ;;
 
+let send t line = enqueue t (Line line)
+let send_late t render = enqueue t (Rendered_late render)
+
 let finish t =
   match t.state with
   | Open ->
@@ -78,8 +89,14 @@ let finish t =
 let rec run t ~write =
   match t.state, Queue.dequeue t.queue with
   | Failed, _ -> ()
-  | (Open | Finishing), Some line ->
-    t.bytes <- t.bytes - String.length line;
+  | (Open | Finishing), Some entry ->
+    let line =
+      match entry with
+      | Line line ->
+        t.bytes <- t.bytes - String.length line;
+        line
+      | Rendered_late render -> render ()
+    in
     (match write line with
      | () -> run t ~write
      | exception (Eio.Cancel.Cancelled _ as exn) -> raise exn

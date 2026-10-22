@@ -20,6 +20,12 @@ val create : ?max_lines:int -> ?max_bytes:int -> unit -> t
     finished. *)
 val send : t -> string -> unit
 
+(** Queues a line made by [render] when its turn to be written comes, so
+    that what it says can still change while it waits (see
+    {!Update_coalescer}). It counts as a line, but not towards
+    [max_bytes]. *)
+val send_late : t -> (unit -> string) -> unit
+
 (** Writes the lines in order as they come, until [finish] (and the lines
     sent before it are written) or a failure. A [write] that raises fails
     the outbox. *)
