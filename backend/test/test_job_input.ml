@@ -98,7 +98,7 @@ let%expect_test "job_input drives a job on this machine" =
     user: go
     assistant:  bash{"command":"while read line; do echo \"got $line\"; done; echo bye","background":true,"stdin":true}
     state: running=true subagents=[] jobs=[j1 running]
-    tool_result bash: started job j1: while read line; do echo "got $line"; done; echo bye; its output is being recorded; you will be notified when it exits. Use job_output to peek, job_wait to block, job_kill to stop it.
+    tool_result bash: started job j1: while read line; do echo "got $line"; done; echo bye; its output is being recorded; you will be notified when it exits. Use job_output to peek, job_kill to stop it.
     assistant:  job_input{"id":"j1","input":"one\n","wait_ms":10000}
     tool_result job_input: sent 4 bytes to job j1 | got one
     assistant:  job_input{"id":"j1","input":"two\n","close":true,"wait_ms":10000}
@@ -139,7 +139,7 @@ let%expect_test "without stdin: true a job reads end of input at once" =
     user: go
     assistant:  bash{"command":"while [ ! -f gate ]; do sleep 0.02; done; cat; echo read to the end","background":true}
     state: running=true subagents=[] jobs=[j1 running]
-    tool_result bash: started job j1: while [ ! -f gate ]; do sleep 0.02; done; cat; echo read to…; its output is being recorded; you will be notified when it exits. Use job_output to peek, job_wait to block, job_kill to stop it.
+    tool_result bash: started job j1: while [ ! -f gate ]; do sleep 0.02; done; cat; echo read to…; its output is being recorded; you will be notified when it exits. Use job_output to peek, job_kill to stop it.
     assistant:  job_input{"id":"j1","input":"x"}
     tool_result job_input: cannot write to job j1: it was started without stdin: true, so its stdin is closed; start it again with bash, background: true and stdin: true to send it input
     assistant: noted
@@ -166,8 +166,8 @@ let%expect_test "a model without jobs does not get job_input; subagents do" =
        : string list Or_error.t)];
   [%expect
     {|
-    ((job_status job_output job_wait job_input job_kill)
-     (Ok (job_status job_output job_wait job_input job_kill)))
+    ((job_status job_output job_input job_kill)
+     (Ok (job_status job_output job_input job_kill)))
     |}]
 ;;
 
@@ -268,7 +268,7 @@ let%expect_test "job_input on a client tool host" =
     {"type":"response","id":"r2","ok":true,"result":{}}
     user: go
     assistant:  bash{"command":"cat","background":true,"stdin":true}
-    tool_result bash: started job j1: cat; its output is being recorded; you will be notified when it exits. Use job_output to peek, job_wait to block, job_kill to stop it.
+    tool_result bash: started job j1: cat; its output is being recorded; you will be notified when it exits. Use job_output to peek, job_kill to stop it.
     assistant:  job_input{"id":"j1","input":"one\n","wait_ms":10000}
     tool_result job_input: sent 4 bytes to job j1 | one
     assistant:  job_input{"id":"j1","input":"","close":true,"wait_ms":10000}
@@ -289,7 +289,7 @@ let%expect_test "job_input on a tool host that predates it" =
     {"type":"response","id":"r2","ok":true,"result":{}}
     user: go
     assistant:  bash{"command":"cat","background":true,"stdin":true}
-    tool_result bash: started job j1: cat; its output is being recorded; you will be notified when it exits. Use job_output to peek, job_wait to block, job_kill to stop it.
+    tool_result bash: started job j1: cat; its output is being recorded; you will be notified when it exits. Use job_output to peek, job_kill to stop it.
     assistant:  job_input{"id":"j1","input":"one\n","wait_ms":10000}
     tool_result job_input: cannot write to job j1: tool host "laptop" runs an older prigh that cannot pass input to jobs: update prigh there and restart its TUI or tool-host, or start the job again with its input in the command (e.g. a here-document)
     assistant:  job_input{"id":"j1","input":"","close":true,"wait_ms":10000}

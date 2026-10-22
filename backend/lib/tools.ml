@@ -64,7 +64,7 @@ let for_model model tools =
 let specs tools = List.map tools ~f:(fun (t : Tool.t) -> t.spec)
 
 (* A subagent's own subagents are synchronous. *)
-let subagent_control = [ "subagent_wait"; "subagent_status"; "subagent_cancel" ]
+let subagent_control = [ "subagent_status"; "subagent_cancel" ]
 
 (* The session's plan, goal, plan mode and the user belong to the main
    agent. *)
@@ -88,13 +88,6 @@ let for_context ~parent ~depth ?only () =
       then None
       else if depth >= 1 && String.equal name "bash"
       then Some Tool_bash.subagent_tool
-      else if depth >= 1
-      then
-        Some
-          (Option.value
-             (List.find Tool_jobs.subagent_tools ~f:(fun j ->
-                String.equal (Tool.name j) name))
-             ~default:t)
       else Some t)
   in
   match only with

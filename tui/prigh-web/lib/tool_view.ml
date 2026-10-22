@@ -174,35 +174,14 @@ let task_details task =
   else Node.none
 ;;
 
-(* Reports of finished jobs or subagents ([job_wait], [job_kill],
-   [subagent_wait]), then perhaps a note of what is still running. *)
+(* The report of a job or subagent stopped by [job_kill] or
+   [subagent_cancel]. *)
 let reports ~fold text =
-  let text, note =
-    match
-      String.substr_index_all text ~may_overlap:false ~pattern:"\n\n"
-      |> List.last
-    with
-    | Some i
-      when List.exists
-             [ "still running: "; "timed out; still running: " ]
-             ~f:(fun prefix ->
-               String.is_substring_at text ~pos:(i + 2) ~substring:prefix) ->
-      String.prefix text i, String.drop_prefix text (i + 2)
-    | _ -> text, ""
-  in
   match Prigh_ui.Delivery.parse text with
   | Some sections ->
     (* Toggled with the card. *)
-    [ Delivery_view.view ~fold:(fst fold) ~key:(fun _ -> snd fold) sections
-    ; output ~fold note
-    ]
-  | None ->
-    [ output
-        ~fold
-        (String.concat
-           ~sep:"\n\n"
-           (List.filter [ text; note ] ~f:(Fn.non String.is_empty)))
-    ]
+    [ Delivery_view.view ~fold:(fst fold) ~key:(fun _ -> snd fold) sections ]
+  | None -> [ output ~fold text ]
 ;;
 
 let cancelled (r : Message.Tool_result.t) =
@@ -618,7 +597,7 @@ let present
          | None -> []
          | Some r -> [ output ~fold ~error:r.is_error ?elided:r.elided r.text ])
     }
-  | "job_wait" | "job_kill" | "subagent_wait" | "subagent_cancel" ->
+  | "job_kill" | "subagent_cancel" ->
     let ids = Tool_args.strings args "ids" @ Tool_args.strings args "id" in
     { arg =
         Option.some_if

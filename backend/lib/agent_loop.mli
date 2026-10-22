@@ -29,6 +29,9 @@ val tool_summary : name:string -> Json.t -> string
 (** Returns the messages added to the context (prompts, assistant messages
     and tool results). [steer] is polled after each turn's tool results; any
     messages it returns are appended before the next provider request.
+    [wake] is called when the model ends its turn (no tool calls, within the
+    turn limit, not cancelled): it may block, and any messages it
+    returns are appended and the run goes on; [[]] ends the run.
 
     Between turns, when the latest response's tokens (plus what was added
     since) cross {!Compaction.should_compact}'s threshold, the context is
@@ -54,6 +57,7 @@ val run
   -> ?depth:int
   -> ?agent_id:string
   -> ?steer:(unit -> Message.t list)
+  -> ?wake:(unit -> Message.t list)
   -> ?emit:(Agent_event.t -> unit)
   -> ?approve:Tool.approver
   -> ?ask_user:

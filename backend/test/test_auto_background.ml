@@ -6,7 +6,7 @@ module Gates = Routed_provider.Gates
 module Json = Jsonaf
 
 (* Foreground [bash] calls of the main agent that run past
-   [auto_background_seconds] become jobs, and waits stop at that limit. *)
+   [auto_background_seconds] become jobs. *)
 
 let message_line = Test_background_subagents.message_line
 let print_messages = Test_background_subagents.print_messages
@@ -118,7 +118,7 @@ let%expect_test
     assistant:  bash{"command":"echo before; while [ ! -f gate ]; do sleep 0.02; done; echo after; seq 1 3; exit 2"}
     tool_output c2: before
     state: running=true subagents=[] jobs=[j1 running]
-    tool_result bash: still running after Ns, so it was moved to the background as job j1 (not restarted: it keeps running). Output so far: | before | Its report ([job j1 exited ...] and its last lines) is delivered to you when it exits: keep working on something else or end your turn. job_output shows more output, job_kill stops it; do not job_wait on it unless you truly cannot do anything else.
+    tool_result bash: still running after Ns, so it was moved to the background as job j1 (not restarted: it keeps running). Output so far: | before | Its report ([job j1 exited ...] and its last lines) is delivered to you when it exits: keep working on something else or end your turn. job_output shows more output, job_kill stops it.
     assistant: moved on
     agent_end
     state: running=false subagents=[] jobs=[j1 running]
@@ -140,7 +140,7 @@ let%expect_test
     assistant:  bash{"command":"echo quick"}
     tool_result bash: quick
     assistant:  bash{"command":"echo before; while [ ! -f gate ]; do sleep 0.02; done; echo after; seq 1 3; exit 2"}
-    tool_result bash: still running after 1s, so it was moved to the background as job j1 (not restarted: it keeps running). Output so far: | before | Its report ([job j1 exited ...] and its last lines) is delivered to you when it exits: keep working on something else or end your turn. job_output shows more output, job_kill stops it; do not job_wait on it unless you truly cannot do anything else.
+    tool_result bash: still running after 1s, so it was moved to the background as job j1 (not restarted: it keeps running). Output so far: | before | Its report ([job j1 exited ...] and its last lines) is delivered to you when it exits: keep working on something else or end your turn. job_output shows more output, job_kill stops it.
     assistant: moved on
     user: [job j1 exited 2] echo before; while [ ! -f gate ]; do sleep 0.02; done; echo… | before | after | 1 | 2 | 3
     assistant: it exited 2
@@ -148,7 +148,8 @@ let%expect_test
 ;;
 
 let%expect_test
-    "job_wait and subagent_wait return at the limit; reports still come once"
+    "the main agent ends its turn with a subagent and a job running; each \
+     report wakes it"
   =
   let gates = Gates.create () in
   Gates.hold gates "look";
@@ -165,11 +166,9 @@ let%expect_test
                     ; "background", `True
                     ]) )
           ]
+        (* A habit from sessions that had it: an unknown tool now. *)
       ; call ~id:"w1" "job_wait" "{}"
-      ; call ~id:"w2" "job_wait" {|{"ids":["j1"],"timeout":600}|}
-      ; call ~id:"w3" "subagent_wait" {|{"ids":["a1"]}|}
-      ; call ~id:"w4" "job_wait" {|{"timeout":0}|}
-      ; Reply.text "waiting no more"
+      ; Reply.text "ending my turn"
       ; Reply.text "a1 in"
       ; Reply.text "j1 in"
       ]
@@ -192,16 +191,10 @@ let%expect_test
     state: running=true subagents=[a1 running] jobs=[]
     tool_result subagent: started agent a1 (look); its result will be delivered to you when it finishes: keep working or end your turn meanwhile
     state: running=true subagents=[a1 running] jobs=[j1 running]
-    tool_result bash: started job j1: while [ ! -f gate ]; do sleep 0.02; done; echo built; its output is being recorded; you will be notified when it exits. Use job_output to peek, job_wait to block, job_kill to stop it.
+    tool_result bash: started job j1: while [ ! -f gate ]; do sleep 0.02; done; echo built; its output is being recorded; you will be notified when it exits. Use job_output to peek, job_kill to stop it.
     assistant:  job_wait{}
-    tool_result job_wait: still running after Ns (the longest a wait lasts): j1 (while [ ! -f gate ]; do sleep 0.02; done; echo built). Nothing is lost: each report is delivered to you when it finishes. Keep working on something that does not need it, or end your turn; do not wait again just to pass the time.
-    assistant:  job_wait{"ids":["j1"],"timeout":600}
-    tool_result job_wait: still running after Ns (the longest a wait lasts): j1 (while [ ! -f gate ]; do sleep 0.02; done; echo built). Nothing is lost: each report is delivered to you when it finishes. Keep working on something that does not need it, or end your turn; do not wait again just to pass the time.
-    assistant:  subagent_wait{"ids":["a1"]}
-    tool_result subagent_wait: still running after Ns (the longest a wait lasts): a1 (look). Nothing is lost: each report is delivered to you when it finishes. Keep working on something that does not need it, or end your turn; do not wait again just to pass the time.
-    assistant:  job_wait{"timeout":0}
-    tool_result job_wait: timed out; still running: j1 (while [ ! -f gate ]; do sleep 0.02; done; echo built)
-    assistant: waiting no more
+    tool_result job_wait: unknown tool "job_wait"
+    assistant: ending my turn
     agent_end
     state: running=false subagents=[a1 running] jobs=[j1 running]
     --- turn over
@@ -221,12 +214,12 @@ let%expect_test
   print_messages
     (List.drop_while (Agent.messages agent) ~f:(function
        | Assistant a ->
-         not (String.equal (Message.Assistant.text a) "waiting no more")
+         not (String.equal (Message.Assistant.text a) "ending my turn")
        | _ -> true));
   [%expect
     {|
     --- messages
-    assistant: waiting no more
+    assistant: ending my turn
     user: [subagent a1 finished] look | child report | [subagent: 1 turns, 10 in / 5 out tokens, $0.0000]
     assistant: a1 in
     user: [job j1 exited 0] while [ ! -f gate ]; do sleep 0.02; done; echo built | built
@@ -283,7 +276,7 @@ let%expect_test
     user: go
     assistant:  bash{"command":"while [ ! -f gate ]; do sleep 0.02; done; echo after the abort"}
     state: running=true subagents=[] jobs=[j1 running]
-    tool_result bash: still running after Ns, so it was moved to the background as job j1 (not restarted: it keeps running). No output so far. | Its report ([job j1 exited ...] and its last lines) is delivered to you when it exits: keep working on something else or end your turn. job_output shows more output, job_kill stops it; do not job_wait on it unless you truly cannot do anything else.
+    tool_result bash: still running after Ns, so it was moved to the background as job j1 (not restarted: it keeps running). No output so far. | Its report ([job j1 exited ...] and its last lines) is delivered to you when it exits: keep working on something else or end your turn. job_output shows more output, job_kill stops it.
     assistant:  hold{}
     --- abort
     tool_result hold: [cancelled]
@@ -385,7 +378,7 @@ let%expect_test "a command on a client tool host moves to the background" =
     {"type":"response","id":"r","ok":true,"result":{"cwd":"$DIR/host","created":false}}
     {"type":"response","id":"r","ok":true,"result":{}}
     assistant:  bash{"command":"basename $PWD; echo from-host; while [ ! -f gate ]; do sleep 0.02; done; echo after-gate"}
-    tool_result bash: still running after Ns, so it was moved to the background as job j1 (not restarted: it keeps running). Output so far: | host | from-host | Its report ([job j1 exited ...] and its last lines) is delivered to you when it exits: keep working on something else or end your turn. job_output shows more output, job_kill stops it; do not job_wait on it unless you truly cannot do anything else.
+    tool_result bash: still running after Ns, so it was moved to the background as job j1 (not restarted: it keeps running). Output so far: | host | from-host | Its report ([job j1 exited ...] and its last lines) is delivered to you when it exits: keep working on something else or end your turn. job_output shows more output, job_kill stops it.
     assistant: moved
     {"type":"response","id":"r","ok":true,"result":{"text":"[job j1 running after Ns, 15 bytes; lines 1-2 of 2] basename $PWD; echo from-host; while [ ! -f gate ]; do slee…\nhost\nfrom-host"}}
     user: [job j1 exited 0] basename $PWD; echo from-host; while [ ! -f gate ]; do slee… | host | from-host | after-gate
@@ -403,7 +396,7 @@ let%expect_test "a command on a client tool host moves to the background" =
   [%expect
     {|
     {"type":"response","id":"r","ok":true,"result":{}}
-    tool_result bash: still running after Ns, so it was moved to the background as job j2 (not restarted: it keeps running). Output so far: | waiting | Its report ([job j2 exited ...] and its last lines) is delivered to you when it exits: keep working on something else or end your turn. job_output shows more output, job_kill stops it; do not job_wait on it unless you truly cannot do anything else.
+    tool_result bash: still running after Ns, so it was moved to the background as job j2 (not restarted: it keeps running). Output so far: | waiting | Its report ([job j2 exited ...] and its last lines) is delivered to you when it exits: keep working on something else or end your turn. job_output shows more output, job_kill stops it.
     assistant: moved again
     disconnected from 127.0.0.1:PORT
     retrying in 50ms
@@ -456,11 +449,11 @@ let%expect_test "job ids continue past moved calls after a reload" =
     {|
     user: go
     assistant:  bash{"command":"while [ ! -f gate ]; do sleep 0.02; done; echo one"}
-    tool_result bash: still running after Ns, so it was moved to the background as job j1 (not restarted: it keeps running). No output so far. | Its report ([job j1 exited ...] and its last lines) is delivered to you when it exits: keep working on something else or end your turn. job_output shows more output, job_kill stops it; do not job_wait on it unless you truly cannot do anything else.
+    tool_result bash: still running after Ns, so it was moved to the background as job j1 (not restarted: it keeps running). No output so far. | Its report ([job j1 exited ...] and its last lines) is delivered to you when it exits: keep working on something else or end your turn. job_output shows more output, job_kill stops it.
     assistant: ok
     user: again
     assistant:  bash{"command":"echo two","background":true}
-    tool_result bash: started job j2: echo two; its output is being recorded; you will be notified when it exits. Use job_output to peek, job_wait to block, job_kill to stop it.
+    tool_result bash: started job j2: echo two; its output is being recorded; you will be notified when it exits. Use job_output to peek, job_kill to stop it.
     assistant: ok
     user: [job j2 exited 0] echo two | two
     assistant: in

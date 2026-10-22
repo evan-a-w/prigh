@@ -802,11 +802,10 @@ you can keep talking to it. When a subagent finishes (or fails, or is
 cancelled) its report is handed to the main agent as a message starting
 `[subagent a1 finished]`: an idle agent starts a turn for it, a running one
 gets it after its current tool calls (several finishing together arrive as one
-message). The model also has `subagent_wait` (block on some or all of them,
-optionally with a timeout; what it returns is not delivered again; it
-returns after `auto_background_seconds`, below, with what is still running),
-`subagent_status` and `subagent_cancel`. Subagents started by a subagent stay
-synchronous (and cannot delegate further).
+message). The model also has `subagent_status` and `subagent_cancel`; there
+is no tool to block on a subagent, since its report wakes the main agent
+anyway. Subagents started by a subagent stay synchronous (and cannot
+delegate further).
 
 Each subagent gets its own transcript. Shift+Tab cycles focus main → agent 1 →
 …, Alt+1…9 jumps, and `/agents` opens a picker (Enter focuses, Ctrl+D cancels
@@ -831,23 +830,26 @@ host that drops its connection keeps its jobs if it reconnects within a
 minute still running them (a TUI or `prigh tool-host` that reconnects does),
 otherwise they fail (`failed: tool host disconnected`). The
 model also has `job_status`, `job_output` (peek at recent output, paging back
-with `offset`), `job_wait` (block on some or all jobs; returned reports are
-not delivered again), `job_input` and `job_kill`.
+with `offset`), `job_input` and `job_kill`; like subagents, jobs have no
+tool to block on them.
 
 Subagents have jobs too, their own (`j1`, ... per subagent): `bash` with
-`background` and the job tools work the same, but since a subagent is not
-woken after it ends its turn, its `job_wait` blocks as long as the jobs
-take (its `timeout` only bounds it), finished jobs' reports reach it
-between its turns, and jobs still running when it finishes are killed,
-which its report says (`[killed when the subagent finished, still
-running: job j2 (sleep 60)]`). Its system prompt and tool descriptions tell
-it to block, never sleep: foreground commands for results it needs (one
-blocking command to wait for something to become ready), jobs plus
-`job_wait` for commands side by side, and to wait for what it needs before
-its final report. The main agent's prompt tells it never to sleep to pass
-the time either.
+`background` and the job tools work the same. Finished jobs' reports reach
+a subagent between its turns, and when it ends its turn while some of its
+jobs still run it is woken by the next report like the main agent: it
+finishes only when it ends a turn with no jobs running. Jobs still running
+when it stops otherwise (cancelled, out of turns) are killed, which its
+report says (`[killed when the subagent finished, still running: job j2
+(sleep 60)]`). Its system prompt tells it never to sleep or poll: foreground
+commands for results it needs (one blocking command to wait for something
+to become ready), jobs for commands side by side, and to kill the jobs it
+no longer needs (servers) before its final report. The main agent's prompt
+tells it never to sleep or poll either, but to keep working or end its turn
+(`job_output` shows a job's output without blocking). `prigh run` likewise
+waits for the agent's jobs and subagents, and the turns their reports
+start, before it exits.
 
-The main agent never stalls on a long command or a wait.
+The main agent never stalls on a long command.
 `auto_background_seconds` in `config.json` (default 30; `0` turns it off)
 is how long a foreground `bash` call of the main agent may run: one still
 running then is moved to the background without being restarted. It
@@ -858,13 +860,10 @@ the last lines of output; from then on it is a job like any other
 (`job_output`, `job_kill`; `job_input` says its stdin is closed), and its
 report arrives when it exits. A command given no `timeout` then has none,
 like a job; one with a `timeout` keeps it. The time counts from when the
-command starts, not while a confirmation waits for you. `job_wait` and
-`subagent_wait` return after the same limit (their `timeout` can be
-shorter, not longer) with what is still running, whose reports are still
-delivered later, once. The system prompt and the tool descriptions tell
-the model to keep working or end its turn rather than wait. Subagents'
-own foreground `bash` calls are never moved, and their `job_wait` has no
-such limit. The tool card shows `job j3` and
+command starts, not while a confirmation waits for you. The system prompt
+and the tool descriptions tell the model to keep working or end its turn
+rather than wait. Subagents' own foreground `bash` calls are never moved.
+The tool card shows `job j3` and
 `moved to the background after 30s` with the output it had then.
 
 A job started with `stdin: true` gets a pipe for its stdin that stays

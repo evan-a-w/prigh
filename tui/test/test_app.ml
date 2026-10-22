@@ -3752,7 +3752,7 @@ let%expect_test "background subagent: runs while main is idle, survives a \
              ~name:"subagent"
              ~id:"c1"
              "started agent a1 (index the repo); its result will be delivered \
-              to you when it finishes; use subagent_wait to block on it"
+              to you when it finishes: keep working or end your turn meanwhile"
        });
   say h "started it";
   H.event h (State (state ~subagents:[ "a1", "index the repo", true ] ()));

@@ -101,7 +101,7 @@ let arg (call : P.Tool_call.t) =
     | "grep" | "find" -> str "pattern"
     | "subagent" -> str "task"
     | "ask_user" | "update_plan" | "exit_plan_mode" -> None
-    | "job_wait" | "job_kill" | "subagent_wait" | "subagent_cancel" -> ids ()
+    | "job_kill" | "subagent_cancel" -> ids ()
     | _ ->
       (match
          List.find_map

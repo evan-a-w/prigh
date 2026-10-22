@@ -154,7 +154,7 @@ let%expect_test "background bash returns at once; the exit report starts a turn"
     user: build it
     assistant:  bash{"command":"while [ ! -f gate ]; do sleep 0.02; done; echo finished; exit 3","background":true}
     state: running=true subagents=[] jobs=[j1 running]
-    tool_result bash: started job j1: while [ ! -f gate ]; do sleep 0.02; done; echo finished; ex…; its output is being recorded; you will be notified when it exits. Use job_output to peek, job_wait to block, job_kill to stop it.
+    tool_result bash: started job j1: while [ ! -f gate ]; do sleep 0.02; done; echo finished; ex…; its output is being recorded; you will be notified when it exits. Use job_output to peek, job_kill to stop it.
     assistant: started it
     agent_end
     state: running=false subagents=[] jobs=[j1 running]
@@ -170,7 +170,7 @@ let%expect_test "background bash returns at once; the exit report starts a turn"
     --- messages
     user: build it
     assistant:  bash{"command":"while [ ! -f gate ]; do sleep 0.02; done; echo finished; exit 3","background":true}
-    tool_result bash: started job j1: while [ ! -f gate ]; do sleep 0.02; done; echo finished; ex…; its output is being recorded; you will be notified when it exits. Use job_output to peek, job_wait to block, job_kill to stop it.
+    tool_result bash: started job j1: while [ ! -f gate ]; do sleep 0.02; done; echo finished; ex…; its output is being recorded; you will be notified when it exits. Use job_output to peek, job_kill to stop it.
     assistant: started it
     user: [job j1 exited 3] while [ ! -f gate ]; do sleep 0.02; done; echo finished; ex… | finished
     assistant: it failed with 3
@@ -187,33 +187,23 @@ let pid_alive pid =
   | exception _ -> false
 ;;
 
-let%expect_test "job_wait, job_output, job_status and job_kill" =
+let%expect_test "job_output, job_status and job_kill" =
   with_agent
     ~main:
       [ background
           ~id:"c1"
           "sleep 30 & echo $! > sleep.pid; echo started-sleeping; wait"
       ; background ~id:"c2" "sleep 0.3; echo hi"
-      ; Reply.tool_call
-          ~id:"w1"
-          ~name:"job_wait"
-          ~arguments:{|{"ids":["j2"]}|}
-          ()
+      ; Reply.text "waiting for j2"
       ; Reply.tool_call
           ~id:"o1"
           ~name:"job_output"
           ~arguments:{|{"id":"j1"}|}
           ()
       ; Reply.tool_call ~id:"s1" ~name:"job_status" ~arguments:"{}" ()
-      ; Reply.tool_call
-          ~id:"w2"
-          ~name:"job_wait"
-          ~arguments:{|{"timeout":0}|}
-          ()
       ; Reply.tool_call ~id:"k1" ~name:"job_kill" ~arguments:{|{"id":"j1"}|} ()
       ; Reply.tool_call ~id:"k2" ~name:"job_kill" ~arguments:{|{"id":"j9"}|} ()
       ; Reply.tool_call ~id:"s2" ~name:"job_status" ~arguments:"{}" ()
-      ; Reply.tool_call ~id:"w3" ~name:"job_wait" ~arguments:"{}" ()
       ; Reply.text "all done"
       ]
     []
@@ -225,7 +215,7 @@ let%expect_test "job_wait, job_output, job_status and job_kill" =
   printf
     "sleep still alive: %b\n"
     (not (eventually t (fun () -> not (pid_alive pid))));
-  (* Everything was returned by the tools, so nothing is delivered again. *)
+  (* j1's report was returned by job_kill, so it is not delivered again. *)
   print_endline "--- messages";
   List.iter (Agent.messages agent) ~f:(fun m ->
     print_endline (clean t (message_line m)));
@@ -236,20 +226,20 @@ let%expect_test "job_wait, job_output, job_status and job_kill" =
     user: go
     assistant:  bash{"command":"sleep 30 & echo $! > sleep.pid; echo started-sleeping; wait","background":true}
     state: running=true subagents=[] jobs=[j1 running]
-    tool_result bash: started job j1: sleep 30 & echo $! > sleep.pid; echo started-sleeping; wait; its output is being recorded; you will be notified when it exits. Use job_output to peek, job_wait to block, job_kill to stop it.
+    tool_result bash: started job j1: sleep 30 & echo $! > sleep.pid; echo started-sleeping; wait; its output is being recorded; you will be notified when it exits. Use job_output to peek, job_kill to stop it.
     assistant:  bash{"command":"sleep 0.3; echo hi","background":true}
     state: running=true subagents=[] jobs=[j1 running; j2 running]
-    tool_result bash: started job j2: sleep 0.3; echo hi; its output is being recorded; you will be notified when it exits. Use job_output to peek, job_wait to block, job_kill to stop it.
-    assistant:  job_wait{"ids":["j2"]}
-    state: running=true subagents=[] jobs=[j1 running; j2 exited 0]
+    tool_result bash: started job j2: sleep 0.3; echo hi; its output is being recorded; you will be notified when it exits. Use job_output to peek, job_kill to stop it.
+    assistant: waiting for j2
+    agent_end
+    state: running=false subagents=[] jobs=[j1 running; j2 running]
     state: running=true subagents=[] jobs=[j1 running]
-    tool_result job_wait: [job j2 exited 0] sleep 0.3; echo hi | hi
+    agent_start
+    user: [job j2 exited 0] sleep 0.3; echo hi | hi
     assistant:  job_output{"id":"j1"}
     tool_result job_output: [job j1 running after Ns, 17 bytes; lines 1-1 of 1] sleep 30 & echo $! > sleep.pid; echo started-sleeping; wait | started-sleeping
     assistant:  job_status{}
     tool_result job_status: j1  running  Ns  sleep 30 & echo $! > sleep.pid; echo started-sleeping; wait  (last: 17 B, started-sleeping) | j2  exited 0, delivered  Ns  sleep 0.3; echo hi  (last: 3 B, hi)
-    assistant:  job_wait{"timeout":0}
-    tool_result job_wait: timed out; still running: j1 (sleep 30 & echo $! > sleep.pid; echo started-sleeping; wait)
     assistant:  job_kill{"id":"j1"}
     state: running=true subagents=[] jobs=[j1 killed]
     state: running=true subagents=[] jobs=[]
@@ -258,8 +248,6 @@ let%expect_test "job_wait, job_output, job_status and job_kill" =
     tool_result job_kill: invalid arguments: unknown job "j9"; known: j1, j2
     assistant:  job_status{}
     tool_result job_status: j1  killed, delivered  Ns  sleep 30 & echo $! > sleep.pid; echo started-sleeping; wait  (last: 17 B, started-sleeping) | j2  exited 0, delivered  Ns  sleep 0.3; echo hi  (last: 3 B, hi)
-    assistant:  job_wait{}
-    tool_result job_wait: no jobs to wait for
     assistant: all done
     agent_end
     state: running=false subagents=[] jobs=[]
@@ -267,25 +255,21 @@ let%expect_test "job_wait, job_output, job_status and job_kill" =
     --- messages
     user: go
     assistant:  bash{"command":"sleep 30 & echo $! > sleep.pid; echo started-sleeping; wait","background":true}
-    tool_result bash: started job j1: sleep 30 & echo $! > sleep.pid; echo started-sleeping; wait; its output is being recorded; you will be notified when it exits. Use job_output to peek, job_wait to block, job_kill to stop it.
+    tool_result bash: started job j1: sleep 30 & echo $! > sleep.pid; echo started-sleeping; wait; its output is being recorded; you will be notified when it exits. Use job_output to peek, job_kill to stop it.
     assistant:  bash{"command":"sleep 0.3; echo hi","background":true}
-    tool_result bash: started job j2: sleep 0.3; echo hi; its output is being recorded; you will be notified when it exits. Use job_output to peek, job_wait to block, job_kill to stop it.
-    assistant:  job_wait{"ids":["j2"]}
-    tool_result job_wait: [job j2 exited 0] sleep 0.3; echo hi | hi
+    tool_result bash: started job j2: sleep 0.3; echo hi; its output is being recorded; you will be notified when it exits. Use job_output to peek, job_kill to stop it.
+    assistant: waiting for j2
+    user: [job j2 exited 0] sleep 0.3; echo hi | hi
     assistant:  job_output{"id":"j1"}
     tool_result job_output: [job j1 running after Ns, 17 bytes; lines 1-1 of 1] sleep 30 & echo $! > sleep.pid; echo started-sleeping; wait | started-sleeping
     assistant:  job_status{}
     tool_result job_status: j1  running  Ns  sleep 30 & echo $! > sleep.pid; echo started-sleeping; wait  (last: 17 B, started-sleeping) | j2  exited 0, delivered  Ns  sleep 0.3; echo hi  (last: 3 B, hi)
-    assistant:  job_wait{"timeout":0}
-    tool_result job_wait: timed out; still running: j1 (sleep 30 & echo $! > sleep.pid; echo started-sleeping; wait)
     assistant:  job_kill{"id":"j1"}
     tool_result job_kill: [job j1 killed] sleep 30 & echo $! > sleep.pid; echo started-sleeping; wait | started-sleeping
     assistant:  job_kill{"id":"j9"}
     tool_result job_kill: invalid arguments: unknown job "j9"; known: j1, j2
     assistant:  job_status{}
     tool_result job_status: j1  killed, delivered  Ns  sleep 30 & echo $! > sleep.pid; echo started-sleeping; wait  (last: 17 B, started-sleeping) | j2  exited 0, delivered  Ns  sleep 0.3; echo hi  (last: 3 B, hi)
-    assistant:  job_wait{}
-    tool_result job_wait: no jobs to wait for
     assistant: all done
     |}]
 ;;
@@ -340,7 +324,7 @@ let%expect_test
     state: running=true subagents=[a1 running] jobs=[]
     tool_result subagent: started agent a1 (look); its result will be delivered to you when it finishes: keep working or end your turn meanwhile
     state: running=true subagents=[a1 running] jobs=[j1 running]
-    tool_result bash: started job j1: while [ ! -f gate ]; do sleep 0.02; done; echo built; its output is being recorded; you will be notified when it exits. Use job_output to peek, job_wait to block, job_kill to stop it.
+    tool_result bash: started job j1: while [ ! -f gate ]; do sleep 0.02; done; echo built; its output is being recorded; you will be notified when it exits. Use job_output to peek, job_kill to stop it.
     assistant:  hold{}
     state: running=true subagents=[a1 finished] jobs=[j1 running]
     state: running=true subagents=[a1 finished] jobs=[j1 exited 0]
@@ -355,7 +339,7 @@ let%expect_test
     user: go
     assistant:  subagent{"task":"look"} bash{"command":"while [ ! -f gate ]; do sleep 0.02; done; echo built","background":true}
     tool_result subagent: started agent a1 (look); its result will be delivered to you when it finishes: keep working or end your turn meanwhile
-    tool_result bash: started job j1: while [ ! -f gate ]; do sleep 0.02; done; echo built; its output is being recorded; you will be notified when it exits. Use job_output to peek, job_wait to block, job_kill to stop it.
+    tool_result bash: started job j1: while [ ! -f gate ]; do sleep 0.02; done; echo built; its output is being recorded; you will be notified when it exits. Use job_output to peek, job_kill to stop it.
     assistant:  hold{}
     tool_result hold: held
     user: [subagent a1 finished] look | child report | [subagent: 1 turns, 10 in / 5 out tokens, $0.0000] |  | [job j1 exited 0] while [ ! -f gate ]; do sleep 0.02; done; echo built | built
@@ -417,9 +401,9 @@ let%expect_test
     user: go
     assistant:  bash{"command":"while [ ! -f gate1 ]; do sleep 0.02; done; echo one","background":true} bash{"command":"while [ ! -f gate2 ]; do sleep 0.02; done; echo two","background":true}
     state: running=true subagents=[] jobs=[j1 running]
-    tool_result bash: started job j1: while [ ! -f gate1 ]; do sleep 0.02; done; echo one; its output is being recorded; you will be notified when it exits. Use job_output to peek, job_wait to block, job_kill to stop it.
+    tool_result bash: started job j1: while [ ! -f gate1 ]; do sleep 0.02; done; echo one; its output is being recorded; you will be notified when it exits. Use job_output to peek, job_kill to stop it.
     state: running=true subagents=[] jobs=[j1 running; j2 running]
-    tool_result bash: started job j2: while [ ! -f gate2 ]; do sleep 0.02; done; echo two; its output is being recorded; you will be notified when it exits. Use job_output to peek, job_wait to block, job_kill to stop it.
+    tool_result bash: started job j2: while [ ! -f gate2 ]; do sleep 0.02; done; echo two; its output is being recorded; you will be notified when it exits. Use job_output to peek, job_kill to stop it.
     assistant:  hold{}
     state: running=true subagents=[] jobs=[j1 exited 0; j2 running]
     --- abort
@@ -444,8 +428,8 @@ let%expect_test
     --- messages
     user: go
     assistant:  bash{"command":"while [ ! -f gate1 ]; do sleep 0.02; done; echo one","background":true} bash{"command":"while [ ! -f gate2 ]; do sleep 0.02; done; echo two","background":true}
-    tool_result bash: started job j1: while [ ! -f gate1 ]; do sleep 0.02; done; echo one; its output is being recorded; you will be notified when it exits. Use job_output to peek, job_wait to block, job_kill to stop it.
-    tool_result bash: started job j2: while [ ! -f gate2 ]; do sleep 0.02; done; echo two; its output is being recorded; you will be notified when it exits. Use job_output to peek, job_wait to block, job_kill to stop it.
+    tool_result bash: started job j1: while [ ! -f gate1 ]; do sleep 0.02; done; echo one; its output is being recorded; you will be notified when it exits. Use job_output to peek, job_kill to stop it.
+    tool_result bash: started job j2: while [ ! -f gate2 ]; do sleep 0.02; done; echo two; its output is being recorded; you will be notified when it exits. Use job_output to peek, job_kill to stop it.
     assistant:  hold{}
     tool_result hold: [cancelled]
     user: [job j1 exited 0] while [ ! -f gate1 ]; do sleep 0.02; done; echo one | one
@@ -513,7 +497,7 @@ let%expect_test
     --- messages
     user: again
     assistant:  bash{"command":"while [ ! -f gate ]; do sleep 0.02; done; echo three","background":true}
-    tool_result bash: started job j3: while [ ! -f gate ]; do sleep 0.02; done; echo three; its output is being recorded; you will be notified when it exits. Use job_output to peek, job_wait to block, job_kill to stop it.
+    tool_result bash: started job j3: while [ ! -f gate ]; do sleep 0.02; done; echo three; its output is being recorded; you will be notified when it exits. Use job_output to peek, job_kill to stop it.
     assistant: ok
     user: [job j3 exited 0] while [ ! -f gate ]; do sleep 0.02; done; echo three | three
     assistant: in
@@ -536,8 +520,8 @@ let%expect_test
   [%expect
     {|
     (bash read write edit ls grep find web_fetch web_search subagent job_status
-     job_output job_wait job_input job_kill)
-    {"type":"object","properties":{"command":{"type":"string","description":"The command to run"},"timeout":{"type":"integer","description":"Timeout in seconds (default 600, none in the background). The command is killed when it expires."},"background":{"type":"boolean","description":"Start it as a background job and return at once with the job id, to run commands side by side or keep a server running while you work. job_wait blocks until it exits and returns its report; job_output, job_input and job_kill act on it meanwhile. Your jobs are killed when you end your turn, so wait for the ones you need first."},"stdin":{"type":"boolean","description":"With background: keep its stdin open (a pipe, not a terminal) for input you send with job_input. Otherwise it reads end of input at once, like a foreground command."}},"required":["command"],"additionalProperties":false}
+     job_output job_input job_kill)
+    {"type":"object","properties":{"command":{"type":"string","description":"The command to run"},"timeout":{"type":"integer","description":"Timeout in seconds (default 600, none in the background). The command is killed when it expires."},"background":{"type":"boolean","description":"Start it as a background job and return at once with the job id, to run commands side by side or keep a server running while you work. Its report arrives when it exits, even after you end your turn; job_output, job_input and job_kill act on it meanwhile. You finish only once your jobs have exited: kill the ones you no longer need."},"stdin":{"type":"boolean","description":"With background: keep its stdin open (a pipe, not a terminal) for input you send with job_input. Otherwise it reads end of input at once, like a foreground command."}},"required":["command"],"additionalProperties":false}
     |}]
 ;;
 
@@ -563,8 +547,14 @@ let%expect_test "job_output pages back; the buffer keeps the end" =
     List.find_exn Tool_jobs.tools ~f:(fun tool ->
       String.equal (Tool.name tool) name)
   in
+  (* What the agent is sent once they have all finished. *)
+  let reports () =
+    Background_tasks.wait_all background;
+    List.iter (Background_tasks.take_undelivered background) ~f:(fun task ->
+      print_endline (clean t (Background_tasks.Task.report task)))
+  in
   call Tool_bash.tool {|{"command": "seq 1 100", "background": true}|};
-  call (tool "job_wait") "{}";
+  reports ();
   call (tool "job_output") {|{"id": "j1", "lines": 3}|};
   call (tool "job_output") {|{"id": "j1", "lines": 3, "offset": 10}|};
   call (tool "job_output") {|{"id": "j1", "lines": 3, "offset": 200}|};
@@ -574,10 +564,10 @@ let%expect_test "job_output pages back; the buffer keeps the end" =
     Tool_bash.tool
     {|{"command": "sleep 5", "background": true, "timeout": 1}|};
   call Tool_bash.tool {|{"command": "kill -9 $$", "background": true}|};
-  call (tool "job_wait") "{}";
+  reports ();
   [%expect
     {|
-    started job j1: seq 1 100; its output is being recorded; you will be notified when it exits. Use job_output to peek, job_wait to block, job_kill to stop it.
+    started job j1: seq 1 100; its output is being recorded; you will be notified when it exits. Use job_output to peek, job_kill to stop it.
     [job j1 exited 0] seq 1 100
     [last 40 of 100 lines; job_output shows more]
     61
@@ -631,13 +621,11 @@ let%expect_test "job_output pages back; the buffer keeps the end" =
     90
     [job j1 exited 0 after Ns, 292 bytes; no lines in range; 100 retained] seq 1 100
     invalid arguments: unknown job "j7"; known: j1
-    started job j2: exit 1; its output is being recorded; you will be notified when it exits. Use job_output to peek, job_wait to block, job_kill to stop it.
-    started job j3: sleep 5; its output is being recorded; you will be notified when it exits. Use job_output to peek, job_wait to block, job_kill to stop it.
-    started job j4: kill -9 $$; its output is being recorded; you will be notified when it exits. Use job_output to peek, job_wait to block, job_kill to stop it.
+    started job j2: exit 1; its output is being recorded; you will be notified when it exits. Use job_output to peek, job_kill to stop it.
+    started job j3: sleep 5; its output is being recorded; you will be notified when it exits. Use job_output to peek, job_kill to stop it.
+    started job j4: kill -9 $$; its output is being recorded; you will be notified when it exits. Use job_output to peek, job_kill to stop it.
     [job j2 exited 1] exit 1
-
     [job j3 timed out after Ns] sleep 5
-
     [job j4 killed by sigkill] kill -9 $$
     |}];
   let tail = Output_tail.create ~capacity:10 () in
@@ -816,5 +804,79 @@ let%expect_test "jobs on a client tool host: output, list, kill, disconnect" =
     connected to 127.0.0.1:PORT as client-3
     user: [job j3 exited 0] echo waiting; while [ ! -f gate2 ]; do sleep 0.02; done | waiting
     assistant: j3 noted
+    |}]
+;;
+
+let%expect_test
+    "a background subagent that ends its turn while its job runs is woken by \
+     the job's report, and only then reports to the main agent"
+  =
+  with_agent
+    ~main:
+      [ Test_background_subagents.spawn "build"
+      ; Reply.text "started a1"
+      ; Reply.text "a1 built it"
+      ]
+    [ ( "build"
+      , [ background ~id:"b1" (gated "echo built")
+        ; Reply.text "waiting for the build"
+        ; Reply.text "built"
+        ] )
+    ]
+  @@ fun t agent ->
+  let child_waiting = ref false in
+  Agent.subscribe agent ~f:(fun (event : Agent.Event.t) ->
+    match event with
+    | Loop (Subagent { agent_id; event = inner; _ }) ->
+      (match inner with
+       | Agent_start -> printf "  %s: agent_start\n" agent_id
+       | Agent_end _ -> printf "  %s: agent_end\n" agent_id
+       | Message_end m ->
+         let line = clean t (message_line m) in
+         if String.is_suffix line ~suffix:"waiting for the build"
+         then child_waiting := true;
+         printf "  %s: %s\n" agent_id line
+       | _ -> ())
+    | Loop (Subagent_end { agent_id; result; _ }) ->
+      printf
+        "subagent_end %s: %s\n"
+        agent_id
+        (Test_background_subagents.one_line result.text)
+    | _ -> ());
+  Or_error.ok_exn (Agent.prompt agent "go");
+  ignore (eventually t (fun () -> !child_waiting) : bool);
+  Test_background_subagents.wait_turn agent;
+  printf
+    "--- the subagent ended its turn; still running: %b\n"
+    (Agent.has_running_subagents agent);
+  open_gate t;
+  Agent.wait_idle agent;
+  [%expect
+    {|
+    state: running=true subagents=[] jobs=[]
+    agent_start
+    user: go
+    assistant:  subagent{"task":"build"}
+      a1: agent_start
+      a1: user: build
+    state: running=true subagents=[a1 running] jobs=[]
+    tool_result subagent: started agent a1 (build); its result will be delivered to you when it finishes: keep working or end your turn meanwhile
+    assistant: started a1
+    agent_end
+    state: running=false subagents=[a1 running] jobs=[]
+      a1: assistant:  bash{"command":"while [ ! -f gate ]; do sleep 0.02; done; echo built","background":true}
+      a1: tool_result bash: started job j1: while [ ! -f gate ]; do sleep 0.02; done; echo built; its output is being recorded; you will be notified when it exits, even after you end your turn (you finish only once your jobs have exited). Use job_output to peek, job_kill to stop it.
+      a1: assistant: waiting for the build
+    --- the subagent ended its turn; still running: true
+      a1: user: [job j1 exited 0] while [ ! -f gate ]; do sleep 0.02; done; echo built | built
+      a1: assistant: built
+      a1: agent_end
+    subagent_end a1: built | [subagent: 3 turns, 40 in / 18 out tokens, $0.0000]
+    state: running=true subagents=[] jobs=[]
+    agent_start
+    user: [subagent a1 finished] build | built | [subagent: 3 turns, 40 in / 18 out tokens, $0.0000]
+    assistant: a1 built it
+    agent_end
+    state: running=false subagents=[] jobs=[]
     |}]
 ;;
