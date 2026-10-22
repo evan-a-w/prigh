@@ -155,8 +155,7 @@ end
 
 module Pending_exec = struct
   type t =
-    { host : string
-    ; on_output : string -> unit
+    { on_output : string -> unit
     ; resolver : Tool_result.t Promise.u
     }
 end
@@ -819,16 +818,6 @@ let save_as_default t =
 let find_host t id = List.find (hosts t) ~f:(fun h -> String.equal h.id id)
 let active_host_connected t = Option.is_some (find_host t t.active_host)
 
-let fail_execs t ~host ~text =
-  let failed =
-    Hashtbl.filter t.pending_execs ~f:(fun (e : Pending_exec.t) ->
-      String.equal e.host host)
-  in
-  Hashtbl.iteri failed ~f:(fun ~key ~data:(e : Pending_exec.t) ->
-    Hashtbl.remove t.pending_execs key;
-    Promise.resolve e.resolver (Tool.Result.error text))
-;;
-
 let location t =
   if String.is_empty t.active_host
   then None
@@ -918,13 +907,7 @@ let set_hosts t clients =
   if not (List.equal Host.equal t.hosts clients)
   then (
     let was_connected = active_host_connected t in
-    let gone =
-      List.filter t.hosts ~f:(fun h ->
-        not (List.exists clients ~f:(fun h' -> String.equal h.id h'.id)))
-    in
     t.hosts <- clients;
-    List.iter gone ~f:(fun h ->
-      fail_execs t ~host:h.id ~text:"[tool host disconnected]");
     match find_host t t.active_host, List.hd (hosts t) with
     | None, Some host when String.is_empty t.active_host ->
       activate_host t host ~cwd:host.cwd ~pinned:false
@@ -1026,7 +1009,7 @@ let host_exec_with_stdin
     Hashtbl.set
       t.pending_execs
       ~key:exec_id
-      ~data:{ Pending_exec.host = host.id; on_output; resolver };
+      ~data:{ Pending_exec.on_output; resolver };
     let stdin =
       match stdin with
       | Some feed when not host.exec_input ->

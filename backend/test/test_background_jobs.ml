@@ -800,13 +800,21 @@ let%expect_test "jobs on a client tool host: output, list, kill, disconnect" =
        | Ok text -> String.is_substring text ~substring:"\nwaiting"
        | Error _ -> false)
      : bool);
+  (* The connection drops: the host reconnects with the job still running,
+     and it carries on there. *)
   Test_tool_host.Listener.drop listener;
+  Test_tool_host.Host.wait_logs t host 4;
+  write t "host/gate2" "";
   wait_idle t agent;
   print_tail t agent 2;
   [%expect
     {|
     {"type":"response","id":"r","ok":true,"result":{"job_id":"j3"}}
-    user: [job j3 failed: tool host disconnected] echo waiting; while [ ! -f gate2 ]; do sleep 0.02; done | waiting
+    tool_exec_result failed: no tool execution "<id>/j2-2"
+    disconnected from 127.0.0.1:PORT
+    retrying in 50ms
+    connected to 127.0.0.1:PORT as client-3
+    user: [job j3 exited 0] echo waiting; while [ ! -f gate2 ]; do sleep 0.02; done | waiting
     assistant: j3 noted
     |}]
 ;;

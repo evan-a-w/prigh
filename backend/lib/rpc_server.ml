@@ -237,6 +237,23 @@ module Client = struct
   let id t = t.id
 end
 
+(* An execution sent to a tool host, until its result. *)
+module Exec = struct
+  module Holder = struct
+    type t =
+      | Client of string (** the connection it was sent on *)
+      | Away of unit ref
+      (** that connection dropped: the host may come back with it still
+          running; the token tells this absence from later ones *)
+  end
+
+  type t =
+    { host : string
+    ; agent : Agent.t
+    ; mutable holder : Holder.t
+    }
+end
+
 type t =
   { login : Login_manager.t
   ; token : string option (** required in [hello] before anything else *)
@@ -250,8 +267,12 @@ type t =
   ; clients : Client.t String.Table.t
   ; mutable client_seq : int
   ; mutable btw_seq : int
-  ; execs : (string * Agent.t) String.Table.t
-    (** in-flight remote executions by exec id: host id and session *)
+  ; execs : Exec.t String.Table.t (** in-flight remote executions by id *)
+  ; host_grace : float
+    (** how long the executions of a host that dropped its connection wait
+        for it to come back with them *)
+  ; sleep : float -> unit
+  ; sw : Switch.t
   ; mutable login_owner : string option
     (** the client running the current login flow *)
   ; terminals : Terminal_relay.t
@@ -382,8 +403,20 @@ let route t agent (event : Agent.Event.t) =
   in
   (match event with
    | Tool_exec { host; exec_id; _ } ->
-     Hashtbl.set t.execs ~key:exec_id ~data:(host, agent);
-     Option.iter (host_client t host) ~f:(fun c -> c.send json)
+     (match host_client t host with
+      | Some c ->
+        Hashtbl.set
+          t.execs
+          ~key:exec_id
+          ~data:{ Exec.host; agent; holder = Client c.id };
+        c.send json
+      | None ->
+        ignore
+          (Agent.tool_exec_result
+             agent
+             ~exec_id
+             (Tool.Result.error (Agent.host_unavailable_message agent))
+           : unit Or_error.t))
    | Tool_exec_cancel { host; exec_id } ->
      Hashtbl.remove t.execs exec_id;
      Option.iter (host_client t host) ~f:(fun c -> c.send json)
@@ -414,8 +447,9 @@ let register t agent =
 
 let create
       ~env
-      ~sw:_
+      ~sw
       ?token
+      ?(host_grace = 60.)
       ?namespace
       ?(backend_host = true)
       ?home
@@ -440,6 +474,9 @@ let create
     ; client_seq = 0
     ; btw_seq = 0
     ; execs = String.Table.create ()
+    ; host_grace
+    ; sleep = Eio.Time.sleep (Eio.Stdenv.clock env)
+    ; sw
     ; login_owner = None
     ; terminals = Terminal_relay.create ()
     ; loaded = File_cache.create ~max_bytes:(128 * 1024 * 1024) ()
@@ -631,18 +668,44 @@ let connect ?signed_in ?(close = fun _ -> ()) t ~send =
   client
 ;;
 
-(* Fails what is in flight on [client] as the host it is now. *)
-let release_host_id t (client : Client.t) ~text =
-  let execs =
-    Hashtbl.filter t.execs ~f:(fun (host, _) ->
-      String.equal host client.host_id)
-  in
-  Hashtbl.iteri execs ~f:(fun ~key:exec_id ~data:(_, agent) ->
+(* Fails the executions on [host] that [f] selects. *)
+let fail_execs t ~host ~text ~f =
+  Hashtbl.filteri t.execs ~f:(fun ~key ~data:(e : Exec.t) ->
+    String.equal e.host host && f key e)
+  |> Hashtbl.iteri ~f:(fun ~key:exec_id ~data:(e : Exec.t) ->
     Hashtbl.remove t.execs exec_id;
     ignore
-      (Agent.tool_exec_result agent ~exec_id (Tool.Result.error text)
-       : unit Or_error.t));
+      (Agent.tool_exec_result e.agent ~exec_id (Tool.Result.error text)
+       : unit Or_error.t))
+;;
+
+(* Fails what is in flight on [client] as the host it is now. *)
+let release_host_id t (client : Client.t) ~text =
+  fail_execs t ~host:client.host_id ~text ~f:(fun _ _ -> true);
   Terminal_relay.host_gone t.terminals ~host:client.host_id
+;;
+
+(* A host whose connection dropped may still run what it was given (a TUI
+   reconnecting keeps its tool host process): its executions wait
+   [host_grace] for it to come back with them (see [claim_host_id]). *)
+let await_host t (client : Client.t) =
+  let token = ref () in
+  Hashtbl.iter t.execs ~f:(fun (e : Exec.t) ->
+    match e.holder with
+    | Client id when String.equal id client.id -> e.holder <- Away token
+    | Client _ | Away _ -> ());
+  Terminal_relay.host_gone t.terminals ~host:client.host_id;
+  Fiber.fork_daemon ~sw:t.sw (fun () ->
+    t.sleep t.host_grace;
+    fail_execs
+      t
+      ~host:client.host_id
+      ~text:"[tool host disconnected]"
+      ~f:(fun _ e ->
+        match e.holder with
+        | Away token' -> phys_equal token token'
+        | Client _ -> false);
+    `Stop_daemon)
 ;;
 
 let notice (client : Client.t) text = client.send (Rpc_json.event (Notice text))
@@ -666,7 +729,9 @@ let hand_over_host_id t (gone : Client.t) =
 let disconnect t (client : Client.t) =
   Hashtbl.remove t.clients client.id;
   Hashtbl.iter client.btws ~f:Cancellation.cancel;
-  release_host_id t client ~text:"[tool host disconnected]";
+  if client.tools && not (String.equal client.host_id client.id)
+  then await_host t client
+  else release_host_id t client ~text:"[tool host disconnected]";
   hand_over_host_id t client;
   if client.tools then publish_hosts t;
   maybe_evict t client.agent
@@ -944,10 +1009,12 @@ let relay_terminal t ~host ~key ~cwd ~cols ~rows channel =
    its machine, so that sessions on it resume when it reconnects or restarts.
    The newest connection owns the id: an older one still holding it is one
    the host gave up on (the backend may notice a dropped connection late) or
-   another frontend on the same machine, so it is demoted to its client id,
-   failing what was in flight on it, until the newer one goes
-   ([hand_over_host_id]). *)
-let claim_host_id t (client : Client.t) host_id =
+   another frontend on the same machine, so it is demoted to its client id
+   until the newer one goes ([hand_over_host_id]). The host says which
+   executions it still runs ([running]: a TUI that reconnects keeps its tool
+   host process): they carry on over the new connection, the others on the
+   id fail, and those nobody waits for any more are cancelled. *)
+let claim_host_id t (client : Client.t) host_id ~running =
   if String.equal host_id client.host_id
   then Ok ()
   else if
@@ -961,7 +1028,7 @@ let claim_host_id t (client : Client.t) host_id =
     Hashtbl.iter t.clients ~f:(fun (other : Client.t) ->
       if String.equal other.host_id host_id
       then (
-        release_host_id t other ~text;
+        Terminal_relay.host_gone t.terminals ~host:host_id;
         other.host_id <- other.id;
         notice
           other
@@ -970,6 +1037,18 @@ let claim_host_id t (client : Client.t) host_id =
               disconnects"
              host_id
              other.id)));
+    fail_execs t ~host:host_id ~text ~f:(fun exec_id _ ->
+      not (Set.mem running exec_id));
+    Hashtbl.iter t.execs ~f:(fun (e : Exec.t) ->
+      if String.equal e.host host_id then e.holder <- Client client.id);
+    Set.iter running ~f:(fun exec_id ->
+      if
+        not
+          (Option.exists (Hashtbl.find t.execs exec_id) ~f:(fun (e : Exec.t) ->
+             String.equal e.host host_id))
+      then
+        client.send
+          (Rpc_json.event (Tool_exec_cancel { host = host_id; exec_id })));
     client.host_id <- host_id;
     client.wanted_host_id <- Some host_id;
     Ok ())
@@ -1020,7 +1099,15 @@ let hello t (client : Client.t) params =
     Or_error.bind (bool_param params "tools" ~default:false) ~f:(fun tools ->
       let claimed =
         match string "host_id" with
-        | Some host_id when tools -> claim_host_id t client host_id
+        | Some host_id when tools ->
+          Or_error.bind
+            (string_list_param params "running_execs")
+            ~f:(fun running ->
+              claim_host_id
+                t
+                client
+                host_id
+                ~running:(String.Set.of_list running))
         | _ -> Ok ()
       in
       Or_error.bind claimed ~f:(fun () ->
@@ -1264,7 +1351,7 @@ let set_archived t ~key ~archived =
 let exec_param t params =
   Or_error.bind (string_param params "exec_id") ~f:(fun exec_id ->
     match Hashtbl.find t.execs exec_id with
-    | Some (_, agent) -> Ok (exec_id, agent)
+    | Some e -> Ok (exec_id, e.agent)
     | None -> Or_error.errorf "no tool execution %S" exec_id)
 ;;
 
