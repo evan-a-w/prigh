@@ -269,6 +269,14 @@ summary:focus-visible { outline: 2px solid var(--sodium); outline-offset: 2px; b
 }
 /* Waiting for the model's first words: the lamp on the spine. */
 .pending { position: relative; display: flex; align-items: center; min-height: 26px; color: var(--muted); font-size: 13px; }
+/* A retry: what failed, under the label. */
+.pending:has(> .detail) { flex-wrap: wrap; column-gap: 8px; }
+.pending > .detail {
+  flex-basis: 100%;
+  color: var(--faint);
+  font: 12px var(--mono);
+  overflow-wrap: anywhere;
+}
 .msg.assistant > .pending > .lamp {
   --lamp-ring: 0 0 0 3px var(--graphite);
   position: absolute;

@@ -143,7 +143,9 @@ let thinking ~live text =
           [ Html.lamp ()
           ; span "label" "Thinking…"
           ]
-      ; div "thinking-text" [ Node.text (String.strip text) ]
+      ; (if String.is_empty (String.strip text)
+         then Node.none
+         else div "thinking-text" [ Node.text (String.strip text) ])
       ]
   else
     folded
@@ -242,7 +244,9 @@ and assistant ~fold times chat (message : Message.Assistant.t) ~streaming =
       match (content : Content.t) with
       | Text text when String.is_empty (String.strip text) -> Node.none
       | Text text -> Markdown_view.render ~streaming:(streaming && last) text
-      | Thinking text when String.is_empty (String.strip text) -> Node.none
+      | Thinking text
+        when String.is_empty (String.strip text) && not (streaming && last) ->
+        Node.none
       | Thinking text -> thinking ~live:(streaming && last) text
       | Tool_call call ->
         Tool_view.view
@@ -257,7 +261,32 @@ and assistant ~fold times chat (message : Message.Assistant.t) ~streaming =
   let blocks = present blocks in
   let pending =
     if streaming && count = 0
-    then div "pending" [ Html.lamp (); span "label" "Waiting for the model…" ]
+    then (
+      let label, detail =
+        match Chat.activity chat with
+        | Retrying { attempt; max_attempts; error; delay_ms } ->
+          ( sprintf
+              "Retrying in %s (attempt %d of %d)…"
+              (Prigh_ui.Activity.seconds delay_ms)
+              attempt
+              max_attempts
+          , Some error )
+        | Waiting (Some { attempt; max_attempts; error; delay_ms = _ }) ->
+          ( sprintf
+              "Waiting for the model (attempt %d of %d)…"
+              attempt
+              max_attempts
+          , Some error )
+        | _ -> "Waiting for the model…", None
+      in
+      div
+        "pending"
+        [ Html.lamp ()
+        ; span "label" label
+        ; (match detail with
+           | Some error -> div "detail" [ Node.text ("after: " ^ error) ]
+           | None -> Node.none)
+        ])
     else Node.none
   in
   let stopped = stopped message in

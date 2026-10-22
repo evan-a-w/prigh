@@ -297,11 +297,22 @@ let view (m : App.Model.t) ~inject =
       [ (if m.pending.sending > 0 && not state.running
          then waiting "running" "Sending…"
          else if state.running
-         then
+         then (
+           let doing = Chat.activity m.chat in
+           let label =
+             String.capitalize
+               (Option.value (Prigh_ui.Activity.label doing) ~default:"working")
+           in
            item
-             ~cls:"running"
+             ~cls:
+               (match doing with
+                | Retrying _ -> "running retrying"
+                | _ -> "running")
+             ~title:label
              ~attrs:activity
-             [ Html.lamp (); Node.text "Working" ]
+             [ Html.lamp ()
+             ; Node.span ~attrs:[ Attr.class_ "label" ] [ Node.text label ]
+             ])
          else
            item
              ~cls:"idle"
