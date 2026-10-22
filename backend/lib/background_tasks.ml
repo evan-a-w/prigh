@@ -238,7 +238,9 @@ let spawn ?input t ~kind ~label ~run =
       | exception exn -> failed_outcome kind exn
     in
     finish t task outcome;
-    t.on_change ();
+    (* Its report is still delivered (and its waiters woken) when the
+       agent's bookkeeping fails; the switch is the server's. *)
+    Guarded.run ~what:"a background task's report" (fun () -> t.on_change ());
     Promise.resolve resolve ());
   t.on_change ();
   task.id
@@ -283,7 +285,7 @@ let run_foreground ?input t ~kind ~label ~after ~cancel ~on_output ~run ~outcome
         | Error exn -> failed_outcome kind exn
       in
       finish t task outcome;
-      t.on_change ();
+      Guarded.run ~what:"a background task's report" (fun () -> t.on_change ());
       Promise.resolve resolve ());
   let finished = function
     | Ok value -> Foreground.Finished value
