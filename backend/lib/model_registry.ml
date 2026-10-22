@@ -107,7 +107,9 @@ let describe_http_error ~url (e : Http_client.Error.t) =
   match e with
   | Connection_failed message ->
     sprintf "could not connect to %s (%s)" url message
-  | Timed_out -> sprintf "no answer from %s in time" url
+  | Connection_lost message ->
+    sprintf "the connection to %s broke (%s)" url message
+  | Timed_out | Stalled _ -> sprintf "no answer from %s in time" url
   | Cancelled -> "cancelled"
 ;;
 

@@ -21,6 +21,8 @@ let rec show_event (e : Agent_event.t) =
   | Agent_start -> "agent_start"
   | Agent_end added -> sprintf "agent_end (%d new messages)" (List.length added)
   | Turn_start -> "turn_start"
+  | Retry { attempt; max_attempts; error; delay } ->
+    sprintf "retry %d/%d in %gs after %S" attempt max_attempts delay error
   | Turn_end { assistant; tool_results } ->
     sprintf
       "turn_end stop=%s tool_results=%d"
@@ -87,10 +89,10 @@ let run ?cancel ?steer ?max_turns ?tools ?(context = []) t provider prompt =
       ?cancel
       ?steer
       ~emit:(fun e -> events := e :: !events)
-      ~retry_delay:(fun ~attempt ->
+      ~sleep:(fun delay ->
         events
         := Agent_event.Tool_output
-             { call_id = "retry"; chunk = sprintf "attempt %d" attempt }
+             { call_id = "sleep"; chunk = sprintf "%gs" delay }
            :: !events)
       ~context
       ~prompts:[ Message.user prompt ]
@@ -516,10 +518,12 @@ let%expect_test "transient provider errors are retried; permanent ones are not" 
     turn_start
     message_start assistant
       update (Text_delta"")
-      tool_output "attempt 1"
+    retry 2/3 in 1s after "HTTP 429: slow down"
+      tool_output "1s"
     message_start assistant
       update (Text_delta"")
-      tool_output "attempt 2"
+    retry 3/3 in 2s after "connection failed: x"
+      tool_output "2s"
     message_start assistant
       update (Text_delta finally)
     message_end assistant "finally"
