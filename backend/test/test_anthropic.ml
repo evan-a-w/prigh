@@ -496,6 +496,53 @@ let%expect_test "stream end to end: request shape, headers, assembled message" =
     |}]
 ;;
 
+let%expect_test
+    "parse events: omitted thinking starts a block at once; a mid-stream \
+     error keeps its type, so a transient one is retried"
+  =
+  let show events =
+    let events, `Stop_reason _, `Usage _, `Error error =
+      T.parse_events ~tools events
+    in
+    let builder = Assistant_builder.create ~model:model.id in
+    List.iter events ~f:(Assistant_builder.apply builder);
+    print_s
+      [%sexp
+        { events : Assistant_event.t list
+        ; content : Content.t list =
+            (Assistant_builder.snapshot builder).content
+        ; error : string option
+        ; retried : bool option =
+            Option.map error ~f:Agent_loop.is_retryable_error
+        }]
+  in
+  (* With [display] omitted, nothing comes between the start and the
+     signature, which may be minutes later. *)
+  show
+    [ {|{"type":"message_start","message":{"usage":{"input_tokens":10,"output_tokens":1}}}|}
+    ; {|{"type":"content_block_start","index":0,"content_block":{"type":"thinking","thinking":""}}|}
+    ];
+  show
+    [ {|{"type":"content_block_start","index":0,"content_block":{"type":"thinking","thinking":""}}|}
+    ; {|{"type":"content_block_delta","index":0,"delta":{"type":"signature_delta","signature":"S1"}}|}
+    ; {|{"type":"content_block_stop","index":0}|}
+    ; {|{"type":"content_block_start","index":1,"content_block":{"type":"thinking","thinking":""}}|}
+    ; {|{"type":"content_block_delta","index":1,"delta":{"type":"thinking_delta","thinking":"More."}}|}
+    ; {|{"type":"error","error":{"type":"overloaded_error","message":"Overloaded"}}|}
+    ];
+  [%expect {|
+    ((events ((Thinking_delta "")))
+     (content ((Thinking ((text "") (signature ()))))) (error ()) (retried ()))
+    ((events
+      ((Thinking_delta "") (Thinking_signature S1) (Thinking_delta "")
+       (Thinking_delta More.)))
+     (content
+      ((Thinking ((text "") (signature (S1))))
+       (Thinking ((text More.) (signature ())))))
+     (error ("overloaded_error: Overloaded")) (retried (true)))
+    |}]
+;;
+
 let%expect_test "thinking: budget models vs adaptive models (effort)" =
   let show id =
     let model = Option.value_exn (Model.find id) in

@@ -179,18 +179,84 @@ let%expect_test "timeout" =
   [%expect {| (Error Timed_out) |}]
 ;;
 
+let%expect_test "idle timeout: a stream that stops sending is given up" =
+  run
+  @@ fun ~env ~sw ->
+  let server =
+    Server.start ~sw ~env ~handler:(fun _ ->
+      { status = 200
+      ; headers = []
+      ; chunks = [ 0., "first"; 0.2, "second"; 0.2, "third"; 5., "never" ]
+      })
+  in
+  let chunks = ref [] in
+  let result =
+    Http.post_stream
+      ~env
+      ~idle_timeout:(Time_ns.Span.of_ms 400.)
+      ~url:(Server.url server "/")
+      ~headers:[]
+      ~body:""
+      ~on_chunk:(fun c -> chunks := c :: !chunks)
+      ()
+  in
+  (* Slower than the timeout in all, but never that long between pieces. *)
+  print_s [%sexp (result : (Http.Response.t, Http.Error.t) Result.t)];
+  print_s [%sexp (List.rev !chunks : string list)];
+  [%expect
+    {|
+    (Error (Stalled 400ms))
+    (first second third)
+    |}]
+;;
+
+let%expect_test "idle timeout: a server that never answers is given up" =
+  run
+  @@ fun ~env ~sw ->
+  let net = Eio.Stdenv.net env in
+  let socket =
+    Eio.Net.listen ~sw ~backlog:8 net (`Tcp (Eio.Net.Ipaddr.V4.loopback, 0))
+  in
+  let port =
+    match Eio.Net.listening_addr socket with
+    | `Tcp (_, port) -> port
+    | `Unix _ -> assert false
+  in
+  (* Accepts, reads nothing, says nothing. *)
+  Fiber.fork_daemon ~sw (fun () ->
+    let _flow, _ = Eio.Net.accept ~sw socket in
+    Eio.Time.sleep (Eio.Stdenv.clock env) 10.;
+    `Stop_daemon);
+  let result =
+    Http.post_stream
+      ~env
+      ~idle_timeout:(Time_ns.Span.of_ms 300.)
+      ~url:(sprintf "http://127.0.0.1:%d/" port)
+      ~headers:[]
+      ~body:""
+      ~on_chunk:ignore
+      ()
+  in
+  print_s [%sexp (result : (Http.Response.t, Http.Error.t) Result.t)];
+  [%expect {| (Error (Stalled 300ms)) |}]
+;;
+
 let%expect_test "error messages" =
   List.iter
     ~f:(fun e -> print_endline (Http.Error.to_string e))
     [ Http.Error.Connection_failed "Eio.Io Net Connection_failure Refused"
+    ; Connection_lost "Eio.Io Net Connection_reset"
     ; Cancelled
     ; Timed_out
+    ; Stalled (Time_ns.Span.of_min 5.)
     ];
   [%expect
     {|
     connection failed: Eio.Io Net Connection_failure Refused
+    connection lost mid-response: Eio.Io Net Connection_reset
     cancelled
     timed out
+    timed out: no data from the server for 5m
     |}]
 ;;
 

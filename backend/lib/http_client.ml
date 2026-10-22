@@ -57,13 +57,14 @@ let https uri raw =
 ;;
 
 exception Read_failed of string
+exception Stalled_exn
 
 (* [idle] bounds each wait for data. Raises [Read_failed] when the
    connection breaks; [on_chunk]'s exceptions propagate. *)
 let read_body body ~idle ~on_chunk =
   let buf = Cstruct.create 65536 in
   let read () =
-    match idle () (fun () -> Eio.Flow.single_read body buf) with
+    match idle (fun () -> Eio.Flow.single_read body buf) with
     | n -> Some n
     | exception End_of_file -> None
     | exception
@@ -106,14 +107,18 @@ let stream
       ~on_chunk
       ()
   =
-  let idle () f =
+  let idle f =
     match idle_timeout with
     | None -> f ()
     | Some span ->
-      Eio.Time.with_timeout_exn
-        (Eio.Stdenv.clock env)
-        (Time_ns.Span.to_sec span)
-        f
+      (match
+         Eio.Time.with_timeout
+           (Eio.Stdenv.clock env)
+           (Time_ns.Span.to_sec span)
+           (fun () -> Ok (f ()))
+       with
+       | Ok x -> x
+       | Error `Timeout -> raise Stalled_exn)
   in
   let request () =
     Switch.run
@@ -124,7 +129,7 @@ let stream
     let headers = Http.Header.of_list headers in
     let uri = with_default_port (Uri.of_string url) in
     match
-      idle () (fun () ->
+      idle (fun () ->
         match body with
         | None -> Cohttp_eio.Client.get client ~sw ~headers uri
         | Some body ->
@@ -169,8 +174,7 @@ let stream
   match Cancellation.protect cancel ~f:(fun () -> with_timeout request) with
   | None -> Error Error.Cancelled
   | Some result -> result
-  | exception Eio.Time.Timeout ->
-    Error (Error.Stalled (Option.value_exn idle_timeout))
+  | exception Stalled_exn -> Error (Error.Stalled (Option.value_exn idle_timeout))
 ;;
 
 let post_stream
