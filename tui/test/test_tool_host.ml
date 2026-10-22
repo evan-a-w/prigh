@@ -32,9 +32,12 @@ let%expect_test "terminal events go to the worker, its lines become requests" =
   let worker, fake_worker = Transport.In_memory.create () in
   let spawns = ref 0 in
   let host =
-    Tool_host.create ~client ~spawn:(fun () ->
-      incr spawns;
-      Deferred.Or_error.return worker)
+    Tool_host.create
+      ~client
+      ~spawn:(fun () ->
+        incr spawns;
+        Deferred.Or_error.return worker)
+      ()
   in
   let to_worker = Transport.In_memory.Backend.requests fake_worker in
   List.iter
@@ -89,8 +92,10 @@ let%expect_test
   =
   let%bind client, requests = connected_client () in
   let host =
-    Tool_host.create ~client ~spawn:(fun () ->
-      Deferred.Or_error.error_string "no such file")
+    Tool_host.create
+      ~client
+      ~spawn:(fun () -> Deferred.Or_error.error_string "no such file")
+      ()
   in
   Tool_host.handle
     host
@@ -116,7 +121,10 @@ let%expect_test
   let%bind client, requests = connected_client () in
   let worker, fake_worker = Transport.In_memory.create () in
   let host =
-    Tool_host.create ~client ~spawn:(fun () -> Deferred.Or_error.return worker)
+    Tool_host.create
+      ~client
+      ~spawn:(fun () -> Deferred.Or_error.return worker)
+      ()
   in
   Tool_host.handle
     host
@@ -146,7 +154,10 @@ let%expect_test
   let%bind client, _requests = connected_client () in
   let worker, fake_worker = Transport.In_memory.create () in
   let host =
-    Tool_host.create ~client ~spawn:(fun () -> Deferred.Or_error.return worker)
+    Tool_host.create
+      ~client
+      ~spawn:(fun () -> Deferred.Or_error.return worker)
+      ()
   in
   let to_worker = Transport.In_memory.Backend.requests fake_worker in
   List.iter
@@ -167,6 +178,172 @@ let%expect_test
     {"type":"input","exec_id":"e1","data":"","close":true}
     {"type":"exec","exec_id":"e2","name":"bash","arguments":{"command":"ls"},"cwd":"/work"}
     |}];
+  Tool_host.close host;
+  Client.close client
+;;
+
+(* A worker process played by hand: what it is sent, what it prints on
+   stdout and stderr, and its exit. *)
+module Fake_worker = struct
+  type t =
+    { transport : Transport.t
+    ; sent : string Pipe.Reader.t
+    ; stdout : string Pipe.Writer.t
+    ; stderr : string Pipe.Writer.t
+    ; exit : unit Ivar.t
+    }
+
+  let create () =
+    let sent, sent_w = Pipe.create () in
+    let lines, stdout = Pipe.create () in
+    let stderr_lines, stderr = Pipe.create () in
+    let exit = Ivar.create () in
+    { transport =
+        { send_line = Pipe.write_without_pushback_if_open sent_w
+        ; lines
+        ; stderr_lines
+        ; close = (fun () -> Ivar.fill_if_empty exit ())
+        ; closed = Ivar.read exit
+        }
+    ; sent
+    ; stdout
+    ; stderr
+    ; exit
+    }
+  ;;
+
+  let print t = List.iter ~f:(Pipe.write_without_pushback t.stdout)
+
+  let exit t =
+    Pipe.close t.stdout;
+    Pipe.close t.stderr;
+    Ivar.fill_if_empty t.exit ()
+  ;;
+end
+
+let exec id =
+  event
+    (sprintf
+       {|{"type":"event","event":"tool_exec","host":"h","exec_id":"%s","call_id":"c","name":"bash","arguments":{"command":"make"},"cwd":"/work"}|}
+       id)
+;;
+
+let%expect_test
+    "while the backend is away, the worker's results wait; the reconnect's \
+     hello names what still runs, then they go out"
+  =
+  let pairs = List.init 2 ~f:(fun _ -> Transport.In_memory.create ()) in
+  let transports = Queue.of_list (List.map pairs ~f:fst) in
+  let client =
+    Client.create ~connect:(fun () ->
+      Deferred.Or_error.return (Queue.dequeue_exn transports))
+  in
+  let%bind () = Deferred.Or_error.ok_exn (Client.connect client) in
+  let worker = Fake_worker.create () in
+  let host =
+    Tool_host.create
+      ~client
+      ~spawn:(fun () -> Deferred.Or_error.return worker.transport)
+      ()
+  in
+  Tool_host.handle host (exec "e1");
+  Tool_host.handle host (exec "e2");
+  let%bind () = print_next worker.sent in
+  let%bind () = print_next worker.sent in
+  (* The connection drops; e1 finishes meanwhile, e2 still runs. *)
+  Transport.In_memory.Backend.close (snd (List.nth_exn pairs 0));
+  let%bind () = Pipe.values_available (Client.incoming client) >>| ignore in
+  Tool_host.set_online host false;
+  Fake_worker.print
+    worker
+    [ {|{"type":"output","exec_id":"e1","chunk":"built\n"}|}
+    ; {|{"type":"result","exec_id":"e1","text":"built","is_error":false}|}
+    ; {|{"type":"terminal_frame","term_id":"t1","kind":"binary","data":"aGkK"}|}
+    ];
+  let%bind () = Scheduler.yield_until_no_jobs_remain () in
+  print_s [%sexp (Tool_host.running_execs host : string list)];
+  let backend = snd (List.nth_exn pairs 1) in
+  let requests = Transport.In_memory.Backend.requests backend in
+  let reply =
+    Prigh_ui_term.Term_app.reconnect
+      ~tool_host:host
+      client
+      ~hello:[ "name", `String "laptop" ]
+      ~delay_ms:0
+      ~session:None
+      ~as_user:None
+  in
+  let%bind hello = Pipe.read_exn requests in
+  print_endline hello;
+  Transport.In_memory.Backend.send
+    backend
+    (sprintf
+       {|{"type":"response","id":%s,"ok":true,"result":{"client_id":"c","host_id":"h"}}|}
+       (Jsonaf.to_string
+          (Option.value_exn
+             (Jsonaf.member "id" (Or_error.ok_exn (Json.parse hello))))));
+  let%bind reply in
+  print_s [%sexp (Result.is_ok reply : bool)];
+  let%bind () = print_next requests in
+  let%bind () = print_next requests in
+  [%expect
+    {|
+    {"type":"exec","exec_id":"e1","name":"bash","arguments":{"command":"make"},"cwd":"/work"}
+    {"type":"exec","exec_id":"e2","name":"bash","arguments":{"command":"make"},"cwd":"/work"}
+    (e1 e2)
+    {"id":1,"method":"hello","params":{"name":"laptop","running_execs":["e1","e2"]}}
+    true
+    {"id":2,"method":"tool_exec_output","params":{"exec_id":"e1","chunk":"built\n"}}
+    {"id":3,"method":"tool_exec_result","params":{"exec_id":"e1","text":"built","is_error":false}}
+    |}];
+  print_s [%sexp (Tool_host.running_execs host : string list)];
+  [%expect {| (e2) |}];
+  Tool_host.close host;
+  Client.close client
+;;
+
+let%expect_test
+    "a worker that exits fails what it ran with its last stderr, and says so"
+  =
+  let%bind client, requests = connected_client () in
+  let first = Fake_worker.create () in
+  let second = Fake_worker.create () in
+  let workers = Queue.of_list [ first; second ] in
+  let host =
+    Tool_host.create
+      ~on_exit:(fun text -> print_endline ("notice: " ^ text))
+      ~client
+      ~spawn:(fun () ->
+        Deferred.Or_error.return (Queue.dequeue_exn workers).transport)
+      ()
+  in
+  let worker = first in
+  Tool_host.handle host (exec "e1");
+  Tool_host.handle host (exec "e2");
+  let%bind () = print_next worker.sent in
+  let%bind () = print_next worker.sent in
+  Fake_worker.print
+    worker
+    [ {|{"type":"result","exec_id":"e1","text":"ok","is_error":false}|} ];
+  Pipe.write_without_pushback worker.stderr "Fatal error: exception Not_found";
+  Fake_worker.exit worker;
+  let%bind () = print_next requests in
+  let%bind () = print_next requests in
+  [%expect
+    {|
+    {"type":"exec","exec_id":"e1","name":"bash","arguments":{"command":"make"},"cwd":"/work"}
+    {"type":"exec","exec_id":"e2","name":"bash","arguments":{"command":"make"},"cwd":"/work"}
+    {"id":1,"method":"tool_exec_result","params":{"exec_id":"e1","text":"ok","is_error":false}}
+    notice: the local tool host (prigh tool-host) exited, failing 1 running tool call(s); it starts again for the next tool call; its last output:
+    Fatal error: exception Not_found
+    {"id":2,"method":"tool_exec_result","params":{"exec_id":"e2","text":"[the tool host process exited; its last output:\nFatal error: exception Not_found]","is_error":true}}
+    |}];
+  (* The next exec starts another. *)
+  let worker = second in
+  Tool_host.handle host (exec "e3");
+  let%bind () = print_next worker.sent in
+  [%expect
+    {| {"type":"exec","exec_id":"e3","name":"bash","arguments":{"command":"make"},"cwd":"/work"} |}];
   Tool_host.close host;
   Client.close client
 ;;

@@ -195,16 +195,41 @@ let send_hello client hello ~session ~as_user =
     ~f:hello_error
 ;;
 
-let reconnect client ~hello ~delay_ms ~session ~as_user =
+(* Our tool host's executions that are still running carry on: the backend
+   keeps them for a host that comes back with them, and what the worker
+   answered meanwhile goes out once the backend knows us again. *)
+let reconnect ?tool_host client ~hello ~delay_ms ~session ~as_user =
   let%bind.Deferred () =
     Clock.after (Time_float.Span.of_ms (Float.of_int delay_ms))
   in
   match%bind.Deferred Client.connect client with
   | Error e -> Deferred.return (Error (Error.to_string_hum e))
-  | Ok () -> send_hello client hello ~session ~as_user
+  | Ok () ->
+    let running =
+      Option.value_map
+        tool_host
+        ~default:[]
+        ~f:Prigh_client_unix.Tool_host.running_execs
+    in
+    let hello =
+      if List.is_empty running
+      then hello
+      else
+        hello
+        @ [ ( "running_execs"
+            , `Array (List.map running ~f:(fun id -> `String id)) )
+          ]
+    in
+    let%map.Deferred reply = send_hello client hello ~session ~as_user in
+    if Result.is_ok reply
+    then
+      Option.iter tool_host ~f:(fun host ->
+        Prigh_client_unix.Tool_host.set_online host true);
+    reply
 ;;
 
-let platform client ~hello ~exit ~quit_requested : Prigh_ui.Component.Platform.t
+let platform ?tool_host client ~hello ~exit ~quit_requested
+  : Prigh_ui.Component.Platform.t
   =
   { rpc =
       (fun method_ params ->
@@ -234,7 +259,8 @@ let platform client ~hello ~exit ~quit_requested : Prigh_ui.Component.Platform.t
   ; reconnect =
       (fun ~delay_ms ~session ~as_user ->
         Effect.of_deferred_fun
-          (fun () -> reconnect client ~hello ~delay_ms ~session ~as_user)
+          (fun () ->
+            reconnect ?tool_host client ~hello ~delay_ms ~session ~as_user)
           ())
   ; sign_out =
       Effect.return
@@ -262,6 +288,7 @@ module Paste = struct
 end
 
 let app
+  ?tool_host
   client
   ~hello
   ~exit
@@ -269,7 +296,9 @@ let app
   ~(dimensions : Dimensions.t Bonsai.t)
   (local_ graph)
   =
-  let platform = Bonsai.return (platform client ~hello ~exit ~quit_requested) in
+  let platform =
+    Bonsai.return (platform ?tool_host client ~hello ~exit ~quit_requested)
+  in
   let model, inject = Prigh_ui.Component.create platform graph in
   let home = Option.value (Sys.getenv "HOME") ~default:"." in
   (* The local zone's offset: [mktime] reads UTC's broken-down time as
@@ -485,11 +514,14 @@ let run ~connect ~hello ~local_tools =
     Deferred.return e
   | Ok reply ->
     let hello_reply = Prigh_protocol.Hello_reply.of_json reply |> Or_error.ok in
+    let notice = ref (fun (_ : string) -> ()) in
     let tool_host =
       Option.map local_tools ~f:(fun backend ->
         Prigh_client_unix.Tool_host.create
+          ~on_exit:(fun text -> !notice text)
           ~client
-          ~spawn:(Prigh_client_unix.Tool_host.spawn_worker ~backend))
+          ~spawn:(Prigh_client_unix.Tool_host.spawn_worker ~backend)
+          ())
     in
     let quit_requested = Ivar.create () in
     let on_focus = ref (fun (_ : bool) -> ()) in
@@ -510,7 +542,7 @@ let run ~connect ~hello ~local_tools =
           ~view:r.view, ~handler:r.handler)
         ~handle_incoming:(fun (r : Result_.t) action -> r.inject action)
         (fun ~exit ~dimensions graph ->
-          app client ~hello ~exit ~quit_requested ~dimensions graph)
+          app ?tool_host client ~hello ~exit ~quit_requested ~dimensions graph)
     in
     (match driver with
      | Error _ as e -> Deferred.return e
@@ -524,6 +556,11 @@ let run ~connect ~hello ~local_tools =
        in
        let had_iexten = Tty.set_iexten tty false in
        install_repaint driver;
+       (notice
+        := fun text ->
+             Driver.send_incoming_event
+               driver
+               (App.Action.Event (Notice text)));
        (on_focus
         := fun focused ->
              Driver.send_incoming_event driver (App.Action.Focus focused));
@@ -540,6 +577,8 @@ let run ~connect ~hello ~local_tools =
             ~f:(fun incoming ->
               (match incoming, tool_host with
                | Event e, Some host -> Prigh_client_unix.Tool_host.handle host e
+               | Closed, Some host ->
+                 Prigh_client_unix.Tool_host.set_online host false
                | _ -> ());
               Driver.send_incoming_event driver (action_of_incoming incoming)));
        let%bind.Deferred () =
