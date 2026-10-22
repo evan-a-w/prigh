@@ -165,9 +165,13 @@ while it is waiting on the browser.
   child leads its own process group and the whole group is killed, so a
   cancelled `bash` cannot leave grandchildren holding the output pipes),
   `Http_client` (cohttp-eio + ocaml-tls; `post` and streaming
-  `post_stream`), `Sse` (incremental `text/event-stream` parser),
+  `post_stream`, whose `idle_timeout` gives up a response or body that
+  sends nothing for that long: `Stalled`; a connection broken mid-body is
+  `Connection_lost`), `Sse` (incremental `text/event-stream` parser),
   `Sse_request` (streaming POST whose non-2xx bodies become
-  `"HTTP <status>: <message>"`, the shape `Agent_loop` retries on).
+  `"HTTP <status>: <message>"`, the shape `Agent_loop` retries on; a model's
+  stream that is silent for 5 minutes, not even a ping, is given up as
+  stalled and retried).
 
 ### Model layer
 
@@ -274,9 +278,19 @@ becomes a list):
   is continued (up to 10 times): what the turn has so far is sent back as
   the last, assistant message, its unresolved `server_tool_use` included,
   and the reply goes on in the same message; elsewhere an unresolved
-  `server_tool_use` is dropped. Consecutive same-role turns are merged, the
-  last cacheable block (not thinking or `server_tool_use`) and the system
-  blocks carry cache breakpoints, thinking blocks
+  `server_tool_use` is dropped. Consecutive same-role turns are merged.
+  Cache breakpoints (three of the four allowed): the end of the system
+  prompt (tools come before it), the last cacheable block (not thinking or
+  `server_tool_use`), and the last one before the newest assistant reply,
+  where the request before ended: the provider only looks about 20 blocks
+  back from a breakpoint for a cached prefix, so a turn of many parallel
+  calls would otherwise read the whole context again
+  (`test_agent.ml` checks that each request extends the one before).
+  Adaptive thinking asks for `display: "summarized"`: newer models omit
+  the text by default, leaving minutes of thought with nothing to show. A
+  thinking block's start is passed on at once (an empty `Thinking_delta`),
+  and a mid-stream `error` event keeps its type (`overloaded_error: ...`)
+  so a transient one is retried. Thinking blocks
   are replayed only with a signature. With an OAuth token (Claude Pro/Max) the
   request is shaped like Claude Code's: Bearer auth, `claude-cli` user agent,
   `claude-code-20250219`/`oauth-2025-04-20` betas, the Claude Code identity
@@ -670,7 +684,11 @@ two can share one.
   (what was pending then is lost) and record it at their first change.
 - `Agent_loop` — the core loop. Per turn: build the request from the context,
   stream the assistant message (emitting `Message_start/update/end`), retry
-  with exponential backoff on retryable errors, execute the tool calls
+  transient errors (HTTP 408/429/5xx/529, Anthropic's overloaded, API and
+  rate limit errors, failed, lost or stalled connections) up to 5 times
+  with backoff (1, 2, 4, 8, 16 s; cancellable), emitting `Retry {attempt;
+  max_attempts; error; delay}` before each wait so the frontends say so,
+  execute the tool calls
   (`Tool_start/output/end`), append results, then poll `steer` for user
   messages to inject before the next turn. A turn whose calls are all
   `parallel_safe` runs them through `Eio.Fiber.List.map`; a mixed turn stays
