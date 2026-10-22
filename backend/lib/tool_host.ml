@@ -563,6 +563,7 @@ let connect
     | addr :: _ ->
       Switch.run (fun sw ->
         let flow = Eio.Net.connect ~sw net addr in
+        Web_server.keepalive flow;
         serve_connection
           ~worker
           ~link
