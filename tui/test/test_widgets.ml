@@ -1805,7 +1805,7 @@ let%expect_test "tools: bash shows the command, its outcome as a chip" =
     {|{"command":"make all"}|}
     ~result:
       (tool_result
-         "still running after 30s, so it was moved to the background as job j3 (not restarted: it keeps running). Output so far (last 2 of 40 lines):\nbuilding 39\nbuilding 40\nIts report ([job j3 exited ...] and its last lines) is delivered to you when it exits: keep working on something else or end your turn. job_output shows more output, job_kill stops it; do not job_wait on it unless you truly cannot do anything else.");
+         "still running after 30s, so it was moved to the background as job j3 (not restarted: it keeps running). Output so far (last 2 of 40 lines):\nbuilding 39\nbuilding 40\nIts report ([job j3 exited ...] and its last lines) is delivered to you when it exits: keep working on something else or end your turn. job_output shows more output, job_kill stops it.");
   [%expect {|
     == quiet ==
     ✓ bash $ make all  job j3 moved to the background after 30s 2 lines
@@ -1821,6 +1821,19 @@ let%expect_test "tools: bash shows the command, its outcome as a chip" =
         building 39
         building 40
     |}];
+  (* job_kill names the job; an old session's job_wait (a tool that no
+     longer exists) still shows its ids and result. *)
+  show_tool
+    "job_kill"
+    {|{"id":"j2"}|}
+    ~result:(tool_result "[job j2 killed] sleep 100");
+  show_tool
+    "job_wait"
+    {|{"ids":["j1","j2"]}|}
+    ~result:
+      (tool_result
+         "[job j1 exited 0] sleep 1; echo bg finished\nbg finished\n\ntimed out; still running: j2 (sleep 100)");
+  [%expect {| |}];
   (* Aborting cancels the call: what it printed is kept, but it did not fail. *)
   show_tool
     ~styled:true
