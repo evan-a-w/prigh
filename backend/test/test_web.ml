@@ -106,6 +106,32 @@ let%expect_test
   [%expect {| eof |}]
 ;;
 
+let%expect_test "web server: connections get TCP keepalive probes" =
+  Tool_test_helpers.with_sandbox
+  @@ fun t ->
+  Eio.Switch.run
+  @@ fun sw ->
+  let net = Eio.Stdenv.net t.env in
+  let socket =
+    Eio.Net.listen
+      ~sw
+      ~backlog:1
+      ~reuse_addr:true
+      net
+      (`Tcp (Eio.Net.Ipaddr.V4.loopback, 0))
+  in
+  let flow = Eio.Net.connect ~sw net (Eio.Net.listening_addr socket) in
+  Web_server.keepalive flow;
+  print_s
+    [%message
+      ""
+        ~keepalive:(Eio.Net.getsockopt flow Eio.Net.Sockopt.SO_KEEPALIVE : bool)
+        ~idle:(Eio.Net.getsockopt flow Eio.Net.Sockopt.TCP_KEEPIDLE : int)
+        ~interval:(Eio.Net.getsockopt flow Eio.Net.Sockopt.TCP_KEEPINTVL : int)
+        ~count:(Eio.Net.getsockopt flow Eio.Net.Sockopt.TCP_KEEPCNT : int)];
+  [%expect {| ((keepalive true) (idle 30) (interval 10) (count 3)) |}]
+;;
+
 let%expect_test "web server: browser URLs" =
   print_endline (Web_server.browser_url ~host:"127.0.0.1" ~port:7777);
   print_endline (Web_server.browser_url ~host:"::1" ~port:7777);

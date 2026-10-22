@@ -41,18 +41,21 @@ module Conn = struct
   type t =
     { input : string option Eio.Stream.t
     ; responses : Json.t Queue.t
+    ; events : Json.t Queue.t
     ; mutable ended : bool
     }
 
   let start
         ?finish_requests
-        ?(write : [ `Record | `Never | `Fail ] = `Record)
+        ?(write : [ `Record | `Never | `Fail | `After of unit Eio.Promise.t ] =
+          `Record)
         server
         ~sw
     =
     let c =
       { input = Eio.Stream.create 20_000
       ; responses = Queue.create ()
+      ; events = Queue.create ()
       ; ended = false
       }
     in
@@ -63,12 +66,17 @@ module Conn = struct
            server
            ~read_line:(fun () -> Eio.Stream.take c.input)
            ~write_line:(fun line ->
-             match write with
-             | `Record ->
+             let record () =
                let json = Json.of_string line in
-               (match Json.member "type" json with
-                | Some (`String "response") -> Queue.enqueue c.responses json
-                | _ -> ())
+               match Json.member "type" json with
+               | Some (`String "response") -> Queue.enqueue c.responses json
+               | _ -> Queue.enqueue c.events json
+             in
+             match write with
+             | `Record -> record ()
+             | `After ready ->
+               Eio.Promise.await ready;
+               record ()
              | `Never -> Fiber.await_cancel ()
              | `Fail -> failwith "connection reset by peer")
          : (Json.t * string) option);
@@ -126,6 +134,135 @@ let many_deltas n =
   ; stop_reason = End_turn
   ; usage = Usage.zero
   }
+;;
+
+(* A frontend that reads slower than the model writes (a slow link, a busy
+   machine) while a long reply streams: each update carries the whole
+   message so far. The updates waiting for it merge, so it is not dropped
+   for being behind, and it ends up with the whole message. *)
+let%expect_test "a slow peer under a long streamed reply keeps up" =
+  with_sandbox
+  @@ fun t ->
+  Eio.Switch.run
+  @@ fun sw ->
+  let deltas =
+    List.init 12_000 ~f:(fun i ->
+      if i < 2_000
+      then Assistant_event.Thinking_delta "t"
+      else Assistant_event.Text_delta (Int.to_string (i % 10)))
+  in
+  let server =
+    make_server
+      t
+      ~sw
+      ~provider:
+        (Faux_provider.create
+           [ { Reply.events = deltas
+             ; stop_reason = End_turn
+             ; usage = Usage.zero
+             }
+           ])
+  in
+  let watcher = Conn.start server ~sw in
+  Conn.send watcher {|{"id": 1, "method": "hello", "params": {}}|};
+  let session = session_id_of t watcher 1 in
+  let ready, set_ready = Eio.Promise.create () in
+  let slow = Conn.start server ~sw ~write:(`After ready) in
+  Conn.send
+    slow
+    (sprintf
+       {|{"id": 1, "method": "hello", "params": {"session": "%s"}}|}
+       session);
+  Conn.send watcher {|{"id": 2, "method": "prompt", "params": {"text": "go"}}|};
+  print_endline (Conn.ok t watcher 2);
+  let rec wait_for_the_run id =
+    Conn.send watcher (sprintf {|{"id": %d, "method": "get_state"}|} id);
+    match
+      Option.bind
+        (Json.member
+           "result"
+           (Conn.response t watcher (`Number (Int.to_string id))))
+        ~f:(Json.member "running")
+    with
+    | Some `False -> ()
+    | _ ->
+      sleep t 0.05;
+      wait_for_the_run (id + 1)
+  in
+  wait_for_the_run 100;
+  Eio.Promise.resolve set_ready ();
+  Conn.send slow {|{"id": 2, "method": "ping"}|};
+  wait_until t (fun () ->
+    slow.ended
+    || Queue.exists slow.responses ~f:(fun r ->
+      match Json.member "id" r with
+      | Some (`Number "2") -> true
+      | _ -> false));
+  let member path json =
+    List.fold path ~init:(Some json) ~f:(fun json key ->
+      Option.bind json ~f:(Json.member key))
+  in
+  let string path json =
+    match member path json with
+    | Some (`String s) -> s
+    | _ -> ""
+  in
+  let updates =
+    Queue.to_list slow.events
+    |> List.filter ~f:(fun e ->
+      String.equal (string [ "event" ] e) "message_update")
+  in
+  let joined kind =
+    List.filter_map updates ~f:(fun e ->
+      Option.some_if
+        (String.equal (string [ "delta"; "type" ] e) kind)
+        (string [ "delta"; "text" ] e))
+    |> String.concat
+  in
+  let text = joined "text_delta" in
+  let thinking = joined "thinking_delta" in
+  let last_partial =
+    match List.last updates with
+    | Some e -> Json.to_string (Option.value_exn (member [ "partial" ] e))
+    | None -> ""
+  in
+  let final =
+    Queue.to_list slow.events
+    |> List.find_map ~f:(fun e ->
+      if
+        String.equal (string [ "event" ] e) "message_end"
+        && String.equal (string [ "message"; "role" ] e) "assistant"
+      then member [ "message"; "content" ] e
+      else None)
+  in
+  print_s
+    [%message
+      ""
+        ~ended:(slow.ended : bool)
+        ~updates:(List.length updates : int)
+        ~text_length:(String.length text : int)
+        ~text_is_the_reply:
+          (String.equal
+             text
+             (String.concat
+                (List.init 10_000 ~f:(fun i -> Int.to_string ((i + 2_000) % 10))))
+           : bool)
+        ~thinking_length:(String.length thinking : int)
+        ~last_partial_has_the_whole_text:
+          (String.is_substring last_partial ~substring:text : bool)
+        ~final_content:
+          (Option.map final ~f:Json.to_string |> Option.map ~f:String.length
+           : int option)];
+  Conn.close watcher;
+  Conn.close slow;
+  Rpc_server.shutdown server;
+  [%expect
+    {|
+    ok
+    ((ended false) (updates 2) (text_length 10000) (text_is_the_reply true)
+     (thinking_length 2000) (last_partial_has_the_whole_text true)
+     (final_content (12057)))
+    |}]
 ;;
 
 (* A laptop that went to sleep, a phone gone from the network behind a proxy

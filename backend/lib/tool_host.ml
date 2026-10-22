@@ -121,7 +121,7 @@ module Worker = struct
           Some feed
         | _ -> None
       in
-      Fiber.fork ~sw:t.sw (fun () ->
+      Guarded.fork ~sw:t.sw ~what:("tool " ^ name) (fun () ->
         let result =
           match
             Host_ops.execute
@@ -165,7 +165,7 @@ module Worker = struct
       in
       let channel = Terminal_channel.Fed.channel fed in
       Hashtbl.set t.viewers ~key:term_id ~data:fed;
-      Fiber.fork ~sw:t.sw (fun () ->
+      Guarded.fork ~sw:t.sw ~what:"a terminal" (fun () ->
         (match
            Terminals.serve
              (Lazy.force t.terminals)
@@ -228,11 +228,68 @@ module Worker = struct
     | _ -> ()
   ;;
 
-  let stop t =
-    Hashtbl.iter t.running ~f:Cancellation.cancel;
+  let running t = Hashtbl.keys t.running
+
+  (* Their sockets on the backend are gone with the connection. *)
+  let close_viewers t =
     Hashtbl.iter t.viewers ~f:Terminal_channel.Fed.close;
     Hashtbl.clear t.viewers
   ;;
+
+  let stop t =
+    Hashtbl.iter t.running ~f:Cancellation.cancel;
+    close_viewers t
+  ;;
+end
+
+(* Where a connected tool host's replies go: the current connection, once
+   its [hello] is answered. In between, results and output wait for the next
+   one (the execs carry on meanwhile: the backend waits for a host that
+   comes back with them, see [Rpc_server]), up to [max_held_output] bytes
+   of output; terminal frames are dropped, their viewers are gone. *)
+module Link = struct
+  type t =
+    { mutable send : (Reply.t -> unit) option
+    ; held : Reply.t Queue.t
+    ; mutable held_output : int
+    }
+
+  let max_held_output = 1024 * 1024
+  let create () = { send = None; held = Queue.create (); held_output = 0 }
+
+  let hold t (reply : Reply.t) =
+    match reply with
+    | Terminal_frame _ | Terminal_closed _ -> ()
+    | Result _ -> Queue.enqueue t.held reply
+    | Output { chunk; _ } ->
+      if t.held_output + String.length chunk <= max_held_output
+      then (
+        t.held_output <- t.held_output + String.length chunk;
+        Queue.enqueue t.held reply)
+  ;;
+
+  let send t reply =
+    match t.send with
+    | Some send -> send reply
+    | None -> hold t reply
+  ;;
+
+  (* Executions whose results wait to be delivered. *)
+  let finished t =
+    Queue.to_list t.held
+    |> List.filter_map ~f:(function
+      | Reply.Result { exec_id; _ } -> Some exec_id
+      | Output _ | Terminal_frame _ | Terminal_closed _ -> None)
+  ;;
+
+  let connect t send =
+    Queue.iter t.held ~f:send;
+    Queue.clear t.held;
+    t.held_output <- 0;
+    t.send <- Some send
+  ;;
+
+  let disconnect t = t.send <- None
 end
 
 (* Lines go out in order through one writer fiber; nothing is written once
@@ -276,10 +333,13 @@ let read_lines flow ~f =
   let rec loop () =
     match Eio.Buf_read.line reader with
     | exception (End_of_file | Eio.Io _) -> ()
+    | exception Eio.Buf_read.Buffer_limit_exceeded ->
+      eprintf "prigh tool-host: a line from the frontend is over 64 MiB\n%!"
     | line ->
       (match Json.parse line with
        | Error _ -> ()
-       | Ok json -> f json);
+       | Ok json ->
+         Guarded.run ~what:"a request from the frontend" (fun () -> f json));
       loop ()
   in
   loop ()
@@ -329,11 +389,11 @@ let worker_kind = function
 ;;
 
 (* One connection: [`Served] once [hello] succeeded, [`Refused] when the
-   backend rejected the credentials, else why it did not. *)
+   backend rejected the credentials, else why it did not. The [worker] and
+   what it runs outlive it. *)
 let serve_connection
-      ~env
-      ~terminals
-      ~mcp
+      ~worker
+      ~link
       ~log
       ~address
       ~token
@@ -348,17 +408,19 @@ let serve_connection
   let outbox =
     Outbox.create ~sw ~write:(fun s -> Eio.Flow.copy_string s flow)
   in
+  (* Requests by id until answered, with the replies they carry: those
+     unanswered when the connection ends go again on the next one. *)
   let pending = Int.Table.create () in
   let next_id = ref 0 in
-  let request meth params =
+  let request (reply : Reply.t) =
     incr next_id;
-    Hashtbl.set pending ~key:!next_id ~data:meth;
+    Hashtbl.set pending ~key:!next_id ~data:reply;
     Outbox.send
       outbox
       (`Object
           [ "id", `Number (Int.to_string !next_id)
-          ; "method", `String meth
-          ; "params", params
+          ; "method", `String (Reply.method_ reply)
+          ; "params", `Object (Reply.fields reply)
           ])
   in
   Outbox.send
@@ -379,12 +441,14 @@ let serve_connection
                      ( "features"
                      , `Array [ `String "exec_input"; `String "terminal_kill" ]
                      )
+                 ; Some
+                     ( "running_execs"
+                     , `Array
+                         (List.map
+                            (Worker.running worker @ Link.finished link)
+                            ~f:(fun id -> `String id)) )
                  ]) )
         ]);
-  let worker =
-    Worker.create ~env ~sw ~terminals ~mcp ~default_cwd:cwd ~send:(fun reply ->
-      request (Reply.method_ reply) (`Object (Reply.fields reply)))
-  in
   let outcome = ref (`Failed (sprintf "disconnected from %s" address)) in
   let reader = Eio.Buf_read.of_flow flow ~max_size:(64 * 1024 * 1024) in
   let rec loop () =
@@ -404,6 +468,7 @@ let serve_connection
              (match field json "id", ok with
               | Some (`String "hello"), Some `True ->
                 outcome := `Served;
+                Link.connect link request;
                 log
                   (sprintf
                      "connected to %s as %s"
@@ -420,7 +485,7 @@ let serve_connection
                    else `Failed ("hello failed: " ^ error);
                 false
               | Some (`Number id), ok ->
-                let meth =
+                let reply =
                   Option.bind
                     (Int.of_string_opt id)
                     ~f:(Hashtbl.find_and_remove pending)
@@ -431,21 +496,30 @@ let serve_connection
                    log
                      (sprintf
                         "%s failed: %s"
-                        (Option.value meth ~default:"request")
+                        (Option.value_map
+                           reply
+                           ~default:"request"
+                           ~f:Reply.method_)
                         error));
                 true
               | _ -> true)
            | Some "event", _ ->
              Option.iter
                (Option.bind (string_field json "event") ~f:worker_kind)
-               ~f:(fun kind -> Worker.handle worker ~kind json);
+               ~f:(fun kind ->
+                 Guarded.run ~what:"a request from the backend" (fun () ->
+                   Worker.handle worker ~kind json));
              true
            | _ -> true)
       in
       if continue then loop ()
   in
-  loop ();
-  Worker.stop worker;
+  Exn.protect ~f:loop ~finally:(fun () ->
+    Link.disconnect link;
+    Hashtbl.to_alist pending
+    |> List.sort ~compare:(fun (a, _) (b, _) -> Int.compare a b)
+    |> List.iter ~f:(fun (_, reply) -> Link.hold link reply);
+    Worker.close_viewers worker);
   Outbox.close outbox;
   !outcome
 ;;
@@ -471,6 +545,16 @@ let connect
     Option.value terminals ~default:(lazy (Terminals.create ~env ~sw ()))
   in
   let mcp = Mcp_hub.create ~env ~sw () in
+  let link = Link.create () in
+  let worker =
+    Worker.create
+      ~env
+      ~sw
+      ~terminals
+      ~mcp
+      ~default_cwd:cwd
+      ~send:(Link.send link)
+  in
   let address = sprintf "%s:%d" host port in
   let net = Eio.Stdenv.net env in
   let attempt () =
@@ -479,10 +563,10 @@ let connect
     | addr :: _ ->
       Switch.run (fun sw ->
         let flow = Eio.Net.connect ~sw net addr in
+        Web_server.keepalive flow;
         serve_connection
-          ~env
-          ~terminals
-          ~mcp
+          ~worker
+          ~link
           ~log
           ~address
           ~token
@@ -500,7 +584,9 @@ let connect
     in
     match attempt () with
     | `Served -> retry initial_backoff
-    | `Refused error -> Error.createf "%s refused the login: %s" address error
+    | `Refused error ->
+      Worker.stop worker;
+      Error.createf "%s refused the login: %s" address error
     | `Failed message ->
       log message;
       retry backoff
