@@ -50,15 +50,20 @@ let subagent_waiting ~has =
        blocks until it finishes (give it a timeout long enough; the default is \
        10 minutes). To wait for something to become ready (a server, a file), \
        use one foreground command that blocks until it is, with a timeout."
-    ; "- To run commands side by side or keep a server running while you \
-       work, start them with bash background: true. Each job's report arrives \
-       in a message starting with \"[job <id> exited <code>]\" when it exits, \
-       even after you end your turn: keep working or end your turn meanwhile."
-      ^ job_output_note ~has
-    ; "- You finish when you end your turn with no jobs running: kill the ones \
-       you no longer need (servers) before your final report."
-    ; ""
     ]
+    @ (if has "job_output"
+       then
+         [ "- To run commands side by side or keep a server running while you \
+            work, start them with bash background: true. Each job's report \
+            arrives in a message starting with \"[job <id> exited <code>]\" \
+            when it exits, even after you end your turn: keep working or end \
+            your turn meanwhile."
+           ^ job_output_note ~has
+         ; "- You finish when you end your turn with no jobs running: kill the \
+            ones you no longer need (servers) before your final report."
+         ]
+       else [])
+    @ [ "" ]
 ;;
 
 let base ~nix ~auto_background ~(role : Role.t) ~tools =
@@ -131,7 +136,8 @@ let base ~nix ~auto_background ~(role : Role.t) ~tools =
                prigh, not typed by the user. You are woken by it even after \
                you end your turn."
             ; "- So while they run, keep working on whatever does not depend \
-               on them, or end your turn. Never sleep or poll to pass the time."
+               on them, or end your turn. Never sleep or poll to pass the \
+               time."
               ^ job_output_note ~has
             ; ""
             ]

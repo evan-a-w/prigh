@@ -250,7 +250,7 @@ let%expect_test "a report arriving mid-run is injected after the tool results" =
     |}]
 ;;
 
-let%expect_test "subagent_status, subagent_wait and subagent_cancel" =
+let%expect_test "subagent_status and subagent_cancel" =
   let gates = Gates.create () in
   Gates.hold gates "slow";
   with_agent
@@ -260,21 +260,12 @@ let%expect_test "subagent_status, subagent_wait and subagent_cancel" =
           [ "c1", "subagent", {|{"task":"quick"}|}
           ; "c2", "subagent", {|{"task":"slow"}|}
           ]
-      ; Reply.tool_call
-          ~id:"w1"
-          ~name:"subagent_wait"
-          ~arguments:{|{"ids":["a1"]}|}
-          ()
+      ; Reply.text "waiting for a1"
       ; Reply.tool_call ~id:"s1" ~name:"subagent_status" ~arguments:"{}" ()
       ; Reply.tool_call
-          ~id:"w2"
-          ~name:"subagent_wait"
-          ~arguments:{|{"timeout":0}|}
-          ()
-      ; Reply.tool_call
-          ~id:"w3"
-          ~name:"subagent_wait"
-          ~arguments:{|{"ids":["a9"]}|}
+          ~id:"x0"
+          ~name:"subagent_cancel"
+          ~arguments:{|{"id":"a9"}|}
           ()
       ; Reply.tool_call
           ~id:"x1"
@@ -282,14 +273,14 @@ let%expect_test "subagent_status, subagent_wait and subagent_cancel" =
           ~arguments:{|{"id":"a2"}|}
           ()
       ; Reply.tool_call ~id:"s2" ~name:"subagent_status" ~arguments:"{}" ()
-      ; Reply.tool_call ~id:"w4" ~name:"subagent_wait" ~arguments:"{}" ()
       ; Reply.text "done"
       ]
     [ "quick", [ Reply.text "quick report" ]; "slow", [ Reply.text "never" ] ]
   @@ fun _t agent ->
   Or_error.ok_exn (Agent.prompt agent "go");
   Agent.wait_idle agent;
-  (* Everything was returned by the tools, so nothing is delivered again. *)
+  (* a2's report was returned by subagent_cancel, so it is not delivered
+     again. *)
   print_messages (Agent.messages agent);
   [%expect
     {|
@@ -305,15 +296,15 @@ let%expect_test "subagent_status, subagent_wait and subagent_cancel" =
     tool_result subagent: started agent a2 (slow); its result will be delivered to you when it finishes: keep working or end your turn meanwhile
     subagent_end a1: ok quick report | [subagent: 1 turns, 10 in / 5 out tokens, $0.0000]
     state: running=true subagents=[a1 done; a2 running]
-    assistant:  subagent_wait{"ids":["a1"]}
+    assistant: waiting for a1
+    agent_end
     state: running=true subagents=[a2 running]
-    tool_result subagent_wait: [subagent a1 finished] quick | quick report | [subagent: 1 turns, 10 in / 5 out tokens, $0.0000]
+    agent_start
+    user: [subagent a1 finished] quick | quick report | [subagent: 1 turns, 10 in / 5 out tokens, $0.0000]
     assistant:  subagent_status{}
     tool_result subagent_status: a1  finished, delivered  0s  quick  (last: finished) | a2  running  0s  slow  (last: waiting for the model)
-    assistant:  subagent_wait{"timeout":0}
-    tool_result subagent_wait: timed out; still running: a2 (slow)
-    assistant:  subagent_wait{"ids":["a9"]}
-    tool_result subagent_wait: invalid arguments: unknown subagent "a9"; known: a1, a2
+    assistant:  subagent_cancel{"id":"a9"}
+    tool_result subagent_cancel: invalid arguments: unknown subagent "a9"; known: a1, a2
     assistant:  subagent_cancel{"id":"a2"}
     subagent_end a2: error [cancelled] | [subagent: 1 turns, 10 in / 5 out tokens, $0.0000]
     state: running=true subagents=[a2 done]
@@ -321,8 +312,6 @@ let%expect_test "subagent_status, subagent_wait and subagent_cancel" =
     tool_result subagent_cancel: [subagent a2 failed] slow | [cancelled] | [subagent: 1 turns, 10 in / 5 out tokens, $0.0000]
     assistant:  subagent_status{}
     tool_result subagent_status: a1  finished, delivered  0s  quick  (last: finished) | a2  failed, delivered  0s  slow  (last: finished)
-    assistant:  subagent_wait{}
-    tool_result subagent_wait: no subagents to wait for
     assistant: done
     agent_end
     state: running=false subagents=[]
@@ -331,20 +320,16 @@ let%expect_test "subagent_status, subagent_wait and subagent_cancel" =
     assistant:  subagent{"task":"quick"} subagent{"task":"slow"}
     tool_result subagent: started agent a1 (quick); its result will be delivered to you when it finishes: keep working or end your turn meanwhile
     tool_result subagent: started agent a2 (slow); its result will be delivered to you when it finishes: keep working or end your turn meanwhile
-    assistant:  subagent_wait{"ids":["a1"]}
-    tool_result subagent_wait: [subagent a1 finished] quick | quick report | [subagent: 1 turns, 10 in / 5 out tokens, $0.0000]
+    assistant: waiting for a1
+    user: [subagent a1 finished] quick | quick report | [subagent: 1 turns, 10 in / 5 out tokens, $0.0000]
     assistant:  subagent_status{}
     tool_result subagent_status: a1  finished, delivered  0s  quick  (last: finished) | a2  running  0s  slow  (last: waiting for the model)
-    assistant:  subagent_wait{"timeout":0}
-    tool_result subagent_wait: timed out; still running: a2 (slow)
-    assistant:  subagent_wait{"ids":["a9"]}
-    tool_result subagent_wait: invalid arguments: unknown subagent "a9"; known: a1, a2
+    assistant:  subagent_cancel{"id":"a9"}
+    tool_result subagent_cancel: invalid arguments: unknown subagent "a9"; known: a1, a2
     assistant:  subagent_cancel{"id":"a2"}
     tool_result subagent_cancel: [subagent a2 failed] slow | [cancelled] | [subagent: 1 turns, 10 in / 5 out tokens, $0.0000]
     assistant:  subagent_status{}
     tool_result subagent_status: a1  finished, delivered  0s  quick  (last: finished) | a2  failed, delivered  0s  slow  (last: finished)
-    assistant:  subagent_wait{}
-    tool_result subagent_wait: no subagents to wait for
     assistant: done
     |}]
 ;;
