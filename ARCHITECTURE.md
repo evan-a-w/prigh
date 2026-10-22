@@ -122,8 +122,14 @@ the TUI with local tools; `Agent.Host.exec_input`): a job on a host without
 it gets a `Stdin_feed` that refuses writes with "runs an older prigh ...
 update it". A tool an older host does not know (`unknown host tool`) gets
 the same advice appended.
-Disconnecting the active host fails its in-flight calls with `[tool host
-disconnected]`, but the session stays on that host: later calls fail with
+A host whose connection drops keeps its in-flight calls for `host_grace`
+(60s, `Rpc_server.create`): its next `hello` lists the executions it still
+runs (`running_execs`), which carry on over the new connection; the others
+on that host id fail (`[tool host reconnected]`), ids the backend no longer
+waits for get a `tool_exec_cancel`, and when no hello comes in time they
+fail with `[tool host disconnected]` (`prigh tool-host -connect` and the
+TUI's `Tool_host` keep their worker across connections and hold results
+and up to 1 MiB of output while offline). The session stays on that host: later calls fail with
 "waiting for tool host NAME to reconnect; /host picks another" (the run
 continues and the model sees the error) and the TUI shows `tools:offline`.
 When the same host id connects again the session resumes on it in the cwd
@@ -985,7 +991,12 @@ two can share one.
   `tool_exec_result`). Nothing waits for a peer: what a connection sends
   goes into its `Outbox`, a queue that never blocks the sender (an agent's
   events, the broadcasts to every client such as `sessions_changed`, other
-  clients' requests). Before, a page that stopped reading (a suspended
+  clients' requests), through `Update_coalescer`: a `message_update`
+  carries the whole message so far, so those of one stream (the agent's or
+  a subagent's) still waiting merge (latest `partial`, deltas joined) and a
+  peer reading slower than the model writes gets fewer, current updates
+  instead of falling behind by ever larger copies (they are rendered when
+  written, `Outbox.send_late`). Before, a page that stopped reading (a suspended
   laptop, a phone gone behind a proxy that keeps its socket) filled a
   bounded queue, and then the agent emitting events to it, and every
   request broadcasting to all clients, waited forever: every session of the
@@ -1126,6 +1137,13 @@ two can share one.
   response is `{btw_id, text, usage, cost_usd}`. `btw_cancel {btw_id}`
   (or the client disconnecting) cancels it. Its usage is added to the
   in-memory `State.usage`/`cost_usd` like subagents'.
+- `Guarded` — fibers on a long-lived switch that cannot fail it: every
+  agent and listener of `prigh serve` shares one switch, so an exception
+  escaping a run, a resume, a background task's bookkeeping or an accept
+  loop would end the backend (every connection dropped, every session's
+  background subagents and jobs lost). `Guarded.fork`/`run` log it (runs
+  end with a `run failed` notice) and `accept_loop` retries a failed
+  `accept`; `prigh tool-host` guards each request likewise.
 - `Net_error` — a failed bind or connect as a short phrase ("address
   already in use", "connection refused") instead of Eio's exception dump,
   for `prigh serve`'s listeners and `prigh tool-host -connect`.

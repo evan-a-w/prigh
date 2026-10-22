@@ -546,7 +546,8 @@ If the backend goes away (the spawned process dies, or the TCP connection
 drops) the TUI reconnects on its own — immediately, then with exponential
 backoff capped at 10s — rejoining the same session and respawning the
 backend when it was spawned; `/retry-backend-connection` retries at once and
-Ctrl+C quits meanwhile.
+Ctrl+C quits meanwhile. Tool calls its local tool host is running carry on
+across the reconnect: their results wait for the backend to be back.
 
 ## In Neovim
 
@@ -821,7 +822,9 @@ session's active tool host like any `bash` call (the backend, or a frontend's
 plus the last 40 lines of output reaches the main agent exactly like a
 subagent report (an idle agent starts a turn; reports finishing together, jobs
 and subagents alike, arrive as one message). Killed jobs report `killed`, a
-host that disconnects fails its jobs (`failed: tool host disconnected`). The
+host that drops its connection keeps its jobs if it reconnects within a
+minute still running them (a TUI or `prigh tool-host` that reconnects does),
+otherwise they fail (`failed: tool host disconnected`). The
 model also has `job_status`, `job_output` (peek at recent output, paging back
 with `offset`), `job_wait` (block on some or all jobs; returned reports are
 not delivered again), `job_input` and `job_kill`.
