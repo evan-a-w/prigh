@@ -200,6 +200,20 @@ let no_delay flow =
       | _ -> ()))
 ;;
 
+(* A peer that vanished without a word (a laptop suspended, a network gone)
+   is noticed within a minute even while nothing is sent to it: until then
+   it still counts as connected, and as a tool host it would be sent tool
+   calls nobody answers. *)
+let keepalive flow =
+  try
+    Eio.Net.setsockopt flow Eio.Net.Sockopt.SO_KEEPALIVE true;
+    Eio.Net.setsockopt flow Eio.Net.Sockopt.TCP_KEEPIDLE 30;
+    Eio.Net.setsockopt flow Eio.Net.Sockopt.TCP_KEEPINTVL 10;
+    Eio.Net.setsockopt flow Eio.Net.Sockopt.TCP_KEEPCNT 3
+  with
+  | _ -> ()
+;;
+
 let serve_rpc router ~query:_ ws =
   Rpc_router.serve_lines
     router
@@ -269,6 +283,7 @@ let listen ~env ~sw ~addr ~port ~root ~websockets ~on_lines =
       socket
       (fun flow _addr ->
          no_delay flow;
+         keepalive flow;
          handle ~clock:(Eio.Stdenv.clock env) ~root ~websockets ~on_lines flow));
   port
 ;;

@@ -770,6 +770,7 @@ let serve_command =
                eprintf "prigh: connection failed: %s\n%!" (Exn.to_string exn))
              socket
              (fun flow _addr ->
+                Web_server.keepalive flow;
                 Rpc_router.serve_connection router ~input:flow ~output:flow)));
        let serve_web
              ~label

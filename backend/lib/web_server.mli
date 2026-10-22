@@ -28,6 +28,10 @@ val handle
 
 val browser_url : host:string -> port:int -> string
 
+(** Turns on TCP keepalive probes (after 30s idle, every 10s, 3 tries), so
+    that a peer gone without closing its connection is noticed. *)
+val keepalive : _ Eio.Net.stream_socket -> unit
+
 (** [Rpc_router.serve_lines] over a WebSocket. *)
 val serve_rpc : Rpc_router.t -> on_websocket
 
