@@ -121,7 +121,6 @@ let execute_tool
 
 (* Seconds before attempt [attempt + 1]: 1, 2, 4, 8, 16, at most 30. *)
 let backoff ~attempt = Float.min 30. (2. ** Float.of_int (attempt - 1))
-
 let overflow_attempts = 2
 
 (* A repeated overflow keeps less of the conversation's end. *)

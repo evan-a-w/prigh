@@ -1645,9 +1645,11 @@ let%expect_test "Anthropic requests keep a stable, cached prefix across turns" =
     | other -> other
   in
   let blocks body =
-    List.concat_map (Json.list_exn (member "messages" body)) ~f:(fun m ->
-      let role = Json.string_exn (member "role" m) in
-      List.map (Json.list_exn (member "content" m)) ~f:(fun b -> role, b))
+    List.concat_map
+      (Json.list_exn (member "messages" body))
+      ~f:(fun m ->
+        let role = Json.string_exn (member "role" m) in
+        List.map (Json.list_exn (member "content" m)) ~f:(fun b -> role, b))
   in
   let show (role, block) =
     let type_ = Json.string_exn (member "type" block) in
@@ -1656,9 +1658,10 @@ let%expect_test "Anthropic requests keep a stable, cached prefix across turns" =
   let same_blocks a b =
     List.equal
       (fun (r1, b1) (r2, b2) ->
-        String.equal r1 r2 && String.equal
-             (Json.to_string (uncached b1))
-             (Json.to_string (uncached b2)))
+         String.equal r1 r2
+         && String.equal
+              (Json.to_string (uncached b1))
+              (Json.to_string (uncached b2)))
       a
       b
   in
@@ -1690,7 +1693,8 @@ let%expect_test "Anthropic requests keep a stable, cached prefix across turns" =
       continues
       (String.concat ~sep:" " (List.map blocks ~f:show));
     previous := Some (fixed body, blocks));
-  [%expect {|
+  [%expect
+    {|
     request 1 (2 breakpoints; first)
       user:text*
     request 2 (3 breakpoints; tools and system unchanged: true, extends the last request: true)

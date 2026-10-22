@@ -174,7 +174,8 @@ let stream
   match Cancellation.protect cancel ~f:(fun () -> with_timeout request) with
   | None -> Error Error.Cancelled
   | Some result -> result
-  | exception Stalled_exn -> Error (Error.Stalled (Option.value_exn idle_timeout))
+  | exception Stalled_exn ->
+    Error (Error.Stalled (Option.value_exn idle_timeout))
 ;;
 
 let post_stream
