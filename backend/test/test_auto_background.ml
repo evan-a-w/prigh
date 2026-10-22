@@ -394,7 +394,10 @@ let%expect_test "a command on a client tool host moves to the background" =
   rpc "prompt" {|{"text": "again"}|};
   Test_background_subagents.wait_turn agent;
   Test_background_jobs.print_tail t agent 2;
+  (* The connection drops and the host comes back with the job running. *)
   Test_tool_host.Listener.drop listener;
+  Test_tool_host.Host.wait_logs t host 3;
+  write t "host/gate2" "";
   Test_background_jobs.wait_idle t agent;
   Test_background_jobs.print_tail t agent 2;
   [%expect
@@ -402,7 +405,10 @@ let%expect_test "a command on a client tool host moves to the background" =
     {"type":"response","id":"r","ok":true,"result":{}}
     tool_result bash: still running after Ns, so it was moved to the background as job j2 (not restarted: it keeps running). Output so far: | waiting | Its report ([job j2 exited ...] and its last lines) is delivered to you when it exits: keep working on something else or end your turn. job_output shows more output, job_kill stops it; do not job_wait on it unless you truly cannot do anything else.
     assistant: moved again
-    user: [job j2 failed: tool host disconnected] echo waiting; while [ ! -f gate2 ]; do sleep 0.02; done; tr… | waiting
+    disconnected from 127.0.0.1:PORT
+    retrying in 50ms
+    connected to 127.0.0.1:PORT as client-3
+    user: [job j2 exited 0] echo waiting; while [ ! -f gate2 ]; do sleep 0.02; done; tr… | waiting
     assistant: j2 noted
     |}]
 ;;

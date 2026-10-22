@@ -106,7 +106,9 @@ module Host = struct
 
   let wait_logs t host n =
     ignore (eventually t (fun () -> Queue.length host.logs >= n) : bool);
-    List.iter (List.take (Queue.to_list host.logs) n) ~f:print_endline;
+    List.iter
+      (List.take (Queue.to_list host.logs) n)
+      ~f:(fun line -> print_endline (mask t line));
     for _ = 1 to n do
       ignore (Queue.dequeue host.logs : string option)
     done

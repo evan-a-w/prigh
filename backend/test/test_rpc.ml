@@ -29,6 +29,7 @@ let make_server
       ?namespace
       ?(backend_host = true)
       ?(tools = Tools.all)
+      ?host_grace
       t
       ~sw
       ~provider
@@ -53,6 +54,7 @@ let make_server
       ~env:t.env
       ~sw
       ?token
+      ?host_grace
       ?namespace
       ~backend_host
       ~login
@@ -66,13 +68,18 @@ let make_server
   Rpc_server.agent_of_client server client, { H.server; client; login; sent }
 ;;
 
-let with_agent ?backend_host replies f =
+let with_agent ?backend_host ?host_grace replies f =
   with_sandbox
   @@ fun t ->
   Eio.Switch.run
   @@ fun sw ->
   let agent, h =
-    make_server ?backend_host t ~sw ~provider:(Faux_provider.create replies)
+    make_server
+      ?backend_host
+      ?host_grace
+      t
+      ~sw
+      ~provider:(Faux_provider.create replies)
   in
   f t agent h
 ;;

@@ -155,8 +155,7 @@ end
 
 module Pending_exec = struct
   type t =
-    { host : string
-    ; on_output : string -> unit
+    { on_output : string -> unit
     ; resolver : Tool_result.t Promise.u
     }
 end
@@ -819,16 +818,6 @@ let save_as_default t =
 let find_host t id = List.find (hosts t) ~f:(fun h -> String.equal h.id id)
 let active_host_connected t = Option.is_some (find_host t t.active_host)
 
-let fail_execs t ~host ~text =
-  let failed =
-    Hashtbl.filter t.pending_execs ~f:(fun (e : Pending_exec.t) ->
-      String.equal e.host host)
-  in
-  Hashtbl.iteri failed ~f:(fun ~key ~data:(e : Pending_exec.t) ->
-    Hashtbl.remove t.pending_execs key;
-    Promise.resolve e.resolver (Tool.Result.error text))
-;;
-
 let location t =
   if String.is_empty t.active_host
   then None
@@ -918,13 +907,7 @@ let set_hosts t clients =
   if not (List.equal Host.equal t.hosts clients)
   then (
     let was_connected = active_host_connected t in
-    let gone =
-      List.filter t.hosts ~f:(fun h ->
-        not (List.exists clients ~f:(fun h' -> String.equal h.id h'.id)))
-    in
     t.hosts <- clients;
-    List.iter gone ~f:(fun h ->
-      fail_execs t ~host:h.id ~text:"[tool host disconnected]");
     match find_host t t.active_host, List.hd (hosts t) with
     | None, Some host when String.is_empty t.active_host ->
       activate_host t host ~cwd:host.cwd ~pinned:false
@@ -1026,7 +1009,7 @@ let host_exec_with_stdin
     Hashtbl.set
       t.pending_execs
       ~key:exec_id
-      ~data:{ Pending_exec.host = host.id; on_output; resolver };
+      ~data:{ Pending_exec.on_output; resolver };
     let stdin =
       match stdin with
       | Some feed when not host.exec_input ->
@@ -1711,6 +1694,20 @@ let close_interrupted t =
       broadcast t (Loop (Message_end m)))
 ;;
 
+(* A bug in a run's bookkeeping fails the run, not the backend (the agent's
+   switch is the server's), and does not leave the session running forever. *)
+let run_failed t ~resolve exn =
+  eprintf
+    "prigh: a run of session %s failed: %s\n%!"
+    (Session.id t.session)
+    (Exn.to_string exn);
+  if Promise.try_resolve resolve ()
+  then (
+    t.run <- None;
+    broadcast t (Notice ("run failed: " ^ Exn.to_string exn));
+    state_changed t)
+;;
+
 (* Finished background tasks not delivered yet go first. [tried] are the
    models a hand-over chain has used so far (empty for a user's prompt). *)
 let rec start_run ?(tried = String.Set.empty) ?(then_ = fun () -> []) t prompts =
@@ -1722,249 +1719,255 @@ let rec start_run ?(tried = String.Set.empty) ?(then_ = fun () -> []) t prompts 
   t.run <- Some { cancel; finished };
   let prompts = deliveries t @ prompts in
   state_changed t;
-  Fiber.fork ~sw:t.sw (fun () ->
-    (* [then_] may wait for the host (attachments): the run is already
+  Guarded.fork
+    ~sw:t.sw
+    ~what:"a run"
+    ~on_error:(run_failed t ~resolve)
+    (fun () ->
+       (* [then_] may wait for the host (attachments): the run is already
        marked as started, so no other can start meanwhile. *)
-    let prompts = prompts @ then_ () in
-    let prompts = prompts @ due_reminders t in
-    let session = t.session in
-    let finish ~idle =
-      t.run <- None;
-      Promise.resolve resolve ();
-      if idle then state_changed t
-    in
-    refresh_mcp t ~cancel;
-    let halted = ref None in
-    let added =
-      match
-        Agent_loop.run
-          ~env:t.env
-          ~provider:t.provider
-          ~config:(loop_config t)
-          ~cwd:t.cwd
-          ~cancel
-          ~approve:(approve t)
-          ~ask_user:(ask_user t ~cancel)
-          ~execute:(executor t)
-          ~background:t.background
-          ~steer:(fun () ->
-            let l = Queue.to_list t.steer_queue in
-            if not (List.is_empty l)
-            then (
-              Queue.clear t.steer_queue;
-              queue_update t);
-            let queued = List.map l ~f:(user_message t) in
-            (* A plan mode switched during the run is told between turns. *)
-            let note =
-              if List.is_empty queued
-              then
-                Option.to_list
-                  (Option.map (plan_mode_note t) ~f:(fun note ->
-                     Message.user
-                       ~origin:{ Injected.empty with notes = [ note ] }
-                       note.text))
-              else []
-            in
-            deliveries t @ note @ queued @ due_reminders t)
-          ~compact:(fun ~keep_recent_tokens ~cancel _messages ->
-            match
-              Compaction.compact
-                ~env:t.env
-                ~provider:t.provider
-                ~model:t.model
-                ~keep_recent_tokens
-                ~cancel
-                session
-            with
-            | Ok outcome -> Ok (Session.messages session, outcome)
-            | Error e ->
-              broadcast
-                t
-                (Notice ("auto-compaction failed: " ^ Error.to_string_hum e));
-              Error e)
-          ~halt:(fun () ->
-            let reason = budget_exhausted t in
-            Option.iter reason ~f:(fun r -> halted := Some r);
-            reason)
-          ~emit:(fun event ->
-            account t event;
-            track_plan t event;
-            match event with
-            | Turn_end _ ->
-              if phys_equal session t.session
-              then Reminder.Tracker.turn_ended t.reminder_tracker;
-              broadcast t (Loop event)
-            | Compacted { summary; _ } ->
-              if phys_equal session t.session
-              then (
-                broadcast t (Compacted { summary });
-                state_changed t)
-            | Message_end m ->
-              ignore (Session.append_message session m : Session.Entry.t);
-              broadcast t (Loop event)
-            | _ -> broadcast t (Loop event))
-          ~context:(Session.messages session)
-          ~prompts
-          ()
-      with
-      | added -> added
-      | exception exn ->
-        broadcast t (Notice ("run failed: " ^ Exn.to_string exn));
-        []
-    in
-    Option.iter !halted ~f:(fun reason -> broadcast t (Notice reason));
-    sweep_orphans t ~main_running:false;
-    let tried = Set.add tried (Model.key t.model) in
-    let cancelled = Cancellation.is_cancelled cancel in
-    let current = phys_equal session t.session in
-    let unavailable =
-      if cancelled || not current then None else unavailable_error added
-    in
-    let handover =
-      Option.bind unavailable ~f:(fun error ->
-        match next_model t ~tried with
-        | None ->
-          if not (List.is_empty t.config.fallback_models)
-          then
-            broadcast
-              t
-              (Notice
-                 (sprintf
-                    "%s cannot continue and no model in fallback_models is \
-                     left to hand over to; /model picks another"
-                    (Model.key t.model)));
-          None
-        | Some next ->
-          let from = Model.key t.model in
-          broadcast
-            t
-            (Notice
-               (sprintf
-                  "%s: %s; handing over to %s"
-                  from
-                  error
-                  (Model.key next)));
-          set_model t next;
-          Some [ handover_message ~from ~to_:next ~error ])
-    in
-    let resuming =
-      match unavailable, handover with
-      | Some error, None -> schedule_resume t ~error
-      | None, _ ->
-        t.past_resets <- 0;
-        false
-      | Some _, Some _ -> false
-    in
-    (* Steering messages that arrived after the last turn boundary go
-       first: they were sent before any follow-up still queued. *)
-    if not (Queue.is_empty t.steer_queue)
-    then (
-      Queue.blit_transfer ~src:t.follow_up_queue ~dst:t.steer_queue ();
-      Queue.blit_transfer ~src:t.steer_queue ~dst:t.follow_up_queue ();
-      queue_update t);
-    auto_compact t;
-    (* The goal carries on after a run that ended normally; anything else
-       stops it, except a hand-over or a resume, which carry on the run. *)
-    let goal_continues =
-      match t.goal with
-      | Some goal when current && Goal.is_active goal ->
-        let max = t.config.goal_max_continuations in
-        if cancelled
-        then (
-          stop_goal t ~reason:"the run was aborted";
-          false)
-        else if Option.is_some handover || resuming
-        then false
-        else if t.plan_mode
-        then
-          (* The model cannot work towards the goal in plan mode: it waits
-             for the user to approve the plan, then carries on. *)
-          false
-        else (
-          match budget_exhausted t, last_stop added with
-          | Some _, _ ->
-            stop_goal t ~reason:"the session's budget is spent";
-            false
-          | None, Some (Error e) ->
-            stop_goal t ~reason:("the run failed: " ^ e);
-            false
-          | None, Some Aborted ->
-            stop_goal t ~reason:"the run was aborted";
-            false
-          | None, (Some (End_turn | Tool_use | Length) | None) ->
-            if goal.continuations >= max
-            then (
-              stop_goal
-                t
-                ~reason:(sprintf "it used all %d automatic continuations" max);
-              false)
-            else true)
-      | Some _ | None -> false
-    in
-    (* After an abort, finished tasks wait for the next prompt (or the next
-       one to finish) rather than restarting the run at once. *)
-    let next =
-      match handover with
-      | Some prompts -> Some (`Handover prompts)
-      | None ->
-        (match Queue.dequeue t.follow_up_queue with
-         | Some queued ->
-           queue_update t;
-           Some (`Prompts [ user_message t queued ])
-         | None ->
-           if
-             Background_tasks.has_undelivered t.background
-             && not (Cancellation.is_cancelled cancel)
-           then Some (`Prompts [])
-           else if goal_continues
-           then (
-             match t.goal with
-             | Some goal ->
-               let goal =
-                 { goal with continuations = goal.continuations + 1 }
+       let prompts = prompts @ then_ () in
+       let prompts = prompts @ due_reminders t in
+       let session = t.session in
+       let finish ~idle =
+         t.run <- None;
+         Promise.resolve resolve ();
+         if idle then state_changed t
+       in
+       refresh_mcp t ~cancel;
+       let halted = ref None in
+       let added =
+         match
+           Agent_loop.run
+             ~env:t.env
+             ~provider:t.provider
+             ~config:(loop_config t)
+             ~cwd:t.cwd
+             ~cancel
+             ~approve:(approve t)
+             ~ask_user:(ask_user t ~cancel)
+             ~execute:(executor t)
+             ~background:t.background
+             ~steer:(fun () ->
+               let l = Queue.to_list t.steer_queue in
+               if not (List.is_empty l)
+               then (
+                 Queue.clear t.steer_queue;
+                 queue_update t);
+               let queued = List.map l ~f:(user_message t) in
+               (* A plan mode switched during the run is told between turns. *)
+               let note =
+                 if List.is_empty queued
+                 then
+                   Option.to_list
+                     (Option.map (plan_mode_note t) ~f:(fun note ->
+                        Message.user
+                          ~origin:{ Injected.empty with notes = [ note ] }
+                          note.text))
+                 else []
                in
-               set_goal_state t (Some goal);
-               Some
-                 (`Prompts
-                     [ goal_message
-                         t
-                         ~source:
-                           (Goal_continuation
-                              { continuation = goal.continuations
-                              ; max = t.config.goal_max_continuations
-                              })
-                         (Goal.continuation_message
-                            goal
-                            ~max_continuations:t.config.goal_max_continuations)
-                     ])
-             | None -> None)
-           else if
-             current
-             && (not cancelled)
-             && Option.is_none handover
-             && (not resuming)
-             && (not t.plan_mode)
-             && Option.is_none (budget_exhausted t)
-             && (not (Background_tasks.has_running t.background))
-             &&
-             match last_stop added with
-             | Some (End_turn | Tool_use | Length) -> true
-             | Some (Error _ | Aborted) | None -> false
+               deliveries t @ note @ queued @ due_reminders t)
+             ~compact:(fun ~keep_recent_tokens ~cancel _messages ->
+               match
+                 Compaction.compact
+                   ~env:t.env
+                   ~provider:t.provider
+                   ~model:t.model
+                   ~keep_recent_tokens
+                   ~cancel
+                   session
+               with
+               | Ok outcome -> Ok (Session.messages session, outcome)
+               | Error e ->
+                 broadcast
+                   t
+                   (Notice ("auto-compaction failed: " ^ Error.to_string_hum e));
+                 Error e)
+             ~halt:(fun () ->
+               let reason = budget_exhausted t in
+               Option.iter reason ~f:(fun r -> halted := Some r);
+               reason)
+             ~emit:(fun event ->
+               account t event;
+               track_plan t event;
+               match event with
+               | Turn_end _ ->
+                 if phys_equal session t.session
+                 then Reminder.Tracker.turn_ended t.reminder_tracker;
+                 broadcast t (Loop event)
+               | Compacted { summary; _ } ->
+                 if phys_equal session t.session
+                 then (
+                   broadcast t (Compacted { summary });
+                   state_changed t)
+               | Message_end m ->
+                 ignore (Session.append_message session m : Session.Entry.t);
+                 broadcast t (Loop event)
+               | _ -> broadcast t (Loop event))
+             ~context:(Session.messages session)
+             ~prompts
+             ()
+         with
+         | added -> added
+         | exception exn ->
+           broadcast t (Notice ("run failed: " ^ Exn.to_string exn));
+           []
+       in
+       Option.iter !halted ~f:(fun reason -> broadcast t (Notice reason));
+       sweep_orphans t ~main_running:false;
+       let tried = Set.add tried (Model.key t.model) in
+       let cancelled = Cancellation.is_cancelled cancel in
+       let current = phys_equal session t.session in
+       let unavailable =
+         if cancelled || not current then None else unavailable_error added
+       in
+       let handover =
+         Option.bind unavailable ~f:(fun error ->
+           match next_model t ~tried with
+           | None ->
+             if not (List.is_empty t.config.fallback_models)
+             then
+               broadcast
+                 t
+                 (Notice
+                    (sprintf
+                       "%s cannot continue and no model in fallback_models is \
+                        left to hand over to; /model picks another"
+                       (Model.key t.model)));
+             None
+           | Some next ->
+             let from = Model.key t.model in
+             broadcast
+               t
+               (Notice
+                  (sprintf
+                     "%s: %s; handing over to %s"
+                     from
+                     error
+                     (Model.key next)));
+             set_model t next;
+             Some [ handover_message ~from ~to_:next ~error ])
+       in
+       let resuming =
+         match unavailable, handover with
+         | Some error, None -> schedule_resume t ~error
+         | None, _ ->
+           t.past_resets <- 0;
+           false
+         | Some _, Some _ -> false
+       in
+       (* Steering messages that arrived after the last turn boundary go
+       first: they were sent before any follow-up still queued. *)
+       if not (Queue.is_empty t.steer_queue)
+       then (
+         Queue.blit_transfer ~src:t.follow_up_queue ~dst:t.steer_queue ();
+         Queue.blit_transfer ~src:t.steer_queue ~dst:t.follow_up_queue ();
+         queue_update t);
+       auto_compact t;
+       (* The goal carries on after a run that ended normally; anything else
+       stops it, except a hand-over or a resume, which carry on the run. *)
+       let goal_continues =
+         match t.goal with
+         | Some goal when current && Goal.is_active goal ->
+           let max = t.config.goal_max_continuations in
+           if cancelled
            then (
-             match stop_reminders t with
-             | [] -> None
-             | prompts -> Some (`Prompts prompts))
-           else None)
-    in
-    (* A hand-over, a queued message, a goal's continuation or a reminder
+             stop_goal t ~reason:"the run was aborted";
+             false)
+           else if Option.is_some handover || resuming
+           then false
+           else if t.plan_mode
+           then
+             (* The model cannot work towards the goal in plan mode: it waits
+             for the user to approve the plan, then carries on. *)
+             false
+           else (
+             match budget_exhausted t, last_stop added with
+             | Some _, _ ->
+               stop_goal t ~reason:"the session's budget is spent";
+               false
+             | None, Some (Error e) ->
+               stop_goal t ~reason:("the run failed: " ^ e);
+               false
+             | None, Some Aborted ->
+               stop_goal t ~reason:"the run was aborted";
+               false
+             | None, (Some (End_turn | Tool_use | Length) | None) ->
+               if goal.continuations >= max
+               then (
+                 stop_goal
+                   t
+                   ~reason:
+                     (sprintf "it used all %d automatic continuations" max);
+                 false)
+               else true)
+         | Some _ | None -> false
+       in
+       (* After an abort, finished tasks wait for the next prompt (or the next
+       one to finish) rather than restarting the run at once. *)
+       let next =
+         match handover with
+         | Some prompts -> Some (`Handover prompts)
+         | None ->
+           (match Queue.dequeue t.follow_up_queue with
+            | Some queued ->
+              queue_update t;
+              Some (`Prompts [ user_message t queued ])
+            | None ->
+              if
+                Background_tasks.has_undelivered t.background
+                && not (Cancellation.is_cancelled cancel)
+              then Some (`Prompts [])
+              else if goal_continues
+              then (
+                match t.goal with
+                | Some goal ->
+                  let goal =
+                    { goal with continuations = goal.continuations + 1 }
+                  in
+                  set_goal_state t (Some goal);
+                  Some
+                    (`Prompts
+                        [ goal_message
+                            t
+                            ~source:
+                              (Goal_continuation
+                                 { continuation = goal.continuations
+                                 ; max = t.config.goal_max_continuations
+                                 })
+                            (Goal.continuation_message
+                               goal
+                               ~max_continuations:
+                                 t.config.goal_max_continuations)
+                        ])
+                | None -> None)
+              else if
+                current
+                && (not cancelled)
+                && Option.is_none handover
+                && (not resuming)
+                && (not t.plan_mode)
+                && Option.is_none (budget_exhausted t)
+                && (not (Background_tasks.has_running t.background))
+                &&
+                match last_stop added with
+                | Some (End_turn | Tool_use | Length) -> true
+                | Some (Error _ | Aborted) | None -> false
+              then (
+                match stop_reminders t with
+                | [] -> None
+                | prompts -> Some (`Prompts prompts))
+              else None)
+       in
+       (* A hand-over, a queued message, a goal's continuation or a reminder
        carries on: the run's next state says [running] again, with no idle
        moment in between (in which the server would evict a session without
        clients). *)
-    finish ~idle:(Option.is_none next);
-    Option.iter next ~f:(function
-      | `Handover prompts -> start_run ~tried t prompts
-      | `Prompts prompts -> start_run t prompts);
-    auto_describe t)
+       finish ~idle:(Option.is_none next);
+       Option.iter next ~f:(function
+         | `Handover prompts -> start_run ~tried t prompts
+         | `Prompts prompts -> start_run t prompts);
+       auto_describe t)
 
 (* A usage limit with no fallback left: resume when it resets, if the
    provider said when. *)
@@ -2029,7 +2032,7 @@ and arm_resume t ~at =
   let resume = { Resume.at; cancel } in
   t.resume <- Some resume;
   Session.set_resume_at t.session (Some at);
-  Fiber.fork ~sw:t.sw (fun () ->
+  Guarded.fork ~sw:t.sw ~what:"resuming after a usage limit" (fun () ->
     (* A little after the reset, so the provider agrees it has passed. *)
     match
       Cancellation.protect cancel ~f:(fun () -> t.sleep_until (at +. 5.))
@@ -2065,17 +2068,18 @@ and auto_describe t =
     let finished, resolve = Promise.create () in
     t.describing <- Some finished;
     Fiber.fork ~sw:t.sw (fun () ->
-      (match
-         Session_description.describe
-           ~provider:t.provider
-           ~model:t.model
-           session
-       with
-       | Ok _ -> if phys_equal session t.session then state_changed t
-       | Error e ->
-         broadcast
-           t
-           (Notice ("session description failed: " ^ Error.to_string_hum e)));
+      Guarded.run ~what:"describing the session" (fun () ->
+        match
+          Session_description.describe
+            ~provider:t.provider
+            ~model:t.model
+            session
+        with
+        | Ok _ -> if phys_equal session t.session then state_changed t
+        | Error e ->
+          broadcast
+            t
+            (Notice ("session description failed: " ^ Error.to_string_hum e)));
       t.describing <- None;
       Promise.resolve resolve ()))
 
