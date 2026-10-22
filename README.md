@@ -266,7 +266,10 @@ starts the toggles afresh.
 
 Work in progress has one sign, a small sodium lamp that breathes (still
 under reduced motion): next to a running session in the sidebar, on a
-running tool, subagent or job, on the status line ("Working"), and on
+running tool, subagent or job, on the status line (what the agent is
+doing: "Waiting for the model", "Thinking", "Writing", "Running tools", or
+"Retrying in 4s (attempt 2/6): overloaded_error: Overloaded" after a
+transient provider error, which the reply being streamed also shows), and on
 whatever waits for the backend; nothing finished glows, and while the
 connection is down only the reconnecting banner and status line do.
 Every action shows at once, before the backend answers: a session clicked
@@ -763,9 +766,11 @@ spent), and then whatever is going on — the goal (`goal:3/20`,
 `goal:done`, `goal:stopped`), the session's reminders (`remind:2`), a
 scheduled resume (`resumes 14:05`),
 `queued:N`, `to answer:N` (confirmations and questions waiting behind an
-open dialog, in yellow), agents, jobs, the tool host — with the current
-mode's keys (`⠋ working · Esc aborts · Enter
-steers`, a picker's keys) in yellow. `think:` and `mode:` are always there
+open dialog, in yellow), `retry:2/6` (the model failed transiently and is
+asked again; the transcript notes why), agents, jobs, the tool host — with
+the current mode's keys and what the agent is doing (`⠋ thinking · Esc
+aborts · Enter steers`, with `waiting for the model`, `writing`, `running
+tools` or `retrying in 4s`; a picker's keys) in yellow. `think:` and `mode:` are always there
 (at narrow widths they outlast the cost and the cwd; `view:` gives way to
 the cwd first). Queued steers and follow-ups (whichever frontend queued
 them) are listed above the editor, one per line, until they are delivered:
