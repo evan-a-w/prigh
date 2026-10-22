@@ -173,7 +173,8 @@ let%expect_test "a foreground bash moved to the background: its job and output" 
   show
     [ {|{"type":"event","event":"tool_end","call":{"id":"c11","name":"bash","arguments":"{\"command\":\"make all\"}"},"result":{"role":"tool_result","tool_call_id":"c11","tool_name":"bash","text":"still running after 30s, so it was moved to the background as job j3 (not restarted: it keeps running). Output so far (last 2 of 40 lines):\nbuilding 39\nbuilding 40\nIts report ([job j3 exited ...] and its last lines) is delivered to you when it exits: keep working on something else or end your turn. job_output shows more output, job_kill stops it.","is_error":false}}|}
     ];
-  [%expect {|
+  [%expect
+    {|
     <div class="ok tool tool-bash">
       <div class="tool-head">
         <span title="Done" role="img" aria-label="Done" class="done mark">
@@ -1015,21 +1016,13 @@ let%expect_test
         <span class="arg"> j1 j2 </span>
       </div>
       <div class="tool-body">
-        <div class="delivery">
-          <div class="delivery-section ok">
-            <div class="delivery-head">
-              <span class="icon"> ↩ </span>
-              <span class="kind"> job j1 </span>
-              <span class="chip ok"> exited 0 </span>
-              <span class="task"> sleep 1; echo bg finished </span>
-            </div>
-            <div class="output">
-              <pre> bg finished </pre>
-            </div>
-          </div>
-        </div>
         <div class="output">
-          <pre> timed out; still running: j2 (sleep 100) </pre>
+          <pre>
+            [job j1 exited 0] sleep 1; echo bg finished
+    bg finished
+
+    timed out; still running: j2 (sleep 100)
+          </pre>
         </div>
       </div>
     </div>

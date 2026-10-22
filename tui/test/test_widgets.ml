@@ -1805,8 +1805,16 @@ let%expect_test "tools: bash shows the command, its outcome as a chip" =
     {|{"command":"make all"}|}
     ~result:
       (tool_result
-         "still running after 30s, so it was moved to the background as job j3 (not restarted: it keeps running). Output so far (last 2 of 40 lines):\nbuilding 39\nbuilding 40\nIts report ([job j3 exited ...] and its last lines) is delivered to you when it exits: keep working on something else or end your turn. job_output shows more output, job_kill stops it.");
-  [%expect {|
+         "still running after 30s, so it was moved to the background as job j3 \
+          (not restarted: it keeps running). Output so far (last 2 of 40 \
+          lines):\n\
+          building 39\n\
+          building 40\n\
+          Its report ([job j3 exited ...] and its last lines) is delivered to \
+          you when it exits: keep working on something else or end your turn. \
+          job_output shows more output, job_kill stops it.");
+  [%expect
+    {|
     == quiet ==
     ✓ bash $ make all  job j3 moved to the background after 30s 2 lines
     == normal ==
@@ -1832,8 +1840,44 @@ let%expect_test "tools: bash shows the command, its outcome as a chip" =
     {|{"ids":["j1","j2"]}|}
     ~result:
       (tool_result
-         "[job j1 exited 0] sleep 1; echo bg finished\nbg finished\n\ntimed out; still running: j2 (sleep 100)");
-  [%expect {| |}];
+         "[job j1 exited 0] sleep 1; echo bg finished\n\
+          bg finished\n\n\
+          timed out; still running: j2 (sleep 100)");
+  [%expect
+    {|
+    == quiet ==
+    ✓ job_kill j2  1 line
+    == normal ==
+    ✓ job_kill j2
+        [job j2 killed] sleep 100
+    == verbose ==
+    ✓ job_kill j2
+        {
+          id: "j2"
+        }
+        [job j2 killed] sleep 100
+    == quiet ==
+    ✓ job_wait j1 j2  4 lines
+    == normal ==
+    ✓ job_wait j1 j2
+        [job j1 exited 0] sleep 1; echo bg finished
+        bg finished
+
+        timed out; still running: j2 (sleep 100)
+    == verbose ==
+    ✓ job_wait j1 j2
+        {
+          ids:
+            [
+              "j1"
+              "j2"
+            ]
+        }
+        [job j1 exited 0] sleep 1; echo bg finished
+        bg finished
+
+        timed out; still running: j2 (sleep 100)
+    |}];
   (* Aborting cancels the call: what it printed is kept, but it did not fail. *)
   show_tool
     ~styled:true
@@ -2414,4 +2458,3 @@ let%expect_test
       accept="/default-dir ~/pro"
     |}]
 ;;
-
