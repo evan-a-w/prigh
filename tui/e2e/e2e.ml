@@ -92,6 +92,9 @@ let rec summarise (e : Event.t) : string option =
          "assistant_end %s"
          (Sexp.to_string [%sexp (a.stop_reason : Stop_reason.t)]))
   | Message_end _ -> Some "message_end"
+  | Retry { attempt; max_attempts; error; delay_ms } ->
+    Some
+      (sprintf "retry %d/%d in %dms after %S" attempt max_attempts delay_ms error)
   | State s -> Some (sprintf "state running=%b model=%s" s.running s.model.key)
   | Notice t -> Some (sprintf "notice %S" t)
   | Auth a ->
@@ -482,6 +485,46 @@ let main () =
         let%bind () = Client.close client in
         print_endline "btw backend exited";
        return ()
+    in
+    (* A transient error: the retry event, then the reply. *)
+    let retry_script = Filename.concat tmp "retry.json" in
+    Out_channel.write_all
+      retry_script
+      ~data:
+        {|[
+  {"stop_reason":"error","error":"HTTP 529: Overloaded"},
+  {"text":"recovered"}
+]|};
+    let%bind () =
+      let client =
+        Client.create
+          ~connect:
+            (spawn
+               [ "serve"
+               ; "-faux-script"
+               ; retry_script
+               ; "-auth-file"
+               ; Filename.concat tmp "auth-retry.json"
+               ; "-cwd"
+               ; tmp
+               ; "-model"
+               ; "deepseek/deepseek-flash"
+               ])
+      in
+      match%bind Client.connect client with
+      | Error e ->
+        print_s [%message "cannot start retry backend" (e : Error.t)];
+        return ()
+      | Ok () ->
+        let%bind () = call client "prompt" [ "text", Json.str "try" ] in
+        let%bind () =
+          drain client ~stop:(function
+            | State { running = false; _ } -> true
+            | _ -> false)
+        in
+        let%bind () = Client.close client in
+        print_endline "retry backend exited";
+        return ()
     in
     (* Fallback chain and default directory through set_config, then a run
        whose model's usage runs out hands over to the next one. *)

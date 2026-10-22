@@ -185,6 +185,7 @@ module Model = struct
     ; viewport : Viewport.t
     ; pending_quit : bool
     ; spinner : int
+    ; activity : Activity.t
     ; verbosity : Verbosity.t
     ; config : P.Config.t option
     ; home : string option
@@ -209,6 +210,8 @@ module Model = struct
   let running t =
     Option.value_map t.state ~default:false ~f:(fun s -> s.running)
   ;;
+
+  let activity t = Activity.set_running t.activity (running t)
 
   let agents_running t =
     List.exists t.agents ~f:(fun (a : Agent_view.t) ->
@@ -470,6 +473,7 @@ let init =
   ; viewport = Viewport.Follow
   ; pending_quit = false
   ; spinner = 0
+  ; activity = Idle
   ; verbosity = Verbosity.Normal
   ; config = None
   ; home = None
@@ -1487,6 +1491,7 @@ let reset_session m =
       ; focus = `Main
       ; queued_messages = []
       ; transcript = Transcript.clear m.transcript
+      ; activity = Idle
       }
   , [ rpc "get_state" ~tag:Initial_state
     ; rpc "get_messages" ~tag:Initial_messages
@@ -3802,6 +3807,7 @@ let auth_event m (e : P.Auth_event.t) =
 
 let event m (e : P.Event.t) =
   let m = with_transcript m ~f:(fun t -> Transcript.apply t e) in
+  let m = { m with activity = Activity.apply m.activity e } in
   let m = update_agents m ~f:(fun agents -> Agent_view.apply_all agents e) in
   match e with
   | State state -> { m with state = Some state }, []
@@ -3855,6 +3861,7 @@ let event m (e : P.Event.t) =
   | Message_start _
   | Message_update _
   | Message_end _
+  | Retry _
   | Tool_start _
   | Tool_output _
   | Tool_end _

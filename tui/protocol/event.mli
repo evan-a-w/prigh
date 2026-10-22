@@ -34,6 +34,7 @@ type t =
       ; delta : Delta.t
       }
   | Message_end of Message.t
+  | Retry of Retry.t
   | Tool_start of Tool_call.t
   | Tool_output of
       { call_id : string
