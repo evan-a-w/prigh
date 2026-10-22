@@ -261,16 +261,15 @@ let listen ~env ~sw ~addr ~port ~root ~websockets ~on_lines =
     | `Unix _ -> port
   in
   Fiber.fork_daemon ~sw (fun () ->
-    while true do
-      Eio.Net.accept_fork
-        ~sw
-        socket
-        ~on_error:(fun exn ->
-          eprintf "prigh: web connection failed: %s\n%!" (Exn.to_string exn))
-        (fun flow _addr ->
-           no_delay flow;
-           handle ~clock:(Eio.Stdenv.clock env) ~root ~websockets ~on_lines flow)
-    done);
+    Guarded.accept_loop
+      ~sw
+      ~clock:(Eio.Stdenv.clock env)
+      ~on_error:(fun exn ->
+        eprintf "prigh: web connection failed: %s\n%!" (Exn.to_string exn))
+      socket
+      (fun flow _addr ->
+         no_delay flow;
+         handle ~clock:(Eio.Stdenv.clock env) ~root ~websockets ~on_lines flow));
   port
 ;;
 

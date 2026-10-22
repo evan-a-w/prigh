@@ -763,15 +763,14 @@ let serve_command =
               Eio.Net.Sockaddr.pp
               (Eio.Net.listening_addr socket));
          Eio.Fiber.fork ~sw (fun () ->
-           while true do
-             Eio.Net.accept_fork
-               ~sw
-               socket
-               ~on_error:(fun exn ->
-                 eprintf "prigh: connection failed: %s\n%!" (Exn.to_string exn))
-               (fun flow _addr ->
-                  Rpc_router.serve_connection router ~input:flow ~output:flow)
-           done));
+           Guarded.accept_loop
+             ~sw
+             ~clock:(Eio.Stdenv.clock env)
+             ~on_error:(fun exn ->
+               eprintf "prigh: connection failed: %s\n%!" (Exn.to_string exn))
+             socket
+             (fun flow _addr ->
+                Rpc_router.serve_connection router ~input:flow ~output:flow)));
        let serve_web
              ~label
              ~flag

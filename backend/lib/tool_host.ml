@@ -121,7 +121,7 @@ module Worker = struct
           Some feed
         | _ -> None
       in
-      Fiber.fork ~sw:t.sw (fun () ->
+      Guarded.fork ~sw:t.sw ~what:("tool " ^ name) (fun () ->
         let result =
           match
             Host_ops.execute
@@ -165,7 +165,7 @@ module Worker = struct
       in
       let channel = Terminal_channel.Fed.channel fed in
       Hashtbl.set t.viewers ~key:term_id ~data:fed;
-      Fiber.fork ~sw:t.sw (fun () ->
+      Guarded.fork ~sw:t.sw ~what:"a terminal" (fun () ->
         (match
            Terminals.serve
              (Lazy.force t.terminals)
@@ -333,10 +333,13 @@ let read_lines flow ~f =
   let rec loop () =
     match Eio.Buf_read.line reader with
     | exception (End_of_file | Eio.Io _) -> ()
+    | exception Eio.Buf_read.Buffer_limit_exceeded ->
+      eprintf "prigh tool-host: a line from the frontend is over 64 MiB\n%!"
     | line ->
       (match Json.parse line with
        | Error _ -> ()
-       | Ok json -> f json);
+       | Ok json ->
+         Guarded.run ~what:"a request from the frontend" (fun () -> f json));
       loop ()
   in
   loop ()
@@ -503,7 +506,9 @@ let serve_connection
            | Some "event", _ ->
              Option.iter
                (Option.bind (string_field json "event") ~f:worker_kind)
-               ~f:(fun kind -> Worker.handle worker ~kind json);
+               ~f:(fun kind ->
+                 Guarded.run ~what:"a request from the backend" (fun () ->
+                   Worker.handle worker ~kind json));
              true
            | _ -> true)
       in
