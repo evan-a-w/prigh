@@ -323,8 +323,7 @@ let thinking_fields ~max_tokens (model : Model.t) (thinking : Thinking.t) =
        | Some effort ->
          [ ( "thinking"
            , `Object
-               [ "type", `String "adaptive"; "display", `String "summarized" ]
-           )
+               [ "type", `String "adaptive"; "display", `String "summarized" ] )
          ; "output_config", `Object [ "effort", `String effort ]
          ]))
 ;;

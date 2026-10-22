@@ -497,8 +497,8 @@ let%expect_test "stream end to end: request shape, headers, assembled message" =
 ;;
 
 let%expect_test
-    "parse events: omitted thinking starts a block at once; a mid-stream \
-     error keeps its type, so a transient one is retried"
+    "parse events: omitted thinking starts a block at once; a mid-stream error \
+     keeps its type, so a transient one is retried"
   =
   let show events =
     let events, `Stop_reason _, `Usage _, `Error error =
@@ -530,7 +530,8 @@ let%expect_test
     ; {|{"type":"content_block_delta","index":1,"delta":{"type":"thinking_delta","thinking":"More."}}|}
     ; {|{"type":"error","error":{"type":"overloaded_error","message":"Overloaded"}}|}
     ];
-  [%expect {|
+  [%expect
+    {|
     ((events ((Thinking_delta "")))
      (content ((Thinking ((text "") (signature ()))))) (error ()) (retried ()))
     ((events
