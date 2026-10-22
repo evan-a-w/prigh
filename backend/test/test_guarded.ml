@@ -138,3 +138,50 @@ let%expect_test "an accept loop survives failing accepts and handlers" =
       served: hello
       |}]
 ;;
+
+let%expect_test
+    "a background task's failing bookkeeping ends neither the switch nor its \
+     waiters"
+  =
+  with_sandbox
+  @@ fun t ->
+  Eio.Switch.run (fun sw ->
+    let background =
+      Background_tasks.create
+        ~env:t.env
+        ~sw
+        ~first_subagent_id:1
+        ~first_job_id:1
+        ()
+    in
+    let armed = ref false in
+    Background_tasks.connect background ~emit:ignore ~on_change:(fun () ->
+      if !armed then failwith "bookkeeping bug");
+    let id =
+      Background_tasks.spawn
+        background
+        ~kind:Job
+        ~label:"work"
+        ~run:(fun ~id:_ ~cancel:_ ~emit:_ ~on_output:_ ->
+          Eio.Fiber.yield ();
+          { Background_tasks.Outcome.status = "exited 0"
+          ; body = ""
+          ; is_error = false
+          })
+    in
+    armed := true;
+    Background_tasks.wait_all background;
+    print_s
+      [%message
+        ""
+          id
+          ~running:(Background_tasks.has_running background : bool)
+          ~undelivered:(Background_tasks.has_undelivered background : bool)]);
+  print_endline "the switch finished";
+  [%expect
+    {|
+    prigh: a background task's report failed: (Failure "bookkeeping bug")
+    (j1 (running false) (undelivered true))
+    the switch finished
+    |}]
+;;
