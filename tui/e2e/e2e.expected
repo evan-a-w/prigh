@@ -181,6 +181,17 @@ jobs backend exited
   event state running=false model=deepseek/deepseek-flash
 <- get_messages: 4 message(s)
 btw backend exited
+<- prompt: ()
+  event state running=true model=deepseek/deepseek-flash
+  event user "try"
+  event message_end
+  event message_start
+  event retry 2/6 in 1000ms after "HTTP 529: Overloaded"
+  event message_start
+  event text_delta "recovered"
+  event assistant_end End_turn
+  event state running=false model=deepseek/deepseek-flash
+retry backend exited
 <- set_config: (Ok
  ((scoped_models ()) (approval_mode Auto)
   (permissions ((allow ()) (ask ()) (deny ()))) (default_model ())

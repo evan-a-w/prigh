@@ -51,7 +51,19 @@ let error_message_of_body ?(limit_rejected = false) ?resets_at ~status body =
      else "")
 ;;
 
-let run ~env ?timeout ~cancel ~url ~headers ~body ~on_event () =
+let default_idle_timeout = Time_ns.Span.of_min 5.
+
+let run
+      ~env
+      ?timeout
+      ?(idle_timeout = default_idle_timeout)
+      ~cancel
+      ~url
+      ~headers
+      ~body
+      ~on_event
+      ()
+  =
   let sse = Sse.create () in
   let status = ref 0 in
   let error_body = Buffer.create 256 in
@@ -64,6 +76,7 @@ let run ~env ?timeout ~cancel ~url ~headers ~body ~on_event () =
     Http_client.post_stream
       ~env
       ?timeout
+      ~idle_timeout
       ~cancel
       ~url
       ~headers:

@@ -4,6 +4,9 @@ open! Import
 type t =
   | Text_delta of string
   | Thinking_delta of string
+  (** Extends the current thinking block, or starts one (also when the
+      current one is signed, so complete); an empty one starts a block whose
+      text may never come. *)
   | Thinking_signature of string
   (** Attaches to the current thinking block (creating an empty one if
       needed); providers emit it once the block is complete. *)

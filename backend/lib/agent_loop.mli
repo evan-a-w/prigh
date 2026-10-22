@@ -40,7 +40,11 @@ val tool_summary : name:string -> Json.t -> string
     (also passed to tools, for subagents): [Some _] ends the run there.
     [approve] checks every tool call before it runs (default: all run);
     [ask_user] is how the [ask_user] tool reaches the user. Both are passed
-    on to the tools' contexts, so [subagent] can hand [approve] down. *)
+    on to the tools' contexts, so [subagent] can hand [approve] down.
+
+    A transient provider error ({!is_retryable_error}) is retried up to
+    [config.retries] times, emitting [Retry] and then waiting with [sleep]
+    (default: the clock; cancellation ends the wait). *)
 val run
   :  env:Env.t
   -> provider:Provider.t
@@ -59,7 +63,7 @@ val run
         -> User_question.Reply.t)
   -> ?execute:Tool.executor
   -> ?background:Background_tasks.t
-  -> ?retry_delay:(attempt:int -> unit)
+  -> ?sleep:(float -> unit)
   -> ?compact:
        (keep_recent_tokens:int
         -> cancel:Cancellation.t

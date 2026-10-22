@@ -139,6 +139,16 @@ let rec activity (event : Agent_event.t) =
     in
     Some (sprintf "%s %s" call.name (String.prefix args 60))
   | Message_start (Assistant _) -> Some "waiting for the model"
+  | Message_update { delta = Thinking_delta _; _ } -> Some "thinking"
+  | Message_update { delta = Text_delta _; _ } -> Some "writing"
+  | Retry { attempt; max_attempts; error; delay } ->
+    Some
+      (sprintf
+         "retrying (attempt %d/%d) in %s after: %s"
+         attempt
+         max_attempts
+         (seconds_text delay)
+         (String.prefix error 80))
   | _ -> None
 ;;
 

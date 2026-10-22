@@ -92,6 +92,9 @@ val tool : t -> string -> Tool.t option
     call without a result while it is not will never get one. *)
 val running : t -> bool
 
+(** What the agent is doing, from its events ([Idle] unless [running]). *)
+val activity : t -> Prigh_ui.Activity.t
+
 (** As the backend says (its state's [running]): a transcript fetched or
     cached while the agent was not known to be working. [t] itself when that
     is what it says. *)

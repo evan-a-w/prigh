@@ -484,7 +484,7 @@ let%expect_test "streamed: text, a search running, its results, more text" =
     … web_search "ocaml eio"
     ──────────────────────────────────────────────────────────────────────
     > ▏
-    …deepseek-flash  ctx:0.1%/1.0M  ⠋ working · Esc aborts · Enter steers
+    …deepseek-flash  $0.01  ⠋ running tools · Esc aborts · Enter steers
     |}];
   H.event h search_result;
   H.event h (text_delta "Eio is an effects-based ");
@@ -509,7 +509,7 @@ let%expect_test "streamed: text, a search running, its results, more text" =
       Eio is an effects-based IO library.
     ──────────────────────────────────────────────────────────────────────
     > ▏
-    …deepseek-flash  ctx:0.1%/1.0M  ⠋ working · Esc aborts · Enter steers
+    …deepseek-flash  ctx:0.1%/1.0M  ⠋ writing · Esc aborts · Enter steers
     |}];
   H.event
     h

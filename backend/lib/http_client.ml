@@ -17,14 +17,21 @@ end
 module Error = struct
   type t =
     | Connection_failed of string
+    | Connection_lost of string
     | Cancelled
     | Timed_out
+    | Stalled of Time_ns.Span.t
   [@@deriving sexp_of]
 
   let to_string = function
     | Connection_failed s -> "connection failed: " ^ s
+    | Connection_lost s -> "connection lost mid-response: " ^ s
     | Cancelled -> "cancelled"
     | Timed_out -> "timed out"
+    | Stalled span ->
+      sprintf
+        "timed out: no data from the server for %s"
+        (Time_ns.Span.to_string_hum ~decimals:0 span)
   ;;
 end
 
@@ -49,15 +56,33 @@ let https uri raw =
   Tls_eio.client_of_flow (force tls_config) ?host raw
 ;;
 
-let read_body body ~on_chunk =
+exception Read_failed of string
+exception Stalled_exn
+
+(* [idle] bounds each wait for data. Raises [Read_failed] when the
+   connection breaks; [on_chunk]'s exceptions propagate. *)
+let read_body body ~idle ~on_chunk =
   let buf = Cstruct.create 65536 in
-  try
-    while true do
-      let n = Eio.Flow.single_read body buf in
-      on_chunk (Cstruct.to_string buf ~len:n)
-    done
-  with
-  | End_of_file -> ()
+  let read () =
+    match idle (fun () -> Eio.Flow.single_read body buf) with
+    | n -> Some n
+    | exception End_of_file -> None
+    | exception
+        (( Eio.Io _
+         | Failure _
+         | Core_unix.Unix_error _
+         | Tls_eio.Tls_alert _
+         | Tls_eio.Tls_failure _ ) as exn) ->
+      raise (Read_failed (Net_error.to_string_hum exn))
+  in
+  let rec loop () =
+    match read () with
+    | None -> ()
+    | Some n ->
+      on_chunk (Cstruct.to_string buf ~len:n);
+      loop ()
+  in
+  loop ()
 ;;
 
 (* An explicit port makes the address lookup numeric: by name ("https") it
@@ -74,6 +99,7 @@ let stream
       ~(env : Env.t)
       ?(cancel = Cancellation.never)
       ?timeout
+      ?idle_timeout
       ?(on_response = ignore)
       ~url
       ~headers
@@ -81,6 +107,19 @@ let stream
       ~on_chunk
       ()
   =
+  let idle f =
+    match idle_timeout with
+    | None -> f ()
+    | Some span ->
+      (match
+         Eio.Time.with_timeout
+           (Eio.Stdenv.clock env)
+           (Time_ns.Span.to_sec span)
+           (fun () -> Ok (f ()))
+       with
+       | Ok x -> x
+       | Error `Timeout -> raise Stalled_exn)
+  in
   let request () =
     Switch.run
     @@ fun sw ->
@@ -90,15 +129,16 @@ let stream
     let headers = Http.Header.of_list headers in
     let uri = with_default_port (Uri.of_string url) in
     match
-      match body with
-      | None -> Cohttp_eio.Client.get client ~sw ~headers uri
-      | Some body ->
-        Cohttp_eio.Client.post
-          client
-          ~sw
-          ~headers
-          ~body:(Cohttp_eio.Body.of_string body)
-          uri
+      idle (fun () ->
+        match body with
+        | None -> Cohttp_eio.Client.get client ~sw ~headers uri
+        | Some body ->
+          Cohttp_eio.Client.post
+            client
+            ~sw
+            ~headers
+            ~body:(Cohttp_eio.Body.of_string body)
+            uri)
     with
     | exception
         (( Eio.Io _
@@ -114,8 +154,9 @@ let stream
         }
       in
       on_response response;
-      read_body body ~on_chunk;
-      Ok response
+      (match read_body body ~idle ~on_chunk with
+       | () -> Ok response
+       | exception Read_failed message -> Error (Error.Connection_lost message))
   in
   let with_timeout f =
     match timeout with
@@ -133,10 +174,29 @@ let stream
   match Cancellation.protect cancel ~f:(fun () -> with_timeout request) with
   | None -> Error Error.Cancelled
   | Some result -> result
+  | exception Stalled_exn ->
+    Error (Error.Stalled (Option.value_exn idle_timeout))
 ;;
 
-let post_stream ~env ?cancel ?timeout ?on_response ~url ~headers ~body =
-  stream ~env ?cancel ?timeout ?on_response ~url ~headers ~body:(Some body)
+let post_stream
+      ~env
+      ?cancel
+      ?timeout
+      ?idle_timeout
+      ?on_response
+      ~url
+      ~headers
+      ~body
+  =
+  stream
+    ~env
+    ?cancel
+    ?timeout
+    ?idle_timeout
+    ?on_response
+    ~url
+    ~headers
+    ~body:(Some body)
 ;;
 
 let get_stream ~env ?cancel ?timeout ?on_response ~url ~headers ~on_chunk () =

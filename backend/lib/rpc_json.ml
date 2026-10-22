@@ -452,6 +452,13 @@ let rec event ?now (e : Agent.Event.t) =
       ]
     | Loop (Message_end m) ->
       [ "event", str "message_end"; "message", message_at m ~at:now ]
+    | Loop (Retry { attempt; max_attempts; error; delay }) ->
+      [ "event", str "retry"
+      ; "attempt", int attempt
+      ; "max_attempts", int max_attempts
+      ; "error", str error
+      ; "delay_ms", ms delay
+      ]
     | Loop (Tool_start call) ->
       [ "event", str "tool_start"; "call", tool_call call ]
     | Loop (Tool_output { call_id; chunk }) ->

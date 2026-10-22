@@ -472,6 +472,12 @@ let apply t (event : P.Event.t) =
        notice ~severity:Warn t "[output truncated by the model's length limit]"
      | P.Stop_reason.End_turn | P.Stop_reason.Tool_use -> t)
   | P.Event.Message_end _ -> t
+  | P.Event.Retry retry ->
+    (* What the failed attempt streamed is dropped; the next starts over. *)
+    notice
+      ~severity:Warn
+      { t with stream = None }
+      (Option.value_exn (Activity.label (Retrying retry)))
   | P.Event.Tool_start call -> add_tool t call
   | P.Event.Tool_output { chunk; call_id } ->
     append_tool_output t ~call_id chunk

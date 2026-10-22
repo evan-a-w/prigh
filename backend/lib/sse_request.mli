@@ -13,9 +13,17 @@ module Outcome : sig
   [@@deriving sexp_of]
 end
 
+(** How long a model's stream may send nothing (not even a keep-alive)
+    before it is given up as stalled: long enough for a large uncached
+    prompt to be read and for a long silent thought. *)
+val default_idle_timeout : Time_ns.Span.t
+
+(** [idle_timeout] (default {!default_idle_timeout}): see
+    {!Http_client.post_stream}. *)
 val run
   :  env:Env.t
   -> ?timeout:Time_ns.Span.t
+  -> ?idle_timeout:Time_ns.Span.t
   -> cancel:Cancellation.t
   -> url:string
   -> headers:(string * string) list

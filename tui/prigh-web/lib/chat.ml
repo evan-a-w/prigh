@@ -5,6 +5,7 @@ type t =
   { rev_entries : entry list
   ; tools : tool String.Map.t
   ; running : bool
+  ; activity : Prigh_ui.Activity.t
   ; first : int
   }
 
@@ -75,11 +76,17 @@ module Entry = struct
 end
 
 let empty =
-  { rev_entries = []; tools = String.Map.empty; running = false; first = 0 }
+  { rev_entries = []
+  ; tools = String.Map.empty
+  ; running = false
+  ; activity = Idle
+  ; first = 0
+  }
 ;;
 
 let first t = t.first
 let running t = t.running
+let activity t = Prigh_ui.Activity.set_running t.activity t.running
 
 let set_running t running =
   if Bool.equal t.running running then t else { t with running }
@@ -237,6 +244,7 @@ let rec apply t (event : Event.t) =
     | Agent_end _ -> { t with running = false }
     | _ -> t
   in
+  let t = { t with activity = Prigh_ui.Activity.apply t.activity event } in
   match event with
   | Message_start (User u) ->
     (* [!command]'s output, added to the context, is already on show. *)
@@ -252,6 +260,12 @@ let rec apply t (event : Event.t) =
   | Message_end (Assistant a) -> set_assistant t a ~streaming:false
   | Message_end (Tool_result r) -> set_result t r
   | Message_start (Tool_result _) | Message_end (User _) -> t
+  | Retry _ ->
+    (* What the failed attempt streamed is dropped; the next starts over. *)
+    (match t.rev_entries with
+     | Assistant { message; streaming = true } :: _ ->
+       set_assistant t { message with content = [] } ~streaming:true
+     | _ -> t)
   | Tool_start call ->
     let t = add_call t call in
     if String.equal call.name "shell" then add t (Shell call) else t
@@ -448,5 +462,11 @@ let reconcile ~old fresh =
     && same_list old.rev_entries rev_entries
     && Map.equal phys_equal old.tools tools
   then old
-  else { rev_entries; tools; running = fresh.running; first = old.first }
+  else
+    { rev_entries
+    ; tools
+    ; running = fresh.running
+    ; activity = old.activity
+    ; first = old.first
+    }
 ;;

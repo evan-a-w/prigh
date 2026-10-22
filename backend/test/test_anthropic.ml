@@ -167,7 +167,10 @@ let%expect_test
               "type": "tool_result",
               "tool_use_id": "toolu_2",
               "content": "(no output)",
-              "is_error": true
+              "is_error": true,
+              "cache_control": {
+                "type": "ephemeral"
+              }
             }
           ]
         },
@@ -219,7 +222,8 @@ let%expect_test
         }
       ],
       "thinking": {
-        "type": "adaptive"
+        "type": "adaptive",
+        "display": "summarized"
       },
       "output_config": {
         "effort": "high"
@@ -267,10 +271,7 @@ let%expect_test
     [
       {
         "type": "text",
-        "text": "You are Claude Code, Anthropic's official CLI for Claude.",
-        "cache_control": {
-          "type": "ephemeral"
-        }
+        "text": "You are Claude Code, Anthropic's official CLI for Claude."
       },
       {
         "type": "text",
@@ -360,8 +361,8 @@ let%expect_test
     [%sexp (stop : string option), (usage : Usage.t), (error : string option)];
   [%expect
     {|
-    ((Thinking_delta "Let me ") (Thinking_delta look.) (Thinking_signature SIG==)
-     (Text_delta Running) (Text_delta " ls.")
+    ((Thinking_delta "") (Thinking_delta "Let me ") (Thinking_delta look.)
+     (Thinking_signature SIG==) (Text_delta Running) (Text_delta " ls.")
      (Tool_call_start (index 0) (id toolu_9) (name bash))
      (Tool_call_delta (index 0) (arguments "{\"cmd\":"))
      (Tool_call_delta (index 0) (arguments "\"ls\"}")))
@@ -462,7 +463,7 @@ let%expect_test "stream end to end: request shape, headers, assembled message" =
     user-agent: claude-cli/2.1.280
     accept: text/event-stream
     [{"type":"text","text":"You are Claude Code, Anthropic's official CLI for Claude.","cache_control":{"type":"ephemeral"}}]
-    {"type":"adaptive"}
+    {"type":"adaptive","display":"summarized"}
     |}];
   let (_ : Server.t) =
     stream_with_server
@@ -492,6 +493,54 @@ let%expect_test "stream end to end: request shape, headers, assembled message" =
     ((content ((Text partial))) (stop_reason Length)
      (usage ((input 3) (output 9) (cache_read 0)))
      (model anthropic/claude-opus-4-6))
+    |}]
+;;
+
+let%expect_test
+    "parse events: omitted thinking starts a block at once; a mid-stream error \
+     keeps its type, so a transient one is retried"
+  =
+  let show events =
+    let events, `Stop_reason _, `Usage _, `Error error =
+      T.parse_events ~tools events
+    in
+    let builder = Assistant_builder.create ~model:model.id in
+    List.iter events ~f:(Assistant_builder.apply builder);
+    print_s
+      [%sexp
+        { events : Assistant_event.t list
+        ; content : Content.t list =
+            (Assistant_builder.snapshot builder).content
+        ; error : string option
+        ; retried : bool option =
+            Option.map error ~f:Agent_loop.is_retryable_error
+        }]
+  in
+  (* With [display] omitted, nothing comes between the start and the
+     signature, which may be minutes later. *)
+  show
+    [ {|{"type":"message_start","message":{"usage":{"input_tokens":10,"output_tokens":1}}}|}
+    ; {|{"type":"content_block_start","index":0,"content_block":{"type":"thinking","thinking":""}}|}
+    ];
+  show
+    [ {|{"type":"content_block_start","index":0,"content_block":{"type":"thinking","thinking":""}}|}
+    ; {|{"type":"content_block_delta","index":0,"delta":{"type":"signature_delta","signature":"S1"}}|}
+    ; {|{"type":"content_block_stop","index":0}|}
+    ; {|{"type":"content_block_start","index":1,"content_block":{"type":"thinking","thinking":""}}|}
+    ; {|{"type":"content_block_delta","index":1,"delta":{"type":"thinking_delta","thinking":"More."}}|}
+    ; {|{"type":"error","error":{"type":"overloaded_error","message":"Overloaded"}}|}
+    ];
+  [%expect
+    {|
+    ((events ((Thinking_delta "")))
+     (content ((Thinking ((text "") (signature ()))))) (error ()) (retried ()))
+    ((events
+      ((Thinking_delta "") (Thinking_signature S1) (Thinking_delta "")
+       (Thinking_delta More.)))
+     (content
+      ((Thinking ((text "") (signature (S1))))
+       (Thinking ((text More.) (signature ())))))
+     (error ("overloaded_error: Overloaded")) (retried (true)))
     |}]
 ;;
 
@@ -536,16 +585,16 @@ let%expect_test "thinking: budget models vs adaptive models (effort)" =
       (On(Max))    thinking={"type":"enabled","budget_tokens":32000} output_config=- interleaved-beta=true
     claude-opus-5-5: (Adaptive(can_disable false))
       Off          thinking=- output_config=- interleaved-beta=false
-      (On())       thinking={"type":"adaptive"} output_config={"effort":"medium"} interleaved-beta=false
-      (On(Low))    thinking={"type":"adaptive"} output_config={"effort":"low"} interleaved-beta=false
-      (On(High))   thinking={"type":"adaptive"} output_config={"effort":"high"} interleaved-beta=false
-      (On(Max))    thinking={"type":"adaptive"} output_config={"effort":"max"} interleaved-beta=false
+      (On())       thinking={"type":"adaptive","display":"summarized"} output_config={"effort":"medium"} interleaved-beta=false
+      (On(Low))    thinking={"type":"adaptive","display":"summarized"} output_config={"effort":"low"} interleaved-beta=false
+      (On(High))   thinking={"type":"adaptive","display":"summarized"} output_config={"effort":"high"} interleaved-beta=false
+      (On(Max))    thinking={"type":"adaptive","display":"summarized"} output_config={"effort":"max"} interleaved-beta=false
     claude-opus-5: (Adaptive(can_disable false))
       Off          thinking=- output_config=- interleaved-beta=false
-      (On())       thinking={"type":"adaptive"} output_config={"effort":"medium"} interleaved-beta=false
-      (On(Low))    thinking={"type":"adaptive"} output_config={"effort":"low"} interleaved-beta=false
-      (On(High))   thinking={"type":"adaptive"} output_config={"effort":"high"} interleaved-beta=false
-      (On(Max))    thinking={"type":"adaptive"} output_config={"effort":"max"} interleaved-beta=false
+      (On())       thinking={"type":"adaptive","display":"summarized"} output_config={"effort":"medium"} interleaved-beta=false
+      (On(Low))    thinking={"type":"adaptive","display":"summarized"} output_config={"effort":"low"} interleaved-beta=false
+      (On(High))   thinking={"type":"adaptive","display":"summarized"} output_config={"effort":"high"} interleaved-beta=false
+      (On(Max))    thinking={"type":"adaptive","display":"summarized"} output_config={"effort":"max"} interleaved-beta=false
     |}]
 ;;
 
@@ -580,6 +629,9 @@ let%expect_test "images: in prompts and tool results" =
               "type": "base64",
               "media_type": "image/jpeg",
               "data": "PHOTO"
+            },
+            "cache_control": {
+              "type": "ephemeral"
             }
           }
         ]
@@ -697,7 +749,7 @@ let%expect_test "pause_turn: the paused turn is sent back and continues" =
      (stop_reason End_turn) (usage ((input 30) (output 12) (cache_read 0)))
      (model anthropic/claude-opus-4-6))
     [{"role":"user","content":[{"type":"text","text":"eio?","cache_control":{"type":"ephemeral"}}]}]
-    [{"role":"user","content":[{"type":"text","text":"eio?"}]},{"role":"assistant","content":[{"type":"text","text":"Searching.","cache_control":{"type":"ephemeral"}},{"type":"server_tool_use","id":"srvtoolu_1","name":"web_search","input":{"query":"eio"}}]}]
+    [{"role":"user","content":[{"type":"text","text":"eio?","cache_control":{"type":"ephemeral"}}]},{"role":"assistant","content":[{"type":"text","text":"Searching.","cache_control":{"type":"ephemeral"}},{"type":"server_tool_use","id":"srvtoolu_1","name":"web_search","input":{"query":"eio"}}]}]
     |}]
 ;;
 
@@ -728,5 +780,5 @@ let%expect_test "an unresolved server_tool_use in history is dropped, not text" 
   print_endline
     (Json.to_string (Option.value_exn (Json.member "messages" body)));
   [%expect
-    {| [{"role":"user","content":[{"type":"text","text":"eio?"}]},{"role":"assistant","content":[{"type":"text","text":"Searching."}]},{"role":"user","content":[{"type":"text","text":"go on","cache_control":{"type":"ephemeral"}}]}] |}]
+    {| [{"role":"user","content":[{"type":"text","text":"eio?","cache_control":{"type":"ephemeral"}}]},{"role":"assistant","content":[{"type":"text","text":"Searching."}]},{"role":"user","content":[{"type":"text","text":"go on","cache_control":{"type":"ephemeral"}}]}] |}]
 ;;
