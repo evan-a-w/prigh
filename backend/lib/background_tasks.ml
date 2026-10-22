@@ -84,14 +84,6 @@ module Summary = struct
   [@@deriving sexp_of]
 end
 
-module Wait_result = struct
-  type t =
-    { finished : Task.t list
-    ; running : Task.t list
-    ; timed_out : bool
-    }
-end
-
 type t =
   { env : Env.t
   ; sw : Switch.t
@@ -405,97 +397,16 @@ let await_any tasks =
     (List.map tasks ~f:(fun (task : Task.t) () -> Promise.await task.finished))
 ;;
 
-let wait t ~kind ~ids ~all ~timeout ~cancel =
-  let targets =
-    match ids with
-    | Some ids -> Or_error.all (List.map ids ~f:(find t ~kind))
-    | None ->
-      Ok
-        (List.filter (tasks t ~kind) ~f:(fun (task : Task.t) ->
-           not task.delivered))
-  in
-  Or_error.map targets ~f:(fun targets ->
-    let deadline = Option.map timeout ~f:(fun s -> now t +. s) in
-    let rec loop () =
-      let running = List.filter targets ~f:Task.running in
-      let finished = List.filter targets ~f:(Fn.non Task.running) in
-      let done_ =
-        List.is_empty running || ((not all) && not (List.is_empty finished))
-      in
-      let remaining =
-        Option.map deadline ~f:(fun deadline -> deadline -. now t)
-      in
-      let stop timed_out =
-        mark_delivered t finished;
-        { Wait_result.finished; running; timed_out }
-      in
-      if done_
-      then stop false
-      else if Option.exists remaining ~f:(fun r -> Float.(r <= 0.))
-      then stop true
-      else (
-        let woke =
-          Cancellation.protect cancel ~f:(fun () ->
-            match remaining with
-            | None -> await_any running
-            | Some r ->
-              Fiber.first
-                (fun () -> await_any running)
-                (fun () -> Eio.Time.sleep (Eio.Stdenv.clock t.env) r))
-        in
-        match woke with
-        | None -> stop false
-        | Some () -> loop ())
-    in
-    loop ())
-;;
-
-let wait_text t ~kind ~ids ~all ~timeout ~cancel =
-  let own = Option.map timeout ~f:Float.of_int in
-  let cap = auto_background t in
-  let capped =
-    match own, cap with
-    | _, None -> false
-    | None, Some _ -> true
-    | Some own, Some cap -> Float.( > ) own cap
-  in
-  let timeout = if capped then cap else own in
-  Or_error.map
-    (wait t ~kind ~ids ~all ~timeout ~cancel)
-    ~f:(fun { Wait_result.finished; running; timed_out } ->
-      let reports = List.map finished ~f:Task.report in
-      let still =
-        match running with
-        | [] -> []
-        | running ->
-          let tasks =
-            String.concat
-              ~sep:", "
-              (List.map running ~f:(fun task ->
-                 sprintf "%s (%s)" task.id (short_task task.label)))
-          in
-          [ (if timed_out && capped
-             then
-               sprintf
-                 "still running after %s (the longest a wait lasts): %s. \
-                  Nothing is lost: each report is delivered to you when it \
-                  finishes. Keep working on something that does not need it, \
-                  or end your turn; do not wait again just to pass the time."
-                 (seconds_text (Option.value_exn cap))
-                 tasks
-             else
-               sprintf
-                 "%sstill running: %s"
-                 (if timed_out then "timed out; " else "")
-                 tasks)
-          ]
-      in
-      match reports @ still with
-      | [] ->
-        (match kind with
-         | Subagent -> "no subagents to wait for"
-         | Job -> "no jobs to wait for")
-      | parts -> String.concat ~sep:"\n\n" parts)
+let rec take_next t ~cancel =
+  match take_undelivered t with
+  | _ :: _ as tasks -> tasks
+  | [] ->
+    (match List.filter t.tasks ~f:Task.running with
+     | [] -> []
+     | running ->
+       (match Cancellation.protect cancel ~f:(fun () -> await_any running) with
+        | None -> []
+        | Some () -> take_next t ~cancel))
 ;;
 
 let cancel t ~kind id =

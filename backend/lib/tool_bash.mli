@@ -17,7 +17,8 @@ val tool : Tool.t
 val save_output : Tool.Context.t -> string -> string
 
 (** [bash] for subagents: never moved to the background by itself, and its
-    [background] parameter says that they wait for their jobs. *)
+    [background] parameter says that they finish only once their jobs have
+    exited. *)
 val subagent_tool : Tool.t
 
 (** Whether this call starts a job rather than running the command. *)

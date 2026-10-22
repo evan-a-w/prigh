@@ -317,7 +317,7 @@ val wait_idle : t -> unit
     once. A finished one's report becomes a user message (several finishing
     together share one): an idle agent starts a turn for it, a running one
     injects it at the next turn boundary (with steering), unless
-    [subagent_wait]/[job_wait]/... already returned it. [abort] leaves them
+    [subagent_cancel]/[job_kill] already returned it. [abort] leaves them
     running; after an abort, reports that are ready wait for the next run. *)
 
 val has_running_subagents : t -> bool

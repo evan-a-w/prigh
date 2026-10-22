@@ -17,6 +17,6 @@ val create
   -> unit
   -> Tool.t
 
-(** [subagent_wait], [subagent_status] and [subagent_cancel], which act on
+(** [subagent_status] and [subagent_cancel], which act on
     the context's background subagents. *)
 val control_tools : Tool.t list

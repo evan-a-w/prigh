@@ -18,8 +18,7 @@ let background_description =
    context as needed. Returns at once with the agent id; its final report \
    arrives later as a message starting with [subagent <id> finished]. Keep \
    working on what does not depend on it, or end your turn: you are woken by \
-   the report. Do not block on it with subagent_wait unless you truly cannot \
-   do anything else."
+   the report."
 ;;
 
 let sync_description =
@@ -141,9 +140,10 @@ let prepare
   }
 ;;
 
-(* A subagent's jobs are its own: their reports arrive between its turns
-   (or through job_wait), and they end with it. Returns those still running
-   then, which are killed. *)
+(* A subagent's jobs are its own: their reports arrive between its turns,
+   and after it ends its turn while some still run (so it finishes only
+   with none running). Those still running when it stops otherwise
+   (cancelled, out of turns) are killed and returned. *)
 let with_jobs (context : Tool.Context.t) ~emit f =
   Eio.Switch.run
   @@ fun sw ->
@@ -165,6 +165,11 @@ let with_jobs (context : Tool.Context.t) ~emit f =
   Background_tasks.cancel_all ~discard:true jobs;
   Background_tasks.wait_all jobs;
   result, left
+;;
+
+let deliveries = function
+  | [] -> []
+  | tasks -> [ Background_tasks.delivery_message tasks ]
 ;;
 
 let execute
@@ -243,10 +248,9 @@ let execute
       Agent_loop.run
         ~env:context.env
         ~background:jobs
-        ~steer:(fun () ->
-          match Background_tasks.take_undelivered jobs with
-          | [] -> []
-          | tasks -> [ Background_tasks.delivery_message tasks ])
+        ~steer:(fun () -> deliveries (Background_tasks.take_undelivered jobs))
+        ~wake:(fun () ->
+          deliveries (Background_tasks.take_next jobs ~cancel:context.cancel))
         ~provider
         ~config
         ~cwd:p.cwd
@@ -433,49 +437,6 @@ let control_spec ~name ~description parameters =
   }
 ;;
 
-let wait_tool =
-  let spec =
-    control_spec
-      ~name:"subagent_wait"
-      ~description:
-        "Rarely needed: a subagent's report is delivered to you automatically \
-         when it finishes, so keep working or end your turn instead. Only when \
-         you cannot do anything useful without a result, block until \
-         background subagents finish and return their reports (they are then \
-         not delivered again). A wait returns after a limit (about 30 seconds \
-         by default) with what is still running, whose reports still arrive \
-         later. By default waits for all of them; pass ids to pick some, \
-         all=false to return as soon as one finishes, timeout to give up \
-         sooner."
-      (Tool_args.schema
-         [ ( "ids"
-           , `Array (`Object [ "type", `String "string" ])
-           , "Agent ids (default: every running or undelivered one)" )
-         ; ( "all"
-           , `Boolean
-           , "Wait for all of them (default) or only the first to finish" )
-         ; ( "timeout"
-           , `Integer
-           , "Give up after this many seconds (at most the wait limit)" )
-         ])
-  in
-  let run (context : Tool.Context.t) args =
-    let background = background_of context in
-    let ids = Tool_args.string_list_opt args "ids" in
-    let all = Option.value (Tool_args.bool_opt args "all") ~default:true in
-    Tool.Result.ok
-      (ok_or_invalid
-         (Background_tasks.wait_text
-            background
-            ~kind:Subagent
-            ~ids
-            ~all
-            ~timeout:(Tool_args.int_opt args "timeout")
-            ~cancel:context.cancel))
-  in
-  { Tool.spec; run }
-;;
-
 let status_tool =
   let spec =
     control_spec
@@ -515,4 +476,4 @@ let cancel_tool =
   { Tool.spec; run }
 ;;
 
-let control_tools = [ wait_tool; status_tool; cancel_tool ]
+let control_tools = [ status_tool; cancel_tool ]
