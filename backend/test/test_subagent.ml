@@ -377,7 +377,10 @@ let print_since_last_turn (r : Provider.Request.t) =
   print_endline "--"
 ;;
 
-let%expect_test "a subagent runs background jobs and blocks on them" =
+let%expect_test
+    "a subagent that ends its turn while its job runs is woken by its report \
+     and finishes only then"
+  =
   with_sandbox
   @@ fun t ->
   let first_tools = ref None in
@@ -385,21 +388,14 @@ let%expect_test "a subagent runs background jobs and blocks on them" =
     Faux_provider.create
       ~on_request:(fun r ->
         if Option.is_none !first_tools
-        then
-          first_tools
-          := Some
-               (List.map r.tools ~f:(fun (s : Tool_spec.t) ->
-                  ( s.name
-                  , if String.equal s.name "job_wait"
-                    then String.prefix s.description 60
-                    else "" )));
+        then first_tools := Some (List.map r.tools ~f:(fun s -> s.name));
         print_since_last_turn r)
       [ Reply.tool_call
           ~id:"c1"
           ~name:"bash"
           ~arguments:{|{"command":"sleep 0.2; echo built","background":true}|}
           ()
-      ; Reply.tool_call ~id:"c2" ~name:"job_wait" ~arguments:"{}" ()
+      ; Reply.text "waiting for the build"
       ; Reply.text "built it"
       ]
   in
@@ -412,30 +408,28 @@ let%expect_test "a subagent runs background jobs and blocks on them" =
       subagent
       {|{"task":"build"}|}
   in
-  print_s [%sexp (!first_tools : (string * string) list option)];
+  print_s [%sexp (!first_tools : string list option)];
   print_s [%sexp (result : Tool.Result.t)];
   [%expect
     {|
       user: build
     --
-      bash -> started job j1: sleep 0.2; echo built; its output is being recorded. job_wait blocks until it exits (wait for it before you finish: your jobs are killed when you end your turn); job_output peeks, job_
+      bash -> started job j1: sleep 0.2; echo built; its output is being recorded; you will be notified when it exits, even after you end your turn (you finish only once your jobs have exited). Use job_output to pe
     --
-      job_wait -> [job j1 exited 0] sleep 0.2; echo built
+      user: [job j1 exited 0] sleep 0.2; echo built
     built
     --
-    (((bash "") (read "") (write "") (edit "") (ls "") (grep "") (find "")
-      (web_fetch "") (job_status "") (job_output "")
-      (job_wait "Block until background jobs exit and return their reports. U")
-      (job_input "") (job_kill "") (subagent "")))
+    ((bash read write edit ls grep find web_fetch job_status job_output job_input
+      job_kill subagent))
     ((text  "built it\
-           \n[subagent: 3 turns, 50 in / 21 out tokens, $0.0000]")
+           \n[subagent: 3 turns, 40 in / 18 out tokens, $0.0000]")
      (is_error false))
     |}]
 ;;
 
 let%expect_test
     "a job's report reaches the subagent between turns; jobs left running are \
-     killed when it finishes"
+     killed when it runs out of turns"
   =
   with_sandbox
   @@ fun t ->
@@ -468,7 +462,7 @@ let%expect_test
       ~tools:(Tools.all @ Tool_jobs.tools @ [ subagent ])
       ~emit:ignore
       subagent
-      {|{"task":"x"}|}
+      {|{"task":"x","max_turns":4}|}
   in
   print_s [%sexp (result : Tool.Result.t)];
   print_s
@@ -481,18 +475,86 @@ let%expect_test
     {|
       user: x
     --
-      bash -> started job j1: echo quick; its output is being recorded. job_wait blocks until it exits (wait for it before you finish: your jobs are killed when you end your turn); job_output peeks, job_kill stops
+      bash -> started job j1: echo quick; its output is being recorded; you will be notified when it exits, even after you end your turn (you finish only once your jobs have exited). Use job_output to peek, job_kil
     --
       bash ->
       user: [job j1 exited 0] echo quick
     quick
     --
-      bash -> started job j2: sleep 60; its output is being recorded. job_wait blocks until it exits (wait for it before you finish: your jobs are killed when you end your turn); job_output peeks, job_kill stops it
+      bash -> started job j2: sleep 60; its output is being recorded; you will be notified when it exits, even after you end your turn (you finish only once your jobs have exited). Use job_output to peek, job_kill
     --
     ((text
        "done early\
       \n[killed when the subagent finished, still running: job j2 (sleep 60)]\
       \n[subagent: 4 turns, 70 in / 29 out tokens, $0.0001]")
+     (is_error false))
+    true
+    |}]
+;;
+
+let%expect_test
+    "a subagent cancelled while woken only by its jobs kills them and stops"
+  =
+  with_sandbox
+  @@ fun t ->
+  let cancel = Cancellation.create () in
+  let ended, ended_turn = Eio.Promise.create () in
+  let provider =
+    Faux_provider.create
+      ~on_request:print_since_last_turn
+      [ Reply.tool_call
+          ~id:"c1"
+          ~name:"bash"
+          ~arguments:{|{"command":"sleep 60","background":true}|}
+          ()
+      ; Reply.text "waiting for it"
+      ]
+  in
+  let subagent = subagent ~provider in
+  let emit (event : Agent_event.t) =
+    match event with
+    | Subagent { event = Turn_end { assistant; _ }; _ }
+      when String.equal (Message.Assistant.text assistant) "waiting for it" ->
+      Eio.Promise.resolve ended_turn ()
+    | _ -> ()
+  in
+  let start = Time_float.now () in
+  let result, () =
+    Eio.Fiber.pair
+      (fun () ->
+         let context =
+           Tool.Context.create
+             ~cancel
+             ~env:t.env
+             ~cwd:t.dir
+             ~tools:(Tools.all @ Tool_jobs.tools @ [ subagent ])
+             ~emit
+             ()
+         in
+         Tool.execute subagent context (Jsonaf.of_string {|{"task":"x"}|}))
+      (fun () ->
+         Eio.Promise.await ended;
+         print_endline "--- cancel";
+         Cancellation.cancel cancel)
+  in
+  print_s [%sexp (result : Tool.Result.t)];
+  print_s
+    [%sexp
+      (Time_float.Span.( < )
+         (Time_float.diff (Time_float.now ()) start)
+         (Time_float.Span.of_sec 20.)
+       : bool)];
+  [%expect
+    {|
+      user: x
+    --
+      bash -> started job j1: sleep 60; its output is being recorded; you will be notified when it exits, even after you end your turn (you finish only once your jobs have exited). Use job_output to peek, job_kill
+    --
+    --- cancel
+    ((text
+       "waiting for it\
+      \n[killed when the subagent finished, still running: job j1 (sleep 60)]\
+      \n[subagent: 2 turns, 30 in / 13 out tokens, $0.0000]")
      (is_error false))
     true
     |}]

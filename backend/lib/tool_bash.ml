@@ -57,15 +57,15 @@ let spec =
          , `Boolean
          , "Start it as a background job and return at once with the job id. \
             You are notified with the exit status and output tail when it \
-            exits; job_output, job_wait, job_input and job_kill act on it \
-            meanwhile. Use it for anything that may take long or keeps running \
-            (builds, test suites, installs, servers, watchers), then carry on \
-            with other work or end your turn." )
+            exits, even after you end your turn; job_output, job_input and \
+            job_kill act on it meanwhile. Use it for anything that may take \
+            long or keeps running (builds, test suites, installs, servers, \
+            watchers), then carry on with other work or end your turn." )
        ; stdin_parameter
        ])
 ;;
 
-(* A subagent is not woken after its turn: it waits for its jobs. *)
+(* A subagent finishes only once its jobs have exited. *)
 let subagent_spec =
   spec_with
     (command_parameters
@@ -73,10 +73,10 @@ let subagent_spec =
          , `Boolean
          , "Start it as a background job and return at once with the job id, \
             to run commands side by side or keep a server running while you \
-            work. job_wait blocks until it exits and returns its report; \
-            job_output, job_input and job_kill act on it meanwhile. Your jobs \
-            are killed when you end your turn, so wait for the ones you need \
-            first." )
+            work. Its report arrives when it exits, even after you end your \
+            turn; job_output, job_input and job_kill act on it meanwhile. You \
+            finish only once your jobs have exited: kill the ones you no \
+            longer need." )
        ; stdin_parameter
        ])
 ;;
@@ -363,16 +363,15 @@ let started_message ?(subagent = false) ~id ~command () =
   if subagent
   then
     sprintf
-      "started job %s: %s; its output is being recorded. job_wait blocks until \
-       it exits (wait for it before you finish: your jobs are killed when you \
-       end your turn); job_output peeks, job_kill stops it."
+      "started job %s: %s; its output is being recorded; you will be notified \
+       when it exits, even after you end your turn (you finish only once your \
+       jobs have exited). Use job_output to peek, job_kill to stop it."
       id
       (Background_tasks.short_task command)
   else
     sprintf
       "started job %s: %s; its output is being recorded; you will be notified \
-       when it exits. Use job_output to peek, job_wait to block, job_kill to \
-       stop it."
+       when it exits. Use job_output to peek, job_kill to stop it."
       id
       (Background_tasks.short_task command)
 ;;
@@ -407,8 +406,7 @@ let moved_message ~id ~after ~output =
      %s\n\
      Its report ([job %s exited ...] and its last lines) is delivered to you \
      when it exits: keep working on something else or end your turn. \
-     job_output shows more output, job_kill stops it; do not job_wait on it \
-     unless you truly cannot do anything else."
+     job_output shows more output, job_kill stops it."
     (Background_tasks.seconds_text after)
     moved_prefix
     id

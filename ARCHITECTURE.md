@@ -541,8 +541,8 @@ two can share one.
   the context carries the agent's `Background_tasks` and the call only spawns
   the loop there, with its own cancellation, and returns `started agent
   a<n> (...)`; deeper calls (no jobs) block and return the report.
-  `subagent_wait`/`subagent_status`/`subagent_cancel` act on the jobs and are
-  dropped below depth 0.
+  `subagent_status`/`subagent_cancel` act on the jobs and are dropped below
+  depth 0. Nothing blocks on background work: its reports wake the agent.
 - `Background_tasks` — one agent's background work, of two kinds:
   subagents (ids `a<n>`, seeded past the subagent calls already in the
   session) and shell jobs (ids `j<n>`, seeded past the `started job j<n>`
@@ -554,7 +554,8 @@ two can share one.
   `delivered` flag. Each finished task's report (`[<kind> <id> <status>]
   <label>` and the body) is delivered exactly once, by `take_undelivered`
   (the agent turns a batch, subagents and jobs together, into one user
-  message) or by `wait`/`cancel_and_wait` (tool results). Events and changes
+  message; `take_next` first blocks until a running task finishes) or by
+  `cancel_and_wait` (`job_kill`/`subagent_cancel` results). Events and changes
   go to the hooks `Agent` installs with `connect`.
 - Background jobs — `bash` with `background: true` at depth 0 spawns a job
   whose fiber runs the same call in the foreground (`background` dropped,
@@ -587,19 +588,19 @@ two can share one.
   keeps going in that fiber. Without an explicit `timeout` (and a limit
   under the default 600 s) the call is sent with the jobs' "no timeout",
   since the limit always comes first. A call finishing in time leaves no
-  task and uses no id. `job_wait`/`subagent_wait` go through
-  `Background_tasks.wait_text`, which caps their `timeout` at the same
-  limit and then says the reports still come later.
+  task and uses no id.
   `Tool_jobs` has `job_status`, `job_output` (`lines`, `offset` from the
-  end), `job_wait`, `job_input` and `job_kill`. Below depth 0 the subagent
-  controls are dropped, but `bash` and the job tools are replaced by their
-  subagent versions (`Tool_bash.subagent_tool`, `Tool_jobs.subagent_tools`,
-  whose descriptions say to block on jobs): `Tool_subagent.execute` gives
-  each subagent run a `Background_tasks` of its own (`with_jobs`, no
-  auto-background, so its foreground calls and `job_wait` block as long as
-  they take), delivers finished jobs' reports through the loop's `steer`,
-  and when the run ends kills (and discards) jobs still running, naming
-  them in the report. Every job (the
+  end), `job_input` and `job_kill`. Below depth 0 the subagent controls are
+  dropped and `bash` is `Tool_bash.subagent_tool` (whose `background`
+  description says the subagent finishes only once its jobs have exited):
+  `Tool_subagent.execute` gives each subagent run a `Background_tasks` of
+  its own (`with_jobs`, no auto-background, so its foreground calls block
+  as long as they take), delivers finished jobs' reports through the
+  loop's `steer` between turns and its `wake` when the model ends a turn
+  (`Background_tasks.take_next`: blocks until a job finishes, so the run
+  goes on with the report and ends only at a turn ended with no job
+  running), and when the run ends otherwise (cancelled, out of turns)
+  kills (and discards) jobs still running, naming them in the report. Every job (the
   model's and `!&cmd`) has a `Stdin_feed` (`Background_tasks.Task.input`):
   `Tool_bash.start_job` puts it in the foreground call's context
   (`Tool.Context.stdin`), so locally `Process.run ~input` keeps the
@@ -658,15 +659,17 @@ two can share one.
   elsewhere (the tool host), whether that host has Nix, which adds how to
   get missing tools from nixpkgs, the host's skills, listed when the model
   has `read`, and the auto-background limit, which the guidance on
-  background work (given to agents with `job_wait`/`subagent_wait`: almost
-  never block, keep working or end the turn, never sleep) names. `role`
+  background work (given to agents with `job_output`/`subagent_status`:
+  keep working or end the turn, never sleep or poll, `job_output` to look
+  without blocking) names. `role`
   (`Main` by default; `Tool_subagent` passes `Subagent`) picks whose prompt
   it is: the main agent's, given the `subagent` tool, tells the model it is
   the orchestrator, delegating substantial work to subagents and keeping
   its own context for planning, coordinating and reviewing; a subagent's
-  (nested ones keep `subagent`) leaves that out and says instead to block
-  rather than sleep — foreground commands, jobs with `job_wait` — since
-  ending its turn ends its task and kills its jobs.
+  (nested ones keep `subagent`) leaves that out and says instead to use
+  foreground commands rather than sleep, that job reports wake it after its
+  turn, and that it finishes only once its jobs have exited (so kill
+  servers first).
   `Agent` builds it once, at the session's first run, and records it as a
   `System_prompt` session entry so every later request (and every reload)
   sends the same prefix, which is what provider prompt caches key on. When
@@ -702,8 +705,9 @@ two can share one.
   order so the context stays deterministic. Every call goes through the
   context's `approve` first (the agent's: the approval mode, plan mode and
   rules; a call waiting for the user blocks on a `Tool_confirm` event); a
-  refusal becomes the call's result. Stops on `End_turn` without tool calls,
-  `Length`, `Error`, `Aborted`, `max_turns`, cancellation or `halt` (polled
+  refusal becomes the call's result. Stops on `End_turn` without tool calls
+  (unless `wake`, which may block, returns messages to go on with: a
+  subagent's job reports), `Length`, `Error`, `Aborted`, `max_turns`, cancellation or `halt` (polled
   before each turn, and handed to tools so subagents poll it too: the
   session budget). Every tool call
   always gets a result (a `[cancelled]` one if needed) so the context stays

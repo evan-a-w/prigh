@@ -148,6 +148,7 @@ let run
       ?(depth = 0)
       ?agent_id
       ?(steer = fun () -> [])
+      ?(wake = fun () -> [])
       ?(emit = ignore)
       ?approve
       ?ask_user
@@ -369,19 +370,21 @@ let run
               result)
       in
       emit (Turn_end { assistant; tool_results });
-      let stopped =
-        match assistant.stop_reason with
-        | Aborted | Error _ | Length -> true
-        | End_turn | Tool_use -> List.is_empty calls
-      in
       let over_limit =
         match config.max_turns with
         | Some n -> !turns >= n
         | None -> false
       in
-      if stopped || over_limit || Cancellation.is_cancelled cancel
+      if over_limit || Cancellation.is_cancelled cancel
       then continue_ := false
-      else List.iter (steer ()) ~f:append
+      else (
+        match assistant.stop_reason, calls with
+        | (Aborted | Error _ | Length), _ -> continue_ := false
+        | (End_turn | Tool_use), [] ->
+          (match wake () with
+           | [] -> continue_ := false
+           | messages -> List.iter messages ~f:append)
+        | (End_turn | Tool_use), _ :: _ -> List.iter (steer ()) ~f:append)
   done;
   let added = List.rev !added in
   emit (Agent_end added);

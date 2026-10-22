@@ -31,11 +31,19 @@ module Role = struct
   [@@deriving sexp_of, equal]
 end
 
+let job_output_note ~has =
+  if has "job_output"
+  then
+    " To look at a running job's output without blocking, use job_output; \
+     job_kill stops it."
+  else ""
+;;
+
 let subagent_waiting ~has =
   if not (has "bash")
   then []
   else
-    [ "Waiting: block, never sleep."
+    [ "Waiting: never sleep or poll."
     ; "- Never run sleep to pass the time or to poll in separate calls (sleep, \
        then check again)."
     ; "- When you need a command's result, run it in the foreground: the call \
@@ -43,22 +51,19 @@ let subagent_waiting ~has =
        10 minutes). To wait for something to become ready (a server, a file), \
        use one foreground command that blocks until it is, with a timeout."
     ]
-    @ (if has "job_wait"
+    @ (if has "job_output"
        then
          [ "- To run commands side by side or keep a server running while you \
-            work, start them with bash background: true and block on them with \
-            job_wait, which waits as long as it takes and returns their \
-            reports; job_output peeks at one, job_kill stops it."
+            work, start them with bash background: true. Each job's report \
+            arrives in a message starting with \"[job <id> exited <code>]\" \
+            when it exits, even after you end your turn: keep working or end \
+            your turn meanwhile."
+           ^ job_output_note ~has
+         ; "- You finish when you end your turn with no jobs running: kill the \
+            ones you no longer need (servers) before your final report."
          ]
        else [])
-    @ [ sprintf
-          "- Ending your turn ends your task: you are not woken again%s. Wait \
-           for what you need before your final report."
-          (if has "job_wait"
-           then ", and your jobs still running are killed"
-           else "")
-      ; ""
-      ]
+    @ [ "" ]
 ;;
 
 let base ~nix ~auto_background ~(role : Role.t) ~tools =
@@ -101,15 +106,14 @@ let base ~nix ~auto_background ~(role : Role.t) ~tools =
      @ [ "" ]
      @ (match role with
         | Subagent -> subagent_waiting ~has
-        | Main when has "subagent_wait" || has "job_wait" ->
-          [ "Background work: almost never block on it." ]
-          @ (if has "job_wait"
+        | Main when has "subagent_status" || has "job_output" ->
+          [ "Background work: never block on it." ]
+          @ (if has "job_output"
              then
                [ "- Commands that may take long (builds, test suites, \
                   installs, image builds, deployments) or that keep running \
                   (servers, watchers) go in the background: bash with \
-                  background: true, then continue with other useful work or \
-                  end your turn. Stop servers with job_kill when done."
+                  background: true. Stop servers with job_kill when done."
                ]
                @ Option.value_map auto_background ~default:[] ~f:(fun s ->
                  [ sprintf
@@ -120,7 +124,7 @@ let base ~nix ~auto_background ~(role : Role.t) ~tools =
                      (Background_tasks.seconds_text s)
                  ])
              else [])
-          @ (if has "subagent_wait"
+          @ (if has "subagent_status"
              then
                [ "- Subagents always run in the background: subagent returns \
                   at once with the agent id."
@@ -131,18 +135,10 @@ let base ~nix ~auto_background ~(role : Role.t) ~tools =
                failed) or \"[subagent <id> finished]\" (or failed), sent by \
                prigh, not typed by the user. You are woken by it even after \
                you end your turn."
-            ; sprintf
-                "- So while they run, keep working on whatever does not depend \
-                 on them, or end your turn. Do not call job_wait or \
-                 subagent_wait to pass the time, to collect results you could \
-                 take as they arrive, or to poll; never sleep to pass the time \
-                 or poll with sleep loops.%s Wait only when you truly cannot \
-                 do anything useful without one result, and then wait for that \
-                 one (ids, all=false)."
-                (Option.value_map auto_background ~default:"" ~f:(fun s ->
-                   sprintf
-                     " A wait returns after %s anyway."
-                     (Background_tasks.seconds_text s)))
+            ; "- So while they run, keep working on whatever does not depend \
+               on them, or end your turn. Never sleep or poll to pass the \
+               time."
+              ^ job_output_note ~has
             ; ""
             ]
         | Main -> [])

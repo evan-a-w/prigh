@@ -186,7 +186,8 @@ scenario_quit() {
 }
 
 # A scripted provider run: a bash tool call, then two background subagents in
-# one turn and a subagent_wait for both. The replies are one shared script:
+# one turn, then the main agent ends its turn and is woken by their reports.
+# The replies are one shared script:
 # each subagent takes its first reply as it starts, before the main agent asks
 # for its next one, and both get the same reply so their order does not
 # matter.
@@ -200,7 +201,7 @@ setup_tools() {
      {"id": "s2", "name": "subagent", "arguments": {"task": "say hello", "tools": ["ls"]}}]},
   {"text": "child reporting: done"},
   {"text": "child reporting: done"},
-  {"text": "waiting for both", "tool_calls": [{"id": "w1", "name": "subagent_wait", "arguments": {}}]},
+  {"text": "waiting for both"},
   {"text": "all done"}
 ]
 JSON

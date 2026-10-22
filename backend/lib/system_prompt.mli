@@ -22,11 +22,11 @@ end
     from nixpkgs. [skills] that the model may use are listed when it has the
     [read] tool. [auto_background] (seconds) says when a foreground command
     is moved to the background, in the guidance on background work (given
-    when the tools include [job_wait] or [subagent_wait]). [role] (default
-    [Main]) is whose prompt it is: the main agent's tells a model with the
-    [subagent] tool to delegate substantial work to subagents; a subagent's
-    tells it to block on commands and jobs rather than sleep, since it is
-    not woken after its turn. *)
+    when the tools include [job_output] or [subagent_status]). [role]
+    (default [Main]) is whose prompt it is: the main agent's tells a model
+    with the [subagent] tool to delegate substantial work to subagents; a
+    subagent's tells it to block on commands rather than sleep, and that it
+    finishes only once its jobs have exited. *)
 val build
   :  ?date:string
   -> ?instructions:(string * string) list

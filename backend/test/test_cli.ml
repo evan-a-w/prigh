@@ -7,18 +7,18 @@ open Tool_test_helpers
 
 let exe = Filename.concat (Sys_unix.getcwd ()) "../bin/main.exe"
 
-let spawn t args =
+let spawn ?(path = "/usr/bin:/bin") t args =
   Core_unix.create_process_env
     ~prog:exe
     ~args
-    ~env:(`Replace [ "HOME", t.dir; "PATH", "/usr/bin:/bin" ])
+    ~env:(`Replace [ "HOME", t.dir; "PATH", path ])
     ()
 ;;
 
 (* Runs [prigh ARGS] to completion; prints stdout, stderr and the exit
    status, with the sandbox and [hide]'s patterns masked. *)
-let prigh ?(hide = []) t args =
-  let p = spawn t args in
+let prigh ?(hide = []) ?path t args =
+  let p = spawn ?path t args in
   Core_unix.close p.stdin;
   let read fd = In_channel.input_all (Core_unix.in_channel_of_descr fd) in
   let out = read p.stdout in
@@ -296,6 +296,41 @@ let%expect_test "run: confirmations and questions are refused, not waited for" =
     [tool] error: [denied by user] Their reason: prigh run is headless, so nobody can confirm it; the user can allow it with approval_mode or permissions in ~/.prigh/config.json
     [tool] ask_user {"questions":[{"question":"Which?"}]}
     [tool] error: [cannot ask: prigh run is headless, so nobody can answer; decide yourself and say what you assumed]
+    [deepseek-flash] tokens: in=0 (cached 0) out=0 cost=$0.0000 session=$DIR/.prigh/sessions/<stamp>_<id>.jsonl
+    |}]
+;;
+
+let%expect_test
+    "run: a turn that ends with a job running is woken by its report"
+  =
+  with_sandbox
+  @@ fun t ->
+  write
+    t
+    "script.json"
+    {|[
+  {"text": "", "tool_calls": [{"id": "c1", "name": "bash", "arguments": {"command": "sleep 0.5; echo built", "background": true}}]},
+  {"text": "started the build"},
+  {"text": "the build finished"}
+]|};
+  (* The job needs bash, wherever it is. *)
+  prigh
+    ~path:(Sys.getenv_exn "PATH")
+    t
+    [ "run"
+    ; "-faux-script"
+    ; Filename.concat t.dir "script.json"
+    ; "-cwd"
+    ; t.dir
+    ; "go"
+    ];
+  [%expect
+    {|
+    $ prigh run -faux-script $DIR/script.json -cwd $DIR go
+    started the build
+    the build finished
+    [tool] bash {"command":"sleep 0.5; echo built","background":true}
+    [tool] started job j1: sleep 0.5; echo built; its output is being recorded; you will be notified when it exits. Use job_output to peek, job_kill to stop it.
     [deepseek-flash] tokens: in=0 (cached 0) out=0 cost=$0.0000 session=$DIR/.prigh/sessions/<stamp>_<id>.jsonl
     |}]
 ;;
