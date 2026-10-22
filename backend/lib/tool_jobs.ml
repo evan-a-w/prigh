@@ -108,70 +108,6 @@ let output_tool =
   { Tool.spec; run }
 ;;
 
-let main_wait_description =
-  "Rarely needed: a job's report is delivered to you automatically when it \
-   exits, so keep working or end your turn instead. Only when you cannot do \
-   anything useful without a result, block until jobs exit and return their \
-   reports (they are then not delivered again). A wait returns after a limit \
-   (about 30 seconds by default) with what is still running, whose reports \
-   still arrive later. By default waits for all running or undelivered jobs; \
-   pass ids to pick some, all=false to return as soon as one exits, timeout to \
-   give up sooner."
-;;
-
-let subagent_wait_description =
-  "Block until background jobs exit and return their reports. Use it whenever \
-   you need a job's result: it waits as long as that takes (timeout bounds \
-   it), so never sleep or poll to wait instead. Jobs you have not waited for \
-   report between your turns, and are killed when you end your turn. By \
-   default waits for all running or undelivered jobs; pass ids to pick some, \
-   all=false to return as soon as one exits."
-;;
-
-let wait_tool_with ~description ~timeout =
-  let spec =
-    spec
-      ~name:"job_wait"
-      ~description
-      (Tool_args.schema
-         [ ( "ids"
-           , `Array (`Object [ "type", `String "string" ])
-           , "Job ids (default: every running or undelivered one)" )
-         ; ( "all"
-           , `Boolean
-           , "Wait for all of them (default) or only the first to exit" )
-         ; "timeout", `Integer, timeout
-         ])
-  in
-  let run (context : Tool.Context.t) args =
-    let background = background_of context in
-    let ids = Tool_args.string_list_opt args "ids" in
-    let all = Option.value (Tool_args.bool_opt args "all") ~default:true in
-    Tool.Result.ok
-      (ok_or_invalid
-         (Background_tasks.wait_text
-            background
-            ~kind:Job
-            ~ids
-            ~all
-            ~timeout:(Tool_args.int_opt args "timeout")
-            ~cancel:context.cancel))
-  in
-  { Tool.spec; run }
-;;
-
-let wait_tool =
-  wait_tool_with
-    ~description:main_wait_description
-    ~timeout:"Give up after this many seconds (at most the wait limit)"
-;;
-
-let subagent_wait_tool =
-  wait_tool_with
-    ~description:subagent_wait_description
-    ~timeout:"Give up after this many seconds (default: wait until they exit)"
-;;
-
 let kill_tool =
   let spec =
     spec
@@ -319,8 +255,4 @@ let input_tool =
   { Tool.spec; run }
 ;;
 
-let tools = [ status_tool; output_tool; wait_tool; input_tool; kill_tool ]
-
-let subagent_tools =
-  [ status_tool; output_tool; subagent_wait_tool; input_tool; kill_tool ]
-;;
+let tools = [ status_tool; output_tool; input_tool; kill_tool ]

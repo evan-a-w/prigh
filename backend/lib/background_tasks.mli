@@ -4,8 +4,8 @@ open! Import
 (** The background work of one agent: subagents (the [subagent] tool at depth
     0) and shell jobs ([bash] with [background]). They outlive the turn that
     started them, and each finished task's report is delivered to the agent
-    exactly once: either through [take_undelivered] (as a message) or by
-    [wait]/[cancel_and_wait] (as a tool result). *)
+    exactly once: either through [take_undelivered]/[take_next] (as a
+    message) or by [cancel_and_wait] (as a tool result). *)
 
 (** The first line of a task or command, at most 60 characters. *)
 val short_task : string -> string
@@ -65,14 +65,6 @@ module Summary : sig
   [@@deriving sexp_of]
 end
 
-module Wait_result : sig
-  type t =
-    { finished : Task.t list
-    ; running : Task.t list (** still running when the wait ended *)
-    ; timed_out : bool
-    }
-end
-
 type t
 
 val create
@@ -91,8 +83,8 @@ val avoid_subagent_ids : t -> string list -> unit
     their usage); [on_change] is called whenever a task starts, finishes or is
     delivered, after its state is updated. [auto_background] (default: never)
     is how many seconds a foreground command may run before it is moved to
-    the background ({!run_foreground}), which also caps waits ([wait]'s
-    callers); it is asked each time, so it follows the configuration. *)
+    the background ({!run_foreground}); it is asked each time, so it follows
+    the configuration. *)
 val connect
   :  ?auto_background:(unit -> float option)
   -> t
@@ -169,31 +161,10 @@ val has_undelivered : t -> bool
 (** One user message carrying the reports of [tasks]. *)
 val delivery_message : Task.t list -> Message.t
 
-(** Blocks until the tasks [ids] (default: every running or undelivered one of
-    [kind]) have all finished ([all]) or at least one has, until [timeout]
-    seconds or until [cancel]. Finished tasks among them are marked
-    delivered. *)
-val wait
-  :  t
-  -> kind:Kind.t
-  -> ids:string list option
-  -> all:bool
-  -> timeout:float option
-  -> cancel:Cancellation.t
-  -> Wait_result.t Or_error.t
-
-(** [job_wait] and [subagent_wait]: [wait] for at most [timeout] seconds and
-    at most {!auto_background} (so a wait never blocks the agent for long),
-    as the tool's result text: the reports of the tasks that finished, then
-    those still running and what to do about them. *)
-val wait_text
-  :  t
-  -> kind:Kind.t
-  -> ids:string list option
-  -> all:bool
-  -> timeout:int option
-  -> cancel:Cancellation.t
-  -> string Or_error.t
+(** [take_undelivered], but when nothing is undelivered and tasks are
+    running, it first blocks until one of them finishes (or [cancel]). [[]]
+    when nothing is running or on [cancel]. *)
+val take_next : t -> cancel:Cancellation.t -> Task.t list
 
 (** Requests cancellation; the task still finishes and is delivered as
     usual. *)

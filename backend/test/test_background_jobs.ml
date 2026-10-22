@@ -187,33 +187,23 @@ let pid_alive pid =
   | exception _ -> false
 ;;
 
-let%expect_test "job_wait, job_output, job_status and job_kill" =
+let%expect_test "job_output, job_status and job_kill" =
   with_agent
     ~main:
       [ background
           ~id:"c1"
           "sleep 30 & echo $! > sleep.pid; echo started-sleeping; wait"
       ; background ~id:"c2" "sleep 0.3; echo hi"
-      ; Reply.tool_call
-          ~id:"w1"
-          ~name:"job_wait"
-          ~arguments:{|{"ids":["j2"]}|}
-          ()
+      ; Reply.text "waiting for j2"
       ; Reply.tool_call
           ~id:"o1"
           ~name:"job_output"
           ~arguments:{|{"id":"j1"}|}
           ()
       ; Reply.tool_call ~id:"s1" ~name:"job_status" ~arguments:"{}" ()
-      ; Reply.tool_call
-          ~id:"w2"
-          ~name:"job_wait"
-          ~arguments:{|{"timeout":0}|}
-          ()
       ; Reply.tool_call ~id:"k1" ~name:"job_kill" ~arguments:{|{"id":"j1"}|} ()
       ; Reply.tool_call ~id:"k2" ~name:"job_kill" ~arguments:{|{"id":"j9"}|} ()
       ; Reply.tool_call ~id:"s2" ~name:"job_status" ~arguments:"{}" ()
-      ; Reply.tool_call ~id:"w3" ~name:"job_wait" ~arguments:"{}" ()
       ; Reply.text "all done"
       ]
     []
@@ -225,7 +215,7 @@ let%expect_test "job_wait, job_output, job_status and job_kill" =
   printf
     "sleep still alive: %b\n"
     (not (eventually t (fun () -> not (pid_alive pid))));
-  (* Everything was returned by the tools, so nothing is delivered again. *)
+  (* j1's report was returned by job_kill, so it is not delivered again. *)
   print_endline "--- messages";
   List.iter (Agent.messages agent) ~f:(fun m ->
     print_endline (clean t (message_line m)));
@@ -563,8 +553,14 @@ let%expect_test "job_output pages back; the buffer keeps the end" =
     List.find_exn Tool_jobs.tools ~f:(fun tool ->
       String.equal (Tool.name tool) name)
   in
+  (* What the agent is sent once they have all finished. *)
+  let reports () =
+    Background_tasks.wait_all background;
+    List.iter (Background_tasks.take_undelivered background) ~f:(fun task ->
+      print_endline (clean t (Background_tasks.Task.report task)))
+  in
   call Tool_bash.tool {|{"command": "seq 1 100", "background": true}|};
-  call (tool "job_wait") "{}";
+  reports ();
   call (tool "job_output") {|{"id": "j1", "lines": 3}|};
   call (tool "job_output") {|{"id": "j1", "lines": 3, "offset": 10}|};
   call (tool "job_output") {|{"id": "j1", "lines": 3, "offset": 200}|};
@@ -574,7 +570,7 @@ let%expect_test "job_output pages back; the buffer keeps the end" =
     Tool_bash.tool
     {|{"command": "sleep 5", "background": true, "timeout": 1}|};
   call Tool_bash.tool {|{"command": "kill -9 $$", "background": true}|};
-  call (tool "job_wait") "{}";
+  reports ();
   [%expect
     {|
     started job j1: seq 1 100; its output is being recorded; you will be notified when it exits. Use job_output to peek, job_wait to block, job_kill to stop it.
@@ -809,4 +805,51 @@ let%expect_test "jobs on a client tool host: output, list, kill, disconnect" =
     user: [job j3 failed: tool host disconnected] echo waiting; while [ ! -f gate2 ]; do sleep 0.02; done | waiting
     assistant: j3 noted
     |}]
+;;
+
+let%expect_test
+    "a background subagent that ends its turn while its job runs is woken by \
+     the job's report, and only then reports to the main agent"
+  =
+  with_agent
+    ~main:
+      [ Test_background_subagents.spawn "build"
+      ; Reply.text "started a1"
+      ; Reply.text "a1 built it"
+      ]
+    [ ( "build"
+      , [ background ~id:"b1" (gated "echo built")
+        ; Reply.text "waiting for the build"
+        ; Reply.text "built"
+        ] )
+    ]
+  @@ fun t agent ->
+  let child_waiting = ref false in
+  Agent.subscribe agent ~f:(fun (event : Agent.Event.t) ->
+    match event with
+    | Loop (Subagent { agent_id; event = inner; _ }) ->
+      (match inner with
+       | Agent_start -> printf "  %s: agent_start\n" agent_id
+       | Agent_end _ -> printf "  %s: agent_end\n" agent_id
+       | Message_end m ->
+         let line = clean t (message_line m) in
+         if String.is_suffix line ~suffix:"waiting for the build"
+         then child_waiting := true;
+         printf "  %s: %s\n" agent_id line
+       | _ -> ())
+    | Loop (Subagent_end { agent_id; result; _ }) ->
+      printf
+        "subagent_end %s: %s\n"
+        agent_id
+        (Test_background_subagents.one_line result.text)
+    | _ -> ());
+  Or_error.ok_exn (Agent.prompt agent "go");
+  ignore (eventually t (fun () -> !child_waiting) : bool);
+  Test_background_subagents.wait_turn agent;
+  printf
+    "--- the subagent ended its turn; still running: %b\n"
+    (Agent.has_running_subagents agent);
+  open_gate t;
+  Agent.wait_idle agent;
+  [%expect {| |}]
 ;;

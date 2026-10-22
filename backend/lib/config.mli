@@ -49,9 +49,7 @@ type t =
     (** text the frontends insert into the prompt editor ([/snippet]) *)
   ; auto_background_seconds : float
     (** a foreground [bash] call of the main agent still running after this
-        long is moved to the background as a job, and [job_wait]/
-        [subagent_wait] return after at most this long (default 30; 0:
-        never, waits unbounded) *)
+        long is moved to the background as a job (default 30; 0: never) *)
   }
 [@@deriving sexp_of]
 
