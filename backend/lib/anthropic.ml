@@ -296,7 +296,9 @@ let effort_of_thinking : Thinking.t -> string option = function
 (* The thinking-related fields of the request. Budget models get
    [thinking.enabled] with a token budget (pi's older Claude path); adaptive
    models get [thinking.adaptive] and the effort in [output_config], or
-   [thinking.disabled] when off (omitted for models that are always on). *)
+   [thinking.disabled] when off (omitted for models that are always on).
+   Adaptive thinking asks for the summarized text: newer models omit it by
+   default, which leaves minutes of thought with nothing to show. *)
 let thinking_fields ~max_tokens (model : Model.t) (thinking : Thinking.t) =
   if not model.supports_thinking
   then []
@@ -319,7 +321,10 @@ let thinking_fields ~max_tokens (model : Model.t) (thinking : Thinking.t) =
          then [ "thinking", `Object [ "type", `String "disabled" ] ]
          else []
        | Some effort ->
-         [ "thinking", `Object [ "type", `String "adaptive" ]
+         [ ( "thinking"
+           , `Object
+               [ "type", `String "adaptive"; "display", `String "summarized" ]
+           )
          ; "output_config", `Object [ "effort", `String effort ]
          ]))
 ;;
