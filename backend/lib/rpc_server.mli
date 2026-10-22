@@ -43,6 +43,9 @@ val create
   :  env:Env.t
   -> sw:Switch.t
   -> ?token:string
+  -> ?host_grace:float
+       (** seconds the in-flight executions of a tool host whose connection
+           dropped wait for it to come back with them (default: 60) *)
   -> ?namespace:string
   -> ?backend_host:bool
        (** whether [new_agent] makes the backend a tool host (default: true) *)

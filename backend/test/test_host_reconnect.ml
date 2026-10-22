@@ -24,6 +24,8 @@ module Fake_host = struct
     ; mutable live : bool
     ; mutable answer : bool (** false: leave execs pending *)
     ; mutable notices : string list (** received, newest first *)
+    ; mutable cancelled : string list
+      (** exec ids of the [tool_exec_cancel]s received, newest first *)
     }
 
   let answer_exec (h : Test_rpc.H.t) t ~name json =
@@ -70,6 +72,7 @@ module Fake_host = struct
   let connect
         ?host_id
         ?session
+        ?(running = [])
         ?(tools = true)
         ~sw
         (h : Test_rpc.H.t)
@@ -78,7 +81,9 @@ module Fake_host = struct
     =
     let sent = Queue.create () in
     let client = Rpc_server.connect h.server ~send:(Queue.enqueue sent) in
-    let t = { client; sent; live = true; answer = true; notices = [] } in
+    let t =
+      { client; sent; live = true; answer = true; notices = []; cancelled = [] }
+    in
     let params =
       `Object
         ([ "name", `String name
@@ -87,6 +92,12 @@ module Fake_host = struct
          ]
          @ Option.value_map host_id ~default:[] ~f:(fun id ->
            [ "host_id", `String id ])
+         @ (if List.is_empty running
+            then []
+            else
+              [ ( "running_execs"
+                , `Array (List.map running ~f:(fun id -> `String id)) )
+              ])
          @ Option.value_map session ~default:[] ~f:(fun agent ->
            [ "session", `String (Session.id (Agent.session agent)) ]))
     in
@@ -119,8 +130,11 @@ module Fake_host = struct
            | Some json
              when not (String.equal (member_string json "event") "tool_exec") ->
              ignore (Queue.dequeue_exn sent : Json.t);
-             if String.equal (member_string json "event") "notice"
-             then t.notices <- member_string json "text" :: t.notices
+             (match member_string json "event" with
+              | "notice" -> t.notices <- member_string json "text" :: t.notices
+              | "tool_exec_cancel" ->
+                t.cancelled <- member_string json "exec_id" :: t.cancelled
+              | _ -> ())
            | _ -> ());
           Eio.Fiber.yield ();
           loop ())
@@ -417,6 +431,122 @@ let%expect_test
     reloaded: true
     ((active_host host-tui) (cwd /home/me/proj)
      (hosts (backend=/home/me/proj host-tui=/home/me/proj)))
+    |}]
+;;
+
+(* Starts a prompt whose bash call the host [laptop] leaves running; the
+   exec it was sent. *)
+let start_exec t (h : Test_rpc.H.t) (laptop : Fake_host.t) =
+  laptop.answer <- false;
+  call t h ~params:{|{"text": "go"}|} "prompt";
+  let rec wait_exec () =
+    match Queue.peek laptop.sent with
+    | Some json when String.equal (member_string json "name") "bash" ->
+      Queue.dequeue_exn laptop.sent
+    | Some json when String.equal (member_string json "name") "$instructions" ->
+      ignore (Queue.dequeue_exn laptop.sent : Json.t);
+      Fake_host.answer_exec h laptop ~name:"laptop" json;
+      wait_exec ()
+    | _ ->
+      Eio.Fiber.yield ();
+      wait_exec ()
+  in
+  wait_exec ()
+;;
+
+let tool_results agent =
+  List.iter (Agent.messages agent) ~f:(function
+    | Tool_result r -> print_endline ("tool_result: " ^ r.text)
+    | _ -> ())
+;;
+
+let%expect_test
+    "a host that reconnects with its executions still running carries on"
+  =
+  Test_rpc.with_agent
+    [ bash "c1"; Reply.text "one"; bash "c2"; Reply.text "two" ]
+  @@ fun t agent h ->
+  Eio.Switch.run
+  @@ fun sw ->
+  let connect ?running () =
+    Fake_host.connect
+      ~sw
+      h
+      ?running
+      ~name:"laptop"
+      ~host_id:"host-laptop"
+      ~cwd:"/home/me"
+      ~session:agent
+  in
+  let laptop = connect () in
+  notices t h;
+  let exec = start_exec t h laptop in
+  (* Its connection drops: the call waits for it to come back. *)
+  Fake_host.disconnect h laptop;
+  Eio.Fiber.yield ();
+  printf "running: %b\n" (Agent.is_running agent);
+  (* It does, still running the exec (and one nobody waits for any more,
+     which it is told to cancel), and answers it on the new connection. *)
+  let laptop =
+    connect ~running:[ member_string exec "exec_id"; "gone/c0-0" ] ()
+  in
+  Fake_host.answer_exec h laptop ~name:"laptop" exec;
+  Agent.wait_idle agent;
+  tool_results agent;
+  Fake_host.print_notices laptop ~name:"laptop";
+  print_s [%sexp (laptop.cancelled : string list)];
+  [%expect
+    {|
+    laptop hello: client_id=client-2 host_id=host-laptop
+    notice: tools now run on laptop in /home/me
+    {"type":"response","id":"r1","ok":true,"result":{}}
+    running: true
+    laptop hello: client_id=client-3 host_id=host-laptop
+    laptop ran bash in /home/me
+    tool_result: ran on laptop in /home/me
+    laptop notice: tools run on laptop again in /home/me
+    (gone/c0-0)
+    |}];
+  (* A host that comes back without it (it restarted) has lost it. *)
+  let exec = start_exec t h laptop in
+  Fake_host.disconnect h laptop;
+  let _laptop = connect () in
+  Agent.wait_idle agent;
+  printf "exec: %s\n" (member_string exec "name");
+  tool_results agent;
+  [%expect
+    {|
+    {"type":"response","id":"r1","ok":true,"result":{}}
+    laptop hello: client_id=client-4 host_id=host-laptop
+    exec: bash
+    tool_result: ran on laptop in /home/me
+    tool_result: [tool host reconnected]
+    |}]
+;;
+
+let%expect_test "a host that does not come back in time fails its executions" =
+  Test_rpc.with_agent ~host_grace:0.05 [ bash "c1"; Reply.text "one" ]
+  @@ fun t agent h ->
+  Eio.Switch.run
+  @@ fun sw ->
+  let laptop =
+    Fake_host.connect
+      ~sw
+      h
+      ~name:"laptop"
+      ~host_id:"host-laptop"
+      ~cwd:"/home/me"
+      ~session:agent
+  in
+  let (_ : Json.t) = start_exec t h laptop in
+  Fake_host.disconnect h laptop;
+  Agent.wait_idle agent;
+  tool_results agent;
+  [%expect
+    {|
+    laptop hello: client_id=client-2 host_id=host-laptop
+    {"type":"response","id":"r1","ok":true,"result":{}}
+    tool_result: [tool host disconnected]
     |}]
 ;;
 

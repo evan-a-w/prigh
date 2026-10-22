@@ -588,7 +588,8 @@ val session_stats : t -> Session_stats.t
 
 (** Replaces the client hosts (every connected client able to run tools,
     whichever session it is attached to). In-flight executions on hosts that
-    are gone fail. Hosts keep the cwd this session last used on them, also
+    are gone keep waiting: the host may come back with them still running
+    ({!Rpc_server} fails them when it does not). Hosts keep the cwd this session last used on them, also
     while disconnected. The active host stays active when it goes away (tool
     calls fail until it comes back, see {!host_unavailable_message}); when it
     is listed again the session resumes on it in the same cwd. Without the
