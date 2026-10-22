@@ -2034,7 +2034,7 @@ let serve_lines ?signed_in ?(finish_requests = false) t ~read_line ~write_line =
   Switch.run
   @@ fun sw ->
   let outbox = Outbox.create () in
-  let send json = Outbox.send outbox (Json.to_string json) in
+  let send = Update_coalescer.send (Update_coalescer.create outbox) in
   (* A failed outbox also gives up on a write stuck on the peer. *)
   Fiber.fork ~sw (fun () ->
     Fiber.first
