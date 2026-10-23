@@ -2034,10 +2034,14 @@ copy of the protocol types and the e2e test guards the contract.
     `App.update`, answers RPCs and prints the commands and the rendered
     page (as text, `Html.mark`s print as the glyphs they draw: ✓ ✕ – ■).
     `e2e/` — the Playwright e2e (see Testing).
-- `bin/` — `prigh-tui` (`-faux`, `-session`, `-model`, `-cwd`, `-auth-file`,
-  `-backend`; `PRIGH_BACKEND` overrides the backend path). `-connect
-  HOST:PORT` (`$PRIGH_CONNECT`) joins a running backend instead of spawning
-  one, with `-token` (`$PRIGH_TOKEN`), `-user` (`$PRIGH_USER`) and `-name`; `-tools local|remote`
+- `bin/` — `prigh-tui [DIR]` (`-faux`, `-session`, `-model`, `-cwd` (same
+  as `DIR`), `-auth-file`, `-backend`; `PRIGH_BACKEND` overrides the backend
+  path). `-connect HOST:PORT` (`$PRIGH_CONNECT`) joins a running backend
+  instead of spawning one, with `-token` (`$PRIGH_TOKEN`), `-user`
+  (`$PRIGH_USER`) and `-name`; the flags are remembered in
+  `~/.prigh/tui-connection.sexp` (`client_unix/saved_connection.ml`, which
+  resolves flag > environment > saved; `-local` ignores it, `-forget`
+  deletes it). `-tools local|remote`
   says where this session's tools run (local = this machine through
   `tool-host`, the default with `-connect`; remote = the backend, the default
   when spawning, where the two coincide).
