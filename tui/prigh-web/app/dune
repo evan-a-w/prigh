@@ -17,5 +17,4 @@
   prigh_protocol
   prigh_client
   prigh_ui
-  prigh_ui_web_app
   prigh_web))

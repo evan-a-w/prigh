@@ -119,8 +119,7 @@ module Command : sig
     (** [/connect], [/signin]: switch server or credentials and answer
         [Relinked]. *)
     | Sign_out
-    (** Forget the stored credentials (the token, in the terminal) and drop
-        the connection; the browsers reload into their sign-in form. *)
+    (** Forget the stored credentials (the token) and drop the connection. *)
     | Notify of
         { mode : Notify.Mode.t
         ; notification : Notify.t
@@ -228,8 +227,7 @@ module Model : sig
     ; quitting : bool
     ; utc_offset : Time_ns.Span.t
     ; terminal_focus : Focus.t (** whether the terminal or page has the focus *)
-    ; server : Server_link.t option
-      (** [None] where the platform does not report it (the browsers) *)
+    ; server : Server_link.t option (** [None] until the platform reports it *)
     }
   [@@deriving sexp_of]
 
@@ -256,10 +254,6 @@ end
 val transcript_rows : Model.t -> int
 
 val init : Model.t
-
-(** Lines one [Scroll_up]/[Scroll_down] intent moves. *)
-val wheel_lines : int
-
 val format_tokens : int -> string
 
 (** [path] with the home directory shown as [~]. *)

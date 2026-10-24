@@ -4,9 +4,6 @@ open Js_of_ocaml
 open Bonsai_web
 module App = Prigh_web.App
 module Client = Prigh_client.Client
-module Browser = Prigh_ui_web_app.Browser
-module Login = Prigh_ui_web_app.Login
-module Ws_transport = Prigh_ui_web_app.Ws_transport
 module Accounts = Prigh_web.Accounts
 module Reconnect_gate = Prigh_web.Reconnect_gate
 
@@ -496,7 +493,7 @@ let terminal
   let key = Prigh_web.Terminal.Target.key target in
   Terminal_widget.view
     ~url:
-      (Prigh_ui_web_app.Terminal_panel.url
+      (Terminal_panel.url
          ~backend:settings.backend
          ~user:settings.login.user
          ~as_user:target.as_user

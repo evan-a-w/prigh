@@ -1,5 +1,6 @@
 ; Runs under node (virtual_dom needs a JavaScript runtime): the state machine
-; driven by actions, and the page it renders as HTML.
+; driven by actions, the page it renders as HTML, and the page glue's pure
+; parts (prigh_web_app).
 
 (library
  (name prigh_web_test)
@@ -16,5 +17,6 @@
   js_of_ocaml
   prigh_protocol
   prigh_web
+  prigh_web_app
   virtual_dom
   virtual_dom.vdom_test_helpers))

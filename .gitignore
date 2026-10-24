@@ -56,18 +56,9 @@
 /result-*
 /.direnv/
 
-*/node_modules/
-*/dist/
 */.artifacts/
 *.log
 */.DS_Store
-*.tsbuildinfo
-# packages/*/node_modules/
-*/packages/*/dist/
-*/packages/*/dist-chrome/
-*/packages/*/dist-firefox/
-*/packages/ai/src/providers/data/
-*/packages/ai/src/providers/.model-generation-*/
 */*.cpuprofile
 
 # Environment
@@ -84,9 +75,6 @@
 *~
 
 # Package specific
-*/.npm/
-*/coverage/
-*/.nyc_output/
 */.pi_config/
 */tui-debug.log
 */compaction-results/
@@ -95,13 +83,11 @@
 */out.jsonl
 */pi-*.html
 */out.html
-*/packages/coding-agent/binaries/
 */todo.md
 */plans/
 */.pi/hf-sessions/
 */.pi/hf-sessions-backup/
 */collect.sh
-*/packages/agent/docs/extensions/pi-server-artifact/index.md
 
 # dune build artifacts at any depth
 _build/

@@ -1,6 +1,6 @@
 open! Core
 
-(** Platform-neutral key event. Terminal and browser events both map here. *)
+(** Platform-neutral key event; the terminal's events map here. *)
 
 module Code : sig
   type t =

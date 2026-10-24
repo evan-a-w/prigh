@@ -135,7 +135,7 @@ let perform (page : Files.Page.t) =
   | Forget file -> forget file
   | Download { url; name } -> download ~url ~name
   | Focus id ->
-    Prigh_ui_web_app.Browser.after_render (fun () ->
+    Browser.after_render (fun () ->
       Option.iter (Dom_html.getElementById_opt id) ~f:(fun el -> el##focus))
 ;;
 
@@ -202,7 +202,7 @@ let install ~schedule:s ~backend =
            ev##.target
            (fun () -> None)
            (fun target ->
-              if Prigh_ui_web_app.Terminal_panel.contains target
+              if Terminal_panel.contains target
               then None
               else if in_panel target
               then Some "files"
