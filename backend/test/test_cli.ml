@@ -68,7 +68,7 @@ let%expect_test "flags: bad values name the flag and the fix" =
     -listen must be HOST:PORT, got "7777"; did you mean 127.0.0.1:7777 (this machine only) or 0.0.0.0:7777 (all interfaces)?
     [exit 2]
     $ prigh serve -web localhost
-    -web must be HOST:PORT such as 127.0.0.1:7788, got "localhost"
+    -web must be HOST:PORT such as 127.0.0.1:7790, got "localhost"
     [exit 2]
     $ prigh serve -web :99999
     -web :99999: the port must be a number from 0 to 65535
