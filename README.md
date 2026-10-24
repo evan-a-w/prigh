@@ -12,6 +12,7 @@ in.
 ./prigh                 # builds backend + frontend if needed, then starts the TUI here
 ./prigh ~/proj          # ... in another directory (or -cwd ~/proj)
 ./prigh -faux           # scripted provider, no API calls
+./prigh -detached .     # in a new detached tmux session (prigh-<dir>); returns at once
 ./prigh -web            # the same UI in a browser (serves it on 127.0.0.1:7788 and opens it)
 ./prigh -prigh-web      # prigh-web, the browser-native UI (127.0.0.1:7790)
 ```
@@ -67,9 +68,28 @@ DIR` is the same). Flags: `-faux`, `-session PATH`, `-model ID`, `-thinking
 LEVEL`, `-auth-file PATH`, `-backend PATH` (same as `$PRIGH_BACKEND`),
 `-connect HOST:PORT`, `-token SECRET`, `-user NAME` (with `-tokens`),
 `-local`, `-forget`, `-tools local|remote`, `-name NAME`,
-and `-- <extra backend args>`. The Nix wrapper sets `PRIGH_BACKEND` to the
-Nix-built backend by default; set `PRIGH_BACKEND` or pass `-backend` to override
-it.
+`-detached`, `-tmux-session NAME` and `-- <extra backend args>`. The Nix
+wrapper sets `PRIGH_BACKEND` to the Nix-built backend by default; set
+`PRIGH_BACKEND` or pass `-backend` to override it.
+
+`-detached` starts the TUI (with the other flags) in a new detached tmux
+session and returns at once, printing how to attach:
+
+```
+$ prigh -detached ~/lix
+prigh is running in tmux session prigh-lix: tmux attach -t prigh-lix
+```
+
+The session is named `prigh-<directory>` (`.`, `:` and the like become
+`_`; `-2`, `-3`, ... if it is taken; `-tmux-session NAME` chooses another)
+and starts in the directory. tmux is `$PRIGH_TMUX` (the Nix wrapper sets
+it to its tmux, so the line names that binary) or `tmux` on `PATH`. The
+session gets the caller's `PATH`, `HOME`, `PRIGH_*`, locale,
+`EDITOR`/`VISUAL`, `XDG_*`, proxy, certificate and provider key
+(`*_API_KEY`) variables, even from a tmux server that is already running;
+other variables are the server's. From inside tmux the line says `tmux
+switch-client -t ...`. Quitting the TUI closes the session; if it fails,
+its error stays on screen until Enter.
 
 The first `nix build`/`nix develop` evaluation is slow (opam-nix resolves the
 pinned package set through import-from-derivation) and the first build compiles

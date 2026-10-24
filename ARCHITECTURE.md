@@ -2073,7 +2073,11 @@ copy of the protocol types and the e2e test guards the contract.
   (`term/backend_link.ml`). `-tools local|remote`
   says where this session's tools run (local = this machine through
   `tool-host`, the default with `-connect`; remote = the backend, the default
-  when spawning, where the two coincide).
+  when spawning, where the two coincide). `-detached` (`-tmux-session`)
+  runs the same command in a new detached tmux session and exits: the
+  argv (session name, `-e` environment, a `sh` wrapper that waits for
+  Enter when the TUI fails) is built by `term/tmux_detach.ml`; the parent
+  validates the flags but neither saves nor spawns anything.
 
 ## Neovim client (`editors/nvim/`)
 
@@ -2164,7 +2168,11 @@ Four layers, cheapest first.
    the TUI respawns it and rejoins the session), fallback, connect_signin
    (from a spawned backend to `serve -listen -token`: refused, signed in
    through the dialog, saved, signed out, back to a local backend) and
-   startup_signin (started against a server that refuses: the dialog).
+   startup_signin (started against a server that refuses: the dialog) and
+   detached (`-detached` through a `PRIGH_TMUX` wrapper for the private
+   server, which was started without the caller's environment: the
+   printed line, the TUI and its environment in the new session, the
+   `-2` name, the pane kept open on failure, the errors before detaching).
    `tui/test/test_backend_link.ml` drives `Backend_link` against in-memory
    backends (the transports each switch opens, the `hello`s, the saved
    file, the tool host).

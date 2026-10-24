@@ -17,6 +17,66 @@ let find_backend () =
     |> Option.value ~default:"prigh"
 ;;
 
+(* The tmux subcommands' output, or exits when tmux cannot be run. *)
+let run_tmux tmux args =
+  match%bind Process.create ~prog:tmux ~args () with
+  | Ok process -> Process.collect_output_and_wait process
+  | Error e ->
+    let reason =
+      match Error.to_exn e with
+      | Core_unix.Unix_error (e, _, _) -> Core_unix.Error.message e
+      | _ -> Error.to_string_hum e
+    in
+    if String.equal tmux "tmux"
+    then
+      Core.eprintf
+        "cannot run tmux (%s): install tmux, or set PRIGH_TMUX to its path\n"
+        reason
+    else
+      Core.eprintf
+        "cannot run $PRIGH_TMUX (%s: %s): set it to a tmux executable, or \
+         unset it to use tmux from PATH\n"
+        tmux
+        reason;
+    Core.exit 1
+;;
+
+let detach ?name ~dir command =
+  let module D = Prigh_ui_term.Tmux_detach in
+  let tmux = D.tmux ~prigh_tmux:(Sys.getenv "PRIGH_TMUX") in
+  let%bind sessions =
+    let%map output =
+      run_tmux tmux [ "list-sessions"; "-F"; "#{session_name}" ]
+    in
+    (* Fails when no server runs: there are no sessions. *)
+    match output.exit_status with
+    | Ok () -> String.split_lines output.stdout
+    | Error _ -> []
+  in
+  let t =
+    D.create
+      ~tmux
+      ~exists:(List.mem sessions ~equal:String.equal)
+      ?name
+      ~environment:(Array.to_list (Core_unix.environment ()))
+      ~dir
+      ~command
+      ()
+  in
+  let%map output = run_tmux tmux t.args in
+  match output.exit_status with
+  | Ok () ->
+    print_endline
+      (D.message t ~inside_tmux:(Option.is_some (Sys.getenv "TMUX")));
+    Ok ()
+  | Error _ ->
+    Core.eprintf
+      "tmux could not start the session %s: %s\n"
+      t.session
+      (String.strip output.stderr);
+    Core.exit 1
+;;
+
 let command =
   Command.async_or_error
     ~summary:
@@ -85,6 +145,18 @@ let command =
          ~doc:"DIR working directory (same as the DIR argument)"
      and auth_file =
        flag "-auth-file" (optional string) ~doc:"PATH credential store"
+     and detached =
+       flag
+         "-detached"
+         no_arg
+         ~doc:
+           " start in a new detached tmux session (prigh-DIR; $PRIGH_TMUX or \
+            tmux) and return at once"
+     and tmux_session =
+       flag
+         "-tmux-session"
+         (optional string)
+         ~doc:"NAME the tmux session's name with -detached (default: prigh-DIR)"
      and rest = flag "--" escape ~doc:" extra backend arguments"
      and cwd_anon = anon (maybe ("DIR" %: string)) in
      fun () ->
@@ -101,6 +173,44 @@ let command =
        in
        let opt name v =
          Option.value_map v ~default:[] ~f:(fun v -> [ name; v ])
+       in
+       if Option.is_some tmux_session && not detached
+       then (
+         Core.eprintf
+           "-tmux-session names the session of -detached: pass both\n";
+         Core.exit 2);
+       let cwd =
+         Option.map cwd ~f:(fun d ->
+           match Filename_unix.realpath d with
+           | path when Sys_unix.is_directory_exn path -> path
+           | (_ : string) | (exception Core_unix.Unix_error _) ->
+             Core.eprintf "no such directory: %s\n" d;
+             Core.exit 2)
+       in
+       (* The child gets the flags as given (it resolves and saves the
+          connection itself), with paths made absolute: it starts in [cwd]. *)
+       let detached_args =
+         let absolute path =
+           if Filename.is_relative path
+           then Filename.concat (Core_unix.getcwd ()) path
+           else path
+         in
+         let path_like v = if String.mem v '/' then absolute v else v in
+         let switch name b = if b then [ name ] else [] in
+         opt "-backend" (Option.map backend ~f:path_like)
+         @ opt "-connect" connect
+         @ opt "-token" token
+         @ opt "-user" user
+         @ switch "-local" local
+         @ switch "-forget" forget
+         @ opt "-tools" tools
+         @ opt "-name" name
+         @ switch "-faux" faux
+         @ opt "-session" (Option.map session ~f:path_like)
+         @ opt "-model" model
+         @ opt "-thinking" thinking
+         @ opt "-auth-file" (Option.map auth_file ~f:absolute)
+         @ Option.value_map rest ~default:[] ~f:(fun rest -> "--" :: rest)
        in
        let backend = Option.value backend ~default:(find_backend ()) in
        let local = local || faux in
@@ -120,7 +230,8 @@ let command =
              (Error.to_string_hum e);
            Core.exit 1
        in
-       if forget then or_exit "delete" (S.forget ~home);
+       (* With -detached the child deletes and saves. *)
+       if forget && not detached then or_exit "delete" (S.forget ~home);
        (* With -local it is not used, only kept for /connect. *)
        let saved =
          if forget
@@ -146,7 +257,8 @@ let command =
          | Error e ->
            Core.eprintf "-connect: %s\n" e;
            Core.exit 2);
-       Option.iter save ~f:(fun t -> or_exit "save" (S.save ~home t));
+       if not detached
+       then Option.iter save ~f:(fun t -> or_exit "save" (S.save ~home t));
        let module Link = Prigh_ui_term.Backend_link in
        let tools =
          Option.map tools ~f:(fun tools ->
@@ -156,47 +268,47 @@ let command =
              Core.eprintf "%s\n" (Error.to_string_hum e);
              Core.exit 2)
        in
-       let cwd =
-         Option.map cwd ~f:(fun d ->
-           match Filename_unix.realpath d with
-           | path when Sys_unix.is_directory_exn path -> path
-           | (_ : string) | (exception Core_unix.Unix_error _) ->
-             Core.eprintf "no such directory: %s\n" d;
-             Core.exit 2)
-       in
-       (* The hello cwd is where our tools run; for a spawned backend the serve
-          arguments already carry it. *)
-       let hello =
-         [ ( "name"
-           , `String (Option.value name ~default:(Core_unix.gethostname ())) )
-         ; "cwd", `String (Option.value cwd ~default:(Core_unix.getcwd ()))
-         ]
-       in
-       let spawn_args =
-         [ "serve" ]
-         @ (if faux then [ "-faux" ] else [])
-         @ opt "-model" model
-         @ opt "-thinking" thinking
-         @ opt "-cwd" cwd
-         @ opt "-auth-file" auth_file
-         @ Option.value rest ~default:[]
-       in
-       Prigh_ui_term.Term_app.run
-         (Link.create
-            ~home
-            ~backend
-            ~spawn_args
-            ~tools
-            ~hello
-            ~session
-            ~target:
-              (match connect with
-               | Some address -> Remote address
-               | None -> Spawn)
-            ~token
-            ~user
-            ~saved:(Option.first_some save saved)
-            ()))
+       if detached
+       then (
+         let dir = Option.value cwd ~default:(Core_unix.getcwd ()) in
+         detach
+           ?name:tmux_session
+           ~dir
+           (Sys_unix.executable_name :: "-cwd" :: dir :: detached_args))
+       else (
+         (* The hello cwd is where our tools run; for a spawned backend the
+            serve arguments already carry it. *)
+         let hello =
+           [ ( "name"
+             , `String (Option.value name ~default:(Core_unix.gethostname ())) )
+           ; "cwd", `String (Option.value cwd ~default:(Core_unix.getcwd ()))
+           ]
+         in
+         let spawn_args =
+           [ "serve" ]
+           @ (if faux then [ "-faux" ] else [])
+           @ opt "-model" model
+           @ opt "-thinking" thinking
+           @ opt "-cwd" cwd
+           @ opt "-auth-file" auth_file
+           @ Option.value rest ~default:[]
+         in
+         Prigh_ui_term.Term_app.run
+           (Link.create
+              ~home
+              ~backend
+              ~spawn_args
+              ~tools
+              ~hello
+              ~session
+              ~target:
+                (match connect with
+                 | Some address -> Remote address
+                 | None -> Spawn)
+              ~token
+              ~user
+              ~saved:(Option.first_some save saved)
+              ())))
 ;;
 
 let () = Command_unix.run command
