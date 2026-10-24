@@ -116,7 +116,7 @@ ENV LANG=C.UTF-8 \
 # Each user's own directory is /workspace/<name>.
 WORKDIR /workspace
 VOLUME ["/home", "/workspace", "/nix"]
-EXPOSE 7777 7788
+EXPOSE 7777 7790
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s CMD ["prigh-docker", "healthcheck"]
 # -g: stop signals go to the whole process group (backend and tool hosts).
 ENTRYPOINT ["tini", "-g", "--", "prigh-docker"]
