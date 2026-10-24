@@ -331,7 +331,7 @@ let%expect_test "decisions" =
 
 (* What each mode holds back, without rules, among the main agent's built-in
    tools (MCP tools ask unless they are read-only). The frontends' mode
-   descriptions ([Session_mode.describe] in tui/ui) say this: update them
+   descriptions ([Session_mode.describe] in frontend/ui) say this: update them
    when it changes. *)
 let%expect_test "which built-in tools ask in each mode" =
   let tools =

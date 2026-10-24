@@ -22,8 +22,8 @@ OxCaml. No plugins; tools and subagents are built in.
 # backend: core, eio, cohttp-eio, jsonaf
 nix develop -c sh -c 'cd backend && dune build && dune build @runtest'
 
-# frontend: bonsai_term, bonsai_web
-nix develop -c sh -c 'cd tui && dune build @runtest'
+# frontends (the TUI and prigh-web): bonsai_term, bonsai_web
+nix develop -c sh -c 'cd frontend && dune build @runtest'
 # @runtest includes the e2e and tmux tests against the backend binary built above,
 # and the web-layer tests (they run under node, via js_of_ocaml)
 
@@ -31,7 +31,7 @@ nix build               # result/bin/prigh wrapper (includes backend + TUI)
 ```
 
 Without Nix, an OxCaml opam switch with the same packages works too
-(`backend/prigh.opam`, `tui/prigh_tui.opam`), with the compiler patch
+(`backend/prigh.opam`, `frontend/prigh_frontend.opam`), with the compiler patch
 `nix/fix-floatarithmem.patch` and the package patches in
 `nix/opam-repository` (add it as an opam repository; see `nix/README.md`).
 
@@ -50,9 +50,9 @@ nix build                            # result/bin/prigh
 ./result/bin/prigh ~/proj
 
 nix build .#backend                  # backend only: result/bin/prigh
-nix build .#tui                      # TUI only: result/bin/prigh-tui
+nix build .#frontend                 # the frontends only: result/bin/prigh-tui, result/share/prigh_frontend/web
 
-nix develop                          # the toolchain (OxCaml) for backend/ and tui/
+nix develop                          # the toolchain (OxCaml) for backend/ and frontend/
 ```
 
 `prigh -web [serve options]` (`nix run . -- -web -cwd ~/proj`) runs the
@@ -239,7 +239,7 @@ Docker image starts one per user with one).
 
 ## In a browser
 
-prigh-web (`tui/prigh-web/`) is the browser frontend, in OCaml like the TUI
+prigh-web (`frontend/web/`) is the browser frontend, in OCaml like the TUI
 but built for the browser rather than mounting the terminal UI: a real DOM
 (Bonsai_web, js_of_ocaml) with a session sidebar, a chat transcript with
 markdown, collapsible tool calls and their images, model and thinking
@@ -682,7 +682,7 @@ shown as notices saying what to fix.
 Then:
 
 ```
-tui/_build/default/bin/main.exe                # interactive TUI (PRIGH_BACKEND or the dune build)
+frontend/_build/default/tui/bin/main.exe       # interactive TUI (PRIGH_BACKEND or the dune build)
 backend/_build/default/bin/main.exe run "explain this repo"    # headless
 backend/_build/default/bin/main.exe run -session ID "go on"     # continue a saved session (id, unique prefix or file)
 backend/_build/default/bin/main.exe sessions list          # saved sessions, the archived ones last under "archived:"
@@ -1405,41 +1405,46 @@ promote` accepts new output everywhere:
 
 1. **Pure expect tests** — `cd backend && dune build @runtest` drives the
    agent loop, tools and RPC with `Faux_provider` and the providers/HTTP/OAuth
-   flows with an in-process EIO HTTP server; `cd tui && dune build @runtest`
+   flows with an in-process EIO HTTP server; `cd frontend && dune build @runtest`
    covers protocol/client decoding, the widgets, the keymap, and `App.update`
    scenarios that print the rendered screen (`Screen.to_plain`).
-2. **Driver-frame snapshots** — `tui/test/test_term_frames.ml`, run by the
-   same `cd tui && dune build @runtest`: drives the real Bonsai_term driver
-   over an in-memory tty, decodes Notty's output with `tui/test/vt.ml`, and
+2. **Driver-frame snapshots** — `frontend/tui/test/test_term_frames.ml`, run by the
+   same `cd frontend && dune build @runtest`: drives the real Bonsai_term driver
+   over an in-memory tty, decodes Notty's output with `frontend/tui/test/vt.ml`, and
    compares it with `Screen.to_plain`.
-3. **Protocol e2e** — `tui/e2e` (also `dune build @e2e`) runs the real
+3. **Protocol e2e** — `frontend/tui/e2e` (also `dune build @e2e`) runs the real
    `backend/_build/default/bin/main.exe serve -faux` through the real client
    with an isolated `HOME`/`-auth-file` and diffs a normalised transcript.
-4. **Real terminal** — the cram test `tui/tmux-test/run.t` (skipped without
+4. **Real terminal** — the cram test `frontend/tui/tmux-test/run.t` (skipped without
    `tmux`) runs each scenario of `run.t/harness.sh` with the built TUI inside
    tmux and compares the captured panes, including a backend kill and
    reconnect.
 
-prigh-web has its own: `tui/prigh-web/test` runs under node in `@runtest`,
-and the Playwright e2e (`tui/prigh-web/e2e`) drives Chromium and Firefox
+prigh-web has its own: `frontend/web/test` runs under node in `@runtest`,
+and the Playwright e2e (`frontend/web/e2e`) drives Chromium and Firefox
 against the real backend; the flake runs it as a check.
 
 ## Layout
 
-- `backend/lib` — `Agent_loop` (stream, run tools, repeat), `Agent`
-  (session, queues, abort, compaction), `Tools` (bash, read, write, edit, ls,
-  grep, find) and `Tool_subagent`, providers (`Anthropic`, `Openai_responses`,
-  `Deepseek`, picked per request by `Provider_router`), auth (`Auth_store`,
-  `Provider_auth`, `Oauth_anthropic`, `Oauth_openai_codex`, `Login_manager`),
-  `Session` JSONL log, `Rpc_server`.
+- `backend/lib` — one library in groups: `agent/` (`Agent_loop`: stream,
+  run tools, repeat; `Agent`: session, queues, abort, compaction),
+  `session/` (the `Session` JSONL log, messages), `providers/`
+  (`Anthropic`, `Openai_responses`, `Deepseek`, picked per request by
+  `Provider_router`), `auth/` (`Auth_store`, `Provider_auth`,
+  `Oauth_anthropic`, `Oauth_openai_codex`, `Login_manager`), `tools/`
+  (`Tools`: bash, read, write, edit, ls, grep, find, and `Tool_subagent`),
+  `host/` (tool hosts), `mcp/`, `rpc/` (`Rpc_server`, `Web_server`),
+  `terminal/`, `util/`.
 - `backend/test` — expect tests, driven by `Faux_provider` and an in-process
   HTTP server; no network.
-- `tui/` — the frontend: `protocol/` (wire types), `client/` (Async_kernel RPC
-  over a `Transport`; `client_unix/` has the stdio/TCP transports and the
-  tool host), `ui/` (platform-agnostic Bonsai logic: `App` state machine,
-  `Editor`, `Picker`, `Transcript`, `Render` to styled `Content`), `term/`
-  (Bonsai_term views + backend process), `prigh-web/` (the browser
-  frontend), `test/`, `e2e/`, `tmux-test/`.
+- `frontend/` — the frontends: `protocol/` (wire types), `client/`
+  (Async_kernel RPC over a `Transport`; `client/unix/` has the stdio/TCP
+  transports and the tool host), `ui/` (platform-agnostic Bonsai logic:
+  `App` state machine, `Editor`, `Picker`, `Transcript`, `Render` to styled
+  `Content`), `tui/` (the terminal frontend: `lib/` Bonsai_term views and
+  backend process, `bin/`, `test/`, `e2e/`, `tmux-test/`) and `web/`
+  (prigh-web, the browser frontend: `lib/`, `app/`, `bin/`, `test/`,
+  `e2e/`).
 - `editors/nvim/` — prigh.nvim, the Neovim ACP client (Lua; headless tests
   against a scripted fake agent: `editors/nvim/test/run.sh`).
 - `ARCHITECTURE.md` — how the pieces fit together; `DOCKER.md` — the

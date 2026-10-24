@@ -5,15 +5,16 @@ prigh is a coding agent. Read `README.md` for what it does and
 
 | Directory | What | Toolchain | Build and test |
 |---|---|---|---|
-| `backend/` | the agent, providers, RPC/web servers (`prigh`) | OxCaml 5.2, Eio | `nix develop`, then `cd backend && dune build @runtest` |
-| `tui/` | the terminal frontend (`prigh-tui`) and prigh-web | OxCaml 5.2, Bonsai | `nix develop`, then `cd tui && dune build @runtest` |
-| `tui/prigh-web/` | prigh-web, the browser frontend (part of `tui/`) | OxCaml 5.2, Bonsai_web | `cd tui && dune build @prigh-web/test/runtest ./prigh-web/bin/site`; e2e: `bash tui/prigh-web/e2e/prigh_web.sh` (backend built, `PLAYWRIGHT_MODULE`/`PLAYWRIGHT_BROWSERS_PATH` set) |
+| `backend/` | the agent, providers, RPC/web servers (`prigh`); `lib/` is grouped in subdirectories (see `backend/AGENTS.md`) | OxCaml 5.2, Eio | `nix develop`, then `cd backend && dune build @runtest` |
+| `frontend/` | the frontends' dune project: `protocol/`, `client/` (+ `client/unix/`) and `ui/` shared, `tui/` and `web/` | OxCaml 5.2, Bonsai | `nix develop`, then `cd frontend && dune build @runtest` |
+| `frontend/tui/` | the terminal frontend (`prigh-tui`): `lib/`, `bin/`, `test/`, `e2e/`, `tmux-test/` | OxCaml 5.2, Bonsai_term | `cd frontend && dune build @tui/test/runtest` (unit tests only) |
+| `frontend/web/` | prigh-web, the browser frontend: `lib/`, `app/`, `bin/`, `test/`, `e2e/` | OxCaml 5.2, Bonsai_web | `cd frontend && dune build @web/test/runtest ./web/bin/site`; e2e: `bash frontend/web/e2e/prigh_web.sh` (backend built, `PLAYWRIGHT_MODULE`/`PLAYWRIGHT_BROWSERS_PATH` set) |
 | `docker/` | the image's entrypoint (`prigh-docker`) | bash | `bash docker/test-prigh-docker.sh` (`-promote` re-records) |
 | `nix/` | pins and patches for the flake | | see `nix/README.md` |
 
 - The backend and the TUI share one OxCaml toolchain and one dev shell
   (`nix develop`; `.#backend` is an alias of it). They are separate dune
-  projects: run dune in `backend/` or `tui/`.
+  projects: run dune in `backend/` or `frontend/`.
 - Backend tests use Eio's io_uring backend where the kernel allows it;
   `EIO_BACKEND=posix` selects the poll-based one (the only one on macOS).
 - OxCaml has bugs we work around (a codegen bug, a signal race that hangs
@@ -21,18 +22,18 @@ prigh is a coding agent. Read `README.md` for what it does and
   lists them. Check it when something misbehaves only under OxCaml or on
   the posix backend, add new ones there, and recheck them when upgrading
   OxCaml.
-- `tui/`'s `@runtest` includes the e2e and tmux tests, which run
+- `frontend/`'s `@runtest` includes the TUI's e2e and tmux tests, which run
   `backend/_build/default/bin/main.exe`: build the backend first (`dune
   build`, not just `@runtest`, which does not rebuild `main.exe`). Dune does
   not see the backend binary as a dependency, so after changing only the
   backend, clear the stale results (`rm -rf
-  tui/_build/default/tmux-test/.cram.run.t`) or the tmux tests report the
+  frontend/_build/default/frontend/tui/tmux-test/.cram.run.t`) or the tmux tests report the
   old run. They need
-  a terminal multiplexer (`tmux`) and can be slow; `dune build @test/runtest`
-  runs only the unit tests. `$PRIGH_BACKEND` overrides that path: unset it
+  a terminal multiplexer (`tmux`) and can be slow; `dune build
+  @tui/test/runtest` runs only the TUI's unit tests. `$PRIGH_BACKEND` overrides that path: unset it
   (e.g. when working inside prigh, which sets it) to test your build.
-- prigh-web's browser e2e (`tui/prigh-web/e2e`) is Playwright scripts run
-  with `node`, not dune; the flake's Linux checks run it (`nix build .#checks.x86_64-linux.prigh-web-e2e`). Locally, point
+- prigh-web's browser e2e (`frontend/web/e2e`) is Playwright scripts run
+  with `node`, not dune; the flake's Linux checks run it (`nix build .#checks.x86_64-linux.web-e2e`). Locally, point
   `PLAYWRIGHT_MODULE` at the playwright package's `index.mjs` and
   `PLAYWRIGHT_BROWSERS_PATH` at its browsers (both in the Nix store), and
   look at the screenshots (`SHOTS=dir`) as well as the text diff.
@@ -41,7 +42,7 @@ prigh is a coding agent. Read `README.md` for what it does and
 - Only have one dune process running at a time, otherwise it hangs. E.g. if
   you are running tests, don't also `dune exec`.
 - Every new RPC field or method must be mirrored by the frontends that use it
-  (`tui/protocol/`, used by the TUI and prigh-web); the e2e tests guard the
+  (`frontend/protocol/`, used by the TUI and prigh-web); the e2e tests guard the
   contract.
 
 ## OCaml conventions
@@ -72,7 +73,7 @@ Use the import.ml module to import things.
 Run ocamlformat on the files you changed when you finish (`dune fmt` in the
 project, or `ocamlformat --inplace FILE`). The dev shells have upstream
 ocamlformat, which cannot parse OxCaml syntax (e.g. `local_`): format such
-files in `tui/` by hand, in the same style.
+files in `frontend/` by hand, in the same style.
 
 ## Tests
 
@@ -87,11 +88,11 @@ output of `dune build @runtest`, and if the diffs are right, `dune promote`.
 - Backend: drive the agent with `Faux_provider` and print event streams; no
   network.
 - TUI: drive `App.update` with keys and events and print the screen the user
-  sees (the `H` harness in `tui/test/test_app.ml`); `tui/e2e` and
-  `tui/tmux-test` check the real binaries.
+  sees (the `H` harness in `frontend/tui/test/test_app.ml`); `frontend/tui/e2e` and
+  `frontend/tui/tmux-test` check the real binaries.
 - prigh-web: drive `App.update` through the `Harness` in
-  `tui/prigh-web/test` and print the rendered HTML/text; the Playwright e2e
-  (`tui/prigh-web/e2e`) checks real browsers.
+  `frontend/web/test` and print the rendered HTML/text; the Playwright e2e
+  (`frontend/web/e2e`) checks real browsers.
 
 ## UI principles
 

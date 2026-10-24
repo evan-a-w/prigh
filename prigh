@@ -1,32 +1,27 @@
 #!/usr/bin/env bash
-# Builds the backend (vanilla `prigh` switch) and the Bonsai_term frontend
-# (OxCaml `prigh-ox` switch, or the current environment under `nix develop`),
-# then runs the TUI.
+# Builds the backend and the frontends (OxCaml: the `prigh-ox` opam switch,
+# or the current environment under `nix develop`), then runs the TUI.
 # Usage: ./prigh [frontend options] [-- backend options]   (see prigh-tui -help)
 #        ./prigh -web [serve options]                      (prigh-web, the browser frontend; see prigh serve -help)
 set -euo pipefail
 root="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 export PATH="$HOME/.local/bin:$PATH"
 
-if command -v opam >/dev/null; then
-	(cd "$root/backend" && eval "$(opam env --switch=prigh --set-switch)" && dune build 2>&1)
-	if [ -z "${IN_NIX_SHELL:-}" ]; then
-		eval "$(opam env --switch=prigh-ox --set-switch)"
-	fi
-else
-	(cd "$root/backend" && dune build 2>&1)
+if [ -z "${IN_NIX_SHELL:-}" ] && command -v opam >/dev/null; then
+	eval "$(opam env --switch=prigh-ox --set-switch)"
 fi
+(cd "$root/backend" && dune build 2>&1)
 
 export PRIGH_BACKEND="${PRIGH_BACKEND:-$root/backend/_build/default/bin/main.exe}"
 
-# ./prigh -web [serve options]: prigh-web (tui/prigh-web/) instead of the TUI.
+# ./prigh -web [serve options]: prigh-web (frontend/web/) instead of the TUI.
 if [ "${1:-}" = "-web" ]; then
 	shift
-	(cd "$root/tui" && dune build ./prigh-web/bin/site 2>&1 | { grep -v missing-effects-backend || true; })
-	export PRIGH_WEB_ROOT="${PRIGH_WEB_ROOT:-$root/tui/_build/default/prigh-web/bin/site}"
+	(cd "$root/frontend" && dune build ./web/bin/site 2>&1 | { grep -v missing-effects-backend || true; })
+	export PRIGH_WEB_ROOT="${PRIGH_WEB_ROOT:-$root/frontend/_build/default/web/bin/site}"
 	exec "$PRIGH_BACKEND" serve -web "${PRIGH_WEB_LISTEN:-127.0.0.1:7790}" -open "$@"
 fi
 
-(cd "$root/tui" && dune build ./bin/main.exe 2>&1)
+(cd "$root/frontend" && dune build ./tui/bin/main.exe 2>&1)
 
-exec "$root/tui/_build/default/bin/main.exe" "$@"
+exec "$root/frontend/_build/default/tui/bin/main.exe" "$@"

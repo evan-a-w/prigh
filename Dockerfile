@@ -29,17 +29,17 @@ RUN printf '%s\n' 'experimental-features = nix-command flakes' 'sandbox = false'
 # that backend dependency changes don't rebuild them.
 COPY flake.nix flake.lock /deps/
 COPY nix /deps/nix
-COPY tui/dune-project tui/prigh_tui.opam /deps/tui/
-RUN nix build --no-link path:/deps#tui.inputDerivation
+COPY frontend/dune-project frontend/prigh_frontend.opam /deps/frontend/
+RUN nix build --no-link path:/deps#frontend.inputDerivation
 COPY backend/dune-project backend/prigh.opam /deps/backend/
 RUN nix build --no-link path:/deps#backend.inputDerivation
 
 COPY . /src
 RUN nix build --out-link /out/backend path:/src#backend \
- && nix build --out-link /out/tui path:/src#tui \
+ && nix build --out-link /out/frontend path:/src#frontend \
  && mkdir -p /opt/prigh/bin /opt/prigh/share \
- && cp -L /out/backend/bin/prigh /out/tui/bin/prigh-tui /opt/prigh/bin/ \
- && cp -rL --preserve=timestamps /out/tui/share/prigh_tui/web /opt/prigh/share/web \
+ && cp -L /out/backend/bin/prigh /out/frontend/bin/prigh-tui /opt/prigh/bin/ \
+ && cp -rL --preserve=timestamps /out/frontend/share/prigh_frontend/web /opt/prigh/share/web \
  && chmod -R u+w /opt/prigh \
  && refs=$(grep -raoh '/nix/store/[a-z0-9]\{32\}-[-a-zA-Z0-9+._?=]*' /opt/prigh | sort -u) \
  && echo "runtime store paths: $refs" \
