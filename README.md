@@ -12,7 +12,7 @@ OxCaml. No plugins; tools and subagents are built in.
 ./prigh ~/proj          # ... in another directory (or -cwd ~/proj)
 ./prigh -faux           # scripted provider, no API calls
 ./prigh -detached .     # in a new detached tmux session (prigh-<dir>); returns at once
-./prigh -web            # prigh-web, the browser UI (serves it on 127.0.0.1:7788 and opens it)
+./prigh -web            # prigh-web, the browser UI (serves it on 127.0.0.1:7790 and opens it)
 ```
 
 ## Build
@@ -57,7 +57,7 @@ nix develop                          # the toolchain (OxCaml) for backend/ and f
 
 `prigh -web [serve options]` (`nix run . -- -web -cwd ~/proj`) runs the
 backend with prigh-web, the browser frontend (`prigh serve -web
-127.0.0.1:7788 -open`; `$PRIGH_WEB_LISTEN` changes the address);
+127.0.0.1:7790 -open`; `$PRIGH_WEB_LISTEN` changes the address);
 `PRIGH_WEB_ROOT` points at the built site (the Nix wrapper sets it).
 
 `prigh-tui [DIR]` starts in `DIR` (default: the current directory; `-cwd
@@ -196,7 +196,7 @@ runs on the session's active host, relayed through the backend.
 ### Several users (namespaces)
 
 ```
-prigh serve -web 0.0.0.0:7788 -tokens 'me=sekrit,alice=0ther'   # or $PRIGH_TOKENS
+prigh serve -web 0.0.0.0:7790 -tokens 'me=sekrit,alice=0ther'   # or $PRIGH_TOKENS
 ```
 
 Each `name=token` entry is a user: log in with the name as the user name
@@ -252,15 +252,15 @@ speaks prigh's own RPC protocol to it over a WebSocket at `/ws`, so it gets
 every backend feature:
 
 ```
-./prigh -web                      # local: serves http://127.0.0.1:7788/ and opens it
+./prigh -web                      # local: serves http://127.0.0.1:7790/ and opens it
 ./prigh -web -faux -cwd ~/proj    # ... any `prigh serve` options after -web
 nix run . -- -web -cwd ~/proj     # the packaged site and backend
 
-# remote: on the server (or PRIGH_WEB_LISTEN=0.0.0.0:7788 ./prigh -web -token sekrit)
-prigh serve -web 0.0.0.0:7788 -token sekrit
-# then open http://server:7788/ and type the token into the sign-in form's
+# remote: on the server (or PRIGH_WEB_LISTEN=0.0.0.0:7790 ./prigh -web -token sekrit)
+prigh serve -web 0.0.0.0:7790 -token sekrit
+# then open http://server:7790/ and type the token into the sign-in form's
 # Password field (the browser remembers it in localStorage; /signout forgets it)
-prigh-tui -connect server:7788 -token sekrit -cwd ~/proj   # terminals use the same port
+prigh-tui -connect server:7790 -token sekrit -cwd ~/proj   # terminals use the same port
 ```
 
 The `-web` port also accepts the terminal frontend's plain JSON-lines
@@ -395,7 +395,7 @@ backend goes away (see above). It connects to its own origin by default;
 `?backend=ws://host:port/ws` points a page served from one place at a
 backend elsewhere, `?session=ID` joins a session and `?name=` names the
 frontend in `/host`. Tools run on a tool host (a browser cannot host
-them). In Docker it is `PRIGH_MODE=web` (port 7788, see `DOCKER.md`).
+them). In Docker it is `PRIGH_MODE=web` (port 7790, see `DOCKER.md`).
 
 The terminal button in the top bar (or `/terminal`, or Ctrl+`) opens a
 shell where the session's tools run (the active `/host`, in its

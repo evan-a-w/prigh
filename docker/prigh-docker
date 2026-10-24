@@ -30,7 +30,7 @@ else
 	my_uid=$(id -u)
 fi
 mode="${PRIGH_MODE:-web}"
-web_port=7788
+web_port=7790
 server_port=7777
 state=/run/prigh
 extrausers="$state/extrausers"

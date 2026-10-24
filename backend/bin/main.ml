@@ -391,7 +391,7 @@ let parse_listen_addr ~flag spec =
         port
         port
     | None ->
-      sprintf "%s must be HOST:PORT such as 127.0.0.1:7788, got %S" flag spec
+      sprintf "%s must be HOST:PORT such as 127.0.0.1:7790, got %S" flag spec
   in
   let addr =
     match String.rsplit2 spec ~on:':' with
