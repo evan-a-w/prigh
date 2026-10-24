@@ -68,6 +68,19 @@ the patch's sha256), versioned `<upstream>+prigh` and pinned in
 - `mirage-crypto-pk 2.4.1+prigh`: the OxCaml `zarith 1.12+ox3` lacks the
   `*_unsigned` conversions; the values converted are below 2^56, so the
   signed ones give the same result.
+- `iomux 0.4+prigh`: a signal that arrives while
+  `caml_enter_blocking_section` releases the domain lock is, under the
+  OxCaml runtime, only handled when the blocking section ends (upstream
+  OCaml re-checks after releasing the lock and handles it before
+  blocking). eio_posix learns that a child exited from its SIGCHLD
+  handler, so when SIGCHLD landed in that window (typically during the
+  lock release's futex syscall) its scheduler slept in `ppoll` forever
+  with the child a zombie. The patch makes the stubs not block when the
+  domain has been interrupted since (`young_limit` is `UINTNAT_MAX`) and,
+  for `ppoll`, keeps signals blocked until `ppoll` atomically unblocks
+  them, so a signal can only interrupt the wait. eio_linux waits for
+  children on a pidfd and is not affected. `backend/test/test_process.ml`
+  ("eio_posix reaps every child promptly") catches a regression.
 
 After changing a patch, update its sha256 in the package's `opam` file
 (`sha256sum files/<patch>`); new files must be `git add`ed before the

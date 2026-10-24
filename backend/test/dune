@@ -17,5 +17,6 @@
   eio
   eio.unix
   eio_main
+  eio_posix
   expect_test_helpers_core
   re))
