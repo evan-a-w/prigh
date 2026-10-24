@@ -45,7 +45,7 @@ let of_arguments args =
       | None -> raise (Tool_args.Invalid "missing required argument \"plan\"")
     in
     let open Or_error.Let_syntax in
-    let%bind steps =
+    let%map steps =
       Or_error.all
         (List.mapi items ~f:(fun i item ->
            let step =
@@ -65,17 +65,9 @@ let of_arguments args =
                   s)
            | Some _, None -> Or_error.errorf "plan[%d] has no status" i))
     in
-    match List.count steps ~f:(fun s -> Status.equal s.status In_progress) with
-    | n when n > 1 ->
-      Or_error.errorf
-        "%d steps are in_progress; at most one step can be in progress at a \
-         time"
-        n
-    | _ ->
-      Ok
-        (match steps with
-         | [] -> None
-         | steps -> Some { explanation; steps }))
+    match steps with
+    | [] -> None
+    | steps -> Some { explanation; steps })
 ;;
 
 let to_json t =
@@ -126,9 +118,9 @@ let spec =
       "Updates the task plan, which the user sees. Use it for work with \
        several steps: give every step (short, a few words to a sentence) with \
        its status, and update it as you go, marking steps completed and the \
-       next one in_progress. At most one step can be in_progress at a time. \
-       Send the whole plan each time; an empty plan clears it. Skip it for \
-       simple tasks."
+       next one in_progress. Several steps can be in_progress at once when \
+       they run in parallel. Send the whole plan each time; an empty plan \
+       clears it. Skip it for simple tasks."
   ; parameters =
       Tool_args.schema
         ~required:[ "plan" ]
