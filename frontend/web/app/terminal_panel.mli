@@ -2,9 +2,9 @@ open! Core
 
 (** The terminal panel's address and extent; [Terminal_widget] draws it. *)
 
-(** The [/terminal] URL (a shell on the backend, see backend/lib/terminals.mli)
-    on the same server as the RPC WebSocket [backend], with the credentials as
-    in [hello]. *)
+(** The [/terminal] URL (a shell on the backend, see
+    backend/lib/terminal/terminals.mli) on the same server as the RPC
+    WebSocket [backend], with the credentials as in [hello]. *)
 val url
   :  backend:string
   -> user:string option

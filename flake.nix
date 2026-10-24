@@ -105,7 +105,7 @@
             depopts = false;
             dev = false;
           };
-        } ./tui query).overrideScope overlay;
+        } ./frontend query).overrideScope overlay;
 
         backendScope = (on.buildOpamProject' {
           repos = oxRepos;
@@ -117,13 +117,13 @@
 
         # The web site gets precompressed siblings (file.gz, file.br) that
         # the backend serves to browsers accepting them (Static_site).
-        prighTui = frontendScope.prigh_tui.overrideAttrs (oa: {
+        prighFrontend = frontendScope.prigh_frontend.overrideAttrs (oa: {
           nativeBuildInputs = (oa.nativeBuildInputs or [ ]) ++ [
             pkgs.zopfli
             pkgs.brotli
           ];
           postInstall = (oa.postInstall or "") + ''
-            for f in "$out"/share/prigh_tui/web/*.{js,css,html,svg,map,txt}; do
+            for f in "$out"/share/prigh_frontend/web/*.{js,css,html,svg,map,txt}; do
               [ -f "$f" ] || continue
               zopfli "$f"
               brotli --keep --best "$f"
@@ -143,7 +143,7 @@
         # `prigh` runs the TUI; `prigh -web [serve options]` runs the backend
         # with prigh-web, the browser frontend, instead (`prigh serve -web
         # 127.0.0.1:7788 -open ...`).
-        prighWebRoot = "${prighTui}/share/prigh_tui/web";
+        prighWebRoot = "${prighFrontend}/share/prigh_frontend/web";
         prigh = pkgs.writeShellApplication {
           name = "prigh";
           text = ''
@@ -154,7 +154,7 @@
               shift
               exec "$PRIGH_BACKEND" serve -web "''${PRIGH_WEB_LISTEN:-127.0.0.1:7788}" -open "$@"
             fi
-            exec ${prighTui}/bin/prigh-tui "$@"
+            exec ${prighFrontend}/bin/prigh-tui "$@"
           '';
         };
       in
@@ -163,7 +163,7 @@
 
         packages = {
           default = prigh;
-          tui = prighTui;
+          frontend = prighFrontend;
           backend = prighBackend;
         };
 
@@ -238,9 +238,9 @@
             mkdir "$out"
           '';
 
-        # tui/prigh-web/e2e: Chromium and Firefox against the built backend
+        # frontend/web/e2e: Chromium and Firefox against the built backend
         # and the installed prigh-web site.
-        checks.prigh-web-e2e =
+        checks.web-e2e =
           if pkgs.stdenv.hostPlatform.isLinux then
             pkgs.runCommand "prigh-web-e2e"
               {
@@ -269,7 +269,7 @@
                 export PRIGH_TMUX=${pkgs.tmux}/bin/tmux
                 export HOME="$PWD/home"
                 mkdir -p "$HOME"
-                cp -r ${./tui/prigh-web/e2e} e2e
+                cp -r ${./frontend/web/e2e} e2e
                 chmod -R u+w e2e
                 ${pkgs.runtimeShell} e2e/prigh_web.sh
                 mkdir "$out"
@@ -277,11 +277,11 @@
           else
             pkgs.runCommand "prigh-web-e2e-skipped" { } ''touch "$out"'';
 
-        # One OxCaml toolchain for the backend and the TUI: both projects
+        # One OxCaml toolchain for the backend and the frontends: both projects
         # build from this shell (`.#backend` is kept as an alias).
         devShells.default = pkgs.mkShell {
           inputsFrom = [
-            prighTui
+            prighFrontend
             prighBackend
           ];
           buildInputs = [
@@ -290,7 +290,7 @@
             frontendScope.expect_test_helpers_async
             # The OxCaml ocamlformat (frontendScope.ocamlformat) has an unhashed git
             # source that does not evaluate; upstream formats the backend, and
-            # whatever does not use OxCaml syntax in tui/.
+            # whatever does not use OxCaml syntax in frontend/.
             pkgs.ocamlformat
             pkgs.ripgrep
             # the backend's terminal tests and the TUI's tmux-test
@@ -300,7 +300,7 @@
           ];
           # opam-nix puts a fake `opam` of every package on PATH (~250 of
           # them); keep one. Otherwise PATH outgrows tmux's 16 KB command
-          # limit, and tui/tmux-test passes it in a tmux command.
+          # limit, and frontend/tui/tmux-test passes it in a tmux command.
           shellHook = ''
             PATH=$(printf '%s' "$PATH" | tr : '\n' | awk '!/-opam\/bin$/ || !seen++' | paste -sd : -)
           '';

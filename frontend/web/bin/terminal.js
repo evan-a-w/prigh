@@ -1,6 +1,6 @@
 // The browser end of a prigh terminal: xterm.js on a WebSocket to the
 // backend's /terminal, whose protocol is described in
-// backend/lib/terminals.mli. prigh-web mounts it through
+// backend/lib/terminal/terminals.mli. prigh-web mounts it through
 // [window.prighTerminal.mount] (see ../app/terminal_widget.ml).
 "use strict";
 
