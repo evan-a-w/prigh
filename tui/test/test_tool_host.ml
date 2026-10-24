@@ -265,7 +265,7 @@ let%expect_test
   let backend = snd (List.nth_exn pairs 1) in
   let requests = Transport.In_memory.Backend.requests backend in
   let reply =
-    Prigh_ui_term.Term_app.reconnect
+    Prigh_ui_term.Backend_link.reconnect_client
       ~tool_host:host
       client
       ~hello:[ "name", `String "laptop" ]
@@ -364,7 +364,7 @@ let%expect_test "the hello carries one host id, also when reconnecting" =
       Deferred.Or_error.return (Queue.dequeue_exn transports))
   in
   let hello =
-    Prigh_ui_term.Term_app.connection_hello
+    Prigh_ui_term.Backend_link.connection_hello
       [ "name", `String "laptop" ]
       ~host_id:(Some (Host_id.choose ~home ~warn:print_endline))
   in
@@ -372,7 +372,7 @@ let%expect_test "the hello carries one host id, also when reconnecting" =
   (* Connects (again), answers the hello and prints it. *)
   let attempt (_, backend) ~session =
     let reply =
-      Prigh_ui_term.Term_app.reconnect
+      Prigh_ui_term.Backend_link.reconnect_client
         client
         ~hello
         ~delay_ms:0
@@ -431,7 +431,7 @@ let%expect_test
      each sends the same id, the one in the file. *)
   let hellos =
     List.init 3 ~f:(fun _ ->
-      Prigh_ui_term.Term_app.connection_hello
+      Prigh_ui_term.Backend_link.connection_hello
         []
         ~host_id:(Some (Host_id.choose ~home ~warn:print_endline)))
   in
@@ -451,7 +451,7 @@ let%expect_test
   (* Without local tools there is no host id. *)
   print_s
     [%sexp
-      (Prigh_ui_term.Term_app.connection_hello [] ~host_id:None
+      (Prigh_ui_term.Backend_link.connection_hello [] ~host_id:None
        : (string * Jsonaf.t) list)];
   (* An edited file wins. *)
   Out_channel.write_all path ~data:"my-desk\n";

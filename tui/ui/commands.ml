@@ -24,6 +24,7 @@ module Argument = struct
     | Resume
     | Snippet
     | Remind
+    | Server
   [@@deriving sexp_of, equal]
 end
 
@@ -253,7 +254,17 @@ let all =
       "reconnect to the backend now instead of waiting for the next retry"
   ; c "state" "" "show session state"
   ; c "clear" "" "clear the transcript"
-  ; c "signout" "" "sign out to log in as another user (browser only)"
+  ; c
+      ~argument:Argument.Server
+      "connect"
+      "[HOST:PORT|local]"
+      "switch to the backend at HOST:PORT (saved for next time) or to a local \
+       one; none: asks, with the current address"
+  ; c "signin" "[user]" "sign in to the server, as another user or again"
+  ; c
+      "signout"
+      ""
+      "sign out of the server (forgets the saved token), then sign in again"
   ; c
       "setusr"
       "[user]"

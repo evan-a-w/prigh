@@ -15,6 +15,7 @@ type t =
   { connect : unit -> Transport.t Deferred.Or_error.t
   ; mutable transport : Transport.t option
   ; mutable connecting : unit Deferred.Or_error.t option
+  ; mutable detached : unit Ivar.t (** filled once [transport] is gone *)
   ; pending : Json.t Or_error.t Ivar.t Int.Table.t
   ; mutable next_id : int
   ; mutable received : int
@@ -57,6 +58,8 @@ let handle_line t line =
 
 let attach t (transport : Transport.t) =
   t.transport <- Some transport;
+  let detached = Ivar.create () in
+  t.detached <- detached;
   don't_wait_for
     (let%bind () =
        Pipe.iter_without_pushback transport.lines ~f:(handle_line t)
@@ -67,6 +70,7 @@ let attach t (transport : Transport.t) =
       | _ -> ());
      fail_pending t "backend closed";
      push t Closed;
+     Ivar.fill_if_empty detached ();
      return ());
   don't_wait_for
     (Pipe.iter_without_pushback transport.stderr_lines ~f:(fun line ->
@@ -97,6 +101,7 @@ let create ~connect =
   { connect
   ; transport = None
   ; connecting = None
+  ; detached = Ivar.create_full ()
   ; pending = Int.Table.create ()
   ; next_id = 1
   ; received = 0
@@ -123,6 +128,12 @@ let waiting t = Hashtbl.length t.pending
 
 let disconnect t =
   Option.iter t.transport ~f:(fun transport -> transport.close ())
+;;
+
+let disconnected t =
+  match t.transport with
+  | None -> return ()
+  | Some _ -> Ivar.read t.detached
 ;;
 
 let incoming t = t.incoming_r

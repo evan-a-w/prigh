@@ -12,6 +12,7 @@ in.
 ./prigh                 # builds backend + frontend if needed, then starts the TUI here
 ./prigh ~/proj          # ... in another directory (or -cwd ~/proj)
 ./prigh -faux           # scripted provider, no API calls
+./prigh -detached .     # in a new detached tmux session (prigh-<dir>); returns at once
 ./prigh -web            # the same UI in a browser (serves it on 127.0.0.1:7788 and opens it)
 ./prigh -prigh-web      # prigh-web, the browser-native UI (127.0.0.1:7790)
 ```
@@ -67,9 +68,28 @@ DIR` is the same). Flags: `-faux`, `-session PATH`, `-model ID`, `-thinking
 LEVEL`, `-auth-file PATH`, `-backend PATH` (same as `$PRIGH_BACKEND`),
 `-connect HOST:PORT`, `-token SECRET`, `-user NAME` (with `-tokens`),
 `-local`, `-forget`, `-tools local|remote`, `-name NAME`,
-and `-- <extra backend args>`. The Nix wrapper sets `PRIGH_BACKEND` to the
-Nix-built backend by default; set `PRIGH_BACKEND` or pass `-backend` to override
-it.
+`-detached`, `-tmux-session NAME` and `-- <extra backend args>`. The Nix
+wrapper sets `PRIGH_BACKEND` to the Nix-built backend by default; set
+`PRIGH_BACKEND` or pass `-backend` to override it.
+
+`-detached` starts the TUI (with the other flags) in a new detached tmux
+session and returns at once, printing how to attach:
+
+```
+$ prigh -detached ~/lix
+prigh is running in tmux session prigh-lix: tmux attach -t prigh-lix
+```
+
+The session is named `prigh-<directory>` (`.`, `:` and the like become
+`_`; `-2`, `-3`, ... if it is taken; `-tmux-session NAME` chooses another)
+and starts in the directory. tmux is `$PRIGH_TMUX` (the Nix wrapper sets
+it to its tmux, so the line names that binary) or `tmux` on `PATH`. The
+session gets the caller's `PATH`, `HOME`, `PRIGH_*`, locale,
+`EDITOR`/`VISUAL`, `XDG_*`, proxy, certificate and provider key
+(`*_API_KEY`) variables, even from a tmux server that is already running;
+other variables are the server's. From inside tmux the line says `tmux
+switch-client -t ...`. Quitting the TUI closes the session; if it fails,
+its error stays on screen until Enter.
 
 The first `nix build`/`nix develop` evaluation is slow (opam-nix resolves the
 pinned package set through import-from-derivation) and the first build compiles
@@ -108,6 +128,37 @@ replaces the saved connection (dropping its token and user), `-token` or
 `-user` alone update it. `$PRIGH_CONNECT`, `$PRIGH_TOKEN` and `$PRIGH_USER`
 take precedence over the saved values but are not saved. `-local` (and
 `-faux`) spawn a backend without touching the saved connection.
+
+All of that can also be done from inside the TUI, so `prigh-tui .` is
+enough once a connection is saved:
+
+- `/connect HOST:PORT` switches to another backend: the old connection, its
+  session, user and dialogs go (as when switching users), and the new
+  address becomes the saved connection once its `hello` is answered,
+  keeping the saved token and user only if it is the saved address. When
+  it cannot be reached nothing changes. `/connect local` spawns a backend,
+  like `-local` (the saved connection stays); `/connect` alone lists the
+  current and saved addresses (Tab completes them) and, on Enter, asks for
+  the address with the current one typed in. Tools follow the `-tools`
+  rule as if prigh-tui had been started that way: on this machine for a
+  remote backend, on a spawned one, unless `-tools` was given.
+- `/signin [USER]` opens a sign-in dialog for the server: a user field
+  (prefilled with the current or saved user; leave it empty for a server
+  with one `-token`) and a masked token/password field (Tab, Up and Down
+  move between them, Ctrl+U empties one). Enter reconnects with them and
+  saves them once the server accepts them; a refusal keeps the dialog open
+  with the server's error. Esc closes it and changes nothing.
+- `/signout` forgets the saved token (the address and user stay, to
+  prefill the dialog), drops the connection and opens the sign-in dialog.
+  On a backend prigh-tui spawned there is nothing to sign in to or out of.
+
+A server that refuses the credentials (saved, from the flags or none) at
+startup, or after a reconnect, no longer stops the TUI: it shows the
+sign-in dialog. Escaped, the TUI stays disconnected and the status line
+says `not signed in to HOST:PORT · /signin signs in · /connect switches
+server`; while connected to a remote backend it shows `server:HOST:PORT`
+next to `user:`. `/login` and `/logout` are unrelated: they manage model
+provider credentials.
 
 By default a connected frontend runs the session's tools (bash, file
 edits, ...) on *its own* machine, in the `-cwd` it was started with, by
@@ -160,8 +211,8 @@ The TUI and tool hosts take `-user NAME -token TOKEN` (`$PRIGH_USER`,
 a user name, but a user name that doesn't match the token is refused like a
 wrong password. Both UIs show the logged-in user as `user:<name>` in the
 status line. Outside this mode the user name is ignored (leave it empty) and
-`/signout` only forgets the saved token; in the terminal TUI `/signout`
-just explains that it is browser-only (restart with other credentials).
+`/signout` only forgets the saved token. In the terminal TUI, `/signin` and
+`/signout` (above) sign in as someone else without restarting.
 
 Each user has its own namespace: its own provider logins, sessions,
 config (`default_model`, scoped models, ...), global `AGENTS.md`, connected
@@ -1151,6 +1202,9 @@ it.
 | `/skills`, `/skill:NAME [args]` | pick a skill (Enter puts `/skill:NAME ` in the editor for its arguments) / run one |
 | `/mcp [reconnect]` | MCP servers and their state: Enter approves a project's server or lists a ready one's tools; `reconnect` restarts failed ones |
 | `/retry-backend-connection` | reconnect to the backend now |
+| `/connect [HOST:PORT\|local]` | (TUI) switch to another backend, saved for next time, or to a spawned one; alone: pick or type the address |
+| `/signin [user]` | (TUI) sign in to the server: a dialog for the user and the token or password |
+| `/signout` | forget the saved login and sign in again (TUI: the token; the browsers: their login form) |
 | `/state` | show session state |
 | `/copy` | (prigh-web) copy the last reply to the clipboard |
 

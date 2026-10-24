@@ -373,7 +373,7 @@ let%expect_test "fuzzy ranking: command names" =
     {|
     "mo" -> mode model scoped-models import permissions
     "lo" -> login logout clone
-    "s"  -> state switch skills skill: setusr session snippet signout sessions scoped-models jobs host todos resume agents hotkeys verbosity permissions
+    "s"  -> state switch skills skill: signin setusr session snippet signout sessions scoped-models jobs host todos resume agents hotkeys verbosity permissions
     "sw" -> switch
     "xyz" ->
     |}]
@@ -622,7 +622,7 @@ let%expect_test "keymap: every binding resolves to its intent and is documented"
     Alt+S                   send exactly what is typed, ignoring the completion popup
     Ctrl+J / Alt+J          insert a newline
     Esc                     close the dialog, or abort the running turn
-    Tab                     complete a slash command, @path or #snippet / open the command picker
+    Tab                     complete a slash command, @path or #snippet / open the command picker / the next field of the sign-in dialog
     Up                      move up (editor line, history, or list row)
     Down                    move down (editor line, history, or list row)
     Alt+Up                  pop the last queued steer/follow-up back into the editor
@@ -719,7 +719,9 @@ let%expect_test "keymap: every binding resolves to its intent and is documented"
     /retry-backend-connection          reconnect to the backend now instead of waiting for the next retry
     /state                             show session state
     /clear                             clear the transcript
-    /signout                           sign out to log in as another user (browser only)
+    /connect [HOST:PORT|local]         switch to the backend at HOST:PORT (saved for next time) or to a local one; none: asks, with the current address
+    /signin [user]                     sign in to the server, as another user or again
+    /signout                           sign out of the server (forgets the saved token), then sign in again
     /setusr [user]                     act as another user (superusers only); without a user, list them
     /quit                              exit
     !command   run a shell command; its output joins the context
@@ -2174,6 +2176,7 @@ let%expect_test
       ~reminders:[]
       ~logged_in:(fun _ -> true)
       ~default_dir_host:None
+      ~server:None
   in
   let show name ac =
     printf
@@ -2251,6 +2254,7 @@ let%expect_test "autocomplete: /skill: completes skill names" =
       ~reminders:[]
       ~logged_in:(fun _ -> true)
       ~default_dir_host:None
+      ~server:None
   in
   let show line ?skills () =
     match compute ?skills line with
@@ -2400,6 +2404,7 @@ let%expect_test
         ~reminders:[]
         ~logged_in:(fun _ -> true)
         ~default_dir_host
+        ~server:None
     with
     | None -> printf "%S none\n" line
     | Some ac ->

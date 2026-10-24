@@ -22,6 +22,7 @@ module Platform = struct
         -> session:string option
         -> as_user:string option
         -> (P.Json.t, string) Result.t Bonsai.Effect.t
+    ; relink : Server_link.Change.t -> Server_link.Outcome.t Bonsai.Effect.t
     }
 end
 
@@ -51,6 +52,9 @@ let perform ctx (platform : Platform.t) (command : App.Command.t) =
         platform.reconnect ~delay_ms ~session ~as_user
       in
       inject (App.Action.Reply (App.Reply_tag.Reconnect generation, result))
+    | Relink { generation; change } ->
+      let%bind.Bonsai.Effect outcome = platform.relink change in
+      inject (App.Action.Relinked { generation; outcome })
     | Sign_out ->
       let%bind.Bonsai.Effect result = platform.sign_out in
       inject

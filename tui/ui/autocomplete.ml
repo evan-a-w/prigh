@@ -33,6 +33,10 @@ let set_items t items = { t with items; selected = 0 }
 let accepts_on_enter t =
   match t.source with
   | Source.Command -> true
+  | Argument { argument = Some Commands.Argument.Server; _ } ->
+    (* A partly typed address is one too ([10.0.0.5:7] is not
+       [10.0.0.5:7777]): Tab completes it. *)
+    t.navigated
   | Argument _ | Path | Directory _ | Skill | Snippet ->
     t.navigated || not (String.is_empty t.prefix)
 ;;
@@ -216,7 +220,26 @@ let snippet_items (snippets : P.Snippet.t list) =
     ]
 ;;
 
-let argument_items ~kind ~models ~auth ~sessions ~snippets ~logged_in =
+let server_items (server : Server_link.t option) =
+  let address detail = function
+    | Some address -> [ Picker.Item.create ~id:address ~detail address ]
+    | None -> []
+  in
+  match server with
+  | None -> []
+  | Some server ->
+    address "the current server" server.address
+    @ (if Option.equal String.equal server.saved server.address
+       then []
+       else address "the saved server" server.saved)
+    @ [ Picker.Item.create
+          ~id:"local"
+          ~detail:"a backend started here, like prigh-tui -local"
+          "local"
+      ]
+;;
+
+let argument_items ~kind ~models ~auth ~sessions ~snippets ~logged_in ~server =
   match (kind : Commands.Argument.t) with
   | Model | Models -> Some (model_items ~logged_in models)
   | Thinking -> Some (thinking_items ())
@@ -238,6 +261,7 @@ let argument_items ~kind ~models ~auth ~sessions ~snippets ~logged_in =
   | Mcp -> Some (mcp_items ())
   | Snippet -> Some (snippet_items snippets)
   | Remind -> None
+  | Server -> Some (server_items server)
   | Budget ->
     Some
       [ Picker.Item.create
@@ -335,6 +359,7 @@ let compute_argument
       ~current_session
       ~logged_in
       ~default_dir_host
+      ~server
   =
   match String.chop_prefix line ~prefix:"/" with
   | None -> None
@@ -438,7 +463,8 @@ let compute_argument
                        ~auth
                        ~sessions
                        ~snippets
-                       ~logged_in)
+                       ~logged_in
+                       ~server)
                     ~default:[]
                 in
                 let items =
@@ -555,6 +581,7 @@ let compute
       ~reminders
       ~logged_in
       ~default_dir_host
+      ~server
   =
   match
     Option.first_some
@@ -576,6 +603,7 @@ let compute
          ~current_session
          ~logged_in
          ~default_dir_host
+         ~server
      with
      | Some _ as t -> t
      | None ->
