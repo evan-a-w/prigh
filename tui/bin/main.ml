@@ -160,9 +160,11 @@ let command =
        in
        let cwd =
          Option.map cwd ~f:(fun d ->
-           if Filename.is_absolute d
-           then d
-           else Filename.concat (Core_unix.getcwd ()) d)
+           match Filename_unix.realpath d with
+           | path when Sys_unix.is_directory_exn path -> path
+           | (_ : string) | (exception Core_unix.Unix_error _) ->
+             Core.eprintf "no such directory: %s\n" d;
+             Core.exit 2)
        in
        (* The hello cwd is where our tools run; for a spawned backend the serve
           arguments already carry it. *)
