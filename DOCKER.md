@@ -52,7 +52,7 @@ serves all of them, and they share sessions:
 
 | Entry | Container port | Host port variable | What |
 |---|---|---|---|
-| `web` (default) | 7788 | `PRIGH_WEB_PORT` | prigh-web, the browser UI (`tui/prigh-web/`); also accepts terminal frontends and tool hosts (`prigh-tui -connect`, `prigh tool-host -connect`) |
+| `web` (default) | 7788 | `PRIGH_WEB_PORT` | prigh-web, the browser UI (`frontend/web/`); also accepts terminal frontends and tool hosts (`prigh-tui -connect`, `prigh tool-host -connect`) |
 | `server` | 7777 | `PRIGH_SERVER_PORT` | plain TCP for terminal frontends and tool hosts only |
 | `tui` | – | – | an interactive TUI as the container's main process (must be the only entry; single-user, see below) |
 
@@ -447,7 +447,7 @@ dependencies get new hashes. Rebuild and push them from a machine that has
 Nix (and enough RAM):
 
 ```
-nix build --no-link --print-out-paths path:.#tui.inputDerivation path:.#backend.inputDerivation \
+nix build --no-link --print-out-paths path:.#frontend.inputDerivation path:.#backend.inputDerivation \
   | nix run nixpkgs#cachix -- push prigh
 ```
 
@@ -456,7 +456,7 @@ build slower but does not break it.
 
 ## How the image is built
 
-1. A `nixos/nix` stage builds `.#backend` and `.#tui` from the flake. It
+1. A `nixos/nix` stage builds `.#backend` and `.#frontend` from the flake. It
    first builds only their dependencies, from a copy of the files that
    determine them, so that layer stays cached. It then keeps just the two
    binaries, prigh-web's site and, as the Nix seed, the few store paths the
