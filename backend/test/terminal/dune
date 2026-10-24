@@ -5,5 +5,7 @@
  (enabled_if %{bin-available:tmux})
  (preprocess
   (pps ppx_jane))
- (inline_tests)
+ (inline_tests
+  (flags
+   (-source-tree-root .)))
  (libraries core core_unix prigh prigh_test eio eio.unix eio_main))

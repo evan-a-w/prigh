@@ -3,7 +3,9 @@
  (public_name prigh)
  (preprocess
   (pps ppx_jane ppx_jsonaf_conv))
- (inline_tests)
+ (inline_tests
+  (flags
+   (-source-tree-root .)))
  (libraries
   core
   core_unix

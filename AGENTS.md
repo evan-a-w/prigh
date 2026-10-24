@@ -5,7 +5,7 @@ prigh is a coding agent. Read `README.md` for what it does and
 
 | Directory | What | Toolchain | Build and test |
 |---|---|---|---|
-| `backend/` | the agent, providers, RPC/web servers (`prigh`) | OCaml 5.3, Eio | `nix develop .#backend`, then `cd backend && dune build @runtest` |
+| `backend/` | the agent, providers, RPC/web servers (`prigh`) | OxCaml 5.2, Eio | `nix develop`, then `cd backend && dune build @runtest` |
 | `tui/` | terminal and Bonsai web frontends (`prigh-tui`) | OxCaml 5.2, Bonsai | `nix develop`, then `cd tui && dune build @runtest` |
 | `tui/prigh-web/` | prigh-web, the DOM browser frontend (part of `tui/`) | OxCaml 5.2, Bonsai_web | `cd tui && dune build @prigh-web/test/runtest ./prigh-web/bin/site`; e2e: `bash tui/prigh-web/e2e/prigh_web.sh` (backend built, `PLAYWRIGHT_MODULE`/`PLAYWRIGHT_BROWSERS_PATH` set) |
 | `pi-web/` | **deprecated**: pi's web UI (Preact/TypeScript) on the backend | node 22 | `npm ci && npm run check && npm test && npm run build` |
@@ -17,8 +17,16 @@ prigh is a coding agent. Read `README.md` for what it does and
   goes into `tui/prigh-web/`. Only keep it compiling when backend changes
   touch `Pi_rpc` (its unit tests: `npm run check && npm test`); remove it
   rather than invest in it.
-- The backend and the TUI need different compilers: build each in its own
-  dev shell (the default shell's OxCaml `dune` cannot build the backend).
+- The backend and the TUI share one OxCaml toolchain and one dev shell
+  (`nix develop`; `.#backend` is an alias of it). They are separate dune
+  projects: run dune in `backend/` or `tui/`.
+- Backend tests use Eio's io_uring backend where the kernel allows it;
+  `EIO_BACKEND=posix` selects the poll-based one (the only one on macOS).
+- OxCaml has bugs we work around (a codegen bug, a signal race that hangs
+  eio_posix, packaging gaps): "Known OxCaml issues" in `nix/README.md`
+  lists them. Check it when something misbehaves only under OxCaml or on
+  the posix backend, add new ones there, and recheck them when upgrading
+  OxCaml.
 - `tui/`'s `@runtest` includes the e2e and tmux tests, which run
   `backend/_build/default/bin/main.exe`: build the backend first (`dune
   build`, not just `@runtest`, which does not rebuild `main.exe`). Dune does
