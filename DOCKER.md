@@ -6,8 +6,8 @@ frontends, or an interactive TUI. They are chosen with environment
 variables.
 
 Each user (namespace) is its own Linux user in the container. Its agent's
-tools (bash, edits, the `>_` shell) run as that user, in
-`/workspace/<name>`, with its own home `/home/<name>`. The backend runs as
+tools (bash, edits, the `>_` shell) run as that user, in its home
+`/home/<name>`, which only it can access. The backend runs as
 the separate `prigh` service user, and nothing but `nix-daemon` runs as root
 after startup. Agents install the tools they need with Nix, into a store
 shared by all users. See [Users](#users), [Installing tools](#installing-tools)
@@ -80,7 +80,7 @@ There are two ways to get a TUI:
   container until it is restarted. `PRIGH_TUI_ARGS` holds TUI flags
   (e.g. `-model ...`). This mode is **single-user**: there are no
   per-namespace users, and the TUI, its backend and its tools all run as
-  `prigh` in `PRIGH_CWD` (default `/workspace/prigh`), with the logins of
+  `prigh` in `PRIGH_CWD` (default `/home/prigh`), with the logins of
   the `default` namespace.
 
 From another machine, connect to the web or server port:
@@ -105,10 +105,10 @@ name in the container. At startup, the entrypoint (as root):
   must not be a user or group of the image (`root`, `prigh`, `nobody`, …).
   A user keeps its uid across restarts and reorderings: it is the owner of
   `/home/<name>` (uids start at 10000);
-- creates `/home/<name>` (mode 700) and `/workspace/<name>` (mode 2770, the
-  user's group) for each user;
+- creates `/home/<name>` (mode 700) for each user: its home and its
+  agent's working directory (clone projects there);
 - starts one tool host per user, running as that user in
-  `/workspace/<name>`, and restarts it if it exits (with a fixed
+  `/home/<name>`, and restarts it if it exits (with a fixed
   `-host-id container-<name>`, so its sessions resume on it after a
   restart, and it is not confused with a TUI run as that user in the
   container, which would use `/home/<name>/.prigh/host-id`). The backend
@@ -120,15 +120,13 @@ name in the container. At startup, the entrypoint (as root):
   is away, also across the backend's restarts) until `/host` moves it;
 - runs the backend as `prigh`.
 
-`prigh-docker users` lists the users, their uids and directories.
+`prigh-docker users` lists the users, their uids and homes.
 
 **Superusers.** `PRIGH_SUPERUSERS=alice` makes alice a superuser. `/setusr
 NAME` in any of the UIs switches her connection to user NAME (its sessions,
 logins and tool host, so its tools run as NAME), `/setusr` lists the users
 and `/setusr alice` switches back; other users get an error.
-Superusers are also in every user's group, so from their own shell they can
-read the other users' `/workspace/<name>` (and write where files are
-group-writable), but not their homes.
+From their own shell, superusers have no access to other users' homes.
 The container tool hosts sign in with separate per-user tokens that never
 have superuser rights, so a superuser's agent cannot use `/setusr`.
 
@@ -164,10 +162,9 @@ user, `default`.
 | `PRIGH_ALLOW_NO_TOKEN` | – | set to `1` to start without a token (only behind something else that authenticates) |
 | `PRIGH_BIND` | `0.0.0.0` | host address the ports are published on (`127.0.0.1` keeps them local, e.g. behind a reverse proxy) |
 | `PRIGH_WEB_PORT`, `PRIGH_SERVER_PORT` | 7790, 7777 | host ports |
-| `PRIGH_WORKSPACE` | volume `prigh-workspace` | host path to bind at `/workspace` instead of the named volume. It must be world-searchable (`o+x`) so that users reach their `/workspace/<name>` |
 | `PRIGH_ARGS` | – | extra backend arguments, e.g. `-model anthropic/claude-sonnet-4-5 -thinking high`, or `-faux` for a scripted provider with no API calls |
 | `PRIGH_TUI_ARGS` | – | extra `prigh-tui` arguments for `PRIGH_MODE=tui` |
-| `PRIGH_CWD` | `/workspace/prigh` | working directory for `PRIGH_MODE=tui` only |
+| `PRIGH_CWD` | `/home/prigh` | working directory for `PRIGH_MODE=tui` only |
 | `GH_TOKEN` | – | GitHub token for `git` over HTTPS, for users without one in `PRIGH_GH_TOKENS` (shared by all of them; see [Git and SSH](#git-and-ssh)) |
 | `PRIGH_GH_TOKENS` | – | per-user GitHub tokens, `name=token,...` |
 | `PRIGH_GIT_NAME`, `PRIGH_GIT_EMAIL` | – | commit author written to a user's `~/.gitconfig` at start if it has none yet |
@@ -301,7 +298,6 @@ What a user's agent (and `>_` shell) can and cannot see:
 | | own user | other users |
 |---|---|---|
 | `/home/<name>` (mode 700) | read/write | no access |
-| `/workspace/<name>` (mode 2770) | read/write | no access, except superusers (group members) |
 | `/home/prigh` (mode 700: sessions, provider logins, tokens) | no access | no access |
 | `/tmp` (shared tmpfs, mode 1777) | its own files | files others make world-readable |
 | `/nix/store` (written only by `nix-daemon`) | read | read: everything in the store is world-readable, so nothing secret belongs there |
@@ -309,12 +305,12 @@ What a user's agent (and `>_` shell) can and cannot see:
 
 - Agents see only the container filesystem. `read_only: true` makes
   everything outside the two volumes, `/tmp` and `/run` (tmpfs)
-  unwritable. There are no bind mounts of the host unless you set
-  `PRIGH_WORKSPACE`, and the Docker socket is not mounted.
+  unwritable. There are no bind mounts of the host, and the Docker socket
+  is not mounted.
 - The container starts as root, with all capabilities dropped except those
   the entrypoint needs to set up the users: `CHOWN` (give users their
   directories), `DAC_OVERRIDE` (create and move directories it doesn't own,
-  e.g. a bound `/workspace` or the old home layout), `FOWNER` (set the mode
+  e.g. the old home layout), `FOWNER` (set the mode
   of the users' directories), `SETUID`/`SETGID` (switch to the users with
   `setpriv`) and `KILL` (`tini` forwards stop signals to processes of other
   users). Only the entrypoint, its tool host restart loops and `nix-daemon`
@@ -329,7 +325,7 @@ What a user's agent (and `>_` shell) can and cannot see:
   Without `CAP_SYS_ADMIN` there is no build sandbox (`sandbox = false`, no
   seccomp filter): a local build runs as a `nixbld` user with network
   access and sees what that user can, e.g. world-readable files in `/tmp`,
-  but not the users' homes or workspaces. A user could thus make a build
+  but not the users' homes. A user could thus make a build
   of their own impure, and another user who later uses that same store path
   gets the impure result. Substituted paths are unaffected (they are
   checked against `cache.nixos.org`'s signature), and so are paths already
@@ -357,8 +353,7 @@ What a user's agent (and `>_` shell) can and cannot see:
 | Path | Volume | Contents |
 |---|---|---|
 | `/home/prigh` | `prigh-home` | the backend's data: sessions (`.prigh/sessions`, per user `.prigh/namespaces/<name>/`), provider logins, config, prompt history |
-| `/home/<name>` | `prigh-home` | user `<name>`'s home: `~/.ssh`, `~/.gitconfig`, shell history |
-| `/workspace/<name>` | `prigh-workspace` or `PRIGH_WORKSPACE` | user `<name>`'s default working directory. Clone projects here (`/cd` switches between them) |
+| `/home/<name>` | `prigh-home` | user `<name>`'s home and working directory: its projects (clone them here; `/cd` switches between them), `~/.ssh`, `~/.gitconfig`, shell history |
 | `/nix` | `prigh-nix` | the Nix store: what users installed (see [Installing tools](#installing-tools)), and prigh's own runtime, copied in from the image at start |
 | `/run/prigh` | tmpfs | the users (`extrausers/passwd`, `group`, `shadow`), rebuilt at each start |
 
@@ -374,8 +369,9 @@ unpacks it into a directory of its name). The upload button, or files
 dropped on the browser, put files into the directory shown; files dropped
 on the message box go to `.prigh/uploads/` in the session's directory and
 are attached to the message. From the Docker host, `docker compose cp
-prigh:/workspace/<name>/proj ./proj` (the service is `prigh`) copies whole
-trees. `prigh-nix` alone can be removed at any time with the stack
+prigh:/home/<name>/proj ./proj` (the service is `prigh`) copies whole
+trees; files copied in are owned by root, so `chown -R <name>:` them
+(`docker compose exec prigh chown -R alice: /home/alice/proj`). `prigh-nix` alone can be removed at any time with the stack
 down: the next start seeds a fresh store, and users reinstall their
 packages.
 
@@ -390,17 +386,36 @@ first start of the new image:
   entrypoint moves everything into `/home/prigh` (and logs it), so logins
   and sessions are kept. With a single `PRIGH_TOKEN`, they are the `default`
   user's.
-- A `/workspace/<name>` whose name is a user is chowned to that user (once,
-  logged). Other directories in `/workspace` stay owned by `prigh`, and no
-  user can reach them. Move each into a user's workspace:
-
-  ```
-  docker compose exec prigh sh -c 'mv /workspace/proj /workspace/NAME/ && chown -R NAME: /workspace/NAME/proj'
-  ```
+- Projects in `/workspace` must be moved into a user's home: see
+  [Migrating from /workspace](#migrating-from-workspace).
 - The SSH key and git config of the old home stay in `/home/prigh`, where
   no agent can use them. Create a key per user with `prigh-docker ssh-key
   NAME` (or copy the old one into `/home/NAME/.ssh` and chown it).
 - Remove any `user:` override: the container must start as root.
+
+## Migrating from /workspace
+
+Older images had a second volume, `prigh-workspace` (or a host path in
+`PRIGH_WORKSPACE`), at `/workspace`, with each user's projects in
+`/workspace/<name>`. Users now work in their homes, and nothing is mounted at
+`/workspace`. If a `/workspace/<name>` is still there (a leftover mount),
+the entrypoint logs, for each, the command that moves it. Otherwise copy the
+old volume into the homes once, with the stack down and after the new image
+has started once (so that `/home/<name>` exists with the user's uid):
+
+```
+docker compose down
+docker run --rm -v <project>_prigh-home:/home -v <project>_prigh-workspace:/workspace debian:bookworm-slim \
+  sh -c 'for d in /workspace/*/; do n=$(basename "$d"); [ -d "/home/$n" ] || { echo "skipping $d: no /home/$n"; continue; }; cp -a "$d." "/home/$n/" && chown -R "$(stat -c %u:%g "/home/$n")" "/home/$n"; done'
+docker compose up -d
+```
+
+(`-v /host/path:/workspace` for a `PRIGH_WORKSPACE` bind mount; `docker
+volume ls` shows the volume names.) Directories that are not named after a
+user are skipped: copy them into a home by hand the same way. When everything
+is in place, `docker volume rm <project>_prigh-workspace`. Sessions keep the
+directory they were in, so `/cd` those that were in `/workspace/<name>/...`
+to the new place.
 
 ## Other commands
 
@@ -408,7 +423,7 @@ first start of the new image:
 prefix them with `prigh-docker`, which runs them without root:
 
 ```
-docker compose exec prigh prigh-docker users                 # name, uid, home, workspace, superuser
+docker compose exec prigh prigh-docker users                 # name, uid, home, superuser
 docker compose exec -it prigh prigh-docker as alice bash     # a shell as alice, in alice's clean environment
 docker compose exec prigh prigh-docker prigh sessions list   # any other command runs as prigh
 docker compose exec prigh prigh-docker as alice nix profile list
@@ -416,7 +431,7 @@ docker compose run --rm prigh bash                           # likewise, in a ne
 ```
 
 Plain `docker compose exec prigh CMD` (e.g. a root shell) is for
-administration, like the `mv`/`chown` above.
+administration, like the `cp`/`chown` above.
 
 ## Logs
 
