@@ -1,16 +1,16 @@
 # prigh architecture
 
 prigh is an agentic coding harness split into an OCaml backend (`backend/`,
-all the logic) and an OCaml frontend (`tui/`, Bonsai: rendering, input and
-UI state only) that runs in a terminal or a browser; both build with
-OxCaml. There is no
+all the logic) and OCaml frontends (`tui/`, Bonsai: rendering, input and
+UI state only): the TUI in a terminal and prigh-web in a browser; all build
+with OxCaml. There is no
 plugin system: tools, subagents, providers and slash commands are compiled in;
 what comes from outside is skills (instructions in `SKILL.md` files) and the
 tools of MCP servers.
 
 ```
  terminal ── frontend (prigh-tui, Bonsai_term) ── JSON lines on stdio or TCP ── backend `prigh serve` (OCaml, Eio)
- browser ─── frontend (main.bc.js, Bonsai_web) ── JSON lines on a WebSocket ──┘  (`-web`: Web_server serves the page and /ws)
+ browser ─── prigh-web (main.bc.js, Bonsai_web) ── JSON lines on a WebSocket ┘  (`-web`: Web_server serves the page and /ws)
                 │                                                      │
                 └─ `prigh tool-host` (local tools)                     ├─ Rpc_server: clients ↔ sessions, tool hosts
                                                                        ├─ Agent (one per session) ── Agent_loop ── Provider_router ── Anthropic / Openai_responses / Deepseek ── HTTPS (SSE)
@@ -1004,7 +1004,7 @@ two can share one.
   end (the time frontends keep). A server tool block is `{type:
   "server_tool", id, name, input (JSON text), output?, is_error}` (no
   `raw`), streamed as the deltas `server_tool_use {id, name, input}` and
-  `server_tool_result {id, output, is_error}`; pi-web gets it as text.
+  `server_tool_result {id, output, is_error}`.
 - `Rpc_server` — the connection and session manager: a table of live
   agents by session id, a table of clients, and per-connection
   `serve_lines` (`serve_connection` over newline-delimited flows, or one
@@ -1184,7 +1184,7 @@ two can share one.
   upgraded and handed to `Rpc_server.serve_lines`, `GET /terminal` upgraded
   and handed to `Terminals` (below), `/files/download` and `/files/upload`
   to `File_http` (authorised by their tickets),
-  anything else served from the web root (the built `tui/web-bin/site`,
+  anything else served from the web root (the built `tui/prigh-web/bin/site`,
   found via `-web-root`, `$PRIGH_WEB_ROOT` or next to the executable)
   by `Static_site`: no `..`, no dot files; `Cache-Control: no-cache` with
   an `ETag` (content hash, cached per file version) and `Last-Modified` (not for Nix's mtime 1), so reloads revalidate to
@@ -1199,7 +1199,7 @@ two can share one.
   global `AGENTS.md`) under `~/.prigh/namespaces/<name>` and no provider keys
   from the environment. Every listener goes through the router, which reads
   a connection's first line (a `hello` with a known token) and hands the
-  connection to that namespace's server; `/terminal` and pi-web look the
+  connection to that namespace's server; `/terminal` looks the
   server up by the query `token` (and `user`). Without `-tokens` it wraps
   one server. Logins are user name + password: `hello`'s optional `user`
   must then be the token's namespace name (`Rpc_server.credentials_ok`,
@@ -1216,9 +1216,8 @@ two can share one.
   `list_users` and `set_user` answer from the client's credentials; an
   allowed `set_user` ends `Rpc_server.serve_lines` and the router serves
   the rest of the connection from the new namespace's server, answering
-  `set_user` with a `hello` of the first one's client details. pi-web
-  instead reconnects with `as_user` (Pi_rpc's `/setusr` sends
-  `prigh_set_user`), as do `/terminal` URLs. Without the backend host,
+  `set_user` with a `hello` of the first one's client details.
+  `/terminal` URLs carry `as_user` in their query instead. Without the backend host,
   `Rpc_server.session_file` keeps session paths inside the sessions
   directory and `Agent.export` writes through the tool host.
 - `Terminal_channel` / `Terminal_relay` — terminals run on the session's
@@ -1250,50 +1249,12 @@ two can share one.
   client as its only client, so when the backend dies (even by SIGKILL) the
   client sees EOF, exits, and tmux destroys the shell.
 
-- `Pi_protocol` / `Pi_rpc` — pi's RPC protocol (what pi's web UI in
-  `pi-web/` speaks) on top of `Rpc_server`: one WebSocket connection is one
-  prigh client (`connect`/`handle`/`disconnect`); pi commands become prigh
-  requests (`prompt` with `streamingBehavior` → `steer`/`follow_up`, its
-  `images` passed on, which come back as pi `image` blocks in user and tool
-  result content,
-  `set_model {provider, modelId}` → `provider/id`, pi's seven thinking
-  levels ↔ prigh's five, `fork {entryId}` → fork at the entry's parent,
-  `bash` → `shell`) and prigh events become pi's (`message_update` carrying
-  the accumulated message with synthetic index timestamps, which pi keys
-  messages by; `tool_execution_*` with accumulated output; `tool_confirm`
-  and login prompts as `extension_ui_request` dialogs (text prompts as
-  `input` with the default as `prefill`) answered through
-  `tool_confirm_respond`/`auth_respond`; notices as toasts; subagents as the
-  agents-rail widget snapshot, re-read from `list_subagents` on every
-  subagent lifecycle event; `session_reloaded`/`session_info_changed`/
-  `thinking_level_changed`/`agent_settled` derived by diffing `state`
-  events, suppressed while running a command the frontend re-syncs after).
-  The prigh-only slash commands (`/login`, `/logout`, `/auth`, `/sessions`,
-  `/switch`, `/host`, `/change_default`, `/help`) arrive as prompts and run in the adapter;
-  `list_sessions`/`switch_session` are pi-protocol additions for the
-  sidebar. `get_state` also re-sends the session's non-empty live state
-  (status entries, queue, pending confirmations, agents rail) since the
-  frontend clears it when it re-syncs after connecting or switching; a
-  session change cancels the old session's confirmation dialogs.
-  `watch_subagent {agentId | toolCallId}` answers with a subagent's
-  transcript (`get_subagent`) and forwards its own message and tool events
-  as `prigh_subagent_event`s until unwatched or the session changes (the
-  pi-web subagent view). `serve -pi-web HOST:PORT` is a second `Web_server` listener whose
-  `/ws?token=&user=&session=&name=` goes to `Pi_rpc.serve_websocket` (the query
-  string becomes the `hello`; a refused hello is reported as
-  `prigh_hello_failed` and the socket closed) and whose `/terminal` is the
-  same `Terminals` as the `-web` listener's. `serve -prigh-web HOST:PORT`
-  is a third, serving prigh-web's site with the same `/ws` (prigh's RPC) and
-  `/terminal` as `-web`.
-
 ### CLI (`backend/bin/main.ml`)
 
 `serve` (RPC on stdio; `-listen HOST:PORT` accepts TCP clients instead,
-`-web HOST:PORT` serves the browser frontend, WebSocket clients and TCP
+`-web HOST:PORT` serves prigh-web, WebSocket clients and TCP
 `-connect` clients on one port (`-open` launches a browser, `-web-root DIR`
-overrides the assets), `-prigh-web HOST:PORT` and `-pi-web HOST:PORT` the
-other two web frontends (`-prigh-web-root`, `-pi-web-root`), `-stdio` as
-well,
+overrides the site), `-stdio` as well,
 `-token SECRET`/`$PRIGH_TOKEN` gates them; with stdio the backend exits when
 the spawning frontend closes it, with `-listen`/`-web` only it runs until
 killed), `tool-host` (the local tool worker), `run <prompt>`
@@ -1341,7 +1302,8 @@ contract.
   `Host_id` (the machine's tool host id in `~/.prigh/host-id`, sent in
   every `hello` with local tools).
 - `ui/` (`prigh_ui`) — **platform-agnostic**, depends only on `core` and
-  `bonsai`; it is what both the terminal and a future web frontend mount.
+  `bonsai`; the terminal mounts its `App`, and prigh-web shares its
+  screen-independent parts (commands, fuzzy matching, tool summaries...).
   - `App` is an Elm-style pure state machine: `update : Model.t -> Action.t
     -> Model.t * Command.t list`. Actions are keys/intents, backend events,
     RPC replies (tagged with `Reply_tag.t` so they stay sexpable), clock
@@ -1352,8 +1314,8 @@ contract.
   - `Component.create ~platform` wraps `App` in `Bonsai.state_machine`,
     turns commands into effects and feeds replies back; it also runs the
     spinner clock while a turn is active. `@` path completion is an RPC
-    (`list_paths`), answered by the active tool host, so both platforms
-    complete the same paths.
+    (`list_paths`), answered by the active tool host, so the paths are the
+    tool host's.
   - Reconnection is App state (`Connection.t`), so the policy is an expect
     test: `Backend_closed` emits `Command.Reconnect {generation; delay_ms;
     session}` (immediately, then 250ms doubling to a 10s cap), the platform
@@ -1362,8 +1324,7 @@ contract.
     `/retry-backend-connection` issues a new generation with no delay.
     Success clears the transcript and re-runs the startup requests.
   - Switching servers is App state too, where the platform reports a
-    `Server_link` (only the terminal: the browsers' connection belongs to
-    the page). `/connect` and the `/signin` dialog (`Sign_in_form`, a
+    `Server_link` (the terminal does). `/connect` and the `/signin` dialog (`Sign_in_form`, a
     `Mode.Sign_in`) emit `Command.Relink {generation; change}` and enter
     `Connection.Switching {generation; previous}`; the platform answers
     `Relinked` with a `Server_link.Outcome`: `Unreachable` (nothing changed:
@@ -1582,50 +1543,10 @@ contract.
   wheel scrolls the transcript (`Scroll_up`/`Scroll_down`, three lines);
   without it the terminal turns the wheel into arrow keys, which walk the
   prompt history. Text selection therefore needs Shift.
-- `web/` (`prigh_ui_web`, pure: `core` + `virtual_dom`) — `Dom_of_screen`
-  renders a `Screen.t` as a monospace cell grid (`pre.screen` > `div.line` >
-  spans with style classes, links as anchors, the cursor cell in
-  `span.cursor`; `style.css` colours it) and `Key_of_dom` maps a browser
-  `keydown` (`key`, `code`, modifiers) to `Key.t`, using the physical `code`
-  for Alt/Ctrl combinations (Option on a Mac produces symbols) and leaving
-  paste and Meta shortcuts to the browser. A test checks every keymap
-  binding is producible from a browser event.
-- `web-app/` (`prigh_ui_web_app`) — the page: `Ws_transport` (a browser
-  WebSocket as a `Transport.t`), `Browser` (localStorage, query string,
-  clipboard, the cell measurement that turns the window into columns and
-  rows) and `Web_app`, the counterpart of `Term_app`: reads
-  `?backend=`/`?session=`/`?name=` plus the user name and password (the
-  token) saved by the connect form (`Login`: `prigh.user`, `prigh.token`)
-  (using the page's origin `/ws` when no backend is explicit), sends `hello` with
-  `tools: false`, mounts the shared component with
-  `Bonsai_web.Start.start_and_get_handle` (incoming actions through the
-  handle), installs document-level `keydown`/`paste`/`wheel`/`resize`
-  listeners, and implements the platform: history in `localStorage`,
-  `navigator.clipboard`, `window.open`; suspend and the external editor
-  report themselves unavailable. A failed first `hello` shows a connect
-  form instead (user name, password with a Caps Lock warning; both are
-  saved and the selected backend is put in the reloaded page's query
-  string). `/signout` (the `Sign_out` command; in the terminal it forgets
-  the saved token instead) and the `sign out` button next to `>_`
-  forget the login, note it, and reload without `?session=`, so every socket
-  is dropped and the next load shows the form instead of connecting. The page's `?session=` follows the current
-  session (`history.replaceState`), so a reload rejoins it. The app sits in
-  `#screen-area` (whose height `Browser.grid_size` measures) next to an
-  optional `Terminal_panel`: a `>_` button opens it, and it is a
-  `Vdom.Node.widget` around `web-bin/terminal.js` (xterm.js and its fit
-  addon, vendored in `web-bin/vendor/`): connect with the size, reset on
-  open (the first message is the replay), reconnect with backoff, ping, and
-  a key after the shell exits starts a new one. `mount`'s options let a
-  page show the connection's state itself (`onStatus`, as prigh-web
-  does), not focus at once, and set the theme. Keys, pastes, wheel and
-  touches inside the panel are left to xterm.js. `web-bin/` is
-  the js_of_ocaml executable plus `index.html`/`style.css`/`terminal.js`
-  and the vendored xterm.js, assembled under `web-bin/site/` and installed
-  to `share/prigh_tui/web`.
-- `prigh-web/` — the DOM-native browser frontend. Unlike `web-app/` it does
-  not mount `ui/`'s cell-grid `App`: it has its own Elm-style state
-  machine over the same `prigh_protocol` types and `prigh_client`, and
-  renders HTML.
+- `prigh-web/` — the browser frontend. Unlike `term/` it does not mount
+  `ui/`'s cell-grid `App`: it has its own Elm-style state machine over the
+  same `prigh_protocol` types and `prigh_client`, renders HTML, and shares
+  the parts of `ui/` that are not about the terminal's screen.
   - `lib/` (`prigh_web`, pure: `core` + `virtual_dom`):
     - `App` — `update : Model.t -> Action.t -> Model.t * Command.t list`;
       commands are `Rpc` tagged with a `Reply_tag.t`, `Reconnect`,
@@ -1986,9 +1907,14 @@ contract.
       `Page_notifications` does the browser side: the Notification API,
       `visibilitychange`, localStorage (`prigh-web.notify`) and the favicon
       with a sodium dot while something is unseen.
-  - `app/` (`prigh_web_app`) — `Web_main.run`: connects a `Ws_transport`
+  - `app/` (`prigh_web_app`) — the page. `Ws_transport` (a browser
+    WebSocket as a `Transport.t`), `Browser` (localStorage, the query
+    string, the clipboard, the visual viewport, running after the next
+    render), `Login` (the active sign-in: `prigh.user`, `prigh.token`) and
+    `Terminal_panel` (the `/terminal` URL; whether an event is inside the
+    panel). `Web_main.run`: connects a `Ws_transport`
     to `?backend=` or the page's `/ws`, sends `hello` with the active
-    account (`prigh.user`/`prigh.token`, `web-app/`'s `Login`) and
+    account (`Login`) and
     `?session=` (giving up after 10s); when the backend refuses, or the
     page has never been in a session on that backend, it shows the
     sign-in form (with the saved accounts, one click each); when it is
@@ -2020,13 +1946,15 @@ contract.
     shown transcript or job output at its end unless scrolled up, and
     performs `Reveal` (opening the folds the card is in).
     `Terminal_widget` is the terminal panel's xterm.js: a
-    `Vdom.Node.widget_of_module` around `web-bin/terminal.js` (loaded with
-    the vendored xterm.js, its fit addon and `xterm.css` the first time the
-    panel opens), connected to `Prigh_ui_web_app.Terminal_panel.url` with
+    `Vdom.Node.widget_of_module` around `bin/terminal.js` (loaded with
+    the xterm.js, its fit addon and `xterm.css` vendored in `bin/vendor/`
+    the first time the panel opens), connected to `Terminal_panel.url` with
     the page's user and token and the target's `as_user`; a new target key
     disposes the old connection (the backend keeps the shell) and mounts a
-    new one; `terminal.js` reports its state through `onStatus`, which
-    becomes `Action.Terminal_status`. It also remembers whether the panel
+    new one. `terminal.js` connects with the size, resets on open (the first
+    message is the replay), reconnects with backoff, pings, and a key after
+    the shell exits starts a new one; it reports its state through
+    `onStatus`, which becomes `Action.Terminal_status`. It also remembers whether the panel
     is open, so a reload reopens it, and focuses the shell for
     `Focus_terminal`. The document listeners leave keys (a capture
     listener takes only Ctrl+`, before xterm.js), pastes and drops inside
@@ -2052,17 +1980,17 @@ contract.
     `agents.css`, `terminal.css`, `files.css`, `highlight.css` (the
     tokens' colours) and `resize.css` (the handles) (design tokens in
     `style.css`'s `:root`), the Recursive font cut to two woff2 instances (sans and mono;
-    `recursive-OFL.txt`), and `web-bin`'s `terminal.js` and
-    vendored xterm.js (copied by dune rules, not duplicated), assembled under
-    `bin/site/` and installed to `share/prigh_tui/prigh-web` (the Nix
-    wrapper exports it as `$PRIGH_PRIGH_WEB_ROOT`). The dev profile links
+    `recursive-OFL.txt`), `terminal.js` and the
+    vendored xterm.js, assembled under
+    `bin/site/` and installed to `share/prigh_tui/web` (the Nix
+    wrapper exports it as `$PRIGH_WEB_ROOT`). The dev profile links
     separately compiled units with inline source maps (~49 MB, fast to
     relink); release builds (`dune build -p`, so Nix) are whole-program at
-    `--opt 3`, ~2 MB (590 KB as the installed `.gz`, 500 KB `.br`;
-    `web-bin` is ~1.75 MB).
+    `--opt 3`, ~2 MB (590 KB as the installed `.gz`, 500 KB `.br`).
   - `test/` — inline expect tests under node: a `Harness` drives
     `App.update`, answers RPCs and prints the commands and the rendered
-    page (as text, `Html.mark`s print as the glyphs they draw: ✓ ✕ – ■).
+    page (as text, `Html.mark`s print as the glyphs they draw: ✓ ✕ – ■);
+    `test_page.ml` covers `app/`'s pure parts (`Login`, the URLs).
     `e2e/` — the Playwright e2e (see Testing).
 - `bin/` — `prigh-tui [DIR]` (`-faux`, `-session`, `-model`, `-cwd` (same
   as `DIR`), `-auth-file`, `-backend`; `PRIGH_BACKEND` overrides the backend
@@ -2205,7 +2133,7 @@ worker's `input` lines. `test_web_fetch.ml` covers `Html_text` and
 HTML, images, binary types, redirects and loops, 404/500, bad URLs,
 timeouts, refused connections, truncation and the size limit);
 `test_web_search.ml` the providers' server tool streams, replay to the
-same and other providers, pi-web's view, which models get `web_search`,
+same and other providers, which models get `web_search`,
 and a search saved in a session and streamed to clients.
 
 `backend/test/test_approval_rules.ml` covers rule parsing, command
@@ -2248,40 +2176,22 @@ running without a login, `-session` by id, broken `config.json` and
 `auth.json`, a taken `-listen`/`-web` port and a tool host whose token the
 backend refuses. Each error names the flag or file and what to do next.
 
-`backend/test/test_pi_rpc.ml` drives `Pi_rpc` over in-memory lines
-(pi commands in, pi events out) for prompts, steering, confirmations,
-thinking levels, forks, sessions, login dialogs, subagents and compaction;
-`pi-web/` has vitest unit tests for its pure modules and a Playwright e2e
-(`pi-web/e2e`, the `e2e` check of `pi-web/flake.nix`) that drives Chromium
-and Firefox through the connect form, a scripted run with tools and a
-subagent, slash commands, the model picker, a reload, a session switch and
-the terminal panel.
-
 The web layer adds three: `backend/test/test_static_site.ml` (validators and
 `304`, precompressed siblings by `Accept-Encoding` and age, `HEAD`),
 `backend/test/test_web.ml` (frames, fragmentation,
 the RFC handshake vector, static serving and traversal, and a masked WebSocket
 RPC conversation over a real loopback socket)
-and `tui/test-web/` (connection selection, `Key_of_dom` and `Dom_of_screen`,
-run under `node` with js_of_ocaml because `virtual_dom`'s initialisers need a
-JavaScript runtime; skipped without `node`). On Linux, the flake's
-`web-workflows` check starts the packaged wrapper and `serve -faux -web`, checks
-that the opened URL does not carry the token and that the secret never reaches
-the log, fetches the installed bundle, and then drives real browsers with
-Playwright (Chromium and Firefox): it submits the connect form by typing the
-token into the Password field, verifies the token is remembered and the page reloads to an
-authenticated WebSocket session, then types into the hidden keyboard input,
-edits with arrow/backspace, submits a prompt to the faux provider and reloads
-to prove the session survives. Every step saves a normalised ASCII snapshot of
-the screen and the expected output lives in `tui/e2e-web/web_workflows.expected`.
-Additional interactions (`/help`, pickers, `@` completion, `!` shell, paste,
-resize, `?backend=` to a second backend, quit and reconnect after a backend
-restart) have been exercised manually.
+and `tui/prigh-web/test/` (below; run under `node` with js_of_ocaml
+because `virtual_dom`'s initialisers need a JavaScript runtime; skipped
+without `node`). The flake's `web-wrapper` check runs the packaged wrapper's
+`prigh -web` against a fake backend (the `serve` arguments, the site it
+points at) and checks the installed site: its files, the release bundle's
+size and the precompressed siblings.
 
 prigh-web's e2e, `tui/prigh-web/e2e/prigh_web.sh` (the flake's Linux
 `prigh-web-e2e` check, against the packaged backend and site), runs
 `prigh_web.mjs` in Chromium and Firefox. The driver owns the backend
-(`serve -prigh-web 127.0.0.1:0 -faux-script ...` with an isolated `HOME`
+(`serve -web 127.0.0.1:0 -faux-script ...` with an isolated `HOME`
 and cwd) so that it can restart it, and prints normalised text snapshots
 (ids, cwd, cost, context and messages' times replaced) diffed against `prigh_web.expected`:
 the sign-in form and signing in with the token, the top bar, a scripted

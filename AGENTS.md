@@ -6,17 +6,11 @@ prigh is a coding agent. Read `README.md` for what it does and
 | Directory | What | Toolchain | Build and test |
 |---|---|---|---|
 | `backend/` | the agent, providers, RPC/web servers (`prigh`) | OxCaml 5.2, Eio | `nix develop`, then `cd backend && dune build @runtest` |
-| `tui/` | terminal and Bonsai web frontends (`prigh-tui`) | OxCaml 5.2, Bonsai | `nix develop`, then `cd tui && dune build @runtest` |
-| `tui/prigh-web/` | prigh-web, the DOM browser frontend (part of `tui/`) | OxCaml 5.2, Bonsai_web | `cd tui && dune build @prigh-web/test/runtest ./prigh-web/bin/site`; e2e: `bash tui/prigh-web/e2e/prigh_web.sh` (backend built, `PLAYWRIGHT_MODULE`/`PLAYWRIGHT_BROWSERS_PATH` set) |
-| `pi-web/` | **deprecated**: pi's web UI (Preact/TypeScript) on the backend | node 22 | `npm ci && npm run check && npm test && npm run build` |
+| `tui/` | the terminal frontend (`prigh-tui`) and prigh-web | OxCaml 5.2, Bonsai | `nix develop`, then `cd tui && dune build @runtest` |
+| `tui/prigh-web/` | prigh-web, the browser frontend (part of `tui/`) | OxCaml 5.2, Bonsai_web | `cd tui && dune build @prigh-web/test/runtest ./prigh-web/bin/site`; e2e: `bash tui/prigh-web/e2e/prigh_web.sh` (backend built, `PLAYWRIGHT_MODULE`/`PLAYWRIGHT_BROWSERS_PATH` set) |
 | `docker/` | the image's entrypoint (`prigh-docker`) | bash | `bash docker/test-prigh-docker.sh` (`-promote` re-records) |
 | `nix/` | pins and patches for the flake | | see `nix/README.md` |
 
-- **pi-web is deprecated**: prigh-web replaces it. Don't add features to it,
-  improve its UI or fix its Playwright e2e (known broken); new browser work
-  goes into `tui/prigh-web/`. Only keep it compiling when backend changes
-  touch `Pi_rpc` (its unit tests: `npm run check && npm test`); remove it
-  rather than invest in it.
 - The backend and the TUI share one OxCaml toolchain and one dev shell
   (`nix develop`; `.#backend` is an alias of it). They are separate dune
   projects: run dune in `backend/` or `tui/`.
@@ -37,20 +31,18 @@ prigh is a coding agent. Read `README.md` for what it does and
   a terminal multiplexer (`tmux`) and can be slow; `dune build @test/runtest`
   runs only the unit tests. `$PRIGH_BACKEND` overrides that path: unset it
   (e.g. when working inside prigh, which sets it) to test your build.
-- The browser e2es (`tui/e2e-web`, `tui/prigh-web/e2e`, `pi-web/e2e`) are
-  Playwright scripts run with `node`, not dune; the flakes' Linux checks run
-  them (`nix build .#checks.x86_64-linux.prigh-web-e2e`). Locally, point
+- prigh-web's browser e2e (`tui/prigh-web/e2e`) is Playwright scripts run
+  with `node`, not dune; the flake's Linux checks run it (`nix build .#checks.x86_64-linux.prigh-web-e2e`). Locally, point
   `PLAYWRIGHT_MODULE` at the playwright package's `index.mjs` and
   `PLAYWRIGHT_BROWSERS_PATH` at its browsers (both in the Nix store), and
   look at the screenshots (`SHOTS=dir`) as well as the text diff.
-- The flakes use the binary cache `prigh.cachix.org`; pass
+- The flake uses the binary cache `prigh.cachix.org`; pass
   `--accept-flake-config` to Nix in non-interactive use.
 - Only have one dune process running at a time, otherwise it hangs. E.g. if
   you are running tests, don't also `dune exec`.
 - Every new RPC field or method must be mirrored by the frontends that use it
   (`tui/protocol/`, used by the TUI and prigh-web); the e2e tests guard the
-  contract. pi-web (deprecated) only needs `backend/lib/pi_rpc.ml` to keep
-  working, not new features.
+  contract.
 
 ## OCaml conventions
 
@@ -100,8 +92,6 @@ output of `dune build @runtest`, and if the diffs are right, `dune promote`.
 - prigh-web: drive `App.update` through the `Harness` in
   `tui/prigh-web/test` and print the rendered HTML/text; the Playwright e2e
   (`tui/prigh-web/e2e`) checks real browsers.
-- pi-web (deprecated): its existing vitest tests (`pi-web/test`) should keep
-  passing; don't add new ones.
 
 ## UI principles
 
@@ -151,6 +141,6 @@ apply the ideas elsewhere. For instance, I might change the API slightly to
 make it cleaner, or remove/reword comments, and you should respect that.
 
 Keep docs current: update `README.md`, `ARCHITECTURE.md`, `DOCKER.md` or
-`pi-web/README.md` when behaviour they describe changes, and this file when
+`nix/README.md` when behaviour they describe changes, and this file when
 the conventions or the workflow change. Don't add plan or handoff documents
 to the repository.

@@ -1,10 +1,9 @@
 # prigh
 
 A coding agent: OCaml backend (Eio, cohttp; Anthropic, OpenAI, OpenAI
-Codex/ChatGPT and DeepSeek providers) and an OCaml frontend — the same
-Bonsai logic mounted either in the terminal (Bonsai_term, OxCaml) or in a
-browser (Bonsai_web, js_of_ocaml). No plugins; tools and subagents are built
-in.
+Codex/ChatGPT and DeepSeek providers) and OCaml frontends — a terminal UI
+(Bonsai_term) and prigh-web, a browser UI (Bonsai_web, js_of_ocaml), both on
+OxCaml. No plugins; tools and subagents are built in.
 
 ## Quick start
 
@@ -13,8 +12,7 @@ in.
 ./prigh ~/proj          # ... in another directory (or -cwd ~/proj)
 ./prigh -faux           # scripted provider, no API calls
 ./prigh -detached .     # in a new detached tmux session (prigh-<dir>); returns at once
-./prigh -web            # the same UI in a browser (serves it on 127.0.0.1:7788 and opens it)
-./prigh -prigh-web      # prigh-web, the browser-native UI (127.0.0.1:7790)
+./prigh -web            # prigh-web, the browser UI (serves it on 127.0.0.1:7788 and opens it)
 ```
 
 ## Build
@@ -57,12 +55,10 @@ nix build .#tui                      # TUI only: result/bin/prigh-tui
 nix develop                          # the toolchain (OxCaml) for backend/ and tui/
 ```
 
-`prigh -web [serve options]` runs the backend with the browser frontend
-(`prigh serve -web 127.0.0.1:7788 -open`); `PRIGH_WEB_ROOT` points at the
-built assets (the Nix wrapper sets it). Likewise `prigh -prigh-web [serve
-options]` (`nix run . -- -prigh-web -cwd ~/proj`) runs `prigh serve
--prigh-web 127.0.0.1:7790 -open` (`$PRIGH_PRIGH_WEB_LISTEN`) with
-`PRIGH_PRIGH_WEB_ROOT` set to the installed prigh-web site.
+`prigh -web [serve options]` (`nix run . -- -web -cwd ~/proj`) runs the
+backend with prigh-web, the browser frontend (`prigh serve -web
+127.0.0.1:7788 -open`; `$PRIGH_WEB_LISTEN` changes the address);
+`PRIGH_WEB_ROOT` points at the built site (the Nix wrapper sets it).
 
 `prigh-tui [DIR]` starts in `DIR` (default: the current directory; `-cwd
 DIR` is the same). Flags: `-faux`, `-session PATH`, `-model ID`, `-thinking
@@ -232,8 +228,8 @@ directory (`/switch`, `/import`, deleting sessions), and `/export` writes
 on the tool host.
 
 `-superusers NAME,...` (`$PRIGH_SUPERUSERS`) lets those users act as any
-other: `/setusr NAME` (in the TUI, the web UI, pi-web and prigh-web, where
-the account menu's "Act as…" does it too) switches the
+other: `/setusr NAME` (in the TUI and prigh-web, where the account menu's
+"Act as…" does it too) switches the
 connection to NAME's sessions, logins and tool hosts (the status line shows
 `user:<me> as <them>`), `/setusr` alone lists the users and `/setusr <me>`
 switches back. Everyone else gets an error. `-host-tokens NAME=TOKEN,...`
@@ -243,80 +239,35 @@ Docker image starts one per user with one).
 
 ## In a browser
 
-The frontend also runs as a web page, with the same keys, commands, pickers
-and transcript as the terminal (it renders the same cell grid). The backend
-serves it and speaks the RPC protocol over a WebSocket at `/ws`:
-
-```
-./prigh -web                      # local: serves http://127.0.0.1:7788/ and opens it
-./prigh -web -faux -cwd ~/proj    # ... any `prigh serve` options after -web
-
-# remote: on the server (or PRIGH_WEB_LISTEN=0.0.0.0:7788 ./prigh -web -token sekrit)
-prigh serve -web 0.0.0.0:7788 -token sekrit
-# then open http://server:7788/ and type the token into the connect form's
-# Password field (the browser remembers it in localStorage; /signout forgets it)
-prigh-tui -connect server:7788 -token sekrit -cwd ~/proj   # terminals use the same port
-```
-
-The `-web` port also accepts the terminal frontend's plain JSON-lines
-connections, so one port serves browsers and terminals on the same sessions
-(`-listen` is only needed for a TCP-only port).
-
-The page connects to its own origin by default; `?backend=ws://host:port/ws`
-points a page served from one place at a backend elsewhere, `?session=ID`
-joins a session (the page keeps it up to date, so a reload stays in the
-session) and `?name=` names the frontend in `/host`. Tools run on the
-backend (a browser cannot host them; `/host` still switches to any connected
-tool host). Prompt history lives in `localStorage`; Ctrl+Z and Ctrl+G have no
-browser equivalent and say so. The `>_` button (top right) opens a shell on
-the backend machine in the session's directory, in a panel under the app
-(it needs `tmux` on the backend; the nix package brings its own). Closing
-the panel keeps the shell, so reopening it or reloading the page finds it
-again; it is killed after 10 minutes with no page attached, when it exits,
-or when the backend stops. Plain `ws://` with a shared token: bind to
-localhost and use an SSH tunnel or a TLS-terminating proxy on untrusted
-networks.
-
-### pi's web UI (deprecated)
-
-pi-web is deprecated: use prigh-web (below), which covers everything it
-does. It still works but gets no new features.
-
-A second, separate browser frontend lives in `pi-web/`: pi's own web UI
-(Preact/TypeScript) on the prigh backend, which speaks pi's RPC protocol for
-it (`Pi_rpc`). It has its own flake:
-
-```
-nix run ./pi-web -- -faux -cwd ~/proj     # serves it on 127.0.0.1:7789 and opens it
-./prigh -pi-web -faux                      # development (npm build + dune-built backend)
-prigh serve -pi-web 0.0.0.0:7789 -token sekrit   # remote; the page asks for the token
-```
-
-One backend can serve both web UIs (on different ports, since their `/ws`
-speak different protocols) with shared sessions; the pi-web wrapper also
-knows where the Bonsai site is, so this is the one-liner to run at boot
-(e.g. a `@reboot` crontab entry):
-
-```
-cd ~/dev/prigh && PRIGH_PI_WEB_LISTEN=0.0.0.0:7789 nix run ./pi-web -- -web 0.0.0.0:7777 -token sekrit -cwd ~/dev/prigh > ~/prigh.stdout 2> ~/prigh.stderr
-# Bonsai UI on :7777, pi-web on :7789
-```
-
-See `pi-web/README.md` for what was kept, dropped and mapped.
-
-### prigh-web
-
-`tui/prigh-web/` is a third browser frontend, in OCaml like the TUI but
-built for the browser rather than mounting the terminal UI: a real DOM
+prigh-web (`tui/prigh-web/`) is the browser frontend, in OCaml like the TUI
+but built for the browser rather than mounting the terminal UI: a real DOM
 (Bonsai_web, js_of_ocaml) with a session sidebar, a chat transcript with
 markdown, collapsible tool calls and their images, model and thinking
 selectors, and a composer that takes pasted or dropped images, `/`
 commands, `@` paths, `#` snippets and `!cmd` like the TUI. Messages show when they were
 sent, in the browser's time zone (`14:32`, `Yesterday 14:32`, `3 Oct
 14:32`; the full date on hover): under your messages and in a reply's
-footer, with a separator where the day changes. It speaks
-prigh's own RPC (the same `/ws` protocol as `-web`), so it gets every
-backend feature without a translation layer like pi-web's.
+footer, with a separator where the day changes. The backend serves it and
+speaks prigh's own RPC protocol to it over a WebSocket at `/ws`, so it gets
+every backend feature:
+
+```
+./prigh -web                      # local: serves http://127.0.0.1:7788/ and opens it
+./prigh -web -faux -cwd ~/proj    # ... any `prigh serve` options after -web
+nix run . -- -web -cwd ~/proj     # the packaged site and backend
+
+# remote: on the server (or PRIGH_WEB_LISTEN=0.0.0.0:7788 ./prigh -web -token sekrit)
+prigh serve -web 0.0.0.0:7788 -token sekrit
+# then open http://server:7788/ and type the token into the sign-in form's
+# Password field (the browser remembers it in localStorage; /signout forgets it)
+prigh-tui -connect server:7788 -token sekrit -cwd ~/proj   # terminals use the same port
+```
+
+The `-web` port also accepts the terminal frontend's plain JSON-lines
+connections, so one port serves browsers and terminals on the same sessions
+(`-listen` is only needed for a TCP-only port). Plain `ws://` with a shared
+token: bind to localhost and use an SSH tunnel or a TLS-terminating proxy
+on untrusted networks.
 
 Tool output folds to a few lines: a running command's last lines (under
 how many came before), a finished one's first six (an error's last six,
@@ -429,15 +380,9 @@ types its character instead. What finished before your latest prompt
 folds under "Earlier"; switching sessions empties the panel. `/agents cancel
 <n|id>` and `/jobs kill <id>` open the item there and stop it.
 
-```
-./prigh -prigh-web -faux -cwd ~/proj           # development: dune-built site and backend, 127.0.0.1:7790
-nix run . -- -prigh-web -cwd ~/proj            # the packaged site and backend
-prigh serve -prigh-web 0.0.0.0:7790 -token sekrit   # remote; the page asks for the token
-```
-
-`-prigh-web-root DIR` (`$PRIGH_PRIGH_WEB_ROOT`) points at the site;
+`-web-root DIR` (`$PRIGH_WEB_ROOT`) points at the site;
 without it the backend looks next to its dune build and in
-`../share/prigh/prigh-web`. The Nix package (`nix run . -- -prigh-web`)
+`../share/prigh/web`. The Nix package (`nix run . -- -web`)
 installs the release build of the page (whole-program js_of_ocaml, about
 2 MB of JavaScript, sent as a 500 KB brotli or 590 KB gzip file it
 ships precompressed); reloads revalidate with `ETag`/`Last-Modified` and
@@ -446,19 +391,22 @@ with inline source maps, uncompressed, quicker to relink but slow to load. The p
 and the chat's scroll position and draft in the tab's sessionStorage (a
 reload, or a phone bringing back a discarded tab, returns to the same place,
 waiting for the backend if it is out of reach), reconnects when the
-backend goes away (see above), and takes `?backend=ws://host:port/ws` like the `-web` page.
-One backend can serve all three web UIs on different ports. In Docker it
-is `PRIGH_MODE=prigh-web` (port 7790, see `DOCKER.md`).
+backend goes away (see above). It connects to its own origin by default;
+`?backend=ws://host:port/ws` points a page served from one place at a
+backend elsewhere, `?session=ID` joins a session and `?name=` names the
+frontend in `/host`. Tools run on a tool host (a browser cannot host
+them). In Docker it is `PRIGH_MODE=web` (port 7788, see `DOCKER.md`).
 
 The terminal button in the top bar (or `/terminal`, or Ctrl+`) opens a
 shell where the session's tools run (the active `/host`, in its
 directory) in a panel under the chat: drag its top edge to resize it (the
 height is remembered), a full-screen sheet on a phone. Keys typed in it
 are the shell's, Esc included; Ctrl+` closes it (so does its ×) and
-gives the keyboard back to the editor. Like the `-web` page's `>_` panel
-it is a tmux session, so closing the panel, reloading the page (which
-reopens it) or losing the connection keeps the shell; it is killed after
-10 minutes with no page attached. It follows the session, `/host` and
+gives the keyboard back to the editor. It is a tmux session (on the
+backend's host it needs `tmux`; the nix package brings its own), so closing
+the panel, reloading the page (which reopens it) or losing the connection
+keeps the shell; it is killed after 10 minutes with no page attached, when
+it exits, or when the backend stops. It follows the session, `/host` and
 the user you act as; when the shell exits, "New shell" starts another,
 and when there is none (no tmux on the host, a host that has gone) the
 panel says why and what to do.
@@ -606,7 +554,7 @@ form, keeping the others; it may be on another backend), sign out of this
 one, and, for `-superusers`, act as another user and come back. The
 accounts (user, token, backend, last session) are kept in localStorage
 (`prigh-web.accounts`); the active one is also in `prigh.user`/`prigh.token`,
-where the `-web` page keeps its login, and the sign-in page lists them.
+and the sign-in page lists them.
 
 If the backend goes away (the spawned process dies, or the TCP connection
 drops) the TUI reconnects on its own — immediately, then with exponential
@@ -1010,8 +958,8 @@ in the `ask` approval mode.
 
 Models see images. The `read` tool returns PNG, JPEG, GIF and WebP files
 (recognised by content, not by name) as images the model can look at, and an
-`@shot.png` attachment adds the image to the prompt; pi-web also sends images
-pasted or dropped into its editor. Images over 2000x2000 px or about 3.4 MB
+`@shot.png` attachment adds the image to the prompt; prigh-web also sends
+images pasted or dropped into its composer. Images over 2000x2000 px or about 3.4 MB
 are downscaled with ImageMagick (`magick` or `convert`) or macOS `sips` on
 the machine that reads them (the tool host); without one, images up to the
 providers' hard limit (8000x8000 px) are sent as they are and larger ones
@@ -1205,7 +1153,7 @@ it.
 | `/retry-backend-connection` | reconnect to the backend now |
 | `/connect [HOST:PORT\|local]` | (TUI) switch to another backend, saved for next time, or to a spawned one; alone: pick or type the address |
 | `/signin [user]` | (TUI) sign in to the server: a dialog for the user and the token or password |
-| `/signout` | forget the saved login and sign in again (TUI: the token; the browsers: their login form) |
+| `/signout` | forget the saved login and sign in again (TUI: the token; prigh-web: its sign-in form) |
 | `/state` | show session state |
 | `/copy` | (prigh-web) copy the last reply to the clipboard |
 
@@ -1472,10 +1420,9 @@ promote` accepts new output everywhere:
    tmux and compares the captured panes, including a backend kill and
    reconnect.
 
-The browser frontends have their own: `tui/test-web` and
-`tui/prigh-web/test` run under node in `@runtest`, and the Playwright e2es
-(`tui/e2e-web`, `tui/prigh-web/e2e`, `pi-web/e2e`) drive Chromium and
-Firefox against the real backend; the flake runs them as checks.
+prigh-web has its own: `tui/prigh-web/test` runs under node in `@runtest`,
+and the Playwright e2e (`tui/prigh-web/e2e`) drives Chromium and Firefox
+against the real backend; the flake runs it as a check.
 
 ## Layout
 
@@ -1491,10 +1438,8 @@ Firefox against the real backend; the flake runs them as checks.
   over a `Transport`; `client_unix/` has the stdio/TCP transports and the
   tool host), `ui/` (platform-agnostic Bonsai logic: `App` state machine,
   `Editor`, `Picker`, `Transcript`, `Render` to styled `Content`), `term/`
-  (Bonsai_term views + backend process), `web/` + `web-app/` + `web-bin/`
-  (DOM rendering, key mapping, WebSocket transport, the js_of_ocaml page),
-  `prigh-web/` (the DOM-native browser frontend), `test/`, `test-web/`,
-  `e2e/`.
+  (Bonsai_term views + backend process), `prigh-web/` (the browser
+  frontend), `test/`, `e2e/`, `tmux-test/`.
 - `editors/nvim/` — prigh.nvim, the Neovim ACP client (Lua; headless tests
   against a scripted fake agent: `editors/nvim/test/run.sh`).
 - `ARCHITECTURE.md` — how the pieces fit together; `DOCKER.md` — the
