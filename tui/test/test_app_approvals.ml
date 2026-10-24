@@ -251,6 +251,32 @@ let%expect_test "the plan in the status line, /todos and /permissions" =
     |}]
 ;;
 
+let%expect_test "the status line counts steps running in parallel" =
+  let h = Test_app.connected ~width:90 ~height:8 () in
+  let plan : P.Plan.t =
+    { explanation = None
+    ; steps =
+        [ { step = "backend"; status = In_progress }
+        ; { step = "tui"; status = In_progress }
+        ; { step = "docs"; status = In_progress }
+        ; { step = "pr"; status = Pending }
+        ]
+    }
+  in
+  H.event h (State (with_mode ~plan Ask));
+  H.show h;
+  [%expect
+    {|
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+
+    ▌ earlier question
+      earlier answer
+    ──────────────────────────────────────────────────────────────────────────────────────────
+    > ▏
+    …deepseek-flash  think:off  mode:ask  ctx:0.1%/1.0M  $0.01  plan 0/4: backend (+2 running)
+    |}]
+;;
+
 let%expect_test
     "confirmations: always allow shows its rules; deny with a reason; Esc in \
      the reason goes back"
@@ -842,8 +868,8 @@ let%expect_test "long choice descriptions and answers wrap in the question box" 
                  [ { label = "Postgres"
                    ; description =
                        Some
-                         "what production uses, with the extensions we rely \
-                          on for search"
+                         "what production uses, with the extensions we rely on \
+                          for search"
                    }
                  ; { label = "SQLite"; description = Some "embedded" }
                  ]

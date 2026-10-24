@@ -624,8 +624,8 @@ two can share one.
   `decide`: deny rule → plan mode refuses edits → ask rule (no
   suggestions) → allow rules, the config's and the session's → plan mode
   asks for other destructive tools → the mode).
-- `Plan` — `update_plan` (Codex's): steps with statuses, validated (one in
-  progress at most), and `latest`, the plan as of the last successful call
+- `Plan` — `update_plan` (Codex's): steps with statuses, validated (several
+  may be in progress, for parallel work), and `latest`, the plan as of the last successful call
   in a list of messages, which is how `Agent` keeps it as session state
   (persisted for free, following rewinds and forks). `User_question`
   (`ask_user`'s questions, answers checked against them, the result text)
