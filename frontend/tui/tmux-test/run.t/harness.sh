@@ -9,12 +9,12 @@ set -euo pipefail
 export LC_ALL=C.UTF-8
 here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 if [ -n "${DUNE_SOURCEROOT:-}" ]; then
-	tui="$DUNE_SOURCEROOT"
+	frontend="$DUNE_SOURCEROOT"
 else
-	tui="$(dirname "$(dirname "$here")")"
+	frontend="$(dirname "$(dirname "$(dirname "$here")")")"
 fi
-root="$(dirname "$tui")"
-exe="${PRIGH_TUI:-$(command -v prigh-tui || echo "$tui/_build/default/bin/main.exe")}"
+root="$(dirname "$frontend")"
+exe="${PRIGH_TUI:-$(command -v prigh-tui || echo "$frontend/_build/default/tui/bin/main.exe")}"
 backend="${PRIGH_BACKEND:-$root/backend/_build/default/bin/main.exe}"
 
 if ! command -v tmux >/dev/null; then

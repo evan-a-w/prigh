@@ -16,7 +16,7 @@
 set -euo pipefail
 here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 export PRIGH_BACKEND="${PRIGH_BACKEND:-$here/../../../backend/_build/default/bin/main.exe}"
-export SITE="${PRIGH_WEB_ROOT:-$here/../../_build/default/prigh-web/bin/site}"
+export SITE="${PRIGH_WEB_ROOT:-$here/../../_build/default/web/bin/site}"
 export TOKEN='sekrit&x=y'
 tmp="$(mktemp -d)"
 actual="$tmp/actual"
@@ -29,7 +29,7 @@ cleanup() {
 }
 trap cleanup EXIT
 test -x "$PRIGH_BACKEND" || { echo "no backend at $PRIGH_BACKEND: build it (cd backend && dune build)" >&2; exit 1; }
-test -f "$SITE/main.bc.js" || { echo "no site at $SITE: build it (cd tui && dune build ./prigh-web/bin/site)" >&2; exit 1; }
+test -f "$SITE/main.bc.js" || { echo "no site at $SITE: build it (cd frontend && dune build ./web/bin/site)" >&2; exit 1; }
 if [ -n "${SHOTS:-}" ]; then mkdir -p "$SHOTS"; fi
 
 for engine in ${ENGINES:-chromium firefox}; do

@@ -458,13 +458,13 @@ let find_root ~env_var ~candidates () =
       Filename_unix.realpath (Filename.concat (Filename.dirname exe) rel))
 ;;
 
-(* prigh-web, the browser frontend (tui/prigh-web/). *)
+(* prigh-web, the browser frontend (frontend/web/). *)
 let find_web_root =
   find_root
     ~env_var:"PRIGH_WEB_ROOT"
     ~candidates:
-      [ "../../../../tui/_build/default/prigh-web/bin/site"
-      ; "../../tui/_build/default/prigh-web/bin/site"
+      [ "../../../../frontend/_build/default/web/bin/site"
+      ; "../../frontend/_build/default/web/bin/site"
       ; "../share/prigh/web"
       ]
 ;;

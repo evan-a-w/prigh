@@ -8,7 +8,7 @@ let find_backend () =
     let exe = Core_unix.readlink "/proc/self/exe" in
     let candidates =
       List.map
-        [ "../../../../backend/_build/default/bin/main.exe"
+        [ "../../../../../backend/_build/default/bin/main.exe"
         ; "../../backend/_build/default/bin/main.exe"
         ]
         ~f:(fun rel -> Filename.concat (Filename.dirname exe) rel)
@@ -42,7 +42,7 @@ let run_tmux tmux args =
 ;;
 
 let detach ?name ~dir command =
-  let module D = Prigh_ui_term.Tmux_detach in
+  let module D = Prigh_tui.Tmux_detach in
   let tmux = D.tmux ~prigh_tmux:(Sys.getenv "PRIGH_TMUX") in
   let%bind sessions =
     let%map output =
@@ -259,7 +259,7 @@ let command =
            Core.exit 2);
        if not detached
        then Option.iter save ~f:(fun t -> or_exit "save" (S.save ~home t));
-       let module Link = Prigh_ui_term.Backend_link in
+       let module Link = Prigh_tui.Backend_link in
        let tools =
          Option.map tools ~f:(fun tools ->
            match Link.Tools.of_string tools with
@@ -293,7 +293,7 @@ let command =
            @ opt "-auth-file" auth_file
            @ Option.value rest ~default:[]
          in
-         Prigh_ui_term.Term_app.run
+         Prigh_tui.Term_app.run
            (Link.create
               ~home
               ~backend

@@ -1,12 +1,13 @@
 (lang dune 3.17)
 
-(name prigh_tui)
+(name prigh_frontend)
 
 (generate_opam_files true)
 
 (package
- (name prigh_tui)
- (synopsis "Bonsai_term frontend for the prigh agentic coding harness")
+ (name prigh_frontend)
+ (synopsis
+  "The terminal (Bonsai_term) and browser (Bonsai_web) frontends of the prigh agentic coding harness")
  (allow_empty)
  (depends
   ocaml

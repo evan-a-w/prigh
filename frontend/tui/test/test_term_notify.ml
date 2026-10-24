@@ -1,6 +1,6 @@
 open! Core
 open! Expect_test_helpers_core
-open Prigh_ui_term
+open Prigh_tui
 
 let%expect_test "focus reports are taken out of the input" =
   List.iter
