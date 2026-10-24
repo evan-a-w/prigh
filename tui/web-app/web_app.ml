@@ -153,6 +153,10 @@ let platform client ~hello ~history_key ~schedule ~quit ~sign_out
         Effect.of_deferred_fun
           (fun () -> reconnect client ~hello ~delay_ms ~session ~as_user)
           ())
+  ; relink =
+      (* The page's connection is the connect form's: the app never asks the
+         browser for a switch, as it reports no [Server_link]. *)
+      (fun _ -> Effect.never)
   ; sign_out = Effect.of_sync_fun (fun () -> Ok (sign_out ())) ()
   ; quit = Effect.of_sync_fun quit ()
   }

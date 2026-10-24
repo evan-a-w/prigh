@@ -169,8 +169,23 @@ let picker_keys (kind : Mode.Picker_kind.t) =
   | _ -> None
 ;;
 
+let sign_in_keys = "Tab next field · Enter signs in · Esc closes"
+
+let disconnected_hint (m : App.Model.t) =
+  match m.mode with
+  | Sign_in _ -> sign_in_keys
+  | _ ->
+    sprintf
+      "not signed in%s · /signin signs in · /connect switches server"
+      (match Option.bind m.server ~f:(fun s -> s.address) with
+       | Some address -> " to " ^ address
+       | None -> "")
+;;
+
 let mode_hint (m : App.Model.t) : Content.Line.t option =
   match m.connection with
+  | Disconnected _ -> Some [ span ~style:attention (disconnected_hint m) ]
+  | Switching _ -> Some [ span ~style:attention "connecting…" ]
   | Reconnecting { attempt; delay_ms; _ } ->
     Some
       [ span
@@ -280,6 +295,7 @@ let mode_hint (m : App.Model.t) : Content.Line.t option =
         | Confirm _ -> Some [ span ~style:attention "confirm: y / n" ]
         | Question _ ->
           Some [ span ~style:attention "Enter accepts · Esc declines" ]
+        | Sign_in _ -> Some [ span ~style:attention sign_in_keys ]
         | Search { query = _; matches; current } ->
           if List.is_empty matches
           then
@@ -547,10 +563,64 @@ let question_dialog ~width ~utc_offset form =
   Boxed.render ~title ~width body, cursor
 ;;
 
+(* The [/signin] dialog: the cursor ends the focused field. *)
+let sign_in_dialog ~width form =
+  let inner = Boxed.inner_width ~width in
+  let field (which : Sign_in_form.Field.t) label value =
+    let focused = Sign_in_form.Field.equal (Sign_in_form.focus form) which in
+    [ span
+        ~style:(if focused then Style.bold attention else gray)
+        (sprintf "%-7s" label)
+    ; span value
+    ]
+  in
+  let user = field User "user" (Sign_in_form.user form) in
+  let token = field Token "token" (Sign_in_form.masked_token form) in
+  let note =
+    match Sign_in_form.submitting form, Sign_in_form.error form with
+    | true, _ -> [ [ span ~style:gray "signing in…" ] ]
+    | false, Some error ->
+      Content.wrap [ [ span ~style:(Style.fg Red) error ] ] ~width:inner
+    | false, None -> []
+  in
+  let hint =
+    [ [ span
+          ~style:gray
+          "prigh serve -tokens: your user name and password; -token: no user"
+      ]
+    ]
+  in
+  let rows = [ user; token ] in
+  let cursor =
+    let row, line =
+      match Sign_in_form.focus form with
+      | User -> 0, user
+      | Token -> 1, token
+    in
+    1 + row, 2 + Int.min (Content.Line.width line) (inner - 1)
+  in
+  ( Boxed.render
+      ~title:("Sign in to " ^ Sign_in_form.address form)
+      ~width
+      (rows @ note @ Content.wrap hint ~width:inner)
+  , cursor )
+;;
+
+let server_part (m : App.Model.t) =
+  match Option.bind m.server ~f:(fun s -> s.address) with
+  | Some address -> [ 6, [ span ~style:gray ("server:" ^ address) ] ]
+  | None -> []
+;;
+
 let status (m : App.Model.t) : Content.Line.t =
-  match m.state with
-  | None -> [ span ~style:gray "connecting…" ]
-  | Some s ->
+  match m.state, m.connection with
+  | _, Disconnected _ -> [ span ~style:attention (disconnected_hint m) ]
+  | None, Switching _ -> [ span ~style:gray "connecting…" ]
+  | None, _ ->
+    (match m.mode with
+     | Sign_in _ -> [ span ~style:attention sign_in_keys ]
+     | _ -> [ span ~style:gray "connecting…" ])
+  | Some s, _ ->
     let max_width = Int.max 1 m.width in
     let base = gray in
     let context =
@@ -594,6 +664,7 @@ let status (m : App.Model.t) : Content.Line.t =
                 (Loop_status.resume_part at ~utc_offset:m.utc_offset)
             ] )
         ])
+      @ server_part m
       @ Option.value_map m.namespace ~default:[] ~f:(fun namespace ->
         let text =
           match App.Model.acting_as m, m.user with
@@ -1072,6 +1143,9 @@ let screen (m : App.Model.t) : Screen.t =
         question_dialog ~width ~utc_offset:m.utc_offset form
       in
       dialog, [], cursor
+    | Sign_in form ->
+      let dialog, cursor = sign_in_dialog ~width form in
+      dialog, [], cursor
     | Confirm { question; _ } ->
       let rows, cursor =
         editor_rows
@@ -1207,8 +1281,8 @@ let screen (m : App.Model.t) : Screen.t =
     let row, col = cursor in
     let base =
       match m.mode with
-      | Picker _ | Question _ | Text_prompt { action = Deny_reason _; _ } ->
-        transcript_area_rows
+      | Picker _ | Question _ | Sign_in _
+      | Text_prompt { action = Deny_reason _; _ } -> transcript_area_rows
       | _ -> transcript_area_rows + dialog_rows + 1 + queued_rows
     in
     Some (base + row, Int.min col (width - 1))

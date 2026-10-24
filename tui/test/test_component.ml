@@ -66,6 +66,19 @@ let make_platform ~replies : Component.Platform.t =
                  " as_user=" ^ u));
             Ok (`Object [ "client_id", `String "client-2" ]))
           ())
+  ; relink =
+      (fun change ->
+        Bonsai.Effect.of_sync_fun
+          (fun () ->
+            print_s [%sexp "relink", (change : Prigh_ui.Server_link.Change.t)];
+            { Prigh_ui.Server_link.Outcome.link =
+                { address = Some "srv:7777"
+                ; user = Some "lloyd"
+                ; saved = None
+                }
+            ; result = Connected (`Object [ "client_id", `String "client-3" ])
+            })
+          ())
   ; sign_out =
       Bonsai.Effect.of_sync_fun
         (fun () ->

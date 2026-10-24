@@ -7,7 +7,10 @@
   core
   core_unix
   core_unix.command_unix
+  core_unix.filename_unix
+  core_unix.sys_unix
   async
   prigh_client
   prigh_client_unix
+  prigh_ui
   prigh_ui_term))

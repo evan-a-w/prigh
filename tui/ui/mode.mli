@@ -40,6 +40,7 @@ module Text_prompt_action : sig
         ; draft : string (** the editor's text, restored afterwards *)
         } (** the reason for denying a tool call, which the model sees *)
     | Host_cwd of string (** host id; the text is the directory there *)
+    | Connect (** [/connect]'s address: [HOST:PORT] or [local] *)
   [@@deriving sexp_of, equal]
 end
 
@@ -90,6 +91,7 @@ type t =
       { call_id : string
       ; form : Question_form.t
       } (** the model's [ask_user] *)
+  | Sign_in of Sign_in_form.t (** [/signin], or a server refusing us *)
   | Search of
       { query : string
       ; matches : int list (** wrapped transcript line indexes *)

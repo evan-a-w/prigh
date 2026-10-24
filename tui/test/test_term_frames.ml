@@ -56,12 +56,24 @@ module H = struct
   (* [with_test_driver] owns the driver for the duration of [f]. *)
   let run ~width ~height f =
     let transport, backend = Transport.In_memory.create () in
-    let client =
-      Prigh_client.Client.create ~connect:(fun () ->
-        Deferred.Or_error.return transport)
+    let link =
+      Prigh_ui_term.Backend_link.create
+        ~open_transport:(fun _ -> Deferred.Or_error.return transport)
+        ~home:"/nonexistent"
+        ~backend:"prigh"
+        ~spawn_args:[ "serve" ]
+        ~tools:None
+        ~hello:[]
+        ~session:None
+        ~target:Spawn
+        ~token:None
+        ~user:None
+        ~saved:None
+        ()
     in
     let%bind () =
-      Deferred.Or_error.ok_exn (Prigh_client.Client.connect client)
+      Deferred.Or_error.ok_exn
+        (Prigh_client.Client.connect (Prigh_ui_term.Backend_link.client link))
     in
     serve backend;
     let%bind `Reader in_r, `Writer _in_w =
@@ -76,7 +88,7 @@ module H = struct
     let vt = Vt.create ~width ~height in
     let terminal = Term_app.Test_terminal.create ~width ~height in
     let%bind result =
-      Term_app.with_test_driver ~client ~terminal ~reader ~writer (fun driver ->
+      Term_app.with_test_driver ~link ~terminal ~reader ~writer (fun driver ->
         Driver.compute_first_frame driver;
         let%bind () = f { driver; vt; out = out_r; writer; terminal } in
         Deferred.Or_error.return ())
@@ -481,7 +493,7 @@ let%expect_test "styled frame: markdown link, diff and autocomplete" =
         [bold]/fallback[/][gray] [off|model...]           show or set the models that take over, in …[/]
         [bold]/default-dir[/][gray] [off|path]            show or set the directory new sessions sta…[/]
         [bold]/login[/][gray] [provider] [api_key|oauth]  log in to a provider[/]
-      [gray]  ↕ 1–8 of 59[/]
+      [gray]  ↕ 1–8 of 61[/]
       …[gray]deepseek-flash[/]  [gray]think:off[/]  [gray]ctx:0.1%/1.0M[/]  [yellow]Tab/Enter accept · Alt+S as typed[/]
       |}];
     return ())

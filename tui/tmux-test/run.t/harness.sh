@@ -41,7 +41,7 @@ start() {
 	session="prigh-test-$$-$RANDOM"
 	{
 		echo "export HOME=$tmp/home TERM=xterm-256color EDITOR=$tmp/editor.sh PRIGH_BACKEND=$backend"
-		echo "$exe -faux -cwd $tmp/cwd -auth-file $tmp/home/auth.json $*"
+		echo "$exe ${tui_args:--faux} -cwd $tmp/cwd -auth-file $tmp/home/auth.json $*"
 		echo "echo EXITED"
 		echo "stty -a | tr ' ;' '\\n\\n' | grep -E '^-?(icanon|echo|iexten|isig|ixon)\$' | tr '\\n' ' '; echo"
 	} >"$tmp/run.sh"
@@ -58,6 +58,7 @@ start() {
 
 stop() {
 	tmux kill-server 2>/dev/null || true
+	if [ -n "${server_pid:-}" ]; then kill "$server_pid" 2>/dev/null || true; fi
 	rm -f "${TMUX_TMPDIR:-/tmp}/tmux-$(id -u)/$socket"
 	rm -rf "$tmp"
 }
@@ -94,6 +95,8 @@ settle() {
 normalise() {
 	sed -E \
 		-e "s#$tmp#\$TMP#g" \
+		-e "s#:${port:-NOPORT}([^0-9]|\$)#:<port>\\1#g" \
+		-e 's/tools now run on [^ ]+ in/tools now run on <host> in/' \
 		-e 's/[⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏]/<spin>/g' \
 		-e 's/session [0-9a-f]{16}/session <id>/g' \
 		-e 's/[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9:.]+Z?/<time>/g' \
@@ -114,9 +117,11 @@ run_scenario() {
 	# Fixed length, so that lines wrap the same everywhere.
 	tmp="$(mktemp -d /tmp/prigh-tmux.XXXXXX)"
 	extra_args=""
+	tui_args=""
 	interactive=""
+	no_start=""
 	if declare -F "setup_$name" >/dev/null; then "setup_$name"; fi
-	start $extra_args
+	[ -n "$no_start" ] || start $extra_args
 	"scenario_$name" || status=$?
 	stop
 	return $status
@@ -600,6 +605,162 @@ scenario_reconnect_dialog() {
 	wait_for "reconnected to the backend"
 	settle
 	capture reconnect_dialog "reconnected: the dialog closed"
+}
+
+# From a spawned backend to `prigh serve -listen -token`: refused without
+# the token, signed in through the dialog (saved), signed out, and back to a
+# local backend.
+setup_connect_signin() {
+	port=$((20000 + RANDOM % 20000))
+	mkdir -p "$tmp/server-home" "$tmp/server-cwd"
+	HOME="$tmp/server-home" "$backend" serve -faux -listen "127.0.0.1:$port" \
+		-token s3cret -cwd "$tmp/server-cwd" \
+		-auth-file "$tmp/server-home/auth.json" >"$tmp/server.log" 2>&1 &
+	server_pid=$!
+	local i
+	for i in $(seq 1 100); do
+		if (echo >"/dev/tcp/127.0.0.1/$port") 2>/dev/null; then return 0; fi
+		sleep 0.1
+	done
+	echo "  the server did not start:"
+	cat "$tmp/server.log"
+	return 1
+}
+
+saved_connection() {
+	local file="$tmp/home/.prigh/tui-connection.sexp"
+	echo "=== saved ($(stat -c %a "$file"))"
+	normalise <"$file"
+}
+
+scenario_connect_signin() {
+	wait_for "Ctrl+C"
+	type_text "/connect 127.0.0.1:$port"
+	keys Enter
+	wait_for "Sign in to"
+	settle
+	capture connect_signin "refused: the sign-in dialog"
+	# A -token server has no users: straight to the token.
+	keys Tab
+	type_text "s3cret"
+	settle
+	capture connect_signin "the token, masked"
+	keys Enter
+	wait_for "connected to 127.0.0.1"
+	settle
+	capture connect_signin "signed in"
+	saved_connection
+	type_text "/signout"
+	keys Enter
+	wait_for "signed out of"
+	settle
+	capture connect_signin "signed out"
+	saved_connection
+	keys Escape
+	settle
+	capture connect_signin "closed: disconnected"
+	type_text "/connect local"
+	keys Enter
+	wait_for "connected to a local backend"
+	settle
+	capture connect_signin "a local backend again"
+}
+
+# Started against a server that wants a token we do not have: the TUI
+# comes up with the sign-in dialog instead of exiting.
+setup_startup_signin() {
+	setup_connect_signin
+	tui_args="-connect 127.0.0.1:$port"
+}
+
+scenario_startup_signin() {
+	wait_for "Sign in to"
+	settle
+	capture startup_signin "refused at startup"
+	keys Tab
+	type_text "s3cret"
+	keys Enter
+	wait_for "connected to 127.0.0.1"
+	settle
+	capture startup_signin "signed in"
+	saved_connection
+}
+
+# prigh-tui -detached: the TUI in a new session of the tmux in $PRIGH_TMUX
+# (here a wrapper for the private server). That server was started without
+# the caller's environment, so the TUI only works if it is passed on.
+setup_detached() {
+	no_start=1
+	mkdir -p "$tmp/home" "$tmp/cwd"
+	printf '#!/bin/sh\nexec %s -L %s "$@"\n' "$(type -P tmux)" "$socket" >"$tmp/tmux.sh"
+	chmod +x "$tmp/tmux.sh"
+	env -i PATH="$PATH" ${TMUX_TMPDIR:+TMUX_TMPDIR="$TMUX_TMPDIR"} \
+		"$(type -P tmux)" -L "$socket" -f /dev/null new-session -d -s other "sleep 600"
+}
+
+# Runs prigh-tui -detached ARGS from $tmp with only these variables (and
+# VAR=VALUE before the arguments) and prints its output and status.
+detached() {
+	local vars=() out status=0 start=$SECONDS
+	while [[ "${1:-}" == *=* ]]; do vars+=("$1"); shift; done
+	out="$(cd "$tmp" && timeout 10 env -i PATH="$PATH" HOME="$tmp/home" LC_ALL=C.UTF-8 \
+		${TMUX_TMPDIR:+TMUX_TMPDIR="$TMUX_TMPDIR"} PRIGH_BACKEND="$backend" \
+		PRIGH_TMUX="$tmp/tmux.sh" "${vars[@]}" "$exe" -detached "$@" 2>&1)" || status=$?
+	printf '%s\n' "$out" | normalise
+	echo "exit $status$([ $((SECONDS - start)) -lt 5 ] && echo ", at once")"
+}
+
+sessions() {
+	echo "=== sessions: $(tmux list-sessions -F '#{session_name}' | sort | tr '\n' ' ' | sed 's/ $//')"
+}
+
+scenario_detached() {
+	local pid odd
+	odd=$'sp ace "dq" \'sq\' $HOME `tick` #{pane_id} semi;\nline two'
+	echo "=== from inside tmux, relative DIR and -auth-file, odd values"
+	detached TMUX=/elsewhere/default,1,0 PRIGH_ODD="$odd" UNRELATED=dropped \
+		-faux -auth-file home/auth.json cwd
+	sessions
+	session=prigh-cwd
+	resize "$W" "$H"
+	wait_for "Ctrl+C"
+	settle
+	capture detached "the TUI in \$TMP/cwd"
+	echo "=== the pane: in $(tmux display -p -t "$session" '#{pane_current_path}' | normalise)"
+	pid="$(tmux display -p -t "$session" '#{pane_pid}')"
+	tr '\n\0' '|\n' <"/proc/$pid/environ" | grep -E '^(HOME|PRIGH_[A-Z_]+|UNRELATED|TMUX)=' | sort |
+		sed -E -e "s#$backend#\$BACKEND#" -e "s#^TMUX=.*/$socket,.*#TMUX=<the private server>#" | normalise
+	echo "=== again, outside tmux: -2"
+	detached -faux "$tmp/cwd"
+	sessions
+	session=prigh-cwd-2
+	resize "$W" "$H"
+	wait_for "Ctrl+C"
+	type_text "hello"
+	keys Enter
+	wait_for "faux reply"
+	settle
+	capture detached "prigh-cwd-2 answers"
+	keys C-c
+	keys C-c
+	for _ in $(seq 1 50); do tmux has-session -t =prigh-cwd-2 2>/dev/null || break; sleep 0.1; done
+	echo "=== quit: the session closed"
+	sessions
+	echo "=== a TUI that fails keeps its pane until Enter"
+	detached -faux -backend /nonexistent/prigh -tmux-session broken.one "$tmp/cwd"
+	session=broken_one
+	wait_for "press Enter"
+	resize "$W" "$H"
+	settle
+	capture detached "the error"
+	keys Enter
+	for _ in $(seq 1 50); do tmux has-session -t =broken_one 2>/dev/null || break; sleep 0.1; done
+	sessions
+	echo "=== errors before detaching"
+	detached -faux "$tmp/missing"
+	detached -faux -connect 127.0.0.1:1 cwd
+	detached PRIGH_TMUX=/nonexistent/tmux -faux cwd
+	sessions
 }
 
 run_scenario "$1"
