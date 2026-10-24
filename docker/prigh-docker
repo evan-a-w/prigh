@@ -114,19 +114,6 @@ set_mode() {
 	chmod "$1" -- "$2"
 }
 
-# As the owner: without CAP_FSETID, root's chmod would drop the setgid bit of
-# a directory whose group it is not in.
-set_mode_as_owner() {
-	local uid="$1"
-	[ "$(mode_of "$3")" = "$2" ] && return 0
-	if [ -n "$dry_run" ]; then
-		show + setpriv --reuid="$uid" --regid="$uid" --clear-groups chmod "$2" "$3"
-		chmod "$2" -- "$3"
-	else
-		setpriv --reuid="$uid" --regid="$uid" --clear-groups chmod "$2" -- "$3"
-	fi
-}
-
 # --- PRIGH_MODE ---------------------------------------------------------------
 
 # Parallel arrays of serve flags and ports.
@@ -261,31 +248,27 @@ load_gh_tokens() {
 	done
 }
 
-# Stable uids: a user keeps the owner of its home (else of its workspace) when
-# that is >= min_uid; others get the lowest uid that no system account,
-# directory or other user has.
+# Stable uids: a user keeps the owner of its home when that is >= min_uid;
+# others get the lowest uid that no system account, home or other user has.
 declare -A uid_of=()
 allocate_uids() {
-	local name kind dir uid next="$min_uid"
+	local name dir uid next="$min_uid"
 	local -A claimed=() used=()
-	for dir in "$root"/home/* "$root"/workspace/*; do
+	for dir in "$root"/home/*; do
 		[ -d "$dir" ] || continue
 		uid=$(owner_of "$dir")
 		[ "$uid" -lt "$min_uid" ] || claimed[$uid]=1
 	done
 	local -a sorted
 	mapfile -t sorted < <(printf '%s\n' "${users[@]}" | LC_ALL=C sort)
-	for kind in home workspace; do
-		for name in "${sorted[@]}"; do
-			[ -z "${uid_of[$name]:-}" ] || continue
-			dir="$root/$kind/$name"
-			[ -d "$dir" ] || continue
-			uid=$(owner_of "$dir")
-			if [ "$uid" -ge "$min_uid" ] && [ -z "${system_ids[$uid]:-}${used[$uid]:-}" ]; then
-				uid_of[$name]="$uid"
-				used[$uid]=1
-			fi
-		done
+	for name in "${sorted[@]}"; do
+		dir="$root/home/$name"
+		[ -d "$dir" ] || continue
+		uid=$(owner_of "$dir")
+		if [ "$uid" -ge "$min_uid" ] && [ -z "${system_ids[$uid]:-}${used[$uid]:-}" ]; then
+			uid_of[$name]="$uid"
+			used[$uid]=1
+		fi
 	done
 	for name in "${sorted[@]}"; do
 		[ -z "${uid_of[$name]:-}" ] || continue
@@ -298,7 +281,7 @@ allocate_uids() {
 }
 
 write_accounts() {
-	local dir="$root$extrausers" name members su
+	local dir="$root$extrausers" name
 	mkdir -p "$dir"
 	chmod 755 "$root$state" "$dir"
 	: >"$dir/passwd"
@@ -306,15 +289,8 @@ write_accounts() {
 	(umask 077 && : >"$dir/shadow")
 	: >"$root$users_file"
 	for name in "${users[@]}"; do
-		members=()
-		for su in "${superusers[@]}"; do
-			[ "$su" = "$name" ] || members+=("$su")
-		done
 		echo "$name:x:${uid_of[$name]}:${uid_of[$name]}:prigh user $name:/home/$name:$user_shell" >>"$dir/passwd"
-		echo "$name:x:${uid_of[$name]}:$(
-			IFS=,
-			echo "${members[*]}"
-		)" >>"$dir/group"
+		echo "$name:x:${uid_of[$name]}:" >>"$dir/group"
 		echo "$name:*:::::::" >>"$dir/shadow"
 		printf '%s\t%s\t%s\n' "$name" "${uid_of[$name]}" "${is_superuser[$name]:+yes}" >>"$root$users_file"
 	done
@@ -421,23 +397,20 @@ migrate_home() {
 	mv -- "$tmp" "$h/prigh"
 }
 
-# ensure_dir PATH UID MODE: a directory owned by UID:UID with MODE; an existing
+# ensure_home NAME UID: /home/NAME owned by UID:UID with mode 700; an existing
 # one owned by someone else is chowned recursively.
-ensure_dir() {
-	local dir="$1" uid="$2" dmode="$3"
+ensure_home() {
+	local dir="$root/home/$1" uid="$2"
 	[ ! -L "$dir" ] || die "${dir#"$root"} is a symlink"
 	if [ ! -e "$dir" ]; then
 		mkdir -p "$dir"
-		case "$dir" in "$root"/home/*) cp -a "$root/etc/skel/." "$dir/" ;; esac
+		cp -a "$root/etc/skel/." "$dir/"
 		set_owner -R "$uid" "$dir"
 	elif [ "$(owner_of "$dir")" != "$uid" ]; then
 		log "${dir#"$root"} is owned by uid $(owner_of "$dir"), not $uid: chowning it recursively"
 		set_owner -R "$uid" "$dir"
 	fi
-	case "$dmode" in
-	2*) set_mode_as_owner "$uid" "$dmode" "$dir" ;;
-	*) set_mode "$dmode" "$dir" ;;
-	esac
+	set_mode 700 "$dir"
 }
 
 setup_service_home() {
@@ -447,18 +420,22 @@ setup_service_home() {
 	if [ "$(owner_of "$h")" != 0 ]; then set_owner 0 "$h"; fi
 	set_mode 755 "$h"
 	lookup_user "$service_user"
-	ensure_dir "$h/$service_user" "$u_uid" 700
+	ensure_home "$service_user" "$u_uid"
 }
 
-setup_user_dirs() {
-	local name ws="$root/workspace" wmode
-	mkdir -p "$ws"
-	wmode=$(mode_of "$ws")
-	((8#$wmode & 1)) ||
-		die "/workspace has mode $wmode, so users cannot reach /workspace/<name>: make it world-searchable (chmod o+x, on the host for a bind mount)"
-	for name in "${users[@]}"; do
-		ensure_dir "$root/home/$name" "${uid_of[$name]}" 700
-		ensure_dir "$ws/$name" "${uid_of[$name]}" 2770
+# Older images kept the projects in /workspace/<name>, now the users work in
+# their homes: say how to move what is still bound there.
+warn_old_workspace() {
+	local d name to
+	for d in "$root"/workspace/*; do
+		[ -d "$d" ] || continue
+		name="${d##*/}"
+		if [[ " $* " == *" $name "* ]]; then
+			to="cp -a /workspace/$name/. /home/$name/ && chown -R $name: /home/$name"
+		else
+			to="cp -a /workspace/$name /home/NAME/ && chown -R NAME: /home/NAME/$name"
+		fi
+		log "/workspace/$name is from an older image: users now work in their homes and nothing uses /workspace. Move it: docker compose exec prigh sh -c '$to', then remove the /workspace mount (see DOCKER.md, Migrating from /workspace)"
 	done
 }
 
@@ -481,17 +458,17 @@ random_token() {
 	fi
 }
 
-# supervise NAME CMD...: CMD in NAME's workspace in the background, restarted
+# supervise NAME CMD...: CMD in NAME's home in the background, restarted
 # whenever it exits.
 supervise() {
 	local name="$1"
 	shift
 	if [ -n "$dry_run" ]; then
-		show "supervise in /workspace/$name:" "$@"
+		show "supervise in /home/$name:" "$@"
 		return
 	fi
 	(
-		cd "$root/workspace/$name"
+		cd "$root/home/$name"
 		while :; do
 			"$@" </dev/null && status=0 || status=$?
 			log "tool host of $name exited ($status), restarting"
@@ -641,8 +618,9 @@ start_nix_daemon() {
 # --- Commands -----------------------------------------------------------------
 
 start_tui_mode() {
-	local cwd="${PRIGH_CWD:-/workspace/$service_user}"
+	local cwd="${PRIGH_CWD:-/home/$service_user}"
 	setup_service_home
+	warn_old_workspace "$service_user"
 	seed_nix
 	start_nix_daemon
 	lookup_user "$service_user"
@@ -674,11 +652,15 @@ start() {
 	setup_service_home
 	allocate_uids
 	write_accounts
-	setup_user_dirs
+	local name
+	for name in "${users[@]}"; do
+		ensure_home "$name" "${uid_of[$name]}"
+	done
+	warn_old_workspace "${users[@]}"
 	seed_nix
 	start_nix_daemon
 
-	local name host_tokens=() summary=() hello
+	local host_tokens=() summary=() hello
 	for name in "${users[@]}"; do
 		summary+=("$name(${uid_of[$name]}${is_superuser[$name]:+,superuser})")
 		git_defaults "$name"
@@ -693,12 +675,12 @@ start() {
 				hello=(PRIGH_TOKEN="$token" PRIGH_USER="$name")
 			fi
 			clean "$name" "${hello[@]}" \
-				prigh tool-host -connect "127.0.0.1:$internal_port" -name container -host-id "container-$name" -cwd "/workspace/$name"
+				prigh tool-host -connect "127.0.0.1:$internal_port" -name container -host-id "container-$name" -cwd "/home/$name"
 			supervise "$name" "${cmd[@]}"
 		done
 	fi
 
-	local serve_args=(-cwd /workspace -no-backend-host) i
+	local serve_args=(-cwd "/home/$service_user" -no-backend-host) i
 	for i in "${!flags[@]}"; do
 		serve_args+=("${flags[$i]}" "0.0.0.0:${ports[$i]}")
 	done
@@ -728,7 +710,7 @@ start() {
 	local hosts="one per user, as that user"
 	! $no_backend_host || hosts="none in the container (PRIGH_NO_BACKEND_HOST=1)"
 	log "mode=$mode users: ${summary[*]}; tool hosts: $hosts; nix: $nix_status"
-	cd "$root/workspace"
+	cd "$root/home/$service_user"
 	service "${backend_env[@]}" prigh serve "${serve_args[@]}" "${extra_args[@]}"
 	run_exec "${cmd[@]}"
 }
@@ -744,7 +726,7 @@ tui() {
 		prev="$a"
 	done
 	if $tui_mode; then
-		service prigh-tui -cwd "${PRIGH_CWD:-/workspace/$service_user}" "$@" -- "${extra_args[@]}"
+		service prigh-tui -cwd "${PRIGH_CWD:-/home/$service_user}" "$@" -- "${extra_args[@]}"
 		run_exec "${cmd[@]}"
 	fi
 	local token_env=()
@@ -806,9 +788,9 @@ cat "$key.pub"' sh "$name@prigh"
 list_users() {
 	require_accounts
 	local name uid su
-	printf '%-16s %-6s %-22s %-28s %s\n' NAME UID HOME WORKSPACE SUPERUSER
+	printf '%-16s %-6s %-22s %s\n' NAME UID HOME SUPERUSER
 	while IFS=$'\t' read -r name uid su; do
-		printf '%-16s %-6s %-22s %-28s %s\n' "$name" "$uid" "/home/$name" "/workspace/$name" "${su:-no}"
+		printf '%-16s %-6s %-22s %s\n' "$name" "$uid" "/home/$name" "${su:-no}"
 	done <"$root$users_file"
 }
 

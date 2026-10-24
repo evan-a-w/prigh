@@ -1,4 +1,4 @@
-# A bind-mounted workspace may be owned by another uid.
+# A repository copied in (e.g. with docker cp) may be owned by another uid.
 [safe]
 	directory = *
 # HTTPS to GitHub authenticates with $GH_TOKEN when it is set.

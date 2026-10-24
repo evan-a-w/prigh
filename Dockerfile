@@ -102,7 +102,7 @@ RUN mv /opt/nix-seed/flake-registry.json /etc/nix/ \
  && mkdir /nix \
  && groupadd -o -g "${PRIGH_GID}" prigh \
  && useradd -o -m -u "${PRIGH_UID}" -g prigh -s /bin/bash prigh \
- && mkdir -p /workspace /home/prigh/.prigh /home/prigh/.config/prigh \
+ && mkdir -p /home/prigh/.prigh /home/prigh/.config/prigh \
  && chown -R prigh:prigh /home/prigh \
  && chmod 700 /home/prigh
 
@@ -113,9 +113,9 @@ ENV LANG=C.UTF-8 \
     GIT_TERMINAL_PROMPT=0
 
 # Starts as root: the entrypoint creates the users, then drops privileges.
-# Each user's own directory is /workspace/<name>.
-WORKDIR /workspace
-VOLUME ["/home", "/workspace", "/nix"]
+# Each user works in its home, /home/<name>.
+WORKDIR /home/prigh
+VOLUME ["/home", "/nix"]
 EXPOSE 7777 7790
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s CMD ["prigh-docker", "healthcheck"]
 # -g: stop signals go to the whole process group (backend and tool hosts).
