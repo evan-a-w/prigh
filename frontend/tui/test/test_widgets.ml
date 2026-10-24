@@ -601,6 +601,7 @@ let%expect_test "keymap: every binding resolves to its intent and is documented"
     Alt+A            Toggle_archived
     Ctrl+X           Copy_last
     Ctrl+Z           Suspend
+    Alt+L            Toggle_sidebar
     Shift+Tab        Next_agent
     Alt+1            (Focus_agent 1)
     Ctrl+C           Interrupt
@@ -659,6 +660,7 @@ let%expect_test "keymap: every binding resolves to its intent and is documented"
     Alt+A                   /sessions: archive or unarchive the highlighted session
     Ctrl+X                  copy the last assistant message
     Ctrl+Z                  suspend to the shell
+    Alt+L                   show or hide the agents sidebar (terminals of 120 columns and more)
     Shift+Tab               cycle focus: main → agent 1 → … → main
     Alt+1                   focus agent N (Alt+1…9)
     Ctrl+C                  clear the editor or abort the turn, then (again) quit

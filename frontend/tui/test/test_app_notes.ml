@@ -103,7 +103,19 @@ let%expect_test
   H.show h;
   [%expect
     {|
-      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+    prigh  new session                                                 /work
+
+
+
+
+
+
+
+
+
+
+
+
 
     ▌ earlier question
       earlier answer
@@ -123,15 +135,16 @@ let%expect_test
 
     ⚑ Review of uncommitted changes
       [P1] Fix the count a.ml:2
-    ────────────────────────────────────────────────────────────────────────
+    ── /help · Tab commands · Alt+Enter follow-up · Ctrl+C twice quits ─────
     > ▏
-    /work  deepseek-flash  think:off  mode:auto  ctx:0.1%/1.0M  $0.01
+    deepseek-flash  think:off  mode:auto          ctx ▱▱▱▱▱ 0.1%/1.0M  $0.01
     |}];
   H.keys h "/verbosity verbose";
   H.enter h;
   H.show h;
   [%expect
     {|
+    prigh  new session                                                 /work
       context compacted
       we fixed the parser
 
@@ -163,10 +176,9 @@ let%expect_test
       [prigh review] Review the uncommitted changes in /work and give
       prioritised findings.
       [P1] Fix the count a.ml:2
-      view: verbose — everything is shown
-    ────────────────────────────────────────────────────────────────────────
+    ── /help · Tab commands ───────── view: verbose — everything is shown ──
     > ▏
-    /work  deepseek-flash  think:off  mode:auto  ctx:0.1%/1.0M  $0.01
+    deepseek-flash  think:off  mode:auto          ctx ▱▱▱▱▱ 0.1%/1.0M  $0.01
     |}]
 ;;
 
@@ -180,7 +192,7 @@ let%expect_test "a note arriving live, before the user's text" =
   H.show h;
   [%expect
     {|
-      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+    prigh  new session                                                 /work
 
     ▌ earlier question
       earlier answer
@@ -189,9 +201,9 @@ let%expect_test "a note arriving live, before the user's text" =
     ⌂ Working directory is now /work/sub
     ▌ fix the build
     ▌ @Makefile  attached
-    ────────────────────────────────────────────────────────────────────────
+    ── /help · Tab commands · Alt+Enter follow-up · Ctrl+C twice quits ─────
     > ▏
-    /work  deepseek-flash  think:off  mode:auto  ctx:0.1%/1.0M  $0.01
+    deepseek-flash  think:off  mode:auto          ctx ▱▱▱▱▱ 0.1%/1.0M  $0.01
     |}]
 ;;
 
@@ -214,18 +226,18 @@ let%expect_test
   [%expect
     {|
     (Rpc (method_ get_entries) (params ()) (tag Entries_for_fork))
+    prigh  new session                                                 /work
 
-      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
-    ▌ earlier question
-      earlier answer
-    Fork at  (3)
-    / ▏
-       fix the build                    #1
-       ◷ Goal: continuing (3/20)        #2
-    ▸* ⚑ Review of uncommitted changes  #3
-    ────────────────────────────────────────────────────────────────────────
-    …deepseek-flash  think:off  ctx:0.1%/1.0M  Enter selects · Esc closes
+    ╭─ Fork at (3) ────────────────────────────────────────────────────────╮
+    │ / ▏                                                                  │
+    │    fix the build                    #1                               │
+    │    ◷ Goal: continuing (3/20)        #2                               │
+    │ ▸* ⚑ Review of uncommitted changes  #3                               │
+    ╰──────────────────────────────────────────────────────────────────────╯
+    ── Enter selects · Esc closes ──────────────────────────────────────────
+    >
+    deepseek-flash  think:off  mode:auto          ctx ▱▱▱▱▱ 0.1%/1.0M  $0.01
     |}];
   H.step ~quiet:true h (Key (Key.plain Up));
   H.step ~quiet:true h (Key (Key.plain Up));
@@ -234,18 +246,18 @@ let%expect_test
   [%expect
     {|
     (Rpc (method_ fork) (params ((at u1))) (tag Reload_messages))
+    prigh  new session                                                 /work
 
 
 
 
 
-      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
     ▌ earlier question
       earlier answer
-    ────────────────────────────────────────────────────────────────────────
+    ── /help · Tab commands · Alt+Enter follow-up · Ctrl+C twice quits ─────
     > fix the build▏
-    /work  deepseek-flash  think:off  mode:auto  ctx:0.1%/1.0M  $0.01
+    deepseek-flash  think:off  mode:auto          ctx ▱▱▱▱▱ 0.1%/1.0M  $0.01
     |}]
 ;;
 
@@ -297,7 +309,9 @@ let%expect_test "plan mode notes: before a prompt, alone, before a goal" =
   H.show h;
   [%expect
     {|
-      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+    prigh  new session                                                 /work
+
+
 
     ▌ earlier question
       earlier answer
@@ -312,9 +326,9 @@ let%expect_test "plan mode notes: before a prompt, alone, before a goal" =
     ◇ Plan mode on: the model was told to plan, not change files
     ◎ Goal: ship it
       planning the goal
-    ────────────────────────────────────────────────────────────────────────
+    ── /help · Tab commands · Alt+Enter follow-up · Ctrl+C twice quits ─────
     > ▏
-    /work  deepseek-flash  think:off  mode:auto  ctx:0.1%/1.0M  $0.01
+    deepseek-flash  think:off  mode:auto          ctx ▱▱▱▱▱ 0.1%/1.0M  $0.01
     |}];
   H.keys h "/fork";
   H.enter h;
@@ -333,6 +347,9 @@ let%expect_test "plan mode notes: before a prompt, alone, before a goal" =
   [%expect
     {|
     (Rpc (method_ get_entries) (params ()) (tag Entries_for_fork))
+    prigh  new session                                                 /work
+
+
 
     ▌ earlier question
       earlier answer
@@ -342,17 +359,14 @@ let%expect_test "plan mode notes: before a prompt, alone, before a goal" =
       looked
 
     ◇ Plan mode off: the model was told it can change files
-      editing
-
-    ◇ Plan mode on: the model was told to plan, not change files
-    ◎ Goal: ship it
-      planning the goal
-    Fork at  (2)
-    / ▏
-       look around                           #1
-    ▸* ◇ Plan mode off: the model was told it can change files  #2
-    ────────────────────────────────────────────────────────────────────────
-    …deepseek-flash  think:off  ctx:0.1%/1.0M  Enter selects · Esc closes
+    ╭─ Fork at (2) ────────────────────────────────────────────────────────╮
+    │ / ▏                                                                  │
+    │    look around                         #1                            │
+    │ ▸* ◇ Plan mode off: the model was told it can change files  #2       │
+    ╰──────────────────────────────────────────────────────────────────────╯
+    ── Enter selects · Esc closes ──────────────────────────────────────────
+    >
+    deepseek-flash  think:off  mode:auto          ctx ▱▱▱▱▱ 0.1%/1.0M  $0.01
     |}]
 ;;
 
@@ -412,7 +426,12 @@ let%expect_test "every kind of note: groups read as one block" =
   H.show h;
   [%expect
     {|
-      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+    prigh  new session                                                 /work
+
+
+
+
+
 
     ▌ earlier question
       earlier answer
@@ -432,9 +451,9 @@ let%expect_test "every kind of note: groups read as one block" =
     ◷ Goal: continuing (2/20)
     ▌ go on
       going
-    ────────────────────────────────────────────────────────────────────────
+    ── /help · Tab commands · Alt+Enter follow-up · Ctrl+C twice quits ─────
     > ▏
-    /work  deepseek-flash  think:off  mode:auto  ctx:0.1%/1.0M  $0.01
+    deepseek-flash  think:off  mode:auto          ctx ▱▱▱▱▱ 0.1%/1.0M  $0.01
     |}]
 ;;
 
@@ -453,22 +472,22 @@ let%expect_test "/diff: the changes in colour, a path, none, not a repository" =
   [%expect
     {|
     (Rpc (method_ git_diff) (params ()) (tag Git_diff))
+    prigh  new session                                                 /work
 
-    ▌ earlier question
-      earlier answer
-      reading the changes…
-      diff /work against HEAD  2 files changed, +2 −1
-      src/a.ml  +1 −1
-        @@ -1,2 +1,2 @@
-         let x = 1
-        -let y = 2
-        +let y = 3
-      new file.txt  new  +1
-        @@ -0,0 +1 @@
-        +hello
-    ────────────────────────────────────────────────────────────────────────
+    ╭─ Changes ────────────────────────────────────────────────────────────╮
+    │ diff /work against HEAD  2 files changed, +2 −1                      │
+    │ src/a.ml  +1 −1                                                      │
+    │   @@ -1,2 +1,2 @@                                                    │
+    │    let x = 1                                                         │
+    │   -let y = 2                                                         │
+    │   +let y = 3                                                         │
+    │ new file.txt  new  +1                                                │
+    │   @@ -0,0 +1 @@                                                      │
+    │   +hello                                                             │
+    ╰───────────────────────────────────────────────────────── Esc closes ─╯
+    ── ↑↓ scroll · Esc closes ────────────────────── reading the changes… ──
     > ▏
-    /work  deepseek-flash  think:off  mode:auto  ctx:0.1%/1.0M  $0.01
+    deepseek-flash  think:off  mode:auto          ctx ▱▱▱▱▱ 0.1%/1.0M  $0.01
     |}];
   print_endline
     (Content.to_styled
@@ -521,22 +540,22 @@ let%expect_test "/diff: the changes in colour, a path, none, not a repository" =
       (tag (Paths_for_autocomplete src)))
     (Rpc (method_ git_diff) (params ((path src))) (tag Git_diff))
     (Rpc (method_ git_diff) (params ()) (tag Git_diff))
-      diff /work against HEAD  2 files changed, +2 −1
-      src/a.ml  +1 −1
-        @@ -1,2 +1,2 @@
-         let x = 1
-        -let y = 2
-        +let y = 3
-      new file.txt  new  +1
-        @@ -0,0 +1 @@
-        +hello
-      reading the changes…
-      no changes in /work against nothing (no commits yet)
-      reading the changes…
-      not a git repository: /work (git init starts one, or /cd into one)
-    ────────────────────────────────────────────────────────────────────────
+    prigh  new session                                                 /work
+
+
+
+
+
+
+
+
+
+
+    ▌ earlier question
+      earlier answer
+    ── not a git repository: /work (git init starts one, or /cd into one) ──
     > ▏
-    /work  deepseek-flash  think:off  mode:auto  ctx:0.1%/1.0M  $0.01
+    deepseek-flash  think:off  mode:auto          ctx ▱▱▱▱▱ 0.1%/1.0M  $0.01
     |}]
 ;;
 
@@ -566,16 +585,16 @@ let%expect_test
         (command "/review main look at errors")
         (hint    "")
         (then_   Review_started))))
+    prigh  new session                                                 /work
 
-      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+
+
 
     ▌ earlier question
       earlier answer
-      reading the changes to review…
-      nothing to review: no changes against main in /work
-    ────────────────────────────────────────────────────────────────────────
+    ── /help ──────── nothing to review: no changes against main in /work ──
     > /review main look at errors▏
-    /work  deepseek-flash  think:off  mode:auto  ctx:0.1%/1.0M  $0.01
+    deepseek-flash  think:off  mode:auto          ctx ▱▱▱▱▱ 0.1%/1.0M  $0.01
     |}];
   H.step ~quiet:true h (Key (Key.ctrl 'u'));
   H.event h (State (state ~running:true ()));
@@ -586,16 +605,16 @@ let%expect_test
   [%expect
     {|
     (Rpc (method_ init) (params ()) (tag Review_started))
-      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+    prigh  new session                                                 /work
+
+
+
 
     ▌ earlier question
       earlier answer
-      reading the changes to review…
-      nothing to review: no changes against main in /work
-      queued: it starts when the current run ends
-    ────────────────────────────────────────────────────────────────────────
+    ── ⠋ working ──────────── queued: it starts when the current run ends ──
     > ▏
-    …deepseek-flash  ctx:0.1%/1.0M  ⠋ working · Esc aborts · Enter steers
+    deepseek-flash  think:off  mode:auto          ctx ▱▱▱▱▱ 0.1%/1.0M  $0.01
     |}]
 ;;
 
@@ -616,15 +635,16 @@ let%expect_test
   H.show h;
   [%expect
     {|
-      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+    prigh  new session                                                                             /work
+
+
+
 
     ▌ earlier question
       earlier answer
-      notifications: the bell when a turn ends, a tool waits for you or background work finishes, while
-      this terminal is not focused (it has not reported focus yet: in tmux, set -g focus-events on)
-    ────────────────────────────────────────────────────────────────────────────────────────────────────
+    ── /help · Tab commands · Alt+Enter follow-up · Ctrl+C twice quits ─────────────────────────────────
     > ▏
-    /work  deepseek-flash  think:off  mode:auto  view:normal  ctx:0.1%/1.0M  $0.01
+    deepseek-flash  think:off  mode:auto  view:normal                         ctx ▱▱▱▱▱ 0.1%/1.0M  $0.01
     |}];
   let finish () =
     H.event h (Agent_end [ assistant "All tests pass.\nDetails follow." ])
@@ -735,15 +755,15 @@ let%expect_test
       (tag (
         Notice_on_success
         "notifications off (/notify bell or /notify desktop turns them on)")))
+    prigh  new session                                                                             /work
+    ▌ earlier question
+      earlier answer
+      denied bash
     ↩ job j1 "make test"  exited 0
         ok
-      declined to answer
       plan not approved: still planning
-      notifications: desktop
-      usage: /notify [off|bell|desktop]
-      notifications off (/notify bell or /notify desktop turns them on)
-    ────────────────────────────────────────────────────────────────────────────────────────────────────
+    ── /help · Tab commands ─────── notifications off (/notify bell or /notify desktop turns them on) ──
     > ▏
-    /work  deepseek-flash  think:off  mode:auto  view:normal  ctx:0.1%/1.0M  $0.01
+    deepseek-flash  think:off  mode:auto  view:normal                         ctx ▱▱▱▱▱ 0.1%/1.0M  $0.01
     |}]
 ;;

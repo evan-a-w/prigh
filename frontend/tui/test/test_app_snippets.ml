@@ -29,44 +29,58 @@ let%expect_test
   H.show h;
   [%expect
     {|
-      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+    prigh  new session                                     /work
 
-    ▌ earlier question
-      earlier answer
-    Snippets  (3)
-    / ▏
-    ▸  review  Review the diff for bugs.
-       tests   Run the tests and fix failures.
-       plan    Plan first; change nothing yet.
-    ────────────────────────────────────────────────────────────
-    …deepseek-flash  ctx:0.1%/1.0M  Enter inserts the text at t…
+
+
+
+    ╭─ Snippets (3) ───────────────────────────────────────────╮
+    │ / ▏                                                      │
+    │ ▸  review  Review the diff for bugs.                     │
+    │    tests   Run the tests and fix failures.               │
+    │    plan    Plan first; change nothing yet.               │
+    ╰──────────────────────────────────────────────────────────╯
+    ── Enter inserts the text at the cursor · Esc closes ───────
+    >
+    deepseek-flash  mode:auto         ctx ▱▱▱▱▱ 0.1%/1.0M  $0.01
     |}];
   H.keys h "tst";
   H.show h;
   [%expect
     {|
-      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+    prigh  new session                                     /work
 
-    ▌ earlier question
-      earlier answer
-    Snippets  (2)
-    / tst▏
-    ▸  tests   Run the tests and fix failures.
-       review  Review the diff for bugs.
-    ────────────────────────────────────────────────────────────
-    …deepseek-flash  ctx:0.1%/1.0M  Enter inserts the text at t…
+
+
+
+
+    ╭─ Snippets (2) ───────────────────────────────────────────╮
+    │ / tst▏                                                   │
+    │ ▸  tests   Run the tests and fix failures.               │
+    │    review  Review the diff for bugs.                     │
+    ╰──────────────────────────────────────────────────────────╯
+    ── Enter inserts the text at the cursor · Esc closes ───────
+    >
+    deepseek-flash  mode:auto         ctx ▱▱▱▱▱ 0.1%/1.0M  $0.01
     |}];
   H.esc h;
   H.show h;
   [%expect
     {|
-      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+    prigh  new session                                     /work
+
+
+
+
+
+
+
 
     ▌ earlier question
       earlier answer
-    ────────────────────────────────────────────────────────────
+    ── /help · Tab commands · Alt+Enter follow-up ──────────────
     > ▏
-    …deepseek-flash  think:off  mode:auto  ctx:0.1%/1.0M  $0.01
+    deepseek-flash  mode:auto         ctx ▱▱▱▱▱ 0.1%/1.0M  $0.01
     |}];
   H.keys h "/snippet";
   H.enter h;
@@ -76,14 +90,20 @@ let%expect_test
   H.show h;
   [%expect
     {|
-      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+    prigh  new session                                     /work
+
+
+
+
+
+
 
     ▌ earlier question
       earlier answer
-    ────────────────────────────────────────────────────────────
+    ── /help · Tab commands · Alt+Enter follow-up ──────────────
     > Review the diff for bugs.
       List them by severity.▏
-    …deepseek-flash  think:off  mode:auto  ctx:0.1%/1.0M  $0.01
+    deepseek-flash  mode:auto         ctx ▱▱▱▱▱ 0.1%/1.0M  $0.01
     |}]
 ;;
 
@@ -93,13 +113,20 @@ let%expect_test "/snippet NAME inserts; an unknown name says the closest" =
   H.show h;
   [%expect
     {|
-      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+    prigh  new session                                     /work
+
+
+
+
+
+
+
 
     ▌ earlier question
       earlier answer
-    ────────────────────────────────────────────────────────────
+    ── /help · Tab commands · Alt+Enter follow-up ──────────────
     > Run the tests and fix failures.▏
-    …deepseek-flash  think:off  mode:auto  ctx:0.1%/1.0M  $0.01
+    deepseek-flash  mode:auto         ctx ▱▱▱▱▱ 0.1%/1.0M  $0.01
     |}];
   H.key h (Key.ctrl 'u');
   command h "/snippet revew";
@@ -108,18 +135,20 @@ let%expect_test "/snippet NAME inserts; an unknown name says the closest" =
   H.show h;
   [%expect
     {|
-      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+    prigh  new session                                     /work
 
-    ▌ earlier question
-      earlier answer
-      unknown snippet "revew"; did you mean review? (/snippet
-      lists them)
-      unknown snippet "zzz"; /snippet lists the 3 saved
-      usage: /snippet [NAME] · /snippet add NAME [TEXT] ·
-      /snippet rm NAME
-    ────────────────────────────────────────────────────────────
+
+
+
+
+
+    ╭─ Error ──────────────────────────────────────────────────╮
+    │ usage: /snippet [NAME] · /snippet add NAME [TEXT] ·      │
+    │ /snippet rm NAME                                         │
+    ╰────────────────────────────────────────── Esc dismisses ─╯
+    ── /help · Tab commands · Alt+Enter follow-up ──────────────
     > ▏
-    …deepseek-flash  think:off  mode:auto  ctx:0.1%/1.0M  $0.01
+    deepseek-flash  mode:auto         ctx ▱▱▱▱▱ 0.1%/1.0M  $0.01
     |}]
 ;;
 
@@ -133,18 +162,18 @@ let%expect_test "/snippet with none saved, or before the config loads" =
   H.show h;
   [%expect
     {|
-      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+    prigh  new session                                     /work
 
-    ▌ earlier question
-      earlier answer
-      the config has not loaded yet; try again in a moment
-      the config has not loaded yet; try again in a moment
-      no snippets yet: /snippet add NAME TEXT saves one
-      unknown snippet "foo"; no snippets yet: /snippet add NAME
-      TEXT saves one
-    ────────────────────────────────────────────────────────────
+
+
+
+    ╭─ Error ──────────────────────────────────────────────────╮
+    │ unknown snippet "foo"; no snippets yet: /snippet add     │
+    │ NAME TEXT saves one                                      │
+    ╰────────────────────────────────────────── Esc dismisses ─╯
+    ── /help · Tab commands · Alt+Enter follow-up ──────────────
     > ▏
-    …deepseek-flash  think:off  mode:auto  ctx:0.1%/1.0M  $0.01
+    deepseek-flash  mode:auto         ctx ▱▱▱▱▱ 0.1%/1.0M  $0.01
     |}]
 ;;
 
@@ -175,15 +204,20 @@ let%expect_test "/snippet add and rm save through set_config, acknowledged" =
   H.show h;
   [%expect
     {|
-      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+    prigh  new session                                     /work
 
-    ▌ earlier question
-      earlier answer
-      snippet fix saved: Fix the failing test. (/snippet fix
-      inserts it)
-    ────────────────────────────────────────────────────────────
+
+
+
+
+
+    ╭─ Notice ─────────────────────────────────────────────────╮
+    │ snippet fix saved: Fix the failing test. (/snippet fix   │
+    │ inserts it)                                              │
+    ╰────────────────────────────────────────── Esc dismisses ─╯
+    ── /help · Tab commands · Alt+Enter follow-up ──────────────
     > ▏
-    …deepseek-flash  think:off  mode:auto  ctx:0.1%/1.0M  $0.01
+    deepseek-flash  mode:auto         ctx ▱▱▱▱▱ 0.1%/1.0M  $0.01
     |}];
   (* Without TEXT: the last prompt sent. *)
   command h "/snippet add ask";
@@ -243,16 +277,20 @@ let%expect_test "/snippet add and rm save through set_config, acknowledged" =
   H.show h;
   [%expect
     {|
-      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+    prigh  new session                                     /work
+
+
+
+
+
+
+
 
     ▌ earlier question
       earlier answer
-      snippet fix saved: Fix the failing test. (/snippet fix
-      inserts it)
-      config.snippets[0] ("fix") has an empty text
-    ────────────────────────────────────────────────────────────
+    ──────────── config.snippets[0] ("fix") has an empty text ──
     > ▏
-    …deepseek-flash  think:off  mode:auto  ctx:0.1%/1.0M  $0.01
+    deepseek-flash  mode:auto         ctx ▱▱▱▱▱ 0.1%/1.0M  $0.01
     |}]
 ;;
 
@@ -269,20 +307,20 @@ let%expect_test "/snippet add and rm: errors say what to do" =
   H.show h;
   [%expect
     {|
-      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+    prigh  new session                                     /work
+
+
+
+
+
+
+
 
     ▌ earlier question
       earlier answer
-      usage: /snippet add NAME [TEXT] (without TEXT: your last
-      prompt)
-      "rm" is a /snippet subcommand; pick another name
-      usage: /snippet rm NAME
-      unknown snippet "revie"; did you mean review? (/snippet
-      lists them)
-      usage: /snippet rm NAME
-    ────────────────────────────────────────────────────────────
+    ── /help · Tab commands ───────── usage: /snippet rm NAME ──
     > ▏
-    …deepseek-flash  think:off  mode:auto  ctx:0.1%/1.0M  $0.01
+    deepseek-flash  mode:auto         ctx ▱▱▱▱▱ 0.1%/1.0M  $0.01
     |}]
 ;;
 
@@ -292,46 +330,58 @@ let%expect_test "/snippet completes names, add and rm" =
   H.show h;
   [%expect
     {|
-      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+    prigh  new session                                     /work
 
-    ▌ earlier question
-      earlier answer
-    ────────────────────────────────────────────────────────────
+
+
+    ╭─ /snippet ───────────────────────────────────────────────╮
+    │ ▸ review  Review the diff for bugs.                      │
+    │   tests   Run the tests and fix failures.                │
+    │   plan    Plan first; change nothing yet.                │
+    │   add     add NAME [TEXT]: save a snippet                │
+    │   rm      rm NAME: delete a snippet                      │
+    ╰──────────────────────────────────────────────────────────╯
+    ── Tab accepts · Enter as typed · Esc hides ────────────────
     > /snippet ▏
-    ▸ review  Review the diff for bugs.
-      tests   Run the tests and fix failures.
-      plan    Plan first; change nothing yet.
-      add     add NAME [TEXT]: save a snippet
-      rm      rm NAME: delete a snippet
-    …deepseek-flash  Tab accepts · Enter as typed · Esc hides
+    deepseek-flash  mode:auto         ctx ▱▱▱▱▱ 0.1%/1.0M  $0.01
     |}];
   H.keys h "re";
   H.show h;
   [%expect
     {|
-      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+    prigh  new session                                     /work
 
-    ▌ earlier question
-      earlier answer
-    ────────────────────────────────────────────────────────────
+
+
+
+    ╭─ /snippet ───────────────────────────────────────────────╮
+    │ ▸ review  Review the diff for bugs.                      │
+    │   tests   Run the tests and fix failures.                │
+    │   rm      rm NAME: delete a snippet                      │
+    │   plan    Plan first; change nothing yet.                │
+    ╰──────────────────────────────────────────────────────────╯
+    ── Tab/Enter accept · Alt+S as typed ───────────────────────
     > /snippet re▏
-    ▸ review  Review the diff for bugs.
-      tests   Run the tests and fix failures.
-      rm      rm NAME: delete a snippet
-      plan    Plan first; change nothing yet.
-    …deepseek-flash  $0.01  Tab/Enter accept · Alt+S as typed
+    deepseek-flash  mode:auto         ctx ▱▱▱▱▱ 0.1%/1.0M  $0.01
     |}];
   H.keys h "view more";
   H.show h;
   [%expect
     {|
-      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+    prigh  new session                                     /work
+
+
+
+
+
+
+
 
     ▌ earlier question
       earlier answer
-    ────────────────────────────────────────────────────────────
+    ── /help · Tab commands · Alt+Enter follow-up ──────────────
     > /snippet review more▏
-    …deepseek-flash  think:off  mode:auto  ctx:0.1%/1.0M  $0.01
+    deepseek-flash  mode:auto         ctx ▱▱▱▱▱ 0.1%/1.0M  $0.01
     |}]
 ;;
 
@@ -341,40 +391,58 @@ let%expect_test "#name: completes snippets fuzzily; Tab inserts their text" =
   H.show h;
   [%expect
     {|
-      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+    prigh  new session                                     /work
 
-    ▌ earlier question
-      earlier answer
-    ────────────────────────────────────────────────────────────
+
+
+
+
+
+    ╭─ Snippets ───────────────────────────────────────────────╮
+    │ ▸ #tests   Run the tests and fix failures.               │
+    │   #review  Review the diff for bugs.                     │
+    ╰──────────────────────────────────────────────────────────╯
+    ── Tab/Enter accept · Alt+S as typed ───────────────────────
     > please #e▏
-    ▸ #tests   Run the tests and fix failures.
-      #review  Review the diff for bugs.
-    …deepseek-flash  $0.01  Tab/Enter accept · Alt+S as typed
+    deepseek-flash  mode:auto         ctx ▱▱▱▱▱ 0.1%/1.0M  $0.01
     |}];
   H.keys h "s";
   H.show h;
   [%expect
     {|
-      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+    prigh  new session                                     /work
 
-    ▌ earlier question
-      earlier answer
-    ────────────────────────────────────────────────────────────
+
+
+
+
+
+
+    ╭─ Snippets ───────────────────────────────────────────────╮
+    │ ▸ #tests  Run the tests and fix failures.                │
+    ╰──────────────────────────────────────────────────────────╯
+    ── Tab/Enter accept · Alt+S as typed ───────────────────────
     > please #es▏
-    ▸ #tests  Run the tests and fix failures.
-    …deepseek-flash  $0.01  Tab/Enter accept · Alt+S as typed
+    deepseek-flash  mode:auto         ctx ▱▱▱▱▱ 0.1%/1.0M  $0.01
     |}];
   H.key h (Key.plain Tab);
   H.show h;
   [%expect
     {|
-      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+    prigh  new session                                     /work
+
+
+
+
+
+
+
 
     ▌ earlier question
       earlier answer
-    ────────────────────────────────────────────────────────────
+    ── /help · Tab commands · Alt+Enter follow-up ──────────────
     > please Run the tests and fix failures.▏
-    …deepseek-flash  think:off  mode:auto  ctx:0.1%/1.0M  $0.01
+    deepseek-flash  mode:auto         ctx ▱▱▱▱▱ 0.1%/1.0M  $0.01
     |}]
 ;;
 
@@ -387,40 +455,58 @@ let%expect_test "#name: Enter inserts multi-line text mid-line, cursor after it"
   H.show h;
   [%expect
     {|
-      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+    prigh  new session                                     /work
 
-    ▌ earlier question
-      earlier answer
-    ────────────────────────────────────────────────────────────
+
+
+
+
+
+
+    ╭─ Snippets ───────────────────────────────────────────────╮
+    │ ▸ #review  Review the diff for bugs.                     │
+    ╰──────────────────────────────────────────────────────────╯
+    ── Tab/Enter accept · Alt+S as typed ───────────────────────
     > a #rev▏b
-    ▸ #review  Review the diff for bugs.
-    …deepseek-flash  $0.01  Tab/Enter accept · Alt+S as typed
+    deepseek-flash  mode:auto         ctx ▱▱▱▱▱ 0.1%/1.0M  $0.01
     |}];
   H.enter h;
   H.show h;
   [%expect
     {|
-      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+    prigh  new session                                     /work
+
+
+
+
+
+
 
     ▌ earlier question
       earlier answer
-    ────────────────────────────────────────────────────────────
+    ── /help · Tab commands · Alt+Enter follow-up ──────────────
     > a Review the diff for bugs.
       List them by severity.▏b
-    …deepseek-flash  think:off  mode:auto  ctx:0.1%/1.0M  $0.01
+    deepseek-flash  mode:auto         ctx ▱▱▱▱▱ 0.1%/1.0M  $0.01
     |}];
   H.keys h "!";
   H.show h;
   [%expect
     {|
-      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+    prigh  new session                                     /work
+
+
+
+
+
+
 
     ▌ earlier question
       earlier answer
-    ────────────────────────────────────────────────────────────
+    ── /help · Tab commands · Alt+Enter follow-up ──────────────
     > a Review the diff for bugs.
       List them by severity.!▏b
-    …deepseek-flash  think:off  mode:auto  ctx:0.1%/1.0M  $0.01
+    deepseek-flash  mode:auto         ctx ▱▱▱▱▱ 0.1%/1.0M  $0.01
     |}];
   (* On a later line too. *)
   H.key h (Key.ctrl 'j');
@@ -429,31 +515,40 @@ let%expect_test "#name: Enter inserts multi-line text mid-line, cursor after it"
   H.show h;
   [%expect
     {|
-      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+    prigh  new session                                     /work
+
+
+
+
+
 
     ▌ earlier question
       earlier answer
-    ────────────────────────────────────────────────────────────
+    ── /help · Tab commands · Alt+Enter follow-up ──────────────
     > a Review the diff for bugs.
       List them by severity.!
       Plan first; change nothing yet.▏b
-    …deepseek-flash  think:off  mode:auto  ctx:0.1%/1.0M  $0.01
+    deepseek-flash  mode:auto         ctx ▱▱▱▱▱ 0.1%/1.0M  $0.01
     |}];
   (* One undo step takes the insertion back. *)
   H.key h (Key.ctrl '_');
   H.show h;
   [%expect
     {|
-      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+    prigh  new session                                     /work
 
-    ▌ earlier question
-      earlier answer
-    ────────────────────────────────────────────────────────────
+
+
+
+
+    ╭─ Snippets ───────────────────────────────────────────────╮
+    │ ▸ #plan  Plan first; change nothing yet.                 │
+    ╰──────────────────────────────────────────────────────────╯
+    ── Tab/Enter accept · Alt+S as typed ───────────────────────
     > a Review the diff for bugs.
       List them by severity.!
       #pl▏b
-    ▸ #plan  Plan first; change nothing yet.
-    …deepseek-flash  $0.01  Tab/Enter accept · Alt+S as typed
+    deepseek-flash  mode:auto         ctx ▱▱▱▱▱ 0.1%/1.0M  $0.01
     |}]
 ;;
 
@@ -463,25 +558,39 @@ let%expect_test "#: headings, issue refs and words with # type and send as is" =
   H.show h;
   [%expect
     {|
-      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+    prigh  new session                                     /work
+
+
+
+
+
+
+
 
     ▌ earlier question
       earlier answer
-    ────────────────────────────────────────────────────────────
+    ── /help · Tab commands · Alt+Enter follow-up ──────────────
     > #▏
-    …deepseek-flash  think:off  mode:auto  ctx:0.1%/1.0M  $0.01
+    deepseek-flash  mode:auto         ctx ▱▱▱▱▱ 0.1%/1.0M  $0.01
     |}];
   H.keys h " Title #123 x#rev ##rev";
   H.show h;
   [%expect
     {|
-      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+    prigh  new session                                     /work
+
+
+
+
+
+
+
 
     ▌ earlier question
       earlier answer
-    ────────────────────────────────────────────────────────────
+    ── /help · Tab commands · Alt+Enter follow-up ──────────────
     > # Title #123 x#rev ##rev▏
-    …deepseek-flash  think:off  mode:auto  ctx:0.1%/1.0M  $0.01
+    deepseek-flash  mode:auto         ctx ▱▱▱▱▱ 0.1%/1.0M  $0.01
     |}];
   H.enter h;
   [%expect
@@ -497,13 +606,20 @@ let%expect_test "#: headings, issue refs and words with # type and send as is" =
   H.show h;
   [%expect
     {|
-      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+    prigh  new session                                     /work
+
+
+
+
+
+
+
 
     ▌ earlier question
       earlier answer
-    ────────────────────────────────────────────────────────────
+    ── /help · Tab commands · Alt+Enter follow-up ──────────────
     > #rev▏
-    …deepseek-flash  think:off  mode:auto  ctx:0.1%/1.0M  $0.01
+    deepseek-flash  mode:auto         ctx ▱▱▱▱▱ 0.1%/1.0M  $0.01
     |}];
   H.enter h;
   [%expect

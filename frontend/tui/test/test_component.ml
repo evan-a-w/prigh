@@ -178,14 +178,14 @@ let%expect_test "component: startup requests, key handling, rpc round trip, \
     rpc get_pending ()
     load history
     spinner=0 running=false
+    prigh  new session                              /w
 
 
 
-      prigh in /w · /help · Esc aborts · Ctrl+C twice
-      quits
-    ──────────────────────────────────────────────────
+
+    ── /help · Tab commands · Alt+Enter follow-up ────
     > ▏
-    /w  m  think:n/a  mode:auto  ctx:0.0%/1.0k  $0.00
+    m  mode:auto            ctx ▱▱▱▱▱ 0.0%/1.0k  $0.00
     |}];
   Bonsai_test.Handle.do_actions
     handle
@@ -197,15 +197,15 @@ let%expect_test "component: startup requests, key handling, rpc round trip, \
   [%expect
     {|
     rpc set_thinking ((thinking zzz))
-    spinner=0 running=false
-
-
-      prigh in /w · /help · Esc aborts · Ctrl+C twice
-      quits
-      thinking must be one of: off, on, low, high, max
-    ──────────────────────────────────────────────────
+    spinner=1 running=false
+    prigh  new session                              /w
+    ╭─ Error ────────────────────────────────────────╮
+    │ thinking must be one of: off, on, low, high,   │
+    │ max                                            │
+    ╰──────────────────────────────── Esc dismisses ─╯
+    ── /help · Tab commands · Alt+Enter follow-up ────
     > ▏
-    /w  m  think:n/a  mode:auto  ctx:0.0%/1.0k  $0.00
+    m  mode:auto            ctx ▱▱▱▱▱ 0.0%/1.0k  $0.00
     |}];
   (* The spinner ticks only while running. *)
   Bonsai_test.Handle.do_actions
@@ -223,14 +223,14 @@ let%expect_test "component: startup requests, key handling, rpc round trip, \
   [%expect
     {|
     spinner=2 running=true
-
-
-      prigh in /w · /help · Esc aborts · Ctrl+C twice
-      quits
-      thinking must be one of: off, on, low, high, max
-    ──────────────────────────────────────────────────
+    prigh  new session                              /w
+    ╭─ Error ────────────────────────────────────────╮
+    │ thinking must be one of: off, on, low, high,   │
+    │ max                                            │
+    ╰──────────────────────────────── Esc dismisses ─╯
+    ── ⠹ working · Esc aborts · Enter steers ─────────
     > ▏
-    …m  $0.00  ⠹ working · Esc aborts · Enter steers
+    m  mode:auto            ctx ▱▱▱▱▱ 0.0%/1.0k  $0.00
     |}];
   Bonsai_test.Handle.do_actions handle [ Key (Key.plain Escape) ];
   Bonsai_test.Handle.recompute_view_until_stable handle;
@@ -248,14 +248,14 @@ let%expect_test "component: startup requests, key handling, rpc round trip, \
     rpc get_config ()
     rpc list_models ()
     spinner=2 running=false
+    prigh  new session                              /w
 
 
-      reconnected to the backend
-      prigh in /w · /help · Esc aborts · Ctrl+C twice
-      quits
-    ──────────────────────────────────────────────────
+
+
+    ── /help ─────────── reconnected to the backend ──
     > ▏
-    /w  m  think:n/a  mode:auto  ctx:0.0%/1.0k  $0.00
+    m  mode:auto            ctx ▱▱▱▱▱ 0.0%/1.0k  $0.00
     |}]
 ;;
 
@@ -295,14 +295,14 @@ let%expect_test "component: /signout runs the platform's sign-out and shows \
     rpc get_pending ()
     load history
     sign out
-    spinner=0 running=false
+    spinner=1 running=false
+    prigh  new session                              /w
 
 
-      prigh in /w · /help · Esc aborts · Ctrl+C twice
-      quits
-      not here
-    ──────────────────────────────────────────────────
+
+
+    ── /help · Tab commands ────────────── not here ──
     > ▏
-    /w  m  think:n/a  mode:auto  ctx:0.0%/1.0k  $0.00
+    m  mode:auto            ctx ▱▱▱▱▱ 0.0%/1.0k  $0.00
     |}]
 ;;

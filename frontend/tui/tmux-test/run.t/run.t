@@ -3,63 +3,218 @@ prints the captured panes.
 
   $ bash ./harness.sh startup
   === initial screen
-    prigh in $TMP/cwd · /help · Esc aborts · Ctrl+C twice quits
-  ────────────────────────────────────────────────────────────────────────────────────────────────────
+  prigh  new session                                                        $TMP/cwd
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  ── /help · Tab commands · Alt+Enter follow-up · Ctrl+C twice quits ─────────────────────────────────
   >
-  $TMP/cwd  deepseek-flash  think:on  mode:auto  view:normal  ctx:0.0%/1.0M  $0.00
+  deepseek-flash  think:on  mode:auto  view:normal                          ctx ▱▱▱▱▱ 0.0%/1.0M  $0.00
   $ bash ./harness.sh prompt
   === typed
-    prigh in $TMP/cwd · /help · Esc aborts · Ctrl+C twice quits
-  ────────────────────────────────────────────────────────────────────────────────────────────────────
+  prigh  new session                                                        $TMP/cwd
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  ── /help · Tab commands · Alt+Enter follow-up · Ctrl+C twice quits ─────────────────────────────────
   > hello there
-  $TMP/cwd  deepseek-flash  think:on  mode:auto  view:normal  ctx:0.0%/1.0M  $0.00
+  deepseek-flash  think:on  mode:auto  view:normal                          ctx ▱▱▱▱▱ 0.0%/1.0M  $0.00
   === after reply
-    prigh in $TMP/cwd · /help · Esc aborts · Ctrl+C twice quits
+  prigh  new session                                                        $TMP/cwd
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
   
   ▌ hello there
     faux reply
-  ────────────────────────────────────────────────────────────────────────────────────────────────────
+  ── /help · Tab commands · Alt+Enter follow-up · Ctrl+C twice quits ─────────────────────────────────
   >
-  $TMP/cwd  deepseek-flash  think:on  mode:auto  view:normal  ctx:0.0%/1.0M  $0.00
+  deepseek-flash  think:on  mode:auto  view:normal                          ctx ▱▱▱▱▱ 0.0%/1.0M  $0.00
   $ bash ./harness.sh ctrl_o
   === after C-o
-    prigh in $TMP/cwd · /help · Esc aborts · Ctrl+C twice quits
-    view: verbose — everything is shown
-  ────────────────────────────────────────────────────────────────────────────────────────────────────
+  prigh  new session                                                        $TMP/cwd
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  ── /help · Tab commands · Alt+Enter follow-up ─────────────── view: verbose — everything is shown ──
   >
-  $TMP/cwd  deepseek-flash  think:on  mode:auto  view:verbose  ctx:0.0%/1.0M  $0.00
+  deepseek-flash  think:on  mode:auto  view:verbose                         ctx ▱▱▱▱▱ 0.0%/1.0M  $0.00
   $ bash ./harness.sh resize
   === 40x12
-    prigh in $TMP/cwd ·
-    /help · Esc aborts · Ctrl+C twice
-    quits
+  prigh  new session                 …/cwd
+  
+  
+  
+  
+  
   
   ▌ first
     faux reply
-  ────────────────────────────────────────
+  ── /help · Tab commands ────────────────
   >
-  …deepseek-flash  think:on  ctx:0.0%/1.0M
+  deepseek-flash       ctx ▱▱▱▱▱ 0.0%/1.0M
   === 100x30
-    prigh in $TMP/cwd · /help · Esc aborts · Ctrl+C twice quits
+  prigh  new session                                                        $TMP/cwd
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
   
   ▌ first
     faux reply
-  ────────────────────────────────────────────────────────────────────────────────────────────────────
+  ── /help · Tab commands · Alt+Enter follow-up · Ctrl+C twice quits ─────────────────────────────────
   >
-  $TMP/cwd  deepseek-flash  think:on  mode:auto  view:normal  ctx:0.0%/1.0M  $0.00
+  deepseek-flash  think:on  mode:auto  view:normal                          ctx ▱▱▱▱▱ 0.0%/1.0M  $0.00
   $ bash ./harness.sh quit
   === after first C-c
-    prigh in $TMP/cwd · /help · Esc aborts · Ctrl+C twice quits
-    press Ctrl+C again to quit
-  ────────────────────────────────────────────────────────────────────────────────────────────────────
+  prigh  new session                                                        $TMP/cwd
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  ── Ctrl+C again quits ──────────────────────────────────────────────────────────────────────────────
   >
-  …deepseek-flash  think:on  mode:auto  view:normal  ctx:0.0%/1.0M  $0.00  Ctrl+C again quits
+  deepseek-flash  think:on  mode:auto  view:normal                          ctx ▱▱▱▱▱ 0.0%/1.0M  $0.00
   === exited (tty flags)
   EXITED
   ixon isig icanon iexten echo
   $ bash ./harness.sh tools
   === normal
-    prigh in $TMP/cwd · /help · Esc aborts · Ctrl+C twice quits
+  prigh  new session                                                        $TMP/cwd
+  
+  
+  
+  
   
   ▌ go
     let me look
@@ -82,11 +237,12 @@ prints the captured panes.
       child reporting: done
       [subagent: 1 turns, 0 in / 0 out tokens, $0.0000]
     all done
-  ────────────────────────────────────────────────────────────────────────────────────────────────────
+  ── /help · Tab commands · Alt+Enter follow-up · Ctrl+C twice quits ─────────────────────────────────
   >
-  …deepseek-flash  think:on  mode:auto  view:normal  ctx:0.0%/1.0M  $0.00  agents:[main] 1✓ 2✓
+  deepseek-flash  think:on  mode:auto  view:normal     agents:[main] 1✓ 2✓  ctx ▱▱▱▱▱ 0.0%/1.0M  $0.00
   === verbose
-    prigh in $TMP/cwd · /help · Esc aborts · Ctrl+C twice quits
+  prigh  new session                                                        $TMP/cwd
+  
   
   ▌ go
     let me look
@@ -112,12 +268,26 @@ prints the captured panes.
       child reporting: done
       [subagent: 1 turns, 0 in / 0 out tokens, $0.0000]
     all done
-    view: verbose — everything is shown
-  ────────────────────────────────────────────────────────────────────────────────────────────────────
+  ── /help · Tab commands · Alt+Enter follow-up ─────────────── view: verbose — everything is shown ──
   >
-  …deepseek-flash  think:on  mode:auto  view:verbose  ctx:0.0%/1.0M  $0.00  agents:[main] 1✓ 2✓
+  deepseek-flash  think:on  mode:auto  view:verbose    agents:[main] 1✓ 2✓  ctx ▱▱▱▱▱ 0.0%/1.0M  $0.00
   === quiet
-    prigh in $TMP/cwd · /help · Esc aborts · Ctrl+C twice quits
+  prigh  new session                                                        $TMP/cwd
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
   
   ▌ go
     let me look
@@ -129,12 +299,12 @@ prints the captured panes.
   ↩ subagent a1 "count files"  finished
   ↩ subagent a2 "say hello"  finished
     all done
-  ────────────────────────────────────────────────────────────────────────────────────────────────────
+  ── /help · Tab commands ─────────────── view: quiet — intermediate output and thinking are hidden ──
   >
-  …deepseek-flash  think:on  mode:auto  view:quiet  ctx:0.0%/1.0M  $0.00  agents:[main] 1✓ 2✓
+  deepseek-flash  think:on  mode:auto  view:quiet      agents:[main] 1✓ 2✓  ctx ▱▱▱▱▱ 0.0%/1.0M  $0.00
   === agent 1
+  prigh  new session                                                        $TMP/cwd
   ◆ subagent 1/2  deepseek-flash  ✓ done 1 turns $0.00  "count files"
-  
   
   
   
@@ -160,12 +330,12 @@ prints the captured panes.
   
   ▌ count files
     child reporting: done
-  ────────────────────────────────────────────────────────────────────────────────────────────────────
+  ── /help · Tab commands · Alt+Enter follow-up · Ctrl+C twice quits ─────────────────────────────────
   >
-  …deepseek-flash  think:on  mode:auto  view:quiet  ctx:0.0%/1.0M  $0.00  agents:main [1✓] 2✓
+  deepseek-flash  think:on  mode:auto  view:quiet      agents:main [1✓] 2✓  ctx ▱▱▱▱▱ 0.0%/1.0M  $0.00
   === agent 2
+  prigh  new session                                                        $TMP/cwd
   ◆ subagent 2/2  deepseek-flash  ✓ done 1 turns $0.00  "say hello"
-  
   
   
   
@@ -191,11 +361,26 @@ prints the captured panes.
   
   ▌ say hello
     child reporting: done
-  ────────────────────────────────────────────────────────────────────────────────────────────────────
+  ── /help · Tab commands · Alt+Enter follow-up · Ctrl+C twice quits ─────────────────────────────────
   >
-  …deepseek-flash  think:on  mode:auto  view:quiet  ctx:0.0%/1.0M  $0.00  agents:main 1✓ [2✓]
+  deepseek-flash  think:on  mode:auto  view:quiet      agents:main 1✓ [2✓]  ctx ▱▱▱▱▱ 0.0%/1.0M  $0.00
   === main again
-    prigh in $TMP/cwd · /help · Esc aborts · Ctrl+C twice quits
+  prigh  new session                                                        $TMP/cwd
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
   
   ▌ go
     let me look
@@ -207,55 +392,160 @@ prints the captured panes.
   ↩ subagent a1 "count files"  finished
   ↩ subagent a2 "say hello"  finished
     all done
-  ────────────────────────────────────────────────────────────────────────────────────────────────────
+  ── /help · Tab commands · Alt+Enter follow-up · Ctrl+C twice quits ─────────────────────────────────
   >
-  …deepseek-flash  think:on  mode:auto  view:quiet  ctx:0.0%/1.0M  $0.00  agents:[main] 1✓ 2✓
+  deepseek-flash  think:on  mode:auto  view:quiet      agents:[main] 1✓ 2✓  ctx ▱▱▱▱▱ 0.0%/1.0M  $0.00
   $ bash ./harness.sh suspend
   === suspended (shell visible)
   [1]+  Stopped sh $TMP/run.sh
   bash$
   === after fg (repainted)
-    prigh in $TMP/cwd · /help · Esc aborts · Ctrl+C twice quits
+  prigh  new session                                                        $TMP/cwd
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
   
   ▌ before
     faux reply
-  ────────────────────────────────────────────────────────────────────────────────────────────────────
+  ── /help · Tab commands · Alt+Enter follow-up · Ctrl+C twice quits ─────────────────────────────────
   >
-  $TMP/cwd  deepseek-flash  think:on  mode:auto  view:normal  ctx:0.0%/1.0M  $0.00
+  deepseek-flash  think:on  mode:auto  view:normal                          ctx ▱▱▱▱▱ 0.0%/1.0M  $0.00
   === editor works
-    prigh in $TMP/cwd · /help · Esc aborts · Ctrl+C twice quits
+  prigh  new session                                                        $TMP/cwd
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
   
   ▌ before
     faux reply
-  ────────────────────────────────────────────────────────────────────────────────────────────────────
+  ── /help · Tab commands · Alt+Enter follow-up · Ctrl+C twice quits ─────────────────────────────────
   > still typing
-  $TMP/cwd  deepseek-flash  think:on  mode:auto  view:normal  ctx:0.0%/1.0M  $0.00
+  deepseek-flash  think:on  mode:auto  view:normal                          ctx ▱▱▱▱▱ 0.0%/1.0M  $0.00
   $ bash ./harness.sh editor
   === after Ctrl+G round trip
-    prigh in $TMP/cwd · /help · Esc aborts · Ctrl+C twice quits
-  ────────────────────────────────────────────────────────────────────────────────────────────────────
+  prigh  new session                                                        $TMP/cwd
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  ── /help · Tab commands · Alt+Enter follow-up · Ctrl+C twice quits ─────────────────────────────────
   > draftedited by editor
   
-  $TMP/cwd  deepseek-flash  think:on  mode:auto  view:normal  ctx:0.0%/1.0M  $0.00
+  deepseek-flash  think:on  mode:auto  view:normal                          ctx ▱▱▱▱▱ 0.0%/1.0M  $0.00
   $ bash ./harness.sh confirm
   === dialog
-    prigh in $TMP/cwd · /help · Esc aborts · Ctrl+C twice quits
+  prigh  new session                                                        $TMP/cwd
   
-  ▌ go
-    running
-  … bash $ echo ran-it
-  ┌─ Confirm ────────────────────────────────────────────────────────────────────────────────────────┐
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  ╭─ Confirm ────────────────────────────────────────────────────────────────────────────────────────╮
   │ Run bash: echo ran-it?                                                                           │
   │ y  allow once                                                                                    │
   │ a  always allow bash(echo:*) this session                                                        │
   │ n  deny                                                                                          │
   │ r  deny, saying why                                                                              │
-  └──────────────────────────────────────────────────────────────────────────────────────────────────┘
-  ────────────────────────────────────────────────────────────────────────────────────────────────────
-  ?
-  …deepseek-flash  think:on  mode:ask  view:normal  ctx:0.0%/1.0M  $0.00  confirm: y/a/n/r
+  ╰──────────────────────────────────────────────────────────────────────────────────────────────────╯
+  ── confirm: y/a/n/r ────────────────────────────────────────────────────────────────────────────────
+  >
+  deepseek-flash  think:on  mode:ask  view:normal                           ctx ▱▱▱▱▱ 0.0%/1.0M  $0.00
   === allowed
-    prigh in $TMP/cwd · /help · Esc aborts · Ctrl+C twice quits
+  prigh  new session                                                        $TMP/cwd
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
   
   ▌ go
     running
@@ -263,11 +553,23 @@ prints the captured panes.
       ran-it
     allowed bash
     first done
-  ────────────────────────────────────────────────────────────────────────────────────────────────────
+  ── /help · Tab commands · Alt+Enter follow-up · Ctrl+C twice quits ─────────────────────────────────
   >
-  $TMP/cwd  deepseek-flash  think:on  mode:ask  view:normal  ctx:0.0%/1.0M  $0.00
+  deepseek-flash  think:on  mode:ask  view:normal                           ctx ▱▱▱▱▱ 0.0%/1.0M  $0.00
   === denied
-    prigh in $TMP/cwd · /help · Esc aborts · Ctrl+C twice quits
+  prigh  new session                                                        $TMP/cwd
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
   
   ▌ go
     running
@@ -282,28 +584,56 @@ prints the captured panes.
       [denied by user]
     denied bash
     second done
-  ────────────────────────────────────────────────────────────────────────────────────────────────────
+  ── /help · Tab commands · Alt+Enter follow-up · Ctrl+C twice quits ─────────────────────────────────
   >
-  $TMP/cwd  deepseek-flash  think:on  mode:ask  view:normal  ctx:0.0%/1.0M  $0.00
+  deepseek-flash  think:on  mode:ask  view:normal                           ctx ▱▱▱▱▱ 0.0%/1.0M  $0.00
   $ bash ./harness.sh approvals
   === dialog with always
-    prigh in $TMP/cwd · /help · Esc aborts · Ctrl+C twice quits
+  prigh  new session                                                        $TMP/cwd
   
-  ▌ go
-    one
-  … bash $ echo first-run
-  ┌─ Confirm ────────────────────────────────────────────────────────────────────────────────────────┐
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  ╭─ Confirm ────────────────────────────────────────────────────────────────────────────────────────╮
   │ Run bash: echo first-run?                                                                        │
   │ y  allow once                                                                                    │
   │ a  always allow bash(echo:*) this session                                                        │
   │ n  deny                                                                                          │
   │ r  deny, saying why                                                                              │
-  └──────────────────────────────────────────────────────────────────────────────────────────────────┘
-  ────────────────────────────────────────────────────────────────────────────────────────────────────
-  ?
-  …deepseek-flash  think:on  mode:ask  view:normal  ctx:0.0%/1.0M  $0.00  confirm: y/a/n/r
+  ╰──────────────────────────────────────────────────────────────────────────────────────────────────╯
+  ── confirm: y/a/n/r ────────────────────────────────────────────────────────────────────────────────
+  >
+  deepseek-flash  think:on  mode:ask  view:normal                           ctx ▱▱▱▱▱ 0.0%/1.0M  $0.00
   === the second echo ran without asking
-    prigh in $TMP/cwd · /help · Esc aborts · Ctrl+C twice quits
+  prigh  new session                                                        $TMP/cwd
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
   
   ▌ go
     one
@@ -317,11 +647,17 @@ prints the captured panes.
   ✓ bash $ echo second-run
       second-run
     second done
-  ────────────────────────────────────────────────────────────────────────────────────────────────────
+  ── /help · Tab commands · Alt+Enter follow-up · Ctrl+C twice quits ─────────────────────────────────
   >
-  $TMP/cwd  deepseek-flash  think:on  mode:ask  view:normal  ctx:0.0%/1.0M  $0.00
+  deepseek-flash  think:on  mode:ask  view:normal                           ctx ▱▱▱▱▱ 0.0%/1.0M  $0.00
   === denied with a reason
-    prigh in $TMP/cwd · /help · Esc aborts · Ctrl+C twice quits
+  prigh  new session                                                        $TMP/cwd
+  
+  
+  
+  
+  
+  
   
   ▌ go
     one
@@ -342,11 +678,17 @@ prints the captured panes.
       [denied by user] Their reason: not on a Friday
     denied bash
     third done
-  ────────────────────────────────────────────────────────────────────────────────────────────────────
+  ── /help · Tab commands · Alt+Enter follow-up · Ctrl+C twice quits ─────────────────────────────────
   >
-  $TMP/cwd  deepseek-flash  think:on  mode:ask  view:normal  ctx:0.0%/1.0M  $0.00
+  deepseek-flash  think:on  mode:ask  view:normal                           ctx ▱▱▱▱▱ 0.0%/1.0M  $0.00
   === Alt+M: auto-edit
-    prigh in $TMP/cwd · /help · Esc aborts · Ctrl+C twice quits
+  prigh  new session                                                        $TMP/cwd
+  
+  
+  
+  
+  
+  
   
   ▌ go
     one
@@ -367,26 +709,30 @@ prints the captured panes.
       [denied by user] Their reason: not on a Friday
     denied bash
     third done
-    mode: auto-edit — file edits run; bash, job_input and MCP tools ask first
-  ────────────────────────────────────────────────────────────────────────────────────────────────────
+  ── /help ────────────── mode: auto-edit — file edits run; bash, job_input and MCP tools ask first ──
   >
-  $TMP/cwd  deepseek-flash  think:on  mode:auto-edit  ctx:0.0%/1.0M  $0.00
+  deepseek-flash  think:on  mode:auto-edit  view:normal                     ctx ▱▱▱▱▱ 0.0%/1.0M  $0.00
   $ bash ./harness.sh plan
   === the plan to approve
-    prigh in $TMP/cwd · /help · Esc aborts · Ctrl+C twice quits
-    mode: plan — read-only planning: no file edits; bash, job_input and MCP tools ask first
+  prigh  new session                                                        $TMP/cwd
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
   
   ◇ Plan mode on: the model was told to plan, not change files
-  ▌ add a.txt
-    looking
-  ✕ write a.txt  1 line
-      [plan mode] Files cannot be changed while planning. Keep investigating with read-only tools,
-      then call exit_plan_mode with the plan for the user to approve.
-    planned
-  … exit_plan_mode  waiting for your approval
-      1. Write a.txt
-      2. Check it
-  ┌─ Plan ───────────────────────────────────────────────────────────────────────────────────────────┐
+  ╭─ Plan ───────────────────────────────────────────────────────────────────────────────────────────╮
   │ Approve the plan and start implementing?                                                         │
   │ 1. Write a.txt                                                                                   │
   │ 2. Check it                                                                                      │
@@ -394,13 +740,23 @@ prints the captured panes.
   │ y  approve: leave plan mode and implement                                                        │
   │ n  keep planning                                                                                 │
   │ r  keep planning, saying what to change                                                          │
-  └──────────────────────────────────────────────────────────────────────────────────────────────────┘
-  ────────────────────────────────────────────────────────────────────────────────────────────────────
-  ?
-  …deepseek-flash  think:on  mode:plan  view:normal  ctx:0.0%/1.0M  $0.00  confirm: y/n/r
+  ╰──────────────────────────────────────────────────────────────────────────────────────────────────╯
+  ── confirm: y/n/r ──────────────────────────────────────────────────────────────────────────────────
+  >
+  deepseek-flash  think:on  mode:plan  view:normal                          ctx ▱▱▱▱▱ 0.0%/1.0M  $0.00
   === approved and implemented
-    prigh in $TMP/cwd · /help · Esc aborts · Ctrl+C twice quits
-    mode: plan — read-only planning: no file edits; bash, job_input and MCP tools ask first
+  prigh  new session                                                        $TMP/cwd
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
   
   ◇ Plan mode on: the model was told to plan, not change files
   ▌ add a.txt
@@ -416,44 +772,91 @@ prints the captured panes.
     implementing
   ✓ write a.txt  1 line
     all done
-  ────────────────────────────────────────────────────────────────────────────────────────────────────
+  ── /help · Tab commands · Alt+Enter follow-up · Ctrl+C twice quits ─────────────────────────────────
   >
-  $TMP/cwd  deepseek-flash  think:on  mode:auto  view:normal  ctx:0.0%/1.0M  $0.00
+  deepseek-flash  think:on  mode:auto  view:normal                          ctx ▱▱▱▱▱ 0.0%/1.0M  $0.00
   $ bash ./harness.sh question
   === first question
-    prigh in $TMP/cwd · /help · Esc aborts · Ctrl+C twice quits
+  prigh  new session                                                        $TMP/cwd
   
-  ▌ go
-    asking
-  … ask_user  waiting for your answer
-      ? Which database?
-      ? Anything else?
-  ┌─ Storage (1/2) ──────────────────────────────────────────────────────────────────────────────────┐
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  ╭─ Storage (1/2) ──────────────────────────────────────────────────────────────────────────────────╮
   │ Which database?                                                                                  │
   │ › ( ) Postgres  what prod uses                                                                   │
   │   ( ) SQLite                                                                                     │
   │   Other:                                                                                         │
   │ ↑↓ choose · type your own · Enter picks · ←→ questions · Esc declines (the model is told)        │
-  └──────────────────────────────────────────────────────────────────────────────────────────────────┘
-  ────────────────────────────────────────────────────────────────────────────────────────────────────
-  …deepseek-flash  think:on  mode:auto  ctx:0.0%/1.0M  $0.00  Enter accepts · Esc declines
+  ╰──────────────────────────────────────────────────────────────────────────────────────────────────╯
+  ── Enter accepts · Esc declines ────────────────────────────────────────────────────────────────────
+  >
+  deepseek-flash  think:on  mode:auto  view:normal                          ctx ▱▱▱▱▱ 0.0%/1.0M  $0.00
   === second question
-    prigh in $TMP/cwd · /help · Esc aborts · Ctrl+C twice quits
+  prigh  new session                                                        $TMP/cwd
   
-  ▌ go
-    asking
-  … ask_user  waiting for your answer
-      ? Which database?
-      ? Anything else?
-  ┌─ Question 2/2 ───────────────────────────────────────────────────────────────────────────────────┐
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  ╭─ Question 2/2 ───────────────────────────────────────────────────────────────────────────────────╮
   │ Anything else?                                                                                   │
   │ › keep it small                                                                                  │
   │ type an answer · Enter answers · ←→ questions · Esc declines (the model is told)                 │
-  └──────────────────────────────────────────────────────────────────────────────────────────────────┘
-  ────────────────────────────────────────────────────────────────────────────────────────────────────
-  …deepseek-flash  think:on  mode:auto  ctx:0.0%/1.0M  $0.00  Enter accepts · Esc declines
+  ╰──────────────────────────────────────────────────────────────────────────────────────────────────╯
+  ── Enter accepts · Esc declines ────────────────────────────────────────────────────────────────────
+  >
+  deepseek-flash  think:on  mode:auto  view:normal                          ctx ▱▱▱▱▱ 0.0%/1.0M  $0.00
   === answered
-    prigh in $TMP/cwd · /help · Esc aborts · Ctrl+C twice quits
+  prigh  new session                                                        $TMP/cwd
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
   
   ▌ go
     asking
@@ -462,28 +865,94 @@ prints the captured panes.
       A: SQLite
       Q: Anything else?
       A: keep it small
-    answered
     thanks
-  ────────────────────────────────────────────────────────────────────────────────────────────────────
+  ── /help · Tab commands · Alt+Enter follow-up · Ctrl+C twice quits ───────────────────── answered ──
   >
-  $TMP/cwd  deepseek-flash  think:on  mode:auto  view:normal  ctx:0.0%/1.0M  $0.00
+  deepseek-flash  think:on  mode:auto  view:normal                          ctx ▱▱▱▱▱ 0.0%/1.0M  $0.00
   $ bash ./harness.sh paste
   === chip after a 5-line paste
-    prigh in $TMP/cwd · /help · Esc aborts · Ctrl+C twice quits
-  ────────────────────────────────────────────────────────────────────────────────────────────────────
+  prigh  new session                                                        $TMP/cwd
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  ── /help · Tab commands · Alt+Enter follow-up · Ctrl+C twice quits ─────────────────────────────────
   > [5 lines pasted]
-  $TMP/cwd  deepseek-flash  think:on  mode:auto  view:normal  ctx:0.0%/1.0M  $0.00
+  deepseek-flash  think:on  mode:auto  view:normal                          ctx ▱▱▱▱▱ 0.0%/1.0M  $0.00
   === cursor inside expands the chip
-    prigh in $TMP/cwd · /help · Esc aborts · Ctrl+C twice quits
-  ────────────────────────────────────────────────────────────────────────────────────────────────────
+  prigh  new session                                                        $TMP/cwd
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  ── /help · Tab commands · Alt+Enter follow-up · Ctrl+C twice quits ─────────────────────────────────
   > line one
     line two
     line three
     line four
     line five
-  $TMP/cwd  deepseek-flash  think:on  mode:auto  view:normal  ctx:0.0%/1.0M  $0.00
+  deepseek-flash  think:on  mode:auto  view:normal                          ctx ▱▱▱▱▱ 0.0%/1.0M  $0.00
   === submitted as one message
-    prigh in $TMP/cwd · /help · Esc aborts · Ctrl+C twice quits
+  prigh  new session                                                        $TMP/cwd
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
   
   ▌ line one
   ▌ line two
@@ -491,45 +960,124 @@ prints the captured panes.
   ▌ line four
   ▌ line five
     faux reply
-  ────────────────────────────────────────────────────────────────────────────────────────────────────
+  ── /help · Tab commands · Alt+Enter follow-up · Ctrl+C twice quits ─────────────────────────────────
   >
-  $TMP/cwd  deepseek-flash  think:on  mode:auto  view:normal  ctx:0.0%/1.0M  $0.00
+  deepseek-flash  think:on  mode:auto  view:normal                          ctx ▱▱▱▱▱ 0.0%/1.0M  $0.00
   $ bash ./harness.sh reconnect
   === after the backend was killed
-    reconnected to the backend
-    prigh in $TMP/cwd · /help · Esc aborts · Ctrl+C twice quits
+  prigh  new session                                                        $TMP/cwd
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
   
   ▌ before
     faux reply
-  ────────────────────────────────────────────────────────────────────────────────────────────────────
+  ── /help · Tab commands · Alt+Enter follow-up · Ctrl+C twice quits ─── reconnected to the backend ──
   >
-  $TMP/cwd  deepseek-flash  think:on  mode:auto  view:normal  ctx:0.0%/1.0M  $0.00
+  deepseek-flash  think:on  mode:auto  view:normal                          ctx ▱▱▱▱▱ 0.0%/1.0M  $0.00
   === prompt works again
-    reconnected to the backend
-    prigh in $TMP/cwd · /help · Esc aborts · Ctrl+C twice quits
+  prigh  new session                                                        $TMP/cwd
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
   
   ▌ before
     faux reply
   
   ▌ after
     faux reply
-  ────────────────────────────────────────────────────────────────────────────────────────────────────
+  ── /help · Tab commands · Alt+Enter follow-up · Ctrl+C twice quits ─────────────────────────────────
   >
-  $TMP/cwd  deepseek-flash  think:on  mode:auto  view:normal  ctx:0.0%/1.0M  $0.00
+  deepseek-flash  think:on  mode:auto  view:normal                          ctx ▱▱▱▱▱ 0.0%/1.0M  $0.00
   $ bash ./harness.sh fallback
   === chain and default directory set
-    prigh in $TMP/cwd · /help · Esc aborts · Ctrl+C twice quits
-    fallback: deepseek/deepseek-flash → anthropic/claude-fable-5-1 (now on deepseek/deepseek-flash)
-    default directory: $TMP/cwd (new sessions start there; /default-dir off clears
-    it)
-  ────────────────────────────────────────────────────────────────────────────────────────────────────
+  prigh  new session                                                        $TMP/cwd
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+                                                    ╭─ Notice ───────────────────────────────────────╮
+                                                    │ default directory: $TMP/cwd  │
+                                                    │ (new sessions start there; /default-dir off    │
+                                                    │ clears it)                                     │
+                                                    ╰──────────────────────────────── Esc dismisses ─╯
+  ── /help · Tab commands · Alt+Enter follow-up · Ctrl+C twice quits ─────────────────────────────────
   >
-  $TMP/cwd  deepseek-flash  think:on  mode:auto  view:normal  ctx:0.0%/1.0M  $0.00
+  deepseek-flash  think:on  mode:auto  view:normal                          ctx ▱▱▱▱▱ 0.0%/1.0M  $0.00
   === handed over
-    prigh in $TMP/cwd · /help · Esc aborts · Ctrl+C twice quits
-    fallback: deepseek/deepseek-flash → anthropic/claude-fable-5-1 (now on deepseek/deepseek-flash)
-    default directory: $TMP/cwd (new sessions start there; /default-dir off clears
-    it)
+  prigh  new session                                                        $TMP/cwd
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
   
   ▌ go
     error: HTTP 429: The usage limit has been reached (usage limit reached)
@@ -538,66 +1086,186 @@ prints the captured panes.
   
   ↪ Handed over from deepseek/deepseek-flash to anthropic/claude-fable-5-1
     carried on
-  ────────────────────────────────────────────────────────────────────────────────────────────────────
+  ── /help · Tab commands · Alt+Enter follow-up · Ctrl+C twice quits ─────────────────────────────────
   >
-  $TMP/cwd  claude-fable-5-1  think:on  mode:auto  view:normal  ctx:0.0%/1.0M  $0.00
+  claude-fable-5-1  think:on  mode:auto  view:normal                        ctx ▱▱▱▱▱ 0.0%/1.0M  $0.00
   $ bash ./harness.sh send_raw
   === the popup highlights a directory
-    prigh in $TMP/cwd · /help · Esc aborts · Ctrl+C twice quits
-  ────────────────────────────────────────────────────────────────────────────────────────────────────
+  prigh  new session                                                        $TMP/cwd
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  ╭─ Directories ────────────────────────────────────────────────────────────────────────────────────╮
+  │ ▸ $TMP/cwd/sub/deeper/                                                         │
+  ╰──────────────────────────────────────────────────────────────────────────────────────────────────╯
+  ── Tab/Enter accept · Alt+S as typed ───────────────────────────────────────────────────────────────
   > /cd $TMP/cwd/sub/
-  ▸ $TMP/cwd/sub/deeper/
-  …deepseek-flash  think:on  mode:auto  ctx:0.0%/1.0M  $0.00  Tab/Enter accept · Alt+S as typed
+  deepseek-flash  think:on  mode:auto  view:normal                          ctx ▱▱▱▱▱ 0.0%/1.0M  $0.00
   === Alt+S: /cd to what was typed
-    prigh in $TMP/cwd · /help · Esc aborts · Ctrl+C twice quits
-    cwd changed
-  ────────────────────────────────────────────────────────────────────────────────────────────────────
+  prigh  new session                                                    $TMP/cwd/sub
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  ── /help · Tab commands · Alt+Enter follow-up · Ctrl+C twice quits ────────────────── cwd changed ──
   >
-  $TMP/cwd/sub  deepseek-flash  think:on  mode:auto  ctx:0.0%/1.0M  $0.00
+  deepseek-flash  think:on  mode:auto  view:normal                          ctx ▱▱▱▱▱ 0.0%/1.0M  $0.00
   $ bash ./harness.sh switch_pending
   === the picker, a confirmation waiting behind it
-    new session
-    prigh in $TMP/cwd · /help · Esc aborts · Ctrl+C twice quits
+  prigh  new session                                                        $TMP/cwd
   
-  ▌ go
-    waiting
-  ✓ bash $ sleep 2
-    now
-  … bash $ rm -rf build
-  Sessions  (2)  Alt+A (un)archives · Alt+D deletes archived · Ctrl+N named
-  /
-   * ▶ (unnamed) ∣ <time> ∣ 2 msgs ∣ go   $TMP/cwd
-  ▸  (unnamed) ∣ <time> ∣ 2 msgs ∣ hello  $TMP/cwd
-  ────────────────────────────────────────────────────────────────────────────────────────────────────
-  …deepseek-flash  mode:ask  to answer:1  Enter switches · Tab marks · Ctrl+D deletes · Esc closes
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  ╭─ Sessions (2) ───────────────────────────────────────────────────────────────────────────────────╮
+  │ /                                     Alt+A (un)archives · Alt+D deletes archived · Ctrl+N named │
+  │  * ▶ (unnamed) ∣ <time> ∣ 2 msgs ∣ go   $TMP/cwd                     │
+  │ ▸  (unnamed) ∣ <time> ∣ 2 msgs ∣ hello  $TMP/cwd                     │
+  ╰──────────────────────────────────────────────────────────────────────────────────────────────────╯
+  ── Enter switches · Tab marks · Ctrl+D deletes · Esc closes ────────────────────────────────────────
+  >
+  deepseek-flash  think:on  mode:ask  view:normal  to answer:1              ctx ▱▱▱▱▱ 0.0%/1.0M  $0.00
   === switched: no dialog from the other session
-    prigh in $TMP/cwd · /help · Esc aborts · Ctrl+C twice quits
+  prigh  new session                                                        $TMP/cwd
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
   
   ▌ hello
     in the first session
-  ────────────────────────────────────────────────────────────────────────────────────────────────────
+  ── /help · Tab commands · Alt+Enter follow-up · Ctrl+C twice quits ─────────────────────────────────
   >
-  $TMP/cwd  deepseek-flash  think:on  mode:ask  view:normal  ctx:0.0%/1.0M  $0.00
+  deepseek-flash  think:on  mode:ask  view:normal                           ctx ▱▱▱▱▱ 0.0%/1.0M  $0.00
   === back: its confirmation again
-    prigh in $TMP/cwd · /help · Esc aborts · Ctrl+C twice quits
+  prigh  new session                                                        $TMP/cwd
   
-  ▌ go
-    waiting
-  ✓ bash $ sleep 2
-    now
-  … bash $ rm -rf build
-  ┌─ Confirm ────────────────────────────────────────────────────────────────────────────────────────┐
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  ╭─ Confirm ────────────────────────────────────────────────────────────────────────────────────────╮
   │ Run bash: rm -rf build?                                                                          │
   │ y  allow once                                                                                    │
   │ a  always allow bash(rm:*) this session                                                          │
   │ n  deny                                                                                          │
   │ r  deny, saying why                                                                              │
-  └──────────────────────────────────────────────────────────────────────────────────────────────────┘
-  ────────────────────────────────────────────────────────────────────────────────────────────────────
-  ?
-  …deepseek-flash  think:on  mode:ask  view:normal  ctx:0.0%/1.0M  $0.00  confirm: y/a/n/r
+  ╰──────────────────────────────────────────────────────────────────────────────────────────────────╯
+  ── confirm: y/a/n/r ────────────────────────────────────────────────────────────────────────────────
+  >
+  deepseek-flash  think:on  mode:ask  view:normal                           ctx ▱▱▱▱▱ 0.0%/1.0M  $0.00
   === answered
-    prigh in $TMP/cwd · /help · Esc aborts · Ctrl+C twice quits
+  prigh  new session                                                        $TMP/cwd
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
   
   ▌ go
     waiting
@@ -606,46 +1274,122 @@ prints the captured panes.
   ✓ bash $ rm -rf build
     allowed bash
     all done
-  ────────────────────────────────────────────────────────────────────────────────────────────────────
+  ── /help · Tab commands · Alt+Enter follow-up · Ctrl+C twice quits ─────────────────────────────────
   >
-  $TMP/cwd  deepseek-flash  think:on  mode:ask  view:normal  ctx:0.0%/1.0M  $0.00
+  deepseek-flash  think:on  mode:ask  view:normal                           ctx ▱▱▱▱▱ 0.0%/1.0M  $0.00
   $ bash ./harness.sh reconnect_dialog
   === typing the reason
-    prigh in $TMP/cwd · /help · Esc aborts · Ctrl+C twice quits
+  prigh  new session                                                        $TMP/cwd
   
-  ▌ go
-    asking
-  … bash $ make deploy
-  ┌─ Why not? (the model sees it) ───────────────────────────────────────────────────────────────────┐
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  ╭─ Why not? (the model sees it) ───────────────────────────────────────────────────────────────────╮
   │ Run bash: make deploy?                                                                           │
   │ › not on a Fri                                                                                   │
-  └──────────────────────────────────────────────────────────────────────────────────────────────────┘
-  ────────────────────────────────────────────────────────────────────────────────────────────────────
-  …deepseek-flash  think:on  mode:ask  view:normal  ctx:0.0%/1.0M  $0.00  Enter denies · Esc goes back
+  ╰──────────────────────────────────────────────────────────────────────────────────────────────────╯
+  ── Enter denies · Esc goes back ────────────────────────────────────────────────────────────────────
+  >
+  deepseek-flash  think:on  mode:ask  view:normal                           ctx ▱▱▱▱▱ 0.0%/1.0M  $0.00
   === reconnected: the dialog closed
-    reconnected to the backend
-    prigh in $TMP/cwd · /help · Esc aborts · Ctrl+C twice quits
+  prigh  new session                                                        $TMP/cwd
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
   
   ▌ go
     asking
   … bash $ make deploy
-  ────────────────────────────────────────────────────────────────────────────────────────────────────
+  ── /help · Tab commands · Alt+Enter follow-up · Ctrl+C twice quits ─── reconnected to the backend ──
   >
-  $TMP/cwd  deepseek-flash  think:on  mode:ask  view:normal  ctx:0.0%/1.0M  $0.00
+  deepseek-flash  think:on  mode:ask  view:normal                           ctx ▱▱▱▱▱ 0.0%/1.0M  $0.00
   $ bash ./harness.sh auto_background
   === moved to the background
-    prigh in $TMP/cwd · /help · Esc aborts · Ctrl+C twice quits
+  prigh  new session                                                        $TMP/cwd
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
   
   ▌ build it
     building
   ✓ bash $ echo compiling; while [ ! -f gate ]; do sleep 0.0…  job j1 moved to the background after 1s
       compiling
     carrying on meanwhile
-  ────────────────────────────────────────────────────────────────────────────────────────────────────
+  ── /help · Tab commands · Alt+Enter follow-up · Ctrl+C twice quits ─────────────────────────────────
   >
-  $TMP/cwd  deepseek-flash  think:on  mode:auto  ctx:0.0%/1.0M  $0.00  jobs:1 <spin>
+  deepseek-flash  think:on  mode:auto  view:normal                jobs:1 <spin>  ctx ▱▱▱▱▱ 0.0%/1.0M  $0.00
   === its report
-    prigh in $TMP/cwd · /help · Esc aborts · Ctrl+C twice quits
+  prigh  new session                                                        $TMP/cwd
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
   
   ▌ build it
     building
@@ -656,77 +1400,263 @@ prints the captured panes.
       compiling
       linked
     the build finished
-  ────────────────────────────────────────────────────────────────────────────────────────────────────
+  ── /help · Tab commands · Alt+Enter follow-up · Ctrl+C twice quits ─────────────────────────────────
   >
-  $TMP/cwd  deepseek-flash  think:on  mode:auto  view:normal  ctx:0.0%/1.0M  $0.00
+  deepseek-flash  think:on  mode:auto  view:normal                          ctx ▱▱▱▱▱ 0.0%/1.0M  $0.00
   $ bash ./harness.sh connect_signin
   === refused: the sign-in dialog
-  ┌─ Sign in to 127.0.0.1:<port> ─────────────────────────────────────────────────────────────────────┐
+  prigh  not signed in                                                                         offline
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  ╭─ Sign in to 127.0.0.1:<port> ─────────────────────────────────────────────────────────────────────╮
   │ user                                                                                             │
   │ token                                                                                            │
   │ unauthorised: bad user name or password                                                          │
   │ prigh serve -tokens: your user name and password; -token: no user                                │
-  └──────────────────────────────────────────────────────────────────────────────────────────────────┘
-  ────────────────────────────────────────────────────────────────────────────────────────────────────
-  Tab next field · Enter signs in · Esc closes
+  ╰──────────────────────────────────────────────────────────────────────────────────────────────────╯
+  ── Tab next field · Enter signs in · Esc closes ────────────────────────────────────────────────────
+  >
+  offline
   === the token, masked
-  ┌─ Sign in to 127.0.0.1:<port> ─────────────────────────────────────────────────────────────────────┐
+  prigh  not signed in                                                                         offline
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  ╭─ Sign in to 127.0.0.1:<port> ─────────────────────────────────────────────────────────────────────╮
   │ user                                                                                             │
   │ token  ******                                                                                    │
   │ unauthorised: bad user name or password                                                          │
   │ prigh serve -tokens: your user name and password; -token: no user                                │
-  └──────────────────────────────────────────────────────────────────────────────────────────────────┘
-  ────────────────────────────────────────────────────────────────────────────────────────────────────
-  Tab next field · Enter signs in · Esc closes
-  === signed in
-    connected to 127.0.0.1:<port>
-    tools now run on <host> in $TMP/cwd
-    prigh in $TMP/cwd · /help · Esc aborts · Ctrl+C twice quits
-  ────────────────────────────────────────────────────────────────────────────────────────────────────
+  ╰──────────────────────────────────────────────────────────────────────────────────────────────────╯
+  ── Tab next field · Enter signs in · Esc closes ────────────────────────────────────────────────────
   >
-  …deepseek-flash  think:on  mode:auto  view:normal  ctx:0.0%/1.0M  $0.00  server:127.0.0.1:<port>
+  offline
+  === signed in
+  prigh  new session                                      $TMP/cwd · 127.0.0.1:<port>
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+    tools now run on <host> in $TMP/cwd
+  ── /help · Tab commands · Alt+Enter follow-up · Ctrl+C twice quits ─ connected to 127.0.0.1:<port> ──
+  >
+  deepseek-flash  think:on  mode:auto  view:normal                          ctx ▱▱▱▱▱ 0.0%/1.0M  $0.00
   === saved (600)
   ((connect 127.0.0.1:<port>) (token s3cret))
   === signed out
-    signed out of 127.0.0.1:<port>; the saved token is forgotten
-  ┌─ Sign in to 127.0.0.1:<port> ─────────────────────────────────────────────────────────────────────┐
+  prigh  not signed in                                                                         offline
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  ╭─ Sign in to 127.0.0.1:<port> ─────────────────────────────────────────────────────────────────────╮
   │ user                                                                                             │
   │ token                                                                                            │
   │ signed out                                                                                       │
   │ prigh serve -tokens: your user name and password; -token: no user                                │
-  └──────────────────────────────────────────────────────────────────────────────────────────────────┘
-  ────────────────────────────────────────────────────────────────────────────────────────────────────
-  Tab next field · Enter signs in · Esc closes
+  ╰──────────────────────────────────────────────────────────────────────────────────────────────────╯
+  ── Tab next field · Enter signs in ── signed out of 127.0.0.1:<port>; the saved token is forgotten ──
+  >
+  offline
   === saved (600)
   ((connect 127.0.0.1:<port>))
   === closed: disconnected
-    signed out of 127.0.0.1:<port>; the saved token is forgotten
-  ────────────────────────────────────────────────────────────────────────────────────────────────────
+  prigh  not signed in                                                                         offline
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  ── not signed in to 127.0.0.1:<port> · /signin signs in · /connect switches server ──────────────────
   >
-  not signed in to 127.0.0.1:<port> · /signin signs in · /connect switches server
+  offline
   === a local backend again
-    connected to a local backend
-    prigh in $TMP/cwd · /help · Esc aborts · Ctrl+C twice quits
-  ────────────────────────────────────────────────────────────────────────────────────────────────────
+  prigh  new session                                                        $TMP/cwd
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  ── /help · Tab commands · Alt+Enter follow-up · Ctrl+C twice quits ─ connected to a local backend ──
   >
-  $TMP/cwd  deepseek-flash  think:on  mode:auto  view:normal  ctx:0.0%/1.0M  $0.00
+  deepseek-flash  think:on  mode:auto  view:normal                          ctx ▱▱▱▱▱ 0.0%/1.0M  $0.00
   $ bash ./harness.sh startup_signin
   === refused at startup
-  ┌─ Sign in to 127.0.0.1:<port> ─────────────────────────────────────────────────────────────────────┐
+  prigh  not signed in                                                                         offline
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  ╭─ Sign in to 127.0.0.1:<port> ─────────────────────────────────────────────────────────────────────╮
   │ user                                                                                             │
   │ token                                                                                            │
   │ unauthorised: bad user name or password                                                          │
   │ prigh serve -tokens: your user name and password; -token: no user                                │
-  └──────────────────────────────────────────────────────────────────────────────────────────────────┘
-  ────────────────────────────────────────────────────────────────────────────────────────────────────
-  Tab next field · Enter signs in · Esc closes
-  === signed in
-    connected to 127.0.0.1:<port>
-    tools now run on <host> in $TMP/cwd
-    prigh in $TMP/cwd · /help · Esc aborts · Ctrl+C twice quits
-  ────────────────────────────────────────────────────────────────────────────────────────────────────
+  ╰──────────────────────────────────────────────────────────────────────────────────────────────────╯
+  ── Tab next field · Enter signs in · Esc closes ────────────────────────────────────────────────────
   >
-  …deepseek-flash  think:on  mode:auto  view:normal  ctx:0.0%/1.0M  $0.00  server:127.0.0.1:<port>
+  offline
+  === signed in
+  prigh  new session                                      $TMP/cwd · 127.0.0.1:<port>
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+    tools now run on <host> in $TMP/cwd
+  ── /help · Tab commands · Alt+Enter follow-up · Ctrl+C twice quits ─ connected to 127.0.0.1:<port> ──
+  >
+  deepseek-flash  think:on  mode:auto  view:normal                          ctx ▱▱▱▱▱ 0.0%/1.0M  $0.00
   === saved (600)
   ((connect 127.0.0.1:<port>) (token s3cret))
   $ bash ./harness.sh detached
@@ -735,10 +1665,36 @@ prints the captured panes.
   exit 0, at once
   === sessions: other prigh-cwd
   === the TUI in $TMP/cwd
-    prigh in $TMP/cwd · /help · Esc aborts · Ctrl+C twice quits
-  ────────────────────────────────────────────────────────────────────────────────────────────────────
+  prigh  new session                                                        $TMP/cwd
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  ── /help · Tab commands · Alt+Enter follow-up · Ctrl+C twice quits ─────────────────────────────────
   >
-  $TMP/cwd  deepseek-flash  think:on  mode:auto  view:normal  ctx:0.0%/1.0M  $0.00
+  deepseek-flash  think:on  mode:auto  view:normal                          ctx ▱▱▱▱▱ 0.0%/1.0M  $0.00
   === the pane: in $TMP/cwd
   HOME=$TMP/home
   PRIGH_BACKEND=$BACKEND
@@ -750,13 +1706,36 @@ prints the captured panes.
   exit 0, at once
   === sessions: other prigh-cwd prigh-cwd-2
   === prigh-cwd-2 answers
-    prigh in $TMP/cwd · /help · Esc aborts · Ctrl+C twice quits
+  prigh  new session                                                        $TMP/cwd
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
   
   ▌ hello
     faux reply
-  ────────────────────────────────────────────────────────────────────────────────────────────────────
+  ── /help · Tab commands · Alt+Enter follow-up · Ctrl+C twice quits ─────────────────────────────────
   >
-  $TMP/cwd  deepseek-flash  think:on  mode:auto  view:normal  ctx:0.0%/1.0M  $0.00
+  deepseek-flash  think:on  mode:auto  view:normal                          ctx ▱▱▱▱▱ 0.0%/1.0M  $0.00
   === quit: the session closed
   === sessions: other prigh-cwd
   === a TUI that fails keeps its pane until Enter

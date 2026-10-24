@@ -220,6 +220,8 @@ module Model = struct
     ; utc_offset : Time_ns.Span.t
     ; terminal_focus : Focus.t
     ; server : Server_link.t option
+    ; notice : Notice.t option
+    ; sidebar : bool
     }
   [@@deriving sexp_of]
 
@@ -268,8 +270,26 @@ let call ?(tag = Reply_tag.Show_error) (method_ : P.Request.Method.t) =
 ;;
 
 let str = P.Json.str
-let transcript_width m = Int.max 1 m.width
-let transcript_height m = Int.max 3 m.height
+
+let editor_row_count m =
+  let inner = Int.max 1 (m.width - 2) in
+  List.sum (module Int) (Editor.lines m.editor) ~f:(fun line ->
+    let rec count text acc =
+      let _, rest = Text_width.take text ~width:inner in
+      if String.is_empty rest then acc + 1 else count rest (acc + 1)
+    in
+    count line 0)
+;;
+
+let layout m =
+  Layout.compute
+    ~width:m.width
+    ~height:m.height
+    ~sidebar:m.sidebar
+    ~editor_rows:(editor_row_count m)
+;;
+
+let transcript_width m = (layout m).main_width
 
 let transcript_line_count m =
   let transcript =
@@ -286,29 +306,12 @@ let transcript_line_count m =
     ~verbosity:m.verbosity
 ;;
 
-let editor_row_count m =
-  let inner = Int.max 1 (m.width - 2) in
-  List.sum (module Int) (Editor.lines m.editor) ~f:(fun line ->
-    let rec count text acc =
-      let _, rest = Text_width.take text ~width:inner in
-      if String.is_empty rest then acc + 1 else count rest (acc + 1)
-    in
-    count line 0)
-;;
-
-let btw_rows m =
-  match m.btw, m.mode with
-  | Some box, Editing ->
-    List.length
-      (Btw_box.render
-         box
-         ~width:(transcript_width m)
-         ~max_rows:(Btw_box.max_rows ~height:(transcript_height m)))
-  | _ -> 0
-;;
-
+(* A focused subagent's header takes the transcript's first row. *)
 let transcript_rows m =
-  Int.max 0 (transcript_height m - (editor_row_count m + 2 + btw_rows m))
+  let rows = (layout m).main_rows in
+  match m.focus with
+  | `Agent _ -> Int.max 0 (rows - 1)
+  | `Main -> rows
 ;;
 
 (* The single place transcript edits go through so the anchored viewport can
@@ -339,7 +342,13 @@ let update_agents m ~f =
     }
 ;;
 
+(* Acknowledgements go to the notice slot and expire; [log] is for what
+   belongs to the session's history. *)
 let notice ?severity m text =
+  { m with notice = Some (Notice.create ?severity text) }
+;;
+
+let log ?severity m text =
   with_transcript m ~f:(fun t -> Transcript.notice ?severity t text)
 ;;
 
@@ -404,9 +413,9 @@ let maybe_open_pending m =
   then m
   else (
     match m.mode, m.pending_confirms, m.pending_questions with
-    | Editing, c :: rest, _ ->
+    | (Editing | Output _), c :: rest, _ ->
       { (confirm_tool m c) with pending_confirms = rest }
-    | Editing, [], (q : P.Pending.Ask.t) :: rest ->
+    | (Editing | Output _), [], (q : P.Pending.Ask.t) :: rest ->
       { m with
         mode =
           Question
@@ -425,7 +434,7 @@ let answer_confirm
       (c : P.Pending.Confirm.t)
       (answer : Confirm_prompt.Answer.t)
   =
-  ( notice m (Confirm_prompt.acknowledgement c answer)
+  ( log m (Confirm_prompt.acknowledgement c answer)
   , [ rpc
         "tool_confirm_respond"
         ~params:(Confirm_prompt.params c answer ~reason)
@@ -440,8 +449,20 @@ let verbosity_notice = function
   | Verbose -> "view: verbose — everything is shown"
 ;;
 
-let block m content =
+let log_block m content =
   with_transcript m ~f:(fun t -> Transcript.add t (Block content))
+;;
+
+(* Over the transcript, unless a dialog is open: then into it, so that a
+   late reply is not lost. *)
+let output m ~title content =
+  if Mode.is_dialog m.mode
+  then log_block m content
+  else
+    { m with
+      mode = Output (Output_box.create ~title content)
+    ; autocomplete = None
+    }
 ;;
 
 let follow m = { m with viewport = Viewport.Follow }
@@ -452,19 +473,6 @@ let tilde m path =
   | Some home when String.is_prefix path ~prefix:(home ^ "/") ->
     "~" ^ String.drop_prefix path (String.length home)
   | _ -> path
-;;
-
-let banner m (state : P.State.t) : Content.Line.t =
-  let where =
-    match state.session_name with
-    | Some name -> sprintf "%s %S" (tilde m state.cwd) name
-    | None -> tilde m state.cwd
-  in
-  [ { text =
-        sprintf "prigh in %s · /help · Esc aborts · Ctrl+C twice quits" where
-    ; style = Style.fg Gray
-    }
-  ]
 ;;
 
 let set_verbosity m verbosity =
@@ -509,6 +517,8 @@ let init =
   ; utc_offset = Time_ns.Span.zero
   ; terminal_focus = Unknown
   ; server = None
+  ; notice = None
+  ; sidebar = true
   }
 ;;
 
@@ -1224,7 +1234,7 @@ let mcp_selected m (list : P.Mcp_list.t) id =
   | None -> m, []
   | Some s ->
     (match s.status with
-     | Ready -> block m (mcp_tools s), []
+     | Ready -> output m ~title:("MCP: " ^ s.name) (mcp_tools s), []
      | Failed ->
        ( error
            m
@@ -1503,9 +1513,15 @@ let drop_pending m =
 (* Everything that belongs to the session shown, reset when it is replaced
    (a switch, another user, a reconnect), and the requests that refill it. *)
 let reset_session m =
+  let m = drop_pending m in
   ( follow
-      { (drop_pending m) with
-        skills = Skill_cache.empty
+      { m with
+        mode =
+          (match m.mode with
+           | Output _ -> Editing
+           | mode -> mode)
+      ; notice = None
+      ; skills = Skill_cache.empty
       ; agents = []
       ; focus = `Main
       ; queued_messages = []
@@ -1525,7 +1541,8 @@ let backend_closed m =
     }
   in
   let m =
-    error
+    log
+      ~severity:Error
       m
       "backend connection lost; reconnecting (/retry-backend-connection to \
        retry now, Ctrl+C quits)"
@@ -1534,7 +1551,7 @@ let backend_closed m =
     if List.is_empty m.stderr_tail
     then m
     else
-      block
+      log_block
         m
         (Content.lines
            ~style:(Style.dim Style.plain)
@@ -1792,7 +1809,8 @@ let reconnect_reply m ~generation result =
        signed_out m ~reason:e, []
      | Error e when Option.is_some session && Connection.session_missing e ->
        schedule_reconnect
-         (warn
+         (log
+            ~severity:Warn
             m
             (sprintf
                "%s; the session was never saved or has been deleted, starting \
@@ -1828,7 +1846,8 @@ let reconnect_reply m ~generation result =
        let m =
          match session, m.state with
          | None, Some { session_path; _ } ->
-           warn
+           log
+             ~severity:Warn
              (notice m "reconnected to the backend")
              (sprintf
                 "session %s no longer exists (it was never saved, or was \
@@ -2054,8 +2073,9 @@ let show_plan m =
   | None ->
     notice m "no plan: the model has not made one (it uses update_plan)", []
   | Some plan ->
-    ( block
+    ( output
         m
+        ~title:"Plan"
         (Content.lines
            (String.concat
               ~sep:"\n"
@@ -2097,7 +2117,11 @@ let show_permissions m =
            Alt+M switches the mode"
         ]
     in
-    block m (Content.lines (String.concat ~sep:"\n" lines)), []
+    ( output
+        m
+        ~title:"Permissions"
+        (Content.lines (String.concat ~sep:"\n" lines))
+    , [] )
 ;;
 
 let fallback_summary m (config : P.Config.t) =
@@ -2299,8 +2323,9 @@ let run_command m (cmd : Commands.Parsed.t) =
   match cmd.name, cmd.args with
   | "", _ -> m, []
   | "help", [] ->
-    ( block
+    ( output
         m
+        ~title:"Help"
         (List.concat
            [ help_heading "Commands" :: Commands.help
            ; [ []; help_heading "In the prompt" ]
@@ -2315,8 +2340,9 @@ let run_command m (cmd : Commands.Parsed.t) =
     (match Commands.find name with
      | Some spec ->
        let usage = Commands.usage spec in
-       ( block
+       ( output
            m
+           ~title:("/" ^ spec.name)
            [ [ { Content.Span.text = usage; style = Style.bold Style.plain }
              ; { text = "  " ^ spec.help; style = Style.plain }
              ]
@@ -2324,8 +2350,9 @@ let run_command m (cmd : Commands.Parsed.t) =
        , [] )
      | None -> unknown_command m name ~retry:(fun name -> "/help " ^ name), [])
   | "hotkeys", _ ->
-    ( block
+    ( output
         m
+        ~title:"Keys"
         ((help_heading "Keys" :: Keymap.help)
          @ ([] :: help_heading "In lists" :: Keymap.list_help))
     , [] )
@@ -2633,7 +2660,7 @@ let run_command m (cmd : Commands.Parsed.t) =
       Option.value_map m.state ~default:"not connected" ~f:(fun s ->
         Sexp.to_string_hum (P.State.sexp_of_t s))
     in
-    block m (Content.lines ~style:(Style.fg Gray) text), []
+    output m ~title:"State" (Content.lines ~style:(Style.fg Gray) text), []
   | "clear", _ ->
     follow { m with transcript = Transcript.clear m.transcript }, []
   | "connect", _ -> connect m cmd.rest
@@ -2989,13 +3016,14 @@ let interrupt m =
   then (
     let m, cmds = abort { m with pending_quit = true } in
     warn m "aborting; Ctrl+C again quits", cmds)
-  else warn { m with pending_quit = true } "press Ctrl+C again to quit", []
+  else { m with pending_quit = true }, []
 ;;
 
 let page_size m = Int.max 1 (m.height / 2)
 
-(* Ten rows, fewer on short screens so the separator and status line stay. *)
-let picker_rows ~height = Int.max 3 (Int.min 10 (height - 5))
+(* Ten rows, fewer when the transcript area is short: the box's borders and
+   the filter take three. *)
+let picker_rows m = Int.max 1 (Int.min 10 ((layout m).main_rows - 3))
 let wheel_lines = 3
 
 let scroll_up m ~lines =
@@ -3178,7 +3206,7 @@ let editing_intent m (intent : Intent.t) =
        else (
          match m.viewport with
          | Viewport.Anchored _ -> follow m, []
-         | Viewport.Follow -> m, []))
+         | Viewport.Follow -> { m with notice = None }, []))
   | Interrupt -> interrupt m
   | Force_quit -> { m with quitting = true }, [ Quit ]
   | Kill_to_end -> ed Editor.kill_to_end
@@ -3206,7 +3234,7 @@ let editing_intent m (intent : Intent.t) =
   | Search -> open_search m, []
   | Prev_user_message -> jump_user_message m ~direction:`Prev
   | Next_user_message -> jump_user_message m ~direction:`Next
-  | Toggle_archived -> m, []
+  | Toggle_archived | Toggle_sidebar -> m, []
 ;;
 
 (* Autocomplete is a sub-state of editing: while it is open it owns a few keys,
@@ -3286,6 +3314,7 @@ let editing m (intent : Intent.t) =
         | Prev_user_message
         | Next_user_message
         | Toggle_archived
+        | Toggle_sidebar
         | Search ->
           let m, cmds = editing_intent m intent in
           let m, more = refresh_autocomplete m in
@@ -3609,7 +3638,7 @@ let picker m (kind : Mode.Picker_kind.t) picker (intent : Intent.t) =
        Picker.handle
          picker
          (if Intent.equal intent Interrupt then Cancel else intent)
-         ~page:(picker_rows ~height:m.height)
+         ~page:(picker_rows m)
      with
      | Continue picker -> { m with mode = Picker { kind; picker } }, []
      | Selected item -> picker_selected m kind item
@@ -3675,6 +3704,7 @@ let login_prompt m ~id ~(prompt : P.Auth_event.Prompt.t) (intent : Intent.t) =
   | Prev_user_message
   | Next_user_message
   | Toggle_archived
+  | Toggle_sidebar
   | Newline -> m, []
   | Insert _
   | Paste _
@@ -3855,7 +3885,8 @@ let text_prompt m ~(action : Mode.Text_prompt_action.t) (intent : Intent.t) =
   | Search
   | Prev_user_message
   | Next_user_message
-  | Toggle_archived -> m, []
+  | Toggle_archived
+  | Toggle_sidebar -> m, []
 ;;
 
 (* ---- confirm mode ----------------------------------------------------- *)
@@ -3962,19 +3993,61 @@ let question m ~call_id ~form (intent : Intent.t) =
   | _ -> m, []
 ;;
 
+(* ---- output box ------------------------------------------------------- *)
+
+(* The box owns the keys that scroll it and Esc; anything else closes it and
+   goes to the editor, so typing on after [/help] just works. *)
+let output_mode m box (intent : Intent.t) =
+  let rows = Int.max 1 ((layout m).main_rows - 2) in
+  let width = Boxed.inner_width ~width:(transcript_width m) in
+  let scroll by =
+    { m with mode = Output (Output_box.scroll box ~by ~width ~rows) }, []
+  in
+  match intent with
+  | Cancel | Interrupt | Submit -> { m with mode = Editing }, []
+  | Up | Scroll_up -> scroll (-1)
+  | Down | Scroll_down -> scroll 1
+  | Page_up -> scroll (-rows)
+  | Page_down -> scroll rows
+  | Home -> scroll (-List.length (Output_box.wrapped box ~width))
+  | End -> scroll (List.length (Output_box.wrapped box ~width))
+  | Force_quit -> { m with quitting = true }, [ Command.Quit ]
+  | _ -> editing { m with mode = Editing } intent
+;;
+
+let toggle_sidebar m =
+  let m = { m with sidebar = not m.sidebar } in
+  let narrow = m.width < Layout.sidebar_threshold in
+  match m.sidebar, narrow with
+  | true, true ->
+    notice
+      m
+      (sprintf
+         "sidebar on: it shows at %d columns and more (now %d)"
+         Layout.sidebar_threshold
+         m.width)
+  | false, true -> notice m "sidebar off"
+  | _, false -> m
+;;
+
 let intent m (intent : Intent.t) =
   let m =
     if Intent.equal intent Interrupt then m else { m with pending_quit = false }
   in
-  match m.mode with
-  | Editing -> editing m intent
-  | Picker { kind; picker = p } -> picker m kind p intent
-  | Login_prompt { id; prompt } -> login_prompt m ~id ~prompt intent
-  | Text_prompt { action; _ } -> text_prompt m ~action intent
-  | Confirm { action; _ } -> confirm m ~action intent
-  | Question { call_id; form } -> question m ~call_id ~form intent
-  | Sign_in form -> sign_in_mode m form intent
-  | Search _ -> search m intent
+  match m.mode, intent with
+  | _, Toggle_sidebar -> toggle_sidebar m, []
+  | Output box, _ -> output_mode m box intent
+  | mode, _ ->
+    (match mode with
+     | Output _ -> m, []
+     | Editing -> editing m intent
+     | Picker { kind; picker = p } -> picker m kind p intent
+     | Login_prompt { id; prompt } -> login_prompt m ~id ~prompt intent
+     | Text_prompt { action; _ } -> text_prompt m ~action intent
+     | Confirm { action; _ } -> confirm m ~action intent
+     | Question { call_id; form } -> question m ~call_id ~form intent
+     | Sign_in form -> sign_in_mode m form intent
+     | Search _ -> search m intent)
 ;;
 
 (* ---- backend events --------------------------------------------------- *)
@@ -4248,7 +4321,8 @@ let rec reply m (tag : Reply_tag.t) (result : (P.Json.t, string) Result.t) =
   let decode json ~f k =
     match f json with
     | Ok v -> k v
-    | Error e -> error m ("protocol error: " ^ Error.to_string_hum e), []
+    | Error e ->
+      log ~severity:Error m ("protocol error: " ^ Error.to_string_hum e), []
   in
   match result with
   | Error e ->
@@ -4307,7 +4381,7 @@ let rec reply m (tag : Reply_tag.t) (result : (P.Json.t, string) Result.t) =
          let m = mcp_problems m list in
          if List.is_empty list.servers
          then notice m ("no MCP servers; " ^ mcp_config_hint), []
-         else block m (mcp_summary list), [])
+         else output m ~title:"MCP servers" (mcp_summary list), [])
      | Mcp_approved server ->
        decode json ~f:P.Mcp_list.of_json (mcp_approved m server)
      | Pending ->
@@ -4365,7 +4439,7 @@ let rec reply m (tag : Reply_tag.t) (result : (P.Json.t, string) Result.t) =
                   diff.root
                   (Diff_files.against diff))
            , [] )
-         else follow (block m (Diff_files.render diff)), [])
+         else output m ~title:"Changes" (Diff_files.render diff), [])
      | Review_started ->
        (* The run's first message shows what started; a busy agent queues it. *)
        (match m.state with
@@ -4395,8 +4469,7 @@ let rec reply m (tag : Reply_tag.t) (result : (P.Json.t, string) Result.t) =
            , [] ))
      | Initial_state ->
        decode json ~f:P.State.of_json (fun state ->
-         let m = { m with state = Some state } in
-         block m [ banner m state ], [])
+         { m with state = Some state }, [])
      | Initial_messages ->
        decode json ~f:(decode_list ~f:P.Message.of_json) (fun messages ->
          let transcript =
@@ -4420,8 +4493,9 @@ let rec reply m (tag : Reply_tag.t) (result : (P.Json.t, string) Result.t) =
               | `String s -> Ok s
               | _ -> Or_error.error_string "expected a user name"))
          (fun users ->
-            ( block
+            ( output
                 m
+                ~title:"Users"
                 (Content.lines
                    (String.concat
                       ~sep:"\n"
@@ -4457,7 +4531,7 @@ let rec reply m (tag : Reply_tag.t) (result : (P.Json.t, string) Result.t) =
                 ] ))
      | Session_stats ->
        decode json ~f:P.Session_stats.of_json (fun stats ->
-         block m (format_stats stats), [])
+         output m ~title:"Session" (format_stats stats), [])
      | Entries_for_fork ->
        decode json ~f:decode_entries (fun (_head, entries) ->
          fork_picker m entries, [])
@@ -4551,7 +4625,7 @@ let rec reply m (tag : Reply_tag.t) (result : (P.Json.t, string) Result.t) =
          { m with auth }, [])
      | Auth_show ->
        decode json ~f:(decode_list ~f:P.Auth_status.of_json) (fun auth ->
-         block { m with auth } (format_auth auth), [])
+         output { m with auth } ~title:"Logins" (format_auth auth), [])
      | Auth_login_picker ->
        decode json ~f:(decode_list ~f:P.Auth_status.of_json) (fun auth ->
          login_picker { m with auth } auth, [])
@@ -4617,7 +4691,7 @@ let rec reply m (tag : Reply_tag.t) (result : (P.Json.t, string) Result.t) =
        decode
          json
          ~f:(fun json -> P.Json.string_field json "text")
-         (fun text -> block m (Content.lines text), [])
+         (fun text -> output m ~title:"Job output" (Content.lines text), [])
      | Job_started ->
        decode
          json
@@ -4728,21 +4802,24 @@ let update m (action : Action.t) =
         (match m.connection with
          | Disconnected _ -> m, [ Command.Load_history ]
          | Connected | Reconnecting _ | Switching _ -> m, start_commands)
+      (* The next key press retires the notice it acknowledged; the key's
+         own notice, if any, replaces it. *)
       | Key key ->
         (match Keymap.lookup key with
-         | Some i -> intent m i
+         | Some i -> intent { m with notice = None } i
          | None -> m, [])
-      | Intent i -> intent m i
+      | Intent i -> intent { m with notice = None } i
       | Event e ->
         let m, cmds = event m e in
         m, cmds @ notify m e
-      | Protocol_error text -> error m ("protocol error: " ^ text), []
+      | Protocol_error text ->
+        log ~severity:Error m ("protocol error: " ^ text), []
       | Stderr line ->
         let all = m.stderr_tail @ [ line ] in
         let stderr_tail =
           List.drop all (Int.max 0 (List.length all - stderr_tail_limit))
         in
-        notice ~severity:Debug { m with stderr_tail } ("backend: " ^ line), []
+        log ~severity:Debug { m with stderr_tail } ("backend: " ^ line), []
       | Backend_closed ->
         (match m.connection with
          | Connected -> backend_closed m
@@ -4759,7 +4836,12 @@ let update m (action : Action.t) =
       | Reply (Reconnect generation, result) ->
         reconnect_reply m ~generation result
       | Reply (tag, result) -> reply m tag result
-      | Tick -> { m with spinner = m.spinner + 1 }, []
+      | Tick ->
+        ( { m with
+            spinner = m.spinner + 1
+          ; notice = Option.bind m.notice ~f:Notice.tick
+          }
+        , [] )
       | Set_home home -> { m with home = Some home }, []
       | Set_utc_offset utc_offset -> { m with utc_offset }, []
       | Focus focused ->
