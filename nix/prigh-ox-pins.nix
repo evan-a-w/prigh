@@ -85,7 +85,7 @@
   incr_select = "v0.18~preview.130.106+341";
   incremental = "v0.18~preview.130.106+341";
   int_repr = "v0.18~preview.130.106+341";
-  iomux = "0.4";
+  iomux = "0.4+prigh";
   ipaddr = "5.6.2";
   jane-street-headers = "v0.18~preview.130.106+341";
   janestreet_lru_cache = "v0.18~preview.130.106+341";
