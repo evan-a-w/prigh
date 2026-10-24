@@ -34,14 +34,7 @@ let%expect_test "the picker lists active sessions first, whatever the order" =
   [%expect
     {|
     (Rpc (method_ list_sessions) (params ()) (tag Sessions_picker))
-      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
-      earlier answer
-       deploy ∣ 2025-06-03T10:00 ∣ 6 msgs ∣ deploy it      /work
-       (unnamed) ∣ 2025-06-02T10:00 ∣ 2 msgs ∣ scratch     /tmp
-       release ∣ 2025-06-01T10:00 ∣ 3 msgs ∣ cut it        /work
-      ── archived ──
-    ▸* build fix ∣ 2025-06-06T10:00 ∣ 12 msgs ∣ fix the build  /work
-       (unnamed) ∣ 2025-06-05T10:00 ∣ 4 msgs ∣ try a spike  /old
+    >
     |}]
 ;;
 
@@ -63,28 +56,14 @@ let%expect_test
   [%expect
     {|
     (Rpc (method_ list_sessions) (params ()) (tag Sessions_picker))
-      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
-      earlier answer
-       deploy ∣ 2025-06-03T10:00 ∣ 6 msgs ∣ deploy it      /work
-     ✓ (unnamed) ∣ 2025-06-02T10:00 ∣ 2 msgs ∣ scratch     /tmp
-    ▸  release ∣ 2025-06-01T10:00 ∣ 3 msgs ∣ cut it        /work
-      ── archived ──
-     * build fix ∣ 2025-06-06T10:00 ∣ 12 msgs ∣ fix the build  /work
-       (unnamed) ∣ 2025-06-05T10:00 ∣ 4 msgs ∣ try a spike  /old
+    >
     |}];
   (* A highlighted session the filter hides gives way to the next one shown. *)
   H.key h (Key.plain Up);
   H.key h (Key.ctrl 'n');
   rows h;
   [%expect
-    {|
-      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
-      earlier answer
-       deploy ∣ 2025-06-03T10:00 ∣ 6 msgs ∣ deploy it      /work
-    ▸  release ∣ 2025-06-01T10:00 ∣ 3 msgs ∣ cut it        /work
-      ── archived ──
-     * build fix ∣ 2025-06-06T10:00 ∣ 12 msgs ∣ fix the build  /work
-    |}];
+    {| > |}];
   (* The hidden mark still counts, and is deleted with the others. *)
   H.key h (Key.plain Tab);
   H.key h (Key.ctrl 'd');
@@ -109,14 +88,7 @@ let%expect_test
   [%expect
     {|
     (Rpc (method_ list_sessions) (params ()) (tag Sessions_cache))
-      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
-      earlier answer
     > /switch
-    ▸ deploy       deploy it · /work
-      scratch      /tmp
-      release      cut it · /work
-      build fix    archived · fix the build · /work
-      try a spike  archived · /old
     |}];
   (* By name, and the id goes in, which every session command accepts. *)
   H.keys h "rel";
@@ -125,12 +97,7 @@ let%expect_test
   rows h;
   [%expect
     {|
-      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
-      earlier answer
     > /switch rel
-    ▸ release      cut it · /work
-      try a spike  archived · /old
-      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
       earlier answer
     > /switch 5
     |}];
@@ -146,24 +113,9 @@ let%expect_test
   rows h;
   [%expect
     {|
-      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
-      earlier answer
     > /archive
-    ▸ deploy   deploy it · /work
-      scratch  /tmp
-      release  cut it · /work
-      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
-      earlier answer
     > /unarchive
-    ▸ build fix    archived · fix the build · /work
-      try a spike  archived · /old
-      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
-      earlier answer
     > /delete
-    ▸ deploy       deploy it · /work
-      scratch      /tmp
-      release      cut it · /work
-      try a spike  archived · /old
     |}]
 ;;
 
@@ -183,20 +135,20 @@ let%expect_test
     (Rpc (method_ list_sessions) (params ()) (tag Sessions_cache))
     (Rpc (method_ list_sessions) (params ()) (tag Sessions_cache))
     (Rpc (method_ list_sessions) (params ()) (tag (Sessions_to_delete (1 2))))
+    prigh  new session                                                         /work
 
 
 
 
 
-      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
-    ▌ earlier question
-      earlier answer
-      session "build fix" is the session you are in: switch to another one first, or
-      leave it out
-    ────────────────────────────────────────────────────────────────────────────────
+    ╭─ Error ──────────────────────────────────────────────────────────────────────╮
+    │ session "build fix" is the session you are in: switch to another one first,  │
+    │ or leave it out                                                              │
+    ╰────────────────────────────────────────────────────────────── Esc dismisses ─╯
+    ── /help · Tab commands · Alt+Enter follow-up · Ctrl+C twice quits ─────────────
     > /delete 1 2▏
-    /work  deepseek-flash  think:off  mode:auto  view:normal  ctx:0.1%/1.0M  $0.01
+    deepseek-flash  think:off  mode:auto  view:normal     ctx ▱▱▱▱▱ 0.1%/1.0M  $0.01
     |}];
   H.key h (Key.ctrl 'u');
   H.keys h "/delete-archived";
@@ -207,20 +159,20 @@ let%expect_test
   [%expect
     {|
     (Rpc (method_ list_sessions) (params ()) (tag Archived_to_delete))
+    prigh  new session                                                         /work
 
 
-      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
-    ▌ earlier question
-      earlier answer
-      session "build fix" is the session you are in: switch to another one first, or
-      leave it out
-    ┌─ Confirm ────────────────────────────────────────────────────────────────────┐
+
+
+
+
+    ╭─ Confirm ────────────────────────────────────────────────────────────────────╮
     │ Delete the archived session 3a (1.4 MB)? Enter deletes, Esc keeps it         │
-    └──────────────────────────────────────────────────────────────────────────────┘
-    ────────────────────────────────────────────────────────────────────────────────
-    ? ▏
-    …deepseek-flash  think:off  mode:auto  ctx:0.1%/1.0M  $0.01  confirm: y / n
+    ╰──────────────────────────────────────────────────────────────────────────────╯
+    ── confirm: y / n ──────────────────────────────────────────────────────────────
+    > ▏
+    deepseek-flash  think:off  mode:auto  view:normal     ctx ▱▱▱▱▱ 0.1%/1.0M  $0.01
     (Rpc
       (method_ delete_sessions)
       (params ((paths (/s/3a.jsonl))))

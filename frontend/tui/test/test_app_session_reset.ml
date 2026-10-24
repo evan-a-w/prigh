@@ -102,22 +102,22 @@ let%expect_test
      (pending_questions ())
      (queued (steer:0 follow_up:0))
      (agents 0))
+    prigh  new session                                    /other
 
-      prigh in /other · /help · Esc aborts · Ctrl+C twice quits
 
-    ▌ in b
-    ┌─ Confirm ────────────────────────────────────────────────┐
+
+
+
+
+    ╭─ Confirm ────────────────────────────────────────────────╮
     │ Run bash: make in b?                                     │
     │ y  allow once                                            │
     │ n  deny                                                  │
     │ r  deny, saying why                                      │
-    └──────────────────────────────────────────────────────────┘
-    ────────────────────────────────────────────────────────────
-    queued (2) · Alt+Up: edit the last · /queue: edit or remove
-      steer      steer in b
-      follow-up  later in b
-    ? ▏
-    …deepseek-flash  ctx:0.1%/1.0M  queued:2  confirm: y/n/r
+    ╰──────────────────────────────────────────────────────────╯
+    ── confirm: y/n/r ──────────────────────────────────────────
+    > ▏
+    deepseek-flash          queued:2  ctx ▱▱▱▱▱ 0.1%/1.0M  $0.01
     |}];
   (* The answer goes to the new session's call. *)
   H.keys h "y";
@@ -284,17 +284,17 @@ let%expect_test
   [%expect
     {|
     (Rpc (method_ list_sessions) (params ()) (tag Sessions_picker))
+    prigh  new session                                                         /work
 
 
-      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
-    ▌ earlier question
-      earlier answer
-    Sessions  (2)  Alt+A (un)archives · Alt+D deletes archived · Ctrl+N named
-    / ▏
-    ▸* build fix ∣ 2025-06-01T10:00 ∣ 12 msgs ∣ fix the build please  /work
-       (unnamed) ∣ 2025-06-02T11:30 ∣ 0 msgs ∣ (empty)  /other
-    ────────────────────────────────────────────────────────────────────────────────
-    …deepseek-flash  to answer:2  Enter switches · Tab marks · Ctrl+D deletes
+    ╭─ Sessions (2) ───────────────────────────────────────────────────────────────╮
+    │ / ▏               Alt+A (un)archives · Alt+D deletes archived · Ctrl+N named │
+    │ ▸* build fix ∣ 2025-06-01T10:00 ∣ 12 msgs ∣ fix the build please  /work      │
+    │    (unnamed) ∣ 2025-06-02T11:30 ∣ 0 msgs ∣ (empty)  /other                   │
+    ╰──────────────────────────────────────────────────────────────────────────────╯
+    ── Enter switches · Tab marks · Ctrl+D deletes · Esc closes ────────────────────
+    >
+    deepseek-flash  think:off  mode:auto  to answer:2     ctx ▱▱▱▱▱ 0.1%/1.0M  $0.01
     |}]
 ;;

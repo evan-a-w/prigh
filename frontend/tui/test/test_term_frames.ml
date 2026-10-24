@@ -201,6 +201,7 @@ let%expect_test "startup frame matches the pure renderer" =
     [%expect
       {|
       === Vt.to_plain ===
+      prigh  new session                                                         /work
 
 
 
@@ -214,13 +215,12 @@ let%expect_test "startup frame matches the pure renderer" =
 
 
 
-        prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
       ▌ earlier question
         earlier answer
-      ────────────────────────────────────────────────────────────────────────────────
+      ── /help · Tab commands · Alt+Enter follow-up · Ctrl+C twice quits ─────────────
       > ▏
-      /work  deepseek-flash  think:off  mode:auto  view:normal  ctx:0.1%/1.0M  $0.01
+      deepseek-flash  think:off  mode:auto  view:normal     ctx ▱▱▱▱▱ 0.1%/1.0M  $0.01
       same: true
       |}];
     return ())
@@ -237,6 +237,7 @@ let%expect_test "typing, streamed reply, Ctrl+O and Alt+Enter through the \
     [%expect
       {|
       === Vt.to_plain ===
+      prigh  new session                                                         /work
 
 
 
@@ -250,13 +251,12 @@ let%expect_test "typing, streamed reply, Ctrl+O and Alt+Enter through the \
 
 
 
-        prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
       ▌ earlier question
         earlier answer
-      ────────────────────────────────────────────────────────────────────────────────
+      ── /help · Tab commands · Alt+Enter follow-up · Ctrl+C twice quits ─────────────
       > hello▏
-      /work  deepseek-flash  think:off  mode:auto  view:normal  ctx:0.1%/1.0M  $0.01
+      deepseek-flash  think:off  mode:auto  view:normal     ctx ▱▱▱▱▱ 0.1%/1.0M  $0.01
       same: true
       |}];
     (* A streamed assistant reply arrives as an incoming action. *)
@@ -270,6 +270,7 @@ let%expect_test "typing, streamed reply, Ctrl+O and Alt+Enter through the \
     [%expect
       {|
       === Vt.to_plain ===
+      prigh  new session                                                         /work
 
 
 
@@ -281,15 +282,14 @@ let%expect_test "typing, streamed reply, Ctrl+O and Alt+Enter through the \
 
 
 
-        prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
       ▌ earlier question
         earlier answer
 
         streamed reply
-      ────────────────────────────────────────────────────────────────────────────────
+      ── /help · Tab commands · Alt+Enter follow-up · Ctrl+C twice quits ─────────────
       > hello▏
-      /work  deepseek-flash  think:off  mode:auto  view:normal  ctx:0.1%/1.0M  $0.01
+      deepseek-flash  think:off  mode:auto  view:normal     ctx ▱▱▱▱▱ 0.1%/1.0M  $0.01
       same: true
       |}];
     (* Raw ^O (ASCII '\015') goes through Key_of_event and cycles verbosity. *)
@@ -299,6 +299,7 @@ let%expect_test "typing, streamed reply, Ctrl+O and Alt+Enter through the \
     [%expect
       {|
       === Vt.to_plain ===
+      prigh  new session                                                         /work
 
 
 
@@ -309,16 +310,15 @@ let%expect_test "typing, streamed reply, Ctrl+O and Alt+Enter through the \
 
 
 
-        prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+
 
       ▌ earlier question
         earlier answer
-        view: verbose — everything is shown
 
         streamed reply
-      ────────────────────────────────────────────────────────────────────────────────
+      ── /help · Tab commands ───────────────── view: verbose — everything is shown ──
       > hello▏
-      /work  deepseek-flash  think:off  mode:auto  view:verbose  ctx:0.1%/1.0M  $0.01
+      deepseek-flash  think:off  mode:auto  view:verbose    ctx ▱▱▱▱▱ 0.1%/1.0M  $0.01
       same: true
       |}];
     (* Alt+Enter is a raw Enter with the Meta modifier; it queues a follow-up. *)
@@ -328,6 +328,7 @@ let%expect_test "typing, streamed reply, Ctrl+O and Alt+Enter through the \
     [%expect
       {|
       === Vt.to_plain ===
+      prigh  new session                                                         /work
 
 
 
@@ -338,16 +339,15 @@ let%expect_test "typing, streamed reply, Ctrl+O and Alt+Enter through the \
 
 
 
-        prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+
 
       ▌ earlier question
         earlier answer
-        view: verbose — everything is shown
 
         streamed reply
-      ────────────────────────────────────────────────────────────────────────────────
+      ── /help · Tab commands · Alt+Enter follow-up · Ctrl+C twice quits ─────────────
       > ▏
-      /work  deepseek-flash  think:off  mode:auto  view:verbose  ctx:0.1%/1.0M  $0.01
+      deepseek-flash  think:off  mode:auto  view:verbose    ctx ▱▱▱▱▱ 0.1%/1.0M  $0.01
       same: true
       |}];
     return ())
@@ -367,6 +367,7 @@ let%expect_test "bracketed paste produces the paste chip" =
     [%expect
       {|
       === Vt.to_plain ===
+      prigh  new session                                                         /work
 
 
 
@@ -380,13 +381,12 @@ let%expect_test "bracketed paste produces the paste chip" =
 
 
 
-        prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
       ▌ earlier question
         earlier answer
-      ────────────────────────────────────────────────────────────────────────────────
+      ── /help · Tab commands · Alt+Enter follow-up · Ctrl+C twice quits ─────────────
       > [4 lines pasted]▏
-      /work  deepseek-flash  think:off  mode:auto  view:normal  ctx:0.1%/1.0M  $0.01
+      deepseek-flash  think:off  mode:auto  view:normal     ctx ▱▱▱▱▱ 0.1%/1.0M  $0.01
       same: true
       |}];
     return ())
@@ -401,6 +401,7 @@ let%expect_test "resize 80 -> 40 keeps the frame matching" =
     [%expect
       {|
       === Vt.to_plain ===
+      prigh  new session                 /work
 
 
 
@@ -413,14 +414,13 @@ let%expect_test "resize 80 -> 40 keeps the frame matching" =
 
 
 
-        prigh in /work · /help · Esc aborts ·
-        Ctrl+C twice quits
+
 
       ▌ earlier question
         earlier answer
-      ────────────────────────────────────────
+      ── /help · Tab commands ────────────────
       > ▏
-      …deepseek-flash  ctx:0.1%/1.0M  $0.01
+      deepseek-flash       ctx ▱▱▱▱▱ 0.1%/1.0M
       same: true
       |}];
     return ())
@@ -465,36 +465,36 @@ let%expect_test "styled frame: markdown link, diff and autocomplete" =
     [%expect
       {|
       === Vt.to_styled ===
+      [bold]prigh[/]  [gray]new session[/]                                                         [gray]/work[/]
 
 
 
 
 
 
-        [gray]prigh in /work · /help · Esc aborts · Ctrl+C twice quits[/]
 
-      [yellow]▌ [/][bold]earlier question[/]
-        earlier [bold]answer[/]
-        See the docs (https://example.com).
-      [green]✓ [/][bold]bash[/]
-          [gray]--- a/x.c[/]
-          [gray]+++ b/x.c[/]
-          [cyan]@@ -1,2 +1,2 @@[/]
-          [red]-old[/]
-          [green]+new[/]
-          [gray] context[/]
-      [gray]────────────────────────────────────────────────────────────────────────────────[/]
+
+
+
+
+
+
+
+
+
+      [gray]╭─ [/][bold]Commands[/][gray] ───────────────────────────────────────────────────────────────────╮[/]
+      [gray]│ [/][invert]▸ [/][bold][invert]/help[/][gray][invert]                              show commands and keys[/]                 [gray] │[/]
+      [gray]│ [/]  [bold]/hotkeys[/][gray]                           show keyboard shortcuts[/]                [gray] │[/]
+      [gray]│ [/]  [bold]/model[/][gray] [name|id|provider/id]       pick or switch the model[/]               [gray] │[/]
+      [gray]│ [/]  [bold]/scoped-models[/][gray]                     pick the models Ctrl+P cycles through[/]  [gray] │[/]
+      [gray]│ [/]  [bold]/change_default[/][gray]                    save the current model and thinking le… │[/]
+      [gray]│ [/]  [bold]/fallback[/][gray] [off|model...]           show or set the models that take over,… │[/]
+      [gray]│ [/]  [bold]/default-dir[/][gray] [off|path]            show or set the directory new sessions… │[/]
+      [gray]│ [/]  [bold]/login[/][gray] [provider] [api_key|oauth]  log in to a provider[/]                   [gray] │[/]
+      [gray]╰────────────────────────────────────────────────────────────────── 1–8 of 61 ─╯[/]
+      [gray]── [/][yellow]Tab/Enter accept · Alt+S as typed[/] [gray]───────────────────────────────────────────[/]
       [yellow][bold]> [/]/
-      [invert]▸ [/][bold][invert]/help[/][gray][invert]                              show commands and keys[/]
-        [bold]/hotkeys[/][gray]                           show keyboard shortcuts[/]
-        [bold]/model[/][gray] [name|id|provider/id]       pick or switch the model[/]
-        [bold]/scoped-models[/][gray]                     pick the models Ctrl+P cycles through[/]
-        [bold]/change_default[/][gray]                    save the current model and thinking level …[/]
-        [bold]/fallback[/][gray] [off|model...]           show or set the models that take over, in …[/]
-        [bold]/default-dir[/][gray] [off|path]            show or set the directory new sessions sta…[/]
-        [bold]/login[/][gray] [provider] [api_key|oauth]  log in to a provider[/]
-      [gray]  ↕ 1–8 of 61[/]
-      …[gray]deepseek-flash[/]  [gray]think:off[/]  [gray]ctx:0.1%/1.0M[/]  [yellow]Tab/Enter accept · Alt+S as typed[/]
+      deepseek-flash  [gray]think:off[/]  [gray]mode:auto[/]  [gray]view:normal[/]     [gray]ctx ▱▱▱▱▱ 0.1%/1.0M[/]  [gray]$0.01[/]
       |}];
     return ())
 ;;
@@ -516,14 +516,14 @@ let%expect_test "mouse wheel scrolls the transcript; Up walks history" =
       {|
       after wheel up: (Anchored(top 8)(new_lines 0))
       === Vt.to_plain ===
-
+      prigh  new session                                                         /work
       ▌ line 2
 
       ▌ line 3
 
-      ────────────────────────────────────────────────────────────────────────────────
+      ── /help · Tab commands · Alt+Enter follow-up · Ctrl+C twice quits ─────────────
       > ▏
-      /work  deepseek-flash  think:off  mode:auto  ctx:0.1%/1.0M  $0.01  ↑ scrolled
+      deepseek-flash  think:off  mode:auto      ↑ scrolled  ctx ▱▱▱▱▱ 0.1%/1.0M  $0.01
       same: true
       |}];
     H.wheel h `Down;
@@ -536,14 +536,14 @@ let%expect_test "mouse wheel scrolls the transcript; Up walks history" =
       {|
       after wheel down: Follow
       === Vt.to_plain ===
-      ▌ line 3
+      prigh  new session                                                         /work
 
       ▌ line 4
 
       ▌ line 5
-      ────────────────────────────────────────────────────────────────────────────────
+      ── /help · Tab commands · Alt+Enter follow-up · Ctrl+C twice quits ─────────────
       > hello▏
-      /work  deepseek-flash  think:off  mode:auto  view:normal  ctx:0.1%/1.0M  $0.01
+      deepseek-flash  think:off  mode:auto  view:normal     ctx ▱▱▱▱▱ 0.1%/1.0M  $0.01
       same: true
       |}];
     return ())

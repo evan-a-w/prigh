@@ -41,13 +41,18 @@ let%expect_test "Alt+M cycles the mode; the status line shows it at once" =
   H.show h;
   [%expect
     {|
-      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+    prigh  new session                                     /work
+
+
+
+
+
 
     ▌ earlier question
       earlier answer
-    ────────────────────────────────────────────────────────────
+    ── /help · Tab commands · Alt+Enter follow-up ──────────────
     > ▏
-    …deepseek-flash  think:off  mode:ask  ctx:0.1%/1.0M  $0.01
+    deepseek-flash  mode:ask          ctx ▱▱▱▱▱ 0.1%/1.0M  $0.01
     |}];
   alt_m h;
   [%expect
@@ -102,16 +107,18 @@ let%expect_test "Alt+M cycles the mode; the status line shows it at once" =
   H.show h;
   [%expect
     {|
-      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+    prigh  new session                                     /work
+
+
+
+
+
 
     ▌ earlier question
       earlier answer
-      mode: auto-edit — file edits run; bash and MCP tools ask
-      first
-      unknown approval mode
-    ────────────────────────────────────────────────────────────
+    ── /help · Tab commands ─────────── unknown approval mode ──
     > ▏
-    …deepseek-flash  think:off  mode:auto  ctx:0.1%/1.0M  $0.01
+    deepseek-flash  mode:auto         ctx ▱▱▱▱▱ 0.1%/1.0M  $0.01
     |}]
 ;;
 
@@ -122,18 +129,22 @@ let%expect_test "/mode picks or sets the mode; /plan toggles plan mode" =
   H.show h;
   [%expect
     {|
-      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+    prigh  new session                                     /work
 
-    ▌ earlier question
-      earlier answer
-    Mode (Alt+M cycles)  (4)
-    / ▏
-       ask        bash, job_input, edits and MCP tools ask first
-    ▸* auto-edit  file edits run; bash, job_input and MCP tools…
-       auto       tools run without asking
-       plan       read-only planning: no file edits; bash, job_…
-    ────────────────────────────────────────────────────────────
-    …deepseek-flash  ctx:0.1%/1.0M  Enter selects · Esc closes
+
+
+
+
+    ╭─ Mode (Alt+M cycles) (4) ────────────────────────────────╮
+    │ / ▏                                                      │
+    │    ask        bash, job_input, edits and MCP tools ask … │
+    │ ▸* auto-edit  file edits run; bash, job_input and MCP t… │
+    │    auto       tools run without asking                   │
+    │    plan       read-only planning: no file edits; bash, … │
+    ╰──────────────────────────────────────────────────────────╯
+    ── Enter selects · Esc closes ──────────────────────────────
+    >
+    deepseek-flash  mode:auto-edit    ctx ▱▱▱▱▱ 0.1%/1.0M  $0.01
     |}];
   H.keys h "plan";
   H.enter h;
@@ -151,13 +162,22 @@ let%expect_test "/mode picks or sets the mode; /plan toggles plan mode" =
   H.show h;
   [%expect
     {|
-      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+    prigh  new session                                     /work
+
+
+
+
+
+
+
+
+
 
     ▌ earlier question
       earlier answer
-    ────────────────────────────────────────────────────────────
+    ── /help · Tab commands · Alt+Enter follow-up ──────────────
     > ▏
-    …deepseek-flash  think:off  mode:plan  ctx:0.1%/1.0M  $0.01
+    deepseek-flash  mode:plan         ctx ▱▱▱▱▱ 0.1%/1.0M  $0.01
     |}];
   command h "/plan";
   command h "/plan on";
@@ -191,22 +211,22 @@ let%expect_test "/mode picks or sets the mode; /plan toggles plan mode" =
       (tag (
         Mode_set
         "mode: ask \226\128\148 bash, job_input, edits and MCP tools ask first")))
+    prigh  new session                                     /work
 
 
 
 
 
 
-      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
-    ▌ earlier question
-      earlier answer
-      unknown mode "careful"; use ask, auto-edit, auto, plan
-      unknown argument "maybe"; use on or off (or nothing to
-      toggle)
-    ────────────────────────────────────────────────────────────
+
+    ╭─ Error ──────────────────────────────────────────────────╮
+    │ unknown argument "maybe"; use on or off (or nothing to   │
+    │ toggle)                                                  │
+    ╰────────────────────────────────────────── Esc dismisses ─╯
+    ── /help · Tab commands · Alt+Enter follow-up ──────────────
     > ▏
-    …deepseek-flash  think:off  mode:ask  ctx:0.1%/1.0M  $0.01
+    deepseek-flash  mode:ask          ctx ▱▱▱▱▱ 0.1%/1.0M  $0.01
     |}]
 ;;
 
@@ -230,24 +250,26 @@ let%expect_test "the plan in the status line, /todos and /permissions" =
   H.show h;
   [%expect
     {|
-      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+    prigh  new session                                                                   /work
 
-    ▌ earlier question
-      earlier answer
-      no plan: the model has not made one (it uses update_plan)
-      plan 1/3
-      ✓ read the code
-      ▸ change it
-      ○ test
-      mode: ask — bash, job_input, edits and MCP tools ask first
-      allowed this session: edit
-      allow (config): bash(git status:*)
-      deny (config): bash(rm:*)
-      rules: permissions in ~/.prigh/config.json, e.g. {"allow": ["bash(git status:*)"],
-      "deny": ["bash(rm:*)"]}; /mode or Alt+M switches the mode
-    ──────────────────────────────────────────────────────────────────────────────────────────
+
+
+
+
+
+
+
+    ╭─ Permissions ──────────────────────────────────────────────────────────────────────────╮
+    │ mode: ask — bash, job_input, edits and MCP tools ask first                             │
+    │ allowed this session: edit                                                             │
+    │ allow (config): bash(git status:*)                                                     │
+    │ deny (config): bash(rm:*)                                                              │
+    │ rules: permissions in ~/.prigh/config.json, e.g. {"allow": ["bash(git status:*)"],     │
+    │ "deny": ["bash(rm:*)"]}; /mode or Alt+M switches the mode                              │
+    ╰─────────────────────────────────────────────────────────────────────────── Esc closes ─╯
+    ── ↑↓ scroll · Esc closes · typing goes to the editor ────────────────────────────────────
     > ▏
-    /work  deepseek-flash  think:off  mode:ask  ctx:0.1%/1.0M  $0.01  plan 1/3: change it
+    deepseek-flash  think:off  mode:ask  plan 1/3: change it        ctx ▱▱▱▱▱ 0.1%/1.0M  $0.01
     |}]
 ;;
 
@@ -267,13 +289,14 @@ let%expect_test "the status line counts steps running in parallel" =
   H.show h;
   [%expect
     {|
-      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+    prigh  new session                                                                   /work
+
 
     ▌ earlier question
       earlier answer
-    ──────────────────────────────────────────────────────────────────────────────────────────
+    ── /help · Tab commands · Alt+Enter follow-up · Ctrl+C twice quits ───────────────────────
     > ▏
-    …deepseek-flash  think:off  mode:ask  ctx:0.1%/1.0M  $0.01  plan 0/4: backend (+2 running)
+    deepseek-flash  mode:ask  plan 0/4: backend (+2 running)        ctx ▱▱▱▱▱ 0.1%/1.0M  $0.01
     |}]
 ;;
 
@@ -290,20 +313,22 @@ let%expect_test
   H.show h;
   [%expect
     {|
-      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+    prigh  new session                                     /work
 
-    ▌ earlier question
-      earlier answer
-    ┌─ Confirm ────────────────────────────────────────────────┐
+
+
+
+
+    ╭─ Confirm ────────────────────────────────────────────────╮
     │ Run bash: git status -s?                                 │
     │ y  allow once                                            │
     │ a  always allow bash(git status:*) this session          │
     │ n  deny                                                  │
     │ r  deny, saying why                                      │
-    └──────────────────────────────────────────────────────────┘
-    ────────────────────────────────────────────────────────────
-    ? draft▏
-    …deepseek-flash  mode:ask  ctx:0.1%/1.0M  confirm: y/a/n/r
+    ╰──────────────────────────────────────────────────────────╯
+    ── confirm: y/a/n/r ────────────────────────────────────────
+    > draft▏
+    deepseek-flash  mode:ask          ctx ▱▱▱▱▱ 0.1%/1.0M  $0.01
     |}];
   H.keys h "a";
   [%expect
@@ -321,37 +346,44 @@ let%expect_test
   H.show h;
   [%expect
     {|
-      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+    prigh  new session                                     /work
 
-    ▌ earlier question
-      earlier answer
-      allowed bash; always: bash(git status:*)
-    ┌─ Why not? (the model sees it) ───────────────────────────┐
+
+
+
+
+
+
+
+    ╭─ Why not? (the model sees it) ───────────────────────────╮
     │ [a1] Run bash: make?                                     │
     │ › ▏                                                      │
-    └──────────────────────────────────────────────────────────┘
-    ────────────────────────────────────────────────────────────
-    …deepseek-flash  ctx:0.1%/1.0M  Enter denies · Esc goes back
+    ╰──────────────────────────────────────────────────────────╯
+    ── Enter denies · Esc goes back ────────────────────────────
+    > draft
+    deepseek-flash  mode:ask          ctx ▱▱▱▱▱ 0.1%/1.0M  $0.01
     |}];
   (* Esc goes back to the question, the draft kept. *)
   H.esc h;
   H.show h;
   [%expect
     {|
-      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+    prigh  new session                                     /work
 
-    ▌ earlier question
-      earlier answer
-      allowed bash; always: bash(git status:*)
-    ┌─ Confirm ────────────────────────────────────────────────┐
+
+
+
+
+
+    ╭─ Confirm ────────────────────────────────────────────────╮
     │ [a1] Run bash: make?                                     │
     │ y  allow once                                            │
     │ n  deny                                                  │
     │ r  deny, saying why                                      │
-    └──────────────────────────────────────────────────────────┘
-    ────────────────────────────────────────────────────────────
-    ? draft▏
-    …deepseek-flash  mode:ask  ctx:0.1%/1.0M  confirm: y/n/r
+    ╰──────────────────────────────────────────────────────────╯
+    ── confirm: y/n/r ──────────────────────────────────────────
+    > draft▏
+    deepseek-flash  mode:ask          ctx ▱▱▱▱▱ 0.1%/1.0M  $0.01
     |}];
   H.keys h "r";
   H.keys h "use dune";
@@ -367,6 +399,7 @@ let%expect_test
         (agent_id a1)
         (reason   "use dune")))
       (tag Show_error))
+    prigh  new session                                     /work
 
 
 
@@ -374,15 +407,14 @@ let%expect_test
 
 
 
-      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
     ▌ earlier question
       earlier answer
       allowed bash; always: bash(git status:*)
       denied bash
-    ────────────────────────────────────────────────────────────
+    ── /help · Tab commands · Alt+Enter follow-up ──────────────
     > draft▏
-    …deepseek-flash  think:off  mode:ask  ctx:0.1%/1.0M  $0.01
+    deepseek-flash  mode:ask          ctx ▱▱▱▱▱ 0.1%/1.0M  $0.01
     |}]
 ;;
 
@@ -403,18 +435,18 @@ let%expect_test
     confirm
     editing
     0
+    prigh  new session                                     /work
 
 
 
 
-      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+
 
     ▌ earlier question
       earlier answer
-      confirmation answered elsewhere
-    ────────────────────────────────────────────────────────────
+    ── /help · Tab commands ─ confirmation answered elsewhere ──
     > ▏
-    …deepseek-flash  think:off  mode:auto  ctx:0.1%/1.0M  $0.01
+    deepseek-flash  mode:auto         ctx ▱▱▱▱▱ 0.1%/1.0M  $0.01
     |}]
 ;;
 
@@ -431,11 +463,13 @@ let%expect_test "the plan to approve" =
   H.show h;
   [%expect
     {|
-      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+    prigh  new session                                     /work
 
-    ▌ earlier question
-      earlier answer
-    ┌─ Plan ───────────────────────────────────────────────────┐
+
+
+
+
+    ╭─ Plan ───────────────────────────────────────────────────╮
     │ Approve the plan and start implementing?                 │
     │ 1. Add the flag to main.ml                               │
     │ 2. Test it                                               │
@@ -443,10 +477,10 @@ let%expect_test "the plan to approve" =
     │ y  approve: leave plan mode and implement                │
     │ n  keep planning                                         │
     │ r  keep planning, saying what to change                  │
-    └──────────────────────────────────────────────────────────┘
-    ────────────────────────────────────────────────────────────
-    ? ▏
-    …deepseek-flash  mode:plan  ctx:0.1%/1.0M  confirm: y/n/r
+    ╰──────────────────────────────────────────────────────────╯
+    ── confirm: y/n/r ──────────────────────────────────────────
+    > ▏
+    deepseek-flash  mode:plan         ctx ▱▱▱▱▱ 0.1%/1.0M  $0.01
     |}];
   (* No "always" for a plan. *)
   H.keys h "a";
@@ -498,20 +532,22 @@ let%expect_test "ask_user: a dialog per question; Enter answers, Esc declines" =
   H.show h;
   [%expect
     {|
-      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+    prigh  new session                                     /work
 
-    ▌ earlier question
-      earlier answer
-    ┌─ Storage (1/3) ──────────────────────────────────────────┐
+
+
+
+    ╭─ Storage (1/3) ──────────────────────────────────────────╮
     │ Which database?                                          │
     │ › ( ) Postgres▏ what prod uses                           │
     │   ( ) SQLite                                             │
     │   Other:                                                 │
     │ ↑↓ choose · type your own · Enter picks · ←→ questions   │
     │ Esc declines (the model is told)                         │
-    └──────────────────────────────────────────────────────────┘
-    ────────────────────────────────────────────────────────────
-    …deepseek-flash  ctx:0.1%/1.0M  Enter accepts · Esc declines
+    ╰──────────────────────────────────────────────────────────╯
+    ── Enter accepts · Esc declines ────────────────────────────
+    >
+    deepseek-flash  mode:auto         ctx ▱▱▱▱▱ 0.1%/1.0M  $0.01
     |}];
   H.key h (Key.plain Down);
   H.enter h;
@@ -523,11 +559,11 @@ let%expect_test "ask_user: a dialog per question; Enter answers, Esc declines" =
   H.show h;
   [%expect
     {|
-      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+    prigh  new session                                     /work
 
-    ▌ earlier question
-      earlier answer
-    ┌─ Question 2/3 ───────────────────────────────────────────┐
+
+
+    ╭─ Question 2/3 ───────────────────────────────────────────╮
     │ Which features?                                          │
     │   [x] auth                                               │
     │   [x] billing                                            │
@@ -535,9 +571,10 @@ let%expect_test "ask_user: a dialog per question; Enter answers, Esc declines" =
     │ ↑↓ choose · Space toggles · type your own                │
     │ Enter accepts · ←→ questions                             │
     │ Esc declines (the model is told)                         │
-    └──────────────────────────────────────────────────────────┘
-    ────────────────────────────────────────────────────────────
-    …deepseek-flash  ctx:0.1%/1.0M  Enter accepts · Esc declines
+    ╰──────────────────────────────────────────────────────────╯
+    ── Enter accepts · Esc declines ────────────────────────────
+    >
+    deepseek-flash  mode:auto         ctx ▱▱▱▱▱ 0.1%/1.0M  $0.01
     |}];
   (* Back to the first: its answer is kept. *)
   H.key h (Key.plain Left);
@@ -548,20 +585,22 @@ let%expect_test "ask_user: a dialog per question; Enter answers, Esc declines" =
   H.enter h;
   [%expect
     {|
-      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+    prigh  new session                                     /work
 
-    ▌ earlier question
-      earlier answer
-    ┌─ Storage (1/3) ──────────────────────────────────────────┐
+
+
+
+    ╭─ Storage (1/3) ──────────────────────────────────────────╮
     │ Which database?                                          │
     │   ( ) Postgres  what prod uses                           │
     │ › (•) SQLite▏                                            │
     │   Other:                                                 │
     │ ↑↓ choose · type your own · Enter picks · ←→ questions   │
     │ Esc declines (the model is told)                         │
-    └──────────────────────────────────────────────────────────┘
-    ────────────────────────────────────────────────────────────
-    …deepseek-flash  ctx:0.1%/1.0M  Enter accepts · Esc declines
+    ╰──────────────────────────────────────────────────────────╯
+    ── Enter accepts · Esc declines ────────────────────────────
+    >
+    deepseek-flash  mode:auto         ctx ▱▱▱▱▱ 0.1%/1.0M  $0.01
     (Rpc
       (method_ ask_user_respond)
       (params (
@@ -687,7 +726,15 @@ let%expect_test "the plan, questions and plan approval in the transcript" =
   H.show h;
   [%expect
     {|
-      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+    prigh  new session                                               /work
+
+
+
+
+
+
+
+
 
     ▌ earlier question
       earlier answer
@@ -706,9 +753,9 @@ let%expect_test "the plan, questions and plan approval in the transcript" =
         in plan mode.
     … ask_user  waiting for your answer
         ? Ready?
-    ──────────────────────────────────────────────────────────────────────
+    ── /help · Tab commands · Alt+Enter follow-up · Ctrl+C twice quits ───
     > ▏
-    /work  deepseek-flash  think:off  mode:auto  ctx:0.1%/1.0M  $0.01
+    deepseek-flash  think:off  mode:auto        ctx ▱▱▱▱▱ 0.1%/1.0M  $0.01
     |}]
 ;;
 
@@ -728,15 +775,18 @@ let%expect_test "/confirm shows the mode and sets ask or auto as the default" =
   H.show h;
   [%expect
     {|
-      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+    prigh  new session                                     /work
+
+
+
+
+
 
     ▌ earlier question
       earlier answer
-      mode: auto — tools run without asking (/confirm on|off
-      sets ask or auto; /mode has all)
-    ────────────────────────────────────────────────────────────
+    ── /help · Tab commands · Alt+Enter follow-up ──────────────
     > ▏
-    …deepseek-flash  think:off  mode:auto  ctx:0.1%/1.0M  $0.01
+    deepseek-flash  mode:auto         ctx ▱▱▱▱▱ 0.1%/1.0M  $0.01
     |}]
 ;;
 
@@ -750,20 +800,20 @@ let%expect_test "job_input's confirmation says which job gets what" =
   H.show h;
   [%expect
     {|
-      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+    prigh  new session                                     /work
 
-    ▌ earlier question
-      earlier answer
-    ┌─ Confirm ────────────────────────────────────────────────┐
+
+
+    ╭─ Confirm ────────────────────────────────────────────────╮
     │ Send to job j1: "y\n"?                                   │
     │ y  allow once                                            │
     │ a  always allow job_input this session                   │
     │ n  deny                                                  │
     │ r  deny, saying why                                      │
-    └──────────────────────────────────────────────────────────┘
-    ────────────────────────────────────────────────────────────
-    ? ▏
-    …deepseek-flash  mode:ask  ctx:0.1%/1.0M  confirm: y/a/n/r
+    ╰──────────────────────────────────────────────────────────╯
+    ── confirm: y/a/n/r ────────────────────────────────────────
+    > ▏
+    deepseek-flash  mode:ask          ctx ▱▱▱▱▱ 0.1%/1.0M  $0.01
     |}]
 ;;
 
@@ -779,19 +829,22 @@ let%expect_test
   H.show h;
   [%expect
     {|
-      prigh in /work · /help · Esc aborts · Ctrl+C
-      twice quits
+    prigh  new session                           /work
 
-    ▌ earlier question
-      earlier answer
-    ┌─ Why not? (the model sees it) ─────────────────┐
+
+
+
+
+
+    ╭─ Why not? (the model sees it) ─────────────────╮
     │ Run bash: rm -rf _build && dune build          │
     │ @runtest?                                      │
     │ › use dune clean instead, it knows what the bu │
     │   ild owns▏                                    │
-    └────────────────────────────────────────────────┘
-    ──────────────────────────────────────────────────
-    …deepseek-flash  Enter denies · Esc goes back
+    ╰────────────────────────────────────────────────╯
+    ── Enter denies · Esc goes back ──────────────────
+    >
+    deepseek-flash  mode:ask       ctx ▱▱▱▱▱ 0.1%/1.0M
     |}]
 ;;
 
@@ -813,19 +866,20 @@ let%expect_test
   H.show h;
   [%expect
     {|
-      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+    prigh  new session                                     /work
 
-    ▌ earlier question
-      earlier answer
-    ┌─ Question ───────────────────────────────────────────────┐
+
+
+    ╭─ Question ───────────────────────────────────────────────╮
     │ Anything else?                                           │
     │ › ▏                                                      │
     │ type an answer · Enter answers                           │
     │ Esc declines (the model is told)                         │
     │ unanswered, the agent carries on by itself at 16:05      │
-    └──────────────────────────────────────────────────────────┘
-    ────────────────────────────────────────────────────────────
-    …deepseek-flash  ctx:0.1%/1.0M  Enter accepts · Esc declines
+    ╰──────────────────────────────────────────────────────────╯
+    ── Enter accepts · Esc declines ────────────────────────────
+    >
+    deepseek-flash  mode:auto         ctx ▱▱▱▱▱ 0.1%/1.0M  $0.01
     |}];
   H.event h (Ask_user_done { call_id = "q1"; timed_out = true });
   H.event
@@ -838,20 +892,20 @@ let%expect_test
   [%expect
     {|
     editing
+    prigh  new session                                     /work
 
 
 
 
 
-      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
     ▌ earlier question
       earlier answer
       the question was not answered within 10m; the agent
       carries on without it
-    ────────────────────────────────────────────────────────────
+    ── /help · Tab commands · Alt+Enter follow-up ──────────────
     > ▏
-    …deepseek-flash  think:off  mode:auto  ctx:0.1%/1.0M  $0.01
+    deepseek-flash  mode:auto         ctx ▱▱▱▱▱ 0.1%/1.0M  $0.01
     |}]
 ;;
 
@@ -884,12 +938,14 @@ let%expect_test "long choice descriptions and answers wrap in the question box" 
   H.show h;
   [%expect
     {|
-      prigh in /work · /help · Esc aborts · Ctrl+C
-      twice quits
+    prigh  new session                           /work
 
-    ▌ earlier question
-      earlier answer
-    ┌─ Question ─────────────────────────────────────┐
+
+
+
+
+
+    ╭─ Question ─────────────────────────────────────╮
     │ Which database?                                │
     │   ( ) Postgres                                 │
     │       what production uses, with the           │
@@ -898,17 +954,17 @@ let%expect_test "long choice descriptions and answers wrap in the question box" 
     │   Other:                                       │
     │ ↑↓ choose · type your own · Enter picks        │
     │ Esc declines (the model is told)               │
-    └────────────────────────────────────────────────┘
-    ──────────────────────────────────────────────────
-    …deepseek-flash  Enter accepts · Esc declines
+    ╰────────────────────────────────────────────────╯
+    ── Enter accepts · Esc declines ──────────────────
+    >
+    deepseek-flash          ctx ▱▱▱▱▱ 0.1%/1.0M  $0.01
+    prigh  new session                           /work
 
 
-      prigh in /work · /help · Esc aborts · Ctrl+C
-      twice quits
 
-    ▌ earlier question
-      earlier answer
-    ┌─ Question ─────────────────────────────────────┐
+
+
+    ╭─ Question ─────────────────────────────────────╮
     │ Which database?                                │
     │   ( ) Postgres                                 │
     │       what production uses, with the           │
@@ -918,8 +974,9 @@ let%expect_test "long choice descriptions and answers wrap in the question box" 
     │          is small tool▏                        │
     │ ↑↓ choose · type your own · Enter picks        │
     │ Esc declines (the model is told)               │
-    └────────────────────────────────────────────────┘
-    ──────────────────────────────────────────────────
-    …deepseek-flash  Enter accepts · Esc declines
+    ╰────────────────────────────────────────────────╯
+    ── Enter accepts · Esc declines ──────────────────
+    >
+    deepseek-flash          ctx ▱▱▱▱▱ 0.1%/1.0M  $0.01
     |}]
 ;;

@@ -474,7 +474,14 @@ let%expect_test "streamed: text, a search running, its results, more text" =
   H.show h;
   [%expect
     {|
-      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+    prigh  new session                                               /work
+
+
+
+
+
+
+
 
     ▌ earlier question
       earlier answer
@@ -482,9 +489,9 @@ let%expect_test "streamed: text, a search running, its results, more text" =
     ▌ what is eio?
       Let me look that up.
     … web_search "ocaml eio"
-    ──────────────────────────────────────────────────────────────────────
+    ── ⠋ running tools · Esc aborts · Enter steers ───────────────────────
     > ▏
-    …deepseek-flash  $0.01  ⠋ running tools · Esc aborts · Enter steers
+    deepseek-flash  think:off  mode:auto        ctx ▱▱▱▱▱ 0.1%/1.0M  $0.01
     |}];
   H.event h search_result;
   H.event h (text_delta "Eio is an effects-based ");
@@ -492,7 +499,7 @@ let%expect_test "streamed: text, a search running, its results, more text" =
   H.show h;
   [%expect
     {|
-      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+    prigh  new session                                               /work
 
     ▌ earlier question
       earlier answer
@@ -507,9 +514,9 @@ let%expect_test "streamed: text, a search running, its results, more text" =
         5. Eio and Domains  https://example.com/domains
         … 1 more result
       Eio is an effects-based IO library.
-    ──────────────────────────────────────────────────────────────────────
+    ── ⠋ writing · Esc aborts · Enter steers ─────────────────────────────
     > ▏
-    …deepseek-flash  ctx:0.1%/1.0M  ⠋ writing · Esc aborts · Enter steers
+    deepseek-flash  think:off  mode:auto        ctx ▱▱▱▱▱ 0.1%/1.0M  $0.01
     |}];
   H.event
     h
@@ -519,7 +526,7 @@ let%expect_test "streamed: text, a search running, its results, more text" =
   H.show h;
   [%expect
     {|
-      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+    prigh  new session                                               /work
 
     ▌ earlier question
       earlier answer
@@ -534,9 +541,9 @@ let%expect_test "streamed: text, a search running, its results, more text" =
         5. Eio and Domains  https://example.com/domains
         … 1 more result
       Eio is an effects-based IO library.
-    ──────────────────────────────────────────────────────────────────────
+    ── /help · Tab commands · Alt+Enter follow-up · Ctrl+C twice quits ───
     > ▏
-    /work  deepseek-flash  think:off  mode:auto  ctx:0.1%/1.0M  $0.01
+    deepseek-flash  think:off  mode:auto        ctx ▱▱▱▱▱ 0.1%/1.0M  $0.01
     |}]
 ;;
 
@@ -548,16 +555,18 @@ let%expect_test "streamed: a search whose message ended without a result" =
   H.event h (Message_end (assistant ""));
   H.show h;
   [%expect {|
-      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+    prigh  new session                                               /work
+
+
 
     ▌ earlier question
       earlier answer
 
     ▌ what is eio?
     ■ web_search "ocaml eio"  no result
-    ──────────────────────────────────────────────────────────────────────
+    ── ⠋ working · Esc aborts · Enter steers ─────────────────────────────
     > ▏
-    …deepseek-flash  ctx:0.1%/1.0M  ⠋ working · Esc aborts · Enter steers
+    deepseek-flash  think:off  mode:auto        ctx ▱▱▱▱▱ 0.1%/1.0M  $0.01
     |}]
 ;;
 
@@ -598,7 +607,9 @@ let%expect_test "loaded: searches in place among the text, folded then verbose" 
   H.show h;
   [%expect
     {|
-      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+    prigh  new session                                               /work
+
+
 
     ▌ earlier question
       earlier answer
@@ -615,9 +626,9 @@ let%expect_test "loaded: searches in place among the text, folded then verbose" 
     ✕ web_search "eio rate"
         web search failed: too many requests
       Eio is an effects-based IO library.
-    ──────────────────────────────────────────────────────────────────────
+    ── /help · Tab commands · Alt+Enter follow-up · Ctrl+C twice quits ───
     > ▏
-    /work  deepseek-flash  think:off  mode:auto  ctx:0.1%/1.0M  $0.01
+    deepseek-flash  think:off  mode:auto        ctx ▱▱▱▱▱ 0.1%/1.0M  $0.01
     |}];
   String.iter "/verbosity verbose" ~f:(fun c ->
     H.step ~quiet:true h (Key (Key.char c)));
@@ -626,6 +637,7 @@ let%expect_test "loaded: searches in place among the text, folded then verbose" 
   H.show h;
   [%expect
     {|
+    prigh  new session                                               /work
     ▌ what is eio?
       Let me look that up.
     ✓ web_search "ocaml eio"  6 results
@@ -644,10 +656,9 @@ let%expect_test "loaded: searches in place among the text, folded then verbose" 
         }
         web search failed: too many requests
       Eio is an effects-based IO library.
-      view: verbose — everything is shown
-    ──────────────────────────────────────────────────────────────────────
+    ── /help · Tab commands ─────── view: verbose — everything is shown ──
     > ▏
-    /work  deepseek-flash  think:off  mode:auto  ctx:0.1%/1.0M  $0.01
+    deepseek-flash  think:off  mode:auto        ctx ▱▱▱▱▱ 0.1%/1.0M  $0.01
     |}]
 ;;
 

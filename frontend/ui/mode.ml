@@ -94,10 +94,11 @@ type t =
       ; matches : int list
       ; current : int
       }
+  | Output of Output_box.t
 [@@deriving sexp_of]
 
 let is_dialog = function
-  | Editing | Search _ -> false
+  | Editing | Search _ | Output _ -> false
   | Picker _
   | Login_prompt _
   | Text_prompt _
@@ -115,4 +116,5 @@ let name = function
   | Question _ -> "question"
   | Sign_in _ -> "sign_in"
   | Search _ -> "search"
+  | Output _ -> "output"
 ;;

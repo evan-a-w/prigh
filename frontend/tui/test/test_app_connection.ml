@@ -37,26 +37,40 @@ let%expect_test "status line: the remote server, next to the user" =
   H.show h;
   [%expect
     {|
-      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+    prigh  new session                                                             /work · 10.0.0.5:7777
+
+
+
+
+
+
+
 
     ▌ earlier question
       earlier answer
-    ────────────────────────────────────────────────────────────────────────────────────────────────────
+    ── /help · Tab commands · Alt+Enter follow-up · Ctrl+C twice quits ─────────────────────────────────
     > ▏
-    /work  deepseek-flash  think:off  mode:auto  ctx:0.1%/1.0M  $0.01  server:10.0.0.5:7777  user:lloyd
+    deepseek-flash  think:off  mode:auto  view:normal  user:lloyd             ctx ▱▱▱▱▱ 0.1%/1.0M  $0.01
     |}];
   (* A spawned backend has no address to show. *)
   H.step h (Server_link (local ()));
   H.show h;
   [%expect
     {|
-      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+    prigh  new session                                                                             /work
+
+
+
+
+
+
+
 
     ▌ earlier question
       earlier answer
-    ────────────────────────────────────────────────────────────────────────────────────────────────────
+    ── /help · Tab commands · Alt+Enter follow-up · Ctrl+C twice quits ─────────────────────────────────
     > ▏
-    /work  deepseek-flash  think:off  mode:auto  view:normal  ctx:0.1%/1.0M  $0.01  user:lloyd
+    deepseek-flash  think:off  mode:auto  view:normal  user:lloyd             ctx ▱▱▱▱▱ 0.1%/1.0M  $0.01
     |}]
 ;;
 
@@ -70,29 +84,39 @@ let%expect_test
   H.show h;
   [%expect
     {|
-      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+    prigh  new session                                                             /work · 10.0.0.5:7777
 
-    ▌ earlier question
-      earlier answer
-    ────────────────────────────────────────────────────────────────────────────────────────────────────
+
+
+
+
+
+    ╭─ /connect ───────────────────────────────────────────────────────────────────────────────────────╮
+    │ ▸ 10.0.0.5:7777  the current server                                                              │
+    │   local          a backend started here, like prigh-tui -local                                   │
+    ╰──────────────────────────────────────────────────────────────────────────────────────────────────╯
+    ── Tab accepts · Enter as typed · Esc hides ────────────────────────────────────────────────────────
     > /connect ▏
-    ▸ 10.0.0.5:7777  the current server
-      local          a backend started here, like prigh-tui -local
-    …deepseek-flash  think:off  mode:auto  ctx:0.1%/1.0M  Tab accepts · Enter as typed · Esc hides
+    deepseek-flash  think:off  mode:auto  view:normal  user:lloyd             ctx ▱▱▱▱▱ 0.1%/1.0M  $0.01
     |}];
   H.enter h;
   H.show h;
   [%expect
     {|
-      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+    prigh  new session                                                             /work · 10.0.0.5:7777
 
-    ▌ earlier question
-      earlier answer
-    ┌─ Connect to HOST:PORT or local (now: 10.0.0.5:7777) ─────────────────────────────────────────────┐
-    └──────────────────────────────────────────────────────────────────────────────────────────────────┘
-    ────────────────────────────────────────────────────────────────────────────────────────────────────
+
+
+
+
+
+
+    ╭─ Connect to HOST:PORT or local (now: 10.0.0.5:7777) ─────────────────────────────────────────────╮
+    │ ↓ type the answer in the editor                                                                  │
+    ╰──────────────────────────────────────────────────────────────────────────────────────────────────╯
+    ── Enter submits · Esc cancels ─────────────────────────────────────────────────────────────────────
     ? 10.0.0.5:7777▏
-    …deepseek-flash  think:off  mode:auto  ctx:0.1%/1.0M  $0.01  user:lloyd  Enter submits · Esc cancels
+    deepseek-flash  think:off  mode:auto  view:normal  user:lloyd             ctx ▱▱▱▱▱ 0.1%/1.0M  $0.01
     |}];
   (* Esc: nothing happens. *)
   H.esc h;
@@ -108,14 +132,20 @@ let%expect_test
   H.show h;
   [%expect
     {|
-      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+    prigh  new session                                                               /work · connecting…
+
+
+
+
+
+
+
 
     ▌ earlier question
       earlier answer
-      connecting to 10.0.0.5:7777…
-    ────────────────────────────────────────────────────────────────────────────────────────────────────
+    ── connecting… ───────────────────────────────────────────────────── connecting to 10.0.0.5:7777… ──
     > ▏
-    /work  deepseek-flash  think:off  mode:auto  ctx:0.1%/1.0M  $0.01  user:lloyd  connecting…
+    connecting…  deepseek-flash  think:off  mode:auto  user:lloyd             ctx ▱▱▱▱▱ 0.1%/1.0M  $0.01
     |}];
   (* Nothing saved, nothing connected to: an empty prompt; Enter on it does
      nothing. *)
@@ -128,15 +158,20 @@ let%expect_test
   H.mode h;
   [%expect
     {|
-      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+    prigh  new session                                                                             /work
 
-    ▌ earlier question
-      earlier answer
-    ┌─ Connect to HOST:PORT or local (now: a local backend) ───────────────────────────────────────────┐
-    └──────────────────────────────────────────────────────────────────────────────────────────────────┘
-    ────────────────────────────────────────────────────────────────────────────────────────────────────
+
+
+
+
+
+
+    ╭─ Connect to HOST:PORT or local (now: a local backend) ───────────────────────────────────────────╮
+    │ ↓ type the answer in the editor                                                                  │
+    ╰──────────────────────────────────────────────────────────────────────────────────────────────────╯
+    ── Enter submits · Esc cancels ─────────────────────────────────────────────────────────────────────
     ? ▏
-    /work  deepseek-flash  think:off  mode:auto  ctx:0.1%/1.0M  $0.01  Enter submits · Esc cancels
+    deepseek-flash  think:off  mode:auto  view:normal                         ctx ▱▱▱▱▱ 0.1%/1.0M  $0.01
     editing
     |}]
 ;;
@@ -147,16 +182,20 @@ let%expect_test "/connect completes local, the current and the saved address" =
   H.show h;
   [%expect
     {|
-      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+    prigh  new session                                                             /work · 10.0.0.5:7777
 
-    ▌ earlier question
-      earlier answer
-    ────────────────────────────────────────────────────────────────────────────────────────────────────
+
+
+
+
+    ╭─ /connect ───────────────────────────────────────────────────────────────────────────────────────╮
+    │ ▸ 10.0.0.5:7777  the current server                                                              │
+    │   10.0.0.9:7000  the saved server                                                                │
+    │   local          a backend started here, like prigh-tui -local                                   │
+    ╰──────────────────────────────────────────────────────────────────────────────────────────────────╯
+    ── Tab accepts · Enter as typed · Esc hides ────────────────────────────────────────────────────────
     > /connect ▏
-    ▸ 10.0.0.5:7777  the current server
-      10.0.0.9:7000  the saved server
-      local          a backend started here, like prigh-tui -local
-    …deepseek-flash  think:off  mode:auto  ctx:0.1%/1.0M  Tab accepts · Enter as typed · Esc hides
+    deepseek-flash  think:off  mode:auto  view:normal  user:lloyd             ctx ▱▱▱▱▱ 0.1%/1.0M  $0.01
     |}];
   H.keys h "lo";
   H.key h (Key.plain Tab);
@@ -175,19 +214,20 @@ let%expect_test "/connect: a bad address says what to type" =
   connection h;
   [%expect
     {|
-      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+    prigh  new session                                                             /work · 10.0.0.5:7777
 
-    ▌ earlier question
-      earlier answer
-      "10.0.0.6" is not HOST:PORT (e.g. 127.0.0.1:7777); /connect HOST:PORT (of prigh serve -listen), or
-      /connect local
-      "host:http" is not HOST:PORT (e.g. 127.0.0.1:7777); /connect HOST:PORT (of prigh serve -listen),
-      or /connect local
-      "a b:1" is not HOST:PORT (e.g. 127.0.0.1:7777); /connect HOST:PORT (of prigh serve -listen), or
-      /connect local
-    ────────────────────────────────────────────────────────────────────────────────────────────────────
+
+
+
+
+                                                      ╭─ Error ────────────────────────────────────────╮
+                                                      │ "a b:1" is not HOST:PORT (e.g.                 │
+                                                      │ 127.0.0.1:7777); /connect HOST:PORT (of prigh  │
+    ▌ earlier question                                │ serve -listen), or /connect local              │
+      earlier answer                                  ╰──────────────────────────────── Esc dismisses ─╯
+    ── /help · Tab commands · Alt+Enter follow-up · Ctrl+C twice quits ─────────────────────────────────
     > ▏
-    /work  deepseek-flash  think:off  mode:auto  ctx:0.1%/1.0M  $0.01  server:10.0.0.5:7777  user:lloyd
+    deepseek-flash  think:off  mode:auto  view:normal  user:lloyd             ctx ▱▱▱▱▱ 0.1%/1.0M  $0.01
     Connected
     |}]
 ;;
@@ -226,20 +266,20 @@ let%expect_test
       (generation 1)
       (previous   Connected))
     (Append_history hello)
+    prigh  new session                                                               /work · connecting…
 
 
 
-      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
-    ▌ earlier question
-      earlier answer
-      connecting to 10.0.0.6:7777…
-      not connected yet
-    ────────────────────────────────────────────────────────────────────────────────────────────────────
-    queued (1) · Alt+Up: edit the last · /queue: edit or remove
-      steer      steer on the old server
+
+
+
+                                                      ╭─ Queued (1) ───────────────────────────────────╮
+    ▌ earlier question                                │ steer      steer on the old server             │
+      earlier answer                                  ╰────────────────────────────────────────────────╯
+    ── connecting… ──────────────────────────────────────────────────────────────── not connected yet ──
     > ▏
-    …deepseek-flash  think:off  mode:auto  ctx:0.1%/1.0M  $0.01  queued:1  to answer:1  connecting…
+    connecting…  deepseek-flash  think:off  mode:auto  to answer:1  queued:1  ctx ▱▱▱▱▱ 0.1%/1.0M  $0.01
     |}];
   relinked
     h
@@ -257,8 +297,18 @@ let%expect_test
   H.show h;
   [%expect
     {|
-      connected to 10.0.0.6:7777 as alice
-    ────────────────────────────────────────────────────────────────────────────────────────────────────
+    prigh  connecting…                                                                     10.0.0.6:7777
+
+
+
+
+
+
+
+
+
+
+    ───────────────────────────────────────────────────────────── connected to 10.0.0.6:7777 as alice ──
     > ▏
     connecting…
     |}];
@@ -275,11 +325,20 @@ let%expect_test
       }];
   [%expect
     {|
-      connected to 10.0.0.6:7777 as alice
-      prigh in /srv · /help · Esc aborts · Ctrl+C twice quits
-    ────────────────────────────────────────────────────────────────────────────────────────────────────
+    prigh  new session                                                              /srv · 10.0.0.6:7777
+
+
+
+
+
+
+
+
+
+
+    ── /help · Tab commands · Alt+Enter follow-up ─────────────── connected to 10.0.0.6:7777 as alice ──
     > ▏
-    /srv  deepseek-flash  think:off  mode:auto  ctx:0.1%/1.0M  $0.01  server:10.0.0.6:7777  user:alice
+    deepseek-flash  think:off  mode:auto  view:normal  user:alice             ctx ▱▱▱▱▱ 0.1%/1.0M  $0.01
     Connected
     ((mode    editing)
      (queued  0)
@@ -303,20 +362,20 @@ let%expect_test
   [%expect
     {|
     (Relink (generation 1) (change (Connect (10.0.0.6:1))))
+    prigh  new session                                                             /work · 10.0.0.5:7777
 
 
 
-      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
-    ▌ earlier question
-      earlier answer
-      connecting to 10.0.0.6:1…
-      still connecting; wait for it, or Ctrl+C quits
-      cannot reach 10.0.0.6:1: Connection refused; still on 10.0.0.5:7777 (is prigh serve -listen
-      running there?)
-    ────────────────────────────────────────────────────────────────────────────────────────────────────
+
+                                                      ╭─ Error ────────────────────────────────────────╮
+                                                      │ cannot reach 10.0.0.6:1: Connection refused;   │
+                                                      │ still on 10.0.0.5:7777 (is prigh serve -listen │
+    ▌ earlier question                                │ running there?)                                │
+      earlier answer                                  ╰──────────────────────────────── Esc dismisses ─╯
+    ── /help · Tab commands · Alt+Enter follow-up · Ctrl+C twice quits ─────────────────────────────────
     > ▏
-    /work  deepseek-flash  think:off  mode:auto  ctx:0.1%/1.0M  $0.01  server:10.0.0.5:7777  user:lloyd
+    deepseek-flash  think:off  mode:auto  view:normal  user:lloyd             ctx ▱▱▱▱▱ 0.1%/1.0M  $0.01
     Connected
     |}];
   (* An answer to an older switch is ignored. *)
@@ -363,6 +422,7 @@ let%expect_test "/connect local" =
     (Rpc (method_ get_config) (params ()) (tag Config))
     (Rpc (method_ list_models) (params ()) (tag Models_catalog))
     (Rpc (method_ get_pending) (params ()) (tag Pending))
+    prigh  new session                                                                             /work
 
 
 
@@ -372,11 +432,10 @@ let%expect_test "/connect local" =
 
 
 
-      connected to a local backend
-      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
-    ────────────────────────────────────────────────────────────────────────────────────────────────────
+
+    ── /help · Tab commands · Alt+Enter follow-up · Ctrl+C twice quits ─ connected to a local backend ──
     > ▏
-    /work  deepseek-flash  think:off  mode:auto  view:normal  ctx:0.1%/1.0M  $0.01
+    deepseek-flash  think:off  mode:auto  view:normal                         ctx ▱▱▱▱▱ 0.1%/1.0M  $0.01
     |}];
   (* There is nothing to sign in to or out of. *)
   H.keys h "/signin";
@@ -386,15 +445,20 @@ let%expect_test "/connect local" =
   H.show h;
   [%expect
     {|
-      connected to a local backend
-      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
-      prigh-tui started this backend: there is nothing to sign in to (/connect HOST:PORT for a remote
-      one)
-      prigh-tui started this backend: there is nothing to sign out of (/connect HOST:PORT for a remote
-      one)
-    ────────────────────────────────────────────────────────────────────────────────────────────────────
+    prigh  new session                                                                             /work
+
+
+
+
+
+                                                      ╭─ Notice ───────────────────────────────────────╮
+                                                      │ prigh-tui started this backend: there is       │
+                                                      │ nothing to sign out of (/connect HOST:PORT for │
+                                                      │ a remote one)                                  │
+                                                      ╰──────────────────────────────── Esc dismisses ─╯
+    ── /help · Tab commands · Alt+Enter follow-up · Ctrl+C twice quits ─────────────────────────────────
     > ▏
-    /work  deepseek-flash  think:off  mode:auto  view:normal  ctx:0.1%/1.0M  $0.01
+    deepseek-flash  think:off  mode:auto  view:normal                         ctx ▱▱▱▱▱ 0.1%/1.0M  $0.01
     |}]
 ;;
 
@@ -411,20 +475,20 @@ let%expect_test
   [%expect
     {|
     (Relink (generation 1) (change (Connect (10.0.0.6:7777))))
+    prigh  not signed in                                                                         offline
 
 
 
 
-
-
-    ┌─ Sign in to 10.0.0.6:7777 ───────────────────────────────────────────────────────────────────────┐
+    ╭─ Sign in to 10.0.0.6:7777 ───────────────────────────────────────────────────────────────────────╮
     │ user   lloyd                                                                                     │
     │ token  ▏                                                                                         │
     │ unauthorised: bad user name or password                                                          │
     │ prigh serve -tokens: your user name and password; -token: no user                                │
-    └──────────────────────────────────────────────────────────────────────────────────────────────────┘
-    ────────────────────────────────────────────────────────────────────────────────────────────────────
-    Tab next field · Enter signs in · Esc closes
+    ╰──────────────────────────────────────────────────────────────────────────────────────────────────╯
+    ── Tab next field · Enter signs in · Esc closes ────────────────────────────────────────────────────
+    >
+    offline
     (Disconnected (reason "unauthorised: bad user name or password"))
     |}]
 ;;
@@ -436,17 +500,20 @@ let%expect_test "the sign-in dialog: prefilled, masked, owns the keyboard" =
   H.show h;
   [%expect
     {|
-      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+    prigh  new session                                                             /work · 10.0.0.5:7777
 
-    ▌ earlier question
-      earlier answer
-    ┌─ Sign in to 10.0.0.5:7777 ───────────────────────────────────────────────────────────────────────┐
+
+
+
+
+    ╭─ Sign in to 10.0.0.5:7777 ───────────────────────────────────────────────────────────────────────╮
     │ user   lloyd                                                                                     │
     │ token  ▏                                                                                         │
     │ prigh serve -tokens: your user name and password; -token: no user                                │
-    └──────────────────────────────────────────────────────────────────────────────────────────────────┘
-    ────────────────────────────────────────────────────────────────────────────────────────────────────
-    …deepseek-flash  think:off  mode:auto  ctx:0.1%/1.0M  Tab next field · Enter signs in · Esc closes
+    ╰──────────────────────────────────────────────────────────────────────────────────────────────────╯
+    ── Tab next field · Enter signs in · Esc closes ────────────────────────────────────────────────────
+    >
+    deepseek-flash  think:off  mode:auto  view:normal  user:lloyd             ctx ▱▱▱▱▱ 0.1%/1.0M  $0.01
     |}];
   (* Enter without a token asks for one. *)
   H.enter h;
@@ -458,18 +525,20 @@ let%expect_test "the sign-in dialog: prefilled, masked, owns the keyboard" =
   H.show h;
   [%expect
     {|
-      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+    prigh  new session                                                             /work · 10.0.0.5:7777
 
-    ▌ earlier question
-      earlier answer
-    ┌─ Sign in to 10.0.0.5:7777 ───────────────────────────────────────────────────────────────────────┐
+
+
+
+    ╭─ Sign in to 10.0.0.5:7777 ───────────────────────────────────────────────────────────────────────╮
     │ user   lloyd                                                                                     │
     │ token  *****▏                                                                                    │
     │ type the token or password                                                                       │
     │ prigh serve -tokens: your user name and password; -token: no user                                │
-    └──────────────────────────────────────────────────────────────────────────────────────────────────┘
-    ────────────────────────────────────────────────────────────────────────────────────────────────────
-    …deepseek-flash  think:off  mode:auto  ctx:0.1%/1.0M  Tab next field · Enter signs in · Esc closes
+    ╰──────────────────────────────────────────────────────────────────────────────────────────────────╯
+    ── Tab next field · Enter signs in · Esc closes ────────────────────────────────────────────────────
+    >
+    deepseek-flash  think:off  mode:auto  view:normal  user:lloyd             ctx ▱▱▱▱▱ 0.1%/1.0M  $0.01
     |}];
   (* Tab, Up and Down move between the fields; Ctrl+U empties one. *)
   H.key h (Key.plain Tab);
@@ -481,18 +550,20 @@ let%expect_test "the sign-in dialog: prefilled, masked, owns the keyboard" =
   H.show h;
   [%expect
     {|
-      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+    prigh  new session                                                             /work · 10.0.0.5:7777
 
-    ▌ earlier question
-      earlier answer
-    ┌─ Sign in to 10.0.0.5:7777 ───────────────────────────────────────────────────────────────────────┐
+
+
+
+    ╭─ Sign in to 10.0.0.5:7777 ───────────────────────────────────────────────────────────────────────╮
     │ user   bob▏                                                                                      │
     │ token  *****                                                                                     │
     │ type the token or password                                                                       │
     │ prigh serve -tokens: your user name and password; -token: no user                                │
-    └──────────────────────────────────────────────────────────────────────────────────────────────────┘
-    ────────────────────────────────────────────────────────────────────────────────────────────────────
-    …deepseek-flash  think:off  mode:auto  ctx:0.1%/1.0M  Tab next field · Enter signs in · Esc closes
+    ╰──────────────────────────────────────────────────────────────────────────────────────────────────╯
+    ── Tab next field · Enter signs in · Esc closes ────────────────────────────────────────────────────
+    >
+    deepseek-flash  think:off  mode:auto  view:normal  user:lloyd             ctx ▱▱▱▱▱ 0.1%/1.0M  $0.01
     |}];
   (* Esc closes it: nothing sent, still connected as before. *)
   H.esc h;
@@ -518,18 +589,20 @@ let%expect_test "the sign-in dialog: prefilled, masked, owns the keyboard" =
   H.enter h;
   [%expect
     {|
-      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+    prigh  new session                                                               /work · connecting…
 
-    ▌ earlier question
-      earlier answer
-    ┌─ Sign in to 10.0.0.5:7777 ───────────────────────────────────────────────────────────────────────┐
+
+
+
+    ╭─ Sign in to 10.0.0.5:7777 ───────────────────────────────────────────────────────────────────────╮
     │ user   bob                                                                                       │
     │ token  ******▏                                                                                   │
     │ signing in…                                                                                      │
     │ prigh serve -tokens: your user name and password; -token: no user                                │
-    └──────────────────────────────────────────────────────────────────────────────────────────────────┘
-    ────────────────────────────────────────────────────────────────────────────────────────────────────
-    /work  deepseek-flash  think:off  mode:auto  ctx:0.1%/1.0M  $0.01  server:10.0.0.5:7777  connecting…
+    ╰──────────────────────────────────────────────────────────────────────────────────────────────────╯
+    ── connecting… ─────────────────────────────────────────────────────────────────────────────────────
+    >
+    connecting…  deepseek-flash  think:off  mode:auto  user:lloyd             ctx ▱▱▱▱▱ 0.1%/1.0M  $0.01
     |}];
   (* Refused: the dialog stays, says why and asks for the token again. *)
   relinked
@@ -540,14 +613,20 @@ let%expect_test "the sign-in dialog: prefilled, masked, owns the keyboard" =
   connection h;
   [%expect
     {|
-    ┌─ Sign in to 10.0.0.5:7777 ───────────────────────────────────────────────────────────────────────┐
+    prigh  not signed in                                                                         offline
+
+
+
+
+    ╭─ Sign in to 10.0.0.5:7777 ───────────────────────────────────────────────────────────────────────╮
     │ user   bob                                                                                       │
     │ token  ▏                                                                                         │
     │ unauthorised: bad user name or password                                                          │
     │ prigh serve -tokens: your user name and password; -token: no user                                │
-    └──────────────────────────────────────────────────────────────────────────────────────────────────┘
-    ────────────────────────────────────────────────────────────────────────────────────────────────────
-    Tab next field · Enter signs in · Esc closes
+    ╰──────────────────────────────────────────────────────────────────────────────────────────────────╯
+    ── Tab next field · Enter signs in · Esc closes ────────────────────────────────────────────────────
+    >
+    offline
     (Disconnected (reason "unauthorised: bad user name or password"))
     |}];
   H.keys h "right";
@@ -569,6 +648,7 @@ let%expect_test "the sign-in dialog: prefilled, masked, owns the keyboard" =
     (Rpc (method_ get_config) (params ()) (tag Config))
     (Rpc (method_ list_models) (params ()) (tag Models_catalog))
     (Rpc (method_ get_pending) (params ()) (tag Pending))
+    prigh  new session                                                             /work · 10.0.0.5:7777
 
 
 
@@ -578,11 +658,10 @@ let%expect_test "the sign-in dialog: prefilled, masked, owns the keyboard" =
 
 
 
-      connected to 10.0.0.5:7777 as bob
-      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
-    ────────────────────────────────────────────────────────────────────────────────────────────────────
+
+    ── /help · Tab commands · Alt+Enter follow-up ───────────────── connected to 10.0.0.5:7777 as bob ──
     > ▏
-    /work  deepseek-flash  think:off  mode:auto  ctx:0.1%/1.0M  $0.01  server:10.0.0.5:7777  user:bob
+    deepseek-flash  think:off  mode:auto  view:normal  user:bob               ctx ▱▱▱▱▱ 0.1%/1.0M  $0.01
     Connected
     |}];
   H.keys h "/signin a b";
@@ -603,20 +682,20 @@ let%expect_test "a sign-in to a server gone meanwhile: said in the dialog" =
   [%expect
     {|
     (Relink (generation 1) (change (Sign_in (user (lloyd)) (token <opaque>))))
+    prigh  new session                                                             /work · 10.0.0.5:7777
 
 
-      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
-    ▌ earlier question
-      earlier answer
-    ┌─ Sign in to 10.0.0.5:7777 ───────────────────────────────────────────────────────────────────────┐
+
+    ╭─ Sign in to 10.0.0.5:7777 ───────────────────────────────────────────────────────────────────────╮
     │ user   lloyd                                                                                     │
     │ token  ▏                                                                                         │
     │ cannot reach 10.0.0.5:7777: Connection refused                                                   │
     │ prigh serve -tokens: your user name and password; -token: no user                                │
-    └──────────────────────────────────────────────────────────────────────────────────────────────────┘
-    ────────────────────────────────────────────────────────────────────────────────────────────────────
-    …deepseek-flash  think:off  mode:auto  ctx:0.1%/1.0M  Tab next field · Enter signs in · Esc closes
+    ╰──────────────────────────────────────────────────────────────────────────────────────────────────╯
+    ── Tab next field · Enter signs in · Esc closes ────────────────────────────────────────────────────
+    >
+    deepseek-flash  think:off  mode:auto  view:normal  user:lloyd             ctx ▱▱▱▱▱ 0.1%/1.0M  $0.01
     Connected
     |}]
 ;;
@@ -633,20 +712,20 @@ let%expect_test
   [%expect
     {|
     Sign_out
+    prigh  not signed in                                                                         offline
 
 
 
 
-
-      signed out of 10.0.0.5:7777; the saved token is forgotten
-    ┌─ Sign in to 10.0.0.5:7777 ───────────────────────────────────────────────────────────────────────┐
+    ╭─ Sign in to 10.0.0.5:7777 ───────────────────────────────────────────────────────────────────────╮
     │ user   lloyd                                                                                     │
     │ token  ▏                                                                                         │
     │ signed out                                                                                       │
     │ prigh serve -tokens: your user name and password; -token: no user                                │
-    └──────────────────────────────────────────────────────────────────────────────────────────────────┘
-    ────────────────────────────────────────────────────────────────────────────────────────────────────
-    Tab next field · Enter signs in · Esc closes
+    ╰──────────────────────────────────────────────────────────────────────────────────────────────────╯
+    ── Tab next field · Enter signs in ──── signed out of 10.0.0.5:7777; the saved token is forgotten ──
+    >
+    offline
     (Disconnected (reason "signed out"))
     |}];
   (* The connection closing is expected: no reconnecting. Esc leaves us
@@ -661,6 +740,7 @@ let%expect_test
   [%expect
     {|
     (Append_history hello)
+    prigh  not signed in                                                                         offline
 
 
 
@@ -669,12 +749,11 @@ let%expect_test
 
 
 
-      signed out of 10.0.0.5:7777; the saved token is forgotten
-      not connected: /signin signs in, /connect switches server
-      not connected (signed out): /signin signs in, /connect switches server
-    ────────────────────────────────────────────────────────────────────────────────────────────────────
+
+
+    ── not signed in to 10.… ─ not connected (signed out): /signin signs in, /connect switches server ──
     > ▏
-    not signed in to 10.0.0.5:7777 · /signin signs in · /connect switches server
+    offline
     |}];
   (* /signin brings the dialog back, with the user. *)
   H.keys h "/signin";
@@ -701,23 +780,24 @@ let%expect_test "startup: the server refuses the saved credentials" =
   [%expect
     {|
     Load_history
+    prigh  not signed in                                                     offline
 
 
-
-
-    ┌─ Sign in to 10.0.0.5:7777 ───────────────────────────────────────────────────┐
+    ╭─ Sign in to 10.0.0.5:7777 ───────────────────────────────────────────────────╮
     │ user   lloyd                                                                 │
     │ token  ▏                                                                     │
     │ unauthorised: bad user name or password                                      │
     │ prigh serve -tokens: your user name and password; -token: no user            │
-    └──────────────────────────────────────────────────────────────────────────────┘
-    ────────────────────────────────────────────────────────────────────────────────
-    Tab next field · Enter signs in · Esc closes
+    ╰──────────────────────────────────────────────────────────────────────────────╯
+    ── Tab next field · Enter signs in · Esc closes ────────────────────────────────
+    >
+    offline
     |}];
   H.esc h;
   H.show h;
   [%expect
     {|
+    prigh  not signed in                                                     offline
 
 
 
@@ -726,10 +806,9 @@ let%expect_test "startup: the server refuses the saved credentials" =
 
 
 
-
-    ────────────────────────────────────────────────────────────────────────────────
+    ── not signed in to 10.0.0.5:7777 · /signin signs in ───────────────────────────
     > ▏
-    not signed in to 10.0.0.5:7777 · /signin signs in · /connect switches server
+    offline
     |}];
   (* Another server instead. *)
   H.keys h "/connect 10.0.0.6:7777";
@@ -760,14 +839,20 @@ let%expect_test "a reconnect refused: the sign-in dialog, no more retries" =
   connection h;
   [%expect
     {|
-    ┌─ Sign in to 10.0.0.5:7777 ───────────────────────────────────────────────────────────────────────┐
+    prigh  not signed in                                                                         offline
+
+
+
+
+    ╭─ Sign in to 10.0.0.5:7777 ───────────────────────────────────────────────────────────────────────╮
     │ user   lloyd                                                                                     │
     │ token  ▏                                                                                         │
     │ unauthorised: bad user name or password                                                          │
     │ prigh serve -tokens: your user name and password; -token: no user                                │
-    └──────────────────────────────────────────────────────────────────────────────────────────────────┘
-    ────────────────────────────────────────────────────────────────────────────────────────────────────
-    Tab next field · Enter signs in · Esc closes
+    ╰──────────────────────────────────────────────────────────────────────────────────────────────────╯
+    ── Tab next field · Enter signs in · Esc closes ────────────────────────────────────────────────────
+    >
+    offline
     (Disconnected (reason "unauthorised: bad user name or password"))
     |}];
   (* Other errors (not about the credentials) still retry. *)
@@ -802,17 +887,17 @@ let%expect_test "in the browser the platform owns the connection" =
   [%expect
     {|
     Sign_out
+    prigh  new session                                                                             /work
 
 
 
-      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
-
-    ▌ earlier question
-      earlier answer
-      /connect is for the terminal UI (prigh-tui); here, /signout signs in again or to another backend
-      /signin is for the terminal UI (prigh-tui); here, /signout signs in again or to another backend
-    ────────────────────────────────────────────────────────────────────────────────────────────────────
+                                                      ╭─ Error ────────────────────────────────────────╮
+                                                      │ /signin is for the terminal UI (prigh-tui);    │
+                                                      │ here, /signout signs in again or to another    │
+    ▌ earlier question                                │ backend                                        │
+      earlier answer                                  ╰──────────────────────────────── Esc dismisses ─╯
+    ── /help · Tab commands · Alt+Enter follow-up · Ctrl+C twice quits ─────────────────────────────────
     > ▏
-    /work  deepseek-flash  think:off  mode:auto  view:normal  ctx:0.1%/1.0M  $0.01
+    deepseek-flash  think:off  mode:auto  view:normal                         ctx ▱▱▱▱▱ 0.1%/1.0M  $0.01
     |}]
 ;;

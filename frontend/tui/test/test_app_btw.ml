@@ -24,22 +24,22 @@ let%expect_test "/btw while running: streamed box, Esc dismisses without \
         (question "which file are you editing?")
         (btw_id   btw-1)))
       (tag (Btw btw-1)))
+    prigh  new session                                     /work
 
 
 
 
-      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
-    ▌ earlier question
-      earlier answer
-      Working on it
-    ┌─ btw ────────────────────────────────────────────────────┐
+
+
+
+    ╭─ btw ────────────────────────────────────────────────────╮
     │ ? which file are you editing?                            │
     │ answering… · Esc to dismiss                              │
-    └──────────────────────────────────────────────────────────┘
-    ────────────────────────────────────────────────────────────
+    ╰──────────────────────────────────────────────────────────╯
+    ── ⠋ writing · Esc closes btw · Enter steers ───────────────
     > ▏
-    …deepseek-flash  ⠋ writing · Esc closes btw · Enter steers
+    deepseek-flash  mode:auto         ctx ▱▱▱▱▱ 0.1%/1.0M  $0.01
     |}];
   H.event h (Btw_delta { btw_id = "btw-1"; delta = "It is `app.ml`, " });
   H.event h (Btw_delta { btw_id = "btw-1"; delta = "around **line 40**." });
@@ -47,19 +47,22 @@ let%expect_test "/btw while running: streamed box, Esc dismisses without \
   H.show h;
   [%expect
     {|
-      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+    prigh  new session                                     /work
 
-    ▌ earlier question
-      earlier answer
-      Working on it
-    ┌─ btw ────────────────────────────────────────────────────┐
+
+
+
+
+
+
+    ╭─ btw ────────────────────────────────────────────────────╮
     │ ? which file are you editing?                            │
     │ It is app.ml, around line 40.                            │
     │ answering… · Esc to dismiss                              │
-    └──────────────────────────────────────────────────────────┘
-    ────────────────────────────────────────────────────────────
+    ╰──────────────────────────────────────────────────────────╯
+    ── ⠋ writing · Esc closes btw · Enter steers ───────────────
     > ▏
-    …deepseek-flash  ⠋ writing · Esc closes btw · Enter steers
+    deepseek-flash  mode:auto         ctx ▱▱▱▱▱ 0.1%/1.0M  $0.01
     |}];
   (* Esc cancels the in-flight call and closes the box; no abort. *)
   H.esc h;
@@ -67,6 +70,7 @@ let%expect_test "/btw while running: streamed box, Esc dismisses without \
   [%expect
     {|
     (Rpc (method_ btw_cancel) (params ((btw_id btw-1))) (tag Ignore))
+    prigh  new session                                     /work
 
 
 
@@ -75,14 +79,13 @@ let%expect_test "/btw while running: streamed box, Esc dismisses without \
 
 
 
-      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
     ▌ earlier question
       earlier answer
       Working on it
-    ────────────────────────────────────────────────────────────
+    ── ⠋ writing · Esc aborts · Enter steers ───────────────────
     > ▏
-    …deepseek-flash  ⠋ writing · Esc aborts · Enter steers
+    deepseek-flash  mode:auto         ctx ▱▱▱▱▱ 0.1%/1.0M  $0.01
     |}];
   H.reply_error h (Btw "btw-1") "cancelled";
   printf "transcript unchanged: %b\n" (Sexp.equal before (transcript_sexp h));
@@ -123,21 +126,22 @@ let%expect_test "/btw: a newer question replaces the box; final reply; errors" =
   H.show h;
   [%expect
     {|
-      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+    prigh  new session                                     /work
 
-    ▌ earlier question
-      earlier answer
-    ┌─ btw ────────────────────────────────────────────────────┐
+
+
+
+    ╭─ btw ────────────────────────────────────────────────────╮
     │ ? second?                                                │
     │ Second answer.                                           │
     │                                                          │
     │ • one                                                    │
     │ • two                                                    │
     │ Esc to dismiss                                           │
-    └──────────────────────────────────────────────────────────┘
-    ────────────────────────────────────────────────────────────
+    ╰──────────────────────────────────────────────────────────╯
+    ── Esc dismisses btw ───────────────────────────────────────
     > ▏
-    …deepseek-flash  think:off  ctx:0.1%/1.0M  Esc dismisses btw
+    deepseek-flash  mode:auto         ctx ▱▱▱▱▱ 0.1%/1.0M  $0.01
     |}];
   (* A finished answer needs no cancel. *)
   H.esc h;
@@ -155,22 +159,22 @@ let%expect_test "/btw: a newer question replaces the box; final reply; errors" =
         (question broken?)
         (btw_id   btw-3)))
       (tag (Btw btw-3)))
+    prigh  new session                                     /work
 
 
 
 
-      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
-    ▌ earlier question
-      earlier answer
-    ┌─ btw ────────────────────────────────────────────────────┐
+
+
+    ╭─ btw ────────────────────────────────────────────────────╮
     │ ? broken?                                                │
     │ error: no credentials for deepseek; /login deepseek      │
     │ Esc to dismiss                                           │
-    └──────────────────────────────────────────────────────────┘
-    ────────────────────────────────────────────────────────────
+    ╰──────────────────────────────────────────────────────────╯
+    ── Esc dismisses btw ───────────────────────────────────────
     > ▏
-    …deepseek-flash  think:off  ctx:0.1%/1.0M  Esc dismisses btw
+    deepseek-flash  mode:auto         ctx ▱▱▱▱▱ 0.1%/1.0M  $0.01
     |}];
   H.esc h;
   H.keys h "/btw";
@@ -178,14 +182,22 @@ let%expect_test "/btw: a newer question replaces the box; final reply; errors" =
   H.show h;
   [%expect
     {|
-      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+    prigh  new session                                     /work
+
+
+
+
+
+
+
+
+
 
     ▌ earlier question
       earlier answer
-      usage: /btw <question>
-    ────────────────────────────────────────────────────────────
+    ── /help · Tab commands ────────── usage: /btw <question> ──
     > ▏
-    …deepseek-flash  think:off  mode:auto  ctx:0.1%/1.0M  $0.01
+    deepseek-flash  mode:auto         ctx ▱▱▱▱▱ 0.1%/1.0M  $0.01
     |}]
 ;;
 
@@ -211,22 +223,22 @@ let%expect_test "/btw: a long answer shows its tail within half the screen" =
         (question count)
         (btw_id   btw-1)))
       (tag (Btw btw-1)))
+    prigh  new session                                     /work
 
-      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
-    ▌ earlier question
-      earlier answer
-    ┌─ btw ────────────────────────────────────────────────────┐
+
+
+    ╭─ btw ────────────────────────────────────────────────────╮
     │ ? count                                                  │
     │ … 20 lines above                                         │
     │ line 11                                                  │
     │                                                          │
     │ line 12                                                  │
     │ answering… · Esc to dismiss                              │
-    └──────────────────────────────────────────────────────────┘
-    ────────────────────────────────────────────────────────────
+    ╰──────────────────────────────────────────────────────────╯
+    ── Esc dismisses btw ───────────────────────────────────────
     > ▏
-    …deepseek-flash  think:off  ctx:0.1%/1.0M  Esc dismisses btw
+    deepseek-flash  mode:auto         ctx ▱▱▱▱▱ 0.1%/1.0M  $0.01
     |}]
 ;;
 
@@ -236,17 +248,21 @@ let%expect_test "/bt autocompletes to /btw" =
   H.show h;
   [%expect
     {|
-      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+    prigh  new session                                     /work
 
-    ▌ earlier question
-      earlier answer
-    ────────────────────────────────────────────────────────────
+
+
+
+
+    ╭─ Commands ───────────────────────────────────────────────╮
+    │ ▸ /btw <question>               ask a side question wit… │
+    │   /budget [dollars|off]         show or set the session… │
+    │   /abort                        abort the current run    │
+    │   /verbosity [quiet|normal|verbose]  set the transcript… │
+    │   /retry-backend-connection     reconnect to the backen… │
+    ╰──────────────────────────────────────────────────────────╯
+    ── Tab/Enter accept · Alt+S as typed ───────────────────────
     > /bt▏
-    ▸ /btw <question>                 ask a side question witho…
-      /budget [dollars|off]           show or set the session's…
-      /abort                          abort the current run
-      /verbosity [quiet|normal|verbose]  set the transcript ver…
-      /retry-backend-connection       reconnect to the backend …
-    …deepseek-flash  $0.01  Tab/Enter accept · Alt+S as typed
+    deepseek-flash  mode:auto         ctx ▱▱▱▱▱ 0.1%/1.0M  $0.01
     |}]
 ;;
