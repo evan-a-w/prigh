@@ -86,51 +86,51 @@
  (action
   (copy ../recursive-OFL.txt recursive-OFL.txt)))
 
-; The terminal panel's xterm.js and its glue, shared with the -web page.
+; The terminal panel's xterm.js (vendored, see ../vendor/README.md) and its glue.
 
 (rule
  (target terminal.js)
- (deps ../../../web-bin/terminal.js)
+ (deps ../terminal.js)
  (action
-  (copy ../../../web-bin/terminal.js terminal.js)))
+  (copy ../terminal.js terminal.js)))
 
 (rule
  (target xterm.js)
- (deps ../../../web-bin/vendor/xterm.js)
+ (deps ../vendor/xterm.js)
  (action
-  (copy ../../../web-bin/vendor/xterm.js xterm.js)))
+  (copy ../vendor/xterm.js xterm.js)))
 
 (rule
  (target xterm.css)
- (deps ../../../web-bin/vendor/xterm.css)
+ (deps ../vendor/xterm.css)
  (action
-  (copy ../../../web-bin/vendor/xterm.css xterm.css)))
+  (copy ../vendor/xterm.css xterm.css)))
 
 (rule
  (target addon-fit.js)
- (deps ../../../web-bin/vendor/addon-fit.js)
+ (deps ../vendor/addon-fit.js)
  (action
-  (copy ../../../web-bin/vendor/addon-fit.js addon-fit.js)))
+  (copy ../vendor/addon-fit.js addon-fit.js)))
 
 (install
  (section share)
  (package prigh_tui)
  (files
-  (index.html as prigh-web/index.html)
-  (main.bc.js as prigh-web/main.bc.js)
-  (style.css as prigh-web/style.css)
-  (chat.css as prigh-web/chat.css)
-  (agents.css as prigh-web/agents.css)
-  (terminal.css as prigh-web/terminal.css)
-  (files.css as prigh-web/files.css)
-  (highlight.css as prigh-web/highlight.css)
-  (resize.css as prigh-web/resize.css)
-  (paging.css as prigh-web/paging.css)
-  (jump.css as prigh-web/jump.css)
-  (recursive-sans.woff2 as prigh-web/recursive-sans.woff2)
-  (recursive-mono.woff2 as prigh-web/recursive-mono.woff2)
-  (recursive-OFL.txt as prigh-web/recursive-OFL.txt)
-  (terminal.js as prigh-web/terminal.js)
-  (xterm.js as prigh-web/xterm.js)
-  (xterm.css as prigh-web/xterm.css)
-  (addon-fit.js as prigh-web/addon-fit.js)))
+  (index.html as web/index.html)
+  (main.bc.js as web/main.bc.js)
+  (style.css as web/style.css)
+  (chat.css as web/chat.css)
+  (agents.css as web/agents.css)
+  (terminal.css as web/terminal.css)
+  (files.css as web/files.css)
+  (highlight.css as web/highlight.css)
+  (resize.css as web/resize.css)
+  (paging.css as web/paging.css)
+  (jump.css as web/jump.css)
+  (recursive-sans.woff2 as web/recursive-sans.woff2)
+  (recursive-mono.woff2 as web/recursive-mono.woff2)
+  (recursive-OFL.txt as web/recursive-OFL.txt)
+  (terminal.js as web/terminal.js)
+  (xterm.js as web/xterm.js)
+  (xterm.css as web/xterm.css)
+  (addon-fit.js as web/addon-fit.js)))

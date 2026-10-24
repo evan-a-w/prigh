@@ -31,8 +31,6 @@ else
 fi
 mode="${PRIGH_MODE:-web}"
 web_port=7788
-pi_web_port=7789
-prigh_web_port=7790
 server_port=7777
 state=/run/prigh
 extrausers="$state/extrausers"
@@ -139,32 +137,27 @@ IFS=',' read -ra entries <<<"${mode//[[:space:]]/}"
 for m in "${entries[@]}"; do
 	case "$m" in
 	web) flags+=(-web) ports+=("$web_port") ;;
-	pi-web) flags+=(-pi-web) ports+=("$pi_web_port") ;;
-	prigh-web) flags+=(-prigh-web) ports+=("$prigh_web_port") ;;
 	server) flags+=(-listen) ports+=("$server_port") ;;
 	tui) tui_mode=true ;;
 	"") ;;
-	*) die "unknown PRIGH_MODE entry '$m' (expected web, pi-web, prigh-web, server or tui)" ;;
+	prigh-web) die "PRIGH_MODE=prigh-web is now PRIGH_MODE=web (prigh-web on port $web_port)" ;;
+	pi-web) die "pi-web was removed: use PRIGH_MODE=web (prigh-web on port $web_port)" ;;
+	*) die "unknown PRIGH_MODE entry '$m' (expected web, server or tui)" ;;
 	esac
 done
 if $tui_mode && [ ${#flags[@]} -gt 0 ]; then
 	die "PRIGH_MODE=tui cannot be combined with other modes"
 fi
 
-# The JSON-lines port that tool hosts and `prigh-docker tui` connect to. With
-# only pi-web, the backend also listens on it, on loopback only.
+# The JSON-lines port that tool hosts and `prigh-docker tui` connect to: the
+# web port serves JSON lines too.
 internal_port=""
-internal_listen=false
 for i in "${!flags[@]}"; do
 	case "${flags[$i]}" in
 	-listen) internal_port="${ports[$i]}" ;;
-	-web | -prigh-web) [ -n "$internal_port" ] || internal_port="${ports[$i]}" ;;
+	-web) [ -n "$internal_port" ] || internal_port="${ports[$i]}" ;;
 	esac
 done
-if [ -z "$internal_port" ] && [ ${#flags[@]} -gt 0 ]; then
-	internal_port="$server_port"
-	internal_listen=true
-fi
 
 extra_args=()
 if [ -n "${PRIGH_ARGS:-}" ]; then
@@ -362,7 +355,7 @@ user_env() {
 	[[ "$(declare -p TERM 2>/dev/null)" != "declare -x"* ]] || env_vars+=(TERM="$TERM")
 	if [ "$1" = "$service_user" ]; then
 		local v
-		for v in PRIGH_BACKEND PRIGH_WEB_ROOT PRIGH_PI_WEB_ROOT PRIGH_PRIGH_WEB_ROOT; do
+		for v in PRIGH_BACKEND PRIGH_WEB_ROOT; do
 			[ -z "${!v:-}" ] || env_vars+=("$v=${!v}")
 		done
 	else
@@ -709,7 +702,6 @@ start() {
 	for i in "${!flags[@]}"; do
 		serve_args+=("${flags[$i]}" "0.0.0.0:${ports[$i]}")
 	done
-	! $internal_listen || serve_args+=(-listen "127.0.0.1:$internal_port")
 	local backend_env=(-u GH_TOKEN -u PRIGH_TOKENS -u PRIGH_SUPERUSERS)
 	if [ "$auth" = tokens ]; then
 		local specs=()

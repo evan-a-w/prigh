@@ -115,7 +115,7 @@
           };
         } ./backend query).overrideScope overlay;
 
-        # The web sites get precompressed siblings (file.gz, file.br) that
+        # The web site gets precompressed siblings (file.gz, file.br) that
         # the backend serves to browsers accepting them (Static_site).
         prighTui = frontendScope.prigh_tui.overrideAttrs (oa: {
           nativeBuildInputs = (oa.nativeBuildInputs or [ ]) ++ [
@@ -123,7 +123,7 @@
             pkgs.brotli
           ];
           postInstall = (oa.postInstall or "") + ''
-            for f in "$out"/share/prigh_tui/{web,prigh-web}/*.{js,css,html,svg,map,txt}; do
+            for f in "$out"/share/prigh_tui/web/*.{js,css,html,svg,map,txt}; do
               [ -f "$f" ] || continue
               zopfli "$f"
               brotli --keep --best "$f"
@@ -141,23 +141,18 @@
         });
 
         # `prigh` runs the TUI; `prigh -web [serve options]` runs the backend
-        # with the browser frontend instead (`prigh serve -web 127.0.0.1:7788
-        # -open ...`), and `prigh -prigh-web` with prigh-web (127.0.0.1:7790).
-        prighWebRoot = "${prighTui}/share/prigh_tui/prigh-web";
+        # with prigh-web, the browser frontend, instead (`prigh serve -web
+        # 127.0.0.1:7788 -open ...`).
+        prighWebRoot = "${prighTui}/share/prigh_tui/web";
         prigh = pkgs.writeShellApplication {
           name = "prigh";
           text = ''
             export PRIGH_BACKEND="''${PRIGH_BACKEND:-${prighBackend}/bin/prigh}"
-            export PRIGH_WEB_ROOT="''${PRIGH_WEB_ROOT:-${prighTui}/share/prigh_tui/web}"
-            export PRIGH_PRIGH_WEB_ROOT="''${PRIGH_PRIGH_WEB_ROOT:-${prighWebRoot}}"
+            export PRIGH_WEB_ROOT="''${PRIGH_WEB_ROOT:-${prighWebRoot}}"
             export PRIGH_TMUX="''${PRIGH_TMUX:-${pkgs.tmux}/bin/tmux}"
             if [ "''${1:-}" = "-web" ]; then
               shift
               exec "$PRIGH_BACKEND" serve -web "''${PRIGH_WEB_LISTEN:-127.0.0.1:7788}" -open "$@"
-            fi
-            if [ "''${1:-}" = "-prigh-web" ]; then
-              shift
-              exec "$PRIGH_BACKEND" serve -prigh-web "''${PRIGH_PRIGH_WEB_LISTEN:-127.0.0.1:7790}" -open "$@"
             fi
             exec ${prighTui}/bin/prigh-tui "$@"
           '';
@@ -182,7 +177,6 @@
           #!${pkgs.runtimeShell}
           printf '%s\n' "$@" > "$ARGS_OUT"
           printf '%s\n' "$PRIGH_WEB_ROOT" > "$ROOT_OUT"
-          printf '%s\n' "$PRIGH_PRIGH_WEB_ROOT" >> "$ROOT_OUT"
           EOF
           chmod +x fake-backend
           ARGS_OUT="$PWD/args" ROOT_OUT="$PWD/root" \
@@ -198,30 +192,20 @@
             -cwd
             /work
           ''} args
-          test "$(head -1 root)" = "${prighTui}/share/prigh_tui/web"
-          test -f ${prighTui}/share/prigh_tui/web/index.html
-          test -f ${prighTui}/share/prigh_tui/web/main.bc.js
-          test -f ${prighTui}/share/prigh_tui/web/style.css
-          test -f ${prighTui}/share/prigh_tui/web/terminal.js
-          test -f ${prighTui}/share/prigh_tui/web/xterm.js
-          test -f ${prighTui}/share/prigh_tui/web/xterm.css
-          test -f ${prighTui}/share/prigh_tui/web/addon-fit.js
+          test "$(cat root)" = "${prighWebRoot}"
+          ARGS_OUT="$PWD/default-args" ROOT_OUT="$PWD/default-root" \
+            PRIGH_BACKEND="$PWD/fake-backend" \
+            ${prigh}/bin/prigh -web
+          diff -u ${pkgs.writeText "expected-default-args" ''
+            serve
+            -web
+            127.0.0.1:7788
+            -open
+          ''} default-args
           ARGS_OUT="$PWD/override-args" ROOT_OUT="$PWD/override-root" \
             PRIGH_BACKEND="$PWD/fake-backend" PRIGH_WEB_ROOT=/custom \
             ${prigh}/bin/prigh -web
-          test "$(head -1 override-root)" = /custom
-          ARGS_OUT="$PWD/prigh-web-args" ROOT_OUT="$PWD/prigh-web-root" \
-            PRIGH_BACKEND="$PWD/fake-backend" \
-            ${prigh}/bin/prigh -prigh-web -token sekrit
-          diff -u ${pkgs.writeText "expected-prigh-web-args" ''
-            serve
-            -prigh-web
-            127.0.0.1:7790
-            -open
-            -token
-            sekrit
-          ''} prigh-web-args
-          test "$(tail -1 prigh-web-root)" = "${prighWebRoot}"
+          test "$(cat override-root)" = /custom
           test -f ${prighWebRoot}/index.html
           test -f ${prighWebRoot}/main.bc.js
           test -f ${prighWebRoot}/style.css
@@ -235,7 +219,7 @@
           test "$(stat -c %s ${prighWebRoot}/main.bc.js)" -lt 5000000
           # precompressed, decoding to the file itself
           for f in ${prighWebRoot}/main.bc.js ${prighWebRoot}/index.html \
-                   ${prighWebRoot}/style.css ${prighTui}/share/prigh_tui/web/main.bc.js; do
+                   ${prighWebRoot}/style.css; do
             ${pkgs.gzip}/bin/gzip -dc "$f.gz" | cmp - "$f"
             ${pkgs.brotli}/bin/brotli -dc "$f.br" | cmp - "$f"
           done
@@ -243,8 +227,6 @@
           touch "$out"
         '';
 
-        # tui/prigh-web/e2e: Chromium and Firefox against the built backend
-        # and the installed prigh-web site.
         # prigh.nvim's headless tests (a fake ACP agent, no network).
         checks.nvim-plugin =
           pkgs.runCommand "prigh-nvim-test" { nativeBuildInputs = [ pkgs.neovim-unwrapped pkgs.git ]; } ''
@@ -256,6 +238,8 @@
             mkdir "$out"
           '';
 
+        # tui/prigh-web/e2e: Chromium and Firefox against the built backend
+        # and the installed prigh-web site.
         checks.prigh-web-e2e =
           if pkgs.stdenv.hostPlatform.isLinux then
             pkgs.runCommand "prigh-web-e2e"
@@ -281,7 +265,7 @@
                 export PLAYWRIGHT_BROWSERS_PATH=${pkgs.playwright-driver.browsers}
                 export PLAYWRIGHT_MODULE=${pkgs.playwright-test}/lib/node_modules/playwright/index.mjs
                 export PRIGH_BACKEND=${prighBackend}/bin/prigh
-                export PRIGH_PRIGH_WEB_ROOT=${prighWebRoot}
+                export PRIGH_WEB_ROOT=${prighWebRoot}
                 export PRIGH_TMUX=${pkgs.tmux}/bin/tmux
                 export HOME="$PWD/home"
                 mkdir -p "$HOME"
@@ -292,81 +276,6 @@
               ''
           else
             pkgs.runCommand "prigh-web-e2e-skipped" { } ''touch "$out"'';
-
-        checks.web-workflows =
-          if pkgs.stdenv.hostPlatform.isLinux then
-            pkgs.runCommand "prigh-web-workflows-test" {
-              nativeBuildInputs =
-                [
-                  pkgs.curl
-                  pkgs.nodejs
-                  pkgs.playwright-test
-                  pkgs.playwright-driver.browsers
-                  pkgs.dejavu_fonts
-                ];
-            } ''
-              cat > fonts.conf <<EOF
-              <?xml version="1.0"?>
-              <!DOCTYPE fontconfig SYSTEM "fonts.dtd">
-              <fontconfig>
-                <dir>${pkgs.dejavu_fonts}/share/fonts</dir>
-                <cachedir>$PWD/font-cache</cachedir>
-              </fontconfig>
-              EOF
-              export FONTCONFIG_FILE="$PWD/fonts.conf"
-              mkdir -p fake-bin
-              for opener in open xdg-open; do
-                cat > "fake-bin/$opener" <<'EOF'
-              #!${pkgs.runtimeShell}
-              printf '%s\n' "$1" > "$OPEN_LOG"
-              EOF
-                chmod +x "fake-bin/$opener"
-              done
-              export PATH="$PWD/fake-bin:$PATH"
-              export PLAYWRIGHT_BROWSERS_PATH=${pkgs.playwright-driver.browsers}
-              export PLAYWRIGHT_MODULE=${pkgs.playwright-test}/lib/node_modules/playwright/index.mjs
-              : >actual
-              cleanup() {
-                status=$?
-                kill "''${server_pid:-}" 2>/dev/null || true
-                if test "$status" -ne 0; then
-                  cat server.err actual 2>/dev/null || true
-                fi
-                exit "$status"
-              }
-              trap cleanup EXIT
-              for engine in chromium firefox; do
-                mkdir -p "home-$engine" "cwd-$engine"
-                export OPEN_LOG="$PWD/opened-$engine"
-                export HOME="$PWD/home-$engine"
-                PRIGH_WEB_LISTEN=127.0.0.1:0 \
-                  ${prigh}/bin/prigh -web -faux -token 'sekrit&x=y' \
-                    -cwd "$PWD/cwd-$engine" >server.out 2>server.err &
-                server_pid=$!
-                for attempt in $(seq 1 200); do
-                  test -s "$OPEN_LOG" && break
-                  sleep 0.05
-                done
-                test -s "$OPEN_LOG"
-                opened_url="$(cat "$OPEN_LOG")"
-                case "$opened_url" in *token*) exit 1;; esac
-                ! grep -q 'sekrit' server.err
-                curl --fail --silent "''${opened_url}main.bc.js" >/dev/null
-                TEST_CWD="$PWD/cwd-$engine" \
-                  node ${./tui/e2e-web/web_workflows.mjs} \
-                    "$opened_url" 'sekrit&x=y' "$engine" >>actual
-                kill "$server_pid"
-                wait "$server_pid" 2>/dev/null || true
-                server_pid=
-              done
-              diff -u ${./tui/e2e-web/web_workflows.expected} actual
-              mkdir "$out"
-              cp actual "$out/screens.txt"
-            ''
-          else
-            pkgs.runCommand "prigh-web-workflows-test-skipped" { } ''
-              touch "$out"
-            '';
 
         # One OxCaml toolchain for the backend and the TUI: both projects
         # build from this shell (`.#backend` is kept as an alias).

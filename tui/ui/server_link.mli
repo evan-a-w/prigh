@@ -3,8 +3,7 @@ open! Import
 
 (** The backend a frontend that manages its own connection (the terminal UI)
     talks to: [/connect] changes it, [/signin] and [/signout] its
-    credentials. The platform reports it ([App.Action.Server_link]); the
-    browsers, whose connection belongs to the page, never do. *)
+    credentials. The platform reports it ([App.Action.Server_link]). *)
 
 type t =
   { address : string option

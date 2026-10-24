@@ -1,7 +1,7 @@
 open! Core
 
 (** Styled text, the platform-neutral rendering target. The terminal maps spans
-    to notty attributes; the web maps them to DOM nodes. *)
+    to notty attributes. *)
 
 module Span : sig
   type t =

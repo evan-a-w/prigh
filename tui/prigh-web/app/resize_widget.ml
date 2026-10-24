@@ -1,6 +1,5 @@
 open! Core
 open Js_of_ocaml
-module Browser = Prigh_ui_web_app.Browser
 module Action = Prigh_web.App.Action
 module Resize = Prigh_web.Resize
 

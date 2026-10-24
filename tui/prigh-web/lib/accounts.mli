@@ -3,9 +3,9 @@ open! Import
 
 (** The sign-ins prigh-web remembers, so that the account menu switches between
     them in one click. They are a JSON list in localStorage ([key]); the active
-    one is also in [prigh.user]/[prigh.token], where [web-app/]'s [Login] (the
-    [-web] page) keeps its single login, so both pages keep working and a
-    login saved before the list existed is migrated into it. *)
+    one is also in [prigh.user]/[prigh.token], where the page's [Login] keeps
+    the current sign-in, and a login saved before the list existed is migrated
+    into it. *)
 
 module Storage : sig
   (** localStorage, or a table in tests. *)

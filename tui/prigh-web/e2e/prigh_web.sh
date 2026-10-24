@@ -9,14 +9,14 @@
 # PLAYWRIGHT_BROWSERS_PATH, tmux (on the PATH or $PRIGH_TMUX) for the
 # terminal panel, plus:
 #   PRIGH_BACKEND        the backend binary (default: the dune build)
-#   PRIGH_PRIGH_WEB_ROOT the built site (default: the dune build)
+#   PRIGH_WEB_ROOT       the built site (default: the dune build)
 #   ENGINES              browsers to run (default: chromium firefox)
 #   SHOTS                a directory to save screenshots of each step in
 #   UPDATE=1             rewrite prigh_web.expected instead of diffing
 set -euo pipefail
 here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 export PRIGH_BACKEND="${PRIGH_BACKEND:-$here/../../../backend/_build/default/bin/main.exe}"
-export SITE="${PRIGH_PRIGH_WEB_ROOT:-$here/../../_build/default/prigh-web/bin/site}"
+export SITE="${PRIGH_WEB_ROOT:-$here/../../_build/default/prigh-web/bin/site}"
 export TOKEN='sekrit&x=y'
 tmp="$(mktemp -d)"
 actual="$tmp/actual"

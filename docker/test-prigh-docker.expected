@@ -96,8 +96,8 @@ $ PRIGH_TOKENS=alice=tok-a prigh-docker tui
 exec setpriv --reuid=1000 --regid=1000 --init-groups env -i HOME=/home/prigh USER=prigh LOGNAME=prigh SHELL=/bin/bash NIX_REMOTE=daemon PATH=/home/prigh/.nix-profile/bin:/home/prigh/.local/state/nix/profile/bin:$PATH LANG=C.UTF-8 GIT_TERMINAL_PROMPT=0 prigh-tui -connect 127.0.0.1:7788 -tools remote
 $ PRIGH_MODE=web,server prigh-docker tui -session s1
 exec setpriv --reuid=1000 --regid=1000 --init-groups env -i HOME=/home/prigh USER=prigh LOGNAME=prigh SHELL=/bin/bash NIX_REMOTE=daemon PATH=/home/prigh/.nix-profile/bin:/home/prigh/.local/state/nix/profile/bin:$PATH LANG=C.UTF-8 GIT_TERMINAL_PROMPT=0 prigh-tui -connect 127.0.0.1:7777 -tools remote -session s1
-$ PRIGH_MODE=pi-web prigh-docker tui
-exec setpriv --reuid=1000 --regid=1000 --init-groups env -i HOME=/home/prigh USER=prigh LOGNAME=prigh SHELL=/bin/bash NIX_REMOTE=daemon PATH=/home/prigh/.nix-profile/bin:/home/prigh/.local/state/nix/profile/bin:$PATH LANG=C.UTF-8 GIT_TERMINAL_PROMPT=0 prigh-tui -connect 127.0.0.1:7777 -tools remote
+$ PRIGH_MODE=web prigh-docker tui
+exec setpriv --reuid=1000 --regid=1000 --init-groups env -i HOME=/home/prigh USER=prigh LOGNAME=prigh SHELL=/bin/bash NIX_REMOTE=daemon PATH=/home/prigh/.nix-profile/bin:/home/prigh/.local/state/nix/profile/bin:$PATH LANG=C.UTF-8 GIT_TERMINAL_PROMPT=0 prigh-tui -connect 127.0.0.1:7788 -tools remote
 $ prigh-docker tui -tools remote
 exec setpriv --reuid=1000 --regid=1000 --init-groups env -i HOME=/home/prigh USER=prigh LOGNAME=prigh SHELL=/bin/bash NIX_REMOTE=daemon PATH=/home/prigh/.nix-profile/bin:/home/prigh/.local/state/nix/profile/bin:$PATH LANG=C.UTF-8 GIT_TERMINAL_PROMPT=0 prigh-tui -connect 127.0.0.1:7788 -tools remote
 $ prigh-docker tui -tools local
@@ -273,8 +273,8 @@ erin	10004
 2770 10003 /workspace/dave
 2770 10004 /workspace/erin
 
-=== old layout: the volume was prigh's home; single PRIGH_TOKEN; pi-web only
-$ PRIGH_TOKEN=tok PRIGH_MODE=pi-web prigh-docker 
+=== old layout: the volume was prigh's home; single PRIGH_TOKEN; web only
+$ PRIGH_TOKEN=tok PRIGH_MODE=web prigh-docker 
 prigh-docker: moving the old home volume's contents (prigh's home) into /home/prigh
 + chown 0:0 /home
 prigh-docker: /home/prigh is owned by uid 0, not 1000: chowning it recursively
@@ -289,9 +289,9 @@ prigh-docker: /workspace/default is owned by uid 1000, not 10000: chowning it re
 prigh-docker: adding the image's store paths to /nix (3 missing or unregistered)
 + nix-store --load-db < /opt/nix-seed/registration
 supervise nix-daemon: env -i PATH=$PATH LANG=C.UTF-8 HOME=/root XDG_CACHE_HOME=/nix/var/cache/root nix-daemon --quiet
-supervise in /workspace/default: setpriv --reuid=10000 --regid=10000 --init-groups env -i HOME=/home/default USER=default LOGNAME=default SHELL=/bin/bash NIX_REMOTE=daemon PATH=/home/default/.nix-profile/bin:/home/default/.local/state/nix/profile/bin:$PATH LANG=C.UTF-8 GIT_TERMINAL_PROMPT=0 PRIGH_TOKEN=host-token-default PRIGH_USER=default prigh tool-host -connect 127.0.0.1:7777 -name container -host-id container-default -cwd /workspace/default
-prigh-docker: mode=pi-web users: default(10000); tool hosts: one per user, as that user; nix: daemon started
-exec setpriv --reuid=1000 --regid=1000 --init-groups env -u PRIGH_TOKEN -u PRIGH_GH_TOKENS -u PRIGH_HOST_TOKENS -u GH_TOKEN -u PRIGH_TOKENS -u PRIGH_SUPERUSERS HOME=/home/prigh USER=prigh LOGNAME=prigh SHELL=/bin/bash NIX_REMOTE=daemon PATH=/home/prigh/.nix-profile/bin:/home/prigh/.local/state/nix/profile/bin:$PATH PRIGH_TOKENS=default=tok PRIGH_HOST_TOKENS=default=host-token-default prigh serve -cwd /workspace -no-backend-host -pi-web 0.0.0.0:7789 -listen 127.0.0.1:7777
+supervise in /workspace/default: setpriv --reuid=10000 --regid=10000 --init-groups env -i HOME=/home/default USER=default LOGNAME=default SHELL=/bin/bash NIX_REMOTE=daemon PATH=/home/default/.nix-profile/bin:/home/default/.local/state/nix/profile/bin:$PATH LANG=C.UTF-8 GIT_TERMINAL_PROMPT=0 PRIGH_TOKEN=host-token-default PRIGH_USER=default prigh tool-host -connect 127.0.0.1:7788 -name container -host-id container-default -cwd /workspace/default
+prigh-docker: mode=web users: default(10000); tool hosts: one per user, as that user; nix: daemon started
+exec setpriv --reuid=1000 --regid=1000 --init-groups env -u PRIGH_TOKEN -u PRIGH_GH_TOKENS -u PRIGH_HOST_TOKENS -u GH_TOKEN -u PRIGH_TOKENS -u PRIGH_SUPERUSERS HOME=/home/prigh USER=prigh LOGNAME=prigh SHELL=/bin/bash NIX_REMOTE=daemon PATH=/home/prigh/.nix-profile/bin:/home/prigh/.local/state/nix/profile/bin:$PATH PRIGH_TOKENS=default=tok PRIGH_HOST_TOKENS=default=host-token-default prigh serve -cwd /workspace -no-backend-host -web 0.0.0.0:7788
 .
 ./default
 ./default/.bashrc
@@ -317,8 +317,8 @@ $ PRIGH_TOKEN=tok prigh-docker
 prigh-docker: /home has both an old-layout home (.prigh or .config) and /home/prigh; move the old files into /home/prigh by hand
 [exit 2]
 
-=== prigh-web: alone (tool hosts connect to it), and with pi-web
-$ PRIGH_TOKEN=tok PRIGH_MODE=prigh-web prigh-docker 
+=== web alone (tool hosts connect to it); the old mode names
+$ PRIGH_TOKEN=tok PRIGH_MODE=web prigh-docker 
 + chmod 700 /home/prigh
 + chown -R 10000:10000 /home/default
 + chmod 700 /home/default
@@ -328,17 +328,17 @@ $ PRIGH_TOKEN=tok PRIGH_MODE=prigh-web prigh-docker
 prigh-docker: adding the image's store paths to /nix (3 missing or unregistered)
 + nix-store --load-db < /opt/nix-seed/registration
 supervise nix-daemon: env -i PATH=$PATH LANG=C.UTF-8 HOME=/root XDG_CACHE_HOME=/nix/var/cache/root nix-daemon --quiet
-supervise in /workspace/default: setpriv --reuid=10000 --regid=10000 --init-groups env -i HOME=/home/default USER=default LOGNAME=default SHELL=/bin/bash NIX_REMOTE=daemon PATH=/home/default/.nix-profile/bin:/home/default/.local/state/nix/profile/bin:$PATH LANG=C.UTF-8 GIT_TERMINAL_PROMPT=0 PRIGH_TOKEN=host-token-default PRIGH_USER=default prigh tool-host -connect 127.0.0.1:7790 -name container -host-id container-default -cwd /workspace/default
-prigh-docker: mode=prigh-web users: default(10000); tool hosts: one per user, as that user; nix: daemon started
-exec setpriv --reuid=1000 --regid=1000 --init-groups env -u PRIGH_TOKEN -u PRIGH_GH_TOKENS -u PRIGH_HOST_TOKENS -u GH_TOKEN -u PRIGH_TOKENS -u PRIGH_SUPERUSERS HOME=/home/prigh USER=prigh LOGNAME=prigh SHELL=/bin/bash NIX_REMOTE=daemon PATH=/home/prigh/.nix-profile/bin:/home/prigh/.local/state/nix/profile/bin:$PATH PRIGH_TOKENS=default=tok PRIGH_HOST_TOKENS=default=host-token-default prigh serve -cwd /workspace -no-backend-host -prigh-web 0.0.0.0:7790
-$ PRIGH_TOKEN=tok PRIGH_MODE=pi-web,prigh-web prigh-docker 
-+ nix-store --check-validity --print-invalid <the 3 paths in /opt/nix-seed/store>
-supervise nix-daemon: env -i PATH=$PATH LANG=C.UTF-8 HOME=/root XDG_CACHE_HOME=/nix/var/cache/root nix-daemon --quiet
-supervise in /workspace/default: setpriv --reuid=10000 --regid=10000 --init-groups env -i HOME=/home/default USER=default LOGNAME=default SHELL=/bin/bash NIX_REMOTE=daemon PATH=/home/default/.nix-profile/bin:/home/default/.local/state/nix/profile/bin:$PATH LANG=C.UTF-8 GIT_TERMINAL_PROMPT=0 PRIGH_TOKEN=host-token-default PRIGH_USER=default prigh tool-host -connect 127.0.0.1:7790 -name container -host-id container-default -cwd /workspace/default
-prigh-docker: mode=pi-web,prigh-web users: default(10000); tool hosts: one per user, as that user; nix: daemon started
-exec setpriv --reuid=1000 --regid=1000 --init-groups env -u PRIGH_TOKEN -u PRIGH_GH_TOKENS -u PRIGH_HOST_TOKENS -u GH_TOKEN -u PRIGH_TOKENS -u PRIGH_SUPERUSERS HOME=/home/prigh USER=prigh LOGNAME=prigh SHELL=/bin/bash NIX_REMOTE=daemon PATH=/home/prigh/.nix-profile/bin:/home/prigh/.local/state/nix/profile/bin:$PATH PRIGH_TOKENS=default=tok PRIGH_HOST_TOKENS=default=host-token-default prigh serve -cwd /workspace -no-backend-host -pi-web 0.0.0.0:7789 -prigh-web 0.0.0.0:7790
-$ PRIGH_TOKEN=tok PRIGH_MODE=prigh-web prigh-docker healthcheck
-port 7790 (-prigh-web) is not accepting connections
+supervise in /workspace/default: setpriv --reuid=10000 --regid=10000 --init-groups env -i HOME=/home/default USER=default LOGNAME=default SHELL=/bin/bash NIX_REMOTE=daemon PATH=/home/default/.nix-profile/bin:/home/default/.local/state/nix/profile/bin:$PATH LANG=C.UTF-8 GIT_TERMINAL_PROMPT=0 PRIGH_TOKEN=host-token-default PRIGH_USER=default prigh tool-host -connect 127.0.0.1:7788 -name container -host-id container-default -cwd /workspace/default
+prigh-docker: mode=web users: default(10000); tool hosts: one per user, as that user; nix: daemon started
+exec setpriv --reuid=1000 --regid=1000 --init-groups env -u PRIGH_TOKEN -u PRIGH_GH_TOKENS -u PRIGH_HOST_TOKENS -u GH_TOKEN -u PRIGH_TOKENS -u PRIGH_SUPERUSERS HOME=/home/prigh USER=prigh LOGNAME=prigh SHELL=/bin/bash NIX_REMOTE=daemon PATH=/home/prigh/.nix-profile/bin:/home/prigh/.local/state/nix/profile/bin:$PATH PRIGH_TOKENS=default=tok PRIGH_HOST_TOKENS=default=host-token-default prigh serve -cwd /workspace -no-backend-host -web 0.0.0.0:7788
+$ PRIGH_TOKEN=tok PRIGH_MODE=prigh-web prigh-docker 
+prigh-docker: PRIGH_MODE=prigh-web is now PRIGH_MODE=web (prigh-web on port 7788)
+[exit 2]
+$ PRIGH_TOKEN=tok PRIGH_MODE=pi-web,web prigh-docker 
+prigh-docker: pi-web was removed: use PRIGH_MODE=web (prigh-web on port 7788)
+[exit 2]
+$ PRIGH_TOKEN=tok PRIGH_MODE=web prigh-docker healthcheck
+port 7788 (-web) is not accepting connections
 [exit 1]
 
 === no token: no auth, one tool host as default without a token
@@ -457,7 +457,7 @@ $ PRIGH_TOKEN=tok PRIGH_MODE=tui,web prigh-docker
 prigh-docker: PRIGH_MODE=tui cannot be combined with other modes
 [exit 2]
 $ PRIGH_TOKEN=tok PRIGH_MODE=bogus prigh-docker 
-prigh-docker: unknown PRIGH_MODE entry 'bogus' (expected web, pi-web, prigh-web, server or tui)
+prigh-docker: unknown PRIGH_MODE entry 'bogus' (expected web, server or tui)
 [exit 2]
 $ PRIGH_TOKEN=tok PRIGH_MODE=, prigh-docker 
 prigh-docker: PRIGH_MODE=',' enables nothing

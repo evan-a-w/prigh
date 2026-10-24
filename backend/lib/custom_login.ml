@@ -11,7 +11,7 @@ end
 
 let ( let* ) x f = Or_error.bind x ~f
 
-(* An empty answer takes the default: the CLI and pi-web cannot prefill. *)
+(* An empty answer takes the default: the CLI cannot prefill. *)
 let ask_text
       (i : Auth_interaction.t)
       ~message
