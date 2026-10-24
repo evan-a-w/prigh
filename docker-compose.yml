@@ -14,6 +14,9 @@ services:
         NIX_SUBSTITUTER: ${PRIGH_NIX_SUBSTITUTER-https://prigh.cachix.org}
         NIX_SUBSTITUTER_KEY: ${PRIGH_NIX_SUBSTITUTER_KEY:-prigh.cachix.org-1:1kHKoGOetNmpzJg8lJ1nvQzwzTL0XiOs5GInELMgSoI=}
     image: prigh:local
+    # The image is only ever built here, never pulled: without this, "docker
+    # compose pull" (Portainer's "Re-pull image and redeploy") fails on it.
+    pull_policy: build
     restart: unless-stopped
     environment:
       PRIGH_MODE: ${PRIGH_MODE:-web}
