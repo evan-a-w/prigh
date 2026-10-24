@@ -1,0 +1,63 @@
+--- a/lib/iomux_stubs.c
++++ b/lib/iomux_stubs.c
+@@ -3,6 +3,8 @@
+ #include <errno.h>
+ #include <poll.h>
+ #include <signal.h>
++#include <stdatomic.h>
++#include <pthread.h>
+ 
+ #include <caml/bigarray.h>
+ #include <caml/memory.h>
+@@ -12,6 +14,20 @@
+ 
+ #include "config.h"
+ 
++/* A signal can arrive after [caml_enter_blocking_section] has run the
++ * pending OCaml signal handlers but before we block: OxCaml's runtime only
++ * runs it when the blocking section ends (upstream OCaml re-checks after
++ * releasing the domain lock). An event loop whose wake-up comes from a
++ * signal handler (eio_posix reaps children on SIGCHLD) would then sleep
++ * forever. A signal recorded in that window interrupts the domain
++ * ([young_limit] = UINTNAT_MAX), so we do not sleep when it is set; ppoll
++ * closes the remaining gap by keeping signals blocked until it waits. */
++static int
++signal_since_enter(caml_domain_state *dom)
++{
++	return atomic_load(&dom->young_limit) == UINTNAT_MAX;
++}
++
+ /* only defined in the runtime with CAML_INTERNALS */
+ CAMLextern int caml_convert_signal_number (int);
+ 
+@@ -32,7 +48,10 @@
+ 	nfds = Int_val(v_nfds);
+ 	timo = Int_val(v_timo);
+ 
++	caml_domain_state *dom = Caml_state;
+ 	caml_enter_blocking_section();
++	if (signal_since_enter(dom))
++		timo = 0;
+ 	r = poll(fds, nfds, timo);
+ 	caml_leave_blocking_section();
+ 	if (r == -1) /* this allocs */
+@@ -85,8 +104,18 @@
+ 		psigmask = &sigmask;
+ 	}
+ 
++	caml_domain_state *dom = Caml_state;
++	sigset_t all, orig;
++	sigfillset(&all);
+ 	caml_enter_blocking_section();
+-	r = ppoll(fds, nfds, timo, psigmask);
++	pthread_sigmask(SIG_BLOCK, &all, &orig);
++	if (signal_since_enter(dom)) {
++		ts.tv_sec = 0;
++		ts.tv_nsec = 0;
++		timo = &ts;
++	}
++	r = ppoll(fds, nfds, timo, psigmask != NULL ? psigmask : &orig);
++	pthread_sigmask(SIG_SETMASK, &orig, NULL);
+ 	caml_leave_blocking_section();
+ 	if (r == -1) /* this allocs */
+ 		uerror("ppoll", Nothing);

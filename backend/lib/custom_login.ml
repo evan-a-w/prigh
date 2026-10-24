@@ -9,7 +9,7 @@ module Key = struct
   [@@deriving sexp_of]
 end
 
-let ( let* ) = Or_error.( >>= )
+let ( let* ) x f = Or_error.bind x ~f
 
 (* An empty answer takes the default: the CLI and pi-web cannot prefill. *)
 let ask_text

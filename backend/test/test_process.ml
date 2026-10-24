@@ -167,3 +167,27 @@ let%expect_test "cancellation kills the whole process group" =
     returned within a second: true
     |}]
 ;;
+
+(* eio_posix learns that a child exited from its SIGCHLD handler. Under
+   OxCaml a signal arriving while the scheduler releases the domain lock
+   before [ppoll] used to wait for the next wake-up, which for a lone child
+   never came (fixed by nix/opam-repository's iomux patch). A missed
+   wake-up shows here as a child not reaped within its timeout. *)
+let%expect_test "eio_posix reaps every child promptly" =
+  Eio_posix.run
+  @@ fun env ->
+  let env = (env :> Eio_unix.Stdenv.base) in
+  let clock = Eio.Stdenv.clock env in
+  let late = ref 0 in
+  for _ = 1 to 500 do
+    match
+      Eio.Time.with_timeout clock 2. (fun () ->
+        Ok (Process.run_collect ~env ~prog:"true" ~args:[] ()))
+    with
+    | Ok { exit = Exited 0; _ } -> ()
+    | Ok output -> print_s [%sexp (output : Process.Output.t)]
+    | Error `Timeout -> incr late
+  done;
+  printf "children not reaped within 2s: %d\n" !late;
+  [%expect {| children not reaped within 2s: 0 |}]
+;;
