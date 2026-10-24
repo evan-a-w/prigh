@@ -42,12 +42,13 @@
         pkgs = nixpkgs.legacyPackages.${system};
         on = opam-nix.lib.${system};
 
+        # nix/opam-repository: packages adapted to the OxCaml pins (see
+        # nix/README.md); first, so they shadow the other repositories.
         oxRepos = [
+          ./nix/opam-repository
           ox-opam-repository
           opam-repository
         ];
-
-        upstreamRepos = [ opam-repository ];
 
         # Pinned to the exact versions of the working `prigh-ox` switch. This
         # both forces the OxCaml compiler and keeps opam-nix's solver inside its
@@ -106,15 +107,13 @@
           };
         } ./tui query).overrideScope overlay;
 
-        backendScope = on.buildOpamProject' {
-          repos = upstreamRepos;
+        backendScope = (on.buildOpamProject' {
+          repos = oxRepos;
           resolveArgs = {
             depopts = false;
             dev = false;
           };
-        } ./backend {
-          ocaml-base-compiler = "5.3.0";
-        };
+        } ./backend query).overrideScope overlay;
 
         # The web sites get precompressed siblings (file.gz, file.br) that
         # the backend serves to browsers accepting them (Static_site).
@@ -369,20 +368,13 @@
               touch "$out"
             '';
 
-        # The backend is vanilla OCaml 5.3 and the TUI OxCaml: dune can only
-        # use one of them, so each has its own shell.
-        devShells.backend = pkgs.mkShell {
-          inputsFrom = [ prighBackend ];
-          buildInputs = [
-            backendScope.expect_test_helpers_core
-            pkgs.ocamlformat
-            pkgs.ripgrep
-            pkgs.tmux
-          ];
-        };
-
+        # One OxCaml toolchain for the backend and the TUI: both projects
+        # build from this shell (`.#backend` is kept as an alias).
         devShells.default = pkgs.mkShell {
-          inputsFrom = [ prighTui ];
+          inputsFrom = [
+            prighTui
+            prighBackend
+          ];
           buildInputs = [
             frontendScope.bonsai_test
             frontendScope.expect_test_helpers_core
@@ -397,7 +389,14 @@
             # the web-layer tests run under node (js_of_ocaml)
             pkgs.nodejs
           ];
+          # opam-nix puts a fake `opam` of every package on PATH (~250 of
+          # them); keep one. Otherwise PATH outgrows tmux's 16 KB command
+          # limit, and tui/tmux-test passes it in a tmux command.
+          shellHook = ''
+            PATH=$(printf '%s' "$PATH" | tr : '\n' | awk '!/-opam\/bin$/ || !seen++' | paste -sd : -)
+          '';
         };
+        devShells.backend = self.devShells.${system}.default;
       }
     );
 }

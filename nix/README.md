@@ -40,12 +40,39 @@ opam list --switch=prigh-ox --installed --columns=name,version \
 # then wrap in the file header and drop the `oxcaml-*` guard/static packages.
 ```
 
-The current file was generated this way from the complete switch; it includes
-`bonsai_term`/`bonsai_test`, `menhir 20260209`, `eio 1.3+ox`, etc. `oxcaml-*`
+The file was generated this way from the complete switch; it includes
+`bonsai_term`/`bonsai_test`, `menhir 20260209`, etc. `oxcaml-*`
 guard/static packages are omitted because their "versions" are the
 `guard`/`enabled` markers, not real versions.
 
-`flake.nix` now uses `query = import ./nix/prigh-ox-pins.nix;` directly.
+Both the TUI and the backend resolve against the same pins, so the
+backend's dependencies are in it too, edited by hand since: the TLS/crypto
+stack the backend uses (`tls-eio 2.1.3`, `mirage-crypto 2.4.1`, `ca-certs
+1.0.3`, `kdf`, `digestif`) and `eio 1.5`, the version the backend was
+written against. The OxCaml repository's `eio 1.3+ox` is not usable from
+Nix: its `url` is a commit of `oxcaml/eio` that is on no branch, so
+`fetchGit` cannot fetch it; plain `eio 1.5` builds with OxCaml unchanged.
+The `+prigh` versions come from `opam-repository/` (below).
+
+## `opam-repository/`
+
+A small opam repository, first in the flake's `repos` so that its packages
+shadow the OxCaml and upstream ones. Each package is the upstream release
+plus a patch in its `files/` (listed in `patches` and `extra-files`, with
+the patch's sha256), versioned `<upstream>+prigh` and pinned in
+`prigh-ox-pins.nix`:
+
+- `digestif 1.3.1+prigh`: OxCaml's `Bytes.blit` takes `local` arguments,
+  which does not unify with the plain function type `feed ~blit` expects;
+  the patch eta-expands it.
+- `mirage-crypto-pk 2.4.1+prigh`: the OxCaml `zarith 1.12+ox3` lacks the
+  `*_unsigned` conversions; the values converted are below 2^56, so the
+  signed ones give the same result.
+
+After changing a patch, update its sha256 in the package's `opam` file
+(`sha256sum files/<patch>`); new files must be `git add`ed before the
+flake sees them. An opam switch uses it with `opam repository add prigh
+nix/opam-repository`.
 
 ## Materialization (optional)
 

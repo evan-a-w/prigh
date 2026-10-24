@@ -1,8 +1,9 @@
 # prigh architecture
 
 prigh is an agentic coding harness split into an OCaml backend (`backend/`,
-all the logic) and an OCaml frontend (`tui/`, Bonsai on OxCaml: rendering,
-input and UI state only) that runs in a terminal or a browser. There is no
+all the logic) and an OCaml frontend (`tui/`, Bonsai: rendering, input and
+UI state only) that runs in a terminal or a browser; both build with
+OxCaml. There is no
 plugin system: tools, subagents, providers and slash commands are compiled in;
 what comes from outside is skills (instructions in `SKILL.md` files) and the
 tools of MCP servers.
@@ -1311,11 +1312,12 @@ provider's in the order anthropic, openai-codex, openai, deepseek.
 
 ## Frontend (`tui/`)
 
-Built with OxCaml 5.2 and the Jane Street `v0.18~preview` packages
-(`nix develop`); the backend stays on vanilla OCaml 5.3 (`nix develop
-.#backend`) because some of its dependencies do not compile with OxCaml
-modes. The two only meet over the wire, so the frontend owns its own
-copy of the protocol types and the e2e test guards the contract.
+Built with OxCaml 5.2 and the Jane Street `v0.18~preview` packages, like
+the backend (one toolchain, `nix develop`; the few backend dependencies
+that need adapting to it are patched in `nix/opam-repository`). The two
+are separate dune projects and only meet over the wire, so the frontend
+owns its own copy of the protocol types and the e2e test guards the
+contract.
 
 - `protocol/` (`prigh_protocol`) — `Jsonaf` decoders for everything
   `Rpc_json` emits (`Message`, `Delta`, `State`, `Model`, `Session_summary`,

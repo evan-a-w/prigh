@@ -3,7 +3,9 @@
  (preprocess
   (pps ppx_jane ppx_jsonaf_conv))
  (inline_tests
-  (deps fake_mcp_server/fake_mcp_server.exe ../bin/main.exe))
+  (deps fake_mcp_server/fake_mcp_server.exe ../bin/main.exe)
+  (flags
+   (-source-tree-root .)))
  (libraries
   core
   core_unix

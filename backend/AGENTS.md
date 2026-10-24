@@ -1,7 +1,7 @@
 See `../AGENTS.md` for the conventions; this file adds the backend's.
 
-Build and test in the backend dev shell (vanilla OCaml 5.3):
-`nix develop .#backend`, then `dune build @runtest` here.
+Build and test in the dev shell (OxCaml, shared with the TUI):
+`nix develop`, then `dune build @runtest` here.
 
 Concurrency uses Eio (effects, direct style). Functions that do I/O take
 [~env:Env.t] (= Eio_unix.Stdenv.base). Tests wrap their body in
