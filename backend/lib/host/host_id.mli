@@ -4,7 +4,7 @@ open! Import
 (** What a tool host is known by ([hello]'s [host_id]): one per machine and
     user, kept in [~/.prigh/host-id] of the home its tools see, so sessions
     follow a host across reconnects and restarts. The TUI keeps the same
-    file ([tui/client_unix/host_id.ml]), so a TUI and [prigh tool-host
+    file ([frontend/client/unix/host_id.ml]), so a TUI and [prigh tool-host
     -connect] on one machine are the same host. The file may be edited to
     choose an id. *)
 

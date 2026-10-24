@@ -2,8 +2,8 @@ open! Core
 open! Import
 
 (** The terminal panel: a shell on the session's active tool host, in the
-    backend's [/terminal] WebSocket (see backend/lib/terminals.mli), drawn by
-    xterm.js in the page. Pure: what the panel shows and what it connects to;
+    backend's [/terminal] WebSocket (see backend/lib/terminal/terminals.mli),
+    drawn by xterm.js in the page. Pure: what the panel shows and what it connects to;
     the page mounts the widget for [Target.t]. *)
 
 module Status : sig
