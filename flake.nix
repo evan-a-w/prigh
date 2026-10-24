@@ -142,7 +142,7 @@
 
         # `prigh` runs the TUI; `prigh -web [serve options]` runs the backend
         # with prigh-web, the browser frontend, instead (`prigh serve -web
-        # 127.0.0.1:7788 -open ...`).
+        # 127.0.0.1:7790 -open ...`).
         prighWebRoot = "${prighFrontend}/share/prigh_frontend/web";
         prigh = pkgs.writeShellApplication {
           name = "prigh";
@@ -152,7 +152,7 @@
             export PRIGH_TMUX="''${PRIGH_TMUX:-${pkgs.tmux}/bin/tmux}"
             if [ "''${1:-}" = "-web" ]; then
               shift
-              exec "$PRIGH_BACKEND" serve -web "''${PRIGH_WEB_LISTEN:-127.0.0.1:7788}" -open "$@"
+              exec "$PRIGH_BACKEND" serve -web "''${PRIGH_WEB_LISTEN:-127.0.0.1:7790}" -open "$@"
             fi
             exec ${prighFrontend}/bin/prigh-tui "$@"
           '';
@@ -199,7 +199,7 @@
           diff -u ${pkgs.writeText "expected-default-args" ''
             serve
             -web
-            127.0.0.1:7788
+            127.0.0.1:7790
             -open
           ''} default-args
           ARGS_OUT="$PWD/override-args" ROOT_OUT="$PWD/override-root" \

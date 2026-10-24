@@ -19,7 +19,7 @@ if [ "${1:-}" = "-web" ]; then
 	shift
 	(cd "$root/frontend" && dune build ./web/bin/site 2>&1 | { grep -v missing-effects-backend || true; })
 	export PRIGH_WEB_ROOT="${PRIGH_WEB_ROOT:-$root/frontend/_build/default/web/bin/site}"
-	exec "$PRIGH_BACKEND" serve -web "${PRIGH_WEB_LISTEN:-127.0.0.1:7788}" -open "$@"
+	exec "$PRIGH_BACKEND" serve -web "${PRIGH_WEB_LISTEN:-127.0.0.1:7790}" -open "$@"
 fi
 
 (cd "$root/frontend" && dune build ./tui/bin/main.exe 2>&1)
