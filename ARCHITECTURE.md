@@ -1359,6 +1359,20 @@ copy of the protocol types and the e2e test guards the contract.
     reply comes back tagged with its generation so late attempts are ignored;
     `/retry-backend-connection` issues a new generation with no delay.
     Success clears the transcript and re-runs the startup requests.
+  - Switching servers is App state too, where the platform reports a
+    `Server_link` (only the terminal: the browsers' connection belongs to
+    the page). `/connect` and the `/signin` dialog (`Sign_in_form`, a
+    `Mode.Sign_in`) emit `Command.Relink {generation; change}` and enter
+    `Connection.Switching {generation; previous}`; the platform answers
+    `Relinked` with a `Server_link.Outcome`: `Unreachable` (nothing changed:
+    back to `previous`), `Rejected` (the old connection is gone: on a bad
+    user or token, `Disconnected` with the dialog open, showing the error)
+    or `Connected` (everything of the old connection is dropped,
+    `reset_connection`, and the startup requests run again). A `Rejected`
+    action (the first `hello`), a reconnect refused for its credentials and
+    `/signout` (after `Command.Sign_out`) also end in `Disconnected`, which
+    never retries; `Backend_closed` is expected while switching or
+    disconnected and ignored.
   - Headless widgets: `Editor` (multi-line, kill ring, undo, chips for long
     pastes, persistent history), `Picker` (fuzzy list with `Fuzzy` ranking),
     `Transcript` (items plus streaming tails; `Transcript.apply` is the one
@@ -1477,13 +1491,13 @@ copy of the protocol types and the e2e test guards the contract.
     output. `Event` has `Tool_exec.stdin` and `Tool_exec_input`; the
     terminal's `Tool_host` forwards them to its `prigh tool-host` worker
     (`"stdin": true` on `exec`, `{"type":"input",…}`), and
-    `Term_app.connection_hello` with local tools announces `"features":
+    `Backend_link.connection_hello` with local tools announces `"features":
     ["exec_input", "terminal_kill"]` (`Terminal_kill` goes to the worker,
     which kills that session's shell).
   - `Key.t` → `Intent.t` through `Keymap` (the one binding table; `/help`
     prints it). `Mode.t` (`Editing | Picker | Login_prompt | Text_prompt |
-    Confirm | Question | Search`) says who owns the keyboard; dialogs never
-    stack, Esc always closes.
+    Confirm | Question | Sign_in | Search`) says who owns the keyboard;
+    dialogs never stack, Esc always closes.
   - Approvals, shared with prigh-web: `Session_mode` (the approval mode, or
     plan mode, as the status line shows it and as prigh-web's chip names it,
     `title`; Alt+M's cycle; `set_mode`'s parameters), `Confirm_prompt` (a confirmation's title and answers with
@@ -1542,9 +1556,23 @@ copy of the protocol types and the e2e test guards the contract.
   plain `ref`, not Bonsai state, because the handler receives a whole batch
   of events at once and state would only update after the frame, so every key
   in the batch would still see `Idle`.
-  `Term_app.run` sends `hello` (`connection_hello`: with local tools, a
-  `host_id` for the life of the process, also sent on reconnects) before
-  mounting the app and feeds the reply back as `Hello`, whose `client_id`
+  `Backend_link` is the platform's side of the connection: the target (a
+  spawned `serve` or `HOST:PORT`), the credentials and the tool host. The
+  `Client`'s transport factory reads the current target, so reconnects
+  follow switches; `relink` opens the new transport before dropping the old
+  connection (an unreachable server changes nothing), closes the old tool
+  host and makes one for the new target (`-tools` rules as at startup:
+  local for a remote backend unless `-tools` was given), sends `hello` and
+  saves the connection through `Saved_connection` once it is answered
+  (`resolve`'s rules for `/connect`, the new credentials for `/signin`);
+  `sign_out` forgets the token there and in the saved file. A `Closed` seen
+  while a newer transport is attached is dropped (`handle_incoming`), and a
+  reconnect overtaken by a switch gives way.
+  `Term_app.run` sends `hello` (`Backend_link.connection_hello`: with local
+  tools, a `host_id` for the life of the process, also sent on reconnects)
+  before mounting the app; a remote backend refusing the credentials does
+  not stop it (the app starts with `Rejected` and the sign-in dialog).
+  It sends `Server_link`, then the reply as `Hello` and `Start`; `client_id`
   is our host id (`Hello_reply` prefers the reply's `host_id`), so `/host`
   can mark this frontend as "(here)"
   and the status line can show `tools:<host>` when tools run elsewhere or
@@ -1575,8 +1603,8 @@ copy of the protocol types and the e2e test guards the contract.
   report themselves unavailable. A failed first `hello` shows a connect
   form instead (user name, password with a Caps Lock warning; both are
   saved and the selected backend is put in the reloaded page's query
-  string). `/signout` (the `Sign_out` command; the terminal's platform
-  answers that it is browser-only) and the `sign out` button next to `>_`
+  string). `/signout` (the `Sign_out` command; in the terminal it forgets
+  the saved token instead) and the `sign out` button next to `>_`
   forget the login, note it, and reload without `?session=`, so every socket
   is dropped and the next load shows the form instead of connecting. The page's `?session=` follows the current
   session (`history.replaceState`), so a reload rejoins it. The app sits in
@@ -2041,7 +2069,8 @@ copy of the protocol types and the e2e test guards the contract.
   (`$PRIGH_USER`) and `-name`; the flags are remembered in
   `~/.prigh/tui-connection.sexp` (`client_unix/saved_connection.ml`, which
   resolves flag > environment > saved; `-local` ignores it, `-forget`
-  deletes it). `-tools local|remote`
+  deletes it); `/connect`, `/signin` and `/signout` change it from inside
+  (`term/backend_link.ml`). `-tools local|remote`
   says where this session's tools run (local = this machine through
   `tool-host`, the default with `-connect`; remote = the backend, the default
   when spawning, where the two coincide).
@@ -2132,7 +2161,13 @@ Four layers, cheapest first.
    ctrl_o, resize, quit, tools, suspend, editor, confirm, approvals (always
    allow, deny with a reason, Alt+M), plan (plan mode and approving the
    plan), question (`ask_user`), paste, reconnect (the backend is killed;
-   the TUI respawns it and rejoins the session), fallback.
+   the TUI respawns it and rejoins the session), fallback, connect_signin
+   (from a spawned backend to `serve -listen -token`: refused, signed in
+   through the dialog, saved, signed out, back to a local backend) and
+   startup_signin (started against a server that refuses: the dialog).
+   `tui/test/test_backend_link.ml` drives `Backend_link` against in-memory
+   backends (the transports each switch opens, the `hello`s, the saved
+   file, the tool host).
 
 The last two layers are the only ones that exercise the real terminal, and
 they paid for themselves immediately: the tmux layer caught `Ctrl+O` being

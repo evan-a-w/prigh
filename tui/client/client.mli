@@ -37,6 +37,10 @@ val waiting : t -> int
     and [Closed] is delivered; [connect] opens a new one. *)
 val disconnect : t -> unit
 
+(** Determined once there is no transport: [Closed] has been delivered for
+    the one {!disconnect} closed, and {!connect} opens a new one. *)
+val disconnected : t -> unit Deferred.t
+
 (** Fails immediately with "not connected" while disconnected. *)
 val call : t -> string -> (string * Json.t) list -> Json.t Deferred.Or_error.t
 

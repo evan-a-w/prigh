@@ -112,8 +112,15 @@ module Command : sig
         }
     (** After [delay_ms], connect again, send [hello] (rejoining [session], as
         [as_user]) and answer [Reply (Reconnect generation, hello reply)]. *)
+    | Relink of
+        { generation : int
+        ; change : Server_link.Change.t
+        }
+    (** [/connect], [/signin]: switch server or credentials and answer
+        [Relinked]. *)
     | Sign_out
-    (** Forget the stored credentials and offer to log in again (browser only). *)
+    (** Forget the stored credentials (the token, in the terminal) and drop
+        the connection; the browsers reload into their sign-in form. *)
     | Notify of
         { mode : Notify.Mode.t
         ; notification : Notify.t
@@ -136,6 +143,13 @@ module Connection : sig
         ; delay_ms : int
         ; session : string option
         }
+    | Switching of
+        { generation : int
+        ; previous : t (** back to it when the new server cannot be reached *)
+        } (** [/connect] or [/signin] under way *)
+    | Disconnected of { reason : string }
+    (** the server refused us, or we signed out: no retries, until
+        [/signin] or [/connect] *)
   [@@deriving sexp_of, equal]
 
   val delay_ms : attempt:int -> int
@@ -157,6 +171,16 @@ module Action : sig
     (** the local time zone's, for times shown *)
     | Focus of bool (** the terminal reported gaining or losing the focus *)
     | Hello of P.Hello_reply.t (** the [hello] reply *)
+    | Server_link of Server_link.t
+    (** the terminal's backend; where it is reported, [/connect], [/signin]
+        and [/signout] manage it *)
+    | Relinked of
+        { generation : int
+        ; outcome : Server_link.Outcome.t
+        } (** the answer to [Command.Relink] *)
+    | Rejected of string
+    (** the first [hello] was refused: start disconnected, asking to sign
+        in *)
     | Resize of
         { width : int
         ; height : int
@@ -204,6 +228,8 @@ module Model : sig
     ; quitting : bool
     ; utc_offset : Time_ns.Span.t
     ; terminal_focus : Focus.t (** whether the terminal or page has the focus *)
+    ; server : Server_link.t option
+      (** [None] where the platform does not report it (the browsers) *)
     }
   [@@deriving sexp_of]
 

@@ -12,4 +12,5 @@
   async
   prigh_client
   prigh_client_unix
+  prigh_ui
   prigh_ui_term))

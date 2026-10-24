@@ -758,7 +758,7 @@ let%expect_test "typing / lists commands, Down twice + Tab fills /login " =
       /fallback [off|model...]        show or set the models th…
       /default-dir [off|path]         show or set the directory…
       /login [provider] [api_key|oauth]  log in to a provider
-      ↕ 1–8 of 59
+      ↕ 1–8 of 61
     …deepseek-flash  $0.01  Tab/Enter accept · Alt+S as typed
     |}];
   H.key h (Key.plain Down);
@@ -775,7 +775,7 @@ let%expect_test "typing / lists commands, Down twice + Tab fills /login " =
       /fallback [off|model...]        show or set the models th…
       /default-dir [off|path]         show or set the directory…
       /login [provider] [api_key|oauth]  log in to a provider
-      ↕ 1–8 of 59
+      ↕ 1–8 of 61
     …deepseek-flash  $0.01  Tab/Enter accept · Alt+S as typed
     |}];
   H.key h (Key.plain Down);
@@ -792,7 +792,7 @@ let%expect_test "typing / lists commands, Down twice + Tab fills /login " =
       /fallback [off|model...]        show or set the models th…
       /default-dir [off|path]         show or set the directory…
       /login [provider] [api_key|oauth]  log in to a provider
-      ↕ 1–8 of 59
+      ↕ 1–8 of 61
     …deepseek-flash  $0.01  Tab/Enter accept · Alt+S as typed
     |}];
   H.key h (Key.plain Tab);
@@ -7685,7 +7685,7 @@ let%expect_test "Tab on an empty editor opens the command list; the list shows \
       /fallback [off|model...]        show or set the models th…
       /default-dir [off|path]         show or set the directory…
       /login [provider] [api_key|oauth]  log in to a provider
-      ↕ 1–8 of 59
+      ↕ 1–8 of 61
     …deepseek-flash  $0.01  Tab/Enter accept · Alt+S as typed
     |}];
   H.key h (Key.plain End);
@@ -7702,7 +7702,7 @@ let%expect_test "Tab on an empty editor opens the command list; the list shows \
       /fallback [off|model...]        show or set the models th…
       /default-dir [off|path]         show or set the directory…
       /login [provider] [api_key|oauth]  log in to a provider
-      ↕ 1–8 of 59
+      ↕ 1–8 of 61
     …deepseek-flash  $0.01  Tab/Enter accept · Alt+S as typed
     |}];
   H.keys h "qu";

@@ -27,7 +27,8 @@ val navigated : t -> bool
 (** Enter accepts the highlighted item for commands, and for arguments and paths
     once the user has typed a filter or moved the highlight; before that Enter
     runs the command as typed (so [/model] Enter Enter opens the picker rather
-    than silently picking the first model). *)
+    than silently picking the first model). [/connect]'s addresses only
+    once the highlight moved: a partly typed one is an address too. *)
 val accepts_on_enter : t -> bool
 
 val set_items : t -> Picker.Item.t list -> t
@@ -52,6 +53,7 @@ val compute
   -> logged_in:(string -> bool)
   -> default_dir_host:string option
        (** where [/default-dir] lists directories ([None]: the active host) *)
+  -> server:Server_link.t option (** what [/connect] offers *)
   -> t option
 
 (** Directory completion for a whole prompt line (the [/host] directory
