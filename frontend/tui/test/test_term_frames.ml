@@ -14,7 +14,7 @@ open! Expect_test_helpers_async
 open Fixtures
 module P = Prigh_protocol
 module Transport = Prigh_client.Transport
-module Term_app = Prigh_ui_term.Term_app
+module Term_app = Prigh_tui.Term_app
 module Driver = Bonsai_term.Driver
 module Ekey = Bonsai_term.Event.Key
 module Mod = Bonsai_term.Event.Modifier
@@ -57,7 +57,7 @@ module H = struct
   let run ~width ~height f =
     let transport, backend = Transport.In_memory.create () in
     let link =
-      Prigh_ui_term.Backend_link.create
+      Prigh_tui.Backend_link.create
         ~open_transport:(fun _ -> Deferred.Or_error.return transport)
         ~home:"/nonexistent"
         ~backend:"prigh"
@@ -73,7 +73,7 @@ module H = struct
     in
     let%bind () =
       Deferred.Or_error.ok_exn
-        (Prigh_client.Client.connect (Prigh_ui_term.Backend_link.client link))
+        (Prigh_client.Client.connect (Prigh_tui.Backend_link.client link))
     in
     serve backend;
     let%bind `Reader in_r, `Writer _in_w =

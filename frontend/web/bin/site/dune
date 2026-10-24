@@ -114,7 +114,7 @@
 
 (install
  (section share)
- (package prigh_tui)
+ (package prigh_frontend)
  (files
   (index.html as web/index.html)
   (main.bc.js as web/main.bc.js)

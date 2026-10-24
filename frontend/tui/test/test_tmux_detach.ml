@@ -1,6 +1,6 @@
 open! Core
 open! Expect_test_helpers_core
-module D = Prigh_ui_term.Tmux_detach
+module D = Prigh_tui.Tmux_detach
 
 let none (_ : string) = false
 

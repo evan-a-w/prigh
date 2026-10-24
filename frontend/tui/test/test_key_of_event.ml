@@ -6,7 +6,7 @@ module Mod = Bonsai_term.Event.Modifier
 module Position = Bonsai_term.Position
 module Key = Prigh_ui.Key
 module Keymap = Prigh_ui.Keymap
-module Key_of_event = Prigh_ui_term.Key_of_event
+module Key_of_event = Prigh_tui.Key_of_event
 
 let key_press key mods = Event.Key_press { key; mods }
 

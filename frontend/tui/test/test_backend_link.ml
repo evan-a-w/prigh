@@ -5,7 +5,7 @@ open! Core
 open! Async
 open! Expect_test_helpers_core
 open! Expect_test_helpers_async
-module Link = Prigh_ui_term.Backend_link
+module Link = Prigh_tui.Backend_link
 module Client = Prigh_client.Client
 module Transport = Prigh_client.Transport
 module Json = Prigh_protocol.Json

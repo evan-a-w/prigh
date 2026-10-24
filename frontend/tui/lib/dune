@@ -1,5 +1,5 @@
 (library
- (name prigh_ui_term)
+ (name prigh_tui)
  (preprocess
   (pps ppx_jane bonsai.ppx_bonsai))
  (foreign_stubs
