@@ -47,7 +47,7 @@ let%expect_test "flags: bad values name the flag and the fix" =
   prigh t [ "models"; "-provider"; "anthropc" ];
   prigh t [ "serve"; "-listen"; "7777" ];
   prigh t [ "serve"; "-web"; "localhost" ];
-  prigh t [ "serve"; "-prigh-web"; ":99999" ];
+  prigh t [ "serve"; "-web"; ":99999" ];
   prigh t [ "tool-host"; "-connect"; "7777" ];
   [%expect
     {|
@@ -70,8 +70,8 @@ let%expect_test "flags: bad values name the flag and the fix" =
     $ prigh serve -web localhost
     -web must be HOST:PORT such as 127.0.0.1:7788, got "localhost"
     [exit 2]
-    $ prigh serve -prigh-web :99999
-    -prigh-web :99999: the port must be a number from 0 to 65535
+    $ prigh serve -web :99999
+    -web :99999: the port must be a number from 0 to 65535
     [exit 2]
     $ prigh tool-host -connect 7777
     -connect must be HOST:PORT (the backend's -listen or -web address), got "7777"

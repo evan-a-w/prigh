@@ -10,7 +10,7 @@ let storage () =
   |> Option.join
 ;;
 
-let session () = Prigh_ui_web_app.Browser.query_param "session"
+let session () = Browser.query_param "session"
 
 let save key fields =
   Option.iter

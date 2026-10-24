@@ -502,9 +502,9 @@ let open_websocket t ~sw ~port target =
   Websocket.create ~role:`Client ~reader ~flow ()
 ;;
 
-(* Over a real listener: the pi web frontend and the terminal pick their
-   namespace by the [token] in the query. *)
-let%expect_test "pi-web and /terminal look the namespace up by token" =
+(* Over a real listener: the terminal picks its namespace by the [token] in
+   the query. *)
+let%expect_test "/terminal looks the namespace up by token" =
   with_sandbox
   @@ fun t ->
   Eio.Switch.run
@@ -520,7 +520,7 @@ let%expect_test "pi-web and /terminal look the namespace up by token" =
       ~port:0
       ~root:None
       ~websockets:
-        [ "/ws", Pi_rpc.serve_websocket router
+        [ "/ws", Web_server.serve_rpc router
         ; "/terminal", Web_server.serve_terminal router terminals
         ]
       ~on_lines:(Rpc_router.serve_lines router)
@@ -532,40 +532,6 @@ let%expect_test "pi-web and /terminal look the namespace up by token" =
       print_endline (mask t line));
     ws
   in
-  Websocket.close (first "/ws?token=nope");
-  Websocket.close (first "/ws");
-  Websocket.close (first "/ws?token=tok-b&user=a");
-  Websocket.close (first "/ws?token=tok-b&user=b");
-  let ws = first "/ws?token=tok-b" in
-  Websocket.send_text ws {|{"id":"1","type":"get_state"}|};
-  let rec until_response () =
-    match Websocket.read_text ws with
-    | None -> ()
-    | Some line ->
-      if String.is_substring line ~substring:{|"type":"response"|}
-      then (
-        let json = Json.of_string line in
-        print_endline
-          (mask
-             t
-             (Json.to_string
-                (Option.value_exn
-                   (Option.bind
-                      (Json.member "data" json)
-                      ~f:(Json.member "sessionFile"))))))
-      else until_response ()
-  in
-  until_response ();
-  Websocket.close ws;
-  [%expect
-    {|
-    {"type":"prigh_hello_failed","error":"unauthorised: bad user name or password"}
-    {"type":"prigh_hello_failed","error":"unauthorised: bad user name or password"}
-    {"type":"prigh_hello_failed","error":"unauthorised: bad user name or password"}
-    {"type":"extension_ui_request","id":"status-host","method":"setStatus","statusKey":"host","statusText":null}
-    {"type":"extension_ui_request","id":"status-host","method":"setStatus","statusKey":"host","statusText":null}
-    "$DIR/home/.prigh/namespaces/b/.prigh/sessions/<stamp>_<id>.jsonl"
-    |}];
   Websocket.close (first "/terminal?token=nope");
   Websocket.close (first "/terminal?token=tok-b&user=a");
   [%expect
@@ -638,7 +604,7 @@ let%expect_test "pi-web and /terminal look the namespace up by token" =
   drain ();
   [%expect
     {|
-    {"type":"event","event":"terminal_open","host":"client-4","term_id":"term-1","key":"b:<id>","cwd":"/home/me","cols":80,"rows":24}
+    {"type":"event","event":"terminal_open","host":"client-2","term_id":"term-1","key":"b:<id>","cwd":"/home/me","cols":80,"rows":24}
     {"type":"response","id":"r","ok":true,"result":{}}
     {"type":"response","id":"r","ok":true,"result":{}}
     {"type":"exit"}
@@ -936,7 +902,7 @@ let%expect_test "single mode: no users to switch to" =
   Rpc_router.shutdown router
 ;;
 
-let%expect_test "pi-web and /terminal: as_user and /setusr" =
+let%expect_test "/terminal: as_user needs a superuser" =
   with_sandbox
   @@ fun t ->
   Eio.Switch.run
@@ -951,7 +917,7 @@ let%expect_test "pi-web and /terminal: as_user and /setusr" =
       ~port:0
       ~root:None
       ~websockets:
-        [ "/ws", Pi_rpc.serve_websocket router
+        [ "/ws", Web_server.serve_rpc router
         ; "/terminal", Web_server.serve_terminal router terminals
         ]
       ~on_lines:(Rpc_router.serve_lines router)
@@ -962,76 +928,12 @@ let%expect_test "pi-web and /terminal: as_user and /setusr" =
       print_endline (mask t line));
     ws
   in
-  Websocket.close (first "/ws?token=tok-a&as_user=s");
   Websocket.close (first "/terminal?token=tok-a&as_user=s");
-  Websocket.close (first "/ws?token=tok-s&as_user=nobody");
+  Websocket.close (first "/terminal?token=tok-s&as_user=nobody");
   [%expect
     {|
-    {"type":"prigh_hello_failed","error":"unauthorised: a is not a superuser"}
     {"type":"error","message":"unauthorised: bad user name or password"}
-    {"type":"prigh_hello_failed","error":"no user \"nobody\""}
-    |}];
-  (* The session file says whose namespace the connection is in. *)
-  let session_file ws =
-    Websocket.send_text ws {|{"id":"1","type":"get_state"}|};
-    let rec until_response () =
-      match Websocket.read_text ws with
-      | None -> ()
-      | Some line ->
-        if String.is_substring line ~substring:{|"type":"response"|}
-        then
-          print_endline
-            (mask
-               t
-               (Json.to_string
-                  (Option.value_exn
-                     (Option.bind
-                        (Json.member "data" (Json.of_string line))
-                        ~f:(Json.member "sessionFile")))))
-        else until_response ()
-    in
-    until_response ()
-  in
-  let ws = open_websocket t ~sw ~port "/ws?token=tok-s&user=s&as_user=a" in
-  session_file ws;
-  (* /setusr answers with the users, or tells the page to reconnect. *)
-  let prompt text =
-    Websocket.send_text
-      ws
-      (sprintf {|{"id":"p","type":"prompt","message":"%s"}|} text);
-    let rec until_response () =
-      match Websocket.read_text ws with
-      | None -> ()
-      | Some line ->
-        let json = Json.of_string line in
-        (match Json.member "type" json with
-         | Some (`String "prigh_set_user") -> print_endline line
-         | Some (`String "message_end") ->
-           Option.iter
-             (Option.bind
-                (Json.member "message" json)
-                ~f:(Json.member "content"))
-             ~f:(fun content -> print_endline (Json.to_string content))
-         | Some (`String "response") -> print_endline line
-         | _ -> ());
-        if String.is_substring line ~substring:{|"type":"response"|}
-        then ()
-        else until_response ()
-    in
-    until_response ()
-  in
-  prompt "/setusr";
-  prompt "/setusr nobody";
-  prompt "/setusr s";
-  Websocket.close ws;
-  [%expect
-    {|
-    "$DIR/home/.prigh/namespaces/a/.prigh/sessions/<stamp>_<id>.jsonl"
-    "Users (`/setusr NAME` to act as one):\n- a\n- s"
-    {"id":"p","type":"response","command":"prompt","success":true,"data":{}}
-    {"id":"p","type":"response","command":"prompt","success":false,"error":"no user \"nobody\""}
-    {"type":"prigh_set_user","user":"s"}
-    {"id":"p","type":"response","command":"prompt","success":true,"data":{}}
+    {"type":"error","message":"unauthorised: bad user name or password"}
     |}];
   Rpc_router.shutdown router
 ;;

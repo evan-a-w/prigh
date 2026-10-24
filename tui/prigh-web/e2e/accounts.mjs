@@ -29,7 +29,7 @@ writeFileSync(
 
 const server = spawn(
   backend,
-  ["serve", "-prigh-web", "127.0.0.1:0", "-prigh-web-root", site, "-faux-script", join(dir, "script.json"),
+  ["serve", "-web", "127.0.0.1:0", "-web-root", site, "-faux-script", join(dir, "script.json"),
     "-tokens", "alice=a,bob=b", "-superusers", "alice", "-cwd", cwd],
   { env: { ...process.env, HOME: home }, stdio: ["ignore", "ignore", "pipe"] },
 );

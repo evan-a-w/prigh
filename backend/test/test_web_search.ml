@@ -81,15 +81,6 @@ let%expect_test "anthropic: a search streams as a server tool between text" =
        (Option.value_exn
           (Json.member "content" (Rpc_json.message (Assistant message)))))
     ~f:(fun c -> print_endline (Json.to_string c));
-  (* pi-web sees it as text. *)
-  print_endline
-    (Json.to_string
-       (Option.value_exn
-          (Json.member
-             "content"
-             (Pi_protocol.message
-                ~timestamp:0
-                (Rpc_json.message (Assistant message))))));
   List.iter events ~f:(fun e ->
     print_endline (Json.to_string (Rpc_json.delta e)));
   [%expect
@@ -97,7 +88,6 @@ let%expect_test "anthropic: a search streams as a server tool between text" =
     {"type":"text","text":"Let me search."}
     {"type":"server_tool","id":"srvtoolu_1","name":"web_search","input":"{\"query\": \"ocaml eio\"}","output":"1. Eio docs — https://ocaml.org/p/eio (2 days ago)\n2. https://github.com/ocaml-multicore/eio — https://github.com/ocaml-multicore/eio","is_error":false}
     {"type":"text","text":"Eio is an effects-based IO library."}
-    [{"type":"text","text":"Let me search."},{"type":"text","text":"[web_search {\"query\": \"ocaml eio\"}]\n1. Eio docs — https://ocaml.org/p/eio (2 days ago)\n2. https://github.com/ocaml-multicore/eio — https://github.com/ocaml-multicore/eio"},{"type":"text","text":"Eio is an effects-based IO library."}]
     {"type":"text_delta","text":"Let me search."}
     {"type":"server_tool_use","id":"srvtoolu_1","name":"web_search","input":"{\"query\": \"ocaml eio\"}"}
     {"type":"server_tool_result","id":"srvtoolu_1","output":"1. Eio docs — https://ocaml.org/p/eio (2 days ago)\n2. https://github.com/ocaml-multicore/eio — https://github.com/ocaml-multicore/eio","is_error":false}

@@ -1,7 +1,7 @@
 open! Core
 open! Import
 
-(** The Bonsai component both platforms mount. The platform supplies the effects
+(** The Bonsai component the terminal mounts. The platform supplies the effects
     that commands need; everything else is shared. *)
 
 module Platform : sig
@@ -13,9 +13,8 @@ module Platform : sig
     ; open_browser : string -> unit Bonsai.Effect.t
     ; quit : unit Bonsai.Effect.t
     ; sign_out : (unit, string) Result.t Bonsai.Effect.t
-    (** Forgets the saved credentials: the browsers reload into their sign-in
-        form, the terminal disconnects (the app opens its sign-in dialog).
-        The error is shown. *)
+    (** Forgets the saved credentials and disconnects (the app opens its
+        sign-in dialog). The error is shown. *)
     ; load_history : unit -> (P.Json.t, string) Result.t Bonsai.Effect.t
     ; append_history : string -> unit Bonsai.Effect.t
     ; copy_to_clipboard : string -> unit Bonsai.Effect.t
@@ -37,7 +36,7 @@ module Platform : sig
 end
 
 (** [start_on_activate] defaults to true. A driver that must wire input before
-    its first browser frame can disable it and schedule [App.Action.Start]
+    its first frame can disable it and schedule [App.Action.Start]
     itself. *)
 val create
   :  ?start_on_activate:bool

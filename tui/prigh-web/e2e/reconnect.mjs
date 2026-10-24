@@ -40,7 +40,7 @@ const startServer = listen =>
   new Promise((resolve, reject) => {
     server = spawn(
       backend,
-      ["serve", "-prigh-web", listen, "-prigh-web-root", site, "-faux-script", join(dir, "script.json"),
+      ["serve", "-web", listen, "-web-root", site, "-faux-script", join(dir, "script.json"),
         "-token", token, "-cwd", cwd],
       { env: { ...process.env, HOME: home }, stdio: ["ignore", "ignore", "pipe"] },
     );

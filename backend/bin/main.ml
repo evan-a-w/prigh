@@ -458,35 +458,14 @@ let find_root ~env_var ~candidates () =
       Filename_unix.realpath (Filename.concat (Filename.dirname exe) rel))
 ;;
 
+(* prigh-web, the browser frontend (tui/prigh-web/). *)
 let find_web_root =
   find_root
     ~env_var:"PRIGH_WEB_ROOT"
     ~candidates:
-      [ "../../../../tui/_build/default/web-bin/site"
-      ; "../../tui/_build/default/web-bin/site"
-      ; "../share/prigh/web"
-      ]
-;;
-
-(* prigh-web: the DOM frontend (tui/prigh-web/). *)
-let find_prigh_web_root =
-  find_root
-    ~env_var:"PRIGH_PRIGH_WEB_ROOT"
-    ~candidates:
       [ "../../../../tui/_build/default/prigh-web/bin/site"
       ; "../../tui/_build/default/prigh-web/bin/site"
-      ; "../share/prigh/prigh-web"
-      ]
-;;
-
-(* The pi web frontend (pi-web/, built with vite). *)
-let find_pi_web_root =
-  find_root
-    ~env_var:"PRIGH_PI_WEB_ROOT"
-    ~candidates:
-      [ "../../../../pi-web/dist"
-      ; "../../pi-web/dist"
-      ; "../share/prigh/pi-web"
+      ; "../share/prigh/web"
       ]
 ;;
 
@@ -565,43 +544,15 @@ let serve_command =
          "-web"
          (optional string)
          ~doc:
-           "HOST:PORT serve the browser frontend and accept WebSocket clients \
-            (port 0 picks a free one)"
+           "HOST:PORT serve prigh-web (the browser frontend) and accept its \
+            WebSocket clients (port 0 picks a free one)"
      and web_root =
        flag
          "-web-root"
          (optional string)
          ~doc:
-           "DIR the built web frontend (default: $PRIGH_WEB_ROOT or the dune \
+           "DIR the built prigh-web site (default: $PRIGH_WEB_ROOT or the dune \
             build)"
-     and prigh_web =
-       flag
-         "-prigh-web"
-         (optional string)
-         ~doc:
-           "HOST:PORT serve prigh-web (the DOM browser frontend) and accept \
-            its WebSocket clients"
-     and prigh_web_root =
-       flag
-         "-prigh-web-root"
-         (optional string)
-         ~doc:
-           "DIR the built prigh-web site (default: $PRIGH_PRIGH_WEB_ROOT or \
-            the dune build)"
-     and pi_web =
-       flag
-         "-pi-web"
-         (optional string)
-         ~doc:
-           "HOST:PORT serve the pi web frontend (pi-web/) and accept its \
-            WebSocket clients, speaking pi's RPC protocol"
-     and pi_web_root =
-       flag
-         "-pi-web-root"
-         (optional string)
-         ~doc:
-           "DIR the built pi web frontend (default: $PRIGH_PI_WEB_ROOT or \
-            pi-web/dist)"
      and open_browser =
        flag "-open" no_arg ~doc:" open the web frontend in a browser"
      in
@@ -676,18 +627,11 @@ let serve_command =
        in
        let listen = Option.map listen ~f:(parse_listen_addr ~flag:"-listen") in
        let web = Option.map web ~f:(parse_listen_addr ~flag:"-web") in
-       let prigh_web =
-         Option.map prigh_web ~f:(parse_listen_addr ~flag:"-prigh-web")
-       in
-       let pi_web = Option.map pi_web ~f:(parse_listen_addr ~flag:"-pi-web") in
-       let browser_ui =
-         Option.is_some web || Option.is_some prigh_web || Option.is_some pi_web
-       in
-       if open_browser && not browser_ui
+       if open_browser && Option.is_none web
        then (
-         eprintf "-open needs -web, -prigh-web or -pi-web\n";
+         eprintf "-open needs -web\n";
          exit 2);
-       let stdio = stdio || (Option.is_none listen && not browser_ui) in
+       let stdio = stdio || (Option.is_none listen && Option.is_none web) in
        Eio_main.run
        @@ fun env ->
        Eio.Switch.run
@@ -772,24 +716,28 @@ let serve_command =
              (fun flow _addr ->
                 Web_server.keepalive flow;
                 Rpc_router.serve_connection router ~input:flow ~output:flow)));
-       let serve_web
-             ~label
-             ~flag
-             ~root
-             ~root_flag
-             ~env_var
-             ~websockets
-             (addr, port)
-         =
+       Option.iter web ~f:(fun (addr, port) ->
+         (* Any terminal of a session is the same shell, whichever tab opens it. *)
+         let terminals = Terminals.create ~env ~sw () in
+         List.iter (Rpc_router.servers router) ~f:(fun (_, server) ->
+           Rpc_server.on_session_deleted server ~f:(Terminals.kill terminals));
+         let root =
+           match web_root with
+           | Some dir -> Some dir
+           | None -> find_web_root ()
+         in
          let port =
-           listen_or_exit ~flag (addr, port) (fun () ->
+           listen_or_exit ~flag:"-web" (addr, port) (fun () ->
              Web_server.listen
                ~env
                ~sw
                ~addr
                ~port
                ~root
-               ~websockets
+               ~websockets:
+                 [ "/ws", Web_server.serve_rpc router
+                 ; "/terminal", Web_server.serve_terminal router terminals
+                 ]
                ~on_lines:(Rpc_router.serve_lines router))
          in
          let host =
@@ -799,79 +747,15 @@ let serve_command =
            | host -> host
          in
          let url = Web_server.browser_url ~host ~port in
-         eprintf "prigh: %s on %s\n%!" label url;
+         eprintf "prigh: prigh-web on %s\n%!" url;
          (match root with
-          | Some root ->
-            eprintf "prigh: serving %s assets from %s\n%!" label root
+          | Some root -> eprintf "prigh: serving prigh-web from %s\n%!" root
           | None ->
             eprintf
-              "prigh: no %s assets found (%s or $%s); only WebSockets are served\n\
-               %!"
-              label
-              root_flag
-              env_var);
-         url
-       in
-       (* Shared, so both UIs on one session see the same shell. *)
-       let terminals = Terminals.create ~env ~sw () in
-       List.iter (Rpc_router.servers router) ~f:(fun (_, server) ->
-         Rpc_server.on_session_deleted server ~f:(Terminals.kill terminals));
-       let terminal = Web_server.serve_terminal router terminals in
-       let opened = ref false in
-       let maybe_open url =
-         if open_browser && not !opened
-         then (
-           opened := true;
-           open_in_browser url)
-       in
-       Option.iter web ~f:(fun addr ->
-         let root =
-           match web_root with
-           | Some dir -> Some dir
-           | None -> find_web_root ()
-         in
-         serve_web
-           ~label:"web ui"
-           ~flag:"-web"
-           ~root
-           ~root_flag:"-web-root"
-           ~env_var:"PRIGH_WEB_ROOT"
-           ~websockets:
-             [ "/ws", Web_server.serve_rpc router; "/terminal", terminal ]
-           addr
-         |> maybe_open);
-       Option.iter prigh_web ~f:(fun addr ->
-         let root =
-           match prigh_web_root with
-           | Some dir -> Some dir
-           | None -> find_prigh_web_root ()
-         in
-         serve_web
-           ~label:"prigh-web"
-           ~flag:"-prigh-web"
-           ~root
-           ~root_flag:"-prigh-web-root"
-           ~env_var:"PRIGH_PRIGH_WEB_ROOT"
-           ~websockets:
-             [ "/ws", Web_server.serve_rpc router; "/terminal", terminal ]
-           addr
-         |> maybe_open);
-       Option.iter pi_web ~f:(fun addr ->
-         let root =
-           match pi_web_root with
-           | Some dir -> Some dir
-           | None -> find_pi_web_root ()
-         in
-         serve_web
-           ~label:"pi-web"
-           ~flag:"-pi-web"
-           ~root
-           ~root_flag:"-pi-web-root"
-           ~env_var:"PRIGH_PI_WEB_ROOT"
-           ~websockets:
-             [ "/ws", Pi_rpc.serve_websocket router; "/terminal", terminal ]
-           addr
-         |> maybe_open);
+              "prigh: no prigh-web site found (-web-root or $PRIGH_WEB_ROOT); \
+               only WebSockets are served\n\
+               %!");
+         if open_browser then open_in_browser url);
        if stdio
        then (
          Rpc_router.serve_connection
