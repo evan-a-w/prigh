@@ -151,10 +151,10 @@ enough once a connection is saved:
 
 A server that refuses the credentials (saved, from the flags or none) at
 startup, or after a reconnect, no longer stops the TUI: it shows the
-sign-in dialog. Escaped, the TUI stays disconnected and the status line
-says `not signed in to HOST:PORT · /signin signs in · /connect switches
-server`; while connected to a remote backend it shows `server:HOST:PORT`
-next to `user:`. `/login` and `/logout` are unrelated: they manage model
+sign-in dialog. Escaped, the TUI stays disconnected: the header and the
+status bar say `offline` and the composer's rule `not signed in to
+HOST:PORT · /signin signs in · /connect switches server`; while connected to
+a remote backend the header shows `HOST:PORT` after the cwd. `/login` and `/logout` are unrelated: they manage model
 provider credentials.
 
 By default a connected frontend runs the session's tools (bash, file
@@ -692,6 +692,42 @@ backend/_build/default/bin/main.exe sessions prune -max-messages 2 -cwd /tmp    
 backend/_build/default/bin/main.exe serve      # JSON-lines RPC on stdio
 ```
 
+### The screen
+
+The terminal UI is laid out in fixed zones, top to bottom:
+
+- the **header**: `prigh`, the session's name, and on the right the
+  home-relative cwd (with the git branch) and the server when it is remote
+  (`reconnecting` or `offline` when the connection is down);
+- the **transcript**; on terminals of 120 columns and more an agents
+  **sidebar** on its left lists the main agent, the subagents and the
+  background jobs, each with a dot (green running, yellow waiting for you,
+  red failed, gray done or idle) and a dim line of what it is doing.
+  Alt+L hides or shows it (for the run); the focused agent is marked;
+- the **composer**: a rule carrying the current mode's keys on the left
+  (`⠋ writing · Esc aborts · Enter steers`, a picker's or dialog's keys) and
+  the latest notice on the right, then the editor, which grows with
+  multi-line input up to a cap and then scrolls;
+- the **status bar** (below).
+
+Pickers, the completion popup, confirmations, questions, the sign-in and
+login dialogs, `/btw`, the queued messages and long command output
+(`/help`, `/diff`, `/stats`, `/mcp`, job output, ...) are boxes drawn over the
+bottom of the transcript, just above the composer: opening or closing them
+never moves the editor, the cursor (unless typing goes into the box) or the
+status bar, and only the editor's own growth resizes the transcript. Long
+output scrolls with Up/Down/PageUp/PageDown, Esc or Enter closes it, and
+typing closes it into the editor.
+
+Acknowledgements (`view: verbose`, `copied 120 chars`, `model: x`, usage
+errors, `cancelled`, a failed command) are not transcript content: they show
+in the composer's rule (in a box above it when too long) until the next key
+press, Esc, or a few seconds pass. What belongs to the session's history
+stays in the transcript: your messages, the agent's replies, tool calls and
+results, the agent's errors, tool approvals (`allowed bash`), the backend's
+notices (compaction, hand-overs, retries), a lost connection and a session
+that no longer exists.
+
 ### Keys
 
 | Key | Action |
@@ -734,6 +770,7 @@ backend/_build/default/bin/main.exe serve      # JSON-lines RPC on stdio
 | Ctrl+Z | suspend to the shell |
 | Shift+Tab | cycle subagent focus: main → agent 1 → … → main |
 | Alt+1…9 | focus agent N |
+| Alt+L | show or hide the agents sidebar (120 columns and more) |
 | Ctrl+C | clear the editor, or abort the running turn; again to quit |
 | Ctrl+D | quit |
 
@@ -771,23 +808,24 @@ them`); Esc goes back to the list unchanged. Afterwards a notice says what
 was deleted and why any session was not (it is running, open in another
 frontend, or the one you are in).
 
-The status line is quiet gray: cwd, model, `think:`, `view:`, the context
-(`ctx:12%/200k`, the share of the model's window; yellow from 50%, red from
-80%), cost (`$1.20/$5.00` against a budget: yellow from 80%, red once
-spent), and then whatever is going on — the goal (`goal:3/20`,
-`goal:done`, `goal:stopped`), the session's reminders (`remind:2`), a
-scheduled resume (`resumes 14:05`),
-`queued:N`, `to answer:N` (confirmations and questions waiting behind an
-open dialog, in yellow), `retry:2/6` (the model failed transiently and is
-asked again; the transcript notes why), agents, jobs, the tool host — with
-the current mode's keys and what the agent is doing (`⠋ thinking · Esc
-aborts · Enter steers`, with `waiting for the model`, `writing`, `running
-tools` or `retrying in 4s`; a picker's keys) in yellow. `think:` and `mode:` are always there
-(at narrow widths they outlast the cost and the cwd; `view:` gives way to
-the cwd first). Queued steers and follow-ups (whichever frontend queued
-them) are listed above the editor, one per line, until they are delivered:
-Alt+Up takes the last back into the editor, and `/queue` picks any of them
-(Enter edits it, Ctrl+D removes it). An unknown command
+The status bar is quiet gray, its segments in a fixed order. On the left:
+the model, `think:`, `mode:`, `view:`, `user:`, the tool host, the plan, the
+goal (`goal:3/20`, `goal:done`, `goal:stopped`), the session's reminders
+(`remind:2`), a scheduled resume (`resumes 14:05`), `retry:2/6` (the model
+failed transiently and is asked again; the transcript notes why) and
+`to answer:N` (confirmations and questions waiting behind an open dialog, in
+yellow). On the right: the scroll position (`↑ scrolled`, `↓ 3 new`),
+`queued:N`, agents, jobs, the context as a meter and a share of the model's
+window (`ctx ▰▱▱▱▱ 12%/200k`; yellow from 50%, red from 80%) and the cost
+(`$1.20/$5.00` against a budget: yellow from 80%, red once spent). When the
+terminal is narrow whole segments give way, the least important first
+(`view:`, then `user:`, `think:`, ...); the model is never cut. What the
+agent is doing (`⠋ thinking`, `waiting for the model`, `writing`, `running
+tools`, `retrying in 4s`) and the keys are in the composer's rule. Queued
+steers and follow-ups (whichever frontend queued them) are listed in a box
+above the composer until they are delivered: Alt+Up takes the last back into
+the editor, and `/queue` picks any of them (Enter edits it, Ctrl+D removes
+it). An unknown command
 goes back into the editor as typed, the error naming the closest command
 (`/modle gpt`: did you mean `/model`?), and a failed `/switch` or `/cd` puts
 the command back with what to try next.
@@ -1228,7 +1266,7 @@ text. Sessions written before this are recognised by their wording and
 shown the same way.
 
 `/btw` works while a turn is running: one extra model call (no tools) answers
-from the session's current context, streaming into a box above the editor
+from the session's current context, streaming into a box above the composer
 that Esc dismisses (without aborting the run). The question and answer are
 never added to the conversation; their cost counts towards the session's.
 
