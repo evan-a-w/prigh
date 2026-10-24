@@ -1,5 +1,24 @@
 # Nix environment notes
 
+## Known OxCaml issues
+
+Bugs and gaps in OxCaml (`5.2.0+ox`, all still present on OxCaml `main`
+when found) that we work around. When upgrading OxCaml, recheck each one
+and drop the workaround once it is fixed; none has been reported upstream
+yet.
+
+| Issue | Kind | Symptom | Workaround | Details |
+|---|---|---|---|---|
+| `Ifloatarithmem` drops its second addressing register (`backend/amd64/cfg_selection.ml`) | compiler (amd64 codegen, non-AVX) | `Invalid_argument("index out of bounds")` compiling `r.(i) +. r.(j)` on a `float array` | `fix-floatarithmem.patch` on the compiler | below |
+| A signal arriving while `caml_enter_blocking_section` releases the domain lock is only handled when the blocking section ends (upstream re-checks after the release) | runtime | event loops woken by signal handlers sleep forever: eio_posix never reaps an exited child (zombie, scheduler idle in `ppoll`); seen as backend tests hanging in `test_git_review.ml` | `iomux 0.4+prigh`; regression test "eio_posix reaps every child promptly" in `backend/test/test_process.ml` | `opam-repository/` below |
+| `eio 1.3+ox`'s `url` is a commit of `oxcaml/eio` on no branch | packaging | Nix `fetchGit` cannot fetch it | plain `eio 1.5` | `prigh-ox-pins.nix` below |
+| `zarith 1.12+ox3` lacks the `*_unsigned` conversions | packaging (old zarith) | `mirage-crypto-pk 2.x` does not compile | `mirage-crypto-pk 2.4.1+prigh` | `opam-repository/` below |
+
+To check the runtime one on a new OxCaml: run the backend tests with
+`EIO_BACKEND=posix` and the iomux patch removed; `test_process.ml` fails
+(unreaped children) while the bug is present. The io_uring backend
+(eio_linux, the default on Linux) is not affected, so default runs hide it.
+
 ## `fix-floatarithmem.patch`
 
 OxCaml `5.2.0+ox` (and `main`) has a native-codegen bug in
