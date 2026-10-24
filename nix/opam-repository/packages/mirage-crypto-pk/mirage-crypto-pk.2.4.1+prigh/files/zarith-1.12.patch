@@ -1,0 +1,29 @@
+--- a/pk/z_extra.ml
++++ b/pk/z_extra.ml
+@@ -6,11 +6,11 @@
+   let rec loop acc i = function
+     | b when b >= 64 ->
+       let x = String.get_int64_be buf i in
+-      let x = Z.of_int64_unsigned Int64.(shift_right_logical x 8) in
++      let x = Z.of_int64 Int64.(shift_right_logical x 8) in
+       loop Z.(x + acc lsl 56) (i + 7) (b - 56)
+     | b when b >= 32 ->
+       let x = String.get_int32_be buf i in
+-      let x = Z.of_int32_unsigned Int32.(shift_right_logical x 8) in
++      let x = Z.of_int32 Int32.(shift_right_logical x 8) in
+       loop Z.(x + acc lsl 24) (i + 3) (b - 24)
+     | b when b >= 16 ->
+       let x = Z.of_int (String.get_uint16_be buf i) in
+@@ -34,10 +34,10 @@
+ let into_octets_be n buf =
+   let rec write n = function
+     | i when i >= 7 ->
+-      Bytes.set_int64_be buf (i - 7) Z.(to_int64_unsigned (n land byte7)) ;
++      Bytes.set_int64_be buf (i - 7) Z.(to_int64 (n land byte7)) ;
+       write Z.(n asr 56) (i - 7)
+     | i when i >= 3 ->
+-      Bytes.set_int32_be buf (i - 3) Z.(to_int32_unsigned (n land byte3)) ;
++      Bytes.set_int32_be buf (i - 3) Z.(to_int32 (n land byte3)) ;
+       write Z.(n asr 24) (i - 3)
+     | i when i >= 1 ->
+       Bytes.set_uint16_be buf (i - 1) Z.(to_int (n land byte2)) ;

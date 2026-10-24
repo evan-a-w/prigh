@@ -422,7 +422,7 @@ end
 let normalise s = String.strip (Lenient_match.ascii_punctuation s)
 
 let matchers =
-  [ Fn.id; String.rstrip ?drop:None; String.strip ?drop:None; normalise ]
+  [ Fn.id; (fun s -> String.rstrip s); (fun s -> String.strip s); normalise ]
 ;;
 
 (* The index of the first occurrence of [pattern] in [lines] at or after

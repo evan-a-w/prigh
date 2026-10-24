@@ -20,10 +20,11 @@ in.
 ## Build
 
 ```
-# backend: vanilla OCaml 5.3, core, eio, cohttp-eio, jsonaf
-nix develop .#backend -c sh -c 'cd backend && dune build @runtest'
+# both build with OxCaml 5.2 in the one dev shell
+# backend: core, eio, cohttp-eio, jsonaf
+nix develop -c sh -c 'cd backend && dune build && dune build @runtest'
 
-# frontend: OxCaml 5.2 + bonsai_term (the default dev shell)
+# frontend: bonsai_term, bonsai_web
 nix develop -c sh -c 'cd tui && dune build @runtest'
 # @runtest includes the e2e and tmux tests against the backend binary built above,
 # and the web-layer tests (they run under node, via js_of_ocaml)
@@ -31,9 +32,10 @@ nix develop -c sh -c 'cd tui && dune build @runtest'
 nix build               # result/bin/prigh wrapper (includes backend + TUI)
 ```
 
-The two need different compilers, so build each in its own shell. Without
-Nix, opam switches with the same packages work too (`backend/prigh.opam`,
-`tui/prigh_tui.opam`; the OxCaml one needs `nix/fix-floatarithmem.patch`).
+Without Nix, an OxCaml opam switch with the same packages works too
+(`backend/prigh.opam`, `tui/prigh_tui.opam`), with the compiler patch
+`nix/fix-floatarithmem.patch` and the package patches in
+`nix/opam-repository` (add it as an opam repository; see `nix/README.md`).
 
 ## Running under Nix
 
@@ -52,8 +54,7 @@ nix build                            # result/bin/prigh
 nix build .#backend                  # backend only: result/bin/prigh
 nix build .#tui                      # TUI only: result/bin/prigh-tui
 
-nix develop                          # TUI toolchain (OxCaml)
-nix develop .#backend                # backend toolchain (OCaml 5.3)
+nix develop                          # the toolchain (OxCaml) for backend/ and tui/
 ```
 
 `prigh -web [serve options]` runs the backend with the browser frontend
