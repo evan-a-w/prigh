@@ -653,15 +653,14 @@ let%expect_test "update_plan: the plan is session state, checked and restored" =
     mode=auto plan=none rules=[]
     mode=auto plan=read the code:completed,change it:in_progress,test:pending rules=[]
     update_plan {"explanation":"first pass","plan":[{"step":"read the code", -> Plan updated (1 of 3 steps completed)
-    update_plan {"plan":[{"step":"a","status":"in_progress"},{"step":"b","st -> ERROR 2 steps are in_progress; at most one step can be in progress at a time
+    mode=auto plan=a:in_progress,b:in_progress rules=[]
+    update_plan {"plan":[{"step":"a","status":"in_progress"},{"step":"b","st -> Plan updated (0 of 2 steps completed)
     update_plan {"plan":[{"step":"a","status":"done"}]} -> ERROR plan[0].status is "done"; use pending, in_progress or completed
-    (((explanation ("first pass"))
-      (steps
-       (((step "read the code") (status Completed))
-        ((step "change it") (status In_progress)) ((step test) (status Pending))))))
+    (((explanation ())
+      (steps (((step a) (status In_progress)) ((step b) (status In_progress))))))
     mode=auto plan=none rules=[]
     update_plan {"plan":[]} -> Plan cleared
-    mode=auto plan=read the code:completed,change it:in_progress,test:pending rules=[]
+    mode=auto plan=a:in_progress,b:in_progress rules=[]
     |}]
 ;;
 

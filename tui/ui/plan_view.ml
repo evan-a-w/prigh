@@ -11,6 +11,14 @@ let status (plan : P.Plan.t) =
       Option.value_map (P.Plan.current plan) ~default:"" ~f:(fun s ->
         ": " ^ s.step)
     in
+    let current =
+      match
+        List.count plan.steps ~f:(fun s ->
+          P.Plan.Status.equal s.status In_progress)
+      with
+      | n when n > 1 -> sprintf "%s (+%d running)" current (n - 1)
+      | _ -> current
+    in
     Some (sprintf "plan %d/%d%s" completed total current))
 ;;
 
