@@ -22,6 +22,11 @@ prigh is a coding agent. Read `README.md` for what it does and
   projects: run dune in `backend/` or `tui/`.
 - Backend tests use Eio's io_uring backend where the kernel allows it;
   `EIO_BACKEND=posix` selects the poll-based one (the only one on macOS).
+- OxCaml has bugs we work around (a codegen bug, a signal race that hangs
+  eio_posix, packaging gaps): "Known OxCaml issues" in `nix/README.md`
+  lists them. Check it when something misbehaves only under OxCaml or on
+  the posix backend, add new ones there, and recheck them when upgrading
+  OxCaml.
 - `tui/`'s `@runtest` includes the e2e and tmux tests, which run
   `backend/_build/default/bin/main.exe`: build the backend first (`dune
   build`, not just `@runtest`, which does not rebuild `main.exe`). Dune does
