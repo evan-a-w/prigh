@@ -41,7 +41,7 @@ start() {
 	session="prigh-test-$$-$RANDOM"
 	{
 		echo "export HOME=$tmp/home TERM=xterm-256color EDITOR=$tmp/editor.sh PRIGH_BACKEND=$backend"
-		echo "$exe -faux -cwd $tmp/cwd -auth-file $tmp/home/auth.json $*"
+		echo "$exe ${tui_args:--faux} -cwd $tmp/cwd -auth-file $tmp/home/auth.json $*"
 		echo "echo EXITED"
 		echo "stty -a | tr ' ;' '\\n\\n' | grep -E '^-?(icanon|echo|iexten|isig|ixon)\$' | tr '\\n' ' '; echo"
 	} >"$tmp/run.sh"
@@ -58,6 +58,7 @@ start() {
 
 stop() {
 	tmux kill-server 2>/dev/null || true
+	if [ -n "${server_pid:-}" ]; then kill "$server_pid" 2>/dev/null || true; fi
 	rm -f "${TMUX_TMPDIR:-/tmp}/tmux-$(id -u)/$socket"
 	rm -rf "$tmp"
 }
@@ -94,6 +95,8 @@ settle() {
 normalise() {
 	sed -E \
 		-e "s#$tmp#\$TMP#g" \
+		-e "s#:${port:-NOPORT}([^0-9]|\$)#:<port>\\1#g" \
+		-e 's/tools now run on [^ ]+ in/tools now run on <host> in/' \
 		-e 's/[⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏]/<spin>/g' \
 		-e 's/session [0-9a-f]{16}/session <id>/g' \
 		-e 's/[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9:.]+Z?/<time>/g' \
@@ -114,6 +117,7 @@ run_scenario() {
 	# Fixed length, so that lines wrap the same everywhere.
 	tmp="$(mktemp -d /tmp/prigh-tmux.XXXXXX)"
 	extra_args=""
+	tui_args=""
 	interactive=""
 	if declare -F "setup_$name" >/dev/null; then "setup_$name"; fi
 	start $extra_args
@@ -600,6 +604,85 @@ scenario_reconnect_dialog() {
 	wait_for "reconnected to the backend"
 	settle
 	capture reconnect_dialog "reconnected: the dialog closed"
+}
+
+# From a spawned backend to `prigh serve -listen -token`: refused without
+# the token, signed in through the dialog (saved), signed out, and back to a
+# local backend.
+setup_connect_signin() {
+	port=$((20000 + RANDOM % 20000))
+	mkdir -p "$tmp/server-home" "$tmp/server-cwd"
+	HOME="$tmp/server-home" "$backend" serve -faux -listen "127.0.0.1:$port" \
+		-token s3cret -cwd "$tmp/server-cwd" \
+		-auth-file "$tmp/server-home/auth.json" >"$tmp/server.log" 2>&1 &
+	server_pid=$!
+	local i
+	for i in $(seq 1 100); do
+		if (echo >"/dev/tcp/127.0.0.1/$port") 2>/dev/null; then return 0; fi
+		sleep 0.1
+	done
+	echo "  the server did not start:"
+	cat "$tmp/server.log"
+	return 1
+}
+
+saved_connection() {
+	local file="$tmp/home/.prigh/tui-connection.sexp"
+	echo "=== saved ($(stat -c %a "$file"))"
+	normalise <"$file"
+}
+
+scenario_connect_signin() {
+	wait_for "Ctrl+C"
+	type_text "/connect 127.0.0.1:$port"
+	keys Enter
+	wait_for "Sign in to"
+	settle
+	capture connect_signin "refused: the sign-in dialog"
+	# A -token server has no users: straight to the token.
+	keys Tab
+	type_text "s3cret"
+	settle
+	capture connect_signin "the token, masked"
+	keys Enter
+	wait_for "connected to 127.0.0.1"
+	settle
+	capture connect_signin "signed in"
+	saved_connection
+	type_text "/signout"
+	keys Enter
+	wait_for "signed out of"
+	settle
+	capture connect_signin "signed out"
+	saved_connection
+	keys Escape
+	settle
+	capture connect_signin "closed: disconnected"
+	type_text "/connect local"
+	keys Enter
+	wait_for "connected to a local backend"
+	settle
+	capture connect_signin "a local backend again"
+}
+
+# Started against a server that wants a token we do not have: the TUI
+# comes up with the sign-in dialog instead of exiting.
+setup_startup_signin() {
+	setup_connect_signin
+	tui_args="-connect 127.0.0.1:$port"
+}
+
+scenario_startup_signin() {
+	wait_for "Sign in to"
+	settle
+	capture startup_signin "refused at startup"
+	keys Tab
+	type_text "s3cret"
+	keys Enter
+	wait_for "connected to 127.0.0.1"
+	settle
+	capture startup_signin "signed in"
+	saved_connection
 }
 
 run_scenario "$1"

@@ -13,12 +13,13 @@ module Result_ : sig
     }
 end
 
-(** The reusable Bonsai app construction. [run] mounts it against a spawned
-    backend; tests mount it against an in-memory transport. *)
+(** The reusable Bonsai app construction. [run] mounts it against the real
+    backend; tests mount it against an in-memory transport. The platform's
+    connection effects ([reconnect], [/connect], [/signin], [/signout]) act
+    on [link]. *)
 val app
-  :  ?tool_host:Prigh_client_unix.Tool_host.t
-  -> Prigh_client.Client.t
-  -> hello:(string * Prigh_protocol.Json.t) list
+  :  ?start_on_activate:bool
+  -> Backend_link.t
   -> exit:(unit -> unit Bonsai.Effect.t)
   -> quit_requested:unit Ivar.t
   -> dimensions:Dimensions.t Bonsai.t
@@ -44,7 +45,7 @@ module Test_terminal : sig
 end
 
 val with_test_driver
-  :  client:Prigh_client.Client.t
+  :  link:Backend_link.t
   -> terminal:Test_terminal.t
   -> writer:Async.Writer.t
   -> reader:Async.Reader.t
@@ -52,40 +53,7 @@ val with_test_driver
       -> 'a Async.Deferred.Or_error.t)
   -> 'a Async.Deferred.Or_error.t
 
-(** The [hello] sent on every connection: [hello] plus [tools], [true] with
-    a [host_id] (this machine's, see {!Prigh_client_unix.Host_id}), so that
-    the backend knows our tool host again when we reconnect or restart (and
-    resumes its sessions on it), and the [features] our tool host has
-    ([exec_input]: it forwards [Tool_exec_input] to running tools). *)
-val connection_hello
-  :  (string * Prigh_protocol.Json.t) list
-  -> host_id:string option
-  -> (string * Prigh_protocol.Json.t) list
-
-(** Connects [client] again after [delay_ms] and sends [hello], with
-    [session] and [as_user] replacing those fields; the [hello] reply. With
-    [tool_host], [hello] names the executions it still runs
-    ([running_execs]), so that the backend keeps them, and once it is
-    answered, what the tool host held while offline goes out. *)
-val reconnect
-  :  ?tool_host:Prigh_client_unix.Tool_host.t
-  -> Prigh_client.Client.t
-  -> hello:(string * Prigh_protocol.Json.t) list
-  -> delay_ms:int
-  -> session:string option
-  -> as_user:string option
-  -> (Prigh_protocol.Json.t, string) Result.t Deferred.t
-
-(** Runs the TUI until the user quits. [connect] opens the transport (and is
-    called again to reconnect after the backend goes away); [hello] is sent on
-    every connection (name, cwd, session, token, ...), with [session] replaced
-    by the current one when reconnecting. With [local_tools] (the path of the
-    prigh binary) the session's tools run on this machine through
-    [prigh tool-host] and [hello] advertises [tools: true] and this
-    machine's [host_id] ({!connection_hello}; a notice says so when it cannot
-    be kept). *)
-val run
-  :  connect:(unit -> Prigh_client.Transport.t Deferred.Or_error.t)
-  -> hello:(string * Prigh_protocol.Json.t) list
-  -> local_tools:string option
-  -> unit Deferred.Or_error.t
+(** Connects ({!Backend_link.start}) and runs the TUI until the user quits.
+    A remote backend that rejects the credentials does not stop it: it starts
+    disconnected, with the sign-in dialog open. *)
+val run : Backend_link.t -> unit Deferred.Or_error.t

@@ -4,6 +4,7 @@ open Bonsai_term
 open Bonsai.Let_syntax
 module App = Prigh_ui.App
 module Client = Prigh_client.Client
+module Server_link = Prigh_ui.Server_link
 
 module Result_ = struct
   type t =
@@ -174,63 +175,8 @@ let edit_externally text =
     Error ("editor failed: " ^ Core_unix.Exit_or_signal.to_string_hum status)
 ;;
 
-let hello_params hello ~session ~as_user =
-  let set name value params =
-    match value with
-    | None -> params
-    | Some v ->
-      List.Assoc.remove params ~equal:String.equal name @ [ name, `String v ]
-  in
-  hello
-  |> List.filter ~f:(fun (name, _) -> not (String.equal name "as_user"))
-  |> set "session" session
-  |> set "as_user" as_user
-;;
-
-let hello_error = Result.map_error ~f:Error.to_string_hum
-
-let send_hello client hello ~session ~as_user =
-  Deferred.map
-    (Client.call client "hello" (hello_params hello ~session ~as_user))
-    ~f:hello_error
-;;
-
-(* Our tool host's executions that are still running carry on: the backend
-   keeps them for a host that comes back with them, and what the worker
-   answered meanwhile goes out once the backend knows us again. *)
-let reconnect ?tool_host client ~hello ~delay_ms ~session ~as_user =
-  let%bind.Deferred () =
-    Clock.after (Time_float.Span.of_ms (Float.of_int delay_ms))
-  in
-  match%bind.Deferred Client.connect client with
-  | Error e -> Deferred.return (Error (Error.to_string_hum e))
-  | Ok () ->
-    let running =
-      Option.value_map
-        tool_host
-        ~default:[]
-        ~f:Prigh_client_unix.Tool_host.running_execs
-    in
-    let hello =
-      if List.is_empty running
-      then hello
-      else
-        hello
-        @ [ ( "running_execs"
-            , `Array (List.map running ~f:(fun id -> `String id)) )
-          ]
-    in
-    let%map.Deferred reply = send_hello client hello ~session ~as_user in
-    if Result.is_ok reply
-    then
-      Option.iter tool_host ~f:(fun host ->
-        Prigh_client_unix.Tool_host.set_online host true);
-    reply
-;;
-
-let platform ?tool_host client ~hello ~exit ~quit_requested
-  : Prigh_ui.Component.Platform.t
-  =
+let platform link ~exit ~quit_requested : Prigh_ui.Component.Platform.t =
+  let client = Backend_link.client link in
   { rpc =
       (fun method_ params ->
         Effect.of_deferred_fun
@@ -259,14 +205,13 @@ let platform ?tool_host client ~hello ~exit ~quit_requested
   ; reconnect =
       (fun ~delay_ms ~session ~as_user ->
         Effect.of_deferred_fun
-          (fun () ->
-            reconnect ?tool_host client ~hello ~delay_ms ~session ~as_user)
+          (fun () -> Backend_link.reconnect link ~delay_ms ~session ~as_user)
           ())
+  ; relink =
+      (fun change ->
+        Effect.of_deferred_fun (fun () -> Backend_link.relink link change) ())
   ; sign_out =
-      Effect.return
-        (Error
-           "/signout is only available in the browser; to log in as another \
-            user, restart prigh-tui with -user and -token")
+      Effect.of_deferred_fun (fun () -> Backend_link.sign_out link) ()
   ; quit =
       (* Bonsai_term's [Driver.finished] never resolves when [exit] is scheduled
          from apply_action (the next frame sees the exit status before any event
@@ -288,18 +233,17 @@ module Paste = struct
 end
 
 let app
-  ?tool_host
-  client
-  ~hello
+  ?start_on_activate
+  link
   ~exit
   ~quit_requested
   ~(dimensions : Dimensions.t Bonsai.t)
   (local_ graph)
   =
-  let platform =
-    Bonsai.return (platform ?tool_host client ~hello ~exit ~quit_requested)
+  let platform = Bonsai.return (platform link ~exit ~quit_requested) in
+  let model, inject =
+    Prigh_ui.Component.create ?start_on_activate platform graph
   in
-  let model, inject = Prigh_ui.Component.create platform graph in
   let home = Option.value (Sys.getenv "HOME") ~default:"." in
   (* The local zone's offset: [mktime] reads UTC's broken-down time as
      local. *)
@@ -390,6 +334,17 @@ let action_of_incoming (incoming : Client.Incoming.t) : App.Action.t =
   | Closed -> Backend_closed
 ;;
 
+let forward_incoming link driver =
+  don't_wait_for
+    (Pipe.iter_without_pushback
+       (Client.incoming (Backend_link.client link))
+       ~f:(fun incoming ->
+         Option.iter
+           (Backend_link.handle_incoming link incoming)
+           ~f:(fun incoming ->
+             Driver.send_incoming_event driver (action_of_incoming incoming))))
+;;
+
 (* The driver only exposes [View.t], so tests read the last [Result_.t] (and
    hence the model) through this ref. Reset on each [start_for_testing]. *)
 let latest_result : Result_.t option ref = ref None
@@ -412,7 +367,7 @@ module Test_terminal = struct
   ;;
 end
 
-let with_test_driver ~client ~(terminal : Test_terminal.t) ~writer ~reader f =
+let with_test_driver ~link ~(terminal : Test_terminal.t) ~writer ~reader f =
   latest_result := None;
   let quit_requested = Ivar.create () in
   Bonsai_term.Private.For_testing.with_driver
@@ -437,23 +392,10 @@ let with_test_driver ~client ~(terminal : Test_terminal.t) ~writer ~reader f =
       ~view:r.view, ~handler:r.handler)
     ~handle_incoming:(fun (r : Result_.t) action -> r.inject action)
     (fun ~exit ~dimensions graph ->
-      app client ~hello:[] ~exit ~quit_requested ~dimensions graph)
+      app link ~exit ~quit_requested ~dimensions graph)
     (fun driver ->
-      don't_wait_for
-        (Pipe.iter_without_pushback (Client.incoming client) ~f:(fun incoming ->
-           Driver.send_incoming_event driver (action_of_incoming incoming)));
+      forward_incoming link driver;
       f driver)
-;;
-
-let connection_hello hello ~host_id =
-  match host_id with
-  | None -> hello @ [ "tools", `False ]
-  | Some id ->
-    hello
-    @ [ "tools", `True
-      ; "host_id", `String id
-      ; "features", `Array [ `String "exec_input"; `String "terminal_kill" ]
-      ]
 ;;
 
 (* Notty drops the terminal's focus reports, so it reads our stdin through a
@@ -491,41 +433,19 @@ let focus_reporting_input ~on_focus =
     Some (Reader.of_pipe (Info.of_string "prigh-tui input") filtered_r, restore))
 ;;
 
-let run ~connect ~hello ~local_tools =
-  let client = Client.create ~connect in
-  let host_id_warning = ref None in
-  let host_id =
-    Option.map local_tools ~f:(fun _ ->
-      Prigh_client_unix.Host_id.choose
-        ~home:(Option.value (Sys.getenv "HOME") ~default:".")
-        ~warn:(fun warning -> host_id_warning := Some warning))
-  in
-  let hello = connection_hello hello ~host_id in
-  match%bind.Deferred
-    match%bind.Deferred Client.connect client with
-    | Error _ as e -> Deferred.return e
-    | Ok () ->
-      Deferred.map
-        (send_hello client hello ~session:None ~as_user:None)
-        ~f:(Result.map_error ~f:Error.of_string)
-  with
-  | Error _ as e ->
-    let%bind.Deferred () = Client.close client in
-    Deferred.return e
-  | Ok reply ->
-    let hello_reply = Prigh_protocol.Hello_reply.of_json reply |> Or_error.ok in
-    let notice = ref (fun (_ : string) -> ()) in
-    let tool_host =
-      Option.map local_tools ~f:(fun backend ->
-        Prigh_client_unix.Tool_host.create
-          ~on_exit:(fun text -> !notice text)
-          ~client
-          ~spawn:(Prigh_client_unix.Tool_host.spawn_worker ~backend)
-          ())
-    in
+let run link =
+  match%bind.Deferred Backend_link.start link with
+  | Unreachable e -> Deferred.Or_error.error_string e
+  | Rejected e
+    when not
+           (Server_link.is_rejection e
+            && Option.is_some (Backend_link.info link).address) ->
+    let%bind.Deferred () = Backend_link.close link in
+    Deferred.Or_error.error_string e
+  | (Rejected _ | Connected _) as first ->
     let quit_requested = Ivar.create () in
     let on_focus = ref (fun (_ : bool) -> ()) in
-    let%bind.Deferred input = 
+    let%bind.Deferred input =
       match focus_reporting_input ~on_focus with
       | None -> Deferred.return None
       | Some (reader, restore) ->
@@ -542,7 +462,13 @@ let run ~connect ~hello ~local_tools =
           ~view:r.view, ~handler:r.handler)
         ~handle_incoming:(fun (r : Result_.t) action -> r.inject action)
         (fun ~exit ~dimensions graph ->
-          app ?tool_host client ~hello ~exit ~quit_requested ~dimensions graph)
+          app
+            ~start_on_activate:false
+            link
+            ~exit
+            ~quit_requested
+            ~dimensions
+            graph)
     in
     (match driver with
      | Error _ as e -> Deferred.return e
@@ -556,31 +482,23 @@ let run ~connect ~hello ~local_tools =
        in
        let had_iexten = Tty.set_iexten tty false in
        install_repaint driver;
-       (notice
-        := fun text ->
-             Driver.send_incoming_event
-               driver
-               (App.Action.Event (Notice text)));
        (on_focus
         := fun focused ->
              Driver.send_incoming_event driver (App.Action.Focus focused));
        if Option.is_some input then write_tty Term_focus.enable;
-       Option.iter hello_reply ~f:(fun reply ->
-         Driver.send_incoming_event driver (App.Action.Hello reply));
-       Option.iter !host_id_warning ~f:(fun warning ->
-         Driver.send_incoming_event
-           driver
-           (App.Action.Event (Notice warning)));
-       don't_wait_for
-         (Pipe.iter_without_pushback
-            (Client.incoming client)
-            ~f:(fun incoming ->
-              (match incoming, tool_host with
-               | Event e, Some host -> Prigh_client_unix.Tool_host.handle host e
-               | Closed, Some host ->
-                 Prigh_client_unix.Tool_host.set_online host false
-               | _ -> ());
-              Driver.send_incoming_event driver (action_of_incoming incoming)));
+       let send = Driver.send_incoming_event driver in
+       send (App.Action.Server_link (Backend_link.info link));
+       (match first with
+        | Connected reply ->
+          Result.iter
+            (Prigh_protocol.Hello_reply.of_json reply)
+            ~f:(fun reply -> send (App.Action.Hello reply))
+        | Rejected e -> send (App.Action.Rejected e)
+        | Unreachable _ -> ());
+       send App.Action.Start;
+       Backend_link.set_notice link (fun text ->
+         send (App.Action.Event (Notice text)));
+       forward_incoming link driver;
        let%bind.Deferred () =
          Deferred.any_unit
            [ Deferred.ignore_m (Driver.finished driver)
@@ -591,10 +509,6 @@ let run ~connect ~hello ~local_tools =
        let%bind.Deferred () = Clock.after (Time_float.Span.of_sec 0.2) in
        ignore (Tty.set_iexten tty had_iexten : bool);
        Option.iter input ~f:(fun (_, restore) -> restore ());
-       Option.iter tool_host ~f:Prigh_client_unix.Tool_host.close;
-       let%bind.Deferred () =
-         Deferred.any_unit
-           [ Client.close client; Clock.after (Time_float.Span.of_sec 3.) ]
-       in
+       let%bind.Deferred () = Backend_link.close link in
        Deferred.return (Ok ()))
 ;;

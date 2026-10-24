@@ -13,7 +13,9 @@ module Platform : sig
     ; open_browser : string -> unit Bonsai.Effect.t
     ; quit : unit Bonsai.Effect.t
     ; sign_out : (unit, string) Result.t Bonsai.Effect.t
-    (** Fails where signing out is not supported; the error is shown. *)
+    (** Forgets the saved credentials: the browsers reload into their sign-in
+        form, the terminal disconnects (the app opens its sign-in dialog).
+        The error is shown. *)
     ; load_history : unit -> (P.Json.t, string) Result.t Bonsai.Effect.t
     ; append_history : string -> unit Bonsai.Effect.t
     ; copy_to_clipboard : string -> unit Bonsai.Effect.t
@@ -28,6 +30,9 @@ module Platform : sig
         -> (P.Json.t, string) Result.t Bonsai.Effect.t
     (** Waits, connects again and sends [hello] (with [session] and [as_user]
         when given); the result is the hello reply. *)
+    ; relink : Server_link.Change.t -> Server_link.Outcome.t Bonsai.Effect.t
+    (** [/connect] and [/signin]: asked only of platforms that report an
+        [App.Action.Server_link]. *)
     }
 end
 

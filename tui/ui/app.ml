@@ -102,6 +102,10 @@ module Command = struct
         ; session : string option
         ; as_user : string option
         }
+    | Relink of
+        { generation : int
+        ; change : Server_link.Change.t
+        }
     | Sign_out
     | Notify of
         { mode : Notify.Mode.t
@@ -122,6 +126,11 @@ module Connection = struct
         (** the session to resume; dropped once the backend says it no longer
             exists (a never-persisted session has no file) *)
         }
+    | Switching of
+        { generation : int
+        ; previous : t (** back to it when the new server cannot be reached *)
+        }
+    | Disconnected of { reason : string }
   [@@deriving sexp_of, equal]
 
   let session_missing error = String.is_prefix error ~prefix:"no session "
@@ -159,6 +168,12 @@ module Action = struct
     | Set_utc_offset of Time_ns.Span.t
     | Focus of bool
     | Hello of P.Hello_reply.t
+    | Server_link of Server_link.t
+    | Relinked of
+        { generation : int
+        ; outcome : Server_link.Outcome.t
+        }
+    | Rejected of string
     | Resize of
         { width : int
         ; height : int
@@ -204,6 +219,7 @@ module Model = struct
     ; quitting : bool
     ; utc_offset : Time_ns.Span.t
     ; terminal_focus : Focus.t
+    ; server : Server_link.t option
     }
   [@@deriving sexp_of]
 
@@ -228,7 +244,7 @@ module Model = struct
   let backend_gone t =
     match t.connection with
     | Connected -> false
-    | Reconnecting _ -> true
+    | Reconnecting _ | Switching _ | Disconnected _ -> true
   ;;
 
   let acting_as t =
@@ -492,19 +508,22 @@ let init =
   ; quitting = false
   ; utc_offset = Time_ns.Span.zero
   ; terminal_focus = Unknown
+  ; server = None
   }
 ;;
 
-let start_commands =
+(* What a new connection shows, also after [/connect] and [/signin]. *)
+let refill_commands =
   [ rpc "get_state" ~tag:Initial_state
   ; rpc "get_messages" ~tag:Initial_messages
   ; rpc "auth_status" ~tag:Auth_refresh
   ; rpc "get_config" ~tag:Config
   ; rpc "list_models" ~tag:Models_catalog
   ; rpc "get_pending" ~tag:Pending
-  ; Command.Load_history
   ]
 ;;
+
+let start_commands = refill_commands @ [ Command.Load_history ]
 
 let decode_list json ~f =
   match json with
@@ -1528,11 +1547,239 @@ let backend_closed m =
     ~session:(Option.map m.state ~f:(fun s -> s.session_path))
 ;;
 
+(* ---- the server: /connect, /signin, /signout ---------------------------- *)
+
+let remote_address m =
+  Option.bind m.server ~f:(fun (s : Server_link.t) -> s.address)
+;;
+
+let server_user m =
+  Option.first_some
+    (Option.bind m.server ~f:(fun (s : Server_link.t) -> s.user))
+    m.user
+;;
+
+(* Everything that came from the old connection (the session, the user, the
+   models, any dialog about them), as when switching users; the editor's
+   draft and the prompt history are the user's and stay. *)
+let reset_connection m =
+  let m, (_ : Command.t list) = reset_session m in
+  { m with
+    state = None
+  ; models = []
+  ; auth = []
+  ; sessions = None
+  ; config = None
+  ; client_id = None
+  ; namespace = None
+  ; user = None
+  ; stderr_tail = []
+  ; known_paths = String.Set.empty
+  ; login_lines = []
+  ; btw = None
+  ; mode = Editing
+  ; autocomplete = None
+  ; pending_quit = false
+  }
+;;
+
+let sign_in_dialog ?error ?user m =
+  match remote_address m with
+  | None -> m
+  | Some address ->
+    { m with
+      mode =
+        Sign_in
+          (Sign_in_form.create
+             ~address
+             ~user:(Option.first_some user (server_user m))
+             ~error)
+    ; autocomplete = None
+    }
+;;
+
+(* The server refused our credentials: nothing of it is shown any more, and
+   the sign-in dialog asks for others. *)
+let signed_out ?user m ~reason =
+  let user = Option.first_some user (server_user m) in
+  let form =
+    match m.mode with
+    | Sign_in form -> Some form
+    | _ -> None
+  in
+  let m = { (reset_connection m) with connection = Disconnected { reason } } in
+  match form with
+  | Some form ->
+    { m with mode = Sign_in (Sign_in_form.failed form ~error:reason) }
+  | None -> sign_in_dialog m ?user ~error:reason
+;;
+
+let not_here m command =
+  ( error
+      m
+      (sprintf
+         "%s is for the terminal UI (prigh-tui); here, /signout signs in again \
+          or to another backend"
+         command)
+  , [] )
+;;
+
+let relink ?doing m change =
+  match m.connection with
+  | Switching _ -> warn m "still connecting; wait for it, or Ctrl+C quits", []
+  | previous ->
+    let generation = m.reconnect_generation + 1 in
+    let m =
+      { m with
+        connection = Switching { generation; previous }
+      ; reconnect_generation = generation
+      }
+    in
+    ( Option.value_map doing ~default:m ~f:(notice m)
+    , [ Command.Relink { generation; change } ] )
+;;
+
+let connect_hint =
+  "/connect HOST:PORT (of prigh serve -listen), or /connect local"
+;;
+
+let connect m arg =
+  match m.server with
+  | None -> not_here m "/connect"
+  | Some server ->
+    (match String.strip arg with
+     | "" ->
+       ( { m with
+           mode =
+             Text_prompt
+               { question =
+                   sprintf
+                     "Connect to HOST:PORT or local (now: %s)"
+                     (Server_link.describe server)
+               ; action = Connect
+               }
+         ; editor =
+             Editor.set_text
+               m.editor
+               (Option.value
+                  (Option.first_some server.address server.saved)
+                  ~default:"")
+         ; autocomplete = None
+         }
+       , [] )
+     | "local" -> relink m (Connect None) ~doing:"starting a local backend…"
+     | address ->
+       (match Server_link.parse_address address with
+        | Error e -> error m (sprintf "%s; %s" e connect_hint), []
+        | Ok _ ->
+          relink
+            m
+            (Connect (Some address))
+            ~doing:(sprintf "connecting to %s…" address)))
+;;
+
+let nothing_to_sign_in m what =
+  ( notice
+      m
+      (sprintf
+         "prigh-tui started this backend: there is nothing to %s (/connect \
+          HOST:PORT for a remote one)"
+         what)
+  , [] )
+;;
+
+let sign_in m args =
+  match m.server, args with
+  | None, _ -> not_here m "/signin"
+  | Some { address = None; _ }, _ -> nothing_to_sign_in m "sign in to"
+  | Some _, ([] | [ _ ]) -> sign_in_dialog m ?user:(List.hd args), []
+  | Some _, _ -> error m "usage: /signin [user]", []
+;;
+
+let sign_out m =
+  match m.server, m.connection with
+  | None, _ -> m, [ Command.Sign_out ]
+  | Some { address = None; _ }, _ -> nothing_to_sign_in m "sign out of"
+  | Some _, Switching _ ->
+    warn m "still connecting; wait for it, or Ctrl+C quits", []
+  | Some { address = Some address; _ }, _ ->
+    let m = signed_out { m with mode = Editing } ~reason:"signed out" in
+    ( notice m (sprintf "signed out of %s; the saved token is forgotten" address)
+    , [ Command.Sign_out ] )
+;;
+
+let connected_notice m (link : Server_link.t) =
+  match link.address with
+  | None -> "connected to a local backend"
+  | Some address ->
+    (match m.user, m.namespace with
+     | Some user, _ | None, Some user ->
+       sprintf "connected to %s as %s" address user
+     | None, None -> sprintf "connected to %s" address)
+;;
+
+let relinked m ~generation (outcome : Server_link.Outcome.t) =
+  match m.connection with
+  | Switching { generation = current; previous } when generation = current ->
+    let m = { m with server = Some outcome.link } in
+    (match outcome.result with
+     | Unreachable e ->
+       let m = { m with connection = previous } in
+       let m =
+         match m.mode with
+         | Sign_in form ->
+           { m with mode = Sign_in (Sign_in_form.failed form ~error:e) }
+         | _ ->
+           error
+             m
+             (sprintf
+                "%s; still on %s (is prigh serve -listen running there?)"
+                e
+                (Server_link.describe outcome.link))
+       in
+       (match previous with
+        | Reconnecting { attempt; session; _ } ->
+          schedule_reconnect m ~attempt ~delay_ms:0 ~session
+        | Connected | Switching _ | Disconnected _ -> m, [])
+     | Rejected e when Server_link.is_rejection e -> signed_out m ~reason:e, []
+     | Rejected e ->
+       let m =
+         { (reset_connection m) with connection = Disconnected { reason = e } }
+       in
+       ( error
+           m
+           (sprintf
+              "%s: %s; %s"
+              (Server_link.describe outcome.link)
+              e
+              connect_hint)
+       , [] )
+     | Connected json ->
+       let m = reset_connection m in
+       let m =
+         match P.Hello_reply.of_json json with
+         | Ok { client_id; namespace; user } ->
+           { m with client_id = Some client_id; namespace; user }
+         | Error _ -> m
+       in
+       let m = { m with connection = Connected } in
+       follow (notice m (connected_notice m outcome.link)), refill_commands)
+  | _ -> m, []
+;;
+
 let retry_backend_connection m =
   match m.connection with
   | Connected -> notice m "backend is connected", []
   | Reconnecting { attempt; session; _ } ->
     schedule_reconnect (notice m "reconnecting…") ~attempt ~delay_ms:0 ~session
+  | Switching _ -> notice m "connecting already…", []
+  | Disconnected { reason } ->
+    ( warn
+        m
+        (sprintf
+           "not connected (%s): /signin signs in, /connect switches server"
+           reason)
+    , [] )
 ;;
 
 let reconnect_reply m ~generation result =
@@ -1540,6 +1787,9 @@ let reconnect_reply m ~generation result =
   | Reconnecting { generation = current; attempt; session; _ }
     when generation = current ->
     (match result with
+     | Error e
+       when Server_link.is_rejection e && Option.is_some (remote_address m) ->
+       signed_out m ~reason:e, []
      | Error e when Option.is_some session && Connection.session_missing e ->
        schedule_reconnect
          (warn
@@ -1592,7 +1842,7 @@ let reconnect_reply m ~generation result =
            ; rpc "get_config" ~tag:Config
            ; rpc "list_models" ~tag:Models_catalog
            ] ))
-  | Connected | Reconnecting _ -> m, []
+  | Connected | Reconnecting _ | Switching _ | Disconnected _ -> m, []
 ;;
 
 (* ---- slash commands --------------------------------------------------- *)
@@ -2386,7 +2636,9 @@ let run_command m (cmd : Commands.Parsed.t) =
     block m (Content.lines ~style:(Style.fg Gray) text), []
   | "clear", _ ->
     follow { m with transcript = Transcript.clear m.transcript }, []
-  | "signout", _ -> m, [ Sign_out ]
+  | "connect", _ -> connect m cmd.rest
+  | "signin", args -> sign_in m args
+  | "signout", _ -> sign_out m
   | "setusr", [] -> m, [ rpc "list_users" ~tag:Users_list ]
   | "setusr", [ user ] ->
     m, [ rpc "set_user" ~params:[ "user", str user ] ~tag:User_switched ]
@@ -2640,6 +2892,7 @@ let refresh_autocomplete m =
       ~reminders:(Option.value (reminders m) ~default:[])
       ~logged_in:(logged_in m)
       ~default_dir_host:(default_dir_host m)
+      ~server:m.server
   with
   | None -> { m with autocomplete = None }, []
   | Some ac -> fetch_autocomplete m ac
@@ -3485,6 +3738,7 @@ let text_prompt m ~(action : Mode.Text_prompt_action.t) (intent : Intent.t) =
       if String.is_empty text
       then m, []
       else m, [ set_host_command m ~host ~cwd:text ]
+    | Connect -> if String.is_empty text then m, [] else connect m text
     | Deny_reason { confirm; draft } ->
       answer_confirm
         { m with editor = Editor.set_text m.editor draft }
@@ -3503,7 +3757,7 @@ let text_prompt m ~(action : Mode.Text_prompt_action.t) (intent : Intent.t) =
       Some
         (Option.value_map m.state ~default:"backend" ~f:(fun s -> s.active_host))
     | Host_cwd host -> Some host
-    | Name | Export_path | Import_path | Deny_reason _ -> None
+    | Name | Export_path | Import_path | Deny_reason _ | Connect -> None
   in
   let edit m =
     let m', cmds = editing_intent m intent in
@@ -3550,7 +3804,7 @@ let text_prompt m ~(action : Mode.Text_prompt_action.t) (intent : Intent.t) =
            editor = Editor.set_text m.editor draft
          }
        , [] )
-     | Name | Cd | Mkdir | Export_path | Import_path | Host_cwd _ ->
+     | Name | Cd | Mkdir | Export_path | Import_path | Host_cwd _ | Connect ->
        ( { m with
            editor = Editor.clear m.editor
          ; mode = Editing
@@ -3654,6 +3908,28 @@ let confirm m ~(action : Mode.Confirm_action.t) (intent : Intent.t) =
   | _ -> m, []
 ;;
 
+(* ---- sign-in dialog --------------------------------------------------- *)
+
+let sign_in_mode m form (intent : Intent.t) =
+  let set form = { m with mode = Sign_in form }, [] in
+  match intent with
+  | Submit | Submit_as_typed ->
+    (match m.connection with
+     | Switching _ -> m, []
+     | Connected | Reconnecting _ | Disconnected _ ->
+       (match Sign_in_form.submit form with
+        | `Wait form -> set form
+        | `Sign_in (form, change) ->
+          relink { m with mode = Sign_in form } change))
+  | Cancel | Interrupt -> { m with mode = Editing }, []
+  | Force_quit -> { m with quitting = true }, [ Quit ]
+  | Complete | Up | Down -> set (Sign_in_form.toggle form)
+  | Insert text | Paste text -> set (Sign_in_form.insert form text)
+  | Backspace -> set (Sign_in_form.backspace form)
+  | Kill_to_start | Kill_word -> set (Sign_in_form.clear form)
+  | _ -> m, []
+;;
+
 (* ---- question mode ---------------------------------------------------- *)
 
 let question m ~call_id ~form (intent : Intent.t) =
@@ -3697,6 +3973,7 @@ let intent m (intent : Intent.t) =
   | Text_prompt { action; _ } -> text_prompt m ~action intent
   | Confirm { action; _ } -> confirm m ~action intent
   | Question { call_id; form } -> question m ~call_id ~form intent
+  | Sign_in form -> sign_in_mode m form intent
   | Search _ -> search m intent
 ;;
 
@@ -4429,8 +4706,15 @@ let is_backend_command = function
 
 let block_backend_rpc m cmds =
   if Model.backend_gone m && List.exists cmds ~f:is_backend_command
-  then
-    error m "backend is gone", List.filter cmds ~f:(Fn.non is_backend_command)
+  then (
+    let why =
+      match m.connection with
+      | Disconnected _ ->
+        "not connected: /signin signs in, /connect switches server"
+      | Switching _ -> "not connected yet"
+      | Connected | Reconnecting _ -> "backend is gone"
+    in
+    error m why, List.filter cmds ~f:(Fn.non is_backend_command))
   else m, cmds
 ;;
 
@@ -4440,7 +4724,10 @@ let update m (action : Action.t) =
   else (
     let m, cmds =
       match action with
-      | Start -> m, start_commands
+      | Start ->
+        (match m.connection with
+         | Disconnected _ -> m, [ Command.Load_history ]
+         | Connected | Reconnecting _ | Switching _ -> m, start_commands)
       | Key key ->
         (match Keymap.lookup key with
          | Some i -> intent m i
@@ -4459,6 +4746,7 @@ let update m (action : Action.t) =
       | Backend_closed ->
         (match m.connection with
          | Connected -> backend_closed m
+         | Switching _ | Disconnected _ -> m, []
          | Reconnecting { attempt; session; _ } ->
            (* An attempt got as far as connecting and then lost the transport
               again; its reply (if any) is now stale. *)
@@ -4478,6 +4766,9 @@ let update m (action : Action.t) =
         { m with terminal_focus = (if focused then Focused else Unfocused) }, []
       | Hello { client_id; namespace; user } ->
         { m with client_id = Some client_id; namespace; user }, []
+      | Server_link link -> { m with server = Some link }, []
+      | Relinked { generation; outcome } -> relinked m ~generation outcome
+      | Rejected reason -> signed_out m ~reason, []
       | Resize { width; height } -> { m with width; height }, []
     in
     let m, cmds = block_backend_rpc m cmds in

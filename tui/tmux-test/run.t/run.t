@@ -659,3 +659,73 @@ prints the captured panes.
   ────────────────────────────────────────────────────────────────────────────────────────────────────
   >
   $TMP/cwd  deepseek-flash  think:on  mode:auto  view:normal  ctx:0.0%/1.0M  $0.00
+  $ bash ./harness.sh connect_signin
+  === refused: the sign-in dialog
+  ┌─ Sign in to 127.0.0.1:<port> ─────────────────────────────────────────────────────────────────────┐
+  │ user                                                                                             │
+  │ token                                                                                            │
+  │ unauthorised: bad user name or password                                                          │
+  │ prigh serve -tokens: your user name and password; -token: no user                                │
+  └──────────────────────────────────────────────────────────────────────────────────────────────────┘
+  ────────────────────────────────────────────────────────────────────────────────────────────────────
+  Tab next field · Enter signs in · Esc closes
+  === the token, masked
+  ┌─ Sign in to 127.0.0.1:<port> ─────────────────────────────────────────────────────────────────────┐
+  │ user                                                                                             │
+  │ token  ******                                                                                    │
+  │ unauthorised: bad user name or password                                                          │
+  │ prigh serve -tokens: your user name and password; -token: no user                                │
+  └──────────────────────────────────────────────────────────────────────────────────────────────────┘
+  ────────────────────────────────────────────────────────────────────────────────────────────────────
+  Tab next field · Enter signs in · Esc closes
+  === signed in
+    connected to 127.0.0.1:<port>
+    tools now run on <host> in $TMP/cwd
+    prigh in $TMP/cwd · /help · Esc aborts · Ctrl+C twice quits
+  ────────────────────────────────────────────────────────────────────────────────────────────────────
+  >
+  …deepseek-flash  think:on  mode:auto  view:normal  ctx:0.0%/1.0M  $0.00  server:127.0.0.1:<port>
+  === saved (600)
+  ((connect 127.0.0.1:<port>) (token s3cret))
+  === signed out
+    signed out of 127.0.0.1:<port>; the saved token is forgotten
+  ┌─ Sign in to 127.0.0.1:<port> ─────────────────────────────────────────────────────────────────────┐
+  │ user                                                                                             │
+  │ token                                                                                            │
+  │ signed out                                                                                       │
+  │ prigh serve -tokens: your user name and password; -token: no user                                │
+  └──────────────────────────────────────────────────────────────────────────────────────────────────┘
+  ────────────────────────────────────────────────────────────────────────────────────────────────────
+  Tab next field · Enter signs in · Esc closes
+  === saved (600)
+  ((connect 127.0.0.1:<port>))
+  === closed: disconnected
+    signed out of 127.0.0.1:<port>; the saved token is forgotten
+  ────────────────────────────────────────────────────────────────────────────────────────────────────
+  >
+  not signed in to 127.0.0.1:<port> · /signin signs in · /connect switches server
+  === a local backend again
+    connected to a local backend
+    prigh in $TMP/cwd · /help · Esc aborts · Ctrl+C twice quits
+  ────────────────────────────────────────────────────────────────────────────────────────────────────
+  >
+  $TMP/cwd  deepseek-flash  think:on  mode:auto  view:normal  ctx:0.0%/1.0M  $0.00
+  $ bash ./harness.sh startup_signin
+  === refused at startup
+  ┌─ Sign in to 127.0.0.1:<port> ─────────────────────────────────────────────────────────────────────┐
+  │ user                                                                                             │
+  │ token                                                                                            │
+  │ unauthorised: bad user name or password                                                          │
+  │ prigh serve -tokens: your user name and password; -token: no user                                │
+  └──────────────────────────────────────────────────────────────────────────────────────────────────┘
+  ────────────────────────────────────────────────────────────────────────────────────────────────────
+  Tab next field · Enter signs in · Esc closes
+  === signed in
+    connected to 127.0.0.1:<port>
+    tools now run on <host> in $TMP/cwd
+    prigh in $TMP/cwd · /help · Esc aborts · Ctrl+C twice quits
+  ────────────────────────────────────────────────────────────────────────────────────────────────────
+  >
+  …deepseek-flash  think:on  mode:auto  view:normal  ctx:0.0%/1.0M  $0.00  server:127.0.0.1:<port>
+  === saved (600)
+  ((connect 127.0.0.1:<port>) (token s3cret))

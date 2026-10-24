@@ -121,8 +121,13 @@ let command =
            Core.exit 1
        in
        if forget then or_exit "delete" (S.forget ~home);
+       (* With -local it is not used, only kept for /connect. *)
        let saved =
-         if forget || local then None else or_exit "read" (S.load ~home)
+         if forget
+         then None
+         else if local
+         then Option.join (Result.ok (S.load ~home))
+         else or_exit "read" (S.load ~home)
        in
        let { S.Resolved.settings = { connect; token; user }; save } =
          S.resolve
@@ -135,28 +140,21 @@ let command =
              }
            ~local
        in
-       let address =
-         Option.map connect ~f:(fun addr ->
-           let bad () =
-             Core.eprintf "-connect must be HOST:PORT, got %s\n" addr;
-             Core.exit 2
-           in
-           match String.rsplit2 addr ~on:':' with
-           | Some (host, port) ->
-             (match Int.of_string_opt port with
-              | Some port ->
-                (if String.is_empty host then "127.0.0.1" else host), port
-              | None -> bad ())
-           | None -> bad ())
-       in
+       Option.iter connect ~f:(fun address ->
+         match Prigh_ui.Server_link.parse_address address with
+         | Ok _ -> ()
+         | Error e ->
+           Core.eprintf "-connect: %s\n" e;
+           Core.exit 2);
        Option.iter save ~f:(fun t -> or_exit "save" (S.save ~home t));
-       let local_tools =
-         match tools, connect with
-         | Some "local", _ | None, Some _ -> Some backend
-         | Some "remote", _ | None, None -> None
-         | Some other, _ ->
-           Core.eprintf "-tools must be local or remote, got %s\n" other;
-           Core.exit 2
+       let module Link = Prigh_ui_term.Backend_link in
+       let tools =
+         Option.map tools ~f:(fun tools ->
+           match Link.Tools.of_string tools with
+           | Ok tools -> tools
+           | Error e ->
+             Core.eprintf "%s\n" (Error.to_string_hum e);
+             Core.exit 2)
        in
        let cwd =
          Option.map cwd ~f:(fun d ->
@@ -168,41 +166,37 @@ let command =
        in
        (* The hello cwd is where our tools run; for a spawned backend the serve
           arguments already carry it. *)
-       let hello_cwd = Option.value cwd ~default:(Core_unix.getcwd ()) in
        let hello =
          [ ( "name"
            , `String (Option.value name ~default:(Core_unix.gethostname ())) )
+         ; "cwd", `String (Option.value cwd ~default:(Core_unix.getcwd ()))
          ]
-         @ [ "cwd", `String hello_cwd ]
-         @ Option.value_map token ~default:[] ~f:(fun t ->
-           [ "token", `String t ])
-         @ Option.value_map user ~default:[] ~f:(fun u -> [ "user", `String u ])
-         @ Option.value_map session ~default:[] ~f:(fun s ->
-           [ "session", `String s ])
        in
-       match address with
-       | Some (host, port) ->
-         Prigh_ui_term.Term_app.run
-           ~connect:(fun () ->
-             Prigh_client_unix.Tcp_transport.connect ~host ~port)
-           ~hello
-           ~local_tools
-       | None ->
-         let args =
-           [ "serve" ]
-           @ (if faux then [ "-faux" ] else [])
-           @ opt "-session" session
-           @ opt "-model" model
-           @ opt "-thinking" thinking
-           @ opt "-cwd" cwd
-           @ opt "-auth-file" auth_file
-           @ Option.value rest ~default:[]
-         in
-         Prigh_ui_term.Term_app.run
-           ~connect:(fun () ->
-             Prigh_client_unix.Stdio_transport.spawn ~prog:backend ~args ())
-           ~hello
-           ~local_tools)
+       let spawn_args =
+         [ "serve" ]
+         @ (if faux then [ "-faux" ] else [])
+         @ opt "-model" model
+         @ opt "-thinking" thinking
+         @ opt "-cwd" cwd
+         @ opt "-auth-file" auth_file
+         @ Option.value rest ~default:[]
+       in
+       Prigh_ui_term.Term_app.run
+         (Link.create
+            ~home
+            ~backend
+            ~spawn_args
+            ~tools
+            ~hello
+            ~session
+            ~target:
+              (match connect with
+               | Some address -> Remote address
+               | None -> Spawn)
+            ~token
+            ~user
+            ~saved:(Option.first_some save saved)
+            ()))
 ;;
 
 let () = Command_unix.run command
