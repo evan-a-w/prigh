@@ -1,7 +1,7 @@
 # prigh architecture
 
 prigh is an agentic coding harness split into an OCaml backend (`backend/`,
-all the logic) and OCaml frontends (`tui/`, Bonsai: rendering, input and
+all the logic) and OCaml frontends (`frontend/`, Bonsai: rendering, input and
 UI state only): the TUI in a terminal and prigh-web in a browser; all build
 with OxCaml. There is no
 plugin system: tools, subagents, providers and slash commands are compiled in;
@@ -53,7 +53,7 @@ tool always runs in the backend but its tool calls follow the same active
 host. A client host is known by its *host id*: the `host_id` it sends in
 `hello`, or its client id without one, so a host that reconnects or
 restarts is the same host. `prigh tool-host -connect` and the TUI send the
-machine's: `Host_id` (`backend/lib`, and `client_unix/` in the TUI) reads
+machine's: `Host_id` (`backend/lib`, and `client/unix/` in the TUI) reads
 `~/.prigh/host-id` from the home the tools see (the TUI's, which its
 `prigh tool-host` worker shares), creating it with a random `host-…` id the
 first time (written to a temporary file and linked into place, so
@@ -80,7 +80,7 @@ cwd (and `/cd` validates the directory on the host: `set_cwd` and
 `set_active_host` take `if_missing` (`fail`, the default; `ask`, answered
 `{missing: path}` when the directory could be created; `create`, which
 creates it with its parents through the host op `$make_dir`) and answer
-`{cwd, created}`; `Dir_change` in the backend and in `tui/protocol`, so
+`{cwd, created}`; `Dir_change` in the backend and in `frontend/protocol`, so
 the frontends confirm before creating anything); a session remembers
 its cwd on each host, also while the host is away. The session file records
 where it runs: every change of cwd, host or pinning appends a `cwd` entry
@@ -164,6 +164,19 @@ stream or a running `bash` command immediately, and a login can be cancelled
 while it is waiting on the browser.
 
 ## Backend layers (`backend/lib`)
+
+`backend/lib` is one library, `prigh`, with its modules grouped in
+subdirectories (`(include_subdirs unqualified)`, so module names do not
+carry the directory): `agent/` (the agent, its loop and what runs inside
+it: compaction, approvals, plans, goals, reminders, the system prompt,
+skills), `session/` (the session log and the message types it records),
+`providers/` (the model providers and their routing, models, SSE, HTTP),
+`auth/` (credentials, OAuth flows, logins), `tools/` (the built-in tools
+and their helpers), `host/` (tool hosts and their operations), `mcp/`,
+`rpc/` (the RPC server and router, namespaces, the web server and
+WebSocket, file transfers), `terminal/` (the browser's terminals) and
+`util/` (`Import`, `Config`, cancellation and other small shared pieces).
+The layers below cut across those groups.
 
 ### Foundations
 
@@ -584,7 +597,7 @@ two can share one.
   outcome (`job_outcome`) and it is delivered like any job, while the call
   returns `still running after Ns, so it was moved to the background as
   job j<n> ...` with the last 10 lines (`Tool_bash.moved_job_id` reads the
-  id back, for the session's job numbering; `Moved_job` in `tui/protocol`
+  id back, for the session's job numbering; `Moved_job` in `frontend/protocol`
   for the frontends). On a client host the pending `Tool_exec` simply
   keeps going in that fiber. Without an explicit `timeout` (and a limit
   under the default 600 s) the call is sent with the jobs' "no timeout",
@@ -876,7 +889,7 @@ two can share one.
   numbers the repeats and reports, once, the ones that used theirs up (a
   `Notice`). Both are user messages with `Source.Reminder`, carrying the
   plan mode note like goal messages. The frontends parse `/remind` with
-  the shared `Remind_command` (`tui/ui`).
+  the shared `Remind_command` (`frontend/ui`).
 - `Config` — `~/.prigh/config.json` (`auto_background_seconds` (default
   30, 0 = off: see background jobs), `scoped_models : string list`,
   `approval_mode` (new sessions' mode; read from `confirm_tools` when
@@ -1184,7 +1197,7 @@ two can share one.
   upgraded and handed to `Rpc_server.serve_lines`, `GET /terminal` upgraded
   and handed to `Terminals` (below), `/files/download` and `/files/upload`
   to `File_http` (authorised by their tickets),
-  anything else served from the web root (the built `tui/prigh-web/bin/site`,
+  anything else served from the web root (the built `frontend/web/bin/site`,
   found via `-web-root`, `$PRIGH_WEB_ROOT` or next to the executable)
   by `Static_site`: no `..`, no dot files; `Cache-Control: no-cache` with
   an `ETag` (content hash, cached per file version) and `Last-Modified` (not for Nix's mtime 1), so reloads revalidate to
@@ -1271,14 +1284,15 @@ path, which is also how a frontend reattaches after a reconnect). With no explic
 session uses the config's `default_model`, else the first logged-in
 provider's in the order anthropic, openai-codex, openai, deepseek.
 
-## Frontend (`tui/`)
+## Frontends (`frontend/`)
 
 Built with OxCaml 5.2 and the Jane Street `v0.18~preview` packages, like
 the backend (one toolchain, `nix develop`; the few backend dependencies
 that need adapting to it are patched in `nix/opam-repository`). The two
-are separate dune projects and only meet over the wire, so the frontend
-owns its own copy of the protocol types and the e2e test guards the
-contract.
+are separate dune projects and only meet over the wire, so the frontends
+own their copy of the protocol types and the e2e tests guard the
+contract. `protocol/`, `client/` and `ui/` are shared; `tui/` is the
+terminal frontend and `web/` prigh-web, the browser one.
 
 - `protocol/` (`prigh_protocol`) — `Jsonaf` decoders for everything
   `Rpc_json` emits (`Message`, `Delta`, `State`, `Model`, `Session_summary`,
@@ -1293,7 +1307,7 @@ contract.
   reconnectable: correlates responses by id, fans out events, stderr and
   `Closed` on one `Incoming.t` pipe that outlives the transport, fails calls
   with "not connected" in between; `received` and `waiting` count the lines
-  received and the calls waiting, for prigh-web's probe). `client_unix/` (`prigh_client_unix`)
+  received and the calls waiting, for prigh-web's probe). `client/unix/` (`prigh_client_unix`)
   has the transports that need a process or a socket — `Stdio_transport`
   spawns the backend, `Tcp_transport` connects to `-listen` — and
   `Tool_host` (spawns `prigh tool-host` lazily and proxies
@@ -1428,7 +1442,7 @@ contract.
   - Notifications: `Notify` decides what is worth telling (a main-agent
     turn's end, a tool confirmation, delivered background work) for both
     frontends. The TUI emits `Command.Notify` only while the terminal has
-    reported losing the focus (`term/`'s `Term_focus` enables focus
+    reported losing the focus (`tui/lib/`'s `Term_focus` enables focus
     reporting and filters `CSI I`/`CSI O` out of the input), and
     `Term_notify` writes the bell or OSC 9/777 (wrapped for tmux) per the
     config's `notify` (`/notify off|bell|desktop`).
@@ -1502,48 +1516,67 @@ contract.
     prigh-web shares the module.
   - Replies tagged `Retry_in_editor` put the command back in the editor
     with a hint when the backend refuses it (`/switch`, `/cd`).
-- `term/` (`prigh_ui_term`) — `Key_of_event` (Bonsai_term events → `Key.t`,
-  bracketed paste → one `Insert`), `View_of_content` (spans → notty attrs,
-  including OSC-8 links),
-  `Tty`/`tty_stubs.c` (clears `IEXTEN`), and `Term_app` (spawns the backend,
-  runs `Bonsai_term.start_with_driver`, pushes client `Incoming.t` into the
-  component, executes the platform commands, sets the cursor). Three
-  terminal-only details live here. Notty's raw mode leaves `IEXTEN` set, so
-  the line discipline eats `^O` before the program sees it; the stub clears
-  the flag around the driver (OCaml's `terminal_io` cannot express it, so
-  notty cannot restore it either). Bonsai_term's `Driver.finished` ivar is
-  not filled when `exit` is scheduled from `apply_action`, so `Term_app`
-  tracks the quit itself. Suspend (`Ctrl+Z`) and the external editor leave
-  and re-enter the alt screen; notty still believes its last frame is on
-  screen, so `install_repaint` re-emits it. Bracketed paste is buffered in a
-  plain `ref`, not Bonsai state, because the handler receives a whole batch
-  of events at once and state would only update after the frame, so every key
-  in the batch would still see `Idle`.
-  `Backend_link` is the platform's side of the connection: the target (a
-  spawned `serve` or `HOST:PORT`), the credentials and the tool host. The
-  `Client`'s transport factory reads the current target, so reconnects
-  follow switches; `relink` opens the new transport before dropping the old
-  connection (an unreachable server changes nothing), closes the old tool
-  host and makes one for the new target (`-tools` rules as at startup:
-  local for a remote backend unless `-tools` was given), sends `hello` and
-  saves the connection through `Saved_connection` once it is answered
-  (`resolve`'s rules for `/connect`, the new credentials for `/signin`);
-  `sign_out` forgets the token there and in the saved file. A `Closed` seen
-  while a newer transport is attached is dropped (`handle_incoming`), and a
-  reconnect overtaken by a switch gives way.
-  `Term_app.run` sends `hello` (`Backend_link.connection_hello`: with local
-  tools, a `host_id` for the life of the process, also sent on reconnects)
-  before mounting the app; a remote backend refusing the credentials does
-  not stop it (the app starts with `Rejected` and the sign-in dialog).
-  It sends `Server_link`, then the reply as `Hello` and `Start`; `client_id`
-  is our host id (`Hello_reply` prefers the reply's `host_id`), so `/host`
-  can mark this frontend as "(here)"
-  and the status line can show `tools:<host>` when tools run elsewhere or
-  `tools:offline` when the active host is gone. Mouse reporting is on so the
-  wheel scrolls the transcript (`Scroll_up`/`Scroll_down`, three lines);
-  without it the terminal turns the wheel into arrow keys, which walk the
-  prompt history. Text selection therefore needs Shift.
-- `prigh-web/` — the browser frontend. Unlike `term/` it does not mount
+- `tui/` — the terminal frontend.
+  - `lib/` (`prigh_tui`) — `Key_of_event` (Bonsai_term events → `Key.t`,
+    bracketed paste → one `Insert`), `View_of_content` (spans → notty attrs,
+    including OSC-8 links),
+    `Tty`/`tty_stubs.c` (clears `IEXTEN`), and `Term_app` (spawns the backend,
+    runs `Bonsai_term.start_with_driver`, pushes client `Incoming.t` into the
+    component, executes the platform commands, sets the cursor). Three
+    terminal-only details live here. Notty's raw mode leaves `IEXTEN` set, so
+    the line discipline eats `^O` before the program sees it; the stub clears
+    the flag around the driver (OCaml's `terminal_io` cannot express it, so
+    notty cannot restore it either). Bonsai_term's `Driver.finished` ivar is
+    not filled when `exit` is scheduled from `apply_action`, so `Term_app`
+    tracks the quit itself. Suspend (`Ctrl+Z`) and the external editor leave
+    and re-enter the alt screen; notty still believes its last frame is on
+    screen, so `install_repaint` re-emits it. Bracketed paste is buffered in a
+    plain `ref`, not Bonsai state, because the handler receives a whole batch
+    of events at once and state would only update after the frame, so every key
+    in the batch would still see `Idle`.
+    `Backend_link` is the platform's side of the connection: the target (a
+    spawned `serve` or `HOST:PORT`), the credentials and the tool host. The
+    `Client`'s transport factory reads the current target, so reconnects
+    follow switches; `relink` opens the new transport before dropping the old
+    connection (an unreachable server changes nothing), closes the old tool
+    host and makes one for the new target (`-tools` rules as at startup:
+    local for a remote backend unless `-tools` was given), sends `hello` and
+    saves the connection through `Saved_connection` once it is answered
+    (`resolve`'s rules for `/connect`, the new credentials for `/signin`);
+    `sign_out` forgets the token there and in the saved file. A `Closed` seen
+    while a newer transport is attached is dropped (`handle_incoming`), and a
+    reconnect overtaken by a switch gives way.
+    `Term_app.run` sends `hello` (`Backend_link.connection_hello`: with local
+    tools, a `host_id` for the life of the process, also sent on reconnects)
+    before mounting the app; a remote backend refusing the credentials does
+    not stop it (the app starts with `Rejected` and the sign-in dialog).
+    It sends `Server_link`, then the reply as `Hello` and `Start`; `client_id`
+    is our host id (`Hello_reply` prefers the reply's `host_id`), so `/host`
+    can mark this frontend as "(here)"
+    and the status line can show `tools:<host>` when tools run elsewhere or
+    `tools:offline` when the active host is gone. Mouse reporting is on so the
+    wheel scrolls the transcript (`Scroll_up`/`Scroll_down`, three lines);
+    without it the terminal turns the wheel into arrow keys, which walk the
+    prompt history. Text selection therefore needs Shift.
+  - `bin/` — `prigh-tui [DIR]` (`-faux`, `-session`, `-model`, `-cwd` (same
+    as `DIR`), `-auth-file`, `-backend`; `PRIGH_BACKEND` overrides the backend
+    path). `-connect HOST:PORT` (`$PRIGH_CONNECT`) joins a running backend
+    instead of spawning one, with `-token` (`$PRIGH_TOKEN`), `-user`
+    (`$PRIGH_USER`) and `-name`; the flags are remembered in
+    `~/.prigh/tui-connection.sexp` (`client/unix/saved_connection.ml`, which
+    resolves flag > environment > saved; `-local` ignores it, `-forget`
+    deletes it); `/connect`, `/signin` and `/signout` change it from inside
+    (`lib/backend_link.ml`). `-tools local|remote`
+    says where this session's tools run (local = this machine through
+    `tool-host`, the default with `-connect`; remote = the backend, the default
+    when spawning, where the two coincide). `-detached` (`-tmux-session`)
+    runs the same command in a new detached tmux session and exits: the
+    argv (session name, `-e` environment, a `sh` wrapper that waits for
+    Enter when the TUI fails) is built by `lib/tmux_detach.ml`; the parent
+    validates the flags but neither saves nor spawns anything.
+  - `test/` (the `App.update` scenarios, the widgets, the client),
+    `e2e/` and `tmux-test/`: see Testing.
+- `web/` — prigh-web, the browser frontend. Unlike `tui/` it does not mount
   `ui/`'s cell-grid `App`: it has its own Elm-style state machine over the
   same `prigh_protocol` types and `prigh_client`, renders HTML, and shares
   the parts of `ui/` that are not about the terminal's screen.
@@ -1982,7 +2015,7 @@ contract.
     `style.css`'s `:root`), the Recursive font cut to two woff2 instances (sans and mono;
     `recursive-OFL.txt`), `terminal.js` and the
     vendored xterm.js, assembled under
-    `bin/site/` and installed to `share/prigh_tui/web` (the Nix
+    `bin/site/` and installed to `share/prigh_frontend/web` (the Nix
     wrapper exports it as `$PRIGH_WEB_ROOT`). The dev profile links
     separately compiled units with inline source maps (~49 MB, fast to
     relink); release builds (`dune build -p`, so Nix) are whole-program at
@@ -1992,22 +2025,6 @@ contract.
     page (as text, `Html.mark`s print as the glyphs they draw: ✓ ✕ – ■);
     `test_page.ml` covers `app/`'s pure parts (`Login`, the URLs).
     `e2e/` — the Playwright e2e (see Testing).
-- `bin/` — `prigh-tui [DIR]` (`-faux`, `-session`, `-model`, `-cwd` (same
-  as `DIR`), `-auth-file`, `-backend`; `PRIGH_BACKEND` overrides the backend
-  path). `-connect HOST:PORT` (`$PRIGH_CONNECT`) joins a running backend
-  instead of spawning one, with `-token` (`$PRIGH_TOKEN`), `-user`
-  (`$PRIGH_USER`) and `-name`; the flags are remembered in
-  `~/.prigh/tui-connection.sexp` (`client_unix/saved_connection.ml`, which
-  resolves flag > environment > saved; `-local` ignores it, `-forget`
-  deletes it); `/connect`, `/signin` and `/signout` change it from inside
-  (`term/backend_link.ml`). `-tools local|remote`
-  says where this session's tools run (local = this machine through
-  `tool-host`, the default with `-connect`; remote = the backend, the default
-  when spawning, where the two coincide). `-detached` (`-tmux-session`)
-  runs the same command in a new detached tmux session and exits: the
-  argv (session name, `-e` environment, a `sh` wrapper that waits for
-  Enter when the TUI fails) is built by `term/tmux_detach.ml`; the parent
-  validates the flags but neither saves nor spawns anything.
 
 ## Neovim client (`editors/nvim/`)
 
@@ -2073,21 +2090,21 @@ Four layers, cheapest first.
 1. **Pure expect tests.** Backend (`cd backend && dune build @runtest`)
    drives the loop/agent/RPC with `Faux_provider` and
    providers/HTTP/OAuth with `Fake_http_server` (an in-process Eio HTTP
-   server); nothing touches the network. Frontend (`cd tui && dune build
+   server); nothing touches the network. Frontend (`cd frontend && dune build
    @runtest`) covers protocol decoding, the client over an in-memory
    transport, the widgets and the keymap, and `App.update` scenarios that
    print the screen (`Screen.to_plain`) — pickers, login prompts, Esc/Ctrl+C,
    streaming, resize, scrolling, subagents. `test_component` runs the Bonsai
    component under `Bonsai_test.Handle` with a scripted platform.
-2. **Rendered-frame snapshots.** `tui/test/test_term_frames.ml` (same
+2. **Rendered-frame snapshots.** `frontend/tui/test/test_term_frames.ml` (same
    `@runtest`) drives the real Bonsai_term driver over an in-memory tty,
-   decodes Notty's output with the VT emulator in `tui/test/vt.ml`, and
+   decodes Notty's output with the VT emulator in `frontend/tui/test/vt.ml`, and
    compares the grid and cursor with `Screen.to_plain`, so
    `View_of_content`/`Key_of_event` cannot diverge from the pure renderer.
-3. **Protocol e2e.** `tui/e2e` (in `@runtest`, also `@e2e`) runs the real
+3. **Protocol e2e.** `frontend/tui/e2e` (in `@runtest`, also `@e2e`) runs the real
    `main.exe serve -faux` with an isolated `-auth-file` and `HOME` through
    the real client and diffs a normalised transcript.
-4. **Real terminal.** The cram test `tui/tmux-test/run.t` (in `@runtest`;
+4. **Real terminal.** The cram test `frontend/tui/tmux-test/run.t` (in `@runtest`;
    skipped when `tmux` is absent) runs each scenario of `run.t/harness.sh`:
    the built TUI inside a detached tmux session, keys sent with `tmux
    send-keys`, panes captured and normalised (spinners, paths) into the
@@ -2103,7 +2120,7 @@ Four layers, cheapest first.
    server, which was started without the caller's environment: the
    printed line, the TUI and its environment in the new session, the
    `-2` name, the pane kept open on failure, the errors before detaching).
-   `tui/test/test_backend_link.ml` drives `Backend_link` against in-memory
+   `frontend/tui/test/test_backend_link.ml` drives `Backend_link` against in-memory
    backends (the transports each switch opens, the `hello`s, the saved
    file, the tool host).
 
@@ -2181,15 +2198,15 @@ The web layer adds three: `backend/test/test_static_site.ml` (validators and
 `backend/test/test_web.ml` (frames, fragmentation,
 the RFC handshake vector, static serving and traversal, and a masked WebSocket
 RPC conversation over a real loopback socket)
-and `tui/prigh-web/test/` (below; run under `node` with js_of_ocaml
+and `frontend/web/test/` (below; run under `node` with js_of_ocaml
 because `virtual_dom`'s initialisers need a JavaScript runtime; skipped
 without `node`). The flake's `web-wrapper` check runs the packaged wrapper's
 `prigh -web` against a fake backend (the `serve` arguments, the site it
 points at) and checks the installed site: its files, the release bundle's
 size and the precompressed siblings.
 
-prigh-web's e2e, `tui/prigh-web/e2e/prigh_web.sh` (the flake's Linux
-`prigh-web-e2e` check, against the packaged backend and site), runs
+prigh-web's e2e, `frontend/web/e2e/prigh_web.sh` (the flake's Linux
+`web-e2e` check, against the packaged backend and site), runs
 `prigh_web.mjs` in Chromium and Firefox. The driver owns the backend
 (`serve -web 127.0.0.1:0 -faux-script ...` with an isolated `HOME`
 and cwd) so that it can restart it, and prints normalised text snapshots
