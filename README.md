@@ -1380,7 +1380,7 @@ mode carries on with it.
 
 The model's plan (`update_plan`: steps pending, in progress or done, as in
 Codex) is session state: the status line shows `plan 2/5: current step`
-while steps remain, `/todos` shows it whole, and the transcript shows every
+(`(+2 running)` when several run in parallel) while steps remain, `/todos` shows it whole, and the transcript shows every
 update as a checklist.
 
 With `ask_user` the model asks you one or more questions, each with
