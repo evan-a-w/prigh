@@ -35,7 +35,9 @@ RAM. The cache must be re-pushed when the dependencies change (see
 `flake.nix`, `flake.lock`, `nix/` and the `*.opam`/`dune-project` files
 are unchanged. In that case only prigh itself is rebuilt, which takes a
 few minutes. Redeploying with "Re-pull image and redeploy" (or the
-GitOps auto-update) rebuilds from the new commit.
+GitOps auto-update) rebuilds from the new commit: the image `prigh:local`
+has `pull_policy: build`, so the pull step skips it instead of looking for
+it in a registry.
 
 ## Docker Compose
 
