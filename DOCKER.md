@@ -57,7 +57,7 @@ serves all of them, and they share sessions:
 | `tui` | – | – | an interactive TUI as the container's main process (must be the only entry; single-user, see below) |
 
 For example, `PRIGH_MODE=web,server` serves prigh-web and a plain TCP
-port. The former entries `prigh-web` (now `web`, on 7790 instead of 7790)
+port. The former entries `prigh-web` (now `web`, same port)
 and `pi-web` (removed) are refused with a message saying so.
 
 ### TUI
