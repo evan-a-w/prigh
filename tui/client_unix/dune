@@ -7,6 +7,7 @@
   async
   async_unix
   core_unix
+  core_unix.sys_unix
   jsonaf
   prigh_protocol
   prigh_client))

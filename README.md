@@ -10,7 +10,7 @@ in.
 
 ```
 ./prigh                 # builds backend + frontend if needed, then starts the TUI here
-./prigh -cwd ~/proj     # ... in another directory
+./prigh ~/proj          # ... in another directory (or -cwd ~/proj)
 ./prigh -faux           # scripted provider, no API calls
 ./prigh -web            # the same UI in a browser (serves it on 127.0.0.1:7788 and opens it)
 ./prigh -prigh-web      # prigh-web, the browser-native UI (127.0.0.1:7790)
@@ -42,11 +42,11 @@ that points the TUI at the Nix-built backend.
 ```
 source /nix/var/nix/profiles/default/etc/profile.d/nix-daemon.sh   # if nix is not on PATH
 
-nix run . -- -cwd ~/proj
-nix run . -- -cwd ~/proj -faux       # scripted provider, no API calls
+nix run . -- ~/proj
+nix run . -- ~/proj -faux            # scripted provider, no API calls
 
 nix build                            # result/bin/prigh
-./result/bin/prigh -cwd ~/proj
+./result/bin/prigh ~/proj
 
 nix build .#backend                  # backend only: result/bin/prigh
 nix build .#tui                      # TUI only: result/bin/prigh-tui
@@ -62,10 +62,11 @@ options]` (`nix run . -- -prigh-web -cwd ~/proj`) runs `prigh serve
 -prigh-web 127.0.0.1:7790 -open` (`$PRIGH_PRIGH_WEB_LISTEN`) with
 `PRIGH_PRIGH_WEB_ROOT` set to the installed prigh-web site.
 
-`prigh-tui` flags: `-faux`, `-session PATH`, `-model ID`, `-thinking LEVEL`,
-`-cwd DIR`, `-auth-file PATH`, `-backend PATH` (same as `$PRIGH_BACKEND`),
+`prigh-tui [DIR]` starts in `DIR` (default: the current directory; `-cwd
+DIR` is the same). Flags: `-faux`, `-session PATH`, `-model ID`, `-thinking
+LEVEL`, `-auth-file PATH`, `-backend PATH` (same as `$PRIGH_BACKEND`),
 `-connect HOST:PORT`, `-token SECRET`, `-user NAME` (with `-tokens`),
-`-tools local|remote`, `-name NAME`,
+`-local`, `-forget`, `-tools local|remote`, `-name NAME`,
 and `-- <extra backend args>`. The Nix wrapper sets `PRIGH_BACKEND` to the
 Nix-built backend by default; set `PRIGH_BACKEND` or pass `-backend` to override
 it.
@@ -94,9 +95,19 @@ frontends at once:
 prigh serve -listen 0.0.0.0:7777 -token sekrit
 
 # on each laptop
-prigh-tui -connect server:7777 -token sekrit -cwd ~/proj
-prigh-tui -connect server:7777 -token sekrit -session <id>   # join a session
+prigh-tui -connect server:7777 -token sekrit ~/proj
+prigh-tui ~/other                        # the same backend: the connection was saved
+prigh-tui -session <id>                  # join a session
+prigh-tui -local                         # spawn a local backend this once
+prigh-tui -forget                        # forget the saved connection (and spawn)
 ```
+
+`-connect`, `-token` and `-user` are saved in `~/.prigh/tui-connection.sexp`
+(mode 0600) and used when they are not given: `-connect` to another address
+replaces the saved connection (dropping its token and user), `-token` or
+`-user` alone update it. `$PRIGH_CONNECT`, `$PRIGH_TOKEN` and `$PRIGH_USER`
+take precedence over the saved values but are not saved. `-local` (and
+`-faux`) spawn a backend without touching the saved connection.
 
 By default a connected frontend runs the session's tools (bash, file
 edits, ...) on *its own* machine, in the `-cwd` it was started with, by

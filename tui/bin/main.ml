@@ -33,21 +33,32 @@ let command =
          (optional string)
          ~doc:
            "HOST:PORT connect to a running `prigh serve -listen` instead of \
-            spawning one (default: $PRIGH_CONNECT)"
+            spawning one (default: $PRIGH_CONNECT, else the saved connection); \
+            saved for next time with -token and -user"
      and token =
        flag
          "-token"
          (optional string)
          ~doc:
            "SECRET the backend's -token, or with -tokens the user's password \
-            (default: $PRIGH_TOKEN)"
+            (default: $PRIGH_TOKEN, else the saved one)"
      and user =
        flag
          "-user"
          (optional string)
          ~doc:
            "NAME the user (namespace) name of a backend with -tokens (default: \
-            $PRIGH_USER)"
+            $PRIGH_USER, else the saved one)"
+     and local =
+       flag
+         "-local"
+         no_arg
+         ~doc:" spawn a backend even if a connection is saved (keeps it)"
+     and forget =
+       flag
+         "-forget"
+         no_arg
+         ~doc:" delete the saved connection (~/.prigh/tui-connection.sexp)"
      and tools =
        flag
          "-tools"
@@ -67,32 +78,84 @@ let command =
      and model = flag "-model" (optional string) ~doc:"ID model id"
      and thinking =
        flag "-thinking" (optional string) ~doc:"LEVEL off|on|low|high|max"
-     and cwd = flag "-cwd" (optional string) ~doc:"DIR working directory"
+     and cwd_flag =
+       flag
+         "-cwd"
+         (optional string)
+         ~doc:"DIR working directory (same as the DIR argument)"
      and auth_file =
        flag "-auth-file" (optional string) ~doc:"PATH credential store"
-     and rest = flag "--" escape ~doc:" extra backend arguments" in
+     and rest = flag "--" escape ~doc:" extra backend arguments"
+     and cwd_anon = anon (maybe ("DIR" %: string)) in
      fun () ->
+       let cwd =
+         match cwd_flag, cwd_anon with
+         | Some a, Some b when not (String.equal a b) ->
+           Core.eprintf
+             "the working directory is given twice (-cwd %s and %s): pass one\n"
+             a
+             b;
+           Core.exit 2
+         | cwd, None | None, cwd -> cwd
+         | Some _, Some _ -> cwd_flag
+       in
        let opt name v =
          Option.value_map v ~default:[] ~f:(fun v -> [ name; v ])
        in
        let backend = Option.value backend ~default:(find_backend ()) in
-       let connect =
-         match connect with
-         | Some c -> Some c
-         | None -> Sys.getenv "PRIGH_CONNECT"
+       let local = local || faux in
+       if local && Option.is_some connect
+       then (
+         Core.eprintf "-connect cannot be used with -local or -faux: pass one\n";
+         Core.exit 2);
+       let home = Sys.getenv "HOME" |> Option.value ~default:"/" in
+       let module S = Prigh_client_unix.Saved_connection in
+       let or_exit what = function
+         | Ok v -> v
+         | Error e ->
+           Core.eprintf
+             "cannot %s the saved connection: %s\n\
+              fix or delete it (prigh-tui -forget)\n"
+             what
+             (Error.to_string_hum e);
+           Core.exit 1
        in
-       let token =
-         match token with
-         | Some t -> Some t
-         | None -> Sys.getenv "PRIGH_TOKEN"
+       if forget then or_exit "delete" (S.forget ~home);
+       let saved =
+         if forget || local then None else or_exit "read" (S.load ~home)
        in
-       let user = Option.first_some user (Sys.getenv "PRIGH_USER") in
+       let { S.Resolved.settings = { connect; token; user }; save } =
+         S.resolve
+           ~saved
+           ~flags:{ connect; token; user }
+           ~env:
+             { connect = Sys.getenv "PRIGH_CONNECT"
+             ; token = Sys.getenv "PRIGH_TOKEN"
+             ; user = Sys.getenv "PRIGH_USER"
+             }
+           ~local
+       in
+       let address =
+         Option.map connect ~f:(fun addr ->
+           let bad () =
+             Core.eprintf "-connect must be HOST:PORT, got %s\n" addr;
+             Core.exit 2
+           in
+           match String.rsplit2 addr ~on:':' with
+           | Some (host, port) ->
+             (match Int.of_string_opt port with
+              | Some port ->
+                (if String.is_empty host then "127.0.0.1" else host), port
+              | None -> bad ())
+           | None -> bad ())
+       in
+       Option.iter save ~f:(fun t -> or_exit "save" (S.save ~home t));
        let local_tools =
          match tools, connect with
          | Some "local", _ | None, Some _ -> Some backend
          | Some "remote", _ | None, None -> None
          | Some other, _ ->
-           eprintf "-tools must be local or remote, got %s\n" other;
+           Core.eprintf "-tools must be local or remote, got %s\n" other;
            Core.exit 2
        in
        let cwd =
@@ -115,21 +178,8 @@ let command =
          @ Option.value_map session ~default:[] ~f:(fun s ->
            [ "session", `String s ])
        in
-       match connect with
-       | Some addr ->
-         let host, port =
-           match String.rsplit2 addr ~on:':' with
-           | Some (host, port) ->
-             (match Int.of_string_opt port with
-              | Some port ->
-                (if String.is_empty host then "127.0.0.1" else host), port
-              | None ->
-                eprintf "-connect must be HOST:PORT, got %s\n" addr;
-                Core.exit 2)
-           | None ->
-             eprintf "-connect must be HOST:PORT, got %s\n" addr;
-             Core.exit 2
-         in
+       match address with
+       | Some (host, port) ->
          Prigh_ui_term.Term_app.run
            ~connect:(fun () ->
              Prigh_client_unix.Tcp_transport.connect ~host ~port)
