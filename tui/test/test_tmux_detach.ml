@@ -88,7 +88,7 @@ let%expect_test "the environment passed on" =
     ; "PRIGH_CONNECT=srv:7777"
     ; "PRIGH_USER=ann"
     ; "PRIGH_TMUX=/nix/store/x-tmux/bin/tmux"
-    ; "PRIGH_PRIGH_WEB_ROOT=/opt/prigh/share/prigh-web"
+    ; "PRIGH_WEB_ROOT=/opt/prigh/share/web"
     ; "PRIGH_EMPTY="
     ; "PRIGH_MULTI=line one\nline two"
     ; "PRIGH_EQUALS=a=b=c"
@@ -127,7 +127,7 @@ let%expect_test "the environment passed on" =
      (PRIGH_CONNECT         srv:7777)
      (PRIGH_USER            ann)
      (PRIGH_TMUX            /nix/store/x-tmux/bin/tmux)
-     (PRIGH_PRIGH_WEB_ROOT  /opt/prigh/share/prigh-web)
+     (PRIGH_WEB_ROOT        /opt/prigh/share/web)
      (PRIGH_EMPTY           "")
      (PRIGH_MULTI           "line one\nline two")
      (PRIGH_EQUALS          a=b=c)

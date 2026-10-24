@@ -2,12 +2,12 @@ open! Core
 open Js_of_ocaml
 open Bonsai_web
 
-(** The terminal panel's xterm.js ([web-bin/terminal.js] and the vendored
+(** The terminal panel's xterm.js ([bin/terminal.js] and the vendored
     xterm.js, loaded on first use) as a widget. A new target's key replaces
     the shell's connection; the old one only detaches (the backend keeps the
     shell). *)
 
-(** Connects to [url] (see [Prigh_ui_web_app.Terminal_panel.url]) and reports
+(** Connects to [url] (see [Terminal_panel.url]) and reports
     the connection's state for the target with [key]. *)
 val view
   :  url:string

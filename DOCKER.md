@@ -1,7 +1,7 @@
 # Running prigh in Docker
 
 `Dockerfile` + `docker-compose.yml` at the repository root run the prigh
-backend in a container serving the browser UI, pi's web UI, terminal
+backend in a container serving prigh-web (the browser UI), terminal
 frontends, or an interactive TUI. They are chosen with environment
 variables.
 
@@ -23,7 +23,7 @@ and [Isolation](#isolation).
    users (see [Users](#users)).
 3. **Deploy the stack**. Portainer clones the repository and builds the
    image.
-4. Open `http://<docker-host>:7788/`, sign in (with `PRIGH_TOKEN` the user
+4. Open `http://<docker-host>:7790/`, sign in (with `PRIGH_TOKEN` the user
    is `default` and the token is the password), and `/login` to a provider
    (see [Logging in](#logging-in)).
 
@@ -52,14 +52,13 @@ serves all of them, and they share sessions:
 
 | Entry | Container port | Host port variable | What |
 |---|---|---|---|
-| `web` (default) | 7788 | `PRIGH_WEB_PORT` | the Bonsai browser UI; also accepts terminal frontends and tool hosts (`prigh-tui -connect`, `prigh tool-host -connect`) |
-| `pi-web` | 7789 | `PRIGH_PI_WEB_PORT` | pi's web UI (`pi-web/`) |
-| `prigh-web` | 7790 | `PRIGH_PRIGH_WEB_PORT` | prigh-web, the DOM browser UI (`tui/prigh-web/`); like `web`, also accepts terminal frontends and tool hosts |
+| `web` (default) | 7790 | `PRIGH_WEB_PORT` | prigh-web, the browser UI (`tui/prigh-web/`); also accepts terminal frontends and tool hosts (`prigh-tui -connect`, `prigh tool-host -connect`) |
 | `server` | 7777 | `PRIGH_SERVER_PORT` | plain TCP for terminal frontends and tool hosts only |
 | `tui` | – | – | an interactive TUI as the container's main process (must be the only entry; single-user, see below) |
 
-For example, `PRIGH_MODE=web,pi-web` serves two web UIs, and
-`PRIGH_MODE=prigh-web` only prigh-web.
+For example, `PRIGH_MODE=web,server` serves prigh-web and a plain TCP
+port. The former entries `prigh-web` (now `web`, same port)
+and `pi-web` (removed) are refused with a message saying so.
 
 ### TUI
 
@@ -74,7 +73,7 @@ There are two ways to get a TUI:
   as `default` by itself. Extra arguments go to `prigh-tui`. `-tools local`
   is refused, because the TUI runs as the `prigh` service user; to host
   tools from a console, run it as the user:
-  `prigh-docker as NAME prigh-tui -connect 127.0.0.1:7788 -user NAME -token TOKEN -tools local`.
+  `prigh-docker as NAME prigh-tui -connect 127.0.0.1:7790 -user NAME -token TOKEN -tools local`.
 - **As the container's process.** Set `PRIGH_MODE=tui` and attach to the
   container: `docker attach prigh-prigh-1` (detach with Ctrl+P Ctrl+Q), or
   **Attach** in Portainer. No ports are used, and `/quit` stops the
@@ -85,7 +84,7 @@ There are two ways to get a TUI:
   the `default` namespace.
 
 From another machine, connect to the web or server port:
-`prigh-tui -connect <docker-host>:7788 -user NAME -token TOKEN -cwd ~/proj`.
+`prigh-tui -connect <docker-host>:7790 -user NAME -token TOKEN -cwd ~/proj`.
 By default the tools then run on *that* machine. Add `-tools remote` to run
 them on the user's tool host in the container instead.
 
@@ -139,9 +138,9 @@ connects a tool host from their own machine, which runs that user's tools
 and `>_` terminal:
 
 ```
-prigh tool-host -connect <docker-host>:7788 -user <name> -token <their token> -cwd ~/proj
+prigh tool-host -connect <docker-host>:7790 -user <name> -token <their token> -cwd ~/proj
 # or, with the tools themselves in a throwaway container on that machine:
-docker run --rm -it -v "$PWD:/work" -w /work <image> prigh tool-host -connect <docker-host>:7788 -user <name> -token <their token> -cwd /work
+docker run --rm -it -v "$PWD:/work" -w /work <image> prigh tool-host -connect <docker-host>:7790 -user <name> -token <their token> -cwd /work
 ```
 
 Then `/host` in the web UI (or TUI) picks it. A TUI started with
@@ -164,7 +163,7 @@ user, `default`.
 | `PRIGH_NO_BACKEND_HOST` | – | `1`: no tool hosts in the container; tools and terminals run only on hosts the users connect |
 | `PRIGH_ALLOW_NO_TOKEN` | – | set to `1` to start without a token (only behind something else that authenticates) |
 | `PRIGH_BIND` | `0.0.0.0` | host address the ports are published on (`127.0.0.1` keeps them local, e.g. behind a reverse proxy) |
-| `PRIGH_WEB_PORT`, `PRIGH_PI_WEB_PORT`, `PRIGH_PRIGH_WEB_PORT`, `PRIGH_SERVER_PORT` | 7788, 7789, 7790, 7777 | host ports |
+| `PRIGH_WEB_PORT`, `PRIGH_SERVER_PORT` | 7790, 7777 | host ports |
 | `PRIGH_WORKSPACE` | volume `prigh-workspace` | host path to bind at `/workspace` instead of the named volume. It must be world-searchable (`o+x`) so that users reach their `/workspace/<name>` |
 | `PRIGH_ARGS` | – | extra backend arguments, e.g. `-model anthropic/claude-sonnet-4-5 -thinking high`, or `-faux` for a scripted provider with no API calls |
 | `PRIGH_TUI_ARGS` | – | extra `prigh-tui` arguments for `PRIGH_MODE=tui` |
@@ -367,7 +366,7 @@ Removing the stack keeps named volumes unless they are removed
 explicitly (`docker compose down -v` deletes them, logins and sessions
 included).
 
-**Getting files out (and in).** In prigh-web (`PRIGH_MODE=prigh-web`,
+**Getting files out (and in).** In prigh-web (`PRIGH_MODE=web`,
 port 7790), the folder button in the top bar (Ctrl+Shift+F) browses the
 session's directory in the container: select a file and Download it, or a
 directory to download it as a `.tar.gz` (`tar -tzf` lists it; `tar -xzf`
@@ -460,13 +459,12 @@ build slower but does not break it.
 1. A `nixos/nix` stage builds `.#backend` and `.#tui` from the flake. It
    first builds only their dependencies, from a copy of the files that
    determine them, so that layer stays cached. It then keeps just the two
-   binaries, the web assets and, as the Nix seed, the few store paths the
+   binaries, prigh-web's site and, as the Nix seed, the few store paths the
    binaries link against (glibc, gmp) plus the `nix` of the `nixos/nix`
    image with its closure and their database registration (`nix-store
    --dump-db`), about 160 MB instead of the ~10 GB build closure. It also
    writes the flake registry that pins `nixpkgs` to `flake.lock`.
-2. A `node` stage builds `pi-web/` with `npm ci && npm run build`.
-3. The runtime stage is `debian:bookworm-slim`. `tini -g` is PID 1, so
+2. The runtime stage is `debian:bookworm-slim`. `tini -g` is PID 1, so
    signals reach the backend and tool hosts and child processes are
    reaped. `libnss-extrausers` lets the entrypoint add users at runtime
    despite the read-only root (`/var/lib/extrausers` points into `/run`);

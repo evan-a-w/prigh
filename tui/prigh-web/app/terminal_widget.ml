@@ -1,10 +1,9 @@
 open! Core
 open Js_of_ocaml
 open Bonsai_web
-module Browser = Prigh_ui_web_app.Browser
 module Status = Prigh_web.Terminal.Status
 
-let contains = Prigh_ui_web_app.Terminal_panel.contains
+let contains = Terminal_panel.contains
 
 let only_inside
       (records : MutationObserver.mutationRecord Js.t Js.js_array Js.t)

@@ -136,7 +136,7 @@ run_tests() {
 	pd login alice
 	pd PRIGH_TOKENS=alice=tok-a tui
 	pd PRIGH_MODE=web,server tui -session s1
-	pd PRIGH_MODE=pi-web tui
+	pd PRIGH_MODE=web tui
 	pd tui -tools remote
 	pd tui -tools local
 	pd PRIGH_TOKEN=tok tui
@@ -186,14 +186,14 @@ run_tests() {
 	files /run/prigh/users
 	dirs
 
-	section "old layout: the volume was prigh's home; single PRIGH_TOKEN; pi-web only"
+	section "old layout: the volume was prigh's home; single PRIGH_TOKEN; web only"
 	fake_root
 	owned /home 1000
 	mkdir -p "$r/home/.prigh/sessions" "$r/home/.config/prigh" "$r/home/.ssh"
 	touch "$r/home/.bashrc" "$r/home/.config/prigh/auth.json" "$r/home/.ssh/id_ed25519"
 	owned /workspace/proj 1000
 	owned /workspace/default 1000
-	pd PRIGH_TOKEN=tok PRIGH_MODE=pi-web
+	pd PRIGH_TOKEN=tok PRIGH_MODE=web
 	(cd "$r/home" && find . | LC_ALL=C sort)
 	dirs
 
@@ -203,12 +203,13 @@ run_tests() {
 	mkdir -p "$r/home/.config"
 	pd PRIGH_TOKEN=tok
 
-	section "prigh-web: alone (tool hosts connect to it), and with pi-web"
+	section "web alone (tool hosts connect to it); the old mode names"
 	fake_root
 	owned /home/prigh 1000
+	pd PRIGH_TOKEN=tok PRIGH_MODE=web
 	pd PRIGH_TOKEN=tok PRIGH_MODE=prigh-web
-	pd PRIGH_TOKEN=tok PRIGH_MODE=pi-web,prigh-web
-	pd PRIGH_TOKEN=tok PRIGH_MODE=prigh-web healthcheck
+	pd PRIGH_TOKEN=tok PRIGH_MODE=pi-web,web
+	pd PRIGH_TOKEN=tok PRIGH_MODE=web healthcheck
 
 	section "no token: no auth, one tool host as default without a token"
 	fake_root

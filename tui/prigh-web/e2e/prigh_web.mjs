@@ -1,4 +1,4 @@
-// Drives a real browser against `prigh serve -prigh-web ... -faux-script`
+// Drives a real browser against `prigh serve -web ... -faux-script`
 // (see prigh_web.sh) and prints normalised snapshots of what the page shows.
 // It owns the backend so that it can restart it. The expected output lives
 // in prigh_web.expected.
@@ -109,7 +109,7 @@ const startServer = (listen, scriptFile) =>
   new Promise((resolve, reject) => {
     server = spawn(
       backend,
-      ["serve", "-prigh-web", listen, "-prigh-web-root", site, "-faux-script", scriptFile,
+      ["serve", "-web", listen, "-web-root", site, "-faux-script", scriptFile,
         "-token", token, "-cwd", cwd],
       // The terminal's tmux server is ours (not a shared -L prigh), so its
       // shell is $SHELL.

@@ -1,13 +1,12 @@
 # prigh in a container: see DOCKER.md.
 #
-# Stage 1 builds the backend and the TUI/Bonsai web frontend with the flake
-# (OxCaml is only practical to build through Nix). Stage 2 builds pi's web
-# UI with npm. The runtime image is Debian with just the two binaries, the
-# few Nix store paths they link against, the static web assets, and Nix
-# itself for the agents to install tools with.
+# The first stage builds the backend, the TUI and prigh-web with the flake
+# (OxCaml is only practical to build through Nix). The runtime image is
+# Debian with just the two binaries, the few Nix store paths they link
+# against, prigh-web's static assets, and Nix itself for the agents to
+# install tools with.
 
 ARG NIX_IMAGE=nixos/nix:2.35.2
-ARG NODE_IMAGE=node:22-bookworm-slim
 ARG RUNTIME_IMAGE=debian:bookworm-slim
 
 FROM ${NIX_IMAGE} AS nix-build
@@ -41,7 +40,6 @@ RUN nix build --out-link /out/backend path:/src#backend \
  && mkdir -p /opt/prigh/bin /opt/prigh/share \
  && cp -L /out/backend/bin/prigh /out/tui/bin/prigh-tui /opt/prigh/bin/ \
  && cp -rL --preserve=timestamps /out/tui/share/prigh_tui/web /opt/prigh/share/web \
- && cp -rL --preserve=timestamps /out/tui/share/prigh_tui/prigh-web /opt/prigh/share/prigh-web \
  && chmod -R u+w /opt/prigh \
  && refs=$(grep -raoh '/nix/store/[a-z0-9]\{32\}-[-a-zA-Z0-9+._?=]*' /opt/prigh | sort -u) \
  && echo "runtime store paths: $refs" \
@@ -57,14 +55,6 @@ RUN nix build --out-link /out/backend path:/src#backend \
       locked = lock.nodes.${lock.nodes.root.inputs.nixpkgs}.locked; \
     in builtins.toJSON { version = 2; flakes = [ { from = { type = "indirect"; id = "nixpkgs"; }; \
       to = { inherit (locked) type owner repo rev narHash lastModified; }; } ]; }' >/seed/flake-registry.json
-
-FROM ${NODE_IMAGE} AS pi-web-build
-WORKDIR /src/pi-web
-COPY pi-web/package.json pi-web/package-lock.json ./
-RUN npm ci --no-audit --no-fund
-COPY tui/web-bin /src/tui/web-bin
-COPY pi-web ./
-RUN npm run build
 
 FROM ${RUNTIME_IMAGE}
 ARG EXTRA_APT_PACKAGES=""
@@ -95,7 +85,6 @@ RUN sed -i -E '/extrausers/! s/^(passwd|group|shadow):(.*)$/\1:\2 extrausers/' /
 # entrypoint copies the missing ones in at every start.
 COPY --from=nix-build /seed /opt/nix-seed
 COPY --from=nix-build /opt/prigh /opt/prigh
-COPY --from=pi-web-build /src/pi-web/dist /opt/prigh/share/pi-web
 COPY docker/prigh-docker /usr/local/bin/prigh-docker
 COPY docker/gitconfig /etc/gitconfig
 COPY docker/ssh_known_hosts /etc/ssh/ssh_known_hosts
@@ -120,8 +109,6 @@ RUN mv /opt/nix-seed/flake-registry.json /etc/nix/ \
 ENV LANG=C.UTF-8 \
     PRIGH_BACKEND=/opt/prigh/bin/prigh \
     PRIGH_WEB_ROOT=/opt/prigh/share/web \
-    PRIGH_PI_WEB_ROOT=/opt/prigh/share/pi-web \
-    PRIGH_PRIGH_WEB_ROOT=/opt/prigh/share/prigh-web \
     PRIGH_MODE=web \
     GIT_TERMINAL_PROMPT=0
 
@@ -129,7 +116,7 @@ ENV LANG=C.UTF-8 \
 # Each user's own directory is /workspace/<name>.
 WORKDIR /workspace
 VOLUME ["/home", "/workspace", "/nix"]
-EXPOSE 7777 7788 7789 7790
+EXPOSE 7777 7790
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s CMD ["prigh-docker", "healthcheck"]
 # -g: stop signals go to the whole process group (backend and tool hosts).
 ENTRYPOINT ["tini", "-g", "--", "prigh-docker"]

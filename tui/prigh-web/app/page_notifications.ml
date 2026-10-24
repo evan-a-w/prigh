@@ -1,7 +1,6 @@
 open! Core
 open! Async_kernel
 open Js_of_ocaml
-module Browser = Prigh_ui_web_app.Browser
 
 let notification_class () : Js.Unsafe.any =
   Js.Unsafe.get Dom_html.window "Notification"

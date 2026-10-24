@@ -1,6 +1,5 @@
 open! Core
 open Js_of_ocaml
-module Browser = Prigh_ui_web_app.Browser
 module Action = Prigh_web.App.Action
 
 let closest (el : Dom_html.element Js.t) selector : Dom_html.element Js.t option
