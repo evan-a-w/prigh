@@ -953,6 +953,7 @@ let%expect_test "find_summary: exact id, unique prefix, ambiguous, missing" =
     ; name = None
     ; description = None
     ; cwd = "/a"
+    ; host = None
     ; created_at = ""
     ; updated_at = ""
     ; first_prompt = None

@@ -30,6 +30,9 @@ type t =
         credentials), a run hands over to the next one after it *)
   ; default_cwd : string option
     (** where new sessions start on the backend host *)
+  ; worktrees_dir : string
+    (** where prigh creates git worktrees on the tool host (default
+        [~/.prigh/worktrees], see {!Worktree}) *)
   ; max_budget_usd : float option
     (** the cost budget of sessions that set none ([/budget]); the CLI's
         [-max-budget-usd] overrides it *)
@@ -54,6 +57,7 @@ type t =
 [@@deriving sexp_of]
 
 val default : t
+val default_worktrees_dir : string
 
 (** [auto_background_seconds], [None] when off. *)
 val auto_background : t -> float option
