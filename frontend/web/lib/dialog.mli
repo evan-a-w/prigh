@@ -72,6 +72,17 @@ type t =
   | Loading of string
   (** the title of a dialog waiting for its list from the backend *)
   | Diff of Git_diff.t (** [/diff] *)
+  | Pulls of Pull_requests.t (** [/pr]: the repository's pull requests *)
+  | Pull of Pr_page.t (** one of them *)
+  | Pr_create of Pr_create.t (** [/pr new] *)
+  | Pr_checked_out of
+      { number : int
+      ; checkout : Pr_checkout.t
+      } (** [/pr checkout N] done: work there? *)
+  | Forge_host of
+      { input : string
+      ; error : string option
+      } (** [/login forgejo]: which host? *)
 [@@deriving sexp_of, equal]
 
 (** Belongs to the session (closed when switching). *)

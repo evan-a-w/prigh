@@ -66,6 +66,17 @@ type t =
   | Mcp_tools of Mcp_server.t
   | Loading of string
   | Diff of Git_diff.t
+  | Pulls of Pull_requests.t
+  | Pull of Pr_page.t
+  | Pr_create of Pr_create.t
+  | Pr_checked_out of
+      { number : int
+      ; checkout : Pr_checkout.t
+      }
+  | Forge_host of
+      { input : string
+      ; error : string option
+      }
 [@@deriving sexp_of, equal]
 
 let per_session = function
@@ -78,6 +89,10 @@ let per_session = function
   | Mcp_tools _
   | Loading _
   | Diff _
+  | Pulls _
+  | Pull _
+  | Pr_create _
+  | Pr_checked_out _
   | Picker
       { kind = Fork _ | Rewind _ | Tree | Hosts | Skills | Mcp _ | Modes | Jump
       ; _
@@ -95,6 +110,12 @@ let per_session = function
           | Accounts )
       ; _
       }
-  | Help | Hotkeys | Settings | Scoped_models _ | Delete _ | Login _ | Auth _ ->
-    false
+  | Help
+  | Hotkeys
+  | Settings
+  | Scoped_models _
+  | Delete _
+  | Login _
+  | Auth _
+  | Forge_host _ -> false
 ;;

@@ -17,10 +17,11 @@ type t =
   ; input : string
   ; selected : int
   ; failed : string option
+  ; forge : string option
   }
 [@@deriving sexp_of, equal]
 
-let start ?(purpose = Purpose.Login) provider =
+let start ?(purpose = Purpose.Login) ?forge provider =
   { provider
   ; purpose
   ; url = None
@@ -29,7 +30,27 @@ let start ?(purpose = Purpose.Login) provider =
   ; input = ""
   ; selected = 0
   ; failed = None
+  ; forge
   }
+;;
+
+(* Letters and digits, then a dash and more: [ABCD-1234]. *)
+let is_code word =
+  match String.lsplit2 word ~on:'-' with
+  | Some (a, b) ->
+    let part p =
+      String.length p >= 4
+      && String.for_all p ~f:(fun c -> Char.is_uppercase c || Char.is_digit c)
+    in
+    part a && part b
+  | None -> false
+;;
+
+let device_code t =
+  Option.bind t.url ~f:(fun (_, instructions) ->
+    String.split instructions ~on:' '
+    |> List.map ~f:(String.strip ~drop:(fun c -> not (Char.is_alphanum c)))
+    |> List.find ~f:is_code)
 ;;
 
 let apply t (event : Auth_event.t) =

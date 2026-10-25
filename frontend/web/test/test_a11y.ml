@@ -32,6 +32,7 @@ let%expect_test "the names of the controls" =
     button "Commands & keys" -- Commands and keys (/help)
     button "Sessions" -- Sessions (Ctrl+B)
     button "New session" -- Rename (/name)
+    button "main" -- main: pull requests (/pr)
     button "Context 0% full" -- Context: 0 of 200k tokens (/compact frees some). Click for the session's details (/session)
     button "Files" -- Files (Ctrl+Shift+F)
     button "Terminal" -- Terminal (Ctrl+`)

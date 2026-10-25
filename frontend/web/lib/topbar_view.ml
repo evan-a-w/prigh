@@ -95,8 +95,14 @@ let view (m : App.Model.t) ~inject =
                   [ where state.cwd
                   ; (match state.git_branch with
                      | Some branch ->
-                       Node.span
-                         ~attrs:[ Attr.class_ "branch"; Attr.title branch ]
+                       Node.button
+                         ~attrs:
+                           [ Attr.class_ "branch"
+                           ; Attr.type_ "button"
+                           ; Attr.title (branch ^ ": pull requests (/pr)")
+                           ; Attr.create "aria-haspopup" "dialog"
+                           ; Attr.on_click (fun _ -> inject (Action.Run "/pr"))
+                           ]
                          [ icon Branch; span ~cls:"branch-name" branch ]
                      | None -> Node.none)
                   ]

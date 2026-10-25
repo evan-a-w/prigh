@@ -270,12 +270,12 @@ let%expect_test "selecting sessions: click, shift-click a range, delete them" =
   [%expect
     {|
     Select sessions Shift for a range
-    (fix the parser bug 2m ago /work 3.9 KB)
-    (Release notes 2m ago /work 11.7 KB)
-    (Open elsewhere 2m ago /work 2.9 KB)
+    (☐ fix the parser bug 2m ago /work 3.9 KB)
+    (☐ Release notes 2m ago /work 11.7 KB)
+    (☐ Open elsewhere 2m ago /work 2.9 KB)
     (Archived 2)
-    (Old lexer 2m ago /work 195.3 KB)
-    (Older docs 2m ago /work 1.2 MB)
+    (☐ Old lexer 2m ago /work 195.3 KB)
+    (☐ Older docs 2m ago /work 1.2 MB)
     (Cancel) (Delete sessions)
     |}];
   H.elements h ~selector:".selection-bar button[disabled]";
@@ -359,9 +359,9 @@ let%expect_test "selecting sessions: click, shift-click a range, delete them" =
   [%expect
     {|
     Select sessions Shift for a range
-    (fix the parser bug 2m ago /work 3.9 KB)
-    (Release notes 2m ago /work 11.7 KB)
-    (Open elsewhere 2m ago /work 2.9 KB)
+    (☐ fix the parser bug 2m ago /work 3.9 KB)
+    (☑ Release notes 2m ago /work 11.7 KB)
+    (☑ Open elsewhere 2m ago /work 2.9 KB)
     (Cancel) (Delete 2 sessions (14.6 KB))
     |}];
   H.key h "Escape" ~target:(Session "s2");
