@@ -1232,14 +1232,26 @@ try {
   const filesBefore = await width(".files-panel");
   const bodyWhileDragging = await drag("files", -160, 0);
   console.log(`while dragging: ${bodyWhileDragging}; no text selected: ${await page.evaluate(() => getSelection().toString() === "")}`);
-  console.log(`dragged 160px left: ${filesBefore} -> ${await width(".files-panel")} (aria ${await valueNow("files")}), kept ${await page.evaluate(() => localStorage.getItem("prigh-web.files-width"))}`);
+  // Kept with the user's preferences on the backend.
+  const keptWidth = async expected => {
+    const read = () => {
+      try {
+        return JSON.parse(readFileSync(join(home, ".prigh/prefs.json"), "utf8"))["web.files-width"] ?? null;
+      } catch {
+        return null;
+      }
+    };
+    for (let i = 0; i < 50 && read() !== expected; i++) await page.waitForTimeout(100);
+    return read();
+  };
+  console.log(`dragged 160px left: ${filesBefore} -> ${await width(".files-panel")} (aria ${await valueNow("files")}), kept ${await keptWidth(560)}`);
   await page.waitForFunction(() => !document.body.className.includes("resizing"));
   await screenshot("resize: the file browser wider");
   await drag("files", -600, 0);
   console.log(`as wide as it goes: ${await width(".files-panel")}, the chat keeps ${await width(".main")}`);
   await handle("files").dblclick();
   await page.waitForFunction(() => document.querySelector(".resizer[data-resize=files]").getAttribute("aria-valuenow") === "400");
-  console.log(`double-clicked: ${await width(".files-panel")}, kept ${await page.evaluate(() => localStorage.getItem("prigh-web.files-width"))}`);
+  console.log(`double-clicked: ${await width(".files-panel")}, kept ${await keptWidth(null)}`);
   await handle("files").focus();
   await page.keyboard.press("ArrowLeft");
   await page.keyboard.press("Shift+ArrowLeft");

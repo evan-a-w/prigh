@@ -521,6 +521,13 @@ let%expect_test "reconnecting with older pages loaded" =
     (Rpc (method_ list_models) (params ()) (tag Models))
     (Rpc (method_ auth_status) (params ()) (tag (Auth_status Refresh)))
     (Rpc (method_ get_config) (params ()) (tag Config))
+    (Rpc (method_ get_prefs)
+     (params
+      ((keys
+        (web.theme web.accent web.notify web.verbosity web.terminal-open history
+         web.migrated web.sidebar-width web.files-width web.files-split
+         web.agents-width web.terminal-height))))
+     (tag Prefs))
     (Rpc (method_ get_messages_page)
      (params ((session /sessions/s2.jsonl) (from e3) (limit 60)))
      (tag (Resync (session s2) (from (e3)))))
@@ -587,6 +594,13 @@ let%expect_test "reconnecting when what was on show has gone from the session" =
     (Rpc (method_ list_models) (params ()) (tag Models))
     (Rpc (method_ auth_status) (params ()) (tag (Auth_status Refresh)))
     (Rpc (method_ get_config) (params ()) (tag Config))
+    (Rpc (method_ get_prefs)
+     (params
+      ((keys
+        (web.theme web.accent web.notify web.verbosity web.terminal-open history
+         web.migrated web.sidebar-width web.files-width web.files-split
+         web.agents-width web.terminal-height))))
+     (tag Prefs))
     (Rpc (method_ get_messages_page)
      (params ((session /sessions/s2.jsonl) (from e5) (limit 60)))
      (tag (Resync (session s2) (from (e5)))))

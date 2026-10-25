@@ -11,11 +11,6 @@ val permission : unit -> string
     [Notification.permission]'s value. *)
 val request_permission : unit -> string Deferred.t
 
-(** [/notify on|off], kept in localStorage ([prigh-web.notify]); on unless
-    turned off. *)
-val saved : unit -> bool
-
-val save : bool -> unit
 val show : Prigh_ui.Notify.t -> unit
 
 (** Called with whether the page is hidden, now and on every change. *)

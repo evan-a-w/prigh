@@ -364,7 +364,7 @@ explicitly (`docker compose down -v` deletes them, logins and sessions
 included).
 
 **Getting files out (and in).** In prigh-web (`PRIGH_MODE=web`,
-port 7790), the folder button beside the session's title (Ctrl+Shift+F) browses the
+port 7790), the folder button at the chat's top right (Ctrl+Shift+F) browses the
 session's directory in the container: select a file and Download it, or a
 directory to download it as a `.tar.gz` (`tar -tzf` lists it; `tar -xzf`
 unpacks it into a directory of its name). The upload button, or files

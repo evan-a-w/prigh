@@ -512,6 +512,7 @@ let apply t (event : P.Event.t) =
   | P.Event.Terminal_kill _
   | P.Event.Btw_delta _
   | P.Event.Sessions_changed
+  | P.Event.Prefs_changed _
   | P.Event.Config_changed _ -> t
 ;;
 

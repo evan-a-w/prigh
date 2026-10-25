@@ -327,7 +327,8 @@ let rec apply t (event : Event.t) =
   | Terminal_close _
   | Terminal_kill _
   | Btw_delta _
-  | Sessions_changed -> t
+  | Sessions_changed
+  | Prefs_changed _ -> t
 ;;
 
 let rec received (event : Event.t) ~at : Event.t =
