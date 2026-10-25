@@ -431,6 +431,7 @@ module Model = struct
     | None -> false
   ;;
 
+  let docked t = t.sidebar_open && not t.narrow
   let waiting t = not (List.is_empty t.confirms && List.is_empty t.questions)
 
   let active t =

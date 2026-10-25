@@ -1,9 +1,11 @@
 open! Core
+open Prigh_web
 module H = Harness
 
 (* The model, the thinking level and the approval mode beside each other
-   along the bottom of the composer's box: always shown, each opening its
-   picker. The top bar has the session and, in its middle, the status. *)
+   along the bottom of the composer's box: always shown, each opening the
+   picker its command opens. The session and its status are in the docked
+   sidebar's card, else in a slim bar over the chat. *)
 
 let controls h = H.text h ~selector:".composer-controls"
 
@@ -133,7 +135,9 @@ let%expect_test "every approval mode, as the chip names it" =
     |}]
 ;;
 
-let%expect_test "the top bar: title, cwd and branch, the status, the panels" =
+let%expect_test
+    "the docked sidebar's card: title, cwd and branch, host, status, panels"
+  =
   let h =
     H.create
       ~state:
@@ -142,38 +146,94 @@ let%expect_test "the top bar: title, cwd and branch, the status, the panels" =
              [ "cwd", `String "/home/ada/projects/prigh/tui"
              ; "git_branch", `String "feature/narrow-top-bar"
              ; "plan_mode", `True
+             ; "active_host", `String "backend"
+             ; ( "hosts"
+               , Jsonaf.of_string
+                   {|[{"id":"backend","name":"desktop","cwd":"/home/ada/projects/prigh/tui"}]|}
+               )
              ]
            ())
       ()
   in
-  H.show h ~selector:".topbar";
+  (* Above the account, at the foot of the sidebar; nothing over the chat. *)
+  H.elements h ~selector:".sidebar > *";
+  H.elements h ~selector:".main > *";
   [%expect
     {|
-    <header class="topbar">
-      <div class="topbar-start">
-        <button type="button"
-                title="Sessions (Ctrl+B)"
-                aria-label="Sessions"
-                class="btn ghost icon toggle-sidebar"
-                @on_click>
-          <icon class="menu"> </icon>
+    <div class="sidebar-head">
+    <button class="btn new-session">
+    <div class="search">
+    <Vdom.Node.none-widget class="">
+    <div class="sessions">
+    <Vdom.Node.none-widget class="">
+    <section class="session-card">
+    <div class="sidebar-footer">
+    <Vdom.Node.none-widget class="">
+    <Vdom.Node.none-widget class="">
+    <div class="chat-frame">
+    <div class="toast-anchor">
+    <Vdom.Node.none-widget class="">
+    <footer class="composer">
+    <Vdom.Node.none-widget class="">
+    |}];
+  H.show h ~selector:".session-card";
+  [%expect
+    {|
+    <section aria-label="This session" class="session-card">
+      <div class="card-head">
+        <button type="button" title="Rename (/name)" class="session-name" @on_click>
+          <span dir="auto"> New session </span>
+          <icon class="pencil"> </icon>
         </button>
-        <div class="title">
-          <button type="button" title="Rename (/name)" class="session-name" @on_click>
-            <span dir="auto"> New session </span>
-            <icon class="pencil"> </icon>
+        <div class="panel-toggles">
+          <button type="button"
+                  title="Files (Ctrl+Shift+F)"
+                  aria-label="Files"
+                  aria-expanded="false"
+                  class="btn files-toggle ghost icon"
+                  @on_click>
+            <icon class="folder"> </icon>
           </button>
-          <div class="session-where">
-            <span title="/home/ada/projects/prigh/tui" class="where">
-              <span class="where-head"> ~/projects/prigh </span>
-              <span class="where-tail"> /tui </span>
-            </span>
-            <span title="feature/narrow-top-bar" class="branch">
-              <icon class="branch"> </icon>
-              <span class="branch-name"> feature/narrow-top-bar </span>
-            </span>
-          </div>
+          <button type="button"
+                  title="Terminal (Ctrl+`)"
+                  aria-label="Terminal"
+                  aria-expanded="false"
+                  class="btn ghost icon terminal-toggle"
+                  @on_click>
+            <icon class="terminal"> </icon>
+          </button>
+          <Vdom.Node.none-widget> </Vdom.Node.none-widget>
         </div>
+      </div>
+      <div class="session-where">
+        <span title="/home/ada/projects/prigh/tui" class="where">
+          <span class="where-head"> ~/projects/prigh </span>
+          <span class="where-tail"> /tui </span>
+        </span>
+        <span title="feature/narrow-top-bar" class="branch">
+          <icon class="branch"> </icon>
+          <span class="branch-name"> feature/narrow-top-bar </span>
+        </span>
+      </div>
+      <div class="card-host">
+        <button type="button"
+                title="Tools run on desktop, in /home/ada/projects/prigh/tui (/host switches)"
+                class="host link status-item"
+                @on_click>
+          <icon class="server"> </icon>
+          <span class="status-text"> desktop </span>
+        </button>
+      </div>
+      <div class="status-extras">
+        <Vdom.Node.none-widget> </Vdom.Node.none-widget>
+        <Vdom.Node.none-widget> </Vdom.Node.none-widget>
+        <Vdom.Node.none-widget> </Vdom.Node.none-widget>
+        <Vdom.Node.none-widget> </Vdom.Node.none-widget>
+        <Vdom.Node.none-widget> </Vdom.Node.none-widget>
+        <Vdom.Node.none-widget> </Vdom.Node.none-widget>
+        <Vdom.Node.none-widget> </Vdom.Node.none-widget>
+        <Vdom.Node.none-widget> </Vdom.Node.none-widget>
+        <Vdom.Node.none-widget> </Vdom.Node.none-widget>
       </div>
       <div class="status">
         <button type="button"
@@ -193,47 +253,211 @@ let%expect_test "the top bar: title, cwd and branch, the status, the panels" =
           <span class="label"> Ready </span>
         </span>
       </div>
-      <div class="topbar-end">
-        <div class="status-extras">
-          <Vdom.Node.none-widget> </Vdom.Node.none-widget>
-          <Vdom.Node.none-widget> </Vdom.Node.none-widget>
-          <Vdom.Node.none-widget> </Vdom.Node.none-widget>
-          <Vdom.Node.none-widget> </Vdom.Node.none-widget>
-          <Vdom.Node.none-widget> </Vdom.Node.none-widget>
-          <Vdom.Node.none-widget> </Vdom.Node.none-widget>
-          <Vdom.Node.none-widget> </Vdom.Node.none-widget>
-          <Vdom.Node.none-widget> </Vdom.Node.none-widget>
-          <Vdom.Node.none-widget> </Vdom.Node.none-widget>
-        </div>
-        <div class="panel-toggles">
-          <button type="button"
-                  title="Files (Ctrl+Shift+F)"
-                  aria-label="Files"
-                  aria-expanded="false"
-                  class="btn files-toggle ghost icon"
-                  @on_click>
-            <icon class="folder"> </icon>
-          </button>
-          <button type="button"
-                  title="Terminal (Ctrl+`)"
-                  aria-label="Terminal"
-                  aria-expanded="false"
-                  class="btn ghost icon terminal-toggle"
-                  @on_click>
-            <icon class="terminal"> </icon>
-          </button>
-          <Vdom.Node.none-widget> </Vdom.Node.none-widget>
-          <button type="button"
-                  title="Settings (Ctrl+, or /settings)"
-                  aria-label="Settings"
-                  aria-haspopup="dialog"
-                  class="btn ghost icon settings-toggle"
-                  @on_click>
-            <icon class="gear"> </icon>
-          </button>
-        </div>
+    </section>
+    |}];
+  H.text h ~selector:".session-card";
+  [%expect
+    {|
+    (New session)
+    (Files (Ctrl+Shift+F)) (Terminal (Ctrl+`))
+    ~/projects/prigh /tui feature/narrow-top-bar
+    (desktop)
+    (0%) ↑0 ↓0 $0.0000 Ready
+    |}]
+;;
+
+let%expect_test "the host opens the host picker, as /host does" =
+  let hosts =
+    {|[{"id":"backend","name":"desktop","cwd":"/work"},{"id":"c7","name":"laptop","cwd":"/home/ann/work","session_id":"s1","session_name":null}]|}
+  in
+  let h =
+    H.create
+      ~state:(H.state_json ~fields:[ "hosts", Jsonaf.of_string hosts ] ())
+      ()
+  in
+  H.click h ~selector:".card-host .host";
+  let clicked = (H.model h).dialog in
+  H.text h ~selector:".modal";
+  H.key h "Escape" ~target:Field;
+  H.quiet h (fun () -> H.act h (Run "/host"));
+  print_s [%sexp (Option.equal Dialog.equal clicked (H.model h).dialog : bool)];
+  [%expect
+    {|
+    (Run /host)
+    (Focus picker-input)
+    Where tools run
+    (Close (Esc))
+    []
+    desktop /work ✓
+    laptop /home/ann/work
+    ↑↓ to move, Enter to choose, Esc to close
+    Close_dialog
+    (Focus editor)
+    true
+    |}];
+  (* Elsewhere than the backend, the header says so too; with no host at
+     all, the card says that. *)
+  H.key h "Escape" ~target:Field;
+  H.event
+    h
+    (sprintf
+       {|{"event":"state","state":%s}|}
+       (H.state_json
+          ~fields:
+            [ "hosts", Jsonaf.of_string hosts; "active_host", `String "c7" ]
+          ()));
+  H.text h ~selector:".card-host";
+  H.quiet h (fun () -> H.act h Toggle_sidebar);
+  H.names h ~selector:".session-bar .host";
+  H.quiet h (fun () -> H.act h Toggle_sidebar);
+  H.event
+    h
+    (sprintf
+       {|{"event":"state","state":%s}|}
+       (H.state_json
+          ~fields:[ "hosts", `Array []; "active_host", `String "" ]
+          ()));
+  H.text h ~selector:".card-host";
+  H.elements h ~selector:".card-host .host";
+  [%expect
+    {|
+    Close_dialog
+    (Focus editor)
+    (laptop)
+    button "laptop" -- Tools run on laptop, in /home/ann/work (/host switches)
+    (No host)
+    <button class="host link status-item warm">
+    |}]
+;;
+
+let%expect_test "without the docked sidebar, a slim bar over the chat" =
+  let h =
+    H.create
+      ~state:
+        (H.state_json
+           ~fields:
+             [ "cwd", `String "/home/ada/projects/prigh/tui"
+             ; "git_branch", `String "main"
+             ]
+           ())
+      ()
+  in
+  H.key h "b" ~ctrl:true;
+  H.elements h ~selector:".session-card";
+  H.elements h ~selector:".main > *";
+  H.show h ~selector:".session-bar";
+  [%expect
+    {|
+    Toggle_sidebar
+    <header class="session-bar">
+    <Vdom.Node.none-widget class="">
+    <div class="chat-frame">
+    <div class="toast-anchor">
+    <Vdom.Node.none-widget class="">
+    <footer class="composer">
+    <Vdom.Node.none-widget class="">
+    <header class="session-bar">
+      <button type="button"
+              title="Sessions (Ctrl+B)"
+              aria-label="Sessions"
+              class="btn ghost icon toggle-sidebar"
+              @on_click>
+        <icon class="menu"> </icon>
+      </button>
+      <button type="button" title="Rename (/name)" class="session-name" @on_click>
+        <span dir="auto"> New session </span>
+        <icon class="pencil"> </icon>
+      </button>
+      <div class="status-extras">
+        <Vdom.Node.none-widget> </Vdom.Node.none-widget>
+        <Vdom.Node.none-widget> </Vdom.Node.none-widget>
+        <Vdom.Node.none-widget> </Vdom.Node.none-widget>
+        <Vdom.Node.none-widget> </Vdom.Node.none-widget>
+        <Vdom.Node.none-widget> </Vdom.Node.none-widget>
+        <Vdom.Node.none-widget> </Vdom.Node.none-widget>
+        <Vdom.Node.none-widget> </Vdom.Node.none-widget>
+        <Vdom.Node.none-widget> </Vdom.Node.none-widget>
+        <Vdom.Node.none-widget> </Vdom.Node.none-widget>
       </div>
+      <div class="status">
+        <button type="button"
+                title="Context: 0 of 200k tokens (/compact frees some). Click for the session's details (/session)"
+                aria-label="Context 0% full"
+                class="context link status-item"
+                @on_click>
+          <span class="meter">
+            <span class="meter-fill" style={ width: 0.00%; }> </span>
+          </span>
+          <span class="percent"> 0% </span>
+        </button>
+        <span title="Tokens: 0 in, 0 out, 0 cache read" class="status-item tokens"> ↑0 ↓0 </span>
+        <span title="Session cost" class="cost status-item"> $0.0000 </span>
+        <span role="status" aria-atomic="true" class="activity idle status-item">
+          <span class="idle-dot"> </span>
+          <span class="label"> Ready </span>
+        </span>
+      </div>
+      <div class="panel-toggles">
+        <button type="button"
+                title="Files (Ctrl+Shift+F)"
+                aria-label="Files"
+                aria-expanded="false"
+                class="btn files-toggle ghost icon"
+                @on_click>
+          <icon class="folder"> </icon>
+        </button>
+        <button type="button"
+                title="Terminal (Ctrl+`)"
+                aria-label="Terminal"
+                aria-expanded="false"
+                class="btn ghost icon terminal-toggle"
+                @on_click>
+          <icon class="terminal"> </icon>
+        </button>
+        <Vdom.Node.none-widget> </Vdom.Node.none-widget>
+      </div>
+      <button type="button"
+              title="Settings (Ctrl+, or /settings)"
+              aria-label="Settings"
+              aria-haspopup="dialog"
+              class="btn ghost icon settings-toggle"
+              @on_click>
+        <icon class="gear"> </icon>
+      </button>
     </header>
+    |}];
+  H.text h ~selector:".session-bar";
+  [%expect
+    {|
+    (Sessions (Ctrl+B)) (New session)
+    (0%) ↑0 ↓0 $0.0000 Ready
+    (Files (Ctrl+Shift+F)) (Terminal (Ctrl+`))
+    (Settings (Ctrl+, or /settings))
+    |}];
+  (* Its toggle brings the sidebar back, and the card with it. *)
+  H.click h ~selector:".session-bar .toggle-sidebar";
+  H.elements h ~selector:".session-bar";
+  H.elements h ~selector:".session-card";
+  [%expect
+    {|
+    Toggle_sidebar
+    <section class="session-card">
+    |}];
+  (* A phone: the sidebar is a drawer, the bar stays (under the drawer). *)
+  H.quiet h (fun () -> H.act h (Set_narrow true));
+  H.elements h ~selector:".session-bar";
+  H.elements h ~selector:".session-card";
+  H.quiet h (fun () -> H.act h Toggle_sidebar);
+  H.elements h ~selector:".session-bar";
+  H.elements h ~selector:".session-card";
+  H.elements h ~selector:".main > [inert]";
+  [%expect
+    {|
+    <header class="session-bar">
+    <header class="session-bar">
+    <header class="session-bar">
+    <div class="chat-frame">
+    <footer class="composer">
     |}]
 ;;
 
@@ -244,7 +468,7 @@ let%expect_test "the cwd's last directory is kept apart: the rest is elided" =
       let h =
         H.create ~state:(H.state_json ~fields:[ "cwd", `String cwd ] ()) ()
       in
-      H.show h ~selector:".topbar .where");
+      H.show h ~selector:".session-card .where");
   [%expect
     {|
     <span title="/work" class="where">
@@ -331,7 +555,79 @@ let%expect_test
   [%expect {| |}]
 ;;
 
-let%expect_test "the status in the top bar: idle, running, and what applies" =
+let%expect_test "each chip opens its command's picker, which owns the keyboard" =
+  let h = H.create () in
+  List.iter
+    [ ".model-chip", "/model"
+    ; ".thinking-chip", "/thinking"
+    ; ".mode-chip", "/mode"
+    ]
+    ~f:(fun (chip, command) ->
+      H.quiet h (fun () -> H.click h ~selector:chip);
+      let clicked = (H.model h).dialog in
+      H.quiet h (fun () -> H.key h "Escape" ~target:Field);
+      H.quiet h (fun () -> H.act h (Run command));
+      printf
+        "%s: %s, same as %s: %b\n"
+        chip
+        (match clicked with
+         | Some (Picker { picker; _ }) -> Picker.title picker
+         | _ -> "no picker")
+        command
+        (Option.equal Dialog.equal clicked (H.model h).dialog);
+      H.quiet h (fun () -> H.key h "Escape" ~target:Field));
+  [%expect
+    {|
+    Open_model_picker
+    Close_dialog
+    .model-chip: Switch model, same as /model: true
+    Close_dialog
+    Open_thinking_picker
+    Close_dialog
+    .thinking-chip: Thinking level, same as /thinking: true
+    Close_dialog
+    (Run /mode)
+    Close_dialog
+    .mode-chip: When tools ask first (Alt+M cycles), same as /mode: true
+    Close_dialog
+    |}];
+  (* Typing filters it (fuzzily), Enter takes the choice, Esc leaves it as
+     it was. *)
+  H.click h ~selector:".model-chip";
+  H.input h ~selector:"#picker-input" "sonet";
+  H.text h ~selector:".picker-items";
+  H.key h "Enter" ~target:Field;
+  H.elements h ~selector:".modal";
+  controls h;
+  [%expect
+    {|
+    Open_model_picker
+    (Focus picker-input)
+    (Picker_query sonet)
+    Claude Sonnet 5 anthropic, 200k ctx
+    Dialog_accept
+    (Focus editor)
+    (Rpc (method_ set_model) (params ((model anthropic/claude-sonnet-5)))
+     (tag Model_set))
+    (Claude Sonnet 5) (Thinking on) (Auto: never asks)
+    |}];
+  H.click h ~selector:".mode-chip";
+  H.key h "ArrowDown" ~target:Field;
+  H.key h "Escape" ~target:Field;
+  H.elements h ~selector:".modal";
+  controls h;
+  [%expect
+    {|
+    (Run /mode)
+    (Focus picker-input)
+    (Dialog_move 1)
+    Close_dialog
+    (Focus editor)
+    (Claude Sonnet 5) (Thinking on) (Auto: never asks)
+    |}]
+;;
+
+let%expect_test "the status in the card: idle, running, and what applies" =
   let h =
     H.create
       ~state:
@@ -347,8 +643,8 @@ let%expect_test "the status in the top bar: idle, running, and what applies" =
       ()
   in
   let status () =
-    H.text h ~selector:".topbar .status";
-    H.text h ~selector:".topbar .status-extras"
+    H.text h ~selector:".session-card .status";
+    H.text h ~selector:".session-card .status-extras"
   in
   status ();
   [%expect {| (65%) ↑120k ↓9.0k $0.4200 Ready |}];
@@ -370,11 +666,11 @@ let%expect_test "the status in the top bar: idle, running, and what applies" =
     h
     {|{"event":"queue_update","steer":0,"follow_up":1,"steer_texts":[],"follow_up_texts":["and the docs"]}|};
   status ();
-  H.elements h ~selector:".topbar .status > .status-item";
-  H.elements h ~selector:".topbar .status-extras > .status-item";
+  H.elements h ~selector:".session-card .status > .status-item";
+  H.elements h ~selector:".session-card .status-extras > .status-item";
   (* Last, in a slot of its own width (style.css), saying it all in its
      title. *)
-  H.show h ~selector:".topbar .status > .activity";
+  H.show h ~selector:".session-card .status > .activity";
   [%expect
     {|
     (90%) ↑0 ↓0 $0.0000 Working
@@ -391,18 +687,22 @@ let%expect_test "the status in the top bar: idle, running, and what applies" =
     </span>
     |}];
   (* The context opens the session's details, with the counters. *)
-  H.click h ~selector:".topbar .context";
+  H.click h ~selector:".session-card .context";
   [%expect
     {|
     (Run /session)
     (Focus dialog)
     (Rpc (method_ session_stats) (params ()) (tag Session_stats))
     |}];
-  (* Waiting for the backend, the bar says so where the status goes. *)
+  (* Waiting for the backend, the card and the bar say so where the status
+     goes. *)
   let h = H.connecting () in
-  H.text h ~selector:".topbar";
+  H.text h ~selector:".session-card";
+  H.quiet h (fun () -> H.act h Toggle_sidebar);
+  H.text h ~selector:".session-bar";
   [%expect
     {|
+    Connecting…
     (Sessions (Ctrl+B))
     Connecting…
     (Settings (Ctrl+, or /settings))

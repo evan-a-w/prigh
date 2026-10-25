@@ -656,7 +656,6 @@ let%expect_test "a question dialog: keys" =
     []
     Space or a click picks, ↑↓ choose, Enter accepts, Esc declines (Decline) (Next)
     <aside class="sidebar">
-    <header class="topbar">
     <div class="chat-frame">
     <footer class="composer">
     |}];

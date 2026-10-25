@@ -88,8 +88,9 @@ let%expect_test
   H.show h ~selector:".session.running .lamp";
   [%expect
     {| <span title="Running" role="img" aria-label="Running" class="lamp"> </span> |}];
-  (* The topbar names the session after its first prompt until it has a name. *)
-  H.text h ~selector:".topbar .title";
+  (* The session's card names it after its first prompt until it has a name. *)
+  H.text h ~selector:".session-card .session-name";
+  H.text h ~selector:".session-card .session-where";
   [%expect
     {|
     (fix the parser bug)

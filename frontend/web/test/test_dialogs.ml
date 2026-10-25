@@ -70,7 +70,6 @@ let%expect_test "a dialog makes the page behind it inert: Tab stays in it" =
     {|
     (Focus dialog)
     <aside class="sidebar">
-    <header class="topbar">
     <div class="chat-frame">
     <footer class="composer">
     |}];
@@ -91,7 +90,6 @@ let%expect_test "a dialog makes the page behind it inert: Tab stays in it" =
     (Rpc (method_ list_jobs) (params ()) (tag Jobs))
     (Focus confirm)
     <aside class="sidebar">
-    <header class="topbar">
     <div class="chat-frame">
     <footer class="composer">
     <aside class="agents-panel">
@@ -537,8 +535,7 @@ let%expect_test
   H.text h ~selector:".toast";
   [%expect {| |}];
   H.reply h "get_state" (H.state_json ());
-  [%expect
-    {| |}];
+  [%expect {| |}];
   (* Replies to an older connection's reconnects are ignored. *)
   H.act h (Reply (Reconnect 0, Error "late"));
   [%expect {| |}];
@@ -565,15 +562,16 @@ let%expect_test "the reconnect delay doubles up to ten seconds" =
 let%expect_test "signing out" =
   let h = H.create () in
   H.text h ~selector:".sidebar-footer";
-  [%expect {| (Commands & keys) |}];
+  [%expect {| (Commands & keys) (Settings (Ctrl+, or /settings)) |}];
   H.act h Saved_login;
   H.text h ~selector:".sidebar-footer";
-  [%expect {| (Commands & keys) (Sign out) |}];
+  [%expect {| (Commands & keys) (Settings (Ctrl+, or /settings)) (Sign out) |}];
   H.act
     h
     (Hello { client_id = "c1"; namespace = Some "bob"; user = Some "ann" });
   H.text h ~selector:".sidebar-footer";
-  [%expect {| (A ann acting as bob) (Commands and keys (/help)) |}];
+  [%expect
+    {| (A ann acting as bob) (Commands and keys (/help)) (Settings (Ctrl+, or /settings)) |}];
   H.act h Sign_out;
   H.type_ h "/signout";
   H.act h Send;
@@ -597,7 +595,7 @@ let%expect_test "on a phone the agents panel is a sheet with the keyboard" =
     (Rpc (method_ list_jobs) (params ()) (tag Jobs))
     (Focus agents-panel)
     <aside class="sidebar">
-    <header class="topbar">
+    <header class="session-bar">
     <div class="chat-frame">
     <footer class="composer">
     |}];

@@ -266,6 +266,16 @@ let delete_archived ~inject archived =
     [ Node.text "Delete archived" ]
 ;;
 
+let settings ~inject =
+  button
+    ~cls:"icon ghost settings-toggle"
+    ~title:"Settings (Ctrl+, or /settings)"
+    ~label:"Settings"
+    ~attrs:[ Attr.create "aria-haspopup" "dialog" ]
+    ~on_click:(inject Action.Open_settings)
+    [ icon Gear ]
+;;
+
 let user_footer (m : App.Model.t) ~inject =
   let help =
     button
@@ -282,7 +292,8 @@ let user_footer (m : App.Model.t) ~inject =
       [ icon Logout ]
   in
   match Account_view.trigger m ~inject with
-  | Some account -> div ~cls:"sidebar-footer" [ account; help ]
+  | Some account ->
+    div ~cls:"sidebar-footer" [ account; help; settings ~inject ]
   | None ->
     div
       ~cls:"sidebar-footer"
@@ -291,11 +302,12 @@ let user_footer (m : App.Model.t) ~inject =
           ~title:"Commands and keys (/help)"
           ~on_click:(inject Action.Open_help)
           [ icon Help; Node.text "Commands & keys" ]
+      ; settings ~inject
       ; (if m.saved_login then sign_out else Node.none)
       ]
 ;;
 
-let view (m : App.Model.t) ~inject =
+let view (m : App.Model.t) ~inject ~session:card =
   let current = Option.map m.state ~f:(fun s -> s.session_id) in
   let sessions = Session_list.filter m.sessions ~query:m.session_query in
   Node.aside
@@ -383,6 +395,7 @@ let view (m : App.Model.t) ~inject =
                  else [ delete_archived ~inject archived ]
                else [])))
     ; (if m.marks.selecting then selection_bar m ~inject else Node.none)
+    ; card
     ; user_footer m ~inject
     ]
 ;;

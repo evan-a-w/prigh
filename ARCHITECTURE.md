@@ -1788,7 +1788,7 @@ terminal frontend and `web/` prigh-web, the browser one.
       are missing after a reload — or a job's output, with what it is
       (crumbs, task, state, data, Cancel/Kill, "Show in chat") in a footer
       pinned under the scrolling body; the status line's
-      summary and the top bar's toggle). Elapsed times tick with `Clock`,
+      summary and the session's toggle). Elapsed times tick with `Clock`,
       which the page sends every second only while the panel is open with
       something running (`Model.ticking`); running jobs are then polled
       every 2s. `Reveal` scrolls the chat to a subagent's card through the
@@ -1798,7 +1798,7 @@ terminal frontend and `web/` prigh-web, the browser one.
       `Status` with the key of the target it is about) and
       `Terminal_view` (a header with the active host's name and directory
       and the connection's state, a notice when the shell exited or could
-      not start — `Terminal.advice` says what to do — and the top bar's
+      not start — `Terminal.advice` says what to do — and the session's
       toggle). The view does not know xterm.js: `View.view` takes the
       widget as a function of a `Terminal.Target.t` (session, active host
       and whether it is connected, the user acted as, generation), so
@@ -1823,8 +1823,8 @@ terminal frontend and `web/` prigh-web, the browser one.
       uploads or after one failed; `Sent_with_files` puts them back if
       the prompt fails. `Files_view` draws the drawer (breadcrumbs or the
       path field, sortable columns, rows, the selected entry's actions,
-      the preview, the transfers with the work lamp), its dialogs, the top
-      bar's toggle, the composer's chips and paperclip, and the hidden
+      the preview, the transfers with the work lamp), its dialogs, the
+      session's toggle, the composer's chips and paperclip, and the hidden
       file pickers. Keys: Ctrl+Shift+F everywhere; in the list
       (`Keys.Target.Files`) ↑↓, Enter, Backspace, F2, Delete, Esc; with
       its dialog open, Enter and Esc.
@@ -1872,14 +1872,20 @@ terminal frontend and `web/` prigh-web, the browser one.
       one, and a bar at the list's foot deletes them; the `Delete` dialog (`Dialog.Delete_target`: paths or every
       archived one) lists them with their sizes and warns about those the
       backend will keep, running, open elsewhere or our own, and the
-      `Delete_result` reply is a toast), `Topbar_view` (a grid of
-      three: the title, the cwd with its middle elided and the branch;
-      `Status_view` in the middle; `Status_view.extras` and the panel
-      toggles and the settings gear — its steps are container queries on the top bar in `style.css`),
+      `Delete_result` reply is a toast; at its foot `Session_view.card`,
+      then the account, help and the settings gear), `Session_view` (the
+      current session in one place at a time, by `Model.docked`: with the
+      sidebar open beside the chat, its `card` in the sidebar — the title
+      and the panel toggles, the cwd with its middle elided and the branch,
+      the tool host opening `/host`, `Status_view.extras`, and last
+      `Status_view`, so that nothing below it moves it —; otherwise its
+      `bar`, a slim line over the chat with the sidebar's toggle, the
+      title, the extras, the status, the panel toggles and the gear — its
+      steps are container queries on the bar in `style.css`),
       `Composer_view` (one box: the editor, then the model, thinking and
-      approval mode chips, each opening its picker, and attach, stop and
-      send along its bottom; the composer's container queries shorten the
-      chips) with `Queue_view` (the queued steers and follow-ups from `Queued`:
+      approval mode chips, plain text until pointed at, each opening the
+      picker its command opens, and attach, stop and send along its
+      bottom; the composer's container queries shorten the chips) with `Queue_view` (the queued steers and follow-ups from `Queued`:
       the backend's `queue_update` lists, taken out at once by Edit and
       remove via `remove_queued`, re-fetched with `get_pending` if that
       fails; what left the queue otherwise is acknowledged when its user
@@ -1898,11 +1904,12 @@ terminal frontend and `web/` prigh-web, the browser one.
       sidebar's account button and the account menu, a `Picker` of
       accounts and actions) over `Accounts` (the saved sign-ins in
       localStorage, behind a `Storage` record so that tests use a table),
-      `Status_view` (in the top bar: the context linking to `/session`,
-      tokens, cost, then the activity in a slot of fixed width; and its
-      `extras`, kept out of the centred status so that they never move it:
-      the plan chip, queued messages, the transfers in progress from
-      `Files.transfers`…), `Settings_view` (`Dialog.Settings`, from the
+      `Status_view` (the context linking to `/session`, tokens, cost and
+      the activity, stacked in the card and on one line in the bar, where
+      the activity has a slot of fixed width; its `extras`, kept out of
+      the status so that they never move it: the plan chip, queued
+      messages, the transfers in progress from `Files.transfers`…; and
+      `host`, where tools run, opening `/host`), `Settings_view` (`Dialog.Settings`, from the
       gear, `/settings` or Ctrl+,: notifications, verbosity, `/confirm`,
       providers, the account; its controls are `Action.Run` commands, which
       leave it open),
@@ -2245,7 +2252,7 @@ prigh-web's e2e, `frontend/web/e2e/prigh_web.sh` (the flake's Linux
 (`serve -web 127.0.0.1:0 -faux-script ...` with an isolated `HOME`
 and cwd) so that it can restart it, and prints normalised text snapshots
 (ids, cwd, cost, context and messages' times replaced) diffed against `prigh_web.expected`:
-the sign-in form and signing in with the token, the top bar, a scripted
+the sign-in form and signing in with the token, the session's card, a scripted
 bash call and its output, a long output folded, unfolded and folded again,
 the model `read`ing a real PNG (`png.mjs` writes
 it; the tool result's `img` must be a loaded `data:image/png` of the right
@@ -2274,8 +2281,9 @@ Playwright's `download` event (the `.tar.gz` listed with `tar`), a typed
 path, new folder, rename with F2, delete after its dialog, then a file
 attached from the browser, one dropped on the composer and one picked with
 the paperclip, sent with a prompt and checked in what the model saw, and
-the phone sheet), the panels' resize handles, and the top bar and the
-composer with the chat column 700, 520 and 400px wide (by bounding boxes:
+the phone sheet), the panels' resize handles, and the session's card and
+the composer with the chat column 700, 520 and 400px wide, then the bar
+over the chat without the sidebar at 900, 600 and 400px (by bounding boxes:
 nothing overlaps, sticks out of its parent or is cut off without an
 ellipsis; the controls' menu under its button, closed by a choice and by
 Esc), with no console or page errors. Then `accounts.mjs` runs the account switcher against `serve -tokens
@@ -2308,7 +2316,8 @@ banner, never saying "Reconnected", and opens no more sockets; the old page
 opened 900 in 30s), then "Retry now" once the connection holds. Then
 `stability.mjs`: nothing redrawn or shifted that did not change while the
 page idles and a reply streams, the editor's height in every frame, and the
-top bar's status in the same place in every frame as turns start, run a
-tool, queue a steer and end, on a desktop and on a phone.
+session's status in the same place in every frame as turns start, run a
+tool, queue a steer and end, in the sidebar's card on a desktop and in the
+bar on a phone.
 `SHOTS=DIR` saves a screenshot per step, `UPDATE=1` re-records,
 `ENGINES=chromium` runs one browser.

@@ -29,12 +29,12 @@ let%expect_test "the names of the controls" =
     button "Archive Fix the build" -- Archive (A)
     button "Delete Fix the build" -- Delete session (Delete)
     button "Archived 1" -- Show the archived sessions
-    button "Commands & keys" -- Commands and keys (/help)
-    button "Sessions" -- Sessions (Ctrl+B)
     button "New session" -- Rename (/name)
-    button "Context 0% full" -- Context: 0 of 200k tokens (/compact frees some). Click for the session's details (/session)
     button "Files" -- Files (Ctrl+Shift+F)
     button "Terminal" -- Terminal (Ctrl+`)
+    button "backend" -- Tools run on the backend (/host switches)
+    button "Context 0% full" -- Context: 0 of 200k tokens (/compact frees some). Click for the session's details (/session)
+    button "Commands & keys" -- Commands and keys (/help)
     button "Settings" -- Settings (Ctrl+, or /settings)
     button "Claude Opus 5.5" -- Claude Opus 5.5: switch model (Ctrl+L)
     button "Thinking on" -- Thinking on: how much the model reasons before it answers (Alt+T cycles, /thinking)
@@ -43,8 +43,8 @@ let%expect_test "the names of the controls" =
     button "Send" -- Send (Enter)
     input "Search sessions"
     textarea "Message"
-    [separator] div "Resize the sessions sidebar" -- Drag to resize, double-click for the default size
     [status] span "Ready"
+    [separator] div "Resize the sessions sidebar" -- Drag to resize, double-click for the default size
     [region] div "Transcript"
     [group] div "Model, thinking and mode"
     |}];
@@ -58,9 +58,16 @@ let%expect_test "the names of the controls" =
     button "Archived 1" -- Show the archived sessions
     button "Cancel" -- Stop selecting (Esc)
     button "Delete sessions" -- Delete the selected sessions (Delete)
+    button "New session" -- Rename (/name)
+    button "Files" -- Files (Ctrl+Shift+F)
+    button "Terminal" -- Terminal (Ctrl+`)
+    button "backend" -- Tools run on the backend (/host switches)
+    button "Context 0% full" -- Context: 0 of 200k tokens (/compact frees some). Click for the session's details (/session)
     button "Commands & keys" -- Commands and keys (/help)
+    button "Settings" -- Settings (Ctrl+, or /settings)
     input "Search sessions"
     [checkbox] button "Fix the build 2m ago /work 0 B" -- /sessions/s1.jsonl
+    [status] span "Ready"
     |}]
 ;;
 
@@ -190,7 +197,7 @@ let%expect_test "the closed drawer on a phone is inert" =
   [%expect
     {|
     <aside class="sidebar">
-    <header class="topbar">
+    <header class="session-bar">
     <div class="chat-frame">
     <footer class="composer">
     |}]

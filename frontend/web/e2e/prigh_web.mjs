@@ -171,7 +171,11 @@ page.on("console", message => {
 });
 page.on("pageerror", error => errors.push(`page: ${error.message}`));
 
+// The session's card shows the cwd's last directory apart (a line of its
+// own in innerText).
+const cwdApart = `${cwd.slice(0, cwd.lastIndexOf("/"))}\n${cwd.slice(cwd.lastIndexOf("/"))}`;
 const clean = text => text
+  .replaceAll(cwdApart, "<CWD>")
   .replaceAll(cwd, "<CWD>")
   .replace(/[0-9a-f]{16}/g, "<ID>")
   .replace(/ws:\/\/127\.0\.0\.1:\d+/g, "ws://127.0.0.1:<PORT>")
@@ -210,15 +214,15 @@ const show = async (label, selector) => {
 const showStatus = async label => {
   section(label);
   console.log(clean(await page.evaluate(() =>
-    [...document.querySelectorAll(".topbar :is(.status, .status-extras)")].map(e => e.innerText).join("\n"))));
+    [...document.querySelectorAll(":is(.session-card, .session-bar) :is(.status, .status-extras)")].map(e => e.innerText).join("\n"))));
   await screenshot(label);
 };
 
-// The top bar's text, with each select showing its chosen option.
-const showHeader = async label => {
+// The session's card (or bar), with each select showing its chosen option.
+const showSession = async label => {
   section(label);
   console.log(clean(await page.evaluate(() =>
-    [...document.querySelectorAll("header *")]
+    [...document.querySelectorAll(":is(.session-card, .session-bar) *")]
       .filter(e => e.tagName === "SELECT" || e.matches(".where")
         || (e.children.length === 0 && e.tagName !== "OPTION" && !e.closest(".where")))
       .map(e => (e.tagName === "SELECT" ? `[${e.selectedOptions[0]?.text ?? ""}]` : e.textContent))
@@ -394,7 +398,7 @@ try {
   await page.locator(".chat .empty").waitFor();
   await show("signed in: sidebar", ".sidebar");
   await show("signed in: chat", ".chat");
-  await showHeader("signed in: top bar");
+  await showSession("signed in: the session's card");
 
   // A dialog owns the keyboard: Tab and Shift+Tab go round it, and Esc gives
   // the focus back to the editor. A refused command stays in the editor.
@@ -559,7 +563,7 @@ try {
   await idle();
   await page.locator(".tool").first().waitFor();
   await showTurn("bash run");
-  await showHeader("top bar after a run");
+  await showSession("the session's card after a run");
 
   // A budget shows in the status line as spend against it.
   await send("/budget 5");
@@ -872,6 +876,17 @@ try {
   await bodyLacks("Connection lost");
   // The thinking level and the mode sit beside the model, each a picker.
   await show("the model, thinking and mode controls", ".composer-controls");
+  // Where tools run, in the session's card, opens the host picker.
+  await page.locator(".session-card .host").click();
+  await page.locator(".modal .picker-item").first().waitFor();
+  await page.waitForTimeout(300); // its fade in
+  await show("the host picker, from the session's card", ".modal");
+  await page.keyboard.press("Escape");
+  await page.waitForSelector(".modal", { state: "detached" });
+  // Quiet until pointed at: then lit, with a chevron.
+  await page.locator(".thinking-chip").hover();
+  await page.waitForTimeout(300);
+  await screenshot("a chip pointed at");
   await page.locator(".thinking-chip").click();
   await page.locator(".modal .picker-item", { hasText: "high" }).waitFor();
   await page.waitForTimeout(300); // its fade in
@@ -1039,7 +1054,7 @@ try {
   await page.waitForTimeout(300); // its fade in
   await show("/cd: the directory popup", ".popup");
   await composer().press("Control+Enter");
-  await page.waitForFunction(c => document.querySelector(".topbar .where")?.title === c, cwd);
+  await page.waitForFunction(c => document.querySelector(".session-card .where")?.title === c, cwd);
   await page.keyboard.press("Control+Shift+F");
   await page.locator(".files-panel").waitFor();
   await row("flag.png").waitFor();
@@ -1273,10 +1288,11 @@ try {
   await page.locator(".code").last().scrollIntoViewIfNeeded();
   await screenshot("resize: highlighted code in a reply");
 
-  // 15. The top bar and the composer fit the chat column, however wide the
-  //     panels around it make it: the composer's chips take shorter labels,
-  //     the status in the top bar drops its counters, then its words; the
-  //     title keeps some room. Nothing overlaps or is cut off.
+  // 15. The session's card (or, without the sidebar, its bar) and the
+  //     composer fit, however wide the panels around the chat make it: the
+  //     composer's chips take shorter labels, the bar's status drops its
+  //     counters, then its words; the title keeps some room. Nothing
+  //     overlaps or is cut off.
   const chatWidth = () => width(".main");
   // Drags the file browser's edge until the chat column is [target] wide.
   const chatAt = async target => {
@@ -1286,14 +1302,17 @@ try {
   const showTopBar = async label => {
     section(label);
     const where = await page.evaluate(() => {
+      const at = document.querySelector(".session-bar") ? ".session-bar" : ".session-card";
       const r = s => document.querySelector(s).getBoundingClientRect();
-      const status = [...document.querySelectorAll(".topbar :is(.status, .status-extras) > .status-item")]
+      const status = [...document.querySelectorAll(`${at} :is(.status, .status-extras) > .status-item`)]
         .filter(e => getComputedStyle(e).display !== "none")
         .map(e => e.innerText.trim().replace(/\s+/g, " ") || "icon");
-      return { title: Math.round(r(".topbar .title").width), status: status.join(", "), height: Math.round(r(".topbar").height) };
+      const title = document.querySelector(`${at} .session-name > span`);
+      const titleFits = title.scrollWidth <= title.clientWidth || title.getBoundingClientRect().width >= 100;
+      return { at, titleFits, status: status.join(", "), height: Math.round(r(at).height) };
     });
-    console.log(`chat ${await chatWidth()}; chips: ${await controlsShown()}; status: ${clean(where.status)}; title at least 100px: ${where.title >= 100}; top bar ${where.height}px high`);
-    for (const s of [".topbar", ".composer"]) {
+    console.log(`chat ${await chatWidth()}; chips: ${await controlsShown()}; ${where.at}: ${clean(where.status)}; title whole or at least 100px: ${where.titleFits}; ${where.height}px high`);
+    for (const s of [".session-card, .session-bar", ".composer"]) {
       const problems = await layoutProblems(s);
       console.log(`${s}: ${problems.length ? problems.join("; ") : "fits"}`);
     }
@@ -1303,7 +1322,7 @@ try {
   await page.locator(".files-panel").waitFor();
   for (const target of [700, 520, 400]) {
     await chatAt(target);
-    await showTopBar(`top bar: a ${target}px chat column`);
+    await showTopBar(`the session: a ${target}px chat column`);
   }
   // The settings page, from the gear: Esc closes it, a choice keeps it.
   await page.locator(".settings-toggle").click();
@@ -1318,11 +1337,13 @@ try {
   await page.waitForSelector(".settings-dialog", { state: "detached" });
   await page.waitForFunction(() => document.activeElement?.id === "editor", null, { timeout: 2000 }).catch(() => {});
   console.log(`Esc closes it, the editor has the focus: ${await page.evaluate(() => document.activeElement?.id === "editor")}`);
-  // Without the sidebar, its button joins the top bar.
+  // Without the sidebar, the session's bar over the chat, with its button.
   await page.keyboard.press("Control+b");
   await page.waitForFunction(() => !document.querySelector(".app.sidebar-open"));
-  await chatAt(400);
-  await showTopBar("top bar: a 400px chat column without the sidebar");
+  for (const target of [900, 600, 400]) {
+    await chatAt(target);
+    await showTopBar(`the session's bar: a ${target}px chat column without the sidebar`);
+  }
   await page.keyboard.press("Control+b");
   await page.waitForFunction(() => document.querySelector(".app.sidebar-open"));
   await handle("files").dblclick();

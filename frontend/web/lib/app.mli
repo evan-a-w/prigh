@@ -470,6 +470,10 @@ module Model : sig
   (** The session's turn runs. *)
   val running : t -> bool
 
+  (** The sidebar is open beside the chat (not a phone's drawer): it shows
+      the session's status, which the header over the chat shows otherwise. *)
+  val docked : t -> bool
+
   (** A tool confirmation or an [ask_user] question is showing: it owns the
       keyboard, above any dialog. *)
   val waiting : t -> bool

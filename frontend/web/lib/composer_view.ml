@@ -126,13 +126,10 @@ let model_chip (m : App.Model.t) (state : State.t) ~inject =
       ~cls:"chip-button model-chip"
       ~title:(sprintf "%s: switch model (Ctrl+L)" state.model.name)
       ~on_click:(inject Action.Open_model_picker)
-      [ icon Cpu
-      ; span ~cls:"chip-label" state.model.name
-      ; icon ~cls:"chevron" Chevron
-      ]
+      [ span ~cls:"chip-label" state.model.name; icon ~cls:"chevron" Chevron ]
 ;;
 
-(* A narrow composer shows the level alone. *)
+(* A narrow composer shows the level alone, after its icon. *)
 let thinking_chip (m : App.Model.t) (state : State.t) ~inject =
   match m.pending.thinking with
   | Some level ->
@@ -162,8 +159,8 @@ let thinking_chip (m : App.Model.t) (state : State.t) ~inject =
       [ icon Brain; span ~cls:"chip-label" "No thinking" ]
 ;;
 
-(* What asks first: a narrow composer shows [label] (ask, auto-edit, auto,
-   plan). *)
+(* What asks first: a narrow composer shows its icon and [label] (ask,
+   auto-edit, auto, plan). *)
 let mode_chip (m : App.Model.t) (state : State.t) ~inject =
   let short mode = [ Attr.create "data-short" (Session_mode.label mode) ] in
   match m.pending.mode with
@@ -190,7 +187,7 @@ let mode_chip (m : App.Model.t) (state : State.t) ~inject =
 ;;
 
 (* The model, the thinking level and the approval mode, along the bottom of
-   the box, each opening its picker. *)
+   the box, each opening the picker its command does. *)
 let controls (m : App.Model.t) ~inject =
   match m.state with
   | None -> div ~cls:"composer-controls" []
