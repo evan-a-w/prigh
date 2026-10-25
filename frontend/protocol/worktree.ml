@@ -117,9 +117,13 @@ module Created = struct
   let of_json j =
     let open Or_error.Let_syntax in
     let%bind worktree = Json.object_field j "worktree" >>= of_json in
-    let%map new_branch = Json.bool_default_field j "new_branch" ~default:false in
+    let%map new_branch =
+      Json.bool_default_field j "new_branch" ~default:false
+    in
     { worktree; new_branch }
   ;;
 end
 
-let removed_of_json j = Or_error.bind (Json.object_field j "worktree") ~f:of_json
+let removed_of_json j =
+  Or_error.bind (Json.object_field j "worktree") ~f:of_json
+;;
