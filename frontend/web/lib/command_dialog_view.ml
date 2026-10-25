@@ -264,6 +264,126 @@ let create_dir (m : App.Model.t) ~target ~path ~busy ~error ~inject =
     ]
 ;;
 
+let dialog_error = function
+  | Some e ->
+    div ~cls:"dialog-error" ~attrs:[ Attr.role "alert" ] [ Node.text e ]
+  | None -> Node.none
+;;
+
+let new_worktree (d : New_worktree.t) ~inject =
+  let field (f : New_worktree.Field.t) ~label ~value ~placeholder ~note =
+    Node.label
+      ~attrs:[ Attr.class_ "field" ]
+      [ span ~cls:"field-label" label
+      ; Node.input
+          ~attrs:
+            [ Attr.id (New_worktree.Field.id f)
+            ; Attr.class_ "text-input"
+            ; Attr.type_ "text"
+            ; Attr.placeholder placeholder
+            ; Attr.value value
+            ; Attr.create "autocomplete" "off"
+            ; Attr.create "autocapitalize" "off"
+            ; Attr.create "spellcheck" "false"
+            ; Attr.on_input (fun _ text ->
+                inject (Action.New_worktree_input { field = f; text }))
+            ]
+          ()
+      ; span ~cls:"field-note" note
+      ]
+  in
+  let head = Option.value d.head ~default:"HEAD" in
+  Modal.view
+    ~cls:"prompt-dialog worktree-dialog"
+    ~title:"New worktree"
+    ~on_close:(inject Action.Close_dialog)
+    ~footer:
+      [ keys_hint "Enter creates, Esc cancels"
+      ; button ~on_click:(inject Action.Close_dialog) [ Node.text "Cancel" ]
+      ; button
+          ~cls:"primary"
+          ~disabled:d.busy
+          ~on_click:(inject Action.Dialog_accept)
+          [ Node.text (if d.busy then "Creating…" else "Create and switch") ]
+      ]
+    [ field
+        Branch
+        ~label:"Branch"
+        ~value:d.branch
+        ~placeholder:"feature/name"
+        ~note:"A new branch, or an existing one to check out"
+    ; field
+        Base
+        ~label:"Base"
+        ~value:d.base
+        ~placeholder:head
+        ~note:
+          (sprintf
+             "Where a new branch starts (empty: %s, where this session is)"
+             head)
+    ; Node.p
+        ~attrs:[ Attr.class_ "dialog-note" ]
+        [ Node.text
+            (match d.project_dir with
+             | Some dir ->
+               sprintf
+                 "Created in %s, then this session works there."
+                 (Sidebar_view.home_relative dir)
+             | None -> "This session works there once it is created.")
+        ]
+    ; dialog_error d.error
+    ]
+;;
+
+let remove_worktree (w : Worktree.t) ~force ~busy ~error ~inject =
+  let dirty = Worktree.dirty w in
+  (* Also once the backend refused: it may know of changes or a lock that
+     the listing did not show. *)
+  let forcing = dirty || w.locked || Option.is_some error in
+  let discard =
+    button
+      ~cls:"danger"
+      ~disabled:busy
+      ~title:
+        (sprintf
+           "%s (/worktree rm -f %s)"
+           (if dirty
+            then "Lose the uncommitted changes"
+            else "Also when locked or with changes")
+           (Prigh_ui.Worktree_command.target w))
+      ~on_click:(inject (Action.Remove_worktree { force = true }))
+      [ Node.text
+          (if busy && force then "Removing…" else Worktrees.force_label w)
+      ]
+  in
+  Modal.view
+    ~cls:"remove-worktree-dialog"
+    ~title:
+      (if dirty then "Remove worktree with changes?" else "Remove worktree?")
+    ~on_close:(inject Action.Close_dialog)
+    ~footer:
+      ([ keys_hint
+           (if force
+            then "Enter removes it anyway, Esc cancels"
+            else "Enter removes, Esc cancels")
+       ; button ~on_click:(inject Action.Close_dialog) [ Node.text "Cancel" ]
+       ]
+       @
+       if force
+       then [ discard ]
+       else
+         (if forcing then [ discard ] else [])
+         @ [ button
+               ~cls:(if forcing then "" else "danger")
+               ~disabled:busy
+               ~on_click:(inject (Action.Remove_worktree { force = false }))
+               [ Node.text (if busy then "Removing…" else "Remove") ]
+           ])
+    [ Node.p [ Node.text (Prigh_ui.Worktree_command.confirm_remove w ~force) ]
+    ; dialog_error error
+    ]
+;;
+
 let rewind_confirm ~text ~inject =
   Modal.view
     ~title:"Rewind here?"
@@ -436,5 +556,8 @@ let view (m : App.Model.t) (dialog : Dialog.t) ~inject =
   | Mcp_tools server -> Some (mcp_tools server ~inject)
   | Loading title -> Some (loading ~title ~inject)
   | Diff diff -> Some (Git_diff_view.view ~fold:(App.Model.fold m) diff ~inject)
+  | New_worktree d -> Some (new_worktree d ~inject)
+  | Remove_worktree { worktree; force; busy; error } ->
+    Some (remove_worktree worktree ~force ~busy ~error ~inject)
   | Picker _ | Help | Settings | Rename _ | Delete _ | Login _ | Auth _ -> None
 ;;

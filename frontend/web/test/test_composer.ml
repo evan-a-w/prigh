@@ -95,7 +95,13 @@ let%expect_test
     |}];
   H.event h (sprintf {|{"event":"state","state":%s}|} (H.state_json ()));
   H.key h "Escape";
-  [%expect {| (browser default) |}]
+  [%expect {|
+    (Rpc (method_ list_worktrees) (params ())
+     (tag (Worktrees (place  "s1\
+                            \nbackend\
+                            \n/work") (purpose (Sidebar 2)))))
+    (browser default)
+    |}]
 ;;
 
 let image =
@@ -385,7 +391,7 @@ let%expect_test "slash commands: the popup, arguments, running, unknown ones" =
     /notify [on|off] tell you when a turn ends or something waits for you while the tab is hidden
     /compact [instructions] summarise older messages to free context
     /diff [path] show the uncommitted changes where the tools run, untracked files too
-    /review [base] [instructions] review the uncommitted changes, or those against a base branch, for prioritised findings
+    /review [base] [instructions] alone: the review page, the changes file by file to approve, comment on and edit (Alt+R); with a base (HEAD: the uncommitted changes) or instructions: have the model review them for prioritised findings
     /init write or improve the project's AGENTS.md
     /name [name] rename the session
     /session show the session's details and statistics
@@ -401,6 +407,7 @@ let%expect_test "slash commands: the popup, arguments, running, unknown ones" =
     /tree show the session tree and move to any message in it
     /cd [path] change the working directory (asks to create a missing one)
     /mkdir [path] create a directory (and its parents) and change to it
+    /worktree [list|new|open|rm ...] pick a git worktree of the repository to work in (Alt+Enter: in a new session, Delete removes it); new BRANCH [BASE] creates one and works there; open [-n] TARGET (-n: in a new session); rm [-f] TARGET (-f: with uncommitted changes)
     /default-dir [path|off] show or set the directory new sessions start in
     /host [name|backend] pick where tools run, and the directory there
     /export [path] export the transcript on the backend (markdown, or .jsonl)
@@ -414,7 +421,6 @@ let%expect_test "slash commands: the popup, arguments, running, unknown ones" =
     /remind [stop|every|rm|off ...] stop [N] TEXT: remind the agent when it ends its turn (at most N times in a row, default 3); every N TEXT: every N turns; rm NAME, off: remove one or all; none: list the session's (Delete removes one)
     /resume [now|cancel] show, run now or cancel the automatic resume after a usage limit
     /copy copy the last reply to the clipboard
-    /btw <question> ask a side question without interrupting the run (not added to the conversation)
     |}];
   H.type_ h "/mod";
   H.key h "Tab";

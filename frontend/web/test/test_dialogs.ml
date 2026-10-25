@@ -157,6 +157,7 @@ let%expect_test "help lists every key and command" =
     Ctrl+J jump to one of your messages: a list to filter (or the marks at the transcript's right edge)
     PageUp / PageDown scroll the transcript
     Ctrl+K search sessions (↓ ↑ through them, Enter opens, Delete deletes)
+    Alt+Enter / Delete (/worktree) start a new session in the highlighted worktree / remove it
     A (on a session) archive or unarchive it (archived sessions are listed last, muted)
     Space (selecting) mark a session (Shift: the range from the last one); Delete deletes the marked ones, Esc stops selecting
     Ctrl+B show or hide the sidebar
@@ -166,6 +167,11 @@ let%expect_test "help lists every key and command" =
     Alt+] Alt+[ the next or previous subagent or job
     Alt+0 close the agents panel
     Ctrl+Shift+F open or close the file browser (/files): ↑↓ select, Enter opens, Backspace goes up, F2 renames, Delete deletes, Esc closes
+    Alt+R open or close the review page (/review): the changes file by file, beside the chat
+    ] / [ (reviewing; also n p, j k) the next / previous changed file
+    a / c / e / v / s (reviewing) approve the file; comment on the selected lines (click a line number, Shift+click for a range); edit or comment; the whole file or the changes; send the new comments to prigh
+    Esc (reviewing) drop the comment or selection, then close the review
+    Ctrl+Enter / Ctrl+S (reviewing) add the comment or reply; save the file being edited
     Ctrl+` open or close the terminal (/terminal); in it, every other key goes to the shell
     Tab (in /scoped-models) check or uncheck the highlighted model
     Delete (in /remind's list) remove the highlighted reminder
@@ -192,7 +198,7 @@ let%expect_test "help lists every key and command" =
     /notify [on|off] tell you when a turn ends or something waits for you while the tab is hidden
     /compact [instructions] summarise older messages to free context
     /diff [path] show the uncommitted changes where the tools run, untracked files too
-    /review [base] [instructions] review the uncommitted changes, or those against a base branch, for prioritised findings
+    /review [base] [instructions] alone: the review page, the changes file by file to approve, comment on and edit (Alt+R); with a base (HEAD: the uncommitted changes) or instructions: have the model review them for prioritised findings
     /init write or improve the project's AGENTS.md
     /name [name] rename the session
     /session show the session's details and statistics
@@ -208,6 +214,7 @@ let%expect_test "help lists every key and command" =
     /tree show the session tree and move to any message in it
     /cd [path] change the working directory (asks to create a missing one)
     /mkdir [path] create a directory (and its parents) and change to it
+    /worktree [list|new|open|rm ...] pick a git worktree of the repository to work in (Alt+Enter: in a new session, Delete removes it); new BRANCH [BASE] creates one and works there; open [-n] TARGET (-n: in a new session); rm [-f] TARGET (-f: with uncommitted changes)
     /default-dir [path|off] show or set the directory new sessions start in
     /host [name|backend] pick where tools run, and the directory there
     /export [path] export the transcript on the backend (markdown, or .jsonl)

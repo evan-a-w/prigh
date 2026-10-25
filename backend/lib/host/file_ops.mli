@@ -23,11 +23,23 @@ val call : Agent.t -> string -> (string * Json.t) list -> Json.t Or_error.t
 
 (** [{path, name, size, mtime, kind: text, text, truncated}], [{..., kind:
     image, mime, url}] ([url] from [image_url], unless the image is too
-    large: then [too_large: true]) or [{..., kind: binary}]. *)
+    large: then [too_large: true]) or [{..., kind: binary}]. A whole text
+    file also has [md5], its bytes' digest (hex), for {!write}. *)
 val preview
   :  Agent.t
   -> path:string
   -> image_url:(path:string -> mime:string -> string)
+  -> Json.t Or_error.t
+
+(** Writes [text] to [path] with the [write] tool on the active host
+    (unchecked by [Seen_files]: the agent is told to read it again before
+    writing it). With [expected], fails without writing unless the file's
+    bytes still have that [md5]. Returns [{path, md5}]. *)
+val write
+  :  Agent.t
+  -> path:string
+  -> text:string
+  -> expected:string option
   -> Json.t Or_error.t
 
 (** Streams the file (or [archive]: the directory as .tar.gz) to [write],

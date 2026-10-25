@@ -170,6 +170,7 @@ let%expect_test
     <Vdom.Node.none-widget class="">
     <div class="sessions">
     <Vdom.Node.none-widget class="">
+    <Vdom.Node.none-widget class="">
     <section class="session-card">
     <div class="sidebar-footer">
     <Vdom.Node.none-widget class="">
@@ -317,8 +318,16 @@ let%expect_test "the host opens the host picker, as /host does" =
     {|
     Close_dialog
     (Focus editor)
+    (Rpc (method_ list_worktrees) (params ())
+     (tag (Worktrees (place  "s1\
+                            \nc7\
+                            \n/work") (purpose (Sidebar 2)))))
     (laptop) main
     button "laptop" -- Tools run on laptop, in /home/ann/work (/host switches)
+    (Rpc (method_ list_worktrees) (params ())
+     (tag (Worktrees (place  "s1\
+                            \n\
+                            \n/work") (purpose (Sidebar 3)))))
     (No host) main
     <button class="host link status-item warm">
     |}]

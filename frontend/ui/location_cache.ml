@@ -1,12 +1,12 @@
 open! Core
 open! Import
 
-type t =
+type 'a t =
   | Empty
   | Loading of string
   | Loaded of
       { key : string
-      ; skills : P.Skill.t list
+      ; value : 'a
       }
 [@@deriving sexp_of]
 
@@ -20,7 +20,7 @@ let key (state : P.State.t option) =
 
 let find t ~key =
   match t with
-  | Loaded { key = k; skills } when String.equal k key -> Some skills
+  | Loaded { key = k; value } when String.equal k key -> Some value
   | Empty | Loading _ | Loaded _ -> None
 ;;
 
@@ -30,8 +30,10 @@ let request t ~key =
   | Empty | Loading _ | Loaded _ -> Some (Loading key)
 ;;
 
-let set t ~key skills =
+let set t ~key value =
   match t with
-  | Loading k when String.equal k key -> Loaded { key; skills }
+  | Loading k when String.equal k key -> Loaded { key; value }
   | Empty | Loading _ | Loaded _ -> t
 ;;
+
+let put _ ~key value = Loaded { key; value }

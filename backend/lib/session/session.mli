@@ -69,6 +69,9 @@ module Entry : sig
       | Told_environment of Told_environment.t
       (** what the model was last told about its environment, see
           {!told_environment} *)
+      | Review of Review_state.Change.t
+      (** a change to the review of the working tree: a comment, an
+          approval; see {!review} *)
     [@@deriving sexp, jsonaf]
   end
 
@@ -195,6 +198,12 @@ val told_environment : t -> Told_environment.t option
 
 val set_told_environment : t -> Told_environment.t -> Entry.t
 
+(** The [review] entries of every branch, in the order written: rewinding
+    keeps comments and approvals. *)
+val review : t -> Review_state.t
+
+val record_review : t -> Review_state.Change.t -> Entry.t
+
 (** The [allow_rule] entries on the active path, oldest first. *)
 val allow_rules : t -> string list
 
@@ -259,6 +268,8 @@ module Summary : sig
     ; name : string option
     ; description : string option
     ; cwd : string
+    ; host : string option
+      (** the id of the tool host [cwd] is on, when the session records it *)
     ; created_at : string
     ; updated_at : string
     ; first_prompt : string option

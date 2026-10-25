@@ -21,6 +21,7 @@ module Picker_kind = struct
     | Skills
     | Snippets
     | Reminders
+    | Worktrees of Worktree.Listing.t
     | Mcp of Mcp_list.t
     | Auth_select of string
   [@@deriving sexp_of, equal]
@@ -63,6 +64,11 @@ module Confirm_action = struct
         { target : Dir_change.Target.t
         ; path : string (** absolute, on the target's host *)
         } (** a missing directory given to [/cd] or [/host] *)
+    | Remove_worktree of
+        { worktree : Worktree.t
+        ; force : bool
+        ; back : Open_picker.t option (** where Esc returns *)
+        }
   [@@deriving sexp_of, equal]
 end
 
