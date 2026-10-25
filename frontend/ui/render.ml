@@ -223,6 +223,13 @@ let mode_hint (m : App.Model.t) : Content.Line.t option =
                 ~style:attention
                 "Enter shows it · Esc closes · Ctrl+D removes"
             ]
+        | Picker { kind = Worktrees _; _ } ->
+          Some
+            [ span
+                ~style:attention
+                "Enter opens · Ctrl+D removes · Ctrl+N in a new session · Esc \
+                 closes"
+            ]
         | Picker { kind = Snippets; _ } ->
           Some
             [ span
