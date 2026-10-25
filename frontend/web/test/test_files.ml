@@ -281,7 +281,7 @@ let%expect_test "downloads: a file, and a directory as .tar.gz" =
   let h = opened () in
   H.act h (Files (Download "README.md"));
   H.text h ~selector:".files-transfers";
-  H.text h ~selector:".status .transfers";
+  H.text h ~selector:".status-extras .transfers";
   H.reply
     h
     "fs_download"
@@ -365,7 +365,7 @@ let%expect_test "uploads into the directory, asking before replacing a file" =
   H.act h (Files (Upload_progress { file = 1; sent = 400 }));
   H.text h ~selector:".files-transfers";
   (* Visible outside the panel too: in the status line. *)
-  H.text h ~selector:".status .transfers";
+  H.text h ~selector:".status-extras .transfers";
   [%expect
     {|
     new.txt 400 B of 1000 B
@@ -397,7 +397,7 @@ let%expect_test "uploads into the directory, asking before replacing a file" =
               Error {|{"error":"no space left for /home/me/proj/README.md"}|}
           }));
   H.text h ~selector:".toasts";
-  H.elements h ~selector:".status .transfers";
+  H.elements h ~selector:".status-extras .transfers";
   [%expect
     {|
     Uploaded "new.txt"
@@ -619,7 +619,7 @@ let%expect_test "files dropped on the composer upload into the chat's uploads" =
     "the file browser needs a newer prigh on tool host laptop: update prigh \
      there and restart its TUI or tool-host";
   H.act h (Files (Upload_progress { file = 1; sent = 500_000 }));
-  H.text h ~selector:".status .transfers";
+  H.text h ~selector:".status-extras .transfers";
   H.show h ~selector:".attach-chip.uploading";
   H.text h ~selector:".attach-chips";
   [%expect

@@ -206,6 +206,14 @@ const show = async (label, selector) => {
   await screenshot(label);
 };
 
+// The status, and what applies after it.
+const showStatus = async label => {
+  section(label);
+  console.log(clean(await page.evaluate(() =>
+    [...document.querySelectorAll(".topbar :is(.status, .status-extras)")].map(e => e.innerText).join("\n"))));
+  await screenshot(label);
+};
+
 // The top bar's text, with each select showing its chosen option.
 const showHeader = async label => {
   section(label);
@@ -525,8 +533,8 @@ try {
   await composer().fill("/remind every 5 Check the disk space.");
   await composer().press("Control+Enter");
   await remindToast("Reminder r2 added");
-  await page.locator(".status .reminders").waitFor();
-  console.log(`status: ${clean(await page.locator(".status .reminders").innerText())}`);
+  await page.locator(".status-extras .reminders").waitFor();
+  console.log(`status: ${clean(await page.locator(".status-extras .reminders").innerText())}`);
   await composer().fill("/remind");
   await composer().press("Control+Enter");
   await page.locator(".modal .picker-item").first().waitFor();
@@ -540,7 +548,7 @@ try {
   await composer().fill("/remind rm r2");
   await composer().press("Control+Enter");
   await remindToast("Reminder r2 removed");
-  await page.waitForSelector(".status .reminders", { state: "detached" });
+  await page.waitForSelector(".status-extras .reminders", { state: "detached" });
   console.log("status: no reminders");
   await composer().fill("");
   for (const toast of await page.locator(".toast").all()) await toast.click().catch(() => {});
@@ -671,7 +679,7 @@ try {
   await send("survey it");
   await bodyHas("Started a survey and a job.");
   await idle();
-  await page.locator(".status .background").click();
+  await page.locator(".status-extras .background").click();
   await page.waitForFunction(() =>
     document.querySelectorAll(".agents-row").length === 3 && !document.querySelector(".agents-row.running"));
   await showPanel("agents panel");
@@ -900,7 +908,7 @@ try {
   await page.locator(".toast", { hasText: "Mode: plan" }).waitFor();
   await page.waitForSelector(".mode-chip.plan-mode:not(.awaiting)");
   await show("plan mode (Alt+M)", ".composer-controls");
-  await show("plan mode: the status line", ".status");
+  await showStatus("plan mode: the status line");
   await send("plan it");
   await page.locator("#confirm.plan-dialog").waitFor();
   await show("a plan to approve", "#confirm");
@@ -909,7 +917,7 @@ try {
   await idle();
   await page.waitForFunction(() => !document.querySelector(".mode-chip.plan-mode"));
   await show("the plan approved", ".composer-controls");
-  await show("the plan approved: the status line", ".status");
+  await showStatus("the plan approved: the status line");
   await showTurn("implementing");
   await send("/permissions");
   await page.locator(".modal").waitFor();
@@ -1128,9 +1136,9 @@ try {
       new DragEvent("drop", { bubbles: true, cancelable: true, dataTransfer: data }));
   });
   await page.locator("#chat-attach-input").setInputFiles({ name: "data.bin", mimeType: "application/octet-stream", buffer: Buffer.from([0, 1, 2, 3, 255, 0, 7]) });
-  await page.waitForFunction(() => /^Uploading 2 files/.test(document.querySelector(".status .transfers")?.textContent ?? ""));
+  await page.waitForFunction(() => /^Uploading 2 files/.test(document.querySelector(".status-extras .transfers")?.textContent ?? ""));
   section("files: uploads in the status line");
-  console.log(clean(await page.locator(".status .transfers").innerText()).replace(/ \d+%$| …$|…$/, ""));
+  console.log(clean(await page.locator(".status-extras .transfers").innerText()).replace(/ \d+%$| …$|…$/, ""));
   await screenshot("files: uploads in the status line");
   release();
   await page.waitForFunction(() => document.querySelectorAll(".attach-chip.ready").length === 3);
@@ -1279,7 +1287,7 @@ try {
     section(label);
     const where = await page.evaluate(() => {
       const r = s => document.querySelector(s).getBoundingClientRect();
-      const status = [...document.querySelectorAll(".topbar .status > .status-item")]
+      const status = [...document.querySelectorAll(".topbar :is(.status, .status-extras) > .status-item")]
         .filter(e => getComputedStyle(e).display !== "none")
         .map(e => e.innerText.trim().replace(/\s+/g, " ") || "icon");
       return { title: Math.round(r(".topbar .title").width), status: status.join(", "), height: Math.round(r(".topbar").height) };

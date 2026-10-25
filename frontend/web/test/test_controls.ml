@@ -176,10 +176,6 @@ let%expect_test "the top bar: title, cwd and branch, the status, the panels" =
         </div>
       </div>
       <div class="status">
-        <span role="status" aria-atomic="true" class="idle status-item">
-          <span class="idle-dot"> </span>
-          <span class="label"> Ready </span>
-        </span>
         <button type="button"
                 title="Context: 0 of 200k tokens (/compact frees some). Click for the session's details (/session)"
                 aria-label="Context 0% full"
@@ -188,46 +184,54 @@ let%expect_test "the top bar: title, cwd and branch, the status, the panels" =
           <span class="meter">
             <span class="meter-fill" style={ width: 0.00%; }> </span>
           </span>
-          0%
+          <span class="percent"> 0% </span>
         </button>
         <span title="Tokens: 0 in, 0 out, 0 cache read" class="status-item tokens"> ↑0 ↓0 </span>
         <span title="Session cost" class="cost status-item"> $0.0000 </span>
-        <Vdom.Node.none-widget> </Vdom.Node.none-widget>
-        <Vdom.Node.none-widget> </Vdom.Node.none-widget>
-        <Vdom.Node.none-widget> </Vdom.Node.none-widget>
-        <Vdom.Node.none-widget> </Vdom.Node.none-widget>
-        <Vdom.Node.none-widget> </Vdom.Node.none-widget>
-        <Vdom.Node.none-widget> </Vdom.Node.none-widget>
-        <Vdom.Node.none-widget> </Vdom.Node.none-widget>
-        <Vdom.Node.none-widget> </Vdom.Node.none-widget>
-        <Vdom.Node.none-widget> </Vdom.Node.none-widget>
+        <span role="status" aria-atomic="true" class="activity idle status-item">
+          <span class="idle-dot"> </span>
+          <span class="label"> Ready </span>
+        </span>
       </div>
-      <div class="panel-toggles">
-        <button type="button"
-                title="Files (Ctrl+Shift+F)"
-                aria-label="Files"
-                aria-expanded="false"
-                class="btn files-toggle ghost icon"
-                @on_click>
-          <icon class="folder"> </icon>
-        </button>
-        <button type="button"
-                title="Terminal (Ctrl+`)"
-                aria-label="Terminal"
-                aria-expanded="false"
-                class="btn ghost icon terminal-toggle"
-                @on_click>
-          <icon class="terminal"> </icon>
-        </button>
-        <Vdom.Node.none-widget> </Vdom.Node.none-widget>
-        <button type="button"
-                title="Settings (Ctrl+, or /settings)"
-                aria-label="Settings"
-                aria-haspopup="dialog"
-                class="btn ghost icon settings-toggle"
-                @on_click>
-          <icon class="gear"> </icon>
-        </button>
+      <div class="topbar-end">
+        <div class="status-extras">
+          <Vdom.Node.none-widget> </Vdom.Node.none-widget>
+          <Vdom.Node.none-widget> </Vdom.Node.none-widget>
+          <Vdom.Node.none-widget> </Vdom.Node.none-widget>
+          <Vdom.Node.none-widget> </Vdom.Node.none-widget>
+          <Vdom.Node.none-widget> </Vdom.Node.none-widget>
+          <Vdom.Node.none-widget> </Vdom.Node.none-widget>
+          <Vdom.Node.none-widget> </Vdom.Node.none-widget>
+          <Vdom.Node.none-widget> </Vdom.Node.none-widget>
+          <Vdom.Node.none-widget> </Vdom.Node.none-widget>
+        </div>
+        <div class="panel-toggles">
+          <button type="button"
+                  title="Files (Ctrl+Shift+F)"
+                  aria-label="Files"
+                  aria-expanded="false"
+                  class="btn files-toggle ghost icon"
+                  @on_click>
+            <icon class="folder"> </icon>
+          </button>
+          <button type="button"
+                  title="Terminal (Ctrl+`)"
+                  aria-label="Terminal"
+                  aria-expanded="false"
+                  class="btn ghost icon terminal-toggle"
+                  @on_click>
+            <icon class="terminal"> </icon>
+          </button>
+          <Vdom.Node.none-widget> </Vdom.Node.none-widget>
+          <button type="button"
+                  title="Settings (Ctrl+, or /settings)"
+                  aria-label="Settings"
+                  aria-haspopup="dialog"
+                  class="btn ghost icon settings-toggle"
+                  @on_click>
+            <icon class="gear"> </icon>
+          </button>
+        </div>
       </div>
     </header>
     |}]
@@ -342,9 +346,12 @@ let%expect_test "the status in the top bar: idle, running, and what applies" =
            ())
       ()
   in
-  let status () = H.text h ~selector:".topbar .status" in
+  let status () =
+    H.text h ~selector:".topbar .status";
+    H.text h ~selector:".topbar .status-extras"
+  in
   status ();
-  [%expect {| Ready (65%) ↑120k ↓9.0k $0.4200 |}];
+  [%expect {| (65%) ↑120k ↓9.0k $0.4200 Ready |}];
   H.event
     h
     (sprintf
@@ -364,15 +371,24 @@ let%expect_test "the status in the top bar: idle, running, and what applies" =
     {|{"event":"queue_update","steer":0,"follow_up":1,"steer_texts":[],"follow_up_texts":["and the docs"]}|};
   status ();
   H.elements h ~selector:".topbar .status > .status-item";
+  H.elements h ~selector:".topbar .status-extras > .status-item";
+  (* Last, in a slot of its own width (style.css), saying it all in its
+     title. *)
+  H.show h ~selector:".topbar .status > .activity";
   [%expect
     {|
-    Working (90%) ↑0 ↓0 $0.0000 (Goal 2/20) (1 queued)
-    <span class="running status-item">
+    (90%) ↑0 ↓0 $0.0000 Working
+    (Goal 2/20) (1 queued)
     <button class="context hot link status-item">
     <span class="status-item tokens">
     <span class="cost status-item">
+    <span class="activity running status-item">
     <button class="goal link status-item warm">
     <button class="link queued status-item">
+    <span title="Working" role="status" aria-atomic="true" class="activity running status-item">
+      <span aria-hidden="true" class="lamp"> </span>
+      <span class="label"> Working </span>
+    </span>
     |}];
   (* The context opens the session's details, with the counters. *)
   H.click h ~selector:".topbar .context";

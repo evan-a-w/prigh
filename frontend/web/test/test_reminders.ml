@@ -36,13 +36,14 @@ let with_reminders () =
 
 let%expect_test "the status line counts the reminders; clicked, it lists them" =
   let h = H.create () in
-  H.text h ~selector:".status .reminders";
+  H.text h ~selector:".status-extras .reminders";
   H.quiet h (fun () -> H.act h (Reply (State, Ok (state ()))));
-  H.text h ~selector:".status .reminders";
-  H.names h ~selector:".status .reminders";
-  H.click h ~selector:".status .reminders";
+  H.text h ~selector:".status-extras .reminders";
+  H.names h ~selector:".status-extras .reminders";
+  H.click h ~selector:".status-extras .reminders";
   H.text h ~selector:".modal";
-  [%expect {|
+  [%expect
+    {|
     (Remind 2)
     button "Remind 2" -- Reminders (/remind lists them, /remind rm NAME removes one):
     r1 · on stop 1/3 · Don't stop until the tests pass.
@@ -63,10 +64,17 @@ let%expect_test "/remind stop and every add one, acknowledged by name" =
   run h "/remind stop Don't stop until the tests pass.";
   run h "/remind stop 5 Keep going.";
   run h "/remind every 20 Check the disk space.\nAnd the logs.";
-  H.reply h "add_reminder" {|{"name":"r4","text":"Don't stop until the tests pass.","on":"stop","max_repeats":3,"repeats":0}|};
-  H.reply h "add_reminder" {|{"name":"r5","text":"Keep going.","on":"stop","max_repeats":5,"repeats":0}|};
+  H.reply
+    h
+    "add_reminder"
+    {|{"name":"r4","text":"Don't stop until the tests pass.","on":"stop","max_repeats":3,"repeats":0}|};
+  H.reply
+    h
+    "add_reminder"
+    {|{"name":"r5","text":"Keep going.","on":"stop","max_repeats":5,"repeats":0}|};
   toasts h;
-  [%expect {|
+  [%expect
+    {|
     (Save_history ("/remind stop Don't stop until the tests pass."))
     (Rpc (method_ add_reminder)
      (params ((text "Don't stop until the tests pass.") (on stop)))
@@ -115,7 +123,8 @@ let%expect_test "/remind's mistakes say what to type; a refusal goes back" =
   run h "/remind every 2 x";
   H.fail h "add_reminder" "the session is gone";
   print_s [%sexp ((H.model h).draft : string)];
-  [%expect {|
+  [%expect
+    {|
     (Save_history ("/remind stop"))
     Usage: /remind stop [N] TEXT: reminded when it ends its turn, at most N times in a row (default 3) (Dismiss)
     "/remind stop"
@@ -153,7 +162,8 @@ let%expect_test "/remind rm and /remind off; with none, it says how to add one" 
   run h "/remind";
   run h "/remind off";
   toasts h;
-  [%expect {|
+  [%expect
+    {|
     (Save_history ("/remind rm r3"))
     (Rpc (method_ remove_reminder) (params ((name r3)))
      (tag (Reminder (command "/remind rm r3") (notice ("reminder r3 removed")))))
@@ -187,7 +197,8 @@ let%expect_test "/remind: a fuzzy picker; Enter shows one, Delete removes it" =
   H.click h ~selector:".picker-remove" ~nth:1;
   H.reply h "remove_reminder" "{}";
   toasts h;
-  [%expect {|
+  [%expect
+    {|
     (Save_history (/remind))
     (Focus picker-input)
     Reminders
@@ -232,7 +243,8 @@ let%expect_test "/remind completes subcommands, and names after rm" =
   print_s [%sexp ((H.model h).draft : string)];
   H.type_ h "/remind stop keep ";
   H.text h ~selector:".popup";
-  [%expect {|
+  [%expect
+    {|
     Reminders ↑↓ Tab Enter Esc   Ctrl+Enter as typed
     stop stop [N] TEXT: remind the agent when it ends its turn
     every every N TEXT: remind the agent every N turns
@@ -249,14 +261,17 @@ let%expect_test "/remind completes subcommands, and names after rm" =
     |}]
 ;;
 
-let%expect_test "switching sessions closes the picker; the new state brings its reminders" =
+let%expect_test
+    "switching sessions closes the picker; the new state brings its reminders"
+  =
   let h = with_reminders () in
   run h "/remind";
   H.quiet h (fun () ->
     H.act h (Reply (State, Ok (state ~session:"s2" ~reminders:"[]" ()))));
   print_s [%sexp ((H.model h).dialog : Dialog.t option)];
-  H.text h ~selector:".status .reminders";
-  [%expect {|
+  H.text h ~selector:".status-extras .reminders";
+  [%expect
+    {|
     (Save_history (/remind))
     (Focus picker-input)
     ()

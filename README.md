@@ -533,13 +533,15 @@ right. Ctrl+L, Alt+T and Alt+M switch or cycle them; in a narrow composer
 the labels get short (`high`, `ask`, `plan`). The top bar has the session's
 title, cwd and branch on the left (the cwd losing its middle rather than
 the directory it ends in), the panel toggles and the settings gear on the
-right, and the status in the middle: what the agent is doing, the context
-(click for `/session`'s details), tokens and cost, then whatever applies
-(the budget, the goal, reminders, a scheduled resume, queued messages to
-take back, background agents and jobs, transfers, the tool host, the
-verbosity, the plan chip `plan 2/5: step` that runs `/todos`). A narrower
-chat column drops the tokens and cost, then says what applies with icons
-alone; the bar never changes height.
+right, and the status in the middle: the context (click for `/session`'s
+details), tokens and cost (or the budget), then what the agent is doing, in
+a slot of its own width so that nothing moves as a turn starts and ends.
+Whatever applies follows the status, beside the panel toggles (before it on
+a phone), so that it never moves the status either: the goal, reminders, a
+scheduled resume, queued messages to take back, background agents and jobs,
+transfers, the tool host, the verbosity, the plan chip `plan 2/5: step`
+that runs `/todos`. A narrower chat column drops the tokens and cost, then
+says what applies with icons alone; the bar never changes height.
 
 The settings page (the gear, `/settings` or Ctrl+,) holds what is not
 about the session: notifications (on or off, and what to do when the

@@ -703,30 +703,40 @@ kbd {
 .popup-item.dimmed, .picker-item.dimmed { opacity: 0.5; }
 .popup-item > .mark.picked { --mark-size: 13px; align-self: center; margin-left: -6px; }
 
-/* The status, in the middle of the top bar: one line that gives way rather
-   than wraps (the padding keeps its links' focus rings inside). */
+/* The status, in the middle of the top bar, and what applies after it at
+   the start of the bar's end: one line that gives way rather than wraps
+   (the padding keeps its links' focus rings inside). Nothing in the status
+   moves as the agent starts and stops: the activity comes last, in a slot
+   of its own width, and what applies is outside the status (before it on a
+   phone, where the status is at the end). */
 
-.status {
+.status, .status-extras {
   display: flex;
   align-items: center;
   gap: 0 14px;
   min-width: 0;
-  max-width: 56cqi;
   padding: 4px;
   overflow: hidden;
   font-size: 12px;
   color: var(--faint);
   font-variant-numeric: tabular-nums;
 }
+.topbar-end { display: flex; align-items: center; gap: 10px; min-width: 0; }
+/* Its width does not count in the bar's end column, so it never pushes the
+   status off the centre: it takes what is left beside the panels. */
+.status-extras { flex: 1 1 0; contain: inline-size; }
+.status-extras:empty { display: none; }
+.topbar-end > .panel-toggles { margin-left: auto; }
 .status .context, .status .tokens, .status .cost { font: 11.5px var(--mono); }
 .status-item { display: inline-flex; align-items: center; gap: 5px; white-space: nowrap; }
 .status-item .icon { width: 13px; height: 13px; }
-.status-item.running { color: var(--sodium); gap: 7px; }
-.status-item.running { flex-shrink: 1; min-width: 0; }
-.status-item.running > .label { overflow: hidden; text-overflow: ellipsis; max-width: 32ch; }
+.status-item.running { color: var(--sodium); }
+.status-item.activity { width: 20ch; flex-shrink: 0; gap: 7px; }
+.status-item.activity > .label { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.status .context > .percent { min-width: 3ch; text-align: right; }
 .status-item.retrying { color: var(--brick); }
 .status-item.idle { color: var(--muted); }
-.idle-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--faint-line); }
+.idle-dot { width: 7px; height: 7px; flex-shrink: 0; border-radius: 50%; background: var(--faint-line); }
 .meter { width: 40px; height: 3px; border-radius: 0; background: var(--rule); overflow: hidden; }
 .meter-fill { display: block; height: 100%; background: var(--muted); }
 .context.warm { color: var(--sodium); }
@@ -737,7 +747,7 @@ kbd {
 .status-item.link:hover { color: var(--chalk); text-decoration: underline; text-underline-offset: 2px; }
 .status-item.link:focus-visible { outline: 2px solid var(--sodium); outline-offset: 2px; }
 .status-item.queued, .status-item.mode { color: var(--sodium); }
-.status-item.mode.plan { color: var(--muted); max-width: 260px; overflow: hidden; text-overflow: ellipsis; }
+.status-item.mode.plan { color: var(--muted); display: inline-block; min-width: 0; max-width: 260px; overflow: hidden; text-overflow: ellipsis; }
 .status-item.background.active { color: var(--sodium); gap: 7px; }
 .status-item.transfers { color: var(--sodium); gap: 7px; min-width: 0; max-width: 32ch; overflow: hidden; text-overflow: ellipsis; display: inline-block; }
 .status-item.transfers .lamp { margin-right: 7px; vertical-align: 1px; }
@@ -1270,7 +1280,7 @@ kbd {
   max-height: 30vh;
   overflow-y: auto;
 }
-.queued {
+.queue > .queued {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr) auto;
   align-items: start;
@@ -1333,14 +1343,22 @@ kbd {
   .status .tokens, .status .cost:not(.budget) { display: none; }
 }
 @container topbar (width < 600px) {
-  .status .status-text, .status .mode { display: none; }
-  .status-item.running > .label { max-width: 14ch; }
+  .status-extras .status-text, .status-extras .status-item.mode { display: none; }
+  .status-item.activity { width: 14ch; }
 }
-/* A phone: the session gets the room, the status follows it. */
-.app.narrow .topbar { grid-template-columns: minmax(0, 1fr) auto auto; }
+/* A phone: the session gets the room, the status follows it, and what
+   applies comes before the status. */
+.app.narrow .topbar { grid-template-columns: minmax(0, 1fr); grid-auto-flow: column; grid-auto-columns: auto; }
+.app.narrow .topbar-end { display: contents; }
+.app.narrow .status-extras { order: 1; contain: none; max-width: 40cqi; }
+.app.narrow .status { order: 2; }
+.app.narrow .panel-toggles { order: 3; }
 @container topbar (width < 480px) {
-  .status { gap: 0 10px; padding: 4px 0; }
-  .status-item.running > .label, .status-item.idle > .label { display: none; }
+  .status, .status-extras { gap: 0 10px; padding: 4px 0; }
+  .status-item.activity:is(.running, .idle) { width: 7px; justify-content: center; }
+  .status-item.activity:is(.running, .idle) > .label { display: none; }
+  /* Not working but out of touch: that is worth the room. */
+  .status-item.activity:is(.connecting, .offline) { width: auto; }
   .status .meter { display: none; }
 }
 

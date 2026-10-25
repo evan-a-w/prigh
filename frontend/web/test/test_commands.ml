@@ -377,6 +377,7 @@ let%expect_test "/verbosity and Ctrl+O" =
   H.key h "Enter" ~target:Field;
   H.show h ~selector:"#chat";
   H.text h ~selector:".status";
+  H.text h ~selector:".status-extras";
   [%expect
     {|
     (Dialog_move -1)
@@ -408,7 +409,8 @@ let%expect_test "/verbosity and Ctrl+O" =
       </div>
       <Vdom.Node.none-widget> </Vdom.Node.none-widget>
     </div>
-    Ready (0%) ↑0 ↓0 $0.0000 (quiet)
+    (0%) ↑0 ↓0 $0.0000 Ready
+    (quiet)
     |}];
   H.key h "o" ~ctrl:true;
   H.key h "o" ~ctrl:true;
@@ -425,8 +427,12 @@ let%expect_test "/verbosity and Ctrl+O" =
     Unknown verbosity “loud”: use quiet, normal or verbose. (Dismiss)
     |}];
   H.text h ~selector:".status";
+  H.text h ~selector:".status-extras";
   [%expect
-    {| Ready (0%) ↑0 ↓0 $0.0000 (verbose) |}]
+    {|
+    (0%) ↑0 ↓0 $0.0000 Ready
+    (verbose)
+    |}]
 ;;
 
 let%expect_test "/confirm" =

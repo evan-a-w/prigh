@@ -1874,8 +1874,8 @@ terminal frontend and `web/` prigh-web, the browser one.
       backend will keep, running, open elsewhere or our own, and the
       `Delete_result` reply is a toast), `Topbar_view` (a grid of
       three: the title, the cwd with its middle elided and the branch;
-      `Status_view` in the middle; the panel toggles and the settings gear
-      — its steps are container queries on the top bar in `style.css`),
+      `Status_view` in the middle; `Status_view.extras` and the panel
+      toggles and the settings gear — its steps are container queries on the top bar in `style.css`),
       `Composer_view` (one box: the editor, then the model, thinking and
       approval mode chips, each opening its picker, and attach, stop and
       send along its bottom; the composer's container queries shorten the
@@ -1898,9 +1898,11 @@ terminal frontend and `web/` prigh-web, the browser one.
       sidebar's account button and the account menu, a `Picker` of
       accounts and actions) over `Accounts` (the saved sign-ins in
       localStorage, behind a `Storage` record so that tests use a table),
-      `Status_view` (in the top bar: activity, the context linking to
-      `/session`, tokens, cost, the plan chip, the transfers in progress
-      from `Files.transfers`), `Settings_view` (`Dialog.Settings`, from the
+      `Status_view` (in the top bar: the context linking to `/session`,
+      tokens, cost, then the activity in a slot of fixed width; and its
+      `extras`, kept out of the centred status so that they never move it:
+      the plan chip, queued messages, the transfers in progress from
+      `Files.transfers`…), `Settings_view` (`Dialog.Settings`, from the
       gear, `/settings` or Ctrl+,: notifications, verbosity, `/confirm`,
       providers, the account; its controls are `Action.Run` commands, which
       leave it open),
@@ -2303,6 +2305,10 @@ every 2.5s (one reconnect, after which the session comes back; the old page
 dropped the working connection again and again), then closes each socket
 as the session's messages arrive (the page gives up after six, with the
 banner, never saying "Reconnected", and opens no more sockets; the old page
-opened 900 in 30s), then "Retry now" once the connection holds.
+opened 900 in 30s), then "Retry now" once the connection holds. Then
+`stability.mjs`: nothing redrawn or shifted that did not change while the
+page idles and a reply streams, the editor's height in every frame, and the
+top bar's status in the same place in every frame as turns start, run a
+tool, queue a steer and end, on a desktop and on a phone.
 `SHOTS=DIR` saves a screenshot per step, `UPDATE=1` re-records,
 `ENGINES=chromium` runs one browser.

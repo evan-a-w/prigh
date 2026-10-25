@@ -80,7 +80,7 @@ let context (state : State.t) ~inject =
                 ]
               []
           ]
-      ; Node.textf "%.0f%%" percent
+      ; span ~cls:"percent" (sprintf "%.0f%%" percent)
       ])
 ;;
 
@@ -223,8 +223,16 @@ let modes (m : App.Model.t) ~inject =
   ]
 ;;
 
+(* A slot of its own width, whatever it says, so that nothing moves as the
+   agent starts and stops: the label gives way, and its title says it all. *)
+let activity_item ?title cls children =
+  item ~cls:("activity " ^ cls) ?title ~attrs:activity children
+;;
+
+let label text = span ~cls:"label" text
+
 let waiting cls text =
-  item ~cls ~attrs:activity [ Html.lamp (); Node.text text ]
+  activity_item ~title:text cls [ Html.lamp (); label text ]
 ;;
 
 let view (m : App.Model.t) ~inject =
@@ -233,40 +241,38 @@ let view (m : App.Model.t) ~inject =
   | _, Reconnecting _ when App.Drops.gave_up m.drops ->
     div
       ~cls:"status"
-      [ item ~cls:"offline" [ Node.text "Stopped reconnecting" ] ]
+      [ activity_item
+          ~title:"Stopped reconnecting"
+          "offline"
+          [ label "Stopped reconnecting" ]
+      ]
   | _, Reconnecting _ ->
     div ~cls:"status" [ waiting "connecting offline" "Reconnecting…" ]
   | Some state, Connected ->
-    let queued = Queued.count m.queue in
+    let doing =
+      if m.pending.sending > 0 && not state.running
+      then waiting "running" "Sending…"
+      else if state.running
+      then (
+        let doing = Chat.activity m.chat in
+        let text =
+          String.capitalize
+            (Option.value (Prigh_ui.Activity.label doing) ~default:"working")
+        in
+        activity_item
+          (match doing with
+           | Retrying _ -> "running retrying"
+           | _ -> "running")
+          ~title:text
+          [ Html.lamp (); label text ])
+      else
+        activity_item
+          "idle"
+          [ Node.span ~attrs:[ Attr.class_ "idle-dot" ] []; label "Ready" ]
+    in
     div
       ~cls:"status"
-      [ (if m.pending.sending > 0 && not state.running
-         then waiting "running" "Sending…"
-         else if state.running
-         then (
-           let doing = Chat.activity m.chat in
-           let label =
-             String.capitalize
-               (Option.value (Prigh_ui.Activity.label doing) ~default:"working")
-           in
-           item
-             ~cls:
-               (match doing with
-                | Retrying _ -> "running retrying"
-                | _ -> "running")
-             ~title:label
-             ~attrs:activity
-             [ Html.lamp ()
-             ; Node.span ~attrs:[ Attr.class_ "label" ] [ Node.text label ]
-             ])
-         else
-           item
-             ~cls:"idle"
-             ~attrs:activity
-             [ Node.span ~attrs:[ Attr.class_ "idle-dot" ] []
-             ; span ~cls:"label" "Ready"
-             ])
-      ; context state ~inject
+      [ context state ~inject
       ; item
           ~cls:"tokens"
           ~title:
@@ -281,7 +287,17 @@ let view (m : App.Model.t) ~inject =
               (tokens state.usage.output)
           ]
       ; cost state ~inject
-      ; goal state ~inject
+      ; doing
+      ]
+;;
+
+let extras (m : App.Model.t) ~inject =
+  match m.state, m.connection with
+  | Some state, Connected ->
+    let queued = Queued.count m.queue in
+    div
+      ~cls:"status-extras"
+      [ goal state ~inject
       ; reminders state ~inject
       ; resume m state ~inject
       ; (if queued > 0
@@ -300,4 +316,5 @@ let view (m : App.Model.t) ~inject =
       ; host state
       ; Node.fragment (modes m ~inject)
       ]
+  | _ -> div ~cls:"status-extras" []
 ;;
