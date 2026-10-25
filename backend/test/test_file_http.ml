@@ -170,7 +170,7 @@ let%expect_test "file browser over RPC and HTTP on the backend host" =
   print_s [%sexp (String.length (get t ~sw ~port url).body : int)];
   [%expect
     {|
-    {"type":"response","id":"r","ok":true,"result":{"path":"notes.txt","name":"notes.txt","size":6,"mtime":<ms>,"kind":"text","text":"hello\n","truncated":false}}
+    {"type":"response","id":"r","ok":true,"result":{"path":"notes.txt","name":"notes.txt","size":6,"mtime":<ms>,"kind":"text","text":"hello\n","truncated":false,"md5":"<id><id>"}}
     {"type":"response","id":"r","ok":true,"result":{"path":"shot.png","name":"shot.png","size":84,"mtime":<ms>,"kind":"image","mime":"image/png","url":"/files/download?ticket=<ticket>"}}
     {"type":"response","id":"r","ok":true,"result":{"path":"blob.bin","name":"blob.bin","size":1000,"mtime":<ms>,"kind":"binary"}}
     HTTP/1.1 200 OK
@@ -484,7 +484,7 @@ let%expect_test "file browser on a network tool host, and without any" =
     {"type":"response","id":"r","ok":true,"result":{"url":"/files/download?ticket=<ticket>","name":"big.bin"}}
     HTTP/1.1 200 OK
     true
-    {"type":"response","id":"r","ok":true,"result":{"path":"readme.md","name":"readme.md","size":5,"mtime":<ms>,"kind":"text","text":"# hi\n","truncated":false}}
+    {"type":"response","id":"r","ok":true,"result":{"path":"readme.md","name":"readme.md","size":5,"mtime":<ms>,"kind":"text","text":"# hi\n","truncated":false,"md5":"<id><id>"}}
     |}]
 ;;
 

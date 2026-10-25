@@ -38,6 +38,8 @@ let with_agent ?tools ?on_request ?auto_describe replies f =
         Some (sprintf "state: running=%b messages=%d" s.running s.message_count)
       | Compacted { summary } -> Some ("compacted: " ^ summary)
       | Config_changed _ -> None
+      | Review_changed r ->
+        Some (sprintf "review: %d comments" (List.length r.comments))
       | Notice n -> Some ("notice: " ^ n)
       | Queue_update { steer; follow_up } ->
         Some
