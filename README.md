@@ -634,25 +634,34 @@ across the reconnect: their results wait for the backend to be back.
 column beside it and keeps working. Down its left are the changed files,
 each with its approval; the strip in its head shows them all at a glance
 (sage approved, sodium changed since approved). The current file shows
-its hunks or, with Whole file (v), all of it with the changes inline.
+its hunks or, with Whole file (v), all of it with the changes inline, one
+line number per row (a removed line's old one, struck through).
 `]` / `[` (or n / p, j / k) go to the next and previous file, `a`
 approves the file (again), Esc closes. It follows the agent: every edit,
 write or command of the agent or its subagents, and every run's end,
 reads the changes again; the arrow button reads them now.
 
-Click a line's number to select it, Shift+click another to select the
-lines between, then Comment (or `c`): write it and Ctrl+Enter adds it
-under the lines. Comments collect until you send them (Send, or `s`):
-the agent then gets one message with each comment's file, lines, the code
-they hold and the thread (`✎ 2 review comments` in the transcript), and
-answers each with the `reply_to_comment` tool. Its replies show threaded
-under the comment; a reply may propose a change (exact replacements, like
-`edit`'s), which Accept applies to the file where the tools run and
-Reject declines, and the agent hears of either with the next comments you
-send. Reply in a thread to go on with it, Resolve it when it is done, or
-delete it. A comment keeps its lines' text, so when the file changes
-around them it moves with them; one whose lines are gone shows above the
-file, marked so.
+Select the code you want changed, as you would to copy it (drag across
+it, within a line or over several; on a phone, press and hold), here or in
+the file browser's preview of a changed file: a Comment button floats by
+the selection. Press it (or `c`), write what should change and Enter adds
+it (Shift+Enter for a new line, Esc drops it), under the code with the
+selected text quoted; that text stays marked while the comment is there,
+and pointing at either the comment or its code lights the other. Removed
+lines can be commented on too: the comment says it is on the old text.
+(A line's number selects the whole line, Shift+click to another.)
+Comments collect until you send them (Send, or `s`): the agent then gets
+one message with each comment's file, lines, the code they hold with the
+selection marked in it and quoted, and the thread (`✎ 2 review comments`
+in the transcript), and answers each with the `reply_to_comment` tool.
+Its replies show threaded under the comment; a reply may propose a change
+(exact replacements, like `edit`'s), which Accept applies to the file
+where the tools run and Reject declines, and the agent hears of either
+with the next comments you send. Reply in a thread to go on with it,
+Resolve it when it is done, or delete it. A comment keeps its code's
+text, so when the file changes around it it moves with it (and, when
+only the rest of its lines changed, with the selected text); one whose
+code is gone shows above the file, marked so.
 
 Edit (e) switches to the file's text: edit it in place (highlighted) and
 Save (Ctrl+S) writes it on the tool host; a file that changed since you
