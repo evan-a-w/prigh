@@ -130,7 +130,7 @@ let%expect_test "subagents start, nest and show in the panel, live" =
     (Rpc (method_ list_subagents) (params ()) (tag Subagents))
     (Rpc (method_ list_subagents) (params ()) (tag Subagents))
     |}];
-  H.text h ~selector:".status .background";
+  H.text h ~selector:".status-extras .background";
   H.show h ~selector:".agents-toggle";
   [%expect
     {|
@@ -256,7 +256,7 @@ let%expect_test "subagents start, nest and show in the panel, live" =
     ];
   H.act h (Clock (at 80.));
   H.text h ~selector:".agents-panel";
-  H.text h ~selector:".status .background";
+  H.text h ~selector:".status-extras .background";
   print_s [%sexp (App.Model.ticking (H.model h) : bool)];
   [%expect
     {|
@@ -629,7 +629,7 @@ let%expect_test "jobs: listed, their output polled, killed" =
     h
     "list_jobs"
     (sprintf "[%s]" (job "j1" "make test" ~elapsed:3. ~last_line:"ok 12 tests"));
-  H.text h ~selector:".status .background";
+  H.text h ~selector:".status-extras .background";
   H.act h (Focus_agent 1);
   H.act h (Focus_agent 1);
   [%expect
@@ -808,8 +808,8 @@ let%expect_test "after a reload, a nested subagent's transcript is fetched" =
             @@ H.page
                  {|[{"role":"user","text":"survey"},
                  {"role":"assistant","content":[{"type":"tool_call","id":"s1","name":"subagent","arguments":"{\"task\":\"Survey the repository\"}"}],"stop_reason":{"type":"tool_use"},"usage":{"input":0,"output":0,"cache_read":0},"model":"m"},
-                 {"role":"tool_result","tool_call_id":"s1","tool_name":"subagent","text":"started agent a1 (Survey the repository); ...","is_error":false}]|})
-       ));
+                 {"role":"tool_result","tool_call_id":"s1","tool_name":"subagent","text":"started agent a1 (Survey the repository); ...","is_error":false}]|}
+           ) ));
   H.reply
     h
     "get_subagent"

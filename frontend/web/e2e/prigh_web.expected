@@ -25,9 +25,10 @@ Ctrl+K find a session
 === chromium: signed in: top bar ===
 New session
 <CWD>
-Ready
+0%
 ↑0 ↓0
 $<COST>
+Ready
 === chromium: a dialog keeps the focus ===
 Tab: dialog: Close (Esc)
 Tab: dialog: Keys
@@ -112,14 +113,15 @@ three lines
 === chromium: top bar after a run ===
 count some lines
 <CWD>
-Ready
+0%
 ↑0 ↓0
 $<COST>
-=== chromium: a budget in the status line ===
 Ready
+=== chromium: a budget in the status line ===
 0%
 ↑0 ↓0
 $<COST>/$<COST>
+Ready
 === chromium: long output, folded ===
 bash
 seq 1 30
@@ -432,10 +434,10 @@ Thinking
 high
 Plan mode
 === chromium: plan mode: the status line ===
-Ready
 0%
 ↑0 ↓0
 $<COST>
+Ready
 === chromium: a plan to approve ===
 Plan
 Approve the plan and start implementing?
@@ -453,10 +455,10 @@ Thinking
 high
 Auto: never asks
 === chromium: the plan approved: the status line ===
-Ready
 0%
 ↑0 ↓0
 $<COST>
+Ready
 plan 0/2: Write the schema
 === chromium: implementing ===
 ◇
@@ -679,15 +681,15 @@ on a phone: 0 handles
 hl-kw:let hl-kw:rec hl-kw:if hl-num:2 hl-kw:then hl-kw:else hl-num:1 hl-num:2 hl-com:(* slow *)
 hl-prop:"name" hl-str:"prigh" hl-prop:"ok" hl-con:true hl-prop:"n" hl-num:3
 === chromium: top bar: a 700px chat column ===
-chat 700; chips: DeepSeek V4.1 Flash, Thinking on, Auto: never asks; status: Ready, 0%; title at least 100px: true; top bar 54px high
+chat 700; chips: DeepSeek V4.1 Flash, Thinking on, Auto: never asks; status: 0%, Ready; title at least 100px: true; top bar 54px high
 .topbar: fits
 .composer: fits
 === chromium: top bar: a 520px chat column ===
-chat 520; chips: DeepSeek V4.1 Flash, on, auto; status: Ready, 0%; title at least 100px: true; top bar 54px high
+chat 520; chips: DeepSeek V4.1 Flash, on, auto; status: 0%, Ready; title at least 100px: true; top bar 54px high
 .topbar: fits
 .composer: fits
 === chromium: top bar: a 400px chat column ===
-chat 400; chips: DeepSeek V4.1 Flash, on, auto; status: icon, 0%; title at least 100px: true; top bar 54px high
+chat 400; chips: DeepSeek V4.1 Flash, on, auto; status: 0%, icon; title at least 100px: true; top bar 54px high
 .topbar: fits
 .composer: fits
 === chromium: settings ===
@@ -718,7 +720,7 @@ Done
 a choice keeps it open: true
 Esc closes it, the editor has the focus: true
 === chromium: top bar: a 400px chat column without the sidebar ===
-chat 400; chips: DeepSeek V4.1 Flash, on, auto; status: icon, 0%; title at least 100px: true; top bar 54px high
+chat 400; chips: DeepSeek V4.1 Flash, on, auto; status: 0%, icon; title at least 100px: true; top bar 54px high
 .topbar: fits
 .composer: fits
 === chromium: errors ===
@@ -930,6 +932,14 @@ selection kept: true
 frames sampled: true
 frames with lines out of view: 0
 frames empty but still tall: 0
+=== chromium: stability: a turn starts and ends: the top bar's status ===
+activities shown: several, ending Ready
+places of the status's items: one
+layout shift in the status: none
+=== chromium: stability: a turn starts and ends on a phone: the top bar's status ===
+activities shown: several, ending Ready
+places of the status's items: one
+layout shift in the status: none
 === chromium: stability: errors ===
 none
 === firefox: sign-in page ===
@@ -959,9 +969,10 @@ Ctrl+K find a session
 === firefox: signed in: top bar ===
 New session
 <CWD>
-Ready
+0%
 ↑0 ↓0
 $<COST>
+Ready
 === firefox: a dialog keeps the focus ===
 Tab: dialog: Close (Esc)
 Tab: dialog: Keys
@@ -1046,14 +1057,15 @@ three lines
 === firefox: top bar after a run ===
 count some lines
 <CWD>
-Ready
+0%
 ↑0 ↓0
 $<COST>
-=== firefox: a budget in the status line ===
 Ready
+=== firefox: a budget in the status line ===
 0%
 ↑0 ↓0
 $<COST>/$<COST>
+Ready
 === firefox: long output, folded ===
 bash
 seq 1 30
@@ -1366,10 +1378,10 @@ Thinking
 high
 Plan mode
 === firefox: plan mode: the status line ===
-Ready
 0%
 ↑0 ↓0
 $<COST>
+Ready
 === firefox: a plan to approve ===
 Plan
 Approve the plan and start implementing?
@@ -1387,10 +1399,10 @@ Thinking
 high
 Auto: never asks
 === firefox: the plan approved: the status line ===
-Ready
 0%
 ↑0 ↓0
 $<COST>
+Ready
 plan 0/2: Write the schema
 === firefox: implementing ===
 ◇
@@ -1613,15 +1625,15 @@ on a phone: 0 handles
 hl-kw:let hl-kw:rec hl-kw:if hl-num:2 hl-kw:then hl-kw:else hl-num:1 hl-num:2 hl-com:(* slow *)
 hl-prop:"name" hl-str:"prigh" hl-prop:"ok" hl-con:true hl-prop:"n" hl-num:3
 === firefox: top bar: a 700px chat column ===
-chat 700; chips: DeepSeek V4.1 Flash, Thinking on, Auto: never asks; status: Ready, 0%; title at least 100px: true; top bar 54px high
+chat 700; chips: DeepSeek V4.1 Flash, Thinking on, Auto: never asks; status: 0%, Ready; title at least 100px: true; top bar 54px high
 .topbar: fits
 .composer: fits
 === firefox: top bar: a 520px chat column ===
-chat 520; chips: DeepSeek V4.1 Flash, on, auto; status: Ready, 0%; title at least 100px: true; top bar 54px high
+chat 520; chips: DeepSeek V4.1 Flash, on, auto; status: 0%, Ready; title at least 100px: true; top bar 54px high
 .topbar: fits
 .composer: fits
 === firefox: top bar: a 400px chat column ===
-chat 400; chips: DeepSeek V4.1 Flash, on, auto; status: icon, 0%; title at least 100px: true; top bar 54px high
+chat 400; chips: DeepSeek V4.1 Flash, on, auto; status: 0%, icon; title at least 100px: true; top bar 54px high
 .topbar: fits
 .composer: fits
 === firefox: settings ===
@@ -1653,7 +1665,7 @@ Done
 a choice keeps it open: true
 Esc closes it, the editor has the focus: true
 === firefox: top bar: a 400px chat column without the sidebar ===
-chat 400; chips: DeepSeek V4.1 Flash, on, auto; status: icon, 0%; title at least 100px: true; top bar 54px high
+chat 400; chips: DeepSeek V4.1 Flash, on, auto; status: 0%, icon; title at least 100px: true; top bar 54px high
 .topbar: fits
 .composer: fits
 === firefox: errors ===
@@ -1865,5 +1877,13 @@ selection kept: true
 frames sampled: true
 frames with lines out of view: 0
 frames empty but still tall: 0
+=== firefox: stability: a turn starts and ends: the top bar's status ===
+activities shown: several, ending Ready
+places of the status's items: one
+layout shift in the status: none
+=== firefox: stability: a turn starts and ends on a phone: the top bar's status ===
+activities shown: several, ending Ready
+places of the status's items: one
+layout shift in the status: none
 === firefox: stability: errors ===
 none

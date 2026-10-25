@@ -64,7 +64,11 @@ let view (m : App.Model.t) ~inject =
       ~attrs:[ Attr.class_ "topbar" ]
       [ div ~cls:"topbar-start" [ toggle; div ~cls:"title" [] ]
       ; Status_view.view m ~inject
-      ; div ~cls:"panel-toggles" [ settings ~inject ]
+      ; div
+          ~cls:"topbar-end"
+          [ Status_view.extras m ~inject
+          ; div ~cls:"panel-toggles" [ settings ~inject ]
+          ]
       ]
   | Some state ->
     Node.header
@@ -100,11 +104,15 @@ let view (m : App.Model.t) ~inject =
           ]
       ; Status_view.view m ~inject
       ; div
-          ~cls:"panel-toggles"
-          [ Files_view.toggle m ~inject
-          ; Terminal_view.toggle m ~inject
-          ; Agents_view.toggle m ~inject
-          ; settings ~inject
+          ~cls:"topbar-end"
+          [ Status_view.extras m ~inject
+          ; div
+              ~cls:"panel-toggles"
+              [ Files_view.toggle m ~inject
+              ; Terminal_view.toggle m ~inject
+              ; Agents_view.toggle m ~inject
+              ; settings ~inject
+              ]
           ]
       ]
 ;;
