@@ -24,7 +24,10 @@ val model : Model.t -> Json.t
     seconds, bytes and last output line. *)
 val job : now:float -> Background_tasks.Task.t -> Json.t
 
+(** With [repo] when it is known ([null]: not in a repository) and the
+    worktrees made for its subagents. *)
 val session_summary : Session.Summary.t -> Json.t
+
 val session_stats : Agent.Session_stats.t -> Json.t
 val entry : Session.Entry.t -> Json.t
 val thinking : Thinking.t -> Json.t

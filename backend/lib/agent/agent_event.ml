@@ -65,6 +65,9 @@ type t =
       ; task : string
       ; model : string
       ; tools : string list
+      ; worktree : Agent_worktree.t option
+        (** the worktree it works in, made for it ([subagent]'s
+            [worktree]) *)
       }
   | Subagent of
       { call_id : string

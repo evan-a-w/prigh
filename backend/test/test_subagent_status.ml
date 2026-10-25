@@ -152,7 +152,13 @@ let emitting_tool name ~run =
 
 let start ~call_id agent_id : Agent_event.t =
   Subagent_start
-    { call_id; agent_id; task = agent_id; model = "faux"; tools = [] }
+    { call_id
+    ; agent_id
+    ; task = agent_id
+    ; model = "faux"
+    ; tools = []
+    ; worktree = None
+    }
 ;;
 
 (* Starts that never get an end, as if what ran them died: one directly in

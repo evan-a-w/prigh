@@ -19,6 +19,9 @@ module Host : sig
     ; exec_input : bool [@sexp.bool]
       (** it takes [Tool_exec_input] (its [hello] listed the [exec_input]
           feature) *)
+    ; git_location : bool [@sexp.bool]
+      (** it runs [$git_location] (the [git_location] feature): sessions
+          record where their cwd there is in git *)
     }
   [@@deriving sexp_of, equal]
 
@@ -439,19 +442,25 @@ val git_diff : ?path:string -> ?base:string -> t -> Git_diff.Result.t Or_error.t
 (** {2 Worktrees}
 
     The repository's git worktrees, run on the active tool host in the
-    session cwd's repository; new ones go under the config's
-    [worktrees_dir] ({!Worktree}). *)
+    repository of [cwd] (default: the session's; relative to it); new ones
+    go under the config's [worktrees_dir] ({!Worktree}). *)
 
-val worktrees : t -> Worktree.Listing.t Or_error.t
+val worktrees : ?cwd:string -> t -> Worktree.Listing.t Or_error.t
 
 val create_worktree
-  :  t
+  :  ?cwd:string
+  -> t
   -> branch:string
   -> base:string option
   -> Worktree.Created.t Or_error.t
 
 (** Removes a worktree of the session cwd's repository ({!Worktree.remove}). *)
-val remove_worktree : t -> path:string -> force:bool -> Worktree.t Or_error.t
+val remove_worktree
+  :  ?cwd:string
+  -> t
+  -> path:string
+  -> force:bool
+  -> Worktree.t Or_error.t
 
 (** [/review ARGS]: a run reviewing the uncommitted changes, or the changes
     against a base when the first word of [ARGS] names a revision; the rest

@@ -370,8 +370,8 @@ let%expect_test "over RPC: sessions in each worktree, the current one, removal" 
   call_ a ~params:{|{"path": "../trees/repo/b"}|} "remove_worktree";
   [%expect
     {|
-    {"type":"response","id":"r1","ok":true,"result":{"worktree":{"path":"$DIR/trees/repo/feat-a","branch":"feat/a","head":"<sha>","main":false,"managed":true,"locked":false,"prunable":false,"changes":0,"upstream":null,"ahead":0,"behind":0,"current":false,"sessions":[]},"new_branch":true}}
-    {"type":"response","id":"r1","ok":true,"result":{"worktree":{"path":"$DIR/trees/repo/b","branch":"b","head":"<sha>","main":false,"managed":true,"locked":false,"prunable":false,"changes":0,"upstream":null,"ahead":0,"behind":0,"current":false,"sessions":[]},"new_branch":true}}
+    {"type":"response","id":"r1","ok":true,"result":{"worktree":{"path":"$DIR/trees/repo/feat-a","branch":"feat/a","head":"<sha>","main":false,"managed":true,"locked":false,"prunable":false,"changes":0,"upstream":null,"ahead":0,"behind":0,"current":false,"sessions":[]},"new_branch":true,"root":"$DIR/repo","cwd":"$DIR/trees/repo/feat-a"}}
+    {"type":"response","id":"r1","ok":true,"result":{"worktree":{"path":"$DIR/trees/repo/b","branch":"b","head":"<sha>","main":false,"managed":true,"locked":false,"prunable":false,"changes":0,"upstream":null,"ahead":0,"behind":0,"current":false,"sessions":[]},"new_branch":true,"root":"$DIR/repo","cwd":"$DIR/trees/repo/b"}}
     {"type":"response","id":"r1","ok":false,"error":"missing param \"branch\""}
     {"type":"response","id":"r1","ok":false,"error":"<host>: not a directory: $DIR/trees/repo/feat-a/sub"}
     {"type":"response","id":"r1","ok":true,"result":{"cwd":"$DIR/trees/repo/feat-a/sub","created":false}}
@@ -414,7 +414,7 @@ let%expect_test "a tool host runs the operations; ~ is its home" =
     ~f:(fun () ->
       exec
         Worktree.create_op
-        (Worktree.create_args ~dir:"~/wt" ~branch:"x" ~base:None);
+        (Worktree.create_args ~dir:"~/wt" ~branch:"x" ~base:None ());
       exec Worktree.list_op (Worktree.list_args ~dir:"~/wt");
       exec
         Worktree.remove_op
@@ -425,7 +425,7 @@ let%expect_test "a tool host runs the operations; ~ is its home" =
       exec Worktree.remove_op (`Object []));
   [%expect
     {|
-    {"worktree":{"path":"$DIR/home/wt/repo/x","branch":"x","head":"<sha>","main":false,"managed":true,"locked":false,"prunable":false,"changes":0,"upstream":null,"ahead":0,"behind":0},"new_branch":true}
+    {"worktree":{"path":"$DIR/home/wt/repo/x","branch":"x","head":"<sha>","main":false,"managed":true,"locked":false,"prunable":false,"changes":0,"upstream":null,"ahead":0,"behind":0},"new_branch":true,"root":"$DIR/repo","cwd":"$DIR/home/wt/repo/x"}
     {"root":"$DIR/repo","project_dir":"$DIR/home/wt/repo","worktrees":[{"path":"$DIR/repo","branch":"main","head":"<sha>","main":true,"managed":false,"locked":false,"prunable":false,"changes":0,"upstream":null,"ahead":0,"behind":0},{"path":"$DIR/home/wt/repo/x","branch":"x","head":"<sha>","main":false,"managed":true,"locked":false,"prunable":false,"changes":0,"upstream":null,"ahead":0,"behind":0}]}
     {"path":"$DIR/home/wt/repo/x","branch":"x","head":"<sha>","main":false,"managed":true,"locked":false,"prunable":false,"changes":0,"upstream":null,"ahead":0,"behind":0}
     error: missing path

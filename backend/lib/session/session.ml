@@ -45,6 +45,12 @@ module Entry = struct
           }
       | Resume_at of { at : float option }
       | Told_environment of Told_environment.t
+      | Repo of
+          { cwd : string
+          ; repo : Git_location.t option
+          }
+      | Agent_worktree of Agent_worktree.t
+      | Worktree_removed of { path : string }
     [@@deriving sexp, jsonaf]
   end
 
@@ -76,6 +82,8 @@ type t =
   ; mutable cwd : string
   ; mutable host : Host.t option
   ; host_cwds : string String.Table.t
+  ; repos : Git_location.t option String.Table.t (** by cwd *)
+  ; mutable agent_worktrees : Agent_worktree.t list (** newest first *)
   ; created_at : Time_float.t
   ; parent : string option
   ; mutable entries : Entry.t list (* reversed *)
@@ -156,7 +164,10 @@ let worth_saving (line : Line.t) =
           | Archived _
           | Spend _
           | Resume_at _
-          | Told_environment _ )
+          | Told_environment _
+          | Repo _
+          | Agent_worktree _
+          | Worktree_removed _ )
       ; _
       }
   | Header _ | Head _ -> false
@@ -246,6 +257,8 @@ let create ~dir ~cwd ?parent () =
     ; cwd
     ; host = None
     ; host_cwds = String.Table.create ()
+    ; repos = String.Table.create ()
+    ; agent_worktrees = []
     ; created_at
     ; parent
     ; entries = []
@@ -285,6 +298,16 @@ let add_entry t (entry : Entry.t) =
   | Spend _
   | Resume_at _
   | Told_environment _ -> ()
+  | Repo { cwd; repo } -> Hashtbl.set t.repos ~key:cwd ~data:repo
+  | Agent_worktree w ->
+    t.agent_worktrees
+    <- w
+       :: List.filter t.agent_worktrees ~f:(fun (o : Agent_worktree.t) ->
+         not (String.equal o.path w.path))
+  | Worktree_removed { path } ->
+    t.agent_worktrees
+    <- List.filter t.agent_worktrees ~f:(fun (o : Agent_worktree.t) ->
+         not (String.equal o.path path))
 ;;
 
 let read_lines path =
@@ -349,6 +372,8 @@ let load ?(yield = fun () -> ()) path =
            ; cwd
            ; host = None
            ; host_cwds = String.Table.create ()
+           ; repos = String.Table.create ()
+           ; agent_worktrees = []
            ; created_at
            ; parent
            ; entries = []
@@ -431,6 +456,11 @@ let add_allow_rule t ~rule = append t (Allow_rule { rule })
 let set_archived t ~archived = append t (Archived { archived })
 let add_spend t ~usage ~cost_usd = append t (Spend { usage; cost_usd })
 let set_told_environment t told = append t (Told_environment told)
+let repo t = Hashtbl.find t.repos t.cwd
+let set_repo t ~cwd repo = append t (Repo { cwd; repo })
+let agent_worktrees t = List.rev t.agent_worktrees
+let add_agent_worktree t worktree = append t (Agent_worktree worktree)
+let worktree_removed t ~path = append t (Worktree_removed { path })
 
 let spend t =
   List.fold
@@ -473,7 +503,10 @@ let name t =
     | Archived _
     | Spend _
     | Resume_at _
-    | Told_environment _ -> None)
+    | Told_environment _
+    | Repo _
+    | Agent_worktree _
+    | Worktree_removed _ -> None)
 ;;
 
 let description t =
@@ -494,7 +527,10 @@ let description t =
     | Archived _
     | Spend _
     | Resume_at _
-    | Told_environment _ -> None)
+    | Told_environment _
+    | Repo _
+    | Agent_worktree _
+    | Worktree_removed _ -> None)
 ;;
 
 let append_compaction ?pinned t ~summary ~kept_from =
@@ -574,7 +610,10 @@ let context t =
       | Archived _
       | Spend _
       | Resume_at _
-      | Told_environment _ -> acc)
+      | Told_environment _
+      | Repo _
+      | Agent_worktree _
+      | Worktree_removed _ -> acc)
   in
   let messages entries =
     List.filter_map entries ~f:(fun (e : Entry.t) ->
@@ -594,7 +633,10 @@ let context t =
       | Archived _
       | Spend _
       | Resume_at _
-      | Told_environment _ -> None)
+      | Told_environment _
+      | Repo _
+      | Agent_worktree _
+      | Worktree_removed _ -> None)
   in
   match compaction with
   | None -> messages path
@@ -636,7 +678,10 @@ let system_prompt t =
     | Archived _
     | Spend _
     | Resume_at _
-    | Told_environment _ -> acc)
+    | Told_environment _
+    | Repo _
+    | Agent_worktree _
+    | Worktree_removed _ -> acc)
 ;;
 
 let goal t =
@@ -657,7 +702,10 @@ let goal t =
     | Archived _
     | Spend _
     | Resume_at _
-    | Told_environment _ -> acc)
+    | Told_environment _
+    | Repo _
+    | Agent_worktree _
+    | Worktree_removed _ -> acc)
 ;;
 
 let reminders t =
@@ -693,7 +741,10 @@ let budget t =
     | Archived _
     | Spend _
     | Resume_at _
-    | Told_environment _ -> acc)
+    | Told_environment _
+    | Repo _
+    | Agent_worktree _
+    | Worktree_removed _ -> acc)
 ;;
 
 let model t =
@@ -714,7 +765,10 @@ let model t =
     | Archived _
     | Spend _
     | Resume_at _
-    | Told_environment _ -> acc)
+    | Told_environment _
+    | Repo _
+    | Agent_worktree _
+    | Worktree_removed _ -> acc)
 ;;
 
 let rewind t ~to_ =
@@ -756,7 +810,11 @@ let fork ?at t ~dir =
                    ; kept_from = renamed kept_from
                    ; pinned = Option.map pinned ~f:renamed
                    })
-            | Archived _ | Spend _ | Resume_at _ -> None
+            | Archived _
+            | Spend _
+            | Resume_at _
+            | Agent_worktree _
+            | Worktree_removed _ -> None
             | payload -> Some payload
           in
           Option.iter payload ~f:(fun payload ->
@@ -785,6 +843,8 @@ module Summary = struct
     ; last_activity : float
     ; resume_at : float option
     ; bytes : int
+    ; repo : Git_location.t option option
+    ; agent_worktrees : Agent_worktree.t list
     }
   [@@deriving sexp_of]
 
@@ -861,7 +921,10 @@ let archived_and_activity t ~mtime =
         | Allow_rule _
         | Spend _
         | Resume_at _
-        | Told_environment _ -> last_message, marker)
+        | Told_environment _
+        | Repo _
+        | Agent_worktree _
+        | Worktree_removed _ -> last_message, marker)
   in
   let activity = Option.value (Option.join last_message_at) ~default:mtime in
   let activity =
@@ -902,6 +965,8 @@ let summarise t ~path ~mtime =
   ; last_activity
   ; resume_at = resume_at t
   ; bytes = 0
+  ; repo = repo t
+  ; agent_worktrees = agent_worktrees t
   }
 ;;
 
@@ -1137,7 +1202,10 @@ let to_markdown t =
     | Archived _
     | Spend _
     | Resume_at _
-    | Told_environment _ -> None
+    | Told_environment _
+    | Repo _
+    | Agent_worktree _
+    | Worktree_removed _ -> None
   in
   let blocks = List.filter_map (active_path t) ~f:block in
   String.concat (("# Session " ^ t.id) :: blocks) ~sep:"\n\n" ^ "\n"

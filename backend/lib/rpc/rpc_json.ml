@@ -267,20 +267,45 @@ let job ~now task =
     ]
 ;;
 
-let session_summary (s : Session.Summary.t) =
+let agent_worktree (w : Agent_worktree.t) =
   `Object
-    [ "id", str s.id
-    ; "path", str s.path
-    ; "name", Option.value_map s.name ~default:`Null ~f:str
-    ; "description", Option.value_map s.description ~default:`Null ~f:str
-    ; "cwd", str s.cwd
-    ; "created_at", str s.created_at
-    ; "updated_at", str s.updated_at
-    ; "first_prompt", Option.value_map s.first_prompt ~default:`Null ~f:str
-    ; "message_count", int s.message_count
-    ; "parent", Option.value_map s.parent ~default:`Null ~f:str
+    [ "agent", str w.agent
+    ; "task", str w.task
+    ; "path", str w.path
+    ; "branch", str w.branch
+    ; "root", str w.root
+    ]
+;;
+
+let repo (r : Git_location.t) =
+  `Object
+    [ "root", str r.root
+    ; "worktree", str r.worktree
+    ; "branch", Option.value_map r.branch ~default:`Null ~f:str
+    ; ("main", if r.main then `True else `False)
+    ]
+;;
+
+let session_summary (s : Session.Summary.t) =
+  [ "id", str s.id
+  ; "path", str s.path
+  ; "name", Option.value_map s.name ~default:`Null ~f:str
+  ; "description", Option.value_map s.description ~default:`Null ~f:str
+  ; "cwd", str s.cwd
+  ; "created_at", str s.created_at
+  ; "updated_at", str s.updated_at
+  ; "first_prompt", Option.value_map s.first_prompt ~default:`Null ~f:str
+  ; "message_count", int s.message_count
+  ; "parent", Option.value_map s.parent ~default:`Null ~f:str
+  ; "host", Option.value_map s.host ~default:`Null ~f:str
+  ]
+  @ (match s.repo with
+     | None -> []
+     | Some r -> [ "repo", Option.value_map r ~default:`Null ~f:repo ])
+  @ [ "agent_worktrees", `Array (List.map s.agent_worktrees ~f:agent_worktree)
     ; "bytes", int s.bytes
     ]
+  |> fun fields -> `Object fields
 ;;
 
 let session_stats (s : Agent.Session_stats.t) =
@@ -332,6 +357,10 @@ let entry (e : Session.Entry.t) =
       ; "at", Option.value_map at ~default:`Null ~f:ms
       ]
     | Told_environment _ -> [ "kind", str "told_environment" ]
+    | Repo _ -> [ "kind", str "repo" ]
+    | Agent_worktree w -> [ "kind", str "agent_worktree"; "path", str w.path ]
+    | Worktree_removed { path } ->
+      [ "kind", str "worktree_removed"; "path", str path ]
   in
   `Object
     ([ "id", str e.id
@@ -492,7 +521,8 @@ let rec event ?now (e : Agent.Event.t) =
       ; "call", tool_call call
       ; "result", tool_result result
       ]
-    | Loop (Subagent_start { call_id; agent_id; task; model; tools }) ->
+    | Loop (Subagent_start { call_id; agent_id; task; model; tools; worktree })
+      ->
       [ "event", str "subagent_start"
       ; "call_id", str call_id
       ; "agent_id", str agent_id
@@ -500,6 +530,8 @@ let rec event ?now (e : Agent.Event.t) =
       ; "model", str model
       ; "tools", `Array (List.map tools ~f:str)
       ]
+      @ Option.value_map worktree ~default:[] ~f:(fun w ->
+        [ "worktree", agent_worktree w ])
     | Loop (Subagent { call_id; agent_id; event = inner }) ->
       [ "event", str "subagent"
       ; "call_id", str call_id

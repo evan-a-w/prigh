@@ -195,6 +195,8 @@ module Listed = struct
     ; persisted : bool
     ; name : string option
     ; description : string option
+    ; repo : Git_location.t option option
+    ; agent_worktrees : Agent_worktree.t list
     }
   [@@deriving equal]
 
@@ -205,6 +207,8 @@ module Listed = struct
     ; persisted = Session.persisted session
     ; name = Session.name session
     ; description = Session.description session
+    ; repo = Session.repo session
+    ; agent_worktrees = Session.agent_worktrees session
     }
   ;;
 end
@@ -222,7 +226,7 @@ module Client = struct
     ; mutable features : string list
       (** [hello]'s [features]: what the host supports beyond the basics
           ([exec_input]: [tool_exec_input]; [terminal_kill]: the
-          [terminal_kill] event) *)
+          [terminal_kill] event; [git_location]: [$git_location]) *)
     ; mutable cwd : string option
     ; mutable agent : Agent.t
     ; mutable placeholder : Agent.t option
@@ -293,6 +297,9 @@ type t =
         for [get_messages_page] without opening them *)
   ; loading : Session.t Or_error.t Promise.t String.Table.t
     (** session files being parsed, by path *)
+  ; repos : Git_location.t option String.Table.t
+    (** where the cwds of saved sessions that recorded none are in git, read
+        from the backend's files once (see [with_repo]) *)
   }
 
 let agent_of_client _t (client : Client.t) = client.agent
@@ -382,6 +389,7 @@ let host_of (client : Client.t) =
   ; session_id = Some (session_id client.agent)
   ; session_name = Session.name (Agent.session client.agent)
   ; exec_input = List.mem client.features "exec_input" ~equal:String.equal
+  ; git_location = List.mem client.features "git_location" ~equal:String.equal
   }
 ;;
 
@@ -495,6 +503,7 @@ let create
     ; listed = String.Table.create ()
     ; on_session_deleted = []
     ; loading = String.Table.create ()
+    ; repos = String.Table.create ()
     }
   in
   Option.iter default_agent ~f:(fun agent ->
@@ -1198,6 +1207,28 @@ let attached_state (client : Client.t) =
   `Object [ "state", Rpc_json.state (Agent.state client.agent) ]
 ;;
 
+(* Sessions from before repositories were recorded (or whose host could not
+   tell) on the backend's own host: their cwd is looked up here, once. *)
+let with_repo t (s : Session.Summary.t) =
+  match s.repo with
+  | Some _ -> s
+  | None ->
+    let on_backend =
+      Option.value_map
+        s.host
+        ~default:true
+        ~f:(String.equal Agent.Host.backend_id)
+    in
+    if t.backend_host && on_backend
+    then (
+      let repo =
+        Hashtbl.find_or_add t.repos s.cwd ~default:(fun () ->
+          Git_location.find ~cwd:s.cwd)
+      in
+      { s with repo = Some repo })
+    else s
+;;
+
 let list_sessions t client =
   let bool b = if b then `True else `False in
   let int n = `Number (Int.to_string n) in
@@ -1209,7 +1240,7 @@ let list_sessions t client =
            [ "live", `True; "clients", int (List.length (clients_of t agent)) ]
          | None -> [ "live", `False ]
        in
-       match Rpc_json.session_summary l.summary with
+       match Rpc_json.session_summary (with_repo t l.summary) with
        | `Object fields ->
          `Object
            (fields
@@ -1462,9 +1493,11 @@ let worktree_json t (client : Client.t) (worktree : Worktree.t) =
   | other -> other
 ;;
 
-let list_worktrees t (client : Client.t) =
+let list_worktrees t (client : Client.t) params =
+  let open Or_error.Let_syntax in
+  let%bind cwd = string_param_opt params "cwd" in
   Or_error.map
-    (Agent.worktrees client.agent)
+    (Agent.worktrees ?cwd client.agent)
     ~f:(fun (listing : Worktree.Listing.t) ->
       `Object
         [ "root", `String listing.root
@@ -1478,17 +1511,36 @@ let create_worktree t (client : Client.t) params =
   let open Or_error.Let_syntax in
   let%bind branch = string_param params "branch" in
   let%bind base = string_param_opt params "base" in
-  let%map created = Agent.create_worktree client.agent ~branch ~base in
+  let%bind cwd = string_param_opt params "cwd" in
+  let%map created = Agent.create_worktree ?cwd client.agent ~branch ~base in
   `Object
     [ "worktree", worktree_json t client created.worktree
     ; ("new_branch", if created.new_branch then `True else `False)
+    ; "root", `String created.root
+    ; "cwd", `String created.cwd
     ]
+;;
+
+(* The saved sessions whose subagents' worktrees include [path] forget it. *)
+let forget_agent_worktree t client ~path =
+  List.filter (listings t client) ~f:(fun (l : Listing.t) ->
+    List.exists l.summary.agent_worktrees ~f:(fun w -> String.equal w.path path))
+  |> List.iter ~f:(fun (l : Listing.t) ->
+    let session =
+      match l.agent with
+      | Some agent -> Ok (Agent.session agent)
+      | None -> Session.load l.summary.path
+    in
+    Or_error.iter session ~f:(fun session ->
+      ignore (Session.worktree_removed session ~path : Session.Entry.t)));
+  sessions_changed t
 ;;
 
 let remove_worktree t (client : Client.t) params =
   let open Or_error.Let_syntax in
   let%bind path = string_param params "path" in
   let%bind force = bool_param params "force" ~default:false in
+  let%bind repo_cwd = string_param_opt params "cwd" in
   let cwd = (Agent.state client.agent).cwd in
   let target = Tool.resolve ~cwd path in
   let%bind () =
@@ -1500,8 +1552,45 @@ let remove_worktree t (client : Client.t) params =
         target
     else Ok ()
   in
-  let%map removed = Agent.remove_worktree client.agent ~path ~force in
-  `Object [ "worktree", worktree_json t client removed ]
+  let recorded =
+    List.find_map (listings t client) ~f:(fun (l : Listing.t) ->
+      List.find l.summary.agent_worktrees ~f:(fun w ->
+        String.equal w.path target))
+  in
+  match
+    Agent.remove_worktree ?cwd:repo_cwd client.agent ~path ~force, recorded
+  with
+  | Ok removed, _ ->
+    forget_agent_worktree t client ~path:removed.path;
+    Ok (`Object [ "worktree", worktree_json t client removed ])
+  | Error e, Some w
+    when String.is_substring
+           (Error.to_string_hum e)
+           ~substring:"not a worktree of" ->
+    (* Removed outside prigh: only the record of it is left. *)
+    forget_agent_worktree t client ~path:w.path;
+    Ok
+      (`Object
+          [ ( "worktree"
+            , worktree_json
+                t
+                client
+                { Worktree.path = w.path
+                ; branch = Some w.branch
+                ; head = None
+                ; main = false
+                ; managed = false
+                ; locked = false
+                ; prunable = true
+                ; changes = None
+                ; upstream = None
+                ; ahead = 0
+                ; behind = 0
+                } )
+          ])
+  | (Error _ as error), _ -> error
+;;
+
 (* The other clients of the server: the user's other browsers and terminals
    follow at once. *)
 let prefs_changed t (from : Client.t) changes =
@@ -1644,7 +1733,7 @@ let dispatch_server t (client : Client.t) ~meth ~params
            attach t client target;
            attached_state client)))
   | "list_sessions" -> Some (ok (list_sessions t client))
-  | "list_worktrees" -> Some (list_worktrees t client)
+  | "list_worktrees" -> Some (list_worktrees t client params)
   | "create_worktree" -> Some (create_worktree t client params)
   | "remove_worktree" -> Some (remove_worktree t client params)
   | "get_messages_page" -> Some (messages_page t client params)
