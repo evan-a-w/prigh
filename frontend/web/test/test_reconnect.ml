@@ -347,6 +347,11 @@ let%expect_test "a session the backend lost stays on show, read-only" =
     (Rpc (method_ list_sessions) (params ()) (tag Sessions))
     (Rpc (method_ list_subagents) (params ()) (tag Subagents))
     (Rpc (method_ list_jobs) (params ()) (tag Jobs))
+    (Rpc (method_ get_review) (params ()) (tag (Review Review)))
+    (Rpc (method_ list_worktrees) (params ())
+     (tag (Worktrees (place  "s2\
+                            \nbackend\
+                            \n/work") (purpose (Sidebar 2)))))
     ((session_gone ()) (draft "still here"))
     |}]
 ;;
@@ -576,6 +581,11 @@ let%expect_test "losing the connection while a session loads" =
     (Rpc (method_ list_sessions) (params ()) (tag Sessions))
     (Rpc (method_ list_subagents) (params ()) (tag Subagents))
     (Rpc (method_ list_jobs) (params ()) (tag Jobs))
+    (Rpc (method_ get_review) (params ()) (tag (Review Review)))
+    (Rpc (method_ list_worktrees) (params ())
+     (tag (Worktrees (place  "s2\
+                            \nbackend\
+                            \n/work") (purpose (Sidebar 2)))))
     (Reconnect (generation 1) (delay_ms 0) (session (s2)))
     Loading the session…
     |}];

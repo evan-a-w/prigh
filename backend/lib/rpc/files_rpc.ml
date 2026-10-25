@@ -9,6 +9,7 @@ let methods =
   ; "fs_delete"
   ; "fs_download"
   ; "fs_upload"
+  ; "fs_write"
   ]
 ;;
 
@@ -184,5 +185,16 @@ let dispatch agent ~meth ~params =
        call Host_files.rename_op [ "from", `String from; "to", `String to_ ])
   | "fs_download" -> Some (download agent params)
   | "fs_upload" -> Some (upload agent params)
+  | "fs_write" ->
+    Some
+      (let open Or_error.Let_syntax in
+       let%bind path = string params "path" in
+       let%bind text =
+         match param params "text" with
+         | Some (`String text) -> Ok text
+         | _ -> Or_error.error_string "missing param \"text\""
+       in
+       let%bind expected = string_opt params "expected" in
+       File_ops.write agent ~path ~text ~expected)
   | _ -> None
 ;;

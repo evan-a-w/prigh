@@ -26,6 +26,7 @@ module Argument = struct
     | Resume
     | Snippet
     | Remind
+    | Worktree
   [@@deriving sexp_of, equal]
 end
 
@@ -127,8 +128,9 @@ let all =
   ; c
       ~args:"[base] [instructions]"
       "review"
-      "review the uncommitted changes, or those against a base branch, for \
-       prioritised findings"
+      "alone: the review page, the changes file by file to approve, comment on \
+       and edit (Alt+R); with a base (HEAD: the uncommitted changes) or \
+       instructions: have the model review them for prioritised findings"
   ; c "init" "write or improve the project's AGENTS.md"
   ; c ~args:"[name]" "name" "rename the session"
   ; c "session" "show the session's details and statistics"
@@ -165,6 +167,14 @@ let all =
       ~args:"[path]"
       "mkdir"
       "create a directory (and its parents) and change to it"
+  ; c
+      ~argument:Worktree
+      ~args:"[list|new|open|rm ...]"
+      "worktree"
+      "pick a git worktree of the repository to work in (Alt+Enter: in a new \
+       session, Delete removes it); new BRANCH [BASE] creates one and works \
+       there; open [-n] TARGET (-n: in a new session); rm [-f] TARGET (-f: \
+       with uncommitted changes)"
   ; c
       ~argument:Backend_directory
       ~args:"[path|off]"

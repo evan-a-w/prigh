@@ -24,6 +24,7 @@ module Argument = struct
     | Resume
     | Snippet
     | Remind
+    | Worktree
     | Server
   [@@deriving sexp_of, equal]
 end
@@ -154,8 +155,10 @@ let all =
   ; c
       "review"
       "[base] [instructions]"
-      "review the uncommitted changes, or those against a base branch, for \
-       prioritised findings"
+      "alone: the changed files' approvals and review comments (prigh-web: the \
+       review page); with a base (HEAD: the uncommitted changes) or \
+       instructions, have the model review the changes for prioritised \
+       findings"
   ; c "init" "" "write or improve the project's AGENTS.md"
   ; c "new" "" "start a new session"
   ; c "name" "[text]" "set the session name"
@@ -210,6 +213,14 @@ let all =
       "mkdir"
       "[path]"
       "create a directory (and its parents) and change to it"
+  ; c
+      ~argument:Argument.Worktree
+      "worktree"
+      "[list|new|open|rm ...]"
+      "pick a git worktree of the repository to work in (Ctrl+N: in a new \
+       session, Ctrl+D removes it); new BRANCH [BASE] creates one and works \
+       there; open [-n] TARGET (-n: in a new session); rm [-f] TARGET (-f: \
+       with uncommitted changes)"
   ; c "fork" "" "fork at a previous user message"
   ; c "rewind" "" "rewind the head to a previous user message"
   ; c "tree" "" "show the session tree and switch head"

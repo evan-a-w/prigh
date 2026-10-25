@@ -39,6 +39,9 @@ let methods =
   ; "list_models"
   ; "compact"
   ; "git_diff"
+  ; "list_worktrees"
+  ; "create_worktree"
+  ; "remove_worktree"
   ; "review"
   ; "init"
   ; "set_budget"
@@ -85,6 +88,7 @@ let methods =
   ; "push_pref"
   ]
   @ Files_rpc.methods
+  @ Review_rpc.methods
 ;;
 
 let param params name =
@@ -1414,6 +1418,91 @@ let request_params request =
   Option.value (param request "params") ~default:(`Object [])
 ;;
 
+(* ---- worktrees ------------------------------------------------------ *)
+
+(* The sessions working in [worktree] on [host]: live ones where they are now,
+   saved ones by their last recorded cwd (a session that recorded no host
+   counts on any). *)
+let worktree_sessions t client ~host (worktree : Worktree.t) =
+  List.filter_map (listings t client) ~f:(fun (l : Listing.t) ->
+    let on_host, cwd =
+      match Option.bind l.agent ~f:Agent.location with
+      | Some (h, cwd) -> Some h.id, cwd
+      | None -> l.summary.host, l.summary.cwd
+    in
+    Option.some_if
+      (Worktree.contains worktree ~dir:cwd
+       && Option.value_map on_host ~default:true ~f:(String.equal host)
+       && ((not l.archived) || Option.is_some l.agent))
+      (`Object
+          [ "id", `String l.summary.id
+          ; "path", `String l.summary.path
+          ; ( "name"
+            , Option.value_map l.summary.name ~default:`Null ~f:(fun n ->
+                `String n) )
+          ; ("live", if Option.is_some l.agent then `True else `False)
+          ; ("running", if l.active then `True else `False)
+          ]))
+;;
+
+let worktree_json t (client : Client.t) (worktree : Worktree.t) =
+  let agent = client.agent in
+  let extra =
+    [ ( "current"
+      , if Worktree.contains worktree ~dir:(Agent.state agent).cwd
+        then `True
+        else `False )
+    ; ( "sessions"
+      , `Array
+          (worktree_sessions t client ~host:(Agent.active_host agent) worktree)
+      )
+    ]
+  in
+  match [%jsonaf_of: Worktree.t] worktree with
+  | `Object fields -> `Object (fields @ extra)
+  | other -> other
+;;
+
+let list_worktrees t (client : Client.t) =
+  Or_error.map
+    (Agent.worktrees client.agent)
+    ~f:(fun (listing : Worktree.Listing.t) ->
+      `Object
+        [ "root", `String listing.root
+        ; "project_dir", `String listing.project_dir
+        ; ( "worktrees"
+          , `Array (List.map listing.worktrees ~f:(worktree_json t client)) )
+        ])
+;;
+
+let create_worktree t (client : Client.t) params =
+  let open Or_error.Let_syntax in
+  let%bind branch = string_param params "branch" in
+  let%bind base = string_param_opt params "base" in
+  let%map created = Agent.create_worktree client.agent ~branch ~base in
+  `Object
+    [ "worktree", worktree_json t client created.worktree
+    ; ("new_branch", if created.new_branch then `True else `False)
+    ]
+;;
+
+let remove_worktree t (client : Client.t) params =
+  let open Or_error.Let_syntax in
+  let%bind path = string_param params "path" in
+  let%bind force = bool_param params "force" ~default:false in
+  let cwd = (Agent.state client.agent).cwd in
+  let target = Tool.resolve ~cwd path in
+  let%bind () =
+    if String.equal cwd target || String.is_prefix cwd ~prefix:(target ^ "/")
+    then
+      Or_error.errorf
+        "this session works in %s: /cd out of it (e.g. to the main worktree) \
+         first"
+        target
+    else Ok ()
+  in
+  let%map removed = Agent.remove_worktree client.agent ~path ~force in
+  `Object [ "worktree", worktree_json t client removed ]
 (* The other clients of the server: the user's other browsers and terminals
    follow at once. *)
 let prefs_changed t (from : Client.t) changes =
@@ -1556,6 +1645,9 @@ let dispatch_server t (client : Client.t) ~meth ~params
            attach t client target;
            attached_state client)))
   | "list_sessions" -> Some (ok (list_sessions t client))
+  | "list_worktrees" -> Some (list_worktrees t client)
+  | "create_worktree" -> Some (create_worktree t client params)
+  | "remove_worktree" -> Some (remove_worktree t client params)
   | "get_messages_page" -> Some (messages_page t client params)
   | "get_outline" -> Some (outline t client params)
   | "get_tool_output" -> Some (tool_output t client params)
@@ -2058,12 +2150,14 @@ let handle t client (request : Json.t) : Json.t =
            match dispatch_server t client ~meth ~params with
            | Some result -> result
            | None ->
+             let agent = agent_of_client t client in
              (match
-                Files_rpc.dispatch (agent_of_client t client) ~meth ~params
+                Option.first_some
+                  (Files_rpc.dispatch agent ~meth ~params)
+                  (Review_rpc.dispatch agent ~meth ~params)
               with
               | Some result -> result
-              | None ->
-                dispatch (agent_of_client t client) t.login ~meth ~params))
+              | None -> dispatch agent t.login ~meth ~params))
        with
        | result -> result
        | exception exn ->

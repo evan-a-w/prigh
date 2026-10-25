@@ -370,6 +370,131 @@ kbd {
 .selection-bar .btn { height: 30px; }
 .selection-bar .btn.danger { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 
+/* The repository's worktrees: a folding section over the footer, its rows
+   like the sessions' (the current one with the sodium edge), their sessions
+   as quiet links under them. Only in a repository. */
+.worktrees {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  max-height: 42%;
+  flex-shrink: 0;
+  margin: 0 -10px;
+  padding: 4px 0 6px 6px;
+  border-top: 1px solid var(--rule);
+}
+.worktrees-head { display: flex; align-items: center; gap: 2px; min-height: 30px; padding-right: 8px; }
+.worktrees-head .lamp { margin: 0 6px; }
+.worktrees-head .btn.icon { width: 26px; height: 26px; }
+.worktrees-head .btn.icon .icon { width: 14px; height: 14px; }
+.worktrees-toggle {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 3px 6px 3px 18px;
+  border: 0;
+  border-radius: var(--r-control);
+  background: none;
+  color: var(--muted);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.worktrees-toggle .sessions-label { color: var(--muted); font-size: 12.5px; font-weight: 600; }
+.worktrees-toggle .divider-count { color: var(--faint); font: 11.5px var(--mono); font-variant-numeric: tabular-nums; }
+.worktrees-toggle .chev { margin-left: auto; color: var(--faint); }
+.worktrees-toggle:hover .sessions-label { color: var(--chalk); }
+.worktrees-toggle:focus-visible { outline: 2px solid var(--sodium); outline-offset: -2px; }
+.worktrees-list {
+  overflow-y: auto;
+  scrollbar-gutter: stable;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding-right: 0;
+}
+.worktree { position: relative; border-radius: var(--r-control); }
+.worktree:hover { background: var(--slate-2); }
+.worktree.current { background: var(--slate-2); box-shadow: inset 2px 0 0 var(--sodium); border-radius: 0 var(--r-control) var(--r-control) 0; }
+.worktree.opening { background: var(--slate-2); }
+.worktree-open {
+  width: 100%;
+  display: flex;
+  align-items: flex-start;
+  padding: 4px 8px 3px 0;
+  margin: 0;
+  border: 0;
+  border-radius: inherit;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: start;
+  cursor: pointer;
+}
+.worktree-open:focus-visible { outline: 2px solid var(--sodium); outline-offset: -2px; }
+.worktree-mark { width: 20px; height: 20px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; }
+.worktree-icon { width: 12px; height: 12px; color: var(--faint-line); }
+.worktree.current .worktree-icon { color: var(--sodium); }
+.worktree-main { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.worktree-line { display: flex; align-items: baseline; gap: 8px; min-width: 0; line-height: 20px; }
+.worktree-branch { min-width: 0; font: 12.5px var(--mono); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.worktree.current .worktree-branch { font-weight: 600; }
+.worktree.gone .worktree-branch { color: var(--faint); text-decoration: line-through; text-decoration-color: var(--faint-line); }
+.worktree-changes { flex-shrink: 0; display: inline-flex; align-items: center; gap: 4px; color: var(--sodium); font: 11px var(--mono); white-space: nowrap; }
+.worktree-changes::before { content: ""; width: 5px; height: 5px; border-radius: 50%; background: currentColor; }
+.worktree-sync { flex-shrink: 0; color: var(--faint); font: 11px var(--mono); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.worktree-tag { flex-shrink: 0; padding: 0 5px; border: 1px solid var(--rule-2); border-radius: var(--r-chip); color: var(--faint); font-size: 10.5px; line-height: 15px; }
+.worktree-path { min-width: 0; font: 11px/16px var(--mono); color: var(--faint); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; direction: rtl; text-align: left; }
+.worktree-path::before { content: "\200E"; }
+.worktree.current .worktree-path { color: var(--muted); }
+.worktree-sessions { display: flex; flex-wrap: wrap; gap: 2px 4px; padding: 0 8px 4px 20px; }
+.worktree-session {
+  max-width: 100%;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 0 6px;
+  border: 1px solid var(--rule);
+  border-radius: var(--r-chip);
+  background: none;
+  color: var(--muted);
+  font-size: 11.5px;
+  line-height: 18px;
+  cursor: pointer;
+}
+.worktree-session-name { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.worktree-session:hover { border-color: var(--rule-2); color: var(--chalk); }
+.worktree-session.here { border-color: var(--sodium-line); color: var(--chalk); }
+.worktree-session:focus-visible { outline: 2px solid var(--sodium); outline-offset: 1px; }
+.worktree-session .lamp { width: 6px; height: 6px; }
+.worktree-actions {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  padding-left: 18px;
+  border-radius: var(--r-control);
+  background: linear-gradient(to right, transparent, var(--slate-2) 16px);
+  opacity: 0;
+}
+.worktree-actions .btn { width: 24px; height: 24px; }
+.worktree-actions .btn .icon { width: 14px; height: 14px; }
+.worktree:hover .worktree-actions, .worktree:focus-within .worktree-actions { opacity: 1; }
+.worktree-actions .btn:hover { background: transparent; color: var(--chalk); }
+.worktree-actions .delete:hover { color: var(--brick); }
+@media (hover: none) {
+  .worktree-actions { opacity: 0.7; background: none; }
+  .worktree-actions .btn { width: 32px; height: 32px; }
+}
+.field-note { color: var(--faint); font-size: 11.5px; }
+.worktree-dialog .field + .field { margin-top: 12px; }
+.worktree-dialog .dialog-note { margin: 12px 0 0; }
+.remove-worktree-dialog p { margin: 0 0 8px; overflow-wrap: anywhere; }
+
 /* The delete confirmation's list. */
 .delete-list { list-style: none; margin: 10px 0 0; padding: 0; display: flex; flex-direction: column; gap: 2px; }
 .delete-row { display: flex; gap: 10px; padding: 3px 8px; border-radius: var(--r-chip); background: var(--well); }

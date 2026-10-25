@@ -78,7 +78,7 @@ let%expect_test "every command does something (none is unknown)" =
     /notify                    toast: Notifications are on, but the browser has not been asked yet: /notify on asks it
     /compact                   toast: Compacting the conversation…
     /diff                      toast: Reading the changes…
-    /review                    toast: Reading the changes to review…
+    /review                    rpc git_diff
     /init                      rpc init
     /name                      (Rename"")
     /session                   loading Session: rpc push_pref, rpc session_stats
@@ -94,6 +94,7 @@ let%expect_test "every command does something (none is unknown)" =
     /tree                      loading Session tree: rpc push_pref, rpc get_entries
     /cd                        path prompt
     /mkdir                     path prompt
+    /worktree                  loading Worktrees: rpc push_pref, rpc list_worktrees
     /default-dir               toast: No default directory: new sessions start in the backend's working directory; /default-dir PATH sets one
     /host                      picker: Where tools run
     /export                    path prompt
@@ -110,7 +111,7 @@ let%expect_test "every command does something (none is unknown)" =
     /btw                       toast: Usage: /btw <question> (asked aside; the run goes on)
     /abort                     rpc abort
     /terminal                  rpc set_prefs, Focus_terminal
-    /files                     rpc fs_list, (Files(Focus files-list))
+    /files                     rpc fs_list, (Files(Focus files-list)), rpc git_diff
     /agents                    agents panel
     /jobs                      agents panel
     /login                     loading Log in to a provider: rpc push_pref, rpc auth_status
@@ -173,6 +174,7 @@ let%expect_test "/help <command> and /hotkeys" =
     Ctrl+J jump to one of your messages: a list to filter (or the marks at the transcript's right edge)
     PageUp / PageDown scroll the transcript
     Ctrl+K search sessions (↓ ↑ through them, Enter opens, Delete deletes)
+    Alt+Enter / Delete (/worktree) start a new session in the highlighted worktree / remove it
     A (on a session) archive or unarchive it (archived sessions are listed last, muted)
     Space (selecting) mark a session (Shift: the range from the last one); Delete deletes the marked ones, Esc stops selecting
     Ctrl+B show or hide the sidebar
@@ -182,6 +184,11 @@ let%expect_test "/help <command> and /hotkeys" =
     Alt+] Alt+[ the next or previous subagent or job
     Alt+0 close the agents panel
     Ctrl+Shift+F open or close the file browser (/files): ↑↓ select, Enter opens, Backspace goes up, F2 renames, Delete deletes, Esc closes
+    Alt+R open or close the review page (/review): the changes file by file, beside the chat
+    ] / [ (reviewing; also n p, j k) the next / previous changed file
+    a / c / e / v / s (reviewing) approve the file; comment on the selected lines (click a line number, Shift+click for a range); edit or comment; the whole file or the changes; send the new comments to prigh
+    Esc (reviewing) drop the comment or selection, then close the review
+    Ctrl+Enter / Ctrl+S (reviewing) add the comment or reply; save the file being edited
     Ctrl+` open or close the terminal (/terminal); in it, every other key goes to the shell
     Tab (in /scoped-models) check or uncheck the highlighted model
     Delete (in /remind's list) remove the highlighted reminder
@@ -305,7 +312,8 @@ let%expect_test "/scoped-models, Ctrl+P and Alt+P" =
         deepseek/deepseek-chat))
       (approval_mode Auto) (permissions ((allow ()) (ask ()) (deny ())))
       (default_model ()) (default_thinking ()) (fallback_models ())
-      (default_cwd ()) (archive_after_days 7) (notify bell) (snippets ())))
+      (default_cwd ()) (worktrees_dir ()) (archive_after_days 7) (notify bell)
+      (snippets ())))
     |}]
 ;;
 
@@ -1627,6 +1635,11 @@ let%expect_test "/setusr: a superuser acts as another user, and back" =
     (Rpc (method_ list_sessions) (params ()) (tag Sessions))
     (Rpc (method_ list_subagents) (params ()) (tag Subagents))
     (Rpc (method_ list_jobs) (params ()) (tag Jobs))
+    (Rpc (method_ get_review) (params ()) (tag (Review Review)))
+    (Rpc (method_ list_worktrees) (params ())
+     (tag (Worktrees (place  "b1\
+                            \nbackend\
+                            \n/work") (purpose (Sidebar 2)))))
     (A alice acting as bob) (Settings (Ctrl+, or /settings))
     |}];
   run h "/setusr alice";

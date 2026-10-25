@@ -40,6 +40,15 @@ let view ~fold (d : Git_diff.t) ~inject =
     ~footer:
       [ span ~cls:"keys-hint" "/diff PATH shows one file or directory"
       ; button
+          ~cls:"small"
+          ~title:"Approve and comment file by file (Alt+R, /review)"
+          ~on_click:
+            (Effect.Many
+               [ inject App.Action.Close_dialog
+               ; inject (App.Action.Review (Open None))
+               ])
+          [ Node.text "Review" ]
+      ; button
           ~cls:"primary"
           ~on_click:(inject App.Action.Close_dialog)
           [ Node.text "Done" ]

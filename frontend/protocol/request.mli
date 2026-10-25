@@ -42,6 +42,52 @@ module Method : sig
         ; path : string
         ; if_missing : Dir_change.If_missing.t
         } (** [set_cwd] or [set_active_host]; see {!Dir_change.Outcome} *)
+    | List_worktrees (** see {!Worktree.Listing} *)
+    | Create_worktree of
+        { branch : string
+        ; base : string option
+          (** a new branch from it; [None]: an existing branch, the one
+              remote branch of that name, or a new one from [HEAD] *)
+        } (** see {!Worktree.Created} *)
+    | Remove_worktree of
+        { path : string
+        ; force : bool (** also with uncommitted changes, or locked *)
+        } (** see {!Worktree.removed_of_json} *)
+    | Get_review (** {!Review} *)
+    | Review_comment of
+        { root : string
+        ; path : string (** relative to [root] *)
+        ; first : int
+        ; last : int
+        ; anchor : string (** the lines' text *)
+        ; text : string
+        } (** a new comment: the {!Review_comment} *)
+    | Review_reply of
+        { id : string
+        ; text : string
+        }
+    | Review_set_status of
+        { id : string
+        ; status : Review_comment.Status.t
+        }
+    | Review_delete of { id : string }
+    | Review_submit (** [{count}]: the comments sent to the agent *)
+    | Review_decide of
+        { id : string
+        ; post : int (** in the thread, from 0 *)
+        ; accept : bool
+        } (** a proposal: accepted (applied) or rejected *)
+    | Review_approve of
+        { path : string
+        ; hash : string
+        } (** the {!Review} *)
+    | Review_unapprove of { path : string }
+    | Fs_preview of { path : string } (** {!File_preview} *)
+    | Fs_write of
+        { path : string
+        ; text : string
+        ; expected : string option (** the [md5] it was read with *)
+        } (** [{path, md5}] *)
   [@@deriving sexp_of, equal]
 
   val name : t -> string

@@ -126,6 +126,7 @@ module Event = struct
     | Compacted of { summary : string }
     | Notice of string
     | Config_changed of Config.t
+    | Review_changed of Review_state.t
     | Queue_update of
         { steer : string list
         ; follow_up : string list
@@ -227,6 +228,7 @@ type t =
   ; max_budget_usd : float option
     (** the budget of sessions that set none, overriding the config's *)
   ; mutable goal : Goal.t option
+  ; mutable review : Review_state.t (** as [Session.review] reads it *)
   ; mutable reminders : Reminder.t list
   ; reminder_tracker : Reminder.Tracker.t
   ; mutable resume : Resume.t option
@@ -264,6 +266,7 @@ let restore_approvals t =
 
 let restore_settings t =
   t.goal <- Session.goal t.session;
+  t.review <- Session.review t.session;
   t.reminders <- Session.reminders t.session;
   (match Session.model t.session with
    | Some (model_id, thinking) ->
@@ -1429,6 +1432,37 @@ let complete_goal t ~summary =
     Or_error.error_string "no goal is active, so there is nothing to complete"
 ;;
 
+(* ---- review --------------------------------------------------------- *)
+
+let update_review t ~f =
+  Or_error.map (f t.review) ~f:(fun (result, changes) ->
+    List.iter changes ~f:(fun change ->
+      ignore (Session.record_review t.session change : Session.Entry.t);
+      t.review <- Review_state.apply t.review change);
+    if not (List.is_empty changes) then broadcast t (Review_changed t.review);
+    result)
+;;
+
+let now t = Eio.Time.now (Eio.Stdenv.clock t.env)
+
+let reply_tools t =
+  if List.is_empty t.review.comments
+  then []
+  else
+    [ Tool_review_reply.create ~reply:(fun ~id ~text ~edits ~resolve ->
+        update_review t ~f:(fun review ->
+          Review_state.reply
+            review
+            ~id
+            ~author:Agent
+            ~text
+            ~edits
+            ~resolve
+            ~at:(now t)
+            ()))
+    ]
+;;
+
 (* Offered only while a goal is active, and never to subagents. *)
 let goal_tools t =
   match t.goal with
@@ -1441,7 +1475,7 @@ let loop_config t =
   { Agent_loop.Config.model = t.model
   ; thinking = t.thinking
   ; system = Some (system_prompt t)
-  ; tools = tools t @ goal_tools t
+  ; tools = tools t @ goal_tools t @ reply_tools t
   ; max_turns = None
   ; max_tokens = None
   ; retries = Agent_loop.Config.default_retries
@@ -2263,6 +2297,7 @@ let create
     ; mcp_noticed = String.Set.empty
     ; max_budget_usd
     ; goal = None
+    ; review = Review_state.empty
     ; reminders = []
     ; reminder_tracker = Reminder.Tracker.create ()
     ; resume = None
@@ -2569,6 +2604,43 @@ let git_diff ?path ?base t =
   |> Git_diff.of_tool_result
 ;;
 
+(* ---- worktrees ------------------------------------------------------ *)
+
+let worktree_call t ~name ~arguments =
+  host_exec
+    t
+    ~cancel:Cancellation.never
+    ~on_output:ignore
+    ~call_id:"worktree"
+    ~cwd:t.cwd
+    ~name
+    ~arguments
+;;
+
+let worktrees t =
+  worktree_call
+    t
+    ~name:Worktree.list_op
+    ~arguments:(Worktree.list_args ~dir:t.config.worktrees_dir)
+  |> Worktree.listing_of_result
+;;
+
+let create_worktree t ~branch ~base =
+  worktree_call
+    t
+    ~name:Worktree.create_op
+    ~arguments:(Worktree.create_args ~dir:t.config.worktrees_dir ~branch ~base)
+  |> Worktree.created_of_result
+;;
+
+let remove_worktree t ~path ~force =
+  worktree_call
+    t
+    ~name:Worktree.remove_op
+    ~arguments:(Worktree.remove_args ~dir:t.config.worktrees_dir ~path ~force)
+  |> Worktree.removed_of_result
+;;
+
 (* A command's prompt: sent now when idle, otherwise after the current run
    like a follow-up. *)
 let command_prompt t ~text ~expanded ~source =
@@ -2624,6 +2696,65 @@ let init t =
     ~text:"/init"
     ~expanded:(Init_prompt.prompt ~cwd:t.cwd)
     ~source:Init
+;;
+
+let review_state t = t.review
+
+let submit_review t =
+  match budget_exhausted t with
+  | Some reason -> Or_error.error_string reason
+  | None ->
+    Or_error.map
+      (update_review t ~f:(fun review ->
+         Or_error.map (Review_state.submit review) ~f:(fun (text, n, changes) ->
+           (text, n), changes)))
+      ~f:(fun (text, count) ->
+        enqueue_queued
+          t
+          t.steer_queue
+          { Queued.text =
+              (if count = 1
+               then "Review comment"
+               else sprintf "%d review comments" count)
+          ; expanded = Some text
+          ; source = Some (Review_comments { count })
+          ; attachments = []
+          ; images = []
+          };
+        count)
+;;
+
+let decide_proposal t ~id ~post ~accept =
+  let open Or_error.Let_syntax in
+  let%bind comment, edits = Review_state.proposal t.review ~id ~post in
+  let state : Review_comment.Proposal.State.t =
+    if not accept
+    then Rejected
+    else (
+      let result =
+        host_exec
+          t
+          ~cancel:Cancellation.never
+          ~on_output:ignore
+          ~call_id:"review"
+          ~cwd:t.cwd
+          ~name:"edit"
+          ~arguments:
+            (`Object
+                [ "path", `String (Review_comment.file comment)
+                ; ( "edits"
+                  , `Array
+                      (List.map edits ~f:(fun (e : Review_comment.Edit.t) ->
+                         `Object
+                           [ "old_text", `String e.old_text
+                           ; "new_text", `String e.new_text
+                           ])) )
+                ])
+      in
+      if result.is_error then Failed (String.strip result.text) else Accepted)
+  in
+  update_review t ~f:(fun review ->
+    Review_state.decide review ~id ~post state ~at:(now t))
 ;;
 
 (* ---- budget, goal and resume ----------------------------------------- *)

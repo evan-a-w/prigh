@@ -50,6 +50,8 @@ val compute
   -> skills:P.Skill.t list option (** [None]: not fetched yet *)
   -> snippets:P.Snippet.t list
   -> reminders:P.Reminder.t list (** the session's, for [/remind rm] *)
+  -> worktrees:P.Worktree.t list option
+       (** for [/worktree open] and [rm]; [None]: not fetched yet *)
   -> logged_in:(string -> bool)
   -> default_dir_host:string option
        (** where [/default-dir] lists directories ([None]: the active host) *)

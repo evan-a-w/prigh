@@ -656,7 +656,7 @@ let%expect_test "keymap: every binding resolves to its intent and is documented"
     Alt+P                   cycle to the previous scoped model
     Ctrl+T                  cycle the thinking level
     Alt+M                   cycle the mode: ask → auto-edit → auto → plan (read-only)
-    Ctrl+N                  picker: toggle the named-only / logged-in-only filter
+    Ctrl+N                  picker: toggle the named-only / logged-in-only filter; /worktree: open in a new session
     Alt+A                   /sessions: archive or unarchive the highlighted session
     Ctrl+X                  copy the last assistant message
     Ctrl+Z                  suspend to the shell
@@ -689,7 +689,7 @@ let%expect_test "keymap: every binding resolves to its intent and is documented"
     /resume [now|cancel]               show, run now or cancel the automatic resume after a usage limit
     /compact [instructions]            summarise older messages to free context
     /diff [path]                       show the uncommitted changes where the tools run (git diff, untracked files too)
-    /review [base] [instructions]      review the uncommitted changes, or those against a base branch, for prioritised findings
+    /review [base] [instructions]      alone: the changed files' approvals and review comments (prigh-web: the review page); with a base (HEAD: the uncommitted changes) or instructions, have the model review the changes for prioritised findings
     /init                              write or improve the project's AGENTS.md
     /new                               start a new session
     /name [text]                       set the session name
@@ -706,6 +706,7 @@ let%expect_test "keymap: every binding resolves to its intent and is documented"
     /switch [path]                     switch to a saved session
     /cd [path]                         change the working directory (asks to create a missing one)
     /mkdir [path]                      create a directory (and its parents) and change to it
+    /worktree [list|new|open|rm ...]   pick a git worktree of the repository to work in (Ctrl+N: in a new session, Ctrl+D removes it); new BRANCH [BASE] creates one and works there; open [-n] TARGET (-n: in a new session); rm [-f] TARGET (-f: with uncommitted changes)
     /fork                              fork at a previous user message
     /rewind                            rewind the head to a previous user message
     /tree                              show the session tree and switch head
@@ -733,11 +734,11 @@ let%expect_test "keymap: every binding resolves to its intent and is documented"
     #name      insert a snippet: Tab or Enter on its completion (/snippet)
     type                     filter the list (fuzzy)
     Enter / Esc              accept the highlighted item / close without changes
-    Ctrl+D                   /sessions: delete the marked or highlighted sessions · /agents: cancel · /jobs: kill · /queue, /remind: remove
+    Ctrl+D                   /sessions: delete the marked or highlighted sessions · /agents: cancel · /jobs: kill · /queue, /remind, /worktree: remove
     Tab                      /sessions: mark or unmark the highlighted session
     Alt+A                    /sessions: archive or unarchive the highlighted session
     Alt+D                    /sessions: delete every archived session
-    Ctrl+N                   /sessions: named only · /model: logged-in only
+    Ctrl+N                   /sessions: named only · /model: logged-in only · /worktree: open in a new session
     Space / Ctrl+A / Ctrl+X  /scoped-models: toggle / all / none
     |}]
 ;;
@@ -2176,6 +2177,7 @@ let%expect_test
       ~skills
       ~snippets:[]
       ~reminders:[]
+      ~worktrees:None
       ~logged_in:(fun _ -> true)
       ~default_dir_host:None
       ~server:None
@@ -2254,6 +2256,7 @@ let%expect_test "autocomplete: /skill: completes skill names" =
       ~skills
       ~snippets:[]
       ~reminders:[]
+      ~worktrees:None
       ~logged_in:(fun _ -> true)
       ~default_dir_host:None
       ~server:None
@@ -2404,6 +2407,7 @@ let%expect_test
         ~skills:None
         ~snippets:[]
         ~reminders:[]
+        ~worktrees:None
         ~logged_in:(fun _ -> true)
         ~default_dir_host
         ~server:None
