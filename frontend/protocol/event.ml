@@ -131,6 +131,7 @@ type t =
       ; delta : string
       } (** streamed answer to our own [btw] request *)
   | Sessions_changed
+  | Prefs_changed of Prefs.Change.t list
 [@@deriving sexp_of, equal]
 
 let rec of_json j =
@@ -192,6 +193,10 @@ let rec of_json j =
     >>| fun c -> Config_changed c
   | "notice" -> Json.string_field j "text" >>| fun t -> Notice t
   | "sessions_changed" -> Ok Sessions_changed
+  | "prefs_changed" ->
+    Json.object_field j "prefs"
+    >>= Prefs.changes_of_json
+    >>| fun changes -> Prefs_changed changes
   | "queue_update" ->
     let texts name = Json.list_field j name ~f:Json.to_string_or_error in
     let%bind steer = texts "steer_texts" in

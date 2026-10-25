@@ -46,11 +46,15 @@ let%expect_test
   H.show h ~selector:".queued:first-child";
   [%expect
     {|
-    (Save_history ("also check the docs"))
+    (Rpc (method_ push_pref)
+     (params ((key history) (value "also check the docs") (max 500)))
+     (tag Ignore))
     Scroll_to_bottom
     (Rpc (method_ steer) (params ((text "also check the docs")))
      (tag (Sent (text "also check the docs") (images ()))))
-    (Save_history ("then write the changelog" "also check the docs"))
+    (Rpc (method_ push_pref)
+     (params ((key history) (value "then write the changelog") (max 500)))
+     (tag Ignore))
     Scroll_to_bottom
     (Rpc (method_ follow_up) (params ((text "then write the changelog")))
      (tag (Sent (text "then write the changelog") (images ()))))

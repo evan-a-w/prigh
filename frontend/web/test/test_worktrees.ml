@@ -688,7 +688,8 @@ let%expect_test "/worktree picks one: Enter, Alt+Enter, Delete" =
   dialog h;
   [%expect
     {|
-    (Save_history (/worktree))
+    (Rpc (method_ push_pref) (params ((key history) (value /worktree) (max 500)))
+     (tag Ignore))
     (Focus dialog)
     (Rpc (method_ list_worktrees) (params ())
      (tag (Worktrees (place  "s1\
@@ -733,7 +734,8 @@ let%expect_test "/worktree picks one: Enter, Alt+Enter, Delete" =
   H.key h "Enter" ~alt:true ~target:Field;
   [%expect
     {|
-    (Save_history ("/worktree list" /worktree))
+    (Rpc (method_ push_pref)
+     (params ((key history) (value "/worktree list") (max 500))) (tag Ignore))
     (Focus dialog)
     (Rpc (method_ list_worktrees) (params ())
      (tag (Worktrees (place  "s1\
@@ -755,7 +757,8 @@ let%expect_test "/worktree picks one: Enter, Alt+Enter, Delete" =
   dialog h;
   [%expect
     {|
-    (Save_history (/worktree "/worktree list" /worktree))
+    (Rpc (method_ push_pref) (params ((key history) (value /worktree) (max 500)))
+     (tag Ignore))
     (Focus dialog)
     (Rpc (method_ list_worktrees) (params ())
      (tag (Worktrees (place  "s1\
@@ -779,7 +782,8 @@ let%expect_test "/worktree picks one: Enter, Alt+Enter, Delete" =
     {|
     Close_dialog
     (Focus editor)
-    (Save_history (/worktree "/worktree list" /worktree))
+    (Rpc (method_ push_pref) (params ((key history) (value /worktree) (max 500)))
+     (tag Ignore))
     (Focus dialog)
     (Rpc (method_ list_worktrees) (params ())
      (tag (Worktrees (place  "s1\
@@ -801,14 +805,18 @@ let%expect_test "/worktree's errors say what to do" =
       H.type_ h "");
   [%expect
     {|
-    (Save_history ("/worktree open"))
+    (Rpc (method_ push_pref)
+     (params ((key history) (value "/worktree open") (max 500))) (tag Ignore))
     Usage: /worktree open [-n] TARGET (TARGET: a branch or path, as /worktree lists them). (Dismiss)
     /worktree open
-    (Save_history ("/worktree frobnicate" "/worktree open"))
+    (Rpc (method_ push_pref)
+     (params ((key history) (value "/worktree frobnicate") (max 500)))
+     (tag Ignore))
     Unknown subcommand "frobnicate": /worktree [list|new BRANCH [BASE]|open [-n] TARGET|rm [-f] TARGET]. (Dismiss)
     /worktree frobnicate
-    (Save_history
-     ("/worktree new a b c" "/worktree frobnicate" "/worktree open"))
+    (Rpc (method_ push_pref)
+     (params ((key history) (value "/worktree new a b c") (max 500)))
+     (tag Ignore))
     Usage: /worktree new BRANCH [BASE]: a new branch from BASE (default: HEAD), or an existing branch. (Dismiss)
     /worktree new a b c
     |}];
@@ -818,9 +826,9 @@ let%expect_test "/worktree's errors say what to do" =
   print_endline (H.model h).draft;
   [%expect
     {|
-    (Save_history
-     ("/worktree open dcos" "/worktree new a b c" "/worktree frobnicate"
-      "/worktree open"))
+    (Rpc (method_ push_pref)
+     (params ((key history) (value "/worktree open dcos") (max 500)))
+     (tag Ignore))
     (Focus dialog)
     (Rpc (method_ list_worktrees) (params ())
      (tag
@@ -840,9 +848,8 @@ let%expect_test "/worktree's errors say what to do" =
   toasts h;
   [%expect
     {|
-    (Save_history
-     ("/worktree rm main" "/worktree open dcos" "/worktree new a b c"
-      "/worktree frobnicate" "/worktree open"))
+    (Rpc (method_ push_pref)
+     (params ((key history) (value "/worktree rm main") (max 500))) (tag Ignore))
     (Focus dialog)
     (Rpc (method_ list_worktrees) (params ())
      (tag
@@ -864,9 +871,8 @@ let%expect_test "/worktree's errors say what to do" =
   toasts h;
   [%expect
     {|
-    (Save_history
-     (/worktree "/worktree rm main" "/worktree open dcos" "/worktree new a b c"
-      "/worktree frobnicate" "/worktree open"))
+    (Rpc (method_ push_pref) (params ((key history) (value /worktree) (max 500)))
+     (tag Ignore))
     (Focus dialog)
     (Rpc (method_ list_worktrees) (params ())
      (tag (Worktrees (place  "s1\
@@ -883,7 +889,9 @@ let%expect_test "/worktree open [-n], rm [-f], new" =
   H.reply h "list_worktrees" (listing ());
   [%expect
     {|
-    (Save_history ("/worktree open feat-login"))
+    (Rpc (method_ push_pref)
+     (params ((key history) (value "/worktree open feat-login") (max 500)))
+     (tag Ignore))
     (Focus dialog)
     (Rpc (method_ list_worktrees) (params ())
      (tag
@@ -904,7 +912,9 @@ let%expect_test "/worktree open [-n], rm [-f], new" =
   H.reply h "list_worktrees" (listing ());
   [%expect
     {|
-    (Save_history ("/worktree open -n docs" "/worktree open feat-login"))
+    (Rpc (method_ push_pref)
+     (params ((key history) (value "/worktree open -n docs") (max 500)))
+     (tag Ignore))
     (Focus dialog)
     (Rpc (method_ list_worktrees) (params ())
      (tag
@@ -927,9 +937,9 @@ let%expect_test "/worktree open [-n], rm [-f], new" =
   H.key h "Enter" ~target:Page;
   [%expect
     {|
-    (Save_history
-     ("/worktree rm -f feat/login" "/worktree open -n docs"
-      "/worktree open feat-login"))
+    (Rpc (method_ push_pref)
+     (params ((key history) (value "/worktree rm -f feat/login") (max 500)))
+     (tag Ignore))
     (Focus dialog)
     (Rpc (method_ list_worktrees) (params ())
      (tag
@@ -957,9 +967,8 @@ let%expect_test "/worktree open [-n], rm [-f], new" =
     {|
     Close_dialog
     (Focus editor)
-    (Save_history
-     ("/worktree rm docs" "/worktree rm -f feat/login" "/worktree open -n docs"
-      "/worktree open feat-login"))
+    (Rpc (method_ push_pref)
+     (params ((key history) (value "/worktree rm docs") (max 500))) (tag Ignore))
     (Focus dialog)
     (Rpc (method_ list_worktrees) (params ())
      (tag
@@ -977,10 +986,9 @@ let%expect_test "/worktree open [-n], rm [-f], new" =
   toasts h;
   [%expect
     {|
-    (Save_history
-     ("/worktree new feat/x main" "/worktree rm docs"
-      "/worktree rm -f feat/login" "/worktree open -n docs"
-      "/worktree open feat-login"))
+    (Rpc (method_ push_pref)
+     (params ((key history) (value "/worktree new feat/x main") (max 500)))
+     (tag Ignore))
     (Expire_toast (id 0) (after_ms 2740))
     (Rpc (method_ create_worktree) (params ((branch feat/x) (base main)))
      (tag (Worktree_created "/worktree new feat/x main")))
@@ -1054,7 +1062,9 @@ let%expect_test "/worktree completes subcommands, worktrees and bases" =
   [%expect
     {|
     (Complete_accept (run true))
-    (Save_history ("/worktree open feat/login"))
+    (Rpc (method_ push_pref)
+     (params ((key history) (value "/worktree open feat/login") (max 500)))
+     (tag Ignore))
     (Focus dialog)
     (Rpc (method_ list_worktrees) (params ())
      (tag

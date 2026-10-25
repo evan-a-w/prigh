@@ -162,7 +162,8 @@ let%expect_test "/mode NAME, /plan, /confirm" =
   print_s [%sexp ((H.model h).draft : string)];
   [%expect
     {|
-    (Save_history ("/mode bogus"))
+    (Rpc (method_ push_pref)
+     (params ((key history) (value "/mode bogus") (max 500))) (tag Ignore))
     Unknown mode “bogus”: use ask, auto-edit, auto, plan (/mode picks one). (Dismiss)
     "/mode bogus"
     |}];
@@ -170,7 +171,8 @@ let%expect_test "/mode NAME, /plan, /confirm" =
   mode_chip h;
   [%expect
     {|
-    (Save_history ("/mode auto" "/mode bogus"))
+    (Rpc (method_ push_pref)
+     (params ((key history) (value "/mode auto") (max 500))) (tag Ignore))
     (Rpc (method_ set_mode) (params ((approval_mode auto) (plan_mode false)))
      (tag (Mode_set "Mode: auto (tools run without asking)")))
     (Auto: never asks)
@@ -186,26 +188,30 @@ let%expect_test "/mode NAME, /plan, /confirm" =
   toasts h;
   [%expect
     {|
-    (Save_history (/plan "/mode auto" "/mode bogus"))
+    (Rpc (method_ push_pref) (params ((key history) (value /plan) (max 500)))
+     (tag Ignore))
     (Rpc (method_ set_mode) (params ((approval_mode auto) (plan_mode true)))
      (tag
       (Mode_set
        "Mode: plan (read-only planning: no file edits; bash, job_input and MCP tools ask first)")))
     (Plan mode)
-    (Save_history (/plan "/mode auto" "/mode bogus"))
+    (Rpc (method_ push_pref) (params ((key history) (value /plan) (max 500)))
+     (tag Ignore))
     (Rpc (method_ set_mode) (params ((approval_mode auto) (plan_mode false)))
      (tag (Mode_set "Mode: auto (tools run without asking)")))
     (Auto: never asks)
-    (Save_history ("/plan on" /plan "/mode auto" "/mode bogus"))
+    (Rpc (method_ push_pref)
+     (params ((key history) (value "/plan on") (max 500))) (tag Ignore))
     (Rpc (method_ set_mode) (params ((approval_mode auto) (plan_mode true)))
      (tag
       (Mode_set
        "Mode: plan (read-only planning: no file edits; bash, job_input and MCP tools ask first)")))
-    (Save_history ("/plan off" "/plan on" /plan "/mode auto" "/mode bogus"))
+    (Rpc (method_ push_pref)
+     (params ((key history) (value "/plan off") (max 500))) (tag Ignore))
     (Rpc (method_ set_mode) (params ((approval_mode auto) (plan_mode false)))
      (tag (Mode_set "Mode: auto (tools run without asking)")))
-    (Save_history
-     ("/plan maybe" "/plan off" "/plan on" /plan "/mode auto" "/mode bogus"))
+    (Rpc (method_ push_pref)
+     (params ((key history) (value "/plan maybe") (max 500))) (tag Ignore))
     Unknown argument “maybe”: use /plan on, /plan off, or /plan to toggle. (Dismiss)
     |}];
   (* /confirm sets the default for new sessions, which is this one's too. *)
@@ -213,9 +219,8 @@ let%expect_test "/mode NAME, /plan, /confirm" =
   mode_chip h;
   [%expect
     {|
-    (Save_history
-     ("/confirm on" "/plan maybe" "/plan off" "/plan on" /plan "/mode auto"
-      "/mode bogus"))
+    (Rpc (method_ push_pref)
+     (params ((key history) (value "/confirm on") (max 500))) (tag Ignore))
     (Rpc (method_ set_config) (params ((config ((approval_mode ask)))))
      (tag
       (Config_saved
@@ -246,7 +251,8 @@ let%expect_test "the plan: its chip, /todos" =
   toasts h;
   [%expect
     {|
-    (Save_history (/todos))
+    (Rpc (method_ push_pref) (params ((key history) (value /todos) (max 500)))
+     (tag Ignore))
     (Expire_toast (id 0) (after_ms 4220))
     No plan: the model has not made one (it makes one with update_plan).
     |}];
@@ -288,7 +294,8 @@ let%expect_test "the plan: its chip, /todos" =
     {|
     (Focus editor)
     (0%) ↑0 ↓0 $0.0000 Ready
-    (Save_history (/todos))
+    (Rpc (method_ push_pref) (params ((key history) (value /todos) (max 500)))
+     (tag Ignore))
     (Focus dialog)
     Plan 2/2
     (Close (Esc))
@@ -320,7 +327,8 @@ let%expect_test "/permissions" =
   modal h;
   [%expect
     {|
-    (Save_history (/permissions))
+    (Rpc (method_ push_pref)
+     (params ((key history) (value /permissions) (max 500))) (tag Ignore))
     (Focus dialog)
     Permissions
     (Close (Esc))
@@ -331,7 +339,8 @@ let%expect_test "/permissions" =
     /mode or Alt+M switches the mode.
     (Done)
     (Focus editor)
-    (Save_history (/permissions))
+    (Rpc (method_ push_pref)
+     (params ((key history) (value /permissions) (max 500))) (tag Ignore))
     (Focus dialog)
     Permissions
     (Close (Esc))
@@ -953,6 +962,13 @@ let%expect_test
     (Rpc (method_ list_models) (params ()) (tag Models))
     (Rpc (method_ auth_status) (params ()) (tag (Auth_status Refresh)))
     (Rpc (method_ get_config) (params ()) (tag Config))
+    (Rpc (method_ get_prefs)
+     (params
+      ((keys
+        (web.theme web.accent web.notify web.verbosity web.terminal-open history
+         web.migrated web.sidebar-width web.files-width web.files-split
+         web.agents-width web.terminal-height))))
+     (tag Prefs))
     (Rpc (method_ get_messages_page)
      (params ((session /sessions/s1.jsonl) (limit 1000000)))
      (tag (Resync (session s1) (from ()))))
@@ -1190,7 +1206,8 @@ let%expect_test "plan mode notes are margin notes, not the user's words" =
   print_s [%sexp ((H.model h).draft : string)];
   [%expect
     {|
-    (Save_history (/fork))
+    (Rpc (method_ push_pref) (params ((key history) (value /fork) (max 500)))
+     (tag Ignore))
     (Focus dialog)
     (Rpc (method_ get_entries) (params ()) (tag (Entries Fork)))
     (Focus picker-input)

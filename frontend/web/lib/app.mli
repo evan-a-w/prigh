@@ -176,6 +176,7 @@ module Reply_tag : sig
         }
     (** like [Reconnect generation], but the backend no longer has [session]
         (it restarted before saving it): we are on another one *)
+    | Prefs (** [get_prefs]: the user's preferences ({!Pref_sync}) *)
   [@@deriving sexp_of, equal]
 end
 
@@ -205,7 +206,6 @@ module Command : sig
     | Set_caret of int
     (** the editor's caret, at this byte offset of the draft, once rendered
         (and focused): after text was put in at the caret *)
-    | Save_history of string list (** newest first *)
     | Sign_out (** forget this account's saved login and reload *)
     | Reveal of string list
     (** scroll the main chat to a subagent's card, opening the transcripts
@@ -221,15 +221,17 @@ module Command : sig
         marking it for a moment *)
     | Scroll_to_bottom (** and follow new output again *)
     | Focus_terminal (** the terminal panel's shell, once mounted *)
-    | Remember_terminal of bool
-    (** whether the panel is open, for [Reopen_terminal] after a reload *)
     | Notify of Prigh_ui.Notify.t (** a browser notification *)
     | Request_notification_permission
     (** answered by [Notification_permission] *)
-    | Save_notifications of bool (** [/notify on|off], in the browser *)
     | Set_title of string (** the tab's, with the count of unseen events *)
     | Files of Files.Page.t
-    | Save_size of Resize.Save.t (** a panel's size, in the browser *)
+    | Cache_prefs of Prefs.Change.t list
+    (** the user's preferences ({!Pref_sync}) as they are now, kept in the
+        browser for the next page load (its first paint, or a backend that
+        keeps none) *)
+    | Apply_theme of Theme.t
+    (** on the document, now (and for the next page load's first paint) *)
     | Keep_scroll_position
     (** older messages are being added above: what shows stays in place *)
     | Probe_connection
@@ -276,14 +278,18 @@ module Action : sig
     | Set_narrow of bool (** a phone-sized window: the sidebar is a drawer *)
     | Page_hidden of bool
     (** the tab was hidden or shown again (reconnect now, or check the socket) *)
-    | Set_notifications of
-        { enabled : bool
-        ; permission : string
+    | Restore_prefs of
+        { prefs : Prefs.Change.t list
+        ; legacy : bool
+        (** kept by a page from before the backend kept them: uploaded
+            unless the backend has its own *)
         }
-    (** at startup: the saved [/notify] and [Notification.permission] *)
+    (** at startup: the preferences the browser cached
+        ([Command.Cache_prefs]), until the backend's arrive *)
+    | Set_notification_permission of string
+    (** at startup: [Notification.permission] *)
     | Notification_permission of string
     (** the browser's answer to [Request_notification_permission] *)
-    | Load_history of string list
     | Set_draft of string (** the caret at the end *)
     | Edit of
         { text : string
@@ -426,7 +432,6 @@ module Action : sig
     | Jump_to_bottom
     | Run of string (** a slash command, e.g. from a button *)
     | Toggle_terminal
-    | Reopen_terminal (** it was open before the page reloaded *)
     | Close_terminal
     | New_shell (** after the shell exited or failed to start *)
     | Terminal_status of
@@ -443,6 +448,9 @@ module Action : sig
     | Load_output of string (** a [Fold] key: the whole of an elided output *)
     | Network of bool
     (** the browser's [online] (reconnect now) and [offline] events *)
+    | Preview_accent of string
+    (** a colour, while the settings' colour input is being dragged: shown,
+        not saved ([Run "/accent #hex"] saves it) *)
   [@@deriving sexp_of]
 end
 
@@ -508,6 +516,10 @@ module Model : sig
     ; session_gone : string option
     (** reconnected to a backend that no longer has this session: its
         transcript stays on show, read-only, until another is chosen *)
+    ; theme : Theme.t (** the user's ([/theme], [/accent]) *)
+    ; theme_preview : Theme.t option
+      (** an accent being picked in the settings, shown but not saved *)
+    ; prefs : Pref_sync.t
     }
   [@@deriving sexp_of]
 
@@ -535,6 +547,10 @@ module Model : sig
 
   (** What the panels' sizes depend on. *)
   val shown : t -> Resize.Shown.t
+
+  (** The theme on show: the one highlighted in the [/theme] or [/accent]
+      picker, or being previewed, else the user's. *)
+  val look : t -> Theme.t
 
   (** Why the backend keeps a session asked to be deleted, if it does. *)
   val kept_from_deletion : t -> Session_summary.t -> string option

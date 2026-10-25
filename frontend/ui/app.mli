@@ -57,6 +57,9 @@ module Reply_tag : sig
     | Abort_done
     | Notice_on_success of string
     | History
+    | Prefs_history
+    (** [get_prefs] of the history the backend keeps for the user (shared
+        with prigh-web) *)
     | Dequeued
     | Editor_text
     | Reload_messages_notice of string

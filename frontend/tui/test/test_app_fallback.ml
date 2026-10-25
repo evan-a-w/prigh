@@ -416,6 +416,13 @@ let%expect_test
     {|
     (Rpc (method_ prompt) (params ((text "fix the bug"))) (tag Show_error))
     (Append_history "fix the bug")
+    (Rpc
+      (method_ push_pref)
+      (params (
+        (key   history)
+        (value "fix the bug")
+        (max   500)))
+      (tag Ignore))
 
     ▌ fix the bug
       error: HTTP 429: The usage limit has been reached (usage

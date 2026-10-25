@@ -2,8 +2,8 @@ open! Core
 open! Import
 
 (** How the terminal frontend tells the user that something needs them while
-    they look elsewhere ([/notify]); prigh-web keeps its own setting in the
-    browser. *)
+    they look elsewhere ([/notify]); prigh-web keeps its own setting with the
+    user's preferences ({!User_prefs}). *)
 module Notify : sig
   type t =
     | Off
