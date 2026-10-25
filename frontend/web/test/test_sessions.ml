@@ -93,7 +93,7 @@ let%expect_test
   [%expect
     {|
     (fix the parser bug)
-    /work main
+    /work (main)
     |}];
   (* The clock moves the ages on, and refreshes the list. *)
   H.act h (Tick (Time_ns.add H.now (Time_ns.Span.of_min 5.)));

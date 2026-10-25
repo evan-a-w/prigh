@@ -30,6 +30,7 @@ val compute
   -> ?skills:Skill.t list
   -> ?snippets:Snippet.t list
   -> ?reminders:Reminder.t list (** the session's, for [/remind rm] *)
+  -> ?forges:Forge_account.t list (** for [/login] and [/logout] *)
   -> text:string
   -> cursor:int
   -> models:Llm.t list

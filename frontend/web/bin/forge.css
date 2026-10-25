@@ -1,0 +1,134 @@
+/* Git hosting: the top bar's branch (it opens the pull requests), the
+   GitHub device code, the settings page's git hosts, and the pull request
+   dialogs. A pull request's state is a quiet outlined tag: sage once merged,
+   brick once closed, dashed while a draft; checks use the outcome marks and
+   the lamp, as tools do. */
+
+.session-where .branch {
+  background: none;
+  border: 0;
+  padding: 0;
+  font: inherit;
+  cursor: pointer;
+  border-radius: var(--r-chip);
+}
+.session-where .branch:hover { color: var(--chalk); }
+.session-where .branch:hover .branch-name { text-decoration: underline; text-underline-offset: 2px; }
+.session-where .branch:focus-visible { outline: 2px solid var(--sodium); outline-offset: 2px; }
+
+/* The one thing to carry to another tab: big, in the machine's face, and
+   selected whole by a click. */
+.device-code { display: flex; align-items: center; gap: 12px; margin: 2px 0 4px; }
+.device-code code {
+  font: 600 26px/1 var(--mono);
+  letter-spacing: 0.14em;
+  color: var(--chalk);
+  background: var(--well);
+  border: 1px solid var(--rule-2);
+  border-radius: var(--r-control);
+  padding: 10px 8px 10px 16px;
+  user-select: all;
+}
+.device-code .copy.copied { color: var(--sage); border-color: var(--sage-line); }
+
+.git-host-name { display: flex; align-items: baseline; gap: 8px; min-width: 0; }
+.git-host .setting-about.host { overflow-wrap: anywhere; }
+.git-host .setting-control .lamp { margin-right: 2px; }
+.auth-git-hosts { margin-top: 14px; }
+.auth-git-hosts h3 { font-size: 12.5px; font-weight: 600; color: var(--muted); margin: 0; padding: 6px 0; }
+
+/* A pull request's state. */
+.pr-state {
+  flex-shrink: 0;
+  min-width: 52px;
+  text-align: center;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 16px;
+  padding: 0 6px;
+  border: 1px solid var(--rule-2);
+  border-radius: var(--r-chip);
+  color: var(--chalk);
+}
+.pr-state.draft { color: var(--muted); border-style: dashed; }
+.pr-state.merged { color: var(--sage); border-color: var(--sage-line); }
+.pr-state.closed { color: var(--brick); border-color: var(--brick-line); }
+.pr-branch { font: 12px var(--mono); background: var(--well); border-radius: var(--r-chip); padding: 1px 5px; overflow-wrap: anywhere; }
+.pr-repo { font: 11.5px var(--mono); color: var(--faint); }
+
+/* The list. */
+.prs-dialog { width: min(760px, 100%); }
+.prs-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 8px; }
+.prs-head .segmented { margin-left: auto; }
+.prs-repo { font: 12px var(--mono); color: var(--muted); text-decoration: none; }
+.prs-repo:hover { color: var(--chalk); text-decoration: underline; text-underline-offset: 2px; }
+.pr-item { align-items: center; }
+.pr-item .picker-label { flex: 0 1 auto; }
+
+/* One pull request. */
+.pr-dialog { width: min(980px, 100%); max-height: 84vh; }
+.pr-dialog .modal-body { display: flex; flex-direction: column; gap: 16px; }
+.pr-dialog .modal-buttons .pr-back { margin-right: auto; }
+.pr-dialog .modal-buttons a.btn { color: var(--chalk); }
+.pr-dialog .modal-buttons a.btn .icon { width: 14px; height: 14px; color: var(--muted); }
+.pr-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; }
+.pr-author { font-weight: 600; }
+.pr-branches { display: inline-flex; align-items: center; gap: 4px; color: var(--faint); }
+.pr-meta .pr-repo { margin-left: auto; }
+.pr-section h3 { display: flex; align-items: baseline; gap: 10px; margin: 0 0 6px; font-size: 12.5px; font-weight: 600; color: var(--muted); }
+.pr-count { font: 400 11.5px var(--mono); color: var(--faint); }
+.pr-none { margin: 0; color: var(--faint); font-size: 12.5px; }
+.pr-checks ul { list-style: none; margin: 0; padding: 0; }
+.pr-check { display: flex; align-items: center; gap: 8px; padding: 3px 0; font-size: 13px; }
+.pr-check + .pr-check { border-top: 1px solid var(--rule); }
+.pr-check > .lamp { margin: 0 3px; }
+.pr-check a { color: var(--chalk); text-decoration-color: var(--rule-2); text-underline-offset: 3px; }
+.pr-check-state { margin-left: auto; font: 11.5px var(--mono); color: var(--faint); }
+.pr-check.failure .pr-check-state { color: var(--brick); }
+.pr-checkout {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px 14px;
+  padding: 8px 12px;
+  border: 1px solid var(--sage-line);
+  border-radius: var(--r-control);
+}
+.pr-checkout p { margin: 0; flex: 1 1 260px; font-size: 12.5px; }
+.pr-checkout .path, .modal .path { font-family: var(--mono); overflow-wrap: anywhere; }
+.pr-diff { display: flex; flex-direction: column; gap: 10px; }
+.pr-diff h3 { margin-bottom: 0; }
+
+/* Creating one. */
+.pr-create-dialog { width: min(640px, 100%); max-height: 86vh; }
+.pr-create-dialog .modal-body { display: flex; flex-direction: column; gap: 12px; }
+.pr-into { display: flex; align-items: center; flex-wrap: wrap; gap: 6px 8px; font-size: 12.5px; color: var(--muted); }
+.pr-into #pr-base { width: 18ch; font: 12px var(--mono); padding: 3px 6px; }
+.pr-into .pr-repo { margin-left: auto; }
+.pr-field { display: flex; flex-direction: column; gap: 4px; }
+.pr-field label { font-size: 12.5px; color: var(--muted); }
+.pr-body-input { min-height: 150px; resize: vertical; line-height: 1.5; }
+.pr-commits summary { cursor: pointer; font-size: 12.5px; color: var(--muted); }
+.pr-commits ul { margin: 6px 0 0; padding-left: 18px; font: 12px/1.6 var(--mono); color: var(--faint); }
+.pr-toggles { display: flex; flex-wrap: wrap; gap: 6px 18px; }
+.pr-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: none;
+  border: 0;
+  padding: 2px 0;
+  cursor: pointer;
+  font-size: 13px;
+  border-radius: var(--r-chip);
+}
+.pr-toggle:focus-visible { outline: 2px solid var(--sodium); outline-offset: 2px; }
+.pr-create-dialog .dialog-note.warn { margin: 0; font-size: 12.5px; color: var(--sodium); }
+.pr-create-dialog .dialog-error { margin-top: 0; }
+
+@media (max-width: 640px) {
+  .prs-head { flex-wrap: wrap; }
+  .pr-item { flex-wrap: wrap; row-gap: 0; }
+  .device-code code { font-size: 22px; }
+  .pr-meta .pr-repo, .pr-into .pr-repo { margin-left: 0; flex-basis: 100%; }
+}

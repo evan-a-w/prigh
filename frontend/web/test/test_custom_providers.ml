@@ -322,6 +322,7 @@ let%expect_test "custom providers in /auth, /login and /logout: edit and remove"
     (Save_history (/auth))
     (Focus dialog)
     (Rpc (method_ auth_status) (params ()) (tag (Auth_status Show)))
+    (Rpc (method_ forge_status) (params ()) (tag (Forge Status)))
     (Focus dialog)
     Providers
     (Close (Esc))
@@ -333,6 +334,15 @@ let%expect_test "custom providers in /auth, /login and /logout: edit and remove"
     (Log in)
     aiproxy custom, http://localhost:3000/v1, OpenAI chat completions (/chat/completions), no key
     (Edit) (Remove)
+    Git hosting
+    GitHub github.com
+    Not signed in.
+    (Use a token) (Connect)
+    Forgejo codeberg.org
+    Not signed in.
+    (Use a token) (Connect)
+    Another Forgejo host A self-hosted Forgejo or Gitea, by its host name.
+    (Add host…)
     /login and /logout pick a provider (Add a custom provider) (Done)
     |}];
   (* Editing asks the same questions, prefilled. *)
@@ -391,6 +401,9 @@ let%expect_test "custom providers in /auth, /login and /logout: edit and remove"
     DeepSeek API key
     aiproxy custom, http://localhost:3000/v1, OpenAI chat completions (/chat/completions), edit
     Custom provider add an OpenAI-compatible endpoint (aiproxy, LiteLLM, OpenRouter, vLLM, Ollama…)
+    GitHub (github.com) not signed in
+    Forgejo (codeberg.org) not signed in
+    Forgejo: another host… a self-hosted Forgejo or Gitea: type its host
     |}];
   H.act h Close_dialog;
   H.type_ h "/login ";
@@ -404,6 +417,9 @@ let%expect_test "custom providers in /auth, /login and /logout: edit and remove"
     DeepSeek
     aiproxy custom, http://localhost:3000/v1
     custom add an OpenAI-compatible endpoint
+    github GitHub (github.com), not signed in
+    forgejo codeberg.org Forgejo (codeberg.org), not signed in
+    forgejo another Forgejo or Gitea host: /login forgejo HOST
     |}];
   (* Removing asks what to remove; answered, the dialog closes. *)
   H.type_ h "/logout";

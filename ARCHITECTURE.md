@@ -1979,6 +1979,30 @@ terminal frontend and `web/` prigh-web, the browser one.
       `Session_tree` labels them like the TUI. `/diff` opens
       `Git_diff_view` (a dialog of `Diff_files`' files, each a fold with
       its counts).
+    - Git hosting: `Forges` (the user's `forge_status` accounts, asked for
+      at startup, after `Forge_done`/`Forge_logged_out` and after switching
+      user; the hosts being signed out of; parsing `/login github [HOST]
+      [token]`, `/login forgejo HOST`, `/login HOST` and `/logout HOST`
+      apart from providers; the pickers' items). `forge_login` opens the
+      login dialog (`Login_flow` with `forge`, the arguments that try
+      again; `device_code` picks GitHub's code out of the instructions,
+      shown big and `.copyable`) and the `auth` events drive it like a
+      provider's. `Model.return_to_settings`: a sign-in started from the
+      settings page (`Settings_view.git_hosts`, also in `/auth`) goes back
+      to it when it ends or is cancelled. Pull requests are dialogs
+      (per session): `Pull_requests` (the `/pr` list: the state `Filter`,
+      a `Picker` of the PRs, loading or the backend's error, and `/pr`'s
+      argument parser), `Pr_page` (one PR: `pr_view`'s detail, the
+      checkout's progress, the list it came from, which Esc goes back to)
+      and `Pr_create` (the form, prefilled by `pr_defaults`; `request` is
+      the `pr_create` to send; a refusal stays in it), drawn by
+      `Pull_requests_view` (the diff through `Git_diff_view.files`). Their
+      replies are tagged `Reply_tag.Forge` (`Forge_reply`, with the
+      session's id: another session's, or one for a dialog closed or
+      changed meanwhile, is dropped). A checkout from the editor offers
+      `Change_dir` in `Dialog.Pr_checked_out`. The top bar's branch runs
+      `/pr`. `Keys.Target.Multiline` (a dialog's textarea): Enter is a
+      new line, Ctrl/⌘+Enter accepts.
     - Notifications: `Page_notify` (pure) tracks `/notify on|off`, the
       browser's permission, whether the tab is hidden and how many things
       happened unseen; events raise `Command.Notify` only while hidden,
@@ -2061,7 +2085,8 @@ terminal frontend and `web/` prigh-web, the browser one.
     startup and performs `Save_size`.
   - `bin/` — `main.bc.js` plus `index.html`, `style.css`, `chat.css`,
     `agents.css`, `terminal.css`, `files.css`, `highlight.css` (the
-    tokens' colours) and `resize.css` (the handles) (design tokens in
+    tokens' colours), `resize.css` (the handles) and `forge.css` (git
+    hosting and the pull request dialogs) (design tokens in
     `style.css`'s `:root`), the Recursive font cut to two woff2 instances (sans and mono;
     `recursive-OFL.txt`), `terminal.js` and the
     vendored xterm.js, assembled under
