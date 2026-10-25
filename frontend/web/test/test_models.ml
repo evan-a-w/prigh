@@ -201,8 +201,8 @@ let%expect_test
   =
   let h = H.create () in
   H.text h ~selector:".status";
-  [%expect
-    {| Ready (0%) ↑0 ↓0 $0.0000 |}];
+  H.text h ~selector:".status-extras";
+  [%expect {| (0%) ↑0 ↓0 $0.0000 Ready |}];
   H.act
     h
     (Hello { client_id = "c1"; namespace = Some "bob"; user = Some "ann" });
@@ -211,11 +211,13 @@ let%expect_test
     h
     {|{"event":"queue_update","steer":1,"follow_up":2,"steer_texts":["a"],"follow_up_texts":["b","c"]}|};
   H.text h ~selector:".status";
+  H.text h ~selector:".status-extras";
   [%expect
     {|
     (Rpc (method_ list_subagents) (params ()) (tag Subagents))
     (Rpc (method_ list_jobs) (params ()) (tag Jobs))
-    Working (75%) ↑123k ↓7.9k $1.2345 (3 queued) laptop
+    (75%) ↑123k ↓7.9k $1.2345 Working
+    (3 queued) laptop
     |}];
   H.show h ~selector:".context";
   [%expect
@@ -228,7 +230,7 @@ let%expect_test
       <span class="meter">
         <span class="meter-fill" style={ width: 75.00%; }> </span>
       </span>
-      75%
+      <span class="percent"> 75% </span>
     </button>
     |}];
   (* The queued messages come back into the editor, last first. *)
