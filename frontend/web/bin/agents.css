@@ -230,7 +230,7 @@
   padding: 10px 16px 12px 18px;
   border-top: 1px solid var(--rule);
   background: var(--slate);
-  box-shadow: 0 -12px 16px -14px #0000008c;
+  box-shadow: 0 -12px 16px -14px var(--edge-shadow);
 }
 .agents-foot .agents-crumbs { margin: 0; }
 .agents-foot .detail-head { padding: 0; border: 0; gap: 4px; }

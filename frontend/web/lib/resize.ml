@@ -32,7 +32,7 @@ module Handle = struct
     | Terminal -> "--terminal-height"
   ;;
 
-  let storage_key t = "prigh-web." ^ String.chop_prefix_exn (var t) ~prefix:"--"
+  let pref_key t = "web." ^ String.chop_prefix_exn (var t) ~prefix:"--"
 
   let label = function
     | Sidebar -> "Resize the sessions sidebar"
@@ -201,7 +201,7 @@ module Action = struct
     | Largest of Handle.t
     | Reset of Handle.t
     | Viewport of Viewport.t
-    | Restore of (Handle.t * int) list
+    | Restore of (Handle.t * int option) list
   [@@deriving sexp_of]
 end
 
@@ -220,7 +220,7 @@ let set t shown h value =
   then t, []
   else
     ( { t with sizes = Map.set t.sizes ~key:h ~data:value }
-    , [ { Save.key = Handle.storage_key h; value = Some value } ] )
+    , [ { Save.key = Handle.pref_key h; value = Some value } ] )
 ;;
 
 let update t shown (action : Action.t) =
@@ -234,15 +234,20 @@ let update t shown (action : Action.t) =
     if Map.mem t.sizes h
     then
       ( { t with sizes = Map.remove t.sizes h }
-      , [ { Save.key = Handle.storage_key h; value = None } ] )
+      , [ { Save.key = Handle.pref_key h; value = None } ] )
     else t, []
   | Viewport viewport -> { t with viewport }, []
   | Restore sizes ->
     ( List.fold sizes ~init:t ~f:(fun t (h, value) ->
-        (* The terminal's largest depends on the window, which may not be
-           known yet. *)
-        let min, max, _ = limits t h in
-        let max = if Handle.equal h Terminal then Int.max_value else max in
-        { t with sizes = Map.set t.sizes ~key:h ~data:(clamp value ~min ~max) })
+        match value with
+        | None -> { t with sizes = Map.remove t.sizes h }
+        | Some value ->
+          (* The terminal's largest depends on the window, which may not be
+             known yet. *)
+          let min, max, _ = limits t h in
+          let max = if Handle.equal h Terminal then Int.max_value else max in
+          { t with
+            sizes = Map.set t.sizes ~key:h ~data:(clamp value ~min ~max)
+          })
     , [] )
 ;;

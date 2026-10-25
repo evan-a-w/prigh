@@ -175,6 +175,9 @@ let set_history t lines =
   { t with history = List.rev lines; history_index = None }
 ;;
 
+let history t = t.history
+let browsing_history t = Option.is_some t.history_index
+
 (* [insert_raw] performs the edit without touching the undo stack; callers are
    responsible for snapshotting. *)
 let insert_raw t s =

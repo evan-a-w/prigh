@@ -24,6 +24,8 @@ module Picker_kind : sig
     | Reminders (** the session's ([/remind]); item ids are their names *)
     | Mcp of Mcp_list.t (** item ids are [Mcp_servers.id]s *)
     | Jump (** item ids are [Jump.Target.to_string]s *)
+    | Themes (** item ids are [Theme.Name.to_string]s *)
+    | Accents (** item ids are [Theme.Accent.to_string]s *)
   [@@deriving sexp_of, equal]
 end
 

@@ -18,11 +18,8 @@ val view
 (** Focuses the shell once it is on the page. *)
 val focus : unit -> unit
 
-(** Whether the panel is open, for [install] after a reload. *)
-val remember : bool -> unit
-
-(** Reopens the panel if it was open before the page reloaded. *)
-val install : schedule:(Prigh_web.App.Action.t -> unit) -> unit
+(** The shell's colours follow the theme on show. *)
+val set_theme : Prigh_web.Theme.t -> unit
 
 (** Whether an event happened in the panel, whose keys, pastes and drops are
     the shell's. *)

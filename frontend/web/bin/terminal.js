@@ -26,7 +26,7 @@
    *   theme?: object,
    * }} options [onStatus] reports the connection's state; [focus] (default
    *   true) focuses the terminal once it is open; [theme] is xterm.js's.
-   * @returns {{ focus(): void, dispose(): void }}
+   * @returns {{ focus(): void, dispose(): void, setTheme(theme: object): void }}
    */
   const mount = (host, url, options) => {
     const report = (state, message) => options.onStatus(state, message);
@@ -150,6 +150,10 @@
       focus: () => {
         if (term) term.focus();
         else focusWhenOpen = true;
+      },
+      setTheme: theme => {
+        options.theme = theme;
+        if (term) term.options.theme = theme;
       },
       dispose: () => {
         state = "disposed";
