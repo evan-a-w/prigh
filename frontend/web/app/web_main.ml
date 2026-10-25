@@ -598,6 +598,15 @@ let key_target (ev : Dom_html.keyboardEvent Js.t) : Prigh_web.Keys.Target.t =
          | Input _ | Textarea _ | Select _ | Button _ | A _ -> false
          | _ -> true -> Files
   | Some el
+    when (match Dom_html.getElementById_opt "review-page" with
+          | None -> false
+          | Some page ->
+            Js.to_bool ((Js.Unsafe.coerce page)##contains el : bool Js.t))
+         &&
+         match Dom_html.tagged el with
+         | Input _ | Textarea _ | Select _ | Button _ | A _ -> false
+         | _ -> true -> Review
+  | Some el
     when Js.Opt.test (el##getAttribute (Js.string "data-session")) ->
     Session
       (Js.to_string

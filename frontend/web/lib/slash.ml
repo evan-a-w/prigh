@@ -128,8 +128,9 @@ let all =
   ; c
       ~args:"[base] [instructions]"
       "review"
-      "review the uncommitted changes, or those against a base branch, for \
-       prioritised findings"
+      "alone: the review page, the changes file by file to approve, comment on \
+       and edit (Alt+R); with a base (HEAD: the uncommitted changes) or \
+       instructions: have the model review them for prioritised findings"
   ; c "init" "write or improve the project's AGENTS.md"
   ; c ~args:"[name]" "name" "rename the session"
   ; c "session" "show the session's details and statistics"

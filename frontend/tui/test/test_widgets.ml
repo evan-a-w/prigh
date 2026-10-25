@@ -689,7 +689,7 @@ let%expect_test "keymap: every binding resolves to its intent and is documented"
     /resume [now|cancel]               show, run now or cancel the automatic resume after a usage limit
     /compact [instructions]            summarise older messages to free context
     /diff [path]                       show the uncommitted changes where the tools run (git diff, untracked files too)
-    /review [base] [instructions]      review the uncommitted changes, or those against a base branch, for prioritised findings
+    /review [base] [instructions]      alone: the changed files' approvals and review comments (prigh-web: the review page); with a base (HEAD: the uncommitted changes) or instructions, have the model review the changes for prioritised findings
     /init                              write or improve the project's AGENTS.md
     /new                               start a new session
     /name [text]                       set the session name
