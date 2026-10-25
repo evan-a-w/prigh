@@ -102,14 +102,14 @@ let%expect_test
       (method_ set_budget)
       (params ((usd null)))
       (tag (Notice_on_success "budget removed")))
+
+
+
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+
     ▌ earlier question
       earlier answer
-      no budget ($0.01 spent): /budget DOLLARS stops the agent starting turns once the session has cost
-      that much
-      budget set to $5.00
-      "lots" is not a budget: /budget DOLLARS (e.g. /budget 5) or /budget off
-      budget $5.00, $0.01 spent: /budget DOLLARS changes it, /budget off removes it
-    ────────────────────────────────────────────────────────────────────────────────────────────────────
+    ────────────────── budget $5.00, $0.01 spent: /budget DOLLARS changes it, /budget off removes it ───
     > ▏
     /work  deepseek-flash  think:off  mode:auto  view:normal  ctx:0.1%/1.0M  $0.01/$5.00
     |}]
@@ -153,13 +153,13 @@ let%expect_test "/goal sets, shows, clears and resumes the goal" =
       (method_ resume_goal)
       (params ())
       (tag (Notice_on_success "goal resumed")))
-      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
     ▌ earlier question
       earlier answer
-      no goal: /goal TEXT sets one, and the agent keeps working until it judges it met
-      goal: all tests pass — stopped (it used all 20 automatic continuations); /goal resume continues
-      it, /goal off clears it
+    ┌─ Notice ─────────────────────────────────────────────────────────────────────────────────────────┐
+    │ goal: all tests pass — stopped (it used all 20 automatic continuations); /goal resume continues  │
+    │ it, /goal off clears it                                                                          │
+    └────────────────────────────────────────────────────────────────────────────────── Esc dismisses ─┘
     ────────────────────────────────────────────────────────────────────────────────────────────────────
     > ▏
     /work  deepseek-flash  think:off  mode:auto  view:normal  ctx:0.1%/1.0M  $0.01  goal:stopped
@@ -190,12 +190,12 @@ let%expect_test "a refused /goal goes back into the editor" =
         (hint    "")
         (then_ (Notice_on_success "goal set: the agent works until it is met")))))
 
-
-      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
-
     ▌ earlier question
       earlier answer
-      the session's budget of $1.00 is spent ($1.20 so far): /budget 3 raises it, /budget off removes it
+    ┌─ Error ──────────────────────────────────────────────────────────────────────────────────────────┐
+    │ the session's budget of $1.00 is spent ($1.20 so far): /budget 3 raises it, /budget off removes  │
+    │ it                                                                                               │
+    └────────────────────────────────────────────────────────────────────────────────── Esc dismisses ─┘
     ────────────────────────────────────────────────────────────────────────────────────────────────────
     > /goal ship it▏
     /work  deepseek-flash  think:off  mode:auto  view:normal  ctx:0.1%/1.0M  $0.01
@@ -221,14 +221,14 @@ let%expect_test "/resume shows, runs now or cancels the automatic resume" =
       (method_ cancel_resume)
       (params ())
       (tag (Notice_on_success "automatic resume cancelled")))
+
+
+
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+
     ▌ earlier question
       earlier answer
-      no resume is scheduled: one is when a run stops at a usage limit whose reset time the provider
-      gives
-      the run stopped at a usage limit and resumes at 14:05: /resume now retries at once, /resume cancel
-      stays stopped
-      usage: /resume [now|cancel]
-    ────────────────────────────────────────────────────────────────────────────────────────────────────
+    ──────────────────────────────────────────────────────────────────── usage: /resume [now|cancel] ───
     > ▏
     /work  deepseek-flash  think:off  mode:auto  view:normal  ctx:0.1%/1.0M  $0.01  resumes 14:05
     |}]
@@ -252,20 +252,20 @@ let%expect_test "completion offers the keywords, but not over a goal's text" =
 
     ▌ earlier question
       earlier answer
-    ────────────────────────────────────────────────────────────────────────────────────────────────────
-    > /goal ▏
     ▸ off     clear the goal
       resume  make a stopped goal active again
-    …deepseek-flash  think:off  mode:auto  ctx:0.1%/1.0M  Tab accepts · Enter as typed · Esc hides
+    ────────────────────────────────────────────────────────────────────────────────────────────────────
+    > /goal ▏
+    deepseek-flash  think:off  mode:auto  ctx:0.1%/1.0M  $0.01  Tab accepts · Enter as typed · Esc hides
 
 
       prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
     ▌ earlier question
       earlier answer
+    ▸ resume  make a stopped goal active again
     ────────────────────────────────────────────────────────────────────────────────────────────────────
     > /goal re▏
-    ▸ resume  make a stopped goal active again
     /work  deepseek-flash  think:off  mode:auto  ctx:0.1%/1.0M  $0.01  Tab/Enter accept · Alt+S as typed
 
 
@@ -282,20 +282,20 @@ let%expect_test "completion offers the keywords, but not over a goal's text" =
 
     ▌ earlier question
       earlier answer
-    ────────────────────────────────────────────────────────────────────────────────────────────────────
-    > /resume ▏
     ▸ now     retry the run at once
       cancel  stay stopped until you send a message
-    …deepseek-flash  think:off  mode:auto  ctx:0.1%/1.0M  Tab accepts · Enter as typed · Esc hides
+    ────────────────────────────────────────────────────────────────────────────────────────────────────
+    > /resume ▏
+    deepseek-flash  think:off  mode:auto  ctx:0.1%/1.0M  $0.01  Tab accepts · Enter as typed · Esc hides
 
 
       prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
     ▌ earlier question
       earlier answer
+    ▸ off  no budget: turns start whatever the session has cost
     ────────────────────────────────────────────────────────────────────────────────────────────────────
     > /budget o▏
-    ▸ off  no budget: turns start whatever the session has cost
     /work  deepseek-flash  think:off  mode:auto  ctx:0.1%/1.0M  $0.01  Tab/Enter accept · Alt+S as typed
     |}]
 ;;

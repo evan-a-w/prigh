@@ -91,7 +91,8 @@ let create ?(start_on_activate = true) platform (local_ graph) =
     let%arr model in
     (App.Model.running model
      || App.Model.agents_running model
-     || App.Model.jobs_running model)
+     || App.Model.jobs_running model
+     || Option.is_some model.notice)
     && not (Mode.is_dialog model.mode)
   in
   let (_ : unit Bonsai.t) =

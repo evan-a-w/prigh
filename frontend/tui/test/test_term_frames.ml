@@ -309,14 +309,14 @@ let%expect_test "typing, streamed reply, Ctrl+O and Alt+Enter through the \
 
 
 
+
         prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
       ▌ earlier question
         earlier answer
-        view: verbose — everything is shown
 
         streamed reply
-      ────────────────────────────────────────────────────────────────────────────────
+      ──────────────────────────────────────── view: verbose — everything is shown ───
       > hello▏
       /work  deepseek-flash  think:off  mode:auto  view:verbose  ctx:0.1%/1.0M  $0.01
       same: true
@@ -338,11 +338,11 @@ let%expect_test "typing, streamed reply, Ctrl+O and Alt+Enter through the \
 
 
 
+
         prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
       ▌ earlier question
         earlier answer
-        view: verbose — everything is shown
 
         streamed reply
       ────────────────────────────────────────────────────────────────────────────────
@@ -420,7 +420,7 @@ let%expect_test "resize 80 -> 40 keeps the frame matching" =
         earlier answer
       ────────────────────────────────────────
       > ▏
-      …deepseek-flash  ctx:0.1%/1.0M  $0.01
+      deepseek-flash  think:off  ctx:0.1%/1.0M
       same: true
       |}];
     return ())
@@ -483,8 +483,6 @@ let%expect_test "styled frame: markdown link, diff and autocomplete" =
           [red]-old[/]
           [green]+new[/]
           [gray] context[/]
-      [gray]────────────────────────────────────────────────────────────────────────────────[/]
-      [yellow][bold]> [/]/
       [invert]▸ [/][bold][invert]/help[/][gray][invert]                              show commands and keys[/]
         [bold]/hotkeys[/][gray]                           show keyboard shortcuts[/]
         [bold]/model[/][gray] [name|id|provider/id]       pick or switch the model[/]
@@ -494,7 +492,9 @@ let%expect_test "styled frame: markdown link, diff and autocomplete" =
         [bold]/default-dir[/][gray] [off|path]            show or set the directory new sessions sta…[/]
         [bold]/login[/][gray] [provider] [api_key|oauth]  log in to a provider[/]
       [gray]  ↕ 1–8 of 61[/]
-      …[gray]deepseek-flash[/]  [gray]think:off[/]  [gray]ctx:0.1%/1.0M[/]  [yellow]Tab/Enter accept · Alt+S as typed[/]
+      [gray]────────────────────────────────────────────────────────────────────────────────[/]
+      [yellow][bold]> [/]/
+      [gray]deepseek-flash[/]  [gray]think:off[/]  [gray]ctx:0.1%/1.0M[/]  [yellow]Tab/Enter accept · Alt+S as typed[/]
       |}];
     return ())
 ;;

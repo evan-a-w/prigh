@@ -103,6 +103,9 @@ let%expect_test
      (queued (steer:0 follow_up:0))
      (agents 0))
 
+
+
+
       prigh in /other · /help · Esc aborts · Ctrl+C twice quits
 
     ▌ in b
@@ -113,11 +116,8 @@ let%expect_test
     │ r  deny, saying why                                      │
     └──────────────────────────────────────────────────────────┘
     ────────────────────────────────────────────────────────────
-    queued (2) · Alt+Up: edit the last · /queue: edit or remove
-      steer      steer in b
-      follow-up  later in b
     ? ▏
-    …deepseek-flash  ctx:0.1%/1.0M  queued:2  confirm: y/n/r
+    deepseek-flash  ctx:0.1%/1.0M  queued:2  confirm: y/n/r
     |}];
   (* The answer goes to the new session's call. *)
   H.keys h "y";
@@ -285,7 +285,6 @@ let%expect_test
     {|
     (Rpc (method_ list_sessions) (params ()) (tag Sessions_picker))
 
-
       prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
     ▌ earlier question
@@ -295,6 +294,7 @@ let%expect_test
     ▸* build fix ∣ 2025-06-01T10:00 ∣ 12 msgs ∣ fix the build please  /work
        (unnamed) ∣ 2025-06-02T11:30 ∣ 0 msgs ∣ (empty)  /other
     ────────────────────────────────────────────────────────────────────────────────
-    …deepseek-flash  to answer:2  Enter switches · Tab marks · Ctrl+D deletes
+    >
+    deepseek-flash  to answer:2  Enter switches · Tab marks · Ctrl+D deletes
     |}]
 ;;
