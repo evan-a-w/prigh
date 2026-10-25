@@ -162,6 +162,7 @@ let%expect_test "help lists every key and command" =
     A (on a session) archive or unarchive it (archived sessions are listed last, muted)
     Space (selecting) mark a session (Shift: the range from the last one); Delete deletes the marked ones, Esc stops selecting
     Ctrl+B show or hide the sidebar
+    Ctrl+, settings: notifications, transcript detail, your account (/settings)
     ← → / ↑ ↓ (on a panel's edge) resize the panel (Shift: faster; Home / End: smallest / largest; Enter: the default size); or drag the edge, double-click to reset
     Alt+1…9 follow subagent or job N in the agents panel
     Alt+] Alt+[ the next or previous subagent or job
@@ -175,6 +176,7 @@ let%expect_test "help lists every key and command" =
     Commands
     /help [command] show commands and keys, or a command's usage
     /hotkeys show the keyboard shortcuts
+    /settings notifications, transcript detail, tool confirmation, your account and providers (Ctrl+,)
     /new start a new session
     /model [name] pick or switch the model
     /scoped-models pick the models Ctrl+P and Alt+P cycle through

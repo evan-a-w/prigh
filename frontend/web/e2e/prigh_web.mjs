@@ -175,6 +175,7 @@ const clean = text => text
   .replaceAll(cwd, "<CWD>")
   .replace(/[0-9a-f]{16}/g, "<ID>")
   .replace(/ws:\/\/127\.0\.0\.1:\d+/g, "ws://127.0.0.1:<PORT>")
+  .replace(/127\.0\.0\.1:\d+/g, "127.0.0.1:<PORT>")
   .replace(/just now|\d+[smhd] ago/g, "<AGE>")
   .replace(/\$\d+\.\d+/g, "$<COST>")
   .replace(/\d+% ctx/g, "<CTX>% ctx")
@@ -287,12 +288,10 @@ const layoutProblems = selector => page.evaluate(selector => {
   return problems;
 }, selector);
 
-// The top bar's controls as shown: each chip's text, "icon" for an icon
-// alone, or the menu.
+// The composer's chips as shown: each chip's text, or "icon" for an icon
+// alone.
 const controlsShown = () => page.evaluate(() => {
-  const more = document.querySelector(".controls-more");
-  if (getComputedStyle(more).display !== "none") return "in a menu";
-  return [...document.querySelectorAll(".controls > .chip-button")].map(chip => {
+  return [...document.querySelectorAll(".composer-controls > .chip-button")].map(chip => {
     const after = getComputedStyle(chip, "::after");
     const extra = after.display !== "none" && after.content.startsWith('"') ? after.content.slice(1, -1) : "";
     const text = (chip.innerText.trim().replace(/\s+/g, " ") + " " + extra).trim();
@@ -864,7 +863,7 @@ try {
   await startServer(`127.0.0.1:${port}`, join(dir, "script3.json"));
   await bodyLacks("Connection lost");
   // The thinking level and the mode sit beside the model, each a picker.
-  await show("the model, thinking and mode controls", ".controls");
+  await show("the model, thinking and mode controls", ".composer-controls");
   await page.locator(".thinking-chip").click();
   await page.locator(".modal .picker-item", { hasText: "high" }).waitFor();
   await page.waitForTimeout(300); // its fade in
@@ -878,7 +877,7 @@ try {
   await page.locator(".modal .picker-item", { hasText: "Asks: edits & commands" }).click();
   await page.locator(".toast", { hasText: "Mode: ask" }).waitFor();
   await page.locator(".mode-chip:not(.awaiting)", { hasText: "Asks: edits & commands" }).waitFor();
-  await show("mode ask", ".controls");
+  await show("mode ask", ".composer-controls");
   await send("build it");
   await page.locator("#confirm").waitFor();
   await show("a confirmation", "#confirm");
@@ -900,7 +899,7 @@ try {
   // Each step is shown at once; the backend's replies settle on the last.
   await page.locator(".toast", { hasText: "Mode: plan" }).waitFor();
   await page.waitForSelector(".mode-chip.plan-mode:not(.awaiting)");
-  await show("plan mode (Alt+M)", ".controls");
+  await show("plan mode (Alt+M)", ".composer-controls");
   await show("plan mode: the status line", ".status");
   await send("plan it");
   await page.locator("#confirm.plan-dialog").waitFor();
@@ -909,7 +908,7 @@ try {
   await bodyHas("Implementing.");
   await idle();
   await page.waitForFunction(() => !document.querySelector(".mode-chip.plan-mode"));
-  await show("the plan approved", ".controls");
+  await show("the plan approved", ".composer-controls");
   await show("the plan approved: the status line", ".status");
   await showTurn("implementing");
   await send("/permissions");
@@ -1266,10 +1265,10 @@ try {
   await page.locator(".code").last().scrollIntoViewIfNeeded();
   await screenshot("resize: highlighted code in a reply");
 
-  // 15. The top bar fits the chat column, however wide the panels around it
-  //     make it: shorter labels, then icons, then one menu; the title and
-  //     the cwd keep their room. Nothing overlaps or is cut off there or in
-  //     the composer and the status line.
+  // 15. The top bar and the composer fit the chat column, however wide the
+  //     panels around it make it: the composer's chips take shorter labels,
+  //     the status in the top bar drops its counters, then its words; the
+  //     title keeps some room. Nothing overlaps or is cut off.
   const chatWidth = () => width(".main");
   // Drags the file browser's edge until the chat column is [target] wide.
   const chatAt = async target => {
@@ -1280,9 +1279,12 @@ try {
     section(label);
     const where = await page.evaluate(() => {
       const r = s => document.querySelector(s).getBoundingClientRect();
-      return { title: Math.round(r(".topbar .title").width), more: getComputedStyle(document.querySelector(".controls-more")).display !== "none" };
+      const status = [...document.querySelectorAll(".topbar .status > .status-item")]
+        .filter(e => getComputedStyle(e).display !== "none")
+        .map(e => e.innerText.trim().replace(/\s+/g, " ") || "icon");
+      return { title: Math.round(r(".topbar .title").width), status: status.join(", "), height: Math.round(r(".topbar").height) };
     });
-    console.log(`chat ${await chatWidth()}; controls: ${await controlsShown()}; title at least 140px: ${where.title >= 140}`);
+    console.log(`chat ${await chatWidth()}; chips: ${await controlsShown()}; status: ${clean(where.status)}; title at least 100px: ${where.title >= 100}; top bar ${where.height}px high`);
     for (const s of [".topbar", ".composer"]) {
       const problems = await layoutProblems(s);
       console.log(`${s}: ${problems.length ? problems.join("; ") : "fits"}`);
@@ -1295,26 +1297,19 @@ try {
     await chatAt(target);
     await showTopBar(`top bar: a ${target}px chat column`);
   }
-  section("top bar: the controls' menu");
-  await page.locator(".controls-more").click();
-  await page.waitForSelector(".controls:popover-open");
-  await page.waitForTimeout(200); // its drop
-  console.log(await page.evaluate(() => {
-    const menu = document.querySelector(".controls").getBoundingClientRect();
-    const more = document.querySelector(".controls-more").getBoundingClientRect();
-    return `${[...document.querySelectorAll(".controls > .chip-button")].map(c => c.innerText.replace(/\s+/g, " ").trim()).join(" | ")}\n`
-      + `under its button: ${menu.top >= more.bottom && Math.abs(menu.right - more.right) <= 1}, in the window: ${menu.left >= 0 && menu.right <= innerWidth}`;
-  }));
-  await screenshot("top bar: the controls' menu");
-  await page.locator(".controls .thinking-chip").click();
-  await page.locator(".modal .picker-item").first().waitFor();
-  console.log(`a choice opens its picker, the menu closes: ${await page.evaluate(() => !document.querySelector(":popover-open"))}`);
+  // The settings page, from the gear: Esc closes it, a choice keeps it.
+  await page.locator(".settings-toggle").click();
+  await page.locator(".settings-dialog").waitFor();
+  await page.waitForTimeout(200);
+  await show("settings", ".settings-dialog");
+  await page.locator(".settings-dialog .segment", { hasText: "Verbose" }).click();
+  await page.locator(".settings-dialog .segment.on", { hasText: "Verbose" }).waitFor();
+  console.log(`a choice keeps it open: ${await page.locator(".settings-dialog").isVisible()}`);
+  await page.locator(".settings-dialog .segment", { hasText: "Normal" }).click();
   await page.keyboard.press("Escape");
-  await page.waitForSelector(".modal", { state: "detached" });
-  await page.locator(".controls-more").click();
-  await page.waitForSelector(".controls:popover-open");
-  await page.keyboard.press("Escape");
-  console.log(`Esc closes it: ${await page.evaluate(() => !document.querySelector(":popover-open"))}`);
+  await page.waitForSelector(".settings-dialog", { state: "detached" });
+  await page.waitForFunction(() => document.activeElement?.id === "editor", null, { timeout: 2000 }).catch(() => {});
+  console.log(`Esc closes it, the editor has the focus: ${await page.evaluate(() => document.activeElement?.id === "editor")}`);
   // Without the sidebar, its button joins the top bar.
   await page.keyboard.press("Control+b");
   await page.waitForFunction(() => !document.querySelector(".app.sidebar-open"));

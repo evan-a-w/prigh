@@ -44,9 +44,7 @@ let scoped_models (picker : Picker.t) checked ~inject =
     ~on_close:(inject Action.Close_dialog)
     ~footer:
       [ keys_hint
-          (sprintf
-             "%d checked. Tab toggles, Enter saves"
-             (Set.length checked))
+          (sprintf "%d checked. Tab toggles, Enter saves" (Set.length checked))
       ; button ~on_click:(inject Action.Close_dialog) [ Node.text "Cancel" ]
       ; button
           ~cls:"primary"
@@ -438,5 +436,5 @@ let view (m : App.Model.t) (dialog : Dialog.t) ~inject =
   | Mcp_tools server -> Some (mcp_tools server ~inject)
   | Loading title -> Some (loading ~title ~inject)
   | Diff diff -> Some (Git_diff_view.view ~fold:(App.Model.fold m) diff ~inject)
-  | Picker _ | Help | Rename _ | Delete _ | Login _ | Auth _ -> None
+  | Picker _ | Help | Settings | Rename _ | Delete _ | Login _ | Auth _ -> None
 ;;

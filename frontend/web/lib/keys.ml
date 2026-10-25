@@ -60,6 +60,8 @@ let help =
     , "mark a session (Shift: the range from the last one); Delete deletes the \
        marked ones, Esc stops selecting" )
   ; "Ctrl+B", "show or hide the sidebar"
+  ; ( "Ctrl+,"
+    , "settings: notifications, transcript detail, your account (/settings)" )
   ; ( "← → / ↑ ↓ (on a panel's edge)"
     , "resize the panel (Shift: faster; Home / End: smallest / largest; Enter: \
        the default size); or drag the edge, double-click to reset" )
@@ -233,9 +235,9 @@ let session_key (m : App.Model.t) t id : App.Action.t option =
   | "ArrowUp" when plain t -> Some (Session_nav { from = Some id; by = -1 })
   (* Space clicks the row's button, as Enter would. *)
   | "Enter" when m.marks.selecting && not (t.ctrl || t.alt || t.meta) ->
-    session (fun s -> App.Action.Mark_session { path = s.path; range = t.shift })
-  | "Enter" when plain t ->
-    session (fun s -> App.Action.Switch_session s.path)
+    session (fun s ->
+      App.Action.Mark_session { path = s.path; range = t.shift })
+  | "Enter" when plain t -> session (fun s -> App.Action.Switch_session s.path)
   | ("Delete" | "Backspace") when plain t ->
     session (fun s -> App.Action.Ask_delete s.path)
   | ("a" | "A") when not (t.ctrl || t.alt || t.meta) ->
@@ -333,6 +335,7 @@ let handle (m : App.Model.t) t : App.Action.t option =
      | ("l" | "L") when command t -> Some Open_model_picker
      | ("k" | "K") when command t -> Some Open_sessions
      | ("b" | "B") when command t -> Some Toggle_sidebar
+     | "," when ctrl_only t -> Some Open_settings
      | ("j" | "J") when ctrl_only t -> Some Open_jump_list
      | ("o" | "O") when ctrl_only t -> Some Cycle_verbosity
      | ("p" | "P") when ctrl_only t -> Some (Cycle_model 1)

@@ -59,6 +59,7 @@ let%expect_test "every command does something (none is unknown)" =
     {|
     /help                      Help
     /hotkeys                   Hotkeys
+    /settings                  Settings
     /new                       rpc new_session
     /model                     picker: Switch model
     /scoped-models             scoped models dialog
@@ -168,6 +169,7 @@ let%expect_test "/help <command> and /hotkeys" =
     A (on a session) archive or unarchive it (archived sessions are listed last, muted)
     Space (selecting) mark a session (Shift: the range from the last one); Delete deletes the marked ones, Esc stops selecting
     Ctrl+B show or hide the sidebar
+    Ctrl+, settings: notifications, transcript detail, your account (/settings)
     ← → / ↑ ↓ (on a panel's edge) resize the panel (Shift: faster; Home / End: smallest / largest; Enter: the default size); or drag the edge, double-click to reset
     Alt+1…9 follow subagent or job N in the agents panel
     Alt+] Alt+[ the next or previous subagent or job
@@ -404,8 +406,7 @@ let%expect_test "/verbosity and Ctrl+O" =
       </div>
       <Vdom.Node.none-widget> </Vdom.Node.none-widget>
     </div>
-    Ready 0% ↑0 ↓0 $0.0000 (quiet)
-    (Notifications not allowed yet: click to ask the browser)
+    Ready (0%) ↑0 ↓0 $0.0000 (quiet)
     |}];
   H.key h "o" ~ctrl:true;
   H.key h "o" ~ctrl:true;
@@ -423,10 +424,7 @@ let%expect_test "/verbosity and Ctrl+O" =
     |}];
   H.text h ~selector:".status";
   [%expect
-    {|
-    Ready 0% ↑0 ↓0 $0.0000 (verbose)
-    (Notifications not allowed yet: click to ask the browser)
-    |}]
+    {| Ready (0%) ↑0 ↓0 $0.0000 (verbose) |}]
 ;;
 
 let%expect_test "/confirm" =
@@ -1560,7 +1558,6 @@ let%expect_test "/setusr: a superuser acts as another user, and back" =
     (Rpc (method_ list_subagents) (params ()) (tag Subagents))
     (Rpc (method_ list_jobs) (params ()) (tag Jobs))
     (A alice acting as bob) (Commands and keys (/help))
-    (alice as bob)
     |}];
   run h "/setusr alice";
   H.reply h "set_user" {|{"client_id":"c1","namespace":"alice","user":"alice"}|};

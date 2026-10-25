@@ -270,6 +270,7 @@ module Action = struct
     | Open_snippets of int option
     | Open_thinking_picker
     | Open_help
+    | Open_settings
     | Open_rename
     | Open_subagents of string option
     (** the agents panel; with a number, an agent's or a job's id *)
@@ -467,7 +468,8 @@ module Model = struct
     then Some "is running: it will be kept (wait for it or stop it first)"
     else if current
     then
-      Some "is the session you are in: it will be kept (switch to another first)"
+      Some
+        "is the session you are in: it will be kept (switch to another first)"
     else if s.clients > 0
     then
       Some
@@ -805,7 +807,8 @@ let set_state_without_files (m : Model.t) (state : State.t) =
         ; list_subagents
         ; list_jobs
         ] ))
-  else { m with chat = Chat.set_running m.chat state.running }, background_changed
+  else
+    { m with chat = Chat.set_running m.chat state.running }, background_changed
 ;;
 
 let set_state (m : Model.t) (state : State.t) =
@@ -2232,7 +2235,8 @@ let account_menu (m : Model.t) =
                 then
                   Picker.Item.create
                     ~id:"notify off"
-                    ~detail:"stop telling you what happens while the tab is hidden"
+                    ~detail:
+                      "stop telling you what happens while the tab is hidden"
                     "Turn notifications off"
                 else
                   Picker.Item.create
@@ -2541,6 +2545,7 @@ let run_command (m : Model.t) ({ name; rest } : Slash.Parsed.t) =
   | "help", "" -> open_dialog m Help
   | "help", name -> help_command m name
   | "hotkeys", _ -> open_dialog m Hotkeys
+  | "settings", _ -> open_dialog m Settings
   | "new", _ -> starting m, [ rpc "new_session" [] ~tag:Reload_state ]
   | "model", "" -> open_picker m (model_picker m)
   | "model", query ->
@@ -2707,7 +2712,9 @@ let run_command (m : Model.t) ({ name; rest } : Slash.Parsed.t) =
     let session =
       if String.is_empty key
       then (
-        let path = Option.value_map m.state ~default:"" ~f:(fun s -> s.session_path) in
+        let path =
+          Option.value_map m.state ~default:"" ~f:(fun s -> s.session_path)
+        in
         match find_session_by_path m path with
         | Some s -> Ok s
         | None -> Error "This session isn't saved yet: send a message first.")
@@ -2718,9 +2725,12 @@ let run_command (m : Model.t) ({ name; rest } : Slash.Parsed.t) =
      | Error e -> prompt_failed m e)
   | "delete", "" ->
     let m, cmds =
-      toast m "Click the sessions to delete (Shift+click for a range), then Delete."
+      toast
+        m
+        "Click the sessions to delete (Shift+click for a range), then Delete."
     in
-    { m with sidebar_open = true; marks = { m.marks with selecting = true } }, cmds
+    ( { m with sidebar_open = true; marks = { m.marks with selecting = true } }
+    , cmds )
   | "delete", keys ->
     (match
        String.split keys ~on:' '
@@ -2999,10 +3009,7 @@ let question (m : Model.t) (action : Question_dialog.Action.t) =
          toast m "Declined to answer: the model goes on without one"
        in
        ( m
-       , [ rpc
-             "ask_user_respond"
-             (Question_dialog.decline_params q)
-             ~tag:Answer
+       , [ rpc "ask_user_respond" (Question_dialog.decline_params q) ~tag:Answer
          ; focus_waiting m
          ]
          @ toast_cmds ))
@@ -3074,8 +3081,8 @@ let newest_page (m : Model.t) path (page : Message_page.t) =
     | true, Some _, `Unchanged when refreshing -> m, prefetch
     | true, Some state, `Changed when refreshing ->
       m, resync_rpc m state :: prefetch
-    | true, Some _, _ when phys_equal entry.chat m.chat && not m.pending.messages
-      -> m, prefetch
+    | true, Some _, _
+      when phys_equal entry.chat m.chat && not m.pending.messages -> m, prefetch
     | true, Some _, (`Unchanged | `Changed | `New) ->
       ( { m with
           chat = entry.chat
@@ -3261,8 +3268,8 @@ let restore_unsure (m : Model.t) ~delivered =
     then
       error
         (set_draft { m with images } text)
-        "The connection went before your message reached the agent: it is \
-         back in the editor."
+        "The connection went before your message reached the agent: it is back \
+         in the editor."
     else
       error
         m
@@ -3318,7 +3325,8 @@ module Rejoin = struct
     (* The banner says what became of the session: no "Reconnected". *)
     let m =
       { m with
-        drops = { (Drops.rejoined m.drops ~resyncing:false) with rejoined = false }
+        drops =
+          { (Drops.rejoined m.drops ~resyncing:false) with rejoined = false }
       }
     in
     let m, restored = restore_unsure m ~delivered:(fun _ -> false) in
@@ -3517,8 +3525,7 @@ let rec reply_to (m : Model.t) (tag : Reply_tag.t) result =
     error m (sprintf "Couldn't set the fallback models: %s" e)
   | Default_dir_saved, Error e ->
     error m (sprintf "Couldn't set the default directory: %s" e)
-  | Sessions_deleted, Error e ->
-    error m (sprintf "Couldn't delete: %s" e)
+  | Sessions_deleted, Error e -> error m (sprintf "Couldn't delete: %s" e)
   | Archived_set { title; archived }, Error e ->
     let m, cmds =
       error
@@ -3658,7 +3665,9 @@ let rec reply_to (m : Model.t) (tag : Reply_tag.t) result =
         path
     in
     let m, toast_cmds =
-      toast m "Earlier messages were compacted: showing the session from its summary"
+      toast
+        m
+        "Earlier messages were compacted: showing the session from its summary"
     in
     m, fetch @ toast_cmds
   | Page { path; before = Some _ }, Error e when is_current m path ->
@@ -3703,7 +3712,8 @@ let rec reply_to (m : Model.t) (tag : Reply_tag.t) result =
     decode m json State.of_json ~f:(fun state ->
       if superseded m state
       then m, []
-      else set_state { m with pending = { m.pending with session = None } } state)
+      else
+        set_state { m with pending = { m.pending with session = None } } state)
   (* The backend answers a change of session with the new state; an older
      one only with [{}]. *)
   | Reload_state, Ok json ->
@@ -3867,7 +3877,8 @@ let rec reply_to (m : Model.t) (tag : Reply_tag.t) result =
     decode m json Delete_result.of_json ~f:(fun result ->
       let gone =
         String.Set.of_list
-          (List.map result.deleted ~f:(fun (d : Delete_result.Deleted.t) -> d.path))
+          (List.map result.deleted ~f:(fun (d : Delete_result.Deleted.t) ->
+             d.path))
       in
       let m =
         { m with
@@ -4339,8 +4350,7 @@ let accept_completion (m : Model.t) ~run =
          && Completion.Source.equal (Completion.source c) (Argument Models)
          && String.is_empty (Completion.prefix c)
          && Completion.selected c = 0 -> send m ~follow_up:false
-  | Some c
-    when Completion.Source.equal (Completion.source c) Snippet ->
+  | Some c when Completion.Source.equal (Completion.source c) Snippet ->
     (match
        Option.bind (Completion.selected_item c) ~f:(fun item ->
          Snippet.find (Option.value (snippets m) ~default:[]) item.id)
@@ -4523,15 +4533,23 @@ let dialog_accept (m : Model.t) =
      | Sessions paths ->
        (match deletable paths with
         | [] -> m, cmds
-        | paths -> m, cmds @ [ call (Delete_sessions paths) ~tag:Sessions_deleted ])
+        | paths ->
+          m, cmds @ [ call (Delete_sessions paths) ~tag:Sessions_deleted ])
      | Archived -> m, cmds @ [ call Delete_archived ~tag:Sessions_deleted ])
   | Some (Login flow) ->
     (match flow.failed, flow.prompt with
      | None, Some _ -> respond_login m flow
      | Some _, _ -> close_dialog m
      | None, None -> m, [])
-  | Some (Help | Hotkeys | Auth _ | Session _ | Text _ | Mcp_tools _ | Diff _) ->
-    close_dialog m
+  | Some
+      ( Help
+      | Hotkeys
+      | Settings
+      | Auth _
+      | Session _
+      | Text _
+      | Mcp_tools _
+      | Diff _ ) -> close_dialog m
   | Some (Loading _) -> m, []
   | Some (Scoped_models { checked; _ }) ->
     let m, cmds = save_scoped m checked in
@@ -4692,17 +4710,26 @@ let update_connected (m : Model.t) (action : Action.t) =
   | Switch_session path -> switch_session m path
   | Ask_delete path ->
     if Set.mem m.marks.marked path
-    then ask_delete m (List.map (Session_marks.marked m.marks m.sessions) ~f:(fun s -> s.path))
+    then
+      ask_delete
+        m
+        (List.map (Session_marks.marked m.marks m.sessions) ~f:(fun s -> s.path))
     else ask_delete m [ path ]
   | Select_sessions on ->
-    { m with marks = (if on then Session_marks.start else Session_marks.empty) }, []
+    ( { m with
+        marks = (if on then Session_marks.start else Session_marks.empty)
+      }
+    , [] )
   | Mark_session { path; range } ->
     ( { m with
-        marks = Session_marks.click m.marks ~path ~range ~order:(session_order m)
+        marks =
+          Session_marks.click m.marks ~path ~range ~order:(session_order m)
       }
     , [] )
   | Delete_marked ->
-    ask_delete m (List.map (Session_marks.marked m.marks m.sessions) ~f:(fun s -> s.path))
+    ask_delete
+      m
+      (List.map (Session_marks.marked m.marks m.sessions) ~f:(fun s -> s.path))
   | Ask_delete_archived -> ask_delete_archived m
   | Set_archived { path; archived } ->
     (match find_session_by_path m path with
@@ -4724,6 +4751,7 @@ let update_connected (m : Model.t) (action : Action.t) =
   | Open_snippets cursor -> open_snippets m ~cursor
   | Open_thinking_picker -> open_thinking_picker m
   | Open_help -> open_dialog m Help
+  | Open_settings -> open_dialog m Settings
   | Open_rename -> open_rename m
   | Open_subagents arg -> open_agents m arg
   | Toggle_subagents ->
@@ -4894,7 +4922,12 @@ let update_connected (m : Model.t) (action : Action.t) =
      | _ -> toast m "No messages of yours to jump to yet: send one first")
   | Run command ->
     (match Slash.parse command with
-     | Some parsed -> run_command { m with dialog = None } parsed
+     | Some parsed ->
+       let m', cmds = run_command { m with dialog = None } parsed in
+       (* A setting changed from the settings page leaves it open. *)
+       (match m.dialog, m'.dialog with
+        | Some Settings, None -> { m' with dialog = m.dialog }, cmds
+        | _ -> m', cmds)
      | None -> m, [])
   | Toggle_terminal ->
     if m.terminal.open_ then close_terminal m else open_terminal m

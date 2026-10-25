@@ -68,7 +68,7 @@ module Icon : sig
     | Bell
     | Bell_off
     | Shield
-    | Sliders
+    | Gear
     | Cross
     | Dash
     | Square

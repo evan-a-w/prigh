@@ -48,6 +48,10 @@ let c ?argument ?(args = "") name help = { Spec.name; args; help; argument }
 let all =
   [ c ~args:"[command]" "help" "show commands and keys, or a command's usage"
   ; c "hotkeys" "show the keyboard shortcuts"
+  ; c
+      "settings"
+      "notifications, transcript detail, tool confirmation, your account and \
+       providers (Ctrl+,)"
   ; c "new" "start a new session"
   ; c ~argument:Model ~args:"[name]" "model" "pick or switch the model"
   ; c "scoped-models" "pick the models Ctrl+P and Alt+P cycle through"
@@ -74,8 +78,8 @@ let all =
       ~argument:Confirm
       ~args:"[on|off]"
       "confirm"
-      "ask before bash, job_input, edits and MCP tools run (mode ask or \
-       auto, also for new sessions)"
+      "ask before bash, job_input, edits and MCP tools run (mode ask or auto, \
+       also for new sessions)"
   ; c
       ~argument:Mode
       ~args:"[ask|auto-edit|auto|plan]"

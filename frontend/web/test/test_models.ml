@@ -5,7 +5,7 @@ let%expect_test
     "the model picker: logged-in providers first, fuzzy filter, Enter switches"
   =
   let h = H.create () in
-  H.text h ~selector:".controls";
+  H.text h ~selector:".composer-controls";
   [%expect {| (Claude Opus 5.5) (Thinking on) (Auto: never asks) |}];
   H.key h "l" ~ctrl:true;
   H.text h ~selector:".modal";
@@ -158,7 +158,7 @@ let%expect_test "thinking: a picker and /thinking, when the model supports it" =
        (H.state_json
           ~fields:[ "model", deepseek; "thinking", `String "off" ]
           ()));
-  H.text h ~selector:".controls";
+  H.text h ~selector:".composer-controls";
   [%expect {| (DeepSeek Chat) (No thinking) (Auto: never asks) |}];
   H.type_ h "/thinking high";
   H.act h Send;
@@ -202,10 +202,7 @@ let%expect_test
   let h = H.create () in
   H.text h ~selector:".status";
   [%expect
-    {|
-    Ready 0% ↑0 ↓0 $0.0000
-    (Notifications not allowed yet: click to ask the browser)
-    |}];
+    {| Ready (0%) ↑0 ↓0 $0.0000 |}];
   H.act
     h
     (Hello { client_id = "c1"; namespace = Some "bob"; user = Some "ann" });
@@ -218,18 +215,21 @@ let%expect_test
     {|
     (Rpc (method_ list_subagents) (params ()) (tag Subagents))
     (Rpc (method_ list_jobs) (params ()) (tag Jobs))
-    Working 75% ↑123k ↓7.9k $1.2345 (3 queued) laptop
-    (Notifications not allowed yet: click to ask the browser) (ann as bob)
+    Working (75%) ↑123k ↓7.9k $1.2345 (3 queued) laptop
     |}];
   H.show h ~selector:".context";
   [%expect
     {|
-    <span title="Context: 150k of 200k tokens (/compact frees some)" class="context status-item warm">
+    <button type="button"
+            title="Context: 150k of 200k tokens (/compact frees some). Click for the session's details (/session)"
+            aria-label="Context 75% full"
+            class="context link status-item warm"
+            @on_click>
       <span class="meter">
         <span class="meter-fill" style={ width: 75.00%; }> </span>
       </span>
       75%
-    </span>
+    </button>
     |}];
   (* The queued messages come back into the editor, last first. *)
   H.type_ h "draft";

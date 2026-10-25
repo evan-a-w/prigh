@@ -451,7 +451,7 @@ let%expect_test "a hand-over: a line, not a prompt bubble" =
 
 let%expect_test "a hand-over as it happens: notice, model, line" =
   let h = H.create ~state:gpt_6 () in
-  H.text h ~selector:".controls";
+  H.text h ~selector:".composer-controls";
   H.event
     h
     {|{"event":"config_changed","config":{"fallback_models":["openai/gpt-6","anthropic/claude-opus-5-5"]}}|};
@@ -471,7 +471,7 @@ let%expect_test "a hand-over as it happens: notice, model, line" =
        handover_origin);
   H.text h ~selector:".entries";
   H.text h ~selector:".toast";
-  H.text h ~selector:".controls";
+  H.text h ~selector:".composer-controls";
   [%expect
     {|
     (GPT-6) (Thinking on) (Auto: never asks)

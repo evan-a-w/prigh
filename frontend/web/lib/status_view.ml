@@ -13,6 +13,9 @@ let tokens n =
   else Int.to_string n
 ;;
 
+(* What a narrow top bar leaves to the icon beside it. *)
+let text_ text = span ~cls:"status-text" text
+
 let item ?(cls = "") ?title ?(attrs = []) children =
   Node.span
     ~attrs:
@@ -26,7 +29,19 @@ let item ?(cls = "") ?title ?(attrs = []) children =
    Ready, Reconnecting… Not the counters, which change all the time. *)
 let activity = [ Attr.role "status"; Attr.create "aria-atomic" "true" ]
 
-let context (state : State.t) =
+let chip ?label ~cls ~title ~command ~inject children =
+  Node.button
+    ~attrs:
+      [ Attr.class_ (String.strip ("status-item link " ^ cls))
+      ; Attr.type_ "button"
+      ; Attr.title title
+      ; Option.value_map label ~default:Attr.empty ~f:(Attr.create "aria-label")
+      ; Attr.on_click (fun _ -> inject (Action.Run command))
+      ]
+    children
+;;
+
+let context (state : State.t) ~inject =
   if state.model.context_window <= 0
   then Node.none
   else (
@@ -42,13 +57,17 @@ let context (state : State.t) =
       then "warm"
       else ""
     in
-    item
+    chip
       ~cls:("context " ^ level)
       ~title:
         (sprintf
-           "Context: %s of %s tokens (/compact frees some)"
+           "Context: %s of %s tokens (/compact frees some). Click for the \
+            session's details (/session)"
            (tokens state.context_tokens)
            (tokens state.model.context_window))
+      ~command:"/session"
+      ~label:(sprintf "Context %.0f%% full" percent)
+      ~inject
       [ Node.span
           ~attrs:[ Attr.class_ "meter" ]
           [ Node.span
@@ -69,17 +88,6 @@ let level_class : Prigh_ui.Loop_status.Level.t -> string = function
   | Normal -> ""
   | Warn -> "warm"
   | Over -> "hot"
-;;
-
-let chip ~cls ~title ~command ~inject children =
-  Node.button
-    ~attrs:
-      [ Attr.class_ ("status-item link " ^ cls)
-      ; Attr.type_ "button"
-      ; Attr.title title
-      ; Attr.on_click (fun _ -> inject (Action.Run command))
-      ]
-    children
 ;;
 
 (* With a budget: spent / budget, warm from 80%, hot once spent. *)
@@ -113,7 +121,7 @@ let goal (state : State.t) ~inject =
       ~title:("Goal: " ^ g.text ^ " (/goal)")
       ~command:"/goal"
       ~inject
-      [ icon Target; Node.text text ]
+      [ icon Target; text_ text ]
 ;;
 
 let reminders (state : State.t) ~inject =
@@ -130,7 +138,7 @@ let reminders (state : State.t) ~inject =
             :: List.map reminders ~f:Prigh_ui.Remind_command.describe))
       ~command:"/remind"
       ~inject
-      [ icon Restart; Node.textf "Remind %d" (List.length reminders) ]
+      [ icon Restart; text_ (sprintf "Remind %d" (List.length reminders)) ]
 ;;
 
 let resume (m : App.Model.t) (state : State.t) ~inject =
@@ -144,7 +152,7 @@ let resume (m : App.Model.t) (state : State.t) ~inject =
       ~command:"/resume"
       ~inject
       [ icon Clock
-      ; Node.text
+      ; text_
           (String.capitalize
              (Prigh_ui.Loop_status.resume_part at ~utc_offset:m.utc_offset))
       ]
@@ -161,7 +169,7 @@ let background (m : App.Model.t) ~inject =
         ; Attr.title "Subagents and jobs (/agents)"
         ; Attr.on_click (fun _ -> inject (Action.Open_subagents None))
         ]
-      [ (if running then Html.lamp () else icon Bot); Node.text text ]
+      [ (if running then Html.lamp () else icon Bot); text_ text ]
 ;;
 
 let transfers (m : App.Model.t) =
@@ -179,73 +187,11 @@ let host (state : State.t) =
       List.find state.hosts ~f:(fun h -> String.equal h.id state.active_host)
       |> Option.value_map ~default:state.active_host ~f:(fun h -> h.name)
     in
-    item ~cls:"host" ~title:"Tools run here" [ icon Server; Node.text name ])
-;;
-
-let user (m : App.Model.t) ~inject =
-  let name =
-    match m.hello, m.account with
-    | Some ({ user = Some user; _ } as hello), _ ->
-      Some
-        (match Hello_reply.acting_as hello with
-         | Some ns -> sprintf "%s as %s" user ns
-         | None -> user)
-    | _, Some account when not (List.is_empty m.accounts) ->
-      Some (Accounts.Account.name account)
-    | _ -> None
-  in
-  match name with
-  | None -> Node.none
-  | Some text ->
-    Node.button
-      ~attrs:
-        [ Attr.class_ "status-item link account"
-        ; Attr.type_ "button"
-        ; Attr.title "Signed in: switch account"
-        ; Attr.on_click (fun _ -> inject Action.Open_accounts)
-        ]
-      [ icon User; Node.text text ]
-;;
-
-(* Whether the browser tells you what happens while the tab is hidden; a
-   click turns it off, or on (asking the browser if it has to). *)
-let notifications (m : App.Model.t) ~inject =
-  let n = m.notifications in
-  let on = n.enabled && Page_notify.Permission.equal n.permission Granted in
-  let cls =
-    if on
-    then "on"
-    else if n.enabled && Page_notify.Permission.equal n.permission Denied
-    then "warm"
-    else "off"
-  in
-  let label, hint =
-    match n.enabled, n.permission with
-    | false, _ -> "Notifications off", "Notifications off (/notify on)"
-    | true, Granted -> "Notifications on", "Notifications on (/notify off)"
-    | true, Default ->
-      ( "Notifications not allowed yet"
-      , "Notifications not allowed yet: click to ask the browser" )
-    | true, Denied ->
-      ( "Notifications blocked"
-      , "Notifications blocked by the browser: click for how to allow them" )
-    | true, Unsupported ->
-      "Notifications unavailable", "Notifications need https or localhost"
-  in
-  Node.button
-    ~attrs:
-      [ Attr.class_ ("status-item link notify " ^ cls)
-      ; Attr.type_ "button"
-      ; Attr.title hint
-      ; Attr.create "aria-label" label
-      ; Attr.on_click (fun _ ->
-          inject (Action.Run (if on then "/notify off" else "/notify on")))
-      ]
-    [ icon (if on then Bell else Bell_off) ]
+    item ~cls:"host" ~title:"Tools run here" [ icon Server; text_ name ])
 ;;
 
 (* Settings that change what you see, and the model's plan; the approval
-   mode is in the top bar. *)
+   mode is in the composer. *)
 let modes (m : App.Model.t) ~inject =
   let chip ?(cls = "") ~title ~command text =
     Node.button
@@ -318,9 +264,9 @@ let view (m : App.Model.t) ~inject =
              ~cls:"idle"
              ~attrs:activity
              [ Node.span ~attrs:[ Attr.class_ "idle-dot" ] []
-             ; Node.text "Ready"
+             ; span ~cls:"label" "Ready"
              ])
-      ; context state
+      ; context state ~inject
       ; item
           ~cls:"tokens"
           ~title:
@@ -347,14 +293,11 @@ let view (m : App.Model.t) ~inject =
                ; Attr.title "Take the last queued message back into the editor"
                ; Attr.on_click (fun _ -> inject Action.Dequeue)
                ]
-             [ icon Undo; Node.text (sprintf "%d queued" queued) ]
+             [ icon Undo; text_ (sprintf "%d queued" queued) ]
          else Node.none)
       ; background m ~inject
       ; transfers m
       ; host state
       ; Node.fragment (modes m ~inject)
-      ; div ~cls:"status-spacer" []
-      ; notifications m ~inject
-      ; user m ~inject
       ]
 ;;

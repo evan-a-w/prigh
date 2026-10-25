@@ -136,7 +136,7 @@ try {
   await page.locator(".picker-dialog").waitFor();
   await show("act as", ".picker-items");
   await page.locator(".picker-item", { hasText: "bob" }).click();
-  await bodyHas("alice as bob");
+  await bodyHas("acting as bob");
   await sessions();
   await show("acting as bob", ".sidebar-footer");
   await menu();

@@ -7,10 +7,11 @@ let%expect_test
     "Enter sends, Shift+Enter is a newline, Alt+Enter queues a follow-up"
   =
   let h = H.create () in
-  H.text h ~selector:".composer-row";
+  H.text h ~selector:".composer-box";
   [%expect
     {|
     []
+    (Claude Opus 5.5) (Thinking on) (Auto: never asks)
     (Attach files (or drop them here)) (Send (Enter))
     |}];
   H.show h ~selector:".send";
@@ -301,14 +302,14 @@ let%expect_test "@ completes paths from the backend" =
     {| (Rpc (method_ list_paths) (params ((prefix zz))) (tag (Paths zz))) |}]
 ;;
 
-let%expect_test
-    "Ctrl+Enter or Cmd+Enter sends what is typed, not the highlight"
+let%expect_test "Ctrl+Enter or Cmd+Enter sends what is typed, not the highlight"
   =
   let h = H.create () in
   H.type_ h "/cd new";
   H.reply h "list_dirs" {|["newer/"]|};
   H.text h ~selector:".popup";
-  [%expect {|
+  [%expect
+    {|
     (Rpc (method_ list_dirs) (params ((prefix new))) (tag (Paths new)))
     Directories ↑↓ Tab Enter Esc   Ctrl+Enter as typed
     newer/
@@ -316,7 +317,8 @@ let%expect_test
   H.key h "Enter" ~ctrl:true;
   let popup = Option.is_some (Prigh_web.App.Model.popup (H.model h)) in
   print_s [%sexp ((H.model h).draft : string), (popup : bool)];
-  [%expect {|
+  [%expect
+    {|
     Send
     (Save_history ("/cd new"))
     (Rpc (method_ set_cwd) (params ((path new) (if_missing ask)))
@@ -326,7 +328,8 @@ let%expect_test
   H.type_ h "look at @src/ma";
   H.reply h "list_paths" {|["src/main.ml"]|};
   H.key h "Enter" ~meta:true;
-  [%expect {|
+  [%expect
+    {|
     (Rpc (method_ list_paths) (params ((prefix src/ma))) (tag (Paths src/ma)))
     Send
     (Save_history ("look at @src/ma" "/cd new"))
@@ -337,7 +340,8 @@ let%expect_test
   (* Without a popup it is Enter. *)
   H.type_ h "hello";
   H.key h "Enter" ~ctrl:true;
-  [%expect {|
+  [%expect
+    {|
     Send
     (Save_history (hello "look at @src/ma" "/cd new"))
     Scroll_to_bottom
@@ -355,6 +359,7 @@ let%expect_test "slash commands: the popup, arguments, running, unknown ones" =
     Commands ↑↓ Tab Enter Esc   Ctrl+Enter as typed
     /help [command] show commands and keys, or a command's usage
     /hotkeys show the keyboard shortcuts
+    /settings notifications, transcript detail, tool confirmation, your account and providers (Ctrl+,)
     /new start a new session
     /model [name] pick or switch the model
     /scoped-models pick the models Ctrl+P and Alt+P cycle through
@@ -402,7 +407,6 @@ let%expect_test "slash commands: the popup, arguments, running, unknown ones" =
     /btw <question> ask a side question without interrupting the run (not added to the conversation)
     /abort stop the current run
     /terminal open a shell where the tools run, in the session's directory (Ctrl+`)
-    /files [path] browse, preview, upload and download files where the tools run (Ctrl+Shift+F)
     |}];
   H.type_ h "/mod";
   H.key h "Tab";
