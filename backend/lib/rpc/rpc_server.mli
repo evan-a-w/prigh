@@ -52,6 +52,9 @@ val create
   -> ?home:string
        (** whose [config.json] [list_sessions] reads [archive_after_days]
            from (default: the calling client's agent's config) *)
+  -> ?forges:Forges.t
+       (** git hosts (default: real HTTP, sign-ins in [login]'s store,
+           settings in [home]'s config) *)
   -> login:Login_manager.t
   -> sessions_dir:string
   -> cwd:string
