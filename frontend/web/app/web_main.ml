@@ -540,6 +540,14 @@ let component client settings ~current (local_ graph) =
         model')
       graph
   in
+  (* After Bonsai has patched the DOM and before the browser paints it: what
+     measures or scrolls the page (the editor's height, the chat's scroll
+     position, focus) lands in the frame that shows the change. A frame
+     later, the editor showed new lines scrolled out of view at each
+     newline and a cleared draft at its old height. *)
+  Bonsai.Edge.after_display
+    (Bonsai.return (Effect.of_sync_fun Browser.rendered ()))
+    graph;
   let open Bonsai.Let_syntax in
   let%arr model
   and inject in

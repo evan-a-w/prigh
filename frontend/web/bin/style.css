@@ -1051,7 +1051,7 @@ kbd {
 .btw-tag { font: 600 11.5px var(--mono); color: var(--muted); background: var(--slate-2); border-radius: var(--r-chip); padding: 0 6px; }
 .btw-question { font-weight: 600; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .btw-answer { margin-top: 4px; }
-.btw-answer .markdown > :first-child { margin-top: 0; }
+.btw-answer .markdown > .md-part:first-child > :first-child { margin-top: 0; }
 .btw-status { display: flex; align-items: center; gap: 8px; color: var(--muted); font-size: 12.5px; }
 .btw-status:empty { display: none; }
 /* Said to screen readers, not shown. */

@@ -529,14 +529,18 @@ let%expect_test "approving the plan" =
     (y Approve: leave plan mode and implement) (n Keep planning) (r Keep planning, saying what to change)
     <div class="confirm-plan">
       <div class="markdown">
-        <h2 dir="auto"> Plan </h2>
-        <ol>
-          <li dir="auto">
-            Change
-            <code> main.ml </code>
-          </li>
-          <li dir="auto"> Test </li>
-        </ol>
+        <div class="md-part">
+          <h2 dir="auto"> Plan </h2>
+        </div>
+        <div class="md-part">
+          <ol>
+            <li dir="auto">
+              Change
+              <code> main.ml </code>
+            </li>
+            <li dir="auto"> Test </li>
+          </ol>
+        </div>
       </div>
     </div>
     |}];

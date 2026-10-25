@@ -389,11 +389,13 @@ let%expect_test "/verbosity and Ctrl+O" =
         </div>
         <div class="assistant msg">
           <div class="markdown">
-            <p dir="auto">
-              Fixed: the
-              <strong> flag </strong>
-               was wrong.
-            </p>
+            <div class="md-part">
+              <p dir="auto">
+                Fixed: the
+                <strong> flag </strong>
+                 was wrong.
+              </p>
+            </div>
           </div>
           <div class="meta">
             <span> m </span>
