@@ -60,7 +60,9 @@ let picker ~kind (p : Picker.t) ~inject =
             ~attrs:
               [ Attr.id "picker-input"
               ; Attr.type_ "text"
-              ; Attr.create "aria-label" ("Filter " ^ String.lowercase (picker_title kind))
+              ; Attr.create
+                  "aria-label"
+                  ("Filter " ^ String.lowercase (picker_title kind))
               ; Attr.role "combobox"
               ; Attr.create "aria-controls" "picker-list"
               ; Attr.create "aria-expanded" "true"
@@ -109,8 +111,12 @@ let picker ~kind (p : Picker.t) ~inject =
                       ]
                   ; Attr.role "option"
                   ; Attr.id (sprintf "picker-option-%d" i)
-                  ; Attr.create "aria-selected" (Bool.to_string (i = Picker.selected p))
-                  ; (if item.marked then Attr.create "aria-checked" "true" else Attr.empty)
+                  ; Attr.create
+                      "aria-selected"
+                      (Bool.to_string (i = Picker.selected p))
+                  ; (if item.marked
+                     then Attr.create "aria-checked" "true"
+                     else Attr.empty)
                   ; Attr.on_click (fun _ ->
                       inject (Action.Picker_choose item.id))
                   ]
@@ -226,10 +232,13 @@ let delete (m : App.Model.t) (target : Dialog.Delete_target.t) ~inject =
   in
   let deleted = List.filter sessions ~f:(fun s -> Option.is_none (kept m s)) in
   let count = List.length deleted in
-  let size = Session_summary.size_string (Session_summary.total_bytes deleted) in
+  let size =
+    Session_summary.size_string (Session_summary.total_bytes deleted)
+  in
   let title =
     match target, sessions with
-    | _, _ when count = 0 && List.length sessions = 1 -> "Can't delete this session"
+    | _, _ when count = 0 && List.length sessions = 1 ->
+      "Can't delete this session"
     | _, _ when count = 0 -> "Can't delete these sessions"
     | Archived, _ -> sprintf "Delete all %d archived sessions?" count
     | Sessions _, [ _ ] -> "Delete session?"
@@ -282,7 +291,11 @@ let delete (m : App.Model.t) (target : Dialog.Delete_target.t) ~inject =
         (List.map (List.take sessions shown) ~f:row
          @
          if count > shown
-         then [ Node.li ~attrs:[ Attr.class_ "delete-more" ] [ Node.textf "and %d more" (count - shown) ] ]
+         then
+           [ Node.li
+               ~attrs:[ Attr.class_ "delete-more" ]
+               [ Node.textf "and %d more" (count - shown) ]
+           ]
          else [])
     ; (match warnings with
        | [] -> Node.none
@@ -356,7 +369,8 @@ let login (m : App.Model.t) (flow : Login_flow.t) ~inject =
              text_input
                ~placeholder
                ~label:
-                 (List.hd (String.split_lines (Auth_event.Prompt.message prompt))
+                 (List.hd
+                    (String.split_lines (Auth_event.Prompt.message prompt))
                   |> Option.value ~default:"Answer")
                ~value:flow.input
                ~inject
@@ -396,9 +410,7 @@ let login (m : App.Model.t) (flow : Login_flow.t) ~inject =
     | None, None ->
       ( div
           ~cls:"login-waiting"
-          [ Html.lamp ()
-          ; Node.text "Waiting for the provider…"
-          ]
+          [ Html.lamp (); Node.text "Waiting for the provider…" ]
       , [ button ~on_click:(inject Action.Close_dialog) [ Node.text "Cancel" ] ]
       )
   in
@@ -486,6 +498,7 @@ let dialog (m : App.Model.t) ~inject =
     Account_view.menu m p ~inject
   | Some (Picker { kind; picker = p }) -> picker ~kind p ~inject
   | Some Help -> help ~inject
+  | Some Settings -> Settings_view.view m ~inject
   | Some (Rename name) -> rename name ~inject
   | Some (Delete target) -> delete m target ~inject
   | Some (Login flow) -> login m flow ~inject

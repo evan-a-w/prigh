@@ -115,8 +115,7 @@ let%expect_test "a connection lost while the session loads backs off, then stops
   show h;
   [%expect
     {|
-    Ready 0% ↑0 ↓0 $0.0000
-    (Notifications not allowed yet: click to ask the browser)
+    Ready (0%) ↑0 ↓0 $0.0000
     Reconnecting now…
     ((connection Connected) (lost 5))
     |}];
@@ -125,8 +124,7 @@ let%expect_test "a connection lost while the session loads backs off, then stops
   [%expect
     {|
     (Expire_toast (id 1) (after_ms 2500))
-    Ready 0% ↑0 ↓0 $0.0000
-    (Notifications not allowed yet: click to ask the browser)
+    Ready (0%) ↑0 ↓0 $0.0000
     Reconnecting now…
     Reconnected
     ((connection Connected) (lost 0))

@@ -1,10 +1,11 @@
 open! Core
 module H = Harness
 
-(* The model, the thinking level and the approval mode beside each other in
-   the top bar: always shown, each opening its picker. *)
+(* The model, the thinking level and the approval mode beside each other
+   along the bottom of the composer's box: always shown, each opening its
+   picker. The top bar has the session and, in its middle, the status. *)
 
-let controls h = H.text h ~selector:".controls"
+let controls h = H.text h ~selector:".composer-controls"
 
 let%expect_test "the thinking chip names the level and opens its picker" =
   let h = H.create () in
@@ -15,8 +16,6 @@ let%expect_test "the thinking chip names the level and opens its picker" =
     (Claude Opus 5.5) (Thinking on) (Auto: never asks)
     <button type="button"
             title="Thinking on: how much the model reasons before it answers (Alt+T cycles, /thinking)"
-            popovertarget="topbar-controls"
-            popovertargetaction="hide"
             class="btn chip-button thinking-chip"
             @on_click>
       <icon class="brain"> </icon>
@@ -134,10 +133,7 @@ let%expect_test "every approval mode, as the chip names it" =
     |}]
 ;;
 
-(* A narrow chat column folds the controls into a menu (style.css): the
-   button that opens it names what they are set to, and each control closes
-   it as it opens its picker. *)
-let%expect_test "the top bar: title, cwd and branch, and the controls' menu" =
+let%expect_test "the top bar: title, cwd and branch, the status, the panels" =
   let h =
     H.create
       ~state:
@@ -154,70 +150,57 @@ let%expect_test "the top bar: title, cwd and branch, and the controls' menu" =
   [%expect
     {|
     <header class="topbar">
-      <button type="button"
-              title="Sessions (Ctrl+B)"
-              aria-label="Sessions"
-              class="btn ghost icon toggle-sidebar"
-              @on_click>
-        <icon class="menu"> </icon>
-      </button>
-      <div class="title">
-        <button type="button" title="Rename (/name)" class="session-name" @on_click>
-          <span dir="auto"> New session </span>
-          <icon class="pencil"> </icon>
+      <div class="topbar-start">
+        <button type="button"
+                title="Sessions (Ctrl+B)"
+                aria-label="Sessions"
+                class="btn ghost icon toggle-sidebar"
+                @on_click>
+          <icon class="menu"> </icon>
         </button>
-        <div class="session-where">
-          <span title="/home/ada/projects/prigh/tui" class="where">
-            <span class="where-head"> ~/projects/prigh </span>
-            <span class="where-tail"> /tui </span>
-          </span>
-          <span title="feature/narrow-top-bar" class="branch">
-            <icon class="branch"> </icon>
-            <span class="branch-name"> feature/narrow-top-bar </span>
-          </span>
+        <div class="title">
+          <button type="button" title="Rename (/name)" class="session-name" @on_click>
+            <span dir="auto"> New session </span>
+            <icon class="pencil"> </icon>
+          </button>
+          <div class="session-where">
+            <span title="/home/ada/projects/prigh/tui" class="where">
+              <span class="where-head"> ~/projects/prigh </span>
+              <span class="where-tail"> /tui </span>
+            </span>
+            <span title="feature/narrow-top-bar" class="branch">
+              <icon class="branch"> </icon>
+              <span class="branch-name"> feature/narrow-top-bar </span>
+            </span>
+          </div>
         </div>
       </div>
-      <button type="button"
-              title="Claude Opus 5.5, thinking on, plan mode"
-              aria-label="Model, thinking and approvals"
-              popovertarget="topbar-controls"
-              class="btn controls-more ghost icon plan-mode"
-              @on_click>
-        <icon class="sliders"> </icon>
-      </button>
-      <div id="topbar-controls" popover="auto" class="controls">
+      <div class="status">
+        <span role="status" aria-atomic="true" class="idle status-item">
+          <span class="idle-dot"> </span>
+          <span class="label"> Ready </span>
+        </span>
         <button type="button"
-                title="Claude Opus 5.5: switch model (Ctrl+L)"
-                popovertarget="topbar-controls"
-                popovertargetaction="hide"
-                class="btn chip-button model-chip"
+                title="Context: 0 of 200k tokens (/compact frees some). Click for the session's details (/session)"
+                aria-label="Context 0% full"
+                class="context link status-item"
                 @on_click>
-          <icon class="cpu"> </icon>
-          <span class="chip-label"> Claude Opus 5.5 </span>
-          <icon class="chevron"> </icon>
+          <span class="meter">
+            <span class="meter-fill" style={ width: 0.00%; }> </span>
+          </span>
+          0%
         </button>
-        <button type="button"
-                title="Thinking on: how much the model reasons before it answers (Alt+T cycles, /thinking)"
-                popovertarget="topbar-controls"
-                popovertargetaction="hide"
-                class="btn chip-button thinking-chip"
-                @on_click>
-          <icon class="brain"> </icon>
-          <span class="chip-key"> Thinking </span>
-          <span class="chip-label"> on </span>
-          <icon class="chevron"> </icon>
-        </button>
-        <button type="button"
-                title="Read-only planning: no file edits; bash, job_input and MCP tools ask first (Alt+M cycles, /mode picks)"
-                data-short="plan"
-                popovertarget="topbar-controls"
-                popovertargetaction="hide"
-                class="btn chip-button mode-chip plan-mode"
-                @on_click>
-          <icon class="shield"> </icon>
-          <span class="chip-label"> Plan mode </span>
-          <icon class="chevron"> </icon>
-        </button>
+        <span title="Tokens: 0 in, 0 out, 0 cache read" class="status-item tokens"> ↑0 ↓0 </span>
+        <span title="Session cost" class="cost status-item"> $0.0000 </span>
+        <Vdom.Node.none-widget> </Vdom.Node.none-widget>
+        <Vdom.Node.none-widget> </Vdom.Node.none-widget>
+        <Vdom.Node.none-widget> </Vdom.Node.none-widget>
+        <Vdom.Node.none-widget> </Vdom.Node.none-widget>
+        <Vdom.Node.none-widget> </Vdom.Node.none-widget>
+        <Vdom.Node.none-widget> </Vdom.Node.none-widget>
+        <Vdom.Node.none-widget> </Vdom.Node.none-widget>
+        <Vdom.Node.none-widget> </Vdom.Node.none-widget>
+        <Vdom.Node.none-widget> </Vdom.Node.none-widget>
       </div>
       <div class="panel-toggles">
         <button type="button"
@@ -237,6 +220,14 @@ let%expect_test "the top bar: title, cwd and branch, and the controls' menu" =
           <icon class="terminal"> </icon>
         </button>
         <Vdom.Node.none-widget> </Vdom.Node.none-widget>
+        <button type="button"
+                title="Settings (Ctrl+, or /settings)"
+                aria-label="Settings"
+                aria-haspopup="dialog"
+                class="btn ghost icon settings-toggle"
+                @on_click>
+          <icon class="gear"> </icon>
+        </button>
       </div>
     </header>
     |}]
@@ -272,5 +263,165 @@ let%expect_test "the cwd's last directory is kept apart: the rest is elided" =
       <span class="where-head"> relative </span>
       <span class="where-tail"> /path </span>
     </span>
+    |}]
+;;
+
+let%expect_test
+    "the composer is one box: the editor, then the chips and the buttons along \
+     its bottom"
+  =
+  let h = H.create () in
+  H.elements h ~selector:".composer-box > *";
+  H.elements h ~selector:".composer-bar > *";
+  H.elements h ~selector:".composer-bar .btn";
+  [%expect
+    {|
+    <Vdom.Node.none-widget class="">
+    <Vdom.Node.none-widget class="">
+    <textarea class="editor">
+    <div class="composer-bar">
+    <div class="composer-controls">
+    <div class="composer-buttons">
+    <button class="btn chip-button model-chip">
+    <button class="btn chip-button thinking-chip">
+    <button class="btn chip-button mode-chip">
+    <button class="attach btn ghost icon">
+    <button class="btn primary send">
+    |}];
+  (* The model's chip opens its picker; so does the mode's. *)
+  H.click h ~selector:".model-chip";
+  H.text h ~selector:".modal h2";
+  H.key h "Escape" ~target:Field;
+  H.click h ~selector:".mode-chip";
+  H.text h ~selector:".modal h2";
+  [%expect
+    {|
+    Open_model_picker
+    (Focus picker-input)
+    Switch model
+    Close_dialog
+    (Focus editor)
+    (Run /mode)
+    (Focus picker-input)
+    When tools ask first (Alt+M cycles)
+    |}];
+  (* Running: stop beside steer. *)
+  H.event
+    h
+    (sprintf
+       {|{"event":"state","state":%s}|}
+       (H.state_json ~fields:[ "running", `True ] ()));
+  H.key h "Escape" ~target:Field;
+  H.names h ~selector:".composer-buttons .btn";
+  [%expect
+    {|
+    Close_dialog
+    (Focus editor)
+    button "Attach files" -- Attach files (or drop them here)
+    button "Stop" -- Stop (Esc)
+    button "Steer" -- Steer (Enter)
+    |}];
+  (* Nothing is left under the box. *)
+  H.elements h ~selector:".composer .status";
+  H.elements h ~selector:".composer .notify";
+  [%expect {| |}]
+;;
+
+let%expect_test "the status in the top bar: idle, running, and what applies" =
+  let h =
+    H.create
+      ~state:
+        (H.state_json
+           ~fields:
+             [ "context_tokens", `Number "130000"
+             ; "cost_usd", `Number "0.42"
+             ; ( "usage"
+               , Jsonaf.of_string
+                   {|{"input":120000,"output":9000,"cache_read":0}|} )
+             ]
+           ())
+      ()
+  in
+  let status () = H.text h ~selector:".topbar .status" in
+  status ();
+  [%expect {| Ready (65%) ↑120k ↓9.0k $0.4200 |}];
+  H.event
+    h
+    (sprintf
+       {|{"event":"state","state":%s}|}
+       (H.state_json
+          ~fields:
+            [ "running", `True
+            ; "context_tokens", `Number "180000"
+            ; ( "goal"
+              , Jsonaf.of_string
+                  {|{"text":"all tests pass","status":"active","continuations":2,"max_continuations":20}|}
+              )
+            ]
+          ()));
+  H.event
+    h
+    {|{"event":"queue_update","steer":0,"follow_up":1,"steer_texts":[],"follow_up_texts":["and the docs"]}|};
+  status ();
+  H.elements h ~selector:".topbar .status > .status-item";
+  [%expect
+    {|
+    Working (90%) ↑0 ↓0 $0.0000 (Goal 2/20) (1 queued)
+    <span class="running status-item">
+    <button class="context hot link status-item">
+    <span class="status-item tokens">
+    <span class="cost status-item">
+    <button class="goal link status-item warm">
+    <button class="link queued status-item">
+    |}];
+  (* The context opens the session's details, with the counters. *)
+  H.click h ~selector:".topbar .context";
+  [%expect
+    {|
+    (Run /session)
+    (Focus dialog)
+    (Rpc (method_ session_stats) (params ()) (tag Session_stats))
+    |}];
+  (* Waiting for the backend, the bar says so where the status goes. *)
+  let h = H.connecting () in
+  H.text h ~selector:".topbar";
+  [%expect
+    {|
+    (Sessions (Ctrl+B))
+    Connecting…
+    (Settings (Ctrl+, or /settings))
+    |}]
+;;
+
+(* A phone: the same chips, with the short names CSS shows (style.css's
+   container queries), and the status beside the title. *)
+let%expect_test "narrow: the chips' short names, the shorter placeholder" =
+  let h = H.create () in
+  H.quiet h (fun () -> H.act h (Set_narrow true));
+  H.elements h ~selector:".app";
+  H.show h ~selector:".mode-chip";
+  H.show h ~selector:"#editor";
+  [%expect
+    {|
+    <div class="app narrow">
+    <button type="button"
+            title="Tools run without asking (Alt+M cycles, /mode picks)"
+            data-short="auto"
+            class="btn chip-button mode-chip"
+            @on_click>
+      <icon class="shield"> </icon>
+      <span class="chip-label"> Auto: never asks </span>
+      <icon class="chevron"> </icon>
+    </button>
+    <textarea id="editor"
+              placeholder="Ask prigh…  / commands"
+              aria-label="Message"
+              dir="auto"
+              rows="1"
+              autocomplete="off"
+              enterkeyhint="send"
+              class="editor"
+              #value=""
+              @on_input> </textarea>
     |}]
 ;;

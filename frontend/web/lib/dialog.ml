@@ -42,6 +42,7 @@ type t =
   | Login of Login_flow.t
   | Auth of Auth_status.t list
   | Hotkeys
+  | Settings
   | Scoped_models of
       { picker : Picker.t
       ; checked : String.Set.t
@@ -94,5 +95,6 @@ let per_session = function
           | Accounts )
       ; _
       }
-  | Help | Hotkeys | Scoped_models _ | Delete _ | Login _ | Auth _ -> false
+  | Help | Hotkeys | Settings | Scoped_models _ | Delete _ | Login _ | Auth _ ->
+    false
 ;;

@@ -102,6 +102,111 @@ let images (m : App.Model.t) ~inject =
            ]))
 ;;
 
+(* A choice the backend has still to confirm. *)
+let pending_chip ?(attrs = []) ?title ~cls label =
+  button
+    ~cls:("chip-button awaiting " ^ cls)
+    ~title:(Option.value title ~default:(sprintf "Switching to %s…" label))
+    ~disabled:true
+    ~attrs:(Attr.create "aria-busy" "true" :: attrs)
+    ~on_click:Effect.Ignore
+    [ Html.lamp (); span ~cls:"chip-label" label ]
+;;
+
+let model_chip (m : App.Model.t) (state : State.t) ~inject =
+  match m.pending.model with
+  | Some key ->
+    let name =
+      List.find m.models ~f:(fun model -> String.equal model.key key)
+      |> Option.value_map ~default:key ~f:(fun model -> model.name)
+    in
+    pending_chip ~cls:"model-chip" name
+  | None ->
+    button
+      ~cls:"chip-button model-chip"
+      ~title:(sprintf "%s: switch model (Ctrl+L)" state.model.name)
+      ~on_click:(inject Action.Open_model_picker)
+      [ icon Cpu
+      ; span ~cls:"chip-label" state.model.name
+      ; icon ~cls:"chevron" Chevron
+      ]
+;;
+
+(* A narrow composer shows the level alone. *)
+let thinking_chip (m : App.Model.t) (state : State.t) ~inject =
+  match m.pending.thinking with
+  | Some level ->
+    pending_chip
+      ~cls:"thinking-chip"
+      ~title:(sprintf "Switching to thinking %s…" level)
+      ("Thinking " ^ level)
+  | None when state.model.supports_thinking ->
+    button
+      ~cls:"chip-button thinking-chip"
+      ~title:
+        (sprintf
+           "Thinking %s: how much the model reasons before it answers (Alt+T \
+            cycles, /thinking)"
+           state.thinking)
+      ~on_click:(inject Action.Open_thinking_picker)
+      [ icon Brain
+      ; span ~cls:"chip-key" "Thinking"
+      ; span ~cls:"chip-label" state.thinking
+      ; icon ~cls:"chevron" Chevron
+      ]
+  | None ->
+    button
+      ~cls:"chip-button thinking-chip unsupported"
+      ~title:(sprintf "%s has no thinking levels" state.model.name)
+      ~on_click:(inject Action.Open_thinking_picker)
+      [ icon Brain; span ~cls:"chip-label" "No thinking" ]
+;;
+
+(* What asks first: a narrow composer shows [label] (ask, auto-edit, auto,
+   plan). *)
+let mode_chip (m : App.Model.t) (state : State.t) ~inject =
+  let short mode = [ Attr.create "data-short" (Session_mode.label mode) ] in
+  match m.pending.mode with
+  | Some mode ->
+    pending_chip
+      ~attrs:(short mode)
+      ~cls:"mode-chip"
+      ~title:(sprintf "Switching to %s…" (Session_mode.label mode))
+      (Session_mode.title mode)
+  | None ->
+    let mode = Session_mode.of_state state in
+    button
+      ~cls:("chip-button mode-chip" ^ if mode.plan then " plan-mode" else "")
+      ~title:
+        (sprintf
+           "%s (Alt+M cycles, /mode picks)"
+           (String.capitalize (Session_mode.describe mode)))
+      ~attrs:(short mode)
+      ~on_click:(inject (Action.Run "/mode"))
+      [ icon Shield
+      ; span ~cls:"chip-label" (Session_mode.title mode)
+      ; icon ~cls:"chevron" Chevron
+      ]
+;;
+
+(* The model, the thinking level and the approval mode, along the bottom of
+   the box, each opening its picker. *)
+let controls (m : App.Model.t) ~inject =
+  match m.state with
+  | None -> div ~cls:"composer-controls" []
+  | Some state ->
+    Node.div
+      ~attrs:
+        [ Attr.class_ "composer-controls"
+        ; Attr.role "group"
+        ; Attr.create "aria-label" "Model, thinking and mode"
+        ]
+      [ model_chip m state ~inject
+      ; thinking_chip m state ~inject
+      ; mode_chip m state ~inject
+      ]
+;;
+
 let connected (m : App.Model.t) =
   match m.connection, m.state with
   | Connected, Some _ -> Option.is_none m.session_gone
@@ -148,40 +253,41 @@ let view (m : App.Model.t) ~inject =
         ~cls:"composer-box"
         [ images m ~inject
         ; Files_view.chips m ~inject
+        ; Node.textarea
+            ~attrs:
+              [ Attr.class_ "editor"
+              ; Attr.id "editor"
+              ; Attr.placeholder (placeholder m)
+              ; Attr.create "aria-label" "Message"
+              ; Attr.create "dir" "auto"
+              ; (match App.Model.popup m with
+                 | None -> Attr.empty
+                 | Some c ->
+                   Attr.many
+                     [ Attr.role "combobox"
+                     ; Attr.create "aria-controls" "completion-list"
+                     ; Attr.create "aria-expanded" "true"
+                     ; Attr.create "aria-autocomplete" "list"
+                     ; Attr.create
+                         "aria-activedescendant"
+                         (sprintf
+                            "completion-option-%d"
+                            (Completion.selected c))
+                     ])
+              ; Attr.value m.draft
+              ; Attr.rows 1
+              ; Attr.create "autocomplete" "off"
+              ; Attr.create "enterkeyhint" "send"
+              ; Attr.on_input (fun ev text ->
+                  let cursor =
+                    Option.value (caret ev) ~default:(String.length text)
+                  in
+                  inject (Action.Edit { text; cursor }))
+              ]
+            []
         ; div
-            ~cls:"composer-row"
-            [ Node.textarea
-                ~attrs:
-                  [ Attr.class_ "editor"
-                  ; Attr.id "editor"
-                  ; Attr.placeholder (placeholder m)
-                  ; Attr.create "aria-label" "Message"
-                  ; Attr.create "dir" "auto"
-                  ; (match App.Model.popup m with
-                     | None -> Attr.empty
-                     | Some c ->
-                       Attr.many
-                         [ Attr.role "combobox"
-                         ; Attr.create "aria-controls" "completion-list"
-                         ; Attr.create "aria-expanded" "true"
-                         ; Attr.create "aria-autocomplete" "list"
-                         ; Attr.create
-                             "aria-activedescendant"
-                             (sprintf
-                                "completion-option-%d"
-                                (Completion.selected c))
-                         ])
-                  ; Attr.value m.draft
-                  ; Attr.rows 1
-                  ; Attr.create "autocomplete" "off"
-                  ; Attr.create "enterkeyhint" "send"
-                  ; Attr.on_input (fun ev text ->
-                      let cursor =
-                        Option.value (caret ev) ~default:(String.length text)
-                      in
-                      inject (Action.Edit { text; cursor }))
-                  ]
-                []
+            ~cls:"composer-bar"
+            [ controls m ~inject
             ; div
                 ~cls:"composer-buttons"
                 [ Files_view.attach_button m ~inject
@@ -220,6 +326,5 @@ let view (m : App.Model.t) ~inject =
                 ]
             ]
         ]
-    ; Status_view.view m ~inject
     ]
 ;;

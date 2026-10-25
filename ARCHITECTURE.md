@@ -1679,7 +1679,7 @@ terminal frontend and `web/` prigh-web, the browser one.
       the status line), a model or thinking level chosen until a state
       has it or `set_model`/`set_thinking` (`Model_set`, `Thinking_set`)
       answers, and an approval mode until a state has it or `set_mode`
-      fails (the top bar's chips, disabled). A command that needs a list
+      fails (the composer's chips, disabled). A command that needs a list
       from the backend opens `Dialog.Loading` at once; `App.reply` gives the
       replies it waits for (`loads`) to the handler only while it still
       shows, so Esc meanwhile has no side effects.
@@ -1872,12 +1872,14 @@ terminal frontend and `web/` prigh-web, the browser one.
       one, and a bar at the list's foot deletes them; the `Delete` dialog (`Dialog.Delete_target`: paths or every
       archived one) lists them with their sizes and warns about those the
       backend will keep, running, open elsewhere or our own, and the
-      `Delete_result` reply is a toast), `Topbar_view` (the title; the
-      cwd with its middle elided and the branch; the model, thinking and
-      approval mode chips, each opening its picker, in a `popover` menu
-      when the chat column is narrow — the steps are container queries on
-      the top bar in `style.css`; the panel toggles), `Composer_view`
-      with `Queue_view` (the queued steers and follow-ups from `Queued`:
+      `Delete_result` reply is a toast), `Topbar_view` (a grid of
+      three: the title, the cwd with its middle elided and the branch;
+      `Status_view` in the middle; the panel toggles and the settings gear
+      — its steps are container queries on the top bar in `style.css`),
+      `Composer_view` (one box: the editor, then the model, thinking and
+      approval mode chips, each opening its picker, and attach, stop and
+      send along its bottom; the composer's container queries shorten the
+      chips) with `Queue_view` (the queued steers and follow-ups from `Queued`:
       the backend's `queue_update` lists, taken out at once by Edit and
       remove via `remove_queued`, re-fetched with `get_pending` if that
       fails; what left the queue otherwise is acknowledged when its user
@@ -1896,8 +1898,12 @@ terminal frontend and `web/` prigh-web, the browser one.
       sidebar's account button and the account menu, a `Picker` of
       accounts and actions) over `Accounts` (the saved sign-ins in
       localStorage, behind a `Storage` record so that tests use a table),
-      `Status_view` (with the plan chip, the transfers in
-      progress from `Files.transfers` and the notifications bell),
+      `Status_view` (in the top bar: activity, the context linking to
+      `/session`, tokens, cost, the plan chip, the transfers in progress
+      from `Files.transfers`), `Settings_view` (`Dialog.Settings`, from the
+      gear, `/settings` or Ctrl+,: notifications, verbosity, `/confirm`,
+      providers, the account; its controls are `Action.Run` commands, which
+      leave it open),
       `Toast` (at most two, the newest, over the bottom of the chat
       column; a repeat is counted rather than stacked, a notice's lifetime
       grows with its length, errors stay until dismissed, long paths are

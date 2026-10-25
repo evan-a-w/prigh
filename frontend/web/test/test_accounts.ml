@@ -134,15 +134,69 @@ let signed_in_as ?(users = false) user =
   h
 ;;
 
+(* The settings page says who we are, and switches or signs out. *)
+let%expect_test "the settings page: the account, switching it, signing out" =
+  let h = signed_in_as "alice" in
+  let account h = H.text h ~selector:".settings-section:last-child" in
+  H.click h ~selector:".settings-toggle";
+  account h;
+  [%expect
+    {|
+    Open_settings
+    (Focus dialog)
+    Account
+    A
+    Signed in as alice 127.0.0.1:7790
+    (Switch account) (Sign out)
+    |}];
+  (* Switch account: the account menu, in its place. *)
+  H.click h ~selector:".account-setting .btn";
+  H.text h ~selector:".account-menu .menu-section";
+  H.elements h ~selector:".settings-dialog";
+  [%expect
+    {|
+    Open_accounts
+    (Focus dialog)
+    Switch to
+    B
+    bob 127.0.0.1:7790
+    C
+    carol prigh.example.com
+    Add account… sign in as another user, or to another backend
+    Turn notifications off stop telling you what happens while the tab is hidden
+    Sign out forget this account in this browser
+    |}];
+  H.key h "Escape" ~target:Page;
+  H.act h Open_settings;
+  H.click h ~selector:".sign-out";
+  [%expect
+    {|
+    Close_dialog
+    (Focus editor)
+    (Focus dialog)
+    Sign_out
+    Sign_out
+    |}];
+  (* Acting as another user says so. *)
+  let h = signed_in_as "alice" in
+  H.act
+    h
+    (Hello { client_id = "c1"; namespace = Some "bob"; user = Some "alice" });
+  H.quiet h (fun () -> H.act h Open_settings);
+  account h;
+  [%expect
+    {|
+    Account
+    A
+    Signed in as alice Acting as bob: you see and work in their sessions. 127.0.0.1:7790
+    (Switch account) (Sign out)
+    |}]
+;;
+
 let%expect_test "the account menu: who we are, the other accounts, actions" =
   let h = signed_in_as "alice" in
   H.text h ~selector:".sidebar-footer";
-  H.text h ~selector:".status-item.account";
-  [%expect
-    {|
-    (A alice) (Commands and keys (/help))
-    (alice)
-    |}];
+  [%expect {| (A alice) (Commands and keys (/help)) |}];
   H.act h Open_accounts;
   H.text h ~selector:".account-menu";
   [%expect

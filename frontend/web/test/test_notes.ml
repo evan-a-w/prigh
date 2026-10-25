@@ -338,9 +338,8 @@ let%expect_test
      (tag (Command_prompt "/review main look at errors")))
     Nothing to review: no changes against main in /work. /review main look at errors is back in the editor. (Dismiss)
     [/review main look at errors]
+    (Claude Opus 5.5) (Thinking on) (Auto: never asks)
     (Attach files (or drop them here)) (Send (Enter))
-    Ready 0% ↑0 ↓0 $0.0000
-    (Notifications not allowed yet: click to ask the browser)
     |}];
   H.quiet h (fun () -> H.act h (Set_draft ""));
   H.event
@@ -394,6 +393,7 @@ let%expect_test "/diff, /review and /init are in the completions and /help" =
     /archive [session] archive a session (this one without an argument): it moves under Archived in the sidebar
     /snippet [NAME|add|rm] insert a saved text at the caret (none: pick one, Alt+N); add NAME [TEXT] saves one (no TEXT: your last prompt), rm NAME deletes it
     /signout sign out of this account
+    /settings notifications, transcript detail, tool confirmation, your account and providers (Ctrl+,)
     /thinking [off|low|on|high|max] pick or set the thinking level
     /sessions search the saved sessions
     /terminal open a shell where the tools run, in the session's directory (Ctrl+`)
@@ -511,55 +511,5 @@ let%expect_test
     (Save_history ("/notify loud" /notify))
     This browser cannot show notifications here (they need https or localhost); the tab's title still counts what happened
     Unknown /notify argument “loud”: /notify on or /notify off (/notify alone says what is on) (Dismiss)
-    |}]
-;;
-
-let%expect_test
-    "the status line shows whether notifications are on; its bell turns them \
-     on and off"
-  =
-  let h = H.create () in
-  let bell () =
-    H.elements h ~selector:".status .notify";
-    H.text h ~selector:".status .notify"
-  in
-  H.act h (Set_notifications { enabled = true; permission = "granted" });
-  bell ();
-  [%expect
-    {|
-    <button class="link notify on status-item">
-    (Notifications on (/notify off))
-    |}];
-  H.quiet h (fun () -> H.click h ~selector:".status .notify");
-  bell ();
-  [%expect
-    {|
-    (Run "/notify off")
-    <button class="link notify off status-item">
-    (Notifications off (/notify on))
-    |}];
-  H.click h ~selector:".status .notify";
-  bell ();
-  [%expect
-    {|
-    (Run "/notify on")
-    (Save_notifications true)
-    (Expire_toast (id 1) (after_ms 6000))
-    <button class="link notify on status-item">
-    (Notifications on (/notify off))
-    |}];
-  H.act h (Set_notifications { enabled = true; permission = "denied" });
-  bell ();
-  [%expect
-    {|
-    <button class="link notify status-item warm">
-    (Notifications blocked by the browser: click for how to allow them)
-    |}];
-  H.act h (Set_notifications { enabled = true; permission = "unsupported" });
-  bell ();
-  [%expect
-    {|
-    <button class="link notify off status-item">
-    (Notifications need https or localhost)
     |}]
 ;;

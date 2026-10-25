@@ -1,0 +1,257 @@
+open! Core
+module H = Harness
+
+(* The settings page: opened from the top bar's gear, /settings or Ctrl+,;
+   Esc or Done closes it. Its controls run the commands that change them and
+   leave it open. *)
+
+let settings h = H.text h ~selector:".settings-dialog"
+
+let%expect_test "the gear, /settings and Ctrl+, open it; Esc closes it" =
+  let h = H.create () in
+  H.click h ~selector:".topbar .settings-toggle";
+  settings h;
+  [%expect
+    {|
+    Open_settings
+    (Focus dialog)
+    Settings
+    (Close (Esc))
+    In this browser
+    Notifications Tell you when a turn ends or something waits for you while this tab is hidden. The browser has not been asked yet: Allow asks it.
+    (Allow) (Turn notifications off (/notify off))
+    Transcript detail How much of tool calls and thinking the transcript shows (Ctrl+O cycles).
+    (Quiet) (Normal) (Verbose)
+    On the backend
+    Tool confirmation Ask before bash, edits and MCP tools run, in this session and new ones.
+    (Ask before tools run (/confirm on))
+    Model providers Logged in to Anthropic.
+    (Manage providers)
+    Account
+    No sign-in This backend lets anyone in: there is no account to switch or sign out of.
+    (Keyboard shortcuts) (Done)
+    |}];
+  (* Esc: closed, nothing changed. *)
+  let before = H.model h in
+  H.key h "Escape" ~target:Page;
+  H.elements h ~selector:".settings-dialog";
+  print_s
+    [%sexp
+      (Poly.equal before.notifications (H.model h).notifications
+       && Prigh_ui.Verbosity.equal before.verbosity (H.model h).verbosity
+       : bool)];
+  [%expect
+    {|
+    Close_dialog
+    (Focus editor)
+    true
+    |}];
+  H.type_ h "/settings";
+  H.act h Send;
+  H.elements h ~selector:".settings-dialog";
+  H.key h "Escape" ~target:Page;
+  H.key h "," ~ctrl:true;
+  H.elements h ~selector:".settings-dialog";
+  (* Enter (not on one of its controls) closes it too. *)
+  H.key h "Enter" ~target:Page;
+  H.elements h ~selector:".settings-dialog";
+  [%expect
+    {|
+    (Save_history (/settings))
+    (Focus dialog)
+    <div class="modal settings-dialog">
+    Close_dialog
+    (Focus editor)
+    Open_settings
+    (Focus dialog)
+    <div class="modal settings-dialog">
+    Dialog_accept
+    (Focus editor)
+    |}];
+  (* It owns the keyboard: the page under it is inert. *)
+  H.quiet h (fun () -> H.act h Open_settings);
+  H.elements h ~selector:".topbar[inert]";
+  H.elements h ~selector:".composer[inert]";
+  [%expect
+    {|
+    <header class="topbar">
+    <footer class="composer">
+    |}]
+;;
+
+let%expect_test "notifications: the switch, and what the browser allows" =
+  let h = H.create () in
+  let notify () = H.text h ~selector:".setting.notify" in
+  H.quiet h (fun () -> H.act h Open_settings);
+  (* Wanted, but the browser has not been asked: Allow asks it. *)
+  notify ();
+  [%expect
+    {|
+    Notifications Tell you when a turn ends or something waits for you while this tab is hidden. The browser has not been asked yet: Allow asks it.
+    (Allow) (Turn notifications off (/notify off))
+    |}];
+  H.click h ~selector:".setting.notify .primary";
+  [%expect
+    {|
+    (Run "/notify on")
+    (Save_notifications true)
+    Request_notification_permission
+    |}];
+  H.act h (Set_notifications { enabled = true; permission = "granted" });
+  notify ();
+  H.show h ~selector:".setting.notify .switch";
+  [%expect
+    {|
+    Notifications Tell you when a turn ends or something waits for you while this tab is hidden.
+    (Turn notifications off (/notify off))
+    <button type="button"
+            role="switch"
+            aria-checked="true"
+            aria-label="Notifications"
+            title="Turn notifications off (/notify off)"
+            class="on switch"
+            @on_click>
+      <span class="switch-knob"> </span>
+    </button>
+    |}];
+  (* Off, and the page stays open. *)
+  H.click h ~selector:".setting.notify .switch";
+  notify ();
+  H.elements h ~selector:".settings-dialog";
+  [%expect
+    {|
+    (Run "/notify off")
+    (Save_notifications false)
+    (Expire_toast (id 0) (after_ms 3220))
+    Notifications Tell you when a turn ends or something waits for you while this tab is hidden.
+    (Turn notifications on (/notify on))
+    <div class="modal settings-dialog">
+    |}];
+  H.click h ~selector:".setting.notify .switch";
+  notify ();
+  [%expect
+    {|
+    (Run "/notify on")
+    (Save_notifications true)
+    (Expire_toast (id 1) (after_ms 6000))
+    Notifications Tell you when a turn ends or something waits for you while this tab is hidden.
+    (Turn notifications off (/notify off))
+    |}];
+  H.act h (Set_notifications { enabled = true; permission = "denied" });
+  notify ();
+  H.act h (Set_notifications { enabled = true; permission = "unsupported" });
+  notify ();
+  [%expect
+    {|
+    Notifications Tell you when a turn ends or something waits for you while this tab is hidden. The browser blocks them: allow notifications in its site settings (the icon left of the address), then turn them off and on.
+    (Turn notifications off (/notify off))
+    Notifications Tell you when a turn ends or something waits for you while this tab is hidden. This page cannot show them: they need https or localhost. The tab's title still counts what happened.
+    (Turn notifications off (/notify off))
+    |}]
+;;
+
+let%expect_test "transcript detail, tool confirmation, providers, shortcuts" =
+  let h = H.create () in
+  H.quiet h (fun () -> H.act h Open_settings);
+  H.names h ~selector:".segment";
+  H.elements h ~selector:".segment";
+  H.click h ~selector:".segment";
+  H.elements h ~selector:".segment";
+  print_s [%sexp ((H.model h).verbosity : Prigh_ui.Verbosity.t)];
+  [%expect
+    {|
+    button "Quiet" -- /verbosity quiet
+    button "Normal" -- /verbosity normal
+    button "Verbose" -- /verbosity verbose
+    <button class="segment">
+    <button class="on segment">
+    <button class="segment">
+    (Run "/verbosity quiet")
+    (Expire_toast (id 0) (after_ms 4660))
+    <button class="on segment">
+    <button class="segment">
+    <button class="segment">
+    Quiet
+    |}];
+  (* Tool confirmation is the config's: off (mode auto) by default. *)
+  H.text h ~selector:".setting.confirm";
+  H.elements h ~selector:".setting.confirm .switch";
+  H.click h ~selector:".setting.confirm .switch";
+  H.elements h ~selector:".setting.confirm .switch";
+  H.elements h ~selector:".settings-dialog";
+  [%expect
+    {|
+    Tool confirmation Ask before bash, edits and MCP tools run, in this session and new ones.
+    (Ask before tools run (/confirm on))
+    <button class="switch">
+    (Run "/confirm on")
+    (Rpc (method_ set_config) (params ((config ((approval_mode ask)))))
+     (tag
+      (Config_saved
+       "Tool confirmation on (mode ask, also for new sessions): bash, job_input, edits and MCP tools ask first")))
+    <button class="on switch">
+    <div class="modal settings-dialog">
+    |}];
+  H.text h ~selector:".setting.providers";
+  [%expect
+    {|
+    Model providers Logged in to Anthropic.
+    (Manage providers)
+    |}];
+  H.click h ~selector:".setting.providers .btn";
+  H.text h ~selector:".modal h2";
+  [%expect
+    {|
+    (Run /auth)
+    (Focus dialog)
+    (Rpc (method_ auth_status) (params ()) (tag (Auth_status Show)))
+    Providers
+    |}];
+  H.key h "Escape" ~target:Page;
+  H.quiet h (fun () -> H.act h Open_settings);
+  H.click h ~selector:".settings-dialog .shortcuts";
+  H.text h ~selector:".modal h2";
+  [%expect
+    {|
+    Close_dialog
+    (Focus editor)
+    (Run /hotkeys)
+    (Focus dialog)
+    Keyboard shortcuts
+    |}]
+;;
+
+(* Every control is named by what it changes; the tooltip has its command. *)
+let%expect_test "the names of the settings' controls" =
+  let h = H.create () in
+  H.quiet h (fun () -> H.act h Open_settings);
+  List.iter [ "button"; "[role]" ] ~f:(fun selector ->
+    H.names h ~selector:(".settings-dialog " ^ selector));
+  [%expect
+    {|
+    button "Close" -- Close (Esc)
+    button "Allow" -- Ask the browser to allow notifications (/notify on)
+    [switch] button "Notifications" -- Turn notifications off (/notify off)
+    button "Quiet" -- /verbosity quiet
+    button "Normal" -- /verbosity normal
+    button "Verbose" -- /verbosity verbose
+    [switch] button "Tool confirmation" -- Ask before tools run (/confirm on)
+    button "Manage providers" -- /auth (/login, /logout)
+    button "Keyboard shortcuts" -- /hotkeys
+    button "Done"
+    [switch] button "Notifications" -- Turn notifications off (/notify off)
+    [group] div "Transcript detail"
+    [switch] button "Tool confirmation" -- Ask before tools run (/confirm on)
+    |}]
+;;
+
+let%expect_test "an open backend has no account to show" =
+  let h = H.create () in
+  H.quiet h (fun () -> H.act h Open_settings);
+  H.text h ~selector:".settings-section:last-child";
+  [%expect
+    {|
+    Account
+    No sign-in This backend lets anyone in: there is no account to switch or sign out of.
+    |}]
+;;

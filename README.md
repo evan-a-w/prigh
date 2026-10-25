@@ -206,8 +206,9 @@ button forgets them and shows the form again, so someone else can log in.
 The TUI and tool hosts take `-user NAME -token TOKEN` (`$PRIGH_USER`,
 `$PRIGH_TOKEN`); the token alone is still accepted, so scripts need not send
 a user name, but a user name that doesn't match the token is refused like a
-wrong password. Both UIs show the logged-in user as `user:<name>` in the
-status line. Outside this mode the user name is ignored (leave it empty) and
+wrong password. The TUI shows the logged-in user as `user:<name>` in the
+status line; prigh-web shows it at the bottom of the sidebar and in its
+settings page. Outside this mode the user name is ignored (leave it empty) and
 `/signout` only forgets the saved token. In the terminal TUI, `/signin` and
 `/signout` (above) sign in as someone else without restarting.
 
@@ -230,8 +231,8 @@ on the tool host.
 `-superusers NAME,...` (`$PRIGH_SUPERUSERS`) lets those users act as any
 other: `/setusr NAME` (in the TUI and prigh-web, where the account menu's
 "Act as…" does it too) switches the
-connection to NAME's sessions, logins and tool hosts (the status line shows
-`user:<me> as <them>`), `/setusr` alone lists the users and `/setusr <me>`
+connection to NAME's sessions, logins and tool hosts (the TUI's status line
+shows `user:<me> as <them>`, prigh-web's sidebar and settings "acting as"), `/setusr` alone lists the users and `/setusr <me>`
 switches back. Everyone else gets an error. `-host-tokens NAME=TOKEN,...`
 (`$PRIGH_HOST_TOKENS`) adds tokens that sign in as NAME but never as a
 superuser, for tool hosts that should not hold the user's own token (the
@@ -280,12 +281,12 @@ starts the toggles afresh.
 
 Work in progress has one sign, a small sodium lamp that breathes (still
 under reduced motion): next to a running session in the sidebar, on a
-running tool, subagent or job, on the status line (what the agent is
+running tool, subagent or job, on the status (what the agent is
 doing: "Waiting for the model", "Thinking", "Writing", "Running tools", or
 "Retrying in 4s (attempt 2/6): overloaded_error: Overloaded" after a
 transient provider error, which the reply being streamed also shows), and on
 whatever waits for the backend; nothing finished glows, and while the
-connection is down only the reconnecting banner and status line do.
+connection is down only the reconnecting banner and status do.
 Every action shows at once, before the backend answers: a session clicked
 in the sidebar lights its lamp while the chat shows the shape of a
 transcript (also while connecting, and for a new session), a prompt shows
@@ -294,7 +295,7 @@ model, thinking level or approval mode chosen shows (disabled, with the
 lamp) until the backend confirms it, and a command that lists something (`/login`, `/fork`,
 `/tree`, `/session`, `/skills`, `/mcp`, `/setusr`…) opens its dialog with
 a loading row (Esc closes it, and the late answer then opens nothing).
-While the connection is down the composer is dashed and the status line
+While the connection is down the composer is dashed and the status
 says "Reconnecting…": what you write stays until it is back (sending is
 refused, saying so, rather than queued).
 
@@ -371,7 +372,7 @@ last line. Selecting one shows a subagent's live transcript at the panel's
 width or a job's output, with what it is pinned under it however far you
 scroll: its task (and who started it), how it stands or ended, its model,
 turns and time, Cancel while it runs (Kill for a job) and "Show in chat",
-which scrolls to its card. It opens from the status line ("2 agents running"), the top bar's
+which scrolls to its card. It opens from the status ("2 agents running"), the top bar's
 robot button, a subagent's card in the chat, `/agents [n|id]` and `/jobs
 [id]`, and Alt+1…9 (the Nth listed; Alt+] and Alt+[ step through them, Alt+0 closes
 it, Esc goes back from outside the editor). Unlike the TUI, Shift+Tab is
@@ -440,7 +441,7 @@ binary file's path and size, to inspect with its tools. Each shows as a
 chip with its name, size and upload progress (× removes it) until it is
 sent, and in the transcript as an `@path` chip. A message waits for its
 uploads; one that failed says to remove it or attach it again. While
-files upload (or a download is being prepared), the status line says so
+files upload (or a download is being prepared), the status says so
 with the work lamp: "Uploading 2 files 40%".
 
 Transfers go through the backend, so they work on any tool host: the page
@@ -519,20 +520,34 @@ model, a goal continuation, delivered background work, the compaction
 summary) are margin notes in the transcript (`↪ Handed over from A to B`),
 each expandable to the text the model saw, and `/fork` and `/tree` label
 them the same way. `/diff` is a dialog of the changed files (each folds,
-with its line counts); `/notify on|off` and the account menu control
-browser notifications while the tab is hidden, and the title (`(2) prigh`)
-and favicon count what happened meanwhile. Beside the model in the top bar
-the thinking level ("Thinking high", "No thinking" for a model without
-levels) and the approval mode ("Asks: edits & commands", "Asks: commands",
-"Auto: never asks", "Plan mode", lit) are always shown, each opening its
-picker (the modes with what each asks first). The top bar fits the chat
-column, however wide the sidebar and the panels leave it: the labels get
-short (`high`, `ask`, `plan`), then the thinking level and the mode become
-icons (their tooltips say which), then all three fold into one menu behind
-a sliders button (lit in plan mode); the session's title and cwd keep their
-room, the cwd losing its middle rather than the directory it ends in.
-Alt+T and Alt+M cycle them. The status line's plan chip (`plan 2/5: step`)
-runs `/todos`. Steers and follow-ups sent while the agent works wait above
+with its line counts); `/notify on|off`, the settings page and the
+account menu control browser notifications while the tab is hidden, and the
+title (`(2) prigh`) and favicon count what happened meanwhile.
+
+The composer is one box: the editor on top and, along its bottom edge, the
+model, the thinking level ("Thinking high", "No thinking" for a model
+without levels) and the approval mode ("Asks: edits & commands", "Asks:
+commands", "Auto: never asks", "Plan mode", lit), each opening its picker
+(the modes with what each asks first), then attach, stop and send on the
+right. Ctrl+L, Alt+T and Alt+M switch or cycle them; in a narrow composer
+the labels get short (`high`, `ask`, `plan`). The top bar has the session's
+title, cwd and branch on the left (the cwd losing its middle rather than
+the directory it ends in), the panel toggles and the settings gear on the
+right, and the status in the middle: what the agent is doing, the context
+(click for `/session`'s details), tokens and cost, then whatever applies
+(the budget, the goal, reminders, a scheduled resume, queued messages to
+take back, background agents and jobs, transfers, the tool host, the
+verbosity, the plan chip `plan 2/5: step` that runs `/todos`). A narrower
+chat column drops the tokens and cost, then says what applies with icons
+alone; the bar never changes height.
+
+The settings page (the gear, `/settings` or Ctrl+,) holds what is not
+about the session: notifications (on or off, and what to do when the
+browser has not been asked, blocks them or cannot show them), transcript
+detail (`/verbosity`), tool confirmation (`/confirm`), the providers
+(`/auth`), who you are signed in (and acting) as with Switch account and
+Sign out, and the keyboard shortcuts. Esc closes it; its controls keep it
+open. Steers and follow-ups sent while the agent works wait above
 the composer, each tagged "Steers this turn" or "After this turn", with
 Edit (back into the editor) and remove buttons; one leaving the queue says
 so ("Steer delivered: …") when it reaches the transcript. A tool confirmation is a dialog with a
@@ -547,7 +562,7 @@ lists them; `/help` and
 `/hotkeys` also list the TUI's keys that the browser keeps (Ctrl+C, Ctrl+Z, Ctrl+F, Ctrl+R, $EDITOR's Ctrl+G)
 and what to use instead, and `/quit` says to close the tab.
 
-The account at the bottom of the sidebar (also in the status line) opens the
+The account at the bottom of the sidebar (also in the settings page) opens the
 account menu: switch to another saved account in one click (the page
 reloads signed in as it, in its last session), add an account (the sign-in
 form, keeping the others; it may be on another backend), sign out of this
@@ -1239,13 +1254,14 @@ for tmux, which needs `set -g allow-passthrough on`). It turns on focus
 reporting and only notifies while the terminal says it is not focused
 (in tmux, `set -g focus-events on`); `/notify` alone says what it does and
 whether the terminal reports focus. prigh-web uses the browser's
-notifications while the tab is hidden: `/notify on` (or the account menu's
-"Turn notifications on") asks the browser for permission, `/notify off`
+notifications while the tab is hidden: `/notify on` (or the settings page's
+switch, or the account menu's "Turn notifications on") asks the browser for
+permission, `/notify off`
 turns them off (kept in localStorage, `prigh-web.notify`); the tab's title
 and favicon count what happened while it was hidden, notifications on or
 not. A blocked or unsupported browser (plain http other than localhost) is
-named with what to do. The status line's bell shows whether notifications
-are on (struck through when off or blocked) and turns them on or off.
+named with what to do in the settings page, whose switch shows whether
+notifications are on and turns them on or off.
 
 Text the harness adds to what the model reads is recorded with the message
 (`origin` in the session file and the RPC: environment notes about a new
@@ -1295,7 +1311,7 @@ things back.
 
 Each session has an approval mode, always shown in the status line
 (`mode:ask`, `mode:auto-edit`, `mode:auto`, `mode:plan`; in prigh-web
-beside the model) and switched with
+beside the model, along the composer's bottom edge) and switched with
 `/mode` or Alt+M (ask → auto-edit → auto → plan → ask):
 
 - `ask`: destructive tools (`bash`, `write`, `edit`, `apply_patch`,
