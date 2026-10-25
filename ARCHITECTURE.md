@@ -1445,6 +1445,22 @@ terminal frontend and `web/` prigh-web, the browser one.
     parses the result into files with their counts, which the transcript
     shows coloured; `/review` and `/init` send `review`/`init` tagged so
     a refusal goes back to the editor.
+  - Git hosting: `Model.forge` holds `forge_status`'s accounts, fetched
+    with the other startup requests, after switching users and after every
+    `Forge_done`/`Forge_logged_out` (`Forge_refresh` also redraws an open
+    `/login`/`/logout` picker or `/auth` box; an error, from a backend
+    without git hosting, is ignored). `Forge_accounts` reads `/login` and
+    `/logout`'s git-host arguments (`Login.parse`: `github [HOST]`,
+    `forgejo HOST`, a listed or dotted host, `[token]`) and makes their
+    picker rows, completions and `/auth` rows; a login is `forge_login`
+    and then the provider logins' `auth` events and dialogs. `Pr_command`
+    parses `/pr`'s arguments; `Pr_view` renders the PR picker's rows and
+    `/pr view`'s output box (header, markdown body, checks, then
+    `Diff_files.render` of `Pr_detail.git_diff`); `Pr_form` is `/pr new`'s
+    dialog (`Mode.Pr_form`, drawn by `Render`; a refused `pr_create` shows
+    its error in it). `/pr checkout` confirms a `Change_dir` to the new
+    worktree (`Cd_to_checkout`). Switching sessions closes the PR picker,
+    form and checkout question (`reset_session`).
   - Notifications: `Notify` decides what is worth telling (a main-agent
     turn's end, a tool confirmation, delivered background work) for both
     frontends. The TUI emits `Command.Notify` only while the terminal has
