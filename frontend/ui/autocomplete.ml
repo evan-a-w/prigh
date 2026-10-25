@@ -260,7 +260,7 @@ let argument_items ~kind ~models ~auth ~sessions ~snippets ~logged_in ~server =
     Some (Option.value_map sessions ~default:[] ~f:session_items)
   | Mcp -> Some (mcp_items ())
   | Snippet -> Some (snippet_items snippets)
-  | Remind -> None
+  | Remind | Worktree -> None
   | Server -> Some (server_items server)
   | Budget ->
     Some
@@ -356,6 +356,7 @@ let compute_argument
       ~sessions
       ~snippets
       ~reminders
+      ~worktrees
       ~current_session
       ~logged_in
       ~default_dir_host
@@ -435,6 +436,32 @@ let compute_argument
                     in
                     Option.some_if
                       (not (List.is_empty items))
+                      { source = Source.Argument spec
+                      ; prefix
+                      ; line = line_index
+                      ; start = start + offset
+                      ; items
+                      ; selected = 0
+                      ; navigated = false
+                      })
+              | Worktree ->
+                (* While [worktrees] are fetched, a completion after the
+                   subcommand opens empty and the app fills it in. *)
+                let rest = String.drop_prefix line start in
+                Option.bind
+                  (Worktree_command.complete
+                     ~worktrees:(Option.value worktrees ~default:[])
+                     rest)
+                  ~f:(fun (offset, candidates) ->
+                    let prefix = String.drop_prefix rest offset in
+                    let items =
+                      List.map candidates ~f:(fun (id, detail) ->
+                        Picker.Item.create ~id ~search:id ~detail id)
+                      |> rank ~prefix
+                    in
+                    Option.some_if
+                      ((not (List.is_empty items))
+                       || (Option.is_none worktrees && offset > 0))
                       { source = Source.Argument spec
                       ; prefix
                       ; line = line_index
@@ -579,6 +606,7 @@ let compute
       ~skills
       ~snippets
       ~reminders
+      ~worktrees
       ~logged_in
       ~default_dir_host
       ~server
@@ -600,6 +628,7 @@ let compute
          ~sessions
          ~snippets
          ~reminders
+         ~worktrees
          ~current_session
          ~logged_in
          ~default_dir_host

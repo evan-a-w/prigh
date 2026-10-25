@@ -65,7 +65,7 @@ module Reply_tag = struct
     | Skills_picker
     | Snippets_saved of string (** the notice *)
     | Reminder_added
-    | Skills_for_autocomplete of string (** the [Skill_cache] key *)
+    | Skills_for_autocomplete of string (** the [Location_cache] key *)
     | Skill_prompt of string (** the [/skill:] text sent *)
     | Mcp_picker
     | Mcp_reconnected
@@ -75,6 +75,22 @@ module Reply_tag = struct
     | Refresh_state
     | Dir_changed of P.Dir_change.Target.t
     (** [Missing]: confirm creating it; otherwise acknowledge *)
+    | Worktrees_picker
+    | Worktrees_for_autocomplete of string
+    | Worktree_target of
+        { command : string
+        ; action : Worktree_command.Action.t
+        }
+    | Worktree_created
+    | Worktree_entered of string
+    | Worktree_session_started of
+        { path : string
+        ; notice : string
+        }
+    | Worktree_removed of
+        { target : string
+        ; force : bool
+        }
     | Retry_in_editor of
         { command : string
         ; hint : string
@@ -193,7 +209,8 @@ module Model = struct
     ; mode : Mode.t
     ; autocomplete : Autocomplete.t option
     ; sessions : P.Session_summary.t list option
-    ; skills : Skill_cache.t
+    ; skills : P.Skill.t list Location_cache.t
+    ; worktrees : P.Worktree.Listing.t Location_cache.t
     ; known_paths : String.Set.t
     ; queued_messages : Queued_message.t list
     ; login_lines : string list
@@ -503,7 +520,8 @@ let init =
   ; mode = Editing
   ; autocomplete = None
   ; sessions = None
-  ; skills = Skill_cache.empty
+  ; skills = Location_cache.empty
+  ; worktrees = Location_cache.empty
   ; known_paths = String.Set.empty
   ; queued_messages = []
   ; login_lines = []
@@ -1517,7 +1535,8 @@ let drop_pending m =
   match m.mode with
   | Confirm { action = Tool_confirm _; _ }
   | Question _
-  | Picker { kind = Agents | Queue | Reminders; _ } -> { m with mode = Editing }
+  | Picker { kind = Agents | Queue | Reminders | Worktrees _; _ }
+  | Confirm { action = Remove_worktree _; _ } -> { m with mode = Editing }
   | Text_prompt { action = Deny_reason { draft; _ }; _ } ->
     { m with mode = Editing; editor = Editor.set_text m.editor draft }
   | _ -> m
@@ -1534,7 +1553,8 @@ let reset_session m =
            | Output _ -> Editing
            | mode -> mode)
       ; notice = None
-      ; skills = Skill_cache.empty
+      ; skills = Location_cache.empty
+      ; worktrees = Location_cache.empty
       ; agents = []
       ; focus = `Main
       ; queued_messages = []
@@ -2281,6 +2301,138 @@ let remind_action m ~command (action : Remind_command.Action.t) =
          ] ))
 ;;
 
+(* ---- worktrees -------------------------------------------------------- *)
+
+let worktree_key m = Location_cache.key m.state
+
+let cache_worktrees m listing =
+  { m with
+    worktrees = Location_cache.put m.worktrees ~key:(worktree_key m) listing
+  }
+;;
+
+let worktree_items (listing : P.Worktree.Listing.t) =
+  List.map listing.worktrees ~f:(fun (w : P.Worktree.t) ->
+    let label = P.Worktree.label w in
+    let describe = Worktree_command.describe w in
+    Picker.Item.create
+      ~id:w.path
+      ~detail:
+        (Option.value
+           (String.chop_prefix describe ~prefix:(label ^ " · "))
+           ~default:describe)
+      ~search:(Worktree_command.target w ^ " " ^ w.path)
+      ~marked:w.current
+      ~dimmed:w.prunable
+      label)
+;;
+
+let worktrees_title m (listing : P.Worktree.Listing.t) =
+  sprintf "Worktrees of %s" (tilde m listing.root)
+;;
+
+let worktrees_picker m listing =
+  open_picker
+    (cache_worktrees m listing)
+    (Worktrees listing)
+    (Picker.create ~title:(worktrees_title m listing) (worktree_items listing))
+;;
+
+let enter_worktree ~notice path =
+  call
+    (Change_dir { target = Cwd; path; if_missing = Fail })
+    ~tag:(Worktree_entered notice)
+;;
+
+let open_worktree m (w : P.Worktree.t) ~new_session =
+  let m = { m with mode = Editing } in
+  if w.prunable
+  then
+    ( error
+        m
+        (sprintf
+           "the worktree %s is gone (%s was deleted); /worktree rm %s forgets \
+            it"
+           (P.Worktree.label w)
+           w.path
+           (Worktree_command.target w))
+    , [] )
+  else (
+    let where = sprintf "the worktree %s at %s" (P.Worktree.label w) w.path in
+    if new_session
+    then
+      ( notice m ("starting a session in " ^ where ^ "…")
+      , [ rpc
+            "new_session"
+            ~tag:
+              (Worktree_session_started
+                 { path = w.path; notice = "new session in " ^ where })
+        ] )
+    else m, [ enter_worktree ~notice:("working in " ^ where) w.path ])
+;;
+
+let remove_command ~force target =
+  sprintf "/worktree rm %s%s" (if force then "-f " else "") target
+;;
+
+let confirm_remove_worktree m (w : P.Worktree.t) ~force ~back =
+  match Worktree_command.cannot_remove w with
+  | Some reason -> error m reason, []
+  | None ->
+    ( { m with
+        mode =
+          Confirm
+            { question = Worktree_command.confirm_remove w ~force ^ " (y/n)"
+            ; action = Remove_worktree { worktree = w; force; back }
+            }
+      ; autocomplete = None
+      }
+    , [] )
+;;
+
+let worktree_command m rest =
+  let command = String.strip ("/worktree " ^ rest) in
+  match Worktree_command.parse rest with
+  | Error text -> error (restore_command m command) text, []
+  | List -> m, [ call List_worktrees ~tag:Worktrees_picker ]
+  | New { branch; base } ->
+    ( notice m (sprintf "creating a worktree for %s…" branch)
+    , [ call
+          (Create_worktree { branch; base })
+          ~tag:
+            (Retry_in_editor { command; hint = ""; then_ = Worktree_created })
+      ] )
+  | (Open _ | Remove _) as action ->
+    m, [ call List_worktrees ~tag:(Worktree_target { command; action }) ]
+;;
+
+let worktree_target m ~command (action : Worktree_command.Action.t) listing =
+  let m = cache_worktrees m listing in
+  let resolve target ~f =
+    match Worktree_command.find listing target with
+    | Error e -> error (restore_command m command) e, []
+    | Ok w -> f w
+  in
+  match action with
+  | List | New _ | Error _ -> m, []
+  | Open { target; new_session } ->
+    resolve target ~f:(open_worktree m ~new_session)
+  | Remove { target; force } ->
+    resolve target ~f:(confirm_remove_worktree m ~force ~back:None)
+;;
+
+(* One with uncommitted changes is kept unless forced: [rm -f] is. *)
+let worktree_remove_failed m ~target ~force e =
+  if (not force) && String.is_substring e ~substring:"force"
+  then (
+    let command = remove_command ~force:true target in
+    ( error
+        (restore_command m command)
+        (sprintf "%s; %s removes it with its changes" e command)
+    , [] ))
+  else error (restore_command m (remove_command ~force target)) e, []
+;;
+
 let cancel_btw m =
   match m.btw with
   | Some box when Btw_box.is_streaming box ->
@@ -2655,6 +2807,7 @@ let run_command m (cmd : Commands.Parsed.t) =
          ~snippets:(snippets m)
          ~last_prompt:(last_prompt m)
          cmd.rest)
+  | "worktree", _ -> worktree_command m cmd.rest
   | "remind", _ ->
     remind_action
       m
@@ -2890,12 +3043,19 @@ let fetch_autocomplete m ac =
       in
       { m with autocomplete = Some ac }, [ request ])
   | Autocomplete.Source.Skill ->
-    let key = Skill_cache.key m.state in
-    (match Skill_cache.request m.skills ~key with
+    let key = Location_cache.key m.state in
+    (match Location_cache.request m.skills ~key with
      | None -> { m with autocomplete = Some ac }, []
      | Some skills ->
        ( { m with autocomplete = Some ac; skills }
        , [ call List_skills ~tag:(Skills_for_autocomplete key) ] ))
+  | Autocomplete.Source.Argument { argument = Some Worktree; _ } ->
+    let key = worktree_key m in
+    (match Location_cache.request m.worktrees ~key with
+     | None -> { m with autocomplete = Some ac }, []
+     | Some worktrees ->
+       ( { m with autocomplete = Some ac; worktrees }
+       , [ call List_worktrees ~tag:(Worktrees_for_autocomplete key) ] ))
   | Autocomplete.Source.Argument spec
     when match spec.argument with
          | Some (Commands.Argument.Sessions | Session_list) ->
@@ -2915,7 +3075,7 @@ let default_dir_host m =
       P.Host.backend_id)
 ;;
 
-let refresh_autocomplete m =
+let refresh_command_autocomplete m =
   let line, col = current_line m in
   let line_index = (Editor.position m.editor).line in
   match
@@ -2927,15 +3087,25 @@ let refresh_autocomplete m =
       ~models:m.models
       ~auth:m.auth
       ~sessions:m.sessions
-      ~skills:(Skill_cache.find m.skills ~key:(Skill_cache.key m.state))
+      ~skills:(Location_cache.find m.skills ~key:(Location_cache.key m.state))
       ~snippets:(Option.value (snippets m) ~default:[])
       ~reminders:(Option.value (reminders m) ~default:[])
+      ~worktrees:
+        (Option.map
+           (Location_cache.find m.worktrees ~key:(worktree_key m))
+           ~f:(fun (l : P.Worktree.Listing.t) -> l.worktrees))
       ~logged_in:(logged_in m)
       ~default_dir_host:(default_dir_host m)
       ~server:m.server
   with
   | None -> { m with autocomplete = None }, []
   | Some ac -> fetch_autocomplete m ac
+;;
+
+(* A dialog's text (a directory prompt prefilled with [/work], say) is not a
+   command line: its completion, if any, is its own. *)
+let refresh_autocomplete m =
+  if Mode.is_dialog m.mode then m, [] else refresh_command_autocomplete m
 ;;
 
 (* The directory prompts complete on the host the answer is for. *)
@@ -3441,6 +3611,12 @@ let picker_selected m (kind : Mode.Picker_kind.t) (item : Picker.Item.t) =
            m
            (sprintf "reminder %s is gone; /remind lists the others" item.id)
        , [] ))
+  | Worktrees listing ->
+    (match
+       List.find listing.worktrees ~f:(fun w -> String.equal w.path item.id)
+     with
+     | Some w -> open_worktree m w ~new_session:false
+     | None -> m, [])
   | Mcp list -> mcp_selected m list item.id
   | Auth_select id ->
     m, [ rpc "auth_respond" ~params:[ "id", str id; "value", str item.id ] ]
@@ -3581,6 +3757,15 @@ let sessions_picker_shown m =
   | _ -> false
 ;;
 
+let worktree_in_picker m (listing : P.Worktree.Listing.t) picker ~f =
+  match
+    Option.bind (Picker.selected_item picker) ~f:(fun item ->
+      List.find listing.worktrees ~f:(fun w -> String.equal w.path item.id))
+  with
+  | Some w -> f w
+  | None -> m, []
+;;
+
 let picker m (kind : Mode.Picker_kind.t) picker (intent : Intent.t) =
   let back = Some { Mode.Open_picker.kind; picker } in
   match intent with
@@ -3613,6 +3798,9 @@ let picker m (kind : Mode.Picker_kind.t) picker (intent : Intent.t) =
                }
          }
        , [] )
+     | Worktrees listing ->
+       worktree_in_picker m listing picker ~f:(fun w ->
+         open_worktree m w ~new_session:true)
      | Models { logged_in_only } ->
        let logged_in_only = not logged_in_only in
        let picker =
@@ -3645,6 +3833,9 @@ let picker m (kind : Mode.Picker_kind.t) picker (intent : Intent.t) =
             (Remind_command.Action.Remove item.id))
      | Sessions selection ->
        confirm_delete m ~back (Session_selection.targets selection picker)
+     | Worktrees listing ->
+       worktree_in_picker m listing picker ~f:(fun w ->
+         confirm_remove_worktree m w ~force:false ~back)
      | _ -> { m with quitting = true }, [ Command.Quit ])
   | _ ->
     (match
@@ -3922,13 +4113,22 @@ let confirm m ~(action : Mode.Confirm_action.t) (intent : Intent.t) =
     | Tool_confirm c -> answer_confirm m c Allow
     | Create_dir { target; path } ->
       m, [ change_dir ~if_missing:Create ~target path ]
+    | Remove_worktree { worktree; force; back = _ } ->
+      ( notice m (sprintf "removing the worktree at %s…" worktree.path)
+      , [ call
+            (Remove_worktree { path = worktree.path; force })
+            ~tag:
+              (Worktree_removed
+                 { target = Worktree_command.target worktree; force })
+        ] )
   in
   let no m =
     match action with
     | Tool_confirm c -> answer_confirm m c Deny
     | Delete_sessions { back = Some _ as back; _ } -> back_to m back, []
+    | Remove_worktree { back = Some _ as back; _ } -> back_to m back, []
     | Create_dir { path; _ } -> notice m (sprintf "not created: %s" path), []
-    | Logout _ | Rewind _ | Delete_sessions _ ->
+    | Logout _ | Rewind _ | Delete_sessions _ | Remove_worktree _ ->
       notice m "cancelled", []
   in
   match intent, action with
@@ -4366,12 +4566,23 @@ let rec reply m (tag : Reply_tag.t) (result : (P.Json.t, string) Result.t) =
        error { m with editor } e, []
      | Skills_for_autocomplete key ->
        skills_for_autocomplete
-         { m with skills = Skill_cache.set m.skills ~key [] }
+         { m with skills = Location_cache.set m.skills ~key [] }
      | Mcp_approved server ->
        error m (sprintf "approving MCP server %s failed: %s" server e), []
      | Mode_set _ ->
        (* The mode shown at once was not taken. *)
        error m e, [ rpc "get_state" ~tag:Refresh_state ]
+     | Worktrees_for_autocomplete key ->
+       refresh_autocomplete
+         { m with
+           worktrees =
+             Location_cache.set
+               m.worktrees
+               ~key
+               { root = ""; project_dir = ""; worktrees = [] }
+         }
+     | Worktree_removed { target; force } ->
+       worktree_remove_failed m ~target ~force e
      | Archive_done _ ->
        (* Undo the picker's optimistic change. *)
        error m e, [ rpc "list_sessions" ~tag:Sessions_refresh ]
@@ -4386,7 +4597,7 @@ let rec reply m (tag : Reply_tag.t) (result : (P.Json.t, string) Result.t) =
      | Skills_for_autocomplete key ->
        decode json ~f:decode_skills (fun skills ->
          skills_for_autocomplete
-           { m with skills = Skill_cache.set m.skills ~key skills })
+           { m with skills = Location_cache.set m.skills ~key skills })
      | Mcp_picker ->
        decode json ~f:P.Mcp_list.of_json (fun list -> mcp_picker m list, [])
      | Mcp_reconnected ->
@@ -4427,6 +4638,35 @@ let rec reply m (tag : Reply_tag.t) (result : (P.Json.t, string) Result.t) =
      | Dir_changed target ->
        decode json ~f:P.Dir_change.Outcome.of_json (fun outcome ->
          dir_changed m target outcome)
+     | Worktrees_picker ->
+       decode json ~f:P.Worktree.Listing.of_json (fun listing ->
+         worktrees_picker m listing, [])
+     | Worktrees_for_autocomplete key ->
+       decode json ~f:P.Worktree.Listing.of_json (fun listing ->
+         refresh_autocomplete
+           { m with worktrees = Location_cache.set m.worktrees ~key listing })
+     | Worktree_target { command; action } ->
+       decode json ~f:P.Worktree.Listing.of_json (fun listing ->
+         worktree_target m ~command action listing)
+     | Worktree_created ->
+       decode json ~f:P.Worktree.Created.of_json (fun created ->
+         let text = Worktree_command.created created in
+         ( notice { m with worktrees = Location_cache.empty } text
+         , [ enter_worktree ~notice:text created.worktree.path ] ))
+     | Worktree_entered text ->
+       decode json ~f:P.Dir_change.Outcome.of_json (function
+         | Changed _ -> notice m text, []
+         | Missing path ->
+           error m (sprintf "%s is gone; /worktree lists the others" path), [])
+     | Worktree_session_started { path; notice } ->
+       let m, commands = reset_session m in
+       follow m, commands @ [ enter_worktree ~notice path ]
+     | Worktree_removed _ ->
+       decode json ~f:P.Worktree.removed_of_json (fun w ->
+         ( notice
+             { m with worktrees = Location_cache.empty }
+             (Worktree_command.removed w)
+         , [] ))
      | Set_model_done key ->
        (match
           List.find m.models ~f:(fun model -> String.equal model.key key)
