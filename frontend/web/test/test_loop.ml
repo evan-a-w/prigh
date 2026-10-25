@@ -35,8 +35,10 @@ let%expect_test
   =
   let h = H.create () in
   H.text h ~selector:".status";
+  H.text h ~selector:".status-extras";
   H.event h (state [ "budget_usd", `Number "5"; "cost_usd", `Number "4.2" ]);
   H.text h ~selector:".status";
+  H.text h ~selector:".status-extras";
   H.elements h ~selector:".status .budget";
   H.event
     h
@@ -47,18 +49,20 @@ let%expect_test
        ; "resume_at_ms", `Number "1791295500000"
        ]);
   H.text h ~selector:".status";
+  H.text h ~selector:".status-extras";
   List.iter
-    [ ".status .budget"; ".status .goal"; ".status .resume" ]
+    [ ".status .budget"; ".status-extras .goal"; ".status-extras .resume" ]
     ~f:(fun selector -> H.elements h ~selector);
   (* In the page's time zone. *)
   H.act h (Set_utc_offset (Time_ns.Span.of_hr 2.));
-  H.text h ~selector:".status .resume";
+  H.text h ~selector:".status-extras .resume";
   [%expect
     {|
-    Ready (0%) ↑0 ↓0 $0.0000
-    Ready (0%) ↑0 ↓0 ($4.20/$5.00)
+    (0%) ↑0 ↓0 $0.0000 Ready
+    (0%) ↑0 ↓0 ($4.20/$5.00) Ready
     <button class="budget cost link status-item warm">
-    Ready (0%) ↑0 ↓0 ($5.50/$5.00) (Goal 3/20) (Resumes 14:05)
+    (0%) ↑0 ↓0 ($5.50/$5.00) Ready
+    (Goal 3/20) (Resumes 14:05)
     <button class="budget cost hot link status-item">
     <button class="goal link status-item warm">
     <button class="link resume status-item warm">

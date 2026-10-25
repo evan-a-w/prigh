@@ -86,7 +86,8 @@ let%expect_test
     </div>
     |}];
   H.show h ~selector:".session.running .lamp";
-  [%expect {| <span title="Running" role="img" aria-label="Running" class="lamp"> </span> |}];
+  [%expect
+    {| <span title="Running" role="img" aria-label="Running" class="lamp"> </span> |}];
   (* The topbar names the session after its first prompt until it has a name. *)
   H.text h ~selector:".topbar .title";
   [%expect
@@ -247,7 +248,7 @@ let%expect_test
     "get_pending"
     {|{"steer_texts":["a"],"follow_up_texts":["b","c"],"confirms":[{"call_id":"c1","name":"bash","summary":"rm -rf build"}]}|};
   H.text h ~selector:".modal";
-  H.text h ~selector:".status .queued";
+  H.text h ~selector:".status-extras .queued";
   [%expect
     {|
     (Focus confirm)
@@ -377,7 +378,8 @@ let%expect_test
   [%expect {| Deleted 1 session (2.0 KB) |}];
   (* Gone from the sidebar at once. *)
   H.text h ~selector:".sessions";
-  [%expect {|
+  [%expect
+    {|
     (fix the parser bug just now /work) (Archive (A)) (Delete session (Delete))
     (Release notes 3h ago ~/docs) (Archive (A)) (Delete session (Delete))
     |}]
@@ -686,7 +688,9 @@ let%expect_test
     |}]
 ;;
 
-let%expect_test "switching: the reply carries the new state, saving a round trip" =
+let%expect_test
+    "switching: the reply carries the new state, saving a round trip"
+  =
   let h = H.create ~sessions () in
   H.act h (Switch_session "/sessions/s3.jsonl");
   H.reply
@@ -700,7 +704,8 @@ let%expect_test "switching: the reply carries the new state, saving a round trip
             ; "session_path", `String "/sessions/s3.jsonl"
             ]
           ()));
-  [%expect {|
+  [%expect
+    {|
     (Rpc (method_ switch_session) (params ((path /sessions/s3.jsonl)))
      (tag Reload_state))
     (Rpc (method_ get_messages_page)
@@ -726,7 +731,8 @@ let%expect_test "sessions clicked in quick succession" =
     print_s
       [%message
         ""
-          ~session:(Option.map m.state ~f:(fun s -> s.session_id) : string option)
+          ~session:
+            (Option.map m.state ~f:(fun s -> s.session_id) : string option)
           ~opening:(m.pending.session : Prigh_web.In_flight.Session.t option)]
   in
   H.quiet h (fun () ->
@@ -741,7 +747,8 @@ let%expect_test "sessions clicked in quick succession" =
   H.quiet h (fun () -> H.act h (Switch_session "/sessions/s4.jsonl"));
   H.fail h "switch_session" "no session /sessions/s4.jsonl";
   where ();
-  [%expect {|
+  [%expect
+    {|
     ((session (s1)) (opening ((Switching /sessions/s3.jsonl))))
     ((session (s3)) (opening ()))
     (Rpc (method_ get_state) (params ()) (tag State))

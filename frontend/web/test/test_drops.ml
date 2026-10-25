@@ -14,7 +14,8 @@ let session () =
     Harness.act
       h
       (Reply
-         (Harness.newest "s1", Ok (Jsonaf.of_string (Harness.page ("[" ^ user "hi" ^ "]"))))));
+         ( Harness.newest "s1"
+         , Ok (Jsonaf.of_string (Harness.page ("[" ^ user "hi" ^ "]"))) )));
   h
 ;;
 
@@ -53,7 +54,9 @@ let lost_while_loading h ~generation =
       ~f:(fun method_ -> Harness.fail h method_ "backend closed"))
 ;;
 
-let%expect_test "a connection lost while the session loads backs off, then stops" =
+let%expect_test
+    "a connection lost while the session loads backs off, then stops"
+  =
   let h = session () in
   (* Lost once it had loaded: back at once. *)
   Harness.act h Backend_closed;
@@ -115,7 +118,7 @@ let%expect_test "a connection lost while the session loads backs off, then stops
   show h;
   [%expect
     {|
-    Ready (0%) ↑0 ↓0 $0.0000
+    (0%) ↑0 ↓0 $0.0000 Ready
     Reconnecting now…
     ((connection Connected) (lost 5))
     |}];
@@ -124,7 +127,7 @@ let%expect_test "a connection lost while the session loads backs off, then stops
   [%expect
     {|
     (Expire_toast (id 1) (after_ms 2500))
-    Ready (0%) ↑0 ↓0 $0.0000
+    (0%) ↑0 ↓0 $0.0000 Ready
     Reconnecting now…
     Reconnected
     ((connection Connected) (lost 0))

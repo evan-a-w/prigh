@@ -9,7 +9,11 @@ let run h command =
   H.act h Send
 ;;
 
-let status h = H.text h ~selector:".status"
+let status h =
+  H.text h ~selector:".status";
+  H.text h ~selector:".status-extras"
+;;
+
 let modal h = H.text h ~selector:".modal"
 let toasts h = H.text h ~selector:".toast"
 
@@ -129,7 +133,8 @@ let%expect_test "the mode chip, Alt+M, and set_mode's reply or failure" =
   (* The filter knows the short names too. *)
   H.act h (Picker_query "auto-e");
   H.text h ~selector:".picker-items";
-  [%expect {| Asks: commands file edits run; bash, job_input and MCP tools ask first |}];
+  [%expect
+    {| Asks: commands file edits run; bash, job_input and MCP tools ask first |}];
   H.key h "Enter" ~target:Field;
   mode_chip h;
   [%expect
@@ -145,8 +150,7 @@ let%expect_test "the mode chip, Alt+M, and set_mode's reply or failure" =
     |}];
   (* The status line leaves the mode to the chip. *)
   status h;
-  [%expect
-    {| Ready (0%) ↑0 ↓0 $0.0000 |}]
+  [%expect {| (0%) ↑0 ↓0 $0.0000 Ready |}]
 ;;
 
 let%expect_test "/mode NAME, /plan, /confirm" =
@@ -249,8 +253,11 @@ let%expect_test "the plan: its chip, /todos" =
   H.event h (sprintf {|{"event":"state","state":%s}|} (state ~plan ()));
   status h;
   [%expect
-    {| Ready (0%) ↑0 ↓0 $0.0000 (plan 1/3: change it) |}];
-  H.click h ~selector:".status .plan";
+    {|
+    (0%) ↑0 ↓0 $0.0000 Ready
+    (plan 1/3: change it)
+    |}];
+  H.click h ~selector:".status-extras .plan";
   modal h;
   [%expect
     {|
@@ -280,7 +287,7 @@ let%expect_test "the plan: its chip, /todos" =
   [%expect
     {|
     (Focus editor)
-    Ready (0%) ↑0 ↓0 $0.0000
+    (0%) ↑0 ↓0 $0.0000 Ready
     (Save_history (/todos))
     (Focus dialog)
     Plan 2/2
@@ -958,7 +965,8 @@ let%expect_test
     Run bash: make?
     (y Allow once) (a Always allow bash(make:*) this session) (n Deny) (r Deny, saying why)
     1 more waiting
-    Ready (0%) ↑0 ↓0 $0.0000 (1 queued)
+    (0%) ↑0 ↓0 $0.0000 Ready
+    (1 queued)
     |}];
   (* Already shown ones are not added twice. *)
   H.event h (confirm ~rules:[ "bash(make:*)" ] "c1" "make");
@@ -1207,7 +1215,8 @@ let%expect_test "an answer that fails is asked again" =
        {|{"call_id":"c1","agent_id":null,"name":"bash","summary":"make test","rules":[]}|});
   toasts h;
   modal h;
-  [%expect {|
+  [%expect
+    {|
     (Answer_confirm (call_id c1) (agent_id ()) (answer Allow))
     (Rpc (method_ get_pending) (params ()) (tag Pending))
     (Focus confirm)

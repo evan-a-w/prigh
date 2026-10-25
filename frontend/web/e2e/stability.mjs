@@ -3,7 +3,8 @@
 // messages, the top bar and the composer are not redrawn, the transcript
 // does not shift, a streamed reply keeps the nodes (and the selection) it
 // was drawn with, and the editor grows with its text in the frame that shows
-// the text. Run by prigh_web.sh; prints normalised results (the expected
+// the text, and the top bar's status keeps its place in every frame as turns
+// start and end, on a desktop and on a phone. Run by prigh_web.sh; prints normalised results (the expected
 // output is in prigh_web.expected).
 //
 // Environment: PLAYWRIGHT_MODULE, PRIGH_BACKEND, SITE, TEST_DIR, TOKEN, and
@@ -34,6 +35,12 @@ writeFileSync(join(dir, "script.json"), JSON.stringify([
   // About 3s of streaming.
   { thinking: "thinking it over", text: long, chunks: 150 },
   { text: "Noted." },
+  // Two turns whose activity changes (Sending, Running tools, Writing,
+  // Ready), each with a steer queued while it runs.
+  { text: "checking", tool_calls: [{ id: "c2", name: "bash", arguments: { command: "sleep 1.5" } }] },
+  { text: "Checked." },
+  { text: "checking", tool_calls: [{ id: "c3", name: "bash", arguments: { command: "sleep 1.5" } }] },
+  { text: "Checked again." },
 ]));
 
 let server;
@@ -90,6 +97,7 @@ await page.addInitScript(() => {
       for (const entry of list.getEntries()) {
         const where = (entry.sources || []).map(s => s.node).filter(n => n && n.nodeType === 1);
         if (where.some(n => n.closest("#chat, header.topbar"))) window.__shifts.push(entry.value);
+        if (where.some(n => n.closest("header.topbar .status"))) window.__statusShifts?.push(entry.value);
       }
     }).observe({ type: "layout-shift" });
   } catch {}
@@ -101,6 +109,24 @@ await page.addInitScript(() => {
         value: editor.value,
         overflow: editor.scrollHeight - editor.clientHeight,
         height: editor.offsetHeight,
+      });
+    // Where the status's items are (the activity is the one that is not a
+    // counter).
+    const status = document.querySelector("header.topbar .status");
+    if (status && window.__status)
+      window.__status.push({
+        activity: status.querySelector(":scope > :not(.context, .tokens, .cost)")?.textContent.trim(),
+        at: [...status.children]
+          .filter(e => getComputedStyle(e).display !== "none")
+          .map(e => {
+            const r = e.getBoundingClientRect();
+            const name = ["context", "tokens", "cost"].find(c => e.classList.contains(c)) ?? "activity";
+            return `${name}@${Math.round(r.left)}`;
+          })
+          .concat([...status.querySelectorAll(":scope > * > .label")]
+            .filter(e => e.offsetWidth > 0)
+            .map(e => `label@${Math.round(e.getBoundingClientRect().left)}`))
+          .join(" "),
       });
     setTimeout(() => requestAnimationFrame(sample), 0);
   };
@@ -229,6 +255,37 @@ try {
   console.log(`frames sampled: ${frames.length > 20}`);
   console.log(`frames with lines out of view: ${frames.filter(f => f.overflow > 1).length}`);
   console.log(`frames empty but still tall: ${frames.filter(f => f.value === "" && f.height > oneLine).length}`);
+
+  // A turn starts, runs a tool, has a steer queued, and ends: what the agent
+  // is doing changes and what applies comes and goes, but the items of the
+  // status start where they did in every frame.
+  const turn = async (label, reply) => {
+    await page.evaluate(() => { window.__status = []; window.__statusShifts = []; });
+    await send("check it");
+    await page.locator(".topbar .status > *", { hasText: "Running tools" }).waitFor();
+    await send("and the rest");
+    await page.locator(".topbar .queued").waitFor();
+    await bodyHas(reply);
+    await idle();
+    await page.waitForTimeout(300);
+    const r = await page.evaluate(() => {
+      const r = { frames: window.__status, shift: window.__statusShifts.reduce((a, b) => a + b, 0) };
+      window.__status = undefined;
+      return r;
+    });
+    const activities = new Set(r.frames.map(f => f.activity));
+    const places = [...new Set(r.frames.map(f => f.at))];
+    section(label);
+    console.log(`activities shown: ${activities.size >= 3 ? "several" : [...activities].join(", ")}, ending ${r.frames.at(-1).activity}`);
+    console.log(`places of the status's items: ${places.length === 1 ? "one" : places.join(" | ")}`);
+    console.log(`layout shift in the status: ${r.shift < 0.0001 ? "none" : r.shift.toFixed(4)}`);
+    await screenshot(label);
+  };
+  await turn("a turn starts and ends: the top bar's status", "Checked.");
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.waitForFunction(() => document.querySelector(".app.narrow:not(.sidebar-open)"));
+  await page.waitForTimeout(400);
+  await turn("a turn starts and ends on a phone: the top bar's status", "Checked again.");
 
   section("errors");
   console.log(errors.length ? errors.join("\n") : "none");
