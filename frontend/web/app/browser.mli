@@ -41,5 +41,16 @@ val reload_without_query_param : string -> unit
     history entry. *)
 val replace_query_param : string -> string -> unit
 
+(** The page's URL fragment ([location.hash], with its [#]). *)
+val hash : unit -> string
+
+(** Removes the fragment from the page's URL without a reload or a history
+    entry. *)
+val clear_hash : unit -> unit
+
+(** [POST]s [body] to [url] and calls [f] with the answer's body when its
+    status is 200, else with [None]. *)
+val post : url:string -> body:string -> f:(string option -> unit) -> unit
+
 val set_app_html : string -> unit
 val input_value : string -> string

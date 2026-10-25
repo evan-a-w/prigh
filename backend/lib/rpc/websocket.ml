@@ -235,6 +235,47 @@ let create ?(role = `Server) ~reader ~flow () =
   }
 ;;
 
+let connect ~reader ~flow ~host ~target =
+  let key =
+    Base64.encode_exn
+      (String.init 16 ~f:(fun _ -> Char.of_int_exn (Random.int 256)))
+  in
+  Eio.Flow.copy_string
+    (sprintf
+       "GET %s HTTP/1.1\r\n\
+        Host: %s\r\n\
+        Upgrade: websocket\r\n\
+        Connection: Upgrade\r\n\
+        Sec-WebSocket-Key: %s\r\n\
+        Sec-WebSocket-Version: 13\r\n\
+        \r\n"
+       target
+       host
+       key)
+    flow;
+  let status = Eio.Buf_read.line reader in
+  let rec headers acc =
+    match Eio.Buf_read.line reader with
+    | "" -> acc
+    | line ->
+      (match String.lsplit2 line ~on:':' with
+       | Some (name, value) ->
+         headers ((String.strip name, String.strip value) :: acc)
+       | None -> headers acc)
+  in
+  let headers = headers [] in
+  let accept =
+    List.Assoc.find headers ~equal:String.Caseless.equal "Sec-WebSocket-Accept"
+  in
+  match String.lsplit2 status ~on:' ' with
+  | Some (_, rest) when String.is_prefix rest ~prefix:"101" ->
+    if Option.equal String.equal accept (Some (accept_key key))
+    then Ok (create ~role:`Client ~reader ~flow ())
+    else Error "a WebSocket handshake with the wrong Sec-WebSocket-Accept"
+  | Some (_, rest) -> Error ("HTTP " ^ String.strip rest)
+  | None -> Error (sprintf "%S, not HTTP" (String.prefix status 80))
+;;
+
 let send_text t text = write t { fin = true; opcode = Text; payload = text }
 let send_binary t data = write t { fin = true; opcode = Binary; payload = data }
 

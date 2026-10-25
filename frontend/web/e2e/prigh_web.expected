@@ -1029,6 +1029,21 @@ main | <DIR>/repo [current]
 feat/login | <DIR>/home/.prigh/worktrees/repo/feat-login
 === chromium: worktrees: errors ===
 none
+=== chromium: remote: prigh web ===
+http://127.0.0.1:<PORT>/#signin=<code>
+=== chromium: remote: opened ===
+http://127.0.0.1:<PORT>/?session=<id>
+sign-in form: 0
+=== chromium: remote: the tool ran on the laptop ===
+in the laptop's directory: true
+in the server's directory: false
+=== chromium: remote: reloaded ===
+sign-in form: 0
+prefer_host: host-laptop
+=== chromium: remote: the spent link elsewhere ===
+Sign in
+=== chromium: remote: errors ===
+none
 === firefox: sign-in page ===
 prigh
 web
@@ -2060,4 +2075,19 @@ Enter works there, Alt+Enter in a new session, Delete removes, Esc closes
 main | <DIR>/repo [current]
 feat/login | <DIR>/home/.prigh/worktrees/repo/feat-login
 === firefox: worktrees: errors ===
+none
+=== firefox: remote: prigh web ===
+http://127.0.0.1:<PORT>/#signin=<code>
+=== firefox: remote: opened ===
+http://127.0.0.1:<PORT>/?session=<id>
+sign-in form: 0
+=== firefox: remote: the tool ran on the laptop ===
+in the laptop's directory: true
+in the server's directory: false
+=== firefox: remote: reloaded ===
+sign-in form: 0
+prefer_host: host-laptop
+=== firefox: remote: the spent link elsewhere ===
+Sign in
+=== firefox: remote: errors ===
 none

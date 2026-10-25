@@ -13,6 +13,7 @@ OxCaml. No plugins; tools and subagents are built in.
 ./prigh -faux           # scripted provider, no API calls
 ./prigh -detached .     # in a new detached tmux session (prigh-<dir>); returns at once
 ./prigh -web            # prigh-web, the browser UI (serves it on 127.0.0.1:7790 and opens it)
+./prigh -web -connect server:7790 -token sekrit   # ... for a backend on another machine
 ```
 
 ## Build
@@ -117,6 +118,7 @@ prigh-tui ~/other                        # the same backend: the connection was 
 prigh-tui -session <id>                  # join a session
 prigh-tui -local                         # spawn a local backend this once
 prigh-tui -forget                        # forget the saved connection (and spawn)
+prigh -web -remote                       # prigh-web here for the same backend (see "prigh-web for a backend elsewhere")
 ```
 
 `-connect`, `-token` and `-user` are saved in `~/.prigh/tui-connection.sexp`
@@ -186,7 +188,9 @@ session keeps running when its frontends disconnect. Plain TCP with a shared
 token: bind to localhost and use an SSH tunnel on untrusted networks.
 
 A tool host doesn't need a TUI: `prigh tool-host -connect server:7777 -token
-sekrit -cwd ~/proj [-name NAME] [-host-id ID]` connects on its own
+sekrit -cwd ~/proj [-name NAME] [-host-id ID]` (`-connect` also takes a
+prigh-web URL such as `wss://host/ws`, for a backend behind a TLS proxy)
+connects on its own
 (reconnecting when the connection drops, but exiting with what to fix
 when the backend refuses its `-token`/`-user`; it is the machine's host, by
 `~/.prigh/host-id`, unless `-host-id` names another) and hosts the session's tools *and* its `>_` terminal, so
@@ -619,6 +623,54 @@ backoff capped at 10s — rejoining the same session and respawning the
 backend when it was spawned; `/retry-backend-connection` retries at once and
 Ctrl+C quits meanwhile. Tool calls its local tool host is running carry on
 across the reconnect: their results wait for the backend to be back.
+
+### prigh-web for a backend elsewhere
+
+The page can also be served from your own machine for a backend on another
+one, like `prigh-tui -connect`: nothing of a backend runs locally (no
+sessions, no provider logins), the session's tools run on this machine, and
+you are signed in without typing the token.
+
+```
+# on the server
+prigh serve -web 0.0.0.0:7790 -token sekrit
+# on the laptop: serves the site on 127.0.0.1:7790 (or the next free port) and opens it
+./prigh -web -connect server:7790 -token sekrit -cwd ~/proj
+./prigh -web -remote                                 # later: the saved connection
+./prigh -web -connect wss://prigh.example.com/ws     # a backend behind a TLS-terminating proxy
+./prigh -web -remote -tools remote                   # tools on the backend, no local tool host
+```
+
+`./prigh -web` with `-connect` or `-remote` runs `prigh web` (see `prigh web
+-help`); without them it is a local backend as before. It:
+
+- checks the backend first: one that cannot be reached, a URL with no
+  prigh-web, or refused credentials stop it with what to fix (`-connect`,
+  `-token`, `-user`);
+- serves the site locally (`-web-root`/`$PRIGH_WEB_ROOT` as for `serve
+  -web`; `-listen HOST:PORT` or `$PRIGH_WEB_LISTEN` to choose where) and
+  relays everything else to the backend: the RPC socket, the terminal and
+  file transfers. The page only talks to its own origin, so a `wss://`
+  backend behind TLS is fine from an `http://localhost` page;
+- signs the page in: the URL it opens (and prints) ends in
+  `#signin=CODE`, a one-time code the page trades for the token and user
+  (a fragment is never sent in a request, so it is in no log, and the
+  token is never printed). The page then remembers them as for a sign-in;
+  the link is spent, run `prigh web` again for a new one;
+- runs a tool host to the backend in-process, as `prigh tool-host
+  -connect` would (`-name`, `-cwd`, `-host-id`; the machine's id from
+  `~/.prigh/host-id`), and the page names it in its `hello`: its sessions
+  move to this machine and new ones start here, as from a TUI.
+  `-tools remote` leaves the tools on the backend;
+- reuses the TUI's saved connection (`~/.prigh/tui-connection.sexp`, and
+  `$PRIGH_CONNECT`, `$PRIGH_TOKEN`, `$PRIGH_USER`) by the TUI's rules, so
+  `prigh-tui` and `./prigh -web -remote` go to the same backend; it is
+  saved once the check passed, and only for `HOST:PORT` (prigh-tui does
+  not connect to URLs: give those with `-connect` or `$PRIGH_CONNECT`).
+
+Ctrl+C stops the site and the tool host. With a `HOST:PORT`, either of
+the backend's ports carries the RPC, but the terminal and file transfers
+need its `-web` port.
 
 ## In Neovim
 

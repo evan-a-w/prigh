@@ -171,6 +171,34 @@ let replace_query_param name value =
   replace_search (fun ~search -> with_query_param ~search name value)
 ;;
 
+let hash () = Js.to_string Dom_html.window##.location##.hash
+
+let clear_hash () =
+  let location = Dom_html.window##.location in
+  Dom_html.window##.history##replaceState
+    Js.null
+    (Js.string "")
+    (Js.some
+       (Js.string
+          (Js.to_string location##.pathname ^ Js.to_string location##.search)))
+;;
+
+let post ~url ~body ~f =
+  let xhr = XmlHttpRequest.create () in
+  xhr##_open (Js.string "POST") (Js.string url) Js._true;
+  xhr##.onreadystatechange
+  := Js.wrap_callback (fun () ->
+       match xhr##.readyState with
+       | XmlHttpRequest.DONE ->
+         f
+           (if xhr##.status = 200
+            then
+              Option.map (Js.Opt.to_option xhr##.responseText) ~f:Js.to_string
+            else None)
+       | _ -> ());
+  xhr##send (Js.some (Js.string body))
+;;
+
 let set_app_html html =
   match Dom_html.getElementById_opt "app" with
   | Some el -> el##.innerHTML := Js.string html

@@ -4,6 +4,7 @@ open! Import
 module Request = struct
   type t =
     { meth : string
+    ; target : string
     ; path : string
     ; query : (string * string) list
     ; headers : (string * string) list
@@ -47,7 +48,7 @@ module Request = struct
                 headers ((String.strip name, String.strip value) :: acc)
               | None -> headers acc)
          in
-         Some { meth; path; query; headers = headers [] }
+         Some { meth; target; path; query; headers = headers [] }
        | _ -> None)
   ;;
 end
@@ -71,6 +72,8 @@ let format_response
     body
 ;;
 
+let respond flow response = Eio.Flow.copy_string (format_response response) flow
+
 let response ~status ~reason body =
   format_response (Static_site.Response.text ~status ~reason body)
 ;;
@@ -90,6 +93,8 @@ type on_lines =
   read_line:(unit -> string option) -> write_line:(string -> unit) -> unit
 
 type on_websocket = query:(string * string) list -> Websocket.t -> unit
+type flow = Eio.Flow.two_way_ty Eio.Resource.t
+type on_http = Request.t -> reader:Eio.Buf_read.t -> flow -> unit
 
 let upgrade_handler ~websockets (request : Request.t) =
   if
@@ -119,7 +124,7 @@ let is_json_lines reader =
   | exception (End_of_file | Eio.Io _) -> false
 ;;
 
-let handle ?clock ~root ~websockets ~on_lines flow =
+let handle ?clock ?(routes = fun _ -> None) ~root ~websockets ~on_lines flow =
   let reader = Eio.Buf_read.of_flow flow ~max_size:(64 * 1024 * 1024) in
   if is_json_lines reader
   then serve_json_lines ~on_lines ~reader flow
@@ -163,6 +168,8 @@ let handle ?clock ~root ~websockets ~on_lines flow =
                      | _ -> ())
                    ()));
          Websocket.close ws)
+    | Some request when Option.is_some (routes request) ->
+      (Option.value_exn (routes request)) request ~reader (flow :> flow)
     | Some request when File_http.handles ~path:request.path ->
       File_http.serve
         ~meth:request.meth
@@ -260,7 +267,7 @@ let serve_terminal router terminals ~query ws =
      | `Unavailable reason -> error ("no terminal: " ^ reason))
 ;;
 
-let listen ~env ~sw ~addr ~port ~root ~websockets ~on_lines =
+let listen ~env ~sw ?routes ~addr ~port ~root ~websockets ~on_lines () =
   let socket =
     Eio.Net.listen
       ~sw
@@ -284,7 +291,13 @@ let listen ~env ~sw ~addr ~port ~root ~websockets ~on_lines =
       (fun flow _addr ->
          no_delay flow;
          keepalive flow;
-         handle ~clock:(Eio.Stdenv.clock env) ~root ~websockets ~on_lines flow));
+         handle
+           ~clock:(Eio.Stdenv.clock env)
+           ?routes
+           ~root
+           ~websockets
+           ~on_lines
+           flow));
   port
 ;;
 

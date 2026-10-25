@@ -6,7 +6,8 @@
 # connection that cannot keep up, then stability.mjs, nothing redrawn or
 # shifted that did not change, then themes.mjs, the themes and the user's
 # preferences on the backend, then worktrees.mjs, the sidebar's worktrees and
-# /worktree in a git repository) in each
+# /worktree in a git repository, then remote.mjs, the page `prigh web
+# -connect` serves for a backend elsewhere) in each
 # browser and diffs the output with prigh_web.expected. Needs node,
 # PLAYWRIGHT_MODULE (the playwright package's index.mjs) and
 # PLAYWRIGHT_BROWSERS_PATH, tmux (on the PATH or $PRIGH_TMUX) for the
@@ -44,6 +45,7 @@ for engine in ${ENGINES:-chromium firefox}; do
 	TEST_DIR="$tmp/$engine" node "$here/stability.mjs" "$engine" >>"$actual"
 	TEST_DIR="$tmp/$engine" node "$here/themes.mjs" "$engine" >>"$actual"
 	TEST_DIR="$tmp/$engine" node "$here/worktrees.mjs" "$engine" >>"$actual"
+	TEST_DIR="$tmp/$engine" node "$here/remote.mjs" "$engine" >>"$actual"
 done
 
 if [ "${UPDATE:-}" = 1 ]; then

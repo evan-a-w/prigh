@@ -24,7 +24,11 @@ open! Import
     client. A brand-new session starts on a host chosen from the client's
     context, never on whichever host connected first: on the client itself
     when it is a tool host, else where the client's session is (see
-    [ARCHITECTURE.md]). A session keeps running when its clients
+    [ARCHITECTURE.md]). A client without tools can name the tool host on
+    its machine with [hello]'s [prefer_host] (prigh-web opened by [prigh
+    web]): while that host is connected, the client's sessions move to it
+    as they would to the client itself if it were a tool host, and new ones
+    start on it. A session keeps running when its clients
     disconnect; an idle session with no clients is dropped from memory (it
     stays on disk, with its tool host, so it is on the same host when loaded
     again). *)

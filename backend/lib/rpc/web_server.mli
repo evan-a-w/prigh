@@ -8,18 +8,42 @@ open! Import
     [{] is a plain JSON-lines client (the terminal frontend's [-connect]) and
     is handed to [on_lines], so one port serves both. *)
 
+module Request : sig
+  type t =
+    { meth : string
+    ; target : string (** the path and query as sent *)
+    ; path : string
+    ; query : (string * string) list (** decoded *)
+    ; headers : (string * string) list
+    }
+  [@@deriving sexp_of]
+
+  val header : t -> string -> string option
+end
+
 type on_lines =
   read_line:(unit -> string option) -> write_line:(string -> unit) -> unit
 
 type on_websocket = query:(string * string) list -> Websocket.t -> unit
+type flow = Eio.Flow.two_way_ty Eio.Resource.t
+
+(** Answers an HTTP request read from [reader] (whose body, if any, follows
+    in it) on the connection. *)
+type on_http = Request.t -> reader:Eio.Buf_read.t -> flow -> unit
+
+(** Writes the response, with [Connection: close]. *)
+val respond : flow -> Static_site.Response.t -> unit
 
 (** Handles one connection: JSON lines until EOF, or one HTTP/1.1 request,
     then close (or the WebSocket until it ends). The [websockets] handler for
     the request's path gets the decoded query string of the upgrade request.
     With [clock], a WebSocket whose peer looks gone ({!Websocket.keepalive})
-    is shut down and its handler cancelled. *)
+    is shut down and its handler cancelled. Another request goes to
+    [routes]'s handler for it, if any, else to {!File_http} or the static
+    site. *)
 val handle
   :  ?clock:_ Eio.Time.clock
+  -> ?routes:(Request.t -> on_http option)
   -> root:string option
   -> websockets:(string * on_websocket) list
   -> on_lines:on_lines
@@ -48,11 +72,13 @@ val serve_terminal : Rpc_router.t -> Terminals.t -> on_websocket
 val listen
   :  env:Env.t
   -> sw:Switch.t
+  -> ?routes:(Request.t -> on_http option)
   -> addr:Eio.Net.Ipaddr.v4v6
   -> port:int
   -> root:string option
   -> websockets:(string * on_websocket) list
   -> on_lines:on_lines
+  -> unit
   -> int
 
 module For_testing : sig

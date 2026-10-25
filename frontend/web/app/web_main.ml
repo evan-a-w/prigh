@@ -6,6 +6,7 @@ module App = Prigh_web.App
 module Client = Prigh_client.Client
 module Accounts = Prigh_web.Accounts
 module Reconnect_gate = Prigh_web.Reconnect_gate
+module Signin_link = Prigh_web.Signin_link
 
 let storage =
   { Accounts.Storage.get = Browser.get_item
@@ -19,6 +20,7 @@ module Settings = struct
     { backend : string
     ; login : Login.t
     ; session : string option
+    ; prefer_host : string option
     }
 
   let load () =
@@ -29,6 +31,7 @@ module Settings = struct
           ~default:(Browser.same_origin_ws_url ())
     ; login = Login.load Login.Storage.browser
     ; session = non_empty (Browser.query_param "session")
+    ; prefer_host = non_empty (Browser.get_item Signin_link.prefer_host_key)
     }
   ;;
 
@@ -45,6 +48,8 @@ module Settings = struct
   let hello t ~session =
     [ "name", `String "prigh-web"; "tools", `False; "tab", `String tab ]
     @ Login.hello_fields t.login
+    @ Option.value_map t.prefer_host ~default:[] ~f:(fun host ->
+      [ "prefer_host", `String host ])
     @ Option.value_map session ~default:[] ~f:(fun s ->
       [ "session", `String s ])
   ;;
@@ -1193,8 +1198,7 @@ let run_app (settings : Settings.t) =
        Deferred.unit)
 ;;
 
-let run () =
-  Async_js.init ();
+let start () =
   let settings = Settings.load () in
   let refused_message = Browser.get_item refused_key in
   Browser.remove_item refused_key;
@@ -1204,4 +1208,37 @@ let run () =
     sign_in_form settings ~notice:true ~error:"Signed out."
   | None when take_adding () -> sign_in_form settings ~adding:true ~error:""
   | None -> run_app settings
+;;
+
+(* Opened by [prigh web]: signed in with what it was given, which replaces
+   any sign-out or refusal noted before. A code already used changes
+   nothing. *)
+let sign_in_from_link code ~f =
+  Browser.post ~url:Signin_link.path ~body:code ~f:(fun reply ->
+    Option.iter
+      (Option.bind reply ~f:Signin_link.Credentials.of_json)
+      ~f:(fun (c : Signin_link.Credentials.t) ->
+        (match c.prefer_host with
+         | Some host -> Browser.set_item Signin_link.prefer_host_key host
+         | None -> Browser.remove_item Signin_link.prefer_host_key);
+        Accounts.activate
+          storage
+          { Accounts.Account.backend = (Settings.load ()).backend
+          ; user = c.user
+          ; token = c.token
+          ; session = None
+          };
+        ignore (Login.take_signed_out Login.Storage.browser : bool);
+        ignore (take_adding () : bool);
+        Browser.remove_item refused_key);
+    f ())
+;;
+
+let run () =
+  Async_js.init ();
+  match Signin_link.code_of_hash (Browser.hash ()) with
+  | Some code ->
+    Browser.clear_hash ();
+    sign_in_from_link code ~f:start
+  | None -> start ()
 ;;

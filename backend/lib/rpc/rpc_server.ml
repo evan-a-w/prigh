@@ -224,6 +224,9 @@ module Client = struct
           ([exec_input]: [tool_exec_input]; [terminal_kill]: the
           [terminal_kill] event) *)
     ; mutable cwd : string option
+    ; mutable prefer_host : string option
+      (** [hello]'s [prefer_host], for a client without tools: the host id
+          of the tool host on its machine *)
     ; mutable agent : Agent.t
     ; mutable placeholder : Agent.t option
       (** the fresh session [connect] gave it, until [hello] (see
@@ -516,6 +519,14 @@ let create
   t
 ;;
 
+(* The tool host on the machine of a client without tools, while it is
+   connected. *)
+let preferred_host t (client : Client.t) =
+  if client.tools
+  then None
+  else Option.bind client.prefer_host ~f:(host_client t)
+;;
+
 let attach t (client : Client.t) agent =
   let previous = client.agent in
   if not (phys_equal previous agent)
@@ -523,7 +534,11 @@ let attach t (client : Client.t) agent =
     client.agent <- agent;
     maybe_evict t previous);
   publish_hosts t;
-  if client.tools then Agent.prefer_host agent client.host_id
+  if client.tools
+  then Agent.prefer_host agent client.host_id
+  else
+    Option.iter (preferred_host t client) ~f:(fun host ->
+      Agent.prefer_host agent host.host_id)
 ;;
 
 (* A brand-new session made or opened for [client] starts on a host chosen
@@ -532,15 +547,29 @@ let attach t (client : Client.t) agent =
    session is (connected or not), in its cwd there. [None] (a client without
    tools on a session without a host): where any new session would be.
    Unpinned: the host was chosen by default. *)
-let start_location (client : Client.t) ~cwd =
+let start_location t (client : Client.t) ~cwd =
   if client.tools
   then
     Some
       ( { Session.Host.id = client.host_id; name = client.name; pinned = false }
       , cwd )
-  else
-    Option.map (Agent.location client.agent) ~f:(fun (host, cwd) ->
-      { host with pinned = false }, cwd)
+  else (
+    match preferred_host t client with
+    | Some host ->
+      let cwd =
+        match
+          List.find (Agent.hosts client.agent) ~f:(fun h ->
+            String.equal h.id host.host_id)
+        with
+        | Some h -> h.cwd
+        | None -> (host_of host).cwd
+      in
+      Some
+        ( { Session.Host.id = host.host_id; name = host.name; pinned = false }
+        , cwd )
+    | None ->
+      Option.map (Agent.location client.agent) ~f:(fun (host, cwd) ->
+        { host with pinned = false }, cwd))
 ;;
 
 (* The cwd [client]'s session last had on the client's own host. *)
@@ -586,7 +615,9 @@ let loaded_start t (client : Client.t) session =
   if t.backend_host || has_host
   then None
   else
-    with_recorded_cwd session (start_location client ~cwd:(host_of client).cwd)
+    with_recorded_cwd
+      session
+      (start_location t client ~cwd:(host_of client).cwd)
 ;;
 
 let fresh_agent t = register t (t.new_agent ~cwd:t.cwd ())
@@ -663,6 +694,7 @@ let connect ?signed_in ?(close = fun _ -> ()) t ~send =
     ; tools = false
     ; features = []
     ; cwd = None
+    ; prefer_host = None
     ; agent
     ; placeholder
     ; authed = Option.is_none t.token || Option.is_some signed_in
@@ -935,7 +967,7 @@ let first_session t (client : Client.t) =
     start_agent
       t
       (Session.create ~dir:t.sessions_dir ~cwd ())
-      (start_location client ~cwd)
+      (start_location t client ~cwd)
   | Some _ | None -> client.agent
 ;;
 
@@ -1122,6 +1154,8 @@ let hello t (client : Client.t) params =
       in
       Or_error.bind claimed ~f:(fun () ->
         client.tools <- tools;
+        client.prefer_host
+        <- Option.filter (string "prefer_host") ~f:(fun _ -> not tools);
         client.features
         <- (match param params "features" with
             | Some (`Array items) ->
@@ -1137,6 +1171,12 @@ let hello t (client : Client.t) params =
         client.placeholder <- None;
         Or_error.map agent ~f:(fun agent ->
           attach t client agent;
+          if tools
+          then
+            (* The frontends on its machine that came before it. *)
+            Hashtbl.iter t.clients ~f:(fun (c : Client.t) ->
+              if Option.equal String.equal c.prefer_host (Some client.host_id)
+              then Agent.prefer_host c.agent client.host_id);
           `Object
             [ "client_id", `String client.id
             ; "host_id", `String client.host_id
@@ -1502,6 +1542,8 @@ let remove_worktree t (client : Client.t) params =
   in
   let%map removed = Agent.remove_worktree client.agent ~path ~force in
   `Object [ "worktree", worktree_json t client removed ]
+;;
+
 (* The other clients of the server: the user's other browsers and terminals
    follow at once. *)
 let prefs_changed t (from : Client.t) changes =
@@ -1628,7 +1670,7 @@ let dispatch_server t (client : Client.t) ~meth ~params
       (unit_result
          (Terminal_relay.closed t.terminals ~host:client.host_id params))
   | "new_session" ->
-    let start = start_location client ~cwd:(own_cwd client) in
+    let start = start_location t client ~cwd:(own_cwd client) in
     let cwd =
       match start with
       | Some (_, cwd) -> cwd
@@ -1696,7 +1738,7 @@ let dispatch_server t (client : Client.t) ~meth ~params
                  then
                    with_recorded_cwd
                      session
-                     (start_location client ~cwd:(host_of client).cwd)
+                     (start_location t client ~cwd:(host_of client).cwd)
                  else loaded_start t client session
                in
                start_agent t session start |> attach t client;
@@ -1716,7 +1758,7 @@ let dispatch_server t (client : Client.t) ~meth ~params
            let start =
              match Agent.location agent with
              | Some ((host, _) as location) when host.pinned -> Some location
-             | Some _ | None -> start_location client ~cwd:(own_cwd client)
+             | Some _ | None -> start_location t client ~cwd:(own_cwd client)
            in
            start_agent t session start |> attach t client;
            if Session.persisted session then sessions_changed t;
