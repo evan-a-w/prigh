@@ -155,7 +155,7 @@ sign-in dialog. Escaped, the TUI stays disconnected and the status line
 says `not signed in to HOST:PORT · /signin signs in · /connect switches
 server`; while connected to a remote backend it shows `server:HOST:PORT`
 next to `user:`. `/login` and `/logout` are unrelated: they manage model
-provider credentials.
+provider and git host credentials.
 
 By default a connected frontend runs the session's tools (bash, file
 edits, ...) on *its own* machine, in the `-cwd` it was started with, by
@@ -1163,6 +1163,8 @@ it.
 | `/fallback [off\|model...]` | show or set the models that take over, in order, when a model's usage runs out (each word completes a model) |
 | `/default-dir [off\|path]` | show or set the directory new sessions start in |
 | `/login [provider\|custom] [api_key\|oauth]`, `/logout [provider]`, `/auth` | credentials; `/login custom` adds an OpenAI-compatible endpoint |
+| `/login github [HOST] [token]`, `/login forgejo HOST [token]`, `/login HOST [token]`, `/logout HOST` | sign in to or out of a git host (see [Git hosting](#git-hosting)) |
+| `/pr [list [open\|closed\|all]\|view N\|new [title]\|checkout N]` | pull requests of the session's repository: pick one (Enter shows it), show one (also `/pr N`), create one from the current branch, or check one out in a git worktree |
 | `/thinking [off\|on\|low\|high\|max]` | set the thinking level |
 | `/verbosity [quiet\|normal\|verbose]` | set the transcript verbosity |
 | `/confirm [on\|off]` | ask before destructive tools: sets the approval mode `ask` or `auto`, here and for new sessions |
@@ -1218,6 +1220,31 @@ adds the skill's file. A name the backend does not know comes back as an
 error listing the closest ones, with the text back in the editor. `/mcp`
 also shows configuration problems, and says where to configure servers when
 there are none.
+
+### Git hosting
+
+prigh signs in to GitHub (github.com, or GitHub Enterprise with `/login
+github HOST`) and Forgejo or Gitea instances (codeberg.org, or any host with
+`/login forgejo HOST`) and calls their APIs from the backend; no `gh` or
+`tea` is needed. `/login github` uses GitHub's device flow (the login box
+shows the code to enter) when OAuth is configured, otherwise it asks for a
+token; `token` after the host goes straight to the token prompt. The
+`/login` picker lists the known hosts under "Git hosting" (and "Forgejo:
+another host…", which asks for the host), `/logout` the signed-in ones, and
+`/auth` shows each host's user and method, and why OAuth is unavailable.
+Accounts belong to the user, like model credentials.
+
+`/pr` works on the repository of the session's directory on its tool host
+(found from `git remote`). `/pr` (or `/pr list closed|all`) is a fuzzy
+picker of pull requests (`#24 Git hosting · lloyd · feat/x → main · draft`);
+Enter, or `/pr view 24` (`/pr 24`, `/pr #24`), shows its title, state,
+branches, URL, description, checks and diff. `/pr new [title]` opens a form
+prefilled from the branch (title, body, base, draft, and "push first" when
+the branch is not on the remote yet): Tab or ↑↓ move between fields, Space
+toggles, Ctrl+J starts a new line in the body, Enter creates it and the
+notice gives its URL. `/pr checkout 24` makes a git worktree next to the
+repository (`<repo>-wt/pr-24`) and asks whether to `/cd` there. Errors say
+what to do (`/login github signs in`, `git remote add origin URL`, ...).
 
 `/diff` runs `git` on the active tool host, in the session's directory, and
 shows the changes by file with their line counts (the TUI in the

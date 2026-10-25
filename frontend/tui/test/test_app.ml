@@ -87,6 +87,7 @@ let%expect_test "startup: requests state, messages and auth; renders history" =
     (Rpc (method_ get_state) (params ()) (tag Initial_state))
     (Rpc (method_ get_messages) (params ()) (tag Initial_messages))
     (Rpc (method_ auth_status) (params ()) (tag Auth_refresh))
+    (Rpc (method_ forge_status) (params ()) (tag Forge_refresh))
     (Rpc (method_ get_config) (params ()) (tag Config))
     (Rpc (method_ list_models) (params ()) (tag Models_catalog))
     (Rpc (method_ get_pending) (params ()) (tag Pending))
@@ -752,8 +753,8 @@ let%expect_test "typing / lists commands, Down twice + Tab fills /login " =
       /change_default                 save the current model an…
       /fallback [off|model...]        show or set the models th…
       /default-dir [off|path]         show or set the directory…
-      /login [provider] [api_key|oauth]  log in to a provider
-      ↕ 1–8 of 61
+      /login [provider] [api_key|oauth]  log in to a provider, …
+      ↕ 1–8 of 62
     ────────────────────────────────────────────────────────────
     > /▏
     deepseek-flash  think:off  Tab/Enter accept · Alt+S as typed
@@ -769,8 +770,8 @@ let%expect_test "typing / lists commands, Down twice + Tab fills /login " =
       /change_default                 save the current model an…
       /fallback [off|model...]        show or set the models th…
       /default-dir [off|path]         show or set the directory…
-      /login [provider] [api_key|oauth]  log in to a provider
-      ↕ 1–8 of 61
+      /login [provider] [api_key|oauth]  log in to a provider, …
+      ↕ 1–8 of 62
     ────────────────────────────────────────────────────────────
     > /▏
     deepseek-flash  think:off  Tab/Enter accept · Alt+S as typed
@@ -786,8 +787,8 @@ let%expect_test "typing / lists commands, Down twice + Tab fills /login " =
       /change_default                 save the current model an…
       /fallback [off|model...]        show or set the models th…
       /default-dir [off|path]         show or set the directory…
-      /login [provider] [api_key|oauth]  log in to a provider
-      ↕ 1–8 of 61
+      /login [provider] [api_key|oauth]  log in to a provider, …
+      ↕ 1–8 of 62
     ────────────────────────────────────────────────────────────
     > /▏
     deepseek-flash  think:off  Tab/Enter accept · Alt+S as typed
@@ -1198,6 +1199,7 @@ let%expect_test "/sessions picker switches and reloads; /logout confirms" =
   [%expect
     {|
     (Rpc (method_ auth_status) (params ()) (tag Auth_logout_picker))
+    (Rpc (method_ forge_status) (params ()) (tag Forge_refresh))
 
 
 
@@ -2277,7 +2279,8 @@ let%expect_test "/rewind picks a user message, then confirms the rewind" =
     ▌ earlier question
       earlier answer
     ┌─ Confirm ────────────────────────────────────────────────┐
-    │ Rewind to "second question"? Later messages are abandon… │
+    │ Rewind to "second question"? Later messages are          │
+    │ abandoned (y/n)                                          │
     └──────────────────────────────────────────────────────────┘
     ────────────────────────────────────────────────────────────
     ? ▏
@@ -2747,6 +2750,7 @@ let%expect_test "/auth, /help, /state, /clear, unknown method errors" =
   [%expect
     {|
     (Rpc (method_ auth_status) (params ()) (tag Auth_show))
+    (Rpc (method_ forge_status) (params ()) (tag Forge_refresh))
 
 
       prigh in /work · /help · Esc aborts · Ctrl+C twice quits
@@ -2783,7 +2787,7 @@ let%expect_test "/auth, /help, /state, /clear, unknown method errors" =
     │ Ctrl+P cycles through                                    │
     │ /change_default                    save the current      │
     │ model and thinking level as the default for new sessions │
-    └───────── 1–11 of 237 · ↑↓ PgUp PgDn scroll · Esc closes ─┘
+    └───────── 1–11 of 244 · ↑↓ PgUp PgDn scroll · Esc closes ─┘
     ────────────────────────────────────────────────────────────
     > ▏
     deepseek-flash  ctx:0.1%/1.0M  ↑↓ scroll · Esc closes
@@ -4890,6 +4894,7 @@ let%expect_test
     (Rpc (method_ get_state) (params ()) (tag Initial_state))
     (Rpc (method_ get_messages) (params ()) (tag Initial_messages))
     (Rpc (method_ auth_status) (params ()) (tag Auth_refresh))
+    (Rpc (method_ forge_status) (params ()) (tag Forge_refresh))
     (Rpc (method_ get_config) (params ()) (tag Config))
     (Rpc (method_ list_models) (params ()) (tag Models_catalog))
     (Rpc (method_ get_pending) (params ()) (tag Pending))
@@ -7039,6 +7044,7 @@ let%expect_test "reconnect: backoff doubles to the 60s cap, stale replies are \
     (Rpc (method_ get_messages) (params ()) (tag Initial_messages))
     (Rpc (method_ get_pending) (params ()) (tag Pending))
     (Rpc (method_ auth_status) (params ()) (tag Auth_refresh))
+    (Rpc (method_ forge_status) (params ()) (tag Forge_refresh))
     (Rpc (method_ get_config) (params ()) (tag Config))
     (Rpc (method_ list_models) (params ()) (tag Models_catalog))
     |}];
@@ -7141,6 +7147,7 @@ let%expect_test "reconnect: a session the backend no longer knows (never \
     (Rpc (method_ get_messages) (params ()) (tag Initial_messages))
     (Rpc (method_ get_pending) (params ()) (tag Pending))
     (Rpc (method_ auth_status) (params ()) (tag Auth_refresh))
+    (Rpc (method_ forge_status) (params ()) (tag Forge_refresh))
     (Rpc (method_ get_config) (params ()) (tag Config))
     (Rpc (method_ list_models) (params ()) (tag Models_catalog))
     |}];
@@ -7483,6 +7490,7 @@ let%expect_test "the hello's host id marks this frontend, also after a \
     (Rpc (method_ get_messages) (params ()) (tag Initial_messages))
     (Rpc (method_ get_pending) (params ()) (tag Pending))
     (Rpc (method_ auth_status) (params ()) (tag Auth_refresh))
+    (Rpc (method_ forge_status) (params ()) (tag Forge_refresh))
     (Rpc (method_ get_config) (params ()) (tag Config))
     (Rpc (method_ list_models) (params ()) (tag Models_catalog))
     (host-abc)
@@ -7837,8 +7845,8 @@ let%expect_test "Tab on an empty editor opens the command list; the list shows \
       /change_default                 save the current model an…
       /fallback [off|model...]        show or set the models th…
       /default-dir [off|path]         show or set the directory…
-      /login [provider] [api_key|oauth]  log in to a provider
-      ↕ 1–8 of 61
+      /login [provider] [api_key|oauth]  log in to a provider, …
+      ↕ 1–8 of 62
     ────────────────────────────────────────────────────────────
     > /▏
     deepseek-flash  think:off  Tab/Enter accept · Alt+S as typed
@@ -7854,8 +7862,8 @@ let%expect_test "Tab on an empty editor opens the command list; the list shows \
       /change_default                 save the current model an…
       /fallback [off|model...]        show or set the models th…
       /default-dir [off|path]         show or set the directory…
-      /login [provider] [api_key|oauth]  log in to a provider
-      ↕ 1–8 of 61
+      /login [provider] [api_key|oauth]  log in to a provider, …
+      ↕ 1–8 of 62
     ────────────────────────────────────────────────────────────
     > /▏
     deepseek-flash  think:off  Tab/Enter accept · Alt+S as typed
@@ -8337,6 +8345,7 @@ let%expect_test "/setusr: lists users, acts as one, reconnects as them" =
     (Rpc (method_ get_messages) (params ()) (tag Initial_messages))
     (Rpc (method_ get_pending) (params ()) (tag Pending))
     (Rpc (method_ auth_status) (params ()) (tag Auth_refresh))
+    (Rpc (method_ forge_status) (params ()) (tag Forge_refresh))
     (Rpc (method_ get_config) (params ()) (tag Config))
 
 
@@ -8413,17 +8422,18 @@ let%expect_test
   [%expect
     {|
     (Rpc (method_ auth_status) (params ()) (tag Auth_login_picker))
-
-
+    (Rpc (method_ forge_status) (params ()) (tag Forge_refresh))
       prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
     ▌ earlier question
       earlier answer
-    Log in to  (3)
+    Log in to  (4)
     / ▏
     ▸* DeepSeek (api_key)              API key  logged in via a…
        ollama (edit)                   custom: http://localhost…
        custom (add an OpenAI-compatible endpoint)  aiproxy, Lit…
+      ── Git hosting ──
+       Forgejo: another host…          Forgejo or Gitea on any …
     ────────────────────────────────────────────────────────────
     >
     deepseek-flash  ctx:0.1%/1.0M  Enter selects · Esc closes
@@ -8656,6 +8666,7 @@ let%expect_test
   [%expect
     {|
     (Rpc (method_ auth_status) (params ()) (tag Auth_show))
+    (Rpc (method_ forge_status) (params ()) (tag Forge_refresh))
       prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
     ▌ earlier question

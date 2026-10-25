@@ -25,6 +25,7 @@ module Argument = struct
     | Snippet
     | Remind
     | Server
+    | Pr
   [@@deriving sexp_of, equal]
 end
 
@@ -72,12 +73,13 @@ let all =
       ~argument:Argument.Login
       "login"
       "[provider] [api_key|oauth]"
-      "log in to a provider"
+      "log in to a provider, or a git host: github [HOST] [token], forgejo \
+       HOST [token], HOST [token]"
   ; c
       ~argument:Argument.Logout
       "logout"
-      "[provider]"
-      "remove a provider's stored credential"
+      "[provider|HOST]"
+      "remove a provider's or a git host's stored credential"
   ; c
       ~argument:Argument.Thinking
       "thinking"
@@ -117,7 +119,7 @@ let all =
       "[off|bell|desktop]"
       "how to tell you that a turn ended or something waits for you while the \
        terminal is not focused"
-  ; c "auth" "" "show which providers are configured"
+  ; c "auth" "" "show which providers and git hosts are configured"
   ; c
       ~argument:Argument.Budget
       "budget"
@@ -151,6 +153,14 @@ let all =
       "[path]"
       "show the uncommitted changes where the tools run (git diff, untracked \
        files too)"
+  ; c
+      ~argument:Argument.Pr
+      "pr"
+      "[list|view N|new|checkout N]"
+      "pull requests of the repository where the tools run: list \
+       [open|closed|all] picks one (Enter shows it, its checks and diff), view \
+       N shows one, new [title] creates one from the current branch, checkout \
+       N checks one out in a git worktree"
   ; c
       "review"
       "[base] [instructions]"
