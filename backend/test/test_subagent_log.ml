@@ -4,7 +4,14 @@ open! Prigh
 let call id = { Content.Tool_call.id; name = "ls"; arguments = "{}" }
 
 let start ?(call_id = "p1") agent_id task : Agent_event.t =
-  Subagent_start { call_id; agent_id; task; model = "faux"; tools = [ "ls" ] }
+  Subagent_start
+    { call_id
+    ; agent_id
+    ; task
+    ; model = "faux"
+    ; tools = [ "ls" ]
+    ; worktree = None
+    }
 ;;
 
 let inside agent_id event : Agent_event.t =

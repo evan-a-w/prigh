@@ -1549,6 +1549,7 @@ let with_remote_agent replies f =
       ; session_id = None
       ; session_name = None
       ; exec_input = false
+      ; git_location = false
       }
     ];
   f t agent

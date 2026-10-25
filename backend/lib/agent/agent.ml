@@ -65,6 +65,7 @@ module Host = struct
     ; session_id : string option
     ; session_name : string option
     ; exec_input : bool [@sexp.bool]
+    ; git_location : bool [@sexp.bool]
     }
   [@@deriving sexp_of, equal]
 
@@ -186,6 +187,8 @@ type t =
   ; mutable session : Session.t
   ; mutable cwd : string
   ; mutable git_branch : string option
+  ; mutable repo_asked : (string * string) option
+    (** the client host and directory last asked where it is in git *)
   ; mutable model : Model.t
   ; mutable thinking : Thinking.t
   ; mutable run : Run.t option
@@ -281,6 +284,7 @@ let backend_host t =
   ; session_id = None
   ; session_name = None
   ; exec_input = false (* runs in this process: no messages *)
+  ; git_location = true
   }
 ;;
 
@@ -295,11 +299,21 @@ let hosts t =
 ;;
 
 let find_branch t ~cwd =
-  if t.backend_host_enabled then Git_branch.find ~cwd else None
+  if t.backend_host_enabled
+  then Option.bind (Git_location.find ~cwd) ~f:(fun l -> l.branch)
+  else None
 ;;
 
 let active_host t = t.active_host
 let subscribe t ~f = t.subscribers <- f :: t.subscribers
+
+(* A subagent's worktree, at any depth. *)
+let rec started_worktree (e : Agent_event.t) =
+  match e with
+  | Subagent_start { worktree; _ } -> worktree
+  | Subagent { event; _ } -> started_worktree event
+  | _ -> None
+;;
 
 let broadcast t (event : Event.t) =
   (match event with
@@ -307,7 +321,9 @@ let broadcast t (event : Event.t) =
      Subagent_log.record
        t.subagent_log
        ~now:(Eio.Time.now (Eio.Stdenv.clock t.env))
-       e
+       e;
+     Option.iter (started_worktree e) ~f:(fun w ->
+       ignore (Session.add_agent_worktree t.session w : Session.Entry.t))
    | _ -> ());
   List.iter (List.rev t.subscribers) ~f:(fun f -> f event)
 ;;
@@ -818,147 +834,6 @@ let save_as_default t =
 let find_host t id = List.find (hosts t) ~f:(fun h -> String.equal h.id id)
 let active_host_connected t = Option.is_some (find_host t t.active_host)
 
-let location t =
-  if String.is_empty t.active_host
-  then None
-  else
-    Some
-      ( { Session.Host.id = t.active_host
-        ; name = t.active_host_name
-        ; pinned = t.host_pinned
-        }
-      , t.cwd )
-;;
-
-(* The host is recorded with the cwd, so that the session resumes there when
-   it is loaded again (evicted, or after a backend restart): see
-   [restore_host]. *)
-let record_location t =
-  let host = Option.map (location t) ~f:fst in
-  if
-    not
-      (String.equal (Session.cwd t.session) t.cwd
-       && Option.equal Session.Host.equal (Session.host t.session) host)
-  then ignore (Session.set_cwd t.session ?host ~cwd:t.cwd () : Session.Entry.t)
-;;
-
-(* A session that recorded no host (or the backend's, when it is disabled)
-   is where a new one would be. *)
-let restore_host t =
-  Hashtbl.clear t.host_cwds;
-  Map.iteri (Session.host_cwds t.session) ~f:(fun ~key ~data ->
-    if String.equal key Host.backend_id
-    then t.backend_cwd <- data
-    else Hashtbl.set t.host_cwds ~key ~data);
-  match Session.host t.session with
-  | Some host
-    when t.backend_host_enabled || not (String.equal host.id Host.backend_id) ->
-    t.active_host <- host.id;
-    t.active_host_name <- host.name;
-    t.host_pinned <- host.pinned
-  | Some _ | None ->
-    t.active_host <- (if t.backend_host_enabled then Host.backend_id else "");
-    t.active_host_name <- "";
-    t.host_pinned <- false;
-    if t.backend_host_enabled then t.backend_cwd <- t.cwd
-;;
-
-let set_host_cwd t (host : Host.t) ~cwd =
-  if not (String.equal t.cwd cwd)
-  then (
-    t.cwd <- cwd;
-    t.git_branch <- find_branch t ~cwd;
-    environment_changed t);
-  record_location t;
-  if String.equal host.id Host.backend_id
-  then t.backend_cwd <- cwd
-  else Hashtbl.set t.host_cwds ~key:host.id ~data:cwd
-;;
-
-let activate_host t (host : Host.t) ~cwd ~pinned =
-  if not (String.equal t.active_host host.id) then environment_changed t;
-  t.active_host <- host.id;
-  t.active_host_name <- host.name;
-  t.host_pinned <- pinned;
-  set_host_cwd t host ~cwd;
-  broadcast t (Notice (sprintf "tools now run on %s in %s" host.name cwd));
-  state_changed t
-;;
-
-let no_host_message =
-  "no tool host connected: connect one with `prigh tool-host -connect ...` or \
-   a TUI, then pick it with /host"
-;;
-
-let host_unavailable_message t =
-  if String.is_empty t.active_host
-  then no_host_message
-  else
-    sprintf
-      "waiting for tool host %S to reconnect; /host picks another"
-      t.active_host_name
-;;
-
-(* A session stays on its host when the host goes away, and resumes there,
-   in the same cwd, when it comes back: only [set_active_host] moves it.
-   Without the backend host, a session that never had a host adopts the
-   first one that connects. *)
-let set_hosts t clients =
-  if not (List.equal Host.equal t.hosts clients)
-  then (
-    let was_connected = active_host_connected t in
-    t.hosts <- clients;
-    match find_host t t.active_host, List.hd (hosts t) with
-    | None, Some host when String.is_empty t.active_host ->
-      activate_host t host ~cwd:host.cwd ~pinned:false
-    | Some host, _ when not was_connected ->
-      t.active_host_name <- host.name;
-      set_host_cwd t host ~cwd:host.cwd;
-      broadcast
-        t
-        (Notice (sprintf "tools run on %s again in %s" host.name t.cwd));
-      state_changed t
-    | Some host, _ ->
-      t.active_host_name <- host.name;
-      state_changed t
-    | None, _ ->
-      if was_connected then broadcast t (Notice (host_unavailable_message t));
-      state_changed t)
-;;
-
-(* Tools default to the frontend: a host attaching takes over a session that
-   runs on the backend by default or has no host yet, never one whose host is
-   only disconnected. *)
-let prefer_host t id =
-  match find_host t id with
-  | None -> ()
-  | Some host ->
-    let take_over =
-      String.is_empty t.active_host
-      || ((not t.host_pinned) && String.equal t.active_host Host.backend_id)
-    in
-    if take_over then activate_host t host ~cwd:host.cwd ~pinned:false
-;;
-
-let tool_exec_output t ~exec_id ~chunk =
-  match Hashtbl.find t.pending_execs exec_id with
-  | None -> Or_error.errorf "no tool execution %S" exec_id
-  | Some e ->
-    e.on_output chunk;
-    Ok ()
-;;
-
-let env t = t.env
-
-let tool_exec_result t ~exec_id result =
-  match Hashtbl.find t.pending_execs exec_id with
-  | None -> Or_error.errorf "no tool execution %S" exec_id
-  | Some e ->
-    Hashtbl.remove t.pending_execs exec_id;
-    Promise.resolve e.resolver result;
-    Ok ()
-;;
-
 (* A tool host predating a tool answers that it does not know it. *)
 let older_host_note (host : Host.t) ~name (result : Tool.Result.t) =
   if
@@ -1067,6 +942,206 @@ let host_exec_with_stdin
       Hashtbl.remove t.pending_execs exec_id;
       broadcast t (Tool_exec_cancel { host = host.id; exec_id });
       Tool.Result.error "[cancelled]")
+;;
+
+let location t =
+  if String.is_empty t.active_host
+  then None
+  else
+    Some
+      ( { Session.Host.id = t.active_host
+        ; name = t.active_host_name
+        ; pinned = t.host_pinned
+        }
+      , t.cwd )
+;;
+
+(* The host is recorded with the cwd, so that the session resumes there when
+   it is loaded again (evicted, or after a backend restart): see
+   [restore_host]. *)
+let record_location t =
+  let host = Option.map (location t) ~f:fst in
+  if
+    not
+      (String.equal (Session.cwd t.session) t.cwd
+       && Option.equal Session.Host.equal (Session.host t.session) host)
+  then ignore (Session.set_cwd t.session ?host ~cwd:t.cwd () : Session.Entry.t)
+;;
+
+(* Where the cwd is in git, recorded in the session for the sessions list
+   ({!Session.repo}): read from the backend's own files at once (the callers
+   then announce the state), asked of a client host that can tell in the
+   background, once per host and directory ([notify]: its answer announces
+   it). *)
+let record_repo ?(notify = false) t session ~cwd repo =
+  if
+    String.equal (Session.cwd session) cwd
+    && not
+         ([%equal: Git_location.t option option]
+            (Session.repo session)
+            (Some repo))
+  then (
+    ignore (Session.set_repo session ~cwd repo : Session.Entry.t);
+    if notify && phys_equal session t.session then state_changed t)
+;;
+
+let refresh_location t =
+  t.git_branch <- find_branch t ~cwd:t.cwd;
+  match location t with
+  | None -> ()
+  | Some (host, cwd) when String.equal host.id Host.backend_id ->
+    if t.backend_host_enabled
+    then record_repo t t.session ~cwd (Git_location.find ~cwd)
+  | Some (host, cwd) ->
+    let place = host.id, cwd in
+    (match find_host t host.id with
+     | Some host
+       when host.git_location
+            && not
+                 (Option.equal
+                    [%equal: string * string]
+                    t.repo_asked
+                    (Some place)) ->
+       t.repo_asked <- Some place;
+       let session = t.session in
+       (* A daemon: a host that never answers must not keep the agent's
+          switch from ending. *)
+       Fiber.fork_daemon ~sw:t.sw (fun () ->
+         Guarded.run ~what:"finding the session's repository" (fun () ->
+           match
+             Git_location.of_result
+               (host_exec_with_stdin
+                  t
+                  host
+                  ~cancel:Cancellation.never
+                  ~on_output:ignore
+                  ~call_id:"git_location"
+                  ~cwd
+                  ~name:Git_location.op
+                  ~arguments:(`Object [])
+                  ())
+           with
+           | Ok repo -> record_repo ~notify:true t session ~cwd repo
+           | Error _ -> (* a host predating [$git_location] *) ());
+         `Stop_daemon)
+     | Some _ | None -> ())
+;;
+
+(* A session that recorded no host (or the backend's, when it is disabled)
+   is where a new one would be. *)
+let restore_host t =
+  Hashtbl.clear t.host_cwds;
+  Map.iteri (Session.host_cwds t.session) ~f:(fun ~key ~data ->
+    if String.equal key Host.backend_id
+    then t.backend_cwd <- data
+    else Hashtbl.set t.host_cwds ~key ~data);
+  match Session.host t.session with
+  | Some host
+    when t.backend_host_enabled || not (String.equal host.id Host.backend_id) ->
+    t.active_host <- host.id;
+    t.active_host_name <- host.name;
+    t.host_pinned <- host.pinned
+  | Some _ | None ->
+    t.active_host <- (if t.backend_host_enabled then Host.backend_id else "");
+    t.active_host_name <- "";
+    t.host_pinned <- false;
+    if t.backend_host_enabled then t.backend_cwd <- t.cwd
+;;
+
+let set_host_cwd t (host : Host.t) ~cwd =
+  if not (String.equal t.cwd cwd)
+  then (
+    t.cwd <- cwd;
+    environment_changed t);
+  record_location t;
+  refresh_location t;
+  if String.equal host.id Host.backend_id
+  then t.backend_cwd <- cwd
+  else Hashtbl.set t.host_cwds ~key:host.id ~data:cwd
+;;
+
+let activate_host t (host : Host.t) ~cwd ~pinned =
+  if not (String.equal t.active_host host.id) then environment_changed t;
+  t.active_host <- host.id;
+  t.active_host_name <- host.name;
+  t.host_pinned <- pinned;
+  set_host_cwd t host ~cwd;
+  broadcast t (Notice (sprintf "tools now run on %s in %s" host.name cwd));
+  state_changed t
+;;
+
+let no_host_message =
+  "no tool host connected: connect one with `prigh tool-host -connect ...` or \
+   a TUI, then pick it with /host"
+;;
+
+let host_unavailable_message t =
+  if String.is_empty t.active_host
+  then no_host_message
+  else
+    sprintf
+      "waiting for tool host %S to reconnect; /host picks another"
+      t.active_host_name
+;;
+
+(* A session stays on its host when the host goes away, and resumes there,
+   in the same cwd, when it comes back: only [set_active_host] moves it.
+   Without the backend host, a session that never had a host adopts the
+   first one that connects. *)
+let set_hosts t clients =
+  if not (List.equal Host.equal t.hosts clients)
+  then (
+    let was_connected = active_host_connected t in
+    t.hosts <- clients;
+    match find_host t t.active_host, List.hd (hosts t) with
+    | None, Some host when String.is_empty t.active_host ->
+      activate_host t host ~cwd:host.cwd ~pinned:false
+    | Some host, _ when not was_connected ->
+      t.active_host_name <- host.name;
+      set_host_cwd t host ~cwd:host.cwd;
+      broadcast
+        t
+        (Notice (sprintf "tools run on %s again in %s" host.name t.cwd));
+      state_changed t
+    | Some host, _ ->
+      t.active_host_name <- host.name;
+      state_changed t
+    | None, _ ->
+      if was_connected then broadcast t (Notice (host_unavailable_message t));
+      state_changed t)
+;;
+
+(* Tools default to the frontend: a host attaching takes over a session that
+   runs on the backend by default or has no host yet, never one whose host is
+   only disconnected. *)
+let prefer_host t id =
+  match find_host t id with
+  | None -> ()
+  | Some host ->
+    let take_over =
+      String.is_empty t.active_host
+      || ((not t.host_pinned) && String.equal t.active_host Host.backend_id)
+    in
+    if take_over then activate_host t host ~cwd:host.cwd ~pinned:false
+;;
+
+let tool_exec_output t ~exec_id ~chunk =
+  match Hashtbl.find t.pending_execs exec_id with
+  | None -> Or_error.errorf "no tool execution %S" exec_id
+  | Some e ->
+    e.on_output chunk;
+    Ok ()
+;;
+
+let env t = t.env
+
+let tool_exec_result t ~exec_id result =
+  match Hashtbl.find t.pending_execs exec_id with
+  | None -> Or_error.errorf "no tool execution %S" exec_id
+  | Some e ->
+    Hashtbl.remove t.pending_execs exec_id;
+    Promise.resolve e.resolver result;
+    Ok ()
 ;;
 
 let host_exec_on t host ~cancel ~on_output ~call_id ~cwd ~name ~arguments =
@@ -1711,7 +1786,7 @@ let run_failed t ~resolve exn =
 (* Finished background tasks not delivered yet go first. [tried] are the
    models a hand-over chain has used so far (empty for a user's prompt). *)
 let rec start_run ?(tried = String.Set.empty) ?(then_ = fun () -> []) t prompts =
-  t.git_branch <- find_branch t ~cwd:t.cwd;
+  refresh_location t;
   cancel_resume_timer t;
   close_interrupted t;
   let cancel = Cancellation.create () in
@@ -2224,7 +2299,11 @@ let create
     ; backend_host_enabled = backend_host
     ; session
     ; cwd
-    ; git_branch = (if backend_host then Git_branch.find ~cwd else None)
+    ; git_branch =
+        (if backend_host
+         then Option.bind (Git_location.find ~cwd) ~f:(fun l -> l.branch)
+         else None)
+    ; repo_asked = None
     ; model
     ; thinking
     ; run = None
@@ -2569,37 +2648,46 @@ let git_diff ?path ?base t =
   |> Git_diff.of_tool_result
 ;;
 
+let resolve_path t path =
+  let path = Tool.expand_home path in
+  if Filename.is_absolute path then path else Filename.concat t.cwd path
+;;
+
 (* ---- worktrees ------------------------------------------------------ *)
 
-let worktree_call t ~name ~arguments =
+let worktree_call ?cwd t ~name ~arguments =
   host_exec
     t
     ~cancel:Cancellation.never
     ~on_output:ignore
     ~call_id:"worktree"
-    ~cwd:t.cwd
+    ~cwd:(Option.value_map cwd ~default:t.cwd ~f:(resolve_path t))
     ~name
     ~arguments
 ;;
 
-let worktrees t =
+let worktrees ?cwd t =
   worktree_call
+    ?cwd
     t
     ~name:Worktree.list_op
     ~arguments:(Worktree.list_args ~dir:t.config.worktrees_dir)
   |> Worktree.listing_of_result
 ;;
 
-let create_worktree t ~branch ~base =
+let create_worktree ?cwd t ~branch ~base =
   worktree_call
+    ?cwd
     t
     ~name:Worktree.create_op
-    ~arguments:(Worktree.create_args ~dir:t.config.worktrees_dir ~branch ~base)
+    ~arguments:
+      (Worktree.create_args ~dir:t.config.worktrees_dir ~branch ~base ())
   |> Worktree.created_of_result
 ;;
 
-let remove_worktree t ~path ~force =
+let remove_worktree ?cwd t ~path ~force =
   worktree_call
+    ?cwd
     t
     ~name:Worktree.remove_op
     ~arguments:(Worktree.remove_args ~dir:t.config.worktrees_dir ~path ~force)
@@ -2884,8 +2972,9 @@ let replace_session t session ~keep_host =
   Reminder.Tracker.reset t.reminder_tracker;
   load_subagent_log t;
   if keep_host then record_location t else t.cwd <- Session.cwd session;
-  t.git_branch <- find_branch t ~cwd:t.cwd;
   restore_host t;
+  t.repo_asked <- None;
+  refresh_location t;
   restore_settings t;
   restore_told t;
   (match List.hd (hosts t) with
@@ -2927,11 +3016,6 @@ let rewind t ~to_ =
 let set_session_name t name =
   ignore (Session.set_name t.session ~name : Session.Entry.t);
   state_changed t
-;;
-
-let resolve_path t path =
-  let path = Tool.expand_home path in
-  if Filename.is_absolute path then path else Filename.concat t.cwd path
 ;;
 
 let set_cwd ?(if_missing = Dir_change.If_missing.Fail) t ~path =
