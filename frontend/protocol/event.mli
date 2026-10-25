@@ -59,6 +59,7 @@ type t =
   | State of State.t
   | Compacted of string
   | Config_changed of Config.t
+  | Review of Review.t (** the session's review changed *)
   | Notice of string
   | Queue_update of
       { steer : string list (** the queued texts, oldest first *)

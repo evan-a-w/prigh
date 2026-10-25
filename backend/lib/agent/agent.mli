@@ -97,6 +97,7 @@ module Event : sig
     | Compacted of { summary : string }
     | Notice of string
     | Config_changed of Config.t
+    | Review_changed of Review_state.t (** after every change *)
     | Queue_update of
         { steer : string list (** the queued texts, in order *)
         ; follow_up : string list
@@ -472,6 +473,35 @@ val review : t -> args:string -> unit Or_error.t
 (** [/init]: a run asking the model to write or improve [AGENTS.md]
     ({!Init_prompt}), queued like [review]. *)
 val init : t -> unit Or_error.t
+
+(** {2 Review: comments and approvals}
+
+    The session's {!Review_state}, recorded in it. While it has comments the
+    main agent has [reply_to_comment] ({!Tool_review_reply}). Each change
+    emits [Review_changed]. *)
+
+val review_state : t -> Review_state.t
+
+(** Applies and records the changes [f] returns, giving back its result. *)
+val update_review
+  :  t
+  -> f:(Review_state.t -> ('a * Review_state.Change.t list) Or_error.t)
+  -> 'a Or_error.t
+
+(** Sends the posts of the user's the agent has not seen
+    ({!Review_state.submit}) as a message with the [Review_comments] source,
+    steering a running agent or starting a run; the comments it covers. *)
+val submit_review : t -> int Or_error.t
+
+(** Accepts (applies the edits to the comment's file on the active tool host,
+    with [edit]) or rejects a pending proposal; one that no longer applies is
+    [Failed]. *)
+val decide_proposal
+  :  t
+  -> id:string
+  -> post:int
+  -> accept:bool
+  -> Review_comment.t Or_error.t
 
 (** {2 Budget, goal and resume} *)
 

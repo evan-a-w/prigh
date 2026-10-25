@@ -291,6 +291,10 @@ let%expect_test
       </div>
       <footer class="modal-buttons">
         <span class="keys-hint"> /diff PATH shows one file or directory </span>
+        <button type="button"
+                title="Approve and comment file by file (Alt+R, /review)"
+                class="btn small"
+                @on_click> Review </button>
         <button type="button" class="btn primary" @on_click> Done </button>
       </footer>
     </div>
@@ -389,7 +393,7 @@ let%expect_test "/diff, /review and /init are in the completions and /help" =
     /files [path] browse, preview, upload and download files where the tools run (Ctrl+Shift+F)
     /login [provider] log in to a model provider (or /login custom)
     /notify [on|off] tell you when a turn ends or something waits for you while the tab is hidden
-    /review [base] [instructions] review the uncommitted changes, or those against a base branch, for prioritised findings
+    /review [base] [instructions] alone: the review page, the changes file by file to approve, comment on and edit (Alt+R); with a base (HEAD: the uncommitted changes) or instructions: have the model review them for prioritised findings
     /switch [path] switch to a saved session
     /rewind go back to an earlier message in this session
     /skills pick a skill to invoke (/skill:name)

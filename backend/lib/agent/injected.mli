@@ -76,10 +76,13 @@ module Source : sig
     | Summary (** the compaction summary standing for older messages *)
     | Review of { target : string } (** [/review] *)
     | Init (** [/init] *)
+    | Review_comments of { count : int }
+    (** the user's review comments, sent with [review_submit] *)
   [@@deriving sexp, jsonaf, equal]
 
   (** The wire name: [delivery], [handover], [goal], [goal_continuation],
-      [reminder], [resume], [shell], [summary], [review], [init]. *)
+      [reminder], [resume], [shell], [summary], [review], [init],
+      [review_comments]. *)
   val kind : t -> string
 
   val title : t -> string

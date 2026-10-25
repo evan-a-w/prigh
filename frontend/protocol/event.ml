@@ -72,6 +72,7 @@ type t =
   | State of State.t
   | Compacted of string
   | Config_changed of Config.t
+  | Review of Review.t
   | Notice of string
   | Queue_update of
       { steer : string list
@@ -194,6 +195,8 @@ let rec of_json j =
     >>= Config.of_json
     >>| fun c -> Config_changed c
   | "notice" -> Json.string_field j "text" >>| fun t -> Notice t
+  | "review" ->
+    Json.object_field j "review" >>= Review.of_json >>| fun r -> Review r
   | "sessions_changed" -> Ok Sessions_changed
   | "prefs_changed" ->
     Json.object_field j "prefs"
@@ -260,7 +263,8 @@ let rec of_json j =
     Terminal_frame { term_id; kind; data }
   | "terminal_close" ->
     Json.string_field j "term_id" >>| fun id -> Terminal_close id
-  | "terminal_kill" -> Json.string_field j "key" >>| fun key -> Terminal_kill key
+  | "terminal_kill" ->
+    Json.string_field j "key" >>| fun key -> Terminal_kill key
   | "btw_delta" ->
     let%bind btw_id = Json.string_field j "btw_id" in
     let%map delta = Json.string_field j "delta" in

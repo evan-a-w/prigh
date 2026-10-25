@@ -161,6 +161,61 @@ let model (m : Model.t) =
     ]
 ;;
 
+let review_comment (c : Review_comment.t) =
+  let post (p : Review_comment.Post.t) =
+    `Object
+      ([ ( "author"
+         , str
+             (match p.author with
+              | User -> "user"
+              | Agent -> "agent") )
+       ; "text", str p.text
+       ; "at_ms", ms p.at
+       ; "delivered", bool p.delivered
+       ]
+       @
+       match p.proposal with
+       | None -> []
+       | Some { edits; state } ->
+         [ ( "proposal"
+           , `Object
+               ([ ( "edits"
+                  , `Array
+                      (List.map edits ~f:(fun (e : Review_comment.Edit.t) ->
+                         `Object
+                           [ "old_text", str e.old_text
+                           ; "new_text", str e.new_text
+                           ])) )
+                ; "state", str (Review_comment.Proposal.State.to_string state)
+                ]
+                @
+                match state with
+                | Failed e -> [ "error", str e ]
+                | Pending | Accepted | Rejected -> []) )
+         ])
+  in
+  `Object
+    [ "id", str c.id
+    ; "root", str c.root
+    ; "path", str c.path
+    ; "first", int c.range.first
+    ; "last", int c.range.last
+    ; "anchor", str c.anchor
+    ; "status", str (Review_comment.Status.to_string c.status)
+    ; "thread", `Array (List.map c.thread ~f:post)
+    ]
+;;
+
+let review (r : Review_state.t) =
+  `Object
+    [ "comments", `Array (List.map r.comments ~f:review_comment)
+    ; ( "approvals"
+      , `Array
+          (List.map (Map.to_alist r.approvals) ~f:(fun (path, hash) ->
+             `Object [ "path", str path; "hash", str hash ])) )
+    ]
+;;
+
 let config (c : Config.t) = Config.to_json c
 
 let reminder ~stops (r : Reminder.t) =
@@ -357,6 +412,7 @@ let entry (e : Session.Entry.t) =
       ; "at", Option.value_map at ~default:`Null ~f:ms
       ]
     | Told_environment _ -> [ "kind", str "told_environment" ]
+    | Review _ -> [ "kind", str "review" ]
     | Repo _ -> [ "kind", str "repo" ]
     | Agent_worktree w -> [ "kind", str "agent_worktree"; "path", str w.path ]
     | Worktree_removed { path } ->
@@ -559,6 +615,7 @@ let rec event ?now (e : Agent.Event.t) =
     | Compacted { summary } ->
       [ "event", str "compacted"; "summary", str summary ]
     | Config_changed c -> [ "event", str "config_changed"; "config", config c ]
+    | Review_changed r -> [ "event", str "review"; "review", review r ]
     | Notice text -> [ "event", str "notice"; "text", str text ]
     | Queue_update { steer; follow_up } ->
       [ "event", str "queue_update"

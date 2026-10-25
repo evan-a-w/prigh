@@ -311,6 +311,7 @@ let%expect_test "a new session in a project or a worktree" =
     (Rpc (method_ list_sessions) (params ()) (tag Sessions))
     (Rpc (method_ list_subagents) (params ()) (tag Subagents))
     (Rpc (method_ list_jobs) (params ()) (tag Jobs))
+    (Rpc (method_ get_review) (params ()) (tag (Review Review)))
     (Rpc (method_ set_cwd) (params ((path /home/u/src/site)))
      (tag (Worktree_entered "New session in /home/u/src/site")))
     (Rpc (method_ list_worktrees) (params ())

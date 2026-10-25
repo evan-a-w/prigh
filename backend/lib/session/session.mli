@@ -69,6 +69,9 @@ module Entry : sig
       | Told_environment of Told_environment.t
       (** what the model was last told about its environment, see
           {!told_environment} *)
+      | Review of Review_state.Change.t
+      (** a change to the review of the working tree: a comment, an
+          approval; see {!review} *)
       | Repo of
           { cwd : string
           ; repo : Git_location.t option (** [None]: not in a repository *)
@@ -204,6 +207,11 @@ val told_environment : t -> Told_environment.t option
 
 val set_told_environment : t -> Told_environment.t -> Entry.t
 
+(** The [review] entries of every branch, in the order written: rewinding
+    keeps comments and approvals. *)
+val review : t -> Review_state.t
+
+val record_review : t -> Review_state.Change.t -> Entry.t
 (** Where the session's cwd is in git, as last recorded for that cwd:
     [None] when nothing was (an older session, a host that cannot tell),
     [Some None] outside a repository. *)
