@@ -171,8 +171,9 @@ let git_host (m : App.Model.t) (a : Forge_account.t) ~inject =
   let login = "/login " ^ Forge_account.login_arg a in
   let note =
     match a.oauth_note with
-    | Some note when a.oauth || Forge_account.signed_in a -> Some ("muted", note)
-    | Some note -> Some ("warm", "No OAuth here: " ^ note)
+    | Some note when a.oauth || Forge_account.signed_in a ->
+      Some ("muted", String.capitalize note)
+    | Some note -> Some ("warm", String.capitalize note)
     | None -> None
   in
   div
